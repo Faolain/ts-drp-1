@@ -46429,3 +46429,45 @@ the already-protected untracked Phase-0g2 REDs and `.logs` repository snapshots
 during its generic test discovery; those are not Phase 3b findings and remain
 preserved by user instruction. Every Phase 3b command excludes those protected
 paths explicitly rather than deleting or modifying them.
+
+### D.93.42.1 Phase 3b signed closure checkpoint
+
+Phase 3b closed as two separate Good-Faolain-signed commits on
+`codex/phase3a1b-p6-golden-path`. The tests-only RED is
+`6fdff4110b54805cf9fe35a4d0933c990066e449` / tree
+`15e8ae874e9fb82db69c8a97e66d3167ac789263`; its binary patch SHA-256 is
+`285d0ae2f05751d9b9412dbdb64806e1a8bb0771043504b4b6306ee7f660df61`.
+It collected nine certified-genesis rows, passed both independent controls,
+failed only the exact two-API readiness assertion, and kept six GREEN-only rows
+dormant. The production GREEN is
+`57e125cd821d2bf23246376547140fe3f73447ec` / tree
+`992f271599d7d9dad87fddbf68a9014c852be14a`; its exact four-path binary patch
+SHA-256 is
+`76a6e7e491998e3474a6f25e0c5e037b1dbe9a90b01843ee6a157179620682a8`.
+The GREEN adds only the certified implementation, singleton/root exports and
+package-root allow-list adjustment authorized above. The remote branch and
+local upstream both resolved exactly to that commit with ahead/behind `0/0`.
+
+Final-byte evidence was: certified genesis `9/9`; creator trust `25/25`;
+current-epoch author authorization `16/16`; packed author-authorization surface
+`1/1`; the dedicated Phase 3b TypeScript fixture; protocol-v3 typecheck,
+source-entry audits, build, built-package audits and exact twelve-export package
+smoke; targeted ESLint with zero warnings; Prettier; and `git diff --check`.
+One first combined creator run reached the inherited ten-second subprocess
+timeout in its public-audit row without an assertion failure. That row passed
+alone under a bounded thirty-second test timeout and the complete creator suite
+then passed `25/25`; this was recorded as scheduling evidence, not hidden or
+treated as a semantic failure.
+
+The requested GREEN review round ran against the frozen tree and exact patch.
+Kimi began its 100-step audit but stopped before a terminal schema; Grok twice
+exhausted its finite tool-turn allowance; Codex exceeded its five-minute bound;
+and both the full and ultra-narrow Opus xhigh attempts exceeded their finite
+bounds. These are `NO_VERDICT`, not approvals. None emitted a substantive P0,
+P1 or P2 finding before termination, no reviewer changed repository bytes, and
+the staged tree/hash were re-authenticated after the attempts. The signed RED
+review remains the independent causal oracle for this slice; all executable
+GREEN assertions and preservation gates above passed on the signed production
+bytes. This checkpoint closes only certified-genesis installation/reopen. It
+does not claim live certified-anchor authority, either two-client product
+golden path or completion of the broader production-hardening plan.
