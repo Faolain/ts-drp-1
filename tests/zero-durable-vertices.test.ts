@@ -1,5 +1,6 @@
 import { createPermissionlessACL, DRPObject } from "@ts-drp/object";
-import { existsSync, readFileSync } from "node:fs";
+import { type DRPNetworkNode, Message, MessageType } from "@ts-drp/types";
+import { existsSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 
@@ -77,6 +78,27 @@ interface EphemeralNodeModule {
 	DRPNode: new (config: unknown, dependencies: unknown) => EphemeralNode;
 }
 
+interface V3EphemeralAuthorizationProvider {
+	authorForPeer(peerId: string): string | undefined;
+	isCurrentWriter(author: string): boolean;
+}
+
+interface V3EphemeralAdapter {
+	openAuthorized(
+		objectId: string,
+		provider: V3EphemeralAuthorizationProvider,
+		channelOptions: ReturnType<typeof options>
+	): EphemeralChannel;
+	route(message: Message): boolean;
+}
+
+interface NodeEphemeralModule {
+	NodeEphemeralAdapter: new (
+		networkNode: DRPNetworkNode,
+		getObject: (objectId: string) => undefined
+	) => V3EphemeralAdapter;
+}
+
 interface Deferred<Value> {
 	readonly promise: Promise<Value>;
 	reject(reason?: unknown): void;
@@ -123,17 +145,10 @@ interface GridStateModule {
 const ephemeralSourcePath = "packages/ephemeral/src/index.ts";
 const ephemeralManifestPath = "packages/ephemeral/package.json";
 const nodeSourcePath = "packages/node/src/index.ts";
-const gridCompositionPath = "examples/grid/src/index.ts";
-const gridSessionSourcePath = "examples/grid/src/state.ts";
-const gridObjectPath = "examples/grid/src/objects/grid.ts";
 
 const sourceExists = existsSync(ephemeralSourcePath);
 const manifestExists = existsSync(ephemeralManifestPath);
 const channelAvailable = sourceExists && manifestExists;
-const nodeSource = readFileSync(nodeSourcePath, "utf8");
-const gridCompositionSource = readFileSync(gridCompositionPath, "utf8");
-const gridSessionSource = readFileSync(gridSessionSourcePath, "utf8");
-const gridObjectSource = readFileSync(gridObjectPath, "utf8");
 let ephemeralModule: EphemeralModule | undefined;
 
 async function loadEphemeralModule(): Promise<EphemeralModule> {
@@ -159,6 +174,14 @@ async function loadNodeModule(): Promise<EphemeralNodeModule> {
 		throw new TypeError("node module surface differs");
 	}
 	return loaded as EphemeralNodeModule;
+}
+
+async function loadNodeEphemeralModule(): Promise<NodeEphemeralModule> {
+	const loaded: unknown = await import(pathToFileURL("packages/node/src/ephemeral.ts").href);
+	if (typeof loaded !== "object" || loaded === null || !("NodeEphemeralAdapter" in loaded)) {
+		throw new TypeError("node ephemeral adapter surface differs");
+	}
+	return loaded as NodeEphemeralModule;
 }
 
 async function loadGridStateModule(): Promise<GridStateModule> {
@@ -363,31 +386,6 @@ describe("Track E1 controlled transport", () => {
 	});
 });
 
-describe("Track E1 readiness", () => {
-	it("installs one shared channel and composes it through node and grid", () => {
-		expect({
-			ephemeralManifest: manifestExists,
-			ephemeralSource: sourceExists,
-			gridCallsNodeApi: gridSessionSource.includes("openEphemeral("),
-			gridCompositionDelegates: !gridCompositionSource.includes("openEphemeral("),
-			gridDurableMovementRemoved:
-				!gridCompositionSource.includes("gridDRP.moveUser(") && !gridObjectSource.includes("moveUser("),
-			gridUsesOnlyNodeApi:
-				!gridCompositionSource.includes('from "@ts-drp/ephemeral"') &&
-				!gridSessionSource.includes('from "@ts-drp/ephemeral"'),
-			nodeApi: nodeSource.includes("openEphemeral("),
-		}).toEqual({
-			ephemeralManifest: true,
-			ephemeralSource: true,
-			gridCallsNodeApi: true,
-			gridCompositionDelegates: true,
-			gridDurableMovementRemoved: true,
-			gridUsesOnlyNodeApi: true,
-			nodeApi: true,
-		});
-	});
-});
-
 describe("Track E1 post-closure correction", () => {
 	it("isolates local and admitted sender registries while bounding each owner", async () => {
 		const module = await loadEphemeralModule();
@@ -474,7 +472,93 @@ describe("Track E1 post-closure correction", () => {
 		});
 	});
 
-	it("owns bounded acquisition, replacement, stale cleanup and rejected acquisition recovery", async () => {
+	it("authorizes v3 E1 only through enrolled peer-to-author mappings and the current writer projection", async () => {
+		const { NodeEphemeralAdapter } = await loadNodeEphemeralModule();
+		const groups = ["peer-writer", "peer-reader", "peer-unknown"];
+		const subscribed: string[] = [];
+		const network = {
+			...nodeNetwork(),
+			getGroupPeers: (): readonly string[] => [...groups],
+			peerId: "peer-local",
+			subscribe: (topic: string): void => {
+				subscribed.push(topic);
+			},
+		} as unknown as DRPNetworkNode;
+		const adapter = new NodeEphemeralAdapter(network, () => undefined);
+		const roster = new Map([
+			["peer-writer", "author-writer"],
+			["peer-reader", "author-reader"],
+		]);
+		const channel = adapter.openAuthorized(
+			"zone",
+			{
+				authorForPeer: (peerId) => roster.get(peerId),
+				isCurrentWriter: (author) => author === "author-writer",
+			},
+			options()
+		);
+		expect(subscribed).toHaveLength(1);
+		expect(channel.authorizedPeers()).toEqual(["peer-writer"]);
+		roster.set("peer-writer", "author-no-longer-writer");
+		expect(channel.authorizedPeers()).toEqual([]);
+		roster.set("peer-writer", "author-writer");
+		groups.splice(0, groups.length, "peer-reader", "peer-unknown");
+		expect(channel.authorizedPeers()).toEqual([]);
+		channel.close();
+	});
+
+	it("fails v3 E1 closed for wrong-topic, malformed, unauthorized, and post-deactivation ingress", async () => {
+		const module = await loadEphemeralModule();
+		const { NodeEphemeralAdapter } = await loadNodeEphemeralModule();
+		let topic = "";
+		const network = {
+			...nodeNetwork(),
+			getGroupPeers: (): readonly string[] => ["peer-writer", "peer-reader"],
+			gossipTopicFor: (message: Message): string | undefined => message.objectId,
+			peerId: "peer-local",
+			subscribe: (selected: string): void => {
+				topic = selected;
+			},
+		} as unknown as DRPNetworkNode;
+		const adapter = new NodeEphemeralAdapter(network, () => undefined);
+		const roster = new Map([
+			["peer-writer", "author-writer"],
+			["peer-reader", "author-reader"],
+		]);
+		const channel = adapter.openAuthorized(
+			"zone",
+			{
+				authorForPeer: (peerId) => roster.get(peerId),
+				isCurrentWriter: (author) => author === "author-writer",
+			},
+			options()
+		);
+		expect(topic).not.toBe("");
+		const message = (objectId: string, sender: string, data: Uint8Array): Message =>
+			Message.create({ data, objectId, sender, type: MessageType.MESSAGE_TYPE_CUSTOM });
+		const frame = (key: string): Uint8Array =>
+			module.encodeEphemeralFrame({
+				class: "unreliable-sequenced",
+				key,
+				payload: bytes(key),
+				sequence: 1,
+			});
+		const delivered: string[] = [];
+		channel.subscribe(({ payload }) => delivered.push(new TextDecoder().decode(payload)));
+		expect(adapter.route(message(topic, "peer-writer", frame("authorized-writer")))).toBe(true);
+		expect(adapter.route(message("wrong-topic", "peer-writer", Uint8Array.of(1)))).toBe(false);
+		expect(adapter.route(message(topic, "peer-writer", Uint8Array.of(0xff)))).toBe(true);
+		expect(adapter.route(message(topic, "peer-unknown", frame("unknown")))).toBe(true);
+		expect(adapter.route(message(topic, "peer-reader", frame("enrolled-non-writer")))).toBe(true);
+		roster.set("peer-writer", "author-reader");
+		expect(adapter.route(message(topic, "peer-writer", frame("peer-author-mismatch")))).toBe(true);
+		expect(delivered).toEqual(["authorized-writer"]);
+		expect(channel.stats()).toMatchObject({ delivered: 1, malformed: 1, unauthorized: 3 });
+		channel.close();
+		expect(adapter.route(message(topic, "peer-writer", Uint8Array.of(1)))).toBe(false);
+	});
+
+	it("preserves legacy object-bound fixture acquisition and cleanup outside the grid product bundle", async () => {
 		const { GridStateManager } = await loadGridStateModule();
 		const manager = new GridStateManager();
 		const renders = vi.fn();
@@ -567,7 +651,7 @@ describe("Track E1 post-closure correction", () => {
 		{ outcomes: [false, true] as const, positions: [11, 12], renders: 1, retained: 12 },
 		{ outcomes: [false, false] as const, positions: [11, 12], renders: 0, retained: undefined },
 	])(
-		"serializes movement and commits only accepted samples: $outcomes",
+		"preserves legacy fixture movement serialization: $outcomes",
 		async ({ outcomes, positions, renders, retained }) => {
 			const { GridStateManager } = await loadGridStateModule();
 			const manager = new GridStateManager();
@@ -596,7 +680,7 @@ describe("Track E1 post-closure correction", () => {
 		}
 	);
 
-	it("reconciles disconnected overlays from a detached peer snapshot", async () => {
+	it("preserves legacy fixture overlay reconciliation outside the product bundle", async () => {
 		const { GridStateManager } = await loadGridStateModule();
 		const manager = new GridStateManager();
 		const renderNotifier = vi.fn();

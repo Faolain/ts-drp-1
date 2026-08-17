@@ -1,0 +1,10 @@
+{
+	"extends": "../../../examples/v3-room/tsconfig.json",
+	"compilerOptions": {
+		"composite": false,
+		"declaration": false,
+		"declarationMap": false,
+		"noEmit": true
+	},
+	"files": ["room-contract.ts"]
+}
