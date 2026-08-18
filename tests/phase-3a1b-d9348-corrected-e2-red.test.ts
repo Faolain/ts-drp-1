@@ -67,6 +67,7 @@ interface ControlledV3 {
 	route(bytes: Uint8Array, sender: string, kind?: Transport["kind"]): Message;
 	stamp(message: Message, transport: Transport): void;
 	topic(): string;
+	unsubscribe(peerId: string): void;
 }
 
 const defaultAuthority = Object.freeze<Authority>({
@@ -114,6 +115,7 @@ function controlledV3(
 	const evidence = new WeakMap<Message, Evidence>();
 	const published: Message[] = [];
 	const peerChangeHandlers = new Set<(change: { peerId: string; subscribed: boolean; topic: string }) => void>();
+	const peerDisconnectHandlers = new Set<(peerId: string) => void>();
 	let subscribedTopic = "";
 	const stamp = (message: Message, transport: Transport): void => {
 		evidence.set(message, Object.freeze({ message: exactSnapshot(message), transport: Object.freeze(transport) }));
@@ -154,6 +156,10 @@ function controlledV3(
 			peerChangeHandlers.add(handler);
 			return () => peerChangeHandlers.delete(handler);
 		},
+		subscribeToPeerDisconnects(handler: (peerId: string) => void): () => void {
+			peerDisconnectHandlers.add(handler);
+			return () => peerDisconnectHandlers.delete(handler);
+		},
 		subscribeToMessageQueue: (): void => undefined,
 		unsubscribe: (): void => undefined,
 	} as unknown as EvidenceNetwork;
@@ -170,7 +176,7 @@ function controlledV3(
 		channel,
 		close: () => channel.close(),
 		disconnect(peerId: string): void {
-			for (const handler of peerChangeHandlers) handler({ peerId, subscribed: false, topic: subscribedTopic });
+			for (const handler of peerDisconnectHandlers) handler(peerId);
 		},
 		evidence,
 		network,
@@ -206,6 +212,9 @@ function controlledV3(
 		},
 		stamp,
 		topic: () => subscribedTopic,
+		unsubscribe(peerId: string): void {
+			for (const handler of peerChangeHandlers) handler({ peerId, subscribed: false, topic: subscribedTopic });
+		},
 		writers,
 	};
 }
@@ -616,6 +625,7 @@ describe("D.93.48 corrected E2 RED", () => {
 			expect(stats(capped.channel)).toMatchObject({ rateLimited: 1, writerBuckets: 128 });
 
 			const cleanup = controlledV3();
+			const disconnectReset = controlledV3();
 			const refilled = controlledV3();
 			cleanup.route(small, "peer-writer");
 			expect(stats(cleanup.channel).writerBuckets).toBe(1);
@@ -625,10 +635,25 @@ describe("D.93.48 corrected E2 RED", () => {
 			});
 			for (let index = 0; index < 121; index += 1) refilled.route(small, "peer-writer");
 			expect(refilledDeliveries).toBe(120);
+			refilled.unsubscribe("peer-writer");
+			refilled.route(small, "peer-writer", "authenticated-stream");
+			expect(refilledDeliveries).toBe(120);
+			expect(stats(refilled.channel).rateLimited).toBe(2);
 			vi.advanceTimersByTime(1_000);
 			refilled.route(small, "peer-writer");
 			expect(refilledDeliveries).toBe(121);
-			expect(stats(refilled.channel).rateLimited).toBe(1);
+			expect(stats(refilled.channel).rateLimited).toBe(2);
+
+			let disconnectDeliveries = 0;
+			disconnectReset.channel.subscribe(() => {
+				disconnectDeliveries += 1;
+			});
+			for (let index = 0; index < 121; index += 1) disconnectReset.route(small, "peer-writer");
+			expect(disconnectDeliveries).toBe(120);
+			disconnectReset.disconnect("peer-writer");
+			disconnectReset.route(small, "peer-writer", "authenticated-stream");
+			expect(disconnectDeliveries).toBe(121);
+			expect(stats(disconnectReset.channel).writerBuckets).toBe(1);
 			cleanup.writers.delete("author-writer");
 			cleanup.route(small, "peer-writer");
 			expect(stats(cleanup.channel).writerBuckets).toBe(0);
@@ -649,6 +674,7 @@ describe("D.93.48 corrected E2 RED", () => {
 			byteBound.close();
 			capped.close();
 			cleanup.close();
+			disconnectReset.close();
 			refilled.close();
 		} finally {
 			vi.useRealTimers();
