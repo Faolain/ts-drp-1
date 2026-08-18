@@ -813,9 +813,10 @@ async function executeCurrentCandidate(repositoryRoot, contract, upstream, merge
 			releaseTip = git(state.root, "commit-tree", tree, "-p", sourceTip, "-m", "unchanged governed descendant");
 			git(state.root, "reset", "--hard", "-q", releaseTip);
 		}
+		let checkoutHead = releaseTip;
 		if (merge) {
 			const tree = git(state.root, "rev-parse", `${releaseTip}^{tree}`);
-			const mergeCommit = git(
+			checkoutHead = git(
 				state.root,
 				"commit-tree",
 				tree,
@@ -826,9 +827,16 @@ async function executeCurrentCandidate(repositoryRoot, contract, upstream, merge
 				"-m",
 				"genuine GitHub merge-ref control"
 			);
-			git(state.root, "reset", "--hard", "-q", mergeCommit);
+			git(state.root, "reset", "--hard", "-q", checkoutHead);
 		}
-		return await executeRepositoryCandidate(state.root, contract, upstream);
+		return {
+			checkoutHead,
+			checkoutParents: exactParents(state.root, checkoutHead),
+			checkoutTree: git(state.root, "rev-parse", `${checkoutHead}^{tree}`),
+			releaseTip,
+			releaseTree: git(state.root, "rev-parse", `${releaseTip}^{tree}`),
+			result: await executeRepositoryCandidate(state.root, contract, upstream),
+		};
 	} finally {
 		rmSync(state.parent, { force: true, recursive: true });
 	}
@@ -841,17 +849,14 @@ export async function runReadyCandidateTopologies(repositoryRoot, contract, read
 	}
 	const current = git(repositoryRoot, "rev-parse", "HEAD");
 	const cases = [
-		["linear:external-empty", contract.externalBase.commit, false, false],
-		["merge:external-empty", contract.externalBase.commit, true, false],
+		["linear:external-current-tip", contract.externalBase.commit, false, false],
+		["merge:external-current-tip", contract.externalBase.commit, true, false],
 		["linear:descendant", current, false, true],
 		["merge:descendant", current, true, true],
 	];
 	const results = [];
 	for (const [name, upstream, merge, descendant] of cases) {
-		results.push({
-			name,
-			result: await executeCurrentCandidate(repositoryRoot, contract, upstream, merge, descendant),
-		});
+		results.push({ name, ...(await executeCurrentCandidate(repositoryRoot, contract, upstream, merge, descendant)) });
 		await yieldToEventLoop();
 	}
 	return results;

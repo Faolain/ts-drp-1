@@ -639,12 +639,25 @@ describe("D.93.35.15 genuine repository candidate", () => {
 		if (!candidateReadiness.ready) return;
 		const results = await runReadyCandidateTopologies(REPOSITORY_ROOT, successorContract, candidateReadiness);
 		expect(results.map(({ name }) => name)).toEqual([
-			"linear:external-empty",
-			"merge:external-empty",
+			"linear:external-current-tip",
+			"merge:external-current-tip",
 			"linear:descendant",
 			"merge:descendant",
 		]);
-		for (const { name, result } of results) {
+		const current = git("rev-parse", "HEAD");
+		for (const { checkoutHead, checkoutParents, checkoutTree, name, releaseTip, releaseTree, result } of results) {
+			if (name === "linear:external-current-tip") {
+				expect({ checkoutHead, checkoutParents, releaseTip }).toEqual({
+					checkoutHead: current,
+					checkoutParents: git("rev-list", "--parents", "-n", "1", current).split(" ").slice(1),
+					releaseTip: current,
+				});
+			}
+			if (name === "merge:external-current-tip") {
+				expect(checkoutParents).toEqual([successorContract.externalBase.commit, current]);
+				expect(releaseTip).toBe(current);
+				expect(checkoutTree).toBe(releaseTree);
+			}
 			expect(result.signal, name).toBeNull();
 			expect(result.status, `${name}\n${normalizedChildOutput(result)}`).toBe(0);
 			expect(result.output, name).toContain("protocol-v3 freeze successor: PASS");
