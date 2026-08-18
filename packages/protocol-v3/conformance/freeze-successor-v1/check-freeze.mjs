@@ -14,16 +14,14 @@ const repositoryRoot = realpathSync(
 );
 const policyPath = `${ownerDirectory}/freeze-policy.json`;
 const profilePath = `${ownerDirectory}/profile.json`;
-const bootstrapParent = "bc8503c46932e4c600b014680da83e4ba6731799";
+const bootstrapParent = "6692cd4ff2aaf008d059b9f38b5c73f50e544831";
 const expectedOwnerPaths = ["check-freeze.mjs", "freeze-policy.json", "profile.json", "spec.md"]
 	.map((file) => `${ownerDirectory}/${file}`)
 	.sort();
-const bootstrapTestPaths = ["tests/fixtures/phase-3a1b-freeze-successor-v1/temporary-repository-harness.mjs"];
 const expectedBootstrapPaths = [
 	`${ownerDirectory}/check-freeze.mjs`,
 	`${ownerDirectory}/freeze-policy.json`,
 	`${ownerDirectory}/spec.md`,
-	...bootstrapTestPaths,
 ].sort();
 
 function fail(message) {
@@ -143,13 +141,28 @@ if (gitText("status", "--porcelain=v1", "--untracked-files=no") !== "") fail("tr
 
 const upstreamPolicyEntry = treeEntryOrUndefined(upstream, policyPath);
 let anchoredPolicy;
+let authorityRevision = upstream;
+let authorityPolicyEntry = upstreamPolicyEntry;
 if (upstreamPolicyEntry === undefined) {
-	if (JSON.stringify(exactParents(releaseTip)) !== JSON.stringify([bootstrapParent])) {
+	const releaseLine = gitText("rev-list", "--first-parent", "--reverse", `${bootstrapParent}..${releaseTip}`)
+		.split("\n")
+		.filter(Boolean);
+	const releaseAnchor = releaseLine[0];
+	if (
+		releaseAnchor === undefined ||
+		JSON.stringify(exactParents(releaseAnchor)) !== JSON.stringify([bootstrapParent])
+	) {
 		fail("release bootstrap parent differs");
 	}
-	if (JSON.stringify(changedPaths(bootstrapParent, releaseTip)) !== JSON.stringify(expectedBootstrapPaths)) {
+	if (JSON.stringify(changedPaths(bootstrapParent, releaseAnchor)) !== JSON.stringify(expectedBootstrapPaths)) {
 		fail("release transition scope differs");
 	}
+	authorityRevision = releaseAnchor;
+	authorityPolicyEntry = treeEntry(releaseAnchor, policyPath);
+	if (authorityPolicyEntry.mode !== "100644" || authorityPolicyEntry.type !== "blob") {
+		fail("release policy object class differs");
+	}
+	anchoredPolicy = parseJsonBytes(blobBytes(authorityPolicyEntry.object, policyPath), "release freeze policy");
 } else {
 	if (upstreamPolicyEntry.mode !== "100644" || upstreamPolicyEntry.type !== "blob") {
 		fail("upstream policy object class differs");
@@ -178,10 +191,11 @@ if (anchoredPolicy !== undefined) {
 		fail("upstream freeze policy schema differs");
 	}
 	const releasePolicyEntry = treeEntry(releaseTip, policyPath);
+	if (authorityPolicyEntry === undefined) fail("release freeze policy is unavailable");
 	if (
-		releasePolicyEntry.mode !== upstreamPolicyEntry.mode ||
-		releasePolicyEntry.type !== upstreamPolicyEntry.type ||
-		releasePolicyEntry.object !== upstreamPolicyEntry.object
+		releasePolicyEntry.mode !== authorityPolicyEntry.mode ||
+		releasePolicyEntry.type !== authorityPolicyEntry.type ||
+		releasePolicyEntry.object !== authorityPolicyEntry.object
 	) {
 		fail("descendant freeze policy differs");
 	}
@@ -227,12 +241,12 @@ if (anchoredPolicy !== undefined) {
 		fail("descendant protected artifact inventory differs");
 	}
 	for (const path of anchoredPolicy.protectedArtifacts) {
-		const upstreamEntry = treeEntry(upstream, path);
+		const authorityEntry = treeEntry(authorityRevision, path);
 		const releaseEntry = treeEntry(releaseTip, path);
 		if (
-			releaseEntry.mode !== upstreamEntry.mode ||
-			releaseEntry.type !== upstreamEntry.type ||
-			releaseEntry.object !== upstreamEntry.object
+			releaseEntry.mode !== authorityEntry.mode ||
+			releaseEntry.type !== authorityEntry.type ||
+			releaseEntry.object !== authorityEntry.object
 		) {
 			fail(`descendant governed identity differs: ${path}`);
 		}

@@ -12,13 +12,17 @@ raw blob SHA-256, and two current root-checker process results. Missing, mixed,
 malformed, wrong-mode, wrong-type, wrong-parent, wrong-tree, dirty or suppressed
 evidence fails closed.
 
-The final v3 bootstrap is one exact transition from signed ordinary-CI owner
-`bc8503c46932e4c600b014680da83e4ba6731799`: checker, policy and spec plus the
-ordinary Git harness correction that unwraps GitHub's checkout merge before
-constructing its own nested linear and merge fixtures. Once the caller-supplied
-upstream contains this v3 policy, that upstream policy and every governed Git
-object are the immutable descendant authority. A candidate cannot authorize
-coordinated policy-and-artifact drift by rewriting its own hashes.
+The final v3 bootstrap is one exact checker, policy and spec transition from
+signed ordinary-CI RED `6692cd4ff2aaf008d059b9f38b5c73f50e544831`.
+When the caller-supplied upstream predates the policy, the checker derives that
+transition as the first commit on the release tip's first-parent line, verifies
+its exact parent and scope, and uses its policy and governed Git objects as the
+immutable authority for the checked release tip. This accepts GitHub's
+two-parent checkout merge and later product commits only while every governed
+object remains identical to the reviewed bootstrap. Once the caller-supplied
+upstream contains the policy, that upstream policy and its governed Git objects
+remain the descendant authority. A candidate cannot authorize coordinated
+policy-and-artifact drift by rewriting its own hashes.
 
 Human-readable `git diff` output and exact planning/RED/GREEN choreography are
 not release authority. The exhaustive historical mutation corpus remains an
