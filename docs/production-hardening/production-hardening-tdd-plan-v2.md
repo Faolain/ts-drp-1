@@ -18153,7 +18153,7 @@ rule this track exists to enforce.
 | Slice  | Change                                                                                                                                                                                                                                                                                                                                                                                                                                               | RED test → GREEN                                                                                                                                                                                                                                                                                                                 |
 | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **E1** | `packages/ephemeral`: `node.openEphemeral(objectId, opts) → EphemeralChannel { publish(bytes,{class,key?}), subscribe, stats }`. Delivery classes `unreliable-unordered`, `unreliable-sequenced` (latest-wins per entity key), `reliable-unordered`. **The channel holds no reference to `DRPObject` — nothing published can create a vertex, by construction.** Transport tier T1: a second gossipsub topic (works today, zero new transport code). | `zero-durable-vertices.test.ts`: 30 Hz × 32 peers × 60 s → `expect(object.vertices.length).toBe(durableCommandCount)` **exactly**, **plus the positive control** that one durable command in the same run creates exactly one vertex. Flagship gate: port grid movement to the channel and assert the vertex count in Playwright |
-| **E2** | Session auth: key derived from the room's current ACL epoch (v2: anchor digest), per-message MAC — cheap, no per-packet secp. Per-peer rate budgets.                                                                                                                                                                                                                                                                                                 | Forged/foreign-session publish rejected; flood stays in budget                                                                                                                                                                                                                                                                   |
+| **E2** | V3-room E1 carries public equality tags for the installed anchor and current latched-ACL epoch while sender attribution and integrity remain owned by strict signed GossipSub or an authenticated direct stream. No key is derived from a public digest and no inner MAC is claimed. One shared rejected-ingress budget plus per-authenticated-author writer budgets cap malformed, unauthorized, stale and valid work.                              | Forged, replayed, mutated or foreign-authority ingress is rejected; authenticated floods stay inside the closed message/byte/state budget; movement still creates zero durable vertices.                                                                                                                                         |
 | **E3** | **Unreliable tier** (hard gate before any Profile-M claim): raw `RTCDataChannel(ordered:false, maxRetransmits:0)` bootstrapped by exchanging SDP over an ordinary libp2p stream on the existing WebRTC connection. Library work in `network`, since `@libp2p/webrtc` does not expose channel options.                                                                                                                                                | Failure-campaign loss/jitter injection: p95 latency under 30% loss beats the reliable tier; no head-of-line stall                                                                                                                                                                                                                |
 | **E4** | Interest management / AOI filter + entity delta codec                                                                                                                                                                                                                                                                                                                                                                                                | 32 visible entities ≤ 256 kbps down                                                                                                                                                                                                                                                                                              |
 | **E5** | **Commit-point helper**: `commitOutcome` producing one durable op **co-signed by all counterparties** (trade = both signatures inside one op the blueprint verifies) or signed by a **referee role** — a per-object ACL role for n-party contention (hit registration, loot rolls)                                                                                                                                                                   | Both-signature op applies once; single-signature rejected; replay idempotent by `clientOperationId`                                                                                                                                                                                                                              |
@@ -47734,3 +47734,277 @@ traffic on the existing shared v3-room/chat/zone path. It does not claim T3/T4,
 corrected E2, P6 completion, product scale, MMORPG readiness or completion of
 the broader production-hardening plan. The next slice is corrected E2 under the
 installed topology boundary.
+
+### D.93.48 — corrected E2 authority-bound ephemeral ingress
+
+D.93.48 supersedes the obsolete Track E2 sentence that proposed deriving a
+per-message MAC key from an anchor digest. An anchor digest and a latched-ACL
+digest are public authenticated identifiers, not secrets. This slice derives no
+key from either value, adds no group-secret distribution protocol and makes no
+claim that an inner MAC authenticates the sender. Sender attribution and message
+integrity continue to come from the installed libp2p security boundary: strict
+signed GossipSub or an authenticated direct stream. The public authority values
+are equality tags that bind otherwise ephemeral traffic to the exact installed
+room authority under which it was sent.
+
+The pre-plan source audit found one concrete attribution defect rather than a
+theoretical rewrite opportunity. Signed GossipSub ingress records its verified
+topic in an identity-keyed `WeakMap`, and direct stream decoding overwrites
+`Message.sender` with `connection.remotePeer`. However,
+`DRPNode.dispatchMessage` is public and the v3 direct E1 branch currently treats
+an unbranded message whose caller-selected sender names any connected peer as
+authenticated. Local application code can therefore manufacture the same
+object shape as direct network ingress. D.93.48 closes that boundary; it does
+not redesign GossipSub, Noise, discovery, topology, E3 transport, AOI or durable
+commit points.
+
+#### One installed authority context
+
+The v3 live-plane owner exposes one read-only current ephemeral authority view
+from state it already authenticated and installed. The closed view contains the
+exact room object identity, current epoch, current anchor digest and the digest
+of the current latched ACL snapshot. The ACL digest uses the existing
+`ts-drp/latched-acl/v3` canonical domain already used for the next-ACL digest; it
+is not a key or a second authorization database. The view also answers the
+current-writer predicate through the installed live authorization owner. It is
+unavailable after deactivation and malformed, missing or internally inconsistent
+state fails closed. An `author-list` authorization has no latched-ACL snapshot
+and therefore exposes no E2 authority view; only the installed latched-ACL room
+path is valid. This view is a declared `V3PlaneHandle` member, not another
+`Reflect.get` convention or application-supplied record.
+
+The shared v3-room owner, not the application shell, binds this view to E1.
+Application projection retains the signed transport-peer-to-author roster, but
+`projection.writerAuthors` is no longer accepted as authorization authority.
+The room maps the transport-authenticated peer to exactly one enrolled author
+and asks the active live-plane owner whether that author is a current writer.
+Changing a returned projection object or supplying an extra writer cannot widen
+E1 access. Grid continues to consume this shared composition; it does not copy
+authority logic. The current implementation supports epoch zero, but the shape
+names current epoch and anchor so a later authenticated epoch transition can
+replace the context without inventing a different E1 protocol.
+
+#### Authenticated ingress evidence
+
+`DRPNetworkNode` owns one identity-keyed ingress-evidence registry for exact
+decoded claimable `Message` instances (`CUSTOM` and `V3_ENVELOPE` only). Each
+entry retains one detached normalized message snapshot (`sender`, `type`,
+`objectId` and copied `data`) plus a closed transport union:
+
+- signed GossipSub: authenticated sender plus verified topic; or
+- authenticated stream: authenticated remote peer plus the negotiated direct
+  protocol.
+
+The network writes the evidence only after its existing signature/key binding
+or authenticated stream boundary succeeds. A claim atomically deletes the
+entry before validation or delivery, compares the exact current
+`sender`/`type`/`objectId`/`data` bytes with the retained detached snapshot and
+rejects any mutation, then returns only that snapshot and closed transport
+union to the route. Routes never read authoritative values back from the
+mutable `Message`. A copied object, an application-created object, a mutated
+exact instance and a second dispatch of a previously claimed instance all
+fail. `Message.sender` remains a display field and is not authority by itself.
+`gossipTopicFor` becomes a read-only pre-claim view over the same registry
+rather than a parallel authority. Before claiming, each adapter uses that view
+only to select its closed transport route: `NodeEphemeralAdapter` accepts
+signed-gossip `CUSTOM` evidence for its exact topic or authenticated-stream
+`CUSTOM` evidence for its exact direct registration;
+`NodeRoomNetworkAdapter` claims only authenticated-stream `V3_ENVELOPE`
+evidence and leaves signed-gossip V3 envelopes untouched for the later generic
+route. Once selected, either adapter claims and drops its active-registration
+message when evidence is absent, malformed, content-mismatched or wrong-topic;
+it never falls through to a weaker direct-membership check. In direct routing,
+mutable `message.objectId` is only a lookup hint: the claimed snapshot must
+match the exact selected registration before delivery. The generic signed
+durable `routeV3Ingress` keeps its existing inner-signature and exact-topic
+authority and does not require this object-identity claim, preserving the
+existing v3-chat serialized/BroadcastChannel ingress contract. There is no
+public stamp function, caller-supplied proof, test hook or compatibility
+fallback. Direct durable room recovery and E1 consume the evidence owner, while
+existing signed-gossip live ingress preserves its current exact-topic law. The
+correction is limited to these v3-room/E1 routes; it does not relabel the
+pre-existing legacy object queue as authenticated transport.
+
+#### Closed v3 frame and bounded receive work
+
+The ephemeral package remains the sole frame, replay, queue and receive-budget
+owner. A channel selects exactly one mode at construction:
+
+- legacy E1 uses only the existing canonical version-1 frame; and
+- a v3-room channel uses only a canonical version-2 frame carrying the current
+  epoch, full current anchor digest and full current latched-ACL digest before
+  the existing delivery-class, key, sequence and payload fields.
+
+A v3 channel neither accepts v1 nor accepts a second context. A legacy channel
+does not accept v2. The existing public `encodeEphemeralFrame` and
+`decodeEphemeralFrame` exports remain exactly the v1 legacy codec; the v2 codec
+is private to the same channel owner rather than a second public entry point.
+The authority view accepts only exact lowercase 64-hex digests and encodes them
+as their exact 32 bytes; the epoch is one canonical unsigned safe integer.
+Unknown versions, malformed view hex, extra or truncated bytes and mixed
+contexts fail closed. The outer exact room topic still binds the object
+identity, and the channel compares every v2 frame to the current installed
+object/epoch/anchor/ACL view before replay state or delivery.
+An observed authority change clears prior-context receive watermarks and rate
+state before accepting the first new-context frame, so a reopened peer can
+begin a new monotonic sequence without making old-context traffic valid again.
+The shipping epoch-zero room has no live authority-transition trigger in this
+slice; transition/reset is a controlled forward-shape case and is not credited
+as a genuine epoch-transition proof. Subscribers continue to receive the
+existing detached application frame; authority metadata is not
+caller-controlled application payload.
+
+Every v3-room channel installs one non-configurable receive profile. A single
+allocation-free rejected-ingress bucket has capacity and per-second refill of
+120 messages and 1,048,576 raw frame bytes for transport-authenticated senders
+that do not map to a current writer. Current writers receive per-author
+monotonic buckets with capacity and per-second refill of 120 transport messages
+and 1,048,576 raw frame bytes, with at most 128 retained writer buckets. Every
+transport peer mapped to the same authenticated author shares that author's
+bucket. That ceiling matches the roadmap's active-writer bound rather than
+D.93.47's role-specific host
+connection cap. It is independent of `maxSequencedSenders`, which remains only
+the smaller application replay-state limit. This admits the 20–30 Hz zone
+movement target including its current gossip-plus-direct duplicate transport
+delivery with bounded bursts, while preventing either multi-peer writers or
+non-writer sender churn from allocating or starving other writer buckets.
+
+After an active registration atomically claims genuine network evidence, the
+channel maps the exact authenticated peer through the installed roster and
+current-writer view. An unknown, enrolled-non-writer or revoked-writer sender is
+charged to the shared rejected-ingress bucket and dropped before v2 decode,
+context comparison, replay or subscriber
+work, without allocating per-peer state. Any prior bucket for a now-revoked
+author is removed before charging the shared rejection bucket. A current
+writer's per-author bucket is charged for the exact raw byte length before size
+acceptance, v2 decode,
+context comparison, replay or subscriber work. Malformed, wrong-context,
+stale and valid current-writer traffic therefore consumes the same writer
+budget, while authenticated non-writer and revoked-writer floods remain bounded
+by the shared bucket. At writer capacity a new writer fails closed. Writer
+entries expire after 60 seconds of monotonic idle time; disconnect or revocation
+removes the affected entry immediately; and close or an installed authority
+change clears every bucket. The writer map never
+exceeds 128 even under authenticated sender churn, while unauthorized traffic
+creates neither a writer bucket nor a replay watermark. Statistics add
+distinct authority-mismatch and rate-limited counters without freezing
+incidental error text or ordering beyond these security-relevant
+charge-before-parse boundaries.
+
+#### Signed TDD scope
+
+The plan-only commit lands first. Its tests-only RED is its sole child and may
+change exactly these test owners:
+
+- add `tests/phase-3a1b-d9348-corrected-e2-red.test.ts` for authority-bound
+  codec/channel semantics, the shared rejected-ingress and per-author writer
+  budgets, state bounds and forged dispatch rejection;
+- modify
+  `tests/fixtures/track-e1-ephemeral/controlled-transport.ts` only to expose the
+  closed legacy or v3 construction facts consumed by that production channel;
+- modify `packages/network/tests/phase-3a1b-p3-network-wire-red.test.ts` to prove
+  that only genuine signed GossipSub and authenticated stream decoding create
+  one-use content-bound ingress evidence, while copied, mutated, replayed or
+  application-created messages do not;
+- modify `packages/network/tests/transport-attribution-1k-red.test.ts`, the
+  existing genuine two-host direct-stream attribution owner, to require the
+  authenticated-stream evidence rather than substituting a single-host fake;
+- modify `tests/zero-durable-vertices.test.ts`, the existing codec/channel and
+  v3-adapter owner, to migrate its two v3 rows away from v1 frames and the fake
+  `gossipTopicFor(message.objectId)` attribution oracle while preserving every
+  legacy E1 row;
+- modify `tests/phase-3a1b-d9346-room-semantics-red.test.ts` to prove that the
+  room uses the active installed authority/writer decision and that application
+  projection cannot widen it; and
+- modify `tests/phase-3a1b-p3-live-transport-red.test.ts`, the genuine
+  prepare/recover/activate owner, to derive the declared current authority view
+  from a real latched-ACL handle and prove deactivation makes it unavailable;
+  and
+- modify `tests/fixtures/phase-3a1b-p3/seam3-types.ts` only to extend its exact
+  `V3PlaneHandle` type pin with that declared authority member rather than
+  weakening the equality check or returning to `Reflect.get`.
+
+The RED keeps every legacy and zero-durable control in
+`tests/zero-durable-vertices.test.ts`, the D.93.46 shared-room contract, the five
+v3-chat browser cases and the genuine two-client zone case independently
+runnable. Only its two existing v3 adapter rows are migrated to the new causal
+contract. A production E2 row may not use a fake
+`gossipTopicFor(message.objectId)` as authentication evidence. The RED requires
+one exact absence signature for the missing content-bound one-use ingress claim,
+installed authority view and v2 authority-bound channel, while legacy E1
+preservation remains green.
+
+The GREEN is the RED's sole child and may change only:
+
+- `packages/types/src/network.ts` for the optional structural one-use
+  ingress-evidence claim surface; absence always fails closed in the v3 E1 and
+  direct-room adapters, while the real production node and genuine transport
+  tests require the member;
+- `packages/network/src/node.ts` for the sole private evidence registry and the
+  signed-gossip/authenticated-stream stamps;
+- `packages/ephemeral/src/index.ts` for the closed v2 codec, authority comparison
+  and bounded receive buckets while preserving the explicit v1 mode;
+- `packages/node/src/v3-live.ts` for the installed current authority view and
+  current-writer query;
+- `packages/node/src/ephemeral.ts` to require exact network evidence and select
+  the v3-bound channel mode;
+- `packages/node/src/room-network.ts` to require the same evidence for direct
+  room ingress and remove direct connected-peer shape as authority; and
+- `examples/v3-room/src/index.ts` to bind the live-plane authority and signed
+  peer-to-author roster inside the shared room session.
+
+No grid, v3-chat, workflow, dependency, lockfile, topology, durable protocol or
+legacy object implementation is authorized to change in GREEN. The fixed E2
+profile therefore reaches the grid through the shared room without a product
+copy. There is one transport-evidence registry, one live authority owner, one
+frame owner and one rate-accounting owner; no wrapper, duplicate oracle,
+optional authentication path or MAC survives.
+
+#### Causal matrix and acceptance
+
+The RED/GREEN matrix includes genuine and controlled cases for: forged public
+`dispatchMessage`; copied branded-message shape; mutated exact-instance and
+second-claim replay; wrong gossip topic; wrong or missing direct evidence;
+sender/evidence disagreement; v1 into v3 and v2 into legacy; wrong object
+context, epoch, anchor and ACL digest; truncated, extended and unknown-version
+frames; controlled current-writer revocation and authority-transition reset;
+projection-only writer widening; monotonic message and byte bucket boundaries;
+the shared rejected-ingress boundary and authenticated non-writer or revoked
+writer flood without per-peer allocation; current-writer malformed,
+foreign-context, stale and valid floods; multi-peer single-author sharing;
+128-writer capacity, disconnect/idle/revocation cleanup; subscriber failure
+isolation; all three E1 delivery classes; a genuine active and deactivated
+latched-ACL handle; and exact zero durable vertices with the existing
+one-command positive control. Error assertions target stable semantic classes
+and state effects, not incidental prose.
+
+Ordinary acceptance runs independent lanes and remains below ten minutes under
+normal uncontended load:
+
+- the corrected-E2 owner, existing zero-durable E1 suite, network attribution
+  owner and D.93.46 room semantics;
+- the genuine five-case v3-chat and two-client zone browser controls;
+- D.93.47 network admission/mesh preservation plus affected network and node
+  tests;
+- direct types, ephemeral, network, node, v3-room and grid typecheck/build/public
+  export smoke; and
+- frozen-lockfile install, affected ESLint, Prettier and diff-check.
+
+The direct product proof still creates one durable `placeBlock`, exchanges
+fresh authority-bound movement, disconnects/reconnects and converges without an
+extra durable movement vertex. The exact active network ingress cases use real
+signed gossip or authenticated streams; controlled ports prove resource
+boundaries but do not replace them.
+
+The plan, RED and GREEN each receive one bounded Codex, Kimi, Grok and Opus
+review. A full review has fifteen minutes and may extend to twenty only while
+relevant public source-review events continue; a narrow delta uses eight and
+twelve minutes as progress checkpoints and may continue to a twenty-minute hard
+ceiling while its public event stream keeps advancing. Grok uses the artifact-preserving
+runner in review mode, retaining its packet, command, JSONL, stderr, public text
+and status. `NO_VERDICT` or timeout is reported honestly and is neither approval
+nor an automatic blocker; each reproduced substantive finding is fixed or
+dismissed with source evidence. D.93.48 closes only corrected E2 authority
+binding, authenticated ingress and bounded receive work. It does not claim E3,
+AOI, T3/T4, scale, full P6 or completion of the broader production-hardening
+plan.
