@@ -644,7 +644,12 @@ describe("D.93.35.15 genuine repository candidate", () => {
 			"linear:descendant",
 			"merge:descendant",
 		]);
-		const current = git("rev-parse", "HEAD");
+		const repositoryHead = git("rev-parse", "HEAD");
+		const repositoryParents = git("rev-list", "--parents", "-n", "1", repositoryHead).split(" ").slice(1);
+		const current =
+			repositoryParents.length === 2 && repositoryParents[0] === successorContract.externalBase.commit
+				? repositoryParents[1]
+				: repositoryHead;
 		for (const { checkoutHead, checkoutParents, checkoutTree, name, releaseTip, releaseTree, result } of results) {
 			if (name === "linear:external-current-tip") {
 				expect({ checkoutHead, checkoutParents, releaseTip }).toEqual({
