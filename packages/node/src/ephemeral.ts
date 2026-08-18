@@ -6,6 +6,7 @@ import {
 	type EphemeralChannelOptions,
 	type EphemeralIngress,
 } from "@ts-drp/ephemeral";
+import { DRP_MESSAGE_PROTOCOL } from "@ts-drp/network";
 import { type DRPNetworkNode, type IDRP, type IDRPObject, Message, MessageType } from "@ts-drp/types";
 
 const EPHEMERAL_TOPIC_DOMAIN = new TextEncoder().encode("ts-drp-ephemeral-topic-v1\u0000");
@@ -25,6 +26,14 @@ interface TopicRegistration {
 /** Live v3 authorization projected from accepted durable room history. */
 export interface EphemeralAuthorizationProvider {
 	authorForPeer(peerId: string): string | undefined;
+	currentAuthority():
+		| Readonly<{
+				readonly aclDigest: string;
+				readonly anchorDigest: string;
+				readonly epoch: number;
+				readonly objectId: string;
+		  }>
+		| undefined;
 	isCurrentWriter(author: string): boolean;
 }
 
@@ -77,6 +86,7 @@ export class NodeEphemeralAdapter {
 			objectId,
 			{
 				authorForPeer: (peerId): string | undefined => peerId,
+				currentAuthority: () => undefined,
 				isCurrentWriter: (author): boolean => this.#getObject(objectId)?.acl.query_isWriter(author) === true,
 			},
 			options,
@@ -119,11 +129,16 @@ export class NodeEphemeralAdapter {
 		}
 		const topic = ephemeralTopicFor(objectId);
 		const registration: TopicRegistration = { allowDirect: !requireLegacyObject, listener: undefined };
+		const currentAuthority = (): ReturnType<EphemeralAuthorizationProvider["currentAuthority"]> => {
+			const authority = provider.currentAuthority();
+			return authority?.objectId === objectId ? authority : undefined;
+		};
 		const transportPeers = (): readonly string[] =>
 			requireLegacyObject
 				? this.#networkNode.getGroupPeers(topic)
 				: [...new Set([...this.#networkNode.getAllPeers(), ...this.#networkNode.getGroupPeers(topic)])];
 		const authorizedPeers = (): readonly string[] => {
+			if (!requireLegacyObject && currentAuthority() === undefined) return [];
 			return transportPeers()
 				.filter((peerId) => {
 					const author = provider.authorForPeer(peerId);
@@ -134,9 +149,21 @@ export class NodeEphemeralAdapter {
 		const channel = createEphemeralChannel(
 			{
 				authorizedPeers,
+				...(requireLegacyObject
+					? {}
+					: {
+							authorForPeer: (peerId: string): string | undefined => provider.authorForPeer(peerId),
+							currentAuthority,
+							isCurrentWriter: (author: string): boolean => provider.isCurrentWriter(author),
+							onPeerDisconnect: (listener: (peerId: string) => void): (() => void) => {
+								const subscribe = this.#networkNode.subscribeToPeerDisconnects;
+								return subscribe === undefined ? (): void => undefined : subscribe.call(this.#networkNode, listener);
+							},
+						}),
 				localPeerId: this.#networkNode.peerId,
 				maxEnvelopeBytes: EPHEMERAL_TRANSPORT_MAX_BYTES,
 				isAuthorized: (sender): boolean => {
+					if (!requireLegacyObject && currentAuthority() === undefined) return false;
 					const author = provider.authorForPeer(sender);
 					return author !== undefined && transportPeers().includes(sender) && provider.isCurrentWriter(author);
 				},
@@ -181,21 +208,32 @@ export class NodeEphemeralAdapter {
 	 */
 	route(message: Message): boolean {
 		if (message.type !== MessageType.MESSAGE_TYPE_CUSTOM) return false;
-		const topic = this.#networkNode.gossipTopicFor(message);
-		const selectedTopic = topic ?? message.objectId;
+		const gossipTopic = this.#networkNode.gossipTopicFor(message);
+		const selectedTopic = message.objectId;
 		const registration = this.#byTopic.get(selectedTopic);
 		if (registration === undefined) return false;
-		if (
-			message.objectId !== selectedTopic ||
-			message.data.byteLength > EPHEMERAL_TRANSPORT_MAX_BYTES ||
-			(topic === undefined &&
-				(!registration.allowDirect ||
-					(!this.#networkNode.getAllPeers().includes(message.sender) &&
-						!this.#networkNode.getGroupPeers(selectedTopic).includes(message.sender))))
+		const evidence = this.#networkNode.claimIngressEvidence?.(message);
+		if (evidence === undefined || evidence.message.data.byteLength > EPHEMERAL_TRANSPORT_MAX_BYTES) {
+			return true;
+		}
+		const transport = evidence.transport;
+		if (gossipTopic !== undefined) {
+			if (
+				transport.kind !== "signed-gossip" ||
+				transport.topic !== selectedTopic ||
+				transport.sender !== evidence.message.sender
+			) {
+				return true;
+			}
+		} else if (
+			transport.kind !== "authenticated-stream" ||
+			transport.protocol !== DRP_MESSAGE_PROTOCOL ||
+			transport.sender !== evidence.message.sender ||
+			!registration.allowDirect
 		) {
 			return true;
 		}
-		registration.listener?.({ bytes: message.data.slice(), sender: message.sender });
+		registration.listener?.({ bytes: evidence.message.data.slice(), sender: evidence.message.sender });
 		return true;
 	}
 

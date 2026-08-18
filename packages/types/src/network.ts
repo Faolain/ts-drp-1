@@ -17,6 +17,9 @@ export interface GroupPeerChange {
 
 export type GroupPeerChangeHandler = (change: GroupPeerChange) => void;
 
+/** Handler invoked when a remote peer's transport connection closes. */
+export type PeerDisconnectHandler = (peerId: string) => void;
+
 export type ControlPlaneAddressFamily = "ipv4" | "ipv6" | "dns" | "unknown";
 
 export type ControlPlaneAddressScope =
@@ -564,6 +567,21 @@ export interface DRPNetworkNode {
 	/** Returns the authenticated gossip topic bound to this exact decoded message identity. */
 	gossipTopicFor(message: Message): string | undefined;
 
+	/** Atomically claims detached transport evidence for this exact decoded message identity. */
+	claimIngressEvidence?(message: Message):
+		| Readonly<{
+				message: Readonly<{
+					data: Uint8Array;
+					objectId: string;
+					sender: string;
+					type: Message["type"];
+				}>;
+				transport:
+					| Readonly<{ kind: "authenticated-stream"; protocol: string; sender: string }>
+					| Readonly<{ kind: "signed-gossip"; sender: string; topic: string }>;
+		  }>
+		| undefined;
+
 	/**
 	 * Sends a message to a specific peer
 	 * @param peerId - The ID of the peer to send to
@@ -593,4 +611,11 @@ export interface DRPNetworkNode {
 	 * @returns A function that removes the handler
 	 */
 	subscribeToGroupPeerChanges(handler: GroupPeerChangeHandler): () => void;
+
+	/**
+	 * Subscribes to genuine remote transport disconnections.
+	 * @param handler - Handler invoked with the disconnected peer ID
+	 * @returns A function that removes the handler
+	 */
+	subscribeToPeerDisconnects?(handler: PeerDisconnectHandler): () => void;
 }

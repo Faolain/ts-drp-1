@@ -76,6 +76,7 @@ import {
 	IntervalRunnerState,
 	Message,
 	MessageType,
+	type PeerDisconnectHandler,
 } from "@ts-drp/types";
 import { createLibp2p, type Libp2p, type Libp2pOptions, type ServiceFactoryMap } from "libp2p";
 import { isBrowser, isWebWorker } from "wherearewe";
@@ -130,10 +131,30 @@ export const BOOTSTRAP_NODES = [
 	"/dns4/bootstrap2.topology.gg/tcp/443/wss/p2p/16Uiu2HAmGjAVQyzgTCumpB9TuojKT4LZTBC5HRiZyuwGG9VHodLC",
 ];
 let log: Logger;
-const gossipTopics = new WeakMap<Message, string>();
 const PUBSUB_SIGN_PREFIX = new TextEncoder().encode("libp2p-pubsub:");
 const MIN_PUBSUB_SEQUENCE = BigInt(0);
 const MAX_PUBSUB_SEQUENCE = BigInt("18446744073709551615");
+
+type IngressTransport =
+	| Readonly<{ kind: "authenticated-stream"; protocol: string; sender: string }>
+	| Readonly<{ kind: "signed-gossip"; sender: string; topic: string }>;
+
+type IngressEvidence = Readonly<{
+	message: Readonly<{ data: Uint8Array; objectId: string; sender: string; type: MessageType }>;
+	transport: IngressTransport;
+}>;
+
+function isClaimableIngress(message: Message): boolean {
+	return message.type === MessageType.MESSAGE_TYPE_CUSTOM || message.type === MessageType.MESSAGE_TYPE_V3_ENVELOPE;
+}
+
+function sameIngressBytes(left: Uint8Array, right: Uint8Array): boolean {
+	if (left.byteLength !== right.byteLength) return false;
+	for (let index = 0; index < left.byteLength; index += 1) {
+		if (left[index] !== right[index]) return false;
+	}
+	return true;
+}
 
 function pubsubSignaturePreimage(message: SignedMessage): Uint8Array | undefined {
 	try {
@@ -481,6 +502,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _pubsub?: ConfigurableGossipSub;
 	private _connectionAdmission?: ConnectionAdmissionController;
 	private _messageQueue: MessageQueue<Message | DirectSyncIngress>;
+	private readonly _ingressEvidence = new WeakMap<Message, IngressEvidence>();
 	private readonly _syncAdmissions = new WeakMap<Connection, SyncSendAdmission>();
 	private _metrics?: PrometheusMetricsRegister;
 	private _bootstrapRetryController?: AbortController;
@@ -497,6 +519,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _relayRefreshTimer?: ReturnType<typeof setTimeout>;
 	private _reservedRelayPeerIds = new Set<string>();
 	private _groupPeerChangeHandlers = new Set<GroupPeerChangeHandler>();
+	private _peerDisconnectHandlers = new Set<PeerDisconnectHandler>();
 	private readonly _hostFactory: DRPNetworkHostFactory;
 	private readonly _hostPolicy: DRPNetworkHostPolicy;
 	private readonly _authenticatedPeerBehaviorProvider: DRPNetworkNodeDependencies["authenticatedPeerBehaviorProvider"];
@@ -797,6 +820,11 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		log.info("::start: Successfuly started DRP network w/ peer_id", this.peerId);
 
 		this._node.addEventListener("peer:connect", (e) => log.info("::start::peer::connect", e.detail));
+		this._node.addEventListener("peer:disconnect", (event: CustomEvent<PeerId>) => {
+			const peerId = event.detail.toString();
+			log.info("::start::peer::disconnect", peerId);
+			this.notifyPeerDisconnect(peerId);
+		});
 
 		this._node.addEventListener("peer:discovery", (e) => log.info("::start::peer::discovery", e.detail));
 
@@ -1890,7 +1918,42 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 * @returns Its authenticated topic, or undefined outside signed gossip ingress.
 	 */
 	gossipTopicFor(message: Message): string | undefined {
-		return gossipTopics.get(message);
+		const transport = this._ingressEvidence.get(message)?.transport;
+		return transport?.kind === "signed-gossip" ? transport.topic : undefined;
+	}
+
+	/**
+	 * Atomically consume exact authenticated transport evidence for one decoded message.
+	 * @param message - Exact decoded message identity delivered by this node.
+	 * @returns A detached authenticated snapshot, or undefined after mutation/replay.
+	 */
+	claimIngressEvidence(message: Message): IngressEvidence | undefined {
+		const evidence = this._ingressEvidence.get(message);
+		this._ingressEvidence.delete(message);
+		if (evidence === undefined) return undefined;
+		const snapshot = evidence.message;
+		return snapshot.sender === message.sender &&
+			snapshot.type === message.type &&
+			snapshot.objectId === message.objectId &&
+			sameIngressBytes(snapshot.data, message.data)
+			? evidence
+			: undefined;
+	}
+
+	private recordIngressEvidence(message: Message, transport: IngressTransport): void {
+		if (!isClaimableIngress(message)) return;
+		this._ingressEvidence.set(
+			message,
+			Object.freeze({
+				message: Object.freeze({
+					data: message.data.slice(),
+					objectId: message.objectId,
+					sender: message.sender,
+					type: message.type,
+				}),
+				transport: Object.freeze(transport),
+			})
+		);
 	}
 
 	private async waitForSubscriber(topic: string, timeout = 1000): Promise<void> {
@@ -2095,8 +2158,22 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		return () => this._groupPeerChangeHandlers.delete(handler);
 	}
 
+	/**
+	 * Subscribe to genuine remote transport disconnections.
+	 * @param handler - Handler invoked with the disconnected peer ID
+	 * @returns A function that removes the handler
+	 */
+	subscribeToPeerDisconnects(handler: PeerDisconnectHandler): () => void {
+		this._peerDisconnectHandlers.add(handler);
+		return () => this._peerDisconnectHandlers.delete(handler);
+	}
+
 	private notifyGroupPeerChange(change: GroupPeerChange): void {
 		for (const handler of this._groupPeerChangeHandlers) handler(change);
+	}
+
+	private notifyPeerDisconnect(peerId: string): void {
+		for (const handler of this._peerDisconnectHandlers) handler(peerId);
 	}
 
 	private async startEnqueueMessages(): Promise<void> {
@@ -2135,7 +2212,8 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		try {
 			const message = this.decodeAttributedMessage(data, authenticatedSender);
 			if (isSyncProtocolMessage(message)) return;
-			gossipTopics.set(message, topic);
+			const gossipTopic = topic;
+			this.recordIngressEvidence(message, { kind: "signed-gossip", sender: authenticatedSender, topic: gossipTopic });
 			const messageQueueCallback = this._messageQueue.enqueue(message);
 			messageQueueCallback.catch((e) => {
 				log.error("::startEnqueueMessages::enqueue:", e);
@@ -2163,6 +2241,11 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 				if (ingress.mode === "heads-chunk") await ingress.completion.wait();
 			} else {
 				validateNegotiatedSync(message, stream.protocol, data.byteLength);
+				this.recordIngressEvidence(message, {
+					kind: "authenticated-stream",
+					protocol: stream.protocol,
+					sender: authenticatedSender,
+				});
 				await this._messageQueue.enqueue(message);
 			}
 			await stream.close();

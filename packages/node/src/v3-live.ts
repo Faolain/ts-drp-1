@@ -25,6 +25,7 @@ import {
 	resolveCurrentEpochAuthorizedAuthor,
 } from "@ts-drp/protocol-v3/author-authorization";
 import {
+	authorizeLatchedApplicationWrite,
 	authorizeLatchedEnvelopeAuthor,
 	deriveNextLatchedSignerSet,
 	type LatchedAclOperation,
@@ -258,6 +259,15 @@ export interface V3PlaneHandle {
 	readonly epoch: 0;
 	readonly topic: string;
 	readonly queueId: string;
+	currentEphemeralAuthority():
+		| {
+				readonly aclDigest: string;
+				readonly anchorDigest: string;
+				readonly epoch: 0;
+				readonly objectId: string;
+				isCurrentWriter(author: string): boolean;
+		  }
+		| undefined;
 	issueLocal(input: V3LocalIssueInput): Promise<V3LocalIssueResult>;
 	publishPending(): Promise<V3EgressResult>;
 	republishRetained(): Promise<V3EgressResult>;
@@ -3427,11 +3437,33 @@ function enqueueTargetedRetainedPublication(
 }
 
 function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
+	const ephemeralAuthority = ((): ReturnType<V3PlaneHandle["currentEphemeralAuthority"]> => {
+		const authorization = registration.authorization;
+		if (authorization.kind !== "latched-acl") return undefined;
+		const snapshot = authorization.value;
+		const aclDigest = lowerHexDigest(hashDomain("ts-drp/latched-acl/v3", encodeCanonical(snapshot)));
+		if (aclDigest === undefined) return undefined;
+		return ObjectFreeze({
+			aclDigest,
+			anchorDigest: registration.payload.provenance.anchorDigest,
+			epoch: 0 as const,
+			objectId: registration.payload.provenance.objectId,
+			isCurrentWriter: (author: string): boolean => {
+				if (!currentRegistration(registration)) return false;
+				const authority = authorizeLatchedApplicationWrite({
+					author,
+					snapshot,
+				});
+				return authority.ok && authority.authorized;
+			},
+		});
+	})();
 	return ObjectFreeze({
 		objectId: registration.payload.provenance.objectId,
 		epoch: 0 as const,
 		topic: registration.topic,
 		queueId: registration.queueId,
+		currentEphemeralAuthority: () => (currentRegistration(registration) ? ephemeralAuthority : undefined),
 		issueLocal: (input: V3LocalIssueInput): Promise<V3LocalIssueResult> => enqueueLocalIssue(registration, input),
 		previewLatchedAcl: (): Readonly<Record<string, unknown>> | undefined =>
 			latchedAclPreview(registration.authorization, registration.latchedOperations),

@@ -15,12 +15,14 @@ export interface DeliveredEphemeralFrame extends EphemeralFrame {
 }
 
 export interface EphemeralStats {
+	readonly authorityMismatch: number;
 	readonly delivered: number;
 	readonly dropped: number;
 	readonly localSequencedKeys: number;
 	readonly malformed: number;
 	readonly overLimit: number;
 	readonly published: number;
+	readonly rateLimited: number;
 	readonly received: number;
 	readonly remoteSequencedKeys: number;
 	readonly sequencedKeys: number;
@@ -28,6 +30,7 @@ export interface EphemeralStats {
 	readonly stale: number;
 	readonly subscriberFailures: number;
 	readonly unauthorized: number;
+	readonly writerBuckets: number;
 }
 
 export interface EphemeralChannelOptions {
@@ -68,21 +71,30 @@ const CODE_TO_CLASS = new Map<number, EphemeralDeliveryClass>(
 	Object.entries(CLASS_TO_CODE).map(([name, code]) => [code, name as EphemeralDeliveryClass])
 );
 const FRAME_VERSION = 1;
+const AUTHORITY_FRAME_VERSION = 2;
 const HEADER_BYTES = 16;
+const AUTHORITY_HEADER_BYTES = 73;
 const KEY_BYTES_LIMIT = 128;
 const MESSAGE_BYTES_LIMIT = 65_536;
 const SEQUENCED_KEYS_LIMIT = 4_096;
 const QUEUE_CAPACITY = 256;
 const RELIABLE_ATTEMPTS = 8;
+const RECEIVE_BYTE_CAPACITY = 1_048_576;
+const RECEIVE_MESSAGE_CAPACITY = 120;
+const RECEIVE_REFILL_MS = 1_000;
+const WRITER_BUCKET_CAPACITY = 128;
+const WRITER_BUCKET_IDLE_MS = 60_000;
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const encoder = new TextEncoder();
 
 interface MutableStats {
+	authorityMismatch: number;
 	delivered: number;
 	dropped: number;
 	malformed: number;
 	overLimit: number;
 	published: number;
+	rateLimited: number;
 	received: number;
 	stale: number;
 	subscriberFailures: number;
@@ -90,9 +102,31 @@ interface MutableStats {
 }
 
 interface QueueEntry {
+	readonly encoded: Uint8Array;
 	readonly frame: EphemeralFrame;
 	readonly reliable: boolean;
 	resolve(accepted: boolean): void;
+}
+
+interface EphemeralAuthorityContext {
+	readonly aclDigest: string;
+	readonly anchorDigest: string;
+	readonly epoch: number;
+	readonly objectId: string;
+}
+
+interface AuthorityBoundTransportPort extends EphemeralTransportPort {
+	authorForPeer(peerId: string): string | undefined;
+	currentAuthority(): EphemeralAuthorityContext | undefined;
+	isCurrentWriter(author: string): boolean;
+	onPeerDisconnect(listener: (peerId: string) => void): () => void;
+}
+
+interface ReceiveBucket {
+	byteTokens: number;
+	lastRefill: number;
+	lastSeen: number;
+	messageTokens: number;
 }
 
 function exactKeys(value: object, expected: readonly string[]): boolean {
@@ -195,6 +229,135 @@ function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
 	return true;
 }
 
+function authorityBoundPort(port: EphemeralTransportPort): AuthorityBoundTransportPort | undefined {
+	const candidate = port as Partial<AuthorityBoundTransportPort>;
+	const members = [
+		candidate.authorForPeer,
+		candidate.currentAuthority,
+		candidate.isCurrentWriter,
+		candidate.onPeerDisconnect,
+	];
+	if (members.every((member) => member === undefined)) return undefined;
+	if (members.some((member) => typeof member !== "function")) {
+		throw new TypeError("ephemeral authority transport differs");
+	}
+	return candidate as AuthorityBoundTransportPort;
+}
+
+function hexBytes(value: unknown): Uint8Array | undefined {
+	if (typeof value !== "string" || !/^[0-9a-f]{64}$/u.test(value)) return undefined;
+	const bytes = new Uint8Array(32);
+	for (let index = 0; index < bytes.byteLength; index += 1) {
+		const parsed = Number.parseInt(value.slice(index * 2, index * 2 + 2), 16);
+		if (!Number.isSafeInteger(parsed)) return undefined;
+		bytes[index] = parsed;
+	}
+	return bytes;
+}
+
+function authoritySnapshot(value: unknown): EphemeralAuthorityContext | undefined {
+	if (typeof value !== "object" || value === null) return undefined;
+	const candidate = value as Partial<EphemeralAuthorityContext>;
+	const anchorDigest = hexBytes(candidate.anchorDigest);
+	const aclDigest = hexBytes(candidate.aclDigest);
+	if (
+		anchorDigest === undefined ||
+		aclDigest === undefined ||
+		typeof candidate.objectId !== "string" ||
+		candidate.objectId.length === 0 ||
+		typeof candidate.epoch !== "number" ||
+		!Number.isSafeInteger(candidate.epoch) ||
+		candidate.epoch < 0
+	) {
+		return undefined;
+	}
+	return Object.freeze({
+		aclDigest: candidate.aclDigest as string,
+		anchorDigest: candidate.anchorDigest as string,
+		epoch: candidate.epoch,
+		objectId: candidate.objectId,
+	});
+}
+
+function sameAuthority(left: EphemeralAuthorityContext, right: EphemeralAuthorityContext): boolean {
+	return (
+		left.aclDigest === right.aclDigest &&
+		left.anchorDigest === right.anchorDigest &&
+		left.epoch === right.epoch &&
+		left.objectId === right.objectId
+	);
+}
+
+function encodeAuthorityFrame(frame: EphemeralFrame, authority: EphemeralAuthorityContext): Uint8Array {
+	const inner = encodeEphemeralFrame(frame);
+	const anchorDigest = hexBytes(authority.anchorDigest);
+	const aclDigest = hexBytes(authority.aclDigest);
+	if (anchorDigest === undefined || aclDigest === undefined || !Number.isSafeInteger(authority.epoch)) {
+		throw new TypeError("ephemeral authority differs");
+	}
+	const output = new Uint8Array(AUTHORITY_HEADER_BYTES + inner.byteLength);
+	const view = new DataView(output.buffer, output.byteOffset, output.byteLength);
+	view.setUint8(0, AUTHORITY_FRAME_VERSION);
+	view.setUint32(1, Math.floor(authority.epoch / 0x1_0000_0000), false);
+	view.setUint32(5, authority.epoch >>> 0, false);
+	output.set(anchorDigest, 9);
+	output.set(aclDigest, 41);
+	output.set(inner, AUTHORITY_HEADER_BYTES);
+	return output;
+}
+
+function decodeAuthorityFrame(
+	bytes: Uint8Array,
+	authority: EphemeralAuthorityContext
+): { readonly contextMatches: boolean; readonly frame: EphemeralFrame } {
+	if (bytes.byteLength <= AUTHORITY_HEADER_BYTES || bytes[0] !== AUTHORITY_FRAME_VERSION) {
+		throw new TypeError("ephemeral authority frame differs");
+	}
+	const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+	const epoch = view.getUint32(1, false) * 0x1_0000_0000 + view.getUint32(5, false);
+	if (!Number.isSafeInteger(epoch)) throw new TypeError("ephemeral authority epoch differs");
+	const expectedAnchor = hexBytes(authority.anchorDigest);
+	const expectedAcl = hexBytes(authority.aclDigest);
+	if (expectedAnchor === undefined || expectedAcl === undefined) throw new TypeError("ephemeral authority differs");
+	return {
+		contextMatches:
+			epoch === authority.epoch &&
+			sameBytes(bytes.subarray(9, 41), expectedAnchor) &&
+			sameBytes(bytes.subarray(41, AUTHORITY_HEADER_BYTES), expectedAcl),
+		frame: decodeEphemeralFrame(bytes.subarray(AUTHORITY_HEADER_BYTES)),
+	};
+}
+
+function newReceiveBucket(now: number): ReceiveBucket {
+	return {
+		byteTokens: RECEIVE_BYTE_CAPACITY,
+		lastRefill: now,
+		lastSeen: now,
+		messageTokens: RECEIVE_MESSAGE_CAPACITY,
+	};
+}
+
+function monotonicNow(): number {
+	return globalThis.performance.now();
+}
+
+function chargeReceiveBucket(bucket: ReceiveBucket, byteLength: number, now: number): boolean {
+	const intervals = Math.floor(Math.max(0, now - bucket.lastRefill) / RECEIVE_REFILL_MS);
+	if (intervals > 0) {
+		bucket.messageTokens = Math.min(
+			RECEIVE_MESSAGE_CAPACITY,
+			bucket.messageTokens + intervals * RECEIVE_MESSAGE_CAPACITY
+		);
+		bucket.byteTokens = Math.min(RECEIVE_BYTE_CAPACITY, bucket.byteTokens + intervals * RECEIVE_BYTE_CAPACITY);
+		bucket.lastRefill += intervals * RECEIVE_REFILL_MS;
+	}
+	bucket.lastSeen = now;
+	if (bucket.messageTokens < 1 || bucket.byteTokens < byteLength) return false;
+	bucket.messageTokens -= 1;
+	bucket.byteTokens -= byteLength;
+	return true;
+}
+
 /**
  * Create the shared bounded channel used by controlled tests and the node adapter.
  * @param port Private authenticated transport port.
@@ -221,6 +384,11 @@ export function createEphemeralChannel(
 	if (!Number.isSafeInteger(port.maxEnvelopeBytes) || port.maxEnvelopeBytes < maxMessageBytes) {
 		throw new TypeError("transport envelope is smaller than the configured ephemeral frame limit");
 	}
+	const v3Port = authorityBoundPort(port);
+	let installedAuthority = v3Port === undefined ? undefined : authoritySnapshot(v3Port.currentAuthority());
+	if (v3Port !== undefined && installedAuthority === undefined) {
+		throw new TypeError("ephemeral authority differs");
+	}
 
 	let closed = false;
 	let draining = false;
@@ -236,13 +404,23 @@ export function createEphemeralChannel(
 	const queue: QueueEntry[] = [];
 	const localSequencedKeys = new Set<string>();
 	const remoteWatermarks = new Map<string, Map<string, number>>();
+	const writerBuckets = new Map<string, ReceiveBucket>();
+	const deleteWriterBucket = (author: string): void => {
+		writerBuckets.delete(author);
+	};
+	const clearWriterBuckets = (): void => {
+		writerBuckets.clear();
+	};
+	let rejectedBucket = newReceiveBucket(monotonicNow());
 	const subscribers = new Set<(frame: DeliveredEphemeralFrame) => void>();
 	const counters: MutableStats = {
+		authorityMismatch: 0,
 		delivered: 0,
 		dropped: 0,
 		malformed: 0,
 		overLimit: 0,
 		published: 0,
+		rateLimited: 0,
 		received: 0,
 		stale: 0,
 		subscriberFailures: 0,
@@ -252,18 +430,77 @@ export function createEphemeralChannel(
 	const unsubscribe = port.onMessage(({ bytes, sender }) => {
 		if (closed) return;
 		counters.received += 1;
+		let authority: EphemeralAuthorityContext | undefined;
+		if (v3Port !== undefined) {
+			authority = authoritySnapshot(v3Port.currentAuthority());
+			if (authority === undefined) {
+				counters.authorityMismatch += 1;
+				return;
+			}
+			if (installedAuthority === undefined || !sameAuthority(installedAuthority, authority)) {
+				installedAuthority = authority;
+				remoteWatermarks.clear();
+				clearWriterBuckets();
+				rejectedBucket = newReceiveBucket(monotonicNow());
+			}
+			const now = monotonicNow();
+			const author = v3Port.authorForPeer(sender);
+			if (author === undefined || !v3Port.isCurrentWriter(author)) {
+				if (author !== undefined) deleteWriterBucket(author);
+				if (!chargeReceiveBucket(rejectedBucket, bytes.byteLength, now)) {
+					counters.rateLimited += 1;
+					return;
+				}
+				counters.authorityMismatch += 1;
+				counters.unauthorized += 1;
+				return;
+			}
+			let bucket = writerBuckets.get(author);
+			if (bucket !== undefined && now - bucket.lastSeen >= WRITER_BUCKET_IDLE_MS) {
+				deleteWriterBucket(author);
+				bucket = undefined;
+			}
+			if (bucket === undefined) {
+				for (const [retainedAuthor, retained] of writerBuckets) {
+					if (now - retained.lastSeen >= WRITER_BUCKET_IDLE_MS || !v3Port.isCurrentWriter(retainedAuthor)) {
+						deleteWriterBucket(retainedAuthor);
+					}
+				}
+				if (writerBuckets.size >= WRITER_BUCKET_CAPACITY) {
+					counters.rateLimited += 1;
+					return;
+				}
+				bucket = newReceiveBucket(now);
+				writerBuckets.set(author, bucket);
+			}
+			const charged = chargeReceiveBucket(bucket, bytes.byteLength, now);
+			if (!charged) {
+				counters.rateLimited += 1;
+				return;
+			}
+		}
 		if (bytes.byteLength > maxMessageBytes) {
 			counters.overLimit += 1;
 			return;
 		}
 		let frame: EphemeralFrame;
 		try {
-			frame = decodeEphemeralFrame(bytes);
+			if (v3Port === undefined) {
+				frame = decodeEphemeralFrame(bytes);
+			} else {
+				if (authority === undefined) throw new TypeError("ephemeral authority differs");
+				const decoded = decodeAuthorityFrame(bytes, authority);
+				if (!decoded.contextMatches) {
+					counters.authorityMismatch += 1;
+					return;
+				}
+				frame = decoded.frame;
+			}
 		} catch {
 			counters.malformed += 1;
 			return;
 		}
-		if (!port.isAuthorized(sender)) {
+		if (v3Port === undefined && !port.isAuthorized(sender)) {
 			counters.unauthorized += 1;
 			return;
 		}
@@ -308,6 +545,22 @@ export function createEphemeralChannel(
 			}
 		}
 	});
+	const unsubscribePeerDisconnect =
+		v3Port?.onPeerDisconnect((peerId) => {
+			try {
+				const author = v3Port.authorForPeer(peerId);
+				if (
+					author !== undefined &&
+					!v3Port
+						.authorizedPeers()
+						.some((candidate) => candidate !== peerId && v3Port.authorForPeer(candidate) === author)
+				) {
+					deleteWriterBucket(author);
+				}
+			} catch {
+				// Uncertain roster evidence cannot grant fresh receive capacity.
+			}
+		}) ?? ((): void => undefined);
 
 	const drain = async (): Promise<void> => {
 		if (draining || closed) return;
@@ -320,12 +573,11 @@ export function createEphemeralChannel(
 				queueSpace = new Promise<void>((resolve) => {
 					resolveQueueSpace = resolve;
 				});
-				const encoded = encodeEphemeralFrame(entry.frame);
 				let accepted = false;
 				const attempts = entry.reliable ? RELIABLE_ATTEMPTS : 1;
 				for (let attempt = 0; attempt < attempts && !closed; attempt += 1) {
 					try {
-						accepted = await Promise.race([port.send(encoded), closedResult]);
+						accepted = await Promise.race([port.send(entry.encoded), closedResult]);
 					} catch {
 						accepted = false;
 					}
@@ -374,7 +626,21 @@ export function createEphemeralChannel(
 			throw new TypeError("unordered publication key differs");
 		}
 		const frame: EphemeralFrame = { ...input, payload: input.payload.slice(), sequence };
-		const encodedSize = encodeEphemeralFrame(frame).byteLength;
+		let encoded: Uint8Array;
+		if (v3Port === undefined) {
+			encoded = encodeEphemeralFrame(frame);
+		} else {
+			const authority = authoritySnapshot(v3Port.currentAuthority());
+			if (authority === undefined) return Promise.resolve(false);
+			if (installedAuthority === undefined || !sameAuthority(installedAuthority, authority)) {
+				installedAuthority = authority;
+				remoteWatermarks.clear();
+				clearWriterBuckets();
+				rejectedBucket = newReceiveBucket(monotonicNow());
+			}
+			encoded = encodeAuthorityFrame(frame, authority);
+		}
+		const encodedSize = encoded.byteLength;
 		if (encodedSize > maxMessageBytes) {
 			counters.overLimit += 1;
 			return Promise.resolve(false);
@@ -384,7 +650,7 @@ export function createEphemeralChannel(
 		}
 		const enqueue = (): Promise<boolean> =>
 			new Promise((resolve) => {
-				queue.push({ frame, reliable: frame.class === "reliable-unordered", resolve });
+				queue.push({ encoded, frame, reliable: frame.class === "reliable-unordered", resolve });
 				void drain();
 			});
 		if (frame.class === "reliable-unordered") {
@@ -402,7 +668,7 @@ export function createEphemeralChannel(
 						(entry) => entry.frame.class === "unreliable-sequenced" && entry.frame.key === frame.key
 					);
 					if (existingIndex >= 0) {
-						const [replaced] = queue.splice(existingIndex, 1, { frame, reliable: false, resolve });
+						const [replaced] = queue.splice(existingIndex, 1, { encoded, frame, reliable: false, resolve });
 						replaced?.resolve(false);
 						counters.dropped += 1;
 						return;
@@ -412,7 +678,7 @@ export function createEphemeralChannel(
 				resolve(false);
 				return;
 			}
-			queue.push({ frame, reliable: false, resolve });
+			queue.push({ encoded, frame, reliable: false, resolve });
 			void drain();
 		});
 	};
@@ -424,9 +690,11 @@ export function createEphemeralChannel(
 			closed = true;
 			resolveClosed?.();
 			unsubscribe();
+			unsubscribePeerDisconnect();
 			for (const entry of queue.splice(0)) entry.resolve(false);
 			localSequencedKeys.clear();
 			remoteWatermarks.clear();
+			clearWriterBuckets();
 			subscribers.clear();
 			try {
 				port.close?.();
@@ -444,6 +712,7 @@ export function createEphemeralChannel(
 				remoteSequencedKeys,
 				sequencedKeys: localSequencedKeys.size + remoteSequencedKeys,
 				sequencedSenders: remoteWatermarks.size,
+				writerBuckets: writerBuckets.size,
 			});
 		},
 		subscribe: (listener): (() => void) => {

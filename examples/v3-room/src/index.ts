@@ -55,6 +55,14 @@ export interface V3RoomProjectionAuthority {
 
 export interface V3RoomEphemeralAuthorizationProvider {
 	authorForPeer(peerId: string): string | undefined;
+	currentAuthority():
+		| Readonly<{
+				readonly aclDigest: string;
+				readonly anchorDigest: string;
+				readonly epoch: 0;
+				readonly objectId: string;
+		  }>
+		| undefined;
 	isCurrentWriter(author: string): boolean;
 }
 
@@ -368,8 +376,11 @@ export async function createV3RoomSession<Projection extends V3RoomProjectionAut
 						const matches = projection.transportPeerAuthors.filter((entry) => entry.peerId === peerId);
 						return matches.length === 1 ? matches[0]?.author : undefined;
 					},
+					currentAuthority() {
+						return activeHandle?.currentEphemeralAuthority();
+					},
 					isCurrentWriter(author: string): boolean {
-						return projection.writerAuthors.includes(author);
+						return activeHandle?.currentEphemeralAuthority()?.isCurrentWriter(author) === true;
 					},
 				},
 				options

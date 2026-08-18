@@ -1,6 +1,7 @@
 import { sha256 } from "@noble/hashes/sha2";
 import { bytesToHex, concatBytes } from "@noble/hashes/utils";
 import type { EphemeralChannel, EphemeralChannelOptions } from "@ts-drp/ephemeral";
+import { DRP_MESSAGE_PROTOCOL } from "@ts-drp/network";
 import { type DRPNetworkNode, Message, MessageType } from "@ts-drp/types";
 
 import type { EphemeralAuthorizationProvider, NodeEphemeralAdapter } from "./ephemeral.js";
@@ -183,8 +184,25 @@ export class NodeRoomNetworkAdapter {
 			const registration = this.#byIngressId.get(message.objectId);
 			if (registration === undefined || registration.closed) return false;
 			if (this.#networkNode.gossipTopicFor(message) !== undefined) return false;
-			if (!this.#networkNode.getAllPeers().includes(message.sender)) return true;
-			registration.ingress(message);
+			const evidence = this.#networkNode.claimIngressEvidence?.(message);
+			if (
+				evidence === undefined ||
+				evidence.transport.kind !== "authenticated-stream" ||
+				evidence.transport.protocol !== DRP_MESSAGE_PROTOCOL ||
+				evidence.transport.sender !== evidence.message.sender ||
+				evidence.message.type !== MessageType.MESSAGE_TYPE_V3_ENVELOPE ||
+				evidence.message.objectId !== registration.ingressId
+			) {
+				return true;
+			}
+			registration.ingress(
+				Message.create({
+					data: evidence.message.data.slice(),
+					objectId: evidence.message.objectId,
+					sender: evidence.message.sender,
+					type: evidence.message.type,
+				})
+			);
 			return true;
 		}
 		if (message.type !== MessageType.MESSAGE_TYPE_CUSTOM) return false;
