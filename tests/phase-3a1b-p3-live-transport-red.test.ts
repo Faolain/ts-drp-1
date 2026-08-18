@@ -487,7 +487,9 @@ async function recoverActivationCapability(
 	try {
 		recovered = await surface.recoverV3LiveReplica({
 			capability: preparedCapability,
-			exactCanonicalAuthorAuthorizationBytes: fixture.exactCanonicalAuthorAuthorizationBytes,
+			...(fixture.exactCanonicalLatchedAclBytes === undefined
+				? { exactCanonicalAuthorAuthorizationBytes: fixture.exactCanonicalAuthorAuthorizationBytes }
+				: { exactCanonicalLatchedAclBytes: fixture.exactCanonicalLatchedAclBytes }),
 			issuanceScope: scope,
 			issuanceStore: activationStore,
 			liveJournalStore: journalStore,
@@ -580,14 +582,18 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			"activateV3LivePlane",
 			"prepareV3LiveGeneration",
 			"recoverV3LiveReplica",
+			"republishV3RetainedTo",
 			"routeV3Ingress",
+			"routeV3RetainedIngress",
 		]);
 		const surface = await privateSurface();
 		expect(Object.keys(surface).sort()).toEqual([
 			"activateV3LivePlane",
 			"prepareV3LiveGeneration",
 			"recoverV3LiveReplica",
+			"republishV3RetainedTo",
 			"routeV3Ingress",
+			"routeV3RetainedIngress",
 		]);
 		expect(ACTIVATION_FAILURE_KINDS).toEqual([
 			"malformed-input",
@@ -865,7 +871,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 	});
 
 	it("reaches genuine recovered activation, binding conflict, ingress queueing, egress and deactivation", async () => {
-		const fixture = await createGenuinePreparedV3Fixture();
+		const fixture = await createGenuinePreparedV3Fixture({ authorizationMode: "latched-acl" });
 		try {
 			const surface = await privateSurface();
 			if (surface.activateV3LivePlane === undefined || surface.routeV3Ingress === undefined) {
@@ -904,6 +910,33 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			expect(Object.isFrozen(activated.handle)).toBe(true);
 			expect(activated.handle.objectId).toBe(fixture.descriptor.objectId);
 			expect(activated.handle.queueId).toBe(activated.handle.topic);
+			const currentEphemeralAuthority = Reflect.get(activated.handle, "currentEphemeralAuthority");
+			expect(typeof currentEphemeralAuthority).toBe("function");
+			if (typeof currentEphemeralAuthority !== "function") {
+				throw new TypeError("missing current ephemeral authority view");
+			}
+			const authority = Reflect.apply(currentEphemeralAuthority, activated.handle, []) as
+				| Readonly<{
+						aclDigest: string;
+						anchorDigest: string;
+						epoch: 0;
+						objectId: string;
+						isCurrentWriter(author: string): boolean;
+				  }>
+				| undefined;
+			expect(fixture.exactCanonicalLatchedAclBytes).toBeDefined();
+			if (fixture.exactCanonicalLatchedAclBytes === undefined) {
+				throw new TypeError("missing genuine latched ACL bytes");
+			}
+			expect(authority).toMatchObject({
+				aclDigest: lowerHex(hashDomain("ts-drp/latched-acl/v3", fixture.exactCanonicalLatchedAclBytes)),
+				anchorDigest: fixture.descriptor.anchorDigest,
+				epoch: 0,
+				objectId: fixture.descriptor.objectId,
+			});
+			expect(authority?.isCurrentWriter(fixture.author)).toBe(true);
+			expect(authority?.isCurrentWriter(`untrusted:${fixture.author}`)).toBe(false);
+			expect(Object.isFrozen(authority)).toBe(true);
 			expect(queue.hasQueue(activated.handle.queueId)).toBe(true);
 			const networkSubscribe = Reflect.get(network, "subscribe") as ReturnType<typeof vi.fn>;
 			const networkUnsubscribe = Reflect.get(network, "unsubscribe") as ReturnType<typeof vi.fn>;
@@ -1066,6 +1099,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 
 			activated.handle.deactivate();
 			activated.handle.deactivate();
+			expect(Reflect.apply(currentEphemeralAuthority, activated.handle, [])).toBeUndefined();
 			expect(queue.hasQueue(activated.handle.queueId)).toBe(false);
 			expect(network.getSubscribedTopics()).toEqual([]);
 			expect(queueClose).toHaveBeenCalledTimes(1);
@@ -1138,6 +1172,12 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			};
 			const first = surface.activateV3LivePlane(input);
 			if (!first.ok) throw new TypeError(`first activation failed: ${first.kind}`);
+			const authorListAuthority = Reflect.get(first.handle, "currentEphemeralAuthority");
+			expect(typeof authorListAuthority).toBe("function");
+			if (typeof authorListAuthority !== "function") {
+				throw new TypeError("missing current ephemeral authority view");
+			}
+			expect(Reflect.apply(authorListAuthority, first.handle, [])).toBeUndefined();
 			const topic = first.handle.topic;
 			network.unsubscribe(topic);
 			expect(network.getSubscribedTopics()).toEqual([]);
@@ -1798,6 +1838,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			"@ts-drp/canonical",
 			"@ts-drp/compaction",
 			"@ts-drp/control-plane",
+			"@ts-drp/ephemeral",
 			"@ts-drp/interval-discovery",
 			"@ts-drp/interval-reconnect",
 			"@ts-drp/interval-runner",

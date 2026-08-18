@@ -6,7 +6,7 @@ import { type GossipSub, type GossipsubMessage } from "@libp2p/gossipsub";
 import { type DRPNetworkNodeConfig, Message, MessageType } from "@ts-drp/types";
 import { afterEach, describe, expect, test } from "vitest";
 
-import { DRPNetworkNode } from "../src/node.js";
+import { DRP_MESSAGE_PROTOCOL, DRPNetworkNode } from "../src/node.js";
 
 const config: DRPNetworkNodeConfig = {
 	bootstrap_peers: [],
@@ -71,6 +71,27 @@ describe("Phase 1k authenticated transport attribution", () => {
 			["phase-1k-direct-spoof", sender.peerId],
 			["phase-1k-direct-honest", sender.peerId],
 		]);
+		const claim = Reflect.get(receiver, "claimIngressEvidence");
+		expect(typeof claim).toBe("function");
+		if (typeof claim !== "function") throw new TypeError("missing direct ingress evidence claim");
+		const first = received[0];
+		const second = received[1];
+		if (first === undefined || second === undefined) throw new TypeError("missing direct messages");
+		expect(Reflect.apply(claim, receiver, [first])).toMatchObject({
+			message: { objectId: "phase-1k-direct-spoof", sender: sender.peerId },
+			transport: { kind: "authenticated-stream", protocol: DRP_MESSAGE_PROTOCOL, sender: sender.peerId },
+		});
+		expect(Reflect.apply(claim, receiver, [first])).toBeUndefined();
+		second.objectId = "mutated-after-authentication";
+		expect(Reflect.apply(claim, receiver, [second])).toBeUndefined();
+		await sender.sendMessage(receiver.peerId, appMessage(sender.peerId, "phase-1k-direct-content"));
+		await waitFor(() => received.length === 3, "the content-bound direct message");
+		const third = received[2];
+		if (third === undefined) throw new TypeError("missing content-bound direct message");
+		third.data[0] = (third.data[0] ?? 0) ^ 1;
+		expect(Reflect.apply(claim, receiver, [third])).toBeUndefined();
+		third.data[0] = new TextEncoder().encode("phase-1k-direct-content")[0] ?? 0;
+		expect(Reflect.apply(claim, receiver, [third])).toBeUndefined();
 	});
 
 	test("signed gossipsub ingress attributes the original publisher rather than a claimed victim", async () => {

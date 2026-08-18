@@ -19,6 +19,17 @@ import {
 import { type DRPNetworkHostFactory, DRPNetworkNode } from "../src/node.js";
 
 interface Seam3NetworkSurface {
+	claimIngressEvidence?(message: Message):
+		| Readonly<{
+				message: Readonly<{
+					data: Uint8Array;
+					objectId: string;
+					sender: string;
+					type: MessageType;
+				}>;
+				transport: Readonly<{ kind: "signed-gossip"; sender: string; topic: string }>;
+		  }>
+		| undefined;
 	publishMessage?(topic: string, message: Message): Promise<true>;
 	gossipTopicFor?(message: Message): string | undefined;
 }
@@ -251,9 +262,11 @@ describe("Phase 3a-1B Seam 3 network and generated-wire RED", () => {
 		const owner = source("packages/network/src/node.ts");
 		expect(types.match(/publishMessage\(topic: string, message: Message\): Promise<true>;/gu)).toHaveLength(1);
 		expect(types.match(/gossipTopicFor\(message: Message\): string \| undefined;/gu)).toHaveLength(1);
+		expect(types.match(/claimIngressEvidence\?\(message: Message\)/gu) ?? []).toHaveLength(1);
 		expect(owner.match(/publishMessage\(topic: string, message: Message\)/gu)).toHaveLength(1);
 		expect(owner.match(/gossipTopicFor\(message: Message\)/gu)).toHaveLength(1);
-		expect(owner).toMatch(/WeakMap<\s*Message\s*,\s*string\s*>/u);
+		expect(owner.match(/claimIngressEvidence\(message: Message\)/gu) ?? []).toHaveLength(1);
+		expect(owner).not.toMatch(/WeakMap<\s*Message\s*,\s*string\s*>/u);
 		expect(owner).not.toMatch(/(?:setGossipTopic|bindGossipTopic|gossipTopics\(\)|gossipTopicEntries)/u);
 	});
 
@@ -333,6 +346,7 @@ describe("Phase 3a-1B Seam 3 network and generated-wire RED", () => {
 		running.push(node);
 		const surface = node as DRPNetworkNode & Seam3NetworkSurface;
 		if (surface.gossipTopicFor === undefined) throw new TypeError("missing gossipTopicFor");
+		if (surface.claimIngressEvidence === undefined) throw new TypeError("missing claimIngressEvidence");
 		const received: Message[] = [];
 		node.subscribeToMessageQueue((message) => {
 			received.push(message);
@@ -356,6 +370,46 @@ describe("Phase 3a-1B Seam 3 network and generated-wire RED", () => {
 		expect(surface.gossipTopicFor(exact)).toBe(TOPIC);
 		expect(surface.gossipTopicFor({ ...exact, data: new Uint8Array(exact.data) })).toBeUndefined();
 		expect(surface.gossipTopicFor(wire)).toBeUndefined();
+		const claimed = surface.claimIngressEvidence(exact);
+		expect(claimed).toEqual({
+			message: { data: Uint8Array.of(2, 3), objectId: TOPIC, sender: signerId.toString(), type: 11 },
+			transport: { kind: "signed-gossip", sender: signerId.toString(), topic: TOPIC },
+		});
+		expect(claimed?.message.data).not.toBe(exact.data);
+		expect(surface.claimIngressEvidence(exact)).toBeUndefined();
+		const contentBoundWire = Message.create({
+			data: Uint8Array.of(4, 5),
+			objectId: TOPIC,
+			sender: "ignored",
+			type: MessageType.MESSAGE_TYPE_CUSTOM,
+		});
+		dispatch(pubsub, await signedIngress(contentBoundWire));
+		await waitFor(() => received.length === 2, "content-bound authenticated Seam3 ingress");
+		const contentBound = received[1];
+		if (contentBound === undefined) throw new TypeError("missing content-bound decoded message");
+		expect(surface.claimIngressEvidence(contentBound)).toEqual({
+			message: {
+				data: Uint8Array.of(4, 5),
+				objectId: TOPIC,
+				sender: signerId.toString(),
+				type: MessageType.MESSAGE_TYPE_CUSTOM,
+			},
+			transport: { kind: "signed-gossip", sender: signerId.toString(), topic: TOPIC },
+		});
+		const mutatedWire = Message.create({
+			data: Uint8Array.of(6, 7),
+			objectId: TOPIC,
+			sender: "ignored",
+			type: MessageType.MESSAGE_TYPE_CUSTOM,
+		});
+		dispatch(pubsub, await signedIngress(mutatedWire));
+		await waitFor(() => received.length === 3, "mutated authenticated Seam3 ingress");
+		const mutated = received[2];
+		if (mutated === undefined) throw new TypeError("missing mutated decoded message");
+		mutated.data[0] = (mutated.data[0] ?? 0) ^ 1;
+		expect(surface.claimIngressEvidence(mutated)).toBeUndefined();
+		mutated.data[0] = 6;
+		expect(surface.claimIngressEvidence(mutated)).toBeUndefined();
 	});
 
 	it("pins tag 11 and the strict two-field V3Envelope through authoritative generation", async () => {

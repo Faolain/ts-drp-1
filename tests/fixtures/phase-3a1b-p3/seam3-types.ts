@@ -37,10 +37,19 @@ interface ExpectedHandle {
 	readonly epoch: 0;
 	readonly topic: string;
 	readonly queueId: string;
+	currentEphemeralAuthority(): ExpectedEphemeralAuthority | undefined;
 	issueLocal(input: ExpectedLocalIssueInput): Promise<ExpectedLocalIssueResult>;
 	publishPending(): Promise<ExpectedEgress>;
 	republishRetained(): Promise<ExpectedEgress>;
 	deactivate(): void;
+}
+
+interface ExpectedEphemeralAuthority {
+	readonly aclDigest: string;
+	readonly anchorDigest: string;
+	readonly epoch: 0;
+	readonly objectId: string;
+	isCurrentWriter(author: string): boolean;
 }
 
 interface ExpectedLocalIssueInput {
@@ -114,6 +123,7 @@ const handleShape: readonly [
 	0,
 	string,
 	string,
+	ExpectedEphemeralAuthority | undefined,
 	Promise<ExpectedLocalIssueResult>,
 	Promise<ExpectedEgress>,
 	Promise<ExpectedEgress>,
@@ -122,6 +132,7 @@ const handleShape: readonly [
 	handle.epoch,
 	handle.topic,
 	handle.queueId,
+	handle.currentEphemeralAuthority(),
 	handle.issueLocal(localIssueInput),
 	handle.publishPending(),
 	handle.republishRetained(),

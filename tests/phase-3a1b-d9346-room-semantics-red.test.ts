@@ -12,6 +12,14 @@ interface Projection {
 
 interface AuthorizationProvider {
 	authorForPeer(peerId: string): string | undefined;
+	currentAuthority():
+		| Readonly<{
+				aclDigest: string;
+				anchorDigest: string;
+				epoch: 0;
+				objectId: string;
+		  }>
+		| undefined;
 	isCurrentWriter(author: string): boolean;
 }
 
@@ -78,6 +86,14 @@ vi.mock("../packages/node/dist/src/v3-live.js", async (importOriginal) => ({
 		probe.activatedSink = input.onAdmittedVertex;
 		return {
 			handle: {
+				currentEphemeralAuthority: () =>
+					Object.freeze({
+						aclDigest: "c".repeat(64),
+						anchorDigest: "a".repeat(64),
+						epoch: 0,
+						isCurrentWriter: (author: string): boolean => author === "author-writer",
+						objectId: "controlled-v3-room",
+					}),
 				deactivate: (): void => {
 					probe.deactivations += 1;
 				},
@@ -397,19 +413,26 @@ describe("D.93.46b real shared-room semantics", () => {
 				operation: Object.freeze({ action: "join", peerId: "peer-reader" }),
 			}),
 		];
-		const writersOnly = application((vertices) => {
+		const widenedProjection = application((vertices) => {
 			const value = project(vertices);
-			return { ...value, writerAuthors: ["author-writer"] };
+			return { ...value, writerAuthors: ["author-writer", "author-reader"] };
 		});
 		const { createV3RoomSession: currentCreateV3RoomSession } = await roomModule;
 		const createV3RoomSession = currentCreateV3RoomSession as unknown as (
 			input: ExpectedInput
 		) => Promise<ExpectedSession>;
-		const session = await createV3RoomSession(input(writersOnly, () => undefined));
+		const session = await createV3RoomSession(input(widenedProjection, () => undefined));
 		session.openEphemeral({ maxMessageBytes: 65_536, maxSequencedKeys: 1, maxSequencedSenders: 2 });
 		const provider = probe.ephemeralProvider;
 		expect(provider).toBeDefined();
 		expect(provider?.authorForPeer("peer-writer")).toBe("author-writer");
+		expect(provider?.currentAuthority()).toEqual({
+			aclDigest: "c".repeat(64),
+			anchorDigest: "a".repeat(64),
+			epoch: 0,
+			isCurrentWriter: expect.any(Function),
+			objectId: "controlled-v3-room",
+		});
 		expect(provider?.isCurrentWriter("author-writer")).toBe(true);
 		expect(provider?.isCurrentWriter(provider.authorForPeer("peer-reader") ?? "")).toBe(false);
 		expect(provider?.authorForPeer("peer-unknown")).toBeUndefined();

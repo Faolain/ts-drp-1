@@ -80,6 +80,7 @@ interface EphemeralNodeModule {
 
 interface V3EphemeralAuthorizationProvider {
 	authorForPeer(peerId: string): string | undefined;
+	currentAuthority(): Readonly<{ aclDigest: string; anchorDigest: string; epoch: 0; objectId: string }> | undefined;
 	isCurrentWriter(author: string): boolean;
 }
 
@@ -493,6 +494,12 @@ describe("Track E1 post-closure correction", () => {
 			"zone",
 			{
 				authorForPeer: (peerId) => roster.get(peerId),
+				currentAuthority: () => ({
+					aclDigest: "22".repeat(32),
+					anchorDigest: "11".repeat(32),
+					epoch: 0,
+					objectId: "zone",
+				}),
 				isCurrentWriter: (author) => author === "author-writer",
 			},
 			options()
@@ -508,14 +515,51 @@ describe("Track E1 post-closure correction", () => {
 	});
 
 	it("fails v3 E1 closed for wrong-topic, malformed, unauthorized, and post-deactivation ingress", async () => {
-		const module = await loadEphemeralModule();
 		const { NodeEphemeralAdapter } = await loadNodeEphemeralModule();
 		let topic = "";
+		const published: Message[] = [];
+		const evidence = new WeakMap<
+			Message,
+			Readonly<{
+				message: Readonly<{ data: Uint8Array; objectId: string; sender: string; type: MessageType }>;
+				transport: Readonly<{ kind: "signed-gossip"; sender: string; topic: string }>;
+			}>
+		>();
+		const stamp = (message: Message, selectedTopic = topic): void => {
+			evidence.set(message, {
+				message: {
+					data: message.data.slice(),
+					objectId: message.objectId,
+					sender: message.sender,
+					type: message.type,
+				},
+				transport: { kind: "signed-gossip", sender: message.sender, topic: selectedTopic },
+			});
+		};
 		const network = {
 			...nodeNetwork(),
+			claimIngressEvidence: (message: Message): unknown => {
+				const claimed = evidence.get(message);
+				evidence.delete(message);
+				if (claimed === undefined) return undefined;
+				const snapshot = claimed.message;
+				return snapshot.sender === message.sender &&
+					snapshot.type === message.type &&
+					snapshot.objectId === message.objectId &&
+					snapshot.data.every((value, index) => value === message.data[index]) &&
+					snapshot.data.byteLength === message.data.byteLength
+					? claimed
+					: undefined;
+			},
 			getGroupPeers: (): readonly string[] => ["peer-writer", "peer-reader"],
-			gossipTopicFor: (message: Message): string | undefined => message.objectId,
+			gossipTopicFor: (message: Message): string | undefined => evidence.get(message)?.transport.topic,
 			peerId: "peer-local",
+			publishMessage: (selected: string, message: Message): Promise<true> => {
+				published.push(message);
+				stamp(message, selected);
+				return Promise.resolve(true);
+			},
+			sendMessage: (): Promise<void> => Promise.resolve(),
 			subscribe: (selected: string): void => {
 				topic = selected;
 			},
@@ -529,6 +573,12 @@ describe("Track E1 post-closure correction", () => {
 			"zone",
 			{
 				authorForPeer: (peerId) => roster.get(peerId),
+				currentAuthority: () => ({
+					aclDigest: "22".repeat(32),
+					anchorDigest: "11".repeat(32),
+					epoch: 0,
+					objectId: "zone",
+				}),
 				isCurrentWriter: (author) => author === "author-writer",
 			},
 			options()
@@ -536,23 +586,35 @@ describe("Track E1 post-closure correction", () => {
 		expect(topic).not.toBe("");
 		const message = (objectId: string, sender: string, data: Uint8Array): Message =>
 			Message.create({ data, objectId, sender, type: MessageType.MESSAGE_TYPE_CUSTOM });
-		const frame = (key: string): Uint8Array =>
-			module.encodeEphemeralFrame({
-				class: "unreliable-sequenced",
-				key,
-				payload: bytes(key),
-				sequence: 1,
-			});
+		await expect(
+			channel.publish({ class: "unreliable-sequenced", key: "fixture", payload: bytes("fixture") })
+		).resolves.toBe(true);
+		const publishedFrame = published[0]?.data;
+		if (publishedFrame === undefined) throw new TypeError("missing production v3 frame");
+		const frame = (): Uint8Array => publishedFrame.slice();
 		const delivered: string[] = [];
 		channel.subscribe(({ payload }) => delivered.push(new TextDecoder().decode(payload)));
-		expect(adapter.route(message(topic, "peer-writer", frame("authorized-writer")))).toBe(true);
-		expect(adapter.route(message("wrong-topic", "peer-writer", Uint8Array.of(1)))).toBe(false);
-		expect(adapter.route(message(topic, "peer-writer", Uint8Array.of(0xff)))).toBe(true);
-		expect(adapter.route(message(topic, "peer-unknown", frame("unknown")))).toBe(true);
-		expect(adapter.route(message(topic, "peer-reader", frame("enrolled-non-writer")))).toBe(true);
+		const exact = message(topic, "peer-writer", frame());
+		stamp(exact);
+		expect(adapter.route(exact)).toBe(true);
+		const wrongTopic = message(topic, "peer-writer", Uint8Array.of(1));
+		stamp(wrongTopic, "wrong-topic");
+		expect(adapter.route(wrongTopic)).toBe(true);
+		expect(network.claimIngressEvidence?.(wrongTopic)).toBeUndefined();
+		const malformed = message(topic, "peer-writer", Uint8Array.of(0xff));
+		stamp(malformed);
+		expect(adapter.route(malformed)).toBe(true);
+		const unknown = message(topic, "peer-unknown", frame());
+		stamp(unknown);
+		expect(adapter.route(unknown)).toBe(true);
+		const reader = message(topic, "peer-reader", frame());
+		stamp(reader);
+		expect(adapter.route(reader)).toBe(true);
 		roster.set("peer-writer", "author-reader");
-		expect(adapter.route(message(topic, "peer-writer", frame("peer-author-mismatch")))).toBe(true);
-		expect(delivered).toEqual(["authorized-writer"]);
+		const revoked = message(topic, "peer-writer", frame());
+		stamp(revoked);
+		expect(adapter.route(revoked)).toBe(true);
+		expect(delivered).toEqual(["fixture"]);
 		expect(channel.stats()).toMatchObject({ delivered: 1, malformed: 1, unauthorized: 3 });
 		channel.close();
 		expect(adapter.route(message(topic, "peer-writer", Uint8Array.of(1)))).toBe(false);
