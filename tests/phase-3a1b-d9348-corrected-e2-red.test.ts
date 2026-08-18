@@ -626,6 +626,13 @@ describe("D.93.48 corrected E2 RED", () => {
 
 			const cleanup = controlledV3();
 			const disconnectReset = controlledV3();
+			const sharedDisconnect = controlledV3({
+				roster: new Map([
+					["peer-a", "author-shared"],
+					["peer-b", "author-shared"],
+				]),
+				writers: new Set(["author-shared"]),
+			});
 			const refilled = controlledV3();
 			cleanup.route(small, "peer-writer");
 			expect(stats(cleanup.channel).writerBuckets).toBe(1);
@@ -654,6 +661,18 @@ describe("D.93.48 corrected E2 RED", () => {
 			disconnectReset.route(small, "peer-writer", "authenticated-stream");
 			expect(disconnectDeliveries).toBe(121);
 			expect(stats(disconnectReset.channel).writerBuckets).toBe(1);
+			let sharedDisconnectDeliveries = 0;
+			sharedDisconnect.channel.subscribe(() => {
+				sharedDisconnectDeliveries += 1;
+			});
+			for (let index = 0; index < 121; index += 1) {
+				sharedDisconnect.route(small, index % 2 === 0 ? "peer-a" : "peer-b");
+			}
+			expect(sharedDisconnectDeliveries).toBe(120);
+			sharedDisconnect.disconnect("peer-a");
+			sharedDisconnect.route(small, "peer-b", "authenticated-stream");
+			expect(sharedDisconnectDeliveries).toBe(120);
+			expect(stats(sharedDisconnect.channel)).toMatchObject({ rateLimited: 2, writerBuckets: 1 });
 			cleanup.writers.delete("author-writer");
 			cleanup.route(small, "peer-writer");
 			expect(stats(cleanup.channel).writerBuckets).toBe(0);
@@ -675,6 +694,7 @@ describe("D.93.48 corrected E2 RED", () => {
 			capped.close();
 			cleanup.close();
 			disconnectReset.close();
+			sharedDisconnect.close();
 			refilled.close();
 		} finally {
 			vi.useRealTimers();
