@@ -1,3 +1,4 @@
+import type { Multiaddr } from "@multiformats/multiaddr";
 import {
 	BrowserRoutingClosestPeersSource,
 	CIRCUIT_RELAY_V2_HOP_PROTOCOL,
@@ -145,6 +146,194 @@ describe("Circuit Relay v2 reservation decoding", () => {
 			outcome: "timeout",
 			protocols: [],
 		});
+	});
+
+	it("retains one owned candidate connection from HOP inspection into RESERVE", async () => {
+		const onConnect = vi.fn();
+		const closeOwnedConnection = vi.fn(() => Promise.resolve());
+		const onDisconnect = vi.fn();
+		const expire = BigInt(Math.floor((NOW + 60_000) / 1_000));
+		const client = relayClientWith({
+			closeOwnedConnection,
+			connection: true,
+			onConnect,
+			onDisconnect,
+			protocols: [CIRCUIT_RELAY_V2_HOP_PROTOCOL],
+			reservationResponse: protobufMessage(
+				protobufBytes(3, protobufVarint(1, expire)),
+				protobufVarint(5, BigInt(RELAY_RESERVATION_STATUS.OK))
+			),
+		});
+		const candidate = validRelayCandidate();
+		await expect(client.inspect(candidate, candidate.addresses[0] as string, signal())).resolves.toMatchObject({
+			hopAdvertised: true,
+			outcome: "connected",
+		});
+		await expect(client.reserve(candidate, signal())).resolves.toMatchObject({
+			status: RELAY_RESERVATION_STATUS.OK,
+		});
+
+		expect(onConnect, "T4_PROVISIONAL_INSPECT_RESERVE_CUSTODY_ABSENT").toHaveBeenCalledTimes(1);
+		expect(closeOwnedConnection).not.toHaveBeenCalled();
+		await client.release(candidate);
+		expect(closeOwnedConnection, "T4_SUCCESSFUL_RESERVATION_EXACT_RELEASE_ABSENT").toHaveBeenCalledOnce();
+		expect(onDisconnect, "T4_SUCCESSFUL_RESERVATION_PEER_DISCONNECT_USED").not.toHaveBeenCalled();
+		await client.stop();
+		expect(closeOwnedConnection).toHaveBeenCalledOnce();
+	});
+
+	it("releases exact newly-created custody after a malformed RESERVE response", async () => {
+		const closeOwnedConnection = vi.fn(() => Promise.resolve());
+		const onDisconnect = vi.fn();
+		const client = relayClientWith({
+			closeOwnedConnection,
+			connection: true,
+			onDisconnect,
+			protocols: [CIRCUIT_RELAY_V2_HOP_PROTOCOL],
+			reservationResponse: Uint8Array.of(26, 5, 8),
+		});
+		const candidate = validRelayCandidate();
+		await client.inspect(candidate, candidate.addresses[0] as string, signal());
+
+		await expect(client.reserve(candidate, signal())).resolves.toMatchObject({
+			status: RELAY_RESERVATION_STATUS.MALFORMED_MESSAGE,
+		});
+		expect(closeOwnedConnection, "T4_FAILED_CANDIDATE_DISCONNECT_ABSENT").toHaveBeenCalledOnce();
+		expect(onDisconnect, "T4_PEER_WIDE_DISCONNECT_USED").not.toHaveBeenCalled();
+	});
+
+	it.each([
+		["refused", RELAY_RESERVATION_STATUS.RESERVATION_REFUSED],
+		["no-reservation", RELAY_RESERVATION_STATUS.NO_RESERVATION],
+	] as const)("releases exact newly-created custody after a %s RESERVE response", async (_case, status) => {
+		const closeOwnedConnection = vi.fn(() => Promise.resolve());
+		const client = relayClientWith({
+			closeOwnedConnection,
+			connection: true,
+			protocols: [CIRCUIT_RELAY_V2_HOP_PROTOCOL],
+			reservationResponse: protobufVarint(5, BigInt(status)),
+		});
+		const candidate = validRelayCandidate();
+		await client.inspect(candidate, candidate.addresses[0] as string, signal());
+
+		await expect(client.reserve(candidate, signal())).resolves.toMatchObject({ status });
+		expect(closeOwnedConnection, "T4_FAILED_CANDIDATE_DISCONNECT_ABSENT").toHaveBeenCalledOnce();
+	});
+
+	it("reuses one application connection through a successful reservation without closing it", async () => {
+		const onConnect = vi.fn();
+		const closeOwnedConnection = vi.fn(() => Promise.resolve());
+		const onDisconnect = vi.fn();
+		const expire = BigInt(Math.floor((NOW + 60_000) / 1_000));
+		const client = relayClientWith({
+			closeOwnedConnection,
+			connection: true,
+			createdConnection: false,
+			onConnect,
+			onDisconnect,
+			protocols: [CIRCUIT_RELAY_V2_HOP_PROTOCOL],
+			reservationResponse: protobufMessage(
+				protobufBytes(3, protobufVarint(1, expire)),
+				protobufVarint(5, BigInt(RELAY_RESERVATION_STATUS.OK))
+			),
+		});
+		const candidate = validRelayCandidate();
+		await client.inspect(candidate, candidate.addresses[0] as string, signal());
+		await expect(client.reserve(candidate, signal())).resolves.toMatchObject({
+			status: RELAY_RESERVATION_STATUS.OK,
+		});
+
+		expect(onConnect, "T4_REUSED_LIVE_RESERVATION_OWNERSHIP_ABSENT").toHaveBeenCalledOnce();
+		expect(closeOwnedConnection).not.toHaveBeenCalled();
+		await client.release(candidate);
+		expect(closeOwnedConnection).not.toHaveBeenCalled();
+		expect(onDisconnect, "T4_REUSED_LIVE_SUCCESS_PEER_DISCONNECT_USED").not.toHaveBeenCalled();
+		await client.stop();
+		expect(closeOwnedConnection).not.toHaveBeenCalled();
+	});
+
+	it("closes only the exact newly-created connection after non-HOP inspection", async () => {
+		const closeOwnedConnection = vi.fn(() => Promise.resolve());
+		const client = relayClientWith({
+			closeOwnedConnection,
+			connection: true,
+			protocols: ["/ipfs/id/1.0.0"],
+		});
+		const candidate = validRelayCandidate();
+		await client.inspect(candidate, candidate.addresses[0] as string, signal());
+
+		expect(closeOwnedConnection, "T4_FAILED_CANDIDATE_DISCONNECT_ABSENT").toHaveBeenCalledOnce();
+	});
+
+	it("never closes a reused application connection after non-HOP inspection", async () => {
+		const closeOwnedConnection = vi.fn(() => Promise.resolve());
+		const onDisconnect = vi.fn();
+		const client = relayClientWith({
+			closeOwnedConnection,
+			connection: true,
+			createdConnection: false,
+			onDisconnect,
+			protocols: ["/ipfs/id/1.0.0"],
+		});
+		const candidate = validRelayCandidate();
+		await client.inspect(candidate, candidate.addresses[0] as string, signal());
+
+		expect(closeOwnedConnection).not.toHaveBeenCalled();
+		expect(onDisconnect, "T4_REUSED_LIVE_PEER_DISCONNECT_USED").not.toHaveBeenCalled();
+	});
+
+	it("awaits late newly-created cleanup before publishing the failed inspection", async () => {
+		let releaseCleanup: (() => void) | undefined;
+		const closeOwnedConnection = vi.fn(() => new Promise<void>((resolve) => (releaseCleanup = resolve)));
+		const client = relayClientWith({
+			closeOwnedConnection,
+			connection: true,
+			protocols: ["/ipfs/id/1.0.0"],
+		});
+		const inspection = client.inspect(validRelayCandidate(), "ignored", signal());
+		let settled = false;
+		void inspection.finally(() => {
+			settled = true;
+		});
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(closeOwnedConnection, "T4_FAILED_CANDIDATE_DISCONNECT_ABSENT").toHaveBeenCalledOnce();
+		expect(settled, "T4_LATE_DISCONNECT_COMPLETION_UNOWNED").toBe(false);
+		releaseCleanup?.();
+		await expect(inspection).resolves.toMatchObject({ hopAdvertised: false });
+	});
+
+	it("fails closed when newly-created cleanup itself rejects", async () => {
+		const closeOwnedConnection = vi.fn(() => Promise.reject(new Error("controlled disconnect failure")));
+		const client = relayClientWith({
+			closeOwnedConnection,
+			connection: true,
+			protocols: ["/ipfs/id/1.0.0"],
+		});
+
+		await expect(client.inspect(validRelayCandidate(), "ignored", signal())).resolves.toMatchObject({
+			hopAdvertised: false,
+			outcome: "refused",
+		});
+		expect(closeOwnedConnection, "T4_DISCONNECT_FAILURE_IGNORED").toHaveBeenCalledOnce();
+	});
+
+	it.each([
+		["missing connection", false, undefined],
+		["aborted inspection", false, 0],
+	] as const)("releases newly-created custody after %s", async (_case, connection, abortAfterMs) => {
+		const closeOwnedConnection = vi.fn(() => Promise.resolve());
+		const controller = new AbortController();
+		const client = relayClientWith({
+			closeOwnedConnection,
+			connection,
+			identifyTimeoutMs: 10,
+			protocols: [],
+		});
+		if (abortAfterMs !== undefined) setTimeout(() => controller.abort(), abortAfterMs);
+
+		await client.inspect(validRelayCandidate(), "ignored", controller.signal);
+
+		expect(closeOwnedConnection, "T4_FAILED_CANDIDATE_DISCONNECT_ABSENT").toHaveBeenCalledOnce();
 	});
 
 	it("decodes an actual HOP RESERVE response with expiry and limits", () => {
@@ -811,18 +1000,65 @@ function validRelayCandidate(): RelayCandidate {
 	);
 }
 
+interface OwnedConnectionReceipt {
+	close(): Promise<void>;
+	readonly connectionId: string;
+	readonly created: boolean;
+}
+
+function controlledReservationStream(response: Uint8Array): object {
+	if (response.byteLength >= 128) throw new Error("controlled response exceeds one-byte frame");
+	const events = new EventTarget();
+	const framed = Uint8Array.from([response.byteLength, ...response]);
+	const log = Object.assign((): void => undefined, { error: (): void => undefined });
+	return {
+		addEventListener: events.addEventListener.bind(events),
+		close: (): Promise<void> => Promise.resolve(),
+		log,
+		push: (): void => undefined,
+		readBufferLength: 0,
+		remoteWriteStatus: "writable",
+		removeEventListener: events.removeEventListener.bind(events),
+		send: (): true => {
+			queueMicrotask(() => {
+				const event = new Event("message") as Event & { data: Uint8Array };
+				Object.defineProperty(event, "data", { value: framed });
+				events.dispatchEvent(event);
+			});
+			return true;
+		},
+		unshift: (): void => undefined,
+	};
+}
+
 function relayClientWith(options: {
+	closeOwnedConnection?(): Promise<void>;
 	readonly connectDelayMs?: number;
 	readonly connection: boolean;
+	readonly createdConnection?: boolean;
 	readonly identificationDelayMs?: number;
 	readonly identifyDuringConnect?: boolean;
 	readonly identifyProtocols?: string[];
 	readonly identifyTimeoutMs?: number;
+	onConnect?(): void;
+	onDisconnect?(peerId: string): void;
 	readonly protocols: string[];
+	readonly reservationResponse?: Uint8Array;
 }): Libp2pRelayClient {
 	const events = new EventTarget();
+	const circuitAddresses: Multiaddr[] = [];
+	const listeners: Array<{ close(): Promise<void>; getAddrs(): Multiaddr[] }> = [];
+	const connection = {
+		id: "connection-1",
+		newStream: (): object => {
+			const response = options.reservationResponse;
+			if (response === undefined) throw new Error("controlled missing reservation response");
+			return controlledReservationStream(response);
+		},
+	};
 	return new Libp2pRelayClient({
-		connect: async (): Promise<void> => {
+		connect: async (): Promise<OwnedConnectionReceipt> => {
+			options.onConnect?.();
 			if (options.connectDelayMs !== undefined) {
 				await new Promise((resolve) => setTimeout(resolve, options.connectDelayMs));
 			}
@@ -838,23 +1074,40 @@ function relayClientWith(options: {
 					);
 				if (options.identifyDuringConnect === true) {
 					dispatchIdentify();
-					return;
+				} else {
+					setTimeout(dispatchIdentify, options.identificationDelayMs ?? 0);
 				}
-				setTimeout(dispatchIdentify, options.identificationDelayMs ?? 0);
 			}
+			return {
+				close: options.closeOwnedConnection ?? ((): Promise<void> => Promise.resolve()),
+				connectionId: "connection-1",
+				created: options.createdConnection ?? true,
+			};
 		},
-		disconnect: (): Promise<void> => Promise.resolve(),
+		disconnect: (peerId: string): Promise<void> => {
+			options.onDisconnect?.(peerId);
+			return Promise.resolve();
+		},
 		host: {
 			addEventListener: events.addEventListener.bind(events),
-			components: { transportManager: { getListeners: () => [], listen: () => Promise.resolve() } },
-			getConnections: () => (options.connection ? [{ id: "connection-1" }] : []),
-			getMultiaddrs: () => [],
+			components: {
+				transportManager: {
+					getListeners: () => listeners,
+					listen: (addresses: Multiaddr[]): Promise<void> => {
+						circuitAddresses.push(...addresses);
+						listeners.push({ close: () => Promise.resolve(), getAddrs: () => [...addresses] });
+						return Promise.resolve();
+					},
+				},
+			},
+			getConnections: () => (options.connection ? [connection] : []),
+			getMultiaddrs: () => circuitAddresses,
 			peerStore: { get: () => Promise.resolve({ protocols: options.protocols }) },
 			removeEventListener: events.removeEventListener.bind(events),
 		} as never,
 		identifyTimeoutMs: options.identifyTimeoutMs ?? 1,
 		reservationTimeoutMs: 1,
-	});
+	} as never);
 }
 
 function protobufMessage(...fields: Uint8Array[]): Uint8Array {

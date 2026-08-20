@@ -16,6 +16,11 @@ const productionEnvironment: BrowserNetworkEnv = {
 const networkSourceModuleUrl = new URL("../../../packages/network/src/node.ts", import.meta.url).href;
 
 describe("browser network rendezvous refresh configuration", () => {
+	it("preserves the shipped single browser relay reservation target", () => {
+		const relayPolicy = buildModularNetworkConfig(productionEnvironment).network_config?.control_plane?.relay_policy;
+		expect(relayPolicy?.target_reservations).toBe(1);
+	});
+
 	it("uses the node's TTL-based default in production and keeps fast fixture churn", () => {
 		const production = buildModularNetworkConfig(productionEnvironment).network_config?.control_plane?.rendezvous;
 		const fixture = buildModularNetworkConfig({

@@ -26,7 +26,10 @@ interface PeerSelectionSnapshot {
 	readonly expectedReplicas: number | undefined;
 	readonly globalDiscovery: boolean;
 	readonly live: number;
+	readonly priority?: number;
+	readonly prioritySlots?: number;
 	readonly queued: number;
+	readonly replacements?: number;
 	readonly selected: number;
 	readonly upgrade: number;
 }
@@ -137,7 +140,7 @@ function snapshot(node: DRPNetworkNode): PeerSelectionSnapshot {
 }
 
 function assertClosedSnapshot(value: PeerSelectionSnapshot): void {
-	expect(Object.keys(value).sort()).toEqual([
+	const t3Keys = [
 		"budget",
 		"charged",
 		"denied",
@@ -148,9 +151,17 @@ function assertClosedSnapshot(value: PeerSelectionSnapshot): void {
 		"queued",
 		"selected",
 		"upgrade",
-	]);
+	];
+	const t4Keys = ["priority", "prioritySlots", "replacements"];
+	const hasAnyT4Key = t4Keys.some((key) => key in value);
+	expect(Object.keys(value).sort()).toEqual(hasAnyT4Key ? [...t3Keys, ...t4Keys].sort() : t3Keys);
 	expect(value.queued + value.selected + value.charged + value.upgrade + value.live).toBeLessThanOrEqual(value.budget);
 	expect(value.dependencyDialQueue).toBeLessThanOrEqual(value.budget);
+	if (hasAnyT4Key) {
+		expect(value.priority).toBeLessThanOrEqual(value.prioritySlots ?? -1);
+		expect(value.priority).toBeLessThanOrEqual(value.selected + value.charged + value.upgrade + value.live);
+		expect(value.replacements).toBeGreaterThanOrEqual(0);
+	}
 }
 
 async function expectDirectPrequeueDenied(host: InspectableHost, target: Multiaddr | PeerId): Promise<void> {
@@ -1059,4 +1070,17 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 			}
 		}
 	);
+
+	test("keeps T3 census fields disjoint when the source-qualified T4 tail is absent", async () => {
+		const node = new DRPNetworkNode(config(), { hostPolicy: quietPolicy });
+		running.push(node);
+		await node.start();
+
+		expect(snapshot(node), "T4_DETACHED_COUNTS_ABSENT").toMatchObject({
+			priority: 0,
+			prioritySlots: 0,
+			replacements: 0,
+		});
+		assertClosedSnapshot(snapshot(node));
+	});
 });
