@@ -48062,3 +48062,339 @@ transport, AOI, topology T3/T4, a next anchor, product scale, full P6 or
 completion of the broader production-hardening plan. The next independent
 slice returns to topology T3: bounded discovery-to-dial peer selection under
 the already-installed T1 admission and T2 mesh owners.
+
+### D.93.49 — T3 bounded discovery-to-dial peer selection
+
+D.93.49 implements roadmap T3 after the shared v3-room, hard T1 admission, T2
+mesh selection and corrected E2 authority are independently closed. It does not
+change durable room composition, ephemeral authority, relay preference, AOI or
+application semantics. T1 remains the final upgraded-connection ceiling and
+parallel-dial owner. T2 remains the sole source of implicit room sync/fetch
+partners. T3 owns only the bounded step from an untrusted discovered identity
+to an outbound dial attempt.
+
+#### Installed dependency seam and authority boundary
+
+The source audit is version-specific. Installed `libp2p@3.3.5` turns discovery
+events into peer-store merges and emits `peer:discovery`; peer-discovery
+providers may also dial. Installed `@libp2p/bootstrap` emits then calls
+`connectionManager.openConnection`, and installed
+`@libp2p/gossipsub@16.0.4` consumes a signed PX peer record and calls the same
+method. The installed dial queue invokes `denyDialPeer` only after queue
+insertion, immediately before address lookup. A late gate alone is therefore
+insufficient. T3 wraps the `connectionManager` component supplied to every
+DRP-configured discovery, GossipSub service, discovery-capable extension
+service and circuit-relay transport factory. Its `openConnection` proxy
+requires one synchronous controller authorization before delegating to the real
+queue. The real peer gate repeats the check before address lookup as defense in
+depth. T3 also sets the installed `maxDialQueueLength` to the exact resolved
+`maxConnections`. This intentionally preserves a larger but still role-bounded
+queue on the relay profile; it does not claim the relay's 2,000-unit budget is
+the installed 500-job default.
+
+The explicit-dial census is also version-specific. Configured bootstrap retry,
+sync, room and public `safeDial` calls are DRP-owned. Relay policy instead calls
+`host.dial` directly. Node routing also calls `host.dial` directly. Circuit
+relay reservation maintenance and libp2p reconnect call `openConnection`
+internally for relay/`KEEP_ALIVE` peers. Remote interval-discovery and
+rendezvous records currently enter the public `connect` owner. D.93.49 routes
+each actual path through the classes below; it does not pretend every path
+already converges on `safeDial`.
+
+There is one combined connection-budget controller. The existing T1
+`ConnectionAdmissionController` remains the sole owner of live connections and
+upgrade reservations and is extended with T3's bounded pre-upgrade states. The
+private `PeerSelector` is only the discovery/source adapter into that
+controller; it owns no second connection census or capacity counter. Every
+capacity unit occupies exactly one of these disjoint states:
+
+1. `queued`: one normalized discovery retained before host attachment;
+2. `selected`: one peer with a one-use peer-gate authorization;
+3. `charged`: the authorization was consumed by one dial-queue job and remains
+   active or in failure cooldown;
+4. `upgrade`: the existing T1 `MultiaddrConnection` reservation; or
+5. `live`: the existing T1 connection-ID census.
+
+The invariant is
+`queued + selected + charged + upgrade + live <= maxConnections`. Transfer
+between states is atomic and never double-counts one candidate or connection.
+Inbound upgrades consume a free unit or synchronously abort the newest queued
+or selected outbound unit before admission; a charged outbound attempt is not
+retroactively hidden. Multiple live connections to one peer each occupy their
+own T1 unit. Discovery never consumes the final `maxParallelDials` units: its
+exact ceiling is `maxConnections - maxParallelDials`, reserving bounded
+headroom for configured bootstrap, relay, sync/room and routing operations. An
+explicit ticket reserves its unit before queue insertion, so a selected
+discovery burst cannot fill the queue ahead of an already-issued ticket.
+Inbound/live T1 pressure remains authoritative and may consume that headroom.
+
+The concrete node exposes one immutable exact snapshot schema: `budget`,
+`queued`, `selected`, `charged`, `upgrade`, `live`, `denied`,
+`dependencyDialQueue`, `globalDiscovery`, and `expectedReplicas`. No generic
+`pending`/`connected` aliases or peer identities are exposed.
+
+Discovery wrappers attach the selector synchronously before libp2p attaches its
+own listener. They cover `peerDiscovery` factories and extension services whose
+constructed result exposes `peerDiscoverySymbol`; the pre-queue component proxy
+also covers their native dials. Event addresses are copied before later
+asynchronous work (native bootstrap has already performed its own peer-store
+merge, which is not misreported as pre-merge evidence). A record for an
+already-live peer is a no-op rather than a second selected unit.
+
+A selected authorization is consumed by the first pre-queue call and confirmed
+by `denyDialPeer`; repeated PX/bootstrap attempts for the same peer are denied
+while its charged cooldown remains. Signed PX is authorized only by the genuine
+`peer:update` transition whose `peerRecordEnvelope` changes and installs the
+certified addresses. The one-use authorization retains that exact envelope
+identity. An unsigned PX naming a previously certified peer, a stale/replayed
+envelope, or an addressless identity cannot pass. The selector never waits
+asynchronously between observing the update and installing selected state.
+
+Explicit DRP-owned targets receive a private, exact-route ticket around their
+real dial call. This includes configured bootstrap retry, sync/room calls, the
+relay-policy `host.dial`, and `NodeRouting.connect`, which is migrated to the
+production network dial owner. A direct route normally contains one exact peer
+ID. Delegated routing may instead select a peer-ID-less exact address; the owned
+relay-policy callback lets `safeDial` bind that canonical address into one
+address-keyed charged unit. `denyOutboundUpgradedConnection` atomically matches
+the exact `MultiaddrConnection.remoteAddr` and transfers that unit to peer-keyed
+`upgrade` evidence before admission; the returned/open connection only
+reconciles `upgrade` to `live`. A circuit route contains
+the exact ordered relay-hop and destination peer IDs and atomically reserves
+both unless the relay hop is already live/leased. Arbitrary peerless addresses
+without this owned explicit-call context and ambiguous route arrays fail.
+Tickets are one-use at the pre-queue owner and peer/address gate,
+reference-count overlapping calls, and are removed in `finally`. Public callers
+cannot construct or serialize them.
+
+Public `connect` remains the remote-record owner and submits interval-discovery/
+rendezvous addresses to the selector instead of minting an explicit ticket.
+Its closed admission predicate partitions a nonempty set into canonical route
+groups by terminal destination peer ID, preserves circuit relay-hop identity,
+and evaluates each group independently under selector and address policy. It
+does not require prior certification. A bad second peer therefore cannot erase
+an independently valid first group, preserving the existing per-address
+admission contract. GREEN replaces the current first-`p2p` component helper for
+this path; a circuit route is keyed by its terminal destination rather than its
+relay hop. Peer-ID-less/malformed remote addresses and ambiguous
+routes fail before any `host.dial`. Existing connect consumers retain their
+behavior while crossing bounded selection.
+
+Relay policy installs one candidate lease before its initial owned dial, so the
+installed circuit-relay reservation call that precedes `created-reservation`
+remains authorized. A successful reservation event promotes it to a bounded
+relay-lifecycle lease for only that peer. The lease permits later reservation
+refresh and reconnect and is removed on reservation removal, replacement, stop
+or deadline. A recently live peer receives one bounded reconnect lease;
+already-live `force` dials such as DCUtR are allowed without a new capacity
+unit. Arbitrary peer-store tags, remote records and caller-supplied strings
+cannot mint either lease.
+
+Selected units that do not start and charged failures retain their one unit
+until connection open, stop or the exact existing 60-second T1 reservation
+lifetime; no third timeout constant is introduced. Connection open transfers
+selected/charged/upgrade evidence to live;
+connection close releases live while an authorized relay/reconnect lease may
+make one further attempt. Stop/restart aborts all work and clears all transient
+states. Timers are unreferenced and teardown aborts them immediately rather
+than waiting through deadlines. Unknown, partial or mixed controller state
+denies rather than falling back to raw dial. There is no libp2p patch,
+peer-store fork, GossipSub mesh copy, second dial queue or second capacity
+census.
+
+The node exposes only that detached exact count snapshot for observability and
+campaign evidence. It exposes no selected peer identities, mutable set, admit
+method or test hook. The production pre-queue owner, peer gate and genuine host
+events remain authority.
+
+#### Deployment-size gate for the global topic
+
+`ControlPlaneConfig.peer_selection.expected_replicas` is one required positive
+safe integer when global pubsub discovery is requested. The fixed small-
+deployment ceiling is 50. Missing configuration disables the global discovery
+module and its `DRP_DISCOVERY_TOPIC` subscription; malformed configuration
+fails host construction; values above 50 disable that global module and topic
+without disabling bounded rendezvous, bootstrap, topic-local GossipSub or PX
+selection. The legacy chat/canvas browser configuration and the separately
+implemented legacy grid configuration are both migrated in the same signed
+GREEN to declare their supported ceiling explicitly; the default-off change is
+therefore deliberate rather than an unmigrated silent application break. The
+sync-lockup preservation fixture declares its intended small deployment in the
+tests-only RED. Isolated v3-room/zone and routing configurations remain
+explicitly global-discovery-free.
+
+`DRP_INTERVAL_DISCOVERY_TOPIC` is not itself the global peer-discovery topic,
+so its subscription remains unchanged, but remote subscriber addresses from
+that protocol enter the selector-backed `connect` path and cannot obtain an
+explicit ticket. The existing host-policy switch may further disable global
+discovery but cannot override the deployment ceiling. The immutable host
+snapshot gains a non-enumerable closed global-discovery decision so existing
+enumerable isolation contracts do not silently widen; the concrete production
+node, not the structural `DRPNetworkNode` interface, exposes the detached T3
+snapshot. The snapshot states the configured expected size and final decision;
+it does not infer deployment size from current peer count.
+
+This is intentionally a coarse T3 gate. T4 remains the sole owner of relay
+reservation, operator-spine preference and lower-priority idle replacement.
+T3 is deterministic first-admitted selection within a hard bound; it makes no
+quality, fairness, topology-optimality or 1,000-client convergence claim.
+
+#### Signed TDD scope
+
+The plan-only commit lands first. Its tests-only RED is its sole child and may
+change exactly:
+
+- add `packages/network/tests/peer-selector-t3-red.test.ts` for selector/gater
+  composition, one-use explicit-ticket custody, real discovery events, native
+  bootstrap/PX-like direct connection-manager attempts, dependency-queue and
+  disjoint-state bounds, failure retention, inbound pressure, deadlines, stop
+  and restart;
+- modify `packages/network/tests/host-factory.test.ts` for the exact
+  deployment-size decision, module/topic installation and host snapshot;
+- modify `packages/network/tests/connection-admission-budget-t1-red.test.ts`
+  to prove the combined disjoint-state transfers and that T3 composes with
+  rather than replaces the T1 final-upgrade and parallel-dial ceilings;
+- modify `packages/network/tests/network.test.ts` for explicit safe-dial,
+  remote-record connect, peer-ID completeness and repeated-attempt custody;
+- modify `packages/interval-discovery/tests/unit.test.ts` for a genuine remote
+  discovery response crossing selector admission rather than an explicit
+  ticket;
+- modify `packages/routing-node/tests/node-routing.test.ts` for the real routing
+  adapter dial crossing exact ticket custody;
+- modify `examples/browser-network/src/config.test.ts` for explicit legacy
+  chat/canvas deployment-size configuration and the default-off boundary;
+- modify `examples/grid/src/network-config.test.ts` for the independent legacy
+  grid deployment declaration;
+- modify `packages/node/tests/sync-lockup/e2e-lockup.test.ts` only to declare its
+  existing small global-discovery fixture size;
+- add `packages/network-spike/tests/peer-selector-t3.test.ts` for the 1,000-peer
+  campaign, native queue prefix and combined connection-census invariant;
+- add
+  `tests/fixtures/phase-3a1b-d9349-peer-selector/browser-fixture.ts`, which
+  constructs only the genuine production node/selector and returns detached
+  count evidence;
+- add `tests/phase-3a1b-d9349-peer-selector-50-browser.pw.ts` for 50 isolated
+  Chromium pages, one real client per page, each exercising the production
+  browser selector ceiling; and
+- add `playwright.phase-3a1b-d9349-peer-selector.config.ts` as that exact
+  browser owner's bounded server/project configuration.
+
+The RED first preserves the existing T1 and T2 suites. Its single absence
+signature is that 1,000 genuine discovery events can still surface unbounded
+raw candidates or that a PX-like direct connection-manager dial does not cross
+one installed selector. Controlled pure counts may locate a boundary but do
+not replace the real gater, real peer-store event and real child-dial cases.
+
+The GREEN is the RED's sole child and may change only:
+
+- `packages/types/src/network.ts` for the closed peer-selection configuration
+  and detached count evidence;
+- `packages/network/src/connection-budget.ts` to extend the existing T1 owner
+  with the one disjoint T1/T3 occupancy machine;
+- add `packages/network/src/peer-selector.ts` as the source adapter into that
+  controller, with no independent census;
+- `packages/network/src/node.ts` to install the adapter/controller, cap the
+  dependency dial queue, compose the peer/address/final-upgrade gates, wrap the
+  actual bootstrap/relay/sync/room dials, route remote `connect`, and apply the
+  global discovery decision;
+- `packages/routing-node/src/index.ts` to replace its direct `host.dial` with
+  the exact production explicit-dial owner;
+- `examples/browser-network/src/config.ts` to declare the legacy chat/canvas
+  deployment ceiling explicitly;
+- `examples/grid/src/network-config.ts` to declare the separate legacy grid
+  deployment ceiling explicitly; and
+- no network-spike production owner: its 1,000-peer campaign is a tests-only
+  driver of the genuine production node and detached evidence.
+
+No v3-room, v3-chat, grid composition/runtime, ephemeral, durable protocol,
+interval-discovery production, relay-policy package, GossipSub dependency,
+workflow, lockfile or freeze-governance file is authorized. The two legacy
+configuration edits do not change chat/canvas/grid application behavior beyond
+making their existing small-deployment assumption explicit. The browser
+fixture and network-spike campaign remain tests-only and cannot admit
+production peers. There is one selector adapter, one combined connection-
+budget controller and one final-upgrade owner; no legacy raw-PX allowance,
+optional selector, accept-either gate or public admission hook survives.
+
+#### Causal matrix and acceptance
+
+The causal matrix covers: 1,000 unique surfaced records under browser and node
+budgets; unselected native calls rejected by the component proxy before queue
+insertion; `getDialQueue()` never exceeding the installed queue bound and
+actual transport attempts never exceeding charged capacity; a pre-issued
+ticketed relay/bootstrap call still entering while 1,000 hostile discoveries
+are rejected; duplicate/self/malformed/addressless candidates; first/interior/
+last discovery capacity and reserved explicit headroom; synchronous startup
+events with retained addresses; configured and extension-service discovery;
+already-live service discovery remaining a no-op; native bootstrap self-dial;
+first and updated signed PX, unsigned PX for a never-seen and previously
+certified peer, stale/replayed envelopes, repeated PX after early failure and
+after expiry; direct `openConnection` before/after a genuine record; and
+disjoint queued/selected/charged/upgrade/live transfers.
+
+Explicit-path rows cover configured bootstrap retry, real default relay client,
+relay reservation and `KEEP_ALIVE` reconnect, already-live DCUtR force dial,
+NodeRouting connect, room/sync dials, peer-keyed, owned delegated-routing
+peerless-address, and circuit-route public safeDial with exact one-use
+reference-counted destination/relay-hop tickets, and the installed circuit
+transport's relay-hop `openConnection`. Remote interval-
+discovery and rendezvous records must instead consume selector capacity.
+Existing peerless-safeDial observability and mixed valid/denied routing-join
+cases are explicit preservation controls.
+Ticket cleanup is killed on success, throw, signal and timeout; unaffiliated
+peer-ID-less, ambiguous-route and malformed explicit records fail closed;
+mixed remote records are independently grouped so valid and denied groups
+retain their own outcomes. Address-policy and final-upgrade denial fail closed.
+Early failure retains one charged unit;
+deadline release, inbound pressure abort, multiple live connections to one
+peer, connection close, stop, restart and bounded teardown each have causal
+rows.
+
+Deployment rows cover pubsub discovery at expected sizes 1 and 50; missing,
+zero, fractional, unsafe and 51/1,000 sizes; migrated legacy browser and grid
+configurations plus the sync-lockup fixture;
+global module/topic/score-parameter absence above the ceiling; interval-topic
+subscription preservation with bounded remote targets; topic-local GossipSub,
+PX and isolated routing preservation; and a 50-page browser census in which no
+page ever exposes, queues or transports beyond its exact browser budget. The
+browser test runs one Playwright worker, opens pages in bounded batches, applies
+no connection-budget reduction, feeds 49 controlled discovery records to each
+real production browser node, and requires 42 admitted plus seven refused per
+page (350 refusals total) at the discovery ceiling. It then occupies the six
+reserved explicit units and requires the seventh explicit request to fail at
+the combined 48-unit ceiling. Stable assertions target acceptance class, counts
+and state transitions, not log wording or incidental timer ordering.
+
+The 1,000-peer campaign is an in-process failure simulation, not 1,000 real
+browsers. The browser lane is exactly 50 real isolated pages and is a ceiling
+check, not a claim that a 50-peer room converges under WAN loss. A later scale
+campaign owns that claim after T4, E3 and AOI.
+
+Ordinary acceptance remains below ten minutes on the parallel PR critical path
+under normal uncontended load, rather than pretending all lanes run serially:
+
+- selector/host-factory/T1/T2/routing/interval unit and 1,000-peer simulation:
+  at most two minutes in one Node lane;
+- 50-page Chromium ceiling: at most five minutes in its own lane, with bounded
+  parallel page startup and immediate abort/stop teardown rather than waiting
+  through cooldown deadlines;
+- D.93.46 two-client room/zone and D.93.48 corrected-E2 preservation: their own
+  existing bounded browser lane, not serialized behind the 50-page ceiling;
+- network/types/routing-node/network-spike typecheck, builds and package tests:
+  at most five minutes in one build lane; and
+- affected ESLint, Prettier, package and diff checks: at most three minutes.
+
+The signed GREEN ledger records measured per-lane and critical-path times. Any
+lane over its bound blocks the performance claim without changing the semantic
+acceptance law.
+
+The plan, RED and GREEN each receive one bounded Kimi, Grok, Codex and Opus
+review. Grok runs through the review runner with `--max-turns 120`, 30-second
+progress reporting, a normal 30-minute window and a 45-minute hard ceiling only
+while its public JSONL stream shows useful forward progress. Every packet,
+event stream, stderr, public response and status is retained. Other reviewers
+receive comparable bounded windows. A timeout or `NO_VERDICT` is reported
+honestly and is not approval; every reproduced substantive P0/P1 is fixed or
+dismissed with source evidence before signing. D.93.49 closes only T3 bounded
+peer selection and its global discovery deployment gate. It does not claim T4,
+E3, AOI, product scale, full P6 or completion of the broader plan.
