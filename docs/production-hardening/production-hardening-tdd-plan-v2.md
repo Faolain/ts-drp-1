@@ -48008,3 +48008,57 @@ dismissed with source evidence. D.93.48 closes only corrected E2 authority
 binding, authenticated ingress and bounded receive work. It does not claim E3,
 AOI, T3/T4, scale, full P6 or completion of the broader production-hardening
 plan.
+
+#### D.93.48 closure ledger
+
+D.93.48 closed as a signed linear TDD sequence. The plan is
+`b95d72cf2d7cc7bab40e06db2446bba37983bdde` / tree
+`82957869c47614e3b0295888fa802115cd0ebc7d`; the initial tests-only RED is
+`73e9b981110f6ffc23c9737856b542f34cf24ff9` / tree
+`4973141e78d63a41d3a6cb6142b6549728401970`; the two causal RED corrections
+are `9b79996da6f10541eb96d7d46b4979f5ee8d0a8a` / tree
+`74174f173c92ee668ba6273c513404581e7f1639` and
+`c4803bad952f6cce36dd8206ba8b65e4a6f040ac` / tree
+`1aa375cffc369e71c5581c08148cd6257d771e2a`; and the bounded GREEN is
+`66ae1cc6759bfbb9034898a694d7584e376af050` / tree
+`f39ba029efd1eeea819d4c6e25a866492a7a7d6f`. Every commit has a Good Faolain
+signature under fingerprint `55E22F154FBAF8C84F378304761B99CEA81C6289`.
+The seven GREEN owner paths remain byte-identical at the later signed branch tip
+`b13f4cd93cfcbad0649fa2a5ea66bf10fac9f49b`; intervening freeze-successor work
+did not reopen corrected E2.
+
+The closed security boundary is one-use content-bound transport evidence plus
+the installed v3-room anchor/ACL epoch, a closed v2 ephemeral frame and bounded
+per-author receive work. It deliberately retains authenticated transport
+signatures and derives no secret or MAC from the public anchor digest. Grid
+receives the result through the shared room owner; it has no copied durable or
+ephemeral authority. Lazy idle expiry replaced the reviewed per-message timer
+map, while disconnect, revocation, close and authority changes retain eager
+cleanup. This closes the Codex timer-churn finding without weakening the
+60-second state bound.
+
+The final Grok review ran through the artifact-preserving runner and retained
+its packet, JSONL event stream, stderr, public response and status under
+`.logs/phase-d9348-e2-green-final3/reviews/grok/run/`. It terminated PASS in
+`240.064s` with no P0, P1 or P2. Kimi and Opus returned terminal PASS with no
+P0/P1; Opus recorded only cleanup observations after the timer-map correction.
+Codex's substantive timer-churn finding was fixed and re-reviewed in the final
+packet. No reviewer credited a controlled port as genuine network evidence.
+
+Current descendant acceptance was refreshed before recording this ledger. The
+six focused production owners passed `65/65` in `13.29s`; the five real v3-chat
+browser cases passed in `7.2s`; and the genuine two-client zone recovery case
+passed in `15.0s`. A first focused invocation also discovered preserved
+repository copies under protected `.logs/`; those copies were excluded from the
+live-checkout rerun rather than deleted or counted as source failures. Affected
+types, ephemeral, network, v3-room and grid typechecks passed in `4.94s`;
+types, ephemeral, network, node, v3-room and grid builds passed in `14.34s`;
+affected Prettier and diff checks passed; affected ESLint reported zero errors
+and eighteen existing JSDoc warnings in the network owner. Logs are preserved
+under `.logs/phase-d9348-closure-20260820/`.
+
+This ledger closes only corrected E2. It does not claim unreliable E3
+transport, AOI, topology T3/T4, a next anchor, product scale, full P6 or
+completion of the broader production-hardening plan. The next independent
+slice returns to topology T3: bounded discovery-to-dial peer selection under
+the already-installed T1 admission and T2 mesh owners.
