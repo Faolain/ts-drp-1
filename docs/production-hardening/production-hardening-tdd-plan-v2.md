@@ -48851,3 +48851,62 @@ complete golden path or completion of the broader production-hardening plan.
 After this ledger, work returns directly to the existing P6 recovery and
 two-client Discord/MMORPG golden path; T4 does not authorize another topology or
 governance detour.
+
+### D.93.50.1 — T4 fixture-causality correction
+
+The signed D.93.50 tests-only RED exposed two test-owned fixture defects while
+the exact-four production GREEN was exercised. Neither defect authorizes a
+production workaround or changes the T4 design.
+
+First, the zero-priority-slot private-dial control supplied a relay candidate
+whose `operatorGroup` string claimed a verified operator but whose
+`operatorEvidence` was absent. The production evidence classifier correctly
+classified that candidate as `unknown`; a reservation could therefore succeed
+while the target's verified-operator-group terminal remained exhausted. The
+control must instead make a control-local copy of the candidate that supplies
+the existing trusted-source evidence form with `verified: true`, the same
+operator group and a deterministic credential digest. The shared candidate
+helper remains unchanged so the unrelated negative rows retain their original
+evidence. The source remains the existing inline non-composite source and cannot
+enable degraded overflow. The assertion remains only that the genuine private
+zero-slot fallback reserves the relay without minting priority capacity; it is
+not a new claim of cryptographic operator verification. Accepting an
+unauthenticated group string, weakening the target, treating `unknown` as
+verified, substituting a composite source or enabling degraded-overflow
+eligibility is forbidden.
+
+Second, the T3 preservation test's local structural snapshot declared the three
+new T4 counts optional even though the signed public type contract requires
+them. That local interface must declare `priority`, `prioritySlots` and
+`replacements` as required numbers. Making the production fields optional,
+casting away the incompatibility or widening the snapshot is forbidden.
+
+This section supersedes only D.93.50's prospective sentence that the GREEN is
+the D.93.50 RED's sole child. This plan-only amendment is instead the sole child
+of the signed D.93.50 RED. Its signed tests-only corrective RED is the
+amendment's sole child and changes exactly:
+
+- `packages/network/tests/relay-spine-t4-red.test.ts`; and
+- `packages/network/tests/peer-selector-t3-red.test.ts`.
+
+The corrected tests retain the existing test declarations, focused partitions
+and T1-T3 preservation surface; the exact command, collected count and duration
+are remeasured and recorded rather than frozen here as a new constant. On the
+pre-GREEN production tree they must remain RED only for the intended missing T4
+production behavior; the verified fixture must not introduce an independent
+operator-evidence failure, and the T3 type owner must compile without an
+optionality mismatch.
+
+The production GREEN is the corrective RED's sole child and retains D.93.50's
+exact four production paths and all other constraints unchanged. It may not
+change either corrected test, another test, a relay source/classifier, a
+workflow, dependency, lockfile, room, zone or application path. The existing
+recovery packet is evidence only until reapplied to that signed corrective RED;
+its exact bytes must still pass the complete final-byte gates and review.
+
+The normal bounded Kimi, Grok, Codex and Opus reviews remain required for the
+plan, corrective RED and GREEN. Review processes may run for thirty minutes,
+or forty-five minutes for a complex packet, while streamed status shows real
+progress. A terminal result, genuine stall or the hard cap ends the run;
+`NO_VERDICT` is recorded honestly. No reviewer may weaken the verified-evidence
+or required-snapshot contracts to obtain a pass.
