@@ -85,6 +85,7 @@ import { isBrowser, isWebWorker } from "wherearewe";
 import {
 	type ConnectionAdmissionController,
 	createConnectionAdmissionController,
+	type ExplicitDialTicket,
 	resolveConnectionBudget,
 } from "./connection-budget.js";
 import { createMetricsRegister, type PrometheusMetricsRegister } from "./metrics/prometheus.js";
@@ -331,6 +332,12 @@ export interface RelayPolicyDriver {
 	stop(): Promise<void>;
 }
 
+interface ResolvedRelayPolicyConfiguration {
+	readonly source: RelayCandidateSource;
+	readonly targetReservations: number;
+	readonly transportProfile: RelayTransportProfile;
+}
+
 const CORE_SERVICE_NAMES = new Set(["ping", "dcutr", "identify", "identifyPush", "pubsub", "autonat", "relay"]);
 const NODE_CLOSEST_PEERS_RELAY_TOTAL_DEADLINE_MS = 55_000;
 
@@ -522,6 +529,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _relayMaintenanceTail: Promise<void> = Promise.resolve();
 	private _relayRefreshTimer?: ReturnType<typeof setTimeout>;
 	private _reservedRelayPeerIds = new Set<string>();
+	private readonly _relayPriorityTickets = new Map<string, ExplicitDialTicket>();
 	private _groupPeerChangeHandlers = new Set<GroupPeerChangeHandler>();
 	private _peerDisconnectHandlers = new Set<PeerDisconnectHandler>();
 	private readonly _hostFactory: DRPNetworkHostFactory;
@@ -648,6 +656,14 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			throw new Error("relay_service.max_reservations must be a non-negative safe integer");
 		}
 		const connectionBudget = this._resolveConnectionBudget();
+		const relayPolicyConfiguration = this._resolveRelayPolicyConfiguration();
+		const prioritySlots = relayPolicyConfiguration?.targetReservations ?? 0;
+		if (
+			prioritySlots >= connectionBudget.maxConnections ||
+			prioritySlots > connectionBudget.maxConnections - connectionBudget.maxParallelDials
+		) {
+			throw new Error("relay priority reservations exceed the effective connection budget");
+		}
 		const _relayServices = {
 			..._node_services,
 			relay: circuitRelayServer({
@@ -706,7 +722,8 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 					: "allow-all";
 		this._outboundAddressPolicy = outboundAddressPolicy;
 		const activeAddressPolicyGate = this._hostPolicy.denyDialMultiaddr === undefined ? addressPolicyGate : undefined;
-		const connectionAdmission = this._connectionAdmission ?? createConnectionAdmissionController(connectionBudget);
+		const connectionAdmission =
+			this._connectionAdmission ?? createConnectionAdmissionController(connectionBudget, { prioritySlots });
 		const peerSelector = new PeerSelector(connectionAdmission);
 		this._connectionAdmission = connectionAdmission;
 		this._peerSelector = peerSelector;
@@ -935,97 +952,42 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		void this.startEnqueueMessages();
 		this._metrics?.start(`drp-network-${this.peerId}`, 10_000);
 		this._messageQueue.start();
-		this._startRelayPolicy();
+		try {
+			this._startRelayPolicy();
+		} catch (error) {
+			this._bootstrapRetryController?.abort(error);
+			this._bootstrapRetryController = undefined;
+			this._relayPolicyController?.abort(error);
+			this._relayPolicyController = undefined;
+			const relayPolicy = this._relayPolicy;
+			this._relayPolicy = undefined;
+			this._clearRelayMaintenance();
+			this._peerSelector?.stop();
+			this._peerSelector = undefined;
+			this._connectionAdmission?.stop();
+			this._connectionAdmission = undefined;
+			this._metrics?.stop();
+			this._messageQueue.close();
+			const host = this._node;
+			this._node = undefined;
+			this._pubsub = undefined;
+			try {
+				await relayPolicy?.stop();
+				await host?.stop();
+			} catch (cleanupError) {
+				throw new AggregateError([error, cleanupError], "relay policy startup and cleanup failed", {
+					cause: error,
+				});
+			}
+			throw error;
+		}
 	}
 
 	private _startRelayPolicy(): void {
 		const relayPolicyConfig = this._config?.control_plane?.relay_policy;
-		const configuredSources = relayPolicyConfig?.sources;
-		const injectedSources = this._relayCandidateSources;
-		if (relayPolicyConfig === undefined || configuredSources === undefined) return;
-		const publicRelayOverflowEnabled =
-			this._config?.control_plane?.rollout?.public_components?.public_relay_overflow?.enabled === true;
+		const resolved = this._resolveRelayPolicyConfiguration();
+		if (relayPolicyConfig === undefined || resolved === undefined) return;
 		const nodeClosestPeersEnabled = this._nodeClosestPeersEnabled();
-		const configuredPublicRelays =
-			configuredSources.configured_relays === undefined
-				? undefined
-				: new ConfiguredPublicRelaySource({ multiaddrs: configuredSources.configured_relays });
-		const nodeTransportProfileEnabled =
-			nodeClosestPeersEnabled ||
-			(configuredSources.configured_relays !== undefined &&
-				configuredSources.configured_relays.length > 0 &&
-				!isBrowser &&
-				!isWebWorker);
-
-		const targetReservations =
-			relayPolicyConfig.target_reservations ?? DEFAULT_RELAY_POLICY_LIMITS.requiredReservations;
-		if (!Number.isSafeInteger(targetReservations) || targetReservations < 1 || targetReservations > 8) {
-			throw new Error("control_plane.relay_policy.target_reservations must be an integer within 1..8");
-		}
-		const sources = [
-			{
-				enabled: configuredPublicRelays !== undefined && configuredSources.configured_relays?.length !== 0,
-				name: "configured-public-relays",
-				priority: "primary" as const,
-				source: configuredPublicRelays,
-			},
-			{
-				enabled:
-					configuredSources.configured_fallback !== undefined &&
-					configuredSources.configured_fallback.enabled !== false &&
-					injectedSources?.configuredFallback !== undefined,
-				name: "configured-fallback",
-				priority: "primary" as const,
-				source: injectedSources?.configuredFallback,
-			},
-			{
-				enabled:
-					configuredSources.cached_successful_relays?.enabled === true &&
-					injectedSources?.cachedSuccessfulRelays !== undefined,
-				name: "cached-successful-relays",
-				priority: "primary" as const,
-				source: injectedSources?.cachedSuccessfulRelays,
-			},
-			{
-				enabled:
-					configuredSources.registry_relay_records?.enabled === true &&
-					injectedSources?.registryRelayRecords !== undefined,
-				name: "registry-relay-records",
-				priority: "primary" as const,
-				source: injectedSources?.registryRelayRecords,
-			},
-			{
-				enabled:
-					publicRelayOverflowEnabled &&
-					configuredSources.delegated_closest_peers?.enabled === true &&
-					injectedSources?.delegatedClosestPeers !== undefined,
-				name: "delegated-closest-peers",
-				priority: "overflow" as const,
-				source: injectedSources?.delegatedClosestPeers,
-			},
-			{
-				degradedOverflowEligible: true,
-				enabled: nodeClosestPeersEnabled && injectedSources?.nodeClosestPeers !== undefined,
-				name: "node-overflow",
-				priority: "overflow" as const,
-				source: injectedSources?.nodeClosestPeers,
-			},
-			{
-				enabled:
-					publicRelayOverflowEnabled &&
-					configuredSources.dht_relay_providers?.enabled === true &&
-					injectedSources?.dhtRelayProviders !== undefined,
-				name: "dht-relay-providers",
-				priority: "overflow" as const,
-				source: injectedSources?.dhtRelayProviders,
-			},
-		].filter(
-			(entry): entry is typeof entry & { readonly source: RelayCandidateSource } =>
-				entry.enabled && entry.source !== undefined
-		);
-		if (sources.length === 0) return;
-
-		const source = new CompositeRelayCandidateSource({ requiredOperatorGroups: targetReservations, sources });
 		const factory = this._relayPolicyFactory ?? ((options): RelayPolicyDriver => this._createRelayPolicy(options));
 		this._relayPolicy = factory({
 			onReservationEvent: (event): void => {
@@ -1037,16 +999,14 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			},
 			perCandidateDeadlineMs:
 				relayPolicyConfig.per_candidate_deadline_ms ?? DEFAULT_RELAY_POLICY_LIMITS.perCandidateDeadlineMs,
-			source,
-			targetReservations,
+			source: resolved.source,
+			targetReservations: resolved.targetReservations,
 			totalDeadlineMs:
 				relayPolicyConfig.total_deadline_ms ??
 				(nodeClosestPeersEnabled
 					? NODE_CLOSEST_PEERS_RELAY_TOTAL_DEADLINE_MS
 					: DEFAULT_RELAY_POLICY_LIMITS.totalDeadlineMs),
-			transportProfile: nodeTransportProfileEnabled
-				? RELAY_TRANSPORT_PROFILES.node
-				: RELAY_TRANSPORT_PROFILES.broadBrowser,
+			transportProfile: resolved.transportProfile,
 		});
 		this._relayPolicyController?.abort();
 		const controller = new AbortController();
@@ -1056,7 +1016,18 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		if (host === undefined) throw new Error("relay policy requires a started libp2p host");
 		this._relayDisconnectListener = (event): void => {
 			const peerId = event.detail.toString();
-			if (!this._reservedRelayPeerIds.delete(peerId)) return;
+			const policyOwnsReservation = this._lastRelayPolicyResult?.reservations.some(
+				({ candidate }) => candidate.peerId === peerId
+			);
+			const hadPriorityReservation = this._reservedRelayPeerIds.delete(peerId);
+			if (!hadPriorityReservation && policyOwnsReservation !== true) return;
+			this._connectionAdmission?.reconcileRelayReservations(
+				[...this._reservedRelayPeerIds].map((activePeerId) => ({
+					peerId: activePeerId,
+					priorityTicket: this._relayPriorityTickets.get(activePeerId),
+				}))
+			);
+			this._relayPriorityTickets.delete(peerId);
 			this._queueRelayMaintenance(async (): Promise<void> => {
 				const result = await policy.replace(peerId, "relay-disconnected", controller.signal);
 				this._handleRelayPolicyResult(result, policy, controller);
@@ -1135,6 +1106,96 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			controlPlane.routing.node.network === "public" &&
 			controlPlane.rollout?.public_components?.delegated_routing?.enabled === true
 		);
+	}
+
+	private _resolveRelayPolicyConfiguration(): ResolvedRelayPolicyConfiguration | undefined {
+		const relayPolicyConfig = this._config?.control_plane?.relay_policy;
+		const configuredSources = relayPolicyConfig?.sources;
+		if (relayPolicyConfig === undefined || configuredSources === undefined) return undefined;
+		const injectedSources = this._relayCandidateSources;
+		const publicRelayOverflowEnabled =
+			this._config?.control_plane?.rollout?.public_components?.public_relay_overflow?.enabled === true;
+		const nodeClosestPeersEnabled = this._nodeClosestPeersEnabled();
+		const configuredPublicRelays =
+			configuredSources.configured_relays === undefined
+				? undefined
+				: new ConfiguredPublicRelaySource({ multiaddrs: configuredSources.configured_relays });
+		const targetReservations =
+			relayPolicyConfig.target_reservations ?? DEFAULT_RELAY_POLICY_LIMITS.requiredReservations;
+		const sources = [
+			{
+				enabled: configuredPublicRelays !== undefined && configuredSources.configured_relays?.length !== 0,
+				name: "configured-public-relays",
+				priority: "primary" as const,
+				source: configuredPublicRelays,
+			},
+			{
+				enabled:
+					configuredSources.configured_fallback !== undefined &&
+					configuredSources.configured_fallback.enabled !== false &&
+					injectedSources?.configuredFallback !== undefined,
+				name: "configured-fallback",
+				priority: "primary" as const,
+				source: injectedSources?.configuredFallback,
+			},
+			{
+				enabled:
+					configuredSources.cached_successful_relays?.enabled === true &&
+					injectedSources?.cachedSuccessfulRelays !== undefined,
+				name: "cached-successful-relays",
+				priority: "primary" as const,
+				source: injectedSources?.cachedSuccessfulRelays,
+			},
+			{
+				enabled:
+					configuredSources.registry_relay_records?.enabled === true &&
+					injectedSources?.registryRelayRecords !== undefined,
+				name: "registry-relay-records",
+				priority: "primary" as const,
+				source: injectedSources?.registryRelayRecords,
+			},
+			{
+				enabled:
+					publicRelayOverflowEnabled &&
+					configuredSources.delegated_closest_peers?.enabled === true &&
+					injectedSources?.delegatedClosestPeers !== undefined,
+				name: "delegated-closest-peers",
+				priority: "overflow" as const,
+				source: injectedSources?.delegatedClosestPeers,
+			},
+			{
+				degradedOverflowEligible: true,
+				enabled: nodeClosestPeersEnabled && injectedSources?.nodeClosestPeers !== undefined,
+				name: "node-overflow",
+				priority: "overflow" as const,
+				source: injectedSources?.nodeClosestPeers,
+			},
+			{
+				enabled:
+					publicRelayOverflowEnabled &&
+					configuredSources.dht_relay_providers?.enabled === true &&
+					injectedSources?.dhtRelayProviders !== undefined,
+				name: "dht-relay-providers",
+				priority: "overflow" as const,
+				source: injectedSources?.dhtRelayProviders,
+			},
+		].filter(
+			(entry): entry is typeof entry & { readonly source: RelayCandidateSource } =>
+				entry.enabled && entry.source !== undefined
+		);
+		if (sources.length === 0) return undefined;
+		return {
+			source: new CompositeRelayCandidateSource({ requiredOperatorGroups: targetReservations, sources }),
+			targetReservations,
+			transportProfile:
+				nodeClosestPeersEnabled ||
+				(configuredSources.configured_relays !== undefined &&
+					configuredSources.configured_relays.length > 0 &&
+					!isBrowser &&
+					!isWebWorker)
+					? RELAY_TRANSPORT_PROFILES.node
+					: RELAY_TRANSPORT_PROFILES.broadBrowser,
+		};
 	}
 
 	private _validateRelayPolicyConfiguration(validateSources = true): void {
@@ -1307,7 +1368,28 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	): void {
 		if (controller.signal.aborted || this._relayPolicy !== policy) return;
 		this._lastRelayPolicyResult = result;
-		this._reservedRelayPeerIds = new Set(result.reservations.map(({ candidate }) => candidate.peerId));
+		const previouslyReservedRelayPeerIds = this._reservedRelayPeerIds;
+		this._connectionAdmission?.reconcileRelayReservations(
+			result.reservations.map(({ candidate }) => ({
+				peerId: candidate.peerId,
+				priorityTicket: this._relayPriorityTickets.get(candidate.peerId),
+			})),
+			result.terminal
+		);
+		this._reservedRelayPeerIds = new Set(
+			result.reservations
+				.map(({ candidate }) => candidate.peerId)
+				.filter((peerId) => this._connectionAdmission?.hasActiveRelayPeer(peerId) === true)
+		);
+		for (const peerId of this._reservedRelayPeerIds) {
+			if (!previouslyReservedRelayPeerIds.has(peerId)) this._pubsub?.score.scoreCache.delete(peerId);
+		}
+		const policyOwnedPeerIds = new Set(policy.activeReservations?.map(({ candidate }) => candidate.peerId) ?? []);
+		for (const peerId of [...this._relayPriorityTickets.keys()]) {
+			if (!this._reservedRelayPeerIds.has(peerId) && !policyOwnedPeerIds.has(peerId)) {
+				this._relayPriorityTickets.delete(peerId);
+			}
+		}
 		if (result.terminal !== "reserved") {
 			if (!this._relayPolicyFailed) {
 				this._emitControlPlaneEvent({ kind: "relay-reservation", outcome: "failed" });
@@ -1359,7 +1441,9 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _clearRelayMaintenance(): void {
 		if (this._relayRefreshTimer !== undefined) clearTimeout(this._relayRefreshTimer);
 		this._relayRefreshTimer = undefined;
+		this._connectionAdmission?.reconcileRelayReservations([]);
 		this._reservedRelayPeerIds.clear();
+		this._relayPriorityTickets.clear();
 		const listener = this._relayDisconnectListener;
 		if (listener !== undefined) this._node?.removeEventListener("peer:disconnect", listener);
 		this._relayDisconnectListener = undefined;
@@ -1374,13 +1458,77 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _createRelayPolicy(options: RelayPolicyFactoryOptions): RelayPolicyDriver {
 		const host = this._node;
 		if (host === undefined) throw new Error("relay policy requires a started libp2p host");
+		const admission = this._connectionAdmission;
+		if (admission === undefined) throw new Error("relay policy requires an attached admission controller");
 		const client = new Libp2pRelayClient({
-			connect: async (address, signal): Promise<void> => {
-				await this.safeDial(multiaddr(address), host, signal);
+			// Contextual return preserves the legacy Promise<void> or owned-receipt callback boundary.
+			// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+			connect: async (address, signal) => {
+				const target = multiaddr(address);
+				const peerId = this.getPeerId(target);
+				if (peerId === undefined) throw new Error("relay candidate address omitted its terminal peer id");
+				const existingConnectionIds = new Set(host.getConnections(peerIdFromString(peerId)).map(({ id }) => id));
+				const priorityEnabled =
+					admission.getSnapshot(0, this._expectedReplicas, this._globalDiscovery).prioritySlots > 0;
+				if (!priorityEnabled) {
+					const connection = await this.safeDial(target, host, signal);
+					if (connection === undefined) throw new Error("relay dial did not return a connection");
+					const created = !existingConnectionIds.has(connection.id);
+					return {
+						close: async (): Promise<void> => {
+							if (created) await connection.close();
+						},
+						connectionId: connection.id,
+						created,
+					};
+				}
+
+				const ticket = admission.createPriorityTicket(target);
+				if (ticket === undefined) {
+					const error = new Error("relay priority dial denied before queue insertion");
+					error.name = "DialDeniedError";
+					throw error;
+				}
+				try {
+					const connection = await host.dial(target, ticket.bindOptions(target, { signal }));
+					const created = !existingConnectionIds.has(connection.id);
+					if (
+						!admission.bindPriorityConnection(ticket, peerId, {
+							connectionId: connection.id,
+							created,
+						})
+					) {
+						if (created) await connection.close().catch(() => undefined);
+						const error = new Error("relay priority dial returned an unbound connection receipt");
+						error.name = "DialDeniedError";
+						throw error;
+					}
+					const previous = this._relayPriorityTickets.get(peerId);
+					if (previous !== undefined && previous !== ticket) previous.release();
+					this._relayPriorityTickets.set(peerId, ticket);
+					let released = false;
+					return {
+						close: async (): Promise<void> => {
+							if (released) return;
+							released = true;
+							try {
+								if (created) await connection.close();
+							} finally {
+								ticket.release();
+								if (this._relayPriorityTickets.get(peerId) === ticket) {
+									this._relayPriorityTickets.delete(peerId);
+								}
+							}
+						},
+						connectionId: connection.id,
+						created,
+					};
+				} catch (error) {
+					ticket.release();
+					throw error;
+				}
 			},
-			disconnect: async (peerId): Promise<void> => {
-				await host.hangUp(peerIdFromString(peerId));
-			},
+			disconnect: (): Promise<void> => Promise.resolve(),
 			host: host as unknown as Libp2pRelayClientOptions["host"],
 		});
 		const policy = new RelayPolicy({
@@ -1594,24 +1742,37 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			return 0;
 		};
 		const appSpecificScore = (peerId: string): number => {
-			if (!rewardEnabled || behaviorProvider === undefined) return 0;
-			try {
-				const observation = behaviorProvider.getObservedPeerBehavior(peerId);
-				if (observation === undefined || observation.authenticated !== true) return 0;
-				if (
-					typeof observation.diversityScore !== "number" ||
-					typeof observation.validBehaviorScore !== "number" ||
-					!Number.isFinite(observation.diversityScore) ||
-					!Number.isFinite(observation.validBehaviorScore)
-				) {
-					return neutralProviderFailure(new Error("observed peer behavior provider returned an invalid score"));
+			const relayScore =
+				this._connectionAdmission?.hasActiveRelayPeer(peerId) === true
+					? observedBehaviorReward?.enabled === true
+						? Math.min(0.5, observedBehaviorReward.max_application_score)
+						: 0.5
+					: 0;
+			let behaviorScore = 0;
+			if (rewardEnabled && behaviorProvider !== undefined && observedBehaviorReward !== undefined) {
+				try {
+					const observation = behaviorProvider.getObservedPeerBehavior(peerId);
+					if (observation?.authenticated === true) {
+						if (
+							typeof observation.diversityScore !== "number" ||
+							typeof observation.validBehaviorScore !== "number" ||
+							!Number.isFinite(observation.diversityScore) ||
+							!Number.isFinite(observation.validBehaviorScore)
+						) {
+							behaviorScore = neutralProviderFailure(
+								new Error("observed peer behavior provider returned an invalid score")
+							);
+						} else {
+							const observedScore =
+								Math.max(0, observation.diversityScore) + Math.max(0, observation.validBehaviorScore);
+							behaviorScore = Math.min(observedScore, observedBehaviorReward.max_application_score);
+						}
+					}
+				} catch (error) {
+					behaviorScore = neutralProviderFailure(error);
 				}
-				const observedScore = Math.max(0, observation.diversityScore) + Math.max(0, observation.validBehaviorScore);
-				if (observedScore <= 0) return 0;
-				return Math.min(observedScore, observedBehaviorReward.max_application_score);
-			} catch (error) {
-				return neutralProviderFailure(error);
 			}
+			return Math.max(relayScore, behaviorScore);
 		};
 
 		if (this._config?.seed) {
@@ -1878,6 +2039,8 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			request.relayId === undefined
 				? await policy.acquire(new TextEncoder().encode(this.peerId), signal)
 				: await policy.replace(request.relayId, "relay-disconnected", signal, request.excludedOperatorGroup);
+		const controller = this._relayPolicyController;
+		if (controller !== undefined) this._handleRelayPolicyResult(result, policy, controller);
 		return result.terminal === "reserved" || result.terminal === "owned-fallback";
 	}
 

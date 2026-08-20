@@ -346,7 +346,10 @@ export interface DRPPeerSelectionSnapshot {
 	readonly expectedReplicas: number | undefined;
 	readonly globalDiscovery: boolean;
 	readonly live: number;
+	readonly priority: number;
+	readonly prioritySlots: number;
 	readonly queued: number;
+	readonly replacements: number;
 	readonly selected: number;
 	readonly upgrade: number;
 }

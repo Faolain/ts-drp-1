@@ -124,6 +124,10 @@ export interface ExplicitDialTicket {
 	release(): void;
 }
 
+export interface ConnectionAdmissionControllerOptions {
+	readonly prioritySlots?: number;
+}
+
 type ConnectionManagerTarget = Multiaddr | readonly Multiaddr[] | PeerId | string | readonly string[];
 
 function isMultiaddr(value: unknown): value is Multiaddr {
@@ -213,12 +217,23 @@ export interface ConnectionAdmissionController {
 	admitDiscoveredPeers(peerIds: readonly PeerId[], addresses: readonly Multiaddr[]): boolean;
 	admitDiscoveredPeer(peerId: PeerId, addresses: readonly Multiaddr[]): boolean;
 	attach(host: Libp2p): void;
+	bindPriorityConnection(
+		ticket: ExplicitDialTicket,
+		peerId: string,
+		receipt: Readonly<{ connectionId?: string; created: boolean }>
+	): boolean;
 	createExplicitTicket(target: ConnectionManagerTarget): ExplicitDialTicket | undefined;
+	createPriorityTicket(target: ConnectionManagerTarget): ExplicitDialTicket | undefined;
 	getSnapshot(
 		dependencyDialQueue: number,
 		expectedReplicas: number | undefined,
 		globalDiscovery: boolean
 	): DRPPeerSelectionSnapshot;
+	hasActiveRelayPeer(peerId: string): boolean;
+	reconcileRelayReservations(
+		reservations: readonly Readonly<{ peerId: string; priorityTicket?: ExplicitDialTicket }>[],
+		terminal?: string
+	): void;
 	recordDenied(): void;
 	revokeDiscoveredPeer(peerId: PeerId): void;
 	stop(): void;
@@ -230,12 +245,25 @@ function connectionMatchKey(peerId: PeerId): string {
 	return peerId.toString();
 }
 
+function knownConnectionId(connection: MultiaddrConnection): string | undefined {
+	const id = (connection as MultiaddrConnection & { readonly id?: unknown }).id;
+	return typeof id === "string" && id.length > 0 ? id : undefined;
+}
+
 /**
  * Create the single final-upgrade admission owner for one host lifecycle.
  * @param budget - The immutable effective budget installed on the same host.
+ * @param options - The bounded priority capacity reserved within the effective budget.
  * @returns A gater plus its synchronous host attach and cleanup lifecycle.
  */
-export function createConnectionAdmissionController(budget: DRPConnectionBudget): ConnectionAdmissionController {
+export function createConnectionAdmissionController(
+	budget: DRPConnectionBudget,
+	options: ConnectionAdmissionControllerOptions = {}
+): ConnectionAdmissionController {
+	const prioritySlots = options.prioritySlots ?? 0;
+	if (!Number.isSafeInteger(prioritySlots) || prioritySlots < 0 || prioritySlots >= budget.maxConnections) {
+		throw new Error("prioritySlots must be a non-negative safe integer below maxConnections");
+	}
 	const liveConnections = new Map<string, Connection>();
 	const reservations = new Set<Reservation>();
 	const reservationsByConnection = new WeakMap<MultiaddrConnection, Reservation>();
@@ -246,9 +274,30 @@ export function createConnectionAdmissionController(budget: DRPConnectionBudget)
 	const progressPermits = new WeakMap<(...arguments_: unknown[]) => unknown, TransportPermit>();
 	const nestedPeerPermits = new Map<string, number>();
 	const wrappedManagers = new WeakMap<object, object>();
+	type PriorityTicketState = {
+		active: boolean;
+		authorization?: Authorization;
+		boundConnectionId?: string;
+		readonly capacityOwned: boolean;
+		readonly key: string;
+		openedConnectionId?: string;
+		priority: boolean;
+		reservation?: Reservation;
+		released: boolean;
+		ticket?: ExplicitDialTicket;
+		token?: symbol;
+	};
+	const priorityTicketStates = new WeakMap<ExplicitDialTicket, PriorityTicketState>();
+	const priorityStates = new Set<PriorityTicketState>();
+	const priorityAuthorizations = new WeakMap<Authorization, PriorityTicketState>();
+	const priorityReservations = new WeakMap<Reservation, PriorityTicketState>();
+	const priorityTransportConnections = new WeakMap<MultiaddrConnection, PriorityTicketState>();
+	const priorityConnections = new Map<string, PriorityTicketState>();
+	const activeRelayTickets = new Map<string, PriorityTicketState>();
 	let attachedHost: Libp2p | undefined;
 	let stopped = false;
 	let denied = 0;
+	let replacements = 0;
 
 	const occupancy = (): number => authorizations.size + reservations.size + liveConnections.size;
 	const selectionOccupancy = (): number =>
@@ -256,6 +305,16 @@ export function createConnectionAdmissionController(budget: DRPConnectionBudget)
 	const selectedCount = (): number =>
 		[...authorizations.values()].filter(({ charged, kind }) => kind === "selected" && !charged).length;
 	const chargedCount = (): number => [...authorizations.values()].filter(({ charged }) => charged).length;
+	const isBorrowedSelection = ({ charged, discoveryPermit, kind }: Authorization): boolean =>
+		kind === "selected" && discoveryPermit && !charged;
+	const priorityStateCount = (): number =>
+		[...priorityStates].filter(({ priority, released }) => priority && !released).length;
+	const priorityOccupancyCount = (): number =>
+		[...priorityStates].filter(({ capacityOwned, priority, released }) => capacityOwned && priority && !released)
+			.length;
+	const ordinaryTailOccupancy = (): number =>
+		occupancy() - priorityOccupancyCount() - [...authorizations.values()].filter(isBorrowedSelection).length;
+	const ordinaryTailCeiling = budget.maxConnections - prioritySlots;
 
 	const removeAuthorization = (authorization: Authorization): void => {
 		if (authorizations.get(authorization.key) !== authorization) return;
@@ -371,11 +430,13 @@ export function createConnectionAdmissionController(budget: DRPConnectionBudget)
 		}
 		const pending: Array<{ authorization: Authorization; reconnect?: ReconnectLease }> = [];
 		let newAuthorizations = 0;
+		let newOrdinaryCommitments = 0;
 		for (const key of keys) {
 			if (hasLivePeer([key])) continue;
 			const authorization = authorizations.get(key);
 			if (authorization?.discoveryPermit === true) {
 				pending.push({ authorization });
+				newOrdinaryCommitments++;
 				continue;
 			}
 			if (authorization?.reusable === true) {
@@ -389,7 +450,9 @@ export function createConnectionAdmissionController(budget: DRPConnectionBudget)
 			const lifecycleAuthorization = createAuthorization(key, "explicit", false, true);
 			pending.push({ authorization: lifecycleAuthorization, reconnect });
 			newAuthorizations++;
+			newOrdinaryCommitments++;
 		}
+		if (ordinaryTailOccupancy() + newOrdinaryCommitments > ordinaryTailCeiling) return undefined;
 		for (const { authorization, reconnect } of pending) {
 			if (!authorizations.has(authorization.key)) authorizations.set(authorization.key, authorization);
 			if (reconnect !== undefined) removeReconnectLease(reconnect);
@@ -476,9 +539,42 @@ export function createConnectionAdmissionController(budget: DRPConnectionBudget)
 		if (reservation.timer !== undefined) clearTimeout(reservation.timer);
 	};
 
+	const releasePriorityState = (state: PriorityTicketState): void => {
+		if (state.released) return;
+		state.active = false;
+		state.priority = false;
+		state.released = true;
+		priorityStates.delete(state);
+		for (const [peerId, active] of activeRelayTickets) {
+			if (active === state) activeRelayTickets.delete(peerId);
+		}
+		if (state.boundConnectionId !== undefined && priorityConnections.get(state.boundConnectionId) === state) {
+			priorityConnections.delete(state.boundConnectionId);
+		}
+		if (state.reservation !== undefined) {
+			removeReservation(state.reservation);
+			priorityReservations.delete(state.reservation);
+			state.reservation = undefined;
+		}
+		const authorization = state.authorization;
+		const token = state.token;
+		if (authorization !== undefined && token !== undefined) {
+			authorization.tickets.delete(token);
+			removeAuthorization(authorization);
+		}
+		state.authorization = undefined;
+		state.token = undefined;
+		state.openedConnectionId = undefined;
+		state.boundConnectionId = undefined;
+	};
+
 	const startExpiry = (reservation: Reservation): void => {
 		if (reservation.timer !== undefined || attachedHost === undefined) return;
-		reservation.timer = setTimeout(() => removeReservation(reservation), RESERVATION_LIFETIME_MS);
+		reservation.timer = setTimeout(() => {
+			const priority = priorityReservations.get(reservation);
+			if (priority === undefined) removeReservation(reservation);
+			else releasePriorityState(priority);
+		}, RESERVATION_LIFETIME_MS);
 		(reservation.timer as ReturnType<typeof setTimeout> & { unref?(): void }).unref?.();
 	};
 
@@ -487,12 +583,29 @@ export function createConnectionAdmissionController(budget: DRPConnectionBudget)
 		if (reservationsByConnection.has(connection)) return false;
 		const keys = [`peer:${peerId}`, `address:${connection.remoteAddr}`];
 		const authorization = consumeAuthorization ? findAuthorization(keys) : undefined;
+		const transportedPriority = priorityTransportConnections.get(connection);
+		priorityTransportConnections.delete(connection);
+		const priorityState =
+			transportedPriority ?? (authorization === undefined ? undefined : priorityAuthorizations.get(authorization));
+		if (
+			transportedPriority !== undefined &&
+			(authorization === undefined || transportedPriority.authorization !== authorization)
+		) {
+			return true;
+		}
+		const isPriority =
+			priorityState !== undefined && priorityState.capacityOwned && priorityState.priority && !priorityState.released;
+		const promotesBorrowedSelection = authorization !== undefined && isBorrowedSelection(authorization);
+		if (
+			!isPriority &&
+			ordinaryTailOccupancy() + (promotesBorrowedSelection || authorization === undefined ? 1 : 0) > ordinaryTailCeiling
+		) {
+			return true;
+		}
 		if (authorization !== undefined) removeAuthorization(authorization);
 		if (occupancy() >= budget.maxConnections) {
 			if (consumeAuthorization) return true;
-			const newestSelected = [...authorizations.values()].findLast(
-				(candidate) => candidate.kind === "selected" && !candidate.charged
-			);
+			const newestSelected = [...authorizations.values()].findLast(isBorrowedSelection);
 			if (newestSelected === undefined) return true;
 			removeAuthorization(newestSelected);
 		}
@@ -503,6 +616,10 @@ export function createConnectionAdmissionController(budget: DRPConnectionBudget)
 		};
 		reservations.add(reservation);
 		reservationsByConnection.set(connection, reservation);
+		if (isPriority && priorityState !== undefined) {
+			priorityState.reservation = reservation;
+			priorityReservations.set(reservation, priorityState);
+		}
 		startExpiry(reservation);
 		return false;
 	};
@@ -510,8 +627,25 @@ export function createConnectionAdmissionController(budget: DRPConnectionBudget)
 	const reconcileOpen = (connection: Connection): void => {
 		if (liveConnections.has(connection.id)) return;
 		const matchKey = connectionMatchKey(connection.remotePeer);
-		const reservation = [...reservations].find((candidate) => candidate.matchKey === matchKey);
-		if (reservation !== undefined) removeReservation(reservation);
+		const reservation =
+			[...reservations].find(
+				(candidate) =>
+					Object.is(candidate.connection, connection) ||
+					(knownConnectionId(candidate.connection) !== undefined &&
+						knownConnectionId(candidate.connection) === connection.id)
+			) ??
+			[...reservations].find(
+				(candidate) => candidate.matchKey === matchKey && priorityReservations.get(candidate) === undefined
+			);
+		if (reservation !== undefined) {
+			const priority = priorityReservations.get(reservation);
+			removeReservation(reservation);
+			if (priority !== undefined && !priority.released) {
+				priorityReservations.delete(reservation);
+				priority.reservation = undefined;
+				priority.openedConnectionId = connection.id;
+			}
+		}
 		const authorization =
 			authorizations.get(`peer:${matchKey}`) ?? authorizations.get(`address:${connection.remoteAddr}`);
 		if (authorization !== undefined) removeAuthorization(authorization);
@@ -522,6 +656,11 @@ export function createConnectionAdmissionController(budget: DRPConnectionBudget)
 
 	const reconcileClose = (connection: Connection): void => {
 		liveConnections.delete(connection.id);
+		const bound = priorityConnections.get(connection.id);
+		if (bound !== undefined) releasePriorityState(bound);
+		for (const state of priorityStates) {
+			if (state.openedConnectionId === connection.id) releasePriorityState(state);
+		}
 		addReconnectLease(`peer:${connection.remotePeer}`);
 	};
 
@@ -560,6 +699,83 @@ export function createConnectionAdmissionController(budget: DRPConnectionBudget)
 		return true;
 	};
 
+	const createPriorityTicket = (target: ConnectionManagerTarget): ExplicitDialTicket | undefined => {
+		const keys = prequeueKeys(target);
+		const key = keys.length === 1 ? keys[0] : undefined;
+		if (stopped || attachedHost === undefined || prioritySlots === 0 || key === undefined) {
+			denied++;
+			return undefined;
+		}
+		const reusedLive = hasLivePeer([key]);
+		if (!reusedLive && priorityStateCount() >= prioritySlots) {
+			denied++;
+			return undefined;
+		}
+
+		let authorization: Authorization | undefined;
+		let token: symbol | undefined;
+		if (!reusedLive) {
+			const existing = authorizations.get(key);
+			if (existing !== undefined) {
+				if (!isBorrowedSelection(existing)) {
+					denied++;
+					return undefined;
+				}
+				removeAuthorization(existing);
+				replacements++;
+			}
+			if (occupancy() >= budget.maxConnections) {
+				const newestSelected = [...authorizations.values()].findLast(isBorrowedSelection);
+				if (newestSelected === undefined) {
+					denied++;
+					return undefined;
+				}
+				removeAuthorization(newestSelected);
+				replacements++;
+			}
+			authorization = createAuthorization(key, "explicit");
+			authorization.charged = true;
+			token = Symbol(key);
+			authorization.tickets.add(token);
+			authorizations.set(key, authorization);
+		}
+
+		const state: PriorityTicketState = {
+			active: false,
+			authorization,
+			capacityOwned: !reusedLive,
+			key,
+			priority: !reusedLive,
+			released: false,
+			token,
+		};
+		if (authorization !== undefined) priorityAuthorizations.set(authorization, state);
+		const ticket: ExplicitDialTicket = {
+			bindOptions: <T extends object>(dialTarget: ConnectionManagerTarget, dialOptions: T): T => {
+				const routeKeys = targetKeys(dialTarget);
+				const issued =
+					authorization === undefined || token === undefined
+						? []
+						: [{ authorization, claimed: false, token } satisfies IssuedTicket];
+				const claim: ExplicitDialClaim = {
+					issued,
+					nestedKeys: new Set(nestedTargetKeys(dialTarget)),
+					nestedUsed: new Set<string>(),
+					outerUsed: false,
+					routeKeys,
+				};
+				return Object.assign({}, dialOptions, { [explicitDialClaim]: claim });
+			},
+			release: (): void => {
+				releasePriorityState(state);
+			},
+		};
+		state.ticket = ticket;
+		priorityTicketStates.set(ticket, state);
+		priorityStates.add(state);
+		return ticket;
+	};
+
 	const onConnectionOpen = (event: CustomEvent<Connection>): void => reconcileOpen(event.detail);
 	const onConnectionClose = (event: CustomEvent<Connection>): void => reconcileClose(event.detail);
 
@@ -588,6 +804,49 @@ export function createConnectionAdmissionController(budget: DRPConnectionBudget)
 			for (const connection of host.getConnections()) reconcileOpen(connection);
 			for (const reservation of reservations) startExpiry(reservation);
 		},
+		bindPriorityConnection: (ticket, peerId, receipt): boolean => {
+			const state = priorityTicketStates.get(ticket);
+			const fail = (): false => {
+				if (state !== undefined) releasePriorityState(state);
+				denied++;
+				return false;
+			};
+			const connectionId = receipt.connectionId;
+			if (
+				stopped ||
+				attachedHost === undefined ||
+				state === undefined ||
+				state.released ||
+				state.key !== `peer:${peerId}` ||
+				typeof connectionId !== "string" ||
+				connectionId.length === 0 ||
+				state.capacityOwned !== receipt.created
+			) {
+				return fail();
+			}
+			const connection = liveConnections.get(connectionId);
+			const reservedConnectionId =
+				state.reservation === undefined ? undefined : knownConnectionId(state.reservation.connection);
+			if (
+				connection === undefined ||
+				connection.remotePeer.toString() !== peerId ||
+				(reservedConnectionId !== undefined && reservedConnectionId !== connectionId) ||
+				(state.capacityOwned && state.openedConnectionId !== connectionId && state.reservation === undefined) ||
+				(priorityConnections.has(connectionId) && priorityConnections.get(connectionId) !== state)
+			) {
+				return fail();
+			}
+			if (state.reservation !== undefined) {
+				removeReservation(state.reservation);
+				priorityReservations.delete(state.reservation);
+				state.reservation = undefined;
+			}
+			state.boundConnectionId = connectionId;
+			state.openedConnectionId = undefined;
+			state.priority = state.capacityOwned;
+			priorityConnections.set(connectionId, state);
+			return true;
+		},
 		createExplicitTicket: (target): ExplicitDialTicket | undefined => {
 			const keys = targetKeys(target);
 			if (stopped || keys.length === 0) {
@@ -599,7 +858,14 @@ export function createConnectionAdmissionController(budget: DRPConnectionBudget)
 			const exemptRelay = (key: string): boolean =>
 				nestedKeys.has(key) && !terminalKeys.has(key) && (lifecycleTargets.has(key) || reconnectTargets.has(key));
 			const missing = keys.filter((key) => !hasLivePeer([key]) && !exemptRelay(key) && !authorizations.has(key));
-			if (occupancy() + missing.length > budget.maxConnections) {
+			const borrowedConversions = keys.filter((key) => {
+				const authorization = authorizations.get(key);
+				return authorization !== undefined && isBorrowedSelection(authorization);
+			}).length;
+			if (
+				occupancy() + missing.length > budget.maxConnections ||
+				ordinaryTailOccupancy() + missing.length + borrowedConversions > ordinaryTailCeiling
+			) {
 				denied++;
 				return undefined;
 			}
@@ -652,6 +918,7 @@ export function createConnectionAdmissionController(budget: DRPConnectionBudget)
 				},
 			};
 		},
+		createPriorityTicket,
 		getSnapshot: (dependencyDialQueue, expectedReplicas, globalDiscovery) =>
 			Object.freeze({
 				budget: budget.maxConnections,
@@ -661,10 +928,38 @@ export function createConnectionAdmissionController(budget: DRPConnectionBudget)
 				expectedReplicas,
 				globalDiscovery,
 				live: liveConnections.size,
+				priority: priorityOccupancyCount(),
+				prioritySlots: stopped ? 0 : prioritySlots,
 				queued: 0,
+				replacements,
 				selected: selectedCount(),
 				upgrade: reservations.size,
 			}),
+		hasActiveRelayPeer: (peerId): boolean => {
+			const state = activeRelayTickets.get(peerId);
+			return state !== undefined && !state.released;
+		},
+		reconcileRelayReservations: (nextReservations): void => {
+			const next = new Map<string, PriorityTicketState>();
+			for (const { peerId, priorityTicket } of nextReservations) {
+				const existing = activeRelayTickets.get(peerId);
+				const state = priorityTicket === undefined ? existing : priorityTicketStates.get(priorityTicket);
+				if (state === undefined || state.released || state.key !== `peer:${peerId}`) continue;
+				if (!priorityStates.has(state)) {
+					if (state.capacityOwned && priorityStateCount() >= prioritySlots) continue;
+					state.priority = state.capacityOwned;
+					priorityStates.add(state);
+				}
+				state.active = true;
+				next.set(peerId, state);
+			}
+			for (const state of [...priorityStates]) {
+				if ([...next.values()].includes(state)) continue;
+				releasePriorityState(state);
+			}
+			activeRelayTickets.clear();
+			for (const [peerId, state] of next) activeRelayTickets.set(peerId, state);
+		},
 		recordDenied: (): void => {
 			denied++;
 		},
@@ -682,6 +977,8 @@ export function createConnectionAdmissionController(budget: DRPConnectionBudget)
 			attachedHost?.removeEventListener("connection:close", onConnectionClose);
 			for (const reservation of [...reservations]) removeReservation(reservation);
 			for (const authorization of [...authorizations.values()]) removeAuthorization(authorization);
+			for (const state of [...priorityStates]) state.ticket?.release();
+			activeRelayTickets.clear();
 			lifecycleTargets.clear();
 			for (const lease of [...reconnectTargets.values()]) removeReconnectLease(lease);
 			nestedPeerPermits.clear();
@@ -764,7 +1061,14 @@ export function createConnectionAdmissionController(budget: DRPConnectionBudget)
 					arguments_[1] = Object.assign({}, options, {
 						...(permit.claim === undefined ? {} : { [explicitDialClaim]: permit.claim }),
 					});
-					return (await Reflect.apply(original, target, arguments_)) as unknown;
+					const connection = (await Reflect.apply(original, target, arguments_)) as unknown;
+					const priority = permit.claim?.issued
+						.map(({ authorization }) => priorityAuthorizations.get(authorization))
+						.find((state): state is PriorityTicketState => state !== undefined && !state.released);
+					if (priority !== undefined && typeof connection === "object" && connection !== null) {
+						priorityTransportConnections.set(connection as MultiaddrConnection, priority);
+					}
+					return connection;
 				},
 				writable: true,
 			});
