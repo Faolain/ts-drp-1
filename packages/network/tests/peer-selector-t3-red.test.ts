@@ -38,6 +38,7 @@ interface T3Node extends DRPNetworkNode {
 interface InspectableHost extends Libp2p {
 	components: {
 		connectionGater: {
+			denyDialMultiaddr?(address: Multiaddr): boolean | Promise<boolean>;
 			denyOutboundUpgradedConnection?(
 				peer: PeerId,
 				connection: Readonly<{ remoteAddr: Multiaddr; remotePeer: PeerId }>
@@ -48,6 +49,7 @@ interface InspectableHost extends Libp2p {
 			openConnection(
 				peer: Multiaddr | PeerId | readonly Multiaddr[],
 				options?: Readonly<{
+					force?: boolean;
 					onProgress?(event: OpenConnectionProgressEvents): void;
 					signal?: AbortSignal;
 				}>
@@ -73,6 +75,12 @@ const quietPolicy = {
 	bootstrapDiscovery: false,
 	coldStartPubsubDiscovery: false,
 	gossipSubPeerExchange: false,
+};
+const localAddressPolicy = {
+	allowInsecureWebSocket: true,
+	allowLoopback: true,
+	allowPrivate: true,
+	target: "node" as const,
 };
 
 function privatePeer(index: number): ReturnType<typeof privateKeyFromRaw> {
@@ -107,6 +115,21 @@ function config(maxConnections = 8, maxParallelDials = 2, expectedReplicas = 8):
 		listen_addresses: [],
 		log_config: { level: "silent" },
 	} as unknown as DRPNetworkNodeConfig;
+}
+
+function configWithLocalAddressPolicy(
+	maxConnections = 8,
+	maxParallelDials = 2,
+	expectedReplicas = 8
+): DRPNetworkNodeConfig {
+	const value = config(maxConnections, maxParallelDials, expectedReplicas);
+	return {
+		...value,
+		control_plane: {
+			...value.control_plane,
+			address_policy: localAddressPolicy,
+		},
+	};
 }
 
 function snapshot(node: DRPNetworkNode): PeerSelectionSnapshot {
@@ -182,18 +205,63 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 		assertClosedSnapshot(value);
 		expect(value).toMatchObject({ charged: 0, denied: 1, selected: 0 });
 		expect(host.components.connectionManager.getDialQueue()).toHaveLength(0);
+
+		let policyHost: InspectableHost | undefined;
+		const policyBase = config();
+		const policyNode = new DRPNetworkNode(
+			{
+				...policyBase,
+				control_plane: {
+					...policyBase.control_plane,
+					address_policy: { target: "node" },
+				},
+			},
+			{
+				hostFactory: async (context): Promise<InspectableHost> => {
+					policyHost = (await context.createHost()) as InspectableHost;
+					return policyHost;
+				},
+				hostPolicy: quietPolicy,
+			}
+		);
+		running.push(policyNode);
+		await policyNode.start();
+		const addressGate = policyHost?.components.connectionGater.denyDialMultiaddr;
+		if (addressGate === undefined) throw new Error("expected configured address-policy gate");
+		expect(await addressGate(address(peer(2), 19_002))).toBe(true);
 	});
 
 	test.skipIf(!selectorRuntimeInstalled)(
 		"selects exactly the first 42 of 1,000 unique records synchronously and reserves explicit headroom",
 		async () => {
-			const node = new DRPNetworkNode(config(48, 6, 50), { hostPolicy: quietPolicy });
+			const expiryNode = new DRPNetworkNode(config(4, 1, 4), {
+				hostPolicy: { ...quietPolicy, denyDialMultiaddr: (): true => true },
+			});
+			running.push(expiryNode);
+			await expiryNode.start();
+			const expiryHost = expiryNode["_node"] as InspectableHost;
+			vi.useFakeTimers();
+			for (let index = 0; index < 3; index += 1) {
+				const id = peer(index + 9_800);
+				expiryHost.dispatchEvent(
+					new CustomEvent("peer:discovery", {
+						detail: { id, multiaddrs: [address(id, 19_800 + index)], protocols: [] },
+					})
+				);
+			}
+			expect(snapshot(expiryNode)).toMatchObject({ charged: 0, selected: 3 });
+			await vi.advanceTimersByTimeAsync(59_999);
+			expect(snapshot(expiryNode)).toMatchObject({ charged: 0, selected: 3 });
+			await vi.advanceTimersByTimeAsync(1);
+			expect(snapshot(expiryNode)).toMatchObject({ charged: 0, selected: 0 });
+			vi.useRealTimers();
+
+			const node = new DRPNetworkNode(config(48, 6, 50), {
+				hostPolicy: { ...quietPolicy, denyDialMultiaddr: (): true => true },
+			});
 			running.push(node);
 			await node.start();
 			const host = node["_node"] as InspectableHost;
-			const explicitAttempt = node
-				.safeDial(address(peer(9_999), 19_999), undefined, AbortSignal.timeout(50))
-				.catch(() => undefined);
 
 			for (let index = 0; index < 1_000; index += 1) {
 				const id = peer(index + 10_000);
@@ -203,11 +271,16 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 					})
 				);
 			}
-			await explicitAttempt;
+			await Promise.all(
+				Array.from({ length: 6 }, (_, index) =>
+					node.safeDial(address(peer(9_900 + index), 19_900 + index)).catch(() => undefined)
+				)
+			);
+			await node.safeDial(address(peer(9_999), 19_999)).catch(() => undefined);
 
 			const value = snapshot(node);
 			assertClosedSnapshot(value);
-			expect(value).toMatchObject({ budget: 48, charged: 1, denied: 958, selected: 42 });
+			expect(value).toMatchObject({ budget: 48, charged: 6, denied: 959, selected: 42 });
 			expect(host.components.connectionManager.getDialQueue()).toHaveLength(0);
 		}
 	);
@@ -215,7 +288,7 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 	test.skipIf(!selectorRuntimeInstalled)(
 		"keeps duplicate, self, malformed and addressless records out of the first/interior/last census",
 		async () => {
-			const node = new DRPNetworkNode(config(4, 1, 4), { hostPolicy: quietPolicy });
+			const node = new DRPNetworkNode(config(8, 1, 8), { hostPolicy: quietPolicy });
 			running.push(node);
 			await node.start();
 			const host = node["_node"] as InspectableHost;
@@ -227,8 +300,8 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 					})
 				);
 			}
-			const atCeiling = snapshot(node);
-			expect(atCeiling).toMatchObject({ denied: 1, selected: 3 });
+			const beforeInvalid = snapshot(node);
+			expect(beforeInvalid).toMatchObject({ denied: 0, selected: 4 });
 
 			for (const detail of [
 				{ id: candidates[0], multiaddrs: [address(candidates[0], 30_000)], protocols: [] },
@@ -240,7 +313,7 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 			}
 			const afterInvalid = snapshot(node);
 			assertClosedSnapshot(afterInvalid);
-			expect(afterInvalid.selected).toBe(3);
+			expect(afterInvalid.selected).toBe(4);
 		}
 	);
 
@@ -248,16 +321,44 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 		"installs extension discovery synchronously and transfers one selected authorization into the native queue",
 		async () => {
 			const configuredDiscovery = new ControlledDiscovery();
-			const serviceDiscovery = new ControlledDiscovery();
+			const advertisedDiscovery = new ControlledDiscovery();
 			let host: InspectableHost | undefined;
-			const node = new DRPNetworkNode(config(3, 1, 3), {
+			let retainedManager: InspectableHost["components"]["connectionManager"] | undefined;
+			let retainedPeerStore: Libp2p["peerStore"] | undefined;
+			let extensionStartCount = 0;
+			let startupDialError: unknown;
+			const startupProgress: string[] = [];
+			const node = new DRPNetworkNode(configWithLocalAddressPolicy(3, 1, 3), {
 				hostFactory: async (context): Promise<InspectableHost> => {
 					host = (await context.createHost({
 						peerDiscovery: [(): PeerDiscovery => configuredDiscovery as unknown as PeerDiscovery],
 						services: {
-							controlledDiscovery: (): unknown => serviceDiscovery,
+							controlledDiscovery: (components: object): unknown => {
+								const retained = components as unknown as {
+									connectionManager: InspectableHost["components"]["connectionManager"];
+									peerStore: Libp2p["peerStore"];
+								};
+								retainedManager = retained.connectionManager;
+								retainedPeerStore = retained.peerStore;
+								return {
+									[peerDiscoverySymbol]: advertisedDiscovery,
+									start: async (): Promise<void> => {
+										extensionStartCount += 1;
+										try {
+											await retained.connectionManager.openConnection(peer(32), {
+												onProgress: (event) => startupProgress.push(event.type),
+												signal: AbortSignal.timeout(100),
+											});
+										} catch (error) {
+											startupDialError = error;
+										}
+									},
+									stop: (): void => undefined,
+								};
+							},
 						} as never,
 					})) as InspectableHost;
+					expect(host.status).toBe("started");
 					return host;
 				},
 				hostPolicy: quietPolicy,
@@ -265,12 +366,17 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 			running.push(node);
 			await node.start();
 			if (host === undefined) throw new Error("expected extension host");
+			expect(extensionStartCount).toBe(1);
+			expect(retainedManager).toBe(host.components.connectionManager);
+			expect(retainedPeerStore).toBe(host.peerStore);
+			expect(startupDialError).toMatchObject({ name: "DialDeniedError" });
+			expect(startupProgress).not.toContain("dial-queue:add-to-dial-queue");
 			const id = peer(30);
 			const serviceId = peer(31);
 			const peerAddress = address(id, 31_030);
 
 			configuredDiscovery.discover({ id, multiaddrs: [peerAddress] });
-			serviceDiscovery.discover({ id: serviceId, multiaddrs: [address(serviceId, 31_031)] });
+			advertisedDiscovery.discover({ id: serviceId, multiaddrs: [address(serviceId, 31_031)] });
 			expect(snapshot(node)).toMatchObject({ charged: 0, selected: 2 });
 			const progress: string[] = [];
 			await host.components.connectionManager
@@ -293,9 +399,8 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 
 			const livePeer = new DRPNetworkNode(
 				{
-					bootstrap_peers: [],
+					...configWithLocalAddressPolicy(2, 1, 2),
 					listen_addresses: ["/ip4/127.0.0.1/tcp/0/ws"],
-					log_config: { level: "silent" },
 				} as never,
 				{ hostPolicy: quietPolicy }
 			);
@@ -303,12 +408,31 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 			await livePeer.start();
 			await node.safeDial(livePeer.getMultiaddrs()[0]);
 			const beforeLiveRediscovery = snapshot(node);
-			serviceDiscovery.discover({
+			advertisedDiscovery.discover({
 				id: livePeer["_node"]?.peerId as PeerId,
 				multiaddrs: livePeer.getMultiaddrs().map((value) => multiaddr(value)),
 			});
 			expect(snapshot(node)).toEqual(beforeLiveRediscovery);
 			assertClosedSnapshot(snapshot(node));
+
+			const cleanup = vi.fn(() => Promise.resolve());
+			const startFailure = new Error("controlled extension start failure");
+			const failingNode = new DRPNetworkNode(configWithLocalAddressPolicy(2, 1, 2), {
+				hostFactory: async (context): Promise<Libp2p> =>
+					context.createHost({
+						services: {
+							failingStart: (): unknown => ({
+								start: (): Promise<never> => Promise.reject(startFailure),
+								stop: cleanup,
+							}),
+						} as never,
+					}),
+				hostPolicy: quietPolicy,
+			});
+			running.push(failingNode);
+			await expect(failingNode.start()).rejects.toBe(startFailure);
+			expect(cleanup).toHaveBeenCalled();
+			expect(failingNode["_node"]).toBeUndefined();
 		}
 	);
 
@@ -316,13 +440,24 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 		"authorizes genuine first and updated signed peer records while replayed and unsigned PX remain inert",
 		async () => {
 			const signerConfig = {
-				bootstrap_peers: [],
+				...configWithLocalAddressPolicy(4, 1, 4),
 				listen_addresses: ["/ip4/127.0.0.1/tcp/0/ws"],
-				log_config: { level: "silent" as const },
 			};
 			const signer = new DRPNetworkNode(signerConfig, { hostPolicy: quietPolicy });
 			const source = new DRPNetworkNode(signerConfig, { hostPolicy: quietPolicy });
-			const target = new DRPNetworkNode(config(4, 1, 4), { hostPolicy: quietPolicy });
+			let retainedPeerStore: Libp2p["peerStore"] | undefined;
+			const target = new DRPNetworkNode(configWithLocalAddressPolicy(4, 1, 4), {
+				hostFactory: async (context): Promise<Libp2p> =>
+					context.createHost({
+						services: {
+							retainedPeerStore: (components: object): unknown => {
+								retainedPeerStore = (components as unknown as { peerStore: Libp2p["peerStore"] }).peerStore;
+								return {};
+							},
+						} as never,
+					}),
+				hostPolicy: quietPolicy,
+			});
 			running.push(signer, source, target);
 			await signer.start(privateBytes(40));
 			await source.start();
@@ -330,6 +465,8 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 			const sourceHost = source["_node"] as InspectableHost;
 			const targetHost = target["_node"] as InspectableHost;
 			const signerHost = signer["_node"] as InspectableHost;
+			expect(retainedPeerStore).toBe(targetHost.peerStore);
+			if (retainedPeerStore === undefined) throw new Error("expected construction-retained peer store");
 			const firstUpdate = raceEvent<CustomEvent<PeerUpdate>>(sourceHost, "peer:update", AbortSignal.timeout(2_000), {
 				filter: (event) =>
 					event.detail.peer.id.equals(signerHost.peerId) && event.detail.peer.peerRecordEnvelope !== undefined,
@@ -339,18 +476,15 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 			const firstEnvelope = firstRecord.peerRecordEnvelope;
 			if (firstEnvelope === undefined) throw new Error("identify did not produce a signed peer record");
 			await expect(
-				targetHost.peerStore.consumePeerRecord(firstEnvelope, { expectedPeer: signerHost.peerId })
+				retainedPeerStore.consumePeerRecord(firstEnvelope, { expectedPeer: signerHost.peerId })
 			).resolves.toBe(true);
 			expect(snapshot(target)).toMatchObject({ selected: 1 });
 
 			await expect(
-				targetHost.peerStore.consumePeerRecord(firstEnvelope, { expectedPeer: signerHost.peerId })
+				retainedPeerStore.consumePeerRecord(firstEnvelope, { expectedPeer: signerHost.peerId })
 			).resolves.toBe(false);
 			await targetHost.peerStore.merge(peer(41), {
-				addresses: [{ isCertified: false, multiaddr: address(peer(41), 32_041) }],
-			});
-			await targetHost.peerStore.merge(signerHost.peerId, {
-				addresses: [{ isCertified: false, multiaddr: address(signerHost.peerId, 32_042) }],
+				addresses: [{ isCertified: true, multiaddr: address(peer(41), 32_041) }],
 			});
 			expect(snapshot(target)).toMatchObject({ selected: 1 });
 
@@ -358,7 +492,11 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 			expect(snapshot(target)).toMatchObject({ selected: 0 });
 			const signerStopTime = Date.now();
 			await signer.stop();
+			// Peer-record sequence defaults to Date.now(); require a strictly newer signer record after restart.
 			await vi.waitFor(() => expect(Date.now()).toBeGreaterThan(signerStopTime), { interval: 1, timeout: 100 });
+			await vi.waitFor(() => expect(targetHost.getConnections(signerHost.peerId)).toHaveLength(0), {
+				timeout: 2_000,
+			});
 			await signer.start(privateBytes(40));
 			const restartedSigner = signer["_node"] as InspectableHost;
 			const updatedRecordPromise = raceEvent<CustomEvent<PeerUpdate>>(
@@ -378,8 +516,16 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 			const updatedRecord = (await updatedRecordPromise).detail.peer;
 			const updatedEnvelope = updatedRecord.peerRecordEnvelope;
 			if (updatedEnvelope === undefined) throw new Error("identify update did not include a signed peer record");
+			const beforeUntrustedUpdate = snapshot(target);
+			targetHost.dispatchEvent(new CustomEvent("peer:update", { detail: { peer: updatedRecord } }));
+			expect(snapshot(target)).toEqual(beforeUntrustedUpdate);
+			await targetHost.peerStore.merge(restartedSigner.peerId, {
+				addresses: [{ isCertified: true, multiaddr: address(restartedSigner.peerId, 32_042) }],
+				peerRecordEnvelope: updatedEnvelope,
+			});
+			expect(snapshot(target)).toEqual(beforeUntrustedUpdate);
 			await expect(
-				targetHost.peerStore.consumePeerRecord(updatedEnvelope, { expectedPeer: restartedSigner.peerId })
+				retainedPeerStore.consumePeerRecord(updatedEnvelope, { expectedPeer: restartedSigner.peerId })
 			).resolves.toBe(true);
 			expect(snapshot(target)).toMatchObject({ selected: 1 });
 
@@ -389,17 +535,25 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 			running.push(failedTarget);
 			await failedTarget.start();
 			const failedHost = failedTarget["_node"] as InspectableHost;
-			vi.useFakeTimers();
-			await expect(
-				failedHost.peerStore.consumePeerRecord(firstEnvelope, { expectedPeer: signerHost.peerId })
-			).resolves.toBe(true);
-			await failedHost.components.connectionManager.openConnection(signerHost.peerId).catch(() => undefined);
-			expect(snapshot(failedTarget)).toMatchObject({ charged: 1, selected: 0 });
-			await expect(
-				failedHost.peerStore.consumePeerRecord(firstEnvelope, { expectedPeer: signerHost.peerId })
-			).resolves.toBe(false);
-			await vi.advanceTimersByTimeAsync(60_000);
-			vi.useRealTimers();
+			const timeoutSpy = vi.spyOn(globalThis, "setTimeout");
+			try {
+				await expect(
+					failedHost.peerStore.consumePeerRecord(firstEnvelope, { expectedPeer: signerHost.peerId })
+				).resolves.toBe(true);
+				const timersBeforeCharge = timeoutSpy.mock.calls.length;
+				await failedHost.components.connectionManager.openConnection(signerHost.peerId).catch(() => undefined);
+				expect(snapshot(failedTarget)).toMatchObject({ charged: 1, selected: 0 });
+				await expect(
+					failedHost.peerStore.consumePeerRecord(firstEnvelope, { expectedPeer: signerHost.peerId })
+				).resolves.toBe(false);
+				const chargeTimers = timeoutSpy.mock.calls.slice(timersBeforeCharge).filter(([, delay]) => delay === 60_000);
+				expect(chargeTimers).toHaveLength(1);
+				const chargeExpiry = chargeTimers[0]?.[0];
+				if (typeof chargeExpiry !== "function") throw new Error("expected charged authorization expiry handler");
+				chargeExpiry();
+			} finally {
+				timeoutSpy.mockRestore();
+			}
 			expect(snapshot(failedTarget)).toMatchObject({ charged: 0, selected: 0 });
 			await expectDirectPrequeueDenied(failedHost, signerHost.peerId);
 			await expect(
@@ -436,7 +590,7 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 	test.skipIf(!selectorRuntimeInstalled)(
 		"keeps explicit ticket cleanup bounded across success, denial, signal and timeout",
 		async () => {
-			const node = new DRPNetworkNode(config(8, 2, 8), { hostPolicy: quietPolicy });
+			const node = new DRPNetworkNode(configWithLocalAddressPolicy(8, 2, 8), { hostPolicy: quietPolicy });
 			running.push(node);
 			await node.start();
 			const host = node["_node"] as InspectableHost;
@@ -471,6 +625,47 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 			const afterCleanup = snapshot(node);
 			assertClosedSnapshot(afterCleanup);
 			expect(afterCleanup).toMatchObject({ queued: 0, selected: 0 });
+			dial.mockRestore();
+
+			const sharedRoute = address(peer(59), 33_059);
+			const managerOpen = host.components.connectionManager.openConnection.bind(host.components.connectionManager);
+			const managerProgress: string[][] = [];
+			const enterManager: Array<() => void> = [];
+			vi.spyOn(host, "dial").mockImplementation(async (target, options) => {
+				await new Promise<void>((resolve) => enterManager.push(resolve));
+				const progress: string[] = [];
+				try {
+					await managerOpen(target as Multiaddr, {
+						...options,
+						onProgress: (event) => progress.push(event.type),
+						signal: AbortSignal.timeout(100),
+					});
+				} catch (error) {
+					if (error instanceof Error && error.name === "DialDeniedError") throw error;
+				}
+				managerProgress.push(progress);
+				return {} as Connection;
+			});
+			const first = node.safeDial(sharedRoute, host);
+			const second = node.safeDial(sharedRoute, host);
+			await vi.waitFor(() => expect(enterManager).toHaveLength(2), { timeout: 1_000 });
+			// Neither outstanding safeDial custody token may be consumed by an unaffiliated raw manager call.
+			await expectDirectPrequeueDenied(host, sharedRoute);
+			const firstEntry = enterManager[0];
+			const secondEntry = enterManager[1];
+			if (firstEntry === undefined || secondEntry === undefined)
+				throw new Error("expected two retained manager entries");
+			firstEntry();
+			await expect(first).resolves.toBeDefined();
+			expect(managerProgress).toHaveLength(1);
+			expect(managerProgress[0]).toContain("dial-queue:add-to-dial-queue");
+			expect(snapshot(node)).toMatchObject({ charged: 1 });
+			await expectDirectPrequeueDenied(host, sharedRoute);
+			secondEntry();
+			await expect(second).resolves.toBeDefined();
+			expect(managerProgress).toHaveLength(2);
+			expect(managerProgress[1]).toContain("dial-queue:add-to-dial-queue");
+			expect(snapshot(node)).toMatchObject({ charged: 1 });
 		}
 	);
 
@@ -478,9 +673,19 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 		"routes room, sync, peerless-upgrade and ordered circuit calls through exact explicit custody",
 		async () => {
 			let host: InspectableHost | undefined;
+			const installedManagerTargets: string[] = [];
 			const node = new DRPNetworkNode(config(8, 2, 8), {
 				hostFactory: async (context): Promise<InspectableHost> => {
 					host = (await context.createHost()) as InspectableHost;
+					const openConnection = host.components.connectionManager.openConnection.bind(
+						host.components.connectionManager
+					);
+					vi.spyOn(host.components.connectionManager, "openConnection").mockImplementation(
+						async (target, options): Promise<unknown> => {
+							installedManagerTargets.push(target.toString());
+							return openConnection(target, options);
+						}
+					);
 					return host;
 				},
 				hostPolicy: { ...quietPolicy, denyDialMultiaddr: (): true => true },
@@ -493,6 +698,7 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 				peer(70).toString(),
 				Message.create({ data: new Uint8Array(), objectId: "t3-room", sender: node.peerId, type: 0 })
 			);
+			expect(snapshot(node)).toMatchObject({ charged: 1, selected: 0 });
 			await node
 				.sendSyncMessage(
 					peer(71).toString(),
@@ -506,12 +712,14 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 					{ signal: AbortSignal.timeout(100) }
 				)
 				.catch(() => undefined);
+			expect(snapshot(node)).toMatchObject({ charged: 2, selected: 0 });
 
 			const relay = peer(72);
 			const destination = peer(73);
 			const circuitRoute = multiaddr(`/ip4/127.0.0.1/tcp/35072/p2p/${relay}/p2p-circuit/p2p/${destination}`);
 			await node.safeDial(circuitRoute, host, AbortSignal.timeout(100)).catch(() => undefined);
-			expect(snapshot(node)).toMatchObject({ charged: 3, selected: 0 });
+			expect(installedManagerTargets.at(-1)).toBe(circuitRoute.toString());
+			expect(snapshot(node)).toMatchObject({ charged: 4, selected: 0 });
 
 			const outbound = host.components.connectionGater.denyOutboundUpgradedConnection;
 			if (outbound === undefined) throw new Error("expected final outbound upgrade gate");
@@ -530,7 +738,7 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 			} as unknown as Libp2p;
 			await expect(node.safeDial(peerlessRoute, controlledHost)).resolves.toBe(upgradedConnection);
 			expect(upgradeDenied).toBe(false);
-			expect(snapshot(node)).toMatchObject({ charged: 3, selected: 0, upgrade: 1 });
+			expect(snapshot(node)).toMatchObject({ charged: 4, selected: 0, upgrade: 1 });
 			assertClosedSnapshot(snapshot(node));
 		}
 	);
@@ -540,22 +748,28 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 		async () => {
 			const remote = new DRPNetworkNode(
 				{
-					bootstrap_peers: [],
+					...configWithLocalAddressPolicy(4, 1, 4),
 					listen_addresses: ["/ip4/127.0.0.1/tcp/0/ws"],
-					log_config: { level: "silent" },
 				} as never,
 				{ hostPolicy: quietPolicy }
 			);
 			running.push(remote);
 			await remote.start();
+			const forcedDcutrTargets: string[] = [];
+			const targetConfig = configWithLocalAddressPolicy(4, 1, 4);
 			const target = new DRPNetworkNode(
 				{
-					...config(4, 1, 4),
+					...targetConfig,
 					bootstrap_peers: remote.getMultiaddrs(),
+					control_plane: {
+						...targetConfig.control_plane,
+						address_policy: {
+							...localAddressPolicy,
+							resolver: { resolve: (): Promise<string[]> => Promise.resolve(["93.184.216.34"]) },
+						},
+					},
 				} as never,
-				{
-					hostPolicy: { ...quietPolicy, bootstrapDiscovery: true },
-				}
+				{ hostPolicy: { ...quietPolicy, bootstrapDiscovery: true } }
 			);
 			running.push(target);
 			const configuredBootstrapDial = vi.spyOn(target, "safeDial");
@@ -580,6 +794,15 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 			});
 			const directConnection = targetHost.getConnections(remoteId)[0];
 			if (directConnection === undefined) throw new Error("expected bootstrap connection");
+			const managerOpen = targetHost.components.connectionManager.openConnection.bind(
+				targetHost.components.connectionManager
+			);
+			vi.spyOn(targetHost.components.connectionManager, "openConnection").mockImplementation(
+				async (dialTarget, options): Promise<unknown> => {
+					if (options?.force === true) forcedDcutrTargets.push(dialTarget.toString());
+					return managerOpen(dialTarget, options);
+				}
+			);
 			const closeRelayed = vi.fn(() => Promise.resolve());
 			const relayedConnection = new Proxy(directConnection, {
 				get(targetConnection, property, receiver): unknown {
@@ -593,9 +816,10 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 			const dcutr = targetHost.services.dcutr;
 			if (dcutr === undefined) throw new Error("expected genuine DCUtR service");
 			await expect(dcutr.attemptUnilateralConnectionUpgrade(relayedConnection)).resolves.toBe(true);
+			expect(forcedDcutrTargets).toHaveLength(1);
 			expect(closeRelayed).toHaveBeenCalledOnce();
 			expect(targetHost.getConnections(remoteId)).toHaveLength(2);
-			expect(snapshot(target)).toMatchObject({ live: 2 });
+			expect(snapshot(target)).toMatchObject({ charged: 0, live: 2 });
 			await targetHost.peerStore.merge(remoteId, { tags: { [KEEP_ALIVE]: { value: 100 } } });
 			await remote.stop();
 			await vi.waitFor(() => expect(snapshot(target).charged).toBe(1), { timeout: 2_000 });
@@ -608,9 +832,8 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 		async () => {
 			const relay = new DRPNetworkNode(
 				{
-					bootstrap_peers: [],
+					...configWithLocalAddressPolicy(4, 1, 4),
 					listen_addresses: ["/ip4/127.0.0.1/tcp/0/ws"],
-					log_config: { level: "silent" },
 					relay_service: { enabled: true },
 				} as never,
 				{ hostPolicy: quietPolicy }
@@ -623,6 +846,7 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 				{
 					...config(4, 1, 4),
 					control_plane: {
+						address_policy: localAddressPolicy,
 						peer_selection: { expected_replicas: 4 },
 						relay_policy: {
 							per_candidate_deadline_ms: 2_000,
@@ -663,9 +887,8 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 		async () => {
 			const relay = new DRPNetworkNode(
 				{
-					bootstrap_peers: [],
+					...configWithLocalAddressPolicy(4, 1, 4),
 					listen_addresses: ["/ip4/127.0.0.1/tcp/0/ws"],
-					log_config: { level: "silent" },
 					relay_service: { enabled: true },
 				} as never,
 				{ hostPolicy: quietPolicy }
@@ -675,12 +898,36 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 			const relayAddress = relay.getMultiaddrs().find((candidate) => candidate.includes("/ws/p2p/"));
 			if (relayAddress === undefined) throw new Error("relay did not expose a WebSocket address");
 
+			const startupManagerTargets: string[] = [];
+			let clientHost: InspectableHost | undefined;
 			const client = new DRPNetworkNode(
 				{
-					...config(4, 1, 4),
+					...configWithLocalAddressPolicy(4, 1, 4),
 					listen_addresses: [`${relayAddress}/p2p-circuit`],
 				} as never,
-				{ hostPolicy: quietPolicy }
+				{
+					hostFactory: async (context): Promise<InspectableHost> => {
+						clientHost = (await context.createHost({
+							services: {
+								startupManagerProbe: (components: object): unknown => {
+									const manager = (
+										components as unknown as {
+											connectionManager: InspectableHost["components"]["connectionManager"];
+										}
+									).connectionManager;
+									const openConnection = manager.openConnection.bind(manager);
+									manager.openConnection = async (target, options): Promise<unknown> => {
+										startupManagerTargets.push(target.toString());
+										return openConnection(target, options);
+									};
+									return {};
+								},
+							} as never,
+						})) as InspectableHost;
+						return clientHost;
+					},
+					hostPolicy: quietPolicy,
+				}
 			);
 			running.push(client);
 			await client.start();
@@ -691,9 +938,17 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 					).toBe(true),
 				{ timeout: 3_000 }
 			);
+			if (clientHost === undefined) throw new Error("expected circuit client host");
+			expect(startupManagerTargets.some((target) => target.includes(relay.peerId))).toBe(true);
 			const value = snapshot(client);
 			assertClosedSnapshot(value);
-			expect(value).toMatchObject({ live: 1 });
+			expect(value).toMatchObject({ charged: 0, live: 1 });
+
+			const destination = peer(95);
+			await client
+				.safeDial(multiaddr(`${relayAddress}/p2p-circuit/p2p/${destination}`), clientHost, AbortSignal.timeout(250))
+				.catch(() => undefined);
+			expect(snapshot(client)).toMatchObject({ charged: 1, live: 1 });
 		}
 	);
 
@@ -718,6 +973,90 @@ describe("D.93.49 T3 bounded discovery-to-dial peer selection", () => {
 			assertClosedSnapshot(value);
 			expect(value.charged).toBe(2);
 			expect(value.denied).toBeGreaterThan(0);
+
+			const reconnectNode = new DRPNetworkNode(configWithLocalAddressPolicy(4, 1, 4), {
+				hostPolicy: quietPolicy,
+			});
+			const reconnectRemotes = Array.from(
+				{ length: 5 },
+				() =>
+					new DRPNetworkNode(
+						{
+							...configWithLocalAddressPolicy(2, 1, 2),
+							listen_addresses: ["/ip4/127.0.0.1/tcp/0/ws"],
+						} as never,
+						{ hostPolicy: quietPolicy }
+					)
+			);
+			running.push(reconnectNode, ...reconnectRemotes);
+			await reconnectNode.start(privateBytes(79));
+			await Promise.all(reconnectRemotes.map((remote, index) => remote.start(privateBytes(80 + index))));
+			const reconnectHost = reconnectNode["_node"] as InspectableHost;
+			const reconnectPeers = reconnectRemotes.map((remote) => remote["_node"]?.peerId as PeerId);
+			const timeoutSpy = vi.spyOn(globalThis, "setTimeout");
+			const reconnectExpiryHandlers: Array<() => void> = [];
+			try {
+				for (const [index, remote] of reconnectRemotes.entries()) {
+					const remoteId = reconnectPeers[index];
+					await reconnectNode.safeDial(remote.getMultiaddrs()[0]);
+					await vi.waitFor(() => expect(snapshot(reconnectNode).live).toBe(1), { timeout: 2_000 });
+					const connection = reconnectHost.getConnections(remoteId)[0];
+					if (connection === undefined) throw new Error("expected recently-live reconnect fixture");
+					const timersBeforeClose = timeoutSpy.mock.calls.length;
+					await connection.close();
+					await vi.waitFor(() => expect(snapshot(reconnectNode).live).toBe(0), { timeout: 2_000 });
+					// Capture only the reconnect lease installed by this genuine close; do not fire process-wide timers.
+					const reconnectTimers = timeoutSpy.mock.calls
+						.slice(timersBeforeClose)
+						.filter(([, delay]) => delay === 60_000);
+					expect(reconnectTimers).toHaveLength(1);
+					const reconnectHandler = reconnectTimers[0]?.[0];
+					if (typeof reconnectHandler !== "function") throw new Error("expected reconnect expiry handler");
+					reconnectExpiryHandlers.push(() => reconnectHandler());
+				}
+
+				const deniedBeforeOldest = snapshot(reconnectNode).denied;
+				await reconnectHost.components.connectionManager.openConnection(reconnectPeers[0]).catch(() => undefined);
+				expect(snapshot(reconnectNode).denied).toBe(deniedBeforeOldest + 1);
+
+				const deniedBeforeNewest = snapshot(reconnectNode).denied;
+				await reconnectHost.components.connectionManager
+					.openConnection(reconnectPeers.at(-1) as PeerId)
+					.catch(() => undefined);
+				expect(snapshot(reconnectNode).denied).toBe(deniedBeforeNewest);
+				const newestConnection = reconnectHost.getConnections(reconnectPeers.at(-1) as PeerId)[0];
+				if (newestConnection === undefined) throw new Error("expected bounded reconnect admission");
+				const timersBeforeNewestClose = timeoutSpy.mock.calls.length;
+				await newestConnection.close();
+				await vi.waitFor(() => expect(snapshot(reconnectNode).live).toBe(0), { timeout: 2_000 });
+				const newestReconnectTimers = timeoutSpy.mock.calls
+					.slice(timersBeforeNewestClose)
+					.filter(([, delay]) => delay === 60_000);
+				expect(newestReconnectTimers).toHaveLength(1);
+				const newestReconnectHandler = newestReconnectTimers[0]?.[0];
+				if (typeof newestReconnectHandler !== "function") throw new Error("expected newest reconnect expiry handler");
+				reconnectExpiryHandlers.push(() => newestReconnectHandler());
+
+				const leasedRelay = reconnectRemotes.at(-1);
+				if (leasedRelay === undefined) throw new Error("expected newest reconnect relay");
+				await reconnectNode
+					.safeDial(
+						multiaddr(`${leasedRelay.getMultiaddrs()[0]}/p2p-circuit/p2p/${peer(96)}`),
+						reconnectHost,
+						AbortSignal.timeout(250)
+					)
+					.catch(() => undefined);
+				expect(snapshot(reconnectNode)).toMatchObject({ charged: 1, live: 0 });
+
+				for (const expireReconnectLease of reconnectExpiryHandlers) expireReconnectLease();
+				await reconnectHost.components.connectionManager
+					.openConnection(reconnectPeers.at(-1) as PeerId)
+					.catch(() => undefined);
+				expect(snapshot(reconnectNode).denied).toBe(deniedBeforeNewest + 1);
+				assertClosedSnapshot(snapshot(reconnectNode));
+			} finally {
+				timeoutSpy.mockRestore();
+			}
 		}
 	);
 });
