@@ -39,6 +39,15 @@ type BudgetSnapshot = DRPNetworkHostConfigSnapshot & {
 	readonly connectionBudget: ConnectionBudget;
 };
 
+interface CombinedAdmissionSnapshot {
+	readonly budget: number;
+	readonly charged: number;
+	readonly live: number;
+	readonly queued: number;
+	readonly selected: number;
+	readonly upgrade: number;
+}
+
 type InspectableHost = Libp2p & {
 	components: {
 		connectionGater: ConnectionGater;
@@ -60,6 +69,8 @@ const quietHostPolicy = {
 	coldStartPubsubDiscovery: false,
 	gossipSubPeerExchange: false,
 };
+const selectorRuntimeInstalled =
+	typeof Object.getOwnPropertyDescriptor(DRPNetworkNode.prototype, "getPeerSelectionSnapshot")?.value === "function";
 
 function withBudget(
 	maxConnections: number,
@@ -76,9 +87,10 @@ function withBudget(
 }
 
 function peer(index: number): PeerId {
-	return peerIdFromPublicKey(
-		privateKeyFromRaw(Uint8Array.from({ length: 32 }, (_, byte) => (byte + index + 1) % 256)).publicKey
-	);
+	const bytes = new Uint8Array(32);
+	bytes[0] = 0x49;
+	new DataView(bytes.buffer).setUint32(28, index + 1, false);
+	return peerIdFromPublicKey(privateKeyFromRaw(bytes).publicKey);
 }
 
 function connection(index: number): MultiaddrConnection {
@@ -265,6 +277,72 @@ describe("Track T1 hard connection admission", () => {
 			])
 		).resolves.toEqual([false, false, true]);
 	});
+
+	test.skipIf(!selectorRuntimeInstalled)(
+		"accounts T3 discovery and T1 upgrades in one disjoint occupancy machine",
+		async () => {
+			let host: InspectableHost | undefined;
+			const node = new DRPNetworkNode(
+				{
+					...withBudget(3, 1),
+					control_plane: { peer_selection: { expected_replicas: 3 } },
+				} as unknown as DRPNetworkNodeConfig,
+				{
+					hostFactory: async (context): Promise<Libp2p> => {
+						host = (await context.createHost()) as InspectableHost;
+						return host;
+					},
+					hostPolicy: quietHostPolicy,
+				}
+			);
+			running.push(node);
+			await node.start();
+			if (host === undefined) throw new Error("expected captured host");
+			const inbound = host.components.connectionGater.denyInboundUpgradedConnection;
+			if (inbound === undefined) throw new Error("expected final inbound gate");
+
+			for (const index of [200, 201]) {
+				const id = peer(index);
+				host.dispatchEvent(
+					new CustomEvent("peer:discovery", {
+						detail: {
+							id,
+							multiaddrs: [multiaddr(`/ip4/127.0.0.1/tcp/${42_000 + index}/p2p/${id}`)],
+							protocols: [],
+						},
+					})
+				);
+			}
+			expect(
+				(node as unknown as { getPeerSelectionSnapshot(): CombinedAdmissionSnapshot }).getPeerSelectionSnapshot()
+			).toMatchObject({ selected: 2, upgrade: 0 });
+			await expect(Promise.resolve(inbound(peer(200), connection(200)))).resolves.toBe(false);
+			const afterFreeUnit = (
+				node as unknown as { getPeerSelectionSnapshot(): CombinedAdmissionSnapshot }
+			).getPeerSelectionSnapshot?.();
+			expect(afterFreeUnit).toMatchObject({ budget: 3, selected: 2, upgrade: 1 });
+
+			await expect(Promise.resolve(inbound(peer(201), connection(201)))).resolves.toBe(false);
+			const snapshot = (
+				node as unknown as { getPeerSelectionSnapshot(): CombinedAdmissionSnapshot }
+			).getPeerSelectionSnapshot?.();
+			expect(snapshot, "T3_COMBINED_CENSUS_ABSENT").toMatchObject({
+				budget: 3,
+				charged: 0,
+				live: 0,
+				queued: 0,
+				selected: 1,
+				upgrade: 2,
+			});
+			expect(
+				(snapshot?.queued ?? 0) +
+					(snapshot?.selected ?? 0) +
+					(snapshot?.charged ?? 0) +
+					(snapshot?.upgrade ?? 0) +
+					(snapshot?.live ?? 0)
+			).toBeLessThanOrEqual(snapshot?.budget ?? 0);
+		}
+	);
 
 	test("preserves an unattached reservation through its deadline and reconciles auto-start on every host", async () => {
 		const remote = new DRPNetworkNode(baseConfig, { hostPolicy: quietHostPolicy });

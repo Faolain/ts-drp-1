@@ -8,6 +8,7 @@ import { DRPNetworkNode } from "@ts-drp/network";
 import { createPermissionlessACL } from "@ts-drp/object";
 import {
 	ActionType,
+	type DRPNetworkNodeConfig,
 	type IDRP,
 	type IDRPObject,
 	type ResolveConflictsType,
@@ -39,6 +40,11 @@ class PosMapDRP implements IDRP {
 
 const OBJ_ID = "e2e-sync-lockup-grid";
 const sortedHashes = (o: IDRPObject<PosMapDRP>): string => [...o.vertices.map((v) => v.hash)].sort().join("|");
+const selectorRuntimeInstalled =
+	typeof Object.getOwnPropertyDescriptor(DRPNetworkNode.prototype, "getPeerSelectionSnapshot")?.value === "function";
+const peerSelectionFixture: Partial<DRPNetworkNodeConfig> = selectorRuntimeInstalled
+	? { control_plane: { peer_selection: { expected_replicas: 4 } } as never }
+	: {};
 
 describe("e2e: clock-skewed peers remain synchronized", () => {
 	vi.setConfig({ testTimeout: 120_000, hookTimeout: 120_000 });
@@ -69,6 +75,7 @@ describe("e2e: clock-skewed peers remain synchronized", () => {
 		new DRPNode({
 			network_config: {
 				bootstrap_peers: bootstrapNode.getMultiaddrs(),
+				...peerSelectionFixture,
 				listen_addresses: ["/ip4/127.0.0.1/tcp/0/ws"],
 				log_config: { level: "silent" },
 				pubsub: { peer_discovery_interval: 500 },
@@ -83,6 +90,7 @@ describe("e2e: clock-skewed peers remain synchronized", () => {
 		bootstrapNode = new DRPNetworkNode({
 			listen_addresses: ["/ip4/127.0.0.1/tcp/0/ws"],
 			bootstrap_peers: [],
+			...peerSelectionFixture,
 			log_config: { level: "silent" },
 			relay_service: { enabled: true },
 			seed: true,

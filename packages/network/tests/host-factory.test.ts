@@ -5,6 +5,16 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { type DRPNetworkHostFactory, type DRPNetworkHostFactoryContext, DRPNetworkNode } from "../src/node.js";
 
+interface T3SnapshotOwner {
+	getPeerSelectionSnapshot(): {
+		expectedReplicas: number | undefined;
+		globalDiscovery: boolean;
+	};
+}
+
+const selectorRuntimeInstalled =
+	typeof Object.getOwnPropertyDescriptor(DRPNetworkNode.prototype, "getPeerSelectionSnapshot")?.value === "function";
+
 const config = {
 	bootstrap_peers: [],
 	listen_addresses: [] as string[],
@@ -39,9 +49,7 @@ describe("DRPNetworkNode host factory", () => {
 		expect(hostFactory).toHaveBeenCalledOnce();
 		expect(node["_node"]?.services.controlPlaneMarker).toEqual({ owner: "injected" });
 		expect(node["_node"]?.services.pubsub).toBe(node["_pubsub"]);
-		expect(node.getSubscribedTopics()).toEqual(
-			expect.arrayContaining([DRP_DISCOVERY_TOPIC, DRP_INTERVAL_DISCOVERY_TOPIC])
-		);
+		expect(node.getSubscribedTopics()).toContain(DRP_INTERVAL_DISCOVERY_TOPIC);
 	});
 
 	test("preserves production discovery and PX defaults in its immutable snapshot", async () => {
@@ -56,13 +64,14 @@ describe("DRPNetworkNode host factory", () => {
 
 		await node.start();
 
-		expect(observedSnapshot).toEqual({
+		if (observedSnapshot === undefined) throw new Error("expected immutable host-factory snapshot");
+		const { peerDiscoveryModules, ...snapshotWithoutDiscoveryModules } = observedSnapshot;
+		expect(snapshotWithoutDiscoveryModules).toEqual({
 			bootstrapDiscovery: true,
 			bootstrapPeerCount: 0,
 			coldStartPubsubDiscovery: true,
 			gossipSubPeerExchange: true,
 			outboundAddressPolicy: "allow-all",
-			peerDiscoveryModules: ["@libp2p/pubsub-peer-discovery"],
 			rollout: {
 				ownedFallback: { configuredRelays: true, localRouting: true, ownedRendezvous: true },
 				publicComponents: {
@@ -74,8 +83,97 @@ describe("DRPNetworkNode host factory", () => {
 			},
 		});
 		expect(Object.isFrozen(observedSnapshot)).toBe(true);
-		expect(Object.isFrozen(observedSnapshot?.peerDiscoveryModules)).toBe(true);
+		expect(Array.isArray(peerDiscoveryModules)).toBe(true);
+		expect(Object.isFrozen(peerDiscoveryModules)).toBe(true);
 	});
+
+	test.skipIf(!selectorRuntimeInstalled)(
+		"keeps global discovery default-off until a bounded deployment size is declared",
+		async () => {
+			let defaultHostSnapshot: DRPNetworkHostFactoryContext["snapshot"] | undefined;
+			const defaultOff = new DRPNetworkNode(config, {
+				hostFactory: (context): ReturnType<DRPNetworkHostFactory> => {
+					defaultHostSnapshot = context.snapshot;
+					return context.createHost();
+				},
+			});
+			const minimum = new DRPNetworkNode({
+				...config,
+				control_plane: { peer_selection: { expected_replicas: 1 } },
+			} as never);
+			const atCeiling = new DRPNetworkNode({
+				...config,
+				control_plane: { peer_selection: { expected_replicas: 50 } },
+			} as never);
+			startedNodes.push(defaultOff, minimum, atCeiling);
+
+			await Promise.all([defaultOff.start(), minimum.start(), atCeiling.start()]);
+
+			const defaultSnapshot = (defaultOff as unknown as T3SnapshotOwner).getPeerSelectionSnapshot?.();
+			const minimumSnapshot = (minimum as unknown as T3SnapshotOwner).getPeerSelectionSnapshot?.();
+			const ceilingSnapshot = (atCeiling as unknown as T3SnapshotOwner).getPeerSelectionSnapshot?.();
+			expect(defaultSnapshot, "T3_SNAPSHOT_ABSENT").toMatchObject({
+				expectedReplicas: undefined,
+				globalDiscovery: false,
+			});
+			expect(minimumSnapshot).toMatchObject({ expectedReplicas: 1, globalDiscovery: true });
+			expect(ceilingSnapshot).toMatchObject({ expectedReplicas: 50, globalDiscovery: true });
+			expect(defaultOff.getSubscribedTopics()).not.toContain(DRP_DISCOVERY_TOPIC);
+			expect(minimum.getSubscribedTopics()).toContain(DRP_DISCOVERY_TOPIC);
+			expect(atCeiling.getSubscribedTopics()).toContain(DRP_DISCOVERY_TOPIC);
+			expect(defaultHostSnapshot?.peerDiscoveryModules).not.toContain("@libp2p/pubsub-peer-discovery");
+			expect(defaultOff["_pubsub"]?.score.params.topics[DRP_DISCOVERY_TOPIC]).toBeUndefined();
+			expect(minimum["_pubsub"]?.score.params.topics[DRP_DISCOVERY_TOPIC]).toBeDefined();
+			expect(atCeiling["_pubsub"]?.score.params.topics[DRP_DISCOVERY_TOPIC]).toBeDefined();
+		}
+	);
+
+	test.skipIf(!selectorRuntimeInstalled).each([0, 1.5, Number.MAX_SAFE_INTEGER + 1])(
+		"rejects malformed expected_replicas %s before constructing a host",
+		async (expectedReplicas) => {
+			const hostFactory = vi.fn(injectedFactory);
+			const node = new DRPNetworkNode(
+				{
+					...config,
+					control_plane: { peer_selection: { expected_replicas: expectedReplicas } },
+				} as never,
+				{ hostFactory }
+			);
+
+			await expect(node.start()).rejects.toThrow(/expected_replicas|peer.selection/iu);
+			expect(hostFactory).not.toHaveBeenCalled();
+		}
+	);
+
+	test.skipIf(!selectorRuntimeInstalled).each([51, 1_000])(
+		"disables only global discovery above the fixed ceiling at %s",
+		async (expectedReplicas) => {
+			let observedSnapshot: DRPNetworkHostFactoryContext["snapshot"] | undefined;
+			const node = new DRPNetworkNode(
+				{
+					...config,
+					control_plane: { peer_selection: { expected_replicas: expectedReplicas } },
+				} as never,
+				{
+					hostFactory: (context): ReturnType<DRPNetworkHostFactory> => {
+						observedSnapshot = context.snapshot;
+						return context.createHost();
+					},
+				}
+			);
+			startedNodes.push(node);
+			await node.start();
+
+			expect((node as unknown as T3SnapshotOwner).getPeerSelectionSnapshot()).toMatchObject({
+				expectedReplicas,
+				globalDiscovery: false,
+			});
+			expect(node.getSubscribedTopics()).not.toContain(DRP_DISCOVERY_TOPIC);
+			expect(node.getSubscribedTopics()).toContain(DRP_INTERVAL_DISCOVERY_TOPIC);
+			expect(observedSnapshot?.peerDiscoveryModules).not.toContain("@libp2p/pubsub-peer-discovery");
+			expect(node["_pubsub"]?.score.params.topics[DRP_DISCOVERY_TOPIC]).toBeUndefined();
+		}
+	);
 
 	test("fails closed with isolated discovery, PX, and the real outbound address gate", async () => {
 		let observedSnapshot: DRPNetworkHostFactoryContext["snapshot"] | undefined;
