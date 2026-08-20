@@ -1,0 +1,136 @@
+{
+	"schemaVersion": "phase-n1prime-c2-independent-reference-vectors-v1",
+	"redAuthorAttestation": {
+		"agentId": "codex-high-phase-n1prime-c2-red-20260727",
+		"readNoImplementationSource": true,
+		"usedExecutionAssistedReconstruction": false,
+		"oracleAuthority": "authoritative-language-neutral-grammar-and-seven-decision-v3-tuple",
+		"willNeverAuthor": [
+			"original-v3-reference",
+			"v3-vector-mint",
+			"regenerated-v3-reference",
+			"typescript-v3-codec-port"
+		]
+	},
+	"historicalBlockedPair": {
+		"test": {
+			"path": "tests/protocol-v3-independent-reference-vectors-n1prime-c.test.ts",
+			"sha256": "10f1f8b502cb599da6350cc13192e8fbe407710698c187e26ffe2e84d47374a2"
+		},
+		"fixture": {
+			"path": "tests/fixtures/phase-n1prime-c/reference-vector-contract.json",
+			"sha256": "1f84788cad31a3fd737cf55d5da053748ea4e997bd4c5dbf4cf50fa568816840"
+		}
+	},
+	"acceptedInputs": {
+		"registry": {
+			"path": "packages/protocol-v3/registry/registry-v1.json",
+			"sha256": "2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9"
+		},
+		"schema": {
+			"path": "packages/protocol-v3/registry/registry-v1.schema.json",
+			"sha256": "6ab6f377457cbe43d79c0aee4b766683c7c202cd308481db66f04e723787fbdc"
+		},
+		"specification": {
+			"path": "docs/protocol/attested-hard-epochs-v5.md",
+			"sha256": "a2d1c818eecf4524aac60d102aded73eafdab8cb613e7a53a91d79fff9ac9db8"
+		},
+		"amendments": {
+			"path": "docs/protocol/amendments-v3.json",
+			"sha256": "e83625828b38ae398cfdb8e8aa4d404ce90e64a43884b248a4d928e14a392508"
+		},
+		"modelSignoff": {
+			"path": "packages/protocol-v3/formal/registry-model-signoff.json",
+			"sha256": "9b93fd6d843817a2e59309f11cba049d129ed5e862e26bc3706d3f4d1fdc5749"
+		},
+		"formalActions": {
+			"path": "packages/protocol-v3/formal/author-lineage-actions.qnt",
+			"sha256": "7971a025959164f609f4509bf4242f94fc4cc0b6974dde903bf462852983f038"
+		},
+		"formalDerivation": {
+			"path": "packages/protocol-v3/formal/signed-field-derivation.json",
+			"sha256": "e693b3fec5ef0d73299642d49e5ab7fdc969df80214f1d9891a05e188d1b7346"
+		},
+		"formalVariables": {
+			"path": "packages/protocol-v3/formal/registry-signed-envelope-variables.qnt",
+			"sha256": "f6dede1370a40a37d2dca526a27f3dc5c6884c9b8c23390da3372977c2bcef13"
+		},
+		"grammarMarkdown": {
+			"path": "docs/protocol/canonical-tag-codec-v1.md",
+			"sha256": "40f817866619931cd13461393005ea2a796de343591e3ec88be404664e8e5036"
+		},
+		"grammarMachine": {
+			"path": "docs/protocol/canonical-tag-codec-v1.json",
+			"sha256": "64426584f7c3217a42e258ec5d2eaae368d209dd520c0653361a1aca82aa705e"
+		}
+	},
+	"opaqueV2Preservation": {
+		"corpus": {
+			"path": "packages/protocol-v2/tests/fixtures/golden-vectors/registry-v5.json",
+			"sha256": "2635989755ac300c1643f327ee7278d7aa0c72c67310b80ef56bb1eabe42b13e",
+			"expectedVectorCount": 26,
+			"expectedCanonicalBytes": 10490
+		},
+		"packageName": "@ts-drp/canonical",
+		"executionCwd": "packages/protocol-v2",
+		"resolvedArtifact": {
+			"path": "packages/canonical/dist/src/index.js",
+			"sha256": "2518b806864d1ac899b654585cd755b02e0be290138595ad4163c96380beaba6"
+		},
+		"packageManifest": {
+			"path": "packages/canonical/package.json",
+			"sha256": "4e591d7ea14652cbc35d64ad793b8448d7df954ef21b5ff49afa0daf3c46950d"
+		},
+		"authority": "preservation-differential-only-after-grammar-oracle-is-fixed"
+	},
+	"targetArtifacts": {
+		"referenceSource": "packages/protocol-v3/conformance/original-reference/reference.mjs",
+		"referenceProvenance": "packages/protocol-v3/conformance/original-reference/provenance.json",
+		"vectors": "packages/protocol-v3/conformance/vectors/registry-v1.json"
+	},
+	"referenceProtocol": {
+		"transport": "one-json-request-on-stdin-one-json-response-on-stdout",
+		"operations": ["encode-corpus", "validate-cases", "issue-next", "digest-received", "verify-received"]
+	},
+	"contextExclusion": {
+		"vectorId": "state-context-exclusion",
+		"kind": "state",
+		"stateCarrierField": "state",
+		"excludedKey": "context",
+		"retainedKey": "values",
+		"excludedMarker": "replica-local-caller-DO-NOT-SERIALIZE",
+		"retainedMarker": "replicated-value-MUST-SERIALIZE"
+	},
+	"sequenceContract": {
+		"stateField": "lastIssued",
+		"lastDurableBeforeSuccess": 9007199254740990,
+		"successfulNext": 9007199254740991,
+		"exhaustedAt": 9007199254740991,
+		"rejectionInstrumentation": ["digestCalls", "signCalls", "publicationCalls"]
+	},
+	"requiredNegativeCategories": [
+		"reserved-enum",
+		"malformed-author-sequence",
+		"mechanical-v2-author-sequence-omission",
+		"mechanical-v2-anchor-omission",
+		"replica-local-context-on-wire",
+		"v2-domain-on-v3",
+		"v3-domain-on-v2",
+		"v2-suite-on-v3",
+		"v3-suite-on-v2"
+	],
+	"requiredAntiCopyMutations": {
+		"omit-authorSequence": "mechanical-v2-author-sequence-omission",
+		"omit-roundChange-anchor": "mechanical-v2-anchor-omission",
+		"activate-reserved-suite": "reserved-enum",
+		"retain-replica-context": "replica-local-context-on-wire",
+		"reuse-v2-domain": "v2-domain-on-v3",
+		"reuse-v2-suite": "v2-suite-on-v3"
+	},
+	"prRuntime": {
+		"opaqueDifferentialMaxMs": 5000,
+		"referenceInvocationMaxMs": 10000,
+		"largeFuzzingInThisSlice": false,
+		"reason": "grammar mutation controls plus the complete pinned corpus cover the targeted RED without lengthening every PR"
+	}
+}

@@ -12,14 +12,21 @@ import {
 	type ControlPlaneScheduler,
 	SystemControlPlaneScheduler,
 } from "@ts-drp/control-plane";
+import { type EphemeralChannel, type EphemeralChannelOptions } from "@ts-drp/ephemeral";
 import { createDRPDiscovery } from "@ts-drp/interval-discovery";
 import { createDRPReconnectBootstrap } from "@ts-drp/interval-reconnect";
 import { IntervalRunner } from "@ts-drp/interval-runner";
 import { Keychain } from "@ts-drp/keychain";
 import { Logger } from "@ts-drp/logger";
 import { MessageQueueManager } from "@ts-drp/message-queue";
-import { DRPNetworkNode as DefaultDRPNetworkNode } from "@ts-drp/network";
-import { createPermissionlessACL, creatorFromObjectID, DRPObject, HashGraph } from "@ts-drp/object";
+import {
+	DRPNetworkNode as DefaultDRPNetworkNode,
+	isDirectSyncIngress,
+	type NegotiatedSyncSender,
+	type SelectedSyncProtocol,
+	SyncTransportError,
+} from "@ts-drp/network";
+import { createACL, creatorFromObjectID, DRPObject, HashGraph } from "@ts-drp/object";
 import {
 	AddressPolicy,
 	createCompositeRendezvousDirectory,
@@ -83,20 +90,30 @@ import { NodeConnectObjectOptionsSchema, NodeCreateObjectOptionsSchema } from "@
 import { DRPValidationError } from "@ts-drp/validation/errors";
 import { AbortError, raceEvent } from "race-event";
 
-import { clearSyncRecoveryEpisodes, drpObjectChangesHandler, handleMessage } from "./handlers.js";
-import { createDRPIntervalSync, DRPIntervalSync, hasRemoteSyncHistory } from "./interval-sync.js";
+import { NodeEphemeralAdapter } from "./ephemeral.js";
+import { clearInvalidPeerBudgets, drpObjectChangesHandler, handleMessage } from "./handlers.js";
+import {
+	createDRPIntervalSync,
+	DRPIntervalSync,
+	type DRPIntervalSyncOptions,
+	hasRemoteSyncHistory,
+} from "./interval-sync.js";
 import { log } from "./logger.js";
 import * as operations from "./operations.js";
+import { NodeRoomNetworkAdapter, type NodeRoomNetworkPort } from "./room-network.js";
 import { DRPObjectStore } from "./store/index.js";
+import {
+	buildSyncResponseChunks as buildBoundedSyncResponseChunks,
+	buildSyncPayloadForProtocol as buildSelectedSyncPayload,
+	type SyncPayloadBuildInput,
+	type SyncResponseBuildInput,
+} from "./sync-codec.js";
+import { clearNodeSyncState, clearObjectSyncState } from "./sync-state.js";
+import { routeV3Ingress } from "./v3-live.js";
 
 interface NodePeerCacheModule {
 	createFsPeerCacheStore(path: string): Promise<PeerCacheStore>;
 }
-
-const DISCOVERY_MESSAGE_TYPES = [
-	MessageType.MESSAGE_TYPE_DRP_DISCOVERY,
-	MessageType.MESSAGE_TYPE_DRP_DISCOVERY_RESPONSE,
-];
 
 const DISCOVERY_QUEUE_ID = "discovery";
 const NOSTR_SECRET_KEY_PATTERN = /^[0-9a-f]{64}$/u;
@@ -310,6 +327,8 @@ export interface DRPNodeDependencies {
 	readonly controlPlaneScheduler?: ControlPlaneScheduler;
 	/** Existing network implementation to use instead of the production default */
 	networkNode?: DRPNetworkNode;
+	/** Negotiated sync port paired with an injected network implementation. */
+	syncSender?: NegotiatedSyncSender;
 	/** Network shutdown owner when an attached control-plane adapter shares the host */
 	networkStop?(): Promise<void>;
 	/** Existing reconnect owner, or false when an external coordinator owns recovery */
@@ -349,6 +368,8 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	private _connectFetchControllers = new Map<string, AbortController>();
 	private _connectRendezvousControllers = new Map<string, AbortController>();
 	private _initialSyncPeers = new Map<string, Set<string>>();
+	private readonly _objectSubscriptionDisposers = new Map<string, () => void>();
+	private _replicaOrigins = new Map<string, "created" | "connected">();
 	private readonly _rendezvousSequenceStore = new InMemorySequenceStore();
 	private readonly _roomRendezvousProducers = new Map<string, ReturnType<typeof createRecordProducer>>();
 	private readonly _roomRendezvousCapacityLogged = new Set<string>();
@@ -376,7 +397,10 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	private _preservedControlPlaneState: ReadonlyMap<string, unknown> | undefined;
 	private readonly _reconnectDependency?: IDRPIntervalReconnectBootstrap | false;
 	private readonly _stopNetwork: () => Promise<void>;
+	private readonly _syncSender: NegotiatedSyncSender | undefined;
 	private _reconnectInterval?: IDRPIntervalReconnectBootstrap;
+	private readonly _ephemeral: NodeEphemeralAdapter;
+	private readonly _roomNetwork: NodeRoomNetworkAdapter;
 
 	/**
 	 * Create a new DRP node.
@@ -392,6 +416,8 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		log.warn = newLogger.warn;
 		log.error = newLogger.error;
 		this.networkNode = dependencies.networkNode ?? new DefaultDRPNetworkNode(config?.network_config);
+		this._syncSender =
+			dependencies.syncSender ?? (this.networkNode instanceof DefaultDRPNetworkNode ? this.networkNode : undefined);
 		if (dependencies.reconnect && dependencies.reconnect.networkNode !== this.networkNode) {
 			throw new Error("Injected reconnect policy must own the injected DRP network node");
 		}
@@ -403,6 +429,8 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		this._stopNetwork = dependencies.networkStop ?? ((): Promise<void> => this.networkNode.stop());
 		this._routing = createConfiguredBrowserRouting(config);
 		this.#objectStore = new DRPObjectStore();
+		this._ephemeral = new NodeEphemeralAdapter(this.networkNode, (objectId) => this.#objectStore.get(objectId));
+		this._roomNetwork = new NodeRoomNetworkAdapter(this.networkNode, this._ephemeral);
 		this.keychain = new Keychain(config?.keychain_config);
 		this.config = {
 			...config,
@@ -430,7 +458,25 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		const reconnectInterval = this.getReconnectInterval();
 		if (reconnectInterval) this._intervals.set("interval::reconnect", reconnectInterval);
 		if (this._subscribedNetworkNode !== this.networkNode) {
-			this.networkNode.subscribeToMessageQueue(this.dispatchMessage.bind(this));
+			this.networkNode.subscribeToMessageQueue((ingress) => {
+				if (isDirectSyncIngress(ingress)) {
+					const admission = this.dispatchMessage(ingress.message);
+					ingress.completion.claim(admission);
+					admission.catch((error: unknown) => {
+						log.error("::dispatchMessage: Failed to enqueue direct sync message", error);
+					});
+					return;
+				}
+				if (
+					ingress.type === MessageType.MESSAGE_TYPE_SYNC ||
+					ingress.type === MessageType.MESSAGE_TYPE_SYNC_ACCEPT ||
+					ingress.type === MessageType.MESSAGE_TYPE_SYNC_REJECT
+				)
+					return;
+				this.dispatchMessage(ingress).catch((error: unknown) => {
+					log.error("::dispatchMessage: Failed to enqueue message", error);
+				});
+			});
 			this.networkNode.subscribeToGroupPeerChanges(this.handleGroupPeerChange.bind(this));
 			this._subscribedNetworkNode = this.networkNode;
 		}
@@ -446,6 +492,17 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	 * Stop the node.
 	 */
 	async stop(): Promise<void> {
+		let shutdownFailure: unknown;
+		try {
+			this._roomNetwork.closeAll();
+		} catch (error) {
+			shutdownFailure = error;
+		}
+		try {
+			this._ephemeral.closeAll();
+		} catch (error) {
+			shutdownFailure ??= error;
+		}
 		const controlPlaneCoordinator = this._controlPlaneCoordinator;
 		this._controlPlaneCoordinator = undefined;
 		try {
@@ -465,7 +522,13 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		this._roomRendezvousCapacityLogged.clear();
 		this._roomRendezvousProducerFactory = undefined;
 		this._roomRendezvousMaxRooms = 0;
-		this._intervals.forEach((interval) => interval.stop());
+		this._intervals.forEach((interval) => {
+			try {
+				interval.stop();
+			} catch (error) {
+				shutdownFailure ??= error;
+			}
+		});
 		this._intervals.clear();
 		const routing = this._routing;
 		this._routing = undefined;
@@ -477,10 +540,25 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		this._rendezvousBootstrapController = undefined;
 		this._rendezvous = undefined;
 		try {
-			await Promise.all([routing?.stop(), rendezvousBootstrap, rendezvousRegistration, this._stopNetwork()]);
+			const results = await Promise.allSettled([
+				routing?.stop(),
+				rendezvousBootstrap,
+				rendezvousRegistration,
+				this._stopNetwork(),
+			]);
+			for (const result of results) {
+				if (result.status === "rejected") shutdownFailure ??= result.reason;
+			}
 		} finally {
-			this.messageQueueManager.closeAll();
+			clearInvalidPeerBudgets(this);
+			clearNodeSyncState(this);
+			try {
+				this.messageQueueManager.closeAll();
+			} catch (error) {
+				shutdownFailure ??= error;
+			}
 		}
+		if (shutdownFailure !== undefined) throw shutdownFailure;
 	}
 
 	/**
@@ -1139,12 +1217,102 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	 * @param msg - The message to dispatch.
 	 */
 	async dispatchMessage(msg: Message): Promise<void> {
-		if (DISCOVERY_MESSAGE_TYPES.includes(msg.type)) {
+		if (this._ephemeral.route(msg)) return;
+		if (this._roomNetwork.route(msg)) return;
+		const routeV3IngressResult = routeV3Ingress(this.networkNode, msg);
+		if (routeV3IngressResult) return;
+		if (
+			msg.type === MessageType.MESSAGE_TYPE_DRP_DISCOVERY ||
+			msg.type === MessageType.MESSAGE_TYPE_DRP_DISCOVERY_RESPONSE
+		) {
 			await this.messageQueueManager.enqueue(DISCOVERY_QUEUE_ID, msg);
 			return;
 		}
 
 		await this.messageQueueManager.enqueue(msg.objectId, msg);
+	}
+
+	/**
+	 * Open the sole transient channel bound to a connected object.
+	 * @param objectId Connected object identity.
+	 * @param options Closed channel limits.
+	 * @returns The existing identically-configured channel or a newly activated one.
+	 */
+	openEphemeral(objectId: string, options: EphemeralChannelOptions): EphemeralChannel {
+		return this._ephemeral.open(objectId, options);
+	}
+
+	/**
+	 * Open the protocol-neutral network lifecycle for one durable room.
+	 * @param objectId Creator-bound durable room identity.
+	 * @returns A retained-history, v3 ingress and E1 transport port.
+	 */
+	openRoomNetwork(objectId: string): NodeRoomNetworkPort {
+		if (this.#objectStore.get(objectId) !== undefined) {
+			throw new Error("room network identity is already owned by a legacy object");
+		}
+		const port = this._roomNetwork.open(
+			objectId,
+			creatorFromObjectID(objectId),
+			() => this._connectObjectCreator(objectId),
+			() => this._closeRoomNetworkLifecycle(objectId)
+		);
+		try {
+			this._addRoomRendezvousProducer(objectId);
+			return port;
+		} catch (error) {
+			try {
+				port.close();
+			} catch {
+				// Preserve the setup failure after best-effort rollback.
+			}
+			throw error;
+		}
+	}
+
+	/**
+	 * Build one request only after the live stream selects its sync protocol.
+	 * @param input Bounded sync request input.
+	 * @returns The negotiated sync payload.
+	 */
+	buildSyncPayloadForProtocol(input: SyncPayloadBuildInput): Promise<Message> {
+		return Promise.resolve().then(() => buildSelectedSyncPayload(this, input));
+	}
+
+	/**
+	 * Build bounded, independently applicable response chunks.
+	 * @param input Bounded sync response input.
+	 * @returns Independently applicable response messages.
+	 */
+	async buildSyncResponseChunks(input: SyncResponseBuildInput): Promise<readonly Message[]> {
+		return buildBoundedSyncResponseChunks(this, input);
+	}
+
+	/**
+	 * Send through the explicit negotiated-sync dependency.
+	 * @param peerId Target peer identity.
+	 * @param payloadFactory Payload builder bound to the selected protocol.
+	 */
+	async sendNegotiatedSync(
+		peerId: string,
+		payloadFactory: (selection: SelectedSyncProtocol) => Message | Promise<Message>
+	): Promise<void> {
+		if (this._syncSender === undefined) {
+			throw new SyncTransportError("SYNC_NEGOTIATION_UNAVAILABLE", "Injected network has no negotiated sync sender");
+		}
+		await this._syncSender.sendSyncMessage(peerId, payloadFactory);
+	}
+
+	/**
+	 * Send one bounded response through the same negotiated-sync port.
+	 * @param peerId Target peer identity.
+	 * @param message Bounded response message.
+	 */
+	async sendNegotiatedSyncResponse(peerId: string, message: Message): Promise<void> {
+		if (this._syncSender === undefined) {
+			throw new SyncTransportError("SYNC_NEGOTIATION_UNAVAILABLE", "Injected network has no negotiated sync sender");
+		}
+		await this._syncSender.sendSyncResponseMessage(peerId, message);
 	}
 
 	/**
@@ -1223,20 +1391,37 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		if (!validation.success) {
 			throw new DRPValidationError(validation.error);
 		}
+		if (
+			options.acl === undefined &&
+			options.id !== undefined &&
+			creatorFromObjectID(options.id) !== this.networkNode.peerId
+		) {
+			throw new Error("A custom object id must be creator-bound when acl is omitted");
+		}
 
+		const storageConfig =
+			options.history_storage === "compact"
+				? ({ history_storage: "compact", replica_mode: "observer" } as const)
+				: ({ history_storage: "full", replica_mode: options.replica_mode } as const);
 		const object = new DRPObject<T>({
 			peerId: this.networkNode.peerId,
-			acl: options.acl ?? createPermissionlessACL(this.networkNode.peerId),
+			acl: options.acl ?? createACL({ admins: this.networkNode.peerId }),
 			drp: options.drp,
 			id: options.id,
 			metrics: options.metrics,
 			config: {
+				finality_config: options.finality_config,
 				log_config: options.log_config,
+				...storageConfig,
 			},
 		});
+		if (this._roomNetwork.has(object.id)) {
+			throw new Error("object identity is already owned by a v3 room network");
+		}
 
 		// put the object in the object store
 		this.#objectStore.put(object.id, object);
+		this._replicaOrigins.set(object.id, "created");
 
 		// subscribe to the object
 		this.subscribeObject(object);
@@ -1245,7 +1430,7 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		if (options.sync?.enabled) {
 			await operations.syncObject(this, object.id, options.sync.peerId);
 		}
-		this._createObjectIntervals(object.id);
+		this._createObjectIntervals(object.id, "created");
 		return object;
 	}
 
@@ -1262,23 +1447,44 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		if (!validation.success) {
 			throw new DRPValidationError(validation.error);
 		}
+		if (this._roomNetwork.has(options.id)) {
+			throw new Error("object identity is already owned by a v3 room network");
+		}
+		const storageConfig =
+			options.history_storage === "compact"
+				? ({ history_storage: "compact", replica_mode: "observer" } as const)
+				: ({ history_storage: "full", replica_mode: options.replica_mode } as const);
+		let acl = options.acl;
+		if (acl === undefined) {
+			const creator = creatorFromObjectID(options.id);
+			if (creator === undefined) {
+				throw new Error("A creator-bound object id must be provided when acl is omitted");
+			}
+			acl = createACL({ admins: creator });
+		}
 		const object = new DRPObject<T>({
 			peerId: this.networkNode.peerId,
 			id: options.id,
+			acl,
 			drp: options.drp,
 			metrics: options.metrics,
-			config: { log_config: options.log_config },
+			config: {
+				finality_config: options.finality_config,
+				log_config: options.log_config,
+				...storageConfig,
+			},
 		});
 
 		// put the object in the object store
 		this.#objectStore.put(object.id, object);
+		this._replicaOrigins.set(object.id, "connected");
 
 		this.subscribeObject(object);
 
 		// Genesis authority was already derived locally from the creator-bound id.
 		// Anti-entropy must remain active even when the initial fetch sees no peer,
 		// so a later SYNC can deliver the object's history.
-		this._createObjectIntervals(options.id);
+		this._createObjectIntervals(options.id, "connected");
 		void this._connectObjectCreator(options.id);
 		const previousFetch = this._connectFetchControllers.get(object.id);
 		previousFetch?.abort();
@@ -1306,11 +1512,9 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 			}
 		};
 		const fetchRetry = setInterval(() => void requestState(), 1000);
-		let fetchSucceeded = false;
 		try {
 			void requestState();
 			await fetchResponse;
-			fetchSucceeded = true;
 		} catch (error) {
 			if (error instanceof AbortError) {
 				if (fetchTimedOut) log.error("::connectObject: Fetch state timed out");
@@ -1325,19 +1529,6 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 			}
 		}
 		if (fetchController.signal.aborted && !fetchTimedOut) return object;
-		if (!fetchSucceeded) return object;
-		// TODO: since when the interval can run this twice do we really want it to be
-		// run while the other one might still be running?
-		const intervalFn = (interval: NodeJS.Timeout) => async (): Promise<void> => {
-			if (object.acl) {
-				await operations.syncObject(this, object.id, options.sync?.peerId);
-				log.info("::connectObject: Synced object", object.id);
-				log.info("::connectObject: Subscribed to object", object.id);
-				clearInterval(interval);
-			}
-		};
-		const retry = setInterval(() => void intervalFn(retry)(), 1000);
-
 		return object;
 	}
 
@@ -1438,13 +1629,20 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	 * @param object - The object to subscribe to.
 	 */
 	subscribeObject<T extends IDRP>(object: IDRPObject<T>): void {
+		if (this._roomNetwork.has(object.id)) {
+			throw new Error("object identity is already owned by a v3 room network");
+		}
 		// Reserve queue capacity before installing callbacks or gossip subscriptions.
 		this.messageQueueManager.subscribe(object.id, (msg) => handleMessage(this, msg));
+		let disposeObjectSubscription: (() => void) | undefined;
 		try {
-			object.subscribe((obj, originFn, vertices) => drpObjectChangesHandler(this, obj, originFn, vertices));
+			disposeObjectSubscription = this._subscribeToObjectChanges(object);
+			this._objectSubscriptionDisposers.set(object.id, disposeObjectSubscription);
 			this.networkNode.subscribe(object.id);
 			this._addRoomRendezvousProducer(object.id);
 		} catch (error) {
+			disposeObjectSubscription?.();
+			this._objectSubscriptionDisposers.delete(object.id);
 			this.messageQueueManager.close(object.id);
 			throw error;
 		}
@@ -1456,47 +1654,21 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	 * @param purge - Whether to purge the object.
 	 */
 	unsubscribeObject(id: string, purge?: boolean): void {
+		this._ephemeral.close(id);
+		const disposeObjectSubscription = this._objectSubscriptionDisposers.get(id);
+		this._objectSubscriptionDisposers.delete(id);
+		disposeObjectSubscription?.();
 		this._connectFetchControllers.get(id)?.abort();
 		this._connectFetchControllers.delete(id);
-		this._connectRendezvousControllers.get(id)?.abort();
-		this._connectRendezvousControllers.delete(id);
-		const roomProducer = this._roomRendezvousProducers.get(id);
-		this._roomRendezvousProducers.delete(id);
-		const directory = this._rendezvous;
-		const lifecycleSignal = this._rendezvousRegistrationController?.signal;
-		if (roomProducer !== undefined && directory !== undefined && lifecycleSignal !== undefined) {
-			const registration = this._rendezvousRegistration;
-			void (async (): Promise<void> => {
-				if (registration !== undefined) {
-					const fenceSignal = AbortSignal.any([lifecycleSignal, AbortSignal.timeout(5_000)]);
-					await Promise.race([
-						registration.then(
-							() => undefined,
-							() => undefined
-						),
-						new Promise<void>((resolve) => {
-							if (fenceSignal.aborted) {
-								resolve();
-								return;
-							}
-							fenceSignal.addEventListener("abort", () => resolve(), { once: true });
-						}),
-					]);
-				}
-				lifecycleSignal.throwIfAborted();
-				const signal = AbortSignal.any([lifecycleSignal, AbortSignal.timeout(5_000)]);
-				const record = await roomProducer.retire();
-				await directory.register(record, signal, registrationCredential(this.config));
-			})().catch((error: unknown) => {
-				log.info("::rendezvous: Room presence retraction failed; record will lapse by TTL", error);
-			});
-		}
-		this._roomRendezvousCapacityLogged.delete(id);
+		this._closeRoomNetworkLifecycle(id);
 		this._stopObjectIntervals(id);
-		clearSyncRecoveryEpisodes(this, id);
+		clearObjectSyncState(this, id);
 		this._initialSyncPeers.delete(id);
 		this.networkNode.unsubscribe(id);
-		if (purge) this.#objectStore.remove(id);
+		if (purge) {
+			this.#objectStore.remove(id);
+			this._replicaOrigins.delete(id);
+		}
 		this.networkNode.removeTopicScoreParams(id);
 		this.messageQueueManager.close(id);
 	}
@@ -1544,10 +1716,24 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 			if (!this.messageQueueManager.hasQueue(object.id)) {
 				this.messageQueueManager.subscribe(object.id, (msg) => handleMessage(this, msg));
 			}
+			if (!this._objectSubscriptionDisposers.has(object.id)) {
+				this._objectSubscriptionDisposers.set(object.id, this._subscribeToObjectChanges(object));
+			}
 			this.networkNode.subscribe(object.id);
 			this._addRoomRendezvousProducer(object.id);
-			this._createObjectIntervals(object.id);
+			const replicaOrigin = this._replicaOrigins.get(object.id);
+			if (replicaOrigin === undefined) {
+				// Provenance cannot be recovered from id shape. Restore ordinary
+				// anti-entropy without assigning a created or connected role.
+				this._createObjectIntervals(object.id, "unmanaged");
+				continue;
+			}
+			this._createObjectIntervals(object.id, replicaOrigin);
 		}
+	}
+
+	private _subscribeToObjectChanges<T extends IDRP>(object: IDRPObject<T>): () => void {
+		return object.subscribe((obj, originFn, vertices) => drpObjectChangesHandler(this, obj, originFn, vertices));
 	}
 
 	private _addRoomRendezvousProducer(objectId: string): void {
@@ -1562,6 +1748,43 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 			return;
 		}
 		this._roomRendezvousProducers.set(objectId, producerFactory(objectId));
+		this._roomRendezvousCapacityLogged.delete(objectId);
+	}
+
+	private _closeRoomNetworkLifecycle(objectId: string): void {
+		this._connectRendezvousControllers.get(objectId)?.abort();
+		this._connectRendezvousControllers.delete(objectId);
+		const roomProducer = this._roomRendezvousProducers.get(objectId);
+		this._roomRendezvousProducers.delete(objectId);
+		const directory = this._rendezvous;
+		const lifecycleSignal = this._rendezvousRegistrationController?.signal;
+		if (roomProducer !== undefined && directory !== undefined && lifecycleSignal !== undefined) {
+			const registration = this._rendezvousRegistration;
+			void (async (): Promise<void> => {
+				if (registration !== undefined) {
+					const fenceSignal = AbortSignal.any([lifecycleSignal, AbortSignal.timeout(5_000)]);
+					await Promise.race([
+						registration.then(
+							() => undefined,
+							() => undefined
+						),
+						new Promise<void>((resolve) => {
+							if (fenceSignal.aborted) {
+								resolve();
+								return;
+							}
+							fenceSignal.addEventListener("abort", () => resolve(), { once: true });
+						}),
+					]);
+				}
+				lifecycleSignal.throwIfAborted();
+				const signal = AbortSignal.any([lifecycleSignal, AbortSignal.timeout(5_000)]);
+				const record = await roomProducer.retire();
+				await directory.register(record, signal, registrationCredential(this.config));
+			})().catch((error: unknown) => {
+				log.info("::rendezvous: Room presence retraction failed; record will lapse by TTL", error);
+			});
+		}
 		this._roomRendezvousCapacityLogged.delete(objectId);
 	}
 
@@ -1591,27 +1814,29 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		interval.start();
 	}
 
-	private _createIntervalSync(id: string): void {
+	private _createIntervalSync(id: string, replicaOrigin: DRPIntervalSyncOptions["replicaOrigin"]): void {
 		const key = objectIntervalKey("sync", id);
 		const existingInterval = this._intervals.get(key);
 		existingInterval?.stop();
 
 		const interval =
-			existingInterval ??
-			createDRPIntervalSync({
-				...this.config.interval_sync_options,
-				id,
-				node: this,
-				logConfig: this.config.log_config,
-			});
+			existingInterval instanceof DRPIntervalSync && existingInterval.replicaOrigin === replicaOrigin
+				? existingInterval
+				: createDRPIntervalSync({
+						...this.config.interval_sync_options,
+						id,
+						node: this,
+						replicaOrigin,
+						logConfig: this.config.log_config,
+					});
 
 		this._intervals.set(key, interval);
 		interval.start();
 	}
 
-	private _createObjectIntervals(id: string): void {
+	private _createObjectIntervals(id: string, replicaOrigin: DRPIntervalSyncOptions["replicaOrigin"]): void {
 		this._createIntervalDiscovery(id);
-		this._createIntervalSync(id);
+		this._createIntervalSync(id, replicaOrigin);
 	}
 
 	private _stopObjectIntervals(id: string): void {
@@ -1735,3 +1960,4 @@ export {
 	type DRPIntervalSyncOptions,
 	INITIAL_SYNC_RETRY_INTERVAL_MS,
 } from "./interval-sync.js";
+export type { NodeRoomNetworkPort } from "./room-network.js";

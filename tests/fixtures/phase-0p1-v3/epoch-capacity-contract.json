@@ -1,0 +1,14 @@
+{
+	"profileId": "compaction-epoch-capacity-v1",
+	"implementationModule": "../packages/compaction/src/index.ts",
+	"controlledModule": "./controlled-epoch-capacity.ts",
+	"conformanceDirectory": "../packages/compaction/conformance/epoch-capacity-v1",
+	"workflow": ".github/workflows/compaction-epoch-capacity.yml",
+	"anchorInclusive": true,
+	"capacityOutcome": {
+		"status": "pending",
+		"code": "EPOCH_FULL",
+		"latchByHash": false
+	},
+	"initialOversizeCode": "EPOCH_CAPACITY_EXCEEDED"
+}

@@ -1,0 +1,27 @@
+{
+	"extends": "../../tsconfig.json",
+	"compilerOptions": {
+		"outDir": "dist"
+	},
+	"include": [
+		"src/**/*.ts",
+		"tests/**/*.ts",
+		"playwright.phase-2d1-schema.config.ts",
+		"playwright.phase-2d2a-idb-adapter.config.ts",
+		"playwright.phase-2d2b1-adapter-closure.config.ts",
+		"playwright.phase-2e5-browser-inventory.config.ts",
+		"playwright.phase-2e6-real-process-death.config.ts",
+		"playwright.phase-2e7-publication-component.config.ts",
+		"playwright.protocol-v2.config.ts",
+		"playwright.protocol-v2-inert.config.ts"
+	],
+	"exclude": [
+		"dist",
+		"./*.d.ts",
+		"tests/assets/phase-3a1b-p2-browser-publication-entry.ts",
+		"tests/assets/phase-3a1b-p2-browser-publication-worker.ts",
+		"tests/phase-3a1b-p2-browser-outbox-publication-death-red.pw.ts",
+		"tests/phase-3a1b-p2-global-setup.ts",
+		"tests/process/phase-3a1b-p2-browser-publication-crash-child.ts"
+	]
+}

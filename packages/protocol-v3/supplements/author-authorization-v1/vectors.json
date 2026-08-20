@@ -1,0 +1,28 @@
+{
+	"digestDomain": "ts-drp/author-authorization/v3",
+	"maximumCanonicalBytes": 8192,
+	"positive": {
+		"carrier": {
+			"authors": ["79b5562e8fe654f94078b112e8a98ba7901f853ae695bed7e0e3910bad049664"],
+			"epoch": 0,
+			"kind": "drp-author-authorization",
+			"objectId": "creator:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			"profileId": "creator-author-authorization-v1",
+			"protocolMajor": 3,
+			"version": 1
+		},
+		"canonicalBytesHex": "080705046b696e6405186472702d617574686f722d617574686f72697a6174696f6e050565706f636803000507617574686f72730701054037396235353632653866653635346639343037386231313265386139386261373930316638353361653639356265643765306533393130626164303439363634050776657273696f6e030205086f626a6563744964052863726561746f723a6161616161616161616161616161616161616161616161616161616161616161050970726f66696c654964051f63726561746f722d617574686f722d617574686f72697a6174696f6e2d7631050d70726f746f636f6c4d616a6f720306",
+		"byteLength": 244,
+		"aclDigest": "520df748b92162115b0f9612ee07bd4c9a58dc60067a66eae4f72b91e94248e7"
+	},
+	"negative": [
+		{ "label": "empty-authors", "mutation": "authors=[]", "reason": "acl-schema-invalid" },
+		{ "label": "duplicate-authors", "mutation": "authors[1]=authors[0]", "reason": "acl-schema-invalid" },
+		{ "label": "uppercase-author", "mutation": "authors[0]=uppercase", "reason": "acl-schema-invalid" },
+		{ "label": "wrong-version", "mutation": "version=2", "reason": "unsupported-acl-version" },
+		{ "label": "wrong-profile", "mutation": "profileId=other", "reason": "unsupported-acl-profile" },
+		{ "label": "wrong-object", "mutation": "objectId=other", "reason": "object-id-mismatch" },
+		{ "label": "wrong-epoch", "mutation": "epoch=1", "reason": "epoch-mismatch" },
+		{ "label": "wrong-domain", "mutation": "digestDomain=raw-sha256", "reason": "acl-digest-mismatch" }
+	]
+}

@@ -1,245 +1,71 @@
-import { DRP_DISCOVERY_TOPIC } from "@ts-drp/types";
+import type { DRPNode } from "@ts-drp/node";
 
-import { gridState } from "./state";
-import { getColorForPeerId, hexToRgba } from "./util/color";
+import type { ZoneSnapshot } from "./v3-zone";
 
-const formatPeerId = (id: string): string => {
-	return `${id.slice(0, 4)}...${id.slice(-4)}`;
-};
-
-/**
- * Render the info
- */
-export function renderInfo(): void {
-	renderPeerId();
-	renderPeers();
-	renderDiscoveryPeers();
-	renderPeersInDRP();
-}
-
-function renderClickablePeerList(
-	peers: string[],
-	isOpen: boolean,
-	elementId: string,
-	callback: () => void,
-	defaultText = "[]"
-): void {
-	const element = <HTMLDivElement>document.getElementById(elementId);
-	const hasPeers = peers.length > 0;
-	if (!hasPeers) {
-		element.innerHTML = defaultText;
-		return;
-	}
-
-	element.innerHTML = `[${peers.map((peer) => `<strong style="color: ${getColorForPeerId(peer)};">${formatPeerId(peer)}</strong>`).join(", ")}]`;
-	element.style.cursor = "pointer";
-
-	const peersList = document.createElement("ul");
-	peersList.style.display = "none";
-	peersList.style.margin = "10px 0";
-	peersList.style.paddingLeft = "20px";
-
-	for (const peer of peers) {
-		const li = document.createElement("li");
-		li.innerHTML = `<strong style="color: ${getColorForPeerId(peer)};">${peer}</strong>`;
-		peersList.appendChild(li);
-	}
-
-	element.appendChild(peersList);
-
-	peersList.style.display = isOpen ? "block" : "none";
-	element.onclick = (): void => {
-		peersList.style.display = peersList.style.display === "none" ? "block" : "none";
-		callback();
-	};
-}
-
-let isDiscoveryPeersOpen = false;
-
-const renderDiscoveryPeers = (): void => {
-	const node = gridState.getNode();
-	gridState.discoveryPeers = node.networkNode.getGroupPeers(DRP_DISCOVERY_TOPIC);
-
-	renderClickablePeerList(gridState.discoveryPeers, isDiscoveryPeersOpen, "discoveryPeers", () => {
-		isDiscoveryPeersOpen = !isDiscoveryPeersOpen;
-	});
-};
-
-let isPeersOpen = false;
-
-const renderPeers = (): void => {
-	const node = gridState.getNode();
-	gridState.peers = node.networkNode.getAllPeers();
-
-	renderClickablePeerList(gridState.peers, isPeersOpen, "peers", () => {
-		isPeersOpen = !isPeersOpen;
-	});
-};
-
-let isPeersInDRPOpen = false;
-
-const renderPeersInDRP = (): void => {
-	if (gridState.drpObject) {
-		const node = gridState.getNode();
-		gridState.objectPeers = node.networkNode.getGroupPeers(gridState.drpObject.id);
-	}
-
-	renderClickablePeerList(
-		gridState.objectPeers,
-		isPeersInDRPOpen,
-		"objectPeers",
-		() => {
-			isPeersInDRPOpen = !isPeersInDRPOpen;
-		},
-		"Your frens in GRID: []"
-	);
-};
-
-let isPeerIdExpanded = false;
-
-const renderPeerId = (): void => {
-	const element_peerId = <HTMLDivElement>document.getElementById("peerId");
-	const node = gridState.getNode();
-
-	const innerHtml = (): string => `
-	<strong id="peerIdExpanded" 
-			style="color: ${getColorForPeerId(node.networkNode.peerId)};
-				   ${isPeerIdExpanded ? "" : "display: none;"}">
-	  ${node.networkNode.peerId}
-	</strong>
-	<strong id="peerIdCollapsed" 
-			style="color: ${getColorForPeerId(node.networkNode.peerId)};
-				   ${!isPeerIdExpanded ? "" : "display: none;"}">
-	  ${formatPeerId(node.networkNode.peerId)}
-	</strong>`;
-
-	element_peerId.style.cursor = "pointer";
-	element_peerId.innerHTML = innerHtml();
-	element_peerId.onclick = (): void => {
-		isPeerIdExpanded = !isPeerIdExpanded;
-		element_peerId.innerHTML = innerHtml();
-	};
-};
-
-/**
- * Render the grid
- */
-export const render = (): void => {
-	if (gridState.drpObject) {
-		const gridIdTextElement = <HTMLSpanElement>document.getElementById("gridIdText");
-		gridIdTextElement.innerText = `You're in GRID ID:`;
-		const gridIdElement = <HTMLSpanElement>document.getElementById("gridId");
-		gridIdElement.innerText = gridState.drpObject.id;
-		const copyGridIdButton = document.getElementById("copyGridId");
-		if (copyGridIdButton) {
-			copyGridIdButton.style.display = "inline"; // Show the button
-		}
-	} else {
-		const copyGridIdButton = document.getElementById("copyGridId");
-		if (copyGridIdButton) {
-			copyGridIdButton.style.display = "none"; // Hide the button
-		}
-	}
-
-	if (!gridState.drpObject) return;
-	const users = gridState.drpObject.drp?.query_users();
-	const element_grid = <HTMLDivElement>document.getElementById("grid");
-	element_grid.innerHTML = "";
-
-	const gridWidth = element_grid.clientWidth;
-	const gridHeight = element_grid.clientHeight;
-	const centerX = Math.floor(gridWidth / 2);
-	const centerY = Math.floor(gridHeight / 2);
-
-	// Draw grid lines
-	const numLinesX = Math.floor(gridWidth / 50);
-	const numLinesY = Math.floor(gridHeight / 50);
-
-	for (let i = -numLinesX; i <= numLinesX; i++) {
-		const line = document.createElement("div");
-		line.style.position = "absolute";
-		line.style.left = `${centerX + i * 50}px`;
-		line.style.top = "0";
-		line.style.width = "1px";
-		line.style.height = "100%";
-		line.style.backgroundColor = "lightgray";
-		element_grid.appendChild(line);
-	}
-
-	for (let i = -numLinesY; i <= numLinesY; i++) {
-		const line = document.createElement("div");
-		line.style.position = "absolute";
-		line.style.left = "0";
-		line.style.top = `${centerY + i * 50}px`;
-		line.style.width = "100%";
-		line.style.height = "1px";
-		line.style.backgroundColor = "lightgray";
-		element_grid.appendChild(line);
-	}
-
-	if (!users) return;
-	for (const userColorString of users) {
-		const [id, color] = userColorString.split(":");
-		const position = gridState.gridDRP?.query_userPosition(userColorString);
-		const node = gridState.getNode();
-		if (position) {
-			const div = document.createElement("div");
-			div.style.position = "absolute";
-			div.style.left = `${centerX + position.x * 50 + 5}px`; // Center the circle
-			div.style.top = `${centerY - position.y * 50 + 5}px`; // Center the circle
-			if (id === node.networkNode.peerId) {
-				div.style.width = `${34}px`;
-				div.style.height = `${34}px`;
-			} else {
-				div.style.width = `${34 + 6}px`;
-				div.style.height = `${34 + 6}px`;
-			}
-			div.style.backgroundColor = color;
-			div.style.borderRadius = "50%";
-			div.style.transition = "background-color 1s ease-in-out";
-			div.style.animation = `glow-${id} 0.5s infinite alternate`;
-
-			// Add black border for the current user's circle
-			if (id === node.networkNode.peerId) {
-				div.style.border = "3px solid black";
-			}
-
-			div.setAttribute("data-glowing-peer-id", id);
-
-			// Create dynamic keyframes for the glow effect
-			const style = document.createElement("style");
-			style.innerHTML = `
-			@keyframes glow-${id} {
-				0% {
-					background-color: ${hexToRgba(color, 0.5)};
-				}
-				100% {
-					background-color: ${hexToRgba(color, 1)};
-				}
-			}`;
-			document.head.appendChild(style);
-
-			element_grid.appendChild(div);
-		}
-	}
-};
-
-/**
- * Enable the UI controls
- */
+/** Enable the durable-zone controls once the real network node is dialable. */
 export function enableUIControls(): void {
 	const loadingMessage = document.getElementById("loadingMessage");
-	if (loadingMessage) {
-		loadingMessage.style.display = "none";
+	if (loadingMessage !== null) loadingMessage.style.display = "none";
+	for (const id of ["joinGrid", "createGrid", "gridInput", "zoneMemberEnrollment", "copyGridId"]) {
+		const control = document.getElementById(id);
+		if (control instanceof HTMLButtonElement || control instanceof HTMLInputElement) control.disabled = false;
 	}
+}
 
-	const joinButton = <HTMLButtonElement>document.getElementById("joinGrid");
-	const createButton = <HTMLButtonElement>document.getElementById("createGrid");
-	const gridInput = <HTMLInputElement>document.getElementById("gridInput");
-	const copyButton = <HTMLButtonElement>document.getElementById("copyGridId");
+/**
+ * Render current network diagnostics without owning application state.
+ * @param node Active network node.
+ */
+export function renderNetwork(node: DRPNode): void {
+	setText("peerId", node.networkNode.peerId);
+	setText("peers", JSON.stringify(node.networkNode.getAllPeers().sort()));
+	setText("discoveryPeers", JSON.stringify(node.networkNode.getSubscribedTopics().sort()));
+}
 
-	joinButton.disabled = false;
-	createButton.disabled = false;
-	gridInput.disabled = false;
-	copyButton.disabled = false;
+/**
+ * Render the deterministic durable projection and transient overlay.
+ * @param snapshot Current zone projection.
+ */
+export function renderZone(snapshot: ZoneSnapshot): void {
+	setText("gridIdText", snapshot.ready ? "You're in ZONE ID:" : "");
+	setText("gridId", snapshot.zoneId);
+	setText(
+		"objectPeers",
+		snapshot.ready ? `Members: ${JSON.stringify(snapshot.transportPeerAuthors.map(({ peerId }) => peerId))}` : ""
+	);
+	const copy = document.getElementById("copyGridId");
+	if (copy instanceof HTMLButtonElement) copy.style.display = snapshot.ready ? "inline" : "none";
+	const grid = document.getElementById("grid");
+	if (!(grid instanceof HTMLDivElement)) return;
+	grid.replaceChildren();
+	for (const block of snapshot.blocks) {
+		const element = document.createElement("div");
+		element.dataset.blockId = block.id;
+		element.textContent = `${block.kind} (${block.x}, ${block.y})`;
+		element.style.position = "absolute";
+		element.style.left = `calc(50% + ${block.x * 24}px)`;
+		element.style.top = `calc(50% - ${block.y * 24}px)`;
+		element.style.padding = "4px 6px";
+		element.style.background = "#444";
+		element.style.color = "white";
+		grid.appendChild(element);
+	}
+	for (const [peerId, position] of Object.entries(snapshot.transientPositions)) {
+		const element = document.createElement("div");
+		element.dataset.glowingPeerId = peerId;
+		element.title = peerId;
+		element.style.position = "absolute";
+		element.style.left = `calc(50% + ${position.x * 24}px)`;
+		element.style.top = `calc(50% - ${position.y * 24}px)`;
+		element.style.width = "18px";
+		element.style.height = "18px";
+		element.style.borderRadius = "50%";
+		element.style.background = "#2d8cff";
+		grid.appendChild(element);
+	}
+}
+
+function setText(id: string, value: string): void {
+	const element = document.getElementById(id);
+	if (element !== null) element.textContent = value;
 }

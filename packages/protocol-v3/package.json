@@ -1,0 +1,48 @@
+{
+	"name": "@ts-drp/protocol-v3",
+	"version": "0.11.0",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/drp-tech/ts-drp.git"
+	},
+	"type": "module",
+	"types": "./dist/src/public.d.ts",
+	"files": [
+		"src",
+		"registry",
+		"supplements/blueprint-artifact-profile-v1",
+		"dist",
+		"!dist/test",
+		"!**/*.tsbuildinfo"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/src/public.d.ts",
+			"import": "./dist/src/public.js"
+		},
+		"./author-authorization": {
+			"types": "./dist/src/author-authorization.d.ts",
+			"import": "./dist/src/author-authorization.js"
+		},
+		"./latched-acl": {
+			"types": "./dist/src/latched-acl.d.ts",
+			"import": "./dist/src/latched-acl.js"
+		},
+		"./registry/registry-v1.json": "./registry/registry-v1.json"
+	},
+	"scripts": {
+		"build": "tsc -b tsconfig.build.json",
+		"clean": "rm -rf dist/ node_modules/",
+		"prepack": "tsc -b",
+		"smoke:public-package": "node --input-type=module -e \"const required = ['ANCHOR_TRUST_STATE_MAX_RECORD_BYTES', 'admitReceivedVertex', 'authenticateCurrentEpochAnchor', 'createAdmissionBoundTransactionalVertexIssuer', 'extractAdmittedReceivedVertex', 'installCertifiedAnchorTrustRoot', 'installCreatorAnchorTrustRoot', 'isAnchorTrustStateRecordBytes', 'openCertifiedAnchorTrust', 'openCurrentAnchorTrust', 'prepareBlueprintAdmission', 'prepareBlueprintRuntime']; const forbidden = ['authenticateCertifiedCurrentEpochAnchor', 'composeAuthorGossipBudget', 'createCurrentAnchorTrustStore', 'createDurableAuthorEquivocationProjection', 'createRemoteEquivocationObserver', 'createTransactionalVertexIssuer', 'deriveEquivocationProofId', 'inspectTrustClosure', 'materializeCurrentEquivocationProof', 'prepareAnchorTrustAdvance', 'verifyEquivocationProof', 'verifyReceivedVertex', 'verifyTrustRecord']; const actual = Object.keys(await import('@ts-drp/protocol-v3')).sort(); if (JSON.stringify(actual) !== JSON.stringify(required)) throw new Error('invalid package exports: ' + actual.join(',')); const leaked = forbidden.filter((name) => actual.includes(name)); if (leaked.length) throw new Error('leaked package exports: ' + leaked.join(',')); console.log('public package exports:', actual.join(','));\" && tsc -p ../../tests/fixtures/phase-0i-v3/tsconfig.built-package-audit.json && tsc -p ../../tests/fixtures/phase-3a0-v3/tsconfig.built-package-audit.json",
+		"typecheck": "tsc --noEmit && pnpm typecheck:public-entry-audit",
+		"typecheck:public-entry-audit": "tsc -p ../../tests/fixtures/phase-0i-v3/tsconfig.public-entry-audit.json && tsc -p ../../tests/fixtures/phase-0j-b-v3/tsconfig.public-entry-audit.json && tsc -p ../../tests/fixtures/phase-3a0-v3/tsconfig.public-entry-audit.json",
+		"watch": "tsc -b -w"
+	},
+	"dependencies": {
+		"@noble/curves": "2.2.0",
+		"@ts-drp/canonical": "0.11.0",
+		"es-module-lexer": "1.6.0"
+	}
+}

@@ -4,6 +4,7 @@ import { type IACL } from "./acl.js";
 import { type DRPIntervalDiscoveryOptions } from "./drp-interval-discovery.js";
 import { type DRPIntervalReconnectOptions } from "./drp-interval-reconnect.js";
 import { type IDRP } from "./drp.js";
+import { type FinalityConfig } from "./finality.js";
 import {
 	type FetchState,
 	type FetchStateResponse,
@@ -17,6 +18,7 @@ import { type KeychainOptions } from "./keychain.js";
 import { type LoggerOptions } from "./logger.js";
 import { type IMetrics } from "./metrics.js";
 import { type DRPNetworkNode, type DRPNetworkNodeConfig } from "./network.js";
+import { type HistoryStorage, type ReplicaMode } from "./object.js";
 
 export interface DRPNodeConfig {
 	log_config?: LoggerOptions;
@@ -33,21 +35,28 @@ interface NodeObjectOptionsBase<T> {
 	drp?: T;
 	metrics?: IMetrics;
 	log_config?: LoggerOptions;
+	finality_config?: FinalityConfig;
 }
 
-export interface NodeCreateObjectOptions<T extends IDRP> extends NodeObjectOptionsBase<T> {
-	sync?: {
-		enabled: boolean;
-		peerId?: string;
-	};
-}
+type NodeObjectStorageOptions =
+	| { history_storage?: Extract<HistoryStorage, "full">; replica_mode?: ReplicaMode }
+	| { history_storage: Extract<HistoryStorage, "compact">; replica_mode: Extract<ReplicaMode, "observer"> };
 
-export interface NodeConnectObjectOptions<T extends IDRP> extends NodeObjectOptionsBase<T> {
-	id: string;
-	sync?: {
-		peerId?: string;
+export type NodeCreateObjectOptions<T extends IDRP> = NodeObjectOptionsBase<T> &
+	NodeObjectStorageOptions & {
+		sync?: {
+			enabled: boolean;
+			peerId?: string;
+		};
 	};
-}
+
+export type NodeConnectObjectOptions<T extends IDRP> = NodeObjectOptionsBase<T> &
+	NodeObjectStorageOptions & {
+		id: string;
+		sync?: {
+			peerId?: string;
+		};
+	};
 
 export interface PeerInfo {
 	/**

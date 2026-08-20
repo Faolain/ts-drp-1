@@ -1,0 +1,55 @@
+name: Protocol v3 blueprint artifact profile freeze
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  protocol-v3-blueprint-artifact-profile:
+    name: Require immutable protocol-v3 blueprint artifact profile
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run merge-base-pinned blueprint artifact profile checker
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CHECKER: packages/protocol-v3/scripts/check-blueprint-artifact-profile-freeze.mjs
+          POLICY: packages/protocol-v3/conformance/freeze-policy-blueprint-artifact-profile-v1.json
+          ADDENDUM: docs/protocol/blueprint-artifact-profile-v3.md
+          AMENDMENT: docs/protocol/blueprint-artifact-profile-v3.json
+          PROFILE: packages/protocol-v3/supplements/blueprint-artifact-profile-v1/profile.json
+          RED_TEST: tests/protocol-v3-blueprint-runtime-0j-b.test.ts
+          RED_CONTRACT: tests/fixtures/phase-0j-b-v3/blueprint-runtime-contract.json
+          RED_ARTIFACT: tests/fixtures/phase-0j-b-v3/chat-blueprint.mjs
+          RED_TYPE_AUDIT: tests/fixtures/phase-0j-b-v3/public-entry-type-audit.ts
+          RED_TYPE_CONFIG: tests/fixtures/phase-0j-b-v3/tsconfig.public-entry-audit.json
+        run: |
+          if git cat-file -e "$BASE_SHA:$CHECKER"; then
+            git show "$BASE_SHA:$CHECKER" > "$RUNNER_TEMP/check-blueprint-artifact-profile-freeze.mjs"
+            PROTOCOL_V3_BLUEPRINT_ARTIFACT_PROFILE_REPOSITORY_ROOT="$GITHUB_WORKSPACE" \
+              node "$RUNNER_TEMP/check-blueprint-artifact-profile-freeze.mjs" "$BASE_SHA"
+          elif ! git cat-file -e "$BASE_SHA:$POLICY" \
+            && ! git cat-file -e "$BASE_SHA:$ADDENDUM" \
+            && ! git cat-file -e "$BASE_SHA:$AMENDMENT" \
+            && ! git cat-file -e "$BASE_SHA:$PROFILE" \
+            && ! git cat-file -e "$BASE_SHA:$RED_TEST" \
+            && ! git cat-file -e "$BASE_SHA:$RED_CONTRACT" \
+            && ! git cat-file -e "$BASE_SHA:$RED_ARTIFACT" \
+            && ! git cat-file -e "$BASE_SHA:$RED_TYPE_AUDIT" \
+            && ! git cat-file -e "$BASE_SHA:$RED_TYPE_CONFIG"; then
+            node packages/protocol-v3/scripts/check-blueprint-artifact-profile-freeze.mjs "$BASE_SHA"
+          else
+            echo "Blueprint artifact profile freeze bootstrap is fail-closed and atomic." >&2
+            exit 1
+          fi
+          node packages/protocol-v3/scripts/check-blueprint-artifact-profile-freeze.mjs "$BASE_SHA"

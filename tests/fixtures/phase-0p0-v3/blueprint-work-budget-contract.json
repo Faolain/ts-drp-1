@@ -1,0 +1,72 @@
+{
+	"profileId": "blueprint-work-budget-v1",
+	"blueprintDigestDomain": "ts-drp/blueprint-admission/v3",
+	"expectedBlueprintDigest": "226e12fa83ca21cbc4e11949e8d3dde4497d5595538a19f575690ff939f6d4a1",
+	"expectedCanonicalByteLength": 971,
+	"expectedCanonicalSha256": "34583934f25a7cfe749f736753c201b9e654f54628159c23f4363843ed62190d",
+	"implementationModule": "../packages/protocol-v3/src/public.ts",
+	"controlledModule": "tests/fixtures/phase-0p0-v3/controlled-blueprint-work-budget.ts",
+	"supplementDirectory": "../packages/protocol-v3/supplements/blueprint-work-budget-v1",
+	"workflow": ".github/workflows/protocol-v3-blueprint-work-budget.yml",
+	"legacyPackageFixture": "tests/fixtures/phase-0i-v3/blueprint-admission-package.json",
+	"protectedArtifactSha256": {
+		"packages/protocol-v3/registry/registry-v1.json": "2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9",
+		"packages/protocol-v3/registry/registry-v1.schema.json": "6ab6f377457cbe43d79c0aee4b766683c7c202cd308481db66f04e723787fbdc",
+		"packages/protocol-v3/conformance/vectors/registry-v1.json": "8b84504ae98b37beae2d91ef8fa29f9a61299a236d32a12b63f24cb2757da741",
+		"packages/protocol-v3/conformance/regenerated-reference/reference.mjs": "0a7b199eec2f1a950d4b91d9041e382f02983e2d601a530de60e7311309ce84a",
+		"packages/protocol-v2/registry/field-registry.json": "d073c5b01dc31c121de5fcd0925697a8a3f0839bf9fcf2c7ddde15489b49f724",
+		"packages/protocol-v2/tests/fixtures/golden-vectors/registry-v5.json": "2635989755ac300c1643f327ee7278d7aa0c72c67310b80ef56bb1eabe42b13e",
+		"packages/protocol-v2/conformance/ahe-reference/src/protocol.js": "8681b6d1ad9b68d2fb12170aa804bf76a0f24c9345748dc32c269275b73f4b92"
+	},
+	"budgetedPackage": {
+		"kind": "drp-blueprint-admission-package",
+		"protocolMajor": 3,
+		"schemaVersion": 1,
+		"implementation": {
+			"artifactDigest": "a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0",
+			"artifactId": "@example/chat-blueprint@1.0.0",
+			"runtimeProfile": "ecmascript-2024-sync-v1"
+		},
+		"manifest": {
+			"schemaVersion": 2,
+			"operationDiscriminator": "action",
+			"workBudgetProfile": "blueprint-work-budget-v1",
+			"operations": [
+				{
+					"name": "append",
+					"argumentSchema": {
+						"kind": "closed-record",
+						"fields": [
+							{ "name": "nested", "required": false, "type": "canonical-object" },
+							{ "name": "requestOrdinal", "required": false, "type": "safe-integer" },
+							{ "name": "value", "required": false, "type": "string" }
+						]
+					},
+					"maxCanonicalOperationBytes": 4096
+				},
+				{
+					"name": "set",
+					"argumentSchema": {
+						"kind": "closed-record",
+						"fields": [
+							{ "name": "key", "required": true, "type": "string" },
+							{ "name": "value", "required": true, "type": "string" }
+						]
+					},
+					"maxCanonicalOperationBytes": 2048
+				},
+				{
+					"name": "set_message",
+					"argumentSchema": {
+						"kind": "closed-record",
+						"fields": [
+							{ "name": "key", "required": true, "type": "string" },
+							{ "name": "value", "required": true, "type": "string" }
+						]
+					},
+					"maxCanonicalOperationBytes": 1024
+				}
+			]
+		}
+	}
+}

@@ -1,0 +1,19 @@
+{
+	"implementationModule": "../packages/protocol-v3/src/index.ts",
+	"controlledModule": "./fixtures/phase-0o-b3-v3/controlled-acl-reputation.ts",
+	"publicEntryModule": "../packages/protocol-v3/src/public.ts",
+	"publicReexportMutantModule": "./fixtures/phase-0o-b3-v3/public-reexport-mutant.ts",
+	"supplementDirectory": "../packages/protocol-v3/supplements/equivocation-acl-reputation-v1",
+	"workflow": ".github/workflows/protocol-v3-equivocation-acl-reputation.yml",
+	"profileId": "equivocation-acl-reputation-v1",
+	"baseProfileId": "equivocation-author-projection-v1",
+	"author": "alice",
+	"objectA": "object:alpha",
+	"objectB": "object:beta",
+	"digests": [
+		"1111111111111111111111111111111111111111111111111111111111111111",
+		"2222222222222222222222222222222222222222222222222222222222222222",
+		"3333333333333333333333333333333333333333333333333333333333333333",
+		"4444444444444444444444444444444444444444444444444444444444444444"
+	]
+}

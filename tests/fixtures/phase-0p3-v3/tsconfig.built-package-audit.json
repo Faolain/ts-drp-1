@@ -1,0 +1,13 @@
+{
+	"extends": "../../../packages/compaction/tsconfig.json",
+	"compilerOptions": {
+		"baseUrl": "../../..",
+		"noEmit": true,
+		"paths": {
+			"@ts-drp/compaction": ["packages/compaction/dist/src/index.d.ts"]
+		},
+		"rootDir": "../../..",
+		"tsBuildInfoFile": "../../../packages/compaction/node_modules/.tmp/phase-0p3-built-package.tsbuildinfo"
+	},
+	"files": ["built-package-type-audit.ts"]
+}

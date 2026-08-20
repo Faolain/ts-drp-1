@@ -1,0 +1,36 @@
+{
+	"schemaVersion": "ts-drp-equivocation-evidence-projection-freeze-v1",
+	"profile": "equivocation-evidence-projection-v1",
+	"baseProfile": "equivocation-digest-identity-v1",
+	"checker": "check-freeze.mjs",
+	"workflow": ".github/workflows/protocol-v3-equivocation-evidence-projection.yml",
+	"protectedArtifacts": [
+		"packages/protocol-v3/supplements/equivocation-evidence-projection-v1/check-freeze.mjs",
+		"packages/protocol-v3/supplements/equivocation-evidence-projection-v1/freeze-policy.json",
+		"packages/protocol-v3/supplements/equivocation-evidence-projection-v1/profile.json",
+		"packages/protocol-v3/supplements/equivocation-evidence-projection-v1/spec.md",
+		".github/workflows/protocol-v3-equivocation-evidence-projection.yml",
+		"tests/protocol-v3-equivocation-projection-0o-b1a.test.ts",
+		"tests/fixtures/phase-0o-b1a-v3/projection-contract.json",
+		"tests/fixtures/phase-0o-b1a-v3/controlled-equivocation-projection.ts",
+		"tests/fixtures/phase-0o-b1a-v3/public-reexport-mutant.ts",
+		"tests/fixtures/phase-0o-b1a-v3/public-entry-type-audit.ts",
+		"tests/fixtures/phase-0o-b1a-v3/built-package-type-audit.ts",
+		"tests/fixtures/phase-0o-b1a-v3/tsconfig.public-entry-audit.json",
+		"tests/fixtures/phase-0o-b1a-v3/tsconfig.built-package-audit.json"
+	],
+	"checkerSha256": "c8628475e3bd43ce6df9b5ba9ecb528f030f48693f3d79262b502b71a932f349",
+	"artifactSha256": {
+		"packages/protocol-v3/supplements/equivocation-evidence-projection-v1/profile.json": "39e766753cb6988a6c1db99b4dc7cac6d5ae3adbdf07173b6eb37edb2e505e61",
+		"packages/protocol-v3/supplements/equivocation-evidence-projection-v1/spec.md": "f49a3e08b2966ccdd363320a3d6eb66f6a9042aa0711a064e45255fbaafb08da",
+		".github/workflows/protocol-v3-equivocation-evidence-projection.yml": "95a99f986fdcf9c0507a7c6a25a506575f84c437afd1d37d2c86ea415324538c",
+		"tests/protocol-v3-equivocation-projection-0o-b1a.test.ts": "1981e86b6197b35206c3a0ac77aee38b7bcb884408880cd335ed958fd460c2ed",
+		"tests/fixtures/phase-0o-b1a-v3/projection-contract.json": "75ebe830d7b7d83b26d7dc5e9cca4f4a704c202424471f00c1520b2ddaf86ea8",
+		"tests/fixtures/phase-0o-b1a-v3/controlled-equivocation-projection.ts": "55699b90744c37695ac174b9f8622b85e4294cf645fee6f7ab52a3a59fc0cab0",
+		"tests/fixtures/phase-0o-b1a-v3/public-reexport-mutant.ts": "03b0190cbe97f3888b753ad2181da49c89d72d699e3280b422b3bb10a78c180e",
+		"tests/fixtures/phase-0o-b1a-v3/public-entry-type-audit.ts": "5952ffb93f8c4c5942e6defa6486233a6c538674515031a31c817062adb8d125",
+		"tests/fixtures/phase-0o-b1a-v3/built-package-type-audit.ts": "f4936250ca0a834ab6406044fd7512537923105c54bc251bb39e90f8a61f0cbd",
+		"tests/fixtures/phase-0o-b1a-v3/tsconfig.public-entry-audit.json": "d09ec2bd6a5e47e94ab531d6d10c3cfdb930eb8e820538dc66ade3379aa8af8c",
+		"tests/fixtures/phase-0o-b1a-v3/tsconfig.built-package-audit.json": "dd19c38d26a7be4ab49de11ccdc1329c0b1bd9721ba559d403e8322576fa6279"
+	}
+}

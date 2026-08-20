@@ -2,6 +2,7 @@ import { generateKeyPairFromSeed } from "@libp2p/crypto/keys";
 import { type Address, type PeerId } from "@libp2p/interface";
 import { peerIdFromPublicKey } from "@libp2p/peer-id";
 import { DRPNetworkNode as DefaultDRPNetworkNode } from "@ts-drp/network";
+import { createPermissionlessACL } from "@ts-drp/object";
 import { RecordSigner, type SignedDrpRecordV1 } from "@ts-drp/rendezvous";
 import {
 	type DRPNetworkNode,
@@ -53,6 +54,8 @@ function createFakeNetwork(): FakeNetworkControls {
 		getAllPeers: vi.fn((): string[] => []),
 		getGroupPeers: vi.fn((): string[] => []),
 		broadcastMessage: vi.fn(() => Promise.resolve()),
+		publishMessage: vi.fn((): Promise<true> => Promise.resolve(true)),
+		gossipTopicFor: vi.fn((): undefined => undefined),
 		sendMessage: vi.fn(() => Promise.resolve()),
 		sendGroupMessageRandomPeer: vi.fn(() => Promise.resolve()),
 		subscribeToMessageQueue: vi.fn((handler) => {
@@ -97,7 +100,7 @@ describe("DRPNode dependencies", () => {
 		expect(fake.networkNode.connectToBootstraps).not.toHaveBeenCalled();
 		expect(node["_intervals"].has("interval::reconnect")).toBe(false);
 
-		const object = await node.createObject({ id: "fake-object" });
+		const object = await node.createObject({ id: "fake-object", acl: createPermissionlessACL() });
 		await fake.messageHandlers[0](
 			Message.create({ objectId: object.id, sender: "remote-peer", type: MessageType.MESSAGE_TYPE_CUSTOM })
 		);

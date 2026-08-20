@@ -1,4 +1,7 @@
-import { DrpType, type IACL, type IDRP, Operation, SemanticsType, Vertex } from "@ts-drp/types";
+/* eslint-disable import/order -- auth mock must register before object imports */
+import { trustedTestVertices } from "./helpers/trusted-vertex-ingest.js";
+
+import { DrpType, type IACL, type IDRP, type IHashGraph, Operation, SemanticsType, Vertex } from "@ts-drp/types";
 import { computeHash } from "@ts-drp/utils/hash";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -80,11 +83,68 @@ describe("DRPVertexApplier", () => {
 				const dependencies = [HashGraph.rootHash];
 				const vertex = Vertex.create({ hash, peerId, dependencies, operation, timestamp });
 
-				const result = await applier.applyVertices([vertex]);
+				const result = await applier.applyVertices(trustedTestVertices([vertex]));
 				console.log(result);
 				expect(result.applied).toBe(true);
 				expect(result.missing).toHaveLength(0);
 				expect(result.invalid).toHaveLength(0);
+			});
+
+			it("should not reintroduce deferred reconciliation when an IHashGraph has no conflict-resolver inspector", async () => {
+				const hashGraphWithoutInspector = new Proxy(mockHashGraph, {
+					get(target, property): unknown {
+						if (property === "hasCustomConflictResolver") return undefined;
+						const value = Reflect.get(target, property, target) as unknown;
+						return typeof value === "function" ? value.bind(target) : value;
+					},
+				}) as IHashGraph;
+				const failClosedApplier = new DRPVertexApplier({
+					drp: mockDRP,
+					acl: mockACL,
+					hashGraph: hashGraphWithoutInspector,
+					states: mockStates,
+					finalityStore: mockFinalityStore,
+					notify: mockNotify,
+				});
+				let observedCallContextKeys: string[] | undefined;
+				const applyVerticesCall = vi
+					.spyOn(
+						failClosedApplier as unknown as {
+							applyVerticesCall(
+								vertices: unknown[],
+								callContext: Record<string, unknown>
+							): Promise<{ applied: boolean; missing: string[]; invalid: string[] }>;
+						},
+						"applyVerticesCall"
+					)
+					.mockImplementation((_vertices, callContext) => {
+						observedCallContextKeys = Object.keys(callContext);
+						return Promise.resolve({ applied: true, missing: [], invalid: [] });
+					});
+				const operation = Operation.create({ opType: "test", value: [], drpType: DrpType.DRP });
+				const timestamp = Date.now();
+				const first = Vertex.create({
+					hash: computeHash(peerId, operation, [HashGraph.rootHash], timestamp),
+					peerId,
+					dependencies: [HashGraph.rootHash],
+					operation,
+					timestamp,
+				});
+				const second = Vertex.create({
+					hash: computeHash(peerId, operation, [HashGraph.rootHash], timestamp + 1),
+					peerId,
+					dependencies: [HashGraph.rootHash],
+					operation,
+					timestamp: timestamp + 1,
+				});
+
+				await expect(failClosedApplier.applyVertices(trustedTestVertices([first, second]))).resolves.toMatchObject({
+					applied: true,
+					missing: [],
+					invalid: [],
+				});
+				expect(applyVerticesCall).toHaveBeenCalledOnce();
+				expect(observedCallContextKeys).toEqual([]);
 			});
 
 			it("should classify non-dependency validation failures as invalid", async () => {
@@ -101,7 +161,7 @@ describe("DRPVertexApplier", () => {
 					signature: new Uint8Array([1, 2, 3]),
 				});
 
-				const result = await applier.applyVertices([vertex]);
+				const result = await applier.applyVertices(trustedTestVertices([vertex]));
 				expect(result.applied).toBe(false);
 				expect(result.missing).toHaveLength(0);
 				expect(result.invalid).toContain("test-hash");
@@ -114,7 +174,7 @@ describe("DRPVertexApplier", () => {
 				const hash = computeHash(peerId, operation, dependencies, timestamp);
 				const vertex = Vertex.create({ hash, peerId, dependencies, operation, timestamp });
 
-				const result = await applier.applyVertices([vertex]);
+				const result = await applier.applyVertices(trustedTestVertices([vertex]));
 				expect(result.applied).toBe(false);
 				expect(result.missing).toEqual([hash]);
 				expect(result.invalid).toHaveLength(0);
@@ -130,7 +190,7 @@ describe("DRPVertexApplier", () => {
 					timestamp: Date.now(),
 				});
 
-				const result = await applier.applyVertices([vertex]);
+				const result = await applier.applyVertices(trustedTestVertices([vertex]));
 				expect(result.applied).toBe(false);
 				expect(result.missing).toHaveLength(0);
 				expect(result.invalid).toEqual([vertex.hash]);
@@ -433,35 +493,6 @@ describe("DRPVertexApplier", () => {
 			});
 		});
 
-		describe("assign", () => {
-			it("should assign DRP state correctly", () => {
-				const vertex = Vertex.create({
-					hash: "test-hash",
-					peerId: "test-peer",
-					dependencies: [],
-					operation: {
-						drpType: DrpType.DRP,
-						opType: "test",
-						value: [],
-					},
-					timestamp: Date.now(),
-					signature: new Uint8Array([1, 2, 3]),
-				});
-
-				const result = applier["assign"]({
-					vertex,
-					isACL: false,
-					currentDRP: mockDRP,
-					acl: mockACL,
-					drpVertices: [],
-					aclVertices: [],
-					lcaResult: { lca: "test-lca", linearizedVertices: [] },
-				});
-
-				expect(result.stop).toBe(false);
-			});
-		});
-
 		describe("assignState", () => {
 			it("should assign state to store", () => {
 				const vertex = Vertex.create({
@@ -477,7 +508,8 @@ describe("DRPVertexApplier", () => {
 					signature: new Uint8Array([1, 2, 3]),
 				});
 
-				const result = applier["assignState"]({
+				const journal = { record: vi.fn() };
+				applier["assignState"]({
 					vertex,
 					isACL: false,
 					currentDRP: mockDRP,
@@ -486,9 +518,12 @@ describe("DRPVertexApplier", () => {
 					drpVertices: [],
 					aclVertices: [],
 					lcaResult: { lca: "test-lca", linearizedVertices: [] },
+					journal,
 				});
 
-				expect(result.stop).toBe(false);
+				expect(mockStates.getACLState(vertex.hash)).toBeDefined();
+				expect(mockStates.getDRPState(vertex.hash)).toBeDefined();
+				expect(journal.record).toHaveBeenCalledTimes(2);
 			});
 		});
 
@@ -507,17 +542,19 @@ describe("DRPVertexApplier", () => {
 					signature: new Uint8Array([1, 2, 3]),
 				});
 
-				const result = applier["addVertexToHashGraph"]({
+				const journal = { record: vi.fn() };
+				applier["addVertexToHashGraph"]({
 					vertex,
 					isACL: false,
 					acl: mockACL,
 					drpVertices: [],
 					aclVertices: [],
 					lcaResult: { lca: "test-lca", linearizedVertices: [] },
+					journal,
 				});
 
-				expect(result.stop).toBe(false);
 				expect(mockHashGraph.vertices.has(vertex.hash)).toBe(true);
+				expect(journal.record).toHaveBeenCalledOnce();
 			});
 		});
 
@@ -540,7 +577,8 @@ describe("DRPVertexApplier", () => {
 				finalitySigners.set("signer1", "signer1");
 				vi.spyOn(mockACL, "query_getFinalitySigners").mockReturnValue(finalitySigners);
 
-				const result = applier["initializeFinalityStore"]({
+				const journal = { record: vi.fn() };
+				applier["initializeFinalityStore"]({
 					vertex,
 					isACL: false,
 					acl: mockACL,
@@ -548,9 +586,11 @@ describe("DRPVertexApplier", () => {
 					drpVertices: [],
 					aclVertices: [],
 					lcaResult: { lca: "test-lca", linearizedVertices: [] },
+					journal,
 				});
 
-				expect(result.stop).toBe(false);
+				expect(applier["finalityStore"].states.has(vertex.hash)).toBe(true);
+				expect(journal.record).toHaveBeenCalledOnce();
 			});
 
 			it("should initialize finality store with LCA operation", () => {
@@ -566,7 +606,8 @@ describe("DRPVertexApplier", () => {
 				finalitySigners.set("signer2", "signer2");
 				vi.spyOn(mockACL2, "query_getFinalitySigners").mockReturnValue(finalitySigners);
 
-				const result = applier["initializeFinalityStore"]({
+				const journal = { record: vi.fn() };
+				applier["initializeFinalityStore"]({
 					vertex,
 					isACL: true,
 					acl: mockACL,
@@ -574,44 +615,13 @@ describe("DRPVertexApplier", () => {
 					drpVertices: [],
 					aclVertices: [],
 					lcaResult: { lca: "test-lca", linearizedVertices: [] },
+					journal,
 				});
-				console.log(result.result);
-
-				expect(result.stop).toBe(false);
 
 				applier["finalityStore"].states.get(hash)?.signerCredentials.forEach((signer) => {
 					expect(signer).toBe("signer2");
 				});
-			});
-		});
-
-		describe("notify", () => {
-			it("should call notify function", () => {
-				const vertex = Vertex.create({
-					hash: "test-hash",
-					peerId: "test-peer",
-					dependencies: [],
-					operation: {
-						drpType: DrpType.DRP,
-						opType: "test",
-						value: [],
-					},
-					timestamp: Date.now(),
-					signature: new Uint8Array([1, 2, 3]),
-				});
-
-				const result = applier["notify"]({
-					vertex,
-					isACL: false,
-					result: undefined,
-					acl: mockACL,
-					drpVertices: [],
-					aclVertices: [],
-					lcaResult: { lca: "test-lca", linearizedVertices: [] },
-				});
-
-				expect(result.stop).toBe(false);
-				expect(mockNotify).toHaveBeenCalledWith("callFn", [vertex]);
+				expect(journal.record).toHaveBeenCalledOnce();
 			});
 		});
 	});

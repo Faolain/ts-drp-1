@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- DRPObject is not typed on purpose to allow for dynamic typing */
 import type { DRPObjectSubscribeCallback, IDRP, IDRPObject } from "@ts-drp/types";
 
+import { log } from "../logger.js";
+
 /**
  * A store for DRP objects.
  */
@@ -83,7 +85,25 @@ export class DRPObjectStore<T extends IDRP = any> {
 		const callbacks = this._subscriptions.get(objectId);
 		if (callbacks) {
 			for (const callback of callbacks) {
-				callback(objectId, object);
+				try {
+					const callbackResult = (callback as unknown as (objectId: string, object: IDRPObject<T>) => unknown)(
+						objectId,
+						object
+					);
+					if (callbackResult !== null && (typeof callbackResult === "object" || typeof callbackResult === "function")) {
+						const then = (callbackResult as { then?: unknown }).then;
+						if (typeof then === "function") {
+							let rejectionReported = false;
+							then.call(callbackResult, undefined, (reason: unknown) => {
+								if (rejectionReported) return;
+								rejectionReported = true;
+								log.error("::objectStore: Subscriber callback rejected", reason);
+							});
+						}
+					}
+				} catch (error) {
+					log.error("::objectStore: Subscriber callback failed", error);
+				}
 			}
 		}
 	}

@@ -8,6 +8,7 @@ import {
 	DRPNetworkNode,
 } from "@ts-drp/network";
 import { DRPNode } from "@ts-drp/node";
+import { createPermissionlessACL } from "@ts-drp/object";
 import {
 	BrowserRoutingClosestPeersSource,
 	Libp2pRelayClient,
@@ -435,6 +436,7 @@ function createProductionRuntime(
 	const nodePort: GridNodePort = {
 		connectObject: async ({ id, sync }): Promise<GridObjectPort> => {
 			const object = await node.connectObject({
+				acl: createPermissionlessACL(),
 				drp: new FixtureGrid(),
 				id,
 				...(sync === undefined ? {} : { sync }),
@@ -446,7 +448,11 @@ function createProductionRuntime(
 			return gridPort(id, grid, network.peerId, role);
 		},
 		createObject: async ({ id }): Promise<GridObjectPort> => {
-			const object = await node.createObject({ drp: new FixtureGrid(), id: id ?? objectId });
+			const object = await node.createObject({
+				acl: createPermissionlessACL(),
+				drp: new FixtureGrid(),
+				id: id ?? objectId,
+			});
 			const grid = object.drp;
 			if (grid === undefined) throw new Error("created production grid missing");
 			runtime.grid = grid;

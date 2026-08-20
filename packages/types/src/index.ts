@@ -27,6 +27,7 @@ export {
 	DRPDiscoveryResponse,
 	DRPDiscoveryResponse_Subscribers,
 	DRPDiscoveryResponse_SubscribersEntry,
+	V3Envelope,
 } from "./proto/drp/v1/messages_pb.js";
 
 export * from "./acl.js";

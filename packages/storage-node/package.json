@@ -1,0 +1,48 @@
+{
+	"name": "@ts-drp/storage-node",
+	"version": "0.11.0",
+	"private": true,
+	"license": "MIT",
+	"engines": {
+		"node": ">=22.13.0"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/drp-tech/ts-drp.git"
+	},
+	"type": "module",
+	"types": "./dist/src/index.d.ts",
+	"files": [
+		"src",
+		"dist",
+		"!dist/test",
+		"!**/*.tsbuildinfo"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/src/index.d.ts",
+			"import": "./dist/src/index.js"
+		},
+		"./issuance": {
+			"types": "./dist/src/issuance.d.ts",
+			"import": "./dist/src/issuance.js"
+		},
+		"./live-journal": {
+			"types": "./dist/src/live-journal.d.ts",
+			"import": "./dist/src/live-journal.js"
+		}
+	},
+	"scripts": {
+		"build": "tsc -b tsconfig.build.json",
+		"clean": "rm -rf dist/ node_modules/",
+		"prepack": "tsc -b",
+		"test": "vitest run",
+		"typecheck": "tsc --noEmit",
+		"watch": "tsc -b -w"
+	},
+	"dependencies": {
+		"@ts-drp/issuance-store": "0.11.0",
+		"@ts-drp/live-journal": "0.11.0",
+		"@ts-drp/storage": "0.11.0"
+	}
+}

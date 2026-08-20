@@ -1,0 +1,279 @@
+{
+	"schemaVersion": "ahe-formal-variable-map-v1",
+	"protocolMajor": 2,
+	"signedEnvelopeKinds": ["vertex", "epochAnchor", "sealVote", "roundChange"],
+	"classificationSources": [
+		{
+			"envelopeKind": "vertex",
+			"evidence": "PH-N1-D12.requirements.activeSuites.identityAndVertex"
+		},
+		{
+			"envelopeKind": "epochAnchor",
+			"evidence": "PH-N1-D10.requirements.profileDigestAndCryptoSuiteIdSignedIn"
+		},
+		{
+			"envelopeKind": "sealVote",
+			"evidence": "PH-N1-D12.requirements.activeSuites.sealVote"
+		},
+		{
+			"envelopeKind": "roundChange",
+			"evidence": "production-hardening-tdd-plan-v2.md#the-normative-pacemaker:signed-round-change-votes"
+		}
+	],
+	"registry": {
+		"path": "packages/protocol-v2/registry/field-registry.json",
+		"registryVersion": 5,
+		"sha256": "d073c5b01dc31c121de5fcd0925697a8a3f0839bf9fcf2c7ddde15489b49f724"
+	},
+	"amendmentLog": {
+		"path": "docs/protocol/amendments-v2.json",
+		"amendmentLogVersion": "2.0.0",
+		"sha256": "a5e60443674e56f003127e80395a92b889270df06b68e43c4418fa0e2ff98725"
+	},
+	"modelSource": {
+		"path": "packages/protocol-v2/formal/ahe-v2-signed-envelope-variables.qnt",
+		"sha256": "000384b27cc1a4dd3f1cf08f02fb916d21c0ceb4a1eb3c173b9c766a64d666b8"
+	},
+	"fieldMappings": [
+		{
+			"envelopeKind": "vertex",
+			"field": "kind",
+			"modelVariable": "vertexKind",
+			"registryPath": "kinds.vertex.fields[0]"
+		},
+		{
+			"envelopeKind": "vertex",
+			"field": "protocolMajor",
+			"modelVariable": "vertexProtocolMajor",
+			"registryPath": "kinds.vertex.fields[1]"
+		},
+		{
+			"envelopeKind": "vertex",
+			"field": "objectId",
+			"modelVariable": "vertexObjectId",
+			"registryPath": "kinds.vertex.fields[2]"
+		},
+		{
+			"envelopeKind": "vertex",
+			"field": "epoch",
+			"modelVariable": "vertexEpoch",
+			"registryPath": "kinds.vertex.fields[3]"
+		},
+		{
+			"envelopeKind": "vertex",
+			"field": "anchor",
+			"modelVariable": "vertexAnchor",
+			"registryPath": "kinds.vertex.fields[4]"
+		},
+		{
+			"envelopeKind": "vertex",
+			"field": "author",
+			"modelVariable": "vertexAuthor",
+			"registryPath": "kinds.vertex.fields[5]"
+		},
+		{
+			"envelopeKind": "vertex",
+			"field": "logicalTime",
+			"modelVariable": "vertexLogicalTime",
+			"registryPath": "kinds.vertex.fields[6]"
+		},
+		{
+			"envelopeKind": "vertex",
+			"field": "dependencies",
+			"modelVariable": "vertexDependencies",
+			"registryPath": "kinds.vertex.fields[7]"
+		},
+		{
+			"envelopeKind": "vertex",
+			"field": "operation",
+			"modelVariable": "vertexOperation",
+			"registryPath": "kinds.vertex.fields[8]"
+		},
+		{
+			"envelopeKind": "epochAnchor",
+			"field": "kind",
+			"modelVariable": "epochAnchorKind",
+			"registryPath": "kinds.epochAnchor.fields[0]"
+		},
+		{
+			"envelopeKind": "epochAnchor",
+			"field": "protocolMajor",
+			"modelVariable": "epochAnchorProtocolMajor",
+			"registryPath": "kinds.epochAnchor.fields[1]"
+		},
+		{
+			"envelopeKind": "epochAnchor",
+			"field": "objectId",
+			"modelVariable": "epochAnchorObjectId",
+			"registryPath": "kinds.epochAnchor.fields[2]"
+		},
+		{
+			"envelopeKind": "epochAnchor",
+			"field": "epoch",
+			"modelVariable": "epochAnchorEpoch",
+			"registryPath": "kinds.epochAnchor.fields[3]"
+		},
+		{
+			"envelopeKind": "epochAnchor",
+			"field": "previousAnchor",
+			"modelVariable": "epochAnchorPreviousAnchor",
+			"registryPath": "kinds.epochAnchor.fields[4]"
+		},
+		{
+			"envelopeKind": "epochAnchor",
+			"field": "cutDigest",
+			"modelVariable": "epochAnchorCutDigest",
+			"registryPath": "kinds.epochAnchor.fields[5]"
+		},
+		{
+			"envelopeKind": "epochAnchor",
+			"field": "stateDigest",
+			"modelVariable": "epochAnchorStateDigest",
+			"registryPath": "kinds.epochAnchor.fields[6]"
+		},
+		{
+			"envelopeKind": "epochAnchor",
+			"field": "aclDigest",
+			"modelVariable": "epochAnchorAclDigest",
+			"registryPath": "kinds.epochAnchor.fields[7]"
+		},
+		{
+			"envelopeKind": "epochAnchor",
+			"field": "historyRoot",
+			"modelVariable": "epochAnchorHistoryRoot",
+			"registryPath": "kinds.epochAnchor.fields[8]"
+		},
+		{
+			"envelopeKind": "epochAnchor",
+			"field": "historySize",
+			"modelVariable": "epochAnchorHistorySize",
+			"registryPath": "kinds.epochAnchor.fields[9]"
+		},
+		{
+			"envelopeKind": "epochAnchor",
+			"field": "archiveIndexRoot",
+			"modelVariable": "epochAnchorArchiveIndexRoot",
+			"registryPath": "kinds.epochAnchor.fields[10]"
+		},
+		{
+			"envelopeKind": "epochAnchor",
+			"field": "blueprintDigest",
+			"modelVariable": "epochAnchorBlueprintDigest",
+			"registryPath": "kinds.epochAnchor.fields[11]"
+		},
+		{
+			"envelopeKind": "epochAnchor",
+			"field": "signerSetDigest",
+			"modelVariable": "epochAnchorSignerSetDigest",
+			"registryPath": "kinds.epochAnchor.fields[12]"
+		},
+		{
+			"envelopeKind": "epochAnchor",
+			"field": "parametersDigest",
+			"modelVariable": "epochAnchorParametersDigest",
+			"registryPath": "kinds.epochAnchor.fields[13]"
+		},
+		{
+			"envelopeKind": "epochAnchor",
+			"field": "profileDigest",
+			"modelVariable": "epochAnchorProfileDigest",
+			"registryPath": "kinds.epochAnchor.fields[14]"
+		},
+		{
+			"envelopeKind": "epochAnchor",
+			"field": "cryptoSuiteId",
+			"modelVariable": "epochAnchorCryptoSuiteId",
+			"registryPath": "kinds.epochAnchor.fields[15]"
+		},
+		{
+			"envelopeKind": "sealVote",
+			"field": "kind",
+			"modelVariable": "sealVoteKind",
+			"registryPath": "kinds.sealVote.fields[0]"
+		},
+		{
+			"envelopeKind": "sealVote",
+			"field": "objectId",
+			"modelVariable": "sealVoteObjectId",
+			"registryPath": "kinds.sealVote.fields[1]"
+		},
+		{
+			"envelopeKind": "sealVote",
+			"field": "epoch",
+			"modelVariable": "sealVoteEpoch",
+			"registryPath": "kinds.sealVote.fields[2]"
+		},
+		{
+			"envelopeKind": "sealVote",
+			"field": "round",
+			"modelVariable": "sealVoteRound",
+			"registryPath": "kinds.sealVote.fields[3]"
+		},
+		{
+			"envelopeKind": "sealVote",
+			"field": "phase",
+			"modelVariable": "sealVotePhase",
+			"registryPath": "kinds.sealVote.fields[4]"
+		},
+		{
+			"envelopeKind": "sealVote",
+			"field": "proposalDigest",
+			"modelVariable": "sealVoteProposalDigest",
+			"registryPath": "kinds.sealVote.fields[5]"
+		},
+		{
+			"envelopeKind": "sealVote",
+			"field": "proposalHash",
+			"modelVariable": "sealVoteProposalHash",
+			"registryPath": "kinds.sealVote.fields[6]"
+		},
+		{
+			"envelopeKind": "sealVote",
+			"field": "signerId",
+			"modelVariable": "sealVoteSignerId",
+			"registryPath": "kinds.sealVote.fields[7]"
+		},
+		{
+			"envelopeKind": "roundChange",
+			"field": "kind",
+			"modelVariable": "roundChangeKind",
+			"registryPath": "kinds.roundChange.fields[0]"
+		},
+		{
+			"envelopeKind": "roundChange",
+			"field": "objectId",
+			"modelVariable": "roundChangeObjectId",
+			"registryPath": "kinds.roundChange.fields[1]"
+		},
+		{
+			"envelopeKind": "roundChange",
+			"field": "epoch",
+			"modelVariable": "roundChangeEpoch",
+			"registryPath": "kinds.roundChange.fields[2]"
+		},
+		{
+			"envelopeKind": "roundChange",
+			"field": "round",
+			"modelVariable": "roundChangeRound",
+			"registryPath": "kinds.roundChange.fields[3]"
+		},
+		{
+			"envelopeKind": "roundChange",
+			"field": "phase",
+			"modelVariable": "roundChangePhase",
+			"registryPath": "kinds.roundChange.fields[4]"
+		},
+		{
+			"envelopeKind": "roundChange",
+			"field": "highestPrepareQC",
+			"modelVariable": "roundChangeHighestPrepareQc",
+			"registryPath": "kinds.roundChange.fields[5]"
+		},
+		{
+			"envelopeKind": "roundChange",
+			"field": "signerId",
+			"modelVariable": "roundChangeSignerId",
+			"registryPath": "kinds.roundChange.fields[6]"
+		}
+	]
+}

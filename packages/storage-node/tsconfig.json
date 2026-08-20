@@ -1,0 +1,14 @@
+{
+	"extends": "../../tsconfig.json",
+	"compilerOptions": {
+		"outDir": "dist"
+	},
+	"include": ["src/**/*.ts", "tests/**/*.ts"],
+	"exclude": [
+		"dist",
+		"./*.d.ts",
+		"tests/phase-3a0-c-anchor-trust-sigkill-red.test.ts",
+		"tests/phase-3a1b-p2-node-outbox-publication-death-red.test.ts",
+		"tests/phase-3a1b-p2-node-outbox-publication-red.test.ts"
+	]
+}
