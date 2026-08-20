@@ -572,7 +572,14 @@ describe("D.93.50 T4 relay-spine priority admission", () => {
 			source: {
 				async *getCandidates(): AsyncIterable<RelayCandidate> {
 					await Promise.resolve();
-					yield relayCandidate(relayAddress, relay.peerId);
+					yield {
+						...relayCandidate(relayAddress, relay.peerId),
+						operatorEvidence: {
+							credentialDigest: `sha256:${relay.peerId}`,
+							operatorGroup: "operator:verified-a",
+							verified: true,
+						},
+					};
 				},
 			},
 			targetReservations: 1,
