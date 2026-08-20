@@ -48527,3 +48527,327 @@ deployment-size gate. It does not claim T4, E3, AOI, product scale, full P6,
 completion of the broader production-hardening plan or product completion. The
 next independent slice returns immediately to the existing P6 recovery and
 two-client Discord/MMORPG golden path.
+
+### D.93.50 — T4 verified relay-spine preference and reserved priority admission
+
+D.93.50 completes the bounded topology prerequisites before the product makes a
+scale claim. It supersedes only D.93.49.2's prospective sentence that the next
+slice returns immediately to P6 and D.93.49's shipped exact ten-key snapshot
+schema by adding the three counts named below. Every other signed T3 law remains
+final. T4 is the remaining roadmap topology prerequisite, and the next slice
+after T4 returns to the existing P6 recovery and two-client Discord/MMORPG
+golden path. The
+already-shipped room and zone remain preservation controls; this slice changes
+neither durable-room composition nor ephemeral traffic. T1 continues to own the
+hard live/upgrade/parallel-dial ceiling, T2 continues to source implicit object
+partners only from the genuine topic mesh, and T3 continues to own the sole
+discovery-to-dial census. T4 adds one priority annotation inside that same
+T1/T3 controller and one bounded mesh preference derived from the existing
+relay-policy owner's successful reservations.
+
+The source audit identifies two missing links. First, the relay policy already
+classifies candidate provenance, obtains a real Circuit Relay v2 reservation,
+records the peer and operator group, and dials through `safeDial`, but the
+connection controller treats that private call exactly like arbitrary explicit
+work. Ordinary charged/live work can therefore fill every capacity unit and
+prevent the operator spine from entering. Second, the node retains the exact active relay
+peer ids, but GossipSub scoring does not consume them, so an authenticated relay
+has no greater chance than an ordinary subscriber of surviving oversubscription
+or entering an underperforming mesh. A public peer tag, configured bootstrap id,
+remote record, claimed operator group or caller option is not equivalent to a
+successful reservation and must not mint either privilege.
+
+#### One reserved priority entitlement
+
+`control_plane.relay_policy.target_reservations`, already validated within
+`1..8`, is also the exact maximum number of relay-priority capacity units for a
+source-qualified policy. The node derives the same nonempty enabled/injected
+source roster before host construction, validates and installs the tail in the
+controller before `host.start()`, bootstrap dials or inbound admission, and then
+constructs the policy from that roster. Mere config presence does not activate
+T4. A missing, disabled or source-empty policy has `prioritySlots: 0` and
+preserves every T1/T3 result. Relay-policy factory construction and startup are
+inside the same startup gate: a throw fails node start, runs the existing
+partial-host cleanup, detaches the controller and clears the preinstalled tail
+before later ordinary work can proceed; it cannot leave an attached tail with
+no policy. A source-qualified policy requires
+`target_reservations < maxConnections` and
+`target_reservations <= maxConnections - maxParallelDials`; an impossible pair
+fails before host construction.
+
+The five T3 states remain the only capacity census. `priority` is a subset
+annotation across selected, charged, upgrade and live records, never a sixth
+pool. A provisional explicit unit is charged atomically when it is created, so
+it never occupies an uncharged-explicit state outside those snapshot fields. The
+identities are `ordinary charged + ordinary upgrade + ordinary live <=
+maxConnections - prioritySlots`, `ordinary charged + ordinary upgrade + ordinary
+live + ordinary uncharged explicit <= maxConnections - prioritySlots`,
+`priority <= prioritySlots`, and `priority <= occupancy`. `prioritySlots` is the
+source-qualified configuration bound.
+`replacements` is a monotonic count only of T4 priority revocations of borrowed
+uncharged selections—not the pre-existing inbound selection eviction—for one
+attached controller lifetime, and resets only with a new controller. The
+active-reservation peer set is controller-owned metadata for protection and
+scoring, not another counter.
+
+Ordinary work may borrow unused priority capacity only while it remains an
+uncharged discovery selection. Ordinary explicit ticket issuance may not occupy
+the reserved tail at all. Neither an ordinary selected/explicit authorization
+nor inbound `reserve()` may cross into charged, upgrade or live state when the
+non-priority committed census has reached `maxConnections - prioritySlots`;
+inbound admission at that boundary must not evict a borrowed selection merely
+to replace it with an ordinary upgrade. A relay-policy-owned provisional dial
+may use free capacity or synchronously revoke exactly the newest ordinary
+uncharged discovery selection. If neither is available, it is denied without
+closing or hiding any live connection. T4 does not infer idleness from
+`Connection.streams`: installed GossipSub holds persistent streams and newly
+opened peers can be between open, identify and mesh establishment. Uncharged
+explicit tickets, charged dials, upgrade reservations, every live connection,
+priority records and unknown state are therefore never replacement candidates.
+Concurrent provisional requests serialize through the same controller and
+cannot revoke the same selection.
+
+The committed-tail inequality is an independent GREEN-blocking RED identity.
+It fills the ordinary committed census to `maxConnections - prioritySlots`,
+keeps a borrowed ordinary selection above that boundary, proves ordinary
+explicit issuance is denied, proves a second state with committed work below the
+boundary but ordinary uncharged-explicit custody reaching it cannot issue
+another explicit ticket while a private provisional still admits, proves
+selected work cannot charge or become live, proves inbound reserve cannot
+consume the tail or replace the borrower with an ordinary upgrade, and then
+proves a private provisional can revoke that selection and charge the released
+unit. Selected reclaim alone cannot satisfy this row.
+
+The private connect closure minted inside `_createRelayPolicy` is the only caller
+allowed to start a provisional priority unit; a factory that deliberately calls
+that method receives the same genuine closure, while an arbitrary injected
+factory does not. When `prioritySlots` is zero the closure degrades exactly to
+the existing ordinary dial, preserving direct `_createRelayPolicy` consumers.
+When slots are active, its provisional unit is keyed by the real peer id, is
+charged atomically when it creates a new authorization, counts against
+`prioritySlots`, and remains priority across inspect, HOP verification and
+RESERVE rather than ending when `safeDial` returns. Reusing an already-censused
+live connection does not provisionally annotate that record, remove it from the
+ordinary committed census or make tail capacity appear free. It remains
+ordinary throughout inspect, RESERVE and the successful reservation lifetime.
+On such a reused live connection, a successful reservation adds only active-score
+membership; capacity-priority promotion is reserved for a connection created
+through reserved admission. On such a reused live connection, a failed
+reservation leaves both census and membership unchanged. With the ordinary
+committed census already at `maxConnections - prioritySlots`, the causal RED
+holds that reused live connection, attempts a concurrent ordinary charge and
+then fails reservation: the ordinary charge remains denied and the committed
+bound never changes. A second row starts at the same boundary, succeeds
+reservation, again denies an ordinary charge, releases the reservation and
+proves that no demotion, stale priority or stranded slot exists.
+
+The private dial returns one ownership receipt recording the exact connection
+id and whether this candidate lifecycle created that connection or reused a
+pre-existing one. A provisional receipt is exactly an ownership receipt for a
+newly created connection; a reused-live ownership receipt is never provisional.
+Failed, non-HOP, aborted, timed-out, refused,
+malformed-response, no-reservation and other non-active outcomes release a newly
+created provisional annotation. Cleanup closes only the exact newly created
+connection; a reused application/GossipSub connection remains ordinary and is
+never closed by peer-wide `hangUp`. Result reconciliation is the backstop that
+closes or demotes every remaining provisional receipt absent from
+`result.reservations`. A successful result gives capacity-priority promotion
+only to returned reservations correlated with a controller-issued provisional
+receipt. It may add score membership for a reused ordinary live connection
+correlated with the same candidate lifecycle or preserve an existing
+controller-owned active reservation; arbitrary injected policy results cannot
+mint capacity or score authority. Disconnect failure, late completion,
+relay-policy factory construction throw, acquire throw, policy stop and node
+stop retain or release the affected unit fail-closed and cannot mint another
+one. The controller denies priority while detached or after stop, so `safeDial`
+cannot lazily create an unattached priority authority.
+
+The clean API remains private to `@ts-drp/network`. Public `safeDial` delegates
+to one internal dial owner at ordinary priority. Only the private closure above
+invokes its provisional path; an arbitrary injected relay-policy factory,
+discovery record, dependency call, extension service or caller option cannot.
+The controller extends its existing records with priority metadata and owns the
+one active-reservation set. It exposes only a private membership predicate to
+the node's score closure. The detached snapshot adds the three counts above and
+exposes no peer identities, mutation method, token or admission hook.
+
+Every default-owner acquire, refresh and replace result atomically installs the
+exact returned reservations that correlate to issued provisional receipts or
+existing controller-owned active reservations, regardless of its terminal
+label; an exhausted or aborted result with a live partial reservation preserves
+that real reservation.
+The peer-disconnect path removes the peer before replacement begins, and
+`replaceRelay()` routes its returned result through the same reconciliation
+owner. Release, empty results, stop and restart clear the corresponding active
+set and provisionals. Once reserved, reconnect work may reacquire provisional
+priority only through that same private owner. Multiple connections to one
+reserved peer still occupy separate T1 live units; peer identity supplies score
+preference while priority annotations remain per capacity unit.
+
+#### Native GossipSub preference, not a parallel mesh
+
+The existing `appSpecificScore` closure reads the controller's live membership
+predicate; it never captures a reassigned set. The relay term is evaluated even
+when authenticated observed-behavior rewards are disabled, as in the current
+browser product configuration. A currently reserved relay receives an
+unweighted preference of `min(0.5, configured max_application_score)` whenever
+the observed-behavior configuration is enabled and supplies that ceiling, even
+when its rollout flag leaves the behavior provider disabled. It receives exactly
+`0.5` only when that configuration is absent or disabled. The authenticated
+behavior term is included only when the existing behavior owner is fully
+enabled. Relay preference and behavior reward combine by `max`, never by
+addition, so the configured application ceiling and the existing `< 1`
+validation bound both remain strict in mixed configuration/rollout states. Its
+weighted contribution remains below the installed accept-PX and
+opportunistic-graft thresholds. Revocation changes the closure immediately and
+becomes visible through native `PeerScore` at the first score computation after
+the existing cache entry expires. A heartbeat does not itself invalidate that
+cache, so the causal row advances beyond the cache deadline and then runs the
+next heartbeat rather than promising the immediately following heartbeat.
+Unknown, configured, candidate-only, stale, failed or remotely tagged peers
+remain neutral unless the independently authenticated behavior owner rewards
+them.
+
+T4 does not mutate GossipSub's private mesh, install direct peers, copy its peer
+tables or promise that an unsubscribed relay appears in a topic. The installed
+GossipSub heartbeat remains the only graft/prune owner. The bonus proves a
+causal score preference over otherwise equal neutral peers; it does not promise
+unconditional membership, retention or a per-room spine path. `Dhi` pruning
+keeps only the top installed `Dscore = 4` peers deterministically and shuffles
+the remainder, while opportunistic graft shuffles qualifying peers. Genuine
+heartbeat rows therefore use explicit bounded candidate sets: at most four
+reserved relays rank inside the top `Dscore` without outbound-rotation
+interference, and one uniquely above-median reserved candidate is eligible for
+the requested opportunistic graft. They assert only outcomes forced by those
+preconditions. T2 continues to read the resulting genuine mesh rather than a
+T4 shadow, so the preference may change which real mesh partners T2 observes
+without changing T2's authority rule.
+
+#### Signed TDD scope
+
+The plan-only commit lands first. Its tests-only RED is its sole child and may
+change exactly:
+
+- add `packages/network/tests/relay-spine-t4-red.test.ts` for private priority
+  custody, selected-work reclaim, active-work protection, concurrent requests,
+  reservation lifecycle and native GossipSub preference;
+- modify `packages/relay-policy/tests/legacy-relay-policy.test.ts` only for the
+  default client's provisional inspect/RESERVE custody and failed-candidate
+  disconnect behavior;
+- modify `packages/network/tests/peer-selector-t3-red.test.ts` only to preserve
+  the existing disjoint census while exercising the added detached counts;
+- modify `packages/network/tests/phase-seven-mesh-scoring.test.ts` only to
+  preserve authenticated behavior scoring and prove the bounded `max`
+  composition;
+- add `packages/network-spike/tests/relay-spine-t4.test.ts` for a deterministic
+  5,000-replica spine-assisted topology simulation driven through the production
+  controller and genuine GossipSub score owner; and
+- modify `packages/network/tests/network-config.types.test-d.ts` only for the
+  closed snapshot additions; and
+- modify `examples/browser-network/src/config.test.ts` only to load its existing
+  exported production configuration and preserve the real
+  `target_reservations = 1` value.
+
+The RED preserves all T1-T3 tests first. It has two independent causal absence
+rows inside the existing focused owner: a private relay candidate cannot reclaim
+a borrowed uncharged selection, and an active reserved relay remains
+score-identical to an otherwise neutral subscriber when behavior rewards are
+disabled. The committed-tail identity above is a third independent blocking
+row. Any row remaining RED blocks GREEN. Controlled counts may diagnose the
+state machine but cannot replace the genuine ticket, private connect closure,
+real relay-policy result or native GossipSub heartbeat rows.
+
+The GREEN is the RED's sole child and may change exactly:
+
+- `packages/types/src/network.ts` for the three bounded detached snapshot
+  counts;
+- `packages/network/src/connection-budget.ts` to extend the single T1/T3 state
+  machine with the ordinary committed-tail gate, priority metadata,
+  selected-work reclaim and reservation-set replacement;
+- `packages/network/src/node.ts` to derive the slot bound from existing relay
+  configuration, keep the priority dial private, project active reservations
+  into the controller, and compose the bounded score; and
+- `packages/relay-policy/src/libp2p-client.ts` only to retain provisional custody
+  across inspect and RESERVE and to disconnect every non-active candidate; and
+- no peer-selector, other relay-policy owner, GossipSub dependency, room, zone,
+  ephemeral, workflow, lockfile or application configuration file.
+
+No compatibility mode, optional priority supplied by callers, peer-store tag
+authority, second controller, direct-mesh mutation or test hook is authorized.
+The ordinary controller factory remains production-used by tests and the node;
+dependency injection may provide real host/connection objects but cannot select
+the result.
+
+#### Causal matrix and acceptance
+
+The causal matrix covers free-capacity provisional admission; borrowed newest
+uncharged-selection reclaim; charged, upgrade, every live connection, priority
+and unknown-state non-replacement; two simultaneous provisional requests;
+provisional promotion and failed/non-HOP/aborted/timed-out/refused cleanup;
+malformed-response and no-reservation cleanup; new versus reused connection
+ownership; a reused-live concurrent ordinary-charge attempt followed by failed
+reservation; reused-live success, denied ordinary charge and release with no
+demotion or stranded slot; disconnect failure and late completion;
+target-reservation bounds, the real browser `target_reservations = 1`
+preservation row in the existing browser config test, a separate synthetic
+maximum-bound `target_reservations = 8` row, discovery-ceiling interaction and
+impossible budget/config pairs; source-qualified pre-host tail installation,
+relay-policy factory-construction throw, zero-slot ordinary fallback,
+source-empty and post-stop inertness; initial acquire, refresh, replacement
+through existing-active correlation, partial exhausted/aborted results, peer
+disconnect, release, stop and restart; candidate-only, configured,
+remote-tagged, stale and failed identities; multiple connections to one relay;
+ordinary explicit-ticket and inbound-reserve denial at the committed tail; the
+exact subset/count identities; and detached snapshot immutability. The custody
+rows drive the private closure minted by `_createRelayPolicy` and genuine
+`Libp2pRelayClient`; an arbitrary injected factory and uncorrelated result are
+negatives and cannot satisfy them.
+
+Mesh rows cover rewards-disabled reserved versus neutral score, behavior-only
+score, a configured ceiling below `0.5`, the mixed
+config-enabled/rollout-disabled ceiling, reserved-plus-behavior `max`, cached
+revocation at the first post-expiry score computation, malformed behavior
+fallback, bounded native `Dhi` top-`Dscore` retention and uniquely eligible
+native opportunistic graft. The genuine heartbeat rows use connected subscribed
+peers and the public native heartbeat; the opportunistic row advances the real
+60-heartbeat cadence rather than setting its private tick or stubbing dependency
+randomness. Before those scenarios, the tests import and assert the installed
+dependency's current `Dscore`, heartbeat cadence and configured threshold values;
+the scenario derives its bounds from those installed constants rather than
+silently copying magic literals. A relay outside the topic remains outside it.
+T2's real mesh read then selects only the resulting dependency mesh.
+
+The 5,000-replica campaign uses multiple verified operator groups, ordinary
+churn and repeated reservation replacement. It drives the production controller
+and score closure, but is separate from the randomized native-heartbeat rows.
+Every prefix must retain the hard connection and parallel-dial bounds, replace
+only uncharged selections, keep no more than the configured priority units, and
+show a higher relay score than an otherwise equal neutral candidate while a
+verified reservation is active. It does not claim an exact mesh member or a
+per-room spine path. This is a deterministic production-controller simulation,
+not a claim of 5,000 real browsers or WAN availability.
+
+Acceptance requires the focused T4 owner; all T1, T2 and T3 tests; the complete
+network package suite; relay-policy preservation; the exact browser-network
+configuration test; v3-room chat and zone two-client preservation;
+network-spike; affected typecheck/build; package smoke; ESLint; Prettier; and
+diff checks. Ordinary developer evidence remains under ten minutes; no
+1,000/5,000-browser claim or freeze-governance matrix is run. Logs record exact
+commands, counts and durations.
+
+The requested bounded review cadence applies separately to plan, RED and GREEN:
+Kimi receives the requested 100-step audit; Grok runs through the
+artifact-preserving review runner with JSONL/status/public output; Codex reviews
+the exact packet; and Opus runs at xhigh. A narrow packet may continue for up to
+thirty minutes and a full packet up to forty-five while streamed evidence shows
+genuine progress. A timeout or `NO_VERDICT` is recorded honestly and is not
+approval; every reproduced substantive P0/P1 is resolved before signing.
+
+The plan, tests-only RED, production GREEN and closure ledger are separate
+Good-Faolain-signed commits with authenticated remote tips. This slice closes
+only T4's bounded operator-spine hook. It does not claim WAN availability,
+1,000 real clients, E3, AOI, finality, next-anchor adoption, full P6, either
+complete golden path or completion of the broader production-hardening plan.
+After this ledger, work returns directly to the existing P6 recovery and
+two-client Discord/MMORPG golden path; T4 does not authorize another topology or
+governance detour.
