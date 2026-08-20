@@ -48481,3 +48481,49 @@ bytes.
 The same bounded Kimi, Grok, Codex and Opus policy applies: reviewers may run
 beyond twelve minutes while their process or streamed evidence is progressing;
 only a reproduced substantive P0/P1 blocks signing.
+
+#### D.93.49.2 — T3 bounded peer-selection closure ledger
+
+D.93.49 closed as a signed linear TDD sequence. The plan is
+`cf6cd16e2d6607ded301fac5e504f319126962a2`; the initial RED is
+`e9a15cee507b79dd13ea355508a68e31b79659c3`; the reviewer-correction amendment
+is `6b10003d0dcc0598c33e53873fba9bf7ff7c3716`; the corrected RED is
+`1df81bc97a90e982f564afbaa4b39da24e65aa52`; and the bounded GREEN is
+`9388ffdf0caac112cbe8e9babeca582fadb20ec8` / tree
+`51c360a509d3e008292740c779b988fbce8bb8df`. Every commit has a Good Faolain
+signature under fingerprint `55E22F154FBAF8C84F378304761B99CEA81C6289`.
+
+The closed boundary is one T1/T3 capacity owner from authenticated discovery
+through the real connection-manager and transport-manager prequeue seams.
+Selection, explicit tickets, relay/reconnect custody, queue ceilings and final
+upgrade reservations share one bounded census. Multi-address alternatives
+derive nested relays and terminal peers per candidate rather than from a
+flattened route order; a peer that is terminal in any candidate is never
+granted the nested-hop exemption. A disposable causal wrapper-boundary probe
+forced a direct route to fail, completed through a cold lifecycle circuit relay
+to the same terminal, and observed only the terminal capacity unit charged.
+The probe was removed to preserve the signed seven-path GREEN scope; a durable
+version remains a nonblocking follow-up test-hardening item rather than a T3
+acceptance gap.
+
+Frozen-byte evidence passed: the focused T3 owner passed `12/12` in `2.91s`;
+the full network suite passed `202/202` in `33.01s`; network typecheck and build,
+affected ESLint, Prettier and diff checks passed. Kimi and Codex returned PASS
+with no P0, P1 or P2. Grok returned PASS in `450.135s` with no P0/P1 and retained
+its packet, JSONL, public response and status under
+`.logs/phase-d93491-t3-green/reviews/final-route-delta/grok/run-final/`. Opus
+returned PASS in `551.808s` with no P0/P1 and recorded only nonblocking cleanup
+observations. The staged GREEN diff SHA-256 was
+`29226570697db27bf065e8133871c0b0888d620cfb3b2a381f8e0ff5c0b696f9`.
+
+Five required GitHub jobs then passed on exact SHA
+`9388ffdf0caac112cbe8e9babeca582fadb20ec8`: operation budget run
+`32385389938`, work budget `32385389949`, author projection `32385389743`,
+gossip budget `32385389895`, and ACL reputation `32385389915`. The signed GREEN
+commit remains unchanged by this ledger.
+
+This ledger closes only T3 bounded discovery-to-dial peer selection and its
+deployment-size gate. It does not claim T4, E3, AOI, product scale, full P6,
+completion of the broader production-hardening plan or product completion. The
+next independent slice returns immediately to the existing P6 recovery and
+two-client Discord/MMORPG golden path.
