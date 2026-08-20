@@ -70,6 +70,7 @@ import {
 	type DRPConnectionBudget,
 	type DRPNetworkNodeConfig,
 	type DRPNetworkNode as DRPNetworkNodeInterface,
+	type DRPPeerSelectionSnapshot,
 	type GroupPeerChange,
 	type GroupPeerChangeHandler,
 	type IMessageQueueHandler,
@@ -87,6 +88,7 @@ import {
 	resolveConnectionBudget,
 } from "./connection-budget.js";
 import { createMetricsRegister, type PrometheusMetricsRegister } from "./metrics/prometheus.js";
+import { PeerSelector } from "./peer-selector.js";
 import { streamToUint8Array, uint8ArrayToStream } from "./stream.js";
 import {
 	createDirectSyncIngress,
@@ -260,7 +262,8 @@ export interface DRPNetworkHostConfigSnapshot {
 	readonly bootstrapDiscovery: boolean;
 	readonly bootstrapPeerCount: number;
 	readonly coldStartPubsubDiscovery: boolean;
-	readonly connectionBudget: DRPConnectionBudget;
+	readonly connectionBudget?: DRPConnectionBudget;
+	readonly globalDiscovery?: boolean;
 	readonly gossipSubPeerExchange: boolean;
 	readonly outboundAddressPolicy: "address-policy" | "allow-all" | "injected";
 	readonly peerDiscoveryModules: readonly ("@libp2p/bootstrap" | "@libp2p/pubsub-peer-discovery")[];
@@ -501,6 +504,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _node?: Libp2p;
 	private _pubsub?: ConfigurableGossipSub;
 	private _connectionAdmission?: ConnectionAdmissionController;
+	private _peerSelector?: PeerSelector;
 	private _messageQueue: MessageQueue<Message | DirectSyncIngress>;
 	private readonly _ingressEvidence = new WeakMap<Message, IngressEvidence>();
 	private readonly _syncAdmissions = new WeakMap<Connection, SyncSendAdmission>();
@@ -528,6 +532,8 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private readonly _relayPolicyFactory: DRPNetworkNodeDependencies["relayPolicyFactory"];
 	private _membershipVerifier?: MembershipVerifier;
 	private _outboundAddressPolicy: DRPNetworkHostConfigSnapshot["outboundAddressPolicy"] = "allow-all";
+	private _expectedReplicas?: number;
+	private _globalDiscovery = false;
 
 	peerId = "";
 
@@ -566,6 +572,19 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		return this._membershipVerifier;
 	}
 
+	/** @returns Detached exact T1/T3 occupancy and deployment evidence. */
+	getPeerSelectionSnapshot(): DRPPeerSelectionSnapshot {
+		const controller = this._connectionAdmission;
+		if (controller === undefined) throw new Error("peer selection is not attached to a running host");
+		const connectionManager = (this._node as unknown as { components?: { connectionManager?: unknown } } | undefined)
+			?.components?.connectionManager as { getDialQueue(): readonly unknown[] } | undefined;
+		return controller.getSnapshot(
+			connectionManager?.getDialQueue().length ?? 0,
+			this._expectedReplicas,
+			this._globalDiscovery
+		);
+	}
+
 	/**
 	 * Start the node.
 	 * @param rawPrivateKey - The raw private key to use.
@@ -583,8 +602,15 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		const bootstrapDiscovery = this._hostPolicy.bootstrapDiscovery ?? true;
 		const coldStartPubsubDiscovery = this._hostPolicy.coldStartPubsubDiscovery ?? true;
 		const gossipSubPeerExchange = this._hostPolicy.gossipSubPeerExchange ?? true;
+		const expectedReplicas = this._config?.control_plane?.peer_selection?.expected_replicas;
+		if (expectedReplicas !== undefined && (!Number.isSafeInteger(expectedReplicas) || expectedReplicas < 1)) {
+			throw new Error("control_plane.peer_selection.expected_replicas must be a positive safe integer");
+		}
+		const globalDiscovery = coldStartPubsubDiscovery && expectedReplicas !== undefined && expectedReplicas <= 50;
+		this._expectedReplicas = expectedReplicas;
+		this._globalDiscovery = globalDiscovery;
 		const _peerDiscovery: Array<PeerDiscoveryFunction> = [];
-		if (coldStartPubsubDiscovery) {
+		if (globalDiscovery) {
 			_peerDiscovery.push(
 				pubsubPeerDiscovery({
 					topics: [DRP_DISCOVERY_TOPIC],
@@ -607,7 +633,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			dcutr: dcutr(),
 			identify: identify(),
 			identifyPush: identifyPush(),
-			pubsub: gossipsub(this.getGossipSubConfig(gossipSubPeerExchange)),
+			pubsub: gossipsub(this.getGossipSubConfig(gossipSubPeerExchange, globalDiscovery)),
 		};
 
 		if (this._config?.autonat) {
@@ -621,11 +647,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		) {
 			throw new Error("relay_service.max_reservations must be a non-negative safe integer");
 		}
-		const connectionBudget = resolveConnectionBudget({
-			...(this._config?.connection_budget === undefined ? {} : { configured: this._config.connection_budget }),
-			relayServiceEnabled: this._config?.relay_service?.enabled === true,
-			runtime: isBrowser ? "browser" : isWebWorker ? "worker" : "node",
-		});
+		const connectionBudget = this._resolveConnectionBudget();
 		const _relayServices = {
 			..._node_services,
 			relay: circuitRelayServer({
@@ -636,8 +658,9 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		};
 
 		const configuredAddressPolicy = this._config?.control_plane?.address_policy;
+		const controlPlaneKeys = Object.keys(this._config?.control_plane ?? {}).filter((key) => key !== "peer_selection");
 		const addressPolicy =
-			this._config?.control_plane === undefined
+			configuredAddressPolicy === undefined && controlPlaneKeys.length === 0
 				? undefined
 				: new AddressPolicy({
 						allowInsecureWebSocket: configuredAddressPolicy?.allowInsecureWebSocket,
@@ -683,8 +706,32 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 					: "allow-all";
 		this._outboundAddressPolicy = outboundAddressPolicy;
 		const activeAddressPolicyGate = this._hostPolicy.denyDialMultiaddr === undefined ? addressPolicyGate : undefined;
-		const connectionAdmission = createConnectionAdmissionController(connectionBudget);
+		const connectionAdmission = this._connectionAdmission ?? createConnectionAdmissionController(connectionBudget);
+		const peerSelector = new PeerSelector(connectionAdmission);
 		this._connectionAdmission = connectionAdmission;
+		this._peerSelector = peerSelector;
+		for (const address of this._config?.listen_addresses ?? []) {
+			if (!address.includes("/p2p-circuit")) continue;
+			try {
+				connectionAdmission.addLifecycleTarget(multiaddr(address));
+			} catch {
+				// libp2p owns the final listen-address validation.
+			}
+		}
+		const wrapFactory =
+			<T>(factory: (components: object) => T): ((components: object) => T) =>
+			(components): T => {
+				const candidate = factory(peerSelector.wrapComponents(components));
+				peerSelector.attachDiscovery(candidate);
+				return candidate;
+			};
+		const wrapServices = (services: ServiceFactoryMap): ServiceFactoryMap =>
+			Object.fromEntries(
+				Object.entries(services).map(([name, factory]) => [
+					name,
+					wrapFactory(factory as (components: object) => unknown),
+				])
+			) as ServiceFactoryMap;
 		const baseOptions: Libp2pOptions = {
 			privateKey,
 			addresses: {
@@ -693,6 +740,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			},
 			connectionManager: {
 				maxConnections: connectionBudget.maxConnections,
+				maxDialQueueLength: connectionBudget.maxConnections,
 				maxParallelDials: connectionBudget.maxParallelDials,
 				dialTimeout: 60_000,
 				addressSorter: this._sortAddresses,
@@ -710,10 +758,14 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			},
 			metrics: this._config?.browser_metrics ? inspectorMetrics() : undefined,
 			...(activeAddressPolicyGate === undefined ? {} : { dns: outboundDns }),
-			peerDiscovery: _peerDiscovery,
-			services: this._config?.relay_service?.enabled === true ? _relayServices : _node_services,
+			peerDiscovery: _peerDiscovery.map((factory) =>
+				wrapFactory(factory as (components: object) => PeerDiscovery)
+			) as NonNullable<Libp2pOptions["peerDiscovery"]>,
+			services: wrapServices(this._config?.relay_service?.enabled === true ? _relayServices : _node_services),
 			streamMuxers: [yamux()],
-			transports: [circuitRelayTransport(), webRTC(), webSockets()],
+			transports: [circuitRelayTransport(), webRTC(), webSockets()].map((factory) =>
+				wrapFactory(factory as (components: object) => ReturnType<typeof factory>)
+			) as NonNullable<Libp2pOptions["transports"]>,
 		};
 		const publicComponents = this._config?.control_plane?.rollout?.public_components;
 		const rollout = Object.freeze({
@@ -736,7 +788,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			gossipSubPeerExchange,
 			outboundAddressPolicy,
 			peerDiscoveryModules: Object.freeze([
-				...(coldStartPubsubDiscovery ? (["@libp2p/pubsub-peer-discovery"] as const) : []),
+				...(globalDiscovery ? (["@libp2p/pubsub-peer-discovery"] as const) : []),
 				...(bootstrapDiscovery && bootstrapNodes.length ? (["@libp2p/bootstrap"] as const) : []),
 			]),
 			rollout,
@@ -744,9 +796,9 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		// Preserve the established enumerable snapshot shape while exposing the
 		// immutable budget as direct host-factory evidence and through browser diagnostics.
 		const snapshot = Object.freeze(
-			Object.defineProperty(snapshotWithoutBudget, "connectionBudget", {
-				enumerable: false,
-				value: connectionBudget,
+			Object.defineProperties(snapshotWithoutBudget, {
+				connectionBudget: { enumerable: false, value: connectionBudget },
+				globalDiscovery: { enumerable: false, value: globalDiscovery },
 			})
 		) as DRPNetworkHostConfigSnapshot;
 		let builtHost: Libp2p | undefined;
@@ -758,16 +810,41 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 					throw new Error(`DRP network host extension cannot replace reserved service "${serviceName}"`);
 				}
 			}
-			hostBuild = createLibp2p({
-				...baseOptions,
-				contentRouters: [...(baseOptions.contentRouters ?? []), ...(extensions.contentRouters ?? [])],
-				peerDiscovery: [...(baseOptions.peerDiscovery ?? []), ...(extensions.peerDiscovery ?? [])],
-				peerRouters: [...(baseOptions.peerRouters ?? []), ...(extensions.peerRouters ?? [])],
-				services: { ...baseOptions.services, ...extensions.services },
-				transports: [...(baseOptions.transports ?? []), ...(extensions.transports ?? [])],
-			});
-			builtHost = await hostBuild;
-			return builtHost;
+			const extensionPeerDiscovery = (extensions.peerDiscovery ?? []).map((factory) =>
+				wrapFactory(factory as (components: object) => PeerDiscovery)
+			) as NonNullable<Libp2pOptions["peerDiscovery"]>;
+			const extensionServices = wrapServices(extensions.services ?? {});
+			hostBuild = (async (): Promise<Libp2p> => {
+				const host = await createLibp2p({
+					...baseOptions,
+					contentRouters: [
+						...(baseOptions.contentRouters ?? []),
+						...(extensions.contentRouters ?? []).map((factory) =>
+							wrapFactory(factory as (components: object) => unknown)
+						),
+					] as NonNullable<Libp2pOptions["contentRouters"]>,
+					peerDiscovery: [...(baseOptions.peerDiscovery ?? []), ...extensionPeerDiscovery],
+					peerRouters: [
+						...(baseOptions.peerRouters ?? []),
+						...(extensions.peerRouters ?? []).map((factory) => wrapFactory(factory as (components: object) => unknown)),
+					] as NonNullable<Libp2pOptions["peerRouters"]>,
+					services: { ...baseOptions.services, ...extensionServices },
+					start: false,
+					transports: [
+						...(baseOptions.transports ?? []),
+						...(extensions.transports ?? []).map((factory) => wrapFactory(factory as (components: object) => unknown)),
+					] as NonNullable<Libp2pOptions["transports"]>,
+				});
+				builtHost = host;
+				const components = (host as unknown as { components: { connectionManager: object; transportManager: object } })
+					.components;
+				connectionAdmission.wrapConnectionManager(components.connectionManager);
+				connectionAdmission.wrapTransportManager(components.transportManager);
+				peerSelector.attachHost(host);
+				await host.start();
+				return host;
+			})();
+			return hostBuild;
 		};
 		try {
 			const host = await this._hostFactory({ createHost, snapshot });
@@ -776,8 +853,10 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			connectionAdmission.attach(host);
 			this._node = host;
 		} catch (error) {
+			peerSelector.stop();
 			connectionAdmission.stop();
 			if (this._connectionAdmission === connectionAdmission) this._connectionAdmission = undefined;
+			if (this._peerSelector === peerSelector) this._peerSelector = undefined;
 			this._emitControlPlaneEvent({ kind: "listen-readiness", outcome: "failed", transport: "unknown" });
 			if (!builtHost && hostBuild) {
 				try {
@@ -849,7 +928,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		});
 
 		// needed as I've disabled the pubsubPeerDiscovery
-		this._pubsub?.subscribe(DRP_DISCOVERY_TOPIC);
+		if (globalDiscovery) this._pubsub?.subscribe(DRP_DISCOVERY_TOPIC);
 		this._pubsub?.subscribe(DRP_INTERVAL_DISCOVERY_TOPIC);
 
 		// start the routing loop to enqueue messages
@@ -1297,7 +1376,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		if (host === undefined) throw new Error("relay policy requires a started libp2p host");
 		const client = new Libp2pRelayClient({
 			connect: async (address, signal): Promise<void> => {
-				await host.dial(multiaddr(address), { signal });
+				await this.safeDial(multiaddr(address), host, signal);
 			},
 			disconnect: async (peerId): Promise<void> => {
 				await host.hangUp(peerIdFromString(peerId));
@@ -1343,7 +1422,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			if (signal.aborted || this._node !== node || node.status === "stopping" || node.status === "stopped") return;
 
 			try {
-				await this.safeDial(addr, node);
+				await this.safeDial(addr, node, signal);
 				return;
 			} catch (e) {
 				log.error("::start::dial::error", e);
@@ -1378,6 +1457,8 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 */
 	async stop(): Promise<void> {
 		if (this._node?.status === IntervalRunnerState.Stopped) throw new Error("Node not started");
+		this._peerSelector?.stop();
+		this._peerSelector = undefined;
 		this._connectionAdmission?.stop();
 		this._connectionAdmission = undefined;
 		this._bootstrapRetryController?.abort();
@@ -1451,17 +1532,25 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		return 0;
 	}
 
+	private _resolveConnectionBudget(): DRPConnectionBudget {
+		return resolveConnectionBudget({
+			...(this._config?.connection_budget === undefined ? {} : { configured: this._config.connection_budget }),
+			relayServiceEnabled: this._config?.relay_service?.enabled === true,
+			runtime: isBrowser ? "browser" : isWebWorker ? "worker" : "node",
+		});
+	}
+
 	private getPeerId(addr: Multiaddr): string | undefined {
 		return addr.getComponents().find((component) => component.name === "p2p")?.value;
 	}
 
-	private getGossipSubConfig(doPX = true): Partial<GossipsubOpts> {
+	private getGossipSubConfig(doPX = true, globalDiscovery = false): Partial<GossipsubOpts> {
 		const baseConfig: Partial<GossipsubOpts> = {
 			doPX,
 			fallbackToFloodsub: false,
 			globalSignaturePolicy: StrictSign,
 			allowPublishToZeroTopicPeers: true,
-			scoreParams: this.getGossipSubPeerScoreParams(),
+			scoreParams: this.getGossipSubPeerScoreParams(globalDiscovery),
 		};
 
 		if (this._config?.seed) {
@@ -1481,7 +1570,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		return baseConfig;
 	}
 
-	private getGossipSubPeerScoreParams(): PeerScoreParams {
+	private getGossipSubPeerScoreParams(globalDiscovery = false): PeerScoreParams {
 		const ipColocation = this._config?.control_plane?.pubsub_scoring?.ip_colocation;
 		const ipColocationParams: Partial<PeerScoreParams> =
 			ipColocation?.enabled === true
@@ -1538,7 +1627,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			...ipColocationParams,
 			appSpecificScore,
 			appSpecificWeight: APP_SPECIFIC_WEIGHT,
-			topics: { [DRP_DISCOVERY_TOPIC]: createTopicScoreParams({ topicWeight: 1 }) },
+			...(globalDiscovery ? { topics: { [DRP_DISCOVERY_TOPIC]: createTopicScoreParams({ topicWeight: 1 }) } } : {}),
 		});
 	}
 
@@ -1668,6 +1757,16 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		signal?: AbortSignal
 	): Promise<Connection | undefined> {
 		if (Array.isArray(peerId) && peerId.length === 0) return undefined;
+		const connectionAdmission =
+			this._connectionAdmission ?? createConnectionAdmissionController(this._resolveConnectionBudget());
+		this._connectionAdmission = connectionAdmission;
+		const ticket = connectionAdmission.createExplicitTicket(peerId);
+		if (ticket === undefined) {
+			const error = new Error("explicit dial denied before queue insertion");
+			error.name = "DialDeniedError";
+			this._emitDialOutcome(this._firstDialAddress(peerId), "denied");
+			throw error;
+		}
 		const eventAddress = this._firstDialAddress(peerId);
 		try {
 			const isArray = Array.isArray(peerId);
@@ -1675,10 +1774,27 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			if (!isArray) {
 				const addr =
 					typeof peerId === "string" ? (peerId.includes("/") ? multiaddr(peerId) : peerIdFromString(peerId)) : peerId;
-				connection = await node?.dial(addr, { signal });
+				const targetPeerId =
+					typeof addr === "object" && "getComponents" in addr
+						? addr
+								.getComponents()
+								.filter(({ name }) => name === "p2p")
+								.at(-1)?.value
+						: undefined;
+				const force =
+					targetPeerId !== undefined &&
+					node
+						?.getConnections(peerIdFromString(targetPeerId))
+						.some(({ remoteAddr }) => !remoteAddr.equals(addr as Multiaddr));
+				connection = await node?.dial(
+					addr,
+					ticket.bindOptions(addr, { ...(force === true ? { force: true } : {}), signal })
+				);
 			} else {
 				const candidates = this.dialCandidates(peerId);
-				connection = await Promise.any(candidates.map((addresses) => node?.dial(addresses, { signal })));
+				connection = await Promise.any(
+					candidates.map((addresses) => node?.dial(addresses, ticket.bindOptions(addresses, { signal })))
+				);
 			}
 			this._emitDialOutcome(eventAddress, connection === undefined ? "failed" : "ok");
 			return connection;
@@ -1688,6 +1804,8 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 				error instanceof Error && error.name === "DialDeniedError" ? "denied" : "failed"
 			);
 			throw error;
+		} finally {
+			ticket.release();
 		}
 	}
 
@@ -1793,7 +1911,16 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 				Array.isArray(addr) && !isComponentArray
 					? (addr as MultiaddrInput[]).map((value) => multiaddr(value))
 					: [multiaddr(addr as MultiaddrInput)];
-			await this.safeDial(multiaddrs);
+			const groups = this._peerSelector?.admitRemoteRoutes(multiaddrs) ?? [];
+			await Promise.all(
+				groups.map(async (group): Promise<void> => {
+					try {
+						await this._node?.dial(group.addresses.length === 1 ? group.addresses[0] : [...group.addresses]);
+					} catch (error) {
+						log.error("::connect:group:", error);
+					}
+				})
+			);
 			log.debug("::connect: Successfully dialed", addr);
 		} catch (e) {
 			log.error("::connect:", e);

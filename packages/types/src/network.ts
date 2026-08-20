@@ -334,6 +334,23 @@ export interface DRPConnectionBudget {
 	readonly role: DRPConnectionBudgetRole;
 }
 
+export interface DRPPeerSelectionConfig {
+	readonly expected_replicas: number;
+}
+
+export interface DRPPeerSelectionSnapshot {
+	readonly budget: number;
+	readonly charged: number;
+	readonly denied: number;
+	readonly dependencyDialQueue: number;
+	readonly expectedReplicas: number | undefined;
+	readonly globalDiscovery: boolean;
+	readonly live: number;
+	readonly queued: number;
+	readonly selected: number;
+	readonly upgrade: number;
+}
+
 export interface ControlPlaneRelayReservationEvidence {
 	readonly expiresAtMs: number;
 	readonly operatorGroup: string;
@@ -348,6 +365,7 @@ export interface ControlPlaneConfig {
 		sink(event: ControlPlaneEvent): void;
 	};
 	readonly pubsub_scoring?: ControlPlanePubsubScoringConfig;
+	readonly peer_selection?: DRPPeerSelectionConfig;
 	readonly recovery?: ControlPlaneRecoveryConfig;
 	readonly relay_policy?: ControlPlaneRelayPolicyConfig;
 	readonly rendezvous?: ControlPlaneRendezvousConfig;
