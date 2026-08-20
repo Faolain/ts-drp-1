@@ -139,6 +139,108 @@ describe("Circuit Relay v2 reservation decoding", () => {
 		}
 	});
 
+	it("clears the observation timer after ordinary success, failure, abort, and timeout", async () => {
+		vi.useFakeTimers();
+		const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+		const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+		try {
+			const expectObservationTimerArmed = async (): Promise<void> => {
+				for (let turn = 0; turn < 8 && vi.getTimerCount() === 0; turn += 1) await Promise.resolve();
+				expect(vi.getTimerCount()).toBe(1);
+			};
+			const observationTimerSince = (callIndex: number, timeoutMs: number): ReturnType<typeof setTimeout> => {
+				for (let index = callIndex; index < setTimeoutSpy.mock.calls.length; index += 1) {
+					if (setTimeoutSpy.mock.calls[index]?.[1] !== timeoutMs) continue;
+					const timer = setTimeoutSpy.mock.results[index]?.value as ReturnType<typeof setTimeout> | undefined;
+					if (timer !== undefined) return timer;
+				}
+				throw new Error(`expected one ${timeoutMs}ms observation timer`);
+			};
+			let releaseSuccessfulPeerStore = (): void => undefined;
+			const successfulPeerStoreGate = new Promise<void>((resolve) => {
+				releaseSuccessfulPeerStore = resolve;
+			});
+			const successful = relayClientWith({
+				connection: true,
+				identifyTimeoutMs: 30_000,
+				peerStoreGate: successfulPeerStoreGate,
+				protocols: [CIRCUIT_RELAY_V2_HOP_PROTOCOL],
+			});
+			const successfulTimerCalls = setTimeoutSpy.mock.calls.length;
+			const successfulInspection = successful.inspect(validRelayCandidate(), "ignored", signal());
+			await expectObservationTimerArmed();
+			const successfulObservationTimer = observationTimerSince(successfulTimerCalls, 30_000);
+			releaseSuccessfulPeerStore();
+			await expect(successfulInspection).resolves.toMatchObject({
+				outcome: "connected",
+			});
+			expect(clearTimeoutSpy).toHaveBeenCalledWith(successfulObservationTimer);
+			expect(vi.getTimerCount()).toBe(0);
+
+			let releaseFailedPeerStore = (): void => undefined;
+			const failedPeerStoreGate = new Promise<void>((resolve) => {
+				releaseFailedPeerStore = resolve;
+			});
+			const failed = relayClientWith({
+				connection: true,
+				identifyTimeoutMs: 30_000,
+				peerStoreError: new Error("controlled peer-store failure"),
+				peerStoreGate: failedPeerStoreGate,
+				protocols: [],
+			});
+			const failedTimerCalls = setTimeoutSpy.mock.calls.length;
+			const failedInspection = failed.inspect(validRelayCandidate(), "ignored", signal());
+			await expectObservationTimerArmed();
+			const failedObservationTimer = observationTimerSince(failedTimerCalls, 30_000);
+			releaseFailedPeerStore();
+			await expect(failedInspection).resolves.toMatchObject({
+				outcome: "refused",
+			});
+			expect(clearTimeoutSpy).toHaveBeenCalledWith(failedObservationTimer);
+			expect(vi.getTimerCount()).toBe(0);
+
+			const abortController = new AbortController();
+			let releaseAbortedPeerStore = (): void => undefined;
+			const abortedPeerStoreGate = new Promise<void>((resolve) => {
+				releaseAbortedPeerStore = resolve;
+			});
+			const aborting = relayClientWith({
+				connection: true,
+				identifyTimeoutMs: 30_000,
+				peerStoreGate: abortedPeerStoreGate,
+				protocols: ["/ipfs/id/1.0.0"],
+			});
+			const abortedTimerCalls = setTimeoutSpy.mock.calls.length;
+			const aborted = aborting.inspect(validRelayCandidate(), "ignored", abortController.signal);
+			await expectObservationTimerArmed();
+			const abortedObservationTimer = observationTimerSince(abortedTimerCalls, 30_000);
+			abortController.abort(new DOMException("controlled abort", "AbortError"));
+			expect(clearTimeoutSpy).toHaveBeenCalledWith(abortedObservationTimer);
+			expect(vi.getTimerCount()).toBe(0);
+			releaseAbortedPeerStore();
+			await expect(aborted).resolves.toMatchObject({ outcome: "aborted" });
+			expect(vi.getTimerCount()).toBe(0);
+
+			const timingOut = relayClientWith({
+				connection: false,
+				identifyTimeoutMs: 1,
+				protocols: [],
+			});
+			const timedOutTimerCalls = setTimeoutSpy.mock.calls.length;
+			const timedOut = timingOut.inspect(validRelayCandidate(), "ignored", signal());
+			await expectObservationTimerArmed();
+			const timedOutObservationTimer = observationTimerSince(timedOutTimerCalls, 1);
+			await vi.runAllTimersAsync();
+			await expect(timedOut).resolves.toMatchObject({ outcome: "timeout" });
+			expect(clearTimeoutSpy).toHaveBeenCalledWith(timedOutObservationTimer);
+			expect(vi.getTimerCount()).toBe(0);
+		} finally {
+			setTimeoutSpy.mockRestore();
+			clearTimeoutSpy.mockRestore();
+			vi.useRealTimers();
+		}
+	});
+
 	it("returns a typed inspection timeout when no connection appears", async () => {
 		const client = relayClientWith({ connection: false, protocols: [] });
 		await expect(client.inspect(validRelayCandidate(), "ignored", signal())).resolves.toMatchObject({
@@ -1042,6 +1144,8 @@ function relayClientWith(options: {
 	readonly identifyTimeoutMs?: number;
 	onConnect?(): void;
 	onDisconnect?(peerId: string): void;
+	readonly peerStoreError?: Error;
+	readonly peerStoreGate?: Promise<void>;
 	readonly protocols: string[];
 	readonly reservationResponse?: Uint8Array;
 }): Libp2pRelayClient {
@@ -1102,7 +1206,13 @@ function relayClientWith(options: {
 			},
 			getConnections: () => (options.connection ? [connection] : []),
 			getMultiaddrs: () => circuitAddresses,
-			peerStore: { get: () => Promise.resolve({ protocols: options.protocols }) },
+			peerStore: {
+				get: async (): Promise<{ readonly protocols: string[] }> => {
+					await options.peerStoreGate;
+					if (options.peerStoreError !== undefined) throw options.peerStoreError;
+					return { protocols: options.protocols };
+				},
+			},
 			removeEventListener: events.removeEventListener.bind(events),
 		} as never,
 		identifyTimeoutMs: options.identifyTimeoutMs ?? 1,

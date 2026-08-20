@@ -8,6 +8,7 @@ interface ExplicitDialTicket {
 }
 
 interface PriorityAdmissionController {
+	attach(host: object): void;
 	admitDiscoveredPeer(peerId: { toString(): string }, addresses: readonly Multiaddr[]): boolean;
 	createExplicitTicket(target: string): ExplicitDialTicket | undefined;
 	createPriorityTicket(target: string): ExplicitDialTicket | undefined;
@@ -54,6 +55,12 @@ describe("D.93.50 deterministic relay-spine controller campaign", () => {
 			const maxParallelDials = 2 + (replica % 3);
 			const prioritySlots = 1 + (replica % 8);
 			const controller = createController({ maxConnections, maxParallelDials, role: "node" }, { prioritySlots });
+			controller.attach(
+				Object.assign(new EventTarget(), {
+					getConnections: (): readonly [] => [],
+					peerId: { toString: (): string => `campaign-host-${replica}` },
+				})
+			);
 			expect(controller.createPriorityTicket, "T4_PRIORITY_CONTROLLER_ABSENT").toBeTypeOf("function");
 			const ordinary: ExplicitDialTicket[] = [];
 			const priority: ExplicitDialTicket[] = [];

@@ -1,6 +1,6 @@
 import { privateKeyFromRaw } from "@libp2p/crypto/keys";
 import type { PeerScoreParams } from "@libp2p/gossipsub/score";
-import type { MultiaddrConnection, PeerId } from "@libp2p/interface";
+import type { Connection, Libp2p, MultiaddrConnection, PeerId } from "@libp2p/interface";
 import { peerIdFromPublicKey, peerIdFromString } from "@libp2p/peer-id";
 import { multiaddr } from "@multiformats/multiaddr";
 import {
@@ -42,6 +42,11 @@ const localAddressPolicy = {
 };
 
 interface PriorityAdmissionController extends ConnectionAdmissionController {
+	bindPriorityConnection(
+		ticket: ExplicitDialTicket,
+		peerId: string,
+		receipt: Readonly<{ connectionId?: string; created: boolean }>
+	): boolean;
 	createPriorityTicket(target: string | PeerId): ExplicitDialTicket | undefined;
 	hasActiveRelayPeer(peerId: string): boolean;
 	reconcileRelayReservations(
@@ -78,7 +83,28 @@ type T4ControllerFactory = (
 	options: { readonly prioritySlots: number }
 ) => PriorityAdmissionController;
 
-const createT4Controller = createConnectionAdmissionController as unknown as T4ControllerFactory;
+const createDetachedT4Controller = createConnectionAdmissionController as unknown as T4ControllerFactory;
+
+function attachT4Controller(
+	controller: PriorityAdmissionController,
+	connections: readonly Connection[] = []
+): EventTarget {
+	const host = Object.assign(new EventTarget(), {
+		getConnections: (): readonly Connection[] => connections,
+		peerId: peer(999),
+	});
+	controller.attach(host as unknown as Libp2p);
+	return host;
+}
+
+function createT4Controller(
+	budget: DRPConnectionBudget,
+	options: { readonly prioritySlots: number }
+): PriorityAdmissionController {
+	const controller = createDetachedT4Controller(budget, options);
+	attachT4Controller(controller);
+	return controller;
+}
 
 function peer(index: number): PeerId {
 	const bytes = new Uint8Array(32);
@@ -89,6 +115,14 @@ function peer(index: number): PeerId {
 
 function connection(index: number): MultiaddrConnection {
 	return { remoteAddr: multiaddr(`/ip4/127.0.0.1/tcp/${45_000 + index}`) } as MultiaddrConnection;
+}
+
+function liveConnection(index: number, remotePeer: PeerId): Connection & MultiaddrConnection {
+	return {
+		id: `t4-live-${index}`,
+		remoteAddr: multiaddr(`/ip4/127.0.0.1/tcp/${46_000 + index}`),
+		remotePeer,
+	} as Connection & MultiaddrConnection;
 }
 
 function snapshot(controller: PriorityAdmissionController): T4Snapshot {
@@ -344,6 +378,180 @@ describe("D.93.50 T4 relay-spine priority admission", () => {
 		controller.stop();
 	});
 
+	test("denies detached priority authority", () => {
+		const detached = createDetachedT4Controller(
+			{ maxConnections: 4, maxParallelDials: 1, role: "node" },
+			{ prioritySlots: 1 }
+		);
+		expect(detached.createPriorityTicket, "T4_DETACHED_PRIORITY_AUTHORITY").toBeTypeOf("function");
+		expect(detached.createPriorityTicket(peer(16)), "T4_DETACHED_PRIORITY_AUTHORITY").toBeUndefined();
+		detached.stop();
+	});
+
+	test("binds priority to one exact same-peer capacity unit", () => {
+		const controller = createDetachedT4Controller(
+			{ maxConnections: 5, maxParallelDials: 1, role: "node" },
+			{ prioritySlots: 2 }
+		);
+		const connections: Connection[] = [];
+		const host = attachT4Controller(controller, connections);
+		const relayPeer = peer(19);
+		const owned = liveConnection(19, relayPeer);
+		const unrelated = liveConnection(20, relayPeer);
+		const ordinaryB = liveConnection(21, peer(21));
+		const ordinaryC = liveConnection(22, peer(22));
+		const deniedSamePeer = liveConnection(23, relayPeer);
+		const postCloseSamePeer = liveConnection(28, relayPeer);
+		const inbound = controller.connectionGater.denyInboundUpgradedConnection;
+		const outbound = controller.connectionGater.denyOutboundUpgradedConnection;
+		if (inbound === undefined || outbound === undefined) throw new Error("expected exact-unit admission gates");
+		const open = (connection: Connection): void => {
+			connections.push(connection);
+			host.dispatchEvent(new CustomEvent("connection:open", { detail: connection }));
+		};
+		const close = (connection: Connection): void => {
+			const index = connections.indexOf(connection);
+			if (index >= 0) connections.splice(index, 1);
+			host.dispatchEvent(new CustomEvent("connection:close", { detail: connection }));
+		};
+
+		expect(controller.createPriorityTicket, "T4_SAME_PEER_UNIT_BINDING").toBeTypeOf("function");
+		const priority = controller.createPriorityTicket(relayPeer);
+		if (priority === undefined) throw new Error("expected one attached priority ticket");
+		expect(outbound(relayPeer, owned), "T4_SAME_PEER_UNIT_BINDING").toBe(false);
+		expect(inbound(relayPeer, unrelated)).toBe(false);
+		open(unrelated);
+		expect(inbound(ordinaryB.remotePeer, ordinaryB)).toBe(false);
+		open(ordinaryB);
+		expect(inbound(ordinaryC.remotePeer, ordinaryC)).toBe(false);
+		open(ordinaryC);
+		const beforeTailDenial = snapshot(controller);
+		expect(beforeTailDenial).toMatchObject({ live: 3, priority: 1, prioritySlots: 2, upgrade: 1 });
+		expect(
+			beforeTailDenial.queued +
+				beforeTailDenial.selected +
+				beforeTailDenial.charged +
+				beforeTailDenial.upgrade +
+				beforeTailDenial.live,
+			"T4_SAME_PEER_UNIT_BINDING"
+		).toBeLessThan(5);
+		expect(inbound(relayPeer, deniedSamePeer), "T4_SAME_PEER_UNIT_BINDING").toBe(true);
+
+		expect(controller.bindPriorityConnection, "T4_SAME_PEER_UNIT_BINDING").toBeTypeOf("function");
+		open(owned);
+		expect(
+			controller.bindPriorityConnection(priority, relayPeer.toString(), {
+				connectionId: owned.id,
+				created: true,
+			}),
+			"T4_SAME_PEER_UNIT_BINDING"
+		).toBe(true);
+		expect(snapshot(controller)).toMatchObject({ live: 4, priority: 1, prioritySlots: 2, upgrade: 0 });
+		close(owned);
+		expect(snapshot(controller), "T4_SAME_PEER_UNIT_BINDING").toMatchObject({ live: 3, priority: 0 });
+		expect(inbound(relayPeer, postCloseSamePeer), "T4_SAME_PEER_UNIT_BINDING").toBe(true);
+		const replacement = controller.createPriorityTicket(peer(24));
+		expect(replacement, "T4_SAME_PEER_UNIT_BINDING").toBeDefined();
+		expect(snapshot(controller)).toMatchObject({ live: 3, priority: 1 });
+		priority.release();
+		expect(snapshot(controller), "T4_SAME_PEER_UNIT_BINDING").toMatchObject({ live: 3, priority: 1 });
+		priority.release();
+		expect(snapshot(controller), "T4_SAME_PEER_UNIT_BINDING").toMatchObject({ live: 3, priority: 1 });
+		expect(inbound(relayPeer, postCloseSamePeer), "T4_SAME_PEER_UNIT_BINDING").toBe(true);
+		replacement?.release();
+		expect(snapshot(controller)).toMatchObject({ live: 3, priority: 0 });
+		controller.stop();
+	});
+
+	test("rejects a priority receipt bound to the wrong connection", () => {
+		const controller = createDetachedT4Controller(
+			{ maxConnections: 4, maxParallelDials: 1, role: "node" },
+			{ prioritySlots: 1 }
+		);
+		const connections: Connection[] = [];
+		const host = attachT4Controller(controller, connections);
+		const relayPeer = peer(25);
+		const expected = liveConnection(25, relayPeer);
+		expect(controller.createPriorityTicket, "T4_WRONG_CONNECTION_BINDING").toBeTypeOf("function");
+		const priority = controller.createPriorityTicket(relayPeer);
+		if (priority === undefined) throw new Error("expected attached priority ticket");
+		const outbound = controller.connectionGater.denyOutboundUpgradedConnection;
+		if (outbound === undefined) throw new Error("expected outbound admission gate");
+		expect(outbound(relayPeer, expected)).toBe(false);
+		connections.push(expected);
+		host.dispatchEvent(new CustomEvent("connection:open", { detail: expected }));
+		expect(controller.bindPriorityConnection, "T4_WRONG_CONNECTION_BINDING").toBeTypeOf("function");
+		expect(
+			controller.bindPriorityConnection(priority, relayPeer.toString(), {
+				connectionId: "not-the-reserved-connection",
+				created: true,
+			}),
+			"T4_WRONG_CONNECTION_BINDING"
+		).toBe(false);
+		expect(snapshot(controller), "T4_WRONG_CONNECTION_BINDING").toMatchObject({ live: 1, priority: 0 });
+		const replacement = controller.createPriorityTicket(peer(29));
+		expect(replacement, "T4_WRONG_CONNECTION_BINDING").toBeDefined();
+		expect(
+			controller.bindPriorityConnection(priority, relayPeer.toString(), {
+				connectionId: expected.id,
+				created: true,
+			}),
+			"T4_WRONG_CONNECTION_BINDING"
+		).toBe(false);
+		priority.release();
+		expect(snapshot(controller), "T4_WRONG_CONNECTION_BINDING").toMatchObject({ live: 1, priority: 1 });
+		priority.release();
+		expect(snapshot(controller), "T4_WRONG_CONNECTION_BINDING").toMatchObject({ live: 1, priority: 1 });
+		replacement?.release();
+		expect(snapshot(controller)).toMatchObject({ live: 1, priority: 0 });
+		controller.stop();
+	});
+
+	test("rejects an id-less receipt when same-peer upgrades are ambiguous", () => {
+		const controller = createDetachedT4Controller(
+			{ maxConnections: 4, maxParallelDials: 1, role: "node" },
+			{ prioritySlots: 1 }
+		);
+		const connections: Connection[] = [];
+		const host = attachT4Controller(controller, connections);
+		const relayPeer = peer(26);
+		const first = liveConnection(26, relayPeer);
+		const second = liveConnection(27, relayPeer);
+		expect(controller.createPriorityTicket, "T4_AMBIGUOUS_CONNECTION_BINDING").toBeTypeOf("function");
+		const priority = controller.createPriorityTicket(relayPeer);
+		if (priority === undefined) throw new Error("expected attached priority ticket");
+		const inbound = controller.connectionGater.denyInboundUpgradedConnection;
+		const outbound = controller.connectionGater.denyOutboundUpgradedConnection;
+		if (inbound === undefined || outbound === undefined) throw new Error("expected exact-unit admission gates");
+		expect(outbound(relayPeer, first)).toBe(false);
+		expect(inbound(relayPeer, second)).toBe(false);
+		connections.push(first, second);
+		host.dispatchEvent(new CustomEvent("connection:open", { detail: first }));
+		host.dispatchEvent(new CustomEvent("connection:open", { detail: second }));
+		expect(controller.bindPriorityConnection, "T4_AMBIGUOUS_CONNECTION_BINDING").toBeTypeOf("function");
+		expect(
+			controller.bindPriorityConnection(priority, relayPeer.toString(), { created: true }),
+			"T4_AMBIGUOUS_CONNECTION_BINDING"
+		).toBe(false);
+		expect(snapshot(controller), "T4_AMBIGUOUS_CONNECTION_BINDING").toMatchObject({ live: 2, priority: 0 });
+		const replacement = controller.createPriorityTicket(peer(30));
+		expect(replacement, "T4_AMBIGUOUS_CONNECTION_BINDING").toBeDefined();
+		expect(
+			controller.bindPriorityConnection(priority, relayPeer.toString(), {
+				connectionId: first.id,
+				created: true,
+			}),
+			"T4_AMBIGUOUS_CONNECTION_BINDING"
+		).toBe(false);
+		priority.release();
+		expect(snapshot(controller), "T4_AMBIGUOUS_CONNECTION_BINDING").toMatchObject({ live: 2, priority: 1 });
+		priority.release();
+		expect(snapshot(controller), "T4_AMBIGUOUS_CONNECTION_BINDING").toMatchObject({ live: 2, priority: 1 });
+		replacement?.release();
+		expect(snapshot(controller)).toMatchObject({ live: 2, priority: 0 });
+		controller.stop();
+	});
+
 	test("lets only priority custody reclaim the newest borrowed selection", async () => {
 		const controller = createT4Controller(
 			{ maxConnections: 4, maxParallelDials: 1, role: "node" },
@@ -404,23 +612,13 @@ describe("D.93.50 T4 relay-spine priority admission", () => {
 		expect(snapshot(upgraded)).toMatchObject({ priority: 1, upgrade: 1 });
 		upgraded.stop();
 
-		const live = createT4Controller({ maxConnections: 3, maxParallelDials: 1, role: "node" }, { prioritySlots: 1 });
+		const live = createDetachedT4Controller(
+			{ maxConnections: 3, maxParallelDials: 1, role: "node" },
+			{ prioritySlots: 1 }
+		);
 		expect(live.createPriorityTicket, "T4_ACTIVE_WORK_PROTECTION_ABSENT").toBeTypeOf("function");
 		const livePeer = peer(36);
-		const liveConnection = {
-			id: "t4-live-connection",
-			remoteAddr: multiaddr("/ip4/127.0.0.1/tcp/45036"),
-			remotePeer: livePeer,
-		};
-		const secondLiveConnection = { ...liveConnection, id: "t4-live-connection-2" };
-		const host = Object.assign(new EventTarget(), {
-			getConnections: (): readonly [typeof liveConnection, typeof secondLiveConnection] => [
-				liveConnection,
-				secondLiveConnection,
-			],
-			peerId: peer(999),
-		});
-		live.attach(host as unknown as Parameters<ConnectionAdmissionController["attach"]>[0]);
+		attachT4Controller(live, [liveConnection(36, livePeer), liveConnection(37, livePeer)]);
 		expect(live.createPriorityTicket(peer(37)), "T4_ACTIVE_WORK_PROTECTION_ABSENT").toBeDefined();
 		expect(live.createPriorityTicket(peer(38))).toBeUndefined();
 		expect(snapshot(live)).toMatchObject({ live: 2, priority: 1 });
