@@ -48910,3 +48910,182 @@ or forty-five minutes for a complex packet, while streamed status shows real
 progress. A terminal result, genuine stall or the hard cap ends the run;
 `NO_VERDICT` is recorded honestly. No reviewer may weaken the verified-evidence
 or required-snapshot contracts to obtain a pass.
+
+### D.93.50.2 — T4 exact-unit priority custody correction
+
+The rejected D.93.50.1 GREEN exposed one production custody defect and one
+test-owned contradiction. This amendment corrects those two findings without
+changing T4's capacity bounds, relay authority, score semantics or public
+surface.
+
+This section supersedes only D.93.50's statement that a provisional unit is
+keyed by peer id and D.93.50.1's prospective statement that its corrective RED
+is the production GREEN's direct parent. Peer id remains score identity only;
+the exact-unit law below replaces capacity identity. This signed plan, its
+exact-three corrective RED and then the exact-four GREEN form the new direct
+lineage. Every other D.93.50/D.93.50.1 law remains normative.
+
+Priority is an annotation on one exact capacity unit. A peer id identifies the
+relay for score membership, but it is not a capacity-unit identity. A
+controller-issued priority ticket must bind to its exact authorization, then
+to the exact upgrade reservation created from that authorization, and finally
+to the exact created connection id. No other authorization, reservation or
+connection inherits priority merely because it has the same peer id. In
+particular, a second inbound, outbound or application connection to the same
+relay remains ordinary and must satisfy the ordinary committed-tail law. When
+the owned connection closes or the ticket is released, another same-peer
+connection remains ordinary and cannot occupy the released priority slot.
+Peer-level active-reservation membership may continue to drive the bounded
+GossipSub score only while it is correlated with a genuine controller-issued
+reservation lifecycle; it cannot reclassify a capacity unit.
+
+Priority authority exists only during an attached controller lifetime.
+`createPriorityTicket` must return `undefined` before `attach`, after `stop`,
+and after failed startup cleanup. The signed RED's direct-controller fixtures
+currently request priority while detached, contradicting D.93.50. They must
+attach a minimal genuine `EventTarget` host before positive priority issuance,
+while adding an explicit detached-negative assertion. A fixture may not make
+attachment optional, fake a priority result or bypass the real controller.
+Attachment is exactly once per controller: rows without a host attach one empty
+host, while the existing live-census row reuses its current `peer(999)` host
+instead of attaching a second fixture.
+
+The exact connection binding remains private to `@ts-drp/network`. The node's
+existing private relay connect closure may bind a controller-issued ticket to
+the exact ownership receipt returned by the genuine dial. Binding a reused
+connection to capacity priority, a mismatched ticket or peer, a missing/unknown
+connection id, a second connection, or a ticket after release fails closed. A
+genuine reused-live receipt may instead bind the exact existing connection id
+to a score-only lifecycle: its ticket has `capacityOwned: false`, never enters
+the priority census, never frees the ordinary tail and never owns connection
+close, but may authorize active-relay score membership after the genuine
+reservation succeeds. Failure before binding releases the provisional unit;
+failure after a newly created connection is bound closes only that exact owned
+connection. The existing public `safeDial` path and legacy relay-client
+compatibility remain ordinary and cannot mint capacity or score authority
+because they possess no controller-issued ticket/receipt correlation.
+The exact connection-id anchor comes from the private dial's returned ownership
+receipt, not peer matching inside `reconcileOpen`. An ambiguous concurrent
+same-peer upgrade cannot be assigned by search or arrival order and fails the
+binding closed.
+
+This amendment is the sole child of the signed D.93.50.1 corrective RED
+`de063c54c9d25a2bef7fb4d8fed9817536a390b1`. Its signed tests-only corrective
+RED is the amendment's sole child and changes exactly:
+
+- `packages/network/tests/relay-spine-t4-red.test.ts`;
+- `packages/network-spike/tests/relay-spine-t4.test.ts`; and
+- `packages/relay-policy/tests/legacy-relay-policy.test.ts` only to assert that
+  the normalized first-observation timer is absent after ordinary success,
+  failure, abort and timeout exits.
+
+The RED preserves every existing T4 row, attaches the direct-controller
+positives, and adds causal assertions for detached denial and exact same-peer
+unit custody. The same-peer row installs one genuine priority-owned connection
+and one pre-existing unrelated ordinary connection to the same peer, fills the
+remaining ordinary tail with other peers, and proves an additional same-peer
+upgrade cannot consume reserved capacity. It closes the owned connection before
+ticket release and proves the pre-existing unrelated connection never becomes
+priority. It also rejects a wrong connection-id binding and an ID-less or
+ambiguous bind while two same-peer upgrades are outstanding. The deterministic
+5,000-replica campaign attaches its real production controller before issuing
+priority. Exact collected counts and runtimes are measured rather than frozen
+in this text.
+
+The same-peer committed-tail setup uses at least two configured priority slots
+with exactly one occupied priority unit. It fills the ordinary committed census
+to `maxConnections - prioritySlots` while total occupancy remains strictly less
+than `maxConnections`, then attempts the additional same-peer upgrade. The hard
+T1 ceiling therefore cannot explain rejection: `T4_SAME_PEER_UNIT_BINDING`
+fails on the peer-keyed recovery candidate and passes only when the ordinary T4
+tail denies that unit. The other new semantic classes are
+`T4_DETACHED_PRIORITY_AUTHORITY` for pre-attach issuance and
+`T4_WRONG_CONNECTION_BINDING` for a mismatched receipt/id, plus
+`T4_AMBIGUOUS_CONNECTION_BINDING` for missing identity or concurrent same-peer
+selection by search/arrival order. These classes name security behavior, not
+incidental diagnostic text or precedence.
+
+RED evidence has two mandatory lanes so absence cannot pass for causality. The
+signed `de063c54c9d25a2bef7fb4d8fed9817536a390b1` tree remains RED for the
+complete missing T4 production surface. Separately, a disposable clean checkout
+of the proposed corrective-RED test tree applies the exact four-path production
+patch derived controller-locally from protected recovery ref
+`refs/codex/recovery/d9350-t4-green-pre-unit-binding-correction`, commit
+`b70f43e9d578fcb7e12dd0ab193facad361e4dbb`, sole parent
+`de063c54c9d25a2bef7fb4d8fed9817536a390b1` and
+tree `0fbe44259b6d50546670cf7f27e9a66917e34f46`. Before use, the release
+controller requires those exact objects, exact four modified production paths
+and their exact `100644 blob` identities/content SHA-256 values:
+
+- `packages/types/src/network.ts` — `81654d65dcd5619b0c1ae08b0f88544a9e1337d1` /
+  `5460264c39a5534a44116fcbee3130be3a7d460f5fbd3e05bded25cb51ecca04`;
+- `packages/network/src/connection-budget.ts` — `888af8a08de1b6989ed9e622ca6c894c95fe37d2` /
+  `91169eca69231e1d245af1a12f3e9fa8cf59835bcd9da814ef52918bd81f1199`;
+- `packages/network/src/node.ts` — `fcc2e76e61374d3cd70b62e1709b4d222a3c14e3` /
+  `c756f0ded156ef281207ed52a76ab850eb4a0c3d1d153ee4d48564e44b2e5ca3`;
+  and
+- `packages/relay-policy/src/libp2p-client.ts` — `89c8212d4d1d7c216eb64aa604cafa2aa397b048` /
+  `d4df6bab99faf2fb4103be225f0626eddd31b124ec54eaf79197c14e70e684ce`.
+
+It materializes those four blobs directly from the recovery commit into the
+disposable test tree; no rendered diff or patch digest is authority.
+This intentionally local pre-sign causality lane is not claimed to be
+reconstructible from a remote ordinary clone: its object/materialized-byte
+inventory, command/output log and result are sealed in the RED review packet
+before the tests are signed. In that lane every pre-existing T4 assertion must
+pass, and all four named new assertions must fail with exactly their semantic
+classes. The same-peer row must observe closure of the
+owned connection before ticket release and prove the unrelated live connection
+does not become priority or cross the ordinary committed tail during that
+interval. The close event itself must restore the free priority slot; subsequent
+ticket release is idempotent. Neither operation may change the unrelated
+connection or grant its peer-level reconnect lease ordinary-tail exemption. The
+disposable candidate is never signed, pushed or treated as authority.
+
+The reviewed candidate test tree is a signing input, not advisory evidence.
+Before signing, the controller records the exact candidate tree plus all three
+test paths' Git blob and raw-content SHA-256 identities. The real corrective RED
+must have the signed plan as sole parent, exactly those three changed paths and
+exactly that reviewed tree/blob/content inventory. After signing and before
+push, the controller re-runs both lanes from the signed RED commit and requires
+the same semantic result. Any edit, amend or different tree invalidates the
+earlier evidence and requires a fresh bounded review/run; a detached log cannot
+bless different test bytes.
+
+The production GREEN is the corrective RED's sole child and retains exactly
+D.93.50's four production paths:
+
+- `packages/types/src/network.ts`;
+- `packages/network/src/connection-budget.ts`;
+- `packages/network/src/node.ts`; and
+- `packages/relay-policy/src/libp2p-client.ts`.
+
+Only the controller's attached-lifetime priority guard, exact
+authorization/reservation/connection binding, private node handoff and
+relay-client first-observation timeout normalization may differ from the
+rejected recovery packet. The normalization removes the exact-literal
+`identifyTimeoutMs === 1` production branch and applies one configured-timeout
+race uniformly; it may not change active/non-active classification, custody or
+cleanup semantics. The corrected
+`packages/relay-policy/tests/legacy-relay-policy.test.ts` rows are the witness,
+and every ordinary success, failure, abort and timeout path must assert that its
+observation timer is cleared. No peer-wide priority inference, test hook,
+alternate
+controller, caller-supplied priority, workflow, dependency, lockfile, room,
+zone, ephemeral or application change is authorized. The public relay-client
+compatibility arm is preservation-only:
+the production T4 path must use the exact ownership receipt, while a legacy
+peer-wide cleanup path has no priority authority and is outside this
+correction.
+
+Acceptance re-runs the focused T4 owners, complete network and relay-policy
+suites, controlled topology campaign, browser configuration, v3-room and zone
+preservation, affected typecheck/build/package/static gates and refactor-clean
+audit. Reviews use the bounded thirty-minute window, extendable to forty-five
+minutes only while a complex reviewer is visibly progressing. A substantive
+exact-unit or detached-authority finding blocks; timeout or `NO_VERDICT` is
+reported honestly. The closure ledger records the durable location and hashes
+of the sealed controller-local RED object inventory and command/output packet.
+After signed GREEN, required remote jobs and the concise T4 closure ledger, work
+returns immediately to the existing P6 recovery and two-client Discord/MMORPG
+golden path.
