@@ -48398,3 +48398,86 @@ honestly and is not approval; every reproduced substantive P0/P1 is fixed or
 dismissed with source evidence before signing. D.93.49 closes only T3 bounded
 peer selection and its global discovery deployment gate. It does not claim T4,
 E3, AOI, product scale, full P6 or completion of the broader plan.
+
+### D.93.49.1 — T3 reviewer-correction closure
+
+The first D.93.49 GREEN review reproduced one common ownership defect rather
+than a new T3 design: admission was wrapped after dependency construction while
+some native consumers had already retained the original connection manager.
+The same review showed that idle selection, retry, relay-hop, reconnect and
+address-policy evidence need to be causal at their consumer boundaries. This
+amendment preserves the D.93.49 capacity and deployment laws while correcting
+those concrete seams; it adds no second selector, public admission surface or
+new product claim.
+
+One controller remains the only capacity owner. Idle selected evidence expires
+under the existing reservation lifetime; explicit work uses the already-frozen
+explicit headroom and cannot displace selected, charged, upgrade or live work.
+At full occupancy the frozen browser-ceiling law still denies the seventh
+explicit dial. Overlapping explicit calls receive distinct one-use custody
+tokens against the same identity while sharing one reference-counted capacity
+unit, so a controlled retry can proceed while a raw unaffiliated call still
+fails before queue insertion; the unit retires only with its final token.
+Circuit addresses reserve their ordered relay hop and terminal destination,
+except that an already-live or bounded relay-lifecycle hop consumes no second
+unit. Recently-live reconnect evidence is time-bounded and capacity-bounded
+rather than a permanent peer authorization.
+
+The DRP-owned `createHost` first constructs the host unstarted, wraps the
+concrete connection manager and peer-store consumption method in place, starts
+the host exactly once, and only then resolves the started/listening host to the
+injected factory. Thus the frozen factory contract still permits immediate
+connectivity before that factory returns. Start failure retains the existing
+stop-and-cleanup contract. Consequently native reconnect, peer-store consumers
+and every configured or additive factory consume those same in-place methods
+even when they retained the concrete objects during construction. The final
+peer gate remains defense in depth, not a parallel capacity authority. A
+standard discovery provider is observed through the object it advertises
+rather than assuming that provider and emitter are the same instance.
+
+Signed peer-record selection is caused only at the installed concrete peer
+store's in-place genuine record-consumption method boundary: after that existing
+asynchronous verifier resolves affirmatively, the wrapper records selection
+synchronously before resolving the same call. The selector performs no second
+verification and does not wait again after observing success. A generic
+`peer:update`, an envelope-shaped raw merge or a caller-supplied certified flag
+cannot mint selection. The peer store's monotonic signed-record sequence check
+remains replay authority;
+transient source and reconnect evidence is bounded and expires, and no
+lifetime-population replay cache is introduced. This paragraph supersedes the
+D.93.49 sentence that allowed a genuine envelope-changing `peer:update` itself
+to mint selection.
+
+Configured address policy remains active when a host policy customizes only
+discovery or peer exchange. Only an explicit injected dial gate replaces it.
+The local relay control fixture therefore declares its loopback/insecure-WS
+allowance in the configuration owned by that fixture instead of relying on a
+production bypass.
+
+This signed plan amendment is the sole child of the signed D.93.49 RED. Its
+tests-only corrective RED is the sole child of this amendment and may modify
+only `packages/network/tests/peer-selector-t3-red.test.ts`. That existing owner
+adds causal rows for selection expiry and preservation of the full-occupancy
+browser ceiling; overlapping and retry tokens sharing one capacity unit;
+ordered relay-hop plus destination occupancy including the live/leased-hop
+exception; bounded reconnect; genuine signed-record method completion versus a
+generic update, raw merge and caller-supplied certification; monotonic stale
+record rejection without an unbounded cache; separate discovery providers; a
+construction-retained native/extension consumers invoking the in-place manager
+and peer store; internal unstarted construction followed by a single start,
+started-host factory resolution and start-failure cleanup; and
+partial-host-policy address enforcement. It makes the address allowance
+explicit for every local loopback/insecure-WS fixture in that owner, including
+relay, keep-alive and extension/live-peer cases. No new test owner or phase
+count is introduced.
+
+In addition to the peer-update authority supersession above, this amendment
+supersedes D.93.49's prospective statement that GREEN is the original RED's sole
+child. The corrected GREEN is the sole child of this corrective RED and retains
+the exact seven D.93.49 production paths already authorized. It may change no
+test, workflow, protocol, lockfile or unrelated owner. The ordinary focused,
+full network, routing, browser, build, type and static gates rerun on frozen
+bytes.
+The same bounded Kimi, Grok, Codex and Opus policy applies: reviewers may run
+beyond twelve minutes while their process or streamed evidence is progressing;
+only a reproduced substantive P0/P1 blocks signing.
