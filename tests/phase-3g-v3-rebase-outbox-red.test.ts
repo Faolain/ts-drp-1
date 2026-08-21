@@ -161,6 +161,16 @@ describe("Phase 3g authenticated-plane rebase outbox RED", () => {
 		});
 		expect(noCurrentTarget.targetDigest).toBeUndefined();
 		expect(noCurrentTarget.networkPublishedDigests).toEqual([]);
+		const receivedWithoutBootstrap = await runSharedPlaneScenario({
+			omitTargetBootstrap: true,
+			targetReceivedWithoutBootstrap: true,
+		});
+		expect(receivedWithoutBootstrap.recovery).toEqual({
+			detail: "v3 recovery issued record chain is empty",
+			kind: "issuance-rejected",
+			ok: false,
+		});
+		expect(receivedWithoutBootstrap.networkPublishedDigests).toEqual([]);
 	});
 
 	it("rejects mixed source authorization bytes and a target-capability substitution", async () => {
@@ -244,6 +254,26 @@ describe("Phase 3g authenticated-plane rebase outbox RED", () => {
 			},
 		});
 		expect(result.completion).toBeUndefined();
+		expect(result.outbox.find(({ digest }) => digest === result.sourceDigest)?.publishState).toBe("pending");
+	});
+
+	it("skips a directly quarantined current row without blocking rebase or publication", async () => {
+		const result = await runSharedPlaneScenario({ targetDirectQuarantinedRow: true });
+		expect(result.recovery).toMatchObject({ ok: true });
+		expect(result.rebaseOutbox).toMatchObject({
+			kind: "displaced",
+			ok: true,
+			source: {
+				intents: [{ operation: { action: "add", value: 1 } }],
+				vertexDigest: result.sourceDigest,
+			},
+		});
+		expect(result.publication).toEqual({ kind: "published", ok: true });
+		expect(result.publicationAfterQuarantine).toEqual({ kind: "published", ok: true });
+		expect(result.networkPublishedDigests).toEqual([result.targetDigest]);
+		expect(result.outbox.find(({ digest }) => digest === result.targetReplacementDigest)?.publishState).toBe(
+			"published"
+		);
 		expect(result.outbox.find(({ digest }) => digest === result.sourceDigest)?.publishState).toBe("pending");
 	});
 });

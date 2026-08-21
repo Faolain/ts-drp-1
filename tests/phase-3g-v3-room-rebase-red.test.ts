@@ -974,6 +974,14 @@ describe("Phase 3g room-owned rebase scheduling RED", () => {
 			Object.freeze({
 				application: Object.freeze({
 					...application(),
+					transformDisplacedOperation: () =>
+						Object.freeze({ action: "message", clientOperationId: "source-identity", text: "changed-action" }),
+				}),
+				operation: Object.freeze({ action: "transform-me", clientOperationId: "source-identity", value: 1 }),
+			}),
+			Object.freeze({
+				application: Object.freeze({
+					...application(),
 					displacementPolicies: Object.freeze({
 						...(Reflect.get(application(), "displacementPolicies") as Record<string, unknown>),
 						"transform-me": "transform",

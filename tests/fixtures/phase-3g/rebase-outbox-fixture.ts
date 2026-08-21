@@ -81,7 +81,9 @@ export interface SharedPlaneScenarioOptions {
 	readonly syntheticCurrentQuarantinedRowCount?: number;
 	readonly syntheticDisplacedRowCount?: number;
 	readonly targetAuthorityMutation?: "authorization-bytes" | "source-capability";
+	readonly targetDirectQuarantinedRow?: boolean;
 	readonly targetQuarantinedMatchingReplacement?: boolean;
+	readonly targetReceivedWithoutBootstrap?: boolean;
 	readonly targetReplacementAfterRecoveryBeforeRead?: boolean;
 	readonly twoSourceRows?: boolean;
 }
@@ -96,6 +98,7 @@ export interface SharedPlaneScenarioResult {
 		readonly publishState: "pending" | "published";
 	}>[];
 	readonly publication?: unknown;
+	readonly publicationAfterQuarantine?: unknown;
 	readonly rebaseOutbox?: unknown;
 	readonly rebaseOutboxes: readonly unknown[];
 	readonly recovery: Readonly<Record<string, unknown>>;
@@ -549,6 +552,34 @@ export async function runSharedPlaneScenario(
 		}
 		let targetReplacement: DurableIssueCommit | undefined;
 		targetJournal = await installJournal(target);
+		if (options.targetReceivedWithoutBootstrap === true) {
+			const received = commitFor(target, 10_000, Object.freeze({ action: "add", value: 99 }), 3);
+			const appended = await targetJournal.appendAccepted({
+				detachedSignature: received.envelope.signature,
+				exactCanonicalPreimageBytes: received.envelope.canonicalPreimageBytes,
+				scope: Object.freeze({ anchorDigest: target.anchorDigest, epoch: 0, objectId }),
+				sourceKind: "received",
+				vertexDigest: lowerHex(received.envelope.digest),
+			});
+			if (!appended.ok) throw new TypeError("Phase 3g target received journal append failed");
+		}
+		if (options.targetDirectQuarantinedRow === true) {
+			targetReplacement = await targetStore.transactIssue(scope, (authorSequence) =>
+				Promise.resolve(
+					commitFor(
+						target,
+						authorSequence,
+						batchOperation(
+							Object.freeze([
+								Object.freeze({ logicalTime: 1, operation: Object.freeze({ action: "add", value: 1 }) }),
+								Object.freeze({ logicalTime: 3, operation: Object.freeze({ action: "add", value: -2 }) }),
+							])
+						),
+						3
+					)
+				)
+			);
+		}
 		if (options.targetQuarantinedMatchingReplacement === true) {
 			const quarantineSeed = commitFor(
 				target,
@@ -627,6 +658,7 @@ export async function runSharedPlaneScenario(
 		const rebaseOutboxes: unknown[] = [];
 		let completion: unknown;
 		let publication: unknown;
+		let publicationAfterQuarantine: unknown;
 		let reopenRecovery: Readonly<Record<string, unknown>> | undefined;
 		const targetPublished: string[] = [];
 		if (Reflect.get(recovery, "ok") === true) {
@@ -721,6 +753,9 @@ export async function runSharedPlaneScenario(
 					rebaseOutboxes.push(next);
 				}
 				publication = await activeHandle.publishPending();
+				if (options.targetDirectQuarantinedRow === true) {
+					publicationAfterQuarantine = await activeHandle.publishPending();
+				}
 			} finally {
 				if (activeHandleNeedsDeactivate) activeHandle.deactivate();
 			}
@@ -768,6 +803,7 @@ export async function runSharedPlaneScenario(
 				networkPublishedDigests: Object.freeze(targetPublished),
 				outbox: await outboxSnapshot(snapshotStore, scope),
 				publication,
+				publicationAfterQuarantine,
 				rebaseOutbox,
 				rebaseOutboxes: Object.freeze(rebaseOutboxes),
 				recovery,
