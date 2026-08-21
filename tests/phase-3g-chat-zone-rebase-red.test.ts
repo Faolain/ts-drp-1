@@ -155,7 +155,10 @@ describe("Phase 3g chat and zone stable rebase identity RED", () => {
 			accepted(first, { author, digestByte: 0x12, sequence: 2 }),
 			accepted(second, { author, digestByte: 0x13, sequence: 3 }),
 		]);
-		expect(Reflect.get(projection, "blocks")).toEqual([second, first]);
+		expect(Reflect.get(projection, "blocks")).toEqual([
+			{ id: second.id, kind: second.kind, x: second.x, y: second.y },
+			{ id: first.id, kind: first.kind, x: first.x, y: first.y },
+		]);
 		expect(Reflect.get(projection, "acceptedDigests")).toEqual(["11".repeat(32), "12".repeat(32), "13".repeat(32)]);
 	});
 });
