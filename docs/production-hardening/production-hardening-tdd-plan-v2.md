@@ -50071,3 +50071,49 @@ closed. The next product slice is Phase 3g rebase outbox, with the same chat/zon
 golden path proving that offline and reconnecting authors survive an epoch cut
 without duplication or author substitution. No broader Phase 3 or product
 completion claim is authorized.
+
+### D.93.51.6 — Phase 3f-c closure ledger
+
+Phase 3f-c closed as shared-room application micro-batching, not as completion
+of Phase 3 or of the product. The linear Good-Faolain-signed chain is plan
+`c7f558c7115dcb4714dbdb275a00e4dd80c06e13`, tests-only RED
+`6d17805f23baa900a5035adbe8e7f8b11a17783a`, and four-owner GREEN
+`ba375032859b1c742ba1c74be88b14418be4d625`, tree
+`14e5683da91b252f2e678ff77e98e4a6f743da88`. Each commit has one parent, was
+signed by Faolain key `55E22F154FBAF8C84F378304761B99CEA81C6289`,
+and was pushed to the tracked branch.
+
+The durable result is one room-owned microtask scheduler feeding one node-owned
+application-batch admission path. Eligible chat messages and zone block
+placements coalesce without acquiring separate authors, sequences, signatures
+or dependency lists; controls remain singleton barriers. Product projection
+expands the one authenticated vertex into ordered child operations without
+inventing child vertices. Live ingress and recovery share the structural parser,
+and malformed recovered batches plus their dependants are quarantined from both
+projection and later egress. Quarantine custody uses captured intrinsics so
+post-import prototype mutation cannot reopen publication.
+
+On the final GREEN bytes the focused six-file batching and preservation roster
+passed `30/30` in 4.27 seconds; the broader twelve-file relevant roster passed
+`54/54` in 22.94 seconds. The five protocol semantic suites passed `87/87`, and
+the controlled operation and work arms passed `28/28` and `12/12`. The real chat
+browser control passed `5/5`; the genuine zone browser control passed `1/1`.
+Node, room, chat and grid type/build gates, package build, ESLint, Prettier and
+diff checks passed. The broad node test typecheck retains only the unrelated
+pre-existing `compact-history-scale-1i-b.ts` diagnostics; the dedicated node and
+Phase 3f typechecks are green. Review and command artifacts remain under
+`.logs/phase3f-c-*`.
+
+Final exact-byte reviews returned `PASS` from Grok, Codex, Kimi and Opus with no
+remaining P0, P1 or P2. The additional one-off Fable/high attempt was rejected
+by the provider's Fable usage limit before emitting review content and is
+recorded as `NO_VERDICT`, not approval or a hidden finding. Earlier substantive
+review findings—outer/first-child logical-time binding, exact product operation
+shape, recovery-to-egress quarantine custody and captured `Set` intrinsics—were
+fixed and rerun before the GREEN was signed.
+
+The next checkpoint is Phase 3g's rebase outbox. Its preservation control keeps
+the same two-client chat and zone paths while proving that operations displaced
+by an epoch cut are retried, transformed, expired or held for review without
+duplication or author substitution. This ledger makes no broader Phase 3,
+production-hardening or product-completion claim.
