@@ -46,6 +46,7 @@ export type SourceOperationProfile =
 	| "mixed-control-batch"
 	| "nested-batch"
 	| "over-limit-batch"
+	| "structural"
 	| "singleton";
 
 interface PreparedPlane {
@@ -77,6 +78,7 @@ export interface SharedPlaneScenarioOptions {
 		| "target-capability";
 	readonly sourceCreatorSignatureCorrupt?: boolean;
 	readonly sourceOperationProfile?: SourceOperationProfile;
+	readonly syntheticDisplacedRowCount?: number;
 	readonly targetAuthorityMutation?: "authorization-bytes" | "source-capability";
 	readonly targetReplacementAfterRecoveryBeforeRead?: boolean;
 	readonly twoSourceRows?: boolean;
@@ -221,14 +223,15 @@ function commitFor(
 	plane: PreparedPlane,
 	authorSequence: number,
 	operation: Readonly<Record<string, unknown>>,
-	logicalTime = authorSequence * 2 + 1
+	logicalTime = authorSequence * 2 + 1,
+	dependencies: readonly string[] = [plane.anchorDigest]
 ): DurableIssueCommit {
 	const scope = Object.freeze({ author: plane.author, objectId: plane.objectId });
 	const canonicalPreimageBytes = encodeCanonical({
 		anchor: plane.anchorDigest,
 		author: plane.author,
 		authorSequence,
-		dependencies: [plane.anchorDigest],
+		dependencies,
 		epoch: 0,
 		kind: "drp-vertex",
 		logicalTime,
@@ -262,6 +265,14 @@ function sourceOperations(profile: SourceOperationProfile): readonly Readonly<{
 			}),
 		]);
 	}
+	if (profile === "structural") {
+		return Object.freeze([
+			Object.freeze({
+				logicalTime: 3,
+				operation: Object.freeze({ action: "causalJoin" }),
+			}),
+		]);
+	}
 	if (profile === "batch-2" || profile === "batch-16") return maximalEntries("counter", profile === "batch-2" ? 2 : 16);
 	const entries = [...maximalEntries("counter", profile === "over-limit-batch" ? 17 : 2)];
 	if (profile === "malformed-batch") {
@@ -291,7 +302,8 @@ function isHostileProfile(profile: SourceOperationProfile): boolean {
 		profile === "malformed-batch" ||
 		profile === "mixed-control-batch" ||
 		profile === "nested-batch" ||
-		profile === "over-limit-batch"
+		profile === "over-limit-batch" ||
+		profile === "structural"
 	);
 }
 
@@ -417,9 +429,22 @@ export async function runSharedPlaneScenario(
 		let sourceCommit: DurableIssueCommit;
 		const sourceCommits: DurableIssueCommit[] = [];
 		if (isHostileProfile(profile)) {
-			const hostile = batchOperation(operations);
+			const hostile =
+				profile === "structural"
+					? (operations[0]?.operation ?? Object.freeze({ action: "causalJoin" }))
+					: batchOperation(operations);
+			const bootstrap = await sourceStore.readIssued(scope, 0);
+			if (bootstrap === null) throw new TypeError("Phase 3g source bootstrap row is unavailable");
 			sourceCommit = await sourceStore.transactIssue(scope, (authorSequence) =>
-				Promise.resolve(commitFor(source, authorSequence, hostile, operations[0]?.logicalTime ?? 3))
+				Promise.resolve(
+					commitFor(
+						source,
+						authorSequence,
+						hostile,
+						operations[0]?.logicalTime ?? 3,
+						profile === "structural" ? [bytesHex(bootstrap.envelope.digest)] : undefined
+					)
+				)
 			);
 			sourceIssue = Object.freeze({ kind: "hostile-stored" as const, ok: true as const });
 		} else {
@@ -461,6 +486,53 @@ export async function runSharedPlaneScenario(
 				: await targetStore.transactIssue(scope, (authorSequence) =>
 						Promise.resolve(commitFor(target, authorSequence, Object.freeze({ action: "add", value: 0 })))
 					);
+		let recoveryIssuanceStore: DurableIssuanceStore = targetStore;
+		if (options.syntheticDisplacedRowCount !== undefined && targetCommit !== undefined) {
+			const requested = options.syntheticDisplacedRowCount;
+			if (!Number.isSafeInteger(requested) || requested < targetCommit.authorSequence) {
+				throw new TypeError("Phase 3g synthetic displaced row count is invalid");
+			}
+			const originalRows: DurableIssuanceOutboxRecord[] = [];
+			let cursor: readonly [string, string, number] | undefined;
+			for (;;) {
+				const page = await targetStore.readOutboxPage(
+					cursor === undefined ? { limit: 128, scope } : { afterKey: cursor, limit: 128, scope }
+				);
+				if (page.length === 0) break;
+				originalRows.push(...page);
+				const last = page.at(-1);
+				if (last === undefined) break;
+				cursor = [scope.objectId, scope.author, last.commit.authorSequence];
+			}
+			const syntheticRows: DurableIssuanceOutboxRecord[] = [];
+			const syntheticBySequence = new Map<number, DurableIssueCommit>();
+			for (let authorSequence = targetCommit.authorSequence + 1; authorSequence <= requested; authorSequence += 1) {
+				const commit = commitFor(
+					source,
+					authorSequence,
+					Object.freeze({ action: "add", value: authorSequence }),
+					authorSequence * 2 + 1
+				);
+				syntheticBySequence.set(authorSequence, commit);
+				syntheticRows.push(Object.freeze({ commit, publishState: "pending" as const }));
+			}
+			const rows = Object.freeze([...originalRows, ...syntheticRows]);
+			recoveryIssuanceStore = Object.freeze({
+				close: () => Promise.resolve(),
+				compareAndMarkOutboxPublished: (input) => targetStore.compareAndMarkOutboxPublished(input),
+				readIssued: (selectedScope, authorSequence) =>
+					Promise.resolve(
+						syntheticBySequence.get(authorSequence) ?? targetStore.readIssued(selectedScope, authorSequence)
+					),
+				readLineage: () => Promise.resolve(Object.freeze({ exhausted: false, next: requested + 1 })),
+				readOutboxPage: (input = {}) => {
+					const after = input.afterKey?.[2] ?? -1;
+					const limit = input.limit ?? 64;
+					return Promise.resolve(rows.filter(({ commit }) => commit.authorSequence > after).slice(0, limit));
+				},
+				transactIssue: (selectedScope, buildAndSign) => targetStore.transactIssue(selectedScope, buildAndSign),
+			});
+		}
 		let targetReplacement: DurableIssueCommit | undefined;
 		targetJournal = await installJournal(target);
 		let selectedSourcePlane = source;
@@ -501,7 +573,7 @@ export async function runSharedPlaneScenario(
 					}),
 			exactCanonicalAuthorAuthorizationBytes: targetAuthorization,
 			issuanceScope: scope,
-			issuanceStore: targetStore,
+			issuanceStore: recoveryIssuanceStore,
 			liveJournalStore: targetJournal,
 		} as never)) as unknown as Readonly<Record<string, unknown>>;
 		let rebaseOutbox: unknown;

@@ -8,19 +8,26 @@ const probe = vi.hoisted(() => ({
 	bootstrapIssues: 0,
 	completionOutcomes: [] as unknown[],
 	completedSources: [] as unknown[],
+	events: [] as string[],
 	issuanceNames: [] as string[],
 	issueInputs: [] as Readonly<Record<string, unknown>>[],
 	issueOutcomes: [] as Readonly<Record<string, unknown>>[],
 	journalInstalled: false,
 	journalNames: [] as string[],
+	nextCapabilityId: 0,
+	readinessOutcome: undefined as unknown,
 	prepareAnchors: [] as string[],
 	publicationOutcomes: [] as Readonly<Record<string, unknown>>[],
 	publishCalls: 0,
+	rebaseGate: undefined as Promise<void> | undefined,
 	rebasePages: [] as unknown[],
 	rebaseReads: 0,
 	recoveredVertices: [] as Readonly<Record<string, unknown>>[],
+	recoveryOutcomes: [] as unknown[],
 	recoveryInputs: [] as Readonly<Record<string, unknown>>[],
+	consumedCapabilityIds: [] as number[],
 	signerCalls: 0,
+	targetBootstrapCommitted: false,
 	trustNames: [] as string[],
 	trustStores: [] as Readonly<{ readonly anchor: string; readonly store: object }>[],
 }));
@@ -58,7 +65,7 @@ vi.mock("../packages/storage-browser/dist/src/issuance.js", async (importOrigina
 			close: () => Promise.resolve(),
 			compareAndMarkOutboxPublished: () => Promise.resolve(),
 			readIssued: () => Promise.resolve(null),
-			readLineage: () => Promise.resolve({ exhausted: false, next: 5 }),
+			readLineage: () => Promise.resolve({ exhausted: false, next: probe.targetBootstrapCommitted ? 1 : 0 }),
 			readOutboxPage: () => Promise.resolve([]),
 			transactIssue: () => Promise.reject(new Error("controlled issuer owns bootstrap transaction")),
 		});
@@ -80,9 +87,32 @@ vi.mock("../packages/storage-browser/dist/src/live-journal.js", async (importOri
 			readPage: () => Promise.resolve({ nextSequence: null, ok: true, rows: [] }),
 			readiness: () =>
 				Promise.resolve(
-					probe.journalInstalled
-						? { ok: true, ready: true, rowCount: 1, scope: {}, snapshot: {} }
-						: { kind: "not-installed", ok: true, ready: false }
+					probe.readinessOutcome ??
+						(probe.journalInstalled
+							? {
+									ok: true,
+									ready: true,
+									rowCount: 1,
+									scope: {
+										anchorDigest: "b".repeat(64),
+										epoch: 0,
+										objectId: `creator:${"d".repeat(32)}`,
+									},
+									snapshot: {
+										genesisDigest: "1".repeat(64),
+										highWatermark: 0,
+										kind: "v3-live-journal-snapshot-token-1",
+										orderedRowDigest: "2".repeat(64),
+										parametersDigest: "3".repeat(64),
+										scope: {
+											anchorDigest: "b".repeat(64),
+											epoch: 0,
+											objectId: `creator:${"d".repeat(32)}`,
+										},
+										snapshotDigest: "4".repeat(64),
+									},
+								}
+							: { kind: "not-installed", ok: true, ready: false })
 				),
 		});
 	},
@@ -93,7 +123,7 @@ vi.mock("../packages/protocol-v3/dist/src/public.js", async (importOriginal) => 
 	createAdmissionBoundTransactionalVertexIssuer: () => ({
 		issue: () => {
 			probe.bootstrapIssues += 1;
-			probe.journalInstalled = true;
+			probe.targetBootstrapCommitted = true;
 			return Promise.resolve({});
 		},
 	}),
@@ -102,20 +132,50 @@ vi.mock("../packages/protocol-v3/dist/src/public.js", async (importOriginal) => 
 
 vi.mock("../packages/node/dist/src/v3-live.js", async (importOriginal) => ({
 	...(await importOriginal()),
-	prepareV3LiveGeneration: (input: { pinnedGenesisAnchorDigest: string }) =>
-		Promise.resolve({
-			capability: Object.freeze({ anchor: input.pinnedGenesisAnchorDigest }),
+	prepareV3LiveGeneration: (input: { pinnedGenesisAnchorDigest: string }) => {
+		probe.nextCapabilityId += 1;
+		return Promise.resolve({
+			capability: Object.freeze({ anchor: input.pinnedGenesisAnchorDigest, id: probe.nextCapabilityId }),
 			descriptor: { anchorDigest: input.pinnedGenesisAnchorDigest, blueprintDigest: "b".repeat(64) },
 			ok: true,
-		}),
+		});
+	},
 	recoverV3LiveReplica: (input: Readonly<Record<string, unknown>>) => {
 		probe.recoveryInputs.push(input);
+		const targetCapability = Reflect.get(input, "capability");
+		const displacedSource = Reflect.get(input, "displacedSource");
+		const sourceCapability =
+			typeof displacedSource === "object" && displacedSource !== null
+				? Reflect.get(displacedSource, "capability")
+				: undefined;
+		for (const capability of [targetCapability, sourceCapability]) {
+			const id = typeof capability === "object" && capability !== null ? Reflect.get(capability, "id") : undefined;
+			if (!Number.isSafeInteger(id) || probe.consumedCapabilityIds.includes(id as number)) {
+				return Promise.resolve({
+					detail: "v3 recovery capability is unavailable",
+					kind: "capability-consumed",
+					ok: false,
+				});
+			}
+			probe.consumedCapabilityIds.push(id as number);
+		}
+		probe.journalInstalled = true;
+		const selected = probe.recoveryOutcomes.shift();
+		if (selected !== undefined) return Promise.resolve(selected);
+		if (!probe.targetBootstrapCommitted) {
+			return Promise.resolve({
+				detail: "v3 recovery issued record chain is empty",
+				kind: "issuance-rejected",
+				ok: false,
+			});
+		}
 		return Promise.resolve({ capability: {}, descriptor: { recoveredVertices: probe.recoveredVertices }, ok: true });
 	},
 	activateV3LivePlane: () => ({
 		handle: {
 			completeRebaseSource: (input: unknown) => {
 				probe.completedSources.push(input);
+				probe.events.push(`complete:${String(Reflect.get(input as object, "authorSequence"))}`);
 				const outcome = probe.completionOutcomes.shift() ?? { kind: "published", ok: true };
 				return outcome instanceof Error ? Promise.reject(outcome) : Promise.resolve(outcome);
 			},
@@ -123,6 +183,7 @@ vi.mock("../packages/node/dist/src/v3-live.js", async (importOriginal) => ({
 			deactivate: () => undefined,
 			issueLocal: async (input: Readonly<Record<string, unknown>>) => {
 				probe.issueInputs.push(input);
+				probe.events.push("issue");
 				const signer = Reflect.get(input, "signRegisteredVertexDigest");
 				if (typeof signer === "function") {
 					probe.signerCalls += 1;
@@ -141,9 +202,10 @@ vi.mock("../packages/node/dist/src/v3-live.js", async (importOriginal) => ({
 				probe.publishCalls += 1;
 				return Promise.resolve(probe.publicationOutcomes.shift() ?? { kind: "empty", ok: true });
 			},
-			readRebaseOutbox: () => {
+			readRebaseOutbox: async () => {
 				probe.rebaseReads += 1;
-				return Promise.resolve(probe.rebasePages.shift() ?? { kind: "empty", ok: true });
+				await probe.rebaseGate;
+				return probe.rebasePages.shift() ?? { kind: "empty", ok: true };
 			},
 			republishRetained: () => Promise.resolve({ kind: "empty", ok: true }),
 		},
@@ -306,19 +368,26 @@ beforeEach(() => {
 	probe.bootstrapIssues = 0;
 	probe.completionOutcomes = [];
 	probe.completedSources = [];
+	probe.events = [];
 	probe.issuanceNames = [];
 	probe.issueInputs = [];
 	probe.issueOutcomes = [];
 	probe.journalInstalled = false;
 	probe.journalNames = [];
+	probe.nextCapabilityId = 0;
+	probe.readinessOutcome = undefined;
 	probe.prepareAnchors = [];
 	probe.publicationOutcomes = [];
 	probe.publishCalls = 0;
+	probe.rebaseGate = undefined;
 	probe.rebasePages = [];
 	probe.rebaseReads = 0;
 	probe.recoveredVertices = [];
+	probe.recoveryOutcomes = [];
 	probe.recoveryInputs = [];
+	probe.consumedCapabilityIds = [];
 	probe.signerCalls = 0;
+	probe.targetBootstrapCommitted = false;
 	probe.trustNames = [];
 	probe.trustStores = [];
 });
@@ -332,14 +401,20 @@ describe("Phase 3g room-owned rebase scheduling RED", () => {
 		expect(probe.trustNames).toHaveLength(2);
 		expect(probe.trustNames).toContain("target-plane--ahe");
 		expect(new Set(probe.trustNames)).toHaveProperty("size", 2);
-		expect(probe.trustStores).toHaveLength(2);
+		expect(probe.trustStores).toHaveLength(4);
 		expect(probe.trustStores[0]?.store).not.toBe(probe.trustStores[1]?.store);
 		expect(probe.issuanceNames).toEqual(["shared-lineage"]);
 		expect(probe.journalNames).toEqual(["target-plane"]);
-		expect([...probe.prepareAnchors].sort()).toEqual(["a".repeat(64), "b".repeat(64)]);
+		expect([...probe.prepareAnchors].sort()).toEqual(["a".repeat(64), "a".repeat(64), "b".repeat(64), "b".repeat(64)]);
 		expect(probe.bootstrapIssues).toBe(1);
-		expect(probe.recoveryInputs).toHaveLength(1);
-		expect(probe.recoveryInputs[0]).toMatchObject({
+		expect(probe.recoveryInputs).toHaveLength(2);
+		expect(Reflect.get(probe.recoveryInputs[0] ?? {}, "capability")).not.toEqual(
+			Reflect.get(probe.recoveryInputs[1] ?? {}, "capability")
+		);
+		expect(Reflect.get(Reflect.get(probe.recoveryInputs[0] ?? {}, "displacedSource") ?? {}, "capability")).not.toEqual(
+			Reflect.get(Reflect.get(probe.recoveryInputs[1] ?? {}, "displacedSource") ?? {}, "capability")
+		);
+		expect(probe.recoveryInputs[1]).toMatchObject({
 			displacedSource: {
 				capability: { anchor: "a".repeat(64) },
 				exactCanonicalLatchedAclBytes: Uint8Array.of(3),
@@ -352,6 +427,93 @@ describe("Phase 3g room-owned rebase scheduling RED", () => {
 		expect(probe.journalNames).toEqual(["target-plane", "target-plane"]);
 		expect(probe.trustNames).toHaveLength(4);
 		await second.close();
+	});
+
+	it("recovers a committed target bootstrap after a pre-journal crash without issuing a duplicate", async () => {
+		probe.targetBootstrapCommitted = true;
+		const create = Reflect.get(await roomModule, "createV3RoomSession") as (
+			input: unknown
+		) => Promise<{ close(): Promise<void> }>;
+		const recovered = await create(roomInput());
+		expect(probe.bootstrapIssues).toBe(0);
+		expect(probe.recoveryInputs).toHaveLength(1);
+		expect(probe.journalInstalled).toBe(true);
+		await recovered.close();
+	});
+
+	it("does not bootstrap an inconsistent issuance lineage after recovery installs journal genesis", async () => {
+		probe.recoveryOutcomes = [
+			Object.freeze({
+				detail: "v3 recovery issuance lineage is inconsistent",
+				kind: "issuance-rejected",
+				ok: false,
+			}),
+		];
+		const create = Reflect.get(await roomModule, "createV3RoomSession") as (
+			input: unknown
+		) => Promise<{ close(): Promise<void> }>;
+		await expect(create(roomInput())).rejects.toThrow("issuance-rejected");
+		expect(probe.bootstrapIssues).toBe(0);
+		expect(probe.recoveryInputs).toHaveLength(1);
+		expect(probe.journalInstalled).toBe(true);
+	});
+
+	it("rejects wrong readiness scope and snapshot scope before bootstrap or recovery", async () => {
+		const create = Reflect.get(await roomModule, "createV3RoomSession") as (
+			input: unknown
+		) => Promise<{ close(): Promise<void> }>;
+		for (const selected of ["readiness", "snapshot"] as const) {
+			const expectedScope = {
+				anchorDigest: "b".repeat(64),
+				epoch: 0,
+				objectId: `creator:${"d".repeat(32)}`,
+			};
+			probe.readinessOutcome = {
+				ok: true,
+				ready: true,
+				rowCount: 1,
+				scope: selected === "readiness" ? { ...expectedScope, anchorDigest: "c".repeat(64) } : expectedScope,
+				snapshot: {
+					genesisDigest: "1".repeat(64),
+					highWatermark: 0,
+					kind: "v3-live-journal-snapshot-token-1",
+					orderedRowDigest: "2".repeat(64),
+					parametersDigest: "3".repeat(64),
+					scope: selected === "snapshot" ? { ...expectedScope, objectId: `creator:${"e".repeat(32)}` } : expectedScope,
+					snapshotDigest: "4".repeat(64),
+				},
+			};
+			await expect(create(roomInput())).rejects.toThrow("readiness");
+			expect(probe.bootstrapIssues).toBe(0);
+			expect(probe.recoveryInputs).toEqual([]);
+		}
+	});
+
+	it("retires structural source rows, accepts the full configured plane bound, and gates new issue on rebase", async () => {
+		let release!: () => void;
+		probe.rebaseGate = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		probe.rebasePages = [
+			...Array.from({ length: 8192 }, (_, index) =>
+				displaced(Object.freeze([]), index + 1, (index + 1).toString(16).padStart(64, "0"))
+			),
+			{ kind: "empty", ok: true },
+		];
+		const create = Reflect.get(await roomModule, "createV3RoomSession") as (
+			input: unknown
+		) => Promise<{ close(): Promise<void>; issue(operation: Readonly<Record<string, unknown>>): Promise<void> }>;
+		const session = await create(roomInput());
+		const issued = session.issue(Object.freeze({ action: "message", clientOperationId: "after-rebase" }));
+		await settleRoomDrain();
+		expect(probe.issueInputs).toEqual([]);
+		release();
+		await issued;
+		expect(probe.completedSources).toHaveLength(8192);
+		expect(probe.issueInputs).toHaveLength(1);
+		expect(probe.events.at(-1)).toBe("issue");
+		expect(probe.events.slice(0, -1).every((event) => event.startsWith("complete:"))).toBe(true);
+		await session.close();
 	});
 
 	it("orders exact rebase and transform inputs while expire and held review perform no issue", async () => {

@@ -66,6 +66,29 @@ describe("Phase 3g authenticated-plane rebase outbox RED", () => {
 		}
 	});
 
+	it("retires an authenticated stored structural source row without exposing an application policy intent", async () => {
+		const structural = await runSharedPlaneScenario({ sourceOperationProfile: "structural" });
+		expect(structural.recovery).toMatchObject({ ok: true });
+		expect(structural.rebaseOutbox).toEqual({
+			kind: "displaced",
+			ok: true,
+			source: {
+				author: structural.sourceRowAuthor,
+				authorSequence: 1,
+				intents: [],
+				vertexDigest: structural.sourceDigest,
+			},
+		});
+		expect(structural.completion).toEqual({ kind: "published", ok: true });
+	});
+
+	it("fails closed before exposing an 8,193rd authenticated displaced source row", async () => {
+		const overCapacity = await runSharedPlaneScenario({ syntheticDisplacedRowCount: 8193 });
+		expect(overCapacity.recovery).toMatchObject({ kind: "graph-rejected", ok: false });
+		expect(overCapacity.rebaseOutbox).toBeUndefined();
+		expect(overCapacity.networkPublishedDigests).toEqual([]);
+	});
+
 	it("enumerates two genuine source rows in author-sequence order without re-deriving the first", async () => {
 		const twoRows = await runSharedPlaneScenario({ twoSourceRows: true });
 		expect(twoRows.recovery).toMatchObject({ ok: true });
@@ -124,7 +147,11 @@ describe("Phase 3g authenticated-plane rebase outbox RED", () => {
 			expect(result.outbox.find(({ authorSequence }) => authorSequence === 1)?.publishState).toBe("pending");
 		}
 		const noCurrentTarget = await runSharedPlaneScenario({ omitTargetBootstrap: true });
-		expect(noCurrentTarget.recovery).toMatchObject({ ok: false });
+		expect(noCurrentTarget.recovery).toEqual({
+			detail: "v3 recovery issued record chain is empty",
+			kind: "issuance-rejected",
+			ok: false,
+		});
 		expect(noCurrentTarget.targetDigest).toBeUndefined();
 		expect(noCurrentTarget.networkPublishedDigests).toEqual([]);
 	});
