@@ -49686,3 +49686,388 @@ the recursive application-only batch ABI, work and byte limits, result
 ownership, and control-operation exclusion. Phase 3g and 3h remain subsequent
 steps. This ledger makes no Phase 3, broader production-hardening or product
 completion claim.
+
+### D.93.51.5 — Phase 3f-c shared-room application micro-batching
+
+Phase 3f-b closed node-owned frontier reduction at signed closure tip
+`457778137b0165619ae4060051722f6f0bbfd01b`, but every shared-room `issue()`
+still creates one separately signed application vertex. Two synchronous chat
+messages or zone commands therefore consume two author sequences, two
+signatures, two frontier references, two journal/outbox rows and two publication
+passes even though the application intends one ordered atomic change. Phase 3f
+does not close until multiple eligible mutations can become one signed
+application change without loss, duplication or author substitution.
+
+This checkpoint authorizes **3f-c application micro-batching only**. It does not
+change tip selection, causal-join construction, received dependency admission,
+ACL semantics, epoch cutting, migration, topology, ephemeral traffic, storage
+schema, archive, sealing or adoption. The two-client chat and genuine zone paths
+remain the preservation control. Phase 3g rebase/outbox work and Phase 3h
+migration work remain later separately signed slices.
+
+#### One batch representation and one scheduling owner
+
+The node owns one exact reserved application operation:
+
+```ts
+{
+  action: "applicationBatch",
+  batch: {
+    entries: [
+      { logicalTime: <safe integer>, operation: <closed application operation> },
+      ...
+    ],
+    version: 1
+  }
+}
+```
+
+The outer record has exactly `action` and `batch`. The batch record has exactly
+`entries` and `version`. Every entry has exactly `logicalTime` and `operation`.
+`entries` is a dense array of two through sixteen entries in caller-observed
+order. Each logical time is a non-negative safe integer, strictly increases in
+entry order, and is the value captured for that original room request. Each
+operation is an own-data, symbol-free, detached canonical closed record. The
+complete outer operation must encode within exactly 65,536 canonical bytes.
+Count is the canonical work unit for this bounded profile: one batch performs at
+most sixteen application reductions. Batch traversal uses the exact limits
+`maxDepth: 8`, `maxItems: 1_024` and `maxBytes: 65_536` before any durable issue or
+reducer call; the codec's much larger general defaults are not the batch work
+budget. Those limits apply to the reserved multi-operation envelope. Lawful
+singleton controls retain their existing closed operation ABI and their own
+authenticated manifest byte ceilings. The 1,024-item value uses the canonical
+decoder's cumulative node-plus-container accounting, not a bespoke walk: RED
+proves sixteen maximal shipped chat and zone entries both encode and decode
+under the same limits, while the exact one-item-over evidence fails before
+signing. This avoids an encode-accept/decode-reject partition.
+
+The batch ABI is recursively validated because every nested canonical value is
+walked and bounded, but **batches are not recursively nestable**.
+`applicationBatch`, `causalJoin`, `join` and `acl` are never legal children.
+Unknown actions, accessors, symbols, sparse arrays, extra keys, cyclic values,
+malformed strings, non-canonical values, mixed control/application entries and
+partial entries fail closed. A one-entry request is always issued as its original
+operation and never wrapped merely to exercise the batch path. No caller may
+submit `applicationBatch` directly; only the node may construct it from a
+captured multi-operation local request. No legacy batch spelling, accept-either
+branch, fallback array, caller-selected reserved name or test hook is added.
+
+The shared room is the sole micro-batch scheduler. `V3RoomApplication` declares
+one frozen, sorted, duplicate-free list of application actions eligible for the
+current shipped composition: chat declares only `message`; zone declares only
+`placeBlock`. The room snapshots each operation and assigns its logical time at
+the synchronous `issue()` boundary, before a caller can mutate either. A single
+microtask drain groups only a contiguous prefix of eligible requests, stopping
+before the first control/non-batchable request or sixteen entries. The room does
+not reproduce the node's reserved envelope or byte measurement. It submits that
+count-bounded prefix to the node's one authoritative batch preflight. When the
+node reports exact `split-required` with `prefixLength` equal to the largest
+non-empty fitting prefix; `prefixLength` counts entries, never bytes,
+before any signer/store/journal/graph/sink call, the room issues that prefix and
+then continues with the untouched suffix. A fitting one-entry prefix is issued
+as its original operation. Prefix length one is evaluated against the original
+singleton ABI, not a hypothetical one-entry wrapper, so every otherwise-lawful
+singleton is a non-empty fitting prefix even when wrapping it would exceed the
+batch envelope limit. An invalid or individually over-budget singleton returns
+its ordinary issue failure and never `split-required`; the room rejects that
+request and continues draining the untouched suffix without batching across the
+failed request. Thus the exact-byte-boundary pair batches, the
+one-byte-over pair splits without loss, and
+`message,message,acl,message` produces exactly batch-of-two, singleton ACL,
+singleton message; no later application operation can cross a control barrier.
+
+The room uses one queue and one drain owner rather than adding `issueBatch`, a
+chat batching adapter and a zone batching adapter. Calls captured while a signer,
+sink or publication await is active enter the next queue snapshot and cannot
+join the already-started batch. `close()` stops new capture and settles already
+captured requests before transport/storage shutdown. A terminal session failure
+rejects every not-yet-started request. There is no timer, wall-clock consensus
+input or parallel signer execution. One microtask is only a local coalescing
+window; the signed operation bytes and author sequence remain the durable order.
+
+`V3LocalIssueInput` replaces singular `logicalTime` plus `operation` with one
+captured `operations` array whose entries use the exact shape above, plus the one
+registered-digest signer. The node copies and validates the complete array before
+the registration task runs. One entry follows the existing ordinary issue path:
+an admitted singleton ACL or other non-node-reserved operation remains lawful.
+Caller-supplied `causalJoin` and `applicationBatch` remain forbidden even as
+singletons; `acl`, `join` and any future application control are excluded from a
+multi-entry batch but are not rejected merely for being lawful singleton
+operations.
+
+For a multi-entry request, the first captured child logical time is the exact
+top-level signed `logicalTime` on every causal join and on the outer batch vertex.
+The remaining child times remain inside the signed batch entries. Accepted
+operation expansion exposes those exact child times, and live/recovered room
+clock advancement uses `max(vertex.logicalTime, ...child logicalTimes) + 2` so a
+reopen cannot reuse a captured time hidden after the outer first-entry value.
+One-entry issuance retains its one captured logical time unchanged.
+
+Two through sixteen eligible entries cause the node to construct the exact
+reserved outer operation and issue it once through the same genuine signer,
+prepared blueprint admission, transaction, journal, graph, admitted sink and
+publication owners. The node independently rejects reserved/control children,
+nested batches, invalid order and over-budget input even if a non-room caller
+invokes the handle directly. Every child action must also name an exact reducer
+in the genuine prepared runtime, and the prepared runtime must contain the exact
+`applicationBatch` reducer, before the node constructs the outer operation. An
+unknown action or catalog/artifact mismatch is therefore rejected before
+signing rather than hidden inside the shallow canonical-object field. The
+existing registration gate remains the only serialization owner and the
+existing frontier reducer may emit zero or more `causalJoin` vertices before
+exactly one application-batch vertex.
+
+The same node-owned structural batch parser and prepared-runtime action check
+run on a locally constructed batch, authenticated live ingress and every
+recovered local/received batch before journal or graph publication. A missing,
+partial, mixed, nested, over-budget, reserved or unknown child therefore cannot
+become durable graph evidence merely because protocol-v3's outer
+`canonical-object` field is shallow. Product-field semantics remain owned by the
+exact authenticated chat/zone batch reducers and by the shared-room expansion
+plus product projector, rather than by a duplicate protocol-v3 schema parser.
+The byte preflight is the first side-effect-free phase of the existing
+`V3PlaneHandle.issueLocal` call and its result is an inline
+`V3LocalIssueResult` variant; it adds no exported function name or second public
+measurement owner. Existing formal export/helper-name audits remain exact,
+including `issueLocalSuccess` and `issueLocalFailure`.
+
+The shipped chat and zone blueprint packages advance in place to the already
+supported work-budget manifest form. Each declares the exact `applicationBatch`
+operation with a required canonical-object `batch` field and the 65,536-byte
+outer ceiling; every declared operation receives an explicit canonical byte
+ceiling. Operation descriptors remain in required code-point order:
+`acl,applicationBatch,causalJoin,join,message` for chat and
+`applicationBatch,causalJoin,join,placeBlock` for zone. Their exact artifact reducer tables add one authenticated
+`applicationBatch` reducer. Chat accepts only message children and applies the
+message reducer in entry order. Zone accepts only `placeBlock` children and
+applies the block reducer in entry order. Both reducers recheck the exact
+version/count/shape/action restrictions when exercised by the authenticated
+runtime/conformance owner. They define the committed deterministic batch
+semantics but are not misreported as a live reducer call in the current room.
+The node parser and shared expansion/product projector are the shipped live
+admission/visibility defenses. ACL, bootstrap join and `causalJoin` remain
+separate authenticated operations and cannot be smuggled through the canonical
+object field. This is the current chat/zone profile, not a generic promise that
+future unnamed controls are batchable; a future application must separately
+declare and prove its own eligible action set.
+
+This manifest/artifact advance intentionally changes the chat and zone blueprint,
+catalog and genesis-anchor identities for newly created batch-enabled rooms.
+Existing durable rooms remain on their old authenticated plane; 3f-c neither
+silently rewrites them nor claims migration. The two-client preservation control
+creates fresh rooms under the new exact identity. Phase 3h remains the separately
+signed migration/rehearsal owner for durable pre-3f-c rooms.
+
+The shared room also becomes the one accepted-operation expansion owner. It
+maps an ordinary vertex to one accepted operation and a valid batch vertex to
+its ordered child operations, carrying the genuine outer author, author
+sequence and vertex digest plus the exact child logical time and zero-based
+operation index. `V3RoomAcceptedOperation` is the room-owned immutable view with
+exact fields `author`, `authorSequence`, `logicalTime`, `operation`,
+`operationCount`, `operationIndex` and `vertexDigest`; it does not forge a child
+vertex or synthetic signature. `V3RoomApplication` replaces
+`projectAcceptedVertices(vertices)` with
+`projectAcceptedOperations(operations)`. Product projectors consume only that
+flattened view; the old projector signature is not retained beside it, and the
+RED advances the exact-equality room contract accordingly. Chat keeps the
+genuine signed vertex digest on
+each visible message and keys internal custody by the tuple `(vertex digest,
+operation index)`, so two children in one vertex cannot overwrite each other.
+Zone applies every child block in order while its accepted-vertex telemetry
+continues to count the one genuine signed vertex. Recovery and live ingress use
+the same expansion owner, so a reconnect cannot reinterpret an old batch or
+publish a partial child prefix. Malformed or mixed batch evidence makes the
+candidate contribute zero application children, records one bounded rejection
+diagnostic and never becomes visible application state. It does not throw from
+the projection stage, terminate an otherwise healthy room or make a durable room
+permanently unopenable. A later valid vertex still projects. Structurally invalid,
+control-bearing or unknown batches should already have failed at the node's
+shared pre-journal parser; this containment law handles product-field rejection
+without pretending that the currently non-executed artifact reducer is a live
+defense.
+
+Expansion is memoized once per exact signed vertex digest by the shared room.
+Whole-history projection reuses that immutable accepted-operation or contained
+empty result, so the parser is not duplicated in product projectors and one
+rejected vertex cannot emit a fresh diagnostic on every later commit. Clock
+advancement reads the structurally authenticated batch entry times even when
+product-field containment yields zero visible children. A product-invalid batch
+therefore cannot hide a later logical time and cause reuse after reconnect.
+
+If recovery encounters an already-journaled structural/control/unknown batch
+from incompatible or hostile prior bytes, it quarantines that vertex and every
+transitively dependent recovered vertex from graph/projection publication,
+records bounded evidence and opens the last valid durable prefix. It does not
+map the row to replica-wide `recoveryFailure` or make the room permanently
+unopenable. Live/current code still rejects that same evidence before journal,
+so quarantine is recovery containment, not an alternate acceptance path.
+
+#### Result ownership and failure law
+
+All room promises represented by one batch have one outcome boundary. They
+resolve only after the one batch vertex is durably accepted and the room drains
+publication to the existing exact `empty` result. If capture, admission,
+authorization, signing, transaction, journal, graph, sink or publication fails,
+every unresolved promise owned by that batch rejects; no promise reports success
+for an operation absent from the durable batch. A child cannot obtain a distinct
+author, author sequence, signature or dependency list: all children inherit the
+one outer vertex authority. The result returned by the node is the one genuine
+outer vertex identity and never a synthetic per-child commit.
+
+As in 3f-b, committed state is not falsely rolled back. A causal join committed
+before a later batch failure remains a truthful neutral vertex. A batch vertex
+that passed transaction/journal/graph but encountered a post-commit sink or
+publication failure remains durable and pending under the existing recovery
+law; all owned promises reject and retry/reconnect must observe it rather than
+issuing duplicate children. A batch rejected before graph commit publishes no
+application child. The RED must distinguish these boundaries with genuine store,
+signer, sink and publication controls rather than aggregate nonzero assertions.
+
+#### Tests-only RED
+
+The signed tests-only RED is the plan commit's sole child and changes exactly:
+
+- `tests/phase-3f-c-v3-application-batching-red.test.ts`;
+- `tests/fixtures/phase-3f-c/application-batching-fixture.ts`;
+- `tests/phase-3f-c-v3-room-batching-red.test.ts`;
+- `tests/phase-3f-c-chat-zone-batching-red.test.ts`;
+- `tests/fixtures/phase-3a1b-p3/seam3-contract.ts`;
+- `tests/fixtures/phase-3a1b-p3/seam3-types.ts`;
+- `tests/fixtures/phase-3a1b-d9346/room-contract.ts`;
+- `tests/fixtures/phase-3f-b/frontier-reduction-fixture.ts`;
+- `tests/phase-3a1b-d9336-local-issue-red.test.ts`;
+- `tests/phase-3a1b-d9346-room-semantics-red.test.ts`; and
+- `tests/phase-3f-b-chat-zone-causal-join-red.test.ts`.
+
+The RED uses genuine prepared/recovered live registrations and the real shared
+room/application exports. It fails only because the singular local issue path,
+batch ABI and shared microtask owner are absent. Existing 3f-b preservation rows
+that do not invoke the advanced local-issue/projector structure remain green.
+Rows whose expected contract advances from singular input or vertex projectors
+to the planned array/accepted-operation shape are explicit readiness REDs against
+old production; they are not falsely required to pass before GREEN. No row may
+be disabled, copied or replaced with a controlled implementation merely to
+manufacture that signature.
+
+The new chat/zone batching RED reuses the established 3f-b Vite boundary: every
+`vi.mock` uses the exact test-relative module specifier proven by 3f-b, and the
+chat module is evaluated once without redefining the non-configurable
+`d9336V3Chat` global. It may not recreate the earlier workspace-package mock,
+substitute an unbuilt source path or duplicate the module-evaluation trap as
+batching evidence.
+
+The RED command explicitly runs both type-contract drivers:
+`tests/phase-3a1b-p3-live-transport-red.test.ts` for the seam-3 issue contract
+and `tests/phase-3a1b-d9346-shared-v3-room-red.test.ts` for the room projector
+contract. Their exact `tsc` failures are intended RED evidence, not a requirement
+that type-level readiness somehow pass against old production. The same drivers
+must pass on GREEN.
+
+The causal matrix proves:
+
+1. one eligible request remains one ordinary signed application vertex;
+2. two and sixteen same-turn eligible requests become exactly one signed batch
+   vertex, use one signer/sequence/frontier set and preserve child order;
+3. seventeen requests split deterministically into sixteen plus one, while an
+   exact byte-boundary pair batches and a one-byte-over pair splits without loss;
+   an individually over-budget head request rejects only its own promise and the
+   untouched suffix issues as a fresh group without crossing that failure;
+4. a control request flushes the preceding batch, runs alone and precedes the
+   following batch; chat ACL, zone bootstrap join, `causalJoin` and caller-supplied
+   `applicationBatch` are never children;
+5. reentrant signer/sink issuance joins the next queue snapshot, not the active
+   batch, and one registration gate still serializes ingress, issue and publish;
+6. a wide frontier produces the already-proved bounded causal joins followed by
+   exactly one batch vertex whose ancestry covers every original tip;
+7. every batch promise resolves once on success, while malformed child,
+   unauthorized ACL, signer throw/reject, wrong signature, transaction refusal,
+   admission refusal, journal refusal, graph capacity, sink failure, publication
+   failure and close reject the exact owned promises without silent success;
+8. retry/recovery after a post-commit failure observes the existing batch and
+   never duplicates a child or substitutes its author;
+9. missing/extra keys, sparse/aliased/mutated input, bad version, zero/one/
+   seventeen entries, non-increasing logical time, nested batch, mixed control,
+   unknown action and canonical depth/item/byte overflow fail closed;
+10. received and recovered malformed/mixed/over-budget batches do not publish a
+    partial projection or brick the room, a later valid vertex still projects,
+    and the same valid batch produces the same flattened operations in live,
+    retained and recovered paths;
+11. chat projects two batched messages with one vertex digest and distinct
+    operation indexes without overwrite; zone applies two batched blocks in
+    order while truthfully counting one durable vertex; and
+12. genuine two-client chat and zone controls retain create/join, durable
+    exchange, E1 movement, disconnect/reconnect and convergence.
+
+Mutants issue every child separately, wrap one child, accept seventeen, ignore
+the byte ceiling, reorder children, batch across ACL, permit nested/reserved
+actions, assign child authors/sequences, reuse one operation index, resolve only
+one promise, resolve before durable acceptance/publication, drop a child, retry a
+committed batch, use a timer, admit a late reentrant request into the active
+batch, bypass the node constructor, parse batches independently in chat/zone or
+publish a valid prefix from a malformed batch, or reject the complete drain
+snapshot after one ordinary singleton failure. Each must fail at a semantic
+result or durable-state boundary; incidental diagnostic wording and private
+source spelling are not authority.
+
+The byte-boundary cases assert the node's real `split-required` preflight result
+and zero durable side effects before the room retries the exact prefix; no room
+fixture re-encodes the outer operation as a reference oracle. Pre-sign capture,
+shape, control and byte failures assert the existing malformed/issuance boundary;
+post-sign authentication asserts admission rejection; sink and publication
+failures assert the room promise and terminal/pending state rather than requiring
+an invented `V3LocalIssueResult` kind. The one/two/sixteen/seventeen measurement
+row lives in `tests/phase-3f-c-v3-room-batching-red.test.ts`, not an additional
+unowned benchmark path.
+
+#### GREEN ownership and gates
+
+The signed GREEN is the RED commit's sole child and changes exactly:
+
+- `packages/node/src/v3-live.ts`;
+- `examples/v3-room/src/index.ts`;
+- `examples/v3-chat/src/index.ts`; and
+- `examples/grid/src/v3-zone.ts`.
+
+No protocol-v3 registry/source, compaction, storage schema, workflow, dependency,
+lockfile, topology, ephemeral, freeze-governance, plan or unrelated product path
+may change. The four owners replace the singular room-to-node issue shape rather
+than preserving it beside a batch overload. Refactor-clean review must reject a
+second scheduler, product-local batching queues, duplicated batch parsers,
+compatibility aliases, optional legacy input or test-only production seams.
+
+Focused RED/GREEN evidence runs the exact 3f-c roster plus the complete 3f-b
+frontier/local-issue/room/chat-zone roster. GREEN additionally runs the five
+protocol semantic suites and both controlled arms, direct node/room/chat/grid
+typecheck and build, package build, ESLint, Prettier and diff checks. The real
+chat and zone browser controls run on final bytes and record vertex/signer counts
+as well as visible convergence. The owned batching measurement row records one,
+two, sixteen and seventeen request cases and must show that the batched path uses
+one application signature per legal group; this is evidence, not a wall-clock
+consensus rule or another benchmark artifact.
+
+GREEN also runs `tests/phase-3a1b-d9346-v3-room-extraction-red.test.ts`; its
+single-runtime-export audit must remain green when the room adds the type-only
+accepted-operation view, and no runtime expansion helper may leak as a second
+public owner.
+
+The existing `phase-3a1-ac-live-persistence` source-shape audit also remains
+green. `queueMicrotask` is room-owned only; node issuance stays inside
+`issueOneVertex`, so 3f-c does not add node timers, full-B live effects or another
+transaction/journal owner merely to satisfy the batching scheduler.
+
+The plan, tests-only RED, GREEN and concise closure ledger are separate
+Good-Faolain-signed linear commits. Kimi, Grok, Codex and Opus each receive one
+bounded exact-packet review for plan, RED and GREEN. Grok uses review mode with
+streamed JSONL/status/public artifacts, `max-turns=64` and an 1,800-second bound;
+it may continue beyond twelve minutes while status shows progress. Timeouts and
+`NO_VERDICT` are reported honestly and are not approval, but only a reproduced
+substantive P0/P1 blocks signing. Reviewers must not launch unrelated exhaustive
+freeze/certification matrices. Every substantive finding is resolved or
+explicitly dismissed with causal evidence.
+
+Closure records exact signed identities, test counts and wall durations and
+states only that Phase 3f frontier reduction plus application batching is
+closed. The next product slice is Phase 3g rebase outbox, with the same chat/zone
+golden path proving that offline and reconnecting authors survive an epoch cut
+without duplication or author substitution. No broader Phase 3 or product
+completion claim is authorized.
