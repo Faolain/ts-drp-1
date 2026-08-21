@@ -49332,3 +49332,249 @@ must rerun the same chat/zone preservation control. The Phase 3e close-set leaf
 derivation, manifest/input equivalence and genesis history/archive-root profile
 remain open Phase 3 exit prerequisites. This ledger makes no broader
 production-hardening or product-completion claim.
+
+### D.93.51.2 — Phase 3f-b node-owned bounded frontier reduction
+
+Phase 3f-a established the one authoritative tip owner but intentionally left
+the shipped local-write path unchanged. At the signed closure tip
+`f2308649ed0c8294b9fc243e1ea999dc062212c9`, `V3LocalIssueInput` still accepts a
+caller-selected dependency array and the shared room still supplies only the
+genesis anchor. That shape permits permanent anchor siblings and lets a caller
+omit authenticated live tips. It cannot safely meet the already authenticated
+`maxDependencies` bound once the frontier grows wider than the configured
+limit.
+
+This checkpoint authorizes **3f-b bounded frontier reduction only**. The node's
+live registration and its `CausalityIndex` are the sole dependency-selection
+authority. `V3LocalIssueInput` deletes `dependencies` and retains only the
+requested application operation, logical time and signer. The node owns one
+exact frozen reserved join value, the closed record
+`{ action: "causalJoin" }`; neither the room nor an issue caller can replace it
+with `message`, `placeBlock` or another admitted operation. Callers can choose
+application intent but cannot name the join role or name, truncate, reorder or
+synthesize causal dependencies. No alternate overload, legacy dependency or
+join field, accept-either branch or application-write anchor fallback remains.
+The pre-activation room bootstrap is the sole explicit exception: before a live
+registration and its `CausalityIndex` exist, the bootstrap issuer must retain
+its one pinned-genesis-anchor dependency. That bootstrap-only dependency is not
+caller-selectable local-write authority and must not be generalized into an
+application fallback.
+
+The join is an application operation, not a protocol-bypass vertex. Both chat
+and zone declare one exact `causalJoin` operation in their canonical blueprint
+package and exact artifact reducer table. Its reducer returns the input state
+unchanged. Chat has no visible projection effect; zone leaves blocks and roster
+unchanged while truthfully including the durable join in its accepted-digest and
+vertex-count audit telemetry. The blueprint digest therefore authenticates the
+join ABI and neutral reducer in the same way as every other application
+operation. The node never accepts a caller-selected join and never bypasses
+blueprint admission: an application opts into wide-frontier reduction only by
+authenticating that exact reserved ABI and reducer in its real blueprint
+package. A missing, altered, unauthorized or non-admitted `causalJoin` fails
+before it can provide causal coverage. Real chat and zone consumer tests, not a
+generic neutrality claim, prove that their authenticated reducers and
+projectors preserve the intended application state.
+
+For one serialized local request, the live node repeatedly reads the current
+fresh sorted `CausalityIndex.tips()` snapshot. If its width exceeds authenticated
+`parameters.maxDependencies`, it selects exactly the first
+`maxDependencies` hashes from that snapshot and issues one `causalJoin` through
+the genuine issuance, signature, admission, journal, graph and admitted-sink
+pipeline. It then re-reads the authoritative tips and repeats. Once the width is
+within the bound, it issues the requested operation with the complete current
+tip set as dependencies. The existing per-registration gate serializes ingress,
+local issue and publication, so no asynchronous remote append can invalidate a
+selection between the read and its commit.
+
+That serialization begins before any task body, signer or sink can run. One
+shared `enqueueRegistrationTask` owner first installs the pending gate result,
+then invokes the current task synchronously only after that reservation is
+visible (or after the prior gate settles). A caller-controlled signer that
+reenters `issueLocal`, or a sink that reenters ingress/publication, therefore
+queues behind the complete outer multi-vertex request rather than reading its
+in-progress frontier. The local closed input remains captured at the API call
+boundary; moving task invocation onto a later microtask must not expose mutable
+caller input. Every ingress, local-issue and publication enqueue path uses this
+one reservation owner rather than open-coding the previous call-before-assign
+ordering.
+
+Every generated vertex has at least one dependency and at most the authenticated
+bound. Each successful join consumes all selected tips and becomes a new tip, so
+one width-`W` iteration reduces the width by exactly
+`maxDependencies - 1`. With `W = 64` and `maxDependencies = 16`, exactly four
+join vertices reduce the frontier to four tips and the one requested application
+vertex consumes those four. Every original tip is therefore an ancestor of the
+application vertex; no original tip is sampled away, left uncovered or replaced
+by a synthetic placeholder. Selection is based on the existing code-unit-sorted
+digest order and is independent of map insertion, arrival and caller order.
+The shipped live node authenticates the one frozen parameter profile whose
+`maxDependencies` is sixteen; a carrier for one, fifteen or any other value is
+rejected during genuine preparation. This slice therefore proves the reachable
+sixteen-parent algorithm and does not forge a payload, add a second parameter
+profile or expose a test hook merely to exercise an unreachable one-parent
+configuration. Any future signed profile that changes this bound must separately
+prove its own reduction termination law before becoming accepted authority; no
+unreachable production branch or structural source oracle stands in for that
+future behavioral proof.
+
+Each internal join is a normal durable signed vertex with the next genuine
+author sequence, the request's captured logical time, exact outbox row, exact
+journal row, graph charge and admitted-sink delivery. `publishPending()` retains
+its existing one-pending-row-per-call contract. After the complete local issue
+returns, the room drains it until the first exact `empty` result so every join
+and the application row is attempted in issuance order. A later publication
+failure leaves already published rows truthful and remaining durable rows
+pending for existing retry/recovery; it cannot be described as all-or-nothing.
+A failure in signing, admission, journaling or graph admission returns the
+existing fail-closed result at that boundary and never reports the application
+operation as accepted. Earlier joins that reached graph commit remain truthful
+durable no-ops; they are not rolled back or duplicated, and a retry continues
+from that smaller authoritative frontier. The existing sink is a post-commit
+notification: its failure cannot erase a durable graph commit and remains
+terminal at the shared-room boundary, whose `terminalFailure` check rejects the
+user request and shuts the session down. A failed join or application attempt
+publishes no graph/tip state of its own; already-issued or journaled residue
+retains the existing recovery/outbox classification and is never misreported as
+application acceptance. A successful multi-vertex `issueLocal` returns the
+author sequence and digest of the final requested application vertex, never an
+intermediate join. Unknown, partial or mixed records remain rejected by the
+existing closed input, blueprint, journal and graph owners.
+
+The authenticated `parameters.maxDependencies` bound becomes an explicit node
+admission invariant in this slice rather than a pre-existing protocol-v3
+registry guarantee. After genuine signature, anchor and blueprint admission but
+before journal or graph publication, live ingress rejects any received vertex
+whose dependency count exceeds the recovered profile bound. Recovery applies
+the same check to every authenticated received and locally issued journal/outbox
+vertex before it can be appended to the recovered index. Locally generated
+joins and application vertices are bounded by construction and checked again at
+their authenticated pre-journal boundary. This one node-owned rule prevents an
+old or remote over-bound vertex from bypassing the new local selector; the
+protocol-v3 registry remains unchanged and no protocol-v2 admission result is
+treated as evidence.
+
+This slice does not batch multiple user operations into one signed vertex.
+Phase 3f-c must separately define the recursive application-batch ABI, canonical
+work/byte limits, promise/result ownership, ACL/control exclusion and shared-room
+micro-batch scheduling. Keeping it separate prevents a dependency-safety change
+from silently choosing user-operation coalescing semantics. Phase 3f is not
+complete until that slice proves that multiple eligible mutations become one
+signed application change without loss, duplication or author substitution.
+
+The signed tests-only RED is the plan commit's sole child and changes exactly:
+
+- `tests/phase-3f-b-v3-frontier-reduction-red.test.ts`;
+- `tests/fixtures/phase-3f-b/frontier-reduction-fixture.ts`;
+- `tests/fixtures/phase-3a1b-p3/seam3-contract.ts`;
+- `tests/fixtures/phase-3a1b-p3/seam3-types.ts`;
+- `tests/phase-3a1b-d9336-local-issue-red.test.ts`;
+- `tests/phase-3a1b-d9346-room-semantics-red.test.ts`;
+- `tests/phase-3f-b-chat-zone-causal-join-red.test.ts`; and
+- `tests/phase-3a1-ac-live-persistence-red.test.ts`.
+
+The new fixture builds genuine prepared/recovered live registrations and real
+signed vertices; it may control durable stores and transport delivery but may
+not reimplement dependency selection or forge an accepted graph. The RED proves:
+
+- the public local-issue type has neither a dependency field nor a join-role
+  field, and attempts to retain either caller authority fail;
+- an anchor plus two and sixteen sibling frontiers issue the application vertex
+  directly with the complete authoritative sorted tips;
+- a seventeen-tip frontier emits one sixteen-parent join and then one
+  two-parent application vertex;
+- a sixty-four-tip frontier emits exactly four joins plus one application
+  vertex, every dependency list is within sixteen, and every original tip is an
+  ancestor of the final application vertex;
+- shuffled arrival and map construction produce the same dependency classes and
+  final ancestor coverage;
+- a signer that synchronously reenters `issueLocal` observes the pending gate
+  already installed: the nested request executes only after the outer join and
+  application vertices commit, uses the resulting fresh frontier, and cannot
+  duplicate the outer request's tip snapshot or author sequence;
+- blueprints with a missing, altered, unknown-ABI or authorization-rejected
+  `causalJoin` fail closed without application acceptance, and substituting an
+  otherwise admitted `message` or `placeBlock` as the internal join is rejected;
+- signer, journal and graph-capacity failures never return node-level
+  application acceptance; an admitted-sink failure remains post-commit but makes
+  the enclosing room request reject through `terminalFailure`; a later failure
+  preserves fully graph-committed prior joins, and a retry from that exact
+  frontier does not duplicate their author sequences;
+- the exact authenticated sixteen-dependency carrier is accepted while altered
+  one-, fifteen- and seventeen-dependency parameter carriers remain rejected by
+  genuine preparation without a forged recovered payload;
+- live received, recovered-received and recovered-local vertices with more than
+  `maxDependencies` newly fail at the genuine node admission boundary before
+  journal/index publication, while exact-bound vertices retain their result;
+- the room drains every one-row publication result through exact `empty`, and a
+  later drain failure remains fail closed;
+- the actual chat and zone application compositions each create a genuine
+  wide-frontier reduction through their signed blueprint package: chat visible
+  messages remain unchanged, zone blocks and roster remain unchanged, and zone
+  accepted-digest/vertex-count telemetry includes every durable join; and
+- anchor-only, ordinary one-write, ACL, retained publication and reconnect
+  controls retain their established results after removing caller-selected
+  dependencies.
+
+Mutants use the anchor forever, accept caller dependencies or a caller join,
+substitute `message`/`placeBlock` for the reserved join, slice the first sixteen
+tips once and drop the rest, issue the application before all joins, reuse a
+stale tip snapshot, select insertion order, allow seventeen parents, emit a
+zero-parent join, skip blueprint admission, mutate a real chat/zone reducer or
+projector, treat a failed join as committed, roll back a committed join, reuse
+an author sequence, invoke a registration task before its gate reservation is
+visible, or report the application accepted after an intermediate failure.
+Assertions target exact Git-independent vertex facts, ancestry and durable
+outcomes, not helper names, source spelling or diagnostic precedence.
+The existing live-persistence owner permits the one exact named shared
+per-vertex issuance function, `issueOneVertex`, used by both internal joins and
+the final application vertex;
+it continues to reject `transactIssue` or `index.append` from every other owner.
+This keeps the repeated signature/admission/journal/graph pipeline factored once
+without hiding it in an inline callback merely to evade the owner oracle.
+
+The signed GREEN is the RED commit's sole child and changes exactly:
+
+- `packages/node/src/v3-live.ts`;
+- `examples/v3-room/src/index.ts`;
+- `examples/v3-chat/src/index.ts`; and
+- `examples/grid/src/v3-zone.ts`.
+
+No compaction owner, protocol registry, storage implementation, workflow,
+topology, lockfile, legacy object or freeze-governance path changes in 3f-b.
+`CausalityIndex.tips()` remains the single frontier owner; the node must not add
+a second frontier cache, dependency map or test hook. All gated work uses the
+one `enqueueRegistrationTask` reservation owner; compatibility queue wrappers
+or per-operation gate implementations are rejected. Chat and zone factor their
+current room-application composition into named product constructors used by
+both their actual product entry points and the consumer RED/GREEN test. Those
+constructors return the genuine package, catalog, bootstrap and projector; they
+are not alternate fixtures or test hooks. Refactor-clean review rejects
+compatibility overloads, copied reduction planners, caller hints, test-only
+application packages and duplicated projection dispatch. The chat consumer test
+evaluates `examples/v3-chat/src/index.ts` exactly once and reuses the exported
+product constructor; it must not reset modules or attempt to redefine the
+existing non-configurable `d9336V3Chat` global.
+
+Focused RED/GREEN evidence runs the eight owned RED paths, the 3f-a tip suite,
+`tests/phase-3a1b-p3-live-transport-red.test.ts` (the exact local-issue type and
+public-export oracle), the existing local issue/recovery/ingress/publication
+suites and the chat/zone room-semantic controls. Final GREEN also runs node,
+room, chat, grid and
+compaction typechecks/builds, the established five semantic suites and controlled
+arms, root lint, Prettier, diff checks, the complete package build, the expanded
+chat control and the genuine-network zone control. Exact commands, terminal
+counts, commit identities and wall durations are written under
+`.logs/phase3f-b-red/` and `.logs/phase3f-b-green/` as non-authoritative audit
+records.
+
+The plan, tests-only RED, GREEN and concise closure ledger remain separate
+Good-Faolain-signed commits. Kimi receives the requested explicit 100-step audit.
+Grok runs through the review-mode skill with preserved packet, streamed JSONL,
+public text and status artifacts and may continue up to thirty minutes while
+events show progress. Codex and Opus xhigh review the same exact packet. A
+timeout or `NO_VERDICT` is recorded honestly but is not approval; only a
+reproduced substantive P0/P1 blocks signing, and every finding is resolved or
+explicitly dismissed with evidence. The roughly forty-minute freeze-successor
+certification matrix is unrelated and is not rerun. After 3f-b closure, work
+continues directly to the separately signed 3f-c application micro-batching
+slice, then 3g and 3h, with the chat/zone golden path preserved at each boundary.
