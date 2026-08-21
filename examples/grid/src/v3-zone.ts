@@ -145,6 +145,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 				creatorInvite,
 				databaseName: `ts-drp-v3-zone--${digest("ts-drp/d9346-zone-database/v1", new TextEncoder().encode(zoneId))}`,
 				initialLogicalTime: 3,
+				issuanceDatabaseName: `ts-drp-v3-zone--${digest("ts-drp/d9346-zone-database/v1", new TextEncoder().encode(zoneId))}`,
 				objectId: zoneId,
 				onAcceptedVertex: () => undefined,
 				onProjection: (value): void => {
@@ -308,6 +309,14 @@ export function createV3ZoneApplication(
 		}),
 		canonicalBlueprintPackageBytes: material.canonicalBlueprintPackageBytes,
 		catalog: material.catalog,
+		displacedOperationIdentity: (operation: Readonly<Record<string, unknown>>) => {
+			const identity = Reflect.get(operation, "id");
+			if (typeof identity !== "string" || identity.length === 0) {
+				throw new TypeError("v3 zone block identity is invalid");
+			}
+			return identity;
+		},
+		displacementPolicies: Object.freeze({ placeBlock: "rebase" as const }),
 		projectAcceptedOperations: (operations: readonly V3RoomAcceptedOperation[]) =>
 			projectZone(operations, creatorPeerId, creatorAuthor),
 	});

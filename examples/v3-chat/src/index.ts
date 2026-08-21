@@ -11,7 +11,7 @@ import { Keychain } from "@ts-drp/keychain";
 import { type DRPNetworkNode, type Message, MessageType } from "@ts-drp/types";
 
 const OBJECT_ID = `creator:${"d".repeat(32)}`;
-const CHAT_ARTIFACT_SOURCE = `function exactKeys(value,keys){return value!==null&&typeof value==="object"&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.prototype.hasOwnProperty.call(value,key))}function aclReducer(input){return {output:input.operation,state:input.state}}function applicationBatchReducer(input){const operation=input.operation;if(!exactKeys(operation,["action","batch"])||operation.action!=="applicationBatch"||!exactKeys(operation.batch,["entries","version"])||operation.batch.version!==1||!Array.isArray(operation.batch.entries)||operation.batch.entries.length<2||operation.batch.entries.length>16)throw new TypeError("invalid application batch");let prior=-1;const output=[];const state=[...input.state];for(const entry of operation.batch.entries){if(!exactKeys(entry,["logicalTime","operation"])||!Number.isSafeInteger(entry.logicalTime)||entry.logicalTime<0||entry.logicalTime<=prior||!exactKeys(entry.operation,["action","text"])||entry.operation.action!=="message"||typeof entry.operation.text!=="string")throw new TypeError("invalid application batch entry");prior=entry.logicalTime;state.push(entry.operation.text);output.push(entry.operation.text)}return {output,state}}function causalJoinReducer(input){return {output:null,state:input.state}}function joinReducer(input){return {output:input.operation.clientId,state:input.state}}function messageReducer(input){const state=[...input.state,input.operation.text];return {output:input.operation.text,state}}export const blueprint={exportSchemaVersion:1,artifactId:"v3-chat.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{acl:aclReducer,applicationBatch:applicationBatchReducer,causalJoin:causalJoinReducer,join:joinReducer,message:messageReducer}};`;
+const CHAT_ARTIFACT_SOURCE = `function exactKeys(value,keys){return value!==null&&typeof value==="object"&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.prototype.hasOwnProperty.call(value,key))}function aclReducer(input){return {output:input.operation,state:input.state}}function applicationBatchReducer(input){const operation=input.operation;if(!exactKeys(operation,["action","batch"])||operation.action!=="applicationBatch"||!exactKeys(operation.batch,["entries","version"])||operation.batch.version!==1||!Array.isArray(operation.batch.entries)||operation.batch.entries.length<2||operation.batch.entries.length>16)throw new TypeError("invalid application batch");let prior=-1;const output=[];const state=[...input.state];for(const entry of operation.batch.entries){if(!exactKeys(entry,["logicalTime","operation"])||!Number.isSafeInteger(entry.logicalTime)||entry.logicalTime<0||entry.logicalTime<=prior||!exactKeys(entry.operation,["action","clientOperationId","text"])||entry.operation.action!=="message"||typeof entry.operation.clientOperationId!=="string"||entry.operation.clientOperationId.length===0||typeof entry.operation.text!=="string")throw new TypeError("invalid application batch entry");prior=entry.logicalTime;const message={clientOperationId:entry.operation.clientOperationId,text:entry.operation.text};state.push(message);output.push(message)}return {output,state}}function causalJoinReducer(input){return {output:null,state:input.state}}function joinReducer(input){return {output:input.operation.clientId,state:input.state}}function messageReducer(input){if(!exactKeys(input.operation,["action","clientOperationId","text"])||typeof input.operation.clientOperationId!=="string"||input.operation.clientOperationId.length===0||typeof input.operation.text!=="string")throw new TypeError("invalid message");const message={clientOperationId:input.operation.clientOperationId,text:input.operation.text};const state=[...input.state,message];return {output:message,state}}export const blueprint={exportSchemaVersion:1,artifactId:"v3-chat.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{acl:aclReducer,applicationBatch:applicationBatchReducer,causalJoin:causalJoinReducer,join:joinReducer,message:messageReducer}};`;
 const PARAMETERS = Object.freeze({
 	maxEpochVertices: 8192,
 	maxEpochBytes: 8_388_608,
@@ -53,6 +53,7 @@ interface CreateInput {
 interface AcceptedMessage {
 	readonly author: string;
 	readonly authorSequence: number;
+	readonly clientOperationId: string;
 	readonly digest: string;
 	readonly logicalTime: number;
 	readonly operationCount: number;
@@ -134,6 +135,10 @@ function bytes(value: string): Uint8Array {
 		throw new TypeError("v3 chat hex value is invalid");
 	}
 	return Uint8Array.from(value.match(/.{2}/gu) ?? [], (pair) => Number.parseInt(pair, 16));
+}
+
+function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
+	return left.byteLength === right.byteLength && left.every((value, index) => value === right[index]);
 }
 
 function digest(domain: string, value: Uint8Array): string {
@@ -296,7 +301,10 @@ function applicationMaterial(): ApplicationMaterial {
 					maxCanonicalOperationBytes: 65_536,
 					argumentSchema: Object.freeze({
 						kind: "closed-record",
-						fields: Object.freeze([Object.freeze({ name: "text", required: true, type: "string" })]),
+						fields: Object.freeze([
+							Object.freeze({ name: "clientOperationId", required: true, type: "string" }),
+							Object.freeze({ name: "text", required: true, type: "string" }),
+						]),
 					}),
 				}),
 			]),
@@ -353,6 +361,14 @@ export function createV3ChatApplication(clientId: ClientId): V3RoomApplication<C
 		bootstrapOperation: Object.freeze({ action: "join", clientId }),
 		canonicalBlueprintPackageBytes: material.canonicalBlueprintPackageBytes,
 		catalog: material.catalog,
+		displacedOperationIdentity: (operation: Readonly<Record<string, unknown>>) => {
+			const identity = Reflect.get(operation, "clientOperationId");
+			if (typeof identity !== "string" || identity.length === 0) {
+				throw new TypeError("v3 chat client operation identity is invalid");
+			}
+			return identity;
+		},
+		displacementPolicies: Object.freeze({ message: "rebase" as const }),
 		projectAcceptedOperations: projectChat,
 	});
 }
@@ -523,19 +539,36 @@ function createRoomNetwork(peerId: string, channelName: string): V3RoomTransport
 }
 
 function projectChat(operations: readonly V3RoomAcceptedOperation[]): ChatProjection {
+	const identities = new Map<string, Uint8Array>();
 	const accepted = operations.flatMap((acceptedOperation) => {
 		const operation = acceptedOperation.operation;
 		const action = Reflect.get(operation, "action");
+		const clientOperationId = Reflect.get(operation, "clientOperationId");
 		const text = Reflect.get(operation, "text");
 		if (action !== "message") return [];
 		const keys = Reflect.ownKeys(operation);
-		if (keys.length !== 2 || !keys.every((key) => key === "action" || key === "text") || typeof text !== "string") {
+		if (
+			keys.length !== 3 ||
+			!keys.every((key) => key === "action" || key === "clientOperationId" || key === "text") ||
+			typeof clientOperationId !== "string" ||
+			clientOperationId.length === 0 ||
+			typeof text !== "string"
+		) {
 			throw new TypeError("v3 chat message operation is invalid");
 		}
+		const identity = `${acceptedOperation.author}\u0000${clientOperationId}`;
+		const operationBytes = encodeCanonical(operation);
+		const prior = identities.get(identity);
+		if (prior !== undefined) {
+			if (!sameBytes(prior, operationBytes)) throw new TypeError("v3 chat message identity conflicts");
+			return [];
+		}
+		identities.set(identity, operationBytes);
 		return [
 			Object.freeze({
 				author: acceptedOperation.author,
 				authorSequence: acceptedOperation.authorSequence,
+				clientOperationId,
 				digest: acceptedOperation.vertexDigest,
 				logicalTime: acceptedOperation.logicalTime,
 				operationCount: acceptedOperation.operationCount,
@@ -566,6 +599,7 @@ async function joinRoom(
 		creatorInvite: input.creatorInvite,
 		databaseName: input.databaseName,
 		initialLogicalTime: selected.logicalTime,
+		issuanceDatabaseName: input.databaseName,
 		objectId: OBJECT_ID,
 		openTransport: () => createRoomNetwork(author, input.channelName),
 		onAcceptedVertex: () => undefined,
@@ -607,7 +641,7 @@ const api = Object.freeze({
 		const selected = active;
 		if (selected === undefined) throw new TypeError("v3 chat client is not joined");
 		if (typeof text !== "string" || text.length === 0) throw new TypeError("v3 chat message is empty");
-		await selected.room.issue(Object.freeze({ action: "message", text }));
+		await selected.room.issue(Object.freeze({ action: "message", clientOperationId: crypto.randomUUID(), text }));
 	},
 	async submitAcl(
 		operation: Readonly<{

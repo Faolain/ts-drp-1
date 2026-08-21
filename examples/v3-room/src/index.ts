@@ -94,8 +94,11 @@ export interface V3RoomApplication<Projection extends V3RoomProjectionAuthority 
 	readonly bootstrapOperation: Readonly<Record<string, unknown>>;
 	readonly canonicalBlueprintPackageBytes: Uint8Array;
 	readonly catalog: Parameters<typeof prepareV3LiveGeneration>[0]["catalog"];
+	displacedOperationIdentity(operation: Readonly<Record<string, unknown>>): string;
+	readonly displacementPolicies: Readonly<Record<string, "expire" | "manual-review" | "rebase" | "transform">>;
 	/** Throw a direct TypeError only when authenticated product fields are invalid. */
 	projectAcceptedOperations(operations: readonly V3RoomAcceptedOperation[]): Projection;
+	transformDisplacedOperation?(operation: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
 }
 
 export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAuthority = V3RoomProjectionAuthority> {
@@ -104,11 +107,13 @@ export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAut
 	readonly creatorInvite: string | V3RoomCreatorInviteMaterial;
 	readonly databaseName: string;
 	readonly initialLogicalTime: number;
+	readonly issuanceDatabaseName: string;
 	readonly objectId: string;
 	openTransport(): V3RoomTransport;
 	onAcceptedVertex(vertex: AdmittedReceivedVertexView): void | Promise<void>;
 	onProjection(projection: Projection): void;
 	readonly publicKeyBytes: Uint8Array;
+	readonly rebaseSourceInvite?: string | V3RoomCreatorInviteMaterial;
 	readonly signRegisteredVertexDigest: SignRegisteredVertexDigest;
 }
 
@@ -324,6 +329,40 @@ function acceptedOperationsForVertex(
 	return Object.freeze(accepted);
 }
 
+function validateDisplacementPolicy(application: V3RoomApplication): void {
+	const policies = application.displacementPolicies;
+	if (
+		policies === null ||
+		typeof policies !== "object" ||
+		Array.isArray(policies) ||
+		!Object.isFrozen(policies) ||
+		(Object.getPrototypeOf(policies) !== Object.prototype && Object.getPrototypeOf(policies) !== null)
+	) {
+		throw new TypeError("v3 room displacement policy is invalid");
+	}
+	const keys = Reflect.ownKeys(policies);
+	if (
+		keys.length !== application.batchableOperationActions.length ||
+		keys.some((key, index) => key !== application.batchableOperationActions[index])
+	) {
+		throw new TypeError("v3 room displacement policy is invalid");
+	}
+	for (const key of keys) {
+		if (typeof key !== "string") throw new TypeError("v3 room displacement policy is invalid");
+		const descriptor = Object.getOwnPropertyDescriptor(policies, key);
+		const value = descriptor !== undefined && "value" in descriptor ? descriptor.value : undefined;
+		if (
+			descriptor?.enumerable !== true ||
+			(value !== "expire" && value !== "manual-review" && value !== "rebase" && value !== "transform")
+		) {
+			throw new TypeError("v3 room displacement policy is invalid");
+		}
+	}
+	if (typeof application.displacedOperationIdentity !== "function") {
+		throw new TypeError("v3 room displacement authority is invalid");
+	}
+}
+
 /**
  * Opens one browser v3 room from application material and a real transport adapter.
  * @param input - Closed application, identity, durable-store and transport bindings.
@@ -343,14 +382,26 @@ export async function createV3RoomSession<Projection extends V3RoomProjectionAut
 	) {
 		throw new TypeError("v3 room batchable operation actions are invalid");
 	}
+	if (input.rebaseSourceInvite !== undefined) validateDisplacementPolicy(input.application);
+	const issuanceDatabaseName =
+		input.issuanceDatabaseName ?? (input.rebaseSourceInvite === undefined ? input.databaseName : undefined);
+	if (typeof issuanceDatabaseName !== "string" || issuanceDatabaseName.length === 0) {
+		throw new TypeError("v3 room issuance database name is invalid");
+	}
 	const invite =
 		typeof input.creatorInvite === "string" ? input.creatorInvite : encodeCreatorInvite(input.creatorInvite);
 	const material = decodeCreatorInvite(invite);
+	const sourceInvite = input.rebaseSourceInvite;
+	const sourceMaterial =
+		sourceInvite === undefined
+			? undefined
+			: decodeCreatorInvite(typeof sourceInvite === "string" ? sourceInvite : encodeCreatorInvite(sourceInvite));
 	const objectIdResult = parseStorageObjectId(input.objectId);
 	if (!objectIdResult.ok) throw new TypeError("v3 room object id is invalid");
-	const { aheStore, issuanceStore, journalStore, prepared, recovered } = await prepareDurableRoomState(
-		input,
+	const { aheStores, issuanceStore, journalStore, prepared, recovered } = await prepareDurableRoomState(
+		Object.freeze({ ...input, issuanceDatabaseName }),
 		material,
+		sourceMaterial,
 		objectIdResult.value
 	);
 	const acceptedVertices = new Map<string, V3RoomAcceptedVertex>();
@@ -441,13 +492,18 @@ export async function createV3RoomSession<Projection extends V3RoomProjectionAut
 			input.onProjection(projection);
 		}
 	} catch (error) {
-		await Promise.all([issuanceStore.close(), journalStore.close(), aheStore.close()]);
+		await Promise.all([issuanceStore.close(), journalStore.close(), ...aheStores.map((store) => store.close())]);
 		throw error;
 	}
+	const recoveredProjectionRejected = recovered.descriptor.recoveredVertices.some(
+		(vertex) => vertex.author === input.author && acceptedOperationRows.get(hex(vertex.digest)) === null
+	);
 	const messageQueueManager = new MessageQueueManager<Message>({ logConfig: { level: "silent" } });
 	let activeHandle: V3PlaneHandle | undefined;
 	let transport: V3RoomTransport | undefined;
-	let terminalFailure: unknown;
+	let terminalFailure: unknown = recoveredProjectionRejected
+		? new TypeError("v3 room recovered operation was not accepted by projection")
+		: undefined;
 	let closed = false;
 	let closePromise: Promise<void> | undefined;
 	const shutdown = (): Promise<void> => {
@@ -470,7 +526,11 @@ export async function createV3RoomSession<Projection extends V3RoomProjectionAut
 			} catch (error) {
 				failures.push(error);
 			}
-			for (const result of await Promise.allSettled([issuanceStore.close(), journalStore.close(), aheStore.close()])) {
+			for (const result of await Promise.allSettled([
+				issuanceStore.close(),
+				journalStore.close(),
+				...aheStores.map((store) => store.close()),
+			])) {
 				if (result.status === "rejected") failures.push(result.reason);
 			}
 			if (failures.length > 0) throw failures[0];
@@ -507,6 +567,7 @@ export async function createV3RoomSession<Projection extends V3RoomProjectionAut
 			}
 		);
 		openedTransport.setRetainedPublisher(async (targetPeerId) => {
+			if (terminalFailure !== undefined) throw terminalFailure;
 			if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
 			const result =
 				targetPeerId === undefined
@@ -520,6 +581,7 @@ export async function createV3RoomSession<Projection extends V3RoomProjectionAut
 		throw error;
 	}
 	type PendingIssue = Readonly<{
+		group?: string;
 		logicalTime: number;
 		operation: Readonly<Record<string, unknown>>;
 		reject(reason: unknown): void;
@@ -588,6 +650,10 @@ export async function createV3RoomSession<Projection extends V3RoomProjectionAut
 			rejectOwned(owned, terminalFailure);
 			return;
 		}
+		if (acceptedOperationRows.get(issued.digest) === null) {
+			rejectOwned(owned, new TypeError("v3 room issued operation was not accepted by projection"));
+			return;
+		}
 		try {
 			await publishAccepted();
 			for (const request of owned) request.resolve();
@@ -608,10 +674,12 @@ export async function createV3RoomSession<Projection extends V3RoomProjectionAut
 			}
 			let end = offset + 1;
 			while (end < snapshot.length && end - offset < 16) {
-				const candidateAction = Reflect.get(snapshot[end]?.operation ?? {}, "action");
+				const candidate = snapshot[end];
+				const candidateAction = Reflect.get(candidate?.operation ?? {}, "action");
 				if (
 					typeof candidateAction !== "string" ||
-					!input.application.batchableOperationActions.includes(candidateAction)
+					!input.application.batchableOperationActions.includes(candidateAction) ||
+					candidate?.group !== head.group
 				) {
 					break;
 				}
@@ -637,12 +705,188 @@ export async function createV3RoomSession<Projection extends V3RoomProjectionAut
 			}
 		});
 	};
+	const acceptedIdentityRows = (): Map<string, Uint8Array> => {
+		const rows = new Map<string, Uint8Array>();
+		for (const vertex of acceptedVertices.values()) {
+			for (const accepted of expand(vertex) ?? []) {
+				const action = Reflect.get(accepted.operation, "action");
+				if (typeof action !== "string" || !input.application.batchableOperationActions.includes(action)) continue;
+				const identity = input.application.displacedOperationIdentity(accepted.operation);
+				if (typeof identity !== "string" || identity.length === 0) {
+					throw new TypeError("v3 room displaced operation identity is invalid");
+				}
+				const key = `${accepted.author}\u0000${action}\u0000${identity}`;
+				const encoded = encodeCanonical(accepted.operation);
+				const prior = rows.get(key);
+				if (prior !== undefined && !sameBytes(prior, encoded)) {
+					throw new TypeError("v3 room accepted operation identity conflicts");
+				}
+				rows.set(key, encoded);
+			}
+		}
+		return rows;
+	};
+	type DisplacedSource = Readonly<{
+		author: string;
+		authorSequence: number;
+		intents: readonly Readonly<{
+			logicalTime: number;
+			operation: Readonly<Record<string, unknown>>;
+			operationCount: number;
+			operationIndex: number;
+		}>[];
+		vertexDigest: string;
+	}>;
+	const drainRebaseOutbox = async (): Promise<void> => {
+		if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
+		const sources: DisplacedSource[] = [];
+		for (;;) {
+			const page = await activeHandle.readRebaseOutbox();
+			if (!page.ok) throw new TypeError(`v3 room rebase outbox failed: ${page.kind}`);
+			if (page.kind === "empty") break;
+			if (page.source.author !== input.author) {
+				throw new TypeError("v3 room displaced source author is invalid");
+			}
+			sources.push(page.source);
+			if (sources.length > 8192) throw new TypeError("v3 room rebase outbox is unbounded");
+			if (
+				sources.some((source, index) => index + 1 < sources.length && source.vertexDigest === page.source.vertexDigest)
+			) {
+				throw new TypeError("v3 room rebase outbox did not advance");
+			}
+			if (page.source.intents.length === 0) {
+				const completed = await activeHandle.completeRebaseSource({
+					authorSequence: page.source.authorSequence,
+					digest: page.source.vertexDigest,
+				});
+				if (!completed.ok) throw new TypeError(`v3 room rebase completion failed: ${completed.kind}`);
+			}
+		}
+		const acceptedRows = acceptedIdentityRows();
+		const sourceRows = new Map<string, Uint8Array>();
+		const capturedMaximum = sources.reduce(
+			(maximum, source) =>
+				source.intents.reduce((sourceMaximum, intent) => Math.max(sourceMaximum, intent.logicalTime), maximum),
+			-1
+		);
+		logicalTime = Math.max(logicalTime, capturedMaximum + 2);
+		const states = sources
+			.filter(({ intents }) => intents.length > 0)
+			.map((source) => ({ held: false, issued: [] as Promise<void>[], source }));
+		const orderedIntents = states
+			.flatMap((state) => state.source.intents.map((intent) => ({ intent, state })))
+			.sort(
+				(left, right) =>
+					left.intent.logicalTime - right.intent.logicalTime ||
+					compareText(left.state.source.author, right.state.source.author) ||
+					left.state.source.authorSequence - right.state.source.authorSequence ||
+					compareText(left.state.source.vertexDigest, right.state.source.vertexDigest) ||
+					left.intent.operationIndex - right.intent.operationIndex
+			);
+		for (const { intent, state } of orderedIntents) {
+			const source = state.source;
+			const operation = detachedRoomOperation(intent.operation);
+			const action = operation === undefined ? undefined : Reflect.get(operation, "action");
+			if (operation === undefined || typeof action !== "string") {
+				throw new TypeError("v3 room displaced operation is invalid");
+			}
+			const policy = input.application.displacementPolicies[action];
+			if (policy === undefined) throw new TypeError("v3 room displacement policy is unavailable");
+			const identity = input.application.displacedOperationIdentity(operation);
+			if (
+				typeof identity !== "string" ||
+				identity.length === 0 ||
+				input.application.displacedOperationIdentity(operation) !== identity
+			) {
+				throw new TypeError("v3 room displaced operation identity is invalid");
+			}
+			const key = `${source.author}\u0000${action}\u0000${identity}`;
+			const sourceBytes = encodeCanonical(operation);
+			const priorSourceBytes = sourceRows.get(key);
+			if (priorSourceBytes !== undefined && !sameBytes(priorSourceBytes, sourceBytes)) {
+				throw new TypeError("v3 room displaced operation identity conflicts");
+			}
+			sourceRows.set(key, sourceBytes);
+			if (policy === "expire") continue;
+			if (policy === "manual-review") {
+				state.held = true;
+				continue;
+			}
+			let selected = operation;
+			if (policy === "transform") {
+				const transform = input.application.transformDisplacedOperation;
+				if (transform === undefined) throw new TypeError("v3 room displaced transform is unavailable");
+				const first = detachedRoomOperation(transform(operation));
+				const second = detachedRoomOperation(transform(operation));
+				if (
+					first === undefined ||
+					second === undefined ||
+					!sameBytes(encodeCanonical(first), encodeCanonical(second)) ||
+					Reflect.get(first, "action") !== action ||
+					input.application.displacedOperationIdentity(first) !== identity
+				) {
+					throw new TypeError("v3 room displaced transform is unstable");
+				}
+				selected = first;
+			}
+			const selectedBytes = encodeCanonical(selected);
+			const acceptedBytes = acceptedRows.get(key);
+			if (acceptedBytes !== undefined) {
+				if (!sameBytes(acceptedBytes, selectedBytes)) {
+					throw new TypeError("v3 room displaced operation identity conflicts");
+				}
+				continue;
+			}
+			acceptedRows.set(key, selectedBytes);
+			const selectedLogicalTime = logicalTime;
+			logicalTime += 2;
+			state.issued.push(
+				new Promise<void>((resolve, reject) => {
+					pendingIssues.push(
+						Object.freeze({
+							group: `${action}\u0000${policy}`,
+							logicalTime: selectedLogicalTime,
+							operation: selected,
+							reject,
+							resolve,
+						})
+					);
+				})
+			);
+		}
+		const issued = states.flatMap((state) => state.issued);
+		if (issued.length > 0) {
+			scheduleDrain();
+			await Promise.all(issued);
+		}
+		for (const { held, source } of states) {
+			if (!held) {
+				const completed = await activeHandle.completeRebaseSource({
+					authorSequence: source.authorSequence,
+					digest: source.vertexDigest,
+				});
+				if (!completed.ok) throw new TypeError(`v3 room rebase completion failed: ${completed.kind}`);
+			}
+		}
+	};
+	const rebasePromise =
+		sourceMaterial === undefined
+			? Promise.resolve()
+			: Promise.resolve().then(async () => {
+					if (terminalFailure !== undefined) throw terminalFailure;
+					await publishAccepted();
+					await drainRebaseOutbox();
+				});
+	void rebasePromise.catch((error: unknown) => {
+		terminalFailure = error;
+	});
 	return Object.freeze({
 		invite,
 		roomId: prepared.descriptor.anchorDigest,
 		trustStatus: "Creator-trusted; not Byzantine-fault-tolerant." as const,
 		async close(): Promise<void> {
 			closed = true;
+			await rebasePromise.catch(() => undefined);
 			for (;;) {
 				if (pendingIssues.length > 0) scheduleDrain();
 				await drainPromise;
@@ -655,6 +899,9 @@ export async function createV3RoomSession<Projection extends V3RoomProjectionAut
 			if (closed) throw new TypeError("v3 room session is closed");
 			const captured = detachedRoomOperation(operation);
 			if (captured === undefined) throw new TypeError("v3 room operation is invalid");
+			await rebasePromise;
+			if (terminalFailure !== undefined) throw terminalFailure;
+			if (closed) throw new TypeError("v3 room session is closed");
 			const current = logicalTime;
 			logicalTime += 2;
 			const promise = new Promise<void>((resolve, reject) => {
@@ -704,10 +951,11 @@ export async function createV3RoomSession<Projection extends V3RoomProjectionAut
 async function prepareDurableRoomState<Projection extends V3RoomProjectionAuthority>(
 	input: CreateV3RoomSessionInput<Projection>,
 	material: V3RoomCreatorInviteMaterial,
+	sourceMaterial: V3RoomCreatorInviteMaterial | undefined,
 	objectId: StorageObjectId
 ): Promise<
 	Readonly<{
-		readonly aheStore: Awaited<ReturnType<typeof createBrowserAheDurableStore>>;
+		readonly aheStores: readonly Awaited<ReturnType<typeof createBrowserAheDurableStore>>[];
 		readonly issuanceStore: Awaited<ReturnType<typeof createBrowserDurableIssuanceStore>>;
 		readonly journalStore: Awaited<ReturnType<typeof createBrowserDurableLiveJournalStore>>;
 		readonly prepared: Extract<Awaited<ReturnType<typeof prepareV3LiveGeneration>>, { readonly ok: true }>;
@@ -715,46 +963,129 @@ async function prepareDurableRoomState<Projection extends V3RoomProjectionAuthor
 	}>
 > {
 	const aheStore = await createBrowserAheDurableStore({ databaseName: `${input.databaseName}--ahe` });
+	const aheStores = [aheStore];
 	let issuanceStore: Awaited<ReturnType<typeof createBrowserDurableIssuanceStore>> | undefined;
 	let journalStore: Awaited<ReturnType<typeof createBrowserDurableLiveJournalStore>> | undefined;
 	try {
-		const trustStore = createCurrentAnchorTrustStore({
-			objectId,
-			pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
-			store: aheStore,
-		});
-		const installed = await trustStore.install({
-			detachedGenesisSignature: material.detachedGenesisSignature,
-			exactCanonicalGenesisAnchorPreimageBytes: material.exactCanonicalGenesisAnchorPreimageBytes,
-			exactCanonicalProfileBytes: material.exactCanonicalProfileBytes,
-			exactCanonicalSignerSetBytes: material.exactCanonicalSignerSetBytes,
-			pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
-		});
-		if (!installed.ok && installed.reason !== "already-installed") {
-			throw new TypeError(`v3 room trust installation failed: ${installed.reason}`);
+		const prepareMaterial = async (
+			selected: V3RoomCreatorInviteMaterial,
+			store: Awaited<ReturnType<typeof createBrowserAheDurableStore>>
+		): Promise<Extract<Awaited<ReturnType<typeof prepareV3LiveGeneration>>, { readonly ok: true }>> => {
+			const trustStore = createCurrentAnchorTrustStore({
+				objectId,
+				pinnedGenesisAnchorDigest: selected.pinnedGenesisAnchorDigest,
+				store,
+			});
+			const installed = await trustStore.install({
+				detachedGenesisSignature: selected.detachedGenesisSignature,
+				exactCanonicalGenesisAnchorPreimageBytes: selected.exactCanonicalGenesisAnchorPreimageBytes,
+				exactCanonicalProfileBytes: selected.exactCanonicalProfileBytes,
+				exactCanonicalSignerSetBytes: selected.exactCanonicalSignerSetBytes,
+				pinnedGenesisAnchorDigest: selected.pinnedGenesisAnchorDigest,
+			});
+			if (!installed.ok && installed.reason !== "already-installed") {
+				throw new TypeError(`v3 room trust installation failed: ${installed.reason}`);
+			}
+			const openedTrust = installed.ok ? installed : await trustStore.open();
+			if (!openedTrust.ok || openedTrust.trust.profileId !== "creator-trusted-v1") {
+				throw new TypeError("v3 room verified trust profile is invalid");
+			}
+			const prepared = await prepareV3LiveGeneration({
+				authenticationProfile: "creator-only",
+				store,
+				objectId,
+				pinnedGenesisAnchorDigest: selected.pinnedGenesisAnchorDigest,
+				exactCanonicalAnchorPreimageBytes: selected.exactCanonicalGenesisAnchorPreimageBytes,
+				detachedSignature: selected.detachedGenesisSignature,
+				exactCanonicalParametersCarrierBytes: selected.exactCanonicalParametersCarrierBytes,
+				catalog: input.application.catalog,
+			});
+			if (!prepared.ok) throw new TypeError(`v3 room preparation failed: ${prepared.kind}`);
+			return prepared;
+		};
+		let prepared = await prepareMaterial(material, aheStore);
+		let sourceAheStore: Awaited<ReturnType<typeof createBrowserAheDurableStore>> | undefined;
+		let sourcePrepared: Extract<Awaited<ReturnType<typeof prepareV3LiveGeneration>>, { readonly ok: true }> | undefined;
+		if (sourceMaterial !== undefined) {
+			sourceAheStore = await createBrowserAheDurableStore({
+				databaseName: `${input.databaseName}--rebase-${sourceMaterial.pinnedGenesisAnchorDigest}--ahe`,
+			});
+			aheStores.push(sourceAheStore);
+			sourcePrepared = await prepareMaterial(sourceMaterial, sourceAheStore);
 		}
-		const openedTrust = installed.ok ? installed : await trustStore.open();
-		if (!openedTrust.ok || openedTrust.trust.profileId !== "creator-trusted-v1") {
-			throw new TypeError("v3 room verified trust profile is invalid");
-		}
-		const prepared = await prepareV3LiveGeneration({
-			authenticationProfile: "creator-only",
-			store: aheStore,
-			objectId,
-			pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
-			exactCanonicalAnchorPreimageBytes: material.exactCanonicalGenesisAnchorPreimageBytes,
-			detachedSignature: material.detachedGenesisSignature,
-			exactCanonicalParametersCarrierBytes: material.exactCanonicalParametersCarrierBytes,
-			catalog: input.application.catalog,
+		const openedIssuanceStore = await createBrowserDurableIssuanceStore({
+			primaryDatabaseName: input.issuanceDatabaseName,
 		});
-		if (!prepared.ok) throw new TypeError(`v3 room preparation failed: ${prepared.kind}`);
-		const openedIssuanceStore = await createBrowserDurableIssuanceStore({ primaryDatabaseName: input.databaseName });
 		issuanceStore = openedIssuanceStore;
 		const openedJournalStore = await createBrowserDurableLiveJournalStore({ primaryDatabaseName: input.databaseName });
 		journalStore = openedJournalStore;
 		const scope = Object.freeze({ author: input.author, objectId: input.objectId });
-		const lineage = await openedIssuanceStore.readLineage(scope);
-		if (lineage.next === 0) {
+		if (typeof openedJournalStore.readiness === "function") {
+			const expectedScope = Object.freeze({
+				anchorDigest: material.pinnedGenesisAnchorDigest,
+				epoch: 0 as const,
+				objectId: input.objectId,
+			});
+			const sameExpectedScope = (value: unknown): boolean =>
+				typeof value === "object" &&
+				value !== null &&
+				Reflect.get(value, "anchorDigest") === expectedScope.anchorDigest &&
+				Reflect.get(value, "epoch") === expectedScope.epoch &&
+				Reflect.get(value, "objectId") === expectedScope.objectId;
+			let readiness;
+			try {
+				readiness = await openedJournalStore.readiness({ scope: expectedScope });
+			} catch {
+				throw new TypeError("v3 room journal readiness failed");
+			}
+			if (!readiness.ok) throw new TypeError("v3 room journal readiness failed");
+			if (!readiness.ready) {
+				if (readiness.kind !== "not-installed") {
+					throw new TypeError("v3 room journal readiness is invalid");
+				}
+			} else {
+				if (
+					!Number.isSafeInteger(readiness.rowCount) ||
+					readiness.rowCount < 0 ||
+					!sameExpectedScope(readiness.scope) ||
+					typeof readiness.snapshot !== "object" ||
+					readiness.snapshot === null ||
+					!sameExpectedScope(Reflect.get(readiness.snapshot, "scope"))
+				) {
+					throw new TypeError("v3 room journal readiness is invalid");
+				}
+			}
+		} else {
+			if (sourceMaterial !== undefined) {
+				throw new TypeError("v3 room journal readiness is unavailable");
+			}
+		}
+		const recoverPrepared = (): ReturnType<typeof recoverV3LiveReplica> =>
+			recoverV3LiveReplica({
+				capability: prepared.capability,
+				...(sourcePrepared === undefined || sourceMaterial === undefined
+					? {}
+					: {
+							displacedSource: Object.freeze({
+								capability: sourcePrepared.capability,
+								exactCanonicalLatchedAclBytes: sourceMaterial.exactCanonicalLatchedAclBytes,
+							}),
+						}),
+				exactCanonicalLatchedAclBytes: material.exactCanonicalLatchedAclBytes,
+				issuanceScope: scope,
+				issuanceStore: openedIssuanceStore,
+				liveJournalStore: openedJournalStore,
+			});
+		let recovered = await recoverPrepared();
+		if (
+			!recovered.ok &&
+			recovered.kind === "issuance-rejected" &&
+			recovered.detail === "v3 recovery issued record chain is empty"
+		) {
+			prepared = await prepareMaterial(material, aheStore);
+			if (sourceMaterial !== undefined && sourceAheStore !== undefined) {
+				sourcePrepared = await prepareMaterial(sourceMaterial, sourceAheStore);
+			}
 			const admission = prepareBlueprintAdmission({
 				canonicalBlueprintPackageBytes: input.application.canonicalBlueprintPackageBytes,
 				expectedBlueprintDigest: prepared.descriptor.blueprintDigest,
@@ -774,24 +1105,18 @@ async function prepareDurableRoomState<Projection extends V3RoomProjectionAuthor
 				objectId: input.objectId,
 				operation: input.application.bootstrapOperation,
 			});
+			recovered = await recoverPrepared();
 		}
-		const recovered = await recoverV3LiveReplica({
-			capability: prepared.capability,
-			exactCanonicalLatchedAclBytes: material.exactCanonicalLatchedAclBytes,
-			issuanceScope: scope,
-			issuanceStore: openedIssuanceStore,
-			liveJournalStore: openedJournalStore,
-		});
 		if (!recovered.ok) throw new TypeError(`v3 room recovery failed: ${recovered.kind}`);
 		return Object.freeze({
-			aheStore,
+			aheStores: Object.freeze([...aheStores]),
 			issuanceStore: openedIssuanceStore,
 			journalStore: openedJournalStore,
 			prepared,
 			recovered,
 		});
 	} catch (error) {
-		const closers: Promise<void>[] = [aheStore.close()];
+		const closers: Promise<void>[] = aheStores.map((store) => store.close());
 		if (issuanceStore !== undefined) closers.push(issuanceStore.close());
 		if (journalStore !== undefined) closers.push(journalStore.close());
 		await Promise.allSettled(closers);
