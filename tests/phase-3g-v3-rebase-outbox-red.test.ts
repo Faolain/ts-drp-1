@@ -212,7 +212,7 @@ describe("Phase 3g authenticated-plane rebase outbox RED", () => {
 		expect(result.outbox.filter(({ digest }) => digest === result.targetDigest)).toHaveLength(1);
 	});
 
-	it("recovers a pending target replacement committed after recovery without allocating a duplicate", async () => {
+	it("preserves source intent when a matching pending target replacement needs product acceptance", async () => {
 		const result = await runSharedPlaneScenario({ targetReplacementAfterRecoveryBeforeRead: true });
 		expect(result.recovery).toMatchObject({ ok: true });
 		expect(result.reopenRecovery).toMatchObject({ ok: true });
@@ -223,14 +223,21 @@ describe("Phase 3g authenticated-plane rebase outbox RED", () => {
 			source: {
 				author: result.sourceRowAuthor,
 				authorSequence: 1,
-				intents: [],
+				intents: [
+					{
+						logicalTime: 3,
+						operation: { action: "add", value: 1 },
+						operationCount: 1,
+						operationIndex: 0,
+					},
+				],
 				vertexDigest: result.sourceDigest,
 			},
 		});
-		expect(result.completion).toEqual({ kind: "published", ok: true });
+		expect(result.completion).toBeUndefined();
 		expect(result.lineageNext).toBe(4);
 		expect(result.outbox.filter(({ digest }) => digest === result.targetReplacementDigest)).toHaveLength(1);
-		expect(result.outbox.find(({ digest }) => digest === result.sourceDigest)?.publishState).toBe("published");
+		expect(result.outbox.find(({ digest }) => digest === result.sourceDigest)?.publishState).toBe("pending");
 	});
 
 	it("does not discard source intent behind a quarantined matching target row", async () => {

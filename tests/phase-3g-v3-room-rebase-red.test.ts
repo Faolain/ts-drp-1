@@ -1120,6 +1120,55 @@ describe("Phase 3g room-owned rebase scheduling RED", () => {
 		await session.close();
 	});
 
+	it("keeps a recovered projection-rejected replacement and its source pending without reissue", async () => {
+		const create = Reflect.get(await roomModule, "createV3RoomSession") as (
+			input: unknown
+		) => Promise<{ close(): Promise<void>; issue(operation: Readonly<Record<string, unknown>>): Promise<void> }>;
+		const base = application();
+		const replacement = Object.freeze({
+			action: "transform-me",
+			clientOperationId: "projection-rejected-restart",
+			value: 2,
+		});
+		let projectionRejections = 0;
+		const selectedApplication = Object.freeze({
+			...base,
+			projectAcceptedOperations: (operations: readonly Readonly<Record<string, unknown>>[]) => {
+				if (operations.some(({ operation }) => Reflect.get(operation, "value") === 2)) {
+					projectionRejections += 1;
+					throw new TypeError("controlled recovered product projection rejection");
+				}
+				return Reflect.apply(Reflect.get(base, "projectAcceptedOperations") as () => unknown, base, [operations]);
+			},
+			transformDisplacedOperation: () => replacement,
+		});
+		probe.recoveredVertices = [acceptedVertex(replacement, 21, 3)];
+		probe.rebasePages = [
+			displaced(
+				Object.freeze([
+					Object.freeze({
+						logicalTime: 1,
+						operation: Object.freeze({ ...replacement, value: 1 }),
+						operationCount: 1,
+						operationIndex: 0,
+					}),
+				])
+			),
+			{ kind: "empty", ok: true },
+		];
+		const session = await create(roomInput(selectedApplication));
+		await settleRoomDrain();
+		expect(projectionRejections).toBeGreaterThan(0);
+		expect(probe.publishCalls).toBe(0);
+		expect(probe.issueInputs).toEqual([]);
+		expect(probe.completedSources).toEqual([]);
+		await expect(
+			session.issue(Object.freeze({ action: "message", clientOperationId: "after-restart-rejection" }))
+		).rejects.toThrow();
+		expect(probe.completedSources).toEqual([]);
+		await session.close();
+	});
+
 	it("rejects partial, extra and accessor-backed policy evidence before consuming a source row", async () => {
 		const accessorPolicies = Object.assign(Object.create(null) as Record<string, unknown>, {
 			"expire-me": "expire",
