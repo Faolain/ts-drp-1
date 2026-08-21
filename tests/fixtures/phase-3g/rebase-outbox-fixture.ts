@@ -78,6 +78,7 @@ export interface SharedPlaneScenarioOptions {
 		| "target-capability";
 	readonly sourceCreatorSignatureCorrupt?: boolean;
 	readonly sourceOperationProfile?: SourceOperationProfile;
+	readonly syntheticCurrentQuarantinedRowCount?: number;
 	readonly syntheticDisplacedRowCount?: number;
 	readonly targetAuthorityMutation?: "authorization-bytes" | "source-capability";
 	readonly targetReplacementAfterRecoveryBeforeRead?: boolean;
@@ -487,9 +488,16 @@ export async function runSharedPlaneScenario(
 						Promise.resolve(commitFor(target, authorSequence, Object.freeze({ action: "add", value: 0 })))
 					);
 		let recoveryIssuanceStore: DurableIssuanceStore = targetStore;
-		if (options.syntheticDisplacedRowCount !== undefined && targetCommit !== undefined) {
-			const requested = options.syntheticDisplacedRowCount;
-			if (!Number.isSafeInteger(requested) || requested < targetCommit.authorSequence) {
+		const syntheticRowCount = options.syntheticCurrentQuarantinedRowCount ?? options.syntheticDisplacedRowCount;
+		if (syntheticRowCount !== undefined && targetCommit !== undefined) {
+			const currentPlane = options.syntheticCurrentQuarantinedRowCount !== undefined;
+			const requested = syntheticRowCount;
+			const finalSequence = currentPlane ? targetCommit.authorSequence + requested - 1 : requested;
+			if (
+				!Number.isSafeInteger(requested) ||
+				requested < 1 ||
+				(!currentPlane && requested < targetCommit.authorSequence)
+			) {
 				throw new TypeError("Phase 3g synthetic displaced row count is invalid");
 			}
 			const originalRows: DurableIssuanceOutboxRecord[] = [];
@@ -506,11 +514,16 @@ export async function runSharedPlaneScenario(
 			}
 			const syntheticRows: DurableIssuanceOutboxRecord[] = [];
 			const syntheticBySequence = new Map<number, DurableIssueCommit>();
-			for (let authorSequence = targetCommit.authorSequence + 1; authorSequence <= requested; authorSequence += 1) {
+			for (let authorSequence = targetCommit.authorSequence + 1; authorSequence <= finalSequence; authorSequence += 1) {
 				const commit = commitFor(
-					source,
+					currentPlane ? target : source,
 					authorSequence,
-					Object.freeze({ action: "add", value: authorSequence }),
+					currentPlane
+						? Object.freeze({
+								action: "applicationBatch",
+								batch: Object.freeze({ entries: Object.freeze([]), version: 1 }),
+							})
+						: Object.freeze({ action: "add", value: authorSequence }),
 					authorSequence * 2 + 1
 				);
 				syntheticBySequence.set(authorSequence, commit);
@@ -524,7 +537,7 @@ export async function runSharedPlaneScenario(
 					Promise.resolve(
 						syntheticBySequence.get(authorSequence) ?? targetStore.readIssued(selectedScope, authorSequence)
 					),
-				readLineage: () => Promise.resolve(Object.freeze({ exhausted: false, next: requested + 1 })),
+				readLineage: () => Promise.resolve(Object.freeze({ exhausted: false, next: finalSequence + 1 })),
 				readOutboxPage: (input = {}) => {
 					const after = input.afterKey?.[2] ?? -1;
 					const limit = input.limit ?? 64;
