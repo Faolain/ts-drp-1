@@ -50117,3 +50117,404 @@ the same two-client chat and zone paths while proving that operations displaced
 by an epoch cut are retried, transformed, expired or held for review without
 duplication or author substitution. This ledger makes no broader Phase 3,
 production-hardening or product-completion claim.
+
+### D.93.52 — Phase 3g authenticated-plane rebase outbox
+
+Phase 3f-c closed bounded dependency aggregation and application batching at
+signed closure tip `9772efdf8cea44db0399d3788eff12952f4f0d8f`. Phase 3g now
+owns the client-side fate of locally durable application intent that cannot be
+published on the currently trusted plane. It does not own creation,
+certification or adoption of an epoch cut.
+
+#### Executable boundary and honest nonclaim
+
+The shipped v3 runtime still accepts only a creator-signed genesis anchor at
+epoch zero. Protocol-v3 anchor installation, the live journal, the node live
+handle and the established type contracts contain no executable next-anchor or
+hard-cut adoption path. Registry and conformance data describe a v3 cut value,
+but no shipped source can produce, certify, install or activate one. A Phase 3g
+test that claimed to execute a certified epoch cut would therefore be synthetic
+or would silently absorb work owned by later cut, sealing and adoption phases.
+
+Phase 3g instead closes the rebase mechanism against the genuine precursor that
+is executable now: **authenticated-plane displacement**. A fixture creates two
+independently genuine creator-signed planes for one exact `objectId`, each with
+its own authenticated anchor but the same physical issuance database and
+`(objectId, author)` lineage. The source session genuinely issues old rows,
+then closes before the target session opens the same database with fresh store
+capabilities. The room input therefore separates its plane-local trust/journal
+`databaseName` from one explicit shared `issuanceDatabaseName`; it does not
+duplicate issuance data or let a caller replace the active target trust
+context. Trust and journal state remain plane-bound; only the issuance lineage
+is shared. The target plane is the room's explicitly selected current trust
+context. One optional closed `rebaseSourceInvite` input carries the exact prior
+creator invite material: canonical source anchor preimage, detached creator
+signature, canonical profile, signer-set, parameters and latched-ACL bytes. It
+is parsed and verified through the existing creator-invite/trust preparation
+path under the same creator signer set, exact `objectId`, epoch zero and the
+room's exact application blueprint; it may neither select nor replace the
+current target context. The verified source anchor must differ from the verified
+target anchor. A bare anchor digest is never sufficient source authority.
+
+Recovery attempts target-plane authentication first. A row that fails target
+authentication may be classified as displaced only when the exact
+`rebaseSourceInvite` context independently authenticates its signature,
+preimage, author, sequence, object, anchor, blueprint and ACL. The node retains
+that detached source-authenticated fact for the derived view but does not append
+the row to the target graph, live journal, latched ACL or projection. A row that
+authenticates under neither context, under both contexts, or only under partial
+or mixed context remains an admission failure. Because both executable fixture
+planes are epoch zero, the anchor digest is the sole operative discriminator;
+epoch transition semantics are not claimed. An untrusted, caller-selected
+target, a same-object lookalike, a foreign creator, a changed
+blueprint/authorization context or a bare anchor string supplies no rebase
+authority.
+
+This is a bounded precursor to the seam a future certified cut may consume. It
+proves authenticated old/current intent handling and shared-lineage egress
+ordering, but it cannot prove source-to-target `previousAnchor`/`cutDigest`
+predecessor binding, epoch advancement, adopted routing or prevention of an
+operator deliberately reopening obsolete source trust. The fixture therefore
+holds exclusive local target-session custody after the genuine source session
+closes. Phase 3g does not call the two-plane fixture a cut, does not claim the
+Phase 3 exit gate, and does not weaken the requirement that final cut
+integration rerun these laws after genuine adoption ships. Phase 3h may use
+this precursor for its reversible migration rehearsal. Certified cut
+construction remains Phase 5 work and atomic adoption remains Phase 6 work.
+
+#### One derived outbox, not a second durable authority
+
+The existing issuance store remains the sole durable issuance and outbox
+owner. Its transaction already binds the author sequence, signed envelope,
+issued record and pending outbox row; its only per-row terminal transition is
+the digest-CAS `pending -> published` transition. Phase 3g does not change that
+store's six-method facade, physical schema, recovery model or crash matrix, and
+does not create a second table, journal, issuer, signer, retry queue or durable
+classification database.
+
+The **rebase outbox** is a read-only derived view over:
+
+- genuine source-plane and target-plane rows from the same issuance lineage;
+- the authenticated source and target plane contexts;
+- the target plane's already accepted operations and authenticated pending
+  issued replacements; and
+- the product's exact per-action displacement policy.
+
+The node owns source-row enumeration, envelope authentication, plane
+classification, batch expansion and stable ordering. The shared room owns the
+one policy/drain state machine and sends any replacement through its existing
+serialized local-issue queue. Products own stable application intent identity
+and visible idempotence. None of those layers may reinterpret a malformed row
+as displaced merely because its anchor bytes differ.
+
+For a source vertex containing an application batch, the derived view expands
+the already-authenticated wrapper with the one existing batch parser and treats
+each child as a separate intent. The target-aware publication adapter scans the
+shared outbox in sequence order. It publishes only rows authenticated as
+current-plane rows, advances past authenticated displaced rows without sending
+their stale envelopes, and fails closed on unavailable, malformed or
+per-row ambiguous or mixed-context evidence. The presence of separately
+authenticated source and target rows in one store is not itself mixed evidence.
+A displaced row therefore cannot head-of-line publish
+before its replacement merely because it has the lower author sequence. One
+invocation advances a monotonic cursor across every inspected row and returns
+only after finding publishable current evidence or exhausting the page, so
+displaced rows are not rescanned from sequence zero for each later current row.
+
+The target plane's bootstrap decision is plane-local, never inferred from the
+shared issuance lineage's nonzero `next`. After target trust and journal open,
+the room issues its genuine target bootstrap exactly when that plane-local
+journal contains no accepted target bootstrap. Reopen proves the existing
+target bootstrap and does not issue another. Recovery then skips only rows
+authenticated as displaced under the verified source context and requires at
+least the genuine target bootstrap plus every other current-plane issued row to
+be recovered. The existing `recoveredCount !== 0` and complete current-plane
+issued-chain invariant remains fail-closed; source displacement does not relax
+it into an empty or truncated target recovery.
+
+The source row remains pending until every child is terminal. A completed
+rebase, an exact author-bound accepted-current duplicate, an authenticated
+pending-current replacement, or a deterministic expiry contributes a terminal
+child outcome. A held child does not. Phase 3g gives manual review no mutable
+resubmit/discard decision: it remains pending and is re-derived byte-for-byte
+until a later product or migration slice gives review decisions their own
+durable authority. Once every child is terminal, the source row uses the
+existing digest-CAS publication transition as the durable target-session
+"never emit this displaced envelope" latch, matching the established
+quarantine precedent. After that CAS, either source- or target-context outbox
+enumeration skips the row as published.
+
+If a crash or thrown graph/journal/sink outcome lands after the target issuance
+transaction commits but before target acceptance or source-row closure, reopen
+must authenticate the exact current-plane issued record and pending outbox row,
+finish the existing terminal-recovery path, and allocate no second sequence or
+signature. Accepted target history and authenticated pending target issuance
+are separate derived facts; neither may be replaced by caller claims. Held
+intent remains pending and reconstructed after restart, and no mutable
+in-memory classification is trusted. The source session is closed before this
+drain begins; preventing later deliberate reopening of obsolete source trust is
+explicitly owed to genuine cut adoption rather than asserted by this precursor.
+
+#### Stable application identity and policy
+
+Every automatically rebaseable application operation carries one required,
+nonempty stable product identity inside its closed signed operation record. The
+value is not a vertex hash, author sequence, logical time or retry counter. The
+original client submission mints it exactly once; recovery and rebase never
+regenerate it. It survives batching, recovery, transformation and re-signing
+unchanged. Identity and deduplication are bound to the exact authenticated
+author as well as the product identity and action. A same identity from another
+author is distinct, while the same author and identity with different canonical
+operation bytes is a conflict that fails closed rather than suppressing either
+intent. The chat `message` ABI names that field `clientOperationId` and advances
+atomically from `{ action, text }` to
+`{ action, clientOperationId, text }`; its canonical blueprint, reducer and
+projection become an ordered identity-bearing state rather than the current
+`string[]`, while preserving the same visible transcript. The zone reuses its
+existing block `id` as the product identity without adding a second field; its
+existing deterministic block map remains the visible idempotence owner.
+
+The room application declares one exact closed displacement-policy table for
+its application actions:
+
+- `rebase`: reissue the same detached intent under the target plane;
+- `transform`: invoke the product's one deterministic local transformation and
+  require the same stable identity in its exact output;
+- `expire`: never issue on the target and make the source child terminal;
+- `manual-review`: retain the exact original intent as held without target
+  issuance or a Phase 3g resolution transition.
+
+Chat `message` is the production `rebase` proof. Zone `placeBlock` also uses
+`rebase`: a block placement has a stable block identity and its last accepted
+value deterministically wins for that identity. ACL, bootstrap `join`,
+node-owned `causalJoin` and the outer `applicationBatch` wrapper are not
+user-rebaseable actions. A controlled application proves `transform`, `expire`
+and `manual-review` without adding those policies to chat or zone. Unknown,
+missing, duplicate, accessor-backed, noncanonical or mixed policy entries fail
+before source rows are consumed. The exact `V3RoomApplication` policy owner
+supplies the product identity extractor and action policy, so node code never
+guesses between chat `clientOperationId`, zone `id`, or future product fields.
+
+Policy is local recovery behavior, not consensus validity and not an alternate
+blueprint admission path. The target node still authenticates and authorizes
+every newly signed replacement normally. A replacement is signed only by the
+target room session's single existing local-author signer, and only when that
+local author exactly equals the authenticated source author. This is not a
+per-author signer registry. A local session may never replace another author's
+intent, borrow its sequence or substitute a fresh signer. A foreign-author
+request fails before transaction, signing, journal, graph or publication work.
+
+The derived state machine for one stable identity is:
+
+```text
+source-authenticated intent
+  |-- same author+identity+bytes accepted on target -> accepted-current -> terminal
+  |-- same author+identity+bytes issued on target   -> pending-current -> terminal recovery
+  |-- source envelope belongs to target plane  -> pending-current  -> existing publication retry
+  `-- authenticated source/target mismatch     -> displaced
+       |-- rebase    -> existing target issue queue -> accepted -> terminal
+       |-- transform -> exact transformed intent -> existing target issue queue -> terminal
+       |-- expire    -> terminal without target issue
+       `-- review    -> held without a Phase 3g terminal transition
+```
+
+Classification is a pure function of detached authenticated envelope facts and
+the authenticated plane contexts. It accepts no graph, arrival-order, timeout,
+retry-count or wall-clock argument. Author-bound target-history lookup
+determines `accepted-current`; authenticated current-plane issued/outbox
+readback determines `pending-current`; neither changes whether an envelope
+belongs to a plane.
+The room orders displaced children by their captured source logical time,
+author, author sequence, vertex digest and operation index, then drains them
+through its one existing microtask scheduler. Compatible means the same local
+author, target plane, application action, terminal policy result and existing
+batch admission class; otherwise the item is a singleton or a later group. At
+most sixteen compatible rebases share one application batch, and the existing
+node queue remains the single serialization gate. Pagination and microtask
+turns, rather than timers, bound recovery work and prevent a post-transition
+rebase burst from creating a second scheduler or an unbounded synchronous task.
+
+#### Tests-only RED ownership
+
+The signed plan commit is followed by a separate Good-Faolain-signed tests-only
+RED. The RED changes only:
+
+- `tests/phase-3g-v3-rebase-outbox-red.test.ts`;
+- `tests/phase-3g-v3-room-rebase-red.test.ts`;
+- `tests/phase-3g-chat-zone-rebase-red.test.ts`;
+- `tests/fixtures/phase-3g/rebase-outbox-fixture.ts`;
+- `tests/fixtures/phase-3a1b-p3/seam3-contract.ts`;
+- `tests/fixtures/phase-3a1b-p3/seam3-types.ts`;
+- `tests/fixtures/phase-3a1b-d9346/room-contract.ts`;
+- `tests/phase-3a1b-d9346-room-semantics-red.test.ts`;
+- `tests/phase-3f-b-chat-zone-causal-join-red.test.ts`;
+- `tests/phase-3f-c-chat-zone-batching-red.test.ts`; and
+- `tests/fixtures/phase-3f-c/application-batching-fixture.ts`.
+
+The fixture builds source and target planes with real canonical anchor,
+parameters, blueprint, ACL and signer material plus genuine signatures. It
+issues source rows, closes the source session, and opens the target against the
+same physical issuance database and lineage; it does not hide displaced rows
+behind a separate target store. Trust and journal capabilities remain exact to
+their respective planes. The target receives the exact verified source invite
+through `rebaseSourceInvite`, while the ordinary current `creatorInvite` remains
+the sole target trust input; missing, swapped, partial or mismatched source
+material fails before displacement. It never edits decoded vertices, injects an
+admitted result, calls a private helper or fabricates a cut. The RED first proves
+both control planes can open serially and independently accept ordinary signed
+writes: the target bootstrap is selected from empty plane-local journal state
+despite a nonempty shared issuance lineage, source rows are not admitted to the
+target graph, and target reopen does not issue a second bootstrap. It then
+proves the source row, shared lineage, and target accepted or pending history are
+genuine before reaching the absent rebase surface.
+Controlled product policies use the same room interface and node path as chat
+and zone; they are not production fallbacks. The seam3 type contract is
+extended without loosening its existing exact-equality assertions, and the
+existing live-transport, shared-room and network-wire contract drivers are
+explicit preservation gates.
+
+The RED causal matrix proves:
+
+1. source and target anchor contexts are independently authenticated for the
+   same object, creator, physical issuance database and author lineage, while a
+   missing source invite, changed source signature, source anchor, target
+   signature, target anchor, object, creator, blueprint or ACL refuses
+   classification without consuming the source row; target activation issues
+   exactly one plane-local bootstrap even though the shared lineage is nonempty,
+   recovery retains a nonempty complete target chain, and target reopen does not
+   duplicate that bootstrap;
+2. an authentic target-plane pending row retains ordinary publication retry,
+   an authentic foreign-plane row becomes displaced, and malformed or
+   unauthenticated bytes remain admission failures rather than displacement;
+   target publication scans past held displaced rows without emitting them or
+   blocking later current-plane rows;
+3. a singleton and a genuine two/sixteen-child source batch expand to exact
+   ordered intents, while malformed, nested, mixed-control and over-limit
+   wrappers fail closed through the existing parser;
+4. an already accepted exact author, action, product identity and canonical
+   operation produces zero target issue/sign/store/journal/publish work, and
+   late source delivery plus repeated target delivery remains visible exactly
+   once; another author reusing the identity is distinct, while same-author
+   identity with changed bytes fails closed;
+5. rebase preserves the exact stable identity and original author, allocates a
+   fresh sequence in the shared lineage, signs once per legal group and never
+   publishes the source envelope through the target session;
+6. a foreign session cannot re-sign another author's intent, and wrong signer,
+   authorization, transaction, admission, journal, graph, sink or publication
+   outcomes remain observable failures with the source row pending;
+7. deterministic transform preserves the stable identity, while a changed,
+   missing, extra, duplicate or nondeterministic transform result fails before
+   target issuance;
+8. expire performs zero target issuance and terminally closes the source child;
+   manual review performs zero target issuance, survives reopen with exact
+   original bytes, never auto-promotes and remains nonterminal throughout
+   Phase 3g;
+9. for a mixed-policy batch the source row remains pending while any child is
+   held, restart re-derives completed children without duplicate issue, and the
+   row closes exactly once only when no held child remains under the immutable
+   policy; Phase 3g has no volatile per-child discard state to lose;
+10. crash-shaped faults before target commit leave the intent displaced, while
+    faults after target commit but before graph, journal, sink, publication or
+    source-row closure authenticate the current issued/outbox candidate, finish
+    terminal recovery and close without a second signature or sequence;
+11. rebase order is independent of store page, graph insertion and delivery
+    order; clock advancement covers every source child logical time and no
+    resumed target issue reuses a captured logical time;
+12. chat uninterrupted execution and authenticated-plane displacement/rebase
+    produce the same ordered visible transcript by stable message identity;
+    zone produces the same sorted block board by block identity; and
+13. the established two-client chat and genuine-network zone controls retain
+    create/join, durable exchange, E1 movement, disconnect/reconnect and
+    convergence on final bytes.
+
+Mutants accept a bare anchor mismatch, skip source authentication, use current
+authentication failure as displacement, omit or substitute the verified source
+invite, use shared-lineage emptiness as the target bootstrap test, relax target
+recovery to allow zero current rows, admit a source row to the target graph or
+journal, duplicate target bootstrap on reopen, hide source and target behind
+separate issuance stores, publish the first displaced pending row, trust caller-supplied
+author/identity, collapse same identity across authors, suppress changed bytes,
+regenerate an identity, sign as the reconnecting rather than original author,
+reuse an old sequence or old signature, issue both old and replacement, ignore
+an authenticated pending target replacement, swallow ambiguous target commit,
+apply a duplicate twice, omit one batch child, treat the outer batch as one
+intent, reorder children, auto-promote held intent, retry expired intent,
+persist and trust a stale classification, close a mixed source row early, fail
+to close it after all children resolve, duplicate after either crash boundary,
+bypass the room queue, introduce a timer, add a second durable outbox, guess
+product identity in node code, or implement product-local rebase schedulers.
+Every mutant dies at an observable authority, durable-state or product-result
+boundary; private spelling and incidental diagnostic precedence are not
+authority.
+
+#### GREEN ownership, preservation and closure
+
+The signed GREEN is the RED commit's sole child and changes exactly:
+
+- `packages/node/src/v3-live.ts`;
+- `examples/v3-room/src/index.ts`;
+- `examples/v3-chat/src/index.ts`; and
+- `examples/grid/src/v3-zone.ts`.
+
+The node adds one production-used plane-classification, shared-lineage outbox
+enumeration and target-aware publication owner beside its existing
+recovery/outbox parser. The same owner authenticates pending current-plane
+replacements and adds authenticated pending-current readback before any new
+sequence is selected, then finishes through the existing recovery and admission
+steps without claiming a pre-existing in-session uncertain-outcome reconciler.
+It adds no new module export or failure kind: the
+RED-owned exact handle/input type extension supplies the verified source context
+and derived displaced-row operations, while existing `record-rejected`,
+`store-failed` and activation failure categories remain fail-closed. The room
+uses plane-local journal evidence rather than shared lineage emptiness for its
+bootstrap decision and adds no second queue: it feeds detached displaced intent
+into the same `PendingIssue` scheduler, owns the exact
+application identity/policy seam, and uses the same issue, split, publication
+and promise laws. The node-owned target-aware completion operation performs the
+exact source-row digest-CAS after the room reports all child outcomes terminal;
+no product writes issuance state directly. Chat and zone update their one canonical application
+composition rather than installing rebase adapters beside it. No compatibility
+overload accepts the old chat message shape. No test hook, caller-supplied
+accepted identity, alternate signer, optional verification mode or
+source-envelope publication path is authorized.
+
+No protocol-v3 source or registry, compaction, issuance-store, storage backend,
+live-journal, workflow, dependency, lockfile, topology, ephemeral, Phase 3h,
+snapshot, sealing, adoption, archive, freeze-governance, plan or unrelated
+product path may change. Refactor-clean review rejects a second classifier,
+outbox, queue, scheduler, signer, batch parser, projector identity map,
+compatibility branch or product-local recovery loop. The existing room
+projection remains the sole accepted-operation identity view; extending its
+rows with stable product identity does not create a parallel projector map.
+
+Focused RED/GREEN evidence runs the three Phase 3g files and their exact
+contract drivers, followed by the complete Phase 3f-a/b/c frontier, local issue,
+room, chat and zone roster. GREEN additionally runs the five protocol semantic
+suites and both controlled arms, issuance-store node/browser conformance,
+the existing Phase 3a1a live-preparation, Phase 3a1ac live-persistence, Phase
+3a1b live-transport, network-wire, shared-room and room semantic contract
+drivers, current root/history gates, direct
+node/room/chat/grid typecheck and build, package build, ESLint, Prettier and diff
+checks. The real chat and zone browser controls run once on final bytes. The
+owned measurements record source-row count, expanded-intent count, target
+signatures/sequences/vertices, publication transitions, duplicate
+suppressions, held/expired counts, page turns and wall duration. These are
+evidence, not consensus fields.
+
+The plan, tests-only RED, GREEN and concise closure ledger remain separate
+Good-Faolain-signed linear commits. Kimi receives the requested 100-step audit.
+Grok runs in review mode with streamed JSONL, status and final artifacts,
+`max-turns=64` and an 1,800-second bound; progress may continue beyond twelve
+minutes. Codex and Opus xhigh review the exact packet independently. A timeout
+or `NO_VERDICT` is reported honestly and is not approval; only a reproduced
+substantive P0/P1 blocks signing, and every such finding is resolved or
+explicitly dismissed with causal evidence. Reviewers may run bounded focused
+checks but not unrelated exhaustive freeze/certification matrices.
+
+Closure records exact signed identities, test counts and wall durations and
+states only that the authenticated-plane rebase mechanism is closed. It must
+repeat that certified epoch-cut integration remains open until a genuine
+adopted next anchor can supply the same authenticated source/target context.
+The next checkpoint is Phase 3h's signed migration record and reversible
+rehearsal; no broader Phase 3, production-hardening or product-completion claim
+is authorized.
