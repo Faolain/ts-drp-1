@@ -246,8 +246,17 @@ describe("D.93.36 local issue, apply and publish RED", () => {
 			});
 			const issuePromise = Reflect.apply(issueLocal as (...args: unknown[]) => unknown, activated.handle, [
 				Object.freeze({
-					logicalTime: 2,
-					operation: Object.freeze({ action: "acl", group: "writer", kind: "grant", target: "d".repeat(64) }),
+					operations: Object.freeze([
+						Object.freeze({
+							logicalTime: 2,
+							operation: Object.freeze({
+								action: "acl",
+								group: "writer",
+								kind: "grant",
+								target: "d".repeat(64),
+							}),
+						}),
+					]),
 					signRegisteredVertexDigest: signer,
 				}),
 			]) as Promise<Readonly<Record<string, unknown>>>;
@@ -365,23 +374,42 @@ describe("D.93.36 local issue, apply and publish RED", () => {
 				Reflect.apply(issueLocal as (...args: unknown[]) => unknown, activated.handle, [
 					Object.freeze({
 						dependencies: [recoveryDigest],
-						logicalTime: 4,
-						operation: Object.freeze({ action: "acl", group: "writer", kind: "grant", target: "e".repeat(64) }),
+						operations: Object.freeze([
+							Object.freeze({
+								logicalTime: 4,
+								operation: Object.freeze({
+									action: "acl",
+									group: "writer",
+									kind: "grant",
+									target: "e".repeat(64),
+								}),
+							}),
+						]),
 						signRegisteredVertexDigest: legacySigner,
 					}),
 				]) as Promise<Readonly<Record<string, unknown>>>,
 				Reflect.apply(issueLocal as (...args: unknown[]) => unknown, activated.handle, [
 					Object.freeze({
 						joinRole: "causalJoin",
-						logicalTime: 6,
-						operation: Object.freeze({ action: "acl", group: "writer", kind: "grant", target: "f".repeat(64) }),
+						operations: Object.freeze([
+							Object.freeze({
+								logicalTime: 6,
+								operation: Object.freeze({
+									action: "acl",
+									group: "writer",
+									kind: "grant",
+									target: "f".repeat(64),
+								}),
+							}),
+						]),
 						signRegisteredVertexDigest: joinSelectorSigner,
 					}),
 				]) as Promise<Readonly<Record<string, unknown>>>,
 				Reflect.apply(issueLocal as (...args: unknown[]) => unknown, activated.handle, [
 					Object.freeze({
-						logicalTime: 8,
-						operation: Object.freeze({ action: "causalJoin" }),
+						operations: Object.freeze([
+							Object.freeze({ logicalTime: 8, operation: Object.freeze({ action: "causalJoin" }) }),
+						]),
 						signRegisteredVertexDigest: callerReservedJoinSigner,
 					}),
 				]) as Promise<Readonly<Record<string, unknown>>>,
@@ -392,6 +420,68 @@ describe("D.93.36 local issue, apply and publish RED", () => {
 			expect(legacySigner).not.toHaveBeenCalled();
 			expect(joinSelectorSigner).not.toHaveBeenCalled();
 			expect(callerReservedJoinSigner).not.toHaveBeenCalled();
+
+			const malformedInputs = [
+				Object.freeze({ operations: Object.freeze([]) }),
+				Object.freeze({
+					operations: Object.freeze([
+						Object.freeze({
+							logicalTime: 10,
+							operation: Object.freeze({
+								action: "applicationBatch",
+								batch: Object.freeze({
+									entries: Object.freeze([
+										Object.freeze({ logicalTime: 10, operation: Object.freeze({ action: "acl" }) }),
+										Object.freeze({ logicalTime: 12, operation: Object.freeze({ action: "acl" }) }),
+									]),
+									version: 1,
+								}),
+							}),
+						}),
+					]),
+				}),
+				Object.freeze({
+					operations: Object.freeze([
+						Object.freeze({ logicalTime: 10, operation: Object.freeze({ action: "acl" }) }),
+						Object.freeze({ logicalTime: 10, operation: Object.freeze({ action: "acl" }) }),
+					]),
+				}),
+				Object.freeze({
+					operations: Object.freeze([
+						Object.freeze({ logicalTime: 10, operation: Object.freeze({ action: "acl" }) }),
+						Object.freeze({ logicalTime: 12, operation: Object.freeze({ action: "join" }) }),
+					]),
+				}),
+				Object.freeze({
+					operations: Object.freeze([
+						Object.freeze({ logicalTime: 10, operation: Object.freeze({ action: "acl" }) }),
+						Object.freeze({ logicalTime: 12, operation: Object.freeze({ action: "causalJoin" }) }),
+					]),
+				}),
+				Object.freeze({
+					operations: Object.freeze([
+						Object.freeze({ logicalTime: 10, operation: Object.freeze({ action: "acl" }) }),
+						Object.freeze({
+							logicalTime: 12,
+							operation: Object.freeze({ action: "applicationBatch", batch: { entries: [], version: 1 } }),
+						}),
+					]),
+				}),
+				Object.freeze({
+					operations: Object.freeze([
+						Object.freeze({ logicalTime: 10, operation: Object.freeze({ action: "unknown" }) }),
+						Object.freeze({ logicalTime: 12, operation: Object.freeze({ action: "acl" }) }),
+					]),
+				}),
+			] as const;
+			for (const malformed of malformedInputs) {
+				const malformedSigner = vi.fn(fixture.signRegisteredVertexDigest);
+				const outcome = (await Reflect.apply(issueLocal as (...args: unknown[]) => unknown, activated.handle, [
+					Object.freeze({ ...malformed, signRegisteredVertexDigest: malformedSigner }),
+				])) as Readonly<{ readonly ok: boolean }>;
+				expect(outcome.ok).toBe(false);
+				expect(malformedSigner).not.toHaveBeenCalled();
+			}
 			const deactivate = Reflect.get(activated.handle, "deactivate");
 			if (typeof deactivate === "function") Reflect.apply(deactivate, activated.handle, []);
 		} finally {

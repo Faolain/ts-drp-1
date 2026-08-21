@@ -53,13 +53,21 @@ interface ExpectedEphemeralAuthority {
 }
 
 interface ExpectedLocalIssueInput {
-	readonly logicalTime: number;
-	readonly operation: Readonly<Record<string, unknown>>;
+	readonly operations: readonly Readonly<{
+		readonly logicalTime: number;
+		readonly operation: Readonly<Record<string, unknown>>;
+	}>[];
 	readonly signRegisteredVertexDigest: SignRegisteredVertexDigest;
 }
 
 type ExpectedLocalIssueResult =
 	| Readonly<{ readonly ok: true; readonly kind: "accepted"; readonly authorSequence: number; readonly digest: string }>
+	| Readonly<{
+			readonly ok: false;
+			readonly kind: "split-required";
+			readonly detail: string;
+			readonly prefixLength: number;
+	  }>
 	| Readonly<{
 			readonly ok: false;
 			readonly kind:

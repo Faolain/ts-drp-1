@@ -1,6 +1,6 @@
 import type {
 	CreateV3RoomSessionInput,
-	V3RoomAcceptedVertex,
+	V3RoomAcceptedOperation,
 	V3RoomApplication,
 	V3RoomProjectionAuthority,
 	V3RoomSession,
@@ -20,9 +20,33 @@ interface ExpectedProjection extends V3RoomProjectionAuthority {
 	readonly acceptedDigests: readonly string[];
 }
 
-type ExpectedProjector = (vertices: readonly V3RoomAcceptedVertex[]) => ExpectedProjection;
+interface ExpectedAcceptedOperation {
+	readonly author: string;
+	readonly authorSequence: number;
+	readonly logicalTime: number;
+	readonly operation: Readonly<Record<string, unknown>>;
+	readonly operationCount: number;
+	readonly operationIndex: number;
+	readonly vertexDigest: string;
+}
 
-type _Projector = Assert<Equal<V3RoomApplication<ExpectedProjection>["projectAcceptedVertices"], ExpectedProjector>>;
+type ExpectedProjector = (operations: readonly V3RoomAcceptedOperation[]) => ExpectedProjection;
+
+type _AcceptedOperation = Assert<Equal<V3RoomAcceptedOperation, ExpectedAcceptedOperation>>;
+type _ApplicationKeys = Assert<
+	Equal<
+		keyof V3RoomApplication<ExpectedProjection>,
+		| "batchableOperationActions"
+		| "bootstrapOperation"
+		| "canonicalBlueprintPackageBytes"
+		| "catalog"
+		| "projectAcceptedOperations"
+	>
+>;
+type _BatchableActions = Assert<
+	Equal<V3RoomApplication<ExpectedProjection>["batchableOperationActions"], readonly string[]>
+>;
+type _Projector = Assert<Equal<V3RoomApplication<ExpectedProjection>["projectAcceptedOperations"], ExpectedProjector>>;
 type _Roster = Assert<Equal<V3RoomProjectionAuthority["transportPeerAuthors"], readonly ExpectedRosterEntry[]>>;
 type _Writers = Assert<Equal<V3RoomProjectionAuthority["writerAuthors"], readonly string[]>>;
 type _ProjectionSink = Assert<

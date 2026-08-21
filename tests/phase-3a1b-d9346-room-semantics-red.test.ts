@@ -24,10 +24,21 @@ interface AuthorizationProvider {
 }
 
 interface ExpectedApplication {
+	readonly batchableOperationActions: readonly string[];
 	readonly bootstrapOperation: Readonly<Record<string, unknown>>;
 	readonly canonicalBlueprintPackageBytes: Uint8Array;
 	readonly catalog: unknown;
-	projectAcceptedVertices(vertices: readonly V3RoomAcceptedVertex[]): Projection;
+	projectAcceptedOperations(operations: readonly AcceptedOperation[]): Projection;
+}
+
+interface AcceptedOperation {
+	readonly author: string;
+	readonly authorSequence: number;
+	readonly logicalTime: number;
+	readonly operation: Readonly<Record<string, unknown>>;
+	readonly operationCount: number;
+	readonly operationIndex: number;
+	readonly vertexDigest: string;
 }
 
 interface ExpectedInput {
@@ -51,7 +62,11 @@ interface ExpectedSession {
 }
 
 interface LocalIssueInput {
-	readonly logicalTime: number;
+	readonly operations: readonly Readonly<{
+		readonly logicalTime: number;
+		readonly operation: Readonly<Record<string, unknown>>;
+	}>[];
+	signRegisteredVertexDigest(digest: Uint8Array): Promise<Uint8Array>;
 }
 
 const probe = vi.hoisted(() => ({
@@ -60,12 +75,20 @@ const probe = vi.hoisted(() => ({
 	deactivations: 0,
 	ephemeralProvider: undefined as AuthorizationProvider | undefined,
 	issueInputs: [] as LocalIssueInput[],
+	issueBarrier: undefined as Promise<void> | undefined,
+	issueBatchFailure: false,
+	issueRejectedActions: new Set<string>(),
+	issueRejectedTexts: new Set<string>(),
 	issueRowsPerRequest: 1,
 	issueSinkVertex: undefined as V3RoomAcceptedVertex | undefined,
+	onSign: undefined as (() => void) | undefined,
 	pendingPublications: 0,
 	publishCalls: 0,
 	publishFailureAtCall: undefined as number | undefined,
 	recovered: [] as unknown[],
+	retainedIngressHandler: undefined as ((message: unknown) => void) | undefined,
+	retainedVertex: undefined as V3RoomAcceptedVertex | undefined,
+	splitPrefixLength: undefined as number | undefined,
 }));
 
 vi.mock("@ts-drp/control-plane", async (importOriginal) => ({
@@ -104,6 +127,33 @@ vi.mock("../packages/node/dist/src/v3-live.js", async (importOriginal) => ({
 				},
 				issueLocal: async (input: LocalIssueInput) => {
 					probe.issueInputs.push(input);
+					await probe.issueBarrier;
+					const entries = input.operations;
+					if (entries.length > 16) {
+						return { detail: "controlled split", kind: "split-required", ok: false, prefixLength: 16 };
+					}
+					if (probe.splitPrefixLength !== undefined && entries.length > probe.splitPrefixLength) {
+						return {
+							detail: "controlled byte split",
+							kind: "split-required",
+							ok: false,
+							prefixLength: probe.splitPrefixLength,
+						};
+					}
+					if (probe.issueBatchFailure && entries.length > 1) {
+						return { detail: "controlled batch-owned failure", kind: "issuance-rejected", ok: false };
+					}
+					if (
+						entries.some(
+							({ operation }) =>
+								probe.issueRejectedActions.has(String(Reflect.get(operation, "action"))) ||
+								probe.issueRejectedTexts.has(String(Reflect.get(operation, "text")))
+						)
+					) {
+						return { detail: "controlled malformed singleton", kind: "malformed-input", ok: false };
+					}
+					probe.onSign?.();
+					await input.signRegisteredVertexDigest(new Uint8Array(32));
 					probe.pendingPublications += probe.issueRowsPerRequest;
 					if (probe.issueSinkVertex !== undefined) {
 						try {
@@ -142,6 +192,9 @@ vi.mock("../packages/node/dist/src/v3-live.js", async (importOriginal) => ({
 			ok: true,
 		}),
 	routeV3Ingress: () => undefined,
+	routeV3RetainedIngress: () => {
+		if (probe.retainedVertex !== undefined) void probe.activatedSink?.({ vertex: probe.retainedVertex });
+	},
 }));
 
 vi.mock("../packages/protocol-v3/dist/src/public.js", async (importOriginal) => ({
@@ -211,15 +264,19 @@ function digest(vertex: V3RoomAcceptedVertex): string {
 	return Array.from(vertex.digest, (value) => value.toString(16).padStart(2, "0")).join("");
 }
 
-function project(vertices: readonly V3RoomAcceptedVertex[]): Projection {
-	const transportPeerAuthors = vertices.flatMap((vertex) => {
-		const peerId = Reflect.get(vertex.operation, "peerId");
-		return Reflect.get(vertex.operation, "action") === "join" && typeof peerId === "string"
-			? [{ author: vertex.author, peerId }]
+function project(operations: readonly AcceptedOperation[]): Projection {
+	const transportPeerAuthors = operations.flatMap((acceptedOperation) => {
+		const peerId = Reflect.get(acceptedOperation.operation, "peerId");
+		return Reflect.get(acceptedOperation.operation, "action") === "join" && typeof peerId === "string"
+			? [{ author: acceptedOperation.author, peerId }]
 			: [];
 	});
 	return Object.freeze({
-		acceptedDigests: Object.freeze(vertices.map(digest)),
+		acceptedDigests: Object.freeze(
+			operations
+				.filter(({ operation }) => Reflect.get(operation, "action") !== "projection-hidden")
+				.map(({ vertexDigest }) => vertexDigest)
+		),
 		transportPeerAuthors: Object.freeze(transportPeerAuthors),
 		writerAuthors: Object.freeze(transportPeerAuthors.map(({ author }) => author)),
 	});
@@ -284,7 +341,13 @@ function input(application: ExpectedApplication, onProjection: (projection: Proj
 				return channel();
 			},
 			requestRetainedHistory: () => undefined,
-			setIngressHandler: () => undefined,
+			setIngressHandler: (
+				_ingressId: string,
+				_live: (message: unknown) => void,
+				retained: (message: unknown) => void
+			) => {
+				probe.retainedIngressHandler = retained;
+			},
 			setRetainedPublisher: () => undefined,
 		}),
 		publicKeyBytes: Uint8Array.of(1),
@@ -292,12 +355,13 @@ function input(application: ExpectedApplication, onProjection: (projection: Proj
 	};
 }
 
-function application(projector: ExpectedApplication["projectAcceptedVertices"] = project): ExpectedApplication {
+function application(projector: ExpectedApplication["projectAcceptedOperations"] = project): ExpectedApplication {
 	return {
+		batchableOperationActions: Object.freeze(["message"]),
 		bootstrapOperation: Object.freeze({ action: "join", peerId: "peer-local" }),
 		canonicalBlueprintPackageBytes: Uint8Array.of(1),
 		catalog: {} as never,
-		projectAcceptedVertices: projector,
+		projectAcceptedOperations: projector,
 	};
 }
 
@@ -307,12 +371,20 @@ beforeEach(() => {
 	probe.deactivations = 0;
 	probe.ephemeralProvider = undefined;
 	probe.issueInputs = [];
+	probe.issueBarrier = undefined;
+	probe.issueBatchFailure = false;
+	probe.issueRejectedActions = new Set<string>();
+	probe.issueRejectedTexts = new Set<string>();
 	probe.issueRowsPerRequest = 1;
 	probe.issueSinkVertex = undefined;
+	probe.onSign = undefined;
 	probe.pendingPublications = 0;
 	probe.publishCalls = 0;
 	probe.publishFailureAtCall = undefined;
 	probe.recovered = [];
+	probe.retainedIngressHandler = undefined;
+	probe.retainedVertex = undefined;
+	probe.splitPrefixLength = undefined;
 });
 
 afterEach(() => {
@@ -320,6 +392,362 @@ afterEach(() => {
 });
 
 describe("D.93.46b real shared-room semantics", () => {
+	it("coalesces two same-turn eligible requests into one node-owned operations input", async () => {
+		const { createV3RoomSession: currentCreateV3RoomSession } = await roomModule;
+		const createV3RoomSession = currentCreateV3RoomSession as unknown as (
+			input: ExpectedInput
+		) => Promise<ExpectedSession>;
+		const session = await createV3RoomSession(input(application(), () => undefined));
+		probe.issueInputs.length = 0;
+		const firstOperation = { action: "message", text: "first" };
+		const firstIssue = session.issue(firstOperation);
+		firstOperation.text = "mutated-after-capture";
+		await Promise.all([firstIssue, session.issue(Object.freeze({ action: "message", text: "second" }))]);
+		expect(probe.issueInputs).toEqual([
+			{
+				operations: [
+					{ logicalTime: 3, operation: { action: "message", text: "first" } },
+					{ logicalTime: 5, operation: { action: "message", text: "second" } },
+				],
+				signRegisteredVertexDigest: expect.any(Function),
+			},
+		]);
+		await session.close();
+	});
+
+	it("splits seventeen requests and never batches across a control barrier", async () => {
+		const { createV3RoomSession: currentCreateV3RoomSession } = await roomModule;
+		const createV3RoomSession = currentCreateV3RoomSession as unknown as (
+			input: ExpectedInput
+		) => Promise<ExpectedSession>;
+		const session = await createV3RoomSession(input(application(), () => undefined));
+		probe.issueInputs.length = 0;
+		await Promise.all(
+			Array.from({ length: 17 }, (_, index) =>
+				session.issue(Object.freeze({ action: "message", text: `message-${index}` }))
+			)
+		);
+		expect(probe.issueInputs.map(({ operations }) => operations?.length)).toEqual([16, 1]);
+
+		probe.issueInputs.length = 0;
+		await Promise.all([
+			session.issue({ action: "message", text: "before-a" }),
+			session.issue({ action: "message", text: "before-b" }),
+			session.issue({ action: "acl", group: "writer", kind: "grant", target: "a".repeat(64) }),
+			session.issue({ action: "message", text: "after" }),
+		]);
+		expect(
+			probe.issueInputs.map((entry) =>
+				(entry.operations ?? []).map(({ operation }) => String(Reflect.get(operation, "action")))
+			)
+		).toEqual([["message", "message"], ["acl"], ["message"]]);
+		await session.close();
+	});
+
+	it("rejects one over-budget eligible head without dropping or coalescing the untouched suffix", async () => {
+		const invalidApplication = application();
+		probe.issueRejectedTexts.add("oversized");
+		const { createV3RoomSession: currentCreateV3RoomSession } = await roomModule;
+		const createV3RoomSession = currentCreateV3RoomSession as unknown as (
+			input: ExpectedInput
+		) => Promise<ExpectedSession>;
+		const session = await createV3RoomSession(input(invalidApplication, () => undefined));
+		probe.issueInputs.length = 0;
+		const outcomes = await Promise.allSettled([
+			session.issue({ action: "message", text: "oversized" }),
+			session.issue({ action: "message", text: "survives-a" }),
+			session.issue({ action: "message", text: "survives-b" }),
+		]);
+		expect(outcomes.map(({ status }) => status)).toEqual(["rejected", "fulfilled", "fulfilled"]);
+		expect(
+			probe.issueInputs.map(({ operations }) => operations.map(({ operation }) => Reflect.get(operation, "text")))
+		).toEqual([
+			["oversized", "survives-a", "survives-b"],
+			["survives-a", "survives-b"],
+		]);
+		await session.close();
+	});
+
+	it("retries the exact node-selected prefix and suffix after a byte-budget split", async () => {
+		probe.splitPrefixLength = 1;
+		const { createV3RoomSession: currentCreateV3RoomSession } = await roomModule;
+		const createV3RoomSession = currentCreateV3RoomSession as unknown as (
+			input: ExpectedInput
+		) => Promise<ExpectedSession>;
+		const session = await createV3RoomSession(input(application(), () => undefined));
+		probe.issueInputs.length = 0;
+		await Promise.all([
+			session.issue({ action: "message", text: "large-prefix" }),
+			session.issue({ action: "message", text: "suffix" }),
+		]);
+		expect(probe.issueInputs.map(({ operations }) => operations.map(({ operation }) => operation))).toEqual([
+			[
+				{ action: "message", text: "large-prefix" },
+				{ action: "message", text: "suffix" },
+			],
+			[{ action: "message", text: "large-prefix" }],
+			[{ action: "message", text: "suffix" }],
+		]);
+		await session.close();
+	});
+
+	it("expands one genuine batch once for recovery and live projection without publishing a malformed prefix", async () => {
+		const validBatch = accepted(0x61, {
+			author: "author-batch",
+			authorSequence: 7,
+			epoch: 0,
+			logicalTime: 9,
+			operation: Object.freeze({
+				action: "applicationBatch",
+				batch: Object.freeze({
+					entries: Object.freeze([
+						Object.freeze({ logicalTime: 7, operation: Object.freeze({ action: "message", text: "first" }) }),
+						Object.freeze({ logicalTime: 9, operation: Object.freeze({ action: "message", text: "second" }) }),
+					]),
+					version: 1,
+				}),
+			}),
+		});
+		const malformedBatch = accepted(0x62, {
+			author: "author-hostile",
+			authorSequence: 8,
+			epoch: 0,
+			logicalTime: 11,
+			operation: Object.freeze({
+				action: "applicationBatch",
+				batch: Object.freeze({
+					entries: Object.freeze([
+						Object.freeze({ logicalTime: 10, operation: Object.freeze({ action: "message", text: "prefix" }) }),
+						Object.freeze({
+							logicalTime: 11,
+							operation: Object.freeze({ action: "applicationBatch", batch: { entries: [], version: 1 } }),
+						}),
+					]),
+					version: 1,
+				}),
+			}),
+		});
+		const productInvalidBatch = accepted(0x64, {
+			author: "author-product-invalid",
+			authorSequence: 9,
+			epoch: 0,
+			logicalTime: 11,
+			operation: Object.freeze({
+				action: "applicationBatch",
+				batch: Object.freeze({
+					entries: Object.freeze([
+						Object.freeze({ logicalTime: 10, operation: Object.freeze({ action: "message", text: "prefix" }) }),
+						Object.freeze({ logicalTime: 11, operation: Object.freeze({ action: "message", text: 7 }) }),
+					]),
+					version: 1,
+				}),
+			}),
+		});
+		const projected: readonly AcceptedOperation[][] = [];
+		const snapshots = projected as AcceptedOperation[][];
+		probe.recovered = [malformedBatch, productInvalidBatch, validBatch];
+		const { createV3RoomSession: currentCreateV3RoomSession } = await roomModule;
+		const createV3RoomSession = currentCreateV3RoomSession as unknown as (
+			input: ExpectedInput
+		) => Promise<ExpectedSession>;
+		const session = await createV3RoomSession(
+			input(
+				application((operations) => {
+					if (
+						operations.some(
+							({ operation }) =>
+								Reflect.get(operation, "action") === "message" && typeof Reflect.get(operation, "text") !== "string"
+						)
+					) {
+						throw new TypeError("D93515_PRODUCT_INVALID_BATCH");
+					}
+					snapshots.push([...operations]);
+					return project(operations);
+				}),
+				() => undefined
+			)
+		);
+		const validDigest = digest(validBatch);
+		expect(snapshots.at(-1)).toEqual([
+			{
+				author: "author-batch",
+				authorSequence: 7,
+				logicalTime: 7,
+				operation: { action: "message", text: "first" },
+				operationCount: 2,
+				operationIndex: 0,
+				vertexDigest: validDigest,
+			},
+			{
+				author: "author-batch",
+				authorSequence: 7,
+				logicalTime: 9,
+				operation: { action: "message", text: "second" },
+				operationCount: 2,
+				operationIndex: 1,
+				vertexDigest: validDigest,
+			},
+		]);
+		expect(snapshots.flat().some(({ vertexDigest }) => vertexDigest === digest(malformedBatch))).toBe(false);
+		expect(snapshots.flat().some(({ vertexDigest }) => vertexDigest === digest(productInvalidBatch))).toBe(false);
+		probe.issueInputs.length = 0;
+		await session.issue({ action: "message", text: "after-quarantine" });
+		expect(probe.issueInputs[0]?.operations[0]?.logicalTime).toBe(13);
+		const later = accepted(0x63, {
+			author: "author-later",
+			authorSequence: 1,
+			epoch: 0,
+			logicalTime: 13,
+			operation: Object.freeze({ action: "message", text: "later" }),
+		});
+		await probe.activatedSink?.({ vertex: later });
+		expect(snapshots.at(-1)?.map(({ operation }) => operation)).toEqual([
+			{ action: "message", text: "first" },
+			{ action: "message", text: "second" },
+			{ action: "message", text: "later" },
+		]);
+		await session.close();
+
+		probe.recovered = [];
+		const liveSnapshots: AcceptedOperation[][] = [];
+		const liveSession = await createV3RoomSession(
+			input(
+				application((operations) => {
+					liveSnapshots.push([...operations]);
+					return project(operations);
+				}),
+				() => undefined
+			)
+		);
+		await probe.activatedSink?.({ vertex: validBatch });
+		expect(liveSnapshots.at(-1)).toEqual(snapshots[0]);
+		await liveSession.close();
+
+		const retainedSnapshots: AcceptedOperation[][] = [];
+		const retainedSession = await createV3RoomSession(
+			input(
+				application((operations) => {
+					retainedSnapshots.push([...operations]);
+					return project(operations);
+				}),
+				() => undefined
+			)
+		);
+		probe.retainedVertex = validBatch;
+		probe.retainedIngressHandler?.(Object.freeze({}));
+		await Promise.resolve();
+		await Promise.resolve();
+		expect(retainedSnapshots.at(-1)).toEqual(snapshots[0]);
+		await retainedSession.close();
+	});
+
+	it("rejects every promise owned by one failed batch while leaving the next snapshot independent", async () => {
+		probe.issueBatchFailure = true;
+		const { createV3RoomSession: currentCreateV3RoomSession } = await roomModule;
+		const createV3RoomSession = currentCreateV3RoomSession as unknown as (
+			input: ExpectedInput
+		) => Promise<ExpectedSession>;
+		const session = await createV3RoomSession(input(application(), () => undefined));
+		probe.issueInputs.length = 0;
+		const failed = await Promise.allSettled([
+			session.issue({ action: "message", text: "first" }),
+			session.issue({ action: "message", text: "second" }),
+		]);
+		expect(failed.map(({ status }) => status)).toEqual(["rejected", "rejected"]);
+		expect(probe.issueInputs).toHaveLength(1);
+		probe.issueBatchFailure = false;
+		await expect(session.issue({ action: "message", text: "later" })).resolves.toBeUndefined();
+		expect(probe.issueInputs).toHaveLength(2);
+		await session.close();
+	});
+
+	it("puts signer reentry into the next room drain snapshot", async () => {
+		const { createV3RoomSession: currentCreateV3RoomSession } = await roomModule;
+		const createV3RoomSession = currentCreateV3RoomSession as unknown as (
+			input: ExpectedInput
+		) => Promise<ExpectedSession>;
+		const session = await createV3RoomSession(input(application(), () => undefined));
+		probe.issueInputs.length = 0;
+		let reentered: Promise<void> | undefined;
+		probe.onSign = () => {
+			probe.onSign = undefined;
+			reentered = session.issue({ action: "message", text: "reentrant" });
+		};
+		await Promise.all([
+			session.issue({ action: "message", text: "first" }),
+			session.issue({ action: "message", text: "second" }),
+		]);
+		await reentered;
+		expect(probe.issueInputs.map(({ operations }) => operations.map(({ operation }) => operation))).toEqual([
+			[
+				{ action: "message", text: "first" },
+				{ action: "message", text: "second" },
+			],
+			[{ action: "message", text: "reentrant" }],
+		]);
+		await session.close();
+	});
+
+	it("puts admitted-sink reentry into the next room drain snapshot", async () => {
+		const { createV3RoomSession: currentCreateV3RoomSession } = await roomModule;
+		const createV3RoomSession = currentCreateV3RoomSession as unknown as (
+			input: ExpectedInput
+		) => Promise<ExpectedSession>;
+		const sessionHolder: { current?: ExpectedSession } = {};
+		let reentered: Promise<void> | undefined;
+		const selectedApplication = application((operations) => {
+			if (operations.length > 0 && sessionHolder.current !== undefined && reentered === undefined) {
+				reentered = sessionHolder.current.issue({ action: "message", text: "sink-reentrant" });
+			}
+			return project(operations);
+		});
+		const session = await createV3RoomSession(input(selectedApplication, () => undefined));
+		sessionHolder.current = session;
+		probe.issueInputs.length = 0;
+		probe.issueSinkVertex = accepted(0x45, {
+			author: "author-local",
+			authorSequence: 4,
+			epoch: 0,
+			logicalTime: 4,
+			operation: Object.freeze({ action: "message", text: "durable" }),
+		});
+		await Promise.all([
+			session.issue({ action: "message", text: "first" }),
+			session.issue({ action: "message", text: "second" }),
+		]);
+		await reentered;
+		expect(probe.issueInputs.map(({ operations }) => operations.map(({ operation }) => operation))).toEqual([
+			[
+				{ action: "message", text: "first" },
+				{ action: "message", text: "second" },
+			],
+			[{ action: "message", text: "sink-reentrant" }],
+		]);
+		await session.close();
+	});
+
+	it("settles captured work and rejects new capture when close begins during the active node issue", async () => {
+		let release = (): void => undefined;
+		probe.issueBarrier = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		const { createV3RoomSession: currentCreateV3RoomSession } = await roomModule;
+		const createV3RoomSession = currentCreateV3RoomSession as unknown as (
+			input: ExpectedInput
+		) => Promise<ExpectedSession>;
+		const session = await createV3RoomSession(input(application(), () => undefined));
+		const owned = Promise.allSettled([
+			session.issue({ action: "message", text: "first" }),
+			session.issue({ action: "message", text: "second" }),
+		]);
+		await Promise.resolve();
+		const closing = session.close();
+		await expect(session.issue({ action: "message", text: "too-late" })).rejects.toThrow();
+		release();
+		expect((await owned).map(({ status }) => status)).toEqual(["fulfilled", "fulfilled"]);
+		await closing;
+	});
+
 	it("refolds one digest-keyed set identically across recovery order, replay, and opposite live order", async () => {
 		const recovered = accepted(0x10, {
 			author: "author-base",
@@ -370,9 +798,7 @@ describe("D.93.46b real shared-room semantics", () => {
 		});
 		const live = [epochLater, authorLater, sequenceLater, digestLater, digestEarlier];
 		const expected = [recovered, digestEarlier, digestLater, sequenceLater, authorLater, epochLater].map(digest);
-		const visibleApplication = application((vertices) =>
-			project(vertices.filter((vertex) => Reflect.get(vertex.operation, "action") !== "projection-hidden"))
-		);
+		const visibleApplication = application(project);
 		const observed: Projection[] = [];
 		probe.recovered = [projectionHidden, recovered];
 		const { createV3RoomSession: currentCreateV3RoomSession } = await roomModule;
@@ -388,7 +814,7 @@ describe("D.93.46b real shared-room semantics", () => {
 		expect(observed).toHaveLength(projectionCount);
 		probe.issueRowsPerRequest = 3;
 		await first.issue(Object.freeze({ action: "after-hidden-recovery" }));
-		expect(probe.issueInputs.at(-1)?.logicalTime).toBe(21);
+		expect(probe.issueInputs.at(-1)?.operations.at(-1)?.logicalTime).toBe(21);
 		expect(probe.publishCalls).toBe(4);
 		await first.close();
 
@@ -400,20 +826,48 @@ describe("D.93.46b real shared-room semantics", () => {
 		await second.close();
 	});
 
-	it("drains every pending row and preserves a later publication failure", async () => {
+	it("rejects both batch promises when publication fails after durable acceptance", async () => {
 		const { createV3RoomSession: currentCreateV3RoomSession } = await roomModule;
 		const createV3RoomSession = currentCreateV3RoomSession as unknown as (
 			input: ExpectedInput
 		) => Promise<ExpectedSession>;
 		probe.issueRowsPerRequest = 3;
 		probe.publishFailureAtCall = 3;
+		const durableBatch = accepted(0x43, {
+			author: "author-local",
+			authorSequence: 3,
+			epoch: 0,
+			logicalTime: 3,
+			operation: Object.freeze({
+				action: "applicationBatch",
+				batch: Object.freeze({
+					entries: Object.freeze([
+						Object.freeze({ logicalTime: 3, operation: Object.freeze({ action: "message", text: "first" }) }),
+						Object.freeze({ logicalTime: 5, operation: Object.freeze({ action: "message", text: "second" }) }),
+					]),
+					version: 1,
+				}),
+			}),
+		});
+		probe.issueSinkVertex = durableBatch;
 		const session = await createV3RoomSession(input(application(), () => undefined));
-		await expect(session.issue(Object.freeze({ action: "three-pending-rows" }))).rejects.toThrow(
-			"v3 room publication failed"
-		);
+		const outcomes = await Promise.allSettled([
+			session.issue(Object.freeze({ action: "message", text: "first" })),
+			session.issue(Object.freeze({ action: "message", text: "second" })),
+		]);
+		expect(outcomes.map(({ status }) => status)).toEqual(["rejected", "rejected"]);
 		expect(probe.publishCalls).toBe(3);
 		expect(probe.pendingPublications).toBe(1);
 		await session.close();
+
+		probe.issueSinkVertex = undefined;
+		probe.publishFailureAtCall = undefined;
+		probe.recovered = [durableBatch];
+		const recovered: Projection[] = [];
+		const reopened = await createV3RoomSession(input(application(), (projection) => recovered.push(projection)));
+		expect(recovered.at(-1)?.acceptedDigests).toEqual([digest(durableBatch), digest(durableBatch)]);
+		expect(probe.issueInputs).toHaveLength(1);
+		await reopened.close();
 	});
 
 	it("surfaces a post-commit admitted-sink failure through terminalFailure", async () => {
@@ -430,16 +884,18 @@ describe("D.93.46b real shared-room semantics", () => {
 		});
 		const session = await createV3RoomSession(
 			input(
-				application((vertices) => {
-					if (vertices.length > 0) throw new Error("D9351_SINK_FAILURE");
-					return project(vertices);
+				application((operations) => {
+					if (operations.length > 0) throw new Error("D9351_SINK_FAILURE");
+					return project(operations);
 				}),
 				() => undefined
 			)
 		);
-		await expect(session.issue(Object.freeze({ action: "committed-before-sink" }))).rejects.toThrow(
-			"D9351_SINK_FAILURE"
-		);
+		const outcomes = await Promise.allSettled([
+			session.issue(Object.freeze({ action: "message", text: "committed-before-sink-a" })),
+			session.issue(Object.freeze({ action: "message", text: "committed-before-sink-b" })),
+		]);
+		expect(outcomes.map(({ status }) => status)).toEqual(["rejected", "rejected"]);
 		await expect(session.issue(Object.freeze({ action: "must-remain-terminal" }))).rejects.toThrow(
 			"D9351_SINK_FAILURE"
 		);
@@ -492,8 +948,8 @@ describe("D.93.46b real shared-room semantics", () => {
 				operation: Object.freeze({ action: "join", peerId: "peer-reader" }),
 			}),
 		];
-		const widenedProjection = application((vertices) => {
-			const value = project(vertices);
+		const widenedProjection = application((operations) => {
+			const value = project(operations);
 			return { ...value, writerAuthors: ["author-writer", "author-reader"] };
 		});
 		const { createV3RoomSession: currentCreateV3RoomSession } = await roomModule;

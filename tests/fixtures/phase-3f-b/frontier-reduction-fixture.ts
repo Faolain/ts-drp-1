@@ -48,7 +48,19 @@ const PARAMETERS = Object.freeze({
 	maxPendingEntries: 4096,
 	maxPendingBytes: 16_777_216,
 });
-const ARTIFACT_SOURCE = `function addReducer(input){const value=input.operation.value??1;const state=input.state+value;return {output:state,state}}function causalJoinReducer(input){return {output:null,state:input.state}}function readReducer(input){return {output:input.state,state:input.state}}function setReducer(input){const state=input.operation.value??0;return {output:state,state}}export const blueprint={exportSchemaVersion:1,artifactId:"counter.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{add:addReducer,causalJoin:causalJoinReducer,"read-value":readReducer,set:setReducer}};`;
+const ARTIFACT_SOURCE = `function addReducer(input){const value=input.operation.value??1;const state=input.state+value;return {output:state,state}}function applicationBatchReducer(input){let state=input.state;const output=[];for(const entry of input.operation.batch.entries){const operation=entry.operation;if(operation.action==="add"){state+=operation.value??1;output.push(state)}else if(operation.action==="set"){state=operation.value??0;output.push(state)}else if(operation.action==="read-value"){output.push(state)}else{throw new TypeError("unknown batch action")}}return {output,state}}function causalJoinReducer(input){return {output:null,state:input.state}}function readReducer(input){return {output:input.state,state:input.state}}function setReducer(input){const state=input.operation.value??0;return {output:state,state}}export const blueprint={exportSchemaVersion:1,artifactId:"counter.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{add:addReducer,applicationBatch:applicationBatchReducer,causalJoin:causalJoinReducer,"read-value":readReducer,set:setReducer}};`;
+const BATCH_BOUNDARY_ARTIFACT_SOURCE = ARTIFACT_SOURCE.replace(
+	"function causalJoinReducer",
+	"function payloadReducer(input){return {output:null,state:input.state}}function causalJoinReducer"
+)
+	.replace(
+		'else{throw new TypeError("unknown batch action")}',
+		'else if(operation.action==="payload"){output.push(null)}else{throw new TypeError("unknown batch action")}'
+	)
+	.replace(
+		'causalJoin:causalJoinReducer,"read-value"',
+		'causalJoin:causalJoinReducer,payload:payloadReducer,"read-value"'
+	);
 
 const createSqliteAheDurableStore = createBuiltSqliteAheDurableStore as unknown as (input: {
 	readonly filename: string;
@@ -79,9 +91,11 @@ export interface FrontierScenarioResult {
 	readonly admittedDigests: readonly string[];
 	readonly initialTips: readonly string[];
 	readonly issued: readonly IssuedVertexFact[];
+	readonly journalAppends: number;
 	readonly nestedResult?: V3LocalIssueResult;
 	readonly result: V3LocalIssueResult;
 	readonly retryResult?: V3LocalIssueResult;
+	readonly signerCalls: number;
 	readonly synchronousReentry: boolean;
 }
 
@@ -90,14 +104,21 @@ export interface FrontierScenarioOptions {
 		readonly catalog: TrustedBlueprintCatalog;
 	}>;
 	readonly causalJoin?: "admitted" | "altered-abi" | "missing" | "unknown-abi";
+	readonly batchBoundaryProfile?: boolean;
 	readonly failJournalAtIssuedOrdinal?: number;
 	readonly failSignerAtIssuedOrdinal?: number;
+	readonly failTransactionAtIssuedOrdinal?: number;
 	readonly maxDependencies?: number;
 	readonly operation?: Readonly<Record<string, unknown>>;
+	readonly operations?: readonly Readonly<{
+		readonly logicalTime: number;
+		readonly operation: Readonly<Record<string, unknown>>;
+	}>[];
 	readonly recoveryOrder?: "forward" | "reverse";
 	readonly reenterFromSigner?: boolean;
 	readonly retryAfterFailure?: boolean;
 	readonly seedOperation?: Readonly<Record<string, unknown>>;
+	readonly wrongSignatureAtIssuedOrdinal?: number;
 }
 
 export interface DependencyBoundScenarioResult {
@@ -188,6 +209,7 @@ function commitFor(
 async function prepareFixture(
 	options: Readonly<{
 		readonly application?: Readonly<{ readonly catalog: TrustedBlueprintCatalog }>;
+		readonly batchBoundaryProfile?: boolean;
 		readonly causalJoin?: "admitted" | "altered-abi" | "missing" | "unknown-abi";
 		readonly maxDependencies?: number;
 	}> = {}
@@ -212,14 +234,14 @@ async function prepareFixture(
 			catalog = options.application.catalog;
 			blueprintDigest = String(catalog.blueprintDigests[0] ?? "");
 		} else {
+			const artifactSource = options.batchBoundaryProfile === true ? BATCH_BOUNDARY_ARTIFACT_SOURCE : ARTIFACT_SOURCE;
 			const exactArtifactBytes = new TextEncoder().encode(
-				options.causalJoin === "missing"
-					? ARTIFACT_SOURCE.replace("causalJoin:causalJoinReducer,", "")
-					: ARTIFACT_SOURCE
+				options.causalJoin === "missing" ? artifactSource.replace("causalJoin:causalJoinReducer,", "") : artifactSource
 			);
 			const artifactDigest = lowerHex(hashDomain(packageGolden.artifactDigestDomain, exactArtifactBytes));
 			const causalJoin = Object.freeze({
 				name: "causalJoin",
+				maxCanonicalOperationBytes: 65_536,
 				argumentSchema:
 					options.causalJoin === "unknown-abi"
 						? Object.freeze({ kind: "unknown-record", fields: Object.freeze([]) })
@@ -232,18 +254,66 @@ async function prepareFixture(
 								),
 							}),
 			});
+			const batchPayload = Object.freeze({
+				argumentSchema: Object.freeze({
+					fields: Object.freeze([
+						Object.freeze({ name: "data", required: false, type: "canonical-object" }),
+						Object.freeze({ name: "text", required: false, type: "string" }),
+					]),
+					kind: "closed-record",
+				}),
+				maxCanonicalOperationBytes: 65_536,
+				name: "payload",
+			});
 			const blueprintPackage = Object.freeze({
 				...packageGolden.package,
 				implementation: Object.freeze({ ...packageGolden.package.implementation, artifactDigest }),
 				manifest: Object.freeze({
 					...packageGolden.package.manifest,
+					schemaVersion: 2,
+					workBudgetProfile: "blueprint-work-budget-v1",
 					operations: Object.freeze(
 						options.causalJoin === "missing"
-							? [...packageGolden.package.manifest.operations]
+							? [
+									Object.freeze({
+										...packageGolden.package.manifest.operations[0],
+										maxCanonicalOperationBytes: 65_536,
+									}),
+									Object.freeze({
+										argumentSchema: Object.freeze({
+											fields: Object.freeze([
+												Object.freeze({ name: "batch", required: true, type: "canonical-object" }),
+											]),
+											kind: "closed-record",
+										}),
+										maxCanonicalOperationBytes: 65_536,
+										name: "applicationBatch",
+									}),
+									...(options.batchBoundaryProfile === true ? [batchPayload] : []),
+									...packageGolden.package.manifest.operations
+										.slice(1)
+										.map((operation) => Object.freeze({ ...operation, maxCanonicalOperationBytes: 65_536 })),
+								]
 							: [
-									packageGolden.package.manifest.operations[0],
+									Object.freeze({
+										...packageGolden.package.manifest.operations[0],
+										maxCanonicalOperationBytes: 65_536,
+									}),
+									Object.freeze({
+										argumentSchema: Object.freeze({
+											fields: Object.freeze([
+												Object.freeze({ name: "batch", required: true, type: "canonical-object" }),
+											]),
+											kind: "closed-record",
+										}),
+										maxCanonicalOperationBytes: 65_536,
+										name: "applicationBatch",
+									}),
 									causalJoin,
-									...packageGolden.package.manifest.operations.slice(1),
+									...(options.batchBoundaryProfile === true ? [batchPayload] : []),
+									...packageGolden.package.manifest.operations
+										.slice(1)
+										.map((operation) => Object.freeze({ ...operation, maxCanonicalOperationBytes: 65_536 })),
 								]
 					),
 				}),
@@ -426,16 +496,20 @@ function recoveryIssuanceStore(commits: readonly DurableIssueCommit[], scope: Du
  * recovery, or live received admission without forging a recovered payload.
  * @param width - Dependency count on the final genuine vertex.
  * @param source - Genuine node boundary under test.
+ * @param operation - Operation carried by the final genuine vertex.
+ * @param dependentOperation - Optional valid operation that depends on the final vertex.
  * @returns Recovery/routing outcome plus journal and sink effects.
  */
 export async function runDependencyBoundScenario(
-	width: 16 | 17,
-	source: "recovered-local" | "recovered-received" | "live-received"
+	width: number,
+	source: "recovered-local" | "recovered-received" | "live-received",
+	operation: Readonly<Record<string, unknown>> = Object.freeze({ action: "add", value: 7 }),
+	dependentOperation?: Readonly<Record<string, unknown>>
 ): Promise<DependencyBoundScenarioResult> {
 	const fixture = await prepareFixture();
 	try {
 		const { commits, initialTips, scope } = siblingCommits(fixture, width);
-		const wideBytes = vertexBytes(fixture, width, [...initialTips].sort(), { action: "add", value: 7 });
+		const wideBytes = vertexBytes(fixture, width, [...initialTips].sort(), operation);
 		const wideDigest = hashDomain("ts-drp/vertex/v3", wideBytes);
 		const wideCommit = commitFor(
 			scope,
@@ -443,11 +517,23 @@ export async function runDependencyBoundScenario(
 			wideBytes,
 			ed25519.sign(wideDigest, hexBytes(contract.privateKeySeedHex))
 		);
+		const dependentCommit =
+			dependentOperation === undefined
+				? undefined
+				: ((): DurableIssueCommit => {
+						const bytes = vertexBytes(fixture, width + 1, [lowerHex(wideDigest)], dependentOperation);
+						const digest = hashDomain("ts-drp/vertex/v3", bytes);
+						return commitFor(scope, width + 1, bytes, ed25519.sign(digest, hexBytes(contract.privateKeySeedHex)));
+					})();
+		const candidateCommits =
+			dependentCommit === undefined
+				? Object.freeze([...commits, wideCommit])
+				: Object.freeze([...commits, wideCommit, dependentCommit]);
 		const journalScope = journalScopeFor(fixture);
 		const snapshot = journalSnapshot(fixture, journalScope);
 		let appendedCount = 0;
 		let sinkCount = 0;
-		const receivedRows = [...commits, wideCommit].map((commit, journalSequence) =>
+		const receivedRows = candidateCommits.map((commit, journalSequence) =>
 			Object.freeze({
 				detachedSignature: commit.envelope.signature,
 				exactCanonicalPreimageBytes: commit.envelope.canonicalPreimageBytes,
@@ -511,7 +597,7 @@ export async function runDependencyBoundScenario(
 				? Object.freeze([])
 				: source === "live-received"
 					? Object.freeze([...commits])
-					: Object.freeze([...commits, wideCommit]);
+					: candidateCommits;
 		const recovered = await recoverV3LiveReplica({
 			capability: fixture.capability as never,
 			exactCanonicalAuthorAuthorizationBytes: fixture.exactCanonicalAuthorAuthorizationBytes,
@@ -588,6 +674,9 @@ export async function runFrontierScenario(
 					throw new TypeError("frontier issuance scope changed");
 				}
 				const selectedSequence = commits.length;
+				if (options.failTransactionAtIssuedOrdinal === selectedSequence - width) {
+					throw new Error("controlled frontier transaction failure");
+				}
 				const commit = await buildAndSign(selectedSequence);
 				if (commits.length !== selectedSequence) throw new Error("frontier issuance lineage changed during signing");
 				commits.push(commit);
@@ -628,6 +717,7 @@ export async function runFrontierScenario(
 				: Object.freeze([]);
 		const snapshot = journalSnapshot(fixture, journalScope);
 		let journalSequence = recoveryRows.length;
+		let journalAppends = 0;
 		const journalStore: DurableLiveJournalStore = {
 			installGenesis: () =>
 				Promise.resolve(
@@ -663,6 +753,7 @@ export async function runFrontierScenario(
 			},
 			appendAccepted(input: AppendAcceptedVertexInput) {
 				const current = journalSequence++;
+				journalAppends += 1;
 				if (options.failJournalAtIssuedOrdinal === current - width) {
 					return Promise.reject(new Error("controlled frontier journal failure"));
 				}
@@ -688,6 +779,7 @@ export async function runFrontierScenario(
 		});
 		if (!recovered.ok) throw new TypeError(`frontier recovery failed: ${recovered.kind}`);
 		recoveryComplete = true;
+		journalAppends = 0;
 		const admittedDigests: string[] = [];
 		const activated = activateV3LivePlane({
 			capability: recovered.capability,
@@ -699,17 +791,27 @@ export async function runFrontierScenario(
 		});
 		if (!activated.ok) throw new TypeError(`frontier activation failed: ${activated.kind}`);
 		let signerActive = false;
+		let signerCalls = 0;
 		let synchronousReentry = false;
 		let nestedResultPromise: Promise<V3LocalIssueResult> | undefined;
 		const failedSignerOrdinals = new Set<number>();
 		const nestedSigner = (digest: Uint8Array): Promise<Uint8Array> => {
+			signerCalls += 1;
 			if (signerActive) synchronousReentry = true;
 			return Promise.resolve(ed25519.sign(new Uint8Array(digest), hexBytes(contract.privateKeySeedHex)));
 		};
+		const operations =
+			options.operations ??
+			Object.freeze([
+				Object.freeze({
+					logicalTime: width + 1,
+					operation: options.operation ?? Object.freeze({ action: "add", value: 7 }),
+				}),
+			]);
 		const result = await activated.handle.issueLocal({
-			logicalTime: width + 1,
-			operation: options.operation ?? Object.freeze({ action: "add", value: 7 }),
+			operations,
 			signRegisteredVertexDigest: (digest: Uint8Array) => {
+				signerCalls += 1;
 				const issuedOrdinal = commits.length - width;
 				if (options.failSignerAtIssuedOrdinal === issuedOrdinal && !failedSignerOrdinals.has(issuedOrdinal)) {
 					failedSignerOrdinals.add(issuedOrdinal);
@@ -719,13 +821,15 @@ export async function runFrontierScenario(
 				if (options.reenterFromSigner === true && nestedResultPromise === undefined) {
 					const nestedOperation = { action: "add", value: 9 };
 					nestedResultPromise = activated.handle.issueLocal({
-						logicalTime: width + 2,
-						operation: nestedOperation,
+						operations: Object.freeze([Object.freeze({ logicalTime: width + 2, operation: nestedOperation })]),
 						signRegisteredVertexDigest: nestedSigner,
 					} as never);
 					nestedOperation.value = 999;
 				}
-				const signature = ed25519.sign(new Uint8Array(digest), hexBytes(contract.privateKeySeedHex));
+				const signature =
+					options.wrongSignatureAtIssuedOrdinal === issuedOrdinal
+						? new Uint8Array(64)
+						: ed25519.sign(new Uint8Array(digest), hexBytes(contract.privateKeySeedHex));
 				signerActive = false;
 				return Promise.resolve(signature);
 			},
@@ -734,8 +838,9 @@ export async function runFrontierScenario(
 		const retryResult =
 			options.retryAfterFailure === true && !result.ok
 				? await activated.handle.issueLocal({
-						logicalTime: width + 3,
-						operation: options.operation ?? Object.freeze({ action: "add", value: 7 }),
+						operations: Object.freeze(
+							operations.map((entry, index) => Object.freeze({ ...entry, logicalTime: width + 3 + index }))
+						),
 						signRegisteredVertexDigest: (digest: Uint8Array) =>
 							Promise.resolve(ed25519.sign(new Uint8Array(digest), hexBytes(contract.privateKeySeedHex))),
 					} as never)
@@ -756,9 +861,11 @@ export async function runFrontierScenario(
 			admittedDigests: Object.freeze(admittedDigests),
 			initialTips: Object.freeze(initialTips.sort()),
 			issued: Object.freeze(issued),
+			journalAppends,
 			nestedResult,
 			result,
 			retryResult,
+			signerCalls,
 			synchronousReentry,
 		});
 	} finally {

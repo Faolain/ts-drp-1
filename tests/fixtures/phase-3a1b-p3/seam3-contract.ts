@@ -161,13 +161,21 @@ export interface V3PlaneHandleContract {
 }
 
 export interface V3LocalIssueInputContract {
-	readonly logicalTime: number;
-	readonly operation: Readonly<Record<string, unknown>>;
+	readonly operations: readonly Readonly<{
+		readonly logicalTime: number;
+		readonly operation: Readonly<Record<string, unknown>>;
+	}>[];
 	readonly signRegisteredVertexDigest: SignRegisteredVertexDigest;
 }
 
 export type V3LocalIssueResultContract =
 	| Readonly<{ readonly ok: true; readonly kind: "accepted"; readonly authorSequence: number; readonly digest: string }>
+	| Readonly<{
+			readonly ok: false;
+			readonly kind: "split-required";
+			readonly detail: string;
+			readonly prefixLength: number;
+	  }>
 	| Readonly<{
 			readonly ok: false;
 			readonly kind:

@@ -39,10 +39,11 @@ vi.mock("../examples/v3-room/src/index.js", async (importOriginal) => {
 });
 
 interface ProductApplication {
+	readonly batchableOperationActions: readonly string[];
 	readonly bootstrapOperation: Readonly<Record<string, unknown>>;
 	readonly canonicalBlueprintPackageBytes: Uint8Array;
 	readonly catalog: TrustedBlueprintCatalog;
-	projectAcceptedVertices(vertices: readonly unknown[]): Readonly<Record<string, unknown>>;
+	projectAcceptedOperations(operations: readonly unknown[]): Readonly<Record<string, unknown>>;
 }
 
 function operations(application: ProductApplication): readonly unknown[] {
@@ -59,6 +60,7 @@ function expectExactOperations(application: ProductApplication, names: readonly 
 	expect(descriptors.map((operation) => String(Reflect.get(operation, "name")))).toEqual(names);
 	expect(descriptors.find((operation) => Reflect.get(operation, "name") === "causalJoin")).toEqual({
 		argumentSchema: { fields: [], kind: "closed-record" },
+		maxCanonicalOperationBytes: 65_536,
 		name: "causalJoin",
 	});
 }
@@ -75,7 +77,7 @@ function expectSameApplication(
 	for (const digest of expected.catalog.blueprintDigests) {
 		expect(actual.catalog.resolve(digest)).toEqual(expected.catalog.resolve(digest));
 	}
-	expect(actual.projectAcceptedVertices(vertices)).toEqual(expected.projectAcceptedVertices(vertices));
+	expect(actual.projectAcceptedOperations(vertices)).toEqual(expected.projectAcceptedOperations(vertices));
 }
 
 function hex(bytes: Uint8Array): string {
@@ -113,10 +115,11 @@ function accepted(
 	return Object.freeze({
 		author,
 		authorSequence: fill,
-		digest: new Uint8Array(32).fill(fill),
-		epoch: 0,
 		logicalTime: fill,
 		operation,
+		operationCount: 1,
+		operationIndex: 0,
+		vertexDigest: fill.toString(16).padStart(2, "0").repeat(32),
 	});
 }
 
@@ -128,7 +131,8 @@ describe("Phase 3f-b real chat and zone causalJoin composition RED", () => {
 		const application = Reflect.apply(create as (...args: unknown[]) => unknown, undefined, [
 			"alice",
 		]) as ProductApplication;
-		expectExactOperations(application, ["acl", "causalJoin", "join", "message"]);
+		expect(application.batchableOperationActions).toEqual(["message"]);
+		expectExactOperations(application, ["acl", "applicationBatch", "causalJoin", "join", "message"]);
 		await expectNeutralReducer(application);
 		const beforeEntry = roomEntryProbe.applications.length;
 		const chatApi = Reflect.get(globalThis, "d9336V3Chat") as Readonly<{
@@ -157,7 +161,7 @@ describe("Phase 3f-b real chat and zone causalJoin composition RED", () => {
 			{ action: "causalJoin" },
 			{ action: "message", text: "visible" },
 		]);
-		const projection = application.projectAcceptedVertices([
+		const projection = application.projectAcceptedOperations([
 			accepted(Object.freeze({ action: "message", text: "already durable" }), 1),
 			...frontier.issued.map(({ operation }, index) => accepted(operation, index + 2)),
 		]);
@@ -174,7 +178,8 @@ describe("Phase 3f-b real chat and zone causalJoin composition RED", () => {
 			"peer:creator",
 			creatorAuthor,
 		]) as ProductApplication;
-		expectExactOperations(application, ["causalJoin", "join", "placeBlock"]);
+		expect(application.batchableOperationActions).toEqual(["placeBlock"]);
+		expectExactOperations(application, ["applicationBatch", "causalJoin", "join", "placeBlock"]);
 		await expectNeutralReducer(application);
 		const beforeEntry = roomEntryProbe.applications.length;
 		const localAuthor = "c".repeat(64);
@@ -253,7 +258,7 @@ describe("Phase 3f-b real chat and zone causalJoin composition RED", () => {
 			accepted(Object.freeze({ action: "placeBlock", id: "seed", kind: "stone", x: 0, y: 0 }), 2),
 			...frontier.issued.map(({ operation }, index) => accepted(operation, index + 3)),
 		];
-		const projection = application.projectAcceptedVertices(zoneVertices);
+		const projection = application.projectAcceptedOperations(zoneVertices);
 		expect(Reflect.get(projection, "blocks")).toEqual([
 			{ id: "block", kind: "stone", x: 1, y: 2 },
 			{ id: "seed", kind: "stone", x: 0, y: 0 },
@@ -263,7 +268,7 @@ describe("Phase 3f-b real chat and zone causalJoin composition RED", () => {
 		]);
 		expect(Reflect.get(projection, "writerAuthors")).toEqual([creatorAuthor]);
 		expect(Reflect.get(projection, "acceptedDigests")).toEqual(
-			zoneVertices.map((vertex) => hex(Reflect.get(vertex, "digest") as Uint8Array))
+			zoneVertices.map((vertex) => Reflect.get(vertex, "vertexDigest"))
 		);
 	});
 });
