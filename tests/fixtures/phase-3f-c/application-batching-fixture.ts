@@ -1,4 +1,7 @@
-import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+
+import type { TrustedBlueprintCatalog } from "../../../packages/blueprint-catalog/src/index.js";
+import packageGolden from "../track-p2-b/forward-counter-package.json" with { type: "json" };
 
 export const APPLICATION_BATCH_LIMITS = Object.freeze({
 	maxBytes: 65_536,
@@ -19,6 +22,92 @@ export interface AcceptedOperationFact {
 	readonly operationCount: number;
 	readonly operationIndex: number;
 	readonly vertexDigest: string;
+}
+
+const COUNTER_BATCH_ARTIFACT_SOURCE = `function addReducer(input){const value=input.operation.value??1;const state=input.state+value;return {output:state,state}}function applicationBatchReducer(input){let state=input.state;const output=[];for(const entry of input.operation.batch.entries){const operation=entry.operation;if(operation.action==="add"){state+=operation.value??1;output.push(state)}else if(operation.action==="set"){state=operation.value??0;output.push(state)}else if(operation.action==="read-value"){output.push(state)}else{throw new TypeError("unknown batch action")}}return {output,state}}function causalJoinReducer(input){return {output:null,state:input.state}}function readReducer(input){return {output:input.state,state:input.state}}function setReducer(input){const state=input.operation.value??0;return {output:state,state}}export const blueprint={exportSchemaVersion:1,artifactId:"counter.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{add:addReducer,applicationBatch:applicationBatchReducer,causalJoin:causalJoinReducer,"read-value":readReducer,set:setReducer}};`;
+
+function hex(bytes: Uint8Array): string {
+	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Builds the one counter catalog shared by the Phase 3f-c and Phase 3g genuine node fixtures.
+ * The helper owns fixture material only; production still authenticates every package and artifact byte.
+ * @param variant Optional controlled artifact variant used by authority-mismatch tests.
+ * @returns Exact catalog, package bytes and blueprint digest.
+ */
+export function counterBatchCatalog(variant = "default"): Readonly<{
+	readonly catalog: TrustedBlueprintCatalog;
+	readonly blueprintDigest: string;
+}> {
+	const artifactBytes = new TextEncoder().encode(COUNTER_BATCH_ARTIFACT_SOURCE);
+	const artifactDigest = hex(hashDomain(packageGolden.artifactDigestDomain, artifactBytes));
+	const blueprintPackage = Object.freeze({
+		...packageGolden.package,
+		implementation: Object.freeze({ ...packageGolden.package.implementation, artifactDigest }),
+		manifest: Object.freeze({
+			...packageGolden.package.manifest,
+			schemaVersion: 2,
+			workBudgetProfile: "blueprint-work-budget-v1",
+			operations: Object.freeze([
+				Object.freeze({
+					...packageGolden.package.manifest.operations[0],
+					maxCanonicalOperationBytes: variant === "default" ? 65_536 : 65_535,
+				}),
+				Object.freeze({
+					argumentSchema: Object.freeze({
+						fields: Object.freeze([Object.freeze({ name: "batch", required: true, type: "canonical-object" })]),
+						kind: "closed-record",
+					}),
+					maxCanonicalOperationBytes: 65_536,
+					name: "applicationBatch",
+				}),
+				Object.freeze({
+					argumentSchema: Object.freeze({ fields: Object.freeze([]), kind: "closed-record" }),
+					maxCanonicalOperationBytes: 65_536,
+					name: "causalJoin",
+				}),
+				...packageGolden.package.manifest.operations
+					.slice(1)
+					.map((operation) => Object.freeze({ ...operation, maxCanonicalOperationBytes: 65_536 })),
+			]),
+		}),
+	});
+	const canonicalBlueprintPackageBytes = encodeCanonical(blueprintPackage);
+	const blueprintDigest = hex(hashDomain(packageGolden.blueprintDigestDomain, canonicalBlueprintPackageBytes));
+	const resolved = Object.freeze({
+		artifactDigest,
+		artifactId: blueprintPackage.implementation.artifactId,
+		blueprintDigest,
+		canonicalBlueprintPackageBytes,
+		exactArtifactBytes: artifactBytes,
+		runtimeProfile: "ecmascript-2024-sync-v1" as const,
+		evidence: Object.freeze({
+			catalogDigest: "9".repeat(64),
+			lintEvidenceDigest: "a".repeat(64),
+			conformanceReceiptDigest: "b".repeat(64),
+			conformanceDigest: "c".repeat(64),
+			conformanceTier: "nightly" as const,
+			conformanceResult: "passed" as const,
+			engines: Object.freeze([
+				Object.freeze({ name: "node" as const, build: "phase-3g" }),
+				Object.freeze({ name: "chromium" as const, build: "phase-3g" }),
+				Object.freeze({ name: "firefox" as const, build: "phase-3g" }),
+				Object.freeze({ name: "webkit" as const, build: "phase-3g" }),
+			]),
+		}),
+	});
+	return Object.freeze({
+		blueprintDigest,
+		catalog: Object.freeze({
+			blueprintDigests: Object.freeze([blueprintDigest]),
+			catalogDigest: "9".repeat(64),
+			resolve(requested: string) {
+				if (requested !== blueprintDigest) throw new TypeError("unknown Phase 3g counter blueprint");
+				return resolved;
+			},
+		}),
+	});
 }
 
 function detachedOperation(operation: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
@@ -51,7 +140,11 @@ export function maximalEntries(product: "chat" | "counter" | "zone", count = 16)
 			batchEntry(
 				index + 1,
 				product === "chat"
-					? Object.freeze({ action: "message", text: `${index}:`.padEnd(256, "m") })
+					? Object.freeze({
+							action: "message",
+							clientOperationId: `message-${index}`,
+							text: `${index}:`.padEnd(256, "m"),
+						})
 					: product === "zone"
 						? Object.freeze({ action: "placeBlock", id: `block-${index}`, kind: "stone", x: index, y: -index })
 						: Object.freeze({ action: "add", value: index + 1 })

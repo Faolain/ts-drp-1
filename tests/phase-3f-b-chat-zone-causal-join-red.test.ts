@@ -147,22 +147,25 @@ describe("Phase 3f-b real chat and zone causalJoin composition RED", () => {
 				accepted(Object.freeze({ action: "join", clientId: "alice" }), 0x31),
 				accepted(Object.freeze({ action: "acl", group: "writer", kind: "grant", target: "e".repeat(64) }), 0x32),
 				accepted(Object.freeze({ action: "causalJoin" }), 0x33),
-				accepted(Object.freeze({ action: "message", text: "entry-visible" }), 0x34),
+				accepted(
+					Object.freeze({ action: "message", clientOperationId: "message-entry-visible", text: "entry-visible" }),
+					0x34
+				),
 			]);
 		}
 		await chatApi.close();
 		const frontier = await runFrontierScenario(17, {
 			application,
-			operation: Object.freeze({ action: "message", text: "visible" }),
-			seedOperation: Object.freeze({ action: "message", text: "seed" }),
+			operation: Object.freeze({ action: "message", clientOperationId: "message-visible", text: "visible" }),
+			seedOperation: Object.freeze({ action: "message", clientOperationId: "message-seed", text: "seed" }),
 		});
 		expect(frontier.result).toMatchObject({ ok: true, kind: "accepted" });
 		expect(frontier.issued.map(({ operation }) => operation)).toEqual([
 			{ action: "causalJoin" },
-			{ action: "message", text: "visible" },
+			{ action: "message", clientOperationId: "message-visible", text: "visible" },
 		]);
 		const projection = application.projectAcceptedOperations([
-			accepted(Object.freeze({ action: "message", text: "already durable" }), 1),
+			accepted(Object.freeze({ action: "message", clientOperationId: "message-durable", text: "already durable" }), 1),
 			...frontier.issued.map(({ operation }, index) => accepted(operation, index + 2)),
 		]);
 		expect(Reflect.get(projection, "accepted")).toMatchObject([{ text: "already durable" }, { text: "visible" }]);

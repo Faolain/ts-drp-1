@@ -155,6 +155,28 @@ export interface V3PlaneHandleContract {
 	readonly topic: string;
 	readonly queueId: string;
 	issueLocal(input: V3LocalIssueInputContract): Promise<V3LocalIssueResultContract>;
+	readRebaseOutbox(): Promise<
+		| Readonly<{ readonly ok: true; readonly kind: "empty" }>
+		| Readonly<{
+				readonly ok: true;
+				readonly kind: "displaced";
+				readonly source: Readonly<{
+					readonly author: string;
+					readonly authorSequence: number;
+					readonly vertexDigest: string;
+					readonly intents: readonly Readonly<{
+						readonly logicalTime: number;
+						readonly operation: Readonly<Record<string, unknown>>;
+						readonly operationCount: number;
+						readonly operationIndex: number;
+					}>[];
+				}>;
+		  }>
+		| Readonly<{ readonly ok: false; readonly kind: "not-active" | "record-rejected" | "store-failed" }>
+	>;
+	completeRebaseSource(
+		input: Readonly<{ readonly authorSequence: number; readonly digest: string }>
+	): Promise<V3EgressResultContract>;
 	publishPending(): Promise<V3EgressResultContract>;
 	republishRetained(): Promise<V3EgressResultContract>;
 	deactivate(): void;

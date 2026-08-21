@@ -81,6 +81,7 @@ const probe = vi.hoisted(() => ({
 	issueRejectedTexts: new Set<string>(),
 	issueRowsPerRequest: 1,
 	issueSinkVertex: undefined as V3RoomAcceptedVertex | undefined,
+	issuanceNames: [] as string[],
 	onSign: undefined as (() => void) | undefined,
 	pendingPublications: 0,
 	publishCalls: 0,
@@ -222,13 +223,15 @@ vi.mock("../packages/storage-browser/dist/src/index.js", async (importOriginal) 
 
 vi.mock("../packages/storage-browser/dist/src/issuance.js", async (importOriginal) => ({
 	...(await importOriginal()),
-	createBrowserDurableIssuanceStore: () =>
-		Promise.resolve({
+	createBrowserDurableIssuanceStore: ({ primaryDatabaseName }: { primaryDatabaseName: string }) => {
+		probe.issuanceNames.push(primaryDatabaseName);
+		return Promise.resolve({
 			close: (): void => {
 				probe.closeCounts.issuance += 1;
 			},
 			readLineage: () => Promise.resolve({ next: 1 }),
-		}),
+		});
+	},
 }));
 
 vi.mock("../packages/storage-browser/dist/src/live-journal.js", async (importOriginal) => ({
@@ -377,6 +380,7 @@ beforeEach(() => {
 	probe.issueRejectedTexts = new Set<string>();
 	probe.issueRowsPerRequest = 1;
 	probe.issueSinkVertex = undefined;
+	probe.issuanceNames = [];
 	probe.onSign = undefined;
 	probe.pendingPublications = 0;
 	probe.publishCalls = 0;
@@ -392,6 +396,25 @@ afterEach(() => {
 });
 
 describe("D.93.46b real shared-room semantics", () => {
+	it("accepts the exact Phase 3g application policy and split durable database input", async () => {
+		const { createV3RoomSession: currentCreateV3RoomSession } = await roomModule;
+		const candidateApplication = Object.freeze({
+			...application(),
+			displacedOperationIdentity: (operation: Readonly<Record<string, unknown>>) =>
+				String(Reflect.get(operation, "clientOperationId")),
+			displacementPolicies: Object.freeze({ message: "rebase" as const }),
+			transformDisplacedOperation: undefined,
+		});
+		const candidateInput = Object.freeze({
+			...input(candidateApplication, () => undefined),
+			issuanceDatabaseName: "controlled-room-shared-issuance",
+		});
+		const session = await Reflect.apply(currentCreateV3RoomSession, undefined, [candidateInput]);
+		expect(session.roomId).toBe("a".repeat(64));
+		expect(probe.issuanceNames).toEqual(["controlled-room-shared-issuance"]);
+		await session.close();
+	});
+
 	it("coalesces two same-turn eligible requests into one node-owned operations input", async () => {
 		const { createV3RoomSession: currentCreateV3RoomSession } = await roomModule;
 		const createV3RoomSession = currentCreateV3RoomSession as unknown as (

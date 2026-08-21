@@ -157,10 +157,25 @@ describe("Phase 3f-c real chat and zone batching composition RED", () => {
 		expect(application.projectAcceptedOperations).toBeTypeOf("function");
 		await expect(
 			reduceBatch(application, Object.freeze([]), [
-				Object.freeze({ logicalTime: 3, operation: Object.freeze({ action: "message", text: "first" }) }),
-				Object.freeze({ logicalTime: 5, operation: Object.freeze({ action: "message", text: "second" }) }),
+				Object.freeze({
+					logicalTime: 3,
+					operation: Object.freeze({ action: "message", clientOperationId: "message-1", text: "first" }),
+				}),
+				Object.freeze({
+					logicalTime: 5,
+					operation: Object.freeze({ action: "message", clientOperationId: "message-2", text: "second" }),
+				}),
 			])
-		).resolves.toEqual({ output: ["first", "second"], state: ["first", "second"] });
+		).resolves.toEqual({
+			output: [
+				{ clientOperationId: "message-1", text: "first" },
+				{ clientOperationId: "message-2", text: "second" },
+			],
+			state: [
+				{ clientOperationId: "message-1", text: "first" },
+				{ clientOperationId: "message-2", text: "second" },
+			],
+		});
 		const maximalChat = await reduceBatch(application, Object.freeze([]), maximalEntries("chat"));
 		expect(maximalChat.output).toHaveLength(16);
 		expect(maximalChat.state).toHaveLength(16);
@@ -181,7 +196,10 @@ describe("Phase 3f-c real chat and zone batching composition RED", () => {
 			await expect(reduceOperation(application, Object.freeze([]), operation)).rejects.toThrow();
 		}
 		for (const operation of malformedBatchOperations(
-			Object.freeze({ logicalTime: 3, operation: Object.freeze({ action: "message", text: "shape" }) })
+			Object.freeze({
+				logicalTime: 3,
+				operation: Object.freeze({ action: "message", clientOperationId: "message-shape", text: "shape" }),
+			})
 		)) {
 			await expect(reduceOperation(application, Object.freeze([]), operation)).rejects.toThrow();
 		}
@@ -192,7 +210,7 @@ describe("Phase 3f-c real chat and zone batching composition RED", () => {
 					author: "a".repeat(64),
 					authorSequence: 1,
 					logicalTime: 3,
-					operation: { action: "message", text: "first" },
+					operation: { action: "message", clientOperationId: "message-1", text: "first" },
 					vertexDigest,
 				},
 				0,
@@ -203,7 +221,7 @@ describe("Phase 3f-c real chat and zone batching composition RED", () => {
 					author: "a".repeat(64),
 					authorSequence: 1,
 					logicalTime: 5,
-					operation: { action: "message", text: "second" },
+					operation: { action: "message", clientOperationId: "message-2", text: "second" },
 					vertexDigest,
 				},
 				1,
@@ -211,8 +229,8 @@ describe("Phase 3f-c real chat and zone batching composition RED", () => {
 			),
 		]);
 		expect(Reflect.get(projection, "accepted")).toMatchObject([
-			{ digest: vertexDigest, operationIndex: 0, text: "first" },
-			{ digest: vertexDigest, operationIndex: 1, text: "second" },
+			{ clientOperationId: "message-1", digest: vertexDigest, operationIndex: 0, text: "first" },
+			{ clientOperationId: "message-2", digest: vertexDigest, operationIndex: 1, text: "second" },
 		]);
 	});
 

@@ -40,13 +40,43 @@ type _ApplicationKeys = Assert<
 		| "bootstrapOperation"
 		| "canonicalBlueprintPackageBytes"
 		| "catalog"
+		| "displacedOperationIdentity"
+		| "displacementPolicies"
 		| "projectAcceptedOperations"
+		| "transformDisplacedOperation"
 	>
 >;
 type _BatchableActions = Assert<
 	Equal<V3RoomApplication<ExpectedProjection>["batchableOperationActions"], readonly string[]>
 >;
+type _DisplacedOperationIdentity = Assert<
+	Equal<
+		V3RoomApplication<ExpectedProjection>["displacedOperationIdentity"],
+		(operation: Readonly<Record<string, unknown>>) => string
+	>
+>;
+type _DisplacementPolicies = Assert<
+	Equal<
+		V3RoomApplication<ExpectedProjection>["displacementPolicies"],
+		Readonly<Record<string, "expire" | "manual-review" | "rebase" | "transform">>
+	>
+>;
 type _Projector = Assert<Equal<V3RoomApplication<ExpectedProjection>["projectAcceptedOperations"], ExpectedProjector>>;
+type _TransformDisplacedOperation = Assert<
+	Equal<
+		V3RoomApplication<ExpectedProjection>["transformDisplacedOperation"],
+		((operation: Readonly<Record<string, unknown>>) => Readonly<Record<string, unknown>>) | undefined
+	>
+>;
+type _IssuanceDatabaseName = Assert<
+	Equal<CreateV3RoomSessionInput<ExpectedProjection>["issuanceDatabaseName"], string>
+>;
+type _RebaseSourceInvite = Assert<
+	Equal<
+		CreateV3RoomSessionInput<ExpectedProjection>["rebaseSourceInvite"],
+		CreateV3RoomSessionInput<ExpectedProjection>["creatorInvite"] | undefined
+	>
+>;
 type _Roster = Assert<Equal<V3RoomProjectionAuthority["transportPeerAuthors"], readonly ExpectedRosterEntry[]>>;
 type _Writers = Assert<Equal<V3RoomProjectionAuthority["writerAuthors"], readonly string[]>>;
 type _ProjectionSink = Assert<

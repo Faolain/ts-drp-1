@@ -1,10 +1,14 @@
+import type { DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-store";
 import type { MessageQueueManager } from "@ts-drp/message-queue";
 import type { AdmittedReceivedVertexView, SignRegisteredVertexDigest } from "@ts-drp/protocol-v3";
 import { type DRPNetworkNode, type Message, type V3Envelope, V3Envelope as V3EnvelopeCodec } from "@ts-drp/types";
 
+import type { DurableLiveJournalStore } from "../../../packages/live-journal/src/index.js";
 import type {
 	activateV3LivePlane,
+	PreparedV3Live,
 	RecoveredV3Live,
+	RecoverV3LiveReplicaInput,
 	routeV3Ingress,
 	V3AdmittedVertexSink,
 	V3EgressResult,
@@ -39,10 +43,33 @@ interface ExpectedHandle {
 	readonly queueId: string;
 	currentEphemeralAuthority(): ExpectedEphemeralAuthority | undefined;
 	issueLocal(input: ExpectedLocalIssueInput): Promise<ExpectedLocalIssueResult>;
+	readRebaseOutbox(): Promise<ExpectedRebaseOutboxResult>;
+	completeRebaseSource(
+		input: Readonly<{ readonly authorSequence: number; readonly digest: string }>
+	): Promise<ExpectedEgress>;
 	publishPending(): Promise<ExpectedEgress>;
 	republishRetained(): Promise<ExpectedEgress>;
 	deactivate(): void;
 }
+
+type ExpectedRebaseOutboxResult =
+	| Readonly<{ readonly ok: true; readonly kind: "empty" }>
+	| Readonly<{
+			readonly ok: true;
+			readonly kind: "displaced";
+			readonly source: Readonly<{
+				readonly author: string;
+				readonly authorSequence: number;
+				readonly vertexDigest: string;
+				readonly intents: readonly Readonly<{
+					readonly logicalTime: number;
+					readonly operation: Readonly<Record<string, unknown>>;
+					readonly operationCount: number;
+					readonly operationIndex: number;
+				}>[];
+			}>;
+	  }>
+	| Readonly<{ readonly ok: false; readonly kind: "not-active" | "record-rejected" | "store-failed" }>;
 
 interface ExpectedEphemeralAuthority {
 	readonly aclDigest: string;
@@ -118,6 +145,33 @@ type _Egress = Assert<Equal<V3EgressResult, ExpectedEgress>>;
 type _LocalIssueInput = Assert<Equal<V3LocalIssueInput, ExpectedLocalIssueInput>>;
 type _LocalIssueResult = Assert<Equal<V3LocalIssueResult, ExpectedLocalIssueResult>>;
 type _Handle = Assert<Equal<V3PlaneHandle, ExpectedHandle>>;
+type _RecoveryInput = Assert<
+	Equal<
+		RecoverV3LiveReplicaInput,
+		| Readonly<{
+				readonly capability: PreparedV3Live;
+				readonly displacedSource?: Readonly<{
+					readonly capability: PreparedV3Live;
+					readonly exactCanonicalAuthorAuthorizationBytes: Uint8Array;
+				}>;
+				readonly exactCanonicalAuthorAuthorizationBytes: Uint8Array;
+				readonly issuanceScope: DurableIssueScope;
+				readonly issuanceStore: DurableIssuanceStore;
+				readonly liveJournalStore: DurableLiveJournalStore;
+		  }>
+		| Readonly<{
+				readonly capability: PreparedV3Live;
+				readonly displacedSource?: Readonly<{
+					readonly capability: PreparedV3Live;
+					readonly exactCanonicalLatchedAclBytes: Uint8Array;
+				}>;
+				readonly exactCanonicalLatchedAclBytes: Uint8Array;
+				readonly issuanceScope: DurableIssueScope;
+				readonly issuanceStore: DurableIssuanceStore;
+				readonly liveJournalStore: DurableLiveJournalStore;
+		  }>
+	>
+>;
 type _Activate = Assert<Equal<typeof activateV3LivePlane, (input: ExpectedInput) => ExpectedActivationResult>>;
 type _Route = Assert<Equal<typeof routeV3Ingress, (networkNode: DRPNetworkNode, message: Message) => boolean>>;
 type _Deactivate = Assert<Equal<ReturnType<V3PlaneHandle["deactivate"]>, void>>;
@@ -132,6 +186,8 @@ const handleShape: readonly [
 	string,
 	ExpectedEphemeralAuthority | undefined,
 	Promise<ExpectedLocalIssueResult>,
+	Promise<ExpectedRebaseOutboxResult>,
+	Promise<ExpectedEgress>,
 	Promise<ExpectedEgress>,
 	Promise<ExpectedEgress>,
 ] = [
@@ -141,6 +197,8 @@ const handleShape: readonly [
 	handle.queueId,
 	handle.currentEphemeralAuthority(),
 	handle.issueLocal(localIssueInput),
+	handle.readRebaseOutbox(),
+	handle.completeRebaseSource({ authorSequence: 0, digest: "0".repeat(64) }),
 	handle.publishPending(),
 	handle.republishRetained(),
 ];
