@@ -50518,3 +50518,67 @@ adopted next anchor can supply the same authenticated source/target context.
 The next checkpoint is Phase 3h's signed migration record and reversible
 rehearsal; no broader Phase 3, production-hardening or product-completion claim
 is authorized.
+
+### D.93.52.1 — Phase 3g closure ledger
+
+Phase 3g closed the bounded authenticated-plane rebase precursor on the signed
+linear chain from the Phase 3f-c closure. The signed plan is
+`2b09bfa8c84d5bfe385e51708fc2f0ba9efcac17`. The tests-only RED begins at
+`fc31dd9cffa616422cfdf208e01e3f9f4f67d451` and its review-driven, tests-only
+corrections are `938725247365c466969cb22c9f334fd9cec0cd45`,
+`f391be8ae6aa9b3f067e7b72f6e2a785dd9ec196`,
+`e3b5cc49419106f033685d1e79896cd543528660`,
+`ad58d42647e2b2a353f747a4ac0e4087a9556d34`,
+`143a30bd9d9599793baeea4db29b059bef14aa35`,
+`b442248bfd2624bbc73e6bf36466afff14d763db`,
+`a664fbe9e4f117adece1e84fa80df554d1dea6d5` and
+`5d432e7bbf33f0a049c84cd781aa98afa28509ef`. The exact four-owner GREEN is
+`efe7cee7609c89ebf1ce7e8878d10d76d2a2dd97`, tree
+`55d80e9b0cb06366d123d1b05c48adbb0d451eee`, sole parent `5d432e7b...`, with
+binary patch SHA-256
+`ef89f4ed4429b5da9d0272dc86947f09e7ffded7a448d4d92b07f6f866461b59`.
+Every listed commit has a Good Faolain signature under fingerprint
+`55E22F154FBAF8C84F378304761B99CEA81C6289`.
+
+Final-byte focused evidence passed the two causal files at `32/32` in `37.04s`,
+the six Phase 3f/3g adjacent preservation files at `31/31` in `20.87s`, and the
+established room semantics at `15/15` in `918ms`. The genuine five semantic
+suites passed `87/87` in `1.76s`; their controlled operation and work arms
+passed `28/28` in `650ms` and `12/12` in `595ms`. The real browser chat control
+passed `5/5` in `5.8s`, and the real browser zone control passed `1/1` in
+`15.6s`.
+Node, room, chat and grid builds, the dedicated Phase 3/P6 typecheck, ESLint,
+Prettier and diff checks passed. The broad node test typecheck retains only the
+pre-existing `compact-history-scale-1i-b.ts` diagnostics and is not counted as
+Phase 3g evidence. Test and streamed review artifacts remain under
+`.logs/phase3g-*`.
+
+Review corrections made source logical time monotonic without pinning captured
+values, authenticated exact source object/creator/blueprint/ACL/author context,
+proved stable multi-row enumeration, retired structural source rows, preserved
+transformed replacements across restart, bounded recovered current and
+quarantined rows, prevented product-rejected replacements from consuming their
+source intent, and contained remote-authored product rejection without poisoning
+the local session. Kimi's final and delta audits returned `PASS` with no P0/P1.
+The final Opus xhigh delta review returned `PASS`, no P0/P1 and high confidence.
+Grok's streamed review and Codex's review ended `NO_VERDICT` without a reproduced
+P0/P1; neither is counted as approval. No remaining substantive reviewer finding
+was waived.
+
+The exact GREEN was pushed to pull request 15. At `2026-08-21T22:49:56Z`, the
+PR reported eleven observed failed jobs plus checks still in progress. The
+first three failures were independently inspected: author-authorization run
+`32534055158` stopped in setup because the checkout has no `.nvmrc`, while
+protocol-v2 registry run `32534055252` and protocol-v3 atomic-freeze run
+`32534055242` selected external-empty merge base `d041baff...` and attempted to
+load freeze checkers that do not exist there. Those three did not execute or
+contradict the Phase 3g rebase evidence. The remaining remote failures are not
+reclassified by this local ledger. Remote CI remains open repository work and
+this ledger does not call the PR green.
+
+This closes only the authenticated-plane displacement/rebase precursor. It does
+not prove a certified cut, adopted next anchor, completed Phase 3, completed
+production-hardening plan, or completed chat/game product. Phase 3h remains the
+next durable-spine checkpoint: a signed migration record and genuinely
+reversible rehearsal whose separate activation decision leaves the room on the
+old plane until authorized.
