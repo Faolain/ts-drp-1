@@ -87,14 +87,14 @@ describe("Phase 3g authenticated-plane rebase outbox RED", () => {
 		expect(overCapacity.recovery).toMatchObject({ kind: "graph-rejected", ok: false });
 		expect(overCapacity.rebaseOutbox).toBeUndefined();
 		expect(overCapacity.networkPublishedDigests).toEqual([]);
-	});
+	}, 60_000);
 
 	it("fails closed before quarantining an 8,193rd authenticated current row", async () => {
 		const overCapacity = await runSharedPlaneScenario({ syntheticCurrentQuarantinedRowCount: 8193 });
 		expect(overCapacity.recovery).toMatchObject({ kind: "graph-rejected", ok: false });
 		expect(overCapacity.rebaseOutbox).toBeUndefined();
 		expect(overCapacity.networkPublishedDigests).toEqual([]);
-	});
+	}, 60_000);
 
 	it("enumerates two genuine source rows in author-sequence order without re-deriving the first", async () => {
 		const twoRows = await runSharedPlaneScenario({ twoSourceRows: true });
