@@ -49634,3 +49634,55 @@ a Vitest config, package manifest, lockfile, fixture, production, workflow or
 unrelated test change. Its terminal evidence records the clean-install module
 resolution, the capacity row duration, the focused RED signature and the
 overlaid GREEN signature before signing either subsequent commit.
+
+### D.93.51.4 — Phase 3f-b closure ledger
+
+Phase 3f-b closed as bounded frontier reduction, not as completion of operation
+batching or Phase 3f. The Good-Faolain-signed chain is plan
+`842591aae9e0df9ccb3f0d7654f14211d17707f2`, tests-only RED
+`809200d2121a1eb2fc2045c6045c8ae92749f136`, RED-oracle amendment
+`60c12e01c887a73b9d7fd69f871573efd72e6cab`, corrective RED
+`2f505c0d5ff6cda0bef794e951fa968438ffe276`, and four-owner GREEN
+`e725ed72e5dd6c23dc1862457681e798fa3bce3f`, tree
+`c4ae62b59302cec4eaaec01e37a18f296c6e1825`. Each transition is linear,
+signed by Faolain key `55E22F154FBAF8C84F378304761B99CEA81C6289`
+and pushed to the tracked branch.
+
+The durable result is that live v3 registrations, through the one
+`CausalityIndex` frontier owner, select every local dependency. Wide frontiers
+are reduced with authenticated, state-neutral `causalJoin` vertices before the
+application vertex; callers cannot name dependencies or substitute the join.
+The same recovered dependency bound applies to live ingress and recovery. One
+registration gate serializes ingress, issuance and publication, and bounded
+identity-bound pending evidence repairs retained streams that deliver a child
+before its parent. Chat and zone consume the shared room composition and retain
+their visible durable behavior.
+
+On the final GREEN bytes the focused preservation and frontier roster passed
+`60/60` in about 24 seconds, including the genuine 8,191-sibling capacity case
+in about 14 seconds. The five established semantic suites passed `87/87` in
+about 1.6 seconds. The chat control passed `5/5` in 5.0 seconds and the genuine
+network zone control passed `1/1` in 13.4 seconds. Node, room, chat and grid
+type/build gates, the package build, ESLint, Prettier and diff checks passed.
+The broad node test typecheck retains only the unrelated pre-existing
+`compact-history-scale-1i-b.ts` discriminated-union diagnostics; the dedicated
+Phase 3f typecheck is green. Non-authoritative command and streamed review
+artifacts remain under `.logs/phase3f-b-green/`.
+
+Codex and Opus returned `PASS`, and Kimi completed its requested `100/100`
+audit with `PASS`; none reproduced a P0 or P1. Grok review mode completed in
+420.139 seconds with terminal public text `VERDICT PASS`, no P0/P1 and two
+nonblocking P2 observations, while the wrapper conservatively recorded
+`NO_VERDICT` because it did not parse that terminal schema. The accepted P2s
+describe signed behavior rather than hidden weakening: a byte-capacity failure
+may leave earlier durable neutral joins truthful, and pending-ingress overflow
+remains bounded and recoverable through retained replay. Refactor-clean review
+accepted the scoped byte counter mirror until a separately authorized
+`CausalityIndex` owner change can absorb it.
+
+The next checkpoint is the separately signed Phase 3f-c application
+micro-batching slice. It must preserve this chat/zone golden path while defining
+the recursive application-only batch ABI, work and byte limits, result
+ownership, and control-operation exclusion. Phase 3g and 3h remain subsequent
+steps. This ledger makes no Phase 3, broader production-hardening or product
+completion claim.
