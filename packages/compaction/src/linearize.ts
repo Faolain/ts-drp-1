@@ -274,6 +274,7 @@ export class CausalityIndex {
 	private readonly maxEpochBytes: number | undefined;
 	private readonly maxEpochVertices: number | undefined;
 	private readonly objectId: string;
+	private readonly tipHashes: Set<string>;
 
 	/**
 	 * Builds exact ancestry for a complete topological order.
@@ -350,6 +351,7 @@ export class CausalityIndex {
 		this.index = new Map(order.map((hash, position) => [hash, position]));
 		const wordCount = Math.ceil(order.length / 32);
 		this.ancestors = new Array<Uint32Array>(order.length);
+		const tipHashes = new Set(order);
 		for (let position = 0; position < order.length; position++) {
 			const hash = order[position] as string;
 			const vertex = vertices.get(hash);
@@ -358,6 +360,7 @@ export class CausalityIndex {
 			}
 			const bits = new Uint32Array(wordCount);
 			for (const dependency of vertex.dependencies) {
+				tipHashes.delete(dependency);
 				const dependencyPosition = this.index.get(dependency);
 				if (dependencyPosition === undefined || dependencyPosition >= position) {
 					throw new LinearizationError("INVALID_ORDER", `dependency ${dependency} does not precede ${hash}`);
@@ -371,6 +374,7 @@ export class CausalityIndex {
 			}
 			this.ancestors[position] = bits;
 		}
+		this.tipHashes = tipHashes;
 		this.epochBytes = initialEpochBytes;
 	}
 
@@ -487,6 +491,16 @@ export class CausalityIndex {
 			this.epochBytes = previousEpochBytes;
 			throw error;
 		}
+		for (const dependency of dependencies) this.tipHashes.delete(dependency);
+		this.tipHashes.add(hash);
+	}
+
+	/**
+	 * Returns the current maximal causal frontier as a detached immutable snapshot.
+	 * @returns Fresh code-unit-sorted tip hashes.
+	 */
+	tips(): readonly string[] {
+		return Object.freeze([...this.tipHashes].sort((left, right) => (left < right ? -1 : left > right ? 1 : 0)));
 	}
 
 	/**
