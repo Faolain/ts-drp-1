@@ -49089,3 +49089,202 @@ of the sealed controller-local RED object inventory and command/output packet.
 After signed GREEN, required remote jobs and the concise T4 closure ledger, work
 returns immediately to the existing P6 recovery and two-client Discord/MMORPG
 golden path.
+
+### D.93.51 — Phase 3 durable-spine resumption and authoritative tip ownership
+
+This checkpoint resumes the core durable-room spine after the signed T4 closure.
+Its authenticated starting point is Good-Faolain-signed commit
+`e6ba4fed910c9406e37593e4b38cdf80d04f119d`, tree
+`63d82abf7275a106bc0414140e15232f4b9b196f`, tracking its exact upstream at
+ahead/behind `0/0`. T4 remains closed by the Good-Faolain-signed annotated tag
+`phase3a1b-t4-exact-unit-priority-closure-v1`: exact GREEN
+`687ea7ce0b857e418046d811bc4299cac93a0a91`, operation run `32427695043`, work
+run `32427695072`, author run `32427695044`, gossip run `32427695020`, and ACL
+run `32427694743`, all `SUCCESS`. No additional topology work is authorized by
+this section.
+
+The current product preservation control is re-established after rebuilding all
+workspace packages from the authenticated source tree. The focused two-client
+chat create/join, durable exchange, disconnect/reopen, missed-history repair and
+post-reconnect convergence rows pass `2/2` in 3.09 seconds wall time. The real
+two-client network zone create/join, durable `placeBlock`, bidirectional E1
+movement without durable growth, disconnect/reopen, missed-history repair and
+post-reconnect durable convergence row passes `1/1` in 18.60 seconds wall time.
+The package build passes in 11.49 seconds. These measurements live under
+`.logs/phase3f-golden-baseline/` and are preservation evidence, not tracked
+authority. The chat transport in this control is the intentional
+`BroadcastChannel` structural adapter; the zone is the genuine network proof.
+Both disconnects are graceful. Neither row is represented as abrupt process
+death, WAN availability or an end-to-end observation of T4 priority selection.
+
+#### Phase 3e authority reconciliation
+
+The roadmap names Phase 3f next, but the older Phase 3e row also says a
+`closeManifestDigest` is mandatory and names a `close-manifest-root.test.ts`
+that never shipped. This section resolves that conflict explicitly instead of
+silently treating Phase 3e as complete.
+
+`closeManifestDigest` supplies no independent cryptographic commitment. The
+frozen `cutValue` carrier is already a canonical object under domain
+`ts-drp/hard-epoch-cut/v3`; its domain-separated `cutDigest` commits the exact
+canonical carrier containing `previousAnchor`, `previousCutDigest`,
+`previousHistoryRoot`, `previousHistorySize`, `closeSetRoot`, `closeSetCount`,
+`historyRoot`, `historySize`, `stateDigest`, `aclDigest`,
+`snapshotManifestDigest`, `blueprintDigest`, `archiveIndexRoot`,
+`availabilityPolicyDigest`, the next signer set, parameters and close reason.
+The next signed anchor independently carries the selected `cutDigest`,
+`historyRoot`, `historySize`, `archiveIndexRoot`, state, ACL and blueprint
+identities. The older proposed close manifest additionally described the sorted
+frontier, deterministic close-set order and vertex byte lengths. Those are
+inputs used to derive and verify the committed roots, not an additional signed
+value needing a second aggregate field: order is committed by the RFC 9162
+history leaves, the frontier is derived from the authenticated close set, and
+byte lengths are recomputed from authenticated vertex preimages before a signer
+accepts a cut. A digest over the manifest may remain an availability address,
+but it is not an independent consensus commitment.
+
+Therefore this section supersedes only the unimplemented Phase 3e requirement
+for an additional consensus `closeManifestDigest` field. It does **not** retire
+the causal root-derivation proof that the old `close-manifest-root.test.ts`
+intended to supply. That proof is resliced before the Phase 3 exit gate as a
+canonical, domain-separated close-set/history-root owner: permuted arrival must
+produce the same deterministic close order and roots, while a changed frontier,
+order, vertex hash or authenticated byte length must change or reject the
+derived evidence. The owner must prove that supplied `closeSetRoot` and
+`historyRoot` values were actually derived from those exact inputs rather than
+merely accepted because they were fields inside a correctly hashed `cutValue`.
+It does not remove or weaken any cut field, RFC 9162 root, root size, canonical
+encoding, domain separation, snapshot manifest, archive root, availability
+policy, next-anchor binding or future Phase 5/6 verification duty. Every future
+cut must still derive `cutDigest` from the exact canonical `cutValue`, and a
+mutation of any owned field must change that digest. No compatibility field,
+accept-either branch or alternate digest is added. This reconciliation does not
+claim Phase 3e complete: canonical close-set leaf derivation, the manifest/input
+equivalence proof above and the genesis `historyRoot`/`archiveIndexRoot` profile
+remain explicit Phase 3 exit prerequisites. Live sealing and adoption remain
+Phase 5 and Phase 6 work. Slice 3f-a may proceed independently as tip-index
+groundwork, but neither it nor this field correction can bypass those remaining
+3e gates. Review must stop this checkpoint if it identifies a security property
+unique to the removed aggregate rather than the retained root-derivation and
+exact canonical cut/anchor evidence.
+
+#### Phase 3f ownership correction and slice 3f-a
+
+The old Phase 3f note points at the legacy object hashgraph and says local
+dependencies default to the full frontier. That is not the shipped v3 product
+path. The shared v3 room currently passes `[anchorDigest]` for every local
+operation; `V3LocalIssueInput` accepts caller-selected dependencies; and the
+node forwards them unchanged into the signed vertex. Concurrent operations are
+therefore permanent anchor siblings. `CausalityIndex` is the genuine recovered
+and live v3 causality owner, but it exposes no authoritative tip snapshot and
+does not yet enforce authenticated `maxDependencies`. Selecting an arbitrary
+sixteen of sixty-four tips would not cover the omitted forty-eight and is
+forbidden.
+
+Phase 3f is split into bounded TDD slices. This checkpoint authorizes only
+**3f-a authoritative tip ownership**. It is necessary groundwork and is not a
+claim that frontier aggregation, application batching or Phase 3f is complete.
+
+`CausalityIndex` gains one public read method:
+
+```ts
+tips(): readonly string[]
+```
+
+The index owns the exact current antichain. Construction derives tips from the
+already validated complete graph: a vertex is a tip exactly when no other
+installed vertex names it as a direct dependency. Every successful append
+removes every exact consumed dependency from the tip set and adds the appended
+hash. Validation, missing dependency, duplicate, wrong epoch, count-capacity and
+byte-capacity failures publish no index or tip mutation of their own. Existing
+reentrant contracts remain authoritative: when observing the outer candidate
+causes a nested append to commit successfully, the outer failure preserves that
+latest committed nested index/tip state rather than rolling it back to the state
+before the outer call. Publication failure after preparing an outer row leaves
+the latest committed state exact. The method returns a fresh frozen array sorted
+by plain UTF-16 code-unit comparison; because every hash is lowercase ASCII
+64-hex, this is also exact Unicode code-point order and never locale order.
+Callers cannot mutate internal custody, insertion order is not authority, and
+the anchor remains a tip only until a genuine child consumes it. The method does
+not accept caller hints, synthesize ancestry, truncate the frontier or expose a
+mutable collection.
+
+The signed tests-only RED is the plan commit's sole child and changes exactly
+one new path:
+
+- `packages/compaction/tests/causality-tips-3f-a.test.ts`.
+
+The RED uses the genuine `CausalityIndex` public surface and proves:
+
+- an anchor-only graph has exactly the anchor tip;
+- independent siblings grow the exact tip set;
+- one valid join consuming every sibling collapses the tips to the join;
+- from tips `{A,B,C}`, a join consuming only `{A,B}` yields exactly `{C,join}`;
+  the RED proves this literal proper-subset result both when constructing from a
+  complete graph and when successfully appending to a live index;
+- construction from the same graph under different valid insertion/order
+  arrangements yields the same sorted tip snapshot;
+- the returned array is frozen, detached and unable to mutate later reads;
+- key/hash mismatch, invalid kind, multiple roots, duplicate dependency,
+  invalid vertex, missing dependency, duplicate hash, wrong epoch,
+  count-capacity and byte-capacity failures add no state of their own;
+- reentrant nested success followed by outer duplicate or capacity failure
+  preserves the exact nested tip/index result, while injected index-publication
+  failure publishes no outer tip and preserves the latest committed state; and
+- the RED fails only because the genuine public `tips()` owner is absent, not
+  because a fixture reimplements the result.
+
+The RED may use a local test-only structural interface and cast solely so the
+package typecheck can reach the runtime absence of `tips()` before GREEN; it may
+not calculate tips or supply a fallback. `packages/compaction/src/index.ts`
+already reexports `CausalityIndex`, so the one authorized GREEN source path is
+sufficient and no export-owner edit is allowed.
+
+The causal mutant set treats the anchor as permanently live, returns all
+vertices, clears the whole tip set whenever any current tip is consumed, removes
+only one consumed dependency, also removes an unconsumed tip, preserves
+insertion order, uses locale ordering, returns a caller-mutable alias, updates
+tips before successful append, rolls back a successful nested append, or changes
+tips on a failed outer publication/capacity outcome. Assertions target exact
+antichain behavior and committed-state atomicity, not source text or incidental
+diagnostics.
+
+The signed GREEN is the RED commit's sole child and changes exactly:
+
+- `packages/compaction/src/linearize.ts`.
+
+No protocol registry, wire carrier, v3 node, room, chat, zone, legacy object,
+workflow, dependency, lockfile, topology or freeze-governance path may change in
+3f-a. The implementation extends the existing index owner rather than creating
+a second frontier map or a test-only oracle. Refactor-clean review must reject
+parallel tip abstractions, caller-owned state, compatibility wrappers and
+unrelated cleanup.
+
+Focused RED/GREEN evidence runs the new owner plus existing compaction
+constructor, append, capacity and public-error suites, followed by compaction
+typecheck/build, root lint, Prettier and diff checks. Final GREEN preservation
+rebuilds packages and reruns the focused two-client chat and real zone controls
+recorded above. Exact commands, counts and wall durations are logged for both
+RED and GREEN.
+
+The plan, tests-only RED, GREEN and concise closure ledger are separate
+Good-Faolain-signed commits and are pushed only after exact-byte custody and
+review. Kimi receives the requested 100-step audit. Grok runs in review mode
+with streamed JSONL/status/public artifacts and may continue up to thirty
+minutes while status shows progress. Codex and Opus xhigh review the exact
+packet independently. A timeout or `NO_VERDICT` is reported honestly and is
+not approval, but only a reproduced substantive P0/P1 blocks signing; every
+such finding is resolved or explicitly dismissed with evidence.
+
+After 3f-a closure, later signed checkpoints must separately define: an
+authenticated application-only join/batch representation with recursive ABI,
+ACL and work limits; node-owned reduction of arbitrarily many tips into
+vertices of at most `maxDependencies`; deletion of caller-selected local
+dependencies; enforcement on both local and received vertices; shared-room
+micro-batching; and the W=64 proof that all original tips become ancestors,
+fan-out remains bounded, multiple mutations use one signed application change,
+and no user-visible write is silently dropped. ACL, membership, epoch and other
+control operations are not batchable unless separately designed. Work then
+continues through Phase 3g and 3h before the Phase 3 exit gate, with the same
+chat/zone golden path rerun at every boundary. E3/E4 may proceed as parallel
+product tracks but do not replace this durable spine.
