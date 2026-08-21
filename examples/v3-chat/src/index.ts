@@ -11,7 +11,7 @@ import { Keychain } from "@ts-drp/keychain";
 import { type DRPNetworkNode, type Message, MessageType } from "@ts-drp/types";
 
 const OBJECT_ID = `creator:${"d".repeat(32)}`;
-const CHAT_ARTIFACT_SOURCE = `function aclReducer(input){return {output:input.operation,state:input.state}}function joinReducer(input){return {output:input.operation.clientId,state:input.state}}function messageReducer(input){const state=[...input.state,input.operation.text];return {output:input.operation.text,state}}export const blueprint={exportSchemaVersion:1,artifactId:"v3-chat.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{acl:aclReducer,join:joinReducer,message:messageReducer}};`;
+const CHAT_ARTIFACT_SOURCE = `function aclReducer(input){return {output:input.operation,state:input.state}}function causalJoinReducer(input){return {output:null,state:input.state}}function joinReducer(input){return {output:input.operation.clientId,state:input.state}}function messageReducer(input){const state=[...input.state,input.operation.text];return {output:input.operation.text,state}}export const blueprint={exportSchemaVersion:1,artifactId:"v3-chat.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{acl:aclReducer,causalJoin:causalJoinReducer,join:joinReducer,message:messageReducer}};`;
 const PARAMETERS = Object.freeze({
 	maxEpochVertices: 8192,
 	maxEpochBytes: 8_388_608,
@@ -22,7 +22,7 @@ const PARAMETERS = Object.freeze({
 	maxPendingBytes: 16_777_216,
 });
 const CLIENT_IDS = ["alice", "bob", "carol", "dave", "erin", "frank", "grace", "heidi"] as const;
-type ClientId = (typeof CLIENT_IDS)[number];
+export type ClientId = (typeof CLIENT_IDS)[number];
 
 // Floors begin above the bootstrap vertex's resumed value (logical time 1 + stride 2).
 const CLIENTS: Readonly<Record<ClientId, Readonly<{ logicalTime: number; seed: string }>>> = Object.freeze({
@@ -264,6 +264,13 @@ function applicationMaterial(): ApplicationMaterial {
 					}),
 				}),
 				Object.freeze({
+					name: "causalJoin",
+					argumentSchema: Object.freeze({
+						kind: "closed-record",
+						fields: Object.freeze([]),
+					}),
+				}),
+				Object.freeze({
 					name: "join",
 					argumentSchema: Object.freeze({
 						kind: "closed-record",
@@ -316,6 +323,21 @@ function applicationMaterial(): ApplicationMaterial {
 				return resolved;
 			},
 		}),
+	});
+}
+
+/**
+ * Creates the one production chat composition installed by the room entry path.
+ * @param clientId - Client identity encoded by the bootstrap join operation.
+ * @returns Exact blueprint, catalog, bootstrap and projection authority.
+ */
+export function createV3ChatApplication(clientId: ClientId): V3RoomApplication<ChatProjection> {
+	const material = applicationMaterial();
+	return Object.freeze({
+		bootstrapOperation: Object.freeze({ action: "join", clientId }),
+		canonicalBlueprintPackageBytes: material.canonicalBlueprintPackageBytes,
+		catalog: material.catalog,
+		projectAcceptedVertices: projectChat,
 	});
 }
 
@@ -508,19 +530,14 @@ function projectChat(vertices: readonly V3RoomAcceptedVertex[]): ChatProjection 
 async function joinRoom(
 	input: Omit<JoinInput, "invite"> & Readonly<{ readonly creatorInvite: string | V3RoomCreatorInviteMaterial }>
 ): Promise<ActiveChat> {
-	const application = applicationMaterial();
+	const application = createV3ChatApplication(input.clientId);
 	const selected = CLIENTS[input.clientId];
 	const clientAuthors = await createClientAuthors();
 	const keychain = await createLocalKeychain(input.clientId);
 	const author = keychain.localAuthorId;
 	const accepted = new Map<string, AcceptedMessage>();
 	const room = await createV3RoomSession({
-		application: Object.freeze({
-			bootstrapOperation: Object.freeze({ action: "join", clientId: input.clientId }),
-			canonicalBlueprintPackageBytes: application.canonicalBlueprintPackageBytes,
-			catalog: application.catalog,
-			projectAcceptedVertices: projectChat,
-		}),
+		application,
 		author,
 		creatorInvite: input.creatorInvite,
 		databaseName: input.databaseName,

@@ -7,7 +7,7 @@ import {
 } from "@ts-drp/example-v3-room";
 import type { DRPNode } from "@ts-drp/node";
 
-const ZONE_ARTIFACT_SOURCE = `function joinReducer(input){return {output:input.operation,state:input.state}}function placeBlockReducer(input){return {output:input.operation,state:input.state}}export const blueprint={exportSchemaVersion:1,artifactId:"v3-zone.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{join:joinReducer,placeBlock:placeBlockReducer}};`;
+const ZONE_ARTIFACT_SOURCE = `function causalJoinReducer(input){return {output:null,state:input.state}}function joinReducer(input){return {output:input.operation,state:input.state}}function placeBlockReducer(input){return {output:input.operation,state:input.state}}export const blueprint={exportSchemaVersion:1,artifactId:"v3-zone.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{causalJoin:causalJoinReducer,join:joinReducer,placeBlock:placeBlockReducer}};`;
 const PARAMETERS = Object.freeze({
 	maxEpochVertices: 8192,
 	maxEpochBytes: 8_388_608,
@@ -137,7 +137,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 			if (separator <= 0) throw new TypeError("v3 zone creator identity is invalid");
 			const creatorPeerId = selectedZoneId.slice(0, separator);
 			const creatorAuthor = creatorAuthorFromInvite(creatorInvite);
-			const application = zoneApplication(bootstrapMembers, creatorPeerId, creatorAuthor);
+			const application = createV3ZoneApplication(bootstrapMembers, creatorPeerId, creatorAuthor);
 			opened = await createV3RoomSession<ZoneProjection>({
 				application,
 				author: localAuthor,
@@ -286,7 +286,14 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 	return Object.freeze(api);
 }
 
-function zoneApplication(
+/**
+ * Creates the one production zone composition installed by the zone entry path.
+ * @param members - Ordered creator-approved bootstrap roster.
+ * @param creatorPeerId - Transport identity bound to the creator roster entry.
+ * @param creatorAuthor - Durable creator author bound to the signed invite.
+ * @returns Exact blueprint, catalog, bootstrap and projection authority.
+ */
+export function createV3ZoneApplication(
 	members: readonly Readonly<Enrollment & { readonly order: number }>[],
 	creatorPeerId: string,
 	creatorAuthor: string
@@ -534,6 +541,7 @@ function applicationMaterial(): Readonly<{
 			schemaVersion: 1,
 			operationDiscriminator: "action",
 			operations: Object.freeze([
+				operation("causalJoin", []),
 				operation("join", [Object.freeze({ name: "roster", type: "canonical-object" })]),
 				operation("placeBlock", [
 					Object.freeze({ name: "id", type: "string" }),

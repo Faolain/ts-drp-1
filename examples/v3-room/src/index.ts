@@ -354,16 +354,16 @@ export async function createV3RoomSession<Projection extends V3RoomProjectionAut
 			logicalTime += 2;
 			if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
 			const issued = await activeHandle.issueLocal({
-				dependencies: [prepared.descriptor.anchorDigest],
 				logicalTime: current,
 				operation,
 				signRegisteredVertexDigest: input.signRegisteredVertexDigest,
 			});
 			if (terminalFailure !== undefined) throw terminalFailure;
 			if (!issued.ok) throw new TypeError(`v3 room issue failed: ${issued.kind}`);
-			const published = await activeHandle.publishPending();
-			if (!published.ok || published.kind !== "published") {
-				throw new TypeError(`v3 room publication failed: ${published.kind}`);
+			for (;;) {
+				const published = await activeHandle.publishPending();
+				if (!published.ok) throw new TypeError(`v3 room publication failed: ${published.kind}`);
+				if (published.kind === "empty") break;
 			}
 		},
 		openEphemeral(options: EphemeralChannelOptions): EphemeralChannel {
@@ -469,18 +469,13 @@ async function prepareDurableRoomState<Projection extends V3RoomProjectionAuthor
 				signRegisteredVertexDigest: input.signRegisteredVertexDigest,
 				transactIssue: (selectedScope, buildAndSign) => openedIssuanceStore.transactIssue(selectedScope, buildAndSign),
 			});
-			const bootstrap = await issuer.issue({
+			await issuer.issue({
 				anchor: material.pinnedGenesisAnchorDigest,
 				dependencies: [material.pinnedGenesisAnchorDigest],
 				epoch: 0,
 				logicalTime: 1,
 				objectId: input.objectId,
 				operation: input.application.bootstrapOperation,
-			});
-			await openedIssuanceStore.compareAndMarkOutboxPublished({
-				authorSequence: bootstrap.authorSequence,
-				digest: bootstrap.envelope.digest,
-				scope,
 			});
 		}
 		const recovered = await recoverV3LiveReplica({

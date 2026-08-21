@@ -1,5 +1,5 @@
 import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";
-import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { decodeCanonical, deepCloneCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { CausalityIndex, type EpochVertex } from "@ts-drp/compaction";
 import { assertTrustPreserved, createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
 import type { DurableIssuanceOutboxRecord, DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-store";
@@ -144,7 +144,7 @@ const SUPPORTED_PARAMETER_PROFILE = ObjectFreeze({
 	runtimeProfile: "ecmascript-2024-sync-v1" as const,
 });
 const ACTIVATION_INPUT_KEYS = ["capability", "messageQueueManager", "networkNode", "onAdmittedVertex"] as const;
-const LOCAL_ISSUE_INPUT_KEYS = ["dependencies", "logicalTime", "operation", "signRegisteredVertexDigest"] as const;
+const LOCAL_ISSUE_INPUT_KEYS = ["logicalTime", "operation", "signRegisteredVertexDigest"] as const;
 const ISSUANCE_SCOPE_KEYS = ["objectId", "author"] as const;
 const OUTBOX_RECORD_KEYS = ["commit", "publishState"] as const;
 const ISSUE_COMMIT_KEYS = ["authorSequence", "envelope", "issuedRecord", "outboxEntry"] as const;
@@ -275,7 +275,6 @@ export interface V3PlaneHandle {
 }
 
 export interface V3LocalIssueInput {
-	readonly dependencies: readonly string[];
 	readonly logicalTime: number;
 	readonly operation: Readonly<Record<string, unknown>>;
 	readonly signRegisteredVertexDigest: SignRegisteredVertexDigest;
@@ -448,6 +447,8 @@ interface AcceptedParameters {
 	readonly maxDependencies: number;
 	readonly maxEpochBytes: number;
 	readonly maxEpochVertices: number;
+	readonly maxPendingBytes: number;
+	readonly maxPendingEntries: number;
 }
 
 const preparedV3LiveAuthority = new WeakMap<object, PreparedV3LivePayload>();
@@ -834,13 +835,19 @@ function acceptedParameterDigest(bytes: Uint8Array, expectedDigest: string): Acc
 		const maxDependencies = snapshot.maxDependencies;
 		const maxEpochBytes = snapshot.maxEpochBytes;
 		const maxEpochVertices = snapshot.maxEpochVertices;
+		const maxPendingBytes = snapshot.maxPendingBytes;
+		const maxPendingEntries = snapshot.maxPendingEntries;
 		return typeof maxDependencies === "number" &&
 			NumberIsSafeInteger(maxDependencies) &&
 			typeof maxEpochBytes === "number" &&
 			NumberIsSafeInteger(maxEpochBytes) &&
 			typeof maxEpochVertices === "number" &&
-			NumberIsSafeInteger(maxEpochVertices)
-			? ObjectFreeze({ maxDependencies, maxEpochBytes, maxEpochVertices })
+			NumberIsSafeInteger(maxEpochVertices) &&
+			typeof maxPendingBytes === "number" &&
+			NumberIsSafeInteger(maxPendingBytes) &&
+			typeof maxPendingEntries === "number" &&
+			NumberIsSafeInteger(maxPendingEntries)
+			? ObjectFreeze({ maxDependencies, maxEpochBytes, maxEpochVertices, maxPendingBytes, maxPendingEntries })
 			: undefined;
 	} catch {
 		return undefined;
@@ -1922,6 +1929,7 @@ async function prepareV3LiveGeneration(input: PrepareV3LiveGenerationInput): Pro
 interface V3PlaneRegistration {
 	active: boolean;
 	readonly authorization: V3LiveAuthorization;
+	epochBytes: number;
 	handle: V3PlaneHandle;
 	readonly index: CausalityIndex;
 	readonly issuanceScope: DurableIssueScope;
@@ -1932,9 +1940,24 @@ interface V3PlaneRegistration {
 	readonly networkNode: DRPNetworkNode;
 	readonly onAdmittedVertex: V3AdmittedVertexSink;
 	readonly payload: PreparedV3LivePayload;
+	readonly pendingIngress: Map<string, PendingV3Ingress>;
 	readonly queueId: string;
 	readonly topic: string;
+	drainingPendingIngress: boolean;
 	gate: Promise<void> | undefined;
+	pendingIngressBytes: number;
+}
+
+interface PendingV3Ingress {
+	readonly evidence: VerifiedV3IngressEvidence;
+	readonly pendingByteCharge: number;
+}
+
+interface VerifiedV3IngressEvidence {
+	readonly authenticated: AuthenticatedRecoveryVertex;
+	readonly exactCanonicalPreimageBytes: Uint8Array;
+	readonly signature: Uint8Array;
+	readonly transportSender: string;
 }
 
 const v3PlaneRegistrations = new WeakMap<DRPNetworkNode, Map<string, V3PlaneRegistration>>();
@@ -2232,6 +2255,8 @@ function currentRegistration(registration: V3PlaneRegistration): boolean {
 
 function deactivateRegistration(registration: V3PlaneRegistration): boolean {
 	registration.active = false;
+	registration.pendingIngress.clear();
+	registration.pendingIngressBytes = 0;
 	const registrations = v3PlaneRegistrations.get(registration.networkNode);
 	if (registrations?.get(registration.topic) === registration) registrations.delete(registration.topic);
 	try {
@@ -2312,6 +2337,93 @@ function ingressFailureLog(category: V3IngressFailureCategory): void {
 	}
 }
 
+function hasBoundedDependencies(payload: PreparedV3LivePayload, vertex: AuthenticatedRecoveryVertex): boolean {
+	return (
+		vertex.vertex.dependencies.length > 0 && vertex.vertex.dependencies.length <= payload.parameters.maxDependencies
+	);
+}
+
+function hasInstalledDependencies(index: CausalityIndex, vertex: AuthenticatedRecoveryVertex): boolean {
+	for (const dependency of vertex.vertex.dependencies) {
+		if (!index.has(dependency)) return false;
+	}
+	return true;
+}
+
+function nextEpochBytes(current: number, byteCharge: number, maximum: number): number | undefined {
+	if (
+		!NumberIsSafeInteger(current) ||
+		current < 0 ||
+		!NumberIsSafeInteger(byteCharge) ||
+		byteCharge < 1 ||
+		!NumberIsSafeInteger(maximum) ||
+		maximum < 1 ||
+		byteCharge > maximum - current
+	) {
+		return undefined;
+	}
+	return current + byteCharge;
+}
+
+function hasGraphCapacity(registration: V3PlaneRegistration, byteCharge: number): boolean {
+	return (
+		registration.index.size < registration.payload.parameters.maxEpochVertices &&
+		nextEpochBytes(registration.epochBytes, byteCharge, registration.payload.parameters.maxEpochBytes) !== undefined
+	);
+}
+
+function releasePendingIngress(registration: V3PlaneRegistration, digest: string): void {
+	const pending = registration.pendingIngress.get(digest);
+	if (pending === undefined) return;
+	registration.pendingIngress.delete(digest);
+	registration.pendingIngressBytes -= pending.pendingByteCharge;
+}
+
+function retainPendingIngress(
+	registration: V3PlaneRegistration,
+	evidence: VerifiedV3IngressEvidence,
+	pendingByteCharge: number
+): void {
+	const authenticated = evidence.authenticated;
+	if (registration.pendingIngress.has(authenticated.digest)) return;
+	if (
+		registration.pendingIngress.size >= registration.payload.parameters.maxPendingEntries ||
+		registration.pendingIngressBytes + pendingByteCharge > registration.payload.parameters.maxPendingBytes
+	) {
+		return ingressFailureLog("graph-rejected");
+	}
+	registration.pendingIngress.set(
+		authenticated.digest,
+		ObjectFreeze({
+			evidence,
+			pendingByteCharge,
+		})
+	);
+	registration.pendingIngressBytes += pendingByteCharge;
+}
+
+async function drainPendingIngress(registration: V3PlaneRegistration): Promise<void> {
+	if (registration.drainingPendingIngress || !currentRegistration(registration)) return;
+	registration.drainingPendingIngress = true;
+	try {
+		for (;;) {
+			const ready = [...registration.pendingIngress.entries()]
+				.filter(([, pending]) =>
+					pending.evidence.authenticated.vertex.dependencies.every((dependency) => registration.index.has(dependency))
+				)
+				.sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
+			if (ready.length === 0) return;
+			for (const [digest, pending] of ready) {
+				if (!currentRegistration(registration)) return;
+				releasePendingIngress(registration, digest);
+				await handleV3Ingress(registration, pending.evidence);
+			}
+		}
+	} finally {
+		registration.drainingPendingIngress = false;
+	}
+}
+
 function extractAuthorizedV3Vertex(
 	payload: PreparedV3LivePayload,
 	receivedCanonicalPreimageBytes: Uint8Array,
@@ -2336,6 +2448,92 @@ function extractAuthorizedV3Vertex(
 
 async function handleV3Ingress(
 	registration: V3PlaneRegistration,
+	evidence: VerifiedV3IngressEvidence
+): Promise<boolean> {
+	if (!currentRegistration(registration)) return false;
+	const authenticated = evidence.authenticated;
+	const alreadyAccepted = registration.index.has(authenticated.digest);
+	if (!alreadyAccepted && !hasInstalledDependencies(registration.index, authenticated)) {
+		ingressFailureLog("graph-rejected");
+		return false;
+	}
+	const candidate = aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
+	if (
+		!alreadyAccepted &&
+		!validateLatchedOperation(registration.authorization, registration.latchedOperations, candidate)
+	) {
+		ingressFailureLog("admission-rejected");
+		return false;
+	}
+	if (!alreadyAccepted && !hasGraphCapacity(registration, authenticated.byteCharge)) {
+		ingressFailureLog("graph-rejected");
+		return false;
+	}
+	let appended;
+	try {
+		appended = await registration.liveJournalStore.appendAccepted({
+			detachedSignature: new Uint8ArrayConstructor(evidence.signature),
+			exactCanonicalPreimageBytes: new Uint8ArrayConstructor(evidence.exactCanonicalPreimageBytes),
+			scope: liveJournalScope(registration.payload),
+			sourceKind: "received",
+			vertexDigest: authenticated.digest,
+		});
+	} catch {
+		ingressFailureLog("journal-rejected");
+		return false;
+	}
+	if (
+		!appended.ok ||
+		appended.vertexDigest !== authenticated.digest ||
+		!sameLiveJournalScope(appended.scope, liveJournalScope(registration.payload)) ||
+		(alreadyAccepted ? !appended.idempotent : appended.idempotent || appended.sourceKind !== "received")
+	) {
+		ingressFailureLog("journal-rejected");
+		return false;
+	}
+	if (alreadyAccepted) {
+		releasePendingIngress(registration, authenticated.digest);
+		return false;
+	}
+	const updatedEpochBytes = nextEpochBytes(
+		registration.epochBytes,
+		authenticated.byteCharge,
+		registration.payload.parameters.maxEpochBytes
+	);
+	if (updatedEpochBytes === undefined) {
+		ingressFailureLog("graph-rejected");
+		return false;
+	}
+	try {
+		const outcome = registration.index.append(authenticated.digest, authenticated.vertex, authenticated.byteCharge);
+		if (outcome !== undefined) {
+			ingressFailureLog("graph-rejected");
+			return false;
+		}
+		registration.epochBytes = updatedEpochBytes;
+	} catch {
+		ingressFailureLog("graph-rejected");
+		return false;
+	}
+	if (candidate !== null && candidate !== undefined) registration.latchedOperations.set(candidate.digest, candidate);
+	releasePendingIngress(registration, authenticated.digest);
+	if (!currentRegistration(registration)) return true;
+	const delivery = ObjectFreeze({
+		vertex: authenticated.admitted,
+		exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(evidence.exactCanonicalPreimageBytes),
+		signature: new Uint8ArrayConstructor(evidence.signature),
+		transportSender: evidence.transportSender,
+	});
+	try {
+		await registration.onAdmittedVertex(delivery);
+	} catch {
+		ingressFailureLog("sink-rejected");
+	}
+	return true;
+}
+
+async function authenticateV3Ingress(
+	registration: V3PlaneRegistration,
 	message: Message,
 	transport: "gossip" | "retained"
 ): Promise<void> {
@@ -2345,14 +2543,16 @@ async function handleV3Ingress(
 		const gossipTopic = registration.networkNode.gossipTopicFor(message);
 		if (transport === "gossip" ? gossipTopic !== registration.topic : gossipTopic !== undefined) return;
 		if (message.objectId !== registration.topic) return;
+		let exactWireBytes: Uint8Array;
 		let receivedCanonicalPreimageBytes: Uint8Array;
 		let signature: Uint8Array;
 		try {
-			const exactWireBytes = copyDetachedBytes(message.data);
-			if (exactWireBytes === undefined || exactWireBytes.byteLength === 0) {
+			const detachedWireBytes = copyDetachedBytes(message.data);
+			if (detachedWireBytes === undefined || detachedWireBytes.byteLength === 0) {
 				ingressFailureLog("envelope-rejected");
 				return;
 			}
+			exactWireBytes = detachedWireBytes;
 			const decoded = V3Envelope.decode(exactWireBytes);
 			const canonicalEnvelope = V3Envelope.encode(decoded).finish();
 			if (!sameBytes(exactWireBytes, canonicalEnvelope)) {
@@ -2390,63 +2590,52 @@ async function handleV3Ingress(
 		}
 		const authenticated = authenticatedRecoveryVertex(extracted.vertex, receivedCanonicalPreimageBytes.byteLength);
 		if (authenticated === undefined) return ingressFailureLog("malformed-input");
-		const alreadyAccepted = registration.index.has(authenticated.digest);
-		const candidate = aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
-		if (
-			!alreadyAccepted &&
-			!validateLatchedOperation(registration.authorization, registration.latchedOperations, candidate)
-		) {
-			return ingressFailureLog("admission-rejected");
-		}
-		let appended;
-		try {
-			appended = await registration.liveJournalStore.appendAccepted({
-				detachedSignature: new Uint8ArrayConstructor(signature),
-				exactCanonicalPreimageBytes: new Uint8ArrayConstructor(receivedCanonicalPreimageBytes),
-				scope: liveJournalScope(registration.payload),
-				sourceKind: "received",
-				vertexDigest: authenticated.digest,
-			});
-		} catch {
-			ingressFailureLog("journal-rejected");
-			return;
-		}
-		if (
-			!appended.ok ||
-			appended.vertexDigest !== authenticated.digest ||
-			!sameLiveJournalScope(appended.scope, liveJournalScope(registration.payload)) ||
-			(alreadyAccepted ? !appended.idempotent : appended.idempotent || appended.sourceKind !== "received")
-		) {
-			ingressFailureLog("journal-rejected");
-			return;
-		}
-		if (alreadyAccepted) return;
-		try {
-			const outcome = registration.index.append(authenticated.digest, authenticated.vertex, authenticated.byteCharge);
-			if (outcome !== undefined) {
-				ingressFailureLog("graph-rejected");
-				return;
-			}
-		} catch {
-			ingressFailureLog("graph-rejected");
-			return;
-		}
-		if (candidate !== null && candidate !== undefined) registration.latchedOperations.set(candidate.digest, candidate);
-		if (!currentRegistration(registration)) return;
-		const delivery = ObjectFreeze({
-			vertex: authenticated.admitted,
-			exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(receivedCanonicalPreimageBytes),
+		if (!hasBoundedDependencies(registration.payload, authenticated)) return ingressFailureLog("admission-rejected");
+		const evidence = ObjectFreeze({
+			authenticated,
+			exactCanonicalPreimageBytes: new Uint8ArrayConstructor(receivedCanonicalPreimageBytes),
 			signature: new Uint8ArrayConstructor(signature),
 			transportSender: message.sender,
 		});
-		try {
-			await registration.onAdmittedVertex(delivery);
-		} catch {
-			ingressFailureLog("sink-rejected");
+		if (!registration.index.has(authenticated.digest) && !hasInstalledDependencies(registration.index, authenticated)) {
+			retainPendingIngress(registration, evidence, exactWireBytes.byteLength);
+			return ingressFailureLog("graph-rejected");
 		}
+		if (await handleV3Ingress(registration, evidence)) await drainPendingIngress(registration);
 	} catch {
 		ingressFailureLog("envelope-rejected");
 	}
+}
+
+function enqueueRegistrationTask<Result>(
+	registration: V3PlaneRegistration,
+	capture: () => () => Promise<Result>
+): Promise<Result> {
+	const predecessor = registration.gate;
+	let release!: () => void;
+	const reservation = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	registration.gate = reservation;
+	let task: () => Promise<Result>;
+	try {
+		task = capture();
+	} catch (error) {
+		task = (): Promise<Result> => Promise.reject(error);
+	}
+	let result: Promise<Result>;
+	try {
+		result = predecessor === undefined ? task() : predecessor.then(task);
+	} catch (error) {
+		result = Promise.reject(error);
+	}
+	const completion = result.then(
+		() => undefined,
+		() => undefined
+	);
+	if (registration.gate === reservation) registration.gate = completion;
+	void result.then(release, release);
+	return result;
 }
 
 function enqueueV3Ingress(
@@ -2454,13 +2643,9 @@ function enqueueV3Ingress(
 	message: Message,
 	transport: "gossip" | "retained" = "gossip"
 ): void {
-	const result =
-		registration.gate === undefined
-			? handleV3Ingress(registration, message, transport)
-			: registration.gate.then(() => handleV3Ingress(registration, message, transport));
-	registration.gate = result.then(
-		() => undefined,
-		() => undefined
+	void enqueueRegistrationTask(
+		registration,
+		(): (() => Promise<void>) => () => authenticateV3Ingress(registration, message, transport)
 	);
 }
 
@@ -2568,6 +2753,7 @@ type StagedLatchedAclOperation = Readonly<{
 
 interface RecoveredV3LivePayload {
 	readonly authorization: V3LiveAuthorization;
+	readonly epochBytes: number;
 	readonly index: CausalityIndex;
 	readonly issuanceScope: DurableIssueScope;
 	readonly issuanceStore: DurableIssuanceStore;
@@ -2852,6 +3038,12 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		} catch {
 			return recoveryFailure("graph-rejected", "v3 recovery graph could not be constructed");
 		}
+		let epochBytes = 0;
+		for (const byteCharge of payload.charges.values()) {
+			const updated = nextEpochBytes(epochBytes, byteCharge, payload.parameters.maxEpochBytes);
+			if (updated === undefined) return recoveryFailure("graph-rejected", "v3 recovery byte charge is invalid");
+			epochBytes = updated;
+		}
 		const preparedVertexCount = index.size;
 		let recoveredCount = 0;
 		const recoveredVertices: AdmittedReceivedVertexView[] = [];
@@ -2932,9 +3124,20 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				) {
 					return recoveryFailure("admission-rejected", "v3 journal row is not authenticated");
 				}
+				if (!hasBoundedDependencies(payload, authenticated)) {
+					return recoveryFailure("admission-rejected", "v3 journal row dependency bound is invalid");
+				}
 				const candidate = aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
 				if (!validateLatchedOperation(authorization, latchedOperations, candidate)) {
 					return recoveryFailure("authorization-rejected", "v3 journal ACL operation is not authorized");
+				}
+				const updatedEpochBytes = nextEpochBytes(
+					epochBytes,
+					authenticated.byteCharge,
+					payload.parameters.maxEpochBytes
+				);
+				if (updatedEpochBytes === undefined) {
+					return recoveryFailure("graph-rejected", "v3 journal replay is at capacity");
 				}
 				try {
 					const outcome = index.append(authenticated.digest, authenticated.vertex, authenticated.byteCharge);
@@ -2942,6 +3145,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				} catch {
 					return recoveryFailure("graph-rejected", "v3 journal replay graph append failed");
 				}
+				epochBytes = updatedEpochBytes;
 				recoveredCount += 1;
 				recoveredVertices.push(authenticated.admitted);
 				if (candidate !== null && candidate !== undefined) latchedOperations.set(candidate.digest, candidate);
@@ -2994,10 +3198,24 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			) {
 				return recoveryFailure("admission-rejected", "v3 recovery vertex is not authenticated");
 			}
+			if (!hasBoundedDependencies(payload, authenticated)) {
+				return recoveryFailure("admission-rejected", "v3 recovery vertex dependency bound is invalid");
+			}
 			const alreadyRecovered = index.has(authenticated.digest);
 			const candidate = aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
 			if (!alreadyRecovered && !validateLatchedOperation(authorization, latchedOperations, candidate)) {
 				return recoveryFailure("authorization-rejected", "v3 recovery ACL operation is not authorized");
+			}
+			let updatedEpochBytes = epochBytes;
+			if (!alreadyRecovered) {
+				if (!hasInstalledDependencies(index, authenticated)) {
+					return recoveryFailure("graph-rejected", "v3 recovery graph dependency is unavailable");
+				}
+				const nextBytes = nextEpochBytes(epochBytes, authenticated.byteCharge, payload.parameters.maxEpochBytes);
+				if (nextBytes === undefined || index.size >= payload.parameters.maxEpochVertices) {
+					return recoveryFailure("graph-rejected", "v3 recovery graph is at capacity");
+				}
+				updatedEpochBytes = nextBytes;
 			}
 			let appended;
 			try {
@@ -3025,6 +3243,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				} catch {
 					return recoveryFailure("graph-rejected", "v3 recovery graph append failed");
 				}
+				epochBytes = updatedEpochBytes;
 				recoveredCount += 1;
 				recoveredVertices.push(authenticated.admitted);
 				if (candidate !== null && candidate !== undefined) latchedOperations.set(candidate.digest, candidate);
@@ -3039,6 +3258,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			capability,
 			ObjectFreeze({
 				authorization,
+				epochBytes,
 				index,
 				issuanceScope: selectedScope,
 				issuanceStore: issuance,
@@ -3068,19 +3288,57 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 	}
 }
 
-async function issueLocal(registration: V3PlaneRegistration, rawInput: V3LocalIssueInput): Promise<V3LocalIssueResult> {
-	if (!currentRegistration(registration)) return localIssueFailure("not-active", "v3 plane is not active");
+interface CapturedLocalIssueInput {
+	readonly logicalTime: number;
+	readonly operation: Readonly<Record<string, unknown>>;
+	readonly signRegisteredVertexDigest: SignRegisteredVertexDigest;
+}
+
+function capturedLocalIssueInput(rawInput: V3LocalIssueInput): CapturedLocalIssueInput | V3LocalIssueResult {
 	const input = snapshotClosedRecord(rawInput, LOCAL_ISSUE_INPUT_KEYS);
-	const dependencies = denseStrings(input?.dependencies);
 	if (
 		input === undefined ||
-		dependencies === undefined ||
 		!NumberIsSafeInteger(input.logicalTime) ||
 		(input.logicalTime as number) < 0 ||
 		!isObject(input.operation) ||
 		typeof input.signRegisteredVertexDigest !== "function"
 	) {
 		return localIssueFailure("malformed-input", "v3 local issue input is invalid");
+	}
+	let operation: unknown;
+	try {
+		operation = deepCloneCanonical(input.operation);
+	} catch {
+		return localIssueFailure("malformed-input", "v3 local issue operation is invalid");
+	}
+	if (!isObject(operation) || ObjectGetPrototypeOf(operation) !== null) {
+		return localIssueFailure("malformed-input", "v3 local issue operation is invalid");
+	}
+	// Canonical decoding yields a null-prototype record; ACL validation consumes
+	// a detached ordinary closed record at the local issuance boundary.
+	const detachedOperation = ObjectFreeze({ ...(operation as Record<string, unknown>) });
+	if (Reflect.get(detachedOperation, "action") === "causalJoin") {
+		return localIssueFailure("authorization-rejected", "v3 causal join is reserved to the node");
+	}
+	return ObjectFreeze({
+		logicalTime: input.logicalTime as number,
+		operation: detachedOperation,
+		signRegisteredVertexDigest: input.signRegisteredVertexDigest as SignRegisteredVertexDigest,
+	});
+}
+
+async function issueOneVertex(
+	registration: V3PlaneRegistration,
+	input: CapturedLocalIssueInput,
+	dependencies: readonly string[],
+	operation: Readonly<Record<string, unknown>>
+): Promise<V3LocalIssueResult> {
+	if (!currentRegistration(registration)) return localIssueFailure("not-active", "v3 plane is not active");
+	if (registration.index.size >= registration.payload.parameters.maxEpochVertices) {
+		return localIssueFailure("graph-rejected", "v3 local issue graph is at capacity");
+	}
+	if (dependencies.length === 0 || dependencies.length > registration.payload.parameters.maxDependencies) {
+		return localIssueFailure("admission-rejected", "v3 local issue dependency bound is invalid");
 	}
 	const scope = copiedScope(registration.issuanceScope);
 	if (scope === undefined || scope.objectId !== registration.payload.provenance.objectId) {
@@ -3090,31 +3348,48 @@ async function issueLocal(registration: V3PlaneRegistration, rawInput: V3LocalIs
 	if (authorized === undefined) {
 		return localIssueFailure("authorization-rejected", "v3 local issue author is not authorized");
 	}
-	const proposedAcl = aclOperation(scope.author, "0".repeat(64), input.operation);
+	const proposedAcl = aclOperation(scope.author, "0".repeat(64), operation);
 	if (!validateLatchedOperation(registration.authorization, registration.latchedOperations, proposedAcl)) {
 		return localIssueFailure("authorization-rejected", "v3 local ACL operation is not authorized");
 	}
 
 	let commit: unknown;
+	let capacityRejected = false;
 	try {
 		const issuer = createAdmissionBoundTransactionalVertexIssuer({
 			author: scope.author,
 			preparedBlueprintAdmission: registration.payload.admission,
 			publicKey: authorized,
-			signRegisteredVertexDigest: input.signRegisteredVertexDigest as SignRegisteredVertexDigest,
+			signRegisteredVertexDigest: input.signRegisteredVertexDigest,
 			transactIssue: (selectedScope, buildAndSign) =>
-				registration.issuanceStore.transactIssue(selectedScope, buildAndSign),
+				registration.issuanceStore.transactIssue(selectedScope, async (authorSequence) => {
+					const candidateCommit = await buildAndSign(authorSequence);
+					const candidateRow = outboxRowSnapshot(
+						ObjectFreeze({ commit: candidateCommit, publishState: "pending" as const }),
+						selectedScope
+					);
+					if (
+						candidateRow !== undefined &&
+						!hasGraphCapacity(registration, candidateRow.canonicalPreimageBytes.byteLength)
+					) {
+						capacityRejected = true;
+						throw new TypeError("v3 local issue graph is at capacity");
+					}
+					return candidateCommit;
+				}),
 		});
 		commit = await issuer.issue({
 			anchor: registration.payload.provenance.anchorDigest,
 			dependencies,
 			epoch: 0,
-			logicalTime: input.logicalTime as number,
+			logicalTime: input.logicalTime,
 			objectId: registration.payload.provenance.objectId,
-			operation: input.operation as Readonly<Record<string, unknown>>,
+			operation,
 		});
 	} catch {
-		return localIssueFailure("issuance-rejected", "v3 local issue transaction failed");
+		return capacityRejected
+			? localIssueFailure("graph-rejected", "v3 local issue graph is at capacity")
+			: localIssueFailure("issuance-rejected", "v3 local issue transaction failed");
 	}
 	const row = outboxRowSnapshot(ObjectFreeze({ commit, publishState: "pending" as const }), scope);
 	if (row === undefined) return localIssueFailure("issuance-rejected", "v3 local issue record is invalid");
@@ -3139,9 +3414,15 @@ async function issueLocal(registration: V3PlaneRegistration, rawInput: V3LocalIs
 	) {
 		return localIssueFailure("admission-rejected", "v3 local issue record is not authenticated");
 	}
+	if (!hasBoundedDependencies(registration.payload, authenticated)) {
+		return localIssueFailure("admission-rejected", "v3 local issue dependency bound is invalid");
+	}
 	const acceptedAcl = aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
 	if (!validateLatchedOperation(registration.authorization, registration.latchedOperations, acceptedAcl)) {
 		return localIssueFailure("authorization-rejected", "v3 local ACL operation is not authorized");
+	}
+	if (!hasGraphCapacity(registration, authenticated.byteCharge)) {
+		return localIssueFailure("graph-rejected", "v3 local issue graph is at capacity");
 	}
 
 	let appended;
@@ -3166,9 +3447,18 @@ async function issueLocal(registration: V3PlaneRegistration, rawInput: V3LocalIs
 		return localIssueFailure("journal-rejected", "v3 local issue journal append was rejected");
 	}
 
+	const updatedEpochBytes = nextEpochBytes(
+		registration.epochBytes,
+		authenticated.byteCharge,
+		registration.payload.parameters.maxEpochBytes
+	);
+	if (updatedEpochBytes === undefined) {
+		return localIssueFailure("graph-rejected", "v3 local issue graph is at capacity");
+	}
 	try {
 		const outcome = registration.index.append(authenticated.digest, authenticated.vertex, authenticated.byteCharge);
 		if (outcome !== undefined) return localIssueFailure("graph-rejected", "v3 local issue graph is at capacity");
+		registration.epochBytes = updatedEpochBytes;
 	} catch {
 		return localIssueFailure("graph-rejected", "v3 local issue graph append failed");
 	}
@@ -3192,16 +3482,50 @@ async function issueLocal(registration: V3PlaneRegistration, rawInput: V3LocalIs
 	return localIssueSuccess(row.authorSequence, authenticated.digest);
 }
 
-function enqueueLocalIssue(registration: V3PlaneRegistration, input: V3LocalIssueInput): Promise<V3LocalIssueResult> {
-	const result =
-		registration.gate === undefined
-			? issueLocal(registration, input)
-			: registration.gate.then(() => issueLocal(registration, input));
-	registration.gate = result.then(
-		() => undefined,
-		() => undefined
-	);
-	return result;
+async function issueLocal(
+	registration: V3PlaneRegistration,
+	input: CapturedLocalIssueInput
+): Promise<V3LocalIssueResult> {
+	const initialTips = registration.index.tips();
+	const maxDependencies = registration.payload.parameters.maxDependencies;
+	if (initialTips.length === 0) return localIssueFailure("graph-rejected", "v3 local issue frontier is empty");
+	if (maxDependencies < 2 && initialTips.length > maxDependencies) {
+		return localIssueFailure("graph-rejected", "v3 local issue dependency bound cannot reduce the frontier");
+	}
+	const requiredJoins =
+		initialTips.length <= maxDependencies
+			? 0
+			: Math.ceil((initialTips.length - maxDependencies) / (maxDependencies - 1));
+	if (registration.index.size + requiredJoins + 1 > registration.payload.parameters.maxEpochVertices) {
+		return localIssueFailure("graph-rejected", "v3 local issue graph is at capacity");
+	}
+	for (;;) {
+		const tips = registration.index.tips();
+		if (tips.length <= maxDependencies) {
+			const issued = await issueOneVertex(registration, input, tips, input.operation);
+			if (issued.ok) await drainPendingIngress(registration);
+			return issued;
+		}
+		const joined = await issueOneVertex(
+			registration,
+			input,
+			tips.slice(0, maxDependencies),
+			ObjectFreeze({ action: "causalJoin" })
+		);
+		if (!joined.ok) return joined;
+	}
+}
+
+function enqueueLocalIssue(
+	registration: V3PlaneRegistration,
+	rawInput: V3LocalIssueInput
+): Promise<V3LocalIssueResult> {
+	return enqueueRegistrationTask(registration, () => {
+		const captured = capturedLocalIssueInput(rawInput);
+		return "ok" in captured
+			? (): Promise<V3LocalIssueResult> => Promise.resolve(captured)
+			: (): Promise<V3LocalIssueResult> => issueLocal(registration, captured);
+	});
 }
 
 async function publishPending(registration: V3PlaneRegistration): Promise<V3EgressResult> {
@@ -3275,15 +3599,7 @@ async function publishPending(registration: V3PlaneRegistration): Promise<V3Egre
 }
 
 function enqueuePendingPublication(registration: V3PlaneRegistration): Promise<V3EgressResult> {
-	const result =
-		registration.gate === undefined
-			? publishPending(registration)
-			: registration.gate.then(() => publishPending(registration));
-	registration.gate = result.then(
-		() => undefined,
-		() => undefined
-	);
-	return result;
+	return enqueueRegistrationTask(registration, () => () => publishPending(registration));
 }
 
 async function republishRetained(registration: V3PlaneRegistration, targetPeerId?: string): Promise<V3EgressResult> {
@@ -3410,30 +3726,14 @@ async function republishRetained(registration: V3PlaneRegistration, targetPeerId
 }
 
 function enqueueRetainedPublication(registration: V3PlaneRegistration): Promise<V3EgressResult> {
-	const result =
-		registration.gate === undefined
-			? republishRetained(registration)
-			: registration.gate.then(() => republishRetained(registration));
-	registration.gate = result.then(
-		() => undefined,
-		() => undefined
-	);
-	return result;
+	return enqueueRegistrationTask(registration, () => () => republishRetained(registration));
 }
 
 function enqueueTargetedRetainedPublication(
 	registration: V3PlaneRegistration,
 	targetPeerId: string
 ): Promise<V3EgressResult> {
-	const result =
-		registration.gate === undefined
-			? republishRetained(registration, targetPeerId)
-			: registration.gate.then(() => republishRetained(registration, targetPeerId));
-	registration.gate = result.then(
-		() => undefined,
-		() => undefined
-	);
-	return result;
+	return enqueueRegistrationTask(registration, () => () => republishRetained(registration, targetPeerId));
 }
 
 function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
@@ -3605,6 +3905,8 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 			registration = {
 				active: true,
 				authorization: recovered.authorization,
+				drainingPendingIngress: false,
+				epochBytes: recovered.epochBytes,
 				handle: undefined as unknown as V3PlaneHandle,
 				index: recovered.index,
 				issuanceScope: selectedScope,
@@ -3615,6 +3917,8 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				networkNode: boundNetworkNode,
 				onAdmittedVertex: boundSink,
 				payload,
+				pendingIngress: new IntrinsicMap<string, PendingV3Ingress>(),
+				pendingIngressBytes: 0,
 				queueId: topic,
 				topic,
 				gate: undefined,
