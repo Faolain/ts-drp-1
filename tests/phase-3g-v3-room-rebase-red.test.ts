@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { V3RoomCreatorInviteMaterial } from "../examples/v3-room/src/index.js";
 
 const probe = vi.hoisted(() => ({
+	admittedSink: undefined as ((input: Readonly<Record<string, unknown>>) => void | Promise<void>) | undefined,
 	bootstrapIssues: 0,
 	completionOutcomes: [] as unknown[],
 	completedSources: [] as unknown[],
@@ -16,6 +17,7 @@ const probe = vi.hoisted(() => ({
 	journalNames: [] as string[],
 	nextCapabilityId: 0,
 	readinessOutcome: undefined as unknown,
+	sinkFailures: [] as unknown[],
 	prepareAnchors: [] as string[],
 	publicationOutcomes: [] as Readonly<Record<string, unknown>>[],
 	publishCalls: 0,
@@ -171,46 +173,79 @@ vi.mock("../packages/node/dist/src/v3-live.js", async (importOriginal) => ({
 		}
 		return Promise.resolve({ capability: {}, descriptor: { recoveredVertices: probe.recoveredVertices }, ok: true });
 	},
-	activateV3LivePlane: () => ({
-		handle: {
-			completeRebaseSource: (input: unknown) => {
-				probe.completedSources.push(input);
-				probe.events.push(`complete:${String(Reflect.get(input as object, "authorSequence"))}`);
-				const outcome = probe.completionOutcomes.shift() ?? { kind: "published", ok: true };
-				return outcome instanceof Error ? Promise.reject(outcome) : Promise.resolve(outcome);
-			},
-			currentEphemeralAuthority: () => undefined,
-			deactivate: () => undefined,
-			issueLocal: async (input: Readonly<Record<string, unknown>>) => {
-				probe.issueInputs.push(input);
-				probe.events.push("issue");
-				const signer = Reflect.get(input, "signRegisteredVertexDigest");
-				if (typeof signer === "function") {
-					probe.signerCalls += 1;
-					await Reflect.apply(signer, undefined, [new Uint8Array(32)]);
-				}
-				return (
-					probe.issueOutcomes.shift() ?? {
+	activateV3LivePlane: (input: Readonly<Record<string, unknown>>) => {
+		probe.admittedSink = Reflect.get(input, "onAdmittedVertex") as typeof probe.admittedSink;
+		return {
+			handle: {
+				completeRebaseSource: (input: unknown) => {
+					probe.completedSources.push(input);
+					probe.events.push(`complete:${String(Reflect.get(input as object, "authorSequence"))}`);
+					const outcome = probe.completionOutcomes.shift() ?? { kind: "published", ok: true };
+					return outcome instanceof Error ? Promise.reject(outcome) : Promise.resolve(outcome);
+				},
+				currentEphemeralAuthority: () => undefined,
+				deactivate: () => undefined,
+				issueLocal: async (input: Readonly<Record<string, unknown>>) => {
+					probe.issueInputs.push(input);
+					probe.events.push("issue");
+					const signer = Reflect.get(input, "signRegisteredVertexDigest");
+					if (typeof signer === "function") {
+						probe.signerCalls += 1;
+						await Reflect.apply(signer, undefined, [new Uint8Array(32)]);
+					}
+					const digestByte = 0xd0 + probe.issueInputs.length;
+					const outcome = probe.issueOutcomes.shift() ?? {
 						authorSequence: 6 + probe.issueInputs.length,
-						digest: "d".repeat(64),
+						digest: digestByte.toString(16).repeat(32),
 						kind: "accepted",
 						ok: true,
+					};
+					if (Reflect.get(outcome, "ok") === true && probe.admittedSink !== undefined) {
+						const entries = Reflect.get(input, "operations");
+						if (!Array.isArray(entries) || entries.length === 0)
+							throw new TypeError("controlled issue input is invalid");
+						const first = entries[0] as Readonly<Record<string, unknown>>;
+						const operation =
+							entries.length === 1
+								? (Reflect.get(first, "operation") as Readonly<Record<string, unknown>>)
+								: Object.freeze({
+										batch: Object.freeze({ entries: Object.freeze(entries), version: 1 }),
+										action: "applicationBatch",
+									});
+						try {
+							await probe.admittedSink(
+								Object.freeze({
+									exactReceivedCanonicalPreimageBytes: new Uint8Array(),
+									signature: new Uint8Array(64),
+									transportSender: "peer:local",
+									vertex: acceptedVertex(
+										operation,
+										Reflect.get(first, "logicalTime") as number,
+										Reflect.get(outcome, "authorSequence") as number,
+										digestByte
+									),
+								})
+							);
+						} catch (error) {
+							probe.sinkFailures.push(error);
+						}
 					}
-				);
+					return outcome;
+				},
+				publishPending: () => {
+					probe.publishCalls += 1;
+					return Promise.resolve(probe.publicationOutcomes.shift() ?? { kind: "empty", ok: true });
+				},
+				readRebaseOutbox: async () => {
+					probe.rebaseReads += 1;
+					await probe.rebaseGate;
+					return probe.rebasePages.shift() ?? { kind: "empty", ok: true };
+				},
+				republishRetained: () => Promise.resolve({ kind: "empty", ok: true }),
 			},
-			publishPending: () => {
-				probe.publishCalls += 1;
-				return Promise.resolve(probe.publicationOutcomes.shift() ?? { kind: "empty", ok: true });
-			},
-			readRebaseOutbox: async () => {
-				probe.rebaseReads += 1;
-				await probe.rebaseGate;
-				return probe.rebasePages.shift() ?? { kind: "empty", ok: true };
-			},
-			republishRetained: () => Promise.resolve({ kind: "empty", ok: true }),
-		},
-		ok: true,
-	}),
+			ok: true,
+		};
+	},
 	routeV3Ingress: () => false,
 	routeV3RetainedIngress: () => false,
 }));
@@ -365,6 +400,7 @@ function expectFreshLogicalTimes(
 }
 
 beforeEach(() => {
+	probe.admittedSink = undefined;
 	probe.bootstrapIssues = 0;
 	probe.completionOutcomes = [];
 	probe.completedSources = [];
@@ -376,6 +412,7 @@ beforeEach(() => {
 	probe.journalNames = [];
 	probe.nextCapabilityId = 0;
 	probe.readinessOutcome = undefined;
+	probe.sinkFailures = [];
 	probe.prepareAnchors = [];
 	probe.publicationOutcomes = [];
 	probe.publishCalls = 0;
@@ -1027,6 +1064,60 @@ describe("Phase 3g room-owned rebase scheduling RED", () => {
 			probe.rebasePages = [];
 		}
 		expect(unstableTransformCalls).toBeGreaterThanOrEqual(2);
+	});
+
+	it("keeps a transformed source pending when the product projection rejects its replacement", async () => {
+		const create = Reflect.get(await roomModule, "createV3RoomSession") as (
+			input: unknown
+		) => Promise<{ close(): Promise<void>; issue(operation: Readonly<Record<string, unknown>>): Promise<void> }>;
+		const base = application();
+		let projectionRejections = 0;
+		const selectedApplication = Object.freeze({
+			...base,
+			projectAcceptedOperations: (operations: readonly Readonly<Record<string, unknown>>[]) => {
+				if (
+					operations.some(
+						({ operation }) =>
+							Reflect.get(operation, "action") === "transform-me" && Reflect.get(operation, "value") === 2
+					)
+				) {
+					projectionRejections += 1;
+					throw new TypeError("controlled product projection rejection");
+				}
+				return Reflect.apply(Reflect.get(base, "projectAcceptedOperations") as () => unknown, base, [operations]);
+			},
+			transformDisplacedOperation: () =>
+				Object.freeze({ action: "transform-me", clientOperationId: "projection-rejected", value: 2 }),
+		});
+		probe.rebasePages = [
+			displaced(
+				Object.freeze([
+					Object.freeze({
+						logicalTime: 1,
+						operation: Object.freeze({
+							action: "transform-me",
+							clientOperationId: "projection-rejected",
+							value: 1,
+						}),
+						operationCount: 1,
+						operationIndex: 0,
+					}),
+				])
+			),
+		];
+		const session = await create(roomInput(selectedApplication));
+		await settleRoomDrain();
+		expect(probe.issueInputs).toHaveLength(1);
+		expect(issuedEntries().map(({ operation }) => operation)).toEqual([
+			{ action: "transform-me", clientOperationId: "projection-rejected", value: 2 },
+		]);
+		expect(projectionRejections).toBeGreaterThan(0);
+		expect(probe.completedSources).toEqual([]);
+		await expect(
+			session.issue(Object.freeze({ action: "message", clientOperationId: "after-projection-rejection" }))
+		).rejects.toThrow();
+		expect(probe.completedSources).toEqual([]);
+		await session.close();
 	});
 
 	it("rejects partial, extra and accessor-backed policy evidence before consuming a source row", async () => {
