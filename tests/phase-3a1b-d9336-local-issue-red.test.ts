@@ -246,7 +246,6 @@ describe("D.93.36 local issue, apply and publish RED", () => {
 			});
 			const issuePromise = Reflect.apply(issueLocal as (...args: unknown[]) => unknown, activated.handle, [
 				Object.freeze({
-					dependencies: Object.freeze([recoveryDigest]),
 					logicalTime: 2,
 					operation: Object.freeze({ action: "acl", group: "writer", kind: "grant", target: "d".repeat(64) }),
 					signRegisteredVertexDigest: signer,
@@ -257,6 +256,13 @@ describe("D.93.36 local issue, apply and publish RED", () => {
 				activated.handle,
 				[]
 			) as Promise<unknown>;
+			const preJournalState = await Promise.race([
+				issuePromise.then((result) => Object.freeze({ kind: "settled" as const, result })),
+				new Promise<Readonly<{ readonly kind: "pending" }>>((resolve) =>
+					setTimeout(() => resolve(Object.freeze({ kind: "pending" as const })), 5)
+				),
+			]);
+			expect(preJournalState).toEqual({ kind: "pending" });
 			await eventually(() => localInput !== undefined);
 			expect(trace).toEqual(["issue:start", "sign", "issue:commit", "journal:local"]);
 			expect(sink).not.toHaveBeenCalled();
@@ -352,6 +358,40 @@ describe("D.93.36 local issue, apply and publish RED", () => {
 			expect(Reflect.get(preview as object, "nextDigest")).toMatch(/^[0-9a-f]{64}$/u);
 			expect(await publishPromise).toEqual({ ok: true, kind: "published" });
 			expect(trace).toEqual(["issue:start", "sign", "issue:commit", "journal:local", "sink:1", "publish", "mark"]);
+			const legacySigner = vi.fn(fixture.signRegisteredVertexDigest);
+			const joinSelectorSigner = vi.fn(fixture.signRegisteredVertexDigest);
+			const callerReservedJoinSigner = vi.fn(fixture.signRegisteredVertexDigest);
+			const [legacyDependencies, callerJoinSelector, callerReservedJoin] = await Promise.all([
+				Reflect.apply(issueLocal as (...args: unknown[]) => unknown, activated.handle, [
+					Object.freeze({
+						dependencies: [recoveryDigest],
+						logicalTime: 4,
+						operation: Object.freeze({ action: "acl", group: "writer", kind: "grant", target: "e".repeat(64) }),
+						signRegisteredVertexDigest: legacySigner,
+					}),
+				]) as Promise<Readonly<Record<string, unknown>>>,
+				Reflect.apply(issueLocal as (...args: unknown[]) => unknown, activated.handle, [
+					Object.freeze({
+						joinRole: "causalJoin",
+						logicalTime: 6,
+						operation: Object.freeze({ action: "acl", group: "writer", kind: "grant", target: "f".repeat(64) }),
+						signRegisteredVertexDigest: joinSelectorSigner,
+					}),
+				]) as Promise<Readonly<Record<string, unknown>>>,
+				Reflect.apply(issueLocal as (...args: unknown[]) => unknown, activated.handle, [
+					Object.freeze({
+						logicalTime: 8,
+						operation: Object.freeze({ action: "causalJoin" }),
+						signRegisteredVertexDigest: callerReservedJoinSigner,
+					}),
+				]) as Promise<Readonly<Record<string, unknown>>>,
+			]);
+			expect(legacyDependencies).toMatchObject({ ok: false, kind: "malformed-input" });
+			expect(callerJoinSelector).toMatchObject({ ok: false, kind: "malformed-input" });
+			expect(callerReservedJoin).toMatchObject({ ok: false, kind: "authorization-rejected" });
+			expect(legacySigner).not.toHaveBeenCalled();
+			expect(joinSelectorSigner).not.toHaveBeenCalled();
+			expect(callerReservedJoinSigner).not.toHaveBeenCalled();
 			const deactivate = Reflect.get(activated.handle, "deactivate");
 			if (typeof deactivate === "function") Reflect.apply(deactivate, activated.handle, []);
 		} finally {

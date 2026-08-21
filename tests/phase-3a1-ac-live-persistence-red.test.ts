@@ -1180,7 +1180,7 @@ function extractedTokenConsumer(sourceText: string): ExtractedTokenConsumer {
 			}
 		}
 	}
-	expect(owners, "token, recovered replica and Seam-3 registration WeakMap owners").toHaveLength(3);
+	expect(owners, "token, recovered replica and Seam-3 registration WeakMap owners").toHaveLength(4);
 	const callsFor = (name: string): ts.CallExpression[] => {
 		const calls: ts.CallExpression[] = [];
 		const visit = (node: ts.Node): void => {
@@ -1228,7 +1228,7 @@ function extractedTokenConsumer(sourceText: string): ExtractedTokenConsumer {
 		return users.includes("activateV3LivePlane") && users.includes("routeV3Ingress");
 	});
 	if (registrationOwner === undefined) throw new TypeError("missing private registration owner");
-	const recoveryOwner = owners.find(({ name }) => name !== owner.name && name !== registrationOwner.name);
+	const recoveryOwner = tokenOwners.find(({ name }) => name !== owner.name);
 	if (recoveryOwner === undefined) throw new TypeError("missing private recovered-replica owner");
 	const registrationOwners = callsFor(registrationOwner.name)
 		.map((call) => {
@@ -1454,8 +1454,8 @@ function tokenSourceAudit(source: string): TokenSourceAudit {
 				forbiddenCalls.has(method) &&
 				!(
 					(method === "append" &&
-						(owner === "recoverV3LiveReplica" || owner === "handleV3Ingress" || owner === "issueLocal")) ||
-					(method === "transactIssue" && owner === "issueLocal")
+						(owner === "recoverV3LiveReplica" || owner === "handleV3Ingress" || owner === "issueOneVertex")) ||
+					(method === "transactIssue" && owner === "issueOneVertex")
 				)
 			) {
 				forbiddenFullBLiveEffects.push(method);
@@ -2083,7 +2083,7 @@ describe.sequential("Phase 3a-1A-c preservation, CAS/reopen and token RED", () =
 	it("keeps token and Seam-3 registration ownership private while allowing only the signed subscription/outbox topology", () => {
 		const source = readFileSync(IMPLEMENTATION, "utf8");
 		expect(tokenSourceAudit(source)).toEqual({
-			privateWeakMapCount: 3,
+			privateWeakMapCount: 4,
 			hasPrivateRegistrationOwner: true,
 			setsOnSuccessPath: true,
 			consumesByGetAndDelete: true,
@@ -2105,6 +2105,7 @@ describe.sequential("Phase 3a-1A-c preservation, CAS/reopen and token RED", () =
 				`${source}\nfunction deadSubscriptionDecoy() { messageQueueManager.subscribe(queueId, handler); }`,
 			],
 			["append", `${source}\nappend();`],
+			["legacy local issue owner", source.replaceAll("issueOneVertex", "issueLocal")],
 			["discard", `${source}\ndiscardGeneration();`],
 		] as const) {
 			expect(tokenSourceAudit(mutant), name).not.toEqual(tokenSourceAudit(source));

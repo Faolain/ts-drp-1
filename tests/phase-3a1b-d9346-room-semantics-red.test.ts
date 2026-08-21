@@ -60,6 +60,11 @@ const probe = vi.hoisted(() => ({
 	deactivations: 0,
 	ephemeralProvider: undefined as AuthorizationProvider | undefined,
 	issueInputs: [] as LocalIssueInput[],
+	issueRowsPerRequest: 1,
+	issueSinkVertex: undefined as V3RoomAcceptedVertex | undefined,
+	pendingPublications: 0,
+	publishCalls: 0,
+	publishFailureAtCall: undefined as number | undefined,
 	recovered: [] as unknown[],
 }));
 
@@ -97,11 +102,27 @@ vi.mock("../packages/node/dist/src/v3-live.js", async (importOriginal) => ({
 				deactivate: (): void => {
 					probe.deactivations += 1;
 				},
-				issueLocal: (input: LocalIssueInput) => {
+				issueLocal: async (input: LocalIssueInput) => {
 					probe.issueInputs.push(input);
-					return Promise.resolve({ ok: true });
+					probe.pendingPublications += probe.issueRowsPerRequest;
+					if (probe.issueSinkVertex !== undefined) {
+						try {
+							await probe.activatedSink?.({ vertex: probe.issueSinkVertex });
+						} catch {
+							// The shipped node logs post-commit sink failure and returns its durable result.
+						}
+					}
+					return { ok: true };
 				},
-				publishPending: () => Promise.resolve({ kind: "published", ok: true }),
+				publishPending: () => {
+					probe.publishCalls += 1;
+					if (probe.publishFailureAtCall === probe.publishCalls) {
+						return Promise.resolve({ kind: "publish-failed", ok: false });
+					}
+					if (probe.pendingPublications === 0) return Promise.resolve({ kind: "empty", ok: true });
+					probe.pendingPublications -= 1;
+					return Promise.resolve({ kind: "published", ok: true });
+				},
 				previewLatchedAcl: () => ({}),
 				republishRetained: () => Promise.resolve({ kind: "published", ok: true }),
 			},
@@ -222,6 +243,7 @@ function channel(): EphemeralChannel {
 		close: () => undefined,
 		publish: () => Promise.resolve(true),
 		stats: () => ({
+			authorityMismatch: 0,
 			delivered: 0,
 			dropped: 0,
 			localSequencedKeys: 0,
@@ -229,12 +251,14 @@ function channel(): EphemeralChannel {
 			overLimit: 0,
 			published: 0,
 			received: 0,
+			rateLimited: 0,
 			remoteSequencedKeys: 0,
 			sequencedKeys: 0,
 			sequencedSenders: 0,
 			stale: 0,
 			subscriberFailures: 0,
 			unauthorized: 0,
+			writerBuckets: 0,
 		}),
 		subscribe: () => () => undefined,
 	});
@@ -283,6 +307,11 @@ beforeEach(() => {
 	probe.deactivations = 0;
 	probe.ephemeralProvider = undefined;
 	probe.issueInputs = [];
+	probe.issueRowsPerRequest = 1;
+	probe.issueSinkVertex = undefined;
+	probe.pendingPublications = 0;
+	probe.publishCalls = 0;
+	probe.publishFailureAtCall = undefined;
 	probe.recovered = [];
 });
 
@@ -357,8 +386,10 @@ describe("D.93.46b real shared-room semantics", () => {
 		const projectionCount = observed.length;
 		await probe.activatedSink?.({ vertex: digestEarlier });
 		expect(observed).toHaveLength(projectionCount);
+		probe.issueRowsPerRequest = 3;
 		await first.issue(Object.freeze({ action: "after-hidden-recovery" }));
 		expect(probe.issueInputs.at(-1)?.logicalTime).toBe(21);
+		expect(probe.publishCalls).toBe(4);
 		await first.close();
 
 		observed.length = 0;
@@ -367,6 +398,54 @@ describe("D.93.46b real shared-room semantics", () => {
 		for (const vertex of [...live].reverse()) await probe.activatedSink?.({ vertex });
 		expect(observed.at(-1)?.acceptedDigests).toEqual(expected);
 		await second.close();
+	});
+
+	it("drains every pending row and preserves a later publication failure", async () => {
+		const { createV3RoomSession: currentCreateV3RoomSession } = await roomModule;
+		const createV3RoomSession = currentCreateV3RoomSession as unknown as (
+			input: ExpectedInput
+		) => Promise<ExpectedSession>;
+		probe.issueRowsPerRequest = 3;
+		probe.publishFailureAtCall = 3;
+		const session = await createV3RoomSession(input(application(), () => undefined));
+		await expect(session.issue(Object.freeze({ action: "three-pending-rows" }))).rejects.toThrow(
+			"v3 room publication failed"
+		);
+		expect(probe.publishCalls).toBe(3);
+		expect(probe.pendingPublications).toBe(1);
+		await session.close();
+	});
+
+	it("surfaces a post-commit admitted-sink failure through terminalFailure", async () => {
+		const { createV3RoomSession: currentCreateV3RoomSession } = await roomModule;
+		const createV3RoomSession = currentCreateV3RoomSession as unknown as (
+			input: ExpectedInput
+		) => Promise<ExpectedSession>;
+		probe.issueSinkVertex = accepted(0x44, {
+			author: "author-local",
+			authorSequence: 4,
+			epoch: 0,
+			logicalTime: 4,
+			operation: Object.freeze({ action: "sink-failure" }),
+		});
+		const session = await createV3RoomSession(
+			input(
+				application((vertices) => {
+					if (vertices.length > 0) throw new Error("D9351_SINK_FAILURE");
+					return project(vertices);
+				}),
+				() => undefined
+			)
+		);
+		await expect(session.issue(Object.freeze({ action: "committed-before-sink" }))).rejects.toThrow(
+			"D9351_SINK_FAILURE"
+		);
+		await expect(session.issue(Object.freeze({ action: "must-remain-terminal" }))).rejects.toThrow(
+			"D9351_SINK_FAILURE"
+		);
+		expect(probe.issueInputs).toHaveLength(1);
+		expect(probe.deactivations).toBe(1);
+		await session.close();
 	});
 
 	it("keeps projector failure recoverable and releases every opened owner exactly once", async () => {

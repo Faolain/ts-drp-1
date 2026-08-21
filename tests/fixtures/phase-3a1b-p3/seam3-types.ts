@@ -53,7 +53,6 @@ interface ExpectedEphemeralAuthority {
 }
 
 interface ExpectedLocalIssueInput {
-	readonly dependencies: readonly string[];
 	readonly logicalTime: number;
 	readonly operation: Readonly<Record<string, unknown>>;
 	readonly signRegisteredVertexDigest: SignRegisteredVertexDigest;

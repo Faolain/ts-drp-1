@@ -161,7 +161,6 @@ export interface V3PlaneHandleContract {
 }
 
 export interface V3LocalIssueInputContract {
-	readonly dependencies: readonly string[];
 	readonly logicalTime: number;
 	readonly operation: Readonly<Record<string, unknown>>;
 	readonly signRegisteredVertexDigest: SignRegisteredVertexDigest;
