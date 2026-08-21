@@ -49288,3 +49288,47 @@ control operations are not batchable unless separately designed. Work then
 continues through Phase 3g and 3h before the Phase 3 exit gate, with the same
 chat/zone golden path rerun at every boundary. E3/E4 may proceed as parallel
 product tracks but do not replace this durable spine.
+
+### D.93.51.1 — Phase 3f-a closure ledger
+
+Phase 3f-a closed as the narrow tip-ownership prerequisite, not as completion
+of frontier aggregation, operation batching or Phase 3f. Good-Faolain-signed
+plan commit `acd18b70de4b23389461e0a82f33560df6fc2333` was followed by the
+separate signed tests-only RED
+`dc79c362c353f1cd93fd6fe978ba58269d3a60be`, tree
+`7b344e58c6a14b8b7b6723a9a98e5ccb427c4f7c`, and the separate one-owner GREEN
+`c017e6ab2a865a2e396a388efbfbf7524ce829fc`, tree
+`806c3ec11bccfce63f6997cbe3ecc64b831b39ba`. Both commits were pushed as
+linear sole-parent transitions and verified with Faolain key
+`55E22F154FBAF8C84F378304761B99CEA81C6289`.
+
+The durable reason for the change is that the live v3 causality index must own
+the exact maximal antichain before later code can reduce or batch it without
+caller-selected omissions. The owner derives the antichain from validated graph
+facts, changes it only after successful publication, preserves committed nested
+work across an outer refusal and exposes only detached immutable snapshots. No
+protocol carrier, node, room, chat, zone, topology, workflow or freeze owner was
+changed.
+
+The RED failed all seven focused rows only because the genuine owner was absent.
+The final GREEN passed those rows `7/7` and the explicitly logged five-file
+predecessor roster `63/63`, followed by compaction typecheck/build, the complete
+package build, ESLint, Prettier and diff checks. The original two-row
+BroadcastChannel chat baseline remains green inside the expanded chat control,
+which passed `5/5`; the real-network zone control passed `1/1`. Together they
+retain durable exchange, reconnect/repair and convergence while E1 movement
+stays outside durable growth. Exact timed command evidence and streamed review
+artifacts are preserved under
+`.logs/phase3f-a-red/` and `.logs/phase3f-a-green/` as non-authoritative audit
+records.
+
+Kimi completed its requested `100/100` audit with no finding. Grok review-mode
+completed normally in 390.139 seconds with streamed JSONL and no finding. Codex
+and Opus xhigh also returned no substantive defect; Opus recorded only
+nonblocking observations about future polling cost and ordering-oracle
+independence. All reviewers accepted the one-owner design as refactor-clean.
+The next checkpoint must define the bounded aggregation/batching authority and
+must rerun the same chat/zone preservation control. The Phase 3e close-set leaf
+derivation, manifest/input equivalence and genesis history/archive-root profile
+remain open Phase 3 exit prerequisites. This ledger makes no broader
+production-hardening or product-completion claim.
