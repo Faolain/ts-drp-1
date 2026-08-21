@@ -81,6 +81,7 @@ export interface SharedPlaneScenarioOptions {
 	readonly syntheticCurrentQuarantinedRowCount?: number;
 	readonly syntheticDisplacedRowCount?: number;
 	readonly targetAuthorityMutation?: "authorization-bytes" | "source-capability";
+	readonly targetQuarantinedMatchingReplacement?: boolean;
 	readonly targetReplacementAfterRecoveryBeforeRead?: boolean;
 	readonly twoSourceRows?: boolean;
 }
@@ -548,6 +549,39 @@ export async function runSharedPlaneScenario(
 		}
 		let targetReplacement: DurableIssueCommit | undefined;
 		targetJournal = await installJournal(target);
+		if (options.targetQuarantinedMatchingReplacement === true) {
+			const quarantineSeed = commitFor(
+				target,
+				10_000,
+				batchOperation(
+					Object.freeze([
+						Object.freeze({ logicalTime: 1, operation: Object.freeze({ action: "add", value: -1 }) }),
+						Object.freeze({ logicalTime: 3, operation: Object.freeze({ action: "add", value: -2 }) }),
+					])
+				),
+				3
+			);
+			const quarantineSeedDigest = lowerHex(quarantineSeed.envelope.digest);
+			const appended = await targetJournal.appendAccepted({
+				detachedSignature: quarantineSeed.envelope.signature,
+				exactCanonicalPreimageBytes: quarantineSeed.envelope.canonicalPreimageBytes,
+				scope: Object.freeze({ anchorDigest: target.anchorDigest, epoch: 0, objectId }),
+				sourceKind: "received",
+				vertexDigest: quarantineSeedDigest,
+			});
+			if (!appended.ok) throw new TypeError("Phase 3g quarantine seed journal append failed");
+			targetReplacement = await targetStore.transactIssue(scope, (authorSequence) =>
+				Promise.resolve(
+					commitFor(
+						target,
+						authorSequence,
+						sourceOperations("singleton")[0]?.operation ?? Object.freeze({ action: "add", value: 1 }),
+						7,
+						[quarantineSeedDigest]
+					)
+				)
+			);
+		}
 		let selectedSourcePlane = source;
 		let sourceCapability: PreparedV3Live | undefined;
 		if (options.omitSourceAuthority !== true) {

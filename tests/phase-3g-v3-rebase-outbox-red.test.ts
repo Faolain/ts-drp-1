@@ -222,4 +222,28 @@ describe("Phase 3g authenticated-plane rebase outbox RED", () => {
 		expect(result.outbox.filter(({ digest }) => digest === result.targetReplacementDigest)).toHaveLength(1);
 		expect(result.outbox.find(({ digest }) => digest === result.sourceDigest)?.publishState).toBe("published");
 	});
+
+	it("does not discard source intent behind a quarantined matching target row", async () => {
+		const result = await runSharedPlaneScenario({ targetQuarantinedMatchingReplacement: true });
+		expect(result.recovery).toMatchObject({ ok: true });
+		expect(result.rebaseOutbox).toEqual({
+			kind: "displaced",
+			ok: true,
+			source: {
+				author: result.sourceRowAuthor,
+				authorSequence: 1,
+				intents: [
+					{
+						logicalTime: 3,
+						operation: { action: "add", value: 1 },
+						operationCount: 1,
+						operationIndex: 0,
+					},
+				],
+				vertexDigest: result.sourceDigest,
+			},
+		});
+		expect(result.completion).toBeUndefined();
+		expect(result.outbox.find(({ digest }) => digest === result.sourceDigest)?.publishState).toBe("pending");
+	});
 });
