@@ -1,5 +1,5 @@
 import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";
-import { decodeCanonical, deepCloneCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { CausalityIndex, type EpochVertex } from "@ts-drp/compaction";
 import { assertTrustPreserved, createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
 import type { DurableIssuanceOutboxRecord, DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-store";
@@ -76,6 +76,9 @@ const MapPrototypeSet = Map.prototype.set;
 const MapSizeGetter = ObjectGetOwnPropertyDescriptor(Map.prototype, "size")?.get;
 const MapIteratorPrototype = ObjectGetPrototypeOf(ReflectApply(MapPrototypeEntries, new IntrinsicMap(), []));
 const MapIteratorNext = ObjectGetOwnPropertyDescriptor(MapIteratorPrototype, "next")?.value;
+const IntrinsicSet = Set;
+const SetPrototypeAdd = Set.prototype.add;
+const SetPrototypeHas = Set.prototype.has;
 const DRP_ERROR_BRAND = Symbol.for("@ts-drp/errors/DRPError");
 const TypedArrayPrototype = ObjectGetPrototypeOf(Uint8Array.prototype) as object;
 const TypedArrayBufferGetter = ObjectGetOwnPropertyDescriptor(TypedArrayPrototype, "buffer")?.get;
@@ -144,7 +147,14 @@ const SUPPORTED_PARAMETER_PROFILE = ObjectFreeze({
 	runtimeProfile: "ecmascript-2024-sync-v1" as const,
 });
 const ACTIVATION_INPUT_KEYS = ["capability", "messageQueueManager", "networkNode", "onAdmittedVertex"] as const;
-const LOCAL_ISSUE_INPUT_KEYS = ["logicalTime", "operation", "signRegisteredVertexDigest"] as const;
+const LOCAL_ISSUE_INPUT_KEYS = ["operations", "signRegisteredVertexDigest"] as const;
+const LOCAL_ISSUE_ENTRY_KEYS = ["logicalTime", "operation"] as const;
+const APPLICATION_BATCH_KEYS = ["action", "batch"] as const;
+const APPLICATION_BATCH_PAYLOAD_KEYS = ["entries", "version"] as const;
+const APPLICATION_BATCH_ACTION = "applicationBatch";
+const APPLICATION_BATCH_MAX_ENTRIES = 16;
+const APPLICATION_BATCH_LIMITS = ObjectFreeze({ maxBytes: 65_536, maxDepth: 8, maxItems: 1_024 });
+const RESERVED_BATCH_ACTIONS = ObjectFreeze(["acl", APPLICATION_BATCH_ACTION, "causalJoin", "join"] as const);
 const ISSUANCE_SCOPE_KEYS = ["objectId", "author"] as const;
 const OUTBOX_RECORD_KEYS = ["commit", "publishState"] as const;
 const ISSUE_COMMIT_KEYS = ["authorSequence", "envelope", "issuedRecord", "outboxEntry"] as const;
@@ -275,13 +285,21 @@ export interface V3PlaneHandle {
 }
 
 export interface V3LocalIssueInput {
-	readonly logicalTime: number;
-	readonly operation: Readonly<Record<string, unknown>>;
+	readonly operations: readonly Readonly<{
+		readonly logicalTime: number;
+		readonly operation: Readonly<Record<string, unknown>>;
+	}>[];
 	readonly signRegisteredVertexDigest: SignRegisteredVertexDigest;
 }
 
 export type V3LocalIssueResult =
 	| Readonly<{ readonly ok: true; readonly kind: "accepted"; readonly authorSequence: number; readonly digest: string }>
+	| Readonly<{
+			readonly ok: false;
+			readonly kind: "split-required";
+			readonly detail: string;
+			readonly prefixLength: number;
+	  }>
 	| Readonly<{
 			readonly ok: false;
 			readonly kind:
@@ -1941,6 +1959,7 @@ interface V3PlaneRegistration {
 	readonly onAdmittedVertex: V3AdmittedVertexSink;
 	readonly payload: PreparedV3LivePayload;
 	readonly pendingIngress: Map<string, PendingV3Ingress>;
+	readonly quarantinedDigests: ReadonlySet<string>;
 	readonly queueId: string;
 	readonly topic: string;
 	drainingPendingIngress: boolean;
@@ -1983,10 +2002,21 @@ function egressSuccess(kind: "empty" | "published"): Extract<V3EgressResult, { r
 }
 
 function localIssueFailure(
-	kind: Extract<V3LocalIssueResult, { readonly ok: false }>["kind"],
+	kind: Exclude<Extract<V3LocalIssueResult, { readonly ok: false }>["kind"], "split-required">,
 	detail: string
-): Extract<V3LocalIssueResult, { readonly ok: false }> {
+): Exclude<Extract<V3LocalIssueResult, { readonly ok: false }>, { readonly kind: "split-required" }> {
 	return ObjectFreeze({ detail, kind, ok: false as const });
+}
+
+function localIssueSplit(
+	prefixLength: number
+): Extract<V3LocalIssueResult, { readonly ok: false; readonly kind: "split-required" }> {
+	return ObjectFreeze({
+		detail: "v3 local issue application batch requires an exact prefix split",
+		kind: "split-required" as const,
+		ok: false as const,
+		prefixLength,
+	});
 }
 
 function localIssueSuccess(authorSequence: number, digest: string): Extract<V3LocalIssueResult, { readonly ok: true }> {
@@ -2457,6 +2487,17 @@ async function handleV3Ingress(
 		ingressFailureLog("graph-rejected");
 		return false;
 	}
+	if (
+		!alreadyAccepted &&
+		!acceptedApplicationOperation(
+			registration.payload,
+			authenticated.vertex.operation,
+			authenticated.admitted.logicalTime
+		)
+	) {
+		ingressFailureLog("admission-rejected");
+		return false;
+	}
 	const candidate = aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
 	if (
 		!alreadyAccepted &&
@@ -2760,6 +2801,7 @@ interface RecoveredV3LivePayload {
 	readonly latchedOperations: Map<string, StagedLatchedAclOperation>;
 	readonly liveJournalStore: DurableLiveJournalStore;
 	readonly prepared: PreparedV3LivePayload;
+	readonly quarantinedDigests: ReadonlySet<string>;
 }
 
 const recoveredV3LiveAuthority = new WeakMap<object, RecoveredV3LivePayload>();
@@ -3047,6 +3089,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		const preparedVertexCount = index.size;
 		let recoveredCount = 0;
 		const recoveredVertices: AdmittedReceivedVertexView[] = [];
+		const quarantinedDigests = new IntrinsicSet<string>();
 		const latchedOperations = new IntrinsicMap<string, StagedLatchedAclOperation>();
 		let journalAfterSequence: number | null = null;
 		if (readiness.rowCount === 0) {
@@ -3124,6 +3167,16 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				) {
 					return recoveryFailure("admission-rejected", "v3 journal row is not authenticated");
 				}
+				if (
+					!acceptedApplicationOperation(payload, authenticated.vertex.operation, authenticated.admitted.logicalTime) ||
+					authenticated.vertex.dependencies.some(
+						(dependency) => ReflectApply(SetPrototypeHas, quarantinedDigests, [dependency]) === true
+					)
+				) {
+					ReflectApply(SetPrototypeAdd, quarantinedDigests, [authenticated.digest]);
+					journalAfterSequence = expectedSequence;
+					continue;
+				}
 				if (!hasBoundedDependencies(payload, authenticated)) {
 					return recoveryFailure("admission-rejected", "v3 journal row dependency bound is invalid");
 				}
@@ -3198,6 +3251,16 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			) {
 				return recoveryFailure("admission-rejected", "v3 recovery vertex is not authenticated");
 			}
+			if (
+				!acceptedApplicationOperation(payload, authenticated.vertex.operation, authenticated.admitted.logicalTime) ||
+				authenticated.vertex.dependencies.some(
+					(dependency) => ReflectApply(SetPrototypeHas, quarantinedDigests, [dependency]) === true
+				)
+			) {
+				ReflectApply(SetPrototypeAdd, quarantinedDigests, [authenticated.digest]);
+				afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
+				continue;
+			}
 			if (!hasBoundedDependencies(payload, authenticated)) {
 				return recoveryFailure("admission-rejected", "v3 recovery vertex dependency bound is invalid");
 			}
@@ -3265,6 +3328,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				latchedOperations,
 				liveJournalStore: journal,
 				prepared: payload,
+				quarantinedDigests,
 			})
 		);
 		return ObjectFreeze({
@@ -3289,40 +3353,207 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 }
 
 interface CapturedLocalIssueInput {
-	readonly logicalTime: number;
-	readonly operation: Readonly<Record<string, unknown>>;
+	readonly operations: readonly Readonly<{
+		readonly logicalTime: number;
+		readonly operation: Readonly<Record<string, unknown>>;
+	}>[];
 	readonly signRegisteredVertexDigest: SignRegisteredVertexDigest;
 }
 
-function capturedLocalIssueInput(rawInput: V3LocalIssueInput): CapturedLocalIssueInput | V3LocalIssueResult {
+function canonicalRecord(value: unknown, keys: readonly string[]): Readonly<Record<string, unknown>> | undefined {
+	try {
+		if (!isObject(value)) return undefined;
+		const prototype = ObjectGetPrototypeOf(value);
+		if (prototype !== ObjectPrototype && prototype !== null) return undefined;
+		const actual = ReflectOwnKeys(value);
+		if (actual.length !== keys.length) return undefined;
+		const record = ObjectCreate(null) as Record<string, unknown>;
+		for (let index = 0; index < keys.length; index += 1) {
+			const key = keys[index] as string;
+			if (actual[index] !== key) return undefined;
+			const descriptor = ObjectGetOwnPropertyDescriptor(value, key);
+			if (descriptor === undefined || descriptor.enumerable !== true || !("value" in descriptor)) return undefined;
+			record[key] = descriptor.value;
+		}
+		return ObjectFreeze(record);
+	} catch {
+		return undefined;
+	}
+}
+
+function denseArray(value: unknown): readonly unknown[] | undefined {
+	try {
+		if (!ArrayIsArray(value) || ObjectGetPrototypeOf(value) !== ArrayPrototype) return undefined;
+		const length = value.length;
+		if (!NumberIsSafeInteger(length) || length < 0) return undefined;
+		const actual = ReflectOwnKeys(value);
+		if (actual.length !== length + 1 || actual[length] !== "length") return undefined;
+		for (let index = 0; index < length; index += 1) {
+			if (actual[index] !== StringConstructor(index)) return undefined;
+			const descriptor = ObjectGetOwnPropertyDescriptor(value, StringConstructor(index));
+			if (descriptor === undefined || descriptor.enumerable !== true || !("value" in descriptor)) return undefined;
+		}
+		return value;
+	} catch {
+		return undefined;
+	}
+}
+
+function detachedCanonicalOperation(value: unknown): Readonly<Record<string, unknown>> | undefined {
+	try {
+		const cloned = decodeCanonical(encodeCanonical(value));
+		if (!isObject(cloned) || ArrayIsArray(cloned) || ObjectGetPrototypeOf(cloned) !== null) return undefined;
+		return ObjectFreeze({ ...(cloned as Record<string, unknown>) });
+	} catch {
+		return undefined;
+	}
+}
+
+function isReservedBatchAction(action: string): boolean {
+	return RESERVED_BATCH_ACTIONS.some((reserved) => reserved === action);
+}
+
+function isKnownBatchChild(payload: PreparedV3LivePayload, operation: Readonly<Record<string, unknown>>): boolean {
+	const action = Reflect.get(operation, "action");
+	return (
+		typeof action === "string" &&
+		!isReservedBatchAction(action) &&
+		typeof Reflect.get(payload.runtime.reducers, action) === "function"
+	);
+}
+
+function applicationBatchEntries(
+	payload: PreparedV3LivePayload,
+	operation: unknown
+):
+	| readonly Readonly<{ readonly logicalTime: number; readonly operation: Readonly<Record<string, unknown>> }>[]
+	| undefined {
+	if (!isObject(operation) || ArrayIsArray(operation)) return undefined;
+	if (typeof Reflect.get(payload.runtime.reducers, APPLICATION_BATCH_ACTION) !== "function") return undefined;
+	if (Reflect.get(operation, "action") !== APPLICATION_BATCH_ACTION) return undefined;
+	const outer = canonicalRecord(operation, APPLICATION_BATCH_KEYS);
+	if (outer === undefined) return undefined;
+	const batch = canonicalRecord(outer.batch, APPLICATION_BATCH_PAYLOAD_KEYS);
+	if (batch === undefined || batch.version !== 1) return undefined;
+	const entries = denseArray(batch.entries);
+	if (entries === undefined || entries.length < 2 || entries.length > APPLICATION_BATCH_MAX_ENTRIES) return undefined;
+	const output: Readonly<{ readonly logicalTime: number; readonly operation: Readonly<Record<string, unknown>> }>[] =
+		[];
+	let priorLogicalTime = -1;
+	for (const value of entries) {
+		const entry = canonicalRecord(value, LOCAL_ISSUE_ENTRY_KEYS);
+		if (
+			entry === undefined ||
+			!NumberIsSafeInteger(entry.logicalTime) ||
+			(entry.logicalTime as number) < 0 ||
+			(entry.logicalTime as number) <= priorLogicalTime
+		) {
+			return undefined;
+		}
+		if (!isObject(entry.operation) || ArrayIsArray(entry.operation)) return undefined;
+		const operationKeys = ReflectOwnKeys(entry.operation);
+		if (operationKeys.some((key) => typeof key !== "string")) return undefined;
+		const child = canonicalRecord(entry.operation, operationKeys as string[]);
+		if (child === undefined || !isKnownBatchChild(payload, child)) return undefined;
+		priorLogicalTime = entry.logicalTime as number;
+		output.push(ObjectFreeze({ logicalTime: priorLogicalTime, operation: child }));
+	}
+	try {
+		const bytes = encodeCanonical(operation, APPLICATION_BATCH_LIMITS);
+		decodeCanonical(bytes, APPLICATION_BATCH_LIMITS);
+	} catch {
+		return undefined;
+	}
+	return ObjectFreeze(output);
+}
+
+function acceptedApplicationOperation(
+	payload: PreparedV3LivePayload,
+	operation: unknown,
+	logicalTime: number
+): boolean {
+	if (!isObject(operation) || ArrayIsArray(operation)) return false;
+	if (Reflect.get(operation, "action") !== APPLICATION_BATCH_ACTION) return true;
+	const entries = applicationBatchEntries(payload, operation);
+	return entries?.[0]?.logicalTime === logicalTime;
+}
+
+function applicationBatchOperation(
+	operations: readonly Readonly<{
+		readonly logicalTime: number;
+		readonly operation: Readonly<Record<string, unknown>>;
+	}>[]
+): Readonly<Record<string, unknown>> {
+	return ObjectFreeze({
+		action: APPLICATION_BATCH_ACTION,
+		batch: ObjectFreeze({ entries: ObjectFreeze([...operations]), version: 1 }),
+	});
+}
+
+function applicationBatchFits(operation: Readonly<Record<string, unknown>>): boolean {
+	try {
+		const bytes = encodeCanonical(operation, APPLICATION_BATCH_LIMITS);
+		decodeCanonical(bytes, APPLICATION_BATCH_LIMITS);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+function capturedLocalIssueInput(
+	payload: PreparedV3LivePayload,
+	rawInput: V3LocalIssueInput
+): CapturedLocalIssueInput | V3LocalIssueResult {
 	const input = snapshotClosedRecord(rawInput, LOCAL_ISSUE_INPUT_KEYS);
-	if (
-		input === undefined ||
-		!NumberIsSafeInteger(input.logicalTime) ||
-		(input.logicalTime as number) < 0 ||
-		!isObject(input.operation) ||
-		typeof input.signRegisteredVertexDigest !== "function"
-	) {
+	if (input === undefined || typeof input.signRegisteredVertexDigest !== "function") {
 		return localIssueFailure("malformed-input", "v3 local issue input is invalid");
 	}
-	let operation: unknown;
-	try {
-		operation = deepCloneCanonical(input.operation);
-	} catch {
-		return localIssueFailure("malformed-input", "v3 local issue operation is invalid");
+	const values = denseArray(input.operations);
+	if (values === undefined || values.length === 0) {
+		return localIssueFailure("malformed-input", "v3 local issue operations are invalid");
 	}
-	if (!isObject(operation) || ObjectGetPrototypeOf(operation) !== null) {
-		return localIssueFailure("malformed-input", "v3 local issue operation is invalid");
-	}
-	// Canonical decoding yields a null-prototype record; ACL validation consumes
-	// a detached ordinary closed record at the local issuance boundary.
-	const detachedOperation = ObjectFreeze({ ...(operation as Record<string, unknown>) });
-	if (Reflect.get(detachedOperation, "action") === "causalJoin") {
-		return localIssueFailure("authorization-rejected", "v3 causal join is reserved to the node");
+	const sourceOperations = new Set<object>();
+	const operations: Readonly<{
+		readonly logicalTime: number;
+		readonly operation: Readonly<Record<string, unknown>>;
+	}>[] = [];
+	let priorLogicalTime = -1;
+	for (const value of values) {
+		const entry = snapshotClosedRecord(value, LOCAL_ISSUE_ENTRY_KEYS);
+		if (
+			entry === undefined ||
+			!NumberIsSafeInteger(entry.logicalTime) ||
+			(entry.logicalTime as number) < 0 ||
+			(entry.logicalTime as number) <= priorLogicalTime ||
+			!isObject(entry.operation) ||
+			sourceOperations.has(entry.operation)
+		) {
+			return localIssueFailure("malformed-input", "v3 local issue operations are invalid");
+		}
+		sourceOperations.add(entry.operation);
+		const operation = detachedCanonicalOperation(entry.operation);
+		if (operation === undefined) {
+			return localIssueFailure("malformed-input", "v3 local issue operation is invalid");
+		}
+		const action = Reflect.get(operation, "action");
+		if (typeof action !== "string") {
+			return localIssueFailure("malformed-input", "v3 local issue operation is invalid");
+		}
+		if (
+			action === APPLICATION_BATCH_ACTION ||
+			action === "causalJoin" ||
+			(values.length > 1 && (action === "acl" || action === "join"))
+		) {
+			return localIssueFailure("authorization-rejected", "v3 local issue operation is reserved to the node");
+		}
+		if (typeof Reflect.get(payload.runtime.reducers, action) !== "function") {
+			return localIssueFailure("malformed-input", "v3 local issue operation is unknown");
+		}
+		priorLogicalTime = entry.logicalTime as number;
+		operations.push(ObjectFreeze({ logicalTime: priorLogicalTime, operation }));
 	}
 	return ObjectFreeze({
-		logicalTime: input.logicalTime as number,
-		operation: detachedOperation,
+		operations: ObjectFreeze(operations),
 		signRegisteredVertexDigest: input.signRegisteredVertexDigest as SignRegisteredVertexDigest,
 	});
 }
@@ -3331,6 +3562,7 @@ async function issueOneVertex(
 	registration: V3PlaneRegistration,
 	input: CapturedLocalIssueInput,
 	dependencies: readonly string[],
+	logicalTime: number,
 	operation: Readonly<Record<string, unknown>>
 ): Promise<V3LocalIssueResult> {
 	if (!currentRegistration(registration)) return localIssueFailure("not-active", "v3 plane is not active");
@@ -3355,12 +3587,17 @@ async function issueOneVertex(
 
 	let commit: unknown;
 	let capacityRejected = false;
+	let signerResolved = false;
 	try {
 		const issuer = createAdmissionBoundTransactionalVertexIssuer({
 			author: scope.author,
 			preparedBlueprintAdmission: registration.payload.admission,
 			publicKey: authorized,
-			signRegisteredVertexDigest: input.signRegisteredVertexDigest,
+			signRegisteredVertexDigest: async (digest) => {
+				const signature = await input.signRegisteredVertexDigest(digest);
+				signerResolved = true;
+				return signature;
+			},
 			transactIssue: (selectedScope, buildAndSign) =>
 				registration.issuanceStore.transactIssue(selectedScope, async (authorSequence) => {
 					const candidateCommit = await buildAndSign(authorSequence);
@@ -3382,14 +3619,16 @@ async function issueOneVertex(
 			anchor: registration.payload.provenance.anchorDigest,
 			dependencies,
 			epoch: 0,
-			logicalTime: input.logicalTime,
+			logicalTime,
 			objectId: registration.payload.provenance.objectId,
 			operation,
 		});
 	} catch {
 		return capacityRejected
 			? localIssueFailure("graph-rejected", "v3 local issue graph is at capacity")
-			: localIssueFailure("issuance-rejected", "v3 local issue transaction failed");
+			: signerResolved
+				? localIssueFailure("admission-rejected", "v3 local issue signature was not admitted")
+				: localIssueFailure("issuance-rejected", "v3 local issue transaction failed");
 	}
 	const row = outboxRowSnapshot(ObjectFreeze({ commit, publishState: "pending" as const }), scope);
 	if (row === undefined) return localIssueFailure("issuance-rejected", "v3 local issue record is invalid");
@@ -3486,6 +3725,29 @@ async function issueLocal(
 	registration: V3PlaneRegistration,
 	input: CapturedLocalIssueInput
 ): Promise<V3LocalIssueResult> {
+	const first = input.operations[0];
+	if (first === undefined) return localIssueFailure("malformed-input", "v3 local issue operations are invalid");
+	let applicationOperation = first.operation;
+	if (input.operations.length > 1) {
+		if (typeof Reflect.get(registration.payload.runtime.reducers, APPLICATION_BATCH_ACTION) !== "function") {
+			return localIssueFailure("malformed-input", "v3 local issue application batch reducer is unavailable");
+		}
+		const maximumPrefix = Math.min(input.operations.length, APPLICATION_BATCH_MAX_ENTRIES);
+		let prefixLength = maximumPrefix;
+		for (; prefixLength > 0; prefixLength -= 1) {
+			const candidate = applicationBatchOperation(input.operations.slice(0, prefixLength));
+			if (prefixLength === 1 || applicationBatchFits(candidate)) break;
+		}
+		if (prefixLength < input.operations.length) {
+			return prefixLength > 0
+				? localIssueSplit(prefixLength)
+				: localIssueFailure("malformed-input", "v3 local issue operation exceeds the application batch budget");
+		}
+		applicationOperation = applicationBatchOperation(input.operations);
+		if (!applicationBatchFits(applicationOperation)) {
+			return localIssueFailure("malformed-input", "v3 local issue application batch is invalid");
+		}
+	}
 	const initialTips = registration.index.tips();
 	const maxDependencies = registration.payload.parameters.maxDependencies;
 	if (initialTips.length === 0) return localIssueFailure("graph-rejected", "v3 local issue frontier is empty");
@@ -3502,7 +3764,7 @@ async function issueLocal(
 	for (;;) {
 		const tips = registration.index.tips();
 		if (tips.length <= maxDependencies) {
-			const issued = await issueOneVertex(registration, input, tips, input.operation);
+			const issued = await issueOneVertex(registration, input, tips, first.logicalTime, applicationOperation);
 			if (issued.ok) await drainPendingIngress(registration);
 			return issued;
 		}
@@ -3510,6 +3772,7 @@ async function issueLocal(
 			registration,
 			input,
 			tips.slice(0, maxDependencies),
+			first.logicalTime,
 			ObjectFreeze({ action: "causalJoin" })
 		);
 		if (!joined.ok) return joined;
@@ -3521,7 +3784,7 @@ function enqueueLocalIssue(
 	rawInput: V3LocalIssueInput
 ): Promise<V3LocalIssueResult> {
 	return enqueueRegistrationTask(registration, () => {
-		const captured = capturedLocalIssueInput(rawInput);
+		const captured = capturedLocalIssueInput(registration.payload, rawInput);
 		return "ok" in captured
 			? (): Promise<V3LocalIssueResult> => Promise.resolve(captured)
 			: (): Promise<V3LocalIssueResult> => issueLocal(registration, captured);
@@ -3559,6 +3822,20 @@ async function publishPending(registration: V3PlaneRegistration): Promise<V3Egre
 			continue;
 		}
 		if (row.publishState !== "pending") return egressFailure("record-rejected", "v3 publication state is invalid");
+		const rowDigest = lowerHexDigest(row.digest);
+		if (rowDigest === undefined) return egressFailure("record-rejected", "v3 publication digest is invalid");
+		if (ReflectApply(SetPrototypeHas, registration.quarantinedDigests, [rowDigest]) === true) {
+			try {
+				await registration.issuanceStore.compareAndMarkOutboxPublished({
+					authorSequence: row.authorSequence,
+					digest: new Uint8ArrayConstructor(row.digest),
+					scope: ObjectFreeze({ ...row.scope }),
+				});
+			} catch {
+				return egressFailure("publication-state-unknown", "v3 quarantined publication state is unknown");
+			}
+			return egressSuccess("published");
+		}
 		const data = V3Envelope.encode({
 			canonicalPreimage: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
 			signature: new Uint8ArrayConstructor(row.signature),
@@ -3693,6 +3970,10 @@ async function republishRetained(registration: V3PlaneRegistration, targetPeerId
 		);
 		if (authenticated === undefined || authenticated.digest !== row.vertexDigest) {
 			return egressFailure("record-rejected", "v3 retained vertex is not authenticated");
+		}
+		if (ReflectApply(SetPrototypeHas, registration.quarantinedDigests, [authenticated.digest]) === true) {
+			afterSequence = expectedSequence;
+			continue;
 		}
 		const message = Message.create({
 			data: V3Envelope.encode({
@@ -3919,6 +4200,7 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				payload,
 				pendingIngress: new IntrinsicMap<string, PendingV3Ingress>(),
 				pendingIngressBytes: 0,
+				quarantinedDigests: recovered.quarantinedDigests,
 				queueId: topic,
 				topic,
 				gate: undefined,

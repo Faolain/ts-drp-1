@@ -2,12 +2,12 @@ import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical"
 import type { EphemeralChannel } from "@ts-drp/ephemeral";
 import {
 	createV3RoomSession,
-	type V3RoomAcceptedVertex,
+	type V3RoomAcceptedOperation,
 	type V3RoomCreatorInviteMaterial,
 } from "@ts-drp/example-v3-room";
 import type { DRPNode } from "@ts-drp/node";
 
-const ZONE_ARTIFACT_SOURCE = `function causalJoinReducer(input){return {output:null,state:input.state}}function joinReducer(input){return {output:input.operation,state:input.state}}function placeBlockReducer(input){return {output:input.operation,state:input.state}}export const blueprint={exportSchemaVersion:1,artifactId:"v3-zone.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{causalJoin:causalJoinReducer,join:joinReducer,placeBlock:placeBlockReducer}};`;
+const ZONE_ARTIFACT_SOURCE = `function exactKeys(value,keys){return value!==null&&typeof value==="object"&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.prototype.hasOwnProperty.call(value,key))}function applicationBatchReducer(input){const operation=input.operation;if(!exactKeys(operation,["action","batch"])||operation.action!=="applicationBatch"||!exactKeys(operation.batch,["entries","version"])||operation.batch.version!==1||!Array.isArray(operation.batch.entries)||operation.batch.entries.length<2||operation.batch.entries.length>16)throw new TypeError("invalid application batch");let prior=-1;const output=[];for(const entry of operation.batch.entries){const child=entry.operation;if(!exactKeys(entry,["logicalTime","operation"])||!Number.isSafeInteger(entry.logicalTime)||entry.logicalTime<0||entry.logicalTime<=prior||!exactKeys(child,["action","id","kind","x","y"])||child.action!=="placeBlock"||typeof child.id!=="string"||child.id.length===0||typeof child.kind!=="string"||child.kind.length===0||!Number.isSafeInteger(child.x)||!Number.isSafeInteger(child.y))throw new TypeError("invalid application batch entry");prior=entry.logicalTime;output.push(child)}return {output,state:input.state}}function causalJoinReducer(input){return {output:null,state:input.state}}function joinReducer(input){return {output:input.operation,state:input.state}}function placeBlockReducer(input){return {output:input.operation,state:input.state}}export const blueprint={exportSchemaVersion:1,artifactId:"v3-zone.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{applicationBatch:applicationBatchReducer,causalJoin:causalJoinReducer,join:joinReducer,placeBlock:placeBlockReducer}};`;
 const PARAMETERS = Object.freeze({
 	maxEpochVertices: 8192,
 	maxEpochBytes: 8_388_608,
@@ -62,6 +62,7 @@ interface ZoneOperationDescriptor {
 		readonly fields: readonly Readonly<{ readonly name: string; readonly required: true; readonly type: string }>[];
 		readonly kind: "closed-record";
 	}>;
+	readonly maxCanonicalOperationBytes: 65_536;
 	readonly name: string;
 }
 
@@ -300,29 +301,32 @@ export function createV3ZoneApplication(
 ): Parameters<typeof createV3RoomSession<ZoneProjection>>[0]["application"] {
 	const material = applicationMaterial();
 	return Object.freeze({
+		batchableOperationActions: Object.freeze(["placeBlock"]),
 		bootstrapOperation: Object.freeze({
 			action: "join",
 			roster: Object.freeze({ entries: Object.freeze(members.map((entry) => Object.freeze({ ...entry }))) }),
 		}),
 		canonicalBlueprintPackageBytes: material.canonicalBlueprintPackageBytes,
 		catalog: material.catalog,
-		projectAcceptedVertices: (vertices: readonly V3RoomAcceptedVertex[]) =>
-			projectZone(vertices, creatorPeerId, creatorAuthor),
+		projectAcceptedOperations: (operations: readonly V3RoomAcceptedOperation[]) =>
+			projectZone(operations, creatorPeerId, creatorAuthor),
 	});
 }
 
 function projectZone(
-	vertices: readonly V3RoomAcceptedVertex[],
+	operations: readonly V3RoomAcceptedOperation[],
 	creatorPeerId: string,
 	creatorAuthor: string
 ): ZoneProjection {
 	const roster = new Map<string, Readonly<Enrollment & { readonly order: number }>>();
 	const rosterOrders = new Map<number, Readonly<Enrollment & { readonly order: number }>>();
 	const blocks = new Map<string, ZoneBlock>();
-	for (const vertex of vertices) {
-		const action = Reflect.get(vertex.operation, "action");
+	const acceptedDigests = new Set<string>();
+	for (const acceptedOperation of operations) {
+		acceptedDigests.add(acceptedOperation.vertexDigest);
+		const action = Reflect.get(acceptedOperation.operation, "action");
 		if (action === "join") {
-			const rosterValue = Reflect.get(vertex.operation, "roster");
+			const rosterValue = Reflect.get(acceptedOperation.operation, "roster");
 			const members =
 				typeof rosterValue === "object" && rosterValue !== null ? Reflect.get(rosterValue, "entries") : undefined;
 			if (!Array.isArray(members)) continue;
@@ -331,7 +335,7 @@ function projectZone(
 				(member) =>
 					member?.order === 0 &&
 					member.author === creatorAuthor &&
-					vertex.author === creatorAuthor &&
+					acceptedOperation.author === creatorAuthor &&
 					member.peerId === creatorPeerId
 			);
 			if (!creatorSignedRoster) continue;
@@ -351,8 +355,9 @@ function projectZone(
 			}
 		}
 		if (action === "placeBlock") {
-			const block = exactBlock(vertex.operation);
-			if (block !== undefined) blocks.set(block.id, block);
+			const block = exactBlock(acceptedOperation.operation);
+			if (block === undefined) throw new TypeError("v3 zone placeBlock operation is invalid");
+			blocks.set(block.id, block);
 		}
 	}
 	const entries = [...roster.values()].sort(
@@ -360,7 +365,7 @@ function projectZone(
 			left.order - right.order || compareText(left.author, right.author) || compareText(left.peerId, right.peerId)
 	);
 	return Object.freeze({
-		acceptedDigests: Object.freeze(vertices.map((vertex) => hex(vertex.digest))),
+		acceptedDigests: Object.freeze([...acceptedDigests]),
 		blocks: Object.freeze([...blocks.values()].sort((left, right) => compareText(left.id, right.id))),
 		transportPeerAuthors: Object.freeze(entries.map(({ author, peerId }) => Object.freeze({ author, peerId }))),
 		writerAuthors: Object.freeze(entries.map(({ author }) => author)),
@@ -421,11 +426,20 @@ function exactMember(value: unknown): Readonly<Enrollment & { readonly order: nu
 
 function exactBlock(value: unknown): ZoneBlock | undefined {
 	if (typeof value !== "object" || value === null) return undefined;
+	const keys = Reflect.ownKeys(value);
+	if (
+		keys.length !== 5 ||
+		!keys.every((key) => key === "action" || key === "id" || key === "kind" || key === "x" || key === "y")
+	) {
+		return undefined;
+	}
+	const action = Reflect.get(value, "action");
 	const id = Reflect.get(value, "id");
 	const kind = Reflect.get(value, "kind");
 	const x = Reflect.get(value, "x");
 	const y = Reflect.get(value, "y");
-	return typeof id === "string" &&
+	return action === "placeBlock" &&
+		typeof id === "string" &&
 		id.length > 0 &&
 		typeof kind === "string" &&
 		kind.length > 0 &&
@@ -523,6 +537,7 @@ function applicationMaterial(): Readonly<{
 	): ZoneOperationDescriptor =>
 		Object.freeze({
 			name,
+			maxCanonicalOperationBytes: 65_536,
 			argumentSchema: Object.freeze({
 				kind: "closed-record",
 				fields: Object.freeze(fields.map((field) => Object.freeze({ ...field, required: true }))),
@@ -538,9 +553,11 @@ function applicationMaterial(): Readonly<{
 			runtimeProfile: "ecmascript-2024-sync-v1",
 		}),
 		manifest: Object.freeze({
-			schemaVersion: 1,
+			schemaVersion: 2,
 			operationDiscriminator: "action",
+			workBudgetProfile: "blueprint-work-budget-v1",
 			operations: Object.freeze([
+				operation("applicationBatch", [Object.freeze({ name: "batch", type: "canonical-object" })]),
 				operation("causalJoin", []),
 				operation("join", [Object.freeze({ name: "roster", type: "canonical-object" })]),
 				operation("placeBlock", [

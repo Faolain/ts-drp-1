@@ -48,6 +48,16 @@ export interface V3RoomCreatorInviteMaterial {
 
 export type V3RoomAcceptedVertex = AdmittedReceivedVertexView;
 
+export interface V3RoomAcceptedOperation {
+	readonly author: string;
+	readonly authorSequence: number;
+	readonly logicalTime: number;
+	readonly operation: Readonly<Record<string, unknown>>;
+	readonly operationCount: number;
+	readonly operationIndex: number;
+	readonly vertexDigest: string;
+}
+
 export interface V3RoomProjectionAuthority {
 	readonly transportPeerAuthors: readonly Readonly<{ readonly author: string; readonly peerId: string }>[];
 	readonly writerAuthors: readonly string[];
@@ -80,10 +90,12 @@ export interface V3RoomTransport {
 }
 
 export interface V3RoomApplication<Projection extends V3RoomProjectionAuthority = V3RoomProjectionAuthority> {
+	readonly batchableOperationActions: readonly string[];
 	readonly bootstrapOperation: Readonly<Record<string, unknown>>;
 	readonly canonicalBlueprintPackageBytes: Uint8Array;
 	readonly catalog: Parameters<typeof prepareV3LiveGeneration>[0]["catalog"];
-	projectAcceptedVertices(vertices: readonly V3RoomAcceptedVertex[]): Projection;
+	/** Throw a direct TypeError only when authenticated product fields are invalid. */
+	projectAcceptedOperations(operations: readonly V3RoomAcceptedOperation[]): Projection;
 }
 
 export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAuthority = V3RoomProjectionAuthority> {
@@ -202,6 +214,116 @@ function decodeCreatorInvite(invite: string): V3RoomCreatorInviteMaterial {
 	});
 }
 
+const APPLICATION_BATCH_LIMITS = Object.freeze({ maxBytes: 65_536, maxDepth: 8, maxItems: 1_024 });
+const APPLICATION_BATCH_ENTRY_KEYS = Object.freeze(["logicalTime", "operation"]);
+const APPLICATION_BATCH_KEYS = Object.freeze(["action", "batch"]);
+const APPLICATION_BATCH_PAYLOAD_KEYS = Object.freeze(["entries", "version"]);
+
+function detachedRoomOperation(value: unknown): Readonly<Record<string, unknown>> | undefined {
+	try {
+		const decoded = decodeCanonical(encodeCanonical(value));
+		if (decoded === null || typeof decoded !== "object" || Array.isArray(decoded)) return undefined;
+		return Object.freeze({ ...(decoded as Record<string, unknown>) });
+	} catch {
+		return undefined;
+	}
+}
+
+function exactRecord(value: unknown, expectedKeys: readonly string[]): Readonly<Record<string, unknown>> | undefined {
+	if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
+	const prototype = Object.getPrototypeOf(value);
+	if (prototype !== null && prototype !== Object.prototype) return undefined;
+	const keys = Reflect.ownKeys(value);
+	if (
+		keys.length !== expectedKeys.length ||
+		keys.some((key) => typeof key !== "string" || !expectedKeys.includes(key))
+	) {
+		return undefined;
+	}
+	const output: Record<string, unknown> = {};
+	for (const key of expectedKeys) {
+		const descriptor = Object.getOwnPropertyDescriptor(value, key);
+		if (descriptor === undefined || descriptor.enumerable !== true || !("value" in descriptor)) return undefined;
+		output[key] = descriptor.value;
+	}
+	return Object.freeze(output);
+}
+
+function exactDenseArray(value: unknown): readonly unknown[] | undefined {
+	if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) return undefined;
+	const keys = Reflect.ownKeys(value);
+	if (keys.length !== value.length + 1 || keys[value.length] !== "length") return undefined;
+	for (let index = 0; index < value.length; index += 1) {
+		if (keys[index] !== String(index)) return undefined;
+		const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+		if (descriptor === undefined || descriptor.enumerable !== true || !("value" in descriptor)) return undefined;
+	}
+	return value;
+}
+
+function acceptedOperationsForVertex(
+	application: V3RoomApplication,
+	vertex: V3RoomAcceptedVertex
+): readonly V3RoomAcceptedOperation[] | undefined {
+	const vertexDigest = hex(vertex.digest);
+	const operation = detachedRoomOperation(vertex.operation);
+	if (operation === undefined) return undefined;
+	if (Reflect.get(operation, "action") !== "applicationBatch") {
+		return Object.freeze([
+			Object.freeze({
+				author: vertex.author,
+				authorSequence: vertex.authorSequence,
+				logicalTime: vertex.logicalTime,
+				operation,
+				operationCount: 1,
+				operationIndex: 0,
+				vertexDigest,
+			}),
+		]);
+	}
+	try {
+		decodeCanonical(encodeCanonical(operation, APPLICATION_BATCH_LIMITS), APPLICATION_BATCH_LIMITS);
+	} catch {
+		return undefined;
+	}
+	const outer = exactRecord(operation, APPLICATION_BATCH_KEYS);
+	const batch = exactRecord(outer?.batch, APPLICATION_BATCH_PAYLOAD_KEYS);
+	const entries = exactDenseArray(batch?.entries);
+	if (outer === undefined || batch === undefined || batch.version !== 1 || entries === undefined) return undefined;
+	if (entries.length < 2 || entries.length > 16) return undefined;
+	let priorLogicalTime = -1;
+	const accepted: V3RoomAcceptedOperation[] = [];
+	for (let operationIndex = 0; operationIndex < entries.length; operationIndex += 1) {
+		const entry = exactRecord(entries[operationIndex], APPLICATION_BATCH_ENTRY_KEYS);
+		const child = detachedRoomOperation(entry?.operation);
+		const action = child === undefined ? undefined : Reflect.get(child, "action");
+		if (
+			entry === undefined ||
+			!Number.isSafeInteger(entry.logicalTime) ||
+			(entry.logicalTime as number) < 0 ||
+			(entry.logicalTime as number) <= priorLogicalTime ||
+			child === undefined ||
+			typeof action !== "string" ||
+			!application.batchableOperationActions.includes(action)
+		) {
+			return undefined;
+		}
+		priorLogicalTime = entry.logicalTime as number;
+		accepted.push(
+			Object.freeze({
+				author: vertex.author,
+				authorSequence: vertex.authorSequence,
+				logicalTime: priorLogicalTime,
+				operation: child,
+				operationCount: entries.length,
+				operationIndex,
+				vertexDigest,
+			})
+		);
+	}
+	return Object.freeze(accepted);
+}
+
 /**
  * Opens one browser v3 room from application material and a real transport adapter.
  * @param input - Closed application, identity, durable-store and transport bindings.
@@ -210,6 +332,17 @@ function decodeCreatorInvite(invite: string): V3RoomCreatorInviteMaterial {
 export async function createV3RoomSession<Projection extends V3RoomProjectionAuthority>(
 	input: CreateV3RoomSessionInput<Projection>
 ): Promise<V3RoomSession<Projection>> {
+	if (
+		!Array.isArray(input.application.batchableOperationActions) ||
+		!Object.isFrozen(input.application.batchableOperationActions) ||
+		input.application.batchableOperationActions.length === 0 ||
+		input.application.batchableOperationActions.some(
+			(action, index, actions) =>
+				typeof action !== "string" || action.length === 0 || (index > 0 && (actions[index - 1] as string) >= action)
+		)
+	) {
+		throw new TypeError("v3 room batchable operation actions are invalid");
+	}
 	const invite =
 		typeof input.creatorInvite === "string" ? input.creatorInvite : encodeCreatorInvite(input.creatorInvite);
 	const material = decodeCreatorInvite(invite);
@@ -221,8 +354,17 @@ export async function createV3RoomSession<Projection extends V3RoomProjectionAut
 		objectIdResult.value
 	);
 	const acceptedVertices = new Map<string, V3RoomAcceptedVertex>();
+	const acceptedOperationRows = new Map<string, readonly V3RoomAcceptedOperation[] | null>();
 	let projection: Projection;
 	let logicalTime = input.initialLogicalTime;
+	const expand = (vertex: V3RoomAcceptedVertex): readonly V3RoomAcceptedOperation[] | undefined => {
+		const identity = hex(vertex.digest);
+		const cached = acceptedOperationRows.get(identity);
+		if (cached !== undefined) return cached === null ? undefined : cached;
+		const expanded = acceptedOperationsForVertex(input.application, vertex);
+		acceptedOperationRows.set(identity, expanded ?? null);
+		return expanded;
+	};
 	const stage = (
 		vertices: readonly V3RoomAcceptedVertex[]
 	): Readonly<{
@@ -231,20 +373,57 @@ export async function createV3RoomSession<Projection extends V3RoomProjectionAut
 	}> => {
 		const candidate = new Map(acceptedVertices);
 		const additions: Readonly<{ readonly identity: string; readonly vertex: V3RoomAcceptedVertex }>[] = [];
-		for (const vertex of vertices) {
+		for (const vertex of [...vertices].sort(compareAcceptedVertices)) {
 			const identity = hex(vertex.digest);
 			if (candidate.has(identity)) continue;
+			const expanded = expand(vertex);
+			if (expanded === undefined) continue;
 			candidate.set(identity, vertex);
 			additions.push(Object.freeze({ identity, vertex }));
 		}
-		return Object.freeze({
-			additions: Object.freeze(additions),
-			projection: input.application.projectAcceptedVertices(
-				Object.freeze([...candidate.values()].sort(compareAcceptedVertices))
-			),
-		});
+		const project = (selected: ReadonlyMap<string, V3RoomAcceptedVertex>): Projection =>
+			input.application.projectAcceptedOperations(
+				Object.freeze([...selected.values()].sort(compareAcceptedVertices).flatMap((vertex) => expand(vertex) ?? []))
+			);
+		try {
+			return Object.freeze({ additions: Object.freeze(additions), projection: project(candidate) });
+		} catch {
+			const contained = new Map(acceptedVertices);
+			const acceptedAdditions: Readonly<{
+				readonly identity: string;
+				readonly vertex: V3RoomAcceptedVertex;
+			}>[] = [];
+			let containedProjection: Projection | undefined;
+			for (const addition of additions) {
+				contained.set(addition.identity, addition.vertex);
+				try {
+					containedProjection = project(contained);
+					acceptedAdditions.push(addition);
+				} catch (error) {
+					const action = Reflect.get(addition.vertex.operation, "action");
+					if (
+						Object.getPrototypeOf(error) !== TypeError.prototype ||
+						(action !== "applicationBatch" &&
+							(typeof action !== "string" || !input.application.batchableOperationActions.includes(action)))
+					) {
+						throw error;
+					}
+					contained.delete(addition.identity);
+					acceptedOperationRows.set(addition.identity, null);
+				}
+			}
+			return Object.freeze({
+				additions: Object.freeze(acceptedAdditions),
+				projection: containedProjection ?? project(contained),
+			});
+		}
 	};
 	const commit = async (vertices: readonly V3RoomAcceptedVertex[]): Promise<boolean> => {
+		for (const vertex of vertices) {
+			const expanded = expand(vertex);
+			const latestChild = expanded?.at(-1)?.logicalTime ?? vertex.logicalTime;
+			logicalTime = Math.max(logicalTime, vertex.logicalTime + 2, latestChild + 2);
+		}
 		const candidate = stage(vertices);
 		if (candidate.additions.length === 0) return false;
 		for (const { vertex } of candidate.additions) await input.onAcceptedVertex(vertex);
@@ -258,7 +437,7 @@ export async function createV3RoomSession<Projection extends V3RoomProjectionAut
 	};
 	try {
 		if (!(await commit(recovered.descriptor.recoveredVertices))) {
-			projection = input.application.projectAcceptedVertices(Object.freeze([]));
+			projection = input.application.projectAcceptedOperations(Object.freeze([]));
 			input.onProjection(projection);
 		}
 	} catch (error) {
@@ -340,31 +519,149 @@ export async function createV3RoomSession<Projection extends V3RoomProjectionAut
 		await shutdown().catch(() => undefined);
 		throw error;
 	}
+	type PendingIssue = Readonly<{
+		logicalTime: number;
+		operation: Readonly<Record<string, unknown>>;
+		reject(reason: unknown): void;
+		resolve(): void;
+	}>;
+	let pendingIssues: PendingIssue[] = [];
+	let drainScheduled = false;
+	let draining = false;
+	let drainPromise: Promise<void> = Promise.resolve();
+	const publishAccepted = async (): Promise<void> => {
+		if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
+		for (;;) {
+			const published = await activeHandle.publishPending();
+			if (!published.ok) throw new TypeError(`v3 room publication failed: ${published.kind}`);
+			if (published.kind === "empty") return;
+		}
+	};
+	const rejectOwned = (owned: readonly PendingIssue[], reason: unknown): void => {
+		for (const request of owned) request.reject(reason);
+	};
+	const issueOwned = async (owned: readonly PendingIssue[]): Promise<void> => {
+		if (owned.length === 0) return;
+		if (activeHandle === undefined) {
+			rejectOwned(owned, new TypeError("v3 room live plane is unavailable"));
+			return;
+		}
+		const issued = await activeHandle
+			.issueLocal({
+				operations: Object.freeze(
+					owned.map(({ logicalTime: selectedLogicalTime, operation }) =>
+						Object.freeze({ logicalTime: selectedLogicalTime, operation })
+					)
+				),
+				signRegisteredVertexDigest: input.signRegisteredVertexDigest,
+			})
+			.catch((error: unknown) => {
+				rejectOwned(owned, error);
+				return undefined;
+			});
+		if (issued === undefined) return;
+		if (!issued.ok && issued.kind === "split-required") {
+			const prefixLength = issued.prefixLength;
+			if (
+				typeof prefixLength !== "number" ||
+				!Number.isSafeInteger(prefixLength) ||
+				prefixLength < 1 ||
+				prefixLength >= owned.length
+			) {
+				rejectOwned(owned, new TypeError("v3 room issue split was invalid"));
+				return;
+			}
+			await issueOwned(owned.slice(0, prefixLength));
+			await issueOwned(owned.slice(prefixLength));
+			return;
+		}
+		if (!issued.ok && issued.kind === "malformed-input" && owned.length > 1) {
+			owned[0]?.reject(new TypeError(`v3 room issue failed: ${issued.kind}`));
+			await issueOwned(owned.slice(1));
+			return;
+		}
+		if (!issued.ok) {
+			rejectOwned(owned, new TypeError(`v3 room issue failed: ${issued.kind}`));
+			return;
+		}
+		if (terminalFailure !== undefined) {
+			rejectOwned(owned, terminalFailure);
+			return;
+		}
+		try {
+			await publishAccepted();
+			for (const request of owned) request.resolve();
+		} catch (error) {
+			rejectOwned(owned, error);
+		}
+	};
+	const drainSnapshot = async (snapshot: readonly PendingIssue[]): Promise<void> => {
+		let offset = 0;
+		while (offset < snapshot.length) {
+			const head = snapshot[offset];
+			if (head === undefined) return;
+			const action = Reflect.get(head.operation, "action");
+			if (typeof action !== "string" || !input.application.batchableOperationActions.includes(action)) {
+				await issueOwned(Object.freeze([head]));
+				offset += 1;
+				continue;
+			}
+			let end = offset + 1;
+			while (end < snapshot.length && end - offset < 16) {
+				const candidateAction = Reflect.get(snapshot[end]?.operation ?? {}, "action");
+				if (
+					typeof candidateAction !== "string" ||
+					!input.application.batchableOperationActions.includes(candidateAction)
+				) {
+					break;
+				}
+				end += 1;
+			}
+			await issueOwned(Object.freeze(snapshot.slice(offset, end)));
+			offset = end;
+		}
+	};
+	const scheduleDrain = (): void => {
+		if (drainScheduled || draining || pendingIssues.length === 0) return;
+		drainScheduled = true;
+		drainPromise = Promise.resolve().then(async (): Promise<void> => {
+			drainScheduled = false;
+			draining = true;
+			const snapshot = Object.freeze(pendingIssues);
+			pendingIssues = [];
+			try {
+				await drainSnapshot(snapshot);
+			} finally {
+				draining = false;
+				if (pendingIssues.length > 0) scheduleDrain();
+			}
+		});
+	};
 	return Object.freeze({
 		invite,
 		roomId: prepared.descriptor.anchorDigest,
 		trustStatus: "Creator-trusted; not Byzantine-fault-tolerant." as const,
 		async close(): Promise<void> {
+			closed = true;
+			for (;;) {
+				if (pendingIssues.length > 0) scheduleDrain();
+				await drainPromise;
+				if (!drainScheduled && !draining && pendingIssues.length === 0) break;
+			}
 			await shutdown();
 		},
 		async issue(operation: Readonly<Record<string, unknown>>): Promise<void> {
 			if (terminalFailure !== undefined) throw terminalFailure;
 			if (closed) throw new TypeError("v3 room session is closed");
+			const captured = detachedRoomOperation(operation);
+			if (captured === undefined) throw new TypeError("v3 room operation is invalid");
 			const current = logicalTime;
 			logicalTime += 2;
-			if (activeHandle === undefined) throw new TypeError("v3 room live plane is unavailable");
-			const issued = await activeHandle.issueLocal({
-				logicalTime: current,
-				operation,
-				signRegisteredVertexDigest: input.signRegisteredVertexDigest,
+			const promise = new Promise<void>((resolve, reject) => {
+				pendingIssues.push(Object.freeze({ logicalTime: current, operation: captured, reject, resolve }));
 			});
-			if (terminalFailure !== undefined) throw terminalFailure;
-			if (!issued.ok) throw new TypeError(`v3 room issue failed: ${issued.kind}`);
-			for (;;) {
-				const published = await activeHandle.publishPending();
-				if (!published.ok) throw new TypeError(`v3 room publication failed: ${published.kind}`);
-				if (published.kind === "empty") break;
-			}
+			scheduleDrain();
+			return promise;
 		},
 		openEphemeral(options: EphemeralChannelOptions): EphemeralChannel {
 			if (terminalFailure !== undefined) throw terminalFailure;

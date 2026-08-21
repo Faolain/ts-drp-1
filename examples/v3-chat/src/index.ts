@@ -1,7 +1,7 @@
 import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import {
 	createV3RoomSession,
-	type V3RoomAcceptedVertex,
+	type V3RoomAcceptedOperation,
 	type V3RoomApplication,
 	type V3RoomCreatorInviteMaterial,
 	type V3RoomSession,
@@ -11,7 +11,7 @@ import { Keychain } from "@ts-drp/keychain";
 import { type DRPNetworkNode, type Message, MessageType } from "@ts-drp/types";
 
 const OBJECT_ID = `creator:${"d".repeat(32)}`;
-const CHAT_ARTIFACT_SOURCE = `function aclReducer(input){return {output:input.operation,state:input.state}}function causalJoinReducer(input){return {output:null,state:input.state}}function joinReducer(input){return {output:input.operation.clientId,state:input.state}}function messageReducer(input){const state=[...input.state,input.operation.text];return {output:input.operation.text,state}}export const blueprint={exportSchemaVersion:1,artifactId:"v3-chat.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{acl:aclReducer,causalJoin:causalJoinReducer,join:joinReducer,message:messageReducer}};`;
+const CHAT_ARTIFACT_SOURCE = `function exactKeys(value,keys){return value!==null&&typeof value==="object"&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.prototype.hasOwnProperty.call(value,key))}function aclReducer(input){return {output:input.operation,state:input.state}}function applicationBatchReducer(input){const operation=input.operation;if(!exactKeys(operation,["action","batch"])||operation.action!=="applicationBatch"||!exactKeys(operation.batch,["entries","version"])||operation.batch.version!==1||!Array.isArray(operation.batch.entries)||operation.batch.entries.length<2||operation.batch.entries.length>16)throw new TypeError("invalid application batch");let prior=-1;const output=[];const state=[...input.state];for(const entry of operation.batch.entries){if(!exactKeys(entry,["logicalTime","operation"])||!Number.isSafeInteger(entry.logicalTime)||entry.logicalTime<0||entry.logicalTime<=prior||!exactKeys(entry.operation,["action","text"])||entry.operation.action!=="message"||typeof entry.operation.text!=="string")throw new TypeError("invalid application batch entry");prior=entry.logicalTime;state.push(entry.operation.text);output.push(entry.operation.text)}return {output,state}}function causalJoinReducer(input){return {output:null,state:input.state}}function joinReducer(input){return {output:input.operation.clientId,state:input.state}}function messageReducer(input){const state=[...input.state,input.operation.text];return {output:input.operation.text,state}}export const blueprint={exportSchemaVersion:1,artifactId:"v3-chat.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{acl:aclReducer,applicationBatch:applicationBatchReducer,causalJoin:causalJoinReducer,join:joinReducer,message:messageReducer}};`;
 const PARAMETERS = Object.freeze({
 	maxEpochVertices: 8192,
 	maxEpochBytes: 8_388_608,
@@ -55,6 +55,8 @@ interface AcceptedMessage {
 	readonly authorSequence: number;
 	readonly digest: string;
 	readonly logicalTime: number;
+	readonly operationCount: number;
+	readonly operationIndex: number;
 	readonly text: string;
 }
 
@@ -249,11 +251,13 @@ function applicationMaterial(): ApplicationMaterial {
 			runtimeProfile: "ecmascript-2024-sync-v1",
 		}),
 		manifest: Object.freeze({
-			schemaVersion: 1,
+			schemaVersion: 2,
 			operationDiscriminator: "action",
+			workBudgetProfile: "blueprint-work-budget-v1",
 			operations: Object.freeze([
 				Object.freeze({
 					name: "acl",
+					maxCanonicalOperationBytes: 65_536,
 					argumentSchema: Object.freeze({
 						kind: "closed-record",
 						fields: Object.freeze([
@@ -264,7 +268,16 @@ function applicationMaterial(): ApplicationMaterial {
 					}),
 				}),
 				Object.freeze({
+					name: "applicationBatch",
+					maxCanonicalOperationBytes: 65_536,
+					argumentSchema: Object.freeze({
+						kind: "closed-record",
+						fields: Object.freeze([Object.freeze({ name: "batch", required: true, type: "canonical-object" })]),
+					}),
+				}),
+				Object.freeze({
 					name: "causalJoin",
+					maxCanonicalOperationBytes: 65_536,
 					argumentSchema: Object.freeze({
 						kind: "closed-record",
 						fields: Object.freeze([]),
@@ -272,6 +285,7 @@ function applicationMaterial(): ApplicationMaterial {
 				}),
 				Object.freeze({
 					name: "join",
+					maxCanonicalOperationBytes: 65_536,
 					argumentSchema: Object.freeze({
 						kind: "closed-record",
 						fields: Object.freeze([Object.freeze({ name: "clientId", required: true, type: "string" })]),
@@ -279,6 +293,7 @@ function applicationMaterial(): ApplicationMaterial {
 				}),
 				Object.freeze({
 					name: "message",
+					maxCanonicalOperationBytes: 65_536,
 					argumentSchema: Object.freeze({
 						kind: "closed-record",
 						fields: Object.freeze([Object.freeze({ name: "text", required: true, type: "string" })]),
@@ -334,10 +349,11 @@ function applicationMaterial(): ApplicationMaterial {
 export function createV3ChatApplication(clientId: ClientId): V3RoomApplication<ChatProjection> {
 	const material = applicationMaterial();
 	return Object.freeze({
+		batchableOperationActions: Object.freeze(["message"]),
 		bootstrapOperation: Object.freeze({ action: "join", clientId }),
 		canonicalBlueprintPackageBytes: material.canonicalBlueprintPackageBytes,
 		catalog: material.catalog,
-		projectAcceptedVertices: projectChat,
+		projectAcceptedOperations: projectChat,
 	});
 }
 
@@ -506,16 +522,24 @@ function createRoomNetwork(peerId: string, channelName: string): V3RoomTransport
 	});
 }
 
-function projectChat(vertices: readonly V3RoomAcceptedVertex[]): ChatProjection {
-	const accepted = vertices.flatMap((vertex) => {
-		const text = Reflect.get(vertex.operation, "text");
-		if (Reflect.get(vertex.operation, "action") !== "message" || typeof text !== "string") return [];
+function projectChat(operations: readonly V3RoomAcceptedOperation[]): ChatProjection {
+	const accepted = operations.flatMap((acceptedOperation) => {
+		const operation = acceptedOperation.operation;
+		const action = Reflect.get(operation, "action");
+		const text = Reflect.get(operation, "text");
+		if (action !== "message") return [];
+		const keys = Reflect.ownKeys(operation);
+		if (keys.length !== 2 || !keys.every((key) => key === "action" || key === "text") || typeof text !== "string") {
+			throw new TypeError("v3 chat message operation is invalid");
+		}
 		return [
 			Object.freeze({
-				author: vertex.author,
-				authorSequence: vertex.authorSequence,
-				digest: hex(vertex.digest),
-				logicalTime: vertex.logicalTime,
+				author: acceptedOperation.author,
+				authorSequence: acceptedOperation.authorSequence,
+				digest: acceptedOperation.vertexDigest,
+				logicalTime: acceptedOperation.logicalTime,
+				operationCount: acceptedOperation.operationCount,
+				operationIndex: acceptedOperation.operationIndex,
 				text,
 			}),
 		];
@@ -547,7 +571,9 @@ async function joinRoom(
 		onAcceptedVertex: () => undefined,
 		onProjection: (projection): void => {
 			accepted.clear();
-			for (const message of projection.accepted) accepted.set(message.digest, message);
+			for (const message of projection.accepted) {
+				accepted.set(`${message.digest}:${message.operationIndex}`, message);
+			}
 		},
 		publicKeyBytes: bytes(author),
 		signRegisteredVertexDigest: (registeredDigest) => keychain.signWithLocalAuthor(registeredDigest),
