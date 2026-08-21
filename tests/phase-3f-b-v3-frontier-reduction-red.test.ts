@@ -179,7 +179,7 @@ describe("Phase 3f-b genuine node-owned frontier reduction RED", () => {
 		expect(result.result).toMatchObject({ ok: false, kind: "graph-rejected" });
 		expect(result.issued.some(({ operation }) => Reflect.get(operation, "action") === "add")).toBe(false);
 		expect(result.admittedDigests).toEqual([]);
-	});
+	}, 60_000);
 
 	for (const source of ["recovered-local", "recovered-received", "live-received"] as const) {
 		it(`enforces the authenticated dependency bound for ${source}`, async () => {

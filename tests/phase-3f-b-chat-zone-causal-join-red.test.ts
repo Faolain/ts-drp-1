@@ -11,7 +11,7 @@ vi.mock("../packages/storage-browser/dist/src/index.js", async (importOriginal) 
 
 const roomEntryProbe = vi.hoisted(() => ({ applications: [] as unknown[] }));
 
-vi.mock("@ts-drp/example-v3-room", async (importOriginal) => {
+vi.mock("../examples/v3-room/src/index.js", async (importOriginal) => {
 	const current = await importOriginal<Record<string, unknown>>();
 	return {
 		...current,
