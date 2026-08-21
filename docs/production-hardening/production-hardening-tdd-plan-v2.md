@@ -49578,3 +49578,59 @@ explicitly dismissed with evidence. The roughly forty-minute freeze-successor
 certification matrix is unrelated and is not rerun. After 3f-b closure, work
 continues directly to the separately signed 3f-c application micro-batching
 slice, then 3g and 3h, with the chat/zone golden path preserved at each boundary.
+
+### D.93.51.3 Phase 3f-b RED oracle portability correction
+
+The signed 3f-b RED at `809200d2121a1eb2fc2045c6045c8ae92749f136`
+reveals two tests-only execution defects only after the exact four-path GREEN is
+overlaid. Neither defect changes the frontier contract. First, the product
+composition test registers its `vi.mock` against the workspace package name
+from the repository root, where that package is not a root dependency. Vite
+therefore cannot resolve the mock identity even though the chat and grid
+importers can resolve their own workspace links; reaching the new product
+constructor incorrectly opens the real browser store and fails on the dummy
+invite or absent Node `indexedDB`. The mock must instead name the exact
+test-relative `../examples/v3-room/src/index.js` source identity that Vite can
+resolve from the test. This remains a behavioral mock of the one genuine room
+entry owner, not an alternate composition or product hook. A root package link,
+`tsconfig.json` path, Vite `resolve.alias` or other resolver change is forbidden.
+
+Second, the genuine 8,191-sibling capacity row performs 8,191 Ed25519
+authentications before it can prove that the recovered graph has no remaining
+vertex capacity. On the pinned local toolchain it takes about sixteen seconds,
+so the repository-wide ten-second default interrupts the genuine proof before
+its assertion once the overlaid asynchronous issuance path yields to the timer.
+The preserved RED runs instead reach their intended assertion after roughly
+13.5--13.8 seconds because the absent production path does not exercise that
+async issuance. That one existing `it` receives an explicit 60,000 ms timeout:
+more than 3.7 times the measured local GREEN-overlay duration and deliberately
+large enough for an uncontended Ubuntu coverage run without changing the work
+under proof. The width, signatures, recovery, capacity assertion and expected
+failure class remain unchanged; reducing the fixture or bypassing
+authentication is forbidden. If a genuine uncontended CI runner exceeds that
+bound, stop for a separately authorized oracle correction rather than widening
+this one.
+
+This correction supersedes only D.93.51.2's immediate RED-to-GREEN parentage.
+The current signed RED is followed by this signed plan-only amendment, then one
+signed tests-only corrective RED changing exactly
+`tests/phase-3f-b-chat-zone-causal-join-red.test.ts` and
+`tests/phase-3f-b-v3-frontier-reduction-red.test.ts`, then the unchanged exact
+four-path GREEN. The corrective RED changes only the mock module identity and
+the one test timeout. Its focused result must remain exactly the signed RED's
+42-pass/18-fail roster with the same failing rows and assertion sites; only the
+capacity-row duration may differ. It must still fail only because the four
+production owners do not yet provide node-owned frontier reduction or the named
+product compositions. On a disposable overlay of the preserved exact four-path
+GREEN, the same focused suite must pass without any root `node_modules` shim.
+The overlay timeout reproduction and corrected pass are recorded under
+`.logs/phase3f-b-green/` before signing the corrective RED. If the existing room
+mock's behavioral shape is insufficient, stop for separate authority rather
+than widening this exact two-edit correction.
+
+All D.93.51.2 dependency, ancestry, failure, reentry, publication, application,
+scope, review and gate laws remain normative. The correction does not authorize
+a Vitest config, package manifest, lockfile, fixture, production, workflow or
+unrelated test change. Its terminal evidence records the clean-install module
+resolution, the capacity row duration, the focused RED signature and the
+overlaid GREEN signature before signing either subsequent commit.
