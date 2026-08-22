@@ -50984,3 +50984,86 @@ substantive P0/P1. Fable is not invoked unless the user explicitly requests it.
 Phase 3h-a closes only creator-owned record creation and reversible rehearsal.
 It does not close Phase 3h or the Phase 3 exit gate. Phase 3h-b separately owns
 activation; creator-offline and delegated/threshold authority remain open.
+
+### D.93.54 — Phase 3h-a canonical source-state ownership correction
+
+D.93.53 requires the prepared migration state to equal both the observable
+barrier-frozen source state and the projected target state, but its exact public
+seam gives the room no application-owned way to canonicalize a projection. The
+room cannot infer product state by deleting operation discriminators or by
+serializing the whole projection: chat and zone projections contain distinct
+transport and provenance metadata. The migration capability therefore owns one
+canonical state view of its application's projection. This is the only new
+authority in this correction.
+
+`V3RoomMigrationCapability` becomes generic in the existing projection type and
+contains both required functions:
+
+```ts
+export interface V3RoomMigrationCapability<Projection extends V3RoomProjectionAuthority = V3RoomProjectionAuthority> {
+	canonicalStateBytes(projection: Projection): Uint8Array;
+	prepare(accepted: readonly V3RoomAcceptedOperation[]): V3RoomMigrationProjection;
+}
+```
+
+`V3RoomApplication<Projection>` retains only the optional `readonly migration?:
+V3RoomMigrationCapability<Projection>` member. Applications without migration
+remain unchanged. There is no top-level state hook, optional fallback, generic
+record-to-state heuristic, accept-either branch or second product-local rehearsal
+loop. Chat canonicalizes only its visible ordered message state; zone canonicalizes
+only its visible sorted block state. The capability is reviewed with each
+product's existing projection and migration mapping, so one owner defines the
+state exported from the source and expected after import.
+
+At the existing barrier the room uses the already-committed `projection` value
+that ordinary callers observe; it must not re-run `projectAcceptedOperations` or
+derive a second projection from the frozen rows for this comparison. The room
+captures `canonicalStateBytes` once alongside `prepare`, invokes both with the
+migration capability as receiver, and requires the source bytes to equal both
+deterministic `prepare()` results before releasing the barrier or reserving
+scratch state. After genuine target imports, it repeats the same captured
+canonicalization over the actual target projection before signing the migration
+record. After close and reopen, it repeats it over the recovered projection. All
+three byte strings must equal the recorded state exactly. Each result must be an
+ordinary intrinsic `Uint8Array` backed by an ordinary `ArrayBuffer`, cover its
+entire zero-offset backing buffer, remain within the existing 32 KiB state bound,
+survive exact canonical decode/re-encode, and be copied before use. A stable
+migration mapping that omits, invents or rewrites observable source state
+therefore fails before target effects; a divergent target or recovered reducer
+fails before receipt.
+
+The corrective plan is the signed D.93.53 RED commit's sole child. Its tests-only
+RED changes exactly `tests/phase-3h-v3-room-rehearsal-red.test.ts` and
+`tests/fixtures/phase-3a1b-d9346/room-contract.ts`. The room contract advances
+the existing exact public type assertion to the generic capability and its
+required canonical-state function; the default projection parameter preserves
+the existing seam re-export. Custom prepare fixtures retain the genuine product
+capability's canonical-state owner while replacing only `prepare`, and one stable
+source-substitution case proves that matching target imports are insufficient
+when the frozen source projection differs. Because D.93.53 production is absent
+at the signed RED base, causal RED evidence also applies the exact previously
+reviewed three-path GREEN candidate in a disposable checkout: staged tree
+`4a29c9beac18501fd1171fbc50a4bbafff190f46`, with room blob
+`8f7bae6e989a6b3ce3831dc662f4c593633f8cb5`, chat blob
+`993ce1d60443c3b2c47ae3c30bf58278e442b2f1` and zone blob
+`fadbbdedbc3cd9c23b8d3480b1265a3682f73c35`. Every prior Phase 3h test passes
+there and only the new source-state assertion fails. The RED's custom migration
+fixture spreads the genuine product migration capability before overriding only
+`prepare`; this keeps the pinned interim top-level-state candidate executable
+while requiring the final GREEN to move the state owner into the capability.
+The disposable overlay is unsigned, unpushed and non-authoritative.
+
+The GREEN is the corrective RED's sole child and changes exactly the same three
+D.93.53 owners: `examples/v3-room/src/index.ts`,
+`examples/v3-chat/src/index.ts` and `examples/grid/src/v3-zone.ts`. It removes any
+interim top-level or generic state heuristic rather than preserving compatibility.
+The original D.93.53 target identity, trust, signer, record, scheduler, cleanup,
+nonactivation and limit laws remain unchanged.
+
+Focused evidence runs the corrective causal case, every Phase 3h test, the full
+Phase 3f–3h preservation set, both real browser golden paths, affected builds and
+typechecks, package build, lint, formatting and diff checks. Kimi performs the
+bounded 100-step review; Grok uses streamed review mode; Codex and Opus xhigh
+review independently. Timeout or `NO_VERDICT` remains an honest non-approval but
+does not override a reproduced P0/P1. The correction does not close Phase 3h or
+authorize Phase 3h-b activation.
