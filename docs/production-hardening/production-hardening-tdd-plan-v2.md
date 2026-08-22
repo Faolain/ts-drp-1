@@ -52402,3 +52402,95 @@ currentAnchor)` classifier with history/restart invariance, the in-repository
 exhaustive small-graph/adversarial schedule model and cross-implementation
 conformance on the pinned unamended subset. The two-client chat/zone golden path
 remains the continuous preservation control.
+
+### D.93.57 closure ledger — authenticated genesis application state
+
+The signed implementation commit is
+`b5743eb7702633617f05285002bcec7abd710a40`, with tree
+`509e2d9fd7891285ac6a62df1f32598e5bf47931`, sole parent
+`70bb5cf133deddebde9b88c5b249955d531ed847`, and a Good Faolain signature.
+Its reviewed binary patch SHA-256 was
+`6f95a8f80d0adf9101abcf9f1f8e2b873711491d999e8bc0e5115e6d43e60fff`.
+The pushed branch and local tip matched exactly. The commit contains only the
+three production paths authorized by the signed D.93.57 plan; protected
+untracked files, 26 stashes, all 21 `refs/codex/recovery` refs and unrelated
+tracked work were preserved. Those custody and branch-parity facts were
+reauthenticated by the orchestrator and were not written to a separate gate
+artifact.
+
+The room creator API now accepts exact canonical application-state bytes rather
+than a caller-selected digest. It validates and copies those bytes before its
+signing await, rejects replica-local top-level `context`, and derives the anchor
+field only through the registered `ts-drp/state/v3` framing. The old
+`stateDigest` input and both product placeholder values are absent. Chat and
+zone each reuse one product-owned canonical state function for both migration
+and genesis; zone derives the empty projection from the authenticated
+order-zero local creator enrollment. The state bytes are not returned as a
+second authority object, and no compatibility or alternate digest path was
+added.
+
+Final-byte acceptance evidence was:
+
+- focused D.93.57 owner: 9/9, with 0.175 seconds of test execution and 3.14
+  seconds total; its dedicated temporary exact-public-type check passed but is
+  not a committed repository gate;
+- exact Phase 3g/3h preservation roster: 59/59 in 50.59 seconds;
+- complete compaction package after GREEN: 74 passed and one pre-existing skip
+  in 5.61 seconds, with its output preserved under the D.93.57 gate artifacts;
+- five protocol semantic suites: 87/87; controlled operation and work arms:
+  28/28 and 12/12;
+- room, chat and grid typecheck/build; exact-path ESLint, Prettier and diff
+  checks: pass;
+- frozen offline install, postinstall and package build: pass in 18.9 seconds;
+- real two-client browser chat: 5/5 in 6.2 seconds; real two-client browser
+  zone: 1/1 in 22.7 seconds.
+
+Only the complete compaction output and exit status are preserved as dedicated
+local D.93.57 gate artifacts. The focused-owner result and the remaining counts
+and timings above are contemporaneous orchestrator observations rather than
+separately persisted command logs. The current D.93.56 compaction owner ran
+inside the complete package, and its room-builder owner ran inside the focused
+D.93.57 test; no separate historical 16-row D.93.56 aggregate was rerun.
+Commands for this slice explicitly excluded protected dependency-empty
+repository copies under `.logs`; this is an operational command scope, not a
+repository-wide Vitest configuration. Collecting those evidence clones produces
+duplicate environmental failures, while the genuine owners above passed in
+their authoritative workspaces. No final production byte changed after these
+gates.
+
+Independent exact-byte review results were:
+
+- Kimi 100-step audit: PASS, no P0/P1/P2, reported terminally to the
+  orchestrator without a separate local artifact file;
+- Grok review mode: PASS with no findings after 450.145 seconds, with streamed
+  JSONL/status artifacts preserved;
+- Codex high: PASS, no P0/P1/P2; the first `codex review` scope-mode invocation
+  ended `NO_VERDICT`, and the separately preserved successful read-only
+  `codex exec` audit is the evidence;
+- Opus xhigh through actual `claude-phel`: PASS, no P0/P1 after 497.748
+  seconds, with streamed artifacts preserved.
+
+The acceptance gates were executed by the orchestrator. The successful final
+review passes were source-and-evidence audits and did not independently rerun
+those gates.
+
+Opus's nonblocking observations about pre-existing byte-guard duplication,
+equivalent zone creator-context derivations, independently composed preparation
+state and the intentional genesis/migration `context` asymmetry did not
+reproduce an object, content, signature or migration defect and were not used
+to widen this slice.
+
+The accepted RED also left four nonblocking test-architecture observations:
+the product route proves its anchor digest through the genuine builder rather
+than a second direct assertion; depth and item rejection rows do not add exact
+at-limit fencepost accepts; the exact input-type check uses a temporary config;
+and reuse of the identical canonical empty value `[]` remains source-review
+enforced while product separation is authenticated by the other anchor fields.
+These are recorded as later test-hardening debt, not as authority to reopen this
+closed slice.
+
+This ledger closes only D.93.57. It does not claim joiner-side state
+re-derivation, a live epoch cut, certification, adoption, pruning, archive,
+completed Phase 3, completed production hardening or completed product. The
+next Phase 3 exit slice and the two-client chat/zone golden path remain separate
+work.
