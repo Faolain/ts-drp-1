@@ -51067,3 +51067,651 @@ bounded 100-step review; Grok uses streamed review mode; Codex and Opus xhigh
 review independently. Timeout or `NO_VERDICT` remains an honest non-approval but
 does not override a reproduced P0/P1. The correction does not close Phase 3h or
 authorize Phase 3h-b activation.
+
+### D.93.55 — Phase 3h-b creator-signed activation and crash-safe source redirect
+
+The signed Phase 3h-a GREEN is
+`e5ef8b56145f5415ab9bff6214bc362aed989dea`, tree
+`0afc394eff5f409352286729040b3b9740ffe8fb`. It proves a creator-signed record
+in a recovered, undiscoverable candidate while the source remains live. It does
+not select that candidate. Phase 3h-b owns exactly that selection, the terminal
+source boundary and the restart route that makes the signed decision effective.
+
+Activation is a second creator-signed registered vertex in the authoritative
+source room. It is not an unsigned receipt bit, local preference, mutable
+database alias, current-writer vote or callback. The room derives the creator
+from the source invite's singleton signer set only after its exact signer-set
+digest equals the authenticated prepared descriptor; the creator must equal the
+registered-vertex signer. The same binding is repeated during startup redirect
+validation. One room-owned migration authority performs that check for record
+issuance, record replay, activation pre-admission and activation replay. No path
+may call the generic accepted-operation expander for `migrationRecord` or
+`migrationActivation` without the descriptor-authenticated authority, and no
+path may substitute the caller's `input.author` for the authenticated creator.
+Delegated and threshold activation remain open.
+
+Adding `migrationActivation` re-identifies the chat and zone blueprint package,
+artifact and catalog. Only rooms created and rehearsed under the final D.93.55
+identities can activate. Existing D.93.53/D.93.54 rooms and candidate records
+remain valid rehearsal evidence but are deliberately not activatable; there is
+no legacy identity, accept-either or cross-blueprint branch.
+
+This slice does not create a certified cut, successor anchor, public rendezvous
+registry, archive deletion, cross-blueprint migration or generic legacy-plane
+router. The source is a retained source archive and redirect-serving history,
+not a rollback authority after activation. Phase 5 still owns certification and
+Phase 6 owns certified-cut adoption and pruning.
+
+#### Public activation seam and exact decision
+
+The room adds exact closed inputs and observations:
+
+```ts
+export interface V3RoomMigrationActivationInput {
+	readonly exactCanonicalRecordBytes: Uint8Array;
+	readonly recordVertexDigest: string;
+	readonly targetCreatorInvite: string | V3RoomCreatorInviteMaterial;
+}
+
+export interface V3RoomMigrationActivationReceipt {
+	readonly activated: true;
+	readonly activationDecisionDigest: string;
+	readonly activationVertexDigest: string;
+	readonly targetAnchorDigest: string;
+}
+```
+
+`V3RoomSession` gains `activateMigration(input):
+Promise<V3RoomMigrationActivationReceipt>`. The input is an exact ordinary
+own-data record with those three keys. Byte-bearing values use the rehearsal
+intrinsic full-buffer discipline and are copied before the first await. No
+caller supplies a target object ID, scratch name, source-state digest,
+activation author or routing flag. The activation and rehearsal receipts are
+distinct frozen closed types and share no mutable byte alias.
+
+The room strictly decodes `exactCanonicalRecordBytes`, re-runs the sole
+migration-record validator unconditionally on the activation/redirect path,
+recomputes its record digest, nonce-derived target object ID and scratch digest,
+and authenticates source and target object, creator, blueprint, signer-set and
+anchor fields against prepared descriptors. It reopens the existing scratch
+candidate through genuine trust, issuance and journal recovery and requires
+exactly one supplied record vertex. Excluding the target bootstrap and that one
+record, its ordered accepted application rows must have the record's exact
+`targetImportOperationCount` and canonical `targetImportOperationsDigest`.
+Reapplying the captured migration capability must reproduce the record's exact
+canonical state and `applicationStateDigest`. Missing, multiple, substituted,
+partial, already-consumed or activation-bearing candidates fail before source
+signing. The D.93.55 rehearsal path also rejects a target invite larger than
+32,768 bytes before issuing its record, so no successful D.93.55 rehearsal can
+produce an invite that the activation decision cannot carry. Earlier D.93.53
+and D.93.54 receipts remain non-activatable evidence as stated above.
+
+The migration authority is required before the target record issuer and on
+every target recovery callback. It derives the creator from the prepared target
+descriptor's authenticated signer set, accepts the record operation, records
+its vertex digest and canonical bytes, and only then permits rehearsal success.
+An authority-free expansion, a caller-author binding or a throw after the
+record was durably signed is not success: the candidate is closed and the
+rehearsal rejects without exposing a receipt.
+
+The activation decision does not copy the up-to-49,152-byte migration record.
+The record's canonical digest, accepted vertex and closed fields already bind it.
+The decision is exactly:
+
+```ts
+{
+	activationAuthority: "creator-ed25519-registered-vertex-v1";
+	applicationStateDigest: string;
+	exactCanonicalTargetCreatorInviteBytes: Uint8Array;
+	kind: "ts-drp-v3-room-migration-activation";
+	migrationRecordDigest: string;
+	migrationRecordVertexDigest: string;
+	rehearsalNonce: Uint8Array;
+	sourceAcceptedOperationCount: number;
+	sourceAcceptedOperationsDigest: string;
+	sourceAnchorDigest: string;
+	sourceBlueprintDigest: string;
+	sourceCreatorAuthor: string;
+	sourceObjectId: string;
+	targetAnchorDigest: string;
+	targetBlueprintDigest: string;
+	targetCreatorAuthor: string;
+	targetImportOperationCount: number;
+	targetImportOperationsDigest: string;
+	targetObjectId: string;
+	version: 1;
+}
+```
+
+`activationDecisionDigest` is
+`hashDomain("ts-drp/v3-room-migration-activation/v1",
+encodeCanonical(decision))`; authority remains the enclosing registered vertex
+signature. Canonical target invite bytes are at most 32,768 bytes, the complete
+decision at most 49,152 bytes and the closed `{ action: "migrationActivation",
+decision }` operation at most the existing 65,536-byte application-operation
+budget. The 32-byte nonce is first-class so restart derives the target and
+scratch without embedding a second record copy. Invite bytes remove a mutable
+external map but are not a second trust oracle: ordinary target trust must
+authenticate the same object, anchor, blueprint, signer set and creator before
+routing.
+
+#### One node-owned terminal transition and no-lost-write rule
+
+The existing node registration gate already serializes local issue and remote
+ingress through the same journal/index owner. D.93.55 adds one handle-bound,
+one-use terminal-transition capability to that gate; it does not add a room
+queue, signer or admission path. Acquiring it reserves the gate immediately,
+waits for every earlier local and remote task including its admitted sink to
+finish, and holds every later task. The room then snapshots the quiescent source
+rows and observable projection and requires their exact count, canonical digest
+and application state to equal the migration record. The activation vertex binds
+the exact quiescent causality frontier as its dependencies; that ancestor closure
+is the selected source cut.
+
+The node exposes the following closed structural seam. Its helper/result aliases
+remain module-private, `V3PlaneHandle` and `V3PlaneActivationInput` retain their
+existing exported names, and the exact exported-name roster in
+`tests/phase-3a1b-p3-live-transport-red.test.ts` stays byte-identical and green.
+The terminal classifier is installed during authenticated recovery, not added to
+the activation input: the latter retains its exact existing four-key shape and
+the existing activation-order evidence remains load-bearing rather than being
+evaded through computed or reflective property access.
+
+```ts
+export interface V3PlaneActivationInput {
+	readonly capability: RecoveredV3Live;
+	readonly messageQueueManager: MessageQueueManager<Message>;
+	readonly networkNode: DRPNetworkNode;
+	readonly onAdmittedVertex: V3AdmittedVertexSink;
+}
+
+type V3TerminalVertexClassifier = (
+	input: Readonly<{
+		readonly author: string;
+		readonly exactReceivedCanonicalPreimageBytes: Uint8Array;
+		readonly signature: Uint8Array;
+		readonly vertex: AdmittedReceivedVertexView;
+	}>
+) => "ordinary" | "terminal-authorized" | "reject";
+
+export type V3AdmittedVertexSink = (
+	delivery: Readonly<{
+		readonly vertex: AdmittedReceivedVertexView;
+		readonly exactReceivedCanonicalPreimageBytes: Uint8Array;
+		readonly signature: Uint8Array;
+		readonly transportSender: string;
+	}>
+) =>
+	| void
+	| Readonly<{
+			readonly kind: "continue" | "retained-bootstrap-ready" | "terminal-accepted" | "terminal-rejected";
+	  }>
+	| Promise<void | Readonly<{
+			readonly kind: "continue" | "retained-bootstrap-ready" | "terminal-accepted" | "terminal-rejected";
+	  }>>;
+
+export interface V3PlaneHandle {
+	readonly objectId: string;
+	readonly epoch: 0;
+	readonly topic: string;
+	readonly queueId: string;
+	currentEphemeralAuthority():
+		| Readonly<{
+				readonly aclDigest: string;
+				readonly anchorDigest: string;
+				readonly epoch: 0;
+				readonly objectId: string;
+				isCurrentWriter(author: string): boolean;
+		  }>
+		| undefined;
+	issueLocal(input: V3LocalIssueInput): Promise<V3LocalIssueResult>;
+	readRebaseOutbox(): Promise<V3RebaseOutboxResult>;
+	completeRebaseSource(
+		input: Readonly<{ readonly authorSequence: number; readonly digest: string }>
+	): Promise<V3EgressResult>;
+	publishPending(): Promise<V3EgressResult>;
+	republishRetained(): Promise<V3EgressResult>;
+	deactivate(): void;
+	beginTerminalTransition(): Promise<
+		| Readonly<{
+				ok: true;
+				capability: Readonly<{
+					publishTerminal(input: V3LocalIssueInput): Promise<
+						| Readonly<{
+								ok: true;
+								kind: "accepted";
+								authorSequence: number;
+								digest: string;
+								terminalIntent: "committed";
+						  }>
+						| Readonly<{
+								ok: false;
+								kind:
+									| "not-active"
+									| "malformed-input"
+									| "authorization-rejected"
+									| "issuance-rejected"
+									| "admission-rejected"
+									| "journal-rejected"
+									| "graph-rejected"
+									| "terminal-rejected";
+								detail: string;
+								terminalIntent: "absent" | "outcome-unknown";
+						  }>
+					>;
+					resume():
+						| Readonly<{ readonly ok: true; readonly kind: "resumed" }>
+						| Readonly<{ readonly ok: false; readonly kind: "invalid-state"; readonly detail: string }>;
+				}>;
+		  }>
+		| Readonly<{
+				ok: false;
+				kind: "not-active" | "transition-active" | "already-terminal";
+				detail: string;
+		  }>
+	>;
+}
+```
+
+That is the existing complete handle plus only `beginTerminalTransition`; no
+existing member is removed or reinterpreted. The existing legacy/latched and
+same-object displaced recovery variants remain exact and unchanged for
+blueprints without `migrationActivation`. The existing room-only reflective
+`previewLatchedAcl` access remains byte-for-byte available on the runtime
+handle; it is neither promoted into this public interface nor dropped by the
+terminal capability. D.93.55 adds exactly three lawful latched-ACL recovery
+shapes whose top-level keys are the base keys
+`capability,classifyTerminalVertex,exactCanonicalLatchedAclBytes,issuanceScope,issuanceStore,liveJournalStore`
+plus: (1) neither additional key for ordinary source recovery or a prepopulated
+rehearsal-target scratch recovery; (2) exactly `displacedSource` for a nonempty
+redirected target; or (3) exactly
+`displacedSource,retainedBootstrapHold` for an empty redirected target. There is
+no `retainedBootstrapHold` shape without `displacedSource`. The hold is the
+literal `true`, never a caller-selected mode string, and is accepted only after
+the bound source activation and ancestor closure have authenticated
+successfully. `displacedSource`, when present, is the exact closed record:
+
+```ts
+{
+	activationVertexDigest: string;
+	capability: PreparedV3Live;
+	exactCanonicalLatchedAclBytes: Uint8Array;
+	issuanceScope: DurableIssueScope;
+	issuanceStore: DurableIssuanceStore;
+	liveJournalStore: DurableLiveJournalStore;
+}
+```
+
+The node consumes a D.93.55 variant if and only if the authenticated prepared
+runtime contains `migrationActivation`; the classifier is then mandatory.
+Missing, extra, mixed, legacy-author-list or wrong-shape migration variants
+fail closed. The classifier and detached raw preimage/signature for every
+authenticated recovered vertex are retained only in the private
+`RecoveredV3LivePayload`, carried into the registration and replayed before
+live ingress. They are not added to the public recovered descriptor. The same
+classifier identity participates in `sameActivation`; a missing or different
+classifier cannot inherit an existing handle. Classification remains an
+internal substep of the existing authenticate/admit stages, so the signed
+activation, ingress and egress ordering arrays retain their exact current
+lengths and names.
+
+The `publishTerminal` input must contain exactly one operation and the ordinary
+signer callback. The operation must be classified `terminal-authorized`; an
+ordinary, rejected, split or multi-operation input is an absent-intent failure.
+The capability is frozen, one-use and bound by private ownership to the plane
+handle that began it. Reuse, a different plane handle, malformed input and
+resume after any possible durable effect fail closed.
+
+For final D.93.55 blueprints whose runtime contains `migrationActivation`, the
+recovery-bound classifier is mandatory. The room installs its sole
+descriptor-bound migration authority; absence or throw is rejection, never a
+bypass. Blueprints without the reserved action keep the existing recovery and
+activation shapes and ordinary sink behavior.
+The node invokes the classifier after cryptographic/ACL authentication but
+before any remote journal append, and repeats it over recovered authenticated
+vertices before subscribing live ingress. Thus an unauthorized noncreator or
+malformed activation never becomes terminal evidence, appends no journal/index
+row, does not poison the source, and cannot prevent a later ordinary write.
+
+Activation must fit one vertex without node-generated topology. Before any
+signer or store effect, the quiescent tip set must be nonempty, already fit
+`maxDependencies`, leave one vertex slot and pass the existing conservative
+maximum-byte precheck for one activation. The terminal arm uses that exact tip
+set and may not synthesize `causalJoin`. It signs once, computes the existing
+exact canonical vertex charge, and rejects before any store effect if the exact
+charge does not fit; no second preimage encoder is introduced. A multi-tip
+frontier that needs consolidation rejects pre-effect; ordinary issuance may
+consolidate it, after which the creator must rehearse the changed source again.
+
+Only the capability may publish one terminal operation. It invokes the genuine
+registered-vertex issuer, journal append, causality index and admitted sink while
+still owning the gate. The admitted sink result is total for an activation:
+`continue` applies only to ordinary accepted vertices, `terminal-accepted` seals
+a valid activation and `terminal-rejected` poisons an invalid activation without
+selecting a target. A throw, missing result or malformed result for an activation
+is `terminal-rejected`, never swallowed into ordinary continuation. The sink
+disposition is applied before the current task releases, so a valid activation
+received from another peer also seals that replica before the next queued task.
+Existing `void`/resolved-`void` sinks remain `continue` only for ordinary
+vertices. A pre-admission `reject` never reaches this post-journal disposition;
+`terminal-rejected` is reserved for an authenticated creator activation whose
+room-owned post-journal invariant unexpectedly fails and therefore must stop the
+replica fail closed.
+Ordinary `V3RoomSession.issue()` rejects the reserved `migrationActivation`
+action even when its shape is valid; the private activation arm is not an
+optional alternate path.
+
+Candidate, frontier, capacity or other pre-effect failure resumes the same gate
+and all held tasks run normally. Once local transaction issuance may have
+committed, resume is forbidden even if a later step throws; outcome-unknown is
+terminal-pending until recovery proves the exact row absent or authenticates it.
+A committed local activation or pre-authorized durable remote journal append
+leaves the registration terminal: held and later local issues reject explicitly,
+held and later application ingress never appends to the source journal or graph,
+and no waiter resolves as a successful source write. This narrowly supersedes
+D.93.53's resolve-during-rehearsal rule only for activation; rehearsal itself
+retains that rule. The terminal handle still permits exact pending/retained
+egress, targeted history service and deactivation.
+
+The irreversible point is the earliest durable authenticated terminal evidence:
+the local issuance/outbox transaction commit or, for a received activation that
+already passed the room-owned creator classifier, the remote journal append.
+Local journal, index and admitted-sink acceptance complete that already-durable
+intent; they do not move the boundary later. A crash before any possible durable
+effect leaves the source authoritative. A crash after an outbox commit, journal
+append, index append or before sink disposition recovers the exact row, finishes
+missing journal/index/sink steps and leaves the source terminal even when receipt
+delivery or publication failed. Recovery requires the activation's exact
+ancestor closure to reproduce the frozen source rows and state. A missing,
+unauthenticated, repeated, conflicting or merge-substituted activation fails
+closed and does not redirect. Signed application vertices outside that closure
+are displaced work, not a second authoritative source suffix; invalid structural
+rows still fail closed.
+
+There is no delta copier. Local callers held across a successful activation
+receive an explicit retryable failure. A disconnected author replica may have
+committed and even published a concurrent source application vertex without yet
+observing the activation; its source-scoped issuance row remains durable and its
+vertex is outside the selected ancestor closure.
+
+D.93.55 extends the one existing Phase 3g owner to this cross-object boundary.
+The displaced-source recovery input binds the separately authenticated source
+prepared capability, source authorization, exact source issuance scope and
+issuance store, exact source journal store and the authenticated activation
+vertex digest. The source scope object ID must equal the activation's source ID,
+the current scope object ID must equal its distinct target ID, authors must
+match, and source/target blueprint and signer-set evidence must match the signed
+decision. The node independently replays the source journal, authenticates the
+activation vertex and derives its ancestor closure; no caller supplies an
+ancestor list, classification or alternate object ID.
+
+The existing outbox reader then enumerates the target and the separately bound
+source scope in one stable total order extended by source object/scope, author,
+author sequence and full digest; independent sequence spaces never share a bare
+cursor. It considers both pending and published authenticated source rows
+outside the activation ancestor closure; rows inside the closure are already
+represented by the migration prefix and are never reissued. The public
+`completeRebaseSource({ authorSequence, digest })` input remains unchanged, but
+the node resolves it only by full digest plus sequence in the authenticated
+source store and scope—never by searching the target scope or treating a target
+sequence as source identity. This published-row enumeration extension exists
+only for the exact D.93.55 cross-object `displacedSource` shape; every existing
+same-object Phase 3g reader and result stays unchanged. The private displaced
+row variant of the existing non-exported `V3RebaseOutboxResult` shape tells the
+room whether the authenticated source row is `pending` or `published`; this is a
+normal returned field, not a side channel, and adds no public node export or
+caller-selected state.
+
+Pending `rebase` and `transform` rows retain the existing pending-to-published
+compare-and-mark transition, performed only after the target replacement is
+durably accepted; a pending `expire` row uses the same transition after its
+deterministic no-target disposition. An already-published source row is never
+passed to `completeRebaseSource`, falsely described or mutated as "completed":
+the room deterministically recomputes its Phase 3g
+author/action/identity and canonical selected bytes, and the authenticated
+accepted target operation with that exact identity and bytes is its durable
+completion/dedup evidence. On restart the bounded source enumeration may see the
+published row again; `rebase`/`transform` finds the accepted target identity and
+issues zero duplicates, `expire` deterministically performs no target or source
+mutation, and `manual-review` remains held. A crash after target acceptance and
+before volatile bookkeeping therefore cannot duplicate an operation. Wrong
+stores, scopes, terminal vertices, closure membership, objects, authors,
+identities, bytes or mixed rows fail closed. No such vertex alters the selected
+source state, and no source write reported successful to its author is silently
+omitted.
+`migrationActivation` is a reserved terminal/publication row, never a displaced
+application intent: its pending outbox is recovered, completed and published on
+the source, while only ordinary application vertices outside the activation
+closure enter Phase 3g.
+
+#### Recovery redirect, retained discovery and product behavior
+
+Normal startup authenticates and recovers the requested source before opening
+transport. With no valid activation it continues unchanged. With one valid
+activation it seals source admission before transport and derives scratch
+storage from the authenticated decision. A rehearsing creator may already have
+the complete target. A replica without that local scratch state installs target
+trust from the exact decision invite and uses the exact
+`retainedBootstrapHold: true` recovery shape, which necessarily also carries the
+exact six-key `displacedSource`. This narrowly supersedes
+D.93.52's nonempty-chain recovery law only for a descriptor-authenticated final
+D.93.55 target selected by a valid source activation. The node installs genuine
+journal genesis but no local target bootstrap vertex, returns an empty recovered
+capability, and activates the genuine node plane with its handle held privately
+by the room. The room opens target transport in a retained-bootstrap-held,
+non-public state,
+requests retained target history, and routes every response through the existing
+node-owned `routeV3RetainedIngress` journal/index/admitted-sink path. It creates
+no room journal writer, no RecoveredV3Live-less activation and no competing
+target history.
+
+While retained-bootstrap-held, target `issueLocal`, target publication,
+cross-object rebase drain and public projection/issue/
+ephemeral exposure are unavailable. Ordinary authenticated retained vertices
+may advance the private scratch projection; only the room's descriptor-bound
+sink may return `retained-bootstrap-ready`, and only after the exact migration
+record prefix, state and import evidence are authenticated. That disposition is
+invalid outside an empty-target retained-bootstrap hold. It releases the node
+hold; only then may the existing cross-object rebase drain begin, so target
+`issueLocal` cannot fail early and poison the session. The disposition does not
+itself expose the room; the room exposes only after its complete redirect checks
+succeed. Missing, malformed, conflicting or incomplete history remains
+redirect-pending/offline and retries from the original source; it never falls
+back to source authority. This is one bounded bootstrap use of the genuine node
+admission path, not an empty-recovery exception for ordinary rooms.
+
+`CreateV3RoomSessionInput.openTransport` becomes
+`openTransport(objectId: string)`: the room passes the authenticated source ID
+for an ordinary source. A redirect concurrently owns one retained-only source
+transport opened with the authenticated source ID and one live target transport
+opened with the authenticated target ID; it does not reuse a single transport
+for both roles. Chat and zone derive each transport coordinate from that
+argument; the zone may no longer close target transport over the old `zoneId`,
+and chat must preserve its source channel while deriving a distinct target
+channel from the target ID. Chat and zone must both wire their retained-message
+callbacks to the room's targeted retained-ingress handler; a live-topic
+coincidence is not redirect discovery or empty-target bootstrap evidence. The
+chat transport is explicitly authorized to track per-delivery provenance in its
+existing transport mapping so a retained response reaches that callback with
+`gossipTopicFor(message) === undefined`; ordinary live-topic delivery remains
+gossip. The provenance remains bound to that exact message object until its
+asynchronously queued admission has finished; a transient callback-only flag is
+invalid. The sender marks each exact outgoing retained message, including
+untargeted retained `publishMessage`, at the existing `retainedPublisher`
+boundary; the mark is per message, never a publication-time window that can
+capture concurrent live publication. This is a bounded adapter correction, not
+a topology redesign.
+
+A redirected room owns two bounded resources. Its source plane is
+redirect-terminal and retained-only: it republishes pending/retained source
+history including the activation and serves it to stale peers, but admits no
+application vertex, exposes no source issue or ephemeral surface and never
+projects source state to the product. Its target plane is the ordinary live room
+and may exchange retained and new target history. This source redirect service
+is what lets an offline peer that lacks the local scratch database learn the
+decision from the original coordinates. The composite public session exposes
+only the target room/projection, forwards `previewLatchedAcl()` to the target
+plane, and closes both planes together.
+
+Publication is required before an online activation call reports success. If
+the decision is durably accepted but publication, target recovery or target
+transport fails, the product becomes redirect-pending/offline: it never resumes
+the source or returns an old active reference, and retries only through the
+original source coordinates. A later successful recovery republishes the source
+decision before exposing the target. Pre-decision failure leaves the original
+source session active and unchanged.
+
+On every redirect the room recovers exactly one target migration record whose
+vertex and canonical bytes match the activation digest. It computes that
+record vertex's exact ancestor closure, rechecks the ordered import evidence in
+that immutable prefix, and requires the projection at the record vertex to
+equal the activation's migration-time state digest. It then replays every later
+legitimate target application vertex as an ordinary suffix and exposes the
+current target projection. The live target head is never compared directly to
+the migration-time digest. A post-activation message or `placeBlock` must
+survive close, source-coordinate redirect and target reopen.
+
+Zero activation stays on source. Malformed, multiple, split, merge-substituted
+or conflicting decisions, a mutated prefix, an unauthorized suffix or another
+activation in the suffix fail closed. This slice follows one hop from a given
+coordinate: a target activation is not recursively followed through its
+predecessor. After a later target-to-successor cycle, callers must adopt the
+newly published target coordinates; the original source coordinate is not a
+permanent multi-hop alias.
+
+Chat and zone expose a thin creator-only
+`activateMigration(rehearsalReceipt)` wrapper. It strictly reuses the frozen
+receipt and deterministically rebuilds the target creator invite from the
+record's nonce, derived target object ID and existing creator key material; it
+retains no product-local migration state. Missing, mutated or foreign receipts
+and rederived invite mismatch fail before terminal acquisition. Joined
+noncreators cannot activate. The wrapper waits for activation, closes the old
+public session, then reopens through the original durable source coordinates;
+only a successful target session publishes the new target invite/room ID.
+
+#### Tests-only RED, GREEN ownership and gates
+
+The signed plan commit's sole child is one tests-only RED changing exactly:
+
+- `tests/phase-3h-v3-room-activation-red.test.ts`;
+- `tests/phase-3h-v3-terminal-transition-red.test.ts`;
+- `tests/phase-3h-v3-room-rehearsal-red.test.ts`;
+- `tests/phase-3h-v3-migration-record-red.test.ts`;
+- `tests/phase-3h-chat-zone-migration-red.test.ts`;
+- `tests/fixtures/phase-3h/migration-rehearsal-fixture.ts`;
+- `tests/fixtures/phase-3a1b-d9346/room-contract.ts`;
+- `tests/fixtures/phase-3a1b-p3/seam3-contract.ts`;
+- `tests/fixtures/phase-3a1b-p3/seam3-types.ts`;
+- `tests/phase-3f-b-chat-zone-causal-join-red.test.ts`;
+- `tests/phase-3f-c-chat-zone-batching-red.test.ts`;
+- `tests/phase-3g-v3-room-rebase-red.test.ts`;
+- `tests/fixtures/phase-3g/rebase-outbox-fixture.ts`;
+- `tests/phase-3a1b-d9336-two-client-room.pw.ts`; and
+- `tests/phase-3a1b-d9346-v3-zone.pw.ts`.
+
+RED preserves Phase 3h-a controls and fails only because the exact terminal
+capability, activation API/operation, target-bound transport and redirect
+behavior are absent. The two Phase 3f files change only their exact operation
+rosters and rederived chat/zone artifact, blueprint and catalog identities for
+the new non-batchable `migrationActivation` descriptor under the unchanged
+65,536-byte budget. They preserve every batching, causal-join and visible-state
+assertion.
+
+The causal matrix covers:
+
+- genuine creator terminal decision, signature, publication and target reopen;
+- earlier local/remote admission quiescence and exact frozen-prefix evidence;
+- local and remote work arriving while held, pre-effect resume and
+  post-effect rejection without source journal/index growth;
+- a noncreator or malformed remote activation rejected before journal/index
+  append, leaving the source writable, followed by a genuine creator decision;
+- public reserved-action rejection, forged/reused/wrong-handle capability and
+  every begin/publish/resume failure, plus total ordinary/valid-terminal/
+  invalid-terminal sink disposition before the next admission task;
+- multi-tip causal-join and insufficient one-vertex capacity rejection before
+  signer/store effects;
+- source publication failure, restart republish and a stale peer learning the
+  redirect only through retained source history;
+- recovered terminal state returning `already-terminal` before live ingress
+  while pending/retained egress and targeted history remain usable;
+- exact source versus target transport IDs, zero source transport before
+  redirect validation and retained-only source service afterward;
+- a non-rehearsing peer with an empty target scratch store acquiring the exact
+  migration prefix through genuine node-owned retained-bootstrap-held target retained
+  history before exposure, while ordinary empty recovery, local target bootstrap
+  and pre-prefix issue/publication/rebase drain remain rejected, and a missing
+  or unauthenticated source activation cannot select the hold shape;
+- crash before issuance, after local issuance commit, after local or remote
+  journal append, after index append, before sink disposition, before
+  publication and before target exposure;
+- post-decision target/store/trust/transport failure producing only
+  redirect-pending/offline retries, never source fallback;
+- wrong creator/signer set/object/anchor/blueprint/invite/record/state/vertex,
+  all three byte bounds, target suppression and cleanup failure;
+- missing, repeated, split, merge-substituted and conflicting activation rows,
+  attempted same-replica post-terminal admission and recursive redirect;
+- cross-object Phase 3g displacement from the exact source issuance store/scope
+  of both a pending and a published concurrent source-author row outside the
+  activation closure, with wrong store/scope/object/closure mutants, alongside a
+  pending activation outbox that remains terminal/publication evidence rather
+  than an intent, without duplication or author substitution;
+- crash/reopen after one published-source replacement is accepted, proving its
+  authenticated target identity suppresses reissue without inventing a source
+  completion mutation, plus a published `expire` row that remains a deterministic
+  no-op across restart;
+- a displaced joined noncreator writer admitted by both authenticated source and
+  target ACLs, plus wrong-writer/source-only/target-only authorization mutants;
+- target message and `placeBlock` suffixes after the record prefix surviving
+  source-coordinate close/reopen, while a forged prefix or suffix fails;
+- two real chat and zone clients converging after activation, retained redirect
+  discovery, disconnect and reconnect.
+
+Assertions use durable rows, store snapshots, public outcomes, process results
+and authenticated identities, not incidental diagnostics or private spelling.
+They retain the distinct `activated: false` rehearsal receipt and require the
+later frozen `activated: true` receipt and accepted vertex.
+
+The GREEN is the RED commit's sole child and changes exactly:
+
+- `packages/node/src/v3-live.ts`;
+- `examples/v3-room/src/index.ts`;
+- `examples/v3-chat/src/index.ts`; and
+- `examples/grid/src/v3-zone.ts`.
+
+The node file owns only the shared terminal state/capability on its existing
+registration gate, pre-admission classification, admitted-sink disposition and
+the cross-object extension of its sole Phase 3g displaced-source owner. The
+room remains the sole activation validator, source/target evidence,
+authenticated source-scope handoff, scratch derivation, redirect and
+composite-session owner. Chat and zone own only the new catalog descriptor,
+deterministic transport and per-delivery provenance mapping, creator-invite
+rederivation and thin wrapper.
+No protocol, storage backend, workflow, lockfile, registry, topology, ephemeral,
+snapshot, sealing, adoption, archive or unrelated path changes are authorized.
+Refactor-clean rejects a second queue, signer, issuer, journal path, constructor,
+projector, router store, compatibility decoder, product-local activation state
+machine or multi-hop alias.
+
+Focused evidence runs the exact RED owners, every Phase 3h file, complete Phase
+3f/3g preservation, five semantic suites and controlled arms, node/room/chat/grid
+builds and typechecks, package build, ESLint, Prettier and diff checks. Final
+bytes run both real browser golden paths through activation, retained redirect
+discovery and reconnect once. Logs record source/target identities, record and
+decision vertices, gate order, journal/index deltas, publication/retained calls,
+transport IDs, redirect state, displacement outcome and wall durations.
+The unchanged Phase 3a1b live-transport export roster and every existing Phase
+3g same-object case remain green; D.93.55 adds no top-level node export and no
+parallel rebase implementation.
+
+The signed plan, signed RED, signed GREEN and signed closure ledger are separate
+linear commits: RED has the plan as sole parent, GREEN has RED as sole parent and
+the ledger has GREEN as sole parent. Kimi performs the bounded 100-step audit;
+Grok runs streamed review mode with `max-turns=64` and an 1,800-second
+progress-aware bound; Codex and Opus xhigh review independently. Timeout or
+`NO_VERDICT` is honest non-approval but does not override a reproduced
+substantive P0/P1. Fable is not invoked without explicit user request.
+
+Phase 3h-b closes only creator-owned rehearsal-to-activation and its one-hop
+restart redirect. The ledger must not claim a certified cut, generic authority
+migration, Phase 3 exit, production-hardening completion or product completion.
+The next checkpoint is the explicit Phase 3 exit-gate evidence.
