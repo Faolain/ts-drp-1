@@ -52105,3 +52105,65 @@ pure `(envelope, currentAnchor)` classifier with history/restart invariance, the
 in-repository exhaustive small-graph/adversarial schedule model, and
 cross-implementation conformance on the pinned unamended subset. The same
 chat/zone golden path remains the preservation control at every boundary.
+
+### D.93.56.1 — Compact-accumulator safe-integer snapshot correction
+
+#### Trigger and bounded correction
+
+The signed D.93.56 tests-only RED at `859004be6d0eb5162cd99b0f8b0f07dbf3d688da`
+contains the required safe ordinal/history-size overflow row. A disposable partial
+GREEN implementing only the new history owner made that dormant row executable
+and exposed one pre-existing primitive defect before the new derivation ran:
+`CompactMerkleAccumulator.fromSnapshot` computes its required peak count with
+`Math.floor(Math.log2(size))`. JavaScript rounds
+`Math.log2(Number.MAX_SAFE_INTEGER)` to `53`, so the accumulator incorrectly
+requires 54 levels for the valid 53-bit value `2^53 - 1` and rejects the RED's
+53 occupied peaks as corrupt.
+
+This is an arithmetic representation defect in the existing accumulator, not a
+change to RFC 9162, the registered history leaf, the close-set contract or the
+shared-room builder. D.93.56.1 supersedes only D.93.56's exact GREEN path list
+and sole-child statement as follows: this signed corrective amendment is the
+RED's sole child, and the GREEN is this amendment's sole child. The GREEN adds
+exactly one eighth path, `packages/compaction/src/ct-merkle.ts`, to the seven
+paths already authorized by D.93.56.
+
+The permitted accumulator delta replaces only the snapshot highest-level
+calculation with an exact safe-integer bit-length calculation. For `size === 0`
+the required peak count remains zero. For every positive safe integer, the
+required count is exactly the length of its base-two representation, covering
+levels `0` through `bitLength - 1`. Peak occupancy, 32-byte validation, copying,
+append semantics, RFC 9162 roots, public exports and all other accumulator code
+remain byte-identical. No floating-point logarithm, alternate snapshot shape,
+compatibility branch or accept-either rule remains.
+
+The already-signed RED is sufficient and remains unchanged: its
+`maximumSnapshot()` supplies 53 occupied peaks and `size:
+Number.MAX_SAFE_INTEGER`; direct restoration must succeed, then appending one
+new history leaf through the new derivation must fail with `RangeError` before
+mutation. A disposable overlay of the partial history owner plus this one-line
+primitive correction must change that row from primitive setup failure to the
+intended derivation overflow disposition. The existing compaction Merkle and
+snapshot suites remain preservation controls, including corrupt peak count,
+occupancy, width and detached-copy rejection.
+
+No new test, fixture, registry, protocol-v3, room, product, workflow or package
+path is authorized by this correction. The final GREEN therefore changes
+exactly these eight paths:
+
+- `packages/compaction/src/ct-merkle.ts`;
+- new `packages/compaction/src/history-commitment.ts`;
+- `packages/compaction/src/index.ts`;
+- `examples/v3-room/package.json`;
+- `examples/v3-room/src/index.ts`;
+- `examples/v3-chat/src/index.ts`;
+- `examples/grid/src/v3-zone.ts`;
+- `pnpm-lock.yaml`.
+
+Acceptance reruns the focused 16-test D.93.56 owner roster, compaction typecheck,
+the existing complete compact-Merkle suite and the remaining D.93.56 gates on
+the final eight-path bytes. Review must confirm that the correction is the sole
+primitive delta and does not create a second accumulator owner. This amendment,
+the eight-path GREEN and the closure ledger remain separate linear
+Good-Faolain-signed commits. It closes only this safe-integer boundary and does
+not expand the Phase 3 exit-a claims.
