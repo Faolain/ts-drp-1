@@ -3,6 +3,12 @@ import type { MessageQueueManager } from "@ts-drp/message-queue";
 import type { AdmittedReceivedVertexView, SignRegisteredVertexDigest } from "@ts-drp/protocol-v3";
 import { type DRPNetworkNode, type Message, type V3Envelope, V3Envelope as V3EnvelopeCodec } from "@ts-drp/types";
 
+import type {
+	V3RoomMigrationCapability,
+	V3RoomMigrationProjection,
+	V3RoomMigrationRehearsalInput,
+	V3RoomMigrationRehearsalReceipt,
+} from "../../../examples/v3-room/src/index.js";
 import type { DurableLiveJournalStore } from "../../../packages/live-journal/src/index.js";
 import type {
 	activateV3LivePlane,
@@ -18,6 +24,11 @@ import type {
 	V3PlaneActivationResult,
 	V3PlaneHandle,
 } from "../../../packages/node/src/v3-live.js";
+
+export type Seam3V3RoomMigrationCapability = V3RoomMigrationCapability;
+export type Seam3V3RoomMigrationProjection = V3RoomMigrationProjection;
+export type Seam3V3RoomMigrationRehearsalInput = V3RoomMigrationRehearsalInput;
+export type Seam3V3RoomMigrationRehearsalReceipt = V3RoomMigrationRehearsalReceipt;
 
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 type Assert<T extends true> = T;

@@ -24,6 +24,16 @@ interface ZoneApi {
 	placeBlock(
 		input: Readonly<{ readonly id: string; readonly kind: string; readonly x: number; readonly y: number }>
 	): Promise<void>;
+	rehearseMigration(): Promise<
+		Readonly<{
+			readonly activated: false;
+			readonly applicationStateDigest: string;
+			readonly importedOperationCount: number;
+			readonly recordDigest: string;
+			readonly recordVertexDigest: string;
+			readonly targetAnchorDigest: string;
+		}>
+	>;
 	snapshot(): ZoneSnapshot;
 }
 
@@ -191,6 +201,15 @@ test("two real network clients recover and converge one durable v3 zone while mo
 		expect((await zone(joiner)).acceptedOperationDigest).not.toBe(afterOfflineProgress.acceptedOperationDigest);
 		await expect(creator.locator('[data-block-id="rejoined"]')).toBeVisible();
 		await expect(joiner.locator('[data-block-id="rejoined"]')).toBeVisible();
+
+		await expect(joiner.evaluate(() => window.__TS_DRP_V3_ZONE__?.rehearseMigration())).rejects.toThrow();
+		const rehearsal = await creator.evaluate(() => window.__TS_DRP_V3_ZONE__?.rehearseMigration());
+		expect(rehearsal).toMatchObject({ activated: false, importedOperationCount: 3 });
+		expect(rehearsal?.applicationStateDigest).toMatch(DIGEST);
+		expect(rehearsal?.recordDigest).toMatch(DIGEST);
+		expect(rehearsal?.recordVertexDigest).toMatch(DIGEST);
+		expect(rehearsal?.targetAnchorDigest).toMatch(DIGEST);
+		expect((await zone(creator)).zoneId).toBe(created.zoneId);
 	} finally {
 		await Promise.allSettled([
 			creator.evaluate(() => window.__TS_DRP_V3_ZONE__?.close()),

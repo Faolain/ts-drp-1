@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { decodeCanonical } from "@ts-drp/canonical";
 import { build } from "esbuild";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer, type Server } from "node:http";
@@ -35,6 +36,16 @@ interface ChatSnapshot {
 	readonly trustStatus: "Creator-trusted; not Byzantine-fault-tolerant." | "";
 }
 
+interface MigrationReceipt {
+	readonly activated: false;
+	readonly applicationStateDigest: string;
+	readonly exactCanonicalRecordBytes: Uint8Array;
+	readonly importedOperationCount: number;
+	readonly recordDigest: string;
+	readonly recordVertexDigest: string;
+	readonly targetAnchorDigest: string;
+}
+
 const EIGHT_CLIENT_IDS = ["alice", "bob", "carol", "dave", "erin", "frank", "grace", "heidi"] as const;
 type ClientId = (typeof EIGHT_CLIENT_IDS)[number];
 
@@ -57,6 +68,7 @@ declare global {
 				}>
 			): Promise<void>;
 			close(): Promise<void>;
+			rehearseMigration(): Promise<MigrationReceipt>;
 			send(text: string): Promise<void>;
 			submitAcl(
 				operation: Readonly<{
@@ -173,6 +185,26 @@ test("two isolated clients join one v3 room and observe the same durable transcr
 		expect(aliceState.durableTranscriptDigest).toBe(bobState.durableTranscriptDigest);
 		expect(aliceState.acceptedOperationDigest).toMatch(DIGEST);
 		expect(aliceState.durableTranscriptDigest).toMatch(DIGEST);
+		await expect(bob.evaluate(() => window.d9336V3Chat.rehearseMigration())).rejects.toThrow();
+		const rehearsal = await alice.evaluate(async () => {
+			const receipt = await window.d9336V3Chat.rehearseMigration();
+			return Object.freeze({
+				...receipt,
+				exactCanonicalRecordBytes: Array.from(receipt.exactCanonicalRecordBytes),
+			});
+		});
+		expect(rehearsal).toMatchObject({
+			activated: false,
+			importedOperationCount: 2,
+		});
+		expect(rehearsal.applicationStateDigest).toMatch(DIGEST);
+		expect(rehearsal.recordDigest).toMatch(DIGEST);
+		expect(rehearsal.recordVertexDigest).toMatch(DIGEST);
+		expect(rehearsal.targetAnchorDigest).toMatch(DIGEST);
+		const migrationRecord = decodeCanonical(Uint8Array.from(rehearsal.exactCanonicalRecordBytes));
+		expect(Reflect.get(migrationRecord as object, "sourceAcceptedOperationCount")).toBe(4);
+		expect(Reflect.get(migrationRecord as object, "sourceAcceptedOperationsDigest")).toMatch(DIGEST);
+		expect((await snapshot(alice)).roomId).toBe(aliceState.roomId);
 	} finally {
 		await Promise.allSettled([
 			alice.evaluate(() => window.d9336V3Chat.close()),

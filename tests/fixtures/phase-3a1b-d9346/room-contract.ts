@@ -2,6 +2,10 @@ import type {
 	CreateV3RoomSessionInput,
 	V3RoomAcceptedOperation,
 	V3RoomApplication,
+	V3RoomMigrationCapability,
+	V3RoomMigrationProjection,
+	V3RoomMigrationRehearsalInput,
+	V3RoomMigrationRehearsalReceipt,
 	V3RoomProjectionAuthority,
 	V3RoomSession,
 } from "../../../examples/v3-room/src/index.js";
@@ -30,6 +34,30 @@ interface ExpectedAcceptedOperation {
 	readonly vertexDigest: string;
 }
 
+interface ExpectedMigrationProjection {
+	readonly exactCanonicalApplicationStateBytes: Uint8Array;
+	readonly importOperations: readonly Readonly<Record<string, unknown>>[];
+}
+
+interface ExpectedMigrationCapability {
+	prepare(accepted: readonly V3RoomAcceptedOperation[]): V3RoomMigrationProjection;
+}
+
+interface ExpectedMigrationInput {
+	readonly rehearsalNonce: Uint8Array;
+	readonly targetCreatorInvite: CreateV3RoomSessionInput<ExpectedProjection>["creatorInvite"];
+}
+
+interface ExpectedMigrationReceipt {
+	readonly activated: false;
+	readonly applicationStateDigest: string;
+	readonly exactCanonicalRecordBytes: Uint8Array;
+	readonly importedOperationCount: number;
+	readonly recordDigest: string;
+	readonly recordVertexDigest: string;
+	readonly targetAnchorDigest: string;
+}
+
 type ExpectedProjector = (operations: readonly V3RoomAcceptedOperation[]) => ExpectedProjection;
 
 type _AcceptedOperation = Assert<Equal<V3RoomAcceptedOperation, ExpectedAcceptedOperation>>;
@@ -42,10 +70,18 @@ type _ApplicationKeys = Assert<
 		| "catalog"
 		| "displacedOperationIdentity"
 		| "displacementPolicies"
+		| "migration"
 		| "projectAcceptedOperations"
 		| "transformDisplacedOperation"
 	>
 >;
+type _MigrationProjection = Assert<Equal<V3RoomMigrationProjection, ExpectedMigrationProjection>>;
+type _MigrationCapability = Assert<Equal<V3RoomMigrationCapability, ExpectedMigrationCapability>>;
+type _MigrationApplication = Assert<
+	Equal<V3RoomApplication<ExpectedProjection>["migration"], V3RoomMigrationCapability | undefined>
+>;
+type _MigrationInput = Assert<Equal<V3RoomMigrationRehearsalInput, ExpectedMigrationInput>>;
+type _MigrationReceipt = Assert<Equal<V3RoomMigrationRehearsalReceipt, ExpectedMigrationReceipt>>;
 type _BatchableActions = Assert<
 	Equal<V3RoomApplication<ExpectedProjection>["batchableOperationActions"], readonly string[]>
 >;
@@ -87,5 +123,10 @@ declare const session: V3RoomSession<ExpectedProjection>;
 declare const options: EphemeralChannelOptions;
 const channel: EphemeralChannel = session.openEphemeral(options);
 const projection: ExpectedProjection = session.projection();
+const rehearsal: Promise<ExpectedMigrationReceipt> = session.rehearseMigration({
+	rehearsalNonce: new Uint8Array(32),
+	targetCreatorInvite: "00",
+});
 void channel;
 void projection;
+void rehearsal;

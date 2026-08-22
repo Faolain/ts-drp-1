@@ -148,7 +148,14 @@ describe("Phase 3f-c real chat and zone batching composition RED", () => {
 		) as BatchApplication;
 		expect(application.batchableOperationActions).toEqual(["message"]);
 		expect(manifest(application)).toMatchObject({ schemaVersion: 2, workBudgetProfile: "blueprint-work-budget-v1" });
-		expect(operationNames(application)).toEqual(["acl", "applicationBatch", "causalJoin", "join", "message"]);
+		expect(operationNames(application)).toEqual([
+			"acl",
+			"applicationBatch",
+			"causalJoin",
+			"join",
+			"message",
+			"migrationRecord",
+		]);
 		expect(operationDescriptor(application, "applicationBatch")).toEqual({
 			argumentSchema: { fields: [{ name: "batch", required: true, type: "canonical-object" }], kind: "closed-record" },
 			maxCanonicalOperationBytes: 65_536,
@@ -244,7 +251,13 @@ describe("Phase 3f-c real chat and zone batching composition RED", () => {
 		) as BatchApplication;
 		expect(application.batchableOperationActions).toEqual(["placeBlock"]);
 		expect(manifest(application)).toMatchObject({ schemaVersion: 2, workBudgetProfile: "blueprint-work-budget-v1" });
-		expect(operationNames(application)).toEqual(["applicationBatch", "causalJoin", "join", "placeBlock"]);
+		expect(operationNames(application)).toEqual([
+			"applicationBatch",
+			"causalJoin",
+			"join",
+			"migrationRecord",
+			"placeBlock",
+		]);
 		expect(operationDescriptor(application, "applicationBatch")).toEqual({
 			argumentSchema: { fields: [{ name: "batch", required: true, type: "canonical-object" }], kind: "closed-record" },
 			maxCanonicalOperationBytes: 65_536,

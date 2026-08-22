@@ -132,7 +132,7 @@ describe("Phase 3f-b real chat and zone causalJoin composition RED", () => {
 			"alice",
 		]) as ProductApplication;
 		expect(application.batchableOperationActions).toEqual(["message"]);
-		expectExactOperations(application, ["acl", "applicationBatch", "causalJoin", "join", "message"]);
+		expectExactOperations(application, ["acl", "applicationBatch", "causalJoin", "join", "message", "migrationRecord"]);
 		await expectNeutralReducer(application);
 		const beforeEntry = roomEntryProbe.applications.length;
 		const chatApi = Reflect.get(globalThis, "d9336V3Chat") as Readonly<{
@@ -182,7 +182,7 @@ describe("Phase 3f-b real chat and zone causalJoin composition RED", () => {
 			creatorAuthor,
 		]) as ProductApplication;
 		expect(application.batchableOperationActions).toEqual(["placeBlock"]);
-		expectExactOperations(application, ["applicationBatch", "causalJoin", "join", "placeBlock"]);
+		expectExactOperations(application, ["applicationBatch", "causalJoin", "join", "migrationRecord", "placeBlock"]);
 		await expectNeutralReducer(application);
 		const beforeEntry = roomEntryProbe.applications.length;
 		const localAuthor = "c".repeat(64);

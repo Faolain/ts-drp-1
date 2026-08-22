@@ -84,6 +84,37 @@ export const EGRESS_FAILURE_KINDS = Object.freeze([
 	"publication-state-unknown",
 ] as const);
 
+export const PHASE_3H_MIGRATION_RECORD_KEYS = Object.freeze([
+	"applicationStateDigest",
+	"archivePolicy",
+	"authorityKind",
+	"exactCanonicalApplicationStateBytes",
+	"kind",
+	"rehearsalNonce",
+	"sourceAcceptedOperationCount",
+	"sourceAcceptedOperationsDigest",
+	"sourceAnchorDigest",
+	"sourceBlueprintDigest",
+	"sourceCreatorAuthor",
+	"sourceObjectId",
+	"targetAnchorDigest",
+	"targetBlueprintDigest",
+	"targetCreatorAuthor",
+	"targetImportOperationCount",
+	"targetImportOperationsDigest",
+	"targetObjectId",
+	"version",
+] as const);
+
+export const PHASE_3H_MIGRATION_DOMAINS = Object.freeze({
+	import: "ts-drp/v3-room-migration-import/v1",
+	record: "ts-drp/v3-room-migration-record/v1",
+	scratch: "ts-drp/v3-room-migration-scratch/v1",
+	source: "ts-drp/v3-room-migration-source/v1",
+	state: "ts-drp/v3-room-migration-state/v1",
+	targetObject: "ts-drp/v3-room-migration-target-object/v1",
+} as const);
+
 export const ACTIVATION_ORDER = Object.freeze([
 	"outer.snapshot",
 	"capability.consume",
