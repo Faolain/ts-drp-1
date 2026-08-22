@@ -14,13 +14,13 @@ type GenesisAnchorSigner = (digest: Uint8Array) => Promise<Uint8Array>;
 
 interface ExpectedCreatorInviteInput {
 	readonly blueprintDigest: string;
+	readonly exactCanonicalApplicationStateBytes: Uint8Array;
 	readonly exactCanonicalLatchedAclBytes: Uint8Array;
 	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
 	readonly exactCanonicalProfileBytes: Uint8Array;
 	readonly exactCanonicalSignerSetBytes: Uint8Array;
 	readonly objectId: string;
 	readonly signGenesisAnchorDigest: GenesisAnchorSigner;
-	readonly stateDigest: string;
 }
 
 interface ExpectedCreatorInviteMaterial {
@@ -96,11 +96,47 @@ function digest(domain: string, value: Uint8Array): string {
 	return hex(hashDomain(domain, value));
 }
 
+function u32be(value: number): Uint8Array {
+	const output = new Uint8Array(4);
+	new DataView(output.buffer).setUint32(0, value, false);
+	return output;
+}
+
+function u64be(value: number): Uint8Array {
+	const output = new Uint8Array(8);
+	new DataView(output.buffer).setBigUint64(0, BigInt(value), false);
+	return output;
+}
+
+function concatenate(parts: readonly Uint8Array[]): Uint8Array {
+	const output = new Uint8Array(parts.reduce((total, part) => total + part.byteLength, 0));
+	let offset = 0;
+	for (const part of parts) {
+		output.set(part, offset);
+		offset += part.byteLength;
+	}
+	return output;
+}
+
+function independentStateDigest(exactCanonicalStateBytes: Uint8Array): string {
+	const domain = new TextEncoder().encode("ts-drp/state/v3");
+	const framed = concatenate([
+		Uint8Array.of(0x44, 0x52, 0x50, 0x00),
+		u32be(domain.byteLength),
+		domain,
+		u64be(exactCanonicalStateBytes.byteLength),
+		exactCanonicalStateBytes,
+	]);
+	return createHash("sha256").update(framed).digest("hex");
+}
+
 function baseInput(
-	onSign: (digestBytes: Uint8Array) => Promise<Uint8Array> = () => Promise.resolve(new Uint8Array(64).fill(0x5a))
+	onSign: (digestBytes: Uint8Array) => Promise<Uint8Array> = () => Promise.resolve(new Uint8Array(64).fill(0x5a)),
+	exactCanonicalApplicationStateBytes: Uint8Array = encodeCanonical([])
 ): V3RoomCreatorInviteMaterialInput {
-	return {
+	const input: ExpectedCreatorInviteInput = {
 		blueprintDigest: "11".repeat(32),
+		exactCanonicalApplicationStateBytes,
 		exactCanonicalLatchedAclBytes: encodeCanonical({ acl: "latched" }),
 		exactCanonicalParametersCarrierBytes: encodeCanonical({ maxEpochBytes: 8_388_608 }),
 		exactCanonicalProfileBytes: encodeCanonical({ profileId: "creator-trusted-v1" }),
@@ -109,8 +145,20 @@ function baseInput(
 		signGenesisAnchorDigest(digestBytes: Uint8Array): Promise<Uint8Array> {
 			return onSign(digestBytes);
 		},
-		stateDigest: "44".repeat(32),
 	};
+	return input as unknown as V3RoomCreatorInviteMaterialInput;
+}
+
+function resizableArrayBuffer(byteLength: number): ArrayBuffer | undefined {
+	const ResizableArrayBuffer = ArrayBuffer as typeof ArrayBuffer & {
+		new (length: number, options: { readonly maxByteLength: number }): ArrayBuffer;
+	};
+	try {
+		const backing = new ResizableArrayBuffer(byteLength, { maxByteLength: Math.max(byteLength + 1, 2) });
+		return Reflect.get(backing, "resizable") === true ? backing : undefined;
+	} catch {
+		return undefined;
+	}
 }
 
 function decodeAnchor(material: V3RoomCreatorInviteMaterial): Readonly<Record<string, unknown>> {
@@ -194,11 +242,13 @@ function expectProductInput(
 		readonly blueprintDigest: string;
 		readonly objectId: string;
 		readonly signerAuthor: string;
+		readonly stateBytes: Uint8Array;
 	}>
 ): void {
 	expect(input.objectId).toBe(expected.objectId);
 	expect(input.blueprintDigest).toBe(expected.blueprintDigest);
-	expect(input.stateDigest).toBe("7".repeat(64));
+	expect(Reflect.has(input, "stateDigest")).toBe(false);
+	expect(Reflect.get(input, "exactCanonicalApplicationStateBytes")).toEqual(expected.stateBytes);
 	expect(input.exactCanonicalLatchedAclBytes).toEqual(expected.acl);
 	expect(input.exactCanonicalParametersCarrierBytes).toEqual(encodeCanonical(EXPECTED_PARAMETERS));
 	const signerSet = encodeCanonical([{ publicKey: expected.signerAuthor, signerId: "creator" }]);
@@ -220,16 +270,133 @@ async function expectProductSigner(input: V3RoomCreatorInviteMaterialInput, sign
 	expect(signature).toEqual(await signer.signWithLocalAuthor(new Uint8Array(digestBytes)));
 }
 
-describe("D.93.56 Phase 3 exit-a shared genesis-root builder RED", () => {
-	it("fails RED only because the shared room builder is absent", () => {
+let canonicalStateInputReady = false;
+try {
+	const probeInput = baseInput();
+	const probeMaterial = await createMaterial(probeInput);
+	canonicalStateInputReady =
+		decodeAnchor(probeMaterial).stateDigest ===
+		independentStateDigest(Reflect.get(probeInput, "exactCanonicalApplicationStateBytes") as Uint8Array);
+} catch {
+	canonicalStateInputReady = false;
+}
+
+describe("D.93.57 Phase 3 exit-b authenticated genesis state RED", () => {
+	it("fails RED only because the builder still accepts a caller-selected digest instead of canonical state bytes", () => {
 		expectTypeOf<V3RoomCreatorInviteMaterialInput>().toEqualTypeOf<ExpectedCreatorInviteInput>();
+		expect(canonicalStateInputReady, "PHASE_3_EXIT_B_CANONICAL_STATE_INPUT_ABSENT").toBe(true);
+	});
+});
+
+describe.skipIf(!canonicalStateInputReady)("D.93.57 authenticated genesis state GREEN contract", () => {
+	it("derives only the registered v3 digest from canonical empty and nonempty state", async () => {
+		const ordered = encodeCanonical({ messages: [], revision: 1 });
+		const reordered = encodeCanonical({ revision: 1, messages: [] });
+		const changed = encodeCanonical({ messages: [], revision: 2 });
+		expect(reordered).toEqual(ordered);
+
+		const signedByState = new Map<string, readonly Uint8Array[]>();
+		const materialForState = async (stateBytes: Uint8Array): Promise<V3RoomCreatorInviteMaterial> => {
+			const signedInputs: Uint8Array[] = [];
+			const material = await createMaterial(
+				baseInput((digestBytes) => {
+					signedInputs.push(new Uint8Array(digestBytes));
+					return Promise.resolve(new Uint8Array(64).fill(0x5a));
+				}, stateBytes)
+			);
+			const expectedAnchorDigest = hashDomain(
+				"ts-drp/epoch-anchor/v3",
+				material.exactCanonicalGenesisAnchorPreimageBytes
+			);
+			expect(signedInputs).toEqual([expectedAnchorDigest]);
+			expect(material.pinnedGenesisAnchorDigest).toBe(hex(expectedAnchorDigest));
+			expect(Reflect.has(material, "exactCanonicalApplicationStateBytes")).toBe(false);
+			signedByState.set(hex(stateBytes), signedInputs);
+			return material;
+		};
+		const emptyMaterial = await materialForState(encodeCanonical([]));
+		const orderedMaterial = await materialForState(ordered);
+		const reorderedMaterial = await materialForState(reordered);
+		const changedMaterial = await materialForState(changed);
+		const emptyDigest = independentStateDigest(encodeCanonical([]));
+		const orderedDigest = independentStateDigest(ordered);
+		expect(decodeAnchor(emptyMaterial).stateDigest).toBe(emptyDigest);
+		expect(decodeAnchor(orderedMaterial).stateDigest).toBe(orderedDigest);
+		expect(decodeAnchor(reorderedMaterial).stateDigest).toBe(orderedDigest);
+		expect(decodeAnchor(changedMaterial).stateDigest).toBe(independentStateDigest(changed));
+		expect(decodeAnchor(changedMaterial).stateDigest).not.toBe(orderedDigest);
+		expect(signedByState.get(hex(changed))).not.toEqual(signedByState.get(hex(ordered)));
+		expect(orderedDigest).toBe(digest("ts-drp/state/v3", ordered));
+		expect(orderedDigest).not.toBe(digest("ts-drp/state/v2", ordered));
+		expect(orderedDigest).not.toBe(digest("ts-drp/v3-room-migration-state/v1", ordered));
+	});
+
+	it("rejects replica-local context while accepting the same ordinary canonical state without it", async () => {
+		const accepted = encodeCanonical({ messages: [] });
+		const excluded = encodeCanonical({ context: { cursor: 7 }, messages: [] });
+		await expect(createMaterial(baseInput(undefined, accepted))).resolves.toBeDefined();
+		await expect(createMaterial(baseInput(undefined, excluded))).rejects.toBeInstanceOf(TypeError);
+	});
+
+	it("fails closed for malformed or non-owned canonical-state byte evidence", async () => {
+		const valid = encodeCanonical({ messages: [] });
+		await expect(createMaterial(baseInput(undefined, new Uint8Array(valid)))).resolves.toBeDefined();
+		const exactBound = encodeCanonical(new Uint8Array(32_764));
+		const overBound = encodeCanonical(new Uint8Array(32_765));
+		expect(exactBound).toHaveLength(32_768);
+		expect(overBound).toHaveLength(32_769);
+		await expect(createMaterial(baseInput(undefined, exactBound))).resolves.toBeDefined();
+		await expect(createMaterial(baseInput(undefined, overBound))).rejects.toBeInstanceOf(TypeError);
+		let deepState: unknown = null;
+		for (let depth = 0; depth < 18; depth++) deepState = { nested: deepState };
+		const overDepth = encodeCanonical(deepState);
+		const overItems = encodeCanonical(Array.from({ length: 16_385 }, () => null));
+		expect(overDepth.byteLength).toBeLessThan(32_768);
+		expect(overItems.byteLength).toBeLessThan(32_768);
+		await expect(createMaterial(baseInput(undefined, overDepth))).rejects.toBeInstanceOf(TypeError);
+		await expect(createMaterial(baseInput(undefined, overItems))).rejects.toBeInstanceOf(TypeError);
+
+		const offsetBacking = new Uint8Array(valid.byteLength + 2);
+		offsetBacking.set(valid, 1);
+		class ForeignUint8Array extends Uint8Array {}
+		const invalid: Uint8Array[] = [
+			Uint8Array.of(0xff),
+			new Uint8Array([...valid, 0]),
+			new Uint8Array(offsetBacking.buffer, 1, valid.byteLength),
+			new ForeignUint8Array(valid),
+		];
+		if (typeof SharedArrayBuffer !== "undefined") {
+			const shared = new Uint8Array(new SharedArrayBuffer(valid.byteLength));
+			shared.set(valid);
+			invalid.push(shared);
+		}
+		const resizable = resizableArrayBuffer(valid.byteLength);
+		if (resizable !== undefined) {
+			const view = new Uint8Array(resizable);
+			view.set(valid);
+			invalid.push(view);
+		}
+		const detachedBacking = new ArrayBuffer(valid.byteLength);
+		const detached = new Uint8Array(detachedBacking);
+		detached.set(valid);
+		structuredClone(detachedBacking, { transfer: [detachedBacking] });
+		invalid.push(detached);
+
+		for (const stateBytes of invalid) {
+			await expect(createMaterial(baseInput(undefined, stateBytes))).rejects.toBeInstanceOf(TypeError);
+		}
+	});
+});
+
+describe("D.93.56 Phase 3 exit-a shared genesis-root builder RED", () => {
+	it("preserves the shared room builder output contract", () => {
 		expectTypeOf<V3RoomCreatorInviteMaterial>().toEqualTypeOf<ExpectedCreatorInviteMaterial>();
 		expectTypeOf<typeof exportedCreateV3RoomCreatorInviteMaterial>().toEqualTypeOf<CreateCreatorInviteMaterial>();
 		expect(candidate, "PHASE_3_EXIT_A_GENESIS_BUILDER_ABSENT").toBeTypeOf("function");
 	});
 });
 
-describe.skipIf(typeof candidate !== "function")("D.93.56 shared genesis-root builder GREEN contract", () => {
+describe.skipIf(!canonicalStateInputReady)("D.93.56 shared genesis-root builder GREEN contract", () => {
 	it("uses a fresh RFC 9162 empty root and exact signing input despite exported-root mutation", async () => {
 		const originalEmptyRoot = new Uint8Array(EMPTY_MERKLE_ROOT);
 		const signedInputs: Uint8Array[] = [];
@@ -261,7 +428,7 @@ describe.skipIf(typeof candidate !== "function")("D.93.56 shared genesis-root bu
 				profileDigest: digest("ts-drp/profile/v3", input.exactCanonicalProfileBytes),
 				protocolMajor: 3,
 				signerSetDigest: digest("ts-drp/signer-set/v3", input.exactCanonicalSignerSetBytes),
-				stateDigest: input.stateDigest,
+				stateDigest: independentStateDigest(Reflect.get(input, "exactCanonicalApplicationStateBytes") as Uint8Array),
 			});
 			expect(signedInputs).toEqual([expectedDigest]);
 			expect(material.pinnedGenesisAnchorDigest).toBe(hex(expectedDigest));
@@ -281,12 +448,14 @@ describe.skipIf(typeof candidate !== "function")("D.93.56 shared genesis-root bu
 		);
 		const expected = {
 			acl: new Uint8Array(input.exactCanonicalLatchedAclBytes),
+			applicationState: new Uint8Array(Reflect.get(input, "exactCanonicalApplicationStateBytes") as Uint8Array),
 			parameters: new Uint8Array(input.exactCanonicalParametersCarrierBytes),
 			profile: new Uint8Array(input.exactCanonicalProfileBytes),
 			signerSet: new Uint8Array(input.exactCanonicalSignerSetBytes),
 		};
 		const pending = createMaterial(input);
 		input.exactCanonicalLatchedAclBytes.fill(0xff);
+		(Reflect.get(input, "exactCanonicalApplicationStateBytes") as Uint8Array).fill(0xff);
 		input.exactCanonicalParametersCarrierBytes.fill(0xff);
 		input.exactCanonicalProfileBytes.fill(0xff);
 		input.exactCanonicalSignerSetBytes.fill(0xff);
@@ -297,6 +466,7 @@ describe.skipIf(typeof candidate !== "function")("D.93.56 shared genesis-root bu
 		const material = await pending;
 		signature.fill(0xee);
 		expect(material.exactCanonicalLatchedAclBytes).toEqual(expected.acl);
+		expect(decodeAnchor(material).stateDigest).toBe(independentStateDigest(expected.applicationState));
 		expect(material.exactCanonicalParametersCarrierBytes).toEqual(expected.parameters);
 		expect(material.exactCanonicalProfileBytes).toEqual(expected.profile);
 		expect(material.exactCanonicalSignerSetBytes).toEqual(expected.signerSet);
@@ -319,6 +489,17 @@ describe.skipIf(typeof candidate !== "function")("D.93.56 shared genesis-root bu
 		await expect(
 			createMaterial({ ...baseInput(), extra: true } as unknown as V3RoomCreatorInviteMaterialInput)
 		).rejects.toBeInstanceOf(TypeError);
+		await expect(
+			createMaterial({
+				...baseInput(),
+				stateDigest: "44".repeat(32),
+			} as unknown as V3RoomCreatorInviteMaterialInput)
+		).rejects.toBeInstanceOf(TypeError);
+		const missingStateBytes = { ...baseInput() } as Record<string, unknown>;
+		delete missingStateBytes.exactCanonicalApplicationStateBytes;
+		await expect(
+			createMaterial(missingStateBytes as unknown as V3RoomCreatorInviteMaterialInput)
+		).rejects.toBeInstanceOf(TypeError);
 		const accessor = Object.defineProperty({ ...baseInput() }, "objectId", {
 			enumerable: true,
 			get: () => `creator:${"33".repeat(16)}`,
@@ -331,8 +512,6 @@ describe.skipIf(typeof candidate !== "function")("D.93.56 shared genesis-root bu
 			{ ...baseInput(), blueprintDigest: "11".repeat(31) },
 			{ ...baseInput(), blueprintDigest: "g".repeat(64) },
 			{ ...baseInput(), objectId: "not-an-object-id" },
-			{ ...baseInput(), stateDigest: "77".repeat(31) },
-			{ ...baseInput(), stateDigest: "z".repeat(64) },
 		]) {
 			await expect(createMaterial(invalid)).rejects.toBeInstanceOf(TypeError);
 		}
@@ -382,11 +561,15 @@ describe.skipIf(typeof candidate !== "function")("D.93.56 shared genesis-root bu
 		await alice.start();
 		const chatApplication = chatModule.createV3ChatApplication("alice");
 		const chatBlueprintDigest = String(chatApplication.catalog.blueprintDigests[0] ?? "");
+		const chatMigration = chatApplication.migration;
+		if (chatMigration === undefined) throw new TypeError("missing expected chat migration owner");
+		const chatStateBytes = chatMigration.canonicalStateBytes(chatApplication.projectAcceptedOperations([]));
 		expectProductInput(chatInput, {
 			acl: await expectedChatAcl(chatObjectId),
 			blueprintDigest: chatBlueprintDigest,
 			objectId: chatObjectId,
 			signerAuthor: alice.localAuthorId,
+			stateBytes: chatStateBytes,
 		});
 		await expectProductSigner(chatInput, alice);
 		expect(zoneInput.objectId).toMatch(/^peer-creator:[0-9a-f]{32}$/u);
@@ -396,6 +579,9 @@ describe.skipIf(typeof candidate !== "function")("D.93.56 shared genesis-root bu
 		]);
 		const zoneApplication = zone.createV3ZoneApplication(zoneMembers, "peer-creator", zoneCreatorAuthor);
 		const zoneBlueprintDigest = String(zoneApplication.catalog.blueprintDigests[0] ?? "");
+		const zoneMigration = zoneApplication.migration;
+		if (zoneMigration === undefined) throw new TypeError("missing expected zone migration owner");
+		const zoneStateBytes = zoneMigration.canonicalStateBytes(zoneApplication.projectAcceptedOperations([]));
 		expectProductInput(zoneInput, {
 			acl: encodeCanonical({
 				epoch: 0,
@@ -415,6 +601,7 @@ describe.skipIf(typeof candidate !== "function")("D.93.56 shared genesis-root bu
 			blueprintDigest: zoneBlueprintDigest,
 			objectId: zoneInput.objectId,
 			signerAuthor: zoneCreatorAuthor,
+			stateBytes: zoneStateBytes,
 		});
 		await expectProductSigner(zoneInput, zoneCreator);
 		expect(builderProbe.materials).toHaveLength(2);
