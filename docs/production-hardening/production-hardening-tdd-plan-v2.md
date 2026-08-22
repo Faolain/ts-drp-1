@@ -51715,3 +51715,75 @@ Phase 3h-b closes only creator-owned rehearsal-to-activation and its one-hop
 restart redirect. The ledger must not claim a certified cut, generic authority
 migration, Phase 3 exit, production-hardening completion or product completion.
 The next checkpoint is the explicit Phase 3 exit-gate evidence.
+
+### D.93.55.1 — Phase 3h-b closure ledger
+
+Phase 3h-b closed creator-signed activation and crash-safe source redirect on
+the Good-Faolain-signed linear chain from plan
+`c13c817a12b6ed6e206b0f3f714f369483ec4a6c`, through tests-only RED
+`d2568d25097a50b3189ece375b35508075d935a7`, to exact four-owner GREEN
+`7c48ae4f920589ea66d16165be594fe3352481f7`, tree
+`eadf226046ce70c6a6ecc01a61dbc5b7a8d82c55`, with binary patch SHA-256
+`7a7070df92964f9c13c41b0f18a82743c066ccc57cbeb2f5fb8acbb3b677e906`.
+The GREEN's sole parent is the RED, its only changed paths are
+`packages/node/src/v3-live.ts`, `examples/v3-room/src/index.ts`,
+`examples/v3-chat/src/index.ts` and `examples/grid/src/v3-zone.ts`, and its
+signature verifies under Faolain fingerprint
+`55E22F154FBAF8C84F378304761B99CEA81C6289`.
+
+The durable result is a creator-authorized activation decision whose installed
+target becomes the room's terminal durable plane while the authenticated source
+is retained as a bounded recovery and redirect bridge. Recovered activation
+holds target exposure until retained bootstrap and displaced-source processing
+are complete. Cross-object displaced operations are authenticated, deduplicated
+against the signed import prefix and reissued through the target authority;
+same-object missing accepted evidence remains fail-closed. Chat and zone expose
+the selected terminal session and object identity together, preserve retained
+ingress provenance and close the composite source/target lifetime coherently.
+Nested redirects quarantine intermediate callbacks and publish one dynamically
+forwarding composite rather than leaking a partially constructed target.
+
+On the final GREEN bytes the exact eight-file Phase 3g/3h roster passed `59/59`
+in `52.41s`. The real chat browser control passed `5/5` in `6.1s`; the real zone
+browser control passed `1/1` in `25.1s`. Room, chat and grid typechecks and builds,
+the dedicated Phase 3/P6 typecheck, ESLint, Prettier and diff checks passed. The
+broad node test typecheck retains only the unrelated pre-existing
+`compact-history-scale-1i-b.ts` diagnostics and is not counted as Phase 3h
+evidence. Build output retained only the established nonblocking bundle-size and
+dynamic-import warnings. Test and streamed-review artifacts remain under
+`.logs/phase3h-*`.
+
+Final exact-byte Kimi and Codex reviews returned `PASS` with no P0, P1 or P2.
+The final Opus xhigh review returned `PASS`, no P0/P1 and one nonblocking P2:
+an exceptional nested-target constructor shutdown can orphan an
+already-installed onward session with no remaining cleanup owner. Grok's final
+review returned `CHANGES` on a
+claimed nested held-target mismatch. That claim was dispositioned as nonblocking
+because the host first receives a consistent target-one composite and identity,
+the same composite forwards to the eventual target-two session after the hold,
+and its identity callback advances in the same transition; waiting for the
+ultimate target before returning would recreate the previously proven
+uncancellable-open failure. Opus independently audited local-complete,
+held-later, post-constructor and arbitrary nesting and found no P0/P1. Earlier
+review rounds found and closed real blocking defects in retained bootstrap,
+accepted-author reconciliation, delayed published evidence, partial-prefix
+recovery, callback quarantine and cancellable construction. No substantive P0
+or P1 remains knowingly waived.
+
+The exact GREEN was pushed to pull request 15, whose head was still
+`7c48ae4f920589ea66d16165be594fe3352481f7` when this ledger was prepared.
+Remote CI was not green and is not represented as green. Protocol-v2 registry
+run `32579091361` and protocol-v3 atomic-freeze run `32579091370` selected the
+external-empty merge base `d041baff...` and failed before Phase 3h because the
+historical checkout has no freeze checker. Docker run `32579091382` failed while
+installing production dependencies for `packages/worker-host`, and equivocation
+projection run `32579091404` failed during collection because
+`@noble/curves/ed25519.js` was unavailable. Other jobs were still queued or in
+progress. These failures are open repository/CI work; they neither execute nor
+contradict the local Phase 3h acceptance evidence.
+
+This ledger closes only creator-owned rehearsal-to-activation and its retained
+redirect. It does not prove a certified cut, generic authority migration,
+completed Phase 3 exit, completed production-hardening plan or completed chat or
+game product. The next checkpoint is the explicit Phase 3 exit gate and its
+two-client chat/zone golden-path preservation evidence.
