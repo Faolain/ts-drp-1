@@ -50,6 +50,8 @@ import {
 } from "@ts-drp/storage";
 import { type DRPNetworkNode, Message, MessageType, V3Envelope } from "@ts-drp/types";
 
+import { classifyV3EnvelopeScope } from "./v3-envelope-scope.js";
+
 const ArrayIsArray = Array.isArray;
 const ArrayPrototype = Array.prototype;
 const FunctionHasInstance = Function.prototype[Symbol.hasInstance];
@@ -2672,7 +2674,7 @@ function extractAuthorizedV3Vertex(
 	const expectedAnchor = payload.provenance.anchorDigest;
 	const preparedBlueprintAdmission = payload.admission;
 	const suiteId = V3_VERTEX_SUITE_ID;
-	return extractAdmittedReceivedVertex({
+	const extracted = extractAdmittedReceivedVertex({
 		domain,
 		expectedAnchor,
 		preparedBlueprintAdmission,
@@ -2681,6 +2683,24 @@ function extractAuthorizedV3Vertex(
 		signature,
 		suiteId,
 	});
+	if (!extracted.ok) return extracted;
+	const classification = classifyV3EnvelopeScope(
+		ObjectFreeze({
+			anchor: extracted.vertex.anchor,
+			epoch: extracted.vertex.epoch,
+			objectId: extracted.vertex.objectId,
+			protocolMajor: extracted.vertex.protocolMajor,
+		}),
+		ObjectFreeze({
+			anchorDigest: payload.provenance.anchorDigest,
+			epoch: payload.provenance.epoch,
+			objectId: payload.provenance.objectId,
+			protocolMajor: 3 as const,
+		})
+	);
+	return classification.current
+		? extracted
+		: ObjectFreeze({ ok: false as const, reason: "admission-rejected" as const });
 }
 
 async function handleV3Ingress(
