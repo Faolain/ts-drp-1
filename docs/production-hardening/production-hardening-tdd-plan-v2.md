@@ -51787,3 +51787,321 @@ redirect. It does not prove a certified cut, generic authority migration,
 completed Phase 3 exit, completed production-hardening plan or completed chat or
 game product. The next checkpoint is the explicit Phase 3 exit gate and its
 two-client chat/zone golden-path preservation evidence.
+
+### D.93.56 — Phase 3 exit-a canonical close-set and history-root derivation
+
+The Phase 3h-b ledger is Good-Faolain-signed commit
+`c87a33e09efebd4af2959a6322bc137077b5059a`, tree
+`658c6efc6bbcf0fa73dd73fb2d002b6c67901fe4`, and is synchronized with its
+tracked branch. The old recovery ref
+`refs/codex/recovery/phase-3a1b-p6-unsigned-draft` is an obsolete pre-P6 RED
+snapshot and is not an implementation source: current signed history already
+contains the P6 authorization closure and every later room transition. Phase 3
+exit work therefore continues from the signed ledger, not by replaying that
+ref.
+
+The executable audit found two still-open Phase 3e duties. First, there is no
+package-owned operation deriving `closeSetRoot` and the append-only
+`historyRoot` from one exact authenticated graph, frontier and byte-charge
+census. Second, the real chat and zone creator-invite factories still place
+illustrative repeated `3` and `5` digests into the genesis `archiveIndexRoot`
+and `historyRoot`. Those values satisfy the digest-shaped schema but do not
+represent empty RFC 9162 trees. Existing RFC 9162 construction and deterministic
+Kahn ordering already belong to `@ts-drp/compaction`; this slice composes those
+owners in a new `history-commitment.ts` module rather than adding another
+Merkle implementation or putting graph policy into the low-level
+`ct-merkle.ts` primitive.
+
+The signed protocol-v3 registry already freezes the only lawful history-leaf
+encoding. This slice reuses that exact closed object and its pinned
+`history-leaf-basic` conformance vector. It does not invent a positional tuple,
+add byte length to the leaf, amend the registry or create a second encoding
+under `ts-drp/history-leaf/v3`.
+
+#### Exact derivation law
+
+`@ts-drp/compaction` adds the following exact public types and asynchronous
+operation. Roots are lowercase 64-character SHA-256 hex strings because that is
+the representation carried by the signed anchor schema. Returned byte arrays
+and accumulator peaks are fresh detached copies; no claim is made that freezing
+a typed-array container makes its elements immutable.
+
+```ts
+export interface CloseSetHistoryCommitmentInput {
+	readonly authenticatedCanonicalPreimageByteLengths: ReadonlyMap<string, number>;
+	readonly exactCanonicalEpochAnchorPreimageBytes: Uint8Array;
+	readonly frontier: readonly string[];
+	readonly maxEpochBytes: number;
+	readonly maxEpochVertices: number;
+	readonly previousHistorySnapshot: AccumulatorSnapshot;
+	readonly vertices: ReadonlyMap<string, EpochVertex>;
+}
+
+export interface CloseSetHistoryEntry {
+	readonly authenticatedCanonicalPreimageByteLength: number;
+	readonly exactCanonicalHistoryLeafBytes: Uint8Array;
+	readonly ordinal: number;
+	readonly vertexHash: string;
+}
+
+export interface CloseSetHistoryCommitment {
+	readonly anchorHash: string;
+	readonly closeSetCount: number;
+	readonly closeSetEntries: readonly CloseSetHistoryEntry[];
+	readonly closeSetOrder: readonly string[];
+	readonly closeSetRoot: string;
+	readonly historyRoot: string;
+	readonly historySize: number;
+	readonly historySnapshot: AccumulatorSnapshot;
+}
+
+export function deriveCloseSetHistoryCommitment(
+	input: CloseSetHistoryCommitmentInput
+): Promise<CloseSetHistoryCommitment>;
+```
+
+`exactCanonicalEpochAnchorPreimageBytes` is the explicit upstream trust boundary;
+the compaction package does not verify its detached signature. Before the first
+`await`, the owner copies those bytes, decodes and strict-round-trips the frozen
+registered 16-field epoch-anchor object, and derives `anchorHash` only as
+lowercase `hex(hashDomain("ts-drp/epoch-anchor/v3", exactBytes))`. The required
+closed fields are `kind`, `protocolMajor`, `objectId`, `epoch`, `previousAnchor`,
+`cutDigest`, `stateDigest`, `aclDigest`, `historyRoot`, `historySize`,
+`archiveIndexRoot`, `blueprintDigest`, `signerSetDigest`, `parametersDigest`,
+`profileDigest` and `cryptoSuiteId`; their exact registry types, constants and
+bounds apply. No caller-assembled projection of those fields is authority.
+
+The graph entry keyed by the derived `anchorHash` must be its sole anchor and
+must match the decoded object and epoch. The previous accumulator snapshot must
+restore to exactly the decoded anchor's `historyRoot` and `historySize`. A
+snapshot from another object, another signed anchor or an earlier retained state
+therefore does not become authority merely because it is internally
+self-consistent. A caller cannot keep the same graph anchor hash while replacing
+history root/size: those fields are inside the hashed canonical preimage.
+
+One exact epoch anchor can produce competing pre-sign close candidates, but it
+cannot be advanced twice. A sequential second close that feeds the first result
+snapshot while retaining the same exact anchor bytes fails because its snapshot
+root and size no longer equal the history fields hashed into that anchor. Only a
+later exact authenticated anchor may authorize the next append. This is the
+one-close-per-epoch boundary; the operation does not keep hidden mutable process
+state.
+
+Before its first `await`, the operation validates and captures with intrinsic
+operations all input evidence: exact ordinary `Map.prototype` graph and charge
+maps, exact ordinary frontier/dependency arrays, plain or null-prototype vertex
+records with own data properties, scalar anchor fields, every canonical vertex
+value, previous root bytes and every accumulator peak. Accessors, foreign
+collection prototypes, resizable/shared/detached byte backing, aliases that
+change during an asynchronous yield, and partial or extra structured fields fail
+rather than becoming late-selected authority. Inputs outside the ordinary
+package-owned collection/record contract are not accepted merely because they
+mimic one successful read. The captured graph is then passed to the existing
+`topologicalOrder`/`CausalityIndex` validation.
+
+`maxEpochVertices` and `maxEpochBytes` are positive safe integers supplied from
+the already-authenticated Phase 3 parameter profile. The complete captured graph
+must not exceed the vertex bound. Every captured close-set charge is positive
+and safe, the exact sum must not exceed the byte bound, and ordinal/new-size
+addition must remain safe. This slice does not reauthenticate vertex preimages:
+the byte census and vertex hashes are explicit authenticated-caller
+preconditions. It preserves the census in `closeSetEntries` for the later close
+manifest/capacity check; byte length is deliberately not a second history-leaf
+field and changing only that census changes the returned manifest evidence, not
+the registered RFC 9162 roots.
+
+The frontier is nonempty and duplicate-free. Its reflexive dependency closure
+means the supplied frontier members plus every ancestor, excluding only the
+anchor. `[anchorHash]` is the sole spelling of an empty close. Every other
+frontier member must be an ordinary vertex, and `CausalityIndex.areRelated` is
+applied only to distinct member pairs, so singleton frontiers remain valid.
+The owner orders the closed vertices by filtering the complete graph's existing
+deterministic minimum-hash Kahn order. It accepts a proper-subset close, accepts
+permuted graph/frontier insertion, and accepts no caller-supplied order. The
+byte-length map keys must equal the derived non-anchor closure exactly; missing,
+extra, anchor-keyed or invalid charges fail. That partial close-set map is never
+passed as `CausalityIndex.initialByteCharges`, whose key contract covers the
+complete graph; it is validated separately after graph/causality construction.
+
+For close-set index `i`, `exactCanonicalHistoryLeafBytes` is exactly
+`encodeCanonical` from `@ts-drp/canonical` over this registered closed object:
+
+```ts
+{
+	kind: "drp-history-leaf",
+	protocolMajor: 3,
+	objectId: decodedAnchor.objectId,
+	epoch: decodedAnchor.epoch,
+	ordinal: decodedAnchor.historySize + i,
+	vertexHash
+}
+```
+
+`closeSetRoot` is the lowercase-hex RFC 9162 root of exactly the current leaf
+bytes. `historyRoot` is the lowercase-hex root after appending those same bytes
+to the authenticated previous accumulator. Empty close returns the RFC 9162
+empty close root, leaves history root/size unchanged and returns a detached copy
+of the authenticated snapshot. Structural collection/schema failures are
+`TypeError`; invalid option bounds or safe-integer overflow are `RangeError`;
+exact anchor/preimage/graph mismatch is
+`LinearizationError("INVALID_ANCHOR")`; charge-key/value mismatch is
+`LinearizationError("INVALID_BYTE_CHARGES")`; and exceeded authenticated
+capacity is `LinearizationError("EPOCH_CAPACITY_EXCEEDED")`. Existing
+graph/causality failures retain their existing codes. Validation order is
+synchronous structure capture, canonical anchor, graph, frontier,
+charges/capacity, prior snapshot, then root construction. Tests assert class/code
+and semantic disposition rather than incidental wording within a class. No
+alternate digest, optional close-manifest hash, accept-either branch or
+caller-selected leaf serializer exists.
+
+`closeSetRoot` is a membership commitment to exactly this close candidate;
+`historyRoot` is the append-only audit commitment extending the decoded anchor's
+prior history. This slice creates neither inclusion/consistency proof APIs nor a
+cut, vote, certificate or adopted anchor.
+
+The RFC 9162 empty-tree root, `SHA-256("")`, is the sole genesis value for both
+`historyRoot` and the presently empty `archiveIndexRoot`. Their equality across
+fields and objects is intentional RFC 9162 empty-tree semantics, not a
+domain-separated object identity. The shared v3-room composition adds this exact
+second runtime export and input shape:
+
+```ts
+export interface V3RoomCreatorInviteMaterialInput {
+	readonly blueprintDigest: string;
+	readonly exactCanonicalLatchedAclBytes: Uint8Array;
+	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
+	readonly exactCanonicalProfileBytes: Uint8Array;
+	readonly exactCanonicalSignerSetBytes: Uint8Array;
+	readonly objectId: string;
+	readonly signGenesisAnchorDigest: (digest: Uint8Array) => Promise<Uint8Array>;
+	readonly stateDigest: string;
+}
+
+export function createV3RoomCreatorInviteMaterial(
+	input: V3RoomCreatorInviteMaterialInput
+): Promise<V3RoomCreatorInviteMaterial>;
+```
+
+The builder requires exactly those own data properties, validates the object and
+digest fields, captures fresh copies of every canonical byte input and the
+signing callback before its first `await`, and invokes the callback with a fresh
+anchor-digest copy. It requires one fresh 64-byte signature and returns the
+existing material shape with fresh detached byte copies. It obtains one fresh
+genesis root synchronously from `new CompactMerkleAccumulator().root()` and
+immediately encodes a copied result as lowercase hex; mutating the public
+`EMPTY_MERKLE_ROOT` export before the call cannot affect either field.
+
+The builder emits the exact D.93.17/registered 16-field epoch-anchor preimage:
+`kind: "drp-epoch-anchor"`, `protocolMajor: 3`, the supplied `objectId`,
+`epoch: 0`, zero `previousAnchor` and `cutDigest`, the supplied `stateDigest`,
+digests of the exact ACL/profile/signer-set/parameters bytes, the supplied
+`blueprintDigest`, both fresh empty roots, `historySize: 0`, and
+`cryptoSuiteId: "ed25519-sha256-v3"`. It computes the signing input only as
+`hashDomain("ts-drp/epoch-anchor/v3", exactCanonicalGenesisAnchorPreimageBytes)`
+and passes a fresh 32-byte copy to the captured callback. No secret key or signer
+object enters the room package.
+
+Chat and zone keep ownership of their application blueprint, ACL membership,
+signer, profile, parameters and state inputs, but both invoke this shared builder
+instead of assembling an anchor object. The builder corrects only history and
+archive roots. The existing illustrative `stateDigest: "7".repeat(64)` is an
+explicit open Phase 3 exit-b input and is not represented as corrected here.
+Likewise, join-time enforcement that every third-party genesis uses this empty
+root profile is deferred; this slice corrects the real creator construction
+paths, not the signed-anchor validator. The history derivation is a production
+package API but has no live sealing caller in this slice; Phase 5 cut creation
+will consume it after the remaining Phase 3 exit gates. These are explicit
+nonclaims, not silent authority gaps.
+
+#### Strict TDD boundary
+
+The signed tests-only RED is this plan commit's sole child and changes exactly:
+
+- new `packages/compaction/tests/close-set-history-roots-3e-exit-red.test.ts`;
+- new `tests/phase-3-exit-genesis-roots-red.test.ts`;
+- `tests/phase-3a1b-d9346-v3-room-extraction-red.test.ts`.
+
+The two new tests use dynamic structural access so RED collects and fails only
+because the genuine derivation and builder are absent. The existing extraction
+test changes its closed runtime surface expectation from exactly one export to
+exactly `createV3RoomCreatorInviteMaterial` and `createV3RoomSession`, then keeps
+all bare-specifier/subpath/duplicate-owner guards. This is an intentional public
+composition widening, not an accidental preservation failure.
+
+The compaction RED pins the existing registry's literal
+`history-leaf-basic.canonicalHex` and independently computes RFC 9162 leaf/node
+hashes with `node:crypto` 0x00/0x01 framing. Additional literal graph/root vectors
+come from that reference, never from the candidate's returned leaf bytes. It
+proves permuted graph/frontier insertion, proper-subset and empty closes,
+multi-epoch continuity bound to authenticated anchors, alternative pre-sign
+close candidates, same-anchor updated-history-field substitution, sequential
+same-anchor double-close rejection, stale/foreign snapshot rejection, mixed
+anchor bytes/graph hash, safe ordinal/size overflow, parameter capacities, changed
+frontier/hash, manifest-only byte-length change, missing/extra/invalid charges,
+missing/duplicate/distinct-related/foreign frontier members, missing dependency,
+cycle, wrong anchor/object/epoch, hostile non-Map/array/object/byte evidence,
+mutation during asynchronous work and detached returned evidence.
+
+The genesis RED mutates exported `EMPTY_MERKLE_ROOT` before calling the genuine
+builder, validates exact callback input and signature-output handling, decodes
+the returned anchor bytes, and requires both root fields to equal lowercase
+`hex(SHA-256(""))`. Controlled module mocks provide a semantic call witness that
+the real chat and zone creator paths call the shared builder; final browser
+controls decode the real returned creator invites. The tests do not claim that
+the room builder owns state digest, that byte length changes the registered
+root, that the compaction API verifies signatures/preimages, or that source
+spelling alone proves ownership.
+
+Deletion of the two dead product-local anchor assemblers is an exact GREEN-diff
+review obligation rather than another source analyzer. The semantic call witness
+and decoded browser invite prove the runtime route; exact-path review proves the
+obsolete local implementations were removed instead of retained as dormant
+sediment.
+
+The GREEN is the RED's sole child and changes exactly:
+
+- new `packages/compaction/src/history-commitment.ts`;
+- `packages/compaction/src/index.ts`;
+- `examples/v3-room/package.json`;
+- `examples/v3-room/src/index.ts`;
+- `examples/v3-chat/src/index.ts`;
+- `examples/grid/src/v3-zone.ts`;
+- `pnpm-lock.yaml`.
+
+All three new public commitment interfaces and the derivation function live in
+`packages/compaction/src/history-commitment.ts` beside their sole implementation
+and are type-re-exported once from `packages/compaction/src/index.ts`; no second
+type owner or parallel adapter is permitted.
+
+The dependency and lockfile change add only the existing workspace
+`@ts-drp/compaction` package to the shared room. No registry, protocol-v3
+freeze, node, storage, transport, migration, topology, workflow or unrelated
+path may change. Refactor-clean requires the two product-local genesis-anchor
+assemblers to collapse into the one room builder in the same GREEN. No wrapper
+or second Merkle/history-root implementation remains. The plan does not
+overclaim removal of the separately identified illustrative state digest.
+
+Acceptance first builds `@ts-drp/compaction` so no room/product suite can resolve
+stale `dist` bytes. It then runs the new RED/GREEN owners, the complete compaction Merkle,
+linearization, causality and capacity suites, Phase 3a/3b anchor and live-room
+preservation, the Phase 3f/3g/3h roster, five protocol semantic suites and their
+controlled arms, room/chat/grid/node typecheck and build, package build, ESLint,
+Prettier and diff checks. Final bytes run the real two-client chat and zone
+golden paths once. Command, count and wall-time logs remain under
+`.logs/phase3-exit-a-*`.
+
+The plan, tests-only RED, GREEN and concise closure ledger are separate linear
+Good-Faolain-signed commits. Kimi performs the requested 100-step audit. Grok
+runs review mode with streamed JSONL/status artifacts, `max-turns=128` and an
+1,800-second progress-aware bound. Codex and Opus xhigh review independently.
+Timeout or `NO_VERDICT` is recorded honestly and is not approval; a reproduced
+substantive P0/P1 blocks signing until resolved or explicitly disproved with
+causal evidence. Fable is not invoked without a new explicit request.
+
+This slice closes only the Phase 3e root-derivation and genesis-empty-root
+prerequisites. It does not create a live cut, snapshot, certificate or adopted
+anchor and does not complete Phase 3. Later signed exit slices still own the
+pure `(envelope, currentAnchor)` classifier with history/restart invariance, the
+in-repository exhaustive small-graph/adversarial schedule model, and
+cross-implementation conformance on the pinned unamended subset. The same
+chat/zone golden path remains the preservation control at every boundary.
