@@ -4,6 +4,8 @@ import {
 	type V3RoomAcceptedOperation,
 	type V3RoomApplication,
 	type V3RoomCreatorInviteMaterial,
+	type V3RoomMigrationProjection,
+	type V3RoomMigrationRehearsalReceipt,
 	type V3RoomSession,
 	type V3RoomTransport,
 } from "@ts-drp/example-v3-room";
@@ -11,7 +13,7 @@ import { Keychain } from "@ts-drp/keychain";
 import { type DRPNetworkNode, type Message, MessageType } from "@ts-drp/types";
 
 const OBJECT_ID = `creator:${"d".repeat(32)}`;
-const CHAT_ARTIFACT_SOURCE = `function exactKeys(value,keys){return value!==null&&typeof value==="object"&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.prototype.hasOwnProperty.call(value,key))}function aclReducer(input){return {output:input.operation,state:input.state}}function applicationBatchReducer(input){const operation=input.operation;if(!exactKeys(operation,["action","batch"])||operation.action!=="applicationBatch"||!exactKeys(operation.batch,["entries","version"])||operation.batch.version!==1||!Array.isArray(operation.batch.entries)||operation.batch.entries.length<2||operation.batch.entries.length>16)throw new TypeError("invalid application batch");let prior=-1;const output=[];const state=[...input.state];for(const entry of operation.batch.entries){if(!exactKeys(entry,["logicalTime","operation"])||!Number.isSafeInteger(entry.logicalTime)||entry.logicalTime<0||entry.logicalTime<=prior||!exactKeys(entry.operation,["action","clientOperationId","text"])||entry.operation.action!=="message"||typeof entry.operation.clientOperationId!=="string"||entry.operation.clientOperationId.length===0||typeof entry.operation.text!=="string")throw new TypeError("invalid application batch entry");prior=entry.logicalTime;const message={clientOperationId:entry.operation.clientOperationId,text:entry.operation.text};state.push(message);output.push(message)}return {output,state}}function causalJoinReducer(input){return {output:null,state:input.state}}function joinReducer(input){return {output:input.operation.clientId,state:input.state}}function messageReducer(input){if(!exactKeys(input.operation,["action","clientOperationId","text"])||typeof input.operation.clientOperationId!=="string"||input.operation.clientOperationId.length===0||typeof input.operation.text!=="string")throw new TypeError("invalid message");const message={clientOperationId:input.operation.clientOperationId,text:input.operation.text};const state=[...input.state,message];return {output:message,state}}export const blueprint={exportSchemaVersion:1,artifactId:"v3-chat.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{acl:aclReducer,applicationBatch:applicationBatchReducer,causalJoin:causalJoinReducer,join:joinReducer,message:messageReducer}};`;
+const CHAT_ARTIFACT_SOURCE = `function exactKeys(value,keys){return value!==null&&typeof value==="object"&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.prototype.hasOwnProperty.call(value,key))}const migrationKeys=["applicationStateDigest","archivePolicy","authorityKind","exactCanonicalApplicationStateBytes","kind","rehearsalNonce","sourceAcceptedOperationCount","sourceAcceptedOperationsDigest","sourceAnchorDigest","sourceBlueprintDigest","sourceCreatorAuthor","sourceObjectId","targetAnchorDigest","targetBlueprintDigest","targetCreatorAuthor","targetImportOperationCount","targetImportOperationsDigest","targetObjectId","version"];function aclReducer(input){return {output:input.operation,state:input.state}}function applicationBatchReducer(input){const operation=input.operation;if(!exactKeys(operation,["action","batch"])||operation.action!=="applicationBatch"||!exactKeys(operation.batch,["entries","version"])||operation.batch.version!==1||!Array.isArray(operation.batch.entries)||operation.batch.entries.length<2||operation.batch.entries.length>16)throw new TypeError("invalid application batch");let prior=-1;const output=[];const state=[...input.state];for(const entry of operation.batch.entries){if(!exactKeys(entry,["logicalTime","operation"])||!Number.isSafeInteger(entry.logicalTime)||entry.logicalTime<0||entry.logicalTime<=prior||!exactKeys(entry.operation,["action","clientOperationId","text"])||entry.operation.action!=="message"||typeof entry.operation.clientOperationId!=="string"||entry.operation.clientOperationId.length===0||typeof entry.operation.text!=="string")throw new TypeError("invalid application batch entry");prior=entry.logicalTime;const message={clientOperationId:entry.operation.clientOperationId,text:entry.operation.text};state.push(message);output.push(message)}return {output,state}}function causalJoinReducer(input){return {output:null,state:input.state}}function joinReducer(input){return {output:input.operation.clientId,state:input.state}}function messageReducer(input){if(!exactKeys(input.operation,["action","clientOperationId","text"])||typeof input.operation.clientOperationId!=="string"||input.operation.clientOperationId.length===0||typeof input.operation.text!=="string")throw new TypeError("invalid message");const message={clientOperationId:input.operation.clientOperationId,text:input.operation.text};const state=[...input.state,message];return {output:message,state}}function migrationRecordReducer(input){const operation=input.operation;const record=operation&&operation.record;if(!exactKeys(operation,["action","record"])||operation.action!=="migrationRecord"||!exactKeys(record,migrationKeys)||record.kind!=="ts-drp-v3-room-migration-record"||record.version!==1||record.archivePolicy!=="retain-source"||record.authorityKind!=="creator-ed25519-registered-vertex-v1")throw new TypeError("invalid migration record");return {output:null,state:input.state}}export const blueprint={exportSchemaVersion:1,artifactId:"v3-chat.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{acl:aclReducer,applicationBatch:applicationBatchReducer,causalJoin:causalJoinReducer,join:joinReducer,message:messageReducer,migrationRecord:migrationRecordReducer}};`;
 const PARAMETERS = Object.freeze({
 	maxEpochVertices: 8192,
 	maxEpochBytes: 8_388_608,
@@ -36,7 +38,6 @@ const CLIENTS: Readonly<Record<ClientId, Readonly<{ logicalTime: number; seed: s
 	heidi: Object.freeze({ logicalTime: 10, seed: "d9339-v3-chat-heidi" }),
 });
 const ACL_VIEW_CLIENT_IDS = ["alice", "bob", "dave"] as const;
-
 interface JoinInput {
 	readonly channelName: string;
 	readonly clientId: ClientId;
@@ -95,6 +96,7 @@ interface ChatSnapshot {
 
 interface ActiveChat {
 	readonly accepted: Map<string, AcceptedMessage>;
+	readonly clientId: ClientId;
 	readonly clientAuthors: Readonly<Record<ClientId, string>>;
 	readonly room: V3RoomSession;
 }
@@ -147,6 +149,53 @@ function digest(domain: string, value: Uint8Array): string {
 
 function compareText(left: string, right: string): number {
 	return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function migrationTargetObjectId(sourceObjectId: string, rehearsalNonce: Uint8Array): string {
+	const separator = sourceObjectId.indexOf(":");
+	if (separator <= 0 || separator === sourceObjectId.length - 1) {
+		throw new TypeError("v3 chat migration source object id is invalid");
+	}
+	const identity = hashDomain(
+		"ts-drp/v3-room-migration-target-object/v1",
+		encodeCanonical({ rehearsalNonce: new Uint8Array(rehearsalNonce), sourceObjectId })
+	);
+	const targetObjectId = `${sourceObjectId.slice(0, separator)}:${hex(identity.subarray(0, 16))}`;
+	if (targetObjectId === sourceObjectId) throw new TypeError("v3 chat migration target object id is invalid");
+	return targetObjectId;
+}
+
+function prepareChatMigration(operations: readonly V3RoomAcceptedOperation[]): V3RoomMigrationProjection {
+	const identities = new Set<string>();
+	const messages = operations
+		.flatMap((row) => {
+			if (Reflect.get(row.operation, "action") !== "message") return [];
+			const clientOperationId = Reflect.get(row.operation, "clientOperationId");
+			const text = Reflect.get(row.operation, "text");
+			if (typeof clientOperationId !== "string" || clientOperationId.length === 0 || typeof text !== "string") {
+				throw new TypeError("v3 chat migration message is invalid");
+			}
+			if (identities.has(clientOperationId)) throw new TypeError("v3 chat migration identity conflicts");
+			identities.add(clientOperationId);
+			return [Object.freeze({ clientOperationId, row, text })];
+		})
+		.sort(
+			(left, right) =>
+				left.row.logicalTime - right.row.logicalTime ||
+				compareText(left.row.author, right.row.author) ||
+				left.row.authorSequence - right.row.authorSequence ||
+				compareText(left.row.vertexDigest, right.row.vertexDigest) ||
+				left.row.operationIndex - right.row.operationIndex
+		);
+	const state = Object.freeze(
+		messages.map(({ clientOperationId, text }) => Object.freeze({ clientOperationId, text }))
+	);
+	return Object.freeze({
+		exactCanonicalApplicationStateBytes: encodeCanonical(state),
+		importOperations: Object.freeze(
+			state.map(({ clientOperationId, text }) => Object.freeze({ action: "message", clientOperationId, text }))
+		),
+	});
 }
 
 function sortedMessages(accepted: Map<string, AcceptedMessage>): readonly AcceptedMessage[] {
@@ -307,6 +356,14 @@ function applicationMaterial(): ApplicationMaterial {
 						]),
 					}),
 				}),
+				Object.freeze({
+					name: "migrationRecord",
+					maxCanonicalOperationBytes: 65_536,
+					argumentSchema: Object.freeze({
+						kind: "closed-record",
+						fields: Object.freeze([Object.freeze({ name: "record", required: true, type: "canonical-object" })]),
+					}),
+				}),
 			]),
 		}),
 	});
@@ -369,6 +426,22 @@ export function createV3ChatApplication(clientId: ClientId): V3RoomApplication<C
 			return identity;
 		},
 		displacementPolicies: Object.freeze({ message: "rebase" as const }),
+		migration: Object.freeze({
+			canonicalStateBytes: (projection: ChatProjection) =>
+				encodeCanonical(
+					[...projection.accepted]
+						.sort(
+							(left, right) =>
+								left.logicalTime - right.logicalTime ||
+								compareText(left.author, right.author) ||
+								left.authorSequence - right.authorSequence ||
+								compareText(left.digest, right.digest) ||
+								left.operationIndex - right.operationIndex
+						)
+						.map(({ clientOperationId, text }) => Object.freeze({ clientOperationId, text }))
+				),
+			prepare: prepareChatMigration,
+		}),
 		projectAcceptedOperations: projectChat,
 	});
 }
@@ -389,7 +462,7 @@ async function createClientAuthors(): Promise<Readonly<Record<ClientId, string>>
 	return Object.freeze(Object.fromEntries(entries) as Record<ClientId, string>);
 }
 
-async function createCreatorInviteMaterial(): Promise<V3RoomCreatorInviteMaterial> {
+async function createCreatorInviteMaterial(objectId = OBJECT_ID): Promise<V3RoomCreatorInviteMaterial> {
 	const keychains = await Promise.all(CLIENT_IDS.map((clientId) => createLocalKeychain(clientId)));
 	const alice = keychains[0];
 	if (alice === undefined) throw new TypeError("v3 chat creator keychain is unavailable");
@@ -414,7 +487,7 @@ async function createCreatorInviteMaterial(): Promise<V3RoomCreatorInviteMateria
 				groups: Object.freeze(groups),
 			});
 		}).sort((left, right) => compareText(left.author, right.author)),
-		objectId: OBJECT_ID,
+		objectId,
 		permissionless: false,
 		version: 1,
 	});
@@ -438,7 +511,7 @@ async function createCreatorInviteMaterial(): Promise<V3RoomCreatorInviteMateria
 		historyRoot: "5".repeat(64),
 		historySize: 0,
 		kind: "drp-epoch-anchor",
-		objectId: OBJECT_ID,
+		objectId,
 		parametersDigest: digest("ts-drp/parameters/v3", exactCanonicalParametersCarrierBytes),
 		previousAnchor: "0".repeat(64),
 		profileDigest: digest("ts-drp/profile/v3", exactCanonicalProfileBytes),
@@ -543,6 +616,7 @@ function projectChat(operations: readonly V3RoomAcceptedOperation[]): ChatProjec
 	const accepted = operations.flatMap((acceptedOperation) => {
 		const operation = acceptedOperation.operation;
 		const action = Reflect.get(operation, "action");
+		if (action === "migrationRecord") return [];
 		const clientOperationId = Reflect.get(operation, "clientOperationId");
 		const text = Reflect.get(operation, "text");
 		if (action !== "message") return [];
@@ -614,6 +688,7 @@ async function joinRoom(
 	});
 	return Object.freeze({
 		accepted,
+		clientId: input.clientId,
 		clientAuthors,
 		room,
 	});
@@ -642,6 +717,18 @@ const api = Object.freeze({
 		if (selected === undefined) throw new TypeError("v3 chat client is not joined");
 		if (typeof text !== "string" || text.length === 0) throw new TypeError("v3 chat message is empty");
 		await selected.room.issue(Object.freeze({ action: "message", clientOperationId: crypto.randomUUID(), text }));
+	},
+	async rehearseMigration(): Promise<V3RoomMigrationRehearsalReceipt> {
+		const selected = active;
+		if (selected === undefined) throw new TypeError("v3 chat client is not joined");
+		if (selected.clientId !== "alice") throw new TypeError("v3 chat migration requires the creator");
+		const rehearsalNonce = new Uint8Array(32);
+		crypto.getRandomValues(rehearsalNonce);
+		const targetObjectId = migrationTargetObjectId(OBJECT_ID, rehearsalNonce);
+		return selected.room.rehearseMigration({
+			rehearsalNonce,
+			targetCreatorInvite: await createCreatorInviteMaterial(targetObjectId),
+		});
 	},
 	async submitAcl(
 		operation: Readonly<{
