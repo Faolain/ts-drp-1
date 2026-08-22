@@ -218,9 +218,11 @@ function application(
 	onProjection?: (accepted: readonly V3RoomAcceptedOperation[]) => void
 ) {
 	const base = createV3ChatApplication("alice");
+	const migration = base.migration;
+	if (migration === undefined) throw new TypeError("v3 chat migration capability is unavailable");
 	return Object.freeze({
 		...base,
-		migration: Object.freeze({ prepare }),
+		migration: Object.freeze({ ...migration, prepare }),
 		projectAcceptedOperations: (accepted: readonly V3RoomAcceptedOperation[]) => {
 			onProjection?.(accepted);
 			return base.projectAcceptedOperations(accepted);
@@ -681,7 +683,7 @@ describe("Phase 3h shared-room reversible rehearsal RED", () => {
 		await source.close();
 	});
 
-	it("rejects duplicate source identity and unstable prepare before reserving a target", async () => {
+	it("rejects duplicate source identity, unstable prepare, and stable source substitution before target effects", async () => {
 		const sourceObjectId = `creator:${"b".repeat(32)}`;
 		const nonce = new Uint8Array(32).fill(0x55);
 		const targetObjectId = expectedTargetObjectId(sourceObjectId, nonce);
@@ -738,6 +740,46 @@ describe("Phase 3h shared-room reversible rehearsal RED", () => {
 		expect(calls).toBe(2);
 		expect(probe.databaseNames).toHaveLength(beforeUnstable);
 		await unstableSource.close();
+
+		const sourceMismatchNonce = new Uint8Array(32).fill(0x57);
+		const sourceMismatchTarget = expectedTargetObjectId(sourceObjectId, sourceMismatchNonce);
+		const sourceMismatchApplication = application(() =>
+			Object.freeze({
+				exactCanonicalApplicationStateBytes: encodeCanonical([]),
+				importOperations: Object.freeze([]),
+			})
+		);
+		const sourceMismatchMaterial = creatorMaterial(sourceMismatchApplication, sourceObjectId);
+		const sourceMismatch = await openRoom({
+			application: sourceMismatchApplication,
+			databaseName: "phase-3h-source-mismatch",
+			material: sourceMismatchMaterial,
+			objectId: sourceObjectId,
+		});
+		await sourceMismatch.issue(
+			Object.freeze({ action: "message", clientOperationId: "omitted", text: "must remain in source state" })
+		);
+		const beforeSourceMismatch = probe.databaseNames.length;
+		try {
+			await expect(
+				sourceMismatch.rehearseMigration({
+					rehearsalNonce: sourceMismatchNonce,
+					targetCreatorInvite: creatorMaterial(sourceMismatchApplication, sourceMismatchTarget).invite,
+				})
+			).rejects.toThrow();
+			expect(probe.databaseNames).toHaveLength(beforeSourceMismatch);
+			await sourceMismatch.issue(
+				Object.freeze({ action: "message", clientOperationId: "after-source-mismatch", text: "source remains live" })
+			);
+			expect(sourceMismatch.projection()).toMatchObject({
+				accepted: expect.arrayContaining([
+					expect.objectContaining({ clientOperationId: "omitted", text: "must remain in source state" }),
+					expect.objectContaining({ clientOperationId: "after-source-mismatch", text: "source remains live" }),
+				]),
+			});
+		} finally {
+			await sourceMismatch.close();
+		}
 	});
 
 	it("rejects oversized state and import descriptions before target reservation", async () => {

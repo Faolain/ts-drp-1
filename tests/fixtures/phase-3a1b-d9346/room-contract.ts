@@ -40,6 +40,7 @@ interface ExpectedMigrationProjection {
 }
 
 interface ExpectedMigrationCapability {
+	canonicalStateBytes(projection: ExpectedProjection): Uint8Array;
 	prepare(accepted: readonly V3RoomAcceptedOperation[]): V3RoomMigrationProjection;
 }
 
@@ -76,9 +77,9 @@ type _ApplicationKeys = Assert<
 	>
 >;
 type _MigrationProjection = Assert<Equal<V3RoomMigrationProjection, ExpectedMigrationProjection>>;
-type _MigrationCapability = Assert<Equal<V3RoomMigrationCapability, ExpectedMigrationCapability>>;
+type _MigrationCapability = Assert<Equal<V3RoomMigrationCapability<ExpectedProjection>, ExpectedMigrationCapability>>;
 type _MigrationApplication = Assert<
-	Equal<V3RoomApplication<ExpectedProjection>["migration"], V3RoomMigrationCapability | undefined>
+	Equal<V3RoomApplication<ExpectedProjection>["migration"], V3RoomMigrationCapability<ExpectedProjection> | undefined>
 >;
 type _MigrationInput = Assert<Equal<V3RoomMigrationRehearsalInput, ExpectedMigrationInput>>;
 type _MigrationReceipt = Assert<Equal<V3RoomMigrationRehearsalReceipt, ExpectedMigrationReceipt>>;
