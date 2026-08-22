@@ -5,7 +5,7 @@ import type {
 	DurableIssueCommit,
 	DurableIssueScope,
 } from "@ts-drp/issuance-store";
-import type { DurableLiveJournalStore, LiveJournalScope } from "@ts-drp/live-journal";
+import type { DurableLiveJournalStore, LiveJournalAcceptedRow, LiveJournalScope } from "@ts-drp/live-journal";
 import { MessageQueueManager } from "@ts-drp/message-queue";
 import type { DRPNetworkNode, Message as MessageShape } from "@ts-drp/types";
 import { Message, MessageType } from "@ts-drp/types";
@@ -14,6 +14,13 @@ import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 import { describe, expect, it, vi } from "vitest";
+
+vi.hoisted(() => {
+	const originalWarn = console.warn;
+	vi.spyOn(console, "warn").mockImplementation((...values: unknown[]) => {
+		if (values[0] !== "::v3-ingress") Reflect.apply(originalWarn, console, values);
+	});
+});
 
 import {
 	createGenuinePreparedV3Fixture,
@@ -391,11 +398,138 @@ function fakeIssuanceStore(overrides: Partial<DurableIssuanceStore> = {}): Durab
 
 const activationJournalStores = new WeakMap<object, DurableLiveJournalStore>();
 
+interface SignedScopeCarrier {
+	readonly canonicalPreimageBytes: Uint8Array;
+	readonly digest: Uint8Array;
+	readonly signature: Uint8Array;
+}
+
+class RecoveryAttemptError extends TypeError {
+	readonly kind: string;
+
+	constructor(kind: string) {
+		super(`v3 recovery failed with ${kind}`);
+		this.kind = kind;
+	}
+}
+
+async function createSignedScopeCarrier(
+	fixture: GenuinePreparedV3Fixture,
+	input: Readonly<{
+		readonly authorSequence: number;
+		readonly dependencies: readonly string[];
+		readonly epoch?: number;
+		readonly objectId?: string;
+	}>
+): Promise<SignedScopeCarrier> {
+	const canonicalPreimageBytes = encodeCanonical({
+		anchor: fixture.descriptor.anchorDigest,
+		author: fixture.author,
+		authorSequence: input.authorSequence,
+		dependencies: [...input.dependencies],
+		epoch: input.epoch ?? fixture.descriptor.epoch,
+		kind: "drp-vertex",
+		logicalTime: input.authorSequence + 1,
+		objectId: input.objectId ?? fixture.descriptor.objectId,
+		operation: { action: "add", value: 1 },
+		protocolMajor: 3,
+	});
+	const digest = hashDomain("ts-drp/vertex/v3", canonicalPreimageBytes);
+	return Object.freeze({
+		canonicalPreimageBytes,
+		digest,
+		signature: await fixture.signRegisteredVertexDigest(digest),
+	});
+}
+
+function receivedJournalRow(
+	fixture: GenuinePreparedV3Fixture,
+	carrier: SignedScopeCarrier,
+	journalSequence = 0
+): LiveJournalAcceptedRow {
+	return Object.freeze({
+		detachedSignature: new Uint8Array(carrier.signature),
+		exactCanonicalPreimageBytes: new Uint8Array(carrier.canonicalPreimageBytes),
+		journalSequence,
+		scope: Object.freeze({
+			anchorDigest: fixture.descriptor.anchorDigest,
+			epoch: 0 as const,
+			objectId: fixture.descriptor.objectId,
+		}),
+		sourceKind: "received" as const,
+		vertexDigest: lowerHex(carrier.digest),
+	});
+}
+
+function journalStoreForFixture(
+	fixture: GenuinePreparedV3Fixture,
+	rows: readonly LiveJournalAcceptedRow[] = Object.freeze([])
+): DurableLiveJournalStore {
+	const journalScope: LiveJournalScope = Object.freeze({
+		anchorDigest: fixture.descriptor.anchorDigest,
+		epoch: 0,
+		objectId: fixture.descriptor.objectId,
+	});
+	const snapshot = Object.freeze({
+		kind: "v3-live-journal-snapshot-token-1" as const,
+		scope: journalScope,
+		highWatermark: Math.max(0, rows.length - 1),
+		genesisDigest: "1".repeat(64),
+		parametersDigest: fixture.descriptor.parametersDigest,
+		orderedRowDigest: "2".repeat(64),
+		snapshotDigest: "3".repeat(64),
+	});
+	return Object.freeze({
+		installGenesis: vi.fn(() =>
+			Promise.resolve(
+				Object.freeze({
+					ok: true as const,
+					scope: journalScope,
+					parametersDigest: fixture.descriptor.parametersDigest,
+					idempotent: false,
+				})
+			)
+		),
+		readiness: vi.fn(() =>
+			Promise.resolve(
+				Object.freeze({ ok: true as const, ready: true as const, scope: journalScope, snapshot, rowCount: rows.length })
+			)
+		),
+		readPage: vi.fn((input) => {
+			const index = input.afterSequence == null ? 0 : input.afterSequence + 1;
+			const pageRows = index < rows.length ? Object.freeze([rows[index] as LiveJournalAcceptedRow]) : Object.freeze([]);
+			return Promise.resolve(
+				Object.freeze({
+					ok: true as const,
+					scope: journalScope,
+					snapshot,
+					rows: pageRows,
+					nextSequence: index + 1 < rows.length ? index : null,
+				})
+			);
+		}),
+		appendAccepted: vi.fn((input) =>
+			Promise.resolve(
+				Object.freeze({
+					ok: true as const,
+					scope: journalScope,
+					journalSequence: rows.length,
+					vertexDigest: input.vertexDigest,
+					sourceKind: input.sourceKind,
+					idempotent: false,
+				})
+			)
+		),
+		close: vi.fn(() => Promise.resolve()),
+	});
+}
+
 async function recoverActivationCapability(
 	surface: Seam3PrivateSurface,
 	fixture: GenuinePreparedV3Fixture,
 	preparedCapability: object,
-	activationStore: DurableIssuanceStore = fakeIssuanceStore()
+	activationStore: DurableIssuanceStore = fakeIssuanceStore(),
+	journalRows: readonly LiveJournalAcceptedRow[] = Object.freeze([])
 ): Promise<Readonly<{ capability: object; recoveryDigest: string; scope: DurableIssueScope }>> {
 	if (surface.recoverV3LiveReplica === undefined) throw new TypeError("missing recoverV3LiveReplica");
 	const scope = Object.freeze({ author: fixture.author, objectId: fixture.descriptor.objectId });
@@ -419,69 +553,21 @@ async function recoverActivationCapability(
 	const originalReadOutboxPage = mutableStore.readOutboxPage;
 	mutableStore.readIssued = (selectedScope, authorSequence): Promise<DurableIssueCommit | null> =>
 		Promise.resolve(
-			selectedScope.objectId === scope.objectId && selectedScope.author === scope.author && authorSequence === 0
+			journalRows.length === 0 &&
+				selectedScope.objectId === scope.objectId &&
+				selectedScope.author === scope.author &&
+				authorSequence === 0
 				? recoveryCommit
 				: null
 		);
 	mutableStore.readOutboxPage = (input = {}): Promise<readonly DurableIssuanceOutboxRecord[]> =>
 		Promise.resolve(
-			input.afterKey == null
+			journalRows.length === 0 && input.afterKey == null
 				? Object.freeze([Object.freeze({ commit: recoveryCommit, publishState: "published" as const })])
 				: Object.freeze([])
 		);
-	const journalScope: LiveJournalScope = Object.freeze({
-		anchorDigest: fixture.descriptor.anchorDigest,
-		epoch: 0,
-		objectId: fixture.descriptor.objectId,
-	});
-	const snapshot = Object.freeze({
-		kind: "v3-live-journal-snapshot-token-1" as const,
-		scope: journalScope,
-		highWatermark: 0,
-		genesisDigest: "1".repeat(64),
-		parametersDigest: fixture.descriptor.parametersDigest,
-		orderedRowDigest: "2".repeat(64),
-		snapshotDigest: "3".repeat(64),
-	});
 	const journalStore: DurableLiveJournalStore =
-		activationJournalStores.get(activationStore as object) ??
-		Object.freeze({
-			installGenesis: () =>
-				Promise.resolve(
-					Object.freeze({
-						ok: true as const,
-						scope: journalScope,
-						parametersDigest: fixture.descriptor.parametersDigest,
-						idempotent: false,
-					})
-				),
-			readiness: () =>
-				Promise.resolve(
-					Object.freeze({ ok: true as const, ready: true as const, scope: journalScope, snapshot, rowCount: 0 })
-				),
-			readPage: () =>
-				Promise.resolve(
-					Object.freeze({
-						ok: true as const,
-						scope: journalScope,
-						snapshot,
-						rows: Object.freeze([]),
-						nextSequence: null,
-					})
-				),
-			appendAccepted: (input) =>
-				Promise.resolve(
-					Object.freeze({
-						ok: true as const,
-						scope: journalScope,
-						journalSequence: 0,
-						vertexDigest: input.vertexDigest,
-						sourceKind: input.sourceKind,
-						idempotent: false,
-					})
-				),
-			close: () => Promise.resolve(),
-		});
+		activationJournalStores.get(activationStore as object) ?? journalStoreForFixture(fixture, journalRows);
 	activationJournalStores.set(activationStore as object, journalStore);
 	let recovered: Awaited<ReturnType<NonNullable<Seam3PrivateSurface["recoverV3LiveReplica"]>>>;
 	try {
@@ -498,7 +584,7 @@ async function recoverActivationCapability(
 		mutableStore.readIssued = originalReadIssued;
 		mutableStore.readOutboxPage = originalReadOutboxPage;
 	}
-	if (!recovered.ok) throw new TypeError(`recovery failed: ${recovered.kind}`);
+	if (!recovered.ok) throw new RecoveryAttemptError(recovered.kind);
 	return Object.freeze({
 		capability: recovered.capability,
 		recoveryDigest: Array.from(carrier.digest, (byte) => byte.toString(16).padStart(2, "0")).join(""),
@@ -579,6 +665,9 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			"V3PlaneActivationInput",
 			"V3PlaneActivationResult",
 			"V3PlaneHandle",
+			"V3TerminalPublishResult",
+			"V3TerminalTransitionResult",
+			"V3TerminalVertexClassifier",
 			"activateV3LivePlane",
 			"prepareV3LiveGeneration",
 			"recoverV3LiveReplica",
@@ -1148,6 +1237,248 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 		} finally {
 			await fixture.close();
 		}
+	});
+
+	it("rejects genuine signed wrong-object and wrong-epoch live vertices before the journal boundary", async () => {
+		const fixture = await createGenuinePreparedV3Fixture({ authorizationMode: "latched-acl" });
+		let deactivate: (() => void) | undefined;
+		try {
+			const surface = await privateSurface();
+			if (surface.activateV3LivePlane === undefined || surface.routeV3Ingress === undefined) {
+				throw new TypeError("missing Seam3 private surface");
+			}
+			const issuanceStore = fakeIssuanceStore();
+			const recovered = await recoverActivationCapability(surface, fixture, fixture.capability, issuanceStore);
+			const journal = activationJournalStores.get(issuanceStore as object);
+			if (journal === undefined) throw new TypeError("missing genuine live journal owner");
+			const appendAccepted = vi.mocked(journal.appendAccepted);
+			const sink = vi.fn();
+			const network = fakeNetwork();
+			const queue = new MessageQueueManager<MessageShape>({ logConfig: { level: "silent" } });
+			const activated = surface.activateV3LivePlane({
+				capability: recovered.capability,
+				messageQueueManager: queue,
+				networkNode: network,
+				onAdmittedVertex: sink,
+			});
+			if (!activated.ok) throw new TypeError(`activation failed: ${activated.kind}`);
+			deactivate = activated.handle.deactivate;
+			const initialAppendCount = appendAccepted.mock.calls.length;
+			Reflect.set(
+				network,
+				"gossipTopicFor",
+				vi.fn(() => activated.handle.topic)
+			);
+			const generated = (await import("@ts-drp/types")) as unknown as {
+				V3Envelope?: {
+					encode(value: { canonicalPreimage: Uint8Array; signature: Uint8Array }): { finish(): Uint8Array };
+				};
+			};
+			if (generated.V3Envelope === undefined) throw new TypeError("missing generated V3Envelope");
+			const current = await createSignedScopeCarrier(fixture, {
+				authorSequence: 1,
+				dependencies: [recovered.recoveryDigest],
+			});
+			const wrongObject = await createSignedScopeCarrier(fixture, {
+				authorSequence: 2,
+				dependencies: [recovered.recoveryDigest],
+				objectId: `creator:${"d".repeat(32)}`,
+			});
+			const wrongEpoch = await createSignedScopeCarrier(fixture, {
+				authorSequence: 2,
+				dependencies: [recovered.recoveryDigest],
+				epoch: 1,
+			});
+			const route = (carrier: SignedScopeCarrier): boolean =>
+				surface.routeV3Ingress?.(
+					network,
+					Message.create({
+						data: generated.V3Envelope?.encode({
+							canonicalPreimage: carrier.canonicalPreimageBytes,
+							signature: carrier.signature,
+						}).finish(),
+						objectId: activated.handle.topic,
+						sender: "authenticated-peer",
+						type: 11,
+					})
+				) === true;
+			expect(route(wrongObject)).toBe(true);
+			expect(route(wrongEpoch)).toBe(true);
+			expect(route(current)).toBe(true);
+			for (let count = 0; count < 200 && sink.mock.calls.length === 0; count += 1) {
+				await new Promise((resolve) => setTimeout(resolve, 1));
+			}
+			expect(sink).toHaveBeenCalledTimes(1);
+			expect(appendAccepted).toHaveBeenCalledTimes(initialAppendCount + 1);
+			expect(appendAccepted.mock.calls.at(-1)?.[0]).toMatchObject({
+				exactCanonicalPreimageBytes: current.canonicalPreimageBytes,
+				sourceKind: "received",
+				vertexDigest: lowerHex(current.digest),
+			});
+		} finally {
+			deactivate?.();
+			await fixture.close();
+		}
+	});
+
+	it("keeps wrong-scope evidence from consuming capacity needed by current-scope pending ingress", async () => {
+		const fixture = await createGenuinePreparedV3Fixture();
+		let deactivate: (() => void) | undefined;
+		try {
+			const surface = await privateSurface();
+			if (surface.activateV3LivePlane === undefined || surface.routeV3Ingress === undefined) {
+				throw new TypeError("missing Seam3 private surface");
+			}
+			const issuanceStore = fakeIssuanceStore();
+			const recovered = await recoverActivationCapability(surface, fixture, fixture.capability, issuanceStore);
+			const journal = activationJournalStores.get(issuanceStore as object);
+			if (journal === undefined) throw new TypeError("missing genuine live journal owner");
+			const appendAccepted = vi.mocked(journal.appendAccepted);
+			const initialAppendCount = appendAccepted.mock.calls.length;
+			const network = fakeNetwork();
+			const queue = new MessageQueueManager<MessageShape>({
+				logConfig: { level: "silent" },
+				maxQueueSize: 5_000,
+			});
+			const activated = surface.activateV3LivePlane({
+				capability: recovered.capability,
+				messageQueueManager: queue,
+				networkNode: network,
+				onAdmittedVertex: vi.fn(),
+			});
+			if (!activated.ok) throw new TypeError(`activation failed: ${activated.kind}`);
+			deactivate = activated.handle.deactivate;
+			Reflect.set(
+				network,
+				"gossipTopicFor",
+				vi.fn(() => activated.handle.topic)
+			);
+			const generated = (await import("@ts-drp/types")) as unknown as {
+				V3Envelope?: {
+					encode(value: { canonicalPreimage: Uint8Array; signature: Uint8Array }): { finish(): Uint8Array };
+				};
+			};
+			if (generated.V3Envelope === undefined) throw new TypeError("missing generated V3Envelope");
+			const envelopeCodec = generated.V3Envelope;
+			const encodeCarrier = (carrier: SignedScopeCarrier): Uint8Array =>
+				envelopeCodec
+					.encode({
+						canonicalPreimage: carrier.canonicalPreimageBytes,
+						signature: carrier.signature,
+					})
+					.finish();
+			const routeBytes = (bytes: Uint8Array): boolean =>
+				surface.routeV3Ingress?.(
+					network,
+					Message.create({
+						data: bytes,
+						objectId: activated.handle.topic,
+						sender: "authenticated-peer",
+						type: 11,
+					})
+				) === true;
+
+			const barrier = await createSignedScopeCarrier(fixture, {
+				authorSequence: 1,
+				dependencies: [recovered.recoveryDigest],
+			});
+			const release = await createSignedScopeCarrier(fixture, {
+				authorSequence: 2,
+				dependencies: [lowerHex(barrier.digest)],
+			});
+			const currentPending = await createSignedScopeCarrier(fixture, {
+				authorSequence: 3,
+				dependencies: [lowerHex(release.digest)],
+			});
+			const pendingWireBytes = encodeCarrier(currentPending);
+			const pendingCapacity = 4_096;
+			const wrongCapacity = await Promise.all(
+				Array.from({ length: pendingCapacity }, (_, index) =>
+					createSignedScopeCarrier(fixture, {
+						authorSequence: index + 10,
+						dependencies: ["f".repeat(64)],
+						epoch: 1,
+					})
+				)
+			);
+			for (const carrier of wrongCapacity) expect(routeBytes(encodeCarrier(carrier))).toBe(true);
+			expect(routeBytes(encodeCarrier(barrier))).toBe(true);
+			for (let count = 0; count < 10_000 && appendAccepted.mock.calls.length < initialAppendCount + 1; count += 1) {
+				await new Promise((resolve) => setTimeout(resolve, 1));
+			}
+			expect(appendAccepted).toHaveBeenCalledTimes(initialAppendCount + 1);
+			expect(routeBytes(pendingWireBytes)).toBe(true);
+			expect(routeBytes(encodeCarrier(release))).toBe(true);
+			const tail = await createSignedScopeCarrier(fixture, {
+				authorSequence: 4,
+				dependencies: [lowerHex(release.digest)],
+			});
+			expect(routeBytes(encodeCarrier(tail))).toBe(true);
+			for (let count = 0; count < 10_000 && appendAccepted.mock.calls.length < initialAppendCount + 3; count += 1) {
+				await new Promise((resolve) => setTimeout(resolve, 1));
+			}
+			expect(appendAccepted.mock.calls.some(([row]) => row.vertexDigest === lowerHex(currentPending.digest))).toBe(
+				true
+			);
+		} finally {
+			deactivate?.();
+			await fixture.close();
+		}
+	});
+
+	it("rejects genuine persisted wrong scope before graph replay while preserving current-scope recovery", async () => {
+		const surface = await privateSurface();
+		if (surface.recoverV3LiveReplica === undefined) throw new TypeError("missing recoverV3LiveReplica");
+		const observedFailures: string[] = [];
+		for (const mutation of ["object", "epoch"] as const) {
+			const fixture = await createGenuinePreparedV3Fixture();
+			try {
+				const carrier = await createSignedScopeCarrier(fixture, {
+					authorSequence: 0,
+					dependencies: [fixture.descriptor.anchorDigest],
+					...(mutation === "object" ? { objectId: `creator:${"e".repeat(32)}` } : { epoch: 1 }),
+				});
+				const issuanceStore = fakeIssuanceStore();
+				const journal = journalStoreForFixture(fixture, Object.freeze([receivedJournalRow(fixture, carrier)]));
+				activationJournalStores.set(issuanceStore as object, journal);
+				try {
+					await recoverActivationCapability(
+						surface,
+						fixture,
+						fixture.capability,
+						issuanceStore,
+						Object.freeze([receivedJournalRow(fixture, carrier)])
+					);
+					observedFailures.push("unexpected-success");
+				} catch (error) {
+					observedFailures.push(error instanceof RecoveryAttemptError ? error.kind : "unknown-error");
+				}
+				expect(journal.appendAccepted).not.toHaveBeenCalled();
+			} finally {
+				await fixture.close();
+			}
+		}
+
+		let currentRecovered = false;
+		const currentFixture = await createGenuinePreparedV3Fixture();
+		try {
+			const current = await createSignedScopeCarrier(currentFixture, {
+				authorSequence: 0,
+				dependencies: [currentFixture.descriptor.anchorDigest],
+			});
+			const recovered = await recoverActivationCapability(
+				surface,
+				currentFixture,
+				currentFixture.capability,
+				fakeIssuanceStore(),
+				Object.freeze([receivedJournalRow(currentFixture, current)])
+			);
+			currentRecovered = typeof recovered.capability === "object";
+		} finally {
+			await currentFixture.close();
+		}
+		expect(currentRecovered).toBe(true);
+		expect(observedFailures).toEqual(["admission-rejected", "admission-rejected"]);
 	});
 
 	it("retires membership-lost registrations and requires a fresh token for one replacement handle", async () => {
@@ -1755,7 +2086,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 		const liveSource = source("packages/node/src/v3-live.ts");
 		const route = functionText(liveSource, "routeV3Ingress");
 		expect(route).not.toBe("");
-		expect(INGRESS_ORDER).toHaveLength(13);
+		expect(INGRESS_ORDER).toHaveLength(14);
 		expect(count(liveSource, /V3Envelope\.decode\(/gu)).toBe(1);
 		expect(count(liveSource, /V3Envelope\.encode\(/gu)).toBe(3);
 		expect(count(liveSource, /extractAdmittedReceivedVertex\(/gu)).toBe(1);

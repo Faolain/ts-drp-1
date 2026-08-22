@@ -172,6 +172,7 @@ export const INGRESS_ORDER = Object.freeze([
 	"envelope.reencode",
 	"envelope.detach",
 	"vertex.extract",
+	"scope.classify",
 	"journal.append",
 	"index.append",
 	"sink.invoke",
