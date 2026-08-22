@@ -4,12 +4,13 @@ import {
 	createV3RoomSession,
 	type V3RoomAcceptedOperation,
 	type V3RoomCreatorInviteMaterial,
+	type V3RoomMigrationActivationReceipt,
 	type V3RoomMigrationProjection,
 	type V3RoomMigrationRehearsalReceipt,
 } from "@ts-drp/example-v3-room";
 import type { DRPNode } from "@ts-drp/node";
 
-const ZONE_ARTIFACT_SOURCE = `function exactKeys(value,keys){return value!==null&&typeof value==="object"&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.prototype.hasOwnProperty.call(value,key))}const migrationKeys=["applicationStateDigest","archivePolicy","authorityKind","exactCanonicalApplicationStateBytes","kind","rehearsalNonce","sourceAcceptedOperationCount","sourceAcceptedOperationsDigest","sourceAnchorDigest","sourceBlueprintDigest","sourceCreatorAuthor","sourceObjectId","targetAnchorDigest","targetBlueprintDigest","targetCreatorAuthor","targetImportOperationCount","targetImportOperationsDigest","targetObjectId","version"];function applicationBatchReducer(input){const operation=input.operation;if(!exactKeys(operation,["action","batch"])||operation.action!=="applicationBatch"||!exactKeys(operation.batch,["entries","version"])||operation.batch.version!==1||!Array.isArray(operation.batch.entries)||operation.batch.entries.length<2||operation.batch.entries.length>16)throw new TypeError("invalid application batch");let prior=-1;const output=[];for(const entry of operation.batch.entries){const child=entry.operation;if(!exactKeys(entry,["logicalTime","operation"])||!Number.isSafeInteger(entry.logicalTime)||entry.logicalTime<0||entry.logicalTime<=prior||!exactKeys(child,["action","id","kind","x","y"])||child.action!=="placeBlock"||typeof child.id!=="string"||child.id.length===0||typeof child.kind!=="string"||child.kind.length===0||!Number.isSafeInteger(child.x)||!Number.isSafeInteger(child.y))throw new TypeError("invalid application batch entry");prior=entry.logicalTime;output.push(child)}return {output,state:input.state}}function causalJoinReducer(input){return {output:null,state:input.state}}function joinReducer(input){return {output:input.operation,state:input.state}}function migrationRecordReducer(input){const operation=input.operation;const record=operation&&operation.record;if(!exactKeys(operation,["action","record"])||operation.action!=="migrationRecord"||!exactKeys(record,migrationKeys)||record.kind!=="ts-drp-v3-room-migration-record"||record.version!==1||record.archivePolicy!=="retain-source"||record.authorityKind!=="creator-ed25519-registered-vertex-v1")throw new TypeError("invalid migration record");return {output:null,state:input.state}}function placeBlockReducer(input){return {output:input.operation,state:input.state}}export const blueprint={exportSchemaVersion:1,artifactId:"v3-zone.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{applicationBatch:applicationBatchReducer,causalJoin:causalJoinReducer,join:joinReducer,migrationRecord:migrationRecordReducer,placeBlock:placeBlockReducer}};`;
+const ZONE_ARTIFACT_SOURCE = `function exactKeys(value,keys){return value!==null&&typeof value==="object"&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.prototype.hasOwnProperty.call(value,key))}const migrationKeys=["applicationStateDigest","archivePolicy","authorityKind","exactCanonicalApplicationStateBytes","kind","rehearsalNonce","sourceAcceptedOperationCount","sourceAcceptedOperationsDigest","sourceAnchorDigest","sourceBlueprintDigest","sourceCreatorAuthor","sourceObjectId","targetAnchorDigest","targetBlueprintDigest","targetCreatorAuthor","targetImportOperationCount","targetImportOperationsDigest","targetObjectId","version"];function applicationBatchReducer(input){const operation=input.operation;if(!exactKeys(operation,["action","batch"])||operation.action!=="applicationBatch"||!exactKeys(operation.batch,["entries","version"])||operation.batch.version!==1||!Array.isArray(operation.batch.entries)||operation.batch.entries.length<2||operation.batch.entries.length>16)throw new TypeError("invalid application batch");let prior=-1;const output=[];for(const entry of operation.batch.entries){const child=entry.operation;if(!exactKeys(entry,["logicalTime","operation"])||!Number.isSafeInteger(entry.logicalTime)||entry.logicalTime<0||entry.logicalTime<=prior||!exactKeys(child,["action","id","kind","x","y"])||child.action!=="placeBlock"||typeof child.id!=="string"||child.id.length===0||typeof child.kind!=="string"||child.kind.length===0||!Number.isSafeInteger(child.x)||!Number.isSafeInteger(child.y))throw new TypeError("invalid application batch entry");prior=entry.logicalTime;output.push(child)}return {output,state:input.state}}function causalJoinReducer(input){return {output:null,state:input.state}}function joinReducer(input){return {output:input.operation,state:input.state}}function migrationActivationReducer(input){const operation=input.operation;if(!exactKeys(operation,["action","decision"])||operation.action!=="migrationActivation"||operation.decision===null||typeof operation.decision!=="object"||Array.isArray(operation.decision))throw new TypeError("invalid migration activation");return {output:null,state:input.state}}function migrationRecordReducer(input){const operation=input.operation;const record=operation&&operation.record;if(!exactKeys(operation,["action","record"])||operation.action!=="migrationRecord"||!exactKeys(record,migrationKeys)||record.kind!=="ts-drp-v3-room-migration-record"||record.version!==1||record.archivePolicy!=="retain-source"||record.authorityKind!=="creator-ed25519-registered-vertex-v1")throw new TypeError("invalid migration record");return {output:null,state:input.state}}function placeBlockReducer(input){return {output:input.operation,state:input.state}}export const blueprint={exportSchemaVersion:1,artifactId:"v3-zone.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{applicationBatch:applicationBatchReducer,causalJoin:causalJoinReducer,join:joinReducer,migrationActivation:migrationActivationReducer,migrationRecord:migrationRecordReducer,placeBlock:placeBlockReducer}};`;
 const PARAMETERS = Object.freeze({
 	maxEpochVertices: 8192,
 	maxEpochBytes: 8_388_608,
@@ -69,6 +70,7 @@ interface ZoneOperationDescriptor {
 }
 
 export interface V3ZoneApi {
+	activateMigration(receipt: V3RoomMigrationRehearsalReceipt): Promise<V3RoomMigrationActivationReceipt>;
 	close(): Promise<void>;
 	create(memberEnrollment: string): Promise<void>;
 	join(invite: string): Promise<void>;
@@ -101,6 +103,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 	let closeRequested = false;
 	let closing: Promise<void> | undefined;
 	let opening: Promise<void> | undefined;
+	const retainedSourceBridges = new Set<Awaited<ReturnType<typeof createV3RoomSession<ZoneProjection>>>>();
 	const resetZoneState = (): void => {
 		projection = emptyProjection();
 		migrationCreatorAuthor = "";
@@ -140,6 +143,8 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 		resetZoneState();
 		zoneId = selectedZoneId;
 		let opened: Awaited<ReturnType<typeof createV3RoomSession<ZoneProjection>>> | undefined;
+		let sourceRoom: Awaited<ReturnType<typeof createV3RoomSession<ZoneProjection>>> | undefined;
+		let redirectedDuringOpen: Awaited<ReturnType<typeof createV3RoomSession<ZoneProjection>>> | undefined;
 		try {
 			const separator = selectedZoneId.indexOf(":");
 			if (separator <= 0) throw new TypeError("v3 zone creator identity is invalid");
@@ -153,35 +158,60 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 				databaseName: `ts-drp-v3-zone--${digest("ts-drp/d9346-zone-database/v1", new TextEncoder().encode(zoneId))}`,
 				initialLogicalTime: 3,
 				issuanceDatabaseName: `ts-drp-v3-zone--${digest("ts-drp/d9346-zone-database/v1", new TextEncoder().encode(zoneId))}`,
+				migrationDatabaseNamespace: `${localAuthor}:${zoneId}`,
 				objectId: zoneId,
 				onAcceptedVertex: () => undefined,
+				onMigrationTarget: (target, targetObjectId): void => {
+					redirectedDuringOpen = target;
+					if (sourceRoom !== undefined) retainedSourceBridges.add(sourceRoom);
+					room = target;
+					zoneId = targetObjectId;
+					ephemeral?.close();
+					const redirectedEphemeral = target.openEphemeral({
+						maxMessageBytes: 65_536,
+						maxSequencedKeys: 1,
+						maxSequencedSenders: 2,
+					});
+					redirectedEphemeral.subscribe(({ payload, sender }) => {
+						const position = decodePosition(payload);
+						if (position === undefined) return;
+						transientPositions.set(sender, position);
+						emit();
+					});
+					ephemeral = redirectedEphemeral;
+				},
 				onProjection: (value): void => {
 					projection = value;
 					emit();
 				},
-				openTransport: () => node.openRoomNetwork(zoneId),
+				openTransport: (openedObjectId) => node.openRoomNetwork(openedObjectId),
 				publicKeyBytes: bytes(localAuthor),
 				signRegisteredVertexDigest: (registeredDigest) => node.keychain.signWithLocalAuthor(registeredDigest),
 			});
+			sourceRoom = opened;
+			if (redirectedDuringOpen !== undefined) retainedSourceBridges.add(opened);
 			if (closeRequested) throw new Error("v3 zone closed during open");
-			const openedEphemeral = opened.openEphemeral({
-				maxMessageBytes: 65_536,
-				maxSequencedKeys: 1,
-				maxSequencedSenders: 2,
-			});
-			openedEphemeral.subscribe(({ payload, sender }) => {
-				const position = decodePosition(payload);
-				if (position === undefined) return;
-				transientPositions.set(sender, position);
-				emit();
-			});
-			room = opened;
+			if (redirectedDuringOpen === undefined) {
+				const openedEphemeral = opened.openEphemeral({
+					maxMessageBytes: 65_536,
+					maxSequencedKeys: 1,
+					maxSequencedSenders: 2,
+				});
+				openedEphemeral.subscribe(({ payload, sender }) => {
+					const position = decodePosition(payload);
+					if (position === undefined) return;
+					transientPositions.set(sender, position);
+					emit();
+				});
+				room = opened;
+				zoneId = opened.objectId;
+				ephemeral = openedEphemeral;
+			}
 			migrationCreatorAuthor = creatorAuthor;
 			migrationMembers = Object.freeze(bootstrapMembers.map((member) => Object.freeze({ ...member })));
-			ephemeral = openedEphemeral;
 			emit();
 		} catch (error) {
-			await opened?.close().catch(() => undefined);
+			await Promise.allSettled([opened?.close(), redirectedDuringOpen?.close()]);
 			resetZoneState();
 			throw error;
 		}
@@ -199,6 +229,28 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 	};
 
 	const api: V3ZoneApi = {
+		async activateMigration(receipt: V3RoomMigrationRehearsalReceipt): Promise<V3RoomMigrationActivationReceipt> {
+			const selected = room;
+			if (selected === undefined) throw new TypeError("v3 zone is not open");
+			if (migrationCreatorAuthor !== localAuthor) throw new TypeError("v3 zone migration requires the creator");
+			const record = decodeCanonical(receipt.exactCanonicalRecordBytes);
+			const nonce = record !== null && typeof record === "object" ? Reflect.get(record, "rehearsalNonce") : undefined;
+			const targetObjectId =
+				record !== null && typeof record === "object" ? Reflect.get(record, "targetObjectId") : undefined;
+			if (!(nonce instanceof Uint8Array) || nonce.byteLength !== 32 || typeof targetObjectId !== "string") {
+				throw new TypeError("v3 zone migration receipt is invalid");
+			}
+			const sourceMembers = migrationMembers;
+			const targetCreatorInvite = await createCreatorInviteMaterial(node, targetObjectId, sourceMembers);
+			const activated = await selected.activateMigration({
+				exactCanonicalRecordBytes: new Uint8Array(receipt.exactCanonicalRecordBytes),
+				recordVertexDigest: receipt.recordVertexDigest,
+				targetCreatorInvite,
+			});
+			invite = encodeZoneInvite({ roomInvite: selected.invite, zoneId: targetObjectId });
+			emit();
+			return activated;
+		},
 		close(): Promise<void> {
 			if (closing !== undefined) return closing;
 			closeRequested = true;
@@ -206,6 +258,8 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 				await opening?.catch(() => undefined);
 				const selected = room;
 				const selectedEphemeral = ephemeral;
+				const sources = [...retainedSourceBridges];
+				retainedSourceBridges.clear();
 				room = undefined;
 				ephemeral = undefined;
 				resetZoneState();
@@ -216,7 +270,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 					failure = error;
 				}
 				try {
-					await selected?.close();
+					await Promise.all([selected?.close(), ...sources.map((source) => source.close())]);
 				} catch (error) {
 					failure ??= error;
 				}
@@ -359,7 +413,7 @@ function projectZone(
 	for (const acceptedOperation of operations) {
 		acceptedDigests.add(acceptedOperation.vertexDigest);
 		const action = Reflect.get(acceptedOperation.operation, "action");
-		if (action === "migrationRecord") continue;
+		if (action === "migrationActivation" || action === "migrationRecord") continue;
 		if (action === "join") {
 			const rosterValue = Reflect.get(acceptedOperation.operation, "roster");
 			const members =
@@ -611,6 +665,7 @@ function applicationMaterial(): Readonly<{
 				operation("applicationBatch", [Object.freeze({ name: "batch", type: "canonical-object" })]),
 				operation("causalJoin", []),
 				operation("join", [Object.freeze({ name: "roster", type: "canonical-object" })]),
+				operation("migrationActivation", [Object.freeze({ name: "decision", type: "canonical-object" })]),
 				operation("migrationRecord", [Object.freeze({ name: "record", type: "canonical-object" })]),
 				operation("placeBlock", [
 					Object.freeze({ name: "id", type: "string" }),

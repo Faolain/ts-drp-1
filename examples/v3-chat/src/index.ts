@@ -1,9 +1,10 @@
-import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import {
 	createV3RoomSession,
 	type V3RoomAcceptedOperation,
 	type V3RoomApplication,
 	type V3RoomCreatorInviteMaterial,
+	type V3RoomMigrationActivationReceipt,
 	type V3RoomMigrationProjection,
 	type V3RoomMigrationRehearsalReceipt,
 	type V3RoomSession,
@@ -13,7 +14,7 @@ import { Keychain } from "@ts-drp/keychain";
 import { type DRPNetworkNode, type Message, MessageType } from "@ts-drp/types";
 
 const OBJECT_ID = `creator:${"d".repeat(32)}`;
-const CHAT_ARTIFACT_SOURCE = `function exactKeys(value,keys){return value!==null&&typeof value==="object"&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.prototype.hasOwnProperty.call(value,key))}const migrationKeys=["applicationStateDigest","archivePolicy","authorityKind","exactCanonicalApplicationStateBytes","kind","rehearsalNonce","sourceAcceptedOperationCount","sourceAcceptedOperationsDigest","sourceAnchorDigest","sourceBlueprintDigest","sourceCreatorAuthor","sourceObjectId","targetAnchorDigest","targetBlueprintDigest","targetCreatorAuthor","targetImportOperationCount","targetImportOperationsDigest","targetObjectId","version"];function aclReducer(input){return {output:input.operation,state:input.state}}function applicationBatchReducer(input){const operation=input.operation;if(!exactKeys(operation,["action","batch"])||operation.action!=="applicationBatch"||!exactKeys(operation.batch,["entries","version"])||operation.batch.version!==1||!Array.isArray(operation.batch.entries)||operation.batch.entries.length<2||operation.batch.entries.length>16)throw new TypeError("invalid application batch");let prior=-1;const output=[];const state=[...input.state];for(const entry of operation.batch.entries){if(!exactKeys(entry,["logicalTime","operation"])||!Number.isSafeInteger(entry.logicalTime)||entry.logicalTime<0||entry.logicalTime<=prior||!exactKeys(entry.operation,["action","clientOperationId","text"])||entry.operation.action!=="message"||typeof entry.operation.clientOperationId!=="string"||entry.operation.clientOperationId.length===0||typeof entry.operation.text!=="string")throw new TypeError("invalid application batch entry");prior=entry.logicalTime;const message={clientOperationId:entry.operation.clientOperationId,text:entry.operation.text};state.push(message);output.push(message)}return {output,state}}function causalJoinReducer(input){return {output:null,state:input.state}}function joinReducer(input){return {output:input.operation.clientId,state:input.state}}function messageReducer(input){if(!exactKeys(input.operation,["action","clientOperationId","text"])||typeof input.operation.clientOperationId!=="string"||input.operation.clientOperationId.length===0||typeof input.operation.text!=="string")throw new TypeError("invalid message");const message={clientOperationId:input.operation.clientOperationId,text:input.operation.text};const state=[...input.state,message];return {output:message,state}}function migrationRecordReducer(input){const operation=input.operation;const record=operation&&operation.record;if(!exactKeys(operation,["action","record"])||operation.action!=="migrationRecord"||!exactKeys(record,migrationKeys)||record.kind!=="ts-drp-v3-room-migration-record"||record.version!==1||record.archivePolicy!=="retain-source"||record.authorityKind!=="creator-ed25519-registered-vertex-v1")throw new TypeError("invalid migration record");return {output:null,state:input.state}}export const blueprint={exportSchemaVersion:1,artifactId:"v3-chat.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{acl:aclReducer,applicationBatch:applicationBatchReducer,causalJoin:causalJoinReducer,join:joinReducer,message:messageReducer,migrationRecord:migrationRecordReducer}};`;
+const CHAT_ARTIFACT_SOURCE = `function exactKeys(value,keys){return value!==null&&typeof value==="object"&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.prototype.hasOwnProperty.call(value,key))}const migrationKeys=["applicationStateDigest","archivePolicy","authorityKind","exactCanonicalApplicationStateBytes","kind","rehearsalNonce","sourceAcceptedOperationCount","sourceAcceptedOperationsDigest","sourceAnchorDigest","sourceBlueprintDigest","sourceCreatorAuthor","sourceObjectId","targetAnchorDigest","targetBlueprintDigest","targetCreatorAuthor","targetImportOperationCount","targetImportOperationsDigest","targetObjectId","version"];function aclReducer(input){return {output:input.operation,state:input.state}}function applicationBatchReducer(input){const operation=input.operation;if(!exactKeys(operation,["action","batch"])||operation.action!=="applicationBatch"||!exactKeys(operation.batch,["entries","version"])||operation.batch.version!==1||!Array.isArray(operation.batch.entries)||operation.batch.entries.length<2||operation.batch.entries.length>16)throw new TypeError("invalid application batch");let prior=-1;const output=[];const state=[...input.state];for(const entry of operation.batch.entries){if(!exactKeys(entry,["logicalTime","operation"])||!Number.isSafeInteger(entry.logicalTime)||entry.logicalTime<0||entry.logicalTime<=prior||!exactKeys(entry.operation,["action","clientOperationId","text"])||entry.operation.action!=="message"||typeof entry.operation.clientOperationId!=="string"||entry.operation.clientOperationId.length===0||typeof entry.operation.text!=="string")throw new TypeError("invalid application batch entry");prior=entry.logicalTime;const message={clientOperationId:entry.operation.clientOperationId,text:entry.operation.text};state.push(message);output.push(message)}return {output,state}}function causalJoinReducer(input){return {output:null,state:input.state}}function joinReducer(input){return {output:input.operation.clientId,state:input.state}}function messageReducer(input){if(!exactKeys(input.operation,["action","clientOperationId","text"])||typeof input.operation.clientOperationId!=="string"||input.operation.clientOperationId.length===0||typeof input.operation.text!=="string")throw new TypeError("invalid message");const message={clientOperationId:input.operation.clientOperationId,text:input.operation.text};const state=[...input.state,message];return {output:message,state}}function migrationActivationReducer(input){const operation=input.operation;if(!exactKeys(operation,["action","decision"])||operation.action!=="migrationActivation"||operation.decision===null||typeof operation.decision!=="object"||Array.isArray(operation.decision))throw new TypeError("invalid migration activation");return {output:null,state:input.state}}function migrationRecordReducer(input){const operation=input.operation;const record=operation&&operation.record;if(!exactKeys(operation,["action","record"])||operation.action!=="migrationRecord"||!exactKeys(record,migrationKeys)||record.kind!=="ts-drp-v3-room-migration-record"||record.version!==1||record.archivePolicy!=="retain-source"||record.authorityKind!=="creator-ed25519-registered-vertex-v1")throw new TypeError("invalid migration record");return {output:null,state:input.state}}export const blueprint={exportSchemaVersion:1,artifactId:"v3-chat.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{acl:aclReducer,applicationBatch:applicationBatchReducer,causalJoin:causalJoinReducer,join:joinReducer,message:messageReducer,migrationActivation:migrationActivationReducer,migrationRecord:migrationRecordReducer}};`;
 const PARAMETERS = Object.freeze({
 	maxEpochVertices: 8192,
 	maxEpochBytes: 8_388_608,
@@ -43,6 +44,10 @@ interface JoinInput {
 	readonly clientId: ClientId;
 	readonly databaseName: string;
 	readonly invite: string;
+}
+
+interface RoomJoinInput extends Omit<JoinInput, "invite"> {
+	readonly creatorInvite: string | V3RoomCreatorInviteMaterial;
 }
 
 interface CreateInput {
@@ -98,6 +103,7 @@ interface ActiveChat {
 	readonly accepted: Map<string, AcceptedMessage>;
 	readonly clientId: ClientId;
 	readonly clientAuthors: Readonly<Record<ClientId, string>>;
+	readonly objectId: string;
 	readonly room: V3RoomSession;
 }
 
@@ -357,6 +363,14 @@ function applicationMaterial(): ApplicationMaterial {
 					}),
 				}),
 				Object.freeze({
+					name: "migrationActivation",
+					maxCanonicalOperationBytes: 65_536,
+					argumentSchema: Object.freeze({
+						kind: "closed-record",
+						fields: Object.freeze([Object.freeze({ name: "decision", required: true, type: "canonical-object" })]),
+					}),
+				}),
+				Object.freeze({
 					name: "migrationRecord",
 					maxCanonicalOperationBytes: 65_536,
 					argumentSchema: Object.freeze({
@@ -531,11 +545,13 @@ async function createCreatorInviteMaterial(objectId = OBJECT_ID): Promise<V3Room
 	});
 }
 
-function createRoomNetwork(peerId: string, channelName: string): V3RoomTransport {
+function createRoomNetwork(peerId: string, channelName: string, knownPeerIds: readonly string[]): V3RoomTransport {
 	const channel = new BroadcastChannel(channelName);
 	const topics = new Set<string>();
-	let ingressHandler = (_message: Message): void => undefined;
-	let retainedPublisher = (): Promise<void> => Promise.resolve();
+	const retainedDeliveries = new WeakSet<Message>();
+	let liveIngressHandler = (_message: Message): void => undefined;
+	let retainedIngressHandler = (_message: Message): void => undefined;
+	let retainedPublisher: (targetPeerId?: string) => Promise<void> = () => Promise.resolve();
 	const node = {
 		peerId,
 		membershipVerifier: undefined,
@@ -558,7 +574,7 @@ function createRoomNetwork(peerId: string, channelName: string): V3RoomTransport
 		getBootstrapNodes: (): [] => [],
 		getSubscribedTopics: (): string[] => [...topics],
 		getMultiaddrs: (): [] => [],
-		getAllPeers: (): [] => [],
+		getAllPeers: (): string[] => knownPeerIds.filter((knownPeerId) => knownPeerId !== peerId),
 		getGroupPeers: (): [] => [],
 		broadcastMessage: (): Promise<void> => Promise.resolve(),
 		publishMessage: (topic: string, message: Message): Promise<true> => {
@@ -566,10 +582,15 @@ function createRoomNetwork(peerId: string, channelName: string): V3RoomTransport
 			return Promise.resolve(true);
 		},
 		gossipTopicFor: (message: Message): string | undefined =>
-			message.type === MessageType.MESSAGE_TYPE_V3_ENVELOPE && topics.has(message.objectId)
+			message.type === MessageType.MESSAGE_TYPE_V3_ENVELOPE &&
+			!retainedDeliveries.has(message) &&
+			topics.has(message.objectId)
 				? message.objectId
 				: undefined,
-		sendMessage: (): Promise<void> => Promise.resolve(),
+		sendMessage: (targetPeerId: string, message: Message): Promise<void> => {
+			channel.postMessage({ message, retained: true, targetPeerId, topic: message.objectId });
+			return Promise.resolve();
+		},
 		sendGroupMessageRandomPeer: (): Promise<void> => Promise.resolve(),
 		subscribeToMessageQueue: (): void => undefined,
 	} as unknown as DRPNetworkNode;
@@ -579,13 +600,31 @@ function createRoomNetwork(peerId: string, channelName: string): V3RoomTransport
 			Reflect.get(event.data, "kind") === "d9338-retained-history-request" &&
 			Reflect.get(event.data, "requester") !== peerId
 		) {
-			void retainedPublisher().catch(() => undefined);
+			const requester = Reflect.get(event.data, "requester");
+			if (typeof requester === "string") {
+				void Promise.all([retainedPublisher(requester), retainedPublisher()]).catch(() => undefined);
+			}
 			return;
 		}
 		const topic = Reflect.get(event.data, "topic");
 		const message = Reflect.get(event.data, "message");
-		if (typeof topic !== "string" || !topics.has(topic) || typeof message !== "object" || message === null) return;
-		ingressHandler(message as Message);
+		const targetPeerId = Reflect.get(event.data, "targetPeerId");
+		if (
+			typeof topic !== "string" ||
+			!topics.has(topic) ||
+			typeof message !== "object" ||
+			message === null ||
+			(typeof targetPeerId === "string" && targetPeerId !== peerId)
+		) {
+			return;
+		}
+		const delivered = message as Message;
+		if (Reflect.get(event.data, "retained") === true) {
+			retainedDeliveries.add(delivered);
+			retainedIngressHandler(delivered);
+		} else {
+			liveIngressHandler(delivered);
+		}
 	});
 	return Object.freeze({
 		networkNode: node,
@@ -601,9 +640,10 @@ function createRoomNetwork(peerId: string, channelName: string): V3RoomTransport
 		setIngressHandler(
 			_ingressId: string,
 			liveHandler: (message: Message) => void,
-			_retainedHandler: (message: Message) => void
+			retainedHandler: (message: Message) => void
 		): void {
-			ingressHandler = liveHandler;
+			liveIngressHandler = liveHandler;
+			retainedIngressHandler = retainedHandler;
 		},
 		setRetainedPublisher(publisher: (targetPeerId?: string) => Promise<void>): void {
 			retainedPublisher = publisher;
@@ -616,7 +656,7 @@ function projectChat(operations: readonly V3RoomAcceptedOperation[]): ChatProjec
 	const accepted = operations.flatMap((acceptedOperation) => {
 		const operation = acceptedOperation.operation;
 		const action = Reflect.get(operation, "action");
-		if (action === "migrationRecord") return [];
+		if (action === "migrationActivation" || action === "migrationRecord") return [];
 		const clientOperationId = Reflect.get(operation, "clientOperationId");
 		const text = Reflect.get(operation, "text");
 		if (action !== "message") return [];
@@ -658,25 +698,40 @@ function projectChat(operations: readonly V3RoomAcceptedOperation[]): ChatProjec
 	});
 }
 
-async function joinRoom(
-	input: Omit<JoinInput, "invite"> & Readonly<{ readonly creatorInvite: string | V3RoomCreatorInviteMaterial }>
-): Promise<ActiveChat> {
+async function joinRoom(input: RoomJoinInput): Promise<ActiveChat> {
 	const application = createV3ChatApplication(input.clientId);
 	const selected = CLIENTS[input.clientId];
 	const clientAuthors = await createClientAuthors();
 	const keychain = await createLocalKeychain(input.clientId);
 	const author = keychain.localAuthorId;
 	const accepted = new Map<string, AcceptedMessage>();
-	const room = await createV3RoomSession({
+	let redirectedRoom: V3RoomSession<ChatProjection> | undefined;
+	let currentObjectId = OBJECT_ID;
+	const source = { room: undefined as V3RoomSession<ChatProjection> | undefined };
+	const room: V3RoomSession<ChatProjection> = await createV3RoomSession({
 		application,
 		author,
 		creatorInvite: input.creatorInvite,
 		databaseName: input.databaseName,
 		initialLogicalTime: selected.logicalTime,
 		issuanceDatabaseName: input.databaseName,
+		migrationDatabaseNamespace: input.databaseName,
 		objectId: OBJECT_ID,
-		openTransport: () => createRoomNetwork(author, input.channelName),
+		openTransport: (openedObjectId) =>
+			createRoomNetwork(
+				author,
+				`${input.channelName}--${digest(
+					"ts-drp/v3-chat-room-channel/v1",
+					encodeCanonical({ objectId: openedObjectId })
+				)}`,
+				Object.values(clientAuthors)
+			),
 		onAcceptedVertex: () => undefined,
+		onMigrationTarget: (target, targetObjectId): void => {
+			redirectedRoom = target;
+			currentObjectId = targetObjectId;
+			if (source.room !== undefined) retainedSourceBridges.add(source.room);
+		},
 		onProjection: (projection): void => {
 			accepted.clear();
 			for (const message of projection.accepted) {
@@ -686,15 +741,23 @@ async function joinRoom(
 		publicKeyBytes: bytes(author),
 		signRegisteredVertexDigest: (registeredDigest) => keychain.signWithLocalAuthor(registeredDigest),
 	});
+	source.room = room;
+	if (redirectedRoom !== undefined) retainedSourceBridges.add(room);
 	return Object.freeze({
 		accepted,
 		clientId: input.clientId,
 		clientAuthors,
-		room,
+		get objectId(): string {
+			return currentObjectId;
+		},
+		get room(): V3RoomSession<ChatProjection> {
+			return redirectedRoom ?? room;
+		},
 	});
 }
 
 let active: ActiveChat | undefined;
+const retainedSourceBridges = new Set<V3RoomSession<ChatProjection>>();
 
 const api = Object.freeze({
 	async create(input: CreateInput): Promise<string> {
@@ -724,11 +787,30 @@ const api = Object.freeze({
 		if (selected.clientId !== "alice") throw new TypeError("v3 chat migration requires the creator");
 		const rehearsalNonce = new Uint8Array(32);
 		crypto.getRandomValues(rehearsalNonce);
-		const targetObjectId = migrationTargetObjectId(OBJECT_ID, rehearsalNonce);
+		const targetObjectId = migrationTargetObjectId(selected.objectId, rehearsalNonce);
 		return selected.room.rehearseMigration({
 			rehearsalNonce,
 			targetCreatorInvite: await createCreatorInviteMaterial(targetObjectId),
 		});
+	},
+	async activateMigration(receipt: V3RoomMigrationRehearsalReceipt): Promise<V3RoomMigrationActivationReceipt> {
+		const selected = active;
+		if (selected === undefined) throw new TypeError("v3 chat client is not joined");
+		if (selected.clientId !== "alice") throw new TypeError("v3 chat migration requires the creator");
+		const record = decodeCanonical(receipt.exactCanonicalRecordBytes);
+		const nonce = record !== null && typeof record === "object" ? Reflect.get(record, "rehearsalNonce") : undefined;
+		const targetObjectId =
+			record !== null && typeof record === "object" ? Reflect.get(record, "targetObjectId") : undefined;
+		if (!(nonce instanceof Uint8Array) || nonce.byteLength !== 32 || typeof targetObjectId !== "string") {
+			throw new TypeError("v3 chat migration receipt is invalid");
+		}
+		const targetCreatorInvite = await createCreatorInviteMaterial(targetObjectId);
+		const activated = await selected.room.activateMigration({
+			exactCanonicalRecordBytes: new Uint8Array(receipt.exactCanonicalRecordBytes),
+			recordVertexDigest: receipt.recordVertexDigest,
+			targetCreatorInvite,
+		});
+		return activated;
 	},
 	async submitAcl(
 		operation: Readonly<{
@@ -755,8 +837,9 @@ const api = Object.freeze({
 	async close(): Promise<void> {
 		const selected = active;
 		active = undefined;
-		if (selected === undefined) return;
-		await selected.room.close();
+		const sources = [...retainedSourceBridges];
+		retainedSourceBridges.clear();
+		await Promise.all([selected?.room.close(), ...sources.map((source) => source.close())]);
 	},
 });
 

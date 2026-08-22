@@ -263,7 +263,13 @@ export type V3AdmittedVertexSink = (
 		readonly signature: Uint8Array;
 		readonly transportSender: string;
 	}>
-) => void | Promise<void>;
+) => // eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- the sink retains legacy void alongside explicit terminal dispositions.
+| void
+	| Readonly<{ readonly kind: "continue" | "retained-bootstrap-ready" | "terminal-accepted" | "terminal-rejected" }>
+	// eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- asynchronous legacy sinks resolve void.
+	| Promise<void | Readonly<{
+			readonly kind: "continue" | "retained-bootstrap-ready" | "terminal-accepted" | "terminal-rejected";
+	  }>>;
 
 export interface V3PlaneHandle {
 	readonly objectId: string;
@@ -286,8 +292,48 @@ export interface V3PlaneHandle {
 	): Promise<V3EgressResult>;
 	publishPending(): Promise<V3EgressResult>;
 	republishRetained(): Promise<V3EgressResult>;
+	beginTerminalTransition(): Promise<V3TerminalTransitionResult>;
 	deactivate(): void;
 }
+
+export type V3TerminalPublishResult =
+	| Readonly<{
+			readonly ok: true;
+			readonly kind: "accepted";
+			readonly authorSequence: number;
+			readonly digest: string;
+			readonly terminalIntent: "committed";
+	  }>
+	| Readonly<{
+			readonly ok: false;
+			readonly kind:
+				| "not-active"
+				| "malformed-input"
+				| "authorization-rejected"
+				| "issuance-rejected"
+				| "admission-rejected"
+				| "journal-rejected"
+				| "graph-rejected"
+				| "terminal-rejected";
+			readonly detail: string;
+			readonly terminalIntent: "absent" | "outcome-unknown";
+	  }>;
+
+export type V3TerminalTransitionResult =
+	| Readonly<{
+			readonly ok: true;
+			readonly capability: Readonly<{
+				publishTerminal(input: V3LocalIssueInput): Promise<V3TerminalPublishResult>;
+				resume():
+					| Readonly<{ readonly ok: true; readonly kind: "resumed" }>
+					| Readonly<{ readonly ok: false; readonly kind: "invalid-state"; readonly detail: string }>;
+			}>;
+	  }>
+	| Readonly<{
+			readonly ok: false;
+			readonly kind: "not-active" | "transition-active" | "already-terminal";
+			readonly detail: string;
+	  }>;
 
 export interface V3LocalIssueInput {
 	readonly operations: readonly Readonly<{
@@ -339,22 +385,29 @@ export type V3EgressResult =
 			readonly detail: string;
 	  }>;
 
+type V3RebaseSource = Readonly<{
+	readonly author: string;
+	readonly authorSequence: number;
+	readonly vertexDigest: string;
+	readonly intents: readonly Readonly<{
+		readonly logicalTime: number;
+		readonly operation: Readonly<Record<string, unknown>>;
+		readonly operationCount: number;
+		readonly operationIndex: number;
+	}>[];
+}>;
+
 type V3RebaseOutboxResult =
 	| Readonly<{ readonly ok: true; readonly kind: "empty" }>
 	| Readonly<{
 			readonly ok: true;
 			readonly kind: "displaced";
-			readonly source: Readonly<{
-				readonly author: string;
-				readonly authorSequence: number;
-				readonly vertexDigest: string;
-				readonly intents: readonly Readonly<{
-					readonly logicalTime: number;
-					readonly operation: Readonly<Record<string, unknown>>;
-					readonly operationCount: number;
-					readonly operationIndex: number;
-				}>[];
-			}>;
+			readonly source: V3RebaseSource & Readonly<{ readonly publishState?: never }>;
+	  }>
+	| Readonly<{
+			readonly ok: true;
+			readonly kind: "displaced";
+			readonly source: V3RebaseSource & Readonly<{ readonly publishState: "pending" | "published" }>;
 	  }>
 	| Readonly<{ readonly ok: false; readonly kind: "not-active" | "record-rejected" | "store-failed" }>;
 
@@ -390,8 +443,52 @@ const LATCHED_DISPLACED_RECOVERY_INPUT_KEYS = [
 	"issuanceStore",
 	"liveJournalStore",
 ] as const;
+const LATCHED_TERMINAL_RECOVERY_INPUT_KEYS = [
+	"capability",
+	"classifyTerminalVertex",
+	"exactCanonicalLatchedAclBytes",
+	"issuanceScope",
+	"issuanceStore",
+	"liveJournalStore",
+] as const;
+const LATCHED_CROSS_OBJECT_RECOVERY_INPUT_KEYS = [
+	"capability",
+	"classifyTerminalVertex",
+	"displacedSource",
+	"exactCanonicalLatchedAclBytes",
+	"issuanceScope",
+	"issuanceStore",
+	"liveJournalStore",
+] as const;
+const LATCHED_RETAINED_BOOTSTRAP_RECOVERY_INPUT_KEYS = [
+	"capability",
+	"classifyTerminalVertex",
+	"displacedSource",
+	"exactCanonicalLatchedAclBytes",
+	"issuanceScope",
+	"issuanceStore",
+	"liveJournalStore",
+	"retainedBootstrapHold",
+] as const;
 const DISPLACED_LEGACY_SOURCE_KEYS = ["capability", "exactCanonicalAuthorAuthorizationBytes"] as const;
 const DISPLACED_LATCHED_SOURCE_KEYS = ["capability", "exactCanonicalLatchedAclBytes"] as const;
+const DISPLACED_CROSS_OBJECT_SOURCE_KEYS = [
+	"activationVertexDigest",
+	"capability",
+	"exactCanonicalLatchedAclBytes",
+	"issuanceScope",
+	"issuanceStore",
+	"liveJournalStore",
+] as const;
+
+export type V3TerminalVertexClassifier = (
+	input: Readonly<{
+		readonly author: string;
+		readonly exactReceivedCanonicalPreimageBytes: Uint8Array;
+		readonly signature: Uint8Array;
+		readonly vertex: AdmittedReceivedVertexView;
+	}>
+) => "ordinary" | "terminal-authorized" | "reject";
 
 declare const recoveredV3LiveBrand: unique symbol;
 export type RecoveredV3Live = Readonly<{ readonly [recoveredV3LiveBrand]: true }>;
@@ -410,7 +507,14 @@ export type RecoverV3LiveReplicaInput =
 	  }>
 	| Readonly<{
 			readonly capability: PreparedV3Live;
-			readonly displacedSource?: Readonly<{
+			readonly exactCanonicalLatchedAclBytes: Uint8Array;
+			readonly issuanceScope: DurableIssueScope;
+			readonly issuanceStore: DurableIssuanceStore;
+			readonly liveJournalStore: DurableLiveJournalStore;
+	  }>
+	| Readonly<{
+			readonly capability: PreparedV3Live;
+			readonly displacedSource: Readonly<{
 				readonly capability: PreparedV3Live;
 				readonly exactCanonicalLatchedAclBytes: Uint8Array;
 			}>;
@@ -418,6 +522,47 @@ export type RecoverV3LiveReplicaInput =
 			readonly issuanceScope: DurableIssueScope;
 			readonly issuanceStore: DurableIssuanceStore;
 			readonly liveJournalStore: DurableLiveJournalStore;
+	  }>
+	| Readonly<{
+			readonly capability: PreparedV3Live;
+			readonly classifyTerminalVertex: V3TerminalVertexClassifier;
+			readonly exactCanonicalLatchedAclBytes: Uint8Array;
+			readonly issuanceScope: DurableIssueScope;
+			readonly issuanceStore: DurableIssuanceStore;
+			readonly liveJournalStore: DurableLiveJournalStore;
+	  }>
+	| Readonly<{
+			readonly capability: PreparedV3Live;
+			readonly classifyTerminalVertex: V3TerminalVertexClassifier;
+			readonly displacedSource: Readonly<{
+				readonly activationVertexDigest: string;
+				readonly capability: PreparedV3Live;
+				readonly exactCanonicalLatchedAclBytes: Uint8Array;
+				readonly issuanceScope: DurableIssueScope;
+				readonly issuanceStore: DurableIssuanceStore;
+				readonly liveJournalStore: DurableLiveJournalStore;
+			}>;
+			readonly exactCanonicalLatchedAclBytes: Uint8Array;
+			readonly issuanceScope: DurableIssueScope;
+			readonly issuanceStore: DurableIssuanceStore;
+			readonly liveJournalStore: DurableLiveJournalStore;
+	  }>
+	| Readonly<{
+			readonly capability: PreparedV3Live;
+			readonly classifyTerminalVertex: V3TerminalVertexClassifier;
+			readonly displacedSource: Readonly<{
+				readonly activationVertexDigest: string;
+				readonly capability: PreparedV3Live;
+				readonly exactCanonicalLatchedAclBytes: Uint8Array;
+				readonly issuanceScope: DurableIssueScope;
+				readonly issuanceStore: DurableIssuanceStore;
+				readonly liveJournalStore: DurableLiveJournalStore;
+			}>;
+			readonly exactCanonicalLatchedAclBytes: Uint8Array;
+			readonly issuanceScope: DurableIssueScope;
+			readonly issuanceStore: DurableIssuanceStore;
+			readonly liveJournalStore: DurableLiveJournalStore;
+			readonly retainedBootstrapHold: true;
 	  }>;
 
 export type RecoverV3LiveReplicaFailureKind =
@@ -1996,6 +2141,7 @@ async function prepareV3LiveGeneration(input: PrepareV3LiveGenerationInput): Pro
 interface V3PlaneRegistration {
 	active: boolean;
 	readonly authorization: V3LiveAuthorization;
+	readonly classifyTerminalVertex?: V3TerminalVertexClassifier;
 	readonly displacedSource?: V3DisplacedSourceAuthority;
 	epochBytes: number;
 	handle: V3PlaneHandle;
@@ -2018,6 +2164,10 @@ interface V3PlaneRegistration {
 	publicationCursor: number | undefined;
 	rebaseCursor: number | undefined;
 	rebaseSnapshot: readonly ClassifiedRebaseRow[] | undefined;
+	retainedBootstrapHold: boolean;
+	releaseTerminalBarrier: (() => void) | undefined;
+	terminalBarrier: Promise<void> | undefined;
+	terminalState: "active" | "transition" | "terminal";
 }
 
 interface PendingV3Ingress {
@@ -2181,7 +2331,7 @@ function activationFailureAfterCleanup(
 function subscribeActivationQueue(
 	messageQueueManager: MessageQueueManager<Message>,
 	queueId: string,
-	handler: (message: Message) => void
+	handler: (message: Message) => void | Promise<void>
 ): "capacity" | "failed" | "ok" {
 	try {
 		messageQueueManager.subscribe(queueId, handler);
@@ -2338,6 +2488,9 @@ function currentRegistration(registration: V3PlaneRegistration): boolean {
 
 function deactivateRegistration(registration: V3PlaneRegistration): boolean {
 	registration.active = false;
+	registration.releaseTerminalBarrier?.();
+	registration.releaseTerminalBarrier = undefined;
+	registration.terminalBarrier = undefined;
 	registration.pendingIngress.clear();
 	registration.pendingIngressBytes = 0;
 	const registrations = v3PlaneRegistrations.get(registration.networkNode);
@@ -2374,6 +2527,7 @@ function sameActivation(
 		registration.authorization === recovered.authorization &&
 		registration.index === recovered.index &&
 		registration.issuanceStore === recovered.issuanceStore &&
+		registration.classifyTerminalVertex === recovered.classifyTerminalVertex &&
 		registration.latchedOperations === recovered.latchedOperations &&
 		registration.liveJournalStore === recovered.liveJournalStore &&
 		sameScope(registration.issuanceScope, recovered.issuanceScope) &&
@@ -2536,6 +2690,25 @@ async function handleV3Ingress(
 	if (!currentRegistration(registration)) return false;
 	const authenticated = evidence.authenticated;
 	const alreadyAccepted = registration.index.has(authenticated.digest);
+	let terminalClassification: ReturnType<V3TerminalVertexClassifier> = "ordinary";
+	if (!alreadyAccepted && registration.classifyTerminalVertex !== undefined) {
+		try {
+			terminalClassification = registration.classifyTerminalVertex(
+				ObjectFreeze({
+					author: authenticated.author,
+					exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(evidence.exactCanonicalPreimageBytes),
+					signature: new Uint8ArrayConstructor(evidence.signature),
+					vertex: authenticated.admitted,
+				})
+			);
+		} catch {
+			terminalClassification = "reject";
+		}
+		if (terminalClassification === "reject" || registration.terminalState === "terminal") {
+			ingressFailureLog("admission-rejected");
+			return false;
+		}
+	}
 	if (!alreadyAccepted && !hasInstalledDependencies(registration.index, authenticated)) {
 		ingressFailureLog("graph-rejected");
 		return false;
@@ -2562,6 +2735,12 @@ async function handleV3Ingress(
 	if (!alreadyAccepted && !hasGraphCapacity(registration, authenticated.byteCharge)) {
 		ingressFailureLog("graph-rejected");
 		return false;
+	}
+	if (!alreadyAccepted && terminalClassification === "terminal-authorized") {
+		// Once authenticated terminal evidence reaches the durable boundary, any
+		// write outcome is ambiguous until recovery. Keep this live capability
+		// fail closed even when the journal adapter throws after committing.
+		registration.terminalState = "terminal";
 	}
 	let appended;
 	try {
@@ -2618,10 +2797,18 @@ async function handleV3Ingress(
 		signature: new Uint8ArrayConstructor(evidence.signature),
 		transportSender: evidence.transportSender,
 	});
+	let disposition: Awaited<ReturnType<V3AdmittedVertexSink>> = undefined;
 	try {
-		await registration.onAdmittedVertex(delivery);
+		disposition = await registration.onAdmittedVertex(delivery);
 	} catch {
 		ingressFailureLog("sink-rejected");
+	}
+	if (terminalClassification === "terminal-authorized") {
+		registration.terminalState = "terminal";
+		if (disposition?.kind !== "terminal-accepted") ingressFailureLog("sink-rejected");
+	}
+	if (registration.retainedBootstrapHold && disposition?.kind === "retained-bootstrap-ready") {
+		registration.retainedBootstrapHold = false;
 	}
 	return true;
 }
@@ -2633,6 +2820,10 @@ async function authenticateV3Ingress(
 ): Promise<void> {
 	try {
 		if (!currentRegistration(registration)) return;
+		if (registration.retainedBootstrapHold && transport === "gossip") {
+			ingressFailureLog("admission-rejected");
+			return;
+		}
 		if (message.type !== MessageType.MESSAGE_TYPE_V3_ENVELOPE) return;
 		const gossipTopic = registration.networkNode.gossipTopicFor(message);
 		if (transport === "gossip" ? gossipTopic !== registration.topic : gossipTopic !== undefined) return;
@@ -2736,11 +2927,14 @@ function enqueueV3Ingress(
 	registration: V3PlaneRegistration,
 	message: Message,
 	transport: "gossip" | "retained" = "gossip"
-): void {
-	void enqueueRegistrationTask(
-		registration,
-		(): (() => Promise<void>) => () => authenticateV3Ingress(registration, message, transport)
-	);
+): Promise<void> {
+	const barrier = registration.terminalBarrier;
+	const enqueue = (): Promise<void> =>
+		enqueueRegistrationTask(
+			registration,
+			(): (() => Promise<void>) => () => authenticateV3Ingress(registration, message, transport)
+		);
+	return barrier === undefined ? enqueue() : barrier.then(enqueue);
 }
 
 interface SnapshottedOutboxRow {
@@ -2840,7 +3034,11 @@ type V3LiveAuthorization =
 	| Readonly<{ readonly kind: "latched-acl"; readonly value: LatchedAclSnapshot }>;
 
 interface V3DisplacedSourceAuthority {
+	readonly activationVertexDigest?: string;
 	readonly authorization: V3LiveAuthorization;
+	readonly issuanceScope?: DurableIssueScope;
+	readonly issuanceStore?: DurableIssuanceStore;
+	readonly liveJournalStore?: DurableLiveJournalStore;
 	readonly prepared: PreparedV3LivePayload;
 }
 
@@ -2852,6 +3050,7 @@ type StagedLatchedAclOperation = Readonly<{
 
 interface RecoveredV3LivePayload {
 	readonly authorization: V3LiveAuthorization;
+	readonly classifyTerminalVertex?: V3TerminalVertexClassifier;
 	readonly displacedSource?: V3DisplacedSourceAuthority;
 	readonly epochBytes: number;
 	readonly index: CausalityIndex;
@@ -2861,6 +3060,8 @@ interface RecoveredV3LivePayload {
 	readonly liveJournalStore: DurableLiveJournalStore;
 	readonly prepared: PreparedV3LivePayload;
 	readonly quarantinedDigests: ReadonlySet<string>;
+	readonly retainedBootstrapHold: boolean;
+	readonly terminal: boolean;
 }
 
 const recoveredV3LiveAuthority = new WeakMap<object, RecoveredV3LivePayload>();
@@ -3100,9 +3301,17 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			snapshotClosedRecord(rawInput, LEGACY_DISPLACED_RECOVERY_INPUT_KEYS);
 		const latchedInput =
 			snapshotClosedRecord(rawInput, LATCHED_RECOVERY_INPUT_KEYS) ??
-			snapshotClosedRecord(rawInput, LATCHED_DISPLACED_RECOVERY_INPUT_KEYS);
+			snapshotClosedRecord(rawInput, LATCHED_DISPLACED_RECOVERY_INPUT_KEYS) ??
+			snapshotClosedRecord(rawInput, LATCHED_TERMINAL_RECOVERY_INPUT_KEYS) ??
+			snapshotClosedRecord(rawInput, LATCHED_CROSS_OBJECT_RECOVERY_INPUT_KEYS) ??
+			snapshotClosedRecord(rawInput, LATCHED_RETAINED_BOOTSTRAP_RECOVERY_INPUT_KEYS);
 		const input = legacyInput ?? latchedInput;
 		if (input === undefined) return recoveryFailure("malformed-input", "v3 recovery input is invalid");
+		const terminalClassifier = Reflect.get(input, "classifyTerminalVertex");
+		if (terminalClassifier !== undefined && typeof terminalClassifier !== "function") {
+			return recoveryFailure("malformed-input", "v3 terminal classifier is invalid");
+		}
+		const retainedBootstrapHold = Reflect.get(input, "retainedBootstrapHold") === true;
 		const exactAuthorizationBytes =
 			legacyInput === undefined
 				? copyDetachedBytes(input.exactCanonicalLatchedAclBytes)
@@ -3139,7 +3348,8 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		if (rawDisplacedSource !== undefined) {
 			const legacySource = snapshotClosedRecord(rawDisplacedSource, DISPLACED_LEGACY_SOURCE_KEYS);
 			const latchedSource = snapshotClosedRecord(rawDisplacedSource, DISPLACED_LATCHED_SOURCE_KEYS);
-			const source = legacySource ?? latchedSource;
+			const crossSource = snapshotClosedRecord(rawDisplacedSource, DISPLACED_CROSS_OBJECT_SOURCE_KEYS);
+			const source = legacySource ?? latchedSource ?? crossSource;
 			if (source === undefined) return recoveryFailure("malformed-input", "v3 displaced source input is invalid");
 			const sourceBytes = copyDetachedBytes(
 				legacySource === undefined
@@ -3153,7 +3363,9 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			if (
 				sourcePayload === undefined ||
 				!payloadIsUsable(sourcePayload) ||
-				sourcePayload.provenance.objectId !== payload.provenance.objectId ||
+				(crossSource === undefined
+					? sourcePayload.provenance.objectId !== payload.provenance.objectId
+					: sourcePayload.provenance.objectId === payload.provenance.objectId) ||
 				sourcePayload.provenance.anchorDigest === payload.provenance.anchorDigest ||
 				sourcePayload.provenance.blueprintDigest !== payload.provenance.blueprintDigest ||
 				sourcePayload.provenance.signerSetDigest !== payload.provenance.signerSetDigest
@@ -3171,7 +3383,29 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			) {
 				return recoveryFailure("authorization-rejected", "v3 displaced source authorization does not match");
 			}
-			displacedSource = ObjectFreeze({ authorization: sourceAuthorization, prepared: sourcePayload });
+			if (crossSource !== undefined) {
+				const sourceScope = copiedScope(crossSource.issuanceScope);
+				if (
+					!isDigestHex(crossSource.activationVertexDigest) ||
+					sourceScope === undefined ||
+					sourceScope.objectId !== sourcePayload.provenance.objectId ||
+					sourceScope.author !== selectedScope.author ||
+					!isObject(crossSource.issuanceStore) ||
+					!isObject(crossSource.liveJournalStore)
+				) {
+					return recoveryFailure("authorization-rejected", "v3 displaced source authority does not match");
+				}
+				displacedSource = ObjectFreeze({
+					activationVertexDigest: crossSource.activationVertexDigest,
+					authorization: sourceAuthorization,
+					issuanceScope: sourceScope,
+					issuanceStore: crossSource.issuanceStore as DurableIssuanceStore,
+					liveJournalStore: crossSource.liveJournalStore as DurableLiveJournalStore,
+					prepared: sourcePayload,
+				});
+			} else {
+				displacedSource = ObjectFreeze({ authorization: sourceAuthorization, prepared: sourcePayload });
+			}
 		}
 
 		const journal = input.liveJournalStore as DurableLiveJournalStore;
@@ -3234,6 +3468,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		}
 		const preparedVertexCount = index.size;
 		let recoveredCount = 0;
+		let recoveredTerminal = false;
 		const recoveredVertices: AdmittedReceivedVertexView[] = [];
 		const quarantinedDigests = new IntrinsicSet<string>();
 		const latchedOperations = new IntrinsicMap<string, StagedLatchedAclOperation>();
@@ -3272,8 +3507,12 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				}
 
 				let authenticated: AuthenticatedRecoveryVertex | undefined;
+				let recoveredPreimageBytes: Uint8Array | undefined;
+				let recoveredSignature: Uint8Array | undefined;
 				try {
 					if (row.sourceKind === "received") {
+						recoveredPreimageBytes = row.exactCanonicalPreimageBytes;
+						recoveredSignature = row.detachedSignature;
 						authenticated = authenticateRecoveryVertex(
 							payload,
 							authorization,
@@ -3288,6 +3527,8 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 							localScope
 						);
 						if (issuedRow !== undefined) {
+							recoveredPreimageBytes = issuedRow.canonicalPreimageBytes;
+							recoveredSignature = issuedRow.signature;
 							authenticated = authenticateRecoveryVertex(
 								payload,
 								authorization,
@@ -3323,6 +3564,33 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 					journalAfterSequence = expectedSequence;
 					continue;
 				}
+				let terminalClassification: ReturnType<V3TerminalVertexClassifier> = "ordinary";
+				if (
+					typeof terminalClassifier === "function" &&
+					recoveredPreimageBytes !== undefined &&
+					recoveredSignature !== undefined
+				) {
+					try {
+						terminalClassification = (terminalClassifier as V3TerminalVertexClassifier)(
+							ObjectFreeze({
+								author: authenticated.author,
+								exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(recoveredPreimageBytes),
+								signature: new Uint8ArrayConstructor(recoveredSignature),
+								vertex: authenticated.admitted,
+							})
+						);
+					} catch {
+						terminalClassification = "reject";
+					}
+				}
+				if (
+					terminalClassification === "reject" ||
+					(recoveredTerminal && terminalClassification !== "terminal-authorized")
+				) {
+					ReflectApply(SetPrototypeAdd, quarantinedDigests, [authenticated.digest]);
+					journalAfterSequence = expectedSequence;
+					continue;
+				}
 				if (!hasBoundedDependencies(payload, authenticated)) {
 					return recoveryFailure("admission-rejected", "v3 journal row dependency bound is invalid");
 				}
@@ -3348,6 +3616,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				recoveredCount += 1;
 				recoveredVertices.push(authenticated.admitted);
 				if (candidate !== null && candidate !== undefined) latchedOperations.set(candidate.digest, candidate);
+				if (terminalClassification === "terminal-authorized") recoveredTerminal = true;
 				journalAfterSequence = expectedSequence;
 			}
 		}
@@ -3441,6 +3710,27 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				return recoveryFailure("admission-rejected", "v3 recovery vertex dependency bound is invalid");
 			}
 			const alreadyRecovered = index.has(authenticated.digest);
+			let terminalClassification: ReturnType<V3TerminalVertexClassifier> = "ordinary";
+			if (!alreadyRecovered && typeof terminalClassifier === "function") {
+				try {
+					terminalClassification = (terminalClassifier as V3TerminalVertexClassifier)(
+						ObjectFreeze({
+							author: authenticated.author,
+							exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(issuedRow.canonicalPreimageBytes),
+							signature: new Uint8ArrayConstructor(issuedRow.signature),
+							vertex: authenticated.admitted,
+						})
+					);
+				} catch {
+					terminalClassification = "reject";
+				}
+				if (
+					terminalClassification === "reject" ||
+					(recoveredTerminal && terminalClassification !== "terminal-authorized")
+				) {
+					return recoveryFailure("authorization-rejected", "v3 recovery terminal sequence is invalid");
+				}
+			}
 			const candidate = aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
 			if (!alreadyRecovered && !validateLatchedOperation(authorization, latchedOperations, candidate)) {
 				return recoveryFailure("authorization-rejected", "v3 recovery ACL operation is not authorized");
@@ -3486,13 +3776,123 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				recoveredCount += 1;
 				recoveredVertices.push(authenticated.admitted);
 				if (candidate !== null && candidate !== undefined) latchedOperations.set(candidate.digest, candidate);
+				if (terminalClassification === "terminal-authorized") recoveredTerminal = true;
 			}
 			afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
 		}
-		if (currentRecordCount === 0 && (displacedSource !== undefined || recoveredCount === 0)) {
+		if (displacedSource?.activationVertexDigest !== undefined) {
+			const sourceScope = displacedSource.issuanceScope;
+			const sourceStore = displacedSource.issuanceStore;
+			const sourceJournal = displacedSource.liveJournalStore;
+			if (sourceScope === undefined || sourceStore === undefined || sourceJournal === undefined) {
+				return recoveryFailure("authorization-rejected", "v3 displaced source authority is incomplete");
+			}
+			let sourceReadiness;
+			try {
+				sourceReadiness = await sourceJournal.readiness({ scope: liveJournalScope(displacedSource.prepared) });
+			} catch {
+				return recoveryFailure("journal-rejected", "v3 displaced source journal readiness failed");
+			}
+			if (
+				!sourceReadiness.ok ||
+				!sourceReadiness.ready ||
+				!NumberIsSafeInteger(sourceReadiness.rowCount) ||
+				(sourceReadiness.rowCount as number) < 1 ||
+				(sourceReadiness.rowCount as number) > displacedSource.prepared.parameters.maxEpochVertices ||
+				!sameLiveJournalScope(sourceReadiness.scope, liveJournalScope(displacedSource.prepared))
+			) {
+				return recoveryFailure("journal-rejected", "v3 displaced source journal is invalid");
+			}
+			let foundActivation = false;
+			let sourceAfter: number | null = null;
+			for (let sequence = 0; sequence < sourceReadiness.rowCount; sequence += 1) {
+				let page;
+				try {
+					page = await sourceJournal.readPage({
+						afterSequence: sourceAfter,
+						limit: 1,
+						scope: liveJournalScope(displacedSource.prepared),
+						snapshot: sourceReadiness.snapshot,
+					});
+				} catch {
+					return recoveryFailure("journal-rejected", "v3 displaced source journal read failed");
+				}
+				if (!page.ok || page.rows.length !== 1) {
+					return recoveryFailure("journal-rejected", "v3 displaced source journal is incomplete");
+				}
+				const sourceRow = journalRowSnapshot(page.rows[0], liveJournalScope(displacedSource.prepared), sequence);
+				if (sourceRow === undefined) {
+					return recoveryFailure("journal-rejected", "v3 displaced source journal row is invalid");
+				}
+				let sourcePreimageBytes: Uint8Array;
+				let sourceSignature: Uint8Array;
+				let issued: SnapshottedOutboxRow | undefined;
+				if (sourceRow.sourceKind === "received") {
+					sourcePreimageBytes = sourceRow.exactCanonicalPreimageBytes;
+					sourceSignature = sourceRow.detachedSignature;
+				} else {
+					let sourceCommit: unknown;
+					try {
+						sourceCommit = await sourceStore.readIssued(sourceScope, sourceRow.authorSequence);
+					} catch {
+						return recoveryFailure("issuance-rejected", "v3 displaced source issued record read failed");
+					}
+					issued = outboxRowSnapshot(
+						ObjectFreeze({ commit: sourceCommit, publishState: "pending" as const }),
+						sourceScope
+					);
+					if (issued === undefined) {
+						return recoveryFailure("admission-rejected", "v3 displaced source vertex is not authenticated");
+					}
+					sourcePreimageBytes = issued.canonicalPreimageBytes;
+					sourceSignature = issued.signature;
+				}
+				const authenticated = authenticateRecoveryVertex(
+					displacedSource.prepared,
+					displacedSource.authorization,
+					sourcePreimageBytes,
+					sourceSignature
+				);
+				if (
+					authenticated === undefined ||
+					authenticated.digest !== sourceRow.vertexDigest ||
+					(sourceRow.sourceKind === "local-issued" && authenticated.author !== sourceScope.author)
+				) {
+					return recoveryFailure("admission-rejected", "v3 displaced source vertex is not authenticated");
+				}
+				if (authenticated.digest === displacedSource.activationVertexDigest) {
+					let classification: ReturnType<V3TerminalVertexClassifier> = "reject";
+					try {
+						classification = (terminalClassifier as V3TerminalVertexClassifier)(
+							ObjectFreeze({
+								author: authenticated.author,
+								exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(sourcePreimageBytes),
+								signature: new Uint8ArrayConstructor(sourceSignature),
+								vertex: authenticated.admitted,
+							})
+						);
+					} catch {
+						classification = "reject";
+					}
+					if (classification !== "terminal-authorized" || sequence !== sourceReadiness.rowCount - 1) {
+						return recoveryFailure("authorization-rejected", "v3 displaced source activation is invalid");
+					}
+					foundActivation = true;
+				}
+				sourceAfter = sequence;
+			}
+			if (!foundActivation) {
+				return recoveryFailure("authorization-rejected", "v3 displaced source activation is unavailable");
+			}
+		}
+		if (
+			!retainedBootstrapHold &&
+			currentRecordCount === 0 &&
+			(recoveredCount === 0 || (displacedSource !== undefined && displacedSource.activationVertexDigest === undefined))
+		) {
 			return recoveryFailure("issuance-rejected", "v3 recovery issued record chain is empty");
 		}
-		if (recoveredCount === 0 || index.size !== preparedVertexCount + recoveredCount) {
+		if (!retainedBootstrapHold && (recoveredCount === 0 || index.size !== preparedVertexCount + recoveredCount)) {
 			return recoveryFailure("issuance-rejected", "v3 recovery requires a complete issued record chain");
 		}
 		const capability = ObjectFreeze({}) as RecoveredV3Live;
@@ -3500,6 +3900,8 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			capability,
 			ObjectFreeze({
 				authorization,
+				classifyTerminalVertex:
+					typeof terminalClassifier === "function" ? (terminalClassifier as V3TerminalVertexClassifier) : undefined,
 				displacedSource,
 				epochBytes,
 				index,
@@ -3509,6 +3911,8 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				liveJournalStore: journal,
 				prepared: payload,
 				quarantinedDigests,
+				retainedBootstrapHold,
+				terminal: recoveredTerminal,
 			})
 		);
 		return ObjectFreeze({
@@ -3538,6 +3942,23 @@ interface CapturedLocalIssueInput {
 		readonly operation: Readonly<Record<string, unknown>>;
 	}>[];
 	readonly signRegisteredVertexDigest: SignRegisteredVertexDigest;
+}
+
+type InternalLocalIssueResult = V3LocalIssueResult &
+	Readonly<{
+		readonly terminalIntent?: "absent" | "outcome-unknown";
+		readonly terminalDisposition?: "continue" | "retained-bootstrap-ready" | "terminal-accepted" | "terminal-rejected";
+	}>;
+
+function internalLocalIssueFailure(
+	kind: Exclude<Extract<V3LocalIssueResult, { readonly ok: false }>["kind"], "split-required">,
+	detail: string,
+	terminalIntent?: "absent" | "outcome-unknown"
+): InternalLocalIssueResult {
+	return ObjectFreeze({
+		...localIssueFailure(kind, detail),
+		...(terminalIntent === undefined ? {} : { terminalIntent }),
+	});
 }
 
 function canonicalRecord(value: unknown, keys: readonly string[]): Readonly<Record<string, unknown>> | undefined {
@@ -3743,8 +4164,9 @@ async function issueOneVertex(
 	input: CapturedLocalIssueInput,
 	dependencies: readonly string[],
 	logicalTime: number,
-	operation: Readonly<Record<string, unknown>>
-): Promise<V3LocalIssueResult> {
+	operation: Readonly<Record<string, unknown>>,
+	requireTerminalAuthorization = false
+): Promise<InternalLocalIssueResult> {
 	if (!currentRegistration(registration)) return localIssueFailure("not-active", "v3 plane is not active");
 	if (registration.index.size >= registration.payload.parameters.maxEpochVertices) {
 		return localIssueFailure("graph-rejected", "v3 local issue graph is at capacity");
@@ -3768,6 +4190,7 @@ async function issueOneVertex(
 	let commit: unknown;
 	let capacityRejected = false;
 	let signerResolved = false;
+	let terminalTransactionStarted = false;
 	try {
 		const issuer = createAdmissionBoundTransactionalVertexIssuer({
 			author: scope.author,
@@ -3778,8 +4201,8 @@ async function issueOneVertex(
 				signerResolved = true;
 				return signature;
 			},
-			transactIssue: (selectedScope, buildAndSign) =>
-				registration.issuanceStore.transactIssue(selectedScope, async (authorSequence) => {
+			transactIssue: async (selectedScope, buildAndSign) => {
+				const commitOutsideTransaction = async (authorSequence: number): Promise<unknown> => {
 					const candidateCommit = await buildAndSign(authorSequence);
 					const candidateRow = outboxRowSnapshot(
 						ObjectFreeze({ commit: candidateCommit, publishState: "pending" as const }),
@@ -3793,7 +4216,24 @@ async function issueOneVertex(
 						throw new TypeError("v3 local issue graph is at capacity");
 					}
 					return candidateCommit;
-				}),
+				};
+				if (requireTerminalAuthorization) {
+					const lineage = await registration.issuanceStore.readLineage(selectedScope);
+					if (!NumberIsSafeInteger(lineage.next) || lineage.next < 0 || lineage.exhausted) {
+						throw new TypeError("v3 terminal issuance lineage is unavailable");
+					}
+					const expectedSequence = lineage.next;
+					const candidate = await commitOutsideTransaction(expectedSequence);
+					terminalTransactionStarted = true;
+					return registration.issuanceStore.transactIssue(selectedScope, (authorSequence) => {
+						if (authorSequence !== expectedSequence) {
+							throw new TypeError("v3 terminal issuance lineage changed");
+						}
+						return Promise.resolve(candidate as never);
+					});
+				}
+				return registration.issuanceStore.transactIssue(selectedScope, commitOutsideTransaction as never);
+			},
 		});
 		commit = await issuer.issue({
 			anchor: registration.payload.provenance.anchorDigest,
@@ -3804,14 +4244,28 @@ async function issueOneVertex(
 			operation,
 		});
 	} catch {
+		if (requireTerminalAuthorization && terminalTransactionStarted) {
+			return internalLocalIssueFailure(
+				"issuance-rejected",
+				"v3 terminal issue transaction outcome is unknown",
+				"outcome-unknown"
+			);
+		}
 		return capacityRejected
 			? localIssueFailure("graph-rejected", "v3 local issue graph is at capacity")
 			: signerResolved
 				? localIssueFailure("admission-rejected", "v3 local issue signature was not admitted")
 				: localIssueFailure("issuance-rejected", "v3 local issue transaction failed");
 	}
+	const committedFailure = (
+		kind: Exclude<Extract<V3LocalIssueResult, { readonly ok: false }>["kind"], "split-required">,
+		detail: string
+	): InternalLocalIssueResult =>
+		requireTerminalAuthorization
+			? internalLocalIssueFailure(kind, detail, "outcome-unknown")
+			: localIssueFailure(kind, detail);
 	const row = outboxRowSnapshot(ObjectFreeze({ commit, publishState: "pending" as const }), scope);
-	if (row === undefined) return localIssueFailure("issuance-rejected", "v3 local issue record is invalid");
+	if (row === undefined) return committedFailure("issuance-rejected", "v3 local issue record is invalid");
 
 	let authenticated: AuthenticatedRecoveryVertex | undefined;
 	try {
@@ -3822,7 +4276,7 @@ async function issueOneVertex(
 			row.signature
 		);
 	} catch {
-		return localIssueFailure("admission-rejected", "v3 local issue authentication failed");
+		return committedFailure("admission-rejected", "v3 local issue authentication failed");
 	}
 	if (
 		authenticated === undefined ||
@@ -3831,17 +4285,36 @@ async function issueOneVertex(
 		authenticated.authorSequence !== row.authorSequence ||
 		registration.index.has(authenticated.digest)
 	) {
-		return localIssueFailure("admission-rejected", "v3 local issue record is not authenticated");
+		return committedFailure("admission-rejected", "v3 local issue record is not authenticated");
 	}
 	if (!hasBoundedDependencies(registration.payload, authenticated)) {
-		return localIssueFailure("admission-rejected", "v3 local issue dependency bound is invalid");
+		return committedFailure("admission-rejected", "v3 local issue dependency bound is invalid");
+	}
+	if (requireTerminalAuthorization) {
+		let classification: ReturnType<V3TerminalVertexClassifier> = "reject";
+		try {
+			classification =
+				registration.classifyTerminalVertex?.(
+					ObjectFreeze({
+						author: authenticated.author,
+						exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
+						signature: new Uint8ArrayConstructor(row.signature),
+						vertex: authenticated.admitted,
+					})
+				) ?? "reject";
+		} catch {
+			classification = "reject";
+		}
+		if (classification !== "terminal-authorized") {
+			return committedFailure("admission-rejected", "v3 terminal issue is not authorized");
+		}
 	}
 	const acceptedAcl = aclOperation(authenticated.author, authenticated.digest, authenticated.vertex.operation);
 	if (!validateLatchedOperation(registration.authorization, registration.latchedOperations, acceptedAcl)) {
-		return localIssueFailure("authorization-rejected", "v3 local ACL operation is not authorized");
+		return committedFailure("authorization-rejected", "v3 local ACL operation is not authorized");
 	}
 	if (!hasGraphCapacity(registration, authenticated.byteCharge)) {
-		return localIssueFailure("graph-rejected", "v3 local issue graph is at capacity");
+		return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
 	}
 
 	let appended;
@@ -3854,7 +4327,7 @@ async function issueOneVertex(
 			vertexDigest: authenticated.digest,
 		});
 	} catch {
-		return localIssueFailure("journal-rejected", "v3 local issue journal append failed");
+		return committedFailure("journal-rejected", "v3 local issue journal append failed");
 	}
 	if (
 		!appended.ok ||
@@ -3863,7 +4336,7 @@ async function issueOneVertex(
 		appended.vertexDigest !== authenticated.digest ||
 		!sameLiveJournalScope(appended.scope, liveJournalScope(registration.payload))
 	) {
-		return localIssueFailure("journal-rejected", "v3 local issue journal append was rejected");
+		return committedFailure("journal-rejected", "v3 local issue journal append was rejected");
 	}
 
 	const updatedEpochBytes = nextEpochBytes(
@@ -3872,21 +4345,22 @@ async function issueOneVertex(
 		registration.payload.parameters.maxEpochBytes
 	);
 	if (updatedEpochBytes === undefined) {
-		return localIssueFailure("graph-rejected", "v3 local issue graph is at capacity");
+		return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
 	}
 	try {
 		const outcome = registration.index.append(authenticated.digest, authenticated.vertex, authenticated.byteCharge);
-		if (outcome !== undefined) return localIssueFailure("graph-rejected", "v3 local issue graph is at capacity");
+		if (outcome !== undefined) return committedFailure("graph-rejected", "v3 local issue graph is at capacity");
 		registration.epochBytes = updatedEpochBytes;
 	} catch {
-		return localIssueFailure("graph-rejected", "v3 local issue graph append failed");
+		return committedFailure("graph-rejected", "v3 local issue graph append failed");
 	}
 	if (acceptedAcl !== null && acceptedAcl !== undefined) {
 		registration.latchedOperations.set(acceptedAcl.digest, acceptedAcl);
 	}
+	let terminalDisposition: InternalLocalIssueResult["terminalDisposition"];
 	if (currentRegistration(registration)) {
 		try {
-			await registration.onAdmittedVertex(
+			const disposition = await registration.onAdmittedVertex(
 				ObjectFreeze({
 					vertex: authenticated.admitted,
 					exactReceivedCanonicalPreimageBytes: new Uint8ArrayConstructor(row.canonicalPreimageBytes),
@@ -3894,17 +4368,28 @@ async function issueOneVertex(
 					transportSender: registration.networkNode.peerId,
 				})
 			);
+			terminalDisposition = disposition?.kind;
 		} catch {
 			ingressFailureLog("sink-rejected");
 		}
 	}
-	return localIssueSuccess(row.authorSequence, authenticated.digest);
+	return ObjectFreeze({
+		...localIssueSuccess(row.authorSequence, authenticated.digest),
+		...(terminalDisposition === undefined ? {} : { terminalDisposition }),
+	});
 }
 
 async function issueLocal(
 	registration: V3PlaneRegistration,
 	input: CapturedLocalIssueInput
 ): Promise<V3LocalIssueResult> {
+	if (
+		!currentRegistration(registration) ||
+		registration.terminalState !== "active" ||
+		registration.retainedBootstrapHold
+	) {
+		return localIssueFailure("not-active", "v3 plane is not accepting local issues");
+	}
 	const first = input.operations[0];
 	if (first === undefined) return localIssueFailure("malformed-input", "v3 local issue operations are invalid");
 	let applicationOperation = first.operation;
@@ -3963,12 +4448,15 @@ function enqueueLocalIssue(
 	registration: V3PlaneRegistration,
 	rawInput: V3LocalIssueInput
 ): Promise<V3LocalIssueResult> {
-	return enqueueRegistrationTask(registration, () => {
-		const captured = capturedLocalIssueInput(registration.payload, rawInput);
-		return "ok" in captured
-			? (): Promise<V3LocalIssueResult> => Promise.resolve(captured)
-			: (): Promise<V3LocalIssueResult> => issueLocal(registration, captured);
-	});
+	const barrier = registration.terminalBarrier;
+	const enqueue = (): Promise<V3LocalIssueResult> =>
+		enqueueRegistrationTask(registration, () => {
+			const captured = capturedLocalIssueInput(registration.payload, rawInput);
+			return "ok" in captured
+				? (): Promise<V3LocalIssueResult> => Promise.resolve(captured)
+				: (): Promise<V3LocalIssueResult> => issueLocal(registration, captured);
+		});
+	return barrier === undefined ? enqueue() : barrier.then(enqueue);
 }
 
 type ClassifiedRebaseRow = Readonly<{
@@ -4043,15 +4531,14 @@ function rebaseIntents(
 
 async function authenticatedOutboxRow(
 	registration: V3PlaneRegistration,
-	rawRow: unknown
+	rawRow: unknown,
+	issuanceStore: DurableIssuanceStore = registration.issuanceStore,
+	issuanceScope: DurableIssueScope = registration.issuanceScope
 ): Promise<ClassifiedRebaseRow | undefined> {
-	const row = outboxRowSnapshot(rawRow, registration.issuanceScope);
+	const row = outboxRowSnapshot(rawRow, issuanceScope);
 	if (row === undefined) return undefined;
-	const issued = await registration.issuanceStore.readIssued(registration.issuanceScope, row.authorSequence);
-	const issuedRow = outboxRowSnapshot(
-		ObjectFreeze({ commit: issued, publishState: row.publishState }),
-		registration.issuanceScope
-	);
+	const issued = await issuanceStore.readIssued(issuanceScope, row.authorSequence);
+	const issuedRow = outboxRowSnapshot(ObjectFreeze({ commit: issued, publishState: row.publishState }), issuanceScope);
 	return issuedRow !== undefined && matchingOutboxRows(row, issuedRow)
 		? classifyRebaseRow(registration, row)
 		: undefined;
@@ -4061,7 +4548,18 @@ async function readRebaseOutbox(registration: V3PlaneRegistration): Promise<V3Re
 	if (!currentRegistration(registration)) {
 		return ObjectFreeze({ detail: "v3 plane is not active", kind: "not-active" as const, ok: false as const });
 	}
+	if (registration.retainedBootstrapHold) {
+		return ObjectFreeze({
+			detail: "v3 retained bootstrap is incomplete",
+			kind: "not-active" as const,
+			ok: false as const,
+		});
+	}
 	if (registration.rebaseSnapshot === undefined) {
+		const crossSource =
+			registration.displacedSource?.issuanceStore === undefined ? undefined : registration.displacedSource;
+		const selectedStore = crossSource?.issuanceStore ?? registration.issuanceStore;
+		const selectedScope = crossSource?.issuanceScope ?? registration.issuanceScope;
 		const displaced: ClassifiedRebaseRow[] = [];
 		let currentRecordCount = 0;
 		let displacedRecordCount = 0;
@@ -4069,10 +4567,8 @@ async function readRebaseOutbox(registration: V3PlaneRegistration): Promise<V3Re
 		for (;;) {
 			let rawPage: unknown;
 			try {
-				rawPage = await registration.issuanceStore.readOutboxPage(
-					afterKey === undefined
-						? { limit: 1, scope: registration.issuanceScope }
-						: { afterKey, limit: 1, scope: registration.issuanceScope }
+				rawPage = await selectedStore.readOutboxPage(
+					afterKey === undefined ? { limit: 1, scope: selectedScope } : { afterKey, limit: 1, scope: selectedScope }
 				);
 			} catch {
 				return ObjectFreeze({
@@ -4092,7 +4588,7 @@ async function readRebaseOutbox(registration: V3PlaneRegistration): Promise<V3Re
 			if (page === null) break;
 			let classified: ClassifiedRebaseRow | undefined;
 			try {
-				classified = await authenticatedOutboxRow(registration, page);
+				classified = await authenticatedOutboxRow(registration, page, selectedStore, selectedScope);
 			} catch {
 				return ObjectFreeze({
 					detail: "v3 rebase outbox record read failed",
@@ -4107,11 +4603,7 @@ async function readRebaseOutbox(registration: V3PlaneRegistration): Promise<V3Re
 					ok: false as const,
 				});
 			}
-			afterKey = ObjectFreeze([
-				registration.issuanceScope.objectId,
-				registration.issuanceScope.author,
-				classified.row.authorSequence,
-			] as const);
+			afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, classified.row.authorSequence] as const);
 			if (classified.kind === "current") {
 				currentRecordCount += 1;
 				if (currentRecordCount > registration.payload.parameters.maxEpochVertices) {
@@ -4131,7 +4623,8 @@ async function readRebaseOutbox(registration: V3PlaneRegistration): Promise<V3Re
 					ok: false as const,
 				});
 			}
-			if (classified.kind === "displaced" && classified.row.publishState === "pending") {
+			if (classified.kind === "displaced") {
+				if (crossSource === undefined && classified.row.publishState !== "pending") continue;
 				const intents = rebaseIntents(
 					(registration.displacedSource as V3DisplacedSourceAuthority).prepared,
 					classified.authenticated
@@ -4142,6 +4635,13 @@ async function readRebaseOutbox(registration: V3PlaneRegistration): Promise<V3Re
 						kind: "record-rejected" as const,
 						ok: false as const,
 					});
+				}
+				if (
+					crossSource !== undefined &&
+					(classified.row.authorSequence === 0 ||
+						classified.authenticated.digest === crossSource.activationVertexDigest)
+				) {
+					continue;
 				}
 				displacedRecordCount += 1;
 				if (
@@ -4174,16 +4674,23 @@ async function readRebaseOutbox(registration: V3PlaneRegistration): Promise<V3Re
 			ok: false as const,
 		});
 	}
-	return ObjectFreeze({
-		kind: "displaced" as const,
-		ok: true as const,
-		source: ObjectFreeze({
-			author: selected.authenticated.author,
-			authorSequence: selected.row.authorSequence,
-			intents: ObjectFreeze(intents),
-			vertexDigest: selected.authenticated.digest,
-		}),
-	});
+	const commonSource = {
+		author: selected.authenticated.author,
+		authorSequence: selected.row.authorSequence,
+		intents: ObjectFreeze(intents),
+		vertexDigest: selected.authenticated.digest,
+	};
+	return source.issuanceStore === undefined
+		? ObjectFreeze({
+				kind: "displaced" as const,
+				ok: true as const,
+				source: ObjectFreeze(commonSource),
+			})
+		: ObjectFreeze({
+				kind: "displaced" as const,
+				ok: true as const,
+				source: ObjectFreeze({ ...commonSource, publishState: selected.row.publishState }),
+			});
 }
 
 async function publishPending(
@@ -4191,6 +4698,9 @@ async function publishPending(
 	completionRow?: SnapshottedOutboxRow
 ): Promise<V3EgressResult> {
 	if (!currentRegistration(registration)) return egressFailure("not-active", "v3 plane is not active");
+	if (registration.retainedBootstrapHold) {
+		return egressFailure("not-active", "v3 retained bootstrap is incomplete");
+	}
 	const scope = copiedScope(registration.issuanceScope);
 	if (scope === undefined || scope.objectId !== registration.payload.provenance.objectId) {
 		return egressFailure("record-rejected", "v3 publication selector is invalid");
@@ -4316,16 +4826,26 @@ async function completeRebaseSource(
 		return egressFailure("record-rejected", "v3 displaced source completion is invalid");
 	}
 	try {
-		const issued = await registration.issuanceStore.readIssued(registration.issuanceScope, input.authorSequence);
-		const row = outboxRowSnapshot(
-			ObjectFreeze({ commit: issued, publishState: "pending" as const }),
-			registration.issuanceScope
-		);
+		const crossSource =
+			registration.displacedSource?.issuanceStore === undefined ? undefined : registration.displacedSource;
+		const selectedStore = crossSource?.issuanceStore ?? registration.issuanceStore;
+		const selectedScope = crossSource?.issuanceScope ?? registration.issuanceScope;
+		const issued = await selectedStore.readIssued(selectedScope, input.authorSequence);
+		const row = outboxRowSnapshot(ObjectFreeze({ commit: issued, publishState: "pending" as const }), selectedScope);
 		const classified = row === undefined ? undefined : classifyRebaseRow(registration, row);
 		if (classified?.kind !== "displaced" || classified.authenticated.digest !== input.digest) {
 			return egressFailure("record-rejected", "v3 displaced source completion does not match");
 		}
 		if (row === undefined) return egressFailure("record-rejected", "v3 displaced source completion does not match");
+		if (crossSource !== undefined) {
+			await selectedStore.compareAndMarkOutboxPublished({
+				authorSequence: row.authorSequence,
+				digest: new Uint8ArrayConstructor(row.digest),
+				scope: selectedScope,
+			});
+			registration.rebaseSnapshot = undefined;
+			return egressSuccess("published");
+		}
 		return await publishPending(registration, row);
 	} catch {
 		return egressFailure("store-failed", "v3 displaced source completion failed");
@@ -4333,6 +4853,18 @@ async function completeRebaseSource(
 }
 
 function enqueuePendingPublication(registration: V3PlaneRegistration): Promise<V3EgressResult> {
+	if (registration.terminalState === "terminal") {
+		return enqueueRegistrationTask(registration, () => async () => {
+			let published = false;
+			for (let count = 0; count <= registration.payload.parameters.maxEpochVertices; count += 1) {
+				const result = await publishPending(registration);
+				if (!result.ok) return result;
+				if (result.kind === "empty") return published ? egressSuccess("published") : result;
+				published = true;
+			}
+			return egressFailure("record-rejected", "v3 terminal publication traversal exceeded the epoch bound");
+		});
+	}
 	return enqueueRegistrationTask(registration, () => () => publishPending(registration));
 }
 
@@ -4474,6 +5006,157 @@ function enqueueTargetedRetainedPublication(
 	return enqueueRegistrationTask(registration, () => () => republishRetained(registration, targetPeerId));
 }
 
+function terminalFailure(
+	kind: Extract<V3TerminalPublishResult, { readonly ok: false }>["kind"],
+	detail: string,
+	terminalIntent: "absent" | "outcome-unknown" = "absent"
+): Extract<V3TerminalPublishResult, { readonly ok: false }> {
+	return ObjectFreeze({ detail, kind, ok: false as const, terminalIntent });
+}
+
+function terminalIssueFailure(result: Exclude<V3LocalIssueResult, { readonly ok: true }>): V3TerminalPublishResult {
+	return terminalFailure(
+		result.kind === "split-required" ? "malformed-input" : result.kind,
+		result.detail,
+		Reflect.get(result, "terminalIntent") === "outcome-unknown" ? "outcome-unknown" : "absent"
+	);
+}
+
+async function publishTerminalIssue(
+	registration: V3PlaneRegistration,
+	rawInput: V3LocalIssueInput
+): Promise<V3TerminalPublishResult> {
+	if (!currentRegistration(registration) || registration.terminalState !== "transition") {
+		return terminalFailure("not-active", "v3 terminal transition is not active");
+	}
+	const rawRecord = snapshotClosedRecord(rawInput, LOCAL_ISSUE_INPUT_KEYS);
+	const rawOperations = denseArray(rawRecord?.operations);
+	const rawFirst = rawOperations?.[0];
+	const rawEntry = snapshotClosedRecord(rawFirst, LOCAL_ISSUE_ENTRY_KEYS);
+	const tips = registration.index.tips();
+	if (tips.length === 0 || tips.length > registration.payload.parameters.maxDependencies) {
+		return terminalFailure("graph-rejected", "v3 terminal issue frontier is invalid");
+	}
+	if (rawEntry !== undefined) {
+		try {
+			const operationBytes = encodeCanonical(rawEntry.operation).byteLength;
+			const remainingBytes = registration.payload.parameters.maxEpochBytes - registration.epochBytes;
+			if (remainingBytes < operationBytes + 256) {
+				return terminalFailure("graph-rejected", "v3 terminal issue graph is at capacity");
+			}
+		} catch {
+			// The closed semantic capture below owns malformed-input classification.
+		}
+	}
+	const captured = capturedLocalIssueInput(registration.payload, rawInput);
+	if ("ok" in captured) {
+		return terminalIssueFailure(captured as Exclude<V3LocalIssueResult, { readonly ok: true }>);
+	}
+	const first = captured.operations[0];
+	if (
+		captured.operations.length !== 1 ||
+		first === undefined ||
+		Reflect.get(first.operation, "action") !== "migrationActivation"
+	) {
+		return terminalFailure("malformed-input", "v3 terminal issue is invalid");
+	}
+	const issued = await issueOneVertex(registration, captured, tips, first.logicalTime, first.operation, true);
+	if (!issued.ok) {
+		const failure = terminalIssueFailure(issued);
+		if (failure.terminalIntent === "outcome-unknown") registration.terminalState = "terminal";
+		return failure;
+	}
+	registration.terminalState = "terminal";
+	if (issued.terminalDisposition !== "terminal-accepted") {
+		return terminalFailure(
+			"terminal-rejected",
+			"v3 terminal sink did not accept the durable transition",
+			"outcome-unknown"
+		);
+	}
+	return ObjectFreeze({
+		authorSequence: issued.authorSequence,
+		digest: issued.digest,
+		kind: "accepted" as const,
+		ok: true as const,
+		terminalIntent: "committed" as const,
+	});
+}
+
+function beginTerminalTransition(registration: V3PlaneRegistration): Promise<V3TerminalTransitionResult> {
+	if (
+		registration.terminalState === "active" &&
+		registration.terminalBarrier === undefined &&
+		currentRegistration(registration)
+	) {
+		let release!: () => void;
+		registration.terminalBarrier = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		registration.releaseTerminalBarrier = release;
+	}
+	const releaseBarrier = (): void => {
+		const release = registration.releaseTerminalBarrier;
+		registration.releaseTerminalBarrier = undefined;
+		registration.terminalBarrier = undefined;
+		release?.();
+	};
+	// eslint-disable-next-line @typescript-eslint/require-await -- queue tasks share one async result contract.
+	return enqueueRegistrationTask(registration, () => async () => {
+		if (!currentRegistration(registration)) {
+			releaseBarrier();
+			return ObjectFreeze({ detail: "v3 plane is not active", kind: "not-active" as const, ok: false as const });
+		}
+		if (registration.terminalState === "terminal") {
+			releaseBarrier();
+			return ObjectFreeze({
+				detail: "v3 plane already has a terminal transition",
+				kind: "already-terminal" as const,
+				ok: false as const,
+			});
+		}
+		if (registration.terminalState === "transition") {
+			return ObjectFreeze({
+				detail: "v3 terminal transition is already active",
+				kind: "transition-active" as const,
+				ok: false as const,
+			});
+		}
+		registration.terminalState = "transition";
+		let used = false;
+		const capability: Extract<V3TerminalTransitionResult, { readonly ok: true }>["capability"] = ObjectFreeze({
+			publishTerminal(this: unknown, input: V3LocalIssueInput): Promise<V3TerminalPublishResult> {
+				if (this !== capability) {
+					return Promise.reject(new TypeError("v3 terminal capability receiver is invalid"));
+				}
+				if (used) return Promise.resolve(terminalFailure("not-active", "v3 terminal capability is not active"));
+				return enqueueRegistrationTask(registration, () => async () => {
+					const result = await publishTerminalIssue(registration, input);
+					if (result.ok || result.terminalIntent === "outcome-unknown") {
+						used = true;
+						releaseBarrier();
+					}
+					return result;
+				});
+			},
+			resume(this: unknown) {
+				if (this !== capability || used || registration.terminalState !== "transition") {
+					return ObjectFreeze({
+						detail: "v3 terminal capability is not active",
+						kind: "invalid-state" as const,
+						ok: false as const,
+					});
+				}
+				used = true;
+				registration.terminalState = "active";
+				releaseBarrier();
+				return ObjectFreeze({ kind: "resumed" as const, ok: true as const });
+			},
+		});
+		return ObjectFreeze({ capability, ok: true as const });
+	});
+}
+
 function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
 	const ephemeralAuthority = ((): ReturnType<V3PlaneHandle["currentEphemeralAuthority"]> => {
 		const authorization = registration.authorization;
@@ -4502,6 +5185,7 @@ function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
 		topic: registration.topic,
 		queueId: registration.queueId,
 		currentEphemeralAuthority: () => (currentRegistration(registration) ? ephemeralAuthority : undefined),
+		beginTerminalTransition: (): Promise<V3TerminalTransitionResult> => beginTerminalTransition(registration),
 		issueLocal: (input: V3LocalIssueInput): Promise<V3LocalIssueResult> => enqueueLocalIssue(registration, input),
 		readRebaseOutbox: (): Promise<V3RebaseOutboxResult> =>
 			enqueueRegistrationTask(registration, () => () => readRebaseOutbox(registration)),
@@ -4586,9 +5270,9 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 		let registration = undefined as unknown as V3PlaneRegistration;
 		let networkSubscriptionAttempted = false;
 		try {
-			const queueSubscription = subscribeActivationQueue(boundQueueManager, queueId, (message) => {
-				enqueueV3Ingress(registration, message);
-			});
+			const queueSubscription = subscribeActivationQueue(boundQueueManager, queueId, (message) =>
+				enqueueV3Ingress(registration, message)
+			);
 			if (queueSubscription !== "ok") {
 				return queueSubscription === "capacity"
 					? activationFailureAfterCleanup(
@@ -4649,6 +5333,7 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 			registration = {
 				active: true,
 				authorization: recovered.authorization,
+				classifyTerminalVertex: recovered.classifyTerminalVertex,
 				displacedSource: recovered.displacedSource,
 				drainingPendingIngress: false,
 				epochBytes: recovered.epochBytes,
@@ -4667,9 +5352,13 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				publicationCursor: undefined,
 				rebaseCursor: undefined,
 				rebaseSnapshot: undefined,
+				retainedBootstrapHold: recovered.retainedBootstrapHold,
+				releaseTerminalBarrier: undefined,
 				quarantinedDigests: recovered.quarantinedDigests,
 				queueId: topic,
 				topic,
+				terminalBarrier: undefined,
+				terminalState: recovered.terminal ? "terminal" : "active",
 				gate: undefined,
 			};
 			registration.handle = makeV3PlaneHandle(registration);
@@ -4742,7 +5431,7 @@ export function routeV3RetainedIngress(handle: V3PlaneHandle, message: Message):
 	) {
 		return false;
 	}
-	enqueueV3Ingress(registration, message, "retained");
+	void enqueueV3Ingress(registration, message, "retained");
 	return true;
 }
 
