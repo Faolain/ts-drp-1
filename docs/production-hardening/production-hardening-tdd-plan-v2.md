@@ -50582,3 +50582,405 @@ production-hardening plan, or completed chat/game product. Phase 3h remains the
 next durable-spine checkpoint: a signed migration record and genuinely
 reversible rehearsal whose separate activation decision leaves the room on the
 old plane until authorized.
+
+### D.93.53 — Phase 3h-a creator-owned migration record and reversible rehearsal
+
+Phase 3g closed the authenticated displacement mechanism at signed ledger tip
+`001a0e8f694c4e520cea44444c5895df2dff2ed9`. Phase 3h begins with the smallest
+executable migration slice: a creator-owned record and a genuine application
+state rehearsal from one authenticated v3 room into a distinct authenticated
+v3 room. The source remains the live room throughout. The target uses derived,
+fresh scratch stores and one room-owned inert transport. This is rehearsal, not
+activation.
+
+#### Executable boundary and retained nonclaims
+
+The repository still has no certified next-anchor producer, adopted-cut router,
+generic legacy-DRP state codec or durable activation-decision owner. Phase 3h-a
+does not manufacture any of them. It does not call two independently valid
+genesis rooms an epoch transition, reuse one object identity across protocol
+preimages, or claim protocol-major legacy migration. A later Phase 3h-b must own
+a separately signed activation decision before any client is routed to the
+candidate. Certified cuts remain Phase 5 and atomic anchor adoption remains
+Phase 6.
+
+Adding the migration operation changes each product's artifact, blueprint and
+catalog digests. This slice therefore rehearses only source and target rooms
+created under the revised D.93.53 blueprint identities. Migration from a room
+created under an earlier chat or zone blueprint digest remains unimplemented;
+there is no accept-either catalog or compatibility decoder.
+
+The bounded production profile is creator-owned. The source creator, local
+author and target creator must be the same exact Ed25519 public key. The room
+derives that key by strictly decoding the singleton creator signer set whose
+exact canonical bytes hash to the `signerSetDigest` authenticated by the
+prepared room descriptor; an invite parser alone is never authority. A current
+writer, projected ACL member, network peer, foreign callback or caller-selected
+key cannot substitute. Creator-offline, delegated and threshold authority
+remain open.
+
+#### Exact public seam and existing registered-vertex signer
+
+The room adds these exact types:
+
+```ts
+export interface V3RoomMigrationProjection {
+	readonly exactCanonicalApplicationStateBytes: Uint8Array;
+	readonly importOperations: readonly Readonly<Record<string, unknown>>[];
+}
+
+export interface V3RoomMigrationCapability {
+	prepare(accepted: readonly V3RoomAcceptedOperation[]): V3RoomMigrationProjection;
+}
+
+export interface V3RoomMigrationRehearsalInput {
+	readonly rehearsalNonce: Uint8Array;
+	readonly targetCreatorInvite: string | V3RoomCreatorInviteMaterial;
+}
+
+export interface V3RoomMigrationRehearsalReceipt {
+	readonly activated: false;
+	readonly applicationStateDigest: string;
+	readonly exactCanonicalRecordBytes: Uint8Array;
+	readonly importedOperationCount: number;
+	readonly recordDigest: string;
+	readonly recordVertexDigest: string;
+	readonly targetAnchorDigest: string;
+}
+```
+
+`V3RoomApplication` gains optional `readonly migration?:
+V3RoomMigrationCapability`. Absence preserves ordinary room behavior and makes
+only rehearsal unavailable. `V3RoomSession` gains
+`rehearseMigration(input: V3RoomMigrationRehearsalInput):
+Promise<V3RoomMigrationRehearsalReceipt>`. Chat and zone add a thin creator-only
+public `rehearseMigration(): Promise<V3RoomMigrationRehearsalReceipt>` that
+mints a fresh full-buffer 32-byte nonce with `crypto.getRandomValues`, derives a
+distinct target object ID exactly as specified below so that it can mint the
+corresponding invite with the existing creator-invite owner, and delegates to
+the room; a joined
+noncreator fails before target creation. No product owns a second migration
+loop.
+
+The rehearsal input is an exact ordinary own-data record with those two keys and
+no extras. Before its first await, the room snapshots a string invite or
+canonical-encodes and strictly decodes a material invite exactly once. It also
+requires the nonce to be an ordinary, non-shared, offset-zero/full-backing
+32-byte `Uint8Array` and copies it. Proxies, accessors, subclasses, shared or
+partial views, later mutation and mixed material fail before store or signer
+work.
+
+There is no new migration signing callback and no direct Ed25519 verifier. Each
+product's existing `signRegisteredVertexDigest` remains the only custody port.
+The room issues one non-batchable `{ action: "migrationRecord", record }`
+operation into the target, where `record` is the exact plain canonical object
+defined below. Chat and zone add that exact closed operation to their genuine
+blueprint with one required `record: "canonical-object"` field,
+`maxCanonicalOperationBytes: 65_536` and an exact neutral
+`migrationRecord` reducer in each authenticated artifact source. This
+deliberately re-derives each artifact digest, blueprint digest and catalog
+digest; source and target use the same revised product identity. Their visible
+application projections ignore the already room-validated operation. The
+ordinary admission-bound issuer derives the
+registered vertex digest, invokes the existing Keychain callback, and strictly
+verifies the creator signature before journal/index acceptance. The room encodes
+the same detached record as `exactCanonicalRecordBytes` and retains the accepted
+vertex digest as `recordVertexDigest`. Thus the record is genuinely
+creator-signed by the already-reviewed protocol path without a new registry
+domain, generic signer, exported verifier or caller-authorized key.
+
+The source session already closes over its application, author, public key,
+source invite, object identity, stores, transport and signer. The target object
+ID is decoded provisionally from the captured target anchor preimage only to
+derive scratch names; it becomes authority only when the genuine target trust
+installation authenticates the same object, anchor, signer set and blueprint.
+Initial logical time, physical names, callbacks and inert transport are all
+room-derived.
+
+#### One atomic room-projection checkpoint and canonical record
+
+The existing room issue scheduler is extended with one migration-barrier task;
+there is no second queue. Its linearization point is the room's committed
+`acceptedVertices` projection, not the live-journal append sequence and not an
+epoch cut. After all earlier local issues commit and before any later local issue
+begins, the barrier synchronously freezes:
+
+1. every room-committed application operation ordered by accepted vertex and
+   then operation index;
+2. its exact canonical closed-row encoding; and
+3. two independent calls to `migration.prepare()` over independently detached
+   frozen snapshots.
+
+The canonical row has exactly the keys `author`, `authorSequence`,
+`exactCanonicalOperationBytes`, `logicalTime`, `operationCount`,
+`operationIndex` and `vertexDigest`; the runtime-only `operation` value is not
+encoded. Each operation is independently canonical-round-tripped before its
+bytes enter that row. No await or external call occurs across snapshot and both
+prepare calls. Their state bytes and canonical import arrays must be byte-equal.
+The source-row digest is
+`hashDomain("ts-drp/v3-room-migration-source/v1", encodeCanonical(rows))`,
+state digest is
+`hashDomain("ts-drp/v3-room-migration-state/v1",
+exactCanonicalApplicationStateBytes)`, and import digest is
+`hashDomain("ts-drp/v3-room-migration-import/v1",
+encodeCanonical(importOperations))`.
+
+The snapshot parser permits at most 8,192 rows and 8 MiB encoded; state permits
+32 KiB; the import description permits at most 8,192 operations and 4 MiB
+encoded; canonical record permits 49,152 bytes; and the surrounding
+`migrationRecord` operation remains within 65,536 bytes. These are structural
+input and memory ceilings, not a promise that every maximum-sized rehearsal
+fits one target epoch. The room synchronously co-enqueues every import before
+awaiting any result, but makes no batching-ratio assumption: the existing
+split-required path may emit one registered vertex per import. Genuine target
+capacity therefore decides success one accepted vertex and exact registered
+byte charge at a time. The migration record is issued **last**, only after all
+imports are durably accepted and the exact projected target state equals the
+prepared state. A capacity or import failure can leave only an undiscoverable,
+nonce-consumed scratch candidate; it can never leave a signed migration record.
+Any overflow, unstable second call, noncanonical value, sparse/duplicate row or
+mixed result rejects, closes the candidate and returns no receipt.
+
+JavaScript's synchronous capture cannot interleave a projection commit. An
+ingress whose `admittedSink` commit finishes first is included; one whose room
+commit finishes later linearizes after the barrier even if its journal append
+already occurred. RED latches both sides of that race and requires the exported
+state to equal the observable room projection at the barrier. This record is
+not a journal cutoff; the retained source archive and a future Phase 3h-b delta
+decision remain responsible for later source activity. A source issue enqueued
+during candidate execution must resolve successfully before candidate teardown
+and does not alter the frozen record.
+
+The record is an exact canonical object with only these keys and values:
+
+```ts
+{
+	applicationStateDigest: string;
+	archivePolicy: "retain-source";
+	authorityKind: "creator-ed25519-registered-vertex-v1";
+	exactCanonicalApplicationStateBytes: Uint8Array;
+	kind: "ts-drp-v3-room-migration-record";
+	rehearsalNonce: Uint8Array;
+	sourceAcceptedOperationCount: number;
+	sourceAcceptedOperationsDigest: string;
+	sourceAnchorDigest: string;
+	sourceBlueprintDigest: string;
+	sourceCreatorAuthor: string;
+	sourceObjectId: string;
+	targetAnchorDigest: string;
+	targetBlueprintDigest: string;
+	targetCreatorAuthor: string;
+	targetImportOperationCount: number;
+	targetImportOperationsDigest: string;
+	targetObjectId: string;
+	version: 1;
+}
+```
+
+All digest strings are exact lowercase 64-hex. `recordDigest` is the lowercase
+hex of `hashDomain("ts-drp/v3-room-migration-record/v1",
+exactCanonicalRecordBytes)` and is content identity only; the encompassing
+registered vertex signature is the authority. The receipt is constructed by
+the room with the exact fields above, detached full-buffer byte copies and
+literal `activated: false`; its `applicationStateDigest` is exactly the record's
+field of that name and must also equal the digest recomputed from the reopened
+target projection. The receipt is observation, not an accepted input.
+
+Source and target object IDs and anchors differ; blueprint digests match. There
+is no detached/legacy signature, accept-either decoder, optional record vertex,
+caller-selected digest or unsigned path. The record is evidence, not a switch:
+issuing it does not close or write the source, publish a target invite, alter
+rendezvous, advance a Phase 3g source row, or select a current room.
+
+#### Scratch trust, storage and inert transport
+
+The thin product wrapper derives the target object ID from the exact canonical
+bytes of the closed own-data object `{ rehearsalNonce, sourceObjectId }`: it computes
+`hashDomain("ts-drp/v3-room-migration-target-object/v1", encodeCanonical(...))`,
+takes the first 16 digest bytes as lowercase 32-hex salt, and prefixes that salt
+with the source object ID's exact substring before its first colon. The derived
+target ID must differ from the source ID. This product-side derivation exists
+only to mint the invite: before it opens or reserves any target resource, the
+room independently recomputes the same expected target object ID from its
+captured source object ID and copied nonce, then requires the strictly decoded
+target invite's authenticated object ID to equal it exactly. A direct public
+room caller therefore cannot pair one nonce with another valid same-creator
+target invite or select a different scratch namespace. The room-owned expected
+target ID, not a caller value, is the reservation identity.
+
+The room derives a scratch digest as the lowercase hex of
+`hashDomain("ts-drp/v3-room-migration-scratch/v1", encodeCanonical({
+rehearsalNonce, sourceObjectId, targetObjectId }))`, where that object has
+exactly those three keys and the nonce is the captured full 32-byte copy. The
+normal room database name is
+`ts-drp-v3-room-migration--<scratchDigest>`; its existing trust and issuance
+names are exactly `<roomName>--ahe` and `<roomName>--issuance`. No concatenated,
+JSON, caller-selected or platform-derived namespace is accepted.
+
+The first genuine target trust `install()` on the retained AHE handle is the
+atomic reservation: it must return `ok`; `already-installed`, a conflicting
+head, or a concurrent same-nonce attempt rejects. That same retained handle is
+passed directly into target preparation, while the journal must report
+`not-installed` and issuance recovery must report its empty-chain bootstrap on
+their retained handles. A failure before trust installation wrote no reservation
+and may safely retry; any failure after installation permanently consumes that
+nonce. This is exact target-scope freshness, not an unimplementable claim that a
+database name was never opened or contains no unrelated object. The 256-bit
+derived namespace separates different target objects. Future activation naming
+is Phase 3h-b.
+
+Target trust authentication occurs through a private `requireFresh` arm of the
+existing `createV3RoomSession` preparation path before source capture. It adds
+no second constructor and never touches source stores. The room then captures
+source state, co-enqueues and awaits every import, compares the resulting target
+projection, issues the record vertex last, closes the target, and reopens the
+same stores once through the ordinary non-fresh recovery path to compare
+rederived state and the recovered record vertex. Reopen is verification, not a
+second reservation.
+
+`examples/v3-room/src/index.ts` owns one private inert rehearsal transport and
+its private closed local network binding. It is not exported or caller supplied.
+It supports only the subscription and local publication calls required by the
+genuine v3 activation/issue path, reports no remote peers, performs no discovery,
+rendezvous, dial or remote send, and throws on any attempted remote egress. The
+ordinary `requestRetainedHistory()` and `publishPending()` calls are expected and
+counted locally; the security boundary is zero remote egress, not the impossible
+claim of zero publication calls. Cleanup deactivates the room, unsubscribes the
+local topic, closes all scratch stores and leaves no transport handle.
+
+Success returns the exact `V3RoomMigrationRehearsalReceipt`; it exposes no
+session, store, network or activation handle. Failure closes every candidate
+resource.
+The source remains open in both cases. No production deletion of scratch stores
+is claimed; reversibility means the authoritative source stays live and the
+candidate stays undiscoverable, not that browser storage writes never occurred.
+
+#### Product-owned state mapping
+
+Chat's exact state value is a canonical array ordered by `logicalTime`
+ascending, then ECMAScript code-unit order of `author`, then `authorSequence`
+ascending, then ECMAScript code-unit order of `vertexDigest`, then
+`operationIndex` ascending. Its entries are closed own-data objects with exactly
+`{ clientOperationId: string, text: string }`;
+`exactCanonicalApplicationStateBytes` is `encodeCanonical` of that array. Its
+exact import array has the same order and one closed `{ action: "message",
+clientOperationId, text }` object per entry. Duplicate `clientOperationId`
+values reject before target creation. Author, sequence and vertex identity
+intentionally change to the authenticated creator.
+
+Zone's exact state value is a canonical array sorted by ECMAScript code-unit
+order of `id`, with one closed own-data `{ id: string, kind: string, x: number,
+y: number }` object per final block; `x` and `y` are safe integers and
+`exactCanonicalApplicationStateBytes` is `encodeCanonical` of that array. Its
+exact import array has the same order and one closed `{ action: "placeBlock",
+id, kind, x, y }` object per entry. Duplicate IDs reject before target creation.
+
+The room owns the single exact migration-record validator used both before
+local issuance and while replaying accepted target operations. Chat and zone do
+not reimplement that schema: their blueprint catalogs add the one non-batchable
+`migrationRecord` descriptor, their reducers leave visible application state
+unchanged only after the room-level validator succeeds, and their migration
+capabilities own only the exact state/import mappings above. Both expose only a
+thin creator-only rehearsal call. Chat parameterizes its existing private
+creator-invite builder by the derived object ID instead of its source-room
+constant. Zone retains its existing private signer-set decoder only for
+non-authoritative preflight; no new room runtime export is added, and the
+prepared descriptor remains final authority. The source-row digest and retained
+archive preserve provenance; export is application state, not original
+operation provenance.
+
+#### Tests-only RED
+
+The plan commit is followed by one Good-Faolain-signed tests-only RED changing
+only:
+
+- `tests/phase-3h-v3-migration-record-red.test.ts`;
+- `tests/phase-3h-v3-room-rehearsal-red.test.ts`;
+- `tests/phase-3h-chat-zone-migration-red.test.ts`;
+- `tests/fixtures/phase-3h/migration-rehearsal-fixture.ts`;
+- `tests/fixtures/phase-3a1b-d9346/room-contract.ts`;
+- `tests/fixtures/phase-3a1b-p3/seam3-contract.ts`; and
+- `tests/fixtures/phase-3a1b-p3/seam3-types.ts`;
+- `tests/phase-3f-b-chat-zone-causal-join-red.test.ts`;
+- `tests/phase-3f-c-chat-zone-batching-red.test.ts`;
+- `tests/phase-3a1b-d9336-two-client-room.pw.ts`; and
+- `tests/phase-3a1b-d9346-v3-zone.pw.ts`.
+
+The Node RED maps the three statically imported browser-store interfaces to the
+genuine SQLite `@ts-drp/storage-node` trust, issuance and journal adapters with
+fresh temporary filenames and asserts their existing parity contract; it does
+not use in-memory store stubs. The same room rehearsal test owns one Playwright
+arm, bundled from the already-authorized fixture, that executes reservation,
+imports, final record issue, close and reopen against genuine IndexedDB. The two
+authorized real two-client chat/zone browser specs preserve the products and
+execute their new thin creator-only rehearsal calls once on final bytes. Trust preparation,
+admission, issue, recovery and projection remain genuine. The instrumented RED
+transport mirrors the specified private inert boundary and proves the production
+surface is still absent.
+
+The two authorized Phase 3f preservation files change only their exact expected
+operation-name rosters to include `migrationRecord`, authenticate the newly
+derived artifact/blueprint/catalog identities, and retain every causal-join and
+batching behavior assertion. They do not add a second migration oracle. The
+room-extraction sole-runtime-export control stays byte-identical and green; no
+new room runtime helper is exported.
+
+The causal matrix proves authenticated source/target trust; exact record bytes
+inside a creator-signed accepted vertex; both deterministic prepare calls; the
+room-projection barrier and ingress race; source writes before, during and after
+candidate execution, with the during write resolved before teardown; only those
+expected writes changing source durable state; exact import/reopen convergence;
+expected local publish/retained calls with zero remote egress; complete cleanup;
+and the exact non-authoritative receipt. Chat preserves client operation
+identities/order; zone preserves sorted final blocks. Existing room, Phase 3f
+and Phase 3g controls remain green.
+
+Negative cases cover hostile top-level rehearsal input; missing/extra/
+noncanonical record fields; wrong content or record vertex; unauthenticated or
+changed invite; same object/anchor; wrong blueprint/creator; current-writer or
+foreign target signing; source snapshot/state/import substitution; both ingress
+race outcomes; every stated count/byte limit; duplicate/conflicting product
+identity; reordered/omitted/added/mutated import; reused reserved nonce; the
+same nonce paired with a different otherwise-valid same-creator target invite,
+which must fail before a second scratch reservation, store open or signer call;
+source
+mutation beyond expected writes; remote egress; and target open/issue/project/
+reopen/cleanup failure. Assertions use public results, durable snapshots and
+observed boundaries, not diagnostic wording or private spelling.
+
+#### GREEN ownership and gates
+
+The GREEN is the RED commit's sole child and changes exactly:
+
+- `examples/v3-room/src/index.ts`;
+- `examples/v3-chat/src/index.ts`; and
+- `examples/grid/src/v3-zone.ts`.
+
+The room remains the sole trust, snapshot, issue-queue, scratch-namespace,
+inert-transport and rehearsal owner. Chat and zone add only their migration
+mapping, operation descriptor and thin creator-only call. No node, protocol,
+object, keychain, storage, workflow, lockfile, registry, freeze, topology,
+ephemeral, Phase 4+ or unrelated path changes. Refactor-clean review rejects a
+second room constructor, trust verifier, signer, projector, scheduler, queue,
+activation flag, legacy codec, state store or product-local rehearsal loop. The
+one private inert transport is the explicitly authorized local boundary, not a
+parallel product transport.
+
+Focused GREEN runs all Phase 3h files, complete Phase 3g causal tests and Phase
+3f room/chat/zone preservation. It then runs the five semantic suites and
+controlled arms, node/room/chat/grid builds and typechecks, package build,
+ESLint, Prettier and diff checks. Real two-client chat and zone browser controls
+run once on final bytes. Logs record counts, wall time, database snapshots,
+barriered source writes, imported operations, reopened target state, local versus
+remote transport calls and cleanup.
+
+The plan, RED, GREEN and closure ledger remain separate Good-Faolain-signed
+linear commits. Kimi performs the bounded 100-step review. Grok uses review mode
+with streamed JSONL/status artifacts, `max-turns=64` and an 1,800-second
+progress-aware bound. Codex and Opus xhigh review independently. Timeout and
+`NO_VERDICT` are honest non-approvals but do not block absent a reproduced
+substantive P0/P1. Fable is not invoked unless the user explicitly requests it.
+
+Phase 3h-a closes only creator-owned record creation and reversible rehearsal.
+It does not close Phase 3h or the Phase 3 exit gate. Phase 3h-b separately owns
+activation; creator-offline and delegated/threshold authority remain open.
