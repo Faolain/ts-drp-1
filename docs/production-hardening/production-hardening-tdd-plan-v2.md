@@ -52243,3 +52243,162 @@ This ledger closes only D.93.56 and D.93.56.1. It does not claim a live epoch
 cut, certificate, adopted anchor, pruning, archive, completed Phase 3, completed
 production hardening, or completed Discord/MMORPG product. The two-client chat
 and zone paths remain the preservation control for the next Phase 3 exit slice.
+
+### D.93.57 — Phase 3 exit-b authenticated genesis application state
+
+#### Trigger and authority boundary
+
+The signed D.93.56 closure leaves one explicit creator-anchor placeholder in
+both real products: chat and zone pass `stateDigest: "7".repeat(64)` into the
+shared room builder. The value is digest-shaped but is not derived from either
+product's initial application state. The resulting creator signature therefore
+authenticates an illustrative value rather than the state from which the room
+actually starts. This is a Phase 3 exit defect even though the current empty
+chat transcript and empty zone block set happen to share one canonical value.
+
+The protocol-v3 registry already freezes the only lawful state identity:
+`kind: "state"`, domain `ts-drp/state/v3`, encoding
+`canonical-value-as-single-part`, with the state value as the one digest part.
+D.93.57 uses that registered identity directly. It does not call
+`@ts-drp/compaction.stateDigest`, whose already-frozen domain is
+`ts-drp/state/v2`; it does not reuse the Phase 3h
+`ts-drp/v3-room-migration-state/v1` record digest; and it does not add another
+state serializer, state digest, registry field, compatibility branch or
+accept-either rule.
+
+`V3RoomCreatorInviteMaterialInput` replaces the caller-selected
+`stateDigest: string` field with:
+
+```ts
+readonly exactCanonicalApplicationStateBytes: Uint8Array;
+```
+
+The input remains a closed exact record. Before its first `await`, the room
+builder validates and copies the state bytes through the same bounded canonical
+application-state byte discipline used by room migration: exact ordinary
+zero-offset `Uint8Array`, ordinary fixed `ArrayBuffer`, at most 32,768 bytes,
+successful bounded canonical decode, and byte-identical canonical re-encode.
+Shared, resizable, detached, offset, malformed, noncanonical or over-bound
+evidence fails closed. When the decoded state value is a record, an own
+`context` field also fails closed: the frozen registry excludes replica-local
+context before hashing, so already-canonical application-state input may not
+smuggle that excluded field into the digest. The builder derives the anchor
+field only as lowercase
+
+```ts
+hex(hashDomain("ts-drp/state/v3", exactCanonicalApplicationStateBytes));
+```
+
+and signs the resulting registered 16-field epoch anchor as before. The exact
+state bytes are input evidence committed by the signed anchor; they are not
+added to the creator invite, returned as a second authority object or persisted
+by this slice. The signing callback and every byte carrier remain captured
+before the await, and later caller mutation cannot alter the signed preimage.
+
+The products keep application-state ownership. Chat extracts one
+`canonicalChatStateBytes`-equivalent product-local seam from the existing
+migration capability and applies it to `projectChat([])`. That state is exactly
+the empty durable message list; accepted-vertex telemetry, transport identities
+and writer authority are not application state. Zone likewise extracts one
+`canonicalZoneStateBytes`-equivalent seam from its existing migration owner and
+applies it to `projectZone([], creatorPeerId, creatorAuthor)`, yielding exactly
+the empty durable block list; enrollment and ACL authority remain separately
+committed by the bootstrap operation and latched ACL. The two empty product
+states both canonically encode the value `[]`; cross-product authority is not
+claimed from that shared empty value, but remains bound by the signed anchor's
+object ID, blueprint digest, parameters, signer set and ACL evidence. Neither
+product may hardcode a digest, hash a UI snapshot, include ephemeral movement,
+or introduce a second genesis-state encoder.
+
+The existing registered `state-context-exclusion` vector is the independent
+representation control: replica-local `context` is excluded before the state
+value is canonically hashed. The product state projections already omit such
+context; this slice does not change reducer semantics, migration state shape,
+the blueprint registry or application projections after accepted operations.
+
+#### Strict TDD boundary
+
+This plan-only amendment is a signed child of the D.93.56 closure ledger. Its
+separate tests-only RED is the amendment's sole child and changes exactly:
+
+- `tests/phase-3-exit-genesis-roots-red.test.ts`.
+
+The first owner advances the exact public input type, replaces every test
+fixture's illustrative digest with canonical application-state bytes, and
+independently derives the expected digest with a `node:crypto` implementation of
+the registered length-prefixed domain framing under the literal v3 state domain;
+`@ts-drp/canonical.hashDomain` is checked only as the production-side
+equivalence control, not reused as the sole oracle. It proves:
+
+- the builder accepts canonical empty and nonempty states and signs the exact
+  resulting anchor digest;
+- identical canonical state bytes classify identically regardless of caller
+  object insertion order before encoding;
+- changing one canonical state value changes the signed anchor and pinned
+  anchor digest;
+- caller mutation during the signing await cannot change the captured state;
+- malformed, noncanonical, shared, resizable, detached, offset and over-bound
+  state evidence fails closed rather than selecting a caller digest, with
+  same-shape ordinary fixed-view canonical acceptance controls preventing a
+  blanket-rejection implementation from satisfying those rows;
+- a decoded record with an own replica-local `context` field fails closed,
+  while the same canonical state without that field is accepted;
+- no `stateDigest` input remains and no v2 or migration-state domain is
+  accepted as authority; and
+- the real chat and zone creator routes pass exact bytes equal to the output of
+  their genuine empty projection plus existing canonical migration-state
+  function, while the decoded creator anchors contain the independently
+  expected v3 state digest.
+
+The unchanged Phase 3h owner remains a preservation run for rehearsal,
+activation, retained recovery and redirect. Its hand-built anchor `stateDigest`
+is builder-output fixture content rather than caller input, so it is not edited
+or misrepresented as a causal RED owner. RED collects normally and fails because
+the genuine builder/product API still owns caller-selected `stateDigest` and
+lacks the new byte authority, not because a mock duplicates the production hash.
+
+The separate GREEN is the RED's sole child and changes exactly:
+
+- `examples/v3-room/src/index.ts`;
+- `examples/v3-chat/src/index.ts`;
+- `examples/grid/src/v3-zone.ts`.
+
+The room remains the sole genesis-anchor builder. Chat and zone retain their
+sole product projection/state owners and share those owners between migration
+and genesis instead of copying an empty-state literal into a new helper. No
+package, dependency, lockfile, compaction, protocol registry, node, storage,
+transport, workflow, topology, migration-record, test or unrelated path may
+change in GREEN. Refactor-clean review rejects the old `"7".repeat(64)` value,
+within those three GREEN owners, parallel state encoders, a public
+caller-selected digest, compatibility overloads and source-only ownership tests
+without a genuine product call witness.
+
+#### Acceptance and nonclaims
+
+Focused RED/GREEN evidence runs the one changed RED owner, the unchanged Phase
+3h owner as preservation, the D.93.56 focused owner roster and the exact Phase
+3g/3h preservation roster. Final bytes run room,
+chat and grid typecheck/build; the complete compaction suite; five protocol
+semantic suites and controlled arms; ESLint, Prettier, frozen offline install,
+package build and diff checks; and the same real two-client chat and zone browser
+controls. Any already-reproduced unrelated baseline failure remains recorded
+honestly and is not repaired outside the three GREEN owners.
+
+The plan, tests-only RED, GREEN and concise closure ledger are separate linear
+Good-Faolain-signed commits. Kimi performs the requested 100-step audit. Grok
+runs review mode with streamed JSONL/status artifacts, `max-turns=128` and an
+1,800-second progress-aware bound. Codex and Opus xhigh through actual
+`claude-phel` review the exact packet independently. Fable is not invoked
+without a new explicit request. Timeout or `NO_VERDICT` is reported honestly
+and is not approval; only a reproduced substantive P0/P1 blocks signing.
+
+D.93.57 closes only the creator-anchor genesis application-state identity. It
+does not make the creator invite carry state bytes and does not add joiner-side
+state-digest verification or prove third-party genesis-state availability. It
+does not prove a live cut, snapshot, certificate, adopted anchor, pruning or
+archive, and it does not complete the Phase 3 exit gate. Later signed slices
+still own the pure `(envelope,
+currentAnchor)` classifier with history/restart invariance, the in-repository
+exhaustive small-graph/adversarial schedule model and cross-implementation
+conformance on the pinned unamended subset. The two-client chat/zone golden path
+remains the continuous preservation control.
