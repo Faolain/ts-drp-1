@@ -89,8 +89,6 @@ describe("D.93.46a shared v3-room extraction", () => {
 		const roomExports = [
 			...new Set(Object.values(roomBuild.metafile.outputs).flatMap((output) => output.exports)),
 		].sort();
-		expect(roomExports, "V3_ROOM_SESSION_MUST_BE_SOLE_EXPORT").toEqual(["createV3RoomSession"]);
-
 		const chatPackageJson = JSON.parse(readFileSync(chatPackage, "utf8")) as Readonly<Record<string, unknown>>;
 		const chatDependencies = chatPackageJson.dependencies as Readonly<Record<string, unknown>> | undefined;
 		expect(chatDependencies?.[roomPackageSpecifier], "V3_CHAT_ROOM_DEPENDENCY_ABSENT").toBe("workspace:*");
@@ -142,5 +140,9 @@ describe("D.93.46a shared v3-room extraction", () => {
 			0
 		);
 		expect(roomBytesInOutput, "V3_CHAT_SHARED_ROOM_OWNER_TREE_SHAKEN").toBeGreaterThan(0);
+		expect(roomExports, "V3_ROOM_RUNTIME_EXPORTS_DIFFER").toEqual([
+			"createV3RoomCreatorInviteMaterial",
+			"createV3RoomSession",
+		]);
 	});
 });
