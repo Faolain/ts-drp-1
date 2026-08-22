@@ -52694,3 +52694,104 @@ The in-repository exhaustive small-graph/adversarial schedule model and
 cross-implementation conformance on the pinned unamended subset remain separate
 Phase 3 exit slices, as do live sealing, certification, adoption, pruning and
 archive. The broader Phase 3, production-hardening plan and product remain open.
+
+#### D.93.58 closure ledger
+
+D.93.58 closed as four linear Good-Faolain-signed commits: plan
+`3afb9a0e9f571f30b6f489381094df0e82b5fc84`, tests-only RED
+`3554d0bfdaf29ba03da8e6052ef22b242a3fc18a`, GREEN
+`28c8c058c342a0764d49b6577067f786bc33d383`, and this separate ledger.
+The GREEN has sole parent `3554d0bfdaf29ba03da8e6052ef22b242a3fc18a`,
+tree `830a35d7e15caf99e1f4b9f6b5212b7389687028`, and changes exactly
+`packages/node/src/v3-envelope-scope.ts` and
+`packages/node/src/v3-live.ts`. Its pre-sign cached binary diff SHA-256 was
+`e22d4f4cd093283045f74645ee2702e02fcac2458f65d69ab06ecbb19c72e25e`.
+`git verify-commit` authenticated the GREEN with Faolain's RSA key
+`55E22F154FBAF8C84F378304761B99CEA81C6289`. The explicit branch push and
+subsequent fetch/`ls-remote` established exact remote identity and `0 0`
+ahead/behind. Pull request 15 reported the same GREEN as its exact head SHA.
+
+The private evaluator now classifies only fresh exact four-field projections
+derived after genuine protocol-v3 extraction. One shared node helper applies
+that classification to live ingress and durable recovery before dependency
+lookup, pending retention, journal append, application/ACL work or graph
+mutation. Unknown, malformed and mismatched scope remains fail closed; no
+package export, compatibility branch, caller-selected policy, test hook or
+alternate admission authority was added. The security-relevant change is the
+ordering of authenticated current-anchor evidence before mutable admission
+effects, not a claim that the classifier alone authenticates a vertex.
+
+Final-byte local evidence was:
+
+- the focused pure evaluator plus complete live-transport owners passed 28/28
+  in 15.56 seconds, including the genuine 4,096-entry pending-capacity
+  discriminator; the deterministic child-process replay row took 0.439 seconds
+  and remained below the five-second bound;
+- the committed dedicated typecheck, exact-path ESLint, exact-path Prettier and
+  diff check passed;
+- the five current protocol semantic suites passed 87/87 in 1.95 seconds;
+  controlled operation and work arms passed 28/28 in 0.708 seconds and 12/12
+  in 0.651 seconds;
+- protocol-v3 typecheck/build/smoke, node build, frozen offline install and all
+  package builds passed; the latter completed in 13.6 seconds;
+- real chat passed 5/5 in 7.3 seconds and the real two-client zone control
+  passed 1/1 in 26.1 seconds; and
+- the direct production successor checker passed against the clean disposable
+  exact-tree candidate and the real pull-request base. The roughly 40-minute
+  exhaustive certification matrix was not rerun because no checker, profile,
+  policy or harness byte changed.
+
+These local gate counts, timings, checker result and custody counts are
+contemporaneous orchestrator observations; no separate D.93.58 command-output
+artifact set was persisted for them. The reviewers audited source and the
+supplied evidence packet but did not independently rerun these gates. Grok and
+Opus GREEN reviews have persisted local JSONL/status artifacts. Kimi's terminal
+audit and Codex's terminal review are preserved in the orchestrator transcript
+but have no separate local GREEN-review artifact directory.
+
+The ordinary scoped evidence therefore remains comfortably below ten minutes.
+This ledger does not conceal broader inherited repository debt: the broad node
+typecheck still fails only in the pre-existing
+`packages/node/tests/helpers/compact-history-scale-1i-b.ts` owner; one
+pre-existing extraction roster remains stale for the later `./latched-acl`
+export; and the root v2/v3 wrapper checkers currently hit their internal default
+Git `maxBuffer` with the large plan file. The clean direct successor checker and
+every D.93.58-scoped gate passed. Those inherited failures neither changed the
+exact GREEN nor authorize weakening them.
+
+The five required remote jobs all completed successfully on exact GREEN
+`28c8c058c342a0764d49b6577067f786bc33d383`:
+
+- operation budget run `32600068485`, job `97096895694`;
+- work budget run `32600068529`, job `97096894993`;
+- ACL reputation run `32600068556`, job `97096894957`;
+- author projection run `32600068505`, job `97096894919`; and
+- gossip budget run `32600068640`, job `97096895474`.
+
+The pull-request check rollup bound those five successful status entries to the
+same exact head SHA. Other repository workflows on that pull request include
+unrelated inherited failures and, at observation time, in-progress jobs; they
+are not represented here as green.
+
+Final-byte review was bounded and read-only. Kimi completed its requested
+100-step audit with PASS and no P0/P1. Grok completed normally with PASS, no
+P0/P1, streamed JSONL/status evidence and one nonblocking type-surface P2.
+Opus xhigh through actual `claude-phel` completed normally with PASS, no P0/P1
+and two nonblocking P2s: duplicated internal validation and an uncaptured
+`Array.prototype.some` consistency edge. Grok's type-surface P2 and both Opus
+P2s remain recorded later hardening debt. Exact-commit Codex review found two
+additional nonblocking exotic-Proxy capture P2s: a changing prototype and a
+mutation between complete logical snapshots can make the private pure evaluator
+return `CURRENT`. They do not widen production acceptance because the sole
+production caller supplies fresh frozen projections, but they remain recorded
+hardening debt. An earlier uncommitted Codex pass also inspected protected
+untracked protocol-v2 tests and is excluded as scope-misaligned rather than
+treated as evidence to delete user-owned files.
+
+Protected untracked paths, 26 stashes and 21 refs under
+`refs/codex/recovery` remained untouched; two recovery-named branch refs also
+remained untouched. This ledger closes only Phase 3 exit-c current-anchor
+envelope-scope purity. It does not claim that Phase 3, production hardening,
+Discord, the MMORPG, sealing, certification, adoption, pruning or archive is
+complete. The next work returns to the Phase 3 exit/golden-path spine rather
+than opening another freeze owner.
