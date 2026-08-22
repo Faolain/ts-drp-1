@@ -52494,3 +52494,203 @@ re-derivation, a live epoch cut, certification, adoption, pruning, archive,
 completed Phase 3, completed production hardening or completed product. The
 next Phase 3 exit slice and the two-client chat/zone golden path remain separate
 work.
+
+### D.93.58 — Phase 3 exit-c pure current-anchor envelope scope
+
+This slice closes only the Phase 3 exit gate's envelope-purity requirement. Its
+authenticated starting point is the signed D.93.57 closure ledger. The existing
+live v3 path authenticates canonical preimage bytes, the registered digest and
+signature, then performs application and graph checks, but it has no explicit
+history-free classifier that binds an authenticated vertex's object, protocol,
+epoch and anchor to the installed current-anchor context. In particular, the
+public protocol-v3 extractor accepts only `expectedAnchor`; the node composition
+does not separately compare the extracted vertex's object and epoch with its
+authenticated live provenance before graph work. The legacy protocol-v2
+cross-product calls the full hook-bearing `admitVertex` and therefore cannot
+satisfy the required compile-level history-free seam for the v3 product.
+
+#### Exact scope decision
+
+Add one private node-owned module,
+`packages/node/src/v3-envelope-scope.ts`. It exports no package-root runtime
+name and is not reachable through the `@ts-drp/protocol-v3` public surface. Its
+sole production evaluator has exactly two inputs:
+
+```ts
+export interface V3EnvelopeScope {
+	readonly anchor: string;
+	readonly epoch: number;
+	readonly objectId: string;
+	readonly protocolMajor: number;
+}
+
+export interface V3CurrentAnchorContext {
+	readonly anchorDigest: string;
+	readonly epoch: number;
+	readonly objectId: string;
+	readonly protocolMajor: 3;
+}
+
+export type V3EnvelopeScopeClassification =
+	| Readonly<{ readonly current: true; readonly code: "CURRENT" }>
+	| Readonly<{
+			readonly current: false;
+			readonly code: "MALFORMED_SCOPE" | "OBJECT_MISMATCH" | "PROTOCOL_MISMATCH" | "EPOCH_MISMATCH" | "ANCHOR_MISMATCH";
+	  }>;
+
+export function classifyV3EnvelopeScope(
+	envelope: V3EnvelopeScope,
+	anchorCtx: V3CurrentAnchorContext
+): V3EnvelopeScopeClassification;
+```
+
+The evaluator is synchronous, total and fail closed. It first snapshots two
+exact plain closed records using intrinsic own-data-property reads. Strings
+must be well formed and nonempty; the anchor digest must be 32-byte lowercase
+hex; epochs and protocol majors must be non-negative safe integers; and the
+context protocol major must be exactly `3`. Accessors, non-plain prototypes,
+extra or missing properties, symbols, malformed strings, invalid digests,
+non-safe numbers, throwing or inconsistent proxy traps and mutation exposed by
+repeated intrinsic capture classify as `MALFORMED_SCOPE`. A transparent Proxy
+that is observably identical to its exact plain target is not claimed to be
+detectable in JavaScript and is not an authority-bearing negative row.
+After successful capture it compares object, protocol, epoch and anchor. The
+stable codes name semantic mismatches, not diagnostic prose. Mixed mismatches
+need only be deterministic and fail closed; no test makes their incidental
+precedence an authority rule.
+
+`packages/node/src/v3-live.ts` invokes this evaluator exactly once inside the
+shared `extractAuthorizedV3Vertex` path used by both live ingress and durable
+journal recovery. After the genuine protocol-v3 extractor succeeds, that helper
+constructs two fresh frozen exact four-key records: the envelope projection
+copies `anchor`, `epoch`, `objectId` and `protocolMajor` from the detached
+`AdmittedReceivedVertexView`; the context projection copies `anchorDigest`,
+`epoch` and `objectId` from the authenticated live provenance and supplies the
+module-owned literal `protocolMajor: 3`. It never passes the larger admitted
+view or provenance record to the closed-record evaluator.
+
+Only `CURRENT` returns the extracted vertex to either caller. Every other
+result takes the existing admission-rejected path before dependency bounds or
+lookups, pending retention, node application checks, ACL work, journal append
+or graph mutation. The protocol-v3 extractor's canonical-byte, registry,
+signature, author-authorization and pure prepared-ABI checks necessarily occur
+before the node-owned scope classifier under the frozen public surface; the
+plan does not falsely claim otherwise. All remaining dependency, capacity,
+ACL, journal and graph checks retain their existing real owners and ordering.
+The pure result is necessary and never sufficient. It is not a test hook,
+caller-selected policy, public package export, compatibility arm or alternate
+admission authority.
+
+#### Tests-only RED
+
+The signed tests-only RED is the plan commit's sole child and changes exactly:
+
+- new `tests/phase-3-exit-envelope-purity-red.test.ts`;
+- `tests/phase-3a1b-p3-live-transport-red.test.ts`;
+- `tests/fixtures/phase-3a1b-p3/seam3-contract.ts`; and
+- new `tests/tsconfig.phase-3-exit-envelope-purity.json`.
+
+The new owner uses dynamic structural loading so RED collects and fails only
+because the exact private evaluator is absent. It independently constructs the
+expected classification and proves:
+
+1. the complete object/protocol/epoch/anchor relation cross-product, including
+   malformed and mixed rows, is total, frozen and deterministic without graph,
+   history, resolver, clock, transport or storage input;
+2. two replica fixtures with deliberately different accepted, pending,
+   rejected and delivery histories but the same current-anchor context produce
+   byte-identical classification vectors for a deterministic adversarial stream
+   of at least 10,000 envelopes. This is an ambient-state structural control:
+   the exact two-argument type is the proof that neither history can enter the
+   decision, not a claim that full graph admission outcomes must match;
+3. a genuine fresh child process launched through the repository's pinned
+   `tsx` dev dependency newly loads the production module, receives only the
+   serialized four-field current-anchor context and deterministic stream, and
+   returns the identical classification vector. In this exit-gate refinement,
+   `currentAnchor` means that authenticated four-field projection; the earlier
+   `(anchor, epoch)` shorthand never authorizes replica-local history;
+4. `Parameters<typeof classifyV3EnvelopeScope>` is exactly the two-item tuple
+   `[V3EnvelopeScope, V3CurrentAnchorContext]`, and root package runtime exports
+   for both `@ts-drp/node` and `@ts-drp/node/v3-live` remain unchanged. The
+   dedicated committed TypeScript config runs `tsc --noEmit` over this exact
+   type owner in RED and GREEN, so Vitest's type erasure cannot make the seam
+   assertion vacuous; and
+5. hostile record shapes and late mutation fail closed rather than consulting
+   or retaining caller state.
+
+The existing genuine live-transport owner adds signed wrong-object and
+wrong-epoch canonical vertices that otherwise use the installed anchor,
+authorized author, valid signature, prepared ABI and available dependency.
+It exercises both fresh live ingress and genuine durable journal recovery. The
+current implementation already rejects the wrong scope late at graph append;
+therefore the load-bearing RED is that a validly signed wrong-scope live vertex
+reaches `liveJournalStore.appendAccepted`, and a wrong-scope persisted row
+currently reaches the graph and returns `graph-rejected`. GREEN must move the
+live rejection before the journal boundary with zero
+pending/journal/index/sink effects, and the persisted row must return the
+security-relevant `admission-rejected` class before graph append. The same signed current-scope live
+control is admitted exactly once, and an independent current-scope persisted
+row still recovers successfully. The fixture contract inserts
+`scope.classify` between `vertex.extract` and `journal.append`; no incidental
+diagnostic precedence is pinned. This is the causal production and restart
+witness; source spelling, AST shape and diagnostic text are not the oracle. All
+existing live-transport assertions remain preservation controls.
+
+The reviewed RED tree is signed separately. It must show the wrong-scope live
+zero-journal and wrong-scope durable-recovery rows fail against the current node
+composition while the independent pure expected vectors pass and the exact
+evaluator-presence/type assertion fails. No production or plan path may enter
+RED.
+
+#### GREEN and acceptance
+
+The GREEN is the RED's sole child and changes exactly:
+
+- new `packages/node/src/v3-envelope-scope.ts`; and
+- `packages/node/src/v3-live.ts`.
+
+No protocol-v3 registry, reference, freeze artifact, public entrypoint, package
+manifest, dependency, lockfile, workflow, compaction, room, chat, zone,
+transport type or unrelated test changes are authorized. Refactor-clean review
+requires one evaluator and one live call site: no duplicate inline comparator,
+legacy fallback, accept-either result, source parser or graph-bearing overload.
+
+Final-byte acceptance runs the new focused owner and the complete existing
+live-transport owner; node typecheck/build/package smoke; the current
+protocol-v3 admission/extraction and five semantic suites with controlled arms;
+root and predecessor freeze checks once; ESLint, Prettier, diff and frozen
+offline install/package build; and the real two-client chat and zone
+preservation controls. The dedicated committed typecheck must pass. The
+deterministic 10,000-envelope pure stream plus child-process replay must finish
+in under five seconds, and this slice must not add a slow ordinary gate.
+The exhaustive historical mutation/certification suite is not rerun because no
+checker/profile/policy/harness byte changes.
+
+Kimi performs the requested 100-step audit. Grok review mode preserves streamed
+JSONL/status artifacts with `max-turns=128` and a progress-aware 1,800-second
+bound. Codex and Opus xhigh through actual `claude-phel` review the exact RED and
+GREEN packets. Fable is not invoked without a new explicit request. Timeout or
+`NO_VERDICT` is reported honestly and is not approval; only a reproduced
+substantive P0/P1 blocks signing.
+
+The plan, tests-only RED, GREEN and concise closure ledger are four separate
+linear Good-Faolain-signed commits. The ledger records the exact GREEN identity,
+the live and recovery zero-journal evidence, the child-process/typecheck
+evidence, runtimes and reviewer outcomes.
+
+D.93.58 does not claim that unauthenticated bytes are safe because the scope
+classifier says `CURRENT`, does not queue future epochs, and does not alter
+signature, ACL, graph or application semantics. It closes only pure
+current-anchor scope classification plus history and restart invariance. The
+three non-current codes `MALFORMED_SCOPE`, `PROTOCOL_MISMATCH` and
+`ANCHOR_MISMATCH` are total fail-closed structural outcomes but are not claimed
+to be ordinarily reachable after the genuine protocol-v3 extractor; the live
+causal rows exercise object and epoch mismatch. Existing wrong-scope rows that
+were already durably journaled before this correction fail closed on recovery;
+this slice prevents new journal poison but does not silently repair or discard
+historical evidence.
+
+The in-repository exhaustive small-graph/adversarial schedule model and
+cross-implementation conformance on the pinned unamended subset remain separate
+Phase 3 exit slices, as do live sealing, certification, adoption, pruning and
+archive. The broader Phase 3, production-hardening plan and product remain open.
