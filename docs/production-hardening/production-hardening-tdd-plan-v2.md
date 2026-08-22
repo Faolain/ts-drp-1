@@ -52167,3 +52167,79 @@ primitive delta and does not create a second accumulator owner. This amendment,
 the eight-path GREEN and the closure ledger remain separate linear
 Good-Faolain-signed commits. It closes only this safe-integer boundary and does
 not expand the Phase 3 exit-a claims.
+
+### D.93.56 closure ledger — Phase 3 exit-a root derivation
+
+The signed implementation commit is
+`b92c2c9a1680fad897881e0917240d0933088179`, with tree
+`465adae7c0573dbd4bfe414b730e4ec8f698682f`, sole parent
+`db27b581ba18dd24fc7a7cdba1be1b62bcbf46ef`, and a Good Faolain signature.
+The pushed branch and local tip matched at signing. Its binary patch SHA-256 was
+`9678678a4b632b1f0e6f49774e3ee7dcb160c8ada9a3dded097011ea61cc1a7e`.
+The commit contains exactly the eight paths authorized by D.93.56.1; protected
+untracked files, 26 stashes, 21 recovery refs, and unrelated tracked work were
+preserved.
+
+The slice protects two narrowly defined results:
+
+- one authenticated-anchor-bound derivation now produces a deterministic
+  close-set membership root and append-only RFC 9162 history root using the
+  registered `historyLeaf` encoding and the existing compaction primitives;
+- chat and zone creator flows now receive fresh RFC 9162 empty roots through one
+  shared room-owned builder, while preserving genuine signatures and their
+  existing two-client behavior.
+
+The compact-accumulator correction changes only the snapshot highest-level
+calculation from floating-point logarithm authority to exact safe-integer binary
+length. The signed RED's `Number.MAX_SAFE_INTEGER` snapshot is valid with 53
+occupied peaks, and the following append fails at the intended safe-integer
+overflow boundary without mutation. No alternate accumulator, Merkle encoding,
+history digest, compatibility branch, or product-local genesis assembler was
+retained.
+
+Final-byte acceptance evidence was:
+
+- focused D.93.56 owner roster: 16/16 in 1.52 seconds;
+- complete compaction package: 74 passed and one pre-existing skip in 6.53
+  seconds;
+- five protocol semantic suites: 87/87; controlled operation and work arms:
+  28/28 and 12/12;
+- frozen offline install plus all package postinstall builds: pass in 13.4
+  seconds;
+- compaction, room, chat and grid typecheck/build; exact-path ESLint, Prettier,
+  JSON/lockfile and diff checks: pass;
+- real browser chat preservation: 5/5 in 6.9 seconds, including two-client
+  durable convergence, repair, partition/heal and invite rejection;
+- real browser zone preservation: 1/1 in 25.8 seconds, including two-client
+  durable recovery/convergence while movement remained ephemeral.
+
+The broader Phase 3 preservation roster passed 105 of 106 rows. Its one room
+issue-settlement failure reproduced unchanged on the clean signed parent. The
+older Phase 3a preservation roster passed 68 rows and retained three stale
+source-shape failures already superseded by the later signed Phase 3g/3h node
+owners. Neither failure touches an implementation path in this slice; both are
+recorded as pre-existing test debt rather than silently claimed green or changed
+outside authority. Protected `.logs` repository copies must remain excluded from
+root Vitest discovery because their intentionally dependency-empty evidence
+clones otherwise duplicate collection.
+
+Independent final-byte review results were:
+
+- Kimi: PASS, no P0/P1;
+- Grok review mode: PASS with no findings after 630.159 seconds, with streamed
+  JSONL/status artifacts preserved;
+- Codex high: PASS, no actionable defect; its independent safe-integer/level
+  comparison found zero mismatches against a `BigInt` bit oracle across 2.1
+  million sampled cases;
+- Opus xhigh through `claude-phel`: PASS, no P0/P1 after 643.799 seconds, with
+  streamed artifacts preserved.
+
+Nonblocking review observations about duplicated owner-local byte-view guards,
+one duplicate ancestry-index construction, and separately unreachable legacy
+logarithm code did not reproduce an acceptance, authority, or object-content
+defect and were not expanded into this signed scope.
+
+This ledger closes only D.93.56 and D.93.56.1. It does not claim a live epoch
+cut, certificate, adopted anchor, pruning, archive, completed Phase 3, completed
+production hardening, or completed Discord/MMORPG product. The two-client chat
+and zone paths remain the preservation control for the next Phase 3 exit slice.
