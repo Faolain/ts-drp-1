@@ -52,6 +52,14 @@ type ClientId = (typeof EIGHT_CLIENT_IDS)[number];
 declare global {
 	interface Window {
 		readonly d9336V3Chat: Readonly<{
+			activateMigration(receipt: MigrationReceipt): Promise<
+				Readonly<{
+					readonly activated: true;
+					readonly activationDecisionDigest: string;
+					readonly activationVertexDigest: string;
+					readonly targetAnchorDigest: string;
+				}>
+			>;
 			create(
 				input: Readonly<{
 					readonly channelName: string;
@@ -147,18 +155,18 @@ test("two isolated clients join one v3 room and observe the same durable transcr
 	try {
 		await Promise.all([install(alice), install(bob)]);
 		const channelName = `d9336-room-${run}`;
+		const bobJoinInput = {
+			channelName,
+			clientId: "bob",
+			databaseName: `d9336-bob-${run}`,
+		} as const;
 		const invite = await alice.evaluate((input) => window.d9336V3Chat.create(input), {
 			channelName,
 			clientId: "alice",
 			databaseName: `d9336-alice-${run}`,
 		} as const);
 		expect(invite).toMatch(/^[0-9a-f]+$/u);
-		await bob.evaluate((input) => window.d9336V3Chat.join(input), {
-			channelName: `d9336-room-${run}`,
-			clientId: "bob",
-			databaseName: `d9336-bob-${run}`,
-			invite,
-		} as const);
+		await bob.evaluate((input) => window.d9336V3Chat.join(input), { ...bobJoinInput, invite });
 		await expect(snapshot(alice)).resolves.toMatchObject({
 			accepted: [],
 			ready: true,
@@ -204,7 +212,35 @@ test("two isolated clients join one v3 room and observe the same durable transcr
 		const migrationRecord = decodeCanonical(Uint8Array.from(rehearsal.exactCanonicalRecordBytes));
 		expect(Reflect.get(migrationRecord as object, "sourceAcceptedOperationCount")).toBe(4);
 		expect(Reflect.get(migrationRecord as object, "sourceAcceptedOperationsDigest")).toMatch(DIGEST);
-		expect((await snapshot(alice)).roomId).toBe(aliceState.roomId);
+		const activationInput = {
+			...rehearsal,
+			exactCanonicalRecordBytes: Uint8Array.from(rehearsal.exactCanonicalRecordBytes),
+		};
+		const sourceBeforeRejectedActivation = await Promise.all([snapshot(alice), snapshot(bob)]);
+		await expect(
+			bob.evaluate((receipt) => window.d9336V3Chat.activateMigration(receipt as MigrationReceipt), activationInput)
+		).rejects.toThrow();
+		expect(await Promise.all([snapshot(alice), snapshot(bob)])).toEqual(sourceBeforeRejectedActivation);
+		await bob.evaluate(() => window.d9336V3Chat.close());
+		const activation = await alice.evaluate(
+			(receipt) => window.d9336V3Chat.activateMigration(receipt as MigrationReceipt),
+			activationInput
+		);
+		expect(activation).toMatchObject({
+			activated: true,
+			activationDecisionDigest: expect.stringMatching(DIGEST),
+			activationVertexDigest: expect.stringMatching(DIGEST),
+			targetAnchorDigest: rehearsal.targetAnchorDigest,
+		});
+		await expect.poll(async () => (await snapshot(alice)).roomId).toBe(activation.targetAnchorDigest);
+		await bob.evaluate((input) => window.d9336V3Chat.join(input), { ...bobJoinInput, invite });
+		await expect.poll(async () => (await snapshot(bob)).roomId).toBe(activation.targetAnchorDigest);
+		await alice.evaluate(() => window.d9336V3Chat.send("after activation"));
+		await expect.poll(async () => (await snapshot(bob)).accepted.map(({ text }) => text)).toContain("after activation");
+		const targetAlice = await snapshot(alice);
+		const targetBob = await snapshot(bob);
+		expect(targetBob.accepted).toEqual(targetAlice.accepted);
+		expect(targetBob.acceptedOperationDigest).toBe(targetAlice.acceptedOperationDigest);
 	} finally {
 		await Promise.allSettled([
 			alice.evaluate(() => window.d9336V3Chat.close()),

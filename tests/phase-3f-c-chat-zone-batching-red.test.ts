@@ -154,6 +154,7 @@ describe("Phase 3f-c real chat and zone batching composition RED", () => {
 			"causalJoin",
 			"join",
 			"message",
+			"migrationActivation",
 			"migrationRecord",
 		]);
 		expect(operationDescriptor(application, "applicationBatch")).toEqual({
@@ -255,6 +256,7 @@ describe("Phase 3f-c real chat and zone batching composition RED", () => {
 			"applicationBatch",
 			"causalJoin",
 			"join",
+			"migrationActivation",
 			"migrationRecord",
 			"placeBlock",
 		]);

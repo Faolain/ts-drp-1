@@ -107,6 +107,7 @@ export const PHASE_3H_MIGRATION_RECORD_KEYS = Object.freeze([
 ] as const);
 
 export const PHASE_3H_MIGRATION_DOMAINS = Object.freeze({
+	activation: "ts-drp/v3-room-migration-activation/v1",
 	import: "ts-drp/v3-room-migration-import/v1",
 	record: "ts-drp/v3-room-migration-record/v1",
 	scratch: "ts-drp/v3-room-migration-scratch/v1",
@@ -114,6 +115,36 @@ export const PHASE_3H_MIGRATION_DOMAINS = Object.freeze({
 	state: "ts-drp/v3-room-migration-state/v1",
 	targetObject: "ts-drp/v3-room-migration-target-object/v1",
 } as const);
+
+export const PHASE_3H_MIGRATION_ACTIVATION_DECISION_KEYS = Object.freeze([
+	"activationAuthority",
+	"applicationStateDigest",
+	"exactCanonicalTargetCreatorInviteBytes",
+	"kind",
+	"migrationRecordDigest",
+	"migrationRecordVertexDigest",
+	"rehearsalNonce",
+	"sourceAcceptedOperationCount",
+	"sourceAcceptedOperationsDigest",
+	"sourceAnchorDigest",
+	"sourceBlueprintDigest",
+	"sourceCreatorAuthor",
+	"sourceObjectId",
+	"targetAnchorDigest",
+	"targetBlueprintDigest",
+	"targetCreatorAuthor",
+	"targetImportOperationCount",
+	"targetImportOperationsDigest",
+	"targetObjectId",
+	"version",
+] as const);
+
+export const PHASE_3H_TERMINAL_DISPOSITIONS = Object.freeze([
+	"continue",
+	"retained-bootstrap-ready",
+	"terminal-accepted",
+	"terminal-rejected",
+] as const);
 
 export const ACTIVATION_ORDER = Object.freeze([
 	"outer.snapshot",
@@ -171,6 +202,7 @@ export interface V3PlaneActivationInputContract {
 	readonly onAdmittedVertex: V3AdmittedVertexSinkContract;
 }
 
+/* eslint-disable @typescript-eslint/no-invalid-void-type -- the signed sink contract deliberately retains legacy void beside terminal dispositions. */
 export type V3AdmittedVertexSinkContract = (
 	delivery: Readonly<{
 		readonly vertex: AdmittedReceivedVertexView;
@@ -178,13 +210,28 @@ export type V3AdmittedVertexSinkContract = (
 		readonly signature: Uint8Array;
 		readonly transportSender: string;
 	}>
-) => void | Promise<void>;
+) =>
+	| void
+	| Readonly<{ readonly kind: "continue" | "retained-bootstrap-ready" | "terminal-accepted" | "terminal-rejected" }>
+	| Promise<void | Readonly<{
+			readonly kind: "continue" | "retained-bootstrap-ready" | "terminal-accepted" | "terminal-rejected";
+	  }>>;
+/* eslint-enable @typescript-eslint/no-invalid-void-type */
 
 export interface V3PlaneHandleContract {
 	readonly objectId: string;
 	readonly epoch: 0;
 	readonly topic: string;
 	readonly queueId: string;
+	currentEphemeralAuthority():
+		| Readonly<{
+				readonly aclDigest: string;
+				readonly anchorDigest: string;
+				readonly epoch: 0;
+				readonly objectId: string;
+				isCurrentWriter(author: string): boolean;
+		  }>
+		| undefined;
 	issueLocal(input: V3LocalIssueInputContract): Promise<V3LocalIssueResultContract>;
 	readRebaseOutbox(): Promise<
 		| Readonly<{ readonly ok: true; readonly kind: "empty" }>
@@ -194,6 +241,7 @@ export interface V3PlaneHandleContract {
 				readonly source: Readonly<{
 					readonly author: string;
 					readonly authorSequence: number;
+					readonly publishState?: "pending" | "published";
 					readonly vertexDigest: string;
 					readonly intents: readonly Readonly<{
 						readonly logicalTime: number;
@@ -210,6 +258,44 @@ export interface V3PlaneHandleContract {
 	): Promise<V3EgressResultContract>;
 	publishPending(): Promise<V3EgressResultContract>;
 	republishRetained(): Promise<V3EgressResultContract>;
+	beginTerminalTransition(): Promise<
+		| Readonly<{
+				readonly ok: true;
+				readonly capability: Readonly<{
+					publishTerminal(input: V3LocalIssueInputContract): Promise<
+						| Readonly<{
+								readonly ok: true;
+								readonly kind: "accepted";
+								readonly authorSequence: number;
+								readonly digest: string;
+								readonly terminalIntent: "committed";
+						  }>
+						| Readonly<{
+								readonly ok: false;
+								readonly kind:
+									| "not-active"
+									| "malformed-input"
+									| "authorization-rejected"
+									| "issuance-rejected"
+									| "admission-rejected"
+									| "journal-rejected"
+									| "graph-rejected"
+									| "terminal-rejected";
+								readonly detail: string;
+								readonly terminalIntent: "absent" | "outcome-unknown";
+						  }>
+					>;
+					resume():
+						| Readonly<{ readonly ok: true; readonly kind: "resumed" }>
+						| Readonly<{ readonly ok: false; readonly kind: "invalid-state"; readonly detail: string }>;
+				}>;
+		  }>
+		| Readonly<{
+				readonly ok: false;
+				readonly kind: "not-active" | "transition-active" | "already-terminal";
+				readonly detail: string;
+		  }>
+	>;
 	deactivate(): void;
 }
 

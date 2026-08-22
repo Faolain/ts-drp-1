@@ -1,4 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
+import { decodeCanonical } from "@ts-drp/canonical";
 
 interface ZoneSnapshot {
 	readonly acceptedOperationDigest: string;
@@ -20,6 +21,14 @@ interface ZoneSnapshot {
 }
 
 interface ZoneApi {
+	activateMigration(receipt: Awaited<ReturnType<ZoneApi["rehearseMigration"]>>): Promise<
+		Readonly<{
+			readonly activated: true;
+			readonly activationDecisionDigest: string;
+			readonly activationVertexDigest: string;
+			readonly targetAnchorDigest: string;
+		}>
+	>;
 	close(): Promise<void>;
 	placeBlock(
 		input: Readonly<{ readonly id: string; readonly kind: string; readonly x: number; readonly y: number }>
@@ -28,6 +37,7 @@ interface ZoneApi {
 		Readonly<{
 			readonly activated: false;
 			readonly applicationStateDigest: string;
+			readonly exactCanonicalRecordBytes: Uint8Array;
 			readonly importedOperationCount: number;
 			readonly recordDigest: string;
 			readonly recordVertexDigest: string;
@@ -209,7 +219,55 @@ test("two real network clients recover and converge one durable v3 zone while mo
 		expect(rehearsal?.recordDigest).toMatch(DIGEST);
 		expect(rehearsal?.recordVertexDigest).toMatch(DIGEST);
 		expect(rehearsal?.targetAnchorDigest).toMatch(DIGEST);
-		expect((await zone(creator)).zoneId).toBe(created.zoneId);
+		if (rehearsal === undefined) throw new TypeError("zone migration rehearsal is absent");
+		const record = decodeCanonical(rehearsal.exactCanonicalRecordBytes);
+		const targetObjectId = Reflect.get(record as object, "targetObjectId");
+		expect(targetObjectId).toMatch(/^.+:[0-9a-f]{32}$/u);
+		await joiner.evaluate(() => window.__TS_DRP_V3_ZONE__?.close());
+		await joiner.close();
+		const activation = await creator.evaluate(
+			(receipt) => window.__TS_DRP_V3_ZONE__?.activateMigration(receipt),
+			rehearsal
+		);
+		expect(activation).toMatchObject({
+			activated: true,
+			activationDecisionDigest: expect.stringMatching(DIGEST),
+			activationVertexDigest: expect.stringMatching(DIGEST),
+			targetAnchorDigest: rehearsal.targetAnchorDigest,
+		});
+		await expect.poll(async () => (await zone(creator)).zoneId).toBe(targetObjectId);
+		joiner = await joinerContext.newPage();
+		await openGrid(joiner);
+		await joiner.fill("#gridInput", created.invite);
+		await joiner.click("#joinGrid");
+		await expect.poll(async () => (await zone(joiner)).zoneId).toBe(targetObjectId);
+		await expect.poll(async () => (await zone(joiner)).blocks).toEqual((await zone(creator)).blocks);
+		await joiner.evaluate(() =>
+			window.__TS_DRP_V3_ZONE__?.placeBlock({ id: "target-suffix", kind: "gold", x: 34, y: 55 })
+		);
+		await expect
+			.poll(async () => (await zone(creator)).blocks)
+			.toContainEqual({
+				id: "target-suffix",
+				kind: "gold",
+				x: 34,
+				y: 55,
+			});
+		await joiner.evaluate(() => window.__TS_DRP_V3_ZONE__?.close());
+		await joiner.close();
+		joiner = await joinerContext.newPage();
+		await openGrid(joiner);
+		await joiner.fill("#gridInput", created.invite);
+		await joiner.click("#joinGrid");
+		await expect.poll(async () => (await zone(joiner)).zoneId).toBe(targetObjectId);
+		await expect
+			.poll(async () => (await zone(joiner)).blocks)
+			.toContainEqual({
+				id: "target-suffix",
+				kind: "gold",
+				x: 34,
+				y: 55,
+			});
 	} finally {
 		await Promise.allSettled([
 			creator.evaluate(() => window.__TS_DRP_V3_ZONE__?.close()),

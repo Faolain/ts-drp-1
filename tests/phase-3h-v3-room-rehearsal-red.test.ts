@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- the controlled application preserves the genuine room surface. */
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
-import type { DRPNetworkNode, Message } from "@ts-drp/types";
+import { type DRPNetworkNode, Message, MessageType, V3Envelope } from "@ts-drp/types";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -9,9 +9,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PHASE_3H_MIGRATION_RECORD_KEYS } from "./fixtures/phase-3a1b-p3/seam3-contract.js";
 import {
+	expectedMigrationActivationDecision,
+	expectedMigrationActivationDecisionDigest,
 	type ExpectedMigrationProjection,
 	type ExpectedMigrationReceipt,
 	expectedTargetObjectId,
+	MIGRATION_ACTIVATION_DECISION_KEYS,
 	operationNames,
 	prepareChatMigration,
 } from "./fixtures/phase-3h/migration-rehearsal-fixture.js";
@@ -43,18 +46,39 @@ const probe = vi.hoisted(() => ({
 	databaseNames: [] as string[],
 	issuanceCloses: 0,
 	issuanceClosedNames: [] as string[],
+	issuanceCrashAfterCommit: false,
 	journalCloses: 0,
 	journalClosedNames: [] as string[],
+	journalCrashAfterAppend: false,
+	journalCrashDatabaseName: undefined as string | undefined,
+	journalCloseObserver: undefined as ((databaseName: string) => void) | undefined,
+	liveIngressHandlers: new Map<string, (message: Message) => void>(),
+	liveIngressTopics: new Map<string, string>(),
 	localPublicationCalls: 0,
 	openTransportCalls: 0,
+	publicationFailures: 0,
 	remoteEgressCalls: 0,
+	retainedIngressHandlers: new Map<string, (message: Message) => void>(),
+	retainedMessageObjects: new WeakSet<Message>(),
+	retainedPublishedMessages: new Map<string, Message[]>(),
+	sinkCrashOnActivation: false,
 	sqliteDirectory: "",
+	armTargetFailureMode: undefined as "recovery" | "store" | "transport" | "trust" | undefined,
+	targetFailureMode: undefined as "recovery" | "store" | "transport" | "trust" | undefined,
 	transportCloses: 0,
+	transportObjectIds: [] as string[],
 }));
+
+function controlledTargetDatabase(databaseName: string): boolean {
+	return databaseName.startsWith("ts-drp-v3-room-migration--");
+}
 
 vi.mock("../packages/storage-browser/dist/src/index.js", async (importOriginal) => ({
 	...(await importOriginal()),
 	createBrowserAheDurableStore: async ({ databaseName }: { readonly databaseName: string }) => {
+		if (probe.targetFailureMode === "store" && controlledTargetDatabase(databaseName)) {
+			throw new TypeError("controlled migration target store failure");
+		}
 		const { createSqliteAheDurableStore } = await import("../packages/storage-node/src/index.js");
 		probe.databaseNames.push(databaseName);
 		const store = createSqliteAheDurableStore({ filename: sqliteFilename(databaseName) });
@@ -67,6 +91,10 @@ vi.mock("../packages/storage-browser/dist/src/index.js", async (importOriginal) 
 						probe.aheClosedNames.push(databaseName);
 						await store.close();
 					};
+				}
+				if (property === "readHead" && probe.targetFailureMode === "trust" && controlledTargetDatabase(databaseName)) {
+					return (): Promise<Readonly<{ ok: false; reason: "STORE_POISONED" }>> =>
+						Promise.resolve(Object.freeze({ ok: false, reason: "STORE_POISONED" }));
 				}
 				const value = Reflect.get(target, property, target) as unknown;
 				return typeof value === "function" ? value.bind(target) : value;
@@ -83,6 +111,14 @@ vi.mock("../packages/storage-browser/dist/src/issuance.js", async (importOrigina
 		const store = createStore({ primaryFilename: sqliteFilename(primaryDatabaseName) });
 		return Object.freeze({
 			...store,
+			transactIssue: async (...args: Parameters<typeof store.transactIssue>) => {
+				const committed = await store.transactIssue(...args);
+				if (probe.issuanceCrashAfterCommit) {
+					probe.issuanceCrashAfterCommit = false;
+					throw new TypeError("controlled crash after issuance commit");
+				}
+				return committed;
+			},
 			close: async (): Promise<void> => {
 				probe.issuanceCloses += 1;
 				probe.issuanceClosedNames.push(primaryDatabaseName);
@@ -100,9 +136,25 @@ vi.mock("../packages/storage-browser/dist/src/live-journal.js", async (importOri
 		const store = createNodeDurableLiveJournalStore({ primaryFilename: sqliteFilename(primaryDatabaseName) });
 		return Object.freeze({
 			...store,
+			readiness: async (...args: Parameters<typeof store.readiness>) => {
+				if (probe.targetFailureMode === "recovery" && controlledTargetDatabase(primaryDatabaseName)) {
+					throw new TypeError("controlled migration target recovery failure");
+				}
+				return store.readiness(...args);
+			},
+			appendAccepted: async (...args: Parameters<typeof store.appendAccepted>) => {
+				const appended = await store.appendAccepted(...args);
+				if (probe.journalCrashAfterAppend && probe.journalCrashDatabaseName === primaryDatabaseName) {
+					probe.journalCrashAfterAppend = false;
+					probe.journalCrashDatabaseName = undefined;
+					throw new TypeError("controlled crash after journal append");
+				}
+				return appended;
+			},
 			close: async (): Promise<void> => {
 				probe.journalCloses += 1;
 				probe.journalClosedNames.push(primaryDatabaseName);
+				probe.journalCloseObserver?.(primaryDatabaseName);
 				await store.close();
 			},
 		});
@@ -120,6 +172,20 @@ interface CreatorMaterial {
 
 type MigrationSession = V3RoomSession<ReturnType<V3RoomApplication["projectAcceptedOperations"]>> &
 	Readonly<{
+		activateMigration(
+			input: Readonly<{
+				readonly exactCanonicalRecordBytes: Uint8Array;
+				readonly recordVertexDigest: string;
+				readonly targetCreatorInvite: V3RoomCreatorInviteMaterial;
+			}>
+		): Promise<
+			Readonly<{
+				readonly activated: true;
+				readonly activationDecisionDigest: string;
+				readonly activationVertexDigest: string;
+				readonly targetAnchorDigest: string;
+			}>
+		>;
 		rehearseMigration(
 			input: Readonly<{ rehearsalNonce: Uint8Array; targetCreatorInvite: V3RoomCreatorInviteMaterial }>
 		): Promise<ExpectedMigrationReceipt>;
@@ -139,6 +205,34 @@ function sqliteFilename(databaseName: string): string {
 
 function digest(domain: string, value: Uint8Array): string {
 	return hex(hashDomain(domain, value));
+}
+
+async function expectRejected(call: () => Promise<unknown>): Promise<void> {
+	let result: Promise<unknown>;
+	try {
+		result = call();
+	} catch (error) {
+		expect(error).toBeInstanceOf(Error);
+		return;
+	}
+	await expect(result).rejects.toThrow();
+}
+
+function recordWithCanonicalSize(
+	targetBytes: number,
+	build: (padding: string) => Readonly<Record<string, unknown>>
+): Readonly<Record<string, unknown>> {
+	let lower = 0;
+	let upper = targetBytes;
+	while (lower <= upper) {
+		const length = Math.floor((lower + upper) / 2);
+		const candidate = build("x".repeat(length));
+		const size = encodeCanonical(candidate).byteLength;
+		if (size === targetBytes) return candidate;
+		if (size < targetBytes) lower = length + 1;
+		else upper = length - 1;
+	}
+	throw new TypeError(`controlled canonical record cannot reach ${String(targetBytes)} bytes`);
 }
 
 function creatorMaterial(
@@ -230,7 +324,7 @@ function application(
 	});
 }
 
-function inertTransport(label: string): V3RoomTransport {
+function inertTransport(label: string, objectId: string): V3RoomTransport {
 	probe.openTransportCalls += 1;
 	const topics = new Set<string>();
 	const networkNode = {
@@ -255,9 +349,19 @@ function inertTransport(label: string): V3RoomTransport {
 		getMultiaddrs: (): [] => [],
 		getPeerMultiaddrs: (): Promise<[]> => Promise.resolve([]),
 		getSubscribedTopics: (): string[] => [...topics],
+		gossipTopicFor: (message: Message): string | undefined =>
+			probe.retainedMessageObjects.has(message) ? undefined : message.objectId,
 		isDialable: (): Promise<boolean> => Promise.resolve(false),
-		publishMessage: (_topic: string, _message: Message): Promise<true> => {
+		publishMessage: (_topic: string, message: Message): Promise<true> => {
 			probe.localPublicationCalls += 1;
+			if (probe.publicationFailures > 0) {
+				probe.publicationFailures -= 1;
+				return Promise.reject(new TypeError("controlled terminal publication failure"));
+			}
+			probe.retainedMessageObjects.add(message);
+			const published = probe.retainedPublishedMessages.get(objectId) ?? [];
+			published.push(message);
+			probe.retainedPublishedMessages.set(objectId, published);
 			return Promise.resolve(true);
 		},
 		removeTopicScoreParams: (): void => undefined,
@@ -291,8 +395,14 @@ function inertTransport(label: string): V3RoomTransport {
 		requestRetainedHistory(): void {
 			probe.localPublicationCalls += 1;
 		},
-		setIngressHandler(): void {
-			// No remote ingress exists in this closed local transport.
+		setIngressHandler(
+			ingressId: string,
+			liveHandler: (message: Message) => void,
+			retainedHandler: (message: Message) => void
+		): void {
+			probe.liveIngressHandlers.set(label, liveHandler);
+			probe.liveIngressTopics.set(label, ingressId);
+			probe.retainedIngressHandlers.set(`${label}:${objectId}`, retainedHandler);
 		},
 		setRetainedPublisher(): void {
 			// The genuine live plane still installs its local retained publisher.
@@ -303,6 +413,7 @@ function inertTransport(label: string): V3RoomTransport {
 async function openRoom(
 	input: Readonly<{
 		application: ReturnType<typeof application>;
+		author?: string;
 		databaseName: string;
 		material: CreatorMaterial;
 		objectId: string;
@@ -311,18 +422,37 @@ async function openRoom(
 	}>
 ): Promise<MigrationSession> {
 	const { createV3RoomSession } = await roomModule;
+	const author = input.author ?? input.material.author;
 	return (await createV3RoomSession({
 		application: input.application,
-		author: input.material.author,
+		author,
 		creatorInvite: input.material.invite,
 		databaseName: input.databaseName,
 		initialLogicalTime: 3,
 		issuanceDatabaseName: `${input.databaseName}--issuance`,
 		objectId: input.objectId,
-		onAcceptedVertex: input.onAcceptedVertex ?? (() => undefined),
+		onAcceptedVertex: (vertex: unknown) => {
+			const operation = Reflect.get(vertex as object, "operation");
+			const action = typeof operation === "object" && operation !== null ? Reflect.get(operation, "action") : undefined;
+			if (probe.sinkCrashOnActivation && action === "migrationActivation") {
+				probe.sinkCrashOnActivation = false;
+				throw new TypeError("controlled crash before terminal sink disposition");
+			}
+			if (action === "migrationActivation" && probe.armTargetFailureMode !== undefined) {
+				probe.targetFailureMode = probe.armTargetFailureMode;
+				probe.armTargetFailureMode = undefined;
+			}
+			input.onAcceptedVertex?.(vertex);
+		},
 		onProjection: () => undefined,
-		openTransport: () => inertTransport(input.databaseName),
-		publicKeyBytes: bytes(input.material.author),
+		openTransport: (openedObjectId: string) => {
+			probe.transportObjectIds.push(openedObjectId);
+			if (probe.targetFailureMode === "transport" && openedObjectId !== input.objectId) {
+				throw new TypeError("controlled migration target transport failure");
+			}
+			return inertTransport(input.databaseName, openedObjectId);
+		},
+		publicKeyBytes: bytes(author),
 		signRegisteredVertexDigest:
 			input.signer ?? ((registeredDigest) => Promise.resolve(ed25519.sign(registeredDigest, input.material.seed))),
 	})) as MigrationSession;
@@ -362,22 +492,88 @@ async function issuanceNext(databaseName: string, material: CreatorMaterial, obj
 	}
 }
 
+async function issuedVertex(
+	databaseName: string,
+	material: CreatorMaterial,
+	objectId: string,
+	authorSequence: number
+): Promise<
+	Readonly<{
+		readonly digest: string;
+		readonly exactCanonicalPreimageBytes: Uint8Array;
+		readonly signature: Uint8Array;
+	}>
+> {
+	const store = createNodeDurableIssuanceStore({ primaryFilename: sqliteFilename(`${databaseName}--issuance`) });
+	try {
+		const committed = await store.readIssued(Object.freeze({ author: material.author, objectId }), authorSequence);
+		if (committed === null) throw new TypeError("controlled migration issued vertex is absent");
+		return Object.freeze({
+			digest: hex(committed.envelope.digest),
+			exactCanonicalPreimageBytes: new Uint8Array(committed.envelope.canonicalPreimageBytes),
+			signature: new Uint8Array(committed.envelope.signature),
+		});
+	} finally {
+		await store.close();
+	}
+}
+
 async function appendReceivedOperation(
 	databaseName: string,
 	material: CreatorMaterial,
 	objectId: string,
 	input: Readonly<{
 		readonly authorSeed: Uint8Array;
+		readonly authorSequence?: number;
 		readonly dependency: string;
 		readonly logicalTime: number;
+		readonly messageObjectId?: string;
 		readonly operation: Readonly<Record<string, unknown>>;
 	}>
 ): Promise<string> {
+	const evidence = receivedOperationEvidence(material, objectId, input);
+	const journal = createNodeDurableLiveJournalStore({ primaryFilename: sqliteFilename(databaseName) });
+	try {
+		const appended = await journal.appendAccepted({
+			detachedSignature: evidence.signature,
+			exactCanonicalPreimageBytes: evidence.exactCanonicalPreimageBytes,
+			scope: Object.freeze({
+				anchorDigest: material.invite.pinnedGenesisAnchorDigest,
+				epoch: 0,
+				objectId,
+			}),
+			sourceKind: "received",
+			vertexDigest: evidence.vertexDigest,
+		});
+		if (!appended.ok) throw new TypeError(`controlled migration received append failed: ${appended.kind}`);
+		return evidence.vertexDigest;
+	} finally {
+		await journal.close();
+	}
+}
+
+function receivedOperationEvidence(
+	material: CreatorMaterial,
+	objectId: string,
+	input: Readonly<{
+		readonly authorSeed: Uint8Array;
+		readonly authorSequence?: number;
+		readonly dependency: string;
+		readonly logicalTime: number;
+		readonly messageObjectId?: string;
+		readonly operation: Readonly<Record<string, unknown>>;
+	}>
+): Readonly<{
+	readonly exactCanonicalPreimageBytes: Uint8Array;
+	readonly message: Message;
+	readonly signature: Uint8Array;
+	readonly vertexDigest: string;
+}> {
 	const author = hex(ed25519.getPublicKey(input.authorSeed));
 	const exactCanonicalPreimageBytes = encodeCanonical({
 		anchor: material.invite.pinnedGenesisAnchorDigest,
 		author,
-		authorSequence: 0,
+		authorSequence: input.authorSequence ?? 0,
 		dependencies: [input.dependency],
 		epoch: 0,
 		kind: "drp-vertex",
@@ -388,21 +584,32 @@ async function appendReceivedOperation(
 	});
 	const vertexDigestBytes = hashDomain("ts-drp/vertex/v3", exactCanonicalPreimageBytes);
 	const vertexDigest = hex(vertexDigestBytes);
+	const signature = ed25519.sign(vertexDigestBytes, input.authorSeed);
+	return Object.freeze({
+		exactCanonicalPreimageBytes,
+		message: Message.create({
+			data: V3Envelope.encode({ canonicalPreimage: exactCanonicalPreimageBytes, signature }).finish(),
+			objectId: input.messageObjectId ?? material.invite.pinnedGenesisAnchorDigest,
+			sender: "peer:phase-3h:remote-writer",
+			type: MessageType.MESSAGE_TYPE_V3_ENVELOPE,
+		}),
+		signature,
+		vertexDigest,
+	});
+}
+
+async function journalRowCount(databaseName: string, material: CreatorMaterial, objectId: string): Promise<number> {
 	const journal = createNodeDurableLiveJournalStore({ primaryFilename: sqliteFilename(databaseName) });
 	try {
-		const appended = await journal.appendAccepted({
-			detachedSignature: ed25519.sign(vertexDigestBytes, input.authorSeed),
-			exactCanonicalPreimageBytes,
+		const readiness = await journal.readiness({
 			scope: Object.freeze({
 				anchorDigest: material.invite.pinnedGenesisAnchorDigest,
 				epoch: 0,
 				objectId,
 			}),
-			sourceKind: "received",
-			vertexDigest,
 		});
-		if (!appended.ok) throw new TypeError(`controlled migration received append failed: ${appended.kind}`);
-		return vertexDigest;
+		if (!readiness.ok || !readiness.ready) throw new TypeError("controlled migration journal is unavailable");
+		return readiness.rowCount;
 	} finally {
 		await journal.close();
 	}
@@ -434,13 +641,27 @@ beforeEach(() => {
 	probe.databaseNames = [];
 	probe.issuanceCloses = 0;
 	probe.issuanceClosedNames = [];
+	probe.issuanceCrashAfterCommit = false;
 	probe.journalCloses = 0;
 	probe.journalClosedNames = [];
+	probe.journalCrashAfterAppend = false;
+	probe.journalCrashDatabaseName = undefined;
+	probe.journalCloseObserver = undefined;
+	probe.liveIngressHandlers.clear();
+	probe.liveIngressTopics.clear();
 	probe.localPublicationCalls = 0;
 	probe.openTransportCalls = 0;
+	probe.publicationFailures = 0;
 	probe.remoteEgressCalls = 0;
+	probe.retainedIngressHandlers.clear();
+	probe.retainedMessageObjects = new WeakSet<Message>();
+	probe.retainedPublishedMessages.clear();
+	probe.sinkCrashOnActivation = false;
 	probe.sqliteDirectory = mkdtempSync(path.join(tmpdir(), "phase-3h-migration-"));
+	probe.armTargetFailureMode = undefined;
+	probe.targetFailureMode = undefined;
 	probe.transportCloses = 0;
+	probe.transportObjectIds = [];
 });
 
 afterEach(() => {
@@ -466,7 +687,13 @@ describe("Phase 3h shared-room reversible rehearsal RED", () => {
 			digest("ts-drp/blueprint-admission/v3", selectedApplication.canonicalBlueprintPackageBytes),
 			[remoteAuthor]
 		);
-		const targetMaterial = creatorMaterial(selectedApplication, targetObjectId);
+		const targetMaterial = creatorMaterial(
+			selectedApplication,
+			targetObjectId,
+			0x41,
+			digest("ts-drp/blueprint-admission/v3", selectedApplication.canonicalBlueprintPackageBytes),
+			[remoteAuthor]
+		);
 		let source = await openRoom({
 			application: selectedApplication,
 			databaseName: "phase-3h-source",
@@ -547,6 +774,16 @@ describe("Phase 3h shared-room reversible rehearsal RED", () => {
 		expect(receipt.applicationStateDigest).toBe(digest("ts-drp/v3-room-migration-state/v1", expectedState));
 
 		const scratch = scratchRoomName(sourceObjectId, targetObjectId, nonce);
+		const ordinaryWriterDigest = await appendReceivedOperation(scratch, targetMaterial, targetObjectId, {
+			authorSeed: remoteSeed,
+			dependency: receipt.recordVertexDigest,
+			logicalTime: 23,
+			operation: Object.freeze({
+				action: "message",
+				clientOperationId: "target-writer-control",
+				text: "writer accepted",
+			}),
+		});
 		const targetNames = [scratch, `${scratch}--ahe`, `${scratch}--issuance`];
 		for (const name of targetNames) {
 			expect(probe.databaseNames.filter((candidate) => candidate === name)).toHaveLength(2);
@@ -558,19 +795,76 @@ describe("Phase 3h shared-room reversible rehearsal RED", () => {
 		expect(probe.remoteEgressCalls).toBe(0);
 		expect(probe.localPublicationCalls).toBe(localPublicationsBefore);
 
+		const independentlyAccepted: string[] = [];
 		const independentlyReopened = await openRoom({
 			application: selectedApplication,
 			databaseName: scratch,
 			material: targetMaterial,
 			objectId: targetObjectId,
+			onAcceptedVertex: (value) => {
+				const digestBytes = Reflect.get(value as object, "digest");
+				if (digestBytes instanceof Uint8Array) independentlyAccepted.push(hex(digestBytes));
+			},
 		});
+		expect(independentlyAccepted).toContain(ordinaryWriterDigest);
 		expect(independentlyReopened.projection()).toMatchObject({
+			accepted: [
+				expect.objectContaining({ clientOperationId: "source-message", text: "durable" }),
+				expect.objectContaining({ clientOperationId: "remote-message", text: "from peer" }),
+				expect.objectContaining({ clientOperationId: "target-writer-control", text: "writer accepted" }),
+			],
+		});
+		await independentlyReopened.close();
+
+		const replayDatabaseName = "phase-3h-record-authority-replay";
+		const replayTarget = await openRoom({
+			application: selectedApplication,
+			databaseName: replayDatabaseName,
+			material: targetMaterial,
+			objectId: targetObjectId,
+		});
+		await replayTarget.issue(
+			Object.freeze({ action: "message", clientOperationId: "source-message", text: "durable" })
+		);
+		await replayTarget.issue(
+			Object.freeze({ action: "message", clientOperationId: "remote-message", text: "from peer" })
+		);
+		await replayTarget.close();
+		const replayTip = await issuedDigest(replayDatabaseName, targetMaterial, targetObjectId, 2);
+		const recordOperation = Object.freeze({ action: "migrationRecord", record });
+		const writerRecordDigest = await appendReceivedOperation(replayDatabaseName, targetMaterial, targetObjectId, {
+			authorSeed: remoteSeed,
+			dependency: replayTip,
+			logicalTime: 25,
+			operation: recordOperation,
+		});
+		const creatorRecordDigest = await appendReceivedOperation(replayDatabaseName, targetMaterial, targetObjectId, {
+			authorSeed: targetMaterial.seed,
+			authorSequence: 3,
+			dependency: replayTip,
+			logicalTime: 26,
+			operation: recordOperation,
+		});
+		const replayAccepted: string[] = [];
+		const replayReopened = await openRoom({
+			application: selectedApplication,
+			databaseName: replayDatabaseName,
+			material: targetMaterial,
+			objectId: targetObjectId,
+			onAcceptedVertex: (value) => {
+				const digestBytes = Reflect.get(value as object, "digest");
+				if (digestBytes instanceof Uint8Array) replayAccepted.push(hex(digestBytes));
+			},
+		});
+		expect(replayAccepted).not.toContain(writerRecordDigest);
+		expect(replayAccepted).toContain(creatorRecordDigest);
+		expect(replayReopened.projection()).toMatchObject({
 			accepted: [
 				expect.objectContaining({ clientOperationId: "source-message", text: "durable" }),
 				expect.objectContaining({ clientOperationId: "remote-message", text: "from peer" }),
 			],
 		});
-		await independentlyReopened.close();
+		await replayReopened.close();
 
 		const issuance = createNodeDurableIssuanceStore({
 			primaryFilename: sqliteFilename(`${scratch}--issuance`),
@@ -626,7 +920,7 @@ describe("Phase 3h shared-room reversible rehearsal RED", () => {
 			source.rehearseMigration({ rehearsalNonce: nonce, targetCreatorInvite: targetMaterial.invite })
 		).rejects.toThrow();
 		await source.close();
-		expect(probe.transportCloses).toBe(3);
+		expect(probe.transportCloses).toBe(5);
 		expect(probe.aheCloses).toBeGreaterThanOrEqual(4);
 		expect(probe.issuanceCloses).toBeGreaterThanOrEqual(4);
 		expect(probe.journalCloses).toBeGreaterThanOrEqual(4);
@@ -637,7 +931,15 @@ describe("Phase 3h shared-room reversible rehearsal RED", () => {
 		const nonce = new Uint8Array(32).fill(0x54);
 		const expectedTarget = expectedTargetObjectId(sourceObjectId, nonce);
 		const selectedApplication = application();
-		const sourceMaterial = creatorMaterial(selectedApplication, sourceObjectId);
+		const remoteSeed = new Uint8Array(32).fill(0x43);
+		const remoteAuthor = hex(ed25519.getPublicKey(remoteSeed));
+		const sourceMaterial = creatorMaterial(
+			selectedApplication,
+			sourceObjectId,
+			0x41,
+			digest("ts-drp/blueprint-admission/v3", selectedApplication.canonicalBlueprintPackageBytes),
+			[remoteAuthor]
+		);
 		const source = await openRoom({
 			application: selectedApplication,
 			databaseName: "phase-3h-hostile-source",
@@ -681,9 +983,36 @@ describe("Phase 3h shared-room reversible rehearsal RED", () => {
 			source.issue(Object.freeze({ action: "message", clientOperationId: "after-hostile", text: "live" }))
 		).resolves.toBeUndefined();
 		await source.close();
+
+		const remote = await openRoom({
+			application: selectedApplication,
+			author: remoteAuthor,
+			databaseName: "phase-3h-hostile-source",
+			material: sourceMaterial,
+			objectId: sourceObjectId,
+			signer: (registeredDigest) => Promise.resolve(ed25519.sign(registeredDigest, remoteSeed)),
+		});
+		const remoteBefore = probe.databaseNames.length;
+		await expect(
+			remote.rehearseMigration({
+				rehearsalNonce: nonce,
+				targetCreatorInvite: creatorMaterial(
+					selectedApplication,
+					expectedTarget,
+					0x41,
+					digest("ts-drp/blueprint-admission/v3", selectedApplication.canonicalBlueprintPackageBytes),
+					[remoteAuthor]
+				).invite,
+			})
+		).rejects.toThrow();
+		expect(probe.databaseNames).toHaveLength(remoteBefore);
+		await expect(
+			remote.issue(Object.freeze({ action: "message", clientOperationId: "remote-after-hostile", text: "live" }))
+		).resolves.toBeUndefined();
+		await remote.close();
 	});
 
-	it("rejects duplicate source identity, unstable prepare, and stable source substitution before target effects", async () => {
+	it("rejects duplicate source identity, unstable prepare, source substitution, and target-state divergence", async () => {
 		const sourceObjectId = `creator:${"b".repeat(32)}`;
 		const nonce = new Uint8Array(32).fill(0x55);
 		const targetObjectId = expectedTargetObjectId(sourceObjectId, nonce);
@@ -780,6 +1109,63 @@ describe("Phase 3h shared-room reversible rehearsal RED", () => {
 		} finally {
 			await sourceMismatch.close();
 		}
+
+		const divergentNonce = new Uint8Array(32).fill(0x5b);
+		const divergentTarget = expectedTargetObjectId(sourceObjectId, divergentNonce);
+		const divergentApplication = application((accepted) => {
+			const stable = prepareChatMigration(accepted);
+			return Object.freeze({
+				exactCanonicalApplicationStateBytes: stable.exactCanonicalApplicationStateBytes,
+				importOperations: Object.freeze(
+					stable.importOperations.map((operation) =>
+						Object.freeze({ ...operation, text: `${String(Reflect.get(operation, "text"))}:mutated-on-import` })
+					)
+				),
+			});
+		});
+		const divergentMaterial = creatorMaterial(divergentApplication, sourceObjectId);
+		const divergentSource = await openRoom({
+			application: divergentApplication,
+			databaseName: "phase-3h-target-divergence",
+			material: divergentMaterial,
+			objectId: sourceObjectId,
+		});
+		try {
+			await divergentSource.issue(
+				Object.freeze({ action: "message", clientOperationId: "divergent", text: "source-state" })
+			);
+			await expect(
+				divergentSource.rehearseMigration({
+					rehearsalNonce: divergentNonce,
+					targetCreatorInvite: creatorMaterial(divergentApplication, divergentTarget).invite,
+				})
+			).rejects.toThrow();
+			await expect(
+				divergentSource.issue(
+					Object.freeze({ action: "message", clientOperationId: "after-divergence", text: "source-live" })
+				)
+			).resolves.toBeUndefined();
+			const scratch = scratchRoomName(sourceObjectId, divergentTarget, divergentNonce);
+			const targetStore = createNodeDurableIssuanceStore({
+				primaryFilename: sqliteFilename(`${scratch}--issuance`),
+			});
+			try {
+				const targetScope = Object.freeze({ author: divergentMaterial.author, objectId: divergentTarget });
+				const lineage = await targetStore.readLineage(targetScope);
+				for (let authorSequence = 0; authorSequence < lineage.next; authorSequence += 1) {
+					const issued = await targetStore.readIssued(targetScope, authorSequence);
+					if (issued === null) throw new TypeError("divergent target issuance has a gap");
+					const preimage = decodeCanonical(issued.envelope.canonicalPreimageBytes);
+					expect(Reflect.get(Reflect.get(preimage as object, "operation") as object, "action")).not.toBe(
+						"migrationRecord"
+					);
+				}
+			} finally {
+				await targetStore.close();
+			}
+		} finally {
+			await divergentSource.close();
+		}
 	});
 
 	it("rejects oversized state and import descriptions before target reservation", async () => {
@@ -850,13 +1236,18 @@ describe("Phase 3h shared-room reversible rehearsal RED", () => {
 		const targetObjectId = expectedTargetObjectId(sourceObjectId, nonce);
 		const holder: { source?: MigrationSession } = {};
 		let concurrentIssue: Promise<void> | undefined;
+		let concurrentIssueResolved = false;
+		let concurrentResolvedBeforeTargetClose = false;
+		let scratchCloseCount = 0;
 		let calls = 0;
 		const selectedApplication = application((accepted) => {
 			calls += 1;
 			if (calls === 1 && holder.source !== undefined) {
-				concurrentIssue = holder.source.issue(
-					Object.freeze({ action: "message", clientOperationId: "during", text: "after barrier" })
-				);
+				concurrentIssue = holder.source
+					.issue(Object.freeze({ action: "message", clientOperationId: "during", text: "after barrier" }))
+					.then(() => {
+						concurrentIssueResolved = true;
+					});
 			}
 			return prepareChatMigration(accepted);
 		});
@@ -869,12 +1260,20 @@ describe("Phase 3h shared-room reversible rehearsal RED", () => {
 		});
 		const source = holder.source;
 		await source.issue(Object.freeze({ action: "message", clientOperationId: "before", text: "before barrier" }));
+		const scratch = scratchRoomName(sourceObjectId, targetObjectId, nonce);
+		probe.journalCloseObserver = (databaseName) => {
+			if (databaseName !== scratch) return;
+			scratchCloseCount += 1;
+			if (scratchCloseCount === 1) concurrentResolvedBeforeTargetClose = concurrentIssueResolved;
+		};
 		const receipt = await source.rehearseMigration({
 			rehearsalNonce: nonce,
 			targetCreatorInvite: creatorMaterial(selectedApplication, targetObjectId).invite,
 		});
 		if (concurrentIssue === undefined) throw new TypeError("concurrent source issue was not queued");
 		await concurrentIssue;
+		expect(concurrentResolvedBeforeTargetClose).toBe(true);
+		expect(scratchCloseCount).toBe(2);
 		expect(calls).toBe(2);
 		expect(receipt.importedOperationCount).toBe(1);
 		expect(
@@ -1094,5 +1493,602 @@ describe("Phase 3h shared-room reversible rehearsal RED", () => {
 			});
 			await reopened.close();
 		}
+	});
+
+	it("rejects noncreator and creator-signed malformed decisions before the exact creator activation", async () => {
+		const sourceObjectId = `creator:${"8".repeat(32)}`;
+		const selectedApplication = application();
+		const remoteSeed = new Uint8Array(32).fill(0x48);
+		const remoteAuthor = hex(ed25519.getPublicKey(remoteSeed));
+		const sourceMaterial = creatorMaterial(
+			selectedApplication,
+			sourceObjectId,
+			0x41,
+			digest("ts-drp/blueprint-admission/v3", selectedApplication.canonicalBlueprintPackageBytes),
+			[remoteAuthor]
+		);
+		const acceptedAfterHostile: string[] = [];
+		let sourceSignerCalls = 0;
+		const source = await openRoom({
+			application: selectedApplication,
+			databaseName: "phase-3h-activation-source",
+			material: sourceMaterial,
+			objectId: sourceObjectId,
+			onAcceptedVertex: (value) => {
+				const digestBytes = Reflect.get(value as object, "digest");
+				if (digestBytes instanceof Uint8Array) acceptedAfterHostile.push(hex(digestBytes));
+			},
+			signer: (registeredDigest) => {
+				sourceSignerCalls += 1;
+				return Promise.resolve(ed25519.sign(registeredDigest, sourceMaterial.seed));
+			},
+		});
+		const hostileNonce = new Uint8Array(32).fill(0x62);
+		const hostileTargetObjectId = expectedTargetObjectId(sourceObjectId, hostileNonce);
+		const hostileTargetMaterial = creatorMaterial(selectedApplication, hostileTargetObjectId);
+		await source.issue(Object.freeze({ action: "message", clientOperationId: "before-activation", text: "durable" }));
+		const hostileRehearsal = await source.rehearseMigration({
+			rehearsalNonce: hostileNonce,
+			targetCreatorInvite: hostileTargetMaterial.invite,
+		});
+		const hostileDecision = expectedMigrationActivationDecision(
+			hostileRehearsal.exactCanonicalRecordBytes,
+			hostileRehearsal.recordVertexDigest,
+			hostileTargetMaterial.invite
+		);
+		const malformedCreatorDecision = Object.freeze({ ...hostileDecision, targetObjectId: sourceObjectId });
+		const oversizedDecision = recordWithCanonicalSize(49_153, (sourceIdentity) =>
+			Object.freeze({ ...hostileDecision, sourceObjectId: sourceIdentity })
+		);
+		const oversizedOperation = recordWithCanonicalSize(65_537, (sourceIdentity) =>
+			Object.freeze({
+				action: "migrationActivation",
+				decision: Object.freeze({ ...hostileDecision, sourceObjectId: sourceIdentity }),
+			})
+		);
+		expect(encodeCanonical(oversizedDecision)).toHaveLength(49_153);
+		expect(encodeCanonical(oversizedOperation)).toHaveLength(65_537);
+		const sourceMessageDigest = await issuedDigest("phase-3h-activation-source", sourceMaterial, sourceObjectId, 1);
+		const activationIngressTopic = probe.liveIngressTopics.get("phase-3h-activation-source");
+		if (activationIngressTopic === undefined) throw new TypeError("controlled migration live topic is absent");
+		const hostileEvidence = receivedOperationEvidence(sourceMaterial, sourceObjectId, {
+			authorSeed: remoteSeed,
+			dependency: sourceMessageDigest,
+			logicalTime: 13,
+			messageObjectId: activationIngressTopic,
+			operation: Object.freeze({ action: "migrationActivation", decision: hostileDecision }),
+		});
+		const malformedCreatorEvidence = receivedOperationEvidence(sourceMaterial, sourceObjectId, {
+			authorSeed: sourceMaterial.seed,
+			authorSequence: 2,
+			dependency: sourceMessageDigest,
+			logicalTime: 14,
+			messageObjectId: activationIngressTopic,
+			operation: Object.freeze({ action: "migrationActivation", decision: malformedCreatorDecision }),
+		});
+		const oversizedDecisionEvidence = receivedOperationEvidence(sourceMaterial, sourceObjectId, {
+			authorSeed: sourceMaterial.seed,
+			authorSequence: 2,
+			dependency: sourceMessageDigest,
+			logicalTime: 15,
+			messageObjectId: activationIngressTopic,
+			operation: Object.freeze({ action: "migrationActivation", decision: oversizedDecision }),
+		});
+		const oversizedOperationEvidence = receivedOperationEvidence(sourceMaterial, sourceObjectId, {
+			authorSeed: sourceMaterial.seed,
+			authorSequence: 2,
+			dependency: sourceMessageDigest,
+			logicalTime: 16,
+			messageObjectId: activationIngressTopic,
+			operation: oversizedOperation,
+		});
+		const ordinaryRemoteEvidence = receivedOperationEvidence(sourceMaterial, sourceObjectId, {
+			authorSeed: remoteSeed,
+			dependency: sourceMessageDigest,
+			logicalTime: 17,
+			messageObjectId: activationIngressTopic,
+			operation: Object.freeze({ action: "message", clientOperationId: "ordinary-remote", text: "accepted" }),
+		});
+		const rowsBeforeHostile = await journalRowCount("phase-3h-activation-source", sourceMaterial, sourceObjectId);
+		const liveIngress = probe.liveIngressHandlers.get("phase-3h-activation-source");
+		if (liveIngress === undefined) throw new TypeError("controlled migration live ingress is absent");
+		liveIngress(hostileEvidence.message);
+		liveIngress(malformedCreatorEvidence.message);
+		liveIngress(oversizedDecisionEvidence.message);
+		liveIngress(oversizedOperationEvidence.message);
+		liveIngress(ordinaryRemoteEvidence.message);
+		await expect(
+			source.issue(Object.freeze({ action: "message", clientOperationId: "after-hostile", text: "still live" }))
+		).resolves.toBeUndefined();
+		expect(acceptedAfterHostile).not.toContain(hostileEvidence.vertexDigest);
+		expect(acceptedAfterHostile).not.toContain(malformedCreatorEvidence.vertexDigest);
+		expect(acceptedAfterHostile).not.toContain(oversizedDecisionEvidence.vertexDigest);
+		expect(acceptedAfterHostile).not.toContain(oversizedOperationEvidence.vertexDigest);
+		expect(acceptedAfterHostile).toContain(ordinaryRemoteEvidence.vertexDigest);
+		expect(await journalRowCount("phase-3h-activation-source", sourceMaterial, sourceObjectId)).toBe(
+			rowsBeforeHostile + 2
+		);
+
+		const nonce = new Uint8Array(32).fill(0x63);
+		const targetObjectId = expectedTargetObjectId(sourceObjectId, nonce);
+		const targetMaterial = creatorMaterial(selectedApplication, targetObjectId);
+		const rehearsal = await source.rehearseMigration({
+			rehearsalNonce: nonce,
+			targetCreatorInvite: targetMaterial.invite,
+		});
+		const expectedDecision = expectedMigrationActivationDecision(
+			rehearsal.exactCanonicalRecordBytes,
+			rehearsal.recordVertexDigest,
+			targetMaterial.invite
+		);
+		const lineageBeforeRejectedActivation = await issuanceNext(
+			"phase-3h-activation-source",
+			sourceMaterial,
+			sourceObjectId
+		);
+		const signerCallsBeforeRejectedActivation = sourceSignerCalls;
+		await expect(
+			source.issue(Object.freeze({ action: "migrationActivation", decision: expectedDecision }))
+		).rejects.toThrow();
+		expect(await issuanceNext("phase-3h-activation-source", sourceMaterial, sourceObjectId)).toBe(
+			lineageBeforeRejectedActivation
+		);
+		expect(sourceSignerCalls).toBe(signerCallsBeforeRejectedActivation);
+		if (typeof source.activateMigration !== "function") throw new TypeError("PHASE3H_ACTIVATION_ABSENT");
+		const mutatedRecordBytes = new Uint8Array(rehearsal.exactCanonicalRecordBytes);
+		mutatedRecordBytes[mutatedRecordBytes.byteLength - 1] =
+			(mutatedRecordBytes[mutatedRecordBytes.byteLength - 1] ?? 0) ^ 1;
+		const foreignTargetObjectId = expectedTargetObjectId(sourceObjectId, new Uint8Array(32).fill(0x64));
+		const foreignTargetMaterial = creatorMaterial(selectedApplication, foreignTargetObjectId, 0x44);
+		const oversizedTargetInvite: V3RoomCreatorInviteMaterial = Object.freeze({
+			...targetMaterial.invite,
+			exactCanonicalProfileBytes: new Uint8Array(32_769),
+		});
+		const inheritedActivationInput = Object.create({
+			exactCanonicalRecordBytes: rehearsal.exactCanonicalRecordBytes,
+			recordVertexDigest: rehearsal.recordVertexDigest,
+			targetCreatorInvite: targetMaterial.invite,
+		}) as object;
+		const accessorActivationInput = Object.defineProperties(
+			{},
+			{
+				exactCanonicalRecordBytes: { enumerable: true, get: () => rehearsal.exactCanonicalRecordBytes },
+				recordVertexDigest: { enumerable: true, get: () => rehearsal.recordVertexDigest },
+				targetCreatorInvite: { enumerable: true, get: () => targetMaterial.invite },
+			}
+		);
+		const invalidActivationInputs = [
+			Object.freeze({
+				exactCanonicalRecordBytes: mutatedRecordBytes,
+				recordVertexDigest: rehearsal.recordVertexDigest,
+				targetCreatorInvite: targetMaterial.invite,
+			}),
+			Object.freeze({
+				exactCanonicalRecordBytes: rehearsal.exactCanonicalRecordBytes,
+				recordVertexDigest: "0".repeat(64),
+				targetCreatorInvite: targetMaterial.invite,
+			}),
+			Object.freeze({
+				exactCanonicalRecordBytes: rehearsal.exactCanonicalRecordBytes,
+				recordVertexDigest: rehearsal.recordVertexDigest,
+				targetCreatorInvite: foreignTargetMaterial.invite,
+			}),
+			Object.freeze({
+				exactCanonicalRecordBytes: rehearsal.exactCanonicalRecordBytes,
+				recordVertexDigest: rehearsal.recordVertexDigest,
+				targetCreatorInvite: oversizedTargetInvite,
+			}),
+			Object.freeze({
+				exactCanonicalRecordBytes: rehearsal.exactCanonicalRecordBytes,
+				extra: true,
+				recordVertexDigest: rehearsal.recordVertexDigest,
+				targetCreatorInvite: targetMaterial.invite,
+			}),
+			inheritedActivationInput,
+			accessorActivationInput,
+		] as const;
+		for (const invalidInput of invalidActivationInputs) {
+			await expectRejected(() => Reflect.apply(source.activateMigration, source, [invalidInput]) as Promise<unknown>);
+			expect(await issuanceNext("phase-3h-activation-source", sourceMaterial, sourceObjectId)).toBe(
+				lineageBeforeRejectedActivation
+			);
+			expect(sourceSignerCalls).toBe(signerCallsBeforeRejectedActivation);
+		}
+		const lineageBeforeActivation = await issuanceNext("phase-3h-activation-source", sourceMaterial, sourceObjectId);
+		const mutableBackings: Uint8Array[] = [];
+		const backedView = (value: Uint8Array): Uint8Array => {
+			const backing = new Uint8Array(value.byteLength + 4);
+			const view = backing.subarray(2, value.byteLength + 2);
+			view.set(value);
+			mutableBackings.push(backing);
+			return view;
+		};
+		const snapshotInvite: V3RoomCreatorInviteMaterial = Object.freeze({
+			detachedGenesisSignature: backedView(targetMaterial.invite.detachedGenesisSignature),
+			exactCanonicalGenesisAnchorPreimageBytes: backedView(
+				targetMaterial.invite.exactCanonicalGenesisAnchorPreimageBytes
+			),
+			exactCanonicalLatchedAclBytes: backedView(targetMaterial.invite.exactCanonicalLatchedAclBytes),
+			exactCanonicalParametersCarrierBytes: backedView(targetMaterial.invite.exactCanonicalParametersCarrierBytes),
+			exactCanonicalProfileBytes: backedView(targetMaterial.invite.exactCanonicalProfileBytes),
+			exactCanonicalSignerSetBytes: backedView(targetMaterial.invite.exactCanonicalSignerSetBytes),
+			pinnedGenesisAnchorDigest: targetMaterial.invite.pinnedGenesisAnchorDigest,
+		});
+		const activationPromise = source.activateMigration({
+			exactCanonicalRecordBytes: backedView(rehearsal.exactCanonicalRecordBytes),
+			recordVertexDigest: rehearsal.recordVertexDigest,
+			targetCreatorInvite: snapshotInvite,
+		});
+		for (const backing of mutableBackings) backing.fill(0);
+		const receipt = await activationPromise;
+		expect(receipt).toEqual({
+			activated: true,
+			activationDecisionDigest: expectedMigrationActivationDecisionDigest(expectedDecision),
+			activationVertexDigest: expect.stringMatching(/^[0-9a-f]{64}$/u),
+			targetAnchorDigest: targetMaterial.invite.pinnedGenesisAnchorDigest,
+		});
+		const activationVertex = await issuedVertex(
+			"phase-3h-activation-source",
+			sourceMaterial,
+			sourceObjectId,
+			lineageBeforeActivation
+		);
+		expect(activationVertex.digest).toBe(receipt.activationVertexDigest);
+		expect(
+			verifyEd25519RegisteredDigest(
+				activationVertex.signature,
+				bytes(activationVertex.digest),
+				bytes(sourceMaterial.author)
+			)
+		).toBe(true);
+		const activationPreimage = decodeCanonical(activationVertex.exactCanonicalPreimageBytes);
+		const activationOperation = Reflect.get(activationPreimage as object, "operation");
+		expect(activationOperation).toEqual({ action: "migrationActivation", decision: expectedDecision });
+		expect(
+			Reflect.ownKeys(Reflect.get(activationOperation as object, "decision") as object)
+				.map(String)
+				.sort()
+		).toEqual([...MIGRATION_ACTIVATION_DECISION_KEYS].sort());
+		await expect(
+			source.issue(Object.freeze({ action: "message", clientOperationId: "after-terminal", text: "forbidden" }))
+		).rejects.toThrow();
+		expect(await issuanceNext("phase-3h-activation-source", sourceMaterial, sourceObjectId)).toBe(
+			lineageBeforeActivation + 1
+		);
+		await source.close();
+
+		const redirectTransportStart = probe.transportObjectIds.length;
+		let redirected = await openRoom({
+			application: selectedApplication,
+			databaseName: "phase-3h-activation-source",
+			material: sourceMaterial,
+			objectId: sourceObjectId,
+		});
+		expect(redirected.roomId).toBe(targetMaterial.invite.pinnedGenesisAnchorDigest);
+		expect(redirected.projection()).toMatchObject({
+			accepted: expect.arrayContaining([
+				expect.objectContaining({ clientOperationId: "before-activation", text: "durable" }),
+				expect.objectContaining({ clientOperationId: "after-hostile", text: "still live" }),
+			]),
+		});
+		expect(probe.transportObjectIds.slice(redirectTransportStart)).toEqual(
+			expect.arrayContaining([sourceObjectId, targetObjectId])
+		);
+		await redirected.issue(Object.freeze({ action: "message", clientOperationId: "target-suffix", text: "survives" }));
+		await redirected.close();
+		redirected = await openRoom({
+			application: selectedApplication,
+			databaseName: "phase-3h-activation-source",
+			material: sourceMaterial,
+			objectId: sourceObjectId,
+		});
+		expect(redirected.roomId).toBe(targetMaterial.invite.pinnedGenesisAnchorDigest);
+		expect(redirected.projection()).toMatchObject({
+			accepted: expect.arrayContaining([
+				expect.objectContaining({ clientOperationId: "target-suffix", text: "survives" }),
+			]),
+		});
+		await redirected.close();
+
+		const remoteObjectId = `creator:${"9".repeat(32)}`;
+		const remoteMaterial = creatorMaterial(selectedApplication, remoteObjectId, 0x42);
+		const remoteNonce = new Uint8Array(32).fill(0x65);
+		const remoteTargetObjectId = expectedTargetObjectId(remoteObjectId, remoteNonce);
+		const remoteTargetMaterial = creatorMaterial(selectedApplication, remoteTargetObjectId, 0x42);
+		const remoteAccepted: string[] = [];
+		const remoteSource = await openRoom({
+			application: selectedApplication,
+			databaseName: "phase-3h-activation-remote",
+			material: remoteMaterial,
+			objectId: remoteObjectId,
+			onAcceptedVertex: (value) => {
+				const digestBytes = Reflect.get(value as object, "digest");
+				if (digestBytes instanceof Uint8Array) remoteAccepted.push(hex(digestBytes));
+			},
+		});
+		await remoteSource.issue(
+			Object.freeze({ action: "message", clientOperationId: "before-remote-activation", text: "durable" })
+		);
+		const remoteRehearsal = await remoteSource.rehearseMigration({
+			rehearsalNonce: remoteNonce,
+			targetCreatorInvite: remoteTargetMaterial.invite,
+		});
+		const remoteDecision = expectedMigrationActivationDecision(
+			remoteRehearsal.exactCanonicalRecordBytes,
+			remoteRehearsal.recordVertexDigest,
+			remoteTargetMaterial.invite
+		);
+		const remoteDependency = await issuedDigest("phase-3h-activation-remote", remoteMaterial, remoteObjectId, 1);
+		const remoteIngressTopic = probe.liveIngressTopics.get("phase-3h-activation-remote");
+		if (remoteIngressTopic === undefined) throw new TypeError("controlled remote activation topic is absent");
+		const remoteActivation = receivedOperationEvidence(remoteMaterial, remoteObjectId, {
+			authorSeed: remoteMaterial.seed,
+			authorSequence: 2,
+			dependency: remoteDependency,
+			logicalTime: 13,
+			messageObjectId: remoteIngressTopic,
+			operation: Object.freeze({ action: "migrationActivation", decision: remoteDecision }),
+		});
+		const remoteLineageBefore = await issuanceNext("phase-3h-activation-remote", remoteMaterial, remoteObjectId);
+		const remoteIngress = probe.liveIngressHandlers.get("phase-3h-activation-remote");
+		if (remoteIngress === undefined) throw new TypeError("controlled remote activation ingress is absent");
+		remoteIngress(remoteActivation.message);
+		await expect(
+			remoteSource.issue(
+				Object.freeze({ action: "message", clientOperationId: "after-remote-activation", text: "forbidden" })
+			)
+		).rejects.toThrow();
+		expect(remoteAccepted).toContain(remoteActivation.vertexDigest);
+		expect(await issuanceNext("phase-3h-activation-remote", remoteMaterial, remoteObjectId)).toBe(remoteLineageBefore);
+		await remoteSource.close();
+	});
+
+	it("recovers irreversible activation commits without reopening source authority", async () => {
+		for (const [index, failurePoint] of [
+			"signer",
+			"issuance",
+			"journal",
+			"sink",
+			"publication",
+			"target-store",
+			"target-trust",
+			"target-recovery",
+			"target-transport",
+		].entries()) {
+			const selectedApplication = application();
+			const sourceObjectId = `creator:${String(index + 1).repeat(32)}`;
+			const staleSeed = new Uint8Array(32).fill(0x31 + index);
+			const staleAuthor = hex(ed25519.getPublicKey(staleSeed));
+			const sourceMaterial = creatorMaterial(
+				selectedApplication,
+				sourceObjectId,
+				0x51 + index,
+				digest("ts-drp/blueprint-admission/v3", selectedApplication.canonicalBlueprintPackageBytes),
+				[staleAuthor]
+			);
+			const nonce = new Uint8Array(32).fill(0x70 + index);
+			const targetObjectId = expectedTargetObjectId(sourceObjectId, nonce);
+			const targetMaterial = creatorMaterial(
+				selectedApplication,
+				targetObjectId,
+				0x51 + index,
+				digest("ts-drp/blueprint-admission/v3", selectedApplication.canonicalBlueprintPackageBytes),
+				[staleAuthor]
+			);
+			const databaseName = `phase-3h-activation-crash-${failurePoint}`;
+			let rejectNextSignature = false;
+			let source = await openRoom({
+				application: selectedApplication,
+				databaseName,
+				material: sourceMaterial,
+				objectId: sourceObjectId,
+				signer: (registeredDigest) => {
+					if (rejectNextSignature) {
+						rejectNextSignature = false;
+						return Promise.reject(new TypeError("controlled crash before issuance"));
+					}
+					return Promise.resolve(ed25519.sign(registeredDigest, sourceMaterial.seed));
+				},
+			});
+			await source.issue(
+				Object.freeze({ action: "message", clientOperationId: `before-${failurePoint}`, text: "durable" })
+			);
+			const rehearsal = await source.rehearseMigration({
+				rehearsalNonce: nonce,
+				targetCreatorInvite: targetMaterial.invite,
+			});
+			if (typeof source.activateMigration !== "function") {
+				throw new TypeError("PHASE3H_ACTIVATION_ABSENT");
+			}
+			if (failurePoint === "signer") rejectNextSignature = true;
+			if (failurePoint === "issuance") probe.issuanceCrashAfterCommit = true;
+			if (failurePoint === "journal") {
+				probe.journalCrashAfterAppend = true;
+				probe.journalCrashDatabaseName = databaseName;
+			}
+			if (failurePoint === "sink") probe.sinkCrashOnActivation = true;
+			if (failurePoint === "publication") probe.publicationFailures = 1;
+			if (failurePoint.startsWith("target-")) {
+				probe.armTargetFailureMode = failurePoint.slice("target-".length) as
+					| "recovery"
+					| "store"
+					| "transport"
+					| "trust";
+			}
+			await expectRejected(() =>
+				source.activateMigration({
+					exactCanonicalRecordBytes: rehearsal.exactCanonicalRecordBytes,
+					recordVertexDigest: rehearsal.recordVertexDigest,
+					targetCreatorInvite: targetMaterial.invite,
+				})
+			);
+			if (failurePoint === "signer") {
+				await expect(
+					source.issue(Object.freeze({ action: "message", clientOperationId: "after-pre-effect", text: "source-live" }))
+				).resolves.toBeUndefined();
+				await source.close();
+				continue;
+			}
+			const targetFailure = failurePoint.startsWith("target-");
+			const sourceLineageAfterTerminalEffect = await issuanceNext(databaseName, sourceMaterial, sourceObjectId);
+			const activationVertex = await issuedVertex(
+				databaseName,
+				sourceMaterial,
+				sourceObjectId,
+				sourceLineageAfterTerminalEffect - 1
+			);
+			const activationPreimage = decodeCanonical(activationVertex.exactCanonicalPreimageBytes);
+			if (activationPreimage === null || typeof activationPreimage !== "object") {
+				throw new TypeError("controlled migration activation preimage is malformed");
+			}
+			const activationOperation = Reflect.get(activationPreimage, "operation");
+			if (activationOperation === null || typeof activationOperation !== "object") {
+				throw new TypeError("controlled migration activation operation is malformed");
+			}
+			expect(Reflect.get(activationOperation, "action")).toBe("migrationActivation");
+			const sourceRowsAfterTerminalEffect = await journalRowCount(databaseName, sourceMaterial, sourceObjectId);
+			await expect(
+				source.issue(
+					Object.freeze({
+						action: "message",
+						clientOperationId: `after-terminal-effect-${failurePoint}`,
+						text: "forbidden-before-reopen",
+					})
+				)
+			).rejects.toThrow();
+			expect(await issuanceNext(databaseName, sourceMaterial, sourceObjectId)).toBe(sourceLineageAfterTerminalEffect);
+			expect(await journalRowCount(databaseName, sourceMaterial, sourceObjectId)).toBe(sourceRowsAfterTerminalEffect);
+			await source.close();
+			if (targetFailure) {
+				await expect(
+					openRoom({
+						application: selectedApplication,
+						databaseName,
+						material: sourceMaterial,
+						objectId: sourceObjectId,
+					})
+				).rejects.toThrow();
+				expect(await issuanceNext(databaseName, sourceMaterial, sourceObjectId)).toBe(sourceLineageAfterTerminalEffect);
+				expect(await journalRowCount(databaseName, sourceMaterial, sourceObjectId)).toBe(sourceRowsAfterTerminalEffect);
+				probe.targetFailureMode = undefined;
+			}
+			const retainedPublicationStart = probe.retainedPublishedMessages.get(sourceObjectId)?.length ?? 0;
+			source = await openRoom({
+				application: selectedApplication,
+				databaseName,
+				material: sourceMaterial,
+				objectId: sourceObjectId,
+			});
+			expect(source.roomId).toBe(targetMaterial.invite.pinnedGenesisAnchorDigest);
+			if (failurePoint === "publication") {
+				const retainedSourceMessages = [...(probe.retainedPublishedMessages.get(sourceObjectId) ?? [])];
+				const replayedDigests = retainedSourceMessages.slice(retainedPublicationStart).map((message) => {
+					const envelope = V3Envelope.decode(message.data ?? new Uint8Array());
+					return hex(hashDomain("ts-drp/vertex/v3", envelope.canonicalPreimage));
+				});
+				expect(replayedDigests).toContain(activationVertex.digest);
+				const staleDatabaseName = `${databaseName}-stale-peer`;
+				const staleAccepted: string[] = [];
+				let stalePeer = await openRoom({
+					application: selectedApplication,
+					author: staleAuthor,
+					databaseName: staleDatabaseName,
+					material: sourceMaterial,
+					objectId: sourceObjectId,
+					onAcceptedVertex: (value) => {
+						const digestBytes = Reflect.get(value as object, "digest");
+						if (digestBytes instanceof Uint8Array) staleAccepted.push(hex(digestBytes));
+					},
+					signer: (registeredDigest) => Promise.resolve(ed25519.sign(registeredDigest, staleSeed)),
+				});
+				const retainedIngress = probe.retainedIngressHandlers.get(`${staleDatabaseName}:${sourceObjectId}`);
+				if (retainedIngress === undefined) throw new TypeError("controlled stale-peer retained ingress is absent");
+				for (const message of retainedSourceMessages) retainedIngress(message);
+				for (let turn = 0; turn < 64 && !staleAccepted.includes(activationVertex.digest); turn += 1) {
+					await new Promise<void>((resolve) => setTimeout(resolve, 0));
+				}
+				expect(staleAccepted).toContain(activationVertex.digest);
+				await stalePeer.close();
+				stalePeer = await openRoom({
+					application: selectedApplication,
+					author: staleAuthor,
+					databaseName: staleDatabaseName,
+					material: sourceMaterial,
+					objectId: sourceObjectId,
+					signer: (registeredDigest) => Promise.resolve(ed25519.sign(registeredDigest, staleSeed)),
+				});
+				expect(stalePeer.roomId).toBe(targetMaterial.invite.pinnedGenesisAnchorDigest);
+				await stalePeer.close();
+			}
+			await expect(
+				source.issue(
+					Object.freeze({ action: "message", clientOperationId: `after-${failurePoint}`, text: "target-live" })
+				)
+			).resolves.toBeUndefined();
+			await source.close();
+		}
+
+		const remoteApplication = application();
+		const remoteObjectId = `creator:${"6".repeat(32)}`;
+		const remoteMaterial = creatorMaterial(remoteApplication, remoteObjectId, 0x58);
+		const remoteNonce = new Uint8Array(32).fill(0x79);
+		const remoteTargetObjectId = expectedTargetObjectId(remoteObjectId, remoteNonce);
+		const remoteTargetMaterial = creatorMaterial(remoteApplication, remoteTargetObjectId, 0x58);
+		const remoteDatabaseName = "phase-3h-activation-crash-remote-journal";
+		let remoteSource = await openRoom({
+			application: remoteApplication,
+			databaseName: remoteDatabaseName,
+			material: remoteMaterial,
+			objectId: remoteObjectId,
+		});
+		await remoteSource.issue(
+			Object.freeze({ action: "message", clientOperationId: "before-remote-journal", text: "durable" })
+		);
+		const remoteRehearsal = await remoteSource.rehearseMigration({
+			rehearsalNonce: remoteNonce,
+			targetCreatorInvite: remoteTargetMaterial.invite,
+		});
+		const remoteDecision = expectedMigrationActivationDecision(
+			remoteRehearsal.exactCanonicalRecordBytes,
+			remoteRehearsal.recordVertexDigest,
+			remoteTargetMaterial.invite
+		);
+		const remoteDependency = await issuedDigest(remoteDatabaseName, remoteMaterial, remoteObjectId, 1);
+		const remoteTopic = probe.liveIngressTopics.get(remoteDatabaseName);
+		const remoteIngress = probe.liveIngressHandlers.get(remoteDatabaseName);
+		if (remoteTopic === undefined || remoteIngress === undefined) {
+			throw new TypeError("controlled remote-journal activation ingress is absent");
+		}
+		const remoteActivation = receivedOperationEvidence(remoteMaterial, remoteObjectId, {
+			authorSeed: remoteMaterial.seed,
+			authorSequence: 2,
+			dependency: remoteDependency,
+			logicalTime: 13,
+			messageObjectId: remoteTopic,
+			operation: Object.freeze({ action: "migrationActivation", decision: remoteDecision }),
+		});
+		probe.journalCrashAfterAppend = true;
+		probe.journalCrashDatabaseName = remoteDatabaseName;
+		remoteIngress(remoteActivation.message);
+		await expect(
+			remoteSource.issue(
+				Object.freeze({ action: "message", clientOperationId: "after-remote-journal", text: "forbidden" })
+			)
+		).rejects.toThrow();
+		expect(await journalRowCount(remoteDatabaseName, remoteMaterial, remoteObjectId)).toBe(3);
+		await remoteSource.close();
+		remoteSource = await openRoom({
+			application: remoteApplication,
+			databaseName: remoteDatabaseName,
+			material: remoteMaterial,
+			objectId: remoteObjectId,
+		});
+		expect(remoteSource.roomId).toBe(remoteTargetMaterial.invite.pinnedGenesisAnchorDigest);
+		await expect(
+			remoteSource.issue(
+				Object.freeze({ action: "message", clientOperationId: "after-remote-recovery", text: "target-live" })
+			)
+		).resolves.toBeUndefined();
+		await remoteSource.close();
 	});
 });

@@ -28,8 +28,17 @@ describe("Phase 3h chat and zone migration composition RED", () => {
 			"causalJoin",
 			"join",
 			"message",
+			"migrationActivation",
 			"migrationRecord",
 		]);
+		expect(migrationDescriptor(application, "migrationActivation")).toEqual({
+			argumentSchema: {
+				fields: [{ name: "decision", required: true, type: "canonical-object" }],
+				kind: "closed-record",
+			},
+			maxCanonicalOperationBytes: 65_536,
+			name: "migrationActivation",
+		});
 		expect(migrationDescriptor(application)).toEqual({
 			argumentSchema: {
 				fields: [{ name: "record", required: true, type: "canonical-object" }],
@@ -129,9 +138,18 @@ describe("Phase 3h chat and zone migration composition RED", () => {
 			"applicationBatch",
 			"causalJoin",
 			"join",
+			"migrationActivation",
 			"migrationRecord",
 			"placeBlock",
 		]);
+		expect(migrationDescriptor(application, "migrationActivation")).toEqual({
+			argumentSchema: {
+				fields: [{ name: "decision", required: true, type: "canonical-object" }],
+				kind: "closed-record",
+			},
+			maxCanonicalOperationBytes: 65_536,
+			name: "migrationActivation",
+		});
 		expect(migrationDescriptor(application)).toEqual({
 			argumentSchema: {
 				fields: [{ name: "record", required: true, type: "canonical-object" }],

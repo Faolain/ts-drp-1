@@ -45,7 +45,12 @@ type ExpectedSink = (
 		readonly signature: Uint8Array;
 		readonly transportSender: string;
 	}>
-) => void | Promise<void>;
+	// eslint-disable-next-line @typescript-eslint/no-invalid-void-type -- exact signed sink contract retains legacy void alongside terminal dispositions.
+) => void | ExpectedTerminalDisposition | Promise<void | ExpectedTerminalDisposition>;
+
+type ExpectedTerminalDisposition = Readonly<{
+	readonly kind: "continue" | "retained-bootstrap-ready" | "terminal-accepted" | "terminal-rejected";
+}>;
 
 interface ExpectedHandle {
 	readonly objectId: string;
@@ -60,25 +65,81 @@ interface ExpectedHandle {
 	): Promise<ExpectedEgress>;
 	publishPending(): Promise<ExpectedEgress>;
 	republishRetained(): Promise<ExpectedEgress>;
+	beginTerminalTransition(): Promise<ExpectedTerminalTransitionResult>;
 	deactivate(): void;
 }
+
+type ExpectedTerminalPublishResult =
+	| Readonly<{
+			readonly ok: true;
+			readonly kind: "accepted";
+			readonly authorSequence: number;
+			readonly digest: string;
+			readonly terminalIntent: "committed";
+	  }>
+	| Readonly<{
+			readonly ok: false;
+			readonly kind:
+				| "not-active"
+				| "malformed-input"
+				| "authorization-rejected"
+				| "issuance-rejected"
+				| "admission-rejected"
+				| "journal-rejected"
+				| "graph-rejected"
+				| "terminal-rejected";
+			readonly detail: string;
+			readonly terminalIntent: "absent" | "outcome-unknown";
+	  }>;
+
+type ExpectedTerminalTransitionResult =
+	| Readonly<{
+			readonly ok: true;
+			readonly capability: Readonly<{
+				publishTerminal(input: ExpectedLocalIssueInput): Promise<ExpectedTerminalPublishResult>;
+				resume():
+					| Readonly<{ readonly ok: true; readonly kind: "resumed" }>
+					| Readonly<{ readonly ok: false; readonly kind: "invalid-state"; readonly detail: string }>;
+			}>;
+	  }>
+	| Readonly<{
+			readonly ok: false;
+			readonly kind: "not-active" | "transition-active" | "already-terminal";
+			readonly detail: string;
+	  }>;
+
+type ExpectedTerminalClassifier = (
+	input: Readonly<{
+		readonly author: string;
+		readonly exactReceivedCanonicalPreimageBytes: Uint8Array;
+		readonly signature: Uint8Array;
+		readonly vertex: AdmittedReceivedVertexView;
+	}>
+) => "ordinary" | "terminal-authorized" | "reject";
+
+type ExpectedRebaseSource = Readonly<{
+	readonly author: string;
+	readonly authorSequence: number;
+	readonly vertexDigest: string;
+	readonly intents: readonly Readonly<{
+		readonly logicalTime: number;
+		readonly operation: Readonly<Record<string, unknown>>;
+		readonly operationCount: number;
+		readonly operationIndex: number;
+	}>[];
+}>;
 
 type ExpectedRebaseOutboxResult =
 	| Readonly<{ readonly ok: true; readonly kind: "empty" }>
 	| Readonly<{
 			readonly ok: true;
 			readonly kind: "displaced";
-			readonly source: Readonly<{
-				readonly author: string;
-				readonly authorSequence: number;
-				readonly vertexDigest: string;
-				readonly intents: readonly Readonly<{
-					readonly logicalTime: number;
-					readonly operation: Readonly<Record<string, unknown>>;
-					readonly operationCount: number;
-					readonly operationIndex: number;
-				}>[];
-			}>;
+			readonly source: ExpectedRebaseSource & Readonly<{ readonly publishState?: never }>;
+	  }>
+	| Readonly<{
+			readonly ok: true;
+			readonly kind: "displaced";
+			readonly source: ExpectedRebaseSource & Readonly<{ readonly publishState: "pending" | "published" }>;
 	  }>
 	| Readonly<{ readonly ok: false; readonly kind: "not-active" | "record-rejected" | "store-failed" }>;
 
@@ -172,7 +233,14 @@ type _RecoveryInput = Assert<
 		  }>
 		| Readonly<{
 				readonly capability: PreparedV3Live;
-				readonly displacedSource?: Readonly<{
+				readonly exactCanonicalLatchedAclBytes: Uint8Array;
+				readonly issuanceScope: DurableIssueScope;
+				readonly issuanceStore: DurableIssuanceStore;
+				readonly liveJournalStore: DurableLiveJournalStore;
+		  }>
+		| Readonly<{
+				readonly capability: PreparedV3Live;
+				readonly displacedSource: Readonly<{
 					readonly capability: PreparedV3Live;
 					readonly exactCanonicalLatchedAclBytes: Uint8Array;
 				}>;
@@ -180,6 +248,47 @@ type _RecoveryInput = Assert<
 				readonly issuanceScope: DurableIssueScope;
 				readonly issuanceStore: DurableIssuanceStore;
 				readonly liveJournalStore: DurableLiveJournalStore;
+		  }>
+		| Readonly<{
+				readonly capability: PreparedV3Live;
+				readonly classifyTerminalVertex: ExpectedTerminalClassifier;
+				readonly exactCanonicalLatchedAclBytes: Uint8Array;
+				readonly issuanceScope: DurableIssueScope;
+				readonly issuanceStore: DurableIssuanceStore;
+				readonly liveJournalStore: DurableLiveJournalStore;
+		  }>
+		| Readonly<{
+				readonly capability: PreparedV3Live;
+				readonly classifyTerminalVertex: ExpectedTerminalClassifier;
+				readonly displacedSource: Readonly<{
+					readonly activationVertexDigest: string;
+					readonly capability: PreparedV3Live;
+					readonly exactCanonicalLatchedAclBytes: Uint8Array;
+					readonly issuanceScope: DurableIssueScope;
+					readonly issuanceStore: DurableIssuanceStore;
+					readonly liveJournalStore: DurableLiveJournalStore;
+				}>;
+				readonly exactCanonicalLatchedAclBytes: Uint8Array;
+				readonly issuanceScope: DurableIssueScope;
+				readonly issuanceStore: DurableIssuanceStore;
+				readonly liveJournalStore: DurableLiveJournalStore;
+		  }>
+		| Readonly<{
+				readonly capability: PreparedV3Live;
+				readonly classifyTerminalVertex: ExpectedTerminalClassifier;
+				readonly displacedSource: Readonly<{
+					readonly activationVertexDigest: string;
+					readonly capability: PreparedV3Live;
+					readonly exactCanonicalLatchedAclBytes: Uint8Array;
+					readonly issuanceScope: DurableIssueScope;
+					readonly issuanceStore: DurableIssuanceStore;
+					readonly liveJournalStore: DurableLiveJournalStore;
+				}>;
+				readonly exactCanonicalLatchedAclBytes: Uint8Array;
+				readonly issuanceScope: DurableIssueScope;
+				readonly issuanceStore: DurableIssuanceStore;
+				readonly liveJournalStore: DurableLiveJournalStore;
+				readonly retainedBootstrapHold: true;
 		  }>
 	>
 >;
@@ -189,6 +298,7 @@ type _Deactivate = Assert<Equal<ReturnType<V3PlaneHandle["deactivate"]>, void>>;
 type _V3Envelope = Assert<Equal<V3Envelope, ExpectedV3Envelope>>;
 
 declare const handle: V3PlaneHandle;
+declare const terminalDisposition: ExpectedTerminalDisposition;
 declare const localIssueInput: ExpectedLocalIssueInput;
 const handleShape: readonly [
 	string,
@@ -201,6 +311,7 @@ const handleShape: readonly [
 	Promise<ExpectedEgress>,
 	Promise<ExpectedEgress>,
 	Promise<ExpectedEgress>,
+	Promise<ExpectedTerminalTransitionResult>,
 ] = [
 	handle.objectId,
 	handle.epoch,
@@ -212,6 +323,7 @@ const handleShape: readonly [
 	handle.completeRebaseSource({ authorSequence: 0, digest: "0".repeat(64) }),
 	handle.publishPending(),
 	handle.republishRetained(),
+	handle.beginTerminalTransition(),
 ];
 handle.deactivate();
 const exactWireValue: V3Envelope = {
@@ -221,4 +333,5 @@ const exactWireValue: V3Envelope = {
 const exactWireBytes: Uint8Array = V3EnvelopeCodec.encode(exactWireValue).finish();
 const decodedWireValue: V3Envelope = V3EnvelopeCodec.decode(exactWireBytes);
 void handleShape;
+void terminalDisposition;
 void decodedWireValue;

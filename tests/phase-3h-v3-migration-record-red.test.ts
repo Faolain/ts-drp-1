@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
 	acceptedOperation,
 	expectedTargetObjectId,
+	MIGRATION_ACTIVATION_DECISION_KEYS,
 	prepareChatMigration,
 	prepareZoneMigration,
 } from "./fixtures/phase-3h/migration-rehearsal-fixture.js";
@@ -13,6 +14,11 @@ function hex(value: Uint8Array): string {
 }
 
 describe("Phase 3h creator-owned migration record RED", () => {
+	it("keeps the activation decision distinct from the migration record", () => {
+		expect(MIGRATION_ACTIVATION_DECISION_KEYS).toContain("migrationRecordDigest");
+		expect(MIGRATION_ACTIVATION_DECISION_KEYS).toContain("migrationRecordVertexDigest");
+		expect(MIGRATION_ACTIVATION_DECISION_KEYS).not.toContain("exactCanonicalApplicationStateBytes");
+	});
 	it("derives one exact nonce-bound target object identity without caller selection", () => {
 		const nonce = new Uint8Array(32).fill(0x53);
 		const source = `creator:${"d".repeat(32)}`;

@@ -363,12 +363,19 @@ function displaced(
 	}>[],
 	authorSequence = 4,
 	vertexDigest = "f".repeat(64),
-	author = "author-local"
+	author = "author-local",
+	publishState?: "pending" | "published"
 ): Readonly<Record<string, unknown>> {
 	return Object.freeze({
 		kind: "displaced",
 		ok: true,
-		source: Object.freeze({ author, authorSequence, intents: Object.freeze(intents), vertexDigest }),
+		source: Object.freeze({
+			author,
+			authorSequence,
+			intents: Object.freeze(intents),
+			...(publishState === undefined ? {} : { publishState }),
+			vertexDigest,
+		}),
 	});
 }
 
@@ -674,6 +681,51 @@ describe("Phase 3g room-owned rebase scheduling RED", () => {
 		expect(probe.completedSources).toEqual([{ authorSequence: 4, digest: "f".repeat(64) }]);
 		expect(probe.publishCalls).toBeGreaterThanOrEqual(2);
 		await session.close();
+	});
+
+	it("preserves published source work and completes pending work only after target acceptance", async () => {
+		const publishedOperation = Object.freeze({
+			action: "rebase-me",
+			clientOperationId: "published-source",
+		});
+		const pendingOperation = Object.freeze({
+			action: "rebase-me",
+			clientOperationId: "pending-source",
+		});
+		const intent = (operation: Readonly<Record<string, unknown>>, logicalTime: number) =>
+			Object.freeze({ logicalTime, operation, operationCount: 1, operationIndex: 0 });
+		probe.recoveredVertices = [acceptedVertex(publishedOperation, 9, 7, 0xb7)];
+		probe.rebasePages = [
+			displaced(Object.freeze([intent(publishedOperation, 3)]), 4, "f".repeat(64), "author-local", "published"),
+			displaced(Object.freeze([intent(pendingOperation, 5)]), 5, "e".repeat(64), "author-local", "pending"),
+			{ kind: "empty", ok: true },
+		];
+		const create = Reflect.get(await roomModule, "createV3RoomSession") as (
+			input: unknown
+		) => Promise<{ close(): Promise<void>; issue(operation: Readonly<Record<string, unknown>>): Promise<void> }>;
+		const session = await create(roomInput());
+		await settleRoomDrain();
+		expect(issuedEntries().map(({ operation }) => operation)).toEqual([pendingOperation]);
+		expect(probe.completedSources).toEqual([{ authorSequence: 5, digest: "e".repeat(64) }]);
+		expect(probe.events.indexOf("issue")).toBeLessThan(probe.events.indexOf("complete:5"));
+		await session.close();
+
+		probe.completedSources = [];
+		probe.events = [];
+		probe.issueInputs = [];
+		probe.recoveredVertices = [];
+		probe.rebasePages = [
+			displaced(Object.freeze([intent(publishedOperation, 3)]), 4, "f".repeat(64), "author-local", "published"),
+			{ kind: "empty", ok: true },
+		];
+		const missingTarget = await create(roomInput());
+		await settleRoomDrain();
+		expect(probe.issueInputs).toEqual([]);
+		expect(probe.completedSources).toEqual([]);
+		await expect(
+			missingTarget.issue(Object.freeze({ action: "message", clientOperationId: "after-missing-target" }))
+		).rejects.toThrow();
+		await missingTarget.close();
 	});
 
 	it("batches sixteen compatible rebases behind one target signature", async () => {
@@ -1229,6 +1281,20 @@ describe("Phase 3g room-owned rebase scheduling RED", () => {
 			expect(failure).toBeInstanceOf(Error);
 			await session?.close();
 			probe.rebasePages = [];
+		}
+	});
+
+	it("keeps the reserved terminal activation outside the real chat and zone displacement policies", async () => {
+		const chat = await import("../examples/v3-chat/src/index.js");
+		const zone = await import("../examples/grid/src/v3-zone.js");
+		const chatApplication = chat.createV3ChatApplication("alice");
+		const zoneApplication = zone.createV3ZoneApplication(
+			Object.freeze([Object.freeze({ author: "a".repeat(64), order: 0, peerId: "creator" })]),
+			"creator",
+			"a".repeat(64)
+		);
+		for (const application of [chatApplication, zoneApplication]) {
+			expect(Reflect.get(application, "displacementPolicies")).not.toHaveProperty("migrationActivation");
 		}
 	});
 });
