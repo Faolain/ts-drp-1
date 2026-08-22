@@ -365,6 +365,15 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 }
 
 /**
+ * Encodes the durable zone projection shared by genesis and migration.
+ * @param projection - Product-owned durable zone state.
+ * @returns Exact canonical durable zone state bytes.
+ */
+function canonicalZoneStateBytes(projection: ZoneProjection): Uint8Array {
+	return encodeCanonical(projection.blocks);
+}
+
+/**
  * Creates the one production zone composition installed by the zone entry path.
  * @param members - Ordered creator-approved bootstrap roster.
  * @param creatorPeerId - Transport identity bound to the creator roster entry.
@@ -394,7 +403,7 @@ export function createV3ZoneApplication(
 		},
 		displacementPolicies: Object.freeze({ placeBlock: "rebase" as const }),
 		migration: Object.freeze({
-			canonicalStateBytes: (projection: ZoneProjection) => encodeCanonical(projection.blocks),
+			canonicalStateBytes: canonicalZoneStateBytes,
 			prepare: prepareZoneMigration,
 		}),
 		projectAcceptedOperations: (operations: readonly V3RoomAcceptedOperation[]) =>
@@ -600,15 +609,19 @@ async function createCreatorInviteMaterial(
 		signers: signerSet,
 	});
 	const exactCanonicalParametersCarrierBytes = encodeCanonical(PARAMETERS);
+	const creator = members.find(({ author, order }) => author === node.keychain.localAuthorId && order === 0);
+	if (creator === undefined) throw new TypeError("v3 zone creator enrollment is unavailable");
 	return createV3RoomCreatorInviteMaterial({
 		blueprintDigest: application.blueprintDigest,
+		exactCanonicalApplicationStateBytes: canonicalZoneStateBytes(
+			projectZone([], creator.peerId, node.keychain.localAuthorId)
+		),
 		exactCanonicalLatchedAclBytes,
 		exactCanonicalParametersCarrierBytes,
 		exactCanonicalProfileBytes,
 		exactCanonicalSignerSetBytes,
 		objectId,
 		signGenesisAnchorDigest: (anchorDigest) => node.keychain.signWithLocalAuthor(anchorDigest),
-		stateDigest: "7".repeat(64),
 	});
 }
 

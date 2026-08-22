@@ -422,6 +422,26 @@ function applicationMaterial(): ApplicationMaterial {
 }
 
 /**
+ * Encodes the durable chat projection shared by genesis and migration.
+ * @param projection - Product-owned durable chat state.
+ * @returns Exact canonical durable chat state bytes.
+ */
+function canonicalChatStateBytes(projection: ChatProjection): Uint8Array {
+	return encodeCanonical(
+		[...projection.accepted]
+			.sort(
+				(left, right) =>
+					left.logicalTime - right.logicalTime ||
+					compareText(left.author, right.author) ||
+					left.authorSequence - right.authorSequence ||
+					compareText(left.digest, right.digest) ||
+					left.operationIndex - right.operationIndex
+			)
+			.map(({ clientOperationId, text }) => Object.freeze({ clientOperationId, text }))
+	);
+}
+
+/**
  * Creates the one production chat composition installed by the room entry path.
  * @param clientId - Client identity encoded by the bootstrap join operation.
  * @returns Exact blueprint, catalog, bootstrap and projection authority.
@@ -442,19 +462,7 @@ export function createV3ChatApplication(clientId: ClientId): V3RoomApplication<C
 		},
 		displacementPolicies: Object.freeze({ message: "rebase" as const }),
 		migration: Object.freeze({
-			canonicalStateBytes: (projection: ChatProjection) =>
-				encodeCanonical(
-					[...projection.accepted]
-						.sort(
-							(left, right) =>
-								left.logicalTime - right.logicalTime ||
-								compareText(left.author, right.author) ||
-								left.authorSequence - right.authorSequence ||
-								compareText(left.digest, right.digest) ||
-								left.operationIndex - right.operationIndex
-						)
-						.map(({ clientOperationId, text }) => Object.freeze({ clientOperationId, text }))
-				),
+			canonicalStateBytes: canonicalChatStateBytes,
 			prepare: prepareChatMigration,
 		}),
 		projectAcceptedOperations: projectChat,
@@ -518,13 +526,13 @@ async function createCreatorInviteMaterial(objectId = OBJECT_ID): Promise<V3Room
 	const exactCanonicalParametersCarrierBytes = encodeCanonical(PARAMETERS);
 	return createV3RoomCreatorInviteMaterial({
 		blueprintDigest: application.blueprintDigest,
+		exactCanonicalApplicationStateBytes: canonicalChatStateBytes(projectChat([])),
 		exactCanonicalLatchedAclBytes,
 		exactCanonicalParametersCarrierBytes,
 		exactCanonicalProfileBytes,
 		exactCanonicalSignerSetBytes,
 		objectId,
 		signGenesisAnchorDigest: (anchorDigest) => alice.signWithLocalAuthor(anchorDigest),
-		stateDigest: "7".repeat(64),
 	});
 }
 

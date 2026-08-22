@@ -160,13 +160,13 @@ type GenesisAnchorSigner = (digest: Uint8Array) => Promise<Uint8Array>;
 
 export interface V3RoomCreatorInviteMaterialInput {
 	readonly blueprintDigest: string;
+	readonly exactCanonicalApplicationStateBytes: Uint8Array;
 	readonly exactCanonicalLatchedAclBytes: Uint8Array;
 	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
 	readonly exactCanonicalProfileBytes: Uint8Array;
 	readonly exactCanonicalSignerSetBytes: Uint8Array;
 	readonly objectId: string;
 	readonly signGenesisAnchorDigest: GenesisAnchorSigner;
-	readonly stateDigest: string;
 }
 
 export type V3RoomAcceptedVertex = AdmittedReceivedVertexView;
@@ -361,7 +361,7 @@ function strictCanonicalBytes(value: unknown, name: string): Uint8Array {
 	return output;
 }
 
-function normalizeMigrationStateBytes(value: unknown): Uint8Array {
+function normalizeApplicationStateBytes(value: unknown, purpose: "genesis" | "migration"): Uint8Array {
 	let backing: unknown;
 	let backingByteLength: unknown;
 	let byteLength: unknown;
@@ -376,7 +376,7 @@ function normalizeMigrationStateBytes(value: unknown): Uint8Array {
 			resizable = Reflect.apply(INTRINSIC_ARRAY_BUFFER_RESIZABLE_GETTER, backing, []) === true;
 		}
 	} catch {
-		throw new TypeError("v3 room migration state is invalid");
+		throw new TypeError(`v3 room ${purpose} state is invalid`);
 	}
 	if (
 		INTRINSIC_GET_PROTOTYPE_OF(value) !== INTRINSIC_UINT8_ARRAY_PROTOTYPE ||
@@ -387,19 +387,28 @@ function normalizeMigrationStateBytes(value: unknown): Uint8Array {
 		typeof byteLength !== "number" ||
 		byteLength !== backingByteLength
 	) {
-		throw new TypeError("v3 room migration state is invalid");
+		throw new TypeError(`v3 room ${purpose} state is invalid`);
 	}
 	const exactState = new INTRINSIC_UINT8_ARRAY(byteLength);
 	Reflect.apply(INTRINSIC_UINT8_ARRAY_SET, exactState, [new INTRINSIC_UINT8_ARRAY(backing, byteOffset, byteLength)]);
-	if (exactState.byteLength > 32_768) throw new TypeError("v3 room migration state is unbounded");
+	if (exactState.byteLength > 32_768) throw new TypeError(`v3 room ${purpose} state is unbounded`);
 	let decodedState: unknown;
 	try {
 		decodedState = decodeCanonical(exactState, { maxBytes: 32_768, maxDepth: 16, maxItems: 16_384 });
 	} catch {
-		throw new TypeError("v3 room migration state is invalid");
+		throw new TypeError(`v3 room ${purpose} state is invalid`);
 	}
 	if (!sameBytes(encodeCanonical(decodedState), exactState)) {
-		throw new TypeError("v3 room migration state is not canonical");
+		throw new TypeError(`v3 room ${purpose} state is not canonical`);
+	}
+	if (
+		purpose === "genesis" &&
+		decodedState !== null &&
+		typeof decodedState === "object" &&
+		!Array.isArray(decodedState) &&
+		Object.hasOwn(decodedState, "context")
+	) {
+		throw new TypeError("v3 room genesis state contains replica-local context");
 	}
 	return exactState;
 }
@@ -490,20 +499,18 @@ export async function createV3RoomCreatorInviteMaterial(
 ): Promise<V3RoomCreatorInviteMaterial> {
 	const record = exactRecord(input, [
 		"blueprintDigest",
+		"exactCanonicalApplicationStateBytes",
 		"exactCanonicalLatchedAclBytes",
 		"exactCanonicalParametersCarrierBytes",
 		"exactCanonicalProfileBytes",
 		"exactCanonicalSignerSetBytes",
 		"objectId",
 		"signGenesisAnchorDigest",
-		"stateDigest",
 	]);
 	if (
 		record === undefined ||
 		typeof record.blueprintDigest !== "string" ||
 		!/^[0-9a-f]{64}$/u.test(record.blueprintDigest) ||
-		typeof record.stateDigest !== "string" ||
-		!/^[0-9a-f]{64}$/u.test(record.stateDigest) ||
 		typeof record.objectId !== "string" ||
 		!parseStorageObjectId(record.objectId).ok ||
 		typeof record.signGenesisAnchorDigest !== "function"
@@ -512,8 +519,12 @@ export async function createV3RoomCreatorInviteMaterial(
 	}
 	const blueprintDigest = record.blueprintDigest;
 	const objectId = record.objectId;
-	const stateDigest = record.stateDigest;
 	const signGenesisAnchorDigest = record.signGenesisAnchorDigest as (digest: Uint8Array) => Promise<Uint8Array>;
+	const exactCanonicalApplicationStateBytes = normalizeApplicationStateBytes(
+		record.exactCanonicalApplicationStateBytes,
+		"genesis"
+	);
+	const stateDigest = digest("ts-drp/state/v3", exactCanonicalApplicationStateBytes);
 	const exactCanonicalLatchedAclBytes = strictCanonicalBytes(
 		record.exactCanonicalLatchedAclBytes,
 		"exactCanonicalLatchedAclBytes"
@@ -1595,10 +1606,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		) {
 			throw new TypeError("v3 room retained migration prefix differs");
 		}
-		const exactState = normalizeMigrationStateBytes(
-			Reflect.apply(migration.canonicalStateBytes, migration, [projection]) as Uint8Array
+		const exactState = normalizeApplicationStateBytes(
+			Reflect.apply(migration.canonicalStateBytes, migration, [projection]) as Uint8Array,
+			"migration"
 		);
-		const recordState = normalizeMigrationStateBytes(record.exactCanonicalApplicationStateBytes);
+		const recordState = normalizeApplicationStateBytes(record.exactCanonicalApplicationStateBytes, "migration");
 		if (
 			!sameBytes(exactState, recordState) ||
 			digest("ts-drp/v3-room-migration-state/v1", exactState) !== decision.applicationStateDigest
@@ -2226,7 +2238,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				if (record === undefined || imports === undefined || imports.length > 8192) {
 					throw new TypeError("v3 room migration projection is invalid");
 				}
-				const exactState = normalizeMigrationStateBytes(record.exactCanonicalApplicationStateBytes);
+				const exactState = normalizeApplicationStateBytes(record.exactCanonicalApplicationStateBytes, "migration");
 				let detachedImportBytes = 0;
 				const detachedImports = imports.map((operation) => {
 					const detached = detachedRoomOperation(operation);
@@ -2257,8 +2269,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (!sameBytes(encodeCanonical(firstProjection), encodeCanonical(secondProjection))) {
 				throw new TypeError("v3 room migration projection is unstable");
 			}
-			const exactSourceState = normalizeMigrationStateBytes(
-				Reflect.apply(canonicalStateBytes, migration, [projection]) as Uint8Array
+			const exactSourceState = normalizeApplicationStateBytes(
+				Reflect.apply(canonicalStateBytes, migration, [projection]) as Uint8Array,
+				"migration"
 			);
 			if (!sameBytes(exactSourceState, firstProjection.exactCanonicalApplicationStateBytes)) {
 				throw new TypeError("v3 room migration source state differs");
@@ -2312,8 +2325,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				if (!sameBytes(encodeCanonical(acceptedImportOperations), encodeCanonical(firstProjection.importOperations))) {
 					throw new TypeError("v3 room migration target projection differs");
 				}
-				const exactTargetState = normalizeMigrationStateBytes(
-					Reflect.apply(canonicalStateBytes, migration, [targetProjection]) as Uint8Array
+				const exactTargetState = normalizeApplicationStateBytes(
+					Reflect.apply(canonicalStateBytes, migration, [targetProjection]) as Uint8Array,
+					"migration"
 				);
 				if (!sameBytes(exactTargetState, firstProjection.exactCanonicalApplicationStateBytes)) {
 					throw new TypeError("v3 room migration target state differs");
@@ -2378,8 +2392,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				if (!sameBytes(acceptedRowsEvidence(reopenedAccepted), completedTargetEvidence)) {
 					throw new TypeError("v3 room migration reopened target differs");
 				}
-				const exactReopenedState = normalizeMigrationStateBytes(
-					Reflect.apply(canonicalStateBytes, migration, [reopenedProjection]) as Uint8Array
+				const exactReopenedState = normalizeApplicationStateBytes(
+					Reflect.apply(canonicalStateBytes, migration, [reopenedProjection]) as Uint8Array,
+					"migration"
 				);
 				if (!sameBytes(exactReopenedState, firstProjection.exactCanonicalApplicationStateBytes)) {
 					throw new TypeError("v3 room migration reopened state differs");
@@ -2579,17 +2594,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		let currentRows: readonly V3RoomAcceptedOperation[];
 		try {
 			currentRows = acceptedOperationSnapshot();
-			exactCurrentState = normalizeMigrationStateBytes(
+			exactCurrentState = normalizeApplicationStateBytes(
 				Reflect.apply(input.application.migration.canonicalStateBytes, input.application.migration, [
 					projection,
-				]) as Uint8Array
+				]) as Uint8Array,
+				"migration"
 			);
 		} catch (error) {
 			transition.capability.resume();
 			throw error;
 		}
 		const exactCurrentRows = acceptedRowsEvidence(currentRows);
-		const recordedState = normalizeMigrationStateBytes(record.exactCanonicalApplicationStateBytes);
+		const recordedState = normalizeApplicationStateBytes(record.exactCanonicalApplicationStateBytes, "migration");
 		if (
 			currentRows.length !== record.sourceAcceptedOperationCount ||
 			digest("ts-drp/v3-room-migration-source/v1", exactCurrentRows) !== record.sourceAcceptedOperationsDigest ||
