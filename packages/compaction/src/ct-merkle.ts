@@ -323,7 +323,7 @@ function validateSnapshot(snapshot: Partial<AccumulatorSnapshot>): AccumulatorSn
 	const { peaks = [], size = 0 } = snapshot;
 	if (!Number.isSafeInteger(size) || size < 0) throw new RangeError("invalid accumulator size");
 	if (!Array.isArray(peaks)) throw new TypeError("accumulator peaks must be an array");
-	const highestLevel = size === 0 ? -1 : Math.floor(Math.log2(size));
+	const highestLevel = size === 0 ? -1 : size.toString(2).length - 1;
 	if (peaks.length !== highestLevel + 1) throw new Error("corrupt compact Merkle accumulator snapshot");
 	const copied: Array<Uint8Array | null> = [];
 	for (let level = 0; level <= highestLevel; level++) {

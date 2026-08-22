@@ -327,6 +327,9 @@ importers:
       '@ts-drp/canonical':
         specifier: workspace:*
         version: link:../../packages/canonical
+      '@ts-drp/compaction':
+        specifier: workspace:*
+        version: link:../../packages/compaction
       '@ts-drp/control-plane':
         specifier: workspace:*
         version: link:../../packages/control-plane

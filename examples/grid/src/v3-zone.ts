@@ -1,6 +1,7 @@
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import type { EphemeralChannel } from "@ts-drp/ephemeral";
 import {
+	createV3RoomCreatorInviteMaterial,
 	createV3RoomSession,
 	type V3RoomAcceptedOperation,
 	type V3RoomCreatorInviteMaterial,
@@ -599,33 +600,15 @@ async function createCreatorInviteMaterial(
 		signers: signerSet,
 	});
 	const exactCanonicalParametersCarrierBytes = encodeCanonical(PARAMETERS);
-	const exactCanonicalGenesisAnchorPreimageBytes = encodeCanonical({
-		aclDigest: digest("ts-drp/latched-acl/v3", exactCanonicalLatchedAclBytes),
-		archiveIndexRoot: "3".repeat(64),
+	return createV3RoomCreatorInviteMaterial({
 		blueprintDigest: application.blueprintDigest,
-		cryptoSuiteId: "ed25519-sha256-v3",
-		cutDigest: "0".repeat(64),
-		epoch: 0,
-		historyRoot: "5".repeat(64),
-		historySize: 0,
-		kind: "drp-epoch-anchor",
-		objectId,
-		parametersDigest: digest("ts-drp/parameters/v3", exactCanonicalParametersCarrierBytes),
-		previousAnchor: "0".repeat(64),
-		profileDigest: digest("ts-drp/profile/v3", exactCanonicalProfileBytes),
-		protocolMajor: 3,
-		signerSetDigest: digest("ts-drp/signer-set/v3", exactCanonicalSignerSetBytes),
-		stateDigest: "7".repeat(64),
-	});
-	const anchorDigestBytes = hashDomain("ts-drp/epoch-anchor/v3", exactCanonicalGenesisAnchorPreimageBytes);
-	return Object.freeze({
-		detachedGenesisSignature: await node.keychain.signWithLocalAuthor(anchorDigestBytes),
 		exactCanonicalLatchedAclBytes,
-		exactCanonicalGenesisAnchorPreimageBytes,
 		exactCanonicalParametersCarrierBytes,
 		exactCanonicalProfileBytes,
 		exactCanonicalSignerSetBytes,
-		pinnedGenesisAnchorDigest: hex(anchorDigestBytes),
+		objectId,
+		signGenesisAnchorDigest: (anchorDigest) => node.keychain.signWithLocalAuthor(anchorDigest),
+		stateDigest: "7".repeat(64),
 	});
 }
 

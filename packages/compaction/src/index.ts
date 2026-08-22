@@ -11,6 +11,7 @@ export {
 	verifyInclusion,
 } from "./ct-merkle.js";
 export { stateDigest } from "./state.js";
+export { deriveCloseSetHistoryCommitment } from "./history-commitment.js";
 export type {
 	AccumulatorSnapshot,
 	BatchOptions,
@@ -24,3 +25,8 @@ export type {
 	LinearizeOptions,
 	MerkleTree,
 } from "./types.js";
+export type {
+	CloseSetHistoryCommitment,
+	CloseSetHistoryCommitmentInput,
+	CloseSetHistoryEntry,
+} from "./history-commitment.js";

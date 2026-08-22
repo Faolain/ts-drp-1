@@ -1,4 +1,5 @@
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { CompactMerkleAccumulator } from "@ts-drp/compaction";
 import { createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
 import type { EphemeralChannel, EphemeralChannelOptions } from "@ts-drp/ephemeral";
 import { MessageQueueManager } from "@ts-drp/message-queue";
@@ -155,6 +156,19 @@ export interface V3RoomCreatorInviteMaterial {
 	readonly pinnedGenesisAnchorDigest: string;
 }
 
+type GenesisAnchorSigner = (digest: Uint8Array) => Promise<Uint8Array>;
+
+export interface V3RoomCreatorInviteMaterialInput {
+	readonly blueprintDigest: string;
+	readonly exactCanonicalLatchedAclBytes: Uint8Array;
+	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
+	readonly exactCanonicalProfileBytes: Uint8Array;
+	readonly exactCanonicalSignerSetBytes: Uint8Array;
+	readonly objectId: string;
+	readonly signGenesisAnchorDigest: GenesisAnchorSigner;
+	readonly stateDigest: string;
+}
+
 export type V3RoomAcceptedVertex = AdmittedReceivedVertexView;
 
 export interface V3RoomAcceptedOperation {
@@ -300,6 +314,53 @@ function digest(domain: string, value: Uint8Array): string {
 	return hex(hashDomain(domain, value));
 }
 
+function strictDetachedBytes(value: unknown, name: string, expectedLength?: number): Uint8Array {
+	let backing: unknown;
+	let backingByteLength: unknown;
+	let byteLength: unknown;
+	let byteOffset: unknown;
+	let resizable = false;
+	try {
+		backing = Reflect.apply(INTRINSIC_TYPED_ARRAY_BUFFER_GETTER, value, []);
+		backingByteLength = Reflect.apply(INTRINSIC_ARRAY_BUFFER_BYTE_LENGTH_GETTER, backing, []);
+		byteLength = Reflect.apply(INTRINSIC_TYPED_ARRAY_BYTE_LENGTH_GETTER, value, []);
+		byteOffset = Reflect.apply(INTRINSIC_TYPED_ARRAY_BYTE_OFFSET_GETTER, value, []);
+		if (INTRINSIC_ARRAY_BUFFER_RESIZABLE_GETTER !== undefined) {
+			resizable = Reflect.apply(INTRINSIC_ARRAY_BUFFER_RESIZABLE_GETTER, backing, []) === true;
+		}
+	} catch {
+		throw new TypeError(`${name} must be an ordinary detached Uint8Array`);
+	}
+	if (
+		INTRINSIC_GET_PROTOTYPE_OF(value) !== INTRINSIC_UINT8_ARRAY_PROTOTYPE ||
+		!(backing instanceof INTRINSIC_ARRAY_BUFFER) ||
+		INTRINSIC_GET_PROTOTYPE_OF(backing) !== INTRINSIC_ARRAY_BUFFER_PROTOTYPE ||
+		resizable ||
+		byteOffset !== 0 ||
+		typeof byteLength !== "number" ||
+		byteLength !== backingByteLength ||
+		(expectedLength !== undefined && byteLength !== expectedLength)
+	) {
+		throw new TypeError(`${name} must be an ordinary detached Uint8Array`);
+	}
+	const output = new INTRINSIC_UINT8_ARRAY(byteLength);
+	Reflect.apply(INTRINSIC_UINT8_ARRAY_SET, output, [new INTRINSIC_UINT8_ARRAY(backing, 0, byteLength)]);
+	return output;
+}
+
+function strictCanonicalBytes(value: unknown, name: string): Uint8Array {
+	const output = strictDetachedBytes(value, name);
+	if (output.byteLength === 0 || output.byteLength > 65_536) throw new TypeError(`${name} is invalid`);
+	let decoded: unknown;
+	try {
+		decoded = decodeCanonical(output, { maxBytes: 65_536, maxDepth: 16, maxItems: 16_384 });
+	} catch {
+		throw new TypeError(`${name} is invalid`);
+	}
+	if (!sameBytes(encodeCanonical(decoded), output)) throw new TypeError(`${name} is not canonical`);
+	return output;
+}
+
 function normalizeMigrationStateBytes(value: unknown): Uint8Array {
 	let backing: unknown;
 	let backingByteLength: unknown;
@@ -416,6 +477,92 @@ function decodeCreatorInvite(invite: string): V3RoomCreatorInviteMaterial {
 		exactCanonicalProfileBytes: inviteBytes(values, "exactCanonicalProfileBytes"),
 		exactCanonicalSignerSetBytes: inviteBytes(values, "exactCanonicalSignerSetBytes"),
 		pinnedGenesisAnchorDigest: values.pinnedGenesisAnchorDigest,
+	});
+}
+
+/**
+ * Builds the one creator-signed genesis invite material shared by room products.
+ * @param input - Closed product-owned blueprint, authority and signer evidence.
+ * @returns Detached exact genesis material for the room session.
+ */
+export async function createV3RoomCreatorInviteMaterial(
+	input: V3RoomCreatorInviteMaterialInput
+): Promise<V3RoomCreatorInviteMaterial> {
+	const record = exactRecord(input, [
+		"blueprintDigest",
+		"exactCanonicalLatchedAclBytes",
+		"exactCanonicalParametersCarrierBytes",
+		"exactCanonicalProfileBytes",
+		"exactCanonicalSignerSetBytes",
+		"objectId",
+		"signGenesisAnchorDigest",
+		"stateDigest",
+	]);
+	if (
+		record === undefined ||
+		typeof record.blueprintDigest !== "string" ||
+		!/^[0-9a-f]{64}$/u.test(record.blueprintDigest) ||
+		typeof record.stateDigest !== "string" ||
+		!/^[0-9a-f]{64}$/u.test(record.stateDigest) ||
+		typeof record.objectId !== "string" ||
+		!parseStorageObjectId(record.objectId).ok ||
+		typeof record.signGenesisAnchorDigest !== "function"
+	) {
+		throw new TypeError("v3 room creator invite input is invalid");
+	}
+	const blueprintDigest = record.blueprintDigest;
+	const objectId = record.objectId;
+	const stateDigest = record.stateDigest;
+	const signGenesisAnchorDigest = record.signGenesisAnchorDigest as (digest: Uint8Array) => Promise<Uint8Array>;
+	const exactCanonicalLatchedAclBytes = strictCanonicalBytes(
+		record.exactCanonicalLatchedAclBytes,
+		"exactCanonicalLatchedAclBytes"
+	);
+	const exactCanonicalParametersCarrierBytes = strictCanonicalBytes(
+		record.exactCanonicalParametersCarrierBytes,
+		"exactCanonicalParametersCarrierBytes"
+	);
+	const exactCanonicalProfileBytes = strictCanonicalBytes(
+		record.exactCanonicalProfileBytes,
+		"exactCanonicalProfileBytes"
+	);
+	const exactCanonicalSignerSetBytes = strictCanonicalBytes(
+		record.exactCanonicalSignerSetBytes,
+		"exactCanonicalSignerSetBytes"
+	);
+	const emptyRoot = hex(new CompactMerkleAccumulator().root());
+	const exactCanonicalGenesisAnchorPreimageBytes = encodeCanonical({
+		aclDigest: digest("ts-drp/latched-acl/v3", exactCanonicalLatchedAclBytes),
+		archiveIndexRoot: emptyRoot,
+		blueprintDigest,
+		cryptoSuiteId: "ed25519-sha256-v3",
+		cutDigest: "0".repeat(64),
+		epoch: 0,
+		historyRoot: emptyRoot,
+		historySize: 0,
+		kind: "drp-epoch-anchor",
+		objectId,
+		parametersDigest: digest("ts-drp/parameters/v3", exactCanonicalParametersCarrierBytes),
+		previousAnchor: "0".repeat(64),
+		profileDigest: digest("ts-drp/profile/v3", exactCanonicalProfileBytes),
+		protocolMajor: 3,
+		signerSetDigest: digest("ts-drp/signer-set/v3", exactCanonicalSignerSetBytes),
+		stateDigest,
+	});
+	const anchorDigest = hashDomain("ts-drp/epoch-anchor/v3", exactCanonicalGenesisAnchorPreimageBytes);
+	const detachedGenesisSignature = strictDetachedBytes(
+		await signGenesisAnchorDigest(new Uint8Array(anchorDigest)),
+		"genesis anchor signature",
+		64
+	);
+	return Object.freeze({
+		detachedGenesisSignature,
+		exactCanonicalGenesisAnchorPreimageBytes: new Uint8Array(exactCanonicalGenesisAnchorPreimageBytes),
+		exactCanonicalLatchedAclBytes: new Uint8Array(exactCanonicalLatchedAclBytes),
+		exactCanonicalParametersCarrierBytes: new Uint8Array(exactCanonicalParametersCarrierBytes),
+		exactCanonicalProfileBytes: new Uint8Array(exactCanonicalProfileBytes),
+		exactCanonicalSignerSetBytes: new Uint8Array(exactCanonicalSignerSetBytes),
+		pinnedGenesisAnchorDigest: hex(anchorDigest),
 	});
 }
 

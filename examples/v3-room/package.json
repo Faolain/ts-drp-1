@@ -16,6 +16,7 @@
 	},
 	"dependencies": {
 		"@ts-drp/canonical": "workspace:*",
+		"@ts-drp/compaction": "workspace:*",
 		"@ts-drp/control-plane": "workspace:*",
 		"@ts-drp/ephemeral": "workspace:*",
 		"@ts-drp/message-queue": "workspace:*",
