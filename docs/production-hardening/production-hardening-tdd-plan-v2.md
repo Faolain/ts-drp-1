@@ -53668,3 +53668,56 @@ audit; Grok uses review mode with preserved streamed evidence; Codex and Opus
 xhigh through actual `claude-phel` review each exact packet. Reviewers do not
 run the expanded tier. Timeout, account exhaustion or `NO_VERDICT` remains
 honest non-approval. Only a reproduced substantive P0/P1 blocks signing.
+
+### D.93.59.3 — closure evidence-custody correction
+
+Final closure review found one process contradiction after the exact GREEN had
+already been signed and all acceptance commands had completed. The controller
+transcript preserves each command, its output and its exit, but those records
+were not also copied under a dedicated final-byte acceptance
+`.logs/phase3-exit-d-*` location as D.93.59 required. Earlier plan, RED, GREEN
+and review artifacts remain separate and are not represented as final-byte gate
+logs. The five GitHub run/job responses and final pull-request rollup likewise
+remain preserved controller observations rather than a separately saved
+API-response artifact.
+The expanded 266,009-schedule certification is an exact-once gate and therefore
+cannot lawfully be rerun merely to repair an artifact location.
+
+For this exact closure only, the preserved controller transcript is the accepted
+command/output/exit custody source. The ledger must identify every local and
+remote result derived from it as a contemporaneous controller observation,
+state that the dedicated `.logs`/API copies are absent, and must not describe a
+review artifact as a gate rerun. This is a disclosure-only authorization: the
+canonical provenance chain is the controller turn that emitted each command,
+output and exit followed by the ledger's explicitly unpersisted transcription;
+no new local file is made equivalent to that unavailable raw evidence. This
+corrects the evidence location; it does not waive a command, exit, threshold,
+exact-GREEN identity, review, byte-accounting nonclaim or any other D.93.59
+acceptance obligation. It grants no authority to reconstruct or fabricate a
+missing raw artifact, retrospectively normalize or selectively excerpt output,
+infer an unrecorded timestamp or exit, rerun the expanded tier, edit production
+or test bytes, weaken an assertion, or install recurring certification. Any
+individual obligation not supported by the preserved transcript must instead be
+named unevidenced and cannot be upgraded to a pass.
+
+This evidence-custody correction is a separate Good-Faolain-signed documentation
+commit after the seven signed D.93.59 through D.93.59.2/GREEN commits and changes
+exactly this plan path. The closure ledger becomes the ninth linear commit and
+must cite this correction. Kimi performs a focused 100-step audit; Grok uses
+streamed review mode; Codex and Opus xhigh through actual `claude-phel` inspect
+the exact one-path packet read-only. They run no gate. Only after those reviews
+close every reproduced P0/P1 may this correction be signed, pushed and used as
+the ledger's evidence authority.
+
+The prepared ledger is temporarily preserved in stash commit
+`1de55dc34f9e973c0c20ca0f8947deb3562333e0`; its first parent is the signed
+GREEN and its second parent is the earlier staged correction snapshot. After
+this correction is signed, restoration must apply only the ledger delta between
+that second parent and the stash commit through a three-way merge onto the new
+signed correction. It must never check out or overwrite the whole stashed plan
+file. Before staging the ledger, verify that the signed D.93.59.3 bytes survive
+the merge and that no other tracked path changed. Keep the temporary stash until
+the merged ledger itself is signed; only then drop that exact temporary stash
+and verify that the prior 26 stashes, 21 `refs/codex/recovery` refs, two
+recovery-named branch refs, protected untracked paths and unrelated work remain
+byte-identical and untouched.
