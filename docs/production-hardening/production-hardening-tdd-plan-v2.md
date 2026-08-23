@@ -54260,3 +54260,90 @@ security of either implementation.
 If its frozen peer differential and every preservation gate pass, it closes the
 last named cross-implementation conjunct and therefore the three-conjunct Phase
 3 exit gate only; Phase 4 and every later release obligation remain open.
+
+### D.93.60.1 — reviewer-execution evidence correction
+
+Closure-ledger review reproduced one process contradiction after the exact
+GREEN and its acceptance evidence were already frozen. D.93.60 requires the
+opt-in expanded-conformance tier exactly once for final acceptance and says
+reviewers do not run it. During the focused Codex review, the controller
+observed that the reviewer launched that expanded command. The controller
+interrupted the process before it produced a terminal result and excluded it
+from every acceptance count, timing, RSS value and verdict. No dedicated raw
+artifact preserves the attempted run or interruption, so its exact progress is
+unevidenced; the ledger may state only this contemporaneous controller
+observation. The authoritative controller-owned expanded command remains the
+sole completed D.93.60 expanded result and has its command, output, exit, wall
+time and RSS copied in
+`.logs/phase3-exit-e-green/expanded-owner-time.log` without a rerun.
+
+Launching the reviewer command nevertheless violated the signed no-reviewer-run
+procedure. A ledger cannot silently turn that violation into compliance. For
+this closure only, D.93.60.1 authorizes a disclosure-only disposition: the
+interrupted reviewer attempt must be named as a procedural deviation, must not
+be called an acceptance run or evidence, and cannot upgrade, replace or weaken
+the sole completed controller certification. This correction grants no
+authority to reconstruct the missing attempt output, infer its test progress or
+exit, rerun either expanded tier, reinterpret a second completed result as
+lawful, waive the no-reviewer-run rule in any later slice, edit the GREEN/RED,
+reference, oracle, manifest, workflow or production bytes, or weaken any
+assertion, threshold, nonclaim or custody obligation. No local gate, remote
+workflow or review may be rerun merely to repair closure prose. Any unsupported
+fact remains unevidenced.
+
+The final pull-request ledger must also record the complete controller-observed
+exact-head rollup rather than listing only the required successful subset. It
+must distinguish the five required D.93.60 successes from unrelated failures,
+skips, cancellations or nonterminal jobs; it may not imply the whole rollup was
+green or complete. The remote result copy is a controller transcription of
+GitHub API responses, not a raw API artifact. Likewise, only the focused and
+expanded owner files are exact command/output/exit transcript copies; remaining
+local gate totals are controller-summary observations. Exact-GREEN Kimi and
+Codex conclusions have no dedicated artifacts and must be labeled unpersisted
+controller observations, while Grok and Opus retain their streamed artifacts.
+Those reviewer artifacts are read-only audits, not independent gate reruns.
+The inherited regenerated-reference `ENOBUFS` cause remains the dirty
+untracked `.logs`/`.pnpm-store` enumeration overflowing the subprocess output
+buffer, not the plan bytes themselves.
+
+The revised ledger must close every reproduced finding from the prior ledger
+reviews, not only their four P1 summaries. In particular it must remove the
+unsupported numeric `0/0` parity wording and the unsupported pull-request
+title-edit and ready/draft-cycle narrative; distinguish staged acceptance bytes
+from the later signed GREEN while binding both to tree
+`21f227adc3a05e655396dbf275399491964581ab`; state that the focused and expanded
+transcript copies were persisted only after both GREEN reviews closed and were
+audited by neither GREEN reviewer; attribute and disposition the reviewers' nonblocking
+findings; and retain the explicit nonclaim that the full-range-only
+`merkle-range` row proves reachability and boundary safety, not subrange
+discrimination. No prior finding may be omitted merely because it was P2.
+
+This document-only correction will be the fourth linear Good-Faolain-signed D.93.60
+commit after plan `b285d1ba1d053e24bc354191f2f028f79c6257e1`, RED
+`331befa0660706630842822fea2ad8138a15060b` and GREEN
+`d1a83b151f50e494a53aaf4c4b1d5b79863bf858`; it supersedes D.93.60's earlier
+four-commit summary. The revised closure ledger becomes the fifth separate
+commit and must cite this correction. Kimi performs the requested focused
+100-step audit; Grok uses streamed review mode; Codex and Opus xhigh through
+actual `claude-phel` review the exact one-path correction read-only. They run no
+gate. Only after all reproduced P0/P1 findings close may this correction be
+signed and used as ledger authority.
+
+The already reviewed ledger is temporarily preserved in stash commit
+`f0fbd779a149f4102c850e445b64be284726aaa2`; its first parent is signed GREEN
+`d1a83b151f50e494a53aaf4c4b1d5b79863bf858`, its second parent is the staged
+ledger index snapshot `93e364a805fe9435749c040b492b31b47d5d3c4e`, and its tree is
+`097acb752ac1d7a98dc46f0e8d03153e0a382017`. After this correction is signed,
+restore only the ledger delta by a three-way merge with `stash^1` as ancestor,
+the signed correction as ours and the stash tree as theirs. Never check out or
+overwrite the whole stashed plan file. Resolve the expected end-of-file
+modify/modify content conflict on the existing plan path by retaining the signed
+D.93.60.1 section first and placing the corrected D.93.60 closure ledger after
+it. Before staging, require both headings to occur exactly once in that order,
+the signed D.93.60.1 body to survive byte-identically, and the file to contain no
+conflict marker, duplicated section or duplicated ledger text. The index must
+contain exactly this one documentation path, with zero tracked unstaged changes
+and no other tracked change. Keep the temporary stash until that ledger is
+signed; only then drop this exact stash and verify that the prior 26 stashes
+beneath it, 21 `refs/codex/recovery` refs, two recovery-named branch refs,
+protected untracked paths and unrelated work remain untouched.
