@@ -53721,3 +53721,174 @@ the merged ledger itself is signed; only then drop that exact temporary stash
 and verify that the prior 26 stashes, 21 `refs/codex/recovery` refs, two
 recovery-named branch refs, protected untracked paths and unrelated work remain
 byte-identical and untouched.
+
+### D.93.59 closure ledger — bounded schedules and indexed journal scale
+
+D.93.59 has eight linear Good-Faolain-signed commits, and this staged ledger is
+the intended ninth: plan
+`2c138e6e9fd8216865b760815ec7507ceb46eedd`, original tests-only RED
+`86d05ecb296eaa93ab0d6f4f29996aca0e9143d6`, observation-correction plan
+`bf35403ef21c770be58be0865c0ec18dd7904c55`, corrective RED
+`63f1433b7183bd0e1fc15ccb235b7f822a1e4773`, scale-correction plan
+`5d5d1d8320e723f4f3586c5bb7fb984c24de941a`, scale RED
+`7711f4e8920f7cf9572d144b65b72c4946cd6043`, GREEN
+`76c14e64a23cd1c359b66fc7c2a27b238f978ae4`, evidence-custody correction
+`f17e981069f404bad227e5363aed1a5456749cd6`, and this separate ledger. The
+GREEN has sole parent `7711f4e8920f7cf9572d144b65b72c4946cd6043`, tree
+`70daff271615e252c80e74e1ed05d11b60c0ed99`, canonical full-index binary patch
+SHA-256
+`687828ecf95fa7d56c222ef74e6dab9be8700d9e3186de5fc8a984beefb9491b`
+and default binary patch SHA-256
+`63c0fbd1b3a949a55c07249a00fad816bc535c7bf06ad6599e745cccfb10514a`.
+It changes exactly the three paths authorized by D.93.59.2. `git
+verify-commit` authenticated it with Faolain's RSA key
+`55E22F154FBAF8C84F378304761B99CEA81C6289`; local, upstream and pull-request
+15 heads matched exactly after push.
+The ledger changes exactly this plan path, and the signed D.93.59.3 correction
+survived its three-way restoration byte-identically.
+
+The bounded pure owner now exhausts its frozen ordinary grammar and independently
+certifies the expanded release corpus without importing the production graph,
+order, history or scope authorities. The retained integration driver composes
+genuine authentication, queueing, issuance, pending release, SQLite journaling
+and crash/recovery; the test owner independently reconstructs the authenticated
+graph and queries the genuine D.93.56 commitment authority. The production
+correction replaces quadratic full-closure materialization only for a previously
+validated, uncontended new append. Exact indexed probes remain subordinate to
+the existing duplicate decision table, and every drift, conflict, idempotent or
+exceptional path retains full fail-closed validation. The verified-scope
+watermark is a private selector, not cached acceptance evidence.
+
+One final review found that the initial install could establish that selector
+from an unbound postcommit snapshot. Before signing, the GREEN was corrected so
+install captures `main.data_version` inside its writer transaction, requires the
+same value across the stable postcommit bracket, runs the full closure derivation
+on that exact snapshot and invalidates the scope watermark on every unsuccessful
+post-write observation or classification path. Blocked or malformed calls return
+before any watermark can be established. All four reviewers independently
+accepted that correction. The driver's earlier illustrative history root was
+likewise replaced before final review with the genuine D.93.56 empty-history
+root after the independent commitment oracle rejected it; no assertion or
+authority was weakened.
+
+Final-byte local acceptance evidence was:
+
+- the focused contract, parity and Node storage roster passed 43 rows with two
+  intended kill-roster skips in 8.68 seconds;
+- the ordinary D.93.59 owner passed seven rows with its expanded row skipped in
+  122.29 seconds after the install-watermark correction;
+- after every final reviewer approved the frozen GREEN, the expanded tier ran
+  exactly once: all eight owner rows passed in 141.25 seconds total, and the
+  exact 407-shape/266,009-schedule row took 3.477 seconds. Apple
+  `/usr/bin/time -l` reported command-level `maximum resident set size` of
+  `499089408` bytes, `37781504` bytes below the exact 512 MiB ceiling;
+- the opted-in 5,231-graph order owner and resolver law passed their exact five
+  plus one cases in 6.60 seconds; complete compaction passed 74 rows with one
+  pre-existing skip in 6.61 seconds;
+- complete live transport, local issue, serialized activation, journal
+  reconciliation and envelope purity passed 32/32 in 13.93 seconds; the retained
+  Phase 3f/3g/3h plus genesis roster passed 96/96 in 43.48 seconds;
+- the five protocol semantic suites passed 87/87 in 1.96 seconds, and their
+  controlled operation/work arms passed 28/28 and 12/12;
+- the committed model typecheck, live-journal/storage typecheck and build,
+  node/room/chat/grid typecheck and build, exact-path ESLint, Prettier, the
+  `packages/live-journal/dist/src/contract.d.ts` SHA-256
+  `a3f88546918b9e0cee4b809945cfcf9bfa36f07582014133739671a03e6f71e5` and diff
+  checks passed. Frozen offline install completed in 13.4 seconds and the
+  complete workspace package/example build passed; and
+- the real two-client chat control passed 5/5 in 7.1 seconds, and the genuine
+  two-client zone control passed 1/1 in 31.3 seconds.
+
+As authorized by signed evidence-custody correction
+`f17e981069f404bad227e5363aed1a5456749cd6`, those gate counts, timings, RSS
+value, public hash, remote workflow results and custody facts are contemporaneous
+controller observations. The controller transcript preserves the commands,
+outputs and exits, but no separate raw D.93.59 final-byte GREEN gate transcript
+set or GitHub API response artifact was copied under `.logs/phase3-exit-d-*`.
+This is the disclosed artifact-location exception, not a claim that the results
+are dedicated-artifact-backed. The exact-once expanded tier cannot be rerun to
+repair the location after the fact. Reviewer artifacts contain their read-only
+audits, not independent gate reruns. Grok and Opus have final streamed
+JSONL/status artifacts; the focused Codex `exec` has a final-message artifact;
+Kimi's 100-step result is preserved in the controller transcript. An earlier
+uncommitted Codex review launched an overbroad Vitest command that collected
+protected `.logs` copies and unrelated untracked protocol-v2 REDs. Its test exit
+is excluded as scope-misaligned evidence. Its two retained source observations
+are that the sibling-permutation replica pair and local issuance effect-order
+arrays are test-owned reports rather than two independently instrumented product
+event streams.
+
+Independent exact-byte GREEN review closed with no P0/P1:
+
+- Kimi 100-step audit: PASS with no findings;
+- Grok review mode: PASS, high confidence, after 390.085 seconds on the final
+  delta, with streamed evidence preserved;
+- Codex read-only final delta audit: PASS and `READY_TO_SIGN: YES`; and
+- Opus xhigh through actual `claude-phel`: PASS, high confidence, after
+  1,141.4 seconds wall time, with streamed evidence preserved.
+
+The signed D.93.59.3 correction packet was separately approved with no P0/P1 by
+Kimi's 100-step audit, the focused Codex read-only audit, and final streamed Grok
+and Opus xhigh reviews. The Kimi result remains in the controller transcript;
+Codex has its final-message artifact and Grok and Opus have streamed artifacts.
+Those reviews inspected the correction bytes and custody only and reran no gate.
+
+Nonblocking review debt remains explicit. The retained driver at
+`tests/fixtures/phase-3-exit-model/driver.ts` has minor bootstrap-byte assumptions
+and derives page observations through the storage owner's complete read path;
+the latter remains a possible scale cost outside the indexed append claim. In
+`packages/storage-node/src/live-journal.ts`, duplicate scope readers,
+conservative watermark establishment/invalidation occasions, the safe
+same-transaction full fallback, idempotent-install watermark establishment,
+missing-scope outcome taxonomy and a possible already-selected
+`store-poisoned` diagnostic overwrite are cleanup or signed-prose divergences;
+reviewers found them fail closed and reproduced no unauthorized append. The
+accepted RED owners
+`packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts` and
+`packages/storage-node/tests/fixtures/phase-3a1b-p4-node-preload.mjs` retain
+test-architecture debt around duplicated fixtures, stale titles, a vacuous
+writer-ledger assertion and declaration-cast maintenance. None grants authority
+to weaken the frozen oracle or widen this closed production slice.
+
+The broad storage-node roster collected 117 rows: 112 passed, four had expected
+skips and one failed its pre-existing stale tsconfig-exclusion assertion in
+`phase-3a0-c-anchor-trust-sigkill-red.test.ts`. The broad node test-inclusive
+typecheck reproduced only the disclosed TS1360/TS2322 diagnostics in
+`packages/node/tests/helpers/compact-history-scale-1i-b.ts`. Package-local
+storage Vitest remains unusable because its existing workspace points at a
+missing package config; the authoritative root-config runs above passed.
+Protected untracked protocol-v2 tests make an in-place root-checker invocation
+non-clean, but the direct production successor checker passed against a clean
+disposable candidate at exact GREEN and the real pull-request base.
+These broad inherited-result and checker statements are likewise contemporaneous
+unpersisted controller observations under the D.93.59.3 evidence boundary.
+
+The five required remote workflows all completed successfully on exact GREEN
+`76c14e64a23cd1c359b66fc7c2a27b238f978ae4`:
+
+- operation budget run `32630498266`, job `97172442948`;
+- work budget run `32630498244`, job `97172442916`;
+- ACL reputation run `32630498204`, job `97172442980`;
+- author projection run `32630498163`, job `97172442744`; and
+- gossip budget run `32630498304`, job `97172442987`.
+
+The pull-request rollup bound all five to the same exact head. These run/job
+mappings and the rollup counts are the unpersisted controller-observed GitHub
+API results covered by the evidence boundary above. At the final observation it
+contained 26 successes, 11 unrelated inherited failures, two skips and two
+cancellations; no entry remained in progress, and only the five named required
+workflows are represented here as green. In particular, protocol-v2 registry
+change control and several pre-existing freeze/type/lint jobs remained red
+outside the exact three-path D.93.59 GREEN.
+
+Protected untracked paths, the prior 26 stashes beneath the temporary ledger
+stash, 21 refs under `refs/codex/recovery` and two recovery-named branch refs
+and unrelated work remained untouched. This ledger closes only the bounded
+in-repository Phase 3 graph/schedule model and the indexed live-journal scale
+correction needed by its retained production representative. It does not certify
+production accepted-byte enforcement or production pending wire-byte accounting;
+those require a lawful large-payload profile or another product-observable
+discriminator. It also does not install recurring certification, prove the
+pinned-reference cross-implementation subset, or close Phase 3, live sealing,
+certification, adoption, pruning, archive, Discord, the MMORPG or production
+hardening as a whole.
