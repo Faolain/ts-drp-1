@@ -53892,3 +53892,371 @@ discriminator. It also does not install recurring certification, prove the
 pinned-reference cross-implementation subset, or close Phase 3, live sealing,
 certification, adoption, pruning, archive, Discord, the MMORPG or production
 hardening as a whole.
+
+### D.93.60 — Phase 3 exit-e pinned-original primitive conformance
+
+#### Trigger and bounded claim
+
+The signed D.93.59 ledger at
+`307b334b7cf31e5ec1a686f4f8f9b74263548cd0` closes the in-repository
+small-graph and adversarial-schedule conjunct. D.93.58 already closes envelope
+purity. The last named Phase 3 exit-gate conjunct is therefore the deliberately
+narrow oracle-(b) comparison from §2.3: current production primitives against
+the immutable original AHE-v4 JavaScript reference, only where later amendments
+did not change the semantic result.
+
+That common surface is a closed manifest, not a similarity claim:
+
+- canonical encoding, valid decode/round-trip, valid deep clone, bytewise
+  comparison and domain-separated SHA-256 framing for the applicable values
+  already partly owned by the Phase-0a differential, with the separate
+  boundary-biased expanded-conformance tier described below;
+- minimum-hash Kahn `topologicalOrder` over valid complete active-epoch graphs,
+  `CausalityIndex` strict ancestry and relatedness when both engines receive the
+  same explicit validated order, and `linearizeEpoch({mode: "none"})` with the
+  anchor omitted from the returned ordinary suffix; and
+- successful RFC 9162 empty, leaf, node, tree, range, inclusion and consistency
+  results plus compact-accumulator append-from-empty roots and snapshots at
+  bounded safe sizes. Proofs are compared by their named semantic fields and
+  byte paths, never by JavaScript property insertion order.
+
+The directly selected pinned owners are
+`packages/protocol-v2/conformance/ahe-reference/src/canonical.js`, `hash.js`,
+`linearize.js` and `ct-merkle.js`; `linearize.js` transitively imports and
+executes `protocol.js`, so the exercised reference closure is those five files.
+They are all under
+`packages/protocol-v2/conformance/reference.lock.json`. The lock currently has
+SHA-256 `ada22a8aa8c5e190e41d5cd8de84ed288d5a0047b10ef579602c28e50f294ffd`;
+the RED binds the lock file and every entry it names, separately requires the
+five-file executed closure above, and imports those exact original modules
+read-only. The current owners are the public
+`@ts-drp/canonical` and `@ts-drp/compaction` package surfaces. Neither the
+pinned tree, either reference lock, a registry, a workflow nor a production
+source path is authorized to change in this slice.
+
+The closed subset explicitly excludes every similarly named behavior that is
+amended, preservation-owned, non-live or otherwise outside this slice: D1
+locale-sensitive signer ordering, D2 typed
+`Float32Array(-0)`, D3 admission precedence, v2 or v3 vertex/anchor/history
+preimages and digests, every admission or pending classification, pair and
+multiple conflict resolution (including the TS-only `Drop` action and
+fail-closed missing-resolver behavior), the exported but non-production
+`ts-drp/state/v2` digest, default-order differences between the two causality
+constructors, append/tip/capacity extensions, hostile-input/copy/yield and
+large-counter hardening, and fold, snapshot, seal, archive, storage, runtime,
+recovery, migration and every protocol-v3 reference. The known D1/D2/D3 and
+hardening divergences remain exercised preservation or provenance sentinels;
+they are never normalized away and never counted as conformance. In
+particular, this slice does not project protocol-v2 records into protocol-v3 or
+claim that v3 wire bytes, state identities, admission decisions or history
+leaves equal the pinned v2 reference.
+
+This boundary was independently inspected before planning. Kimi completed the
+requested 100-step feasibility audit and found the test-only primitive slice
+feasible; Grok reached terminal `VERDICT: COMPLETE` with no blocking finding;
+and Opus xhigh through actual `claude-phel` found the architecture ready while
+requiring the `/v2` state-digest exclusion and tests-only GREEN authority used
+here. A disposable read-only scale pilot against compiled current artifacts and
+the exact pinned sources completed 5,231 graphs, 41,838 insertion permutations,
+500,724 causality observations, 10,000 applicable canonical/hash/state values
+and Merkle boundaries through 256 leaves in 6.545 seconds, with Apple
+`/usr/bin/time -l` maximum resident set size of 106,561,536 bytes. The state
+rows made that pilot conservatively broader than the signed subset and do not
+authorize state-digest conformance. The first pilot also proved why proof
+property order is outside authority: the zero-to-zero consistency proof had the
+same semantic fields in a different object-key order.
+
+#### Complete input, independent witnesses and causal RED
+
+The tests-only RED is this plan's sole child and changes exactly:
+
+- new `tests/phase-3-exit-pinned-reference-conformance-red.test.ts`;
+- new `tests/fixtures/phase-3-exit-reference-conformance/contract.ts`;
+- new `tests/fixtures/phase-3-exit-reference-conformance/oracle.ts`; and
+- new `tests/tsconfig.phase-3-exit-reference-conformance.json`.
+
+The contract is the sole closed test manifest. It freezes the reference paths
+and lock entries, exact operation and exclusion sets, corpus identities, seeds,
+Merkle boundary sizes, ordinary and expanded counts, transcript framing and
+mutation roster. Its dedicated tsconfig has a closed `files` list containing
+the RED test, contract and oracle, plus an `include` containing only the future
+`fixtures/phase-3-exit-reference-conformance/driver.ts`; the one-path GREEN
+therefore does not edit the type gate. As in the D.93.58 dedicated gate, it
+overrides inherited build settings with `composite: false`,
+`declaration: false`, `declarationMap: false`, `noEmit: true` and
+`rootDir: ".."`.
+
+The oracle owns only independent expectations: the existing sort-based Kahn
+witness and each enumerated corpus graph's `ancestorMasks` field from
+`packages/compaction/tests/corpus.ts`. It maps mask bit/index `i` to the exact
+digest returned by that owner's `hashForIndex(i)` and uses the same mapping when
+comparing `referenceOrder`; `corpus.ts` remains byte-identical. For graph indices
+`i` and `j`, the manifest-owned laws are exactly
+`expectedAncestor(i, j) = (ancestorMasks[j] & (1 << i)) !== 0` and
+`expectedRelated(i, j) = i === j || expectedAncestor(i, j) ||
+expectedAncestor(j, i)`. The first law is strict and therefore false on the
+diagonal; the second is reflexive. The remaining independent expectations are
+literal `node:crypto` SHA-256 with `0x00`/`0x01` RFC framing, byte comparison,
+proof-path comparison and LF-only transcript hashing. The RFC construction
+deliberately repeats the file-local third witness in
+`packages/compaction/tests/ct-merkle.test.ts` because that test exports no
+reusable helper; refactor review permits this one test-only witness and forbids
+moving it into production or duplicating it in the driver. The oracle imports
+no production linearization, Merkle or history implementation and no pinned
+reference implementation.
+
+All inputs are complete before either peer executes. A pure allocator in the
+frozen test contract materializes the same logical row twice, and the RED test
+asserts before invocation that the two slots have distinct graph Maps, vertex
+records, dependency arrays, validated/supplied-order arrays, Merkle leaf views
+and backing buffers, and encoded decode-row views and backing buffers. The
+driver accepts those caller-owned slots, forwards one only to its labeled
+original call and the other only to its labeled current call. This is not
+established by a driver-returned receipt. The contract freezes a `CALL_BINDINGS`
+roster for every peer operation, including the exact original/current callee,
+exact arity and complete ordered binding relation
+`(operation, peer, argument position) -> expression`. Its closed expression
+codomain is exactly a direct same-peer slot access, a frozen immutable manifest
+scalar/option literal, or a named same-function same-peer SSA result edge. The
+relation covers every argument of multi-argument and variadic calls, each
+spread, every `NewExpression` argument and receiver, and every required or
+omitted property of a constructed options object. For every call result it also
+names exactly one destination: either the next same-peer SSA receiver/argument
+edge for an intermediate stateful value or the returned observation field for a
+terminal semantic value. Every Promise-valued result is awaited at the rostered
+boundary before either destination consumes it. When the disposable or committed
+driver exists, the RED parses its source with the TypeScript AST and requires zero
+missing or extra peer-primitive calls and an exact expression-tree match for every
+rostered binding.
+
+Slot roots and their access chains may occur nowhere else in the driver source.
+The audit rejects their use in assignment or update targets, aliases,
+destructuring, casts or assertions, receiver positions not named by the roster,
+unrelated calls or arguments, wrapper forwarding, copies, reallocation,
+computed callees, a carrier cache and a module-scope fixture. Each rostered peer
+operation is a branch-free, loop-free, try-free straight-line function. Its
+audited `CallExpression` or `NewExpression` result is assigned once, is never
+discarded or overwritten, and flows exactly once either to its named same-peer
+SSA edge or to its named property in the returned labeled observation. Every
+stateful constructor/method sequence must name each intermediate receiver/result
+edge and its terminal observation in the same roster. An unresolved Promise,
+short-circuit, conditional, exception-swallowing or unreachable call form fails
+the audit. The driver may use no unrostered peer primitive call.
+
+The mutation matrix is the complete roster cross-product, not a current-peer
+sample. For both peers, every applicable positional argument (including a
+non-trailing argument), spread, options property, constructor argument,
+receiver and SSA-result edge independently receives each applicable one-axis
+mutation: opposite-peer substitution; removal where the call grammar permits or
+an explicit `undefined`/default at the same position where it does not; and an
+extra positional, spread or options-property binding. Frozen scalar/option
+literals receive their own wrong-literal, missing/default and extra-property
+mutants. For every call and result edge on both peers, separate mutants add a
+pre-call slot mutation/rebinding, make the call unreachable, discard or
+overwrite its result, drop required `await`/resolution, route an intermediate
+result to the wrong same-peer or opposite-peer edge, or substitute the opposite
+peer's terminal result in the returned observation. The audit has distinct
+wrong-binding, missing-binding/arity, extra-binding, dead-result,
+unresolved-result and observation-substitution failure classes. Every one-axis
+mutant must fail its exact AST boundary; changing only a pre-invocation
+allocator is not a qualifying kill. Fixtures contain no expected order, root,
+proof or digest, and the driver returns only separately labeled raw
+observations. The test compares Kahn order, ancestry, relatedness, mode-none
+membership, RFC roots/proofs/accumulator results, domain framing and
+byte-comparison signs with the applicable independent witness as well as across
+peers. Canonical encode, valid decode/round-trip and valid deep-clone evidence
+is instead a direct current-versus-locked-original differential anchored by the
+frozen Phase-0a vectors and the D2 provenance sentinel; it does not claim a
+third encoder. Substituting one engine for both labeled slots therefore fails
+the mandatory D2 divergence even where an applicable canonical value happens
+to agree.
+
+The ordinary gate uses all 407 pinned corpus shapes through six vertices, all
+of their bounded `min(8, V!)` insertion permutations (3,246 executions), and
+the complete strict-ancestor/relatedness matrix (27,972 boolean observations).
+It covers Merkle sizes `0, 1, 2, 3, 4, 5, 7, 8, 9, 15, 16, 17, 31, 32, 33,
+63, 64, 65`, every inclusion index, every consistency prefix through 33 and
+boundary prefixes thereafter, plus accumulator prefixes from empty through 256
+leaves. One preservation row supplies genuine D.93.56 current history-leaf
+bytes to both Merkle peers only as opaque leaves and compares the resulting
+roots/proofs without interpreting or equating their v3 schema. Applicable
+canonical/hash rows reuse the existing Phase-0a owner as the ordinary per-PR
+authority rather than minting a second small codec corpus. The
+exact owner is `packages/canonical/tests/phase-0a-contract.test.ts`. The existing
+`packages/compaction/tests/order-exhaustive.test.ts` remains the current-engine
+407-graph order owner; this slice adds locked-original and complete ancestry
+comparison rather than replacing it.
+
+An opt-in expanded-conformance arm extends the same immutable graph contract to
+all 5,231 shapes through seven vertices and all 41,838 bounded insertion
+permutations, and runs exactly 10,000 seed-pinned boundary-biased applicable
+canonical/hash/byte-operation inputs plus the declared Merkle boundary corpus.
+Seed `0x3e60_2026` deterministically covers null and booleans; safe-integer and
+finite-float boundaries excluding negative zero and non-finite values; Unicode
+strings; dense arrays; closed plain records; Maps and Sets; byte arrays and the
+shared valid typed-array intersection; and nested values kept within current
+byte, item and depth limits. It separately covers empty, prefix-equal,
+first-differing-byte and length-differing byte comparisons, valid decode of each
+encoded value, byte-identical re-encoding and semantically equal deep clones.
+For every nested clone, each peer must also prove that the outer value and every
+nested mutable container or byte view have different identities from the input,
+and that mutating the clone cannot mutate the source. Identity-return and
+shallow-clone mutants must fail those per-peer detachment assertions.
+Hostile-object, invalid-wire and amended D2 behavior stays outside the pass
+table. This plan freezes the requirement that, before the RED is signed, its
+exact LF transcript counts and SHA-256 pins are regenerated by an independent
+`node:crypto` command, every named one-axis mutant is shown to change its
+intended pin/assertion, and the real prospective driver is measured below ten
+minutes and 512 MiB. The 6.545-second feasibility pilot is
+not final RED evidence and cannot supply those future pins.
+
+The bare RED passes only its manifest, independent-oracle, static-roster and
+mutation-definition controls, then fails exactly one readiness assertion
+because `tests/fixtures/phase-3-exit-reference-conformance/driver.ts` does not
+exist. The missing module is addressed through a runtime-computed test-only path so
+the four RED files still typecheck. Every runtime peer comparison, provenance
+sentinel and engine-dependent mutant row remains dormant until the driver
+exists. Before RED signing, a disposable driver overlay must activate and make
+every unmutated dormant row pass, while separate disposable one-axis mutations
+must kill at least:
+
+- one wrong dependency edge or insertion-order/reverse-ready tie breaking;
+- an off-by-one mask-index-to-`hashForIndex` projection or an expected order
+  derived from a peer instead of `referenceOrder`;
+- one flipped ancestor bit or a false reflexive `areRelated(x, x)` result;
+- returning the anchor from mode-none linearization;
+- one wrong canonical tag, valid-decode result, byte-comparison sign or
+  domain-framing byte;
+- returning the canonical clone input unchanged or copying only its outer
+  container;
+- omitting the RFC leaf prefix, swapping node children or reversing accumulator
+  peak folding;
+- truncating, extending, reordering or relabeling one inclusion/consistency
+  path;
+- dropping or adding one graph member on only one peer;
+- aliasing either peer's graph Map, vertex record, dependency/order array,
+  Merkle leaf bytes or encoded decode-row bytes, including only their backing
+  buffers, by mutating every applicable actual rostered argument/option/receiver
+  binding in both directions or by adding a pre-call rebinding;
+- omitting/defaulting every applicable positional argument, spread, receiver,
+  SSA-result edge and options property, including non-trailing positions, and
+  adding one extra argument, spread or property at every applicable call shape;
+- swapping each stateful receiver/result edge to the wrong same-peer or opposite
+  peer result, making each rostered call unreachable, discarded, overwritten or
+  unresolved by dropping its required `await`, or routing the opposite peer's
+  terminal result to each labeled observation;
+- substituting one peer for the other, bypassing the reference-lock check, or
+  importing the regenerated/v3 reference; and
+- silently normalizing an excluded D2, missing-resolver or safe-integer proof
+  discriminator until its named divergence disappears.
+
+When activated by the disposable or committed driver, the provenance controls
+run the original and current engines on excluded, module-specific
+discriminators: original D2 bytes differ from the amended
+current bytes; original pair mode without a resolver no-ops while current
+compaction fails closed; and the original 32-bit-alias proof behavior differs
+from the safe-integer-hardened verifier. These rows prove which modules actually
+ran. They are exclusions, not pass-table outputs or permission to weaken the
+current engine.
+
+#### One-path GREEN, exception threshold and refactor boundary
+
+The GREEN is the RED's sole child and adds exactly one path:
+
+- new `tests/fixtures/phase-3-exit-reference-conformance/driver.ts`.
+
+The driver is test-only plumbing. It imports the exact locked original modules
+and the public current package surfaces, resolves every operation according to
+its declared return type on both peers, and returns only resolved semantic
+values; synchronous versus Promise shape is non-authoritative and the test owns
+every comparison. It forwards the two separately allocated caller-owned input
+slots through the exact direct call expressions frozen by `CALL_BINDINGS`,
+without aliasing, destructuring, wrapper forwarding, caching, substituting or
+reallocating them. Every multi-argument, variadic, options-object, constructor,
+receiver and result edge is rostered as a direct slot access, frozen manifest
+literal or same-peer SSA result. Each intermediate stateful result flows once to
+its named same-peer SSA edge; each terminal semantic result is fully resolved
+and flows once to its named raw labeled observation. It does not import the RED
+oracle, own an expected value or digest, select the subset, read a private
+bitset/peak, serialize a transcript,
+catch a mismatch into success, expose a production hook or become a package
+export. No duplicate
+Kahn, Merkle, canonical or hash implementation is permitted in the driver.
+
+Production changes are forbidden in the initial GREEN. If an unmutated overlap
+row fails, work stops rather than editing the frozen reference or weakening the
+manifest. A production correction requires a separately signed narrow
+amendment and two-of-three evidence: the pinned reference and the independent
+sort-Kahn or literal-RFC witness must agree against production on the same valid
+input. If production and the independent witness agree against the reference,
+the row becomes a reviewed explicit reference divergence; it is not repaired
+by changing either engine. Cross-root Vitest access, Node-22 WebCrypto
+top-level-await loading or any need for `fs.allow` is likewise a stop condition,
+not pre-authority for a config change.
+
+A canonical encode/decode/clone mismatch has no two-of-three correction path in
+this slice because the plan intentionally creates no third canonical codec. It
+therefore stops for a new independently reviewed amendment and genuinely
+independent witness; neither peer may be edited under D.93.60 alone.
+
+Refactor-clean review treats the existing sort-Kahn and literal-RFC owners as
+deliberate independent witnesses, not duplication to remove. It rejects an
+adapter that embeds either algorithm, a second fixture schema, a second
+reference loader, a public/debug seam and any compatibility fallback. Public
+runtime/type export rosters remain byte-identical.
+
+The focused command runs the ordinary owner with an explicit 120-second
+per-test timeout. The opt-in expanded-conformance case has its own explicit
+600-second timeout while retaining the independent below-ten-minute wall and
+512-MiB RSS laws; neither case depends on the root 10-second default. Acceptance
+builds `@ts-drp/canonical` and `@ts-drp/compaction` immediately before the
+focused owner, and the driver loads those public package exports from that fresh
+build rather than a stale pre-existing `dist` tree.
+
+#### Acceptance, reviews, custody and nonclaims
+
+Final-byte evidence is persisted under `.logs/phase3-exit-e-*`. Acceptance runs
+the focused ordinary owner and dedicated typecheck, then the frozen opt-in
+expanded-conformance tier once on the exact reviewed GREEN. It also runs the
+existing Phase-0a canonical/reference differential and protocol-v2
+reference-lock checks; the complete compaction suite and the existing opt-in
+5,231-graph order
+owner; D.93.56 commitment, D.93.57 genesis, D.93.58 envelope purity and the
+ordinary D.93.59 schedule/storage owners without rerunning D.93.59's exact-once
+266,009-schedule tier; Phase 3f/3g/3h preservation; five protocol semantic
+suites and their controlled arms; room, chat, grid and node typecheck/build;
+package build, exact-path ESLint, Prettier, frozen offline install and diff
+checks; and the real two-client chat and zone controls once on final bytes.
+Any inherited broad failure remains recorded rather than repaired outside the
+five tests-only paths.
+
+The direct production successor checker and the five required remote workflows
+must be green on the exact signed GREEN. No reference, registry, policy,
+workflow, package manifest, dependency, lockfile or production byte changes, so
+the roughly forty-minute freeze certification matrix remains outside this
+slice. The new opt-in expanded-conformance arm is a release evidence command,
+not a claim that a recurring nightly workflow has been installed.
+
+The plan, tests-only RED, one-path test-driver GREEN and concise closure ledger
+are four separate linear Good-Faolain-signed commits. Kimi performs the
+requested 100-step audit. Grok uses review mode with streamed JSONL/status
+artifacts, `max-turns=128` and a progress-aware 1,800-second bound. Codex and
+Opus xhigh through actual `claude-phel` independently review each exact packet.
+Reviewers do not run the opt-in expanded-conformance arm. Timeout, account
+exhaustion or `NO_VERDICT` is honest non-approval; a reproduced substantive
+P0/P1 blocks signing until corrected or causally disproved. Fable is not invoked
+without a new explicit request.
+
+Protected untracked paths, the 26 stashes, 21 refs under
+`refs/codex/recovery`, two recovery-named branch refs and unrelated work remain
+untouched. D.93.60 does not certify v3 wire/digest or admission equivalence,
+product state, a live cut, fold, snapshot, seal, certification, adoption,
+pruning, archive, storage behavior, browser/backend equivalence, recurring
+nightly installation, Discord, the MMORPG or production hardening as a whole.
+The tests-only driver adds no production capability. Agreement with the pinned
+reference proves bounded implementation fidelity, not general correctness or
+security of either implementation.
+
+If its frozen peer differential and every preservation gate pass, it closes the
+last named cross-implementation conjunct and therefore the three-conjunct Phase
+3 exit gate only; Phase 4 and every later release obligation remain open.
