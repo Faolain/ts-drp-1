@@ -15,16 +15,24 @@ import {
 	P4_NODE_SCHEMA,
 	P4_NODE_SQLITE_CATALOG,
 } from "./fixtures/phase-3a1b-p4-node-contract.js";
-import {
-	armPhase3a1bP4NodeReadbackFault,
-	armPhase3a1bP4NodeReadbackInterleave,
-	observePhase3a1bP4NodeOperation,
-	takePhase3a1bP4NodeObservationLedger,
-} from "./fixtures/phase-3a1b-p4-node-preload.mjs";
+import * as nodePreload from "./fixtures/phase-3a1b-p4-node-preload.mjs";
 import {
 	isPhase3a1bP4NodeMutationScopeRead,
 	referencesPhase3a1bP4NodeTable,
 } from "./fixtures/phase-3a1b-p4-node-sql-classifier.mjs";
+import { encodeCanonical, hashDomain } from "../../canonical/dist/src/index.js";
+
+const {
+	armPhase3a1bP4NodeReadbackFault,
+	armPhase3a1bP4NodeReadbackInterleave,
+	observePhase3a1bP4NodeOperation,
+	takePhase3a1bP4NodeObservationLedger,
+} = nodePreload;
+const armPhase3a1bP4NodeDataVersionInterleaves = (
+	nodePreload as unknown as {
+		armPhase3a1bP4NodeDataVersionInterleaves(interleaves: readonly Readonly<Record<string, unknown>>[]): void;
+	}
+).armPhase3a1bP4NodeDataVersionInterleaves;
 
 interface JournalStore {
 	appendAccepted(input: Readonly<Record<string, unknown>>): Promise<Readonly<Record<string, unknown>>>;
@@ -36,6 +44,20 @@ interface JournalStore {
 
 interface Candidate {
 	createNodeDurableLiveJournalStore(options: { readonly primaryFilename: string }): JournalStore;
+}
+
+interface QueryEvidence {
+	readonly connection: string;
+	readonly dataVersion: boolean;
+	readonly dataVersionValue: number | null;
+	readonly method: "all" | "get" | "run";
+	readonly operation: string;
+	readonly parameters: readonly unknown[];
+	readonly phase: "outside" | "postcommit" | "readonly" | "writer";
+	readonly role: "distinct" | "ordinary" | "target";
+	readonly sql: string;
+	readonly table: "accepted_entries" | "scopes" | null;
+	readonly tables: readonly ("accepted_entries" | "scopes")[];
 }
 
 interface Material {
@@ -162,6 +184,166 @@ function exactInputs(material = loadMaterial()): {
 	};
 }
 
+function generatedInputs(
+	seed: string,
+	authorSequence = 0
+): {
+	readonly install: Readonly<Record<string, unknown>>;
+	readonly local: Readonly<Record<string, unknown>>;
+	readonly received: Readonly<Record<string, unknown>>;
+	readonly scope: Readonly<{ readonly anchorDigest: string; readonly epoch: 0; readonly objectId: string }>;
+} {
+	const zero = "0".repeat(64);
+	const objectId = `creator:${seed.repeat(32)}`;
+	const parametersBytes = encodeCanonical({
+		maxEpochVertices: 64,
+		maxEpochBytes: 1_048_576,
+		maxDependencies: 8,
+		snapshotChunkBytes: 65_536,
+		maxSnapshotBytes: 1_048_576,
+		maxPendingEntries: 64,
+		maxPendingBytes: 1_048_576,
+	});
+	const parametersDigest = Buffer.from(hashDomain("ts-drp/parameters/v3", parametersBytes)).toString("hex");
+	const anchorBytes = encodeCanonical({
+		kind: "drp-epoch-anchor",
+		protocolMajor: 3,
+		objectId,
+		epoch: 0,
+		previousAnchor: zero,
+		cutDigest: zero,
+		stateDigest: zero,
+		aclDigest: zero,
+		historyRoot: zero,
+		historySize: 0,
+		archiveIndexRoot: zero,
+		blueprintDigest: "2".repeat(64),
+		signerSetDigest: "3".repeat(64),
+		parametersDigest,
+		profileDigest: "4".repeat(64),
+		cryptoSuiteId: "ed25519-sha256-v3",
+	});
+	const anchorDigest = Buffer.from(hashDomain("ts-drp/epoch-anchor/v3", anchorBytes)).toString("hex");
+	const vertexBytes = encodeCanonical({
+		kind: "drp-vertex",
+		protocolMajor: 3,
+		objectId,
+		epoch: 0,
+		anchor: anchorDigest,
+		author: `creator-${seed}`,
+		authorSequence,
+		logicalTime: authorSequence + 1,
+		dependencies: ["5".repeat(64)],
+		operation: { arguments: { value: authorSequence + 1 }, type: "append" },
+	});
+	const vertexDigest = Buffer.from(hashDomain("ts-drp/vertex/v3", vertexBytes)).toString("hex");
+	const signature = new Uint8Array(64).fill(7);
+	const scope = { anchorDigest, epoch: 0 as const, objectId };
+	return {
+		install: {
+			detachedAnchorSignature: signature,
+			exactCanonicalAnchorPreimageBytes: anchorBytes,
+			exactCanonicalParametersCarrierBytes: parametersBytes,
+			objectId,
+		},
+		local: { author: `creator-${seed}`, authorSequence, scope, sourceKind: "local-issued", vertexDigest },
+		received: {
+			detachedSignature: signature,
+			exactCanonicalPreimageBytes: vertexBytes,
+			scope,
+			sourceKind: "received",
+			vertexDigest,
+		},
+		scope,
+	};
+}
+
+function takeQueryEvidence(): readonly QueryEvidence[] {
+	return (
+		nodePreload as unknown as {
+			takePhase3a1bP4NodeQueryLedger(): readonly QueryEvidence[];
+		}
+	).takePhase3a1bP4NodeQueryLedger();
+}
+
+function acceptedAll(evidence: readonly QueryEvidence[]): readonly QueryEvidence[] {
+	return evidence.filter(({ method, tables }) => method === "all" && tables.includes("accepted_entries"));
+}
+
+function normalizedTopology(evidence: readonly QueryEvidence[]): string {
+	return JSON.stringify(
+		evidence.map(({ dataVersion, method, parameters, phase, role, sql, tables }) => ({
+			dataVersion,
+			method,
+			parameterCount: parameters.length,
+			phase,
+			role,
+			sql: sql.trim().replace(/\s+/gu, " "),
+			tables,
+		}))
+	);
+}
+
+function explainDetails(primaryFilename: string, evidence: QueryEvidence): readonly string[] {
+	const database = new DatabaseSync(`${primaryFilename}.drp-live-journal-v1.sqlite`, {
+		allowExtension: false,
+		enableDoubleQuotedStringLiterals: false,
+		enableForeignKeyConstraints: false,
+		readOnly: true,
+	});
+	try {
+		const parameters = evidence.parameters as readonly (bigint | number | string | Uint8Array | null)[];
+		return database
+			.prepare(`EXPLAIN QUERY PLAN ${evidence.sql}`)
+			.all(...parameters)
+			.map(({ detail }) => String(detail));
+	} finally {
+		database.close();
+	}
+}
+
+function expectIndexedFastAppend(primaryFilename: string, evidence: readonly QueryEvidence[]): void {
+	expect(acceptedAll(evidence)).toEqual([]);
+	const versions = evidence.filter(({ dataVersion, method }) => dataVersion && method === "get");
+	expect(new Set(versions.map(({ operation }) => operation))).toEqual(
+		new Set(evidence.map(({ operation }) => operation))
+	);
+	for (const operation of new Set(versions.map(({ operation }) => operation))) {
+		const operationVersions = versions.filter((evidence) => evidence.operation === operation);
+		expect(
+			operationVersions.map(({ phase }) => phase),
+			operation
+		).toEqual(["writer", "postcommit", "readonly", "outside"]);
+		expect(
+			operationVersions.every(({ dataVersionValue }) => Number.isSafeInteger(dataVersionValue)),
+			operation
+		).toBe(true);
+		expect(new Set(operationVersions.map(({ dataVersionValue }) => dataVersionValue)), operation).toHaveLength(1);
+	}
+	const indexed = evidence.filter(
+		(item) =>
+			item.method === "get" && !item.dataVersion && (item.table === "scopes" || item.table === "accepted_entries")
+	);
+	expect(indexed.length).toBeGreaterThanOrEqual(4);
+	const planned = indexed.map((item) => ({ item, details: explainDetails(primaryFilename, item) }));
+	for (const { details } of planned) {
+		expect(details.some((detail) => /\bSEARCH\b/u.test(detail))).toBe(true);
+		expect(details.some((detail) => /\bSCAN(?:\s+TABLE)?\s+accepted_entries\b/u.test(detail))).toBe(false);
+	}
+	const detailFor = (pattern: RegExp): readonly string[] =>
+		planned.filter(({ item }) => pattern.test(item.sql)).flatMap(({ details }) => details);
+	expect(detailFor(/\bFROM\s+(?:main\.)?scopes\b/iu).some((detail) => /USING PRIMARY KEY/iu.test(detail))).toBe(true);
+	expect(detailFor(/(?:^|\W)journal_sequence\s*=\s*\?/iu).some((detail) => /USING PRIMARY KEY/iu.test(detail))).toBe(
+		true
+	);
+	expect(detailFor(/vertex_digest\s*=\s*\?/iu).some((detail) => /accepted_entries_2/iu.test(detail))).toBe(true);
+	expect(
+		detailFor(/local_author\s*=\s*\?[\s\S]*local_author_sequence\s*=\s*\?/iu).some((detail) =>
+			/accepted_entries_3/iu.test(detail)
+		)
+	).toBe(true);
+}
+
 function rawClosure(primaryFilename: string): {
 	readonly rows: readonly Record<string, unknown>[];
 	readonly scopes: readonly Record<string, unknown>[];
@@ -183,6 +365,34 @@ function rawClosure(primaryFilename: string): {
 				unknown
 			>[],
 		};
+	} finally {
+		database.close();
+	}
+}
+
+function corruptReceivedSignature(primaryFilename: string, objectId: string, byteLength = 63): void {
+	const database = new DatabaseSync(`${primaryFilename}.drp-live-journal-v1.sqlite`, {
+		allowExtension: false,
+		enableDoubleQuotedStringLiterals: false,
+		enableForeignKeyConstraints: false,
+		readOnly: false,
+	});
+	try {
+		database.exec("BEGIN IMMEDIATE");
+		const update = database
+			.prepare(
+				`UPDATE accepted_entries SET received_signature=zeroblob(${byteLength}) WHERE object_id=? AND journal_sequence=0`
+			)
+			.run(objectId);
+		if (update.changes !== 1) throw new Error("test-owned corruption target was not unique");
+		database.exec("COMMIT");
+	} catch (error) {
+		try {
+			database.exec("ROLLBACK");
+		} catch {
+			// Preserve the test-owned corruption failure.
+		}
+		throw error;
 	} finally {
 		database.close();
 	}
@@ -400,6 +610,290 @@ describe("D.93.34 p4-b Node strict live-journal RED", () => {
 			expectOneSnapshot("page");
 		} finally {
 			await store.close();
+		}
+	});
+
+	it("uses only indexed addressed evidence for validated received and local monotonic appends", async () => {
+		const { createNodeDurableLiveJournalStore } = await loadCandidate();
+		const primaryFilename = primary("addressed-indexes");
+		const store = createNodeDurableLiveJournalStore({ primaryFilename });
+		const first = generatedInputs("1", 0);
+		const second = generatedInputs("1", 1);
+		try {
+			expect(await store.installGenesis(first.install)).toMatchObject({ ok: true });
+			takeQueryEvidence();
+			takePhase3a1bP4NodeObservationLedger();
+			expect(
+				await observePhase3a1bP4NodeOperation("addressed-received", () => store.appendAccepted(first.received))
+			).toMatchObject({ idempotent: false, journalSequence: 0, ok: true, sourceKind: "received" });
+			expect(
+				await observePhase3a1bP4NodeOperation("addressed-local", () => store.appendAccepted(second.local))
+			).toMatchObject({ idempotent: false, journalSequence: 1, ok: true, sourceKind: "local-issued" });
+			const evidence = takeQueryEvidence();
+			expectIndexedFastAppend(primaryFilename, evidence);
+			expect(new Set(evidence.map(({ connection }) => connection))).toHaveLength(1);
+			expect(
+				evidence
+					.filter(({ method, sql }) => method === "get" && /(?:^|\W)journal_sequence\s*=\s*\?/iu.test(sql))
+					.map(({ operation, parameters }) => [operation, parameters.at(-1)])
+			).toEqual([
+				["addressed-received", 0],
+				["addressed-local", 1],
+			]);
+			const topology = takePhase3a1bP4NodeObservationLedger();
+			for (const label of ["addressed-received", "addressed-local"]) {
+				expect(topology.filter((event) => event === `${label}:target:begin-immediate`)).toHaveLength(1);
+				expect(topology.filter((event) => event === `${label}:target:commit`)).toHaveLength(1);
+				expect(topology.filter((event) => event.startsWith(`${label}:target:readonly-begin:`))).toHaveLength(1);
+				expect(topology.filter((event) => event.startsWith(`${label}:target:readonly-commit:`))).toHaveLength(1);
+			}
+		} finally {
+			await store.close();
+		}
+	});
+
+	it("keeps validated monotonic append statement topology constant without accepted-row materialization", async () => {
+		const { createNodeDurableLiveJournalStore } = await loadCandidate();
+		const primaryFilename = primary("addressed-bounded-loop");
+		const store = createNodeDurableLiveJournalStore({ primaryFilename });
+		try {
+			await store.installGenesis(generatedInputs("3").install);
+			takeQueryEvidence();
+			for (let index = 0; index < 12; index += 1) {
+				const values = generatedInputs("3", index);
+				expect(
+					await observePhase3a1bP4NodeOperation(`bounded-${index}`, () => store.appendAccepted(values.received))
+				).toMatchObject({ idempotent: false, journalSequence: index, ok: true });
+			}
+			const evidence = takeQueryEvidence();
+			expect(acceptedAll(evidence)).toEqual([]);
+			const perAppendEvidence = Array.from({ length: 12 }, (_, index) =>
+				evidence.filter(({ operation }) => operation === `bounded-${index}`)
+			);
+			const perAppend = perAppendEvidence.map((operationEvidence) => operationEvidence.length);
+			expect(new Set(perAppend)).toHaveLength(1);
+			expect(perAppend[0]).toBeGreaterThan(0);
+			expect(perAppend[0]).toBeLessThanOrEqual(16);
+			expect(new Set(perAppendEvidence.map(normalizedTopology))).toHaveLength(1);
+		} finally {
+			await store.close();
+		}
+	});
+
+	it("fully validates one reopened append, refreshes after external drift, then returns to addressed probes", async () => {
+		const { createNodeDurableLiveJournalStore } = await loadCandidate();
+		const primaryFilename = primary("addressed-reopen-drift");
+		const first = createNodeDurableLiveJournalStore({ primaryFilename });
+		try {
+			await first.installGenesis(generatedInputs("4").install);
+			await first.appendAccepted(generatedInputs("4", 0).received);
+		} finally {
+			await first.close();
+		}
+
+		const reopened = createNodeDurableLiveJournalStore({ primaryFilename });
+		try {
+			takeQueryEvidence();
+			expect(
+				await observePhase3a1bP4NodeOperation("reopen-full", () =>
+					reopened.appendAccepted(generatedInputs("4", 1).local)
+				)
+			).toMatchObject({ idempotent: false, journalSequence: 1, ok: true });
+			expect(
+				await observePhase3a1bP4NodeOperation("reopen-fast", () =>
+					reopened.appendAccepted(generatedInputs("4", 2).local)
+				)
+			).toMatchObject({ idempotent: false, journalSequence: 2, ok: true });
+			let evidence = takeQueryEvidence();
+			expect(acceptedAll(evidence.filter(({ operation }) => operation === "reopen-full")).length).toBeGreaterThan(0);
+			expect(acceptedAll(evidence.filter(({ operation }) => operation === "reopen-fast"))).toEqual([]);
+
+			const other = createNodeDurableLiveJournalStore({ primaryFilename });
+			try {
+				expect(await other.appendAccepted(generatedInputs("4", 3).local)).toMatchObject({
+					idempotent: false,
+					journalSequence: 3,
+					ok: true,
+				});
+			} finally {
+				await other.close();
+			}
+			takeQueryEvidence();
+			expect(
+				await observePhase3a1bP4NodeOperation("external-drift-full", () =>
+					reopened.appendAccepted(generatedInputs("4", 4).local)
+				)
+			).toMatchObject({ idempotent: false, journalSequence: 4, ok: true });
+			expect(
+				await observePhase3a1bP4NodeOperation("external-drift-fast", () =>
+					reopened.appendAccepted(generatedInputs("4", 5).local)
+				)
+			).toMatchObject({ idempotent: false, journalSequence: 5, ok: true });
+			evidence = takeQueryEvidence();
+			expect(
+				acceptedAll(evidence.filter(({ operation }) => operation === "external-drift-full")).length
+			).toBeGreaterThan(0);
+			expect(acceptedAll(evidence.filter(({ operation }) => operation === "external-drift-fast"))).toEqual([]);
+		} finally {
+			await reopened.close();
+		}
+	});
+
+	it("keeps independently validated scope watermarks when fast appends alternate", async () => {
+		const { createNodeDurableLiveJournalStore } = await loadCandidate();
+		const primaryFilename = primary("addressed-two-scopes");
+		const store = createNodeDurableLiveJournalStore({ primaryFilename });
+		try {
+			await store.installGenesis(generatedInputs("6").install);
+			await store.installGenesis(generatedInputs("7").install);
+			takeQueryEvidence();
+			for (const [label, input] of [
+				["scope-a-0", generatedInputs("6", 0).received],
+				["scope-b-0", generatedInputs("7", 0).received],
+				["scope-a-1", generatedInputs("6", 1).local],
+				["scope-b-1", generatedInputs("7", 1).local],
+			] as const) {
+				expect(await observePhase3a1bP4NodeOperation(label, () => store.appendAccepted(input))).toMatchObject({
+					idempotent: false,
+					ok: true,
+				});
+			}
+			const evidence = takeQueryEvidence();
+			expect(acceptedAll(evidence)).toEqual([]);
+			for (const [operation, scope] of [
+				["scope-a-0", generatedInputs("6").scope],
+				["scope-b-0", generatedInputs("7").scope],
+				["scope-a-1", generatedInputs("6").scope],
+				["scope-b-1", generatedInputs("7").scope],
+			] as const) {
+				const scopeGets = evidence.filter(
+					(item) => item.operation === operation && item.method === "get" && item.table === "scopes"
+				);
+				expect(scopeGets.length, operation).toBeGreaterThanOrEqual(2);
+				expect(
+					scopeGets.map(({ parameters }) => parameters.slice(0, 3)),
+					operation
+				).toEqual(Array.from({ length: scopeGets.length }, () => [scope.objectId, scope.epoch, scope.anchorDigest]));
+			}
+
+			corruptReceivedSignature(primaryFilename, generatedInputs("7").scope.objectId);
+			takeQueryEvidence();
+			expect(
+				await observePhase3a1bP4NodeOperation("scope-a-after-b-corruption", () =>
+					store.appendAccepted(generatedInputs("6", 2).local)
+				)
+			).toMatchObject({ idempotent: false, journalSequence: 2, ok: true });
+			expect(
+				await observePhase3a1bP4NodeOperation("scope-b-after-corruption", () =>
+					store.appendAccepted(generatedInputs("7", 2).local)
+				)
+			).toEqual({ kind: "store-poisoned", ok: false });
+			const driftEvidence = takeQueryEvidence();
+			expect(
+				acceptedAll(driftEvidence.filter(({ operation }) => operation === "scope-a-after-b-corruption")).length
+			).toBeGreaterThan(0);
+			expect(
+				acceptedAll(driftEvidence.filter(({ operation }) => operation === "scope-b-after-corruption")).length
+			).toBeGreaterThan(0);
+			expect(
+				rawClosure(primaryFilename)
+					.rows.filter(({ object_id: objectId }) => objectId === generatedInputs("7").scope.objectId)
+					.map(({ journal_sequence: sequence }) => sequence)
+			).toEqual([0, 1]);
+		} finally {
+			await store.close();
+		}
+	});
+
+	it("falls back and poisons both received and local appends when prior corruption lands before or after target commit", async () => {
+		const { createNodeDurableLiveJournalStore } = await loadCandidate();
+		for (const timing of ["before", "after"] as const) {
+			for (const sourceKind of ["received", "local-issued"] as const) {
+				const primaryFilename = primary(`addressed-corrupt-${timing}-${sourceKind}`);
+				const store = createNodeDurableLiveJournalStore({ primaryFilename });
+				const values = generatedInputs("8", 1);
+				const candidate = sourceKind === "received" ? values.received : values.local;
+				const corrupt = (): void => corruptReceivedSignature(primaryFilename, values.scope.objectId);
+				try {
+					await store.installGenesis(values.install);
+					await store.appendAccepted(generatedInputs("8", 0).received);
+					if (timing === "before") corrupt();
+					else armPhase3a1bP4NodeReadbackFault("exact-new", corrupt);
+					takeQueryEvidence();
+					const result = await observePhase3a1bP4NodeOperation(`corrupt-${timing}-${sourceKind}`, () =>
+						store.appendAccepted(candidate)
+					);
+					expect(result, `${timing}/${sourceKind}`).toEqual({ kind: "store-poisoned", ok: false });
+					expect(acceptedAll(takeQueryEvidence()).length, `${timing}/${sourceKind}`).toBeGreaterThan(0);
+					expect(await store.readiness({ scope: values.scope }), `${timing}/${sourceKind}`).toEqual({
+						kind: "store-poisoned",
+						ok: false,
+					});
+					const closure = rawClosure(primaryFilename);
+					expect(
+						closure.rows.map(({ journal_sequence: sequence }) => sequence),
+						`${timing}/${sourceKind}`
+					).toEqual(timing === "before" ? [0] : [0, 1]);
+				} finally {
+					await store.close();
+				}
+			}
+		}
+	});
+
+	it("invalidates addressed and full-fallback evidence when another facade commits between version reads", async () => {
+		const { createNodeDurableLiveJournalStore } = await loadCandidate();
+		for (const mode of ["inside", "fallback"] as const) {
+			const primaryFilename = primary(`addressed-version-bracket-${mode}`);
+			const store = createNodeDurableLiveJournalStore({ primaryFilename });
+			const values = generatedInputs("9", 1);
+			try {
+				await store.installGenesis(values.install);
+				await store.appendAccepted(generatedInputs("9", 0).received);
+				armPhase3a1bP4NodeDataVersionInterleaves(
+					mode === "inside"
+						? [
+								{
+									callback: (): void => corruptReceivedSignature(primaryFilename, values.scope.objectId, 63),
+									occurrence: 1,
+									phase: "postcommit",
+								},
+							]
+						: [
+								{
+									callback: (): void => corruptReceivedSignature(primaryFilename, values.scope.objectId, 63),
+									occurrence: 1,
+									phase: "readonly",
+								},
+								{
+									callback: (): void => corruptReceivedSignature(primaryFilename, values.scope.objectId, 62),
+									occurrence: 2,
+									phase: "readonly",
+								},
+							]
+				);
+				takeQueryEvidence();
+				takePhase3a1bP4NodeObservationLedger();
+				const result = await observePhase3a1bP4NodeOperation(`version-bracket-${mode}`, () =>
+					store.appendAccepted(values.local)
+				);
+				expect(result, mode).toEqual(
+					mode === "inside" ? { kind: "store-poisoned", ok: false } : { kind: "outcome-unknown", ok: false }
+				);
+				const ledger = takePhase3a1bP4NodeObservationLedger();
+				expect(
+					ledger.filter((event) => event.startsWith(`version-bracket-${mode}:distinct:data-version-interleave:`)),
+					mode
+				).toHaveLength(mode === "inside" ? 1 : 2);
+				const evidence = takeQueryEvidence().filter(({ operation }) => operation === `version-bracket-${mode}`);
+				expect(acceptedAll(evidence).length, mode).toBeGreaterThan(0);
+				expect(
+					new Set(evidence.filter(({ dataVersion }) => dataVersion).map(({ dataVersionValue }) => dataVersionValue))
+						.size
+				).toBeGreaterThan(1);
+			} finally {
+				await store.close();
+			}
 		}
 	});
 

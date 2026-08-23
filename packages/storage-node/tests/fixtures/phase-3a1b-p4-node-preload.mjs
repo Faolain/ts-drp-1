@@ -21,9 +21,12 @@ let operationLabel;
 let externalFaultCallback;
 let externalInterleaveSpec;
 let externalReadbackFate;
+let externalDataVersionInterleaves = [];
+let externalDataVersionPhaseCounts = new Map();
 let externalPending = Promise.resolve();
 let injectedDepth = 0;
 let externalLedger = [];
+let externalQueryLedger = [];
 let nextDatabaseIdentity = 1;
 
 /**
@@ -45,6 +48,12 @@ export function armPhase3a1bP4NodeReadbackFault(fate, callback = () => undefined
 	externalFaultCallback = callback;
 }
 
+/** Arms exact test-owned external commits immediately after selected data-version reads. */
+export function armPhase3a1bP4NodeDataVersionInterleaves(interleaves) {
+	externalDataVersionInterleaves = [...interleaves];
+	externalDataVersionPhaseCounts = new Map();
+}
+
 /** Executes one public operation while the external SQLite observer owns its label. */
 export async function observePhase3a1bP4NodeOperation(label, callback) {
 	if (operationLabel !== undefined) throw new TypeError("nested p4 Node observations are forbidden");
@@ -55,6 +64,8 @@ export async function observePhase3a1bP4NodeOperation(label, callback) {
 		return result;
 	} finally {
 		await externalPending;
+		externalDataVersionInterleaves = [];
+		externalDataVersionPhaseCounts = new Map();
 		operationLabel = undefined;
 	}
 }
@@ -63,6 +74,13 @@ export async function observePhase3a1bP4NodeOperation(label, callback) {
 export function takePhase3a1bP4NodeObservationLedger() {
 	const value = Object.freeze([...externalLedger]);
 	externalLedger = [];
+	return value;
+}
+
+/** Drains exact test-owned SQL, binding, method, phase, role and connection evidence. */
+export function takePhase3a1bP4NodeQueryLedger() {
+	const value = Object.freeze([...externalQueryLedger]);
+	externalQueryLedger = [];
 	return value;
 }
 
@@ -110,6 +128,60 @@ function recordClosureQuery(owner, state) {
 	);
 }
 
+function recordQueryEvidence(owner, state, method, parameters, result) {
+	if (operationLabel === undefined || owner.database === undefined) return;
+	const normalized = owner.sql.trim().replace(/\s+/gu, " ");
+	const journalTables = ["accepted_entries", "scopes"].filter((name) => table(owner.sql, name));
+	const dataVersion = /^PRAGMA\s+main\.data_version$/iu.test(normalized);
+	if (journalTables.length === 0 && !dataVersion) return;
+	const phase = state?.mutationActive
+		? "writer"
+		: state?.readonlyActive
+			? "readonly"
+			: state?.committed
+				? "postcommit"
+				: "outside";
+	externalQueryLedger.push(
+		Object.freeze({
+			connection: identity(owner.database),
+			dataVersion,
+			dataVersionValue:
+				dataVersion && result !== undefined && result !== null ? (Object.values(result)[0] ?? null) : null,
+			method,
+			operation: operationLabel,
+			parameters: Object.freeze(
+				parameters.map((parameter) => (parameter instanceof Uint8Array ? new Uint8Array(parameter) : parameter))
+			),
+			phase,
+			role: state?.role ?? "target",
+			sql: owner.sql,
+			table: journalTables.includes("accepted_entries")
+				? "accepted_entries"
+				: journalTables.includes("scopes")
+					? "scopes"
+					: null,
+			tables: Object.freeze(journalTables),
+		})
+	);
+	if (dataVersion && injectedDepth === 0) {
+		const occurrence = (externalDataVersionPhaseCounts.get(phase) ?? 0) + 1;
+		externalDataVersionPhaseCounts.set(phase, occurrence);
+		const index = externalDataVersionInterleaves.findIndex(
+			(interleave) => interleave.phase === phase && interleave.occurrence === occurrence
+		);
+		if (index >= 0) {
+			const [{ callback }] = externalDataVersionInterleaves.splice(index, 1);
+			externalLedger.push(`${operationLabel}:distinct:data-version-interleave:${phase}:${occurrence}`);
+			injectedDepth += 1;
+			try {
+				callback();
+			} finally {
+				injectedDepth -= 1;
+			}
+		}
+	}
+}
+
 DatabaseSync.prototype.prepare = function (sql) {
 	const statement = originalPrepare.call(this, sql);
 	statementOwner.set(statement, { database: this, sql });
@@ -147,7 +219,12 @@ DatabaseSync.prototype.exec = function (sql) {
 		if (state.role === "target" && externalFaultCallback !== undefined) {
 			const callback = externalFaultCallback;
 			externalFaultCallback = undefined;
-			callback();
+			injectedDepth += 1;
+			try {
+				callback();
+			} finally {
+				injectedDepth -= 1;
+			}
 		}
 		if (state.role === "target" && externalInterleaveSpec !== undefined) {
 			const workerData = externalInterleaveSpec;
@@ -186,6 +263,7 @@ StatementSync.prototype.get = function (...parameters) {
 	const result = originalGet.apply(this, parameters);
 	const owner = statementOwner.get(this) ?? { database: undefined, sql: "" };
 	const state = owner.database === undefined ? undefined : databaseState.get(owner.database);
+	recordQueryEvidence(owner, state, "get", parameters, result);
 	recordClosureQuery(owner, state);
 	if (state?.readonlyActive && (table(owner.sql, "scopes") || table(owner.sql, "accepted_entries"))) {
 		observe("during-readback", owner.sql, { parameters });
@@ -207,6 +285,7 @@ StatementSync.prototype.all = function (...parameters) {
 	const result = originalAll.apply(this, parameters);
 	const owner = statementOwner.get(this) ?? { database: undefined, sql: "" };
 	const state = owner.database === undefined ? undefined : databaseState.get(owner.database);
+	recordQueryEvidence(owner, state, "all", parameters, result);
 	recordClosureQuery(owner, state);
 	if (state?.readonlyActive && (table(owner.sql, "scopes") || table(owner.sql, "accepted_entries"))) {
 		observe("during-readback", owner.sql, { parameters });
@@ -226,6 +305,7 @@ StatementSync.prototype.run = function (...parameters) {
 	const result = originalRun.apply(this, parameters);
 	const owner = statementOwner.get(this) ?? { database: undefined, sql: "" };
 	const state = owner.database === undefined ? undefined : databaseState.get(owner.database);
+	recordQueryEvidence(owner, state, "run", parameters, result);
 	if (state?.mutationActive && (table(owner.sql, "scopes") || table(owner.sql, "accepted_entries"))) {
 		if (operationLabel !== undefined) externalLedger.push(`${operationLabel}:${state.role}:write`);
 		observe("after-row-write", owner.sql, { changes: result.changes, parameters });

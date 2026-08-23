@@ -154,6 +154,86 @@ function resolvedExportNames(filename: string): readonly string[] {
 	);
 }
 
+function addressedObservationFixture(sourceKind: "local-issued" | "received" = "received"): Readonly<{
+	readonly actual: Readonly<Record<string, unknown>>;
+	readonly before: Readonly<Record<string, unknown>>;
+	readonly row: Readonly<Record<string, unknown>>;
+	readonly scope: Readonly<Record<string, unknown>>;
+	readonly target: Readonly<Record<string, unknown>>;
+}> {
+	const identity = Object.freeze({
+		anchorDigest: "a".repeat(64),
+		epoch: 0,
+		objectId: `creator:${"1".repeat(32)}`,
+	});
+	const storedScope = Object.freeze({
+		detachedAnchorSignature: new Uint8Array(64).fill(2),
+		exactCanonicalAnchorPreimageBytes: new Uint8Array([1, 2, 3]),
+		exactCanonicalParametersCarrierBytes: new Uint8Array([4, 5, 6]),
+		nextJournalSequence: 0,
+		parametersDigest: "b".repeat(64),
+		scope: identity,
+	});
+	const row = Object.freeze(
+		sourceKind === "received"
+			? {
+					detachedSignature: new Uint8Array(64).fill(3),
+					exactCanonicalPreimageBytes: new Uint8Array([7, 8, 9]),
+					journalSequence: 0,
+					scope: identity,
+					sourceKind,
+					vertexDigest: "c".repeat(64),
+				}
+			: {
+					author: "creator",
+					authorSequence: 0,
+					journalSequence: 0,
+					scope: identity,
+					sourceKind,
+					vertexDigest: "c".repeat(64),
+				}
+	);
+	const before = Object.freeze({ kind: "append-addressed", row: null, scope: storedScope });
+	const actual = Object.freeze({
+		kind: "append-addressed",
+		row,
+		scope: Object.freeze({ ...storedScope, nextJournalSequence: 1 }),
+	});
+	return Object.freeze({ actual, before, row, scope: storedScope, target: Object.freeze({ kind: "append", row }) });
+}
+
+function strictRecordMutants(
+	record: Readonly<Record<string, unknown>>,
+	accessorKey: string
+): readonly Readonly<Record<string, unknown>>[] {
+	return [
+		Object.assign(Object.create(null) as Record<string, unknown>, record),
+		Object.assign(Object.create({ testOwnedHostilePrototype: true }) as Record<string, unknown>, record),
+		{ ...record, testOwnedExtraStringKey: true },
+		{ ...record, [Symbol("test-owned-extra")]: true },
+		Object.defineProperty({ ...record }, accessorKey, {
+			enumerable: true,
+			get: () => record[accessorKey],
+		}),
+		new Proxy(
+			{ ...record },
+			{
+				ownKeys(): never {
+					throw new Error("test-owned hostile nested ownKeys trap");
+				},
+			}
+		),
+		new Proxy(
+			{ ...record },
+			{
+				getOwnPropertyDescriptor(): never {
+					throw new Error("test-owned hostile nested descriptor trap");
+				},
+			}
+		),
+	];
+}
+
 describe("D.93.34 p4-d parity and governance RED", () => {
 	it("binds both adapter schemas and complete death registries to the shared contract owner", () => {
 		expect(P4_NODE_SCHEMA).toEqual(NODE_SCHEMA);
@@ -236,6 +316,290 @@ describe("D.93.34 p4-d parity and governance RED", () => {
 		for (const text of [source, declaration]) {
 			expect(text).not.toMatch(/\b(?:LiveJournalBackend|createDurableLiveJournalStore)\b/u);
 		}
+		expect(sha256("packages/live-journal/dist/src/contract.d.ts")).toBe(
+			"a3f88546918b9e0cee4b809945cfcf9bfa36f07582014133739671a03e6f71e5"
+		);
+	});
+
+	it("classifies the closed append-addressed observation matrix through the sole shared runtime owner", async () => {
+		const runtime = await import("@ts-drp/live-journal");
+		const classify = runtime.classifyLiveJournalMutationObservation as unknown as (
+			input: Readonly<Record<string, unknown>>
+		) => "exact-new" | "exact-old" | "mixed" | "unreadable";
+		const fixture = addressedObservationFixture();
+		const classifyWith = (input: Readonly<Record<string, unknown>>): string => classify(input);
+
+		expect(classifyWith({ actual: fixture.actual, before: fixture.before, target: fixture.target })).toBe("exact-new");
+		expect(classifyWith({ actual: undefined, before: fixture.before, target: fixture.target })).toBe("unreadable");
+		expect(classifyWith({ actual: fixture.before, before: fixture.before, target: fixture.target })).toBe("exact-old");
+		const localFixture = addressedObservationFixture("local-issued");
+		expect(
+			classifyWith({ actual: localFixture.actual, before: localFixture.before, target: localFixture.target })
+		).toBe("exact-new");
+		expect(
+			classifyWith({ actual: localFixture.before, before: localFixture.before, target: localFixture.target })
+		).toBe("exact-old");
+		const localIdentity = localFixture.scope.scope as Readonly<Record<string, unknown>>;
+		const localActuals = [
+			{ rows: [localFixture.row], scope: localFixture.actual.scope },
+			{ ...localFixture.actual, extra: true },
+			{ ...localFixture.actual, row: null },
+			{ ...localFixture.actual, row: { ...localFixture.row, author: "other" } },
+			{ ...localFixture.actual, row: { ...localFixture.row, authorSequence: 1 } },
+			{ ...localFixture.actual, row: { ...localFixture.row, vertexDigest: "d".repeat(64) } },
+			{ ...localFixture.actual, row: { ...localFixture.row, journalSequence: 1 } },
+			{ ...localFixture.actual, row: { ...localFixture.row, sourceKind: "received" } },
+			{
+				...localFixture.actual,
+				row: { ...localFixture.row, scope: { ...localIdentity, objectId: `creator:${"5".repeat(32)}` } },
+			},
+			{ ...localFixture.actual, row: { ...localFixture.row, extra: true } },
+			Object.assign(Object.create(null) as Record<string, unknown>, localFixture.actual),
+			Object.defineProperty({ ...localFixture.actual }, "row", {
+				enumerable: true,
+				get: () => localFixture.row,
+			}),
+		];
+		expect(
+			localActuals.map((actual) => classifyWith({ actual, before: localFixture.before, target: localFixture.target }))
+		).toEqual(Array(localActuals.length).fill("mixed"));
+		const localTargets = [
+			undefined,
+			null,
+			{ row: localFixture.row },
+			{ ...localFixture.target, kind: "install" },
+			{ ...localFixture.target, extra: true },
+			{ ...localFixture.target, row: { ...localFixture.row, author: "other" } },
+			{ ...localFixture.target, row: { ...localFixture.row, authorSequence: 1 } },
+			{ ...localFixture.target, row: { ...localFixture.row, vertexDigest: "d".repeat(64) } },
+			{ ...localFixture.target, row: { ...localFixture.row, journalSequence: 1 } },
+			{ ...localFixture.target, row: { ...localFixture.row, sourceKind: "received" } },
+			{
+				...localFixture.target,
+				row: { ...localFixture.row, scope: { ...localIdentity, anchorDigest: "e".repeat(64) } },
+			},
+			{ ...localFixture.target, row: { ...localFixture.row, extra: true } },
+		];
+		expect(
+			localTargets.map((target) => classifyWith({ actual: localFixture.actual, before: localFixture.before, target }))
+		).toEqual(Array(localTargets.length).fill("mixed"));
+
+		for (const current of [fixture, localFixture]) {
+			const other = current === fixture ? localFixture : fixture;
+			const currentActualScope = current.actual.scope as Readonly<Record<string, unknown>>;
+			const currentStoredScope = current.scope as Readonly<Record<string, unknown>>;
+			const currentIdentity = current.scope.scope as Readonly<Record<string, unknown>>;
+			const currentRow = current.row as Readonly<Record<string, unknown>>;
+			expect(classifyWith({ actual: undefined, before: current.before, target: current.target })).toBe("unreadable");
+			const semanticActuals: unknown[] = [
+				null,
+				{ rows: [current.row], scope: currentActualScope },
+				{ row: current.row, scope: currentActualScope },
+				{ ...current.actual, kind: "append" },
+				{ ...current.actual, row: other.row },
+				{ kind: "append-addressed", scope: currentActualScope },
+				{ ...current.actual, scope: { ...currentActualScope, nextJournalSequence: 0 } },
+				{ ...current.actual, scope: { ...currentActualScope, nextJournalSequence: 2 } },
+				{
+					...current.actual,
+					scope: { ...currentActualScope, exactCanonicalAnchorPreimageBytes: new Uint8Array([9, 9, 9]) },
+				},
+				{
+					...current.actual,
+					scope: { ...currentActualScope, detachedAnchorSignature: new Uint8Array(64).fill(9) },
+				},
+				{
+					...current.actual,
+					scope: { ...currentActualScope, exactCanonicalParametersCarrierBytes: new Uint8Array([6, 5, 4]) },
+				},
+				{ ...current.actual, scope: { ...currentActualScope, parametersDigest: "d".repeat(64) } },
+				{
+					...current.actual,
+					scope: { ...currentActualScope, scope: { ...currentIdentity, anchorDigest: "e".repeat(64) } },
+				},
+				{
+					...current.actual,
+					scope: { ...currentActualScope, scope: { ...currentIdentity, objectId: `creator:${"3".repeat(32)}` } },
+				},
+				{ ...current.actual, scope: { ...currentActualScope, scope: { ...currentIdentity, epoch: 1 } } },
+			];
+			const semanticBefores: unknown[] = [
+				undefined,
+				null,
+				{ rows: [], scope: current.scope },
+				{ row: null, scope: current.scope },
+				{ kind: "append-addressed", row: null },
+				{ ...current.before, kind: "append" },
+				{ ...current.before, row: current.row },
+				{ ...current.before, row: other.row },
+				{ ...current.before, scope: { ...current.scope, nextJournalSequence: 1 } },
+				{
+					...current.before,
+					scope: { ...current.scope, exactCanonicalAnchorPreimageBytes: new Uint8Array([9, 9, 9]) },
+				},
+				{
+					...current.before,
+					scope: { ...current.scope, detachedAnchorSignature: new Uint8Array(64).fill(9) },
+				},
+				{
+					...current.before,
+					scope: { ...current.scope, exactCanonicalParametersCarrierBytes: new Uint8Array([6, 5, 4]) },
+				},
+				{ ...current.before, scope: { ...current.scope, parametersDigest: "d".repeat(64) } },
+				{
+					...current.before,
+					scope: { ...current.scope, scope: { ...currentIdentity, anchorDigest: "e".repeat(64) } },
+				},
+				{
+					...current.before,
+					scope: { ...current.scope, scope: { ...currentIdentity, objectId: `creator:${"4".repeat(32)}` } },
+				},
+				{ ...current.before, scope: { ...current.scope, scope: { ...currentIdentity, epoch: 1 } } },
+			];
+			const semanticTargets: unknown[] = [{ ...current.target, row: other.row }];
+			if (typeof SharedArrayBuffer !== "undefined") {
+				const sharedCopy = (value: unknown): Uint8Array => {
+					if (!(value instanceof Uint8Array)) throw new TypeError("test-owned byte evidence is missing");
+					const shared = new Uint8Array(new SharedArrayBuffer(value.byteLength));
+					shared.set(value);
+					return shared;
+				};
+				for (const field of [
+					"detachedAnchorSignature",
+					"exactCanonicalAnchorPreimageBytes",
+					"exactCanonicalParametersCarrierBytes",
+				] as const) {
+					semanticActuals.push({
+						...current.actual,
+						scope: { ...currentActualScope, [field]: sharedCopy(currentActualScope[field]) },
+					});
+					semanticBefores.push({
+						...current.before,
+						scope: { ...current.scope, [field]: sharedCopy(currentStoredScope[field]) },
+					});
+				}
+				if (current.row.sourceKind === "received") {
+					for (const field of ["detachedSignature", "exactCanonicalPreimageBytes"] as const) {
+						semanticActuals.push({
+							...current.actual,
+							row: { ...current.row, [field]: sharedCopy(currentRow[field]) },
+						});
+						semanticTargets.push({
+							...current.target,
+							row: { ...current.row, [field]: sharedCopy(currentRow[field]) },
+						});
+					}
+				}
+			}
+			expect(
+				semanticActuals.map((actual) => classifyWith({ actual, before: current.before, target: current.target }))
+			).toEqual(Array(semanticActuals.length).fill("mixed"));
+			expect(
+				semanticBefores.map((before) => classifyWith({ actual: current.actual, before, target: current.target }))
+			).toEqual(Array(semanticBefores.length).fill("mixed"));
+			expect(
+				semanticTargets.map((target) => classifyWith({ actual: current.actual, before: current.before, target }))
+			).toEqual(Array(semanticTargets.length).fill("mixed"));
+			const nestedActuals: readonly Readonly<Record<string, unknown>>[] = [
+				...strictRecordMutants(current.actual, "row"),
+				...strictRecordMutants(current.row, "vertexDigest").map((row) => ({ ...current.actual, row })),
+				...strictRecordMutants(currentIdentity, "epoch").map((scope) => ({
+					...current.actual,
+					row: { ...current.row, scope },
+				})),
+				{ ...current.actual, row: { ...current.row, scope: { ...currentIdentity, epoch: 1 } } },
+				...strictRecordMutants(currentActualScope, "parametersDigest").map((scope) => ({
+					...current.actual,
+					scope,
+				})),
+				...strictRecordMutants(currentIdentity, "epoch").map((scopeIdentity) => ({
+					...current.actual,
+					scope: { ...currentActualScope, scope: scopeIdentity },
+				})),
+			];
+			expect(
+				nestedActuals.map((actual) => classifyWith({ actual, before: current.before, target: current.target }))
+			).toEqual(Array(nestedActuals.length).fill("mixed"));
+
+			const nestedBefores: readonly Readonly<Record<string, unknown>>[] = [
+				...strictRecordMutants(current.before, "row"),
+				...strictRecordMutants(current.scope, "parametersDigest").map((scope) => ({
+					...current.before,
+					scope,
+				})),
+				...strictRecordMutants(currentIdentity, "epoch").map((scopeIdentity) => ({
+					...current.before,
+					scope: { ...current.scope, scope: scopeIdentity },
+				})),
+				{ ...current.before, scope: { ...current.scope, scope: { ...currentIdentity, epoch: 1 } } },
+			];
+			expect(
+				nestedBefores.map((before) => classifyWith({ actual: current.actual, before, target: current.target }))
+			).toEqual(Array(nestedBefores.length).fill("mixed"));
+
+			const nestedTargets: readonly Readonly<Record<string, unknown>>[] = [
+				...strictRecordMutants(current.target, "row"),
+				...strictRecordMutants(current.row, "vertexDigest").map((row) => ({ ...current.target, row })),
+				...strictRecordMutants(currentIdentity, "epoch").map((scope) => ({
+					...current.target,
+					row: { ...current.row, scope },
+				})),
+				{ ...current.target, row: { ...current.row, scope: { ...currentIdentity, epoch: 1 } } },
+			];
+			expect(
+				nestedTargets.map((target) => classifyWith({ actual: current.actual, before: current.before, target }))
+			).toEqual(Array(nestedTargets.length).fill("mixed"));
+		}
+
+		const identity = fixture.scope.scope as Readonly<Record<string, unknown>>;
+		const mixedActuals: unknown[] = [
+			{ ...fixture.actual, row: null },
+			{ ...fixture.actual, row: { ...fixture.row, vertexDigest: "d".repeat(64) } },
+			{ ...fixture.actual, row: { ...fixture.row, journalSequence: 1 } },
+			{ ...fixture.actual, row: { ...fixture.row, sourceKind: "local-issued" } },
+			{
+				...fixture.actual,
+				row: { ...fixture.row, detachedSignature: new Uint8Array(64).fill(8) },
+			},
+			{
+				...fixture.actual,
+				row: { ...fixture.row, exactCanonicalPreimageBytes: new Uint8Array([9, 8, 7]) },
+			},
+			{
+				...fixture.actual,
+				row: { ...fixture.row, scope: { ...identity, objectId: `creator:${"2".repeat(32)}` } },
+			},
+			{ ...fixture.actual, row: { ...fixture.row, extra: true } },
+		];
+		expect(
+			mixedActuals.map((actual) => classifyWith({ actual, before: fixture.before, target: fixture.target }))
+		).toEqual(Array(mixedActuals.length).fill("mixed"));
+
+		const mixedTargets: readonly unknown[] = [
+			undefined,
+			null,
+			{ row: fixture.row },
+			{ ...fixture.target, kind: "install" },
+			{ ...fixture.target, extra: true },
+			{ ...fixture.target, row: { ...fixture.row, vertexDigest: "d".repeat(64) } },
+			{ ...fixture.target, row: { ...fixture.row, journalSequence: 1 } },
+			{
+				...fixture.target,
+				row: { ...fixture.row, detachedSignature: new Uint8Array(64).fill(9) },
+			},
+			{
+				...fixture.target,
+				row: { ...fixture.row, exactCanonicalPreimageBytes: new Uint8Array([9, 8, 7]) },
+			},
+			{
+				...fixture.target,
+				row: { ...fixture.row, scope: { ...identity, anchorDigest: "e".repeat(64) } },
+			},
+			{ ...fixture.target, row: { ...fixture.row, extra: true } },
+		];
+		expect(
+			mixedTargets.map((target) => classifyWith({ actual: fixture.actual, before: fixture.before, target }))
+		).toEqual(Array(mixedTargets.length).fill("mixed"));
 	});
 
 	it("pins both adapter source declarations and built runtime inventories exactly", async () => {
