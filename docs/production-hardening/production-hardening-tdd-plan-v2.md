@@ -53457,3 +53457,214 @@ supersedes D.93.59's earlier four-commit summary: final lineage is the
 signed D.93.59 plan, signed original RED, this signed corrective plan, signed
 corrective RED, signed GREEN and signed closure ledger. All D.93.59 acceptance,
 review, custody and nonclaim rules otherwise remain unchanged.
+
+### D.93.59.2 — live-journal append scale correction
+
+The first honest GREEN-driver overlay on the signed D.93.59.1 corrective RED
+reproduced a production failure on the frozen `accepted-capacity`
+representative before any GREEN byte was staged. The genuine driver created
+the authenticated anchor and single-dependency counter chain, used the real
+message queue and `routeV3Ingress`, and delegated every accepted row to the
+real Node SQLite live-journal store. After `824` seconds of sustained worker
+progress the durable journal contained only about `2,600` of the required
+`8,191` admitted rows, so the run was stopped. This is not approval, a timeout
+reclassified as success or authority to shrink the fixed profile. It is the
+one driver-revealed production failure for which D.93.59 reserved at most one
+narrowly reviewed production amendment. The elapsed time and approximate row
+count are contemporaneous controller observations without a dedicated raw
+command log; the exact paused driver source is preserved at
+`.logs/phase3-exit-d-green-draft/driver.ts`, and the causal source/SQLite
+diagnosis is independently reviewed rather than inferred from that timing.
+
+The causal defect is in `packages/storage-node/src/live-journal.ts`, not in the
+model, scope classifier, graph, signature or SQLite substrate. Every ordinary
+new `appendAccepted` currently calls `readRows` before the write, then calls
+`postWriteSnapshot` after commit. Both operations materialize the complete
+addressed `accepted_entries` closure. The nth append therefore copies and
+validates O(n) prior rows twice, making the retained 8,191-row production path
+quadratic even though the table already has unique indexes for vertex digest
+and local `(author, author_sequence)` references. The existing 8,191-signature
+frontier owner demonstrates that genuine authentication itself is not the
+observed order-of-growth defect. D.93.59.2 keeps the signed accepted-count
+oracle and fixes this sole storage composition boundary; it does not replace
+the real SQLite store with an in-memory mock, raw fixture insert, smaller
+carrier, disabled durability pragma or test-only production hook.
+
+The shared live-journal mutation-observation owner remains
+`classifyLiveJournalMutationObservation` in
+`packages/live-journal/src/contract.ts`. Its runtime export name, generated
+declaration and package surface remain byte-identical: the public TypeScript
+parameter continues to name only the existing full durable-snapshot form. The
+Node composition invokes one module-private runtime form through its existing
+internal `never` cast, and the parity owner does the same. No overload, exported
+type or caller-selectable public evidence form is added.
+
+That internal form is the exact strict record
+`{kind:"append-addressed",row:LiveJournalStoredRow|null,scope:LiveJournalStoredScope}`.
+`before` must be that record and `actual` must be the same record or the sole
+unreadable sentinel `undefined`; mixing it with `{rows,scope}`, using another
+absence encoding, or supplying a missing discriminator, partial record,
+extra/symbol/accessor key, hostile prototype, inconsistent descriptor read or
+uncopied/shared byte view is `mixed`. Only `actual === undefined` is
+`unreadable`. This strict capture applies to the new addressed branch; the
+existing full-form runtime behavior and public declaration are not silently
+hardened or widened by this correction.
+
+The addressed matrix is complete and admits only a genuinely new append.
+`before` must have `row:null`, the exact installed genesis/scope identity of
+the target, and `nextJournalSequence === target.row.journalSequence`.
+`exact-new` then requires `actual` to retain byte-exact installed genesis
+material, contain the byte-exact target row at that captured sequence and have
+`nextJournalSequence === target.row.journalSequence + 1`. `exact-old` requires
+the same installed genesis, `row:null` and the unchanged target-sequence
+counter in both observations. A pre-existing target row, wrong genesis/scope,
+mismatched target row, missing row with an advanced counter, present row with
+an unadvanced counter, counter jump beyond one, or any other partial mixture is
+`mixed`. A legal later append therefore selects the existing full-snapshot
+classification path rather than weakening this addressed matrix. The target
+read always uses the captured `target.row.journalSequence`, never
+`actual.scope.nextJournalSequence - 1`. This is a second internal evidence
+representation for the same classifier, not a second mutation classifier or
+compatibility fallback.
+
+The Node store owns one module-private, non-authoritative verified-scope
+watermark per installed scope. It contains only the exact scope identity,
+validated `nextJournalSequence` and the connection's SQLite
+`PRAGMA main.data_version`; it caches no row, result, admission evidence or
+semantic decision. A fresh/reopened store has no watermark. Exact install of
+the empty closure and full readiness validation may establish one only when
+`main.data_version` is stable before and after the full snapshot. Any
+full-snapshot failure, unreadable observation or mixed result invalidates it.
+This watermark is solely a proof that the historical closure previously passed
+the unchanged full validator and that no other SQLite connection has committed
+since.
+
+Inside the existing `BEGIN IMMEDIATE` append transaction the store reads the
+installed scope and `PRAGMA main.data_version`; that exact value is the
+write-transaction version. The indexed fast path is eligible only when the
+scope counter and version equal the watermark. Reopen/unvalidated state,
+counter drift or external-connection version drift rolls back that probe
+transaction without mutation, then starts a fresh `BEGIN IMMEDIATE` transaction
+and performs the existing full closure validation before mutation. A stable
+successful full path refreshes the watermark. On the eligible path the store
+probes the candidate digest and, for `local-issued`, local reference through
+their exact unique indexes, runs the unchanged shared
+`decideLiveJournalDuplicate` table, then performs the same row insert and
+compare-and-advance scope update.
+
+Postcommit readback is bracketed, not sampled once. On the same connection the
+store reads `PRAGMA main.data_version` immediately before beginning a readonly
+transaction; inside that transaction it reads `main.data_version`, the exact
+stored scope and the row at the captured target sequence; after committing the
+readonly transaction it reads `main.data_version` again. Addressed
+classification and watermark advancement are permitted only when all three
+postcommit values equal the write-transaction version and the scope counter is
+exactly target-plus-one. Any version mismatch, counter beyond the target or
+other concurrent advancement abandons that addressed evidence and begins one
+fresh, likewise pre/inside/post-version-bracketed full readonly snapshot and
+existing full classifier. A stable lawful cross-facade append succeeds and
+refreshes the watermark; unrelated missing/malformed/corrupt prior rows poison;
+and another version change during the full fallback is unreadable
+`outcome-unknown`, never authority. Thus an uncontended validated sequence is
+linear, but no successful append gains authority from a merely target-local
+view of an unvalidated, stale or externally changed closure.
+
+Install, readiness and page derivation retain complete closure validation.
+Rejection, conflict and idempotent paths must retain complete closure
+validation because they are not the monotonic scale path. The categorical
+no-`.all()` rule applies only to an uncontended successful new append whose
+scope counter and `data_version` match its established watermark; fallback
+paths are required to materialize the complete closure. Existing exact-old,
+exact-new, mixed, unreadable, cross-facade interleave, death-edge and
+store-poisoning semantics remain byte-identical for every admitted SQLite
+operation and every external-connection commit observable through
+`main.data_version`. The database handle is module-private and the exact catalog
+forbids triggers or another same-connection mutation owner; raw hidden
+same-connection in-place corruption is therefore not a claimed threat-model
+case.
+
+The corrective tests-only RED is the sole child of this amendment and changes
+exactly three existing paths:
+
+- `tests/phase-3a1b-p4-live-journal-parity-governance-red.test.ts` adds direct
+  exact-new, exact-old, mixed, unreadable, cross-form and hostile-input controls
+  for the exact addressed schema and matrix above while preserving the existing
+  exported declaration and one shared runtime export roster;
+- `packages/storage-node/tests/fixtures/phase-3a1b-p4-node-preload.mjs` extends
+  its existing SQLite observation ledger to capture phase, exact SQL/bind
+  topology, indexed `.get()`, full `.all()`, `data_version` and postcommit
+  readback events without changing production behavior; and
+- `packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts`
+  proves that validated uncontended new received and local-issued appends use
+  only addressed indexed probes before and after commit. From the captured
+  statements and bindings, runtime `EXPLAIN QUERY PLAN` must report `SEARCH`
+  through the scope/journal-sequence primary keys, the digest unique index and
+  the local-reference unique index; no successful-fast-path statement may
+  report `SCAN accepted_entries`. A `.get()` count alone is not accepted as an
+  index proof. The owner also proves: an unrelated prior-row corruption through
+  a second SQLite facade changes `data_version`, forces full validation and
+  poisons; a reopen is initially unvalidated and fully scans once; a lawful
+  cross-facade append forces full fallback and refreshes the watermark; the
+  following uncontended append returns to the addressed path; a second facade
+  corrupting an unrelated prior row after fast-path commit but before the first
+  postcommit version/readback transaction forces full validation and poison
+  even though the target row and counter remain exact; two independently
+  validated scopes alternate fast appends without a last-scope cache or repeat
+  full scans; and duplicate, conflict, failure, readiness/page and
+  ambiguous-readback controls retain existing semantics. A bounded monotonic
+  loop proves zero accepted-row `.all()` calls after the one establishing
+  validation and constant indexed statement topology per later append. Its
+  oracle is SQLite operation and query-plan evidence, not a load-sensitive
+  wall-clock threshold.
+
+On the signed D.93.59.1 corrective-RED parent, every prior test remains green,
+the absent `driver.ts` readiness failure remains, and the new addressed
+classifier/topology rows are the only additional intended failures. The RED
+does not import or inspect production source text, accept a caller-selected
+expected result, mutate a private index or run the forbidden 266,009-schedule
+certification tier.
+
+The corrected GREEN is that RED's sole child and changes exactly three paths:
+
+- `packages/live-journal/src/contract.ts` extends the sole mutation-observation
+  classifier with the closed addressed append evidence;
+- `packages/storage-node/src/live-journal.ts` replaces complete closure scans
+  only on the monotonic successful new-append path with the indexed probes and
+  targeted readonly readback above; and
+- new `tests/fixtures/phase-3-exit-model/driver.ts` installs the already-signed
+  genuine retained integration adapter without weakening any D.93.59 or
+  D.93.59.1 assertion.
+
+There is no schema migration, package-root or `exports` change, public
+declaration change, new dependency, row/result/evidence cache, raw SQL fixture
+loader, public test hook, alternate durable store, new journal decision table
+or second graph/order/commitment authority. The one verified-scope watermark is
+module-private, invalidation-aware and non-authoritative; it only selects
+addressed versus full validation. The storage refactor must delete the
+unconditional complete-snapshot assembly from the validated uncontended append
+branch rather than layering a bypass over it. The unchanged complete snapshot
+owner remains shared by install, readiness/page, drift/reopen fallback and
+fail-closed exceptional paths.
+
+Acceptance first runs the corrected focused storage/parity owners and the
+ordinary D.93.59 owner with the restored driver. That Vitest invocation passes
+`--testTimeout 600000` so the genuine 8,191-row case is not killed by the
+repository's ten-second per-test default; this CLI-only allowance does not
+widen the source scope or the ordinary owner's separate sub-ten-minute wall
+budget. The owner must complete below ten minutes and the retained real
+accepted-count row must still authenticate the anchor, exactly `8,191` admitted
+vertices and the rejected candidate, recompute the exact count and byte
+headroom, and use the genuine SQLite store. The expanded 266,009-schedule tier
+remains forbidden during drafting and reviews and runs once only after the
+exact GREEN is frozen. All D.93.59 preservation, typecheck, build, lint, format,
+install, workflow, two-client golden-path, RSS, custody, review and nonclaim
+gates remain binding.
+
+The plan amendment, corrective tests-only RED, corrected three-path GREEN and
+closure ledger are separate linear Good-Faolain-signed commits after the four
+already-signed D.93.59/D.93.59.1 commits. This eight-commit sequence supersedes
+the six-commit summary in D.93.59.1. Kimi again performs the requested 100-step
+audit; Grok uses review mode with preserved streamed evidence; Codex and Opus
+xhigh through actual `claude-phel` review each exact packet. Reviewers do not
+run the expanded tier. Timeout, account exhaustion or `NO_VERDICT` remains
+honest non-approval. Only a reproduced substantive P0/P1 blocks signing.
