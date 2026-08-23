@@ -36,6 +36,19 @@ type PendingRow =
 	| Omit<Extract<StoredRow, { readonly sourceKind: "received" }>, "journalSequence">
 	| Omit<Extract<StoredRow, { readonly sourceKind: "local-issued" }>, "journalSequence">;
 type DurableSnapshot = Readonly<{ readonly scope: StoredScope; readonly rows: readonly StoredRow[] }>;
+type AddressedSnapshot = Readonly<{
+	readonly kind: "append-addressed";
+	readonly row: StoredRow | null;
+	readonly scope: StoredScope;
+}>;
+type VerifiedScopeWatermark = Readonly<{
+	readonly dataVersion: number;
+	readonly nextJournalSequence: number;
+	readonly scope: LiveJournalScope;
+}>;
+type VersionedSnapshot = Readonly<{ readonly dataVersion: number; readonly snapshot: DurableSnapshot | null }>;
+type VersionedAddressedSnapshot = Readonly<{ readonly dataVersion: number; readonly snapshot: AddressedSnapshot }>;
+const UNSTABLE_VERSION = Symbol("unstable-data-version");
 
 const SCOPES_DDL =
 	"CREATE TABLE scopes (\n  object_id TEXT NOT NULL,\n  epoch INTEGER NOT NULL,\n  anchor_digest TEXT NOT NULL,\n  next_journal_sequence INTEGER NOT NULL,\n  exact_anchor_preimage BLOB NOT NULL,\n  detached_anchor_signature BLOB NOT NULL,\n  parameters_digest TEXT NOT NULL,\n  exact_parameters_carrier BLOB NOT NULL,\n  PRIMARY KEY (object_id, epoch, anchor_digest)\n) WITHOUT ROWID";
@@ -93,6 +106,12 @@ function statement(database: DatabaseSync, sql: string): StatementSync {
 function scalar(database: DatabaseSync, sql: string): unknown {
 	const row = statement(database, sql).get();
 	return row === undefined ? undefined : Object.values(row)[0];
+}
+
+function dataVersion(database: DatabaseSync): number {
+	const value = scalar(database, "PRAGMA main.data_version");
+	if (!Number.isSafeInteger(value) || (value as number) < 0) throw new Error("invalid-data-version");
+	return value as number;
 }
 
 function admit(database: DatabaseSync): void {
@@ -225,18 +244,83 @@ function readRows(database: DatabaseSync, scope: LiveJournalScope): readonly Sto
 		.map(rowFromSql);
 }
 
+const ROW_COLUMNS =
+	"object_id,epoch,anchor_digest,journal_sequence,source_kind,vertex_digest,received_preimage,received_signature,local_author,local_author_sequence";
+
+function readRowBySequence(database: DatabaseSync, scope: LiveJournalScope, journalSequence: number): StoredRow | null {
+	const row = statement(
+		database,
+		`SELECT ${ROW_COLUMNS} FROM accepted_entries WHERE object_id=? AND epoch=? AND anchor_digest=? AND journal_sequence=?`
+	).get(...scopeParameters(scope), journalSequence);
+	return row === undefined ? null : rowFromSql(row);
+}
+
+function readRowByDigest(database: DatabaseSync, scope: LiveJournalScope, vertexDigest: string): StoredRow | undefined {
+	const row = statement(
+		database,
+		`SELECT ${ROW_COLUMNS} FROM accepted_entries WHERE object_id=? AND epoch=? AND anchor_digest=? AND vertex_digest=?`
+	).get(...scopeParameters(scope), vertexDigest);
+	return row === undefined ? undefined : rowFromSql(row);
+}
+
+function readRowByLocalReference(
+	database: DatabaseSync,
+	scope: LiveJournalScope,
+	author: string,
+	authorSequence: number
+): StoredRow | undefined {
+	const row = statement(
+		database,
+		`SELECT ${ROW_COLUMNS} FROM accepted_entries WHERE object_id=? AND epoch=? AND anchor_digest=? AND local_author=? AND local_author_sequence=?`
+	).get(...scopeParameters(scope), author, authorSequence);
+	return row === undefined ? undefined : rowFromSql(row);
+}
+
 function readSnapshot(database: DatabaseSync, scope: LiveJournalScope): DurableSnapshot | null {
 	const selectedScope = readScope(database, scope);
 	const rows = readRows(database, scope);
 	return selectedScope === null ? null : { rows, scope: selectedScope };
 }
 
-function readSnapshotReadonly(database: DatabaseSync, scope: LiveJournalScope): DurableSnapshot | null {
+function readVersionedSnapshotReadonly(
+	database: DatabaseSync,
+	scope: LiveJournalScope
+): VersionedSnapshot | typeof UNSTABLE_VERSION {
+	const before = dataVersion(database);
 	database.exec("BEGIN");
 	try {
+		const inside = dataVersion(database);
 		const snapshot = readSnapshot(database, scope);
 		database.exec("COMMIT");
-		return snapshot;
+		const after = dataVersion(database);
+		return before === inside && inside === after ? { dataVersion: after, snapshot } : UNSTABLE_VERSION;
+	} catch (error) {
+		try {
+			database.exec("ROLLBACK");
+		} catch {
+			// Preserve the read failure.
+		}
+		throw error;
+	}
+}
+
+function readVersionedAddressedSnapshotReadonly(
+	database: DatabaseSync,
+	scope: LiveJournalScope,
+	journalSequence: number
+): VersionedAddressedSnapshot | typeof UNSTABLE_VERSION {
+	const before = dataVersion(database);
+	database.exec("BEGIN");
+	try {
+		const inside = dataVersion(database);
+		const storedScope = readScope(database, scope);
+		const row = readRowBySequence(database, scope, journalSequence);
+		if (storedScope === null) throw new Error("missing-addressed-scope");
+		database.exec("COMMIT");
+		const after = dataVersion(database);
+		return before === inside && inside === after
+			? { dataVersion: after, snapshot: { kind: "append-addressed", row, scope: storedScope } }
+			: UNSTABLE_VERSION;
 	} catch (error) {
 		try {
 			database.exec("ROLLBACK");
@@ -362,12 +446,36 @@ export function createNodeDurableLiveJournalStore(
 	let closed = false;
 	let poisoned = false;
 	let closePromise: Promise<void> | undefined;
+	const verifiedScopes = new Map<string, VerifiedScopeWatermark>();
+	const watermarkKey = (scope: LiveJournalScope): string =>
+		JSON.stringify([scope.objectId, scope.epoch, scope.anchorDigest]);
+	const invalidateWatermark = (scope: LiveJournalScope): void => {
+		verifiedScopes.delete(watermarkKey(scope));
+	};
+	const establishWatermark = (scope: StoredScope, version: number): void => {
+		verifiedScopes.set(watermarkKey(scope.scope), {
+			dataVersion: version,
+			nextJournalSequence: scope.nextJournalSequence,
+			scope: Object.freeze({ ...scope.scope }),
+		});
+	};
+	const matchesWatermark = (scope: StoredScope, version: number): boolean => {
+		const watermark = verifiedScopes.get(watermarkKey(scope.scope));
+		return (
+			watermark !== undefined &&
+			watermark.dataVersion === version &&
+			watermark.nextJournalSequence === scope.nextJournalSequence &&
+			watermark.scope.objectId === scope.scope.objectId &&
+			watermark.scope.epoch === scope.scope.epoch &&
+			watermark.scope.anchorDigest === scope.scope.anchorDigest
+		);
+	};
 	const unavailable = (): ReturnType<typeof failed> | undefined =>
 		poisoned ? failed("store-poisoned") : closed ? failed("store-closed") : undefined;
 
 	const classify = (
-		actual: DurableSnapshot | null | undefined,
-		before: DurableSnapshot | null,
+		actual: unknown,
+		before: unknown,
 		target: Readonly<Record<string, unknown>>
 	): LiveJournalFailureKind | undefined => {
 		let decision: unknown;
@@ -386,14 +494,6 @@ export function createNodeDurableLiveJournalStore(
 		return "internal-invariant";
 	};
 
-	const postWriteSnapshot = (scope: LiveJournalScope): DurableSnapshot | null | undefined => {
-		try {
-			return readSnapshotReadonly(database, scope);
-		} catch {
-			return undefined;
-		}
-	};
-
 	// eslint-disable-next-line @typescript-eslint/require-await -- SQLite work is synchronous behind the async port.
 	const installGenesis = async (input: InstallLiveJournalGenesisInput): Promise<InstallLiveJournalGenesisResult> => {
 		const blocked = unavailable();
@@ -409,8 +509,10 @@ export function createNodeDurableLiveJournalStore(
 		let before: DurableSnapshot | null = null;
 		let idempotent = false;
 		let rejected: LiveJournalFailureKind | undefined;
+		let writeVersion: number | undefined;
 		try {
 			database.exec("BEGIN IMMEDIATE");
+			writeVersion = dataVersion(database);
 			const installed = readScopeWriter(database, selected.stored.scope);
 			const storedRows = readRows(database, selected.stored.scope);
 			if (installed === null) {
@@ -438,10 +540,19 @@ export function createNodeDurableLiveJournalStore(
 			} catch {
 				// Preserve the substrate failure.
 			}
+			invalidateWatermark(selected.stored.scope);
 			return failed("substrate-failure");
 		}
-		const actual = postWriteSnapshot(selected.stored.scope);
+		let observation: VersionedSnapshot | typeof UNSTABLE_VERSION | undefined;
+		try {
+			observation = readVersionedSnapshotReadonly(database, selected.stored.scope);
+		} catch {
+			invalidateWatermark(selected.stored.scope);
+			observation = undefined;
+		}
+		const actual = observation === undefined || observation === UNSTABLE_VERSION ? undefined : observation.snapshot;
 		if (rejected !== undefined) {
+			invalidateWatermark(selected.stored.scope);
 			if (rejected === "store-poisoned") poisoned = true;
 			if (actual === undefined && rejected !== "store-poisoned") return failed("outcome-unknown");
 			if (actual !== undefined && actual !== null && captureAddressedClosure(actual) === undefined) {
@@ -450,8 +561,26 @@ export function createNodeDurableLiveJournalStore(
 			}
 			return failed(rejected);
 		}
-		const kind = classify(actual, before, { kind: "install", scope: selected.stored });
-		if (kind !== undefined) return failed(kind);
+		const capturedActual = actual === undefined || actual === null ? actual : captureAddressedClosure(actual);
+		if (actual !== undefined && actual !== null && capturedActual === undefined) {
+			invalidateWatermark(selected.stored.scope);
+			poisoned = true;
+			return failed("store-poisoned");
+		}
+		const kind = classify(capturedActual, before, { kind: "install", scope: selected.stored });
+		if (kind !== undefined) {
+			invalidateWatermark(selected.stored.scope);
+			return failed(kind);
+		}
+		if (
+			capturedActual !== undefined &&
+			capturedActual !== null &&
+			observation !== undefined &&
+			observation !== UNSTABLE_VERSION &&
+			observation.dataVersion === writeVersion
+		) {
+			establishWatermark(capturedActual.scope, observation.dataVersion);
+		}
 		return Object.freeze({
 			idempotent,
 			ok: true,
@@ -472,16 +601,22 @@ export function createNodeDurableLiveJournalStore(
 			return failed("malformed-input");
 		}
 		let candidate = captured.value as PendingRow;
-		let before: DurableSnapshot | null = null;
+		let before: DurableSnapshot | AddressedSnapshot | null = null;
 		let row: StoredRow | undefined;
 		let idempotent = false;
 		let rejected: LiveJournalFailureKind | undefined;
+		let writeVersion: number | undefined;
+		let addressed = false;
 		try {
 			database.exec("BEGIN IMMEDIATE");
 			const scope = readScopeWriter(database, candidate.scope);
-			const storedRows = readRows(database, candidate.scope);
+			writeVersion = dataVersion(database);
+			let storedRows: readonly StoredRow[] | undefined;
+			addressed = scope !== null && matchesWatermark(scope, writeVersion);
+			if (scope === null || !addressed) storedRows = readRows(database, candidate.scope);
 			if (scope === null) {
-				if (storedRows.length !== 0) rejected = "store-poisoned";
+				invalidateWatermark(candidate.scope);
+				if (storedRows?.length !== 0) rejected = "store-poisoned";
 				else {
 					rejected =
 						statement(database, "SELECT 1 AS present FROM main.scopes WHERE object_id=? AND epoch=? LIMIT 1").get(
@@ -492,7 +627,9 @@ export function createNodeDurableLiveJournalStore(
 							: "wrong-scope";
 				}
 			} else {
-				before = captureAddressedClosure({ rows: storedRows, scope }) ?? null;
+				before = addressed
+					? { kind: "append-addressed", row: null, scope }
+					: (captureAddressedClosure({ rows: storedRows ?? [], scope }) ?? null);
 				if (before === null) rejected = "store-poisoned";
 				else {
 					const structural = captureLiveJournalInput("received", candidate);
@@ -501,20 +638,47 @@ export function createNodeDurableLiveJournalStore(
 				}
 			}
 			if (rejected === undefined && scope !== null && before !== null) {
-				const digestRow = before.rows.find(({ vertexDigest }) => vertexDigest === candidate.vertexDigest);
+				let fullRows = "rows" in before ? before.rows : undefined;
+				let digestRow = addressed
+					? readRowByDigest(database, candidate.scope, candidate.vertexDigest)
+					: fullRows?.find(({ vertexDigest }) => vertexDigest === candidate.vertexDigest);
 				let referenceRow: StoredRow | undefined;
 				if (candidate.sourceKind === "local-issued") {
 					const { author, authorSequence } = candidate;
-					referenceRow = before.rows.find(
-						(row) => row.sourceKind === "local-issued" && row.author === author && row.authorSequence === authorSequence
-					);
+					referenceRow = addressed
+						? readRowByLocalReference(database, candidate.scope, author, authorSequence)
+						: fullRows?.find(
+								(item) =>
+									item.sourceKind === "local-issued" && item.author === author && item.authorSequence === authorSequence
+							);
 				}
-				const decision = decideLiveJournalDuplicate({
+				let decision = decideLiveJournalDuplicate({
 					candidate,
 					digestRow: existingProbe(digestRow),
 					referenceRow: existingProbe(referenceRow),
 				} as never) as Readonly<Record<string, unknown>>;
-				if (decision.action === "conflict") rejected = "evidence-conflict";
+				if (addressed && decision.action !== "append") {
+					fullRows = readRows(database, candidate.scope);
+					before = captureAddressedClosure({ rows: fullRows, scope }) ?? null;
+					addressed = false;
+					if (before === null) rejected = "store-poisoned";
+					else {
+						digestRow = fullRows.find(({ vertexDigest }) => vertexDigest === candidate.vertexDigest);
+						if (candidate.sourceKind === "local-issued") {
+							const { author, authorSequence } = candidate;
+							referenceRow = fullRows.find(
+								(item) =>
+									item.sourceKind === "local-issued" && item.author === author && item.authorSequence === authorSequence
+							);
+						} else referenceRow = undefined;
+						decision = decideLiveJournalDuplicate({
+							candidate,
+							digestRow: existingProbe(digestRow),
+							referenceRow: existingProbe(referenceRow),
+						} as never) as Readonly<Record<string, unknown>>;
+					}
+				}
+				if (rejected === undefined && decision.action === "conflict") rejected = "evidence-conflict";
 				else if (decision.action === "idempotent") {
 					row = digestRow ?? referenceRow;
 					if (row === undefined) rejected = "internal-invariant";
@@ -540,10 +704,18 @@ export function createNodeDurableLiveJournalStore(
 			} catch {
 				// Preserve the substrate failure.
 			}
+			invalidateWatermark(candidate.scope);
 			return failed("substrate-failure");
 		}
-		const actual = postWriteSnapshot(candidate.scope);
 		if (rejected !== undefined) {
+			invalidateWatermark(candidate.scope);
+			let actual: DurableSnapshot | null | undefined;
+			try {
+				const observed = readVersionedSnapshotReadonly(database, candidate.scope);
+				actual = observed === UNSTABLE_VERSION ? undefined : observed.snapshot;
+			} catch {
+				actual = undefined;
+			}
 			if (rejected === "store-poisoned") poisoned = true;
 			if (actual === undefined && rejected !== "store-poisoned") return failed("outcome-unknown");
 			if (actual !== undefined && actual !== null && captureAddressedClosure(actual) === undefined) {
@@ -553,8 +725,71 @@ export function createNodeDurableLiveJournalStore(
 			return failed(rejected);
 		}
 		if (row === undefined) return failed("internal-invariant");
-		const kind = classify(actual, before, { kind: "append", row });
-		if (kind !== undefined) return failed(kind);
+		let kind: LiveJournalFailureKind | undefined;
+		if (addressed && !idempotent) {
+			let observed: VersionedAddressedSnapshot | typeof UNSTABLE_VERSION | undefined;
+			try {
+				observed = readVersionedAddressedSnapshotReadonly(database, candidate.scope, row.journalSequence);
+			} catch {
+				observed = undefined;
+			}
+			if (observed === undefined) {
+				kind = classify(undefined, before, { kind: "append", row });
+			} else if (
+				observed !== UNSTABLE_VERSION &&
+				observed.dataVersion === writeVersion &&
+				observed.snapshot.scope.nextJournalSequence === row.journalSequence + 1
+			) {
+				kind = classify(observed.snapshot, before, { kind: "append", row });
+				if (kind === undefined) establishWatermark(observed.snapshot.scope, observed.dataVersion);
+			} else {
+				let fallback: VersionedSnapshot | typeof UNSTABLE_VERSION | undefined;
+				try {
+					fallback = readVersionedSnapshotReadonly(database, candidate.scope);
+				} catch {
+					fallback = undefined;
+				}
+				if (fallback === undefined || fallback === UNSTABLE_VERSION) kind = "outcome-unknown";
+				else {
+					const actual = fallback.snapshot;
+					if (actual !== null && captureAddressedClosure(actual) === undefined) kind = "store-poisoned";
+					else {
+						const targetPresent = actual?.rows.some(({ journalSequence }) => journalSequence === row.journalSequence);
+						const fallbackActual =
+							actual !== null && before !== null && "kind" in before && targetPresent !== true
+								? {
+										kind: "append-addressed" as const,
+										row: actual.rows.find(({ journalSequence }) => journalSequence === row.journalSequence) ?? null,
+										scope: actual.scope,
+									}
+								: actual;
+						kind = classify(fallbackActual, targetPresent === true ? null : before, { kind: "append", row });
+						if (kind === undefined && actual !== null) establishWatermark(actual.scope, fallback.dataVersion);
+					}
+				}
+			}
+		} else {
+			let observed: VersionedSnapshot | typeof UNSTABLE_VERSION | undefined;
+			try {
+				observed = readVersionedSnapshotReadonly(database, candidate.scope);
+			} catch {
+				observed = undefined;
+			}
+			if (observed === undefined || observed === UNSTABLE_VERSION) kind = "outcome-unknown";
+			else {
+				const actual = observed.snapshot;
+				if (actual !== null && captureAddressedClosure(actual) === undefined) kind = "store-poisoned";
+				else {
+					kind = classify(actual, before, { kind: "append", row });
+					if (kind === undefined && actual !== null) establishWatermark(actual.scope, observed.dataVersion);
+				}
+			}
+		}
+		if (kind !== undefined) {
+			invalidateWatermark(candidate.scope);
+			if (kind === "store-poisoned") poisoned = true;
+			return failed(kind);
+		}
 		return Object.freeze({
 			idempotent,
 			journalSequence: row.journalSequence,

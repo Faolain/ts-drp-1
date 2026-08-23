@@ -66,6 +66,8 @@ const STORED_LOCAL_KEYS = [
 	"vertexDigest",
 ] as const;
 const DURABLE_SNAPSHOT_KEYS = ["rows", "scope"] as const;
+const ADDRESSED_OBSERVATION_KEYS = ["kind", "row", "scope"] as const;
+const APPEND_TARGET_KEYS = ["kind", "row"] as const;
 const ANCHOR_KEYS = [
 	"aclDigest",
 	"archiveIndexRoot",
@@ -182,11 +184,15 @@ function failure(kind: LiveJournalFailureKind): Captured<never> {
 	return objectFreeze({ kind, ok: false });
 }
 
-function snapshotRecord(value: unknown, keys: readonly string[]): Readonly<Record<string, unknown>> | undefined {
+function snapshotRecord(
+	value: unknown,
+	keys: readonly string[],
+	requireOrdinaryPrototype = false
+): Readonly<Record<string, unknown>> | undefined {
 	try {
 		if (typeof value !== "object" || value === null || arrayIsArray(value)) return undefined;
 		const prototype = getPrototypeOf(value);
-		if (prototype !== Object.prototype && prototype !== null) return undefined;
+		if (prototype !== Object.prototype && (requireOrdinaryPrototype || prototype !== null)) return undefined;
 		const actual = ownKeys(value);
 		if (actual.length !== keys.length || actual.some((key) => typeof key !== "string" || !keys.includes(key))) {
 			return undefined;
@@ -261,8 +267,8 @@ function exactDecoded(bytes: Uint8Array, keys: readonly string[]): Readonly<Reco
 	}
 }
 
-function copyScope(value: unknown): LiveJournalScope | undefined {
-	const record = snapshotRecord(value, SCOPE_KEYS);
+function copyScope(value: unknown, requireOrdinaryPrototype = false): LiveJournalScope | undefined {
+	const record = snapshotRecord(value, SCOPE_KEYS, requireOrdinaryPrototype);
 	if (record === undefined) return undefined;
 	const { anchorDigest, epoch, objectId } = record;
 	if (typeof objectId !== "string" || !parseStorageObjectId(objectId).ok || epoch !== 0 || !isDigest(anchorDigest)) {
@@ -673,6 +679,35 @@ function exactBefore(
 export function classifyLiveJournalMutationObservation(input: MutationObservationInput): MutationDecision {
 	try {
 		if (input.actual === undefined) return "unreadable";
+		const addressedBefore = captureAddressedObservation(input.before);
+		const addressedActual = captureAddressedObservation(input.actual);
+		if (addressedBefore !== undefined || addressedActual !== undefined) {
+			const target = captureAppendTarget(input.target);
+			if (addressedBefore === undefined || addressedActual === undefined || target === undefined) return "mixed";
+			if (
+				addressedBefore.row !== null ||
+				!sameScope(addressedBefore.scope.scope, target.row.scope) ||
+				addressedBefore.scope.nextJournalSequence !== target.row.journalSequence
+			) {
+				return "mixed";
+			}
+			if (
+				addressedActual.row !== null &&
+				sameInstalledGenesis(addressedActual.scope, addressedBefore.scope) &&
+				sameStoredRow(addressedActual.row, target.row) &&
+				addressedActual.scope.nextJournalSequence === target.row.journalSequence + 1
+			) {
+				return "exact-new";
+			}
+			if (
+				addressedActual.row === null &&
+				sameInstalledGenesis(addressedActual.scope, addressedBefore.scope) &&
+				addressedActual.scope.nextJournalSequence === target.row.journalSequence
+			) {
+				return "exact-old";
+			}
+			return "mixed";
+		}
 		const actual = input.actual === null ? null : captureDurableSnapshot(input.actual);
 		if (actual === undefined) return "mixed";
 		let before: LiveJournalDurableSnapshot | null = null;
@@ -698,10 +733,27 @@ export function classifyLiveJournalMutationObservation(input: MutationObservatio
 	}
 }
 
-function captureStoredScope(value: unknown): LiveJournalStoredScope | undefined {
-	const record = snapshotRecord(value, STORED_SCOPE_KEYS);
+function captureAddressedObservation(
+	value: unknown
+): Readonly<{ readonly row: LiveJournalStoredRow | null; readonly scope: LiveJournalStoredScope }> | undefined {
+	const record = snapshotRecord(value, ADDRESSED_OBSERVATION_KEYS, true);
+	if (record === undefined || record.kind !== "append-addressed") return undefined;
+	const scope = captureStoredScope(record.scope, true);
+	const row = record.row === null ? null : captureStoredRow(record.row, true);
+	return scope === undefined || row === undefined ? undefined : { row, scope };
+}
+
+function captureAppendTarget(value: unknown): Extract<MutationTarget, { readonly kind: "append" }> | undefined {
+	const record = snapshotRecord(value, APPEND_TARGET_KEYS, true);
+	if (record === undefined || record.kind !== "append") return undefined;
+	const row = captureStoredRow(record.row, true);
+	return row === undefined ? undefined : { kind: "append", row };
+}
+
+function captureStoredScope(value: unknown, requireOrdinaryPrototype = false): LiveJournalStoredScope | undefined {
+	const record = snapshotRecord(value, STORED_SCOPE_KEYS, requireOrdinaryPrototype);
 	if (record === undefined) return undefined;
-	const scope = copyScope(record.scope);
+	const scope = copyScope(record.scope, requireOrdinaryPrototype);
 	const anchor = copyBytes(record.exactCanonicalAnchorPreimageBytes);
 	const signature = copyBytes(record.detachedAnchorSignature, 64);
 	const parameters = copyBytes(record.exactCanonicalParametersCarrierBytes);
@@ -725,7 +777,7 @@ function captureStoredScope(value: unknown): LiveJournalStoredScope | undefined 
 	};
 }
 
-function captureStoredRow(value: unknown): LiveJournalStoredRow | undefined {
+function captureStoredRow(value: unknown, requireOrdinaryPrototype = false): LiveJournalStoredRow | undefined {
 	if (typeof value !== "object" || value === null) return undefined;
 	let sourceKind: unknown;
 	try {
@@ -738,9 +790,9 @@ function captureStoredRow(value: unknown): LiveJournalStoredRow | undefined {
 	const keys =
 		sourceKind === "received" ? STORED_RECEIVED_KEYS : sourceKind === "local-issued" ? STORED_LOCAL_KEYS : undefined;
 	if (keys === undefined) return undefined;
-	const record = snapshotRecord(value, keys);
+	const record = snapshotRecord(value, keys, requireOrdinaryPrototype);
 	if (record === undefined) return undefined;
-	const scope = copyScope(record.scope);
+	const scope = copyScope(record.scope, requireOrdinaryPrototype);
 	if (scope === undefined || !isDigest(record.vertexDigest) || !isSafeIntegerBetween(record.journalSequence, 0)) {
 		return undefined;
 	}
@@ -774,7 +826,7 @@ function captureDurableSnapshot(value: unknown): LiveJournalDurableSnapshot | un
 	const scope = captureStoredScope(record.scope);
 	if (scope === undefined || record.rows.length !== scope.nextJournalSequence) return undefined;
 	try {
-		const rows = record.rows.map(captureStoredRow);
+		const rows = record.rows.map((row) => captureStoredRow(row));
 		if (rows.some((row) => row === undefined)) return undefined;
 		return { rows: rows as LiveJournalStoredRow[], scope };
 	} catch {
