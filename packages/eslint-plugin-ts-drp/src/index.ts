@@ -10,6 +10,10 @@ const messages = {
 	promiseUsage: "Promise and thenable usage are forbidden in a consensus reducer module.",
 	moduleImport: "Static and dynamic imports are forbidden in a consensus reducer module.",
 	dynamicCode: "Dynamic code evaluation is forbidden in a consensus reducer module.",
+	implementationApproximated:
+		"Implementation-approximated numeric operation '{{name}}' is forbidden in a consensus reducer module.",
+	localeSensitive: "Locale-sensitive operation '{{name}}' is forbidden in a consensus reducer module.",
+	dynamicCall: "A non-literal computed call target is forbidden in a consensus reducer module.",
 	moduleMutation: "Module-scoped mutable state is forbidden in a consensus reducer module.",
 	mutableCapture: "Capturing a mutable module-scoped object or collection is forbidden in a consensus reducer module.",
 } as const;
@@ -60,6 +64,18 @@ const PURE_MATH_MEMBERS = new Set([
 	"SQRT1_2",
 	"SQRT2",
 	"abs",
+	"ceil",
+	"clz32",
+	"floor",
+	"fround",
+	"imul",
+	"max",
+	"min",
+	"round",
+	"sign",
+	"trunc",
+]);
+const IMPLEMENTATION_APPROXIMATED_MATH_MEMBERS = new Set([
 	"acos",
 	"acosh",
 	"asin",
@@ -68,32 +84,31 @@ const PURE_MATH_MEMBERS = new Set([
 	"atan2",
 	"atanh",
 	"cbrt",
-	"ceil",
-	"clz32",
 	"cos",
 	"cosh",
 	"exp",
 	"expm1",
-	"floor",
-	"fround",
 	"hypot",
-	"imul",
 	"log",
-	"log10",
 	"log1p",
+	"log10",
 	"log2",
-	"max",
-	"min",
 	"pow",
-	"round",
-	"sign",
 	"sin",
 	"sinh",
 	"sqrt",
 	"tan",
 	"tanh",
-	"trunc",
 ]);
+const LOCALE_SENSITIVE_MEMBERS = new Set([
+	"localeCompare",
+	"toLocaleString",
+	"toLocaleDateString",
+	"toLocaleTimeString",
+	"toLocaleLowerCase",
+	"toLocaleUpperCase",
+]);
+const INVOCATION_MEMBERS = new Set(["apply", "bind", "call"]);
 
 function staticMemberName(node: MemberNode): string | undefined {
 	if (!node.computed && node.property.type === "Identifier") return node.property.name;
@@ -105,6 +120,64 @@ function staticMemberName(node: MemberNode): string | undefined {
 		return String(node.property.value);
 	}
 	return undefined;
+}
+
+function staticPropertyName(node: AstNode): string | undefined {
+	if (node.type !== "Property") return undefined;
+	if (!node.computed && node.key.type === "Identifier") return node.key.name;
+	if (node.key.type === "Literal" && (typeof node.key.value === "string" || typeof node.key.value === "number")) {
+		return String(node.key.value);
+	}
+	return undefined;
+}
+
+function parentAfterTransparentExpressions(node: AstNode): readonly [AstNode, AstNode | undefined] {
+	let current = node;
+	let parent = (current as AstNode & { readonly parent?: AstNode }).parent;
+	while (
+		parent !== undefined &&
+		(RUNTIME_TRANSPARENT_EXPRESSIONS.has(parent.type) || isPossibleExpressionResult(parent, current))
+	) {
+		current = parent;
+		parent = (current as AstNode & { readonly parent?: AstNode }).parent;
+	}
+	return [current, parent];
+}
+
+function bindingTargets(node: AstNode): readonly AstNode[] {
+	const targets: AstNode[] = [];
+	let current = node;
+	let parent = (current as AstNode & { readonly parent?: AstNode }).parent;
+	while (parent !== undefined) {
+		if (parent.type === "VariableDeclarator" && parent.init === current) {
+			targets.push(parent.id);
+			break;
+		}
+		if (parent.type === "AssignmentExpression" && parent.right === current) {
+			targets.push(parent.left);
+			current = parent;
+			parent = (current as AstNode & { readonly parent?: AstNode }).parent;
+			continue;
+		}
+		if (!RUNTIME_TRANSPARENT_EXPRESSIONS.has(parent.type) && !isPossibleExpressionResult(parent, current)) {
+			break;
+		}
+		current = parent;
+		parent = (current as AstNode & { readonly parent?: AstNode }).parent;
+	}
+	return targets;
+}
+
+function isDirectInvocation(node: AstNode): boolean {
+	const [current, parent] = parentAfterTransparentExpressions(node);
+	if (parent?.type === "CallExpression") {
+		return parent.callee === current || parent.arguments.includes(current as never);
+	}
+	if (parent?.type === "TaggedTemplateExpression") return parent.tag === current;
+	if (parent?.type !== "MemberExpression" || parent.object !== current) return false;
+	if (!INVOCATION_MEMBERS.has(staticMemberName(parent as MemberNode) ?? "")) return false;
+	const [receiver, call] = parentAfterTransparentExpressions(parent);
+	return call?.type === "CallExpression" && call.callee === receiver;
 }
 
 function isPossibleExpressionResult(parent: AstNode, child: AstNode): boolean {
@@ -264,6 +337,15 @@ function createRule(): Rule.RuleModule {
 			const ambientAliasNames = new Set<string>();
 			const handledAmbientIdentifiers = new Set<AstNode>();
 			const randomMembers: MemberNode[] = [];
+			const mathMembers: MemberNode[] = [];
+			const mathPatterns: Array<{
+				readonly initializer: IdentifierNode;
+				readonly pattern: AstNode;
+			}> = [];
+			const dynamicPatterns: Array<{
+				readonly bindings: readonly IdentifierNode[];
+				readonly node: AstNode;
+			}> = [];
 			const reportedNodes = new Set<AstNode>();
 
 			function report(node: AstNode, messageId: MessageId, data?: Readonly<Record<string, string>>): void {
@@ -351,6 +433,76 @@ function createRule(): Rule.RuleModule {
 				}
 				for (const reference of globalScope.through) references.set(reference.identifier, reference);
 				return references;
+			}
+
+			function variableMap(globalScope: Scope.Scope): ReadonlyMap<AstNode, Scope.Variable> {
+				const variables = new Map<AstNode, Scope.Variable>();
+				const pending = [globalScope];
+				while (pending.length > 0) {
+					const scope = pending.pop();
+					if (scope === undefined) continue;
+					for (const variable of scope.variables) {
+						for (const identifier of variable.identifiers) variables.set(identifier, variable);
+						for (const reference of variable.references) variables.set(reference.identifier, variable);
+					}
+					pending.push(...scope.childScopes);
+				}
+				return variables;
+			}
+
+			function isAmbientMath(identifier: IdentifierNode, references: ReadonlyMap<AstNode, Scope.Reference>): boolean {
+				const reference = references.get(identifier);
+				return reference === undefined || reference.resolved === null || reference.resolved.defs.length === 0;
+			}
+
+			function inspectNumericAndLocalePolicy(globalScope: Scope.Scope): void {
+				const references = referenceMap(globalScope);
+				for (const node of mathMembers) {
+					if (node.object.type !== "Identifier" || !isAmbientMath(node.object as IdentifierNode, references)) continue;
+					const member = staticMemberName(node);
+					if (member === undefined || !IMPLEMENTATION_APPROXIMATED_MATH_MEMBERS.has(member)) continue;
+					handledAmbientIdentifiers.add(node.object);
+					report(node, "implementationApproximated", { name: `Math.${member}` });
+				}
+
+				for (const { initializer, pattern } of mathPatterns) {
+					if (!isAmbientMath(initializer, references) || pattern.type !== "ObjectPattern") continue;
+					let handled = false;
+					for (const property of pattern.properties) {
+						const member = staticPropertyName(property);
+						if (member === undefined || !IMPLEMENTATION_APPROXIMATED_MATH_MEMBERS.has(member)) continue;
+						handled = true;
+						report(property, "implementationApproximated", { name: `Math.${member}` });
+					}
+					if (handled) handledAmbientIdentifiers.add(initializer);
+				}
+			}
+
+			function inspectDynamicAliases(globalScope: Scope.Scope): void {
+				const variables = variableMap(globalScope);
+				for (const candidate of dynamicPatterns) {
+					const pending = [...candidate.bindings];
+					const visited = new Set<Scope.Variable>();
+					let invoked = false;
+					while (!invoked && pending.length > 0) {
+						const identifier = pending.pop();
+						if (identifier === undefined) continue;
+						const variable = variables.get(identifier);
+						if (variable === undefined || visited.has(variable)) continue;
+						visited.add(variable);
+						for (const reference of variable.references) {
+							const referenceIdentifier = reference.identifier as IdentifierNode;
+							if (isDirectInvocation(referenceIdentifier)) {
+								invoked = true;
+								break;
+							}
+							for (const target of bindingTargets(referenceIdentifier)) {
+								pending.push(...bindingIdentifiers(target));
+							}
+						}
+					}
+					if (invoked) report(candidate.node, "dynamicCall");
+				}
 			}
 
 			function inspectRandomMembers(globalScope: Scope.Scope): void {
@@ -655,6 +807,9 @@ function createRule(): Rule.RuleModule {
 				"AccessorProperty"(node): void {
 					if (node.static) report(node, "moduleMutation");
 				},
+				"AssignmentExpression"(node): void {
+					if (node.operator === "**=") report(node, "implementationApproximated", { name: "**=" });
+				},
 				"ArrowFunctionExpression": inspectAsyncFunction,
 				"AwaitExpression"(node): void {
 					const belongsToAsyncFunction = sourceCode
@@ -667,6 +822,9 @@ function createRule(): Rule.RuleModule {
 								ancestor.async
 						);
 					if (!belongsToAsyncFunction) report(node, "asyncSyntax");
+				},
+				"BinaryExpression"(node): void {
+					if (node.operator === "**") report(node, "implementationApproximated", { name: "**" });
 				},
 				"ExportAllDeclaration"(node): void {
 					report(node, "moduleImport");
@@ -696,6 +854,18 @@ function createRule(): Rule.RuleModule {
 				},
 				"MemberExpression"(node): void {
 					const member = staticMemberName(node);
+					if (node.object.type === "Identifier" && node.object.name === "Math") mathMembers.push(node);
+					if (member !== undefined && LOCALE_SENSITIVE_MEMBERS.has(member)) {
+						report(node, "localeSensitive", { name: member });
+					}
+					if (node.computed && member === undefined) {
+						if (isDirectInvocation(node)) {
+							report(node, "dynamicCall");
+						} else {
+							const bindings = bindingTargets(node).flatMap(bindingIdentifiers);
+							if (bindings.length > 0) dynamicPatterns.push({ bindings, node });
+						}
+					}
 					if (
 						node.object.type === "Identifier" &&
 						((node.object.name === "Math" && member === "random") ||
@@ -711,8 +881,24 @@ function createRule(): Rule.RuleModule {
 				"PropertyDefinition"(node): void {
 					if (node.static) report(node, "moduleMutation");
 				},
+				"Property"(node): void {
+					if (node.parent.type !== "ObjectPattern") return;
+					const member = staticPropertyName(node);
+					if (member !== undefined && LOCALE_SENSITIVE_MEMBERS.has(member)) {
+						report(node, "localeSensitive", { name: member });
+					}
+					if (node.computed && member === undefined) {
+						dynamicPatterns.push({ bindings: bindingIdentifiers(node.value), node });
+					}
+				},
 				"StaticBlock"(node): void {
 					report(node, "moduleMutation");
+				},
+				"VariableDeclarator"(node): void {
+					const initializer = unwrapExpression(node.init);
+					if (initializer?.type === "Identifier" && initializer.name === "Math" && node.id.type === "ObjectPattern") {
+						mathPatterns.push({ initializer: initializer as IdentifierNode, pattern: node.id });
+					}
 				},
 				"Program:exit"(): void {
 					const globalScope = sourceCode.scopeManager.globalScope;
@@ -721,6 +907,8 @@ function createRule(): Rule.RuleModule {
 					if (scope === undefined) return;
 					inspectAliases(scope);
 					inspectRandomMembers(globalScope);
+					inspectNumericAndLocalePolicy(globalScope);
+					inspectDynamicAliases(globalScope);
 					inspectAmbientDeclarations(scope);
 					inspectModuleState(scope);
 					inspectAmbientReferences(globalScope);

@@ -632,30 +632,57 @@ async function loadRule(ruleSource) {
 	return (await import(moduleUrl)).default;
 }
 
-/** @param {string} text @param {string} filename @param {'artifact'|'source'} kind @param {import("eslint").ESLint.Plugin} plugin @param {import("eslint").Linter.Parser} parser @param {typeof import("eslint").Linter} LinterConstructor */
-function lintTarget(text, filename, kind, plugin, parser, LinterConstructor) {
+async function loadLintPolicy() {
+	const root = repositoryRoot();
+	const ruleBytes = fs.readFileSync(path.join(root, "packages/eslint-plugin-ts-drp/src/index.ts"));
+	const contractBytes = fs.readFileSync(
+		path.join(root, "packages/blueprint-toolchain/contracts/no-ambient-lint-v2.json")
+	);
+	const contract = JSON.parse(decodeExactText(contractBytes, "lint contract"));
+	if (
+		contract.schemaVersion !== 2 ||
+		contract.ruleId !== "drp/no-ambient-in-reducer" ||
+		contract.eslintVersion !== "9.23.0" ||
+		contract.parserVersion !== "8.29.0"
+	) {
+		throw new TypeError("lint contract versions are unsupported");
+	}
+	const plugin = await loadRule(new TextDecoder("utf-8", { fatal: true }).decode(ruleBytes));
+	const ruleMessages = plugin.rules?.["no-ambient-in-reducer"]?.meta?.messages;
+	if (JSON.stringify(ruleMessages) !== JSON.stringify(contract.messages)) {
+		throw new TypeError("lint contract messages differ from the production rule");
+	}
+	return { contract, contractBytes, plugin, ruleBytes };
+}
+
+/** @param {string} text @param {'artifact'|'source'} kind @param {import("eslint").ESLint.Plugin} plugin @param {import("eslint").Linter.Parser} parser @param {typeof import("eslint").Linter} LinterConstructor @param {Record<string, any>} contract */
+function lintTarget(text, kind, plugin, parser, LinterConstructor, contract) {
+	const target = contract[kind];
 	const linter = new LinterConstructor();
 	const messages = linter.verify(
 		text,
 		[
 			{
-				files: kind === "artifact" ? ["**/*.mjs"] : ["**/*.ts"],
+				files: target.files,
 				languageOptions: {
-					ecmaVersion: 2024,
+					ecmaVersion: target.ecmaVersion,
 					parser: kind === "source" ? parser : undefined,
-					sourceType: "module",
+					sourceType: target.sourceType,
 				},
-				linterOptions: { noInlineConfig: true, reportUnusedDisableDirectives: false },
+				linterOptions: {
+					noInlineConfig: target.noInlineConfig,
+					reportUnusedDisableDirectives: target.reportUnusedDisableDirectives,
+				},
 				plugins: { drp: plugin },
-				rules: { "drp/no-ambient-in-reducer": "error" },
+				rules: { [contract.ruleId]: "error" },
 			},
 		],
-		{ filename }
+		{ filename: target.filename }
 	);
 	if (kind === "artifact" && linter.getSourceCode()?.getAllComments().length !== 0) {
-		throw new TypeError(`${filename} comments are forbidden`);
+		throw new TypeError(`${target.filename} comments are forbidden`);
 	}
-	if (messages.length !== 0) throw new TypeError(`${filename} failed deterministic lint`);
+	if (messages.length !== 0) throw new TypeError(`${target.filename} failed deterministic lint`);
 }
 
 /** @param {Buffer} sourceBytes @param {Buffer} authoringBytes @param {Buffer} artifact */
@@ -664,19 +691,9 @@ async function createLintEvidence(sourceBytes, authoringBytes, artifact) {
 		import("@typescript-eslint/parser"),
 		import("eslint"),
 	]);
-	const root = repositoryRoot();
-	const rulePath = path.join(root, "packages/eslint-plugin-ts-drp/src/index.ts");
-	const contractPath = path.join(root, "packages/blueprint-toolchain/contracts/no-ambient-lint-v1.json");
-	const ruleBytes = fs.readFileSync(rulePath);
-	const contractBytes = fs.readFileSync(contractPath);
-	const contractText = decodeExactText(contractBytes, "lint contract");
-	const contract = JSON.parse(contractText);
-	if (contract.eslintVersion !== "9.23.0" || contract.parserVersion !== "8.29.0") {
-		throw new TypeError("lint contract versions are unsupported");
-	}
-	const plugin = await loadRule(new TextDecoder("utf-8", { fatal: true }).decode(ruleBytes));
-	lintTarget(sourceBytes.toString("utf8"), "blueprint.ts", "source", plugin, parser, LinterConstructor);
-	lintTarget(artifact.toString("utf8"), "artifact.mjs", "artifact", plugin, parser, LinterConstructor);
+	const { contract, contractBytes, plugin, ruleBytes } = await loadLintPolicy();
+	lintTarget(sourceBytes.toString("utf8"), "source", plugin, parser, LinterConstructor, contract);
+	lintTarget(artifact.toString("utf8"), "artifact", plugin, parser, LinterConstructor, contract);
 	const artifactSha256 = sha256(artifact);
 	const sourceSha256 = sha256(sourceBytes);
 	return Buffer.from(
@@ -684,12 +701,12 @@ async function createLintEvidence(sourceBytes, authoringBytes, artifact) {
 			artifactDigest: domainHex("ts-drp/blueprint-artifact/v3", artifact),
 			artifactSha256,
 			authoringSha256: sha256(authoringBytes),
-			eslintVersion: "9.23.0",
+			eslintVersion: contract.eslintVersion,
 			kind: "ts-drp-blueprint-lint-evidence",
 			lintContractSha256: sha256(contractBytes),
-			parserVersion: "8.29.0",
+			parserVersion: contract.parserVersion,
 			result: "clean",
-			ruleId: "drp/no-ambient-in-reducer",
+			ruleId: contract.ruleId,
 			rulePackage: "eslint-plugin-ts-drp",
 			ruleSourceSha256: sha256(ruleBytes),
 			schemaVersion: 1,
@@ -757,16 +774,15 @@ function controlReducerBinding(name, operationName, selectedAction) {
 	throw new TypeError("unknown conformance control");
 }
 
-/** @param {string} source @param {string} filename */
-async function proveAmbientLintRejects(source, filename) {
+/** @param {string} source */
+async function proveAmbientLintRejects(source) {
 	const [{ default: parser }, { Linter: LinterConstructor }] = await Promise.all([
 		import("@typescript-eslint/parser"),
 		import("eslint"),
 	]);
-	const ruleBytes = fs.readFileSync(path.join(repositoryRoot(), "packages/eslint-plugin-ts-drp/src/index.ts"));
-	const plugin = await loadRule(new TextDecoder("utf-8", { fatal: true }).decode(ruleBytes));
+	const { contract, plugin } = await loadLintPolicy();
 	try {
-		lintTarget(source, filename, "source", plugin, parser, LinterConstructor);
+		lintTarget(source, "source", plugin, parser, LinterConstructor, contract);
 	} catch {
 		return;
 	}
@@ -1217,7 +1233,7 @@ async function createConformanceReceipt(authoring, sourceBytes, artifact, packag
 		controls[name] = { artifact: await emitArtifact(source, { artifactId, operations }), artifactId, source };
 		artifacts[name] = controls[name].artifact;
 	}
-	await proveAmbientLintRejects(CONTROL_SOURCES.ambientBad, "ambientBad.ts");
+	await proveAmbientLintRejects(CONTROL_SOURCES.ambientBad);
 	const nightlyOperations = [
 		...prOperations,
 		.../** @type {Record<string, any>[]} */ (authoring.conformance.nightlyAdditionalCases).map(

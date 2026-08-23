@@ -1,3 +1,5 @@
+import tsParser from "@typescript-eslint/parser";
+import { Linter } from "eslint";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -5,6 +7,7 @@ import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { buildBlueprint } from "../packages/blueprint-toolchain/src/index.js";
+import plugin from "../packages/eslint-plugin-ts-drp/src/index.js";
 
 const REPOSITORY_ROOT = path.resolve(import.meta.dirname, "..");
 const FIXTURE_ROOT = path.join(import.meta.dirname, "fixtures/track-p2-a");
@@ -36,11 +39,57 @@ function runTsc(project: string): ReturnType<typeof spawnSync> {
 	});
 }
 
+function numericDiagnostics(text: string, kind: "artifact" | "source"): readonly string[] {
+	const linter = new Linter();
+	return linter
+		.verify(
+			text,
+			[
+				{
+					files: ["**/*.ts", "**/*.mjs"],
+					languageOptions:
+						kind === "source"
+							? { ecmaVersion: 2024, parser: tsParser, sourceType: "module" }
+							: { ecmaVersion: 2024, sourceType: "module" },
+					plugins: { drp: plugin },
+					rules: { "drp/no-ambient-in-reducer": "error" },
+				},
+			],
+			{ filename: `designated/alias.${kind === "source" ? "ts" : "mjs"}` }
+		)
+		.map(({ messageId }) => messageId ?? "parse-error");
+}
+
 afterAll(() => {
 	for (const directory of temporaryDirectories.splice(0)) fs.rmSync(directory, { force: true, recursive: true });
 });
 
 describe("Track P2-a Opus corrective causal RED", () => {
+	it.each([
+		["source", "state: any, key: string"],
+		["artifact", "state, key"],
+	] as const)("rejects assignment and transitive computed-callee laundering in %s", (kind, parameters) => {
+		const assigned = `export function value(${parameters}) { let selected; selected = state[key]; return selected(1); }`;
+		const transitive = `export function value(${parameters}) { const first = state[key]; const selected = first; return selected(1); }`;
+		expect(numericDiagnostics(assigned, kind)).toEqual(["dynamicCall"]);
+		expect(numericDiagnostics(transitive, kind)).toEqual(["dynamicCall"]);
+	});
+	it.each([
+		["source", "state: any, key: string, fallback: any"],
+		["artifact", "state, key, fallback"],
+	] as const)("rejects value-flow wrapper computed-callee laundering in %s", (kind, parameters) => {
+		const sequence = `export function value(${parameters}) { return (0, state[key])(1); }`;
+		const logical = `export function value(${parameters}) { return (state[key] ?? fallback)(1); }`;
+		const sequenceAlias = `export function value(${parameters}) { const selected = (0, state[key]); return selected(1); }`;
+		const logicalAlias = `export function value(${parameters}) { const selected = state[key] ?? fallback; return selected(1); }`;
+		const assignmentAlias = `export function value(${parameters}) { let sink; const selected = (sink = state[key]); return selected(1); }`;
+		expect(numericDiagnostics(sequence, kind)).toEqual(["dynamicCall"]);
+		expect(numericDiagnostics(logical, kind)).toEqual(["dynamicCall"]);
+		expect(numericDiagnostics(sequenceAlias, kind)).toEqual(["dynamicCall"]);
+		expect(numericDiagnostics(logicalAlias, kind)).toEqual(["dynamicCall"]);
+		expect(numericDiagnostics(assignmentAlias, kind)).toEqual(["dynamicCall"]);
+	});
+
 	it("builds valid template-literal and regular-expression reducer source without AST traversal failure", async () => {
 		const { authoring, output } = authoringWithSource(
 			"valid-literals",
@@ -82,9 +131,11 @@ describe("Track P2-a exact-byte fixture governance", () => {
 	it("keeps the exact allowlist lint-clean and Prettier-stable without changing governed bytes", () => {
 		const governed = [
 			"packages/blueprint-toolchain/contracts/no-ambient-lint-v1.json",
+			"packages/blueprint-toolchain/contracts/no-ambient-lint-v2.json",
 			"tests/fixtures/track-p2-a/date-controls/artifact.mjs",
 			"tests/fixtures/track-p2-a/forward-counter/artifact.mjs",
 			"tests/fixtures/track-p2-a/no-ambient-lint-v1.json",
+			"tests/fixtures/track-p2-a/no-ambient-lint-v2.json",
 		];
 		const before = Object.fromEntries(
 			governed.map((filename) => [filename, fs.readFileSync(path.join(REPOSITORY_ROOT, filename))])

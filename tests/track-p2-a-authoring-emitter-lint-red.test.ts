@@ -11,7 +11,8 @@ import { pathToFileURL } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import acceptedLintContract from "./fixtures/phase-0j-a/no-ambient-contract.json" with { type: "json" };
-import lintContract from "./fixtures/track-p2-a/no-ambient-lint-v1.json" with { type: "json" };
+import numericContract from "./fixtures/phase-0n-a-v3/numeric-determinism-contract.json" with { type: "json" };
+import lintContract from "./fixtures/track-p2-a/no-ambient-lint-v2.json" with { type: "json" };
 import preservation from "./fixtures/track-p2-a/preservation.json" with { type: "json" };
 import { decodeCanonical, hashDomain } from "../packages/canonical/src/index.js";
 
@@ -66,7 +67,8 @@ const AUTHORING_FIXTURE = path.join(FIXTURE_ROOT, "forward-counter");
 const EXPECTED_ARTIFACT = fs.readFileSync(path.join(AUTHORING_FIXTURE, "artifact.mjs"));
 const DATE_CONTROL_ROOT = path.join(FIXTURE_ROOT, "date-controls");
 const EXPECTED_DATE_ARTIFACT = fs.readFileSync(path.join(DATE_CONTROL_ROOT, "artifact.mjs"));
-const EXPECTED_LINT_CONTRACT = fs.readFileSync(path.join(FIXTURE_ROOT, "no-ambient-lint-v1.json"));
+const EXPECTED_LINT_CONTRACT = fs.readFileSync(path.join(FIXTURE_ROOT, "no-ambient-lint-v2.json"));
+const EXPECTED_V1_LINT_CONTRACT = fs.readFileSync(path.join(FIXTURE_ROOT, "no-ambient-lint-v1.json"));
 const TOOLCHAIN_DIRECTORY = path.join(REPOSITORY_ROOT, "packages/blueprint-toolchain");
 const CATALOG_DIRECTORY = path.join(REPOSITORY_ROOT, "packages/blueprint-catalog");
 const temporaryDirectories: string[] = [];
@@ -274,7 +276,7 @@ describe("Track P2-a exact emission and lint evidence causal RED", () => {
 
 	it("writes the exact compact lint contract and canonical clean lint evidence over the copied bytes", () => {
 		const { output } = requireSuccessfulBuild();
-		const productionContract = fs.readFileSync(path.join(TOOLCHAIN_DIRECTORY, "contracts/no-ambient-lint-v1.json"));
+		const productionContract = fs.readFileSync(path.join(TOOLCHAIN_DIRECTORY, "contracts/no-ambient-lint-v2.json"));
 		expect(productionContract).toEqual(EXPECTED_LINT_CONTRACT);
 		const evidence = decodeCanonical(new Uint8Array(fs.readFileSync(path.join(output, "lint.bin")))) as LintEvidence;
 		const artifact = fs.readFileSync(path.join(output, "artifact.mjs"));
@@ -631,7 +633,11 @@ describe("Track P2-a anti-hollow controls", () => {
 
 	it("the exact lint-contract oracle kills version, parser, message, option, whitespace and LF mutants", () => {
 		expect(Buffer.from(lintContractBytes(lintContract))).toEqual(EXPECTED_LINT_CONTRACT);
-		expect(lintContract.messages).toEqual(acceptedLintContract.messages);
+		expect(lintContract.messages).toMatchObject(acceptedLintContract.messages);
+		expect(lintContract.messages).toMatchObject(numericContract.messages);
+		expect(fs.readFileSync(path.join(TOOLCHAIN_DIRECTORY, "contracts/no-ambient-lint-v1.json"))).toEqual(
+			EXPECTED_V1_LINT_CONTRACT
+		);
 		const text = EXPECTED_LINT_CONTRACT.toString("utf8");
 		for (const mutant of [
 			text.replace('"eslintVersion":"9.23.0"', '"eslintVersion":"9.24.0"'),

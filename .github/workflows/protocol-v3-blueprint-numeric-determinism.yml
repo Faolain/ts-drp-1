@@ -1,0 +1,45 @@
+name: Protocol v3 blueprint numeric determinism freeze
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  protocol-v3-blueprint-numeric-determinism:
+    name: Require immutable protocol-v3 blueprint numeric determinism
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.24.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run merge-base-pinned blueprint numeric determinism checker
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          CHECKER: packages/protocol-v3/scripts/check-blueprint-numeric-determinism-freeze.mjs
+          POLICY: packages/protocol-v3/conformance/freeze-policy-blueprint-numeric-determinism-v1.json
+        run: |
+          if git cat-file -e "$BASE_SHA:$CHECKER"; then
+            git show "$BASE_SHA:$CHECKER" > "$RUNNER_TEMP/check-blueprint-numeric-determinism-freeze.mjs"
+            PROTOCOL_V3_BLUEPRINT_NUMERIC_DETERMINISM_REPOSITORY_ROOT="$GITHUB_WORKSPACE" \
+              node "$RUNNER_TEMP/check-blueprint-numeric-determinism-freeze.mjs" "$BASE_SHA"
+          elif ! git cat-file -e "$BASE_SHA:$POLICY"; then
+            node "$CHECKER" "$BASE_SHA"
+          else
+            echo "Blueprint numeric determinism freeze bootstrap is fail-closed." >&2
+            exit 1
+          fi
+          node "$CHECKER" "$BASE_SHA"
+      - run: pnpm exec vitest run tests/eslint-plugin-ts-drp-numeric-determinism-0n-a.test.ts --coverage.enabled=false --exclude '.logs/**'

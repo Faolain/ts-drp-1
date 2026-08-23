@@ -12,6 +12,7 @@
 		"src",
 		"registry",
 		"supplements/blueprint-artifact-profile-v1",
+		"supplements/blueprint-numeric-determinism-v1",
 		"dist",
 		"!dist/test",
 		"!**/*.tsbuildinfo"
