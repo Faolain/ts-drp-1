@@ -52795,3 +52795,606 @@ envelope-scope purity. It does not claim that Phase 3, production hardening,
 Discord, the MMORPG, sealing, certification, adoption, pruning or archive is
 complete. The next work returns to the Phase 3 exit/golden-path spine rather
 than opening another freeze owner.
+
+### D.93.59 — Phase 3 exit-d bounded live-v3 graph/schedule model
+
+#### Trigger, authority inventory and exact claim
+
+The signed D.93.58 closure ledger at
+`a6d21a433e7bdfba599b3dcc8546c3bdee496ed1` closes the pure
+`(envelope, currentAnchor)` classification requirement and leaves two distinct
+Phase 3 exit requirements open: an in-repository exhaustive small-graph plus
+adversarial-schedule model, and later cross-implementation conformance on the
+pinned unamended reference subset. D.93.59 owns only the first requirement.
+
+The bounded pre-plan inventory found no missing production graph primitive and
+no authority for a second one:
+
+- `packages/compaction/tests/corpus.ts` is the sole in-repository graph-shape
+  owner. It hash-pins 407 admissible direct-antichain DAGs through six vertices
+  for ordinary evidence and 5,231 through seven for the existing expanded
+  order certification. Its `referenceOrder` is the independent sort-based Kahn
+  oracle.
+- `packages/compaction/tests/order-exhaustive.test.ts` and
+  `resolver-laws-property.test.ts` already drive the genuine production order,
+  causality and resolver owners over complete graphs and insertion
+  permutations. A measured final-byte audit of the five cases in the
+  5,231-graph order owner passed 5/5 in 4.71 seconds when preserved `.logs/**`
+  repositories were explicitly excluded from discovery. The separate
+  resolver-law case was not part of that measured command.
+- D.93.56 owns authenticated close-set and append-only history derivation,
+  including independent registered-leaf and RFC 9162 vectors. D.93.57 owns the
+  genesis application-state digest. D.93.58 owns current-anchor envelope scope
+  and restart/history independence. None of those owners composes live issue,
+  reordered delivery, volatile pending drain, a durable journal and recovery.
+- `packages/node/src/v3-live.ts` already owns that live composition: genuine
+  extraction and authorization, volatile missing-dependency parking, sorted
+  pending drain after a successful acceptance, journal-before-index
+  publication, local issue and durable recovery. The present repository has no
+  exhaustive owner that drives those boundaries across a finite graph and
+  schedule corpus.
+- The historical Python AHE model and legacy v2 convergence harness do not
+  satisfy this gate. The Python model does not execute the TypeScript
+  production engine, and the widened legacy owner has disclosed divergences.
+  Neither may be promoted into D.93.59 evidence.
+- The existing Quint author-lineage model samples a different state machine.
+  It remains preservation evidence for author sequence and lineage, not a
+  substitute for the live issue/delivery/pending/journal/crash composition
+  owned here.
+
+The exact D.93.59 claim is therefore bounded, layered and compositional:
+
+> A pure immutable model exhausts every graph and schedule in the closed corpus
+> below. A bounded real-v3 integration corpus then drives every named action,
+> durable boundary and failure class through two genuine replicas installed
+> under the same authenticated current anchor. Together with the unchanged
+> exhaustive production order/resolver owners, those layers prove that admitted
+> membership is journal-backed, dependency-complete, capacity-bounded and
+> duplicate-free; production order, tips and the D.93.56 close/history
+> commitment are independent of the represented delivery, insertion and
+> crash/recovery classes. Volatile pending is never authority and a dropped or
+> crash-discarded row remains eligible for genuine later redelivery.
+
+The exhaustiveness claim applies only to the immutable model corpus. Production
+execution is intentionally restricted to the retained representatives and the
+already-exhaustive production order/resolver owners. This is a finite safety
+and bounded-delivery result, not a universal protocol proof, a network-liveness
+proof or an eventual-delivery assumption about the public Internet.
+
+#### One finite model owner
+
+The test model has one immutable state owner under
+`tests/fixtures/phase-3-exit-model/oracle.ts`. Its closed state contains only:
+
+- the exact current-anchor `objectId`, epoch `0`, anchor digest and protocol
+  major `3` as an immutable authenticated prefix;
+- the fixed authenticated recovery/bootstrap ordinary vertex plus the admitted
+  graph. Corpus label `0` maps to a genuine `drp-vertex` whose sole dependency
+  is the actual anchor digest. The actual `drp-epoch-anchor` is an additional
+  immutable prefix, counts toward live index vertex and accepted-byte capacity,
+  is excluded from the live journal, and is excluded from D.93.56 ordinary
+  close-set charge evidence;
+- a volatile pending map keyed by full vertex digest, with each entry's exact
+  encoded v3 envelope wire-byte charge;
+- the durable accepted journal sequence, callback observations, recovery
+  descriptor observations and the durable issuance/outbox facts needed to
+  authenticate a locally issued preimage;
+- separate accepted canonical-preimage byte charges and pending exact-wire-byte
+  charges, with configured vertex, accepted-byte, pending-entry and pending-byte
+  bounds; and
+- derived accepted membership, independent reference order and tips.
+
+The model action alphabet is exactly:
+
+1. `Deliver(vertex)` through the genuine v3 wire route;
+2. `Redeliver(vertex)` for a duplicate or a post-restart retry;
+3. `IssueLocal(label, operations)` through the genuine live handle, with no
+   caller-supplied dependency list;
+4. `CrashRestart`, which closes the live plane, discards volatile pending and
+   recovers from the same durable issuance and live-journal stores; and
+5. `QueryCommitment`, which derives the current frontier from accepted state.
+   Pure schedules record the derived-tip projection only. Retained real
+   representatives invoke the existing D.93.56 owner as a read-only query over
+   the graph proven accepted by durable and public evidence.
+
+`IssueLocal` models the production API rather than a synthetic preimage API.
+Production derives dependencies from genuine current `index.tips()` and may
+emit a `causalJoin` only when the dependency bound requires it. The retained
+release representative uses the fixed supported production parameter profile,
+whose `maxDependencies` is `16`. Its exact graph is anchor `H`, bootstrap `B`
+depending on `[H]`, and siblings `A` and `C` each depending on `[B]`; therefore
+the production-selected tips before local issue are exactly the actual digests
+of `A` and `C`, and no causal join is emitted. The local input is the one-entry
+operation list `[{logicalTime: 3, operation: {action: "add", value: 3}}]` plus
+the genuine deterministic `A0` signer. Before schedule delivery begins,
+bootstrap `B` itself is created by genuine local issuance, durably committing
+the `A0` sequence `0` issuance/outbox and `local-issued` journal row. It is not
+merely delivered as a received row. The later genuine local issuance must
+therefore select `A0` sequence `1`.
+
+A deterministic preflight on a disposable identical fixture with the same
+fresh issuance lineage observes the future local digest `L` as an opaque value.
+A fresh identical run parks remote child `R` on `[L]`, verifies that `A` and `C`
+are the live tips, then calls genuine local issue with operations only. Neither
+the oracle nor the driver reconstructs a production issuance preimage or
+supplies dependencies to production. The RED pins the exact graph, operation,
+lineage, `A0` author, returned sequence `1` and returned-digest equality across
+the two runs. `A` and `C` use `A1` sequences `0` and `1`; `R` uses `A1`
+sequence `2`, so no existing author slot is reused.
+
+On accepted local issue, the model requires one authenticated durable
+issuance/outbox row for the exact returned author sequence and digest before one
+`local-issued` live-journal row, accepted membership and one callback. Recovery
+authority is the union of genuine received journal rows and uniquely
+authenticated current-scope issuance/outbox rows. Recovery must reconcile a
+missing local-issued journal row before graph append. The outbox publication
+state alone is not graph authority, and a missing, ambiguous or mismatched
+issuance record cannot create accepted membership.
+
+One controlled representative commits the genuine issuance transaction and
+throws before live-journal append. The pre-crash callback and journal lack that
+digest; recovery authenticates the durable current outbox row, appends exactly
+one local-issued journal row, returns it as recovered evidence and admits it
+once. This transition and the ordinary accepted transition are exercised by
+named real representatives; they are not silently multiplied across pure graph
+shapes that cannot express local issuance.
+
+Pending drain is an effect of a successful delivery or local issue, not a
+caller-selected action. Certified close, next-anchor creation, folding,
+snapshot adoption, pruning, archive, rebase, migration activation, gossip mesh
+behavior and future-epoch queueing are outside this alphabet.
+
+The independent oracle may consume the frozen `CorpusGraph` shape,
+`ancestorMasks` and `referenceOrder` from the established compaction test
+owner. It must not import or call production `topologicalOrder`,
+`CausalityIndex`, `linearizeEpoch`, `deriveCloseSetHistoryCommitment`,
+`classifyV3EnvelopeScope`, live ingress helpers or room projectors when deriving
+expected state. It independently applies only the closed transition law:
+
+- current scope, authorized author, all dependencies accepted and remaining
+  capacity admit exactly once;
+- a current authorized vertex with missing dependencies parks only while the
+  pending-entry bound and the sum of exact encoded envelope wire bytes permit;
+- after an acceptance, pending drain snapshots the entire currently ready set,
+  sorts that wave by digest, removes and attempts each member in that order,
+  rechecking current accepted vertex/byte capacity for every attempt, then
+  rescans for the next wave. A newly unlocked lower-digest row cannot overtake a
+  member of the already-snapshotted wave; if earlier wave members exhaust
+  capacity, later members are dropped without authority and remain eligible for
+  genuine redelivery. A dedicated small-bound pure row starts one accepted slot
+  below capacity with two ready siblings: the lower digest consumes the last
+  slot and the higher digest drops until genuine redelivery. A mutant that
+  checks capacity only once for the wave must fail that row;
+- duplicate accepted or pending digests are neutral;
+- malformed, wrong-scope, unauthorized, accepted-capacity overflow and partial
+  evidence have no durable accepted effect;
+- pending overflow drops the row without durable or terminal authority, so an
+  exact later redelivery remains eligible; and
+- restart reconstructs candidates from genuine received journal rows union
+  uniquely authenticated current issuance/outbox rows, journals any missing
+  local-issued row before graph append, clears volatile pending, and records
+  recovered evidence separately from callbacks that actually ran before the
+  crash.
+
+Expected tips are the accepted hashes that are not a dependency of another
+accepted vertex; no caller may choose the query frontier. The pure label model
+uses only `referenceOrder(makeGraph(shape))` and synthetic `hashForIndex` values,
+with synthetic root label `0` standing for the bootstrap after an implicit fixed
+anchor prefix. Those synthetic hashes are never an integration expectation. For
+each real representative, the test materializes the complete authenticated
+actual-digest `Map<string, EpochVertex>` containing the actual anchor, bootstrap
+and ordinary rows, calls the same independent `referenceOrder` on that actual
+graph, requires the actual anchor first, then maps the remaining actual digests
+back to labels through a one-to-one table. The test owns that expected-order
+call; the driver only returns authenticated graph and observation evidence and
+contains no ordering oracle.
+
+D.93.59 does not implement another Merkle tree or registered leaf encoder. Once
+accepted membership, actual-digest reference order, derived tips and accepted
+canonical-preimage charges are independently fixed, retained real
+representatives pass that exact graph/frontier/charge evidence to D.93.56 and
+assert its close-set membership/order result. D.93.56's unchanged independent
+registered-leaf and RFC 9162 vectors remain the sole authority for root bytes.
+
+#### Exhaustive bounds and schedule classes
+
+The ordinary pure-model corpus reuses `enumerateCorpus(4)`: exactly ten
+cumulative insertion-labelled direct-antichain shapes containing the logical
+bootstrap plus at most three ordinary vertices, with corpus SHA-256
+`28bce9a70097d7c5a7bb201ea12aa99545b9e3a15e3a6c9cbf26fdc2a7928756`.
+Each ordinary vertex has the deterministic author mapping frozen below.
+For each shape, ordinary labels are ascending integers and the
+independent `referenceOrder(makeGraph(shape))` is mapped back to those labels.
+Before schedule construction the RED calls the established `corpusHash` on
+`enumerateCorpus(4)` and requires both the exact count `10` and the pinned corpus
+digest above; the schedule digest is not accepted as a substitute for this
+independent topology-corpus check.
+
+The schedule generator is closed by these five families. The following list
+defines their semantic membership, while the loop nesting below defines their
+canonical serialized order:
+
+1. `delivery`: for every lexicographic permutation of the ordinary labels,
+   deliver every label normally, then query commitment;
+2. `accepted-duplicate`: for every such permutation and every ordinary label,
+   deliver the permutation, redeliver that label, then query;
+3. `pending-duplicate`: for each ordinary label with a non-bootstrap dependency,
+   deliver and immediately redeliver it before its dependency, deliver all
+   remaining labels in independent reference order, then query;
+4. `pending-crash`: for each such eligible label, deliver it while blocked,
+   crash/restart, redeliver it, deliver all remaining labels in reference order,
+   then query; and
+5. `post-append-crash`: for every ordinary label, deliver labels in reference
+   order while the selected append uses the controlled
+   `commit-then-throw` journal mode, crash immediately after that action, then
+   continue and query.
+
+Canonical emission is shape-major in `enumerateCorpus` order. For each shape,
+`permutations(ordinary)` is the recursive left-to-right routine that, at each
+depth, selects the head at ascending array index and recurses over the remaining
+array without that element. For each resulting permutation the generator emits
+its one `delivery` schedule and then, in ascending ordinary-label order, every
+`accepted-duplicate` schedule for that same permutation. It next visits eligible
+labels in ascending order and emits `pending-duplicate` immediately followed by
+`pending-crash` for each label. Finally it emits `post-append-crash` in ascending
+ordinary-label order. No family-major regrouping or later sort is permitted.
+
+The local-issue release is not falsely claimed for graph shapes that contain no
+eligible ordinary parent/child edge. It is a retained genuine-integration
+representative on the exact `H -> B -> {A,C} -> L -> R` graph defined above,
+using the production API and opaque preflight digest.
+
+The canonical schedule value is exactly
+`[shape.dependencies, family, actions]`. `family` is one of the five literal
+names above. The closed pure-schedule action grammar is exactly:
+
+- `["deliver", label, "normal"]`;
+- `["deliver", label, "commit-then-throw"]`;
+- `["redeliver", label]`;
+- `["crash-restart"]`; or
+- `["query-commitment"]`.
+
+The schedule string is `JSON.stringify(scheduleValue)` with no whitespace and
+no LF inside the string. Its UTF-8 bytes followed by exactly one `0x0a` byte form
+one schedule line. Shapes, families, permutations, eligible labels and selected
+labels retain the generator order defined above; they are not locale-sorted.
+The schedule SHA-256 hashes the concatenation of those complete lines.
+
+The closed outcome projection is exactly
+`[admittedAscending, journalAppendOrder, pendingAscending,
+callbackEmissionOrder, recoveredAscending, tipsAscending]`, with every entry a
+dense array of integer corpus labels. Journal and callback evidence deliberately
+retain order so insertion-ordered pending drain changes the outcome. The outcome
+value is `[scheduleStringWithoutLf, projection]`; one outcome line is UTF-8
+`JSON.stringify(outcomeValue)` followed by exactly one `0x0a`. The outcome
+SHA-256 hashes the concatenation of those lines. Sensitivity is qualified to
+fields in this closed pure value/projection: any action order, graph, family,
+action field or modeled transition-order change must change a pinned digest.
+
+Commitment roots, byte charges and issuance/outbox state are not fields of this
+six-array projection. Their named mutants are killed by the separate D.93.56
+charge/commitment, capacity-fence and issuance-join assertions below, not
+attributed to the outcome pin.
+
+The pure schedule digest intentionally does not hash signatures or production
+object bytes. Real mapping is separately frozen by the integration assertions.
+They use authors `A0` and `A1` from detached Ed25519 seeds of 32 bytes all
+`0x11` and all `0x22`. Bootstrap label `0` is `A0` sequence `0`, logical time
+`1`, operation `{action: "add", value: 1}`, depending only on the actual anchor.
+Every ordinary label `i >= 1` is authored by `A1` at sequence `i - 1`, logical
+time `i + 1`, operation `{action: "add", value: i + 1}`, and dependencies are
+the actual digests mapped from `shape.dependencies[i]`. This leaves the `A0`
+sequence `1` slot exclusively for the retained genuine local issue. The object
+ID, epoch `0`, anchor digest, protocol major and registered vertex kind come
+from the one authenticated fixture. The RED asserts this complete canonical
+preimage mapping, digest/signature custody, absence of duplicate author slots
+and the one-to-one label table independently of the pure corpus hashes.
+
+The ordinary corpus is exactly 226 schedules:
+
+- 47 `delivery`;
+- 135 `accepted-duplicate`;
+- 9 `pending-duplicate`;
+- 9 `pending-crash`; and
+- 26 `post-append-crash`.
+
+Its schedule SHA-256 is
+`d23a995b26c33c48ac2f65ebd0d3f61bbd693c162fe4b2e967f6e60a30add884`
+and its outcome SHA-256 is
+`3eadee6cf46b8d1f1bc98f8036f91a5e1cd23759bbbc2993a653ae4af0ea53f6`.
+The RED independently recomputes and pins both values before loading the
+test-only driver. The duplicate and crash classes are separate families, not
+their unconstrained Cartesian product. That partial-order reduction is part of
+the claim: D.93.59 exhausts exactly these semantic schedules, not JavaScript
+microtask interleavings.
+
+Separate assertions in the ordinary owner use explicit small model bounds where
+the entry fence binds first in one row and the exact-wire-byte fence binds first
+in another. They pin add/subtract accounting, overflow drop, and successful
+redelivery without changing the 226 canonical schedule count or claiming that
+the fixed real counter profile reaches its byte fence.
+
+The retained real-v3 integration corpus is not the Cartesian product above. It
+contains one smallest causal representative for each distinct production
+boundary: ready forward delivery, complete reverse delivery, sibling
+permutation across two replicas, duplicate-before-release,
+duplicate-after-acceptance, crash with volatile pending, crash immediately
+after a delegated durable journal append, crash after a genuine issuance commit
+but before live-journal append, local issue releasing a remote child,
+accepted vertex/preimage-byte capacity, pending-entry capacity, wrong
+scope/author/signature, and a multi-member commitment query. Every
+representative uses genuine signed wire bytes, the fixed supported production
+parameter profile, two independent real replicas where convergence is claimed
+and the same action/result contract as the pure model. The real accepted and
+pending-entry capacity rows reach their fixed limits; fixture-only smaller
+parameter carriers are forbidden because production rejects their digest. With
+the admitted counter operation grammar, the entry limit necessarily binds before
+the fixed 16 MiB pending-byte limit. Compact byte and entry fenceposts therefore
+belong to the pure model. Deleting any action adapter or mapping one integration outcome
+to a different pure transition must fail a controlled row. This retained corpus
+validates the real adapter without opening hundreds of SQLite stores merely to
+repeat pure state transitions.
+
+The expanded pure certification tier reuses `enumerateCorpus(6)`: exactly 407
+shapes through the logical bootstrap plus five ordinary vertices, with corpus
+SHA-256
+`70388c6d344b32ceb693995855ab05ee20d729bf67c75807dfb0489d47e071f3`.
+It independently requires `corpusHash(enumerateCorpus(6))` to equal that digest
+and the exact shape count before deriving schedules.
+It contains exactly 266,009 schedules: 43,847 `delivery`, 218,175
+`accepted-duplicate`, 1,008 `pending-duplicate`, 1,008 `pending-crash` and
+1,971 `post-append-crash`. Its schedule SHA-256 is
+`a95c0fee3d70b05fcd773da2d10d5b33bb631bc818388d08374d3a81d30eb819`
+and its outcome SHA-256 is
+`7eee1dd0cc6cd6ab0708aee1f470ea91df89f5309257ed5261664574656574ce`.
+It repeats the exact accepted-vertex/byte and pending-entry/wire-byte fenceposts
+against the expanded immutable-model corpus; the retained real-v3
+representatives remain unchanged.
+
+Before this plan packet may be signed, an independent `node:crypto` control
+regenerates every ordinary and expanded count, corpus digest, schedule digest
+and outcome digest from the closed grammar above. Any mismatch requires a
+narrow correction to this still-unsigned plan packet; it is not accepted as a
+second intended RED failure beside missing driver readiness.
+
+The expanded tier is enabled only by
+`RUN_PHASE3_EXIT_MODEL_CERTIFICATION=true`. It is an explicit release/closure
+command run once on frozen final bytes, not an ordinary PR test or a represented
+scheduled workflow until a later workflow owner installs one. The already
+existing 5,231-graph production-order owner remains separate expanded evidence
+and is not replayed as live signed traffic.
+
+The ordinary focused owner must finish below ten minutes on uncontended local
+hardware. The RED records a tighter measured target on its frozen 226 schedules.
+The 266,009-schedule tier must finish within three minutes and below 512 MiB peak
+resident memory on uncontended local hardware. It runs at most once on frozen
+final bytes for the closure ledger and is forbidden during review iterations;
+the ledger records actual duration and peak RSS with the exact count. Peak RSS
+is measured by wrapping the frozen command in `/usr/bin/time -l` on the current
+Apple host and recording `maximum resident set size` in bytes; an Ubuntu
+execution uses `/usr/bin/time -v` and records `Maximum resident set size
+(kbytes)` in KiB. The 512 MiB threshold is exactly `536870912` bytes or `524288`
+KiB. This is the command-level maximum reported by `time`, not an invented sum
+of simultaneous process-tree resident sets; the ledger records host, field,
+unit, raw value and comparison.
+
+#### Real adapters, observations and fail-closed controls
+
+`tests/fixtures/phase-3-exit-model/driver.ts` is the test-only adapter for the
+retained integration corpus, never a semantic authority. It uses:
+
+- genuine registered v3 canonical preimages and Ed25519 signatures;
+- genuine trust preparation and current-anchor activation;
+- the real node SQLite durable issuance and live-journal stores;
+- the real message queue, `routeV3Ingress`, local issue and recovery boundary;
+  and
+- the real compaction order/causality and D.93.56 commitment owners as the
+  system under test.
+
+The existing genuine live fixture may gain only deterministic test options for
+the closed author roster, empty-history anchor root, arbitrary signed registered
+vertices and the completion-only observation wrappers below. Its fixed supported
+production parameters, defaults and all existing consumers remain
+byte-semantically unchanged. It may not expose live private pending or index
+state.
+
+`routeV3Ingress` proves synchronous ownership/enqueue only, so it is never used
+as an action-completion signal. The already-proven Phase 3g observed-queue
+concept is extracted once into
+`tests/fixtures/shared/observed-message-queue.ts`; Phase 3g imports that owner and
+deletes its local polling copy. The shared test-only
+`ObservedMessageQueueManager` delegates the genuine subscribed handler unchanged
+and exposes one monotonically numbered, externally awaitable receipt per enqueue
+occurrence. Receipts are consumed in FIFO occurrence order and resolve only
+after that occurrence's delegated handler promise settles; re-enqueuing the same
+message object or byte-identical payload cannot reuse an earlier receipt. The
+wrapper cannot classify, reorder, drop or mutate a message. Every `Deliver` and
+`Redeliver` awaits its exact occurrence receipt before the next model action.
+The commit-then-throw journal wrapper separately exposes a one-shot signal after
+the genuine delegated append has completed successfully and immediately before
+the injected throw. The crash action awaits both the append signal and the
+processed-message settlement before deactivation. Fixed sleeps, polling loops
+and `routeV3Ingress` return values are not completion authority.
+
+The driver observes only public/durable facts: accepted callbacks, journal
+pages, issuance/outbox rows, publications and recovery results. A controlled
+journal wrapper may inject a crash after delegating one exact append to the real
+store; it may not decide admission. Before recovery, durable reconstruction
+candidates are the union of genuine received journal rows and uniquely
+authenticated current issuance/outbox rows. After recovery has reconciled every
+local-issued candidate into the journal, stable authenticated membership equals
+the unique durable journal digest set. Publicly observed accepted evidence is
+the union of callbacks that actually ran and exact digests reported by recovery
+descriptors; callback replay is neither required nor assumed. In the controlled
+commit-then-throw journal row, the selected digest is durable and later
+recovered but is absent from the pre-crash callback set. In the controlled
+issuance-commit row, it is absent from the pre-crash journal and callback sets,
+then appears exactly once in recovered evidence and the reconciled journal.
+
+The actual authenticated anchor is the immutable prefix and is not a journal
+row. The fixed recovered bootstrap row maps to corpus label `0`. Received rows
+recover their exact preimage from the journal. Locally issued journal rows do
+not store a preimage there, so the driver joins exact
+`(objectId, author, authorSequence, digest)` evidence to the durable
+issuance/outbox record and authenticates the matching preimage before admitting
+it to the reconstructed graph. Missing, duplicate, ambiguous or byte-mismatched
+joins fail closed. No production private index is read.
+
+Pending state is proven only through durable/public effects. With the fixed
+counter profile, the `4,096`-entry fence necessarily binds before the `16 MiB`
+byte fence. The retained real discriminator therefore parks exactly enough
+genuine future-dependent signed envelopes to reach the entry fence, supplies
+one additional row, and finally supplies the dependency. The admitted parked
+rows drain; the dropped over-capacity row does not appear unless genuinely
+redelivered. This proves entry accounting, entry-count release subtraction and
+duplicate neutrality without a pending-state hook. Exact wire-byte charging and
+the byte fence remain load-bearing only in the immutable pure model through
+small explicit entry/byte bounds where either limit can bind first. The fixed
+real counter profile cannot distinguish production wire-byte charge selection
+from canonical-preimage charging or prove production byte-charge subtraction,
+because its entry fence binds first. D.93.59 therefore does not certify those
+production byte-accounting details; a later slice needs an authenticated
+large-payload profile or another lawful production-observable discriminator.
+
+Dedicated controlled schedules retain meaningful rejection of:
+
+- wrong object, epoch, anchor and protocol before journal admission;
+- unauthorized author and malformed signature;
+- missing dependency before release;
+- duplicate delivery without a second journal row or callback;
+- accepted vertex/preimage-byte overflow and real pending-entry overflow without
+  partial durable effects, plus pure-model pending wire-byte overflow under the
+  explicit small bound;
+- issuance commit followed by pre-journal failure, reconciled exactly once from
+  the authenticated current outbox;
+- definite journal failure before effect; and
+- outcome-unknown journal evidence after a delegated durable append, which
+  appears in recovery evidence without a fabricated callback and is never
+  retried as an ordinary pre-effect failure.
+
+Only exact semantic outcomes and durable state are asserted. Incidental warning
+text and diagnostic precedence are not model authority.
+
+#### Oracle sensitivity and strict bounded TDD
+
+The tests-only RED is the signed plan's sole child and changes exactly:
+
+- new `tests/phase-3-exit-small-graph-schedule-red.test.ts`;
+- new `tests/fixtures/phase-3-exit-model/model-contract.ts`;
+- new `tests/fixtures/phase-3-exit-model/oracle.ts`;
+- new `tests/fixtures/phase-3-exit-model/schedules.ts`;
+- new `tests/fixtures/phase-3-exit-model/tsconfig.json`, the committed dedicated
+  typecheck owner for this test/model surface;
+- `tests/fixtures/phase-3a1b-p3/live-fixture.ts`;
+- new `tests/fixtures/shared/observed-message-queue.ts`; and
+- `tests/fixtures/phase-3g/rebase-outbox-fixture.ts`, only to replace its local
+  observed-queue/polling copy with the shared owner without changing scenarios.
+
+The RED contains the complete immutable oracle, schedule corpus, fixture
+options, type contract and assertions. It passes independent corpus/oracle
+controls, then fails exactly one readiness assertion because the genuine
+test-only driver module is absent. The missing driver is loaded through a
+runtime-computed test-only path so the tests-only commit still typechecks. The
+RED must kill at least these controlled semantic mutants inside the existing
+test partitions:
+
+Pure-transition and digest mutants execute directly in the tests-only RED.
+Shared observation-owner controls execute directly without the absent driver.
+For driver-only mappings, RED review additionally uses disposable exact-parent
+candidate overlays for each named flawed mapping; preservation rows pass and the
+targeted dormant GREEN row alone rejects the mutant. Those overlays are recorded
+as causal evidence but are never staged, signed or accepted as alternate drivers.
+
+- skip pending drain after the last dependency;
+- count a pending vertex as accepted;
+- expose acceptance before journal durability;
+- retain volatile pending across restart;
+- omit post-restart redelivery;
+- require callback replay for a durably committed recovered row;
+- ignore an authenticated issuance/outbox row committed before journal append;
+- make a duplicate allocate a second journal row;
+- in the pure model, charge pending capacity from canonical-preimage bytes
+  instead of exact wire bytes, fail to subtract the modeled byte charge on
+  release, or check accepted capacity only once for a multi-member ready wave;
+- substitute a smaller fixture-only parameter carrier for the fixed supported
+  production profile;
+- treat pending overflow as terminal instead of drop-and-redeliverable;
+- accept a locally issued journal row without its unique authenticated
+  issuance/outbox preimage join;
+- let a caller choose the commitment frontier instead of deriving tips;
+- use synthetic label hashes for real expected order;
+- use delivery/insertion order instead of independent actual-digest reference
+  order or digest-ordered pending drain;
+- treat enqueue ownership as processed-message completion;
+- delete one accepted member before the derived-tip projection; and
+- delete or alter a byte charge before the separately asserted D.93.56
+  commitment query.
+
+The GREEN is the RED's sole child and adds exactly one path:
+
+- new `tests/fixtures/phase-3-exit-model/driver.ts`.
+
+This is explicitly a gate-installation GREEN. If the complete driver reveals a
+production failure on a named frozen schedule, work stops: D.93.59 is corrected
+with at most one separately reviewed narrow amendment before any production
+path changes. The signed plan does not pre-authorize speculative edits to
+`packages/node/src/v3-live.ts` or any compaction owner. Assertions are never
+weakened merely to preserve the exact-one GREEN scope.
+
+No package root, `exports` map, production debug/test hook, compatibility
+branch, alternate admission path, second graph enumerator, second ordering
+oracle, second history/Merkle implementation or caller-selected expected result
+is allowed. Refactor-clean review rejects an oracle hidden in the driver and a
+production rule copied into a mock store.
+
+#### Acceptance, reviews, custody and nonclaims
+
+Final-byte acceptance persists command output and exit artifacts under
+`.logs/phase3-exit-d-*` and runs:
+
+- the ordinary 226-schedule focused model owner and the expanded
+  266,009-schedule/407-shape certification tier once each;
+- the existing 5,231-graph order owner once with
+  `RUN_PHASE_0B_NIGHTLY=true` and `.logs/**` excluded, requiring its exact five
+  cases plus the resolver-law owner's one case to execute, six total, rather
+  than skip; the complete compaction suite, D.93.56 commitment owner and Phase
+  3f causality tips/frontier owners;
+- the complete Phase 3 live-transport, local-issue, serialized-activation,
+  journal-reconciliation and D.93.58 envelope-purity owners;
+- Phase 3f/3g/3h preservation, five protocol semantic suites and their
+  controlled arms;
+- the committed D.93.59 dedicated typecheck; node build; room, chat and grid
+  typecheck/build; package build; exact-path ESLint, Prettier and diff checks;
+  frozen offline install; and
+- the same real two-client chat and zone golden paths once on final bytes.
+
+The broad node test-inclusive typecheck is rerun once as observational evidence.
+On this base it retains the previously disclosed TS1360/TS2322 failure only in
+`packages/node/tests/helpers/compact-history-scale-1i-b.ts`, outside D.93.59's
+authority. Closure requires the committed D.93.59 typecheck and no new broad
+node diagnostic in any changed owner; it neither misreports the inherited broad
+failure as green nor expands this slice to repair that unrelated helper.
+
+The direct production successor checker and five required workflow jobs must be
+green on the exact signed GREEN. The roughly 40-minute freeze certification
+matrix is not rerun because D.93.59 changes no checker, profile, policy or
+harness byte.
+
+The plan, tests-only RED, test-driver GREEN and concise closure ledger are four
+separate linear Good-Faolain-signed commits. Kimi performs the requested
+100-step review. Grok runs review mode with streamed JSONL/status artifacts,
+`max-turns=128` and an 1,800-second progress-aware bound. Codex and Opus xhigh
+through actual `claude-phel` review each exact packet independently. Reviewers
+do not launch the expanded certification tier. Timeout or `NO_VERDICT` is
+reported honestly and is not approval; only a reproduced substantive P0/P1
+blocks signing. Fable is not invoked without a new explicit request.
+
+Protected untracked paths, 26 stashes, 21 refs under `refs/codex/recovery`, two
+recovery-named branch refs and unrelated work remain untouched. D.93.59 closes
+only the bounded in-repository Phase 3 graph/schedule model if every frozen
+schedule and preservation gate passes. It installs no recurring workflow and
+makes no claim that the release-only certification command ran on future
+commits. It does not close pinned-reference cross-implementation conformance,
+Phase 3 as a whole, live sealing, certification, adoption, pruning, archive,
+Discord or the MMORPG. The next exit slice remains the narrow pinned unamended
+conformance subset, with the two-client chat/zone golden path preserved again.
