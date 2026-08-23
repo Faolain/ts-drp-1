@@ -54688,3 +54688,38 @@ consumer, define how deterministic math bytes are embedded in the
 self-contained artifact, supply independently witnessed functions and vectors,
 and run the authoritative active shipped-runtime matrix. Until then forbidden
 math rejects at publisher lint and no product capability is claimed.
+
+#### D.94.5 — pre-RED preservation-fact correction
+
+The signed D.94 review packet incorrectly stated that every existing Track P2
+owner was green before production changes. A focused invocation on signed plan
+HEAD `7ed2ae7eccdecbd0f6f9a931141be358c0d0e022` reproduced one inherited
+preservation mismatch in
+`tests/track-p2-a-authoring-emitter-lint-red.test.ts`: the fixture still expects
+SHA-256 `c70d02071592106b04f2b560498d4478e7b3742ef923445cc052c5f70891e3a7`
+for `packages/protocol-v3/src/public.ts`, while the committed file is
+`37fde13960dff3a24c9033481103ecbc6ae9dd678ea0750d3831c80927d5f93e`.
+The preservation fixture was last changed by Track P2 commit
+`94169e908e4abcf4c525428941d0baafffdaa6ee`, before the later protocol-v3
+public-surface commits. The companion Track P2 Opus-corrective owner passed
+5/5, and the existing Phase 0j owner passed 101/101 when `.logs/**` was
+excluded from collection and root coverage was disabled for the focused run.
+
+This correction does not authorize a RED shortcut. RED still adds exactly the
+two paths named by D.94.2 and does not edit the stale preservation fixture,
+production, a frozen profile or a golden. Its new Phase 0n owner has exactly
+one aggregate policy-readiness failure; the inherited Track P2 hash mismatch
+is separately disclosed and may not be counted as evidence for that failure.
+GREEN closes the inherited mismatch through the already authorized exact
+`tests/fixtures/track-p2-a/preservation.json` successor update while retaining
+the Track P2 assertion itself and enumerating the deliberate protocol-v3
+successor bytes.
+
+The accepted lineage is therefore two linear signed plan-document commits —
+D.94 at `7ed2ae7eccdecbd0f6f9a931141be358c0d0e022` and this factual correction —
+followed by the separately signed tests-only RED and GREEN commits. This
+supersedes only D.94.2's preproduction Track P2-green sentence and D.94.4's
+three-commit arithmetic. It changes no 0n-a policy, scope, gate, nonclaim or
+lean-review rule. Because the mismatch is a reproduced factual P1, this
+correction receives only the permitted focused P1 confirmation; no P2 is
+reopened and no gate is rerun merely to polish these bytes.
