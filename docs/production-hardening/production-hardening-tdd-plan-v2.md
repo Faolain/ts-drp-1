@@ -54723,3 +54723,213 @@ three-commit arithmetic. It changes no 0n-a policy, scope, gate, nonclaim or
 lean-review rule. Because the mismatch is a reproduced factual P1, this
 correction receives only the permitted focused P1 confirmation; no P2 is
 reopened and no gate is rerun merely to polish these bytes.
+
+### D.95 — Phase 4a executable v3 blueprint-fold boundary
+
+Phase 0n-a is complete at signed GREEN
+`6fd009266d58c4c55843f4faf54b68d38466beba`. Its source-and-emitted-artifact
+restriction closes Phase 4a's last publisher prerequisite. This amendment now
+turns the historical Phase 4a row into an executable v3 slice; it does not
+authorize a deterministic-math runtime, snapshot transport, certification,
+pruning or a protocol-v2 change.
+
+#### D.95.1 — Corrected architecture and single application owner
+
+The old row predates the Phase 0j reducer ABI and is stale where it describes a
+production `BlueprintStateMachine` over `IDRP`. Legacy `MapDRP`, `SetDRP` and
+`AddMulDRP` are class-and-method-dispatch implementations. They remain semantic
+test witnesses, but production Phase 4a never indexes a DRP object, traverses a
+prototype or calls an arbitrary method. The sole live application ABI is the
+already governed Phase 0j shape:
+
+```text
+reducer({state, operation}) -> {state, output}
+```
+
+over closed canonical values from one genuine `PreparedBlueprintRuntime`.
+Phase 4a may add one explicit protocol-v3 application subpath whose only
+purpose is to consume the existing module-private runtime provenance, the
+private compiled operation discriminator/schema and the exact prepared reducer
+table. The Phase 4a change to `packages/protocol-v3/src/index.ts` extends
+`PreparedBlueprintRuntimeState` to retain that already validated frozen reducer
+table beside the namespace; the public informational `runtime.reducers` field
+is never the selection authority. The non-root subpath delegates to this same
+owner rather than reconstructing a second WeakMap. That seam validates the
+genuine runtime plus caller-bound
+`expectedBlueprintDigest`, selects the declared reducer from private prepared
+state, invokes it with `undefined` receiver and returns only a canonically
+detached closed `{state, output}` result. A copied runtime record, public-field
+dispatch, raw reducer callback, undeclared action, schema-invalid operation,
+accessor/symbol/inherited/extra result, synchronous throw, Promise or hostile
+thenable fails before any state is adopted. It does not expose the namespace,
+reducer table or a generic callback runner, and it is not added to the existing
+protocol-v3 root export roster.
+
+`IStagedStateMachine` is a small generic contract in `@ts-drp/types` for
+`fork`, `apply`, `snapshot` and `adopt`. A reference-shaped
+`DeterministicStateMachine` port is added only to `@ts-drp/test-utils` as an
+oracle; the frozen protocol-v2 reference file remains byte-identical.
+One new non-root `@ts-drp/compaction` application-fold subpath owns the single
+production `BlueprintStateMachine` over the prepared v3 application seam. The
+existing compaction root neither exports nor imports that subpath, so the
+current worker-host operation worker cannot acquire a static protocol-v3 edge
+through its existing root import. The machine uses `deepCloneCanonical`, never
+`structuredClone`, and accepts exact canonical initial-state bytes rather than
+a caller-selected object.
+
+Those bytes must re-encode identically and their registered
+`hashDomain("ts-drp/state/v3", exactCanonicalApplicationStateBytes)` must equal
+the signed creator-anchor `stateDigest` supplied by the caller. This consumes
+the D.93.57 identity rather than inventing `{}` or a second state digest.
+The exact application-value profile is 32,768 canonical bytes, depth 16 and
+16,384 items. It is applied before initial-state decode and independently to
+every reducer next-state and output before either becomes observable or
+adoptable. Malformed, noncanonical, over-bound, shared, detached or
+digest-mismatched initial state fails before a reducer is selected. The state
+machine retains no replica-local `context`, validates every next state and
+output through that same bounded canonical round trip, returns detached
+snapshots and makes adoption explicit. Every reducer invocation receives fresh
+deep canonical clones of both staged state and the authenticated operation;
+neither the graph operation nor its byte carriers may be mutated by reducer
+code on success or failure.
+
+`foldBlueprintEpoch` is the only Phase 4a fold. It consumes a complete active
+epoch, the existing deterministic compaction order, the prepared blueprint
+machine and a required explicit authorization evaluator. Authorization has no
+default: missing, non-boolean, throwing or false evaluation rejects before the
+corresponding reducer invocation. The fold stages on a fork, skips the anchor's
+non-application record, applies every admitted application operation exactly
+once in order, and exposes an idempotent one-use adoption result. Any admission,
+authorization, dispatch, reducer or canonical-state failure leaves the original
+machine byte-identical. A later node composition must derive that mandatory
+evaluator from authenticated anchor authority; `() => true` is not production
+authority and no product integration is claimed by the core slice.
+
+#### D.95.2 — Atomic tests-only RED
+
+The core RED is one tests-only child of this signed amendment. Its primary
+owner is `tests/phase-4a-blueprint-fold-red.test.ts`, backed by a closed contract
+and exact self-contained artifact fixtures under
+`tests/fixtures/phase-4a-v3/`. It imports production surfaces conditionally so
+the sole readiness failure is the missing Phase 4a application/fold owner; it
+does not edit production, the Phase 0j/0n governed bytes, legacy blueprints or
+the frozen reference.
+
+The RED must prove, as one atomic matrix:
+
+- three-way agreement between the production candidate, the oracle-only
+  staged state machine and independently projected legacy Map/Set/AddMul
+  semantics, using new Phase 0j-shaped artifacts rather than invoking legacy
+  class methods as production;
+- exact initial-state byte and v3 digest binding, including empty and nonempty
+  states plus `-0`, `Date`, class instance, accessor, sparse and mutated-carrier
+  failures;
+- genuine runtime provenance and blueprint binding, with copied, spread,
+  proxied, cross-paired and foreign-module runtime controls;
+- exact declared-operation selection from the private prepared schema, with
+  undeclared, wrong-discriminator, malformed-argument and public-table
+  substitution mutants;
+- required explicit authorization for every non-anchor vertex, including
+  omission, false, non-boolean and throw; zero reducer calls on the rejected
+  vertex and zero partial adoption;
+- synchronous throw, Promise and hostile-thenable returns as stable protocol
+  errors; closed result-shape and canonical next-state/output enforcement;
+- the exact 32,768-byte, depth-16 and 16,384-item application-value bounds on
+  initial state, every next state and every output, with at-limit acceptance
+  and one-over rejection controls;
+- detached state and operation inputs, including a reducer that mutates both
+  arguments while the graph/source operation and its canonical bytes remain
+  byte-identical on success and failure;
+- sibling arrival permutations, dependency-respecting continuation, identical
+  Kahn order and identical final canonical state bytes/digest;
+- `fork` isolation, detached snapshots, explicit adoption, adopt-exactly-once,
+  repeated close/redelivery and original-state preservation after every
+  failure; and
+- causal mutants for missing provenance, public-field dispatch, wrong reducer,
+  omitted authorization, authorize-after-reduce, direct-state mutation,
+  `structuredClone`, await/Promise acceptance, skipped canonical validation,
+  partial adoption and anchor application.
+
+The RED pins the exact Phase 0j-b and Phase 0n-a identities it consumes and
+keeps their existing behavioral owners green. A local oracle copy, permissive
+fallback, fake capability, embedded expected transcript or RED-only production
+hook is not an admissible readiness mechanism.
+
+#### D.95.3 — Core GREEN ownership
+
+GREEN is the RED's sole child and changes only the natural owners required by
+that matrix:
+
+- `@ts-drp/types` for the generic staged-state-machine contract;
+- `@ts-drp/test-utils` for the reference-shaped oracle only;
+- `packages/protocol-v3/src/index.ts` for the existing WeakMap owner's retained
+  private reducer table, plus the non-root protocol-v3 blueprint-application
+  subpath that delegates genuine runtime consumption and invocation to it;
+- a new non-root `@ts-drp/compaction` application-fold subpath for
+  `BlueprintStateMachine`, the fold result/error surface and the existing
+  epoch-operation type correction, without re-export from or import by the
+  existing compaction root; and
+- the package manifests, project references and append-only stable error-code
+  roster strictly required by those owners.
+
+No legacy `callDRP`/`stateFromDRP` adapter, compatibility overload, copied
+reducer table, second canonical codec, second state digest, node transport
+change, registry edit or runtime import is allowed. Existing Phase 0j
+preparation remains the only loader; existing Phase 0n publication policy
+remains the only numeric/locale eligibility gate. The GREEN produces a real
+package-reachable fold primitive, not yet a cut, snapshot or product-visible
+state.
+
+#### D.95.4 — Live composition and 4,096-operation frame gate
+
+After the core GREEN is signed, a separate Phase 4a live-composition RED/GREEN
+may connect it to the recovered v3 node authority. That child must consume the
+node's genuine one-use recovery lineage, rebind product-supplied exact genesis
+state bytes to the signed anchor state digest, retain authenticated author
+evidence for every graph member, and supply the fold's mandatory authorization
+evaluator from the hard-epoch anchor authority. It may expose a staged fold on
+the live handle only if stale graph/capability, duplicate close, failed adopt,
+deactivation and redelivery are fail closed and do not mutate visible state.
+It may not infer authority merely from graph membership or accept a raw
+authorization callback from product code.
+
+That live child also owns the real 4,096-operation blueprint-fold Worker/frame
+gate. Its task entry and workload live outside `@ts-drp/worker-host`; the signed
+worker-host owner/import/census guards remain unchanged while the child consumes
+the package only through its existing generic bounded task API. It adds no
+transport kind or telemetry name and measures actual prepared-artifact reducer
+work rather than a synthetic loop. Chromium's Long Tasks observer must first
+prove itself with the existing positive control: an intentional roughly 200 ms
+main-thread block produces an observed task of at least 150 ms. Only then may
+the real fold assert no task at or above 50 ms. Firefox and WebKit use the same
+ready/result protocol and exact output digest even where that observer is
+unavailable. The worker result is canonical state bytes/digest plus bounded
+accounting, never an alternate authority object. A separate signed amendment is
+required if the existing worker API cannot express this without a new wire or
+metric surface.
+
+#### D.95.5 — Gates, lineage, review and nonclaims
+
+The executable lineage is: this plan-only checkpoint; one tests-only core RED;
+one core GREEN; then the separately bounded live-composition RED/GREEN and its
+closure ledger. Each commit is linear, Good-Faolain-signed and pushed before
+its child. The core final gates are limited to its exact owner, Phase 0j-b
+runtime, Phase 0n-a policy, complete compaction tests, affected package
+build/typecheck, workspace typecheck, targeted lint, formatting, public-package
+surface audit, the unchanged worker-host emitted-graph forbidden-owner guard
+and the applicable freeze checkers. The live child adds only its node/recovery
+preservation owners and bounded browser worker gate. Phase 3's 266,009-case
+certification, remote workflows and unrelated broad suites are not rerun.
+
+One exact-byte Codex, Kimi 100-step, Grok and Opus review round is allowed for
+each plan/RED/GREEN checkpoint. Only a reproduced factual or substantive P0/P1
+changes bytes or triggers one focused confirmation. P2 wording, cleanup and
+coverage suggestions are recorded as debt and do not cause prose polishing,
+gate reruns or review loops.
+
+Phase 4a establishes deterministic staged application and explicit fail-closed
+authorization only. It does not certify a cut, export/import a snapshot, persist
+or serve snapshot chunks, prune history, seal an epoch, prove weeks of soak,
+permit forbidden math, add deterministic math, or claim that lint plus one
+engine makes arbitrary JavaScript deterministic. Phase 4b and later retain
+those obligations.
