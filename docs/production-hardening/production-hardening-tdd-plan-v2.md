@@ -54347,3 +54347,173 @@ and no other tracked change. Keep the temporary stash until that ledger is
 signed; only then drop this exact stash and verify that the prior 26 stashes
 beneath it, 21 `refs/codex/recovery` refs, two recovery-named branch refs,
 protected untracked paths and unrelated work remain untouched.
+
+### D.93.60 closure ledger — pinned-original primitive conformance
+
+D.93.60 is five separate linear Good-Faolain-signed commits: plan
+`b285d1ba1d053e24bc354191f2f028f79c6257e1`, tests-only RED
+`331befa0660706630842822fea2ad8138a15060b`, one-path test-driver GREEN
+`d1a83b151f50e494a53aaf4c4b1d5b79863bf858`, reviewer-evidence correction
+`541fe579810860adee45c56b74f558cd5f7965fa`, and this separately staged ledger
+as the intended fifth. The correction has sole parent GREEN, tree
+`c75c9797d7d7d3198f62c4a8e585c28716da9fd2`, canonical full-index binary patch
+SHA-256
+`82e1e9aeec440b71222ba30d3c1cac60546b759680db0df2d7b9a03c572cda7c`
+and default binary patch SHA-256
+`be7373aebe721e7924b6c33df00473145480070c1842888704775e3364bdc330`.
+`git verify-commit` authenticated every commit with Faolain's RSA key
+`55E22F154FBAF8C84F378304761B99CEA81C6289`. The signed D.93.60.1 section
+survived the three-way content-conflict resolution byte-identically before this
+ledger was staged; the two headings occur once in correction-then-ledger order,
+and no conflict marker, duplicate section or other tracked path remains.
+
+The GREEN has sole parent RED, tree
+`21f227adc3a05e655396dbf275399491964581ab`, canonical full-index binary patch
+SHA-256
+`f7e9dd385d343cac230618e458fbf6d0ba0d85c973acfd756425015139236665`
+and default binary patch SHA-256
+`a9e0323ee5cbee2e8305c49979ea97089f3b2ae4460f839cafcb1787d05e0913`.
+It adds exactly the 192-line
+`tests/fixtures/phase-3-exit-reference-conformance/driver.ts`; the frozen four
+RED paths, production bytes, public exports, workflow files, manifests and
+lockfiles are unchanged. Acceptance ran on the staged bytes that became that
+exact GREEN tree; no GREEN byte changed afterward.
+
+The frozen test contract, not the driver, owns the lawful original-v2/current
+intersection, reference locks, complete call/result grammar, separately
+allocated peer carriers, independent sort-Kahn/RFC witnesses, transcript pins
+and mutation matrix. The driver is one test-only boundary that directly invokes
+the locked original and freshly built public current peers and returns only
+resolved labeled observations. It supplies no expected value, algorithm,
+private hook, cache, normalization fallback or production capability. The
+accepted overlap covers canonical valid-value behavior, domain framing and byte
+comparison, deterministic min-hash Kahn order, ancestry/relatedness and
+mode-none linearization, RFC 9162 Merkle trees and proofs, full-range roots and
+the append-from-empty accumulator. Explicit divergences and every v3 wire,
+identity, admission, state/history, runtime and later-lifecycle authority remain
+excluded.
+
+Final-byte local acceptance evidence was:
+
+- fresh `@ts-drp/canonical` and `@ts-drp/compaction` builds, the dedicated
+  D.93.60 typecheck, exact-path ESLint, Prettier and diff checks passed;
+- the ordinary focused owner passed 5/5 in 15.88 seconds total, with 14.97
+  seconds of owner execution. An earlier 5/5 invocation exited nonzero only
+  because root coverage thresholds were applied to the isolated owner and is
+  not the authoritative command;
+- the controller-owned D.93.60 expanded tier completed exactly once on the
+  staged GREEN: 5/5 passed in 110.32 seconds total, with 109.32 seconds of owner
+  execution. Apple `/usr/bin/time -l` measured 111.17 seconds wall,
+  411926528-byte maximum resident set size, 88492928-byte peak memory footprint
+  and zero swaps, below the exact 512 MiB ceiling. D.93.59's 266,009-schedule
+  tier was not rerun;
+- Phase-0a canonical and protocol-v2 golden-vector/freeze controls passed
+  10/10, 8/8 and 1/1. The regenerated-reference owner passed 6/7 and reproduced
+  only its inherited `spawnSync git ENOBUFS` internal freeze-CLI failure because
+  dirty untracked `.logs`/`.pnpm-store` enumeration overflowed the child-process
+  output buffer, not because plan bytes were too large;
+- complete compaction passed 74 rows with one pre-existing skip; the opted-in
+  5,231-graph order plus resolver-law owners passed 6/6 in 10.89 seconds;
+  D.93.56 through ordinary D.93.59 passed 29 rows with one intended expanded
+  skip in 134.95 seconds;
+- live transport, local issue, serialized activation, journal reconciliation
+  and envelope purity passed 32/32 in 16.24 seconds; retained Phase 3f/3g/3h
+  plus genesis preservation passed 96/96 in 78.28 seconds; the five protocol
+  semantic suites passed 87/87, and controlled operation/work arms passed
+  28/28 and 12/12;
+- frozen offline install, all 38 package builds, D.93.59/D.93.60 dedicated
+  typechecks, live-journal/storage-node typechecks, and room/chat/grid direct
+  typecheck/build passed. The broad node test-inclusive typecheck reproduced
+  only the inherited TS1360/TS2322 pair in
+  `packages/node/tests/helpers/compact-history-scale-1i-b.ts`; and
+- the real two-client chat control passed 5/5 in 6.5 seconds, the genuine
+  two-client zone control passed 1/1 in 27.0 seconds, and the direct production
+  freeze-successor checker passed in a clean disposable exact-tree candidate
+  against base `d041baffcd56f16c8a20564133a4a7fc108e8331`.
+
+Only `.logs/phase3-exit-e-green/focused-owner.log` and
+`.logs/phase3-exit-e-green/expanded-owner-time.log` are exact
+command/output/exit transcript copies. They were persisted only after all GREEN
+reviews closed and were audited by no GREEN reviewer. The remaining gate
+counts, timings, install, build, typecheck, two-client and checker results are
+contemporaneous unpersisted controller observations reconciled into
+`.logs/phase3-exit-e-green/evidence.md`. The remote-workflow copy is a
+controller transcription, not a raw GitHub API artifact. These artifact
+locations were corrected without rerunning a local gate, remote workflow or
+review; reviewer artifacts are read-only audits, not independent gate reruns.
+
+Independent exact-byte GREEN review closed with no P0/P1. Kimi's requested
+100-step audit and the focused Codex review are unpersisted controller
+observations with no dedicated GREEN artifact. Grok review mode passed at high
+confidence after 420.152 seconds, with streamed artifacts under
+`.logs/phase3-exit-e-green-reviews/grok/`. Opus xhigh through actual
+`claude-phel` passed at high confidence after 1077.139 seconds, with streamed
+artifacts under `.logs/phase3-exit-e-green-reviews/opus-claude-phel/`.
+Grok's nonblocking missing-transcript finding is answered by the explicit
+post-review artifact boundary above. Opus's two nonblocking findings remain
+recorded: the full-range Merkle row is not subrange evidence, and the two
+protected untracked protocol-v2 tests require explicit path filtering in any
+broad protocol-v2 invocation.
+
+Contrary to the signed review procedure, the focused Codex reviewer launched
+the opt-in expanded arm. The controller interrupted it before a terminal result
+and excluded it from every acceptance count, timing, RSS value and verdict. No
+raw artifact preserves that attempted run or interruption, so its exact
+progress and exit remain unevidenced. Signed D.93.60.1 authorizes this
+disclosure-only disposition: the attempt contributed no acceptance evidence,
+does not become a second completed result, and neither repairs nor waives the
+procedure. The controller-owned transcript above remains the sole completed
+expanded certification; no acceptance command was rerun to repair prose.
+
+The five required pull-request workflows all completed successfully on exact
+GREEN `d1a83b151f50e494a53aaf4c4b1d5b79863bf858`:
+
+- operation budget run `32656698501`, job `97236419437`;
+- work budget run `32656698287`, job `97236418760`;
+- ACL reputation run `32656698371`, job `97236418956`;
+- author projection run `32656698347`, job `97236418882`; and
+- gossip budget run `32656698350`, job `97236418905`.
+
+The controller validated the exact RED-parent/GREEN relationship, used an exact
+leased RED-parent-to-GREEN branch-ref replay to repair GitHub's stale
+pull-request head cache, and observed local/upstream parity with pull request 15
+still draft. The pull-request rollup then bound all five required successes to
+the exact GREEN SHA. Earlier RED-head results are superseded and are not GREEN
+evidence. At the final controller observation of that exact GREEN head, the
+rollup contained 41 checks: 26 successful, 11 failed, two skipped and two
+cancelled; every entry was terminal. The five required jobs above are the only
+successful subset this closure relies on. The other failures, skips and
+cancellations are outside D.93.60's required five, are not cleared or causally
+classified here, and do not make the full rollup green. This exact composition
+is an unpersisted controller observation; no raw GitHub API response artifact
+exists.
+
+The D.93.60.1 correction itself received a Kimi 100-step PASS, streamed Grok
+PASS, Codex PASS and actual `claude-phel` Opus PASS on its final exact bytes;
+the latter's only nonblocking wording observation is resolved here by saying
+all GREEN reviews and no GREEN reviewer. Those correction reviews inspected
+documentation and custody only and reran no gate or workflow.
+
+The temporary reviewed-ledger stash
+`f0fbd779a149f4102c850e445b64be284726aaa2` remains above the prior 26 stashes
+until this fifth commit is signed. Its first parent is signed GREEN, its second
+parent is index snapshot `93e364a805fe9435749c040b492b31b47d5d3c4e`, and its tree is
+`097acb752ac1d7a98dc46f0e8d03153e0a382017`. The merge used GREEN as ancestor,
+signed D.93.60.1 as ours and the stash tree as theirs, then resolved the
+end-of-file modify/modify conflict without checking out or overwriting the plan
+file. The prior 26 stashes beneath it, 21 refs under `refs/codex/recovery`, two
+recovery-named branch refs, protected untracked paths and unrelated work remain
+untouched. Only after this ledger is signed may that exact temporary stash be
+dropped and those custody facts reverified.
+
+The full-range `hashRange(0, leaves.length)` row proves same-peer stateful
+reachability, empty/boundary safety and equality with the RFC root; it does not
+certify discriminating non-full subranges. Extending that claim requires a
+separate amendment. This closure proves bounded cross-implementation fidelity
+for the declared intersection, not general correctness or security of either
+implementation, v3 equivalence, product state, a live cut, fold, snapshot,
+seal, certification, adoption, pruning, archive, storage/browser/backend
+equivalence, recurring automation, Discord, the MMORPG or production hardening
+as a whole. It closes only the final named cross-implementation conjunct and
+therefore the Phase 3 exit gate; Phase 4 and every later release obligation
+remain open.
