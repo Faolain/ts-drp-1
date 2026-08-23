@@ -957,17 +957,16 @@ describe("Phase 3 exit-d bounded live-v3 graph/schedule model RED", () => {
 				(digest, index, values) => accepted.has(digest) && values.indexOf(digest) === index
 			);
 		};
-		const readyOrder = (orderByScenario.get("ready-forward") as readonly string[]).slice(1);
-		expect(acceptedAttemptOrder("ready-forward")).toEqual(readyOrder);
-		expect((byName.get("ready-forward") as Phase3ExitRealObservation).journalDigests).toEqual(readyOrder);
-		expect((byName.get("ready-forward") as Phase3ExitRealObservation).callbackDigests).toEqual(readyOrder);
-		const reverseOrder = (orderByScenario.get("complete-reverse") as readonly string[]).slice(1);
-		expect(acceptedAttemptOrder("complete-reverse")).toEqual([
-			reverseOrder[0] as string,
-			...reverseOrder.slice(1).reverse(),
-		]);
-		expect((byName.get("complete-reverse") as Phase3ExitRealObservation).journalDigests).toEqual(reverseOrder);
-		expect((byName.get("complete-reverse") as Phase3ExitRealObservation).callbackDigests).toEqual(reverseOrder);
+		const readyJournalOrder = (orderByScenario.get("ready-forward") as readonly string[]).slice(1);
+		const readyOrdinaryOrder = readyJournalOrder.slice(1);
+		expect(acceptedAttemptOrder("ready-forward")).toEqual(readyOrdinaryOrder);
+		expect((byName.get("ready-forward") as Phase3ExitRealObservation).journalDigests).toEqual(readyJournalOrder);
+		expect((byName.get("ready-forward") as Phase3ExitRealObservation).callbackDigests).toEqual(readyOrdinaryOrder);
+		const reverseJournalOrder = (orderByScenario.get("complete-reverse") as readonly string[]).slice(1);
+		const reverseOrdinaryOrder = reverseJournalOrder.slice(1);
+		expect(acceptedAttemptOrder("complete-reverse")).toEqual([...reverseOrdinaryOrder].reverse());
+		expect((byName.get("complete-reverse") as Phase3ExitRealObservation).journalDigests).toEqual(reverseJournalOrder);
+		expect((byName.get("complete-reverse") as Phase3ExitRealObservation).callbackDigests).toEqual(reverseOrdinaryOrder);
 		expect(orderByScenario.get("sibling-permutation")?.length).toBeGreaterThan(3);
 		const sibling = byName.get("sibling-permutation") as Phase3ExitRealObservation;
 		const siblingLabels = standardLabelTable(sibling);
