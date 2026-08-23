@@ -44,7 +44,10 @@ interface BlueprintFixture {
 }
 
 export interface GenuinePreparedV3Fixture {
+	readonly anchorDigest: string;
+	readonly anchorPublicKey: Uint8Array;
 	readonly author: string;
+	readonly authors: readonly string[];
 	readonly authorPublicKey: Uint8Array;
 	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
 	readonly exactCanonicalAuthorAuthorizationBytes: Uint8Array;
@@ -57,7 +60,27 @@ export interface GenuinePreparedV3Fixture {
 	readonly recoverySignature: Uint8Array;
 	readonly receivedCanonicalPreimageBytes: Uint8Array;
 	readonly receivedSignature: Uint8Array;
+	readonly objectId: string;
+	readonly parameters: typeof PARAMETERS;
 	signRegisteredVertexDigest(digest: Uint8Array): Promise<Uint8Array>;
+	createRegisteredVertex(
+		input: Readonly<{
+			readonly anchor?: string;
+			readonly authorSequence: number;
+			readonly dependencies: readonly string[];
+			readonly epoch?: number;
+			readonly logicalTime: number;
+			readonly objectId?: string;
+			readonly operation: Readonly<Record<string, unknown>>;
+			readonly privateKeySeedHex: string;
+			readonly protocolMajor?: number;
+		}>
+	): Readonly<{
+		readonly author: string;
+		readonly canonicalPreimageBytes: Uint8Array;
+		readonly digest: Uint8Array;
+		readonly signature: Uint8Array;
+	}>;
 	createRecoveryVertex(
 		authorSequence: number,
 		dependencies: readonly string[]
@@ -71,7 +94,12 @@ export interface GenuinePreparedV3Fixture {
 }
 
 export interface GenuinePreparedV3FixtureOptions {
+	readonly anchorPrivateKeySeedHex?: string;
 	readonly authorizationMode?: "latched-acl" | "legacy-author-list";
+	readonly authorizedPrivateKeySeedHexes?: readonly string[];
+	readonly historyRoot?: string;
+	readonly historySize?: number;
+	readonly objectId?: string;
 	readonly prepareV3LiveGeneration?: typeof defaultPrepareV3LiveGeneration;
 }
 
@@ -175,10 +203,23 @@ export async function createGenuinePreparedV3Fixture(
 	try {
 		const authorizationMode = options.authorizationMode ?? "legacy-author-list";
 		const fixture = blueprintFixture(authorizationMode);
-		const base = makeCreatorMaterial({ objectId: `creator:${"a".repeat(32)}` });
-		const author = bytesHex(ed25519.getPublicKey(hexBytes(contract.privateKeySeedHex)));
+		const anchorPrivateKeySeedHex = options.anchorPrivateKeySeedHex ?? contract.privateKeySeedHex;
+		const objectIdValue = options.objectId ?? `creator:${"a".repeat(32)}`;
+		const base = makeCreatorMaterial({ objectId: objectIdValue, privateKeySeedHex: anchorPrivateKeySeedHex });
+		const authorizedPrivateKeySeedHexes = options.authorizedPrivateKeySeedHexes ?? [contract.privateKeySeedHex];
+		if (authorizedPrivateKeySeedHexes.length === 0) throw new TypeError("deterministic Seam3 author roster is invalid");
+		const issuingAuthor = bytesHex(ed25519.getPublicKey(hexBytes(authorizedPrivateKeySeedHexes[0] as string)));
+		const authors = Object.freeze(
+			authorizedPrivateKeySeedHexes
+				.map((seed) => bytesHex(ed25519.getPublicKey(hexBytes(seed))))
+				.sort((left, right) => (left < right ? -1 : left > right ? 1 : 0))
+		);
+		if (authors.length === 0 || new Set(authors).size !== authors.length) {
+			throw new TypeError("deterministic Seam3 author roster is invalid");
+		}
+		const author = issuingAuthor;
 		const exactCanonicalAuthorAuthorizationBytes = encodeCanonical({
-			authors: [author],
+			authors,
 			epoch: 0,
 			kind: "drp-author-authorization",
 			objectId: base.anchor.objectId,
@@ -191,13 +232,11 @@ export async function createGenuinePreparedV3Fixture(
 				? encodeCanonical({
 						epoch: 0,
 						kind: "drp-v3-latched-acl",
-						members: [
-							{
-								author,
-								finalityKey: author,
-								groups: ["admin", "finality", "writer"],
-							},
-						],
+						members: authors.map((selectedAuthor) => ({
+							author: selectedAuthor,
+							finalityKey: selectedAuthor,
+							groups: ["admin", "finality", "writer"],
+						})),
 						objectId: base.anchor.objectId,
 						permissionless: false,
 						version: 1,
@@ -210,12 +249,14 @@ export async function createGenuinePreparedV3Fixture(
 					? lowerHex(hashDomain("ts-drp/author-authorization/v3", exactCanonicalAuthorAuthorizationBytes))
 					: lowerHex(hashDomain("ts-drp/latched-acl/v3", exactCanonicalLatchedAclBytes)),
 			blueprintDigest: fixture.blueprintDigest,
+			historyRoot: options.historyRoot ?? base.anchor.historyRoot,
+			historySize: options.historySize ?? base.anchor.historySize,
 			parametersDigest: lowerHex(hashDomain("ts-drp/parameters/v3", encodeCanonical(PARAMETERS))),
 		});
 		const anchorBytes = encodeCanonical(anchor);
 		const anchorDigest = bytesHex(independentHashDomain(contract.anchorDigestDomain, anchorBytes));
-		const signature = ed25519.sign(hexBytes(anchorDigest), hexBytes(contract.privateKeySeedHex));
-		const objectId: StorageObjectId = must(parseStorageObjectId(String(anchor.objectId)));
+		const signature = ed25519.sign(hexBytes(anchorDigest), hexBytes(anchorPrivateKeySeedHex));
+		const objectId: StorageObjectId = must(parseStorageObjectId(objectIdValue));
 		const trust = createCurrentAnchorTrustStore({ objectId, pinnedGenesisAnchorDigest: anchorDigest, store });
 		const installed = await trust.install({
 			detachedGenesisSignature: signature,
@@ -250,13 +291,16 @@ export async function createGenuinePreparedV3Fixture(
 			dependencies: [receivedDependencyDigest],
 			operation: { action: "add", value: 1 },
 		};
-		const receivedCanonicalPreimageBytes = encodeCanonical({ ...vertexInput, author: contract.signerId });
+		const receivedCanonicalPreimageBytes = encodeCanonical({ ...vertexInput, author });
 		const receivedDigest = hashDomain("ts-drp/vertex/v3", receivedCanonicalPreimageBytes);
 		const recoveryCanonicalPreimageBytes = encodeCanonical({ ...vertexInput, author });
 		const recoveryDigest = hashDomain("ts-drp/vertex/v3", recoveryCanonicalPreimageBytes);
-		return Object.freeze({
+		const result: GenuinePreparedV3Fixture = {
+			anchorDigest,
+			anchorPublicKey: ed25519.getPublicKey(hexBytes(anchorPrivateKeySeedHex)),
 			author,
-			authorPublicKey: ed25519.getPublicKey(hexBytes(contract.privateKeySeedHex)),
+			authors,
+			authorPublicKey: ed25519.getPublicKey(hexBytes(authorizedPrivateKeySeedHexes[0] as string)),
 			capability: prepared.capability,
 			exactCanonicalAnchorPreimageBytes: new Uint8Array(anchorBytes),
 			exactCanonicalAuthorAuthorizationBytes: new Uint8Array(exactCanonicalAuthorAuthorizationBytes),
@@ -265,10 +309,34 @@ export async function createGenuinePreparedV3Fixture(
 			exactCanonicalParametersCarrierBytes: new Uint8Array(exactCanonicalParametersCarrierBytes),
 			detachedAnchorSignature: new Uint8Array(signature),
 			descriptor: prepared.descriptor,
+			objectId: String(objectId),
+			parameters: PARAMETERS,
 			recoveryCanonicalPreimageBytes,
-			recoverySignature: ed25519.sign(recoveryDigest, hexBytes(contract.privateKeySeedHex)),
+			recoverySignature: ed25519.sign(recoveryDigest, hexBytes(authorizedPrivateKeySeedHexes[0] as string)),
 			receivedCanonicalPreimageBytes,
-			receivedSignature: ed25519.sign(receivedDigest, hexBytes(contract.privateKeySeedHex)),
+			receivedSignature: ed25519.sign(receivedDigest, hexBytes(authorizedPrivateKeySeedHexes[0] as string)),
+			createRegisteredVertex(vertex) {
+				const selectedAuthor = bytesHex(ed25519.getPublicKey(hexBytes(vertex.privateKeySeedHex)));
+				const canonicalPreimageBytes = encodeCanonical({
+					anchor: vertex.anchor ?? anchorDigest,
+					author: selectedAuthor,
+					authorSequence: vertex.authorSequence,
+					dependencies: [...vertex.dependencies],
+					epoch: vertex.epoch ?? 0,
+					kind: "drp-vertex",
+					logicalTime: vertex.logicalTime,
+					objectId: vertex.objectId ?? objectId,
+					operation: vertex.operation,
+					protocolMajor: vertex.protocolMajor ?? 3,
+				});
+				const digest = hashDomain("ts-drp/vertex/v3", canonicalPreimageBytes);
+				return Object.freeze({
+					author: selectedAuthor,
+					canonicalPreimageBytes,
+					digest,
+					signature: ed25519.sign(digest, hexBytes(vertex.privateKeySeedHex)),
+				});
+			},
 			createRecoveryVertex(authorSequence, dependencies) {
 				const canonicalPreimageBytes = encodeCanonical({
 					...vertexInput,
@@ -281,11 +349,13 @@ export async function createGenuinePreparedV3Fixture(
 				return Object.freeze({
 					canonicalPreimageBytes,
 					digest,
-					signature: ed25519.sign(digest, hexBytes(contract.privateKeySeedHex)),
+					signature: ed25519.sign(digest, hexBytes(authorizedPrivateKeySeedHexes[0] as string)),
 				});
 			},
 			signRegisteredVertexDigest(digest) {
-				return Promise.resolve(ed25519.sign(new Uint8Array(digest), hexBytes(contract.privateKeySeedHex)));
+				return Promise.resolve(
+					ed25519.sign(new Uint8Array(digest), hexBytes(authorizedPrivateKeySeedHexes[0] as string))
+				);
 			},
 			async prepareAgain() {
 				const next = await prepareV3LiveGeneration(input);
@@ -296,7 +366,8 @@ export async function createGenuinePreparedV3Fixture(
 				await store.close();
 				rmSync(directory, { force: true, recursive: true });
 			},
-		});
+		};
+		return Object.freeze(result);
 	} catch (error) {
 		await store.close();
 		rmSync(directory, { force: true, recursive: true });

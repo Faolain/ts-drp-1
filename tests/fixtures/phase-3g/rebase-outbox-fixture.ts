@@ -31,6 +31,7 @@ import {
 	makeCreatorMaterial,
 } from "../phase-3a0-v3/controlled-anchor-trust.js";
 import { counterBatchCatalog, maximalEntries } from "../phase-3f-c/application-batching-fixture.js";
+import { ObservedMessageQueueManager } from "../shared/observed-message-queue.js";
 
 const PARAMETERS = Object.freeze({
 	maxEpochVertices: 8192,
@@ -522,28 +523,6 @@ function network(
 		subscribe: (topic: string) => topics.add(topic),
 		unsubscribe: (topic: string) => topics.delete(topic),
 	} as unknown as DRPNetworkNode;
-}
-
-class ObservedMessageQueueManager<T> extends MessageQueueManager<T> {
-	readonly processed = new Set<T>();
-
-	override subscribe(queueId: string, handler: Parameters<MessageQueueManager<T>["subscribe"]>[1]): void {
-		super.subscribe(queueId, async (message) => {
-			try {
-				await handler(message);
-			} finally {
-				this.processed.add(message);
-			}
-		});
-	}
-}
-
-async function waitForProcessed<T>(manager: ObservedMessageQueueManager<T>, message: T): Promise<boolean> {
-	for (let turn = 0; turn < 64; turn += 1) {
-		if (manager.processed.has(message)) return true;
-		await new Promise((resolve) => setTimeout(resolve, 5));
-	}
-	return manager.processed.has(message);
 }
 
 async function outboxSnapshot(
@@ -1118,11 +1097,16 @@ export async function runTerminalCommitScenario(): Promise<TerminalCommitScenari
 		const admittedActions: string[] = [];
 		const admittedClientOperationIds: string[] = [];
 		const publishedDigests: string[] = [];
-		let releaseEarlierSink = (): void => undefined;
+		let earlierSinkReleased = false;
+		let resolveEarlierSink = (): void => undefined;
 		let signalEarlierSinkStarted = (): void => undefined;
 		const earlierSinkRelease = new Promise<void>((resolve) => {
-			releaseEarlierSink = resolve;
+			resolveEarlierSink = resolve;
 		});
+		const releaseEarlierSink = (): void => {
+			earlierSinkReleased = true;
+			resolveEarlierSink();
+		};
 		const earlierSinkStarted = new Promise<void>((resolve) => {
 			signalEarlierSinkStarted = resolve;
 		});
@@ -1202,15 +1186,24 @@ export async function runTerminalCommitScenario(): Promise<TerminalCommitScenari
 				lowerHex(bootstrap.envelope.digest),
 			]);
 			const heldRemoteMessage = messageForCommit(heldRemote, activated.handle.topic);
+			const heldRemoteReceiptPromise = messageQueueManager.nextReceipt();
 			heldRemoteRouted = routeV3Ingress(boundNetwork, heldRemoteMessage);
-			heldRemoteProcessedBeforeResume = await waitForProcessed(messageQueueManager, heldRemoteMessage);
+			const heldRemoteReceipt = await heldRemoteReceiptPromise;
+			const heldRemoteStartedBeforeEarlierRelease = await heldRemoteReceipt.started;
+			await new Promise<void>((resolve) => setImmediate(resolve));
 			heldBeforeResume =
 				issuanceTransactions === issuanceTransactionsBeforeResume &&
 				laterIssueSignerCalls === 0 &&
-				!heldRemoteProcessedBeforeResume;
+				!earlierSinkReleased &&
+				heldRemoteStartedBeforeEarlierRelease &&
+				heldRemoteReceipt.handlerStarted &&
+				!heldRemoteReceipt.settled &&
+				heldRemoteReceipt.outcome === undefined;
 			releaseEarlierSink();
 			earlierIssue = await earlierIssuePromise;
 			begun = await beginPromise;
+			await new Promise<void>((resolve) => setImmediate(resolve));
+			heldRemoteProcessedBeforeResume = heldRemoteReceipt.settled;
 			const firstCapability = Reflect.get(begun as object, "capability");
 			begunWhileActive = await Reflect.apply(
 				Reflect.get(activated.handle, "beginTerminalTransition") as () => unknown,
@@ -1264,6 +1257,7 @@ export async function runTerminalCommitScenario(): Promise<TerminalCommitScenari
 				]
 			);
 			resume = Reflect.apply(Reflect.get(firstCapability as object, "resume") as () => unknown, firstCapability, []);
+			await heldRemoteReceipt.processed;
 			laterIssue = await laterIssuePromise;
 			issuanceTransactionsAfterResume = issuanceTransactions;
 			reusedResume = Reflect.apply(
@@ -1395,8 +1389,16 @@ export async function runTerminalCommitScenario(): Promise<TerminalCommitScenari
 				[terminalDigest]
 			);
 			const postTerminalRemoteMessage = messageForCommit(postTerminalRemote, activated.handle.topic);
+			const postTerminalReceiptPromise = messageQueueManager.nextReceipt();
 			postTerminalRemoteRouted = routeV3Ingress(boundNetwork, postTerminalRemoteMessage);
-			postTerminalRemoteProcessed = await waitForProcessed(messageQueueManager, postTerminalRemoteMessage);
+			if (postTerminalRemoteRouted) {
+				const postTerminalReceipt = await postTerminalReceiptPromise;
+				await postTerminalReceipt.started;
+				await postTerminalReceipt.processed;
+				postTerminalRemoteProcessed = postTerminalReceipt.settled;
+			} else {
+				postTerminalRemoteProcessed = false;
+			}
 			publication = await activated.handle.publishPending();
 		} finally {
 			releaseEarlierSink();
