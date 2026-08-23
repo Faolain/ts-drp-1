@@ -53398,3 +53398,62 @@ commits. It does not close pinned-reference cross-implementation conformance,
 Phase 3 as a whole, live sealing, certification, adoption, pruning, archive,
 Discord or the MMORPG. The next exit slice remains the narrow pinned unamended
 conformance subset, with the two-client chat/zone golden path preserved again.
+
+### D.93.59.1 — recovered-bootstrap observation correction
+
+The signed D.93.59 RED exposed one impossible observation law before the GREEN
+driver existed. The authenticated bootstrap at corpus label `0` is restored by
+`recoverV3LiveReplica`: it is a durable journal member and belongs to recovered
+evidence, but it is neither a scheduled delivery occurrence nor a live accepted
+callback. Recovery completes before activation installs the live sink, and
+activation does not replay recovered vertices through that sink. The RED
+correctly omits label `0` from the explicit `ready-forward`
+and `complete-reverse` action traces, yet two later assertions incorrectly
+require that same digest in both the attempted-order and callback-order arrays.
+Because the owner also requires `attemptedDigests` to equal the digests in the
+explicit action trace, no honest driver can satisfy those assertions.
+
+The corrective tests-only child changes exactly
+`tests/phase-3-exit-small-graph-schedule-red.test.ts`. It preserves the complete
+reference order as the exact durable history: `referenceOrder[0]` is the anchor,
+`referenceOrder[1]` is recovered bootstrap label `0`, and the ordinary scheduled
+suffix is exactly `referenceOrder.slice(2)`. The journal order is
+`referenceOrder.slice(1)`, including bootstrap. For `ready-forward`, scheduled
+accepted attempts and live callbacks equal the ordinary suffix. For
+`complete-reverse`, scheduled accepted attempts equal the reverse of that same
+ordinary suffix, while live callbacks equal the ordinary suffix in production
+drain order. The union of callback and recovered evidence must still equal
+authenticated accepted membership. The already-correct sibling row remains the
+control: its journal includes bootstrap and its callbacks begin at the parent.
+
+This amendment also resolves the accepted-byte wording exposed during final RED
+review. Under the frozen production profile, the retained single-dependency
+counter chain reaches the `8,192` accepted-entry bound while remaining below
+`8 MiB`; a padded nonconforming carrier would be rejected by authentication and
+cannot turn that row into byte-capacity evidence. This is not a universal claim
+about all schema-valid counter vertices: lawful high-fan-in vertices can consume
+more bytes and may reach the byte bound first. D.93.59.1 explicitly scopes the
+retained real capacity representative to the count boundary and supersedes the
+earlier layer-unqualified “accepted vertex/preimage-byte overflow” bullet and
+real-representative byte-overflow wording. The original accepted-count
+obligation remains binding. The retained real row must authenticate the anchor,
+`8,191` admitted vertices and one rejected candidate, independently recompute
+the accepted count and byte total, prove the count is exactly `8,192`, and prove
+the otherwise-valid candidate remains within the byte ceiling. The immutable
+pure model retains its independently tight accepted-byte fence and capacity
+mutants. This slice does not certify production accepted-byte enforcement; that
+requires a later lawful large-payload profile or another production-observable
+discriminator and must be recorded as an explicit closure-ledger nonclaim.
+
+No fixture, model, schedule, production, crash/recovery, commitment or
+public-surface byte changes in this correction; the capacity paragraph above
+ratifies the already-signed RED's honest real-count/pure-byte split rather than
+authorizing another test edit. The corrected RED must retain
+the same single readiness failure because `driver.ts` is absent, while every
+non-driver test, the dedicated typecheck, exact-path lint/format and the relevant
+Phase 3g/3h preservation controls remain green. The GREEN remains the exact-one
+new `tests/fixtures/phase-3-exit-model/driver.ts` path. This six-commit sequence
+supersedes D.93.59's earlier four-commit summary: final lineage is the
+signed D.93.59 plan, signed original RED, this signed corrective plan, signed
+corrective RED, signed GREEN and signed closure ledger. All D.93.59 acceptance,
+review, custody and nonclaim rules otherwise remain unchanged.
