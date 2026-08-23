@@ -54517,3 +54517,174 @@ equivalence, recurring automation, Discord, the MMORPG or production hardening
 as a whole. It closes only the final named cross-implementation conjunct and
 therefore the Phase 3 exit gate; Phase 4 and every later release obligation
 remain open.
+
+### D.94 — Phase 0n forward-v3 numeric-determinism prerequisite
+
+Phase 3 is closed at signed ledger `7f1909431c12742c1bb485cdc47d9898939d1c4b`.
+Before Phase 4a may introduce the first live v3 fold, D.52.4 requires the
+remaining Phase 0n row to be corrected out of its historical `consensus-v2`
+ownership. This amendment is that correction. It authorizes a tests-first v3
+publisher-tooling slice only; it does not authorize a protocol-v2 change, a
+wire or runtime change, a reducer implementation, a catalog admission, or the
+Phase 4a fold itself.
+
+#### D.94.1 — Corrected fact and ownership boundary
+
+The historical row is not a safe executable specification in four respects:
+
+1. ECMA-262 2024 classifies `Math.sqrt` as implementation-approximated; it is
+   not the exact cross-engine exception claimed by the old row. The current
+   `drp/no-ambient-in-reducer` allowlist also admits every other
+   implementation-approximated member relevant here:
+   `acos`, `acosh`, `asin`, `asinh`, `atan`, `atan2`, `atanh`, `cbrt`, `cos`,
+   `cosh`, `exp`, `expm1`, `hypot`, `log`, `log1p`, `log10`, `log2`, `pow`,
+   `sin`, `sinh`, `sqrt`, `tan` and `tanh`. The same specification classifies
+   Number exponentiation as implementation-approximated, so the equivalent
+   `**` and `**=` syntax is part of the ban rather than a bypass around
+   `Math.pow`. The syntax-only gate makes no unsupported BigInt-only exception.
+2. ECMA-402 locale results are implementation- and locale-sensitive. The
+   publisher restriction must cover `localeCompare`, `toLocaleString`,
+   `toLocaleDateString`, `toLocaleTimeString`, `toLocaleLowerCase` and
+   `toLocaleUpperCase`, in addition to the already-rejected unresolved `Intl`
+   root.
+3. `shipping-targets.json` currently declares Electron inactive with an empty
+   version list. A million-input cross-engine corpus would therefore be
+   vacuous for shipped Electron and cannot be the causal gate for an
+   engine-independent lint restriction.
+4. The exact artifact profile forbids imports and evaluates a self-contained
+   copied ESM artifact. No `@ts-drp/math` package or governed bundling seam
+   exists. Adding an unused placeholder package would not make a blueprint
+   deterministic and would contradict the current artifact contract.
+
+Phase 0n is therefore split. **0n-a** is the mandatory Phase 4a prerequisite:
+an additive forward-v3 publisher-eligibility restriction applied by the same
+ESLint rule to both reducer source and the exact emitted artifact. **0n-b** is
+deferred until a trusted blueprint actually needs an operation forbidden by
+0n-a. Only that concrete demand may propose a deterministic math package,
+self-contained bundling contract and active shipped-runtime matrix. Phase 4a
+may proceed after 0n-a because its named first-fold reducers require none of
+the forbidden operations.
+
+The frozen `ts-drp-blueprint-artifact-profile-v1`, its freeze policy, protocol
+v2, and every existing v1 artifact remain byte-identical. 0n-a adds a new
+publisher lint-contract version and additive v3 numeric-determinism supplement;
+it does not rewrite the historical profile into a stronger claim.
+
+#### D.94.2 — 0n-a RED contract
+
+The RED changes tests and test fixtures only. Its primary owner is
+`tests/eslint-plugin-ts-drp-numeric-determinism-0n-a.test.ts`, backed by one
+closed fixture contract under `tests/fixtures/phase-0n-a-v3/`. The current rule
+must fail only the new negative rows; all existing Phase 0j and Track P2 owners
+remain green before production changes.
+
+The contract must pin, for TypeScript source and emitted `.mjs` text:
+
+- direct, optional-chain and static-computed uses of every forbidden `Math`
+  member;
+- `BinaryExpression` exponentiation and `AssignmentExpression` exponentiation
+  assignment in both source and emitted syntax, with ordinary non-exponent
+  arithmetic controls;
+- destructured, assigned and passed aliases of those members;
+- direct, optional-chain, static-computed and extracted uses of every named
+  locale-sensitive member, regardless of receiver type;
+- non-literal computed members used as direct or optional callees, tagged
+  template tags, extracted/passed callees, or the receiver of
+  `.call`/`.apply`/`.bind`, while preserving deterministic computed data reads
+  and writes;
+- exact diagnostic message IDs distinct from generic ambient access and
+  randomness; and
+- locally shadowed `Math` controls, the retained exact `Math` constants and
+  algorithmically specified members (`abs`, `ceil`, `clz32`, `floor`,
+  `fround`, `imul`, `max`, `min`, `round`, `sign`, `trunc`), code-point
+  comparisons, ordinary deterministic sorting controls, and computed data
+  mutation.
+
+The RED must include causal mutants for re-allowing one forbidden Math member,
+re-allowing `**` or `**=`, dropping one locale name, checking source but not
+emitted bytes, accepting an alias, treating a dynamic call as a data access,
+and laundering a computed callee through extraction, tagging or
+`.call`/`.apply`/`.bind`. It must also pin the complete forbidden/retained sets
+so a partial list cannot pass. The sole readiness failure is the missing
+production policy; no production owner, frozen profile, golden artifact or
+preservation manifest changes in RED.
+
+#### D.94.3 — 0n-a GREEN and additive governance
+
+GREEN may change only the owners required to implement and govern that RED:
+
+1. `packages/eslint-plugin-ts-drp/src/index.ts` narrows the Math allowlist and
+   implements the exponentiation, locale, dynamic-call and alias rules without
+   duplicating a second reducer analyzer.
+2. `packages/blueprint-toolchain/contracts/no-ambient-lint-v2.json` becomes the
+   exact contract consumed by `packages/blueprint-toolchain/src/index.js` for
+   both source and copied artifact lint. Its evidence continues to bind the
+   exact rule and contract hashes. The v1 production contract remains in place
+   byte-identically as historical evidence; this is an additive selector
+   change, not an in-place rename.
+3. An additive
+   `packages/protocol-v3/supplements/blueprint-numeric-determinism-v1/`
+   profile, `packages/protocol-v3/conformance/freeze-policy-blueprint-numeric-determinism-v1.json`,
+   `packages/protocol-v3/scripts/check-blueprint-numeric-determinism-freeze.mjs`,
+   `.github/workflows/protocol-v3-blueprint-numeric-determinism.yml`, and a
+   concise `docs/protocol/` rationale bind the forbidden and retained sets, the
+   lint contract, the checker/workflow and the unchanged v1 base. The workflow
+   runs the merge-base-pinned checker plus the exact Phase 0n owner; it is the
+   recurring route, not an acceptance rerun during this local slice.
+   `packages/protocol-v3/package.json` includes the new supplement in packed
+   files without adding a runtime export. No existing v1 protected byte is
+   edited.
+4. The necessary hard-coded Track P2 successors are explicitly in GREEN scope:
+   `tests/track-p2-a-authoring-emitter-lint-red.test.ts`,
+   `tests/track-p2-a-opus-corrective-red.test.ts`, an additive
+   `tests/fixtures/track-p2-a/no-ambient-lint-v2.json`,
+   `tests/fixtures/track-p2-a/preservation.json`, and
+   `tests/fixtures/track-p2-d/fixture-metadata.json`. The Track P2-a owners
+   select and compare the v2 production contract while continuing to pin the
+   v1 production/fixture pair byte-identically. Track P2-d metadata advances
+   only its rule, contract, lint-evidence and transitively bound product
+   digests.
+5. Exact lint evidence/goldens and preservation hashes are regenerated once
+   from the changed rule and v2 contract. The preservation diff must enumerate
+   those deliberate successor bytes; it may not normalize unrelated products
+   or weaken the read-once, exact-emission, atomic-publication or evidence-hash
+   assertions.
+
+The implementation must remain fail closed. Unknown ambient roots, imports,
+randomness, async behavior and module-state restrictions retain their current
+diagnostics. A forbidden operation must not become admissible through a local
+alias, destructuring, optional chaining, static bracket syntax, exponentiation
+operator, extracted dynamic callee, tagged template or computed receiver passed
+through `.call`, `.apply` or `.bind`. Conversely, 0n-a must not ban
+deterministic computed property reads/writes merely because existing blueprint
+reducers use them for data.
+
+The GREEN is tests/tooling/governance only. It adds no runtime export, wire
+field, registry entry, trusted package, deterministic-math implementation or
+claim that allowed JavaScript is generally deterministic. Agreement with
+ECMA's algorithmic specification is the classification basis; absence of an
+observed engine divergence is not evidence.
+
+#### D.94.4 — Gates, lineage and lean review rule
+
+The accepted lineage is one signed plan-only checkpoint, one tests-only RED
+commit and one GREEN commit. RED and GREEN must be independently signed and
+the GREEN tree must retain the exact RED test/fixture bytes. Required gates are
+limited to the Phase 0n owner, the existing Phase 0j no-ambient owner, Track P2
+authoring/emission/lint, both v1 and additive numeric freeze checks, relevant
+package builds/typechecks, workspace typecheck, targeted lint and formatting.
+The 266,009-case Phase 3 certification, remote workflows, inactive Electron
+matrix and unrelated broad suites are not rerun for this slice.
+
+Review is deliberately bounded after Phase 3's disproportionate closure work:
+one exact-byte Codex, Kimi 100-step, Grok and Opus review round for this plan
+checkpoint, then one such round for RED and one for GREEN. Only a reproduced
+factual or substantive P0/P1 changes bytes or triggers a focused confirmation;
+P2 wording and cleanup observations are recorded as debt and do not cause a
+new review round, gate rerun or prose-polish cycle.
+
+0n-b remains unscheduled. Its future plan must name the first real blueprint
+consumer, define how deterministic math bytes are embedded in the
+self-contained artifact, supply independently witnessed functions and vectors,
+and run the authoritative active shipped-runtime matrix. Until then forbidden
+math rejects at publisher lint and no product capability is claimed.
