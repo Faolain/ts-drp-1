@@ -55270,3 +55270,150 @@ allowed; P2 is recorded debt. This slice does not add chunks or a manifest,
 streaming, storage, an active snapshot pointer, live-node export/import, a cut,
 certification, pruning, transfer, soak or a snapshot-product-complete claim;
 those remain Phase 4b live composition and Phases 4c–4d.
+
+### D.100 — Phase 4b-b live snapshot replacement composition
+
+Phase 4b-a is complete at signed plan `4d11abe6`, signed tests-only RED
+`faeffb5e` and signed GREEN `f6b3da88`. The core non-root compaction owner now
+exports the exact frozen v3 snapshot payload and imports it into a fresh
+isolated blueprint machine. Its final GREEN review round reproduced two
+substantive Kimi P1s — public-only prepared-runtime identity and an
+unvalidated snapshot-shaped export source — plus one Grok P1 where size checks
+occurred after potentially large copies or codec allocations. GREEN was
+corrected without another review round: machine construction now proves the
+prepared capability through the module-private protocol-v3 runtime owner before
+exposure, export invokes the captured method on an exact
+`BlueprintStateMachine`, and snapshot/ACL limits are applied before copy,
+decode or encode. Opus found no source P1 on the final observed content but
+honestly withheld exact-byte approval because those authorized corrections
+changed custody during its one review. The corrected focused snapshot and
+Phase 4a owners passed 25/25, the compaction suite passed 74 with one skip, and
+compaction build, typecheck, package-subpath import, targeted lint and diff
+validation passed. The disclosed caller-bound non-`1` schema-version wording is
+P2 debt; it does not create another review cycle.
+
+Phase 4b-b composes that primitive into the existing recovered v3 live
+authority. It adds no second runtime, machine, ACL, graph, topic, queue or
+activation owner. The only product surface remains the existing non-root
+`@ts-drp/node/v3-live` subpath and its exact top-level export roster remains
+unchanged. The private inferred `V3BlueprintLiveHandle` gains one closed-result
+snapshot export method. Export is
+available only after the current complete epoch fold has been adopted and while
+the registration remains current. Before adoption, after deactivation, from an
+author-list authority, or when the next ACL cannot be derived, it fails closed
+without returning bytes.
+
+Every export input is derived inside the live registration. The application
+machine and blueprint digest come from the adopted Phase 4a owner. Object,
+current epoch, anchor, blueprint and the pre-certification
+`archiveIndexRoot` come from the exact authenticated signed anchor already held
+by `PreparedV3LivePayload`; callers cannot supply or replace them. The current
+parameter carrier already authenticates `maxSnapshotBytes`; Phase 4b-b extends
+`AcceptedParameters` only to retain that previously validated value for the
+D.99 owner. It does not retain or introduce chunk policy in this slice. For
+latched authority, the ACL embedded in the closed-epoch payload
+is the exact canonical `stageLatchedAclOperations(...).next` value computed
+from the current authenticated ACL and the canonically digest-ordered accepted
+ACL operations. This is the same next-ACL preview already owned by v3-live, not
+a caller ACL or a second evaluator.
+
+Import is a distinct exact input branch of the existing
+`activateV3LivePlane(...)`, never a post-activation option or a method on an
+active handle. `V3PlaneActivationInput` becomes the closed union of its existing
+four-field genesis branch and a snapshot branch containing the same one-use
+recovered capability and queue/network/sink bindings plus exact canonical
+payload bytes, expected payload digest and expected application-state digest.
+Those two expected digests are external verification expectations, not
+certification. All other identity, runtime, ACL and limit facts come from the
+opaque recovered capability. Activation first captures only the closed input
+record and byte-carrier reference without reading or allocating from that
+carrier. It then consumes the genuine recovered authority once, obtains the
+authenticated `maxSnapshotBytes`, and synchronously invokes the D.99 owner,
+which validates intrinsic carrier slots, bounds length, and copies the exact
+bytes before any await or observable effect. It derives the remaining signed
+metadata and next ACL, completes D.99 import, and constructs the registration
+before subscribing a topic or installing a queue. Snapshot schema version is
+the D.99 module constant `1`; it is not anchor- or caller-derived. The existing
+`archiveIndexRoot` is decoded from the exact authenticated signed-anchor
+preimage rather than copied from a new parallel payload field. Snapshot
+failures map to existing activation failure kinds; this slice does not widen
+the public failure-kind roster. Genesis activation and snapshot activation
+share one private registration/effect owner; there is no parallel activation
+implementation and no new module export.
+
+A successful snapshot activation returns the unchanged ordinary plane result.
+The existing `bindV3BlueprintLivePlane` gains a closed one-field `{plane}`
+retrieval branch that returns only the already installed snapshot handle; it
+never imports or constructs a machine after activation. The imported machine is
+installed in an explicit private `snapshot-closed` registration mode, with
+`blueprintClosing` and `blueprintFolded` true, before the plane handle is
+visible. That mode is stronger than ordinary fold closure: it exposes no
+current ephemeral ACL authority, signer, issuance, journal,
+terminal-transition, rebase-completion, pending-publication,
+retained-publication, ingest, local-issue, stage, adopt, second-import or merge
+authority. Each effect-bearing plane method fails closed with its existing
+result vocabulary; any deliberately nonmutating query result is separately
+pinned. The next ACL remains payload and preview evidence, never active
+imported-plane authority. The handle can only re-export the identical canonical
+payload and expose the detached adopted snapshot until deactivation. A failure
+retains or exposes no registration, topic subscription, queue, machine or
+observable partial effect. This is fresh replacement/read authority for one
+already closed epoch. It does not activate a next epoch.
+
+The tests-only RED has exactly four governed paths: it adds
+`tests/phase-4b-v3-live-snapshot-composition-red.test.ts` and
+`tests/fixtures/phase-4b-v3/live-snapshot.ts`, mechanically ports
+`tests/phase-4a-v3-live-blueprint-fold.test.ts` to that shared fixture without
+changing any retained assertion or behavior, and advances the authoritative
+exact type oracle in `tests/fixtures/phase-3a1b-p3/seam3-types.ts`. The type
+oracle pins the closed genesis/snapshot activation union and exact unchanged
+activation function/result vocabulary while retaining the existing four-key
+genesis capture, one-use capability consumption, and subscribe-after-consume
+evidence; the snapshot branch has its own exact closed key roster. Recovery,
+network and store scaffolding therefore has one test owner. Two independent
+recovered latched-ACL peers fold and adopt the same authenticated epoch, compare
+exact canonical state bytes and digest, export one live payload, and compare it
+against an independent D.99 reconstruction using the signed anchor,
+authenticated limits and independently staged next ACL. A third independently
+prepared and recovered capability activates from those exact bytes and must
+expose the same machine snapshot and byte-identical re-export while the source
+remains unchanged.
+
+The RED also pins export rejection before adoption and after deactivation;
+author-list rejection; exact next-ACL rather than current-ACL binding; wrong
+payload/application digest, object, anchor, blueprint, ACL, archive root and
+oversize carrier rejection before subscription/queue effects; shared,
+resizable, partial and mutated caller carriers; one-use recovered capability;
+no active-handle import; and the absence of runtime/machine/snapshot authority
+from package roots. For an imported registration it calls every effect-bearing
+plane and blueprint method and pins zero signer, issuance-store, journal,
+network, queue, publication, ACL-authority, ingress, terminal, rebase, stage,
+adopt and refold effects, plus `currentEphemeralAuthority() === undefined`.
+Every negative case has one causal axis and a valid control. Its sole active
+failure is the absent snapshot activation/export surface; behavioral cases
+remain dormant.
+
+GREEN changes only `packages/node/src/v3-live.ts`. It imports the existing
+non-root compaction snapshot owner, retains authenticated `maxSnapshotBytes`,
+adds the private snapshot-closed mode, factors the current
+activation-registration and blueprint-handle construction into shared private
+owners, and extends only the two existing v3-live functions described above.
+It does not change package roots, the
+top-level v3-live export roster, protocol registries, snapshot schema,
+compaction, network, room, grid, storage or worker-host. Refactor-clean must
+leave one activation effect path and one latched next-ACL projection.
+
+Plan, RED and GREEN each receive one exact-byte P0/P1-only Grok, Kimi 100-step
+and Opus xhigh review round. Only a reproduced substantive P0/P1 changes bytes;
+P2 is recorded debt and does not cause prose, mutant or review loops. Each
+checkpoint records formatter, node/compaction typecheck and build as affected,
+targeted lint, diff validation, the new owner, retained Phase 4a and Phase 4b-a
+owners, and the ordinary node package lane in `.logs/phase4b-live-snapshot/`.
+
+This slice deliberately uses the signed anchor's existing
+`archiveIndexRoot`; no archive update exists before certification. It does not
+create a snapshot manifest, chunks, transfer, storage pointer, cut,
+certificate, successor anchor, next-epoch activation, pruning, cold join or
+product-complete Phase 4 claim. Phase 4c owns bounded streaming transfer;
+Phase 4d owns continuous independent shadow comparison; Phase 5 and Phase 6
+own certified close and verified successor adoption.
