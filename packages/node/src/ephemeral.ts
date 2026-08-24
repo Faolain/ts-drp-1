@@ -161,7 +161,7 @@ export class NodeEphemeralAdapter {
 							},
 						}),
 				localPeerId: this.#networkNode.peerId,
-				maxEnvelopeBytes: EPHEMERAL_TRANSPORT_MAX_BYTES,
+				maxEnvelopeBytes: (): number => EPHEMERAL_TRANSPORT_MAX_BYTES,
 				isAuthorized: (sender): boolean => {
 					if (!requireLegacyObject && currentAuthority() === undefined) return false;
 					const author = provider.authorForPeer(sender);
@@ -173,8 +173,10 @@ export class NodeEphemeralAdapter {
 						if (registration.listener === listener) registration.listener = undefined;
 					};
 				},
-				send: (bytes): Promise<boolean> =>
-					this.#send(topic, bytes, requireLegacyObject ? Object.freeze([]) : authorizedPeers()),
+				send: (input): Promise<boolean> => {
+					if (input.recipients !== "all") return Promise.resolve(false);
+					return this.#send(topic, input.bytes, requireLegacyObject ? Object.freeze([]) : authorizedPeers());
+				},
 				close: (): void => {
 					try {
 						this.#networkNode.unsubscribe(topic);

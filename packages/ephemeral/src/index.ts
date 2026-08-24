@@ -44,13 +44,19 @@ export interface EphemeralIngress {
 	readonly sender: string;
 }
 
+export interface EphemeralTransportSendInput {
+	readonly bytes: Uint8Array;
+	readonly class: EphemeralDeliveryClass;
+	readonly recipients: "all" | readonly string[];
+}
+
 export interface EphemeralTransportPort {
 	readonly localPeerId: string;
-	readonly maxEnvelopeBytes: number;
 	authorizedPeers(): readonly string[];
 	isAuthorized(sender: string): boolean;
+	maxEnvelopeBytes(deliveryClass: EphemeralDeliveryClass): number;
 	onMessage(listener: (ingress: EphemeralIngress) => void): () => void;
-	send(bytes: Uint8Array): Promise<boolean>;
+	send(input: EphemeralTransportSendInput): Promise<boolean>;
 	close?(): void;
 }
 
@@ -381,9 +387,8 @@ export function createEphemeralChannel(
 	if ((maxSequencedSenders + 1) * maxSequencedKeys > SEQUENCED_KEYS_LIMIT) {
 		throw new TypeError("ephemeral sequenced allocation exceeds the retained-entry limit");
 	}
-	if (!Number.isSafeInteger(port.maxEnvelopeBytes) || port.maxEnvelopeBytes < maxMessageBytes) {
-		throw new TypeError("transport envelope is smaller than the configured ephemeral frame limit");
-	}
+	if (typeof port.maxEnvelopeBytes !== "function" || typeof port.send !== "function")
+		throw new TypeError("ephemeral transport differs");
 	const v3Port = authorityBoundPort(port);
 	let installedAuthority = v3Port === undefined ? undefined : authoritySnapshot(v3Port.currentAuthority());
 	if (v3Port !== undefined && installedAuthority === undefined) {
@@ -391,7 +396,9 @@ export function createEphemeralChannel(
 	}
 
 	let closed = false;
-	let draining = false;
+	let drainingReliable = false;
+	let drainingUnreliable = false;
+	let activeEntries = 0;
 	let nextSequence = 1;
 	let resolveClosed: (() => void) | undefined;
 	let resolveQueueSpace: (() => void) | undefined;
@@ -401,7 +408,9 @@ export function createEphemeralChannel(
 	let queueSpace = new Promise<void>((resolve) => {
 		resolveQueueSpace = resolve;
 	});
-	const queue: QueueEntry[] = [];
+	const reliableQueue: QueueEntry[] = [];
+	const unreliableQueue: QueueEntry[] = [];
+	const retainedEntryCount = (): number => activeEntries + reliableQueue.length + unreliableQueue.length;
 	const localSequencedKeys = new Set<string>();
 	const remoteWatermarks = new Map<string, Map<string, number>>();
 	const writerBuckets = new Map<string, ReceiveBucket>();
@@ -562,22 +571,24 @@ export function createEphemeralChannel(
 			}
 		}) ?? ((): void => undefined);
 
-	const drain = async (): Promise<void> => {
-		if (draining || closed) return;
-		draining = true;
+	const drain = async (reliable: boolean): Promise<void> => {
+		if ((reliable ? drainingReliable : drainingUnreliable) || closed) return;
+		if (reliable) drainingReliable = true;
+		else drainingUnreliable = true;
+		const queue = reliable ? reliableQueue : unreliableQueue;
 		try {
 			while (!closed) {
 				const entry = queue.shift();
 				if (entry === undefined) break;
-				resolveQueueSpace?.();
-				queueSpace = new Promise<void>((resolve) => {
-					resolveQueueSpace = resolve;
-				});
+				activeEntries += 1;
 				let accepted = false;
 				const attempts = entry.reliable ? RELIABLE_ATTEMPTS : 1;
 				for (let attempt = 0; attempt < attempts && !closed; attempt += 1) {
 					try {
-						accepted = await Promise.race([port.send(entry.encoded), closedResult]);
+						accepted = await Promise.race([
+							port.send({ bytes: entry.encoded.slice(), class: entry.frame.class, recipients: "all" }),
+							closedResult,
+						]);
 					} catch {
 						accepted = false;
 					}
@@ -586,10 +597,16 @@ export function createEphemeralChannel(
 				if (accepted) counters.published += 1;
 				else if (!entry.reliable) counters.dropped += 1;
 				entry.resolve(accepted);
+				activeEntries -= 1;
+				resolveQueueSpace?.();
+				queueSpace = new Promise<void>((resolve) => {
+					resolveQueueSpace = resolve;
+				});
 			}
 		} finally {
-			draining = false;
-			if (!closed && queue.length > 0) void drain();
+			if (reliable) drainingReliable = false;
+			else drainingUnreliable = false;
+			if (!closed && queue.length > 0) void drain(reliable);
 		}
 	};
 
@@ -645,30 +662,46 @@ export function createEphemeralChannel(
 			counters.overLimit += 1;
 			return Promise.resolve(false);
 		}
+		let classEnvelopeBytes: number;
+		try {
+			classEnvelopeBytes = port.maxEnvelopeBytes(frame.class);
+		} catch {
+			classEnvelopeBytes = 0;
+		}
+		if (!Number.isSafeInteger(classEnvelopeBytes) || classEnvelopeBytes < 1 || encodedSize > classEnvelopeBytes) {
+			counters.overLimit += 1;
+			return Promise.resolve(false);
+		}
 		if (frame.class === "unreliable-sequenced" && frame.key !== null) {
 			localSequencedKeys.add(frame.key);
 		}
 		const enqueue = (): Promise<boolean> =>
 			new Promise((resolve) => {
-				queue.push({ encoded, frame, reliable: frame.class === "reliable-unordered", resolve });
-				void drain();
+				const reliable = frame.class === "reliable-unordered";
+				(reliable ? reliableQueue : unreliableQueue).push({ encoded, frame, reliable, resolve });
+				void drain(reliable);
 			});
 		if (frame.class === "reliable-unordered") {
 			return (async (): Promise<boolean> => {
-				while (!closed && queue.length >= QUEUE_CAPACITY) {
+				while (!closed && retainedEntryCount() >= QUEUE_CAPACITY) {
 					await Promise.race([queueSpace, closedResult]);
 				}
 				return closed ? false : enqueue();
 			})();
 		}
 		return new Promise((resolve) => {
-			if (queue.length >= QUEUE_CAPACITY) {
+			if (retainedEntryCount() >= QUEUE_CAPACITY) {
 				if (frame.class === "unreliable-sequenced") {
-					const existingIndex = queue.findIndex(
+					const existingIndex = unreliableQueue.findIndex(
 						(entry) => entry.frame.class === "unreliable-sequenced" && entry.frame.key === frame.key
 					);
 					if (existingIndex >= 0) {
-						const [replaced] = queue.splice(existingIndex, 1, { encoded, frame, reliable: false, resolve });
+						const [replaced] = unreliableQueue.splice(existingIndex, 1, {
+							encoded,
+							frame,
+							reliable: false,
+							resolve,
+						});
 						replaced?.resolve(false);
 						counters.dropped += 1;
 						return;
@@ -678,8 +711,8 @@ export function createEphemeralChannel(
 				resolve(false);
 				return;
 			}
-			queue.push({ encoded, frame, reliable: false, resolve });
-			void drain();
+			unreliableQueue.push({ encoded, frame, reliable: false, resolve });
+			void drain(false);
 		});
 	};
 
@@ -691,7 +724,8 @@ export function createEphemeralChannel(
 			resolveClosed?.();
 			unsubscribe();
 			unsubscribePeerDisconnect();
-			for (const entry of queue.splice(0)) entry.resolve(false);
+			for (const entry of reliableQueue.splice(0)) entry.resolve(false);
+			for (const entry of unreliableQueue.splice(0)) entry.resolve(false);
 			localSequencedKeys.clear();
 			remoteWatermarks.clear();
 			clearWriterBuckets();

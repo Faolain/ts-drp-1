@@ -1011,7 +1011,12 @@ describe.skipIf(!channelAvailable)("Track E1 shared ephemeral channel", () => {
 		expect(() =>
 			module.createEphemeralChannel(port, options({ maxSequencedKeys: 2, maxSequencedSenders: 2_048 }))
 		).toThrow();
-		expect(() => module.createEphemeralChannel(bus.createPort("tiny-envelope", 1), options())).toThrow();
+		const tinyEnvelope = module.createEphemeralChannel(bus.createPort("tiny-envelope", 1), options());
+		expect(await tinyEnvelope.publish({ class: "unreliable-unordered", key: null, payload: bytes("oversize") })).toBe(
+			false
+		);
+		expect(tinyEnvelope.stats()).toMatchObject({ overLimit: 1, published: 0 });
+		tinyEnvelope.close();
 		expect(() =>
 			module.createEphemeralChannel(port, {
 				maxMessageBytes: 65_536,

@@ -415,7 +415,7 @@ describe("D.93.48 corrected E2 RED", () => {
 					authorizedPeers: () => ["peer-writer"],
 					isAuthorized: () => true,
 					localPeerId: "legacy-local",
-					maxEnvelopeBytes: 65_536,
+					maxEnvelopeBytes: (): number => 65_536,
 					onMessage: (listener) => {
 						legacyIngress = listener;
 						return (): void => {

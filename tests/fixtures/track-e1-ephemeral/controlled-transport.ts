@@ -3,14 +3,20 @@ export interface ControlledIngress {
 	readonly sender: string;
 }
 
+export interface ControlledTransportSendInput {
+	readonly bytes: Uint8Array;
+	readonly class: "reliable-unordered" | "unreliable-sequenced" | "unreliable-unordered";
+	readonly recipients: "all" | readonly string[];
+}
+
 export interface ControlledTransportPort {
 	readonly localPeerId: string;
-	readonly maxEnvelopeBytes: number;
 	authorizedPeers(): readonly string[];
 	close(): void;
 	isAuthorized(sender: string): boolean;
+	maxEnvelopeBytes(): number;
 	onMessage(listener: (ingress: ControlledIngress) => void): () => void;
-	send(bytes: Uint8Array): Promise<boolean>;
+	send(input: Uint8Array | ControlledTransportSendInput): Promise<boolean>;
 }
 
 interface ControlledEndpoint {
@@ -64,14 +70,15 @@ export class ControlledEphemeralBus {
 				endpoint.listeners.clear();
 			},
 			localPeerId: peerId,
-			maxEnvelopeBytes,
+			maxEnvelopeBytes: (): number => maxEnvelopeBytes,
 			isAuthorized: (sender) =>
 				endpoint.connected && endpoint.authorized.has(sender) && this.#endpoints.get(sender)?.connected === true,
 			onMessage: (listener) => {
 				endpoint.listeners.add(listener);
 				return () => endpoint.listeners.delete(listener);
 			},
-			send: (bytes): Promise<boolean> => {
+			send: (input): Promise<boolean> => {
+				const bytes = input instanceof Uint8Array ? input : input.bytes;
 				if (!endpoint.connected) return Promise.resolve(false);
 				if (endpoint.failuresRemaining > 0) {
 					endpoint.failuresRemaining -= 1;
