@@ -83,19 +83,20 @@ interface ZoneApi {
 	snapshot(): ZoneSnapshot;
 }
 
+interface GridNetworkSnapshot {
+	readonly connections: readonly Readonly<{ readonly peerId: string }>[];
+	readonly peerId: string;
+}
+
 interface NetworkSnapshot {
-	readonly connections: readonly Readonly<{
-		readonly multiaddr: string;
-		readonly peerId: string;
-		readonly transport: string;
-	}>[];
+	readonly connections: readonly string[];
 	readonly peerId: string;
 }
 
 declare global {
 	interface Window {
 		readonly __E303_RTC_OBSERVER__?: RtcObserver;
-		readonly __TS_DRP_GRID_SESSION__?: { snapshot(): NetworkSnapshot };
+		readonly __TS_DRP_GRID_SESSION__?: { snapshot(): GridNetworkSnapshot };
 		readonly __TS_DRP_V3_ZONE__?: ZoneApi;
 	}
 }
@@ -313,7 +314,10 @@ async function network(page: Page): Promise<NetworkSnapshot> {
 		const session = window.__TS_DRP_GRID_SESSION__;
 		if (session === undefined) throw new Error("E303_NETWORK_SESSION_ABSENT");
 		const snapshot = session.snapshot();
-		return { connections: snapshot.connections, peerId: snapshot.peerId };
+		return {
+			connections: [...new Set(snapshot.connections.map(({ peerId }) => peerId))].sort(),
+			peerId: snapshot.peerId,
+		};
 	});
 }
 
