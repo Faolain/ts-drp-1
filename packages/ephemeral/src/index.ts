@@ -48,6 +48,7 @@ export interface EphemeralTransportSendInput {
 	readonly bytes: Uint8Array;
 	readonly class: EphemeralDeliveryClass;
 	readonly recipients: "all" | readonly string[];
+	readonly signal?: AbortSignal;
 }
 
 export interface EphemeralTransportPort {
@@ -58,12 +59,15 @@ export interface EphemeralTransportPort {
 	onMessage(listener: (ingress: EphemeralIngress) => void): () => void;
 	send(input: EphemeralTransportSendInput): Promise<boolean>;
 	close?(): void;
+	restartUnreliable?(): Promise<void>;
 }
 
 export interface EphemeralChannel {
 	authorizedPeers(): readonly string[];
 	close(): void;
 	publish(input: EphemeralPublishInput): Promise<boolean>;
+	resetReliable(): Promise<void>;
+	restartUnreliable(): Promise<void>;
 	stats(): EphemeralStats;
 	subscribe(listener: (frame: DeliveredEphemeralFrame) => void): () => void;
 }
@@ -84,6 +88,7 @@ const KEY_BYTES_LIMIT = 128;
 const MESSAGE_BYTES_LIMIT = 65_536;
 const SEQUENCED_KEYS_LIMIT = 4_096;
 const QUEUE_CAPACITY = 256;
+const UNRELIABLE_QUEUE_RESERVE = 32;
 const RELIABLE_ATTEMPTS = 8;
 const RECEIVE_BYTE_CAPACITY = 1_048_576;
 const RECEIVE_MESSAGE_CAPACITY = 120;
@@ -416,8 +421,12 @@ export function createEphemeralChannel(
 	let closed = false;
 	let drainingReliable = false;
 	let drainingUnreliable = false;
+	let reliableGeneration = 0;
+	let reliableTransportController = new AbortController();
+	const unreliableTransportController = new AbortController();
 	let activeEntries = 0;
 	let nextSequence = 1;
+	const reliableIdleWaiters = new Set<() => void>();
 	let resolveClosed: (() => void) | undefined;
 	let resolveQueueSpace: (() => void) | undefined;
 	const closedResult = new Promise<false>((resolve) => {
@@ -600,15 +609,30 @@ export function createEphemeralChannel(
 				if (entry === undefined) break;
 				activeEntries += 1;
 				let accepted = false;
+				const entrySignal = reliable ? reliableTransportController.signal : unreliableTransportController.signal;
 				const attempts = entry.reliable ? RELIABLE_ATTEMPTS : 1;
-				for (let attempt = 0; attempt < attempts && !closed; attempt += 1) {
+				for (let attempt = 0; attempt < attempts && !closed && !entrySignal.aborted; attempt += 1) {
+					let resolveAborted!: (value: false) => void;
+					const aborted = new Promise<false>((resolve) => {
+						resolveAborted = resolve;
+					});
+					const onAbort = (): void => resolveAborted(false);
+					entrySignal.addEventListener("abort", onAbort, { once: true });
 					try {
 						accepted = await Promise.race([
-							port.send({ bytes: entry.encoded.slice(), class: entry.frame.class, recipients: "all" }),
+							port.send({
+								bytes: entry.encoded.slice(),
+								class: entry.frame.class,
+								recipients: "all",
+								signal: entrySignal,
+							}),
 							closedResult,
+							aborted,
 						]);
 					} catch {
 						accepted = false;
+					} finally {
+						entrySignal.removeEventListener("abort", onAbort);
 					}
 					if (accepted) break;
 				}
@@ -622,8 +646,11 @@ export function createEphemeralChannel(
 				});
 			}
 		} finally {
-			if (reliable) drainingReliable = false;
-			else drainingUnreliable = false;
+			if (reliable) {
+				drainingReliable = false;
+				for (const resolve of reliableIdleWaiters) resolve();
+				reliableIdleWaiters.clear();
+			} else drainingUnreliable = false;
 			if (!closed && queue.length > 0) void drain(reliable);
 		}
 	};
@@ -701,10 +728,15 @@ export function createEphemeralChannel(
 			});
 		if (frame.class === "reliable-unordered") {
 			return (async (): Promise<boolean> => {
-				while (!closed && retainedEntryCount() >= QUEUE_CAPACITY) {
+				const generation = reliableGeneration;
+				while (
+					!closed &&
+					generation === reliableGeneration &&
+					retainedEntryCount() >= QUEUE_CAPACITY - UNRELIABLE_QUEUE_RESERVE
+				) {
 					await Promise.race([queueSpace, closedResult]);
 				}
-				return closed ? false : enqueue();
+				return closed || generation !== reliableGeneration ? false : enqueue();
 			})();
 		}
 		return new Promise((resolve) => {
@@ -733,12 +765,26 @@ export function createEphemeralChannel(
 			void drain(false);
 		});
 	};
+	const resetReliable = async (): Promise<void> => {
+		reliableGeneration += 1;
+		reliableTransportController.abort(new Error("ephemeral reliable drain reset"));
+		reliableTransportController = new AbortController();
+		for (const entry of reliableQueue.splice(0)) entry.resolve(false);
+		resolveQueueSpace?.();
+		if (drainingReliable) {
+			await new Promise<void>((resolve) => {
+				reliableIdleWaiters.add(resolve);
+			});
+		}
+	};
 
 	return {
 		authorizedPeers: (): readonly string[] => [...port.authorizedPeers()],
 		close: (): void => {
 			if (closed) return;
 			closed = true;
+			void resetReliable();
+			unreliableTransportController.abort(new Error("ephemeral channel closed"));
 			resolveClosed?.();
 			unsubscribe();
 			unsubscribePeerDisconnect();
@@ -755,6 +801,12 @@ export function createEphemeralChannel(
 			}
 		},
 		publish,
+		resetReliable: (): Promise<void> => {
+			return closed ? Promise.resolve() : resetReliable();
+		},
+		restartUnreliable: (): Promise<void> => {
+			return closed ? Promise.resolve() : (port.restartUnreliable?.() ?? Promise.resolve());
+		},
 		stats: (): EphemeralStats => {
 			let remoteSequencedKeys = 0;
 			for (const watermarks of remoteWatermarks.values()) remoteSequencedKeys += watermarks.size;

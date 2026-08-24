@@ -590,12 +590,16 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 					maxPayloadBytes: DRP_UNRELIABLE_WEBRTC_MAX_PAYLOAD_BYTES,
 					onMessage: (): (() => void) => (): void => undefined,
 					reconcile: (): Promise<void> => Promise.resolve(),
+					restart: (): Promise<void> => Promise.resolve(),
 					send: (): Promise<boolean> => Promise.resolve(false),
 					snapshot: () =>
 						Object.freeze({
 							activeLinks: 0,
+							authenticatedConnectionLosses: 0,
 							backpressuredDrops: 0,
 							handshakeFailures: 0,
+							lastLinkDrop: undefined,
+							linkDrops: 0,
 							links: Object.freeze([]),
 							received: 0,
 							sent: 0,
@@ -2345,14 +2349,28 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 * @param peerId - The peer ID to send the message to.
 	 * @param message - The message to send.
 	 */
-	async sendMessage(peerId: string, message: Message): Promise<void> {
+	async sendMessage(peerId: string, message: Message, options: { readonly signal?: AbortSignal } = {}): Promise<void> {
+		let stream: Stream | undefined;
+		const abort = (): void => {
+			if (stream === undefined) return;
+			stream.abort(
+				options.signal?.reason instanceof Error ? options.signal.reason : new Error("direct message send aborted")
+			);
+		};
 		try {
+			options.signal?.throwIfAborted();
 			const connection = await this.safeDial([multiaddr(`/p2p/${peerId}`)]);
-			const stream = <Stream>await connection?.newStream(DRP_MESSAGE_PROTOCOL);
+			options.signal?.throwIfAborted();
+			stream = <Stream>await connection?.newStream(DRP_MESSAGE_PROTOCOL, { signal: options.signal });
+			options.signal?.addEventListener("abort", abort, { once: true });
+			options.signal?.throwIfAborted();
 			const messageBuffer = Message.encode(message).finish();
 			await uint8ArrayToStream(stream, messageBuffer);
 		} catch (e) {
 			log.error("::sendMessage:", e);
+			if (options.signal !== undefined) throw e;
+		} finally {
+			options.signal?.removeEventListener("abort", abort);
 		}
 	}
 

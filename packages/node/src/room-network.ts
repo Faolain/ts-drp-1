@@ -20,6 +20,7 @@ interface RoomRegistration {
 	requestAttempt: Promise<void> | undefined;
 	requestPending: boolean;
 	readonly timers: Set<ReturnType<typeof setTimeout>>;
+	unsubscribePeerConnections(): void;
 }
 
 /** Protocol-neutral network port used by one durable room composition. */
@@ -83,6 +84,7 @@ export class NodeRoomNetworkAdapter {
 		const registration = this.#byObjectId.get(objectId);
 		if (registration === undefined || registration.closed) return;
 		registration.closed = true;
+		registration.unsubscribePeerConnections();
 		for (const timer of registration.timers) clearTimeout(timer);
 		registration.timers.clear();
 		this.#byObjectId.delete(objectId);
@@ -129,12 +131,20 @@ export class NodeRoomNetworkAdapter {
 			requestAttempt: undefined,
 			requestPending: false,
 			timers: new Set(),
+			unsubscribePeerConnections: () => undefined,
 		};
 		this.#byObjectId.set(objectId, registration);
 		this.#byControlId.set(registration.controlId, registration);
 		try {
 			this.#networkNode.subscribe(registration.controlId);
+			const subscribePeerConnections = this.#networkNode.subscribeToPeerConnections;
+			if (typeof subscribePeerConnections === "function") {
+				registration.unsubscribePeerConnections = subscribePeerConnections.call(this.#networkNode, () => {
+					void this.#request(registration);
+				});
+			}
 		} catch (error) {
+			registration.unsubscribePeerConnections();
 			this.#byObjectId.delete(objectId);
 			this.#byControlId.delete(registration.controlId);
 			throw error;

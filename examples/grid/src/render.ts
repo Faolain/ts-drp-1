@@ -35,6 +35,7 @@ export function renderZone(snapshot: ZoneSnapshot): void {
 	);
 	const copy = document.getElementById("copyGridId");
 	if (copy instanceof HTMLButtonElement) copy.style.display = snapshot.ready ? "inline" : "none";
+	renderFabric(snapshot);
 	const grid = document.getElementById("grid");
 	if (!(grid instanceof HTMLDivElement)) return;
 	grid.replaceChildren();
@@ -63,6 +64,49 @@ export function renderZone(snapshot: ZoneSnapshot): void {
 		element.style.background = "#2d8cff";
 		grid.appendChild(element);
 	}
+}
+
+function renderFabric(snapshot: ZoneSnapshot): void {
+	const container = document.getElementById("fabricWorkbench");
+	if (!(container instanceof HTMLElement)) return;
+	const heading = document.createElement("h2");
+	heading.textContent = "Fabric loss and head-of-line evidence";
+	const description = document.createElement("p");
+	description.textContent = "Age of information from receiver-observed raw and reliable WebRTC samples.";
+	const rows = snapshot.fabricTrials.map((trial) => {
+		const row = document.createElement("section");
+		row.setAttribute("data-e3-03-trial", trial.trialId);
+		const title = document.createElement("h3");
+		title.textContent = trial.trialId;
+		row.append(
+			title,
+			fabricMetric("raw-aoi-p50", `Raw p50: ${String(trial.rawAoIP50Ms)} ms`),
+			fabricMetric("raw-aoi-p95", `Raw p95: ${String(trial.rawAoIP95Ms)} ms`),
+			fabricMetric("reliable-aoi-p50", `Reliable p50: ${String(trial.reliableAoIP50Ms)} ms`),
+			fabricMetric("reliable-aoi-p95", `Reliable p95: ${String(trial.reliableAoIP95Ms)} ms`),
+			fabricMetric("max-gap", `Max gap: ${String(trial.maxGap)}`),
+			fabricMetric("raw-delivered", `Raw delivered: ${String(trial.rawDelivered)}`),
+			fabricMetric("raw-dropped", `Raw dropped: ${String(trial.sampleCount - trial.rawDelivered)}`),
+			fabricMetric("reliable-delivered", `Reliable delivered: ${String(trial.reliableDelivered)}`),
+			fabricMetric("reliable-dropped", `Reliable dropped: ${String(trial.sampleCount - trial.reliableDelivered)}`),
+			fabricMetric("fallback-count", `Fallback: ${String(trial.fallbackCount)}`),
+			fabricMetric("durable-delta", `Durable delta: ${String(trial.durableDelta)}`)
+		);
+		return row;
+	});
+	container.replaceChildren(heading, description, ...rows);
+}
+
+function fabricMetric(name: string, text: string): HTMLElement {
+	const separator = text.indexOf(":");
+	const row = document.createElement("p");
+	const label = document.createElement("span");
+	label.textContent = text.slice(0, separator + 1) + " ";
+	const value = document.createElement("span");
+	value.dataset.metric = name;
+	value.textContent = text.slice(separator + 2);
+	row.append(label, value);
+	return row;
 }
 
 function setText(id: string, value: string): void {

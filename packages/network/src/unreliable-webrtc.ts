@@ -22,8 +22,19 @@ const BUFFERED_AMOUNT_CEILING = 65_536;
 
 export interface DRPUnreliableWebRtcSnapshot {
 	readonly activeLinks: number;
+	readonly authenticatedConnectionLosses: number;
 	readonly backpressuredDrops: number;
 	readonly handshakeFailures: number;
+	readonly lastLinkDrop:
+		| "channel-close"
+		| "connection-close"
+		| "connection-failed"
+		| "owner-close"
+		| "replacement"
+		| "restart"
+		| "send-error"
+		| undefined;
+	readonly linkDrops: number;
 	readonly received: number;
 	readonly sent: number;
 	readonly unknownRouteDrops: number;
@@ -43,6 +54,7 @@ export interface DRPUnreliableWebRtcRoute {
 	close(): void;
 	onMessage(listener: (ingress: { readonly bytes: Uint8Array; readonly sender: string }) => void): () => void;
 	reconcile(peers: readonly string[]): Promise<void>;
+	restart(): Promise<void>;
 	send(peers: readonly string[], bytes: Uint8Array): Promise<boolean>;
 	snapshot(): DRPUnreliableWebRtcSnapshot;
 }
@@ -94,6 +106,7 @@ interface RouteRegistration {
 	readonly digest: Uint8Array;
 	readonly digestHex: string;
 	readonly listeners: Set<(ingress: { readonly bytes: Uint8Array; readonly sender: string }) => void>;
+	peers: readonly string[];
 	readonly routeId: string;
 }
 
@@ -397,17 +410,22 @@ function messageBytes(data: unknown): Uint8Array | undefined {
 }
 
 class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
+	readonly #activatedPeers = new Set<string>();
 	readonly #createPeerConnection: () => RTCPeerConnection;
 	readonly #links = new Map<string, ActiveLink>();
 	readonly #pendingLinks = new Map<string, Promise<ActiveLink | undefined>>();
 	readonly #pendingPeerConnections = new Map<RTCPeerConnection, PendingPeerConnection>();
+	readonly #retryLinks = new Map<string, ReturnType<typeof setTimeout>>();
 	readonly #routes = new Map<string, RouteRegistration>();
 	readonly #routesByDigest = new Map<string, RouteRegistration>();
 	readonly #signaling: AuthenticatedWebRtcSignalingPort;
 	readonly #unsubscribeRequest: () => void;
+	#authenticatedConnectionLosses = 0;
 	#backpressuredDrops = 0;
 	#closed = false;
 	#handshakeFailures = 0;
+	#lastLinkDrop: DRPUnreliableWebRtcSnapshot["lastLinkDrop"];
+	#linkDrops = 0;
 	#received = 0;
 	#sent = 0;
 	#unknownRouteDrops = 0;
@@ -442,6 +460,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			digest,
 			digestHex: bytesToHex(digest),
 			listeners: new Set(),
+			peers: Object.freeze([]),
 			routeId,
 		};
 		this.#routes.set(routeId, registration);
@@ -455,6 +474,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			maxPayloadBytes: MAX_PAYLOAD_BYTES,
 			onMessage: (): (() => void) => (): void => undefined,
 			reconcile: (): Promise<void> => Promise.resolve(),
+			restart: (): Promise<void> => Promise.resolve(),
 			send: (): Promise<boolean> => Promise.resolve(false),
 			snapshot: (): DRPUnreliableWebRtcSnapshot => this.#snapshot(),
 		});
@@ -474,6 +494,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 				};
 			},
 			reconcile: (peers: readonly string[]): Promise<void> => this.#reconcile(registration, peers),
+			restart: (): Promise<void> => this.#restart(registration),
 			send: (peers: readonly string[], bytes: Uint8Array): Promise<boolean> => this.#send(registration, peers, bytes),
 			snapshot: (): DRPUnreliableWebRtcSnapshot => this.#snapshot(),
 		});
@@ -485,12 +506,34 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		registration.listeners.clear();
 		this.#routes.delete(registration.routeId);
 		this.#routesByDigest.delete(registration.digestHex);
-		if (this.#routes.size === 0) this.#closeAllLinks();
+		if (this.#routes.size === 0) {
+			this.#closeAllLinks();
+			return;
+		}
+		for (const peerId of [...this.#retryLinks.keys()]) {
+			if (!this.#desiredPeers().includes(peerId)) this.#clearLinkRetry(peerId);
+		}
 	}
 
 	async #reconcile(registration: RouteRegistration, peers: readonly string[]): Promise<void> {
 		if (this.#closed || registration.closed || new Set(peers).size !== peers.length) return;
-		await Promise.all(peers.slice(0, MAX_LINKS).map((peerId) => this.#linkFor(peerId)));
+		registration.peers = Object.freeze(peers.slice(0, MAX_LINKS));
+		await Promise.all(
+			registration.peers.map(async (peerId) => {
+				if ((await this.#linkFor(peerId)) === undefined) this.#scheduleLinkRetry(peerId);
+			})
+		);
+	}
+
+	async #restart(registration: RouteRegistration): Promise<void> {
+		if (this.#closed || registration.closed) return;
+		for (const peerId of registration.peers) {
+			this.#clearLinkRetry(peerId);
+			this.#closePendingForPeer(peerId);
+			const link = this.#links.get(peerId);
+			if (link !== undefined) this.#dropLink(peerId, link, "restart");
+		}
+		await this.#reconcile(registration, registration.peers);
 	}
 
 	async #send(registration: RouteRegistration, peers: readonly string[], bytes: Uint8Array): Promise<boolean> {
@@ -503,13 +546,28 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		) {
 			return false;
 		}
+		registration.peers = Object.freeze(peers.slice(0, MAX_LINKS));
 		const payload = bytes.slice();
 		const results = await Promise.all(peers.map((peerId) => this.#sendPeer(registration, peerId, payload)));
 		return results.every(Boolean);
 	}
 
 	async #sendPeer(registration: RouteRegistration, peerId: string, payload: Uint8Array): Promise<boolean> {
-		const link = await this.#linkFor(peerId);
+		const existing = this.#links.get(peerId);
+		const connection = this.#connectionFor(peerId);
+		const reusable =
+			existing !== undefined &&
+			existing.channel.readyState === "open" &&
+			(connection === undefined || this.#sameConnection(existing.connection, connection));
+		let link = reusable ? existing : undefined;
+		if (link === undefined) {
+			const setup = this.#linkFor(peerId);
+			if (this.#activatedPeers.has(peerId)) {
+				void setup;
+				return false;
+			}
+			link = await setup;
+		}
 		if (link === undefined || link.channel.readyState !== "open") return false;
 		if (link.channel.bufferedAmount > BUFFERED_AMOUNT_CEILING) {
 			this.#backpressuredDrops += 1;
@@ -524,20 +582,25 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			this.#sent += 1;
 			return true;
 		} catch {
-			this.#dropLink(peerId, link);
+			this.#dropLink(peerId, link, "send-error");
 			return false;
 		}
 	}
 
 	async #linkFor(peerId: string): Promise<ActiveLink | undefined> {
 		const existing = this.#links.get(peerId);
-		if (existing !== undefined && existing.channel.readyState === "open") return existing;
+		const connection = this.#connectionFor(peerId);
+		const replacementRequired =
+			existing !== undefined && connection !== undefined && !this.#sameConnection(existing.connection, connection);
+		if (existing !== undefined && existing.channel.readyState === "open" && !replacementRequired) return existing;
 		const pending = this.#pendingLinks.get(peerId);
 		if (pending !== undefined) return pending;
-		if (this.#signaling.localPeerId >= peerId || this.#links.size + this.#pendingPeerConnections.size >= MAX_LINKS) {
+		if (
+			this.#signaling.localPeerId >= peerId ||
+			(!replacementRequired && this.#links.size + this.#pendingPeerConnections.size >= MAX_LINKS)
+		) {
 			return undefined;
 		}
-		const connection = this.#connectionFor(peerId);
 		if (connection === undefined) return undefined;
 		const setup = withDeadline((signal) => this.#initiate(connection, signal)).catch(() => {
 			this.#closePendingForPeer(peerId);
@@ -562,9 +625,14 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 	async #initiate(connection: AuthenticatedWebRtcConnection, signal: AbortSignal): Promise<ActiveLink> {
 		const pc = this.#createPeerConnection();
 		let authenticatedClosed = false;
+		let established = false;
 		const unsubscribeConnection = connection.onClose(() => {
-			authenticatedClosed = true;
-			pc.close();
+			if (!established) {
+				authenticatedClosed = true;
+				pc.close();
+				return;
+			}
+			this.#authenticatedConnectionLosses += 1;
 		});
 		this.#pendingPeerConnections.set(pc, {
 			peerId: connection.remotePeerId,
@@ -583,6 +651,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			await waitForOpen(channel);
 			if (authenticatedClosed || !this.#isCurrent(connection)) throw new Error("authenticated connection changed");
 			this.#pendingPeerConnections.delete(pc);
+			established = true;
 			return this.#registerLink({ channel, closing: false, connection, pc, unsubscribeConnection });
 		} catch (error) {
 			this.#pendingPeerConnections.delete(pc);
@@ -597,7 +666,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			this.#closed ||
 			connection.transport !== "webrtc" ||
 			connection.remotePeerId >= this.#signaling.localPeerId ||
-			this.#links.size + this.#pendingPeerConnections.size >= MAX_LINKS
+			(!this.#links.has(connection.remotePeerId) && this.#links.size + this.#pendingPeerConnections.size >= MAX_LINKS)
 		) {
 			throw new Error("unreliable WebRTC signaling request rejected");
 		}
@@ -619,10 +688,15 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		const offer = decodeDescription(request, "offer");
 		const pc = this.#createPeerConnection();
 		let authenticatedClosed = false;
+		let established = false;
 		let inboundChannelError: Error | undefined;
 		const unsubscribeConnection = connection.onClose(() => {
-			authenticatedClosed = true;
-			pc.close();
+			if (!established) {
+				authenticatedClosed = true;
+				pc.close();
+				return;
+			}
+			this.#authenticatedConnectionLosses += 1;
 		});
 		this.#pendingPeerConnections.set(pc, {
 			peerId: connection.remotePeerId,
@@ -659,6 +733,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 					throw new Error("authenticated connection changed");
 				}
 				this.#pendingPeerConnections.delete(pc);
+				established = true;
 				this.#registerLink({ channel, closing: false, connection, pc, unsubscribeConnection });
 			};
 			void withDeadline((_signal) => finish(), deadlineAt - Date.now()).catch(() => {
@@ -677,27 +752,31 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 	}
 
 	#isCurrent(connection: AuthenticatedWebRtcConnection): boolean {
-		return this.#signaling
-			.connections()
-			.some(
-				(candidate) =>
-					candidate.id === connection.id &&
-					candidate.generation === connection.generation &&
-					candidate.remotePeerId === connection.remotePeerId &&
-					candidate.remoteAddr === connection.remoteAddr &&
-					candidate.transport === "webrtc"
-			);
+		return this.#signaling.connections().some((candidate) => this.#sameConnection(candidate, connection));
+	}
+
+	#sameConnection(left: AuthenticatedWebRtcConnection, right: AuthenticatedWebRtcConnection): boolean {
+		return (
+			left.id === right.id &&
+			left.generation === right.generation &&
+			left.remotePeerId === right.remotePeerId &&
+			left.remoteAddr === right.remoteAddr &&
+			left.transport === "webrtc" &&
+			right.transport === "webrtc"
+		);
 	}
 
 	#registerLink(link: ActiveLink): ActiveLink {
 		const peerId = link.connection.remotePeerId;
 		const previous = this.#links.get(peerId);
-		if (previous !== undefined) this.#dropLink(peerId, previous);
+		if (previous !== undefined) this.#dropLink(peerId, previous, "replacement");
 		this.#links.set(peerId, link);
+		this.#activatedPeers.add(peerId);
 		link.channel.addEventListener("message", (event) => this.#receive(peerId, link, event));
-		link.channel.addEventListener("close", () => this.#dropLink(peerId, link), { once: true });
+		link.channel.addEventListener("close", () => this.#dropLink(peerId, link, "channel-close"), { once: true });
 		link.pc.addEventListener("connectionstatechange", () => {
-			if (["closed", "disconnected", "failed"].includes(link.pc.connectionState)) this.#dropLink(peerId, link);
+			if (link.pc.connectionState === "closed") this.#dropLink(peerId, link, "connection-close");
+			if (link.pc.connectionState === "failed") this.#dropLink(peerId, link, "connection-failed");
 		});
 		return link;
 	}
@@ -729,22 +808,56 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		}
 	}
 
-	#dropLink(peerId: string, link: ActiveLink): void {
+	#dropLink(peerId: string, link: ActiveLink, reason: NonNullable<DRPUnreliableWebRtcSnapshot["lastLinkDrop"]>): void {
 		if (link.closing) return;
 		link.closing = true;
+		this.#lastLinkDrop = reason;
+		this.#linkDrops += 1;
 		if (this.#links.get(peerId) === link) this.#links.delete(peerId);
 		link.unsubscribeConnection();
 		link.channel.close();
 		link.pc.close();
+		this.#scheduleLinkRetry(peerId);
 	}
 
 	#closeAllLinks(): void {
+		this.#activatedPeers.clear();
+		for (const peerId of [...this.#retryLinks.keys()]) this.#clearLinkRetry(peerId);
 		for (const [pc, pending] of this.#pendingPeerConnections) {
 			pending.unsubscribeConnection();
 			pc.close();
 		}
 		this.#pendingPeerConnections.clear();
-		for (const [peerId, link] of [...this.#links]) this.#dropLink(peerId, link);
+		for (const [peerId, link] of [...this.#links]) this.#dropLink(peerId, link, "owner-close");
+	}
+
+	#clearLinkRetry(peerId: string): void {
+		const retry = this.#retryLinks.get(peerId);
+		if (retry === undefined) return;
+		clearTimeout(retry);
+		this.#retryLinks.delete(peerId);
+	}
+
+	#desiredPeers(): readonly string[] {
+		return [...new Set([...this.#routes.values()].flatMap(({ peers }) => peers))];
+	}
+
+	#scheduleLinkRetry(peerId: string): void {
+		if (
+			this.#closed ||
+			this.#signaling.localPeerId >= peerId ||
+			!this.#desiredPeers().includes(peerId) ||
+			this.#retryLinks.has(peerId)
+		) {
+			return;
+		}
+		const retry = setTimeout(() => {
+			this.#retryLinks.delete(peerId);
+			void this.#linkFor(peerId).then((link) => {
+				if (link === undefined) this.#scheduleLinkRetry(peerId);
+			});
+		}, 250);
+		this.#retryLinks.set(peerId, retry);
 	}
 
 	#closePendingForPeer(peerId: string): void {
@@ -759,8 +872,11 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 	#snapshot(): DRPUnreliableWebRtcSnapshot {
 		return Object.freeze({
 			activeLinks: this.#links.size,
+			authenticatedConnectionLosses: this.#authenticatedConnectionLosses,
 			backpressuredDrops: this.#backpressuredDrops,
 			handshakeFailures: this.#handshakeFailures,
+			lastLinkDrop: this.#lastLinkDrop,
+			linkDrops: this.#linkDrops,
 			links: [...this.#links.values()]
 				.map(({ channel, connection }) =>
 					Object.freeze({

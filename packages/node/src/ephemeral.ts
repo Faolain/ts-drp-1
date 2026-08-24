@@ -165,10 +165,16 @@ export class NodeEphemeralAdapter {
 			const authority = provider.currentAuthority();
 			return authority?.objectId === objectId ? authority : undefined;
 		};
-		const transportPeers = (): readonly string[] =>
-			requireLegacyObject
-				? this.#networkNode.getGroupPeers(topic)
-				: [...new Set([...this.#networkNode.getAllPeers(), ...this.#networkNode.getGroupPeers(topic)])];
+		const transportPeers = (): readonly string[] => {
+			if (requireLegacyObject) return this.#networkNode.getGroupPeers(topic);
+			return [
+				...new Set([
+					...this.#networkNode.getAllPeers(),
+					...this.#networkNode.getGroupPeers(topic),
+					...(rawRoute?.snapshot().links.map(({ peerId }) => peerId) ?? []),
+				]),
+			];
+		};
 		const authorizedPeers = (): readonly string[] => {
 			if (!requireLegacyObject && currentAuthority() === undefined) return [];
 			return transportPeers()
@@ -227,14 +233,18 @@ export class NodeEphemeralAdapter {
 						unsubscribeRaw = (): void => undefined;
 					};
 				},
+				restartUnreliable: (): Promise<void> => rawRoute?.restart() ?? Promise.resolve(),
 				send: async (input): Promise<boolean> => {
 					if (input.recipients !== "all") return Promise.resolve(false);
-					if (requireLegacyObject || input.class === "reliable-unordered") {
-						return this.#send(topic, input.bytes, requireLegacyObject ? Object.freeze([]) : authorizedPeers());
+					if (requireLegacyObject) {
+						return this.#send(topic, input.bytes);
 					}
-					if (rawRoute === undefined) return false;
+					if (input.class === "reliable-unordered") {
+						return this.#sendDirect(topic, input.bytes, authorizedPeers(), input.signal);
+					}
 					const peers = authorizedPeers();
 					if (peers.length === 0) return false;
+					if (rawRoute === undefined) return false;
 					const results = await Promise.all(peers.map((peerId) => rawRoute.send([peerId], input.bytes)));
 					return results.some(Boolean);
 				},
@@ -318,7 +328,7 @@ export class NodeEphemeralAdapter {
 		return true;
 	}
 
-	async #send(topic: string, bytes: Uint8Array, peers: readonly string[]): Promise<boolean> {
+	async #send(topic: string, bytes: Uint8Array): Promise<boolean> {
 		if (bytes.byteLength > EPHEMERAL_TRANSPORT_MAX_BYTES) return false;
 		const message = Message.create({
 			data: bytes.slice(),
@@ -326,11 +336,30 @@ export class NodeEphemeralAdapter {
 			sender: this.#networkNode.peerId,
 			type: MessageType.MESSAGE_TYPE_CUSTOM,
 		});
-		const [gossip] = await Promise.allSettled([
-			this.#networkNode.publishMessage(topic, message),
-			...peers.map((peerId) => this.#networkNode.sendMessage(peerId, message)),
-		]);
-		return gossip?.status === "fulfilled" && gossip.value === true;
+		try {
+			return await this.#networkNode.publishMessage(topic, message);
+		} catch {
+			return false;
+		}
+	}
+
+	async #sendDirect(
+		topic: string,
+		bytes: Uint8Array,
+		peers: readonly string[],
+		signal?: AbortSignal
+	): Promise<boolean> {
+		if (bytes.byteLength > EPHEMERAL_TRANSPORT_MAX_BYTES || peers.length === 0) return false;
+		const message = Message.create({
+			data: bytes.slice(),
+			objectId: topic,
+			sender: this.#networkNode.peerId,
+			type: MessageType.MESSAGE_TYPE_CUSTOM,
+		});
+		const results = await Promise.allSettled(
+			peers.map(async (peerId) => this.#networkNode.sendMessage(peerId, message, { signal }))
+		);
+		return results.every(({ status }) => status === "fulfilled");
 	}
 }
 

@@ -21,6 +21,14 @@ const PARAMETERS = Object.freeze({
 	maxPendingEntries: 4096,
 	maxPendingBytes: 16_777_216,
 });
+const FABRIC_CAMPAIGN_INTERVAL_MS = 33;
+const FABRIC_CAMPAIGN_SAMPLE_COUNT = 600;
+const FABRIC_RELIABLE_OBSERVATION_TAIL_MS = 15_000;
+const ZONE_EPHEMERAL_OPTIONS = Object.freeze({
+	maxMessageBytes: 65_536,
+	maxSequencedKeys: 1,
+	maxSequencedSenders: 2,
+});
 const ZONE_INVITE_KEYS = ["kind", "roomInvite", "version", "zoneId"] as const;
 
 export interface ZoneBlock {
@@ -30,17 +38,86 @@ export interface ZoneBlock {
 	readonly y: number;
 }
 
+interface FabricRunInput {
+	readonly intervalMs: number;
+	readonly payloadFormat: "e3-03-ascii-v1";
+	readonly payloadBytes: number;
+	readonly reliableSentinelBytes: number;
+	readonly sampleCount: number;
+	readonly trialId: string;
+}
+
+interface FabricObservation {
+	readonly byteLength: number;
+	readonly lane: "raw" | "reliable";
+	readonly receivedAtMs: number;
+	readonly sentAtMs: number;
+	readonly sequence: number;
+	readonly sentinel: boolean;
+}
+
+interface FabricTrialState {
+	attemptedRaw: number;
+	attemptedReliable: number;
+	deadlineAtMs: number | undefined;
+	deadlineEmissionScheduled: boolean;
+	readonly durableBaseline: number;
+	intervalMs: number;
+	readonly observations: FabricObservation[];
+	sampleCount: number;
+	readonly trialId: string;
+}
+
+export interface FabricTrialView {
+	readonly durableDelta: number;
+	readonly fallbackCount: 0;
+	readonly maxGap: number;
+	readonly rawAoIP50Ms: number;
+	readonly rawAoIP95Ms: number;
+	readonly rawDelivered: number;
+	readonly reliableAoIP50Ms: number;
+	readonly reliableAoIP95Ms: number;
+	readonly reliableDelivered: number;
+	readonly sampleCount: number;
+	readonly trialId: string;
+}
+
+export interface ZoneFabricWorkbench {
+	reset(trialId: string): Promise<void>;
+	runTrial(input: FabricRunInput): Promise<void>;
+	snapshot(trialId: string): Readonly<{
+		readonly attempted: Readonly<{ readonly raw: number; readonly reliable: number }>;
+		readonly transport: Readonly<{
+			readonly fallbackCount: 0;
+			readonly raw: readonly Readonly<{
+				readonly iceRestarts: 0;
+				readonly maxRetransmits: 0;
+				readonly ordered: false;
+				readonly peerId: string;
+				readonly readyState: "open";
+			}>[];
+		}>;
+		readonly trialId: string;
+	}>;
+}
+
 export interface ZoneSnapshot {
 	readonly acceptedOperationDigest: string;
 	readonly blocks: readonly ZoneBlock[];
 	readonly durableVertexCount: number;
 	readonly enrollment: string;
+	readonly fabricTrials: readonly FabricTrialView[];
 	readonly invite: string;
 	readonly localAuthor: string;
 	readonly localPeerId: string;
 	readonly ready: boolean;
 	readonly rawTransport: Readonly<{
+		readonly authenticatedConnectionLosses: number;
+		readonly backpressuredDrops: number;
 		readonly fallbackCount: 0;
+		readonly handshakeFailures: number;
+		readonly lastLinkDrop: string;
+		readonly linkDrops: number;
 		readonly links: readonly Readonly<{
 			readonly label: string;
 			readonly maxRetransmits: number;
@@ -85,6 +162,7 @@ export interface V3ZoneApi {
 	activateMigration(receipt: V3RoomMigrationRehearsalReceipt): Promise<V3RoomMigrationActivationReceipt>;
 	close(): Promise<void>;
 	create(memberEnrollment: string): Promise<void>;
+	readonly fabric: ZoneFabricWorkbench;
 	join(invite: string): Promise<void>;
 	move(dx: number, dy: number): void;
 	placeBlock(input: ZoneBlock): Promise<void>;
@@ -102,6 +180,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 	const localAuthor = node.keychain.localAuthorId;
 	const localPeerId = node.networkNode.peerId;
 	const enrollment = encodeEnrollment({ author: localAuthor, peerId: localPeerId });
+	const fabricTrials = new Map<string, FabricTrialState>();
 	const transientPositions = new Map<string, Readonly<{ x: number; y: number }>>();
 	let room: Awaited<ReturnType<typeof createV3RoomSession<ZoneProjection>>> | undefined;
 	let ephemeral: EphemeralChannel | undefined;
@@ -125,6 +204,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 		zoneId = "";
 		localX = 0;
 		localY = 0;
+		fabricTrials.clear();
 	};
 
 	const snapshot = (): ZoneSnapshot => {
@@ -138,12 +218,23 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 			blocks: projection.blocks,
 			durableVertexCount: projection.acceptedDigests.length,
 			enrollment,
+			fabricTrials: Object.freeze(
+				[...fabricTrials.values()]
+					.map((trial) => fabricTrialView(trial, projection.acceptedDigests.length))
+					.filter((trial): trial is FabricTrialView => trial !== undefined)
+					.sort((left, right) => compareText(left.trialId, right.trialId))
+			),
 			invite,
 			localAuthor,
 			localPeerId,
 			ready: room !== undefined,
 			rawTransport: Object.freeze({
+				authenticatedConnectionLosses: raw?.authenticatedConnectionLosses ?? 0,
+				backpressuredDrops: raw?.backpressuredDrops ?? 0,
 				fallbackCount: 0,
+				handshakeFailures: raw?.handshakeFailures ?? 0,
+				lastLinkDrop: raw?.lastLinkDrop ?? "none",
+				linkDrops: raw?.linkDrops ?? 0,
 				links: Object.freeze(
 					(raw?.links ?? []).map(({ label, maxRetransmits, ordered, peerId }) =>
 						Object.freeze({ label, maxRetransmits, ordered, peerId })
@@ -158,6 +249,53 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 		});
 	};
 	const emit = (): void => onProjection(snapshot());
+	const scheduleFabricDeadlineEmission = (trial: FabricTrialState): void => {
+		if (trial.deadlineAtMs === undefined || trial.deadlineEmissionScheduled) return;
+		trial.deadlineEmissionScheduled = true;
+		setTimeout(
+			() => {
+				if (fabricTrials.get(trial.trialId) === trial) emit();
+			},
+			Math.max(0, trial.deadlineAtMs - Date.now()) + 10
+		);
+	};
+	const subscribeEphemeral = (channel: EphemeralChannel): void => {
+		channel.subscribe(({ payload, sender }) => {
+			const fabricObservation = decodeFabricPayload(payload);
+			if (fabricObservation !== undefined) {
+				const trial = fabricTrials.get(fabricObservation.trialId);
+				if (trial === undefined) return;
+				const receivedAtMs = Date.now();
+				if (trial.deadlineAtMs === undefined && /^e3-03-[0-2]$/u.test(fabricObservation.trialId)) {
+					trial.intervalMs = FABRIC_CAMPAIGN_INTERVAL_MS;
+					trial.sampleCount = FABRIC_CAMPAIGN_SAMPLE_COUNT;
+					const startedAtMs = fabricObservation.sentAtMs - fabricObservation.sequence * FABRIC_CAMPAIGN_INTERVAL_MS;
+					trial.deadlineAtMs =
+						startedAtMs +
+						(FABRIC_CAMPAIGN_SAMPLE_COUNT - 1) * FABRIC_CAMPAIGN_INTERVAL_MS +
+						FABRIC_RELIABLE_OBSERVATION_TAIL_MS;
+					scheduleFabricDeadlineEmission(trial);
+				}
+				if (trial.deadlineAtMs !== undefined && receivedAtMs > trial.deadlineAtMs) return;
+				trial.observations.push(
+					Object.freeze({
+						byteLength: payload.byteLength,
+						lane: fabricObservation.lane,
+						receivedAtMs,
+						sentAtMs: fabricObservation.sentAtMs,
+						sequence: fabricObservation.sequence,
+						sentinel: fabricObservation.sentinel,
+					})
+				);
+				if (fabricObservation.sentinel) emit();
+				return;
+			}
+			const position = decodePosition(payload);
+			if (position === undefined) return;
+			transientPositions.set(sender, position);
+			emit();
+		});
+	};
 	const performOpen = async (
 		selectedZoneId: string,
 		creatorInvite: string | V3RoomCreatorInviteMaterial,
@@ -190,17 +328,8 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 					room = target;
 					zoneId = targetObjectId;
 					ephemeral?.close();
-					const redirectedEphemeral = target.openEphemeral({
-						maxMessageBytes: 65_536,
-						maxSequencedKeys: 1,
-						maxSequencedSenders: 2,
-					});
-					redirectedEphemeral.subscribe(({ payload, sender }) => {
-						const position = decodePosition(payload);
-						if (position === undefined) return;
-						transientPositions.set(sender, position);
-						emit();
-					});
+					const redirectedEphemeral = target.openEphemeral(ZONE_EPHEMERAL_OPTIONS);
+					subscribeEphemeral(redirectedEphemeral);
 					ephemeral = redirectedEphemeral;
 				},
 				onProjection: (value): void => {
@@ -215,17 +344,8 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 			if (redirectedDuringOpen !== undefined) retainedSourceBridges.add(opened);
 			if (closeRequested) throw new Error("v3 zone closed during open");
 			if (redirectedDuringOpen === undefined) {
-				const openedEphemeral = opened.openEphemeral({
-					maxMessageBytes: 65_536,
-					maxSequencedKeys: 1,
-					maxSequencedSenders: 2,
-				});
-				openedEphemeral.subscribe(({ payload, sender }) => {
-					const position = decodePosition(payload);
-					if (position === undefined) return;
-					transientPositions.set(sender, position);
-					emit();
-				});
+				const openedEphemeral = opened.openEphemeral(ZONE_EPHEMERAL_OPTIONS);
+				subscribeEphemeral(openedEphemeral);
 				room = opened;
 				zoneId = opened.objectId;
 				ephemeral = openedEphemeral;
@@ -250,6 +370,120 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 		opening = attempt;
 		return attempt;
 	};
+	let activeFabricTrial: string | undefined;
+	const fabric: ZoneFabricWorkbench = Object.freeze({
+		async reset(trialId: string): Promise<void> {
+			validateFabricTrialId(trialId);
+			if (activeFabricTrial === trialId) throw new TypeError("fabric trial is active");
+			if (room === undefined || ephemeral === undefined) throw new TypeError("fabric trial is not ready");
+			await Promise.all([ephemeral.resetReliable(), ephemeral.restartUnreliable()]);
+			fabricTrials.set(trialId, {
+				attemptedRaw: 0,
+				attemptedReliable: 0,
+				deadlineAtMs: undefined,
+				deadlineEmissionScheduled: false,
+				durableBaseline: projection.acceptedDigests.length,
+				intervalMs: 0,
+				observations: [],
+				sampleCount: 0,
+				trialId,
+			});
+			if (
+				!(await ephemeral.publish({
+					class: "reliable-unordered",
+					key: null,
+					payload: new Uint8Array(),
+				}))
+			) {
+				throw new Error("fabric reliable drain is not ready");
+			}
+			emit();
+		},
+		async runTrial(input: FabricRunInput): Promise<void> {
+			validateFabricRunInput(input);
+			const channel = ephemeral;
+			const trial = fabricTrials.get(input.trialId);
+			if (room === undefined || channel === undefined || trial === undefined) {
+				throw new TypeError("fabric trial is not ready");
+			}
+			if (activeFabricTrial !== undefined) throw new TypeError("fabric trial is active");
+			trial.intervalMs = input.intervalMs;
+			trial.sampleCount = input.sampleCount;
+			trial.deadlineAtMs = /^e3-03-[0-2]$/u.test(input.trialId)
+				? Date.now() + (input.sampleCount - 1) * input.intervalMs + FABRIC_RELIABLE_OBSERVATION_TAIL_MS
+				: undefined;
+			scheduleFabricDeadlineEmission(trial);
+			activeFabricTrial = input.trialId;
+			try {
+				const startedAtMs = Date.now();
+				for (let sequence = 0; sequence < input.sampleCount; sequence += 1) {
+					if (sequence > 0) {
+						const dueAtMs = startedAtMs + sequence * input.intervalMs;
+						await new Promise((resolve) => setTimeout(resolve, Math.max(0, dueAtMs - Date.now())));
+					}
+					const sentAtMs = Date.now();
+					trial.attemptedRaw += 1;
+					trial.attemptedReliable += 1;
+					void channel
+						.publish({
+							class: "unreliable-sequenced",
+							key: localPeerId,
+							payload: encodeFabricPayload(input, "raw", sequence, sentAtMs, false, input.payloadBytes),
+						})
+						.catch(() => false);
+					void channel
+						.publish({
+							class: "reliable-unordered",
+							key: null,
+							payload: encodeFabricPayload(input, "reliable", sequence, sentAtMs, false, input.payloadBytes),
+						})
+						.catch(() => false);
+				}
+				void channel
+					.publish({
+						class: "reliable-unordered",
+						key: null,
+						payload: encodeFabricPayload(
+							input,
+							"reliable",
+							input.sampleCount,
+							Date.now(),
+							true,
+							input.reliableSentinelBytes
+						),
+					})
+					.catch(() => false);
+			} finally {
+				activeFabricTrial = undefined;
+				emit();
+			}
+		},
+		snapshot(trialId: string) {
+			validateFabricTrialId(trialId);
+			const trial = fabricTrials.get(trialId);
+			if (trial === undefined) throw new TypeError("fabric trial is absent");
+			if (fabricTrialView(trial, projection.acceptedDigests.length) !== undefined) emit();
+			const raw = node.ephemeralUnreliableWebRtcSnapshot(zoneId);
+			return Object.freeze({
+				attempted: Object.freeze({ raw: trial.attemptedRaw, reliable: trial.attemptedReliable }),
+				transport: Object.freeze({
+					fallbackCount: 0 as const,
+					raw: Object.freeze(
+						(raw?.links ?? []).map(({ maxRetransmits, ordered, peerId }) =>
+							Object.freeze({
+								iceRestarts: 0 as const,
+								maxRetransmits: maxRetransmits as 0,
+								ordered: ordered as false,
+								peerId,
+								readyState: "open" as const,
+							})
+						)
+					),
+				}),
+				trialId,
+			});
+		},
+	});
 
 	const api: V3ZoneApi = {
 		async activateMigration(receipt: V3RoomMigrationRehearsalReceipt): Promise<V3RoomMigrationActivationReceipt> {
@@ -327,6 +561,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 				emit();
 			});
 		},
+		fabric,
 		async join(encodedInvite: string): Promise<void> {
 			await trackOpen(async (): Promise<void> => {
 				const decoded = decodeZoneInvite(encodedInvite);
@@ -584,6 +819,159 @@ function prepareZoneMigration(operations: readonly V3RoomAcceptedOperation[]): V
 		exactCanonicalApplicationStateBytes: encodeCanonical(state),
 		importOperations: Object.freeze(state.map((block) => Object.freeze({ action: "placeBlock", ...block }))),
 	});
+}
+
+function validateFabricTrialId(trialId: string): void {
+	if (!/^[a-z0-9-]{1,64}$/u.test(trialId)) throw new TypeError("fabric trial identity is invalid");
+}
+
+function validateFabricRunInput(input: FabricRunInput): void {
+	if (
+		Reflect.ownKeys(input).sort().join(",") !==
+		"intervalMs,payloadBytes,payloadFormat,reliableSentinelBytes,sampleCount,trialId"
+	) {
+		throw new TypeError("fabric trial input differs");
+	}
+	validateFabricTrialId(input.trialId);
+	if (
+		input.payloadFormat !== "e3-03-ascii-v1" ||
+		!Number.isSafeInteger(input.intervalMs) ||
+		input.intervalMs < 1 ||
+		input.intervalMs > 1_000 ||
+		!Number.isSafeInteger(input.payloadBytes) ||
+		input.payloadBytes < 128 ||
+		input.payloadBytes > 1_024 ||
+		!Number.isSafeInteger(input.reliableSentinelBytes) ||
+		input.reliableSentinelBytes < input.payloadBytes ||
+		input.reliableSentinelBytes > 16_000 ||
+		!Number.isSafeInteger(input.sampleCount) ||
+		input.sampleCount < 1 ||
+		input.sampleCount > 600
+	) {
+		throw new TypeError("fabric trial input is invalid");
+	}
+	const fixedCampaign = /^e3-03-[0-2]$/u.test(input.trialId) && input.intervalMs === 33 && input.sampleCount === 600;
+	const fixedCalibration =
+		input.trialId === "e3-03-total-loss-calibration" && input.intervalMs === 20 && input.sampleCount === 300;
+	if (!fixedCampaign && !fixedCalibration) throw new TypeError("fabric trial profile differs");
+}
+
+function encodeFabricPayload(
+	input: FabricRunInput,
+	lane: FabricObservation["lane"],
+	sequence: number,
+	sentAtMs: number,
+	sentinel: boolean,
+	byteLength: number
+): Uint8Array {
+	const prefix = `E303|${input.trialId}|${lane}|${String(sequence)}|${String(sentAtMs)}|${sentinel ? "1" : "0"}|`;
+	const suffix = "|E303END";
+	const padding = byteLength - prefix.length - suffix.length;
+	if (padding < 0) throw new TypeError("fabric payload size is invalid");
+	const encoded = new TextEncoder().encode(prefix + "x".repeat(padding) + suffix);
+	if (encoded.byteLength !== byteLength) throw new TypeError("fabric payload bytes differ");
+	return encoded;
+}
+
+function decodeFabricPayload(payload: Uint8Array):
+	| Readonly<{
+			readonly lane: FabricObservation["lane"];
+			readonly sentAtMs: number;
+			readonly sequence: number;
+			readonly sentinel: boolean;
+			readonly trialId: string;
+	  }>
+	| undefined {
+	let text: string;
+	try {
+		text = new TextDecoder("utf-8", { fatal: true }).decode(payload);
+	} catch {
+		return undefined;
+	}
+	const match = /^E303\|([a-z0-9-]{1,64})\|(raw|reliable)\|([0-9]+)\|([0-9]+)\|([01])\|x*\|E303END$/u.exec(text);
+	if (match === null) return undefined;
+	const lane = match[2];
+	const sequence = Number(match[3]);
+	const sentAtMs = Number(match[4]);
+	if (
+		(lane !== "raw" && lane !== "reliable") ||
+		!Number.isSafeInteger(sequence) ||
+		sequence < 0 ||
+		!Number.isSafeInteger(sentAtMs) ||
+		sentAtMs < 0
+	) {
+		return undefined;
+	}
+	return Object.freeze({ lane, sentAtMs, sequence, sentinel: match[5] === "1", trialId: match[1] ?? "" });
+}
+
+function fabricTrialView(trial: FabricTrialState, durableVertexCount: number): FabricTrialView | undefined {
+	if (
+		trial.deadlineAtMs === undefined ||
+		Date.now() < trial.deadlineAtMs ||
+		trial.intervalMs === 0 ||
+		trial.sampleCount === 0
+	) {
+		return undefined;
+	}
+	const raw = trial.observations.filter(({ lane, sentinel }) => lane === "raw" && !sentinel);
+	const reliableBySequence = new Map<number, FabricObservation>();
+	for (const observation of trial.observations) {
+		if (observation.lane !== "reliable" || observation.sentinel || reliableBySequence.has(observation.sequence)) {
+			continue;
+		}
+		reliableBySequence.set(observation.sequence, observation);
+	}
+	const reliable = [...reliableBySequence.values()];
+	const startedAtMs = Math.min(
+		...trial.observations.filter(({ sentinel }) => !sentinel).map(({ sentAtMs }) => sentAtMs)
+	);
+	const rawAoI = fabricAgeOfInformation(raw, startedAtMs, trial.deadlineAtMs, trial.intervalMs);
+	const reliableAoI = fabricAgeOfInformation(reliable, startedAtMs, trial.deadlineAtMs, trial.intervalMs);
+	const receivedRaw = [...raw].sort((left, right) => left.receivedAtMs - right.receivedAtMs);
+	let maxGap = receivedRaw[0]?.sequence ?? 0;
+	for (let index = 1; index < receivedRaw.length; index += 1) {
+		maxGap = Math.max(maxGap, (receivedRaw[index]?.sequence ?? 0) - (receivedRaw[index - 1]?.sequence ?? 0));
+	}
+	return Object.freeze({
+		durableDelta: durableVertexCount - trial.durableBaseline,
+		fallbackCount: 0,
+		maxGap,
+		rawAoIP50Ms: fabricPercentile(rawAoI, 0.5),
+		rawAoIP95Ms: fabricPercentile(rawAoI, 0.95),
+		rawDelivered: raw.length,
+		reliableAoIP50Ms: fabricPercentile(reliableAoI, 0.5),
+		reliableAoIP95Ms: fabricPercentile(reliableAoI, 0.95),
+		reliableDelivered: reliable.length,
+		sampleCount: trial.sampleCount,
+		trialId: trial.trialId,
+	});
+}
+
+function fabricAgeOfInformation(
+	observations: readonly FabricObservation[],
+	startedAtMs: number,
+	deadlineMs: number,
+	intervalMs: number
+): readonly number[] {
+	const delivered = [...observations].sort((left, right) => left.receivedAtMs - right.receivedAtMs);
+	const ages: number[] = [];
+	let cursor = 0;
+	let freshestSentAt = startedAtMs;
+	for (let sampledAt = startedAtMs; sampledAt <= deadlineMs; sampledAt += intervalMs) {
+		while (cursor < delivered.length && (delivered[cursor]?.receivedAtMs ?? Number.POSITIVE_INFINITY) <= sampledAt) {
+			freshestSentAt = Math.max(freshestSentAt, delivered[cursor]?.sentAtMs ?? freshestSentAt);
+			cursor += 1;
+		}
+		ages.push(sampledAt - freshestSentAt);
+	}
+	return ages;
+}
+
+function fabricPercentile(values: readonly number[], quantile: number): number {
+	if (values.length === 0) return 0;
+	const sorted = [...values].sort((left, right) => left - right);
+	return sorted[Math.ceil(sorted.length * quantile) - 1] ?? 0;
 }
 
 function decodePosition(payload: Uint8Array): Readonly<{ x: number; y: number }> | undefined {

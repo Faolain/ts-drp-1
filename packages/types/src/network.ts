@@ -611,7 +611,7 @@ export interface DRPNetworkNode {
 	 * @param message - The message to send
 	 * @returns Resolves when the message has been sent
 	 */
-	sendMessage(peerId: string, message: Message): Promise<void>;
+	sendMessage(peerId: string, message: Message, options?: { readonly signal?: AbortSignal }): Promise<void>;
 
 	/**
 	 * Sends a message to a random peer in a group
