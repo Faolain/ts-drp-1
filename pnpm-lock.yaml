@@ -434,13 +434,16 @@ importers:
       '@ts-drp/errors':
         specifier: 0.11.0
         version: link:../errors
+      '@ts-drp/protocol-v3':
+        specifier: 0.11.0
+        version: link:../protocol-v3
+      '@ts-drp/types':
+        specifier: 0.11.0
+        version: link:../types
     devDependencies:
       '@ts-drp/object':
         specifier: 0.11.0
         version: link:../object
-      '@ts-drp/types':
-        specifier: 0.11.0
-        version: link:../types
 
   packages/control-plane:
     dependencies:
@@ -1058,6 +1061,9 @@ importers:
       '@ts-drp/canonical':
         specifier: 0.11.0
         version: link:../canonical
+      '@ts-drp/errors':
+        specifier: 0.11.0
+        version: link:../errors
       es-module-lexer:
         specifier: 1.6.0
         version: 1.6.0
@@ -1221,6 +1227,9 @@ importers:
 
   packages/test-utils:
     dependencies:
+      '@ts-drp/canonical':
+        specifier: 0.11.0
+        version: link:../canonical
       '@ts-drp/types':
         specifier: 0.11.0
         version: link:../types

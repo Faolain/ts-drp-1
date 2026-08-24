@@ -30,6 +30,7 @@
 		"watch": "tsc -b -w"
 	},
 	"dependencies": {
+		"@ts-drp/canonical": "0.11.0",
 		"@ts-drp/types": "0.11.0",
 		"vitest": "^3.0.5"
 	}

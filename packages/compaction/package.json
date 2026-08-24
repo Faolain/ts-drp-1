@@ -18,6 +18,10 @@
 		".": {
 			"types": "./dist/src/index.d.ts",
 			"import": "./dist/src/index.js"
+		},
+		"./blueprint-fold": {
+			"types": "./dist/src/blueprint-fold.d.ts",
+			"import": "./dist/src/blueprint-fold.js"
 		}
 	},
 	"scripts": {
@@ -32,10 +36,11 @@
 	"dependencies": {
 		"@noble/hashes": "^1.7.1",
 		"@ts-drp/canonical": "0.11.0",
-		"@ts-drp/errors": "0.11.0"
+		"@ts-drp/errors": "0.11.0",
+		"@ts-drp/protocol-v3": "0.11.0",
+		"@ts-drp/types": "0.11.0"
 	},
 	"devDependencies": {
-		"@ts-drp/object": "0.11.0",
-		"@ts-drp/types": "0.11.0"
+		"@ts-drp/object": "0.11.0"
 	}
 }

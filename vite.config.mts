@@ -6,6 +6,10 @@ export default defineConfig({
 	plugins: [tsconfigPaths()],
 	resolve: {
 		alias: {
+			"@ts-drp/protocol-v3/blueprint-application": path.resolve(
+				__dirname,
+				"packages/protocol-v3/src/blueprint-application.ts"
+			),
 			"@ts-drp/routing-node/constants": path.resolve(__dirname, "packages/routing-node/src/constants.ts"),
 			"@ts-drp/control-plane": path.resolve(__dirname, "packages/control-plane/src/index.ts"),
 			"@ts-drp/errors": path.resolve(__dirname, "packages/errors/src/index.ts"),

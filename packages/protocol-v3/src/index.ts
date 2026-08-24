@@ -1,5 +1,13 @@
 import { ed25519 } from "@noble/curves/ed25519.js";
-import { CanonicalDecodingError, compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import {
+	CanonicalDecodingError,
+	compareBytes,
+	decodeCanonical,
+	deepCloneCanonical,
+	encodeCanonical,
+	hashDomain,
+} from "@ts-drp/canonical";
+import { DRPError } from "@ts-drp/errors";
 import { init as initializeModuleLexer, parse as parseModule } from "es-module-lexer";
 
 import registryJson from "../registry/registry-v1.json" with { type: "json" };
@@ -22,6 +30,7 @@ const intrinsicObjectGetPrototypeOf = Object.getPrototypeOf;
 const intrinsicObjectHasOwn = Object.hasOwn;
 const intrinsicObjectPrototype = Object.prototype;
 const intrinsicReflectApply = Reflect.apply;
+const intrinsicReflectGet = Reflect.get;
 const intrinsicReflectOwnKeys = Reflect.ownKeys;
 const intrinsicSet = Set;
 const intrinsicSetAdd = Set.prototype.add;
@@ -2007,6 +2016,7 @@ interface PreparedBlueprintRuntimeState {
 	readonly admission: PreparedBlueprintAdmissionState;
 	readonly exactArtifactBytes: Uint8Array;
 	readonly namespace: object;
+	readonly reducers: PreparedBlueprintRuntime["reducers"];
 }
 
 interface BlueprintArtifactProfile {
@@ -2808,9 +2818,130 @@ export async function prepareBlueprintRuntime(
 			admission: preparedAdmission,
 			exactArtifactBytes,
 			namespace,
+			reducers,
 		})
 	);
 	return prepared;
+}
+
+export interface ApplyPreparedBlueprintOperationInput {
+	readonly expectedBlueprintDigest: string;
+	readonly operation: unknown;
+	readonly preparedBlueprintRuntime: PreparedBlueprintRuntime;
+	readonly state: unknown;
+}
+
+export interface PreparedBlueprintOperationResult {
+	readonly output: unknown;
+	readonly state: unknown;
+}
+
+function applicationFailure(
+	code:
+		| "BLUEPRINT_DIGEST_MISMATCH"
+		| "BLUEPRINT_OPERATION_INVALID"
+		| "BLUEPRINT_REDUCER_ASYNC"
+		| "BLUEPRINT_REDUCER_FAILED"
+		| "BLUEPRINT_RESULT_INVALID"
+		| "BLUEPRINT_RUNTIME_PROVENANCE",
+	message: string,
+	cause?: unknown
+): never {
+	throw new DRPError(code, message, cause === undefined ? undefined : { cause });
+}
+
+/**
+ * Applies one schema-validated operation through a genuine prepared runtime.
+ *
+ * Reducer selection uses only the module-private prepared runtime state. Both
+ * reducer inputs and both returned values cross canonical clone boundaries.
+ */
+export function applyPreparedBlueprintOperation(
+	input: ApplyPreparedBlueprintOperationInput
+): PreparedBlueprintOperationResult {
+	assertClosedRecord(
+		input,
+		["expectedBlueprintDigest", "operation", "preparedBlueprintRuntime", "state"],
+		"blueprint application input"
+	);
+	const expectedBlueprintDigest = ownDataProperty(input, "expectedBlueprintDigest", "blueprint application input");
+	const preparedBlueprintRuntime = ownDataProperty(input, "preparedBlueprintRuntime", "blueprint application input");
+	const operation = ownDataProperty(input, "operation", "blueprint application input");
+	const state = ownDataProperty(input, "state", "blueprint application input");
+	if (typeof expectedBlueprintDigest !== "string") {
+		return applicationFailure("BLUEPRINT_DIGEST_MISMATCH", "expected blueprint digest is invalid");
+	}
+	const runtimeState =
+		preparedBlueprintRuntime !== null && typeof preparedBlueprintRuntime === "object"
+			? preparedBlueprintRuntimes.get(preparedBlueprintRuntime)
+			: undefined;
+	if (runtimeState === undefined) {
+		return applicationFailure(
+			"BLUEPRINT_RUNTIME_PROVENANCE",
+			"prepared blueprint runtime does not have module-private provenance"
+		);
+	}
+	if (expectedBlueprintDigest !== runtimeState.admission.blueprintDigest) {
+		return applicationFailure("BLUEPRINT_DIGEST_MISMATCH", "prepared blueprint digest does not match caller binding");
+	}
+
+	let operationSchema: CompiledOperationSchema | undefined;
+	let detachedOperation: Readonly<Record<string, unknown>>;
+	try {
+		operationSchema = operationSchemaForPreparedAdmission(operation, runtimeState.admission);
+		if (
+			operationSchema === undefined ||
+			!operationWithinCanonicalByteBudget(operation as Readonly<Record<string, unknown>>, operationSchema)
+		) {
+			return applicationFailure("BLUEPRINT_OPERATION_INVALID", "operation does not match the prepared schema");
+		}
+		detachedOperation = deepCloneCanonical(operation as Readonly<Record<string, unknown>>);
+	} catch (error) {
+		if (error instanceof DRPError) throw error;
+		return applicationFailure("BLUEPRINT_OPERATION_INVALID", "operation is outside the canonical domain", error);
+	}
+	const discriminator = ownDataProperty(detachedOperation, runtimeState.admission.discriminator, "blueprint operation");
+	const reducer = runtimeState.reducers[discriminator as string];
+	if (typeof reducer !== "function") {
+		return applicationFailure("BLUEPRINT_OPERATION_INVALID", "prepared reducer is unavailable");
+	}
+
+	let detachedState: unknown;
+	try {
+		detachedState = deepCloneCanonical(state);
+	} catch (error) {
+		return applicationFailure("BLUEPRINT_RESULT_INVALID", "application state is outside the canonical domain", error);
+	}
+
+	let result: unknown;
+	try {
+		result = intrinsicReflectApply(reducer, undefined, [
+			Object.freeze({ operation: detachedOperation, state: detachedState }),
+		]);
+	} catch (error) {
+		return applicationFailure("BLUEPRINT_REDUCER_FAILED", "blueprint reducer threw synchronously", error);
+	}
+	if (result !== null && (typeof result === "object" || typeof result === "function")) {
+		try {
+			if (typeof intrinsicReflectGet(result, "then") === "function") {
+				return applicationFailure("BLUEPRINT_REDUCER_ASYNC", "blueprint reducer returned an asynchronous result");
+			}
+		} catch (error) {
+			if (error instanceof DRPError) throw error;
+			return applicationFailure("BLUEPRINT_REDUCER_ASYNC", "blueprint reducer returned a hostile thenable", error);
+		}
+	}
+
+	try {
+		assertClosedRecord(result, ["state", "output"], "blueprint reducer result");
+		return Object.freeze({
+			output: deepCloneCanonical(ownDataProperty(result, "output", "blueprint reducer result")),
+			state: deepCloneCanonical(ownDataProperty(result, "state", "blueprint reducer result")),
+		});
+	} catch (error) {
+		if (error instanceof DRPError) throw error;
+		return applicationFailure("BLUEPRINT_RESULT_INVALID", "blueprint reducer returned an invalid result", error);
+	}
 }
 
 /**

@@ -167,6 +167,17 @@ const CATALOG_ERROR_CODES = [
 	"BLUEPRINT_REQUEST_MALFORMED",
 	"BLUEPRINT_NOT_CATALOGUED",
 ] as const;
+const APPLICATION_ERROR_CODES = [
+	"BLUEPRINT_ALREADY_ADOPTED",
+	"BLUEPRINT_AUTHORIZATION_REJECTED",
+	"BLUEPRINT_AUTHORIZATION_REQUIRED",
+	"BLUEPRINT_DIGEST_MISMATCH",
+	"BLUEPRINT_OPERATION_INVALID",
+	"BLUEPRINT_REDUCER_ASYNC",
+	"BLUEPRINT_REDUCER_FAILED",
+	"BLUEPRINT_RESULT_INVALID",
+	"BLUEPRINT_RUNTIME_PROVENANCE",
+] as const;
 const temporaryDirectories: string[] = [];
 
 function sha256(bytes: Uint8Array): string {
@@ -1210,8 +1221,11 @@ describe("Track P2-d private catalog construction and verify CLI RED", () => {
 });
 
 describe("Track P2-d public/package/governance and preservation controls", () => {
-	it("publishes exactly the closed Blueprint additions in alphabetized registry order", () => {
-		expect(DRP_ERROR_CODES.filter((code) => code.startsWith("BLUEPRINT_"))).toEqual([...CATALOG_ERROR_CODES].sort());
+	it("publishes exactly the closed catalog and application Blueprint additions in alphabetized registry order", () => {
+		expect(DRP_ERROR_CODES.filter((code) => code.startsWith("BLUEPRINT_"))).toEqual(
+			[...CATALOG_ERROR_CODES, ...APPLICATION_ERROR_CODES].sort()
+		);
+		expect(DRP_ERROR_CODES).toContain("INVALID_APPLICATION_STATE");
 		expect([...DRP_ERROR_CODES]).toEqual([...DRP_ERROR_CODES].sort());
 		expect(new Set(DRP_ERROR_CODES).size).toBe(DRP_ERROR_CODES.length);
 	});

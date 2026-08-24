@@ -26,6 +26,10 @@
 			"types": "./dist/src/author-authorization.d.ts",
 			"import": "./dist/src/author-authorization.js"
 		},
+		"./blueprint-application": {
+			"types": "./dist/src/blueprint-application.d.ts",
+			"import": "./dist/src/blueprint-application.js"
+		},
 		"./latched-acl": {
 			"types": "./dist/src/latched-acl.d.ts",
 			"import": "./dist/src/latched-acl.js"
@@ -44,6 +48,7 @@
 	"dependencies": {
 		"@noble/curves": "2.2.0",
 		"@ts-drp/canonical": "0.11.0",
+		"@ts-drp/errors": "0.11.0",
 		"es-module-lexer": "1.6.0"
 	}
 }

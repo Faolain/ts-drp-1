@@ -6,7 +6,7 @@ export interface EpochVertex {
 	hash: string;
 	kind: "drp-epoch-anchor" | "drp-vertex";
 	objectId: string;
-	operation?: {
+	operation?: Record<string, unknown> & {
 		conflictKey?: string;
 		value?: unknown;
 	};
