@@ -7,6 +7,7 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			"@ts-drp/compaction/blueprint-fold": path.resolve(__dirname, "packages/compaction/src/blueprint-fold.ts"),
+			"@ts-drp/compaction/blueprint-snapshot": path.resolve(__dirname, "packages/compaction/src/blueprint-snapshot.ts"),
 			"@ts-drp/protocol-v3/author-authorization": path.resolve(
 				__dirname,
 				"packages/protocol-v3/src/author-authorization.ts"
