@@ -1,3 +1,4 @@
+import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import type {
 	DurableIssuanceOutboxRecord,
 	DurableIssuanceStore,
@@ -115,9 +116,41 @@ function journalStore(fixture: GenuinePreparedV3Fixture): DurableLiveJournalStor
 	});
 }
 
-function recoveryStore(fixture: GenuinePreparedV3Fixture): DurableIssuanceStore {
+function lowerHex(bytes: Uint8Array): string {
+	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function recoveryCarrier(
+	fixture: GenuinePreparedV3Fixture,
+	recoveryOperation?: Readonly<Record<string, unknown>>
+): Promise<Readonly<{ canonicalPreimageBytes: Uint8Array; digest: Uint8Array; signature: Uint8Array }>> {
+	if (recoveryOperation === undefined) return fixture.createRecoveryVertex(0, [fixture.anchorDigest]);
+	const canonicalPreimageBytes = encodeCanonical({
+		anchor: fixture.anchorDigest,
+		author: fixture.author,
+		authorSequence: 0,
+		dependencies: [fixture.anchorDigest],
+		epoch: 0,
+		kind: "drp-vertex",
+		logicalTime: 1,
+		objectId: fixture.objectId,
+		operation: recoveryOperation,
+		protocolMajor: 3,
+	});
+	const digest = hashDomain("ts-drp/vertex/v3", canonicalPreimageBytes);
+	return Object.freeze({
+		canonicalPreimageBytes,
+		digest,
+		signature: await fixture.signRegisteredVertexDigest(digest),
+	});
+}
+
+async function recoveryStore(
+	fixture: GenuinePreparedV3Fixture,
+	recoveryOperation?: Readonly<Record<string, unknown>>
+): Promise<Readonly<{ readonly store: DurableIssuanceStore; readonly vertexDigest: string }>> {
 	const scope: DurableIssueScope = Object.freeze({ author: fixture.author, objectId: fixture.objectId });
-	const carrier = fixture.createRecoveryVertex(0, [fixture.anchorDigest]);
+	const carrier = await recoveryCarrier(fixture, recoveryOperation);
 	const envelope = Object.freeze({
 		canonicalPreimageBytes: new Uint8Array(carrier.canonicalPreimageBytes),
 		digest: new Uint8Array(carrier.digest),
@@ -131,7 +164,7 @@ function recoveryStore(fixture: GenuinePreparedV3Fixture): DurableIssuanceStore 
 	});
 	const outbox: DurableIssuanceOutboxRecord = Object.freeze({ commit, publishState: "published" });
 	let nextAuthorSequence = 1;
-	return Object.freeze({
+	const store = Object.freeze({
 		close: vi.fn(() => Promise.resolve()),
 		compareAndMarkOutboxPublished: vi.fn(() => Promise.resolve()),
 		readIssued: vi.fn((selectedScope, sequence) =>
@@ -154,21 +187,30 @@ function recoveryStore(fixture: GenuinePreparedV3Fixture): DurableIssuanceStore 
 			return issued;
 		}),
 	});
+	return Object.freeze({ store, vertexDigest: lowerHex(carrier.digest) });
 }
 
 /**
  * Recovers one genuine prepared capability through the shipped replica path.
  * @param fixture - Authenticated live fixture that minted the capability.
  * @param capability - One-use prepared capability to recover.
+ * @param recoveryOperation - Optional exact vertex operation for a closed-graph recovery proof.
  * @returns The recovered capability and the stores that authenticated it.
  */
 export async function recover(
 	fixture: GenuinePreparedV3Fixture,
-	capability: PreparedV3Live
+	capability: PreparedV3Live,
+	recoveryOperation?: Readonly<Record<string, unknown>>
 ): Promise<
-	Readonly<{ capability: RecoveredV3Live; issuanceStore: DurableIssuanceStore; journal: DurableLiveJournalStore }>
+	Readonly<{
+		capability: RecoveredV3Live;
+		issuanceStore: DurableIssuanceStore;
+		journal: DurableLiveJournalStore;
+		recoveryVertexDigest: string;
+	}>
 > {
-	const issuanceStore = recoveryStore(fixture);
+	const recoveredStore = await recoveryStore(fixture, recoveryOperation);
+	const issuanceStore = recoveredStore.store;
 	const journal = journalStore(fixture);
 	const result = await recoverV3LiveReplica({
 		capability,
@@ -180,7 +222,35 @@ export async function recover(
 		liveJournalStore: journal,
 	});
 	if (!result.ok) throw new TypeError(`recovery failed: ${result.kind}`);
-	return Object.freeze({ capability: result.capability, issuanceStore, journal });
+	return Object.freeze({
+		capability: result.capability,
+		issuanceStore,
+		journal,
+		recoveryVertexDigest: recoveredStore.vertexDigest,
+	});
+}
+
+/**
+ * Recovers the fixed closed-epoch ACL vertex used by the live snapshot composition owner.
+ * @param fixture - Authenticated live fixture that minted the capability.
+ * @param capability - One-use prepared capability to recover.
+ * @returns The recovered closed-graph capability and its evidence owners.
+ */
+export function recoverLiveSnapshotPeer(
+	fixture: GenuinePreparedV3Fixture,
+	capability: PreparedV3Live
+): ReturnType<typeof recover> {
+	if (fixture.exactCanonicalLatchedAclBytes === undefined) return recover(fixture, capability);
+	return recover(
+		fixture,
+		capability,
+		Object.freeze({
+			action: "acl",
+			group: "writer",
+			kind: "grant",
+			target: fixture.author === "f".repeat(64) ? "e".repeat(64) : "f".repeat(64),
+		})
+	);
 }
 
 export type { GenuinePreparedV3Fixture, RecoveredV3Live };

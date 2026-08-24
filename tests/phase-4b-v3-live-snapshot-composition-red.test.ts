@@ -12,7 +12,7 @@ import { createGenuinePreparedV3Fixture } from "./fixtures/phase-3a1b-p3/live-fi
 import {
 	fakeNetwork,
 	type GenuinePreparedV3Fixture,
-	recover,
+	recoverLiveSnapshotPeer as recover,
 	type RecoveredV3Live,
 } from "./fixtures/phase-4b-v3/live-snapshot.js";
 import packageGolden from "./fixtures/track-p2-b/forward-counter-package.json" with { type: "json" };
@@ -236,16 +236,6 @@ function nextAclOperation(fixture: GenuinePreparedV3Fixture): LatchedAclOperatio
 	});
 }
 
-function nextAclApplicationOperation(fixture: GenuinePreparedV3Fixture): Readonly<Record<string, unknown>> {
-	const operation = nextAclOperation(fixture);
-	return Object.freeze({
-		action: "acl",
-		group: operation.group,
-		kind: operation.kind,
-		target: operation.target,
-	});
-}
-
 function independentNextAclBytes(fixture: GenuinePreparedV3Fixture): Uint8Array {
 	const opened = openedLatchedAcl(fixture);
 	if (!opened.ok) throw new TypeError("authenticated latched ACL could not be opened");
@@ -357,17 +347,12 @@ async function foldAdoptedHandle(
 		plane: activation.handle,
 	});
 	if (!binding.ok) throw new TypeError("binding failed");
-	const issuedAcl = await activation.handle.issueLocal({
-		operations: Object.freeze([Object.freeze({ logicalTime: 1, operation: nextAclApplicationOperation(fixture) })]),
-		signRegisteredVertexDigest: fixture.signRegisteredVertexDigest,
-	});
-	if (!issuedAcl.ok) throw new TypeError(`accepted ACL operation failed: ${issuedAcl.kind}`);
 	const staged = await binding.handle.stageBlueprintEpoch();
 	if (!staged.ok) throw new TypeError("fold failed");
 	const adopted = staged.adopt();
 	if (!adopted.ok) throw new TypeError("adoption failed");
 	return Object.freeze({
-		aclOperationDigest: issuedAcl.digest,
+		aclOperationDigest: recovered.recoveryVertexDigest,
 		activation,
 		adopted: adopted.snapshot,
 		handle: binding.handle,
@@ -653,9 +638,6 @@ describe("Phase 4b-b live snapshot replacement composition tests-only RED", () =
 					plane: authorActivation.handle,
 				});
 				if (!authorBinding.ok) throw new TypeError("author-list binding failed");
-				const authorStaged = await authorBinding.handle.stageBlueprintEpoch();
-				if (!authorStaged.ok) throw new TypeError("author-list fold failed");
-				if (!authorStaged.adopt().ok) throw new TypeError("author-list adoption failed");
 				expectClosedFailure(exportSnapshotPayload(authorBinding.handle), "authorization-rejected");
 				authorActivation.handle.deactivate();
 
