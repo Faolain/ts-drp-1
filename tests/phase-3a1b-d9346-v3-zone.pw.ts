@@ -221,8 +221,15 @@ test("two real network clients recover and converge one durable v3 zone while mo
 		expect((await zone(joiner)).durableVertexCount).toBe(afterOfflineProgress.durableVertexCount);
 		await expect(joiner.locator('[data-block-id="offline"]')).toBeVisible();
 
-		await creator.keyboard.press("a");
-		await expect.poll(async () => (await zone(joiner)).transientPositions[creatorPeerId]).toBeDefined();
+		await expect
+			.poll(
+				async () => {
+					await creator.keyboard.press("a");
+					return (await zone(joiner)).transientPositions[creatorPeerId];
+				},
+				{ intervals: [100, 250, 500, 1_000] }
+			)
+			.toBeDefined();
 		await expect
 			.poll(async () => (await zone(joiner)).rawTransport.links)
 			.toEqual([{ label: "ts-drp-ephemeral/1", maxRetransmits: 0, ordered: false, peerId: creatorPeerId }]);
