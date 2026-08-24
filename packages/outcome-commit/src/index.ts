@@ -46,6 +46,8 @@ const OPERATION_KEYS = [
 	"exactCanonicalIntentBytes",
 	"exactCanonicalPayloadBytes",
 ] as const;
+const ADMISSION_OPERATION_KEYS = ["action", "proof"] as const;
+const ADMISSION_POLICY_KEYS = ["aclDigest", "anchorDigest", "epoch", "maxEntries", "objectId"] as const;
 const VERIFY_KEYS = [
 	"expectedAclDigest",
 	"expectedAnchorDigest",
@@ -112,6 +114,20 @@ export interface OutcomeCommitOperation {
 	readonly clientOperationId: string;
 	readonly exactCanonicalIntentBytes: Uint8Array;
 	readonly exactCanonicalPayloadBytes: Uint8Array;
+}
+
+export interface OutcomeCommitAdmissionOperation extends Readonly<Record<string, unknown>> {
+	readonly action: "commit-outcome-v1";
+	readonly proof: OutcomeCommitOperation;
+}
+
+export type OutcomeCommitAdmissionReservation =
+	| Readonly<{ readonly kind: "fresh"; commit(): "committed"; release(): void }>
+	| Readonly<{ readonly kind: "duplicate" | "conflict" | "rejected" }>;
+
+export interface OutcomeCommitAdmissionPolicy {
+	readonly size: number;
+	reserve(operation: Readonly<Record<string, unknown>>): OutcomeCommitAdmissionReservation;
 }
 
 export interface VerifiedOutcomeCommit {
@@ -359,6 +375,32 @@ function detachedOperation(
 	});
 }
 
+function copiedOperation(value: unknown): OutcomeCommitOperation | undefined {
+	const operation = exactRecord(value, OPERATION_KEYS);
+	const approvals = copyApprovals(operation?.approvals, false);
+	const intentBytes = strictBytes(operation?.exactCanonicalIntentBytes);
+	const payloadBytes = strictBytes(operation?.exactCanonicalPayloadBytes);
+	if (
+		operation === undefined ||
+		operation.action !== "commit-outcome-v1" ||
+		approvals === undefined ||
+		intentBytes === undefined ||
+		payloadBytes === undefined ||
+		typeof operation.clientOperationId !== "string" ||
+		!IDENTIFIER.test(operation.clientOperationId)
+	) {
+		return undefined;
+	}
+	return detachedOperation(intentBytes, payloadBytes, operation.clientOperationId, approvals);
+}
+
+function admissionProof(value: unknown): OutcomeCommitOperation | undefined {
+	const direct = copiedOperation(value);
+	if (direct !== undefined) return direct;
+	const carrier = exactRecord(value, ADMISSION_OPERATION_KEYS);
+	return carrier?.action === "commit-outcome-v1" ? copiedOperation(carrier.proof) : undefined;
+}
+
 function validApprovalSignatures(approvals: readonly OutcomeApproval[], digest: Uint8Array): boolean {
 	return approvals.every(({ signature, signer }) => {
 		try {
@@ -474,6 +516,15 @@ export function createOutcomeCommitOperation(
 	return detachedOperation(opened.bytes, payload, opened.intent.clientOperationId, approvals);
 }
 
+/** Wrap one verified-shape proof in the blueprint's canonical-object operation carrier. */
+export function createOutcomeCommitAdmissionOperation(
+	operation: OutcomeCommitOperation
+): OutcomeCommitAdmissionOperation {
+	const proof = copiedOperation(operation);
+	if (proof === undefined) throw new TypeError("outcome admission operation is invalid");
+	return Object.freeze({ action: "commit-outcome-v1" as const, proof });
+}
+
 function rejected(
 	reason: Exclude<OutcomeCommitVerificationResult, { readonly ok: true }>["reason"]
 ): OutcomeCommitVerificationResult {
@@ -548,6 +599,28 @@ export function verifyOutcomeCommitOperation(
 	return Object.freeze({ ok: true as const, verified });
 }
 
+/** Verify either the public proof or its durable blueprint carrier against one authenticated room context. */
+export function verifyOutcomeCommitAdmissionOperation(
+	input: Readonly<{
+		readonly expectedAclDigest: string;
+		readonly expectedAnchorDigest: string;
+		readonly expectedEpoch: number;
+		readonly expectedObjectId: string;
+		readonly operation: Readonly<Record<string, unknown>>;
+	}>
+): OutcomeCommitVerificationResult {
+	const record = exactRecord(input, VERIFY_KEYS);
+	const proof = admissionProof(record?.operation);
+	if (record === undefined || proof === undefined) return rejected("malformed-proof");
+	return verifyOutcomeCommitOperation({
+		expectedAclDigest: record.expectedAclDigest as string,
+		expectedAnchorDigest: record.expectedAnchorDigest as string,
+		expectedEpoch: record.expectedEpoch as number,
+		expectedObjectId: record.expectedObjectId as string,
+		operation: proof,
+	});
+}
+
 /** Create the bounded replay/conflict owner used by later pre-journal admission. */
 export function createOutcomeCommitRegistry(input: Readonly<{ readonly maxEntries: number }>): OutcomeCommitRegistry {
 	const record = exactRecord(input, ["maxEntries"]);
@@ -580,6 +653,98 @@ export function createOutcomeCommitRegistry(input: Readonly<{ readonly maxEntrie
 			if (state === undefined) throw new TypeError("outcome registry requires a verified commit");
 			entries.set(state.clientOperationId, state.intentDigest);
 			return "committed";
+		},
+	});
+}
+
+/** Create one fresh replay/conflict policy bound to an authenticated room context. */
+export function createOutcomeCommitAdmissionPolicy(
+	input: Readonly<{
+		readonly aclDigest: string;
+		readonly anchorDigest: string;
+		readonly epoch: number;
+		readonly maxEntries: number;
+		readonly objectId: string;
+	}>
+): OutcomeCommitAdmissionPolicy {
+	const record = exactRecord(input, ADMISSION_POLICY_KEYS);
+	if (
+		record === undefined ||
+		typeof record.aclDigest !== "string" ||
+		!DIGEST.test(record.aclDigest) ||
+		typeof record.anchorDigest !== "string" ||
+		!DIGEST.test(record.anchorDigest) ||
+		!Number.isSafeInteger(record.epoch) ||
+		(record.epoch as number) < 0 ||
+		(record.epoch as number) > 0xffff_ffff ||
+		typeof record.objectId !== "string" ||
+		!OBJECT_ID.test(record.objectId)
+	) {
+		throw new TypeError("outcome admission policy context is invalid");
+	}
+	const registry = createOutcomeCommitRegistry({ maxEntries: record.maxEntries as number });
+	const ordinaryReservation = (): Extract<OutcomeCommitAdmissionReservation, { readonly kind: "fresh" }> => {
+		let active = true;
+		return Object.freeze({
+			commit(): "committed" {
+				if (!active) throw new TypeError("outcome admission reservation was already consumed");
+				active = false;
+				return "committed";
+			},
+			kind: "fresh" as const,
+			release(): void {
+				active = false;
+			},
+		});
+	};
+	return Object.freeze({
+		get size(): number {
+			return registry.size;
+		},
+		reserve(operation: Readonly<Record<string, unknown>>): OutcomeCommitAdmissionReservation {
+			const action = Reflect.get(operation, "action");
+			if (action === "applicationBatch") {
+				const batch = Reflect.get(operation, "batch");
+				const entries = batch !== null && typeof batch === "object" ? Reflect.get(batch, "entries") : undefined;
+				if (
+					Array.isArray(entries) &&
+					entries.some((entry) => {
+						const child = entry !== null && typeof entry === "object" ? Reflect.get(entry, "operation") : undefined;
+						return child !== null && typeof child === "object" && Reflect.get(child, "action") === "commit-outcome-v1";
+					})
+				) {
+					return Object.freeze({ kind: "rejected" as const });
+				}
+				return ordinaryReservation();
+			}
+			if (action !== "commit-outcome-v1") return ordinaryReservation();
+			const verified = verifyOutcomeCommitAdmissionOperation({
+				expectedAclDigest: record.aclDigest as string,
+				expectedAnchorDigest: record.anchorDigest as string,
+				expectedEpoch: record.epoch as number,
+				expectedObjectId: record.objectId as string,
+				operation,
+			});
+			if (!verified.ok) return Object.freeze({ kind: "rejected" as const });
+			const classification = registry.classify(verified.verified);
+			if (classification === "duplicate" || classification === "conflict") {
+				return Object.freeze({ kind: classification });
+			}
+			if (classification !== "fresh") return Object.freeze({ kind: "rejected" as const });
+			let active = true;
+			return Object.freeze({
+				commit(): "committed" {
+					if (!active) throw new TypeError("outcome admission reservation was already consumed");
+					const committed = registry.commit(verified.verified);
+					if (committed !== "committed") throw new TypeError("outcome admission registry changed during commit");
+					active = false;
+					return committed;
+				},
+				kind: "fresh" as const,
+				release(): void {
+					active = false;
+				},
+			});
 		},
 	});
 }

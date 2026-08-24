@@ -12,14 +12,18 @@ import {
 } from "@ts-drp/example-v3-room";
 import type { DRPNode } from "@ts-drp/node";
 import {
+	createOutcomeCommitAdmissionOperation,
+	createOutcomeCommitAdmissionPolicy,
 	createOutcomeCommitOperation,
 	type OutcomeApproval,
+	type OutcomeCommitAdmissionOperation,
 	type PreparedOutcomeIntent,
 	prepareOutcomeIntent,
+	verifyOutcomeCommitAdmissionOperation,
 	verifyOutcomeCommitOperation,
 } from "@ts-drp/outcome-commit";
 
-const ZONE_ARTIFACT_SOURCE = `function exactKeys(value,keys){return value!==null&&typeof value==="object"&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.prototype.hasOwnProperty.call(value,key))}const migrationKeys=["applicationStateDigest","archivePolicy","authorityKind","exactCanonicalApplicationStateBytes","kind","rehearsalNonce","sourceAcceptedOperationCount","sourceAcceptedOperationsDigest","sourceAnchorDigest","sourceBlueprintDigest","sourceCreatorAuthor","sourceObjectId","targetAnchorDigest","targetBlueprintDigest","targetCreatorAuthor","targetImportOperationCount","targetImportOperationsDigest","targetObjectId","version"];function applicationBatchReducer(input){const operation=input.operation;if(!exactKeys(operation,["action","batch"])||operation.action!=="applicationBatch"||!exactKeys(operation.batch,["entries","version"])||operation.batch.version!==1||!Array.isArray(operation.batch.entries)||operation.batch.entries.length<2||operation.batch.entries.length>16)throw new TypeError("invalid application batch");let prior=-1;const output=[];for(const entry of operation.batch.entries){const child=entry.operation;if(!exactKeys(entry,["logicalTime","operation"])||!Number.isSafeInteger(entry.logicalTime)||entry.logicalTime<0||entry.logicalTime<=prior||!exactKeys(child,["action","id","kind","x","y"])||child.action!=="placeBlock"||typeof child.id!=="string"||child.id.length===0||typeof child.kind!=="string"||child.kind.length===0||!Number.isSafeInteger(child.x)||!Number.isSafeInteger(child.y))throw new TypeError("invalid application batch entry");prior=entry.logicalTime;output.push(child)}return {output,state:input.state}}function causalJoinReducer(input){return {output:null,state:input.state}}function joinReducer(input){return {output:input.operation,state:input.state}}function migrationActivationReducer(input){const operation=input.operation;if(!exactKeys(operation,["action","decision"])||operation.action!=="migrationActivation"||operation.decision===null||typeof operation.decision!=="object"||Array.isArray(operation.decision))throw new TypeError("invalid migration activation");return {output:null,state:input.state}}function migrationRecordReducer(input){const operation=input.operation;const record=operation&&operation.record;if(!exactKeys(operation,["action","record"])||operation.action!=="migrationRecord"||!exactKeys(record,migrationKeys)||record.kind!=="ts-drp-v3-room-migration-record"||record.version!==1||record.archivePolicy!=="retain-source"||record.authorityKind!=="creator-ed25519-registered-vertex-v1")throw new TypeError("invalid migration record");return {output:null,state:input.state}}function placeBlockReducer(input){return {output:input.operation,state:input.state}}export const blueprint={exportSchemaVersion:1,artifactId:"v3-zone.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{applicationBatch:applicationBatchReducer,causalJoin:causalJoinReducer,join:joinReducer,migrationActivation:migrationActivationReducer,migrationRecord:migrationRecordReducer,placeBlock:placeBlockReducer}};`;
+const ZONE_ARTIFACT_SOURCE = `function exactKeys(value,keys){return value!==null&&typeof value==="object"&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.prototype.hasOwnProperty.call(value,key))}const migrationKeys=["applicationStateDigest","archivePolicy","authorityKind","exactCanonicalApplicationStateBytes","kind","rehearsalNonce","sourceAcceptedOperationCount","sourceAcceptedOperationsDigest","sourceAnchorDigest","sourceBlueprintDigest","sourceCreatorAuthor","sourceObjectId","targetAnchorDigest","targetBlueprintDigest","targetCreatorAuthor","targetImportOperationCount","targetImportOperationsDigest","targetObjectId","version"];function applicationBatchReducer(input){const operation=input.operation;if(!exactKeys(operation,["action","batch"])||operation.action!=="applicationBatch"||!exactKeys(operation.batch,["entries","version"])||operation.batch.version!==1||!Array.isArray(operation.batch.entries)||operation.batch.entries.length<2||operation.batch.entries.length>16)throw new TypeError("invalid application batch");let prior=-1;const output=[];for(const entry of operation.batch.entries){const child=entry.operation;if(!exactKeys(entry,["logicalTime","operation"])||!Number.isSafeInteger(entry.logicalTime)||entry.logicalTime<0||entry.logicalTime<=prior||!exactKeys(child,["action","id","kind","x","y"])||child.action!=="placeBlock"||typeof child.id!=="string"||child.id.length===0||typeof child.kind!=="string"||child.kind.length===0||!Number.isSafeInteger(child.x)||!Number.isSafeInteger(child.y))throw new TypeError("invalid application batch entry");prior=entry.logicalTime;output.push(child)}return {output,state:input.state}}function causalJoinReducer(input){return {output:null,state:input.state}}function commitOutcomeReducer(input){const operation=input.operation;if(!exactKeys(operation,["action","proof"])||operation.action!=="commit-outcome-v1"||!exactKeys(operation.proof,["action","approvals","clientOperationId","exactCanonicalIntentBytes","exactCanonicalPayloadBytes"]))throw new TypeError("invalid outcome commit");return {output:operation,state:input.state}}function joinReducer(input){return {output:input.operation,state:input.state}}function migrationActivationReducer(input){const operation=input.operation;if(!exactKeys(operation,["action","decision"])||operation.action!=="migrationActivation"||operation.decision===null||typeof operation.decision!=="object"||Array.isArray(operation.decision))throw new TypeError("invalid migration activation");return {output:null,state:input.state}}function migrationRecordReducer(input){const operation=input.operation;const record=operation&&operation.record;if(!exactKeys(operation,["action","record"])||operation.action!=="migrationRecord"||!exactKeys(record,migrationKeys)||record.kind!=="ts-drp-v3-room-migration-record"||record.version!==1||record.archivePolicy!=="retain-source"||record.authorityKind!=="creator-ed25519-registered-vertex-v1")throw new TypeError("invalid migration record");return {output:null,state:input.state}}function placeBlockReducer(input){return {output:input.operation,state:input.state}}export const blueprint={exportSchemaVersion:1,artifactId:"v3-zone.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{applicationBatch:applicationBatchReducer,causalJoin:causalJoinReducer,"commit-outcome-v1":commitOutcomeReducer,join:joinReducer,migrationActivation:migrationActivationReducer,migrationRecord:migrationRecordReducer,placeBlock:placeBlockReducer}};`;
 const PARAMETERS = Object.freeze({
 	maxEpochVertices: 8192,
 	maxEpochBytes: 8_388_608,
@@ -147,6 +151,7 @@ export interface ZoneSnapshot {
 	readonly invite: string;
 	readonly localAuthor: string;
 	readonly localPeerId: string;
+	readonly outcomeCount: number;
 	readonly outcomeContext: OutcomeContext | null;
 	readonly ready: boolean;
 	readonly rawTransport: Readonly<{
@@ -187,7 +192,7 @@ interface TradeIntentView extends OutcomeContext {
 	readonly counterparties: readonly string[];
 	readonly intentDigest: string;
 	readonly outcomeKind: string;
-	readonly status: "absent" | "approved" | "pending" | "ready";
+	readonly status: "absent" | "accepted" | "approved" | "pending" | "ready" | "recovered";
 }
 
 export interface PreparedTradeIntent {
@@ -206,6 +211,7 @@ export interface TradeApproval {
 interface ZoneProjection {
 	readonly acceptedDigests: readonly string[];
 	readonly blocks: readonly ZoneBlock[];
+	readonly outcomes: readonly OutcomeCommitAdmissionOperation[];
 	readonly transportPeerAuthors: readonly Readonly<{ readonly author: string; readonly peerId: string }>[];
 	readonly writerAuthors: readonly string[];
 }
@@ -320,6 +326,13 @@ export interface V3ZoneApi {
 			readonly exactCanonicalPayloadHex: string;
 		}>
 	): Promise<Readonly<{ readonly action: "commit-outcome-v1"; readonly clientOperationId: string }>>;
+	commitTradeIntent(
+		input: Readonly<{
+			readonly approvals: readonly TradeApproval[];
+			readonly exactCanonicalIntentHex: string;
+			readonly exactCanonicalPayloadHex: string;
+		}>
+	): Promise<Readonly<{ readonly kind: "accepted" | "duplicate" }>>;
 	snapshot(): ZoneSnapshot;
 }
 
@@ -350,6 +363,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 	let localY = 0;
 	let localMovementSequence = 0;
 	let tradeIntent: TradeIntentView | undefined;
+	let recoveredTradeIntent = false;
 	let closeRequested = false;
 	let closing: Promise<void> | undefined;
 	let opening: Promise<void> | undefined;
@@ -372,6 +386,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 		localY = 0;
 		localMovementSequence = 0;
 		tradeIntent = undefined;
+		recoveredTradeIntent = false;
 		fabricTrials.clear();
 	};
 	const outcomeContextFor = (selected: V3RoomSession<ZoneProjection>): OutcomeContext => {
@@ -436,9 +451,24 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 		const positionEntries = [...transientPositions.entries()].sort(([left], [right]) => compareText(left, right));
 		const raw = zoneId.length === 0 ? undefined : node.ephemeralUnreliableWebRtcSnapshot(zoneId);
 		const outcomeContext = room === undefined ? null : outcomeContextFor(room);
-		const currentTradeIntent =
+		const contextualTradeIntent =
 			tradeIntent !== undefined && outcomeContext !== null && sameOutcomeContext(tradeIntent, outcomeContext)
 				? tradeIntent
+				: undefined;
+		const committedOutcome =
+			contextualTradeIntent === undefined
+				? undefined
+				: projection.outcomes.find(
+						(outcome) => outcome.proof.clientOperationId === contextualTradeIntent.clientOperationId
+					);
+		const committedPrepared = committedOutcome === undefined ? undefined : preparedOutcomeCarrier(committedOutcome);
+		const currentTradeIntent =
+			contextualTradeIntent !== undefined
+				? committedPrepared === undefined ||
+					(contextualTradeIntent.intentDigest === committedPrepared.intentDigest &&
+						(contextualTradeIntent.status === "accepted" || contextualTradeIntent.status === "recovered"))
+					? contextualTradeIntent
+					: tradeIntentView(committedPrepared, "accepted", 2)
 				: absentTradeIntent();
 		return Object.freeze({
 			acceptedOperationDigest: digest(
@@ -460,6 +490,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 			invite,
 			localAuthor,
 			localPeerId,
+			outcomeCount: projection.outcomes.length,
 			outcomeContext,
 			ready: room !== undefined,
 			rawTransport: Object.freeze({
@@ -602,6 +633,8 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 				application,
 				author: localAuthor,
 				creatorInvite,
+				createOperationAdmissionPolicy: (context) =>
+					createOutcomeCommitAdmissionPolicy({ ...context, maxEntries: PARAMETERS.maxEpochVertices }),
 				databaseName: `ts-drp-v3-zone--${digest("ts-drp/d9346-zone-database/v1", new TextEncoder().encode(zoneId))}`,
 				initialLogicalTime: 3,
 				issuanceDatabaseName: `ts-drp-v3-zone--${digest("ts-drp/d9346-zone-database/v1", new TextEncoder().encode(zoneId))}`,
@@ -614,6 +647,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 					room = target;
 					zoneId = targetObjectId;
 					tradeIntent = undefined;
+					recoveredTradeIntent = false;
 					ephemeral?.close();
 					clearAoiProjection();
 					const redirectedEphemeral = target.openEphemeral(ZONE_EPHEMERAL_OPTIONS);
@@ -622,6 +656,17 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 				},
 				onProjection: (value): void => {
 					projection = value;
+					const latestOutcome = value.outcomes.at(-1);
+					if (latestOutcome !== undefined) {
+						const preparedOutcome = preparedOutcomeCarrier(latestOutcome);
+						if (
+							preparedOutcome.intent.counterparties.includes(localAuthor) &&
+							tradeIntent?.intentDigest !== preparedOutcome.intentDigest
+						) {
+							tradeIntent = tradeIntentView(preparedOutcome, "accepted", 2);
+							recoveredTradeIntent = room === undefined;
+						}
+					}
 					emit();
 				},
 				openTransport: (openedObjectId) => node.openRoomNetwork(openedObjectId),
@@ -793,6 +838,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 				targetCreatorInvite,
 			});
 			tradeIntent = undefined;
+			recoveredTradeIntent = false;
 			invite = encodeZoneInvite({ roomInvite: selected.invite, zoneId: targetObjectId });
 			emit();
 			return activated;
@@ -818,6 +864,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 			const signature = await node.keychain.signWithLocalAuthor(prepared.registeredDigest);
 			if (room !== selected || !sameOutcomeContext(context, outcomeContextFor(selected))) {
 				tradeIntent = undefined;
+				recoveredTradeIntent = false;
 				throw new TypeError("v3 zone trade context changed while approving");
 			}
 			tradeIntent = tradeIntentView(prepared, "approved", 1);
@@ -856,6 +903,69 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 			});
 			closing = attempt;
 			return attempt;
+		},
+		async commitTradeIntent(input): Promise<Readonly<{ readonly kind: "accepted" | "duplicate" }>> {
+			const selected = room;
+			if (
+				selected === undefined ||
+				input === null ||
+				typeof input !== "object" ||
+				!Array.isArray(input.approvals) ||
+				typeof input.exactCanonicalIntentHex !== "string" ||
+				typeof input.exactCanonicalPayloadHex !== "string"
+			) {
+				throw new TypeError("v3 zone trade commit input is invalid");
+			}
+			const { context, prepared } = requireCurrentPrepared(
+				input.exactCanonicalIntentHex,
+				input.exactCanonicalPayloadHex
+			);
+			const approvals: readonly OutcomeApproval[] = input.approvals.map((approval) =>
+				Object.freeze({ signature: bytes(approval.signatureHex), signer: approval.signer })
+			);
+			const proof = createOutcomeCommitOperation({ approvals, prepared });
+			const verified = verifyOutcomeCommitOperation({
+				expectedAclDigest: context.aclDigest,
+				expectedAnchorDigest: context.anchorDigest,
+				expectedEpoch: context.epoch,
+				expectedObjectId: context.objectId,
+				operation: proof,
+			});
+			if (!verified.ok) throw new TypeError(`v3 zone trade proof was rejected: ${verified.reason}`);
+			const operation = createOutcomeCommitAdmissionOperation(verified.verified.operation);
+			try {
+				await selected.issue(operation);
+			} catch (error) {
+				const existing = projection.outcomes.find(
+					(candidate) => candidate.proof.clientOperationId === verified.verified.clientOperationId
+				);
+				if (
+					existing !== undefined &&
+					preparedOutcomeCarrier(existing).intentDigest === verified.verified.intentDigest
+				) {
+					if (recoveredTradeIntent) {
+						tradeIntent = tradeIntentView(prepared, "recovered", 2);
+						recoveredTradeIntent = false;
+						emit();
+					}
+					return Object.freeze({ kind: "duplicate" as const });
+				}
+				throw error;
+			}
+			if (room !== selected || !sameOutcomeContext(context, outcomeContextFor(selected))) {
+				tradeIntent = undefined;
+				recoveredTradeIntent = false;
+				throw new TypeError("v3 zone trade context changed while committing");
+			}
+			const accepted = projection.outcomes.find(
+				(candidate) => candidate.proof.clientOperationId === verified.verified.clientOperationId
+			);
+			if (accepted === undefined || preparedOutcomeCarrier(accepted).intentDigest !== verified.verified.intentDigest) {
+				throw new TypeError("v3 zone trade commit was not projected");
+			}
+			tradeIntent = tradeIntentView(prepared, "accepted", 2);
+			emit();
+			return Object.freeze({ kind: "accepted" as const });
 		},
 		async create(memberEnrollments: string | readonly string[]): Promise<void> {
 			await trackOpen(async (): Promise<void> => {
@@ -1114,7 +1224,11 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
  * @returns Exact canonical durable zone state bytes.
  */
 function canonicalZoneStateBytes(projection: ZoneProjection): Uint8Array {
-	return encodeCanonical(projection.blocks);
+	return encodeCanonical(
+		projection.outcomes.length === 0
+			? projection.blocks
+			: Object.freeze({ blocks: projection.blocks, outcomes: projection.outcomes })
+	);
 }
 
 /**
@@ -1163,6 +1277,7 @@ function projectZone(
 	const roster = new Map<string, Readonly<Enrollment & { readonly order: number }>>();
 	const rosterOrders = new Map<number, Readonly<Enrollment & { readonly order: number }>>();
 	const blocks = new Map<string, ZoneBlock>();
+	const outcomes = new Map<string, OutcomeCommitAdmissionOperation>();
 	const acceptedDigests = new Set<string>();
 	for (const acceptedOperation of operations) {
 		acceptedDigests.add(acceptedOperation.vertexDigest);
@@ -1202,6 +1317,12 @@ function projectZone(
 			if (block === undefined) throw new TypeError("v3 zone placeBlock operation is invalid");
 			blocks.set(block.id, block);
 		}
+		if (action === "commit-outcome-v1") {
+			const outcome = verifiedOutcomeCarrier(acceptedOperation.operation);
+			const existing = outcomes.get(outcome.proof.clientOperationId);
+			if (existing !== undefined) throw new TypeError("v3 zone outcome identity conflicts");
+			outcomes.set(outcome.proof.clientOperationId, outcome);
+		}
 	}
 	const entries = [...roster.values()].sort(
 		(left, right) =>
@@ -1210,9 +1331,36 @@ function projectZone(
 	return Object.freeze({
 		acceptedDigests: Object.freeze([...acceptedDigests]),
 		blocks: Object.freeze([...blocks.values()].sort((left, right) => compareText(left.id, right.id))),
+		outcomes: Object.freeze([...outcomes.values()]),
 		transportPeerAuthors: Object.freeze(entries.map(({ author, peerId }) => Object.freeze({ author, peerId }))),
 		writerAuthors: Object.freeze(entries.map(({ author }) => author)),
 	});
+}
+
+function preparedOutcomeCarrier(operation: Readonly<Record<string, unknown>>): PreparedOutcomeIntent {
+	const proof = Reflect.get(operation, "proof");
+	if (proof === null || typeof proof !== "object" || Array.isArray(proof)) {
+		throw new TypeError("v3 zone outcome proof is invalid");
+	}
+	const intentBytes = Reflect.get(proof, "exactCanonicalIntentBytes");
+	const payloadBytes = Reflect.get(proof, "exactCanonicalPayloadBytes");
+	if (!(intentBytes instanceof Uint8Array) || !(payloadBytes instanceof Uint8Array)) {
+		throw new TypeError("v3 zone outcome proof bytes are invalid");
+	}
+	return openPreparedTradeIntent(hex(intentBytes), hex(payloadBytes));
+}
+
+function verifiedOutcomeCarrier(operation: Readonly<Record<string, unknown>>): OutcomeCommitAdmissionOperation {
+	const prepared = preparedOutcomeCarrier(operation);
+	const verified = verifyOutcomeCommitAdmissionOperation({
+		expectedAclDigest: prepared.intent.aclDigest,
+		expectedAnchorDigest: prepared.intent.anchorDigest,
+		expectedEpoch: prepared.intent.epoch,
+		expectedObjectId: prepared.intent.objectId,
+		operation,
+	});
+	if (!verified.ok) throw new TypeError(`v3 zone outcome projection was rejected: ${verified.reason}`);
+	return createOutcomeCommitAdmissionOperation(verified.verified.operation);
 }
 
 function creatorAuthorFromSignerSet(exactCanonicalSignerSetBytes: Uint8Array): string {
@@ -1248,6 +1396,7 @@ function emptyProjection(): ZoneProjection {
 	return Object.freeze({
 		acceptedDigests: Object.freeze([]),
 		blocks: Object.freeze([]),
+		outcomes: Object.freeze([]),
 		transportPeerAuthors: Object.freeze([]),
 		writerAuthors: Object.freeze([]),
 	});
@@ -1297,7 +1446,12 @@ function exactBlock(value: unknown): ZoneBlock | undefined {
 function prepareZoneMigration(operations: readonly V3RoomAcceptedOperation[]): V3RoomMigrationProjection {
 	const blocks = new Map<string, ZoneBlock>();
 	for (const row of operations) {
-		if (Reflect.get(row.operation, "action") !== "placeBlock") continue;
+		const action = Reflect.get(row.operation, "action");
+		if (action === "commit-outcome-v1") {
+			verifiedOutcomeCarrier(row.operation);
+			throw new TypeError("v3 zone outcome migration requires an authenticated transfer owner");
+		}
+		if (action !== "placeBlock") continue;
 		const block = exactBlock(row.operation);
 		if (block === undefined) throw new TypeError("v3 zone migration block is invalid");
 		if (blocks.has(block.id)) throw new TypeError("v3 zone migration identity conflicts");
@@ -1555,6 +1709,7 @@ function applicationMaterial(): Readonly<{
 			operations: Object.freeze([
 				operation("applicationBatch", [Object.freeze({ name: "batch", type: "canonical-object" })]),
 				operation("causalJoin", []),
+				operation("commit-outcome-v1", [Object.freeze({ name: "proof", type: "canonical-object" })]),
 				operation("join", [Object.freeze({ name: "roster", type: "canonical-object" })]),
 				operation("migrationActivation", [Object.freeze({ name: "decision", type: "canonical-object" })]),
 				operation("migrationRecord", [Object.freeze({ name: "record", type: "canonical-object" })]),
@@ -1704,7 +1859,7 @@ function openPreparedTradeIntent(
 
 function tradeIntentView(
 	prepared: PreparedOutcomeIntent,
-	status: "approved" | "pending" | "ready",
+	status: "accepted" | "approved" | "pending" | "ready" | "recovered",
 	approvalCount: number
 ): TradeIntentView {
 	return Object.freeze({

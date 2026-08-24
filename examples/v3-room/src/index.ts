@@ -11,6 +11,7 @@ import {
 	routeV3Ingress,
 	routeV3RetainedIngress,
 	type V3AdmittedVertexSink,
+	type V3OperationAdmissionPolicy,
 	type V3PlaneHandle,
 } from "@ts-drp/node/v3-live";
 import {
@@ -267,6 +268,14 @@ export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAut
 	readonly application: V3RoomApplication<Projection>;
 	readonly author: string;
 	readonly creatorInvite: string | V3RoomCreatorInviteMaterial;
+	createOperationAdmissionPolicy?(
+		context: Readonly<{
+			readonly aclDigest: string;
+			readonly anchorDigest: string;
+			readonly epoch: 0;
+			readonly objectId: string;
+		}>
+	): V3OperationAdmissionPolicy;
 	readonly databaseName: string;
 	readonly initialLogicalTime: number;
 	readonly issuanceDatabaseName: string;
@@ -1087,6 +1096,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	requireFreshTrust: boolean,
 	redirectSource?: RedirectSourceRecovery
 ): Promise<V3RoomSession<Projection>> {
+	if (
+		input.createOperationAdmissionPolicy !== undefined &&
+		typeof input.createOperationAdmissionPolicy !== "function"
+	) {
+		throw new TypeError("v3 room operation admission factory is invalid");
+	}
 	if (
 		!Array.isArray(input.application.batchableOperationActions) ||
 		!Object.isFrozen(input.application.batchableOperationActions) ||
@@ -2940,6 +2955,18 @@ async function prepareDurableRoomState<Projection extends V3RoomProjectionAuthor
 				issuanceScope: scope,
 				issuanceStore: openedIssuanceStore,
 				liveJournalStore: openedJournalStore,
+				...(input.createOperationAdmissionPolicy === undefined
+					? {}
+					: {
+							operationAdmissionPolicy: input.createOperationAdmissionPolicy(
+								Object.freeze({
+									aclDigest: digest("ts-drp/latched-acl/v3", material.exactCanonicalLatchedAclBytes),
+									anchorDigest: material.pinnedGenesisAnchorDigest,
+									epoch: 0 as const,
+									objectId: input.objectId,
+								})
+							),
+						}),
 				...(retainedBootstrapHold ? { retainedBootstrapHold: true as const } : {}),
 			});
 		let retainedBootstrapHeld = false;

@@ -551,6 +551,7 @@ const LATCHED_RETAINED_BOOTSTRAP_RECOVERY_INPUT_KEYS = [
 	"liveJournalStore",
 	"retainedBootstrapHold",
 ] as const;
+const OPERATION_ADMISSION_POLICY_KEY = "operationAdmissionPolicy";
 const DISPLACED_LEGACY_SOURCE_KEYS = ["capability", "exactCanonicalAuthorAuthorizationBytes"] as const;
 const DISPLACED_LATCHED_SOURCE_KEYS = ["capability", "exactCanonicalLatchedAclBytes"] as const;
 const DISPLACED_CROSS_OBJECT_SOURCE_KEYS = [
@@ -571,10 +572,18 @@ export type V3TerminalVertexClassifier = (
 	}>
 ) => "ordinary" | "terminal-authorized" | "reject";
 
+export type V3OperationAdmissionReservation =
+	| Readonly<{ readonly kind: "fresh"; commit(): "committed"; release(): void }>
+	| Readonly<{ readonly kind: "duplicate" | "conflict" | "rejected" }>;
+
+export interface V3OperationAdmissionPolicy {
+	reserve(operation: Readonly<Record<string, unknown>>): V3OperationAdmissionReservation;
+}
+
 declare const recoveredV3LiveBrand: unique symbol;
 export type RecoveredV3Live = Readonly<{ readonly [recoveredV3LiveBrand]: true }>;
 
-export type RecoverV3LiveReplicaInput =
+type RecoverV3LiveReplicaBaseInput =
 	| Readonly<{
 			readonly capability: PreparedV3Live;
 			readonly displacedSource?: Readonly<{
@@ -645,6 +654,9 @@ export type RecoverV3LiveReplicaInput =
 			readonly liveJournalStore: DurableLiveJournalStore;
 			readonly retainedBootstrapHold: true;
 	  }>;
+
+export type RecoverV3LiveReplicaInput = RecoverV3LiveReplicaBaseInput &
+	Readonly<{ readonly operationAdmissionPolicy?: V3OperationAdmissionPolicy }>;
 
 export type RecoverV3LiveReplicaFailureKind =
 	| "malformed-input"
@@ -788,6 +800,10 @@ function snapshotClosedRecord(value: unknown, keys: readonly string[]): PlainRec
 	} catch {
 		return undefined;
 	}
+}
+
+function snapshotRecoveryRecord(value: unknown, keys: readonly string[]): PlainRecord | undefined {
+	return snapshotClosedRecord(value, keys) ?? snapshotClosedRecord(value, [...keys, OPERATION_ADMISSION_POLICY_KEY]);
 }
 
 function isInstanceOf(value: unknown, constructor: object | undefined): boolean {
@@ -2298,6 +2314,8 @@ interface V3PlaneRegistration {
 	readonly mode: "genesis-active" | "snapshot-closed";
 	readonly networkNode: DRPNetworkNode;
 	readonly onAdmittedVertex: V3AdmittedVertexSink;
+	operationAdmissionHalted: boolean;
+	readonly operationAdmissionPolicy?: V3OperationAdmissionPolicy;
 	readonly payload: PreparedV3LivePayload;
 	readonly pendingIngress: Map<string, PendingV3Ingress>;
 	readonly quarantinedDigests: ReadonlySet<string>;
@@ -2679,6 +2697,7 @@ function sameActivation(
 			(ReflectOwnKeys(input).length === SNAPSHOT_ACTIVATION_INPUT_KEYS.length ? "snapshot-closed" : "genesis-active") &&
 		registration.messageQueueManager === input.messageQueueManager &&
 		registration.onAdmittedVertex === input.onAdmittedVertex &&
+		registration.operationAdmissionPolicy === recovered.operationAdmissionPolicy &&
 		registration.authorization === recovered.authorization &&
 		registration.index === recovered.index &&
 		registration.issuanceStore === recovered.issuanceStore &&
@@ -2863,6 +2882,10 @@ async function handleV3Ingress(
 	if (!currentRegistration(registration)) return false;
 	const authenticated = evidence.authenticated;
 	const alreadyAccepted = registration.index.has(authenticated.digest);
+	if (!alreadyAccepted && registration.operationAdmissionHalted) {
+		ingressFailureLog("admission-rejected");
+		return false;
+	}
 	let terminalClassification: ReturnType<V3TerminalVertexClassifier> = "ordinary";
 	if (!alreadyAccepted && registration.classifyTerminalVertex !== undefined) {
 		try {
@@ -2909,6 +2932,16 @@ async function handleV3Ingress(
 		ingressFailureLog("graph-rejected");
 		return false;
 	}
+	const reservation = alreadyAccepted
+		? undefined
+		: reserveOperation(
+				registration.operationAdmissionPolicy,
+				authenticated.vertex.operation as Readonly<Record<string, unknown>>
+			);
+	if (reservation === null) {
+		ingressFailureLog("admission-rejected");
+		return false;
+	}
 	if (!alreadyAccepted && terminalClassification === "terminal-authorized") {
 		// Once authenticated terminal evidence reaches the durable boundary, any
 		// write outcome is ambiguous until recovery. Keep this live capability
@@ -2925,6 +2958,7 @@ async function handleV3Ingress(
 			vertexDigest: authenticated.digest,
 		});
 	} catch {
+		if (reservation !== undefined) registration.operationAdmissionHalted = true;
 		ingressFailureLog("journal-rejected");
 		return false;
 	}
@@ -2934,6 +2968,7 @@ async function handleV3Ingress(
 		!sameLiveJournalScope(appended.scope, liveJournalScope(registration.payload)) ||
 		(alreadyAccepted ? !appended.idempotent : appended.idempotent || appended.sourceKind !== "received")
 	) {
+		if (reservation !== undefined) registration.operationAdmissionHalted = true;
 		ingressFailureLog("journal-rejected");
 		return false;
 	}
@@ -2947,23 +2982,32 @@ async function handleV3Ingress(
 		registration.payload.parameters.maxEpochBytes
 	);
 	if (updatedEpochBytes === undefined) {
+		if (reservation !== undefined) registration.operationAdmissionHalted = true;
 		ingressFailureLog("graph-rejected");
 		return false;
 	}
 	try {
 		const outcome = registration.index.append(authenticated.digest, authenticated.vertex, authenticated.byteCharge);
 		if (outcome !== undefined) {
+			if (reservation !== undefined) registration.operationAdmissionHalted = true;
 			ingressFailureLog("graph-rejected");
 			return false;
 		}
 		registration.epochBytes = updatedEpochBytes;
 	} catch {
+		if (reservation !== undefined) registration.operationAdmissionHalted = true;
 		ingressFailureLog("graph-rejected");
 		return false;
 	}
 	retainApplicationVertex(registration.applicationVertices, registration.applicationAuthors, authenticated);
 	registration.graphVersion += 1;
 	if (candidate !== null && candidate !== undefined) registration.latchedOperations.set(candidate.digest, candidate);
+	if (!commitOperationReservation(reservation)) {
+		registration.operationAdmissionHalted = true;
+		releasePendingIngress(registration, authenticated.digest);
+		ingressFailureLog("admission-rejected");
+		return true;
+	}
 	releasePendingIngress(registration, authenticated.digest);
 	if (!currentRegistration(registration)) return true;
 	const delivery = ObjectFreeze({
@@ -3235,10 +3279,58 @@ interface RecoveredV3LivePayload {
 	readonly issuanceStore: DurableIssuanceStore;
 	readonly latchedOperations: Map<string, StagedLatchedAclOperation>;
 	readonly liveJournalStore: DurableLiveJournalStore;
+	readonly operationAdmissionPolicy?: V3OperationAdmissionPolicy;
 	readonly prepared: PreparedV3LivePayload;
 	readonly quarantinedDigests: ReadonlySet<string>;
 	readonly retainedBootstrapHold: boolean;
 	readonly terminal: boolean;
+}
+
+type FreshOperationAdmissionReservation = Extract<V3OperationAdmissionReservation, { readonly kind: "fresh" }>;
+
+function operationAdmissionPolicy(value: unknown): V3OperationAdmissionPolicy | undefined {
+	return isObject(value) && typeof Reflect.get(value, "reserve") === "function"
+		? (value as unknown as V3OperationAdmissionPolicy)
+		: undefined;
+}
+
+function reserveOperation(
+	policy: V3OperationAdmissionPolicy | undefined,
+	operation: Readonly<Record<string, unknown>>
+): FreshOperationAdmissionReservation | null | undefined {
+	if (policy === undefined) return undefined;
+	try {
+		const reservation = policy.reserve(operation);
+		const fresh = snapshotClosedRecord(reservation, ["commit", "kind", "release"]);
+		if (
+			fresh !== undefined &&
+			fresh.kind === "fresh" &&
+			typeof fresh.commit === "function" &&
+			typeof fresh.release === "function"
+		) {
+			return reservation as FreshOperationAdmissionReservation;
+		}
+		return null;
+	} catch {
+		return null;
+	}
+}
+
+function commitOperationReservation(reservation: FreshOperationAdmissionReservation | undefined): boolean {
+	if (reservation === undefined) return true;
+	try {
+		return reservation.commit() === "committed";
+	} catch {
+		return false;
+	}
+}
+
+function releaseOperationReservation(reservation: FreshOperationAdmissionReservation | undefined): void {
+	try {
+		reservation?.release();
+	} catch {
+		// The policy remains fail closed even when a best-effort pre-durable release rejects.
+	}
 }
 
 const recoveredV3LiveAuthority = new WeakMap<object, RecoveredV3LivePayload>();
@@ -3474,16 +3566,21 @@ function openRecoveryAuthorization(
 export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput): Promise<RecoverV3LiveReplicaResult> {
 	try {
 		const legacyInput =
-			snapshotClosedRecord(rawInput, LEGACY_RECOVERY_INPUT_KEYS) ??
-			snapshotClosedRecord(rawInput, LEGACY_DISPLACED_RECOVERY_INPUT_KEYS);
+			snapshotRecoveryRecord(rawInput, LEGACY_RECOVERY_INPUT_KEYS) ??
+			snapshotRecoveryRecord(rawInput, LEGACY_DISPLACED_RECOVERY_INPUT_KEYS);
 		const latchedInput =
-			snapshotClosedRecord(rawInput, LATCHED_RECOVERY_INPUT_KEYS) ??
-			snapshotClosedRecord(rawInput, LATCHED_DISPLACED_RECOVERY_INPUT_KEYS) ??
-			snapshotClosedRecord(rawInput, LATCHED_TERMINAL_RECOVERY_INPUT_KEYS) ??
-			snapshotClosedRecord(rawInput, LATCHED_CROSS_OBJECT_RECOVERY_INPUT_KEYS) ??
-			snapshotClosedRecord(rawInput, LATCHED_RETAINED_BOOTSTRAP_RECOVERY_INPUT_KEYS);
+			snapshotRecoveryRecord(rawInput, LATCHED_RECOVERY_INPUT_KEYS) ??
+			snapshotRecoveryRecord(rawInput, LATCHED_DISPLACED_RECOVERY_INPUT_KEYS) ??
+			snapshotRecoveryRecord(rawInput, LATCHED_TERMINAL_RECOVERY_INPUT_KEYS) ??
+			snapshotRecoveryRecord(rawInput, LATCHED_CROSS_OBJECT_RECOVERY_INPUT_KEYS) ??
+			snapshotRecoveryRecord(rawInput, LATCHED_RETAINED_BOOTSTRAP_RECOVERY_INPUT_KEYS);
 		const input = legacyInput ?? latchedInput;
 		if (input === undefined) return recoveryFailure("malformed-input", "v3 recovery input is invalid");
+		const rawOperationAdmissionPolicy = Reflect.get(input, OPERATION_ADMISSION_POLICY_KEY);
+		const selectedOperationAdmissionPolicy = operationAdmissionPolicy(rawOperationAdmissionPolicy);
+		if (rawOperationAdmissionPolicy !== undefined && selectedOperationAdmissionPolicy === undefined) {
+			return recoveryFailure("malformed-input", "v3 operation admission policy is invalid");
+		}
 		const terminalClassifier = Reflect.get(input, "classifyTerminalVertex");
 		if (terminalClassifier !== undefined && typeof terminalClassifier !== "function") {
 			return recoveryFailure("malformed-input", "v3 terminal classifier is invalid");
@@ -3788,6 +3885,13 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				if (updatedEpochBytes === undefined) {
 					return recoveryFailure("graph-rejected", "v3 journal replay is at capacity");
 				}
+				const reservation = reserveOperation(
+					selectedOperationAdmissionPolicy,
+					authenticated.vertex.operation as Readonly<Record<string, unknown>>
+				);
+				if (reservation === null) {
+					return recoveryFailure("admission-rejected", "v3 journal replay operation was rejected");
+				}
 				try {
 					const outcome = index.append(authenticated.digest, authenticated.vertex, authenticated.byteCharge);
 					if (outcome !== undefined) return recoveryFailure("graph-rejected", "v3 journal replay is at capacity");
@@ -3799,6 +3903,9 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				recoveredCount += 1;
 				recoveredVertices.push(authenticated.admitted);
 				if (candidate !== null && candidate !== undefined) latchedOperations.set(candidate.digest, candidate);
+				if (!commitOperationReservation(reservation)) {
+					return recoveryFailure("admission-rejected", "v3 journal replay policy commit failed");
+				}
 				if (terminalClassification === "terminal-authorized") recoveredTerminal = true;
 				journalAfterSequence = expectedSequence;
 			}
@@ -3929,6 +4036,15 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				}
 				updatedEpochBytes = nextBytes;
 			}
+			const reservation = alreadyRecovered
+				? undefined
+				: reserveOperation(
+						selectedOperationAdmissionPolicy,
+						authenticated.vertex.operation as Readonly<Record<string, unknown>>
+					);
+			if (reservation === null) {
+				return recoveryFailure("admission-rejected", "v3 recovery operation was rejected");
+			}
 			let appended;
 			try {
 				appended = await journal.appendAccepted({
@@ -3960,6 +4076,9 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				recoveredCount += 1;
 				recoveredVertices.push(authenticated.admitted);
 				if (candidate !== null && candidate !== undefined) latchedOperations.set(candidate.digest, candidate);
+				if (!commitOperationReservation(reservation)) {
+					return recoveryFailure("admission-rejected", "v3 recovery policy commit failed");
+				}
 				if (terminalClassification === "terminal-authorized") recoveredTerminal = true;
 			}
 			afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
@@ -4095,6 +4214,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				issuanceStore: issuance,
 				latchedOperations,
 				liveJournalStore: journal,
+				operationAdmissionPolicy: selectedOperationAdmissionPolicy,
 				prepared: payload,
 				quarantinedDigests,
 				retainedBootstrapHold,
@@ -4354,6 +4474,9 @@ async function issueOneVertex(
 	requireTerminalAuthorization = false
 ): Promise<InternalLocalIssueResult> {
 	if (!currentRegistration(registration)) return localIssueFailure("not-active", "v3 plane is not active");
+	if (registration.operationAdmissionHalted) {
+		return localIssueFailure("admission-rejected", "v3 operation admission is halted until recovery");
+	}
 	if (registration.index.size >= registration.payload.parameters.maxEpochVertices) {
 		return localIssueFailure("graph-rejected", "v3 local issue graph is at capacity");
 	}
@@ -4371,6 +4494,10 @@ async function issueOneVertex(
 	const proposedAcl = aclOperation(scope.author, "0".repeat(64), operation);
 	if (!validateLatchedOperation(registration.authorization, registration.latchedOperations, proposedAcl)) {
 		return localIssueFailure("authorization-rejected", "v3 local ACL operation is not authorized");
+	}
+	const reservation = reserveOperation(registration.operationAdmissionPolicy, operation);
+	if (reservation === null) {
+		return localIssueFailure("admission-rejected", "v3 local operation was rejected before issuance");
 	}
 
 	let commit: unknown;
@@ -4430,6 +4557,11 @@ async function issueOneVertex(
 			operation,
 		});
 	} catch {
+		if (!signerResolved && !terminalTransactionStarted) {
+			releaseOperationReservation(reservation);
+		} else if (reservation !== undefined) {
+			registration.operationAdmissionHalted = true;
+		}
 		if (requireTerminalAuthorization && terminalTransactionStarted) {
 			return internalLocalIssueFailure(
 				"issuance-rejected",
@@ -4446,10 +4578,12 @@ async function issueOneVertex(
 	const committedFailure = (
 		kind: Exclude<Extract<V3LocalIssueResult, { readonly ok: false }>["kind"], "split-required">,
 		detail: string
-	): InternalLocalIssueResult =>
-		requireTerminalAuthorization
+	): InternalLocalIssueResult => {
+		if (reservation !== undefined) registration.operationAdmissionHalted = true;
+		return requireTerminalAuthorization
 			? internalLocalIssueFailure(kind, detail, "outcome-unknown")
 			: localIssueFailure(kind, detail);
+	};
 	const row = outboxRowSnapshot(ObjectFreeze({ commit, publishState: "pending" as const }), scope);
 	if (row === undefined) return committedFailure("issuance-rejected", "v3 local issue record is invalid");
 
@@ -4544,6 +4678,10 @@ async function issueOneVertex(
 	registration.graphVersion += 1;
 	if (acceptedAcl !== null && acceptedAcl !== undefined) {
 		registration.latchedOperations.set(acceptedAcl.digest, acceptedAcl);
+	}
+	if (!commitOperationReservation(reservation)) {
+		registration.operationAdmissionHalted = true;
+		return localIssueFailure("admission-rejected", "v3 local operation policy commit failed");
 	}
 	let terminalDisposition: InternalLocalIssueResult["terminalDisposition"];
 	if (currentRegistration(registration)) {
@@ -5821,6 +5959,8 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				mode,
 				networkNode: boundNetworkNode,
 				onAdmittedVertex: boundSink,
+				operationAdmissionHalted: false,
+				operationAdmissionPolicy: recovered.operationAdmissionPolicy,
 				payload,
 				pendingIngress: new IntrinsicMap<string, PendingV3Ingress>(),
 				pendingIngressBytes: 0,
