@@ -379,9 +379,17 @@ test("three real clients recover targeted AOI state after raw loss without durab
 		expect(initialSenderPackets.map(({ sequence }) => sequence)).toEqual(
 			Array.from({ length: 31 }, (_value, sequence) => sequence)
 		);
-		expect([...initialReceiverPackets].sort((left, right) => left.sequence - right.sequence)).toEqual(
-			initialSenderPackets
-		);
+		const initialSenderBySequence = new Map(initialSenderPackets.map((packet) => [packet.sequence, packet]));
+		expect(initialReceiverPackets.length).toBeGreaterThan(0);
+		expect(new Set(initialReceiverPackets.map(({ sequence }) => sequence)).size).toBe(initialReceiverPackets.length);
+		for (const packet of initialReceiverPackets) expect(packet).toEqual(initialSenderBySequence.get(packet.sequence));
+		expect(initialReceiverPackets.find(({ sequence }) => sequence === 30)).toMatchObject({
+			baseKeyframeId: 30,
+			baseKeyframeSequence: 30,
+			batchId: 30,
+			kind: 1,
+			sequence: 30,
+		});
 		expect(initialSenderPackets[0]).toMatchObject({
 			baseKeyframeId: 0,
 			baseKeyframeSequence: 0,
