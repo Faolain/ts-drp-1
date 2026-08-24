@@ -8,7 +8,9 @@ const ZONE_SOURCE = readFileSync("examples/grid/src/v3-zone.ts", "utf8");
 const ROUTE_HEADER_BYTES = 33;
 const AUTHORITY_HEADER_BYTES = 73;
 const EPHEMERAL_HEADER_BYTES = 16;
-const MAX_ENTITY_BATCH_BYTES = 514;
+const PROJECTION_HEADER_BYTES = 25;
+const PROJECTION_RECORD_BYTES = 17;
+const MAX_ENTITY_COUNT = 32;
 
 function targetedCompositionIsOwned(): boolean {
 	const start = ZONE_SOURCE.indexOf("async publishAoiPopulation(");
@@ -17,7 +19,8 @@ function targetedCompositionIsOwned(): boolean {
 	const owner = ZONE_SOURCE.slice(start, end);
 	return (
 		owner.includes("selectAoiEntityDeltas(") &&
-		owner.includes("encodeEntityDeltaBatch(") &&
+		owner.includes("createAoiProjectionSender(") &&
+		owner.includes('class: "unreliable-unordered"') &&
 		owner.includes("ephemeral.publishTo(") &&
 		!owner.includes("ephemeral.publish({")
 	);
@@ -193,9 +196,12 @@ test("one real observer receives 32 targeted entities below the routed downstrea
 		const routedBytesReceived = observerAfter.rawTransport.routedBytesReceived - receiverBytesBaseline;
 		const routedBytesSent = (await zone(creator)).rawTransport.routedBytesSent - senderBytesBaseline;
 		const excludedRoutedBytes = excludedAfter.rawTransport.routedBytesReceived - excludedBytesBaseline;
-		const targetedKeyBytes = new TextEncoder().encode(`aoi:${observerPeerId}`).byteLength;
 		const expectedRoutedBytesPerBatch =
-			ROUTE_HEADER_BYTES + AUTHORITY_HEADER_BYTES + EPHEMERAL_HEADER_BYTES + targetedKeyBytes + MAX_ENTITY_BATCH_BYTES;
+			ROUTE_HEADER_BYTES +
+			AUTHORITY_HEADER_BYTES +
+			EPHEMERAL_HEADER_BYTES +
+			PROJECTION_HEADER_BYTES +
+			MAX_ENTITY_COUNT * PROJECTION_RECORD_BYTES;
 		expect(routedBytesSent).toBe(expectedRoutedBytesPerBatch * SAMPLE_COUNT);
 		expect(routedBytesReceived).toBe(routedBytesSent);
 		expect(excludedRoutedBytes).toBe(0);
