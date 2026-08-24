@@ -1,4 +1,13 @@
-# Slice E4-02: Zone Bandwidth Proof
+# Slice E4-04: Zone Bandwidth Proof
+
+## Reconciliation
+
+Signed E4-02 (`55d8eecf`) proved targeted fixed-batch delivery to a bounded
+three-member roster and exposed routed-byte accounting. Its 34 static entities
+and roughly ten-second browser control did not exercise loss-tolerant
+projection, 128 moving entities, a 20-second boundary campaign or selected
+candidate-pair bandwidth. E4-03 projection recovery is therefore a prerequisite
+and this original bandwidth claim remains open.
 
 ## Contract
 
@@ -8,12 +17,12 @@ no durable vertices.
 
 ## Product seam
 
-Add `publishTo(recipients, input)` as the unreliable-only selective operation on
-the class-aware transport port established in E3-00. Every target must already
-be E2-authorized; targeting cannot authorize a peer. The zone composes AOI
-selection and delta encoding in the fabric workbench without a second filter.
+Reuse the shipped `publishTo(recipients, input)` unreliable-only operation.
+Every target must already be E2-authorized; targeting cannot authorize a peer.
+The zone composes the existing AOI selection and E4-03 projection owner in the
+fabric workbench without a second filter.
 
-AOI batches use `unreliable-unordered`; `@ts-drp/aoi` owns their generation,
+AOI batches use `unreliable-unordered`; `@ts-drp/ephemeral` owns their generation,
 batch, chunk, ordering and replay rules. Movement continues to use the existing
 single `unreliable-sequenced` key per sender. The two-client proof therefore
 remains within the zone's current one-key/two-sender sequenced budget and

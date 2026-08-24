@@ -2,10 +2,11 @@
 
 ## Next Agent Prompt
 
-Status: planned on 2026-08-20 from tracked-clean signed HEAD
-`687ea7ce0b857e418046d811bc4299cac93a0a91`. Shared v3-room recovery,
-two-client chat convergence, zone adoption, corrected E2 authority binding, and
-T1–T4 topology are already shipped. Do not rebuild them.
+Status: reconciled on 2026-08-24 from tracked-clean signed HEAD
+`f6b3da881f9880444145a0617ae77e1c7bc88f2e`. Shared v3-room recovery,
+two-client chat convergence, zone adoption, corrected E2 authority binding,
+T1–T4 topology, the E3 transport track, deterministic AOI selection and
+targeted AOI delivery are already shipped. Do not rebuild them.
 
 This is a parallel product track, not the core durable-lifecycle spine. First
 retain the signed T4 result and record the current two-client chat/zone baseline:
@@ -13,11 +14,13 @@ create/join, durable message or `placeBlock`, E1 movement, disconnect/reconnect,
 and durable convergence. Then E3/E4 may proceed alongside Phase 3f–3h. E5 waits
 for the stable durable-command and authority boundaries established by Phase 3.
 
-When taking up this track, start with
-[Slice E3-00](slices/00-independent-delivery-lanes.md). Land its tests-only RED
-and GREEN separately. The first contract is only that a blocked reliable
-publication cannot stall an unreliable publication before transport. Do not
-implement WebRTC in that slice.
+The next product slice is
+[Slice E4-03](slices/05-loss-tolerant-deltas.md). Land its tests-only RED and
+GREEN separately. E4-01 (`f57afdd3`) shipped deterministic AOI selection and a
+bounded fixed batch. E4-02 (`55d8eecf`) shipped authorized targeted delivery.
+Those signed implementation labels are prerequisites, not evidence that the
+older active-spec slices 05 and 06 are complete. E4-03 adds loss-tolerant
+projection; E4-04 then runs the original 128-entity browser bandwidth proof.
 
 Warnings:
 
@@ -39,16 +42,18 @@ Warnings:
 
 Global checklist:
 
-- [ ] [E3-00](slices/00-independent-delivery-lanes.md): split reliable and
+- [x] [E3-00](slices/00-independent-delivery-lanes.md): split reliable and
       unreliable drains.
-- [ ] [E3-01](slices/01-authenticated-unreliable-webrtc.md): add the bounded
+- [x] [E3-01](slices/01-authenticated-unreliable-webrtc.md): add the bounded
       authenticated raw WebRTC owner.
-- [ ] [E3-02](slices/02-zone-transport-adoption.md): route zone movement over
+- [x] [E3-02](slices/02-zone-transport-adoption.md): route zone movement over
       raw WebRTC while preserving E2.
-- [ ] [E3-03](slices/03-loss-and-hol-proof.md): prove the 30% loss/no-HOL claim.
-- [ ] [E4-00](slices/04-deterministic-aoi.md): ship deterministic AOI selection.
-- [ ] [E4-01](slices/05-loss-tolerant-deltas.md): ship bounded keyframes/deltas.
-- [ ] [E4-02](slices/06-zone-bandwidth-proof.md): prove 32 visible entities at
+- [x] [E3-03](slices/03-loss-and-hol-proof.md): prove the 30% loss/no-HOL claim.
+- [x] [E4-00](slices/04-deterministic-aoi.md): ship deterministic AOI selection,
+      its bounded fixed batch and authorized targeted delivery prerequisites.
+- [ ] [E4-03](slices/05-loss-tolerant-deltas.md): ship bounded loss-tolerant
+      keyframes/deltas in the existing AOI owner.
+- [ ] [E4-04](slices/06-zone-bandwidth-proof.md): prove 32 visible entities at
       no more than 256 kbps down.
 - [ ] [E5-00](slices/07-cosigned-intent.md): define canonical co-signed intent.
 - [ ] [E5-01](slices/08-prejournal-commit-admission.md): enforce it before local
@@ -79,16 +84,16 @@ E5 makes a two-party outcome durable exactly once.
 - `examples/v3-room` owns trust, invite, recovery, issuance, projection,
   ingress, and reconnect composition.
 - `examples/grid/src/v3-zone.ts` already adopts that owner, publishes movement
-  as `unreliable-sequenced`, and retains `placeBlock` as a durable command.
-- `@ts-drp/ephemeral` already owns delivery classes, canonical frames, latest
-  sequence watermarks, E2 authority comparison, replay rejection, and bounded
-  receive work.
-- `NodeEphemeralAdapter` currently carries every class over signed GossipSub
-  and authenticated reliable streams.
-- The single current ephemeral drain lets a pending reliable send block a later
-  unreliable send before transport.
-- `@libp2p/webrtc@6.0.26` creates reliable channels internally and does not
-  expose the channel options or peer connection needed by E3.
+  as `unreliable-sequenced`, sends targeted fixed AOI batches as
+  `unreliable-unordered`, and retains `placeBlock` as a durable command.
+- `@ts-drp/ephemeral` owns delivery classes, canonical frames, latest sequence
+  watermarks, E2 authority comparison, replay rejection, bounded receive work,
+  deterministic AOI selection and the fixed AOI batch codec.
+- `@ts-drp/network` and `NodeEphemeralAdapter` own authenticated raw WebRTC,
+  independent reliable/raw drains, lane selection and targeted routing.
+- The remaining E4 defect is projection recovery: the zone replaces its visible
+  population from each decoded fixed batch, so a lost batch has no generation,
+  base-keyframe, atomic assembly or bounded wait-for-keyframe semantics.
 - T1–T4 already bound libp2p connection admission, selection, and relay
   preference. E3 must not introduce a raw peer dial or second topology owner.
 
@@ -100,7 +105,7 @@ E5 makes a two-party outcome durable exactly once.
 | Raw WebRTC signaling, peer link, data channel, routing and backpressure | `@ts-drp/network`                           |
 | Reliable/raw lane selection plus E2 peer-author projection              | `NodeEphemeralAdapter`                      |
 | Durable room authority and reconnect                                    | `examples/v3-room` + existing v3-live owner |
-| Deterministic AOI and delta codec                                       | new `@ts-drp/aoi`                           |
+| Deterministic AOI, fixed batch and loss-tolerant projection             | `@ts-drp/ephemeral`                         |
 | Canonical co-signed intent/proof                                        | new `@ts-drp/outcome-commit`                |
 | Product composition and workbench                                       | `examples/grid`                             |
 
@@ -116,9 +121,9 @@ E3-00 split drains
    -> E3-01 raw authenticated WebRTC
       -> E3-02 zone adoption
          -> E3-03 real loss/no-HOL proof
-            -> E4-00 deterministic AOI
-               -> E4-01 resilient delta codec
-                  -> E4-02 bandwidth/browser proof
+            -> E4-00 deterministic AOI + targeted-delivery prerequisites
+               -> E4-03 resilient projection
+                  -> E4-04 bandwidth/browser proof
                      -> E5-00 co-signed intent
                         -> E5-01 pre-journal admission
                            -> E5-02 genuine referee arm
