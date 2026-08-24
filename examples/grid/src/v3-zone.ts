@@ -105,6 +105,20 @@ export interface ZoneFabricWorkbench {
 
 export interface ZoneSnapshot {
 	readonly acceptedOperationDigest: string;
+	readonly aoiBandwidth: Readonly<
+		Record<
+			string,
+			Readonly<{
+				readonly durableDelta: number;
+				readonly elapsedMs: number;
+				readonly inputEntityCount: number;
+				readonly projectionBitsPerSecond: number;
+				readonly projectionPayloadBytesSent: number;
+				readonly publicationCount: number;
+				readonly selectedEntityCount: number;
+			}>
+		>
+	>;
 	readonly aoiPopulations: Readonly<Record<string, readonly EntityDelta[]>>;
 	readonly aoiProjection: Readonly<
 		Record<
@@ -139,6 +153,7 @@ export interface ZoneSnapshot {
 			readonly ordered: boolean;
 			readonly peerId: string;
 		}>[];
+		readonly overLimit: number;
 		readonly received: number;
 		readonly routedBytesReceived: number;
 		readonly routedBytesSent: number;
@@ -163,8 +178,16 @@ interface Enrollment {
 
 interface AoiProjectionSenderState {
 	readonly authorityGeneration: number;
+	readonly durableBaseline: number;
+	durableDelta: number;
+	inputEntityCount: number;
+	lastPublishedAtMs: number;
 	readonly maxEnvelopeBytes: number;
 	nextSequence: number;
+	projectionPayloadBytesSent: number;
+	publicationCount: number;
+	selectedEntityCount: number;
+	startedAtMs: number | undefined;
 	readonly sender: AoiProjectionSender;
 }
 
@@ -295,6 +318,24 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 
 	const snapshot = (): ZoneSnapshot => {
 		const aoiEntries = [...aoiPopulations.entries()].sort(([left], [right]) => compareText(left, right));
+		const aoiBandwidthEntries = [...aoiSenders.entries()]
+			.filter(([, state]) => state.publicationCount > 0)
+			.map(([peerId, state]) => {
+				const elapsedMs = Math.max(0, state.lastPublishedAtMs - (state.startedAtMs ?? state.lastPublishedAtMs));
+				return [
+					peerId,
+					Object.freeze({
+						durableDelta: state.durableDelta,
+						elapsedMs,
+						inputEntityCount: state.inputEntityCount,
+						projectionBitsPerSecond: elapsedMs === 0 ? 0 : (state.projectionPayloadBytesSent * 8_000) / elapsedMs,
+						projectionPayloadBytesSent: state.projectionPayloadBytesSent,
+						publicationCount: state.publicationCount,
+						selectedEntityCount: state.selectedEntityCount,
+					}),
+				] as const;
+			})
+			.sort(([left], [right]) => compareText(left, right));
 		const aoiProjectionEntries = [...aoiReceivers.entries()]
 			.map(([peerId, { receiver }]) => [peerId, projectionView(receiver.snapshot())] as const)
 			.sort(([left], [right]) => compareText(left, right));
@@ -305,6 +346,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 				"ts-drp/d9346-zone-accepted-operations/v1",
 				encodeCanonical(projection.acceptedDigests)
 			),
+			aoiBandwidth: Object.freeze(Object.fromEntries(aoiBandwidthEntries)),
 			aoiPopulations: Object.freeze(Object.fromEntries(aoiEntries)),
 			aoiProjection: Object.freeze(Object.fromEntries(aoiProjectionEntries)),
 			blocks: projection.blocks,
@@ -332,6 +374,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 						Object.freeze({ label, maxRetransmits, ordered, peerId })
 					)
 				),
+				overLimit: ephemeral?.stats().overLimit ?? 0,
 				received: raw?.received ?? 0,
 				routedBytesReceived: raw?.routedBytesReceived ?? 0,
 				routedBytesSent: raw?.routedBytesSent ?? 0,
@@ -783,6 +826,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 			const maxEnvelopeBytes = ephemeral.maxEnvelopeBytes?.("unreliable-unordered");
 			if (authorityGeneration === undefined || maxEnvelopeBytes === undefined || maxEnvelopeBytes < 42) return false;
 			const { createAoiProjectionSender, selectAoiEntityDeltas } = await projectionModule;
+			const inputEntityCount = input.entities.length;
 			const selected = selectAoiEntityDeltas({
 				entities: input.entities,
 				maxEntities: 32,
@@ -796,16 +840,26 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 				senderState.authorityGeneration !== authorityGeneration ||
 				senderState.maxEnvelopeBytes !== maxEnvelopeBytes
 			) {
+				const nowMs = Date.now();
 				senderState = {
 					authorityGeneration,
+					durableBaseline: projection.acceptedDigests.length,
+					durableDelta: 0,
+					inputEntityCount: 0,
+					lastPublishedAtMs: nowMs,
 					maxEnvelopeBytes,
 					nextSequence: 0,
+					projectionPayloadBytesSent: 0,
+					publicationCount: 0,
+					selectedEntityCount: 0,
+					startedAtMs: undefined,
 					sender: createAoiProjectionSender({ generation: authorityGeneration, maxPayloadBytes: maxEnvelopeBytes }),
 				};
 				aoiSenders.set(input.observerPeerId, senderState);
 			}
 			const packets = senderState.sender.encode({ entities: selected, sequence: senderState.nextSequence });
 			senderState.nextSequence += 1;
+			let projectionPayloadBytesSent = 0;
 			for (const payload of packets) {
 				if (
 					!(await ephemeral.publishTo([input.observerPeerId], {
@@ -816,7 +870,17 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 				) {
 					return false;
 				}
+				projectionPayloadBytesSent += payload.byteLength;
 			}
+			const publishedAtMs = Date.now();
+			senderState.durableDelta = projection.acceptedDigests.length - senderState.durableBaseline;
+			senderState.inputEntityCount = inputEntityCount;
+			senderState.lastPublishedAtMs = publishedAtMs;
+			senderState.projectionPayloadBytesSent += projectionPayloadBytesSent;
+			senderState.publicationCount += 1;
+			senderState.selectedEntityCount = selected.length;
+			senderState.startedAtMs ??= publishedAtMs;
+			emit();
 			return true;
 		},
 		async rehearseMigration(): Promise<V3RoomMigrationRehearsalReceipt> {

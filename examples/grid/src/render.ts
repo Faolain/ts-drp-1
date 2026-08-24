@@ -36,6 +36,7 @@ export function renderZone(snapshot: ZoneSnapshot): void {
 	const copy = document.getElementById("copyGridId");
 	if (copy instanceof HTMLButtonElement) copy.style.display = snapshot.ready ? "inline" : "none";
 	renderFabric(snapshot);
+	renderAoiBandwidth(snapshot);
 	renderAoiProjection(snapshot);
 	const grid = document.getElementById("grid");
 	if (!(grid instanceof HTMLDivElement)) return;
@@ -65,6 +66,31 @@ export function renderZone(snapshot: ZoneSnapshot): void {
 		element.style.background = "#2d8cff";
 		grid.appendChild(element);
 	}
+}
+
+function renderAoiBandwidth(snapshot: ZoneSnapshot): void {
+	const container = document.getElementById("aoiBandwidthWorkbench");
+	if (!(container instanceof HTMLElement)) return;
+	const heading = document.createElement("h2");
+	heading.textContent = "AOI bandwidth workbench";
+	const description = document.createElement("p");
+	description.textContent =
+		"AOI projection payload throughput is a product diagnostic; browser candidate-pair bytes remain the acceptance authority.";
+	const rows = Object.entries(snapshot.aoiBandwidth).map(([peerId, diagnostic]) => {
+		const row = document.createElement("p");
+		row.dataset.aoiBandwidthPeer = peerId;
+		row.textContent = `${peerId}: ${String(diagnostic.selectedEntityCount)} / ${String(
+			diagnostic.inputEntityCount
+		)} visible, ${(diagnostic.projectionBitsPerSecond / 1_000).toFixed(2)} kbps projection payload, ${String(
+			diagnostic.publicationCount
+		)} publications, ${String(diagnostic.projectionPayloadBytesSent)} bytes, durable delta ${String(
+			diagnostic.durableDelta
+		)}, over-limit ${String(snapshot.rawTransport.overLimit)}`;
+		return row;
+	});
+	const empty = document.createElement("p");
+	empty.textContent = "Waiting for outbound AOI projection data.";
+	container.replaceChildren(heading, description, ...(rows.length === 0 ? [empty] : rows));
 }
 
 function renderAoiProjection(snapshot: ZoneSnapshot): void {
