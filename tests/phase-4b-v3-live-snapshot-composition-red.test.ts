@@ -721,12 +721,14 @@ describe("Phase 4b-b live snapshot replacement composition tests-only RED", () =
 					const network = fakeNetwork(`peer:phase4b:shape-${label}`);
 					const subscribe = vi.spyOn(queues, "subscribe");
 					const base = activationRecord(snapshotInput(recovered.capability, network, valid, queues));
+					clearMockRecord(recovered.journal);
+					clearMockRecord(recovered.issuanceStore);
 					const result = activateV3LivePlane(mutate(base) as V3PlaneActivationInput);
 					expect(result, label).toEqual(expect.objectContaining({ kind: "malformed-input", ok: false }));
 					expect(Object.isFrozen(result), label).toBe(true);
 					expectNoRegistrationEffects(network, queues, subscribe);
-					expect(recovered.journal.appendAccepted).not.toHaveBeenCalled();
-					expect(recovered.issuanceStore.transactIssue).not.toHaveBeenCalled();
+					expectNoMockRecordCalls(recovered.journal);
+					expectNoMockRecordCalls(recovered.issuanceStore);
 					after?.();
 					const replay = activateGenesis(recovered.capability, `peer:phase4b:shape-${label}-control`);
 					expect(replay.ok, `${label} must reject before consuming the capability`).toBe(true);
