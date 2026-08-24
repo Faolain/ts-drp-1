@@ -100,7 +100,8 @@ export interface GenuinePreparedV3FixtureOptions {
 	readonly historyRoot?: string;
 	readonly historySize?: number;
 	readonly exactCanonicalInitialStateBytes?: Uint8Array;
-	readonly latchedAclGroups?: readonly ("admin" | "finality" | "writer")[];
+	readonly latchedAclGroups?: readonly ("admin" | "finality" | "referee" | "writer")[];
+	readonly latchedAclVersion?: 1 | 2;
 	readonly objectId?: string;
 	readonly prepareV3LiveGeneration?: typeof defaultPrepareV3LiveGeneration;
 }
@@ -241,7 +242,7 @@ export async function createGenuinePreparedV3Fixture(
 						})),
 						objectId: base.anchor.objectId,
 						permissionless: false,
-						version: 1,
+						version: options.latchedAclVersion ?? 1,
 					})
 				: undefined;
 		const anchor = Object.freeze({
