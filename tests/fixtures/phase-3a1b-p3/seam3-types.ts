@@ -180,12 +180,24 @@ type ExpectedLocalIssueResult =
 			readonly detail: string;
 	  }>;
 
-interface ExpectedInput {
+type ExpectedGenesisActivationInput = {
 	readonly capability: RecoveredV3Live;
 	readonly messageQueueManager: MessageQueueManager<Message>;
 	readonly networkNode: DRPNetworkNode;
 	readonly onAdmittedVertex: ExpectedSink;
-}
+};
+
+type ExpectedSnapshotActivationInput = {
+	readonly capability: RecoveredV3Live;
+	readonly exactCanonicalPayloadBytes: Uint8Array;
+	readonly expectedApplicationStateDigest: string;
+	readonly expectedPayloadDigest: string;
+	readonly messageQueueManager: MessageQueueManager<Message>;
+	readonly networkNode: DRPNetworkNode;
+	readonly onAdmittedVertex: ExpectedSink;
+};
+
+type ExpectedInput = ExpectedGenesisActivationInput | ExpectedSnapshotActivationInput;
 
 type ExpectedActivationResult =
 	| Readonly<{ ok: true; handle: ExpectedHandle }>
