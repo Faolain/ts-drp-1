@@ -17,6 +17,8 @@ export interface GroupPeerChange {
 
 export type GroupPeerChangeHandler = (change: GroupPeerChange) => void;
 
+export type PeerConnectionHandler = (peerId: string) => void;
+
 /** Handler invoked when a remote peer's transport connection closes. */
 export type PeerDisconnectHandler = (peerId: string) => void;
 
@@ -632,6 +634,13 @@ export interface DRPNetworkNode {
 	 * @returns A function that removes the handler
 	 */
 	subscribeToGroupPeerChanges(handler: GroupPeerChangeHandler): () => void;
+
+	/**
+	 * Subscribes to genuine authenticated remote transport connections.
+	 * @param handler - Handler invoked with the connected peer ID
+	 * @returns A function that removes the handler
+	 */
+	subscribeToPeerConnections?(handler: PeerConnectionHandler): () => void;
 
 	/**
 	 * Subscribes to genuine remote transport disconnections.

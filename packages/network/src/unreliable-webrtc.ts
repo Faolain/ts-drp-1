@@ -42,6 +42,7 @@ export interface DRPUnreliableWebRtcRoute {
 	readonly maxPayloadBytes: number;
 	close(): void;
 	onMessage(listener: (ingress: { readonly bytes: Uint8Array; readonly sender: string }) => void): () => void;
+	reconcile(peers: readonly string[]): Promise<void>;
 	send(peers: readonly string[], bytes: Uint8Array): Promise<boolean>;
 	snapshot(): DRPUnreliableWebRtcSnapshot;
 }
@@ -453,6 +454,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			close(): void {},
 			maxPayloadBytes: MAX_PAYLOAD_BYTES,
 			onMessage: (): (() => void) => (): void => undefined,
+			reconcile: (): Promise<void> => Promise.resolve(),
 			send: (): Promise<boolean> => Promise.resolve(false),
 			snapshot: (): DRPUnreliableWebRtcSnapshot => this.#snapshot(),
 		});
@@ -471,6 +473,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 					registration.listeners.delete(listener);
 				};
 			},
+			reconcile: (peers: readonly string[]): Promise<void> => this.#reconcile(registration, peers),
 			send: (peers: readonly string[], bytes: Uint8Array): Promise<boolean> => this.#send(registration, peers, bytes),
 			snapshot: (): DRPUnreliableWebRtcSnapshot => this.#snapshot(),
 		});
@@ -483,6 +486,11 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		this.#routes.delete(registration.routeId);
 		this.#routesByDigest.delete(registration.digestHex);
 		if (this.#routes.size === 0) this.#closeAllLinks();
+	}
+
+	async #reconcile(registration: RouteRegistration, peers: readonly string[]): Promise<void> {
+		if (this.#closed || registration.closed || new Set(peers).size !== peers.length) return;
+		await Promise.all(peers.slice(0, MAX_LINKS).map((peerId) => this.#linkFor(peerId)));
 	}
 
 	async #send(registration: RouteRegistration, peers: readonly string[], bytes: Uint8Array): Promise<boolean> {

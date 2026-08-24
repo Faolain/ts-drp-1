@@ -5,8 +5,14 @@ import {
 	type EphemeralChannel,
 	type EphemeralChannelOptions,
 	type EphemeralIngress,
+	inspectEphemeralDeliveryClass,
 } from "@ts-drp/ephemeral";
-import { DRP_MESSAGE_PROTOCOL, type DRPUnreliableWebRtcOwner } from "@ts-drp/network";
+import {
+	DRP_MESSAGE_PROTOCOL,
+	type DRPUnreliableWebRtcOwner,
+	type DRPUnreliableWebRtcRoute,
+	type DRPUnreliableWebRtcSnapshot,
+} from "@ts-drp/network";
 import { type DRPNetworkNode, type IDRP, type IDRPObject, Message, MessageType } from "@ts-drp/types";
 
 const EPHEMERAL_TOPIC_DOMAIN = new TextEncoder().encode("ts-drp-ephemeral-topic-v1\u0000");
@@ -16,6 +22,7 @@ interface ObjectRegistration {
 	readonly channel: EphemeralChannel;
 	readonly mode: "legacy" | "v3";
 	readonly options: EphemeralChannelOptions;
+	readonly rawRoute: DRPUnreliableWebRtcRoute | undefined;
 }
 
 interface TopicRegistration {
@@ -88,6 +95,15 @@ export class NodeEphemeralAdapter {
 	}
 
 	/**
+	 * Read detached raw WebRTC evidence for one active authorized object.
+	 * @param objectId Durable v3 room identity.
+	 * @returns Current raw owner snapshot, or undefined outside an active v3 route.
+	 */
+	unreliableWebRtcSnapshot(objectId: string): DRPUnreliableWebRtcSnapshot | undefined {
+		return this.#byObject.get(objectId)?.rawRoute?.snapshot();
+	}
+
+	/**
 	 * Open or retrieve an object-bound channel.
 	 * @param objectId Connected object identity.
 	 * @param options Closed channel limits.
@@ -141,6 +157,10 @@ export class NodeEphemeralAdapter {
 		}
 		const topic = ephemeralTopicFor(objectId);
 		const registration: TopicRegistration = { allowDirect: !requireLegacyObject, listener: undefined };
+		const rawRoute = requireLegacyObject ? undefined : this.#unreliableWebRtcOwner?.openUnreliableWebRtcRoute(topic);
+		let unsubscribeRaw = (): void => undefined;
+		let unsubscribeGroupPeers = (): void => undefined;
+		let unsubscribePeerConnections = (): void => undefined;
 		const currentAuthority = (): ReturnType<EphemeralAuthorizationProvider["currentAuthority"]> => {
 			const authority = provider.currentAuthority();
 			return authority?.objectId === objectId ? authority : undefined;
@@ -158,6 +178,10 @@ export class NodeEphemeralAdapter {
 				})
 				.sort();
 		};
+		const reconcileRaw = (): void => {
+			if (rawRoute === undefined) return;
+			void rawRoute.reconcile(authorizedPeers()).catch(() => undefined);
+		};
 		const channel = createEphemeralChannel(
 			{
 				authorizedPeers,
@@ -173,24 +197,53 @@ export class NodeEphemeralAdapter {
 							},
 						}),
 				localPeerId: this.#networkNode.peerId,
-				maxEnvelopeBytes: (): number => EPHEMERAL_TRANSPORT_MAX_BYTES,
+				maxEnvelopeBytes: (deliveryClass): number =>
+					requireLegacyObject || deliveryClass === "reliable-unordered"
+						? EPHEMERAL_TRANSPORT_MAX_BYTES
+						: (rawRoute?.maxPayloadBytes ?? 0),
 				isAuthorized: (sender): boolean => {
 					if (!requireLegacyObject && currentAuthority() === undefined) return false;
 					const author = provider.authorForPeer(sender);
 					return author !== undefined && transportPeers().includes(sender) && provider.isCurrentWriter(author);
 				},
 				onMessage: (listener): (() => void) => {
-					registration.listener = listener;
+					registration.listener = (ingress): void => {
+						const deliveryClass = inspectEphemeralDeliveryClass(ingress.bytes);
+						if (!requireLegacyObject && deliveryClass !== undefined && deliveryClass !== "reliable-unordered") {
+							return;
+						}
+						listener(ingress);
+					};
+					unsubscribeRaw =
+						rawRoute?.onMessage((ingress): void => {
+							const deliveryClass = inspectEphemeralDeliveryClass(ingress.bytes);
+							if (deliveryClass === "reliable-unordered") return;
+							listener(ingress);
+							reconcileRaw();
+						}) ?? ((): void => undefined);
 					return (): void => {
-						if (registration.listener === listener) registration.listener = undefined;
+						registration.listener = undefined;
+						unsubscribeRaw();
+						unsubscribeRaw = (): void => undefined;
 					};
 				},
-				send: (input): Promise<boolean> => {
+				send: async (input): Promise<boolean> => {
 					if (input.recipients !== "all") return Promise.resolve(false);
-					return this.#send(topic, input.bytes, requireLegacyObject ? Object.freeze([]) : authorizedPeers());
+					if (requireLegacyObject || input.class === "reliable-unordered") {
+						return this.#send(topic, input.bytes, requireLegacyObject ? Object.freeze([]) : authorizedPeers());
+					}
+					if (rawRoute === undefined) return false;
+					const peers = authorizedPeers();
+					if (peers.length === 0) return false;
+					const results = await Promise.all(peers.map((peerId) => rawRoute.send([peerId], input.bytes)));
+					return results.some(Boolean);
 				},
 				close: (): void => {
 					try {
+						unsubscribeRaw();
+						unsubscribeGroupPeers();
+						unsubscribePeerConnections();
+						rawRoute?.close();
 						this.#networkNode.unsubscribe(topic);
 					} finally {
 						this.#byObject.delete(objectId);
@@ -204,10 +257,24 @@ export class NodeEphemeralAdapter {
 			channel,
 			mode: requireLegacyObject ? "legacy" : "v3",
 			options: { ...options },
+			rawRoute,
 		});
 		this.#byTopic.set(topic, registration);
 		try {
 			this.#networkNode.subscribe(topic);
+			if (rawRoute !== undefined) {
+				const subscribeGroupPeers = this.#networkNode.subscribeToGroupPeerChanges;
+				if (typeof subscribeGroupPeers === "function") {
+					unsubscribeGroupPeers = subscribeGroupPeers.call(this.#networkNode, (change): void => {
+						if (change.topic === topic) reconcileRaw();
+					});
+				}
+				const subscribePeerConnections = this.#networkNode.subscribeToPeerConnections;
+				if (typeof subscribePeerConnections === "function") {
+					unsubscribePeerConnections = subscribePeerConnections.call(this.#networkNode, reconcileRaw);
+				}
+				reconcileRaw();
+			}
 		} catch (error) {
 			channel.close();
 			throw error;

@@ -21,6 +21,7 @@ import { Logger } from "@ts-drp/logger";
 import { MessageQueueManager } from "@ts-drp/message-queue";
 import {
 	DRPNetworkNode as DefaultDRPNetworkNode,
+	type DRPUnreliableWebRtcSnapshot,
 	isDirectSyncIngress,
 	type NegotiatedSyncSender,
 	type SelectedSyncProtocol,
@@ -1244,6 +1245,15 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 	 */
 	openEphemeral(objectId: string, options: EphemeralChannelOptions): EphemeralChannel {
 		return this._ephemeral.open(objectId, options);
+	}
+
+	/**
+	 * Read detached raw WebRTC evidence for one active v3 ephemeral object.
+	 * @param objectId Durable v3 room identity.
+	 * @returns Current raw transport evidence, or undefined outside an active v3 route.
+	 */
+	ephemeralUnreliableWebRtcSnapshot(objectId: string): DRPUnreliableWebRtcSnapshot | undefined {
+		return this._ephemeral.unreliableWebRtcSnapshot(objectId);
 	}
 
 	/**

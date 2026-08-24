@@ -227,6 +227,24 @@ export function decodeEphemeralFrame(bytes: Uint8Array): EphemeralFrame {
 	return frame;
 }
 
+/**
+ * Inspect the delivery class carried by a canonical ephemeral frame or authority envelope.
+ * Malformed inputs remain the channel decoder's responsibility and therefore return undefined.
+ * @param bytes Candidate transport bytes.
+ * @returns The canonical delivery class, or undefined when the bytes are not a valid frame.
+ */
+export function inspectEphemeralDeliveryClass(bytes: Uint8Array): EphemeralDeliveryClass | undefined {
+	try {
+		if (bytes[0] === FRAME_VERSION) return decodeEphemeralFrame(bytes).class;
+		if (bytes[0] === AUTHORITY_FRAME_VERSION && bytes.byteLength > AUTHORITY_HEADER_BYTES) {
+			return decodeEphemeralFrame(bytes.subarray(AUTHORITY_HEADER_BYTES)).class;
+		}
+	} catch {
+		// Preserve malformed-frame accounting in the channel's single canonical decoder.
+	}
+	return undefined;
+}
+
 function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
 	if (left.byteLength !== right.byteLength) return false;
 	for (let index = 0; index < left.byteLength; index += 1) {

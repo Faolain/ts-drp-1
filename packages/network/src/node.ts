@@ -77,6 +77,7 @@ import {
 	IntervalRunnerState,
 	Message,
 	MessageType,
+	type PeerConnectionHandler,
 	type PeerDisconnectHandler,
 } from "@ts-drp/types";
 import { createLibp2p, type Libp2p, type Libp2pOptions, type ServiceFactoryMap } from "libp2p";
@@ -541,6 +542,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _reservedRelayPeerIds = new Set<string>();
 	private readonly _relayPriorityTickets = new Map<string, ExplicitDialTicket>();
 	private _groupPeerChangeHandlers = new Set<GroupPeerChangeHandler>();
+	private _peerConnectionHandlers = new Set<PeerConnectionHandler>();
 	private _peerDisconnectHandlers = new Set<PeerDisconnectHandler>();
 	private readonly _hostFactory: DRPNetworkHostFactory;
 	private readonly _hostPolicy: DRPNetworkHostPolicy;
@@ -587,6 +589,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 					close(): void {},
 					maxPayloadBytes: DRP_UNRELIABLE_WEBRTC_MAX_PAYLOAD_BYTES,
 					onMessage: (): (() => void) => (): void => undefined,
+					reconcile: (): Promise<void> => Promise.resolve(),
 					send: (): Promise<boolean> => Promise.resolve(false),
 					snapshot: () =>
 						Object.freeze({
@@ -989,7 +992,11 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 
 		log.info("::start: Successfuly started DRP network w/ peer_id", this.peerId);
 
-		this._node.addEventListener("peer:connect", (e) => log.info("::start::peer::connect", e.detail));
+		this._node.addEventListener("peer:connect", (event: CustomEvent<PeerId>) => {
+			const peerId = event.detail.toString();
+			log.info("::start::peer::connect", peerId);
+			this.notifyPeerConnection(peerId);
+		});
 		this._node.addEventListener("peer:disconnect", (event: CustomEvent<PeerId>) => {
 			const peerId = event.detail.toString();
 			log.info("::start::peer::disconnect", peerId);
@@ -2534,12 +2541,26 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		return () => this._peerDisconnectHandlers.delete(handler);
 	}
 
+	/**
+	 * Subscribe to genuine remote transport connections.
+	 * @param handler - Handler invoked with the connected peer ID
+	 * @returns A function that removes the handler
+	 */
+	subscribeToPeerConnections(handler: PeerConnectionHandler): () => void {
+		this._peerConnectionHandlers.add(handler);
+		return () => this._peerConnectionHandlers.delete(handler);
+	}
+
 	private notifyGroupPeerChange(change: GroupPeerChange): void {
 		for (const handler of this._groupPeerChangeHandlers) handler(change);
 	}
 
 	private notifyPeerDisconnect(peerId: string): void {
 		for (const handler of this._peerDisconnectHandlers) handler(peerId);
+	}
+
+	private notifyPeerConnection(peerId: string): void {
+		for (const handler of this._peerConnectionHandlers) handler(peerId);
 	}
 
 	private async startEnqueueMessages(): Promise<void> {

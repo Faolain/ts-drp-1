@@ -39,6 +39,17 @@ export interface ZoneSnapshot {
 	readonly localAuthor: string;
 	readonly localPeerId: string;
 	readonly ready: boolean;
+	readonly rawTransport: Readonly<{
+		readonly fallbackCount: 0;
+		readonly links: readonly Readonly<{
+			readonly label: string;
+			readonly maxRetransmits: number;
+			readonly ordered: boolean;
+			readonly peerId: string;
+		}>[];
+		readonly received: number;
+		readonly sent: number;
+	}>;
 	readonly transientPositions: Readonly<Record<string, Readonly<{ readonly x: number; readonly y: number }>>>;
 	readonly transportPeerAuthors: readonly Readonly<{ readonly author: string; readonly peerId: string }>[];
 	readonly zoneId: string;
@@ -118,6 +129,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 
 	const snapshot = (): ZoneSnapshot => {
 		const positionEntries = [...transientPositions.entries()].sort(([left], [right]) => compareText(left, right));
+		const raw = zoneId.length === 0 ? undefined : node.ephemeralUnreliableWebRtcSnapshot(zoneId);
 		return Object.freeze({
 			acceptedOperationDigest: digest(
 				"ts-drp/d9346-zone-accepted-operations/v1",
@@ -130,6 +142,16 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 			localAuthor,
 			localPeerId,
 			ready: room !== undefined,
+			rawTransport: Object.freeze({
+				fallbackCount: 0,
+				links: Object.freeze(
+					(raw?.links ?? []).map(({ label, maxRetransmits, ordered, peerId }) =>
+						Object.freeze({ label, maxRetransmits, ordered, peerId })
+					)
+				),
+				received: raw?.received ?? 0,
+				sent: raw?.sent ?? 0,
+			}),
 			transientPositions: Object.freeze(Object.fromEntries(positionEntries)),
 			transportPeerAuthors: projection.transportPeerAuthors,
 			zoneId,
