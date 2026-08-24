@@ -1,3 +1,14 @@
+export {
+	decodeEntityDeltaBatch,
+	encodeEntityDeltaBatch,
+	ENTITY_DELTA_BATCH_MAX_BYTES,
+	ENTITY_DELTA_BATCH_MAX_ENTITIES,
+	ENTITY_DELTA_BATCH_VERSION,
+	selectAoiEntityDeltas,
+	type AoiSelectionInput,
+	type EntityDelta,
+} from "./aoi-delta.js";
+
 export type EphemeralDeliveryClass = "reliable-unordered" | "unreliable-sequenced" | "unreliable-unordered";
 
 export interface EphemeralPublishInput {

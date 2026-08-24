@@ -1,5 +1,5 @@
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
-import type { EphemeralChannel } from "@ts-drp/ephemeral";
+import { decodeEntityDeltaBatch, encodeEntityDeltaBatch, type EphemeralChannel } from "@ts-drp/ephemeral";
 import {
 	createV3RoomCreatorInviteMaterial,
 	createV3RoomSession,
@@ -191,6 +191,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 	let zoneId = "";
 	let localX = 0;
 	let localY = 0;
+	let localMovementSequence = 0;
 	let closeRequested = false;
 	let closing: Promise<void> | undefined;
 	let opening: Promise<void> | undefined;
@@ -204,6 +205,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 		zoneId = "";
 		localX = 0;
 		localY = 0;
+		localMovementSequence = 0;
 		fabricTrials.clear();
 	};
 
@@ -576,13 +578,26 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 		},
 		move(dx: number, dy: number): void {
 			if (room === undefined || ephemeral === undefined) return;
-			localX += dx;
-			localY += dy;
+			const nextX = localX + dx;
+			const nextY = localY + dy;
+			if (
+				!Number.isInteger(dx) ||
+				!Number.isInteger(dy) ||
+				nextX < -2_147_483_648 ||
+				nextX > 2_147_483_647 ||
+				nextY < -2_147_483_648 ||
+				nextY > 2_147_483_647
+			) {
+				throw new TypeError("v3 zone movement is outside its integer range");
+			}
+			localX = nextX;
+			localY = nextY;
+			localMovementSequence = (localMovementSequence + 1) >>> 0;
 			transientPositions.set(localPeerId, Object.freeze({ x: localX, y: localY }));
 			void ephemeral.publish({
 				class: "unreliable-sequenced",
 				key: localPeerId,
-				payload: new TextEncoder().encode(JSON.stringify({ x: localX, y: localY })),
+				payload: encodeEntityDeltaBatch([{ entityId: 0, sequence: localMovementSequence, x: localX, y: localY }]),
 			});
 			emit();
 		},
@@ -976,13 +991,9 @@ function fabricPercentile(values: readonly number[], quantile: number): number {
 
 function decodePosition(payload: Uint8Array): Readonly<{ x: number; y: number }> | undefined {
 	try {
-		const value: unknown = JSON.parse(new TextDecoder().decode(payload));
-		if (typeof value !== "object" || value === null) return undefined;
-		const x = Reflect.get(value, "x");
-		const y = Reflect.get(value, "y");
-		return Number.isSafeInteger(x) && Number.isSafeInteger(y)
-			? Object.freeze({ x: x as number, y: y as number })
-			: undefined;
+		const entities = decodeEntityDeltaBatch(payload);
+		const value = entities[0];
+		return entities.length === 1 && value?.entityId === 0 ? Object.freeze({ x: value.x, y: value.y }) : undefined;
 	} catch {
 		return undefined;
 	}
