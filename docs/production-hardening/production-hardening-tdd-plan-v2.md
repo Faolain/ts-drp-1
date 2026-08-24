@@ -55092,3 +55092,35 @@ affected Phase 4a owner, these direct adversarial/type probes, successor
 RED/checker, package type/build/smoke, formatting and applicable freeze gates
 are rerun. No Phase 3 certification, workflow replay, broad suite or further
 review round is authorized merely for prose or P2 cleanup.
+
+### D.96 — E3-03 independent browser drains and loss/HOL product proof
+
+E3-03 is product-closed by signed RED corrections `a71b2317` and
+`b6bfeb3d`, followed by signed GREEN `11cbdf92`. It adds no new governance
+successor. The live v3 zone now owns two independent bounded drains: raw
+unreliable WebRTC for unreliable classes and an abortable authenticated stream
+for reliable-unordered traffic. Resetting the reliable drain cancels active,
+queued and capacity-waiting publications by generation while reserving bounded
+admission for raw traffic. Raw restart/reconciliation remains explicit,
+no-dial, current-writer-authorized and fail-closed; retained peer reconnection
+reuses the existing durable-history request owner.
+
+The exact Chromium 151 product checkpoint runs three 600-sample campaigns at
+33 ms under 40 ms latency, 30% peer-to-peer loss and reordering. Native RTC
+bytes and production counters prove raw traffic remains unordered with
+`maxRetransmits: 0`, continues while the independent reliable lane experiences
+head-of-line delay, and beats reliable p95 age of information by at least 20%.
+The product UI renders receiver-derived p50/p95, accepted-sequence gap,
+delivered/dropped, fallback and durable-delta values; the browser owner compares
+them with its independent observations. Movement creates zero durable vertices,
+then one durable block converges after the campaigns.
+
+The final P0/P1-only round recorded Grok PASS and Kimi 100/100. Kimi and Opus
+reproduced reliable reset-generation leakage, raw admission starvation and an
+application-versus-wire gap mismatch; those exact defects were fixed before
+GREEN signing. Opus's generic-profile concern was closed by rejecting inputs
+outside the two fixed E3-03 profiles instead of growing a benchmark framework.
+P2 observations remain debt and did not cause another test, workflow or review
+round. The passing gate set is four package builds, grid typecheck, formatting,
+zero-error focused lint, 25 focused unit tests, one Chromium product proof and
+`git diff --check`.
