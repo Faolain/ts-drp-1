@@ -55195,3 +55195,78 @@ that path. It does not add a second codec, authority oracle, signaling path,
 runtime dial, durability path, snapshot feature, deterministic math, governance
 successor or broad benchmark framework. One P0/P1-only review round follows RED
 and GREEN; P2 remains debt and cannot create a review loop.
+
+### D.99 — E4-02 closure and Phase 4b-a canonical snapshot payload
+
+E4-02 is product-closed by signed RED `cacae68a`, signed causal raw-owner RED
+`26dd8ddd`, and signed GREEN `55d8eecf`. The live grid now selects and encodes a
+nearest-32 population through the E4-01 owner, publishes it to one current
+observer through the existing raw route, and proves in genuine three-client
+Chromium that an equally connected authorized nonrecipient receives no state or
+routed bytes. Three hundred batches at 33 ms remain below 256 kbps using exact
+route-envelope accounting, create zero durable vertices, and are followed by one
+ordinary durable block converging on all three clients.
+
+The final GREEN review round recorded Kimi 100/100 and Opus PASS. Grok
+reproduced one substantive defect: targeted raw send began per-peer sends before
+proving every target had a usable current-generation link and also replaced the
+route's reconciliation-owned membership with the target subset. GREEN was
+corrected without another review round. Explicitly reconciled routes now retain
+their full desired membership and preflight every target for a current open link
+and backpressure before the first send. The signed E3-01 lazy-bootstrap behavior
+remains only for low-level routes that have never received explicit membership
+reconciliation. Network typecheck, targeted lint, diff validation, and 35
+focused E3-01/E3-02/E4-02 assertions passed after the correction. The disclosed
+one-shot raw-link startup rejection remains fail-closed P2 debt with no reliable
+or durable fallback.
+
+Phase 4b begins with one core product slice: canonical v3 snapshot-payload
+export/import for the Phase 4a blueprint machine. It adds one non-root
+`@ts-drp/compaction/blueprint-snapshot` subpath and does not re-export it from
+the existing compaction root or worker-host graph. The owner consumes the exact
+frozen `drp-snapshot-payload` schema and `ts-drp/snapshot-payload/v3` domain:
+`kind`, `protocolMajor`, `objectId`, `epoch`, `anchor`, `schemaVersion`,
+`blueprintDigest`, `application`, `acl`, and `archiveIndexRoot`, with no aliases,
+optional fields, local caches, callbacks or transport metadata. Export obtains
+the application bytes and blueprint digest from a genuine
+`BlueprintStateMachine`; it accepts an exact canonical ACL carrier plus explicit
+anchor metadata and an anchored maximum snapshot byte count. It returns detached
+exact canonical payload bytes and the domain-separated payload digest.
+
+Import is replacement into a newly constructed isolated machine, never mutation
+or merge into a live instance. It first snapshots an exact unshared byte carrier,
+requires canonical byte-for-byte re-encoding, validates the payload digest and
+every expected metadata field, requires the embedded blueprint digest to match
+the genuine prepared runtime, and requires the embedded ACL to reproduce the
+caller-supplied exact canonical ACL bytes. It then constructs a fresh
+`BlueprintStateMachine` from the embedded application value and returns detached
+ACL/payload bytes and metadata. Missing fields, extra fields, wrong kind or
+protocol, noncanonical bytes, wrong payload/application/ACL/blueprint/anchor/
+archive/object/epoch/schema binding, oversize input, shared/resizable/partial or
+shadowed byte carriers, and caller mutation all fail before a machine is exposed.
+
+The tests-only RED changes exactly
+`tests/phase-4b-blueprint-snapshot-red.test.ts` and
+`tests/fixtures/phase-4b-v3/blueprint-snapshot-contract.json`. It independently
+reproduces the frozen registry vector, exercises export/import detachment and
+replacement deletion, and proves induction across at least two nonempty epochs:
+folding forward from an imported snapshot yields byte-identical application
+state and digest to archival replay from genesis in canonical Kahn order. Named
+mutants cover shallow merge, omitted blueprint/anchor/archive/ACL binding,
+decoded-object hashing, re-encoding without exact-byte comparison, shared input,
+live-instance mutation, and one-epoch/self-agreement shortcuts. Its sole active
+failure is the absent snapshot owner; all independent oracles pass and GREEN
+cases remain dormant.
+
+GREEN changes only
+`packages/compaction/src/blueprint-snapshot.ts`, the minimum shared exact-byte
+carrier helper and Phase 4a fold owner needed to expose its non-authoritative
+blueprint identity, plus `packages/compaction/package.json` for the explicit
+subpath. Phase 4a behavior and the signed RED remain unchanged. Focused gates are
+the new owner, all Phase 4a fold/corrective owners, affected compaction
+build/typecheck, targeted lint, formatting, package export/pack audit and
+`git diff --check`. One P0/P1-only RED review and one P0/P1-only GREEN review are
+allowed; P2 is recorded debt. This slice does not add chunks or a manifest,
+streaming, storage, an active snapshot pointer, live-node export/import, a cut,
+certification, pruning, transfer, soak or a snapshot-product-complete claim;
+those remain Phase 4b live composition and Phases 4c–4d.
