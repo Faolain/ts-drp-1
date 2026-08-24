@@ -543,11 +543,13 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		};
 		const directConnection: Libp2pConnectionFixture = {
 			...connection,
+			addEventListener(): void {},
 			id: "libp2p-connection-direct",
 			remoteAddr: { toString: (): string => "/ip4/127.0.0.1/udp/4002/webrtc-direct" },
 		};
 		const deceptiveConnection: Libp2pConnectionFixture = {
 			...connection,
+			addEventListener(): void {},
 			id: "libp2p-connection-deceptive",
 			remoteAddr: { toString: (): string => "/dns/webrtc/tcp/4003" },
 		};
@@ -609,6 +611,10 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		let incoming: ((input: IncomingSignalingStream) => Promise<void>) | undefined;
 		let rejectOutbound: ((error: Error) => void) | undefined;
 		let rejectInbound: ((error: Error) => void) | undefined;
+		let markOutboundReadStarted: (() => void) | undefined;
+		const outboundReadStarted = new Promise<void>((resolve) => {
+			markOutboundReadStarted = resolve;
+		});
 		const outboundStream = {
 			abort: vi.fn((error: Error): void => rejectOutbound?.(error)),
 			close: vi.fn((): Promise<void> => Promise.resolve()),
@@ -635,8 +641,10 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 			},
 			read: (stream): Promise<Uint8Array> =>
 				new Promise<Uint8Array>((_resolve, reject) => {
-					if (stream === outboundStream) rejectOutbound = reject;
-					else rejectInbound = reject;
+					if (stream === outboundStream) {
+						rejectOutbound = reject;
+						markOutboundReadStarted?.();
+					} else rejectInbound = reject;
 				}),
 			write: (): Promise<void> => Promise.resolve(),
 		});
@@ -650,7 +658,7 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 			() => undefined,
 			(error: unknown) => error
 		);
-		await tick();
+		await outboundReadStarted;
 		controller.abort(new Error("controlled outbound cancellation"));
 		await tick();
 		const outboundAborted = outboundStream.abort.mock.calls.length === 1;
