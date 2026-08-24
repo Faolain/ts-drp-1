@@ -54933,3 +54933,162 @@ or serve snapshot chunks, prune history, seal an epoch, prove weeks of soak,
 permit forbidden math, add deterministic math, or claim that lint plus one
 engine makes arbitrary JavaScript deterministic. Phase 4b and later retain
 those obligations.
+
+#### D.95.6 — Numeric-freeze successor correction before core GREEN
+
+Exact-byte review of the staged core GREEN reproduced a governance deadlock.
+Phase 0n-a hash-pinned the whole `packages/protocol-v3/package.json`, although
+its durable authority is only the numeric-determinism supplement's packed-file
+presence and the absence of a deterministic-math runtime/export. D.95.3
+correctly requires that manifest to add the non-root blueprint-application
+subpath and its direct errors dependency. The v1 workflow extracts the base v1
+checker, so neither an in-place hash restamp nor a coordinated checker/policy/
+workflow edit can pass its own predecessor. The existing five-policy protocol-v3
+freeze successor governs a disjoint immutable inventory and cannot authorize
+this transition. This is a substantive prerequisite correction, not permission
+to weaken Phase 0n-a.
+
+The corrected linear lineage supersedes D.95.3/.5's sole-child shorthand:
+
+1. signed D.95 plan `3c21a0157b258cd9ae214a9b401b9cc6d5933170`;
+2. signed core RED `19b0452b0aebc0ba8c359065be3015c8dedd6307`;
+3. this signed plan-only correction;
+4. one signed tests-only numeric-freeze-successor RED;
+5. one signed numeric-freeze-successor GREEN;
+6. one signed tests-only product-P1 corrective RED; and
+7. the restored corrected core product GREEN as that corrective RED's sole
+   child.
+
+The current product GREEN is preserved as tracked-only temporary stash
+`49c4bb900f1cf416d3bda5e07e8ae9f098ce63c8`, with exact message
+`On codex/phase3a1b-p6-golden-path: phase4a-core-green-p1-frozen`, working tree
+`fab510d82ae1778dda3cb60fb40caf6373decfa2`, signed core-RED first parent
+`19b0452b0aebc0ba8c359065be3015c8dedd6307`, index parent
+`4dccabd8369af746ad2ea66578a0ea6393b4d3da` and index-parent tree
+`24c7e708028d3c30c677c0f7388ae2d904930746`. Its index parent has the reviewed
+14-path product GREEN; its working tree has exactly those paths plus the
+authorized `packages/compaction/src/types.ts` correction. It must not be
+restored while the correction or successor RED/GREEN is staged.
+
+After the successor GREEN, sign the product-P1 corrective RED below, then
+restore by a verified three-way merge only: ancestor is the stash's first
+parent, ours is the signed corrective RED, and theirs is the stash working
+tree. A blind `stash apply`, whole-file checkout, read-tree overwrite or path
+replacement is forbidden. Before staging, require the successor owners,
+workflow, correction heading and corrective-RED bytes to survive byte-exactly;
+require the product side to contain exactly the stash's 15 tracked paths and
+bytes; require no conflict marker, duplicate heading, other tracked change or
+tracked unstaged change; and require the index diff against the corrective RED
+to be exactly those 15 product paths. The stash remains until the corrected
+product GREEN is signed and pushed, then only this exact stash is dropped. The
+prior 26 stashes, protected untracked work, 21 recovery refs and two recovery
+branches remain untouched throughout and are recounted afterward.
+
+The successor RED changes tests/fixtures only and exactly:
+
+```text
+tests/protocol-v3-blueprint-numeric-determinism-successor-red.test.ts
+tests/fixtures/phase-4a-numeric-freeze-successor/successor-contract.json
+tests/fixtures/phase-4a-numeric-freeze-successor/controlled-successor.mjs
+```
+
+Its sole readiness failure is the absent successor owner. The controlled
+repository matrix proves: the signed v1 predecessor bundle; the exact
+successor-owner/workflow bootstrap scope; unique first-parent bootstrap after
+the signed successor RED; the one-time workflow bootstrap rule below;
+base-successor/current-successor routing after bootstrap;
+the one-time D.95 manifest transition; preservation of every v1 semantic byte;
+and rejection of partial/extra successor owners, wrong predecessor or parent,
+restamped v1 material, removed supplement packing, deterministic-math runtime
+or export, changed numeric rule/profile/contract, extra manifest delta during
+bootstrap and missing/dead workflow execution. Mutants for each axis must be
+causal. No production or v1 governed byte changes in RED.
+
+The successor GREEN changes exactly four new owner files plus the existing
+numeric workflow:
+
+```text
+packages/protocol-v3/conformance/blueprint-numeric-determinism-successor-v2/check-freeze.mjs
+packages/protocol-v3/conformance/blueprint-numeric-determinism-successor-v2/freeze-policy.json
+packages/protocol-v3/conformance/blueprint-numeric-determinism-successor-v2/profile.json
+packages/protocol-v3/conformance/blueprint-numeric-determinism-successor-v2/spec.md
+.github/workflows/protocol-v3-blueprint-numeric-determinism.yml
+```
+
+It leaves `packages/protocol-v3/package.json` and every v1 checker, policy,
+profile, rationale, RED, contract, lint/toolchain owner and Track-P2 successor
+byte-identical. The unchanged-package successor GREEN proves its bootstrap
+topology first. The restored product GREEN then makes the separately
+authenticated manifest transition: add exactly `./blueprint-application` with
+its declaration/import targets and `@ts-drp/errors` at the workspace version;
+all other predecessor manifest fields remain unchanged.
+
+This correction explicitly authorizes one bootstrap exception to the v1
+workflow routing. The required workflow path, job id and displayed job name stay
+unchanged, but only when the unique merge base contains neither successor-v2
+checker nor policy, the candidate workflow does **not** execute the immutable
+v1 checker against the authorized successor delta. It runs the current v2
+checker instead. That checker must hash- and Git-object-authenticate the exact
+base v1 checker, policy, workflow and package plus the complete ordered 17-entry
+v1 `protectedArtifacts` list and all 16 `artifactSha256` bindings. Current-tree
+equality is released for exactly two named v1 paths: the workflow, replaced by
+this same-job bootstrap route, and the package manifest, whose current change
+is deferred until the later product GREEN and governed by the exact transition
+and semantic projection below. The v1 policy/checker and every other current v1
+artifact remain byte-identical to their v1 pins. The successor profile records
+the two releases and their replacement authorities explicitly; no other v1
+obligation is inferred, omitted or normalized.
+
+The bootstrap-mode v2 checker also authenticates the signed successor RED as
+the bootstrap commit's sole parent and the exact four-owner-plus-workflow diff.
+Executing v1 on that candidate would deterministically reject the deliberately
+superseding workflow, so its non-execution is this signed one-time governance
+transition, not a passing v1 result or a general fail-open. Once the unique
+merge base contains both v2 checker and policy, bootstrap mode is forbidden:
+the unchanged required job must extract and run the base v2 checker and then
+run the current v2 checker. Missing either execution, selecting v1 again,
+accepting only one successor file, using a second bootstrap or changing the job
+identity fails closed.
+
+After that transition, the successor governs only the Phase 0n semantic
+projection. The numeric supplement must remain in packed files; neither a
+deterministic-math package/runtime dependency nor a numeric/deterministic-math
+runtime export may appear; and the D.95 blueprint-application subpath and errors
+dependency must remain while Phase 4a depends on them. Unrelated future manifest
+evolution is outside Phase 0n authority and must not be full-file hash-frozen
+again. The successor policy/checker/profile/spec and workflow are immutable
+after bootstrap, and descendant workflows extract the base successor before
+running the current successor. A missing base successor after bootstrap,
+selective old-checker omission, inferred bootstrap, second bootstrap or
+coordinated restamp fails closed.
+
+The three other exact-GREEN P1 corrections remain inside D.95.3's already
+authorized production owners, but they receive one additive tests-only
+corrective RED before product restoration. That RED changes exactly:
+
+```text
+tests/phase-4a-blueprint-fold-p1-corrective-red.test.ts
+tests/fixtures/phase-4a-v3/public-operation-type-corrective-audit.ts
+tests/fixtures/phase-4a-v3/tsconfig.corrective.json
+```
+
+It retains every signed core-RED byte and has one readiness failure for the
+still-unrestored product owner. Its runtime matrix proves no-op adoption cannot
+repeat, an A→B→A digest cycle cannot resurrect a stale sibling, and a shared
+Uint8Array subclass with shadowed `buffer`/`byteLength`/`byteOffset` plus later
+replacement of the ambient constructors cannot cross the initial-byte
+boundary. The type fixture passes a real `add_mul` application operation
+through exported `EpochVertex`/`FoldBlueprintEpochInput` without a cast while
+retaining typed conflict-key/value access. Each old behavior has one causal
+mutant; generic error text, private-field spelling or generation
+implementation is not the oracle.
+
+The corrected product GREEN uses an opaque parent generation and consumes the
+child on every adoption so no-op replay and digest ABA fail; validates/copies
+initial bytes through captured intrinsic typed-array and ArrayBuffer slots; and
+widens the existing `EpochVertex.operation` type to the closed
+application-record shape. The corrective RED bytes remain exact. Only the
+affected Phase 4a owner, these direct adversarial/type probes, successor
+RED/checker, package type/build/smoke, formatting and applicable freeze gates
+are rerun. No Phase 3 certification, workflow replay, broad suite or further
+review round is authorized merely for prose or P2 cleanup.
