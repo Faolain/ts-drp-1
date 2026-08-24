@@ -13,6 +13,7 @@ import {
 } from "@ts-drp/protocol-v3/blueprint-application";
 import type { IStagedStateMachine } from "@ts-drp/types";
 
+import { copyExactByteCarrier, copyTrustedBytes } from "./exact-byte-carrier.js";
 import { topologicalOrder } from "./linearize.js";
 import type { EpochVertex } from "./types.js";
 
@@ -22,34 +23,8 @@ const APPLICATION_LIMITS: Readonly<CanonicalLimits> = Object.freeze({
 	maxDepth: 16,
 	maxItems: 16_384,
 });
-const intrinsicObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
-const intrinsicObjectGetPrototypeOf = Object.getPrototypeOf;
-const intrinsicReflectApply = Reflect.apply;
-const intrinsicUint8Array = Uint8Array;
-const intrinsicUint8ArrayPrototype = Uint8Array.prototype;
-const intrinsicUint8ArraySet = Uint8Array.prototype.set;
-const intrinsicArrayBufferPrototype = ArrayBuffer.prototype;
-const intrinsicArrayBufferByteLengthGetter = intrinsicObjectGetOwnPropertyDescriptor(
-	intrinsicArrayBufferPrototype,
-	"byteLength"
-)?.get as (this: ArrayBuffer) => number;
-const intrinsicArrayBufferResizableGetter = intrinsicObjectGetOwnPropertyDescriptor(
-	intrinsicArrayBufferPrototype,
-	"resizable"
-)?.get as ((this: ArrayBuffer) => boolean) | undefined;
-const intrinsicTypedArrayPrototype = intrinsicObjectGetPrototypeOf(intrinsicUint8ArrayPrototype);
-const intrinsicTypedArrayBufferGetter = intrinsicObjectGetOwnPropertyDescriptor(intrinsicTypedArrayPrototype, "buffer")
-	?.get as (this: Uint8Array) => ArrayBufferLike;
-const intrinsicTypedArrayByteLengthGetter = intrinsicObjectGetOwnPropertyDescriptor(
-	intrinsicTypedArrayPrototype,
-	"byteLength"
-)?.get as (this: Uint8Array) => number;
-const intrinsicTypedArrayByteOffsetGetter = intrinsicObjectGetOwnPropertyDescriptor(
-	intrinsicTypedArrayPrototype,
-	"byteOffset"
-)?.get as (this: Uint8Array) => number;
-
 export interface BlueprintStateSnapshot {
+	readonly blueprintDigest: string;
 	readonly exactCanonicalStateBytes: Uint8Array;
 	readonly stateDigest: string;
 }
@@ -75,6 +50,24 @@ function applicationStateFailure(message: string, cause?: unknown): never {
 	throw new DRPError("INVALID_APPLICATION_STATE", message, cause === undefined ? undefined : { cause });
 }
 
+function assertPreparedRuntimeProvenance(
+	expectedBlueprintDigest: string,
+	preparedBlueprintRuntime: PreparedBlueprintRuntime
+): void {
+	try {
+		applyPreparedBlueprintOperation({
+			expectedBlueprintDigest,
+			operation: null,
+			preparedBlueprintRuntime,
+			state: null,
+		});
+	} catch (error) {
+		if (error instanceof DRPError && error.code === "BLUEPRINT_OPERATION_INVALID") return;
+		throw error;
+	}
+	throw new DRPError("BLUEPRINT_OPERATION_INVALID", "null unexpectedly matched a prepared blueprint operation");
+}
+
 function applicationStateBytes(value: unknown): Uint8Array {
 	try {
 		const bytes = encodeCanonical(value, APPLICATION_LIMITS);
@@ -91,25 +84,7 @@ function decodeInitialState(
 ): { readonly bytes: Uint8Array; readonly value: unknown } {
 	let bytes: Uint8Array;
 	try {
-		if (intrinsicObjectGetPrototypeOf(input) !== intrinsicUint8ArrayPrototype) {
-			return applicationStateFailure("initial application state must use an unshared Uint8Array");
-		}
-		const byteLength = intrinsicReflectApply(intrinsicTypedArrayByteLengthGetter, input, []);
-		const byteOffset = intrinsicReflectApply(intrinsicTypedArrayByteOffsetGetter, input, []);
-		const buffer = intrinsicReflectApply(intrinsicTypedArrayBufferGetter, input, []);
-		if (intrinsicObjectGetPrototypeOf(buffer) !== intrinsicArrayBufferPrototype) {
-			return applicationStateFailure("initial application state must use an unshared Uint8Array");
-		}
-		const bufferByteLength = intrinsicReflectApply(intrinsicArrayBufferByteLengthGetter, buffer, []);
-		const resizable =
-			intrinsicArrayBufferResizableGetter === undefined
-				? false
-				: intrinsicReflectApply(intrinsicArrayBufferResizableGetter, buffer, []);
-		if (byteLength === 0 || byteOffset !== 0 || byteLength !== bufferByteLength || resizable) {
-			return applicationStateFailure("initial application state must use one full, attached byte buffer");
-		}
-		bytes = new intrinsicUint8Array(byteLength);
-		intrinsicReflectApply(intrinsicUint8ArraySet, bytes, [input]);
+		bytes = copyExactByteCarrier(input, "initial application state");
 	} catch (error) {
 		return applicationStateFailure("initial application state bytes are unreadable", error);
 	}
@@ -142,6 +117,10 @@ export class BlueprintStateMachine implements IStagedStateMachine<BlueprintState
 
 	constructor(input: BlueprintStateMachineInput) {
 		const initial = decodeInitialState(input.exactCanonicalInitialStateBytes, input.expectedInitialStateDigest);
+		if (!/^[0-9a-f]{64}$/u.test(input.expectedBlueprintDigest)) {
+			throw new DRPError("BLUEPRINT_DIGEST_MISMATCH", "expected blueprint digest is invalid");
+		}
+		assertPreparedRuntimeProvenance(input.expectedBlueprintDigest, input.preparedBlueprintRuntime);
 		this.#expectedBlueprintDigest = input.expectedBlueprintDigest;
 		this.#preparedBlueprintRuntime = input.preparedBlueprintRuntime;
 		this.#exactCanonicalStateBytes = initial.bytes;
@@ -156,7 +135,7 @@ export class BlueprintStateMachine implements IStagedStateMachine<BlueprintState
 		if (staged.#baseGeneration !== this.#generation) {
 			throw new DRPError("BLUEPRINT_ALREADY_ADOPTED", "staged transition is stale or already adopted");
 		}
-		const nextBytes = new intrinsicUint8Array(staged.#exactCanonicalStateBytes);
+		const nextBytes = copyTrustedBytes(staged.#exactCanonicalStateBytes);
 		const nextState = deepCloneCanonical(staged.#state);
 		this.#exactCanonicalStateBytes = nextBytes;
 		this.#state = nextState;
@@ -199,7 +178,8 @@ export class BlueprintStateMachine implements IStagedStateMachine<BlueprintState
 
 	snapshot(): BlueprintStateSnapshot {
 		return Object.freeze({
-			exactCanonicalStateBytes: new intrinsicUint8Array(this.#exactCanonicalStateBytes),
+			blueprintDigest: this.#expectedBlueprintDigest,
+			exactCanonicalStateBytes: copyTrustedBytes(this.#exactCanonicalStateBytes),
 			stateDigest: this.#stateDigest,
 		});
 	}
