@@ -38,6 +38,7 @@ export function renderZone(snapshot: ZoneSnapshot): void {
 	renderFabric(snapshot);
 	renderAoiBandwidth(snapshot);
 	renderAoiProjection(snapshot);
+	renderTradeIntent(snapshot);
 	const grid = document.getElementById("grid");
 	if (!(grid instanceof HTMLDivElement)) return;
 	grid.replaceChildren();
@@ -66,6 +67,28 @@ export function renderZone(snapshot: ZoneSnapshot): void {
 		element.style.background = "#2d8cff";
 		grid.appendChild(element);
 	}
+}
+
+function renderTradeIntent(snapshot: ZoneSnapshot): void {
+	const container = document.getElementById("tradeIntentWorkbench");
+	if (!(container instanceof HTMLElement)) return;
+	const heading = document.createElement("h2");
+	heading.textContent = "Co-signed trade intent";
+	const intent = snapshot.tradeIntent;
+	const status = document.createElement("p");
+	status.dataset.tradeIntentStatus = intent.status;
+	status.textContent =
+		intent.status === "absent"
+			? "No trade intent prepared."
+			: `${intent.status}: ${String(intent.approvalCount)} / 2 approvals for ${intent.clientOperationId}`;
+	const context = document.createElement("p");
+	context.textContent =
+		intent.status === "absent"
+			? "Trade intent context is unavailable."
+			: `Intent ${intent.intentDigest}; object ${intent.objectId}; epoch ${String(intent.epoch)}; counterparties ${intent.counterparties.join(
+					", "
+				)}`;
+	container.replaceChildren(heading, status, context);
 }
 
 function renderAoiBandwidth(snapshot: ZoneSnapshot): void {

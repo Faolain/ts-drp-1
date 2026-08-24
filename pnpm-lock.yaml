@@ -227,6 +227,9 @@ importers:
       '@ts-drp/object':
         specifier: 0.11.0
         version: link:../../packages/object
+      '@ts-drp/outcome-commit':
+        specifier: workspace:*
+        version: link:../../packages/outcome-commit
       '@ts-drp/relay-policy':
         specifier: 0.11.0
         version: link:../../packages/relay-policy
@@ -1030,6 +1033,15 @@ importers:
       tsx:
         specifier: 4.19.1
         version: 4.19.1
+
+  packages/outcome-commit:
+    dependencies:
+      '@noble/curves':
+        specifier: 2.2.0
+        version: 2.2.0
+      '@ts-drp/canonical':
+        specifier: 0.11.0
+        version: link:../canonical
 
   packages/protocol-v2:
     dependencies:
