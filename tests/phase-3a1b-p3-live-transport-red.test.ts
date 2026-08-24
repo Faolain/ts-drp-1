@@ -669,6 +669,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			"V3TerminalTransitionResult",
 			"V3TerminalVertexClassifier",
 			"activateV3LivePlane",
+			"bindV3BlueprintLivePlane",
 			"prepareV3LiveGeneration",
 			"recoverV3LiveReplica",
 			"republishV3RetainedTo",
@@ -678,6 +679,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 		const surface = await privateSurface();
 		expect(Object.keys(surface).sort()).toEqual([
 			"activateV3LivePlane",
+			"bindV3BlueprintLivePlane",
 			"prepareV3LiveGeneration",
 			"recoverV3LiveReplica",
 			"republishV3RetainedTo",

@@ -6,10 +6,21 @@ export default defineConfig({
 	plugins: [tsconfigPaths()],
 	resolve: {
 		alias: {
+			"@ts-drp/compaction/blueprint-fold": path.resolve(__dirname, "packages/compaction/src/blueprint-fold.ts"),
+			"@ts-drp/protocol-v3/author-authorization": path.resolve(
+				__dirname,
+				"packages/protocol-v3/src/author-authorization.ts"
+			),
 			"@ts-drp/protocol-v3/blueprint-application": path.resolve(
 				__dirname,
 				"packages/protocol-v3/src/blueprint-application.ts"
 			),
+			"@ts-drp/protocol-v3/latched-acl": path.resolve(__dirname, "packages/protocol-v3/src/latched-acl.ts"),
+			"@ts-drp/protocol-v3/registry/registry-v1.json": path.resolve(
+				__dirname,
+				"packages/protocol-v3/registry/registry-v1.json"
+			),
+			"@ts-drp/protocol-v3": path.resolve(__dirname, "packages/protocol-v3/src/public.ts"),
 			"@ts-drp/routing-node/constants": path.resolve(__dirname, "packages/routing-node/src/constants.ts"),
 			"@ts-drp/control-plane": path.resolve(__dirname, "packages/control-plane/src/index.ts"),
 			"@ts-drp/errors": path.resolve(__dirname, "packages/errors/src/index.ts"),

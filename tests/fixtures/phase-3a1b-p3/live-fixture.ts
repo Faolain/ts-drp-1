@@ -99,6 +99,8 @@ export interface GenuinePreparedV3FixtureOptions {
 	readonly authorizedPrivateKeySeedHexes?: readonly string[];
 	readonly historyRoot?: string;
 	readonly historySize?: number;
+	readonly exactCanonicalInitialStateBytes?: Uint8Array;
+	readonly latchedAclGroups?: readonly ("admin" | "finality" | "writer")[];
 	readonly objectId?: string;
 	readonly prepareV3LiveGeneration?: typeof defaultPrepareV3LiveGeneration;
 }
@@ -235,7 +237,7 @@ export async function createGenuinePreparedV3Fixture(
 						members: authors.map((selectedAuthor) => ({
 							author: selectedAuthor,
 							finalityKey: selectedAuthor,
-							groups: ["admin", "finality", "writer"],
+							groups: [...(options.latchedAclGroups ?? ["admin", "finality", "writer"])],
 						})),
 						objectId: base.anchor.objectId,
 						permissionless: false,
@@ -252,6 +254,10 @@ export async function createGenuinePreparedV3Fixture(
 			historyRoot: options.historyRoot ?? base.anchor.historyRoot,
 			historySize: options.historySize ?? base.anchor.historySize,
 			parametersDigest: lowerHex(hashDomain("ts-drp/parameters/v3", encodeCanonical(PARAMETERS))),
+			stateDigest:
+				options.exactCanonicalInitialStateBytes === undefined
+					? base.anchor.stateDigest
+					: lowerHex(hashDomain("ts-drp/state/v3", options.exactCanonicalInitialStateBytes)),
 		});
 		const anchorBytes = encodeCanonical(anchor);
 		const anchorDigest = bytesHex(independentHashDomain(contract.anchorDigestDomain, anchorBytes));

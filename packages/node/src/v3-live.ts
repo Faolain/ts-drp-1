@@ -1,6 +1,11 @@
 import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { CausalityIndex, type EpochVertex } from "@ts-drp/compaction";
+import {
+	BlueprintStateMachine,
+	type BlueprintStateSnapshot,
+	foldBlueprintEpoch,
+} from "@ts-drp/compaction/blueprint-fold";
 import { assertTrustPreserved, createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
 import type { DurableIssuanceOutboxRecord, DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-store";
 import type { DurableLiveJournalStore, LiveJournalScope } from "@ts-drp/live-journal";
@@ -149,6 +154,7 @@ const SUPPORTED_PARAMETER_PROFILE = ObjectFreeze({
 	runtimeProfile: "ecmascript-2024-sync-v1" as const,
 });
 const ACTIVATION_INPUT_KEYS = ["capability", "messageQueueManager", "networkNode", "onAdmittedVertex"] as const;
+const BLUEPRINT_BINDING_INPUT_KEYS = ["exactCanonicalInitialStateBytes", "plane"] as const;
 const LOCAL_ISSUE_INPUT_KEYS = ["operations", "signRegisteredVertexDigest"] as const;
 const LOCAL_ISSUE_ENTRY_KEYS = ["logicalTime", "operation"] as const;
 const CANONICAL_APPLICATION_BATCH_ENTRY_KEYS = ["operation", "logicalTime"] as const;
@@ -258,6 +264,11 @@ export interface V3PlaneActivationInput {
 	readonly onAdmittedVertex: V3AdmittedVertexSink;
 }
 
+interface V3BlueprintLiveBindingInput {
+	readonly exactCanonicalInitialStateBytes: Uint8Array;
+	readonly plane: V3PlaneHandle;
+}
+
 export type V3AdmittedVertexSink = (
 	delivery: Readonly<{
 		readonly vertex: AdmittedReceivedVertexView;
@@ -297,6 +308,36 @@ export interface V3PlaneHandle {
 	beginTerminalTransition(): Promise<V3TerminalTransitionResult>;
 	deactivate(): void;
 }
+
+interface V3BlueprintLiveHandle {
+	readonly epoch: 0;
+	readonly objectId: string;
+	blueprintSnapshot(): BlueprintStateSnapshot | undefined;
+	stageBlueprintEpoch(): Promise<V3BlueprintFoldResult>;
+}
+
+type V3BlueprintFoldResult =
+	| Readonly<{
+			readonly ok: true;
+			readonly kind: "staged";
+			readonly order: readonly string[];
+			readonly outputs: readonly unknown[];
+			readonly staged: BlueprintStateSnapshot;
+			adopt(): V3BlueprintAdoptResult;
+	  }>
+	| Readonly<{
+			readonly ok: false;
+			readonly kind: "not-active" | "already-folded" | "fold-rejected";
+			readonly detail: string;
+	  }>;
+
+type V3BlueprintAdoptResult =
+	| Readonly<{ readonly ok: true; readonly kind: "adopted"; readonly snapshot: BlueprintStateSnapshot }>
+	| Readonly<{
+			readonly ok: false;
+			readonly kind: "not-active" | "stale-graph" | "already-adopted" | "adopt-rejected";
+			readonly detail: string;
+	  }>;
 
 export type V3TerminalPublishResult =
 	| Readonly<{
@@ -377,6 +418,10 @@ export type V3PlaneActivationFailureKind =
 
 export type V3PlaneActivationResult =
 	| Readonly<{ readonly ok: true; readonly handle: V3PlaneHandle }>
+	| Readonly<{ readonly ok: false; readonly kind: V3PlaneActivationFailureKind; readonly detail: string }>;
+
+type V3BlueprintLiveBindingResult =
+	| Readonly<{ readonly ok: true; readonly handle: V3BlueprintLiveHandle }>
 	| Readonly<{ readonly ok: false; readonly kind: V3PlaneActivationFailureKind; readonly detail: string }>;
 
 export type V3EgressResult =
@@ -1298,6 +1343,51 @@ function isExactOwnedSingleEntryMap(map: unknown, expectedKey: string, expectedV
 	}
 }
 
+function copyApplicationVertices(source: Map<string, EpochVertex>): Map<string, EpochVertex> | undefined {
+	try {
+		const copy = new IntrinsicMap<string, EpochVertex>();
+		const iterator = ReflectApply(MapPrototypeEntries, source, []) as unknown;
+		for (;;) {
+			const step = nextCapturedMapIterator(iterator);
+			if (step?.done === true) return copy;
+			if (step?.done !== false || !ArrayIsArray(step.value)) return undefined;
+			const key = ObjectGetOwnPropertyDescriptor(step.value, "0");
+			const vertex = ObjectGetOwnPropertyDescriptor(step.value, "1");
+			if (
+				key === undefined ||
+				!("value" in key) ||
+				typeof key.value !== "string" ||
+				vertex === undefined ||
+				!("value" in vertex)
+			) {
+				return undefined;
+			}
+			ReflectApply(MapPrototypeSet, copy, [key.value, vertex.value]);
+		}
+	} catch {
+		return undefined;
+	}
+}
+
+function retainApplicationVertex(
+	vertices: Map<string, EpochVertex>,
+	authors: Map<string, string>,
+	authenticated: AuthenticatedRecoveryVertex
+): void {
+	ReflectApply(MapPrototypeSet, vertices, [authenticated.digest, authenticated.vertex]);
+	ReflectApply(MapPrototypeSet, authors, [authenticated.digest, authenticated.author]);
+}
+
+function intrinsicMapSize(map: Map<unknown, unknown>): number | undefined {
+	try {
+		if (MapSizeGetter === undefined) return undefined;
+		const size = ReflectApply(MapSizeGetter, map, []) as number;
+		return NumberIsSafeInteger(size) && size >= 0 ? size : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
 function isLinearizationFailure(value: unknown): boolean {
 	if (!isObject(value)) return false;
 	try {
@@ -2142,10 +2232,17 @@ async function prepareV3LiveGeneration(input: PrepareV3LiveGenerationInput): Pro
 
 interface V3PlaneRegistration {
 	active: boolean;
+	readonly applicationAuthors: Map<string, string>;
+	readonly applicationVertices: Map<string, EpochVertex>;
 	readonly authorization: V3LiveAuthorization;
+	blueprintClosing: boolean;
+	blueprintFolded: boolean;
+	blueprintMachine?: BlueprintStateMachine;
+	blueprintHandle?: V3BlueprintLiveHandle;
 	readonly classifyTerminalVertex?: V3TerminalVertexClassifier;
 	readonly displacedSource?: V3DisplacedSourceAuthority;
 	epochBytes: number;
+	graphVersion: number;
 	handle: V3PlaneHandle;
 	readonly index: CausalityIndex;
 	readonly issuanceScope: DurableIssueScope;
@@ -2385,6 +2482,14 @@ function resolveV3AuthorizedAuthor(
 	const authority = authorizeLatchedEnvelopeAuthor({ author, snapshot: authorization.value });
 	const bytes = authority.ok && authority.authorized ? publicKeyBytes(author) : undefined;
 	return bytes === undefined ? undefined : ObjectFreeze({ bytes, format: "raw" as const });
+}
+
+function isV3ApplicationAuthorAuthorized(authorization: V3LiveAuthorization, author: string): boolean {
+	if (authorization.kind === "author-list") {
+		return resolveCurrentEpochAuthorizedAuthor({ authorization: authorization.value, author }).ok;
+	}
+	const authority = authorizeLatchedApplicationWrite({ author, snapshot: authorization.value });
+	return authority.ok && authority.authorized;
 }
 
 function aclOperation(author: string, digest: string, value: unknown): StagedLatchedAclOperation | null | undefined {
@@ -2808,6 +2913,8 @@ async function handleV3Ingress(
 		ingressFailureLog("graph-rejected");
 		return false;
 	}
+	retainApplicationVertex(registration.applicationVertices, registration.applicationAuthors, authenticated);
+	registration.graphVersion += 1;
 	if (candidate !== null && candidate !== undefined) registration.latchedOperations.set(candidate.digest, candidate);
 	releasePendingIngress(registration, authenticated.digest);
 	if (!currentRegistration(registration)) return true;
@@ -2839,7 +2946,7 @@ async function authenticateV3Ingress(
 	transport: "gossip" | "retained"
 ): Promise<void> {
 	try {
-		if (!currentRegistration(registration)) return;
+		if (!currentRegistration(registration) || registration.blueprintClosing) return;
 		if (registration.retainedBootstrapHold && transport === "gossip") {
 			ingressFailureLog("admission-rejected");
 			return;
@@ -3069,6 +3176,8 @@ type StagedLatchedAclOperation = Readonly<{
 }>;
 
 interface RecoveredV3LivePayload {
+	readonly applicationAuthors: Map<string, string>;
+	readonly applicationVertices: Map<string, EpochVertex>;
 	readonly authorization: V3LiveAuthorization;
 	readonly classifyTerminalVertex?: V3TerminalVertexClassifier;
 	readonly displacedSource?: V3DisplacedSourceAuthority;
@@ -3480,6 +3589,11 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		} catch {
 			return recoveryFailure("graph-rejected", "v3 recovery graph could not be constructed");
 		}
+		const applicationVertices = copyApplicationVertices(payload.vertices);
+		if (applicationVertices === undefined) {
+			return recoveryFailure("graph-rejected", "v3 recovery graph could not be retained");
+		}
+		const applicationAuthors = new IntrinsicMap<string, string>();
 		let epochBytes = 0;
 		for (const byteCharge of payload.charges.values()) {
 			const updated = nextEpochBytes(epochBytes, byteCharge, payload.parameters.maxEpochBytes);
@@ -3632,6 +3746,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				} catch {
 					return recoveryFailure("graph-rejected", "v3 journal replay graph append failed");
 				}
+				retainApplicationVertex(applicationVertices, applicationAuthors, authenticated);
 				epochBytes = updatedEpochBytes;
 				recoveredCount += 1;
 				recoveredVertices.push(authenticated.admitted);
@@ -3792,6 +3907,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				} catch {
 					return recoveryFailure("graph-rejected", "v3 recovery graph append failed");
 				}
+				retainApplicationVertex(applicationVertices, applicationAuthors, authenticated);
 				epochBytes = updatedEpochBytes;
 				recoveredCount += 1;
 				recoveredVertices.push(authenticated.admitted);
@@ -3919,6 +4035,8 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		recoveredV3LiveAuthority.set(
 			capability,
 			ObjectFreeze({
+				applicationAuthors,
+				applicationVertices,
 				authorization,
 				classifyTerminalVertex:
 					typeof terminalClassifier === "function" ? (terminalClassifier as V3TerminalVertexClassifier) : undefined,
@@ -4374,6 +4492,8 @@ async function issueOneVertex(
 	} catch {
 		return committedFailure("graph-rejected", "v3 local issue graph append failed");
 	}
+	retainApplicationVertex(registration.applicationVertices, registration.applicationAuthors, authenticated);
+	registration.graphVersion += 1;
 	if (acceptedAcl !== null && acceptedAcl !== undefined) {
 		registration.latchedOperations.set(acceptedAcl.digest, acceptedAcl);
 	}
@@ -4405,6 +4525,7 @@ async function issueLocal(
 ): Promise<V3LocalIssueResult> {
 	if (
 		!currentRegistration(registration) ||
+		registration.blueprintClosing ||
 		registration.terminalState !== "active" ||
 		registration.retainedBootstrapHold
 	) {
@@ -5177,6 +5298,141 @@ function beginTerminalTransition(registration: V3PlaneRegistration): Promise<V3T
 	});
 }
 
+function blueprintFoldFailure(
+	kind: Extract<V3BlueprintFoldResult, { readonly ok: false }>["kind"],
+	detail: string
+): Extract<V3BlueprintFoldResult, { readonly ok: false }> {
+	return ObjectFreeze({ detail, kind, ok: false as const });
+}
+
+function blueprintAdoptFailure(
+	kind: Extract<V3BlueprintAdoptResult, { readonly ok: false }>["kind"],
+	detail: string
+): Extract<V3BlueprintAdoptResult, { readonly ok: false }> {
+	return ObjectFreeze({ detail, kind, ok: false as const });
+}
+
+function signedInitialStateDigest(payload: PreparedV3LivePayload): string | undefined {
+	try {
+		const anchor = decodeCanonical(payload.input.exactCanonicalAnchorPreimageBytes);
+		const digest = isObject(anchor) ? Reflect.get(anchor, "stateDigest") : undefined;
+		return isDigestHex(digest) ? digest : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+function stageClosedBlueprintEpoch(registration: V3PlaneRegistration): V3BlueprintFoldResult {
+	if (!currentRegistration(registration) || registration.blueprintMachine === undefined) {
+		return blueprintFoldFailure("not-active", "v3 blueprint fold is not active");
+	}
+	if (registration.blueprintFolded) {
+		return blueprintFoldFailure("already-folded", "v3 blueprint epoch was already folded");
+	}
+	const graphVersion = registration.graphVersion;
+	let staged;
+	try {
+		const vertices = copyApplicationVertices(registration.applicationVertices);
+		if (vertices === undefined) return blueprintFoldFailure("fold-rejected", "v3 blueprint graph is unavailable");
+		staged = foldBlueprintEpoch({
+			anchorHash: registration.payload.provenance.anchorDigest,
+			authorize: ({ hash }) => {
+				const author = ReflectApply(MapPrototypeGet, registration.applicationAuthors, [hash]) as string | undefined;
+				return author !== undefined && isV3ApplicationAuthorAuthorized(registration.authorization, author);
+			},
+			machine: registration.blueprintMachine,
+			vertices,
+		});
+	} catch {
+		return blueprintFoldFailure("fold-rejected", "v3 blueprint epoch fold was rejected");
+	}
+	let used = false;
+	return ObjectFreeze({
+		adopt: (): V3BlueprintAdoptResult => {
+			if (used) return blueprintAdoptFailure("already-adopted", "v3 blueprint fold result was already used");
+			used = true;
+			if (!currentRegistration(registration) || registration.blueprintMachine === undefined) {
+				return blueprintAdoptFailure("not-active", "v3 blueprint fold is not active");
+			}
+			if (registration.blueprintFolded || registration.graphVersion !== graphVersion) {
+				return blueprintAdoptFailure("stale-graph", "v3 blueprint fold graph is stale");
+			}
+			try {
+				const snapshot = staged.adopt();
+				registration.blueprintFolded = true;
+				return ObjectFreeze({ kind: "adopted" as const, ok: true as const, snapshot });
+			} catch {
+				return blueprintAdoptFailure("adopt-rejected", "v3 blueprint fold adoption was rejected");
+			}
+		},
+		kind: "staged" as const,
+		ok: true as const,
+		order: staged.order,
+		outputs: staged.outputs,
+		staged: staged.staged,
+	});
+}
+
+function stageBlueprintEpoch(registration: V3PlaneRegistration): Promise<V3BlueprintFoldResult> {
+	if (!currentRegistration(registration) || registration.blueprintMachine === undefined) {
+		return Promise.resolve(blueprintFoldFailure("not-active", "v3 blueprint fold is not active"));
+	}
+	if (registration.blueprintClosing || registration.blueprintFolded) {
+		return Promise.resolve(blueprintFoldFailure("already-folded", "v3 blueprint epoch was already folded"));
+	}
+	// Close application admission synchronously, then wait behind every task that
+	// already owned the registration gate before copying the fixed epoch graph.
+	registration.blueprintClosing = true;
+	return enqueueRegistrationTask(registration, () => () => Promise.resolve(stageClosedBlueprintEpoch(registration)));
+}
+
+/**
+ * Binds exact signed-genesis application state to one active recovered v3 plane.
+ * @param rawInput - Closed plane and exact canonical state bytes.
+ * @returns A live blueprint fold handle or a closed binding failure.
+ */
+export function bindV3BlueprintLivePlane(rawInput: V3BlueprintLiveBindingInput): V3BlueprintLiveBindingResult {
+	try {
+		const input = snapshotClosedRecord(rawInput, BLUEPRINT_BINDING_INPUT_KEYS);
+		if (input === undefined) return activationFailure("malformed-input", "v3 blueprint binding input is invalid");
+		const registration = v3HandleRegistrations.get(input.plane as V3PlaneHandle);
+		const initialStateBytes = copyDetachedBytes(input.exactCanonicalInitialStateBytes);
+		if (registration === undefined || !currentRegistration(registration)) {
+			return activationFailure("capability-consumed", "v3 plane is unavailable");
+		}
+		if (registration.blueprintMachine !== undefined || registration.blueprintHandle !== undefined) {
+			return activationFailure("capability-consumed", "v3 blueprint binding is already active");
+		}
+		const initialStateDigest = signedInitialStateDigest(registration.payload);
+		if (initialStateBytes === undefined || initialStateDigest === undefined) {
+			return activationFailure("malformed-input", "v3 signed genesis state is invalid");
+		}
+		let machine: BlueprintStateMachine;
+		try {
+			machine = new BlueprintStateMachine({
+				exactCanonicalInitialStateBytes: initialStateBytes,
+				expectedBlueprintDigest: registration.payload.provenance.blueprintDigest,
+				expectedInitialStateDigest: initialStateDigest,
+				preparedBlueprintRuntime: registration.payload.runtime,
+			});
+		} catch {
+			return activationFailure("malformed-input", "v3 signed genesis state is invalid");
+		}
+		registration.blueprintMachine = machine;
+		const handle: V3BlueprintLiveHandle = ObjectFreeze({
+			blueprintSnapshot: (): BlueprintStateSnapshot | undefined =>
+				currentRegistration(registration) ? registration.blueprintMachine?.snapshot() : undefined,
+			epoch: 0 as const,
+			objectId: registration.payload.provenance.objectId,
+			stageBlueprintEpoch: (): Promise<V3BlueprintFoldResult> => stageBlueprintEpoch(registration),
+		});
+		registration.blueprintHandle = handle;
+		return ObjectFreeze({ handle, ok: true as const });
+	} catch {
+		return activationFailure("internal-invariant", "v3 blueprint binding failed");
+	}
+}
+
 function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
 	const ephemeralAuthority = ((): ReturnType<V3PlaneHandle["currentEphemeralAuthority"]> => {
 		const authorization = registration.authorization;
@@ -5352,11 +5608,18 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 			}
 			registration = {
 				active: true,
+				applicationAuthors: recovered.applicationAuthors,
+				applicationVertices: recovered.applicationVertices,
 				authorization: recovered.authorization,
+				blueprintClosing: false,
+				blueprintFolded: false,
+				blueprintHandle: undefined,
+				blueprintMachine: undefined,
 				classifyTerminalVertex: recovered.classifyTerminalVertex,
 				displacedSource: recovered.displacedSource,
 				drainingPendingIngress: false,
 				epochBytes: recovered.epochBytes,
+				graphVersion: intrinsicMapSize(recovered.applicationAuthors) ?? -1,
 				handle: undefined as unknown as V3PlaneHandle,
 				index: recovered.index,
 				issuanceScope: selectedScope,
