@@ -19,7 +19,7 @@ interface AuthenticatedConnection {
 	readonly remoteAddr: string;
 	readonly remotePeerId: string;
 	readonly transport: "other" | "webrtc";
-	exchange(request: Uint8Array): Promise<Uint8Array>;
+	exchange(request: Uint8Array, signal: AbortSignal): Promise<Uint8Array>;
 	onClose(listener: () => void): () => void;
 }
 
@@ -34,7 +34,7 @@ interface Libp2pConnectionFixture {
 	readonly remoteAddr: Readonly<{ toString(): string }>;
 	readonly remotePeer: Readonly<{ toString(): string }>;
 	addEventListener(type: "close", listener: () => void): void;
-	newStream(protocol: string): Promise<unknown>;
+	newStream(protocol: string, options?: Readonly<{ signal?: AbortSignal }>): Promise<unknown>;
 }
 
 interface IncomingSignalingStream {
@@ -88,7 +88,7 @@ interface OwnerModule {
 			connections(): readonly Libp2pConnectionFixture[];
 			readonly localPeerId: string;
 			onIncoming(listener: (input: IncomingSignalingStream) => Promise<void>): () => void;
-			read(stream: unknown): Promise<Uint8Array>;
+			read(stream: unknown, maxBytes: number): Promise<Uint8Array>;
 			write(stream: unknown, bytes: Uint8Array): Promise<void>;
 		}>
 	): SignalingPort;
@@ -108,6 +108,7 @@ async function loadOwnerModule(): Promise<OwnerModule> {
 type Listener = (event: unknown) => void;
 
 class FakeDataChannel {
+	binaryType: BinaryType = "blob";
 	bufferedAmount = 0;
 	readonly label: string;
 	readonly maxRetransmits: number | null;
@@ -160,7 +161,10 @@ class FakeDataChannel {
 		this.sent.push(bytes);
 		const peer = this.#peer;
 		queueMicrotask(() => {
-			if (peer !== undefined) peer.#emit("message", new MessageEvent("message", { data: bytes.buffer }));
+			if (peer !== undefined) {
+				const delivered = peer.binaryType === "arraybuffer" ? bytes.buffer : new Blob([bytes]);
+				peer.#emit("message", new MessageEvent("message", { data: delivered }));
+			}
 		});
 	}
 
@@ -525,19 +529,32 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		const inboundStream = Object.freeze({ id: "inbound-stream" });
 		let closeListener: (() => void) | undefined;
 		let incoming: ((input: IncomingSignalingStream) => Promise<void>) | undefined;
-		const newStream = vi.fn<(protocol: string) => Promise<unknown>>(() => Promise.resolve(outboundStream));
+		const newStream = vi.fn<(protocol: string, options?: Readonly<{ signal?: AbortSignal }>) => Promise<unknown>>(() =>
+			Promise.resolve(outboundStream)
+		);
 		const connection: Libp2pConnectionFixture = {
 			addEventListener: (_type, listener): void => {
 				closeListener = listener;
 			},
 			id: "libp2p-connection-7",
 			newStream,
-			remoteAddr: { toString: (): string => "/ip4/127.0.0.1/udp/4001/webrtc" },
+			remoteAddr: { toString: (): string => "/webrtc" },
 			remotePeer: { toString: (): string => "peer-b" },
 		};
+		const directConnection: Libp2pConnectionFixture = {
+			...connection,
+			id: "libp2p-connection-direct",
+			remoteAddr: { toString: (): string => "/ip4/127.0.0.1/udp/4002/webrtc-direct" },
+		};
+		const deceptiveConnection: Libp2pConnectionFixture = {
+			...connection,
+			id: "libp2p-connection-deceptive",
+			remoteAddr: { toString: (): string => "/dns/webrtc/tcp/4003" },
+		};
 		const writes: Array<{ bytes: Uint8Array; stream: unknown }> = [];
+		const readBounds: number[] = [];
 		const port = module.createLibp2pWebRtcSignalingPort({
-			connections: (): readonly Libp2pConnectionFixture[] => [connection],
+			connections: (): readonly Libp2pConnectionFixture[] => [connection, directConnection, deceptiveConnection],
 			localPeerId: "peer-a",
 			onIncoming: (listener): (() => void) => {
 				incoming = listener;
@@ -545,8 +562,10 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 					if (incoming === listener) incoming = undefined;
 				};
 			},
-			read: (stream): Promise<Uint8Array> =>
-				Promise.resolve(stream === outboundStream ? Uint8Array.of(4, 5) : Uint8Array.of(1, 2, 3)),
+			read: (stream, maxBytes): Promise<Uint8Array> => {
+				readBounds.push(maxBytes);
+				return Promise.resolve(stream === outboundStream ? Uint8Array.of(4, 5) : Uint8Array.of(1, 2, 3));
+			},
 			write: (stream, bytes): Promise<void> => {
 				writes.push({ bytes: bytes.slice(), stream });
 				return Promise.resolve();
@@ -557,13 +576,16 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		expect(adapted).toMatchObject({
 			generation: 1,
 			id: "libp2p-connection-7",
-			remoteAddr: "/ip4/127.0.0.1/udp/4001/webrtc",
+			remoteAddr: "/webrtc",
 			remotePeerId: "peer-b",
 			transport: "webrtc",
 		});
-		expect(await adapted.exchange(Uint8Array.of(9))).toEqual(Uint8Array.of(4, 5));
-		expect(newStream).toHaveBeenCalledExactlyOnceWith(SIGNALING_PROTOCOL);
+		expect(port.connections().map(({ transport }) => transport)).toEqual(["webrtc", "webrtc", "other"]);
+		const exchangeAbort = new AbortController();
+		expect(await adapted.exchange(Uint8Array.of(9), exchangeAbort.signal)).toEqual(Uint8Array.of(4, 5));
+		expect(newStream).toHaveBeenCalledExactlyOnceWith(SIGNALING_PROTOCOL, { signal: exchangeAbort.signal });
 		expect(writes).toEqual([{ bytes: Uint8Array.of(9), stream: outboundStream }]);
+		expect(readBounds).toEqual([65_536]);
 
 		const requestEvidence: Array<{ id: string; peerId: string; request: Uint8Array }> = [];
 		port.onRequest((authenticated, request): Promise<Uint8Array> => {
@@ -574,11 +596,84 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		await incoming({ connection, stream: inboundStream });
 		expect(requestEvidence).toEqual([{ id: "libp2p-connection-7", peerId: "peer-b", request: Uint8Array.of(1, 2, 3) }]);
 		expect(writes.at(-1)).toEqual({ bytes: Uint8Array.of(6, 7), stream: inboundStream });
+		expect(readBounds).toEqual([65_536, 65_536]);
 
 		const closed = vi.fn();
 		adapted.onClose(closed);
 		closeListener?.();
 		expect(closed).toHaveBeenCalledOnce();
+	});
+
+	it("aborts bounded signaling streams on outbound cancellation and the inbound setup deadline", async () => {
+		const module = await loadOwnerModule();
+		let incoming: ((input: IncomingSignalingStream) => Promise<void>) | undefined;
+		let rejectOutbound: ((error: Error) => void) | undefined;
+		let rejectInbound: ((error: Error) => void) | undefined;
+		const outboundStream = {
+			abort: vi.fn((error: Error): void => rejectOutbound?.(error)),
+			close: vi.fn((): Promise<void> => Promise.resolve()),
+		};
+		const inboundStream = {
+			abort: vi.fn((error: Error): void => rejectInbound?.(error)),
+			close: vi.fn((): Promise<void> => Promise.resolve()),
+		};
+		const connection: Libp2pConnectionFixture = {
+			addEventListener(): void {},
+			id: "libp2p-connection-cancellable",
+			newStream: (): Promise<unknown> => Promise.resolve(outboundStream),
+			remoteAddr: { toString: (): string => "/webrtc" },
+			remotePeer: { toString: (): string => "peer-b" },
+		};
+		const port = module.createLibp2pWebRtcSignalingPort({
+			connections: (): readonly Libp2pConnectionFixture[] => [connection],
+			localPeerId: "peer-a",
+			onIncoming: (listener): (() => void) => {
+				incoming = listener;
+				return (): void => {
+					if (incoming === listener) incoming = undefined;
+				};
+			},
+			read: (stream): Promise<Uint8Array> =>
+				new Promise<Uint8Array>((_resolve, reject) => {
+					if (stream === outboundStream) rejectOutbound = reject;
+					else rejectInbound = reject;
+				}),
+			write: (): Promise<void> => Promise.resolve(),
+		});
+		port.onRequest((): Promise<Uint8Array> => Promise.resolve(Uint8Array.of(1)));
+		const adapted = port.connections()[0];
+		if (adapted === undefined || incoming === undefined) throw new Error("cancellable signaling fixture missing");
+
+		const controller = new AbortController();
+		const outbound = adapted.exchange(Uint8Array.of(1), controller.signal);
+		const outboundResult = outbound.then(
+			() => undefined,
+			(error: unknown) => error
+		);
+		await tick();
+		controller.abort(new Error("controlled outbound cancellation"));
+		await tick();
+		const outboundAborted = outboundStream.abort.mock.calls.length === 1;
+		if (!outboundAborted) outboundStream.abort(new Error("controlled outbound cleanup"));
+		expect(outboundAborted).toBe(true);
+		expect(await outboundResult).toMatchObject({ message: "controlled outbound cancellation" });
+
+		vi.useFakeTimers();
+		const inbound = incoming({ connection, stream: inboundStream });
+		const inboundResult = inbound.then(
+			() => undefined,
+			(error: unknown) => error
+		);
+		try {
+			await tick();
+			await vi.advanceTimersByTimeAsync(10_000);
+			const inboundAborted = inboundStream.abort.mock.calls.length === 1;
+			if (!inboundAborted) inboundStream.abort(new Error("controlled inbound cleanup"));
+			expect(inboundAborted).toBe(true);
+			expect(await inboundResult).toMatchObject({ message: "RTC setup deadline exceeded" });
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it("exports the network owner, composes only the default node, and promotes sanitized RTC evidence", async () => {
@@ -642,10 +737,12 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		expect(left.peerConnections[0]?.channels).toHaveLength(1);
 		expect(right.peerConnections[0]?.channels).toHaveLength(1);
 		expect(left.peerConnections[0]?.channels[0]).toMatchObject({
+			binaryType: "arraybuffer",
 			label: RAW_LABEL,
 			maxRetransmits: 0,
 			ordered: false,
 		});
+		expect(right.peerConnections[0]?.channels[0]?.binaryType).toBe("arraybuffer");
 		expect(left.peerConnections[0]?.candidates).toHaveLength(1);
 		expect(right.peerConnections[0]?.candidates).toHaveLength(1);
 		expect(bus.exchangeRecords).toEqual([
