@@ -364,7 +364,7 @@ class FakeSignalingBus {
 	responseTransform: (response: Uint8Array) => Uint8Array = (response) => response;
 
 	createPort(peerId: string): SignalingPort {
-		const endpoint = this.#endpoints.get(peerId) ?? { connections: new Map() };
+		const endpoint: MutableEndpoint = this.#endpoints.get(peerId) ?? { connections: new Map() };
 		this.#endpoints.set(peerId, endpoint);
 		return {
 			connections: (): readonly AuthenticatedConnection[] => [...endpoint.connections.values()],
@@ -421,7 +421,9 @@ class FakeSignalingBus {
 				id,
 				onClose(listener): () => void {
 					closeListeners.add(listener);
-					return (): void => closeListeners.delete(listener);
+					return (): void => {
+						closeListeners.delete(listener);
+					};
 				},
 				remoteAddr: `/webrtc/${remotePeerId}`,
 				remotePeerId,
