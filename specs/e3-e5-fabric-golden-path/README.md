@@ -3,10 +3,14 @@
 ## Next Agent Prompt
 
 Status: reconciled on 2026-08-24 from tracked-clean signed HEAD
-`f6b3da881f9880444145a0617ae77e1c7bc88f2e`. Shared v3-room recovery,
-two-client chat convergence, zone adoption, corrected E2 authority binding,
-T1–T4 topology, the E3 transport track, deterministic AOI selection and
-targeted AOI delivery are already shipped. Do not rebuild them.
+`be4e80865d57ef748c20cb931f6f241366ddeff9`. The E3 transport track,
+loss-tolerant targeted AOI, the browser bandwidth proof, canonical co-signed
+intent and pre-journal outcome admission are shipped. Do not rebuild them.
+The E5-01 handoff passed formatter, targeted lint and typechecks, 28 focused
+tests in 1.55 seconds, retained migration/fold owners and diff check. Its bounded
+browser attempts reached durable acceptance and reconnect recovery; the final
+product-view corrections were source-verified without exceeding the retry
+limit.
 
 This is a parallel product track, not the core durable-lifecycle spine. First
 retain the signed T4 result and record the current two-client chat/zone baseline:
@@ -14,13 +18,11 @@ create/join, durable message or `placeBlock`, E1 movement, disconnect/reconnect,
 and durable convergence. Then E3/E4 may proceed alongside Phase 3f–3h. E5 waits
 for the stable durable-command and authority boundaries established by Phase 3.
 
-The next product slice is
-[Slice E4-03](slices/05-loss-tolerant-deltas.md). Land its tests-only RED and
-GREEN separately. E4-01 (`f57afdd3`) shipped deterministic AOI selection and a
-bounded fixed batch. E4-02 (`55d8eecf`) shipped authorized targeted delivery.
-Those signed implementation labels are prerequisites, not evidence that the
-older active-spec slices 05 and 06 are complete. E4-03 adds loss-tolerant
-projection; E4-04 then runs the original 128-entity browser bandwidth proof.
+The next product slice is [Slice E5-02](slices/09-referee-arm.md). It is blocked
+on adding a genuine authenticated `referee` ACL role through the bounded
+protocol-v3 successor path. That role is product authority required by the
+slice, not permission to reopen unrelated governance machinery. Land its
+tests-only RED and GREEN separately.
 
 Warnings:
 
@@ -51,12 +53,12 @@ Global checklist:
 - [x] [E3-03](slices/03-loss-and-hol-proof.md): prove the 30% loss/no-HOL claim.
 - [x] [E4-00](slices/04-deterministic-aoi.md): ship deterministic AOI selection,
       its bounded fixed batch and authorized targeted delivery prerequisites.
-- [ ] [E4-03](slices/05-loss-tolerant-deltas.md): ship bounded loss-tolerant
+- [x] [E4-03](slices/05-loss-tolerant-deltas.md): ship bounded loss-tolerant
       keyframes/deltas in the existing AOI owner.
-- [ ] [E4-04](slices/06-zone-bandwidth-proof.md): prove 32 visible entities at
+- [x] [E4-04](slices/06-zone-bandwidth-proof.md): prove 32 visible entities at
       no more than 256 kbps down.
-- [ ] [E5-00](slices/07-cosigned-intent.md): define canonical co-signed intent.
-- [ ] [E5-01](slices/08-prejournal-commit-admission.md): enforce it before local
+- [x] [E5-00](slices/07-cosigned-intent.md): define canonical co-signed intent.
+- [x] [E5-01](slices/08-prejournal-commit-admission.md): enforce it before local
       issuance and remote journal admission.
 - [ ] [E5-02](slices/09-referee-arm.md): add referee decisions only after a
       separately authorized ACL-role transition.
@@ -91,9 +93,10 @@ E5 makes a two-party outcome durable exactly once.
   deterministic AOI selection and the fixed AOI batch codec.
 - `@ts-drp/network` and `NodeEphemeralAdapter` own authenticated raw WebRTC,
   independent reliable/raw drains, lane selection and targeted routing.
-- The remaining E4 defect is projection recovery: the zone replaces its visible
-  population from each decoded fixed batch, so a lost batch has no generation,
-  base-keyframe, atomic assembly or bounded wait-for-keyframe semantics.
+- The zone now owns a durable outcome projection whose admission is serialized
+  before journal append and rebuilt before reconnect activation. Outcome-bearing
+  room migration remains fail-closed until an authenticated transfer owner is
+  designed; it must not replay a source-context proof into a target context.
 - T1–T4 already bound libp2p connection admission, selection, and relay
   preference. E3 must not introduce a raw peer dial or second topology owner.
 
