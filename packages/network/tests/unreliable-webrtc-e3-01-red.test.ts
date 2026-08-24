@@ -65,6 +65,7 @@ interface UnreliableWebRtcRoute {
 	close(): void;
 	onMessage(listener: (ingress: { readonly bytes: Uint8Array; readonly sender: string }) => void): () => void;
 	send(peers: readonly string[], bytes: Uint8Array): Promise<boolean>;
+	restart(): Promise<void>;
 	snapshot(): UnreliableWebRtcSnapshot;
 }
 
@@ -843,6 +844,9 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		expect(await leftAlpha.send(["peer-b"], Uint8Array.of(3))).toBe(false);
 		expect(await leftBeta.send(["peer-b"], Uint8Array.of(4))).toBe(true);
 		expect(leftBeta.snapshot().activeLinks).toBe(1);
+		await leftBeta.restart();
+		expect(left.peerConnections).toHaveLength(2);
+		expect(await leftBeta.send(["peer-b"], Uint8Array.of(5))).toBe(true);
 
 		leftBeta.close();
 		rightBeta.close();
@@ -850,8 +854,8 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		expect(left.peerConnections[0]?.connectionState).toBe("closed");
 		const leftGamma = left.owner.openUnreliableWebRtcRoute("zone:gamma");
 		right.owner.openUnreliableWebRtcRoute("zone:gamma");
-		expect(await leftGamma.send(["peer-b"], Uint8Array.of(5))).toBe(true);
-		expect(left.peerConnections).toHaveLength(2);
+		expect(await leftGamma.send(["peer-b"], Uint8Array.of(6))).toBe(true);
+		expect(left.peerConnections).toHaveLength(3);
 		expect(leftGamma.snapshot().activeLinks).toBe(1);
 	});
 
@@ -871,6 +875,11 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		channel.bufferedAmount = 65_537;
 		expect(await route.send(["peer-b"], Uint8Array.of(2))).toBe(false);
 		expect(route.snapshot().backpressuredDrops).toBe(1);
+		expect(route.snapshot().activeLinks).toBe(1);
+		await route.restart();
+		expect(left.peerConnections).toHaveLength(2);
+		expect(route.snapshot().activeLinks).toBe(1);
+		expect(await route.send(["peer-b"], Uint8Array.of(3))).toBe(true);
 
 		for (const [name, leftOptions, rightOptions] of [
 			["initiator small SCTP", { maxMessageSize: MAX_ROUTED_ENVELOPE_BYTES - 1 }, {}],
@@ -935,7 +944,7 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		}
 	});
 
-	it("rejects unknown routes, closes on generation loss, and cannot revive stale signaling", async () => {
+	it("rejects unknown routes, retains established raw links, and cannot revive stale signaling", async () => {
 		const module = await loadOwnerModule();
 		const bus = new FakeSignalingBus();
 		const left = owner(module, bus, "peer-a");
@@ -948,18 +957,32 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		expect(otherRoute.snapshot()).toMatchObject({ received: 0, unknownRouteDrops: 1 });
 
 		bus.disconnect(pair);
-		expect(leftRoute.snapshot().activeLinks).toBe(0);
-		expect(left.peerConnections.every(({ connectionState }) => connectionState === "closed")).toBe(true);
-		expect(await leftRoute.send(["peer-b"], Uint8Array.of(2))).toBe(false);
+		expect(leftRoute.snapshot()).toMatchObject({ activeLinks: 1, authenticatedConnectionLosses: 1 });
+		expect(left.peerConnections.every(({ connectionState }) => connectionState === "connected")).toBe(true);
+		expect(await leftRoute.send(["peer-b"], Uint8Array.of(2))).toBe(true);
 
 		pair = bus.connect("peer-a", "peer-b");
 		const alphaRoute = right.owner.openUnreliableWebRtcRoute("zone:alpha");
 		const received: Uint8Array[] = [];
 		alphaRoute.onMessage(({ bytes }) => received.push(bytes.slice()));
+		expect(await leftRoute.send(["peer-b"], Uint8Array.of(3))).toBe(false);
+		await vi.waitFor(() => expect(leftRoute.snapshot().links[0]).toMatchObject({ generation: pair.left.generation }));
 		expect(await leftRoute.send(["peer-b"], Uint8Array.of(3))).toBe(true);
 		await tick();
 		expect(received).toEqual([Uint8Array.of(3)]);
 		expect(leftRoute.snapshot().links[0]).toMatchObject({ generation: pair.left.generation });
+		expect(left.peerConnections[0]?.connectionState).toBe("closed");
+
+		const retainedPeerConnection = left.peerConnections.at(-1);
+		bus.disconnect(pair);
+		pair = bus.connect("peer-a", "peer-b");
+		expect(await leftRoute.send(["peer-b"], Uint8Array.of(4))).toBe(false);
+		await vi.waitFor(() => expect(leftRoute.snapshot().links[0]).toMatchObject({ generation: pair.left.generation }));
+		expect(await leftRoute.send(["peer-b"], Uint8Array.of(4))).toBe(true);
+		await tick();
+		expect(leftRoute.snapshot()).toMatchObject({ activeLinks: 1, links: [{ generation: pair.left.generation }] });
+		expect(retainedPeerConnection?.connectionState).toBe("closed");
+		expect(received).toEqual([Uint8Array.of(3), Uint8Array.of(4)]);
 
 		const staleBus = new FakeSignalingBus();
 		const staleLeft = owner(module, staleBus, "peer-a");

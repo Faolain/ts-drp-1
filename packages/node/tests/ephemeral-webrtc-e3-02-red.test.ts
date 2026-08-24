@@ -1,6 +1,11 @@
 import { sha256 } from "@noble/hashes/sha2";
 import { bytesToHex, concatBytes } from "@noble/hashes/utils";
-import type { EphemeralChannel, EphemeralChannelOptions } from "@ts-drp/ephemeral";
+import {
+	createEphemeralChannel,
+	type EphemeralChannel,
+	type EphemeralChannelOptions,
+	type EphemeralTransportPort,
+} from "@ts-drp/ephemeral";
 import type { DRPNetworkNode, IDRP, IDRPObject, Message } from "@ts-drp/types";
 import { describe, expect, it } from "vitest";
 
@@ -170,6 +175,152 @@ describe("E3-02 v3 zone transport adoption RED", () => {
 			lower.channel.close();
 			higher.channel.close();
 		}
+	});
+
+	it("retains a live authenticated raw peer through a bounded control-plane replacement", async () => {
+		const bus = new ControlledRawBus();
+		bus.connect("peer-a", "peer-b");
+		const roster = new Map([
+			["peer-a", "author-a"],
+			["peer-b", "author-b"],
+		]);
+		const writers = new Set(["author-a", "author-b"]);
+		const peers = ["peer-b"];
+		const left = controlledNode({ bus, localPeerId: "peer-a", peers, raw: true, roster, writers });
+		const right = controlledNode({ bus, localPeerId: "peer-b", peers: ["peer-a"], raw: true, roster, writers });
+		try {
+			expect(await left.channel.publish({ class: "unreliable-unordered", key: null, payload: payload("before") })).toBe(
+				true
+			);
+			peers.length = 0;
+			expect(await left.channel.publish({ class: "unreliable-unordered", key: null, payload: payload("during") })).toBe(
+				true
+			);
+			writers.delete("author-b");
+			expect(
+				await left.channel.publish({ class: "unreliable-unordered", key: null, payload: payload("revoked") })
+			).toBe(false);
+		} finally {
+			left.channel.close();
+			right.channel.close();
+		}
+	});
+
+	it("keeps the v3 reliable lane on the independent authenticated stream drain", async () => {
+		const bus = new ControlledRawBus();
+		const roster = new Map([
+			["peer-a", "author-a"],
+			["peer-b", "author-b"],
+		]);
+		const node = controlledNode({
+			bus,
+			localPeerId: "peer-a",
+			peers: ["peer-b"],
+			raw: true,
+			roster,
+			writers: new Set(["author-a", "author-b"]),
+		});
+		try {
+			expect(await node.channel.publish({ class: "reliable-unordered", key: null, payload: payload("control") })).toBe(
+				true
+			);
+			expect(node.direct).toHaveLength(1);
+			expect(node.published).toHaveLength(0);
+		} finally {
+			node.channel.close();
+		}
+	});
+
+	it("resets an active reliable stream drain without closing the raw route", async () => {
+		const bus = new ControlledRawBus();
+		const roster = new Map([
+			["peer-a", "author-a"],
+			["peer-b", "author-b"],
+		]);
+		const writers = new Set(["author-a", "author-b"]);
+		let enteredSend!: () => void;
+		const sendEntered = new Promise<void>((resolve) => {
+			enteredSend = resolve;
+		});
+		let capturedSignal: AbortSignal | undefined;
+		let sends = 0;
+		const network = {
+			getAllPeers: (): readonly string[] => ["peer-b"],
+			getGroupPeers: (): readonly string[] => ["peer-b"],
+			peerId: "peer-a",
+			publishMessage: (): Promise<boolean> => Promise.resolve(true),
+			sendMessage: (_peerId: string, _message: Message, options?: { readonly signal?: AbortSignal }): Promise<void> => {
+				sends += 1;
+				capturedSignal = options?.signal;
+				enteredSend();
+				if (sends > 1) return Promise.resolve();
+				return new Promise((_resolve, reject) => {
+					if (capturedSignal?.aborted === true) {
+						reject(capturedSignal.reason);
+						return;
+					}
+					capturedSignal?.addEventListener("abort", () => reject(capturedSignal?.reason), { once: true });
+				});
+			},
+			subscribe: (): void => undefined,
+			subscribeToPeerDisconnects: (): (() => void) => (): void => undefined,
+			unsubscribe: (): void => undefined,
+		} as unknown as DRPNetworkNode;
+		const provider: EphemeralAuthorizationProvider = {
+			authorForPeer: (peerId): string | undefined => roster.get(peerId),
+			currentAuthority: () => AUTHORITY,
+			isCurrentWriter: (author): boolean => writers.has(author),
+		};
+		const owner = bus.owner("peer-a");
+		const adapter = new NodeEphemeralAdapter(network, () => undefined, owner);
+		const channel = adapter.openAuthorized("zone", provider, OPTIONS);
+		const route = onlyRoute(owner);
+		const publication = channel.publish({ class: "reliable-unordered", key: null, payload: payload("blocked") });
+		await sendEntered;
+		await channel.resetReliable();
+		expect(capturedSignal?.aborted).toBe(true);
+		await expect(publication).resolves.toBe(false);
+		await expect(channel.publish({ class: "reliable-unordered", key: null, payload: payload("fresh") })).resolves.toBe(
+			true
+		);
+		expect(sends).toBe(2);
+		expect(route.closed).toBe(false);
+		channel.close();
+	});
+
+	it("cancels capacity waiters and preserves raw admission across a reliable backlog", async () => {
+		let blockReliable = true;
+		const port: EphemeralTransportPort = {
+			authorizedPeers: (): readonly string[] => ["peer-b"],
+			isAuthorized: (): boolean => true,
+			localPeerId: "peer-a",
+			maxEnvelopeBytes: (): number => 1_024,
+			onMessage: (): (() => void) => (): void => undefined,
+			send: (input): Promise<boolean> => {
+				if (!blockReliable || input.class !== "reliable-unordered") return Promise.resolve(true);
+				return new Promise((resolve) => {
+					if (input.signal?.aborted === true) {
+						resolve(false);
+						return;
+					}
+					input.signal?.addEventListener("abort", () => resolve(false), { once: true });
+				});
+			},
+		};
+		const channel = createEphemeralChannel(port, OPTIONS);
+		const reliable = Array.from({ length: 256 }, (_, index) =>
+			channel.publish({ class: "reliable-unordered", key: null, payload: payload(`reliable-${String(index)}`) })
+		);
+		await expect(
+			channel.publish({ class: "unreliable-unordered", key: null, payload: payload("raw-reserved") })
+		).resolves.toBe(true);
+		await channel.resetReliable();
+		await expect(Promise.all(reliable)).resolves.toEqual(Array.from({ length: 256 }, () => false));
+		blockReliable = false;
+		await expect(channel.publish({ class: "reliable-unordered", key: null, payload: payload("fresh") })).resolves.toBe(
+			true
+		);
+		channel.close();
 	});
 
 	it("fails every unavailable raw state closed with zero reliable fallback", async () => {

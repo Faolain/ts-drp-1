@@ -1041,7 +1041,7 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			expect(
 				scheduledReliable.every(({ receivedAtMs, sentAtMs }) => receivedAtMs >= sentAtMs && receivedAtMs <= deadlineMs)
 			).toBe(true);
-			const receiverSequence = rawSequenceEvidence(rawWire);
+			const receiverSequence = rawSequenceEvidence(raw);
 			const senderSequence = rawSequenceEvidence(senderRaw);
 			expect(receiverSequence.gap).toBeGreaterThan(1);
 			expect(senderSequence.maxStallMs).toBeLessThanOrEqual(500);

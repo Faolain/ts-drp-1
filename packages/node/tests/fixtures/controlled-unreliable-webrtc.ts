@@ -8,12 +8,27 @@ export interface ControlledRawSend {
 	readonly sender: string;
 }
 
-function snapshot(activeLinks: number, backpressuredDrops: number): DRPUnreliableWebRtcSnapshot {
+function snapshot(peers: readonly string[], backpressuredDrops: number): DRPUnreliableWebRtcSnapshot {
 	return Object.freeze({
-		activeLinks,
+		activeLinks: peers.length,
+		authenticatedConnectionLosses: 0,
 		backpressuredDrops,
 		handshakeFailures: 0,
-		links: Object.freeze([]),
+		lastLinkDrop: undefined,
+		linkDrops: 0,
+		links: Object.freeze(
+			peers.map((peerId) =>
+				Object.freeze({
+					connectionId: `controlled-${peerId}`,
+					generation: 0,
+					label: "ts-drp-ephemeral/1",
+					maxRetransmits: 0,
+					ordered: false,
+					peerId,
+					remoteAddr: `/controlled/${peerId}`,
+				})
+			)
+		),
 		received: 0,
 		sent: 0,
 		unknownRouteDrops: 0,
@@ -59,13 +74,17 @@ export class ControlledRawRoute implements DRPUnreliableWebRtcRoute {
 		return Promise.resolve();
 	}
 
+	restart(): Promise<void> {
+		return Promise.resolve();
+	}
+
 	send(peers: readonly string[], bytes: Uint8Array): Promise<boolean> {
 		if (this.closed || this.backpressured) return Promise.resolve(false);
 		return Promise.resolve(this.#bus.send(this.#localPeerId, this.routeId, peers, bytes));
 	}
 
 	snapshot(): DRPUnreliableWebRtcSnapshot {
-		return snapshot(this.closed ? 0 : 1, this.backpressured ? 1 : 0);
+		return snapshot(this.closed ? [] : (this.reconciledPeers.at(-1) ?? []), this.backpressured ? 1 : 0);
 	}
 }
 
