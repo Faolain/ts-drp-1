@@ -55148,3 +55148,50 @@ batch decoded through the same public owner. Movement remains raw-only and
 creates zero durable vertices. A following E4 slice may add targeted recipient
 publication and a genuine 32-entity browser population; it must not claim the
 full AOI bandwidth gate from this payload-only slice.
+
+### D.98 — E4-01 closure and E4-02 targeted AOI delivery
+
+E4-01 is product-closed by signed RED `fbef73f1` and signed GREEN
+`f57afdd3`. The public ephemeral owner now performs exact-integer bounded AOI
+selection and encodes at most 32 entity deltas into a 514-byte fixed-width
+batch. The grid's live movement path consumes that same binary owner over the
+existing raw channel with no JSON, reliable or durable fallback. The final
+P0/P1 round was Kimi 100/100, Grok PASS and Opus PASS, all with zero P0/P1.
+One real Chromium attempt recorded the inherited one-shot pre-link raw drop;
+the bounded unchanged rerun passed both movement directions, zero durable
+growth, reconnect and later durable convergence. Explicit uint32 movement
+rollover semantics remain P2 debt owned by a later keyframe/generation slice.
+
+E4-02 adds targeted interest delivery to the existing channel rather than a
+parallel transport. `EphemeralChannel.publishTo` accepts a nonempty bounded
+recipient list, copies and deterministically orders unique peer ids, requires
+every recipient to be in the current authorized-peer projection, and carries
+that exact target set through admission, queueing, raw send and sequenced
+coalescing. Existing `publish` remains the all-authorized-peer operation.
+Targeted coalescing may replace only the same delivery class, sequenced key and
+recipient set; one observer's queued AOI batch cannot erase another's.
+
+The raw route snapshot also counts accepted routed bytes, including the route
+header and authority-bound ephemeral frame, so the application can measure the
+actual data-channel message budget instead of extrapolating the 514-byte
+payload alone. The grid exposes one product AOI publication path that selects
+and encodes through the E4-01 owner and targets the named current observer;
+ordinary movement remains unchanged.
+
+The tests-only RED adds one focused targeted-publication owner plus one dormant
+three-client Chromium checkpoint and its config. Unit cases prove copied,
+ordered, authorized targets; exact no-dial recipient isolation; per-target-set
+sequenced coalescing; close/reset behavior; routed-byte accounting; and the
+unchanged all-peer path. The browser creates a genuine 32-entity batch, waits
+for authenticated raw links before the campaign, sends 300 batches at 33 ms to
+one selected observer, proves an equally connected authorized non-recipient
+receives none, and measures routed downstream below 256 kbps. The campaign
+creates zero durable vertices, then one ordinary durable block converges across
+all three clients. Its sole readiness failure is the absent targeted channel
+owner; browser behavior remains dormant until GREEN.
+
+GREEN changes only the existing ephemeral/network/node/grid owners required by
+that path. It does not add a second codec, authority oracle, signaling path,
+runtime dial, durability path, snapshot feature, deterministic math, governance
+successor or broad benchmark framework. One P0/P1-only review round follows RED
+and GREEN; P2 remains debt and cannot create a review loop.
