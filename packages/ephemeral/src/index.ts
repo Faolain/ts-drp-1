@@ -77,6 +77,7 @@ export interface EphemeralChannel {
 	authorizedPeers(): readonly string[];
 	close(): void;
 	publish(input: EphemeralPublishInput): Promise<boolean>;
+	publishTo(recipients: readonly string[], input: EphemeralPublishInput): Promise<boolean>;
 	resetReliable(): Promise<void>;
 	restartUnreliable(): Promise<void>;
 	stats(): EphemeralStats;
@@ -100,6 +101,7 @@ const MESSAGE_BYTES_LIMIT = 65_536;
 const SEQUENCED_KEYS_LIMIT = 4_096;
 const QUEUE_CAPACITY = 256;
 const UNRELIABLE_QUEUE_RESERVE = 32;
+export const EPHEMERAL_TARGET_RECIPIENTS_MAX = 8;
 const RELIABLE_ATTEMPTS = 8;
 const RECEIVE_BYTE_CAPACITY = 1_048_576;
 const RECEIVE_MESSAGE_CAPACITY = 120;
@@ -126,6 +128,7 @@ interface MutableStats {
 interface QueueEntry {
 	readonly encoded: Uint8Array;
 	readonly frame: EphemeralFrame;
+	readonly recipients: "all" | readonly string[];
 	readonly reliable: boolean;
 	resolve(accepted: boolean): void;
 }
@@ -267,6 +270,11 @@ function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
 		if (left[index] !== right[index]) return false;
 	}
 	return true;
+}
+
+function sameRecipients(left: "all" | readonly string[], right: "all" | readonly string[]): boolean {
+	if (left === "all" || right === "all") return left === right;
+	return left.length === right.length && left.every((peerId, index) => peerId === right[index]);
 }
 
 function authorityBoundPort(port: EphemeralTransportPort): AuthorityBoundTransportPort | undefined {
@@ -620,6 +628,24 @@ export function createEphemeralChannel(
 				if (entry === undefined) break;
 				activeEntries += 1;
 				let accepted = false;
+				let recipientsAuthorized = true;
+				if (entry.recipients !== "all") {
+					try {
+						const authorized = port.authorizedPeers();
+						recipientsAuthorized = entry.recipients.every((peerId) => authorized.includes(peerId));
+					} catch {
+						recipientsAuthorized = false;
+					}
+				}
+				if (!recipientsAuthorized) {
+					entry.resolve(false);
+					activeEntries -= 1;
+					resolveQueueSpace?.();
+					queueSpace = new Promise<void>((resolve) => {
+						resolveQueueSpace = resolve;
+					});
+					continue;
+				}
 				const entrySignal = reliable ? reliableTransportController.signal : unreliableTransportController.signal;
 				const attempts = entry.reliable ? RELIABLE_ATTEMPTS : 1;
 				for (let attempt = 0; attempt < attempts && !closed && !entrySignal.aborted; attempt += 1) {
@@ -634,7 +660,7 @@ export function createEphemeralChannel(
 							port.send({
 								bytes: entry.encoded.slice(),
 								class: entry.frame.class,
-								recipients: "all",
+								recipients: entry.recipients,
 								signal: entrySignal,
 							}),
 							closedResult,
@@ -666,7 +692,7 @@ export function createEphemeralChannel(
 		}
 	};
 
-	const publish = (input: EphemeralPublishInput): Promise<boolean> => {
+	const publishFor = (recipients: "all" | readonly string[], input: EphemeralPublishInput): Promise<boolean> => {
 		if (closed) return Promise.resolve(false);
 		if (
 			!exactKeys(input, ["class", "key", "payload"]) ||
@@ -734,7 +760,7 @@ export function createEphemeralChannel(
 		const enqueue = (): Promise<boolean> =>
 			new Promise((resolve) => {
 				const reliable = frame.class === "reliable-unordered";
-				(reliable ? reliableQueue : unreliableQueue).push({ encoded, frame, reliable, resolve });
+				(reliable ? reliableQueue : unreliableQueue).push({ encoded, frame, recipients, reliable, resolve });
 				void drain(reliable);
 			});
 		if (frame.class === "reliable-unordered") {
@@ -754,12 +780,16 @@ export function createEphemeralChannel(
 			if (retainedEntryCount() >= QUEUE_CAPACITY) {
 				if (frame.class === "unreliable-sequenced") {
 					const existingIndex = unreliableQueue.findIndex(
-						(entry) => entry.frame.class === "unreliable-sequenced" && entry.frame.key === frame.key
+						(entry) =>
+							entry.frame.class === "unreliable-sequenced" &&
+							entry.frame.key === frame.key &&
+							sameRecipients(entry.recipients, recipients)
 					);
 					if (existingIndex >= 0) {
 						const [replaced] = unreliableQueue.splice(existingIndex, 1, {
 							encoded,
 							frame,
+							recipients,
 							reliable: false,
 							resolve,
 						});
@@ -772,9 +802,31 @@ export function createEphemeralChannel(
 				resolve(false);
 				return;
 			}
-			unreliableQueue.push({ encoded, frame, reliable: false, resolve });
+			unreliableQueue.push({ encoded, frame, recipients, reliable: false, resolve });
 			void drain(false);
 		});
+	};
+	const publish = (input: EphemeralPublishInput): Promise<boolean> => publishFor("all", input);
+	const publishTo = (recipients: readonly string[], input: EphemeralPublishInput): Promise<boolean> => {
+		if (closed) return Promise.resolve(false);
+		if (
+			!Array.isArray(recipients) ||
+			recipients.length < 1 ||
+			recipients.length > EPHEMERAL_TARGET_RECIPIENTS_MAX ||
+			recipients.some((peerId) => typeof peerId !== "string" || peerId.length === 0) ||
+			new Set(recipients).size !== recipients.length
+		) {
+			throw new TypeError("ephemeral target recipients differ");
+		}
+		const selected = Object.freeze([...recipients].sort((left, right) => (left < right ? -1 : left > right ? 1 : 0)));
+		let authorized: readonly string[];
+		try {
+			authorized = port.authorizedPeers();
+		} catch {
+			return Promise.resolve(false);
+		}
+		if (!selected.every((peerId) => authorized.includes(peerId))) return Promise.resolve(false);
+		return publishFor(selected, input);
 	};
 	const resetReliable = async (): Promise<void> => {
 		reliableGeneration += 1;
@@ -812,6 +864,7 @@ export function createEphemeralChannel(
 			}
 		},
 		publish,
+		publishTo,
 		resetReliable: (): Promise<void> => {
 			return closed ? Promise.resolve() : resetReliable();
 		},

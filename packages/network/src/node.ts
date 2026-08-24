@@ -602,6 +602,8 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 							linkDrops: 0,
 							links: Object.freeze([]),
 							received: 0,
+							routedBytesReceived: 0,
+							routedBytesSent: 0,
 							sent: 0,
 							unknownRouteDrops: 0,
 						}),

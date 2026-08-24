@@ -36,6 +36,8 @@ export interface DRPUnreliableWebRtcSnapshot {
 		| undefined;
 	readonly linkDrops: number;
 	readonly received: number;
+	readonly routedBytesReceived: number;
+	readonly routedBytesSent: number;
 	readonly sent: number;
 	readonly unknownRouteDrops: number;
 	readonly links: readonly Readonly<{
@@ -106,6 +108,7 @@ interface RouteRegistration {
 	readonly digest: Uint8Array;
 	readonly digestHex: string;
 	readonly listeners: Set<(ingress: { readonly bytes: Uint8Array; readonly sender: string }) => void>;
+	membershipReconciled: boolean;
 	peers: readonly string[];
 	readonly routeId: string;
 }
@@ -427,6 +430,8 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 	#lastLinkDrop: DRPUnreliableWebRtcSnapshot["lastLinkDrop"];
 	#linkDrops = 0;
 	#received = 0;
+	#routedBytesReceived = 0;
+	#routedBytesSent = 0;
 	#sent = 0;
 	#unknownRouteDrops = 0;
 
@@ -460,6 +465,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			digest,
 			digestHex: bytesToHex(digest),
 			listeners: new Set(),
+			membershipReconciled: false,
 			peers: Object.freeze([]),
 			routeId,
 		};
@@ -517,6 +523,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 
 	async #reconcile(registration: RouteRegistration, peers: readonly string[]): Promise<void> {
 		if (this.#closed || registration.closed || new Set(peers).size !== peers.length) return;
+		registration.membershipReconciled = true;
 		registration.peers = Object.freeze(peers.slice(0, MAX_LINKS));
 		await Promise.all(
 			registration.peers.map(async (peerId) => {
@@ -542,49 +549,68 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			registration.closed ||
 			bytes.byteLength > MAX_PAYLOAD_BYTES ||
 			peers.length === 0 ||
+			peers.length > MAX_LINKS ||
 			new Set(peers).size !== peers.length
 		) {
 			return false;
 		}
-		registration.peers = Object.freeze(peers.slice(0, MAX_LINKS));
-		const payload = bytes.slice();
-		const results = await Promise.all(peers.map((peerId) => this.#sendPeer(registration, peerId, payload)));
-		return results.every(Boolean);
-	}
-
-	async #sendPeer(registration: RouteRegistration, peerId: string, payload: Uint8Array): Promise<boolean> {
-		const existing = this.#links.get(peerId);
-		const connection = this.#connectionFor(peerId);
-		const reusable =
-			existing !== undefined &&
-			existing.channel.readyState === "open" &&
-			(connection === undefined || this.#sameConnection(existing.connection, connection));
-		let link = reusable ? existing : undefined;
-		if (link === undefined) {
-			const setup = this.#linkFor(peerId);
-			if (this.#activatedPeers.has(peerId)) {
-				void setup;
+		if (!registration.membershipReconciled) {
+			const desiredPeers = [...new Set([...registration.peers, ...peers])].slice(0, MAX_LINKS);
+			registration.peers = Object.freeze(desiredPeers);
+			await Promise.all(
+				desiredPeers.map(async (peerId) => {
+					const existing = this.#links.get(peerId);
+					const connection = this.#connectionFor(peerId);
+					if (
+						existing !== undefined &&
+						existing.channel.readyState === "open" &&
+						(connection === undefined || this.#sameConnection(existing.connection, connection))
+					) {
+						return;
+					}
+					const setup = this.#linkFor(peerId);
+					if (this.#activatedPeers.has(peerId)) {
+						void setup;
+						return;
+					}
+					await setup;
+				})
+			);
+		}
+		const targets: { readonly link: ActiveLink; readonly peerId: string }[] = [];
+		for (const peerId of peers) {
+			const link = this.#links.get(peerId);
+			const connection = this.#connectionFor(peerId);
+			if (
+				link === undefined ||
+				link.channel.readyState !== "open" ||
+				(connection !== undefined && !this.#sameConnection(link.connection, connection))
+			) {
 				return false;
 			}
-			link = await setup;
+			targets.push({ link, peerId });
 		}
-		if (link === undefined || link.channel.readyState !== "open") return false;
-		if (link.channel.bufferedAmount > BUFFERED_AMOUNT_CEILING) {
+		if (targets.some(({ link }) => link.channel.bufferedAmount > BUFFERED_AMOUNT_CEILING)) {
 			this.#backpressuredDrops += 1;
 			return false;
 		}
+		const payload = bytes.slice();
 		const envelope = new Uint8Array(ROUTE_HEADER_BYTES + payload.byteLength);
 		envelope[0] = ROUTE_VERSION;
 		envelope.set(registration.digest, 1);
 		envelope.set(payload, ROUTE_HEADER_BYTES);
-		try {
-			link.channel.send(envelope);
-			this.#sent += 1;
-			return true;
-		} catch {
-			this.#dropLink(peerId, link, "send-error");
-			return false;
+		let sent = true;
+		for (const { link, peerId } of targets) {
+			try {
+				link.channel.send(envelope);
+				this.#sent += 1;
+				this.#routedBytesSent += envelope.byteLength;
+			} catch {
+				this.#dropLink(peerId, link, "send-error");
+				sent = false;
+			}
 		}
+		return sent;
 	}
 
 	async #linkFor(peerId: string): Promise<ActiveLink | undefined> {
@@ -799,6 +825,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		}
 		const ingress = Object.freeze({ bytes: bytes.slice(ROUTE_HEADER_BYTES), sender: peerId });
 		this.#received += 1;
+		this.#routedBytesReceived += bytes.byteLength;
 		for (const listener of route.listeners) {
 			try {
 				listener(ingress);
@@ -891,6 +918,8 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 				)
 				.sort((left, right) => left.peerId.localeCompare(right.peerId)),
 			received: this.#received,
+			routedBytesReceived: this.#routedBytesReceived,
+			routedBytesSent: this.#routedBytesSent,
 			sent: this.#sent,
 			unknownRouteDrops: this.#unknownRouteDrops,
 		});

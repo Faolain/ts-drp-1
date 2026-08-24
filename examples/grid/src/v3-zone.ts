@@ -26,7 +26,7 @@ const FABRIC_CAMPAIGN_SAMPLE_COUNT = 600;
 const FABRIC_RELIABLE_OBSERVATION_TAIL_MS = 15_000;
 const ZONE_EPHEMERAL_OPTIONS = Object.freeze({
 	maxMessageBytes: 65_536,
-	maxSequencedKeys: 1,
+	maxSequencedKeys: 9,
 	maxSequencedSenders: 2,
 });
 const ZONE_INVITE_KEYS = ["kind", "roomInvite", "version", "zoneId"] as const;
@@ -37,6 +37,8 @@ export interface ZoneBlock {
 	readonly x: number;
 	readonly y: number;
 }
+
+type EntityDelta = ReturnType<typeof decodeEntityDeltaBatch>[number];
 
 interface FabricRunInput {
 	readonly intervalMs: number;
@@ -103,6 +105,7 @@ export interface ZoneFabricWorkbench {
 
 export interface ZoneSnapshot {
 	readonly acceptedOperationDigest: string;
+	readonly aoiPopulations: Readonly<Record<string, readonly EntityDelta[]>>;
 	readonly blocks: readonly ZoneBlock[];
 	readonly durableVertexCount: number;
 	readonly enrollment: string;
@@ -125,6 +128,8 @@ export interface ZoneSnapshot {
 			readonly peerId: string;
 		}>[];
 		readonly received: number;
+		readonly routedBytesReceived: number;
+		readonly routedBytesSent: number;
 		readonly sent: number;
 	}>;
 	readonly transientPositions: Readonly<Record<string, Readonly<{ readonly x: number; readonly y: number }>>>;
@@ -161,11 +166,20 @@ interface ZoneOperationDescriptor {
 export interface V3ZoneApi {
 	activateMigration(receipt: V3RoomMigrationRehearsalReceipt): Promise<V3RoomMigrationActivationReceipt>;
 	close(): Promise<void>;
-	create(memberEnrollment: string): Promise<void>;
+	create(memberEnrollments: string | readonly string[]): Promise<void>;
 	readonly fabric: ZoneFabricWorkbench;
 	join(invite: string): Promise<void>;
 	move(dx: number, dy: number): void;
 	placeBlock(input: ZoneBlock): Promise<void>;
+	publishAoiPopulation(
+		input: Readonly<{
+			readonly entities: readonly EntityDelta[];
+			readonly observerPeerId: string;
+			readonly observerX: number;
+			readonly observerY: number;
+			readonly radius: number;
+		}>
+	): Promise<boolean>;
 	rehearseMigration(): Promise<V3RoomMigrationRehearsalReceipt>;
 	snapshot(): ZoneSnapshot;
 }
@@ -180,6 +194,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 	const localAuthor = node.keychain.localAuthorId;
 	const localPeerId = node.networkNode.peerId;
 	const enrollment = encodeEnrollment({ author: localAuthor, peerId: localPeerId });
+	const aoiPopulations = new Map<string, readonly EntityDelta[]>();
 	const fabricTrials = new Map<string, FabricTrialState>();
 	const transientPositions = new Map<string, Readonly<{ x: number; y: number }>>();
 	let room: Awaited<ReturnType<typeof createV3RoomSession<ZoneProjection>>> | undefined;
@@ -200,6 +215,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 		projection = emptyProjection();
 		migrationCreatorAuthor = "";
 		migrationMembers = Object.freeze([]);
+		aoiPopulations.clear();
 		transientPositions.clear();
 		invite = "";
 		zoneId = "";
@@ -210,6 +226,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 	};
 
 	const snapshot = (): ZoneSnapshot => {
+		const aoiEntries = [...aoiPopulations.entries()].sort(([left], [right]) => compareText(left, right));
 		const positionEntries = [...transientPositions.entries()].sort(([left], [right]) => compareText(left, right));
 		const raw = zoneId.length === 0 ? undefined : node.ephemeralUnreliableWebRtcSnapshot(zoneId);
 		return Object.freeze({
@@ -217,6 +234,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 				"ts-drp/d9346-zone-accepted-operations/v1",
 				encodeCanonical(projection.acceptedDigests)
 			),
+			aoiPopulations: Object.freeze(Object.fromEntries(aoiEntries)),
 			blocks: projection.blocks,
 			durableVertexCount: projection.acceptedDigests.length,
 			enrollment,
@@ -243,6 +261,8 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 					)
 				),
 				received: raw?.received ?? 0,
+				routedBytesReceived: raw?.routedBytesReceived ?? 0,
+				routedBytesSent: raw?.routedBytesSent ?? 0,
 				sent: raw?.sent ?? 0,
 			}),
 			transientPositions: Object.freeze(Object.fromEntries(positionEntries)),
@@ -262,7 +282,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 		);
 	};
 	const subscribeEphemeral = (channel: EphemeralChannel): void => {
-		channel.subscribe(({ payload, sender }) => {
+		channel.subscribe(({ key, payload, sender }) => {
 			const fabricObservation = decodeFabricPayload(payload);
 			if (fabricObservation !== undefined) {
 				const trial = fabricTrials.get(fabricObservation.trialId);
@@ -290,6 +310,17 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 					})
 				);
 				if (fabricObservation.sentinel) emit();
+				return;
+			}
+			if (key === `aoi:${localPeerId}`) {
+				let population: readonly EntityDelta[];
+				try {
+					population = decodeEntityDeltaBatch(payload);
+				} catch {
+					return;
+				}
+				aoiPopulations.set(sender, population);
+				emit();
 				return;
 			}
 			const position = decodePosition(payload);
@@ -543,18 +574,28 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 			closing = attempt;
 			return attempt;
 		},
-		async create(memberEnrollment: string): Promise<void> {
+		async create(memberEnrollments: string | readonly string[]): Promise<void> {
 			await trackOpen(async (): Promise<void> => {
-				const member = decodeEnrollment(memberEnrollment);
-				if (member.author === localAuthor || member.peerId === localPeerId) {
-					throw new TypeError("v3 zone member enrollment duplicates the creator");
+				const encodedMembers = typeof memberEnrollments === "string" ? [memberEnrollments] : [...memberEnrollments];
+				if (encodedMembers.length < 1 || encodedMembers.length > 8) {
+					throw new TypeError("v3 zone member enrollment count differs");
+				}
+				const decodedMembers = encodedMembers.map((encoded) => decodeEnrollment(encoded));
+				const authors = new Set([localAuthor]);
+				const peerIds = new Set([localPeerId]);
+				for (const member of decodedMembers) {
+					if (authors.has(member.author) || peerIds.has(member.peerId)) {
+						throw new TypeError("v3 zone member enrollment duplicates a member");
+					}
+					authors.add(member.author);
+					peerIds.add(member.peerId);
 				}
 				const salt = new Uint8Array(16);
 				crypto.getRandomValues(salt);
 				const selectedZoneId = `${localPeerId}:${hex(salt)}`;
 				const members = Object.freeze([
 					Object.freeze({ author: localAuthor, order: 0, peerId: localPeerId }),
-					Object.freeze({ ...member, order: 1 }),
+					...decodedMembers.map((member, index) => Object.freeze({ ...member, order: index + 1 })),
 				]);
 				const material = await createCreatorInviteMaterial(node, selectedZoneId, members);
 				await performOpen(selectedZoneId, material, members);
@@ -617,6 +658,31 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 			await selected.issue(
 				Object.freeze({ action: "placeBlock", id: input.id, kind: input.kind, x: input.x, y: input.y })
 			);
+		},
+		async publishAoiPopulation(input): Promise<boolean> {
+			if (room === undefined || ephemeral === undefined) return false;
+			if (
+				input === null ||
+				typeof input !== "object" ||
+				typeof input.observerPeerId !== "string" ||
+				input.observerPeerId.length === 0
+			) {
+				throw new TypeError("v3 zone AOI publication differs");
+			}
+			const { selectAoiEntityDeltas } = await import("@ts-drp/ephemeral");
+			const selected = selectAoiEntityDeltas({
+				entities: input.entities,
+				maxEntities: 32,
+				observerX: input.observerX,
+				observerY: input.observerY,
+				radius: input.radius,
+			});
+			const payload = encodeEntityDeltaBatch(selected);
+			return ephemeral.publishTo([input.observerPeerId], {
+				class: "unreliable-sequenced",
+				key: `aoi:${input.observerPeerId}`,
+				payload,
+			});
 		},
 		async rehearseMigration(): Promise<V3RoomMigrationRehearsalReceipt> {
 			const selected = room;
@@ -788,10 +854,12 @@ function exactMember(value: unknown): Readonly<Enrollment & { readonly order: nu
 	const peerId = Reflect.get(value, "peerId");
 	return typeof author === "string" &&
 		/^[0-9a-f]{64}$/u.test(author) &&
-		(order === 0 || order === 1) &&
+		Number.isSafeInteger(order) &&
+		Number(order) >= 0 &&
+		Number(order) <= 8 &&
 		typeof peerId === "string" &&
 		peerId.length > 0
-		? Object.freeze({ author, order, peerId })
+		? Object.freeze({ author, order: Number(order), peerId })
 		: undefined;
 }
 

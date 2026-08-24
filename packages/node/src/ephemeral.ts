@@ -235,18 +235,22 @@ export class NodeEphemeralAdapter {
 				},
 				restartUnreliable: (): Promise<void> => rawRoute?.restart() ?? Promise.resolve(),
 				send: async (input): Promise<boolean> => {
-					if (input.recipients !== "all") return Promise.resolve(false);
+					const authorized = authorizedPeers();
+					const recipients = input.recipients === "all" ? authorized : input.recipients;
+					if (!recipients.every((peerId) => authorized.includes(peerId))) return false;
 					if (requireLegacyObject) {
-						return this.#send(topic, input.bytes);
+						return input.recipients === "all" ? this.#send(topic, input.bytes) : false;
 					}
 					if (input.class === "reliable-unordered") {
-						return this.#sendDirect(topic, input.bytes, authorizedPeers(), input.signal);
+						return this.#sendDirect(topic, input.bytes, recipients, input.signal);
 					}
-					const peers = authorizedPeers();
-					if (peers.length === 0) return false;
+					if (recipients.length === 0) return false;
 					if (rawRoute === undefined) return false;
-					const results = await Promise.all(peers.map((peerId) => rawRoute.send([peerId], input.bytes)));
-					return results.some(Boolean);
+					if (input.recipients === "all") {
+						const results = await Promise.all(recipients.map((peerId) => rawRoute.send([peerId], input.bytes)));
+						return results.some(Boolean);
+					}
+					return rawRoute.send(recipients, input.bytes);
 				},
 				close: (): void => {
 					try {

@@ -30,6 +30,8 @@ function snapshot(peers: readonly string[], backpressuredDrops: number): DRPUnre
 			)
 		),
 		received: 0,
+		routedBytesReceived: 0,
+		routedBytesSent: 0,
 		sent: 0,
 		unknownRouteDrops: 0,
 	});
