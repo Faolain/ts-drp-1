@@ -15,6 +15,17 @@ interface ZoneSnapshot {
 	readonly localAuthor: string;
 	readonly localPeerId: string;
 	readonly ready: boolean;
+	readonly rawTransport: Readonly<{
+		readonly fallbackCount: number;
+		readonly received: number;
+		readonly sent: number;
+		readonly links: readonly Readonly<{
+			readonly label: "ts-drp-ephemeral/1";
+			readonly maxRetransmits: 0;
+			readonly ordered: false;
+			readonly peerId: string;
+		}>[];
+	}>;
 	readonly transientPositions: Readonly<Record<string, Readonly<{ readonly x: number; readonly y: number }>>>;
 	readonly transportPeerAuthors: readonly Readonly<{ readonly author: string; readonly peerId: string }>[];
 	readonly zoneId: string;
@@ -143,6 +154,8 @@ test("two real network clients recover and converge one durable v3 zone while mo
 		await expect.poll(async () => (await zone(joiner)).durableVertexCount).toBe(2);
 		expect((await zone(joiner)).transportPeerAuthors).toEqual(created.transportPeerAuthors);
 		expect((await zone(joiner)).acceptedOperationDigest).toBe((await zone(creator)).acceptedOperationDigest);
+		expect((await zone(creator)).rawTransport.fallbackCount).toBe(0);
+		expect((await zone(joiner)).rawTransport.fallbackCount).toBe(0);
 
 		await creator.evaluate(() => window.__TS_DRP_V3_ZONE__?.placeBlock({ id: "spawn", kind: "stone", x: 2, y: 3 }));
 		await expect.poll(async () => (await zone(creator)).blocks).toEqual([{ id: "spawn", kind: "stone", x: 2, y: 3 }]);
@@ -161,6 +174,15 @@ test("two real network clients recover and converge one durable v3 zone while mo
 		await expect
 			.poll(async () => (await zone(joiner)).transientPositions[creatorPeerId])
 			.not.toEqual(beforeCreatorMovement);
+		expect((await zone(creator)).rawTransport.sent).toBeGreaterThan(0);
+		expect((await zone(joiner)).rawTransport.received).toBeGreaterThan(0);
+		await expect
+			.poll(async () => (await zone(creator)).rawTransport.links)
+			.toEqual([{ label: "ts-drp-ephemeral/1", maxRetransmits: 0, ordered: false, peerId: joinerPeerId }]);
+		await expect
+			.poll(async () => (await zone(joiner)).rawTransport.links)
+			.toEqual([{ label: "ts-drp-ephemeral/1", maxRetransmits: 0, ordered: false, peerId: creatorPeerId }]);
+		expect((await zone(creator)).rawTransport.fallbackCount).toBe(0);
 		expect((await zone(creator)).durableVertexCount).toBe(afterBlock.durableVertexCount);
 		expect((await zone(joiner)).durableVertexCount).toBe(afterBlock.durableVertexCount);
 		expect((await zone(creator)).acceptedOperationDigest).toBe(afterBlock.acceptedOperationDigest);
@@ -193,6 +215,7 @@ test("two real network clients recover and converge one durable v3 zone while mo
 		await joiner.fill("#gridInput", created.invite);
 		await joiner.click("#joinGrid");
 		await expect.poll(async () => (await zone(joiner)).blocks).toEqual((await zone(creator)).blocks);
+		expect((await zone(joiner)).rawTransport.fallbackCount).toBe(0);
 		expect((await zone(joiner)).acceptedOperationDigest).toBe((await zone(creator)).acceptedOperationDigest);
 		expect((await zone(joiner)).transientPositions).toEqual({});
 		expect((await zone(joiner)).durableVertexCount).toBe(afterOfflineProgress.durableVertexCount);
@@ -200,6 +223,9 @@ test("two real network clients recover and converge one durable v3 zone while mo
 
 		await creator.keyboard.press("a");
 		await expect.poll(async () => (await zone(joiner)).transientPositions[creatorPeerId]).toBeDefined();
+		await expect
+			.poll(async () => (await zone(joiner)).rawTransport.links)
+			.toEqual([{ label: "ts-drp-ephemeral/1", maxRetransmits: 0, ordered: false, peerId: creatorPeerId }]);
 		expect((await zone(joiner)).durableVertexCount).toBe(afterOfflineProgress.durableVertexCount);
 
 		await joiner.evaluate(() => window.__TS_DRP_V3_ZONE__?.placeBlock({ id: "rejoined", kind: "glass", x: 13, y: 21 }));

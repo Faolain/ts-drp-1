@@ -11,6 +11,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import { type EphemeralAuthorizationProvider, NodeEphemeralAdapter } from "../packages/node/src/ephemeral.js";
 import { NodeRoomNetworkAdapter } from "../packages/node/src/room-network.js";
+import {
+	ControlledRawBus,
+	type ControlledRawOwner,
+} from "../packages/node/tests/fixtures/controlled-unreliable-webrtc.js";
 
 const DIRECT_PROTOCOL = "/drp/message/0.0.1";
 const options: EphemeralChannelOptions = {
@@ -59,12 +63,18 @@ interface ControlledV3 {
 	readonly evidence: WeakMap<Message, Evidence>;
 	readonly network: EvidenceNetwork;
 	readonly published: Message[];
+	readonly rawOwner: ControlledRawOwner;
 	readonly roster: Map<string, string>;
 	readonly writers: Set<string>;
 	close(): void;
 	disconnect(peerId: string): void;
-	publish(payload: Uint8Array, sequencedKey?: string): Promise<Message>;
-	route(bytes: Uint8Array, sender: string, kind?: Transport["kind"]): Message;
+	publish(
+		payload: Uint8Array,
+		sequencedKey?: string,
+		deliveryClass?: "reliable-unordered" | "unreliable-sequenced" | "unreliable-unordered"
+	): Promise<Uint8Array>;
+	route(bytes: Uint8Array, sender: string, kind?: Transport["kind"]): void;
+	routeReliable(bytes: Uint8Array, sender: string): void;
 	stamp(message: Message, transport: Transport): void;
 	topic(): string;
 	unsubscribe(peerId: string): void;
@@ -114,6 +124,8 @@ function controlledV3(
 	const writers = new Set(input.writers ?? ["author-local", "author-writer"]);
 	const evidence = new WeakMap<Message, Evidence>();
 	const published: Message[] = [];
+	const rawBus = new ControlledRawBus();
+	const rawOwner = rawBus.owner("peer-local");
 	const peerChangeHandlers = new Set<(change: { peerId: string; subscribed: boolean; topic: string }) => void>();
 	const peerDisconnectHandlers = new Set<(peerId: string) => void>();
 	let subscribedTopic = "";
@@ -168,8 +180,13 @@ function controlledV3(
 		currentAuthority: (): Authority => authority.value,
 		isCurrentWriter: (author: string): boolean => writers.has(author),
 	} as EphemeralAuthorizationProvider & { currentAuthority(): Authority };
-	const adapter = new NodeEphemeralAdapter(network, () => undefined, null);
+	const adapter = new NodeEphemeralAdapter(network, () => undefined, rawOwner);
 	const channel = adapter.openAuthorized(objectId, provider, options);
+	for (const peerId of roster.keys()) {
+		const owner = peerId === "peer-local" ? rawOwner : rawBus.owner(peerId);
+		owner.openUnreliableWebRtcRoute(subscribedTopic);
+		rawBus.connect("peer-local", peerId);
+	}
 	return {
 		adapter,
 		authority,
@@ -180,35 +197,37 @@ function controlledV3(
 		},
 		evidence,
 		network,
-		async publish(payload: Uint8Array, sequencedKey?: string): Promise<Message> {
+		async publish(
+			payload: Uint8Array,
+			sequencedKey?: string,
+			deliveryClass = sequencedKey === undefined ? "unreliable-unordered" : "unreliable-sequenced"
+		): Promise<Uint8Array> {
 			await expect(
 				channel.publish({
-					class: sequencedKey === undefined ? "unreliable-unordered" : "unreliable-sequenced",
+					class: deliveryClass,
 					key: sequencedKey ?? null,
 					payload,
 				})
 			).resolves.toBe(true);
-			const message = published.at(-1);
-			if (message === undefined) throw new TypeError("missing published v3 frame");
-			return message;
+			const bytes = deliveryClass === "reliable-unordered" ? published.at(-1)?.data : rawBus.sends.at(-1)?.bytes;
+			if (bytes === undefined) throw new TypeError(`missing ${deliveryClass} v3 frame`);
+			return bytes.slice();
 		},
 		published,
+		rawOwner,
 		roster,
-		route(bytes: Uint8Array, sender: string, kind: Transport["kind"] = "signed-gossip"): Message {
+		route(bytes: Uint8Array, sender: string, _kind: Transport["kind"] = "signed-gossip"): void {
+			rawBus.inject("peer-local", subscribedTopic, sender, bytes);
+		},
+		routeReliable(bytes: Uint8Array, sender: string): void {
 			const message = Message.create({
 				data: bytes.slice(),
 				objectId: subscribedTopic,
 				sender,
 				type: MessageType.MESSAGE_TYPE_CUSTOM,
 			});
-			stamp(
-				message,
-				kind === "signed-gossip"
-					? { kind, sender, topic: subscribedTopic }
-					: { kind, protocol: DIRECT_PROTOCOL, sender }
-			);
+			stamp(message, { kind: "signed-gossip", sender, topic: subscribedTopic });
 			expect(adapter.route(message)).toBe(true);
-			return message;
 		},
 		stamp,
 		topic: () => subscribedTopic,
@@ -220,89 +239,28 @@ function controlledV3(
 }
 
 async function publishedBytes(fixture: ControlledV3, payload: string, key?: string): Promise<Uint8Array> {
-	return (await fixture.publish(new TextEncoder().encode(payload), key)).data.slice();
+	return fixture.publish(new TextEncoder().encode(payload), key);
+}
+
+async function publishedReliableBytes(fixture: ControlledV3, payload: string): Promise<Uint8Array> {
+	return fixture.publish(new TextEncoder().encode(payload), undefined, "reliable-unordered");
 }
 
 describe("D.93.48 corrected E2 RED", () => {
-	it("emits authority-bound v2 traffic and consumes exact gossip or direct evidence only once", async () => {
+	it("emits authority-bound v2 traffic only through raw ingress with authenticated peer attribution", async () => {
 		const fixture = controlledV3();
 		try {
 			const delivered: string[] = [];
-			fixture.channel.subscribe(({ payload }) => delivered.push(new TextDecoder().decode(payload)));
-			const exact = await fixture.publish(new TextEncoder().encode("gossip"));
-			expect(exact.data[0]).toBe(2);
-			expect(fixture.adapter.route(exact)).toBe(true);
-			expect(fixture.adapter.route(exact)).toBe(true);
-			const directSource = await fixture.publish(new TextEncoder().encode("direct"));
-			const direct = Message.create({
-				data: directSource.data.slice(),
-				objectId: fixture.topic(),
-				sender: "peer-writer",
-				type: MessageType.MESSAGE_TYPE_CUSTOM,
-			});
-			fixture.stamp(direct, { kind: "authenticated-stream", protocol: DIRECT_PROTOCOL, sender: "peer-writer" });
-			expect(fixture.adapter.route(direct)).toBe(true);
-			expect(delivered).toEqual(["gossip", "direct"]);
-		} finally {
-			fixture.close();
-		}
-	});
-
-	it("rejects copied, application-created, content-mutated and wrong-protocol messages", async () => {
-		const fixture = controlledV3();
-		try {
-			const delivered: string[] = [];
-			fixture.channel.subscribe(({ payload }) => delivered.push(new TextDecoder().decode(payload)));
-			const exact = await fixture.publish(new TextEncoder().encode("protected"));
-			const copied = Message.create({ ...exact, data: exact.data.slice() });
-			expect(fixture.adapter.route(copied)).toBe(true);
-
-			const mutated = Message.create({ ...exact, data: exact.data.slice() });
-			fixture.stamp(mutated, { kind: "signed-gossip", sender: mutated.sender, topic: fixture.topic() });
-			mutated.data[mutated.data.byteLength - 1] = (mutated.data.at(-1) ?? 0) ^ 1;
-			expect(fixture.adapter.route(mutated)).toBe(true);
-
-			const forged = Message.create({
-				data: exact.data.slice(),
-				objectId: fixture.topic(),
-				sender: "peer-writer",
-				type: MessageType.MESSAGE_TYPE_CUSTOM,
-			});
-			expect(fixture.adapter.route(forged)).toBe(true);
-			const wrongObject = Message.create({ ...forged, data: forged.data.slice(), objectId: "wrong-object" });
-			fixture.stamp(wrongObject, {
-				kind: "authenticated-stream",
-				protocol: DIRECT_PROTOCOL,
-				sender: "peer-writer",
-			});
-			expect(fixture.adapter.route(wrongObject)).toBe(false);
-			expect(fixture.network.claimIngressEvidence?.(wrongObject)).toEqual({
-				message: {
-					data: exact.data,
-					objectId: "wrong-object",
-					sender: "peer-writer",
-					type: MessageType.MESSAGE_TYPE_CUSTOM,
-				},
-				transport: { kind: "authenticated-stream", protocol: DIRECT_PROTOCOL, sender: "peer-writer" },
-			});
-
-			const wrongProtocol = Message.create({ ...forged, data: forged.data.slice() });
-			fixture.stamp(wrongProtocol, {
-				kind: "authenticated-stream",
-				protocol: "/wrong/direct/protocol",
-				sender: "peer-writer",
-			});
-			expect(fixture.adapter.route(wrongProtocol)).toBe(true);
-
-			const wrongTopic = Message.create({ ...forged, data: forged.data.slice() });
-			fixture.stamp(wrongTopic, {
-				kind: "signed-gossip",
-				sender: "peer-writer",
-				topic: "wrong-topic",
-			});
-			expect(fixture.adapter.route(wrongTopic)).toBe(true);
-			expect(fixture.network.claimIngressEvidence?.(wrongTopic)).toBeUndefined();
-			expect(delivered).toEqual([]);
+			fixture.channel.subscribe(({ payload, sender }) =>
+				delivered.push(`${sender}:${new TextDecoder().decode(payload)}`)
+			);
+			const exact = await fixture.publish(new TextEncoder().encode("raw"));
+			expect(exact[0]).toBe(2);
+			fixture.route(exact, "peer-writer");
+			fixture.route(exact, "peer-reader");
+			expect(delivered).toContain("peer-writer:raw");
+			expect(delivered).not.toContain("peer-reader:raw");
+			expect(fixture.published).toHaveLength(0);
 		} finally {
 			fixture.close();
 		}
@@ -514,9 +472,9 @@ describe("D.93.48 corrected E2 RED", () => {
 			for (let index = 0; index < 200; index += 1) rejected.route(bytes, `peer-${index}`);
 			expect(stats(rejected.channel)).toMatchObject({ authorityMismatch: 120, rateLimited: 80, writerBuckets: 0 });
 
-			const large = await publishedBytes(source, "x".repeat(60_000));
+			const large = await publishedReliableBytes(source, "x".repeat(60_000));
 			const allowedByBytes = Math.floor(1_048_576 / large.byteLength);
-			for (let index = 0; index <= allowedByBytes; index += 1) rejectedBytes.route(large, "peer-reader");
+			for (let index = 0; index <= allowedByBytes; index += 1) rejectedBytes.routeReliable(large, "peer-reader");
 			expect(stats(rejectedBytes.channel)).toMatchObject({
 				authorityMismatch: allowedByBytes,
 				rateLimited: 1,
@@ -594,17 +552,17 @@ describe("D.93.48 corrected E2 RED", () => {
 			vi.setSystemTime(0);
 			const largeSource = controlledV3();
 			const byteBound = controlledV3();
-			const large = await publishedBytes(largeSource, "x".repeat(60_000));
+			const large = await publishedReliableBytes(largeSource, "x".repeat(60_000));
 			const allowedByBytes = Math.floor(1_048_576 / large.byteLength);
 			let byteDeliveries = 0;
 			byteBound.channel.subscribe(() => {
 				byteDeliveries += 1;
 			});
-			for (let index = 0; index <= allowedByBytes; index += 1) byteBound.route(large, "peer-writer");
+			for (let index = 0; index <= allowedByBytes; index += 1) byteBound.routeReliable(large, "peer-writer");
 			expect(byteDeliveries).toBe(allowedByBytes);
 			expect(stats(byteBound.channel).rateLimited).toBe(1);
 			vi.advanceTimersByTime(1_000);
-			byteBound.route(large, "peer-writer");
+			byteBound.routeReliable(large, "peer-writer");
 			expect(byteDeliveries).toBe(allowedByBytes + 1);
 			expect(stats(byteBound.channel).rateLimited).toBe(1);
 

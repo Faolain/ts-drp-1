@@ -9,6 +9,10 @@ import {
 	type ControlledTransportPort,
 } from "./fixtures/track-e1-ephemeral/controlled-transport.js";
 import { Grid } from "../examples/grid/src/objects/grid.js";
+import {
+	ControlledRawBus,
+	type ControlledRawOwner,
+} from "../packages/node/tests/fixtures/controlled-unreliable-webrtc.js";
 
 type DeliveryClass = "reliable-unordered" | "unreliable-sequenced" | "unreliable-unordered";
 
@@ -96,7 +100,8 @@ interface V3EphemeralAdapter {
 interface NodeEphemeralModule {
 	NodeEphemeralAdapter: new (
 		networkNode: DRPNetworkNode,
-		getObject: (objectId: string) => undefined
+		getObject: (objectId: string) => undefined,
+		rawOwner: ControlledRawOwner | null
 	) => V3EphemeralAdapter;
 }
 
@@ -514,6 +519,79 @@ describe("Track E1 post-closure correction", () => {
 		channel.close();
 	});
 
+	it("keeps 57,600 v3 movements on the raw lane with zero durable vertices and one durable control vertex", async () => {
+		const { NodeEphemeralAdapter } = await loadNodeEphemeralModule();
+		const raw = new ControlledRawBus();
+		raw.connect("alice", "bob");
+		const aliceOwner = raw.owner("alice");
+		const bobOwner = raw.owner("bob");
+		const aliceReliable: Message[] = [];
+		const bobReliable: Message[] = [];
+		const network = (peerId: string, peer: string, reliable: Message[]): DRPNetworkNode =>
+			({
+				...nodeNetwork(),
+				getAllPeers: (): readonly string[] => [peer],
+				getGroupPeers: (): readonly string[] => [peer],
+				peerId,
+				publishMessage: (_topic: string, message: Message): Promise<true> => {
+					reliable.push(message);
+					return Promise.resolve(true);
+				},
+				sendMessage: (_peer: string, message: Message): Promise<void> => {
+					reliable.push(message);
+					return Promise.resolve();
+				},
+				subscribeToPeerDisconnects: (): (() => void) => (): void => undefined,
+			}) as unknown as DRPNetworkNode;
+		const roster = new Map([
+			["alice", "author-alice"],
+			["bob", "author-bob"],
+		]);
+		const provider: V3EphemeralAuthorizationProvider = {
+			authorForPeer: (peerId) => roster.get(peerId),
+			currentAuthority: () => ({
+				aclDigest: "22".repeat(32),
+				anchorDigest: "11".repeat(32),
+				epoch: 0,
+				objectId: "zone",
+			}),
+			isCurrentWriter: (author) => author === "author-alice" || author === "author-bob",
+		};
+		const alice = new NodeEphemeralAdapter(network("alice", "bob", aliceReliable), () => undefined, aliceOwner);
+		const bob = new NodeEphemeralAdapter(network("bob", "alice", bobReliable), () => undefined, bobOwner);
+		const aliceChannel = alice.openAuthorized("zone", provider, options());
+		const bobChannel = bob.openAuthorized("zone", provider, options());
+		let delivered = 0;
+		bobChannel.subscribe(() => {
+			delivered += 1;
+		});
+		const world = new DRPObject({
+			acl: createPermissionlessACL("alice"),
+			drp: new Grid(),
+			peerId: "alice",
+		});
+		const beforeMovement = world.vertices.length;
+		for (let sample = 0; sample < 57_600; sample += 1) {
+			await expect(
+				aliceChannel.publish({
+					class: "unreliable-sequenced",
+					key: "alice",
+					payload: bytes(String(sample)),
+				})
+			).resolves.toBe(true);
+		}
+		expect(delivered).toBeGreaterThan(0);
+		expect(delivered).toBeLessThan(57_600);
+		expect(raw.sends).toHaveLength(57_600);
+		expect(aliceReliable).toHaveLength(0);
+		expect(bobReliable).toHaveLength(0);
+		expect(world.vertices).toHaveLength(beforeMovement);
+		world.drp?.addUser("alice", "blue");
+		expect(world.vertices).toHaveLength(beforeMovement + 1);
+		aliceChannel.close();
+		bobChannel.close();
+	});
+
 	it("fails v3 E1 closed for wrong-topic, malformed, unauthorized, and post-deactivation ingress", async () => {
 		const { NodeEphemeralAdapter } = await loadNodeEphemeralModule();
 		let topic = "";
@@ -586,9 +664,9 @@ describe("Track E1 post-closure correction", () => {
 		expect(topic).not.toBe("");
 		const message = (objectId: string, sender: string, data: Uint8Array): Message =>
 			Message.create({ data, objectId, sender, type: MessageType.MESSAGE_TYPE_CUSTOM });
-		await expect(
-			channel.publish({ class: "unreliable-sequenced", key: "fixture", payload: bytes("fixture") })
-		).resolves.toBe(true);
+		await expect(channel.publish({ class: "reliable-unordered", key: null, payload: bytes("fixture") })).resolves.toBe(
+			true
+		);
 		const publishedFrame = published[0]?.data;
 		if (publishedFrame === undefined) throw new TypeError("missing production v3 frame");
 		const frame = (): Uint8Array => publishedFrame.slice();
