@@ -55124,3 +55124,27 @@ P2 observations remain debt and did not cause another test, workflow or review
 round. The passing gate set is four package builds, grid typecheck, formatting,
 zero-error focused lint, 25 focused unit tests, one Chromium product proof and
 `git diff --check`.
+
+### D.97 — E4-01 bounded AOI selection and entity-delta batch
+
+E4 starts with one product primitive and one immediate consumer. The primitive
+lives in `@ts-drp/ephemeral`: deterministic per-observer visibility selection
+over integer entity ids and signed 32-bit coordinates, followed by a canonical
+binary delta batch. Selection admits at most 32 entities inside the configured
+integer radius, orders by squared distance and then entity id, and rejects
+duplicates, unsafe arithmetic, invalid bounds and caller-order dependence. The
+codec carries version, count and for each entity `{ entityId, sequence, x, y }`
+as fixed-width big-endian integers. Its maximum payload is 514 bytes, so one
+30 Hz batch is 123,360 payload bits/s, below the Profile-M 256 kbps downstream
+budget before later transport accounting.
+
+The tests-only RED owns exact at/over-radius, 32/33-visible, distance-tie,
+permutation, duplicate, coordinate and malformed/noncanonical decode cases. It
+also pins round-trip detachment, exact maximum bytes and the 30 Hz payload
+budget. The sole readiness failure is the absent public AOI/codec owner. GREEN
+adds that owner without changing transport, authority, durability or protocol
+registries, then replaces the grid's JSON position payload with a one-entity
+batch decoded through the same public owner. Movement remains raw-only and
+creates zero durable vertices. A following E4 slice may add targeted recipient
+publication and a genuine 32-entity browser population; it must not claim the
+full AOI bandwidth gate from this payload-only slice.
