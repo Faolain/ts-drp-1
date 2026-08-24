@@ -6,6 +6,7 @@ import {
 	type DRPNetworkHostConfigSnapshot,
 	type DRPNetworkHostFactory,
 	DRPNetworkNode,
+	extractSanitizedRtcEvidence,
 } from "@ts-drp/network";
 import { DRPNode } from "@ts-drp/node";
 import { createPermissionlessACL } from "@ts-drp/object";
@@ -654,7 +655,7 @@ async function inspectDirectProof(
 	const baseline = await rtcCapture.baseline(pc);
 	const current = await waitForValue(
 		async () => {
-			const value = await rtcEvidence(pc);
+			const value = await extractSanitizedRtcEvidence(pc);
 			return value.bytesSent > baseline.sent && value.bytesReceived > baseline.received ? value : undefined;
 		},
 		5_000,
@@ -873,46 +874,11 @@ function payloadBytes(data: string | ArrayBufferLike | Blob | ArrayBufferView): 
 	return data.byteLength;
 }
 
-async function rtcEvidence(pc: RTCPeerConnection): Promise<{
-	readonly bytesReceived: number;
-	readonly bytesSent: number;
-	readonly candidateTypes: DirectTransportProof["iceCandidateTypes"];
-	readonly dataChannelOpen: boolean;
-	readonly selectedPairId: string;
-}> {
-	const stats = await pc.getStats();
-	const pair = [...stats.values()].find(
-		(value) =>
-			value.type === "candidate-pair" &&
-			((value as RTCIceCandidatePairStats).nominated === true ||
-				(value as RTCIceCandidatePairStats).state === "succeeded")
-	) as (RTCIceCandidatePairStats & { localCandidateId?: string; remoteCandidateId?: string }) | undefined;
-	if (pair === undefined) throw new Error("selected RTC candidate pair missing");
-	const candidateTypes = [pair.localCandidateId, pair.remoteCandidateId].map((id) => {
-		if (id === undefined) throw new Error("selected RTC pair omitted a candidate ID");
-		const type = stats.get(id)?.candidateType;
-		if (type !== "host" && type !== "prflx" && type !== "relay" && type !== "srflx") {
-			throw new Error(`selected RTC pair reported unsupported candidate type ${String(type)}`);
-		}
-		return type;
-	});
-	const dataChannelOpen = [...stats.values()].some(
-		(value) => value.type === "data-channel" && (value as { state?: string }).state === "open"
-	);
-	return {
-		bytesReceived: pair.bytesReceived ?? 0,
-		bytesSent: pair.bytesSent ?? 0,
-		candidateTypes,
-		dataChannelOpen: dataChannelOpen || pc.sctp?.transport.state === "connected",
-		selectedPairId: pair.id,
-	};
-}
-
 async function selectedPairBytes(
 	pc: RTCPeerConnection | undefined
 ): Promise<{ readonly received: number; readonly sent: number }> {
 	if (pc === undefined) return { received: 0, sent: 0 };
-	const evidence = await rtcEvidence(pc);
+	const evidence = await extractSanitizedRtcEvidence(pc);
 	return { received: evidence.bytesReceived, sent: evidence.bytesSent };
 }
 

@@ -168,7 +168,7 @@ function controlledV3(
 		currentAuthority: (): Authority => authority.value,
 		isCurrentWriter: (author: string): boolean => writers.has(author),
 	} as EphemeralAuthorizationProvider & { currentAuthority(): Authority };
-	const adapter = new NodeEphemeralAdapter(network, () => undefined);
+	const adapter = new NodeEphemeralAdapter(network, () => undefined, null);
 	const channel = adapter.openAuthorized(objectId, provider, options);
 	return {
 		adapter,

@@ -429,7 +429,11 @@ export class DRPNode extends TypedEventEmitter<NodeEvents> implements IDRPNode {
 		this._stopNetwork = dependencies.networkStop ?? ((): Promise<void> => this.networkNode.stop());
 		this._routing = createConfiguredBrowserRouting(config);
 		this.#objectStore = new DRPObjectStore();
-		this._ephemeral = new NodeEphemeralAdapter(this.networkNode, (objectId) => this.#objectStore.get(objectId));
+		this._ephemeral = new NodeEphemeralAdapter(
+			this.networkNode,
+			(objectId) => this.#objectStore.get(objectId),
+			this.networkNode instanceof DefaultDRPNetworkNode ? this.networkNode.unreliableWebRtcOwner : null
+		);
 		this._roomNetwork = new NodeRoomNetworkAdapter(this.networkNode, this._ephemeral);
 		this.keychain = new Keychain(config?.keychain_config);
 		this.config = {

@@ -6,7 +6,7 @@ import {
 	type EphemeralChannelOptions,
 	type EphemeralIngress,
 } from "@ts-drp/ephemeral";
-import { DRP_MESSAGE_PROTOCOL } from "@ts-drp/network";
+import { DRP_MESSAGE_PROTOCOL, type DRPUnreliableWebRtcOwner } from "@ts-drp/network";
 import { type DRPNetworkNode, type IDRP, type IDRPObject, Message, MessageType } from "@ts-drp/types";
 
 const EPHEMERAL_TOPIC_DOMAIN = new TextEncoder().encode("ts-drp-ephemeral-topic-v1\u0000");
@@ -43,15 +43,22 @@ export class NodeEphemeralAdapter {
 	readonly #byTopic = new Map<string, TopicRegistration>();
 	readonly #getObject: (objectId: string) => IDRPObject<IDRP> | undefined;
 	readonly #networkNode: DRPNetworkNode;
+	readonly #unreliableWebRtcOwner: DRPUnreliableWebRtcOwner | null;
 
 	/**
 	 * Create one adapter for one node instance.
 	 * @param networkNode Exact signed network boundary.
 	 * @param getObject Current object lookup.
+	 * @param unreliableWebRtcOwner Narrow raw owner available only on the default network implementation.
 	 */
-	constructor(networkNode: DRPNetworkNode, getObject: (objectId: string) => IDRPObject<IDRP> | undefined) {
+	constructor(
+		networkNode: DRPNetworkNode,
+		getObject: (objectId: string) => IDRPObject<IDRP> | undefined,
+		unreliableWebRtcOwner: DRPUnreliableWebRtcOwner | null
+	) {
 		this.#networkNode = networkNode;
 		this.#getObject = getObject;
+		this.#unreliableWebRtcOwner = unreliableWebRtcOwner;
 	}
 
 	/** Close every active channel before node shutdown. */
@@ -63,6 +70,11 @@ export class NodeEphemeralAdapter {
 			} catch (error) {
 				failure ??= error;
 			}
+		}
+		try {
+			this.#unreliableWebRtcOwner?.close();
+		} catch (error) {
+			failure ??= error;
 		}
 		if (failure !== undefined) throw failure;
 	}

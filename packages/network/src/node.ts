@@ -90,7 +90,7 @@ import {
 } from "./connection-budget.js";
 import { createMetricsRegister, type PrometheusMetricsRegister } from "./metrics/prometheus.js";
 import { PeerSelector } from "./peer-selector.js";
-import { streamToUint8Array, uint8ArrayToStream } from "./stream.js";
+import { readUint8ArrayFrame, streamToUint8Array, uint8ArrayToStream, writeUint8ArrayFrame } from "./stream.js";
 import {
 	createDirectSyncIngress,
 	type DirectSyncIngress,
@@ -103,6 +103,13 @@ import {
 	SyncTransportError,
 	validateNegotiatedSync,
 } from "./sync.js";
+import {
+	createDRPUnreliableWebRtcOwner,
+	createLibp2pWebRtcSignalingPort,
+	DRP_UNRELIABLE_WEBRTC_MAX_PAYLOAD_BYTES,
+	DRP_UNRELIABLE_WEBRTC_SIGNALING_PROTOCOL,
+	type DRPUnreliableWebRtcOwner,
+} from "./unreliable-webrtc.js";
 
 export * from "./stream.js";
 export {
@@ -513,6 +520,9 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _connectionAdmission?: ConnectionAdmissionController;
 	private _peerSelector?: PeerSelector;
 	private _messageQueue: MessageQueue<Message | DirectSyncIngress>;
+	private _activeUnreliableWebRtcOwner?: DRPUnreliableWebRtcOwner;
+	private _unreliableWebRtcIncoming?: (stream: Stream, connection: Connection) => Promise<void>;
+	private readonly _unreliableWebRtcOwner: DRPUnreliableWebRtcOwner;
 	private readonly _ingressEvidence = new WeakMap<Message, IngressEvidence>();
 	private readonly _syncAdmissions = new WeakMap<Connection, SyncSendAdmission>();
 	private _metrics?: PrometheusMetricsRegister;
@@ -568,6 +578,29 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			id: "network",
 			logConfig: config?.log_config,
 		});
+		this._unreliableWebRtcOwner = Object.freeze({
+			close: (): void => this._resetUnreliableWebRtcOwner(),
+			openUnreliableWebRtcRoute: (routeId: string) => {
+				const active = this._activeUnreliableWebRtcOwner;
+				if (active !== undefined) return active.openUnreliableWebRtcRoute(routeId);
+				return Object.freeze({
+					close(): void {},
+					maxPayloadBytes: DRP_UNRELIABLE_WEBRTC_MAX_PAYLOAD_BYTES,
+					onMessage: (): (() => void) => (): void => undefined,
+					send: (): Promise<boolean> => Promise.resolve(false),
+					snapshot: () =>
+						Object.freeze({
+							activeLinks: 0,
+							backpressuredDrops: 0,
+							handshakeFailures: 0,
+							links: Object.freeze([]),
+							received: 0,
+							sent: 0,
+							unknownRouteDrops: 0,
+						}),
+				});
+			},
+		});
 		this._validateRelayPolicyConfiguration(false);
 	}
 
@@ -578,6 +611,46 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 */
 	get membershipVerifier(): MembershipVerifier | undefined {
 		return this._membershipVerifier;
+	}
+
+	/** @returns Stable fail-closed raw WebRTC owner for the node lifecycle. */
+	get unreliableWebRtcOwner(): DRPUnreliableWebRtcOwner {
+		return this._unreliableWebRtcOwner;
+	}
+
+	private _activateUnreliableWebRtcOwner(): void {
+		this._deactivateUnreliableWebRtcOwner();
+		const signaling = createLibp2pWebRtcSignalingPort({
+			connections: (): readonly Connection[] => (this._node === undefined ? [] : this._node.getConnections()),
+			localPeerId: this.peerId,
+			onIncoming: (listener): (() => void) => {
+				const selected = (stream: Stream, connection: Connection): Promise<void> => listener({ connection, stream });
+				this._unreliableWebRtcIncoming = selected;
+				return (): void => {
+					if (this._unreliableWebRtcIncoming === selected) this._unreliableWebRtcIncoming = undefined;
+				};
+			},
+			read: (stream, maxBytes): Promise<Uint8Array> => readUint8ArrayFrame(stream, maxBytes),
+			write: (stream, bytes): Promise<void> => writeUint8ArrayFrame(stream, bytes),
+		});
+		this._activeUnreliableWebRtcOwner = createDRPUnreliableWebRtcOwner({
+			createPeerConnection: (): RTCPeerConnection => {
+				if (typeof RTCPeerConnection === "undefined") throw new Error("RTCPeerConnection is unavailable");
+				return new RTCPeerConnection();
+			},
+			signaling,
+		});
+	}
+
+	private _deactivateUnreliableWebRtcOwner(): void {
+		this._activeUnreliableWebRtcOwner?.close();
+		this._activeUnreliableWebRtcOwner = undefined;
+		this._unreliableWebRtcIncoming = undefined;
+	}
+
+	private _resetUnreliableWebRtcOwner(): void {
+		this._deactivateUnreliableWebRtcOwner();
+		if (this._node?.status === "started") this._activateUnreliableWebRtcOwner();
 	}
 
 	/** @returns Detached exact T1/T3 occupancy and deployment evidence. */
@@ -912,6 +985,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 
 		this._pubsub = this._node.services.pubsub as ConfigurableGossipSub;
 		this.peerId = this._node.peerId.toString();
+		this._activateUnreliableWebRtcOwner();
 
 		log.info("::start: Successfuly started DRP network w/ peer_id", this.peerId);
 
@@ -955,6 +1029,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		try {
 			this._startRelayPolicy();
 		} catch (error) {
+			this._deactivateUnreliableWebRtcOwner();
 			this._bootstrapRetryController?.abort(error);
 			this._bootstrapRetryController = undefined;
 			this._relayPolicyController?.abort(error);
@@ -1605,6 +1680,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	 */
 	async stop(): Promise<void> {
 		if (this._node?.status === IntervalRunnerState.Stopped) throw new Error("Node not started");
+		this._deactivateUnreliableWebRtcOwner();
 		this._peerSelector?.stop();
 		this._peerSelector = undefined;
 		this._connectionAdmission?.stop();
@@ -2475,6 +2551,18 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			}
 			void this.handleSignedGossipsubMessage(e.detail.msg);
 		});
+		await this._node?.handle(
+			DRP_UNRELIABLE_WEBRTC_SIGNALING_PROTOCOL,
+			async (stream, connection): Promise<void> => {
+				const listener = this._unreliableWebRtcIncoming;
+				if (listener === undefined) {
+					stream.abort(new Error("unreliable WebRTC signaling owner is unavailable"));
+					return;
+				}
+				await listener(stream, connection);
+			},
+			{ maxInboundStreams: 1, maxOutboundStreams: 1 }
+		);
 		await this._node?.handle(
 			[...DRP_SYNC_PROTOCOLS],
 			(stream, connection) => this.handleStream(stream, connection.remotePeer.toString()),

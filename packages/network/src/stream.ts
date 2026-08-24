@@ -57,16 +57,36 @@ export async function uint8ArrayToStream(stream: Stream, input: Uint8Array): Pro
 }
 
 /**
+ * Write one length-prefixed frame without closing the stream.
+ * Bidirectional request/response protocols use this before reading the peer's frame.
+ * @param stream Exact negotiated stream.
+ * @param input Bounded frame bytes.
+ */
+export async function writeUint8ArrayFrame(stream: Stream, input: Uint8Array): Promise<void> {
+	await lpStream(stream).write(input);
+}
+
+/**
+ * Read one length-prefixed frame with a caller-owned byte ceiling.
+ * @param stream Exact negotiated stream.
+ * @param maxDataLength Maximum accepted frame body bytes.
+ * @returns The detached frame body.
+ */
+export async function readUint8ArrayFrame(stream: Stream, maxDataLength: number): Promise<Uint8Array> {
+	return lpStream(stream, {
+		lengthDecoder: decodeFrameLength,
+		maxBufferSize: maxDataLength + MAX_FRAME_PREFIX_BYTES,
+		maxDataLength,
+	})
+		.read()
+		.then((data) => data.subarray());
+}
+
+/**
  * Convert a stream to a Uint8Array.
  * @param stream - The stream to read from.
  * @returns The Uint8Array.
  */
 export async function streamToUint8Array(stream: Stream): Promise<Uint8Array> {
-	return lpStream(stream, {
-		lengthDecoder: decodeFrameLength,
-		maxBufferSize: MAX_FRAME_BYTES + MAX_FRAME_PREFIX_BYTES,
-		maxDataLength: MAX_FRAME_BYTES,
-	})
-		.read()
-		.then((data) => data.subarray());
+	return readUint8ArrayFrame(stream, MAX_FRAME_BYTES);
 }

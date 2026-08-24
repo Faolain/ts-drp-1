@@ -485,7 +485,7 @@ describe("Track E1 post-closure correction", () => {
 				subscribed.push(topic);
 			},
 		} as unknown as DRPNetworkNode;
-		const adapter = new NodeEphemeralAdapter(network, () => undefined);
+		const adapter = new NodeEphemeralAdapter(network, () => undefined, null);
 		const roster = new Map([
 			["peer-writer", "author-writer"],
 			["peer-reader", "author-reader"],
@@ -564,7 +564,7 @@ describe("Track E1 post-closure correction", () => {
 				topic = selected;
 			},
 		} as unknown as DRPNetworkNode;
-		const adapter = new NodeEphemeralAdapter(network, () => undefined);
+		const adapter = new NodeEphemeralAdapter(network, () => undefined, null);
 		const roster = new Map([
 			["peer-writer", "author-writer"],
 			["peer-reader", "author-reader"],
