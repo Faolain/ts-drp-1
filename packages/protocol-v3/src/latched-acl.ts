@@ -2,7 +2,8 @@ import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical"
 
 const AUTHOR = /^[0-9a-f]{64}$/u;
 const OBJECT_ID = /^[A-Za-z0-9._:-]{1,256}$/u;
-const GROUPS = ["admin", "finality", "writer"] as const;
+const GROUPS_V1 = ["admin", "finality", "writer"] as const;
+const GROUPS_V2 = ["admin", "finality", "referee", "writer"] as const;
 const SNAPSHOT_KEYS = ["epoch", "kind", "members", "objectId", "permissionless", "version"] as const;
 const MEMBER_KEYS = ["author", "finalityKey", "groups"] as const;
 const AUTHORITY_INPUT_KEYS = ["author", "snapshot"] as const;
@@ -14,7 +15,7 @@ const OPEN_KEYS = ["exactCanonicalLatchedAclBytes", "expectedAclDigest", "expect
 const DIGEST = /^[0-9a-f]{64}$/u;
 const MAX_CANONICAL_BYTES = 8192;
 
-export type LatchedAclGroup = (typeof GROUPS)[number];
+export type LatchedAclGroup = (typeof GROUPS_V2)[number];
 
 export type LatchedAclMember = Readonly<{
 	readonly author: string;
@@ -28,7 +29,7 @@ export type LatchedAclSnapshot = Readonly<{
 	readonly members: readonly LatchedAclMember[];
 	readonly objectId: string;
 	readonly permissionless: boolean;
-	readonly version: 1;
+	readonly version: 1 | 2;
 }>;
 
 export type LatchedAclOperation =
@@ -104,12 +105,16 @@ function lowerHex(bytes: Uint8Array): string {
 	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function groupIndex(group: LatchedAclGroup): number {
-	return GROUPS.indexOf(group);
+function groupsForVersion(version: LatchedAclSnapshot["version"]): readonly LatchedAclGroup[] {
+	return version === 1 ? GROUPS_V1 : GROUPS_V2;
 }
 
-function isGroup(value: unknown): value is LatchedAclGroup {
-	return typeof value === "string" && GROUPS.includes(value as LatchedAclGroup);
+function groupIndex(group: LatchedAclGroup, version: LatchedAclSnapshot["version"]): number {
+	return groupsForVersion(version).indexOf(group);
+}
+
+function isGroup(value: unknown, version: LatchedAclSnapshot["version"]): value is LatchedAclGroup {
+	return typeof value === "string" && groupsForVersion(version).includes(value as LatchedAclGroup);
 }
 
 function copySnapshot(value: unknown): LatchedAclSnapshot | undefined {
@@ -117,7 +122,7 @@ function copySnapshot(value: unknown): LatchedAclSnapshot | undefined {
 	if (
 		record === undefined ||
 		record.kind !== "drp-v3-latched-acl" ||
-		record.version !== 1 ||
+		(record.version !== 1 && record.version !== 2) ||
 		typeof record.epoch !== "number" ||
 		!Number.isSafeInteger(record.epoch) ||
 		record.epoch < 0 ||
@@ -130,6 +135,8 @@ function copySnapshot(value: unknown): LatchedAclSnapshot | undefined {
 	) {
 		return undefined;
 	}
+	const version = record.version;
+	const groupsForSnapshot = groupsForVersion(version);
 	const members: LatchedAclMember[] = [];
 	let previousAuthor = "";
 	for (const valueMember of record.members) {
@@ -141,7 +148,7 @@ function copySnapshot(value: unknown): LatchedAclSnapshot | undefined {
 			selected.author <= previousAuthor ||
 			!Array.isArray(selected.groups) ||
 			selected.groups.length === 0 ||
-			selected.groups.length > GROUPS.length ||
+			selected.groups.length > groupsForSnapshot.length ||
 			(selected.finalityKey !== null &&
 				(typeof selected.finalityKey !== "string" || !AUTHOR.test(selected.finalityKey)))
 		) {
@@ -150,8 +157,8 @@ function copySnapshot(value: unknown): LatchedAclSnapshot | undefined {
 		const groups: LatchedAclGroup[] = [];
 		let previousGroup = -1;
 		for (const valueGroup of selected.groups) {
-			if (!isGroup(valueGroup)) return undefined;
-			const index = groupIndex(valueGroup);
+			if (!isGroup(valueGroup, version)) return undefined;
+			const index = groupIndex(valueGroup, version);
 			if (index <= previousGroup) return undefined;
 			previousGroup = index;
 			groups.push(valueGroup);
@@ -173,7 +180,7 @@ function copySnapshot(value: unknown): LatchedAclSnapshot | undefined {
 		members: Object.freeze(members),
 		objectId: record.objectId,
 		permissionless: record.permissionless,
-		version: 1,
+		version,
 	});
 }
 
@@ -236,7 +243,7 @@ function mutableMembers(snapshot: LatchedAclSnapshot): Map<string, MutableMember
 	);
 }
 
-function copyOperation(value: unknown): LatchedAclOperation | undefined {
+function copyOperation(value: unknown, version: LatchedAclSnapshot["version"]): LatchedAclOperation | undefined {
 	if (typeof value !== "object" || value === null) return undefined;
 	const kindDescriptor = Object.getOwnPropertyDescriptor(value, "kind");
 	if (kindDescriptor === undefined || !("value" in kindDescriptor)) return undefined;
@@ -262,7 +269,7 @@ function copyOperation(value: unknown): LatchedAclOperation | undefined {
 		!AUTHOR.test(record.actor) ||
 		typeof record.target !== "string" ||
 		!AUTHOR.test(record.target) ||
-		!isGroup(record.group)
+		!isGroup(record.group, version)
 	) {
 		return undefined;
 	}
@@ -341,7 +348,10 @@ function failedStage(
 	return Object.freeze({ index, ok: false, reason });
 }
 
-function freezeMembers(members: Map<string, MutableMember>): readonly LatchedAclMember[] {
+function freezeMembers(
+	members: Map<string, MutableMember>,
+	version: LatchedAclSnapshot["version"]
+): readonly LatchedAclMember[] {
 	return Object.freeze(
 		[...members.values()]
 			.filter(({ finalityKey, groups }) => groups.size > 0 || finalityKey !== null)
@@ -350,7 +360,9 @@ function freezeMembers(members: Map<string, MutableMember>): readonly LatchedAcl
 				Object.freeze({
 					author,
 					finalityKey,
-					groups: Object.freeze([...groups].sort((left, right) => groupIndex(left) - groupIndex(right))),
+					groups: Object.freeze(
+						[...groups].sort((left, right) => groupIndex(left, version) - groupIndex(right, version))
+					),
 				})
 			)
 	);
@@ -375,7 +387,7 @@ export function stageLatchedAclOperations(
 		}
 		const operations: LatchedAclOperation[] = [];
 		for (const [index, value] of record.operations.entries()) {
-			const operation = copyOperation(value);
+			const operation = copyOperation(value, snapshot.version);
 			if (operation === undefined) return failedStage(index, "malformed-input");
 			operations.push(operation);
 		}
@@ -415,7 +427,7 @@ export function stageLatchedAclOperations(
 			target?.groups.delete(operation.group);
 			if (target !== undefined && operation.group === "finality") target.finalityKey = null;
 		}
-		const frozenMembers = freezeMembers(next);
+		const frozenMembers = freezeMembers(next, snapshot.version);
 		if (!frozenMembers.some(({ groups }) => groups.includes("admin"))) {
 			const index = operations.findIndex((operation) => operation.kind === "revoke" && operation.group === "admin");
 			return failedStage(Math.max(0, index), "last-admin");
@@ -430,7 +442,7 @@ export function stageLatchedAclOperations(
 				members: frozenMembers,
 				objectId: snapshot.objectId,
 				permissionless: snapshot.permissionless,
-				version: 1,
+				version: snapshot.version,
 			}),
 			ok: true,
 		});

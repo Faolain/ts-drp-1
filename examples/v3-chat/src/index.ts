@@ -90,7 +90,7 @@ interface ChatSnapshot {
 		readonly stagedOperations: readonly Readonly<{
 			readonly actorClientId: ClientId;
 			readonly digest: string;
-			readonly group: "admin" | "finality" | "writer";
+			readonly group: "admin" | "finality" | "referee" | "writer";
 			readonly kind: "grant" | "revoke";
 			readonly targetClientId: ClientId;
 		}>[];
@@ -117,7 +117,7 @@ interface LatchedPreview {
 		readonly actor: string;
 		readonly digest: string;
 		readonly operation: Readonly<{
-			readonly group: "admin" | "finality" | "writer";
+			readonly group: "admin" | "finality" | "referee" | "writer";
 			readonly kind: "grant" | "revoke";
 			readonly target: string;
 		}>;
@@ -126,7 +126,7 @@ interface LatchedPreview {
 
 interface LatchedMember {
 	readonly author: string;
-	readonly groups: readonly ("admin" | "finality" | "writer")[];
+	readonly groups: readonly ("admin" | "finality" | "referee" | "writer")[];
 }
 
 interface ApplicationMaterial {
@@ -805,7 +805,7 @@ const api = Object.freeze({
 	},
 	async submitAcl(
 		operation: Readonly<{
-			readonly group: "admin" | "finality" | "writer";
+			readonly group: "admin" | "finality" | "referee" | "writer";
 			readonly kind: "grant" | "revoke";
 			readonly targetClientId: ClientId;
 		}>

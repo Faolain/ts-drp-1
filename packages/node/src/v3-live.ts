@@ -2564,7 +2564,10 @@ function aclOperation(author: string, digest: string, value: unknown): StagedLat
 	if (
 		record === undefined ||
 		(record.kind !== "grant" && record.kind !== "revoke") ||
-		(record.group !== "admin" && record.group !== "finality" && record.group !== "writer") ||
+		(record.group !== "admin" &&
+			record.group !== "finality" &&
+			record.group !== "referee" &&
+			record.group !== "writer") ||
 		typeof record.target !== "string" ||
 		!/^[0-9a-f]{64}$/u.test(record.target)
 	) {
