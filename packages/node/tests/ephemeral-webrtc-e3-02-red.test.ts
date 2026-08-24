@@ -151,6 +151,64 @@ describe("E3-02 v3 zone transport adoption RED", () => {
 		}
 	});
 
+	it("sends one targeted raw copy without reliable publication or direct fallback", async () => {
+		const bus = new ControlledRawBus();
+		bus.connect("peer-a", "peer-b");
+		bus.connect("peer-a", "peer-c");
+		const roster = new Map([
+			["peer-a", "author-a"],
+			["peer-b", "author-b"],
+			["peer-c", "author-c"],
+		]);
+		const writers = new Set(["author-a", "author-b", "author-c"]);
+		const sender = controlledNode({
+			bus,
+			localPeerId: "peer-a",
+			peers: ["peer-b", "peer-c"],
+			raw: true,
+			roster,
+			writers,
+		});
+		const target = controlledNode({
+			bus,
+			localPeerId: "peer-b",
+			peers: ["peer-a"],
+			raw: true,
+			roster,
+			writers,
+		});
+		const excluded = controlledNode({
+			bus,
+			localPeerId: "peer-c",
+			peers: ["peer-a"],
+			raw: true,
+			roster,
+			writers,
+		});
+		const targeted: string[] = [];
+		const untargeted: string[] = [];
+		target.channel.subscribe(({ payload: bytes }) => targeted.push(new TextDecoder().decode(bytes)));
+		excluded.channel.subscribe(({ payload: bytes }) => untargeted.push(new TextDecoder().decode(bytes)));
+		try {
+			expect(
+				await sender.channel.publishTo(["peer-b"], {
+					class: "unreliable-sequenced",
+					key: "aoi:peer-b",
+					payload: payload("population"),
+				})
+			).toBe(true);
+			expect(bus.sends).toHaveLength(1);
+			expect(bus.sends[0]).toMatchObject({ peers: ["peer-b"], sender: "peer-a" });
+			expect(targeted).toEqual(["population"]);
+			expect(untargeted).toEqual([]);
+			expectNoReliable(sender);
+		} finally {
+			sender.channel.close();
+			target.channel.close();
+			excluded.channel.close();
+		}
+	});
+
 	it("reconciles authenticated routes independently of which peer publishes first", async () => {
 		const bus = new ControlledRawBus();
 		bus.connect("peer-a", "peer-z");
