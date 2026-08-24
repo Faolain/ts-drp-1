@@ -260,6 +260,19 @@ describe("D.93.48 corrected E2 RED", () => {
 			fixture.route(exact, "peer-reader");
 			expect(delivered).toContain("peer-writer:raw");
 			expect(delivered).not.toContain("peer-reader:raw");
+			const reliableBypass = Message.create({
+				data: exact.slice(),
+				objectId: fixture.topic(),
+				sender: "peer-writer",
+				type: MessageType.MESSAGE_TYPE_CUSTOM,
+			});
+			fixture.stamp(reliableBypass, {
+				kind: "signed-gossip",
+				sender: "peer-writer",
+				topic: fixture.topic(),
+			});
+			expect(fixture.adapter.route(reliableBypass)).toBe(true);
+			expect(delivered.filter((entry) => entry === "peer-writer:raw")).toHaveLength(1);
 			expect(fixture.published).toHaveLength(0);
 		} finally {
 			fixture.close();

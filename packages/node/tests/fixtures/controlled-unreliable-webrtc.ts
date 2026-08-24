@@ -28,6 +28,7 @@ export class ControlledRawRoute implements DRPUnreliableWebRtcRoute {
 	readonly routeId: string;
 	backpressured = false;
 	closed = false;
+	readonly reconciledPeers: string[][] = [];
 
 	constructor(bus: ControlledRawBus, localPeerId: string, routeId: string) {
 		this.#bus = bus;
@@ -51,6 +52,11 @@ export class ControlledRawRoute implements DRPUnreliableWebRtcRoute {
 		return (): void => {
 			this.#listeners.delete(listener);
 		};
+	}
+
+	reconcile(peers: readonly string[]): Promise<void> {
+		this.reconciledPeers.push([...peers]);
+		return Promise.resolve();
 	}
 
 	send(peers: readonly string[], bytes: Uint8Array): Promise<boolean> {

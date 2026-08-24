@@ -146,6 +146,32 @@ describe("E3-02 v3 zone transport adoption RED", () => {
 		}
 	});
 
+	it("reconciles authenticated routes independently of which peer publishes first", async () => {
+		const bus = new ControlledRawBus();
+		bus.connect("peer-a", "peer-z");
+		const roster = new Map([
+			["peer-a", "author-a"],
+			["peer-z", "author-z"],
+		]);
+		const writers = new Set(["author-a", "author-z"]);
+		const lower = controlledNode({ bus, localPeerId: "peer-a", peers: ["peer-z"], raw: true, roster, writers });
+		const higher = controlledNode({ bus, localPeerId: "peer-z", peers: ["peer-a"], raw: true, roster, writers });
+		try {
+			expect(onlyRoute(lower.owner).reconciledPeers).toContainEqual(["peer-z"]);
+			expect(onlyRoute(higher.owner).reconciledPeers).toContainEqual(["peer-a"]);
+			expect(
+				await higher.channel.publish({
+					class: "unreliable-sequenced",
+					key: "movement",
+					payload: payload("higher-first"),
+				})
+			).toBe(true);
+		} finally {
+			lower.channel.close();
+			higher.channel.close();
+		}
+	});
+
 	it("fails every unavailable raw state closed with zero reliable fallback", async () => {
 		const roster = new Map([["peer-b", "author-b"]]);
 		const writers = new Set(["author-b"]);
