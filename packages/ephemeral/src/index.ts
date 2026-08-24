@@ -1,4 +1,21 @@
 export {
+	AOI_PROJECTION_ASSEMBLY_LIFETIME_MS,
+	AOI_PROJECTION_HEADER_BYTES,
+	AOI_PROJECTION_KEYFRAME_INTERVAL,
+	AOI_PROJECTION_MAX_ASSEMBLIES,
+	AOI_PROJECTION_MAX_BUFFERED_BYTES,
+	AOI_PROJECTION_MAX_CHUNKS,
+	AOI_PROJECTION_RECORD_BYTES,
+	AOI_PROJECTION_VERSION,
+	createAoiProjectionReceiver,
+	createAoiProjectionSender,
+	type AoiProjectionEntity,
+	type AoiProjectionReceiver,
+	type AoiProjectionReceiverSnapshot,
+	type AoiProjectionSender,
+} from "./aoi-projection.js";
+
+export {
 	decodeEntityDeltaBatch,
 	encodeEntityDeltaBatch,
 	ENTITY_DELTA_BATCH_MAX_BYTES,
@@ -75,7 +92,9 @@ export interface EphemeralTransportPort {
 
 export interface EphemeralChannel {
 	authorizedPeers(): readonly string[];
+	authorityGeneration?(): number | undefined;
 	close(): void;
+	maxEnvelopeBytes?(deliveryClass: EphemeralDeliveryClass): number;
 	publish(input: EphemeralPublishInput): Promise<boolean>;
 	publishTo(recipients: readonly string[], input: EphemeralPublishInput): Promise<boolean>;
 	resetReliable(): Promise<void>;
@@ -843,6 +862,7 @@ export function createEphemeralChannel(
 
 	return {
 		authorizedPeers: (): readonly string[] => [...port.authorizedPeers()],
+		authorityGeneration: (): number | undefined => authoritySnapshot(v3Port?.currentAuthority())?.epoch,
 		close: (): void => {
 			if (closed) return;
 			closed = true;
@@ -862,6 +882,18 @@ export function createEphemeralChannel(
 			} catch {
 				// Local transport teardown cannot revive a closed channel.
 			}
+		},
+		maxEnvelopeBytes: (deliveryClass): number => {
+			if (!isDeliveryClass(deliveryClass)) throw new TypeError("ephemeral delivery class differs");
+			let transportBound: number;
+			try {
+				transportBound = port.maxEnvelopeBytes(deliveryClass);
+			} catch {
+				return 0;
+			}
+			if (!Number.isSafeInteger(transportBound) || transportBound < 1) return 0;
+			const envelopeOverhead = HEADER_BYTES + (v3Port === undefined ? 0 : AUTHORITY_HEADER_BYTES);
+			return Math.max(0, Math.min(maxMessageBytes, transportBound) - envelopeOverhead);
 		},
 		publish,
 		publishTo,

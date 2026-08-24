@@ -36,6 +36,7 @@ export function renderZone(snapshot: ZoneSnapshot): void {
 	const copy = document.getElementById("copyGridId");
 	if (copy instanceof HTMLButtonElement) copy.style.display = snapshot.ready ? "inline" : "none";
 	renderFabric(snapshot);
+	renderAoiProjection(snapshot);
 	const grid = document.getElementById("grid");
 	if (!(grid instanceof HTMLDivElement)) return;
 	grid.replaceChildren();
@@ -64,6 +65,26 @@ export function renderZone(snapshot: ZoneSnapshot): void {
 		element.style.background = "#2d8cff";
 		grid.appendChild(element);
 	}
+}
+
+function renderAoiProjection(snapshot: ZoneSnapshot): void {
+	const container = document.getElementById("aoiProjectionWorkbench");
+	if (!(container instanceof HTMLElement)) return;
+	const heading = document.createElement("h2");
+	heading.textContent = "Loss-tolerant AOI projection";
+	const rows = Object.entries(snapshot.aoiProjection).map(([peerId, projection]) => {
+		const row = document.createElement("p");
+		row.dataset.aoiProjectionPeer = peerId;
+		row.textContent = `${peerId}: generation ${String(projection.generation ?? "none")}, base ${String(
+			projection.baseKeyframeId ?? "none"
+		)} @ ${String(projection.baseKeyframeSequence ?? "none")}, sequence ${String(
+			projection.lastSequence ?? "none"
+		)}, ${projection.waitingForKeyframe ? "waiting for keyframe" : "current"}`;
+		return row;
+	});
+	const empty = document.createElement("p");
+	empty.textContent = "Waiting for AOI projection data.";
+	container.replaceChildren(heading, ...(rows.length === 0 ? [empty] : rows));
 }
 
 function renderFabric(snapshot: ZoneSnapshot): void {

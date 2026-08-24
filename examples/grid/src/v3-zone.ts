@@ -106,6 +106,18 @@ export interface ZoneFabricWorkbench {
 export interface ZoneSnapshot {
 	readonly acceptedOperationDigest: string;
 	readonly aoiPopulations: Readonly<Record<string, readonly EntityDelta[]>>;
+	readonly aoiProjection: Readonly<
+		Record<
+			string,
+			Readonly<{
+				readonly baseKeyframeId: number | null;
+				readonly baseKeyframeSequence: number | null;
+				readonly generation: number | null;
+				readonly lastSequence: number | null;
+				readonly waitingForKeyframe: boolean;
+			}>
+		>
+	>;
 	readonly blocks: readonly ZoneBlock[];
 	readonly durableVertexCount: number;
 	readonly enrollment: string;
@@ -147,6 +159,53 @@ interface ZoneProjection {
 interface Enrollment {
 	readonly author: string;
 	readonly peerId: string;
+}
+
+interface AoiProjectionSenderState {
+	readonly authorityGeneration: number;
+	readonly maxEnvelopeBytes: number;
+	nextSequence: number;
+	readonly sender: AoiProjectionSender;
+}
+
+interface AoiProjectionReceiverState {
+	readonly authorityGeneration: number;
+	expiryTimer: ReturnType<typeof setTimeout> | undefined;
+	readonly receiver: AoiProjectionReceiver;
+}
+
+interface AoiProjectionSender {
+	encode(
+		input: Readonly<{ readonly entities: readonly EntityDelta[]; readonly sequence: number }>
+	): readonly Uint8Array[];
+}
+
+interface AoiProjectionReceiver {
+	expire(nowMs: number): void;
+	ingest(
+		input: Readonly<{ readonly authorityGeneration: number; readonly bytes: Uint8Array; readonly receivedAtMs: number }>
+	): boolean;
+	nextExpiryAtMs(): number | null;
+	snapshot(): Readonly<{
+		readonly baseKeyframeId: number | null;
+		readonly baseKeyframeSequence: number | null;
+		readonly entities: readonly EntityDelta[];
+		readonly generation: number | null;
+		readonly lastSequence: number | null;
+		readonly waitingForKeyframe: boolean;
+	}>;
+}
+
+function projectionView(
+	snapshot: ReturnType<AoiProjectionReceiver["snapshot"]>
+): ZoneSnapshot["aoiProjection"][string] {
+	return Object.freeze({
+		baseKeyframeId: snapshot.baseKeyframeId,
+		baseKeyframeSequence: snapshot.baseKeyframeSequence,
+		generation: snapshot.generation,
+		lastSequence: snapshot.lastSequence,
+		waitingForKeyframe: snapshot.waitingForKeyframe,
+	});
 }
 
 interface ZoneInvite {
@@ -194,7 +253,10 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 	const localAuthor = node.keychain.localAuthorId;
 	const localPeerId = node.networkNode.peerId;
 	const enrollment = encodeEnrollment({ author: localAuthor, peerId: localPeerId });
+	const projectionModule = import("@ts-drp/ephemeral");
 	const aoiPopulations = new Map<string, readonly EntityDelta[]>();
+	const aoiReceivers = new Map<string, AoiProjectionReceiverState>();
+	const aoiSenders = new Map<string, AoiProjectionSenderState>();
 	const fabricTrials = new Map<string, FabricTrialState>();
 	const transientPositions = new Map<string, Readonly<{ x: number; y: number }>>();
 	let room: Awaited<ReturnType<typeof createV3RoomSession<ZoneProjection>>> | undefined;
@@ -211,11 +273,17 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 	let closing: Promise<void> | undefined;
 	let opening: Promise<void> | undefined;
 	const retainedSourceBridges = new Set<Awaited<ReturnType<typeof createV3RoomSession<ZoneProjection>>>>();
+	const clearAoiProjection = (): void => {
+		for (const state of aoiReceivers.values()) clearTimeout(state.expiryTimer);
+		aoiPopulations.clear();
+		aoiReceivers.clear();
+		aoiSenders.clear();
+	};
 	const resetZoneState = (): void => {
 		projection = emptyProjection();
 		migrationCreatorAuthor = "";
 		migrationMembers = Object.freeze([]);
-		aoiPopulations.clear();
+		clearAoiProjection();
 		transientPositions.clear();
 		invite = "";
 		zoneId = "";
@@ -227,6 +295,9 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 
 	const snapshot = (): ZoneSnapshot => {
 		const aoiEntries = [...aoiPopulations.entries()].sort(([left], [right]) => compareText(left, right));
+		const aoiProjectionEntries = [...aoiReceivers.entries()]
+			.map(([peerId, { receiver }]) => [peerId, projectionView(receiver.snapshot())] as const)
+			.sort(([left], [right]) => compareText(left, right));
 		const positionEntries = [...transientPositions.entries()].sort(([left], [right]) => compareText(left, right));
 		const raw = zoneId.length === 0 ? undefined : node.ephemeralUnreliableWebRtcSnapshot(zoneId);
 		return Object.freeze({
@@ -235,6 +306,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 				encodeCanonical(projection.acceptedDigests)
 			),
 			aoiPopulations: Object.freeze(Object.fromEntries(aoiEntries)),
+			aoiProjection: Object.freeze(Object.fromEntries(aoiProjectionEntries)),
 			blocks: projection.blocks,
 			durableVertexCount: projection.acceptedDigests.length,
 			enrollment,
@@ -271,6 +343,24 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 		});
 	};
 	const emit = (): void => onProjection(snapshot());
+	const scheduleAoiExpiry = (channel: EphemeralChannel, sender: string, state: AoiProjectionReceiverState): void => {
+		clearTimeout(state.expiryTimer);
+		const expiresAt = state.receiver.nextExpiryAtMs();
+		if (expiresAt === null) {
+			state.expiryTimer = undefined;
+			return;
+		}
+		state.expiryTimer = setTimeout(
+			() => {
+				state.expiryTimer = undefined;
+				if (room === undefined || ephemeral !== channel || aoiReceivers.get(sender) !== state) return;
+				state.receiver.expire(Date.now());
+				scheduleAoiExpiry(channel, sender, state);
+				emit();
+			},
+			Math.max(0, expiresAt - Date.now()) + 1
+		);
+	};
 	const scheduleFabricDeadlineEmission = (trial: FabricTrialState): void => {
 		if (trial.deadlineAtMs === undefined || trial.deadlineEmissionScheduled) return;
 		trial.deadlineEmissionScheduled = true;
@@ -282,7 +372,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 		);
 	};
 	const subscribeEphemeral = (channel: EphemeralChannel): void => {
-		channel.subscribe(({ key, payload, sender }) => {
+		channel.subscribe(({ class: deliveryClass, key, payload, sender }) => {
 			const fabricObservation = decodeFabricPayload(payload);
 			if (fabricObservation !== undefined) {
 				const trial = fabricTrials.get(fabricObservation.trialId);
@@ -312,15 +402,34 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 				if (fabricObservation.sentinel) emit();
 				return;
 			}
-			if (key === `aoi:${localPeerId}`) {
-				let population: readonly EntityDelta[];
-				try {
-					population = decodeEntityDeltaBatch(payload);
-				} catch {
-					return;
-				}
-				aoiPopulations.set(sender, population);
-				emit();
+			if (deliveryClass === "unreliable-unordered" && key === null) {
+				const authorityGeneration = channel.authorityGeneration?.();
+				if (authorityGeneration === undefined || payload.byteLength < 6) return;
+				const packetGeneration = new DataView(payload.buffer, payload.byteOffset, payload.byteLength).getUint32(
+					2,
+					false
+				);
+				if (packetGeneration !== authorityGeneration) return;
+				void projectionModule.then(({ createAoiProjectionReceiver }) => {
+					if (room === undefined || ephemeral !== channel || channel.authorityGeneration?.() !== authorityGeneration) {
+						return;
+					}
+					let state = aoiReceivers.get(sender);
+					if (state === undefined || state.authorityGeneration !== authorityGeneration) {
+						clearTimeout(state?.expiryTimer);
+						state = {
+							authorityGeneration,
+							expiryTimer: undefined,
+							receiver: createAoiProjectionReceiver({ authorityGeneration }),
+						};
+						aoiReceivers.set(sender, state);
+						aoiPopulations.delete(sender);
+					}
+					const accepted = state.receiver.ingest({ authorityGeneration, bytes: payload, receivedAtMs: Date.now() });
+					if (accepted) aoiPopulations.set(sender, state.receiver.snapshot().entities);
+					scheduleAoiExpiry(channel, sender, state);
+					emit();
+				});
 				return;
 			}
 			const position = decodePosition(payload);
@@ -361,6 +470,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 					room = target;
 					zoneId = targetObjectId;
 					ephemeral?.close();
+					clearAoiProjection();
 					const redirectedEphemeral = target.openEphemeral(ZONE_EPHEMERAL_OPTIONS);
 					subscribeEphemeral(redirectedEphemeral);
 					ephemeral = redirectedEphemeral;
@@ -669,7 +779,10 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 			) {
 				throw new TypeError("v3 zone AOI publication differs");
 			}
-			const { selectAoiEntityDeltas } = await import("@ts-drp/ephemeral");
+			const authorityGeneration = ephemeral.authorityGeneration?.();
+			const maxEnvelopeBytes = ephemeral.maxEnvelopeBytes?.("unreliable-unordered");
+			if (authorityGeneration === undefined || maxEnvelopeBytes === undefined || maxEnvelopeBytes < 42) return false;
+			const { createAoiProjectionSender, selectAoiEntityDeltas } = await projectionModule;
 			const selected = selectAoiEntityDeltas({
 				entities: input.entities,
 				maxEntities: 32,
@@ -677,12 +790,34 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 				observerY: input.observerY,
 				radius: input.radius,
 			});
-			const payload = encodeEntityDeltaBatch(selected);
-			return ephemeral.publishTo([input.observerPeerId], {
-				class: "unreliable-sequenced",
-				key: `aoi:${input.observerPeerId}`,
-				payload,
-			});
+			let senderState = aoiSenders.get(input.observerPeerId);
+			if (
+				senderState === undefined ||
+				senderState.authorityGeneration !== authorityGeneration ||
+				senderState.maxEnvelopeBytes !== maxEnvelopeBytes
+			) {
+				senderState = {
+					authorityGeneration,
+					maxEnvelopeBytes,
+					nextSequence: 0,
+					sender: createAoiProjectionSender({ generation: authorityGeneration, maxPayloadBytes: maxEnvelopeBytes }),
+				};
+				aoiSenders.set(input.observerPeerId, senderState);
+			}
+			const packets = senderState.sender.encode({ entities: selected, sequence: senderState.nextSequence });
+			senderState.nextSequence += 1;
+			for (const payload of packets) {
+				if (
+					!(await ephemeral.publishTo([input.observerPeerId], {
+						class: "unreliable-unordered",
+						key: null,
+						payload,
+					}))
+				) {
+					return false;
+				}
+			}
+			return true;
 		},
 		async rehearseMigration(): Promise<V3RoomMigrationRehearsalReceipt> {
 			const selected = room;
