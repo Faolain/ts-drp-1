@@ -33,6 +33,14 @@ export type Seam3V3RoomMigrationRehearsalReceipt = V3RoomMigrationRehearsalRecei
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 type Assert<T extends true> = T;
 
+type ExpectedOperationAdmissionReservation =
+	| Readonly<{ readonly kind: "fresh"; commit(): "committed"; release(): void }>
+	| Readonly<{ readonly kind: "duplicate" | "conflict" | "rejected" }>;
+
+interface ExpectedOperationAdmissionPolicy {
+	reserve(operation: Readonly<Record<string, unknown>>): ExpectedOperationAdmissionReservation;
+}
+
 type ExpectedV3Envelope = {
 	canonicalPreimage: Uint8Array;
 	signature: Uint8Array;
@@ -229,80 +237,84 @@ type _Egress = Assert<Equal<V3EgressResult, ExpectedEgress>>;
 type _LocalIssueInput = Assert<Equal<V3LocalIssueInput, ExpectedLocalIssueInput>>;
 type _LocalIssueResult = Assert<Equal<V3LocalIssueResult, ExpectedLocalIssueResult>>;
 type _Handle = Assert<Equal<V3PlaneHandle, ExpectedHandle>>;
-type _RecoveryInput = Assert<
-	Equal<
-		RecoverV3LiveReplicaInput,
-		| Readonly<{
+type ExpectedRecoveryInput =
+	| Readonly<{
+			readonly capability: PreparedV3Live;
+			readonly displacedSource?: Readonly<{
 				readonly capability: PreparedV3Live;
-				readonly displacedSource?: Readonly<{
-					readonly capability: PreparedV3Live;
-					readonly exactCanonicalAuthorAuthorizationBytes: Uint8Array;
-				}>;
 				readonly exactCanonicalAuthorAuthorizationBytes: Uint8Array;
-				readonly issuanceScope: DurableIssueScope;
-				readonly issuanceStore: DurableIssuanceStore;
-				readonly liveJournalStore: DurableLiveJournalStore;
-		  }>
-		| Readonly<{
+			}>;
+			readonly exactCanonicalAuthorAuthorizationBytes: Uint8Array;
+			readonly issuanceScope: DurableIssueScope;
+			readonly issuanceStore: DurableIssuanceStore;
+			readonly liveJournalStore: DurableLiveJournalStore;
+	  }>
+	| Readonly<{
+			readonly capability: PreparedV3Live;
+			readonly exactCanonicalLatchedAclBytes: Uint8Array;
+			readonly issuanceScope: DurableIssueScope;
+			readonly issuanceStore: DurableIssuanceStore;
+			readonly liveJournalStore: DurableLiveJournalStore;
+	  }>
+	| Readonly<{
+			readonly capability: PreparedV3Live;
+			readonly displacedSource: Readonly<{
+				readonly capability: PreparedV3Live;
+				readonly exactCanonicalLatchedAclBytes: Uint8Array;
+			}>;
+			readonly exactCanonicalLatchedAclBytes: Uint8Array;
+			readonly issuanceScope: DurableIssueScope;
+			readonly issuanceStore: DurableIssuanceStore;
+			readonly liveJournalStore: DurableLiveJournalStore;
+	  }>
+	| Readonly<{
+			readonly capability: PreparedV3Live;
+			readonly classifyTerminalVertex: ExpectedTerminalClassifier;
+			readonly exactCanonicalLatchedAclBytes: Uint8Array;
+			readonly issuanceScope: DurableIssueScope;
+			readonly issuanceStore: DurableIssuanceStore;
+			readonly liveJournalStore: DurableLiveJournalStore;
+	  }>
+	| Readonly<{
+			readonly capability: PreparedV3Live;
+			readonly classifyTerminalVertex: ExpectedTerminalClassifier;
+			readonly displacedSource: Readonly<{
+				readonly activationVertexDigest: string;
 				readonly capability: PreparedV3Live;
 				readonly exactCanonicalLatchedAclBytes: Uint8Array;
 				readonly issuanceScope: DurableIssueScope;
 				readonly issuanceStore: DurableIssuanceStore;
 				readonly liveJournalStore: DurableLiveJournalStore;
-		  }>
-		| Readonly<{
+			}>;
+			readonly exactCanonicalLatchedAclBytes: Uint8Array;
+			readonly issuanceScope: DurableIssueScope;
+			readonly issuanceStore: DurableIssuanceStore;
+			readonly liveJournalStore: DurableLiveJournalStore;
+	  }>
+	| Readonly<{
+			readonly capability: PreparedV3Live;
+			readonly classifyTerminalVertex: ExpectedTerminalClassifier;
+			readonly displacedSource: Readonly<{
+				readonly activationVertexDigest: string;
 				readonly capability: PreparedV3Live;
-				readonly displacedSource: Readonly<{
-					readonly capability: PreparedV3Live;
-					readonly exactCanonicalLatchedAclBytes: Uint8Array;
-				}>;
 				readonly exactCanonicalLatchedAclBytes: Uint8Array;
 				readonly issuanceScope: DurableIssueScope;
 				readonly issuanceStore: DurableIssuanceStore;
 				readonly liveJournalStore: DurableLiveJournalStore;
-		  }>
-		| Readonly<{
-				readonly capability: PreparedV3Live;
-				readonly classifyTerminalVertex: ExpectedTerminalClassifier;
-				readonly exactCanonicalLatchedAclBytes: Uint8Array;
-				readonly issuanceScope: DurableIssueScope;
-				readonly issuanceStore: DurableIssuanceStore;
-				readonly liveJournalStore: DurableLiveJournalStore;
-		  }>
-		| Readonly<{
-				readonly capability: PreparedV3Live;
-				readonly classifyTerminalVertex: ExpectedTerminalClassifier;
-				readonly displacedSource: Readonly<{
-					readonly activationVertexDigest: string;
-					readonly capability: PreparedV3Live;
-					readonly exactCanonicalLatchedAclBytes: Uint8Array;
-					readonly issuanceScope: DurableIssueScope;
-					readonly issuanceStore: DurableIssuanceStore;
-					readonly liveJournalStore: DurableLiveJournalStore;
-				}>;
-				readonly exactCanonicalLatchedAclBytes: Uint8Array;
-				readonly issuanceScope: DurableIssueScope;
-				readonly issuanceStore: DurableIssuanceStore;
-				readonly liveJournalStore: DurableLiveJournalStore;
-		  }>
-		| Readonly<{
-				readonly capability: PreparedV3Live;
-				readonly classifyTerminalVertex: ExpectedTerminalClassifier;
-				readonly displacedSource: Readonly<{
-					readonly activationVertexDigest: string;
-					readonly capability: PreparedV3Live;
-					readonly exactCanonicalLatchedAclBytes: Uint8Array;
-					readonly issuanceScope: DurableIssueScope;
-					readonly issuanceStore: DurableIssuanceStore;
-					readonly liveJournalStore: DurableLiveJournalStore;
-				}>;
-				readonly exactCanonicalLatchedAclBytes: Uint8Array;
-				readonly issuanceScope: DurableIssueScope;
-				readonly issuanceStore: DurableIssuanceStore;
-				readonly liveJournalStore: DurableLiveJournalStore;
-				readonly retainedBootstrapHold: true;
-		  }>
-	>
+			}>;
+			readonly exactCanonicalLatchedAclBytes: Uint8Array;
+			readonly issuanceScope: DurableIssueScope;
+			readonly issuanceStore: DurableIssuanceStore;
+			readonly liveJournalStore: DurableLiveJournalStore;
+			readonly retainedBootstrapHold: true;
+	  }>;
+type _RecoveryInput = Assert<
+	"operationAdmissionPolicy" extends keyof RecoverV3LiveReplicaInput
+		? Equal<
+				RecoverV3LiveReplicaInput,
+				ExpectedRecoveryInput & Readonly<{ readonly operationAdmissionPolicy?: ExpectedOperationAdmissionPolicy }>
+			>
+		: Equal<RecoverV3LiveReplicaInput, ExpectedRecoveryInput>
 >;
 type _Activate = Assert<Equal<typeof activateV3LivePlane, (input: ExpectedInput) => ExpectedActivationResult>>;
 type _Route = Assert<Equal<typeof routeV3Ingress, (networkNode: DRPNetworkNode, message: Message) => boolean>>;

@@ -18,6 +18,16 @@ type Equal<Left, Right> =
 	(<Value>() => Value extends Left ? 1 : 2) extends <Value>() => Value extends Right ? 1 : 2 ? true : false;
 type Assert<Value extends true> = Value;
 
+type ExpectedOperationAdmissionReservation =
+	| Readonly<{ readonly kind: "fresh"; commit(): "committed"; release(): void }>
+	| Readonly<{ readonly kind: "duplicate" | "conflict" | "rejected" }>;
+
+interface ExpectedOperationAdmissionPolicy {
+	reserve(operation: Readonly<Record<string, unknown>>): ExpectedOperationAdmissionReservation;
+}
+
+type PropertyIfPresent<Value, Key extends PropertyKey> = Key extends keyof Value ? Value[Key] : undefined;
+
 interface ExpectedRosterEntry {
 	readonly author: string;
 	readonly peerId: string;
@@ -136,6 +146,23 @@ type _Roster = Assert<Equal<V3RoomProjectionAuthority["transportPeerAuthors"], r
 type _Writers = Assert<Equal<V3RoomProjectionAuthority["writerAuthors"], readonly string[]>>;
 type _ProjectionSink = Assert<
 	Equal<CreateV3RoomSessionInput<ExpectedProjection>["onProjection"], (projection: ExpectedProjection) => void>
+>;
+type _OperationAdmissionFactory = Assert<
+	Equal<
+		PropertyIfPresent<CreateV3RoomSessionInput<ExpectedProjection>, "createOperationAdmissionPolicy">,
+		"createOperationAdmissionPolicy" extends keyof CreateV3RoomSessionInput<ExpectedProjection>
+			?
+					| ((
+							context: Readonly<{
+								readonly aclDigest: string;
+								readonly anchorDigest: string;
+								readonly epoch: 0;
+								readonly objectId: string;
+							}>
+					  ) => ExpectedOperationAdmissionPolicy)
+					| undefined
+			: undefined
+	>
 >;
 type _TransportFactory = Assert<
 	Equal<CreateV3RoomSessionInput<ExpectedProjection>["openTransport"], (objectId: string) => V3RoomTransport>
