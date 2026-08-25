@@ -1,4 +1,4 @@
-import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { installCertifiedAnchorTrustRoot } from "@ts-drp/protocol-v3";
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
@@ -218,6 +218,9 @@ export async function createProductTraceDriver(
 		objectId: material.anchor.objectId,
 		previousAnchor: material.anchorDigest,
 	});
+	const exactValueDigest = Buffer.from(hashDomain("ts-drp/hard-epoch-cut/v3", exactCanonicalCutValueBytes)).toString(
+		"hex"
+	);
 	let browser: Awaited<ReturnType<typeof modules.browser.openBrowserSealVoteStore>> | undefined;
 	let pacemaker: SealPacemakerHandle;
 	let trust: unknown;
@@ -393,6 +396,12 @@ export async function createProductTraceDriver(
 
 	await open();
 	let roundChangeSigner = 1;
+	const modelStatus = (status: PacemakerStatus): PacemakerStatus =>
+		Object.freeze({
+			...status,
+			finalizedValueDigest: status.finalizedValueDigest === exactValueDigest ? "value-X" : status.finalizedValueDigest,
+			lockedValueDigest: status.lockedValueDigest === exactValueDigest ? "value-X" : status.lockedValueDigest,
+		});
 	return Object.freeze({
 		async apply(step: ItfTraceState): Promise<PacemakerStatus> {
 			if (
@@ -402,7 +411,7 @@ export async function createProductTraceDriver(
 				step.lastEvent === "round-change" ||
 				step.lastEvent === "finalized"
 			) {
-				return pacemaker.status();
+				return modelStatus(pacemaker.status());
 			}
 			switch (step.lastEvent) {
 				case "proposal":
@@ -441,7 +450,7 @@ export async function createProductTraceDriver(
 				default:
 					throw new Error(`TRACE_EVENT_UNSUPPORTED:${step.lastEvent}`);
 			}
-			return pacemaker.status();
+			return modelStatus(pacemaker.status());
 		},
 		async close(): Promise<void> {
 			await pacemaker.stop();
