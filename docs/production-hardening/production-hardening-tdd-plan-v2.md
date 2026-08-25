@@ -56172,3 +56172,101 @@ change bytes. P2 remains debt and does not create mutants, prose cleanup or a
 confirmation review. No Fable review is authorized for Phase 4d. A later 4d-b
 or 4d-c slice must add measured recurring capability; it may not reopen 4d-a
 merely to enlarge the oracle roster.
+
+### D.103 — Phase 4d-b bounded recurring runner and reviewed ledger candidate
+
+Phase 4d-b makes the shipped comparator recurring and reviewable. It does not
+add a fifth comparison leg, certify a close, trust a snapshot, update a branch
+or turn a CI artifact into authority. The semantic owner accepts a tier and an
+async shard producer with the closed input `{ seed, closes: 100 }`, invokes
+`compareShadowRun` itself for every returned shard with
+`expectedCloses: 100` and `expectedReferenceSamples: 10`, aggregates only
+immutable comparison results and emits one closed run report. The owner derives
+each producer seed and rejects a shard unless every returned observation carries
+that exact seed. A caller cannot supply seeds, expectations, agreement counters
+or a success boolean.
+
+The per-PR profile is exactly one 100-close shard using D.102's fixed seed. The
+nightly profile is exactly 100 independent 100-close shards: the UTC date and
+checked-out Git SHA derive one uint32 base seed, and an injective fixed uint32
+step derives each shard seed. Every shard carries exactly ten observed
+reference closes. Thus the nightly capability covers 10,000 closes and 1,000
+reference samples without constructing one quadratic 10,000-close archival
+prefix. Each shard still creates distinct A/B machines, starts its archival leg
+from genesis and replays that shard's complete prefix. The generated operation
+values must depend on the shard seed; a seed that is merely reported is a
+causal mutant.
+
+The exact schema-v1 run report records `date`, `sha`, `tier`, base `seed`,
+planned and completed shard/epoch counts, reference samples, applied vertices,
+nonempty states, mismatch diagnostics, and exact `browsers` and `runtimes`
+rosters. Node-only runs honestly record an empty browser roster and the pinned
+Node major in `runtimes`; Phase 4d-c owns browser/deployment telemetry. A
+mismatch still emits its bounded diagnostic artifact and fails the job. It
+cannot be counted as a completed green epoch.
+
+The committed ledger is a closed JSON array of exact schema-v1 nightly reports.
+The owner validates every existing row before returning a detached array with
+one candidate appended. Dates are strict UTC calendar dates in increasing
+order; `(date, sha, seed)` is unique; integer counts are safe and internally
+consistent; rosters are sorted and duplicate-free; unknown keys, malformed
+digests and non-nightly rows fail closed. Append returns bytes or plain data
+only. It does not open the repository, write a file, run Git, sign, push or
+grant CI write permission. The scheduled workflow uploads the proposed full
+ledger and the individual report for human-reviewed landing. Failed runs are
+also retained as artifacts but never silently rewritten into green rows.
+
+The tests-only RED is exact three paths:
+
+- `tests/fixtures/phase-4d-v3/shadow-runner-contract.ts`;
+- `tests/fixtures/phase-4d-v3/shadow-runner-driver.ts`;
+- `tests/phase-4d-shadow-runner-red.test.ts`.
+
+Independent RED cases pin the two exact tier profiles, date/SHA seed derivation,
+seed-sensitive genuine operations, comparator invocation for every shard,
+partial/missing/extra shard and liveness rejection, mismatch artifact
+preservation, exact schema, append-only/non-overwrite behavior, sorted closed
+rosters and structural read-only workflow policy. One causal readiness test
+fails solely because the private runner subpath is absent; behavioral GREEN
+cases are dormant and no source-text existence marker can satisfy readiness.
+
+The minimal GREEN is exact seven paths:
+
+- `packages/test-utils/src/shadow-runner.ts`;
+- `packages/test-utils/package.json` for the additive private subpath only;
+- `vite.config.mts` for the specific-before-bare runner alias and the exact
+  `**/.logs/**` Vitest discovery exclusion;
+- `tests/fixtures/phase-4d-v3/shadow-driver.ts` only to accept the captured
+  seed/close profile and make operation generation seed-sensitive;
+- `.github/workflows/phase-4d-shadow-comparison.yml`;
+- `docs/production-hardening/shadow-soak-ledger.json`, initially `[]`;
+- this plan ledger entry.
+
+The workflow triggers on pull requests, one nightly UTC schedule and bounded
+manual `pr|nightly` dispatch. Permissions are exactly `contents: read`;
+checkout uses `fetch-depth: 0`; install is frozen; the checked-out `GITHUB_SHA`
+and UTC date are explicit inputs; `vite.config.mts` excludes `.logs/**` from
+all Vitest discovery in addition to the command's explicit exclusion;
+and the report plus proposed ledger are uploaded even on comparator failure.
+No step commits or pushes. Focused gates are exact-path formatting/lint,
+`git diff --check`, test-utils typecheck/build, the 4d-a comparator owner, the
+new default PR runner, structural workflow/ledger checks and one bounded
+two-shard test proving aggregation and failure causality. The real 10,000-close
+nightly path is exercised by the scheduled/manual workflow and is not folded
+into ordinary local or PR feedback.
+
+D.103 receives one exact-byte P0/P1-only plan, RED and GREEN review round from
+Grok, genuine Kimi 100-step and Opus xhigh. Only reproduced substantive P0/P1
+may change bytes; P2 is recorded as debt, with no confirmation round and no
+Fable review.
+
+The single D.103 plan review packet was staged tree `1f957b40`, cached diff
+object `a4fca024` and canonical SHA-256 `51946fd7`. Opus xhigh session
+`a0cfdb5a-eab3-4cf2-bb42-a7105b3d83e6` returned PASS. Grok reproduced that the
+runner could report derived seeds while repeatedly consuming the default
+fixture and could let producer-selected shard expectations weaken the signed
+100-close/10-reference profile. Genuine Kimi 100-check session
+`4e769478-e5ce-4a79-91db-718f7266e5ef` reproduced the missing global
+`.logs/**` discovery exclusion. The correction binds runner-derived seeds into
+and back out of every shard, fixes each comparator call to 100/10 and requires
+the Vite exclusion. No confirmation review is opened.
