@@ -18,6 +18,10 @@
 		".": {
 			"types": "./dist/src/index.d.ts",
 			"import": "./dist/src/index.js"
+		},
+		"./snapshot-transfer": {
+			"types": "./dist/src/snapshot-transfer.d.ts",
+			"import": "./dist/src/snapshot-transfer.js"
 		}
 	},
 	"scripts": {

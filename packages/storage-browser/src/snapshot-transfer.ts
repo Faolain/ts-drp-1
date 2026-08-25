@@ -507,7 +507,6 @@ export async function createBrowserSnapshotQuarantineStore(
 							discard: () => {
 								if (portClosed) return Promise.resolve();
 								portClosed = true;
-								released = true;
 								return Promise.resolve();
 							},
 							read: (descriptorInput: SnapshotChunkDescriptor) => {

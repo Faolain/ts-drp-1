@@ -55881,6 +55881,57 @@ The minimal GREEN may change exactly seven production paths:
 Neither package root export roster changes. No generic stream API, caller-owned
 transport authority, extra dependency edge or lockfile change is authorized.
 
+GREEN execution reproduced three causal defects in the signed RED harness and
+closed them in tests-only signed corrective RED `3ae1c411`. The root exact-type
+project now resolves its frozen workspace types and the same built private
+receipt owner used by the quarantine adapter, the browser transport fixture
+imports its canonical source owner directly, and the genuine corrupt source
+validates its already-decoded request descriptor instead of attempting to
+decode that object as bytes. The corrected three-node case therefore observes
+one full corrupt body before switching to the honest source; it no longer
+passes through an early fixture reset.
+
+Two independently reproduced runtime defects required widening the final GREEN
+from seven to ten production paths. First, both durable adapters implemented
+the verifier port's `discard()` by releasing the entire scope even though
+`scope.release()` is the explicit scope-lifetime operation. The Node and
+browser adapter paths are therefore authorized only to make `discard()` close
+the selected verifier port while preserving the durable scope. Second, the
+existing reliable frame helper created a new length-prefix decoder per read;
+the first decoder could retain a prefetched response body and leave the second
+read at EOF. `packages/network/src/stream.ts` is authorized only to retain one
+private decoder per libp2p stream with a dynamic per-read pre-allocation bound.
+No new root export is introduced. These three corrective production paths are:
+
+- `packages/network/src/stream.ts`;
+- `packages/storage-node/src/snapshot-transfer.ts`;
+- `packages/storage-browser/src/snapshot-transfer.ts`.
+
+The corrected GREEN passes the 12-case bounded pull owner, the nine-case
+dedicated protocol plus genuine three-node composition set, and the six-case
+Chromium/Firefox/WebKit source-and-resume matrix. Network, Node,
+storage-browser, storage-node, compaction and protocol-v3 typechecks pass, as
+does the dedicated browser fixture compiler; the four touched package builds,
+targeted ESLint and `git diff --check` pass. D.99, D.100 and 4c-b preservation
+passes, including 18/18 4c-b browser cases. The selected preservation set is
+48/49 only because the already-recorded root-launched 4c-a memory child still
+cannot resolve its bare `@ts-drp/canonical` import; all fourteen other 4c-a
+cases pass and this inherited harness debt does not widen the product GREEN.
+
+The single final GREEN review round was frozen at staged tree `08f6266b`,
+cached diff object `1408ae83` and canonical diff SHA-256 `fbd8cebd`. Grok's
+authorized identical-packet continuation, Kimi's genuine 100-step session
+`60ede564-a126-4517-9bbb-13d896a3d172`, and Opus xhigh session
+`835a1aa7-87a2-4abd-bf12-fefaa714055d` each returned PASS with P0=0/P1=0 and
+READY_TO_SIGN=YES. The initial Grok process that exhausted its default turn
+limit remains NO_VERDICT and is not approval evidence. Nonblocking P2 debt is
+limited to defensive lifecycle, taxonomy and cleanup hardening: validate
+stored quarantine state kinds explicitly, abort any surviving snapshot streams
+when the network node stops, tighten per-descriptor/body accounting and
+concurrent-read assumptions, and normalize narrow post-close/error edges. None
+reproduced unauthorized transfer, activation, durable mutation or authority
+reuse, so no further test, mutation or review round is authorized.
+
 The single final RED review round was frozen at staged tree `0bb49198` and
 cached diff object `6d26e17d`. Kimi completed its genuine 100-step session
 `e5f64c6b-0e47-4b5c-b4a6-64af84108285` with PASS/P0=0/P1=0. Grok reproduced

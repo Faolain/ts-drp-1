@@ -19,12 +19,24 @@
 // THE SOFTWARE.
 
 import type { Stream } from "@libp2p/interface";
-import { InvalidDataLengthLengthError, type LengthPrefixedStreamOpts, lpStream } from "@libp2p/utils";
+import {
+	InvalidDataLengthError,
+	InvalidDataLengthLengthError,
+	type LengthPrefixedStreamOpts,
+	lpStream,
+} from "@libp2p/utils";
 
 const MAX_FRAME_BYTES = 4 * 1024 * 1024;
 // The maximum frame length uses a four-byte varint. The byte-stream limit sees
 // prefix and body together when a transport delivers them in one event.
 const MAX_FRAME_PREFIX_BYTES = 4;
+
+interface FramedStreamSession {
+	maxDataLength: number;
+	stream: ReturnType<typeof lpStream>;
+}
+
+const framedStreamSessions = new WeakMap<Stream, FramedStreamSession>();
 
 // lpStream treats RangeError as an incomplete prefix, so enforce the bound
 // before returning that signal and letting it request another byte.
@@ -45,6 +57,26 @@ const decodeFrameLength: LengthPrefixedStreamOpts["lengthDecoder"] = (data) => {
 	throw new RangeError("Could not decode frame length");
 };
 
+function framedStreamSession(stream: Stream): FramedStreamSession {
+	const existing = framedStreamSessions.get(stream);
+	if (existing !== undefined) return existing;
+	const session = { maxDataLength: MAX_FRAME_BYTES } as FramedStreamSession;
+	const lengthDecoder: LengthPrefixedStreamOpts["lengthDecoder"] = (data) => {
+		const dataLength = decodeFrameLength(data);
+		if (dataLength > session.maxDataLength) {
+			throw new InvalidDataLengthError(`Message length too long - ${dataLength} > ${session.maxDataLength}`);
+		}
+		return dataLength;
+	};
+	session.stream = lpStream(stream, {
+		lengthDecoder,
+		maxBufferSize: MAX_FRAME_BYTES + MAX_FRAME_PREFIX_BYTES,
+		maxDataLength: MAX_FRAME_BYTES,
+	});
+	framedStreamSessions.set(stream, session);
+	return session;
+}
+
 /**
  * Convert a Uint8Array to a stream.
  * @param stream - The stream to write to.
@@ -63,7 +95,7 @@ export async function uint8ArrayToStream(stream: Stream, input: Uint8Array): Pro
  * @param input Bounded frame bytes.
  */
 export async function writeUint8ArrayFrame(stream: Stream, input: Uint8Array): Promise<void> {
-	await lpStream(stream).write(input);
+	await framedStreamSession(stream).stream.write(input);
 }
 
 /**
@@ -73,13 +105,12 @@ export async function writeUint8ArrayFrame(stream: Stream, input: Uint8Array): P
  * @returns The detached frame body.
  */
 export async function readUint8ArrayFrame(stream: Stream, maxDataLength: number): Promise<Uint8Array> {
-	return lpStream(stream, {
-		lengthDecoder: decodeFrameLength,
-		maxBufferSize: maxDataLength + MAX_FRAME_PREFIX_BYTES,
-		maxDataLength,
-	})
-		.read()
-		.then((data) => data.subarray());
+	if (!Number.isSafeInteger(maxDataLength) || maxDataLength < 0 || maxDataLength > MAX_FRAME_BYTES) {
+		throw new InvalidDataLengthError(`Invalid maximum message length - ${maxDataLength}`);
+	}
+	const session = framedStreamSession(stream);
+	session.maxDataLength = maxDataLength;
+	return session.stream.read().then((data) => data.subarray());
 }
 
 /**

@@ -57,6 +57,7 @@ import {
 import { type DRPNetworkNode, Message, MessageType, V3Envelope } from "@ts-drp/types";
 
 import { classifyV3EnvelopeScope } from "./v3-envelope-scope.js";
+import { consumeRecoveredV3LiveAuthority, installRecoveredV3LiveAuthority } from "./v3-live-recovered-authority.js";
 
 const ArrayIsArray = Array.isArray;
 const ArrayPrototype = Array.prototype;
@@ -3336,18 +3337,8 @@ function releaseOperationReservation(reservation: FreshOperationAdmissionReserva
 	}
 }
 
-const recoveredV3LiveAuthority = new WeakMap<object, RecoveredV3LivePayload>();
-
 function consumeRecoveredV3Live(capability: RecoveredV3Live): RecoveredV3LivePayload | undefined {
-	try {
-		if (!isObject(capability)) return undefined;
-		const recovered = recoveredV3LiveAuthority.get(capability);
-		if (recovered === undefined) return undefined;
-		recoveredV3LiveAuthority.delete(capability);
-		return recovered;
-	} catch {
-		return undefined;
-	}
+	return consumeRecoveredV3LiveAuthority<RecoveredV3LivePayload>(capability);
 }
 
 type SnapshottedJournalRow =
@@ -4202,7 +4193,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			return recoveryFailure("issuance-rejected", "v3 recovery requires a complete issued record chain");
 		}
 		const capability = ObjectFreeze({}) as RecoveredV3Live;
-		recoveredV3LiveAuthority.set(
+		installRecoveredV3LiveAuthority(
 			capability,
 			ObjectFreeze({
 				applicationAuthors,

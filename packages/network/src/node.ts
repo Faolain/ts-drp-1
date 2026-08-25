@@ -91,6 +91,11 @@ import {
 } from "./connection-budget.js";
 import { createMetricsRegister, type PrometheusMetricsRegister } from "./metrics/prometheus.js";
 import { PeerSelector } from "./peer-selector.js";
+import {
+	SNAPSHOT_CHUNK_PROTOCOL,
+	type SnapshotChunkProtocolPort,
+	type SnapshotChunkProtocolStream,
+} from "./snapshot-transfer.js";
 import { readUint8ArrayFrame, streamToUint8Array, uint8ArrayToStream, writeUint8ArrayFrame } from "./stream.js";
 import {
 	createDirectSyncIngress,
@@ -523,6 +528,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _messageQueue: MessageQueue<Message | DirectSyncIngress>;
 	private _activeUnreliableWebRtcOwner?: DRPUnreliableWebRtcOwner;
 	private _unreliableWebRtcIncoming?: (stream: Stream, connection: Connection) => Promise<void>;
+	private _snapshotChunkIncoming?: (stream: Stream, connection: Connection) => Promise<void>;
 	private readonly _unreliableWebRtcOwner: DRPUnreliableWebRtcOwner;
 	private readonly _ingressEvidence = new WeakMap<Message, IngressEvidence>();
 	private readonly _syncAdmissions = new WeakMap<Connection, SyncSendAdmission>();
@@ -625,6 +631,163 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	/** @returns Stable fail-closed raw WebRTC owner for the node lifecycle. */
 	get unreliableWebRtcOwner(): DRPUnreliableWebRtcOwner {
 		return this._unreliableWebRtcOwner;
+	}
+
+	/**
+	 * Creates one dedicated snapshot protocol port over already-open authenticated connections.
+	 * This method is consumed only by the non-root snapshot-transfer subpath.
+	 * @returns A bounded port with no dial fallback.
+	 */
+	createSnapshotChunkProtocolHost(): SnapshotChunkProtocolPort {
+		const active = new Set<Stream>();
+		let closed = false;
+		let selectedHandler: ((stream: SnapshotChunkProtocolStream) => Promise<void>) | undefined;
+		let incoming: ((stream: Stream, connection: Connection) => Promise<void>) | undefined;
+		const failure = (code: string, message: string, cause?: unknown): Error => {
+			const error = new Error(message, cause === undefined ? undefined : { cause });
+			Object.defineProperty(error, "code", { enumerable: true, value: code });
+			return error;
+		};
+		const wrap = (stream: Stream, peerId: string): SnapshotChunkProtocolStream => {
+			let streamClosed = false;
+			active.add(stream);
+			const abort = (reason = failure("aborted", "snapshot stream was aborted")): void => {
+				if (streamClosed) return;
+				streamClosed = true;
+				active.delete(stream);
+				stream.abort(reason);
+			};
+			const abortIfNeeded = (signal: AbortSignal): void => {
+				if (signal.aborted) {
+					const error = failure("aborted", "snapshot stream was aborted", signal.reason);
+					abort(error);
+					throw error;
+				}
+			};
+			return Object.freeze({
+				peerId,
+				abort,
+				close: async (): Promise<void> => {
+					if (streamClosed) return;
+					streamClosed = true;
+					active.delete(stream);
+					await stream.close();
+				},
+				read: async (maxBytes: number, { signal }: Readonly<{ readonly signal: AbortSignal }>): Promise<Uint8Array> => {
+					abortIfNeeded(signal);
+					if (!Number.isSafeInteger(maxBytes) || maxBytes < 0) {
+						throw failure("protocol-violation", "snapshot frame limit is invalid");
+					}
+					let rejectAbort!: (error: Error) => void;
+					const aborted = new Promise<never>((_resolve, reject) => {
+						rejectAbort = reject;
+					});
+					const onAbort = (): void => {
+						const error = failure("aborted", "snapshot stream was aborted", signal.reason);
+						abort(error);
+						rejectAbort(error);
+					};
+					signal.addEventListener("abort", onAbort, { once: true });
+					try {
+						const bytes = await Promise.race([readUint8ArrayFrame(stream, maxBytes), aborted]);
+						abortIfNeeded(signal);
+						return new Uint8Array(bytes);
+					} catch (error) {
+						if (signal.aborted) throw failure("aborted", "snapshot stream was aborted", signal.reason);
+						abort(failure("protocol-violation", "snapshot frame violates its byte bound", error));
+						throw failure("protocol-violation", "snapshot frame violates its byte bound", error);
+					} finally {
+						signal.removeEventListener("abort", onAbort);
+					}
+				},
+				write: async (
+					exactBytes: Uint8Array,
+					{ signal }: Readonly<{ readonly signal: AbortSignal }>
+				): Promise<void> => {
+					abortIfNeeded(signal);
+					let bytes: Uint8Array;
+					try {
+						bytes = new Uint8Array(exactBytes);
+					} catch (error) {
+						throw failure("protocol-violation", "snapshot frame carrier is invalid", error);
+					}
+					await writeUint8ArrayFrame(stream, bytes);
+					abortIfNeeded(signal);
+				},
+			});
+		};
+		return Object.freeze({
+			localPeerId: this.peerId,
+			close: (): Promise<void> => {
+				if (closed) return Promise.resolve();
+				closed = true;
+				if (incoming !== undefined && this._snapshotChunkIncoming === incoming) {
+					this._snapshotChunkIncoming = undefined;
+				}
+				selectedHandler = undefined;
+				for (const stream of [...active]) stream.abort(failure("aborted", "snapshot protocol port closed"));
+				active.clear();
+				return Promise.resolve();
+			},
+			connectedPeers: (): readonly string[] => {
+				if (closed || this._node === undefined) return [];
+				return [
+					...new Set(
+						this._node
+							.getConnections()
+							.filter(({ status }) => status === "open")
+							.map(({ remotePeer }) => remotePeer.toString())
+					),
+				].sort();
+			},
+			open: async (
+				peerId: string,
+				{ signal }: Readonly<{ readonly signal: AbortSignal }>
+			): Promise<SnapshotChunkProtocolStream> => {
+				if (closed || this._node === undefined || signal.aborted) {
+					throw failure(signal.aborted ? "aborted" : "connection-unavailable", "snapshot connection is unavailable");
+				}
+				let connection: Connection | undefined;
+				try {
+					connection = this._node
+						.getConnections(peerIdFromString(peerId))
+						.filter(({ status }) => status === "open")
+						.sort((left, right) => left.id.localeCompare(right.id))[0];
+				} catch {
+					connection = undefined;
+				}
+				if (connection === undefined) {
+					throw failure("connection-unavailable", "snapshot peer is not already connected");
+				}
+				try {
+					const stream = await connection.newStream(SNAPSHOT_CHUNK_PROTOCOL, { signal });
+					return wrap(stream, connection.remotePeer.toString());
+				} catch (error) {
+					throw failure(signal.aborted ? "aborted" : "connection-unavailable", "snapshot stream open failed", error);
+				}
+			},
+			serve: (handler: (stream: SnapshotChunkProtocolStream) => Promise<void>): (() => void) => {
+				if (closed || selectedHandler !== undefined || this._snapshotChunkIncoming !== undefined) {
+					throw new TypeError("snapshot protocol server is unavailable");
+				}
+				selectedHandler = handler;
+				incoming = async (stream, connection): Promise<void> => {
+					const selected = selectedHandler;
+					if (closed || selected === undefined) {
+						stream.abort(failure("connection-unavailable", "snapshot protocol server is unavailable"));
+						return;
+					}
+					await selected(wrap(stream, connection.remotePeer.toString()));
+				};
+				this._snapshotChunkIncoming = incoming;
+				return (): void => {
+					if (incoming !== undefined && this._snapshotChunkIncoming === incoming) {
+						this._snapshotChunkIncoming = undefined;
+					}
+					selectedHandler = undefined;
+				};
+			},
+		});
 	}
 
 	private _activateUnreliableWebRtcOwner(): void {
@@ -1694,6 +1857,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	async stop(): Promise<void> {
 		if (this._node?.status === IntervalRunnerState.Stopped) throw new Error("Node not started");
 		this._deactivateUnreliableWebRtcOwner();
+		this._snapshotChunkIncoming = undefined;
 		this._peerSelector?.stop();
 		this._peerSelector = undefined;
 		this._connectionAdmission?.stop();
@@ -2592,6 +2756,18 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 			}
 			void this.handleSignedGossipsubMessage(e.detail.msg);
 		});
+		await this._node?.handle(
+			SNAPSHOT_CHUNK_PROTOCOL,
+			async (stream, connection): Promise<void> => {
+				const listener = this._snapshotChunkIncoming;
+				if (listener === undefined) {
+					stream.abort(new Error("snapshot protocol owner is unavailable"));
+					return;
+				}
+				await listener(stream, connection);
+			},
+			{ maxInboundStreams: 4, maxOutboundStreams: 4 }
+		);
 		await this._node?.handle(
 			DRP_UNRELIABLE_WEBRTC_SIGNALING_PROTOCOL,
 			async (stream, connection): Promise<void> => {
