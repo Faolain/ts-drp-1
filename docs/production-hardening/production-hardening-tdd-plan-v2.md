@@ -55477,9 +55477,9 @@ several competing validators:
 - `@ts-drp/storage/snapshot-transfer` and its Node/browser implementations own
   only durable quarantine mechanics. They store exact manifest bytes and
   detached verified chunks, report missing indices, poison conflicts, expire or
-  discard sessions, and release a terminal quarantine receipt. They do not
-  interpret ACLs, certify a manifest, change an AHE generation or expose an
-  active pointer.
+  discard sessions, consume the compaction receipt and return an opaque verified
+  quarantine reference. They do not interpret ACLs, certify a manifest, change
+  an AHE generation or expose an active pointer.
 - `@ts-drp/network/snapshot-transfer` owns only authenticated reliable-stream
   framing and cancellation. The private node `V3SnapshotTransferSession` is the
   sole mutable transfer policy owner. One recovered capability is consumed
@@ -55643,10 +55643,11 @@ staged descriptor requests, a body-byte budget no larger than the authenticated
 `maxSnapshotBytes`, and 86,400,000 ms durable quarantine retention after the
 last verified write. Callers, manifests and peers cannot widen them. The node
 owner captures transfer limits at session creation; the storage owner captures
-retention at scope creation. Fake-clock REDs pin each exact boundary, slow-drip
-reset behavior, total-duration supremacy over progress, attempt exhaustion,
-restart retention at one millisecond before expiry and deterministic sweep at
-expiry. Later profile changes require a new reviewed plan slice rather than
+retention at scope creation. Phase 4c-b fake-clock REDs pin only durable
+retention at one millisecond before expiry and deterministic sweep at expiry.
+Phase 4c-c, where the private Node transfer session is in scope, pins the exact
+inactivity, total-duration, slow-drip, attempt, concurrency and byte-budget
+boundaries. Later profile changes require a new reviewed plan slice rather than
 optional tuning fields.
 
 The quarantine completion operation accepts only a 4c-a terminal receipt for
@@ -55657,6 +55658,92 @@ digest, ACL, peer or activation logic. Before RED, a bounded storage spike must
 confirm exact transaction and cleanup behavior for both backends; if either
 backend needs a different semantic contract, reslice rather than add adapter
 flags.
+
+The bounded substrate spike passed without a backend-specific semantic split.
+One real Node SQLite database proved rollback leaves neither manifest nor chunk,
+commit survives close/reopen, and transactional scope deletion removes its
+chunks. Real Chromium, Firefox and WebKit IndexedDB databases all accepted
+`durability: "strict"`, left neither object-store row after abort, preserved a
+commit across close/reopen and removed both rows through explicit transactional
+cleanup. Their reported quotas were 10 GiB, 10 GiB and 1 GiB respectively, all
+above the shipped 256 MiB snapshot ceiling. These checks prove API/schema
+feasibility, not power-loss durability; the RED still requires genuine
+process/worker termination and fresh-reopen evidence. The common contract
+therefore remains one store/session shape with separate physical adapters.
+
+The signed 4c-a completion record is intentionally observable but structurally
+forgeable, so it is not itself the 4c-b completion authority. A narrow new
+`@ts-drp/compaction/snapshot-quarantine-receipt` subpath wraps the existing
+verifier without changing the exact `@ts-drp/compaction/snapshot-stream`
+runtime roster. It captures and decodes the exact manifest, binds object, epoch,
+anchor, manifest digest and the exact quarantine receiver, delegates all bytes
+to the genuine 4c-a verifier, and mints a frozen empty receipt only after its
+terminal payload verification. Module-private `WeakMap` identity is the sole
+runtime brand. Consumption compares the same scope and exact quarantine
+receiver, then deletes the receipt synchronously before returning a detached
+completion record. Forged, cloned, foreign, wrong-scope and replayed receipts
+therefore fail. A failed or outcome-unknown completion consumes the receipt;
+recovery reopens retained chunks and reruns 4c-a rather than replaying authority.
+
+`@ts-drp/storage/snapshot-transfer` stays generic over that opaque receipt and
+owns the single backend-neutral session contract. Node and browser adapters
+import the receipt consumer directly and supply their exact durable session as
+the quarantine identity. Storage persists an `open`/`verified` resource state
+only to freeze write-versus-complete races; restart never trusts that state as
+verification authority and must rerun 4c-a before minting a fresh reference.
+The existing 4c-a `discard()` is clarified as release of the current verifier
+lease. Ephemeral test quarantines may delete there, while durable quarantines
+retain verified chunks until explicit `cancel()` or exact expiry. Quarantine
+ports, verifier inputs and the `verifySnapshotStream` function remain
+byte-for-byte type compatible with signed 4c-a. The receipt wrapper owns one
+internal controller, passes its signal through the existing verifier input and
+closes an abort-checking proxy over the unchanged durable quarantine port, so
+no transaction can begin after abort or close without adding signal parameters
+to the frozen port methods.
+
+The tests-only RED is limited to twelve paths:
+
+- `tests/phase-4c-snapshot-quarantine-red.test.ts`;
+- `tests/fixtures/phase-4c-v3/snapshot-quarantine-contract.ts`;
+- `tests/fixtures/phase-4c-v3/snapshot-quarantine-types.ts`;
+- `packages/storage-node/tests/phase-4c-b-snapshot-quarantine-red.test.ts`;
+- `packages/storage-node/tests/fixtures/phase-4c-b-snapshot-quarantine-crash-child.mjs`;
+- `packages/storage-browser/tests/phase-4c-b-snapshot-quarantine-red.pw.ts`;
+- `packages/storage-browser/tests/assets/phase-4c-b-snapshot-quarantine-entry.ts`;
+- `packages/storage-browser/tests/assets/phase-4c-b-snapshot-quarantine-worker.ts`;
+- `packages/storage-browser/tests/phase-4c-b-snapshot-quarantine-server.ts`;
+- `packages/storage-browser/playwright.phase-4c-b-snapshot-quarantine.config.ts`;
+- `packages/storage-node/tsconfig.json` only for the exact 4c-b RED exclusion;
+- `packages/storage-browser/tsconfig.json` only for the exact 4c-b RED
+  exclusions.
+
+Its single readiness failure is the absent common, receipt, Node and browser
+non-root owners. Backend-neutral behavior is collected once and reused by both
+physical adapters. Node SIGKILL and browser worker termination separately prove
+old-or-new manifest/chunk commits and exact restart recovery; neither adds a
+production test hook. The root RED compiles the shared exact type fixture in an
+isolated temporary TypeScript project; the package exclusions prevent those
+cross-root future-owner fixtures from becoming unrelated unconditional package
+typecheck failures.
+
+The minimal GREEN may change exactly nine paths:
+
+- `packages/compaction/src/snapshot-quarantine-receipt.ts`;
+- `packages/compaction/package.json` only for the receipt subpath;
+- `packages/storage/src/snapshot-transfer.ts`;
+- `packages/storage/package.json` only for the common subpath;
+- `packages/storage-node/src/snapshot-transfer.ts`;
+- `packages/storage-node/package.json` only for the subpath and direct compaction
+  dependency;
+- `packages/storage-browser/src/snapshot-transfer.ts`;
+- `packages/storage-browser/package.json` only for the subpath and direct
+  compaction dependency;
+- `pnpm-lock.yaml` only for those workspace dependency edges.
+
+Package roots and prior runtime rosters remain unchanged. The Node adapter uses
+its own `.drp-snapshot-quarantine-v1.sqlite` database; the browser adapter uses
+its own `--drp-snapshot-quarantine-v1` database. Neither adds tables or object
+stores to an existing exact-schema authority.
 
 #### Phase 4c-c — authenticated pull transfer and D.100 composition
 
@@ -55733,6 +55820,16 @@ barrier-observed peak memory and concatenate-then-drop mutant, private retained
 activation material, exact seven-path GREEN scope, fixed owner-local resource
 limits, and verifier-only quarantine writes. Per the hard review boundary, P2
 was recorded and no confirmation or prose review round was opened.
+
+The Phase 4c-b correction review was bound to staged tree `cba47b00` and plan
+SHA-256 `a8712725`. Kimi's completed 100-step review reproduced a stale second
+receipt owner and transfer-session timer assertions outside the storage slice.
+Grok and Opus reproduced an incompatible attempt to add abort parameters to the
+signed 4c-a port types; Opus additionally reproduced the cross-root package
+typecheck collision. The plan was corrected once to retain one compaction
+receipt owner, move network timers/retries to 4c-c, keep the 4c-a surface
+byte-identical through a wrapper-owned abort proxy, and isolate the exact 4c-b
+RED owners from ordinary package typechecks. No confirmation round was opened.
 
 Phase 4c does not certify a cut or manifest, create a successor anchor, activate
 a next epoch, update an AHE head, prune history, transfer archive segments,
