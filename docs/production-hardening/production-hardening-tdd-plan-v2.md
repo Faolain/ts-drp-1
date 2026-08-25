@@ -55765,6 +55765,17 @@ Chromium/Firefox/WebKit IndexedDB matrix. Phase 4c-b still exposes no transfer,
 activation, adoption, certification or archive authority; those boundaries
 remain with the following slices.
 
+The user-authorized one-off Fable-high audit subsequently reviewed signed 4c-b
+GREEN `6fcdc67b` without changing repository state. Fable session
+`10dc913a-11ff-4b0f-8649-6016e6b9e887` returned PASS with P0=0/P1=0 and
+independently confirmed both the complete-versus-poison transaction race and
+hostile byte-carrier admission are closed in the signed bytes. It recorded only
+nonblocking P2 cleanup debt: capture declaration getters once, validate stored
+state enum values explicitly, decide expired-but-unswept completion semantics,
+normalize minor backend absent-row diagnostics, retain the documented SQLite
+busy-timeout availability tradeoff, and remove one unreachable browser schema
+branch when convenient. No further Fable round is authorized or required.
+
 #### Phase 4c-c — authenticated pull transfer and D.100 composition
 
 This slice uses a dedicated reliable protocol, provisionally
@@ -55795,10 +55806,13 @@ and serves only a previously verified manifest/chunk scope.
 
 The genuine checkpoint uses three real network nodes: receiver, corrupt/slow
 source and honest source. A source folds and adopts a real D.100 epoch and
-exports a D.99 payload and frozen manifest. The receiver starts with a
-non-prefix durable chunk subset, rejects a valid-sized corrupt chunk, bounds a
-slow drip, switches peer without dialing, fetches exactly the remaining
-descriptors, and obtains one terminal verified quarantine reference. No
+exports a D.99 payload and frozen manifest. The shipped 32,768-byte application
+state bound plus the 8,192-byte latched-ACL bound makes that genuine D.100
+payload a single 131,072-byte chunk; the independent bounded transfer owner
+therefore proves arbitrary non-prefix durable resume with its multi-chunk 4c-a
+fixture, while the three-node composition rejects a valid-sized corrupt chunk,
+bounds a slow drip, switches peer without dialing, fetches exactly the genuine
+remaining descriptor, and obtains one terminal verified quarantine reference. No
 registration, queue, topic, active pointer or snapshot plane exists before
 completion. For a deliberately small fixture, the terminal adapter
 materializes the verified payload once. The same privately retained authority
@@ -55815,6 +55829,86 @@ contiguous `Uint8Array`, only the small fixture is materialized for activation.
 Large-snapshot browser adoption is an explicit nonclaim until a later streamed
 decode/import owner exists; the Phase 4c memory claim covers transfer and
 verification, not whole-payload D.100 materialization.
+
+The tests-only RED is limited to this plan correction and these sixteen test or
+fixture paths:
+
+- `packages/network/tests/phase-4c-c-snapshot-protocol-red.test.ts`;
+- `packages/storage-browser/playwright.phase-4c-c-snapshot-transfer.config.ts`;
+- `packages/storage-browser/tests/assets/phase-4c-c-snapshot-source-entry.ts`;
+- `packages/storage-browser/tests/assets/phase-4c-c-snapshot-transfer-entry.ts`;
+- `packages/storage-browser/tests/phase-4c-b-snapshot-quarantine-server.ts` only
+  to consume the shared browser server;
+- `packages/storage-browser/tests/phase-4c-browser-server.ts`;
+- `packages/storage-browser/tests/phase-4c-c-snapshot-transfer-red.pw.ts`;
+- `packages/storage-browser/tsconfig.json` only for the two future-owner RED
+  exclusions;
+- `tests/fixtures/phase-4c-v3/browser-live-snapshot.ts`;
+- `tests/fixtures/phase-4c-v3/snapshot-pull-contract.ts`;
+- `tests/fixtures/phase-4c-v3/snapshot-pull-transport.ts`;
+- `tests/fixtures/phase-4c-v3/snapshot-pull-types.ts`;
+- `tests/fixtures/phase-4c-v3/snapshot-transfer-fixture.ts`;
+- `tests/fixtures/phase-4c-v3/tsconfig.browser-live-snapshot.json`;
+- `tests/phase-4c-snapshot-pull-red.test.ts`;
+- `tests/phase-4c-v3-snapshot-transfer-composition-red.test.ts`.
+
+The final RED review reproduced that the retained recovered authority cannot be
+claimed before transfer through the existing exact five-path proposal. The
+runtime token is an empty, one-use capability whose private authority map and
+sole consumer both live in `v3-live.ts`; merely retaining the public token
+would leave it independently activatable during transfer, while invoking the
+existing activation function would create the queue/topic effects that this
+slice forbids. The RED therefore calls the existing activation function with
+the same token while a transfer is pending and requires
+`capability-consumed` with zero effects. GREEN moves only the private recovered
+authority registry into one internal, unexported owner so the transfer session
+can synchronously claim it and later restore it solely into the existing D.100
+activation path. No package or runtime export roster changes.
+
+The minimal GREEN may change exactly seven production paths:
+
+- `packages/network/src/snapshot-transfer.ts`;
+- `packages/network/src/node.ts` only for the dedicated authenticated-stream
+  lifecycle owned by that subpath;
+- `packages/network/package.json` only for the non-root transfer route;
+- `packages/node/src/v3-live-recovered-authority.ts` as the unexported private
+  recovered-authority registry;
+- `packages/node/src/v3-live.ts` only to consume that shared private registry
+  while retaining its exact public roster and activation behavior;
+- `packages/node/src/snapshot-transfer.ts`;
+- `packages/node/package.json` only for the non-root transfer route.
+
+Neither package root export roster changes. No generic stream API, caller-owned
+transport authority, extra dependency edge or lockfile change is authorized.
+
+The single final RED review round was frozen at staged tree `0bb49198` and
+cached diff object `6d26e17d`. Kimi completed its genuine 100-step session
+`e5f64c6b-0e47-4b5c-b4a6-64af84108285` with PASS/P0=0/P1=0. Grok reproduced
+the one-chunk browser fixture's contradictory two-or-more fetched-chunk
+assertion. Opus reproduced that P0 plus the unbounded real-timer case and the
+unresolvable browser package imports, and two P1 receive-boundary gaps: response
+control/body limits were not causal and the live network frame-bound test was
+masked by concurrent abort. The correction changes the browser expectation to
+exactly `[0]`, leaves non-prefix multi-chunk evidence in the independent
+transport owner, grants the real slow-peer case its own 60-second test budget,
+uses the established relative-source browser imports, separates live oversized
+frame rejection from abort, and adds test-owned body-byte evidence plus
+mismatched-control and 131,073-byte response cases that must leave durable
+missing indices unchanged. The same correction makes the four-session limit
+causally process-wide across distinct owners and pins pre-transfer capability
+consumption through the seven-path private-authority refactor above. Per the
+hard review boundary, no confirmation review was opened.
+
+Corrected RED gates passed exact-path Prettier and ESLint, `git diff --check`,
+the dedicated browser-live fixture compiler, and network, storage-browser,
+storage-node, compaction and protocol-v3 typechecks. Focused Vitest has exactly
+one missing-owner failure with four independent passes and sixteen dormant
+GREEN cases. Chromium, Firefox and WebKit each pass the genuine D.100 source
+checkpoint and skip only the absent transfer owner. The retained 4c-b browser
+matrix passes 18/18; the selected Phase4a/D.99/D.100/4c-b preservation set
+passes 50/51, with only the already-recorded root-launched 4c-a 64 MiB child
+unable to resolve `@ts-drp/canonical` from that inherited environment while all
+fourteen other 4c-a assertions pass.
 
 #### Preservation, review and nonclaims
 

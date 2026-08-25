@@ -18,6 +18,8 @@
 	"exclude": [
 		"dist",
 		"./*.d.ts",
+		"tests/assets/phase-4c-c-snapshot-source-entry.ts",
+		"tests/assets/phase-4c-c-snapshot-transfer-entry.ts",
 		"tests/assets/phase-4c-b-snapshot-quarantine-entry.ts",
 		"tests/assets/phase-4c-b-snapshot-quarantine-worker.ts",
 		"tests/phase-4c-b-snapshot-quarantine-red.pw.ts",
