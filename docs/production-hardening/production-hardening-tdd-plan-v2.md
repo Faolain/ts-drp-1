@@ -56330,3 +56330,141 @@ PR-profile artifact simulation all pass. Null-carrier diagnostics, timeout and
 concurrency headroom, fixture-specific three-operation ledger arithmetic and
 fixed-seed prose drift remain P2 debt. Per the single-round boundary, no
 confirmation review follows these fixes.
+
+### D.104 — Phase 4d-c standing shadow telemetry
+
+Phase 4d-c turns the shipped comparator and bounded runner into one real,
+long-running diagnostic deployment. It adds no comparison leg, consensus
+decision or trusted history. One owner invokes `runShadowTier` itself with the
+genuine four-leg producer; it never accepts a caller-supplied report, success
+flag, count, duration or elapsed-day value. Every fold-agreement, applied
+vertex, nonempty-state, reference-sample and mismatch value is derived from the
+comparator-backed report. UTC cycle identity comes from the process clock,
+duration comes from the process monotonic clock, the runtime roster is derived
+from `process.versions.node`, and the browser roster is exactly empty. The
+checked-out SHA and bounded instance name are diagnostic deployment metadata,
+not authenticated consensus inputs.
+
+The semantic owner is one private
+`@ts-drp/test-utils/shadow-telemetry` subpath. Its process-lifetime service
+prevents overlapping cycles, runs the nightly 100-shard profile at most once
+per observed UTC day, and becomes terminal after any mismatch or incomplete
+report. Terminal means that no later comparison can run; the daemon remains
+alive only to republish the exact terminal evidence until operator shutdown.
+It exposes neither a report-recording API nor a caller clock. Vitest
+fake timers may replace the ambient clocks in the RED, but production callers
+cannot pass them. Per-cycle values are gauges, not retry-multiplying counters.
+Labels are a closed low-cardinality set: `tier` and bounded `instance`, plus a
+closed mismatch kind where needed. Seeds and epochs are values or trace
+attributes, never labels. There is deliberately no `green_days`, total soak
+age, certified-close or enablement metric in this slice.
+
+Telemetry uses two existing mechanisms without conflating them. The owner
+wraps the genuine cycle in `IMetrics.traceFunc`, so a terminal mismatch or
+delivery failure closes the span as an error. A narrow gauge/push port is backed
+by the existing Prometheus register. That register gains one additive strict
+push method while its current best-effort network `start()`/`pushMetrics()`
+behavior remains unchanged. The repository-internal deployment imports that
+source module relatively, so no new network package subpath, dependency or
+root/Vite alias is created. The strict method inspects the resolved response
+and accepts only status `200..299`; redirects, client/server errors and
+transport failure reject. The standing service pushes the complete cycle
+immediately and then republishes that whole immutable evidence every 60
+seconds. A process-liveness heartbeat may exist from startup but is explicitly
+not fold evidence. The separately named evidence heartbeat and all report
+gauges remain absent until the first complete cycle has been strictly pushed.
+A strict-push rejection is process-fatal rather than logged as success.
+
+No safety statement depends on the existing cleanup script: its current
+timestamp parser is not evidence. Each cycle publishes `in_progress`,
+`cycle_started_unixtime_seconds`, `last_complete_unixtime_seconds`,
+`report_complete` and mismatch gauges from the process clock and exact runner
+result. The daemon watchdog terminalizes an in-progress cycle after 45 minutes.
+Prometheus loads the committed rule file and routes alerts through Alertmanager
+to a required external webhook. Concrete `for: 2m` rules fire when the process
+heartbeat is absent or older than 120 seconds, a cycle remains in progress
+beyond 45 minutes, no first completion exists after that bound, the last
+completion is older than 26 hours, the report is incomplete, or any mismatch
+is nonzero. Thus a dead process, a hung fold and frozen old gauges all fail
+visible even if Pushgateway retains them indefinitely.
+
+The deployment is an explicitly diagnostic soak image, not the ordinary DRP
+product container. It runs the repository-pinned genuine shadow producer under
+`tsx`, builds the required private workspace packages in the image, derives
+one UTC date per cycle, handles `SIGINT`/`SIGTERM`, and uses the checked-out
+repository SHA. The existing Prometheus compose stack gains the soak service
+and alert rule plus Alertmanager wired to the required webhook. OTLP tracing is
+enabled only when an explicit exporter URL is present; Prometheus delivery
+remains mandatory. A terminal mismatch flushes the tracer exporter immediately
+before entering evidence-only mode. Strict-push failure flushes before nonzero
+exit, and `SIGINT`/`SIGTERM` await the same flush before clean shutdown. A
+focused unmocked local HTTP
+checkpoint proves that the real `prom-client` Pushgateway body contains the
+closed metric names, labels and comparator-derived values, that `3xx` and
+`5xx` responses reject, and that the exact `{ job, instance }` grouping is
+stable.
+
+The tests-only RED is exact three paths:
+
+- `tests/fixtures/phase-4d-v3/shadow-telemetry-contract.ts`;
+- `tests/fixtures/phase-4d-v3/shadow-telemetry-driver.ts`;
+- `tests/phase-4d-shadow-telemetry-red.test.ts`.
+
+Independent RED cases pin real-runner invocation, exact report-to-gauge
+mapping, one-cycle-per-day and nonoverlap behavior, monotonic duration,
+terminal mismatch, strict push failure, bounded labels, heartbeat cadence,
+pre-success evidence-heartbeat exclusion, frozen-last-push and overtime-cycle
+alerts, tracer flush, signal shutdown, unmocked Prometheus exposition and
+structural compose/Alertmanager reachability. Named mutants cover caller-report
+injection, fabricated counts, backwards/nonfinite clocks, mismatch counted as
+agreement, retry multiplication, seed/epoch labels, accepted redirect,
+swallowed push rejection, heartbeat-only hung work and CI-style one-shot exit.
+Exactly one readiness test fails solely because the telemetry subpath is
+absent; all independent oracles pass and behavioral GREEN cases remain
+dormant.
+
+The minimal GREEN is exact twelve paths:
+
+- `packages/test-utils/src/shadow-telemetry.ts`;
+- `packages/test-utils/package.json` for its private subpath;
+- `packages/network/src/metrics/prometheus.ts` for strict push only;
+- `scripts/production-hardening/run-shadow-soak.ts`;
+- `scripts/production-hardening/Dockerfile.shadow-soak`;
+- `docker/prometheus-metrics/docker-compose.yml`;
+- `docker/prometheus-metrics/prometheus.yml`;
+- `docker/prometheus-metrics/shadow-soak-alerts.yml`;
+- `docker/prometheus-metrics/alertmanager.yml.tmpl`;
+- `vite.config.mts` for the ordered telemetry alias;
+- `package.json` for one explicit soak command;
+- this plan ledger entry.
+
+The package roots, comparator and runner exports, ledger, workflow, protocol,
+canonical, compaction, node, storage and application owners remain unchanged.
+Focused gates are exact-path formatting/lint, `git diff --check`, test-utils,
+network and tracer typecheck/build, retained 4d-a/4d-b owners, the telemetry
+owner, a real local Pushgateway failure/success exchange, Docker Compose config
+validation, a real soak-image build and a bounded container run that reaches
+its first process heartbeat and then handles `SIGTERM`. No browser claim is
+made until a later genuine browser deployment supplies an independent roster.
+Phase 5 still owns certified close; Phase 6 still owns the
+100,000-epoch/30-day enablement decision, successor adoption and pruning.
+
+D.104 receives one exact-byte P0/P1-only plan, RED and GREEN review round from
+Grok, genuine Kimi 100-step and Opus xhigh. Only a reproduced substantive
+P0/P1 may change bytes. P2 remains debt; there is no confirmation round and no
+Fable review.
+
+The single D.104 plan review packet was staged tree `663a568f`, cached diff
+object `dc2887c0` and canonical SHA-256 `1a51336f`. Opus xhigh session
+`50fffd53-d96c-481f-a187-ce87ac58a7cb` reproduced the prefix-shadowed network
+subpath, redirect-as-success delivery, false cleanup premise and missing real
+image gate. Genuine Kimi 100-check session
+`46b461d7-9957-4905-b635-20058795554a` reproduced the ambiguous pre-success
+heartbeat, unspecified alert delivery and unflushed terminal traces. Grok
+independently reproduced stale gauges and a hung cycle remaining green. The
+correction keeps the network source private, requires exact 2xx delivery,
+separates process from evidence heartbeats, adds freshness/overtime gauges and
+watchdog rules, wires Alertmanager, flushes tracing on every terminal path and
+builds/runs the real image. The broken cleanup parser is explicitly outside the
+trust argument rather than silently treated as repaired. No confirmation
+review is opened.
