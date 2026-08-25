@@ -56973,3 +56973,15 @@ tuple, transactional TOCTOU boundary, formal crash safety, same-origin hard-deat
 evidence, and cross-page dispatch takeover causal before any signing or storage
 authority lands. The next pickup is the single atomic D.105b GREEN that wakes
 this exact RED without editing it.
+
+The first product-GREEN execution exposed one causal RED-fixture defect that the
+sole formal round had missed: `OBJECT_ID = "object:phase-5"` violates the
+already-shipped storage-object identity law requiring exactly one prefix
+separator followed by 32 lowercase hexadecimal characters. Every dormant
+behavior therefore failed at certified-genesis admission before reaching any
+new Phase-5 owner. The bounded correction changes only that test identity to
+`phase5:55555555555555555555555555555555`; every dependent CutValue, anchor,
+certificate, proposal and vote byte is still independently derived at runtime.
+Production validation remains byte-identical and fail closed. This is a RED
+causality repair discovered by the first GREEN gate, not a weakened expectation
+or an additional formal-review round.

@@ -2,7 +2,7 @@ import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
 
 import type { SealPhase } from "./seal-types.js";
 
-export const OBJECT_ID = "object:phase-5";
+export const OBJECT_ID = "phase5:55555555555555555555555555555555";
 export const ANCHOR = "11".repeat(32);
 export const ZERO_DIGEST = "00".repeat(32);
 export const SIGNER_IDS = Object.freeze(["A", "B", "C", "Z"]);
