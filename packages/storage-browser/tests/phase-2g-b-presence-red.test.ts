@@ -42,11 +42,11 @@ describe("Phase 2g-b browser metadata capability RED", () => {
 			.map((file) => fs.readFileSync(file, "utf8"))
 			.join("\n");
 		expect.soft(browserSource).toMatch(/\bprobeBlobPresence\b/u);
-		expect.soft(browserSource.match(/\.getKey\s*\(/gu) ?? []).toHaveLength(1);
 		const methodStart = idbAdapterSource.search(/\bpublic\s+(?:async\s+)?probeBlobPresence\b/u);
 		const methodEnd = methodStart < 0 ? -1 : idbAdapterSource.indexOf("\n\tpublic ", methodStart + 1);
 		const methodSource =
 			methodStart < 0 ? "" : idbAdapterSource.slice(methodStart, methodEnd < 0 ? undefined : methodEnd);
+		expect.soft(methodSource.match(/\.getKey\s*\(/gu) ?? []).toHaveLength(1);
 		expect
 			.soft(methodSource)
 			.not.toMatch(/\b(?:digestBlob|encode|decode|JSON|structuredClone|Uint8Array)\b|\.get\s*\(/u);

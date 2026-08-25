@@ -18,12 +18,19 @@ describe("storage-browser structural controls", () => {
 			".": { import: "./dist/src/index.js", types: "./dist/src/index.d.ts" },
 			"./issuance": { import: "./dist/src/issuance.js", types: "./dist/src/issuance.d.ts" },
 			"./live-journal": { import: "./dist/src/live-journal.js", types: "./dist/src/live-journal.d.ts" },
+			"./seal-vote": { import: "./dist/src/seal-vote.js", types: "./dist/src/seal-vote.d.ts" },
+			"./snapshot-transfer": {
+				import: "./dist/src/snapshot-transfer.js",
+				types: "./dist/src/snapshot-transfer.d.ts",
+			},
 		});
 		expect(node.private).toBe(true);
 		expect(browser.dependencies).toEqual({
 			"@ts-drp/canonical": "0.11.0",
+			"@ts-drp/compaction": "0.11.0",
 			"@ts-drp/issuance-store": "0.11.0",
 			"@ts-drp/live-journal": "0.11.0",
+			"@ts-drp/seal": "0.11.0",
 			"@ts-drp/storage": "0.11.0",
 		});
 	});
@@ -40,6 +47,7 @@ describe("storage-browser structural controls", () => {
 			"playwright.phase-2e5-browser-inventory.config.ts",
 			"playwright.phase-2e6-real-process-death.config.ts",
 			"playwright.phase-2e7-publication-component.config.ts",
+			"playwright.phase-5c-seal-vote.config.ts",
 			"playwright.protocol-v2.config.ts",
 			"playwright.protocol-v2-inert.config.ts",
 		]);
@@ -53,6 +61,7 @@ describe("storage-browser structural controls", () => {
 			"playwright.phase-2e5-browser-inventory.config.ts",
 			"playwright.phase-2e6-real-process-death.config.ts",
 			"playwright.phase-2e7-publication-component.config.ts",
+			"playwright.phase-5c-seal-vote.config.ts",
 			"playwright.protocol-v2.config.ts",
 			"playwright.protocol-v2-inert.config.ts",
 		]);

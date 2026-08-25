@@ -164,6 +164,25 @@ test("one strict transaction owns incarnation, signer state, slot and outbox bef
 	});
 });
 
+test("voter enrollment scopes snapshots and round advancement across multiple lawful signer rows", async ({ page }) => {
+	await page.goto(server?.origin ?? "about:blank");
+	const result = (await page.evaluate(
+		(databaseName) => window.phase5cSealVote.runScopedSnapshotScenario(databaseName),
+		`phase-5c-scoped-${crypto.randomUUID()}`
+	)) as {
+		readonly advanced: { readonly ok: boolean; readonly revision: number };
+		readonly firstAfter: { readonly enteredRound: number; readonly revision: number };
+		readonly firstBefore: { readonly enteredRound: number; readonly revision: number };
+		readonly secondAfter: { readonly enteredRound: number; readonly revision: number };
+		readonly secondBefore: { readonly enteredRound: number; readonly revision: number };
+	};
+	expect(result.firstBefore).toMatchObject({ enteredRound: 0, revision: 1 });
+	expect(result.secondBefore).toMatchObject({ enteredRound: 0, revision: 1 });
+	expect(result.advanced).toEqual({ ok: true, revision: 2 });
+	expect(result.firstAfter).toMatchObject({ enteredRound: 2, revision: 2 });
+	expect(result.secondAfter).toMatchObject({ enteredRound: 0, revision: 1 });
+});
+
 test("worker termination reopens only the committed exact vote state", async ({ page }) => {
 	await page.goto(server?.origin ?? "about:blank");
 	const databaseName = `phase-5c-worker-${crypto.randomUUID()}`;

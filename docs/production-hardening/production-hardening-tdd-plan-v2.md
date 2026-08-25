@@ -56912,14 +56912,12 @@ request base, and the actual branch merge base
 why the same-pull-request landing rule above is normative. Per the review
 boundary there was no confirmation round.
 
-The one expressly requested Fable-high architecture advisory also returned the
-Phase-5 approach correct with zero P0/P1: governed D.105a first, then one atomic
-D.105b RED/GREEN, then the Phase-5d pacemaker. Its nonblocking clarifications are
-incorporated above: the exact-thirteen browser graph must name its bundler reuse,
-and Phase 5d may widen the round-advance transaction beyond its minimum two
-stores only under its own frozen law. This ledger update is intentionally a
-separate post-GREEN documentation commit and does not reopen or enlarge the
-signed exact-seven supplement.
+The one expressly requested Fable-high architecture advisory produced no review
+evidence. It was launched outside the repository to avoid protected-path
+auto-discovery, every repository read was denied, and the sole session therefore
+terminated `REVIEW_BLOCKED / NOT_DETERMINED`. It made no edit or test and was not
+retried. The Phase-5 approach is supported by the signed plan and the
+source-grounded Grok/Kimi/Opus record above, not by that blocked Fable session.
 
 Product capability gained at D.105a: no signer, vote, QC, storage, dispatcher, or
 live-room authority. Governance/security debt discharged: the v3 round-free
@@ -56985,3 +56983,78 @@ certificate, proposal and vote byte is still independently derived at runtime.
 Production validation remains byte-identical and fail closed. This is a RED
 causality repair discovered by the first GREEN gate, not a weakened expectation
 or an additional formal-review round.
+
+The D.105b GREEN candidate now supplies the four missing production surfaces
+without adding live-room or network authority. Protocol-v3 owns certified
+epoch-zero seal identity and registered vote/QC verification; keychain owns
+opaque finality-key custody; seal owns provisional signing plus the durable
+anti-equivocation transition; and the browser storage subpath exposes only the
+observation/store composition. The primary database migrates from the historical
+four-store schema to the additive eight-store schema. Every vote attempt performs
+the incarnation, signer-state, and exact-slot decision in one strict transaction
+over the four Phase-5 stores, while monotone round advancement uses its own strict
+state transaction. Only transaction-complete stored bytes can enter the bounded
+package-internal dispatcher. The public observation path cannot mint a carrier or
+start dispatch; those acting capabilities remain assigned to 5e/5f.
+
+The candidate's focused evidence is green before formal review. The five affected
+packages typecheck and build; exact-path formatting, lint, and diff checks pass;
+the retained registry, authorization, governed digest, seal safety, codec,
+genesis-profile, and Phase-2h bundle passes 56/56 when serialized so its Git
+subprocess checks retain their existing deadline. The complete storage-browser
+package passes 261 tests with 24 intentional environment skips. The Phase-5c
+Playwright matrix passes 22 cases across Chromium, Firefox, and WebKit with the
+two persistent-Chromium-only death rows skipped outside Chromium; the retained
+Phase-2d schema lane passes 12/12; and the retained Phase-2e6 detached-Chromium
+death campaign passes its 18-boundary case. The Phase-5c hard-death case separately
+passes every vote-transaction boundary. The same executable seal RED invokes the
+actual Quint typechecker and all four bounded n=4 safety traces.
+
+Product capability gained at the D.105b candidate: a certified epoch-zero signer
+can construct and strictly verify prepare/commit seal records, preserve
+anti-equivocation state and exact committed carriers across browser crashes, and
+recover pending committed publication work without exposing acting transport
+authority. Governance/security debt discharged: consensus identity remains in
+the governed protocol owner; finality identity is roster-derived rather than
+caller-selected; provisional signatures are never externally released; schema
+migration and storage-loss detection fail closed; and Web Locks coordinate only
+already-durable bytes. The next pickup is the single exact-byte D.105b GREEN
+review round. Only reproduced P0/P1 fixes may change that packet; after it signs,
+Phase 5d begins the pacemaker, round-change evidence, and bidirectional formal
+trace gate.
+
+The sole D.105b GREEN review round authenticated signed HEAD `9de34112`, staged
+tree `52309a19`, and canonical full-index SHA-256 `99a043a0…`, with exactly 34
+staged paths and zero tracked unstaged paths. Grok returned CHANGES with five
+P1s. Kimi emitted a nominal 100-check PASS but did not substantively classify
+the five supplied candidates; source reconciliation reproduced the same five
+P1s and therefore recorded its usable verdict as REJECT. Opus returned PASS and
+dismissed or demoted the candidates. Per the checkpoint rule there is no second
+or confirmation review: only the five source-reproduced same-round defects alter
+the candidate.
+
+The correction removes raw-digest finality signing: protocol-v3 now mints a
+fieldless, one-use signing request alongside the independently inspectable
+registered digest, and keychain custody destructively consumes that request;
+raw digest carriers and replayed requests fail. Seal voter composition now
+accepts only a branded package-internal store port and mints a fieldless
+enrollment from the certified authority's exact object, epoch-zero, signer, and
+anchor identity plus the external incarnation expectation. Browser snapshot and
+round advancement use that exact compound signer-state key, so multiple lawful
+objects/signers coexist without a database-wide `getAll` oracle. Vote intents
+are fieldless and destructively consumed once before the mechanical adapter sees
+detached transition data.
+
+The production IDB transaction no longer contains a test hook, caller callback,
+or keepalive await between safety reads and writes. The persistent-Chromium
+child instead instruments native transaction/request events outside production,
+arms each of the eight boundaries, and is killed with `SIGKILL`; same-profile
+raw reopen still proves old XOR exact-new. Finally, each dispatch scan cursor-
+filters durable pending rows and admits at most concurrency plus one; a drain
+sends at most four, leaves overflow durable, and a successor drain recovers the
+remainder. The browser oracle now proves the 4+2 split as well as multi-signer
+snapshot/round isolation. Focused post-correction evidence is 7/7 seal safety,
+25/27 Phase-5c browser cases passed with the two non-Chromium hard-death skips,
+and all affected package typechecks/builds passed. Exact retained gates and the
+final signed packet are recorded at commit handoff below; no further model review
+is authorized for these corrected bytes.

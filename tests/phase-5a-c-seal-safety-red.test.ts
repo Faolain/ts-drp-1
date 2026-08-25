@@ -27,7 +27,12 @@ import {
 	ownerReadiness,
 	REPOSITORY_ROOT,
 } from "./fixtures/phase-5-v3/seal-fixture.js";
-import { type ExactSealCarrier, EXPECTED_EXPORTS, type SealStorePort } from "./fixtures/phase-5-v3/seal-types.js";
+import { EXPECTED_EXPORTS, type SealStorePort } from "./fixtures/phase-5-v3/seal-types.js";
+import {
+	consumeSealVoteIntent,
+	mintSealStorePort,
+	resolveSealVoterEnrollment,
+} from "../packages/seal/src/storage-port.js";
 
 interface SafetyContract {
 	readonly limits: {
@@ -101,23 +106,25 @@ function boundSealIdentity(
 
 function createOracleStore(
 	initialState = emptyOracleState()
-): SealStorePort & { state(): ReturnType<typeof emptyOracleState> } {
+): Readonly<{ port: SealStorePort; state(): ReturnType<typeof emptyOracleState> }> {
 	let state = initialState;
-	return Object.freeze({
+	const port = mintSealStorePort({
 		commitVote(raw: unknown) {
-			const input = raw as {
-				readonly carrier: ExactSealCarrier;
-				readonly expectedIncarnation: string;
-				readonly expectedRevision: number;
-				readonly phase: "prepare" | "commit";
-				readonly round: number;
-				readonly signerId: string;
-			};
+			if (raw === null || typeof raw !== "object" || Reflect.ownKeys(raw).length !== 0) {
+				return Promise.resolve({ ok: false, reason: "NON_OPAQUE_VOTE_INTENT" });
+			}
+			const input = consumeSealVoteIntent(raw);
+			if (input === undefined) return Promise.resolve({ ok: false, reason: "UNTRUSTED_VOTE_INTENT" });
+			if (consumeSealVoteIntent(raw) !== undefined) {
+				return Promise.resolve({ ok: false, reason: "REUSABLE_VOTE_INTENT" });
+			}
 			const result = oracleCommit({ ...input, state });
 			if (result.ok) state = result.state;
 			return Promise.resolve(result);
 		},
-		openSnapshot() {
+		openSnapshot(enrollment: unknown) {
+			const scope = resolveSealVoterEnrollment(enrollment);
+			if (scope === undefined) return Promise.reject(new TypeError("untrusted enrollment"));
 			return Promise.resolve(
 				Object.freeze({
 					enteredRound: state.enteredRound,
@@ -126,8 +133,8 @@ function createOracleStore(
 				})
 			);
 		},
-		state: () => state,
 	});
+	return Object.freeze({ port, state: () => state });
 }
 
 describe.sequential("Phase 5a-c atomic seal safety RED", () => {
@@ -324,11 +331,20 @@ describe.sequential("Phase 5a-c atomic seal safety RED", () => {
 			hashDomain("ts-drp/seal-vote/v3", identity.exactCanonicalVotePreimageBytes)
 		);
 		const signature = await modules.keychain.signSealRegisteredDigest({
-			registeredDigest: prepared.registeredDigest,
+			request: prepared.signingRequest,
 			signer: finality.signer,
 		});
 		expect(signature).toHaveLength(64);
 		expect(ed25519.verify(signature, prepared.registeredDigest, finality.publicKey, { zip215: false })).toBe(true);
+		await expect(
+			modules.keychain.signSealRegisteredDigest({ request: prepared.signingRequest, signer: finality.signer })
+		).rejects.toThrow(/consumed/u);
+		await expect(
+			modules.keychain.signSealRegisteredDigest({
+				request: Uint8Array.from(prepared.registeredDigest),
+				signer: finality.signer,
+			})
+		).rejects.toThrow(/untrusted/u);
 	});
 
 	it.runIf(readiness.ready)(
@@ -363,7 +379,7 @@ describe.sequential("Phase 5a-c atomic seal safety RED", () => {
 					});
 					if (!prepared.ok) throw new Error(`failed to prepare ${selected.signerId}`);
 					const signature = await modules.keychain.signSealRegisteredDigest({
-						registeredDigest: prepared.registeredDigest,
+						request: prepared.signingRequest,
 						signer: finality.signer,
 					});
 					return {
@@ -432,7 +448,7 @@ describe.sequential("Phase 5a-c atomic seal safety RED", () => {
 			expect(mixedPrepared.ok).toBe(true);
 			if (!mixedPrepared.ok) return;
 			const mixedSignature = await modules.keychain.signSealRegisteredDigest({
-				registeredDigest: mixedPrepared.registeredDigest,
+				request: mixedPrepared.signingRequest,
 				signer: mixedFinality.signer,
 			});
 			const mixedVote = {
@@ -485,7 +501,7 @@ describe.sequential("Phase 5a-c atomic seal safety RED", () => {
 				authority: opened.authority,
 				expectedStorageIncarnation: "incarnation-A",
 				signer: finality.signer,
-				store,
+				store: store.port,
 			});
 			expect(created.ok).toBe(true);
 			if (!created.ok) return;
@@ -541,7 +557,7 @@ describe.sequential("Phase 5a-c atomic seal safety RED", () => {
 				authority: opened.authority,
 				expectedStorageIncarnation: "incarnation-A",
 				signer: finality.signer,
-				store,
+				store: store.port,
 			});
 			expect(created.ok).toBe(true);
 			if (!created.ok) return;
@@ -592,7 +608,7 @@ describe.sequential("Phase 5a-c atomic seal safety RED", () => {
 				authority: opened.authority,
 				expectedStorageIncarnation: "incarnation-A",
 				signer: finality.signer,
-				store: conflictStore,
+				store: conflictStore.port,
 			});
 			expect(conflictVoter.ok).toBe(true);
 			if (!conflictVoter.ok) return;
@@ -606,17 +622,23 @@ describe.sequential("Phase 5a-c atomic seal safety RED", () => {
 			if (!conflict.ok) expect(conflict.existing).toEqual(conflictingCarrier);
 
 			let ambiguousCalls = 0;
+			const ambiguousStore = mintSealStorePort({
+				commitVote() {
+					ambiguousCalls += 1;
+					return Promise.reject(new Error("unknown transaction outcome"));
+				},
+				openSnapshot(enrollment: unknown) {
+					if (resolveSealVoterEnrollment(enrollment) === undefined) {
+						return Promise.reject(new TypeError("untrusted enrollment"));
+					}
+					return Promise.resolve({ enteredRound: 0, incarnation: "incarnation-A", revision: 0 });
+				},
+			});
 			const ambiguousVoter = await modules.seal.createSealVoter({
 				authority: opened.authority,
 				expectedStorageIncarnation: "incarnation-A",
 				signer: finality.signer,
-				store: {
-					commitVote() {
-						ambiguousCalls += 1;
-						return Promise.reject(new Error("unknown transaction outcome"));
-					},
-					openSnapshot: () => Promise.resolve({ enteredRound: 0, incarnation: "incarnation-A", revision: 0 }),
-				},
+				store: ambiguousStore,
 			});
 			expect(ambiguousVoter.ok).toBe(true);
 			if (!ambiguousVoter.ok) return;

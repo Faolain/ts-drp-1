@@ -23,6 +23,7 @@ export interface SealAuthorityModule {
 				exactCanonicalPreimageBytes: Uint8Array;
 				proposalHash: string;
 				registeredDigest: Uint8Array;
+				signingRequest: unknown;
 				valueDigest: string;
 		  }>;
 	verifySealQC(input: Readonly<{ authority: unknown; exactCanonicalQcBytes: Uint8Array }>):
@@ -43,13 +44,10 @@ export interface FinalityKeychainModule {
 			signer: unknown;
 		}>
 	>;
-	signSealRegisteredDigest(input: Readonly<{ signer: unknown; registeredDigest: Uint8Array }>): Promise<Uint8Array>;
+	signSealRegisteredDigest(input: Readonly<{ request: unknown; signer: unknown }>): Promise<Uint8Array>;
 }
 
-export interface SealStorePort {
-	openSnapshot(): Promise<unknown>;
-	commitVote(input: unknown): Promise<unknown>;
-}
+export type SealStorePort = object;
 
 export interface SealVoterHandle {
 	enterRound(input: Readonly<{ expectedRevision: number; round: number }>): Promise<unknown>;

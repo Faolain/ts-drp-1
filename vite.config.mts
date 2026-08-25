@@ -6,6 +6,19 @@ export default defineConfig({
 	plugins: [tsconfigPaths()],
 	resolve: {
 		alias: {
+			"@ts-drp/keychain/finality": path.resolve(__dirname, "packages/keychain/src/finality.ts"),
+			"@ts-drp/protocol-v3/internal/seal-signing-request": path.resolve(
+				__dirname,
+				"packages/protocol-v3/src/internal/seal-signing-request.ts"
+			),
+			"@ts-drp/protocol-v3/internal/seal-authority-identity": path.resolve(
+				__dirname,
+				"packages/protocol-v3/src/internal/seal-authority-identity.ts"
+			),
+			"@ts-drp/protocol-v3/seal": path.resolve(__dirname, "packages/protocol-v3/src/seal.ts"),
+			"@ts-drp/storage-browser/seal-vote": path.resolve(__dirname, "packages/storage-browser/src/seal-vote.ts"),
+			"@ts-drp/seal/internal/storage-port": path.resolve(__dirname, "packages/seal/src/storage-port.ts"),
+			"@ts-drp/seal": path.resolve(__dirname, "packages/seal/src/index.ts"),
 			"@ts-drp/test-utils/shadow-comparison": path.resolve(__dirname, "packages/test-utils/src/shadow-comparison.ts"),
 			"@ts-drp/test-utils/shadow-runner": path.resolve(__dirname, "packages/test-utils/src/shadow-runner.ts"),
 			"@ts-drp/test-utils/shadow-telemetry": path.resolve(__dirname, "packages/test-utils/src/shadow-telemetry.ts"),

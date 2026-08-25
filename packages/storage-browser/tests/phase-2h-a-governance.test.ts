@@ -139,14 +139,19 @@ describe("Phase 2h-a configuration and governance", () => {
 		expect(scripts["e2e-test:storage-browser"]).not.toContain("protocol-v2");
 	});
 
-	it("keeps browser schema v1 and the production package surface untouched", () => {
+	it("retains the historical v1 authority while assigning the current v2 vote stores only to Phase 5c", () => {
 		const schema = fs.readFileSync(
 			path.join(repositoryRoot, "packages/storage-browser/src/internal/schema-idb.ts"),
 			"utf8"
 		);
+		expect(schema).toContain("PHASE_2D_SCHEMA_AUTHORITY");
 		expect(schema).toContain("version: 1");
+		expect(schema).toContain("PHASE_5C_SCHEMA_AUTHORITY");
+		expect(schema).toContain("version: 2");
 		for (const store of ["objects", "generations", "blobs", "promotions"]) expect(schema).toContain(`"${store}"`);
-		expect(schema).not.toMatch(/voteSlots|storageMeta|signerState|voteOutbox/u);
+		for (const store of ["voteSlots", "storageMeta", "signerState", "voteOutbox"]) {
+			expect(schema).toContain(`"${store}"`);
+		}
 	});
 
 	it("validates the bounded coverage-denominator before/after contract", () => {

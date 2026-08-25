@@ -14,30 +14,53 @@ interface Phase2dSchemaHarness {
 	runUnexpectedSchemaAndVersion(): Promise<unknown>;
 }
 
+const HISTORICAL_PRIVATE_V1_STORES = Object.freeze([
+	{ autoIncrement: false, indexes: [], keyPath: "digest", name: "blobs" },
+	{
+		autoIncrement: false,
+		indexes: [],
+		keyPath: ["objectId", "generationId"],
+		name: "generations",
+	},
+	{ autoIncrement: false, indexes: [], keyPath: "objectId", name: "objects" },
+	{
+		autoIncrement: false,
+		indexes: [],
+		keyPath: ["objectId", "generationId", "digest"],
+		name: "promotions",
+	},
+]);
+
 const EXPECTED_EXACT_SCHEMA = Object.freeze({
 	kind: "opened",
 	stores: [
-		{ autoIncrement: false, indexes: [], keyPath: "digest", name: "blobs" },
+		...HISTORICAL_PRIVATE_V1_STORES,
 		{
 			autoIncrement: false,
 			indexes: [],
-			keyPath: ["objectId", "generationId"],
-			name: "generations",
+			keyPath: ["objectId", "epoch", "signerId"],
+			name: "signerState",
 		},
-		{ autoIncrement: false, indexes: [], keyPath: "objectId", name: "objects" },
+		{ autoIncrement: false, indexes: [], keyPath: "key", name: "storageMeta" },
 		{
 			autoIncrement: false,
 			indexes: [],
-			keyPath: ["objectId", "generationId", "digest"],
-			name: "promotions",
+			keyPath: ["objectId", "epoch", "round", "phase", "signerId"],
+			name: "voteOutbox",
+		},
+		{
+			autoIncrement: false,
+			indexes: [],
+			keyPath: ["objectId", "epoch", "round", "phase", "signerId"],
+			name: "voteSlots",
 		},
 	],
-	version: 1,
+	version: 2,
 });
 
 const HISTORICAL_FIVE_STORE_SCHEMA = Object.freeze({
 	stores: [
-		...EXPECTED_EXACT_SCHEMA.stores,
+		...HISTORICAL_PRIVATE_V1_STORES,
 		{
 			autoIncrement: false,
 			indexes: [
@@ -107,11 +130,11 @@ test("production opening consumes the selected decision digest before creating a
 	});
 });
 
-test("fresh production opening creates the exact four-store zero-index private-v1 schema", async ({ page }) => {
+test("fresh production opening creates the exact eight-store zero-index private-v2 schema", async ({ page }) => {
 	await expect(runHarness(page, "runFreshSchema")).resolves.toEqual(EXPECTED_EXACT_SCHEMA);
 });
 
-test("production validation accepts an independently created exact private-v1 schema", async ({ page }) => {
+test("production validation migrates an independently created exact private-v1 schema", async ({ page }) => {
 	await expect(runHarness(page, "runExistingCorrectSchema")).resolves.toEqual(EXPECTED_EXACT_SCHEMA);
 });
 

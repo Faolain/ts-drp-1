@@ -1,4 +1,5 @@
 const PHASE_2D_DECISION_LINK_SHA256 = "40f0175e5d7a0c4aa9855e61324639b71045ffbcf197c12caf788824c2d8e19c";
+const PHASE_5C_BLOCKED_OPEN_TIMEOUT_MILLISECONDS = 250;
 
 export const PHASE_2D_SCHEMA_AUTHORITY = Object.freeze({
 	stores: Object.freeze([
@@ -30,11 +31,42 @@ export const PHASE_2D_SCHEMA_AUTHORITY = Object.freeze({
 	version: 1,
 } as const);
 
+export const PHASE_5C_SCHEMA_AUTHORITY = Object.freeze({
+	stores: Object.freeze([
+		...PHASE_2D_SCHEMA_AUTHORITY.stores,
+		Object.freeze({ autoIncrement: false, indexes: Object.freeze([]), keyPath: "key", name: "storageMeta" }),
+		Object.freeze({
+			autoIncrement: false,
+			indexes: Object.freeze([]),
+			keyPath: Object.freeze(["objectId", "epoch", "round", "phase", "signerId"]),
+			name: "voteSlots",
+		}),
+		Object.freeze({
+			autoIncrement: false,
+			indexes: Object.freeze([]),
+			keyPath: Object.freeze(["objectId", "epoch", "signerId"]),
+			name: "signerState",
+		}),
+		Object.freeze({
+			autoIncrement: false,
+			indexes: Object.freeze([]),
+			keyPath: Object.freeze(["objectId", "epoch", "round", "phase", "signerId"]),
+			name: "voteOutbox",
+		}),
+	]),
+	version: 2,
+} as const);
+
 export const PHASE_2D_SCHEMA_VERSION = PHASE_2D_SCHEMA_AUTHORITY.version;
 export const PHASE_2D_OBJECTS_STORE = PHASE_2D_SCHEMA_AUTHORITY.stores[0].name;
 export const PHASE_2D_GENERATIONS_STORE = PHASE_2D_SCHEMA_AUTHORITY.stores[1].name;
 export const PHASE_2D_BLOBS_STORE = PHASE_2D_SCHEMA_AUTHORITY.stores[2].name;
 export const PHASE_2D_PROMOTIONS_STORE = PHASE_2D_SCHEMA_AUTHORITY.stores[3].name;
+export const PHASE_5C_SCHEMA_VERSION = PHASE_5C_SCHEMA_AUTHORITY.version;
+export const PHASE_5C_STORAGE_META_STORE = "storageMeta" as const;
+export const PHASE_5C_VOTE_SLOTS_STORE = "voteSlots" as const;
+export const PHASE_5C_SIGNER_STATE_STORE = "signerState" as const;
+export const PHASE_5C_VOTE_OUTBOX_STORE = "voteOutbox" as const;
 
 export interface Phase2dStorageDecisionBinding {
 	readonly chosen: "idb-strict" | "unselected";
@@ -99,10 +131,14 @@ function exactKeyPath(actual: string | string[] | null, expected: string | reado
 	);
 }
 
-function hasExactSchema(database: IDBDatabase): boolean {
-	const authority = PHASE_2D_SCHEMA_AUTHORITY;
+function hasExactSchema(
+	database: IDBDatabase,
+	authority: typeof PHASE_2D_SCHEMA_AUTHORITY | typeof PHASE_5C_SCHEMA_AUTHORITY,
+	transaction?: IDBTransaction,
+	ignoreVersion = false
+): boolean {
 	if (
-		database.version !== authority.version ||
+		(!ignoreVersion && database.version !== authority.version) ||
 		database.objectStoreNames.length !== authority.stores.length ||
 		authority.stores.some((store) => !database.objectStoreNames.contains(store.name))
 	) {
@@ -110,9 +146,9 @@ function hasExactSchema(database: IDBDatabase): boolean {
 	}
 
 	try {
-		const transaction = database.transaction(authority.stores.map((store) => store.name));
+		const selectedTransaction = transaction ?? database.transaction(authority.stores.map((store) => store.name));
 		return authority.stores.every((expectedStore) => {
-			const actualStore = transaction.objectStore(expectedStore.name);
+			const actualStore = selectedTransaction.objectStore(expectedStore.name);
 			if (
 				actualStore.autoIncrement !== expectedStore.autoIncrement ||
 				!exactKeyPath(actualStore.keyPath, expectedStore.keyPath) ||
@@ -125,6 +161,29 @@ function hasExactSchema(database: IDBDatabase): boolean {
 	} catch {
 		return false;
 	}
+}
+
+function createStores(
+	database: IDBDatabase,
+	stores: readonly Readonly<{
+		autoIncrement: false;
+		indexes: readonly never[];
+		keyPath: string | readonly string[];
+		name: string;
+	}>[]
+): void {
+	for (const storeAuthority of stores) {
+		database.createObjectStore(storeAuthority.name, {
+			autoIncrement: storeAuthority.autoIncrement,
+			keyPath: copyKeyPath(storeAuthority.keyPath),
+		});
+	}
+}
+
+function randomIncarnation(): string {
+	const bytes = new Uint8Array(16);
+	crypto.getRandomValues(bytes);
+	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function copyKeyPath(keyPath: string | readonly string[]): string | string[] {
@@ -147,37 +206,79 @@ function classifyOpenError(error: DOMException | null): Error {
 
 function openDatabase(databaseName: string, onVersionChange?: () => void): Promise<IDBDatabase> {
 	return new Promise((resolve, reject) => {
-		const request = indexedDB.open(databaseName, PHASE_2D_SCHEMA_VERSION);
+		const request = indexedDB.open(databaseName, PHASE_5C_SCHEMA_VERSION);
+		let blockedTimer: ReturnType<typeof setTimeout> | undefined;
+		let settled = false;
+		const clearBlockedTimer = (): void => {
+			if (blockedTimer !== undefined) clearTimeout(blockedTimer);
+		};
 		request.addEventListener(
 			"upgradeneeded",
 			(event) => {
-				if (event.oldVersion !== 0 || request.result.objectStoreNames.length !== 0) {
+				const transaction = request.transaction;
+				if (settled || transaction === null || (event.oldVersion !== 0 && event.oldVersion !== 1)) {
 					request.transaction?.abort();
 					return;
 				}
-				for (const storeAuthority of PHASE_2D_SCHEMA_AUTHORITY.stores) {
-					request.result.createObjectStore(storeAuthority.name, {
-						autoIncrement: storeAuthority.autoIncrement,
-						keyPath: copyKeyPath(storeAuthority.keyPath),
-					});
+				if (event.oldVersion === 0) {
+					if (request.result.objectStoreNames.length !== 0) {
+						transaction.abort();
+						return;
+					}
+					createStores(request.result, PHASE_5C_SCHEMA_AUTHORITY.stores);
+				} else {
+					if (!hasExactSchema(request.result, PHASE_2D_SCHEMA_AUTHORITY, transaction, true)) {
+						transaction.abort();
+						return;
+					}
+					createStores(request.result, PHASE_5C_SCHEMA_AUTHORITY.stores.slice(PHASE_2D_SCHEMA_AUTHORITY.stores.length));
 				}
+				transaction.objectStore(PHASE_5C_STORAGE_META_STORE).add({ key: "incarnation", value: randomIncarnation() });
 			},
 			{ once: true }
 		);
-		request.addEventListener("error", () => reject(classifyOpenError(request.error)), { once: true });
+		request.addEventListener(
+			"blocked",
+			() => {
+				blockedTimer ??= setTimeout(() => {
+					if (settled) return;
+					settled = true;
+					reject(new BrowserStorageBlockedError());
+				}, PHASE_5C_BLOCKED_OPEN_TIMEOUT_MILLISECONDS);
+			},
+			{ once: true }
+		);
+		request.addEventListener(
+			"error",
+			() => {
+				if (settled) return;
+				settled = true;
+				clearBlockedTimer();
+				reject(classifyOpenError(request.error));
+			},
+			{ once: true }
+		);
 		request.addEventListener(
 			"success",
 			() => {
 				const database = request.result;
-				if (!hasExactSchema(database)) {
+				if (settled) {
 					database.close();
+					return;
+				}
+				if (!hasExactSchema(database, PHASE_5C_SCHEMA_AUTHORITY)) {
+					database.close();
+					settled = true;
+					clearBlockedTimer();
 					reject(new BrowserStorageSchemaError());
 					return;
 				}
 				database.addEventListener("versionchange", () => {
-					if (onVersionChange === undefined) database.close();
-					else onVersionChange();
+					database.close();
+					onVersionChange?.();
 				});
+				settled = true;
+				clearBlockedTimer();
 				resolve(database);
 			},
 			{ once: true }

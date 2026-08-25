@@ -8,7 +8,11 @@ const IDB_ADAPTER_OWNER = path.join(PACKAGE_DIRECTORY, "src/internal/idb-adapter
 const SCHEMA_IDB_OWNER = path.join(PACKAGE_DIRECTORY, "src/internal/schema-idb.ts");
 const ISSUANCE_OWNER = path.join(PACKAGE_DIRECTORY, "src/internal/browser-issuance-store.ts");
 const ISSUANCE_TEST_CONTROL_OWNER = path.join(PACKAGE_DIRECTORY, "src/internal/issuance-test-control.ts");
-const STRICT_MUTATION_OWNERS = new Set([IDB_ADAPTER_OWNER, SCHEMA_IDB_OWNER]);
+const LIVE_JOURNAL_OWNER = path.join(PACKAGE_DIRECTORY, "src/live-journal.ts");
+const SEAL_VOTE_OWNER = path.join(PACKAGE_DIRECTORY, "src/internal/seal-vote-store.ts");
+const SEAL_VOTE_TEST_CONTROL_OWNER = path.join(PACKAGE_DIRECTORY, "src/internal/seal-vote-test-control.ts");
+const SNAPSHOT_TRANSFER_OWNER = path.join(PACKAGE_DIRECTORY, "src/snapshot-transfer.ts");
+const STRICT_MUTATION_OWNERS = new Set([IDB_ADAPTER_OWNER, SCHEMA_IDB_OWNER, SEAL_VOTE_OWNER]);
 const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
 	[
 		IDB_ADAPTER_OWNER,
@@ -37,6 +41,7 @@ const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 			"objectStore",
 			"index",
 			"count",
+			"add",
 			"abort",
 			"close",
 			"addEventListener",
@@ -60,6 +65,80 @@ const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 		]),
 	],
 	[ISSUANCE_TEST_CONTROL_OWNER, new Set(["open", "transaction", "objectStore", "add", "close", "addEventListener"])],
+	[
+		LIVE_JOURNAL_OWNER,
+		new Set([
+			"abort",
+			"add",
+			"addEventListener",
+			"bound",
+			"close",
+			"createIndex",
+			"createObjectStore",
+			"get",
+			"getAll",
+			"getKey",
+			"index",
+			"objectStore",
+			"open",
+			"put",
+			"transaction",
+		]),
+	],
+	[
+		SNAPSHOT_TRANSFER_OWNER,
+		new Set([
+			"abort",
+			"add",
+			"addEventListener",
+			"bound",
+			"close",
+			"createIndex",
+			"createObjectStore",
+			"delete",
+			"get",
+			"getAll",
+			"getAllKeys",
+			"getKey",
+			"index",
+			"map",
+			"objectStore",
+			"open",
+			"put",
+			"transaction",
+			"upperBound",
+		]),
+	],
+	[
+		SEAL_VOTE_OWNER,
+		new Set([
+			"abort",
+			"add",
+			"addEventListener",
+			"close",
+			"continue",
+			"get",
+			"getAll",
+			"objectStore",
+			"openCursor",
+			"put",
+			"transaction",
+		]),
+	],
+	[
+		SEAL_VOTE_TEST_CONTROL_OWNER,
+		new Set([
+			"abort",
+			"add",
+			"addEventListener",
+			"close",
+			"count",
+			"createObjectStore",
+			"objectStore",
+			"open",
+			"transaction",
+		]),
+	],
 	[
 		path.join(PACKAGE_DIRECTORY, "tests/opfs-idb-spike/assets/strict-idb-harness.ts"),
 		new Set([
@@ -168,6 +247,32 @@ const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 		path.join(PACKAGE_DIRECTORY, "tests/assets/phase-2l-d-browser-parity-entry.ts"),
 		new Set(["open", "deleteDatabase", "transaction", "objectStore", "add", "addEventListener", "close"]),
 	],
+	[
+		path.join(PACKAGE_DIRECTORY, "tests/assets/phase-3a1b-p4-browser-live-journal-entry.ts"),
+		new Set([
+			"addEventListener",
+			"close",
+			"databases",
+			"delete",
+			"deleteDatabase",
+			"getAll",
+			"getAllKeys",
+			"index",
+			"objectStore",
+			"open",
+			"put",
+			"some",
+			"transaction",
+		]),
+	],
+	[
+		path.join(PACKAGE_DIRECTORY, "tests/assets/phase-3a1b-p4-browser-live-journal-worker.ts"),
+		new Set(["addEventListener", "close", "getAll", "objectStore", "open", "transaction"]),
+	],
+	[
+		path.join(PACKAGE_DIRECTORY, "tests/fixtures/phase-3a1b-p4-browser-observation.ts"),
+		new Set(["apply", "call", "get", "set"]),
+	],
 ]);
 
 export interface IdbOwnershipAuditOptions {
@@ -227,7 +332,8 @@ export function auditIdbOwnership(options: IdbOwnershipAuditOptions = {}): reado
 	};
 	const isStrictDurability = (expression: ts.Expression): boolean => stringValue(expression) === "strict";
 	for (const diagnostic of ts.getPreEmitDiagnostics(program)) {
-		if (diagnostic.file && governedRootNames.includes(diagnostic.file.fileName)) {
+		// The package typecheck owns composite-project file-list diagnostics; this bounded program owns raw-IDB use.
+		if (diagnostic.file && diagnostic.code !== 6307 && governedRootNames.includes(diagnostic.file.fileName)) {
 			violations.push(ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"));
 		}
 	}

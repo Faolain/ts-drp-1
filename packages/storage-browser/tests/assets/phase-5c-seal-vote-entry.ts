@@ -1,5 +1,6 @@
 interface Phase5cSealVoteTestControl {
 	runSchemaScenario(databaseName: string): Promise<unknown>;
+	runScopedSnapshotScenario(databaseName: string): Promise<unknown>;
 	runStrictVoteScenario(databaseName: string): Promise<unknown>;
 	runDispatchScenario(databaseName: string, mode: string): Promise<unknown>;
 	runDeathCheckpoint(databaseName: string, checkpoint: string): Promise<never>;
@@ -14,7 +15,6 @@ declare global {
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore -- the tests-only RED lands before the package-internal GREEN owner.
-// eslint-disable-next-line import/no-unresolved
 const candidate = (await import("../../src/internal/seal-vote-test-control.js")) as {
 	createSealVoteBrowserTestControl(): Phase5cSealVoteTestControl;
 };

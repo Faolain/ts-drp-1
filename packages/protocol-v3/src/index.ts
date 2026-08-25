@@ -11,6 +11,10 @@ import { DRPError } from "@ts-drp/errors";
 import { init as initializeModuleLexer, parse as parseModule } from "es-module-lexer";
 
 import registryJson from "../registry/registry-v1.json" with { type: "json" };
+import {
+	type CertifiedSealAuthorityMaterial,
+	certifiedSealAuthorityResolver,
+} from "./internal/seal-authority-custody.js";
 import blueprintArtifactProfileJson from "../supplements/blueprint-artifact-profile-v1/profile.json" with { type: "json" };
 
 const intrinsicArray = Array;
@@ -359,6 +363,7 @@ interface AnchorTrustApi {
 	resolveCurrentEpochAuthorizedAuthor(
 		input: ResolveCurrentEpochAuthorizedAuthorInput
 	): ResolveCurrentEpochAuthorizedAuthorResult;
+	[certifiedSealAuthorityResolver](trust: CertifiedAnchorTrust): CertifiedSealAuthorityMaterial | undefined;
 }
 
 const ANCHOR_DIGEST_DOMAIN = "ts-drp/epoch-anchor/v3";
@@ -1614,6 +1619,18 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 		}
 	};
 
+	const resolveCertifiedSealMaterial = (trust: CertifiedAnchorTrust): CertifiedSealAuthorityMaterial | undefined => {
+		const state = certifiedRegistry.get(trust);
+		if (state === undefined) return undefined;
+		return Object.freeze({
+			currentAnchorDigest: trust.currentAnchorDigest,
+			currentEpoch: 0 as const,
+			exactCanonicalSignerSetBytes: new intrinsicUint8Array(state.exactCanonicalSignerSetBytes),
+			objectId: trust.objectId,
+			quorum: trust.quorum,
+		});
+	};
+
 	return Object.freeze({
 		authenticateCurrentEpochAnchor,
 		installCertifiedAnchorTrustRoot,
@@ -1623,6 +1640,7 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 		openCurrentEpochAuthorAuthorization,
 		openCurrentAnchorTrust,
 		resolveCurrentEpochAuthorizedAuthor,
+		[certifiedSealAuthorityResolver]: resolveCertifiedSealMaterial,
 	});
 }
 
@@ -2855,6 +2873,8 @@ function applicationFailure(
  *
  * Reducer selection uses only the module-private prepared runtime state. Both
  * reducer inputs and both returned values cross canonical clone boundaries.
+ * @param input - Prepared runtime, expected digest, application state, and operation.
+ * @returns Detached next state and operation result.
  */
 export function applyPreparedBlueprintOperation(
 	input: ApplyPreparedBlueprintOperationInput

@@ -96,7 +96,7 @@ describe("Phase 2d2d private-v1 schema authority", () => {
 		expect.soft(browserAdapterSource).not.toContain("getAll(generationPrefix(");
 	});
 
-	it("preserves the stable browser root while publishing only the issuance subpath", () => {
+	it("preserves the stable browser root while publishing additive bounded subpaths", () => {
 		const packageManifest = JSON.parse(
 			fs.readFileSync(path.join(PACKAGE_DIRECTORY, "package.json"), "utf8")
 		) as Readonly<Record<string, unknown>>;
@@ -106,6 +106,11 @@ describe("Phase 2d2d private-v1 schema authority", () => {
 			".": { import: "./dist/src/index.js", types: "./dist/src/index.d.ts" },
 			"./issuance": { import: "./dist/src/issuance.js", types: "./dist/src/issuance.d.ts" },
 			"./live-journal": { import: "./dist/src/live-journal.js", types: "./dist/src/live-journal.d.ts" },
+			"./seal-vote": { import: "./dist/src/seal-vote.js", types: "./dist/src/seal-vote.d.ts" },
+			"./snapshot-transfer": {
+				import: "./dist/src/snapshot-transfer.js",
+				types: "./dist/src/snapshot-transfer.d.ts",
+			},
 		});
 	});
 

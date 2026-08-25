@@ -20,6 +20,7 @@ export interface Phase2e6DatabaseLifecycleTrace {
 }
 
 const PHASE_2E6_STORE_NAMES = ["objects", "generations", "blobs", "promotions"] as const;
+const CURRENT_PRIMARY_DATABASE_VERSION = 2;
 
 /**
  * Counts post-seed database creation/deletion calls in one browser realm.
@@ -60,7 +61,7 @@ export function tracePhase2e6DatabaseLifecycle(): Phase2e6DatabaseLifecycleTrace
 }
 
 /**
- * Finds one exact schema-v1 database before any recovery open can create it.
+ * Finds one exact current primary database before any recovery open can create it.
  * @param databaseName - Exact database identity selected before process death.
  * @returns The unique matching persisted name, or null.
  */
@@ -68,7 +69,7 @@ export async function rawPhase2e6DatabaseIdentity(databaseName: string): Promise
 	let matchCount = 0;
 	let matchedName: string | null = null;
 	for (const database of await indexedDB.databases()) {
-		if (database.name !== databaseName || database.version !== 1) continue;
+		if (database.name !== databaseName || database.version !== CURRENT_PRIMARY_DATABASE_VERSION) continue;
 		matchCount += 1;
 		matchedName = database.name;
 	}

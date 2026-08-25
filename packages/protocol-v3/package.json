@@ -34,6 +34,18 @@
 			"types": "./dist/src/latched-acl.d.ts",
 			"import": "./dist/src/latched-acl.js"
 		},
+		"./seal": {
+			"types": "./dist/src/seal.d.ts",
+			"import": "./dist/src/seal.js"
+		},
+		"./internal/seal-signing-request": {
+			"types": "./dist/src/internal/seal-signing-request.d.ts",
+			"import": "./dist/src/internal/seal-signing-request.js"
+		},
+		"./internal/seal-authority-identity": {
+			"types": "./dist/src/internal/seal-authority-identity.d.ts",
+			"import": "./dist/src/internal/seal-authority-identity.js"
+		},
 		"./snapshot-transfer": {
 			"types": "./dist/src/snapshot-transfer.d.ts",
 			"import": "./dist/src/snapshot-transfer.js"

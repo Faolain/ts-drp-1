@@ -89,12 +89,24 @@ test("primary loss, bounded overflow and total volatile loss recover every durab
 		(name) => window.phase5cSealVote.runDispatchScenario(name, "takeover-only"),
 		databaseName
 	)) as {
+		readonly first: {
+			readonly overflowReason: string;
+			readonly sentKeys: readonly string[];
+		};
 		readonly inFlightPeak: number;
-		readonly overflowReason: string;
+		readonly overflowReason: string | undefined;
+		readonly second: {
+			readonly overflowReason: string | undefined;
+			readonly sentKeys: readonly string[];
+		};
 		readonly sentKeys: readonly string[];
 	};
 	expect(takeover.inFlightPeak).toBeLessThanOrEqual(4);
-	expect(takeover.overflowReason).toBe("DISPATCH_QUEUE_FULL_RETRY_LATER");
+	expect(takeover.first.overflowReason).toBe("DISPATCH_QUEUE_FULL_RETRY_LATER");
+	expect(takeover.first.sentKeys).toHaveLength(4);
+	expect(takeover.second.overflowReason).toBeUndefined();
+	expect(takeover.second.sentKeys).toHaveLength(6);
+	expect(takeover.overflowReason).toBeUndefined();
 	expect([...takeover.sentKeys].sort()).toEqual([...committed.committedKeys].sort());
 	const rawSends = await observedSends(successor);
 	expect(rawSends.length).toBe(committed.committedKeys.length);

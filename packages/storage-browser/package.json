@@ -29,6 +29,10 @@
 			"types": "./dist/src/live-journal.d.ts",
 			"import": "./dist/src/live-journal.js"
 		},
+		"./seal-vote": {
+			"types": "./dist/src/seal-vote.d.ts",
+			"import": "./dist/src/seal-vote.js"
+		},
 		"./snapshot-transfer": {
 			"types": "./dist/src/snapshot-transfer.d.ts",
 			"import": "./dist/src/snapshot-transfer.js"
@@ -47,6 +51,7 @@
 		"@ts-drp/compaction": "0.11.0",
 		"@ts-drp/issuance-store": "0.11.0",
 		"@ts-drp/live-journal": "0.11.0",
+		"@ts-drp/seal": "0.11.0",
 		"@ts-drp/storage": "0.11.0"
 	}
 }

@@ -1,5 +1,5 @@
 export const PHASE_2E5_ROOT_COMMAND =
-	"pnpm exec playwright test --config packages/storage-browser/playwright.phase-2e5-browser-inventory.config.ts --fail-on-flaky-tests && pnpm exec playwright test --config packages/storage-browser/playwright.phase-2e6-real-process-death.config.ts --fail-on-flaky-tests && pnpm exec playwright test --config packages/storage-browser/playwright.phase-2e7-publication-component.config.ts --fail-on-flaky-tests";
+	"pnpm exec playwright test --config packages/storage-browser/playwright.phase-2e5-browser-inventory.config.ts --fail-on-flaky-tests && pnpm exec playwright test --config packages/storage-browser/playwright.phase-2e6-real-process-death.config.ts --fail-on-flaky-tests && pnpm exec playwright test --config packages/storage-browser/playwright.phase-2e7-publication-component.config.ts --fail-on-flaky-tests && pnpm exec playwright test --config packages/storage-browser/playwright.phase-2l-d-parity.config.ts --fail-on-flaky-tests";
 export const PHASE_2E5_MATRIX = "phase-2e5-browser-request-inventory-red.pw.ts";
 
 export interface Phase2e5AuthorityInput {

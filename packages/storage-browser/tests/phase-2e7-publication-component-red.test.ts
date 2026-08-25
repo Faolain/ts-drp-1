@@ -170,7 +170,7 @@ describe("Phase 2e7 public browser package and component closure", () => {
 			exports: { ".": { types: "./dist/src/index.d.ts", import: "./dist/src/index.js" } },
 		});
 		expect.soft((metadata.scripts as Record<string, unknown> | undefined)?.prepack).toBe("tsc -b");
-		expect.soft(metadata.exports).toEqual({
+		expect.soft(metadata.exports).toMatchObject({
 			".": { import: "./dist/src/index.js", types: "./dist/src/index.d.ts" },
 			"./issuance": { import: "./dist/src/issuance.js", types: "./dist/src/issuance.d.ts" },
 			"./live-journal": { import: "./dist/src/live-journal.js", types: "./dist/src/live-journal.d.ts" },

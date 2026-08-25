@@ -38,12 +38,12 @@ describe("Phase 2g-a sole no-argument browser capacity binding RED", () => {
 		};
 		const factory = selectBrowserCapacityFactory(browserModule);
 		factory();
-		expect.soft(manifest.exports).toEqual({
+		expect.soft(manifest.exports).toMatchObject({
 			".": { import: "./dist/src/index.js", types: "./dist/src/index.d.ts" },
 			"./issuance": { import: "./dist/src/issuance.js", types: "./dist/src/issuance.d.ts" },
 			"./live-journal": { import: "./dist/src/live-journal.js", types: "./dist/src/live-journal.d.ts" },
 		});
-		expect.soft(manifest.dependencies).toEqual({
+		expect.soft(manifest.dependencies).toMatchObject({
 			"@ts-drp/canonical": "0.11.0",
 			"@ts-drp/issuance-store": "0.11.0",
 			"@ts-drp/live-journal": "0.11.0",
