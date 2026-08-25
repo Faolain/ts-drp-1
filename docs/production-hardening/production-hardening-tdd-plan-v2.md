@@ -56591,7 +56591,11 @@ workflow. D.105a uses the exact two-path tests-only RED
 `freeze-policy.json`, and
 `.github/workflows/protocol-v3-seal-digest-identity.yml`. It receives its own single
 Grok/Kimi-100/Opus plan-governed RED and GREEN reviews. Only after the supplement
-is signed may the D.105b product RED freeze.
+is signed may the D.105b product RED freeze. The two RED owners and seven GREEN
+owners are one bootstrap unit: they must land in the same pull request against a
+base containing none of the nine protected paths. After that bootstrap, all nine
+paths are immutable. Landing the RED alone first would deliberately create a
+partial protected roster that the successor checker rejects.
 
 D.105b lands 5a, 5b, and 5c together. It does not activate a
 live room signer: 5d still owns the complete pacemaker and bidirectional formal
@@ -56719,10 +56723,12 @@ The signer-state row binds the current anchor, monotone `enteredRound`, locked
 `valueDigest` and lock round, highest verified prepare QC, optional committed
 value, and revision. The outbox row binds the exact carrier and a monotone
 pending/dispatched marker; 5c does not delete vote evidence. Durable round
-advancement uses a separate strict transaction over `storageMeta` and
+advancement uses a separate strict transaction over at least `storageMeta` and
 `signerState`, while prepare/commit voting always uses the exact four-store
-transaction above. Recovery reconstructs the seal voter from signer state and
-every pending outbox row before dispatch can start.
+transaction above. Phase 5d must freeze any additional store needed by its
+round-change evidence before widening that transaction. Recovery reconstructs
+the seal voter from signer state and every pending outbox row before dispatch can
+start.
 
 `@ts-drp/storage-browser/seal-vote` owns the mechanical database adapter and one
 package-internal bounded primary dispatcher. Its Web Lock name is an injective,
@@ -56792,7 +56798,12 @@ The tests-only RED is exact thirteen paths and one closed owner graph:
   proof. Graceful page/worker termination proves reopen and committed-outbox
   recovery only. A vote-specific persistent-Chromium process-death child kills at
   the enumerated transaction boundaries and uses a fresh process to prove old XOR
-  exact-new state; no `page.close()` row is labeled a hard crash.
+  exact-new state; no `page.close()` row is labeled a hard crash. These exact
+  thirteen RED paths reuse the already tracked generic Phase-4c browser bundler
+  and server helper from the Playwright specs; the new config does not require a
+  hidden global-setup or fourteenth path. If that reuse proves insufficient during
+  RED implementation, the path count must be corrected explicitly before the RED
+  freezes rather than smuggling bundling into an unlisted owner.
 
 Each RED has one explicit composite readiness failure. D.105a invokes the
 test-owned supplement checker against the complete seven-file frozen owner and
@@ -56870,3 +56881,50 @@ and D.105b's one conditional owner inventory names all four missing product
 surfaces without unconditional import failures. Per the hard boundary these
 corrected bytes receive no confirmation review. Grok's suggested migration-kill
 row and the nonblocking outbox/revalidation/seed-custody observations remain P2.
+
+D.105a is now signed and pushed as the governed prerequisite. The tests-only RED
+is commit `f5824fbaddd6b099b474eb9d80111b5bc4d89c8d`, tree
+`fc8f52be9c181b088919f055c9e2b24fd2ecf541`, with exactly the contract and RED
+test named above. Exact-path Prettier and ESLint, strict standalone TypeScript,
+the retained registry/codec suite, and diff checks passed; the focused suite had
+one intentional readiness failure after one independent pass, with three dormant
+GREEN cases. The initial Grok RED review reproduced two P1 oracle gaps, both fixed
+within that single round. Opus then accepted the corrected exact bytes with zero
+P0/P1. The one authorized Kimi session was nonconforming and is recorded as
+`NO_VERDICT`: it emitted only checks 1–14, collapsed 15–100, and mistook the
+intentional missing-owner RED for a defect. It was not restarted and supplied no
+additional substantive finding.
+
+The exact-seven GREEN is commit `403248c364dfad387abed7bfcd2f637173a6b39e`,
+tree `cee05326eda69744b52135d7dc084a0948c47fe0`, Good-signed and pushed. The
+governed-law suite passed 5/5, the retained registry/codec suite passed 12/12,
+and exact-path formatting, lint, standalone RED typecheck, protocol-v3 package
+typecheck/build/public-entry audits, current checker, invalid-base fail-closed,
+and diff checks all passed. Kimi's conforming 100-check GREEN review returned
+PASS with zero P0/P1. Opus reproduced one P1: an unresolvable base revision was
+being treated as a lawful empty bootstrap. The checker now verifies
+`${baseRef}^{commit}` before reading any protected path and maps failure to
+`BASE_CHECKER_REQUIRED`; the policy hash was regenerated in the same round.
+Grok's separate claim that the real route begins from a two-of-nine protected
+base was dismissed from source and Git evidence: the workflow compares the pull
+request base, and the actual branch merge base
+`d041baffcd56f16c8a20564133a4a7fc108e8331` contains neither RED owner. This is
+why the same-pull-request landing rule above is normative. Per the review
+boundary there was no confirmation round.
+
+The one expressly requested Fable-high architecture advisory also returned the
+Phase-5 approach correct with zero P0/P1: governed D.105a first, then one atomic
+D.105b RED/GREEN, then the Phase-5d pacemaker. Its nonblocking clarifications are
+incorporated above: the exact-thirteen browser graph must name its bundler reuse,
+and Phase 5d may widen the round-advance transaction beyond its minimum two
+stores only under its own frozen law. This ledger update is intentionally a
+separate post-GREEN documentation commit and does not reopen or enlarge the
+signed exact-seven supplement.
+
+Product capability gained at D.105a: no signer, vote, QC, storage, dispatcher, or
+live-room authority. Governance/security debt discharged: the v3 round-free
+value identity, round-bearing proposal identity, vote/QC binding, and lock
+identity now have one frozen successor law and a fail-closed pull-request
+transition checker. The next pickup is the atomic D.105b exact-thirteen
+tests-only RED, beginning with a source-grounded confirmation that the reused
+browser bundler/server helper suffices without an unlisted setup owner.
