@@ -1,13 +1,19 @@
-import { ed25519 } from "@noble/curves/ed25519.js";
+import { ed25519 } from "../../../protocol-v3/node_modules/@noble/curves/ed25519.js";
 import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
-// eslint-disable-next-line import/no-unresolved -- RED intentionally imports the future finality subpath.
+// eslint-disable-next-line import/no-unresolved -- resolved by the exact test alias to preserve singleton custody.
 import { createRecoverableFinalitySigner, signSealRegisteredDigest } from "@ts-drp/keychain/finality";
 import { installCertifiedAnchorTrustRoot } from "@ts-drp/protocol-v3";
-// eslint-disable-next-line import/no-unresolved -- RED intentionally imports the future protocol seal subpath.
-import { openSealAuthority, prepareSealVote } from "@ts-drp/protocol-v3/seal";
+// eslint-disable-next-line import/no-unresolved -- resolved by the exact test alias to preserve singleton custody.
+import {
+	openSealAuthority,
+	prepareRoundChange,
+	prepareSealVote,
+	verifyProposalBundle,
+	verifySealQC,
+} from "@ts-drp/protocol-v3/seal";
 import { createSealVoter } from "@ts-drp/seal";
-// eslint-disable-next-line import/no-unresolved -- RED intentionally imports the future pacemaker subpath.
-import { createSealPacemaker } from "@ts-drp/seal/pacemaker";
+// eslint-disable-next-line import/no-unresolved -- resolved by the exact test alias to preserve singleton custody.
+import { createSealPacemaker, leaderForRound } from "@ts-drp/seal/pacemaker";
 
 import law from "../../../../tests/fixtures/phase-5d-v3/pacemaker-law-contract.json" with { type: "json" };
 import { openBrowserSealVoteStore } from "../../src/seal-vote.js";
@@ -110,20 +116,24 @@ function certifiedGenesis(): Readonly<{
 	});
 }
 
-function observedMetrics(
-	events: string[]
-): Readonly<{ traceFunc(name: string, operation: (...args: never[]) => unknown): (...args: never[]) => unknown }> {
+function observedMetrics(events: unknown[]): Readonly<{
+	traceFunc(name: string, operation: (...args: unknown[]) => unknown): (...args: unknown[]) => unknown;
+}> {
 	return Object.freeze({
-		traceFunc(name: string, operation: (...args: never[]) => unknown) {
-			return (...args: never[]) => {
-				events.push(name);
+		traceFunc(name: string, operation: (...args: unknown[]) => unknown) {
+			return (...args: unknown[]) => {
+				const event = args[0];
+				if (event === null || typeof event !== "object" || Reflect.get(event, "kind") !== name) {
+					throw new Error("fieldless pacemaker event");
+				}
+				events.push(structuredClone(event));
 				return operation(...args);
 			};
 		},
 	});
 }
 
-async function openHarness(databaseName: string, events: string[]): Promise<OpenHarnessResult> {
+async function openHarness(databaseName: string, events: unknown[]): Promise<OpenHarnessResult> {
 	const genesis = certifiedGenesis();
 	const installed = installCertifiedAnchorTrustRoot(genesis.input);
 	if (!installed.ok) throw new Error(`trust install failed: ${installed.reason}`);
@@ -159,18 +169,32 @@ async function openHarness(databaseName: string, events: string[]): Promise<Open
 async function exactQc(
 	exactCanonicalCutValueBytes: Uint8Array,
 	phase: "commit" | "prepare",
-	round: number
+	round: number,
+	signerIndexes: readonly number[] = [0, 1, 2]
 ): Promise<Uint8Array> {
+	const prepareQcBytes =
+		phase === "commit" ? await exactQc(exactCanonicalCutValueBytes, "prepare", round, signerIndexes) : null;
 	const genesis = certifiedGenesis();
 	const installed = installCertifiedAnchorTrustRoot(genesis.input);
 	if (!installed.ok) throw new Error("trust install failed");
 	const votes = [];
 	let valueDigest = "";
 	let proposalHash = "";
-	for (const selected of SIGNERS.slice(0, 3)) {
+	for (const signerIndex of signerIndexes) {
+		const selected = SIGNERS[signerIndex];
+		if (selected === undefined) throw new Error("missing QC signer");
 		const finality = await createRecoverableFinalitySigner({ seed: hexBytes(selected.privateKeySeedHex) });
 		const authority = openSealAuthority({ signerPublicKey: finality.publicKey, trust: installed.trust });
 		if (!authority.ok) throw new Error("authority open failed");
+		if (prepareQcBytes !== null) {
+			const verifiedPrepare = verifySealQC({
+				authority: authority.authority,
+				exactCanonicalQcBytes: prepareQcBytes,
+			});
+			if (!verifiedPrepare.ok || verifiedPrepare.phase !== "prepare") {
+				throw new Error("prepare QC authority hydration failed");
+			}
+		}
 		const prepared = prepareSealVote({ authority: authority.authority, exactCanonicalCutValueBytes, phase, round });
 		if (!prepared.ok) throw new Error(`vote prepare failed: ${prepared.reason}`);
 		const signature = await signSealRegisteredDigest({ request: prepared.signingRequest, signer: finality.signer });
@@ -191,6 +215,69 @@ async function exactQc(
 		proposalHash,
 		round,
 		votes,
+	});
+}
+
+async function signedRoundChange(
+	signerIndex: number,
+	round: number,
+	highestPrepareQC: Uint8Array | null
+): Promise<Readonly<{ exactCanonicalRoundChangeBytes: Uint8Array; signature: Uint8Array }>> {
+	const selected = SIGNERS[signerIndex];
+	if (selected === undefined) throw new Error("missing round-change signer");
+	const genesis = certifiedGenesis();
+	const installed = installCertifiedAnchorTrustRoot(genesis.input);
+	if (!installed.ok) throw new Error("trust install failed");
+	const finality = await createRecoverableFinalitySigner({ seed: hexBytes(selected.privateKeySeedHex) });
+	const authority = openSealAuthority({ signerPublicKey: finality.publicKey, trust: installed.trust });
+	if (!authority.ok) throw new Error("authority open failed");
+	const prepared = prepareRoundChange({ authority: authority.authority, highestPrepareQC, round });
+	if (!prepared.ok) throw new Error(`round-change prepare failed: ${prepared.reason}`);
+	return Object.freeze({
+		exactCanonicalRoundChangeBytes: prepared.exactCanonicalPreimageBytes,
+		signature: await signSealRegisteredDigest({ request: prepared.signingRequest, signer: finality.signer }),
+	});
+}
+
+async function exactProposalBundleAtRound(
+	exactCanonicalCutValueBytes: Uint8Array,
+	round: number,
+	newRoundCertificate: readonly Readonly<{
+		exactCanonicalRoundChangeBytes: Uint8Array;
+		signature: Uint8Array;
+	}>[]
+): Promise<ProposalBundle> {
+	const signerId = leaderForRound(
+		SIGNERS.map((signer) => signer.signerId),
+		round
+	);
+	const leader = SIGNERS.find((signer) => signer.signerId === signerId);
+	if (leader === undefined) throw new Error("missing leader");
+	const genesis = certifiedGenesis();
+	const installed = installCertifiedAnchorTrustRoot(genesis.input);
+	if (!installed.ok) throw new Error("trust install failed");
+	const finality = await createRecoverableFinalitySigner({ seed: hexBytes(leader.privateKeySeedHex) });
+	const authority = openSealAuthority({ signerPublicKey: finality.publicKey, trust: installed.trust });
+	if (!authority.ok) throw new Error("authority open failed");
+	const prepared = prepareSealVote({
+		authority: authority.authority,
+		exactCanonicalCutValueBytes,
+		phase: "prepare",
+		round,
+	});
+	if (!prepared.ok) throw new Error("leader vote prepare failed");
+	return Object.freeze({
+		exactCanonicalCutValueBytes,
+		exactCanonicalLeaderVotePreimageBytes: prepared.exactCanonicalPreimageBytes,
+		exactCanonicalProposalBytes: encodeCanonical({
+			epoch: 0,
+			kind: "drp-seal-proposal",
+			objectId: OBJECT_ID,
+			round,
+			valueDigest: prepared.valueDigest,
+		}),
+		leaderVoteSignature: await signSealRegisteredDigest({ request: prepared.signingRequest, signer: finality.signer }),
+		newRoundCertificate,
 	});
 }
 
@@ -226,7 +313,7 @@ async function exactProposalBundle(exactCanonicalCutValueBytes: Uint8Array): Pro
 }
 
 async function runRoundChangeCommit(databaseName: string): Promise<unknown> {
-	const events: string[] = [];
+	const events: unknown[] = [];
 	const first = await openHarness(databaseName, events);
 	await new Promise((resolvePromise) => setTimeout(resolvePromise, 1_150));
 	const beforeStatus = first.pacemaker.status();
@@ -250,12 +337,14 @@ async function runRoundChangeCommit(databaseName: string): Promise<unknown> {
 }
 
 async function runQcCustody(databaseName: string): Promise<unknown> {
-	const events: string[] = [];
+	const events: unknown[] = [];
 	const opened = await openHarness(databaseName, events);
 	try {
 		const proposal = await opened.pacemaker.observeProposalBundle(
 			await exactProposalBundle(opened.exactCanonicalCutValueBytes)
 		);
+		const afterProposalFirst = opened.pacemaker.status();
+		const afterProposalSecond = opened.pacemaker.status();
 		const prepare = await opened.pacemaker.observePrepareQc(
 			await exactQc(opened.exactCanonicalCutValueBytes, "prepare", 0)
 		);
@@ -263,7 +352,239 @@ async function runQcCustody(databaseName: string): Promise<unknown> {
 		const finalized = await opened.pacemaker.observeCommitQc(
 			await exactQc(opened.exactCanonicalCutValueBytes, "commit", 0)
 		);
-		return { afterFinal: opened.pacemaker.status(), beforeFinal, events, finalized, prepare, proposal };
+		const afterFinal = opened.pacemaker.status();
+		const postFinalProposal = await opened.pacemaker.observeProposalBundle(
+			await exactProposalBundle(opened.exactCanonicalCutValueBytes)
+		);
+		const afterPostFinalProposal = opened.pacemaker.status();
+		return {
+			afterFinal,
+			afterPostFinalProposal,
+			afterProposalFirst,
+			afterProposalSecond,
+			beforeFinal,
+			events,
+			finalized,
+			postFinalProposal,
+			prepare,
+			proposal,
+		};
+	} finally {
+		await opened.pacemaker.stop();
+		await opened.browser.close();
+	}
+}
+
+async function runSerializedTransitions(databaseName: string): Promise<unknown> {
+	const events: unknown[] = [];
+	const opened = await openHarness(databaseName, events);
+	try {
+		const bundle = await exactProposalBundle(opened.exactCanonicalCutValueBytes);
+		const prepareQc = await exactQc(opened.exactCanonicalCutValueBytes, "prepare", 0);
+		const [proposal, prepare] = await Promise.all([
+			opened.pacemaker.observeProposalBundle(bundle),
+			opened.pacemaker.observePrepareQc(prepareQc),
+		]);
+		return { events, prepare, proposal, status: opened.pacemaker.status() };
+	} finally {
+		await opened.pacemaker.stop();
+		await opened.browser.close();
+	}
+}
+
+async function runStopFence(databaseName: string): Promise<unknown> {
+	const events: unknown[] = [];
+	const opened = await openHarness(databaseName, events);
+	try {
+		const bundle = await exactProposalBundle(opened.exactCanonicalCutValueBytes);
+		let settled = false;
+		const proposalTask = opened.pacemaker.observeProposalBundle(bundle).then((result) => {
+			settled = true;
+			return result;
+		});
+		await opened.pacemaker.stop();
+		const settledWhenStopResolved = settled;
+		const eventsWhenStopResolved = structuredClone(events);
+		const statusWhenStopResolved = opened.pacemaker.status();
+		const proposal = await proposalTask;
+		await new Promise((resolvePromise) => setTimeout(resolvePromise, 0));
+		return {
+			eventsAfterTurn: events,
+			eventsWhenStopResolved,
+			proposal,
+			settledWhenStopResolved,
+			statusAfterTurn: opened.pacemaker.status(),
+			statusWhenStopResolved,
+		};
+	} finally {
+		await opened.browser.close();
+	}
+}
+
+async function runCertificateSelection(): Promise<unknown> {
+	const genesis = certifiedGenesis();
+	const installed = installCertifiedAnchorTrustRoot(genesis.input);
+	if (!installed.ok) throw new Error("trust install failed");
+	const local = SIGNERS[0];
+	if (local === undefined) throw new Error("missing local signer");
+	const finality = await createRecoverableFinalitySigner({ seed: hexBytes(local.privateKeySeedHex) });
+	const authority = openSealAuthority({ signerPublicKey: finality.publicKey, trust: installed.trust });
+	if (!authority.ok) throw new Error("authority open failed");
+	const primaryCut = encodeCanonical({
+		...law.vectors.crypto.cutValue,
+		nextSignerSet: genesis.signerSet,
+		objectId: OBJECT_ID,
+		previousAnchor: genesis.anchorDigest,
+	});
+	const alternateCut = encodeCanonical({
+		...law.vectors.crypto.cutValue,
+		closeReason: "timeout",
+		nextSignerSet: genesis.signerSet,
+		objectId: OBJECT_ID,
+		previousAnchor: genesis.anchorDigest,
+	});
+	const lowerRound = await exactQc(primaryCut, "prepare", 1);
+	const sameRoundA = await exactQc(primaryCut, "prepare", 2, [0, 1, 2]);
+	const sameRoundB = await exactQc(primaryCut, "prepare", 2, [1, 2, 3]);
+	const conflicting = await exactQc(alternateCut, "prepare", 2, [0, 1, 3]);
+	const digestA = bytesHex(hashDomain("ts-drp/seal-qc/v3", sameRoundA));
+	const digestB = bytesHex(hashDomain("ts-drp/seal-qc/v3", sameRoundB));
+	const acceptedCertificate = await Promise.all([
+		signedRoundChange(0, 3, lowerRound),
+		signedRoundChange(1, 3, sameRoundA),
+		signedRoundChange(2, 3, sameRoundB),
+	]);
+	const conflictCertificate = await Promise.all([
+		signedRoundChange(0, 3, sameRoundA),
+		signedRoundChange(1, 3, conflicting),
+		signedRoundChange(2, 3, null),
+	]);
+	return Object.freeze({
+		accepted: verifyProposalBundle({
+			...(await exactProposalBundleAtRound(primaryCut, 3, acceptedCertificate)),
+			authority: authority.authority,
+		}),
+		conflict: verifyProposalBundle({
+			...(await exactProposalBundleAtRound(primaryCut, 3, conflictCertificate)),
+			authority: authority.authority,
+		}),
+		expectedSelectedDigest: digestA < digestB ? digestA : digestB,
+	});
+}
+
+function corruptSignerState(databaseName: string, field: "finalizedCommitQC" | "highestPrepareQC"): Promise<void> {
+	return new Promise((resolvePromise, reject) => {
+		const request = indexedDB.open(databaseName, 2);
+		request.addEventListener("error", () => reject(request.error ?? new Error("corrupt reopen failed")), {
+			once: true,
+		});
+		request.addEventListener(
+			"success",
+			() => {
+				const database = request.result;
+				const transaction = database.transaction(["signerState"], "readwrite");
+				const store = transaction.objectStore("signerState");
+				const get = store.get([OBJECT_ID, 0, SIGNERS[0]?.signerId]);
+				get.addEventListener(
+					"success",
+					() => {
+						const row = get.result as Record<string, unknown>;
+						const qc = row[field] as Record<string, unknown>;
+						store.put({ ...row, [field]: { ...qc, exactCanonicalQcBytes: Uint8Array.of(0) } });
+					},
+					{ once: true }
+				);
+				transaction.addEventListener(
+					"complete",
+					() => {
+						database.close();
+						resolvePromise();
+					},
+					{ once: true }
+				);
+				transaction.addEventListener(
+					"abort",
+					() => reject(transaction.error ?? new Error("corrupt transaction aborted")),
+					{ once: true }
+				);
+			},
+			{ once: true }
+		);
+	});
+}
+
+async function runCorruptQcReopen(databaseName: string): Promise<unknown> {
+	const events: unknown[] = [];
+	const opened = await openHarness(databaseName, events);
+	await opened.pacemaker.observeProposalBundle(await exactProposalBundle(opened.exactCanonicalCutValueBytes));
+	await opened.pacemaker.observePrepareQc(await exactQc(opened.exactCanonicalCutValueBytes, "prepare", 0));
+	await opened.pacemaker.observeCommitQc(await exactQc(opened.exactCanonicalCutValueBytes, "commit", 0));
+	await opened.pacemaker.stop();
+	await opened.browser.close();
+	await corruptSignerState(databaseName, "finalizedCommitQC");
+	try {
+		const reopened = await openHarness(databaseName, events);
+		await reopened.pacemaker.stop();
+		await reopened.browser.close();
+		return Object.freeze({ ok: true as const });
+	} catch (error) {
+		return Object.freeze({
+			message: error instanceof Error ? error.message : String(error),
+			ok: false as const,
+		});
+	}
+}
+
+async function runCommitWithoutPrepareQc(databaseName: string): Promise<unknown> {
+	const genesis = certifiedGenesis();
+	const installed = installCertifiedAnchorTrustRoot(genesis.input);
+	if (!installed.ok) throw new Error("trust install failed");
+	const local = SIGNERS[0];
+	if (local === undefined) throw new Error("missing local signer");
+	const finality = await createRecoverableFinalitySigner({ seed: hexBytes(local.privateKeySeedHex) });
+	const authority = openSealAuthority({ signerPublicKey: finality.publicKey, trust: installed.trust });
+	if (!authority.ok) throw new Error("authority open failed");
+	const browser = await openBrowserSealVoteStore({ databaseName });
+	try {
+		const created = await createSealVoter({
+			authority: authority.authority,
+			expectedStorageIncarnation: browser.observation.incarnation,
+			signer: finality.signer,
+			store: browser.store,
+		});
+		if (!created.ok) throw new Error(`voter open failed: ${created.reason}`);
+		const exactCanonicalCutValueBytes = encodeCanonical({
+			...law.vectors.crypto.cutValue,
+			nextSignerSet: genesis.signerSet,
+			objectId: OBJECT_ID,
+			previousAnchor: genesis.anchorDigest,
+		});
+		const committed = await created.voter.vote({
+			exactCanonicalCutValueBytes,
+			expectedRevision: 0,
+			phase: "commit",
+			round: 0,
+		});
+		return Object.freeze({
+			committed,
+			exposesEnterRound: Reflect.has(created.voter, "enterRound"),
+			status: created.voter.status(),
+		});
+	} finally {
+		await browser.close();
+	}
+}
+
+async function runEvidencePruning(databaseName: string): Promise<unknown> {
+	const events: unknown[] = [];
+	const opened = await openHarness(databaseName, events);
+	try {
+		await opened.pacemaker.observeRoundChange(await signedRoundChange(1, 1, null));
+		const beforeCatchup = opened.pacemaker.status();
+		const catchup = await opened.pacemaker.observePrepareQc(
+			await exactQc(opened.exactCanonicalCutValueBytes, "prepare", 2)
+		);
+		return Object.freeze({ afterCatchup: opened.pacemaker.status(), beforeCatchup, catchup });
 	} finally {
 		await opened.pacemaker.stop();
 		await opened.browser.close();
@@ -273,12 +594,27 @@ async function runQcCustody(databaseName: string): Promise<unknown> {
 declare global {
 	interface Window {
 		phase5dPacemaker: Readonly<{
+			runCommitWithoutPrepareQc(databaseName: string): Promise<unknown>;
+			runCertificateSelection(): Promise<unknown>;
+			runCorruptQcReopen(databaseName: string): Promise<unknown>;
+			runEvidencePruning(databaseName: string): Promise<unknown>;
 			runQcCustody(databaseName: string): Promise<unknown>;
 			runRoundChangeCommit(databaseName: string): Promise<unknown>;
+			runSerializedTransitions(databaseName: string): Promise<unknown>;
+			runStopFence(databaseName: string): Promise<unknown>;
 		}>;
 	}
 }
 
-window.phase5dPacemaker = Object.freeze({ runQcCustody, runRoundChangeCommit });
+window.phase5dPacemaker = Object.freeze({
+	runCommitWithoutPrepareQc,
+	runCertificateSelection,
+	runCorruptQcReopen,
+	runEvidencePruning,
+	runQcCustody,
+	runRoundChangeCommit,
+	runSerializedTransitions,
+	runStopFence,
+});
 
 export {};

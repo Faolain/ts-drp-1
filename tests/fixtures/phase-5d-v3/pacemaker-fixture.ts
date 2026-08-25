@@ -8,6 +8,7 @@ import type {
 	ItfTrace,
 	ItfTraceState,
 	PacemakerCandidateModules,
+	PacemakerEvent,
 	PacemakerStatus,
 	PacemakerTraceDriver,
 	SealPacemakerHandle,
@@ -224,6 +225,7 @@ export async function createProductTraceDriver(
 	let browser: Awaited<ReturnType<typeof modules.browser.openBrowserSealVoteStore>> | undefined;
 	let pacemaker: SealPacemakerHandle;
 	let trust: unknown;
+	const productEvents: PacemakerEvent[] = [];
 
 	const openAuthority = async (index: number): Promise<Readonly<{ authority: unknown; signer: unknown }>> => {
 		const selected = material.signers[index];
@@ -242,11 +244,24 @@ export async function createProductTraceDriver(
 	const signedVote = async (
 		index: number,
 		phase: "commit" | "prepare",
-		round: number
+		round: number,
+		prepareQcBytes: Uint8Array | null = null
 	): Promise<PreparedSignedRecord> => {
 		const selected = material.signers[index];
 		if (selected === undefined) throw new Error("missing certified signer");
 		const opened = await openAuthority(index);
+		if (prepareQcBytes !== null) {
+			const verifiedPrepare = requireRecord<Readonly<{ ok: boolean; phase?: string; reason?: string }>>(
+				modules.protocol.verifySealQC({
+					authority: opened.authority,
+					exactCanonicalQcBytes: prepareQcBytes,
+				}),
+				"prepare-qc-hydration-failed"
+			);
+			if (!verifiedPrepare.ok || verifiedPrepare.phase !== "prepare") {
+				throw new Error(verifiedPrepare.reason ?? "prepare-qc-hydration-failed");
+			}
+		}
 		const prepared = requireRecord<
 			Readonly<{
 				exactCanonicalPreimageBytes?: Uint8Array;
@@ -290,8 +305,9 @@ export async function createProductTraceDriver(
 	};
 
 	const exactQc = async (phase: "commit" | "prepare", round: number): Promise<Uint8Array> => {
+		const prepareQcBytes = phase === "commit" ? await exactQc("prepare", round) : null;
 		const votes = await Promise.all(
-			Array.from({ length: n === 7 ? 5 : n - 1 }, (_, index) => signedVote(index, phase, round))
+			Array.from({ length: n === 7 ? 5 : n - 1 }, (_, index) => signedVote(index, phase, round, prepareQcBytes))
 		);
 		const first = votes[0];
 		if (first === undefined) throw new Error("empty quorum");
@@ -386,7 +402,16 @@ export async function createProductTraceDriver(
 		if (!created.ok) throw new Error(created.reason);
 		const opened = await modules.pacemaker.createSealPacemaker({
 			authority: local.authority,
-			metrics: { traceFunc: (_name, operation) => operation },
+			metrics: {
+				traceFunc:
+					(_name: string, operation: (...args: unknown[]) => unknown) =>
+					(...args: unknown[]) => {
+						const event = args[0];
+						if (event === null || typeof event !== "object") throw new Error("FIELDLESS_PRODUCT_EVENT");
+						productEvents.push(structuredClone(event) as PacemakerEvent);
+						return operation(...args);
+					},
+			} as never,
 			store: browser.store,
 			voter: created.voter,
 		});
@@ -455,6 +480,9 @@ export async function createProductTraceDriver(
 		async close(): Promise<void> {
 			await pacemaker.stop();
 			await browser?.close();
+		},
+		events(): readonly PacemakerEvent[] {
+			return Object.freeze(productEvents.map((event) => Object.freeze(structuredClone(event))));
 		},
 	});
 }

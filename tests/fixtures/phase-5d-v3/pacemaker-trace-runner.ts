@@ -1,4 +1,10 @@
-import type { ItfTrace, ItfTraceState, PacemakerStatus, PacemakerTraceDriver } from "./pacemaker-types.js";
+import type {
+	ItfTrace,
+	ItfTraceState,
+	PacemakerEvent,
+	PacemakerStatus,
+	PacemakerTraceDriver,
+} from "./pacemaker-types.js";
 
 const TRACE_KEYS = [
 	"#meta",
@@ -100,15 +106,12 @@ export function assertClosedItfTrace(trace: ItfTrace): void {
 		) {
 			throw new Error("TRACE_STATE_MISMATCH");
 		}
-		if (
-			(state.lastEvent === "prepare-vote" || state.lastEvent === "commit-vote") &&
-			state.durableRevision !== previous.durableRevision + 1
-		) {
+		if (state.lastEvent === "proposal" && state.durableRevision !== previous.durableRevision + 1) {
 			throw new Error("TRACE_STATE_MISMATCH");
 		}
 		if (
 			state.lastEvent === "prepare-qc" &&
-			(state.durableRevision !== previous.durableRevision + 1 ||
+			(state.durableRevision !== previous.durableRevision + (previous.lastEvent === "proposal" ? 2 : 1) ||
 				state.durablePrepareQcCount !== previous.durablePrepareQcCount + 1 ||
 				state.pendingRoundChangeCount !== previous.pendingRoundChangeCount)
 		) {
@@ -170,13 +173,17 @@ function matchesState(expected: ItfTraceState, actual: PacemakerStatus): boolean
  * @param trace - Checked closed trace.
  * @param driver - Product-backed replay driver.
  */
-export async function replayCheckedTrace(trace: ItfTrace, driver: PacemakerTraceDriver): Promise<void> {
+export async function replayCheckedTrace(
+	trace: ItfTrace,
+	driver: PacemakerTraceDriver
+): Promise<readonly PacemakerEvent[]> {
 	assertClosedItfTrace(trace);
 	try {
 		for (const state of trace.states) {
 			const actual = await driver.apply(state);
 			if (!matchesState(state, actual)) throw new Error(`TRACE_STATE_MISMATCH:${state["#meta"].index}`);
 		}
+		return driver.events();
 	} finally {
 		await driver.close();
 	}
@@ -189,17 +196,30 @@ export async function replayCheckedTrace(trace: ItfTrace, driver: PacemakerTrace
  * @returns Standalone Quint replay source.
  */
 export function implementationEventsToQuintTest(
-	events: readonly Readonly<{
-		readonly kind: string;
-		readonly phase: string;
-		readonly round: number;
-		readonly sequence: number;
-		readonly valueDigest: string;
-	}>[],
+	events: readonly PacemakerEvent[],
 	importPath = "../packages/seal/formal/seal-pacemaker"
 ): string {
 	let previous = -1;
 	const steps = events.flatMap((event) => {
+		if (
+			exactKeys(event).join(",") !== "anchor,epoch,kind,objectId,phase,qcDigest,round,sequence,signerId,valueDigest"
+		) {
+			throw new Error("MODEL_REPLAY_REQUIRED");
+		}
+		if (
+			event.epoch !== 0 ||
+			typeof event.anchor !== "string" ||
+			typeof event.objectId !== "string" ||
+			typeof event.signerId !== "string" ||
+			!Number.isSafeInteger(event.round) ||
+			event.round < 0 ||
+			!Number.isSafeInteger(event.sequence) ||
+			event.sequence < 0 ||
+			(event.qcDigest !== null && !/^[0-9a-f]{64}$/u.test(event.qcDigest)) ||
+			!/^([0-9a-f]{64}|value-X)$/u.test(event.valueDigest)
+		) {
+			throw new Error("MODEL_REPLAY_REQUIRED");
+		}
 		if (event.sequence !== previous + 1) throw new Error("MODEL_REPLAY_REQUIRED");
 		previous = event.sequence;
 		const candidate = `qc(${event.round}, "${event.phase}", "${event.valueDigest}", 4)`;
@@ -233,13 +253,21 @@ export function implementationEventsToQuintTest(
 
 function actionsForState(state: ItfTraceState): readonly string[] {
 	const candidate = `qc(${state.round}, "${state.lastEvent.startsWith("commit") ? "commit" : "prepare"}", ${JSON.stringify(state.valueDigest)}, ${state.n})`;
+	const commitCandidate = `qc(${state.round}, "commit", ${JSON.stringify(state.valueDigest)}, ${state.n})`;
 	switch (state.lastEvent) {
 		case "proposal":
-			return [`acceptProposal("A", bundle(${state.round}, ${JSON.stringify(state.valueDigest)}, ${state.n}))`];
+			return [
+				`acceptProposal("A", bundle(${state.round}, ${JSON.stringify(state.valueDigest)}, ${state.n}))`,
+				`persistVoteSet(${candidate})`,
+			];
 		case "prepare-vote":
 			return [`persistVoteSet(${candidate})`];
 		case "prepare-qc":
-			return [`formQc("A", ${candidate})`, `deliverPrepareQc("A", ${candidate}, 0)`];
+			return [
+				`formQc("A", ${candidate})`,
+				`deliverPrepareQc("A", ${candidate}, 0)`,
+				`persistCommitVoteSet(${commitCandidate})`,
+			];
 		case "commit-vote":
 			return [`persistCommitVoteSet(${candidate})`];
 		case "commit-qc":

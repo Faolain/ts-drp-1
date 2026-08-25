@@ -8,6 +8,19 @@ export type PacemakerEventKind =
 	| "finalized"
 	| "restart";
 
+export interface PacemakerEvent {
+	readonly anchor: string;
+	readonly epoch: 0;
+	readonly kind: PacemakerEventKind;
+	readonly objectId: string;
+	readonly phase: "commit" | "prepare" | "round-change";
+	readonly qcDigest: string | null;
+	readonly round: number;
+	readonly sequence: number;
+	readonly signerId: string;
+	readonly valueDigest: string;
+}
+
 export interface PacemakerStatus {
 	readonly bufferedFutureRounds: number;
 	readonly durableCommitQcCount: number;
@@ -121,4 +134,5 @@ export interface ItfTrace {
 export interface PacemakerTraceDriver {
 	apply(step: ItfTraceState): Promise<PacemakerStatus>;
 	close(): Promise<void>;
+	events(): readonly PacemakerEvent[];
 }

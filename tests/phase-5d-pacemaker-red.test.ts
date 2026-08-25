@@ -159,7 +159,18 @@ type ItfTraceMutableStates = MutableTraceState[];
 function throwsModelReplayRequired(): boolean {
 	try {
 		implementationEventsToQuintTest([
-			{ kind: "round_entered", phase: "awaiting", round: 1, sequence: 1, valueDigest: "value-X" },
+			{
+				anchor: "a".repeat(64),
+				epoch: 0,
+				kind: "round_entered",
+				objectId: "phase5d:test",
+				phase: "round-change",
+				qcDigest: null,
+				round: 1,
+				sequence: 1,
+				signerId: "A",
+				valueDigest: "0".repeat(64),
+			},
 		]);
 		return false;
 	} catch (error) {
@@ -411,13 +422,67 @@ describe.sequential("Phase 5d model-first pacemaker RED", () => {
 		]) {
 			expect(events.has(event), event).toBe(true);
 		}
+		const eventIdentity = Object.freeze({
+			anchor: "a".repeat(64),
+			epoch: 0 as const,
+			objectId: "phase5d:test",
+			signerId: "A",
+		});
 		const generated = implementationEventsToQuintTest([
-			{ kind: "vote_cast", phase: "prepare", round: 0, sequence: 0, valueDigest: "value-X" },
-			{ kind: "qc_formed", phase: "prepare", round: 0, sequence: 1, valueDigest: "value-X" },
-			{ kind: "lock_acquired", phase: "prepare", round: 0, sequence: 2, valueDigest: "value-X" },
-			{ kind: "vote_cast", phase: "commit", round: 0, sequence: 3, valueDigest: "value-X" },
-			{ kind: "qc_formed", phase: "commit", round: 0, sequence: 4, valueDigest: "value-X" },
-			{ kind: "finalized", phase: "commit", round: 0, sequence: 5, valueDigest: "value-X" },
+			{
+				...eventIdentity,
+				kind: "vote_cast",
+				phase: "prepare",
+				qcDigest: null,
+				round: 0,
+				sequence: 0,
+				valueDigest: "value-X",
+			},
+			{
+				...eventIdentity,
+				kind: "qc_formed",
+				phase: "prepare",
+				qcDigest: "1".repeat(64),
+				round: 0,
+				sequence: 1,
+				valueDigest: "value-X",
+			},
+			{
+				...eventIdentity,
+				kind: "lock_acquired",
+				phase: "prepare",
+				qcDigest: "1".repeat(64),
+				round: 0,
+				sequence: 2,
+				valueDigest: "value-X",
+			},
+			{
+				...eventIdentity,
+				kind: "vote_cast",
+				phase: "commit",
+				qcDigest: "1".repeat(64),
+				round: 0,
+				sequence: 3,
+				valueDigest: "value-X",
+			},
+			{
+				...eventIdentity,
+				kind: "qc_formed",
+				phase: "commit",
+				qcDigest: "2".repeat(64),
+				round: 0,
+				sequence: 4,
+				valueDigest: "value-X",
+			},
+			{
+				...eventIdentity,
+				kind: "finalized",
+				phase: "commit",
+				qcDigest: "2".repeat(64),
+				round: 0,
+				sequence: 5,
+				valueDigest: "value-X",
+			},
 		]);
 		expect(generated).toContain("persistVoteSet");
 		expect(generated).toContain("deliverCommitQc");
@@ -436,10 +501,18 @@ describe.sequential("Phase 5d model-first pacemaker RED", () => {
 		}
 		expect(() =>
 			implementationEventsToQuintTest([
-				{ kind: "round_entered", phase: "awaiting", round: 1, sequence: 1, valueDigest: "value-X" },
+				{
+					...eventIdentity,
+					kind: "round_entered",
+					phase: "round-change",
+					qcDigest: null,
+					round: 1,
+					sequence: 1,
+					valueDigest: "value-X",
+				},
 			])
 		).toThrow("MODEL_REPLAY_REQUIRED");
-	});
+	}, 60_000);
 
 	it("typechecks and executes non-vacuous model actions before runtime readiness", () => {
 		const modelPath = resolve(REPOSITORY_ROOT, PRODUCT_CONTRACT.model.path);
@@ -604,7 +677,22 @@ describe.sequential("Phase 5d model-first pacemaker RED", () => {
 				const databaseName = `phase5d-product-${crypto.randomUUID()}`;
 				openedDatabases.push(databaseName);
 				const trace = readTrace(descriptor.path);
-				await replayCheckedTrace(trace, await createProductTraceDriver(modules, trace, databaseName));
+				const events = await replayCheckedTrace(trace, await createProductTraceDriver(modules, trace, databaseName));
+				expect(events.length, `${descriptor.path} emitted no product facts`).toBeGreaterThan(0);
+				const generated = implementationEventsToQuintTest(events);
+				const temporary = mkdtempSync(resolve(REPOSITORY_ROOT, ".phase5d-product-events-"));
+				try {
+					const generatedPath = resolve(temporary, "implementation-replay.qnt");
+					writeFileSync(generatedPath, generated, "utf8");
+					const replayed = spawnSync(
+						"pnpm",
+						["exec", "quint", "test", generatedPath, "--main", "generatedPacemakerReplay", "--backend", "typescript"],
+						{ cwd: REPOSITORY_ROOT, encoding: "utf8" }
+					);
+					expect(replayed.status, `${descriptor.path}\n${replayed.stdout}\n${replayed.stderr}`).toBe(0);
+				} finally {
+					rmSync(temporary, { force: true, recursive: true });
+				}
 			}
 		}
 	);

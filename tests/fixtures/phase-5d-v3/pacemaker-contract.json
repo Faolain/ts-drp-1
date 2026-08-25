@@ -68,24 +68,15 @@
 		},
 		{
 			"path": "packages/seal/model/traces/n4-round-carryover.itf.json",
-			"sha256": "1743887eb1e3ce12c7847dbb35582334c94c235cbef1e52c201d9b1614a35b11",
+			"sha256": "848ce697bf5adbe083be44778733f9cfef04029c966c7e0f31b2722194ef636b",
 			"n": 4,
-			"requiredEvents": [
-				"proposal",
-				"prepare-vote",
-				"prepare-qc",
-				"timeout",
-				"round-change",
-				"commit-vote",
-				"commit-qc",
-				"finalized"
-			]
+			"requiredEvents": ["proposal", "prepare-qc", "timeout", "round-change", "commit-qc", "finalized"]
 		},
 		{
 			"path": "packages/seal/model/traces/n7-crash-restart.itf.json",
-			"sha256": "cda8a11aff398d95e000801752326ba2230ecdb8170649e3fd4a18f6c50cc7c3",
+			"sha256": "401bcb3500278c5a8c068ae34083ac3a1b90fbddb9a86e7fb68fc6a59b8da43d",
 			"n": 7,
-			"requiredEvents": ["proposal", "prepare-vote", "prepare-qc", "timeout", "round-change", "crash", "restart"]
+			"requiredEvents": ["proposal", "prepare-qc", "timeout", "round-change", "crash", "restart"]
 		}
 	],
 	"governedInputs": {
