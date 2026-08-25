@@ -1,0 +1,165 @@
+{
+	"schemaVersion": "phase-5d-pacemaker-product-red-v1",
+	"decisionId": "PH-P5-D02",
+	"profile": {
+		"id": "pacemaker-profile-v1",
+		"roundTimeoutBaseMs": 1000,
+		"roundTimeoutMaxMs": 30000,
+		"maxFutureRoundGap": 8,
+		"epoch": 0,
+		"apalacheVersion": "0.56.1",
+		"minimumSymbolicSteps": 12,
+		"minimumLivenessSteps": 10000
+	},
+	"phases": ["awaiting", "prepared", "committed", "finalized", "stopped", "terminal"],
+	"events": ["round_entered", "vote_cast", "qc_formed", "lock_acquired", "finalized", "restart"],
+	"actionCoverage": [
+		"timeout",
+		"round-change",
+		"proposal",
+		"prepare-qc",
+		"commit-qc",
+		"catchup",
+		"equivocation",
+		"duplicate",
+		"loss",
+		"invalid-nested-qc",
+		"crash",
+		"restart"
+	],
+	"model": {
+		"path": "packages/seal/formal/seal-pacemaker.qnt",
+		"module": "sealPacemaker",
+		"sha256": "b7e01ef414142fe13f54e0f06596026f5b262960db5f8470ee71ac6c205209ef",
+		"invariants": [
+			"safetyN4",
+			"safetyN5",
+			"safetyN6",
+			"safetyN7",
+			"integrity",
+			"exactSlotIntegrity",
+			"qcAuthority",
+			"roundChangeAuthority",
+			"agreement",
+			"lockSafety",
+			"noRetroactiveVote",
+			"authorityIsolation",
+			"durableBeforeGossip",
+			"finalityRequiresCommitQc",
+			"highestQcRestartSafe",
+			"boundedFutureEvidence",
+			"crashPreservesDurableAuthority"
+		],
+		"runs": [
+			"testRoundCarryover",
+			"testCatchupNeedsFPlusOne",
+			"testCommitQcFinalizes",
+			"testCrashRestartRetainsDurableAuthority",
+			"testByzantineEquivocationDoesNotFormConflictingQcs",
+			"testDuplicateLossAndInvalidNestedQc"
+		]
+	},
+	"traces": [
+		{
+			"path": "packages/seal/model/traces/n4-catchup.itf.json",
+			"sha256": "18a4ee2d8a45f91e6bbad099bec1200ed607846c751d51c2f1b263f914967921",
+			"n": 4,
+			"requiredEvents": ["one-round-change", "f-plus-one-catchup", "far-future-one", "far-future-qc"]
+		},
+		{
+			"path": "packages/seal/model/traces/n4-round-carryover.itf.json",
+			"sha256": "1743887eb1e3ce12c7847dbb35582334c94c235cbef1e52c201d9b1614a35b11",
+			"n": 4,
+			"requiredEvents": [
+				"proposal",
+				"prepare-vote",
+				"prepare-qc",
+				"timeout",
+				"round-change",
+				"commit-vote",
+				"commit-qc",
+				"finalized"
+			]
+		},
+		{
+			"path": "packages/seal/model/traces/n7-crash-restart.itf.json",
+			"sha256": "cda8a11aff398d95e000801752326ba2230ecdb8170649e3fd4a18f6c50cc7c3",
+			"n": 7,
+			"requiredEvents": ["proposal", "prepare-vote", "prepare-qc", "timeout", "round-change", "crash", "restart"]
+		}
+	],
+	"governedInputs": {
+		"lawContract": "tests/fixtures/phase-5d-v3/pacemaker-law-contract.json",
+		"profile": "packages/protocol-v3/supplements/pacemaker-profile-v1/profile.json",
+		"profileSha256": "a3db1f1bbffc19c1339f14a520c373966958bf6ad5cddca7104ff1a0e707a28e",
+		"vectors": "packages/protocol-v3/supplements/pacemaker-profile-v1/vectors.json",
+		"vectorsSha256": "09086c6019e336452080e02035a09893e5445fa3dff171c0fe29ba62ab9d6336"
+	},
+	"runtimeOwners": [
+		"packages/protocol-v3/src/seal.ts",
+		"packages/seal/src/index.ts",
+		"packages/seal/src/pacemaker.ts",
+		"packages/seal/src/storage-port.ts",
+		"packages/seal/src/internal/seal-vote-intent.ts",
+		"packages/seal/package.json",
+		"packages/storage-browser/src/seal-vote.ts",
+		"packages/storage-browser/src/internal/seal-vote-store.ts",
+		"vite.config.mts"
+	],
+	"requiredRuntimeExports": {
+		"pacemaker": [
+			"MAX_FUTURE_ROUND_GAP",
+			"ROUND_TIMEOUT_BASE_MS",
+			"ROUND_TIMEOUT_MAX_MS",
+			"createSealPacemaker",
+			"leaderForRound",
+			"roundTimeoutMs"
+		],
+		"protocol": [
+			"openSealAuthority",
+			"prepareRoundChange",
+			"prepareSealVote",
+			"verifyProposalBundle",
+			"verifyRoundChange",
+			"verifySealQC"
+		],
+		"seal": ["createSealVoter"]
+	},
+	"storage": {
+		"schemaVersion": 2,
+		"roundChangePhase": "round-change",
+		"voteTransactionStores": ["signerState", "storageMeta", "voteOutbox", "voteSlots"],
+		"qcTransactionStores": ["signerState", "storageMeta"],
+		"completeHighestQcRequired": true,
+		"completeCommitQcRequired": true
+	},
+	"limits": {
+		"activeSignerCounts": [4, 5, 6, 7],
+		"futureWindow": 8,
+		"maxBufferedRounds": 8,
+		"safeRoundMaximum": 9007199254740991
+	},
+	"mutantRejections": {
+		"constant-model": "MODEL_ACTION_INERT",
+		"event-name-only-replay": "TRACE_STATE_MISMATCH",
+		"implementation-log-without-model": "MODEL_REPLAY_REQUIRED",
+		"one-signature-catchup": "INSUFFICIENT_CATCHUP_EVIDENCE",
+		"locale-sorted-leader": "LEADER_MISMATCH",
+		"invalid-deadline-reset": "DEADLINE_RESET_FORBIDDEN",
+		"unbounded-future-bucket": "FUTURE_EVIDENCE_OVER_LIMIT",
+		"unsigned-leader-proposal": "PROPOSAL_AUTHENTICATION_FAILED",
+		"non-atomic-round-entry": "ROUND_ENTRY_NOT_DURABLE",
+		"precommit-round-change-release": "PROVISIONAL_CARRIER_RELEASE",
+		"divergent-timeout-base": "PROFILE_MISMATCH",
+		"divergent-timeout-cap": "PROFILE_MISMATCH",
+		"divergent-future-gap": "PROFILE_MISMATCH",
+		"uncapped-exponent": "ROUND_TIMEOUT_OVERFLOW",
+		"digest-only-highest-qc": "COMPLETE_QC_REQUIRED",
+		"local-commit-vote-as-finality": "COMMIT_QC_REQUIRED",
+		"finalized-before-commit-qc-persistence": "FINALIZATION_NOT_DURABLE",
+		"proposal-without-cut-value": "CUT_VALUE_REQUIRED",
+		"nested-qc-not-below-round-change": "NESTED_QC_ROUND_INVALID",
+		"vacuous-symbolic-depth": "SYMBOLIC_DEPTH_TOO_SMALL",
+		"synthetic-product-crash": "CRASH_IS_HARNESS_ONLY"
+	}
+}

@@ -1,0 +1,125 @@
+{
+	"#meta": {
+		"format": "ITF",
+		"format-description": "Informal Trace Format",
+		"source": "phase-5d-v3-checked-corpus:n7-round-change-crash-restart"
+	},
+	"vars": [
+		"lastEvent",
+		"n",
+		"round",
+		"phase",
+		"valueDigest",
+		"durableRevision",
+		"futureBucketCount",
+		"pendingRoundChangeCount",
+		"durablePrepareQcCount",
+		"durableCommitQcCount"
+	],
+	"states": [
+		{
+			"#meta": { "index": 0 },
+			"lastEvent": "init",
+			"n": 7,
+			"round": 0,
+			"phase": "awaiting",
+			"valueDigest": "",
+			"durableRevision": 0,
+			"futureBucketCount": 0,
+			"pendingRoundChangeCount": 0,
+			"durablePrepareQcCount": 0,
+			"durableCommitQcCount": 0
+		},
+		{
+			"#meta": { "index": 1 },
+			"lastEvent": "proposal",
+			"n": 7,
+			"round": 0,
+			"phase": "prepared",
+			"valueDigest": "value-X",
+			"durableRevision": 0,
+			"futureBucketCount": 0,
+			"pendingRoundChangeCount": 0,
+			"durablePrepareQcCount": 0,
+			"durableCommitQcCount": 0
+		},
+		{
+			"#meta": { "index": 2 },
+			"lastEvent": "prepare-vote",
+			"n": 7,
+			"round": 0,
+			"phase": "prepared",
+			"valueDigest": "value-X",
+			"durableRevision": 1,
+			"futureBucketCount": 0,
+			"pendingRoundChangeCount": 0,
+			"durablePrepareQcCount": 0,
+			"durableCommitQcCount": 0
+		},
+		{
+			"#meta": { "index": 3 },
+			"lastEvent": "prepare-qc",
+			"n": 7,
+			"round": 0,
+			"phase": "committed",
+			"valueDigest": "value-X",
+			"durableRevision": 2,
+			"futureBucketCount": 0,
+			"pendingRoundChangeCount": 0,
+			"durablePrepareQcCount": 1,
+			"durableCommitQcCount": 0
+		},
+		{
+			"#meta": { "index": 4 },
+			"lastEvent": "timeout",
+			"n": 7,
+			"round": 1,
+			"phase": "awaiting",
+			"valueDigest": "value-X",
+			"durableRevision": 3,
+			"futureBucketCount": 0,
+			"pendingRoundChangeCount": 1,
+			"durablePrepareQcCount": 1,
+			"durableCommitQcCount": 0
+		},
+		{
+			"#meta": { "index": 5 },
+			"lastEvent": "round-change",
+			"n": 7,
+			"round": 1,
+			"phase": "awaiting",
+			"valueDigest": "value-X",
+			"durableRevision": 3,
+			"futureBucketCount": 0,
+			"pendingRoundChangeCount": 1,
+			"durablePrepareQcCount": 1,
+			"durableCommitQcCount": 0
+		},
+		{
+			"#meta": { "index": 6 },
+			"lastEvent": "crash",
+			"n": 7,
+			"round": 1,
+			"phase": "awaiting",
+			"valueDigest": "value-X",
+			"durableRevision": 3,
+			"futureBucketCount": 0,
+			"pendingRoundChangeCount": 1,
+			"durablePrepareQcCount": 1,
+			"durableCommitQcCount": 0
+		},
+		{
+			"#meta": { "index": 7 },
+			"lastEvent": "restart",
+			"n": 7,
+			"round": 1,
+			"phase": "awaiting",
+			"valueDigest": "value-X",
+			"durableRevision": 3,
+			"futureBucketCount": 0,
+			"pendingRoundChangeCount": 1,
+			"durablePrepareQcCount": 1,
+			"durableCommitQcCount": 0
+		}
+	]
+}

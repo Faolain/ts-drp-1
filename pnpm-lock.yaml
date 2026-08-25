@@ -79,6 +79,9 @@ importers:
       eslint-plugin-vitest:
         specifier: ^0.5.4
         version: 0.5.4(@typescript-eslint/eslint-plugin@8.29.0(@typescript-eslint/parser@8.29.0(eslint@9.23.0)(typescript@5.8.2))(eslint@9.23.0)(typescript@5.8.2))(eslint@9.23.0)(typescript@5.8.2)(vitest@3.1.1(@types/node@22.14.0)(terser@5.49.0)(tsx@4.19.1)(yaml@2.8.0))
+      fake-indexeddb:
+        specifier: 6.2.5
+        version: 6.2.5
       fast-check:
         specifier: ^4.9.0
         version: 4.9.0
@@ -5756,6 +5759,11 @@ packages:
     resolution:
       { integrity: sha512-hMQ4CX1p1izmuLYyZqLMO/qGNw10wSv9QDCPfzXfyFrOaCSSoRfqE1Kf1s5an66J5JZC62NewG+mK49jOCtQew== }
     engines: { node: ">=4" }
+
+  fake-indexeddb@6.2.5:
+    resolution:
+      { integrity: sha512-CGnyrvbhPlWYMngksqrSSUT1BAVP49dZocrHuK0SvtR0D5TMs5wP0o3j7jexDJW01KSadjBp1M/71o/KR3nD1w== }
+    engines: { node: ">=18" }
 
   fast-check@4.9.0:
     resolution:
@@ -14069,6 +14077,8 @@ snapshots:
       chardet: 0.7.0
       iconv-lite: 0.4.24
       tmp: 0.0.33
+
+  fake-indexeddb@6.2.5: {}
 
   fast-check@4.9.0:
     dependencies:
