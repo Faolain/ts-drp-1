@@ -1,11 +1,10 @@
-import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
-
 import type {
 	SnapshotChunkProtocolPort,
 	SnapshotChunkProtocolStream,
 	SnapshotPeerAuthorization,
 } from "./snapshot-pull-types.js";
 import type { SnapshotQuarantineFixture } from "./snapshot-quarantine-contract.js";
+import { decodeCanonical, encodeCanonical } from "../../../packages/canonical/src/index.js";
 
 export type SnapshotScriptedPeerBehavior =
 	| "corrupt"

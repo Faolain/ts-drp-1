@@ -52,7 +52,7 @@ const EXPECTED_TYPES = resolve(CURRENT_DIRECTORY, "fixtures/phase-4c-v3/snapshot
 const NETWORK_MODULE_PATH: string = "../packages/network/src/snapshot-transfer.js";
 const NODE_MODULE_PATH: string = "../packages/node/src/snapshot-transfer.js";
 const NODE_QUARANTINE_MODULE_PATH: string = "../packages/storage-node/src/snapshot-transfer.js";
-const RECEIPT_MODULE_PATH: string = "@ts-drp/compaction/snapshot-quarantine-receipt";
+const RECEIPT_MODULE_PATH: string = "../packages/compaction/dist/src/snapshot-quarantine-receipt.js";
 const ownersExist = existsSync(NETWORK_OWNER) && existsSync(NODE_OWNER);
 const PROFILE = Object.freeze({
 	maxManifestBytes: 212_387 as const,
@@ -90,10 +90,16 @@ function assertTypeContract(): void {
 			JSON.stringify({
 				compilerOptions: {
 					allowImportingTsExtensions: true,
+					baseUrl: REPOSITORY_ROOT,
 					composite: false,
 					declaration: false,
 					declarationMap: false,
 					noEmit: true,
+					paths: {
+						"@ts-drp/message-queue": [resolve(REPOSITORY_ROOT, "packages/message-queue/dist/src/index.d.ts")],
+						"@ts-drp/types": [resolve(REPOSITORY_ROOT, "packages/types/dist/src/index.d.ts")],
+						"@ts-drp/*": [resolve(REPOSITORY_ROOT, "packages/*")],
+					},
 				},
 				extends: resolve(REPOSITORY_ROOT, "tsconfig.json"),
 				files: [source],

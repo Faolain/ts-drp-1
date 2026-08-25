@@ -38,7 +38,7 @@ const NODE_MODULE_PATH: string = "../packages/node/src/snapshot-transfer.js";
 const NODE_QUARANTINE_MODULE_PATH: string = "../packages/storage-node/src/snapshot-transfer.js";
 const NETWORK_MODULE_PATH: string = "../packages/network/src/snapshot-transfer.js";
 const NETWORK_NODE_MODULE_PATH: string = "../packages/network/src/node.js";
-const RECEIPT_MODULE_PATH: string = "@ts-drp/compaction/snapshot-quarantine-receipt";
+const RECEIPT_MODULE_PATH: string = "../packages/compaction/dist/src/snapshot-quarantine-receipt.js";
 const ownerExists = existsSync(NODE_OWNER);
 const NETWORK_CONFIG: DRPNetworkNodeConfig = {
 	bootstrap_peers: [],
@@ -132,7 +132,11 @@ function installCorruptSource(port: SnapshotChunkProtocolPort, fixture: Snapshot
 			stream.abort(new Error("corrupt snapshot source received an invalid request"));
 			return;
 		}
-		const selectedRequest = exactSnapshotRecord(required(request.descriptors[0], "corrupt requested descriptor"));
+		const selectedValue = required(request.descriptors[0], "corrupt requested descriptor");
+		if (selectedValue === null || typeof selectedValue !== "object" || Array.isArray(selectedValue)) {
+			throw new TypeError("corrupt requested descriptor is invalid");
+		}
+		const selectedRequest = selectedValue as Readonly<Record<string, unknown>>;
 		const index = selectedRequest.index;
 		if (typeof index !== "number") throw new TypeError("corrupt descriptor index is invalid");
 		const descriptor = required(fixture.declaration.chunks[index], "corrupt descriptor");
