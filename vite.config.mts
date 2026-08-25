@@ -8,6 +8,7 @@ export default defineConfig({
 		alias: {
 			"@ts-drp/test-utils/shadow-comparison": path.resolve(__dirname, "packages/test-utils/src/shadow-comparison.ts"),
 			"@ts-drp/test-utils/shadow-runner": path.resolve(__dirname, "packages/test-utils/src/shadow-runner.ts"),
+			"@ts-drp/test-utils/shadow-telemetry": path.resolve(__dirname, "packages/test-utils/src/shadow-telemetry.ts"),
 			"@ts-drp/canonical/domain-hash-stream": path.resolve(__dirname, "packages/canonical/src/domain-hash-stream.ts"),
 			"@ts-drp/compaction/blueprint-fold": path.resolve(__dirname, "packages/compaction/src/blueprint-fold.ts"),
 			"@ts-drp/compaction/blueprint-snapshot": path.resolve(__dirname, "packages/compaction/src/blueprint-snapshot.ts"),

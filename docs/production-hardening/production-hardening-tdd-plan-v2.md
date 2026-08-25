@@ -56368,7 +56368,10 @@ behavior remains unchanged. The repository-internal deployment imports that
 source module relatively, so no new network package subpath, dependency or
 root/Vite alias is created. The strict method inspects the resolved response
 and accepts only status `200..299`; redirects, client/server errors and
-transport failure reject. The standing service pushes the complete cycle
+transport failure reject. Each strict request is bounded to 60 seconds and is
+cancelled by process shutdown. It replaces the exact `{ job, instance }` group on
+every strict push so a restarted process clears retained prior evidence rather
+than merging a fresh heartbeat into stale success. The standing service pushes the complete cycle
 immediately and then republishes that whole immutable evidence every 60
 seconds. A process-liveness heartbeat may exist from startup but is explicitly
 not fold evidence. The separately named evidence heartbeat and all report
@@ -56423,7 +56426,7 @@ Exactly one readiness test fails solely because the telemetry subpath is
 absent; all independent oracles pass and behavioral GREEN cases remain
 dormant.
 
-The minimal GREEN is exact twelve paths:
+The minimal GREEN was initially scoped to exact twelve paths:
 
 - `packages/test-utils/src/shadow-telemetry.ts`;
 - `packages/test-utils/package.json` for its private subpath;
@@ -56468,3 +56471,85 @@ watchdog rules, wires Alertmanager, flushes tracing on every terminal path and
 builds/runs the real image. The broken cleanup parser is explicitly outside the
 trust argument rather than silently treated as repaired. No confirmation
 review is opened.
+
+The final tests-only RED is Good-signed commit
+`116e517ffd32f02af72af24e78251a16ea0fab26`. Its one review round rejected
+the first packet for five causal P1 families: evidence freshness was not
+pinned on either successful or failed first cycles; alert checks could pass
+with inert constants and no routed rules; mismatch, strict-push and signal
+paths did not causally await an error span flush; the 45-minute watchdog did
+not suppress a late producer; and the successful scheduler never crossed a
+UTC boundary. Opus xhigh session
+`f4e67726-29b5-45b3-ba92-705238568793` and the controller-grounded Grok
+classification reproduced all five. Genuine Kimi session
+`1666bbe6-a384-4b49-a6c1-7ba1150e88e6` returned PASS but explicitly did not
+close those candidates, so it was not used as clearance. The corrected RED
+pins each behavior directly and received no confirmation review.
+
+Live image composition exposed one product-boundary dependency hidden by the
+Vitest owner: the genuine `buildShadowRun` producer shared a module with the
+live-peer checkpoint, whose eager imports load `vi` outside a test runner.
+The clean correction leaves the producer single-owned and moves only the live
+checkpoint's dependencies behind its own async entry point. Two RED
+corrections also remain visible: the process-stale rule explicitly matches an
+absent heartbeat, and the causal lifecycle wait is long enough for the real
+100-shard rejection chain rather than assuming a fixed microtask count. These
+changes initially expanded the honest GREEN landing to exact fifteen paths:
+the declared twelve plus `tests/fixtures/phase-4d-v3/shadow-driver.ts`,
+`tests/fixtures/phase-4d-v3/shadow-telemetry-contract.ts`, and
+`tests/phase-4d-shadow-telemetry-red.test.ts`. This is a bounded composition
+correction, not a new comparison owner or review round.
+
+The implemented capability now runs the real nightly runner in a Node 22
+diagnostic image, strictly pushes comparator-derived gauges, exposes separate
+process and evidence freshness, terminalizes mismatch, timeout and delivery
+failure, flushes tracing on terminal and signal exits, and routes six concrete
+Prometheus alerts through Alertmanager. The pre-review smoke image built and
+issued a strict `PUT`, but its 7.1-second terminal result was not accepted as
+capability evidence: the final review correctly identified it as the false
+runtime-provenance mismatch described below.
+
+The single final GREEN review round was bound to staged tree `833a42d3`,
+full-index diff object `03d5ff49` and SHA-256 `70902fa4`. Opus xhigh session
+`97c47164-8a06-4222-806c-f2541798de67` reproduced one P0: the diagnostic
+image loaded source and built protocol-v3 as different module identities, so
+the private prepared-runtime provenance check converted every genuine run
+into a false `invalid-observation` mismatch. It also reproduced stale
+`report_complete=1` after a watchdog timeout following prior success. Grok
+reproduced that signal shutdown could flush before the active traced cycle
+closed. Grok and the controller independently reproduced that broad Docker
+context admission embedded protected workspace-local untracked files. Kimi
+session `f8f53c7c-ed92-4796-b957-caa64f6a9caf` additionally reproduced an
+unbounded, uncancelled strict Pushgateway request and a root-running image.
+
+The bounded correction uses the bare protocol-v3 package identity in both
+Vitest and the image, and supplies that built package through the existing
+workspace-link block. `stop()` now generation-fences and joins the active
+cycle before `done` resolves; the supervisor cannot win its signal race until
+that join and the final tracer flush complete. Strict Pushgateway requests use
+the process lifetime signal plus a fixed 60-second timeout. Terminal state
+always publishes `report_complete=0`, while the overtime alert also consumes
+the durable overtime gauge after `in_progress` clears. The image copies files
+as the non-root Node user and `.dockerignore` explicitly excludes every
+protected local-only path in current custody. Causal retained tests now cover
+signal during a held active cycle, request cancellation, timeout after prior
+green evidence, and the exact alert expression. The fixed genuine producer is
+bounded and generation-checked between shards; turning Phase 4d into a new
+Worker/process protocol solely to kill an impossible held test double remains
+debt rather than reopening the runner architecture. Graceful `SIGTERM` remains
+exit zero by design.
+
+The corrected non-root image then completed all 100 genuine shards and 10,000
+epoch closes in 351 seconds. Its strict `PUT` contained
+`report_complete=1`, `completed_epochs=10000`, and
+`mismatches{kind="none"}=0`; the next heartbeat republished the same complete
+evidence. An exact image inspection showed uid 1000 and absence of every
+protected local path, and a real `SIGTERM` exited zero after the active cycle
+and trace flush had settled. The disposable gate container was removed; no
+product deployment or external service was mutated.
+
+These same-round fixes make the final landing exact seventeen paths: the
+previous exact fifteen plus `.dockerignore` and
+`tests/fixtures/phase-4d-v3/shadow-telemetry-driver.ts`. They add no comparison
+leg, certification authority or governance checkpoint. Per the hard boundary,
+there is no confirmation review.

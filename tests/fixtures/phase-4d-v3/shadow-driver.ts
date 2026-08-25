@@ -1,6 +1,5 @@
 /* eslint-disable import/order, jsdoc/require-jsdoc, sort-imports -- the tests-only driver keeps original/current owner namespaces visibly separate */
 import { compareBytes, encodeCanonical, hashDomain } from "@ts-drp/canonical";
-import { MessageQueueManager } from "@ts-drp/message-queue";
 import type { Message } from "@ts-drp/types";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -8,11 +7,7 @@ import path from "node:path";
 
 import blueprintPackage from "../phase-4a-v3/blueprint-package.json" with { type: "json" };
 import snapshotContract from "../phase-4b-v3/blueprint-snapshot-contract.json" with { type: "json" };
-import {
-	prepareBlueprintAdmission,
-	prepareBlueprintRuntime,
-	type PreparedBlueprintRuntime,
-} from "../../../packages/protocol-v3/src/public.js";
+import { prepareBlueprintAdmission, prepareBlueprintRuntime, type PreparedBlueprintRuntime } from "@ts-drp/protocol-v3";
 import {
 	BlueprintStateMachine,
 	foldBlueprintEpoch,
@@ -26,9 +21,6 @@ import {
 	hashDomain as referenceHashDomain,
 } from "../../../packages/protocol-v2/conformance/ahe-reference/src/hash.js";
 import { DeterministicStateMachine as ReferenceStateMachine } from "../../../packages/protocol-v2/conformance/ahe-reference/src/state.js";
-import { activateV3LivePlane, bindV3BlueprintLivePlane } from "../../../packages/node/src/v3-live.js";
-
-import { createGenuinePreparedV3Fixture } from "../phase-3a1b-p3/live-fixture.js";
 import {
 	FOREIGN_AUTHOR,
 	OBJECT_ID,
@@ -43,7 +35,6 @@ import {
 	type ShadowTypeScriptObservation,
 	WRITER,
 } from "./shadow-contract.js";
-import { fakeNetwork, recover } from "../phase-4b-v3/live-snapshot.js";
 
 type PlainState = { map: Record<string, string>; set: string[]; total: number };
 type Operation =
@@ -226,7 +217,7 @@ function stateDigest(bytes: Uint8Array): string {
 	return bytesHex(hashDomain(STATE_DOMAIN, bytes));
 }
 
-async function prepareRuntime(): Promise<PreparedBlueprintRuntime> {
+function prepareRuntime(): Promise<PreparedBlueprintRuntime> {
 	const admission = prepareBlueprintAdmission({
 		canonicalBlueprintPackageBytes: exactCanonicalBlueprintPackageBytes,
 		expectedBlueprintDigest,
@@ -412,6 +403,16 @@ export async function buildShadowRun(
 }
 
 export async function runLivePeerCheckpoint(): Promise<LivePeerCheckpoint> {
+	const [messageQueue, livePlane, liveFixture, liveSnapshot] = await Promise.all([
+		import("@ts-drp/message-queue"),
+		import("../../../packages/node/src/v3-live.js"),
+		import("../phase-3a1b-p3/live-fixture.js"),
+		import("../phase-4b-v3/live-snapshot.js"),
+	]);
+	const { MessageQueueManager } = messageQueue;
+	const { activateV3LivePlane, bindV3BlueprintLivePlane } = livePlane;
+	const { createGenuinePreparedV3Fixture } = liveFixture;
+	const { fakeNetwork, recover } = liveSnapshot;
 	const initialStateBytes = encodeCanonical(0);
 	const fixture = await createGenuinePreparedV3Fixture({
 		authorizationMode: "latched-acl",

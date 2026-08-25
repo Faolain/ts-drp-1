@@ -36,11 +36,11 @@ export const SHADOW_SOAK_METRICS = Object.freeze({
 export const SHADOW_SOAK_ALERTS = Object.freeze([
 	Object.freeze({
 		alert: "ShadowSoakProcessStale",
-		expr: `time() - ${SHADOW_SOAK_METRICS.processHeartbeat} > ${SHADOW_SOAK_PROCESS_STALE_SECONDS}`,
+		expr: `absent(${SHADOW_SOAK_METRICS.processHeartbeat}) or time() - ${SHADOW_SOAK_METRICS.processHeartbeat} > ${SHADOW_SOAK_PROCESS_STALE_SECONDS}`,
 	}),
 	Object.freeze({
 		alert: "ShadowSoakCycleOvertime",
-		expr: `${SHADOW_SOAK_METRICS.cycleInProgress} == 1 and time() - ${SHADOW_SOAK_METRICS.cycleStarted} > ${SHADOW_SOAK_CYCLE_TIMEOUT_MS / 1000}`,
+		expr: `(${SHADOW_SOAK_METRICS.cycleInProgress} == 1 and time() - ${SHADOW_SOAK_METRICS.cycleStarted} > ${SHADOW_SOAK_CYCLE_TIMEOUT_MS / 1000}) or ${SHADOW_SOAK_METRICS.cycleOvertime} == 1`,
 	}),
 	Object.freeze({
 		alert: "ShadowSoakFirstEvidenceMissing",
@@ -69,7 +69,11 @@ export interface ShadowSoakGauge {
 export interface ShadowSoakPrometheusPort {
 	gauge(input: Readonly<{ help: string; labelNames: readonly string[]; name: ShadowSoakMetricName }>): ShadowSoakGauge;
 	pushStrict(
-		input: Readonly<{ groupings: Readonly<{ instance: string }>; jobName: typeof SHADOW_SOAK_JOB }>
+		input: Readonly<{
+			groupings: Readonly<{ instance: string }>;
+			jobName: typeof SHADOW_SOAK_JOB;
+			signal: AbortSignal;
+		}>
 	): Promise<void>;
 }
 

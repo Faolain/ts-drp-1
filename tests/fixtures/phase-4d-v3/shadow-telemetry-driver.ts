@@ -42,6 +42,7 @@ export interface MetricWrite {
 export class ObservedPrometheusPort implements ShadowSoakPrometheusPort {
 	readonly configs: Array<Readonly<{ help: string; labelNames: readonly string[]; name: ShadowSoakMetricName }>> = [];
 	readonly pushes: Array<Readonly<{ groupings: Readonly<{ instance: string }>; jobName: string }>> = [];
+	readonly signals: AbortSignal[] = [];
 	readonly writes: MetricWrite[] = [];
 	pushFailure: Error | undefined;
 
@@ -55,9 +56,14 @@ export class ObservedPrometheusPort implements ShadowSoakPrometheusPort {
 	}
 
 	pushStrict(
-		input: Readonly<{ groupings: Readonly<{ instance: string }>; jobName: typeof SHADOW_SOAK_JOB }>
+		input: Readonly<{
+			groupings: Readonly<{ instance: string }>;
+			jobName: typeof SHADOW_SOAK_JOB;
+			signal: AbortSignal;
+		}>
 	): Promise<void> {
 		this.pushes.push(Object.freeze({ groupings: Object.freeze({ ...input.groupings }), jobName: input.jobName }));
+		this.signals.push(input.signal);
 		return this.pushFailure === undefined ? Promise.resolve() : Promise.reject(this.pushFailure);
 	}
 

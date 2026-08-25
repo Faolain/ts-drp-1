@@ -43,6 +43,7 @@
 		"proto-gen": "pnpm proto-gen:types",
 		"proto-gen:types": "buf generate packages/types/src/proto -o packages/types/src/proto",
 		"release": "release-it",
+		"shadow:soak": "tsx scripts/production-hardening/run-shadow-soak.ts",
 		"test": "vitest",
 		"test:public-relay-live": "RUN_PUBLIC_LIVE=true pnpm exec vitest run packages/network-spike/tests/public-relay-live.test.ts",
 		"test:public-convergence": "RUN_PUBLIC_LIVE=true pnpm exec vitest run packages/network-spike/tests/public-convergence-live.test.ts",

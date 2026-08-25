@@ -3,8 +3,13 @@
 **/dist/
 .logs/
 .pnpm-store/
+.agents/
+.claude/
 coverage/
 playwright-report/
 test-results/
 *.log
 .env
+skills-lock.json
+packages/protocol-v2/tests/author-sequence-0g2.test.ts
+packages/protocol-v2/tests/local-author-sequence-issuance-0g2.test.ts

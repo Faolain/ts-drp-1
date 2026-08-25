@@ -96,11 +96,19 @@ class ControlledFlush {
 }
 
 async function waitForCondition(predicate: () => boolean): Promise<void> {
-	for (let attempt = 0; attempt < 100; attempt++) {
+	for (let attempt = 0; attempt < 1_000; attempt++) {
 		if (predicate()) return;
 		await Promise.resolve();
 	}
 	throw new TypeError("condition did not settle");
+}
+
+async function waitForIoCondition(predicate: () => boolean): Promise<void> {
+	for (let attempt = 0; attempt < 100; attempt++) {
+		if (predicate()) return;
+		await new Promise<void>((resolve) => setImmediate(resolve));
+	}
+	throw new TypeError("I/O condition did not settle");
 }
 
 function completeReport(): ShadowRunReport {
@@ -302,24 +310,31 @@ describe("Phase 4d-c standing shadow telemetry RED", () => {
 			const tracer = new ObservedTracer();
 			const held = deferred<readonly ShadowCloseObservation[]>();
 			let calls = 0;
+			let holdNextCycle = false;
 			const handle = requireOwner().startStandingShadowTelemetry({
 				instance: "soak-overtime",
-				produceShard: () => {
+				produceShard: (input) => {
 					calls++;
-					return held.promise;
+					return holdNextCycle ? held.promise : boundedGenuineShard(input);
 				},
 				prometheus,
 				sha: SHADOW_SEED_VECTOR.sha,
 				tracer,
 			});
+			expect((await handle.firstCycle).state).toBe("evidence");
+			expect(calls).toBe(100);
+			expect(prometheus.latest(SHADOW_SOAK_METRICS.reportComplete)?.value).toBe(1);
+			holdNextCycle = true;
+			await vi.advanceTimersByTimeAsync(24 * 60 * 60_000);
+			expect(calls).toBe(101);
 			await vi.advanceTimersByTimeAsync(SHADOW_SOAK_CYCLE_TIMEOUT_MS);
-			expect((await handle.firstCycle).state).toBe("terminal");
-			expect(calls).toBe(1);
+			expect(handle.snapshot().state).toBe("terminal");
+			expect(calls).toBe(101);
 			expect(prometheus.latest(SHADOW_SOAK_METRICS.cycleOvertime)?.value).toBe(1);
 			expect(prometheus.latest(SHADOW_SOAK_METRICS.cycleInProgress)?.value).toBe(0);
 			expect(prometheus.latest(SHADOW_SOAK_METRICS.reportComplete)?.value).toBe(0);
-			expect(prometheus.latest(SHADOW_SOAK_METRICS.evidenceHeartbeat)).toBeUndefined();
-			expect(prometheus.latest(SHADOW_SOAK_METRICS.lastComplete)).toBeUndefined();
+			expect(prometheus.latest(SHADOW_SOAK_METRICS.evidenceHeartbeat)).toBeDefined();
+			expect(prometheus.latest(SHADOW_SOAK_METRICS.lastComplete)).toBeDefined();
 			expect(tracer.failures).toHaveLength(1);
 			const pushesAtTerminal = prometheus.pushes.length;
 			await vi.advanceTimersByTimeAsync(2 * SHADOW_SOAK_HEARTBEAT_MS);
@@ -327,7 +342,7 @@ describe("Phase 4d-c standing shadow telemetry RED", () => {
 			const lateShard = await boundedGenuineShard({ closes: 100, seed: SHADOW_SEED_VECTOR.seed });
 			held.resolve(lateShard);
 			await vi.advanceTimersByTimeAsync(0);
-			expect(calls).toBe(1);
+			expect(calls).toBe(101);
 			expect(handle.snapshot().state).toBe("terminal");
 			expect(prometheus.latest(SHADOW_SOAK_METRICS.cycleOvertime)?.value).toBe(1);
 			await handle.stop();
@@ -432,13 +447,46 @@ describe("Phase 4d-c standing shadow telemetry RED", () => {
 			await lifecycle;
 			expect(handle.snapshot().state).toBe("stopped");
 		}
+
+		const activeRelease = deferred<readonly ShadowCloseObservation[]>();
+		let activeInput: Parameters<typeof boundedGenuineShard>[0] | undefined;
+		const activeHandle = requireOwner().startStandingShadowTelemetry({
+			instance: "soak-flush-active",
+			produceShard: (input) => {
+				activeInput = input;
+				return activeRelease.promise;
+			},
+			prometheus: new ObservedPrometheusPort(),
+			sha: SHADOW_SEED_VECTOR.sha,
+			tracer: new ObservedTracer(),
+		});
+		const activeSignal = deferred<"SIGINT" | "SIGTERM">();
+		const activeFlush = new ControlledFlush();
+		const activeLifecycle = lifecycleOwner.superviseStandingShadowTelemetry({
+			flush: activeFlush.flush,
+			handle: activeHandle,
+			signal: activeSignal.promise,
+		});
+		await waitForCondition(() => activeInput !== undefined);
+		activeSignal.resolve("SIGTERM");
+		await Promise.resolve();
+		expect(activeFlush.calls).toBe(0);
+		activeRelease.resolve(await boundedGenuineShard(activeInput as Parameters<typeof boundedGenuineShard>[0]));
+		await waitForCondition(() => activeFlush.calls === 1);
+		activeFlush.releaseNext();
+		await activeLifecycle;
+		expect(activeHandle.snapshot().state).toBe("stopped");
 	});
 
 	it.skipIf(!ownerReady)("rejects Pushgateway redirects and server errors with the real client", async () => {
 		let status = 202;
 		const bodies: string[] = [];
+		const methods: string[] = [];
 		const paths: string[] = [];
+		let holdResponse = false;
 		const server = createServer((request, response) => {
+			request.on("error", () => undefined);
+			methods.push(request.method ?? "");
 			paths.push(request.url ?? "");
 			let body = "";
 			request.setEncoding("utf8");
@@ -447,7 +495,7 @@ describe("Phase 4d-c standing shadow telemetry RED", () => {
 			});
 			request.on("end", () => {
 				bodies.push(body);
-				response.writeHead(status).end();
+				if (!holdResponse) response.writeHead(status).end();
 			});
 		});
 		server.listen(0, "127.0.0.1");
@@ -460,7 +508,11 @@ describe("Phase 4d-c standing shadow telemetry RED", () => {
 					gauge(input: Readonly<{ help: string; labelNames: string[]; name: string }>): {
 						set(labels: Readonly<Record<string, string>>, value: number): void;
 					};
-					pushMetricsOrThrow(jobName: string, groupings: Readonly<Record<string, string>>): Promise<void>;
+					pushMetricsOrThrow(
+						jobName: string,
+						groupings: Readonly<Record<string, string>>,
+						signal?: AbortSignal
+					): Promise<void>;
 				};
 			};
 			const register = module.createMetricsRegister(`http://127.0.0.1:${address.port}`);
@@ -473,11 +525,19 @@ describe("Phase 4d-c standing shadow telemetry RED", () => {
 			status = 500;
 			await expect(register.pushMetricsOrThrow(SHADOW_SOAK_JOB, { instance: "soak-http" })).rejects.toThrow(/500/u);
 			expect(bodies[0]).toContain("phase4d_strict_push_proof");
+			expect(methods).toEqual(["PUT", "PUT", "PUT"]);
 			expect(paths).toEqual([
 				`/metrics/job/${SHADOW_SOAK_JOB}/instance/soak-http`,
 				`/metrics/job/${SHADOW_SOAK_JOB}/instance/soak-http`,
 				`/metrics/job/${SHADOW_SOAK_JOB}/instance/soak-http`,
 			]);
+			holdResponse = true;
+			const abort = new AbortController();
+			const pending = register.pushMetricsOrThrow(SHADOW_SOAK_JOB, { instance: "soak-http" }, abort.signal);
+			await waitForIoCondition(() => methods.length === 4);
+			abort.abort(new Error("strict push cancelled"));
+			await expect(pending).rejects.toThrow(/abort|cancel/u);
+			expect(methods[3]).toBe("PUT");
 		} finally {
 			const closed = once(server, "close");
 			server.close();
