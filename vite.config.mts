@@ -6,8 +6,10 @@ export default defineConfig({
 	plugins: [tsconfigPaths()],
 	resolve: {
 		alias: {
+			"@ts-drp/canonical/domain-hash-stream": path.resolve(__dirname, "packages/canonical/src/domain-hash-stream.ts"),
 			"@ts-drp/compaction/blueprint-fold": path.resolve(__dirname, "packages/compaction/src/blueprint-fold.ts"),
 			"@ts-drp/compaction/blueprint-snapshot": path.resolve(__dirname, "packages/compaction/src/blueprint-snapshot.ts"),
+			"@ts-drp/compaction/snapshot-stream": path.resolve(__dirname, "packages/compaction/src/snapshot-stream.ts"),
 			"@ts-drp/protocol-v3/author-authorization": path.resolve(
 				__dirname,
 				"packages/protocol-v3/src/author-authorization.ts"
@@ -17,6 +19,7 @@ export default defineConfig({
 				"packages/protocol-v3/src/blueprint-application.ts"
 			),
 			"@ts-drp/protocol-v3/latched-acl": path.resolve(__dirname, "packages/protocol-v3/src/latched-acl.ts"),
+			"@ts-drp/protocol-v3/snapshot-transfer": path.resolve(__dirname, "packages/protocol-v3/src/snapshot-transfer.ts"),
 			"@ts-drp/protocol-v3/registry/registry-v1.json": path.resolve(
 				__dirname,
 				"packages/protocol-v3/registry/registry-v1.json"

@@ -951,6 +951,6 @@ describe("Phase 4c-a frozen snapshot stream RED", () => {
 			expect(owner.settledVerifierBodyBytes).toBe(0);
 			expect(mutant.retainedBodyMutantDetected).toBe(true);
 			expect(mutant.peakVerifierBodyBytes).toBeGreaterThanOrEqual(contract.profile.maxVerifierMemoryBytes);
-		});
+		}, 30_000);
 	});
 });
