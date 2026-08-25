@@ -26,6 +26,10 @@
 		"./blueprint-snapshot": {
 			"types": "./dist/src/blueprint-snapshot.d.ts",
 			"import": "./dist/src/blueprint-snapshot.js"
+		},
+		"./snapshot-stream": {
+			"types": "./dist/src/snapshot-stream.d.ts",
+			"import": "./dist/src/snapshot-stream.js"
 		}
 	},
 	"scripts": {

@@ -1,4 +1,5 @@
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { createDomainHashStream, type DomainHashStream } from "@ts-drp/canonical/domain-hash-stream";
 import type { PreparedBlueprintRuntime } from "@ts-drp/protocol-v3/blueprint-application";
 
 import { BlueprintStateMachine } from "./blueprint-fold.js";
@@ -75,6 +76,17 @@ function hex(bytes: Uint8Array): string {
 
 function digest(domain: string, bytes: Uint8Array): string {
 	return hex(hashDomain(domain, bytes));
+}
+
+/** Creates the shared running D.99 snapshot-payload digest owner. */
+export function createBlueprintSnapshotPayloadHashStream(exactByteLength: number): DomainHashStream {
+	return createDomainHashStream(PAYLOAD_DOMAIN, exactByteLength);
+}
+
+function snapshotPayloadDigest(bytes: Uint8Array): string {
+	const stream = createBlueprintSnapshotPayloadHashStream(bytes.byteLength);
+	stream.update(bytes);
+	return hex(stream.digest());
 }
 
 function assertDigest(value: string, name: string): void {
@@ -177,7 +189,7 @@ export function exportBlueprintSnapshotPayload(
 	return Object.freeze({
 		applicationStateDigest: snapshot.stateDigest,
 		exactCanonicalPayloadBytes,
-		payloadDigest: digest(PAYLOAD_DOMAIN, exactCanonicalPayloadBytes),
+		payloadDigest: snapshotPayloadDigest(exactCanonicalPayloadBytes),
 	});
 }
 
@@ -192,7 +204,7 @@ export function importBlueprintSnapshotPayload(
 	const payloadBytes = copyExactByteCarrier(input.exactCanonicalPayloadBytes, "exactCanonicalPayloadBytes", {
 		maxBytes: input.maxSnapshotBytes,
 	});
-	if (digest(PAYLOAD_DOMAIN, payloadBytes) !== input.expectedPayloadDigest) {
+	if (snapshotPayloadDigest(payloadBytes) !== input.expectedPayloadDigest) {
 		throw new TypeError("snapshot payload digest does not match exact bytes");
 	}
 	const payload = exactPayloadRecord(

@@ -18,6 +18,10 @@
 		".": {
 			"types": "./dist/src/index.d.ts",
 			"import": "./dist/src/index.js"
+		},
+		"./domain-hash-stream": {
+			"types": "./dist/src/domain-hash-stream.d.ts",
+			"import": "./dist/src/domain-hash-stream.js"
 		}
 	},
 	"scripts": {
