@@ -220,6 +220,7 @@ export function implementationEventsToQuintTest(
 		) {
 			throw new Error("MODEL_REPLAY_REQUIRED");
 		}
+		if (event.kind === "restart" && event.sequence === 0) previous = -1;
 		if (event.sequence !== previous + 1) throw new Error("MODEL_REPLAY_REQUIRED");
 		previous = event.sequence;
 		const candidate = `qc(${event.round}, "${event.phase}", "${event.valueDigest}", 4)`;

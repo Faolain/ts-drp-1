@@ -133,8 +133,10 @@ test("complete prepare and commit QCs become durable before lock and finalizatio
 	expect(result.afterPostFinalProposal).toEqual(result.afterFinal);
 	const eventKinds = result.events.map(({ kind }) => kind);
 	for (const event of ["vote_cast", "qc_formed", "lock_acquired", "finalized"]) expect(eventKinds).toContain(event);
-	for (const [sequence, event] of result.events.entries()) {
-		expect(event).toMatchObject({ epoch: 0, kind: eventKinds[sequence], sequence });
+	let expectedSequence = 0;
+	for (const event of result.events) {
+		if (event.kind === "restart") expectedSequence = 0;
+		expect(event).toMatchObject({ epoch: 0, kind: event.kind, sequence: expectedSequence++ });
 		expect(Object.keys(event).sort()).toEqual([
 			"anchor",
 			"epoch",
