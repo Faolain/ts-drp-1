@@ -56230,7 +56230,7 @@ rosters and structural read-only workflow policy. One causal readiness test
 fails solely because the private runner subpath is absent; behavioral GREEN
 cases are dormant and no source-text existence marker can satisfy readiness.
 
-The minimal GREEN is exact seven paths:
+The minimal GREEN is exact nine paths:
 
 - `packages/test-utils/src/shadow-runner.ts`;
 - `packages/test-utils/package.json` for the additive private subpath only;
@@ -56238,6 +56238,11 @@ The minimal GREEN is exact seven paths:
   `**/.logs/**` Vitest discovery exclusion;
 - `tests/fixtures/phase-4d-v3/shadow-driver.ts` only to accept the captured
   seed/close profile and make operation generation seed-sensitive;
+- `tests/fixtures/phase-4d-v3/shadow-runner-driver.ts` only to persist the
+  bounded report before any ledger read, parse or append can fail;
+- `tests/phase-4d-shadow-runner-red.test.ts` only to let the real workflow
+  invocation accept its emitted complete report and to bound the scheduled
+  nightly case at the workflow's 45-minute timeout;
 - `.github/workflows/phase-4d-shadow-comparison.yml`;
 - `docs/production-hardening/shadow-soak-ledger.json`, initially `[]`;
 - this plan ledger entry.
@@ -56270,3 +56275,58 @@ fixture and could let producer-selected shard expectations weaken the signed
 `.logs/**` discovery exclusion. The correction binds runner-derived seeds into
 and back out of every shard, fixes each comparator call to 100/10 and requires
 the Vite exclusion. No confirmation review is opened.
+
+The initial exact-three RED review packet was staged tree `8b54c54f`, cached
+diff object `006bae73` and canonical SHA-256 `7affe2b7`. Opus xhigh session
+`e4497408-2fa9-4e14-9ae1-d9d0b92be801` reproduced that the tests did not prove
+the shipped comparator was invoked, did not pin aggregate liveness or an extra
+observation, and could lose the nightly mismatch report before ledger append
+failed. Grok reproduced that an incomplete report could be uploaded while a PR
+job exited zero. Genuine Kimi 100-check session
+`89136d66-194b-42fb-b9c9-9121fb0e9592` reiterated the global `.logs/**` GREEN
+obligation without resolving the emitter edge. The corrected RED spies on the
+real comparator for every exact 100/10 call and distinct shard, adds zero,
+empty and 101-observation cases, writes the report and unchanged ledger before
+throwing on incomplete evidence, and bans workflow `continue-on-error`. It is
+signed as `ee2e3d26`; no confirmation review was opened.
+
+The 4d-b GREEN implements the private runner and append validator, makes the
+genuine fixture seed-sensitive while preserving its zero-argument D.102
+profile, adds the private package/Vite seam and global `.logs/**` exclusion,
+ships one read-only bounded workflow and initializes the reviewed ledger to an
+empty array. The workflow always uploads whatever bounded evidence exists but
+cannot commit or push it. Focused gate and final review evidence follow on the
+same exact-nine landing packet. A real PR artifact simulation reproduced that
+the signed RED's no-environment-only assertion rejected the complete report it
+had just emitted. The exact-nine correction authorizes only the successful
+environment branch and the scheduled timeout in that existing owner; it adds no
+new semantic or workflow source.
+
+Exact-nine formatting, source lint, `git diff --check` and test-utils
+typecheck/build pass. The 4d-a comparator and 4d-b runner pass together at
+16/16. A real PR-profile entry simulation using explicit UTC date, SHA and
+temporary absolute output paths produced one complete 100-close report with
+300 applied vertices, 100 nonempty states, ten reference samples and zero
+mismatches, plus an unchanged empty proposed ledger. The scheduled 100-shard
+nightly path remains intentionally outside local and PR feedback; the focused
+owner nevertheless executes all 100 runner/comparator calls over distinct
+shard arrays and checks the exact 10,000/1,000 aggregation.
+
+The final exact-eight review packet was staged tree `213dc9ec`, cached diff
+object `4cf0d45b` and canonical SHA-256 `51c03507`. Grok and genuine Kimi's
+100-check session `3204e81e-0800-4e46-a307-414027e3edf2` returned PASS with
+P0=0 and P1=0. Opus xhigh session
+`c2913ac4-f196-4bd1-9e64-93efef4a956b` reproduced one clean-checkout P0: the
+new runner self-imported its package subpath, whose export resolves through
+gitignored `dist` before the package build has created it. The correction uses
+the module-relative `.js` import while the ordered Vite alias continues to
+give the RED spy the same source identity. The controller also retained the
+same-round RED P1 that a ledger read or parse must not erase an already-computed
+mismatch report; the artifact driver now persists the report before touching
+the ledger. These two reproduced defects alone expand the landing to the
+declared exact-nine paths. Formatting, targeted lint, `git diff --check`,
+test-utils typecheck/build, the combined 4d-a/4d-b 16-test owner and a real
+PR-profile artifact simulation all pass. Null-carrier diagnostics, timeout and
+concurrency headroom, fixture-specific three-operation ledger arithmetic and
+fixed-seed prose drift remain P2 debt. Per the single-round boundary, no
+confirmation review follows these fixes.

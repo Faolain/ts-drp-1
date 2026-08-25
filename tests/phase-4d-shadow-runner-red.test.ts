@@ -320,65 +320,73 @@ describe("Phase 4d-b bounded recurring shadow runner RED", () => {
 		expect(ledgerExists()).toBe(true);
 	});
 
-	it.skipIf(!ownerReady)("pins a read-only bounded workflow and emits only explicit artifacts", async () => {
-		const workflow = parsedWorkflow();
-		expect(workflow).toBeDefined();
-		expect(workflow?.permissions).toEqual({ contents: "read" });
-		const triggers = workflow?.on as Record<string, unknown> | undefined;
-		expect(Object.keys(triggers ?? {}).sort()).toEqual(["pull_request", "schedule", "workflow_dispatch"]);
-		expect(triggers?.schedule).toEqual([expect.objectContaining({ cron: expect.any(String) })]);
-		expect(triggers?.workflow_dispatch).toMatchObject({
-			inputs: { tier: { options: ["pr", "nightly"], required: true, type: "choice" } },
-		});
-		const source = JSON.stringify(workflow);
-		expect(source).toContain("fetch-depth");
-		expect(source).toContain("--frozen-lockfile");
-		expect(source).toContain(".logs/**");
-		expect(source).toContain("phase-4d-shadow-runner-red.test.ts");
-		expect(source).toContain("SHADOW_LEDGER_OUTPUT");
-		expect(source).toContain("SHADOW_OUTPUT");
-		expect(source).toContain("upload-artifact");
-		expect(source).toContain("always()");
-		expect(source).not.toContain("continue-on-error");
-		expect(source).not.toMatch(/git (?:commit|push)|contents[^\n]*write/u);
-		const viteConfig = (await import("../vite.config.mts")).default;
-		expect(viteConfig.test?.exclude).toContain("**/.logs/**");
-		await expect(emitRequestedWorkflowArtifacts(requireOwner())).resolves.toBeUndefined();
-
-		const selected = requireOwner();
-		const complete = await completeNightlyCandidate(selected);
-		const failed = Object.freeze({
-			...complete,
-			completedEpochs: SHADOW_CLOSES_PER_SHARD,
-			completedShards: 1,
-			mismatches: Object.freeze([
-				Object.freeze({ epoch: 1, kind: "state-mismatch" as const, seed: SHADOW_SEED_VECTOR.seed }),
-			]),
-		});
-		const append = vi.fn(selected.appendShadowLedger);
-		const fakeOwner: ShadowRunnerModule = {
-			...selected,
-			appendShadowLedger: append,
-			runShadowTier: () => Promise.resolve(failed),
-		};
-		const temporary = mkdtempSync(path.join(tmpdir(), "phase4d-shadow-"));
-		const reportPath = path.join(temporary, "report.json");
-		const ledgerPath = path.join(temporary, "ledger.json");
-		try {
-			process.env.SHADOW_DATE = SHADOW_SEED_VECTOR.date;
-			process.env.SHADOW_LEDGER_OUTPUT = ledgerPath;
-			process.env.SHADOW_OUTPUT = reportPath;
-			process.env.SHADOW_SHA = SHADOW_SEED_VECTOR.sha;
-			process.env.SHADOW_TIER = "nightly";
-			await expect(emitRequestedWorkflowArtifacts(fakeOwner)).rejects.toThrow(/incomplete/u);
-			expect(JSON.parse(readFileSync(reportPath, "utf8"))).toMatchObject({
-				completedShards: 1,
-				mismatches: [{ kind: "state-mismatch" }],
+	it.skipIf(!ownerReady)(
+		"pins a read-only bounded workflow and emits only explicit artifacts",
+		async () => {
+			const workflow = parsedWorkflow();
+			expect(workflow).toBeDefined();
+			expect(workflow?.permissions).toEqual({ contents: "read" });
+			const triggers = workflow?.on as Record<string, unknown> | undefined;
+			expect(Object.keys(triggers ?? {}).sort()).toEqual(["pull_request", "schedule", "workflow_dispatch"]);
+			expect(triggers?.schedule).toEqual([expect.objectContaining({ cron: expect.any(String) })]);
+			expect(triggers?.workflow_dispatch).toMatchObject({
+				inputs: { tier: { options: ["pr", "nightly"], required: true, type: "choice" } },
 			});
-			expect(JSON.parse(readFileSync(ledgerPath, "utf8"))).toEqual([]);
-			expect(append).not.toHaveBeenCalled();
-		} finally {
-			rmSync(temporary, { force: true, recursive: true });
-		}
-	});
+			const source = JSON.stringify(workflow);
+			expect(source).toContain("fetch-depth");
+			expect(source).toContain("--frozen-lockfile");
+			expect(source).toContain(".logs/**");
+			expect(source).toContain("phase-4d-shadow-runner-red.test.ts");
+			expect(source).toContain("SHADOW_LEDGER_OUTPUT");
+			expect(source).toContain("SHADOW_OUTPUT");
+			expect(source).toContain("upload-artifact");
+			expect(source).toContain("always()");
+			expect(source).not.toContain("continue-on-error");
+			expect(source).not.toMatch(/git (?:commit|push)|contents[^\n]*write/u);
+			const viteConfig = (await import("../vite.config.mts")).default;
+			expect(viteConfig.test?.exclude).toContain("**/.logs/**");
+			const requested = await emitRequestedWorkflowArtifacts(requireOwner());
+			if (requested !== undefined) {
+				expect(reportIsComplete(requested)).toBe(true);
+				return;
+			}
+
+			const selected = requireOwner();
+			const complete = await completeNightlyCandidate(selected);
+			const failed = Object.freeze({
+				...complete,
+				completedEpochs: SHADOW_CLOSES_PER_SHARD,
+				completedShards: 1,
+				mismatches: Object.freeze([
+					Object.freeze({ epoch: 1, kind: "state-mismatch" as const, seed: SHADOW_SEED_VECTOR.seed }),
+				]),
+			});
+			const append = vi.fn(selected.appendShadowLedger);
+			const fakeOwner: ShadowRunnerModule = {
+				...selected,
+				appendShadowLedger: append,
+				runShadowTier: () => Promise.resolve(failed),
+			};
+			const temporary = mkdtempSync(path.join(tmpdir(), "phase4d-shadow-"));
+			const reportPath = path.join(temporary, "report.json");
+			const ledgerPath = path.join(temporary, "ledger.json");
+			try {
+				process.env.SHADOW_DATE = SHADOW_SEED_VECTOR.date;
+				process.env.SHADOW_LEDGER_OUTPUT = ledgerPath;
+				process.env.SHADOW_OUTPUT = reportPath;
+				process.env.SHADOW_SHA = SHADOW_SEED_VECTOR.sha;
+				process.env.SHADOW_TIER = "nightly";
+				await expect(emitRequestedWorkflowArtifacts(fakeOwner)).rejects.toThrow(/incomplete/u);
+				expect(JSON.parse(readFileSync(reportPath, "utf8"))).toMatchObject({
+					completedShards: 1,
+					mismatches: [{ kind: "state-mismatch" }],
+				});
+				expect(JSON.parse(readFileSync(ledgerPath, "utf8"))).toEqual([]);
+				expect(append).not.toHaveBeenCalled();
+			} finally {
+				rmSync(temporary, { force: true, recursive: true });
+			}
+		},
+		2_700_000
+	);
 });

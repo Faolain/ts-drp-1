@@ -30,7 +30,6 @@ import { activateV3LivePlane, bindV3BlueprintLivePlane } from "../../../packages
 
 import { createGenuinePreparedV3Fixture } from "../phase-3a1b-p3/live-fixture.js";
 import {
-	EXPECTED_REFERENCE_SAMPLES,
 	FOREIGN_AUTHOR,
 	OBJECT_ID,
 	REFERENCE_HASHES,
@@ -165,11 +164,17 @@ function vertexHash(epoch: number, index: number): string {
 	return (10_000 + epoch * 8 + index).toString(16).padStart(64, "0");
 }
 
-function operationsFor(epoch: number): readonly Operation[] {
+function operationsFor(epoch: number, seed = SHADOW_SEED): readonly Operation[] {
+	const seedOffset = (seed ^ SHADOW_SEED) >>> 0;
+	const suffix = seedOffset === 0 ? "" : `-${seedOffset}`;
 	return Object.freeze([
-		Object.freeze({ action: "map_set" as const, key: `key-${epoch % 7}`, value: `value-${epoch}` }),
-		Object.freeze({ action: "set_add" as const, value: `member-${epoch % 11}` }),
-		Object.freeze({ action: "add_mul" as const, add: (epoch % 3) + 1, multiplier: 1 }),
+		Object.freeze({
+			action: "map_set" as const,
+			key: `key-${(epoch + seedOffset) % 7}`,
+			value: `value-${epoch}${suffix}`,
+		}),
+		Object.freeze({ action: "set_add" as const, value: `member-${(epoch + seedOffset) % 11}${suffix}` }),
+		Object.freeze({ action: "add_mul" as const, add: ((epoch + seedOffset) % 3) + 1, multiplier: 1 }),
 	]);
 }
 
@@ -345,7 +350,24 @@ export async function referenceVector(value: unknown): Promise<Readonly<{ bytes:
 	return Object.freeze({ bytes, digest: referenceBytesToHex(await referenceHashDomain(STATE_DOMAIN, bytes)) });
 }
 
-export async function buildShadowRun(): Promise<readonly ShadowCloseObservation[]> {
+export async function buildShadowRun(
+	input: Readonly<{ closes?: number; referenceSampleInterval?: number; seed?: number }> = {}
+): Promise<readonly ShadowCloseObservation[]> {
+	const closes = input.closes ?? SHADOW_CLOSES;
+	const referenceSampleInterval = input.referenceSampleInterval ?? REFERENCE_SAMPLE_INTERVAL;
+	const seed = input.seed ?? SHADOW_SEED;
+	if (
+		!Number.isSafeInteger(closes) ||
+		closes <= 0 ||
+		!Number.isSafeInteger(referenceSampleInterval) ||
+		referenceSampleInterval <= 0 ||
+		closes % referenceSampleInterval !== 0 ||
+		!Number.isSafeInteger(seed) ||
+		seed < 0 ||
+		seed > 0xffff_ffff
+	) {
+		throw new TypeError("shadow run profile is invalid");
+	}
 	const [runtimeA, runtimeB, runtimeArchive] = await Promise.all([
 		prepareRuntime(),
 		prepareRuntime(),
@@ -356,8 +378,8 @@ export async function buildShadowRun(): Promise<readonly ShadowCloseObservation[
 	const reference = referenceMachine(INITIAL_STATE);
 	const fixtures: Array<readonly Operation[]> = [];
 	const observations: ShadowCloseObservation[] = [];
-	for (let epoch = 0; epoch < SHADOW_CLOSES; epoch++) {
-		const operations = operationsFor(epoch);
+	for (let epoch = 0; epoch < closes; epoch++) {
+		const operations = operationsFor(epoch, seed);
 		fixtures.push(operations);
 		const resultA = foldCurrent(machineA, epoch, operations);
 		const resultB = foldCurrent(machineB, epoch, operations);
@@ -375,15 +397,15 @@ export async function buildShadowRun(): Promise<readonly ShadowCloseObservation[
 				engineA: typeScriptObservation(epoch, resultA.order, machineA),
 				engineB: typeScriptObservation(epoch, resultB.order, machineB),
 				reference:
-					(epoch + 1) % REFERENCE_SAMPLE_INTERVAL === 0
+					(epoch + 1) % referenceSampleInterval === 0
 						? Object.freeze({ kind: "observed" as const, value: referenceObservation })
 						: Object.freeze({ kind: "not-sampled" as const }),
-				seed: SHADOW_SEED,
+				seed,
 			})
 		);
 	}
 	const referenceSamples = observations.filter((entry) => entry.reference.kind === "observed").length;
-	if (referenceSamples !== EXPECTED_REFERENCE_SAMPLES) {
+	if (referenceSamples !== closes / referenceSampleInterval) {
 		throw new TypeError("shadow reference sample schedule drifted");
 	}
 	return Object.freeze(observations);

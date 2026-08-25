@@ -113,9 +113,9 @@ export async function emitRequestedWorkflowArtifacts(owner: ShadowRunnerModule):
 		sha,
 		tier,
 	});
+	writeFileSync(output, exactReportBytes(report));
 	const ledger = JSON.parse(readFileSync(LEDGER_PATH, "utf8")) as unknown;
 	if (!Array.isArray(ledger)) throw new TypeError("shadow ledger root must be an array");
-	writeFileSync(output, exactReportBytes(report));
 	const complete = reportIsComplete(report);
 	const proposed = tier === "nightly" && complete ? owner.appendShadowLedger({ candidate: report, ledger }) : ledger;
 	writeFileSync(ledgerOutput, exactLedgerBytes(proposed));

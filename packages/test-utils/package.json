@@ -23,6 +23,10 @@
 		"./shadow-comparison": {
 			"types": "./dist/src/shadow-comparison.d.ts",
 			"import": "./dist/src/shadow-comparison.js"
+		},
+		"./shadow-runner": {
+			"types": "./dist/src/shadow-runner.d.ts",
+			"import": "./dist/src/shadow-runner.js"
 		}
 	},
 	"scripts": {
