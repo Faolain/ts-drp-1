@@ -56928,3 +56928,48 @@ identity now have one frozen successor law and a fail-closed pull-request
 transition checker. The next pickup is the atomic D.105b exact-thirteen
 tests-only RED, beginning with a source-grounded confirmation that the reused
 browser bundler/server helper suffices without an unlisted setup owner.
+
+D.105b's corrected exact-thirteen tests-only RED is now Good-signed and pushed as
+commit `54310fd12b3d605f25a4b02dadd30de91d65cccc`, tree
+`e1f12d93b09de3d6c931f69708e48c4253b2aa53`. Its pre-commit full-index diff
+object was `86e1de1c4b1e3585dc6b9510d4215a790ebf1583` with canonical SHA-256
+`77b821ab36063de82cc6d4001c8a70b27cb4fe52e4dfd2d91880d80b2d51a1fa`;
+there were exactly thirteen staged paths and zero tracked unstaged paths. The
+focused RED executed two independent controls, failed only the composite
+four-owner readiness assertion, and kept four complete future behaviors dormant.
+The actual Quint typecheck and all four named state traces passed. All 24
+cross-engine browser cases discovered and skipped on the absent composite owner.
+Exact-path Prettier and ESLint, storage-browser TypeScript, and diff checks
+passed. The retained D.105a, genesis-profile, and Phase-2h suites passed 21/21;
+the sole Phase-2d failure remains its already-recorded stale export inventory
+that omits the shipped `./snapshot-transfer` subpath.
+
+The sole RED review round authenticated the original frozen exact-thirteen
+packet at staged tree `228ad957…` and canonical SHA-256 `eb6b5386…`. Grok and
+Opus returned CHANGES. Kimi's 100-check terminal returned PASS but did not
+actually classify the supplied transaction-count candidate; source
+reconciliation therefore recorded that candidate as one P1 and did not treat
+the terminal as clearance. The same-round corrections replaced the invented
+seventeen-field CutValue with the frozen registry's exact 22-field tuple and a
+field-roster guard; replaced the constant Quint witness with mutable n=4
+slot/lock/QC/outbox/crash/restart state and executable safety traces; and changed
+the impossible exact-one transaction oracle so all five vote attempts must each
+traverse the exact strict four-store transaction while only the first may mutate
+durable state. The browser death child now receives the exact live origin, arms
+at the requested transaction boundary, is killed as a process group with
+`SIGKILL`, and is checked after same-profile reopen through test-owned raw IDB
+counts. The worker path is exercised. Primary takeover now commits in the first
+page, closes it before dispatch, executes the successor in the second page, and
+cross-checks test-observed exact sends against durable nonempty keys. The browser
+export roster is closed, the candidate voter itself owns stale, duplicate,
+conflict, and ambiguous-terminal paths, and QC rows use the frozen
+`{signerId, voteDigest, signature}` carrier with mixed-tuple, duplicate-signer,
+and truncated-signature negatives. The complete 22-mutant roster is explicit.
+Per the checkpoint rule these corrected bytes received no confirmation review.
+
+Product capability gained at D.105b RED: none; all four production owners remain
+absent. Governance/security debt discharged: the RED now makes the registry
+tuple, transactional TOCTOU boundary, formal crash safety, same-origin hard-death
+evidence, and cross-page dispatch takeover causal before any signing or storage
+authority lands. The next pickup is the single atomic D.105b GREEN that wakes
+this exact RED without editing it.
