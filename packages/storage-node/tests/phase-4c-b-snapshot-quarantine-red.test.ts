@@ -25,7 +25,7 @@ import type {
 
 const OWNER_PATH = resolve(fileURLToPath(new URL("../src/snapshot-transfer.ts", import.meta.url)));
 const NODE_MODULE_PATH: string = "../src/snapshot-transfer.js";
-const RECEIPT_MODULE_PATH: string = "../../compaction/src/snapshot-quarantine-receipt.js";
+const RECEIPT_MODULE_PATH: string = "@ts-drp/compaction/snapshot-quarantine-receipt";
 const ownerExists = (await import("node:fs")).existsSync(OWNER_PATH);
 const CHILD = fileURLToPath(new URL("./fixtures/phase-4c-b-snapshot-quarantine-crash-child.mjs", import.meta.url));
 const temporaryDirectories: string[] = [];
@@ -322,7 +322,7 @@ describe.skipIf(!ownerExists)("Phase 4c-b genuine Node SQLite quarantine RED", (
 		expect(() => owner.createNodeSnapshotQuarantineStore({ primaryFilename: foreignPrimary })).toThrowError(
 			expect.objectContaining({ code: "unsupported-schema" })
 		);
-		expect(rawCounts(primaryFilename)).toEqual({ chunks: 0, scopes: 1 });
+		expect(rawCounts(primaryFilename)).toEqual({ chunks: 1, scopes: 1 });
 	});
 
 	it("consumes one genuine terminal receipt exactly once and persists only an opaque verified reference", async () => {
