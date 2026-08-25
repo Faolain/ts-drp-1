@@ -57058,3 +57058,28 @@ snapshot/round isolation. Focused post-correction evidence is 7/7 seal safety,
 and all affected package typechecks/builds passed. Exact retained gates and the
 final signed packet are recorded at commit handoff below; no further model review
 is authorized for these corrected bytes.
+
+The corrected atomic GREEN is Good-signed and pushed as commit
+`ad4539d12b09f4652dbe0e5e82674bbfafc16fae`, tree
+`3237ecf361c453907e127d6b59b28e64139dfb53`. Its pre-commit full-index diff
+object was `d6a29e63b2934614ce7f62857b043397698ffe6a`, canonical SHA-256
+`b317f848797cd2319dc598efb587ebbfa69326717521907ebad517cb94440051`, with
+exactly 42 staged paths and zero tracked unstaged paths. Exact-path Prettier,
+ESLint, diff checks, all four affected package typechecks, all four package
+builds, the 56/56 focused retained unit bundle, 12/12 retained schema browser
+cases, the retained 18-boundary death campaign, and the Phase-5c 25-pass/two
+intentional-skip browser matrix all passed. The exact staged tree and the final
+signed commit each independently passed the complete storage-browser gate:
+44/44 files and 285/285 tests. The latter includes its own clean-archive child,
+so no dirty-worktree allowance or staged overlay is part of the final claim.
+
+Product capability gained: a certified epoch-zero finality signer can prepare a
+one-use protocol-bound signing request, persist one prepare/commit vote through
+strict four-store browser anti-equivocation, reopen exact scoped signer state
+among multiple lawful rows, and recover bounded durable publication work after
+hard process death. Governance/security debt discharged: raw-digest signing,
+enumerable/reusable provisional intents, database-wide signer-state selection,
+in-transaction test callbacks, and false bounded-overflow reporting are all
+removed. Acting publication and live-room authority remain absent. The next
+slice is Phase 5d: RED-first pacemaker and distinct round-change evidence, with
+the bidirectional Quint/TypeScript trace gate before any network composition.
