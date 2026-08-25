@@ -57373,3 +57373,65 @@ Phase 5d gains no live-room authority, publisher, certified anchor adoption,
 pruning, authority handoff, creator storage-loss re-learn, or claim that the
 Phase-5 observation exit metric is satisfied. Phase 5e remains the first live
 creator composition.
+
+### D.106b/c implementation, review reconciliation, and evidence
+
+The tests-only Phase-5d RED landed at signed commit `9f3cf4fa`; its causal
+corrections remained separate signed commits, ending with trace/model custody
+corrections `259f8a46` and `467aba69` and browser-observer governance correction
+`3b167049`. The atomic runtime GREEN then landed as exactly the nine owners above
+at signed commit `52200539d171e772f86e87ce7a9114b7323f9802`, tree
+`54962da927da746e18c55b8e989e7e91989365d1`. Its authenticated pre-commit binary
+diff SHA-256 was
+`9a651fbba725566887eac95e846970750cb2d4969e817371b71a3d5389fdbc3f`.
+No package manifest or lockfile escaped the signed exact-nine GREEN.
+
+The sole Kimi GREEN review reproduced two P1 lifecycle failures: public observe
+operations did not share the timer's serialized gate, and `stop()` did not drain
+in-flight observations. The sole Opus/xhigh GREEN review returned `CHANGES` and
+expanded the same causal families to durable full-QC recovery, terminal-state
+fencing, signed round entry, proposal/certificate highest-QC selection, round-0
+commit voting, pure status, closed replay events, and bounded future evidence.
+The sole Grok run ended `NO_VERDICT` and was not restarted; its read-only partial
+source audit was used only to reproduce those already in-scope candidates, not
+as formal approval. This was the one review round. There was no confirmation
+review.
+
+The same-round runtime correction now:
+
+- serializes timer work and all four public observations through one operation
+  gate, fences terminal/finalized state inside that gate, and makes `stop()`
+  await the admitted operation tail before returning;
+- persists and re-verifies complete canonical prepare and commit QCs on reopen,
+  rejects corrupt or byte-less durable summaries, and distinguishes a local
+  commit vote from verified commit-QC finality;
+- requires a durable matching prepare QC before a commit vote, emits the round-0
+  commit vote after prepare-QC persistence, and makes finalization terminal;
+- selects the greatest certified nested prepare QC, rejects equal-round
+  different-value evidence, breaks equal-round same-value ties by the lowest
+  registered QC digest, and binds the proposal value to that selection;
+- replaces external round mutation with the signed durable round-change path,
+  keeps `status()` observational, prunes stale future evidence, and emits the
+  closed replay tuple with a local monotone sequence; and
+- preserves restart semantics: a lower-round durable lock does not falsely
+  restore the newer entered round as `committed`, while same-round complete QC
+  custody does.
+
+Acceptance evidence on the committed tree:
+
+- root Phase-5d suite: 13/13, including real Apalache verification, all checked
+  ITF traces, and genuine voter/pacemaker/fake-IDB bidirectional replay;
+- Phase-5d browser matrix: 24/24 across Chromium, Firefox, and WebKit;
+- storage-browser preservation and clean-checkout package gate: 285/285;
+- protocol-v3, seal, and storage-browser builds and package typechecks: PASS;
+- exact-nine ESLint and cached-diff checks: PASS.
+
+The repository-wide typecheck remains blocked outside this slice by the retained
+`packages/object` compact-history tests that supply `history_storage: "archive"`
+to the current `"full" | "compact"` type. Repository-wide ESLint exhausted the
+Node 4 GiB heap before producing findings; the exact changed-owner lint is clean.
+These are explicit inherited gate limitations, not Phase-5d passes. The shipped
+capability is still observation/model mode: a durable epoch-zero pacemaker and
+browser voter exist, but no live-room/network composition, certified adoption,
+pruning, or Phase-5 exit-metric claim is added. Phase 5e remains the next product
+slice.
