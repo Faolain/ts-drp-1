@@ -1,6 +1,7 @@
-/* eslint-disable import/no-unresolved, @typescript-eslint/explicit-function-return-type -- Future-owner death child. */
-import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
+/* eslint-disable @typescript-eslint/explicit-function-return-type -- Future-owner death child. */
 import { DatabaseSync } from "node:sqlite";
+
+import { encodeCanonical, hashDomain } from "../../../canonical/dist/src/index.js";
 
 const [primaryFilename, targetJson] = process.argv.slice(2);
 if (typeof primaryFilename !== "string" || typeof targetJson !== "string") process.exit(64);
