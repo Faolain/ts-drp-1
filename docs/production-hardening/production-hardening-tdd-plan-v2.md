@@ -55745,6 +55745,26 @@ its own `.drp-snapshot-quarantine-v1.sqlite` database; the browser adapter uses
 its own `--drp-snapshot-quarantine-v1` database. Neither adds tables or object
 stores to an existing exact-schema authority.
 
+Phase 4c-b closed at signed GREEN `6fcdc67b`, after the tests-only crash fixture
+resolution correction `814cb30c`. The shipped capability is a durable,
+manifest-first quarantine with arbitrary missing-set resume, detached bounded
+chunk custody, atomic conflict poisoning, explicit cancellation and local
+expiry in both SQLite and IndexedDB. Completion authority remains the private
+one-use receipt minted by the genuine 4c-a verifier; the stored `verified` bit
+is resource state, never independent snapshot authority.
+
+The final review reproduced three security defects and GREEN closed all three:
+the manifest pre-copy ceiling now comes from the fixed signed profile rather
+than caller input, byte-carrier admission uses captured intrinsic slots before
+allocation, and completion rechecks chunk closure and the durable state inside
+the same write transaction that performs the `open` to `verified` transition.
+Consequently a second connection cannot erase committed poison by racing
+completion. The final gates passed package formatting/lint/diff checks, all four
+package typechecks and builds, the root and Node semantic/crash owners, and the
+Chromium/Firefox/WebKit IndexedDB matrix. Phase 4c-b still exposes no transfer,
+activation, adoption, certification or archive authority; those boundaries
+remain with the following slices.
+
 #### Phase 4c-c — authenticated pull transfer and D.100 composition
 
 This slice uses a dedicated reliable protocol, provisionally
