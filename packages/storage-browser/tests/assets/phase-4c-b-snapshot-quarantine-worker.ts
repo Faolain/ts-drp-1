@@ -17,7 +17,6 @@ self.onmessage = async (
 		if (operation !== target.operation || target.edge !== "precommit") return;
 		request.addEventListener("success", () => {
 			self.postMessage({ edge: target.edge, kind: "checkpoint", operation });
-			Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);
 		});
 	};
 	IDBObjectStore.prototype.add = function observedAdd(value: unknown, key?: IDBValidKey): IDBRequest<IDBValidKey> {
@@ -38,11 +37,12 @@ self.onmessage = async (
 	const scope = await store.openScope(selected.declaration);
 	if (target.operation === "manifest" && target.edge === "postcommit") {
 		self.postMessage({ edge: target.edge, kind: "checkpoint", operation: target.operation });
-		Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);
+		await new Promise(() => undefined);
 	}
 	await scope.verificationQuarantine.open(new AbortController().signal).write(descriptor, bytes);
 	if (target.operation === "chunk" && target.edge === "postcommit") {
 		self.postMessage({ edge: target.edge, kind: "checkpoint", operation: target.operation });
-		Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0);
+		await new Promise(() => undefined);
 	}
+	await new Promise(() => undefined);
 };

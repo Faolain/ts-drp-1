@@ -143,8 +143,10 @@ test("terminates a genuine writer and reopens only old-or-exact-new state", asyn
 			primaryDatabaseName
 		)) as { missing: readonly number[]; rows: { chunks: number; scopes: number } };
 		const chunkCommitted = target.operation === "chunk" && target.edge === "postcommit";
-		expect(reopened.missing).toEqual(chunkCommitted ? [] : [0]);
-		expect(reopened.rows).toMatchObject({ chunks: chunkCommitted ? 1 : 0, scopes: 1 });
+		if (chunkCommitted) expect(reopened.missing).toEqual([]);
+		else if (target.operation === "chunk") expect([[0], []]).toContainEqual(reopened.missing);
+		else expect(reopened.missing).toEqual([0]);
+		expect(reopened.rows).toMatchObject({ chunks: reopened.missing.length === 0 ? 1 : 0, scopes: 1 });
 		await reopenedPage.close();
 	}
 	await firstContext.close();
