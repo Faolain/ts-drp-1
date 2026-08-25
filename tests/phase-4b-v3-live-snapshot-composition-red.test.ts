@@ -54,6 +54,8 @@ const V3_LIVE_EXPORT_ROSTER = Object.freeze([
 	"V3LiveDescriptor",
 	"V3LocalIssueInput",
 	"V3LocalIssueResult",
+	"V3OperationAdmissionPolicy",
+	"V3OperationAdmissionReservation",
 	"V3PlaneActivationFailureKind",
 	"V3PlaneActivationInput",
 	"V3PlaneActivationResult",
