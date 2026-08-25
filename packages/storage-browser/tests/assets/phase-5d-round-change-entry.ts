@@ -229,11 +229,21 @@ async function runRoundChangeCommit(databaseName: string): Promise<unknown> {
 	const events: string[] = [];
 	const first = await openHarness(databaseName, events);
 	await new Promise((resolvePromise) => setTimeout(resolvePromise, 1_150));
-	const beforeClose = first.pacemaker.status();
+	const beforeStatus = first.pacemaker.status();
+	const beforeClose = Object.freeze({
+		...beforeStatus,
+		enteredRound: beforeStatus.round,
+		revision: beforeStatus.durableRevision,
+	});
 	await first.pacemaker.stop();
 	await first.browser.close();
 	const reopened = await openHarness(databaseName, events);
-	const afterReopen = reopened.pacemaker.status();
+	const reopenedStatus = reopened.pacemaker.status();
+	const afterReopen = Object.freeze({
+		...reopenedStatus,
+		enteredRound: reopenedStatus.round,
+		revision: reopenedStatus.durableRevision,
+	});
 	await reopened.pacemaker.stop();
 	await reopened.browser.close();
 	return { afterReopen, beforeClose, events };
