@@ -55417,3 +55417,337 @@ certificate, successor anchor, next-epoch activation, pruning, cold join or
 product-complete Phase 4 claim. Phase 4c owns bounded streaming transfer;
 Phase 4d owns continuous independent shadow comparison; Phase 5 and Phase 6
 own certified close and verified successor adoption.
+
+### D.101 — Phase 4c bounded snapshot streaming and transfer ownership
+
+Phase 4c is not permission to reassemble a snapshot eagerly under a new API.
+The signed Phase 4 table already requires
+`verifySnapshotStream(...): AsyncIterable<Uint8Array>`, a verifier-memory delta
+below two chunks for a generated 64 MiB payload, resume from arbitrary missing
+sets, and bounded slow-drip and byte-budget failure. D.99 and D.100 deliberately
+consume one complete canonical payload only at the terminal replacement
+boundary; they do not weaken that streaming requirement. Phase 4c therefore
+ships three independently reviewable product slices: the frozen manifest and
+running verifier, a dedicated durable quarantine, and authenticated transfer
+composition. Phase 4c is complete only when all three are GREEN.
+
+The data format is not redesigned here. The signed protocol-v3 registry already
+owns `snapshotChunk` under `ts-drp/snapshot-chunk/v3` as the domain-framed
+canonical index plus raw chunk bytes. It also owns `snapshotManifest` under
+`ts-drp/snapshot-manifest/v3` as the exact canonical twelve-field record:
+`kind`, `protocolMajor`, `encodingVersion`, `objectId`, `epoch`, `anchor`,
+`schemaVersion`, `stateDigest`, `aclDigest`, `payloadDigest`, `totalBytes` and
+the index-ordered contiguous `chunks` records `{index,digest,byteLength}`.
+Existing registry vectors remain the independent byte/digest authority. No
+Phase 4c GREEN may edit or restamp the registry, its generated reference, its
+vectors, D.99's snapshot payload schema, or D.100's activation result roster.
+
+The shipped live profile supplies the operative resource bounds: authenticated
+`snapshotChunkBytes = 131072` and `maxSnapshotBytes = 268435456`, hence at most
+2,048 chunks. Registry-wide extrema are compatibility syntax, not authority to
+allocate a 4 GiB browser payload or a 262,144-row manifest. D.100 currently
+retains the authenticated maximum payload size but drops the already validated
+chunk size. Live transfer composition must retain both values from the opaque
+recovered authority; callers and serving peers cannot choose them. Core tests
+may pass an explicit frozen profile, but no live adapter may replace recovered
+limits with defaults.
+
+#### One owner per concept
+
+Phase 4c uses a small ownership graph rather than one cross-package session or
+several competing validators:
+
+- `@ts-drp/protocol-v3/snapshot-transfer` is the sole pure codec for the frozen
+  manifest and chunk identities. It validates exact closed canonical records,
+  registry vectors, safe counts and sums, and authenticated profile bounds. It
+  contains no transport, storage, peer selection or activation policy.
+- `@ts-drp/compaction/snapshot-stream` is the sole semantic stream verifier. It
+  pulls descriptors in canonical index order, verifies exact carriers, lengths
+  and index-bound chunk digests before writing detached bytes to a quarantine
+  port, and verifies the running D.99 payload-domain digest before releasing a
+  private unforgeable terminal receipt. The required `AsyncIterable<Uint8Array>`
+  is opened from that verified receipt and reads the quarantine in canonical
+  order; it never exposes arrival-time or merely per-chunk-valid bytes. It does
+  not retain a payload or activate a plane.
+- a narrow non-root canonical helper owns incremental domain framing. It accepts
+  a known part length, hashes bounded updates, and terminalizes once. Its RED
+  differentially proves every segmentation against the existing `hashDomain`;
+  neither protocol-v3 nor compaction may duplicate `HASH_MAGIC`, length framing
+  or SHA-256 setup.
+- `@ts-drp/storage/snapshot-transfer` and its Node/browser implementations own
+  only durable quarantine mechanics. They store exact manifest bytes and
+  detached verified chunks, report missing indices, poison conflicts, expire or
+  discard sessions, and release a terminal quarantine receipt. They do not
+  interpret ACLs, certify a manifest, change an AHE generation or expose an
+  active pointer.
+- `@ts-drp/network/snapshot-transfer` owns only authenticated reliable-stream
+  framing and cancellation. The private node `V3SnapshotTransferSession` is the
+  sole mutable transfer policy owner. One recovered capability is consumed
+  before the first network or storage effect into private activation material
+  that retains the authenticated identity, runtime, ACL and limits. That same
+  material remains inside the session through terminal D.100 activation;
+  transfer does not consume one authority and ask the caller for an unexplained
+  second capability. Only crash recovery obtains and consumes a genuinely new
+  recovered capability, then revalidates the durable quarantine before
+  continuing. The session chooses already connected authorized peers, bounds
+  attempts, concurrency, bytes and time, switches peers, drives the semantic
+  verifier and quarantine, and finally invokes the existing D.100
+  snapshot-closed replacement owner.
+
+The current AHE durable store is not a quarantine implementation. Its blobs use
+`ts-drp-storage/blob/v1`, its generation begins from a complete predeclared
+storage-digest closure, and a snapshot manifest contains different index-bound
+protocol chunk digests. Reusing it would either rehash into a second authority
+or require the bytes before streaming starts. Phase 4c-b therefore uses a
+separate transfer schema behind one common port; no existing AHE generation,
+head, adoption pointer or death-recovery invariant is modified.
+
+#### Phase 4c-a — frozen manifest and bounded running verifier
+
+The tests-only RED adds one focused core owner, one closed contract fixture, one
+exact type fixture and one isolated memory child. Its sole active readiness
+failure is the absent explicit `snapshot-transfer`/`snapshot-stream` subpaths;
+all independent registry, digest and memory oracles run before that failure and
+all product behavior remains dormant.
+
+The manifest codec requires exact unshared, attached, non-resizable full-buffer
+carriers and byte-for-byte canonical re-encoding. It authenticates the external
+expected manifest digest before trusting fields or reserving resources, then
+requires the frozen record, current encoding profile, caller-authenticated live
+limits, contiguous indices, exact non-final chunk lengths, a nonempty final
+chunk, safe `totalBytes`, exact descriptor sum, and at most 2,048 descriptors
+under the shipped profile. The manifest's own digest or payload digest is never
+self-authenticating; core verification requires an external expected manifest
+digest. Phase 5 will bind that digest into a certified cut. Until then it is a
+test-owned or shadow-comparison expectation, not a cold-join trust root.
+
+The shipped profile also freezes `maxManifestBytes = 212387`. This is the exact
+maximum canonical carrier derived from the frozen twelve-field schema, a
+1,024-UTF-16-unit object id, maximum safe-integer epoch/schema values, four
+32-byte hex digests, the 256 MiB total and 2,048 maximum-size descriptor rows.
+Both codec and transport reject `byteLength > 212387` from the intrinsic byte
+carrier slots before copying, hashing, decoding, canonical re-encoding,
+reserving quarantine or allocating from manifest claims. RED pins the exact
+boundary and one byte over and independently regenerates the constant from the
+schema/profile maxima; the constant is implementation profile policy, not a new
+registry field.
+
+The manifest metadata is derived, not parallel. `stateDigest` is exactly the
+D.99 `applicationStateDigest`. `aclDigest` is the
+`ts-drp/latched-acl/v3` digest of the exact canonical ACL embedded in the D.99
+payload, which D.100 already defines as the staged next ACL for the closed
+epoch. Object, epoch, anchor and schema must equal the same D.99 payload. A
+manifest builder may consume that verified export and its authenticated live
+facts; it may not accept a different caller ACL/state convention. Named REDs
+cross-check each binding against D.99 import and reject current-ACL,
+whole-payload-state-digest and re-encoded-surrogate mutants.
+
+The chunk source is demand-driven:
+
+```ts
+read(
+  descriptor: { index: number; digest: string; byteLength: number },
+  options: { signal: AbortSignal },
+): Promise<Uint8Array | undefined>
+```
+
+The verifier asks for one canonical descriptor at a time in 4c-a. Later
+transfer composition may stage up to four descriptor requests, but it retains
+at most one response body and never writes an unverified body. Transport staging
+is outside durable quarantine; only the semantic verifier may write after
+index, length and digest verification. A corrupt peer therefore cannot occupy a
+durable index or poison an honest retry merely by answering first.
+`verifySnapshotStream` drives source-to-quarantine verification and gates its
+returned `AsyncIterable<Uint8Array>` on the private terminal receipt. Iteration
+cannot yield until exact total length and the incremental
+`ts-drp/snapshot-payload/v3` digest match the authenticated manifest; afterward
+it reads detached verified chunks from quarantine in canonical order with the
+same memory bound. No active pointer, D.100 import, externally usable iterable
+or completion receipt exists after partial verification, missing/corrupt/
+substituted/reordered data, source failure, abort, timeout or byte-budget
+exhaustion. Consumer abandonment of the verified iterable closes its read
+lease without invalidating or promoting the quarantine scope.
+
+Named causal REDs cover the frozen golden vectors; every manifest field;
+noncanonical/extra/missing fields; unsafe sums; zero, boundary and over-bound
+payloads; wrong descriptor count/order/index/length; chunk index omission,
+reorder, duplication and substitution; hostile shared/resizable/partial,
+shadowed and subsequently mutated byte carriers; wrong expected manifest and
+payload digests; source retention; consumer cancellation; abort before read,
+after read, before yield and before completion; a never-resolving read; and a
+source whose arbitrary pre-existing set is complemented only by the exact
+missing indices. Each mutant asserts that it changed one fixture and pins one
+closed rejection class.
+
+The 64 MiB memory proof runs in a fresh `--expose-gc` child over a generated
+lazy source and a test-owned temporary-file quarantine; it never constructs the
+full source payload or an output accumulator. Manifest construction/parsing is
+completed before the measurement baseline. The normative oracle records peak
+live chunk-body ownership and peak post-baseline `heapUsed + arrayBuffers`
+throughout source read, digest verification, quarantine write, terminal hash
+finalization and verified iteration. Test-owned barriers hold each boundary
+long enough for an external high-water sampler; the peak must remain below
+262,144 bytes and fewer than two complete chunk bodies. A named
+concatenate-then-drop mutant must breach that peak oracle even though it frees
+the allocation before settlement. The post-settlement forced-GC measurement is
+retained only as separate leak evidence. RSS and allocator high-water data are
+logged separately as diagnostics, not used as a brittle absolute threshold.
+The child also reopens the verified iterable, proves 512 chunks and the exact
+running payload digest, so an empty, short-circuited or write-only verifier
+cannot satisfy the memory gate.
+
+RED scope is limited to:
+
+- `tests/phase-4c-snapshot-stream-red.test.ts`;
+- `tests/fixtures/phase-4c-v3/snapshot-stream-contract.json`;
+- `tests/fixtures/phase-4c-v3/snapshot-stream-types.ts`;
+- `tests/fixtures/phase-4c-v3/snapshot-stream-memory-child.mjs`.
+
+The minimal GREEN may change exactly seven paths:
+
+- `packages/canonical/src/domain-hash-stream.ts`;
+- `packages/canonical/package.json` for only the non-root helper route;
+- `packages/protocol-v3/src/snapshot-transfer.ts`;
+- `packages/protocol-v3/package.json` for only the non-root codec route;
+- `packages/compaction/src/snapshot-stream.ts`;
+- `packages/compaction/src/blueprint-snapshot.ts` for only the shared D.99
+  payload-digest owner;
+- `packages/compaction/package.json` for only the non-root stream route.
+
+Package roots and existing root export rosters remain unchanged. The v2
+reference may inform an independent RED oracle but is never imported by GREEN.
+
+#### Phase 4c-b — durable snapshot quarantine
+
+This slice begins only after 4c-a is signed. Its RED defines one common storage
+contract and genuine Node SQLite and browser IndexedDB implementations. A
+transfer scope is a local domain-separated key over authenticated object,
+epoch, anchor and expected manifest digest. The store writes the exact manifest
+first and each detached chunk atomically by scope and index. Exact duplicate
+writes are idempotent; any different digest, length or bytes for an occupied
+index poisons the scope and prevents completion. Reads return detached bytes.
+
+The RED proves restart from arbitrary non-prefix missing sets, exact missing
+indices, crash between manifest and chunk commits, crash during a chunk commit,
+same-manifest resume, conflicting-manifest refusal, conflict poisoning,
+explicit cancel, expiry sweep on open and while a process is active, and no
+write or callback after abort/close. Disconnect pauses and retains verified
+chunks until the owner-local expiry; explicit cancellation discards them.
+No test claims wall-clock cleanup while a browser process is not running.
+
+There is no signed expiry field. Phase 4c freezes local resource-policy
+constants instead: 10,000 ms per-read inactivity, 120,000 ms total transfer
+duration, three attempts per descriptor, four active sessions process-wide, one
+active session per authenticated scope/peer, one live response body, four
+staged descriptor requests, a body-byte budget no larger than the authenticated
+`maxSnapshotBytes`, and 86,400,000 ms durable quarantine retention after the
+last verified write. Callers, manifests and peers cannot widen them. The node
+owner captures transfer limits at session creation; the storage owner captures
+retention at scope creation. Fake-clock REDs pin each exact boundary, slow-drip
+reset behavior, total-duration supremacy over progress, attempt exhaustion,
+restart retention at one millisecond before expiry and deterministic sweep at
+expiry. Later profile changes require a new reviewed plan slice rather than
+optional tuning fields.
+
+The quarantine completion operation accepts only a 4c-a terminal receipt for
+the same scope and manifest and returns an opaque verified quarantine reference.
+It exposes no assembled payload, commit/adopt/head-swap method or arbitrary
+database handle. The Node and browser adapters contain no manifest, chunk,
+digest, ACL, peer or activation logic. Before RED, a bounded storage spike must
+confirm exact transaction and cleanup behavior for both backends; if either
+backend needs a different semantic contract, reslice rather than add adapter
+flags.
+
+#### Phase 4c-c — authenticated pull transfer and D.100 composition
+
+This slice uses a dedicated reliable protocol, provisionally
+`/ts-drp/v3/snapshot-chunk/1.0.0`. It does not reuse gossip, retained
+publication, DAG sync, ordinary `sendMessage`, E3 unreliable WebRTC or a
+general arbitrary-stream API. The adapter uses only an already authenticated
+connection and fails closed when absent; it never dials through a fallback.
+
+Phase 4c-c cannot begin until signed 4c-b exists. Closed bounded transport
+records carry an exact manifest request/response and
+requests for at most four ordered unique missing chunk digests. A chunk response
+binds manifest digest, index, chunk digest and byte length before one body frame
+bounded by the authenticated chunk size. External carriers are copied before
+any await. The node session limits one transfer per authenticated scope and
+peer, four outstanding descriptors but only one received body, four sessions
+globally, exact received bytes, 10-second per-read inactivity, 120-second total
+duration and three attempts per descriptor. A malicious
+peer's corrupt, withheld or slow-dripped response closes that attempt and moves
+the still-missing descriptor to another already connected authorized peer.
+Transport success never overrides 4c-a verification.
+
+Serving is also fail closed. A connected peer is not automatically entitled to
+snapshot bytes. Until a room-owned authenticated peer-to-author mapping exists,
+the genuine integration may install an exact signed invite mapping, but
+production serving must reject rather than accept a caller boolean or every
+connected peer. The server has no access to private runtime/machine authority
+and serves only a previously verified manifest/chunk scope.
+
+The genuine checkpoint uses three real network nodes: receiver, corrupt/slow
+source and honest source. A source folds and adopts a real D.100 epoch and
+exports a D.99 payload and frozen manifest. The receiver starts with a
+non-prefix durable chunk subset, rejects a valid-sized corrupt chunk, bounds a
+slow drip, switches peer without dialing, fetches exactly the remaining
+descriptors, and obtains one terminal verified quarantine reference. No
+registration, queue, topic, active pointer or snapshot plane exists before
+completion. For a deliberately small fixture, the terminal adapter
+materializes the verified payload once. The same privately retained authority
+consumed before transfer invokes the existing D.100 branch; a genuinely fresh
+recovered capability is used only by the explicit crash/reopen path. The
+imported plane remains
+`snapshot-closed`, re-exports byte-identical payload/state/ACL digests, and the
+source remains unchanged. Abort closes streams, suppresses later callbacks and
+honors quarantine retention/discard policy.
+
+A genuine browser checkpoint repeats interruption, IndexedDB reopen, exact
+missing-set resume and terminal verification. Because D.100 still requires one
+contiguous `Uint8Array`, only the small fixture is materialized for activation.
+Large-snapshot browser adoption is an explicit nonclaim until a later streamed
+decode/import owner exists; the Phase 4c memory claim covers transfer and
+verification, not whole-payload D.100 materialization.
+
+#### Preservation, review and nonclaims
+
+Every RED and GREEN checkpoint has one exact-byte P0/P1-only Grok, Kimi
+100-step and Opus xhigh review round. Only a reproduced substantive P0/P1 may
+change bytes; P2 is recorded debt and does not cause prose, formatting, mutant
+or governance review loops. Each slice records formatter, targeted lint, diff
+validation, affected package build/typecheck/package-subpath audit, its focused
+owners, registry freeze/vectors, D.99/D.100 preservation, Phase 4a fold, and the
+ordinary node/storage/browser lanes actually touched. The 64 MiB child and real
+browser transfer are explicit gates, not inferred from unit tests. Evidence
+lives under `.logs/phase4c-snapshot-transfer/`.
+
+The D.101 plan review round was bound to initial staged tree `0543be63` and
+plan SHA-256 `ff6ce22e`. Grok reproduced the missing pre-copy manifest ceiling.
+Kimi's 100-step review additionally reproduced temporally vacuous residual-only
+memory measurement, an incomplete one-use recovered-authority lifecycle,
+category-level rather than exact 4c-a GREEN scope, and unauthenticated/
+unspecified expiry and slow-drip policy. Opus reproduced the peak-memory defect
+as P0 and the manifest ceiling plus unverified-prefetch/quarantine conflict as
+P1. D.101 was corrected once with the exact 212,387-byte carrier limit,
+barrier-observed peak memory and concatenate-then-drop mutant, private retained
+activation material, exact seven-path GREEN scope, fixed owner-local resource
+limits, and verifier-only quarantine writes. Per the hard review boundary, P2
+was recorded and no confirmation or prose review round was opened.
+
+Phase 4c does not certify a cut or manifest, create a successor anchor, activate
+a next epoch, update an AHE head, prune history, transfer archive segments,
+define compression as consensus, discover or implicitly dial peers, expose a
+public mirror, or claim cold join. Phase 4d owns continuous independent shadow
+comparison. Phase 5 binds the expected manifest digest into certified close
+evidence; Phase 6 owns active successor adoption and rollback; Phase 7 owns
+archives and age-independent cold join.
+
+Signed E5-02 product RED `37032bd6` remains a truthful future contract, not an
+authorized current GREEN. It requires a staged next-epoch referee ACL to become
+current and later revoke the old writer. D.100 intentionally imports only a
+closed replacement and has no certified successor activation. Implementing
+that RED before Phase 5/6 would either authorize from `preview.next` or fabricate
+an unsigned epoch transition. It therefore remains deferred until certified
+close and verified successor adoption exist. This dependency does not block
+Phase 4c streaming product work and must not generate a governance successor or
+review loop.
