@@ -56553,3 +56553,320 @@ previous exact fifteen plus `.dockerignore` and
 `tests/fixtures/phase-4d-v3/shadow-telemetry-driver.ts`. They add no comparison
 leg, certification authority or governance checkpoint. Per the hard boundary,
 there is no confirmation review.
+
+### D.105 — governed seal identities, then atomic Phase 5a–5c vote safety and browser dispatch
+
+Phase 5 begins with one governed-law prerequisite followed by one atomic
+observation-mode product capability. The frozen v3
+registry already owns the round-free `cutValue`, round-bearing `sealProposal`,
+signed `sealVote`, and `sealQC` records, but no production owner currently
+constructs or verifies those records, persists signer safety state, or releases
+committed vote bytes. The v3 registry field names alone do not normatively state
+that a vote's `proposalDigest` is the digest of the round-free CutValue, that
+`proposalHash` is the digest of the round-bearing SealProposal, or that locks key
+on the former. Those identities exist in the Phase-5 table and the predecessor
+v2 law, but not in numbered v3 D01–D07. Production must not mint consensus law
+from plan prose.
+
+D.105a therefore lands a separately frozen, additive protocol-v3 seal-identity
+supplement before any product RED. Its numbered decision `PH-P5-D01` states:
+
+- `valueDigest = hashDomain("ts-drp/hard-epoch-cut/v3", exactCutValueBytes)`;
+- `proposalHash = hashDomain("ts-drp/seal-proposal/v3", exactSealProposalBytes)`;
+- `SealProposal.valueDigest`, `sealVote.proposalDigest`, and
+  `sealQC.proposalDigest` are that same `valueDigest`;
+- vote/QC `proposalHash` is the exact proposal hash for that round; and
+- safety locks, committed-value identity, and same-value round carryover compare
+  `valueDigest`, never `proposalHash`.
+
+The supplement is the governed v3 inheritance of the predecessor rule. It does
+not change a registry field, domain, schema, vector, base D01–D07 decision, or
+formal registry roster. Its frozen owner is
+`packages/protocol-v3/supplements/seal-digest-identity-v1/` with spec, profile,
+schema, independent vectors, checker, and freeze policy plus one dedicated
+workflow. D.105a uses the exact two-path tests-only RED
+`tests/fixtures/phase-5-v3/seal-digest-law-contract.json` and
+`tests/phase-5a-seal-digest-law-red.test.ts`, then the exact seven-path GREEN
+`spec.md`, `profile.json`, `schema.json`, `vectors.json`, `check-freeze.mjs`,
+`freeze-policy.json`, and
+`.github/workflows/protocol-v3-seal-digest-identity.yml`. It receives its own single
+Grok/Kimi-100/Opus plan-governed RED and GREEN reviews. Only after the supplement
+is signed may the D.105b product RED freeze.
+
+D.105b lands 5a, 5b, and 5c together. It does not activate a
+live room signer: 5d still owns the complete pacemaker and bidirectional formal
+trace gate, while 5e owns creator-certified live composition and the storage-loss
+re-learn rule.
+
+Canonical seal records have one owner, an additive
+`@ts-drp/protocol-v3/seal` subpath. It reads the frozen registry rather than
+copying a second field table; validates and encodes exact `CutValue`,
+`SealProposal`, seal-vote, and seal-QC preimages; computes the two governed
+digests; verifies strict Ed25519 seal signatures; and sorts and deduplicates QC
+votes by signer ID in code-point order. That same subpath shares the existing
+singleton anchor-trust custody and mints an opaque seal-authority capability. It
+exposes only the current object/epoch/anchor, quorum, and signer-key resolution
+needed by the seal state machine; it exports no raw trust record, mutable roster,
+anchor-advance power, or root symbol. The roster is not caller-selected, and no
+caller may supply a signer array, Byzantine bound, or quorum. A `CutValue` must
+bind that capability's object, epoch, and `previousAnchor`. Prepare and commit QCs
+bind both the registry-named
+`proposalDigest` (the round-free `valueDigest`) and the round-bearing
+`proposalHash`. Locks and committed-value comparison retain only `valueDigest`;
+the lock also records the justifying prepare-QC digest and round, never treats a
+new round's `proposalHash` as a new value, and rejects a different value without
+a verified prepare QC at least as high as the durable lock. `roundChange` remains
+its own registered signed-envelope kind. D.105 neither widens `sealVote.phase`
+beyond `prepare | commit` nor exposes a round-change constructor. The entire
+D.105b authority is explicitly limited to closing epoch 0 against the exact
+genesis-certified multi-signer anchor. Current-epoch authority advancement is
+not inferred from the creator/quorum-1 live trust view; 5g/6a owns that successor
+capability.
+
+Finality private-key custody has one separate natural owner: additive
+`@ts-drp/keychain/finality`. It wraps either a non-extractable Ed25519 CryptoKey
+or a recoverable seed-derived Ed25519 key in an opaque capability, derives only
+its public key, exposes no raw seed/key or generic sign callback, and signs only
+the v3 `ed25519-seal-v3` registered digest. Signer ID is not key-derived. The
+opaque protocol authority locates the unique authenticated roster entry whose
+`publicKey` equals that derived key and supplies that entry's independent
+`signerId`; any caller-supplied signer ID must match or is rejected. This is not
+the legacy author/identity signing key. The seal owner also mints the named
+opaque voter enrollment that binds this authenticated `(signerId, publicKey)`
+tuple to the externally retained expected storage incarnation. Raw callbacks,
+rosters, and incarnation flags never reach the transaction.
+All protocol-v3, keychain, and seal subpaths receive specific-before-bare Vite
+aliases and exact type oracles in the same commit, preventing source/dist
+singleton or WeakMap brand splits.
+
+The new `@ts-drp/seal` package owns only the durable anti-equivocation state
+machine and transactional orchestration. It delegates every registered codec,
+digest, and signature check to `@ts-drp/protocol-v3/seal`; it does not grow a
+second registry validator. The package exposes one transactional voter
+composition rather than a mutable
+`SealSignerState`. Parsing, canonical-byte capture, signature/QC validation, and
+proposal validation happen before storage mutation. The owner presents an opaque,
+revision- and storage-incarnation-bound intent to a narrow durable port. The
+branded custody may sign asynchronously before the transaction, and the seal
+owner strictly verifies the fresh exact 64-byte signature against the
+authenticated key, but keeps that provisional carrier private. The subsequent
+strict transaction performs its incarnation, revision, and slot reads and then
+installs the exact slot, monotone signer state, and durable outbox without any
+intervening `await` or external callback. A revision race returns
+`REVALIDATION_REQUIRED`; the owner discards the provisional carrier, reopens the
+current snapshot, and revalidates before it can sign again. Concurrent duplicate
+or conflict attempts may compute private provisional signatures, but only the
+transaction winner's stored bytes can ever become observable.
+The stored and dispatched carrier is the registry-frozen pair
+`{ exactCanonicalPreimageBytes, signature }`; D.105 invents no wrapper frame or
+network encoding. Only detached copies of that pair returned after commit are
+dispatchable. Internally, same-slot/same-preimage resolves to the stored signature
+and preimage bytes verbatim; same-slot/different-preimage resolves to a typed
+conflict retaining the exact existing carrier and never treats the requested vote
+as successful. The public observation handle exposes only bounded status/digest
+diagnostics, not either carrier. Entered-round advancement is itself durable and
+monotone. Ambiguous substrate outcomes terminalize that voter instance until
+reopen and recovery; they never release caller-held bytes.
+
+A wrong, stale, swapped, malformed, or non-current custody capability therefore
+cannot mint a verified transition. The browser public subpath exposes only the
+observation/store constructor and bounded status diagnostics. The publisher,
+exact-carrier reader, dispatcher constructor, and raw four-store mutators remain
+package-internal in D.105b. Package-local browser composition tests exercise that
+internal dispatcher, but no exported production minter can turn it into acting
+authority. Phase 5e/5f must add the first authenticated acting capability and
+live publication composition. No internal mutation owner accepts caller-supplied
+`valid`, revision, lock, authority, signer-ID, or incarnation DTO flags.
+
+The first browser implementation uses the existing primary AHE database and is
+the Phase-5c schema bump, not another derived side database. The historical
+four-store Phase-2d authority remains an immutable decision record, while the
+current schema becomes version 2 with exactly four additive stores:
+`storageMeta`, `voteSlots`, `signerState`, and `voteOutbox`. Opening a fresh
+database creates all eight stores; opening an exact version-1 database performs
+only the additive migration and preserves every existing row; any other old,
+partial, extra, wrongly keyed, or indexed schema fails closed without mutation.
+Fresh `storageMeta` receives one owner-generated random database incarnation
+inside schema creation or upgrade, never from caller input. Every signer binding
+supplies its separately enrolled expected incarnation, and every strict
+transaction rechecks it. Whole-database deletion/recreation therefore fails as
+`STORAGE_LOSS` rather than silently resetting the signer's memory. A bounded
+blocked-open owner records rejection and, if `upgradeneeded` arrives after its
+deadline, aborts that late transaction; a timed-out migration cannot commit in
+the background. The stale Phase-2h assertion that the current source must remain
+version 1 and contain no vote stores is replaced by an explicit historical-v1 to
+current-v2 ownership assertion. Its closed Phase-2h evidence artifact is not
+rewritten.
+
+The four new stores have one closed shape. `storageMeta` uses key path `key`;
+`voteSlots` and `voteOutbox` use
+`[objectId, epoch, round, phase, signerId]`; `signerState` uses
+`[objectId, epoch, signerId]`; none has an index or auto-increment. A vote uses one
+`readwrite` transaction whose `objectStoreNames` are exactly those four stores
+and whose observed durability is exactly `strict`; unsupported or downgraded
+strict durability is a fatal signer-capability error before writes. It reads the
+incarnation, signer state plus safe-integer revision, and occupied slot in that
+order. An absent slot is installed with native `add`, never `put`; the transaction
+also `add`s the exact committed carrier to the outbox and `put`s the one monotone
+state row. A same-preimage duplicate returns the already stored carrier even if a
+new signing attempt produced different signature bytes. A conflicting preimage
+aborts and returns the exact existing carrier. Network callbacks and successful
+vote results become observable only from transaction completion, never request
+success. Carrier bounds and intrinsic exact whole fixed-`ArrayBuffer` capture run
+before the first await.
+
+The signer-state row binds the current anchor, monotone `enteredRound`, locked
+`valueDigest` and lock round, highest verified prepare QC, optional committed
+value, and revision. The outbox row binds the exact carrier and a monotone
+pending/dispatched marker; 5c does not delete vote evidence. Durable round
+advancement uses a separate strict transaction over `storageMeta` and
+`signerState`, while prepare/commit voting always uses the exact four-store
+transaction above. Recovery reconstructs the seal voter from signer state and
+every pending outbox row before dispatch can start.
+
+`@ts-drp/storage-browser/seal-vote` owns the mechanical database adapter and one
+package-internal bounded primary dispatcher. Its Web Lock name is an injective,
+versioned encoding of the exact primary database name; the browser LockManager
+itself supplies the origin/default-storage-bucket scope. No caller bucket token,
+consensus epoch, room namespace, or caller-selected alias participates. The
+adapter captures the native LockManager with its receiver. Locks are advisory
+around dispatch of already committed `voteOutbox` bytes only.
+Missing, non-callable, throwing, rejecting, aborted, or acquisition-timeout Lock
+APIs fall back to unelected dispatch. Two tabs may therefore send a duplicate,
+but they send byte-identical committed bytes and never sign twice. The scheduler
+holds at most one in-flight job per durable outbox key, has a fixed bounded
+`DISPATCH_QUEUE_FULL_RETRY_LATER` overflow, leaves overflowed rows durable for a
+later full missing-key scan, marks an entry dispatched only after the publish port
+settles successfully, and reconstructs all pending work from durable rows after
+volatile loss. Signing, validation, and the four-store transaction never run
+under the Web Lock, and network work never runs inside an IndexedDB transaction.
+Cooperative close revokes new work and awaits in-flight work.
+`versionchange` instead closes the database connection synchronously, fences any
+late result from marking rows, and permits a successor tab to reopen and drain
+the still-durable work; it never delays the schema upgrade behind an awaited
+publisher.
+
+The 5a–5c formal boundary is deliberately smaller than the 5d pacemaker but is
+not optional. `packages/seal/formal/seal-safety.qnt` models n=4 with honest
+A/B/C and Byzantine Z, rounds 0 and 1, prepare/commit slots, persistent
+`enteredRound`, lock/highest-prepare-QC, committed value, outbox, volatile
+messages, crash, and restart. Executed Quint invariants cover agreement,
+exact-slot integrity, round monotonicity, lock safety, QC tuple/authority
+isolation, durable-before-gossip, and crash preservation. The exact witness has
+A/B/C prepare X in round 0, delivers that QC only to A/B, obtains only two commit
+votes, externally advances the honest signers to round 1, and re-proposes the
+same `valueDigest` under a distinct round-1 `proposalHash`; A/B/C then commit X
+and no conflicting commit vote or QC exists. `enterRound` is only an externally
+scheduled monotone safety transition. No live owner may invoke it in D.105.
+Phase 5d extends this state with round-change evidence, timeouts, leader choice,
+catch-up, partial synchrony, full n=4…7 exploration, and bidirectional event-log
+conformance. D.105 cannot enable acting mode or satisfy the Phase-5 exit gate.
+
+The tests-only RED is exact thirteen paths and one closed owner graph:
+
+- `packages/seal/formal/seal-safety.qnt` is the executable independent safety
+  model;
+- `tests/fixtures/phase-5-v3/seal-contract.ts`,
+  `tests/fixtures/phase-5-v3/seal-fixture.ts`,
+  `tests/fixtures/phase-5-v3/seal-types.ts`, and
+  `tests/fixtures/phase-5-v3/seal-safety-contract.json` hold independent
+  registry/hash, Ed25519, signer-roster, revision, raw-store, type, model,
+  schema, bound, failure-kind, and named-mutant oracles;
+- `tests/phase-5a-c-seal-safety-red.test.ts` proves registry/domain framing,
+  CutValue/proposal identity, QC authentication, lock carryover, revision races,
+  durable-before-release ordering, exact duplicate/conflict behavior, carrier
+  custody, ambiguity terminalization, and actual Quint execution;
+- `packages/storage-browser/tests/assets/phase-5c-seal-vote-entry.ts`,
+  `packages/storage-browser/tests/assets/phase-5c-seal-vote-worker.ts`,
+  `packages/storage-browser/tests/assets/phase-5c-seal-vote-death-child.ts`,
+  `packages/storage-browser/tests/phase-5c-seal-vote-schema.pw.ts`,
+  `packages/storage-browser/tests/phase-5c-seal-vote-dispatch.pw.ts`,
+  `packages/storage-browser/tests/phase-5c-seal-vote-death.pw.ts`, and
+  `packages/storage-browser/playwright.phase-5c-seal-vote.config.ts`
+  exercise fresh/open-v1 migration, malformed and blocked migration with no late
+  commit, every transaction boundary, storage-incarnation loss, two tabs in one
+  BrowserContext, Locks on/off/error/timeout, primary close before a newly
+  committed row can send, bounded successor takeover with a nonempty send set,
+  queue overflow plus full reread, and held-lock `versionchange` closure. Separate
+  browser contexts are an explicit negative and cannot satisfy the shared-lock
+  proof. Graceful page/worker termination proves reopen and committed-outbox
+  recovery only. A vote-specific persistent-Chromium process-death child kills at
+  the enumerated transaction boundaries and uses a fresh process to prove old XOR
+  exact-new state; no `page.close()` row is labeled a hard crash.
+
+Each RED has one explicit composite readiness failure. D.105a invokes the
+test-owned supplement checker against the complete seven-file frozen owner and
+expects its authenticated result; absence produces the sole failure only after
+the independent identity vectors and negative controls pass. D.105b's one owner
+inventory covers all four missing production surfaces:
+`@ts-drp/protocol-v3/seal`, `@ts-drp/keychain/finality`, `@ts-drp/seal`, and
+`@ts-drp/storage-browser/seal-vote`. Conditional resolution plus local future
+structural overlays keep the exact type and behavioral owners collected and
+typechecked before that assertion, without an unconditional missing import.
+Every independent oracle and retained Phase-2 schema/strict-durability control
+executes before readiness; all behavioral GREEN cases return only behind that
+single fact. Neither RED uses a source marker or raw import error as its oracle.
+Mutants must
+kill round-in-CutValue, proposalHash lock identity, mixed-QC acceptance,
+signature-length-only verification, duplicate signer counting, validation after
+write, state-only/vote-only/outbox-only commits, provisional-byte release,
+put-overwrite, revision-ignore, incarnation-ignore, default-durability fallback,
+async signing after transaction start, Lock-as-authority, empty takeover,
+raw-seeded outbox dispatch, queue coalescing, prefix-only outbox recovery, late
+upgrade after timeout, and graceful-close-as-crash labeling. The duplicate oracle
+compares canonical preimage and returned bytes, not digests; the takeover oracle
+creates the row through the real vote transaction before closing its primary.
+
+The expected D.105b GREEN scope is the new seal package and model, the additive
+protocol-v3 seal codec/authority subpath plus its singleton-private plumbing, the
+additive keychain finality-custody subpath, the additive storage-browser
+seal-vote subpath, the primary schema-v2 owner, the exact retained schema
+lifecycle/governance fixtures that must acknowledge the Phase-5c bump, ordered
+specific-before-bare Vite aliases, workspace lock metadata, and this ledger.
+Protocol-v3 root exports, registry, schema, and golden vectors remain byte-identical.
+Historical additive-export inventory assertions are changed only when a focused
+gate proves they still block the current authoritative subpath; already-stale
+inventories are recorded as inherited P2 rather than expanded into a governance
+sweep. No node/network/live-room,
+snapshot, anchor-adoption, pruning, archive, outcome, grid, or chat owner changes
+in D.105. Network publication is an injected signed-carrier port; 5e owns the
+first transport framing and authenticated live composition.
+
+Focused gates are exact-path formatting/lint and `git diff --check`; seal,
+protocol-v3, storage, and storage-browser typecheck/build; the RED and retained
+registry/formal/schema/strict-durability suites; actual Quint parse/typecheck/test
+and bounded simulation; Chromium/Firefox/WebKit same-context multi-tab runs; and
+the retained Phase-2 process-death preservation matrix plus the new
+vote-transaction persistent-Chromium death/reopen matrix. Cross-engine graceful
+reopen is not substituted for the latter. Evidence is recorded per gate without
+reading or incorporating protected workspace-local artifacts.
+
+D.105 receives one exact-byte P0/P1-only plan, RED, and GREEN review round from
+Grok, genuine Kimi 100-step, and Opus xhigh. Only reproduced substantive P0/P1
+findings may change that checkpoint's bytes. P2 remains debt; there is no
+confirmation round and no Fable review.
+
+The sole D.105 plan review round authenticated signed HEAD `403eadbb`, staged
+tree `2f57aaac`, canonical full-index diff SHA-256 `bc437a11…`, and the exact-one
+plan SHA-256 `f2bb4dd5…`, with zero tracked unstaged paths. Grok returned CHANGES
+with four P1s, genuine Kimi completed exactly 100 checks and returned one P1, and
+Opus xhigh returned CHANGES with one P1. No reviewer edited or tested the packet.
+All agreed the additive `PH-P5-D01` supplement, epoch-0 firewall,
+prepare/commit-only slot, schema-v2 four-store transaction, process-death matrix,
+and 5d/5e deferrals are feasible.
+
+The same-round corrections are bounded to the reproduced blockers. Finality
+custody now derives only its public key; the authenticated roster selects the
+independent signer ID, and a named voter-enrollment capability binds that tuple
+to the external incarnation expectation. Signing completes and is verified
+before the IDB transaction so WebCrypto custody remains lawful; provisional
+bytes stay private, and there is explicitly no await or callback between the
+transaction's final reads and its three writes. This resolves Kimi's
+auto-commit concern without excluding the signed non-extractable WebCrypto
+option. Observation mode now exports neither exact carriers nor a publisher or
+dispatcher constructor; 5e/5f must mint acting authority. Finally, D.105a pins
+the complete seven-file supplement through one checker-backed readiness result,
+and D.105b's one conditional owner inventory names all four missing product
+surfaces without unconditional import failures. Per the hard boundary these
+corrected bytes receive no confirmation review. Grok's suggested migration-kill
+row and the nonblocking outbox/revalidation/seed-custody observations remain P2.
