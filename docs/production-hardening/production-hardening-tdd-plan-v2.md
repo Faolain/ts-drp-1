@@ -56013,3 +56013,129 @@ an unsigned epoch transition. It therefore remains deferred until certified
 close and verified successor adoption exist. This dependency does not block
 Phase 4c streaming product work and must not generate a governance successor or
 review loop.
+
+### D.102 — Phase 4d independent shadow comparison
+
+Phase 4d closes the self-agreement defect before any certified or destructive
+transition. It is a standing diagnostic gate, not another consensus owner. It
+may observe authenticated epoch fixtures and canonical snapshots, but it cannot
+authorize a fold, certify a cut, activate a successor, update an AHE head,
+discard history or make a snapshot trusted. A mismatch is terminal for the gate
+and carries the exact seed and epoch needed for replay; agreement has no runtime
+effect.
+
+The work is split by capability rather than by accumulating governance files:
+
+- **4d-a — causal four-way comparator and live smoke.** Two independently
+  prepared TypeScript engines fold separate owned machines, a third machine
+  replays every prior exported epoch from signed genesis, and a sampled fourth
+  leg executes the hash-pinned JavaScript reference fold. A/B/archival
+  observations exist and agree at every close; a deterministic fixed subset
+  additionally carries a reference observation. An unsampled reference leg is
+  an explicit `not-sampled` variant and is never counted as agreement. The two
+  live TypeScript peers must additionally agree on canonical order and the D.99
+  export digest. The per-PR result contains exactly 100 close diagnostics and
+  positive applied-vertex, nonempty-state and reference-sample counters; an
+  empty, partial or skipped run cannot pass.
+- **4d-b — bounded recurring runner and ledger.** The same semantic owner runs
+  the per-PR 100-epoch smoke and the nightly 10,000-epoch seeded expansion. A
+  dated result is schema-validated and append-only; it records exact SHA, seed,
+  browser roster, epochs, reference samples, nontrivial states and mismatches.
+  The runner produces a reviewed ledger candidate or artifact. It does not
+  grant CI permission to push directly to a protected branch.
+- **4d-c — standing soak telemetry.** A long-running deployment reuses the same
+  comparator result and emits fold-agreement, liveness and mismatch metrics via
+  the existing tracer/Prometheus path. The Phase 6 enablement gate, not Phase
+  4d, later requires zero mismatches, at least 100,000 accumulated epochs and 30
+  consecutive green days. Test fixtures, CI retries or copied historical rows
+  cannot manufacture elapsed time.
+
+#### 4d-a oracle and ownership boundary
+
+The sampled reference leg imports the immutable files under
+`packages/protocol-v2/conformance/ahe-reference/src/` directly and first
+authenticates their existing freeze-policy hashes. It supplies authorization
+through a separately written epoch-anchor ACL predicate with the same
+application-writer rule exercised by the live path; a missing authorizer or a
+permissive `() => true` mutant must fail. The reference reducer is a separately
+written plain-data interpretation of the exported fixture operations, not a
+call back into `applyPreparedBlueprintOperation`. It obtains canonical bytes
+from the reference canonical codec and computes the digest only through the
+reference `hashDomain("ts-drp/state/v3", bytes)` owner. The v2 `state.js`
+digest is forbidden evidence. Generated state and operations are restricted to
+the byte-identical reference/v3 subset: null, booleans, safe integers other
+than negative zero, strings, arrays and plain string-keyed objects. Floats,
+typed arrays, accessors, symbols, class instances and other amended grammar
+edges fail fixture admission, with a named domain-exclusion mutant. Thus a
+shared TypeScript fold, reducer, codec or digest bug cannot make all four legs
+agree.
+
+The TypeScript A and B legs use distinct genuine prepared runtimes and distinct
+machines. The archival leg starts from signed genesis and replays the entire
+fixture prefix at every epoch; it may not import A's or B's latest snapshot.
+The first live checkpoint reuses two independently recovered v3 peers and their
+authenticated graph/authorization path. Later seeded cases may use isolated
+compaction machines because certified next-epoch live activation does not exist
+before Phases 5 and 6, but every generated fixture remains in the same closed
+operation/state subset exercised by the live checkpoint.
+
+The comparator is one private test-infrastructure concept under a new
+`@ts-drp/test-utils/shadow-comparison` subpath. It accepts already produced,
+detached A/B/archival observations plus an observed-or-not-sampled reference
+variant. Before state comparison it requires exact cross-leg `objectId`,
+`epoch`, `anchor` and `blueprintDigest` equality. It returns distinct immutable
+`identity-mismatch` and `state-mismatch` diagnostics, compares canonical bytes
+and digests, and maintains exact close/liveness counters. It does not fold,
+encode, hash, import the reference, retain a runtime/machine, or expose a
+caller-selected success boolean. The fixture driver owns the four genuinely
+independent executions.
+
+The tests-only RED is exact three paths:
+
+- `tests/fixtures/phase-4d-v3/shadow-contract.ts`;
+- `tests/fixtures/phase-4d-v3/shadow-driver.ts`;
+- `tests/phase-4d-shadow-comparison-red.test.ts`.
+
+Its independent tests run freeze authentication, reference-codec/hash vectors,
+the separately written reducer and ACL predicate, seeded fixture generation and
+named identity, authorization, reference-domain, single-leg, order, bytes,
+digest, partial-run and empty-liveness mutants before one readiness test fails
+solely because the comparator subpath is absent. Behavioral GREEN cases are
+dormant behind that causal capability check; there is exactly one focused
+failure.
+
+The minimal 4d-a GREEN is exact three production-test-infrastructure paths:
+
+- `packages/test-utils/src/shadow-comparison.ts`;
+- `packages/test-utils/package.json` only for the non-root subpath;
+- `vite.config.mts` only to place the exact shadow-comparison alias before the
+  existing prefix-matching `@ts-drp/test-utils` alias.
+
+No protocol, canonical, compaction, node, storage, network, application or
+workflow owner changes in 4d-a. The focused gates are exact-path Prettier and
+ESLint, `git diff --check`, the test-utils typecheck/build, the new owner, the
+retained Phase 4a live fold and D.99/D.100 snapshot owners, and the existing
+reference freeze/vector owners. The per-PR smoke uses a fixed seed and 100
+epochs and must report exactly 100 A/B/archival agreements, the fixed positive
+reference-sample count, zero identity/state mismatches and positive vertex/state
+liveness counters.
+
+The single D.102 plan review round was frozen at staged tree `8b2e2100`, cached
+diff object `07250c96` and canonical SHA-256 `787dc868`. Opus xhigh session
+`cc77cec3-2779-4aa2-84f4-92ede82275d4` reproduced the root Vite alias collision;
+Grok reproduced the partial-run loophole that allowed one close to satisfy a
+100-epoch smoke; and genuine Kimi 100-step session
+`8ced35fd-4e6f-4515-93fb-ff819848da2d` reproduced permissive reference
+authorization, v2/v3 digest-and-grammar ambiguity and missing cross-leg epoch
+identity. The correction makes GREEN exact three, requires one diagnostic for
+every close, gives unsampled reference epochs an explicit non-agreement state,
+pins epoch-anchor ACL authorization and the reference v3-domain digest over the
+byte-identical subset, and separates identity from state mismatches. No
+confirmation review is opened.
+
+Plan, RED and GREEN each receive one exact-byte P0/P1-only Grok, genuine Kimi
+100-step and Opus xhigh review round. Only a reproduced substantive P0/P1 may
+change bytes. P2 remains debt and does not create mutants, prose cleanup or a
+confirmation review. No Fable review is authorized for Phase 4d. A later 4d-b
+or 4d-c slice must add measured recurring capability; it may not reopen 4d-a
+merely to enlarge the oracle roster.
