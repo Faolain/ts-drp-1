@@ -1215,6 +1215,9 @@ importers:
       '@ts-drp/canonical':
         specifier: 0.11.0
         version: link:../canonical
+      '@ts-drp/compaction':
+        specifier: 0.11.0
+        version: link:../compaction
       '@ts-drp/issuance-store':
         specifier: 0.11.0
         version: link:../issuance-store
@@ -1227,6 +1230,9 @@ importers:
 
   packages/storage-node:
     dependencies:
+      '@ts-drp/compaction':
+        specifier: 0.11.0
+        version: link:../compaction
       '@ts-drp/issuance-store':
         specifier: 0.11.0
         version: link:../issuance-store

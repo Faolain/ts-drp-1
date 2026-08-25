@@ -28,6 +28,10 @@
 		"./live-journal": {
 			"types": "./dist/src/live-journal.d.ts",
 			"import": "./dist/src/live-journal.js"
+		},
+		"./snapshot-transfer": {
+			"types": "./dist/src/snapshot-transfer.d.ts",
+			"import": "./dist/src/snapshot-transfer.js"
 		}
 	},
 	"scripts": {
@@ -40,6 +44,7 @@
 	},
 	"dependencies": {
 		"@ts-drp/canonical": "0.11.0",
+		"@ts-drp/compaction": "0.11.0",
 		"@ts-drp/issuance-store": "0.11.0",
 		"@ts-drp/live-journal": "0.11.0",
 		"@ts-drp/storage": "0.11.0"

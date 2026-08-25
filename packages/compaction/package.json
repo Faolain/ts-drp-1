@@ -30,6 +30,10 @@
 		"./snapshot-stream": {
 			"types": "./dist/src/snapshot-stream.d.ts",
 			"import": "./dist/src/snapshot-stream.js"
+		},
+		"./snapshot-quarantine-receipt": {
+			"types": "./dist/src/snapshot-quarantine-receipt.d.ts",
+			"import": "./dist/src/snapshot-quarantine-receipt.js"
 		}
 	},
 	"scripts": {
