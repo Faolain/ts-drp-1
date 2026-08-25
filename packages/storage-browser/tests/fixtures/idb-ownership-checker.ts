@@ -239,6 +239,7 @@ const DEFAULT_OWNER_METHODS: ReadonlyMap<string, ReadonlySet<string>> = new Map(
 			"close",
 		]),
 	],
+	[path.join(PACKAGE_DIRECTORY, "tests/phase-5d-round-change.pw.ts"), new Set(["call"])],
 	[
 		path.join(PACKAGE_DIRECTORY, "tests/assets/phase-2l-b-browser-death-worker.ts"),
 		new Set(["addEventListener", "abort"]),
