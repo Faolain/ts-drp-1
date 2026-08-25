@@ -6,6 +6,7 @@ export default defineConfig({
 	plugins: [tsconfigPaths()],
 	resolve: {
 		alias: {
+			"@ts-drp/test-utils/shadow-comparison": path.resolve(__dirname, "packages/test-utils/src/shadow-comparison.ts"),
 			"@ts-drp/canonical/domain-hash-stream": path.resolve(__dirname, "packages/canonical/src/domain-hash-stream.ts"),
 			"@ts-drp/compaction/blueprint-fold": path.resolve(__dirname, "packages/compaction/src/blueprint-fold.ts"),
 			"@ts-drp/compaction/blueprint-snapshot": path.resolve(__dirname, "packages/compaction/src/blueprint-snapshot.ts"),

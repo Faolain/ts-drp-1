@@ -56133,6 +56133,39 @@ pins epoch-anchor ACL authorization and the reference v3-domain digest over the
 byte-identical subset, and separates identity from state mismatches. No
 confirmation review is opened.
 
+The corrected tests-only RED is signed as `4380631b`. Its initial review packet
+was staged tree `6033bc39`, cached diff object `52b8f806` and canonical SHA-256
+`5b9203c7`. Genuine Kimi's 100-check review and Grok accepted that packet, while
+Opus reproduced three causal holes: the reference value could be ignored, a
+zero-liveness 100-close transcript could pass, and the state digest could be
+ignored when state bytes agreed. The exact-three RED correction adds named
+sampled-reference-byte, missing-reference-sample, digest-only, zero-vertex and
+empty-state mutants. Its focused result is exactly one missing-owner failure,
+four independent oracle passes and three dormant GREEN cases. No confirmation
+review was opened.
+
+The 4d-a GREEN adds only the planned private comparator, package subpath and
+ordered Vite alias. The comparator validates all 100 closed observations,
+positive vertex and nonempty-state liveness, the exact sampled-reference count,
+cross-leg object/epoch/anchor/blueprint identity, canonical state bytes and
+state digests, plus A/B order and D.99 payload digests. Results and diagnostics
+are detached and immutable. Exact-path formatting, test-utils typecheck/build,
+the focused owner and the retained Phase 4a, D.99, D.100 and pinned-reference
+owners pass. One preservation command that explicitly named the tracked golden
+vector owner also collected two matching copies under protected `.logs/**` and
+therefore reported two package-resolution suite failures; those files were not
+read, edited or used as evidence. The corrected command explicitly excluded
+`.logs/**` and passed the intended six tracked files and all 37 tests.
+
+The final GREEN review packet was staged tree `cba4e939`, cached diff object
+`3e017ac4` and canonical SHA-256 `c41ae089`. Grok, Opus xhigh session
+`ee16217d-04e4-474d-a679-45943294d6cc`, and genuine Kimi 100-check session
+`cb221079-6ce3-4841-905a-39a0c024e226` each returned PASS with P0=0, P1=0 and
+READY_TO_SIGN. Custody remained exact four with zero tracked unstaged changes.
+Their remaining observations concern malformed shared/accessor/cross-realm or
+sparse-array carriers and diagnostic precision; these are recorded as P2 debt
+and do not open another review or mutation round.
+
 Plan, RED and GREEN each receive one exact-byte P0/P1-only Grok, genuine Kimi
 100-step and Opus xhigh review round. Only a reproduced substantive P0/P1 may
 change bytes. P2 remains debt and does not create mutants, prose cleanup or a
