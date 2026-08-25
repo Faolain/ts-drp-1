@@ -18,6 +18,10 @@
 	"exclude": [
 		"dist",
 		"./*.d.ts",
+		"tests/assets/phase-4c-b-snapshot-quarantine-entry.ts",
+		"tests/assets/phase-4c-b-snapshot-quarantine-worker.ts",
+		"tests/phase-4c-b-snapshot-quarantine-red.pw.ts",
+		"tests/phase-4c-b-snapshot-quarantine-server.ts",
 		"tests/assets/phase-3a1b-p2-browser-publication-entry.ts",
 		"tests/assets/phase-3a1b-p2-browser-publication-worker.ts",
 		"tests/phase-3a1b-p2-browser-outbox-publication-death-red.pw.ts",
