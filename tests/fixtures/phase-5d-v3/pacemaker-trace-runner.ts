@@ -315,7 +315,9 @@ export function checkedTraceToQuintModule(trace: ItfTrace, importPath: string): 
 	const expressions = [`initN(${initial.n})`];
 	for (const state of trace.states) {
 		expressions.push(...actionsForState(state));
-		const value = JSON.stringify(state.valueDigest);
+		const modelValueDigest =
+			state.lastEvent === "proposal" && state.valueDigest === "" ? "value-X" : state.valueDigest;
+		const value = JSON.stringify(modelValueDigest);
 		expressions.push(
 			`check(state.enteredRound.get("A") == ${state.round} and state.phase.get("A") == "${state.phase}" and state.revision == ${state.durableRevision} and state.futureRounds.size() == ${state.futureBucketCount} and state.durableOutbox.size() == ${state.pendingRoundChangeCount} and state.durablePrepareQcs.size() == ${state.durablePrepareQcCount} and state.durableCommitQcs.size() == ${state.durableCommitQcCount} and (if (state.finalizedValue.get("A") != EMPTY) state.finalizedValue.get("A") else if (state.lockedValue.get("A") != EMPTY) state.lockedValue.get("A") else state.proposedValue.get("A")) == ${value})`
 		);

@@ -236,7 +236,7 @@ describe.sequential("Phase 5d model-first pacemaker RED", () => {
 		const exactQc = law.vectors.crypto.qcs.find(({ id }) => id === "prepare-r2-a");
 		const quorumForFour = Math.floor((2 * (PRODUCT_CONTRACT.limits.activeSignerCounts[0] ?? 0)) / 3) + 1;
 		const roundTrace = readTrace(roundTracePath);
-		const commitVoteIndex = roundTrace.states.findIndex(({ lastEvent }) => lastEvent === "commit-vote");
+		const prepareQcIndex = roundTrace.states.findLastIndex(({ lastEvent }) => lastEvent === "prepare-qc");
 		const commitQcIndex = roundTrace.states.findIndex(({ lastEvent }) => lastEvent === "commit-qc");
 		const results = new Map<string, boolean>([
 			[
@@ -296,9 +296,10 @@ describe.sequential("Phase 5d model-first pacemaker RED", () => {
 			],
 			[
 				"local-commit-vote-as-finality",
-				commitVoteIndex >= 0 &&
-					commitQcIndex === commitVoteIndex + 1 &&
-					roundTrace.states[commitVoteIndex]?.phase === "committed" &&
+				prepareQcIndex >= 0 &&
+					commitQcIndex === prepareQcIndex + 1 &&
+					roundTrace.states[prepareQcIndex]?.phase === "committed" &&
+					roundTrace.states[prepareQcIndex]?.durableCommitQcCount === 0 &&
 					roundTrace.states[commitQcIndex]?.phase === "finalized",
 			],
 			[

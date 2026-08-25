@@ -30,7 +30,7 @@
 	"model": {
 		"path": "packages/seal/formal/seal-pacemaker.qnt",
 		"module": "sealPacemaker",
-		"sha256": "b7e01ef414142fe13f54e0f06596026f5b262960db5f8470ee71ac6c205209ef",
+		"sha256": "f877e4d2a85361c77d1c6a82cb3851432b0e79a75be0ae7813fe0ad5e74b66dd",
 		"invariants": [
 			"safetyN4",
 			"safetyN5",

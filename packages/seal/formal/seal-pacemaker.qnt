@@ -474,12 +474,20 @@ module sealPacemaker {
     evidenceCount >= 1,
     val withinWindow = futureRound <= state.enteredRound.get(target) + MAX_FUTURE_ROUND_GAP
     val enough = evidenceCount >= fPlusOne(state.activeN)
+    val highestRound = state.highestPrepareRound.get(target)
+    val highestValue = state.highestPrepareValue.get(target)
+    val highest = if (highestRound == -1) emptyQc else qc(highestRound, "prepare", highestValue, state.activeN)
+    val change = roundChange(target, futureRound, highest, highestRound >= 0)
+    val message = roundChangeEnvelope(change, 0)
     state' =
       if (enough)
         state
           .with("enteredRound", state.enteredRound.set(target, futureRound))
           .with("phase", state.phase.set(target, "awaiting"))
           .with("futureRounds", Set())
+          .with("durableRoundChanges", state.durableRoundChanges.union(Set(change)))
+          .with("durableOutbox", state.durableOutbox.union(Set(message)))
+          .with("network", state.network.union(Set(message)))
           .with("events", state.events.union(Set("catchup", "round_entered")))
           .with("revision", state.revision + 1)
           .with("livenessTick", state.livenessTick + 1)
