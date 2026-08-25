@@ -1,4 +1,5 @@
 import {
+	consumeSealRoundChangeIntent,
 	consumeSealVoteIntent,
 	mintSealStorePort,
 	resolveSealVoterEnrollment,
@@ -31,17 +32,23 @@ export async function openBrowserSealVoteStore(input: Readonly<{ databaseName: s
 	const internal = await openInternalSealVoteStore({ databaseName: input.databaseName });
 	const pending = await internal.readPending();
 	const store = mintSealStorePort({
+		commitQc: (enrollment: unknown, qc: unknown) => {
+			const scoped = resolveSealVoterEnrollment(enrollment);
+			return scoped === undefined
+				? Promise.resolve(Object.freeze({ ok: false as const, reason: "UNTRUSTED_VOTER_ENROLLMENT" }))
+				: internal.commitQc({ ...(qc as object), ...scoped });
+		},
+		commitRoundChange: (roundChange: unknown) => {
+			const intent = consumeSealRoundChangeIntent(roundChange);
+			return intent === undefined
+				? Promise.resolve(Object.freeze({ ok: false as const, reason: "UNTRUSTED_ROUND_CHANGE_INTENT" }))
+				: internal.commitRoundChange(intent);
+		},
 		commitVote: (vote: unknown) => {
 			const intent = consumeSealVoteIntent(vote);
 			return intent === undefined
 				? Promise.resolve(Object.freeze({ ok: false as const, reason: "UNTRUSTED_VOTE_INTENT" }))
 				: internal.commitVote(intent);
-		},
-		commitRound: (enrollment: unknown, round: unknown) => {
-			const scoped = resolveSealVoterEnrollment(enrollment);
-			return scoped === undefined
-				? Promise.resolve(Object.freeze({ ok: false as const, reason: "UNTRUSTED_VOTER_ENROLLMENT" }))
-				: internal.commitRound({ ...(round as object), ...scoped });
 		},
 		openSnapshot: (enrollment: unknown) => {
 			const scoped = resolveSealVoterEnrollment(enrollment);

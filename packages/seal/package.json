@@ -15,6 +15,10 @@
 			"types": "./dist/src/index.d.ts",
 			"import": "./dist/src/index.js"
 		},
+		"./pacemaker": {
+			"types": "./dist/src/pacemaker.d.ts",
+			"import": "./dist/src/pacemaker.js"
+		},
 		"./internal/storage-port": {
 			"types": "./dist/src/storage-port.d.ts",
 			"import": "./dist/src/storage-port.js"

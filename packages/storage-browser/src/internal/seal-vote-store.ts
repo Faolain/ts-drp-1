@@ -24,7 +24,7 @@ export interface PendingVoteRow {
 	readonly carrier: StoredSealCarrier;
 	readonly epoch: 0;
 	readonly objectId: string;
-	readonly phase: "commit" | "prepare";
+	readonly phase: "commit" | "prepare" | "round-change";
 	readonly round: number;
 	readonly signerId: string;
 	readonly dispatched: boolean;
@@ -33,10 +33,12 @@ export interface PendingVoteRow {
 export interface InternalSealVoteStore {
 	readonly incarnation: string;
 	readonly schema: Readonly<{ stores: readonly string[]; version: 2 }>;
+	commitQc(input: unknown): Promise<unknown>;
 	commitRound(input: unknown): Promise<unknown>;
+	commitRoundChange(input: unknown): Promise<unknown>;
 	commitVote(input: unknown): Promise<unknown>;
 	close(): void;
-	markDispatched(key: readonly [string, 0, number, "commit" | "prepare", string]): Promise<void>;
+	markDispatched(key: readonly [string, 0, number, "commit" | "prepare" | "round-change", string]): Promise<void>;
 	openSnapshot(scope: unknown): Promise<unknown>;
 	readPending(maxRows?: number): Promise<readonly PendingVoteRow[]>;
 }
@@ -107,7 +109,7 @@ function requestResult<T>(request: IDBRequest<T>): Promise<T> {
 }
 
 function transactionComplete(transaction: IDBTransaction): Promise<void> {
-	return new Promise((resolve, reject) => {
+	const completion = new Promise<void>((resolve, reject) => {
 		transaction.addEventListener("complete", () => resolve(), { once: true });
 		transaction.addEventListener(
 			"abort",
@@ -120,6 +122,8 @@ function transactionComplete(transaction: IDBTransaction): Promise<void> {
 			{ once: true }
 		);
 	});
+	void completion.catch(() => undefined);
+	return completion;
 }
 
 function copiedCarrier(value: unknown): StoredSealCarrier | undefined {
@@ -153,9 +157,9 @@ async function settleAbort(transaction: IDBTransaction): Promise<void> {
 function voteKey(input: {
 	readonly objectId: string;
 	readonly round: number;
-	readonly phase: "commit" | "prepare";
+	readonly phase: "commit" | "prepare" | "round-change";
 	readonly signerId: string;
-}): [string, 0, number, "commit" | "prepare", string] {
+}): [string, 0, number, "commit" | "prepare" | "round-change", string] {
 	return [input.objectId, 0, input.round, input.phase, input.signerId];
 }
 
@@ -167,7 +171,7 @@ function copiedPendingRow(value: unknown): PendingVoteRow | undefined {
 		typeof value.objectId !== "string" ||
 		value.epoch !== 0 ||
 		!safeNonnegative(value.round) ||
-		(value.phase !== "prepare" && value.phase !== "commit") ||
+		(value.phase !== "prepare" && value.phase !== "commit" && value.phase !== "round-change") ||
 		typeof value.signerId !== "string" ||
 		typeof value.dispatched !== "boolean"
 	) {
@@ -307,6 +311,21 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			plainRecord(existingState) && typeof existingState.committedValueDigest === "string"
 				? existingState.committedValueDigest
 				: null;
+		const existingHighestPrepareQC =
+			plainRecord(existingState) && plainRecord(existingState.highestPrepareQC) ? existingState.highestPrepareQC : null;
+		if (
+			raw.phase === "commit" &&
+			(prepareQC === null ||
+				existingHighestPrepareQC === null ||
+				existingHighestPrepareQC.digest !== prepareQC.digest ||
+				existingHighestPrepareQC.round !== raw.round ||
+				existingHighestPrepareQC.valueDigest !== raw.valueDigest ||
+				!(existingHighestPrepareQC.exactCanonicalQcBytes instanceof Uint8Array))
+		) {
+			abort(transaction);
+			await settleAbort(transaction);
+			return Object.freeze({ ok: false as const, reason: "PREPARE_QC_REQUIRED", writes: 0 });
+		}
 		if (existingCommittedValue !== null && existingCommittedValue !== raw.valueDigest) {
 			abort(transaction);
 			await settleAbort(transaction);
@@ -350,7 +369,6 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			plainRecord(existingState) && safeNonnegative(existingState.enteredRound) ? existingState.enteredRound : 0,
 			raw.round
 		);
-		const advancesLock = prepareQC !== null && (existingLockRound === null || prepareQC.round >= existingLockRound);
 		const stateRow = {
 			anchor: raw.anchor,
 			committedValueDigest:
@@ -359,15 +377,21 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 					: plainRecord(existingState)
 						? (existingState.committedValueDigest ?? null)
 						: null,
+			durableCommitQcCount:
+				plainRecord(existingState) && safeNonnegative(existingState.durableCommitQcCount)
+					? existingState.durableCommitQcCount
+					: 0,
+			durablePrepareQcCount:
+				plainRecord(existingState) && safeNonnegative(existingState.durablePrepareQcCount)
+					? existingState.durablePrepareQcCount
+					: 0,
 			enteredRound,
 			epoch: 0,
-			highestPrepareQC: advancesLock
-				? prepareQC
-				: plainRecord(existingState)
-					? (existingState.highestPrepareQC ?? null)
-					: null,
-			lockRound: advancesLock ? prepareQC.round : existingLockRound,
-			lockedValueDigest: advancesLock ? prepareQC.valueDigest : existingLockedValue,
+			finalizedCommitQC: plainRecord(existingState) ? (existingState.finalizedCommitQC ?? null) : null,
+			finalizedValueDigest: plainRecord(existingState) ? (existingState.finalizedValueDigest ?? null) : null,
+			highestPrepareQC: existingHighestPrepareQC,
+			lockRound: existingLockRound,
+			lockedValueDigest: existingLockedValue,
 			objectId: raw.objectId,
 			revision: currentRevision + 1,
 			signerId: raw.signerId,
@@ -394,6 +418,297 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			stored: copiedCarrier(carrier),
 			writes: 3,
 		});
+	};
+
+	const commitQc = async (raw: unknown): Promise<unknown> => {
+		if (!plainRecord(raw)) return Object.freeze({ ok: false as const, reason: "MALFORMED_INPUT" });
+		let exactCanonicalQcBytes: Uint8Array;
+		let decoded: unknown;
+		try {
+			exactCanonicalQcBytes = exactBytes(raw.exactCanonicalQcBytes);
+			decoded = decodeCanonical(exactCanonicalQcBytes);
+		} catch {
+			return Object.freeze({ ok: false as const, reason: "MALFORMED_INPUT" });
+		}
+		if (
+			!plainRecord(decoded) ||
+			decoded.kind !== "drp-seal-qc" ||
+			decoded.objectId !== raw.objectId ||
+			decoded.epoch !== 0 ||
+			decoded.phase !== raw.phase ||
+			decoded.round !== raw.round ||
+			decoded.proposalDigest !== raw.valueDigest ||
+			decoded.proposalHash !== raw.proposalHash ||
+			typeof raw.qcDigest !== "string" ||
+			!digestHex.test(raw.qcDigest) ||
+			typeof raw.anchor !== "string" ||
+			typeof raw.expectedIncarnation !== "string" ||
+			!safeNonnegative(raw.expectedRevision) ||
+			typeof raw.objectId !== "string" ||
+			raw.epoch !== 0 ||
+			(raw.phase !== "prepare" && raw.phase !== "commit") ||
+			!safeNonnegative(raw.round) ||
+			typeof raw.signerId !== "string" ||
+			typeof raw.valueDigest !== "string" ||
+			!digestHex.test(raw.valueDigest)
+		) {
+			return Object.freeze({ ok: false as const, reason: "MALFORMED_INPUT" });
+		}
+		const transaction = opened.transaction([PHASE_5C_SIGNER_STATE_STORE, PHASE_5C_STORAGE_META_STORE], "readwrite", {
+			durability: "strict",
+		});
+		if (transaction.durability !== "strict") {
+			abort(transaction);
+			await settleAbort(transaction);
+			throw new Error("strict IndexedDB durability is unavailable");
+		}
+		const completion = transactionComplete(transaction);
+		const metaRow = await requestResult(transaction.objectStore(PHASE_5C_STORAGE_META_STORE).get("incarnation"));
+		if (!plainRecord(metaRow) || metaRow.value !== raw.expectedIncarnation) {
+			abort(transaction);
+			await settleAbort(transaction);
+			return Object.freeze({ ok: false as const, reason: "STORAGE_LOSS" });
+		}
+		const stateStore = transaction.objectStore(PHASE_5C_SIGNER_STATE_STORE);
+		const stateKey: [string, 0, string] = [raw.objectId, 0, raw.signerId];
+		const storedState = await requestResult(stateStore.get(stateKey));
+		if (
+			(storedState === undefined && raw.expectedRevision !== 0) ||
+			(storedState !== undefined &&
+				(!plainRecord(storedState) ||
+					storedState.anchor !== raw.anchor ||
+					storedState.revision !== raw.expectedRevision ||
+					!safeNonnegative(storedState.revision) ||
+					storedState.revision === Number.MAX_SAFE_INTEGER))
+		) {
+			abort(transaction);
+			await settleAbort(transaction);
+			return Object.freeze({ ok: false as const, reason: "REVALIDATION_REQUIRED" });
+		}
+		const state =
+			storedState === undefined
+				? Object.freeze({
+						anchor: raw.anchor,
+						committedValueDigest: null,
+						durableCommitQcCount: 0,
+						durablePrepareQcCount: 0,
+						enteredRound: 0,
+						epoch: 0,
+						finalizedCommitQC: null,
+						finalizedValueDigest: null,
+						highestPrepareQC: null,
+						lockRound: null,
+						lockedValueDigest: null,
+						objectId: raw.objectId,
+						revision: 0,
+						signerId: raw.signerId,
+					})
+				: storedState;
+		const exactQc = Object.freeze({
+			digest: raw.qcDigest,
+			exactCanonicalQcBytes: Uint8Array.from(exactCanonicalQcBytes),
+			phase: raw.phase,
+			proposalHash: raw.proposalHash,
+			round: raw.round,
+			valueDigest: raw.valueDigest,
+		});
+		if (raw.phase === "prepare") {
+			const highest = plainRecord(state.highestPrepareQC) ? state.highestPrepareQC : null;
+			if (highest !== null && highest.round === raw.round) {
+				if (highest.valueDigest !== raw.valueDigest) {
+					abort(transaction);
+					await settleAbort(transaction);
+					return Object.freeze({ ok: false as const, reason: "PREPARE_QC_CONFLICT" });
+				}
+				if (highest.digest === raw.qcDigest) {
+					if (compareBytes(exactBytes(highest.exactCanonicalQcBytes), exactCanonicalQcBytes) !== 0) {
+						abort(transaction);
+						await settleAbort(transaction);
+						return Object.freeze({ ok: false as const, reason: "PREPARE_QC_CONFLICT" });
+					}
+					await completion;
+					return Object.freeze({ advanced: false, duplicate: true, ok: true as const, revision: state.revision });
+				}
+				if (typeof highest.digest !== "string") {
+					abort(transaction);
+					await settleAbort(transaction);
+					return Object.freeze({ ok: false as const, reason: "PREPARE_QC_CONFLICT" });
+				}
+				if (raw.qcDigest > highest.digest) {
+					await completion;
+					return Object.freeze({ advanced: false, duplicate: false, ok: true as const, revision: state.revision });
+				}
+			}
+			if (highest !== null && safeNonnegative(highest.round) && highest.round > raw.round) {
+				abort(transaction);
+				await settleAbort(transaction);
+				return Object.freeze({ ok: false as const, reason: "QC_ROLLBACK" });
+			}
+			await requestResult(
+				stateStore.put({
+					...state,
+					durablePrepareQcCount: (safeNonnegative(state.durablePrepareQcCount) ? state.durablePrepareQcCount : 0) + 1,
+					enteredRound: Math.max(safeNonnegative(state.enteredRound) ? state.enteredRound : 0, raw.round),
+					highestPrepareQC: exactQc,
+					lockRound: raw.round,
+					lockedValueDigest: raw.valueDigest,
+					revision: state.revision + 1,
+				})
+			);
+		} else {
+			const highest = plainRecord(state.highestPrepareQC) ? state.highestPrepareQC : null;
+			if (highest === null || highest.round !== raw.round || highest.valueDigest !== raw.valueDigest) {
+				abort(transaction);
+				await settleAbort(transaction);
+				return Object.freeze({ ok: false as const, reason: "PREPARE_QC_REQUIRED" });
+			}
+			const existingFinal = plainRecord(state.finalizedCommitQC) ? state.finalizedCommitQC : null;
+			if (existingFinal !== null) {
+				if (compareBytes(exactBytes(existingFinal.exactCanonicalQcBytes), exactCanonicalQcBytes) === 0) {
+					await completion;
+					return Object.freeze({ duplicate: true, ok: true as const, revision: state.revision });
+				}
+				abort(transaction);
+				await settleAbort(transaction);
+				return Object.freeze({ ok: false as const, reason: "FINALIZED_VALUE_CONFLICT" });
+			}
+			await requestResult(
+				stateStore.put({
+					...state,
+					durableCommitQcCount: (safeNonnegative(state.durableCommitQcCount) ? state.durableCommitQcCount : 0) + 1,
+					finalizedCommitQC: exactQc,
+					finalizedValueDigest: raw.valueDigest,
+					revision: state.revision + 1,
+				})
+			);
+		}
+		await completion;
+		return Object.freeze({ advanced: true, duplicate: false, ok: true as const, revision: raw.expectedRevision + 1 });
+	};
+
+	const commitRoundChange = async (raw: unknown): Promise<unknown> => {
+		if (!plainRecord(raw)) return Object.freeze({ ok: false as const, reason: "MALFORMED_INPUT" });
+		const carrier = copiedCarrier(raw.carrier);
+		let decoded: unknown;
+		try {
+			decoded = carrier === undefined ? undefined : decodeCanonical(carrier.exactCanonicalPreimageBytes);
+		} catch {
+			return Object.freeze({ ok: false as const, reason: "MALFORMED_INPUT" });
+		}
+		if (
+			carrier === undefined ||
+			!plainRecord(decoded) ||
+			decoded.kind !== "drp-round-change" ||
+			decoded.objectId !== raw.objectId ||
+			decoded.epoch !== 0 ||
+			decoded.anchor !== raw.anchor ||
+			decoded.round !== raw.round ||
+			decoded.phase !== "round-change" ||
+			decoded.signerId !== raw.signerId ||
+			typeof raw.anchor !== "string" ||
+			typeof raw.expectedIncarnation !== "string" ||
+			!safeNonnegative(raw.expectedRevision) ||
+			typeof raw.objectId !== "string" ||
+			!safeNonnegative(raw.round) ||
+			typeof raw.signerId !== "string"
+		) {
+			return Object.freeze({ ok: false as const, reason: "MALFORMED_INPUT" });
+		}
+		const transaction = opened.transaction([...VOTE_TRANSACTION_STORES], "readwrite", { durability: "strict" });
+		if (transaction.durability !== "strict") {
+			abort(transaction);
+			await settleAbort(transaction);
+			throw new Error("strict IndexedDB durability is unavailable");
+		}
+		const completion = transactionComplete(transaction);
+		const metaRow = await requestResult(transaction.objectStore(PHASE_5C_STORAGE_META_STORE).get("incarnation"));
+		if (!plainRecord(metaRow) || metaRow.value !== raw.expectedIncarnation) {
+			abort(transaction);
+			await settleAbort(transaction);
+			return Object.freeze({ ok: false as const, reason: "STORAGE_LOSS" });
+		}
+		const stateStore = transaction.objectStore(PHASE_5C_SIGNER_STATE_STORE);
+		const stateKey: [string, 0, string] = [raw.objectId, 0, raw.signerId];
+		const state = await requestResult(stateStore.get(stateKey));
+		const current =
+			state === undefined
+				? {
+						anchor: raw.anchor,
+						committedValueDigest: null,
+						durableCommitQcCount: 0,
+						durablePrepareQcCount: 0,
+						enteredRound: 0,
+						epoch: 0,
+						finalizedCommitQC: null,
+						finalizedValueDigest: null,
+						highestPrepareQC: null,
+						lockRound: null,
+						lockedValueDigest: null,
+						objectId: raw.objectId,
+						revision: 0,
+						signerId: raw.signerId,
+					}
+				: state;
+		if (
+			!plainRecord(current) ||
+			current.anchor !== raw.anchor ||
+			current.revision !== raw.expectedRevision ||
+			!safeNonnegative(current.revision) ||
+			current.revision === Number.MAX_SAFE_INTEGER ||
+			!safeNonnegative(current.enteredRound) ||
+			raw.round <= current.enteredRound
+		) {
+			abort(transaction);
+			await settleAbort(transaction);
+			return Object.freeze({ ok: false as const, reason: "REVALIDATION_REQUIRED" });
+		}
+		const key = voteKey({ objectId: raw.objectId, phase: "round-change", round: raw.round, signerId: raw.signerId });
+		const occupied = await requestResult(transaction.objectStore(PHASE_5C_VOTE_SLOTS_STORE).get(key));
+		if (occupied !== undefined) {
+			const stored = plainRecord(occupied) ? copiedCarrier(occupied.carrier) : undefined;
+			if (
+				stored !== undefined &&
+				compareBytes(stored.exactCanonicalPreimageBytes, carrier.exactCanonicalPreimageBytes) === 0
+			) {
+				await completion;
+				return Object.freeze({ duplicate: true, ok: true as const, revision: current.revision });
+			}
+			abort(transaction);
+			await settleAbort(transaction);
+			return Object.freeze({ existing: stored, ok: false as const, reason: "ROUND_CHANGE_CONFLICT" });
+		}
+		const row: PendingVoteRow = {
+			carrier,
+			dispatched: false,
+			epoch: 0,
+			objectId: raw.objectId,
+			phase: "round-change",
+			round: raw.round,
+			signerId: raw.signerId,
+		};
+		await Promise.all([
+			requestResult(
+				transaction.objectStore(PHASE_5C_VOTE_SLOTS_STORE).add({
+					carrier,
+					epoch: 0,
+					objectId: raw.objectId,
+					phase: "round-change",
+					round: raw.round,
+					signerId: raw.signerId,
+				})
+			),
+			requestResult(transaction.objectStore(PHASE_5C_VOTE_OUTBOX_STORE).add(row)),
+			requestResult(
+				stateStore.put({
+					...current,
+					enteredRound: raw.round,
+					revision: current.revision + 1,
+				})
+			),
+		]);
+		await completion;
+		input.onCommitted?.(copiedPendingRow(row) as PendingVoteRow);
+		return Object.freeze({ duplicate: false, ok: true as const, revision: current.revision + 1 });
 	};
 
 	const readPending = async (maxRows = Number.MAX_SAFE_INTEGER): Promise<readonly PendingVoteRow[]> => {
@@ -464,8 +779,12 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 				? {
 						anchor: raw.anchor,
 						committedValueDigest: null,
+						durableCommitQcCount: 0,
+						durablePrepareQcCount: 0,
 						enteredRound: 0,
 						epoch: 0,
+						finalizedCommitQC: null,
+						finalizedValueDigest: null,
 						highestPrepareQC: null,
 						lockRound: null,
 						lockedValueDigest: null,
@@ -494,11 +813,13 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 	};
 
 	return Object.freeze({
+		commitQc,
 		commitRound,
+		commitRoundChange,
 		commitVote,
 		close: () => opened.close(),
 		incarnation,
-		markDispatched: async (key: readonly [string, 0, number, "commit" | "prepare", string]) => {
+		markDispatched: async (key: readonly [string, 0, number, "commit" | "prepare" | "round-change", string]) => {
 			const transaction = opened.transaction(PHASE_5C_VOTE_OUTBOX_STORE, "readwrite", { durability: "strict" });
 			if (transaction.durability !== "strict") {
 				abort(transaction);
@@ -528,16 +849,49 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			if (scope.expectedIncarnation !== incarnation) {
 				return Object.freeze({ enteredRound: 0, incarnation, revision: 0, storageLoss: true });
 			}
-			const transaction = opened.transaction(PHASE_5C_SIGNER_STATE_STORE, "readonly");
+			const transaction = opened.transaction([PHASE_5C_SIGNER_STATE_STORE, PHASE_5C_VOTE_OUTBOX_STORE], "readonly");
 			const state = await requestResult(
 				transaction.objectStore(PHASE_5C_SIGNER_STATE_STORE).get([scope.objectId, 0, scope.signerId])
 			);
+			const pendingRows = await requestResult(transaction.objectStore(PHASE_5C_VOTE_OUTBOX_STORE).getAll());
 			await transactionComplete(transaction);
-			if (state === undefined) return Object.freeze({ enteredRound: 0, incarnation, revision: 0 });
+			const pendingRoundChangeCount = pendingRows.filter(
+				(row) =>
+					plainRecord(row) &&
+					row.objectId === scope.objectId &&
+					row.epoch === 0 &&
+					row.signerId === scope.signerId &&
+					row.phase === "round-change"
+			).length;
+			if (state === undefined) {
+				return Object.freeze({
+					durableCommitQcCount: 0,
+					durablePrepareQcCount: 0,
+					enteredRound: 0,
+					finalizedCommitQcBytes: null,
+					finalizedValueDigest: null,
+					highestPrepareQcBytes: null,
+					highestPrepareQcDigest: null,
+					incarnation,
+					lockedValueDigest: null,
+					pendingRoundChangeCount,
+					revision: 0,
+				});
+			}
 			if (!plainRecord(state) || state.anchor !== scope.anchor) throw new Error("invalid scoped signer state snapshot");
+			const highest = plainRecord(state.highestPrepareQC) ? state.highestPrepareQC : null;
+			const finalized = plainRecord(state.finalizedCommitQC) ? state.finalizedCommitQC : null;
 			return Object.freeze({
+				durableCommitQcCount: safeNonnegative(state.durableCommitQcCount) ? state.durableCommitQcCount : 0,
+				durablePrepareQcCount: safeNonnegative(state.durablePrepareQcCount) ? state.durablePrepareQcCount : 0,
 				enteredRound: state.enteredRound,
+				finalizedCommitQcBytes: finalized === null ? null : exactBytes(finalized.exactCanonicalQcBytes),
+				finalizedValueDigest: typeof state.finalizedValueDigest === "string" ? state.finalizedValueDigest : null,
+				highestPrepareQcBytes: highest === null ? null : exactBytes(highest.exactCanonicalQcBytes),
+				highestPrepareQcDigest: highest === null || typeof highest.digest !== "string" ? null : highest.digest,
 				incarnation,
+				lockedValueDigest: typeof state.lockedValueDigest === "string" ? state.lockedValueDigest : null,
+				pendingRoundChangeCount,
 				revision: state.revision,
 			});
 		},
