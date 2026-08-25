@@ -95,16 +95,6 @@ export const SNAPSHOT_QUARANTINE_ROOT_RUNTIME_ROSTERS = Object.freeze({
 
 export const SNAPSHOT_QUARANTINE_PACKAGE_EXPORT_MAPS = Object.freeze({
 	browser: Object.freeze({
-		"chunkFields": Object.freeze([
-			"anchor",
-			"byteLength",
-			"digest",
-			"epoch",
-			"exactBytes",
-			"index",
-			"manifestDigest",
-			"objectId",
-		] as const),
 		".": Object.freeze({ import: "./dist/src/index.js", types: "./dist/src/index.d.ts" }),
 		"./issuance": Object.freeze({ import: "./dist/src/issuance.js", types: "./dist/src/issuance.d.ts" }),
 		"./live-journal": Object.freeze({ import: "./dist/src/live-journal.js", types: "./dist/src/live-journal.d.ts" }),
@@ -154,6 +144,16 @@ export const SNAPSHOT_QUARANTINE_PACKAGE_EXPORT_MAPS = Object.freeze({
 
 export const SNAPSHOT_QUARANTINE_SCHEMA = Object.freeze({
 	browser: Object.freeze({
+		chunkFields: Object.freeze([
+			"anchor",
+			"byteLength",
+			"digest",
+			"epoch",
+			"exactBytes",
+			"index",
+			"manifestDigest",
+			"objectId",
+		] as const),
 		chunksKeyPath: Object.freeze(["objectId", "epoch", "anchor", "manifestDigest", "index"] as const),
 		databaseSuffix: "--drp-snapshot-quarantine-v1",
 		expiryIndex: "expiryAsc",
