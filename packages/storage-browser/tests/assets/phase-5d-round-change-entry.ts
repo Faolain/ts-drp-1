@@ -47,7 +47,13 @@ function canonicalDigest(domain: string, value: unknown): string {
 
 function certifiedGenesis(): Readonly<{
 	anchorDigest: string;
-	input: Readonly<Record<string, unknown>>;
+	input: Readonly<{
+		exactCanonicalCertifiedGenesisCertificateBytes: Uint8Array;
+		exactCanonicalGenesisAnchorPreimageBytes: Uint8Array;
+		exactCanonicalProfileBytes: Uint8Array;
+		exactCanonicalSignerSetBytes: Uint8Array;
+		pinnedGenesisAnchorDigest: string;
+	}>;
 	signerSet: readonly Readonly<{ publicKey: string; signerId: string }>[];
 }> {
 	const signerSet = SIGNERS.map(({ publicKeyHex, signerId }) => ({ publicKey: publicKeyHex, signerId }));
