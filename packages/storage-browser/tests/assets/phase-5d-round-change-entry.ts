@@ -13,7 +13,7 @@ import {
 } from "@ts-drp/protocol-v3/seal";
 import { createSealVoter } from "@ts-drp/seal";
 // eslint-disable-next-line import/no-unresolved -- resolved by the exact test alias to preserve singleton custody.
-import { createSealPacemaker, leaderForRound } from "@ts-drp/seal/pacemaker";
+import { createSealPacemaker, leaderForRound, type PacemakerEvent } from "@ts-drp/seal/pacemaker";
 
 import law from "../../../../tests/fixtures/phase-5d-v3/pacemaker-law-contract.json" with { type: "json" };
 import { openBrowserSealVoteStore } from "../../src/seal-vote.js";
@@ -117,17 +117,16 @@ function certifiedGenesis(): Readonly<{
 }
 
 function observedMetrics(events: unknown[]): Readonly<{
-	traceFunc(name: string, operation: (...args: unknown[]) => unknown): (...args: unknown[]) => unknown;
+	traceFunc(name: string, operation: (event: PacemakerEvent) => unknown): (event: PacemakerEvent) => unknown;
 }> {
 	return Object.freeze({
-		traceFunc(name: string, operation: (...args: unknown[]) => unknown) {
-			return (...args: unknown[]) => {
-				const event = args[0];
+		traceFunc(name: string, operation: (event: PacemakerEvent) => unknown) {
+			return (event: PacemakerEvent) => {
 				if (event === null || typeof event !== "object" || Reflect.get(event, "kind") !== name) {
 					throw new Error("fieldless pacemaker event");
 				}
 				events.push(structuredClone(event));
-				return operation(...args);
+				return operation(event);
 			};
 		},
 	});
