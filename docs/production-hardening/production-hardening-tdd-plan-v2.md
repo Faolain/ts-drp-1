@@ -57083,3 +57083,293 @@ in-transaction test callbacks, and false bounded-overflow reporting are all
 removed. Acting publication and live-room authority remain absent. The next
 slice is Phase 5d: RED-first pacemaker and distinct round-change evidence, with
 the bidirectional Quint/TypeScript trace gate before any network composition.
+
+## D.106 — Phase 5d pacemaker law, ownership, and executable boundary
+
+Phase 5d starts only after the signed D.105b handoff above. Read-only source
+reconciliation found that the standing G3 prose is directionally complete but
+not yet implementable as an interoperable protocol. The frozen v3 registry has
+an unsigned five-field `sealProposal`; it cannot by itself authenticate the
+deterministic leader or carry a new-round certificate. The registry's distinct
+signed `roundChange` kind already embeds a complete `seal-qc | null`, not a
+digest-only summary plus an unspecified attachment. Finally, G3 names
+`roundTimeoutBaseMs`, `roundTimeoutMaxMs`, and `maxFutureRoundGap` without
+assigning values or an authenticated source. Phase 5d must close those gaps by
+governed composition before a behavioral RED; it must not silently add fields,
+domains, caller-selected timing, or a second seal codec.
+
+### D.106a — additive pacemaker profile, without a registry rewrite
+
+One additive `pacemaker-profile-v1` supplement freezes the following execution
+law while leaving registry-v3 byte-identical:
+
+- `roundTimeoutBaseMs = 1_000`, `roundTimeoutMaxMs = 30_000`, and
+  `maxFutureRoundGap = 8`. `T(r)` is computed without exponent overflow: rounds
+  at or above the first capped round return the cap directly. These values are
+  package constants authenticated by the supplement; no caller, room, profile,
+  clock, or transport may override them. The supplement vectors freeze the
+  exact base, cap, gap, first capped round, and representative uncapped/capped
+  `T(r)` results. The product RED reads those same vectors and requires the real
+  pacemaker constants and timeout function to agree; divergent base, cap, gap,
+  or overflowing exponent implementations are causal mutants rather than prose
+  obligations.
+- `leader(r)` sorts the certified anchor roster by raw UTF-8 bytes and selects
+  `r mod n`. JavaScript locale order is not an authority.
+- A new-round certificate is a local immutable composition of exactly the
+  certified quorum `q` detached signed `roundChange` carriers for one exact
+  `(objectId, epoch, anchor, round)`. Carriers are sorted by signer ID, signer IDs
+  are unique, every signature and nested prepare QC is verified by the existing
+  protocol-v3 seal owner, and no certificate digest/domain/wrapper is invented.
+  Extra votes are not silently truncated into another certificate.
+- The frozen `roundChange.highestPrepareQC` is the complete registered prepare
+  QC or `null`. A non-null QC must be for the same object/epoch/anchor authority,
+  phase `prepare`, and a round strictly below the round-change round. Selection
+  chooses greatest QC round. Same-round QCs for different values make the
+  certificate invalid; same-round QCs for the same value choose the lowest
+  registered QC digest.
+- A proposal bundle is not a twentieth registered kind. It is a local immutable
+  composition containing the exact canonical `CutValue` bytes, the exact frozen
+  `SealProposal` bytes, the exact already-durable leader `prepare` vote carrier
+  matching that proposal, and, for `r > 0`, the exact verified new-round
+  certificate. Before accepting, voting, or replaying a bundle, the receiver
+  must decode and semantically validate the complete `CutValue`, recompute its
+  `valueDigest`, and bind that digest to both proposal and leader vote. No
+  digest-only availability assumption or caller assertion may substitute. The
+  leader vote authenticates the exact tuple
+  `(leader, objectId, epoch, round, valueDigest, proposalHash)` with the existing
+  finality key and counts toward the prepare QC. Round 0 has no new-round
+  certificate. For later rounds the
+  proposed value must equal the certificate selection when one exists; when all
+  certificate votes carry `null`, the authenticated leader may choose any fully
+  valid local CutValue. Relaying the same bundle is harmless; changing its value
+  requires another leader vote and reaches the durable exact-slot conflict.
+- The supplement does not widen `sealVote.phase`, change `SealProposal`, edit a
+  registry vector, or authenticate transport peers. It defines composition from
+  existing registered bytes. Phase 5e later gives those exact bytes a live
+  carrier; Phase 5d remains observation/model mode.
+
+D.106a uses the same single-use successor discipline as D.105a. The tests-only
+RED is exactly two paths:
+`tests/fixtures/phase-5d-v3/pacemaker-law-contract.json` and
+`tests/phase-5d-pacemaker-law-red.test.ts`. The additive GREEN is exactly seven:
+`packages/protocol-v3/supplements/pacemaker-profile-v1/{spec.md,profile.json,schema.json,vectors.json,check-freeze.mjs,freeze-policy.json}`
+and `.github/workflows/protocol-v3-pacemaker-profile.yml`. RED and GREEN form one
+bootstrap unit against a base containing neither protected owner. Independent
+registry vectors, original-reference hashing, leader ordering, certificate
+selection, proposal-bundle composition, invalid-base handling, and controlled
+Git transition mutants run before the sole missing-supplement readiness failure.
+The RED commit must not merge separately: the workflow compares the pull-request
+base that predates both RED owners and all seven GREEN owners, exactly as D.105a
+does. The immutable workflow also installs a commit-pinned Temurin JDK 17 and,
+when the later `seal-pacemaker.qnt` owner exists, runs the pinned Quint/Apalache
+formal command described below. Before that later owner exists the conditional
+formal step is explicitly skipped, not counted as a formal success.
+
+### D.106b — one atomic product GREEN, still without live networking
+
+The product owner graph remains narrow:
+
+1. `@ts-drp/protocol-v3/seal` alone encodes and authenticates round-change
+   preimages, signatures, nested QCs, leader prepare carriers, and exact
+   proposal identity. It reuses the frozen registry and the existing one-use
+   finality signing request. It does not retain a caller-supplied roster or mint
+   a generic signing oracle.
+2. `@ts-drp/seal/pacemaker` owns round/phase state, certificate selection,
+   deadlines, catch-up, bounded future evidence, and the serialized transition
+   gate. It composes the existing certified authority and voter; it does not
+   encode registered records itself. The package root stays unchanged.
+3. The existing browser seal-vote adapter widens only its internal durable phase
+   discriminator to include `round-change`. No schema-v3 store is needed: the
+   existing compound `voteSlots` and `voteOutbox` keys already contain `phase`.
+   Entering `r > 0` is one strict transaction over the same exact four stores:
+   incarnation and revision recheck, exact round-change slot read, native slot
+   and outbox `add`, and signer-state `put` with monotone `enteredRound` and
+   revision. The signature remains private until completion. Duplicate and
+   conflict behavior is byte-exact. A separate strict transaction over
+   `storageMeta` and `signerState` persists the complete exact canonical verified
+   prepare QC, including its registered vote/signature roster, whenever it
+   advances the highest prepare QC, even when an old-round commit vote is no
+   longer legal. Digest/round/value summaries are derived diagnostics only and
+   cannot be the restart authority: reopen re-verifies the complete bytes before
+   they can be nested in a new `roundChange`. There is no external `enterRound`
+   transition once the pacemaker owner is installed.
+4. The existing signer-state `committedValueDigest` records only the local
+   anti-equivocation fact that this signer cast a commit vote; it is not a
+   finality fact. A verified commit QC finalizes only through another strict
+   `storageMeta` + `signerState` transaction that rechecks incarnation,
+   revision, authority, current lock/round, and conflict state, then persists
+   the complete exact canonical commit QC, its `finalizedValueDigest`, and the
+   next revision atomically. `finalized` is observable only after that
+   transaction completes, and reopen must re-verify the stored QC before
+   restoring the finalized phase. A local commit vote, caller boolean, QC
+   digest, or pre-completion request success can never produce finalization.
+5. A test-owned conformance driver composes the real `packages/seal` owner with
+   the real browser mechanical adapter under `fake-indexeddb`. It is not a fifth
+   consensus oracle and is not exported by any package root.
+
+The pacemaker captures a monotonic clock and scheduler internally. Its test
+constructor is package-internal and accepts a deterministic monotonic clock;
+the public subpath cannot accept wall time, timer functions, timeout constants,
+rosters, quorum, leader, or Byzantine bounds. Every externally callable method
+runs through one serialized gate. `stop()` cancels the armed deadline, fences
+late callbacks, waits for the gate, and permits no later durable mutation or
+event.
+
+The phase machine is closed: awaiting proposal/new-round evidence, prepared and
+awaiting a prepare QC, committed and awaiting a commit QC, finalized, stopped,
+or terminal. Each of the first three active phases gets one `T(r)` deadline.
+Only accepted phase progress replaces the deadline. Invalid, duplicate,
+unauthorized, stale, or far-future input does not reset it. Timeout from an
+active phase enters `r + 1` by the atomic round-change transaction. Safe-integer
+round exhaustion terminalizes rather than wrapping.
+
+Catch-up is evidence-driven. A verified prepare or commit QC from round `r`, or
+exactly `f + 1 = ceil(n/3)` unique valid round-change votes for `r`, may advance
+to `r`; one higher-round signature never can. Evidence beyond the eight-round
+window is verified without allocating a per-round bucket and is admitted only
+as one complete catch-up proof. Inside the window, storage is bounded by the
+authenticated roster: at most one round-change carrier per signer per round,
+one proposal bundle, and the fixed prepare/commit QC observations. Late valid
+old votes may still form and verify a QC, but no signing transition may target a
+round below durable `enteredRound`.
+
+Accepted durable transitions emit their closed diagnostic facts only after the
+corresponding transaction completes, through one fieldless observation
+capability backed by `IMetrics.traceFunc`: `round_entered`, `vote_cast`,
+`qc_formed`, `lock_acquired`, `finalized`, or `restart`. `qc_formed` is not
+emitted until the complete prepare QC is durable; a commit QC produces
+`finalized` only after the complete finalization record is durable. Events
+contain only object/epoch/anchor identity, signer, phase, round, governed
+digests, and a monotone local sequence; no signature, CutValue bytes, key,
+storage handle, callback authority, seed, clock object, or timer escapes. Sink
+failure cannot roll back or authorize a transition. A genuine abrupt `crash`
+cannot emit a product event and is therefore a model-to-implementation harness
+action only. For implementation-to-model replay, the death harness inserts that
+one lifecycle action from the observed process boundary before consuming the
+product's post-reopen `restart` event; synthetic pre-crash telemetry is
+forbidden. Except for that externally observed death boundary, the product
+event stream is the sole implementation-to-model input.
+
+### D.106c — model and bidirectional trace gate
+
+The Phase-5d model replaces the externally scheduled round jump with actual
+round-change, timeout, leader, certificate, catch-up, proposal, QC, crash, and
+restart actions. It parameterizes active signer sets for n=4,5,6,7; includes
+Byzantine equivocation, reorder, duplication, loss, bounded future input, and
+durable/volatile separation; and refines every frozen registered field rather
+than treating nested QC identity as an uninterpreted string. It checks agreement,
+integrity, validity, lock safety, no retroactive vote, authority isolation, and
+durable-before-gossip. Bounded liveness is a separate witness under a fair honest
+leader and q responsive correct signers after GST; no asynchronous execution is
+claimed live.
+
+The toolchain is pinned to repository Quint `0.32.0` and Quint's Apalache backend
+`0.56.1`. The RED must prove an actual `quint verify --backend apalache` run and
+must fail if the backend is unavailable; `quint run`, a parse/typecheck, Docker
+presence, or a prerecorded transcript cannot substitute for symbolic checking.
+The official backend is bounded, so every report records n, invariants, maximum
+steps, seed where applicable, and the explicit finite claim. Safety checks run
+for n=4…7; deterministic and randomized Quint simulations supply the 10^4-step
+bounded-liveness witnesses. If the exact n=4…7 matrix cannot complete within the
+Phase-5 gate budget, the slice stops and is resliced around a reviewed inductive
+invariant or smaller independently justified bound; it does not silently drop n
+or replace symbolic verification with sampling.
+
+The immutable D.106a workflow supplies JDK 17 and passes
+`--apalache-version=0.56.1`; local evidence may instead connect Quint to a
+version-pinned Apalache server/container, but the real symbolic command must
+complete and a transcript cannot substitute. The safety invocation uses a
+non-vacuous maximum-step bound at least as large as the longest checked ITF
+trace and never below 12, and a structural action-coverage control requires the
+bounded model to reach timeout, round-change, proposal, prepare QC, commit QC,
+catch-up, crash, and restart actions. `max-steps` 0/1 and action-inert models are
+causal failures.
+
+Model-to-implementation replay consumes checked-in ITF traces with an explicit
+`lastEvent` discriminator and drives the real pacemaker/store through exact
+message, timeout, crash, and restart steps. Implementation-to-model replay turns
+the closed event stream into a generated Quint test that imports the same model
+actions; Quint must accept every transition in order. Test-owned translation may
+map bytes to governed digest symbols but cannot choose whether a transition is
+legal. At minimum the checked corpus includes the n=4 permanent-stall/carryover
+schedule, f+1 catch-up versus one-signature rejection, far-future no-allocation,
+and crash/restart with pending exact round-change outbox evidence. The existing
+`pacemaker-contract.json` RED owner is also the closed SHA-256 manifest for every
+checked trace, and the root RED rejects any missing, extra, or mismatched trace.
+The immutable root CODEOWNERS already routes the repository catch-all and cannot
+lawfully gain another rule; ordinary reviewed Git custody plus the manifest
+oracle supplies trace governance. The earlier immutable supplement checker does
+not pretend to protect trace files that did not exist at its bootstrap.
+
+The model-first product RED is exactly fifteen paths:
+
+- `packages/seal/formal/seal-pacemaker.qnt`;
+- `packages/seal/model/traces/{n4-round-carryover.itf.json,n4-catchup.itf.json,n7-crash-restart.itf.json}`;
+- `tests/fixtures/phase-5d-v3/{pacemaker-contract.json,pacemaker-fixture.ts,pacemaker-types.ts,pacemaker-trace-runner.ts,tsconfig.json}`;
+- `tests/phase-5d-pacemaker-red.test.ts`;
+- `packages/storage-browser/tests/assets/phase-5d-round-change-entry.ts`;
+- `packages/storage-browser/tests/phase-5d-round-change.pw.ts`;
+- `packages/storage-browser/playwright.phase-5d-round-change.config.ts`;
+- root `package.json`; and
+- `pnpm-lock.yaml`.
+
+The last two RED owners add the test-only `fake-indexeddb` dependency before any
+independent fake-IDB control executes. The dependency and its lock entry are
+part of RED causality, not implementation readiness.
+
+The independent model, symbolic/toolchain controls, registry/reference checks,
+trace translations, fake-IDB harness, and browser transaction controls execute
+before one composite missing-runtime readiness assertion. Future behavior is
+collected and typechecked behind only that fact. The RED rejects models with
+constant predicates, trace runners that compare only event names, implementation
+logs accepted without model replay, model traces not executed against the real
+voter, one-signature catch-up, locale-sorted leaders, deadline resets on invalid
+input, unbounded far-future buckets, unsigned leader proposals, non-atomic round
+entry, and round-change bytes released before transaction completion. It also
+rejects `divergent-timeout-base`, `divergent-timeout-cap`,
+`divergent-future-gap`, `uncapped-exponent`, digest-only highest-QC recovery,
+local-commit-vote-as-finality, finalized-before-commit-QC-persistence,
+proposal-without-CutValue, vacuous symbolic depth, and synthetic product crash
+telemetry.
+
+The atomic runtime GREEN is expected to touch exactly nine paths:
+`packages/protocol-v3/src/seal.ts`,
+`packages/seal/src/{index.ts,pacemaker.ts,storage-port.ts,internal/seal-vote-intent.ts}`,
+`packages/seal/package.json`,
+`packages/storage-browser/src/{seal-vote.ts,internal/seal-vote-store.ts}`,
+and root `vite.config.mts`. The test-only `fake-indexeddb` dependency already
+landed with RED; the runtime package graph remains protocol-v3/keychain → seal →
+mechanical browser storage. A required tenth runtime owner or any second lockfile
+change, registry change, schema-v3 migration, new signed domain, public raw
+carrier, or network/node composition is a reslice trigger rather than an
+unrecorded scope expansion.
+
+### D.106 formal plan review and single-round correction
+
+The frozen pre-correction plan packet was exact one staged path at signed HEAD
+`c1535af287d10c35d46ce73b60efd1699ffb9e68`, staged tree
+`e3824735f4fd8e44ee6b851e815e336b1ea573b9`, canonical diff SHA-256
+`1b78d56857d1406408a5f8404528faf9c0d4d7dd84bdaaaffa0119de99a6b4af`, and plan
+SHA-256 `872ca5fcc5ec861decd8c5705c8119d3770d7fa2c1a575d8f31d0ebb5ca47216`.
+The sole Kimi 100-check session returned `CHANGES_REQUIRED`; the sole
+Opus/xhigh session returned `CHANGES` with two P1 findings; the sole Grok
+session ended `NO_VERDICT` and was not restarted. Its read-only source audit was
+retained as non-formal evidence only.
+
+The same-round correction above discharges the reproduced blockers without a
+new registry kind, store, schema migration, or live carrier: RED owns its
+fake-IDB dependency; supplement vectors bind runtime timing; proposal bundles
+carry and validate exact CutValue bytes; full prepare and commit QCs become
+restart-safe durable authorities; commit-vote and finalization facts are
+distinct; symbolic depth and JDK/Apalache execution are non-vacuous; trace
+hashes live in the enumerated contract owner; and abrupt crash is a harness
+boundary rather than fabricated product telemetry. This is the one permitted
+plan-review correction. There is no confirmation review round.
+
+Preservation gates retain D.105a/D.105b, the complete Phase-5c browser and hard-
+death matrices, protocol-v3 registry/reference/freeze suites, all affected
+package typechecks/builds, root lint, exact formatting, and zero-diff checks.
+Phase 5d gains no live-room authority, publisher, certified anchor adoption,
+pruning, authority handoff, creator storage-loss re-learn, or claim that the
+Phase-5 observation exit metric is satisfied. Phase 5e remains the first live
+creator composition.
