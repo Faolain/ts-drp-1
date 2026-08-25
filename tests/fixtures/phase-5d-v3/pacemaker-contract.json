@@ -62,19 +62,19 @@
 	"traces": [
 		{
 			"path": "packages/seal/model/traces/n4-catchup.itf.json",
-			"sha256": "18a4ee2d8a45f91e6bbad099bec1200ed607846c751d51c2f1b263f914967921",
+			"sha256": "42a5fcb078d5b11f9d929d064623f0f0654d8f8f590a459166715348b0a180d4",
 			"n": 4,
 			"requiredEvents": ["one-round-change", "f-plus-one-catchup", "far-future-one", "far-future-qc"]
 		},
 		{
 			"path": "packages/seal/model/traces/n4-round-carryover.itf.json",
-			"sha256": "848ce697bf5adbe083be44778733f9cfef04029c966c7e0f31b2722194ef636b",
+			"sha256": "c9b44f5bc5971e29530300cc7bb80173ed5b4643e0aa2a0c243b22f002c69e04",
 			"n": 4,
 			"requiredEvents": ["proposal", "prepare-qc", "timeout", "round-change", "commit-qc", "finalized"]
 		},
 		{
 			"path": "packages/seal/model/traces/n7-crash-restart.itf.json",
-			"sha256": "401bcb3500278c5a8c068ae34083ac3a1b90fbddb9a86e7fb68fc6a59b8da43d",
+			"sha256": "20d6e3619a8b363ac7f05f539a7225b8c74b1bff581587ac326777df1d3b84b4",
 			"n": 7,
 			"requiredEvents": ["proposal", "prepare-qc", "timeout", "round-change", "crash", "restart"]
 		}

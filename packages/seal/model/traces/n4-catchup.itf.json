@@ -52,7 +52,7 @@
 			"valueDigest": "",
 			"durableRevision": 1,
 			"futureBucketCount": 0,
-			"pendingRoundChangeCount": 0,
+			"pendingRoundChangeCount": 1,
 			"durablePrepareQcCount": 0,
 			"durableCommitQcCount": 0
 		},
@@ -65,7 +65,7 @@
 			"valueDigest": "",
 			"durableRevision": 1,
 			"futureBucketCount": 0,
-			"pendingRoundChangeCount": 0,
+			"pendingRoundChangeCount": 1,
 			"durablePrepareQcCount": 0,
 			"durableCommitQcCount": 0
 		},
@@ -78,7 +78,7 @@
 			"valueDigest": "value-X",
 			"durableRevision": 2,
 			"futureBucketCount": 0,
-			"pendingRoundChangeCount": 0,
+			"pendingRoundChangeCount": 1,
 			"durablePrepareQcCount": 1,
 			"durableCommitQcCount": 0
 		}

@@ -36,7 +36,7 @@
 			"n": 7,
 			"round": 0,
 			"phase": "prepared",
-			"valueDigest": "value-X",
+			"valueDigest": "",
 			"durableRevision": 1,
 			"futureBucketCount": 0,
 			"pendingRoundChangeCount": 0,

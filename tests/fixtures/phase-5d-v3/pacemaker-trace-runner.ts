@@ -181,7 +181,11 @@ export async function replayCheckedTrace(
 	try {
 		for (const state of trace.states) {
 			const actual = await driver.apply(state);
-			if (!matchesState(state, actual)) throw new Error(`TRACE_STATE_MISMATCH:${state["#meta"].index}`);
+			if (!matchesState(state, actual)) {
+				throw new Error(
+					`TRACE_STATE_MISMATCH:${state["#meta"].index}:${JSON.stringify({ actual, expected: state })}`
+				);
+			}
 		}
 		return driver.events();
 	} finally {
@@ -253,12 +257,14 @@ export function implementationEventsToQuintTest(
 }
 
 function actionsForState(state: ItfTraceState): readonly string[] {
-	const candidate = `qc(${state.round}, "${state.lastEvent.startsWith("commit") ? "commit" : "prepare"}", ${JSON.stringify(state.valueDigest)}, ${state.n})`;
+	const transitionValueDigest =
+		state.lastEvent === "proposal" && state.valueDigest === "" ? "value-X" : state.valueDigest;
+	const candidate = `qc(${state.round}, "${state.lastEvent.startsWith("commit") ? "commit" : "prepare"}", ${JSON.stringify(transitionValueDigest)}, ${state.n})`;
 	const commitCandidate = `qc(${state.round}, "commit", ${JSON.stringify(state.valueDigest)}, ${state.n})`;
 	switch (state.lastEvent) {
 		case "proposal":
 			return [
-				`acceptProposal("A", bundle(${state.round}, ${JSON.stringify(state.valueDigest)}, ${state.n}))`,
+				`acceptProposal("A", bundle(${state.round}, ${JSON.stringify(transitionValueDigest)}, ${state.n}))`,
 				`persistVoteSet(${candidate})`,
 			];
 		case "prepare-vote":
