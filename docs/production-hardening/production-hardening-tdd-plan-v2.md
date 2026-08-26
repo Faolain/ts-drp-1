@@ -57656,7 +57656,7 @@ The tests-only RED is exactly six paths:
 - `packages/storage-browser/tests/phase-5e-creator-actor.pw.ts`; and
 - `packages/storage-browser/playwright.phase-5e-creator-actor.config.ts`.
 
-The expected GREEN is exactly eighteen paths:
+The expected GREEN is exactly nineteen paths:
 
 - `packages/keychain/src/finality.ts`;
 - `packages/seal/src/{creator.ts,internal/creator-close-intent.ts}`;
@@ -57679,6 +57679,10 @@ The expected GREEN is exactly eighteen paths:
 - the retained `packages/storage-browser/tests/assets/phase-5d-round-change-entry.ts`,
   whose direct database reopen must advance from schema v2 to v3 in the same
   additive migration commit; and
+- the retained `tests/phase-4c-snapshot-quarantine-red.test.ts` exact package
+  export-map assertion, which keeps the frozen Phase-4c browser subpaths and
+  admits exactly the already-shipped `./seal-vote` plus D.107b's
+  `./seal-evidence` additive subpath; and
 - the specific-before-bare Vite aliases.
 
 The evidence store is mechanical, scoped by the authenticated creator enrollment
