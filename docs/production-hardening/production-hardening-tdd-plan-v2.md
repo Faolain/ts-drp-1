@@ -59974,11 +59974,14 @@ or additional Fable review ran.
 #### D.108d1b — authenticated peer-local cold issuance custody
 
 D.108d1b closes the second blocking prerequisite discovered by the rejected
-D.108d2 freeze. Its tests-only RED roster is exactly seven paths. Two are new
-contract owners:
+D.108d2 freeze. Its tests-only RED roster is exactly nine paths. Four are new
+contract and fresh-process owners:
 
 - `tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts`; and
-- `tests/phase-6a-creator-successor-local-author-red.test.ts`.
+- `tests/phase-6a-creator-successor-local-author-red.test.ts`;
+- `packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs`;
+  and
+- `packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts`.
 
 Five retained test-infrastructure owners must change because they mint the
 genuine multi-writer adoption fixture, pin the closed reopen surface or execute
@@ -59987,9 +59990,9 @@ the built fresh-process proof:
 - `tests/fixtures/phase-6a-v3/creator-adoption-contract.ts`;
 - `tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts`;
 - `tests/phase-6a-creator-successor-activation-red.test.ts`;
-- `packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs`;
+- `packages/storage-node/tests/fixtures/phase-6a-creator-successor-activation-child.mjs`;
   and
-- `packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts`.
+- `packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts`.
 
 The GREEN production roster is exactly three existing owners:
 
@@ -60008,16 +60011,22 @@ successor material, registration, store or success projection, and ordinary
 
 The sole issuance selector in `creator-adoption.ts` must stop choosing whichever
 ACL writer happens to have a nonzero durable lineage. It opens the already
-authenticated epoch-one latched ACL, requires the captured lowercase 32-byte
-Ed25519 author to have current application-writer authority, and asks the
-captured signer exactly once to sign a fresh copy of the already authenticated
-32-byte successor current-anchor digest. It retains an independent digest copy
-across that await, accepts only a detached exact 64-byte ordinary
-`Uint8Array`, and verifies the tuple with the shipped strict protocol-v3
-Ed25519 verifier and the public key encoded by `author`. Throwing, rejecting,
-mutating, aliased, short, noncanonical or wrong-key signer results fail closed.
-The proof introduces no new digest domain and the identity signature is neither
-persisted nor published.
+authenticated epoch-one latched ACL and requires the captured lowercase
+32-byte Ed25519 author to have current application-writer authority. It then
+uses the existing secure-context WebCrypto authority to fill an exact ordinary
+32-byte `Uint8Array` with fresh unpredictable possession bytes. The selector
+retains one independent copy, passes a second independent copy to the captured
+signer exactly once, accepts only a detached exact 64-byte ordinary
+`Uint8Array`, imports the public key encoded by `author` as raw Ed25519, and
+requires `crypto.subtle.verify` to accept the signature over the retained
+possession bytes. Missing WebCrypto, import/verification failure, throwing,
+rejecting, mutating, aliased, short, noncanonical or wrong-key signer results
+fail closed. Returning any durable carrier signature, including the successor
+anchor signature, also fails because every reopen uses unpredictable bytes.
+The proof introduces no digest domain: the possession bytes are not a protocol
+digest, vertex, anchor or transferable signed carrier. This is one deliberate
+local possession use of the room's existing signing callback; neither the
+challenge nor its signature is persisted, published or retained.
 
 Only after that authentication may the selector examine the genuine durable
 issuance store. The selected local scope is exactly `{ author, objectId }`; its
@@ -60039,10 +60048,11 @@ inventing placeholder writer names. In one fresh built-package child it proves:
 2. an independent fresh late peer with no copied creator or other-writer
    issuance row cold-reopens and issues author sequence zero as itself; and
 3. copied creator custody, wrong-author/right-signer, right-author/wrong-signer,
-   two nonzero lineages, signer mutation/aliasing/throw/rejection and non-writer
-   identities all fail before every live effect.
+   two nonzero lineages, reuse of the durable successor anchor signature,
+   signer mutation/aliasing/throw/rejection and non-writer identities all fail
+   before every live effect.
 
-The child must use real SQLite issuance/journal/AHE/snapshot owners and the
+The new child must use real SQLite issuance/journal/AHE/snapshot owners and the
 package-aware fresh-process launcher against freshly built exports. Its oracle
 asserts the authenticated author and author sequence in the issued canonical
 preimage, issued row, outbox row and accepted journal row; it also proves no
@@ -60050,7 +60060,7 @@ foreign scope row was read as local custody. The retained D.108d1 cold/hot
 gates, D.108d1a identity gates, three-engine Web Lock matrix and complete
 Phase-4c selection including the real 64 MiB child remain mandatory. Affected
 node/storage-node builds and recorded baseline typechecks, exact-three
-production plus exact-seven RED ESLint/Prettier/diff checks, export/dependency
+production plus exact-nine RED ESLint/Prettier/diff checks, export/dependency
 audits and an isolated no-`dist` install/build/run close GREEN.
 
 No v3-live owner, package manifest, root export, room/chat source, keychain API,
@@ -60062,6 +60072,52 @@ one tests-only RED review and one GREEN review under the same Grok-high,
 Kimi-K3 CHECK001-CHECK100 and Opus-5/xhigh protocol used by D.108d1a. Same-round
 P0/P1 findings are reproduced and corrected once; P2 findings are assigned
 without a confirmation rerun.
+
+The D.108d1b plan-freeze review inspected immutable signed docs-only commit
+`b980e6caa975c109c5ba2d1556f18b7e60bf65d3`, parent
+`6ce8b0f1214bb153a6c1f2b8fe49f7dca532574a`, tree
+`903bc102ccbde61d8103ce23c0f38c89eeda921c`, stable patch id
+`431140d97101bd862d1afd7204446bb3983a848b` and staged-diff SHA-256
+`51e0f37a0e24009eea95f420628f00d115e28928df01d5d0fe74052ad3e5e0c2`.
+Grok 4.6/high session `01a03f96-415e-7572-bf54-331f6f7af740` inspected for
+780.238 seconds. Its first turn ended normally with `stop_reason=end_turn` and
+a substantive result but prefixed progress prose made the runner classify that
+turn `NO_VERDICT`; a one-turn continuation of the same session emitted the
+valid terminal schema and returned `CHANGES_REQUIRED`, P0=0/P1=1/P2=1. Kimi
+K3 session `session_13a67d47-ff5c-415a-8475-97971b337bbb` completed exactly
+CHECK001 through CHECK100 and returned `CHANGES_REQUIRED`, P0=0/P1=1/P2=6.
+Opus 5/xhigh session `11b4ab54-72a3-457b-af21-ad63d61f7506` completed 62
+turns over 961.092 API seconds and returned `CHANGES_REQUIRED`,
+P0=0/P1=3/P2=3.
+
+The round reproduced three material defects. The required two-field exact-set
+change would break the existing native child and browser entry while the
+seven-path roster omitted both. The fixed anchor-digest challenge was already
+signed in the durable carrier whenever anchor and ACL-author keys coincide, so
+it did not prove private custody. Finally,
+`verifyEd25519RegisteredDigest` is not on the protocol-v3 package's pinned
+public surface, making the named verifier unreachable from the frozen three
+GREEN owners. The single same-round correction above expands RED to nine,
+includes both existing callers, replaces the replayable carrier value with
+fresh random possession bytes and uses WebCrypto already present in the target
+runtimes. A direct capability probe signed one 32-byte challenge with the
+workspace's Ed25519 implementation, then imported and verified it at a local
+secure origin in Chromium, Firefox and WebKit; all three returned
+`{ supported: true, valid: true, mutant: false }`. Node 22 likewise exposes
+`crypto.getRandomValues` and `crypto.subtle.verify`. No package export,
+manifest, dependency or fourth production owner is needed.
+
+The P2 ledger remains explicit without confirmation. Reviewers record the
+signer's documented registered-vertex wording versus this one local possession
+use, the cold path's not-yet-pinned direct successor-projection ACL-digest
+cross-check, the need to keep multi-writer fixture construction additive, an
+unspecified exact new failure detail, permissionless-ACL lineage enumeration,
+and the distinction between allowed snapshot quarantine completion and
+forbidden later live effects. Static-challenge replay and the two paths
+mislabelled as retained were subsumed by the reproduced P1 correction. These
+items remain RED clarity or future hardening and do not widen the corrected
+freeze. No reviewer modified the tracked tree, no confirmation review ran and
+no Fable review ran.
 
 #### D.108d2 — product and peer proof freeze boundary
 
