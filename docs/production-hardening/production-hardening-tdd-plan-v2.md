@@ -59606,12 +59606,16 @@ before RED.
 #### D.108d1a — successor handle registration-identity compatibility
 
 D.108d1a is the first blocking prerequisite discovered by the rejected D.108d2
-freeze. Its corrected tests-only RED roster is exactly four paths: two new
+freeze. Its corrected tests-only RED roster is exactly five paths: two new
 owners,
 
 - `tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts`;
   and
 - `tests/phase-6a-creator-successor-handle-identity-red.test.ts`;
+
+the retained deterministic built-subpath launcher owner,
+
+- `tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts`;
 
 plus the two retained cold-child owners that must add the cold-wrapper proof:
 
@@ -59663,7 +59667,7 @@ claim.
 The contract pins one composite readiness failure. Every substantive behavior
 is skipped only by that same fact and must execute in GREEN; the readiness scan
 is never a substitute for the genuine hot and cold gates. It also pins exact
-four-RED/three-GREEN rosters, the unchanged exact `@ts-drp/node/v3-live` export
+five-RED/three-GREEN rosters, the unchanged exact `@ts-drp/node/v3-live` export
 roster, no node-root or package-manifest export and no product consumer. GREEN
 also runs the three retained exact-v3-live-surface owners
 `tests/phase-4b-v3-live-snapshot-composition-red.test.ts`,
@@ -59705,6 +59709,17 @@ bytes rather than pass on `empty`. The existing cold child joins the RED roster
 so the cold wrapper cannot inherit the same identity defect unseen, and the
 three retained exact-v3-live-export tests now guard the promised public-surface
 containment.
+
+The first deterministic RED dry-run then exposed one test-launcher fact before
+the RED checkpoint was signed: the retained child cannot resolve its new bare
+`@ts-drp/node/v3-live` import unless the existing closed import hook maps that
+subpath to the exact freshly built node target. The launcher contract therefore
+joins the corrected RED roster as the fifth test-only owner. This is not a
+production dependency, manifest export or production-relative import. The same
+dry-run also confirmed that the unchanged runtime roster includes the retained
+`bindV3BlueprintLivePlane` export, so the contract records all seven existing
+exports rather than an obsolete six-name subset. No GREEN owner or product
+surface changed, and the review round was not rerun as a confirmation round.
 
 The nonblocking ledger remains explicit without confirmation: Grok records the
 adjacent D.108d2 wording, the not-yet-pinned bridge-specific readiness fact and
