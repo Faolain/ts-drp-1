@@ -59560,8 +59560,10 @@ remain the exact old source authority, so its pending outbox row can be
 classified and suppressed. The non-genesis journal branch is reachable only
 from the private successor custody owner; no public epoch switch or
 caller-selected anchor is added. The existing
-`packages/node/src/internal/v3-live-recovered-authority.ts` must remain byte-for-
-byte unchanged, and the RED pins that fact.
+`packages/node/src/v3-live-recovered-authority.ts` must remain byte-for-byte
+unchanged at SHA-256
+`20453bc3aefdb4c97dbfb77e311e4021621ea6413514cb3e049914d22f4e9cb1`,
+and the RED pins that fact.
 
 The `@ts-drp/node/creator-adoption-activate` non-root subpath exports exactly two
 functions and no serializable authority type. `activateCreatorSuccessorAdoption`
