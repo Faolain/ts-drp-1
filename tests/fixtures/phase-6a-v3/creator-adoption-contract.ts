@@ -224,6 +224,7 @@ export interface GenuineCreatorAdoptionFixture {
 		readonly journalRows: readonly LiveJournalAcceptedRow[];
 		readonly journalSnapshot: LiveJournalSnapshotToken;
 		readonly localIssued: Readonly<{ readonly authorSequence: number; readonly digest: string }>;
+		readonly predecessorExactCanonicalLatchedAclBytes: Uint8Array;
 		readonly proposed: DetachedHeadEvidence;
 	}>;
 	readonly controls: {
@@ -242,6 +243,11 @@ export interface GenuineCreatorAdoptionFixture {
 	};
 	readonly handle: CreatorLiveCloseHandle;
 	readonly journal: DurableLiveJournalStore;
+	readonly runtimeBindings: Readonly<{
+		readonly messageQueueManager: MessageQueueManager<Message>;
+		readonly networkNode: DRPNetworkNode;
+		onAdmittedVertex(input: Readonly<Record<string, unknown>>): Promise<void> | void;
+	}>;
 	readonly scope: LiveJournalScope;
 	close(): Promise<void>;
 }
@@ -778,7 +784,7 @@ function deleteDatabase(name: string): Promise<void> {
  * @returns Genuine sealed handle, trusted catalog, mutation controls and cleanup owner.
  */
 export async function openGenuineCreatorAdoptionFixture(
-	options: Readonly<{ readonly objectId?: string }> = {}
+	options: Readonly<{ readonly objectId?: string; readonly stageAclChange?: boolean }> = {}
 ): Promise<GenuineCreatorAdoptionFixture> {
 	const controls: GenuineCreatorAdoptionFixture["controls"] = {
 		adoptionPhase: false,
@@ -815,11 +821,14 @@ export async function openGenuineCreatorAdoptionFixture(
 	if (!openedCurrentTrust.ok)
 		throw new TypeError(`D.108b fixture current trust open failed: ${openedCurrentTrust.reason}`);
 	const recovered = await recoverWithDurableStores(fixture, fixture.capability, controls);
+	const messageQueueManager = new MessageQueueManager<Message>({ logConfig: { level: "silent" } });
+	const networkNode = fakeNetwork(`d108b-${crypto.randomUUID()}`);
+	const onAdmittedVertex = (): void => undefined;
 	const activation = activateV3LivePlane({
 		capability: recovered.capability,
-		messageQueueManager: new MessageQueueManager<Message>({ logConfig: { level: "silent" } }),
-		networkNode: fakeNetwork(`d108b-${crypto.randomUUID()}`),
-		onAdmittedVertex: () => undefined,
+		messageQueueManager,
+		networkNode,
+		onAdmittedVertex,
 	});
 	if (!activation.ok) throw new TypeError(`D.108b fixture activation failed: ${activation.kind}`);
 	const blueprint = bindV3BlueprintLivePlane({
@@ -834,6 +843,23 @@ export async function openGenuineCreatorAdoptionFixture(
 		signRegisteredVertexDigest: fixture.signRegisteredVertexDigest,
 	});
 	if (!localIssued.ok) throw new TypeError(`D.108b fixture local issue failed: ${localIssued.kind}`);
+	if (options.stageAclChange === true) {
+		const stagedAcl = await activation.handle.issueLocal({
+			operations: Object.freeze([
+				Object.freeze({
+					logicalTime: 3,
+					operation: Object.freeze({
+						action: "acl",
+						group: "writer",
+						kind: "grant",
+						target: fixture.author === "f".repeat(64) ? "e".repeat(64) : "f".repeat(64),
+					}),
+				}),
+			]),
+			signRegisteredVertexDigest: fixture.signRegisteredVertexDigest,
+		});
+		if (!stagedAcl.ok) throw new TypeError(`D.108b fixture ACL issue failed: ${stagedAcl.kind}`);
+	}
 	const signer = await createRecoverableFinalitySigner({ seed: hexBytes(contract.privateKeySeedHex) });
 	const [vote, evidence, rawSnapshotStore] = await Promise.all([
 		openBrowserSealVoteStore({ databaseName: primaryDatabaseName }),
@@ -939,10 +965,12 @@ export async function openGenuineCreatorAdoptionFixture(
 			journalRows: Object.freeze(journalRows),
 			journalSnapshot: journalReadiness.snapshot,
 			localIssued: Object.freeze({ authorSequence: localIssued.authorSequence, digest: localIssued.digest }),
+			predecessorExactCanonicalLatchedAclBytes: Uint8Array.from(fixture.exactCanonicalLatchedAclBytes as Uint8Array),
 			proposed,
 		}),
 		handle: bound.handle,
 		journal: recovered.journal,
+		runtimeBindings: Object.freeze({ messageQueueManager, networkNode, onAdmittedVertex }),
 		scope: journalScope,
 	});
 }

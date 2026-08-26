@@ -2535,6 +2535,7 @@ interface VerifiedV3IngressEvidence {
 
 const v3PlaneRegistrations = new WeakMap<DRPNetworkNode, Map<string, V3PlaneRegistration>>();
 const v3HandleRegistrations = new WeakMap<V3PlaneHandle, V3PlaneRegistration>();
+const creatorSuccessorTransportHandoffs = new WeakMap<object, V3PlaneRegistration>();
 const claimedCreatorCloseHandles = new WeakSet<V3PlaneHandle>();
 const HEX_DIGITS = "0123456789abcdef";
 
@@ -2921,6 +2922,41 @@ function sameActivation(
 		registration.payload.provenance.anchorDigest === payload.provenance.anchorDigest &&
 		registration.payload.liveStateRef.digest === payload.liveStateRef.digest
 	);
+}
+
+function creatorSuccessorTransportHandoff(
+	material: CreatorSuccessorLiveMaterial,
+	bindings: CreatorSuccessorRuntimeBindings
+): V3PlaneRegistration | undefined {
+	try {
+		const registrations = v3PlaneRegistrations.get(bindings.networkNode);
+		if (registrations === undefined) return undefined;
+		for (const registration of registrations.values()) {
+			const trust = registration.payload.trust.trust;
+			if (
+				currentRegistration(registration) &&
+				registration.messageQueueManager === bindings.messageQueueManager &&
+				registration.mode === "genesis-active" &&
+				registration.blueprintClosing &&
+				registration.blueprintFolded &&
+				registration.terminalState === "terminal" &&
+				registration.authorization.kind === "latched-acl" &&
+				sameBytes(
+					encodeCanonical(registration.authorization.value),
+					material.predecessorExactCanonicalLatchedAclBytes
+				) &&
+				trust.objectId === material.predecessor.trust.objectId &&
+				trust.currentEpoch === material.predecessor.trust.currentEpoch &&
+				trust.currentAnchorDigest === material.predecessor.trust.currentAnchorDigest &&
+				trust.genesisAnchorDigest === material.predecessor.trust.genesisAnchorDigest
+			) {
+				return registration;
+			}
+		}
+		return undefined;
+	} catch {
+		return undefined;
+	}
 }
 
 function copiedScope(value: unknown): DurableIssueScope | undefined {
@@ -6296,6 +6332,8 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 		if (input === undefined) return activationFailure("malformed-input", "v3 activation input is invalid");
 		const mode = snapshotInput === undefined ? "genesis-active" : "snapshot-closed";
 		const { capability, messageQueueManager, networkNode, onAdmittedVertex } = input;
+		const transportHandoff = creatorSuccessorTransportHandoffs.get(capability as object);
+		creatorSuccessorTransportHandoffs.delete(capability as object);
 		const successorInitialState = creatorSuccessorInitialState.get(capability as object);
 		if (successorInitialState !== undefined) creatorSuccessorInitialState.delete(capability as object);
 		const recovered = consumeRecoveredV3Live(capability as RecoveredV3Live);
@@ -6337,7 +6375,8 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 		const boundSink = onAdmittedVertex as V3AdmittedVertexSink;
 		let registrations = v3PlaneRegistrations.get(boundNetworkNode);
 		const existing = registrations?.get(topic);
-		if (existing !== undefined) {
+		const reusesTransport = existing !== undefined && existing === transportHandoff && currentRegistration(existing);
+		if (existing !== undefined && !reusesTransport) {
 			if (currentRegistration(existing)) {
 				return sameActivation(existing, recovered, input)
 					? ObjectFreeze({ handle: existing.handle, ok: true as const })
@@ -6347,7 +6386,7 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				return activationFailure("internal-invariant", "v3 stale registration could not be retired");
 			}
 		}
-		if (hasQueueGuarded(boundQueueManager, queueId) !== false) {
+		if (hasQueueGuarded(boundQueueManager, queueId) !== reusesTransport) {
 			return activationFailure("internal-invariant", "v3 queue is already owned");
 		}
 		const subscribedTopics = denseStrings(boundNetworkNode.getSubscribedTopics());
@@ -6357,15 +6396,18 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				if (subscribedTopics[index] === topic) ownsTopic = true;
 			}
 		}
-		if (subscribedTopics === undefined || ownsTopic) {
+		if (subscribedTopics === undefined || ownsTopic !== reusesTransport) {
 			return activationFailure("internal-invariant", "v3 topic is already owned");
 		}
 		let registration = undefined as unknown as V3PlaneRegistration;
 		let networkSubscriptionAttempted = false;
 		try {
-			const queueSubscription = subscribeActivationQueue(boundQueueManager, queueId, (message) =>
-				enqueueV3Ingress(registration, message)
-			);
+			const queueSubscription = reusesTransport
+				? "ok"
+				: subscribeActivationQueue(boundQueueManager, queueId, (message) => {
+						const owner = v3PlaneRegistrations.get(boundNetworkNode)?.get(topic);
+						return owner === undefined ? undefined : enqueueV3Ingress(owner, message);
+					});
 			if (queueSubscription !== "ok") {
 				return queueSubscription === "capacity"
 					? activationFailureAfterCleanup(
@@ -6398,22 +6440,24 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 					false
 				);
 			}
-			networkSubscriptionAttempted = true;
-			try {
-				const subscription = boundNetworkNode.subscribe(topic);
-				if (subscription !== undefined && typeof Reflect.get(subscription as object, "then") === "function") {
-					void Promise.resolve(subscription).catch(() => undefined);
+			if (!reusesTransport) {
+				networkSubscriptionAttempted = true;
+				try {
+					const subscription = boundNetworkNode.subscribe(topic);
+					if (subscription !== undefined && typeof Reflect.get(subscription as object, "then") === "function") {
+						void Promise.resolve(subscription).catch(() => undefined);
+					}
+				} catch {
+					return activationFailureAfterCleanup(
+						"subscribe-failed",
+						"v3 topic subscription failed",
+						boundNetworkNode,
+						boundQueueManager,
+						topic,
+						queueId,
+						true
+					);
 				}
-			} catch {
-				return activationFailureAfterCleanup(
-					"subscribe-failed",
-					"v3 topic subscription failed",
-					boundNetworkNode,
-					boundQueueManager,
-					topic,
-					queueId,
-					true
-				);
 			}
 			if (topicMembership(boundNetworkNode, topic) !== true) {
 				return activationFailureAfterCleanup(
@@ -6472,6 +6516,11 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 			if (snapshotMachine !== undefined) registration.blueprintHandle = makeV3BlueprintLiveHandle(registration);
 			v3HandleRegistrations.set(registration.handle, registration);
 			registrations ??= new IntrinsicMap<string, V3PlaneRegistration>();
+			if (reusesTransport) {
+				existing.active = false;
+				existing.pendingIngress.clear();
+				existing.pendingIngressBytes = 0;
+			}
 			registrations.set(topic, registration);
 			v3PlaneRegistrations.set(boundNetworkNode, registrations);
 			return ObjectFreeze({ handle: registration.handle, ok: true as const });
@@ -6556,6 +6605,10 @@ async function activateCreatorSuccessorLive(
 				expectedPayloadDigest: material.snapshotPayloadDigest,
 			})
 		);
+		const transportHandoff = creatorSuccessorTransportHandoff(material, bindings);
+		if (transportHandoff !== undefined) {
+			creatorSuccessorTransportHandoffs.set(recovered.capability, transportHandoff);
+		}
 		const activated = activateV3LivePlane({ capability: recovered.capability, ...bindings });
 		if (!activated.ok) return rejected("activation-rejected", `creator successor activation failed: ${activated.kind}`);
 		if (!material.terminalizeSource()) {

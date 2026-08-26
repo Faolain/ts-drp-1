@@ -7,6 +7,7 @@ import type { DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-s
 import type { DurableLiveJournalStore } from "@ts-drp/live-journal";
 import { type CurrentAnchorTrust, openCurrentAnchorTrust } from "@ts-drp/protocol-v3";
 import { openCreatorSuccessorTrust } from "@ts-drp/protocol-v3/creator-close";
+import { openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";
 import { decodeSnapshotManifest, snapshotChunkDigest } from "@ts-drp/protocol-v3/snapshot-transfer";
 import {
 	type AheDurableStore,
@@ -611,13 +612,22 @@ function successorCommitMaterial(
 			byteLength: exactCanonicalProjectionBytes.byteLength,
 			digest: projectionDigest.value,
 		});
+		const predecessorAclDigest = digestBlob(facts.exactCanonicalLatchedAclBytes);
+		if (!predecessorAclDigest.ok) return undefined;
+		const predecessorAclRef = Object.freeze({
+			byteLength: facts.exactCanonicalLatchedAclBytes.byteLength,
+			digest: predecessorAclDigest.value,
+		});
+		const retained = facts.proposedReferences.filter((candidate) => !sameRef(candidate, predecessorLiveRef));
 		const candidateReferences = Object.freeze(
-			[...facts.proposedReferences.filter((candidate) => !sameRef(candidate, predecessorLiveRef)), projectionRef].sort(
-				(left, right) => (left.digest < right.digest ? -1 : left.digest > right.digest ? 1 : 0)
-			)
+			[
+				...retained,
+				projectionRef,
+				...(retained.some((candidate) => sameRef(candidate, predecessorAclRef)) ? [] : [predecessorAclRef]),
+			].sort((left, right) => (left.digest < right.digest ? -1 : left.digest > right.digest ? 1 : 0))
 		);
 		if (
-			candidateReferences.length !== facts.proposedReferences.length ||
+			!candidateReferences.some((candidate) => sameRef(candidate, predecessorAclRef)) ||
 			new Set(candidateReferences.map(({ digest }) => digest)).size !== candidateReferences.length
 		) {
 			return undefined;
@@ -660,10 +670,18 @@ function creatorSuccessorLiveSeed(
 			return undefined;
 		}
 		const projectionDigest = digestBlob(projected.bytes);
-		if (!projectionDigest.ok) return undefined;
+		const predecessorAclDigest = digestBlob(facts.exactCanonicalLatchedAclBytes);
+		if (!projectionDigest.ok || !predecessorAclDigest.ok) return undefined;
 		const projectionRef = Object.freeze({ byteLength: projected.bytes.byteLength, digest: projectionDigest.value });
+		const predecessorAclRef = Object.freeze({
+			byteLength: facts.exactCanonicalLatchedAclBytes.byteLength,
+			digest: predecessorAclDigest.value,
+		});
 		const successorCandidates = commitMaterial.candidateReferences.map((ref) => {
 			if (sameRef(ref, projectionRef)) return Object.freeze({ bytes: Uint8Array.from(projected.bytes), ref });
+			if (sameRef(ref, predecessorAclRef)) {
+				return Object.freeze({ bytes: Uint8Array.from(facts.exactCanonicalLatchedAclBytes), ref });
+			}
 			const candidate = closure.proposedCandidates.find((entry) => sameRef(entry.ref, ref));
 			if (candidate === undefined) throw new TypeError("creator successor candidate is unavailable");
 			return Object.freeze({ bytes: Uint8Array.from(candidate.bytes), ref: Object.freeze({ ...ref }) });
@@ -959,14 +977,23 @@ async function reopenCreatorSuccessorMaterial(
 			return coldFailure("chain-invalid", "creator successor projection is invalid");
 		}
 		const exactCanonicalLatchedAclBytes = encodeCanonical(snapshot.payload.acl);
-		const successorAcl = canonicalRecord(exactCanonicalLatchedAclBytes);
-		const predecessorExactCanonicalLatchedAclBytes =
-			successorAcl !== undefined && successorAcl.epoch === 1
-				? encodeCanonical({ ...successorAcl, epoch: 0 })
+		const predecessorAclCandidates = activeCandidates.filter(
+			(candidate) => hex(hashDomain("ts-drp/latched-acl/v3", candidate.bytes)) === currentAnchor.aclDigest
+		);
+		const predecessorExactCanonicalLatchedAclBytes = predecessorAclCandidates[0]?.bytes;
+		const openedPredecessorAcl =
+			predecessorAclCandidates.length === 1 && predecessorExactCanonicalLatchedAclBytes !== undefined
+				? openCanonicalLatchedAclSnapshot({
+						exactCanonicalLatchedAclBytes: predecessorExactCanonicalLatchedAclBytes,
+						expectedAclDigest: String(currentAnchor.aclDigest),
+						expectedEpoch: 0,
+						expectedObjectId: objectId,
+					})
 				: undefined;
 		if (
 			predecessorExactCanonicalLatchedAclBytes === undefined ||
-			hex(hashDomain("ts-drp/latched-acl/v3", predecessorExactCanonicalLatchedAclBytes)) !== currentAnchor.aclDigest
+			openedPredecessorAcl === undefined ||
+			!openedPredecessorAcl.ok
 		) {
 			return coldFailure("chain-invalid", "creator predecessor ACL cannot be reconstructed");
 		}

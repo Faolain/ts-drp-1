@@ -168,6 +168,10 @@ export async function createD108d1PackedDurableMaterial(
 		byteLength: fixture.evidence.exactCanonicalProjectionBytes.byteLength,
 		digest: projectionDigest,
 	});
+	const predecessorAclRef = Object.freeze({
+		byteLength: fixture.evidence.predecessorExactCanonicalLatchedAclBytes.byteLength,
+		digest: lowerHex(hashDomain("ts-drp-storage/blob/v1", fixture.evidence.predecessorExactCanonicalLatchedAclBytes)),
+	});
 	const activeClosure = Object.freeze(
 		committedInspection.references.map((ref) => Object.freeze({ byteLength: ref.byteLength, digest: ref.digest }))
 	);
@@ -216,7 +220,11 @@ export async function createD108d1PackedDurableMaterial(
 			head: committed.head,
 			projection: { bytes: fixture.evidence.exactCanonicalProjectionBytes, ref: projectionRef },
 		},
-		blobs: [...fixture.evidence.current.candidates, ...fixture.evidence.proposed.candidates],
+		blobs: [
+			...fixture.evidence.current.candidates,
+			...fixture.evidence.proposed.candidates,
+			{ bytes: fixture.evidence.predecessorExactCanonicalLatchedAclBytes, ref: predecessorAclRef },
+		],
 		catalog: {
 			blueprintDigests: fixture.catalog.blueprintDigests,
 			catalogDigest: fixture.catalog.catalogDigest,

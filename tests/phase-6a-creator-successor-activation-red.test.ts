@@ -115,9 +115,11 @@ function containsDigest(value: unknown, expected: Uint8Array): boolean {
 	return false;
 }
 
-async function childMaterial(): Promise<Readonly<{ readonly directory: string; readonly material: unknown }>> {
+async function childMaterial(
+	options: Readonly<{ readonly stageAclChange?: boolean }> = {}
+): Promise<Readonly<{ readonly directory: string; readonly material: unknown }>> {
 	const directory = mkdtempSync(join(tmpdir(), "ts-drp-d108d1-unit-"));
-	const fixture = await openGenuineCreatorAdoptionFixture();
+	const fixture = await openGenuineCreatorAdoptionFixture(options);
 	try {
 		return Object.freeze({ directory, material: await createD108d1PackedDurableMaterial(fixture, directory) });
 	} catch (error) {
@@ -265,7 +267,7 @@ describe("D.108d1 creator successor activation RED", () => {
 				result = await activate({
 					capability: prepared.capability,
 					handle: fixture.handle,
-					...runtimeBindings(`d108d1-${crypto.randomUUID()}`),
+					...fixture.runtimeBindings,
 				});
 				expect(result).toMatchObject({ lifecycle: "active", ok: true, recovery: "active-new" });
 				const handle = result.handle as Readonly<Record<string, unknown>>;
@@ -303,7 +305,7 @@ describe("D.108d1 creator successor activation RED", () => {
 				expect.objectContaining({ kind: "malformed-input", ok: false })
 			);
 			for (const mode of ["cold", "extra-epoch"] as const) {
-				const child = await childMaterial();
+				const child = await childMaterial({ stageAclChange: mode === "cold" });
 				childRuns.push(child.directory);
 				const proof = (await runD108d1ActivationChild(mode, child.material)).proof;
 				if (mode === "cold") {

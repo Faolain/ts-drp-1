@@ -232,10 +232,19 @@ function validProjection(material: CreatorAdoptionIntentMaterial): Readonly<Reco
 		byteLength: material.exactCanonicalProjectionBytes.byteLength,
 		digest: digest.value,
 	});
+	const predecessorAclDigest = digestBlob(material.activation.predecessorExactCanonicalLatchedAclBytes);
+	if (!predecessorAclDigest.ok) return undefined;
+	const predecessorAclRef = Object.freeze({
+		byteLength: material.activation.predecessorExactCanonicalLatchedAclBytes.byteLength,
+		digest: predecessorAclDigest.value,
+	});
+	const retained = material.pendingReferences.filter((ref) => !sameRef(ref, material.predecessorLiveRef));
 	const derived = Object.freeze(
-		[...material.pendingReferences.filter((ref) => !sameRef(ref, material.predecessorLiveRef)), projectionRef].sort(
-			(left, right) => (left.digest < right.digest ? -1 : left.digest > right.digest ? 1 : 0)
-		)
+		[
+			...retained,
+			projectionRef,
+			...(retained.some((ref) => sameRef(ref, predecessorAclRef)) ? [] : [predecessorAclRef]),
+		].sort((left, right) => (left.digest < right.digest ? -1 : left.digest > right.digest ? 1 : 0))
 	);
 	return material.pendingReferences.filter((ref) => sameRef(ref, material.predecessorLiveRef)).length === 1 &&
 		new Set(derived.map(({ digest: value }) => value)).size === derived.length &&
@@ -379,6 +388,20 @@ async function stageCandidate(facts: SealedAdoptionFacts, material: CreatorAdopt
 		)
 	) {
 		throw new TypeError("creator successor projection cache failed");
+	}
+	const predecessorAclBytes = material.activation.predecessorExactCanonicalLatchedAclBytes;
+	const predecessorAclDigest = digestBlob(predecessorAclBytes);
+	if (
+		!predecessorAclDigest.ok ||
+		!successfulMutation(
+			await facts.store.putCachedBlob({
+				...scope,
+				bytes: predecessorAclBytes,
+				digest: predecessorAclDigest.value,
+			})
+		)
+	) {
+		throw new TypeError("creator predecessor ACL cache failed");
 	}
 	for (const ref of material.candidateReferences) {
 		if (!successfulMutation(await facts.store.promoteReference({ ...scope, digest: ref.digest }))) {
