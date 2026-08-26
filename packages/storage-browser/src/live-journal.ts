@@ -209,7 +209,7 @@ async function admit(database: IDBDatabase): Promise<void> {
 	}
 }
 
-function scopeKey(scope: LiveJournalScope): [string, 0, string] {
+function scopeKey(scope: LiveJournalScope): [string, number, string] {
 	return [scope.objectId, scope.epoch, scope.anchorDigest];
 }
 
@@ -290,7 +290,7 @@ function fromRawScope(value: unknown): StoredScope {
 		exactCanonicalParametersCarrierBytes: parameters,
 		nextJournalSequence: raw.nextJournalSequence as number,
 		parametersDigest: raw.parametersDigest as string,
-		scope: { anchorDigest: raw.anchorDigest as string, epoch: raw.epoch as 0, objectId: raw.objectId as string },
+		scope: { anchorDigest: raw.anchorDigest as string, epoch: raw.epoch as number, objectId: raw.objectId as string },
 	};
 }
 
@@ -303,7 +303,7 @@ function fromRawRow(value: unknown): StoredRow {
 	if (raw === undefined) throw new CorruptLiveJournalError();
 	const scope = {
 		anchorDigest: raw.anchorDigest as string,
-		epoch: raw.epoch as 0,
+		epoch: raw.epoch as number,
 		objectId: raw.objectId as string,
 	};
 	if (sourceKind === "received") {
@@ -333,7 +333,7 @@ function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
 	return left.byteLength === right.byteLength && left.every((byte, index) => byte === right[index]);
 }
 
-function sameGenesis(left: StoredScope, right: StoredScope): boolean {
+function sameInstalledScope(left: StoredScope, right: StoredScope): boolean {
 	return (
 		left.scope.objectId === right.scope.objectId &&
 		left.scope.epoch === right.scope.epoch &&
@@ -453,7 +453,7 @@ function installWriter(database: IDBDatabase, input: StoredScope): Promise<Write
 				if (before === null) {
 					outcome = { before, idempotent: false, rejected: "store-poisoned" };
 					transaction.abort();
-				} else if (sameGenesis(before.scope, input)) outcome = { before, idempotent: true };
+				} else if (sameInstalledScope(before.scope, input)) outcome = { before, idempotent: true };
 				else {
 					outcome = { before, idempotent: false, rejected: "genesis-conflict" };
 					transaction.abort();
@@ -638,7 +638,7 @@ function appendWriter(database: IDBDatabase, initial: PendingRow): Promise<Write
 /**
  * Creates the strict Browser live-journal capability.
  * @param options - Exact primary IndexedDB name options.
- * @returns A strict five-method live-journal capability.
+ * @returns A strict six-method live-journal capability.
  */
 export async function createBrowserDurableLiveJournalStore(
 	options: BrowserDurableLiveJournalStoreOptions
@@ -687,12 +687,15 @@ export async function createBrowserDurableLiveJournalStore(
 		}
 	};
 
-	const installGenesis = async (input: InstallLiveJournalGenesisInput): Promise<InstallLiveJournalGenesisResult> => {
+	const install = async (
+		operation: "install" | "installEpochAnchor",
+		input: InstallLiveJournalGenesisInput
+	): Promise<InstallLiveJournalGenesisResult> => {
 		const blocked = unavailable();
 		if (blocked !== undefined) return blocked;
 		let captured: ReturnType<typeof captureLiveJournalInput>;
 		try {
-			captured = captureLiveJournalInput("install", input);
+			captured = captureLiveJournalInput(operation, input);
 			if (captured.ok !== true) return failed(captured.kind);
 		} catch {
 			return failed("malformed-input");
@@ -723,6 +726,10 @@ export async function createBrowserDurableLiveJournalStore(
 			scope: Object.freeze({ ...selected.stored.scope }),
 		});
 	};
+	const installGenesis = (input: InstallLiveJournalGenesisInput): Promise<InstallLiveJournalGenesisResult> =>
+		install("install", input);
+	const installEpochAnchor = (input: InstallLiveJournalGenesisInput): Promise<InstallLiveJournalGenesisResult> =>
+		install("installEpochAnchor", input);
 
 	const appendAccepted = async (input: AppendAcceptedVertexInput): Promise<AppendAcceptedVertexResult> => {
 		const blocked = unavailable();
@@ -870,5 +877,5 @@ export async function createBrowserDurableLiveJournalStore(
 		return closePromise;
 	};
 
-	return Object.freeze({ appendAccepted, close, installGenesis, readiness, readPage });
+	return Object.freeze({ appendAccepted, close, installEpochAnchor, installGenesis, readiness, readPage });
 }

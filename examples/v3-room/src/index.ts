@@ -243,7 +243,7 @@ export interface V3RoomEphemeralAuthorizationProvider {
 		| Readonly<{
 				readonly aclDigest: string;
 				readonly anchorDigest: string;
-				readonly epoch: 0;
+				readonly epoch: number;
 				readonly objectId: string;
 		  }>
 		| undefined;
@@ -285,7 +285,7 @@ export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAut
 		context: Readonly<{
 			readonly aclDigest: string;
 			readonly anchorDigest: string;
-			readonly epoch: 0;
+			readonly epoch: number;
 			readonly objectId: string;
 		}>
 	): V3OperationAdmissionPolicy;

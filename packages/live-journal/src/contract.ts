@@ -271,14 +271,19 @@ function copyScope(value: unknown, requireOrdinaryPrototype = false): LiveJourna
 	const record = snapshotRecord(value, SCOPE_KEYS, requireOrdinaryPrototype);
 	if (record === undefined) return undefined;
 	const { anchorDigest, epoch, objectId } = record;
-	if (typeof objectId !== "string" || !parseStorageObjectId(objectId).ok || epoch !== 0 || !isDigest(anchorDigest)) {
+	if (
+		typeof objectId !== "string" ||
+		!parseStorageObjectId(objectId).ok ||
+		!isSafeIntegerBetween(epoch, 0) ||
+		!isDigest(anchorDigest)
+	) {
 		return undefined;
 	}
-	return objectFreeze({ anchorDigest, epoch: 0, objectId });
+	return objectFreeze({ anchorDigest, epoch, objectId });
 }
 
 function cloneScope(scope: LiveJournalScope): LiveJournalScope {
-	return objectFreeze({ anchorDigest: scope.anchorDigest, epoch: 0, objectId: scope.objectId });
+	return objectFreeze({ anchorDigest: scope.anchorDigest, epoch: scope.epoch, objectId: scope.objectId });
 }
 
 function sameScope(left: LiveJournalScope, right: LiveJournalScope): boolean {
@@ -368,7 +373,7 @@ function validateVertex(vertex: Readonly<Record<string, unknown>>): boolean {
 	return true;
 }
 
-function captureInstall(input: unknown): Captured<CapturedInstall> {
+function captureInstall(input: unknown, genesisOnly: boolean): Captured<CapturedInstall> {
 	const record = snapshotRecord(input, INSTALL_KEYS);
 	if (record === undefined) return failure("malformed-input");
 	const objectId = record.objectId;
@@ -390,14 +395,18 @@ function captureInstall(input: unknown): Captured<CapturedInstall> {
 		return failure("noncanonical-preimage");
 	}
 	if (anchor.objectId !== objectId) return failure("wrong-scope");
-	const zero = "0".repeat(64);
-	if (anchor.epoch !== 0 || anchor.historySize !== 0 || anchor.previousAnchor !== zero || anchor.cutDigest !== zero) {
+	if (genesisOnly) {
+		const zero = "0".repeat(64);
+		if (anchor.epoch !== 0 || anchor.historySize !== 0 || anchor.previousAnchor !== zero || anchor.cutDigest !== zero) {
+			return failure("noncanonical-preimage");
+		}
+	} else if (!isSafeIntegerBetween(anchor.epoch, 1)) {
 		return failure("noncanonical-preimage");
 	}
 	const parametersDigest = lowerHex(hashDomain("ts-drp/parameters/v3", parametersBytes));
 	if (anchor.parametersDigest !== parametersDigest) return failure("digest-mismatch");
 	const anchorDigest = lowerHex(hashDomain("ts-drp/epoch-anchor/v3", anchorBytes));
-	const scope = objectFreeze({ anchorDigest, epoch: 0 as const, objectId });
+	const scope = objectFreeze({ anchorDigest, epoch: anchor.epoch as number, objectId });
 	return objectFreeze({
 		ok: true,
 		value: objectFreeze({
@@ -558,10 +567,11 @@ function capturePage(input: unknown): Captured<CapturedPage> {
  * @returns A detached immutable value or a closed failure.
  */
 export function captureLiveJournalInput(
-	operation: "append" | "install" | "page" | "readiness" | "received",
+	operation: "append" | "install" | "installEpochAnchor" | "page" | "readiness" | "received",
 	input: unknown
 ): Captured<CapturedInstall | CapturedPage | LiveJournalPendingRow | LiveJournalScope> {
-	if (operation === "install") return captureInstall(input);
+	if (operation === "install") return captureInstall(input, true);
+	if (operation === "installEpochAnchor") return captureInstall(input, false);
 	if (operation === "append") return captureAppend(input);
 	if (operation === "readiness") return captureReadiness(input);
 	if (operation === "page") return capturePage(input);
@@ -615,7 +625,7 @@ export function decideLiveJournalDuplicate(probe: DuplicateProbe): DuplicateDeci
 	});
 }
 
-function sameInstalledGenesis(left: LiveJournalStoredScope, right: LiveJournalStoredScope): boolean {
+function sameInstalledScope(left: LiveJournalStoredScope, right: LiveJournalStoredScope): boolean {
 	return (
 		sameScope(left.scope, right.scope) &&
 		left.parametersDigest === right.parametersDigest &&
@@ -646,7 +656,7 @@ function sameStoredRow(left: LiveJournalStoredRow, right: LiveJournalStoredRow):
 function targetIsPresent(snapshot: LiveJournalDurableSnapshot | null, target: MutationTarget): boolean {
 	if (snapshot === null) return false;
 	if (target.kind === "install") {
-		return sameInstalledGenesis(snapshot.scope, target.scope);
+		return sameInstalledScope(snapshot.scope, target.scope);
 	}
 	const row = snapshot.rows.find(({ journalSequence }) => journalSequence === target.row.journalSequence);
 	return (
@@ -664,7 +674,7 @@ function exactBefore(
 	if (target.kind === "install") return snapshot === null && before === null;
 	if (snapshot === null || before === null) return false;
 	return (
-		sameInstalledGenesis(snapshot.scope, before.scope) &&
+		sameInstalledScope(snapshot.scope, before.scope) &&
 		before.scope.nextJournalSequence === target.row.journalSequence &&
 		snapshot.scope.nextJournalSequence === target.row.journalSequence &&
 		!snapshot.rows.some(({ journalSequence }) => journalSequence === target.row.journalSequence)
@@ -693,7 +703,7 @@ export function classifyLiveJournalMutationObservation(input: MutationObservatio
 			}
 			if (
 				addressedActual.row !== null &&
-				sameInstalledGenesis(addressedActual.scope, addressedBefore.scope) &&
+				sameInstalledScope(addressedActual.scope, addressedBefore.scope) &&
 				sameStoredRow(addressedActual.row, target.row) &&
 				addressedActual.scope.nextJournalSequence === target.row.journalSequence + 1
 			) {
@@ -701,7 +711,7 @@ export function classifyLiveJournalMutationObservation(input: MutationObservatio
 			}
 			if (
 				addressedActual.row === null &&
-				sameInstalledGenesis(addressedActual.scope, addressedBefore.scope) &&
+				sameInstalledScope(addressedActual.scope, addressedBefore.scope) &&
 				addressedActual.scope.nextJournalSequence === target.row.journalSequence
 			) {
 				return "exact-old";
@@ -906,12 +916,15 @@ function deriveToken(snapshot: LiveJournalDurableSnapshot): LiveJournalSnapshotT
 			if (!captured.ok) return undefined;
 		}
 	}
-	const capturedInstall = captureInstall({
-		detachedAnchorSignature: stored.detachedAnchorSignature,
-		exactCanonicalAnchorPreimageBytes: stored.exactCanonicalAnchorPreimageBytes,
-		exactCanonicalParametersCarrierBytes: stored.exactCanonicalParametersCarrierBytes,
-		objectId: stored.scope.objectId,
-	});
+	const capturedInstall = captureInstall(
+		{
+			detachedAnchorSignature: stored.detachedAnchorSignature,
+			exactCanonicalAnchorPreimageBytes: stored.exactCanonicalAnchorPreimageBytes,
+			exactCanonicalParametersCarrierBytes: stored.exactCanonicalParametersCarrierBytes,
+			objectId: stored.scope.objectId,
+		},
+		stored.scope.epoch === 0
+	);
 	if (
 		!capturedInstall.ok ||
 		capturedInstall.value.parametersDigest !== stored.parametersDigest ||

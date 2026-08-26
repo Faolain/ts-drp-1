@@ -26,7 +26,7 @@ export type LiveJournalFailureKind = (typeof LIVE_JOURNAL_FAILURE_KINDS)[number]
 
 export interface LiveJournalScope {
 	readonly objectId: string;
-	readonly epoch: 0;
+	readonly epoch: number;
 	readonly anchorDigest: string;
 }
 
@@ -137,6 +137,7 @@ export type LiveJournalPageResult =
 
 export interface DurableLiveJournalStore {
 	installGenesis(input: InstallLiveJournalGenesisInput): Promise<InstallLiveJournalGenesisResult>;
+	installEpochAnchor(input: InstallLiveJournalGenesisInput): Promise<InstallLiveJournalGenesisResult>;
 	appendAccepted(input: AppendAcceptedVertexInput): Promise<AppendAcceptedVertexResult>;
 	readiness(input: LiveJournalReadinessInput): Promise<LiveJournalReadinessResult>;
 	readPage(input: LiveJournalPageInput): Promise<LiveJournalPageResult>;

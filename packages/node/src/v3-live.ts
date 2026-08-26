@@ -236,7 +236,7 @@ export type PrepareV3LiveFailureKind =
 
 export interface V3LiveDescriptor {
 	readonly objectId: string;
-	readonly epoch: 0;
+	readonly epoch: number;
 	readonly anchorDigest: string;
 	readonly blueprintDigest: string;
 	readonly parametersDigest: string;
@@ -308,14 +308,14 @@ export type V3AdmittedVertexSink = (
 
 export interface V3PlaneHandle {
 	readonly objectId: string;
-	readonly epoch: 0;
+	readonly epoch: number;
 	readonly topic: string;
 	readonly queueId: string;
 	currentEphemeralAuthority():
 		| {
 				readonly aclDigest: string;
 				readonly anchorDigest: string;
-				readonly epoch: 0;
+				readonly epoch: number;
 				readonly objectId: string;
 				isCurrentWriter(author: string): boolean;
 		  }
@@ -352,7 +352,7 @@ interface V3CreatorCloseRegistration {
 }
 
 interface V3BlueprintLiveHandle {
-	readonly epoch: 0;
+	readonly epoch: number;
 	readonly objectId: string;
 	blueprintSnapshot(): BlueprintStateSnapshot | undefined;
 	exportSnapshotPayload(): V3BlueprintSnapshotExportResult;
@@ -737,7 +737,7 @@ interface CatalogSnapshot {
 interface ProvenanceSnapshot {
 	readonly anchorDigest: string;
 	readonly blueprintDigest: string;
-	readonly epoch: 0;
+	readonly epoch: number;
 	readonly objectId: string;
 	readonly parametersDigest: string;
 	readonly profileDigest: string;
@@ -1348,9 +1348,11 @@ function snapshotAuthenticatedProvenance(value: unknown, expectedObjectId: strin
 	const result = snapshotClosedRecord(value, AUTHENTICATION_RESULT_KEYS);
 	if (result === undefined || result.ok !== true) return undefined;
 	const provenance = snapshotClosedRecord(result.provenance, PROVENANCE_KEYS);
+	if (provenance === undefined) return undefined;
+	const epochIsSafe =
+		typeof provenance.epoch === "number" && NumberIsSafeInteger(provenance.epoch) && provenance.epoch >= 0;
 	if (
-		provenance === undefined ||
-		provenance.epoch !== 0 ||
+		!epochIsSafe ||
 		provenance.objectId !== expectedObjectId ||
 		!isDigestHex(provenance.anchorDigest) ||
 		!isDigestHex(provenance.blueprintDigest) ||
@@ -1363,7 +1365,7 @@ function snapshotAuthenticatedProvenance(value: unknown, expectedObjectId: strin
 	return ObjectFreeze({
 		anchorDigest: provenance.anchorDigest,
 		blueprintDigest: provenance.blueprintDigest,
-		epoch: 0 as const,
+		epoch: provenance.epoch as number,
 		objectId: provenance.objectId,
 		parametersDigest: provenance.parametersDigest,
 		profileDigest: provenance.profileDigest,
@@ -2066,7 +2068,7 @@ async function prepareV3LiveGeneration(input: PrepareV3LiveGenerationInput): Pro
 		hash: provenance.anchorDigest,
 		kind: "drp-epoch-anchor" as const,
 		objectId: provenance.objectId,
-		epoch: 0,
+		epoch: provenance.epoch,
 		dependencies: dependencies as string[],
 	});
 	const vertices = new IntrinsicMap<string, EpochVertex>();
@@ -2113,7 +2115,7 @@ async function prepareV3LiveGeneration(input: PrepareV3LiveGenerationInput): Pro
 					hash: provenance.anchorDigest,
 					kind: "drp-epoch-anchor",
 					objectId: provenance.objectId,
-					epoch: 0,
+					epoch: provenance.epoch,
 					dependencies: [],
 				},
 			],
@@ -2773,7 +2775,8 @@ function payloadIsUsable(payload: PreparedV3LivePayload): boolean {
 	return (
 		isObject(payload) &&
 		typeof payload.provenance.objectId === "string" &&
-		payload.provenance.epoch === 0 &&
+		NumberIsSafeInteger(payload.provenance.epoch) &&
+		payload.provenance.epoch >= 0 &&
 		isDigestHex(payload.provenance.anchorDigest) &&
 		isObject(payload.admission) &&
 		isObject(payload.trust) &&
@@ -3432,7 +3435,7 @@ function recoveryFailure(
 function liveJournalScope(payload: PreparedV3LivePayload): LiveJournalScope {
 	return ObjectFreeze({
 		anchorDigest: payload.provenance.anchorDigest,
-		epoch: 0 as const,
+		epoch: payload.provenance.epoch,
 		objectId: payload.provenance.objectId,
 	});
 }
@@ -4598,7 +4601,7 @@ async function issueOneVertex(
 		commit = await issuer.issue({
 			anchor: registration.payload.provenance.anchorDigest,
 			dependencies,
-			epoch: 0,
+			epoch: registration.payload.provenance.epoch,
 			logicalTime,
 			objectId: registration.payload.provenance.objectId,
 			operation,
@@ -5705,7 +5708,7 @@ function makeV3BlueprintLiveHandle(registration: V3PlaneRegistration): V3Bluepri
 	return ObjectFreeze({
 		blueprintSnapshot: (): BlueprintStateSnapshot | undefined =>
 			currentRegistration(registration) ? registration.blueprintMachine?.snapshot() : undefined,
-		epoch: 0 as const,
+		epoch: registration.payload.provenance.epoch,
 		exportSnapshotPayload: (): V3BlueprintSnapshotExportResult => exportLiveSnapshotPayload(registration),
 		objectId: registration.payload.provenance.objectId,
 		stageBlueprintEpoch: (): Promise<V3BlueprintFoldResult> => stageBlueprintEpoch(registration),
@@ -5875,7 +5878,7 @@ function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
 		return ObjectFreeze({
 			aclDigest,
 			anchorDigest: registration.payload.provenance.anchorDigest,
-			epoch: 0 as const,
+			epoch: registration.payload.provenance.epoch,
 			objectId: registration.payload.provenance.objectId,
 			isCurrentWriter: (author: string): boolean => {
 				if (!currentRegistration(registration)) return false;
@@ -5889,7 +5892,7 @@ function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
 	})();
 	const handle = {
 		objectId: registration.payload.provenance.objectId,
-		epoch: 0 as const,
+		epoch: registration.payload.provenance.epoch,
 		topic: registration.topic,
 		queueId: registration.queueId,
 		currentEphemeralAuthority: (): ReturnType<V3PlaneHandle["currentEphemeralAuthority"]> =>

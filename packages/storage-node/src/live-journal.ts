@@ -190,7 +190,7 @@ function readScope(database: DatabaseSync, scope: LiveJournalScope): StoredScope
 		exactCanonicalParametersCarrierBytes: copyBlob(row.exact_parameters_carrier),
 		nextJournalSequence: row.next_journal_sequence as number,
 		parametersDigest: row.parameters_digest as string,
-		scope: { anchorDigest: row.anchor_digest as string, epoch: row.epoch as 0, objectId: row.object_id as string },
+		scope: { anchorDigest: row.anchor_digest as string, epoch: row.epoch as number, objectId: row.object_id as string },
 	};
 }
 
@@ -206,14 +206,14 @@ function readScopeWriter(database: DatabaseSync, scope: LiveJournalScope): Store
 		exactCanonicalParametersCarrierBytes: copyBlob(row.exact_parameters_carrier),
 		nextJournalSequence: row.next_journal_sequence as number,
 		parametersDigest: row.parameters_digest as string,
-		scope: { anchorDigest: row.anchor_digest as string, epoch: row.epoch as 0, objectId: row.object_id as string },
+		scope: { anchorDigest: row.anchor_digest as string, epoch: row.epoch as number, objectId: row.object_id as string },
 	};
 }
 
 function rowFromSql(row: Readonly<Record<string, unknown>>): StoredRow {
 	const scope = {
 		anchorDigest: row.anchor_digest as string,
-		epoch: row.epoch as 0,
+		epoch: row.epoch as number,
 		objectId: row.object_id as string,
 	};
 	return row.source_kind === "received"
@@ -357,7 +357,7 @@ function readReplaySnapshotReadonly(
 				parametersDigest: row.parameters_digest as string,
 				scope: {
 					anchorDigest: row.anchor_digest as string,
-					epoch: row.epoch as 0,
+					epoch: row.epoch as number,
 					objectId: row.object_id as string,
 				},
 			},
@@ -376,7 +376,7 @@ function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
 	return left.byteLength === right.byteLength && left.every((value, index) => value === right[index]);
 }
 
-function sameGenesis(left: StoredScope, right: StoredScope): boolean {
+function sameInstalledScope(left: StoredScope, right: StoredScope): boolean {
 	return (
 		left.scope.objectId === right.scope.objectId &&
 		left.scope.epoch === right.scope.epoch &&
@@ -425,7 +425,7 @@ function captureAddressedClosure(snapshot: DurableSnapshot): DurableSnapshot | u
 /**
  * Creates the strict Node live-journal capability.
  * @param options - Exact primary SQLite filename options.
- * @returns A strict five-method live-journal capability.
+ * @returns A strict six-method live-journal capability.
  */
 export function createNodeDurableLiveJournalStore(
 	options: NodeDurableLiveJournalStoreOptions
@@ -494,13 +494,15 @@ export function createNodeDurableLiveJournalStore(
 		return "internal-invariant";
 	};
 
-	// eslint-disable-next-line @typescript-eslint/require-await -- SQLite work is synchronous behind the async port.
-	const installGenesis = async (input: InstallLiveJournalGenesisInput): Promise<InstallLiveJournalGenesisResult> => {
+	const install = (
+		operation: "install" | "installEpochAnchor",
+		input: InstallLiveJournalGenesisInput
+	): InstallLiveJournalGenesisResult => {
 		const blocked = unavailable();
 		if (blocked !== undefined) return blocked;
 		let captured: ReturnType<typeof captureLiveJournalInput>;
 		try {
-			captured = captureLiveJournalInput("install", input);
+			captured = captureLiveJournalInput(operation, input);
 			if (captured.ok !== true) return failed(captured.kind);
 		} catch {
 			return failed("malformed-input");
@@ -519,7 +521,7 @@ export function createNodeDurableLiveJournalStore(
 				if (storedRows.length !== 0) rejected = "store-poisoned";
 				else {
 					database.exec(
-						`INSERT INTO scopes(object_id,epoch,anchor_digest,next_journal_sequence,exact_anchor_preimage,detached_anchor_signature,parameters_digest,exact_parameters_carrier) VALUES(${sqlText(selected.stored.scope.objectId)},0,${sqlText(selected.stored.scope.anchorDigest)},0,${sqlBlob(selected.stored.exactCanonicalAnchorPreimageBytes)},${sqlBlob(selected.stored.detachedAnchorSignature)},${sqlText(selected.stored.parametersDigest)},${sqlBlob(selected.stored.exactCanonicalParametersCarrierBytes)})`
+						`INSERT INTO scopes(object_id,epoch,anchor_digest,next_journal_sequence,exact_anchor_preimage,detached_anchor_signature,parameters_digest,exact_parameters_carrier) VALUES(${sqlText(selected.stored.scope.objectId)},${selected.stored.scope.epoch},${sqlText(selected.stored.scope.anchorDigest)},0,${sqlBlob(selected.stored.exactCanonicalAnchorPreimageBytes)},${sqlBlob(selected.stored.detachedAnchorSignature)},${sqlText(selected.stored.parametersDigest)},${sqlBlob(selected.stored.exactCanonicalParametersCarrierBytes)})`
 					);
 					statement(
 						database,
@@ -529,7 +531,7 @@ export function createNodeDurableLiveJournalStore(
 			} else {
 				before = captureAddressedClosure({ rows: storedRows, scope: installed }) ?? null;
 				if (before === null) rejected = "store-poisoned";
-				else if (sameGenesis(before.scope, selected.stored)) idempotent = true;
+				else if (sameInstalledScope(before.scope, selected.stored)) idempotent = true;
 				else rejected = "genesis-conflict";
 			}
 			if (rejected === undefined) database.exec("COMMIT");
@@ -588,6 +590,10 @@ export function createNodeDurableLiveJournalStore(
 			scope: Object.freeze({ ...selected.stored.scope }),
 		});
 	};
+	const installGenesis = (input: InstallLiveJournalGenesisInput): Promise<InstallLiveJournalGenesisResult> =>
+		Promise.resolve(install("install", input));
+	const installEpochAnchor = (input: InstallLiveJournalGenesisInput): Promise<InstallLiveJournalGenesisResult> =>
+		Promise.resolve(install("installEpochAnchor", input));
 
 	// eslint-disable-next-line @typescript-eslint/require-await -- SQLite work is synchronous behind the async port.
 	const appendAccepted = async (input: AppendAcceptedVertexInput): Promise<AppendAcceptedVertexResult> => {
@@ -686,7 +692,7 @@ export function createNodeDurableLiveJournalStore(
 				} else if (decision.action === "append") {
 					const journalSequence = scope.nextJournalSequence;
 					database.exec(
-						`INSERT INTO accepted_entries(object_id,epoch,anchor_digest,journal_sequence,source_kind,vertex_digest,received_preimage,received_signature,local_author,local_author_sequence) VALUES(${sqlText(candidate.scope.objectId)},0,${sqlText(candidate.scope.anchorDigest)},${journalSequence},${sqlText(candidate.sourceKind)},${sqlText(candidate.vertexDigest)},${candidate.sourceKind === "received" ? sqlBlob(candidate.exactCanonicalPreimageBytes) : "NULL"},${candidate.sourceKind === "received" ? sqlBlob(candidate.detachedSignature) : "NULL"},${candidate.sourceKind === "local-issued" ? sqlText(candidate.author) : "NULL"},${candidate.sourceKind === "local-issued" ? candidate.authorSequence : "NULL"})`
+						`INSERT INTO accepted_entries(object_id,epoch,anchor_digest,journal_sequence,source_kind,vertex_digest,received_preimage,received_signature,local_author,local_author_sequence) VALUES(${sqlText(candidate.scope.objectId)},${candidate.scope.epoch},${sqlText(candidate.scope.anchorDigest)},${journalSequence},${sqlText(candidate.sourceKind)},${sqlText(candidate.vertexDigest)},${candidate.sourceKind === "received" ? sqlBlob(candidate.exactCanonicalPreimageBytes) : "NULL"},${candidate.sourceKind === "received" ? sqlBlob(candidate.detachedSignature) : "NULL"},${candidate.sourceKind === "local-issued" ? sqlText(candidate.author) : "NULL"},${candidate.sourceKind === "local-issued" ? candidate.authorSequence : "NULL"})`
 					);
 					const update = statement(
 						database,
@@ -904,5 +910,5 @@ export function createNodeDurableLiveJournalStore(
 		return closePromise;
 	};
 
-	return Object.freeze({ appendAccepted, close, installGenesis, readiness, readPage });
+	return Object.freeze({ appendAccepted, close, installEpochAnchor, installGenesis, readiness, readPage });
 }
