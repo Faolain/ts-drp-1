@@ -58040,7 +58040,7 @@ combined closure was not bound to the exact current/successor/CutValue/QC
 references.
 
 Same-round tests-only corrections are signed and pushed as `7c409d1c`,
-`24ba9ffb` and `35e0d078`. The final corrected exact-five packet is at
+`24ba9ffb` and `35e0d078`. The review-corrected exact-five packet is at
 `35e0d07848aba3684161e3cc90236448507cdc4a`, with tree
 `4ca4fccdb16983a16ec2a1e2004075ab855b1041`, combined patch object
 `16a2954ab21c739c375ec37c5e989eef8961b8dd` from the frozen parent and
@@ -58081,6 +58081,18 @@ specific-before-bare readiness, non-empty close binding, exact trust-ref set
 semantics, all ambiguous-head identity legs and post-seal snapshot serving
 were also closed in the same correction. No Fable review ran. The 26 existing
 stashes and every protected untracked path remained untouched.
+
+The first GREEN implementation read-through then caught one last RED fixture
+defect before any GREEN owner was created: the product scanner validates AHE
+blob refs in the `ts-drp-storage/blob/v1` domain, while the parity helper used
+raw SHA-256. Signed and pushed tests-only correction `b83484fc` replaces that
+helper with an independent exact-domain derivation. Its tree is
+`455119937c239971e3a39afbe9c8f9cd1080ca6a`, patch object
+`550f59b40f6e719bd905e3e63392a41db8dddbf2` and SHA-256
+`f65b6d7cac58690d65bfd8bdc5d5e878d7bbb06957c336327b35ea9adc322ab0`.
+The focused RED remains exactly 5 pass / 1 intended readiness failure / 2
+future-product skips, and exact-file lint/format/diff checks pass. This is an
+oracle correction, not a product change or another review launch.
 
 ### D.107 causal mutants, gates and handoff
 
