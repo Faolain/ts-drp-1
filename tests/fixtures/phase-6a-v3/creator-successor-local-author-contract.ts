@@ -29,10 +29,29 @@ export const D108D1B_GREEN_PATHS = Object.freeze([
 	"packages/node/src/internal/creator-successor-live.ts",
 ] as const);
 
+export const D108D1B_ORACLE_RED_PATHS = Object.freeze([
+	"tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts",
+	"tests/phase-6a-creator-successor-local-author-red.test.ts",
+	"packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+	"packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts",
+	"packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts",
+	"packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts",
+] as const);
+
+export const D108D1B_ORACLE_GREEN_PATHS = Object.freeze([
+	"packages/node/src/creator-adoption.ts",
+	"packages/node/src/v3-live.ts",
+] as const);
+
 export const D108D1B_REOPEN_INPUT_KEYS = CREATOR_SUCCESSOR_LOCAL_AUTHOR_REOPEN_INPUT_KEYS;
-export const D108D1B_FAILURE_KIND = "chain-invalid";
 export const D108D1B_CHILD_BEHAVIORS = Object.freeze([
 	"fresh Node binds established and fresh chat peers while every ambiguous or unauthenticated cold reopen fails before live effects",
+] as const);
+export const D108D1B_ORACLE_CHILD_BEHAVIORS = Object.freeze([
+	"fresh Node proves packed chat authority, repeated possession and strict lineage failure ordering",
+] as const);
+export const D108D1B_ORACLE_BROWSER_BEHAVIORS = Object.freeze([
+	"wrong-key and throwing browser possession fail before writer activation",
 ] as const);
 
 export interface D108d1bChildMessage {
@@ -69,7 +88,12 @@ function localAuthorSeed(configuredSeed: string): Uint8Array {
 	return new Uint8Array(createHash("sha256").update(preimage).digest());
 }
 
-/** @returns The shipped chat clients' exact local Ed25519 identities and ACL groups. */
+/**
+ * Returns the shipped chat clients' exact local Ed25519 identities and ACL
+ * groups. The close fixture intentionally models group projection only; it
+ * does not claim exact product finality-key custody.
+ * @returns The bounded authority projection used by the genuine close fixture.
+ */
 export function d108d1bChatAuthorities(): readonly Readonly<{
 	readonly author: string;
 	readonly groups: readonly ("admin" | "finality" | "writer")[];
@@ -165,6 +189,41 @@ export function d108d1bReadiness(): Readonly<{ readonly missing: readonly string
 	}
 	if (!/CreatorSuccessorReopenInput[\s\S]*author[\s\S]*signRegisteredVertexDigest/u.test(internal)) {
 		missing.push("internal local-author carrier");
+	}
+	const callers = [
+		"packages/storage-node/tests/fixtures/phase-6a-creator-successor-activation-child.mjs",
+		"packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+		"packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts",
+	];
+	for (const path of callers) {
+		const source = readFileSync(resolve(REPOSITORY_ROOT, path), "utf8");
+		if (
+			!/reopenCreatorSuccessorAdoption\(\{[\s\S]*author:[\s\S]*signRegisteredVertexDigest(?:\s*:|\s*[,}])/u.test(source)
+		) {
+			missing.push(`retained local-author caller: ${path}`);
+		}
+	}
+	return Object.freeze({ missing: Object.freeze(missing), ready: missing.length === 0 });
+}
+
+/** @returns Whether the one-owner oracle corrective GREEN is present. */
+export function d108d1bOracleReadiness(): Readonly<{ readonly missing: readonly string[]; readonly ready: boolean }> {
+	const source = readFileSync(resolve(REPOSITORY_ROOT, D108D1B_ORACLE_GREEN_PATHS[0]), "utf8");
+	const live = readFileSync(resolve(REPOSITORY_ROOT, D108D1B_ORACLE_GREEN_PATHS[1]), "utf8");
+	const missing: string[] = [];
+	if (!/openCanonicalLatchedAclSnapshot\([\s\S]*expectedEpoch:\s*1/u.test(source)) {
+		missing.push("authenticated successor ACL opening");
+	}
+	if (!/lineage\.exhausted\s*!==\s*false/u.test(source)) missing.push("strict false lineage discriminator");
+	for (const detail of [
+		"creator issuance ACL authority is invalid",
+		"creator issuance possession proof failed",
+		"creator issuance lineage is invalid",
+	]) {
+		if (!source.includes(detail)) missing.push(detail);
+	}
+	if (!/creatorPredecessorIssuanceStore[\s\S]*candidateEpoch\s*>\s*expectedEpoch/u.test(live)) {
+		missing.push("epoch-bounded predecessor issuance view");
 	}
 	return Object.freeze({ missing: Object.freeze(missing), ready: missing.length === 0 });
 }

@@ -9,9 +9,14 @@ import { REPOSITORY_ROOT } from "./fixtures/phase-6a-v3/creator-successor-activa
 import {
 	D108D1B_CHILD_BEHAVIORS,
 	D108D1B_GREEN_PATHS,
+	D108D1B_ORACLE_BROWSER_BEHAVIORS,
+	D108D1B_ORACLE_CHILD_BEHAVIORS,
+	D108D1B_ORACLE_GREEN_PATHS,
+	D108D1B_ORACLE_RED_PATHS,
 	D108D1B_RED_PATHS,
 	D108D1B_REOPEN_INPUT_KEYS,
 	d108d1bChatAuthorities,
+	d108d1bOracleReadiness,
 	d108d1bReadiness,
 	openD108d1bMultiWriterFixture,
 } from "./fixtures/phase-6a-v3/creator-successor-local-author-contract.js";
@@ -20,6 +25,32 @@ beforeAll(() => {
 	Object.defineProperty(navigator, "storage", {
 		configurable: true,
 		value: Object.freeze({ estimate: () => Promise.resolve({ quota: 1_000_000_000_000, usage: 0 }) }),
+	});
+
+	it("freezes the exact six-RED/one-GREEN oracle corrective ownership", () => {
+		expect(D108D1B_ORACLE_RED_PATHS).toEqual([
+			"tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts",
+			"tests/phase-6a-creator-successor-local-author-red.test.ts",
+			"packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+			"packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts",
+			"packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts",
+			"packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts",
+		]);
+		expect(new Set(D108D1B_ORACLE_RED_PATHS).size).toBe(6);
+		expect(D108D1B_ORACLE_RED_PATHS.every((path) => readFileSync(resolve(REPOSITORY_ROOT, path)).byteLength > 0)).toBe(
+			true
+		);
+		expect(D108D1B_ORACLE_GREEN_PATHS).toEqual([
+			"packages/node/src/creator-adoption.ts",
+			"packages/node/src/v3-live.ts",
+		]);
+		expect(D108D1B_ORACLE_CHILD_BEHAVIORS).toHaveLength(1);
+		expect(D108D1B_ORACLE_BROWSER_BEHAVIORS).toHaveLength(1);
+		const browser = readFileSync(
+			resolve(REPOSITORY_ROOT, "packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts"),
+			"utf8"
+		);
+		for (const behavior of D108D1B_ORACLE_BROWSER_BEHAVIORS) expect(browser).toContain(behavior);
 	});
 });
 
@@ -110,5 +141,9 @@ describe("D.108d1b authenticated peer-local cold issuance RED", () => {
 
 	it("[RED readiness] requires authenticated local-author selection", () => {
 		expect(d108d1bReadiness()).toEqual({ missing: [], ready: true });
+	});
+
+	it("[RED oracle readiness] requires canonical ACL, strict lineage and bounded diagnostic ownership", () => {
+		expect(d108d1bOracleReadiness()).toEqual({ missing: [], ready: true });
 	});
 });

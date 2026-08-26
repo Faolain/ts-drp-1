@@ -23,6 +23,9 @@ const D108D1_BROWSER_BEHAVIORS = [
 	"missing or hostile LockManager authority fails activation closed",
 	"two tabs elect one lifetime-held writer then a freshly reverified loser wins after release",
 ] as const;
+const D108D1B_ORACLE_BROWSER_BEHAVIORS = [
+	"wrong-key and throwing browser possession fail before writer activation",
+] as const;
 
 function ready(): boolean {
 	if (!GREEN_PATHS.every((path) => existsSync(resolve(REPOSITORY_ROOT, path)))) return false;
@@ -74,6 +77,43 @@ test("pins the complete browser behavior inventory", () => {
 	expect(D108D1_BROWSER_BEHAVIORS).toEqual([
 		"missing or hostile LockManager authority fails activation closed",
 		"two tabs elect one lifetime-held writer then a freshly reverified loser wins after release",
+	]);
+	expect(D108D1B_ORACLE_BROWSER_BEHAVIORS).toEqual([
+		"wrong-key and throwing browser possession fail before writer activation",
+	]);
+});
+
+test("wrong-key and throwing browser possession fail before writer activation", async ({ page }) => {
+	await page.goto(server?.origin ?? "about:blank");
+	const databaseName = `d108d1b-possession-failure-${crypto.randomUUID()}`;
+	await page.evaluate(
+		({ databaseName: selected, material: carrier }) => window.phase6aCreatorSuccessorActivation.seed(selected, carrier),
+		{ databaseName, material }
+	);
+	const results = await page.evaluate(
+		({ databaseName: selected, material: carrier }) =>
+			window.phase6aCreatorSuccessorActivation.probePossessionFailure(selected, carrier),
+		{ databaseName, material }
+	);
+	expect(results).toEqual([
+		expect.objectContaining({
+			detail: "creator issuance possession proof failed",
+			kind: "chain-invalid",
+			lockHeld: false,
+			ok: false,
+			publicationCount: 0,
+			signerCount: 1,
+			verificationCount: 1,
+		}),
+		expect.objectContaining({
+			detail: "creator issuance possession proof failed",
+			kind: "chain-invalid",
+			lockHeld: false,
+			ok: false,
+			publicationCount: 0,
+			signerCount: 1,
+			verificationCount: 1,
+		}),
 	]);
 });
 

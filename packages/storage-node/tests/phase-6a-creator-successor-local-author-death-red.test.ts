@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createD108d1PackedDurableMaterial } from "../../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.js";
 import {
 	D108D1B_CHILD_BEHAVIORS,
+	D108D1B_ORACLE_CHILD_BEHAVIORS,
 	d108d1bChatAuthorities,
 	d108d1bReadiness,
 	openD108d1bMultiWriterFixture,
@@ -43,6 +44,9 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 		expect(D108D1B_CHILD_BEHAVIORS).toEqual([
 			"fresh Node binds established and fresh chat peers while every ambiguous or unauthenticated cold reopen fails before live effects",
 		]);
+		expect(D108D1B_ORACLE_CHILD_BEHAVIORS).toEqual([
+			"fresh Node proves packed chat authority, repeated possession and strict lineage failure ordering",
+		]);
 		expect(childPath.pathname.endsWith("phase-6a-creator-successor-local-author-child.mjs")).toBe(true);
 	});
 
@@ -59,6 +63,27 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 			| undefined;
 		expect(proof?.pid).toEqual(expect.any(Number));
 		expect(proof?.pid).not.toBe(process.pid);
+		const expectedAcl = d108d1bChatAuthorities()
+			.map(({ author, groups }) => ({ author, groups: [...groups] }))
+			.sort((left, right) => left.author.localeCompare(right.author));
+		const oracle = proof?.oracle as
+			| Readonly<{
+					readonly aclMembers?: readonly Readonly<{ readonly author: string; readonly groups: readonly string[] }>[];
+					readonly bobCarrier?: Readonly<Record<string, unknown>>;
+			  }>
+			| undefined;
+		expect([...(oracle?.aclMembers ?? [])].sort((left, right) => left.author.localeCompare(right.author))).toEqual(
+			expectedAcl
+		);
+		expect(oracle?.aclMembers?.filter(({ groups }) => groups.includes("writer"))).toHaveLength(7);
+		expect(oracle?.aclMembers?.find(({ author }) => author === proof?.authors?.dave)?.groups).toEqual(["finality"]);
+		expect(oracle?.bobCarrier).toMatchObject({
+			exactlyOnce: true,
+			preimageMatches: true,
+			scopeMatches: true,
+			signatureMatches: true,
+			sourceKind: "received",
+		});
 		const results = proof?.results ?? [];
 		expect(results.map(({ name }) => name)).toEqual([
 			"established-bob",
@@ -73,6 +98,11 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 			"signer-throw",
 			"signer-reject",
 			"non-writer",
+			"selected-exhausted-lineage",
+			"foreign-exhausted-lineage",
+			"malformed-exhausted-lineage",
+			"missing-webcrypto",
+			"ed25519-unavailable",
 		]);
 		const [established, fresh, ...rejected] = results;
 		expect(established).toMatchObject({
@@ -84,6 +114,16 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 				outboxRowAuthor: proof?.authors?.bob,
 			},
 			result: { lifecycle: "active", ok: true, recovery: "active-new" },
+			repeat: {
+				issued: {
+					acceptedJournalAuthor: proof?.authors?.bob,
+					author: proof?.authors?.bob,
+					authorSequence: 2,
+					issuedRowAuthor: proof?.authors?.bob,
+					outboxRowAuthor: proof?.authors?.bob,
+				},
+				result: { lifecycle: "active", ok: true, recovery: "active-new" },
+			},
 		});
 		expect(fresh).toMatchObject({
 			issued: {
@@ -99,22 +139,63 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 			.filter(({ groups }) => groups.includes("writer"))
 			.map(({ author }) => author)
 			.sort();
-		for (const accepted of [established, fresh]) {
-			const effects = accepted?.effects as Readonly<{ readonly lineageReads?: readonly string[] }> | undefined;
-			expect([...(effects?.lineageReads ?? [])].sort()).toEqual(writerAuthors);
-			const signerCalls = accepted?.signerCalls as readonly Readonly<{ bytes: string; ordinary: boolean }>[];
-			expect(signerCalls).toHaveLength(2);
+		for (const [accepted, reopenCount] of [
+			[established, 2],
+			[fresh, 1],
+		] as const) {
+			const effects = accepted?.effects as
+				| Readonly<{
+						readonly aheRecoverCount?: number;
+						readonly issuanceStoreShape?: boolean;
+						readonly lineageReads?: readonly string[];
+						readonly order?: readonly string[];
+						readonly snapshotOpenCount?: number;
+				  }>
+				| undefined;
+			expect(effects?.aheRecoverCount).toBe(reopenCount);
+			expect(effects?.snapshotOpenCount).toBe(reopenCount);
+			expect(effects?.issuanceStoreShape).toBe(true);
+			const reads = effects?.lineageReads ?? [];
+			expect(reads).toHaveLength(7 * reopenCount);
+			for (let offset = 0; offset < reads.length; offset += 7) {
+				expect([...reads.slice(offset, offset + 7)].sort()).toEqual(writerAuthors);
+			}
+			const signerCalls = accepted?.signerCalls as readonly Readonly<{
+				bytes: string;
+				matchesDurableCarrier: boolean;
+				ordinary: boolean;
+				use: string;
+			}>[];
+			expect(signerCalls).toHaveLength(2 * reopenCount);
 			expect(signerCalls.every(({ bytes, ordinary }) => ordinary && bytes.length === 64)).toBe(true);
+			const possessions = signerCalls.filter(({ use }) => use === "possession");
+			expect(possessions).toHaveLength(reopenCount);
+			expect(possessions.every(({ matchesDurableCarrier }) => !matchesDurableCarrier)).toBe(true);
+			const order = effects?.order ?? [];
+			const possessionIndices = order.flatMap((entry, index) => (entry === "possession:signer" ? [index] : []));
+			expect(possessionIndices).toHaveLength(reopenCount);
+			for (const [positionIndex, position] of possessionIndices.entries()) {
+				const end = possessionIndices[positionIndex + 1] ?? order.length;
+				const selected = order.slice(position + 1, end).filter((entry) => entry.startsWith("lineage:"));
+				expect(selected).toHaveLength(7);
+			}
 		}
-		const establishedCalls = established?.signerCalls as readonly Readonly<{ bytes: string }>[];
-		const freshCalls = fresh?.signerCalls as readonly Readonly<{ bytes: string }>[];
-		expect(establishedCalls[0]?.bytes).not.toBe(freshCalls[0]?.bytes);
+		const establishedPossessions = (
+			established?.signerCalls as readonly Readonly<{ bytes: string; use: string }>[]
+		).filter(({ use }) => use === "possession");
+		const freshPossessions = (fresh?.signerCalls as readonly Readonly<{ bytes: string; use: string }>[]).filter(
+			({ use }) => use === "possession"
+		);
+		expect(new Set([...establishedPossessions, ...freshPossessions].map(({ bytes }) => bytes)).size).toBe(3);
 		for (const failure of rejected) {
 			expect(failure).toMatchObject({
 				effects: {
 					adoptionSwapCount: 0,
+					aheRecoverCount: 1,
 					installEpochAnchorCount: 0,
+					issuanceStoreShape: true,
 					publicationCount: 0,
+					snapshotOpenCount: 1,
 					subscribeCount: 0,
 					transactIssueCount: 0,
 				},
@@ -129,11 +210,37 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 			"signature-alias",
 			"signer-throw",
 			"signer-reject",
-			"non-writer",
+			"missing-webcrypto",
+			"ed25519-unavailable",
 		]) {
 			const failure = rejected.find((candidate) => candidate.name === name);
 			const effects = failure?.effects as Readonly<{ readonly lineageReads?: readonly string[] }> | undefined;
 			expect(effects?.lineageReads).toEqual([]);
+			expect(failure?.result).toEqual({
+				detail: "creator issuance possession proof failed",
+				kind: "chain-invalid",
+				ok: false,
+			});
+		}
+		const nonWriter = rejected.find((candidate) => candidate.name === "non-writer");
+		expect(nonWriter?.result).toEqual({
+			detail: "creator issuance ACL authority is invalid",
+			kind: "chain-invalid",
+			ok: false,
+		});
+		for (const name of [
+			"copied-creator-lineage",
+			"two-nonzero-lineages",
+			"selected-exhausted-lineage",
+			"foreign-exhausted-lineage",
+			"malformed-exhausted-lineage",
+		]) {
+			const failure = rejected.find((candidate) => candidate.name === name);
+			expect(failure?.result).toEqual({
+				detail: "creator issuance lineage is invalid",
+				kind: "chain-invalid",
+				ok: false,
+			});
 		}
 	});
 });

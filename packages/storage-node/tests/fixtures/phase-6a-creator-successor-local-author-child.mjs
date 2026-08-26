@@ -135,7 +135,129 @@ function peerJournalMaterial(material) {
 	};
 }
 
-async function seedIssuance(material, suffix, carriers, effects) {
+function sameBytes(left, right) {
+	return left.byteLength === right.byteLength && Buffer.from(left).equals(Buffer.from(right));
+}
+
+function concatenate(chunks) {
+	const output = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.byteLength, 0));
+	let offset = 0;
+	for (const chunk of chunks) {
+		output.set(chunk, offset);
+		offset += chunk.byteLength;
+	}
+	return output;
+}
+
+function durableByteValues(value, selectedByteLength, output = new Set(), visited = new WeakSet()) {
+	if (value instanceof Uint8Array) {
+		if (value.byteLength === selectedByteLength) output.add(Buffer.from(value).toString("hex"));
+		return output;
+	}
+	if (value === null || typeof value !== "object" || visited.has(value)) return output;
+	visited.add(value);
+	for (const entry of Array.isArray(value) ? value : Object.values(value)) {
+		durableByteValues(entry, selectedByteLength, output, visited);
+	}
+	return output;
+}
+
+function packedOracle(material) {
+	const payload = decodeCanonical(concatenate(material.snapshot.chunks));
+	if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
+		throw new TypeError("D.108d1b packed snapshot payload is malformed");
+	}
+	const acl = payload.acl;
+	if (acl === null || typeof acl !== "object" || Array.isArray(acl) || !Array.isArray(acl.members)) {
+		throw new TypeError("D.108d1b packed snapshot ACL is malformed");
+	}
+	const peerMaterial = peerJournalMaterial(material);
+	const established = material.establishedPeer;
+	const digest = Buffer.from(established.digest).toString("hex");
+	const rows = peerMaterial.journalRows.filter((row) => row.vertexDigest === digest);
+	const row = rows[0];
+	return Object.freeze({
+		aclMembers: Object.freeze(
+			acl.members.map((member) =>
+				Object.freeze({
+					author: member.author,
+					groups: Object.freeze([...member.groups]),
+				})
+			)
+		),
+		bobCarrier: Object.freeze({
+			exactlyOnce: rows.length === 1,
+			preimageMatches:
+				row?.exactCanonicalPreimageBytes instanceof Uint8Array &&
+				sameBytes(row.exactCanonicalPreimageBytes, established.canonicalPreimageBytes),
+			scopeMatches:
+				row?.scope?.anchorDigest === material.oracle.genesisAnchorDigest &&
+				row.scope.epoch === 0 &&
+				row.scope.objectId === material.proposed.head.objectId,
+			signatureMatches:
+				row?.detachedSignature instanceof Uint8Array && sameBytes(row.detachedSignature, established.signature),
+			sourceKind: row?.sourceKind,
+			vertexDigest: row?.vertexDigest,
+		}),
+	});
+}
+
+function instrumentIssuanceStore(raw, effects, input) {
+	const descriptors = Object.getOwnPropertyDescriptors(raw);
+	const readLineage = descriptors.readLineage;
+	const transactIssue = descriptors.transactIssue;
+	if (
+		readLineage === undefined ||
+		!("value" in readLineage) ||
+		transactIssue === undefined ||
+		!("value" in transactIssue)
+	) {
+		throw new TypeError("D.108d1b issuance store shape is unavailable");
+	}
+	descriptors.readLineage = {
+		...readLineage,
+		value: async (scope) => {
+			effects.lineageReads.push(scope.author);
+			effects.order.push(`lineage:${scope.author}`);
+			const lineage = await raw.readLineage(scope);
+			if (input.lineageFault === "selected-exhausted" && scope.author === input.authority.author) {
+				return { ...lineage, exhausted: true };
+			}
+			if (input.lineageFault === "malformed-exhausted" && scope.author === input.authority.author) {
+				return { ...lineage, exhausted: 0 };
+			}
+			if (input.lineageFault === "foreign-exhausted" && scope.author === input.lineageFaultAuthor) {
+				return { ...lineage, exhausted: true };
+			}
+			return lineage;
+		},
+	};
+	descriptors.transactIssue = {
+		...transactIssue,
+		value: (...args) => {
+			effects.transactIssueCount += 1;
+			return raw.transactIssue(...args);
+		},
+	};
+	const store = Object.freeze(Object.defineProperties(Object.create(Object.getPrototypeOf(raw)), descriptors));
+	effects.issuanceStoreShape =
+		Reflect.ownKeys(store).length === Reflect.ownKeys(raw).length &&
+		Reflect.ownKeys(raw).every((key, index) => key === Reflect.ownKeys(store)[index]) &&
+		Reflect.ownKeys(raw).every((key) => {
+			const expected = Object.getOwnPropertyDescriptor(raw, key);
+			const actual = Object.getOwnPropertyDescriptor(store, key);
+			return (
+				expected !== undefined &&
+				actual !== undefined &&
+				expected.enumerable === actual.enumerable &&
+				expected.configurable === actual.configurable &&
+				"value" in expected === "value" in actual
+			);
+		});
+	return store;
+}
+
+async function seedIssuance(material, suffix, carriers, effects, input) {
 	const raw = createNodeDurableIssuanceStore({
 		primaryFilename: join(material.directory, `issuance-local-author-${suffix}.sqlite`),
 	});
@@ -147,34 +269,18 @@ async function seedIssuance(material, suffix, carriers, effects) {
 			return Promise.resolve(commit);
 		});
 	}
-	const store = new Proxy(
-		{},
-		{
-			get(_target, property) {
-				if (property === "readLineage") {
-					return (scope) => {
-						effects.lineageReads.push(scope.author);
-						return raw.readLineage(scope);
-					};
-				}
-				if (property === "transactIssue") {
-					return (...args) => {
-						effects.transactIssueCount += 1;
-						return raw.transactIssue(...args);
-					};
-				}
-				return Reflect.get(raw, property, raw);
-			},
-		}
-	);
+	const store = instrumentIssuanceStore(raw, effects, input);
 	return { raw, store };
 }
 
-function signerFor(material, scenario, selectedAuthority, wrongAuthority, observations) {
+function signerFor(material, scenario, selectedAuthority, wrongAuthority, observations, state, effects, durableValues) {
 	return async (bytes) => {
+		effects.order.push(`${state.use}:signer`);
 		observations.push({
 			bytes: Buffer.from(bytes).toString("hex"),
+			matchesDurableCarrier: durableValues.has(Buffer.from(bytes).toString("hex")),
 			ordinary: ordinary(bytes),
+			use: state.use,
 		});
 		if (scenario === "throw") throw new TypeError("D.108d1b signer threw");
 		if (scenario === "reject") return Promise.reject(new TypeError("D.108d1b signer rejected"));
@@ -192,6 +298,32 @@ function signerFor(material, scenario, selectedAuthority, wrongAuthority, observ
 		}
 		return signature;
 	};
+}
+
+async function withCryptoScenario(scenario, operation) {
+	if (scenario !== "missing-webcrypto" && scenario !== "ed25519-unavailable") return operation();
+	const descriptor = Object.getOwnPropertyDescriptor(globalThis, "crypto");
+	const webCrypto = globalThis.crypto;
+	try {
+		Object.defineProperty(globalThis, "crypto", {
+			configurable: true,
+			enumerable: true,
+			value:
+				scenario === "missing-webcrypto"
+					? undefined
+					: Object.freeze({
+							getRandomValues: webCrypto.getRandomValues.bind(webCrypto),
+							subtle: Object.freeze({
+								importKey: () => Promise.reject(new DOMException("Ed25519 unavailable", "NotSupportedError")),
+								verify: webCrypto.subtle.verify.bind(webCrypto.subtle),
+							}),
+						}),
+		});
+		return await operation();
+	} finally {
+		if (descriptor === undefined) Reflect.deleteProperty(globalThis, "crypto");
+		else Object.defineProperty(globalThis, "crypto", descriptor);
+	}
 }
 
 async function journalRows(raw, scope) {
@@ -215,7 +347,9 @@ async function runCase(material, index, input) {
 	const effects = {
 		aheRecoverCount: 0,
 		installEpochAnchorCount: 0,
+		issuanceStoreShape: false,
 		lineageReads: [],
+		order: [],
 		snapshotOpenCount: 0,
 		transactIssueCount: 0,
 	};
@@ -224,48 +358,54 @@ async function runCase(material, index, input) {
 		seedJournal(peerJournalMaterial(material), effects, suffix),
 		seedSnapshot(material, events, effects, suffix),
 	]);
-	const issuance = await seedIssuance(material, suffix, input.carriers, effects);
+	const issuance = await seedIssuance(material, suffix, input.carriers, effects, input);
 	const node = network(events, publications, `d108d1b-target-${index}`);
 	const observations = [];
-	const signer = signerFor(material, input.scenario, input.authority, input.wrongAuthority, observations);
-	let activeHandle;
-	try {
-		const result = await reopenCreatorSuccessorAdoption({
-			...material.creatorGenesis,
-			author: input.authority.author,
-			catalog: trustedCatalog(material),
-			issuanceStore: issuance.store,
-			liveJournalStore: liveJournal.store,
-			messageQueueManager: new MessageQueueManager({ logConfig: { level: "silent" } }),
-			networkNode: node,
-			onAdmittedVertex: () => undefined,
-			signRegisteredVertexDigest: signer,
-			snapshotDeclaration: material.snapshot.declaration,
-			snapshotStore: snapshot.store,
-			store: ahe.store,
-		});
-		const shared = {
-			effects: {
-				adoptionSwapCount: ahe.adoptionSwapCount(),
-				installEpochAnchorCount: effects.installEpochAnchorCount,
-				lineageReads: [...effects.lineageReads],
-				publicationCount: publications.length,
-				snapshotOpenCount: effects.snapshotOpenCount,
-				subscribeCount: events.filter((event) => event === "subscribe").length,
-				transactIssueCount: effects.transactIssueCount,
-			},
-			name: input.name,
-			signerCalls: observations,
-		};
-		if (!result.ok) {
-			return { ...shared, result: { detail: result.detail, kind: result.kind, ok: false } };
-		}
-		activeHandle = result.handle;
-		const issued = await result.handle.issueLocal({
-			operations: [{ logicalTime: 64 + index, operation: { action: "add", value: index + 10 } }],
-			signRegisteredVertexDigest: signer,
-		});
-		if (!issued.ok) throw new TypeError(`D.108d1b ${input.name} issue failed: ${issued.kind}`);
+	const state = { use: "possession" };
+	const signer = signerFor(
+		material,
+		input.scenario,
+		input.authority,
+		input.wrongAuthority,
+		observations,
+		state,
+		effects,
+		durableByteValues(material, 32)
+	);
+	const reopen = () =>
+		withCryptoScenario(input.scenario, () =>
+			reopenCreatorSuccessorAdoption({
+				...material.creatorGenesis,
+				author: input.authority.author,
+				catalog: trustedCatalog(material),
+				issuanceStore: issuance.store,
+				liveJournalStore: liveJournal.store,
+				messageQueueManager: new MessageQueueManager({ logConfig: { level: "silent" } }),
+				networkNode: node,
+				onAdmittedVertex: () => undefined,
+				signRegisteredVertexDigest: signer,
+				snapshotDeclaration: material.snapshot.declaration,
+				snapshotStore: snapshot.store,
+				store: ahe.store,
+			})
+		);
+	const shared = () => ({
+		effects: {
+			adoptionSwapCount: ahe.adoptionSwapCount(),
+			aheRecoverCount: effects.aheRecoverCount,
+			installEpochAnchorCount: effects.installEpochAnchorCount,
+			issuanceStoreShape: effects.issuanceStoreShape,
+			lineageReads: [...effects.lineageReads],
+			order: [...effects.order],
+			publicationCount: publications.length,
+			snapshotOpenCount: effects.snapshotOpenCount,
+			subscribeCount: events.filter((event) => event === "subscribe").length,
+			transactIssueCount: effects.transactIssueCount,
+		},
+		name: input.name,
+		signerCalls: [...observations],
+	});
+	const issuedEvidence = async (issued) => {
 		const scope = Object.freeze({ author: input.authority.author, objectId: material.proposed.head.objectId });
 		const outbox = await issuance.raw.readOutboxPage({ scope });
 		const selected = outbox.find((row) => row.commit.authorSequence === issued.authorSequence);
@@ -278,14 +418,53 @@ async function runCase(material, index, input) {
 		});
 		const accepted = rows.find((row) => row.vertexDigest === issued.digest);
 		return {
-			...shared,
-			issued: {
-				acceptedJournalAuthor: accepted?.sourceKind === "local-issued" ? accepted.author : undefined,
-				author: preimage.author,
-				authorSequence: preimage.authorSequence,
-				issuedRowAuthor: selected.commit.issuedRecord.scope.author,
-				outboxRowAuthor: selected.commit.outboxEntry.scope.author,
-			},
+			acceptedJournalAuthor: accepted?.sourceKind === "local-issued" ? accepted.author : undefined,
+			author: preimage.author,
+			authorSequence: preimage.authorSequence,
+			issuedRowAuthor: selected.commit.issuedRecord.scope.author,
+			outboxRowAuthor: selected.commit.outboxEntry.scope.author,
+		};
+	};
+	let activeHandle;
+	try {
+		const result = await reopen();
+		if (!result.ok) {
+			return { ...shared(), result: { detail: result.detail, kind: result.kind, ok: false } };
+		}
+		activeHandle = result.handle;
+		state.use = "issue";
+		const issued = await result.handle.issueLocal({
+			operations: [{ logicalTime: 64 + index, operation: { action: "add", value: index + 10 } }],
+			signRegisteredVertexDigest: signer,
+		});
+		if (!issued.ok) throw new TypeError(`D.108d1b ${input.name} issue failed: ${issued.kind}`);
+		const firstIssued = await issuedEvidence(issued);
+		let repeat;
+		if (input.repeat === true) {
+			await Promise.resolve(activeHandle.deactivate());
+			activeHandle = undefined;
+			state.use = "possession";
+			const reopened = await reopen();
+			if (!reopened.ok) {
+				repeat = { result: { detail: reopened.detail, kind: reopened.kind, ok: false } };
+			} else {
+				activeHandle = reopened.handle;
+				state.use = "issue";
+				const reissued = await reopened.handle.issueLocal({
+					operations: [{ logicalTime: 96 + index, operation: { action: "add", value: index + 20 } }],
+					signRegisteredVertexDigest: signer,
+				});
+				if (!reissued.ok) throw new TypeError(`D.108d1b ${input.name} repeat issue failed: ${reissued.kind}`);
+				repeat = {
+					issued: await issuedEvidence(reissued),
+					result: { lifecycle: reopened.lifecycle, ok: true, recovery: reopened.recovery },
+				};
+			}
+		}
+		return {
+			...shared(),
+			issued: firstIssued,
+			...(repeat === undefined ? {} : { repeat }),
 			result: { lifecycle: result.lifecycle, ok: true, recovery: result.recovery },
 		};
 	} finally {
@@ -307,7 +486,14 @@ async function matrix(material) {
 	const carolCarrier = derivedCarrier(material, carol);
 	const creatorRows = material.issuance.outbox.map(({ commit }) => ({ commit }));
 	const cases = [
-		{ authority: bob, carriers: [bobCarrier], name: "established-bob", scenario: "valid", wrongAuthority: carol },
+		{
+			authority: bob,
+			carriers: [bobCarrier],
+			name: "established-bob",
+			repeat: true,
+			scenario: "valid",
+			wrongAuthority: carol,
+		},
 		{ authority: carol, carriers: [], name: "fresh-carol", scenario: "valid", wrongAuthority: bob },
 		{
 			authority: bob,
@@ -343,6 +529,45 @@ async function matrix(material) {
 		{ authority: bob, carriers: [bobCarrier], name: "signer-throw", scenario: "throw", wrongAuthority: carol },
 		{ authority: bob, carriers: [bobCarrier], name: "signer-reject", scenario: "reject", wrongAuthority: carol },
 		{ authority: dave, carriers: [], name: "non-writer", scenario: "valid", wrongAuthority: alice },
+		{
+			authority: bob,
+			carriers: [bobCarrier],
+			lineageFault: "selected-exhausted",
+			name: "selected-exhausted-lineage",
+			scenario: "valid",
+			wrongAuthority: carol,
+		},
+		{
+			authority: bob,
+			carriers: [bobCarrier],
+			lineageFault: "foreign-exhausted",
+			lineageFaultAuthor: carol.author,
+			name: "foreign-exhausted-lineage",
+			scenario: "valid",
+			wrongAuthority: carol,
+		},
+		{
+			authority: bob,
+			carriers: [bobCarrier],
+			lineageFault: "malformed-exhausted",
+			name: "malformed-exhausted-lineage",
+			scenario: "valid",
+			wrongAuthority: carol,
+		},
+		{
+			authority: bob,
+			carriers: [bobCarrier],
+			name: "missing-webcrypto",
+			scenario: "missing-webcrypto",
+			wrongAuthority: carol,
+		},
+		{
+			authority: bob,
+			carriers: [bobCarrier],
+			name: "ed25519-unavailable",
+			scenario: "ed25519-unavailable",
+			wrongAuthority: carol,
+		},
 	];
 	const results = [];
 	for (let index = 0; index < cases.length; index += 1) {
@@ -350,6 +575,7 @@ async function matrix(material) {
 	}
 	return Object.freeze({
 		authors: Object.freeze({ alice: alice.author, bob: bob.author, carol: carol.author, dave: dave.author }),
+		oracle: packedOracle(material),
 		pid: process.pid,
 		results: Object.freeze(results),
 	});

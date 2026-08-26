@@ -12,14 +12,18 @@ const FIXTURE_AUTHOR_SEED = Uint8Array.from(
 	"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20".match(/.{2}/gu) ?? [],
 	(pair) => Number.parseInt(pair, 16)
 );
+const WRONG_AUTHOR_SEED = Uint8Array.from(
+	"2122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40".match(/.{2}/gu) ?? [],
+	(pair) => Number.parseInt(pair, 16)
+);
 const ED25519_PKCS8_PREFIX = Uint8Array.from("302e020100300506032b657004220420".match(/.{2}/gu) ?? [], (pair) =>
 	Number.parseInt(pair, 16)
 );
 
-async function signFixturePossession(bytes: Uint8Array): Promise<Uint8Array> {
+async function signPossession(bytes: Uint8Array, seed: Uint8Array): Promise<Uint8Array> {
 	const pkcs8 = new Uint8Array(ED25519_PKCS8_PREFIX.byteLength + FIXTURE_AUTHOR_SEED.byteLength);
 	pkcs8.set(ED25519_PKCS8_PREFIX);
-	pkcs8.set(FIXTURE_AUTHOR_SEED, ED25519_PKCS8_PREFIX.byteLength);
+	pkcs8.set(seed, ED25519_PKCS8_PREFIX.byteLength);
 	const key = await crypto.subtle.importKey("pkcs8", pkcs8, { name: "Ed25519" }, false, ["sign"]);
 	return new Uint8Array(await crypto.subtle.sign("Ed25519", key, new Uint8Array(bytes)));
 }
@@ -32,14 +36,22 @@ interface ContenderResult {
 	readonly ok: boolean;
 	readonly publicationCount: number;
 	readonly recovery?: string;
+	readonly signerCount: number;
 	readonly verificationCount: number;
 }
+
+type PossessionSignerMode = "throw" | "valid" | "wrong-key";
 
 declare global {
 	interface Window {
 		phase6aCreatorSuccessorActivation: Readonly<{
-			openContender(databaseName: string, packedMaterial: unknown): Promise<ContenderResult>;
+			openContender(
+				databaseName: string,
+				packedMaterial: unknown,
+				signerMode?: PossessionSignerMode
+			): Promise<ContenderResult>;
 			probeAuthorityFailure(databaseName: string, packedMaterial: unknown): Promise<readonly ContenderResult[]>;
+			probePossessionFailure(databaseName: string, packedMaterial: unknown): Promise<readonly ContenderResult[]>;
 			release(): Promise<boolean>;
 			seed(databaseName: string, packedMaterial: unknown): Promise<void>;
 		}>;
@@ -315,13 +327,25 @@ async function seed(databaseName: string, packedMaterial: unknown): Promise<void
 	}
 }
 
-async function openContender(databaseName: string, packedMaterial: unknown): Promise<ContenderResult> {
+async function openContender(
+	databaseName: string,
+	packedMaterial: unknown,
+	signerMode: PossessionSignerMode = "valid"
+): Promise<ContenderResult> {
 	if (activeHandle !== undefined) {
-		return { kind: "authority-unavailable", lockHeld: false, ok: false, publicationCount: 0, verificationCount: 0 };
+		return {
+			kind: "authority-unavailable",
+			lockHeld: false,
+			ok: false,
+			publicationCount: 0,
+			signerCount: 0,
+			verificationCount: 0,
+		};
 	}
 	const material = unpack(packedMaterial) as PlainRecord;
 	const stores = await openStores(databaseName);
 	const publications: unknown[] = [];
+	let signerCount = 0;
 	let verificationCount = 0;
 	const countedStore = new Proxy(stores.store, {
 		get(target, property, receiver): unknown {
@@ -332,6 +356,11 @@ async function openContender(databaseName: string, packedMaterial: unknown): Pro
 			};
 		},
 	});
+	const signRegisteredVertexDigest = async (bytes: Uint8Array): Promise<Uint8Array> => {
+		signerCount += 1;
+		if (signerMode === "throw") throw new TypeError("D.108d1b browser signer threw");
+		return signPossession(bytes, signerMode === "wrong-key" ? WRONG_AUTHOR_SEED : FIXTURE_AUTHOR_SEED);
+	};
 	try {
 		const result = await reopenCreatorSuccessorAdoption({
 			...(material.creatorGenesis as PlainRecord),
@@ -344,7 +373,7 @@ async function openContender(databaseName: string, packedMaterial: unknown): Pro
 			messageQueueManager: new BrowserTestMessageQueueManager(),
 			networkNode: network(publications),
 			onAdmittedVertex: () => undefined,
-			signRegisteredVertexDigest: signFixturePossession,
+			signRegisteredVertexDigest,
 			snapshotDeclaration: (material.snapshot as PlainRecord).declaration,
 			snapshotStore: stores.snapshotStore,
 			store: countedStore,
@@ -362,6 +391,7 @@ async function openContender(databaseName: string, packedMaterial: unknown): Pro
 				lockHeld: false,
 				ok: false,
 				publicationCount: publications.length,
+				signerCount,
 				verificationCount,
 			};
 		}
@@ -374,6 +404,7 @@ async function openContender(databaseName: string, packedMaterial: unknown): Pro
 			ok: true,
 			publicationCount: publications.length,
 			recovery: String(result.recovery),
+			signerCount,
 			verificationCount,
 		};
 	} catch (error) {
@@ -385,6 +416,16 @@ async function openContender(databaseName: string, packedMaterial: unknown): Pro
 		]);
 		throw error;
 	}
+}
+
+async function probePossessionFailure(
+	databaseName: string,
+	packedMaterial: unknown
+): Promise<readonly ContenderResult[]> {
+	return Promise.all([
+		openContender(databaseName, packedMaterial, "wrong-key"),
+		openContender(databaseName, packedMaterial, "throw"),
+	]);
 }
 
 async function probeAuthorityFailure(
@@ -418,5 +459,11 @@ async function release(): Promise<boolean> {
 }
 
 if (typeof window !== "undefined") {
-	window.phase6aCreatorSuccessorActivation = Object.freeze({ openContender, probeAuthorityFailure, release, seed });
+	window.phase6aCreatorSuccessorActivation = Object.freeze({
+		openContender,
+		probeAuthorityFailure,
+		probePossessionFailure,
+		release,
+		seed,
+	});
 }
