@@ -56,6 +56,7 @@ import {
 } from "@ts-drp/storage";
 import { type DRPNetworkNode, Message, MessageType, V3Envelope } from "@ts-drp/types";
 
+import { bindCreatorLiveClose } from "./creator-close.js";
 import { classifyV3EnvelopeScope } from "./v3-envelope-scope.js";
 import { consumeRecoveredV3LiveAuthority, installRecoveredV3LiveAuthority } from "./v3-live-recovered-authority.js";
 
@@ -2372,7 +2373,27 @@ interface VerifiedV3IngressEvidence {
 
 const v3PlaneRegistrations = new WeakMap<DRPNetworkNode, Map<string, V3PlaneRegistration>>();
 const v3HandleRegistrations = new WeakMap<V3PlaneHandle, V3PlaneRegistration>();
+const claimedCreatorCloseHandles = new WeakSet<V3PlaneHandle>();
 const HEX_DIGITS = "0123456789abcdef";
+
+const installCreatorCloseResolver = Reflect.get(bindCreatorLiveClose, "installV3CreatorCloseRegistrationResolver");
+if (
+	typeof installCreatorCloseResolver !== "function" ||
+	ReflectApply(installCreatorCloseResolver, bindCreatorLiveClose, [
+		(plane: unknown): V3CreatorCloseRegistration | undefined => {
+			if (plane === null || typeof plane !== "object") return undefined;
+			const handle = plane as V3PlaneHandle;
+			if (claimedCreatorCloseHandles.has(handle)) return undefined;
+			const registration = v3HandleRegistrations.get(handle);
+			if (registration === undefined) return undefined;
+			const claimed = creatorCloseRegistration(registration);
+			if (claimed !== undefined) claimedCreatorCloseHandles.add(handle);
+			return claimed;
+		},
+	]) !== true
+) {
+	throw new TypeError("v3 creator close registration resolver is unavailable");
+}
 
 function activationFailure(
 	kind: V3PlaneActivationFailureKind,
@@ -5844,7 +5865,6 @@ function creatorCloseRegistration(registration: V3PlaneRegistration): V3CreatorC
 }
 
 function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
-	let creatorCloseClaimed = false;
 	const ephemeralAuthority = ((): ReturnType<V3PlaneHandle["currentEphemeralAuthority"]> => {
 		if (registration.mode === "snapshot-closed") return undefined;
 		const authorization = registration.authorization;
@@ -5906,17 +5926,6 @@ function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
 			deactivateRegistration(registration);
 		},
 	};
-	ObjectDefineProperty(handle, "claimCreatorCloseRegistration", {
-		configurable: false,
-		enumerable: false,
-		value: function (this: unknown): V3CreatorCloseRegistration | undefined {
-			if (this !== handle || creatorCloseClaimed) return undefined;
-			const claimed = creatorCloseRegistration(registration);
-			if (claimed !== undefined) creatorCloseClaimed = true;
-			return claimed;
-		},
-		writable: false,
-	});
 	return ObjectFreeze(handle) as V3PlaneHandle;
 }
 

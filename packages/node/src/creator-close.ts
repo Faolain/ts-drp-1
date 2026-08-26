@@ -36,6 +36,7 @@ const PROFILE: SnapshotTransferProfile = Object.freeze({
 });
 const SCANNABLE_BYTES = 8192;
 const bindings = new WeakMap<V3PlaneHandle, CreatorLiveCloseHandle>();
+let creatorCloseRegistrationResolver: ((plane: V3PlaneHandle) => unknown) | undefined;
 
 type CreatorTrustProjection = Readonly<{
 	byzantineFaultTolerant: false;
@@ -122,9 +123,7 @@ interface V3CreatorCloseRegistration {
 }
 
 function claimCreatorCloseRegistration(plane: V3PlaneHandle): V3CreatorCloseRegistration | undefined {
-	const claim = Reflect.get(plane, "claimCreatorCloseRegistration");
-	if (typeof claim !== "function") return undefined;
-	const registration = Reflect.apply(claim, plane, []) as unknown;
+	const registration = creatorCloseRegistrationResolver?.(plane);
 	return plainRecord(registration) ? (registration as unknown as V3CreatorCloseRegistration) : undefined;
 }
 
@@ -586,3 +585,20 @@ export async function bindCreatorLiveClose(
 		return Object.freeze({ ok: false as const, reason: "CREATOR_CLOSE_BIND_FAILED" });
 	}
 }
+
+Object.defineProperty(bindCreatorLiveClose, "installV3CreatorCloseRegistrationResolver", {
+	configurable: false,
+	enumerable: false,
+	value: function installV3CreatorCloseRegistrationResolver(this: unknown, resolver: unknown): boolean {
+		if (
+			this !== bindCreatorLiveClose ||
+			creatorCloseRegistrationResolver !== undefined ||
+			typeof resolver !== "function"
+		) {
+			return false;
+		}
+		creatorCloseRegistrationResolver = (plane): unknown => Reflect.apply(resolver, undefined, [plane]) as unknown;
+		return true;
+	},
+	writable: false,
+});
