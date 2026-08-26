@@ -55,9 +55,9 @@ afterEach(async () => {
 });
 
 describe("D.108a successor-epoch live substrate RED", () => {
-	it("freezes exactly five RED and five GREEN owners without a product API", () => {
+	it("freezes exactly five RED and six GREEN owners without a new product API", () => {
 		expect(REQUIRED_RED_PATHS).toHaveLength(5);
-		expect(REQUIRED_GREEN_PATHS).toHaveLength(5);
+		expect(REQUIRED_GREEN_PATHS).toHaveLength(6);
 		expect(REQUIRED_RED_PATHS.every((path) => existsSync(resolve(REPOSITORY_ROOT, path)))).toBe(true);
 		expect(SUCCESSOR_JOURNAL_METHODS).toEqual([
 			"appendAccepted",
@@ -112,7 +112,7 @@ describe("D.108a successor-epoch live substrate RED", () => {
 		}
 	});
 
-	it("[RED readiness] requires the five successor representation owners together", () => {
+	it("[RED readiness] requires the six successor representation owners together", () => {
 		expect(readiness, `missing D.108a owners: ${readiness.missing.join(", ")}`).toEqual({ missing: [], ready: true });
 	});
 

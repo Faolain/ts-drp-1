@@ -58675,13 +58675,16 @@ The D.108a tests-only RED is exactly five paths:
 
 It freezes epoch-zero preservation, hostile/noncanonical/safe-integer controls,
 Node/browser journal parity and an epoch-one representation oracle behind one
-composite readiness failure. The expected GREEN is exactly five paths:
+composite readiness failure. The corrected expected GREEN is exactly six paths:
 
 - `packages/live-journal/src/types.ts`;
 - `packages/live-journal/src/contract.ts`;
 - `packages/storage-node/src/live-journal.ts`;
-- `packages/storage-browser/src/live-journal.ts`; and
-- `packages/node/src/v3-live.ts`.
+- `packages/storage-browser/src/live-journal.ts`;
+- `packages/node/src/v3-live.ts`; and
+- `examples/v3-room/src/index.ts`, limited to widening the two existing
+  authenticated current-authority epoch type annotations from literal zero to
+  `number` with no runtime or caller-selected epoch change.
 
 Those owners may add the mechanical journal operation and generalize internal
 epoch-bearing types/validation, but they must not add the adoption binder,
@@ -58690,6 +58693,17 @@ exports already carry the changed interface/type, so no manifest, lockfile or
 root value export is expected. Any need for a store schema/version change,
 registered wire change, additional production path or new root product API
 stops and corrects the roster before the RED freezes.
+
+The first exact-five GREEN review reproduced that the freshly built node
+declaration widens `V3PlaneHandle.currentEphemeralAuthority().epoch` while the
+v3-room provider and admission-policy contexts still pinned literal epoch zero.
+That stale product type broke the v3-room build plus the v3-chat, grid and
+storage-browser test-inclusive typechecks. The same review round therefore
+reopened the RED readiness roster before GREEN custody, added the one exact
+product type owner above, and requires both annotations to accept authenticated
+current epochs. This is a compile-surface correction only: the existing genesis
+call sites still supply epoch zero, no caller chooses an epoch, and no product
+activation or adoption behavior enters D.108a.
 
 The sole D.108a RED review round froze the pre-correction tests-only packet at
 parent HEAD `0db3def0c9feec4e7bf1bd84b4cc58c133c7712d`, staged tree

@@ -18,6 +18,7 @@ export const REQUIRED_GREEN_PATHS = Object.freeze([
 	"packages/storage-node/src/live-journal.ts",
 	"packages/storage-browser/src/live-journal.ts",
 	"packages/node/src/v3-live.ts",
+	"examples/v3-room/src/index.ts",
 ]);
 
 export const SUCCESSOR_JOURNAL_METHODS = Object.freeze([
@@ -225,7 +226,7 @@ function ownerMatches(text: string | undefined, patterns: readonly RegExp[]): bo
 }
 
 /**
- * Collapses all five future owners into the one intentional RED readiness fact.
+ * Collapses all six future owners into the one intentional RED readiness fact.
  * @returns Exact owner paths whose successor representation is still absent.
  */
 export function successorEpochReadiness(): SuccessorEpochReadiness {
@@ -291,6 +292,22 @@ export function successorEpochReadiness(): SuccessorEpochReadiness {
 		!ownerMatches(planeHandle, [/epoch:\s*registration\.payload\.provenance\.epoch/u])
 	) {
 		missing.push("packages/node/src/v3-live.ts");
+	}
+	const roomPath = "examples/v3-room/src/index.ts";
+	const room = source(roomPath);
+	const ephemeralProvider = sourceOwner(
+		room,
+		"export interface V3RoomEphemeralAuthorizationProvider",
+		"export interface V3RoomTransport"
+	);
+	const roomInput = sourceOwner(room, "export interface CreateV3RoomSessionInput", "export interface V3RoomSession");
+	if (
+		!ownerMatches(ephemeralProvider, [/readonly\s+epoch:\s*number;/u]) ||
+		ephemeralProvider?.includes("readonly epoch: 0;") ||
+		!ownerMatches(roomInput, [/createOperationAdmissionPolicy\?/u, /readonly\s+epoch:\s*number;/u]) ||
+		roomInput?.includes("readonly epoch: 0;")
+	) {
+		missing.push(roomPath);
 	}
 	return Object.freeze({ missing: Object.freeze([...new Set(missing)]), ready: missing.length === 0 });
 }
