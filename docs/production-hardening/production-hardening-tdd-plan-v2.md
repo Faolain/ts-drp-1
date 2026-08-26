@@ -59378,6 +59378,65 @@ consumer that can destructively consume the opaque success capability; D.108c
 proves it has no enumerable/method authority and the existing live activator
 rejects it.
 
+D.108c GREEN is complete. The original exact-four production implementation
+landed as signed commit `92099ffac3c1c882ea0deeea703e8c057ad159e5` on parent
+`b1d3ac4448951e5dba186303c9d89849eed3f440`, tree
+`67509ec6364cf950d65c54345424fea6cb132bba`, stable patch id
+`c0cea50d1fb3bfdca965da3e1ed746f2c4344381` and canonical patch SHA-256
+`3043869f6dff13895fbb266aae9d2c5982276c326b25c3dfc57ecb9a735001d6`.
+It consumes the owner-bound intent before mutation, authenticates pending-old
+or generation-id-independent active-new from bounded lineage, creator trust and
+every referenced blob, stages the one projection replacement, promotes the
+exact sorted closure, completes it, performs one pending-head CAS and publishes
+success only after a fresh authenticated reopen. The node root, storage
+surface, products, transport, issuance and live activation remain unchanged.
+
+The sole GREEN review round used that immutable commit. Grok/high ended
+`NO_VERDICT` after 380.096 seconds with exit code 1, `stop_reason=cancelled` and
+no terminal schema; it was not retried or counted as approval. Kimi Code 0.38.0
+session `353e8458-78f3-403a-af9b-b17c1c165bbd` performed extensive read-only
+inspection but stalled without CHECK001-CHECK100 or a terminal verdict and was
+stopped; it is `NO_VERDICT` and was not retried. Opus 5/xhigh session
+`0c3347dd-7316-4d16-af17-954d8d4d0e41` returned `CHANGES_REQUIRED`, P0=0,
+P1=1 and P2=3. No reviewer edited or tested the workspace, no reviewer spawned
+a delegate and no Fable process ran.
+
+The Opus P1 reproduced directly: mutating the nested caller-visible descriptor
+changed the descriptor retained behind the opaque success capability
+(`custodied:0`, expected `1`). The same-round correction stores only detached
+canonical projection bytes plus a copied head and decodes a fresh descriptor
+graph on destructive capability consumption. The identical reproduction then
+reported `custodied:1`, expected `1`. The correction landed without a
+confirmation review as signed commit
+`a0f496afec4625483e73be4f0fc1eebe82aa45d7`; final tree is
+`6e4220d52a0ef23e11b34e085140395a0e34a239`, combined stable patch id is
+`ab366ef2e530bdbdf662367a6ace3a780b2f2d19` and combined patch SHA-256 is
+`6eef50d85933f6d8b7c4054bc539370f97e6c0426da28a2bd132816b0fc3435f`.
+Both commits have Good Faolain signatures under RSA key
+`55E22F154FBAF8C84F378304761B99CEA81C6289` and are pushed.
+
+Final focused evidence is green. `pnpm exec vitest run
+tests/phase-6a-creator-adoption-commit-red.test.ts
+packages/storage-node/tests/phase-6a-creator-adoption-commit-death-red.test.ts
+--no-coverage` passes 11/11, including all twenty-seven logical request faults
+and all eighteen real SQLite SIGKILL edges. `pnpm exec playwright test --config
+packages/storage-browser/playwright.phase-6a-creator-adoption-commit.config.ts`
+passes 6/6 in 2.9 minutes: ordinary plus native SIGKILL/reopen matrices in
+Chromium, Firefox and WebKit. Exact-four ESLint, Prettier and diff checks pass.
+All four affected package builds pass. Storage and storage-browser typechecks
+pass; node and storage-node test-inclusive typechecks retain only their existing
+cross-root/test-fixture diagnostics, while both production builds are clean.
+
+The retained command covering D.108b, both D.107d close owners, Phase-4b live
+snapshot composition and strict SQLite SIGKILL recovery passes 42 with one
+pre-existing documented skip; the strict browser recovery contract passes 3/3.
+The remaining Opus P2s are recorded rather than widened into this GREEN:
+`storage-failed` remains a source-frozen presently unreachable failure member,
+pending-old reopen repeats one closure load, and mint/commit share duplicated
+candidate-derivation and recovery helpers. None changes the authenticated
+terminal, wire/storage authority or acceptance result; consolidation belongs to
+a separately frozen refactor slice.
+
 ### D.108d — epoch-one activation and product proof
 
 D.108d consumes only a genuine D.108c durable result. It installs the epoch-one
