@@ -1,12 +1,20 @@
 /* eslint import/no-unresolved: "off" */
+import { ed25519 } from "@noble/curves/ed25519.js";
 import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { createCreatorCloseFixture } from "./fixtures/phase-5e-v3/creator-close-contract.js";
+import {
+	createCreatorCloseFixture,
+	CREATOR_PRIVATE_KEY_SEED_HEX,
+	successorTrustRecord,
+	trustRecordForAnchor,
+} from "./fixtures/phase-5e-v3/creator-close-contract.js";
 import {
 	classifyIndependentAdvance,
+	classifyIndependentTrustClosure,
 	CREATOR_ADVANCE_REJECTIONS,
 	CREATOR_CONTINUITY_STATES,
 	CREATOR_LIFECYCLE_STATES,
@@ -15,6 +23,7 @@ import {
 	creatorLiveCloseReadiness,
 	exactKeys,
 	expectedCombinedClosure,
+	type IndependentAdvanceClassification,
 	REPOSITORY_ROOT,
 	REQUIRED_GREEN_PATHS,
 	REQUIRED_RED_PATHS,
@@ -25,6 +34,18 @@ const readiness = creatorLiveCloseReadiness();
 
 function ref(digest: string, byteLength = 32): Readonly<{ byteLength: number; digest: string }> {
 	return Object.freeze({ byteLength, digest });
+}
+
+function bytesRef(bytes: Uint8Array): Readonly<{ byteLength: number; digest: string }> {
+	return ref(createHash("sha256").update(bytes).digest("hex"), bytes.byteLength);
+}
+
+function hexBytes(value: string): Uint8Array {
+	return new Uint8Array(Buffer.from(value, "hex"));
+}
+
+function changedTrustBytes(bytes: Uint8Array, changes: Readonly<Record<string, unknown>>): Uint8Array {
+	return encodeCanonical({ ...(decodeCanonical(bytes) as Readonly<Record<string, unknown>>), ...changes });
 }
 
 describe.sequential("Phase 5e genuine creator live close RED", () => {
@@ -59,24 +80,40 @@ describe.sequential("Phase 5e genuine creator live close RED", () => {
 
 	it("independently classifies replay, equivocation, rollback, gap and the exact successor without writes", async () => {
 		const fixture = await createCreatorCloseFixture();
-		const current = { anchor: fixture.anchorDigest, epoch: 0 } as const;
-		const successorTrustBytes = encodeCanonical({
-			currentAnchorDigest: fixture.successorAnchorDigest,
-			currentEpoch: 1,
-		});
-		expect(classifyIndependentAdvance(current, successorTrustBytes)).toEqual({
+		const currentTrustBytes = trustRecordForAnchor(
+			fixture,
+			fixture.exactCanonicalCurrentAnchorPreimageBytes,
+			fixture.currentAnchorSignature
+		);
+		const successorSignature = ed25519.sign(
+			hexBytes(fixture.successorAnchorDigest),
+			hexBytes(CREATOR_PRIVATE_KEY_SEED_HEX)
+		);
+		const successorTrustBytes = successorTrustRecord(fixture, successorSignature);
+		expect(classifyIndependentAdvance(currentTrustBytes, successorTrustBytes)).toEqual({
 			kind: "successor",
 			ok: true,
 		});
 		const successorTrust = decodeCanonical(successorTrustBytes) as Readonly<Record<string, unknown>>;
 		expect(successorTrust.currentEpoch).toBe(1);
 		for (const [candidate, reason] of [
-			[encodeCanonical({ currentAnchorDigest: fixture.anchorDigest, currentEpoch: 0 }), "BYTE_REPLAY"],
-			[encodeCanonical({ currentAnchorDigest: "f".repeat(64), currentEpoch: 0 }), "EPOCH_EQUIVOCATION"],
-			[encodeCanonical({ currentAnchorDigest: "e".repeat(64), currentEpoch: -1 }), "ROLLBACK"],
-			[encodeCanonical({ currentAnchorDigest: "d".repeat(64), currentEpoch: 2 }), "EPOCH_GAP"],
+			[currentTrustBytes, "BYTE_REPLAY"],
+			[changedTrustBytes(currentTrustBytes, { currentAnchorDigest: "f".repeat(64) }), "EPOCH_EQUIVOCATION"],
+			[changedTrustBytes(currentTrustBytes, { currentEpoch: -1 }), "ROLLBACK"],
+			[changedTrustBytes(successorTrustBytes, { currentEpoch: 2 }), "EPOCH_GAP"],
+			[
+				changedTrustBytes(successorTrustBytes, {
+					exactCanonicalCurrentAnchorPreimageBytes: encodeCanonical({
+						...(decodeCanonical(fixture.exactCanonicalSuccessorAnchorPreimageBytes) as Readonly<
+							Record<string, unknown>
+						>),
+						previousAnchor: "c".repeat(64),
+					}),
+				}),
+				"TRUST_CLOSURE_INVALID",
+			],
 		] as const) {
-			expect(classifyIndependentAdvance(current, candidate)).toEqual({ ok: false, reason });
+			expect(classifyIndependentAdvance(currentTrustBytes, candidate)).toEqual({ ok: false, reason });
 		}
 	});
 
@@ -95,6 +132,30 @@ describe.sequential("Phase 5e genuine creator live close RED", () => {
 		});
 		expect(closure).toEqual([liveProjection, retainedAuxiliary, successorTrust, cut, commitQc]);
 		expect(closure).not.toContainEqual(currentTrust);
+		expect(
+			classifyIndependentTrustClosure({
+				current: [currentTrust, liveProjection, retainedAuxiliary],
+				currentTrustRef: currentTrust,
+				proofRefs: [cut, commitQc],
+				proposed: closure,
+				successorTrustRef: successorTrust,
+			})
+		).toEqual({ kind: "successor", ok: true });
+		for (const proposed of [
+			closure.filter(({ digest }) => digest !== cut.digest),
+			closure.filter(({ digest }) => digest !== commitQc.digest),
+			[...closure, currentTrust],
+		]) {
+			expect(
+				classifyIndependentTrustClosure({
+					current: [currentTrust, liveProjection, retainedAuxiliary],
+					currentTrustRef: currentTrust,
+					proofRefs: [cut, commitQc],
+					proposed,
+					successorTrustRef: successorTrust,
+				})
+			).toEqual({ ok: false, reason: "TRUST_CLOSURE_INVALID" });
+		}
 		expect(() =>
 			expectedCombinedClosure({
 				current: [currentTrust, liveProjection],
@@ -116,19 +177,23 @@ describe.sequential("Phase 5e genuine creator live close RED", () => {
 		for (const changed of [
 			{ ...expected, closureDigest: "d".repeat(64) },
 			{ ...expected, generationId: "e".repeat(64) },
+			{ ...expected, objectId: `creator:${"d".repeat(32)}` },
 			{ ...expected, revision: 3 },
 		]) {
 			expect(resolveIndependentAmbiguousSwap(expected, changed)).toBe("conflict");
 		}
 	});
 
-	it("forbids duplicated consensus, activation, pruning and a second head owner", () => {
-		for (const path of REQUIRED_GREEN_PATHS) {
-			if (!readiness.ready && !readiness.missing.every((missing) => missing !== path)) continue;
-			const source = readFileSync(resolve(REPOSITORY_ROOT, path), "utf8");
-			if (path.endsWith("creator-close.ts") || path.endsWith("creator-trust-advance.ts")) continue;
-			expect(source).not.toContain("activateSuccessorEpoch");
-			expect(source).not.toContain("pruneSealedEpoch");
+	it.skipIf(!readiness.ready)("forbids activation, pruning and a second combined-head owner", () => {
+		const closeSource = readFileSync(resolve(REPOSITORY_ROOT, "packages/node/src/creator-close.ts"), "utf8");
+		const advanceSource = readFileSync(
+			resolve(REPOSITORY_ROOT, "packages/control-plane/src/creator-trust-advance.ts"),
+			"utf8"
+		);
+		expect(closeSource.match(/\.swapHead\s*\(/gu) ?? []).toHaveLength(1);
+		expect(advanceSource).not.toMatch(/\.swapHead\s*\(/u);
+		for (const source of [closeSource, advanceSource]) {
+			expect(source).not.toMatch(/activateV3LivePlane|activateSnapshotTransfer|prune|adoptSuccessor/iu);
 		}
 	});
 
@@ -136,12 +201,82 @@ describe.sequential("Phase 5e genuine creator live close RED", () => {
 		expect(readiness, `missing D.107d owners: ${readiness.missing.join(", ")}`).toEqual({ missing: [], ready: true });
 	});
 
-	it.skipIf(!readiness.ready)("keeps both new runtime subpaths closed", async () => {
+	it.skipIf(!readiness.ready)("keeps both new runtime subpaths closed and binds every classifier verdict", async () => {
 		const [controlPlane, node] = await Promise.all([
 			import("@ts-drp/control-plane/creator-trust-advance"),
 			import("@ts-drp/node/creator-close"),
 		]);
 		expect(exactKeys(controlPlane)).toEqual(CREATOR_LIVE_CLOSE_EXPORTS.controlPlane);
 		expect(exactKeys(node)).toEqual(CREATOR_LIVE_CLOSE_EXPORTS.node);
+
+		const fixture = await createCreatorCloseFixture();
+		const currentBytes = trustRecordForAnchor(
+			fixture,
+			fixture.exactCanonicalCurrentAnchorPreimageBytes,
+			fixture.currentAnchorSignature
+		);
+		const successorBytes = successorTrustRecord(
+			fixture,
+			ed25519.sign(hexBytes(fixture.successorAnchorDigest), hexBytes(CREATOR_PRIVATE_KEY_SEED_HEX))
+		);
+		const liveRef = ref("a".repeat(64), 9_000);
+		const cutRef = ref("b".repeat(64), 9_001);
+		const commitQcRef = ref("c".repeat(64), 9_002);
+		const inspect = controlPlane.inspectCreatorTrustAdvance as (input: unknown) => IndependentAdvanceClassification;
+		for (const candidateBytes of [
+			successorBytes,
+			currentBytes,
+			changedTrustBytes(currentBytes, { currentAnchorDigest: "f".repeat(64) }),
+			changedTrustBytes(currentBytes, { currentEpoch: -1 }),
+			changedTrustBytes(successorBytes, { currentEpoch: 2 }),
+		]) {
+			const currentTrustRef = bytesRef(currentBytes);
+			const successorTrustRef = bytesRef(candidateBytes);
+			const current = [currentTrustRef, liveRef];
+			const proposed = expectedCombinedClosure({
+				current,
+				currentTrustRef,
+				proofRefs: [cutRef, commitQcRef],
+				successorTrustRef,
+			});
+			expect(
+				inspect({
+					current: { candidates: [{ bytes: currentBytes, ref: currentTrustRef }], closure: current },
+					proofRefs: [cutRef, commitQcRef],
+					proposed: { candidates: [{ bytes: candidateBytes, ref: successorTrustRef }], closure: proposed },
+				})
+			).toEqual(classifyIndependentAdvance(currentBytes, candidateBytes));
+		}
+
+		const currentTrustRef = bytesRef(currentBytes);
+		const successorTrustRef = bytesRef(successorBytes);
+		const secondTrustBytes = changedTrustBytes(currentBytes, { currentAnchorDigest: "e".repeat(64) });
+		const secondTrustRef = bytesRef(secondTrustBytes);
+		for (const proposed of [
+			{ candidates: [], closure: [liveRef, cutRef, commitQcRef] },
+			{
+				candidates: [
+					{ bytes: successorBytes, ref: successorTrustRef },
+					{ bytes: secondTrustBytes, ref: secondTrustRef },
+				],
+				closure: [liveRef, successorTrustRef, secondTrustRef, cutRef, commitQcRef],
+			},
+			{
+				candidates: [{ bytes: successorBytes, ref: successorTrustRef }],
+				closure: [liveRef, successorTrustRef, commitQcRef],
+			},
+			{
+				candidates: [{ bytes: successorBytes, ref: successorTrustRef }],
+				closure: [liveRef, successorTrustRef, cutRef],
+			},
+		]) {
+			expect(
+				inspect({
+					current: { candidates: [{ bytes: currentBytes, ref: currentTrustRef }], closure: [currentTrustRef, liveRef] },
+					proofRefs: [cutRef, commitQcRef],
+					proposed,
+				})
+			).toEqual({ ok: false, reason: "TRUST_CLOSURE_INVALID" });
+		}
 	});
 });

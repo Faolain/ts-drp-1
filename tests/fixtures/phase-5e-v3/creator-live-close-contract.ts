@@ -68,8 +68,15 @@ export function creatorLiveCloseReadiness(): CreatorLiveCloseReadiness {
 		}
 	}
 	const vite = readFileSync(resolve(REPOSITORY_ROOT, "vite.config.mts"), "utf8");
-	for (const subpath of ["@ts-drp/control-plane/creator-trust-advance", "@ts-drp/node/creator-close"]) {
-		if (!vite.includes(`"${subpath}"`)) missing.push(`${subpath} Vite alias`);
+	for (const [subpath, bare] of [
+		["@ts-drp/control-plane/creator-trust-advance", "@ts-drp/control-plane"],
+		["@ts-drp/node/creator-close", "@ts-drp/node"],
+	] as const) {
+		const specificIndex = vite.indexOf(`"${subpath}"`);
+		const bareIndex = vite.indexOf(`"${bare}"`);
+		if (specificIndex < 0 || (bareIndex >= 0 && specificIndex >= bareIndex)) {
+			missing.push(`${subpath} specific-before-bare Vite alias`);
+		}
 	}
 	return Object.freeze({ missing: Object.freeze([...missing]), ready: missing.length === 0 });
 }
@@ -78,35 +85,72 @@ export type IndependentAdvanceClassification =
 	| Readonly<{ readonly ok: true; readonly kind: "successor" }>
 	| Readonly<{
 			readonly ok: false;
-			readonly reason: "BYTE_REPLAY" | "EPOCH_EQUIVOCATION" | "EPOCH_GAP" | "ROLLBACK";
+			readonly reason: "BYTE_REPLAY" | "EPOCH_EQUIVOCATION" | "EPOCH_GAP" | "ROLLBACK" | "TRUST_CLOSURE_INVALID";
 	  }>;
+
+function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
+	if (left.byteLength !== right.byteLength) return false;
+	for (let index = 0; index < left.byteLength; index += 1) {
+		if (left[index] !== right[index]) return false;
+	}
+	return true;
+}
+
+function sameCanonicalField(left: unknown, right: unknown): boolean {
+	return left instanceof Uint8Array && right instanceof Uint8Array && sameBytes(left, right);
+}
 
 /**
  * Independently classifies the closed epoch relation without writing storage.
- * @param current - Authenticated current epoch and anchor identity.
+ * @param currentExactTrustBytes - Authenticated exact current trust carrier.
  * @param candidateExactTrustBytes - Candidate exact successor trust carrier.
  * @returns Closed advancement classification.
  */
 export function classifyIndependentAdvance(
-	current: Readonly<{ readonly anchor: string; readonly epoch: number }>,
+	currentExactTrustBytes: Uint8Array,
 	candidateExactTrustBytes: Uint8Array
 ): IndependentAdvanceClassification {
-	const decoded = decodeCanonical(candidateExactTrustBytes) as Readonly<Record<string, unknown>>;
-	const candidateEpoch = decoded.currentEpoch;
-	const candidateAnchor = decoded.currentAnchorDigest;
-	if (candidateEpoch === current.epoch && candidateAnchor === current.anchor) {
-		return Object.freeze({ ok: false as const, reason: "BYTE_REPLAY" as const });
+	try {
+		if (sameBytes(currentExactTrustBytes, candidateExactTrustBytes)) {
+			return Object.freeze({ ok: false as const, reason: "BYTE_REPLAY" as const });
+		}
+		const current = decodeCanonical(currentExactTrustBytes) as Readonly<Record<string, unknown>>;
+		const decoded = decodeCanonical(candidateExactTrustBytes) as Readonly<Record<string, unknown>>;
+		const currentEpoch = current.currentEpoch;
+		const candidateEpoch = decoded.currentEpoch;
+		if (typeof currentEpoch !== "number") {
+			return Object.freeze({ ok: false as const, reason: "TRUST_CLOSURE_INVALID" as const });
+		}
+		if (candidateEpoch === currentEpoch) {
+			return Object.freeze({ ok: false as const, reason: "EPOCH_EQUIVOCATION" as const });
+		}
+		if (typeof candidateEpoch !== "number" || candidateEpoch < currentEpoch) {
+			return Object.freeze({ ok: false as const, reason: "ROLLBACK" as const });
+		}
+		if (candidateEpoch !== currentEpoch + 1) {
+			return Object.freeze({ ok: false as const, reason: "EPOCH_GAP" as const });
+		}
+		const anchor = decodeCanonical(decoded.exactCanonicalCurrentAnchorPreimageBytes as Uint8Array) as Readonly<
+			Record<string, unknown>
+		>;
+		if (
+			decoded.version !== 1 ||
+			decoded.objectId !== current.objectId ||
+			decoded.genesisAnchorDigest !== current.genesisAnchorDigest ||
+			decoded.profileId !== current.profileId ||
+			decoded.quorum !== current.quorum ||
+			!sameCanonicalField(decoded.exactCanonicalProfileBytes, current.exactCanonicalProfileBytes) ||
+			!sameCanonicalField(decoded.exactCanonicalSignerSetBytes, current.exactCanonicalSignerSetBytes) ||
+			anchor.objectId !== current.objectId ||
+			anchor.epoch !== candidateEpoch ||
+			anchor.previousAnchor !== current.currentAnchorDigest
+		) {
+			return Object.freeze({ ok: false as const, reason: "TRUST_CLOSURE_INVALID" as const });
+		}
+		return Object.freeze({ kind: "successor" as const, ok: true as const });
+	} catch {
+		return Object.freeze({ ok: false as const, reason: "TRUST_CLOSURE_INVALID" as const });
 	}
-	if (candidateEpoch === current.epoch) {
-		return Object.freeze({ ok: false as const, reason: "EPOCH_EQUIVOCATION" as const });
-	}
-	if (typeof candidateEpoch !== "number" || candidateEpoch < current.epoch) {
-		return Object.freeze({ ok: false as const, reason: "ROLLBACK" as const });
-	}
-	if (candidateEpoch !== current.epoch + 1) {
-		return Object.freeze({ ok: false as const, reason: "EPOCH_GAP" as const });
-	}
-	return Object.freeze({ kind: "successor" as const, ok: true as const });
 }
 
 export interface ModelGenerationRef {
@@ -140,7 +184,40 @@ export function expectedCombinedClosure(
 	if (new Set(combined.map(({ digest }) => digest)).size !== combined.length) {
 		throw new TypeError("combined closure refs must be unique");
 	}
-	return Object.freeze([...combined].sort((left, right) => left.digest.localeCompare(right.digest)));
+	return Object.freeze(
+		[...combined].sort((left, right) => (left.digest < right.digest ? -1 : left.digest > right.digest ? 1 : 0))
+	);
+}
+
+/**
+ * Requires the proposed closure to be the exact one-trust-ref combined successor.
+ * @param input - Current and proposed detached closure identities plus certified proof refs.
+ * @returns Closed closure verdict.
+ */
+export function classifyIndependentTrustClosure(
+	input: Readonly<{
+		current: readonly ModelGenerationRef[];
+		currentTrustRef: ModelGenerationRef;
+		proofRefs: readonly ModelGenerationRef[];
+		proposed: readonly ModelGenerationRef[];
+		successorTrustRef: ModelGenerationRef;
+	}>
+): IndependentAdvanceClassification {
+	try {
+		const expected = expectedCombinedClosure(input);
+		if (
+			expected.length !== input.proposed.length ||
+			expected.some(
+				(ref, index) =>
+					ref.digest !== input.proposed[index]?.digest || ref.byteLength !== input.proposed[index]?.byteLength
+			)
+		) {
+			return Object.freeze({ ok: false as const, reason: "TRUST_CLOSURE_INVALID" as const });
+		}
+		return Object.freeze({ kind: "successor" as const, ok: true as const });
+	} catch {
+		return Object.freeze({ ok: false as const, reason: "TRUST_CLOSURE_INVALID" as const });
+	}
 }
 
 /**
