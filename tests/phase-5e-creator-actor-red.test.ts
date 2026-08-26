@@ -206,7 +206,7 @@ describe("Phase 5e durable creator actor RED", () => {
 		try {
 			expect(store.schema).toEqual({
 				stores: PHASE_5C_SCHEMA_AUTHORITY.stores.map(({ name }) => name).sort(),
-				version: 2,
+				version: PHASE_5C_SCHEMA_AUTHORITY.version,
 			});
 			expect(store.incarnation).toMatch(/^[0-9a-f]{32,}$/u);
 		} finally {
