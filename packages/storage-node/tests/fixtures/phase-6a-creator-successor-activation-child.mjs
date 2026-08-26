@@ -347,12 +347,7 @@ async function cold(material, selectedMode) {
 		const reopenWith = (stores) =>
 			reopenCreatorSuccessorAdoption({
 				...material.creatorGenesis,
-				...(material.d108d1bLocalAuthor === true
-					? {
-							author: material.issuance.scope.author,
-							signRegisteredVertexDigest: signFixtureVertex,
-						}
-					: {}),
+				author: material.issuance.scope.author,
 				...(selectedMode === "divergent-genesis" ? { pinnedGenesisAnchorDigest: "f".repeat(64) } : {}),
 				...(selectedMode === "extra-epoch" ? { epoch: 1 } : {}),
 				catalog,
@@ -361,6 +356,7 @@ async function cold(material, selectedMode) {
 				messageQueueManager: new MessageQueueManager({ logConfig: { level: "silent" } }),
 				networkNode: node,
 				onAdmittedVertex: () => undefined,
+				signRegisteredVertexDigest: signFixtureVertex,
 				snapshotDeclaration: material.snapshot.declaration,
 				snapshotStore: stores.snapshot.store,
 				store: stores.ahe.store,

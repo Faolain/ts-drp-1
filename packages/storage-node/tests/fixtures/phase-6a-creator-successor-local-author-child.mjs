@@ -113,6 +113,28 @@ function derivedCarrier(material, selectedAuthority) {
 	});
 }
 
+function peerJournalMaterial(material) {
+	const localCommits = new Map(
+		material.issuance.outbox.map(({ commit }) => [Buffer.from(commit.envelope.digest).toString("hex"), commit])
+	);
+	return {
+		...material,
+		journalRows: material.journalRows.map((row) => {
+			if (row.sourceKind !== "local-issued") return row;
+			const commit = localCommits.get(row.vertexDigest);
+			if (commit === undefined) throw new TypeError("D.108d1b peer journal carrier is unavailable");
+			return Object.freeze({
+				detachedSignature: commit.envelope.signature,
+				exactCanonicalPreimageBytes: commit.envelope.canonicalPreimageBytes,
+				journalSequence: row.journalSequence,
+				scope: row.scope,
+				sourceKind: "received",
+				vertexDigest: row.vertexDigest,
+			});
+		}),
+	};
+}
+
 async function seedIssuance(material, suffix, carriers, effects) {
 	const raw = createNodeDurableIssuanceStore({
 		primaryFilename: join(material.directory, `issuance-local-author-${suffix}.sqlite`),
@@ -125,23 +147,26 @@ async function seedIssuance(material, suffix, carriers, effects) {
 			return Promise.resolve(commit);
 		});
 	}
-	const store = new Proxy(raw, {
-		get(target, property, receiver) {
-			if (property === "readLineage") {
-				return (scope) => {
-					effects.lineageReads.push(scope.author);
-					return target.readLineage(scope);
-				};
-			}
-			if (property === "transactIssue") {
-				return (...args) => {
-					effects.transactIssueCount += 1;
-					return target.transactIssue(...args);
-				};
-			}
-			return Reflect.get(target, property, receiver);
-		},
-	});
+	const store = new Proxy(
+		{},
+		{
+			get(_target, property) {
+				if (property === "readLineage") {
+					return (scope) => {
+						effects.lineageReads.push(scope.author);
+						return raw.readLineage(scope);
+					};
+				}
+				if (property === "transactIssue") {
+					return (...args) => {
+						effects.transactIssueCount += 1;
+						return raw.transactIssue(...args);
+					};
+				}
+				return Reflect.get(raw, property, raw);
+			},
+		}
+	);
 	return { raw, store };
 }
 
@@ -196,7 +221,7 @@ async function runCase(material, index, input) {
 	};
 	const [ahe, liveJournal, snapshot] = await Promise.all([
 		seedAhe(material, effects, suffix),
-		seedJournal(material, effects, suffix),
+		seedJournal(peerJournalMaterial(material), effects, suffix),
 		seedSnapshot(material, events, effects, suffix),
 	]);
 	const issuance = await seedIssuance(material, suffix, input.carriers, effects);

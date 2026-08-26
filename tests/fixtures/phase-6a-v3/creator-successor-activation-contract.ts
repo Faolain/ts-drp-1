@@ -231,14 +231,6 @@ export async function createD108d1PackedDurableMaterial(
 	}
 	const resolved = fixture.catalog.resolve(String(projection.blueprintDigest));
 	const outbox = await fixture.evidence.issuanceStore.readOutboxPage({ scope: fixture.evidence.issuanceScope });
-	const activationOwner = readFileSync(
-		resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption-activate.ts"),
-		"utf8"
-	);
-	const adoptionOwner = readFileSync(resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption.ts"), "utf8");
-	const d108d1bLocalAuthor =
-		/COLD_KEYS[\s\S]*["']author["'][\s\S]*["']signRegisteredVertexDigest["']/u.test(activationOwner) &&
-		/getRandomValues[\s\S]*subtle\.(?:importKey|verify)/u.test(adoptionOwner);
 	return packD108d1Value({
 		active: {
 			closure: activeClosure,
@@ -264,7 +256,6 @@ export async function createD108d1PackedDurableMaterial(
 			pinnedGenesisAnchorDigest: fixture.evidence.currentTrust.genesisAnchorDigest,
 		},
 		current: fixture.evidence.current,
-		d108d1bLocalAuthor,
 		directory,
 		...(fixture.evidence.establishedPeer === undefined ? {} : { establishedPeer: fixture.evidence.establishedPeer }),
 		issuance: { outbox, scope: fixture.evidence.issuanceScope },

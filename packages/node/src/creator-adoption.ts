@@ -47,6 +47,7 @@ const PROFILE = Object.freeze({
 	maxSnapshotBytes: 268_435_456,
 	snapshotChunkBytes: 131_072,
 });
+const ED25519_PUBLIC_KEY_HEX = /^[0-9a-f]{64}$/u;
 
 type FailureKind =
 	| "malformed-input"
@@ -813,7 +814,7 @@ function presentBase(generation: GenerationRecord): PresentHead | undefined {
 	return generation.baseExpectedHead.kind === "present" ? Object.freeze({ ...generation.baseExpectedHead }) : undefined;
 }
 
-async function successorIssuanceScope(
+async function authenticatedSuccessorIssuanceScope(
 	input: CreatorSuccessorReopenInput,
 	objectId: StorageObjectId,
 	exactCanonicalLatchedAclBytes: Uint8Array
@@ -826,16 +827,45 @@ async function successorIssuanceScope(
 			return member.groups.includes("writer") ? [member.author] : [];
 		});
 		if (writers.length === 0 || new Set(writers).size !== writers.length) return undefined;
-		let selected: DurableIssueScope | undefined;
+		if (!ED25519_PUBLIC_KEY_HEX.test(input.author) || !writers.includes(input.author)) return undefined;
+		const webCrypto = globalThis.crypto;
+		if (
+			webCrypto === undefined ||
+			typeof webCrypto.getRandomValues !== "function" ||
+			webCrypto.subtle === undefined ||
+			typeof webCrypto.subtle.importKey !== "function" ||
+			typeof webCrypto.subtle.verify !== "function"
+		) {
+			return undefined;
+		}
+		const challenge = new Uint8Array(32);
+		webCrypto.getRandomValues(challenge);
+		const retainedChallenge = Uint8Array.from(challenge);
+		const signerChallenge = Uint8Array.from(challenge);
+		const signature = await input.signRegisteredVertexDigest(signerChallenge);
+		if (
+			!sameBytes(signerChallenge, retainedChallenge) ||
+			!(signature instanceof Uint8Array) ||
+			Object.getPrototypeOf(signature) !== Uint8Array.prototype ||
+			signature.byteOffset !== 0 ||
+			signature.byteLength !== 64 ||
+			signature.buffer.byteLength !== 64
+		) {
+			return undefined;
+		}
+		const authorBytes = Uint8Array.from(input.author.match(/.{2}/gu)?.map((byte) => Number.parseInt(byte, 16)) ?? []);
+		const publicKey = await webCrypto.subtle.importKey("raw", authorBytes, { name: "Ed25519" }, false, ["verify"]);
+		if (!(await webCrypto.subtle.verify({ name: "Ed25519" }, publicKey, signature, retainedChallenge))) {
+			return undefined;
+		}
+		const selected = Object.freeze({ author: input.author, objectId });
 		for (const author of writers) {
 			const scope = Object.freeze({ author, objectId });
 			const lineage = await input.issuanceStore.readLineage(scope);
-			if (lineage.next > 0) {
-				if (selected !== undefined) return undefined;
-				selected = scope;
-			}
+			if (lineage.exhausted || !Number.isSafeInteger(lineage.next) || lineage.next < 0) return undefined;
+			if (author !== input.author && lineage.next !== 0) return undefined;
 		}
-		return selected ?? (writers.length === 1 ? Object.freeze({ author: writers[0] as string, objectId }) : undefined);
+		return selected;
 	} catch {
 		return undefined;
 	}
@@ -997,7 +1027,7 @@ async function reopenCreatorSuccessorMaterial(
 		) {
 			return coldFailure("chain-invalid", "creator predecessor ACL cannot be reconstructed");
 		}
-		const issuanceScope = await successorIssuanceScope(input, objectId, exactCanonicalLatchedAclBytes);
+		const issuanceScope = await authenticatedSuccessorIssuanceScope(input, objectId, exactCanonicalLatchedAclBytes);
 		if (issuanceScope === undefined) return coldFailure("chain-invalid", "creator issuance authority is ambiguous");
 		const material: CreatorSuccessorLiveMaterial = Object.freeze({
 			catalog: factsForCatalog(resolved),

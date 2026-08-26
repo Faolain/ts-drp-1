@@ -2,7 +2,7 @@ import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";
 import type { DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-store";
 import type { DurableLiveJournalStore } from "@ts-drp/live-journal";
 import type { MessageQueueManager } from "@ts-drp/message-queue";
-import type { CurrentAnchorTrust } from "@ts-drp/protocol-v3";
+import type { CurrentAnchorTrust, SignRegisteredVertexDigest } from "@ts-drp/protocol-v3";
 import type { AheDurableStore, GenerationRef, PresentHead } from "@ts-drp/storage";
 import type {
 	SnapshotQuarantineDeclaration,
@@ -81,6 +81,7 @@ let handleAliasKernel: CreatorSuccessorHandleAliasKernel | undefined;
 
 export interface CreatorSuccessorReopenInput {
 	readonly authenticationProfile: "creator-only";
+	readonly author: string;
 	readonly catalog: TrustedBlueprintCatalog;
 	readonly detachedSignature: Uint8Array;
 	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
@@ -88,6 +89,7 @@ export interface CreatorSuccessorReopenInput {
 	readonly issuanceStore: DurableIssuanceStore;
 	readonly liveJournalStore: DurableLiveJournalStore;
 	readonly pinnedGenesisAnchorDigest: string;
+	readonly signRegisteredVertexDigest: SignRegisteredVertexDigest;
 	readonly snapshotDeclaration: SnapshotQuarantineDeclaration;
 	readonly snapshotStore: SnapshotQuarantineStore<SnapshotVerificationReceipt>;
 	readonly store: AheDurableStore;

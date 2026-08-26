@@ -335,20 +335,16 @@ async function openContender(databaseName: string, packedMaterial: unknown): Pro
 	try {
 		const result = await reopenCreatorSuccessorAdoption({
 			...(material.creatorGenesis as PlainRecord),
-			...(material.d108d1bLocalAuthor === true
-				? {
-						author: (material.issuance as PlainRecord).scope
-							? String(((material.issuance as PlainRecord).scope as PlainRecord).author)
-							: "",
-						signRegisteredVertexDigest: signFixturePossession,
-					}
-				: {}),
+			author: (material.issuance as PlainRecord).scope
+				? String(((material.issuance as PlainRecord).scope as PlainRecord).author)
+				: "",
 			catalog: trustedCatalog(material),
 			issuanceStore: stores.issuanceStore,
 			liveJournalStore: stores.liveJournalStore,
 			messageQueueManager: new BrowserTestMessageQueueManager(),
 			networkNode: network(publications),
 			onAdmittedVertex: () => undefined,
+			signRegisteredVertexDigest: signFixturePossession,
 			snapshotDeclaration: (material.snapshot as PlainRecord).declaration,
 			snapshotStore: stores.snapshotStore,
 			store: countedStore,

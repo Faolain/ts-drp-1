@@ -17,6 +17,7 @@ import {
 const HOT_KEYS = Object.freeze(["capability", "handle", "messageQueueManager", "networkNode", "onAdmittedVertex"]);
 const COLD_KEYS = Object.freeze([
 	"authenticationProfile",
+	"author",
 	"catalog",
 	"detachedSignature",
 	"exactCanonicalAnchorPreimageBytes",
@@ -27,6 +28,7 @@ const COLD_KEYS = Object.freeze([
 	"networkNode",
 	"onAdmittedVertex",
 	"pinnedGenesisAnchorDigest",
+	"signRegisteredVertexDigest",
 	"snapshotDeclaration",
 	"snapshotStore",
 	"store",
@@ -245,6 +247,9 @@ export async function activateCreatorSuccessorAdoption(input: unknown): Promise<
 export async function reopenCreatorSuccessorAdoption(input: unknown): Promise<Readonly<Record<string, unknown>>> {
 	const captured = capture(input, COLD_KEYS);
 	if (captured === undefined) return failure("malformed-input", "creator successor reopen input is invalid");
+	if (typeof captured.author !== "string" || typeof captured.signRegisteredVertexDigest !== "function") {
+		return failure("malformed-input", "creator successor local author input is invalid");
+	}
 	const bindings = runtimeBindings(captured);
 	if (bindings === undefined) return failure("malformed-input", "creator successor runtime bindings are invalid");
 	const reopened = await consumeCreatorSuccessorReopen(captured as never);
