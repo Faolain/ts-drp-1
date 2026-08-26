@@ -60295,6 +60295,79 @@ proposed. None of these P2 observations changes the accepted local proof,
 authorizes a fourth production owner or delays this GREEN checkpoint; the
 already-assigned follow-up remains the pre-D.108d2 deadline.
 
+#### D.108d1b-oracle — possession, lineage and retained-caller closure
+
+This corrective slice is the narrow pre-D.108d2 deadline assigned by the
+D.108d1b RED and GREEN ledgers. Its tests-only RED roster is exactly six
+existing owners:
+
+- `tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts`;
+- `tests/phase-6a-creator-successor-local-author-red.test.ts`;
+- `packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs`;
+- `packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts`;
+- `packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts`;
+  and
+- `packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts`.
+
+Its GREEN roster is exactly the existing private reconstruction owner
+`packages/node/src/creator-adoption.ts`. A need for another production owner,
+new package export, caller-selected authority, public result field, digest
+domain, protocol carrier or store/schema change stops this corrective slice and
+requires a new plan freeze.
+
+The genuine native child must retain the packed close, journal and snapshot
+carriers as its independent oracle. It proves that the authenticated snapshot
+ACL contains exactly the shipped eight chat identities, exactly seven writers,
+and Dave as finality-only; that Bob's admitted epoch-zero carrier occurs in the
+packed peer journal with its exact preimage, signature, digest, scope and order;
+and that the fixture models shipped group membership while deliberately not
+claiming exact product `finalityKey` custody. No expected ACL fact may be
+derived solely from the same input passed to the production selector.
+
+The established Bob case issues ordinal one, deactivates, then genuinely cold
+reopens the same epoch-one journal and issuance stores and issues ordinal two.
+The two reopen possession challenges are distinct ordinary 32-byte values and
+neither equals any same-length packed durable digest or carrier value. Every
+reopen invokes the possession signer exactly once before the first lineage
+read. Valid selection reads all seven writer lineages. Throwing, rejecting,
+wrong-key, replay, mutation, alias, missing-WebCrypto and Ed25519-unavailable
+possession cases perform zero lineage reads. Selected or foreign exhausted
+lineage and a non-boolean exhausted discriminator fail closed; only exact
+`exhausted === false` plus a safe nonnegative `next` is accepted. Browser
+Chromium, Firefox and WebKit exercise the same wrong-key and throwing-signer
+failure category before lock acquisition, subscription or publication.
+
+The successor ACL must be opened through the existing canonical latched-ACL
+validator against the authenticated successor anchor before writer selection;
+malformed members are never silently omitted. The private selector returns
+only an internal bounded reason sufficient to distinguish ACL/author,
+possession and lineage failure, while the public failure kind remains the
+existing `chain-invalid`. Snapshot quarantine verification and completion are
+the one documented durable action permitted before possession. A failed
+possession or lineage proof still performs zero issuance, AHE swap, epoch-anchor
+installation, subscription and publication effects.
+
+The test-infrastructure correction removes the unused failure-kind constant,
+preserves the issuance store's full own-property shape while instrumenting it,
+projects the previously dead AHE recovery count into every result, and makes
+readiness cover the closed capture, internal carrier and all three retained
+native/local/browser caller legs. The native/browser fixtures retain their
+existing fresh-build import hooks and memory limits. Optional zeroing of random
+nonsecret possession bytes remains future hygiene, and a distinct signing
+domain remains deferred unless a future remote, delegated or shared signing
+oracle is proposed.
+
+RED and GREEN each receive one immutable Grok/high, exact Kimi K3
+CHECK001-CHECK100 and Opus 5/xhigh review round. Same-round reproduced P0/P1
+findings are corrected once without a confirmation review; P2 findings are
+recorded and assigned. Acceptance retains the complete D.108b through
+D.108d1b suite, the Phase-4c fresh-process 64 MiB peak-live proof, affected
+build/typecheck, exact-owner lint/format/diff checks and all three successor
+browser engines. GREEN additionally requires an isolated no-`dist` install and
+fresh dependency-closure build so ordinary workspace state cannot mask the
+subprocess proof. Only signed, pushed RED, GREEN and evidence commits close this
+deadline and permit D.108d2 RED.
+
 #### D.108d2 — product and peer proof freeze boundary
 
 D.108d2 does not begin from the recorded D.108d1 GREEN alone. The first
