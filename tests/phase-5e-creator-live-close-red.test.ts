@@ -1,7 +1,6 @@
 /* eslint import/no-unresolved: "off" */
 import { ed25519 } from "@noble/curves/ed25519.js";
-import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
-import { createHash } from "node:crypto";
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -37,7 +36,7 @@ function ref(digest: string, byteLength = 32): Readonly<{ byteLength: number; di
 }
 
 function bytesRef(bytes: Uint8Array): Readonly<{ byteLength: number; digest: string }> {
-	return ref(createHash("sha256").update(bytes).digest("hex"), bytes.byteLength);
+	return ref(Buffer.from(hashDomain("ts-drp-storage/blob/v1", bytes)).toString("hex"), bytes.byteLength);
 }
 
 function hexBytes(value: string): Uint8Array {
