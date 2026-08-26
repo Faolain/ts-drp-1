@@ -57895,6 +57895,18 @@ independent carrier/QC oracle and all three browser engines, including WebKit.
 The repair is committed separately before the exact-nine D.107c GREEN packet so
 neither slice hides the ownership expansion.
 
+D.107b.2 is signed and pushed as `fce6f7d8`. Its exact-two packet used parent
+HEAD `a1b77904e977cdd5f3c223a4b673c1bb4f2941fb`, tree
+`bb50822376089e81530112193b93a77da66fe86f`, patch object
+`477637c006e9dd72c182f8a27a5c681127a638a8` and SHA-256
+`fa26a1ad206363a6d667fe600d25f548a38a9e23818b0ee29d2df1a04f9ab51d`.
+The voter now returns the exact carrier supplied by storage for both first
+commit and duplicate-slot recovery; creator QC assembly consumes only that
+carrier. Seal build/typecheck, exact-two lint/format/diff checks, retained actor
+Vitest 12/12, retained actor Playwright 12/12 and the previously failing WebKit
+D.107c two-peer recovery case all passed. No browser store, signer, protocol,
+schema or public package subpath changed.
+
 ### D.107c — persistent peer evidence and bounded re-learn
 
 D.107c adds the connected peer carrier and the only q=1 recovery gate. The RED
