@@ -57821,6 +57821,28 @@ claim at the protocol seam, uses internally consistent signed advancement
 mutants, retains the Phase-4c export contract in the exact-ten GREEN, and adds
 no public QC assembler.
 
+D.107a GREEN is signed as `4df66cf0`. The exact-ten packet adds the private
+creator-authority/successor-trust custody, the effect-free creator-close seam,
+the destructive one-use anchor-signing request, and the canonical snapshot
+encoder while leaving the protocol-v3 root roster and common QC verifier
+unchanged. The focused creator-close suite passed 11/11; protocol-v3 typecheck,
+build, built-package/public-entry audits and public-package smoke passed; exact
+owner formatting and diff checks passed. The retained Phase-4c logic passed
+14/14 with its memory child excluded; the full retained run's sole failure is
+the previously recorded out-of-process workspace-resolution inability to load
+the root `@ts-drp/canonical` package, not a D.107a behavioral failure.
+
+The sole D.107a GREEN review round required no correction. Grok and Opus each
+returned `PASS`, P0=0/P1=0 and ready-to-sign on the same exact-ten staged tree.
+Kimi is recorded as `NO_VERDICT`: the installed CLI rejected the one authorized
+`--prompt`/`--plan` launch before session initialization, and the no-retry rule
+was honored. Nonblocking debt retained for later slices includes pinning the
+standing local availability-policy tuple at the live composition, repeating
+the unchanged blueprint/parameters/signer-set proof at durable successor
+recovery, and giving the new snapshot encoder its own complete public type
+contract rather than only the retained export roster. None expands D.107a into
+D.107b-d or Phase 6.
+
 Product capability gained only after D.107d: the creator can seal one genuine
 live epoch, persist and publish its exact q=1 certificate and snapshot, survive
 mid-close crashes, recover same-seed signing continuity from durable peer
