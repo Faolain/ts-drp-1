@@ -59012,6 +59012,94 @@ cannot resolve workspace package aliases and reports the previously recorded
 cross-example/test ledger; exact-owner ESLint plus the Vite-transformed genuine
 test and affected package builds are the RED compile evidence.
 
+D.108b GREEN is complete. During GREEN execution the final post-close received
+row control reproduced a tests-only defect before reaching the candidate: its
+one-byte preimage and all-`f` digest were not a registered vertex pair, and the
+real live-journal contract correctly rejected it. The narrow correction derives
+one distinct canonical vertex from a genuine received row, changes its author
+sequence, and derives the registered `ts-drp/vertex/v3` digest from those exact
+bytes. The corrected control appends durably and the verifier then rejects the
+fresh row as `journal-invalid`. This correction landed separately as signed
+commit `34a79d8437fbf275c50480f4efd5038dbf6c32ee` before any GREEN production
+commit; no production byte entered that commit.
+
+The implementation retains successful close facts behind the internal
+creator-adoption module's WeakMap rather than on a public function property. It
+reopens the complete paginated generation lineage and active closure without an
+AHE write, re-executes the registered creator trust advance, compares sealed and
+fresh authenticated journal/issuance replay, verifies the retained snapshot
+manifest/chunks/payload, binds the caller catalog result to the authenticated
+generation-one catalog identity and exact artifact bytes, derives the exact
+thirty-one-key canonical generation-two projection, and only then mints an
+owner-bound one-use intent. The sole public runtime export is
+`verifyCreatorSuccessorAdoption` on `@ts-drp/node/creator-adoption`; the node root
+and product examples remain unchanged. This exact five-path implementation
+landed as signed commit `0eab797b2c8cbb56c109cce154147a14bbeffaa0`.
+
+The sole D.108b GREEN review round froze the original implementation at parent
+HEAD `34a79d8437fbf275c50480f4efd5038dbf6c32ee`, staged tree
+`cb2a10606b4e7044413a73c5a2d29fbdd3327b41`, patch object
+`03c9392df921fa8f1c11d525f922e34b84b3f92f` and canonical SHA-256
+`b3472c1e2780b6872a12df58ee0baf38f9a841e5ff10f09577b9bfbc3d491928`,
+with exactly the five production paths above and zero tracked unstaged paths.
+Grok/high's sole actual launch ended `NO_VERDICT` after 390.330 seconds with
+exit code 1, `stop_reason=cancelled` and no terminal schema; it was not retried
+or counted as approval. The installed Kimi 0.38.0 launcher failed before an
+active lifecycle or model session existed in both attempted output modes with
+`Agent event 'agent.activity.updated' has no active lifecycle context`; no Kimi
+session ID or checks were produced, no further attempt ran, and Kimi is recorded
+as `NO_VERDICT`. Opus 5/xhigh session
+`9294608a-1b95-4734-a4ae-438a5483a402` completed normally with
+`CHANGES_REQUIRED`, P0=0/P1=4/P2=3. No Fable process ran.
+
+Three Opus P1s reproduced and were corrected in the same round: the empty
+journal branch now enforces the same anchor-only graph/cardinality invariant as
+the nonempty branch; private facts and their raw stores moved off the public
+`bindCreatorLiveClose` function into the unexported internal WeakMap owner; and
+generation lineage now follows every bounded page with cursor-cycle and empty
+continuation rejection instead of permanently rejecting the 129th lifetime
+generation. Its short-closure failure-classification P2 was also corrected by
+checking lengths before indexing, and its structural-catalog P2 was hardened by
+binding resolved artifact/catalog/runtime identity to the authenticated
+generation-one projection. The corrected no-confirmation-review packet retained
+the same parent and roster at staged tree
+`595897dd0b873c70385229daeedba47d00a33c7f`, patch object
+`4da674b294a569f6dab94190cb79a7b6e7b2488d` and SHA-256
+`3930a1e2944fb3300baede258e33ff20a7e8c90873e24c20196dc0146bd403af`.
+
+Opus's quarantine-expiry observation is factual but does not widen D.108b: the
+existing quarantine contract remains TTL-bound, an expired or missing scope
+fails closed as `snapshot-invalid` with no intent, and this plan already assigns
+expiry/reacquisition before activation to the later adoption/activation owner.
+Adding a retention/read API here is expressly outside the frozen roster. Its
+remaining multi-intent P2 is likewise non-authoritative in D.108b: every minted
+carrier is independently owner-bound and destructively one-use, no consumer
+exists in this slice, and D.108c's one-CAS owner remains responsible for the
+single durable adoption outcome. Neither observation grants current authority.
+
+Final local evidence is green. Exact-owner ESLint completed with zero warnings;
+exact-five Prettier, staged and unstaged `git diff --check`, node package build
+and the four-file focused/retained Vitest command all passed, the latter 39/39.
+The focused D.108b owner passes 13/13 including all fifty mutation controls, the
+post-close durable-row proof, exact projection reopen, one-use custody and the
+runtime zero-AHE-mutation assertion. Node typecheck contains only the inherited
+worker-host `rootDir`/file-list, missing WebRTC route `emit`, and compact-history
+helper diagnostics; no D.108b path remains.
+
+The clean-environment proof archived the exact corrected staged tree
+`595897dd0b873c70385229daeedba47d00a33c7f` into a new temporary directory, so
+no local untracked file, ignored `dist` output or workspace alias could enter.
+`pnpm install --frozen-lockfile` completed and its postinstall rebuilt all forty
+selected workspace packages, including node, storage-node and storage-browser.
+The same four retained test files passed 39/39 from that tree, and a fresh Node
+self-import from `packages/node` returned exactly
+`["verifyCreatorSuccessorAdoption"]` for the built non-root subpath. The
+temporary checkout was moved to Trash after verification and remains
+recoverable. Both D.108b commits have Good Faolain signatures under
+RSA key `55E22F154FBAF8C84F378304761B99CEA81C6289`, were pushed to
+`origin/codex/phase3a1b-p6-golden-path`, all twenty-six pre-existing stashes
+remain untouched, and protected untracked paths were neither read nor staged.
+
 ### D.108c — one-CAS durable adoption and death/reopen recovery
 
 D.108c is the only sub-slice allowed to stage and swap the successor live
