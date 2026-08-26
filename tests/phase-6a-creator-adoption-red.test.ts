@@ -812,12 +812,19 @@ describe("D.108b read-only creator-successor adoption RED", () => {
 				})
 			);
 
+			const sealedReceivedRow = genuine.evidence.journalRows.find(({ sourceKind }) => sourceKind === "received");
+			if (sealedReceivedRow?.sourceKind !== "received")
+				throw new TypeError("D.108b received replay row is unavailable");
+			const postClosePreimageBytes = encodeCanonical({
+				...(decodeCanonical(sealedReceivedRow.exactCanonicalPreimageBytes) as Readonly<Record<string, unknown>>),
+				authorSequence: 999,
+			});
 			const appended = await genuine.journal.appendAccepted({
 				detachedSignature: new Uint8Array(64),
-				exactCanonicalPreimageBytes: Uint8Array.of(1),
+				exactCanonicalPreimageBytes: postClosePreimageBytes,
 				scope: genuine.scope,
 				sourceKind: "received",
-				vertexDigest: "f".repeat(64),
+				vertexDigest: hex(hashDomain("ts-drp/vertex/v3", postClosePreimageBytes)),
 			});
 			expect(appended.ok).toBe(true);
 			const postCloseVertex = await candidate.verifyCreatorSuccessorAdoption({
