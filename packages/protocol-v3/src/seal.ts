@@ -1,8 +1,11 @@
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 
-import type { CertifiedAnchorTrust } from "./index.js";
-import { resolveCertifiedSealAuthorityMaterial } from "./internal/seal-authority-custody.js";
+import type { CertifiedAnchorTrust, CurrentAnchorTrust } from "./index.js";
+import {
+	resolveCertifiedSealAuthorityMaterial,
+	resolveCreatorAnchorTrustMaterial,
+} from "./internal/seal-authority-custody.js";
 import { registerSealAuthorityIdentity } from "./internal/seal-authority-identity.js";
 import { mintSealSigningRequest, type SealSigningRequest } from "./internal/seal-signing-request.js";
 import registryJson from "../registry/registry-v1.json" with { type: "json" };
@@ -270,7 +273,9 @@ export function openSealAuthority(
 ): Readonly<{ authority: SealAuthority; ok: true; signerId: string } | { ok: false; reason: string }> {
 	try {
 		if (!plainRecord(input) || !exactRecordKeys(input, ["signerPublicKey", "trust"])) return failure("malformed-input");
-		const material = resolveCertifiedSealAuthorityMaterial(input.trust as CertifiedAnchorTrust);
+		const material =
+			resolveCertifiedSealAuthorityMaterial(input.trust as CertifiedAnchorTrust) ??
+			resolveCreatorAnchorTrustMaterial(input.trust as CurrentAnchorTrust);
 		if (material === undefined || material.currentEpoch !== 0) return failure("untrusted-context");
 		const signerPublicKey = copyExactBytes(input.signerPublicKey, 32, 32);
 		const decodedSignerSet = decodeCanonical(material.exactCanonicalSignerSetBytes);

@@ -7,6 +7,10 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			"@ts-drp/keychain/finality": path.resolve(__dirname, "packages/keychain/src/finality.ts"),
+			"@ts-drp/protocol-v3/internal/creator-anchor-signing-request": path.resolve(
+				__dirname,
+				"packages/protocol-v3/src/internal/creator-anchor-signing-request.ts"
+			),
 			"@ts-drp/protocol-v3/internal/seal-signing-request": path.resolve(
 				__dirname,
 				"packages/protocol-v3/src/internal/seal-signing-request.ts"
@@ -15,6 +19,7 @@ export default defineConfig({
 				__dirname,
 				"packages/protocol-v3/src/internal/seal-authority-identity.ts"
 			),
+			"@ts-drp/protocol-v3/creator-close": path.resolve(__dirname, "packages/protocol-v3/src/creator-close.ts"),
 			"@ts-drp/protocol-v3/seal": path.resolve(__dirname, "packages/protocol-v3/src/seal.ts"),
 			"@ts-drp/storage-browser/seal-vote": path.resolve(__dirname, "packages/storage-browser/src/seal-vote.ts"),
 			"@ts-drp/seal/internal/storage-port": path.resolve(__dirname, "packages/seal/src/storage-port.ts"),

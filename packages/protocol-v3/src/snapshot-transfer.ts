@@ -4,6 +4,7 @@ export const SNAPSHOT_MANIFEST_MAX_BYTES = 212_387 as const;
 
 const MANIFEST_DOMAIN = "ts-drp/snapshot-manifest/v3";
 const CHUNK_DOMAIN = "ts-drp/snapshot-chunk/v3";
+const PAYLOAD_DOMAIN = "ts-drp/snapshot-payload/v3";
 const MANIFEST_FIELDS = Object.freeze([
 	"aclDigest",
 	"anchor",
@@ -65,6 +66,13 @@ export interface DecodedSnapshotManifest {
 	readonly exactCanonicalManifestBytes: Uint8Array;
 	readonly manifest: Readonly<Record<string, unknown>>;
 	readonly manifestDigest: string;
+}
+
+export interface EncodedSnapshotTransfer {
+	readonly chunks: readonly Uint8Array[];
+	readonly exactCanonicalManifestBytes: Uint8Array;
+	readonly manifestDigest: string;
+	readonly payloadDigest: string;
 }
 
 type SnapshotManifestFailureCode =
@@ -217,7 +225,115 @@ function decodeRecord(bytes: Uint8Array): Record<string, unknown> {
 	return exactRecord(value, MANIFEST_FIELDS, "manifest");
 }
 
-/** Decodes and validates one externally authenticated frozen snapshot manifest. */
+/**
+ * Encodes one exact payload into detached frozen-profile chunks and manifest bytes.
+ * @param input - Exact payload plus authenticated snapshot identity/profile fields.
+ * @param input.aclDigest - Exact snapshot ACL digest.
+ * @param input.anchor - Exact current anchor digest.
+ * @param input.epoch - Current epoch number.
+ * @param input.exactCanonicalPayloadBytes - Exact canonical snapshot payload bytes.
+ * @param input.objectId - Authenticated object identifier.
+ * @param input.profile - Frozen snapshot transfer limits.
+ * @param input.schemaVersion - Snapshot payload schema version.
+ * @param input.stateDigest - Exact application-state digest.
+ * @returns Detached chunks plus exact canonical manifest and registered digests.
+ */
+export function encodeSnapshotTransfer(input: {
+	readonly aclDigest: string;
+	readonly anchor: string;
+	readonly epoch: number;
+	readonly exactCanonicalPayloadBytes: Uint8Array;
+	readonly objectId: string;
+	readonly profile: SnapshotTransferProfile;
+	readonly schemaVersion: number;
+	readonly stateDigest: string;
+}): EncodedSnapshotTransfer {
+	const values = exactRecord(
+		input,
+		[
+			"aclDigest",
+			"anchor",
+			"epoch",
+			"exactCanonicalPayloadBytes",
+			"objectId",
+			"profile",
+			"schemaVersion",
+			"stateDigest",
+		],
+		"snapshot transfer input"
+	);
+	const suppliedProfile = values.profile as SnapshotTransferProfile;
+	const profile: SnapshotTransferProfile = Object.freeze({
+		maxManifestBytes: suppliedProfile.maxManifestBytes,
+		maxSnapshotBytes: suppliedProfile.maxSnapshotBytes,
+		snapshotChunkBytes: suppliedProfile.snapshotChunkBytes,
+	});
+	assertProfile(profile);
+	assertDigest(values.aclDigest, "aclDigest");
+	assertDigest(values.anchor, "anchor");
+	assertDigest(values.stateDigest, "stateDigest");
+	const epoch = safeInteger(values.epoch, 0, "epoch");
+	const schemaVersion = safeInteger(values.schemaVersion, 1, "schemaVersion");
+	if (typeof values.objectId !== "string" || values.objectId.length < 1 || values.objectId.length > 1024) {
+		throw new SnapshotManifestError("manifest-invalid", "objectId is invalid");
+	}
+	const payloadInput = values.exactCanonicalPayloadBytes as Uint8Array;
+	const payloadLength = exactByteLength(payloadInput);
+	if (payloadLength > profile.maxSnapshotBytes) {
+		throw new SnapshotManifestError("manifest-invalid", "snapshot payload exceeds the authenticated limit");
+	}
+	let payload: Uint8Array;
+	try {
+		payload = copyExactCarrier(payloadInput, "snapshot payload");
+	} catch (error) {
+		throw new SnapshotManifestError("manifest-invalid", "snapshot payload carrier is invalid", { cause: error });
+	}
+	const chunks: Uint8Array[] = [];
+	for (let offset = 0; offset < payload.byteLength; offset += profile.snapshotChunkBytes) {
+		const length = Math.min(profile.snapshotChunkBytes, payload.byteLength - offset);
+		chunks.push(payload.subarray(offset, offset + length));
+	}
+	const descriptors = Object.freeze(
+		chunks.map((chunk, index) =>
+			Object.freeze({ byteLength: chunk.byteLength, digest: snapshotChunkDigest(index, chunk), index })
+		)
+	);
+	const payloadDigest = hex(hashDomain(PAYLOAD_DOMAIN, payload));
+	const exactCanonicalManifestBytes = encodeCanonical(
+		{
+			aclDigest: values.aclDigest,
+			anchor: values.anchor,
+			chunks: descriptors,
+			encodingVersion: "drp-canonical-profile-1",
+			epoch,
+			kind: "drp-snapshot-manifest",
+			objectId: values.objectId,
+			payloadDigest,
+			protocolMajor: 3,
+			schemaVersion,
+			stateDigest: values.stateDigest,
+			totalBytes: payload.byteLength,
+		},
+		{ maxBytes: SNAPSHOT_MANIFEST_MAX_BYTES }
+	);
+	const manifestDigest = hex(hashDomain(MANIFEST_DOMAIN, exactCanonicalManifestBytes));
+	decodeSnapshotManifest({ exactCanonicalManifestBytes, expectedManifestDigest: manifestDigest, profile });
+	return Object.freeze({
+		chunks: Object.freeze(chunks),
+		exactCanonicalManifestBytes: Uint8Array.from(exactCanonicalManifestBytes),
+		manifestDigest,
+		payloadDigest,
+	});
+}
+
+/**
+ * Decodes and validates one externally authenticated frozen snapshot manifest.
+ * @param input - Exact manifest carrier, expected digest, and frozen profile.
+ * @param input.exactCanonicalManifestBytes - Exact canonical manifest bytes.
+ * @param input.expectedManifestDigest - Expected registered manifest digest.
+ * @param input.profile - Frozen snapshot transfer limits.
+ * @returns Detached validated manifest bytes and chunk descriptors.
+ */
 export function decodeSnapshotManifest(input: {
 	readonly exactCanonicalManifestBytes: Uint8Array;
 	readonly expectedManifestDigest: string;
@@ -302,7 +418,12 @@ export function decodeSnapshotManifest(input: {
 	});
 }
 
-/** Computes the frozen index-bound digest for one exact snapshot chunk. */
+/**
+ * Computes the frozen index-bound digest for one exact snapshot chunk.
+ * @param index - Canonical zero-based chunk index.
+ * @param exactBytes - Exact chunk body bytes.
+ * @returns Registered chunk digest.
+ */
 export function snapshotChunkDigest(index: number, exactBytes: Uint8Array): string {
 	if (!Number.isSafeInteger(index) || index < 0) throw new TypeError("snapshot chunk index is invalid");
 	const bytes = intrinsicReadableView(exactBytes, "snapshot chunk bytes");

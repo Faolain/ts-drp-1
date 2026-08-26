@@ -14,6 +14,9 @@ import registryJson from "../registry/registry-v1.json" with { type: "json" };
 import {
 	type CertifiedSealAuthorityMaterial,
 	certifiedSealAuthorityResolver,
+	type CreatorAnchorTrustMaterial,
+	creatorAnchorTrustResolver,
+	creatorAnchorTrustSuccessorMinter,
 } from "./internal/seal-authority-custody.js";
 import blueprintArtifactProfileJson from "../supplements/blueprint-artifact-profile-v1/profile.json" with { type: "json" };
 
@@ -332,6 +335,8 @@ export type ResolveCurrentEpochAuthorizedAuthorResult =
 
 interface AnchorTrustPrivateState {
 	readonly exactCanonicalCurrentAnchorPreimageBytes: Uint8Array;
+	readonly exactCanonicalProfileBytes: Uint8Array;
+	readonly exactCanonicalSignerSetBytes: Uint8Array;
 	readonly detachedCurrentAnchorSignature: Uint8Array;
 	readonly publicKey: Uint8Array;
 	readonly profileDigest: string;
@@ -364,6 +369,12 @@ interface AnchorTrustApi {
 		input: ResolveCurrentEpochAuthorizedAuthorInput
 	): ResolveCurrentEpochAuthorizedAuthorResult;
 	[certifiedSealAuthorityResolver](trust: CertifiedAnchorTrust): CertifiedSealAuthorityMaterial | undefined;
+	[creatorAnchorTrustResolver](trust: CurrentAnchorTrust): CreatorAnchorTrustMaterial | undefined;
+	[creatorAnchorTrustSuccessorMinter](
+		currentTrust: CurrentAnchorTrust,
+		exactCanonicalSuccessorAnchorPreimageBytes: Uint8Array,
+		detachedSuccessorAnchorSignature: Uint8Array
+	): CurrentAnchorTrust | undefined;
 }
 
 const ANCHOR_DIGEST_DOMAIN = "ts-drp/epoch-anchor/v3";
@@ -826,6 +837,8 @@ function mintAnchorTrust(
 			...state,
 			detachedCurrentAnchorSignature: new Uint8Array(state.detachedCurrentAnchorSignature),
 			exactCanonicalCurrentAnchorPreimageBytes: new Uint8Array(state.exactCanonicalCurrentAnchorPreimageBytes),
+			exactCanonicalProfileBytes: new Uint8Array(state.exactCanonicalProfileBytes),
+			exactCanonicalSignerSetBytes: new Uint8Array(state.exactCanonicalSignerSetBytes),
 			publicKey: new Uint8Array(state.publicKey),
 		})
 	);
@@ -1341,6 +1354,8 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 				{
 					detachedCurrentAnchorSignature: signature,
 					exactCanonicalCurrentAnchorPreimageBytes: anchorBytes,
+					exactCanonicalProfileBytes: profileBytes,
+					exactCanonicalSignerSetBytes: signerSetBytes,
 					publicKey: carriers.publicKey,
 					profileDigest: anchor.profileDigest,
 					quorum: 1,
@@ -1447,6 +1462,8 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 				{
 					detachedCurrentAnchorSignature: signature,
 					exactCanonicalCurrentAnchorPreimageBytes: anchorBytes,
+					exactCanonicalProfileBytes: profileBytes,
+					exactCanonicalSignerSetBytes: signerSetBytes,
 					publicKey: carriers.publicKey,
 					profileDigest: anchor.profileDigest,
 					quorum: 1,
@@ -1631,6 +1648,74 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 		});
 	};
 
+	const resolveCreatorAnchorTrustMaterial = (trust: CurrentAnchorTrust): CreatorAnchorTrustMaterial | undefined => {
+		const state = registry.get(trust);
+		if (state === undefined) return undefined;
+		return Object.freeze({
+			currentAnchorDigest: trust.currentAnchorDigest,
+			currentEpoch: trust.currentEpoch,
+			detachedCurrentAnchorSignature: new intrinsicUint8Array(state.detachedCurrentAnchorSignature),
+			exactCanonicalCurrentAnchorPreimageBytes: new intrinsicUint8Array(state.exactCanonicalCurrentAnchorPreimageBytes),
+			exactCanonicalProfileBytes: new intrinsicUint8Array(state.exactCanonicalProfileBytes),
+			exactCanonicalSignerSetBytes: new intrinsicUint8Array(state.exactCanonicalSignerSetBytes),
+			genesisAnchorDigest: trust.genesisAnchorDigest,
+			objectId: trust.objectId,
+			publicKey: new intrinsicUint8Array(state.publicKey),
+			quorum: 1 as const,
+		});
+	};
+
+	const mintCreatorAnchorTrustSuccessor = (
+		currentTrust: CurrentAnchorTrust,
+		exactCanonicalSuccessorAnchorPreimageBytes: Uint8Array,
+		detachedSuccessorAnchorSignature: Uint8Array
+	): CurrentAnchorTrust | undefined => {
+		try {
+			const currentState = registry.get(currentTrust);
+			if (currentState === undefined) return undefined;
+			const anchorBytes = new intrinsicUint8Array(exactCanonicalSuccessorAnchorPreimageBytes);
+			const signature = new intrinsicUint8Array(detachedSuccessorAnchorSignature);
+			const decoded = decodeExact(anchorBytes);
+			if (!decoded.ok || !isAnchorRecord(decoded.value)) return undefined;
+			const anchor = decoded.value;
+			const anchorDigestBytes = hashDomain(ANCHOR_DIGEST_DOMAIN, anchorBytes);
+			const anchorDigest = bytesToHex(anchorDigestBytes);
+			if (
+				anchor.cryptoSuiteId !== ACTIVE_ANCHOR_SUITE ||
+				anchor.objectId !== currentTrust.objectId ||
+				anchor.epoch !== currentTrust.currentEpoch + 1 ||
+				anchor.previousAnchor !== currentTrust.currentAnchorDigest ||
+				anchor.profileDigest !== currentState.profileDigest ||
+				anchor.signerSetDigest !== currentState.signerSetDigest ||
+				!verifyStrictSignature(signature, anchorDigestBytes, currentState.publicKey)
+			) {
+				return undefined;
+			}
+			return mintAnchorTrust(
+				registry,
+				{
+					currentAnchorDigest: anchorDigest,
+					currentEpoch: anchor.epoch,
+					genesisAnchorDigest: currentTrust.genesisAnchorDigest,
+					objectId: currentTrust.objectId,
+					profileId: CREATOR_PROFILE,
+				},
+				{
+					detachedCurrentAnchorSignature: signature,
+					exactCanonicalCurrentAnchorPreimageBytes: anchorBytes,
+					exactCanonicalProfileBytes: currentState.exactCanonicalProfileBytes,
+					exactCanonicalSignerSetBytes: currentState.exactCanonicalSignerSetBytes,
+					publicKey: currentState.publicKey,
+					profileDigest: currentState.profileDigest,
+					quorum: 1,
+					signerSetDigest: currentState.signerSetDigest,
+				}
+			);
+		} catch {
+			return undefined;
+		}
+	};
+
 	return Object.freeze({
 		authenticateCurrentEpochAnchor,
 		installCertifiedAnchorTrustRoot,
@@ -1641,6 +1726,8 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 		openCurrentAnchorTrust,
 		resolveCurrentEpochAuthorizedAuthor,
 		[certifiedSealAuthorityResolver]: resolveCertifiedSealMaterial,
+		[creatorAnchorTrustResolver]: resolveCreatorAnchorTrustMaterial,
+		[creatorAnchorTrustSuccessorMinter]: mintCreatorAnchorTrustSuccessor,
 	});
 }
 

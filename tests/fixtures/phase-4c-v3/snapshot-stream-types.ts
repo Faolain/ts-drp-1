@@ -87,6 +87,7 @@ export const EXPECTED_CANONICAL_EXPORTS = Object.freeze(["createDomainHashStream
 export const EXPECTED_PROTOCOL_EXPORTS = Object.freeze([
 	"SNAPSHOT_MANIFEST_MAX_BYTES",
 	"decodeSnapshotManifest",
+	"encodeSnapshotTransfer",
 	"snapshotChunkDigest",
 ] as const);
 export const EXPECTED_STREAM_EXPORTS = Object.freeze(["verifySnapshotStream"] as const);

@@ -34,6 +34,10 @@
 			"types": "./dist/src/latched-acl.d.ts",
 			"import": "./dist/src/latched-acl.js"
 		},
+		"./creator-close": {
+			"types": "./dist/src/creator-close.d.ts",
+			"import": "./dist/src/creator-close.js"
+		},
 		"./seal": {
 			"types": "./dist/src/seal.d.ts",
 			"import": "./dist/src/seal.js"
@@ -41,6 +45,10 @@
 		"./internal/seal-signing-request": {
 			"types": "./dist/src/internal/seal-signing-request.d.ts",
 			"import": "./dist/src/internal/seal-signing-request.js"
+		},
+		"./internal/creator-anchor-signing-request": {
+			"types": "./dist/src/internal/creator-anchor-signing-request.d.ts",
+			"import": "./dist/src/internal/creator-anchor-signing-request.js"
 		},
 		"./internal/seal-authority-identity": {
 			"types": "./dist/src/internal/seal-authority-identity.d.ts",
