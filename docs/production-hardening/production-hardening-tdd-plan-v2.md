@@ -57656,7 +57656,7 @@ The tests-only RED is exactly six paths:
 - `packages/storage-browser/tests/phase-5e-creator-actor.pw.ts`; and
 - `packages/storage-browser/playwright.phase-5e-creator-actor.config.ts`.
 
-The expected GREEN is exactly twelve paths:
+The expected GREEN is exactly thirteen paths:
 
 - `packages/keychain/src/finality.ts`;
 - `packages/seal/src/{creator.ts,internal/creator-close-intent.ts}`;
@@ -57665,6 +57665,9 @@ The expected GREEN is exactly twelve paths:
 - `packages/storage-browser/src/internal/{schema-idb.ts,seal-evidence-store.ts,seal-vote-store.ts}`;
 - `packages/storage-browser/package.json`;
 - the retained `packages/storage-browser/tests/phase-5c-seal-vote-schema.pw.ts` schema/transaction authority; and
+- the retained `packages/storage-browser/tests/assets/phase-5d-round-change-entry.ts`,
+  whose direct database reopen must advance from schema v2 to v3 in the same
+  additive migration commit; and
 - the specific-before-bare Vite aliases.
 
 The evidence store is mechanical, scoped by the authenticated creator enrollment
@@ -57673,6 +57676,55 @@ verify a QC, mint trust, publish, or mutate a vote row. No transport, example,
 node live-plane edit, caller-signable raw digest, raw outbox reader or public
 store mutation handle is authorized here. If the actor cannot be expressed
 within this roster, D.107b reslices before GREEN.
+
+### D.107b.1 — mandatory Phase-4c fresh-process memory-gate debt closure
+
+Before any D.107c RED work begins, the test/build-infrastructure owner closes
+the inherited Phase-4c workspace-resolution debt. The retained 64 MiB child at
+`tests/fixtures/phase-4c-v3/snapshot-stream-memory-child.mjs` currently fails
+during module loading because a fresh root-scoped Node subprocess cannot resolve
+its bare `@ts-drp/canonical` workspace import. Fourteen sibling Phase-4c-a
+assertions pass, but that does not waive the explicit memory gate. D.107b.1 is
+the assigned repair slice and the start of D.107c is its hard deadline.
+
+The tests-only RED is exactly two new paths:
+
+- `tests/fixtures/phase-4c-v3/snapshot-subprocess-resolution-contract.ts`; and
+- `tests/phase-4c-snapshot-subprocess-resolution-red.test.ts`.
+
+The expected GREEN is exactly three retained test-infrastructure paths:
+
+- `tests/fixtures/shared/workspace-package-subprocess.mjs`, the single
+  package-aware fresh-process launcher/resolution owner;
+- `tests/fixtures/phase-4c-v3/snapshot-stream-memory-child.mjs`; and
+- `tests/phase-4c-snapshot-stream-red.test.ts`.
+
+The launcher must resolve the intended freshly built workspace package exports
+from the package graph visible to that package, while the memory proof remains a
+genuine newly spawned Node process. It may not use Vite aliases, `NODE_PATH`, a
+root shim package, production-relative source imports, stale or gitignored
+`dist` output, weakened heap/body limits, new product APIs, or broad production
+dependency changes. If the repair needs any production-source change, this
+slice stops and reslices instead of widening silently.
+
+Acceptance is all-or-nothing. The complete retained Phase-4c suite must include
+and pass the 64 MiB child with no exclusion. During execution, the owner-mode
+child must sample peak simultaneously live snapshot/chunk body ownership, settle
+at zero retained verifier body bytes, and remain strictly below the signed
+`2 * snapshotChunkBytes` ceiling. The deliberately retaining mutant must hold
+the real received chunk bodies until the final chunk and cross that same ceiling,
+proving that the oracle observes live peak ownership rather than post-completion
+memory. The Phase-4c semantic, wire, digest, limit and activation contracts remain
+unchanged.
+
+Final evidence must include the focused Phase-4c tests, the affected workspace
+package builds and typechecks, exact-owner lint/format/diff checks, and relevant
+retained snapshot tests. It must also include an isolated detached worktree or
+equivalent temporary-checkout proof that starts without package `dist` artifacts,
+installs with lifecycle scripts disabled under the frozen lockfile, freshly
+builds the exact package dependency chain, and then passes the complete retained
+Phase-4c suite. Record the exact commands, results, clean-environment identity,
+remaining debt and signed commit/push custody here before D.107c begins.
 
 ### D.107c — persistent peer evidence and bounded re-learn
 
