@@ -59605,14 +59605,63 @@ before RED.
 
 #### D.108d2 — product and peer proof freeze boundary
 
-D.108d2 begins from the recorded D.108d1 GREEN and corrected one-round review.
-Its tests-only RED roster is exactly five paths:
+D.108d2 does not begin from the recorded D.108d1 GREEN alone. The first
+plan-freeze review reproduced two node-layer prerequisites that make the
+five-path RED and two-owner GREEN below unreachable. No D.108d2 RED path may be
+written until D.108d1a and D.108d1b have each received an exact roster, a
+tests-only RED, the required one-round Grok/Kimi/Opus review, a GREEN,
+refactor-clean review, retained gates and clean-checkout proof:
+
+- D.108d1a owns preservation of the private v3-plane registration identity and
+  async lifetime when D.108d1 wraps an activated handle. Its acceptance gate
+  activates or cold-reopens a genuine successor and proves that the returned
+  handle itself can issue, route a genuine point-to-point retained envelope,
+  target retained republication, await deactivation and then reactivate in the
+  same origin. This is a narrow node compatibility slice, not a product API,
+  Web Lock policy or transport redesign.
+- D.108d1b owns unambiguous peer-local issuance custody during cold reopen. Its
+  acceptance gate uses the real multi-writer chat ACL and proves both an
+  established peer with only its own local lineage and an independent fresh
+  late peer with no copied creator issuance identity can cold-reopen and issue
+  as themselves. Copying creator issuance rows into another peer, selecting an
+  arbitrary nonzero writer or accepting two candidate lineages is forbidden.
+  The exact authenticated kernel seam must be frozen before RED; if it cannot
+  bind the room's already existing local author/signing authority without a new
+  caller-selected product authority, the slice stops again.
+
+These are pre-D.108d2 deadlines, not Phase-6-exit observations. D.108d1a moves
+the wrapped-handle identity item out of D.108e2; D.108d1b is the newly assigned
+owner for the cold issuance ambiguity. Neither may change a wire format,
+snapshot schema, ACL membership, issuance schema, digest owner, chunk limit,
+memory ceiling or room/chat API. Their exact RED/GREEN path rosters are the
+next freeze task; the rejected D.108d2 freeze is not permission to edit node
+production sources opportunistically.
+
+After both prerequisites are green, the corrected D.108d2 tests-only RED roster
+must be exactly eleven paths. It contains the five new paths:
 
 - `tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts`;
 - `tests/phase-6a-creator-successor-product-red.test.ts`;
 - `packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts`;
 - `packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts`; and
-- `packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts`.
+- `packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts`;
+
+plus the six retained governance owners whose earlier temporary no-product
+claims must become exact D.108d2 ownership claims:
+
+- `tests/fixtures/phase-6a-v3/creator-adoption-contract.ts`;
+- `tests/phase-6a-creator-adoption-red.test.ts`;
+- `tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts`;
+- `tests/phase-6a-creator-adoption-commit-red.test.ts`;
+- `tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts`; and
+- `tests/phase-6a-creator-successor-activation-red.test.ts`.
+
+Those six corrections must require one exact `examples/v3-room/src/index.ts`
+consumer of the non-root verify, commit, activate and reopen subpaths while
+continuing to forbid node-root widening, direct chat consumption and every
+other product consumer. They must rename the old `noProductConsumer` facts and
+assertions rather than returning a misleading true value after product
+consumption begins.
 
 The expected GREEN roster is exactly two existing product owners:
 
@@ -59649,9 +59698,12 @@ The chat joins the same room constructor. Its join input may forward only the
 optional untrusted snapshot declaration; it may not accept a separate epoch,
 anchor, genesis anchor, lifecycle, object, ACL or trust-profile value. It adds
 `adoptSuccessor()` as the thin room-method consumer, and its existing snapshot
-adds `authority`, which is `null` while no chat is active and otherwise the
-room's exact frozen authority projection. Neither product returns the D.108b
-intent, D.108c prepared capability, D.108d1 activation result, raw trust bytes,
+adds `authority`. That value is `null` before successor activation, including
+an otherwise ready epoch-zero genesis chat, and is the room's exact frozen
+seven-key projection only after hot or cold D.108d1 activation. Before that
+transition `roomId` remains the prepared genesis anchor; afterward it is the
+authenticated live current anchor. Neither product returns the D.108b intent,
+D.108c prepared capability, D.108d1 activation result, raw trust bytes,
 snapshot receipt, store handle, signing authority or displaced-source claim.
 
 The declaration's scope fields remain untrusted overlap, never a projection
@@ -59673,20 +59725,25 @@ untrusted snapshot declaration independently from the persisted manifest and
 chunk rows; that declaration is used only to exercise cold reopen and is never
 used as the expected authority value.
 
-The real-browser proof uses three separately served origins so native Web Lock
-authority remains honest and no same-origin test tab can mask split ownership.
+The real-browser proof uses three separately served origins for independent
+storage and product-realm isolation; D.108d1's retained same-origin two-tab
+test, not this cross-origin proof, remains the Web Lock exclusivity gate.
 The creator runs the existing chat product through genuine close, D.108b,
 D.108c and D.108d1 hot activation. An existing peer first opens and receives an
 epoch-zero chat operation, then closes its predecessor, imports the exact copied
 durable successor carrier into its existing local database and cold-reopens the
 same room/chat projection. A fresh late peer begins only after the epoch-one
-operation exists and cold-reopens from a newly populated database. A
-tests-only relay observes the creator product transport and structured-clones
-the actual `Message` objects between origins; it never synthesizes a vertex,
-signature, digest, epoch, anchor or projection. The existing peer receives the
-real live epoch-one envelope, while the late peer receives the real retained
-envelope produced by the creator handle's retained publisher. Both must project
-the same authenticated epoch-one operation and exact oracle authority.
+operation exists and cold-reopens from a newly populated database. Before the
+product bundle loads, the tests-only entry installs an in-page
+`BroadcastChannel` substitute that forwards the product's actual structured-
+cloneable channel records through the Playwright relay between origins. There
+is no product transport hook. The relay must record and compare byte-exact
+`Message.data`, `objectId`, `sender` and `type` before and after each origin hop;
+it never synthesizes a vertex, signature, digest, epoch, anchor or projection.
+The existing peer receives the real live epoch-one envelope, while the late
+peer receives the real targeted retained envelope produced by the creator
+handle's retained publisher. Both must project the same authenticated
+epoch-one operation and exact oracle authority.
 
 The exact D.108d2 browser behavior inventory is:
 
@@ -59696,6 +59753,12 @@ The exact D.108d2 browser behavior inventory is:
   that genuine operation through live ingress; and
 - a newly populated late peer cold-reopens the successor and accepts the same
   genuine operation through retained ingress.
+
+The room must await the possibly asynchronous active-handle `deactivate()` in
+`close()` and before any replacement or reacquisition can be observed as
+complete. The browser inventory includes close then reactivate within one
+origin, proving that both the private active-owner entry and Web Lock lifetime
+are released before the next activation.
 
 One composite readiness fact is the sole intentional Vitest failure before
 GREEN. Every behavior test is conditionally skipped only by that same fact, and
@@ -59722,11 +59785,50 @@ D.108e1 is the named D.108 test-infrastructure closure owner for direct child
 snapshot-port read telemetry, a clean built-export-map import-hook proof and
 the browser package-shim lifetime. D.108e2 is the named node hardening owner for
 one stable-topic derivation helper, an explicit worker-realm Web Lock policy,
-literal cold `authenticationProfile` validation and preservation of private
-v3-plane registration identity by the lifetime wrapper. Each will receive its
-own exact RED/GREEN roster and required review round after D.108d2; both must
-close before Phase 6a exits. None is permission to weaken the already executed
-D.108d1 authority, snapshot, memory, transport or recovery gates.
+and literal cold `authenticationProfile` validation. Wrapped-handle plane
+identity is no longer deferred here; D.108d1a must close it before D.108d2.
+Each remaining D.108e item will receive its own exact RED/GREEN roster and
+required review round after D.108d2; both must close before Phase 6a exits.
+None is permission to weaken the already executed D.108d1 authority, snapshot,
+memory, transport or recovery gates.
+
+The rejected D.108d2 plan-freeze review inspected immutable signed commit
+`6d0c3c036c3dd5d6422391478171b1d9253705c9`, parent
+`227d0e41722e6fab66598e3f0b19fdf06141759f`, tree
+`8c433c71359c59209d067007959f0fbad10529d1`, stable patch id
+`380e77b5d3bda0da11f097c28b2d25850f4526e6` and staged-diff SHA-256
+`c3dd3d69a7b30de307bec9ceeba1287c8ed9c331670fd017db1339ea4dd3f465`.
+Grok/high completed its sole 640.181-second launch with exit code 0 and
+`stop_reason=end_turn`; its runner classified a terminal response and the
+verdict was `CHANGES_REQUIRED`, P0=1/P1=1/P2=1. Kimi CLI 0.38.0 used exact
+`kimi-code/k3` in session
+`session_e258c344-d414-4e4a-947c-bc85be23732d`, emitted CHECK001 through
+CHECK100 exactly once and returned `ACCEPTED`, P0=0/P1=0/P2=2. Opus session
+`7a3fa1ff-6264-4fd2-9784-97c150b4627f` resolved to Opus at xhigh, launched no
+subagent and returned schema-valid `CHANGES_REQUIRED`, P0=2/P1=3/P2=5.
+
+The same round reproduced and corrected every material P0/P1 at plan level.
+The three retained governance scanners would reject the required room imports,
+so their fixture and assertion owners join the future RED roster. Genesis has
+no D.108d1 result, so successor authority remains null until activation. The
+cross-origin relay is now an exact pre-load BroadcastChannel substitute with a
+byte-preservation gate, and room shutdown must await successor deactivation.
+Most importantly, source inspection confirmed that cold reopen cannot choose
+an independent fresh peer from a seven-writer ACL using only nonzero copied
+lineages, and that D.108d1's spread wrapper loses the raw handle identity used
+by retained ingress and targeted republication. Those blockers create
+D.108d1a/D.108d1b and stop D.108d2 before RED rather than widening its product
+patch.
+
+The nonblocking ledger remains explicit without same-round confirmation:
+Grok's copied issuance/journal-carrier observation is subsumed by the blocking
+issuance reslice; Kimi's phase-label drift remains a documentation cleanup and
+its `roomId` ambiguity was independently material as the corrected authority
+P1. Opus's deferred items cover post-adoption creator-close method semantics,
+cold snapshot-store lifetime, early declaration/object equality, cross-origin
+Web Lock rationale and the existing projection/authority naming collision.
+No reviewer changed the tracked tree, no confirmation review ran, and no Fable
+or collaboration subagent ran.
 
 The D.108d1 plan-freeze review packet used parent HEAD
 `dbb753fe78c5a8d8b6fbc420fe4e53fb0bda5269`, exact one-path staged tree
