@@ -209,13 +209,16 @@ if (typeof window !== "undefined") {
 			const [browser, network, node] = await modules();
 			const opened = await browser.openBrowserSealEvidenceStore({ databaseName: recoveryDatabase });
 			const connected = Object.keys(responses).sort();
+			const normalized = Object.freeze(
+				Object.fromEntries(connected.map((peerId) => [peerId, evidence(responses[peerId])]))
+			);
 			const host = Object.freeze({
 				createSealEvidenceProtocolHost: () =>
 					Object.freeze({
 						close: () => Promise.resolve(),
 						connectedPeers: () => Object.freeze([...connected]),
 						localPeerId: "creator",
-						query: (peerId: string): Promise<unknown> => Promise.resolve(structuredClone(responses[peerId])),
+						query: (peerId: string): Promise<unknown> => Promise.resolve(structuredClone(normalized[peerId])),
 						serve: (): (() => void) => () => undefined,
 					}),
 			});

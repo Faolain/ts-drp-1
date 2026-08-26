@@ -57916,6 +57916,18 @@ advance trust or activate snapshots. If product semantics must enter network,
 or if peer evidence cannot be atomic without altering the four-store vote
 transaction, the slice reslices.
 
+The first GREEN browser run exposed two test-infrastructure facts hidden by RED
+readiness skips. The shared Phase-4c server invokes esbuild directly and did not
+consume `vite.config.mts`, so the planned aliases could not resolve; D.107c was
+therefore resliced from eight to nine GREEN owners in signed commit `6d669ad4`,
+adding only that shared server. Its generic bundler now consumes the central
+workspace alias map. The next three-engine run showed that WebKit does not
+consistently preserve typed arrays when evidence crosses two Playwright page
+boundaries. The browser fixture now explicitly rehydrates that simulated wire
+carrier before invoking product code; product exact-byte validation remains
+strict. Neither correction adds a product dependency, resolver, API or semantic
+owner.
+
 ### D.107d — genuine live close, combined CAS and honest product projection
 
 D.107d is the only slice that enables the earlier owners in a live room. A
