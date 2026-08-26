@@ -57656,7 +57656,7 @@ The tests-only RED is exactly six paths:
 - `packages/storage-browser/tests/phase-5e-creator-actor.pw.ts`; and
 - `packages/storage-browser/playwright.phase-5e-creator-actor.config.ts`.
 
-The expected GREEN is exactly nineteen paths:
+The expected GREEN is exactly twenty-four paths:
 
 - `packages/keychain/src/finality.ts`;
 - `packages/seal/src/{creator.ts,internal/creator-close-intent.ts}`;
@@ -57683,6 +57683,17 @@ The expected GREEN is exactly nineteen paths:
   export-map assertion, which keeps the frozen Phase-4c browser subpaths and
   admits exactly the already-shipped `./seal-vote` plus D.107b's
   `./seal-evidence` additive subpath; and
+- the retained `packages/storage-browser/tests/fixtures/idb-adapter-browser-oracle.ts`
+  primary-database version oracle;
+- the retained `packages/storage-browser/tests/phase-2d1-schema-lifecycle-red.pw.ts`
+  exact primary-schema authority;
+- the retained `packages/storage-browser/tests/assets/schema-lifecycle-entry.ts`
+  cooperative-versionchange target, which must remain one version above the
+  authoritative primary schema;
+- `tests/fixtures/phase-5e-v3/creator-actor-contract.ts` and
+  `tests/phase-5e-creator-actor-red.test.ts`, whose executable exact roster and
+  restart/ambiguous-outcome mutants advance with these same-round corrections;
+  and
 - the specific-before-bare Vite aliases.
 
 The evidence store is mechanical, scoped by the authenticated creator enrollment
