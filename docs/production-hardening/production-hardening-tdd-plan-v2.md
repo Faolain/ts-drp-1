@@ -60309,11 +60309,33 @@ existing owners:
   and
 - `packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts`.
 
-Its GREEN roster is exactly the existing private reconstruction owner
-`packages/node/src/creator-adoption.ts`. A need for another production owner,
-new package export, caller-selected authority, public result field, digest
-domain, protocol carrier or store/schema change stops this corrective slice and
-requires a new plan freeze.
+Its initial GREEN roster named only the existing private reconstruction owner
+`packages/node/src/creator-adoption.ts`. The first deterministic RED dry-run
+then reached the required same-store reopen after Bob's epoch-one issue and
+reproduced `creator predecessor recovery failed: admission-rejected`. The
+predecessor validator receives Bob's complete durable author outbox; its first
+reopen sees only Bob's epoch-zero carrier, while its second reopen also sees the
+valid newly issued epoch-one row and correctly refuses to authenticate that row
+as predecessor material. This is not a fixture, signer or store-resolution
+defect, and filtering it in the test would weaken the required same-custody
+proof.
+
+That reproduced boundary triggers the stop condition and reslices GREEN to
+exactly two existing private owners:
+
+- `packages/node/src/creator-adoption.ts`; and
+- `packages/node/src/v3-live.ts`.
+
+The first retains canonical successor-ACL opening, possession classification
+and strict lineage selection. The second already owns creator-successor
+predecessor/successor recovery and must give predecessor validation a bounded
+private view that excludes only exact authenticated outbox carriers belonging
+to a later epoch while preserving malformed, same-epoch and backing-store
+failures. Successor recovery and the activated handle continue to receive the
+complete original issuance store. No store wrapper escapes private recovery,
+and no package export, caller-selected authority, public result field, digest
+domain, protocol carrier or store/schema change is authorized. A need for a
+third production owner stops the corrected slice and requires another freeze.
 
 The genuine native child must retain the packed close, journal and snapshot
 carriers as its independent oracle. It proves that the authenticated snapshot
