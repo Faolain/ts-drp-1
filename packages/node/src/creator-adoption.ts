@@ -9,9 +9,11 @@ import {
 	type AheDurableStore,
 	digestBlob,
 	digestClosure,
+	type GenerationId,
 	type GenerationPageCursor,
 	type GenerationRecord,
 	type GenerationRef,
+	parseGenerationId,
 	type PresentHead,
 } from "@ts-drp/storage";
 import type {
@@ -500,6 +502,56 @@ function projection(
 	}
 }
 
+function successorCommitMaterial(
+	facts: SealedAdoptionFacts,
+	closure: RecoveredClosure,
+	exactCanonicalProjectionBytes: Uint8Array
+):
+	| Readonly<{
+			readonly candidateReferences: readonly GenerationRef[];
+			readonly generationId: GenerationId;
+			readonly predecessorLiveRef: GenerationRef;
+	  }>
+	| undefined {
+	try {
+		const predecessors = closure.currentCandidates.filter(({ bytes, ref }) => {
+			const decoded = canonicalRecord(bytes);
+			return (
+				decoded?.kind === "v3-live-generation-1" &&
+				facts.proposedReferences.some((candidate) => sameRef(candidate, ref))
+			);
+		});
+		if (predecessors.length !== 1) return undefined;
+		const predecessorLiveRef = predecessors[0]?.ref;
+		if (predecessorLiveRef === undefined) return undefined;
+		const projectionDigest = digestBlob(exactCanonicalProjectionBytes);
+		if (!projectionDigest.ok) return undefined;
+		const projectionRef = Object.freeze({
+			byteLength: exactCanonicalProjectionBytes.byteLength,
+			digest: projectionDigest.value,
+		});
+		const candidateReferences = Object.freeze(
+			[...facts.proposedReferences.filter((candidate) => !sameRef(candidate, predecessorLiveRef)), projectionRef].sort(
+				(left, right) => (left.digest < right.digest ? -1 : left.digest > right.digest ? 1 : 0)
+			)
+		);
+		if (
+			candidateReferences.length !== facts.proposedReferences.length ||
+			new Set(candidateReferences.map(({ digest }) => digest)).size !== candidateReferences.length
+		) {
+			return undefined;
+		}
+		const random = new Uint8Array(32);
+		crypto.getRandomValues(random);
+		const parsed = parseGenerationId(hex(random));
+		return parsed.ok
+			? Object.freeze({ candidateReferences, generationId: parsed.value, predecessorLiveRef })
+			: undefined;
+	} catch {
+		return undefined;
+	}
+}
+
 /**
  * Verifies a sealed creator close and mints one owner-bound, one-use successor-adoption intent.
  * @param input - Genuine sealed close handle and trusted blueprint catalog.
@@ -526,10 +578,19 @@ export async function verifyCreatorSuccessorAdoption(input: unknown): Promise<Ad
 		if (resolved === undefined) return failure("blueprint-invalid", "creator successor blueprint is invalid");
 		const projected = projection(facts, chain, snapshot, resolved);
 		if (projected === undefined) return failure("internal-invariant", "creator successor projection failed");
+		const commitMaterial = successorCommitMaterial(facts, closure, projected.bytes);
+		if (commitMaterial === undefined) {
+			return failure("internal-invariant", "creator successor commit material failed");
+		}
 		return Object.freeze({
 			descriptor: projected.descriptor,
 			intent: createCreatorAdoptionIntent(captured.handle, {
+				candidateReferences: commitMaterial.candidateReferences,
 				exactCanonicalProjectionBytes: projected.bytes,
+				generationId: commitMaterial.generationId,
+				pendingHead: facts.proposedHead,
+				pendingReferences: facts.proposedReferences,
+				predecessorLiveRef: commitMaterial.predecessorLiveRef,
 			}),
 			ok: true as const,
 		});

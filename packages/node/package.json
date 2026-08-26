@@ -42,6 +42,10 @@
 		"./creator-adoption": {
 			"types": "./dist/src/creator-adoption.d.ts",
 			"import": "./dist/src/creator-adoption.js"
+		},
+		"./creator-adoption-commit": {
+			"types": "./dist/src/creator-adoption-commit.d.ts",
+			"import": "./dist/src/creator-adoption-commit.js"
 		}
 	},
 	"scripts": {
