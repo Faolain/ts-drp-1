@@ -28,7 +28,7 @@ import type {
 	SnapshotQuarantineStore,
 	SnapshotVerificationReceipt,
 } from "@ts-drp/storage/snapshot-transfer";
-import type { DRPNetworkNode, Message } from "@ts-drp/types";
+import { type DRPNetworkNode, Message, MessageType, V3Envelope } from "@ts-drp/types";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -39,8 +39,15 @@ import {
 	type CreatorLiveCloseHandle,
 	type CreatorLiveCloseResult,
 } from "../../../packages/node/src/creator-close.js";
-import { type PreparedV3Live, type RecoveredV3Live, recoverV3LiveReplica } from "../../../packages/node/src/v3-live.js";
-import { activateV3LivePlane, bindV3BlueprintLivePlane } from "../../../packages/node/src/v3-live.js";
+import {
+	activateV3LivePlane,
+	bindV3BlueprintLivePlane,
+	type PreparedV3Live,
+	type RecoveredV3Live,
+	recoverV3LiveReplica,
+	routeV3Ingress,
+	type V3AdmittedVertexSink,
+} from "../../../packages/node/src/v3-live.js";
 import type { CurrentAnchorTrust } from "../../../packages/protocol-v3/src/index.js";
 import { openBrowserSealEvidenceStore } from "../../../packages/storage-browser/src/seal-evidence.js";
 import { openBrowserSealVoteStore } from "../../../packages/storage-browser/src/seal-vote.js";
@@ -215,6 +222,13 @@ export interface GenuineCreatorAdoptionFixture {
 		readonly current: DetachedHeadEvidence;
 		readonly currentTrust: CurrentAnchorTrust;
 		readonly declaration: SnapshotQuarantineDeclaration;
+		readonly establishedPeer?: Readonly<{
+			readonly author: string;
+			readonly authorSequence: 0;
+			readonly canonicalPreimageBytes: Uint8Array;
+			readonly digest: Uint8Array;
+			readonly signature: Uint8Array;
+		}>;
 		readonly exactCanonicalPayloadBytes: Uint8Array;
 		readonly exactCanonicalProjectionBytes: Uint8Array;
 		readonly generations: readonly GenerationRecord[];
@@ -784,7 +798,13 @@ function deleteDatabase(name: string): Promise<void> {
  * @returns Genuine sealed handle, trusted catalog, mutation controls and cleanup owner.
  */
 export async function openGenuineCreatorAdoptionFixture(
-	options: Readonly<{ readonly objectId?: string; readonly stageAclChange?: boolean }> = {}
+	options: Readonly<{
+		readonly authorizedPrivateKeySeedHexes?: readonly string[];
+		readonly establishedPeerPrivateKeySeedHex?: string;
+		readonly objectId?: string;
+		readonly stageAclChange?: boolean;
+		readonly successorAclGroups?: Readonly<Record<string, readonly ("admin" | "finality" | "writer")[]>>;
+	}> = {}
 ): Promise<GenuineCreatorAdoptionFixture> {
 	const controls: GenuineCreatorAdoptionFixture["controls"] = {
 		adoptionPhase: false,
@@ -803,6 +823,9 @@ export async function openGenuineCreatorAdoptionFixture(
 	let declaration: SnapshotQuarantineDeclaration | undefined;
 	const fixture = await createGenuinePreparedV3Fixture({
 		authorizationMode: "latched-acl",
+		...(options.authorizedPrivateKeySeedHexes === undefined
+			? {}
+			: { authorizedPrivateKeySeedHexes: options.authorizedPrivateKeySeedHexes }),
 		exactCanonicalInitialStateBytes: encodeCanonical(0),
 		historyRoot: emptyHistoryRoot,
 		historySize: 0,
@@ -823,7 +846,14 @@ export async function openGenuineCreatorAdoptionFixture(
 	const recovered = await recoverWithDurableStores(fixture, fixture.capability, controls);
 	const messageQueueManager = new MessageQueueManager<Message>({ logConfig: { level: "silent" } });
 	const networkNode = fakeNetwork(`d108b-${crypto.randomUUID()}`);
-	const onAdmittedVertex = (): void => undefined;
+	let establishedPeerAuthor: string | undefined;
+	let resolveEstablishedPeer: (() => void) | undefined;
+	const establishedPeerAdmission = new Promise<void>((resolveAdmission) => {
+		resolveEstablishedPeer = resolveAdmission;
+	});
+	const onAdmittedVertex = (delivery: Parameters<V3AdmittedVertexSink>[0]): void => {
+		if (delivery.vertex.author === establishedPeerAuthor) resolveEstablishedPeer?.();
+	};
 	const activation = activateV3LivePlane({
 		capability: recovered.capability,
 		messageQueueManager,
@@ -859,6 +889,83 @@ export async function openGenuineCreatorAdoptionFixture(
 			signRegisteredVertexDigest: fixture.signRegisteredVertexDigest,
 		});
 		if (!stagedAcl.ok) throw new TypeError(`D.108b fixture ACL issue failed: ${stagedAcl.kind}`);
+	}
+	let latestDependency = localIssued.digest;
+	if (options.successorAclGroups !== undefined) {
+		if (fixture.authors.length !== 8) throw new TypeError("D.108d1b chat ACL requires eight authors");
+		if (
+			Object.keys(options.successorAclGroups).length !== fixture.authors.length ||
+			fixture.authors.some((author) => options.successorAclGroups?.[author] === undefined)
+		) {
+			throw new TypeError("D.108d1b chat ACL author roster is incomplete");
+		}
+		const operations = fixture.authors.flatMap((target) =>
+			(["admin", "finality", "writer"] as const).flatMap((group) =>
+				options.successorAclGroups?.[target]?.includes(group) ? [] : [[target, group] as const]
+			)
+		);
+		for (let index = 0; index < operations.length; index += 1) {
+			const [target, group] = operations[index] as (typeof operations)[number];
+			const stagedAcl = await activation.handle.issueLocal({
+				operations: Object.freeze([
+					Object.freeze({
+						logicalTime: index + 3,
+						operation: Object.freeze({ action: "acl", group, kind: "revoke", target }),
+					}),
+				]),
+				signRegisteredVertexDigest: fixture.signRegisteredVertexDigest,
+			});
+			if (!stagedAcl.ok) {
+				throw new TypeError(`D.108d1b chat ACL issue failed: ${stagedAcl.kind}: ${stagedAcl.detail}`);
+			}
+			latestDependency = stagedAcl.digest;
+		}
+	}
+	let establishedPeer: GenuineCreatorAdoptionFixture["evidence"]["establishedPeer"];
+	if (options.establishedPeerPrivateKeySeedHex !== undefined) {
+		const carrier = fixture.createRegisteredVertex({
+			authorSequence: 0,
+			dependencies: [latestDependency],
+			logicalTime: 32,
+			operation: Object.freeze({ action: "add", value: 3 }),
+			privateKeySeedHex: options.establishedPeerPrivateKeySeedHex,
+		});
+		establishedPeerAuthor = carrier.author;
+		Reflect.set(networkNode, "gossipTopicFor", () => activation.handle.topic);
+		const claimed = routeV3Ingress(
+			networkNode,
+			Message.create({
+				data: V3Envelope.encode({
+					canonicalPreimage: carrier.canonicalPreimageBytes,
+					signature: carrier.signature,
+				}).finish(),
+				objectId: activation.handle.topic,
+				sender: "d108d1b-established-peer",
+				type: MessageType.MESSAGE_TYPE_V3_ENVELOPE,
+			})
+		);
+		if (!claimed) throw new TypeError("D.108d1b established peer ingress was not claimed");
+		let admissionTimer: ReturnType<typeof setTimeout> | undefined;
+		try {
+			await Promise.race([
+				establishedPeerAdmission,
+				new Promise<never>((_resolve, reject) => {
+					admissionTimer = setTimeout(
+						() => reject(new TypeError("D.108d1b established peer admission timed out")),
+						5_000
+					);
+				}),
+			]);
+		} finally {
+			if (admissionTimer !== undefined) clearTimeout(admissionTimer);
+		}
+		establishedPeer = Object.freeze({
+			author: carrier.author,
+			authorSequence: 0,
+			canonicalPreimageBytes: Uint8Array.from(carrier.canonicalPreimageBytes),
+			digest: Uint8Array.from(carrier.digest),
+			signature: Uint8Array.from(carrier.signature),
+		});
 	}
 	const signer = await createRecoverableFinalitySigner({ seed: hexBytes(contract.privateKeySeedHex) });
 	const [vote, evidence, rawSnapshotStore] = await Promise.all([
@@ -956,6 +1063,7 @@ export async function openGenuineCreatorAdoptionFixture(
 			current,
 			currentTrust: openedCurrentTrust.trust,
 			declaration,
+			...(establishedPeer === undefined ? {} : { establishedPeer }),
 			exactCanonicalPayloadBytes: concatenate(chunks),
 			exactCanonicalProjectionBytes,
 			generations: Object.freeze([...generationPage.value.generations]),

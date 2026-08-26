@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
+/* eslint-disable jsdoc/require-param, jsdoc/require-returns -- shared test-fixture helpers are intentionally untyped JavaScript */
 import { MessageQueueManager } from "@ts-drp/message-queue";
 /* eslint-disable import/no-unresolved -- the exact built subpath is intentionally absent in RED */
 import {
@@ -13,6 +14,7 @@ import { createNodeDurableLiveJournalStore } from "@ts-drp/storage-node/live-jou
 import { createNodeSnapshotQuarantineStore } from "@ts-drp/storage-node/snapshot-transfer";
 import { createPrivateKey, sign } from "node:crypto";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const [, , mode] = process.argv;
 
@@ -20,7 +22,8 @@ function send(value) {
 	if (typeof process.send === "function") process.send(value);
 }
 
-function unpack(value) {
+/** Detaches the byte carriers transferred over IPC. */
+export function unpack(value) {
 	if (Array.isArray(value)) return value.map(unpack);
 	if (value !== null && typeof value === "object") {
 		if (Object.keys(value).length === 1 && typeof value.bytesBase64 === "string") {
@@ -31,7 +34,8 @@ function unpack(value) {
 	return value;
 }
 
-function successful(result, label) {
+/** Extracts one successful durable-store result. */
+export function successful(result, label) {
 	if (!result.ok) throw new Error(`${label}: ${result.reason ?? result.kind ?? "failed"}`);
 	return result.value;
 }
@@ -93,7 +97,8 @@ async function putGeneration(store, generation, blobs, expectedHead) {
 	).head;
 }
 
-function network(events, publications, targetPeerId) {
+/** Creates the deterministic network double shared by the fresh-process fixtures. */
+export function network(events, publications, targetPeerId) {
 	const topics = new Set();
 	return {
 		peerId: `d108d1-child-${process.pid}`,
@@ -138,7 +143,8 @@ function network(events, publications, targetPeerId) {
 	};
 }
 
-async function seedAhe(material, effects, suffix = "") {
+/** Seeds one genuine native AHE custody set. */
+export async function seedAhe(material, effects, suffix = "") {
 	const raw = createSqliteAheDurableStore({ filename: join(material.directory, `ahe${suffix}.sqlite`) });
 	const blobs = new Map();
 	for (const candidate of material.blobs) blobs.set(candidate.ref.digest, candidate.bytes);
@@ -202,7 +208,8 @@ async function seedIssuance(material, suffix = "") {
 	return store;
 }
 
-async function seedJournal(material, effects, suffix = "") {
+/** Seeds one genuine native live-journal custody set. */
+export async function seedJournal(material, effects, suffix = "") {
 	const raw = createNodeDurableLiveJournalStore({
 		primaryFilename: join(material.directory, `journal${suffix}.sqlite`),
 	});
@@ -235,7 +242,8 @@ async function seedJournal(material, effects, suffix = "") {
 	};
 }
 
-async function seedSnapshot(material, events, effects, suffix = "") {
+/** Seeds one genuine native snapshot quarantine. */
+export async function seedSnapshot(material, events, effects, suffix = "") {
 	const raw = createNodeSnapshotQuarantineStore({
 		primaryFilename: join(material.directory, `snapshot${suffix}.sqlite`),
 	});
@@ -339,6 +347,12 @@ async function cold(material, selectedMode) {
 		const reopenWith = (stores) =>
 			reopenCreatorSuccessorAdoption({
 				...material.creatorGenesis,
+				...(material.d108d1bLocalAuthor === true
+					? {
+							author: material.issuance.scope.author,
+							signRegisteredVertexDigest: signFixtureVertex,
+						}
+					: {}),
 				...(selectedMode === "divergent-genesis" ? { pinnedGenesisAnchorDigest: "f".repeat(64) } : {}),
 				...(selectedMode === "extra-epoch" ? { epoch: 1 } : {}),
 				catalog,
@@ -454,23 +468,25 @@ function receiveMaterial() {
 	return new Promise((resolve) => process.once("message", (message) => resolve(unpack(message))));
 }
 
-void (async () => {
-	if (mode === "probe") {
-		send({
-			kind: "proof",
-			proof: {
-				exports: [
-					typeof activateCreatorSuccessorAdoption === "function" ? "activateCreatorSuccessorAdoption" : "missing",
-					typeof reopenCreatorSuccessorAdoption === "function" ? "reopenCreatorSuccessorAdoption" : "missing",
-				],
-				package: "@ts-drp/node/creator-adoption-activate",
-			},
-		});
-		return;
-	}
-	const material = await receiveMaterial();
-	send({ kind: "proof", proof: await cold(material, mode) });
-})().catch((error) => {
-	send({ kind: "child-error", message: error instanceof Error ? error.message : String(error) });
-	process.exitCode = 1;
-});
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+	void (async () => {
+		if (mode === "probe") {
+			send({
+				kind: "proof",
+				proof: {
+					exports: [
+						typeof activateCreatorSuccessorAdoption === "function" ? "activateCreatorSuccessorAdoption" : "missing",
+						typeof reopenCreatorSuccessorAdoption === "function" ? "reopenCreatorSuccessorAdoption" : "missing",
+					],
+					package: "@ts-drp/node/creator-adoption-activate",
+				},
+			});
+			return;
+		}
+		const material = await receiveMaterial();
+		send({ kind: "proof", proof: await cold(material, mode) });
+	})().catch((error) => {
+		send({ kind: "child-error", message: error instanceof Error ? error.message : String(error) });
+		process.exitCode = 1;
+	});
+}

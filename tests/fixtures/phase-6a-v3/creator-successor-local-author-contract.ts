@@ -1,0 +1,170 @@
+import { ed25519 } from "@noble/curves/ed25519.js";
+import { type Serializable, spawn } from "node:child_process";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
+import { type GenuineCreatorAdoptionFixture, openGenuineCreatorAdoptionFixture } from "./creator-adoption-contract.js";
+import {
+	CREATOR_SUCCESSOR_LOCAL_AUTHOR_REOPEN_INPUT_KEYS,
+	REPOSITORY_ROOT,
+} from "./creator-successor-activation-contract.js";
+import { workspacePackageImportHook } from "../shared/workspace-package-subprocess.mjs";
+
+export const D108D1B_RED_PATHS = Object.freeze([
+	"tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts",
+	"tests/phase-6a-creator-successor-local-author-red.test.ts",
+	"packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+	"packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts",
+	"tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+	"tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts",
+	"tests/phase-6a-creator-successor-activation-red.test.ts",
+	"packages/storage-node/tests/fixtures/phase-6a-creator-successor-activation-child.mjs",
+	"packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts",
+] as const);
+
+export const D108D1B_GREEN_PATHS = Object.freeze([
+	"packages/node/src/creator-adoption-activate.ts",
+	"packages/node/src/creator-adoption.ts",
+	"packages/node/src/internal/creator-successor-live.ts",
+] as const);
+
+export const D108D1B_REOPEN_INPUT_KEYS = CREATOR_SUCCESSOR_LOCAL_AUTHOR_REOPEN_INPUT_KEYS;
+export const D108D1B_FAILURE_KIND = "chain-invalid";
+export const D108D1B_CHILD_BEHAVIORS = Object.freeze([
+	"fresh Node binds established and fresh chat peers while every ambiguous or unauthenticated cold reopen fails before live effects",
+] as const);
+
+export interface D108d1bChildMessage {
+	readonly kind: string;
+	readonly message?: string;
+	readonly proof?: Readonly<Record<string, unknown>>;
+}
+
+const CHAT_CLIENTS = Object.freeze([
+	Object.freeze({
+		groups: Object.freeze(["admin", "finality", "writer"] as const),
+		id: "alice",
+		seed: "d9336-v3-chat-alice",
+	}),
+	Object.freeze({ groups: Object.freeze(["admin", "writer"] as const), id: "bob", seed: "d9336-v3-chat-bob" }),
+	Object.freeze({ groups: Object.freeze(["writer"] as const), id: "carol", seed: "d9339-v3-chat-carol" }),
+	Object.freeze({ groups: Object.freeze(["finality"] as const), id: "dave", seed: "d9339-v3-chat-dave" }),
+	Object.freeze({ groups: Object.freeze(["writer"] as const), id: "erin", seed: "d9339-v3-chat-erin" }),
+	Object.freeze({ groups: Object.freeze(["writer"] as const), id: "frank", seed: "d9339-v3-chat-frank" }),
+	Object.freeze({ groups: Object.freeze(["writer"] as const), id: "grace", seed: "d9339-v3-chat-grace" }),
+	Object.freeze({ groups: Object.freeze(["writer"] as const), id: "heidi", seed: "d9339-v3-chat-heidi" }),
+] as const);
+
+function hex(bytes: Uint8Array): string {
+	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function localAuthorSeed(configuredSeed: string): Uint8Array {
+	const seed = createHash("sha512").update(new TextEncoder().encode(configuredSeed)).digest();
+	const domain = new TextEncoder().encode("ts-drp-keychain/local-author-ed25519/v1");
+	const preimage = new Uint8Array(domain.byteLength + 1 + seed.byteLength);
+	preimage.set(domain);
+	preimage.set(seed, domain.byteLength + 1);
+	return new Uint8Array(createHash("sha256").update(preimage).digest());
+}
+
+/** @returns The shipped chat clients' exact local Ed25519 identities and ACL groups. */
+export function d108d1bChatAuthorities(): readonly Readonly<{
+	readonly author: string;
+	readonly groups: readonly ("admin" | "finality" | "writer")[];
+	readonly id: (typeof CHAT_CLIENTS)[number]["id"];
+	readonly privateKeySeedHex: string;
+}>[] {
+	return Object.freeze(
+		CHAT_CLIENTS.map((client) => {
+			const seed = localAuthorSeed(client.seed);
+			return Object.freeze({
+				author: hex(ed25519.getPublicKey(seed)),
+				groups: client.groups,
+				id: client.id,
+				privateKeySeedHex: hex(seed),
+			});
+		})
+	);
+}
+
+/** @returns One genuine successor close containing Bob's accepted epoch-zero vertex. */
+export async function openD108d1bMultiWriterFixture(): Promise<GenuineCreatorAdoptionFixture> {
+	const authorities = d108d1bChatAuthorities();
+	const established = authorities.find(({ id }) => id === "bob");
+	if (established === undefined) throw new TypeError("D.108d1b established chat authority is unavailable");
+	return openGenuineCreatorAdoptionFixture({
+		authorizedPrivateKeySeedHexes: authorities.map(({ privateKeySeedHex }) => privateKeySeedHex),
+		establishedPeerPrivateKeySeedHex: established.privateKeySeedHex,
+		successorAclGroups: Object.freeze(Object.fromEntries(authorities.map(({ author, groups }) => [author, groups]))),
+	});
+}
+
+/**
+ * Runs the one-process genuine D.108d1b native acceptance matrix.
+ * @param input - Packed durable successor material.
+ * @returns The child's single terminal proof message.
+ */
+export function runD108d1bLocalAuthorChild(input: unknown): Promise<D108d1bChildMessage> {
+	return new Promise((resolvePromise, reject) => {
+		const childPath = resolve(
+			REPOSITORY_ROOT,
+			"packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs"
+		);
+		const importHook = workspacePackageImportHook({
+			"@ts-drp/canonical": resolve(REPOSITORY_ROOT, "packages/canonical/dist/src/index.js"),
+			"@ts-drp/message-queue": resolve(REPOSITORY_ROOT, "packages/message-queue/dist/src/index.js"),
+			"@ts-drp/node/creator-adoption-activate": resolve(
+				REPOSITORY_ROOT,
+				"packages/node/dist/src/creator-adoption-activate.js"
+			),
+			"@ts-drp/node/v3-live": resolve(REPOSITORY_ROOT, "packages/node/dist/src/v3-live.js"),
+			"@ts-drp/storage-node": resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/index.js"),
+			"@ts-drp/storage-node/issuance": resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/issuance.js"),
+			"@ts-drp/storage-node/live-journal": resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/live-journal.js"),
+			"@ts-drp/storage-node/snapshot-transfer": resolve(
+				REPOSITORY_ROOT,
+				"packages/storage-node/dist/src/snapshot-transfer.js"
+			),
+		});
+		const child = spawn(process.execPath, [importHook, childPath], {
+			stdio: ["ignore", "ignore", "pipe", "ipc"],
+		});
+		let observed: D108d1bChildMessage | undefined;
+		let stderr = "";
+		const timer = setTimeout(() => {
+			child.kill("SIGKILL");
+			reject(new Error(`D.108d1b child timeout: ${stderr}`));
+		}, 90_000);
+		child.stderr?.setEncoding("utf8");
+		child.stderr?.on("data", (value: string) => (stderr += value));
+		child.on("message", (message: D108d1bChildMessage) => (observed = message));
+		child.once("error", reject);
+		child.once("spawn", () => child.send(input as Serializable));
+		child.once("exit", (code) => {
+			clearTimeout(timer);
+			if (code !== 0 || observed === undefined || observed.kind === "child-error") {
+				reject(new Error(observed?.message ?? `D.108d1b child failed (${String(code)}): ${stderr}`));
+			} else resolvePromise(observed);
+		});
+	});
+}
+
+/** @returns Whether every exact-three GREEN owner exposes the frozen local-author seam. */
+export function d108d1bReadiness(): Readonly<{ readonly missing: readonly string[]; readonly ready: boolean }> {
+	const missing: string[] = D108D1B_GREEN_PATHS.filter((path) => !existsSync(resolve(REPOSITORY_ROOT, path)));
+	const activation = readFileSync(resolve(REPOSITORY_ROOT, D108D1B_GREEN_PATHS[0]), "utf8");
+	const adoption = readFileSync(resolve(REPOSITORY_ROOT, D108D1B_GREEN_PATHS[1]), "utf8");
+	const internal = readFileSync(resolve(REPOSITORY_ROOT, D108D1B_GREEN_PATHS[2]), "utf8");
+	if (!/COLD_KEYS[\s\S]*["']author["'][\s\S]*["']signRegisteredVertexDigest["']/u.test(activation)) {
+		missing.push("closed cold author/signer capture");
+	}
+	if (!/getRandomValues[\s\S]*subtle\.(?:importKey|verify)/u.test(adoption)) {
+		missing.push("fresh WebCrypto possession proof");
+	}
+	if (!/CreatorSuccessorReopenInput[\s\S]*author[\s\S]*signRegisteredVertexDigest/u.test(internal)) {
+		missing.push("internal local-author carrier");
+	}
+	return Object.freeze({ missing: Object.freeze(missing), ready: missing.length === 0 });
+}

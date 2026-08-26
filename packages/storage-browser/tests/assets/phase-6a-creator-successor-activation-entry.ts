@@ -8,6 +8,22 @@ import { createBrowserSnapshotQuarantineStore } from "../../src/snapshot-transfe
 type PlainRecord = Readonly<Record<string, unknown>>;
 type Closeable = Readonly<{ close(): Promise<void> }>;
 
+const FIXTURE_AUTHOR_SEED = Uint8Array.from(
+	"0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20".match(/.{2}/gu) ?? [],
+	(pair) => Number.parseInt(pair, 16)
+);
+const ED25519_PKCS8_PREFIX = Uint8Array.from("302e020100300506032b657004220420".match(/.{2}/gu) ?? [], (pair) =>
+	Number.parseInt(pair, 16)
+);
+
+async function signFixturePossession(bytes: Uint8Array): Promise<Uint8Array> {
+	const pkcs8 = new Uint8Array(ED25519_PKCS8_PREFIX.byteLength + FIXTURE_AUTHOR_SEED.byteLength);
+	pkcs8.set(ED25519_PKCS8_PREFIX);
+	pkcs8.set(FIXTURE_AUTHOR_SEED, ED25519_PKCS8_PREFIX.byteLength);
+	const key = await crypto.subtle.importKey("pkcs8", pkcs8, { name: "Ed25519" }, false, ["sign"]);
+	return new Uint8Array(await crypto.subtle.sign("Ed25519", key, new Uint8Array(bytes)));
+}
+
 interface ContenderResult {
 	readonly detail?: string;
 	readonly epoch?: number;
@@ -319,6 +335,14 @@ async function openContender(databaseName: string, packedMaterial: unknown): Pro
 	try {
 		const result = await reopenCreatorSuccessorAdoption({
 			...(material.creatorGenesis as PlainRecord),
+			...(material.d108d1bLocalAuthor === true
+				? {
+						author: (material.issuance as PlainRecord).scope
+							? String(((material.issuance as PlainRecord).scope as PlainRecord).author)
+							: "",
+						signRegisteredVertexDigest: signFixturePossession,
+					}
+				: {}),
 			catalog: trustedCatalog(material),
 			issuanceStore: stores.issuanceStore,
 			liveJournalStore: stores.liveJournalStore,

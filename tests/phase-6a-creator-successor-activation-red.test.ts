@@ -17,6 +17,7 @@ import {
 	CREATOR_SUCCESSOR_ACTIVATION_FAILURE_KINDS,
 	CREATOR_SUCCESSOR_ACTIVATION_INPUT_KEYS,
 	CREATOR_SUCCESSOR_ACTIVATION_SUCCESS_KEYS,
+	CREATOR_SUCCESSOR_LOCAL_AUTHOR_REOPEN_INPUT_KEYS,
 	CREATOR_SUCCESSOR_REOPEN_INPUT_KEYS,
 	D108D1_BROWSER_BEHAVIORS,
 	D108D1_CHILD_BEHAVIORS,
@@ -148,7 +149,7 @@ describe("D.108d1 creator successor activation RED", () => {
 		]);
 	});
 
-	it("freezes the closed non-root surface without caller-selected identity", () => {
+	it("retains the pre-D.108d1b cold input only as a malformed negative beside the authoritative local-author roster", () => {
 		expect(CREATOR_SUCCESSOR_ACTIVATION_EXPORTS).toEqual([
 			"activateCreatorSuccessorAdoption",
 			"reopenCreatorSuccessorAdoption",
@@ -173,6 +174,24 @@ describe("D.108d1 creator successor activation RED", () => {
 			"networkNode",
 			"onAdmittedVertex",
 			"pinnedGenesisAnchorDigest",
+			"snapshotDeclaration",
+			"snapshotStore",
+			"store",
+		]);
+		expect(CREATOR_SUCCESSOR_LOCAL_AUTHOR_REOPEN_INPUT_KEYS).toEqual([
+			"authenticationProfile",
+			"author",
+			"catalog",
+			"detachedSignature",
+			"exactCanonicalAnchorPreimageBytes",
+			"exactCanonicalParametersCarrierBytes",
+			"issuanceStore",
+			"liveJournalStore",
+			"messageQueueManager",
+			"networkNode",
+			"onAdmittedVertex",
+			"pinnedGenesisAnchorDigest",
+			"signRegisteredVertexDigest",
 			"snapshotDeclaration",
 			"snapshotStore",
 			"store",
