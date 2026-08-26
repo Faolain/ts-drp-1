@@ -57870,6 +57870,31 @@ review and no confirmation review ran. Remaining D.107b.1 resolution debt is
 none: the child boots from the freshly built package graph, the full retained
 Phase-4c suite includes it without exclusion, and D.107c may now begin.
 
+### D.107b.2 — exact durable vote-carrier/QC identity repair
+
+Before D.107c GREEN can be accepted, close one inherited D.107b carrier defect
+exposed by the real WebKit recovery gate. The creator actor currently persists a
+commit vote, then signs the same vote a second time to assemble its q=1 commit
+QC. Chromium/Firefox and the Node test backend happened to return byte-identical
+Ed25519 signatures; WebKit returned two distinct valid signatures. The resulting
+QC verifies, but it does not contain the exact signature held by the durable
+vote carrier, so D.107c correctly rejects it.
+
+This repair is exactly two product paths:
+
+- `packages/seal/src/index.ts`; and
+- `packages/seal/src/creator.ts`.
+
+The voter success result returns the exact carrier reopened from the strict
+four-store commit, and the creator actor assembles prepare and commit q=1 QCs
+only from that returned durable carrier. Restart recovery must reacquire the
+occupied slot through the same duplicate vote path; it may not re-sign a QC,
+read browser storage directly, weaken exact signature equality or add a new
+public subpath. Acceptance requires the retained actor gates plus D.107c's
+independent carrier/QC oracle and all three browser engines, including WebKit.
+The repair is committed separately before the exact-nine D.107c GREEN packet so
+neither slice hides the ownership expansion.
+
 ### D.107c — persistent peer evidence and bounded re-learn
 
 D.107c adds the connected peer carrier and the only q=1 recovery gate. The RED
