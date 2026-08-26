@@ -187,9 +187,9 @@ afterEach(async () => {
 });
 
 describe("Phase 5e durable creator actor RED", () => {
-	it("freezes the exact six RED and exact sixteen GREEN owner rosters", () => {
+	it("freezes the exact six RED and exact eighteen GREEN owner rosters", () => {
 		expect(REQUIRED_RED_PATHS).toHaveLength(6);
-		expect(REQUIRED_GREEN_PATHS).toHaveLength(16);
+		expect(REQUIRED_GREEN_PATHS).toHaveLength(18);
 		expect(NEW_SEMANTIC_OWNERS).toEqual([
 			"packages/seal/src/creator.ts",
 			"packages/seal/src/internal/creator-close-intent.ts",

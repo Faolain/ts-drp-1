@@ -57656,13 +57656,17 @@ The tests-only RED is exactly six paths:
 - `packages/storage-browser/tests/phase-5e-creator-actor.pw.ts`; and
 - `packages/storage-browser/playwright.phase-5e-creator-actor.config.ts`.
 
-The expected GREEN is exactly sixteen paths:
+The expected GREEN is exactly eighteen paths:
 
 - `packages/keychain/src/finality.ts`;
 - `packages/seal/src/{creator.ts,internal/creator-close-intent.ts}`;
 - `packages/seal/package.json`;
 - `pnpm-lock.yaml`, limited to the matching `packages/seal` importer entry for
   its direct existing-workspace `@ts-drp/canonical` codec dependency;
+- the retained `tests/fixtures/phase-5-v3/seal-types.ts` exact keychain/browser
+  type-and-export roster;
+- the retained `tests/phase-5d-pacemaker-red.test.ts` executable fake-IDB
+  schema control;
 - `packages/storage-browser/src/{seal-evidence.ts,seal-vote.ts}`;
 - `packages/storage-browser/src/internal/{schema-idb.ts,seal-evidence-store.ts,seal-vote-store.ts}`;
 - the retained `packages/storage-browser/src/internal/seal-vote-test-control.ts`,
