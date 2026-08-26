@@ -1,0 +1,977 @@
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import {
+	type CloseSetHistoryCommitment,
+	CompactMerkleAccumulator,
+	deriveCloseSetHistoryCommitment,
+	type EpochVertex,
+} from "@ts-drp/compaction";
+import { createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
+import type { DurableIssuanceStore, DurableIssueCommit, DurableIssueScope } from "@ts-drp/issuance-store";
+import type {
+	DurableLiveJournalStore,
+	LiveJournalAcceptedRow,
+	LiveJournalScope,
+	LiveJournalSnapshotToken,
+} from "@ts-drp/live-journal";
+import { MessageQueueManager } from "@ts-drp/message-queue";
+import {
+	type AheDurableStore,
+	digestBlob,
+	type GenerationRecord,
+	type GenerationRef,
+	type PresentHead,
+} from "@ts-drp/storage";
+import type {
+	SnapshotQuarantineDeclaration,
+	SnapshotQuarantineScope,
+	SnapshotQuarantineStore,
+	SnapshotVerificationReceipt,
+} from "@ts-drp/storage/snapshot-transfer";
+import type { Message } from "@ts-drp/types";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+
+import type { TrustedBlueprintCatalog } from "../../../packages/blueprint-catalog/src/index.js";
+import { createRecoverableFinalitySigner } from "../../../packages/keychain/src/finality.js";
+import {
+	bindCreatorLiveClose,
+	type CreatorLiveCloseHandle,
+	type CreatorLiveCloseResult,
+} from "../../../packages/node/src/creator-close.js";
+import { type PreparedV3Live, type RecoveredV3Live, recoverV3LiveReplica } from "../../../packages/node/src/v3-live.js";
+import { activateV3LivePlane, bindV3BlueprintLivePlane } from "../../../packages/node/src/v3-live.js";
+import type { CurrentAnchorTrust } from "../../../packages/protocol-v3/src/index.js";
+import { openBrowserSealEvidenceStore } from "../../../packages/storage-browser/src/seal-evidence.js";
+import { openBrowserSealVoteStore } from "../../../packages/storage-browser/src/seal-vote.js";
+import { createBrowserSnapshotQuarantineStore } from "../../../packages/storage-browser/src/snapshot-transfer.js";
+import { createNodeDurableIssuanceStore } from "../../../packages/storage-node/src/issuance.js";
+import { createNodeDurableLiveJournalStore } from "../../../packages/storage-node/src/live-journal.js";
+import { contract, hexBytes } from "../phase-3a0-v3/controlled-anchor-trust.js";
+import { createGenuinePreparedV3Fixture } from "../phase-3a1b-p3/live-fixture.js";
+import { fakeNetwork } from "../phase-4b-v3/live-snapshot.js";
+
+export const REPOSITORY_ROOT = resolve(import.meta.dirname, "../../..");
+
+export const D108B_RED_PATHS = Object.freeze([
+	"tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
+	"tests/phase-6a-creator-adoption-red.test.ts",
+	"tests/fixtures/phase-3a1b-p3/live-fixture.ts",
+] as const);
+
+export const D108B_GREEN_PATHS = Object.freeze([
+	"packages/node/src/creator-adoption.ts",
+	"packages/node/src/internal/creator-adoption-intent.ts",
+	"packages/node/src/creator-close.ts",
+	"packages/node/src/v3-live.ts",
+	"packages/node/package.json",
+] as const);
+
+export const CREATOR_ADOPTION_EXPORTS = Object.freeze(["verifyCreatorSuccessorAdoption"] as const);
+
+export const CREATOR_ADOPTION_FAILURE_KINDS = Object.freeze([
+	"malformed-input",
+	"sealed-live-unavailable",
+	"recovery-failed",
+	"chain-invalid",
+	"journal-invalid",
+	"snapshot-invalid",
+	"blueprint-invalid",
+	"internal-invariant",
+] as const);
+
+export const V3_LIVE_GENERATION_2_KEYS = Object.freeze([
+	"aclDigest",
+	"anchorDigest",
+	"archiveIndexRoot",
+	"artifactDigest",
+	"artifactId",
+	"blueprintDigest",
+	"byteCharge",
+	"catalogDigest",
+	"compactHistory",
+	"epoch",
+	"graphDigest",
+	"historyRoot",
+	"historySize",
+	"kind",
+	"maxDependencies",
+	"maxEpochBytes",
+	"maxEpochVertices",
+	"objectId",
+	"orderedVertexHashesDigest",
+	"parametersDigest",
+	"previousHistoryRoot",
+	"previousHistorySize",
+	"profileDigest",
+	"runtimeProfile",
+	"signerSetDigest",
+	"snapshotManifestDigest",
+	"snapshotPayloadDigest",
+	"stateDigest",
+	"trustProfile",
+	"vertexCount",
+	"version",
+] as const);
+
+export const CUT_VALUE_FIELDS = Object.freeze([
+	"kind",
+	"protocolMajor",
+	"encodingVersion",
+	"objectId",
+	"epoch",
+	"previousAnchor",
+	"previousCutDigest",
+	"previousHistoryRoot",
+	"previousHistorySize",
+	"closeSetRoot",
+	"closeSetCount",
+	"historyRoot",
+	"historySize",
+	"stateDigest",
+	"aclDigest",
+	"snapshotManifestDigest",
+	"blueprintDigest",
+	"archiveIndexRoot",
+	"availabilityPolicyDigest",
+	"nextSignerSet",
+	"parameters",
+	"closeReason",
+] as const);
+
+export const D108B_MUTANTS = Object.freeze([
+	...CUT_VALUE_FIELDS.map((field) => `cut:${field}` as const),
+	"cut-swap",
+	"qc-swap",
+	"qc-prepare-as-commit",
+	"qc-duplicate-signer",
+	"trust-old",
+	"trust-foreign",
+	"pending-head-ref-length",
+	"pending-head-ref-digest",
+	"predecessor-link-missing",
+	"predecessor-link-duplicate",
+	"predecessor-link-cycle",
+	"predecessor-link-skipped",
+	"post-close-durable-vertex",
+	"durable-local-issued-missing",
+	"close-order",
+	"history-extension",
+	"manifest-old",
+	"manifest-foreign",
+	"manifest-chunk-size",
+	"manifest-chunk-digest",
+	"manifest-chunk-gap",
+	"payload-state",
+	"payload-acl",
+	"payload-archive",
+	"payload-anchor",
+	"payload-blueprint",
+	"catalog-wrong-blueprint",
+	"catalog-wrong-artifact",
+] as const);
+
+export interface CandidateCreatorAdoptionModule {
+	verifyCreatorSuccessorAdoption?(input: unknown): Promise<Readonly<Record<string, unknown>>>;
+}
+
+export interface GenuineCreatorAdoptionFixture {
+	readonly catalog: TrustedBlueprintCatalog;
+	readonly evidence: Readonly<{
+		readonly chunks: readonly Uint8Array[];
+		readonly closeResult: CreatorLiveCloseResult;
+		readonly current: DetachedHeadEvidence;
+		readonly currentTrust: CurrentAnchorTrust;
+		readonly declaration: SnapshotQuarantineDeclaration;
+		readonly exactCanonicalPayloadBytes: Uint8Array;
+		readonly exactCanonicalProjectionBytes: Uint8Array;
+		readonly generations: readonly GenerationRecord[];
+		readonly history: CloseSetHistoryCommitment;
+		readonly issuanceScope: DurableIssueScope;
+		readonly issuanceStore: DurableIssuanceStore;
+		readonly journalRows: readonly LiveJournalAcceptedRow[];
+		readonly journalSnapshot: LiveJournalSnapshotToken;
+		readonly localIssued: Readonly<{ readonly authorSequence: number; readonly digest: string }>;
+		readonly proposed: DetachedHeadEvidence;
+	}>;
+	readonly controls: {
+		activeRefMutation?: "digest" | "length";
+		adoptionPhase: boolean;
+		aheMutationCount: number;
+		readonly blobOverrides: Map<string, Uint8Array>;
+		cutField?: (typeof CUT_VALUE_FIELDS)[number];
+		generationMutation?: "cycle" | "duplicate" | "missing" | "skipped";
+		issuanceMissing: boolean;
+		journalMutation?: "reverse";
+		mutateSnapshotChunk: boolean;
+		snapshotChunkOverride?: readonly Uint8Array[];
+	};
+	readonly handle: CreatorLiveCloseHandle;
+	readonly journal: DurableLiveJournalStore;
+	readonly scope: LiveJournalScope;
+	close(): Promise<void>;
+}
+
+export interface DetachedHeadEvidence {
+	readonly candidates: readonly Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }>[];
+	readonly head: PresentHead;
+	readonly references: readonly GenerationRef[];
+	readonly trustRef: GenerationRef;
+}
+
+export type ModelIntent = Readonly<Record<never, never>>;
+
+/**
+ * Independent one-use custody oracle used before the production owner exists.
+ * @returns Model intent, owner and destructive consumer.
+ */
+export function modelIntentCustody(): Readonly<{
+	consume(intent: unknown, owner: object): unknown;
+	intent: ModelIntent;
+	owner: object;
+}> {
+	const owner = Object.freeze({});
+	const intent = Object.freeze({}) as ModelIntent;
+	const states = new WeakMap<object, Readonly<{ owner: object; value: string }>>();
+	states.set(intent, Object.freeze({ owner, value: "verified" }));
+	return Object.freeze({
+		consume(candidate, candidateOwner) {
+			if (candidate === null || typeof candidate !== "object") return undefined;
+			const state = states.get(candidate);
+			if (state === undefined || state.owner !== candidateOwner) return undefined;
+			states.delete(candidate);
+			return state.value;
+		},
+		intent,
+		owner,
+	});
+}
+
+/**
+ * Returns one independently changed field value for the exact CutValue mutation table.
+ * @param field - Exact registered CutValue field under mutation.
+ * @param value - Current independently decoded field value.
+ * @returns A distinct canonical-encodable field value.
+ */
+function changedField(field: (typeof CUT_VALUE_FIELDS)[number], value: unknown): unknown {
+	if (field === "kind") return "drp-hard-epoch-cut-mutant";
+	if (field === "protocolMajor") return 4;
+	if (field === "encodingVersion") return "drp-canonical-profile-mutant";
+	if (field === "closeReason") return "mutated-close";
+	if (field === "nextSignerSet") {
+		return Array.isArray(value) && value[0] !== undefined ? [value[0], value[0]] : [];
+	}
+	if (field === "parameters" && value !== null && typeof value === "object") {
+		return { ...(value as Record<string, unknown>), maxDependencies: 17 };
+	}
+	if (typeof value === "number") return value + 1;
+	if (typeof value === "string") return value === "f".repeat(64) ? "e".repeat(64) : "f".repeat(64);
+	return null;
+}
+
+/**
+ * Mutates exactly one registered CutValue field while preserving canonical encoding.
+ * @param bytes - Genuine canonical CutValue bytes.
+ * @param field - Registered field to change, or undefined for a transparent read.
+ * @returns Exact original or single-field mutant bytes.
+ */
+export function mutatedCutBlob(bytes: Uint8Array, field: (typeof CUT_VALUE_FIELDS)[number] | undefined): Uint8Array {
+	if (field === undefined) return bytes;
+	try {
+		const value = decodeCanonical(bytes);
+		if (value === null || typeof value !== "object" || Array.isArray(value)) return bytes;
+		const record = value as Record<string, unknown>;
+		if (record.kind !== "drp-hard-epoch-cut" || !Object.hasOwn(record, field)) return bytes;
+		return encodeCanonical({ ...record, [field]: changedField(field, record[field]) });
+	} catch {
+		return bytes;
+	}
+}
+
+/**
+ * Resolves one exact detached closure blob from captured genuine evidence.
+ * @param evidence - Captured head closure and candidate bytes.
+ * @param ref - Exact reference to resolve.
+ * @returns Detached exact blob bytes.
+ */
+export function bytesForRef(evidence: DetachedHeadEvidence, ref: GenerationRef): Uint8Array {
+	const candidate = evidence.candidates.find(
+		(entry) => entry.ref.byteLength === ref.byteLength && entry.ref.digest === ref.digest
+	);
+	if (candidate === undefined) throw new TypeError(`D.108b fixture ref is absent: ${ref.digest}`);
+	return Uint8Array.from(candidate.bytes);
+}
+
+function decoratedAheStore(
+	backend: AheDurableStore,
+	controls: GenuineCreatorAdoptionFixture["controls"]
+): AheDurableStore {
+	return Object.freeze({
+		capabilities: backend.capabilities,
+		beginGeneration: (input) => {
+			controls.aheMutationCount += 1;
+			return backend.beginGeneration(input);
+		},
+		close: () => backend.close(),
+		completeGeneration: (input) => {
+			controls.aheMutationCount += 1;
+			return backend.completeGeneration(input);
+		},
+		discardGeneration: (input) => {
+			controls.aheMutationCount += 1;
+			return backend.discardGeneration(input);
+		},
+		getBlob: async (digest) => {
+			const result = await backend.getBlob(digest);
+			if (!result.ok || result.value === null) return result;
+			const override = controls.blobOverrides.get(digest);
+			if (override !== undefined) return Object.freeze({ ok: true as const, value: Uint8Array.from(override) });
+			return Object.freeze({ ok: true as const, value: mutatedCutBlob(result.value, controls.cutField) });
+		},
+		promoteReference: (input) => {
+			controls.aheMutationCount += 1;
+			return backend.promoteReference(input);
+		},
+		putCachedBlob: (input) => {
+			controls.aheMutationCount += 1;
+			return backend.putCachedBlob(input);
+		},
+		readGenerationPage: async (input) => {
+			const result = await backend.readGenerationPage(input);
+			if (!result.ok || controls.generationMutation === undefined || result.value.generations.length < 2) return result;
+			const generations = [...result.value.generations];
+			const last = generations.findLast(({ state }) => state === "Adopted") ?? generations.at(-1);
+			if (last === undefined) return result;
+			if (controls.generationMutation === "missing") generations.splice(Math.max(0, generations.length - 2), 1);
+			else if (controls.generationMutation === "duplicate") generations.push(last);
+			else {
+				const index = generations.indexOf(last);
+				const base = last.baseExpectedHead;
+				if (base.kind !== "present") return result;
+				generations[index] = Object.freeze({
+					...last,
+					baseExpectedHead: Object.freeze({
+						...base,
+						...(controls.generationMutation === "cycle"
+							? { generationId: last.generationId }
+							: { revision: Math.max(0, base.revision - 1) }),
+					}),
+				});
+			}
+			return Object.freeze({ ok: true as const, value: Object.freeze({ ...result.value, generations }) });
+		},
+		readHead: (objectId) => backend.readHead(objectId),
+		recoverActiveGeneration: async (objectId) => {
+			const result = await backend.recoverActiveGeneration(objectId);
+			if (!result.ok || result.value.kind !== "active" || controls.activeRefMutation === undefined) return result;
+			const references = result.value.references.map((ref, index) =>
+				index !== 0
+					? ref
+					: controls.activeRefMutation === "length"
+						? { ...ref, byteLength: ref.byteLength + 1 }
+						: { ...ref, digest: "f".repeat(64) as typeof ref.digest }
+			);
+			return Object.freeze({
+				ok: true as const,
+				value: Object.freeze({
+					...result.value,
+					adoptedGeneration: Object.freeze({ ...result.value.adoptedGeneration, closure: references }),
+					references,
+				}),
+			});
+		},
+		swapHead: (input) => {
+			controls.aheMutationCount += 1;
+			return backend.swapHead(input);
+		},
+	});
+}
+
+function decoratedSnapshotStore(
+	backend: SnapshotQuarantineStore<SnapshotVerificationReceipt>,
+	controls: GenuineCreatorAdoptionFixture["controls"],
+	observeDeclaration: (declaration: SnapshotQuarantineDeclaration) => void
+): SnapshotQuarantineStore<SnapshotVerificationReceipt> {
+	return Object.freeze({
+		close: () => backend.close(),
+		openScope: async (declaration, options) => {
+			observeDeclaration(declaration);
+			const scope = await backend.openScope(declaration, options);
+			if (!controls.adoptionPhase) return scope;
+			const decorated: SnapshotQuarantineScope<SnapshotVerificationReceipt> = Object.freeze({
+				cancel: (selected) => scope.cancel(selected),
+				complete: (receipt, selected) => scope.complete(receipt, selected),
+				missingIndices: (selected) => scope.missingIndices(selected),
+				release: () => scope.release(),
+				scope: scope.scope,
+				status: (selected) => scope.status(selected),
+				verificationQuarantine: Object.freeze({
+					open(signal) {
+						const port = scope.verificationQuarantine.open(signal);
+						return Object.freeze({
+							discard: () => port.discard(),
+							read: async (descriptor) => {
+								const bytes = await port.read(descriptor);
+								const override = controls.snapshotChunkOverride?.[descriptor.index];
+								if (override !== undefined) return Uint8Array.from(override);
+								if (bytes === undefined || !controls.mutateSnapshotChunk || descriptor.index !== 0) return bytes;
+								const mutant = Uint8Array.from(bytes);
+								if (mutant.byteLength > 0) mutant[0] = (mutant[0] as number) ^ 1;
+								return mutant;
+							},
+							write: (descriptor, bytes) => port.write(descriptor, bytes),
+						});
+					},
+				}),
+			});
+			return decorated;
+		},
+		sweepExpired: (options) => backend.sweepExpired(options),
+	});
+}
+
+async function detachedHeadEvidence(
+	store: AheDurableStore,
+	inspection: Awaited<ReturnType<CreatorLiveCloseHandle["inspectDurableHead"]>>
+): Promise<DetachedHeadEvidence> {
+	const candidates = await Promise.all(
+		inspection.references.map(async (ref) => {
+			const loaded = await store.getBlob(ref.digest);
+			if (!loaded.ok || loaded.value === null || loaded.value.byteLength !== ref.byteLength) {
+				throw new TypeError("D.108b fixture closure blob is unavailable");
+			}
+			return Object.freeze({ bytes: Uint8Array.from(loaded.value), ref: Object.freeze({ ...ref }) });
+		})
+	);
+	return Object.freeze({
+		candidates: Object.freeze(candidates),
+		head: Object.freeze({ ...inspection.head }),
+		references: Object.freeze(inspection.references.map((ref) => Object.freeze({ ...ref }))),
+		trustRef: Object.freeze({ ...inspection.trustRef }),
+	});
+}
+
+function concatenate(chunks: readonly Uint8Array[]): Uint8Array {
+	const output = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.byteLength, 0));
+	let offset = 0;
+	for (const chunk of chunks) {
+		output.set(chunk, offset);
+		offset += chunk.byteLength;
+	}
+	return output;
+}
+
+function hex(bytes: Uint8Array): string {
+	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function recoverWithDurableStores(
+	fixture: Awaited<ReturnType<typeof createGenuinePreparedV3Fixture>>,
+	capability: PreparedV3Live,
+	controls: GenuineCreatorAdoptionFixture["controls"]
+): Promise<
+	Readonly<{
+		readonly capability: RecoveredV3Live;
+		close(): Promise<void>;
+		readonly issuanceStore: DurableIssuanceStore;
+		readonly journal: DurableLiveJournalStore;
+	}>
+> {
+	const directory = mkdtempSync(join(tmpdir(), "drp-d108b-replay-"));
+	const rawIssuanceStore = createNodeDurableIssuanceStore({ primaryFilename: join(directory, "issuance.sqlite") });
+	const rawJournal = createNodeDurableLiveJournalStore({ primaryFilename: join(directory, "journal.sqlite") });
+	const issuanceStore: DurableIssuanceStore = Object.freeze({
+		close: () => rawIssuanceStore.close(),
+		compareAndMarkOutboxPublished: (input) => rawIssuanceStore.compareAndMarkOutboxPublished(input),
+		readIssued: (scope, sequence) =>
+			controls.issuanceMissing ? Promise.resolve(null) : rawIssuanceStore.readIssued(scope, sequence),
+		readLineage: (scope) => rawIssuanceStore.readLineage(scope),
+		readOutboxPage: (input) => rawIssuanceStore.readOutboxPage(input),
+		transactIssue: (scope, buildAndSign) => rawIssuanceStore.transactIssue(scope, buildAndSign),
+	});
+	const journal: DurableLiveJournalStore = Object.freeze({
+		appendAccepted: (input) => rawJournal.appendAccepted(input),
+		close: () => rawJournal.close(),
+		installEpochAnchor: (input) => rawJournal.installEpochAnchor(input),
+		installGenesis: (input) => rawJournal.installGenesis(input),
+		readiness: (input) => rawJournal.readiness(input),
+		readPage: async (input) => {
+			const result = await rawJournal.readPage(input);
+			return result.ok && controls.journalMutation === "reverse"
+				? Object.freeze({ ...result, rows: Object.freeze([...result.rows].reverse()) })
+				: result;
+		},
+	});
+	try {
+		const scope = Object.freeze({ author: fixture.author, objectId: fixture.objectId });
+		const envelope = Object.freeze({
+			canonicalPreimageBytes: Uint8Array.from(fixture.recoveryCanonicalPreimageBytes),
+			digest: hashDomain("ts-drp/vertex/v3", fixture.recoveryCanonicalPreimageBytes),
+			signature: Uint8Array.from(fixture.recoverySignature),
+		});
+		await issuanceStore.transactIssue(scope, (authorSequence) => {
+			if (authorSequence !== 0) throw new TypeError("D.108b recovery issuance sequence is invalid");
+			return Promise.resolve(
+				Object.freeze({
+					authorSequence,
+					envelope,
+					issuedRecord: Object.freeze({ authorSequence, envelope, scope }),
+					outboxEntry: Object.freeze({ authorSequence, envelope, scope }),
+				}) satisfies DurableIssueCommit
+			);
+		});
+		const installed = await journal.installGenesis({
+			detachedAnchorSignature: fixture.detachedAnchorSignature,
+			exactCanonicalAnchorPreimageBytes: fixture.exactCanonicalAnchorPreimageBytes,
+			exactCanonicalParametersCarrierBytes: fixture.exactCanonicalParametersCarrierBytes,
+			objectId: fixture.objectId,
+		});
+		if (!installed.ok) throw new TypeError(`D.108b durable journal install failed: ${installed.kind}`);
+		const appended = await journal.appendAccepted({
+			detachedSignature: envelope.signature,
+			exactCanonicalPreimageBytes: envelope.canonicalPreimageBytes,
+			scope: installed.scope,
+			sourceKind: "received",
+			vertexDigest: hex(envelope.digest),
+		});
+		if (!appended.ok) throw new TypeError(`D.108b durable journal seed failed: ${appended.kind}`);
+		if (fixture.exactCanonicalLatchedAclBytes === undefined) {
+			throw new TypeError("D.108b fixture requires a latched ACL");
+		}
+		const recovered = await recoverV3LiveReplica({
+			capability,
+			exactCanonicalLatchedAclBytes: fixture.exactCanonicalLatchedAclBytes,
+			issuanceScope: scope,
+			issuanceStore,
+			liveJournalStore: journal,
+		});
+		if (!recovered.ok) throw new TypeError(`D.108b durable recovery failed: ${recovered.kind}`);
+		return Object.freeze({
+			capability: recovered.capability,
+			close: async () => {
+				await Promise.all([rawIssuanceStore.close(), rawJournal.close()]);
+				rmSync(directory, { force: true, recursive: true });
+			},
+			issuanceStore,
+			journal,
+		});
+	} catch (error) {
+		await Promise.allSettled([rawIssuanceStore.close(), rawJournal.close()]);
+		rmSync(directory, { force: true, recursive: true });
+		throw error;
+	}
+}
+
+function expectedSuccessorProjection(
+	catalog: TrustedBlueprintCatalog,
+	closeResult: CreatorLiveCloseResult,
+	current: DetachedHeadEvidence,
+	proposed: DetachedHeadEvidence,
+	history: CloseSetHistoryCommitment,
+	declaration: SnapshotQuarantineDeclaration
+): Uint8Array {
+	const cut = decodeCanonical(bytesForRef(proposed, closeResult.cutValueRef)) as Readonly<Record<string, unknown>>;
+	const successorTrust = decodeCanonical(bytesForRef(proposed, closeResult.successorTrustRef)) as Readonly<
+		Record<string, unknown>
+	>;
+	const currentTrust = decodeCanonical(bytesForRef(current, closeResult.currentTrustRef)) as Readonly<
+		Record<string, unknown>
+	>;
+	if (
+		!(successorTrust.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array) ||
+		!(currentTrust.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array)
+	) {
+		throw new TypeError("D.108b fixture trust anchors are unavailable");
+	}
+	const successorAnchorBytes = successorTrust.exactCanonicalCurrentAnchorPreimageBytes;
+	const successorAnchor = decodeCanonical(successorAnchorBytes) as Readonly<Record<string, unknown>>;
+	const currentAnchor = decodeCanonical(currentTrust.exactCanonicalCurrentAnchorPreimageBytes) as Readonly<
+		Record<string, unknown>
+	>;
+	const parameters = cut.parameters as Readonly<Record<string, unknown>>;
+	const resolved = catalog.resolve(String(successorAnchor.blueprintDigest));
+	const ordered = encodeCanonical({
+		kind: "v3-live-order-1",
+		vertexHashes: [closeResult.successorAnchorDigest],
+	});
+	const graph = encodeCanonical({
+		charges: [{ byteCharge: successorAnchorBytes.byteLength, hash: closeResult.successorAnchorDigest }],
+		kind: "v3-live-graph-1",
+		vertices: [
+			{
+				dependencies: [],
+				epoch: 1,
+				hash: closeResult.successorAnchorDigest,
+				kind: "drp-epoch-anchor",
+				objectId: successorAnchor.objectId,
+			},
+		],
+	});
+	const orderDigest = digestBlob(ordered);
+	const graphDigest = digestBlob(graph);
+	if (!orderDigest.ok || !graphDigest.ok) throw new TypeError("D.108b fixture projection digest failed");
+	const manifest = decodeCanonical(declaration.exactCanonicalManifestBytes) as Readonly<Record<string, unknown>>;
+	if (
+		cut.previousHistoryRoot !== currentAnchor.historyRoot ||
+		cut.previousHistorySize !== currentAnchor.historySize ||
+		cut.historyRoot !== history.historyRoot ||
+		cut.historySize !== history.historySize
+	) {
+		throw new TypeError("D.108b fixture history cross-link failed");
+	}
+	return encodeCanonical({
+		aclDigest: successorAnchor.aclDigest,
+		anchorDigest: closeResult.successorAnchorDigest,
+		archiveIndexRoot: successorAnchor.archiveIndexRoot,
+		artifactDigest: resolved.artifactDigest,
+		artifactId: resolved.artifactId,
+		blueprintDigest: successorAnchor.blueprintDigest,
+		byteCharge: successorAnchorBytes.byteLength,
+		catalogDigest: resolved.evidence.catalogDigest,
+		compactHistory: history.historySnapshot,
+		epoch: 1,
+		graphDigest: graphDigest.value,
+		historyRoot: history.historyRoot,
+		historySize: history.historySize,
+		kind: "v3-live-generation-2",
+		maxDependencies: parameters.maxDependencies,
+		maxEpochBytes: parameters.maxEpochBytes,
+		maxEpochVertices: parameters.maxEpochVertices,
+		objectId: successorAnchor.objectId,
+		orderedVertexHashesDigest: orderDigest.value,
+		parametersDigest: successorAnchor.parametersDigest,
+		previousHistoryRoot: currentAnchor.historyRoot,
+		previousHistorySize: currentAnchor.historySize,
+		profileDigest: successorAnchor.profileDigest,
+		runtimeProfile: resolved.runtimeProfile,
+		signerSetDigest: successorAnchor.signerSetDigest,
+		snapshotManifestDigest: cut.snapshotManifestDigest,
+		snapshotPayloadDigest: manifest.payloadDigest,
+		stateDigest: successorAnchor.stateDigest,
+		trustProfile: "creator-only",
+		vertexCount: 1,
+		version: 2,
+	});
+}
+
+async function genuineHistoryEvidence(
+	exactCanonicalAnchorPreimageBytes: Uint8Array,
+	rows: readonly LiveJournalAcceptedRow[],
+	issuanceStore: DurableIssuanceStore
+): Promise<CloseSetHistoryCommitment> {
+	const anchor = decodeCanonical(exactCanonicalAnchorPreimageBytes) as Readonly<Record<string, unknown>>;
+	const anchorDigest = rows[0]?.scope.anchorDigest;
+	if (anchorDigest === undefined) throw new TypeError("D.108b fixture journal is empty");
+	const vertices = new Map<string, EpochVertex>([
+		[
+			anchorDigest,
+			{
+				dependencies: [],
+				epoch: Number(anchor.epoch),
+				hash: anchorDigest,
+				kind: "drp-epoch-anchor",
+				objectId: String(anchor.objectId),
+			},
+		],
+	]);
+	const charges = new Map<string, number>();
+	for (const row of rows) {
+		let bytes: Uint8Array;
+		if (row.sourceKind === "received") bytes = row.exactCanonicalPreimageBytes;
+		else {
+			const issued = await issuanceStore.readIssued(
+				Object.freeze({ author: row.author, objectId: row.scope.objectId }),
+				row.authorSequence
+			);
+			if (issued === null) throw new TypeError("D.108b fixture local-issued evidence is unavailable");
+			bytes = issued.envelope.canonicalPreimageBytes;
+		}
+		const decoded = decodeCanonical(bytes) as Readonly<Record<string, unknown>>;
+		vertices.set(
+			row.vertexDigest,
+			Object.freeze({
+				anchor: decoded.anchor,
+				dependencies: decoded.dependencies,
+				epoch: decoded.epoch,
+				hash: row.vertexDigest,
+				kind: decoded.kind,
+				objectId: decoded.objectId,
+				operation: decoded.operation,
+			}) as unknown as EpochVertex
+		);
+		charges.set(row.vertexDigest, bytes.byteLength);
+	}
+	const depended = new Set<string>();
+	for (const [hash, vertex] of vertices) {
+		if (hash === anchorDigest) continue;
+		for (const dependency of vertex.dependencies) if (dependency !== anchorDigest) depended.add(dependency);
+	}
+	const frontier = [...charges.keys()].filter((hash) => !depended.has(hash));
+	return deriveCloseSetHistoryCommitment({
+		authenticatedCanonicalPreimageByteLengths: charges,
+		exactCanonicalEpochAnchorPreimageBytes: exactCanonicalAnchorPreimageBytes,
+		frontier,
+		maxEpochBytes: 16_777_216,
+		maxEpochVertices: 4096,
+		previousHistorySnapshot: new CompactMerkleAccumulator().snapshot(),
+		vertices,
+	});
+}
+
+/**
+ * Deletes one fixture-only IndexedDB database after all handles have closed.
+ * @param name - Exact fixture database name.
+ * @returns Completion after deletion, error or blocking is observed.
+ */
+function deleteDatabase(name: string): Promise<void> {
+	return new Promise((resolvePromise) => {
+		const request = indexedDB.deleteDatabase(name);
+		request.addEventListener("success", () => resolvePromise(), { once: true });
+		request.addEventListener("error", () => resolvePromise(), { once: true });
+		request.addEventListener("blocked", () => resolvePromise(), { once: true });
+	});
+}
+
+/**
+ * Builds the real pending-successor handoff consumed by the future verifier.
+ * @param options - Optional distinct object identity for cross-close swap controls.
+ * @returns Genuine sealed handle, trusted catalog, mutation controls and cleanup owner.
+ */
+export async function openGenuineCreatorAdoptionFixture(
+	options: Readonly<{ readonly objectId?: string }> = {}
+): Promise<GenuineCreatorAdoptionFixture> {
+	const controls: GenuineCreatorAdoptionFixture["controls"] = {
+		adoptionPhase: false,
+		aheMutationCount: 0,
+		blobOverrides: new Map(),
+		issuanceMissing: false,
+		mutateSnapshotChunk: false,
+	};
+	const emptyHistoryRoot = Array.from(new CompactMerkleAccumulator().root(), (byte: number) =>
+		byte.toString(16).padStart(2, "0")
+	).join("");
+	const primaryDatabaseName = `d108b-seal-${crypto.randomUUID()}`;
+	const snapshotDatabaseName = `d108b-snapshot-${crypto.randomUUID()}`;
+	let aheBackend: AheDurableStore | undefined;
+	let declaration: SnapshotQuarantineDeclaration | undefined;
+	const fixture = await createGenuinePreparedV3Fixture({
+		authorizationMode: "latched-acl",
+		exactCanonicalInitialStateBytes: encodeCanonical(0),
+		historyRoot: emptyHistoryRoot,
+		historySize: 0,
+		...(options.objectId === undefined ? {} : { objectId: options.objectId }),
+		storeDecorator: (backend) => {
+			aheBackend = backend;
+			return decoratedAheStore(backend, controls);
+		},
+	});
+	if (aheBackend === undefined) throw new TypeError("D.108b fixture AHE backend capture failed");
+	const openedCurrentTrust = await createCurrentAnchorTrustStore({
+		objectId: fixture.objectId as Parameters<typeof createCurrentAnchorTrustStore>[0]["objectId"],
+		pinnedGenesisAnchorDigest: fixture.anchorDigest,
+		store: aheBackend,
+	}).open();
+	if (!openedCurrentTrust.ok)
+		throw new TypeError(`D.108b fixture current trust open failed: ${openedCurrentTrust.reason}`);
+	const recovered = await recoverWithDurableStores(fixture, fixture.capability, controls);
+	const activation = activateV3LivePlane({
+		capability: recovered.capability,
+		messageQueueManager: new MessageQueueManager<Message>({ logConfig: { level: "silent" } }),
+		networkNode: fakeNetwork(`d108b-${crypto.randomUUID()}`),
+		onAdmittedVertex: () => undefined,
+	});
+	if (!activation.ok) throw new TypeError(`D.108b fixture activation failed: ${activation.kind}`);
+	const blueprint = bindV3BlueprintLivePlane({
+		exactCanonicalInitialStateBytes: encodeCanonical(0),
+		plane: activation.handle,
+	});
+	if (!blueprint.ok) throw new TypeError(`D.108b fixture blueprint binding failed: ${blueprint.kind}`);
+	const localIssued = await activation.handle.issueLocal({
+		operations: Object.freeze([
+			Object.freeze({ logicalTime: 2, operation: Object.freeze({ action: "add", value: 2 }) }),
+		]),
+		signRegisteredVertexDigest: fixture.signRegisteredVertexDigest,
+	});
+	if (!localIssued.ok) throw new TypeError(`D.108b fixture local issue failed: ${localIssued.kind}`);
+	const signer = await createRecoverableFinalitySigner({ seed: hexBytes(contract.privateKeySeedHex) });
+	const [vote, evidence, rawSnapshotStore] = await Promise.all([
+		openBrowserSealVoteStore({ databaseName: primaryDatabaseName }),
+		openBrowserSealEvidenceStore({ databaseName: primaryDatabaseName }),
+		createBrowserSnapshotQuarantineStore({ primaryDatabaseName: snapshotDatabaseName }),
+	]);
+	if (vote.observation.incarnation !== evidence.observation.incarnation) {
+		throw new TypeError("D.108b fixture seal incarnation mismatch");
+	}
+	const snapshotStore = decoratedSnapshotStore(rawSnapshotStore, controls, (value) => {
+		declaration = value;
+	});
+	const bound = await bindCreatorLiveClose({
+		evidenceStore: evidence.store,
+		exactCanonicalAvailabilityPolicyBytes: encodeCanonical({
+			minLocalCopies: 1,
+			minMirrorReceipts: 0,
+			minRollbackGenerations: 2,
+			mode: "local-only",
+		}),
+		onObservation: () => undefined,
+		plane: activation.handle,
+		signer: signer.signer as unknown as Parameters<typeof bindCreatorLiveClose>[0]["signer"],
+		snapshotStore,
+		storageIncarnation: vote.observation.incarnation,
+		voteStore: vote.store,
+	});
+	if (!bound.ok) throw new TypeError(`D.108b fixture close binding failed: ${bound.reason}`);
+	const current = await detachedHeadEvidence(aheBackend, await bound.handle.inspectDurableHead());
+	const closeResult = await bound.handle.close();
+	controls.adoptionPhase = true;
+	const proposed = await detachedHeadEvidence(aheBackend, await bound.handle.inspectDurableHead());
+	const generationPage = await aheBackend.readGenerationPage({ objectId: fixture.objectId, limit: 128 });
+	if (!generationPage.ok || generationPage.value.nextCursor !== null) {
+		throw new TypeError("D.108b fixture generation page is unavailable");
+	}
+	const journalScope = Object.freeze({ anchorDigest: fixture.anchorDigest, epoch: 0, objectId: fixture.objectId });
+	const journalReadiness = await recovered.journal.readiness({ scope: journalScope });
+	if (!journalReadiness.ok || !journalReadiness.ready) {
+		throw new TypeError("D.108b fixture journal snapshot is unavailable");
+	}
+	const journalRows: LiveJournalAcceptedRow[] = [];
+	let afterSequence: number | null = null;
+	while (true) {
+		const journalPage: Awaited<ReturnType<DurableLiveJournalStore["readPage"]>> = await recovered.journal.readPage({
+			afterSequence,
+			limit: 128,
+			scope: journalScope,
+			snapshot: journalReadiness.snapshot,
+		});
+		if (!journalPage.ok) throw new TypeError("D.108b fixture journal page is unavailable");
+		journalRows.push(...journalPage.rows);
+		if (journalPage.nextSequence === null) break;
+		afterSequence = journalPage.nextSequence;
+	}
+	const history = await genuineHistoryEvidence(
+		fixture.exactCanonicalAnchorPreimageBytes,
+		journalRows,
+		recovered.issuanceStore
+	);
+	if (declaration === undefined) throw new TypeError("D.108b fixture snapshot declaration capture failed");
+	const exactCanonicalProjectionBytes = expectedSuccessorProjection(
+		fixture.catalog,
+		closeResult,
+		current,
+		proposed,
+		history,
+		declaration
+	);
+	const reopenedSnapshot = await rawSnapshotStore.openScope(declaration);
+	const portController = new AbortController();
+	const port = reopenedSnapshot.verificationQuarantine.open(portController.signal);
+	const chunks = await Promise.all(
+		declaration.chunks.map(async (descriptor: SnapshotQuarantineDeclaration["chunks"][number]) => {
+			const bytes = await port.read(descriptor);
+			if (bytes === undefined) throw new TypeError("D.108b fixture snapshot chunk is unavailable");
+			return Uint8Array.from(bytes);
+		})
+	);
+	await port.discard();
+	await reopenedSnapshot.release();
+	return Object.freeze({
+		catalog: fixture.catalog,
+		close: async () => {
+			await bound.handle.stop();
+			activation.handle.deactivate();
+			await Promise.all([vote.close(), evidence.close(), snapshotStore.close(), recovered.close(), fixture.close()]);
+			await Promise.all([deleteDatabase(primaryDatabaseName), deleteDatabase(snapshotDatabaseName)]);
+		},
+		controls,
+		evidence: Object.freeze({
+			chunks: Object.freeze(chunks),
+			closeResult,
+			current,
+			currentTrust: openedCurrentTrust.trust,
+			declaration,
+			exactCanonicalPayloadBytes: concatenate(chunks),
+			exactCanonicalProjectionBytes,
+			generations: Object.freeze([...generationPage.value.generations]),
+			history,
+			issuanceScope: Object.freeze({ author: fixture.author, objectId: fixture.objectId }),
+			issuanceStore: recovered.issuanceStore,
+			journalRows: Object.freeze(journalRows),
+			journalSnapshot: journalReadiness.snapshot,
+			localIssued: Object.freeze({ authorSequence: localIssued.authorSequence, digest: localIssued.digest }),
+			proposed,
+		}),
+		handle: bound.handle,
+		journal: recovered.journal,
+		scope: journalScope,
+	});
+}
+
+/**
+ * Returns whether the node manifest exposes exactly the intended non-root subpath.
+ * @param packageText - Exact node package manifest text.
+ * @returns Whether the manifest has the frozen D.108b export map.
+ */
+function exactExportMap(packageText: string): boolean {
+	try {
+		const parsed = JSON.parse(packageText) as Readonly<Record<string, unknown>>;
+		const exports = parsed.exports as Readonly<Record<string, unknown>> | undefined;
+		const entry = exports?.["./creator-adoption"] as Readonly<Record<string, unknown>> | undefined;
+		return entry?.types === "./dist/src/creator-adoption.d.ts" && entry.import === "./dist/src/creator-adoption.js";
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * One composite readiness owner; all other RED controls remain executable.
+ * @param candidate - Dynamically imported future production owner, when present.
+ * @returns Frozen exact readiness facts.
+ */
+export function creatorAdoptionReadiness(candidate: CandidateCreatorAdoptionModule | undefined): Readonly<{
+	greenPaths: boolean;
+	intentCustody: boolean;
+	packageExport: boolean;
+	publicVerifier: boolean;
+	ready: boolean;
+}> {
+	const greenPaths = D108B_GREEN_PATHS.every((path) => existsSync(resolve(REPOSITORY_ROOT, path)));
+	const packageExport = exactExportMap(readFileSync(resolve(REPOSITORY_ROOT, "packages/node/package.json"), "utf8"));
+	const intentPath = resolve(REPOSITORY_ROOT, "packages/node/src/internal/creator-adoption-intent.ts");
+	const intentCustody =
+		existsSync(intentPath) &&
+		/WeakMap/u.test(readFileSync(intentPath, "utf8")) &&
+		/consumeCreatorAdoptionIntent/u.test(readFileSync(intentPath, "utf8"));
+	const publicVerifier = typeof candidate?.verifyCreatorSuccessorAdoption === "function";
+	return Object.freeze({
+		greenPaths,
+		intentCustody,
+		packageExport,
+		publicVerifier,
+		ready: greenPaths && packageExport && intentCustody && publicVerifier,
+	});
+}
+
+/**
+ * Returns the source-level no-mutation/no-root/no-product governance facts.
+ * @returns Frozen source-governance facts.
+ */
+export function sourceGovernance(): Readonly<{
+	forbiddenRootExport: boolean;
+	noAheMutationInVerifier: boolean;
+	noProductConsumer: boolean;
+}> {
+	const verifierPath = resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption.ts");
+	const verifier = existsSync(verifierPath) ? readFileSync(verifierPath, "utf8") : "";
+	const root = readFileSync(resolve(REPOSITORY_ROOT, "packages/node/src/index.ts"), "utf8");
+	const examples = ["examples/v3-chat/src/index.ts", "examples/v3-room/src/index.ts"]
+		.map((path) => readFileSync(resolve(REPOSITORY_ROOT, path), "utf8"))
+		.join("\n");
+	return Object.freeze({
+		forbiddenRootExport: /creator-adoption|verifyCreatorSuccessorAdoption/u.test(root),
+		noAheMutationInVerifier:
+			!/\.(?:beginGeneration|putCachedBlob|promoteReference|completeGeneration|swapHead|discardGeneration)\s*\(/u.test(
+				verifier
+			),
+		noProductConsumer: !/verifyCreatorSuccessorAdoption|CreatorAdoptionIntent/u.test(examples),
+	});
+}

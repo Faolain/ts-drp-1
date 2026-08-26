@@ -49,6 +49,7 @@ export interface GenuinePreparedV3Fixture {
 	readonly author: string;
 	readonly authors: readonly string[];
 	readonly authorPublicKey: Uint8Array;
+	readonly catalog: TrustedBlueprintCatalog;
 	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
 	readonly exactCanonicalAuthorAuthorizationBytes: Uint8Array;
 	readonly exactCanonicalLatchedAclBytes: Uint8Array | undefined;
@@ -104,6 +105,7 @@ export interface GenuinePreparedV3FixtureOptions {
 	readonly latchedAclVersion?: 1 | 2;
 	readonly objectId?: string;
 	readonly prepareV3LiveGeneration?: typeof defaultPrepareV3LiveGeneration;
+	storeDecorator?(store: AheDurableStore): AheDurableStore;
 }
 
 export type PrepareV3LiveGenerationForFixture = typeof defaultPrepareV3LiveGeneration;
@@ -201,7 +203,8 @@ export async function createGenuinePreparedV3Fixture(
 	options: GenuinePreparedV3FixtureOptions = {}
 ): Promise<GenuinePreparedV3Fixture> {
 	const directory = mkdtempSync(path.join(tmpdir(), "drp-seam3-token-"));
-	const store = createSqliteAheDurableStore({ filename: path.join(directory, "store.sqlite") });
+	const backendStore = createSqliteAheDurableStore({ filename: path.join(directory, "store.sqlite") });
+	const store = options.storeDecorator?.(backendStore) ?? backendStore;
 	const prepareV3LiveGeneration = options.prepareV3LiveGeneration ?? defaultPrepareV3LiveGeneration;
 	try {
 		const authorizationMode = options.authorizationMode ?? "legacy-author-list";
@@ -274,6 +277,7 @@ export async function createGenuinePreparedV3Fixture(
 		});
 		if (!installed.ok) throw new TypeError(`trust install failed: ${installed.reason}`);
 		const exactCanonicalParametersCarrierBytes = encodeCanonical(PARAMETERS);
+		const trustedCatalog = catalog(fixture);
 		const input = Object.freeze({
 			authenticationProfile: "creator-only",
 			store,
@@ -282,7 +286,7 @@ export async function createGenuinePreparedV3Fixture(
 			exactCanonicalAnchorPreimageBytes: new Uint8Array(anchorBytes),
 			detachedSignature: new Uint8Array(signature),
 			exactCanonicalParametersCarrierBytes: new Uint8Array(exactCanonicalParametersCarrierBytes),
-			catalog: catalog(fixture),
+			catalog: trustedCatalog,
 		});
 		const prepared = await prepareV3LiveGeneration(input);
 		if (!prepared.ok) throw new TypeError(`live preparation failed: ${"kind" in prepared ? prepared.kind : "unknown"}`);
@@ -309,6 +313,7 @@ export async function createGenuinePreparedV3Fixture(
 			authors,
 			authorPublicKey: ed25519.getPublicKey(hexBytes(authorizedPrivateKeySeedHexes[0] as string)),
 			capability: prepared.capability,
+			catalog: trustedCatalog,
 			exactCanonicalAnchorPreimageBytes: new Uint8Array(anchorBytes),
 			exactCanonicalAuthorAuthorizationBytes: new Uint8Array(exactCanonicalAuthorAuthorizationBytes),
 			exactCanonicalLatchedAclBytes:
@@ -370,13 +375,13 @@ export async function createGenuinePreparedV3Fixture(
 				return Object.freeze({ capability: next.capability, descriptor: next.descriptor });
 			},
 			async close(): Promise<void> {
-				await store.close();
+				await backendStore.close();
 				rmSync(directory, { force: true, recursive: true });
 			},
 		};
 		return Object.freeze(result);
 	} catch (error) {
-		await store.close();
+		await backendStore.close();
 		rmSync(directory, { force: true, recursive: true });
 		throw error;
 	}

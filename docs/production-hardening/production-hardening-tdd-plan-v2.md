@@ -58883,6 +58883,135 @@ wrong anchor. It must also prove all semantic checks finish before the intent is
 minted and that a forged, cloned, serialized, replayed, foreign-owner or
 already-consumed intent grants no authority.
 
+The D.108b RED is frozen to exactly three tests-only paths:
+
+- `tests/fixtures/phase-6a-v3/creator-adoption-contract.ts`; and
+- `tests/phase-6a-creator-adoption-red.test.ts`; and
+- `tests/fixtures/phase-3a1b-p3/live-fixture.ts`, limited to returning the
+  genuine trusted catalog it already constructs and accepting one tests-only
+  AHE decorator. The decorator retains the same backend for cleanup and gives
+  the adoption fixture observable read/mutation seams without duplicating
+  catalog evidence or changing a production owner.
+
+The fixture builds two genuine creator-certified, sealed-live epoch-zero closes
+through the shipped preparation, recovery, blueprint-fold, snapshot quarantine
+and creator-actor owners. Recovery uses the real strict Node SQLite journal and
+issuance stores, seeds genuine received and local-issued rows, and retains the
+authenticated snapshot manifest/chunks plus all AHE generation records. The
+independent RED oracle executes each of the twenty-two registered CutValue
+field mutants and every successor-trust/commit-QC swap, active/predecessor
+generation link/ref mutation, manifest/chunk/payload cross-pair, durable
+journal/issuance replay mutation, close/history mutation and catalog/artifact
+cross-pair against the existing owning verifier or codec. It also constructs
+the exact thirty-one-key successor projection, reopens its compact accumulator,
+and reproduces both old and new history roots/sizes. The same fifty named
+controls are wired through the genuine handle's AHE, generation-page,
+quarantine, journal, issuance and catalog seams so GREEN must return the exact
+closed typed failure for every mutant with no intent. One composite readiness
+assertion is the only designed RED failure before the future subpath exists;
+the twelve genuine/independent contract controls execute before readiness and
+may not be converted into skips.
+
+The expected D.108b GREEN is exactly five production paths:
+
+- `packages/node/src/creator-adoption.ts`, the sole new non-root verifier and
+  cross-package composition owner;
+- `packages/node/src/internal/creator-adoption-intent.ts`, module-private
+  WeakMap custody for the owner-bound one-use intent and its future D.108c
+  consumer;
+- `packages/node/src/creator-close.ts`, limited to retaining detached facts
+  already authenticated by a successful genuine close and exposing them only
+  through the private sealed-handle resolver;
+- `packages/node/src/v3-live.ts`, limited to a read-only durable journal and
+  issuance replay callback on that private registration; and
+- `packages/node/package.json`, limited to the additive
+  `./creator-adoption` subpath export.
+
+No protocol-v3, control-plane, storage, quarantine, journal, issuance, example,
+UI, lockfile or root-export owner is expected. Any need to change one of those
+production paths, add an AHE write, add a quarantine retention API or accept a
+caller-nominated trust/proof/live ref stops and corrects this roster before
+GREEN custody.
+
+The canonical `v3-live-generation-2` record has exactly these thirty-one keys:
+`aclDigest`, `anchorDigest`, `archiveIndexRoot`, `artifactDigest`, `artifactId`,
+`blueprintDigest`, `byteCharge`, `catalogDigest`, `compactHistory`, `epoch`,
+`graphDigest`, `historyRoot`, `historySize`, `kind`, `maxDependencies`,
+`maxEpochBytes`, `maxEpochVertices`, `objectId`, `orderedVertexHashesDigest`,
+`parametersDigest`, `previousHistoryRoot`, `previousHistorySize`,
+`profileDigest`, `runtimeProfile`, `signerSetDigest`,
+`snapshotManifestDigest`, `snapshotPayloadDigest`, `stateDigest`,
+`trustProfile`, `vertexCount` and `version`. `kind` is
+`v3-live-generation-2`, `version` is `2`, and the other inherited live fields
+retain their `v3-live-generation-1` meanings. `compactHistory` is one exact
+canonical record with exactly `peaks` and `size`; `size` equals both the outer
+`historySize` and the verified CutValue history size, while `peaks` is the
+fixed dense array of `null` or detached 32-byte `Uint8Array` values returned by
+`CompactMerkleAccumulator.snapshot()`. Reopening the accumulator must reproduce
+the outer `historyRoot`; its pre-extension root/size must reproduce
+`previousHistoryRoot`/`previousHistorySize`. The successor projection encodes
+the anchor-only new graph (`vertexCount: 1`) and binds its exact byte charge,
+order and graph digests plus the verified manifest/payload, ACL, state, archive,
+blueprint/catalog/artifact, parameters, signer/profile and history identities.
+Neither a JSON/hex normalization nor an empty-accumulator restart is accepted.
+
+The sole D.108b RED review round froze its original packet at parent HEAD
+`9b1dd88a3b6d10e9ef4a580896a09ed702f61a6d`, staged tree
+`a762abed13555d1e19a9528a39232221847329ac`, patch object
+`91a9f5056310b7c77b3aa861f9ad93c866577c3b` and SHA-256
+`5b5bc0fd7c300e1903139d8817f2e43b7cbf482c67b6f749784bb2656ddcc14f`.
+Grok/high reached terminal `NO_VERDICT` after 450.357 seconds with exit code 1,
+`stop_reason=cancelled` and no public terminal schema; its sole actual launch
+was not retried. Kimi K3 session
+`session_39709805-8672-4e2b-973e-21f0fa74ce9c` emitted exactly CHECK001
+through CHECK100 and returned `CHANGES_REQUIRED`, P0=2/P1=1/P2=1. Opus
+5/xhigh session `98523cd8-ad0e-4a7b-8968-ddd130aa1f9a` returned
+`CHANGES_REQUIRED`, P0=3/P1=4/P2=3. No Fable review ran.
+
+The reproduced same-round P0/P1 union was corrected tests-only with no
+confirmation review. Genuine close setup now runs before readiness with a
+deterministic Node `navigator.storage.estimate` test shim; the quarantine
+decorator preserves receipt-bound capability identity during close and only
+decorates later adoption reads. The fixture also supplies the authenticated
+empty-history root required by its epoch-zero anchor. The label-only mutant
+roster was replaced by executable controls over two cross-object genuine
+closes, real SQLite journal/issuance custody, AHE blob/ref/generation reads,
+snapshot declarations/chunks and valid catalog artifacts. Every CutValue field
+is independently changed and passed to `openCreatorSuccessorTrust`; valid
+prepare/commit QCs, duplicate signer and cross-close swaps reach the seal/trust
+owners; generation lineage, canonical close/history extension, manifest and
+payload cross-links, local-issued replay and post-close rows each have a
+separate causal oracle. The future verifier branch forwards the same controls,
+pins the exact module export and typed failure for each mutant, proves zero AHE
+writes at runtime, compares the accepted descriptor to independently encoded
+generation-2 bytes, and consumes the real owner-bound intent once while
+rejecting forged, cloned, serialized, foreign-owner and replay carriers. The
+future dynamic imports no longer require an expiring TypeScript or ESLint
+suppression. The live-fixture roster wording above now records both of its
+actual tests-only responsibilities.
+
+The corrected same-round pre-evidence packet has exact staged tree
+`a7d54e59840e4105b332802bc76dd78072260f7f`, patch object
+`f955b67aea15a230b59a406763e00934bfbc8e2f` and SHA-256
+`2650be2c4f229fc58234e090486327ed16386578ccbb106fe6852ae6318e9170`.
+`pnpm exec vitest run tests/phase-6a-creator-adoption-red.test.ts
+--no-coverage` now produces the intended thirteen-test RED: twelve genuine and
+independent controls pass and the sole composite future-owner readiness
+assertion fails with all four facts false. Exact-three ESLint completes with
+zero warnings, exact-four Prettier and both staged/unstaged `git diff --check`
+complete cleanly. No confirmation review and no Fable review ran.
+
+The storage-node, storage-browser and node package builds pass. Storage-node
+and storage-browser typechecks pass. The node typecheck reproduces only its
+inherited worker-host `rootDir`/file-list diagnostics, missing WebRTC test-route
+`emit`, and compact-history discriminated-union helper diagnostics; no D.108b
+path appears. The retained Phase-4b snapshot composition, Phase-5e creator
+certificate and Phase-5e live-close selection passes 26/26. The broad root
+TypeScript invocation remains non-gating because its existing project mode
+cannot resolve workspace package aliases and reports the previously recorded
+cross-example/test ledger; exact-owner ESLint plus the Vite-transformed genuine
+test and affected package builds are the RED compile evidence.
+
 ### D.108c — one-CAS durable adoption and death/reopen recovery
 
 D.108c is the only sub-slice allowed to stage and swap the successor live
