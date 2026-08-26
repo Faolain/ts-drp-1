@@ -60446,6 +60446,94 @@ ordering and three-engine diagnostic parity remain required by the current
 GREEN. None authorizes another production owner, a new API or wire/store
 change, and none delays the exact-two-owner D.108d1b-oracle GREEN.
 
+The exact-two-owner GREEN is signed and pushed as
+`827da876ed41718c763fd9673f4c109e5977ab6b`, parent
+`79a1445142f0de047c6d341b77c446876606a431`, tree
+`ab4d48202fce9d37bbadbd92fcbe5786279665f8`, stable patch id
+`2a6cdccf256f5a6235842c351b8745753f65b16c` and parent-to-tip diff
+SHA-256 `74253bb60640b5d24b7de997a175422c97039a954a8118d35e5f8eef463c6c09`.
+Only `packages/node/src/creator-adoption.ts` and
+`packages/node/src/v3-live.ts` changed. The first now opens the successor ACL
+through the canonical validator against the authenticated successor digest,
+epoch one and object; proves fresh ordinary Ed25519 possession before reading
+all writer lineages; accepts only exact `exhausted === false` with a safe
+nonnegative `next`; and maps the three private authority, possession and
+lineage categories to bounded details while preserving public
+`chain-invalid`. The second gives predecessor validation one private,
+bounded issuance view. A row is omitted only after its outbox and issued
+carriers match and its bytes, signature, digest, author and sequence
+authenticate under successor authority at `candidateEpoch > expectedEpoch`.
+Malformed, forged, mismatched, read-failing, same/older-epoch,
+cursor-regressing and over-bound rows remain visible or fail closed. Successor
+recovery and the activated handle retain the complete original store, and the
+private wrapper is consumed with predecessor recovery rather than escaping.
+
+The required refactor-clean pass identified no parallel owner to extract.
+Bounded failure classification replaces the old ambiguous private result in
+`creator-adoption.ts`; the issuance view is the single predecessor boundary,
+reuses the existing outbox snapshot, carrier-match and recovery-authentication
+primitives, and has one consumer. Promoting it to a public or shared store
+abstraction would widen authority and increase sediment rather than remove it.
+
+Ordinary-checkout GREEN verification passed. The focused native selection is
+9/9, including Bob ordinal one, awaited deactivation, genuine cold reopen over
+the same journal/issuance stores and ordinal two, plus the forged-future,
+malformed-future and issued-read-failure controls. The complete retained
+D.108b through D.108d1b eight-file selection is 55/55. The exact five-file
+Phase-4c selection is 44/44 with no exclusion, including the real fresh-process
+64 MiB peak-live owner and retaining mutant. The owner samples live verifier
+body bytes inside each awaited write, remains strictly below the signed
+`2 * chunkBodyBytes` ceiling and settles at zero; the mutant holds actual chunk
+bodies through the final chunk, crosses that ceiling while execution is live
+and also settles at zero. This remains a live-ownership proof rather than a
+post-completion residue check. Successor activation passes 12/12,
+Phase-4c-b passes 18/18 and Phase-4c-c passes 6/6 across Chromium, Firefox and
+WebKit. Fresh node, storage-node and storage-browser builds pass;
+storage-browser typecheck passes. Node and storage-node test-inclusive
+typechecks reproduce only the recorded worker-host/cross-workspace
+`rootDir`/file-list and legacy WebRTC, compact-history and retained-fixture
+typing baselines, with no new production error. Exact-eight-owner ESLint with
+zero warnings, Prettier, child `node --check` and `git diff --check` pass.
+
+The isolated proof used detached worktree
+`/private/tmp/ts-drp-d108d1b-oracle-green.kP4xfO/repo` at the exact signed
+GREEN commit. Before installation, `find packages -type d -name dist
+-print -quit` returned no path. `pnpm install --offline --ignore-scripts
+--frozen-lockfile` installed all 48 workspace projects and a second check
+printed `NO_DIST_AFTER_IGNORE_SCRIPTS_INSTALL`. Only then did
+`node scripts/ensure-native-deps.mjs` prepare the pinned native prebuild and
+the filtered storage-node, storage-browser and node build command freshly
+build the complete 33-package dependency closure. The isolated checkout then
+passed the same 55/55 and 44/44 native selections, the 12/12, 18/18 and 6/6
+three-engine browser matrices, storage-browser typecheck, exact-owner lint,
+format, child syntax, diff and clean tracked-status checks. Thus neither local
+`dist`, ancestor modules nor the ordinary workspace masked subprocess package
+resolution or successor authority.
+
+The sole GREEN review round inspected that immutable signed packet. Grok
+4.6/high completed normally in 420.101 seconds with a recognized
+`TERMINAL_RESPONSE` and returned `APPROVED`, P0=0/P1=0/P2=0. Kimi K3 session
+`session_ea1390a4-711f-4516-8b3c-8de7815b7753` emitted exactly CHECK001
+through CHECK100 once each and returned `APPROVED`, P0=0/P1=0/P2=1. Opus
+5/xhigh session `646df4ed-14b2-4a9d-abaa-1d209de5bc18` used no subagent,
+completed 63 turns in 554.413 seconds and returned `APPROVED`,
+P0=0/P1=0/P2=4. No reviewer changed the tracked tree, no same-round P0/P1
+exists, no confirmation review ran and no Fable review ran. Raw artifacts are
+retained under the respective
+`/private/tmp/ts-drp-d108d1b-oracle-green-{grok,kimi,opus}.*` directories.
+
+The GREEN-round P2 ledger remains nonblocking and is assigned without
+widening. D.108e2 retained-recovery performance hardening owns an explicit
+single-scope/one-row pagination invariant for the private view, a per-recovery
+rather than per-call skip budget, and removal of the duplicate issued-record
+read if profiling shows value. That slice may also replace the fourth
+successor preparation with a custody-safe non-consuming prepared-payload view
+if activation CPU or peak memory becomes material. The already-assigned
+D.108e2 oracle work treats the behavioral child matrix—not source regexes—as
+acceptance authority and removes or bounds those regexes. These advisories do
+not affect correctness, termination, current signed limits or the exact
+single consumer, and none authorizes a public store adapter or delays D.108d2.
+
 #### D.108d2 — product and peer proof freeze boundary
 
 D.108d2 does not begin from the recorded D.108d1 GREEN alone. The first
