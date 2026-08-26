@@ -94,7 +94,6 @@ async function installTransactionObserver(page: Page): Promise<void> {
 		const original = IDBDatabase.prototype.transaction;
 		Object.defineProperty(window, "__phase5eTransactions", { value: observed });
 		Object.defineProperty(window, "__phase5eLedger", { value: ledger });
-		Object.defineProperty(window, "__phase5eHoldWrites", { value: false, writable: true });
 		globalThis.addEventListener("phase5e-creator-observation", (event) => {
 			ledger.push(`event:${String((event as CustomEvent<{ kind: string }>).detail.kind)}`);
 		});
@@ -111,15 +110,6 @@ async function installTransactionObserver(page: Page): Promise<void> {
 				stores: Array.from(selected.objectStoreNames),
 			};
 			observed.push(row);
-			if (selected.mode === "readwrite") {
-				const firstStore = selected.objectStoreNames.item(0);
-				const pump = (): void => {
-					if (Reflect.get(window, "__phase5eHoldWrites") !== true || firstStore === null) return;
-					const request = selected.objectStore(firstStore).getAll(undefined, 1);
-					request.addEventListener("success", pump, { once: true });
-				};
-				pump();
-			}
 			selected.addEventListener("complete", () => {
 				row.completed = true;
 				ledger.push(`transaction:${row.stores.join(",")}:complete`);
@@ -189,8 +179,8 @@ function durablePhase(raw: Awaited<ReturnType<typeof rawDatabase>>): string {
 	const state = raw.rows.signerState?.[0] as Record<string, unknown> | undefined;
 	if (state === undefined) return "evidence-committed";
 	if (state.finalizedCommitQC !== null && typeof state.finalizedCommitQC === "object") return "finalized";
-	if (Number(state.durablePrepareQcCount ?? 0) > 0) return "prepared";
 	if ((raw.counts.voteSlots ?? 0) >= 2) return "commit-voted";
+	if (Number(state.durablePrepareQcCount ?? 0) > 0) return "prepared";
 	if ((raw.counts.voteSlots ?? 0) >= 1) return "prepare-voted";
 	return "evidence-committed";
 }
@@ -306,7 +296,7 @@ test("renderer termination at every durable boundary reopens old or the exact ne
 			const databaseName = `phase5e-crash-${index}-${crypto.randomUUID()}`;
 			const first = await context.newPage();
 			await first.goto(server?.origin ?? "about:blank");
-			if (index === 0) await first.evaluate((name) => window.phase5eCreatorActor.start(name), databaseName);
+			if (index === 0) await first.evaluate((name) => window.phase5eCreatorActor.observe(name), databaseName);
 			else {
 				await first.evaluate(([name, eventKind]) => window.phase5eCreatorActor.armCrash(name, eventKind), [
 					databaseName,
@@ -341,6 +331,7 @@ test("renderer termination at every durable boundary reopens old or the exact ne
 test("exact replay is idempotent, a conflicting close is durable failure, and stop fences late effects", async ({
 	page,
 }) => {
+	await installTransactionObserver(page);
 	await page.goto(server?.origin ?? "about:blank");
 	const conflict = await page.evaluate(
 		(name) => window.phase5eCreatorActor.runConflict(name),

@@ -1,3 +1,4 @@
+/* eslint import/no-unresolved: "off" */
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { installCreatorAnchorTrustRoot } from "@ts-drp/protocol-v3";
@@ -238,10 +239,10 @@ export async function openCreatorActorHarness(databaseName: string): Promise<Cre
 	const [creator, evidenceCandidate, voteCandidate, finalityCandidate] = (await Promise.all([
 		// eslint-disable-next-line @typescript-eslint/ban-ts-comment -- this literal future import must remain valid across RED and GREEN.
 		// @ts-ignore -- D.107b RED freezes this literal package subpath before its GREEN owner exists.
-		import(/* @vite-ignore */ "@ts-drp/seal/creator"), // eslint-disable-line import/no-unresolved -- future exact package subpath.
+		import(/* @vite-ignore */ "@ts-drp/seal/creator"),
 		// eslint-disable-next-line @typescript-eslint/ban-ts-comment -- this literal future import must remain valid across RED and GREEN.
 		// @ts-ignore -- D.107b RED freezes this literal package subpath before its GREEN owner exists.
-		import(/* @vite-ignore */ "@ts-drp/storage-browser/seal-evidence"), // eslint-disable-line import/no-unresolved -- future exact package subpath.
+		import(/* @vite-ignore */ "@ts-drp/storage-browser/seal-evidence"),
 		import("@ts-drp/storage-browser/seal-vote"),
 		import("@ts-drp/keychain/finality"),
 	])) as unknown as readonly [
@@ -361,7 +362,23 @@ if (typeof window !== "undefined") {
 		},
 		async runStop(databaseName: string): Promise<unknown> {
 			const active = await open(databaseName);
-			Reflect.set(window, "__phase5eHoldWrites", true);
+			const blockerDatabase = await new Promise<IDBDatabase>((resolvePromise, reject) => {
+				const request = indexedDB.open(databaseName);
+				request.addEventListener("error", () => reject(request.error), { once: true });
+				request.addEventListener("success", () => resolvePromise(request.result), { once: true });
+			});
+			let holding = true;
+			const blocker = blockerDatabase.transaction("sealEvidence", "readwrite", { durability: "strict" });
+			const blockerComplete = new Promise<void>((resolvePromise, reject) => {
+				blocker.addEventListener("complete", () => resolvePromise(), { once: true });
+				blocker.addEventListener("abort", () => reject(blocker.error), { once: true });
+			});
+			const pump = (): void => {
+				if (!holding) return;
+				const request = blocker.objectStore("sealEvidence").count();
+				request.addEventListener("success", pump, { once: true });
+			};
+			pump();
 			const pending = active.harness.actor.close({ closeInput: active.harness.closeInput });
 			let openReadwriteTransactions = 0;
 			for (let attempt = 0; attempt < 100 && openReadwriteTransactions === 0; attempt++) {
@@ -378,7 +395,9 @@ if (typeof window !== "undefined") {
 				status: active.harness.actor.status(),
 			});
 			const stop = active.harness.actor.stop();
-			Reflect.set(window, "__phase5eHoldWrites", false);
+			holding = false;
+			await blockerComplete;
+			blockerDatabase.close();
 			const [result] = await Promise.all([pending, stop]);
 			const settled = structuredClone({ events: active.harness.events, status: active.harness.actor.status() });
 			await new Promise((resolvePromise) => setTimeout(resolvePromise, 0));
