@@ -58118,6 +58118,54 @@ GREEN verification commands and results were:
   and is recorded as one environment-capability failure, not hidden or counted
   as D.107b approval.
 
+D.107c RED is signed and pushed as `e7058dfa`. Its corrected exact-seven packet
+used parent HEAD `4d570abec640fa7e60a891b8f7b5850d46ee7d2f`, staged tree
+`dfa134ed0f50219fe7c32b9d6874d515f829a8eb`, patch object
+`d018ec2b10b2ef82ce906561040906682424429b` and SHA-256
+`1127eeced136221c61a1966dc1b44f13f1909fcf2a547d71d72c4ee66290814f`.
+It remains tests-only and exactly seven paths. The shared genuine creator fixture
+lives at the browser entry, while the root driver owns the independent carrier,
+common-QC, CutValue and successor-trust oracle. The browser RED uses persistent
+profiles, a detached fresh process group with a stdout persistence handshake,
+group `SIGKILL`, exact reopen/serve comparison, creator database deletion,
+no-peer stall, two-peer exact recovery and recovery-store serve, and terminal
+conflict across Chromium, Firefox and WebKit.
+
+The sole D.107c RED review round was frozen before corrections at HEAD
+`4d570abec640fa7e60a891b8f7b5850d46ee7d2f`, tree
+`12eeee292b922f6645b23cf4177e30066df42914`, patch object
+`5fa96823043e6985bedc2088a600a8a3a8a85928` and SHA-256
+`806ffac75542bde8581645c4364bc3ad4e09468a8444552a18760b29222b18ca`.
+Grok is recorded as `NO_VERDICT`: its one launch was canceled after 510 seconds
+without a terminal verdict, and its public artifact contained only three
+progress sentences; it was neither retried nor counted as approval. Kimi session
+`session_72173b01-c5e9-4c9f-b5fc-ffe6ee0f10bd` emitted exactly checks 1 through
+100 and returned `PASS`, P0=0/P1=0. Opus 5/xhigh session
+`971c099d-b46e-4f95-9a69-204f09fe8099` returned `CHANGES_REQUIRED`, P0=1/P1=3:
+the `pnpm exec tsx` grandchild could not use the wrapper's IPC channel; browser
+recovery did not yet assert the returned exact evidence or serve it from the
+recovery database; the future network module did not bind its exported protocol
+constant to the registered value; and the independent driver duplicated the
+10-second timeout literal. Same-round tests-only corrections replaced IPC with
+the stdout marker above, added both exact recovery checks and the constant
+binding, and consumed `CREATOR_RELEARN_LIMITS.queryTimeoutMs`. No confirmation
+review and no Fable review ran.
+
+Final D.107c RED verification commands and results were:
+
+- `pnpm exec vitest run --coverage.enabled=false tests/phase-5e-creator-relearn-red.test.ts`:
+  the intended RED, exactly 6 pass / 1 readiness failure naming only
+  `packages/network/src/seal.ts` and `packages/node/src/creator-seal.ts` / 1
+  future-module skip;
+- `pnpm exec playwright test --config packages/storage-browser/playwright.phase-5e-creator-relearn.config.ts`:
+  exactly 6 intentional RED skips, two scenarios across three engines;
+- `pnpm exec vitest run --coverage.enabled=false tests/phase-5e-creator-actor-red.test.ts`:
+  retained actor 12/12;
+- `pnpm --filter @ts-drp/storage-browser typecheck`: pass; and
+- exact-seven `prettier --check`, ESLint with zero warnings, cached
+  `git diff --check`, exact roster and custody checks: pass. The 26 existing
+  stashes and protected untracked paths remained untouched.
+
 Product capability gained only after D.107d: the creator can seal one genuine
 live epoch, persist and publish its exact q=1 certificate and snapshot, survive
 mid-close crashes, recover same-seed signing continuity from durable peer
