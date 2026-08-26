@@ -94,6 +94,7 @@ async function installTransactionObserver(page: Page): Promise<void> {
 		const original = IDBDatabase.prototype.transaction;
 		Object.defineProperty(window, "__phase5eTransactions", { value: observed });
 		Object.defineProperty(window, "__phase5eLedger", { value: ledger });
+		Object.defineProperty(window, "__phase5eHoldWrites", { value: false, writable: true });
 		globalThis.addEventListener("phase5e-creator-observation", (event) => {
 			ledger.push(`event:${String((event as CustomEvent<{ kind: string }>).detail.kind)}`);
 		});
@@ -110,6 +111,15 @@ async function installTransactionObserver(page: Page): Promise<void> {
 				stores: Array.from(selected.objectStoreNames),
 			};
 			observed.push(row);
+			if (selected.mode === "readwrite") {
+				const firstStore = selected.objectStoreNames.item(0);
+				const pump = (): void => {
+					if (Reflect.get(window, "__phase5eHoldWrites") !== true || firstStore === null) return;
+					const request = selected.objectStore(firstStore).getAll(undefined, 1);
+					request.addEventListener("success", pump, { once: true });
+				};
+				pump();
+			}
 			selected.addEventListener("complete", () => {
 				row.completed = true;
 				ledger.push(`transaction:${row.stores.join(",")}:complete`);
@@ -296,7 +306,13 @@ test("renderer termination at every durable boundary reopens old or the exact ne
 			const databaseName = `phase5e-crash-${index}-${crypto.randomUUID()}`;
 			const first = await context.newPage();
 			await first.goto(server?.origin ?? "about:blank");
-			await first.evaluate((name) => window.phase5eCreatorActor.start(name), databaseName);
+			if (index === 0) await first.evaluate((name) => window.phase5eCreatorActor.start(name), databaseName);
+			else {
+				await first.evaluate(([name, eventKind]) => window.phase5eCreatorActor.armCrash(name, eventKind), [
+					databaseName,
+					EXPECTED_EVENT_KINDS[index - 1] as string,
+				] as const);
+			}
 			if (index > 0) await waitForEventCount(first, databaseName, Math.min(index, EXPECTED_EVENT_KINDS.length));
 			await first.close({ runBeforeUnload: false });
 			const reopened = await context.newPage();

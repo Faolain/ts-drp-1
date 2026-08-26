@@ -267,6 +267,9 @@ export async function openCreatorActorHarness(databaseName: string): Promise<Cre
 			if (typeof globalThis.dispatchEvent === "function" && typeof CustomEvent === "function") {
 				globalThis.dispatchEvent(new CustomEvent("phase5e-creator-observation", { detail: { kind: event.kind } }));
 			}
+			if (Reflect.get(globalThis, "__phase5eAbortAfterObservation") === event.kind) {
+				throw new Error("injected renderer crash boundary");
+			}
 		},
 		signer: signer.signer,
 		storageIncarnation: vote.observation.incarnation,
@@ -310,6 +313,7 @@ async function open(databaseName: string): Promise<ActiveRun> {
 declare global {
 	interface Window {
 		phase5eCreatorActor: Readonly<{
+			armCrash(databaseName: string, eventKind: string): Promise<unknown>;
 			awaitResult(databaseName: string): Promise<unknown>;
 			close(databaseName: string): Promise<void>;
 			observe(databaseName: string): Promise<unknown>;
@@ -322,6 +326,10 @@ declare global {
 
 if (typeof window !== "undefined") {
 	window.phase5eCreatorActor = Object.freeze({
+		async armCrash(databaseName: string, eventKind: string): Promise<unknown> {
+			Reflect.set(globalThis, "__phase5eAbortAfterObservation", eventKind);
+			return window.phase5eCreatorActor.start(databaseName);
+		},
 		async awaitResult(databaseName: string): Promise<unknown> {
 			const active = await open(databaseName);
 			await active.task;
@@ -353,19 +361,24 @@ if (typeof window !== "undefined") {
 		},
 		async runStop(databaseName: string): Promise<unknown> {
 			const active = await open(databaseName);
+			Reflect.set(window, "__phase5eHoldWrites", true);
 			const pending = active.harness.actor.close({ closeInput: active.harness.closeInput });
-			await Promise.resolve();
-			const openReadwriteTransactions = (
-				(Reflect.get(window, "__phase5eTransactions") as
-					| readonly Readonly<{ completed: boolean; mode: string }>[]
-					| undefined) ?? []
-			).filter(({ completed, mode }) => mode === "readwrite" && !completed).length;
+			let openReadwriteTransactions = 0;
+			for (let attempt = 0; attempt < 100 && openReadwriteTransactions === 0; attempt++) {
+				await new Promise((resolvePromise) => setTimeout(resolvePromise, 0));
+				openReadwriteTransactions = (
+					(Reflect.get(window, "__phase5eTransactions") as
+						| readonly Readonly<{ completed: boolean; mode: string }>[]
+						| undefined) ?? []
+				).filter(({ completed, mode }) => mode === "readwrite" && !completed).length;
+			}
 			const atStop = structuredClone({
 				events: active.harness.events,
 				openReadwriteTransactions,
 				status: active.harness.actor.status(),
 			});
 			const stop = active.harness.actor.stop();
+			Reflect.set(window, "__phase5eHoldWrites", false);
 			const [result] = await Promise.all([pending, stop]);
 			const settled = structuredClone({ events: active.harness.events, status: active.harness.actor.status() });
 			await new Promise((resolvePromise) => setTimeout(resolvePromise, 0));
