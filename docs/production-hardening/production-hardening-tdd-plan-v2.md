@@ -59719,6 +59719,104 @@ allowlist, bounded TTL reverify, byte-unchanged recovered-authority owner and
 terminal source claim outside D.108d2. No confirmation review ran, no reviewer
 changed the tracked tree, and no Fable or collaboration subagent ran.
 
+D.108d1 GREEN was first frozen as signed commit
+`1061e754c6c65f05eb474bcff43201031c668876`, parent
+`8dd67a53790aa5b07db528cead6cdb0c915ccadd`, with tree
+`15c4306dea50f1df0893017b39f44a2cfc6a0329`. It implements the exact eight
+production owners above plus the retained Node/browser/fresh-process harness
+integration. The successor imports its verified snapshot before subscribing,
+installs the authenticated epoch-one journal anchor, retains and classifies the
+displaced epoch-zero outbox without publishing it, exposes only the non-root
+activation/reopen surface and holds browser Web Lock authority for the active
+handle lifetime. The cold path walks the durable current-to-proposed-to-active
+lineage, reauthenticates both trust generations and the snapshot, and performs
+no adoption CAS.
+
+The sole GREEN review round inspected that immutable commit. Grok/high session
+`01a03eee-a7a5-78f1-9d57-412050f2c0b5` initially stopped after 570.227 seconds
+because the runner's exact 24-turn ceiling produced `max_turns_reached` and a
+transport `cancelled` stop reason before a terminal object. This was not a
+service-side cancellation: the same reviewer session was resumed in place,
+without a second review launch or a new model context, and completed four turns
+later with `CHANGES_REQUIRED`, P0=0/P1=1/P2=1. Its P1 reproduced on the genuine
+fixture: a successor could not claim the stable topic when given the
+predecessor's actual network and message-queue manager because the terminal
+predecessor still owned both registrations. Its P2 noted that the child
+snapshot-read event counter is completion-derived rather than a direct port
+read probe.
+
+Two Kimi command-shape probes were rejected by the local CLI parser before any
+model session (`--prompt` cannot be combined with `--plan` or `--auto`); they
+are not review launches or verdicts. The one actual Kimi K3 review ran in an
+isolated clone as session `session_73effd8c-3464-4af3-b59a-68a3cd6c12d3`,
+completed exactly CHECK001 through CHECK100 and returned `ACCEPTED`, P0=0/P1=0/
+P2=1. Its P2 records duplicated stable-topic derivation. Opus 5/xhigh session
+`60e38d84-9c32-4717-b65a-72d5e9413b1b` returned valid
+`CHANGES_REQUIRED`, P0=0/P1=1/P2=6. Its P1 reproduced that cold reopen tried to
+derive the predecessor ACL by changing only the successor ACL epoch; any valid
+epoch-zero staged membership change therefore made the already adopted durable
+successor unreopenable. No reviewer wrote the tracked tree, no confirmation
+review ran and no Fable or collaboration subagent ran.
+
+Both blocking findings were corrected in the same round by signed commit
+`1ce22888d166e9c30491dc6368b576c0f293e4f2`, tree
+`9e53579478867cbc15cadec25eb6a6b16d498832`. The private activation owner now
+authenticates an exact terminal predecessor registration and transfers the
+existing stable-topic and queue ownership in place; the queue's sole handler
+routes through the current private registration, so no duplicate subscribe,
+unsubscribe window or second queue is introduced. The retained test activates
+the successor with the predecessor fixture's exact network, message-queue
+manager and sink. Separately, the adoption candidate retains the exact
+predecessor canonical ACL as a content-addressed blob in the existing AHE
+closure. Cold reopen selects that blob by the authenticated predecessor anchor
+ACL digest and reopens it against epoch zero and the exact object before it can
+be used as displaced-source authority. A retained cold child stages a genuine
+writer grant before close and now reopens successfully. This preserves staged
+ACL semantics and snapshot formats; it adds no store schema, wire field,
+product API, caller-selected identity, digest domain, limit or production
+dependency.
+
+Ordinary-checkout verification after the correction passed the five-file
+D.108b/D.108c/D.108d1 Vitest selection 42/42 and the complete retained
+Phase-4c five-file selection 44/44. The latter includes the genuine fresh Node
+64 MiB owner and retaining mutant with no exclusion: owner mode samples peak
+simultaneously live chunk-body ownership during execution, remains strictly
+below the signed `2 * 131072` byte ceiling and settles at zero; the mutant holds
+the actual received bodies through the last chunk, crosses the same ceiling
+while the stream is live and also settles at zero only after release. The
+D.108d1 Playwright matrix passed 9/9, and retained Phase-4c-b and Phase-4c-c
+passed 18/18 and 6/6 across Chromium, Firefox and WebKit. Fresh storage-node,
+storage-browser and node builds passed; storage-browser typecheck, exact-six
+ESLint with zero warnings, Prettier and both diff checks passed. The broad
+storage-node test-project typecheck still reproduces its recorded cross-package
+`rootDir`/file-list baseline and is not an affected-production gate.
+
+The accepted isolated proof used detached clone commit
+`1ce22888d166e9c30491dc6368b576c0f293e4f2` at
+`/private/tmp/ts-drp-d108d1-corrected.QkL6z3/repo`. Package/example `dist`
+discovery returned no path before installation. `pnpm install --offline
+--ignore-scripts --frozen-lockfile` passed for all 48 workspace projects and
+the same discovery again returned no path. After
+`node scripts/ensure-native-deps.mjs`, the exact storage-node,
+storage-browser and node dependency build passed for 33 workspace projects.
+The combined retained Phase-4c plus Phase-6 selection then passed 86/86; the
+fresh-process package import, real 64 MiB peak-live measurement, staged-ACL
+cold reopen and same-transport hot handoff all executed. In that clone,
+D.108d1 browsers passed 9/9, Phase-4c-b passed 18/18 and Phase-4c-c passed 6/6
+across all three engines. Exact-six ESLint, Prettier, `git diff --check` and
+tracked status were clean. The temporary clone was removed after recording
+this evidence, so no ancestor package, local alias, stale build or ignored
+artifact can be the authority for the result.
+
+The nonblocking review observations remain explicit rather than widening this
+round: direct child port-read telemetry and the import-hook/export-map proof
+stay with the D.108 test-infrastructure owner; stable-topic helper deduplication,
+worker-realm Web Lock policy, explicit cold `authenticationProfile` validation,
+browser shim lifetime and wrapped-handle plane identity are assigned to the
+D.108d2 pre-RED audit and must be resolved or given a later named owner before
+Phase 6 exit. None weakens or bypasses the executed snapshot receipt,
+peak-live memory, trust-chain, topic/queue ownership or single-writer gates.
+
 The complete retained Phase-4 snapshot suite, including the genuine fresh-
 process 64 MiB peak-live child, and every retained Phase-5 creator actor,
 re-learn, live-close and product-room gate stay enabled. D.108 does not waive
