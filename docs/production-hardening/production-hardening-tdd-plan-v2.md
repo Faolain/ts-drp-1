@@ -57958,6 +57958,52 @@ ordering, raw crash classifications, nested durable-QC corruption, raw-digest/
 copied-actor/foreign-evidence/ambiguous-retry mutants, and post-stop durable
 stability without adding a product test API.
 
+D.107b GREEN is signed and pushed as `eeb2304d`. Its final exact-twenty-four
+packet has tree `d8490ee8f6cd391ead5d267a8a73b2e22c1526ea`, patch object
+`0b04bdd1366bf545eda40101bc7bc04aeb0c2c3a` and SHA-256
+`c9415e4c557685c694f2d32e388706abffa434d650a0b7c1860763f13f90af35`.
+The additive primary schema is v3 with the exact ninth `sealEvidence` store;
+evidence is durable before either vote, every vote still uses the frozen strict
+four-store transaction, both durable QC copies are reverified at restart, and
+an ambiguous or conflicting evidence write terminalizes the live actor before
+another signing attempt. No network, AHE-head mutation, raw signer/digest,
+outbox reader, public mutation handle, wire change or root export was added.
+
+The sole D.107b GREEN review round used the frozen pre-correction HEAD
+`567481138e9ee80657bca4acac02854f68d15468`, staged tree
+`4960b36379861c54157bb3eab5a188c48a94949a`, patch object
+`326dd36a0d2e6a90730b7126f2f18ac881efaad6` and SHA-256
+`6909b421f26e93c81e76abcc9321a1efb5e45f04ec4ac4ad3201033df568a9aa`.
+Opus returned `CHANGES_REQUIRED`, P0=2/P1=2: three retained primary-schema
+owners still pinned v2, and a live ambiguous evidence-write result was not
+terminal. Kimi completed exactly 100 checks and returned `CHANGES_REQUIRED`,
+P0=0/P1=1, because the evidence-side prepare-QC copy was not reverified. Grok
+is recorded as `NO_VERDICT`: its one read-only packetized launch was canceled
+after 660 seconds without a terminal schema; it was neither retried nor counted
+as approval. Same-round corrections resliced the plan from nineteen to twenty-
+four paths in signed commit `e517c7f3`; no confirmation review was run.
+
+GREEN verification commands and results were:
+
+- `pnpm install --offline --ignore-scripts --frozen-lockfile`: pass;
+- package `build` and `typecheck` for canonical, keychain, storage-browser and
+  seal: pass;
+- exact-owner `prettier --check`, ESLint and `git diff --check`: pass;
+- focused creator actor Vitest: 12/12; focused creator actor Playwright:
+  12/12 across Chromium, Firefox and WebKit;
+- retained Phase-5 unit battery: 53/53, including the real pinned Apalache
+  backend; retained Phase-5c Playwright: 25 pass / 2 intentional non-Chromium
+  death-test skips; retained Phase-5d Playwright: 24/24;
+- retained Phase-4 snapshot blueprint/quarantine/pull/composition battery:
+  40/40; the separately assigned D.107b.1 64 MiB child remains the only
+  Phase-4c gate not claimed here;
+- retained Phase-2d schema lifecycle: 12/12; retained Phase-2e6 real-process
+  death: 1/1; and the Phase-2g-c version-dependent quota trace cases: 2/2.
+  The same Phase-2g-c invocation's independent engine-generated quota positive
+  control remained unavailable in local Chromium (`engineControlPresent:false`)
+  and is recorded as one environment-capability failure, not hidden or counted
+  as D.107b approval.
+
 Product capability gained only after D.107d: the creator can seal one genuine
 live epoch, persist and publish its exact q=1 certificate and snapshot, survive
 mid-close crashes, recover same-seed signing continuity from durable peer
