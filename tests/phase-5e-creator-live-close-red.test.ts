@@ -48,9 +48,9 @@ function changedTrustBytes(bytes: Uint8Array, changes: Readonly<Record<string, u
 }
 
 describe.sequential("Phase 5e genuine creator live close RED", () => {
-	it("freezes the exact five RED and exact eight GREEN owners", () => {
+	it("freezes the exact five RED and exact nine GREEN owners", () => {
 		expect(REQUIRED_RED_PATHS).toHaveLength(5);
-		expect(REQUIRED_GREEN_PATHS).toHaveLength(8);
+		expect(REQUIRED_GREEN_PATHS).toHaveLength(9);
 		expect(REQUIRED_RED_PATHS.every((path) => readFileSync(resolve(REPOSITORY_ROOT, path)).byteLength > 0)).toBe(true);
 		expect(REQUIRED_GREEN_PATHS).toEqual([
 			"packages/control-plane/src/creator-trust-advance.ts",
@@ -58,6 +58,7 @@ describe.sequential("Phase 5e genuine creator live close RED", () => {
 			"packages/node/src/creator-close.ts",
 			"packages/node/src/v3-live.ts",
 			"packages/node/package.json",
+			"pnpm-lock.yaml",
 			"examples/v3-room/src/index.ts",
 			"examples/v3-chat/src/index.ts",
 			"vite.config.mts",

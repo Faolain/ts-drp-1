@@ -18,6 +18,7 @@ export const REQUIRED_GREEN_PATHS = Object.freeze([
 	"packages/node/src/creator-close.ts",
 	"packages/node/src/v3-live.ts",
 	"packages/node/package.json",
+	"pnpm-lock.yaml",
 	"examples/v3-room/src/index.ts",
 	"examples/v3-chat/src/index.ts",
 	"vite.config.mts",

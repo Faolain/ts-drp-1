@@ -57999,11 +57999,13 @@ boots the package-local entry through the shared Phase-4c browser server. This
 path assignment is frozen before RED so the exact-five custody packet has no
 implicit owner and does not create a second root browser harness.
 
-The expected GREEN is exactly eight paths:
+The expected GREEN is exactly nine paths:
 
 - a new non-root `packages/control-plane/src/creator-trust-advance.ts` and the
   control-plane package export;
 - `packages/node/src/{creator-close.ts,v3-live.ts}` and the node package export;
+- `pnpm-lock.yaml`, limited to the matching node importer entry for its direct
+  dependency on the already accepted seal actor;
 - `examples/v3-room/src/index.ts`;
 - `examples/v3-chat/src/index.ts`; and
 - the specific-before-bare Vite aliases.
@@ -58093,6 +58095,16 @@ helper with an independent exact-domain derivation. Its tree is
 The focused RED remains exactly 5 pass / 1 intended readiness failure / 2
 future-product skips, and exact-file lint/format/diff checks pass. This is an
 oracle correction, not a product change or another review launch.
+
+Before GREEN dependency installation, the frozen exact-eight roster was
+resliced to exact nine. `packages/node/src/creator-close.ts` composes the
+already accepted `@ts-drp/seal/creator` actor, so the direct node-package edge
+must also be represented in the committed lockfile importer. Relying on a
+transitive workspace link or a production-relative source import would make a
+clean frozen install non-reproducible and violate the package boundary. The
+only added owner is `pnpm-lock.yaml`, limited to that importer edge; no product
+API, semantic owner or dependency family changes. This pre-GREEN roster
+correction receives its own signed commit and no additional review launch.
 
 ### D.107 causal mutants, gates and handoff
 
