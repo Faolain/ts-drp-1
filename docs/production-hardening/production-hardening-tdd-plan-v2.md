@@ -57656,7 +57656,7 @@ The tests-only RED is exactly six paths:
 - `packages/storage-browser/tests/phase-5e-creator-actor.pw.ts`; and
 - `packages/storage-browser/playwright.phase-5e-creator-actor.config.ts`.
 
-The expected GREEN is exactly fifteen paths:
+The expected GREEN is exactly sixteen paths:
 
 - `packages/keychain/src/finality.ts`;
 - `packages/seal/src/{creator.ts,internal/creator-close-intent.ts}`;
@@ -57669,6 +57669,9 @@ The expected GREEN is exactly fifteen paths:
   whose held-lock upgrade oracle compares the authoritative schema version;
 - `packages/storage-browser/package.json`;
 - the retained `packages/storage-browser/tests/phase-5c-seal-vote-schema.pw.ts` schema/transaction authority; and
+- the retained `packages/storage-browser/tests/phase-5c-seal-vote-death.pw.ts`
+  raw reopen oracle, whose exact database-version assertion advances with the
+  additive schema while its old-XOR-new vote law remains unchanged; and
 - the retained `packages/storage-browser/tests/assets/phase-5d-round-change-entry.ts`,
   whose direct database reopen must advance from schema v2 to v3 in the same
   additive migration commit; and

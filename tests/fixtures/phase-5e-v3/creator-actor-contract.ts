@@ -26,6 +26,7 @@ export const REQUIRED_GREEN_PATHS = Object.freeze([
 	"packages/storage-browser/src/internal/seal-vote-test-control.ts",
 	"packages/storage-browser/package.json",
 	"packages/storage-browser/tests/phase-5c-seal-vote-schema.pw.ts",
+	"packages/storage-browser/tests/phase-5c-seal-vote-death.pw.ts",
 	"packages/storage-browser/tests/assets/phase-5d-round-change-entry.ts",
 	"vite.config.mts",
 ]);
