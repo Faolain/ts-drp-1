@@ -60390,6 +60390,62 @@ fresh dependency-closure build so ordinary workspace state cannot mask the
 subprocess proof. Only signed, pushed RED, GREEN and evidence commits close this
 deadline and permit D.108d2 RED.
 
+The immutable tests-only RED review inspected signed tip
+`84909eeca8b74e9f9bac1532b60db4dd0b5812dc`, signed plan-reslice baseline
+`8a741e6cdb41147d4275a61e2af30bc2d0124fff`, tree
+`fd9fde54380652893aa4a2b6588f3a27f6b03890`, full-range stable patch id
+`765cb1150aa1fbe1ca6a6c7ce99fb08a3d721344` and full-range diff SHA-256
+`e3e9851e67288076e1dc012ed5a8072589bc34a5254091fabd9148e27e6ce502`.
+The range changed exactly the six frozen RED paths, while both GREEN owners
+remained byte-identical to the reslice baseline. Grok 4.6/high session
+`01a0402a-6c29-7810-8830-3ab2316c1575` completed its read-only inspection in
+690.243 seconds with normal `end_turn`, P0=0/P1=1/P2=0. Its exact JSON verdict
+did not contain the runner's legacy text marker, so the wrapper reported
+`NO_VERDICT` even though the object was present; one 25.375-second
+schema-constrained terminal synthesis of that same session returned
+`CHANGES_REQUIRED`. This was neither a service cancellation nor a second
+review. Kimi K3 session `session_2c47dfde-6ef5-4f52-8fe3-96258f7aa8ec`
+emitted exactly CHECK001 through CHECK100 once each and returned
+`CHANGES_REQUIRED`, P0=0/P1=1/P2=4. Opus 5/xhigh session
+`acd91a58-4d96-4b5c-b259-c5485868a073` used no subagent, completed 33 turns in
+505.072 seconds and returned `CHANGES_REQUIRED`, P0=0/P1=1/P2=5. No reviewer
+modified the tracked tree, no confirmation review ran and no Fable review ran.
+The raw Grok, Kimi and Opus artifacts remain under the respective
+`/private/tmp/ts-drp-d108d1b-oracle-red-final-*` directories.
+
+All three reviewers independently reported the same P1, and it reproduced
+locally. The exact six-RED/two-GREEN ownership test was declared inside the
+module `beforeAll`, so Vitest 3.1.1 silently did not collect it. Before the
+correction, `pnpm exec vitest run
+tests/phase-6a-creator-successor-local-author-red.test.ts --reporter=basic`
+collected six tests and produced five passes plus only the intended readiness
+failure. Signed correction commit
+`da9c82b3499ec4278dce09c50791f7720dd00036`, tree
+`1730ce2675cec0fa64a8d6a8921e071982a33382`, stable patch id
+`11f1361a236b8b12f6d77de2dc9d780cb5bd4b54` and correction diff SHA-256
+`fe8714f36728b6c7255a2f4a989f76705ed2ed7b4848550431c07c8ff6b19cbb`
+moves that test beside the other collected tests and corrects the stale
+one-owner wording. The two-file focused RED rerun then collected nine tests:
+the ownership gate passed, seven assertions passed overall, and exactly the
+two intended failures remained—the six-item production-readiness gap and
+Bob's genuine second cold reopen. Exact-two-file ESLint with zero warnings,
+Prettier, `git diff --check`, the two production-owner byte-identity check and
+the signed push all passed.
+
+The RED-round P2 ledger is assigned without widening this checkpoint. A later
+D.108e2 retained-oracle hardening slice owns an explicit Bob journal-order
+assertion, a digest-consistent malformed ACL-member behavioral case, and an
+unsafe or negative lineage-`next` case. That slice also owns replacing the
+contract's coarse cross-file readiness regexes with bounded predicates and
+binding or removing the descriptive oracle-child behavior constant. Browser
+test-infrastructure hardening in the same later slice owns an observed Web
+Lock acquisition count and sequential, separately named-database possession
+failure probes. These are additional oracle-strengthening tasks: the canonical
+ACL validator, safe-nonnegative lineage predicate, native signer-before-lineage
+ordering and three-engine diagnostic parity remain required by the current
+GREEN. None authorizes another production owner, a new API or wire/store
+change, and none delays the exact-two-owner D.108d1b-oracle GREEN.
+
 #### D.108d2 — product and peer proof freeze boundary
 
 D.108d2 does not begin from the recorded D.108d1 GREEN alone. The first
