@@ -59454,6 +59454,106 @@ before and after volatile activation, duplicate activation, two-tab races and an
 activation failure after durable CAS must converge without a second adoption
 CAS.
 
+D.108d is implemented as two authority-preserving sub-slices rather than one
+mixed kernel/product patch. D.108d1 owns successor preparation, durable
+recovery and volatile activation. D.108d2 owns only the room/chat projection,
+existing-peer and late-peer product proof after D.108d1 is green. D.108d2 may
+not compensate for an incomplete kernel, and Phase 6a remains open until both
+sub-slices and the cumulative gates below pass.
+
+#### D.108d1 — successor activation kernel freeze
+
+The D.108d1 tests-only RED roster is exactly five paths:
+
+- `tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts`;
+- `tests/phase-6a-creator-successor-activation-red.test.ts`;
+- `packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts`;
+- `packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts`; and
+- `packages/storage-browser/playwright.phase-6a-creator-successor-activation.config.ts`.
+
+Its genuine fixture runs the complete D.108b verification and D.108c durable
+commit, and accepts no synthetic prepared capability. The independent oracle
+decodes and hashes the already certified successor anchor, parameter carrier,
+snapshot manifest/payload and generation-two projection directly; probes the
+issuance and journal stores independently of the activation result; and records
+network publications at the stable object/genesis topic. One composite
+readiness fact is the only intentional failure before GREEN; the remaining
+behavioral cases are designed skips until every expected owner exists.
+
+The D.108d1 oracle must prove all of the following in Node and in a real browser
+store where applicable: the successor journal scope is exactly epoch one and
+uses `installEpochAnchor`, never a widened `installGenesis`; the verified
+snapshot is imported before the first epoch-one operation; author issuance
+continues the same epoch-free `(objectId, author)` lineage without a reset; the
+terminal epoch-zero registration is supplied as the exact existing
+`displacedSource`; at least one pending epoch-zero outbox row is classified but
+is never published as epoch one; and activation exposes only authenticated
+epoch/anchor/object/ACL authority. It also proves one-use consumption for the
+D.108c capability, terminal old handle/registration and stale author authority,
+idempotent duplicate activation, failure cleanup after durable adoption, reopen
+before and after volatile activation without a second `swapHead`, and two-tab
+winner/loser convergence without split ownership. TTL expiry may reacquire and
+reverify a capability but may not turn an expired quarantine lease into live
+authority.
+
+The expected D.108d1 GREEN roster is exactly eight paths:
+
+- `packages/node/src/creator-adoption-activate.ts`;
+- `packages/node/src/creator-adoption.ts`;
+- `packages/node/src/creator-adoption-commit.ts`;
+- `packages/node/src/creator-close.ts`;
+- `packages/node/src/internal/creator-adoption-intent.ts`;
+- `packages/node/src/internal/creator-successor-live.ts`;
+- `packages/node/src/v3-live.ts`; and
+- `packages/node/package.json`.
+
+Authenticated activation material must move through the single existing
+D.108b-intent to D.108c-prepared-capability custody chain. The new internal live
+owner may bind that opaque material to the existing private v3-live machinery;
+it must not create a second handle-keyed authority cache, export a raw
+caller-selected epoch preparation function, or expose snapshot/trust/signing
+material through a serializable capability. `creator-close.ts` may make the
+terminal source registration claimable exactly once for `displacedSource`;
+`v3-live.ts` may install a non-genesis journal anchor and construct the private
+successor prepared/recovered registration from already authenticated custody.
+The public non-root activation subpath accepts only the genuine D.108c
+capability, its bound close handle and ordinary runtime/store/transport
+dependencies. It derives all identity, epoch, anchor, lifecycle, trust,
+snapshot and source-disposition values from custody. No root export, wire or
+storage schema, product API, topic derivation, issuance scope, snapshot format,
+digest owner, limit or memory ceiling changes in D.108d1. A need for any ninth
+production path stops and corrects this freeze before RED.
+
+#### D.108d2 — product and peer proof freeze boundary
+
+D.108d2 does not begin until D.108d1 GREEN and its one-round review are
+recorded. Before its RED, this section will freeze its exact tests-only roster,
+independent authenticated projection oracle, one composite readiness failure
+and expected room/chat GREEN owners. Its scope is limited to consuming the
+D.108d1 result in the existing room and chat, projecting reopened
+epoch/anchor/lifecycle/creator-certified trust from the active handle, and
+proving a real epoch-one operation reaches both an existing peer and a fresh
+late peer. It may not add a second activation path or accept those values from
+caller DTOs.
+
+The D.108d1 plan-freeze review packet used parent HEAD
+`dbb753fe78c5a8d8b6fbc420fe4e53fb0bda5269`, exact one-path staged tree
+`a2bd017aa5bfbae8b8ecbaffe435f51014130be3`, patch object
+`94c89031edc791502c4350323c466c5425ede679` and SHA-256
+`c9b6f06131c36cbae2d80ff025d60a07b0e71e0c4ebbfdd8c25c07aa4e1bfbfa`.
+Grok/high returned `NO_VERDICT` after 315.201 seconds with exit code 1 and
+`stop_reason=cancelled`; its sole launch was not retried. Kimi CLI 1.49.0 used
+exact `kimi-code/k3`, thinking enabled and the 100-step ceiling in session
+`65381e01-80e8-4775-a45e-b43ae5c6636d`; it completed sixteen assistant and
+forty tool records after repository inspection but emitted neither CHECK001-
+CHECK100 nor a terminal object, so it is `NO_VERDICT` and was not retried. Opus
+session `6d60379c-9784-4daf-92a1-67e9a1dc68a1` resolved to
+`claude-opus-5` at xhigh and launched no subagent, but its read-only policy
+denied the `/tmp` contract file; it returned explanatory prose rather than the
+required terminal object and is `NO_VERDICT` without retry. No reviewer changed
+the tracked tree, no P0/P1 finding was available to reproduce, no confirmation
+review ran and no Fable process ran.
+
 The complete retained Phase-4 snapshot suite, including the genuine fresh-
 process 64 MiB peak-live child, and every retained Phase-5 creator actor,
 re-learn, live-close and product-room gate stay enabled. D.108 does not waive
