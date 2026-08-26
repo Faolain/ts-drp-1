@@ -58018,6 +58018,70 @@ a second AHE head, remote adoption, epoch-one activation, archive certification,
 pruning, signer handoff, delegated/attested labels or an observation-exit claim
 are forbidden scope expansions.
 
+The sole D.107d RED review round is closed without a confirmation rerun. The
+initial exact-five packet was signed and pushed as `afb0879d`, from parent
+`606077335bec51ef567ffedd656c462c1968d397`, with tree
+`e37881c727163fe7fcf43140b3f0827a5c383d6c`, patch object
+`c8ac1fd152040ce04c6a9890ae27520ea23b4497` and SHA-256
+`2e952ec1789bdc874b4af627aa34563649f6084b22dfc3d5653e8c60d6adc114`.
+Grok is `NO_VERDICT`: its one read-only launch ended after 510 seconds with
+runner exit 2 and no terminal schema; it was not retried or counted as
+approval. Kimi session `session_14ca4cc0-22a8-43c5-96ed-a33d587ae7a1`
+completed exactly checks 1 through 100 and returned `CHANGES_REQUIRED`,
+P0=0/P1=1/P2=8: the independent advancement classifications were not yet
+causally bound to the future product classifier. Opus 5/xhigh session
+`c244a116-e2fd-4404-90df-52c153e2e7e0` returned `CHANGES_REQUIRED`,
+P0=2/P1=6/P2=4: the browser assumed the trust ref was positional and declared
+an incompatible duplicate `Window` property; product behavioral parity and
+closed invalid-closure cases were absent; lifecycle was sampled only after
+seal; the source custody gate exempted both new owners; peer pages used
+different browser contexts and therefore could not prove transport; and the
+combined closure was not bound to the exact current/successor/CutValue/QC
+references.
+
+Same-round tests-only corrections are signed and pushed as `7c409d1c`,
+`24ba9ffb` and `35e0d078`. The final corrected exact-five packet is at
+`35e0d07848aba3684161e3cc90236448507cdc4a`, with tree
+`4ca4fccdb16983a16ec2a1e2004075ab855b1041`, combined patch object
+`16a2954ab21c739c375ec37c5e989eef8961b8dd` from the frozen parent and
+SHA-256 `006a946d7624636ea13567ff50aa3dec151343b8842b72b6c428d6e110480f19`.
+It now distinguishes exact-byte replay from same-epoch equivocation, rejects
+broken successor bindings, zero/two trust refs and either missing proof ref,
+and requires the product classifier to equal those independent verdicts. The
+browser oracle identifies the current trust ref explicitly, requires the exact
+combined sorted closure, samples active and pending-adoption projections,
+proves a real same-context peer receives the live operation, rejects that
+peer's close attempt with the authority-specific error, accepts the creator's
+close, and requires a fresh late peer to receive the sealed snapshot after the
+old handle is terminal. The new owner source gate permits exactly one
+`swapHead` in node creator-close and forbids activation, adoption and pruning;
+Vite readiness now enforces specific-before-bare ordering. The bundle entry's
+single documented TypeScript project-boundary suppression covers only the
+intentional cross-package esbuild import; it removes the duplicate global and
+allows the affected package typecheck to inspect all remaining code.
+
+Final D.107d RED verification commands and results were:
+
+- `pnpm exec vitest run --coverage.enabled=false tests/phase-5e-creator-live-close-red.test.ts`:
+  the intended RED, exactly 5 independent passes / 1 readiness failure naming
+  the two missing source owners and two ordered aliases / 2 future-product
+  skips;
+- `pnpm exec playwright test --config packages/storage-browser/playwright.phase-5e-creator-live-close.config.ts`:
+  exactly 6 intentional RED skips, two scenarios across Chromium, Firefox and
+  WebKit;
+- `pnpm --filter @ts-drp/storage-browser typecheck`: pass;
+- exact-five `eslint --max-warnings 0`, `prettier --check`,
+  `git diff --check`, roster and custody checks: pass; and
+- the package-local browser collector no longer imports the root fixture, so
+  Node performs no pre-collection bare-workspace resolution and reports six
+  skips rather than the earlier resolver error/no-tests pair.
+
+No RED P0/P1 remains. Kimi's useful P2s for broken-chain classification,
+specific-before-bare readiness, non-empty close binding, exact trust-ref set
+semantics, all ambiguous-head identity legs and post-seal snapshot serving
+were also closed in the same correction. No Fable review ran. The 26 existing
+stashes and every protected untracked path remained untouched.
+
 ### D.107 causal mutants, gates and handoff
 
 Every RED uses behavior, raw durable evidence or an independent byte oracle;
