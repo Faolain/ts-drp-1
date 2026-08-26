@@ -8,7 +8,14 @@ import {
 } from "@ts-drp/compaction/blueprint-fold";
 import { exportBlueprintSnapshotPayload, importBlueprintSnapshotPayload } from "@ts-drp/compaction/blueprint-snapshot";
 import { assertTrustPreserved, createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
-import type { DurableIssuanceOutboxRecord, DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-store";
+import type {
+	DurableBuildAndSign,
+	DurableIssuanceOutboxRecord,
+	DurableIssuanceStore,
+	DurableIssueScope,
+	DurableOutboxPageInput,
+	DurableOutboxPublicationTransitionInput,
+} from "@ts-drp/issuance-store";
 import type { DurableLiveJournalStore, LiveJournalScope } from "@ts-drp/live-journal";
 import type { MessageQueueManager } from "@ts-drp/message-queue";
 import {
@@ -3927,6 +3934,71 @@ function matchingOutboxRows(left: SnapshottedOutboxRow, right: SnapshottedOutbox
 	);
 }
 
+function creatorPredecessorIssuanceStore(
+	issuanceStore: DurableIssuanceStore,
+	issuanceScope: DurableIssueScope,
+	successorPayload: PreparedV3LivePayload,
+	successorAuthorization: V3LiveAuthorization,
+	expectedEpoch: number
+): DurableIssuanceStore {
+	return ObjectFreeze({
+		close: () => issuanceStore.close(),
+		compareAndMarkOutboxPublished: (input: DurableOutboxPublicationTransitionInput) =>
+			issuanceStore.compareAndMarkOutboxPublished(input),
+		readIssued: (scope: DurableIssueScope, authorSequence: number) => issuanceStore.readIssued(scope, authorSequence),
+		readLineage: (scope: DurableIssueScope) => issuanceStore.readLineage(scope),
+		readOutboxPage: async (input?: DurableOutboxPageInput) => {
+			let afterKey = input?.afterKey;
+			let skipped = 0;
+			for (;;) {
+				const page = await issuanceStore.readOutboxPage({
+					...(afterKey === undefined || afterKey === null ? {} : { afterKey }),
+					limit: 1,
+					scope: issuanceScope,
+				});
+				if (page.length !== 1) return page;
+				const row = outboxRowSnapshot(page[0], issuanceScope);
+				if (row === undefined || (afterKey !== undefined && afterKey !== null && row.authorSequence <= afterKey[2])) {
+					return page;
+				}
+				const issuedCommit = await issuanceStore.readIssued(issuanceScope, row.authorSequence);
+				const issuedRow = outboxRowSnapshot(
+					ObjectFreeze({ commit: issuedCommit, publishState: row.publishState }),
+					issuanceScope
+				);
+				if (issuedRow === undefined || !matchingOutboxRows(row, issuedRow)) return page;
+				const authenticated = authenticateRecoveryVertex(
+					successorPayload,
+					successorAuthorization,
+					row.canonicalPreimageBytes,
+					row.signature
+				);
+				const candidateEpoch = authenticated?.vertex.epoch;
+				if (
+					authenticated !== undefined &&
+					authenticated.digest === lowerHexDigest(row.digest) &&
+					authenticated.author === issuanceScope.author &&
+					authenticated.authorSequence === row.authorSequence &&
+					typeof candidateEpoch === "number" &&
+					candidateEpoch > expectedEpoch
+				) {
+					skipped += 1;
+					if (skipped > successorPayload.parameters.maxEpochVertices) return page;
+					afterKey = ObjectFreeze([issuanceScope.objectId, issuanceScope.author, row.authorSequence]) as readonly [
+						string,
+						string,
+						number,
+					];
+					continue;
+				}
+				return page;
+			}
+		},
+		transactIssue: (scope: DurableIssueScope, buildAndSign: DurableBuildAndSign) =>
+			issuanceStore.transactIssue(scope, buildAndSign),
+	});
+}
+
 function openRecoveryAuthorization(
 	payload: PreparedV3LivePayload,
 	exactAuthorizationBytes: Uint8Array,
@@ -6576,19 +6648,40 @@ async function activateCreatorSuccessorLive(
 	): Readonly<{ readonly detail: string; readonly kind: string; readonly ok: false }> =>
 		ObjectFreeze({ detail, kind, ok: false as const });
 	try {
-		const [predecessorValidation, predecessorSource, successor] = await Promise.all([
+		const [predecessorValidation, predecessorSource, successor, successorIssuanceAuthority] = await Promise.all([
 			prepareExistingCreatorGeneration(material.predecessor, material),
 			prepareExistingCreatorGeneration(material.predecessor, material),
 			prepareExistingCreatorGeneration(material.successor, material),
+			prepareExistingCreatorGeneration(material.successor, material),
 		]);
-		if (predecessorValidation === undefined || predecessorSource === undefined || successor === undefined) {
+		if (
+			predecessorValidation === undefined ||
+			predecessorSource === undefined ||
+			successor === undefined ||
+			successorIssuanceAuthority === undefined
+		) {
 			return rejected("preparation-rejected", "creator successor generation preparation failed");
 		}
+		const successorPayload = consumePreparedV3Live(successorIssuanceAuthority);
+		const successorAuthorization =
+			successorPayload === undefined
+				? undefined
+				: openRecoveryAuthorization(successorPayload, material.exactCanonicalLatchedAclBytes, "latched-acl");
+		if (successorPayload === undefined || successorAuthorization === undefined) {
+			return rejected("preparation-rejected", "creator successor issuance authority preparation failed");
+		}
+		const predecessorIssuanceStore = creatorPredecessorIssuanceStore(
+			material.issuanceStore,
+			material.issuanceScope,
+			successorPayload,
+			successorAuthorization,
+			material.predecessor.trust.currentEpoch
+		);
 		const validatedPredecessor = await recoverV3LiveReplica({
 			capability: predecessorValidation,
 			exactCanonicalLatchedAclBytes: material.predecessorExactCanonicalLatchedAclBytes,
 			issuanceScope: material.issuanceScope,
-			issuanceStore: material.issuanceStore,
+			issuanceStore: predecessorIssuanceStore,
 			liveJournalStore: material.liveJournalStore,
 		});
 		if (!validatedPredecessor.ok) {

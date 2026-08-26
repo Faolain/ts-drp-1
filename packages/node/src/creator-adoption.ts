@@ -814,20 +814,38 @@ function presentBase(generation: GenerationRecord): PresentHead | undefined {
 	return generation.baseExpectedHead.kind === "present" ? Object.freeze({ ...generation.baseExpectedHead }) : undefined;
 }
 
+type AuthenticatedSuccessorIssuanceScopeResult =
+	| Readonly<{ readonly ok: true; readonly scope: DurableIssueScope }>
+	| Readonly<{ readonly ok: false; readonly reason: "authority" | "lineage" | "possession" }>;
+
 async function authenticatedSuccessorIssuanceScope(
 	input: CreatorSuccessorReopenInput,
 	objectId: StorageObjectId,
+	expectedAclDigest: string,
 	exactCanonicalLatchedAclBytes: Uint8Array
-): Promise<DurableIssueScope | undefined> {
+): Promise<AuthenticatedSuccessorIssuanceScopeResult> {
+	let writers: readonly string[];
 	try {
-		const acl = canonicalRecord(exactCanonicalLatchedAclBytes);
-		if (acl?.objectId !== objectId || !Array.isArray(acl.members)) return undefined;
-		const writers = acl.members.flatMap((member) => {
-			if (!record(member) || typeof member.author !== "string" || !Array.isArray(member.groups)) return [];
-			return member.groups.includes("writer") ? [member.author] : [];
+		const opened = openCanonicalLatchedAclSnapshot({
+			exactCanonicalLatchedAclBytes,
+			expectedAclDigest,
+			expectedEpoch: 1,
+			expectedObjectId: objectId,
 		});
-		if (writers.length === 0 || new Set(writers).size !== writers.length) return undefined;
-		if (!ED25519_PUBLIC_KEY_HEX.test(input.author) || !writers.includes(input.author)) return undefined;
+		if (!opened.ok) return Object.freeze({ ok: false as const, reason: "authority" as const });
+		writers = opened.snapshot.members.flatMap(({ author, groups }) => (groups.includes("writer") ? [author] : []));
+		if (
+			writers.length === 0 ||
+			new Set(writers).size !== writers.length ||
+			!ED25519_PUBLIC_KEY_HEX.test(input.author) ||
+			!writers.includes(input.author)
+		) {
+			return Object.freeze({ ok: false as const, reason: "authority" as const });
+		}
+	} catch {
+		return Object.freeze({ ok: false as const, reason: "authority" as const });
+	}
+	try {
 		const webCrypto = globalThis.crypto;
 		if (
 			webCrypto === undefined ||
@@ -836,7 +854,7 @@ async function authenticatedSuccessorIssuanceScope(
 			typeof webCrypto.subtle.importKey !== "function" ||
 			typeof webCrypto.subtle.verify !== "function"
 		) {
-			return undefined;
+			return Object.freeze({ ok: false as const, reason: "possession" as const });
 		}
 		const challenge = new Uint8Array(32);
 		webCrypto.getRandomValues(challenge);
@@ -851,23 +869,30 @@ async function authenticatedSuccessorIssuanceScope(
 			signature.byteLength !== 64 ||
 			signature.buffer.byteLength !== 64
 		) {
-			return undefined;
+			return Object.freeze({ ok: false as const, reason: "possession" as const });
 		}
 		const authorBytes = Uint8Array.from(input.author.match(/.{2}/gu)?.map((byte) => Number.parseInt(byte, 16)) ?? []);
 		const publicKey = await webCrypto.subtle.importKey("raw", authorBytes, { name: "Ed25519" }, false, ["verify"]);
 		if (!(await webCrypto.subtle.verify({ name: "Ed25519" }, publicKey, signature, retainedChallenge))) {
-			return undefined;
+			return Object.freeze({ ok: false as const, reason: "possession" as const });
 		}
-		const selected = Object.freeze({ author: input.author, objectId });
+	} catch {
+		return Object.freeze({ ok: false as const, reason: "possession" as const });
+	}
+	try {
 		for (const author of writers) {
 			const scope = Object.freeze({ author, objectId });
 			const lineage = await input.issuanceStore.readLineage(scope);
-			if (lineage.exhausted || !Number.isSafeInteger(lineage.next) || lineage.next < 0) return undefined;
-			if (author !== input.author && lineage.next !== 0) return undefined;
+			if (lineage.exhausted !== false || !Number.isSafeInteger(lineage.next) || lineage.next < 0) {
+				return Object.freeze({ ok: false as const, reason: "lineage" as const });
+			}
+			if (author !== input.author && lineage.next !== 0) {
+				return Object.freeze({ ok: false as const, reason: "lineage" as const });
+			}
 		}
-		return selected;
+		return Object.freeze({ ok: true as const, scope: Object.freeze({ author: input.author, objectId }) });
 	} catch {
-		return undefined;
+		return Object.freeze({ ok: false as const, reason: "lineage" as const });
 	}
 }
 
@@ -1027,8 +1052,22 @@ async function reopenCreatorSuccessorMaterial(
 		) {
 			return coldFailure("chain-invalid", "creator predecessor ACL cannot be reconstructed");
 		}
-		const issuanceScope = await authenticatedSuccessorIssuanceScope(input, objectId, exactCanonicalLatchedAclBytes);
-		if (issuanceScope === undefined) return coldFailure("chain-invalid", "creator issuance authority is ambiguous");
+		const issuance = await authenticatedSuccessorIssuanceScope(
+			input,
+			objectId,
+			String(successorAnchor.aclDigest),
+			exactCanonicalLatchedAclBytes
+		);
+		if (!issuance.ok) {
+			const detail =
+				issuance.reason === "authority"
+					? "creator issuance ACL authority is invalid"
+					: issuance.reason === "possession"
+						? "creator issuance possession proof failed"
+						: "creator issuance lineage is invalid";
+			return coldFailure("chain-invalid", detail);
+		}
+		const issuanceScope = issuance.scope;
 		const material: CreatorSuccessorLiveMaterial = Object.freeze({
 			catalog: factsForCatalog(resolved),
 			exactCanonicalLatchedAclBytes,
