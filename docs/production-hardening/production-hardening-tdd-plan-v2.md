@@ -60119,6 +60119,67 @@ items remain RED clarity or future hardening and do not widen the corrected
 freeze. No reviewer modified the tracked tree, no confirmation review ran and
 no Fable review ran.
 
+The D.108d1b tests-only RED review inspected immutable signed commit
+`ebe2b9b969d28b9871f47c73afda4646c14cd863`, parent
+`34a627de14815bc61e43a72059925446b46684ba`, tree
+`0c14326a103ba9cee638cd4b466e5fe7f12d3a5c`, stable patch id
+`a98de41e49ef3b59aabb98e64ba0dc6d53bab403` and diff SHA-256
+`ba5ff0cda054425e54682474ca01efacbf0bad4e372bbe0d5823ce461d3688b9`.
+The diff is exactly the frozen nine test paths and leaves all three GREEN
+production owners byte-identical to the parent. Grok 4.6/high session
+`01a03fd1-7229-7ee3-8c71-4c7831fe8b0f` first reached the runner's 16-turn cap
+after 390.313 seconds; the runner therefore reported strict `NO_VERDICT` with
+`stop_reason=cancelled` and underlying `Error: max turns reached`, not a model
+verdict or inactivity timeout. One terminal-synthesis continuation of that
+same session returned `APPROVED`, P0=0/P1=0/P2=2. Kimi K3 session
+`665078ea-8fce-4b63-b887-35876b2c5fb5` completed exactly CHECK001 through
+CHECK100 once each and returned `APPROVED`, P0=0/P1=0/P2=5. Opus 5/xhigh
+session `4d671765-77f7-40aa-b84c-d2a8cc4145bb` completed in 642.543 API
+seconds and returned `CHANGES_REQUIRED`, P0=0/P1=1/P2=4. No reviewer modified
+the tracked tree and no confirmation review ran.
+
+The sole same-round P1 reproduced locally. The positive child selected a
+`sourceKind: "local-issued"` accepted-journal row, then tried to decode its
+nonexistent `exactCanonicalPreimageBytes`. The live-journal union and SQLite
+row mapper instead put `author` and `authorSequence` directly on that variant;
+`pnpm exec tsx --eval` against the canonical source reproduced the old call as
+`TypeError: truncated canonical value`. Signed correction commit
+`0cf4a3b90f2b43ecc151c280567f7d6decd7e535`, tree
+`391f9d47816f1e0985fba299bb7cef32a45f8693`, stable patch id
+`e93358fa6b624ec8b7b6f2d0d166fc51366e9bb8` and correction diff SHA-256
+`441339cbbb66d18914c1a79333c64a27c1ff02a4f023ad3ad627d48f7416afd9`
+now guards for the local-issued variant and reads its direct `author` field.
+`node --check`, exact-file ESLint with zero warnings, Prettier, `git diff
+--check` and the focused two-file Vitest RED rerun all passed their intended
+checks: five assertions passed, the single causal child remained skipped and
+only the one readiness assertion failed with exactly the three frozen missing
+GREEN owners. The genuine Bob fixture remained among the five passing
+assertions.
+
+The RED-round P2 ledger is assigned without widening or a confirmation review.
+D.108d1b GREEN owns removal of source-gated retained launcher injection and
+must prove the matched production text is live behavior. A narrow
+D.108d1b-oracle follow-up, due before D.108d2 RED, owns same-author repeated
+challenge freshness and inequality from durable carrier values, explicit
+packed close/snapshot evidence for Bob, the exact seven-writer/Dave-finality
+ACL projection, complete possession-before-lineage ordering, and removal or
+assertion of the otherwise dead `aheRecoverCount`. Test-infrastructure cleanup
+in that same follow-up owns the unused failure-kind constant, all-three-leg
+bridge readiness and documentation of the fixture's deliberately limited
+`finalityKey` fidelity. These are test-oracle improvements; none authorizes a
+fourth production owner, product API, wire/store change or weaker failure
+boundary.
+
+One expressly authorized Fable/high advisory ran outside the formal RED
+protocol as session `a7db7666-a971-43a2-8158-dd6317676609` and returned
+`ALIGNED_WITH_CORRECTIONS` after 39 turns. Its blocking guidance was already
+satisfied by the exact nine-path roster, the 16-key closed input, explicit
+definition of an established peer as Bob's admitted epoch-zero lineage, and
+explicit staging. Its remaining browser failure-parity and later
+reopen-after-epoch-one advice is assigned to the D.108d1b-oracle follow-up
+before D.108d2. Fable is not part of the Grok/Kimi/Opus checkpoint, and no
+further Fable run is authorized without a new explicit instruction.
+
 #### D.108d2 — product and peer proof freeze boundary
 
 D.108d2 does not begin from the recorded D.108d1 GREEN alone. The first
