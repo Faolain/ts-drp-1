@@ -311,6 +311,7 @@ describe("Phase 3 exit-c current-anchor envelope purity RED", () => {
 		]);
 		expect(Object.keys(live).sort()).toEqual([
 			"activateV3LivePlane",
+			"bindV3BlueprintLivePlane",
 			"prepareV3LiveGeneration",
 			"recoverV3LiveReplica",
 			"republishV3RetainedTo",

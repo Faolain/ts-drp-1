@@ -59606,7 +59606,7 @@ before RED.
 #### D.108d1a — successor handle registration-identity compatibility
 
 D.108d1a is the first blocking prerequisite discovered by the rejected D.108d2
-freeze. Its corrected tests-only RED roster is exactly five paths: two new
+freeze. Its reviewed tests-only RED roster is exactly six paths: two new
 owners,
 
 - `tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts`;
@@ -59622,6 +59622,15 @@ plus the two retained cold-child owners that must add the cold-wrapper proof:
 - `packages/storage-node/tests/fixtures/phase-6a-creator-successor-activation-child.mjs`;
   and
 - `packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts`.
+
+The sixth tests-only owner is the retained runtime-surface assertion whose
+obsolete six-name roster the RED checkpoint review reproduced:
+
+- `tests/phase-3-exit-envelope-purity-red.test.ts`.
+
+It is reconciled to the already-public seven-name runtime roster by adding the
+existing `bindV3BlueprintLivePlane`; this does not add, remove or rename a
+production export.
 
 The expected GREEN roster is exactly three existing node owners:
 
@@ -59667,12 +59676,12 @@ claim.
 The contract pins one composite readiness failure. Every substantive behavior
 is skipped only by that same fact and must execute in GREEN; the readiness scan
 is never a substitute for the genuine hot and cold gates. It also pins exact
-five-RED/three-GREEN rosters, the unchanged exact `@ts-drp/node/v3-live` export
+six-RED/three-GREEN rosters, the unchanged exact `@ts-drp/node/v3-live` export
 roster, no node-root or package-manifest export and no product consumer. GREEN
-also runs the three retained exact-v3-live-surface owners
-`tests/phase-4b-v3-live-snapshot-composition-red.test.ts`,
-`tests/phase-3a1b-p3-live-transport-red.test.ts` and
-`tests/phase-3-exit-envelope-purity-red.test.ts`, plus the
+also runs the two independently green retained exact-v3-live-surface owners
+`tests/phase-4b-v3-live-snapshot-composition-red.test.ts` and
+`tests/phase-3-exit-envelope-purity-red.test.ts`, plus the new D.108d1a-owned
+seven-name runtime pin and the
 complete D.108b/D.108c/D.108d1 retained selection, the D.108d1 three-engine
 Web Lock matrix, affected node build/typecheck, exact-owner ESLint/Prettier/diff
 checks and the retained Phase-4c snapshot selection including the 64 MiB fresh
@@ -59706,9 +59715,10 @@ The hot retained path must prove asynchronous admission and a received journal
 row rather than only the route claim boolean. Targeted retained publication
 must contain a genuine row, return `published` and record exact sent envelope
 bytes rather than pass on `empty`. The existing cold child joins the RED roster
-so the cold wrapper cannot inherit the same identity defect unseen, and the
-three retained exact-v3-live-export tests now guard the promised public-surface
-containment.
+so the cold wrapper cannot inherit the same identity defect unseen. The freeze
+review intended three retained exact-v3-live-export suites to guard public-
+surface containment; the later RED checkpoint review below corrects that gate
+inventory against their actual baseline status.
 
 The first deterministic RED dry-run then exposed one test-launcher fact before
 the RED checkpoint was signed: the retained child cannot resolve its new bare
@@ -59721,7 +59731,7 @@ dry-run also confirmed that the unchanged runtime roster includes the retained
 exports rather than an obsolete six-name subset. No GREEN owner or product
 surface changed, and the review round was not rerun as a confirmation round.
 
-The corrected tests-only RED then landed exactly those five owners. The focused
+The initial tests-only RED then landed exactly five owners. The focused
 `pnpm exec vitest run
 tests/phase-6a-creator-successor-handle-identity-red.test.ts
 packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts
@@ -59746,6 +59756,75 @@ missing workspace declaration and legacy test errors. The affected production
 build graphs are green and none of those broad failures names a D.108d1a-owned
 production change; they remain baseline debt and do not widen this tests-only
 RED.
+
+The D.108d1a RED checkpoint review inspected signed commit
+`83efc56c62cc54bf921fcbb72745d19e098fb00d`, parent
+`a6260e16e0888edc89f876ad2153d82d0235fd1d`, tree
+`3b0bd6ad514a9569b76cb0ca52cac932898c954a`, stable patch id
+`92a72876dd97c16521fb907564d56d2e01b82de8` and staged-diff SHA-256
+`8936396e78c11976f268bcdce2926c1e53106ea223863083ec1bdcf745ae5299`.
+Grok/high first exhausted its configured 16-turn runner allowance after
+270.113 seconds; the wrapper classified that resumable stop as `cancelled` and
+`NO_VERDICT`, so the exact same Grok session
+`01a03f5e-684c-7a22-b8e4-b50451d3c1d1` was resumed with a 64-turn allowance.
+It then ended normally with the required terminal `CHANGES_REQUIRED`,
+P0=0/P1=1/P2=2. Kimi K3 session
+`9602996f-0dff-4a40-bd9d-1a80ad8cf11b` completed in 770.240 seconds, emitted
+CHECK001 through CHECK100 exactly once and returned terminal
+`CHANGES_REQUIRED`, P0=0/P1=2/P2=5. Opus 5/xhigh session
+`a1d984b6-218f-41b2-a82c-0f5b58013907` launched no subagent and returned the
+same schema-valid `CHANGES_REQUIRED`, P0=0/P1=2/P2=5. No reviewer edited the
+tracked tree and no confirmation review was run.
+
+Separately, the expressly authorized one-off Fable 5/high advisory session
+`f1dc1828-b10c-4444-a68c-3ce1677a03b` completed normally after 271.359 API
+seconds with `SOUND_WITH_GUIDANCE`, P0=0/P1=1/P2=4 and zero spawned
+subagents. It independently identified the obsolete six-name Phase-3 exit
+roster, recommended the same sixth tests-only RED owner, found the Phase-4c
+closed import-hook approach and exact-three GREEN seam sound, and answered yes
+to the D.108d1a -> D.108d1b -> D.108d2 order. Its denied Vitest attempts left
+the independently reproduced broad Seam-3 baseline failures to the formal
+Kimi/Opus evidence above; the advisory did not authorize a reslice.
+
+The same round reproduced both material findings. `pnpm exec vitest run
+tests/phase-3-exit-envelope-purity-red.test.ts --no-coverage
+--reporter=verbose` exited 1 with exactly one failure: the received runtime
+surface contained the retained `bindV3BlueprintLivePlane` while that older
+assertion still expected six names. That test therefore joins the RED roster as
+the sixth tests-only owner and now pins the existing seven-name roster. `pnpm
+exec vitest run tests/phase-3a1b-p3-live-transport-red.test.ts --no-coverage
+--reporter=verbose` exited 1 with 21/24 passing and three inherited failures:
+its source roster omits the existing `V3OperationAdmissionPolicy` and
+`V3OperationAdmissionReservation`, one hostile re-import collides with the
+already-installed creator-close resolver, and its package dependency roster
+omits the existing `@ts-drp/seal`. The suite is therefore not represented as a
+complete D.108d1a GREEN gate. This correction does not reconcile that broad
+legacy owner, weaken the new exact runtime pin or widen production scope.
+
+The RED checkpoint P2 ledger remains nonblocking. Grok records that the cold
+proof checks aggregate send count rather than exact per-reopen peer/bytes and
+that readiness pins source names rather than bridge behavior. Kimi and Opus
+also record the unforced alias-failure cleanup obligation, the cold test's
+missing explicit 60-second timeout, possible hot-test module-specifier identity
+ambiguity, and the absence of a built-file export-roster assertion. The exact
+bridge identifiers remain intentionally frozen names, hot behavior carries the
+byte-exact proof, cold built execution carries the fresh-process proof, and no
+P2 observation authorizes this RED correction to widen beyond its sixth
+tests-only owner.
+
+After correction, `pnpm exec vitest run
+tests/phase-6a-creator-successor-handle-identity-red.test.ts
+packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts
+tests/phase-3-exit-envelope-purity-red.test.ts --no-coverage
+--reporter=verbose` exited 1 with the exact intended shape: 8 pass, the sole
+`[RED readiness]` failure and the same two designed skips; all four Phase-3
+exit assertions passed. The independently green retained snapshot-surface
+owner passed 7/7 under `pnpm exec vitest run
+tests/phase-4b-v3-live-snapshot-composition-red.test.ts --no-coverage
+--reporter=verbose`. Both `pnpm --filter @ts-drp/node build` and `pnpm --filter
+@ts-drp/storage-node build` exited 0. Exact-six ESLint with `--max-warnings 0`,
+Prettier over the six test owners plus this plan, and `git diff --check` all
+exited 0.
 
 The nonblocking ledger remains explicit without confirmation: Grok records the
 adjacent D.108d2 wording, the not-yet-pinned bridge-specific readiness fact and

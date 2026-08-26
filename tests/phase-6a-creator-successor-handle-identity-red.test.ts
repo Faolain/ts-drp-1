@@ -46,8 +46,8 @@ function sameBytes(left: Uint8Array | undefined, right: Uint8Array): boolean {
 }
 
 describe("D.108d1a successor handle registration identity RED", () => {
-	it("freezes exact five-RED/three-GREEN ownership and the unchanged v3-live surface", async () => {
-		expect(D108D1A_RED_PATHS).toHaveLength(5);
+	it("freezes exact six-RED/three-GREEN ownership and the unchanged v3-live surface", async () => {
+		expect(D108D1A_RED_PATHS).toHaveLength(6);
 		expect(D108D1A_GREEN_PATHS).toEqual([
 			"packages/node/src/creator-adoption-activate.ts",
 			"packages/node/src/internal/creator-successor-live.ts",

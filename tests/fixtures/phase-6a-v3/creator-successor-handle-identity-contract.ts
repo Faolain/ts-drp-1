@@ -15,6 +15,7 @@ export const D108D1A_RED_PATHS = Object.freeze([
 	"tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts",
 	"packages/storage-node/tests/fixtures/phase-6a-creator-successor-activation-child.mjs",
 	"packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts",
+	"tests/phase-3-exit-envelope-purity-red.test.ts",
 ] as const);
 
 export const D108D1A_GREEN_PATHS = Object.freeze([
