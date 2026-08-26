@@ -17,6 +17,7 @@ export const REQUIRED_GREEN_PATHS = Object.freeze([
 	"packages/seal/src/creator.ts",
 	"packages/seal/src/internal/creator-close-intent.ts",
 	"packages/seal/package.json",
+	"pnpm-lock.yaml",
 	"packages/storage-browser/src/seal-evidence.ts",
 	"packages/storage-browser/src/seal-vote.ts",
 	"packages/storage-browser/src/internal/schema-idb.ts",

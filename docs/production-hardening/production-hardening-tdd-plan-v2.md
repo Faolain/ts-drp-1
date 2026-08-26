@@ -57656,11 +57656,13 @@ The tests-only RED is exactly six paths:
 - `packages/storage-browser/tests/phase-5e-creator-actor.pw.ts`; and
 - `packages/storage-browser/playwright.phase-5e-creator-actor.config.ts`.
 
-The expected GREEN is exactly fourteen paths:
+The expected GREEN is exactly fifteen paths:
 
 - `packages/keychain/src/finality.ts`;
 - `packages/seal/src/{creator.ts,internal/creator-close-intent.ts}`;
 - `packages/seal/package.json`;
+- `pnpm-lock.yaml`, limited to the matching `packages/seal` importer entry for
+  its direct existing-workspace `@ts-drp/canonical` codec dependency;
 - `packages/storage-browser/src/{seal-evidence.ts,seal-vote.ts}`;
 - `packages/storage-browser/src/internal/{schema-idb.ts,seal-evidence-store.ts,seal-vote-store.ts}`;
 - the retained `packages/storage-browser/src/internal/seal-vote-test-control.ts`,
@@ -57678,6 +57680,11 @@ verify a QC, mint trust, publish, or mutate a vote row. No transport, example,
 node live-plane edit, caller-signable raw digest, raw outbox reader or public
 store mutation handle is authorized here. If the actor cannot be expressed
 within this roster, D.107b reslices before GREEN.
+
+The canonical dependency is not a new library or a transitive-layout shortcut:
+the seal actor directly authors the registered q=1 QC bytes and therefore names
+the already-frozen workspace codec explicitly. No other importer, package
+version or resolved package entry may change.
 
 ### D.107b.1 — mandatory Phase-4c fresh-process memory-gate debt closure
 
