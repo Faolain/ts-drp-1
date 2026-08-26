@@ -12,7 +12,7 @@ import { createNodeDurableLiveJournalStore } from "@ts-drp/storage-node/live-jou
 import { createNodeSnapshotQuarantineStore } from "@ts-drp/storage-node/snapshot-transfer";
 import { join } from "node:path";
 
-const [, , mode, encodedInput] = process.argv;
+const [, , mode] = process.argv;
 
 function send(value) {
 	if (typeof process.send === "function") process.send(value);
@@ -123,7 +123,7 @@ function network(events, publications) {
 	};
 }
 
-async function seedAhe(material) {
+async function seedAhe(material, effects) {
 	const raw = createSqliteAheDurableStore({ filename: join(material.directory, "ahe.sqlite") });
 	const blobs = new Map();
 	for (const candidate of material.blobs) blobs.set(candidate.ref.digest, candidate.bytes);
@@ -151,6 +151,12 @@ async function seedAhe(material) {
 	let adoptionSwapCount = 0;
 	const store = new Proxy(raw, {
 		get(target, property, receiver) {
+			if (property === "recoverActiveGeneration") {
+				return (...args) => {
+					effects.aheRecoverCount += 1;
+					return target.recoverActiveGeneration(...args);
+				};
+			}
 			if (property !== "swapHead") return Reflect.get(target, property, receiver);
 			return (...args) => {
 				adoptionSwapCount += 1;
@@ -179,9 +185,9 @@ async function seedIssuance(material) {
 	return store;
 }
 
-async function seedJournal(material) {
-	const store = createNodeDurableLiveJournalStore({ primaryFilename: join(material.directory, "journal.sqlite") });
-	const installed = await store.installGenesis({
+async function seedJournal(material, effects) {
+	const raw = createNodeDurableLiveJournalStore({ primaryFilename: join(material.directory, "journal.sqlite") });
+	const installed = await raw.installGenesis({
 		detachedAnchorSignature: material.creatorGenesis.detachedSignature,
 		exactCanonicalAnchorPreimageBytes: material.creatorGenesis.exactCanonicalAnchorPreimageBytes,
 		exactCanonicalParametersCarrierBytes: material.creatorGenesis.exactCanonicalParametersCarrierBytes,
@@ -190,13 +196,24 @@ async function seedJournal(material) {
 	if (!installed.ok) throw new Error(`journal genesis rejected: ${installed.kind}`);
 	for (const row of material.journalRows) {
 		const { journalSequence: _journalSequence, ...input } = row;
-		const appended = await store.appendAccepted(input);
+		const appended = await raw.appendAccepted(input);
 		if (!appended.ok) throw new Error(`journal row rejected: ${appended.kind}`);
 	}
-	return store;
+	return {
+		raw,
+		store: new Proxy(raw, {
+			get(target, property, receiver) {
+				if (property !== "installEpochAnchor") return Reflect.get(target, property, receiver);
+				return (...args) => {
+					effects.installEpochAnchorCount += 1;
+					return target.installEpochAnchor(...args);
+				};
+			},
+		}),
+	};
 }
 
-async function seedSnapshot(material, events) {
+async function seedSnapshot(material, events, effects) {
 	const raw = createNodeSnapshotQuarantineStore({ primaryFilename: join(material.directory, "snapshot.sqlite") });
 	const scope = await raw.openScope(material.snapshot.declaration);
 	const port = scope.verificationQuarantine.open(new AbortController().signal);
@@ -204,25 +221,79 @@ async function seedSnapshot(material, events) {
 		await port.write(material.snapshot.declaration.chunks[index], material.snapshot.chunks[index]);
 	}
 	await port.discard();
+	const expiresAt = (await scope.status()).expiresAt;
 	await scope.release();
-	return new Proxy(raw, {
+	const persistedScope = await raw.openScope(material.snapshot.declaration);
+	const persistedPort = persistedScope.verificationQuarantine.open(new AbortController().signal);
+	for (let index = 0; index < material.snapshot.declaration.chunks.length; index += 1) {
+		const persisted = await persistedPort.read(material.snapshot.declaration.chunks[index]);
+		if (persisted === undefined || !Buffer.from(persisted).equals(Buffer.from(material.snapshot.chunks[index]))) {
+			throw new Error(`snapshot chunk ${index} did not persist after port discard`);
+		}
+	}
+	await persistedPort.discard();
+	await persistedScope.release();
+	const store = new Proxy(raw, {
 		get(target, property, receiver) {
 			if (property !== "openScope") return Reflect.get(target, property, receiver);
-			return (...args) => {
-				events.push("snapshot-open");
-				return target.openScope(...args);
+			return async (...args) => {
+				effects.snapshotOpenCount += 1;
+				events.push("snapshot:open-scope");
+				const opened = await target.openScope(...args);
+				const quarantine = {
+					open(signal) {
+						events.push("snapshot:port-open");
+						const openedPort = opened.verificationQuarantine.open(signal);
+						return new Proxy(openedPort, {
+							get(portTarget, portProperty, portReceiver) {
+								if (portProperty !== "read") return Reflect.get(portTarget, portProperty, portReceiver);
+								return async (descriptor) => {
+									const bytes = await portTarget.read(descriptor);
+									events.push(`snapshot:read:${descriptor.index}`);
+									return bytes;
+								};
+							},
+						});
+					},
+				};
+				return new Proxy(opened, {
+					get(scopeTarget, scopeProperty, scopeReceiver) {
+						if (scopeProperty === "verificationQuarantine") return quarantine;
+						if (scopeProperty !== "complete") return Reflect.get(scopeTarget, scopeProperty, scopeReceiver);
+						return async (...completeArgs) => {
+							const completed = await scopeTarget.complete(...completeArgs);
+							events.push("snapshot:complete");
+							return completed;
+						};
+					},
+				});
 			};
 		},
 	});
+	return { expiresAt, raw, store };
 }
 
-async function cold(material) {
+function containsDigest(value, expected) {
+	if (value instanceof Uint8Array) return Buffer.from(value).equals(expected);
+	if (Array.isArray(value)) return value.some((entry) => containsDigest(entry, expected));
+	if (value !== null && typeof value === "object") {
+		return Object.values(value).some((entry) => containsDigest(entry, expected));
+	}
+	return false;
+}
+
+async function cold(material, selectedMode) {
 	const events = [];
 	const publications = [];
-	const ahe = await seedAhe(material);
+	const effects = {
+		aheRecoverCount: 0,
+		installEpochAnchorCount: 0,
+		snapshotOpenCount: 0,
+	};
+	const ahe = await seedAhe(material, effects);
 	const issuanceStore = await seedIssuance(material);
-	const liveJournalStore = await seedJournal(material);
-	const snapshotStore = await seedSnapshot(material, events);
+	const liveJournal = await seedJournal(material, effects);
+	const snapshot = await seedSnapshot(material, events, effects);
 	const catalog = Object.freeze({
 		blueprintDigests: Object.freeze([...material.catalog.blueprintDigests]),
 		catalogDigest: material.catalog.catalogDigest,
@@ -232,28 +303,45 @@ async function cold(material) {
 		},
 	});
 	const node = network(events, publications);
+	let activeHandle;
+	const originalNow = Date.now;
 	try {
+		if (selectedMode === "ttl-expired") Date.now = () => snapshot.expiresAt + 1;
 		const result = await reopenCreatorSuccessorAdoption({
 			...material.creatorGenesis,
+			...(selectedMode === "divergent-genesis" ? { pinnedGenesisAnchorDigest: "f".repeat(64) } : {}),
+			...(selectedMode === "extra-epoch" ? { epoch: 1 } : {}),
 			catalog,
 			issuanceStore,
-			liveJournalStore,
+			liveJournalStore: liveJournal.store,
 			messageQueueManager: new MessageQueueManager({ logConfig: { level: "silent" } }),
 			networkNode: node,
 			onAdmittedVertex: () => undefined,
 			snapshotDeclaration: material.snapshot.declaration,
-			snapshotStore,
+			snapshotStore: snapshot.store,
 			store: ahe.store,
 		});
-		if (!result.ok) throw new Error(`cold reopen rejected: ${result.kind}`);
+		if (!result.ok) {
+			return {
+				effects: {
+					...effects,
+					adoptionSwapCount: ahe.adoptionSwapCount(),
+					publicationCount: publications.length,
+					subscribeCount: events.filter((event) => event === "subscribe").length,
+				},
+				failure: { kind: result.kind, ok: false },
+				pid: process.pid,
+			};
+		}
+		activeHandle = result.handle;
 		const displaced = await result.handle.readRebaseOutbox();
 		await result.handle.publishPending();
 		const oldDigest = Buffer.from(
 			material.issuance.outbox.find((row) => row.publishState === "pending").commit.envelope.digest
-		).toString("hex");
-		const publicationText = JSON.stringify(publications, (_key, value) =>
-			value instanceof Uint8Array ? Buffer.from(value).toString("hex") : value
 		);
+		const subscribeIndex = events.indexOf("subscribe");
+		const snapshotCompletionIndex = events.lastIndexOf("snapshot:complete");
+		const snapshotReadCount = events.filter((event) => event.startsWith("snapshot:read:")).length;
 		return {
 			activation: {
 				epoch: result.handle.epoch,
@@ -262,17 +350,26 @@ async function cold(material) {
 				recovery: result.recovery,
 			},
 			adoptionSwapCount: ahe.adoptionSwapCount(),
-			freshProcess: true,
+			pid: process.pid,
 			oldOutbox: {
 				classified: displaced.kind,
-				publishedAsEpochOne: publicationText.includes(oldDigest),
+				publishedAsEpochOne: publications.some((publication) => containsDigest(publication, oldDigest)),
 			},
 			snapshotImportedBeforeActivation:
-				events.indexOf("snapshot-open") >= 0 && events.indexOf("snapshot-open") < events.indexOf("subscribe"),
+				snapshotReadCount === material.snapshot.declaration.chunks.length &&
+				snapshotCompletionIndex >= 0 &&
+				snapshotCompletionIndex < subscribeIndex,
+			trust: result.trust,
 		};
 	} finally {
-		await Promise.allSettled([snapshotStore.close(), liveJournalStore.close(), issuanceStore.close(), ahe.raw.close()]);
+		Date.now = originalNow;
+		await Promise.resolve(activeHandle?.deactivate());
+		await Promise.allSettled([snapshot.raw.close(), liveJournal.raw.close(), issuanceStore.close(), ahe.raw.close()]);
 	}
+}
+
+function receiveMaterial() {
+	return new Promise((resolve) => process.once("message", (message) => resolve(unpack(message))));
 }
 
 void (async () => {
@@ -289,8 +386,8 @@ void (async () => {
 		});
 		return;
 	}
-	const material = unpack(JSON.parse(Buffer.from(encodedInput ?? "", "base64url").toString("utf8")));
-	send({ kind: "proof", proof: await cold(material) });
+	const material = await receiveMaterial();
+	send({ kind: "proof", proof: await cold(material, mode) });
 })().catch((error) => {
 	send({ kind: "child-error", message: error instanceof Error ? error.message : String(error) });
 	process.exitCode = 1;

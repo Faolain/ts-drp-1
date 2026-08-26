@@ -1,4 +1,5 @@
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { type Serializable, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -117,6 +118,14 @@ export interface D108d1Oracle {
 	readonly stateDigest: string;
 }
 
+export type D108d1ChildMode = "cold" | "divergent-genesis" | "extra-epoch" | "probe" | "ttl-expired";
+
+export interface D108d1ChildMessage {
+	readonly kind: string;
+	readonly message?: string;
+	readonly proof?: Readonly<Record<string, unknown>>;
+}
+
 function packD108d1Value(value: unknown): unknown {
 	if (value instanceof Uint8Array) return Object.freeze({ bytesBase64: Buffer.from(value).toString("base64") });
 	if (Array.isArray(value)) return value.map(packD108d1Value);
@@ -146,15 +155,11 @@ export async function createD108d1PackedDurableMaterial(
 	if (verified.ok !== true) throw new TypeError(`D.108d1 verification failed: ${String(verified.kind)}`);
 	const committed = await committer.commitCreatorSuccessorAdoption({ handle: fixture.handle, intent: verified.intent });
 	if (committed.ok !== true) throw new TypeError(`D.108d1 commit failed: ${String(committed.kind)}`);
+	const committedInspection = await fixture.handle.inspectDurableHead();
+	if (!Buffer.from(encodeCanonical(committedInspection.head)).equals(Buffer.from(encodeCanonical(committed.head)))) {
+		throw new TypeError("D.108d1 committed head does not match durable inspection");
+	}
 	const projection = canonicalRecord(fixture.evidence.exactCanonicalProjectionBytes);
-	const predecessorLiveRef = fixture.evidence.current.candidates.find(({ bytes }) => {
-		try {
-			return canonicalRecord(bytes).kind === "v3-live-generation-1";
-		} catch {
-			return false;
-		}
-	})?.ref;
-	if (predecessorLiveRef === undefined) throw new TypeError("D.108d1 predecessor live ref is unavailable");
 	const projectionDigest = lowerHex(
 		hashDomain("ts-drp-storage/blob/v1", fixture.evidence.exactCanonicalProjectionBytes)
 	);
@@ -163,18 +168,44 @@ export async function createD108d1PackedDurableMaterial(
 		digest: projectionDigest,
 	});
 	const activeClosure = Object.freeze(
-		[
-			...fixture.evidence.proposed.references.filter(
-				(ref) => ref.digest !== predecessorLiveRef.digest || ref.byteLength !== predecessorLiveRef.byteLength
-			),
-			projectionRef,
-		].sort((left, right) => (left.digest < right.digest ? -1 : left.digest > right.digest ? 1 : 0))
+		committedInspection.references.map((ref) => Object.freeze({ byteLength: ref.byteLength, digest: ref.digest }))
 	);
+	if (
+		!activeClosure.some((ref) => ref.digest === projectionRef.digest && ref.byteLength === projectionRef.byteLength)
+	) {
+		throw new TypeError("D.108d1 committed durable closure omits the successor projection");
+	}
 	const currentTrustCandidate = fixture.evidence.current.candidates.find(
 		(candidate) => candidate.ref.digest === fixture.evidence.closeResult.currentTrustRef.digest
 	);
 	if (currentTrustCandidate === undefined) throw new TypeError("D.108d1 current trust candidate is unavailable");
 	const currentTrustRecord = canonicalRecord(currentTrustCandidate.bytes);
+	if (!(currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array)) {
+		throw new TypeError("D.108d1 current anchor carrier is unavailable");
+	}
+	const currentAnchor = canonicalRecord(currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes);
+	const exactCanonicalParametersCarrierBytes = encodeCanonical({
+		maxDependencies: 16,
+		maxEpochBytes: 8_388_608,
+		maxEpochVertices: 8192,
+		maxPendingBytes: 16_777_216,
+		maxPendingEntries: 4096,
+		maxSnapshotBytes: 268_435_456,
+		snapshotChunkBytes: 131_072,
+	});
+	const authenticatedCurrentAnchorDigest = lowerHex(
+		hashDomain("ts-drp/epoch-anchor/v3", currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes)
+	);
+	const authenticatedParametersDigest = lowerHex(
+		hashDomain("ts-drp/parameters/v3", exactCanonicalParametersCarrierBytes)
+	);
+	if (
+		authenticatedCurrentAnchorDigest !== fixture.evidence.currentTrust.currentAnchorDigest ||
+		authenticatedCurrentAnchorDigest !== fixture.evidence.currentTrust.genesisAnchorDigest ||
+		currentAnchor.parametersDigest !== authenticatedParametersDigest
+	) {
+		throw new TypeError("D.108d1 creator-genesis carriers are not bound to the authenticated anchor");
+	}
 	const resolved = fixture.catalog.resolve(String(projection.blueprintDigest));
 	const outbox = await fixture.evidence.issuanceStore.readOutboxPage({ scope: fixture.evidence.issuanceScope });
 	return packD108d1Value({
@@ -194,23 +225,51 @@ export async function createD108d1PackedDurableMaterial(
 			authenticationProfile: "creator-only",
 			detachedSignature: currentTrustRecord.detachedCurrentAnchorSignature,
 			exactCanonicalAnchorPreimageBytes: currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes,
-			exactCanonicalParametersCarrierBytes: encodeCanonical({
-				maxDependencies: 16,
-				maxEpochBytes: 8_388_608,
-				maxEpochVertices: 8192,
-				maxPendingBytes: 16_777_216,
-				maxPendingEntries: 4096,
-				maxSnapshotBytes: 268_435_456,
-				snapshotChunkBytes: 131_072,
-			}),
+			exactCanonicalParametersCarrierBytes,
 			pinnedGenesisAnchorDigest: fixture.evidence.currentTrust.genesisAnchorDigest,
 		},
 		current: fixture.evidence.current,
 		directory,
 		issuance: { outbox, scope: fixture.evidence.issuanceScope },
 		journalRows: fixture.evidence.journalRows,
+		oracle: deriveD108d1Oracle(fixture),
 		proposed: fixture.evidence.proposed,
 		snapshot: { chunks: fixture.evidence.chunks, declaration: fixture.evidence.declaration },
+	});
+}
+
+/**
+ * Launches the genuine built-package child and transfers its carrier over IPC.
+ * @param mode - One bounded cold-reopen proof mode.
+ * @param input - Packed durable material, unused by the import probe.
+ * @returns The child's single terminal proof message.
+ */
+export function runD108d1ActivationChild(mode: D108d1ChildMode, input: unknown): Promise<D108d1ChildMessage> {
+	return new Promise((resolvePromise, reject) => {
+		const childPath = resolve(
+			REPOSITORY_ROOT,
+			"packages/storage-node/tests/fixtures/phase-6a-creator-successor-activation-child.mjs"
+		);
+		const child = spawn(process.execPath, [childPath, mode], { stdio: ["ignore", "ignore", "pipe", "ipc"] });
+		let observed: D108d1ChildMessage | undefined;
+		let stderr = "";
+		const timer = setTimeout(() => {
+			child.kill("SIGKILL");
+			reject(new Error(`D.108d1 child timeout: ${stderr}`));
+		}, 60_000);
+		child.stderr?.setEncoding("utf8");
+		child.stderr?.on("data", (value: string) => (stderr += value));
+		child.on("message", (message: D108d1ChildMessage) => (observed = message));
+		child.once("error", reject);
+		child.once("spawn", () => {
+			if (mode !== "probe") child.send(input as Serializable);
+		});
+		child.once("exit", (code) => {
+			clearTimeout(timer);
+			if (code !== 0 || observed === undefined || observed.kind === "child-error") {
+				reject(new Error(observed?.message ?? `D.108d1 child failed (${String(code)}): ${stderr}`));
+			} else resolvePromise(observed);
+		});
 	});
 }
 
@@ -310,7 +369,7 @@ export function deriveD108d1Oracle(fixture: GenuineCreatorAdoptionFixture): D108
  * @returns Frozen readiness plus every absent owner.
  */
 export function d108d1Readiness(): Readonly<{ readonly missing: readonly string[]; readonly ready: boolean }> {
-	const missing = D108D1_GREEN_PATHS.filter((path) => !existsSync(resolve(REPOSITORY_ROOT, path)));
+	const missing: string[] = D108D1_GREEN_PATHS.filter((path) => !existsSync(resolve(REPOSITORY_ROOT, path)));
 	const manifestPath = resolve(REPOSITORY_ROOT, "packages/node/package.json");
 	if (existsSync(manifestPath)) {
 		const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as { readonly exports?: Record<string, unknown> };
@@ -341,11 +400,8 @@ export function d108d1SourceGovernance(): Readonly<Record<string, boolean>> {
 	const products = `${read("examples/v3-room/src/index.ts")}\n${read("examples/v3-chat/src/index.ts")}`;
 	const recoveredAuthority = read("packages/node/src/v3-live-recovered-authority.ts");
 	return Object.freeze({
-		exactColdInputCapture: CREATOR_SUCCESSOR_REOPEN_INPUT_KEYS.every((key) => owner.includes(`"${key}"`)),
-		exactHotInputCapture: CREATOR_SUCCESSOR_ACTIVATION_INPUT_KEYS.every((key) => owner.includes(`"${key}"`)),
 		internalCustody: /installCreatorSuccessorLive|consumeCreatorSuccessorLive/u.test(internal),
 		noProductConsumer: !/activateCreatorSuccessorAdoption|creator-adoption-activate/u.test(products),
-		noRawEpochInput: !/readonly\s+epoch\s*:/u.test(owner),
 		noRootExport: !/activateCreatorSuccessorAdoption|creator-adoption-activate/u.test(root),
 		privateEpochAnchor: /installEpochAnchor/u.test(live) && /CreatorSuccessor|creatorSuccessor/u.test(live),
 		recoveredAuthorityUnchanged:

@@ -90,8 +90,8 @@ test("missing or hostile LockManager authority fails activation closed", async (
 		{ databaseName, material }
 	);
 	expect(results).toEqual([
-		expect.objectContaining({ kind: "authority-unavailable", ok: false }),
-		expect.objectContaining({ kind: "authority-unavailable", ok: false }),
+		expect.objectContaining({ kind: "authority-unavailable", ok: false, verificationCount: 1 }),
+		expect.objectContaining({ kind: "authority-unavailable", ok: false, verificationCount: 1 }),
 	]);
 });
 
@@ -125,14 +125,37 @@ test("two tabs elect one lifetime-held writer then a freshly reverified loser wi
 		const loser = left.ok ? second : first;
 		expect([left.ok, right.ok].filter(Boolean)).toHaveLength(1);
 		expect(left.ok ? right : left).toMatchObject({ kind: "authority-unavailable", lockHeld: false, ok: false });
-		expect(left.ok ? left : right).toMatchObject({ epoch: 1, lockHeld: true, ok: true, publicationCount: 0 });
+		expect(left.ok ? left : right).toMatchObject({
+			epoch: 1,
+			lockHeld: true,
+			ok: true,
+			publicationCount: 0,
+			recovery: "active-new",
+			verificationCount: 1,
+		});
 		expect(await winner.evaluate(() => window.phase6aCreatorSuccessorActivation.release())).toBe(true);
-		const reacquired = await loser.evaluate(
-			({ databaseName: selected, material: carrier }) =>
-				window.phase6aCreatorSuccessorActivation.openContender(selected, carrier),
-			{ databaseName, material }
-		);
-		expect(reacquired).toMatchObject({ epoch: 1, lockHeld: true, ok: true, publicationCount: 0 });
+		let reacquired: Awaited<ReturnType<typeof window.phase6aCreatorSuccessorActivation.openContender>> | null = null;
+		await expect
+			.poll(
+				async () => {
+					reacquired = await loser.evaluate(
+						({ databaseName: selected, material: carrier }) =>
+							window.phase6aCreatorSuccessorActivation.openContender(selected, carrier),
+						{ databaseName, material }
+					);
+					return reacquired.ok;
+				},
+				{ timeout: 10_000 }
+			)
+			.toBe(true);
+		expect(reacquired).toMatchObject({
+			epoch: 1,
+			lockHeld: true,
+			ok: true,
+			publicationCount: 0,
+			recovery: "active-new",
+			verificationCount: 1,
+		});
 		expect(await loser.evaluate(() => window.phase6aCreatorSuccessorActivation.release())).toBe(true);
 	} finally {
 		await context.close();

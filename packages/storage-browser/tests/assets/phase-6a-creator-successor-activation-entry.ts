@@ -1,8 +1,3 @@
-import { MessageQueueManager } from "@ts-drp/message-queue";
-import type { Message } from "@ts-drp/types";
-
-// eslint-disable-next-line import/no-unresolved -- the exact owner is intentionally absent in RED
-import { reopenCreatorSuccessorAdoption } from "../../../node/src/creator-adoption-activate.js";
 import { createBrowserAheDurableStore } from "../../src/index.js";
 import { createBrowserDurableIssuanceStore } from "../../src/issuance.js";
 import { createBrowserDurableLiveJournalStore } from "../../src/live-journal.js";
@@ -10,6 +5,9 @@ import { createBrowserSnapshotQuarantineStore } from "../../src/snapshot-transfe
 
 type PlainRecord = Readonly<Record<string, unknown>>;
 type Closeable = Readonly<{ close(): Promise<void> }>;
+type ActivationSurface = Readonly<{
+	reopenCreatorSuccessorAdoption(input: unknown): Promise<PlainRecord>;
+}>;
 
 interface ContenderResult {
 	readonly epoch?: number;
@@ -17,21 +15,48 @@ interface ContenderResult {
 	readonly lockHeld: boolean;
 	readonly ok: boolean;
 	readonly publicationCount: number;
+	readonly recovery?: string;
+	readonly verificationCount: number;
 }
 
 declare global {
 	interface Window {
 		phase6aCreatorSuccessorActivation: Readonly<{
 			openContender(databaseName: string, packedMaterial: unknown): Promise<ContenderResult>;
-			probeAuthorityFailure(databaseName: string, packedMaterial: unknown): Promise<readonly PlainRecord[]>;
+			probeAuthorityFailure(databaseName: string, packedMaterial: unknown): Promise<readonly ContenderResult[]>;
 			release(): Promise<boolean>;
 			seed(databaseName: string, packedMaterial: unknown): Promise<void>;
 		}>;
 	}
 }
 
-let activeHandle: Readonly<{ deactivate(): void }> | undefined;
+let activeHandle: Readonly<{ deactivate(): void | Promise<void> }> | undefined;
 let activeStores: readonly Closeable[] = [];
+
+class BrowserTestMessageQueueManager {
+	private readonly queues = new Set<string>(["general"]);
+
+	close(queueId: string): void {
+		this.queues.delete(queueId === "" ? "general" : queueId);
+	}
+
+	enqueue(): Promise<void> {
+		return Promise.resolve();
+	}
+
+	hasQueue(queueId: string): boolean {
+		return this.queues.has(queueId === "" ? "general" : queueId);
+	}
+
+	subscribe(queueId: string): void {
+		this.queues.add(queueId === "" ? "general" : queueId);
+	}
+}
+
+async function activationSurface(): Promise<ActivationSurface> {
+	const ownerName = "creator-adoption-activate";
+	return import(`../../../node/src/${ownerName}.js`) as Promise<ActivationSurface>;
+}
 
 function unpack(value: unknown): unknown {
 	if (Array.isArray(value)) return value.map(unpack);
@@ -52,7 +77,7 @@ function successful(value: unknown, label: string): PlainRecord {
 }
 
 async function putGeneration(
-	store: ReturnType<typeof createBrowserAheDurableStore>,
+	store: Awaited<ReturnType<typeof createBrowserAheDurableStore>>,
 	generation: PlainRecord,
 	blobs: ReadonlyMap<string, Uint8Array>,
 	expectedHead: PlainRecord
@@ -163,19 +188,20 @@ async function openStores(databaseName: string): Promise<
 		issuanceStore: Awaited<ReturnType<typeof createBrowserDurableIssuanceStore>>;
 		liveJournalStore: Awaited<ReturnType<typeof createBrowserDurableLiveJournalStore>>;
 		snapshotStore: Awaited<ReturnType<typeof createBrowserSnapshotQuarantineStore>>;
-		store: ReturnType<typeof createBrowserAheDurableStore>;
+		store: Awaited<ReturnType<typeof createBrowserAheDurableStore>>;
 	}>
 > {
-	const [issuanceStore, liveJournalStore, snapshotStore] = await Promise.all([
+	const [issuanceStore, liveJournalStore, snapshotStore, store] = await Promise.all([
 		createBrowserDurableIssuanceStore({ primaryDatabaseName: `${databaseName}-issuance` }),
 		createBrowserDurableLiveJournalStore({ primaryDatabaseName: `${databaseName}-journal` }),
 		createBrowserSnapshotQuarantineStore({ primaryDatabaseName: `${databaseName}-snapshot` }),
+		createBrowserAheDurableStore({ databaseName: `${databaseName}-ahe` }),
 	]);
 	return {
 		issuanceStore,
 		liveJournalStore,
 		snapshotStore,
-		store: createBrowserAheDurableStore({ databaseName: `${databaseName}-ahe` }),
+		store,
 	};
 }
 
@@ -249,12 +275,25 @@ async function seed(databaseName: string, packedMaterial: unknown): Promise<void
 		const port = scope.verificationQuarantine.open(new AbortController().signal);
 		for (let index = 0; index < (snapshot.chunks as readonly Uint8Array[]).length; index += 1) {
 			await port.write(
-				(snapshot.declaration as PlainRecord).chunks[index] as never,
+				((snapshot.declaration as PlainRecord).chunks as readonly unknown[])[index] as never,
 				(snapshot.chunks as readonly Uint8Array[])[index] as Uint8Array
 			);
 		}
 		await port.discard();
 		await scope.release();
+		const persistedScope = await stores.snapshotStore.openScope(snapshot.declaration as never);
+		const persistedPort = persistedScope.verificationQuarantine.open(new AbortController().signal);
+		for (let index = 0; index < (snapshot.chunks as readonly Uint8Array[]).length; index += 1) {
+			const persisted = await persistedPort.read(
+				((snapshot.declaration as PlainRecord).chunks as readonly unknown[])[index] as never
+			);
+			const expected = (snapshot.chunks as readonly Uint8Array[])[index] as Uint8Array;
+			if (persisted === undefined || indexedDB.cmp(persisted, expected) !== 0) {
+				throw new TypeError(`D.108d1 browser snapshot chunk ${index} did not persist after port discard`);
+			}
+		}
+		await persistedPort.discard();
+		await persistedScope.release();
 	} finally {
 		await Promise.allSettled([
 			stores.snapshotStore.close(),
@@ -266,36 +305,77 @@ async function seed(databaseName: string, packedMaterial: unknown): Promise<void
 }
 
 async function openContender(databaseName: string, packedMaterial: unknown): Promise<ContenderResult> {
+	if (activeHandle !== undefined) {
+		return { kind: "authority-unavailable", lockHeld: false, ok: false, publicationCount: 0, verificationCount: 0 };
+	}
 	const material = unpack(packedMaterial) as PlainRecord;
 	const stores = await openStores(databaseName);
 	const publications: unknown[] = [];
-	const result = await reopenCreatorSuccessorAdoption({
-		...(material.creatorGenesis as PlainRecord),
-		catalog: trustedCatalog(material),
-		issuanceStore: stores.issuanceStore,
-		liveJournalStore: stores.liveJournalStore,
-		messageQueueManager: new MessageQueueManager<Message>({ logConfig: { level: "silent" } }),
-		networkNode: network(publications),
-		onAdmittedVertex: () => undefined,
-		snapshotDeclaration: (material.snapshot as PlainRecord).declaration,
-		snapshotStore: stores.snapshotStore,
-		store: stores.store,
+	const { reopenCreatorSuccessorAdoption } = await activationSurface();
+	let verificationCount = 0;
+	const countedStore = new Proxy(stores.store, {
+		get(target, property, receiver): unknown {
+			if (property !== "recoverActiveGeneration") return Reflect.get(target, property, receiver);
+			return (...args: unknown[]): ReturnType<typeof target.recoverActiveGeneration> => {
+				verificationCount += 1;
+				return target.recoverActiveGeneration(...(args as Parameters<typeof target.recoverActiveGeneration>));
+			};
+		},
 	});
-	if (result.ok !== true) {
+	try {
+		const result = await reopenCreatorSuccessorAdoption({
+			...(material.creatorGenesis as PlainRecord),
+			catalog: trustedCatalog(material),
+			issuanceStore: stores.issuanceStore,
+			liveJournalStore: stores.liveJournalStore,
+			messageQueueManager: new BrowserTestMessageQueueManager(),
+			networkNode: network(publications),
+			onAdmittedVertex: () => undefined,
+			snapshotDeclaration: (material.snapshot as PlainRecord).declaration,
+			snapshotStore: stores.snapshotStore,
+			store: countedStore,
+		});
+		if (result.ok !== true) {
+			await Promise.allSettled([
+				stores.snapshotStore.close(),
+				stores.liveJournalStore.close(),
+				stores.issuanceStore.close(),
+				stores.store.close(),
+			]);
+			return {
+				kind: String(result.kind),
+				lockHeld: false,
+				ok: false,
+				publicationCount: publications.length,
+				verificationCount,
+			};
+		}
+		const handle = result.handle as PlainRecord & Readonly<{ deactivate(): void | Promise<void> }>;
+		activeHandle = handle;
+		activeStores = [stores.snapshotStore, stores.liveJournalStore, stores.issuanceStore, stores.store];
+		return {
+			epoch: Number(handle.epoch),
+			lockHeld: true,
+			ok: true,
+			publicationCount: publications.length,
+			recovery: String(result.recovery),
+			verificationCount,
+		};
+	} catch (error) {
 		await Promise.allSettled([
 			stores.snapshotStore.close(),
 			stores.liveJournalStore.close(),
 			stores.issuanceStore.close(),
 			stores.store.close(),
 		]);
-		return { kind: String(result.kind), lockHeld: false, ok: false, publicationCount: publications.length };
+		throw error;
 	}
-	activeHandle = result.handle as Readonly<{ deactivate(): void }>;
-	activeStores = [stores.snapshotStore, stores.liveJournalStore, stores.issuanceStore, stores.store];
-	return { epoch: Number(result.handle.epoch), lockHeld: true, ok: true, publicationCount: publications.length };
 }
 
-async function probeAuthorityFailure(databaseName: string, packedMaterial: unknown): Promise<readonly PlainRecord[]> {
+async function probeAuthorityFailure(
+	databaseName: string,
+	packedMaterial: unknown
+): Promise<readonly ContenderResult[]> {
 	const descriptor = Object.getOwnPropertyDescriptor(navigator, "locks");
 	try {
 		Object.defineProperty(navigator, "locks", { configurable: true, value: undefined });
@@ -314,7 +394,7 @@ async function probeAuthorityFailure(databaseName: string, packedMaterial: unkno
 
 async function release(): Promise<boolean> {
 	if (activeHandle === undefined) return false;
-	activeHandle.deactivate();
+	await Promise.resolve(activeHandle.deactivate());
 	activeHandle = undefined;
 	const stores = activeStores;
 	activeStores = [];
