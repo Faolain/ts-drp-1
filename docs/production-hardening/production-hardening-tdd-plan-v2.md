@@ -57723,12 +57723,24 @@ The tests-only RED is exactly two new paths:
 - `tests/fixtures/phase-4c-v3/snapshot-subprocess-resolution-contract.ts`; and
 - `tests/phase-4c-snapshot-subprocess-resolution-red.test.ts`.
 
-The expected GREEN is exactly three retained test-infrastructure paths:
+The expected GREEN is exactly five retained test-infrastructure paths:
 
 - `tests/fixtures/shared/workspace-package-subprocess.mjs`, the single
   package-aware fresh-process launcher/resolution owner;
 - `tests/fixtures/phase-4c-v3/snapshot-stream-memory-child.mjs`; and
-- `tests/phase-4c-snapshot-stream-red.test.ts`.
+- `tests/phase-4c-snapshot-stream-red.test.ts`;
+- root `package.json`; and
+- root `pnpm-lock.yaml`.
+
+The root dependency metadata is a same-slice clean-proof correction, not a
+production dependency expansion. The isolated lifecycle-disabled install
+proved that retained root tests import `@noble/curves/ed25519.js` while the root
+test package did not declare `@noble/curves`; the normal checkout silently
+resolved it from `/Users/aristotle/node_modules`. GREEN therefore declares the
+already-locked `2.2.0` package as a root test-only dev dependency so the complete
+retained Phase-4c suite is reproducible without ancestor-directory state. No
+workspace product package manifest or production source is authorized to
+change.
 
 The launcher must resolve the intended freshly built workspace package exports
 from the package graph visible to that package, while the memory proof remains a
