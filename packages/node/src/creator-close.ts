@@ -25,8 +25,9 @@ import {
 	parseGenerationId,
 	type PresentHead,
 } from "@ts-drp/storage";
-import type { SnapshotQuarantineStore } from "@ts-drp/storage/snapshot-transfer";
+import type { SnapshotQuarantineDeclaration, SnapshotQuarantineStore } from "@ts-drp/storage/snapshot-transfer";
 
+import { installCreatorAdoptionFacts } from "./internal/creator-adoption-intent.js";
 import type { V3PlaneHandle } from "./v3-live.js";
 
 const PROFILE: SnapshotTransferProfile = Object.freeze({
@@ -119,7 +120,23 @@ interface V3CreatorCloseRegistration {
 			| { readonly detail: string; readonly kind: string; readonly ok: false }
 		>
 	>;
+	sealDurableReplay(): Promise<Readonly<{ verify(): Promise<boolean> }> | undefined>;
 	terminalize(): boolean;
+}
+
+interface CreatorAdoptionFacts {
+	readonly closeResult: CreatorLiveCloseResult;
+	readonly currentHead: PresentHead;
+	readonly currentReferences: readonly GenerationRef[];
+	readonly currentTrust: CurrentAnchorTrust;
+	readonly durableReplay: Readonly<{ verify(): Promise<boolean> }>;
+	readonly history: Awaited<ReturnType<typeof deriveCloseSetHistoryCommitment>>;
+	readonly objectId: Parameters<AheDurableStore["recoverActiveGeneration"]>[0];
+	readonly proposedHead: PresentHead;
+	readonly proposedReferences: readonly GenerationRef[];
+	readonly snapshotDeclaration: SnapshotQuarantineDeclaration;
+	readonly snapshotStore: SnapshotQuarantineStore<SnapshotVerificationReceipt>;
+	readonly store: AheDurableStore;
 }
 
 function claimCreatorCloseRegistration(plane: V3PlaneHandle): V3CreatorCloseRegistration | undefined {
@@ -246,7 +263,13 @@ async function persistSnapshot(
 		objectId: string;
 		stateDigest: string;
 	}>
-): Promise<Readonly<{ exactCanonicalManifestBytes: Uint8Array; manifestDigest: string }>> {
+): Promise<
+	Readonly<{
+		declaration: SnapshotQuarantineDeclaration;
+		exactCanonicalManifestBytes: Uint8Array;
+		manifestDigest: string;
+	}>
+> {
 	const encoded = encodeSnapshotTransfer({ ...input, profile: PROFILE, schemaVersion: 1 });
 	const decoded = decodeSnapshotManifest({
 		exactCanonicalManifestBytes: encoded.exactCanonicalManifestBytes,
@@ -282,6 +305,12 @@ async function persistSnapshot(
 		await verified.completion;
 		await scope.complete(await verified.receipt);
 		return Object.freeze({
+			declaration: Object.freeze({
+				chunks: Object.freeze(decoded.chunks.map((chunk) => Object.freeze({ ...chunk }))),
+				exactCanonicalManifestBytes: Uint8Array.from(encoded.exactCanonicalManifestBytes),
+				scope: scopeKey,
+				totalBytes: decoded.chunks.reduce((total, chunk) => total + chunk.byteLength, 0),
+			}),
 			exactCanonicalManifestBytes: Uint8Array.from(encoded.exactCanonicalManifestBytes),
 			manifestDigest: encoded.manifestDigest,
 		});
@@ -402,6 +431,7 @@ export async function bindCreatorLiveClose(
 		let capturedGraph: Exclude<ReturnType<V3CreatorCloseRegistration["captureCloseGraph"]>, undefined> | undefined;
 		let persistedSnapshot: Awaited<ReturnType<typeof persistSnapshot>> | undefined;
 		let derivedCommitment: Awaited<ReturnType<typeof deriveCloseSetHistoryCommitment>> | undefined;
+		let durableReplay: Readonly<{ verify(): Promise<boolean> }> | undefined;
 		const trust = Object.freeze({
 			byzantineFaultTolerant: false as const,
 			kind: "creator-certified" as const,
@@ -457,6 +487,8 @@ export async function bindCreatorLiveClose(
 						vertices: graph.vertices,
 					});
 					const commitment = derivedCommitment;
+					durableReplay ??= await registration.sealDurableReplay();
+					if (durableReplay === undefined) throw new TypeError("creator close durable replay seal failed");
 					const current = await inspectHead(registration.store, registration.objectId);
 					const currentTrustCandidate = current.candidates.find(({ ref }) => sameRef(ref, current.trustRef));
 					if (currentTrustCandidate === undefined) throw new TypeError("creator current trust bytes are unavailable");
@@ -520,7 +552,7 @@ export async function bindCreatorLiveClose(
 						proposed: { candidates: proposedCandidates, closure: proposed },
 					});
 					if (!advance.ok) throw new TypeError(`creator trust advance failed: ${advance.reason}`);
-					await stageCombinedGeneration(
+					const proposedHead = await stageCombinedGeneration(
 						registration.store,
 						current,
 						[
@@ -530,9 +562,9 @@ export async function bindCreatorLiveClose(
 						],
 						proposed
 					);
+					if (!registration.terminalize()) throw new TypeError("creator close terminalization failed");
 					lifecycle = "successor-pending-adoption";
-					registration.terminalize();
-					return Object.freeze({
+					const result = Object.freeze({
 						closedVertexCount: commitment.closeSetCount,
 						commitQcRef: copiedRef(commitQcRef),
 						currentTrustRef: copiedRef(current.trustRef),
@@ -544,6 +576,28 @@ export async function bindCreatorLiveClose(
 						successorEpoch: 1 as const,
 						successorTrustRef: copiedRef(successorTrustRef),
 					});
+					if (
+						!installCreatorAdoptionFacts(
+							handle,
+							Object.freeze({
+								closeResult: result,
+								currentHead: Object.freeze({ ...current.head }),
+								currentReferences: Object.freeze(current.references.map(copiedRef)),
+								currentTrust: registration.currentTrust,
+								durableReplay,
+								history: commitment,
+								objectId: registration.objectId,
+								proposedHead: Object.freeze({ ...proposedHead }),
+								proposedReferences: Object.freeze(proposed.map(copiedRef)),
+								snapshotDeclaration: persistedSnapshot.declaration,
+								snapshotStore: input.snapshotStore,
+								store: registration.store,
+							}) satisfies CreatorAdoptionFacts
+						)
+					) {
+						throw new TypeError("creator adoption facts already exist");
+					}
+					return result;
 				})().catch((error) => {
 					closeTask = undefined;
 					if (stagedSnapshot === undefined && registration.abortSnapshotStage()) lifecycle = "active";

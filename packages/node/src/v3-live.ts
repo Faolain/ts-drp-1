@@ -348,6 +348,7 @@ interface V3CreatorCloseRegistration {
 		  }>
 		| undefined;
 	stageSnapshot(): Promise<V3BlueprintSnapshotExportResult>;
+	sealDurableReplay(): Promise<Readonly<{ verify(): Promise<boolean> }> | undefined>;
 	terminalize(): boolean;
 }
 
@@ -3518,6 +3519,135 @@ function authenticateRecoveryVertex(
 	return authenticatedRecoveryVertex(extracted.vertex, canonicalPreimageBytes.byteLength);
 }
 
+interface CreatorReplayRow {
+	readonly byteCharge: number;
+	readonly digest: string;
+	readonly exactCanonicalVertexBytes: Uint8Array;
+}
+
+async function readCreatorReplayRows(
+	registration: V3PlaneRegistration
+): Promise<readonly CreatorReplayRow[] | undefined> {
+	try {
+		const scope = liveJournalScope(registration.payload);
+		const readiness = await registration.liveJournalStore.readiness({ scope });
+		if (
+			!readiness.ok ||
+			!readiness.ready ||
+			!sameLiveJournalScope(readiness.scope, scope) ||
+			!NumberIsSafeInteger(readiness.rowCount) ||
+			readiness.rowCount < 0 ||
+			readiness.rowCount > registration.payload.parameters.maxEpochVertices
+		) {
+			return undefined;
+		}
+		if (readiness.rowCount === 0) {
+			const empty = await registration.liveJournalStore.readPage({
+				afterSequence: null,
+				limit: 1,
+				scope,
+				snapshot: readiness.snapshot,
+			});
+			return empty.ok &&
+				empty.rows.length === 0 &&
+				empty.nextSequence === null &&
+				registration.applicationVertices.size === 1 &&
+				registration.applicationCharges.size === 1
+				? ObjectFreeze([])
+				: undefined;
+		}
+		const rows: CreatorReplayRow[] = [];
+		const page = await registration.liveJournalStore.readPage({
+			afterSequence: null,
+			limit: readiness.rowCount,
+			scope,
+			snapshot: readiness.snapshot,
+		});
+		if (!page.ok || page.rows.length !== readiness.rowCount || page.nextSequence !== null) return undefined;
+		for (let expectedSequence = 0; expectedSequence < readiness.rowCount; expectedSequence += 1) {
+			const row = journalRowSnapshot(page.rows[expectedSequence], scope, expectedSequence);
+			if (row === undefined) return undefined;
+
+			let authenticated: AuthenticatedRecoveryVertex | undefined;
+			if (row.sourceKind === "received") {
+				authenticated = authenticateRecoveryVertex(
+					registration.payload,
+					registration.authorization,
+					row.exactCanonicalPreimageBytes,
+					row.detachedSignature
+				);
+			} else {
+				const localScope = ObjectFreeze({ author: row.author, objectId: scope.objectId });
+				const issued = await registration.issuanceStore.readIssued(localScope, row.authorSequence);
+				const issuedRow = outboxRowSnapshot(
+					ObjectFreeze({ commit: issued, publishState: "published" as const }),
+					localScope
+				);
+				if (issuedRow !== undefined && lowerHexDigest(issuedRow.digest) === row.vertexDigest) {
+					authenticated = authenticateRecoveryVertex(
+						registration.payload,
+						registration.authorization,
+						issuedRow.canonicalPreimageBytes,
+						issuedRow.signature
+					);
+					if (authenticated?.author !== row.author || authenticated.authorSequence !== row.authorSequence) {
+						authenticated = undefined;
+					}
+				}
+			}
+			if (authenticated === undefined || authenticated.digest !== row.vertexDigest) return undefined;
+			const retainedVertex = registration.applicationVertices.get(authenticated.digest);
+			const retainedCharge = registration.applicationCharges.get(authenticated.digest);
+			const exactCanonicalVertexBytes = encodeCanonical(authenticated.vertex);
+			if (
+				retainedVertex === undefined ||
+				retainedCharge !== authenticated.byteCharge ||
+				!sameBytes(encodeCanonical(retainedVertex), exactCanonicalVertexBytes)
+			) {
+				return undefined;
+			}
+			rows.push(
+				ObjectFreeze({
+					byteCharge: authenticated.byteCharge,
+					digest: authenticated.digest,
+					exactCanonicalVertexBytes,
+				})
+			);
+		}
+		return registration.applicationVertices.size === rows.length + 1 &&
+			registration.applicationCharges.size === rows.length + 1
+			? ObjectFreeze(rows)
+			: undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+async function sealCreatorDurableReplay(
+	registration: V3PlaneRegistration
+): Promise<Readonly<{ verify(): Promise<boolean> }> | undefined> {
+	const sealed = await readCreatorReplayRows(registration);
+	if (sealed === undefined) return undefined;
+	return ObjectFreeze({
+		verify: async (): Promise<boolean> => {
+			const reopened = await readCreatorReplayRows(registration);
+			if (reopened === undefined || reopened.length !== sealed.length) return false;
+			for (let index = 0; index < sealed.length; index += 1) {
+				const expected = sealed[index] as CreatorReplayRow;
+				const actual = reopened[index] as CreatorReplayRow;
+				if (
+					actual.byteCharge !== expected.byteCharge ||
+					actual.digest !== expected.digest ||
+					!sameBytes(actual.exactCanonicalVertexBytes, expected.exactCanonicalVertexBytes)
+				) {
+					return false;
+				}
+			}
+			return true;
+		},
+	});
+}
+
 function classifyPlaneVertex(
 	payload: PreparedV3LivePayload,
 	authorization: V3LiveAuthorization,
@@ -5856,6 +5986,7 @@ function creatorCloseRegistration(registration: V3PlaneRegistration): V3CreatorC
 			if (!adopted.ok) return snapshotExportFailure("not-adopted", adopted.detail);
 			return exportLiveSnapshotPayload(registration);
 		},
+		sealDurableReplay: () => sealCreatorDurableReplay(registration),
 		store: registration.payload.input.store,
 		terminalize: (): boolean => {
 			if (!currentRegistration(registration) || !registration.blueprintFolded) return false;
