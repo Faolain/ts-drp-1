@@ -57791,6 +57791,85 @@ pinned; and readiness did not force removal of the source-relative product
 import. All five findings were corrected in the same RED round. No confirmation
 review was run.
 
+D.107b.1 GREEN is signed and pushed as `89ce1170`. Its exact-five frozen
+packet used HEAD `98488bca1906a566d289128aee9d9bf58e29e6a4`, tree
+`1a4443174489cac69d326567c35099caa2c730fa`, patch object
+`a72b00db415c297408aecd74ef0c430869814a0f` and SHA-256
+`3a9200c1ffa2d022e550e9e2dce96674885a2de0caad0eaf661c63a704530e5d`.
+The shared launcher starts an allowlisted fresh ESM resolver from
+`packages/compaction`, compares both package resolutions with their exact
+nonempty built export targets, and then starts a separate plain-Node
+measurement child with only those resolved file URLs. The child uses
+`node:crypto` as its independent SHA-256 oracle; it no longer uses `tsx`, a
+bare workspace import, or a production-relative source import. Root
+`@noble/curves@2.2.0` is now an exact test-only dev dependency, closing the
+additional clean-test defect in which the normal checkout resolved the
+undeclared root-test import from `/Users/aristotle/node_modules`. No workspace
+product manifest, production source, API, wire, digest, limit, memory ceiling
+or activation owner changed.
+
+The first isolated exact-three attempt was useful RED evidence rather than an
+accepted proof: temporary commit `59e18b21fa43f9bb815268ad7cde4442059b87c0`,
+tree `ae68ff915dc2c29e9a25c02ad8cef213dae52e43`, started with no package
+`dist`, and `pnpm install --offline --ignore-scripts --frozen-lockfile` also
+left no package `dist`. After fresh compaction and retained-owner builds, the
+64 MiB child passed, but the broader suite exposed the undeclared root
+`@noble/curves` import. That deterministic failure caused the signed plan-only
+reslice `98488bca`; it was not waived or hidden with an ancestor module,
+`NODE_PATH`, an alias or a shim.
+
+The accepted isolated proof used detached temporary commit
+`fc1184ec9df242105dd1a383cc67f7c9c90afb64` with the exact GREEN tree
+`1a4443174489cac69d326567c35099caa2c730fa`. Before installation,
+`find packages -type d -name dist -print -quit` returned no path.
+`pnpm install --offline --ignore-scripts --frozen-lockfile` passed for all 48
+workspace projects and the same check again returned
+`NO_DIST_AFTER_IGNORE_SCRIPTS_INSTALL`. Only then did
+`node scripts/ensure-native-deps.mjs` prepare the pinned
+`node-datachannel@0.32.3` prebuild, followed by these fresh build commands:
+
+- `pnpm --filter @ts-drp/storage-node... --filter @ts-drp/storage-browser... --filter @ts-drp/message-queue... build` — pass, 20-project closure;
+- `pnpm --filter @ts-drp/node... --filter @ts-drp/network... build` — pass,
+  30-project closure; and
+- individual `pnpm --filter <package> typecheck` commands for `canonical`,
+  `protocol-v3` including all public-entry audits, `compaction`, `storage`,
+  `storage-node`, `storage-browser` and `message-queue` — seven passes.
+
+In that same artifact-clean checkout, the exact five-file retained Vitest
+command for snapshot stream, subprocess resolution, quarantine, pull and v3
+transfer composition passed 44/44. The real memory case processed 64 MiB as
+512 131,072-byte bodies in a fresh process. It asserted the signed ceiling as
+both the retained contract value and exactly `2 * chunkBodyBytes`; owner peak
+was strictly below it and settled ownership was zero. The deliberate mutant
+retained the actual received bodies inside `quarantine.write` through the final
+chunk, crossed the same ceiling while execution was live, then cleared and
+also reported settled ownership zero. Thus the gate cannot be satisfied by
+sampling only post-completion residue. The retained browser commands passed
+18/18 for Phase-4c-b and 6/6 for Phase-4c-c across Chromium, Firefox and
+WebKit. Exact-five Prettier, three-code-owner ESLint, `git diff --check` and a
+clean tracked status all passed there.
+
+The ordinary-checkout focused stream-plus-resolution command passed 18/18 and
+the complete retained Phase-4c Vitest command passed 44/44; the same Phase-4c-b
+and Phase-4c-c Playwright commands passed 18/18 and 6/6. The compaction
+dependency build passed, as did exact `canonical`, `protocol-v3` and
+`compaction` typechecks. The broader recursive
+`pnpm --filter @ts-drp/compaction... typecheck` remains a non-gating inherited
+baseline because it reaches pre-existing `@ts-drp/object` test literals with
+`history_storage: "archive"` before compaction; the exact affected production
+owners all typecheck, and D.107b.1 did not edit that package. Final exact-five
+Prettier, code-owner ESLint, cached diff checks and 26-stash custody passed;
+protected untracked paths were neither read, edited nor staged.
+
+The sole GREEN review round used the frozen packet above. Grok completed with
+`PASS`, P0=0/P1=0. Kimi session
+`session_ea101796-ef0d-48e2-a926-adcb2e120e4b` emitted exactly checks 1 through
+100 and returned `PASS`, P0=0/P1=0. Opus 5/xhigh session
+`f01592cd-b843-4745-a15b-56deb4d2659b` returned `PASS`, P0=0/P1=0. No Fable
+review and no confirmation review ran. Remaining D.107b.1 resolution debt is
+none: the child boots from the freshly built package graph, the full retained
+Phase-4c suite includes it without exclusion, and D.107c may now begin.
+
 ### D.107c — persistent peer evidence and bounded re-learn
 
 D.107c adds the connected peer carrier and the only q=1 recovery gate. The RED
