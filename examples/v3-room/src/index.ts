@@ -4,13 +4,22 @@ import { createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
 import type { EphemeralChannel, EphemeralChannelOptions } from "@ts-drp/ephemeral";
 import { MessageQueueManager } from "@ts-drp/message-queue";
 import {
+	bindCreatorLiveClose,
+	type BindCreatorLiveCloseInput,
+	type CreatorLiveCloseHandle,
+	type CreatorLiveCloseResult,
+	type CreatorLiveCloseStatus,
+} from "@ts-drp/node/creator-close";
+import {
 	activateV3LivePlane,
+	bindV3BlueprintLivePlane,
 	prepareV3LiveGeneration,
 	recoverV3LiveReplica,
 	republishV3RetainedTo,
 	routeV3Ingress,
 	routeV3RetainedIngress,
 	type V3AdmittedVertexSink,
+	type V3LiveDescriptor,
 	type V3OperationAdmissionPolicy,
 	type V3PlaneHandle,
 } from "@ts-drp/node/v3-live";
@@ -24,6 +33,9 @@ import { parseStorageObjectId, type StorageObjectId } from "@ts-drp/storage";
 import { createBrowserAheDurableStore } from "@ts-drp/storage-browser";
 import { createBrowserDurableIssuanceStore } from "@ts-drp/storage-browser/issuance";
 import { createBrowserDurableLiveJournalStore } from "@ts-drp/storage-browser/live-journal";
+import { openBrowserSealEvidenceStore } from "@ts-drp/storage-browser/seal-evidence";
+import { openBrowserSealVoteStore } from "@ts-drp/storage-browser/seal-vote";
+import { createBrowserSnapshotQuarantineStore } from "@ts-drp/storage-browser/snapshot-transfer";
 import type { DRPNetworkNode, Message } from "@ts-drp/types";
 
 const CREATOR_INVITE_KEYS = Object.freeze([
@@ -267,6 +279,7 @@ export interface V3RoomApplication<Projection extends V3RoomProjectionAuthority 
 export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAuthority = V3RoomProjectionAuthority> {
 	readonly application: V3RoomApplication<Projection>;
 	readonly author: string;
+	readonly creatorFinalitySigner?: BindCreatorLiveCloseInput["signer"];
 	readonly creatorInvite: string | V3RoomCreatorInviteMaterial;
 	createOperationAdmissionPolicy?(
 		context: Readonly<{
@@ -297,11 +310,40 @@ export interface V3RoomSession<Projection extends V3RoomProjectionAuthority = V3
 	readonly trustStatus: "Creator-trusted; not Byzantine-fault-tolerant.";
 	close(): Promise<void>;
 	activateMigration(input: V3RoomMigrationActivationInput): Promise<V3RoomMigrationActivationReceipt>;
+	inspectDurableHead(): ReturnType<CreatorLiveCloseHandle["inspectDurableHead"]>;
 	issue(operation: Readonly<Record<string, unknown>>): Promise<void>;
 	openEphemeral(options: EphemeralChannelOptions): EphemeralChannel;
 	previewLatchedAcl(): Readonly<Record<string, unknown>>;
 	projection(): Projection;
 	rehearseMigration(input: V3RoomMigrationRehearsalInput): Promise<V3RoomMigrationRehearsalReceipt>;
+	sealEpoch(): Promise<CreatorLiveCloseResult>;
+	status(): CreatorLiveCloseStatus;
+}
+
+const CREATOR_LOCAL_AVAILABILITY_POLICY_BYTES = encodeCanonical({
+	minLocalCopies: 1,
+	minMirrorReceipts: 0,
+	minRollbackGenerations: 2,
+	mode: "local-only",
+});
+
+function unavailableCreatorCloseStatus(
+	trustProfile: V3LiveDescriptor["trustProfile"],
+	continuity: CreatorLiveCloseStatus["continuity"] = "continuous"
+): CreatorLiveCloseStatus {
+	if (trustProfile !== "creator-only") throw new TypeError("v3 room creator trust profile is unavailable");
+	return Object.freeze({
+		closeAuthority: "unavailable" as const,
+		continuity,
+		lifecycle: "active" as const,
+		trust: Object.freeze({
+			byzantineFaultTolerant: false as const,
+			kind: "creator-certified" as const,
+			quorum: 1 as const,
+			signerCount: 1 as const,
+			text: "Creator-certified; one of one; not Byzantine-fault-tolerant." as const,
+		}),
+	});
 }
 
 function hex(value: Uint8Array): string {
@@ -956,25 +998,31 @@ function validateDisplacementPolicy(application: V3RoomApplication): void {
 }
 
 function migrationCreatorAuthor(material: V3RoomCreatorInviteMaterial): string {
-	const decoded = decodeCanonical(material.exactCanonicalSignerSetBytes, {
-		maxBytes: 4_096,
-		maxDepth: 3,
-		maxItems: 32,
+	const decoded = decodeCanonical(material.exactCanonicalLatchedAclBytes, {
+		maxBytes: 65_536,
+		maxDepth: 6,
+		maxItems: 512,
 	});
-	if (!Array.isArray(decoded) || decoded.length !== 1) throw new TypeError("v3 room migration creator is invalid");
-	const signer = decoded[0];
-	const publicKey = signer !== null && typeof signer === "object" ? Reflect.get(signer, "publicKey") : undefined;
-	if (
-		signer === null ||
-		typeof signer !== "object" ||
-		Reflect.ownKeys(signer).length !== 2 ||
-		Reflect.get(signer, "signerId") !== "creator" ||
-		typeof publicKey !== "string" ||
-		!/^[0-9a-f]{64}$/u.test(publicKey)
-	) {
-		throw new TypeError("v3 room migration creator is invalid");
+	const members = exactDenseArray(
+		decoded !== null && typeof decoded === "object" ? Reflect.get(decoded, "members") : undefined
+	);
+	const candidates = (members ?? []).flatMap((value) => {
+		const member = exactRecord(value, ["author", "finalityKey", "groups"]);
+		const groups = exactDenseArray(member?.groups);
+		return member !== undefined &&
+			typeof member.author === "string" &&
+			/^[0-9a-f]{64}$/u.test(member.author) &&
+			member.finalityKey === member.author &&
+			groups?.includes("admin") === true &&
+			groups.includes("finality") &&
+			groups.includes("writer")
+			? [member.author]
+			: [];
+	});
+	if (candidates.length !== 1) {
+		throw new TypeError("v3 room migration creator application author is invalid");
 	}
-	return publicKey;
+	return candidates[0] as string;
 }
 
 function migrationInviteAuthority(material: V3RoomCreatorInviteMaterial): Readonly<{
@@ -1408,6 +1456,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	);
 	const messageQueueManager = new MessageQueueManager<Message>({ logConfig: { level: "silent" } });
 	let activeHandle: RoomPlaneHandle | undefined;
+	let creatorCloseHandle: CreatorLiveCloseHandle | undefined;
+	let creatorCloseUnavailableContinuity: CreatorLiveCloseStatus["continuity"] = "continuous";
+	const creatorCloseStoreClosers: Array<() => Promise<void>> = [];
 	let transport: V3RoomTransport | undefined;
 	let terminalFailure: unknown = recoveredProjectionRejected
 		? new TypeError("v3 room recovered operation was not accepted by projection")
@@ -1449,6 +1500,13 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		closePromise = (async (): Promise<void> => {
 			const failures: unknown[] = [];
+			if (creatorCloseHandle !== undefined) {
+				try {
+					await creatorCloseHandle.stop();
+				} catch (error) {
+					failures.push(error);
+				}
+			}
 			try {
 				activeHandle?.deactivate();
 			} catch (error) {
@@ -1465,6 +1523,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				failures.push(error);
 			}
 			for (const result of await Promise.allSettled([
+				...creatorCloseStoreClosers.map((closeStore) => closeStore()),
 				issuanceStore.close(),
 				journalStore.close(),
 				...aheStores.map((store) => store.close()),
@@ -1678,6 +1737,20 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		});
 		if (!activated.ok) throw new TypeError(`v3 room activation failed: ${activated.kind}`);
 		activeHandle = activated.handle as RoomPlaneHandle;
+		if (input.creatorFinalitySigner !== undefined) {
+			if (input.application.migration === undefined) {
+				throw new TypeError("v3 room creator close initial state is unavailable");
+			}
+			const initialProjection = input.application.projectAcceptedOperations(Object.freeze([]));
+			const exactCanonicalInitialStateBytes = normalizeApplicationStateBytes(
+				Reflect.apply(input.application.migration.canonicalStateBytes, input.application.migration, [
+					initialProjection,
+				]) as Uint8Array,
+				"genesis"
+			);
+			const blueprint = bindV3BlueprintLivePlane({ exactCanonicalInitialStateBytes, plane: activeHandle });
+			if (!blueprint.ok) throw new TypeError(`v3 room creator-close blueprint binding failed: ${blueprint.kind}`);
+		}
 		openedTransport.setIngressHandler(
 			activeHandle.topic,
 			(message) => {
@@ -1696,6 +1769,41 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					: await republishV3RetainedTo(activeHandle, targetPeerId);
 			if (!result.ok) throw new TypeError(`v3 room retained publication failed: ${result.kind}`);
 		});
+		if (input.creatorFinalitySigner !== undefined) {
+			const voteStore = await openBrowserSealVoteStore({ databaseName: input.databaseName });
+			creatorCloseStoreClosers.push(voteStore.close);
+			const evidenceStore = await openBrowserSealEvidenceStore({ databaseName: input.databaseName });
+			creatorCloseStoreClosers.push(evidenceStore.close);
+			const snapshotStore = await createBrowserSnapshotQuarantineStore({
+				primaryDatabaseName: input.databaseName,
+			});
+			creatorCloseStoreClosers.push(snapshotStore.close);
+			if (voteStore.observation.incarnation !== evidenceStore.observation.incarnation) {
+				throw new TypeError("v3 room creator-close storage incarnation differs");
+			}
+			const bound = await bindCreatorLiveClose({
+				evidenceStore: evidenceStore.store,
+				exactCanonicalAvailabilityPolicyBytes: CREATOR_LOCAL_AVAILABILITY_POLICY_BYTES,
+				onObservation: () => undefined,
+				plane: activeHandle,
+				signer: input.creatorFinalitySigner,
+				snapshotStore,
+				storageIncarnation: voteStore.observation.incarnation,
+				voteStore: voteStore.store,
+			});
+			if (bound.ok) creatorCloseHandle = bound.handle;
+			else {
+				creatorCloseUnavailableContinuity = [
+					"AMBIGUOUS_OUTCOME",
+					"CREATOR_CONTINUITY_TERMINAL",
+					"DURABLE_EVIDENCE_INVALID",
+					"DURABLE_QC_INVALID",
+					"STORAGE_LOSS",
+				].includes(bound.reason)
+					? "stalled"
+					: "continuous";
+			}
+		}
 		openedTransport.requestRetainedHistory();
 	} catch (error) {
 		await shutdown().catch(() => undefined);
@@ -2692,6 +2800,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			await redirect?.close().catch(() => undefined);
 			await shutdown();
 		},
+		async inspectDurableHead(): ReturnType<CreatorLiveCloseHandle["inspectDurableHead"]> {
+			if (redirectPromise !== undefined) await redirectPromise;
+			if (redirectedSession !== undefined) return redirectedSession.inspectDurableHead();
+			if (creatorCloseHandle === undefined) throw new TypeError("creator close authority is unavailable");
+			return creatorCloseHandle.inspectDurableHead();
+		},
 		async issue(operation: Readonly<Record<string, unknown>>): Promise<void> {
 			if (redirectPromise !== undefined) await redirectPromise;
 			if (redirectedSession !== undefined) {
@@ -2779,6 +2893,24 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			return projection;
 		},
 		rehearseMigration,
+		async sealEpoch(): Promise<CreatorLiveCloseResult> {
+			if (redirectPromise !== undefined) await redirectPromise;
+			if (redirectedSession !== undefined) return redirectedSession.sealEpoch();
+			if (terminalFailure !== undefined) throw terminalFailure;
+			if (closed) throw new TypeError("v3 room session is closed");
+			if (creatorCloseHandle === undefined) throw new TypeError("creator close authority is unavailable");
+			await rebasePromise;
+			await migrationCompletionBarrier;
+			await drainPendingIssues();
+			return creatorCloseHandle.close();
+		},
+		status(): CreatorLiveCloseStatus {
+			if (redirectedSession !== undefined) return redirectedSession.status();
+			return (
+				creatorCloseHandle?.status() ??
+				unavailableCreatorCloseStatus(prepared.descriptor.trustProfile, creatorCloseUnavailableContinuity)
+			);
+		},
 	});
 }
 

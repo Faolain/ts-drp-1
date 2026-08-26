@@ -77,6 +77,7 @@ const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const ObjectGetPrototypeOf = Object.getPrototypeOf;
 const IntrinsicMap = Map;
 const MapPrototype = Map.prototype;
+const MapPrototypeDelete = Map.prototype.delete;
 const MapPrototypeEntries = Map.prototype.entries;
 const MapPrototypeGet = Map.prototype.get;
 const MapPrototypeHas = Map.prototype.has;
@@ -327,6 +328,26 @@ export interface V3PlaneHandle {
 	republishRetained(): Promise<V3EgressResult>;
 	beginTerminalTransition(): Promise<V3TerminalTransitionResult>;
 	deactivate(): void;
+}
+
+interface V3CreatorCloseRegistration {
+	abortSnapshotStage(): boolean;
+	readonly currentTrust: CurrentAnchorTrust;
+	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
+	readonly exactCanonicalParametersBytes: Uint8Array;
+	readonly maxEpochBytes: number;
+	readonly maxEpochVertices: number;
+	readonly objectId: StorageObjectId;
+	readonly store: AheDurableStore;
+	captureCloseGraph():
+		| Readonly<{
+				readonly charges: ReadonlyMap<string, number>;
+				readonly frontier: readonly string[];
+				readonly vertices: ReadonlyMap<string, EpochVertex>;
+		  }>
+		| undefined;
+	stageSnapshot(): Promise<V3BlueprintSnapshotExportResult>;
+	terminalize(): boolean;
 }
 
 interface V3BlueprintLiveHandle {
@@ -1434,10 +1455,12 @@ function copyApplicationVertices(source: Map<string, EpochVertex>): Map<string, 
 function retainApplicationVertex(
 	vertices: Map<string, EpochVertex>,
 	authors: Map<string, string>,
-	authenticated: AuthenticatedRecoveryVertex
+	authenticated: AuthenticatedRecoveryVertex,
+	charges?: Map<string, number>
 ): void {
 	ReflectApply(MapPrototypeSet, vertices, [authenticated.digest, authenticated.vertex]);
 	ReflectApply(MapPrototypeSet, authors, [authenticated.digest, authenticated.author]);
+	if (charges !== undefined) ReflectApply(MapPrototypeSet, charges, [authenticated.digest, authenticated.byteCharge]);
 }
 
 function intrinsicMapSize(map: Map<unknown, unknown>): number | undefined {
@@ -2295,6 +2318,7 @@ async function prepareV3LiveGeneration(input: PrepareV3LiveGenerationInput): Pro
 interface V3PlaneRegistration {
 	active: boolean;
 	readonly applicationAuthors: Map<string, string>;
+	readonly applicationCharges: Map<string, number>;
 	readonly applicationVertices: Map<string, EpochVertex>;
 	readonly authorization: V3LiveAuthorization;
 	blueprintClosing: boolean;
@@ -3003,7 +3027,12 @@ async function handleV3Ingress(
 		ingressFailureLog("graph-rejected");
 		return false;
 	}
-	retainApplicationVertex(registration.applicationVertices, registration.applicationAuthors, authenticated);
+	retainApplicationVertex(
+		registration.applicationVertices,
+		registration.applicationAuthors,
+		authenticated,
+		registration.applicationCharges
+	);
 	registration.graphVersion += 1;
 	if (candidate !== null && candidate !== undefined) registration.latchedOperations.set(candidate.digest, candidate);
 	if (!commitOperationReservation(reservation)) {
@@ -3273,6 +3302,7 @@ type StagedLatchedAclOperation = Readonly<{
 
 interface RecoveredV3LivePayload {
 	readonly applicationAuthors: Map<string, string>;
+	readonly applicationCharges: Map<string, number>;
 	readonly applicationVertices: Map<string, EpochVertex>;
 	readonly authorization: V3LiveAuthorization;
 	readonly classifyTerminalVertex?: V3TerminalVertexClassifier;
@@ -3729,7 +3759,8 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			return recoveryFailure("graph-rejected", "v3 recovery graph could not be constructed");
 		}
 		const applicationVertices = copyApplicationVertices(payload.vertices);
-		if (applicationVertices === undefined) {
+		const applicationCharges = new IntrinsicMap<string, number>(payload.charges);
+		if (applicationVertices === undefined || applicationCharges.size !== applicationVertices.size) {
 			return recoveryFailure("graph-rejected", "v3 recovery graph could not be retained");
 		}
 		const applicationAuthors = new IntrinsicMap<string, string>();
@@ -3892,7 +3923,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				} catch {
 					return recoveryFailure("graph-rejected", "v3 journal replay graph append failed");
 				}
-				retainApplicationVertex(applicationVertices, applicationAuthors, authenticated);
+				retainApplicationVertex(applicationVertices, applicationAuthors, authenticated, applicationCharges);
 				epochBytes = updatedEpochBytes;
 				recoveredCount += 1;
 				recoveredVertices.push(authenticated.admitted);
@@ -4065,7 +4096,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				} catch {
 					return recoveryFailure("graph-rejected", "v3 recovery graph append failed");
 				}
-				retainApplicationVertex(applicationVertices, applicationAuthors, authenticated);
+				retainApplicationVertex(applicationVertices, applicationAuthors, authenticated, applicationCharges);
 				epochBytes = updatedEpochBytes;
 				recoveredCount += 1;
 				recoveredVertices.push(authenticated.admitted);
@@ -4197,6 +4228,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			capability,
 			ObjectFreeze({
 				applicationAuthors,
+				applicationCharges,
 				applicationVertices,
 				authorization,
 				classifyTerminalVertex:
@@ -4668,7 +4700,12 @@ async function issueOneVertex(
 	} catch {
 		return committedFailure("graph-rejected", "v3 local issue graph append failed");
 	}
-	retainApplicationVertex(registration.applicationVertices, registration.applicationAuthors, authenticated);
+	retainApplicationVertex(
+		registration.applicationVertices,
+		registration.applicationAuthors,
+		authenticated,
+		registration.applicationCharges
+	);
 	registration.graphVersion += 1;
 	if (acceptedAcl !== null && acceptedAcl !== undefined) {
 		registration.latchedOperations.set(acceptedAcl.digest, acceptedAcl);
@@ -5347,7 +5384,12 @@ async function publishTerminalIssue(
 	registration: V3PlaneRegistration,
 	rawInput: V3LocalIssueInput
 ): Promise<V3TerminalPublishResult> {
-	if (!currentRegistration(registration) || registration.terminalState !== "transition") {
+	if (
+		!currentRegistration(registration) ||
+		registration.blueprintClosing ||
+		registration.blueprintFolded ||
+		registration.terminalState !== "transition"
+	) {
 		return terminalFailure("not-active", "v3 terminal transition is not active");
 	}
 	const rawRecord = snapshotClosedRecord(rawInput, LOCAL_ISSUE_INPUT_KEYS);
@@ -5405,7 +5447,7 @@ async function publishTerminalIssue(
 }
 
 function beginTerminalTransition(registration: V3PlaneRegistration): Promise<V3TerminalTransitionResult> {
-	if (registration.mode === "snapshot-closed") {
+	if (registration.mode === "snapshot-closed" || registration.blueprintClosing || registration.blueprintFolded) {
 		return Promise.resolve(
 			ObjectFreeze({ detail: "v3 plane is not active", kind: "not-active" as const, ok: false as const })
 		);
@@ -5429,7 +5471,7 @@ function beginTerminalTransition(registration: V3PlaneRegistration): Promise<V3T
 	};
 	// eslint-disable-next-line @typescript-eslint/require-await -- queue tasks share one async result contract.
 	return enqueueRegistrationTask(registration, () => async () => {
-		if (!currentRegistration(registration)) {
+		if (!currentRegistration(registration) || registration.blueprintClosing || registration.blueprintFolded) {
 			releaseBarrier();
 			return ObjectFreeze({ detail: "v3 plane is not active", kind: "not-active" as const, ok: false as const });
 		}
@@ -5559,7 +5601,11 @@ function stageClosedBlueprintEpoch(registration: V3PlaneRegistration): V3Bluepri
 }
 
 function stageBlueprintEpoch(registration: V3PlaneRegistration): Promise<V3BlueprintFoldResult> {
-	if (!currentRegistration(registration) || registration.blueprintMachine === undefined) {
+	if (
+		!currentRegistration(registration) ||
+		registration.blueprintMachine === undefined ||
+		registration.terminalState !== "active"
+	) {
 		return Promise.resolve(blueprintFoldFailure("not-active", "v3 blueprint fold is not active"));
 	}
 	if (registration.blueprintClosing || registration.blueprintFolded) {
@@ -5732,7 +5778,73 @@ export function bindV3BlueprintLivePlane(rawInput: V3BlueprintLiveBindingInput):
 	}
 }
 
+/**
+ * Claims the close-only state of one genuine active v3 registration.
+ * @param registration - Private genuine live registration.
+ * @returns A close registration backed by the private live registry, or undefined.
+ */
+function creatorCloseRegistration(registration: V3PlaneRegistration): V3CreatorCloseRegistration | undefined {
+	if (
+		!currentRegistration(registration) ||
+		registration.mode !== "genesis-active" ||
+		registration.terminalState !== "active" ||
+		registration.blueprintHandle === undefined ||
+		registration.payload.input.store.capabilities.durability !== "strict" ||
+		registration.payload.input.store.capabilities.signingEligibility !== "backend-capability-required"
+	)
+		return undefined;
+	return ObjectFreeze({
+		abortSnapshotStage: (): boolean => {
+			if (!currentRegistration(registration) || registration.blueprintFolded || registration.terminalState !== "active")
+				return false;
+			registration.blueprintClosing = false;
+			return true;
+		},
+		captureCloseGraph: () => {
+			if (!currentRegistration(registration) || !registration.blueprintFolded) return undefined;
+			const vertices = copyApplicationVertices(registration.applicationVertices);
+			const charges = new IntrinsicMap<string, number>(registration.applicationCharges);
+			ReflectApply(MapPrototypeDelete, charges, [registration.payload.provenance.anchorDigest]);
+			if (vertices === undefined || vertices.size !== charges.size + 1 || vertices.size !== registration.index.size) {
+				return undefined;
+			}
+			return ObjectFreeze({
+				charges,
+				frontier: registration.index.tips(),
+				vertices,
+			});
+		},
+		currentTrust: registration.payload.trust.trust,
+		exactCanonicalAnchorPreimageBytes: new Uint8ArrayConstructor(
+			registration.payload.input.exactCanonicalAnchorPreimageBytes
+		),
+		exactCanonicalParametersBytes: new Uint8ArrayConstructor(
+			registration.payload.input.exactCanonicalParametersCarrierBytes
+		),
+		maxEpochBytes: registration.payload.parameters.maxEpochBytes,
+		maxEpochVertices: registration.payload.parameters.maxEpochVertices,
+		objectId: registration.payload.input.objectId,
+		stageSnapshot: async (): Promise<V3BlueprintSnapshotExportResult> => {
+			if (registration.blueprintFolded) return exportLiveSnapshotPayload(registration);
+			const staged = await stageBlueprintEpoch(registration);
+			if (!staged.ok) return snapshotExportFailure("not-active", staged.detail);
+			const adopted = staged.adopt();
+			if (!adopted.ok) return snapshotExportFailure("not-adopted", adopted.detail);
+			return exportLiveSnapshotPayload(registration);
+		},
+		store: registration.payload.input.store,
+		terminalize: (): boolean => {
+			if (!currentRegistration(registration) || !registration.blueprintFolded) return false;
+			registration.blueprintClosing = true;
+			registration.operationAdmissionHalted = true;
+			registration.terminalState = "terminal";
+			return true;
+		},
+	});
+}
+
 function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
+	let creatorCloseClaimed = false;
 	const ephemeralAuthority = ((): ReturnType<V3PlaneHandle["currentEphemeralAuthority"]> => {
 		if (registration.mode === "snapshot-closed") return undefined;
 		const authorization = registration.authorization;
@@ -5755,12 +5867,13 @@ function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
 			},
 		});
 	})();
-	return ObjectFreeze({
+	const handle = {
 		objectId: registration.payload.provenance.objectId,
 		epoch: 0 as const,
 		topic: registration.topic,
 		queueId: registration.queueId,
-		currentEphemeralAuthority: () => (currentRegistration(registration) ? ephemeralAuthority : undefined),
+		currentEphemeralAuthority: (): ReturnType<V3PlaneHandle["currentEphemeralAuthority"]> =>
+			currentRegistration(registration) ? ephemeralAuthority : undefined,
 		beginTerminalTransition: (): Promise<V3TerminalTransitionResult> => beginTerminalTransition(registration),
 		issueLocal: (input: V3LocalIssueInput): Promise<V3LocalIssueResult> =>
 			registration.mode === "snapshot-closed"
@@ -5792,7 +5905,19 @@ function makeV3PlaneHandle(registration: V3PlaneRegistration): V3PlaneHandle {
 			if (!registration.active) return;
 			deactivateRegistration(registration);
 		},
-	}) as V3PlaneHandle;
+	};
+	ObjectDefineProperty(handle, "claimCreatorCloseRegistration", {
+		configurable: false,
+		enumerable: false,
+		value: function (this: unknown): V3CreatorCloseRegistration | undefined {
+			if (this !== handle || creatorCloseClaimed) return undefined;
+			const claimed = creatorCloseRegistration(registration);
+			if (claimed !== undefined) creatorCloseClaimed = true;
+			return claimed;
+		},
+		writable: false,
+	});
+	return ObjectFreeze(handle) as V3PlaneHandle;
 }
 
 /**
@@ -5932,6 +6057,7 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 			registration = {
 				active: true,
 				applicationAuthors: recovered.applicationAuthors,
+				applicationCharges: recovered.applicationCharges,
 				applicationVertices: recovered.applicationVertices,
 				authorization: recovered.authorization,
 				blueprintClosing: mode === "snapshot-closed",

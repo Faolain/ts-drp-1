@@ -18,6 +18,10 @@
 		".": {
 			"types": "./dist/src/index.d.ts",
 			"import": "./dist/src/index.js"
+		},
+		"./creator-trust-advance": {
+			"types": "./dist/src/creator-trust-advance.d.ts",
+			"import": "./dist/src/creator-trust-advance.js"
 		}
 	},
 	"scripts": {

@@ -10,7 +10,9 @@ const config = defineConfig({
 		alias: {
 			"@ts-drp/keychain/finality": path.resolve(__dirname, "packages/keychain/src/finality.ts"),
 			"@ts-drp/network/seal": path.resolve(__dirname, "packages/network/src/seal.ts"),
+			"@ts-drp/node/creator-close": path.resolve(__dirname, "packages/node/src/creator-close.ts"),
 			"@ts-drp/node/creator-seal": path.resolve(__dirname, "packages/node/src/creator-seal.ts"),
+			"@ts-drp/node/v3-live": path.resolve(__dirname, "packages/node/src/v3-live.ts"),
 			"@ts-drp/seal/creator": path.resolve(__dirname, "packages/seal/src/creator.ts"),
 			"@ts-drp/seal/internal/creator-close-intent": path.resolve(
 				__dirname,
@@ -58,6 +60,10 @@ const config = defineConfig({
 			),
 			"@ts-drp/protocol-v3": path.resolve(__dirname, "packages/protocol-v3/src/public.ts"),
 			"@ts-drp/routing-node/constants": path.resolve(__dirname, "packages/routing-node/src/constants.ts"),
+			"@ts-drp/control-plane/creator-trust-advance": path.resolve(
+				__dirname,
+				"packages/control-plane/src/creator-trust-advance.ts"
+			),
 			"@ts-drp/control-plane": path.resolve(__dirname, "packages/control-plane/src/index.ts"),
 			"@ts-drp/errors": path.resolve(__dirname, "packages/errors/src/index.ts"),
 			"@ts-drp/membership": path.resolve(__dirname, "packages/membership/src/index.ts"),

@@ -12,9 +12,11 @@ import {
 	type V3RoomTransport,
 } from "@ts-drp/example-v3-room";
 import { Keychain } from "@ts-drp/keychain";
+import { createRecoverableFinalitySigner, type FinalitySigner } from "@ts-drp/keychain/finality";
 import { type DRPNetworkNode, type Message, MessageType } from "@ts-drp/types";
 
 const OBJECT_ID = `creator:${"d".repeat(32)}`;
+const CREATOR_FINALITY_KEYCHAIN_SEED = "d107d-v3-chat-creator-finality";
 const CHAT_ARTIFACT_SOURCE = `function exactKeys(value,keys){return value!==null&&typeof value==="object"&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.prototype.hasOwnProperty.call(value,key))}const migrationKeys=["applicationStateDigest","archivePolicy","authorityKind","exactCanonicalApplicationStateBytes","kind","rehearsalNonce","sourceAcceptedOperationCount","sourceAcceptedOperationsDigest","sourceAnchorDigest","sourceBlueprintDigest","sourceCreatorAuthor","sourceObjectId","targetAnchorDigest","targetBlueprintDigest","targetCreatorAuthor","targetImportOperationCount","targetImportOperationsDigest","targetObjectId","version"];function aclReducer(input){return {output:input.operation,state:input.state}}function applicationBatchReducer(input){const operation=input.operation;if(!exactKeys(operation,["action","batch"])||operation.action!=="applicationBatch"||!exactKeys(operation.batch,["entries","version"])||operation.batch.version!==1||!Array.isArray(operation.batch.entries)||operation.batch.entries.length<2||operation.batch.entries.length>16)throw new TypeError("invalid application batch");let prior=-1;const output=[];const state=[...input.state];for(const entry of operation.batch.entries){if(!exactKeys(entry,["logicalTime","operation"])||!Number.isSafeInteger(entry.logicalTime)||entry.logicalTime<0||entry.logicalTime<=prior||!exactKeys(entry.operation,["action","clientOperationId","text"])||entry.operation.action!=="message"||typeof entry.operation.clientOperationId!=="string"||entry.operation.clientOperationId.length===0||typeof entry.operation.text!=="string")throw new TypeError("invalid application batch entry");prior=entry.logicalTime;const message={clientOperationId:entry.operation.clientOperationId,text:entry.operation.text};state.push(message);output.push(message)}return {output,state}}function causalJoinReducer(input){return {output:null,state:input.state}}function joinReducer(input){return {output:input.operation.clientId,state:input.state}}function messageReducer(input){if(!exactKeys(input.operation,["action","clientOperationId","text"])||typeof input.operation.clientOperationId!=="string"||input.operation.clientOperationId.length===0||typeof input.operation.text!=="string")throw new TypeError("invalid message");const message={clientOperationId:input.operation.clientOperationId,text:input.operation.text};const state=[...input.state,message];return {output:message,state}}function migrationActivationReducer(input){const operation=input.operation;if(!exactKeys(operation,["action","decision"])||operation.action!=="migrationActivation"||operation.decision===null||typeof operation.decision!=="object"||Array.isArray(operation.decision))throw new TypeError("invalid migration activation");return {output:null,state:input.state}}function migrationRecordReducer(input){const operation=input.operation;const record=operation&&operation.record;if(!exactKeys(operation,["action","record"])||operation.action!=="migrationRecord"||!exactKeys(record,migrationKeys)||record.kind!=="ts-drp-v3-room-migration-record"||record.version!==1||record.archivePolicy!=="retain-source"||record.authorityKind!=="creator-ed25519-registered-vertex-v1")throw new TypeError("invalid migration record");return {output:null,state:input.state}}export const blueprint={exportSchemaVersion:1,artifactId:"v3-chat.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{acl:aclReducer,applicationBatch:applicationBatchReducer,causalJoin:causalJoinReducer,join:joinReducer,message:messageReducer,migrationActivation:migrationActivationReducer,migrationRecord:migrationRecordReducer}};`;
 const PARAMETERS = Object.freeze({
 	maxEpochVertices: 8192,
@@ -48,6 +50,7 @@ interface JoinInput {
 }
 
 interface RoomJoinInput extends Omit<JoinInput, "invite"> {
+	readonly creatorFinalitySigner?: FinalitySigner;
 	readonly creatorInvite: string | V3RoomCreatorInviteMaterial;
 }
 
@@ -104,8 +107,15 @@ interface ActiveChat {
 	readonly accepted: Map<string, AcceptedMessage>;
 	readonly clientId: ClientId;
 	readonly clientAuthors: Readonly<Record<ClientId, string>>;
+	readonly databaseName: string;
+	readonly migrationInvites: Map<string, V3RoomCreatorInviteMaterial>;
 	readonly objectId: string;
 	readonly room: V3RoomSession;
+}
+
+interface CreatorAuthorityMaterial {
+	readonly material: V3RoomCreatorInviteMaterial;
+	readonly signer: FinalitySigner;
 }
 
 interface LatchedPreview {
@@ -485,10 +495,32 @@ async function createClientAuthors(): Promise<Readonly<Record<ClientId, string>>
 	return Object.freeze(Object.fromEntries(entries) as Record<ClientId, string>);
 }
 
-async function createCreatorInviteMaterial(objectId = OBJECT_ID): Promise<V3RoomCreatorInviteMaterial> {
+async function keychainLocalAuthorSeed(configuredSeed: string): Promise<Uint8Array> {
+	const encodedSeed = new TextEncoder().encode(configuredSeed);
+	const seed = new Uint8Array(await crypto.subtle.digest("SHA-512", encodedSeed));
+	const domain = new TextEncoder().encode("ts-drp-keychain/local-author-ed25519/v1");
+	const preimage = new Uint8Array(domain.byteLength + 1 + seed.byteLength);
+	preimage.set(domain, 0);
+	preimage[domain.byteLength] = 0;
+	preimage.set(seed, domain.byteLength + 1);
+	return new Uint8Array(await crypto.subtle.digest("SHA-256", preimage));
+}
+
+async function createCreatorAuthorityMaterial(objectId = OBJECT_ID): Promise<CreatorAuthorityMaterial> {
 	const keychains = await Promise.all(CLIENT_IDS.map((clientId) => createLocalKeychain(clientId)));
 	const alice = keychains[0];
 	if (alice === undefined) throw new TypeError("v3 chat creator keychain is unavailable");
+	const finalityKeychain = new Keychain({ private_key_seed: CREATOR_FINALITY_KEYCHAIN_SEED });
+	await finalityKeychain.start();
+	const finality = await createRecoverableFinalitySigner({
+		seed: await keychainLocalAuthorSeed(CREATOR_FINALITY_KEYCHAIN_SEED),
+	});
+	if (
+		hex(finality.publicKey) !== finalityKeychain.localAuthorId ||
+		finalityKeychain.localAuthorId === alice.localAuthorId
+	) {
+		throw new TypeError("v3 chat creator finality identity is invalid");
+	}
 	const authors = Object.fromEntries(
 		CLIENT_IDS.map((clientId, index) => [clientId, keychains[index]?.localAuthorId] as const)
 	) as Record<ClientId, string>;
@@ -515,7 +547,7 @@ async function createCreatorInviteMaterial(objectId = OBJECT_ID): Promise<V3Room
 		version: 1,
 	});
 	const application = applicationMaterial();
-	const signerSet = Object.freeze([Object.freeze({ publicKey: alice.localAuthorId, signerId: "creator" })]);
+	const signerSet = Object.freeze([Object.freeze({ publicKey: finalityKeychain.localAuthorId, signerId: "creator" })]);
 	const exactCanonicalSignerSetBytes = encodeCanonical(signerSet);
 	const exactCanonicalProfileBytes = encodeCanonical({
 		cryptoSuiteId: "ed25519-sha256-v3",
@@ -524,7 +556,7 @@ async function createCreatorInviteMaterial(objectId = OBJECT_ID): Promise<V3Room
 		signers: signerSet,
 	});
 	const exactCanonicalParametersCarrierBytes = encodeCanonical(PARAMETERS);
-	return createV3RoomCreatorInviteMaterial({
+	const material = await createV3RoomCreatorInviteMaterial({
 		blueprintDigest: application.blueprintDigest,
 		exactCanonicalApplicationStateBytes: canonicalChatStateBytes(projectChat([])),
 		exactCanonicalLatchedAclBytes,
@@ -532,8 +564,13 @@ async function createCreatorInviteMaterial(objectId = OBJECT_ID): Promise<V3Room
 		exactCanonicalProfileBytes,
 		exactCanonicalSignerSetBytes,
 		objectId,
-		signGenesisAnchorDigest: (anchorDigest) => alice.signWithLocalAuthor(anchorDigest),
+		signGenesisAnchorDigest: (anchorDigest) => finalityKeychain.signWithLocalAuthor(anchorDigest),
 	});
+	return Object.freeze({ material, signer: finality.signer });
+}
+
+async function createCreatorInviteMaterial(objectId = OBJECT_ID): Promise<V3RoomCreatorInviteMaterial> {
+	return (await createCreatorAuthorityMaterial(objectId)).material;
 }
 
 function createRoomNetwork(peerId: string, channelName: string, knownPeerIds: readonly string[]): V3RoomTransport {
@@ -702,6 +739,7 @@ async function joinRoom(input: RoomJoinInput): Promise<ActiveChat> {
 	const room: V3RoomSession<ChatProjection> = await createV3RoomSession({
 		application,
 		author,
+		...(input.creatorFinalitySigner === undefined ? {} : { creatorFinalitySigner: input.creatorFinalitySigner }),
 		creatorInvite: input.creatorInvite,
 		databaseName: input.databaseName,
 		initialLogicalTime: selected.logicalTime,
@@ -738,6 +776,8 @@ async function joinRoom(input: RoomJoinInput): Promise<ActiveChat> {
 		accepted,
 		clientId: input.clientId,
 		clientAuthors,
+		databaseName: input.databaseName,
+		migrationInvites: new Map<string, V3RoomCreatorInviteMaterial>(),
 		get objectId(): string {
 			return currentObjectId;
 		},
@@ -753,8 +793,12 @@ const retainedSourceBridges = new Set<V3RoomSession<ChatProjection>>();
 const api = Object.freeze({
 	async create(input: CreateInput): Promise<string> {
 		if (active !== undefined) throw new TypeError("v3 chat client is already joined");
-		const material = await createCreatorInviteMaterial();
-		active = await joinRoom({ ...input, creatorInvite: material });
+		const authority = await createCreatorAuthorityMaterial();
+		active = await joinRoom({
+			...input,
+			creatorFinalitySigner: authority.signer,
+			creatorInvite: authority.material,
+		});
 		return active.room.invite;
 	},
 	async join(input: JoinInput): Promise<void> {
@@ -765,6 +809,23 @@ const api = Object.freeze({
 			creatorInvite: input.invite,
 			databaseName: input.databaseName,
 		});
+	},
+	async inspectDurableHead(databaseName: string) {
+		const selected = active;
+		if (selected === undefined) throw new TypeError("v3 chat client is not joined");
+		if (databaseName !== selected.databaseName) throw new TypeError("v3 chat database identity differs");
+		const inspected = await selected.room.inspectDurableHead();
+		return Object.freeze({
+			generationId: inspected.head.generationId,
+			references: inspected.references,
+			revision: inspected.head.revision,
+			trustRef: inspected.trustRef,
+		});
+	},
+	async sealEpoch() {
+		const selected = active;
+		if (selected === undefined) throw new TypeError("v3 chat client is not joined");
+		return selected.room.sealEpoch();
 	},
 	async send(text: string): Promise<void> {
 		const selected = active;
@@ -779,10 +840,13 @@ const api = Object.freeze({
 		const rehearsalNonce = new Uint8Array(32);
 		crypto.getRandomValues(rehearsalNonce);
 		const targetObjectId = migrationTargetObjectId(selected.objectId, rehearsalNonce);
-		return selected.room.rehearseMigration({
+		const targetCreatorInvite = await createCreatorInviteMaterial(targetObjectId);
+		const receipt = await selected.room.rehearseMigration({
 			rehearsalNonce,
-			targetCreatorInvite: await createCreatorInviteMaterial(targetObjectId),
+			targetCreatorInvite,
 		});
+		selected.migrationInvites.set(targetObjectId, targetCreatorInvite);
+		return receipt;
 	},
 	async activateMigration(receipt: V3RoomMigrationRehearsalReceipt): Promise<V3RoomMigrationActivationReceipt> {
 		const selected = active;
@@ -795,12 +859,14 @@ const api = Object.freeze({
 		if (!(nonce instanceof Uint8Array) || nonce.byteLength !== 32 || typeof targetObjectId !== "string") {
 			throw new TypeError("v3 chat migration receipt is invalid");
 		}
-		const targetCreatorInvite = await createCreatorInviteMaterial(targetObjectId);
+		const targetCreatorInvite = selected.migrationInvites.get(targetObjectId);
+		if (targetCreatorInvite === undefined) throw new TypeError("v3 chat migration invite is unavailable");
 		const activated = await selected.room.activateMigration({
 			exactCanonicalRecordBytes: new Uint8Array(receipt.exactCanonicalRecordBytes),
 			recordVertexDigest: receipt.recordVertexDigest,
 			targetCreatorInvite,
 		});
+		selected.migrationInvites.delete(targetObjectId);
 		return activated;
 	},
 	async submitAcl(
@@ -824,6 +890,11 @@ const api = Object.freeze({
 	},
 	snapshot(): ChatSnapshot {
 		return snapshot(active);
+	},
+	status() {
+		const selected = active;
+		if (selected === undefined) throw new TypeError("v3 chat client is not joined");
+		return selected.room.status();
 	},
 	async close(): Promise<void> {
 		const selected = active;

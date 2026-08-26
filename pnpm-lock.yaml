@@ -916,6 +916,9 @@ importers:
       "@ts-drp/routing-node":
         specifier: workspace:*
         version: link:../routing-node
+      "@ts-drp/seal":
+        specifier: 0.11.0
+        version: link:../seal
       "@ts-drp/storage":
         specifier: 0.11.0
         version: link:../storage
