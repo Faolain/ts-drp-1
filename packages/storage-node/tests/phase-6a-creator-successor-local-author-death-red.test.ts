@@ -88,6 +88,9 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 		expect(results.map(({ name }) => name)).toEqual([
 			"established-bob",
 			"fresh-carol",
+			"forged-future-outbox",
+			"malformed-future-outbox",
+			"future-outbox-read-failure",
 			"copied-creator-lineage",
 			"wrong-author-right-signer",
 			"right-author-wrong-signer",
@@ -104,7 +107,7 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 			"missing-webcrypto",
 			"ed25519-unavailable",
 		]);
-		const [established, fresh, ...rejected] = results;
+		const [established, fresh, forgedFuture, malformedFuture, backingFailure, ...rejected] = results;
 		expect(established).toMatchObject({
 			issued: {
 				acceptedJournalAuthor: proof?.authors?.bob,
@@ -135,6 +138,27 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 			},
 			result: { lifecycle: "active", ok: true, recovery: "active-new" },
 		});
+		for (const [control, detail] of [
+			[forgedFuture, "creator predecessor recovery failed: admission-rejected"],
+			[malformedFuture, "creator predecessor recovery failed: admission-rejected"],
+			[backingFailure, "creator predecessor recovery failed: issuance-rejected"],
+		] as const) {
+			expect(control).toMatchObject({
+				effects: {
+					adoptionSwapCount: 0,
+					aheRecoverCount: 2,
+					installEpochAnchorCount: 1,
+					issuanceStoreShape: true,
+					publicationCount: 0,
+					snapshotOpenCount: 2,
+					subscribeCount: 1,
+					transactIssueCount: 1,
+				},
+				issued: { author: proof?.authors?.bob, authorSequence: 1 },
+				repeat: { result: { detail, kind: "recovery-rejected", ok: false } },
+				result: { lifecycle: "active", ok: true, recovery: "active-new" },
+			});
+		}
 		const writerAuthors = d108d1bChatAuthorities()
 			.filter(({ groups }) => groups.includes("writer"))
 			.map(({ author }) => author)

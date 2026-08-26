@@ -202,13 +202,41 @@ function packedOracle(material) {
 	});
 }
 
+function repeatFaultCommit(commit, fault) {
+	const decoded = decodeCanonical(commit.envelope.canonicalPreimageBytes);
+	const canonicalPreimageBytes =
+		fault === "malformed"
+			? Uint8Array.of(0xff)
+			: encodeCanonical({
+					...decoded,
+					logicalTime: Number(decoded.logicalTime) + 1,
+				});
+	const envelope = Object.freeze({
+		canonicalPreimageBytes,
+		digest: hashDomain("ts-drp/vertex/v3", canonicalPreimageBytes),
+		signature: Uint8Array.from(commit.envelope.signature, (byte, index) => (index === 0 ? byte ^ 1 : byte)),
+	});
+	return Object.freeze({
+		...commit,
+		envelope,
+		issuedRecord: Object.freeze({ ...commit.issuedRecord, envelope }),
+		outboxEntry: Object.freeze({ ...commit.outboxEntry, envelope }),
+	});
+}
+
 function instrumentIssuanceStore(raw, effects, input) {
 	const descriptors = Object.getOwnPropertyDescriptors(raw);
+	const readIssued = descriptors.readIssued;
 	const readLineage = descriptors.readLineage;
+	const readOutboxPage = descriptors.readOutboxPage;
 	const transactIssue = descriptors.transactIssue;
 	if (
+		readIssued === undefined ||
+		!("value" in readIssued) ||
 		readLineage === undefined ||
 		!("value" in readLineage) ||
+		readOutboxPage === undefined ||
+		!("value" in readOutboxPage) ||
 		transactIssue === undefined ||
 		!("value" in transactIssue)
 	) {
@@ -230,6 +258,29 @@ function instrumentIssuanceStore(raw, effects, input) {
 				return { ...lineage, exhausted: true };
 			}
 			return lineage;
+		},
+	};
+	descriptors.readIssued = {
+		...readIssued,
+		value: async (scope, authorSequence) => {
+			const commit = await raw.readIssued(scope, authorSequence);
+			if (!effects.repeatPhase || authorSequence !== 1 || input.repeatOutboxFault === undefined) return commit;
+			if (input.repeatOutboxFault === "read-issued-throw") {
+				throw new TypeError("D.108d1b repeat issued-record read failed");
+			}
+			return commit === null ? null : repeatFaultCommit(commit, input.repeatOutboxFault);
+		},
+	};
+	descriptors.readOutboxPage = {
+		...readOutboxPage,
+		value: async (...args) => {
+			const rows = await raw.readOutboxPage(...args);
+			if (!effects.repeatPhase || input.repeatOutboxFault === undefined) return rows;
+			return rows.map((row) =>
+				row.commit.authorSequence === 1 && input.repeatOutboxFault !== "read-issued-throw"
+					? Object.freeze({ ...row, commit: repeatFaultCommit(row.commit, input.repeatOutboxFault) })
+					: row
+			);
 		},
 	};
 	descriptors.transactIssue = {
@@ -350,6 +401,7 @@ async function runCase(material, index, input) {
 		issuanceStoreShape: false,
 		lineageReads: [],
 		order: [],
+		repeatPhase: false,
 		snapshotOpenCount: 0,
 		transactIssueCount: 0,
 	};
@@ -443,6 +495,7 @@ async function runCase(material, index, input) {
 		if (input.repeat === true) {
 			await Promise.resolve(activeHandle.deactivate());
 			activeHandle = undefined;
+			effects.repeatPhase = true;
 			state.use = "possession";
 			const reopened = await reopen();
 			if (!reopened.ok) {
@@ -495,6 +548,33 @@ async function matrix(material) {
 			wrongAuthority: carol,
 		},
 		{ authority: carol, carriers: [], name: "fresh-carol", scenario: "valid", wrongAuthority: bob },
+		{
+			authority: bob,
+			carriers: [bobCarrier],
+			name: "forged-future-outbox",
+			repeat: true,
+			repeatOutboxFault: "forged-future",
+			scenario: "valid",
+			wrongAuthority: carol,
+		},
+		{
+			authority: bob,
+			carriers: [bobCarrier],
+			name: "malformed-future-outbox",
+			repeat: true,
+			repeatOutboxFault: "malformed",
+			scenario: "valid",
+			wrongAuthority: carol,
+		},
+		{
+			authority: bob,
+			carriers: [bobCarrier],
+			name: "future-outbox-read-failure",
+			repeat: true,
+			repeatOutboxFault: "read-issued-throw",
+			scenario: "valid",
+			wrongAuthority: carol,
+		},
 		{
 			authority: bob,
 			carriers: [bobCarrier, ...creatorRows],
