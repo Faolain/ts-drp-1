@@ -138,8 +138,8 @@ function network(events, publications, targetPeerId) {
 	};
 }
 
-async function seedAhe(material, effects) {
-	const raw = createSqliteAheDurableStore({ filename: join(material.directory, "ahe.sqlite") });
+async function seedAhe(material, effects, suffix = "") {
+	const raw = createSqliteAheDurableStore({ filename: join(material.directory, `ahe${suffix}.sqlite`) });
 	const blobs = new Map();
 	for (const candidate of material.blobs) blobs.set(candidate.ref.digest, candidate.bytes);
 	blobs.set(material.active.projection.ref.digest, material.active.projection.bytes);
@@ -182,8 +182,10 @@ async function seedAhe(material, effects) {
 	return { adoptionSwapCount: () => adoptionSwapCount, raw, store };
 }
 
-async function seedIssuance(material) {
-	const store = createNodeDurableIssuanceStore({ primaryFilename: join(material.directory, "issuance.sqlite") });
+async function seedIssuance(material, suffix = "") {
+	const store = createNodeDurableIssuanceStore({
+		primaryFilename: join(material.directory, `issuance${suffix}.sqlite`),
+	});
 	for (const row of material.issuance.outbox) {
 		await store.transactIssue(material.issuance.scope, (authorSequence) => {
 			if (authorSequence !== row.commit.authorSequence) throw new Error("issuance sequence diverged");
@@ -200,8 +202,10 @@ async function seedIssuance(material) {
 	return store;
 }
 
-async function seedJournal(material, effects) {
-	const raw = createNodeDurableLiveJournalStore({ primaryFilename: join(material.directory, "journal.sqlite") });
+async function seedJournal(material, effects, suffix = "") {
+	const raw = createNodeDurableLiveJournalStore({
+		primaryFilename: join(material.directory, `journal${suffix}.sqlite`),
+	});
 	const installed = await raw.installGenesis({
 		detachedAnchorSignature: material.creatorGenesis.detachedSignature,
 		exactCanonicalAnchorPreimageBytes: material.creatorGenesis.exactCanonicalAnchorPreimageBytes,
@@ -231,8 +235,10 @@ async function seedJournal(material, effects) {
 	};
 }
 
-async function seedSnapshot(material, events, effects) {
-	const raw = createNodeSnapshotQuarantineStore({ primaryFilename: join(material.directory, "snapshot.sqlite") });
+async function seedSnapshot(material, events, effects, suffix = "") {
+	const raw = createNodeSnapshotQuarantineStore({
+		primaryFilename: join(material.directory, `snapshot${suffix}.sqlite`),
+	});
 	const scope = await raw.openScope(material.snapshot.declaration);
 	const port = scope.verificationQuarantine.open(new AbortController().signal);
 	for (let index = 0; index < material.snapshot.declaration.chunks.length; index += 1) {
@@ -305,6 +311,15 @@ async function cold(material, selectedMode) {
 	const issuanceStore = await seedIssuance(material);
 	const liveJournal = await seedJournal(material, effects);
 	const snapshot = await seedSnapshot(material, events, effects);
+	const secondStores =
+		material.d108d1aIdentity === true
+			? {
+					ahe: await seedAhe(material, effects, "-second"),
+					issuanceStore: await seedIssuance(material, "-second"),
+					liveJournal: await seedJournal(material, effects, "-second"),
+					snapshot: await seedSnapshot(material, events, effects, "-second"),
+				}
+			: undefined;
 	const catalog = Object.freeze({
 		blueprintDigests: Object.freeze([...material.catalog.blueprintDigests]),
 		catalogDigest: material.catalog.catalogDigest,
@@ -315,31 +330,34 @@ async function cold(material, selectedMode) {
 	});
 	const targetPeerId = `d108d1a-cold-target-${process.pid}`;
 	const node = network(events, publications, targetPeerId);
+	const adoptionSwapCount = () =>
+		ahe.adoptionSwapCount() + (secondStores === undefined ? 0 : secondStores.ahe.adoptionSwapCount());
 	let activeHandle;
 	const originalNow = Date.now;
 	try {
 		if (selectedMode === "ttl-expired") Date.now = () => snapshot.expiresAt + 1;
-		const reopen = () =>
+		const reopenWith = (stores) =>
 			reopenCreatorSuccessorAdoption({
 				...material.creatorGenesis,
 				...(selectedMode === "divergent-genesis" ? { pinnedGenesisAnchorDigest: "f".repeat(64) } : {}),
 				...(selectedMode === "extra-epoch" ? { epoch: 1 } : {}),
 				catalog,
-				issuanceStore,
-				liveJournalStore: liveJournal.store,
+				issuanceStore: stores.issuanceStore,
+				liveJournalStore: stores.liveJournal.store,
 				messageQueueManager: new MessageQueueManager({ logConfig: { level: "silent" } }),
 				networkNode: node,
 				onAdmittedVertex: () => undefined,
 				snapshotDeclaration: material.snapshot.declaration,
-				snapshotStore: snapshot.store,
-				store: ahe.store,
+				snapshotStore: stores.snapshot.store,
+				store: stores.ahe.store,
 			});
+		const reopen = () => reopenWith({ ahe, issuanceStore, liveJournal, snapshot });
 		const result = await reopen();
 		if (!result.ok) {
 			return {
 				effects: {
 					...effects,
-					adoptionSwapCount: ahe.adoptionSwapCount(),
+					adoptionSwapCount: adoptionSwapCount(),
 					publicationCount: publications.length,
 					subscribeCount: events.filter((event) => event === "subscribe").length,
 				},
@@ -372,8 +390,9 @@ async function cold(material, selectedMode) {
 		if (material.d108d1aIdentity === true) {
 			await Promise.resolve(result.handle.deactivate());
 			activeHandle = undefined;
-			const second = await reopen();
-			if (!second.ok) throw new Error(`second cold reopen failed: ${second.kind}`);
+			if (secondStores === undefined) throw new Error("second cold identity stores are unavailable");
+			const second = await reopenWith(secondStores);
+			if (!second.ok) throw new Error(`second cold reopen failed: ${second.kind}: ${second.detail}`);
 			activeHandle = second.handle;
 			const secondIssue = await second.handle.issueLocal({
 				operations: [{ logicalTime: 40, operation: { action: "add", value: 17 } }],
@@ -398,7 +417,7 @@ async function cold(material, selectedMode) {
 				ok: result.ok,
 				recovery: result.recovery,
 			},
-			adoptionSwapCount: ahe.adoptionSwapCount(),
+			adoptionSwapCount: adoptionSwapCount(),
 			...(identityReopens === undefined ? {} : { identityReopens }),
 			pid: process.pid,
 			oldOutbox: {
@@ -414,7 +433,20 @@ async function cold(material, selectedMode) {
 	} finally {
 		Date.now = originalNow;
 		await Promise.resolve(activeHandle?.deactivate());
-		await Promise.allSettled([snapshot.raw.close(), liveJournal.raw.close(), issuanceStore.close(), ahe.raw.close()]);
+		await Promise.allSettled([
+			snapshot.raw.close(),
+			liveJournal.raw.close(),
+			issuanceStore.close(),
+			ahe.raw.close(),
+			...(secondStores === undefined
+				? []
+				: [
+						secondStores.snapshot.raw.close(),
+						secondStores.liveJournal.raw.close(),
+						secondStores.issuanceStore.close(),
+						secondStores.ahe.raw.close(),
+					]),
+		]);
 	}
 }
 

@@ -59826,6 +59826,31 @@ tests/phase-4b-v3-live-snapshot-composition-red.test.ts --no-coverage
 Prettier over the six test owners plus this plan, and `git diff --check` all
 exited 0.
 
+The first exact-three GREEN dry-run then exposed one further test-fixture fact
+without requiring a production reslice. The first cold wrapper's local issue
+appended a successor epoch-one row to the shared journal; the second cold
+reopen correctly revalidated the displaced predecessor and rejected that
+live-mutated journal as `recovery-rejected: creator predecessor recovery
+failed: admission-rejected` before reaching handle aliasing. Changing recovery
+to accept that state would widen D.108d1a beyond registration identity and is
+forbidden. The already-owned child fixture therefore creates two exact,
+independently seeded SQLite custody sets from the same authenticated packed
+durable checkpoint under distinct filenames, while keeping both activations in
+the same fresh process, stable topic, network owner and writer-lock realm. The
+first wrapper issues and targets one retained replay, awaits deactivation, and
+the second independently reopens, issues and targets one retained replay. Both
+return `published`, exact aggregate `sendMessage` count is two, and the summed
+post-seed adoption-CAS count across both AHE stores is zero. The child now also
+reports the typed second-reopen detail on failure. This correction changes only
+the two already-frozen cold-child RED owners, does not alter the six/three
+rosters or production contract, and does not trigger a confirmation review.
+With the provisional exact-three source bridge present, the corrected focused
+command passed 11/11 with zero skip. After removing those provisional
+production edits and freshly rebuilding node/storage-node for a separate
+tests-only commit, the same command returned the preserved RED shape: 8 pass,
+the sole readiness failure and two designed skips. Exact-two-owner ESLint,
+Prettier, both affected builds and `git diff --check` exited 0.
+
 The nonblocking ledger remains explicit without confirmation: Grok records the
 adjacent D.108d2 wording, the not-yet-pinned bridge-specific readiness fact and
 the missing focused command. Kimi records the private bridge's additional

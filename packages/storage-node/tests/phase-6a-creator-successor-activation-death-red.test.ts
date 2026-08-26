@@ -98,7 +98,7 @@ describe("D.108d1 fresh-process successor activation RED", () => {
 			pid: expect.any(Number),
 		});
 		const identity = result.proof?.identityReopens as Readonly<{ readonly sentCount?: unknown }> | undefined;
-		expect(Number(identity?.sentCount)).toBeGreaterThanOrEqual(3);
+		expect(Number(identity?.sentCount)).toBe(2);
 		expect(result.proof?.pid).not.toBe(process.pid);
 	});
 });
