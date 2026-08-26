@@ -43,7 +43,7 @@ export interface SealVoterHandle {
 		}>
 	): Promise<
 		| Readonly<{ existing?: ExactSealCarrier; ok: false; reason: string }>
-		| Readonly<{ carrierDigest: string; duplicate: boolean; ok: true }>
+		| Readonly<{ carrierDigest: string; duplicate: boolean; ok: true; stored: ExactSealCarrier }>
 	>;
 }
 
@@ -476,6 +476,7 @@ export async function createSealVoter(
 						carrierDigest: bytesToHex(prepared.registeredDigest),
 						duplicate: committed.duplicate,
 						ok: true as const,
+						stored,
 					});
 				} finally {
 					active = false;

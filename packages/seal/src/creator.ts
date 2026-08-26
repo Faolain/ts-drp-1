@@ -1,14 +1,14 @@
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
-import { type FinalitySigner, signCreatorAnchorRequest, signSealRegisteredDigest } from "@ts-drp/keychain/finality";
+import { type FinalitySigner, signCreatorAnchorRequest } from "@ts-drp/keychain/finality";
 import {
 	completeCreatorSuccessor,
 	openCreatorSuccessorTrust,
 	prepareCreatorClose,
 	prepareCreatorSuccessor,
 } from "@ts-drp/protocol-v3/creator-close";
-import { openSealAuthority, prepareSealVote, type SealAuthority, verifySealQC } from "@ts-drp/protocol-v3/seal";
+import { openSealAuthority, type SealAuthority, verifySealQC } from "@ts-drp/protocol-v3/seal";
 
-import { createSealVoter, type SealStorePort, type SealVoterHandle } from "./index.js";
+import { createSealVoter, type ExactSealCarrier, type SealStorePort, type SealVoterHandle } from "./index.js";
 import {
 	copyCreatorCloseEvidenceRecord,
 	type CreatorCloseEvidenceAdapter,
@@ -131,21 +131,20 @@ function q1QcBytes(carrier: Readonly<{ exactCanonicalPreimageBytes: Uint8Array; 
 	});
 }
 
-async function signedQc(
-	authority: SealAuthority,
-	signer: FinalitySigner,
+async function durableVoteCarrier(
+	voter: SealVoterHandle,
 	exactCanonicalCutValueBytes: Uint8Array,
 	phase: "commit" | "prepare"
-): Promise<Uint8Array> {
-	const prepared = prepareSealVote({ authority, exactCanonicalCutValueBytes, phase, round: 0 });
-	if (!prepared.ok) throw new Error(prepared.reason);
-	const signature = await signSealRegisteredDigest({ request: prepared.signingRequest, signer });
-	const qcBytes = q1QcBytes({ exactCanonicalPreimageBytes: prepared.exactCanonicalPreimageBytes, signature });
-	const verified = verifySealQC({ authority, exactCanonicalQcBytes: qcBytes });
-	if (!verified.ok || verified.phase !== phase || verified.valueDigest !== prepared.valueDigest) {
-		throw new Error("constructed creator QC failed verification");
-	}
-	return qcBytes;
+): Promise<Readonly<{ carrier: ExactSealCarrier; ok: true } | { ok: false; reason: string }>> {
+	const voted = await voter.vote({
+		exactCanonicalCutValueBytes,
+		expectedRevision: voter.status().revision,
+		phase,
+		round: 0,
+	});
+	return voted.ok
+		? Object.freeze({ carrier: voted.stored, ok: true as const })
+		: Object.freeze({ ok: false as const, reason: voted.reason });
 }
 
 function phaseForRevision(revision: number): string {
@@ -279,6 +278,8 @@ async function runClose(
 		let voterStatus = voter.status();
 		let prepareQcBytes = record.exactCanonicalPrepareQcBytes;
 		let commitQcBytes = record.exactCanonicalCommitQcBytes;
+		let prepareCarrier: ExactSealCarrier | null = null;
+		let commitCarrier: ExactSealCarrier | null = null;
 
 		if (voterStatus.revision < 1) {
 			const voted = await voter.vote({
@@ -288,6 +289,7 @@ async function runClose(
 				round: 0,
 			});
 			if (!voted.ok) return failure(voted.reason);
+			prepareCarrier = voted.stored;
 			voterStatus = voter.status();
 			record = nextRecord(record, { phase: "prepare-voted", revision: 1 });
 			const evidenceFailure = await persistEvidence(state, record, state.evidenceRecord?.phase ?? null);
@@ -297,7 +299,12 @@ async function runClose(
 		if (state.stopRequested) return failure("STOPPED");
 
 		if (voterStatus.revision < 2) {
-			prepareQcBytes = await signedQc(authority, state.signer, preparedClose.exactCanonicalCutValueBytes, "prepare");
+			if (prepareCarrier === null) {
+				const durable = await durableVoteCarrier(voter, preparedClose.exactCanonicalCutValueBytes, "prepare");
+				if (!durable.ok) return failure(durable.reason);
+				prepareCarrier = durable.carrier;
+			}
+			prepareQcBytes = q1QcBytes(prepareCarrier);
 			const persisted = await voter.persistQc({ exactCanonicalQcBytes: prepareQcBytes });
 			if (!plainRecord(persisted) || persisted.ok !== true) {
 				return failure(plainRecord(persisted) && typeof persisted.reason === "string" ? persisted.reason : "QC_FAILED");
@@ -321,6 +328,7 @@ async function runClose(
 				round: 0,
 			});
 			if (!voted.ok) return failure(voted.reason);
+			commitCarrier = voted.stored;
 			voterStatus = voter.status();
 			record = nextRecord(record, { phase: "commit-voted", prepareQcBytes, revision: 3 });
 			const evidenceFailure = await persistEvidence(state, record, state.evidenceRecord?.phase ?? null);
@@ -330,7 +338,12 @@ async function runClose(
 		if (state.stopRequested) return failure("STOPPED");
 
 		if (voterStatus.revision < 4) {
-			commitQcBytes = await signedQc(authority, state.signer, preparedClose.exactCanonicalCutValueBytes, "commit");
+			if (commitCarrier === null) {
+				const durable = await durableVoteCarrier(voter, preparedClose.exactCanonicalCutValueBytes, "commit");
+				if (!durable.ok) return failure(durable.reason);
+				commitCarrier = durable.carrier;
+			}
+			commitQcBytes = q1QcBytes(commitCarrier);
 			const persisted = await voter.persistQc({ exactCanonicalQcBytes: commitQcBytes });
 			if (!plainRecord(persisted) || persisted.ok !== true) {
 				return failure(plainRecord(persisted) && typeof persisted.reason === "string" ? persisted.reason : "QC_FAILED");
@@ -341,7 +354,9 @@ async function runClose(
 			if (evidenceFailure !== undefined) return failure(evidenceFailure);
 			emit(state, "commit_qc_committed");
 		} else if (commitQcBytes === null) {
-			commitQcBytes = await signedQc(authority, state.signer, preparedClose.exactCanonicalCutValueBytes, "commit");
+			const durable = await durableVoteCarrier(voter, preparedClose.exactCanonicalCutValueBytes, "commit");
+			if (!durable.ok) return failure(durable.reason);
+			commitQcBytes = q1QcBytes(durable.carrier);
 		}
 		if (commitQcBytes === null || voterStatus.revision < 4) return failure("DURABLE_QC_INVALID");
 		if (state.stopRequested) return failure("STOPPED");
