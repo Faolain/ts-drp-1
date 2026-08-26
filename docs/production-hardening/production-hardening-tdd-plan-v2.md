@@ -58106,6 +58106,117 @@ only added owner is `pnpm-lock.yaml`, limited to that importer edge; no product
 API, semantic owner or dependency family changes. This pre-GREEN roster
 correction receives its own signed commit and no additional review launch.
 
+D.107d GREEN is implemented, review-corrected, signed and pushed. The initial
+exact-nine review packet was rooted at
+`e807f8f1fe164891ba3ec4e37bad16c57bd65b93`, with tree
+`7fa80edcfebb42a13956307d9c2ba8779306fb50`, patch object
+`ce904137146483632b9b7684b6810387e5d35c67` and SHA-256
+`97f8157574716209cae9164acd0a5986e75f460f8aa441b65305d7ba97744808`.
+It added the pure control-plane trust-advance classifier, the sole node live
+close composer, authenticated live graph byte charges, strict browser actor and
+snapshot stores, creator-only room authority, a finality key distinct from the
+chat application-author key, the exact package/lock edges and the ordered Vite
+aliases. The mainline closes a real non-empty epoch, folds and quarantines its
+snapshot, obtains the durable q=1 commit QC and successor trust record, stages
+the exact combined closure and performs one expected-head CAS whose ambiguous
+write result is accepted only by exact reopen.
+
+The one GREEN review round is closed without a confirmation launch. Grok is
+`NO_VERDICT`: its sole read-only launch produced no valid terminal schema and
+ended cancelled after 360.322 seconds with runner exit 1; it was not retried or
+counted as approval. Kimi session
+`session_a9da1072-a170-4065-a992-827d9fe5de9d` completed exactly checks 001
+through 100 and returned `CHANGES_REQUIRED`, P0=0/P1=3/P2=12. Its three P1s
+were the unfenced terminal-transition issue lane, the unretryable/dishonest
+failed-close state and rejection after a combined head had already committed.
+Opus 5/xhigh session `4f7b32d4-22f0-4258-bd3a-d9bcc7ff01c2` returned
+`CHANGES_REQUIRED`, P0=1/P1=4/P2=8. Its P0 found that repointing the trust
+signer also redefined the retained migration creator application author. Its
+P1s required actor-derived continuity, honest retryable lifecycle projection,
+a degraded rather than fatal room open when close continuity is unavailable,
+and a genuine receiver-bound strict-store registration seam.
+
+The same review round corrected every P0/P1. Terminal transitions now reject
+both before and inside the live registration gate once blueprint close begins,
+so no terminal vertex can enter between fold, graph capture, snapshot export
+and terminalization. Snapshot fold/graph/manifest/commitment evidence is cached
+for actor-supported retry; a failure before adoption aborts the close latch and
+returns to active, while a post-fold failure remains honestly sealed with close
+authority available to resume. Continuity is derived from the seal actor's
+durable phase/terminal state, and continuity-terminal/storage-loss opens leave
+the room available with `stalled` and no close authority rather than killing the
+session. Once the exact combined CAS has reopened successfully, local
+terminalization is best-effort and cannot contradict the durable success result.
+The close registration is now claimed once through a private resolver installed
+by the genuine `v3-live` WeakMap registry, is receiver-bound, and refuses a
+store without strict durability/backend signing eligibility; fabricated plane
+objects cannot supply registration state to the signer-backed composer.
+
+The migration correction keeps the trust finality key distinct while deriving
+the creator application-author authority from the unique signed-ACL member with
+admin/finality/writer authority. Rehearsal retains its exact target invite and
+activation reuses those bytes rather than regenerating a signed trust root.
+This both repairs the Opus P0 and closes the WebKit-only trust-state conflict
+exposed by expanding the retained Chromium oracle to all three engines. No wire
+format, digest owner, product API, activation authority, chunk/memory limit or
+dependency family changed.
+
+The initial exact-nine implementation is signed and pushed as `7888fbba`, with
+tree `27461c19e8a4b947e8787a2a797e4a83ec6c1ef9`. The final registry-backed
+same-round correction is signed and pushed as `d4e88bc8`, with correction patch
+object `c14716862c13d5c21d17020cc2cad69b719a2301` and SHA-256
+`2b21dad26da46031853c69772022cdc9788d0bf37451f8b70090aebb7dbfe0d5`.
+The complete exact-nine packet from the frozen parent ends at
+`d4e88bc8852215a8a808f73b56557e0a859c921e`, tree
+`da5a1e92f654eea4d4eb03a040de61815f3abe4d`, combined patch object
+`e7a0db32b7df5ccde8022587fee661240ab5fb07` and SHA-256
+`ca6eb6324050a992c04ec7567589891d7b84b7e9bf8311217d86f96d96bc4bde`.
+The final roster remains exactly the frozen nine paths, and the lock diff remains
+exactly the three-line `packages/node` importer edge for `@ts-drp/seal@0.11.0`.
+
+Final D.107d GREEN verification commands and results were:
+
+- `pnpm exec vitest run --coverage.enabled=false` with the 11 retained
+  Phase-4a/4b/4c and Phase-5e creator close/actor/relearn/live-close owners:
+  11 files / 92 tests pass, including the genuine fresh-process 64 MiB peak-live
+  snapshot/chunk ownership proof;
+- `pnpm exec playwright test --config packages/storage-browser/playwright.phase-5e-creator-live-close.config.ts`:
+  6/6 pass across Chromium, Firefox and WebKit, including a real non-empty close,
+  exact combined head, terminal old handle, peer authority rejection and a late
+  peer receiving the sealed state;
+- the retained creator actor and relearn Playwright configs: 12/12 and 6/6
+  respectively across Chromium, Firefox and WebKit;
+- the unchanged `phase-3a1b-d9336-two-client-room.pw.ts`, collected with a
+  temporary Node hook resolving only its otherwise-unresolvable root-level
+  `@ts-drp/canonical` import to the freshly built canonical export: the committed
+  Chromium config passes 5/5, and a temporary three-engine project expansion
+  passes 15/15. No test source, dependency or Vite alias was changed for that
+  collector proof;
+- control-plane typecheck/build, node build, v3-room typecheck/build, v3-chat
+  typecheck/build and storage-browser typecheck/build: pass;
+- `pnpm install --offline --frozen-lockfile`: pass for all 48 workspaces, with
+  the postinstall affected-package build graph also passing;
+- exact-owner `eslint --max-warnings 0`, `prettier --check`, staged
+  `git diff --check`, exact-nine roster, single-`swapHead`, forbidden
+  activation/adoption/prune and exact lock-importer checks: pass; and
+- broad `pnpm --filter @ts-drp/node typecheck` remains non-green only for the
+  already recorded test-program debts: worker-host `rootDir`/file-list leakage,
+  the WebRTC route's missing `emit`, and the compact-history discriminated-union
+  helper. No D.107d source diagnostic is present.
+
+No GREEN P0/P1 remains. Recorded P2 debt is limited to the classifier's epoch
+shape label/safe-integer guard, an explicit empty-application-epoch rejection,
+snapshot-quarantine incarnation/TTL promotion, behavioral fault injection for
+ambiguous CAS and live byte-charge tamper, close-path reload durability, the
+peer fallback's post-seal projection, second-bind identity diagnostics, the
+duplicated example key derivation/keychain lifetime, hard-coded epoch/transfer
+profile adjacency and the latent mixed-alias module-instance hazard. The old
+d9336 root collector's bare-workspace resolution is also retained harness debt;
+the exact committed config is green through the documented temporary
+fresh-build hook. These do not weaken the D.107d close gate or authorize Phase-6
+activation. No Fable review ran. The 26 existing stashes and all protected
+untracked paths remained unmodified.
+
 ### D.107 causal mutants, gates and handoff
 
 Every RED uses behavior, raw durable evidence or an independent byte oracle;
