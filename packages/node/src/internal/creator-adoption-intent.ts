@@ -1,3 +1,4 @@
+import { decodeCanonical } from "@ts-drp/canonical";
 import type { GenerationId, GenerationRef, PresentHead } from "@ts-drp/storage";
 
 export type CreatorAdoptionIntent = Readonly<Record<never, never>>;
@@ -18,6 +19,8 @@ export interface PreparedCreatorSuccessorAdoptionMaterial {
 	readonly head: PresentHead;
 }
 
+export type PreparedCreatorSuccessorAdoptionInput = Omit<PreparedCreatorSuccessorAdoptionMaterial, "descriptor">;
+
 const custody = new WeakMap<
 	object,
 	Readonly<{ readonly material: CreatorAdoptionIntentMaterial; readonly owner: object }>
@@ -25,7 +28,7 @@ const custody = new WeakMap<
 const sealedFacts = new WeakMap<object, object>();
 const preparedCustody = new WeakMap<
 	object,
-	Readonly<{ readonly material: PreparedCreatorSuccessorAdoptionMaterial; readonly owner: object }>
+	Readonly<{ readonly material: PreparedCreatorSuccessorAdoptionInput; readonly owner: object }>
 >();
 
 function copiedRef(ref: GenerationRef): GenerationRef {
@@ -34,6 +37,14 @@ function copiedRef(ref: GenerationRef): GenerationRef {
 
 function copiedHead(head: PresentHead): PresentHead {
 	return Object.freeze({ ...head });
+}
+
+function decodedDescriptor(bytes: Uint8Array): Readonly<Record<string, unknown>> {
+	const decoded = decodeCanonical(bytes);
+	if (decoded === null || typeof decoded !== "object" || Array.isArray(decoded)) {
+		throw new TypeError("prepared creator successor descriptor is invalid");
+	}
+	return Object.freeze(decoded as Record<string, unknown>);
 }
 
 /**
@@ -117,14 +128,13 @@ export function consumeCreatorAdoptionIntent(
  */
 export function createPreparedCreatorSuccessorAdoption(
 	owner: object,
-	material: PreparedCreatorSuccessorAdoptionMaterial
+	material: PreparedCreatorSuccessorAdoptionInput
 ): PreparedCreatorSuccessorAdoption {
 	const capability = Object.freeze({}) as PreparedCreatorSuccessorAdoption;
 	preparedCustody.set(
 		capability,
 		Object.freeze({
 			material: Object.freeze({
-				descriptor: material.descriptor,
 				exactCanonicalProjectionBytes: Uint8Array.from(material.exactCanonicalProjectionBytes),
 				head: copiedHead(material.head),
 			}),
@@ -150,9 +160,10 @@ export function consumePreparedCreatorSuccessorAdoption(
 	const retained = preparedCustody.get(capability);
 	if (retained === undefined || retained.owner !== owner) return undefined;
 	preparedCustody.delete(capability);
+	const exactCanonicalProjectionBytes = Uint8Array.from(retained.material.exactCanonicalProjectionBytes);
 	return Object.freeze({
-		descriptor: retained.material.descriptor,
-		exactCanonicalProjectionBytes: Uint8Array.from(retained.material.exactCanonicalProjectionBytes),
+		descriptor: decodedDescriptor(exactCanonicalProjectionBytes),
+		exactCanonicalProjectionBytes,
 		head: copiedHead(retained.material.head),
 	});
 }

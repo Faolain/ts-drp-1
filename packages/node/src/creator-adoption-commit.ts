@@ -407,7 +407,6 @@ function success(
 ): CommitSuccess {
 	return Object.freeze({
 		capability: createPreparedCreatorSuccessorAdoption(handle, {
-			descriptor,
 			exactCanonicalProjectionBytes: material.exactCanonicalProjectionBytes,
 			head,
 		}),
