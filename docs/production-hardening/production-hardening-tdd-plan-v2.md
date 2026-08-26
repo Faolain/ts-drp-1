@@ -59935,6 +59935,42 @@ tracked tree and no confirmation review ran. No Fable or collaboration
 subagent ran in that earlier freeze round; the later expressly authorized
 read-only Fable advisory is recorded above.
 
+The D.108d1a GREEN code-review round inspected immutable signed commit
+`4962ea7b86f376632d2b18cd73015bf4d2a1b0b4`, parent
+`4d15f2c25f62665ac0378424d8a58d1ec891036b`, tree
+`7ee9c8ccf3748463855f75b163ea300f4e5d1c47`, stable patch id
+`abed0a04782d65477dfeda8f733aaf54a35623c3` and staged-diff SHA-256
+`ca21d2becc015231986a494e9c31a0127a96d13b89929dcce2a7a7c88153c770`.
+Grok 4.6/high session `01a03f83-07fe-7572-9bb7-1bd252d353ea` performed 13
+read-only turns over 570.163 seconds. Its first turn ended normally with
+`stop_reason=end_turn` and an approval object, but progress prose before that
+object made the strict runner classify the turn `NO_VERDICT`; it was neither a
+timeout nor cancellation. A one-turn continuation of that same session, with
+no further inspection, emitted the constrained terminal schema and returned
+`APPROVED`, P0=0/P1=0/P2=0. Kimi K3 session
+`session_a92d79d9-bfb3-459a-a610-3e4674bd9e32` completed exactly CHECK001
+through CHECK100 once, independently reran the focused 11/11 and exact
+lint/format/diff checks, and returned `APPROVED`, P0=0/P1=0/P2=3. Opus 5/xhigh
+session `73df7d9d-cd9e-4d2a-b875-4aef58a663a2` completed 28 turns over
+545.392 API seconds with a valid structured result, `APPROVED`, P0=0/P1=0/P2=5.
+Two denied optional search-plugin calls did not block its allowed exact-file
+inspection. No reviewer reported a P0 or P1, so this round requires no code
+correction and no confirmation review.
+
+The GREEN-round P2 ledger is assigned without widening this slice. Kimi and
+Opus both note that wrapper deactivation would need `finally` cleanup if the
+currently self-catching raw deactivation could ever throw; Kimi also repeats
+the documented async-deactivate type mismatch and cold-reopen-only recovery
+after a hypothetical alias failure. Opus additionally records the alias-failure
+cleanup's dependency on today's fresh-activation identity invariant, a future
+stale-`activeOwners` revalidation seam, the creator-close claim guard being
+keyed by handle rather than registration, and the absence of an outer
+post-activation exception boundary for currently nonthrowing validated data.
+These are D.108e/future consumer-lifetime hardening observations, not reachable
+D.108d1a acceptance defects. The exact three production owners remain
+unchanged, no reviewer modified the tracked tree, and no same-round confirmation
+or additional Fable review ran.
+
 #### D.108d2 — product and peer proof freeze boundary
 
 D.108d2 does not begin from the recorded D.108d1 GREEN alone. The first
