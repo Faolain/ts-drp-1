@@ -59851,6 +59851,77 @@ tests-only commit, the same command returned the preserved RED shape: 8 pass,
 the sole readiness failure and two designed skips. Exact-two-owner ESLint,
 Prettier, both affected builds and `git diff --check` exited 0.
 
+D.108d1a GREEN now changes exactly the frozen three production owners. The
+internal successor-live module owns one install-once, exception-closed
+wrapper-alias kernel. The v3-live owner accepts only a distinct unregistered
+wrapper for a genuine current raw handle, rejects a second alias for that raw
+handle, and adds the wrapper as another weak key for the exact same
+`V3PlaneRegistration`; it returns only a boolean and exposes no registration or
+raw authority. The activation owner consumes that alias before `activeOwners`
+or success publication. Alias failure deactivates the raw handle, releases the
+held browser lock and returns typed `internal-invariant`. Awaited ordinary
+deactivation leaves the weak alias fail-closed through the registration's
+existing inactive/currentness checks. No root or package export, product
+consumer, wire/store/snapshot carrier, digest owner, ACL, issuance scope,
+topic, limit or memory ceiling changed.
+
+The required refactor-clean pass identified registration identity as the sole
+concept and `v3HandleRegistrations` as its natural owner. The bridge transports
+only the wrapper key across the existing acyclic internal seam and stores no
+parallel registration state; its additional WeakSet is solely the one-shot
+claim guard. Importing the alias owner directly from `v3-live` would either
+widen the pinned runtime export roster or create cyclic authority, so the tiny
+private compatibility seam is the clean bounded shape for this slice.
+
+Ordinary-checkout GREEN verification is green. The focused three-file command
+passes 11/11 with zero skip. The complete retained D.108b/D.108c/D.108d1 plus
+D.108d1a six-file selection passes 46/46. The complete retained Phase-4c
+five-file selection passes 44/44, including the real 64 MiB fresh-process owner
+and retaining mutant with no exclusion. D.108d1 Playwright passes 9/9,
+Phase-4c-b passes 18/18 and Phase-4c-c passes 6/6 across Chromium, Firefox and
+WebKit. Fresh `@ts-drp/node` and `@ts-drp/storage-node` builds pass. Exact-three
+ESLint with zero warnings, Prettier and `git diff --check` pass. The node
+test-inclusive typecheck reproduces only its recorded worker-host `rootDir` /
+file-list, WebRTC `emit` and compact-history helper errors; storage-node
+reproduces its recorded cross-workspace `rootDir`/file-list and untyped retained
+fixture errors. Neither reports a new D.108d1a production type error, and both
+production build graphs are clean.
+
+The isolated GREEN proof used detached temporary worktree
+`/private/tmp/ts-drp-d108d1a-green.wquQSo/repo` at synthetic commit
+`83622cb8bc4a5a9cc4a7ee901ca2cac81f2e5f48`, whose parent is signed tests-only
+commit `4d15f2c25f62665ac0378424d8a58d1ec891036b` and whose tree is the exact
+pre-review staged GREEN tree `51c9e1a6b642a33cd9835ab0173e389338adc6b4`.
+Before install, `find packages -type d -name dist -print -quit` returned no
+path. `pnpm install --offline --ignore-scripts --frozen-lockfile` installed all
+48 workspace projects, a second no-`dist` check printed
+`NO_DIST_AFTER_IGNORE_SCRIPTS_INSTALL`, and `node
+scripts/ensure-native-deps.mjs` installed the required native prebuild. Fresh
+`pnpm --filter @ts-drp/storage-node... --filter @ts-drp/node... build` then
+built the complete Node dependency closure. The retained Phase-4c command
+passed 44/44 and the retained D.108b/D.108c/D.108d1/D.108d1a command passed
+46/46. Thus the actual fresh subprocess resolved only freshly built package
+exports. The 64 MiB child sampled `peakVerifierBodyBytes` inside each awaited
+quarantine write while the body was live, asserted the signed
+`maxMemoryBytes === 2 * chunkBodyBytes` profile and the strict
+`peakVerifierBodyBytes < 2 * chunkBodyBytes` owner bound, and killed the
+retaining mutant whose live peak reached at least twice the chunk body even
+though both modes settled at zero after completion. This is peak-live
+ownership evidence, not a post-completion heap observation.
+
+The first browser invocations named nonexistent root-level shorthand configs
+and exited before collection. After correcting only those command paths, the
+D.108d1 browser matrix passed 9/9. The first Phase-4c-b/c attempts then exposed
+that the clean recipe had not built `@ts-drp/storage-browser`; package-export
+resolution correctly failed rather than falling back to stale artifacts.
+`pnpm --filter @ts-drp/storage-browser... build` freshly built that package and
+its dependency closure, after which the unchanged Phase-4c-b and Phase-4c-c
+configs passed 18/18 and 6/6 across Chromium, Firefox and WebKit. Exact-three
+ESLint with zero warnings, exact-four Prettier, `git diff --check` and tracked
+status were clean in the worktree. These failed attempts and the corrective
+build step are part of the evidence; no alias, ignored artifact or production
+source change masked them.
+
 The nonblocking ledger remains explicit without confirmation: Grok records the
 adjacent D.108d2 wording, the not-yet-pinned bridge-specific readiness fact and
 the missing focused command. Kimi records the private bridge's additional
@@ -59860,8 +59931,9 @@ guard, the wrapper's async-deactivate type mismatch with public
 `V3PlaneHandle`, and the fact that alias failure after terminalization leaves
 cold reopen as the sole recovery. Those observations remain future hardening
 and test clarity, not permission to widen this GREEN. No reviewer changed the
-tracked tree, no confirmation review ran, and no Fable or collaboration
-subagent ran.
+tracked tree and no confirmation review ran. No Fable or collaboration
+subagent ran in that earlier freeze round; the later expressly authorized
+read-only Fable advisory is recorded above.
 
 #### D.108d2 — product and peer proof freeze boundary
 

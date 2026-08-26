@@ -61,6 +61,7 @@ import {
 	type CreatorSuccessorGenerationMaterial,
 	type CreatorSuccessorLiveMaterial,
 	type CreatorSuccessorRuntimeBindings,
+	installCreatorSuccessorHandleAlias,
 	installCreatorSuccessorLive,
 } from "./internal/creator-successor-live.js";
 import { classifyV3EnvelopeScope } from "./v3-envelope-scope.js";
@@ -2536,6 +2537,7 @@ interface VerifiedV3IngressEvidence {
 const v3PlaneRegistrations = new WeakMap<DRPNetworkNode, Map<string, V3PlaneRegistration>>();
 const v3HandleRegistrations = new WeakMap<V3PlaneHandle, V3PlaneRegistration>();
 const creatorSuccessorTransportHandoffs = new WeakMap<object, V3PlaneRegistration>();
+const aliasedCreatorSuccessorHandles = new WeakSet<V3PlaneHandle>();
 const claimedCreatorCloseHandles = new WeakSet<V3PlaneHandle>();
 const HEX_DIGITS = "0123456789abcdef";
 
@@ -2867,6 +2869,25 @@ function currentRegistration(registration: V3PlaneRegistration): boolean {
 	const registrations = v3PlaneRegistrations.get(registration.networkNode);
 	if (registrations?.get(registration.topic) !== registration) return false;
 	return topicMembership(registration.networkNode, registration.topic) === true;
+}
+
+function aliasCreatorSuccessorHandle(rawHandle: object, wrapper: object): boolean {
+	if (rawHandle === wrapper) return false;
+	const raw = rawHandle as V3PlaneHandle;
+	const alias = wrapper as V3PlaneHandle;
+	const registration = v3HandleRegistrations.get(raw);
+	if (
+		registration === undefined ||
+		registration.handle !== raw ||
+		!currentRegistration(registration) ||
+		aliasedCreatorSuccessorHandles.has(raw) ||
+		v3HandleRegistrations.has(alias)
+	) {
+		return false;
+	}
+	v3HandleRegistrations.set(alias, registration);
+	aliasedCreatorSuccessorHandles.add(raw);
+	return true;
 }
 
 function deactivateRegistration(registration: V3PlaneRegistration): boolean {
@@ -6619,6 +6640,10 @@ async function activateCreatorSuccessorLive(
 	} catch {
 		return rejected("internal-invariant", "creator successor activation failed unexpectedly");
 	}
+}
+
+if (!installCreatorSuccessorHandleAlias(aliasCreatorSuccessorHandle)) {
+	throw new TypeError("creator successor handle alias owner was already installed");
 }
 
 if (!installCreatorSuccessorLive(activateCreatorSuccessorLive)) {

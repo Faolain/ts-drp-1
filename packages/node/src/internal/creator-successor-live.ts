@@ -74,7 +74,10 @@ type CreatorSuccessorLiveKernel = (
 	bindings: CreatorSuccessorRuntimeBindings
 ) => Promise<CreatorSuccessorLiveResult>;
 
+type CreatorSuccessorHandleAliasKernel = (rawHandle: object, wrapper: object) => boolean;
+
 let kernel: CreatorSuccessorLiveKernel | undefined;
+let handleAliasKernel: CreatorSuccessorHandleAliasKernel | undefined;
 
 export interface CreatorSuccessorReopenInput {
 	readonly authenticationProfile: "creator-only";
@@ -124,6 +127,31 @@ export function consumeCreatorSuccessorLive(
 				Object.freeze({ detail: "creator successor live owner is unavailable", kind: "internal-invariant", ok: false })
 			)
 		: kernel(material, bindings);
+}
+
+/**
+ * Installs the sole private wrapper-to-registration identity bridge.
+ * @param owner - Private handle-alias kernel.
+ * @returns Whether this call installed the sole owner.
+ */
+export function installCreatorSuccessorHandleAlias(owner: CreatorSuccessorHandleAliasKernel): boolean {
+	if (handleAliasKernel !== undefined) return false;
+	handleAliasKernel = owner;
+	return true;
+}
+
+/**
+ * Associates one successor wrapper with its genuine raw live-plane handle.
+ * @param rawHandle - Genuine activated live-plane handle.
+ * @param wrapper - Newly frozen public successor wrapper.
+ * @returns Whether the private registration owner accepted the alias.
+ */
+export function consumeCreatorSuccessorHandleAlias(rawHandle: object, wrapper: object): boolean {
+	try {
+		return handleAliasKernel?.(rawHandle, wrapper) === true;
+	} catch {
+		return false;
+	}
 }
 
 /**

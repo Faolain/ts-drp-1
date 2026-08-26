@@ -7,6 +7,7 @@ import {
 	type PreparedCreatorSuccessorAdoptionMaterial,
 } from "./internal/creator-adoption-intent.js";
 import {
+	consumeCreatorSuccessorHandleAlias,
 	consumeCreatorSuccessorLive,
 	consumeCreatorSuccessorReopen,
 	type CreatorSuccessorLiveMaterial,
@@ -206,6 +207,15 @@ async function activateMaterial(
 			await lock?.release();
 		},
 	});
+	if (!consumeCreatorSuccessorHandleAlias(rawHandle, wrapped)) {
+		try {
+			await Promise.resolve(rawHandle.deactivate());
+		} catch {
+			// Continue to release the sole writer lock and return a typed failure.
+		}
+		await lock?.release();
+		return failure("internal-invariant", "creator successor handle identity is unavailable");
+	}
 	activeOwners.set(topic, Object.freeze({ bindings, handle: wrapped }));
 	return success(material, wrapped);
 }
