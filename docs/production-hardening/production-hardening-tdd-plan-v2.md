@@ -58218,6 +58218,77 @@ Final D.107c RED verification commands and results were:
   `git diff --check`, exact roster and custody checks: pass. The 26 existing
   stashes and protected untracked paths remained untouched.
 
+D.107c GREEN is signed and pushed as `a3b61995`. Its corrected exact-nine
+packet used parent HEAD `55e61df07fed516986320a7bbd27e7d3e61dcd6d`, tree
+`e416fb31e7bba1d000dd3bfd23d4fc23c6f9061d`, patch object
+`95dcff632fe98d0141f3505b444559a3c0e78313` and SHA-256
+`d3d3f169d5b847a34e4bfff3e9c8dfd41ee12a80de7b4eaf499b3a4863b32da1`.
+Network now exposes only the registered connected-only dumb carrier; node owns
+the bounded all-peer query, common-QC/carrier/CutValue/trust verification,
+order-independent conflict barrier and strict restore; and the existing browser
+store owns the only mechanical peer persistence/serve path. Peer-only rows stay
+distinct from authored creator-close rows in the existing version-3 key space,
+so restored evidence cannot impersonate local finalized signing continuity.
+No schema/store/version, snapshot, signing, trust-advance, activation or D.107d
+owner changed.
+
+The sole D.107c GREEN review round was frozen before corrections at HEAD
+`55e61df07fed516986320a7bbd27e7d3e61dcd6d`, tree
+`83cd43ecd074a3253b0f0071698d82b989062d5f`, patch object
+`7bcf6cdd3e233ce784b2537f4935e8d43d85de08` and SHA-256
+`1e1e0a3d9bb1a539260a591d6a00be5114d484e95b8e17c9a3e07fb09488590d`.
+Grok is `NO_VERDICT`: its one read-only launch was canceled after 705 seconds
+without a terminal schema, and its public artifact contained only progress
+sentences; it was neither retried nor counted as approval. Kimi is also
+`NO_VERDICT`: its CLI rejected the incompatible `--prompt` plus `--plan` launch
+before model-session initialization, and the one-launch/no-retry rule was
+honored. Opus 5/xhigh session `77e1a242-1931-4774-8d8e-ce218a756825`
+returned `CHANGES_REQUIRED`, P0=1/P1=1. The P0 found that a peer-only write
+fabricated a local-incarnation `finalized` creator-close row and could therefore
+be misread as authored continuity. The P1 found that a non-identical carrier
+with otherwise identical QC/CutValue/trust fields could overwrite stored peer
+evidence. Same-round corrections store a minimal peer-only row, exclude such
+rows from the authored `readAll()` capability, and reject every non-identical
+stored peer carrier as `EVIDENCE_CONFLICT`. No confirmation review and no Fable
+review ran.
+
+Final D.107c GREEN verification commands and results were:
+
+- network, node and storage-browser package builds: pass; network and
+  storage-browser package typechecks: pass; node's source-only build: pass. The
+  node package-wide `tsc --noEmit` still reports only its pre-existing test
+  rootDir/worker-host, unreliable-WebRTC fixture and compact-history fixture
+  errors, with no `creator-seal` diagnostic;
+- focused D.107c Vitest: 8/8; focused D.107c Playwright: 6/6 across
+  Chromium/Firefox/WebKit; retained creator actor Vitest: 12/12; retained actor
+  Playwright: 12/12;
+- retained Phase-4 unit battery: 78/78, including the genuine fresh-process
+  64 MiB child; retained Phase-4c browser matrices: 18/18 plus 6/6;
+- retained Phase-5 unit battery: 61/61. Its first concurrent invocation passed
+  59 and hit only the 10-second default timeout in two independent real-checker
+  bootstrap cases; those two owners then passed 10/10 serially with the intended
+  30-second bound. Retained Phase-5c Playwright: 25 pass / 2 designed
+  non-Chromium death skips; retained Phase-5d Playwright: 24/24;
+- built subpath smoke: exact network runtime keys
+  `SEAL_EVIDENCE_PROTOCOL,createSealEvidenceProtocolPort`, exact node key
+  `recoverCreatorSealContinuity`, and exact registered protocol value: pass;
+- exact-nine Prettier, cached diff, roster and custody checks: pass; ESLint has
+  zero errors and changed code passes `--quiet`. The large retained network-node
+  owner still emits its 20 unrelated pre-existing JSDoc warnings under
+  `--max-warnings 0`; they are not represented as a clean warning count; and
+- the sampled older combined-generation/product-room battery passed 74/77.
+  Its three failures are pre-existing source-shape/private-WeakMap and active-
+  close expectations outside every D.107c owner. The old root product-room
+  Playwright launcher also remains unable to resolve bare `@ts-drp/canonical`
+  and finds no tests; that launcher does not use the repaired Phase-4c server.
+  Neither result is counted as D.107c approval or silently repaired here.
+
+The 26 existing stashes and all protected untracked paths remained untouched.
+Remaining D.107c debt is none inside the accepted slice: the exact carrier is
+durable before acknowledgement, fresh process death/reopen serves it, total
+creator loss stalls without peers, complete identical evidence restores, and
+valid conflict terminalizes without granting signing or activation authority.
+
 Product capability gained only after D.107d: the creator can seal one genuine
 live epoch, persist and publish its exact q=1 certificate and snapshot, survive
 mid-close crashes, recover same-seed signing continuity from durable peer
