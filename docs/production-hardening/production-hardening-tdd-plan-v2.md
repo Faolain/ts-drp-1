@@ -58502,3 +58502,314 @@ head awaiting adoption. Governance/security debt discharged: creator acting
 authority remains singleton-proven; one-signer certificates obey the common QC
 law; exact-slot/outbox ordering remains authoritative; trust and live evidence
 advance under one CAS; and the UI no longer self-asserts trust or recovery.
+
+## D.108 — Phase 6a verified creator-successor adoption
+
+Phase 6a starts with the creator-certified first successor and does not begin
+pruning. D.107d deliberately made the certified successor trust record,
+CutValue and commit QC durable while retaining the epoch-zero live projection;
+that head means **successor pending live adoption**, not an already active
+epoch one. D.108 advances the live epoch by installing one later generation in
+the same AHE object. It does not create a second trust store, a second current
+head, an in-place anchor field or a product-local consensus owner.
+
+This reconciles the older Phase-6 table language with the implemented handoff.
+For D.108, “a crash leaves the old anchor unchanged” means that the active live
+projection, journal scope, transport registration and issuing authority remain
+the closed epoch-zero ones until adoption commits. The topic string is the
+stable object/genesis rendezvous identity, not epoch authority, and does not
+change at adoption. The pending head may already
+contain the certified epoch-one trust and proof bytes from D.107d. A valid
+adoption replaces only the live projection and adds the exact recovery evidence
+described below; it does not vote again, recertify the cut or perform another
+trust advance.
+
+### D.108 common authority, evidence and transaction law
+
+All semantic work occurs before the authoritative transaction. The verifier
+starts from `recoverActiveGeneration`, the adopted generation record returned by
+that call, and immutable blobs loaded by its exact references. Neither a caller
+nor the product may nominate the trust ref, CutValue ref, commit-QC ref,
+predecessor head, snapshot digest, next anchor or current epoch. The owner
+classifies those values from exact canonical bytes and the active generation.
+It rejects duplicate roles, missing roles, unreferenced supplied bytes, mixed
+objects, same-epoch byte conflicts, rollback, an epoch gap and any ref whose
+length or `ts-drp-storage/blob/v1` digest does not match its bytes.
+
+The active pending generation's `baseExpectedHead` is the immediate live
+predecessor. Recovery finds that exact generation through the existing bounded
+`readGenerationPage` API, one bounded detached page at a time; it never requests
+or materializes a whole journal. Every link must decrement the head revision by
+one, name the same object, match the recorded generation and closure digests and
+have the expected `Superseded`/`Adopted` relationship. A missing, duplicate,
+cyclic, skipped or rewritten link is a closed verification failure. Starting
+from the pinned creator genesis, the owner opens only the genesis record with
+`openCurrentAnchorTrust`, then advances each recovered creator transition only
+with `openCreatorSuccessorTrust` and its exact CutValue and commit-QC bytes. It
+does not weaken the genesis-only opener, deserialize a capability, infer trust
+from a current record alone or add a production-relative import.
+
+For the first successor, the existing peer independently reconstructs the
+non-empty epoch-zero close set from the authenticated durable live journal and
+issuance records, repeats canonical ordering and blueprint fold, and derives the
+exact close-set and compact-history result. The result must equal the CutValue's
+`closeSetRoot`, `closeSetCount`, `previousHistoryRoot`,
+`previousHistorySize`, `historyRoot` and `historySize`. The verified compact
+accumulator snapshot is encoded in a new canonical successor projection kind,
+`v3-live-generation-2`; D.108 must not add fields to or reuse the
+`v3-live-generation-1` kind. Before D.108b RED freezes, its exact key set and
+canonical compact-accumulator representation must be recorded here and must
+bind the previous/current history roots and sizes. The next epoch recovers that
+state rather than incorrectly starting from an empty accumulator. A later
+transition must prove the recovered compact accumulator extends the anchor's
+committed prior root/size; D.108 may not enable a second close until that
+retained-state gate is green.
+
+The exact CutValue bytes must pass the registered v3 schema/domain, bind the
+predecessor object/epoch/anchor, previous cut and history, parameters,
+blueprint, ACL, state, archive root, availability-policy digest, next signer set
+and manifest digest. The commit QC must pass the existing current-anchor
+authority, signature, unique-signer/quorum, phase, proposal hash and round-free
+value-digest checks. The successor trust record and signed next anchor must be
+the deterministic result of that CutValue and predecessor anchor. Creator q=1
+remains honestly creator-certified and is not relabelled BFT.
+
+Snapshot bytes remain untrusted until the existing manifest decoder, chunk
+digest/size/contiguity checks and genuine quarantine receipt complete. The
+manifest must equal the CutValue manifest digest and bind its object, old epoch,
+old anchor, state and ACL. The exact payload is then imported through the
+already prepared trusted blueprint runtime; its payload, application-state, ACL,
+blueprint and archive-root checks must all agree with the manifest, CutValue and
+successor anchor. A QC alone cannot bless missing or corrupt snapshot bytes, and
+a valid snapshot cannot substitute for a missing or invalid QC/history proof.
+The AHE closure retains the exact manifest and verified state identities, not a
+claim that TTL-bound quarantine chunks are permanent. Activation requires a
+fresh valid quarantine scope; after expiry or cleanup, reopen remains honestly
+adopted-but-inactive, reacquires the exact manifest's chunks through the existing
+connected-only plane and repeats full verification before activation. If that
+law requires a new snapshot retention/promotion API rather than reacquisition,
+D.108b stops and reslices before RED instead of silently widening storage.
+
+Only after those independent checks may the node owner mint a module-private,
+one-use adoption intent bound to:
+
+- the exact pending `PresentHead` and its complete closure;
+- `(expectedEpoch, expectedAnchor, expectedCutValueDigest)` derived from the
+  verified predecessor and CutValue;
+- the exact successor trust, manifest, state, ACL, blueprint, parameters,
+  archive and compact-history identities; and
+- the exact candidate closure and freshly selected generation identity.
+
+Staging the candidate generation, caching new immutable blobs, promoting every
+reference and completing the candidate all happen before authority changes.
+The candidate replaces the predecessor live-projection ref with exactly one
+epoch-one live projection and retains the verified successor trust/CutValue/QC
+chain plus the exact snapshot manifest; the `v3-live-generation-2` projection
+is the single durable compact-history recovery carrier.
+It neither retains two current-live projections nor drops proof needed to reopen
+the current trust chain. The sole authoritative transaction is the existing
+strict `swapHead({expectedHead: pendingHead, ...})`. Because immutable closure
+verification binds the semantic tuple to `pendingHead`, this exact-head CAS is
+also the required CAS on `(expectedEpoch, expectedAnchor,
+expectedCutValueDigest)`; no callback, crypto, decode, snapshot read, network
+operation or mutable caller fact runs inside it.
+
+`HEAD_CONFLICT` is never last-writer-wins. A thrown or otherwise ambiguous swap
+is successful only if a fresh recovery observes the exact candidate generation,
+closure digest, revision and semantic tuple. An already active byte-identical
+successor is an idempotent result; another generation with a different closure,
+same-epoch different CutValue, stale predecessor or future epoch is a conflict.
+Incomplete candidates remain non-authoritative debris for later bounded cleanup.
+No activation, publication, current-epoch UI update or old-handle retirement is
+reported from request success or candidate completion.
+
+After exact CAS success/reopen, the owner consumes the verified snapshot and
+candidate capability to prepare, recover and activate epoch one. The new plane
+uses the successor anchor and epoch-one journal scope on the unchanged stable
+object/genesis topic; current epoch/anchor verification, not a new topic string,
+fences traffic. Issuance remains one epoch-free `(objectId, author)` lineage, so
+author sequence never resets at adoption. Before current-epoch publication, the
+new plane supplies the authenticated epoch-zero plane as the existing
+`displacedSource`, classifies every retained outbox row and proves no pending
+epoch-zero row is emitted as current. It imports the verified blueprint state
+before accepting an operation. The old epoch-zero handle and registration stay
+terminal. A reload at every staging/CAS/
+activation boundary must recover exactly one of two honest states: pending
+successor with no epoch-one effects, or the complete active epoch-one closure.
+If durable adoption committed but volatile activation did not, reopen resumes
+activation without another head swap. If adoption did not commit, reopen may
+retry from the unchanged pending head after re-verifying all evidence.
+
+### D.108a — epoch-general live substrate without adoption authority
+
+D.108a removes only the literal epoch-zero assumptions that would make a
+verified successor impossible to represent. `LiveJournalScope`, prepared/live
+descriptors, graph vertices, authorization scopes, snapshot import metadata,
+traffic classification and journal validation become safe-nonnegative-current-
+epoch owners while topic derivation remains stable over object plus genesis.
+Existing genesis preparation still admits only epoch zero, and no new public
+caller may choose an epoch: later values must come from a verified current
+trust/adoption capability. The issuance store remains unchanged and epoch-free
+over `(objectId, author)`; no issuance scope is installed and its monotonically
+increasing author sequence is not reset. Storage keys and wire records already
+containing `epoch` keep their existing formats; no schema, domain, digest,
+memory bound, chunk limit, trust profile or root export changes.
+
+The journal contract keeps `installGenesis` genesis-only. It adds one mechanical
+`installEpochAnchor` operation whose input is an exact canonical non-genesis
+anchor/signature/parameters carrier and whose output is only an idempotent
+durable journal scope. Like the existing journal store, it does not mint trust,
+adoption, signing or live authority; D.108d may call it only after consuming a
+genuine D.108c result. A raw caller can at most create unreferenced mechanical
+journal rows that no live owner accepts. Renaming or weakening
+`installGenesis`, accepting a nonzero epoch through that method, or teaching the
+journal to duplicate protocol-v3 certificate verification is forbidden.
+
+The D.108a tests-only RED is exactly five paths:
+
+- `tests/fixtures/phase-6a-v3/successor-epoch-contract.ts`;
+- `tests/phase-6a-creator-successor-epoch-red.test.ts`;
+- `packages/storage-browser/tests/assets/phase-6a-successor-epoch-entry.ts`;
+- `packages/storage-browser/tests/phase-6a-successor-epoch.pw.ts`; and
+- `packages/storage-browser/playwright.phase-6a-successor-epoch.config.ts`.
+
+It freezes epoch-zero preservation, hostile/noncanonical/safe-integer controls,
+Node/browser journal parity and an epoch-one representation oracle behind one
+composite readiness failure. The expected GREEN is exactly five paths:
+
+- `packages/live-journal/src/types.ts`;
+- `packages/live-journal/src/contract.ts`;
+- `packages/storage-node/src/live-journal.ts`;
+- `packages/storage-browser/src/live-journal.ts`; and
+- `packages/node/src/v3-live.ts`.
+
+Those owners may add the mechanical journal operation and generalize internal
+epoch-bearing types/validation, but they must not add the adoption binder,
+inspect a pending close, call `swapHead` or activate epoch one. Existing package
+exports already carry the changed interface/type, so no manifest, lockfile or
+root value export is expected. Any need for a store schema/version change,
+registered wire change, additional production path or new root product API
+stops and corrects the roster before the RED freezes.
+
+### D.108b — read-only external verification and one-use intent
+
+D.108b adds the pure/detached chain and adoption verifier plus the node
+composition that consumes a genuine sealed-live registration, durable journals,
+snapshot quarantine and trusted blueprint catalog. It performs every authority,
+CutValue/QC, proposal/value, close/history, manifest/payload, blueprint, archive
+and next-anchor check above and mints the one-use intent, but it performs zero
+AHE mutations and zero live/network effects. `packages/protocol-v3/src/creator-close.ts`
+remains the registered creator certificate owner;
+`packages/control-plane/src/creator-trust-advance.ts` remains the detached
+closure-transition owner; one new non-root node adoption composer owns their
+cross-package orchestration. No example or UI may consume it yet.
+
+RED must independently mutate every signed/bound field, swap the CutValue and QC
+between otherwise valid closes, use a prepare QC as commit, duplicate a signer,
+substitute the old or foreign snapshot, alter one post-close durable vertex,
+break canonical close order/history extension, use a valid artifact under the
+wrong blueprint/catalog, and provide a valid archive/state/ACL value under the
+wrong anchor. It must also prove all semantic checks finish before the intent is
+minted and that a forged, cloned, serialized, replayed, foreign-owner or
+already-consumed intent grants no authority.
+
+### D.108c — one-CAS durable adoption and death/reopen recovery
+
+D.108c is the only sub-slice allowed to stage and swap the successor live
+generation. Its node owner uses the D.108b intent, the existing strict
+`AheDurableStore` methods and no new transaction API. Unit and real
+SQLite/IndexedDB campaigns kill before and after every generation-cache,
+promotion, completion and head-swap request/transaction boundary. Each recovery
+must authenticate the complete active closure and report exactly pending-old or
+active-new; mixed live/trust evidence, publication before commit, a second swap,
+same-epoch equivocation and stale-head overwrite fail. The browser campaign runs
+Chromium, Firefox and WebKit for the ordinary matrix and preserves the existing
+native hard-kill distinction; graceful page closure is not labelled process
+death.
+
+D.108c still performs no transport subscription, issue, product/UI update or
+pruning. Its success is a durable prepared epoch-one capability plus exact
+reopen evidence. Storage source changes beyond an exact consumer of the existing
+bounded pages/generation/CAS contract, or any change to the storage transaction
+surface, stop and reslice.
+
+### D.108d — epoch-one activation and product proof
+
+D.108d consumes only a genuine D.108c durable result. It installs the epoch-one
+journal scope, imports the freshly verified snapshot, binds the next current-
+epoch author authority and activates one successor-authorized plane on the
+stable object/genesis topic. The epoch-free issuance lineage is reused only
+after the old plane is bound as `displacedSource`; the RED carries at least one
+pending epoch-zero outbox row across adoption and proves it is classified and
+never published as an epoch-one row. The product room and chat project the
+reopened epoch, anchor, lifecycle and creator-certified trust; they never derive
+those strings from caller DTOs. A genuine operation issued in epoch one reaches
+an existing peer and a fresh late peer, while the old handle/registration,
+stale author authority and pending-adoption capability remain terminal. Reload
+before and after volatile activation, duplicate activation, two-tab races and an
+activation failure after durable CAS must converge without a second adoption
+CAS.
+
+The complete retained Phase-4 snapshot suite, including the genuine fresh-
+process 64 MiB peak-live child, and every retained Phase-5 creator actor,
+re-learn, live-close and product-room gate stay enabled. D.108 does not waive
+the signed `<2x chunk-body` memory requirement, reduce a snapshot/chunk limit,
+change the snapshot wire format, alter digest ownership, prune a rollback
+generation or claim attested/delegated adoption. Phase 6b remains the first
+deletion owner.
+
+### D.108 TDD, review, verification and handoff
+
+Before each sub-slice RED, freeze its exact path roster, independent oracle,
+single composite readiness failure and expected GREEN owners in this section.
+Each sub-slice lands as a tests-only signed RED, receives one separate Grok/high,
+genuine Kimi K3 100-check and Opus/xhigh RED review, applies only reproduced
+same-round P0/P1 corrections without a confirmation review, then lands a
+separate GREEN and the corresponding one-round GREEN review. No Fable review
+runs without new express authorization.
+
+Every checkpoint records the authenticated parent/head/tree, exact roster,
+patch object and SHA-256, commands and results, review sessions/verdicts,
+same-round corrections, remaining P2/inherited debt and signed commit/push
+custody. Verification is proportionate but cumulative: focused Phase-6a unit
+and browser/death gates; protocol-v3, control-plane, live-journal, node and
+affected storage package build/typecheck; exact-owner ESLint, Prettier,
+`git diff --check`, export/alias/dependency audits; retained trust, generation
+recovery, snapshot transfer/activation, blueprint fold, creator close/actor/
+re-learn and product tests; and an isolated clean frozen install/build run so a
+source alias, stale `dist` file or local workspace state cannot mint a false
+success.
+
+Phase 6a closes only when a fresh process can recover the D.107d pending head,
+fully verify its exact certified close and snapshot from untrusted carriers,
+commit exactly one complete epoch-one live closure, recover it after every crash
+point, activate the genuine epoch-one room and issue/receive a real epoch-one
+operation with the old plane terminal. Only then may D.108 hand off to Phase 6b
+bounded pruning. Until then, the only honest product state after D.107d remains
+`successor-pending-adoption`.
+
+The D.108 plan review packet was frozen at parent HEAD
+`26cf0dfc991cb028594541d636255d61f5f14a40`, staged tree
+`2440afb2ae4871afe0723d97ae51c61f677e8cac`, patch object
+`2cdda487587c9556ef6c50bb51297e4eca52e4c4` and SHA-256
+`0e81260c8991c8dbbac7e9791913262087d664e61e7c30ee94a200514c6776c0`;
+its exact roster was this plan file only. Grok/high returned `NO_VERDICT` after
+45.011 seconds with exit code 1 and no public terminal review; its sole launch
+was not retried. Kimi K3 session
+`session_43718fc7-8fc2-45a0-a9b3-2d3657c47596` emitted exactly CHECK001 through
+CHECK100 and returned `ACCEPTED`, P0=0/P1=0/P2=0. Opus 5/xhigh session
+`422521a5-31b7-4c05-81c9-17b6f72ed4a8` returned `CHANGES_REQUIRED`,
+P0=0/P1=3/P2=4. Its reproduced P1 findings were that issuance is an epoch-free
+lineage whose pending old rows need an explicit displaced-source disposition,
+that no epoch-one issuance scope exists to install, and that compact-history
+state had no selected versioned durable representation. The same-round plan
+corrections above preserve the stable topic and issuance identities, require the
+existing displaced-source classifier with a pending-row RED, and allocate
+`v3-live-generation-2` as the single successor compact-history carrier. The
+reproduction also pinned TTL-expiry reacquisition before activation so a
+quarantine lease cannot become authority. Opus's four P2 observations remain
+recorded for the later exact sub-slice freezes: public naming of any new journal
+operation types, the two literal-zero backend statements and full epoch-one
+round trip, the NoHead terminal/request budget for history walking, and explicit
+reuse of `assertTrustPreserved` plus the current empty-accumulator close owner.
+No confirmation review and no Fable review ran.
