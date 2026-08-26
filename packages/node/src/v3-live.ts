@@ -57,6 +57,12 @@ import {
 import { type DRPNetworkNode, Message, MessageType, V3Envelope } from "@ts-drp/types";
 
 import { bindCreatorLiveClose } from "./creator-close.js";
+import {
+	type CreatorSuccessorGenerationMaterial,
+	type CreatorSuccessorLiveMaterial,
+	type CreatorSuccessorRuntimeBindings,
+	installCreatorSuccessorLive,
+} from "./internal/creator-successor-live.js";
 import { classifyV3EnvelopeScope } from "./v3-envelope-scope.js";
 import { consumeRecoveredV3LiveAuthority, installRecoveredV3LiveAuthority } from "./v3-live-recovered-authority.js";
 
@@ -335,7 +341,11 @@ interface V3CreatorCloseRegistration {
 	abortSnapshotStage(): boolean;
 	readonly currentTrust: CurrentAnchorTrust;
 	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
+	readonly exactCanonicalLatchedAclBytes: Uint8Array;
 	readonly exactCanonicalParametersBytes: Uint8Array;
+	readonly issuanceScope: DurableIssueScope;
+	readonly issuanceStore: DurableIssuanceStore;
+	readonly liveJournalStore: DurableLiveJournalStore;
 	readonly maxEpochBytes: number;
 	readonly maxEpochVertices: number;
 	readonly objectId: StorageObjectId;
@@ -782,6 +792,23 @@ interface AcceptedParameters {
 }
 
 const preparedV3LiveAuthority = new WeakMap<object, PreparedV3LivePayload>();
+const creatorSuccessorRecovery = new WeakMap<
+	object,
+	Readonly<{
+		readonly issuanceScope: DurableIssueScope;
+		readonly issuanceStore: DurableIssuanceStore;
+		readonly liveJournalStore: DurableLiveJournalStore;
+		readonly sourceCapability: PreparedV3Live;
+	}>
+>();
+const creatorSuccessorInitialState = new WeakMap<
+	object,
+	Readonly<{
+		readonly exactCanonicalPayloadBytes: Uint8Array;
+		readonly expectedApplicationStateDigest: string;
+		readonly expectedPayloadDigest: string;
+	}>
+>();
 
 function consumePreparedV3Live(capability: PreparedV3Live): PreparedV3LivePayload | undefined {
 	const payload = preparedV3LiveAuthority.get(capability);
@@ -1815,6 +1842,138 @@ function buildPreparedV3LiveMint(
 		vertices: input.vertices,
 	}) satisfies PreparedV3LivePayload;
 	return ObjectFreeze({ capability, descriptor, payload });
+}
+
+async function prepareExistingCreatorGeneration(
+	generation: CreatorSuccessorGenerationMaterial,
+	material: CreatorSuccessorLiveMaterial
+): Promise<PreparedV3Live | undefined> {
+	try {
+		const parsedObjectId = parseStorageObjectId(generation.head.objectId);
+		if (!parsedObjectId.ok || generation.trust.objectId !== parsedObjectId.value) return undefined;
+		const authenticated = authenticateCurrentEpochAnchor({
+			detachedSignature: generation.detachedAnchorSignature,
+			exactCanonicalAnchorPreimageBytes: generation.exactCanonicalAnchorPreimageBytes,
+			trust: generation.trust,
+		});
+		const provenance = snapshotAuthenticatedProvenance(authenticated, parsedObjectId.value);
+		if (
+			provenance === undefined ||
+			provenance.anchorDigest !== generation.trust.currentAnchorDigest ||
+			generation.trust.genesisAnchorDigest !== material.pinnedGenesisAnchorDigest
+		) {
+			return undefined;
+		}
+		const parameters = acceptedParameterDigest(
+			material.exactCanonicalParametersCarrierBytes,
+			provenance.parametersDigest
+		);
+		if (parameters === undefined) return undefined;
+		const resolved = material.catalog.resolve(provenance.blueprintDigest);
+		const catalog = snapshotCatalog(material.catalog, resolved);
+		if (catalog === undefined || catalog.blueprintDigest !== provenance.blueprintDigest) return undefined;
+		const admission = prepareBlueprintAdmission({
+			canonicalBlueprintPackageBytes: catalog.canonicalBlueprintPackageBytes,
+			expectedBlueprintDigest: provenance.blueprintDigest,
+		});
+		if (!admissionMatches(admission, provenance.blueprintDigest)) return undefined;
+		const runtime = await prepareBlueprintRuntime({
+			canonicalBlueprintPackageBytes: catalog.canonicalBlueprintPackageBytes,
+			exactArtifactBytes: catalog.exactArtifactBytes,
+			expectedBlueprintDigest: provenance.blueprintDigest,
+			preparedBlueprintAdmission: admission,
+		});
+		if (!runtimeMatches(runtime, catalog)) return undefined;
+		const projection = decodeCanonical(generation.exactCanonicalProjectionBytes);
+		if (!isObject(projection) || !sameBytes(encodeCanonical(projection), generation.exactCanonicalProjectionBytes)) {
+			return undefined;
+		}
+		const byteCharge = typedArrayByteLength(generation.exactCanonicalAnchorPreimageBytes);
+		const projectionDigestResult = digestBlob(generation.exactCanonicalProjectionBytes);
+		if (
+			byteCharge === undefined ||
+			byteCharge < 1 ||
+			!projectionDigestResult.ok ||
+			Reflect.get(projection, "kind") !== (provenance.epoch === 0 ? "v3-live-generation-1" : "v3-live-generation-2") ||
+			Reflect.get(projection, "objectId") !== provenance.objectId ||
+			Reflect.get(projection, "epoch") !== provenance.epoch ||
+			Reflect.get(projection, "anchorDigest") !== provenance.anchorDigest ||
+			Reflect.get(projection, "blueprintDigest") !== provenance.blueprintDigest ||
+			Reflect.get(projection, "parametersDigest") !== provenance.parametersDigest ||
+			Reflect.get(projection, "profileDigest") !== provenance.profileDigest ||
+			Reflect.get(projection, "signerSetDigest") !== provenance.signerSetDigest ||
+			Reflect.get(projection, "artifactDigest") !== catalog.artifactDigest ||
+			Reflect.get(projection, "artifactId") !== catalog.artifactId ||
+			Reflect.get(projection, "catalogDigest") !== catalog.catalogDigest ||
+			Reflect.get(projection, "runtimeProfile") !== catalog.runtimeProfile ||
+			Reflect.get(projection, "vertexCount") !== 1 ||
+			Reflect.get(projection, "byteCharge") !== byteCharge
+		) {
+			return undefined;
+		}
+		const liveStateRef = copiedGenerationRef(
+			projectionDigestResult.value,
+			generation.exactCanonicalProjectionBytes.byteLength
+		);
+		if (
+			liveStateRef === undefined ||
+			!generation.references.some(
+				(ref) => ref.digest === liveStateRef.digest && ref.byteLength === liveStateRef.byteLength
+			)
+		) {
+			return undefined;
+		}
+		const captured: CapturedInput = ObjectFreeze({
+			authenticationProfile: "creator-only",
+			catalog: material.catalog,
+			detachedSignature: new Uint8ArrayConstructor(generation.detachedAnchorSignature),
+			exactCanonicalAnchorPreimageBytes: new Uint8ArrayConstructor(generation.exactCanonicalAnchorPreimageBytes),
+			exactCanonicalParametersCarrierBytes: new Uint8ArrayConstructor(material.exactCanonicalParametersCarrierBytes),
+			objectId: parsedObjectId.value,
+			pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
+			store: material.store,
+		});
+		const dependencies = ObjectFreeze([]) as unknown as string[];
+		const vertex = ObjectFreeze({
+			dependencies,
+			epoch: provenance.epoch,
+			hash: provenance.anchorDigest,
+			kind: "drp-epoch-anchor" as const,
+			objectId: provenance.objectId,
+		});
+		const vertices = new IntrinsicMap<string, EpochVertex>([[provenance.anchorDigest, vertex]]);
+		const charges = new IntrinsicMap<string, number>([[provenance.anchorDigest, byteCharge]]);
+		const mint = buildPreparedV3LiveMint(
+			ObjectFreeze({
+				admission,
+				byteCharge,
+				captured,
+				catalog,
+				charges,
+				durableProjectionBytes: generation.exactCanonicalProjectionBytes,
+				liveStateRef,
+				order: ObjectFreeze([provenance.anchorDigest]),
+				parameters,
+				projectionDigest: projectionDigestResult.value,
+				proposedClosure: generation.references,
+				provenance,
+				runtime,
+				vertices,
+			}),
+			ObjectFreeze({
+				candidates: generation.candidates,
+				head: generation.head,
+				references: generation.references,
+				trust: generation.trust,
+				trustRef: generation.trustRef,
+			})
+		);
+		if (!("payload" in mint)) return undefined;
+		preparedV3LiveAuthority.set(mint.capability, mint.payload);
+		return mint.capability;
+	} catch {
+		return undefined;
+	}
 }
 
 type StagePreparedGenerationResult =
@@ -3754,6 +3913,8 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			snapshotRecoveryRecord(rawInput, LATCHED_RETAINED_BOOTSTRAP_RECOVERY_INPUT_KEYS);
 		const input = legacyInput ?? latchedInput;
 		if (input === undefined) return recoveryFailure("malformed-input", "v3 recovery input is invalid");
+		const successorRecovery = creatorSuccessorRecovery.get(input.capability as object);
+		if (successorRecovery !== undefined) creatorSuccessorRecovery.delete(input.capability as object);
 		const rawOperationAdmissionPolicy = Reflect.get(input, OPERATION_ADMISSION_POLICY_KEY);
 		const selectedOperationAdmissionPolicy = operationAdmissionPolicy(rawOperationAdmissionPolicy);
 		if (rawOperationAdmissionPolicy !== undefined && selectedOperationAdmissionPolicy === undefined) {
@@ -3855,6 +4016,19 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 					liveJournalStore: crossSource.liveJournalStore as DurableLiveJournalStore,
 					prepared: sourcePayload,
 				});
+			} else if (
+				successorRecovery !== undefined &&
+				latchedSource !== undefined &&
+				source.capability === successorRecovery.sourceCapability &&
+				successorRecovery.issuanceScope.objectId === sourcePayload.provenance.objectId
+			) {
+				displacedSource = ObjectFreeze({
+					authorization: sourceAuthorization,
+					issuanceScope: successorRecovery.issuanceScope,
+					issuanceStore: successorRecovery.issuanceStore,
+					liveJournalStore: successorRecovery.liveJournalStore,
+					prepared: sourcePayload,
+				});
 			} else {
 				displacedSource = ObjectFreeze({ authorization: sourceAuthorization, prepared: sourcePayload });
 			}
@@ -3865,7 +4039,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		const scope = liveJournalScope(payload);
 		let installed;
 		try {
-			installed = await journal.installGenesis({
+			installed = await (successorRecovery === undefined ? journal.installGenesis : journal.installEpochAnchor)({
 				detachedAnchorSignature: new Uint8ArrayConstructor(payload.input.detachedSignature),
 				exactCanonicalAnchorPreimageBytes: new Uint8ArrayConstructor(payload.input.exactCanonicalAnchorPreimageBytes),
 				exactCanonicalParametersCarrierBytes: new Uint8ArrayConstructor(
@@ -4368,13 +4542,18 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			}
 		}
 		if (
+			successorRecovery === undefined &&
 			!retainedBootstrapHold &&
 			currentRecordCount === 0 &&
 			(recoveredCount === 0 || (displacedSource !== undefined && displacedSource.activationVertexDigest === undefined))
 		) {
 			return recoveryFailure("issuance-rejected", "v3 recovery issued record chain is empty");
 		}
-		if (!retainedBootstrapHold && (recoveredCount === 0 || index.size !== preparedVertexCount + recoveredCount)) {
+		if (
+			successorRecovery === undefined &&
+			!retainedBootstrapHold &&
+			(recoveredCount === 0 || index.size !== preparedVertexCount + recoveredCount)
+		) {
 			return recoveryFailure("issuance-rejected", "v3 recovery requires a complete issued record chain");
 		}
 		const capability = ObjectFreeze({}) as RecoveredV3Live;
@@ -5877,6 +6056,41 @@ function importLiveSnapshotMachine(
 	}
 }
 
+function importCreatorSuccessorInitialMachine(
+	recovered: RecoveredV3LivePayload,
+	input: Readonly<{
+		readonly exactCanonicalPayloadBytes: Uint8Array;
+		readonly expectedApplicationStateDigest: string;
+		readonly expectedPayloadDigest: string;
+	}>
+): BlueprintStateMachine | undefined {
+	try {
+		if (
+			bytesToLowerHex(hashDomain("ts-drp/snapshot-payload/v3", input.exactCanonicalPayloadBytes)) !==
+			input.expectedPayloadDigest
+		) {
+			return undefined;
+		}
+		const decoded = decodeCanonical(input.exactCanonicalPayloadBytes);
+		if (!isObject(decoded) || !sameBytes(encodeCanonical(decoded), input.exactCanonicalPayloadBytes)) return undefined;
+		const exactCanonicalInitialStateBytes = encodeCanonical(Reflect.get(decoded, "application"));
+		if (
+			bytesToLowerHex(hashDomain("ts-drp/state/v3", exactCanonicalInitialStateBytes)) !==
+			input.expectedApplicationStateDigest
+		) {
+			return undefined;
+		}
+		return new BlueprintStateMachine({
+			exactCanonicalInitialStateBytes,
+			expectedBlueprintDigest: recovered.prepared.provenance.blueprintDigest,
+			expectedInitialStateDigest: input.expectedApplicationStateDigest,
+			preparedBlueprintRuntime: recovered.prepared.runtime,
+		});
+	} catch {
+		return undefined;
+	}
+}
+
 /**
  * Binds exact signed-genesis application state to one active recovered v3 plane.
  * @param rawInput - Closed plane and exact canonical state bytes.
@@ -5941,6 +6155,7 @@ function creatorCloseRegistration(registration: V3PlaneRegistration): V3CreatorC
 	if (
 		!currentRegistration(registration) ||
 		registration.mode !== "genesis-active" ||
+		registration.authorization.kind !== "latched-acl" ||
 		registration.terminalState !== "active" ||
 		registration.blueprintHandle === undefined ||
 		registration.payload.input.store.capabilities.durability !== "strict" ||
@@ -5972,9 +6187,13 @@ function creatorCloseRegistration(registration: V3PlaneRegistration): V3CreatorC
 		exactCanonicalAnchorPreimageBytes: new Uint8ArrayConstructor(
 			registration.payload.input.exactCanonicalAnchorPreimageBytes
 		),
+		exactCanonicalLatchedAclBytes: encodeCanonical(registration.authorization.value),
 		exactCanonicalParametersBytes: new Uint8ArrayConstructor(
 			registration.payload.input.exactCanonicalParametersCarrierBytes
 		),
+		issuanceScope: ObjectFreeze({ ...registration.issuanceScope }),
+		issuanceStore: registration.issuanceStore,
+		liveJournalStore: registration.liveJournalStore,
 		maxEpochBytes: registration.payload.parameters.maxEpochBytes,
 		maxEpochVertices: registration.payload.parameters.maxEpochVertices,
 		objectId: registration.payload.input.objectId,
@@ -6077,6 +6296,8 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 		if (input === undefined) return activationFailure("malformed-input", "v3 activation input is invalid");
 		const mode = snapshotInput === undefined ? "genesis-active" : "snapshot-closed";
 		const { capability, messageQueueManager, networkNode, onAdmittedVertex } = input;
+		const successorInitialState = creatorSuccessorInitialState.get(capability as object);
+		if (successorInitialState !== undefined) creatorSuccessorInitialState.delete(capability as object);
 		const recovered = consumeRecoveredV3Live(capability as RecoveredV3Live);
 		if (recovered === undefined) return activationFailure("capability-consumed", "v3 capability is unavailable");
 		const payload = recovered.prepared;
@@ -6095,8 +6316,13 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 		) {
 			return activationFailure("malformed-input", "v3 activation binding is invalid");
 		}
-		const snapshotMachine = mode === "snapshot-closed" ? importLiveSnapshotMachine(recovered, input) : undefined;
-		if (mode === "snapshot-closed" && snapshotMachine === undefined) {
+		const snapshotMachine =
+			mode === "snapshot-closed"
+				? importLiveSnapshotMachine(recovered, input)
+				: successorInitialState === undefined
+					? undefined
+					: importCreatorSuccessorInitialMachine(recovered, successorInitialState);
+		if ((mode === "snapshot-closed" || successorInitialState !== undefined) && snapshotMachine === undefined) {
 			return activationFailure("malformed-input", "v3 snapshot activation input is invalid");
 		}
 		const boundNetworkNode = networkNode as DRPNetworkNode;
@@ -6174,7 +6400,10 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 			}
 			networkSubscriptionAttempted = true;
 			try {
-				boundNetworkNode.subscribe(topic);
+				const subscription = boundNetworkNode.subscribe(topic);
+				if (subscription !== undefined && typeof Reflect.get(subscription as object, "then") === "function") {
+					void Promise.resolve(subscription).catch(() => undefined);
+				}
 			} catch {
 				return activationFailureAfterCleanup(
 					"subscribe-failed",
@@ -6240,7 +6469,7 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				gate: undefined,
 			};
 			registration.handle = makeV3PlaneHandle(registration);
-			if (mode === "snapshot-closed") registration.blueprintHandle = makeV3BlueprintLiveHandle(registration);
+			if (snapshotMachine !== undefined) registration.blueprintHandle = makeV3BlueprintLiveHandle(registration);
 			v3HandleRegistrations.set(registration.handle, registration);
 			registrations ??= new IntrinsicMap<string, V3PlaneRegistration>();
 			registrations.set(topic, registration);
@@ -6260,6 +6489,87 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 	} catch {
 		return activationFailure("internal-invariant", "v3 activation failed");
 	}
+}
+
+async function activateCreatorSuccessorLive(
+	material: CreatorSuccessorLiveMaterial,
+	bindings: CreatorSuccessorRuntimeBindings
+): Promise<
+	Readonly<
+		| { readonly handle: object; readonly ok: true }
+		| { readonly detail: string; readonly kind: string; readonly ok: false }
+	>
+> {
+	const rejected = (
+		kind: string,
+		detail: string
+	): Readonly<{ readonly detail: string; readonly kind: string; readonly ok: false }> =>
+		ObjectFreeze({ detail, kind, ok: false as const });
+	try {
+		const [predecessorValidation, predecessorSource, successor] = await Promise.all([
+			prepareExistingCreatorGeneration(material.predecessor, material),
+			prepareExistingCreatorGeneration(material.predecessor, material),
+			prepareExistingCreatorGeneration(material.successor, material),
+		]);
+		if (predecessorValidation === undefined || predecessorSource === undefined || successor === undefined) {
+			return rejected("preparation-rejected", "creator successor generation preparation failed");
+		}
+		const validatedPredecessor = await recoverV3LiveReplica({
+			capability: predecessorValidation,
+			exactCanonicalLatchedAclBytes: material.predecessorExactCanonicalLatchedAclBytes,
+			issuanceScope: material.issuanceScope,
+			issuanceStore: material.issuanceStore,
+			liveJournalStore: material.liveJournalStore,
+		});
+		if (!validatedPredecessor.ok) {
+			return rejected("recovery-rejected", `creator predecessor recovery failed: ${validatedPredecessor.kind}`);
+		}
+		if (consumeRecoveredV3Live(validatedPredecessor.capability) === undefined) {
+			return rejected("internal-invariant", "creator predecessor recovery custody failed");
+		}
+		creatorSuccessorRecovery.set(
+			successor,
+			ObjectFreeze({
+				issuanceScope: material.issuanceScope,
+				issuanceStore: material.issuanceStore,
+				liveJournalStore: material.liveJournalStore,
+				sourceCapability: predecessorSource,
+			})
+		);
+		const recovered = await recoverV3LiveReplica({
+			capability: successor,
+			displacedSource: ObjectFreeze({
+				capability: predecessorSource,
+				exactCanonicalLatchedAclBytes: material.predecessorExactCanonicalLatchedAclBytes,
+			}),
+			exactCanonicalLatchedAclBytes: material.exactCanonicalLatchedAclBytes,
+			issuanceScope: material.issuanceScope,
+			issuanceStore: material.issuanceStore,
+			liveJournalStore: material.liveJournalStore,
+		});
+		if (!recovered.ok) return rejected("recovery-rejected", `creator successor recovery failed: ${recovered.kind}`);
+		creatorSuccessorInitialState.set(
+			recovered.capability,
+			ObjectFreeze({
+				exactCanonicalPayloadBytes: new Uint8ArrayConstructor(material.exactCanonicalSnapshotPayloadBytes),
+				expectedApplicationStateDigest: material.stateDigest,
+				expectedPayloadDigest: material.snapshotPayloadDigest,
+			})
+		);
+		const activated = activateV3LivePlane({ capability: recovered.capability, ...bindings });
+		if (!activated.ok) return rejected("activation-rejected", `creator successor activation failed: ${activated.kind}`);
+		if (!material.terminalizeSource()) {
+			activated.handle.deactivate();
+			return rejected("source-unavailable", "creator predecessor could not be terminalized");
+		}
+		return ObjectFreeze({ handle: activated.handle, ok: true as const });
+	} catch {
+		return rejected("internal-invariant", "creator successor activation failed unexpectedly");
+	}
+}
+
+if (!installCreatorSuccessorLive(activateCreatorSuccessorLive)) {
+	throw new TypeError("creator successor live owner was already installed");
 }
 
 /**

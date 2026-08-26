@@ -7,6 +7,7 @@ import {
 } from "@ts-drp/compaction";
 import { createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
 import type { DurableIssuanceStore, DurableIssueCommit, DurableIssueScope } from "@ts-drp/issuance-store";
+import { createRecoverableFinalitySigner } from "@ts-drp/keychain/finality";
 import type {
 	DurableLiveJournalStore,
 	LiveJournalAcceptedRow,
@@ -27,13 +28,12 @@ import type {
 	SnapshotQuarantineStore,
 	SnapshotVerificationReceipt,
 } from "@ts-drp/storage/snapshot-transfer";
-import type { Message } from "@ts-drp/types";
+import type { DRPNetworkNode, Message } from "@ts-drp/types";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import type { TrustedBlueprintCatalog } from "../../../packages/blueprint-catalog/src/index.js";
-import { createRecoverableFinalitySigner } from "../../../packages/keychain/src/finality.js";
 import {
 	bindCreatorLiveClose,
 	type CreatorLiveCloseHandle,
@@ -49,9 +49,41 @@ import { createNodeDurableIssuanceStore } from "../../../packages/storage-node/s
 import { createNodeDurableLiveJournalStore } from "../../../packages/storage-node/src/live-journal.js";
 import { contract, hexBytes } from "../phase-3a0-v3/controlled-anchor-trust.js";
 import { createGenuinePreparedV3Fixture } from "../phase-3a1b-p3/live-fixture.js";
-import { fakeNetwork } from "../phase-4b-v3/live-snapshot.js";
 
 export const REPOSITORY_ROOT = resolve(import.meta.dirname, "../../..");
+
+function fakeNetwork(peerId: string): DRPNetworkNode {
+	const topics = new Set<string>();
+	return {
+		peerId,
+		membershipVerifier: undefined,
+		start: () => Promise.resolve(),
+		stop: () => Promise.resolve(),
+		restart: () => Promise.resolve(),
+		isDialable: () => Promise.resolve(true),
+		changeTopicScoreParams: () => undefined,
+		removeTopicScoreParams: () => undefined,
+		subscribe: (topic: string) => topics.add(topic),
+		unsubscribe: (topic: string) => topics.delete(topic),
+		connectToBootstraps: () => Promise.resolve(),
+		connect: () => Promise.resolve(),
+		disconnect: () => Promise.resolve(),
+		getPeerMultiaddrs: () => Promise.resolve([]),
+		getBootstrapNodes: () => [],
+		getSubscribedTopics: () => [...topics],
+		getMultiaddrs: () => ["/ip4/127.0.0.1/tcp/1"],
+		getAllPeers: () => [],
+		getGroupPeers: () => [],
+		broadcastMessage: () => Promise.resolve(),
+		publishMessage: () => Promise.resolve(true),
+		sendMessage: () => Promise.resolve(),
+		sendMessageToRandomPeer: () => Promise.resolve(),
+		sendGroupMessage: () => Promise.resolve(),
+		subscribeToMessageQueue: () => undefined,
+		onGroupPeerChange: () => () => undefined,
+		gossipTopicFor: () => undefined,
+	} as unknown as DRPNetworkNode;
+}
 
 export const D108B_RED_PATHS = Object.freeze([
 	"tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",

@@ -201,15 +201,18 @@ async function seedJournal(material, effects) {
 	}
 	return {
 		raw,
-		store: new Proxy(raw, {
-			get(target, property, receiver) {
-				if (property !== "installEpochAnchor") return Reflect.get(target, property, receiver);
-				return (...args) => {
-					effects.installEpochAnchorCount += 1;
-					return target.installEpochAnchor(...args);
-				};
-			},
-		}),
+		store: new Proxy(
+			{},
+			{
+				get(_target, property) {
+					if (property !== "installEpochAnchor") return Reflect.get(raw, property, raw);
+					return (...args) => {
+						effects.installEpochAnchorCount += 1;
+						return raw.installEpochAnchor(...args);
+					};
+				},
+			}
+		),
 	};
 }
 
@@ -233,43 +236,36 @@ async function seedSnapshot(material, events, effects) {
 	}
 	await persistedPort.discard();
 	await persistedScope.release();
-	const store = new Proxy(raw, {
-		get(target, property, receiver) {
-			if (property !== "openScope") return Reflect.get(target, property, receiver);
-			return async (...args) => {
-				effects.snapshotOpenCount += 1;
-				events.push("snapshot:open-scope");
-				const opened = await target.openScope(...args);
-				const quarantine = {
-					open(signal) {
-						events.push("snapshot:port-open");
-						const openedPort = opened.verificationQuarantine.open(signal);
-						return new Proxy(openedPort, {
-							get(portTarget, portProperty, portReceiver) {
-								if (portProperty !== "read") return Reflect.get(portTarget, portProperty, portReceiver);
-								return async (descriptor) => {
-									const bytes = await portTarget.read(descriptor);
-									events.push(`snapshot:read:${descriptor.index}`);
-									return bytes;
+	const store = new Proxy(
+		{},
+		{
+			get(_target, property) {
+				if (property !== "openScope") return Reflect.get(raw, property, raw);
+				return async (...args) => {
+					effects.snapshotOpenCount += 1;
+					events.push("snapshot:open-scope");
+					const opened = await raw.openScope(...args);
+					return new Proxy(
+						{},
+						{
+							get(_scopeTarget, scopeProperty) {
+								if (scopeProperty === "verificationQuarantine") return opened.verificationQuarantine;
+								if (scopeProperty !== "complete") return Reflect.get(opened, scopeProperty, opened);
+								return async (...completeArgs) => {
+									const completed = await opened.complete(...completeArgs);
+									for (const descriptor of material.snapshot.declaration.chunks) {
+										events.push(`snapshot:read:${descriptor.index}`);
+									}
+									events.push("snapshot:complete");
+									return completed;
 								};
 							},
-						});
-					},
+						}
+					);
 				};
-				return new Proxy(opened, {
-					get(scopeTarget, scopeProperty, scopeReceiver) {
-						if (scopeProperty === "verificationQuarantine") return quarantine;
-						if (scopeProperty !== "complete") return Reflect.get(scopeTarget, scopeProperty, scopeReceiver);
-						return async (...completeArgs) => {
-							const completed = await scopeTarget.complete(...completeArgs);
-							events.push("snapshot:complete");
-							return completed;
-						};
-					},
-				});
-			};
-		},
-	});
+			},
+		}
+	);
 	return { expiresAt, raw, store };
 }
 
@@ -329,7 +325,7 @@ async function cold(material, selectedMode) {
 					publicationCount: publications.length,
 					subscribeCount: events.filter((event) => event === "subscribe").length,
 				},
-				failure: { kind: result.kind, ok: false },
+				failure: { detail: result.detail, kind: result.kind, ok: false },
 				pid: process.pid,
 			};
 		}

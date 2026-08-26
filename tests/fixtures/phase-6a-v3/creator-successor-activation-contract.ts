@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import type { GenuineCreatorAdoptionFixture } from "./creator-adoption-contract.js";
+import { workspacePackageImportHook } from "../shared/workspace-package-subprocess.mjs";
 
 export const REPOSITORY_ROOT = resolve(import.meta.dirname, "../../..");
 
@@ -250,7 +251,23 @@ export function runD108d1ActivationChild(mode: D108d1ChildMode, input: unknown):
 			REPOSITORY_ROOT,
 			"packages/storage-node/tests/fixtures/phase-6a-creator-successor-activation-child.mjs"
 		);
-		const child = spawn(process.execPath, [childPath, mode], { stdio: ["ignore", "ignore", "pipe", "ipc"] });
+		const importHook = workspacePackageImportHook({
+			"@ts-drp/message-queue": resolve(REPOSITORY_ROOT, "packages/message-queue/dist/src/index.js"),
+			"@ts-drp/node/creator-adoption-activate": resolve(
+				REPOSITORY_ROOT,
+				"packages/node/dist/src/creator-adoption-activate.js"
+			),
+			"@ts-drp/storage-node": resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/index.js"),
+			"@ts-drp/storage-node/issuance": resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/issuance.js"),
+			"@ts-drp/storage-node/live-journal": resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/live-journal.js"),
+			"@ts-drp/storage-node/snapshot-transfer": resolve(
+				REPOSITORY_ROOT,
+				"packages/storage-node/dist/src/snapshot-transfer.js"
+			),
+		});
+		const child = spawn(process.execPath, [importHook, childPath, mode], {
+			stdio: ["ignore", "ignore", "pipe", "ipc"],
+		});
 		let observed: D108d1ChildMessage | undefined;
 		let stderr = "";
 		const timer = setTimeout(() => {

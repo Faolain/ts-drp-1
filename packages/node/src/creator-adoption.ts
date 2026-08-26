@@ -1,8 +1,11 @@
 import type { ResolvedBlueprintBytes, TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import type { CloseSetHistoryCommitment } from "@ts-drp/compaction";
+import { verifySnapshotStreamWithReceipt } from "@ts-drp/compaction/snapshot-quarantine-receipt";
 import { inspectCreatorTrustAdvance } from "@ts-drp/control-plane/creator-trust-advance";
-import type { CurrentAnchorTrust } from "@ts-drp/protocol-v3";
+import type { DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-store";
+import type { DurableLiveJournalStore } from "@ts-drp/live-journal";
+import { type CurrentAnchorTrust, openCurrentAnchorTrust } from "@ts-drp/protocol-v3";
 import { openCreatorSuccessorTrust } from "@ts-drp/protocol-v3/creator-close";
 import { decodeSnapshotManifest, snapshotChunkDigest } from "@ts-drp/protocol-v3/snapshot-transfer";
 import {
@@ -14,7 +17,9 @@ import {
 	type GenerationRecord,
 	type GenerationRef,
 	parseGenerationId,
+	parseStorageObjectId,
 	type PresentHead,
+	type StorageObjectId,
 } from "@ts-drp/storage";
 import type {
 	SnapshotQuarantineDeclaration,
@@ -28,6 +33,13 @@ import {
 	type CreatorAdoptionIntent,
 	resolveCreatorAdoptionFacts,
 } from "./internal/creator-adoption-intent.js";
+import {
+	type CreatorSuccessorLiveMaterial,
+	type CreatorSuccessorLiveSeed,
+	type CreatorSuccessorReopenInput,
+	type CreatorSuccessorReopenResult,
+	installCreatorSuccessorReopen,
+} from "./internal/creator-successor-live.js";
 
 const PROFILE = Object.freeze({
 	maxManifestBytes: 212_387,
@@ -58,13 +70,19 @@ interface SealedAdoptionFacts {
 	readonly currentReferences: readonly GenerationRef[];
 	readonly currentTrust: CurrentAnchorTrust;
 	readonly durableReplay: Readonly<{ verify(): Promise<boolean> }>;
+	readonly exactCanonicalLatchedAclBytes: Uint8Array;
+	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
 	readonly history: CloseSetHistoryCommitment;
+	readonly issuanceScope: DurableIssueScope;
+	readonly issuanceStore: DurableIssuanceStore;
+	readonly liveJournalStore: DurableLiveJournalStore;
 	readonly objectId: Parameters<AheDurableStore["recoverActiveGeneration"]>[0];
 	readonly proposedHead: PresentHead;
 	readonly proposedReferences: readonly GenerationRef[];
 	readonly snapshotDeclaration: SnapshotQuarantineDeclaration;
 	readonly snapshotStore: SnapshotQuarantineStore<SnapshotVerificationReceipt>;
 	readonly store: AheDurableStore;
+	terminalizeSource(): boolean;
 }
 
 interface RecoveredClosure {
@@ -81,12 +99,16 @@ interface VerifiedChain {
 		readonly runtimeProfile: string;
 	}>;
 	readonly currentAnchor: Readonly<Record<string, unknown>>;
+	readonly currentTrustRecord: Readonly<Record<string, unknown>>;
 	readonly cut: Readonly<Record<string, unknown>>;
 	readonly successorAnchor: Readonly<Record<string, unknown>>;
 	readonly successorAnchorBytes: Uint8Array;
+	readonly successorTrust: CurrentAnchorTrust;
+	readonly successorTrustRecord: Readonly<Record<string, unknown>>;
 }
 
 interface VerifiedSnapshot {
+	readonly exactCanonicalPayloadBytes: Uint8Array;
 	readonly manifest: Readonly<Record<string, unknown>>;
 	readonly payload: Readonly<Record<string, unknown>>;
 }
@@ -146,10 +168,14 @@ function hex(bytes: Uint8Array): string {
 	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
+	return left.byteLength === right.byteLength && left.every((byte, index) => byte === right[index]);
+}
+
 function canonicalRecord(bytes: Uint8Array): Readonly<Record<string, unknown>> | undefined {
 	try {
 		const decoded = decodeCanonical(bytes);
-		return record(decoded) && Buffer.from(encodeCanonical(decoded)).equals(bytes) ? decoded : undefined;
+		return record(decoded) && sameBytes(encodeCanonical(decoded), bytes) ? decoded : undefined;
 	} catch {
 		return undefined;
 	}
@@ -206,7 +232,7 @@ async function loadClosure(
 
 async function readGenerationLineage(
 	store: AheDurableStore,
-	objectId: SealedAdoptionFacts["objectId"]
+	objectId: StorageObjectId
 ): Promise<readonly GenerationRecord[] | undefined> {
 	const generations: GenerationRecord[] = [];
 	const seenCursors = new Set<GenerationPageCursor>();
@@ -230,21 +256,46 @@ async function recoverClosure(facts: SealedAdoptionFacts): Promise<RecoveredClos
 	const recovered = await facts.store.recoverActiveGeneration(facts.objectId);
 	if (!recovered.ok || recovered.value.kind !== "active") return undefined;
 	const active = recovered.value;
+	const pending = sameHead(active.head, facts.proposedHead);
+	const adopted =
+		!pending &&
+		active.head.objectId === facts.proposedHead.objectId &&
+		active.head.revision === facts.proposedHead.revision + 1 &&
+		active.adoptedGeneration.baseExpectedHead.kind === "present" &&
+		sameHead(active.adoptedGeneration.baseExpectedHead, facts.proposedHead);
+	if (!pending && !adopted) return undefined;
 	if (
-		!sameHead(active.head, facts.proposedHead) ||
-		active.references.length !== facts.proposedReferences.length ||
-		active.adoptedGeneration.closure.length !== facts.proposedReferences.length ||
-		!facts.proposedReferences.every((ref, index) => sameRef(ref, active.references[index] as GenerationRef)) ||
-		!facts.proposedReferences.every((ref, index) =>
-			sameRef(ref, active.adoptedGeneration.closure[index] as GenerationRef)
-		)
+		pending &&
+		(active.references.length !== facts.proposedReferences.length ||
+			active.adoptedGeneration.closure.length !== facts.proposedReferences.length ||
+			!facts.proposedReferences.every((ref, index) => sameRef(ref, active.references[index] as GenerationRef)) ||
+			!facts.proposedReferences.every((ref, index) =>
+				sameRef(ref, active.adoptedGeneration.closure[index] as GenerationRef)
+			))
 	) {
 		return undefined;
 	}
 	const closureDigest = digestClosure(active.references);
-	if (!closureDigest.ok || closureDigest.value !== facts.proposedHead.closureDigest) return undefined;
+	if (!closureDigest.ok || closureDigest.value !== active.head.closureDigest) return undefined;
 	const generations = await readGenerationLineage(facts.store, facts.objectId);
-	if (generations === undefined || !validGenerationLineage(generations, facts)) return undefined;
+	if (generations === undefined) return undefined;
+	if (pending && !validGenerationLineage(generations, facts)) return undefined;
+	if (adopted) {
+		const current = generations.find(({ generationId }) => generationId === facts.currentHead.generationId);
+		const proposed = generations.find(({ generationId }) => generationId === facts.proposedHead.generationId);
+		const successor = generations.find(({ generationId }) => generationId === active.head.generationId);
+		if (
+			current?.state !== "Superseded" ||
+			proposed?.state !== "Superseded" ||
+			successor?.state !== "Adopted" ||
+			proposed.baseExpectedHead.kind !== "present" ||
+			!sameHead(proposed.baseExpectedHead, facts.currentHead) ||
+			successor.baseExpectedHead.kind !== "present" ||
+			!sameHead(successor.baseExpectedHead, facts.proposedHead)
+		) {
+			return undefined;
+		}
+	}
 	const [currentCandidates, proposedCandidates] = await Promise.all([
 		loadClosure(facts.store, facts.currentReferences),
 		loadClosure(facts.store, facts.proposedReferences),
@@ -328,6 +379,7 @@ function verifyChain(facts: SealedAdoptionFacts, closure: RecoveredClosure): Ver
 	}
 	return Object.freeze({
 		currentAnchor,
+		currentTrustRecord,
 		currentCatalog: Object.freeze({
 			artifactDigest: currentProjection.artifactDigest,
 			artifactId: currentProjection.artifactId,
@@ -338,10 +390,15 @@ function verifyChain(facts: SealedAdoptionFacts, closure: RecoveredClosure): Ver
 		cut,
 		successorAnchor,
 		successorAnchorBytes,
+		successorTrust: opened.trust,
+		successorTrustRecord,
 	});
 }
 
-async function verifySnapshot(facts: SealedAdoptionFacts, chain: VerifiedChain): Promise<VerifiedSnapshot | undefined> {
+async function verifySnapshot(
+	facts: Pick<SealedAdoptionFacts, "snapshotDeclaration" | "snapshotStore">,
+	chain: VerifiedChain
+): Promise<VerifiedSnapshot | undefined> {
 	let scope: Awaited<ReturnType<SealedAdoptionFacts["snapshotStore"]["openScope"]>> | undefined;
 	let port: ReturnType<NonNullable<typeof scope>["verificationQuarantine"]["open"]> | undefined;
 	try {
@@ -353,17 +410,41 @@ async function verifySnapshot(facts: SealedAdoptionFacts, chain: VerifiedChain):
 		scope = await facts.snapshotStore.openScope(facts.snapshotDeclaration);
 		port = scope.verificationQuarantine.open(new AbortController().signal);
 		const chunks: Uint8Array[] = [];
-		for (const descriptor of decoded.chunks) {
-			const bytes = await port.read(descriptor);
+		const readChunk = async (descriptor: Readonly<{ readonly index: number }>): Promise<Uint8Array | undefined> => {
+			const selected = decoded.chunks[descriptor.index];
+			if (selected === undefined) return undefined;
+			const bytes = await port?.read(selected);
 			if (
 				bytes === undefined ||
-				bytes.byteLength !== descriptor.byteLength ||
-				snapshotChunkDigest(descriptor.index, bytes) !== descriptor.digest
+				bytes.byteLength !== selected.byteLength ||
+				snapshotChunkDigest(selected.index, bytes) !== selected.digest
 			) {
 				return undefined;
 			}
-			chunks.push(Uint8Array.from(bytes));
+			chunks[selected.index] = Uint8Array.from(bytes);
+			return bytes;
+		};
+		const status = await scope.status();
+		if (status.kind === "verified") {
+			for (const descriptor of decoded.chunks) {
+				if ((await readChunk(descriptor)) === undefined) return undefined;
+			}
+		} else {
+			const verified = verifySnapshotStreamWithReceipt({
+				exactCanonicalManifestBytes: facts.snapshotDeclaration.exactCanonicalManifestBytes,
+				expectedManifestDigest: facts.snapshotDeclaration.scope.manifestDigest,
+				expectedScope: facts.snapshotDeclaration.scope,
+				profile: PROFILE,
+				quarantine: scope.verificationQuarantine,
+				source: Object.freeze({ read: readChunk }),
+			});
+			await verified.completion;
+			await scope.complete(await verified.receipt);
 		}
+		for (const descriptor of decoded.chunks) {
+			if (chunks[descriptor.index] === undefined && (await readChunk(descriptor)) === undefined) return undefined;
+		}
+		if (chunks.length !== decoded.chunks.length || chunks.some((chunk) => chunk === undefined)) return undefined;
 		const payloadBytes = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.byteLength, 0));
 		let offset = 0;
 		for (const chunk of chunks) {
@@ -390,7 +471,7 @@ async function verifySnapshot(facts: SealedAdoptionFacts, chain: VerifiedChain):
 		) {
 			return undefined;
 		}
-		return Object.freeze({ manifest, payload });
+		return Object.freeze({ exactCanonicalPayloadBytes: payloadBytes, manifest, payload });
 	} catch {
 		return undefined;
 	} finally {
@@ -552,6 +633,93 @@ function successorCommitMaterial(
 	}
 }
 
+function creatorSuccessorLiveSeed(
+	facts: SealedAdoptionFacts,
+	closure: RecoveredClosure,
+	chain: VerifiedChain,
+	snapshot: VerifiedSnapshot,
+	resolved: ResolvedBlueprintBytes,
+	projected: Readonly<{ readonly bytes: Uint8Array; readonly descriptor: Readonly<Record<string, unknown>> }>,
+	commitMaterial: NonNullable<ReturnType<typeof successorCommitMaterial>>
+): CreatorSuccessorLiveSeed | undefined {
+	try {
+		const predecessorProjection = closure.currentCandidates.filter(
+			({ bytes, ref }) =>
+				canonicalRecord(bytes)?.kind === "v3-live-generation-1" && sameRef(ref, commitMaterial.predecessorLiveRef)
+		);
+		const exactCanonicalLatchedAclBytes = encodeCanonical(snapshot.payload.acl);
+		if (
+			predecessorProjection.length !== 1 ||
+			hex(hashDomain("ts-drp/latched-acl/v3", exactCanonicalLatchedAclBytes)) !== chain.successorAnchor.aclDigest ||
+			typeof snapshot.manifest.payloadDigest !== "string" ||
+			typeof snapshot.manifest.stateDigest !== "string" ||
+			!(chain.currentTrustRecord.detachedCurrentAnchorSignature instanceof Uint8Array) ||
+			!(chain.currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array) ||
+			!(chain.successorTrustRecord.detachedCurrentAnchorSignature instanceof Uint8Array)
+		) {
+			return undefined;
+		}
+		const projectionDigest = digestBlob(projected.bytes);
+		if (!projectionDigest.ok) return undefined;
+		const projectionRef = Object.freeze({ byteLength: projected.bytes.byteLength, digest: projectionDigest.value });
+		const successorCandidates = commitMaterial.candidateReferences.map((ref) => {
+			if (sameRef(ref, projectionRef)) return Object.freeze({ bytes: Uint8Array.from(projected.bytes), ref });
+			const candidate = closure.proposedCandidates.find((entry) => sameRef(entry.ref, ref));
+			if (candidate === undefined) throw new TypeError("creator successor candidate is unavailable");
+			return Object.freeze({ bytes: Uint8Array.from(candidate.bytes), ref: Object.freeze({ ...ref }) });
+		});
+		return Object.freeze({
+			catalog: factsForCatalog(resolved),
+			exactCanonicalLatchedAclBytes: Uint8Array.from(exactCanonicalLatchedAclBytes),
+			exactCanonicalParametersCarrierBytes: Uint8Array.from(facts.exactCanonicalParametersCarrierBytes),
+			exactCanonicalSnapshotPayloadBytes: Uint8Array.from(snapshot.exactCanonicalPayloadBytes),
+			issuanceScope: Object.freeze({ ...facts.issuanceScope }),
+			issuanceStore: facts.issuanceStore,
+			liveJournalStore: facts.liveJournalStore,
+			pinnedGenesisAnchorDigest: facts.currentTrust.genesisAnchorDigest,
+			predecessor: Object.freeze({
+				candidates: Object.freeze(closure.currentCandidates),
+				detachedAnchorSignature: Uint8Array.from(chain.currentTrustRecord.detachedCurrentAnchorSignature),
+				exactCanonicalAnchorPreimageBytes: Uint8Array.from(
+					chain.currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes
+				),
+				exactCanonicalProjectionBytes: Uint8Array.from(predecessorProjection[0]?.bytes as Uint8Array),
+				head: Object.freeze({ ...facts.currentHead }),
+				references: Object.freeze(facts.currentReferences.map((ref) => Object.freeze({ ...ref }))),
+				trust: facts.currentTrust,
+				trustRef: Object.freeze({ ...facts.closeResult.currentTrustRef }),
+			}),
+			predecessorExactCanonicalLatchedAclBytes: Uint8Array.from(facts.exactCanonicalLatchedAclBytes),
+			snapshotPayloadDigest: snapshot.manifest.payloadDigest,
+			stateDigest: snapshot.manifest.stateDigest,
+			store: facts.store,
+			successor: Object.freeze({
+				candidates: Object.freeze(successorCandidates),
+				detachedAnchorSignature: Uint8Array.from(chain.successorTrustRecord.detachedCurrentAnchorSignature),
+				exactCanonicalAnchorPreimageBytes: Uint8Array.from(chain.successorAnchorBytes),
+				exactCanonicalProjectionBytes: Uint8Array.from(projected.bytes),
+				references: Object.freeze(commitMaterial.candidateReferences.map((ref) => Object.freeze({ ...ref }))),
+				trust: chain.successorTrust,
+				trustRef: Object.freeze({ ...facts.closeResult.successorTrustRef }),
+			}),
+			terminalizeSource: facts.terminalizeSource,
+		});
+	} catch {
+		return undefined;
+	}
+}
+
+function factsForCatalog(resolved: ResolvedBlueprintBytes): TrustedBlueprintCatalog {
+	return Object.freeze({
+		blueprintDigests: Object.freeze([resolved.blueprintDigest]),
+		catalogDigest: resolved.evidence.catalogDigest,
+		resolve: (blueprintDigest: string) => {
+			if (blueprintDigest !== resolved.blueprintDigest) throw new TypeError("blueprint is not catalogued");
+			return resolved;
+		},
+	}) as TrustedBlueprintCatalog;
+}
+
 /**
  * Verifies a sealed creator close and mints one owner-bound, one-use successor-adoption intent.
  * @param input - Genuine sealed close handle and trusted blueprint catalog.
@@ -582,9 +750,12 @@ export async function verifyCreatorSuccessorAdoption(input: unknown): Promise<Ad
 		if (commitMaterial === undefined) {
 			return failure("internal-invariant", "creator successor commit material failed");
 		}
+		const activation = creatorSuccessorLiveSeed(facts, closure, chain, snapshot, resolved, projected, commitMaterial);
+		if (activation === undefined) return failure("internal-invariant", "creator successor activation material failed");
 		return Object.freeze({
 			descriptor: projected.descriptor,
 			intent: createCreatorAdoptionIntent(captured.handle, {
+				activation,
 				candidateReferences: commitMaterial.candidateReferences,
 				exactCanonicalProjectionBytes: projected.bytes,
 				generationId: commitMaterial.generationId,
@@ -597,4 +768,251 @@ export async function verifyCreatorSuccessorAdoption(input: unknown): Promise<Ad
 	} catch {
 		return failure("internal-invariant", "creator adoption verification failed unexpectedly");
 	}
+}
+
+function coldFailure(kind: string, detail: string): CreatorSuccessorReopenResult {
+	return Object.freeze({ detail, kind, ok: false as const });
+}
+
+function uniqueCandidateByKind(
+	candidates: readonly Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }>[],
+	kind: string
+):
+	| Readonly<{
+			readonly bytes: Uint8Array;
+			readonly record: Readonly<Record<string, unknown>>;
+			readonly ref: GenerationRef;
+	  }>
+	| undefined {
+	const matches = candidates.flatMap((candidate) => {
+		const decoded = canonicalRecord(candidate.bytes);
+		return decoded?.kind === kind ? [Object.freeze({ ...candidate, record: decoded })] : [];
+	});
+	return matches.length === 1 ? matches[0] : undefined;
+}
+
+function presentBase(generation: GenerationRecord): PresentHead | undefined {
+	return generation.baseExpectedHead.kind === "present" ? Object.freeze({ ...generation.baseExpectedHead }) : undefined;
+}
+
+async function successorIssuanceScope(
+	input: CreatorSuccessorReopenInput,
+	objectId: StorageObjectId,
+	exactCanonicalLatchedAclBytes: Uint8Array
+): Promise<DurableIssueScope | undefined> {
+	try {
+		const acl = canonicalRecord(exactCanonicalLatchedAclBytes);
+		if (acl?.objectId !== objectId || !Array.isArray(acl.members)) return undefined;
+		const writers = acl.members.flatMap((member) => {
+			if (!record(member) || typeof member.author !== "string" || !Array.isArray(member.groups)) return [];
+			return member.groups.includes("writer") ? [member.author] : [];
+		});
+		if (writers.length === 0 || new Set(writers).size !== writers.length) return undefined;
+		let selected: DurableIssueScope | undefined;
+		for (const author of writers) {
+			const scope = Object.freeze({ author, objectId });
+			const lineage = await input.issuanceStore.readLineage(scope);
+			if (lineage.next > 0) {
+				if (selected !== undefined) return undefined;
+				selected = scope;
+			}
+		}
+		return selected ?? (writers.length === 1 ? Object.freeze({ author: writers[0] as string, objectId }) : undefined);
+	} catch {
+		return undefined;
+	}
+}
+
+async function reopenCreatorSuccessorMaterial(
+	input: CreatorSuccessorReopenInput
+): Promise<CreatorSuccessorReopenResult> {
+	try {
+		const parsedObjectId = parseStorageObjectId(input.snapshotDeclaration.scope.objectId);
+		if (!parsedObjectId.ok) return coldFailure("chain-invalid", "creator successor object identity is invalid");
+		const objectId = parsedObjectId.value;
+		const recovered = await input.store.recoverActiveGeneration(objectId);
+		if (!recovered.ok || recovered.value.kind !== "active") {
+			return coldFailure("storage-failed", "creator successor durable generation is unavailable");
+		}
+		const active = recovered.value;
+		const proposedHead = presentBase(active.adoptedGeneration);
+		const lineage = await readGenerationLineage(input.store, objectId);
+		const proposedGeneration = lineage?.find((generation) => generation.generationId === proposedHead?.generationId);
+		const currentHead = proposedGeneration === undefined ? undefined : presentBase(proposedGeneration);
+		const currentGeneration = lineage?.find((generation) => generation.generationId === currentHead?.generationId);
+		if (
+			proposedHead === undefined ||
+			currentHead === undefined ||
+			proposedGeneration === undefined ||
+			currentGeneration === undefined ||
+			active.head.revision !== proposedHead.revision + 1 ||
+			proposedHead.revision !== currentHead.revision + 1 ||
+			!sameClosure(active.references, active.adoptedGeneration.closure)
+		) {
+			return coldFailure("chain-invalid", "creator successor generation lineage is invalid");
+		}
+		const [currentCandidates, proposedCandidates, activeCandidates] = await Promise.all([
+			loadClosure(input.store, currentGeneration.closure),
+			loadClosure(input.store, proposedGeneration.closure),
+			loadClosure(input.store, active.references),
+		]);
+		if (currentCandidates === undefined || proposedCandidates === undefined || activeCandidates === undefined) {
+			return coldFailure("storage-failed", "creator successor closure is unavailable");
+		}
+		const currentProjection = uniqueCandidateByKind(currentCandidates, "v3-live-generation-1");
+		const successorProjection = uniqueCandidateByKind(activeCandidates, "v3-live-generation-2");
+		const currentTrustCandidate = uniqueCandidateByKind(currentCandidates, "drp-anchor-trust-state");
+		const successorTrustCandidate = uniqueCandidateByKind(proposedCandidates, "drp-anchor-trust-state");
+		const cutCandidate = uniqueCandidateByKind(proposedCandidates, "drp-hard-epoch-cut");
+		if (
+			currentProjection === undefined ||
+			successorProjection === undefined ||
+			currentTrustCandidate === undefined ||
+			successorTrustCandidate === undefined ||
+			cutCandidate === undefined
+		) {
+			return coldFailure("chain-invalid", "creator successor authenticated closure is incomplete");
+		}
+		const openedCurrent = openCurrentAnchorTrust({
+			exactCanonicalTrustStateRecordBytes: currentTrustCandidate.bytes,
+			expectedObjectId: objectId,
+			pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
+		});
+		if (!openedCurrent.ok) return coldFailure("chain-invalid", "creator genesis trust is invalid");
+		const qcs = proposedCandidates.flatMap((candidate) =>
+			canonicalRecord(candidate.bytes)?.kind === "drp-seal-qc" ? [candidate] : []
+		);
+		const openedSuccessors = qcs.flatMap((candidate) => {
+			const opened = openCreatorSuccessorTrust({
+				currentTrust: openedCurrent.trust,
+				exactCanonicalCommitQcBytes: candidate.bytes,
+				exactCanonicalCutValueBytes: cutCandidate.bytes,
+				exactCanonicalTrustStateRecordBytes: successorTrustCandidate.bytes,
+			});
+			return opened.ok ? [Object.freeze({ qc: candidate, trust: opened.trust })] : [];
+		});
+		if (openedSuccessors.length !== 1) return coldFailure("chain-invalid", "creator successor QC is invalid");
+		const openedSuccessor = openedSuccessors[0] as (typeof openedSuccessors)[number];
+		if (
+			!inspectCreatorTrustAdvance({
+				current: { candidates: currentCandidates, closure: currentGeneration.closure },
+				proofRefs: [cutCandidate.ref, openedSuccessor.qc.ref],
+				proposed: { candidates: proposedCandidates, closure: proposedGeneration.closure },
+			}).ok
+		) {
+			return coldFailure("chain-invalid", "creator successor trust advance is invalid");
+		}
+		const currentTrustRecord = currentTrustCandidate.record;
+		const successorTrustRecord = successorTrustCandidate.record;
+		if (
+			!(currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array) ||
+			!(currentTrustRecord.detachedCurrentAnchorSignature instanceof Uint8Array) ||
+			!(successorTrustRecord.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array) ||
+			!(successorTrustRecord.detachedCurrentAnchorSignature instanceof Uint8Array) ||
+			!sameBytes(
+				input.exactCanonicalAnchorPreimageBytes,
+				currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes
+			) ||
+			!sameBytes(input.detachedSignature, currentTrustRecord.detachedCurrentAnchorSignature)
+		) {
+			return coldFailure("chain-invalid", "creator genesis carriers do not match durable trust");
+		}
+		const currentAnchor = canonicalRecord(currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes);
+		const successorAnchorBytes = Uint8Array.from(successorTrustRecord.exactCanonicalCurrentAnchorPreimageBytes);
+		const successorAnchor = canonicalRecord(successorAnchorBytes);
+		if (currentAnchor === undefined || successorAnchor === undefined) {
+			return coldFailure("chain-invalid", "creator anchor carriers are invalid");
+		}
+		const chain: VerifiedChain = Object.freeze({
+			currentAnchor,
+			currentCatalog: Object.freeze({
+				artifactDigest: String(currentProjection.record.artifactDigest),
+				artifactId: String(currentProjection.record.artifactId),
+				blueprintDigest: String(currentProjection.record.blueprintDigest),
+				catalogDigest: String(currentProjection.record.catalogDigest),
+				runtimeProfile: String(currentProjection.record.runtimeProfile),
+			}),
+			currentTrustRecord,
+			cut: cutCandidate.record,
+			successorAnchor,
+			successorAnchorBytes,
+			successorTrust: openedSuccessor.trust,
+			successorTrustRecord,
+		});
+		const snapshot = await verifySnapshot(input, chain);
+		if (snapshot === undefined) return coldFailure("snapshot-unavailable", "creator successor snapshot is unavailable");
+		const resolved = verifiedCatalog(input.catalog, snapshot.payload.blueprintDigest, chain.currentCatalog);
+		const manifestDigest = input.snapshotDeclaration.scope.manifestDigest;
+		if (
+			resolved === undefined ||
+			successorProjection.record.anchorDigest !== openedSuccessor.trust.currentAnchorDigest ||
+			successorProjection.record.epoch !== 1 ||
+			successorProjection.record.objectId !== objectId ||
+			successorProjection.record.blueprintDigest !== successorAnchor.blueprintDigest ||
+			successorProjection.record.parametersDigest !== successorAnchor.parametersDigest ||
+			successorProjection.record.snapshotManifestDigest !== manifestDigest ||
+			successorProjection.record.snapshotPayloadDigest !== snapshot.manifest.payloadDigest ||
+			successorProjection.record.stateDigest !== snapshot.manifest.stateDigest ||
+			hex(hashDomain("ts-drp/parameters/v3", input.exactCanonicalParametersCarrierBytes)) !==
+				successorAnchor.parametersDigest
+		) {
+			return coldFailure("chain-invalid", "creator successor projection is invalid");
+		}
+		const exactCanonicalLatchedAclBytes = encodeCanonical(snapshot.payload.acl);
+		const successorAcl = canonicalRecord(exactCanonicalLatchedAclBytes);
+		const predecessorExactCanonicalLatchedAclBytes =
+			successorAcl !== undefined && successorAcl.epoch === 1
+				? encodeCanonical({ ...successorAcl, epoch: 0 })
+				: undefined;
+		if (
+			predecessorExactCanonicalLatchedAclBytes === undefined ||
+			hex(hashDomain("ts-drp/latched-acl/v3", predecessorExactCanonicalLatchedAclBytes)) !== currentAnchor.aclDigest
+		) {
+			return coldFailure("chain-invalid", "creator predecessor ACL cannot be reconstructed");
+		}
+		const issuanceScope = await successorIssuanceScope(input, objectId, exactCanonicalLatchedAclBytes);
+		if (issuanceScope === undefined) return coldFailure("chain-invalid", "creator issuance authority is ambiguous");
+		const material: CreatorSuccessorLiveMaterial = Object.freeze({
+			catalog: factsForCatalog(resolved),
+			exactCanonicalLatchedAclBytes,
+			exactCanonicalParametersCarrierBytes: Uint8Array.from(input.exactCanonicalParametersCarrierBytes),
+			exactCanonicalSnapshotPayloadBytes: Uint8Array.from(snapshot.exactCanonicalPayloadBytes),
+			issuanceScope,
+			issuanceStore: input.issuanceStore,
+			liveJournalStore: input.liveJournalStore,
+			pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
+			predecessor: Object.freeze({
+				candidates: currentCandidates,
+				detachedAnchorSignature: Uint8Array.from(currentTrustRecord.detachedCurrentAnchorSignature),
+				exactCanonicalAnchorPreimageBytes: Uint8Array.from(currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes),
+				exactCanonicalProjectionBytes: Uint8Array.from(currentProjection.bytes),
+				head: currentHead,
+				references: Object.freeze(currentGeneration.closure.map((ref) => Object.freeze({ ...ref }))),
+				trust: openedCurrent.trust,
+				trustRef: Object.freeze({ ...currentTrustCandidate.ref }),
+			}),
+			predecessorExactCanonicalLatchedAclBytes,
+			snapshotPayloadDigest: String(snapshot.manifest.payloadDigest),
+			stateDigest: String(snapshot.manifest.stateDigest),
+			store: input.store,
+			successor: Object.freeze({
+				candidates: activeCandidates,
+				detachedAnchorSignature: Uint8Array.from(successorTrustRecord.detachedCurrentAnchorSignature),
+				exactCanonicalAnchorPreimageBytes: successorAnchorBytes,
+				exactCanonicalProjectionBytes: Uint8Array.from(successorProjection.bytes),
+				head: Object.freeze({ ...active.head }),
+				references: Object.freeze(active.references.map((ref) => Object.freeze({ ...ref }))),
+				trust: openedSuccessor.trust,
+				trustRef: Object.freeze({ ...successorTrustCandidate.ref }),
+			}),
+			terminalizeSource: () => true,
+		});
+		return Object.freeze({ material, ok: true as const });
+	} catch {
+		return coldFailure("internal-invariant", "creator successor reopen failed unexpectedly");
+	}
+}
+
+if (!installCreatorSuccessorReopen(reopenCreatorSuccessorMaterial)) {
+	throw new TypeError("creator successor reopen owner was already installed");
 }

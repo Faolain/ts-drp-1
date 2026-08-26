@@ -1,3 +1,5 @@
+import { reopenCreatorSuccessorAdoption } from "@ts-drp/node/creator-adoption-activate";
+
 import { createBrowserAheDurableStore } from "../../src/index.js";
 import { createBrowserDurableIssuanceStore } from "../../src/issuance.js";
 import { createBrowserDurableLiveJournalStore } from "../../src/live-journal.js";
@@ -5,11 +7,9 @@ import { createBrowserSnapshotQuarantineStore } from "../../src/snapshot-transfe
 
 type PlainRecord = Readonly<Record<string, unknown>>;
 type Closeable = Readonly<{ close(): Promise<void> }>;
-type ActivationSurface = Readonly<{
-	reopenCreatorSuccessorAdoption(input: unknown): Promise<PlainRecord>;
-}>;
 
 interface ContenderResult {
+	readonly detail?: string;
 	readonly epoch?: number;
 	readonly kind?: string;
 	readonly lockHeld: boolean;
@@ -51,11 +51,6 @@ class BrowserTestMessageQueueManager {
 	subscribe(queueId: string): void {
 		this.queues.add(queueId === "" ? "general" : queueId);
 	}
-}
-
-async function activationSurface(): Promise<ActivationSurface> {
-	const ownerName = "creator-adoption-activate";
-	return import(`../../../node/src/${ownerName}.js`) as Promise<ActivationSurface>;
 }
 
 function unpack(value: unknown): unknown {
@@ -311,7 +306,6 @@ async function openContender(databaseName: string, packedMaterial: unknown): Pro
 	const material = unpack(packedMaterial) as PlainRecord;
 	const stores = await openStores(databaseName);
 	const publications: unknown[] = [];
-	const { reopenCreatorSuccessorAdoption } = await activationSurface();
 	let verificationCount = 0;
 	const countedStore = new Proxy(stores.store, {
 		get(target, property, receiver): unknown {
@@ -343,6 +337,7 @@ async function openContender(databaseName: string, packedMaterial: unknown): Pro
 				stores.store.close(),
 			]);
 			return {
+				detail: String(result.detail),
 				kind: String(result.kind),
 				lockHeld: false,
 				ok: false,

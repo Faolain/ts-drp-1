@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 function deterministicEnvironment() {
 	const environment = {};
@@ -79,4 +79,35 @@ export function runWorkspacePackageSubprocess(input) {
 			maxBuffer: 1024 * 1024,
 		}
 	);
+}
+
+/**
+ * Creates a fresh-process Node import hook bound to exact freshly built files.
+ * @param expectedImports - Bare specifiers mapped to their exact built targets.
+ * @returns One `--import` argument that registers the closed resolver.
+ */
+export function workspacePackageImportHook(expectedImports) {
+	if (!plainRecord(expectedImports) || Object.keys(expectedImports).length === 0) {
+		throw new TypeError("workspace package import hook is malformed");
+	}
+	const resolved = {};
+	for (const [specifier, expectedPath] of Object.entries(expectedImports)) {
+		if (
+			typeof specifier !== "string" ||
+			specifier.length === 0 ||
+			typeof expectedPath !== "string" ||
+			expectedPath.length === 0 ||
+			readFileSync(expectedPath).byteLength === 0
+		) {
+			throw new TypeError(`workspace package import hook target is invalid for ${specifier}`);
+		}
+		resolved[specifier] = pathToFileURL(expectedPath).href;
+	}
+	const hookSource =
+		`const targets=${JSON.stringify(resolved)};` +
+		`export async function resolve(specifier,context,nextResolve){` +
+		`const target=targets[specifier];return target===undefined?nextResolve(specifier,context):{shortCircuit:true,url:target};}`;
+	const hookUrl = `data:text/javascript;base64,${Buffer.from(hookSource).toString("base64")}`;
+	const preloadSource = `import{register}from"node:module";register(${JSON.stringify(hookUrl)},import.meta.url);`;
+	return `--import=data:text/javascript;base64,${Buffer.from(preloadSource).toString("base64")}`;
 }

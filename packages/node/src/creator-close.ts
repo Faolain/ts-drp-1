@@ -6,7 +6,9 @@ import {
 } from "@ts-drp/compaction/snapshot-quarantine-receipt";
 import { inspectTrustClosure } from "@ts-drp/control-plane";
 import { inspectCreatorTrustAdvance } from "@ts-drp/control-plane/creator-trust-advance";
+import type { DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-store";
 import type { FinalitySigner } from "@ts-drp/keychain/finality";
+import type { DurableLiveJournalStore } from "@ts-drp/live-journal";
 import type { CurrentAnchorTrust } from "@ts-drp/protocol-v3";
 import { openCreatorSuccessorTrust, prepareCreatorClose } from "@ts-drp/protocol-v3/creator-close";
 import {
@@ -27,7 +29,7 @@ import {
 } from "@ts-drp/storage";
 import type { SnapshotQuarantineDeclaration, SnapshotQuarantineStore } from "@ts-drp/storage/snapshot-transfer";
 
-import { installCreatorAdoptionFacts } from "./internal/creator-adoption-intent.js";
+import { installCreatorAdoptionFacts, revokeCreatorAdoptionFacts } from "./internal/creator-adoption-intent.js";
 import type { V3PlaneHandle } from "./v3-live.js";
 
 const PROFILE: SnapshotTransferProfile = Object.freeze({
@@ -50,7 +52,7 @@ type CreatorTrustProjection = Readonly<{
 export type CreatorLiveCloseStatus = Readonly<{
 	closeAuthority: "available" | "unavailable";
 	continuity: "continuous" | "relearning" | "stalled";
-	lifecycle: "active" | "sealed" | "successor-pending-adoption";
+	lifecycle: "active" | "sealed" | "successor-adopted" | "successor-pending-adoption";
 	trust: CreatorTrustProjection;
 }>;
 
@@ -97,7 +99,11 @@ interface V3CreatorCloseRegistration {
 	abortSnapshotStage(): boolean;
 	readonly currentTrust: CurrentAnchorTrust;
 	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
+	readonly exactCanonicalLatchedAclBytes: Uint8Array;
 	readonly exactCanonicalParametersBytes: Uint8Array;
+	readonly issuanceScope: DurableIssueScope;
+	readonly issuanceStore: DurableIssuanceStore;
+	readonly liveJournalStore: DurableLiveJournalStore;
 	readonly maxEpochBytes: number;
 	readonly maxEpochVertices: number;
 	readonly objectId: Parameters<AheDurableStore["recoverActiveGeneration"]>[0];
@@ -130,13 +136,19 @@ interface CreatorAdoptionFacts {
 	readonly currentReferences: readonly GenerationRef[];
 	readonly currentTrust: CurrentAnchorTrust;
 	readonly durableReplay: Readonly<{ verify(): Promise<boolean> }>;
+	readonly exactCanonicalLatchedAclBytes: Uint8Array;
+	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
 	readonly history: Awaited<ReturnType<typeof deriveCloseSetHistoryCommitment>>;
+	readonly issuanceScope: DurableIssueScope;
+	readonly issuanceStore: DurableIssuanceStore;
+	readonly liveJournalStore: DurableLiveJournalStore;
 	readonly objectId: Parameters<AheDurableStore["recoverActiveGeneration"]>[0];
 	readonly proposedHead: PresentHead;
 	readonly proposedReferences: readonly GenerationRef[];
 	readonly snapshotDeclaration: SnapshotQuarantineDeclaration;
 	readonly snapshotStore: SnapshotQuarantineStore<SnapshotVerificationReceipt>;
 	readonly store: AheDurableStore;
+	terminalizeSource(): boolean;
 }
 
 function claimCreatorCloseRegistration(plane: V3PlaneHandle): V3CreatorCloseRegistration | undefined {
@@ -441,7 +453,12 @@ export async function bindCreatorLiveClose(
 		});
 		const handle: CreatorLiveCloseHandle = Object.freeze({
 			close: (): Promise<CreatorLiveCloseResult> => {
-				if (closeTask !== undefined || lifecycle === "successor-pending-adoption" || actor.status().terminal) {
+				if (
+					closeTask !== undefined ||
+					lifecycle === "successor-pending-adoption" ||
+					lifecycle === "successor-adopted" ||
+					actor.status().terminal
+				) {
 					return Promise.reject(new TypeError("creator close authority is unavailable"));
 				}
 				closeTask = (async (): Promise<CreatorLiveCloseResult> => {
@@ -585,13 +602,24 @@ export async function bindCreatorLiveClose(
 								currentReferences: Object.freeze(current.references.map(copiedRef)),
 								currentTrust: registration.currentTrust,
 								durableReplay,
+								exactCanonicalLatchedAclBytes: Uint8Array.from(registration.exactCanonicalLatchedAclBytes),
+								exactCanonicalParametersCarrierBytes: Uint8Array.from(registration.exactCanonicalParametersBytes),
 								history: commitment,
+								issuanceScope: Object.freeze({ ...registration.issuanceScope }),
+								issuanceStore: registration.issuanceStore,
+								liveJournalStore: registration.liveJournalStore,
 								objectId: registration.objectId,
 								proposedHead: Object.freeze({ ...proposedHead }),
 								proposedReferences: Object.freeze(proposed.map(copiedRef)),
 								snapshotDeclaration: persistedSnapshot.declaration,
 								snapshotStore: input.snapshotStore,
 								store: registration.store,
+								terminalizeSource: (): boolean => {
+									if (lifecycle !== "successor-pending-adoption") return false;
+									lifecycle = "successor-adopted";
+									revokeCreatorAdoptionFacts(handle);
+									return true;
+								},
 							}) satisfies CreatorAdoptionFacts
 						)
 					) {
@@ -618,12 +646,14 @@ export async function bindCreatorLiveClose(
 				const actorStatus = actor.status();
 				const continuity = actorStatus.terminal
 					? ("stalled" as const)
-					: lifecycle === "successor-pending-adoption" || actorStatus.phase === "empty"
+					: lifecycle === "successor-pending-adoption" ||
+						  lifecycle === "successor-adopted" ||
+						  actorStatus.phase === "empty"
 						? ("continuous" as const)
 						: ("relearning" as const);
 				return Object.freeze({
 					closeAuthority:
-						lifecycle === "successor-pending-adoption" || actorStatus.terminal
+						lifecycle === "successor-pending-adoption" || lifecycle === "successor-adopted" || actorStatus.terminal
 							? ("unavailable" as const)
 							: ("available" as const),
 					continuity,

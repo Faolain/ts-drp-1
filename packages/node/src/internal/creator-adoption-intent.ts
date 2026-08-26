@@ -1,10 +1,13 @@
 import { decodeCanonical } from "@ts-drp/canonical";
 import type { GenerationId, GenerationRef, PresentHead } from "@ts-drp/storage";
 
+import type { CreatorSuccessorLiveMaterial, CreatorSuccessorLiveSeed } from "./creator-successor-live.js";
+
 export type CreatorAdoptionIntent = Readonly<Record<never, never>>;
 export type PreparedCreatorSuccessorAdoption = Readonly<Record<never, never>>;
 
 export interface CreatorAdoptionIntentMaterial {
+	readonly activation: CreatorSuccessorLiveSeed;
 	readonly candidateReferences: readonly GenerationRef[];
 	readonly exactCanonicalProjectionBytes: Uint8Array;
 	readonly generationId: GenerationId;
@@ -14,6 +17,7 @@ export interface CreatorAdoptionIntentMaterial {
 }
 
 export interface PreparedCreatorSuccessorAdoptionMaterial {
+	readonly activation: CreatorSuccessorLiveMaterial;
 	readonly descriptor: Readonly<Record<string, unknown>>;
 	readonly exactCanonicalProjectionBytes: Uint8Array;
 	readonly head: PresentHead;
@@ -69,6 +73,15 @@ export function resolveCreatorAdoptionFacts<T extends object>(owner: object): T 
 }
 
 /**
+ * Revokes the predecessor's private verifier facts after successor activation.
+ * @param owner - Genuine sealed predecessor handle.
+ * @returns Whether private facts were present and revoked.
+ */
+export function revokeCreatorAdoptionFacts(owner: object): boolean {
+	return sealedFacts.delete(owner);
+}
+
+/**
  * Creates one opaque, owner-bound, destructively consumable adoption intent.
  * @param owner - Genuine close handle that owns consumption.
  * @param material - Detached verified successor projection.
@@ -83,6 +96,7 @@ export function createCreatorAdoptionIntent(
 		intent,
 		Object.freeze({
 			material: Object.freeze({
+				activation: material.activation,
 				candidateReferences: Object.freeze(material.candidateReferences.map(copiedRef)),
 				exactCanonicalProjectionBytes: Uint8Array.from(material.exactCanonicalProjectionBytes),
 				generationId: material.generationId,
@@ -111,6 +125,7 @@ export function consumeCreatorAdoptionIntent(
 	if (retained === undefined || retained.owner !== owner) return undefined;
 	custody.delete(intent);
 	return Object.freeze({
+		activation: retained.material.activation,
 		candidateReferences: Object.freeze(retained.material.candidateReferences.map(copiedRef)),
 		exactCanonicalProjectionBytes: Uint8Array.from(retained.material.exactCanonicalProjectionBytes),
 		generationId: retained.material.generationId,
@@ -135,6 +150,7 @@ export function createPreparedCreatorSuccessorAdoption(
 		capability,
 		Object.freeze({
 			material: Object.freeze({
+				activation: material.activation,
 				exactCanonicalProjectionBytes: Uint8Array.from(material.exactCanonicalProjectionBytes),
 				head: copiedHead(material.head),
 			}),
@@ -162,6 +178,7 @@ export function consumePreparedCreatorSuccessorAdoption(
 	preparedCustody.delete(capability);
 	const exactCanonicalProjectionBytes = Uint8Array.from(retained.material.exactCanonicalProjectionBytes);
 	return Object.freeze({
+		activation: retained.material.activation,
 		descriptor: decodedDescriptor(exactCanonicalProjectionBytes),
 		exactCanonicalProjectionBytes,
 		head: copiedHead(retained.material.head),

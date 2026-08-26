@@ -20,6 +20,7 @@ import {
 	type PreparedCreatorSuccessorAdoption,
 	resolveCreatorAdoptionFacts,
 } from "./internal/creator-adoption-intent.js";
+import { completeCreatorSuccessorLiveMaterial } from "./internal/creator-successor-live.js";
 
 type FailureKind =
 	| "malformed-input"
@@ -407,6 +408,7 @@ function success(
 ): CommitSuccess {
 	return Object.freeze({
 		capability: createPreparedCreatorSuccessorAdoption(handle, {
+			activation: completeCreatorSuccessorLiveMaterial(material.activation, head),
 			exactCanonicalProjectionBytes: material.exactCanonicalProjectionBytes,
 			head,
 		}),
