@@ -59606,11 +59606,18 @@ before RED.
 #### D.108d1a — successor handle registration-identity compatibility
 
 D.108d1a is the first blocking prerequisite discovered by the rejected D.108d2
-freeze. Its tests-only RED roster is exactly two new paths:
+freeze. Its corrected tests-only RED roster is exactly four paths: two new
+owners,
 
 - `tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts`;
   and
-- `tests/phase-6a-creator-successor-handle-identity-red.test.ts`.
+- `tests/phase-6a-creator-successor-handle-identity-red.test.ts`;
+
+plus the two retained cold-child owners that must add the cold-wrapper proof:
+
+- `packages/storage-node/tests/fixtures/phase-6a-creator-successor-activation-child.mjs`;
+  and
+- `packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts`.
 
 The expected GREEN roster is exactly three existing node owners:
 
@@ -59625,23 +59632,43 @@ that wrapper with the exact same current private registration and return no
 registration, raw handle or mutable authority. The activation owner must bind
 the alias before publishing success or installing it in `activeOwners`; alias
 failure deactivates the raw handle, releases the held lock and fails closed.
-Hot duplicate convergence continues to return the same wrapper.
+Hot duplicate convergence continues to return the same wrapper and remains
+proved by the retained D.108d1 selection; D.108d1a does not consume an extra hot
+capability to repeat that gate.
 
-The genuine behavior gate prepares two hot capabilities before the source
-becomes terminal, activates the first with one real network/queue binding and
-uses the returned public successor handle—not a captured raw handle—to prove:
+The genuine hot behavior gate activates one capability with one real network/
+queue binding and uses the returned public successor handle—not a captured raw
+handle—to issue one genuine epoch-one operation. It records the actual
+published V3 `Message`, then proves all of the following:
 
-- `routeV3RetainedIngress()` accepts one direct V3 envelope for the current
-  stable topic through the identity-keyed registration;
-- `republishV3RetainedTo()` targets one real connected peer and uses the same
-  retained-journal publication path;
-- awaited deactivation makes both identity-keyed operations fail closed; and
-- a second prepared capability can activate after release and its returned
-  handle independently passes the same identity checks.
+- a second independently signed, not-yet-admitted epoch-one envelope is routed
+  through `routeV3RetainedIngress()` for the current stable topic, and the gate
+  awaits the bound admitted-vertex sink plus the received journal row with the
+  exact independently derived vertex digest; the synchronous `true` return is
+  insufficient by itself;
+- `republishV3RetainedTo()` targets one peer present in the genuine network
+  roster, returns exact `kind: "published"` rather than `empty`, calls
+  `sendMessage()` for that exact peer and emits bytes that decode to the exact
+  canonical preimage/signature of the recorded accepted row; and
+- awaited deactivation makes both identity-keyed operations fail closed.
 
-The contract also pins one composite readiness failure, exact two-RED/three-
-GREEN rosters, no node-root or package-manifest export, no product consumer and
-no source-string-only substitute for the genuine behavior. GREEN runs the
+Hot reactivation is intentionally forbidden after the one-shot predecessor
+claim. The cold child then reopens the already adopted durable successor with
+the existing exact fourteen-key input, uses the returned cold wrapper for one
+genuine identity-keyed retained operation, awaits deactivation, cold-reopens
+again and independently repeats the identity check. It performs no second
+adoption CAS and never copies a hot prepared capability across the terminal
+claim.
+
+The contract pins one composite readiness failure. Every substantive behavior
+is skipped only by that same fact and must execute in GREEN; the readiness scan
+is never a substitute for the genuine hot and cold gates. It also pins exact
+four-RED/three-GREEN rosters, the unchanged exact `@ts-drp/node/v3-live` export
+roster, no node-root or package-manifest export and no product consumer. GREEN
+also runs the three retained exact-v3-live-surface owners
+`tests/phase-4b-v3-live-snapshot-composition-red.test.ts`,
+`tests/phase-3a1b-p3-live-transport-red.test.ts` and
+`tests/phase-3-exit-envelope-purity-red.test.ts`, plus the
 complete D.108b/D.108c/D.108d1 retained selection, the D.108d1 three-engine
 Web Lock matrix, affected node build/typecheck, exact-owner ESLint/Prettier/diff
 checks and the retained Phase-4c snapshot selection including the 64 MiB fresh
@@ -59649,6 +59676,47 @@ process. No wire, store, snapshot, issuance, journal, digest, ACL, topic, limit,
 memory, Web Lock policy, room/chat API or public package surface changes belong
 to D.108d1a. A need for a fourth production path stops and corrects this
 freeze before RED.
+
+The first D.108d1a plan-freeze review inspected immutable signed commit
+`f011b3510b5a4873f8690ba0715cb236e5b2b615`, parent
+`fc2dbeb979d79bbf3ad803844dc06fdb8a7d01e3`, tree
+`81b8851c7cffb1f8034d51cbdd9ffc7d430a153e`, stable patch id
+`8bb3169111e6ea64ab00e88ae722f18b73079f97` and staged-diff SHA-256
+`5487cd6ea7ffbc7a01c394e745bddf98384672001bb43d57a74d6c8ddd4eb9d1`.
+Grok/high completed its sole 680.223-second launch with exit code 0 and
+`stop_reason=end_turn`; the runner classified a terminal response and Grok
+returned `CHANGES_REQUIRED`, P0=0/P1=1/P2=2. Kimi CLI 0.38.0 used exact
+`kimi-code/k3` in session
+`session_cb7d40e4-add9-42d0-8e2e-1c851e0fd57b`. Its initial broad grep crossed
+the expressly protected `.logs/` path, so that process was safety-interrupted;
+the same conversation was resumed with exact-path reads only, all protected-
+path output was discarded, and it emitted CHECK001 through CHECK100 exactly
+once before `ACCEPTED`, P0=0/P1=0/P2=3. Opus/xhigh session
+`35aa8758-dcf4-4773-ba54-2726fe1ad58d` launched no subagent and returned a
+schema-valid `CHANGES_REQUIRED`, P0=1/P1=4/P2=5.
+
+The same round reproduced and corrected every material P0/P1. A second hot
+capability cannot survive the predecessor's one-shot terminal claim, so the
+post-release gate is now exact cold reopen without adding `creator-close.ts`.
+The hot retained path must prove asynchronous admission and a received journal
+row rather than only the route claim boolean. Targeted retained publication
+must contain a genuine row, return `published` and record exact sent envelope
+bytes rather than pass on `empty`. The existing cold child joins the RED roster
+so the cold wrapper cannot inherit the same identity defect unseen, and the
+three retained exact-v3-live-export tests now guard the promised public-surface
+containment.
+
+The nonblocking ledger remains explicit without confirmation: Grok records the
+adjacent D.108d2 wording, the not-yet-pinned bridge-specific readiness fact and
+the missing focused command. Kimi records the private bridge's additional
+fail-closed blueprint-binding blast radius and the unspecified existing failure
+kind. Opus additionally records the creator-close resolver's per-handle claim
+guard, the wrapper's async-deactivate type mismatch with public
+`V3PlaneHandle`, and the fact that alias failure after terminalization leaves
+cold reopen as the sole recovery. Those observations remain future hardening
+and test clarity, not permission to widen this GREEN. No reviewer changed the
+tracked tree, no confirmation review ran, and no Fable or collaboration
+subagent ran.
 
 #### D.108d2 — product and peer proof freeze boundary
 
