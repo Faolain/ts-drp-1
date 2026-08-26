@@ -59971,6 +59971,98 @@ D.108d1a acceptance defects. The exact three production owners remain
 unchanged, no reviewer modified the tracked tree, and no same-round confirmation
 or additional Fable review ran.
 
+#### D.108d1b — authenticated peer-local cold issuance custody
+
+D.108d1b closes the second blocking prerequisite discovered by the rejected
+D.108d2 freeze. Its tests-only RED roster is exactly seven paths. Two are new
+contract owners:
+
+- `tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts`; and
+- `tests/phase-6a-creator-successor-local-author-red.test.ts`.
+
+Five retained test-infrastructure owners must change because they mint the
+genuine multi-writer adoption fixture, pin the closed reopen surface or execute
+the built fresh-process proof:
+
+- `tests/fixtures/phase-6a-v3/creator-adoption-contract.ts`;
+- `tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts`;
+- `tests/phase-6a-creator-successor-activation-red.test.ts`;
+- `packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs`;
+  and
+- `packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts`.
+
+The GREEN production roster is exactly three existing owners:
+
+- `packages/node/src/creator-adoption-activate.ts`;
+- `packages/node/src/creator-adoption.ts`; and
+- `packages/node/src/internal/creator-successor-live.ts`.
+
+The closed cold-reopen input adds exactly the already-existing room fields
+`author` and `signRegisteredVertexDigest`. This is not a new room/chat field,
+key, signer, seed, callback or caller-selected authority: D.108d2 may pass only
+the `CreateV3RoomSessionInput.author` and `signRegisteredVertexDigest` values
+that already own ordinary local issue. The internal reopen carrier snapshots
+both values before its first await. No signer or signature is retained in the
+successor material, registration, store or success projection, and ordinary
+`issueLocal` still requires and verifies its own per-operation signing callback.
+
+The sole issuance selector in `creator-adoption.ts` must stop choosing whichever
+ACL writer happens to have a nonzero durable lineage. It opens the already
+authenticated epoch-one latched ACL, requires the captured lowercase 32-byte
+Ed25519 author to have current application-writer authority, and asks the
+captured signer exactly once to sign a fresh copy of the already authenticated
+32-byte successor current-anchor digest. It retains an independent digest copy
+across that await, accepts only a detached exact 64-byte ordinary
+`Uint8Array`, and verifies the tuple with the shipped strict protocol-v3
+Ed25519 verifier and the public key encoded by `author`. Throwing, rejecting,
+mutating, aliased, short, noncanonical or wrong-key signer results fail closed.
+The proof introduces no new digest domain and the identity signature is neither
+persisted nor published.
+
+Only after that authentication may the selector examine the genuine durable
+issuance store. The selected local scope is exactly `{ author, objectId }`; its
+lineage may be fresh (`next === 0`) or an established nonexhausted local
+lineage. Every other current ACL writer must have the exact fresh
+`{ exhausted: false, next: 0 }` lineage in this local store. A copied creator
+lineage, an arbitrary nonzero foreign writer, malformed/exhausted lineage or
+two nonzero writer lineages therefore rejects before successor material is
+constructed or v3 live subscription, queue creation or journal installation
+can begin. Zero lineages are no longer ambiguous because the authenticated
+local signer selects one writer; two candidate lineages are never accepted.
+
+The causal GREEN gate derives the actual eight-member V3 chat ACL and local
+Ed25519 identities from its shipped deterministic client seeds rather than
+inventing placeholder writer names. In one fresh built-package child it proves:
+
+1. an established non-creator peer with only its own local lineage cold-reopens
+   again and issues the next genuine epoch-one operation as itself;
+2. an independent fresh late peer with no copied creator or other-writer
+   issuance row cold-reopens and issues author sequence zero as itself; and
+3. copied creator custody, wrong-author/right-signer, right-author/wrong-signer,
+   two nonzero lineages, signer mutation/aliasing/throw/rejection and non-writer
+   identities all fail before every live effect.
+
+The child must use real SQLite issuance/journal/AHE/snapshot owners and the
+package-aware fresh-process launcher against freshly built exports. Its oracle
+asserts the authenticated author and author sequence in the issued canonical
+preimage, issued row, outbox row and accepted journal row; it also proves no
+foreign scope row was read as local custody. The retained D.108d1 cold/hot
+gates, D.108d1a identity gates, three-engine Web Lock matrix and complete
+Phase-4c selection including the real 64 MiB child remain mandatory. Affected
+node/storage-node builds and recorded baseline typechecks, exact-three
+production plus exact-seven RED ESLint/Prettier/diff checks, export/dependency
+audits and an isolated no-`dist` install/build/run close GREEN.
+
+No v3-live owner, package manifest, root export, room/chat source, keychain API,
+wire/store/snapshot schema, ACL member, issuance schema, digest owner, topic,
+limit, memory ceiling or Web Lock policy belongs to D.108d1b. A need for a
+fourth production owner or a new product authority stops this freeze and
+reslices before RED. D.108d1b must receive one immutable plan-freeze review,
+one tests-only RED review and one GREEN review under the same Grok-high,
+Kimi-K3 CHECK001-CHECK100 and Opus-5/xhigh protocol used by D.108d1a. Same-round
+P0/P1 findings are reproduced and corrected once; P2 findings are assigned
+without a confirmation rerun.
+
 #### D.108d2 — product and peer proof freeze boundary
 
 D.108d2 does not begin from the recorded D.108d1 GREEN alone. The first
@@ -60002,9 +60094,9 @@ the wrapped-handle identity item out of D.108e2; D.108d1b is the newly assigned
 owner for the cold issuance ambiguity. Neither may change a wire format,
 snapshot schema, ACL membership, issuance schema, digest owner, chunk limit,
 memory ceiling or room/chat API. Their exact RED/GREEN path rosters are
-separate freeze tasks; D.108d1a is now frozen immediately above, while
-D.108d1b remains unfrozen. The rejected D.108d2 freeze is not permission to
-edit node production sources opportunistically.
+separate freeze tasks; D.108d1a and D.108d1b are now frozen immediately above.
+The rejected D.108d2 freeze is not permission to edit node production sources
+opportunistically.
 
 After both prerequisites are green, the corrected D.108d2 tests-only RED roster
 must be exactly eleven paths. It contains the five new paths:
