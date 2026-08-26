@@ -198,6 +198,8 @@ export interface GenuineCreatorAdoptionFixture {
 		activeRefMutation?: "digest" | "length";
 		adoptionPhase: boolean;
 		aheMutationCount: number;
+		aheMutationHook?(observation: CreatorAdoptionAheMutationObservation): void;
+		readonly aheOperationCounts: Map<CreatorAdoptionAheMutationOperation, number>;
 		readonly blobOverrides: Map<string, Uint8Array>;
 		cutField?: (typeof CUT_VALUE_FIELDS)[number];
 		generationMutation?: "cycle" | "duplicate" | "missing" | "skipped";
@@ -210,6 +212,20 @@ export interface GenuineCreatorAdoptionFixture {
 	readonly journal: DurableLiveJournalStore;
 	readonly scope: LiveJournalScope;
 	close(): Promise<void>;
+}
+
+export type CreatorAdoptionAheMutationOperation =
+	| "beginGeneration"
+	| "completeGeneration"
+	| "discardGeneration"
+	| "promoteReference"
+	| "putCachedBlob"
+	| "swapHead";
+
+export interface CreatorAdoptionAheMutationObservation {
+	readonly edge: "after-request" | "before-request";
+	readonly occurrence: number;
+	readonly operation: CreatorAdoptionAheMutationOperation;
 }
 
 export interface DetachedHeadEvidence {
@@ -306,21 +322,22 @@ function decoratedAheStore(
 	backend: AheDurableStore,
 	controls: GenuineCreatorAdoptionFixture["controls"]
 ): AheDurableStore {
+	function mutate<T>(operation: CreatorAdoptionAheMutationOperation, request: () => Promise<T>): Promise<T> {
+		const occurrence = controls.aheOperationCounts.get(operation) ?? 0;
+		controls.aheOperationCounts.set(operation, occurrence + 1);
+		controls.aheMutationCount += 1;
+		controls.aheMutationHook?.(Object.freeze({ edge: "before-request", occurrence, operation }));
+		return request().then((result) => {
+			controls.aheMutationHook?.(Object.freeze({ edge: "after-request", occurrence, operation }));
+			return result;
+		});
+	}
 	return Object.freeze({
 		capabilities: backend.capabilities,
-		beginGeneration: (input) => {
-			controls.aheMutationCount += 1;
-			return backend.beginGeneration(input);
-		},
+		beginGeneration: (input) => mutate("beginGeneration", () => backend.beginGeneration(input)),
 		close: () => backend.close(),
-		completeGeneration: (input) => {
-			controls.aheMutationCount += 1;
-			return backend.completeGeneration(input);
-		},
-		discardGeneration: (input) => {
-			controls.aheMutationCount += 1;
-			return backend.discardGeneration(input);
-		},
+		completeGeneration: (input) => mutate("completeGeneration", () => backend.completeGeneration(input)),
+		discardGeneration: (input) => mutate("discardGeneration", () => backend.discardGeneration(input)),
 		getBlob: async (digest) => {
 			const result = await backend.getBlob(digest);
 			if (!result.ok || result.value === null) return result;
@@ -328,14 +345,8 @@ function decoratedAheStore(
 			if (override !== undefined) return Object.freeze({ ok: true as const, value: Uint8Array.from(override) });
 			return Object.freeze({ ok: true as const, value: mutatedCutBlob(result.value, controls.cutField) });
 		},
-		promoteReference: (input) => {
-			controls.aheMutationCount += 1;
-			return backend.promoteReference(input);
-		},
-		putCachedBlob: (input) => {
-			controls.aheMutationCount += 1;
-			return backend.putCachedBlob(input);
-		},
+		promoteReference: (input) => mutate("promoteReference", () => backend.promoteReference(input)),
+		putCachedBlob: (input) => mutate("putCachedBlob", () => backend.putCachedBlob(input)),
 		readGenerationPage: async (input) => {
 			const result = await backend.readGenerationPage(input);
 			if (!result.ok || controls.generationMutation === undefined || result.value.generations.length < 2) return result;
@@ -380,10 +391,7 @@ function decoratedAheStore(
 				}),
 			});
 		},
-		swapHead: (input) => {
-			controls.aheMutationCount += 1;
-			return backend.swapHead(input);
-		},
+		swapHead: (input) => mutate("swapHead", () => backend.swapHead(input)),
 	});
 }
 
@@ -743,6 +751,7 @@ export async function openGenuineCreatorAdoptionFixture(
 	const controls: GenuineCreatorAdoptionFixture["controls"] = {
 		adoptionPhase: false,
 		aheMutationCount: 0,
+		aheOperationCounts: new Map(),
 		blobOverrides: new Map(),
 		issuanceMissing: false,
 		mutateSnapshotChunk: false,
