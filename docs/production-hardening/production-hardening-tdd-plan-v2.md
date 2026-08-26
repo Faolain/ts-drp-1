@@ -59120,6 +59120,185 @@ reopen evidence. Storage source changes beyond an exact consumer of the existing
 bounded pages/generation/CAS contract, or any change to the storage transaction
 surface, stop and reslice.
 
+The D.108c public surface is one additive non-root node export,
+`@ts-drp/node/creator-adoption-commit`, whose sole runtime value export is
+`commitCreatorSuccessorAdoption`. Its exact closed input is `{handle, intent}`:
+the genuine D.107d sealed-close handle and the owner-bound D.108b intent. A raw
+store, object id, head, epoch, anchor, CutValue digest, closure, generation id or
+projection is never accepted from the caller. Success is the exact frozen shape
+`{capability, descriptor, head, lifecycle: "successor-prepared", ok: true,
+recovery}`, where `recovery` is exactly `"active-new"`, `descriptor` is the
+authenticated generation-2 projection descriptor, `head` is the recovered
+authoritative head and `capability` is a new opaque, module-custodied,
+destructively consumable `PreparedCreatorSuccessorAdoption`. It is not a
+`PreparedV3Live`, cannot activate anything and is reserved for D.108d. The exact
+failure vocabulary is `malformed-input`, `intent-unavailable`,
+`recovery-failed`, `chain-invalid`, `pending-old`, `stale-head`,
+`storage-failed` and `internal-invariant`; failures contain only
+`{detail, kind, ok: false}`. `pending-old` is the sole retryable failure and
+means that authenticated reopen found the unchanged sealed pending head;
+`stale-head` means a different authoritative closure and is never retried.
+
+D.108c may extend the private D.108b intent material, without changing the
+D.108b public verifier result, so the mint snapshots the pending head, its exact
+ordered closure, the one predecessor-live ref, the exact sorted candidate
+closure, a fresh 32-byte lower-hex generation id and detached generation-2
+projection bytes. The predecessor-live ref is independently classified from the
+authenticated pending/predecessor closures and canonical generation-1 bytes; it
+is not guessed by closure position. The candidate closure replaces that single
+ref with the generation-2 projection ref and retains every verified successor
+trust/CutValue/commit-QC recovery ref byte-for-byte. The exact manifest and
+payload identities live in the canonical generation-2 projection; no separate
+snapshot-manifest closure ref or second cache write is invented. The closure is
+strictly digest-sorted, has no duplicate digest and contains exactly one live
+projection. Creating multiple genuine intents may create multiple staged
+candidates, but the pending-head CAS authorizes at most one. A later active
+generation is idempotent `active-new` exactly when it has the same object,
+`Adopted` state, revision `pending.revision + 1`, candidate closure digest and
+per-ref byte equality against the intent's sorted candidate closure. Its
+generation id need not equal the retrying intent's fresh candidate id. A closure
+digest or per-ref mismatch at that revision is `stale-head` and never swapped
+again.
+
+The commit owner destructively consumes the intent before its first write, then
+reopens and authenticates the complete active generation and every referenced
+blob. Authentication means byte equality to the intent snapshot plus the
+genesis-anchored creator trust chain: the owner follows bounded
+`readGenerationPage` lineage to the superseded epoch-zero generation and loads
+its still-retained genesis trust ref with `getBlob`, then advances through the
+pending successor trust/CutValue/commit-QC evidence. D.108c neither prunes nor
+changes retention. It accepts exactly the sealed pending head or the
+already-active exact candidate closure under the generation-id-independent
+predicate above. The store and branded object id come only from
+`resolveCreatorAdoptionFacts(handle)` for the same owner that consumes the
+intent; they never enter the public input. From pending it calls, in order,
+`beginGeneration` with `baseExpectedHead` exactly equal to the sealed pending
+head, one
+`putCachedBlob` for the generation-2 projection, `promoteReference` once for
+every candidate ref in sorted order, `completeGeneration`, and exactly one
+`swapHead` with the sealed pending head as `expectedHead`. Every store result is
+closed-shape copied before use. No crypto, canonical decode, mutable caller read,
+snapshot read or network/product callback occurs inside any store transaction.
+After any rejected, thrown or ambiguous call, including `BASE_HEAD_MISMATCH` at
+begin, it performs a fresh authenticated reopen: only the unchanged sealed
+pending head is the retryable `pending-old` failure, only an exact complete
+candidate under the predicate above is `active-new`, and all other observations
+fail closed. `pending-old` never mints a capability. No result is published from
+candidate completion or from an unresolved swap request. The opaque success
+capability's WeakMap custody lives in the internal intent/capability module so a
+later D.108d internal consumer need not add another D.108c runtime export.
+
+The tests-only RED is exactly nine paths:
+
+- `tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts`;
+- `tests/phase-6a-creator-adoption-commit-red.test.ts`;
+- `packages/storage-node/tests/fixtures/phase-6a-creator-adoption-commit-child.mjs`;
+- `packages/storage-node/tests/phase-6a-creator-adoption-commit-death-red.test.ts`;
+- `packages/storage-browser/tests/assets/phase-6a-creator-adoption-commit-entry.ts`;
+- `packages/storage-browser/tests/process/phase-6a-creator-adoption-commit-child.ts`;
+- `packages/storage-browser/tests/phase-6a-creator-adoption-commit-global-setup.ts`;
+- `packages/storage-browser/tests/phase-6a-creator-adoption-commit.pw.ts`; and
+- `packages/storage-browser/playwright.phase-6a-creator-adoption-commit.config.ts`.
+
+The expected GREEN is exactly four paths:
+
+- `packages/node/src/creator-adoption-commit.ts`;
+- `packages/node/src/internal/creator-adoption-intent.ts`;
+- `packages/node/src/creator-adoption.ts`; and
+- `packages/node/package.json`, limited to the additive non-root export above.
+
+Any need to edit `v3-live.ts`, a storage package, a wire/schema/domain owner, a
+root export or a product owner stops and reslices before GREEN. The unit RED
+decorates the genuine D.108b store and enumerates `before-request`,
+`commit-then-throw` and `after-request` for begin, cache, every per-ref promotion,
+completion and swap. For every row it proves one-use intent custody, zero writes
+before consumption, no success before authenticated reopen, exact old XOR new,
+no mixed projection/trust closure, no second swap, stale-head rejection and
+same-epoch different-closure rejection. It also freezes the exact public keys,
+failure vocabulary, four-owner source roster and zero transport/issuance/
+activation calls.
+
+The real SQLite child uses the existing private expanded crash observer and a
+fresh file-backed strict store. The parent sends genuine fixture material, kills
+the process group with `SIGKILL` at `before-commit` and `after-commit` for each
+mutation operation (including every numbered promotion), then reopens in a
+fresh child and proves the authenticated terminal classification. Because the
+sealed handle and intent are deliberately process-local WeakMap capabilities,
+the fresh child applies a tests-only copy of the owner's exact terminal
+predicate—object, Adopted state, revision, closure digest and per-ref bytes—to
+the recorded candidate sentinel; it does not claim to call the dead process's
+commit capability. The browser
+ordinary campaign runs the same logical before/after-request and
+after-transaction-terminal matrix in Chromium, Firefox and WebKit against a
+fresh real IndexedDB database and persistent profile. Its tests-only bundle
+instruments native IDB request/transaction observations without changing the
+adapter. The native process-death campaign runs through the existing persistent-
+context process-group harness in Chromium, Firefox and WebKit, kills the
+detached browser process group only after the exact armed observation, verifies
+`SIGKILL`, and reopens the same profile/database in a new child; no engine row
+may silently skip. Graceful `page.close`,
+`context.close`, reload and worker termination remain ordinary lifecycle rows
+and are never presented as process death. Each real campaign requires the
+predecessor/candidate sentinel plus authenticated closure evidence and accepts
+only pending-old XOR active-new; unreferenced staged debris is permitted, mixed
+authority is not.
+
+The RED checkpoint runs the focused unit, Node-death and three-engine browser
+commands; exact-nine lint/format/diff checks; and one Grok/high, Kimi K3
+100-check and Opus 5/xhigh review against the frozen parent/tree/patch. The GREEN
+checkpoint repeats those commands plus the retained D.108b, D.107d close,
+Phase-4b live-snapshot and strict AHE SQLite/IndexedDB recovery suites; builds
+`@ts-drp/storage`, `@ts-drp/storage-node`, `@ts-drp/storage-browser` and
+`@ts-drp/node`; runs affected typechecks and exact-four lint/format/diff checks;
+and repeats the same three-review protocol once. Both checkpoints record exact
+commands, results, review sessions, reproduced P0/P1 corrections, remaining P2,
+commit/tree/patch custody, good signed-commit evidence and push status here.
+
+The D.108c capability intentionally does not survive process death: serialized
+authority is forbidden. The exact adopted active closure is the durable genuine
+D.108c result. D.108d owns the named fresh-process re-entry slice: starting only
+from the existing pinned creator-genesis preparation inputs and configured AHE,
+it re-runs the same genesis-anchored trust/CutValue/QC/generation-2 identity
+authentication, re-acquires and verifies the TTL-bound snapshot evidence, and
+mints the volatile activation capability without another head swap. It may not
+accept a caller-nominated current head, epoch, anchor, CutValue digest or
+closure. D.108d RED must kill after D.108c CAS and before volatile activation,
+discard every WeakMap capability, and prove this exact path; until that gate is
+green D.108c reports only durable successor preparation, never successful
+activation.
+
+The sole D.108c plan-freeze review packet used parent HEAD
+`7a8feb40e63abc04e08ace97db84d48233441a24`, staged tree
+`43aaa943841f49c5e794b96dd362d7aeaf0e1f07`, patch object
+`0580a6b48104b06610d719cdbbaebe9f897d9aa3` and patch SHA-256
+`ff07d1971a6dff19d3e0ae9159cc2bd009a10568ba9bfee2d9a2d727c213fd4c`.
+Exact-plan Prettier plus staged/unstaged `git diff --check` passed before
+custody. Grok/high reached `NO_VERDICT` after 450.223 seconds with exit code 1,
+`stop_reason=cancelled` and no valid terminal schema; its sole launch was not
+retried. Kimi Code 0.38.0 failed before creating an active model lifecycle or
+session with `Agent event 'agent.activity.updated' has no active lifecycle
+context`; no checks or verdict were produced and it was not retried. Opus 5 at
+xhigh session `2b8d18db-d5e5-40e9-a62d-cf57cf718941` returned
+`CHANGES_REQUIRED`, P0=1/P1=4/P2=4.
+
+Every reproduced finding was corrected in the same review round with no
+confirmation review. Exact active-new recovery is now independent of a retrying
+intent's fresh generation id and pins object/state/revision/closure digest plus
+per-ref bytes. The nonexistent snapshot-manifest closure ref was removed; its
+identities remain in generation-2 bytes. Authenticated reopen now walks bounded
+generation lineage to the retained genesis trust ref. `pending-old` is a named
+retryable failure distinct from stale equivocation. Process-local WeakMap loss
+is explicit: real death tests apply the exact terminal predicate to recorded
+sentinels, while D.108d owns genesis-pinned post-death capability re-derivation
+without another swap. The lower-severity corrections also pin
+`baseExpectedHead`, same-handle private store/object resolution and internal
+success-capability custody, all-three-engine native process death with no silent
+skip, and the separation between tests-only terminal authentication and the
+dead process's unavailable commit capability. The corrected plan packet before
+this evidence note is staged tree `9b1a78ac4d023cc58130cbda43e0e04c0249ac2f`,
+patch object `e8de39dcf11131476e5bde08587468ab95a584b0` and SHA-256
+`03dc9ab91ad8e643b95a2636e5c3e5a19cb0eacd8359b51d687f08f92b182ffb`.
+
 ### D.108d — epoch-one activation and product proof
 
 D.108d consumes only a genuine D.108c durable result. It installs the epoch-one
