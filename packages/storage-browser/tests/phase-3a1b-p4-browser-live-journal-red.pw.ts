@@ -78,7 +78,7 @@ test("routes all four shared pure decisions through the real Browser adapter bui
 	}
 });
 
-test("opens the exact five-method facade and native strict-IDB schema without touching primary", async ({ page }) => {
+test("opens the exact six-method facade and native strict-IDB schema without touching primary", async ({ page }) => {
 	const value = await runCase(page, "surface-schema");
 	expect(value.keys).toEqual([...P4_BROWSER_METHODS].sort());
 	expect(value.primaryCreated).toBe(false);

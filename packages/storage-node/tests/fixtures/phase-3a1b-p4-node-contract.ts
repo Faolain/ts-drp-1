@@ -1,6 +1,7 @@
 export const P4_NODE_METHODS = Object.freeze([
 	"appendAccepted",
 	"close",
+	"installEpochAnchor",
 	"installGenesis",
 	"readiness",
 	"readPage",

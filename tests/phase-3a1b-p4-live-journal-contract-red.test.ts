@@ -275,8 +275,15 @@ function expectedSingleReceivedSnapshot(): Readonly<Record<string, unknown>> {
 }
 
 describe("D.93.34 p4-a frozen shared contract", () => {
-	it("freezes the exact five methods, fifteen failures, three domains and closed input keys", () => {
-		expect(LIVE_JOURNAL_METHODS).toEqual(["appendAccepted", "close", "installGenesis", "readiness", "readPage"]);
+	it("freezes the exact six methods, fifteen failures, three domains and closed input keys", () => {
+		expect(LIVE_JOURNAL_METHODS).toEqual([
+			"appendAccepted",
+			"close",
+			"installEpochAnchor",
+			"installGenesis",
+			"readiness",
+			"readPage",
+		]);
 		expect(LIVE_JOURNAL_FAILURE_KINDS).toHaveLength(15);
 		expect(LIVE_JOURNAL_FAILURE_KINDS[0]).toBe("malformed-input");
 		expect(LIVE_JOURNAL_FAILURE_KINDS.at(-1)).toBe("internal-invariant");
@@ -394,7 +401,7 @@ describe("D.93.34 p4-a frozen shared contract", () => {
 		expect(result.status).toBe(0);
 	});
 
-	it("installs exact creator genesis and exposes only one frozen five-method capability", async () => {
+	it("installs exact creator genesis and exposes only one frozen six-method capability", async () => {
 		const store = await openCandidateStore();
 		try {
 			expect(Object.keys(store).sort()).toEqual([...LIVE_JOURNAL_METHODS].sort());

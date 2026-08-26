@@ -317,7 +317,7 @@ describe("D.93.34 p4-d parity and governance RED", () => {
 			expect(text).not.toMatch(/\b(?:LiveJournalBackend|createDurableLiveJournalStore)\b/u);
 		}
 		expect(sha256("packages/live-journal/dist/src/contract.d.ts")).toBe(
-			"a3f88546918b9e0cee4b809945cfcf9bfa36f07582014133739671a03e6f71e5"
+			"5faa4b32eb79e64aecf4d03a57dd366060714432c9f2086e4a1b5eed96441ec5"
 		);
 	});
 

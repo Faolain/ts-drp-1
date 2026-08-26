@@ -977,7 +977,7 @@ describe("D.93.34 p4-b Node strict live-journal RED", () => {
 		).toBe("14688ec0442cf331f329a5cb944bfa893f6a6ef08eeedd8bb6352651283d7211");
 	});
 
-	it("opens a genuine strict facade with five methods and an injective sidecar filename", async () => {
+	it("opens a genuine strict facade with six methods and an injective sidecar filename", async () => {
 		const { createNodeDurableLiveJournalStore } = await loadCandidate();
 		const primaryFilename = primary("surface");
 		const store = createNodeDurableLiveJournalStore({ primaryFilename });

@@ -221,14 +221,14 @@ export type V3AdmittedVertexSinkContract = (
 
 export interface V3PlaneHandleContract {
 	readonly objectId: string;
-	readonly epoch: 0;
+	readonly epoch: number;
 	readonly topic: string;
 	readonly queueId: string;
 	currentEphemeralAuthority():
 		| Readonly<{
 				readonly aclDigest: string;
 				readonly anchorDigest: string;
-				readonly epoch: 0;
+				readonly epoch: number;
 				readonly objectId: string;
 				isCurrentWriter(author: string): boolean;
 		  }>

@@ -62,7 +62,7 @@ type ExpectedTerminalDisposition = Readonly<{
 
 interface ExpectedHandle {
 	readonly objectId: string;
-	readonly epoch: 0;
+	readonly epoch: number;
 	readonly topic: string;
 	readonly queueId: string;
 	currentEphemeralAuthority(): ExpectedEphemeralAuthority | undefined;
@@ -154,7 +154,7 @@ type ExpectedRebaseOutboxResult =
 interface ExpectedEphemeralAuthority {
 	readonly aclDigest: string;
 	readonly anchorDigest: string;
-	readonly epoch: 0;
+	readonly epoch: number;
 	readonly objectId: string;
 	isCurrentWriter(author: string): boolean;
 }
@@ -326,7 +326,7 @@ declare const terminalDisposition: ExpectedTerminalDisposition;
 declare const localIssueInput: ExpectedLocalIssueInput;
 const handleShape: readonly [
 	string,
-	0,
+	number,
 	string,
 	string,
 	ExpectedEphemeralAuthority | undefined,

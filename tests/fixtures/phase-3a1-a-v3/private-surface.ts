@@ -41,7 +41,7 @@ type ExpectedFailureKind =
 
 type ExpectedDescriptor = Readonly<{
 	objectId: string;
-	epoch: 0;
+	epoch: number;
 	anchorDigest: string;
 	blueprintDigest: string;
 	parametersDigest: string;

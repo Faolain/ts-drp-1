@@ -1,6 +1,7 @@
 export const P4_BROWSER_METHODS = Object.freeze([
 	"appendAccepted",
 	"close",
+	"installEpochAnchor",
 	"installGenesis",
 	"readiness",
 	"readPage",

@@ -3,6 +3,7 @@ import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
 export const LIVE_JOURNAL_METHODS = Object.freeze([
 	"appendAccepted",
 	"close",
+	"installEpochAnchor",
 	"installGenesis",
 	"readiness",
 	"readPage",
