@@ -57435,3 +57435,381 @@ capability is still observation/model mode: a durable epoch-zero pacemaker and
 browser voter exist, but no live-room/network composition, certified adoption,
 pruning, or Phase-5 exit-metric claim is added. Phase 5e remains the next product
 slice.
+
+## D.107 — Phase 5e creator-certified close, durable recovery and first successor
+
+Phase 5e is the first acting seal composition. It is not a q=1 shortcut around
+the Phase-5 machinery. The creator closes one genuine live epoch through the
+same registered CutValue, proposal, vote and QC owners used by larger signer
+sets; stores the snapshot and every signing prerequisite before the first vote;
+publishes only exact durable evidence; and replaces trust and live evidence in
+one combined-generation CAS. The successful product state is **epoch 0 sealed,
+creator-certified successor pending adoption**. The old epoch-zero handle is
+terminal for writes. Activating the successor from snapshot evidence, changing
+the current live epoch and pruning the old graph remain Phase 6.
+
+The implementation is feasible only as a composition of the existing owners:
+
+- the node live-plane registration owns the authenticated graph, admission
+  fence, serialized task gate and genuine blueprint fold;
+- compaction owns close-set/history derivation and canonical snapshot payloads;
+- protocol-v3 owns all registered CutValue, proposal, vote, QC, anchor and
+  snapshot-manifest bytes and their domain hashes;
+- seal and the schema-v2 browser voter own durable anti-equivocation, complete
+  QC custody and post-commit carrier release;
+- snapshot quarantine/transfer owns durable chunk verification and connected-
+  only snapshot serving; and
+- the existing AHE combined-generation owner performs the sole authoritative
+  head CAS.
+
+No test fixture may substitute for any owner in that chain. In particular,
+fixture-authored CutValues, manifests or q=1 QCs are reference oracles only and
+cannot satisfy product readiness.
+
+### D.107 common creator authority and custody law
+
+The creator authority is distinct from the application-author identity even
+though both are recoverable from the configured `private_key_seed`. Keychain
+derives the creator authority Ed25519 seed under a separate fixed domain and
+exposes only its public key plus an opaque signer. New creator invites place
+that authority public key in the one-entry signer set and use it for the genesis
+anchor signature. The existing local-author key remains the vertex/ACL identity.
+Protocol-v3 mints separate fieldless, destructive-use requests for a registered
+seal digest and for the exact genesis-anchor digest; the same opaque creator
+signer consumes either request internally. The genesis request is bound to the
+exact creator profile, signer set, object and anchor preimage and cannot sign an
+arbitrary digest. No raw seed, private key, generic digest signer or
+caller-provided signer ID crosses the composition boundary.
+
+This is an intentional creator-profile specialization of the D.105 finality
+custody rule, not permission to reuse the application-author capability. A
+genuine singleton-minted `CurrentAnchorTrust` with exactly one authenticated
+signer and quorum one may open the same opaque `SealAuthority` used by certified
+profiles. A copied trust object, caller roster, caller quorum, public-key-only
+record or foreign key cannot. Delegated and attested seal authority remains
+epoch-zero-only until 5e2/5f; no creator change widens those capabilities.
+
+The frozen twelve-field, 8,192-byte `drp-anchor-trust-state` version-1 carrier
+remains the only scannable creator trust record. A successor uses those same
+fields to carry the certified current epoch, current anchor bytes/signature and
+unchanged creator profile/signer-set carriers. Exact CutValue and complete
+commit-QC bytes remain separate content-addressed refs in the same combined
+generation; they are not copied into or hidden behind a larger trust-record
+version. The legacy genesis opener remains genesis-only. The creator-close
+subpath opens a successor only after the unique v1 trust ref and the separate
+CutValue/commit-QC closure refs have been jointly verified, then mints
+`CurrentAnchorTrust` at the recorded safe-integer epoch through singleton-private
+custody. The first successor obeys the standing advancement law: same object,
+`epoch=current+1`, `previousAnchor=currentAnchorDigest`, exact CutValue digest,
+unchanged blueprint/parameters/profile/signer-set, and state/ACL/history/archive
+fields derived from the exact certified close. Byte-identical current evidence
+is replay; same epoch/different anchor is equivocation; a lower epoch is
+rollback; a higher non-successor is an epoch gap. None writes or mints trust.
+
+The creator close uses the existing initial availability policy, encoded and
+hashed canonically rather than represented by a zero digest:
+
+```text
+mode: local-only
+minRollbackGenerations: 2
+minLocalCopies: 1
+minMirrorReceipts: 0
+```
+
+Phase 5e verifies and binds this policy but does not yet enforce archival or
+pruning consequences; those remain Phase 7 and Phase 6 respectively.
+
+### D.107 close candidate and q=1 certificate sequence
+
+One receiver-bound node operation synchronously closes application admission,
+drains tasks already admitted through the live registration gate and captures
+one graph version. From that same capture it derives, without caller summaries:
+
+1. the authenticated frontier, canonical-preimage byte charges and deterministic
+   close-set/history commitment;
+2. the adopted blueprint state and exact next ACL bytes;
+3. the exact snapshot payload, payload digest, chunks, chunk digests, manifest
+   bytes and manifest digest;
+4. the unchanged signer set, profile and accepted parameters;
+5. the availability-policy digest; and
+6. the exact canonical CutValue.
+
+Authenticated received vertex byte lengths must survive into the close capture;
+re-encoding vertices to recreate byte charges is forbidden. Snapshot chunks and
+manifest are stored in durable quarantine and reverified through the standing
+receipt path before any signing request is minted. The exact close candidate is
+also content-addressed durably before the first signature so a crash never leaves
+a vote digest without the CutValue/snapshot evidence required to resume it.
+
+At q=1 the protocol still executes both phases:
+
+```text
+durable prepare slot/outbox
+  -> exact one-vote prepare QC through the shared QC builder/verifier
+  -> durable complete prepare-QC state
+  -> durable commit slot/outbox
+  -> exact one-vote commit QC through the same builder/verifier
+  -> durable complete finalized-QC state
+```
+
+The QC builder accepts only one genuine already-durable carrier, authors the
+registered `sealQC` record and immediately proves it through `verifySealQC`.
+There is no creator-only verifier, one-signature anchor shortcut, caller
+`valid` flag or digest-only finality. Publication of a vote, QC, manifest or
+close certificate is impossible before the corresponding durable completion.
+
+### D.107 storage-loss detection and peer re-learn
+
+The browser database cannot distinguish first installation from complete origin
+deletion by itself: deletion destroys both the vote log and its incarnation.
+Phase 5e therefore does not trust a caller `fresh`, `storageLost`, `relearned` or
+`highestQc` fact. A one-use process-local capability created while authoring a
+brand-new room may initialize an empty creator signer exactly once. Every later
+creator start must either reopen complete local continuity or enter
+`relearn-required`; an empty/recreated/partial signer store is never silently
+fresh.
+
+A recovering q=1 creator snapshots all currently connected authenticated room
+peers, queries each under a fixed bound, and refuses every signing transition
+until the query settles. Each response contains exact registered evidence, not
+a summary: the creator's own signed carrier, complete QC, CutValue and the
+snapshot/anchor bindings necessary to validate and resume the close. The
+recoverer verifies the signature against its genuine authority, uses the common
+QC verifier, rejects foreign tuples, and restores complete lock/finality/intent
+custody. Two different values for one creator-signed slot or two conflicting
+commit QCs terminalize as equivocation; arrival order or lexical value order
+never chooses a winner. Zero authenticated responses after detected loss means
+**stalled**, not an inferred empty history. This preserves the Phase-5 table's
+honest partial-delivery risk instead of converting unreachable evidence into a
+double-signing path.
+
+Peers persist verified q=1 evidence before acknowledging or relaying it. The
+primary browser database advances to a new additive schema version with one
+mechanical seal-evidence store; the existing four-store strict vote transaction
+and its key/store roster remain byte-for-byte unchanged. Evidence persistence
+does not authorize signing or adoption. Snapshot bodies continue over the
+existing connected-only/no-dial snapshot protocol; the seal sidecar carries
+bounded exact registered evidence and authenticated query/response control
+frames only. A receiving peer may retain and serve the evidence but cannot
+advance its trust head before Phase 6 verification/adoption.
+
+### D.107a — pure creator-close law and certificate evidence
+
+D.107a is effect-free. Its tests independently derive a nontrivial raw close
+set and history extension, mutate one post-signing vertex, differentially build
+snapshot chunks/manifest, derive every CutValue field, form q=1 prepare and
+commit QCs, and verify the successor trust chain. It also pins the distinction
+between creator-authority and application-author keys and proves the trust label
+is derived from a genuine reopened profile.
+
+The tests-only RED is exactly three paths:
+
+- `tests/fixtures/phase-5e-v3/creator-close-contract.ts`;
+- `tests/fixtures/phase-5e-v3/creator-close-types.ts`; and
+- `tests/phase-5e-creator-close-red.test.ts`.
+
+The expected GREEN is exactly nine paths:
+
+- `packages/protocol-v3/src/{index.ts,anchor-trust-singleton.ts,creator-close.ts,seal.ts,snapshot-transfer.ts}`;
+- `packages/protocol-v3/src/internal/{creator-anchor-signing-request.ts,seal-authority-custody.ts}`;
+- the protocol-v3 package export; and
+- the specific-before-bare Vite alias.
+
+The new creator-close subpath composes facts produced by the existing compaction
+history/snapshot owners; it does not reimplement their graph traversal, fold,
+Merkle or payload logic. Snapshot-manifest encoding joins its existing decoder
+in the snapshot-transfer owner. Successor preparation is one creator-close
+concept, not parallel `creator-close` and `anchor-trust-advance` abstractions.
+
+A required additional semantic owner, registry/schema/domain change, root
+protocol export, or effectful storage/network dependency is a reslice trigger.
+The sole readiness failure is the absent pure creator-close owner after all
+independent reference/vector/mutant controls have run.
+
+### D.107b — durable creator actor and crash recovery
+
+D.107b composes the distinct seed-derived creator signer, the genuine seal
+authority, the existing pacemaker/voter and the real browser vote store. It owns
+no network and cannot advance the AHE head. This is where the primary browser
+database advances additively from schema v2 to v3: the original eight stores
+remain byte-for-byte compatible and one `sealEvidence` store durably retains the
+exact local close candidate before any signing request can be consumed. The
+schema-v3 migration and public/internal observation owners report the exact
+nine-store roster, while every vote transition continues to use exactly the
+frozen four-store strict transaction. Its RED proves the full
+prepare-to-finalized sequence, exact post-commit carrier release, durable
+close-intent custody, restart at every boundary, complete-QC re-verification,
+duplicate exact-byte replay, same-slot conflict, ambiguous-outcome
+terminalization and cooperative stop. The real product actor, not the fixture,
+must drive every transaction.
+
+The tests-only RED is exactly six paths:
+
+- `tests/fixtures/phase-5e-v3/creator-actor-contract.ts`;
+- `tests/fixtures/phase-5e-v3/creator-actor-driver.ts`;
+- `tests/phase-5e-creator-actor-red.test.ts`;
+- `packages/storage-browser/tests/assets/phase-5e-creator-actor-entry.ts`;
+- `packages/storage-browser/tests/phase-5e-creator-actor.pw.ts`; and
+- `packages/storage-browser/playwright.phase-5e-creator-actor.config.ts`.
+
+The expected GREEN is exactly twelve paths:
+
+- `packages/keychain/src/finality.ts`;
+- `packages/seal/src/{creator.ts,internal/creator-close-intent.ts}`;
+- `packages/seal/package.json`;
+- `packages/storage-browser/src/{seal-evidence.ts,seal-vote.ts}`;
+- `packages/storage-browser/src/internal/{schema-idb.ts,seal-evidence-store.ts,seal-vote-store.ts}`;
+- `packages/storage-browser/package.json`;
+- the retained `packages/storage-browser/tests/phase-5c-seal-vote-schema.pw.ts` schema/transaction authority; and
+- the specific-before-bare Vite aliases.
+
+The evidence store is mechanical, scoped by the authenticated creator enrollment
+and contains exact bytes rather than semantic summaries. It cannot sign, form or
+verify a QC, mint trust, publish, or mutate a vote row. No transport, example,
+node live-plane edit, caller-signable raw digest, raw outbox reader or public
+store mutation handle is authorized here. If the actor cannot be expressed
+within this roster, D.107b reslices before GREEN.
+
+### D.107c — persistent peer evidence and bounded re-learn
+
+D.107c adds the connected peer carrier and the only q=1 recovery gate. The RED
+uses two authenticated peers plus a creator, persistent browser profiles and
+real process/Worker death. It proves that peers persist before acknowledgement,
+every connected peer is queried, foreign/malformed/digest-only evidence is
+ignored, conflicting own-signed evidence terminalizes, no-peer recovery stalls,
+and total creator-database deletion followed by the same seed cannot sign until
+complete evidence is restored. Recovery must reproduce the exact old value and
+carrier; it may not create replacement signature bytes.
+
+The tests-only RED is exactly seven paths:
+
+- `tests/fixtures/phase-5e-v3/creator-relearn-contract.ts`;
+- `tests/fixtures/phase-5e-v3/creator-relearn-driver.ts`;
+- `tests/phase-5e-creator-relearn-red.test.ts`;
+- `packages/storage-browser/tests/assets/phase-5e-creator-relearn-entry.ts`;
+- `packages/storage-browser/tests/phase-5e-creator-relearn.pw.ts`;
+- `packages/storage-browser/playwright.phase-5e-creator-relearn.config.ts`; and
+- the dedicated non-graceful death child used by that Playwright owner.
+
+The expected GREEN is exactly eight paths:
+
+- `packages/network/src/{node.ts,seal.ts}` and `packages/network/package.json`;
+- `packages/node/src/creator-seal.ts` and `packages/node/package.json`;
+- the existing browser `seal-evidence` public/internal owners introduced by
+  D.107b; and
+- the specific-before-bare Vite aliases.
+
+The schema is already v3 before this slice begins. D.107c extends the one
+evidence-store owner with peer persistence/query operations; it does not add a
+second evidence store or change the retained nine-store schema roster. The node
+owner transports authenticated evidence and orchestrates the all-peer barrier,
+while protocol/seal/actor owners retain all verification, selection and signing
+authority.
+
+The network owner is a dumb authenticated connected carrier. It does not form
+or verify QCs, decide highest evidence, dial new peers, mark rows dispatched,
+advance trust or activate snapshots. If product semantics must enter network,
+or if peer evidence cannot be atomic without altering the four-store vote
+transaction, the slice reslices.
+
+### D.107d — genuine live close, combined CAS and honest product projection
+
+D.107d is the only slice that enables the earlier owners in a live room. A
+receiver-bound close method is minted only from the genuine prepared/recovered
+live registration, verified creator trust, actor, snapshot quarantine and
+re-learn-ready state. It closes a non-empty epoch, persists/serves the snapshot,
+obtains the exact durable commit QC, prepares the successor trust record, and
+stages one combined generation that replaces the old trust ref while preserving
+every non-trust ref and adding the certified close evidence. Exactly one
+`swapHead(expectedHead=openedHead)` may make it authoritative. Ambiguous success
+is resolved by reopen and exact successor comparison.
+
+After that CAS the epoch-zero admission/issuance/append/close handle is terminal.
+The room reports the verified creator trust class, continuity state and lifecycle
+state separately. The trust text remains honest—creator-certified, one of one,
+not Byzantine-fault-tolerant—and comes only from the reopened trust/profile
+capability. `relearning`, `stalled`, `sealed` and `successor pending adoption`
+are durable/runtime projections, not caller strings. A reset/new object is never
+presented as recovered continuity.
+
+The tests-only RED is expected to be exactly five paths:
+
+- `tests/fixtures/phase-5e-v3/creator-live-close-contract.ts`;
+- `tests/phase-5e-creator-live-close-red.test.ts`;
+- `tests/phase-5e-creator-live-close.pw.ts`;
+- its Playwright config; and
+- its browser entry asset.
+
+The expected GREEN is exactly eight paths:
+
+- a new non-root `packages/control-plane/src/creator-trust-advance.ts` and the
+  control-plane package export;
+- `packages/node/src/{creator-close.ts,v3-live.ts}` and the node package export;
+- `examples/v3-room/src/index.ts`;
+- `examples/v3-chat/src/index.ts`; and
+- the specific-before-bare Vite aliases.
+
+The control-plane successor capability reuses the existing closure scanner,
+requires exactly one verified current v1 trust ref plus the creator-close proof
+refs, and classifies byte replay, equivocation, rollback and epoch gap without
+writes. Node invokes it only for the certified close path; every other combined
+generation still calls `assertTrustPreserved`. Node-local trust scanning or
+advancement classification is forbidden. Grid/chat duplicated consensus owners,
+a second AHE head, remote adoption, epoch-one activation, archive certification,
+pruning, signer handoff, delegated/attested labels or an observation-exit claim
+are forbidden scope expansions.
+
+### D.107 causal mutants, gates and handoff
+
+Every RED uses behavior, raw durable evidence or an independent byte oracle;
+source-token and missing-file assertions are readiness only. The closed mutant
+families include:
+
+- close vertex/frontier/byte-charge tamper;
+- snapshot state/ACL/chunk/manifest swap;
+- CutValue close/history/availability/next-signer mutation;
+- q=1 QC bypass, foreign authority and publish-before-durable;
+- signed digest with missing close intent after restart;
+- successor signature without commit-QC or snapshot binding;
+- trust-only head swap, two head swaps and stale-head overwrite;
+- local-author/finality-key conflation and caller-selected signer identity;
+- recreated-database freshness bypass and caller-declared re-learn completion;
+- first-peer/arrival-order selection, incomplete peer query and no-peer unlock;
+- transient-only peer evidence, acknowledgement before persistence and
+  dispatch marking before publication settles; and
+- literal/unverified trust label, false recovered-continuity wording and
+  successor activation before Phase 6.
+
+Each sub-slice receives one tests-only RED commit, one separate Grok, genuine
+Kimi 100-check and Opus/xhigh RED review round, same-round RED corrections only,
+then one atomic GREEN and the corresponding single GREEN review round. Before
+each GREEN review, run the focused unit/browser/death gates, affected package
+builds and typechecks, exact-owner lint/format/diff checks, and the retained
+Phase-5a–5d, Phase-4 snapshot, combined-generation and product-room suites.
+Repository-wide typecheck/lint limitations remain reported independently and
+cannot be relabelled as passes.
+
+D.107 plan review precedes D.107a RED. The plan review is bound to this exact
+document-only packet and may correct owner counts or dependency direction once;
+it cannot add a new registered kind, weaken the common QC verifier, treat a
+caller recovery fact as authority, or move Phase-6 adoption into Phase 5e.
+
+The sole formal plan-review round closed with source-grounded corrections rather
+than a confirmation rerun. Grok returned `CHANGES` with two P1s: preserve the
+frozen v1 trust carrier and add a governed genesis-anchor signing request. Opus
+returned `CHANGES` with two P1s: allocate the schema-v3 migration/retained schema
+gate and add the control-plane successor-advancement owner. The Kimi launch is
+recorded as `NO_VERDICT`: its output exceeded the transport budget and no
+recoverable 100-check artifact existed, so it was neither retried nor counted as
+approval. This corrected decision keeps one trust-record classifier, one
+evidence store and one trust-advancement classifier; no confirmation review is
+authorized.
+
+Product capability gained only after D.107d: the creator can seal one genuine
+live epoch, persist and publish its exact q=1 certificate and snapshot, survive
+mid-close crashes, recover same-seed signing continuity from durable peer
+evidence after local storage loss, and atomically install a certified successor
+head awaiting adoption. Governance/security debt discharged: creator acting
+authority remains singleton-proven; one-signer certificates obey the common QC
+law; exact-slot/outbox ordering remains authoritative; trust and live evidence
+advance under one CAS; and the UI no longer self-asserts trust or recovery.
