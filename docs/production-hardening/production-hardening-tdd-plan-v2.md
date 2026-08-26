@@ -58691,6 +58691,68 @@ root value export is expected. Any need for a store schema/version change,
 registered wire change, additional production path or new root product API
 stops and corrects the roster before the RED freezes.
 
+The sole D.108a RED review round froze the pre-correction tests-only packet at
+parent HEAD `0db3def0c9feec4e7bf1bd84b4cc58c133c7712d`, staged tree
+`5ef1a0ef057977e2fd1b2e1c7f44cc1c71d2391c`, patch object
+`170e1598180e4b43ee905d04ae4ff888ede4e1d0` and SHA-256
+`7e75ba38c2d614739c5206c9c9e23062285df6e6fe0c2071702f531211c1022c`.
+Its exact roster was the five RED paths above, all additive and tests-only.
+Grok/high returned `NO_VERDICT` after 450.285 seconds with exit code 1,
+`stop_reason=cancelled` and no public terminal schema; its sole launch was not
+retried. Kimi K3 session `session_9bf7150b-a772-4030-840c-fb473eaf3679`
+emitted exactly CHECK001 through CHECK100 and returned `CHANGES_REQUIRED`,
+P0=0/P1=1/P2=6. Opus 5/xhigh session
+`415f813e-4658-4949-a3ec-e64baf7826c0` returned `CHANGES_REQUIRED`,
+P0=0/P1=4/P2=7.
+
+The reproduced same-round P1 union was corrected tests-only with no
+confirmation review. Both Node and browser had attempted to encode
+`Number.MAX_SAFE_INTEGER + 1`, so the canonical encoder threw before the
+candidate store ran; RED now proves that boundary is unencodable, submits the
+unsafe value directly through journal-scope capture, and keeps the reachable
+negative/fractional/non-genesis carriers. The hostile accessor now occupies the
+exact four-key install shape and records zero getter dispatch, preventing an
+arity short-circuit from hiding a direct property read. The executable oracle
+now installs genuine epoch-zero and epoch-one anchors and rows for the same
+object in one store, proves independent row counts/digests/pages and rejects a
+cross-scope snapshot token. Finally, the five-owner readiness fact now inspects
+the exact scope, provenance, payload, issue and handle owners for safe
+nonnegative provenance propagation instead of accepting unrelated epoch
+substrings.
+
+The corrected RED packet was exact tree
+`c7a7173583ab5a38a725b1257a5d37bf7d2208bf`, patch object
+`d5d20cd4e96e3319d290cca08f583a3a15ec4f3b` and SHA-256
+`35f5bb506226b606c07304d6e5f1ccd9fbf48e23a6f5ff075c9472a481d0121e`.
+`pnpm exec vitest run tests/phase-6a-creator-successor-epoch-red.test.ts
+--no-coverage` produced the intended six-test RED: three pass, the one
+five-owner readiness failure, and two designed skips. `pnpm exec playwright
+test --config
+packages/storage-browser/playwright.phase-6a-successor-epoch.config.ts`
+produced exactly three designed browser skips. Exact-five Prettier and ESLint
+completed cleanly, `pnpm --filter @ts-drp/storage-browser typecheck` passed,
+and both unstaged/staged `git diff --check` gates passed. Signed commit
+`1a51c2fc5f1ed08755d800027e1230f645ceb4e3` (`test: pin successor epoch
+substrate red`) has a good signature and was pushed to
+`codex/phase3a1b-p6-golden-path`.
+
+The remaining RED-review P2 ledger is explicit rather than silently waived.
+The new Playwright config is not yet enumerated by the storage-browser
+`tsconfig`; the Node/Playwright readiness implementations and Node/browser
+material literals are duplicated; the fixture's local-issued carrier is not
+yet exercised; source-loaded adapters still resolve bare live-journal imports
+through built `dist` until the required pre-GREEN build; canonical digest
+oracles do not also pin literal digest strings; the browser gate does not yet
+pin fresh-store/case identity plus every wrong-scope/digest-mismatch variant;
+and retained p4 tests still pin the old five-method inventory and emitted
+declaration hash. D.108a GREEN must rebuild `@ts-drp/live-journal` before the
+gated tests, then update only the affected retained test fixtures/evidence
+needed for the intentional additive sixth method; it may not weaken the exact
+surface or use stale `dist` as success evidence. If a distinct public install
+input/result name proves necessary, the explicit live-journal type re-export
+and its retained export inventory are also an assigned D.108a GREEN evidence
+owner, not permission for a new root value API.
+
 ### D.108b — read-only external verification and one-use intent
 
 D.108b adds the pure/detached chain and adoption verifier plus the node
