@@ -77,9 +77,9 @@ afterEach(async () => {
 });
 
 describe("Phase 5e persistent creator evidence and bounded re-learn RED", () => {
-	it("freezes the exact seven RED and exact eight GREEN owners", () => {
+	it("freezes the exact seven RED and exact nine GREEN owners", () => {
 		expect(REQUIRED_RED_PATHS).toHaveLength(7);
-		expect(REQUIRED_GREEN_PATHS).toHaveLength(8);
+		expect(REQUIRED_GREEN_PATHS).toHaveLength(9);
 		expect(NEW_SEMANTIC_OWNERS).toEqual(["packages/network/src/seal.ts", "packages/node/src/creator-seal.ts"]);
 		expect(REQUIRED_RED_PATHS.every((path) => readFileSync(resolve(REPOSITORY_ROOT, path)).byteLength > 0)).toBe(true);
 	});

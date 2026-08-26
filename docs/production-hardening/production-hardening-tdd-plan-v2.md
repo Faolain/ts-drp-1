@@ -57892,13 +57892,16 @@ The tests-only RED is exactly seven paths:
 - `packages/storage-browser/tests/process/phase-5e-creator-relearn-death-child.ts`,
   the dedicated non-graceful death child used by that Playwright owner.
 
-The expected GREEN is exactly eight paths:
+The expected GREEN is exactly nine paths:
 
 - `packages/network/src/{node.ts,seal.ts}` and `packages/network/package.json`;
 - `packages/node/src/creator-seal.ts` and `packages/node/package.json`;
 - the existing browser `seal-evidence` public/internal owners introduced by
   D.107b; and
-- the specific-before-bare Vite aliases.
+- the specific-before-bare Vite aliases plus the shared Phase-4c esbuild test
+  server that must consume that central alias map. The server is test
+  infrastructure only; it may not acquire a product resolver or package
+  dependency.
 
 The schema is already v3 before this slice begins. D.107c extends the one
 evidence-store owner with peer persistence/query operations; it does not add a

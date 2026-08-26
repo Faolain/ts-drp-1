@@ -21,6 +21,7 @@ export const REQUIRED_GREEN_PATHS = Object.freeze([
 	"packages/node/package.json",
 	"packages/storage-browser/src/seal-evidence.ts",
 	"packages/storage-browser/src/internal/seal-evidence-store.ts",
+	"packages/storage-browser/tests/phase-4c-browser-server.ts",
 	"vite.config.mts",
 ]);
 
