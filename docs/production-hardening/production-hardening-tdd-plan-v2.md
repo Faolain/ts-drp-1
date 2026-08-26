@@ -60180,6 +60180,121 @@ reopen-after-epoch-one advice is assigned to the D.108d1b-oracle follow-up
 before D.108d2. Fable is not part of the Grok/Kimi/Opus checkpoint, and no
 further Fable run is authorized without a new explicit instruction.
 
+D.108d1b GREEN is signed and pushed as
+`b42df58406c59a61c21d7e8618834f40f26ed4ad`, parent
+`20669ddbee7ba1dc3229c9a9e0a3b96b421784b7`, tree
+`de2837812305982c53168a7d7488816f4eeb037c`, stable patch id
+`b392352b7de816af574f6b9d00213a43d69f0a97` and diff SHA-256
+`a51872a4f4be40d16e7f38da88bbd1390f970765a7dfcf6e6a9ee6c8e215cab3`.
+The production change remains exactly the frozen three owners. Four already
+frozen test owners remove the temporary source-gated retained-caller bridge and
+repair the genuine peer child; there is no eighth path, manifest, export,
+dependency, product API, wire/store/snapshot schema, ACL member, digest owner,
+topic, limit, memory ceiling or Web Lock change.
+
+The closed activation owner now captures the exact 16-key input, including the
+existing room `author` and `signRegisteredVertexDigest`, synchronously before
+its first await. The internal carrier types those two existing values without
+exporting a new product surface. The sole authenticated issuance selector first
+requires the lowercase 32-byte Ed25519 author to be a current epoch-one writer,
+then fills one exact 32-byte WebCrypto challenge, retains and exposes separate
+ordinary copies, calls the captured signer once, detects mutation of the
+signer-owned copy, accepts only an exact ordinary 64-byte detached signature,
+and verifies it against a raw nonextractable Ed25519 public key. Throwing,
+rejecting, wrong-key, replayed-anchor, mutated, aliased, nonordinary or malformed
+results fail closed. Only after possession succeeds does it read every writer's
+lineage: the selected scope is exactly `{ author, objectId }`, must be
+nonexhausted with a safe nonnegative next value, and every foreign writer must
+be nonexhausted at next zero. No challenge, signature or signer enters the
+material, registration, store or success projection; ordinary issue still
+requires its own callback.
+
+The first GREEN child dry-run exposed two test-infrastructure facts, neither a
+production reslice. `createNodeDurableIssuanceStore` returns a frozen object, so
+the RED spy's `new Proxy(raw, { get })` violated the ECMAScript invariant for a
+nonconfigurable `readLineage` data property on the first real GREEN read. The
+owned child now uses the same empty-target forwarding-proxy pattern as the
+retained journal/snapshot spies. Next, creator-side ACL vertices were packed as
+`local-issued`; replaying that provenance on a different peer correctly
+requires the creator's issuance rows, which is the copied custody this gate
+forbids. The child therefore reconstructs the peer journal by converting only
+those creator-local rows to `received` rows using the exact packed canonical
+preimage, detached signature, digest, scope and journal order. The real journal
+contract reauthenticates those carriers during seeding, missing carriers throw,
+Bob's ingress row was already received, and Bob/Carol issuance stores still
+contain only their own selected carriers. With those narrow fixture repairs the
+fresh built child passes all 12 cases.
+
+The required refactor-clean pass found one concept owner rather than a parallel
+compatibility path. `authenticatedSuccessorIssuanceScope` is the sole
+ACL/possession/lineage selector, and both retained native and browser callers
+now pass the existing author/signer unconditionally. The packed
+`d108d1bLocalAuthor` source-regex flag and all conditional injection are gone;
+the retained callers therefore prove the live 16-key contract rather than
+source text. No adapter or second authority remains in production.
+
+Ordinary-checkout verification is green. Fresh `@ts-drp/node`,
+`@ts-drp/storage-node` and `@ts-drp/storage-browser` builds pass. The focused
+two-file D.108d1b command passes 7/7 with zero skip. The complete retained
+D.108b/D.108c/D.108d1/D.108d1a/D.108d1b eight-file selection passes 53/53.
+The complete Phase-4c five-file selection passes 44/44, including the genuine
+fresh-process 64 MiB peak-live owner and retaining mutant with no exclusion.
+The successor Web Lock matrix passes 9/9 and Phase-4c-b/Phase-4c-c pass 18/18
+and 6/6 across Chromium, Firefox and WebKit. Exact-three production plus
+exact-nine RED ESLint with zero warnings, Prettier, both child `node --check`
+commands and `git diff --check` pass. Storage-browser typecheck passes. Node
+and storage-node test-inclusive typechecks reproduce only their recorded
+worker-host/cross-workspace `rootDir` and file-list plus legacy WebRTC,
+compact-history and retained fixture typing baselines; neither reports a new
+D.108d1b production error, while all three production build graphs are clean.
+
+The isolated proof used detached worktree
+`/private/tmp/ts-drp-d108d1b-green.ze1X7P/repo` at the exact signed GREEN
+commit above. `find packages -type d -name dist -print -quit` returned no path
+before installation. `pnpm install --offline --ignore-scripts
+--frozen-lockfile` installed all 48 workspaces and a second check printed
+`NO_DIST_AFTER_IGNORE_SCRIPTS_INSTALL`. Only then did `node
+scripts/ensure-native-deps.mjs` prepare the pinned native prebuild and `pnpm
+--filter @ts-drp/storage-node... --filter @ts-drp/storage-browser... --filter
+@ts-drp/node... build` freshly build the 33-package dependency closure. In
+that checkout the eight-file D.108 selection passed 53/53; the Phase-4c
+selection passed 44/44 with the real 64 MiB child/mutant; browser matrices
+passed 9/9, 18/18 and 6/6; and exact-owner lint, format, diff and tracked status
+were clean. Thus neither local `dist`, ancestor modules nor the ordinary
+workspace state masked the authority or package-resolution proof.
+
+The sole GREEN review round inspected the immutable packet above. An initial
+Grok runner startup named the unavailable CLI id `grok-4.6-build` and exited
+before inference with zero events and no model session; correcting that local
+launcher argument to the advertised `grok-4.6` created the one real review.
+Grok 4.6/high session `01a03ffd-2a38-7aa1-8dd6-fcf5ffc1f478` completed 29
+read-only turns over 570.201 seconds and returned an approval object with
+P0=0/P1=0/P2=0. Progress prose before the object made the strict runner report
+`NO_VERDICT` despite normal `stop_reason=end_turn`; one terminal-only
+continuation of that same session emitted the exact schema and returned
+`APPROVED`. Kimi K3 session `28d170ae-14c0-41b9-9d8e-c400da25a9b4`
+completed exactly CHECK001 through CHECK100 once each and returned `APPROVED`,
+P0=0/P1=0/P2=2. Opus 5/xhigh session
+`4d3430bc-741f-4784-9983-3fc27cbd99a1` launched no subagent, completed in
+777.443 API seconds and returned `APPROVED`, P0=0/P1=0/P2=5. No reviewer
+changed the tracked tree, no same-round P0/P1 exists, no confirmation review
+ran and no Fable review ran.
+
+The GREEN-round P2 ledger is assigned without widening D.108d1b. The existing
+D.108d1b-oracle follow-up, due before D.108d2 RED, additionally owns strict
+`lineage.exhausted === false` validation, malformed ACL-member rejection,
+missing/Ed25519-less WebCrypto and malformed/exhausted-lineage cases, diagnostic
+failure detail, and full own-property fidelity for the frozen-store issuance
+spy. It also documents that snapshot quarantine verification/completion is the
+one permitted durable action before possession while issuance, AHE adoption,
+journal installation, subscription and publication remain forbidden. Random
+possession bytes and signatures are nonsecret and local; optional zeroing is
+future hygiene. A distinct digest domain remains explicitly out of this slice
+and is assigned only if a future remote, delegated or shared signing oracle is
+proposed. None of these P2 observations changes the accepted local proof,
+authorizes a fourth production owner or delays this GREEN checkpoint; the
+already-assigned follow-up remains the pre-D.108d2 deadline.
+
 #### D.108d2 — product and peer proof freeze boundary
 
 D.108d2 does not begin from the recorded D.108d1 GREEN alone. The first
