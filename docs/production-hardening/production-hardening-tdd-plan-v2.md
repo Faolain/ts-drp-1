@@ -59634,6 +59634,55 @@ required terminal object and is `NO_VERDICT` without retry. No reviewer changed
 the tracked tree, no P0/P1 finding was available to reproduce, no confirmation
 review ran and no Fable process ran.
 
+The corrected tests-only RED checkpoint used immutable HEAD
+`59921b76025054d058f71eee368f55a261f1153e` with parent
+`0c18c50c5a4a80e1690228cad8bc1a5f384ad300` and exactly one launch per
+required reviewer. Grok/high completed its sole launch in 510.267 seconds with
+exit code 0 and `stop_reason=end_turn`, but its runner honestly classified the
+result `NO_VERDICT` because explanatory prose preceded the required terminal
+JSON; the embedded payload was `CHANGES_REQUIRED` and was treated only as
+finding input. Kimi used exact `kimi-code/k3`, thinking enabled and the
+100-step ceiling in session `752da4b4-f73e-40fa-83f6-d733286f4ee8`; it
+returned valid `CHANGES_REQUIRED` with zero P0, three P1 and three P2 findings.
+Opus session `2e8f3ab9-4704-41b3-bf62-f3935eeef676` resolved to
+`claude-opus-5` at xhigh, launched no subagent, incurred no permission denial
+and returned valid `CHANGES_REQUIRED` with three P0, eleven P1 and eight P2
+findings. No reviewer changed the tracked tree, no reviewer was relaunched, no
+confirmation review ran and no Fable process ran.
+
+The same round independently reproduced and corrected the material findings
+without widening the seven-path RED roster: the packed creator-genesis anchor
+and parameter carrier are now domain-hash-bound to the genuine fixture; the
+active closure is read back from the durable post-commit head; the fresh child
+records completed snapshot reads and completion before subscription rather
+than treating `openScope()` as import; every successful handle is deactivated;
+old source verification is terminal after activation; duplicate capabilities
+are prepared before the source becomes terminal; cold extra-epoch and
+divergent-genesis controls use genuine durable material and observe zero live
+effects; TTL expiry advances a genuine persisted quarantine beyond its real
+expiry and requires exactly one full-recovery/open decision; displaced-row
+publication compares the actual digest bytes in recorded calls; browser store
+creation is awaited, failure stores are closed, release is awaited, and the
+loser reacquisition uses a bounded poll. The claim that quarantine-port
+`discard()` deletes persisted chunks was not reproduced: both Node and browser
+store implementations use it only to close the port, so the RED keeps that
+operation and now reopens every seeded chunk to prove persistence. Brittle
+owner-source substring checks for input-key spelling were removed in favor of
+the genuine valid-input plus unknown-key behavior controls.
+
+Those corrections are signed commit
+`0875d8e07ed826da4f90caf1c99c3e35d324e054` and were pushed to
+`codex/phase3a1b-p6-golden-path`. The focused Vitest command above reports the
+intended RED state: one readiness failure, six passes and eleven designed
+skips. The direct Playwright command reports nine designed skips across
+Chromium, Firefox and WebKit. Exact-seven ESLint, Prettier and `git diff
+--check` pass, and `pnpm --filter @ts-drp/storage-browser typecheck` passes.
+The package-wide storage-node and node `tsc --noEmit` commands remain non-gates
+at this checkpoint because their existing test tsconfigs include cross-package
+source outside `rootDir` and the node suite retains unrelated type failures;
+the D.108d1 GREEN build/typecheck gate remains responsible for the affected
+production packages after the eight owners exist.
+
 At the user's express instruction after those harness failures, the corrected
 plan-freeze round used a self-contained, tool-free contract so every model
 could reach the terminal schema without repository or `/tmp` reads. The common
