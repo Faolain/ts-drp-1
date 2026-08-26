@@ -59314,6 +59314,70 @@ adding that existing fixture under the narrow hook-only restriction above. This
 does not change the reviewed four-path GREEN roster, production scope or review
 findings and does not trigger a confirmation review.
 
+The sole D.108c RED review packet used parent HEAD
+`8401abfa96746181516402976abffaeeca5d1106`, exact-ten staged tree
+`eba0670a5bc7f17b84f14f009bcc20cec3fe4f87`, patch object
+`5768ffa558f7f2bc66fae9f96bf9c88a01ca36b8` and SHA-256
+`27c016700a7ff05fa6f47c34d0b955e153e669b34859a60d4a6099534e4dd53b`.
+Grok/high reached `NO_VERDICT` after 540.203 seconds with exit code 1,
+`stop_reason=cancelled` and no valid terminal schema; its sole launch was not
+retried. Kimi Code 0.38.0 again failed before an active agent lifecycle or model
+session with `Agent event 'agent.activity.updated' has no active lifecycle
+context`; it produced no checks/verdict and was not retried. Opus 5/xhigh session
+`65367232-84b7-4fe6-baac-9a13cea4f79f` returned `CHANGES_REQUIRED`,
+P0=4/P1=7/P2=4.
+
+Every reproduced P0/P1 was corrected in the same round without confirmation
+review. The browser tests now own a tokenized asset server rather than borrowing
+the phase-3 allowlist; the genuine fixture hook drives all twenty-seven logical
+request rows; consumed-intent replay performs zero writes; and the Node death
+test has an explicit 240-second bound. Real terminal rows no longer accept an
+always-old substrate: SQLite pins active-new exactly after swap commit and old
+elsewhere; browser ordinary rows pin exact outcomes, while native swap request
+death allows the honest atomic old/new race and transaction-complete pins new.
+The browser bundle observes native write-request success and transaction
+completion separately, applies the full object/state/revision/closure/per-ref
+predicate, derives its roster cardinality from the running bundle, captures
+every descendant process group at the armed edge, SIGKILLs browser plus driver,
+and polls every captured PID absent before reopen. Source governance now pins
+the exact non-root export targets, failure vocabulary, private capability
+consumer, absent root/product consumer and absent activation/issue/transport
+effects. Owner-facing rows pin closed malformed shapes, forged intent, opaque
+non-activation capability, destructive intent reuse and byte-identical second-
+intent idempotency. The Node fixture classifies the predecessor live ref from
+canonical generation-1 bytes rather than set position.
+
+Corrected RED evidence is final HEAD
+`ec945507ccf7456bc4596f200354a9253d546ff8`, tree
+`7d0174ec8a773c211a1335ed1e75263cee2f1b0c`, combined exact-ten patch object
+`1fcda0ce381458c5c1a290f50ae0ded58605a1f7` and SHA-256
+`7f626a283a0b801693287e2fb448804f0fc5d187e8cb724e35f87e57f4164208`.
+`pnpm exec vitest run tests/phase-6a-creator-adoption-commit-red.test.ts
+packages/storage-node/tests/phase-6a-creator-adoption-commit-death-red.test.ts
+--no-coverage` is the intended RED: seven pass including all eighteen real
+SQLite SIGKILL edges, one readiness failure names only the absent commit owner
+and package export, and three owner-facing tests skip. `pnpm exec playwright test
+--config
+packages/storage-browser/playwright.phase-6a-creator-adoption-commit.config.ts`
+passes 6/6: ordinary plus eighteen native SIGKILL/reopen edges in Chromium,
+Firefox and WebKit. Exact-ten ESLint/Prettier, `node --check`, staged/unstaged
+diff checks and storage-browser test-inclusive typecheck pass; storage-node was
+freshly built before its child ran. Signed commits
+`ff6d98b7` and `ec945507` have Good Faolain signatures under RSA key
+`55E22F154FBAF8C84F378304761B99CEA81C6289` and are pushed.
+
+The remaining RED-review P2 is explicit. The isolated SQLite seed uses the
+storage contract's pinned first-head revision one rather than a parent/child
+readback handshake; failure would be a child error, never false success. The
+browser request-success kill is intentionally an atomic old/new race, not
+mislabelled as deterministically pre-commit; transaction-complete remains exact
+new. Failure kinds that require persisted corruption or impossible internal
+invariants are source-vocabulary frozen rather than synthesized by a store
+result override, which the narrow fixture hook forbids. D.108d remains the first
+consumer that can destructively consume the opaque success capability; D.108c
+proves it has no enumerable/method authority and the existing live activator
+rejects it.
+
 ### D.108d — epoch-one activation and product proof
 
 D.108d consumes only a genuine D.108c durable result. It installs the epoch-one
