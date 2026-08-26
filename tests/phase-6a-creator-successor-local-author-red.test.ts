@@ -26,8 +26,10 @@ beforeAll(() => {
 		configurable: true,
 		value: Object.freeze({ estimate: () => Promise.resolve({ quota: 1_000_000_000_000, usage: 0 }) }),
 	});
+});
 
-	it("freezes the exact six-RED/one-GREEN oracle corrective ownership", () => {
+describe("D.108d1b authenticated peer-local cold issuance RED", () => {
+	it("freezes the exact six-RED/two-GREEN oracle corrective ownership", () => {
 		expect(D108D1B_ORACLE_RED_PATHS).toEqual([
 			"tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts",
 			"tests/phase-6a-creator-successor-local-author-red.test.ts",
@@ -52,9 +54,7 @@ beforeAll(() => {
 		);
 		for (const behavior of D108D1B_ORACLE_BROWSER_BEHAVIORS) expect(browser).toContain(behavior);
 	});
-});
 
-describe("D.108d1b authenticated peer-local cold issuance RED", () => {
 	it("freezes exact nine-RED/three-GREEN ownership and the closed cold input", () => {
 		expect(D108D1B_RED_PATHS).toHaveLength(9);
 		expect(new Set(D108D1B_RED_PATHS).size).toBe(9);

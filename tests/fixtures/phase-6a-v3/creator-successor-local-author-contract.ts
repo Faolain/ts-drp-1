@@ -206,7 +206,7 @@ export function d108d1bReadiness(): Readonly<{ readonly missing: readonly string
 	return Object.freeze({ missing: Object.freeze(missing), ready: missing.length === 0 });
 }
 
-/** @returns Whether the one-owner oracle corrective GREEN is present. */
+/** @returns Whether the two-owner oracle corrective GREEN is present. */
 export function d108d1bOracleReadiness(): Readonly<{ readonly missing: readonly string[]; readonly ready: boolean }> {
 	const source = readFileSync(resolve(REPOSITORY_ROOT, D108D1B_ORACLE_GREEN_PATHS[0]), "utf8");
 	const live = readFileSync(resolve(REPOSITORY_ROOT, D108D1B_ORACLE_GREEN_PATHS[1]), "utf8");
