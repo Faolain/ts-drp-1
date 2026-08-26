@@ -23,6 +23,7 @@ import {
 	EXPECTED_STREAM_EXPORTS,
 	typeContractSource,
 } from "./fixtures/phase-4c-v3/snapshot-stream-types.js";
+import { runWorkspacePackageSubprocess } from "./fixtures/shared/workspace-package-subprocess.mjs";
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "../packages/canonical/src/index.js";
 
 interface RegistryField {
@@ -922,12 +923,21 @@ describe("Phase 4c-a frozen snapshot stream RED", () => {
 
 		it("proves peak verifier ownership on 64 MiB and kills retained-body accumulation", () => {
 			const run = (mode: "owner" | "retain-mutant"): string =>
-				execFileSync(process.execPath, ["--expose-gc", "--import", "tsx", MEMORY_CHILD, mode], {
-					cwd: REPOSITORY_ROOT,
-					encoding: "utf8",
-					maxBuffer: 1024 * 1024,
+				runWorkspacePackageSubprocess({
+					childPath: MEMORY_CHILD,
+					expectedImports: {
+						"@ts-drp/canonical": resolve(REPOSITORY_ROOT, "packages/canonical/dist/src/index.js"),
+						"@ts-drp/compaction/snapshot-stream": resolve(
+							REPOSITORY_ROOT,
+							"packages/compaction/dist/src/snapshot-stream.js"
+						),
+					},
+					mode,
+					nodeArguments: ["--expose-gc"],
+					packageDirectory: resolve(REPOSITORY_ROOT, "packages/compaction"),
 				});
 			const owner = JSON.parse(run("owner")) as {
+				readonly chunkBodyBytes: number;
 				readonly chunkCount: number;
 				readonly exactByteLength: number;
 				readonly maxMemoryBytes: number;
@@ -938,8 +948,10 @@ describe("Phase 4c-a frozen snapshot stream RED", () => {
 				readonly settledVerifierBodyBytes: number;
 			};
 			const mutant = JSON.parse(run("retain-mutant")) as {
+				readonly chunkBodyBytes: number;
 				readonly peakVerifierBodyBytes: number;
 				readonly retainedBodyMutantDetected: boolean;
+				readonly settledVerifierBodyBytes: number;
 			};
 			expect(owner.chunkCount).toBe(512);
 			expect(owner.reopenedChunkCount).toBe(512);
@@ -947,10 +959,12 @@ describe("Phase 4c-a frozen snapshot stream RED", () => {
 			expect(owner.payloadDigest).toMatch(/^[0-9a-f]{64}$/);
 			expect(owner.manifestDigest).toMatch(/^[0-9a-f]{64}$/);
 			expect(owner.maxMemoryBytes).toBe(contract.profile.maxVerifierMemoryBytes);
-			expect(owner.peakVerifierBodyBytes).toBeLessThan(contract.profile.maxVerifierMemoryBytes);
+			expect(owner.maxMemoryBytes).toBe(2 * owner.chunkBodyBytes);
+			expect(owner.peakVerifierBodyBytes).toBeLessThan(2 * owner.chunkBodyBytes);
 			expect(owner.settledVerifierBodyBytes).toBe(0);
 			expect(mutant.retainedBodyMutantDetected).toBe(true);
-			expect(mutant.peakVerifierBodyBytes).toBeGreaterThanOrEqual(contract.profile.maxVerifierMemoryBytes);
+			expect(mutant.peakVerifierBodyBytes).toBeGreaterThanOrEqual(2 * mutant.chunkBodyBytes);
+			expect(mutant.settledVerifierBodyBytes).toBe(0);
 		}, 30_000);
 	});
 });

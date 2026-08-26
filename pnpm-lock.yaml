@@ -40,6 +40,9 @@ importers:
       "@informalsystems/quint":
         specifier: 0.32.0
         version: 0.32.0
+      "@noble/curves":
+        specifier: 2.2.0
+        version: 2.2.0
       "@playwright/test":
         specifier: 1.62.1
         version: 1.62.1

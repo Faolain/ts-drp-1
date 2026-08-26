@@ -1,15 +1,25 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
-import { sha256 } from "@noble/hashes/sha2";
-import { encodeCanonical } from "@ts-drp/canonical";
+import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const STREAM_MODULE_PATH = "../../../packages/compaction/src/snapshot-stream.js";
-const [{ verifySnapshotStream }] = await Promise.all([import(STREAM_MODULE_PATH)]);
-
 const MODE = process.argv[2] ?? "owner";
 if (MODE !== "owner" && MODE !== "retain-mutant") throw new Error(`unknown memory mode ${MODE}`);
+const RESOLVED_IMPORTS = JSON.parse(process.argv[3] ?? "null");
+if (
+	RESOLVED_IMPORTS === null ||
+	typeof RESOLVED_IMPORTS !== "object" ||
+	Array.isArray(RESOLVED_IMPORTS) ||
+	Reflect.ownKeys(RESOLVED_IMPORTS).sort().join("\n") !==
+		["@ts-drp/canonical", "@ts-drp/compaction/snapshot-stream"].sort().join("\n")
+) {
+	throw new Error("missing exact workspace package resolutions");
+}
+const [{ encodeCanonical }, { verifySnapshotStream }] = await Promise.all([
+	import(RESOLVED_IMPORTS["@ts-drp/canonical"]),
+	import(RESOLVED_IMPORTS["@ts-drp/compaction/snapshot-stream"]),
+]);
 
 const CHUNK_BYTES = 131_072;
 const PAYLOAD_BYTES = 67_108_864;
@@ -41,8 +51,7 @@ function u64be(value) {
 
 function independentDomainHasher(domain, exactPartLength) {
 	const domainBytes = new TextEncoder().encode(domain);
-	const hasher = sha256
-		.create()
+	const hasher = createHash("sha256")
 		.update(Uint8Array.of(0x44, 0x52, 0x50, 0x00))
 		.update(u32be(domainBytes.byteLength))
 		.update(domainBytes)
@@ -63,8 +72,7 @@ function independentDomainHasher(domain, exactPartLength) {
 
 function independentDigest(domain, ...parts) {
 	const domainBytes = new TextEncoder().encode(domain);
-	const hasher = sha256
-		.create()
+	const hasher = createHash("sha256")
 		.update(Uint8Array.of(0x44, 0x52, 0x50, 0x00))
 		.update(u32be(domainBytes.byteLength))
 		.update(domainBytes);
@@ -226,6 +234,7 @@ try {
 	observe();
 	process.stdout.write(
 		`${JSON.stringify({
+			chunkBodyBytes: CHUNK_BYTES,
 			chunkCount,
 			exactByteLength: completion.exactByteLength,
 			manifestDigest: completion.manifestDigest,
