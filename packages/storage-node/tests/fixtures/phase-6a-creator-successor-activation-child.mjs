@@ -5,11 +5,13 @@ import {
 	activateCreatorSuccessorAdoption,
 	reopenCreatorSuccessorAdoption,
 } from "@ts-drp/node/creator-adoption-activate";
+import { republishV3RetainedTo } from "@ts-drp/node/v3-live";
 /* eslint-enable import/no-unresolved */
 import { createSqliteAheDurableStore } from "@ts-drp/storage-node";
 import { createNodeDurableIssuanceStore } from "@ts-drp/storage-node/issuance";
 import { createNodeDurableLiveJournalStore } from "@ts-drp/storage-node/live-journal";
 import { createNodeSnapshotQuarantineStore } from "@ts-drp/storage-node/snapshot-transfer";
+import { createPrivateKey, sign } from "node:crypto";
 import { join } from "node:path";
 
 const [, , mode] = process.argv;
@@ -32,6 +34,16 @@ function unpack(value) {
 function successful(result, label) {
 	if (!result.ok) throw new Error(`${label}: ${result.reason ?? result.kind ?? "failed"}`);
 	return result.value;
+}
+
+function signFixtureVertex(digest) {
+	const seed = Buffer.from("0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20", "hex");
+	const key = createPrivateKey({
+		format: "der",
+		key: Buffer.concat([Buffer.from("302e020100300506032b657004220420", "hex"), seed]),
+		type: "pkcs8",
+	});
+	return Promise.resolve(new Uint8Array(sign(null, Buffer.from(digest), key)));
 }
 
 async function putGeneration(store, generation, blobs, expectedHead) {
@@ -81,7 +93,7 @@ async function putGeneration(store, generation, blobs, expectedHead) {
 	).head;
 }
 
-function network(events, publications) {
+function network(events, publications, targetPeerId) {
 	const topics = new Set();
 	return {
 		peerId: `d108d1-child-${process.pid}`,
@@ -104,7 +116,7 @@ function network(events, publications) {
 		getBootstrapNodes: () => [],
 		getSubscribedTopics: () => [...topics],
 		getMultiaddrs: () => ["/ip4/127.0.0.1/tcp/1"],
-		getAllPeers: () => [],
+		getAllPeers: () => [targetPeerId],
 		getGroupPeers: () => [],
 		broadcastMessage: (...args) => {
 			publications.push(args);
@@ -114,7 +126,10 @@ function network(events, publications) {
 			publications.push(args);
 			return Promise.resolve(true);
 		},
-		sendMessage: () => Promise.resolve(),
+		sendMessage: (peerId, message) => {
+			publications.push(["send", peerId, message]);
+			return Promise.resolve();
+		},
 		sendMessageToRandomPeer: () => Promise.resolve(),
 		sendGroupMessage: () => Promise.resolve(),
 		subscribeToMessageQueue: () => undefined,
@@ -298,25 +313,28 @@ async function cold(material, selectedMode) {
 			return material.catalog.resolved;
 		},
 	});
-	const node = network(events, publications);
+	const targetPeerId = `d108d1a-cold-target-${process.pid}`;
+	const node = network(events, publications, targetPeerId);
 	let activeHandle;
 	const originalNow = Date.now;
 	try {
 		if (selectedMode === "ttl-expired") Date.now = () => snapshot.expiresAt + 1;
-		const result = await reopenCreatorSuccessorAdoption({
-			...material.creatorGenesis,
-			...(selectedMode === "divergent-genesis" ? { pinnedGenesisAnchorDigest: "f".repeat(64) } : {}),
-			...(selectedMode === "extra-epoch" ? { epoch: 1 } : {}),
-			catalog,
-			issuanceStore,
-			liveJournalStore: liveJournal.store,
-			messageQueueManager: new MessageQueueManager({ logConfig: { level: "silent" } }),
-			networkNode: node,
-			onAdmittedVertex: () => undefined,
-			snapshotDeclaration: material.snapshot.declaration,
-			snapshotStore: snapshot.store,
-			store: ahe.store,
-		});
+		const reopen = () =>
+			reopenCreatorSuccessorAdoption({
+				...material.creatorGenesis,
+				...(selectedMode === "divergent-genesis" ? { pinnedGenesisAnchorDigest: "f".repeat(64) } : {}),
+				...(selectedMode === "extra-epoch" ? { epoch: 1 } : {}),
+				catalog,
+				issuanceStore,
+				liveJournalStore: liveJournal.store,
+				messageQueueManager: new MessageQueueManager({ logConfig: { level: "silent" } }),
+				networkNode: node,
+				onAdmittedVertex: () => undefined,
+				snapshotDeclaration: material.snapshot.declaration,
+				snapshotStore: snapshot.store,
+				store: ahe.store,
+			});
+		const result = await reopen();
 		if (!result.ok) {
 			return {
 				effects: {
@@ -330,6 +348,18 @@ async function cold(material, selectedMode) {
 			};
 		}
 		activeHandle = result.handle;
+		let firstIdentity;
+		if (material.d108d1aIdentity === true) {
+			const firstIssue = await result.handle.issueLocal({
+				operations: [{ logicalTime: 30, operation: { action: "add", value: 13 } }],
+				signRegisteredVertexDigest: signFixtureVertex,
+			});
+			if (!firstIssue.ok) throw new Error(`first cold identity issue failed: ${firstIssue.kind}`);
+			firstIdentity = await republishV3RetainedTo(result.handle, targetPeerId);
+			if (!firstIdentity.ok || firstIdentity.kind !== "published") {
+				throw new Error(`first cold identity replay failed: ${firstIdentity.kind}`);
+			}
+		}
 		const displaced = await result.handle.readRebaseOutbox();
 		await result.handle.publishPending();
 		const oldDigest = Buffer.from(
@@ -338,6 +368,29 @@ async function cold(material, selectedMode) {
 		const subscribeIndex = events.indexOf("subscribe");
 		const snapshotCompletionIndex = events.lastIndexOf("snapshot:complete");
 		const snapshotReadCount = events.filter((event) => event.startsWith("snapshot:read:")).length;
+		let identityReopens;
+		if (material.d108d1aIdentity === true) {
+			await Promise.resolve(result.handle.deactivate());
+			activeHandle = undefined;
+			const second = await reopen();
+			if (!second.ok) throw new Error(`second cold reopen failed: ${second.kind}`);
+			activeHandle = second.handle;
+			const secondIssue = await second.handle.issueLocal({
+				operations: [{ logicalTime: 40, operation: { action: "add", value: 17 } }],
+				signRegisteredVertexDigest: signFixtureVertex,
+			});
+			if (!secondIssue.ok) throw new Error(`second cold identity issue failed: ${secondIssue.kind}`);
+			const secondIdentity = await republishV3RetainedTo(second.handle, targetPeerId);
+			if (!secondIdentity.ok || secondIdentity.kind !== "published") {
+				throw new Error(`second cold identity replay failed: ${secondIdentity.kind}`);
+			}
+			identityReopens = {
+				first: firstIdentity.kind,
+				second: secondIdentity.kind,
+				sentCount: publications.filter((publication) => publication[0] === "send").length,
+				targetPeerId,
+			};
+		}
 		return {
 			activation: {
 				epoch: result.handle.epoch,
@@ -346,6 +399,7 @@ async function cold(material, selectedMode) {
 				recovery: result.recovery,
 			},
 			adoptionSwapCount: ahe.adoptionSwapCount(),
+			...(identityReopens === undefined ? {} : { identityReopens }),
 			pid: process.pid,
 			oldOutbox: {
 				classified: displaced.kind,

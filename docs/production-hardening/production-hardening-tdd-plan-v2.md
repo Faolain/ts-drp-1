@@ -59721,6 +59721,32 @@ dry-run also confirmed that the unchanged runtime roster includes the retained
 exports rather than an obsolete six-name subset. No GREEN owner or product
 surface changed, and the review round was not rerun as a confirmation round.
 
+The corrected tests-only RED then landed exactly those five owners. The focused
+`pnpm exec vitest run
+tests/phase-6a-creator-successor-handle-identity-red.test.ts
+packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts
+--no-coverage --reporter=verbose` command exited 1 with the intended sole
+`[RED readiness]` failure naming `activationConsumer`, `internalBridge` and
+`liveInstaller`; four retained/contract assertions passed and the hot plus cold
+identity behaviors were the exact two designed skips. The separately retained
+`pnpm exec vitest run
+tests/phase-6a-creator-successor-activation-red.test.ts --no-coverage
+--reporter=verbose` command exited 0 with exact 15/15 passing and zero skip.
+Both `pnpm --filter @ts-drp/node build` and
+`pnpm --filter @ts-drp/storage-node build` exited 0. Exact-five ESLint with
+`--max-warnings 0`, Prettier check and `git diff --check` also exited 0.
+
+The broad package `typecheck` commands remain independently non-green on
+inherited configuration/test debt: node reports the already-recorded
+worker-host-outside-`rootDir` plus legacy test typing failures, while
+storage-node follows cross-workspace source imports outside its `rootDir` and
+existing untyped retained fixtures. A root `pnpm exec tsc --noEmit --pretty
+false` likewise reports the repository's pre-existing example module-mode,
+missing workspace declaration and legacy test errors. The affected production
+build graphs are green and none of those broad failures names a D.108d1a-owned
+production change; they remain baseline debt and do not widen this tests-only
+RED.
+
 The nonblocking ledger remains explicit without confirmation: Grok records the
 adjacent D.108d2 wording, the not-yet-pinned bridge-specific readiness fact and
 the missing focused command. Kimi records the private bridge's additional

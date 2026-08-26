@@ -12,9 +12,14 @@ import {
 	d108d1Readiness,
 	runD108d1ActivationChild,
 } from "../../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.js";
+import {
+	D108D1A_COLD_BEHAVIOR,
+	d108d1aReadiness,
+} from "../../../tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.js";
 
 const childPath = new URL("./fixtures/phase-6a-creator-successor-activation-child.mjs", import.meta.url);
 const readiness = d108d1Readiness();
+const identityReadiness = d108d1aReadiness();
 const directories: string[] = [];
 
 beforeAll(() => {
@@ -70,4 +75,30 @@ describe("D.108d1 fresh-process successor activation RED", () => {
 			expect(result.proof?.pid).not.toBe(process.pid);
 		}
 	);
+
+	it.skipIf(!identityReadiness.ready)(D108D1A_COLD_BEHAVIOR, async () => {
+		const directory = mkdtempSync(join(tmpdir(), "ts-drp-d108d1a-cold-"));
+		directories.push(directory);
+		const material = await durableMaterial(directory);
+		if (material === null || typeof material !== "object" || Array.isArray(material)) {
+			throw new TypeError("D.108d1a packed material is invalid");
+		}
+		const result = await runD108d1ActivationChild("cold", {
+			...material,
+			d108d1aIdentity: true,
+		});
+		expect(result.proof).toMatchObject({
+			adoptionSwapCount: 0,
+			identityReopens: {
+				first: "published",
+				second: "published",
+				sentCount: expect.any(Number),
+				targetPeerId: expect.stringMatching(/^d108d1a-cold-target-/u),
+			},
+			pid: expect.any(Number),
+		});
+		const identity = result.proof?.identityReopens as Readonly<{ readonly sentCount?: unknown }> | undefined;
+		expect(Number(identity?.sentCount)).toBeGreaterThanOrEqual(3);
+		expect(result.proof?.pid).not.toBe(process.pid);
+	});
 });

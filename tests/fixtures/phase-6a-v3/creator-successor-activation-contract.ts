@@ -265,6 +265,7 @@ export function runD108d1ActivationChild(mode: D108d1ChildMode, input: unknown):
 				REPOSITORY_ROOT,
 				"packages/node/dist/src/creator-adoption-activate.js"
 			),
+			"@ts-drp/node/v3-live": resolve(REPOSITORY_ROOT, "packages/node/dist/src/v3-live.js"),
 			"@ts-drp/storage-node": resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/index.js"),
 			"@ts-drp/storage-node/issuance": resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/issuance.js"),
 			"@ts-drp/storage-node/live-journal": resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/live-journal.js"),
