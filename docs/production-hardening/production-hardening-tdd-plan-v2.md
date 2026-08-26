@@ -59188,10 +59188,13 @@ candidate completion or from an unresolved swap request. The opaque success
 capability's WeakMap custody lives in the internal intent/capability module so a
 later D.108d internal consumer need not add another D.108c runtime export.
 
-The tests-only RED is exactly nine paths:
+The tests-only RED is exactly ten paths:
 
 - `tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts`;
 - `tests/phase-6a-creator-adoption-commit-red.test.ts`;
+- `tests/fixtures/phase-6a-v3/creator-adoption-contract.ts`, limited to an
+  additive, dynamically armed AHE mutation-edge hook on its already captured
+  genuine store decorator;
 - `packages/storage-node/tests/fixtures/phase-6a-creator-adoption-commit-child.mjs`;
 - `packages/storage-node/tests/phase-6a-creator-adoption-commit-death-red.test.ts`;
 - `packages/storage-browser/tests/assets/phase-6a-creator-adoption-commit-entry.ts`;
@@ -59208,7 +59211,11 @@ The expected GREEN is exactly four paths:
 - `packages/node/package.json`, limited to the additive non-root export above.
 
 Any need to edit `v3-live.ts`, a storage package, a wire/schema/domain owner, a
-root export or a product owner stops and reslices before GREEN. The unit RED
+root export or a product owner stops and reslices before GREEN. The inherited
+D.108b fixture hook may observe or throw before/after one named mutation and may
+convert only a genuine committed result into `commit-then-throw`; it cannot
+synthesize a store result, alter bytes, choose authority or exist in production.
+The unit RED
 decorates the genuine D.108b store and enumerates `before-request`,
 `commit-then-throw` and `after-request` for begin, cache, every per-ref promotion,
 completion and swap. For every row it proves one-use intent custody, zero writes
@@ -59244,7 +59251,7 @@ only pending-old XOR active-new; unreferenced staged debris is permitted, mixed
 authority is not.
 
 The RED checkpoint runs the focused unit, Node-death and three-engine browser
-commands; exact-nine lint/format/diff checks; and one Grok/high, Kimi K3
+commands; exact-ten lint/format/diff checks; and one Grok/high, Kimi K3
 100-check and Opus 5/xhigh review against the frozen parent/tree/patch. The GREEN
 checkpoint repeats those commands plus the retained D.108b, D.107d close,
 Phase-4b live-snapshot and strict AHE SQLite/IndexedDB recovery suites; builds
@@ -59298,6 +59305,14 @@ dead process's unavailable commit capability. The corrected plan packet before
 this evidence note is staged tree `9b1a78ac4d023cc58130cbda43e0e04c0249ac2f`,
 patch object `e8de39dcf11131476e5bde08587468ab95a584b0` and SHA-256
 `03dc9ab91ad8e643b95a2636e5c3e5a19cb0eacd8359b51d687f08f92b182ffb`.
+
+Pre-RED fixture reconnaissance then reproduced one tests-only ownership gap:
+the genuine D.108b sealed handle captures its decorated AHE before D.108c can
+wrap it, and the existing decorator counts mutations but cannot arm the required
+named request edges. The RED roster is therefore corrected from nine to ten by
+adding that existing fixture under the narrow hook-only restriction above. This
+does not change the reviewed four-path GREEN roster, production scope or review
+findings and does not trigger a confirmation review.
 
 ### D.108d — epoch-one activation and product proof
 
