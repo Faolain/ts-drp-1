@@ -59603,6 +59603,53 @@ issuance scope, snapshot format, digest owner, limit or memory ceiling changes
 in D.108d1. A need for any ninth production path stops and corrects this freeze
 before RED.
 
+#### D.108d1a — successor handle registration-identity compatibility
+
+D.108d1a is the first blocking prerequisite discovered by the rejected D.108d2
+freeze. Its tests-only RED roster is exactly two new paths:
+
+- `tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts`;
+  and
+- `tests/phase-6a-creator-successor-handle-identity-red.test.ts`.
+
+The expected GREEN roster is exactly three existing node owners:
+
+- `packages/node/src/creator-adoption-activate.ts`;
+- `packages/node/src/internal/creator-successor-live.ts`; and
+- `packages/node/src/v3-live.ts`.
+
+The internal successor-live owner may add one private install-once bridge from
+the activation wrapper to the v3-live registration owner. The v3-live owner
+must accept only a genuine raw activated handle and one new wrapper, associate
+that wrapper with the exact same current private registration and return no
+registration, raw handle or mutable authority. The activation owner must bind
+the alias before publishing success or installing it in `activeOwners`; alias
+failure deactivates the raw handle, releases the held lock and fails closed.
+Hot duplicate convergence continues to return the same wrapper.
+
+The genuine behavior gate prepares two hot capabilities before the source
+becomes terminal, activates the first with one real network/queue binding and
+uses the returned public successor handle—not a captured raw handle—to prove:
+
+- `routeV3RetainedIngress()` accepts one direct V3 envelope for the current
+  stable topic through the identity-keyed registration;
+- `republishV3RetainedTo()` targets one real connected peer and uses the same
+  retained-journal publication path;
+- awaited deactivation makes both identity-keyed operations fail closed; and
+- a second prepared capability can activate after release and its returned
+  handle independently passes the same identity checks.
+
+The contract also pins one composite readiness failure, exact two-RED/three-
+GREEN rosters, no node-root or package-manifest export, no product consumer and
+no source-string-only substitute for the genuine behavior. GREEN runs the
+complete D.108b/D.108c/D.108d1 retained selection, the D.108d1 three-engine
+Web Lock matrix, affected node build/typecheck, exact-owner ESLint/Prettier/diff
+checks and the retained Phase-4c snapshot selection including the 64 MiB fresh
+process. No wire, store, snapshot, issuance, journal, digest, ACL, topic, limit,
+memory, Web Lock policy, room/chat API or public package surface changes belong
+to D.108d1a. A need for a fourth production path stops and corrects this
+freeze before RED.
+
 #### D.108d2 — product and peer proof freeze boundary
 
 D.108d2 does not begin from the recorded D.108d1 GREEN alone. The first
@@ -59633,9 +59680,10 @@ These are pre-D.108d2 deadlines, not Phase-6-exit observations. D.108d1a moves
 the wrapped-handle identity item out of D.108e2; D.108d1b is the newly assigned
 owner for the cold issuance ambiguity. Neither may change a wire format,
 snapshot schema, ACL membership, issuance schema, digest owner, chunk limit,
-memory ceiling or room/chat API. Their exact RED/GREEN path rosters are the
-next freeze task; the rejected D.108d2 freeze is not permission to edit node
-production sources opportunistically.
+memory ceiling or room/chat API. Their exact RED/GREEN path rosters are
+separate freeze tasks; D.108d1a is now frozen immediately above, while
+D.108d1b remains unfrozen. The rejected D.108d2 freeze is not permission to
+edit node production sources opportunistically.
 
 After both prerequisites are green, the corrected D.108d2 tests-only RED roster
 must be exactly eleven paths. It contains the five new paths:
