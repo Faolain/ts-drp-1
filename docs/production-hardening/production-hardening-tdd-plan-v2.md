@@ -57895,6 +57895,38 @@ recovery, and giving the new snapshot encoder its own complete public type
 contract rather than only the retained export roster. None expands D.107a into
 D.107b-d or Phase 6.
 
+The sole D.107b RED review round closed with same-round test corrections and no
+confirmation review. Grok returned `CHANGES` with P0=4/P1=4, chiefly because the
+browser fixture used non-bundleable mapped imports, the hand-built v2 database
+lacked the real incarnation row, the raw schema oracle omitted key paths/indexes/
+auto-increment, and the crash/stop observations trusted product summaries rather
+than raw durable state. Opus returned `CHANGES` with P0=0/P1=6, identifying the
+decoy finalized-QC corruption, catalog-only mutants, missing independent QC
+verification, early-release ordering gap, weak stop fence and retained Phase-5d
+schema-version owner omitted from GREEN. Kimi completed the required 100 checks
+and returned `CHANGES_REQUIRED`, P0=1/P1=2, independently confirming the package
+entry reachability failure, incomplete live schema oracle and causal recovery
+coverage gap.
+
+The corrected RED is signed and pushed as `ab29ed82`, with staged tree
+`64d804cb19802eff647baf63e6f42f10fd9a81e9`, patch object
+`f1699e9ddc0680565c81547496e4e980405c80a5` and SHA-256
+`b8dbd8509fab21645d11cfc91babcea13abb7e9af5c4ca4269cfffbe89d9e2ec`.
+It remains exactly six files. The shared actor harness now lives at the package-
+scoped browser entry and the root fixture is a thin re-export; three literal
+dynamic package imports are bundle-visible without producing pre-readiness
+module-load or package-typecheck failures. The corrected unit RED is exactly
+4 pass / 1 readiness failure / 7 dormant causal cases, and the three-browser
+RED is exactly 12 skipped. `pnpm --filter @ts-drp/storage-browser typecheck`,
+the exact-six ESLint and Prettier checks, and both staged/unstaged diff checks
+passed. The repository-root ad hoc `tsc -p tsconfig.json` remains a non-gate
+with its pre-existing cross-workspace/example/test configuration failures; it
+is not represented as a pass. The corrected RED independently verifies returned
+and reopened QCs, the full nine-store raw schema, exact evidence/vote completion
+ordering, raw crash classifications, nested durable-QC corruption, raw-digest/
+copied-actor/foreign-evidence/ambiguous-retry mutants, and post-stop durable
+stability without adding a product test API.
+
 Product capability gained only after D.107d: the creator can seal one genuine
 live epoch, persist and publish its exact q=1 certificate and snapshot, survive
 mid-close crashes, recover same-seed signing continuity from durable peer
