@@ -74,7 +74,9 @@ interface CreatorLiveCloseApi {
 			trustRef: Readonly<{ byteLength: number; digest: string }>;
 		}>
 	>;
-	join(input: Readonly<{ channelName: string; clientId: "bob"; databaseName: string; invite: string }>): Promise<void>;
+	join(
+		input: Readonly<{ channelName: string; clientId: "bob" | "carol"; databaseName: string; invite: string }>
+	): Promise<void>;
 	sealEpoch(): Promise<
 		Readonly<{
 			closedVertexCount: number;
@@ -186,8 +188,13 @@ test("does not let a connected joined peer claim creator close authority", async
 	const channelName = `phase5e-live-peer-${run}`;
 	const creator = await context.newPage();
 	const peer = await context.newPage();
+	const latePeer = await context.newPage();
 	try {
-		await Promise.all([creator.goto(server?.origin ?? "about:blank"), peer.goto(server?.origin ?? "about:blank")]);
+		await Promise.all([
+			creator.goto(server?.origin ?? "about:blank"),
+			peer.goto(server?.origin ?? "about:blank"),
+			latePeer.goto(server?.origin ?? "about:blank"),
+		]);
 		const invite = await creator.evaluate((input) => window.phase5eCreatorLiveClose.create(input), {
 			channelName,
 			clientId: "alice",
@@ -195,7 +202,7 @@ test("does not let a connected joined peer claim creator close authority", async
 		} as const);
 		await peer.evaluate((input) => window.phase5eCreatorLiveClose.join(input), {
 			channelName,
-			clientId: "bob",
+			clientId: "carol",
 			databaseName: `phase5e-live-peer-${run}`,
 			invite,
 		} as const);
@@ -214,9 +221,19 @@ test("does not let a connected joined peer claim creator close authority", async
 			lifecycle: "successor-pending-adoption",
 			ok: true,
 		});
+		await latePeer.evaluate((input) => window.phase5eCreatorLiveClose.join(input), {
+			channelName,
+			clientId: "bob",
+			databaseName: `phase5e-live-late-peer-${run}`,
+			invite,
+		} as const);
+		await expect
+			.poll(() => latePeer.evaluate(() => window.phase5eCreatorLiveClose.snapshot().accepted.map(({ text }) => text)))
+			.toContain("peer must receive this");
 		await creator.evaluate(() => window.phase5eCreatorLiveClose.close());
 		await peer.evaluate(() => window.phase5eCreatorLiveClose.close());
+		await latePeer.evaluate(() => window.phase5eCreatorLiveClose.close());
 	} finally {
-		await Promise.all([creator.close(), peer.close()]);
+		await Promise.all([creator.close(), peer.close(), latePeer.close()]);
 	}
 });
