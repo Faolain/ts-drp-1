@@ -59605,16 +59605,128 @@ before RED.
 
 #### D.108d2 — product and peer proof freeze boundary
 
-D.108d2 does not begin until D.108d1 GREEN and its one-round review are
-recorded. Before its RED, this section will freeze its exact tests-only roster,
-independent authenticated projection oracle, one composite readiness failure
-and expected room/chat GREEN owners. Its scope is limited to consuming the
-D.108d1 result in the existing room and chat, projecting reopened
-epoch/anchor/lifecycle/creator-certified trust from the active handle, and
-proving a real epoch-one operation reaches both an existing peer and a fresh
-late peer. It may not add a second activation path or accept those values from
-caller DTOs. The displaced-source claim is terminal and is never re-exposed to
-D.108d2; D.108d2 consumes only the already-active successor registration.
+D.108d2 begins from the recorded D.108d1 GREEN and corrected one-round review.
+Its tests-only RED roster is exactly five paths:
+
+- `tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts`;
+- `tests/phase-6a-creator-successor-product-red.test.ts`;
+- `packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts`;
+- `packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts`; and
+- `packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts`.
+
+The expected GREEN roster is exactly two existing product owners:
+
+- `examples/v3-room/src/index.ts`; and
+- `examples/v3-chat/src/index.ts`.
+
+No node, storage, protocol, package-manifest or wire owner belongs to this
+sub-slice. A need for a third GREEN path stops D.108d2 and reslices the missing
+kernel or adapter contract instead of hiding it in the product patch.
+
+The room keeps one constructor and one active-handle slot. Its input may add
+only the optional untrusted `successorSnapshotDeclaration`; that declaration is
+the already required D.108d1 cold-reopen carrier, not product authority. The
+room session adds `adoptCreatorSuccessor()` for the hot creator path and
+`authority()` for observation. The hot method performs the existing exact
+verify -> commit -> activate custody chain against its bound creator-close
+handle and replaces the one active handle only after D.108d1 returns success.
+The cold branch is selected only by the declaration, opens the room's existing
+derived AHE, issuance, journal and snapshot stores, and calls the single
+`reopenCreatorSuccessorAdoption()` owner. It must not first prepare or activate a
+genesis plane, perform another adoption CAS, or reconstruct displaced-source
+authority in the product layer.
+
+The exact frozen room authority projection has seven keys:
+`{ aclDigest, anchorDigest, epoch, genesisAnchorDigest, lifecycle, objectId,
+profileId }`. `lifecycle` is the literal `active` and `profileId` is the literal
+`creator-trusted-v1`. The room constructs this value only after requiring exact
+agreement between the D.108d1 authenticated trust result and the active
+handle's current ephemeral authority for current anchor, epoch and object. Its
+`roomId` follows that authenticated current anchor after adoption or cold
+reopen. The existing human-readable `trustStatus` remains unchanged.
+
+The chat joins the same room constructor. Its join input may forward only the
+optional untrusted snapshot declaration; it may not accept a separate epoch,
+anchor, genesis anchor, lifecycle, object, ACL or trust-profile value. It adds
+`adoptSuccessor()` as the thin room-method consumer, and its existing snapshot
+adds `authority`, which is `null` while no chat is active and otherwise the
+room's exact frozen authority projection. Neither product returns the D.108b
+intent, D.108c prepared capability, D.108d1 activation result, raw trust bytes,
+snapshot receipt, store handle, signing authority or displaced-source claim.
+
+The declaration's scope fields remain untrusted overlap, never a projection
+source: a forged declaration must fail inside the D.108d1 authenticated reopen
+before the product exposes a session. The product accepts no caller DTO whose
+purpose is to choose any of the seven projected values. This distinction is
+source-governed so the unavoidable snapshot-transfer carrier cannot be
+mistaken for application authority.
+
+The independent projection oracle operates on the browser fixture's raw copied
+durable rows. Using only the base canonical codec, registered domain hashes and
+generic IndexedDB reads, it walks the current/proposed/active generation
+lineage, verifies every selected ref against its bytes, identifies the unique
+generation-two projection and creator trust record, hashes the successor
+anchor and ACL, and derives the exact seven-key product projection. It imports
+no creator-adoption, successor-activation, current-trust opener, snapshot
+decoder, room projection or chat projection owner. It also reconstructs the
+untrusted snapshot declaration independently from the persisted manifest and
+chunk rows; that declaration is used only to exercise cold reopen and is never
+used as the expected authority value.
+
+The real-browser proof uses three separately served origins so native Web Lock
+authority remains honest and no same-origin test tab can mask split ownership.
+The creator runs the existing chat product through genuine close, D.108b,
+D.108c and D.108d1 hot activation. An existing peer first opens and receives an
+epoch-zero chat operation, then closes its predecessor, imports the exact copied
+durable successor carrier into its existing local database and cold-reopens the
+same room/chat projection. A fresh late peer begins only after the epoch-one
+operation exists and cold-reopens from a newly populated database. A
+tests-only relay observes the creator product transport and structured-clones
+the actual `Message` objects between origins; it never synthesizes a vertex,
+signature, digest, epoch, anchor or projection. The existing peer receives the
+real live epoch-one envelope, while the late peer receives the real retained
+envelope produced by the creator handle's retained publisher. Both must project
+the same authenticated epoch-one operation and exact oracle authority.
+
+The exact D.108d2 browser behavior inventory is:
+
+- hot creator adoption exposes the oracle-derived epoch-one room/chat authority
+  and can issue a genuine operation through the replacement handle;
+- an already established peer cold-reopens the copied successor and accepts
+  that genuine operation through live ingress; and
+- a newly populated late peer cold-reopens the successor and accepts the same
+  genuine operation through retained ingress.
+
+One composite readiness fact is the sole intentional Vitest failure before
+GREEN. Every behavior test is conditionally skipped only by that same fact, and
+the contract source pins the skip expression. GREEN must execute the complete
+enumerated Vitest and three-engine Playwright inventories with zero skip. The
+focused commands are `pnpm exec vitest run
+tests/phase-6a-creator-successor-product-red.test.ts --no-coverage` and `pnpm
+exec playwright test --config
+packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts`.
+
+The full retained D.108b/D.108c/D.108d1 selections, Phase-4 snapshot transfer
+including the fresh-process 64 MiB peak-live child, and Phase-5 creator actor,
+re-learn, live-close and product-room gates remain enabled. D.108d2 changes no
+wire format, digest owner, journal or issuance schema, topic derivation,
+snapshot/chunk limit, memory ceiling, Web Lock policy, activation authority or
+product signing policy. The displaced-source claim stays terminal and is never
+re-exposed; both product flows consume only D.108d1's already active successor
+registration.
+
+#### D.108e — inherited activation hardening owners before Phase 6 exit
+
+D.108d1's nonblocking observations are assigned rather than silently inherited.
+D.108e1 is the named D.108 test-infrastructure closure owner for direct child
+snapshot-port read telemetry, a clean built-export-map import-hook proof and
+the browser package-shim lifetime. D.108e2 is the named node hardening owner for
+one stable-topic derivation helper, an explicit worker-realm Web Lock policy,
+literal cold `authenticationProfile` validation and preservation of private
+v3-plane registration identity by the lifetime wrapper. Each will receive its
+own exact RED/GREEN roster and required review round after D.108d2; both must
+close before Phase 6a exits. None is permission to weaken the already executed
+D.108d1 authority, snapshot, memory, transport or recovery gates.
 
 The D.108d1 plan-freeze review packet used parent HEAD
 `dbb753fe78c5a8d8b6fbc420fe4e53fb0bda5269`, exact one-path staged tree
@@ -59809,12 +59921,12 @@ this evidence, so no ancestor package, local alias, stale build or ignored
 artifact can be the authority for the result.
 
 The nonblocking review observations remain explicit rather than widening this
-round: direct child port-read telemetry and the import-hook/export-map proof
-stay with the D.108 test-infrastructure owner; stable-topic helper deduplication,
-worker-realm Web Lock policy, explicit cold `authenticationProfile` validation,
-browser shim lifetime and wrapped-handle plane identity are assigned to the
-D.108d2 pre-RED audit and must be resolved or given a later named owner before
-Phase 6 exit. None weakens or bypasses the executed snapshot receipt,
+round: the D.108d2 pre-RED audit assigns direct child port-read telemetry, the
+import-hook/export-map proof and browser shim lifetime to D.108e1; stable-topic
+helper deduplication, worker-realm Web Lock policy, explicit cold
+`authenticationProfile` validation and wrapped-handle plane identity are
+assigned to D.108e2. Both named owners must close before Phase 6 exit. None
+weakens or bypasses the executed snapshot receipt,
 peak-live memory, trust-chain, topic/queue ownership or single-writer gates.
 
 The complete retained Phase-4 snapshot suite, including the genuine fresh-
