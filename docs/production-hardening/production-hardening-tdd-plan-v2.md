@@ -58767,6 +58767,100 @@ input/result name proves necessary, the explicit live-journal type re-export
 and its retained export inventory are also an assigned D.108a GREEN evidence
 owner, not permission for a new root value API.
 
+D.108a GREEN is complete. Its first review packet froze parent HEAD
+`1e3f5befd52c19fb3690c7db19ab30b164d8727e`, exact-five staged tree
+`829eb3b000a001d6b1575b8e1a820912a6635188`, patch object
+`e7782d8337664a32bfbd22dfbcecb57118c31b50` and SHA-256
+`56667352cf83e04e7d48462e8ff9bb07a31cf840df19e4805fdb742f19496049`.
+Grok/high reached terminal `NO_VERDICT` after 300.262 seconds with exit code 1,
+`stop_reason=cancelled` and no public terminal schema; its sole launch was not
+retried. Kimi K3 session
+`session_e7e19e52-4d4e-454b-b944-4d8ba5227531` emitted exactly CHECK001
+through CHECK100 and returned `ACCEPTED`, P0=0/P1=0/P2=8. Opus 5/xhigh
+session `be052b5f-0396-4c65-971e-e3311b1102ca` returned
+`CHANGES_REQUIRED`, P0=0/P1=1/P2=4.
+
+The sole reproduced GREEN P1 was the product-type roster omission recorded
+above: after the fresh node declaration exposed current-authority epoch as
+`number`, the v3-room provider and admission-policy contexts still required
+literal zero. The same round added the exact sixth GREEN owner and changed only
+those two type annotations. The corrected RED readiness isolated that one
+missing owner as 3 pass / 1 intentional readiness failure / 2 designed skips.
+Signed and pushed commit `a279b518a5b611aff15b9c1bb13b29b7f443e109`
+(`test: correct successor epoch green roster`) owns the three-path tests/plan
+correction. No confirmation review and no Fable review ran.
+
+The corrected exact-six GREEN packet then froze parent HEAD
+`a279b518a5b611aff15b9c1bb13b29b7f443e109`, tree
+`3c3d259fcf05ecba1c4a11328951647160c60c43`, patch object
+`ef9ca9f4d981d666e3001f60898fc6a8a86540d1` and SHA-256
+`269007a5beb0d50b357a4cc45006eb692b4ba222460352b351baf4a73d74d9c0`.
+It is signed and pushed as `87cc7ca7fd60621d0a107bb0e67a524fe83c8eb6`
+(`feat: generalize live substrate epochs`). The implementation adds only the mechanical `installEpochAnchor`,
+keeps `installGenesis` genesis-only, preserves safe nonnegative authenticated
+epoch through the journal, graph, issue, blueprint, plane, snapshot and traffic
+owners, and leaves topic and issuance identities unchanged. There is no schema,
+wire, digest, limit, trust, adoption, CAS, activation or root-value-API change.
+
+Focused GREEN verification passed 6/6 Vitest and 3/3 Chromium/Firefox/WebKit.
+Fresh ordered builds passed for live-journal, storage-node, storage-browser,
+node and v3-room. Exact-six Prettier, ESLint with zero warnings, staged and
+unstaged `git diff --check`, and the v3-room, v3-chat, grid, live-journal,
+storage-node and storage-browser typechecks passed. The broad node typecheck
+still reports only the inherited worker-host rootDir/file-list errors, missing
+WebRTC test-route `emit`, and compact-history discriminated-union helper errors;
+no D.108a owner appears in its diagnostics.
+
+The intentional retained-surface update has tree
+`d68fed0cccb285953f1d63b49c05d5d9c70d3481` and is signed and pushed as
+`5b3454833746e38cdfedb4c42402be8f4b978746` (`test: retain generalized live
+epoch surfaces`). The p3 exact type contract
+now compiles, the shared and Node p4 six-method assertions pass, the emitted
+live-journal declaration hash is pinned to
+`5faa4b32eb79e64aecf4d03a57dd366060714432c9f2086e4a1b5eed96441ec5`,
+and the retained browser p4 matrix passes 30/30 across all three engines. The
+retained Phase-4a/4b and Phase-5e creator close/actor/re-learn/live-close unit
+selection passes 48/48; retained creator actor, re-learn and live-close browser
+matrices pass 12/12, 6/6 and 6/6 respectively.
+
+The complete retained Phase-4c unit suite passes 44/44 in the ordinary
+checkout, including the genuine fresh-process 64 MiB peak-live owner/mutant
+proof with no exclusion. Its browser quarantine and transfer matrices pass
+18/18 and 6/6. Thus D.108a neither regresses the repaired workspace subprocess
+resolution nor weakens the signed `<2 * chunkBodyBytes` ownership ceiling.
+
+The accepted isolated proof used detached worktree commit
+`5b3454833746e38cdfedb4c42402be8f4b978746` under the
+temporary root `/private/tmp/ts-drp-d108a-clean.FsfPCs/checkout`, removed after
+verification. Before installation, package/example `dist` discovery returned
+`NO_DIST_BEFORE_INSTALL`. `pnpm install --offline --ignore-scripts
+--frozen-lockfile` passed for all 48 workspace projects and the same discovery
+returned `NO_DIST_AFTER_INSTALL`. After `node scripts/ensure-native-deps.mjs`,
+the exact storage-node/storage-browser/node/v3-room dependency build passed for
+34 projects. Live-journal, storage-node, storage-browser and v3-room typechecks
+passed; broad node typecheck reproduced only the inherited ledger above. The
+12-file focused/retained Vitest command passed 98/98, including D.108a,
+Phase-4a/4b, all five Phase-4c owners and the four Phase-5e creator owners. The
+clean-checkout D.108a Playwright gate passed 3/3, Phase-4c-b passed 18/18 and
+Phase-4c-c passed 6/6. Final tracked status and `git diff --check` were clean,
+so no local source alias, stale declaration or ignored build artifact masked
+the result.
+
+Remaining debt is explicit and non-gating for this slice. Three old p4
+inventory assertions still predate later snapshot-transfer/seal export,
+dependency and packed test-control additions (40 pass / 3 inherited failures /
+2 designed death skips in the selected p4 unit run). The retained p3 behavior
+owner similarly has 21 passes and three later-phase inventory/registration
+failures: the added operation-admission exports, creator-close resolver and
+seal dependency; its D.108a type-contract subprocess itself passes. Review P2
+also retains the duplicated Node/browser material builders, the unenumerated
+Phase-6a Playwright config, non-literal digest oracles, incomplete browser
+wrong-scope matrix, unused local-issued fixture carrier, source-string
+readiness limitations, shared install-result naming, and the currently
+unreachable synchronous-wrapper risk. None grants authority or blocks D.108b;
+each stays with its later owning fixture or adoption slice rather than widening
+D.108a.
+
 ### D.108b — read-only external verification and one-use intent
 
 D.108b adds the pure/detached chain and adoption verifier plus the node
