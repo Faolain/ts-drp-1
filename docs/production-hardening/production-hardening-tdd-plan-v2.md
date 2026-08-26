@@ -59463,10 +59463,12 @@ sub-slices and the cumulative gates below pass.
 
 #### D.108d1 — successor activation kernel freeze
 
-The D.108d1 tests-only RED roster is exactly five paths:
+The corrected D.108d1 tests-only RED roster is exactly seven paths:
 
 - `tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts`;
 - `tests/phase-6a-creator-successor-activation-red.test.ts`;
+- `packages/storage-node/tests/fixtures/phase-6a-creator-successor-activation-child.mjs`;
+- `packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts`;
 - `packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts`;
 - `packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts`; and
 - `packages/storage-browser/playwright.phase-6a-creator-successor-activation.config.ts`.
@@ -59476,9 +59478,16 @@ commit, and accepts no synthetic prepared capability. The independent oracle
 decodes and hashes the already certified successor anchor, parameter carrier,
 snapshot manifest/payload and generation-two projection directly; probes the
 issuance and journal stores independently of the activation result; and records
-network publications at the stable object/genesis topic. One composite
-readiness fact is the only intentional failure before GREEN; the remaining
-behavioral cases are designed skips until every expected owner exists.
+network publications at the stable object/genesis topic. It uses only the base
+canonical codec, registered domain hash and raw durable-store reads, and imports
+no production successor decoder, manifest reader or projection builder. One
+composite readiness fact is the only intentional failure before GREEN; the
+remaining behavioral cases are designed skips only while an expected owner is
+absent. When readiness becomes true, the focused unit, subprocess and browser
+commands must report the complete enumerated executed-test inventory with zero
+skip. A source assertion pins every conditional skip to that same readiness
+fact, so adding the eight owners while leaving a substantive case skipped is a
+GREEN failure.
 
 The D.108d1 oracle must prove all of the following in Node and in a real browser
 store where applicable: the successor journal scope is exactly epoch one and
@@ -59494,7 +59503,27 @@ idempotent duplicate activation, failure cleanup after durable adoption, reopen
 before and after volatile activation without a second `swapHead`, and two-tab
 winner/loser convergence without split ownership. TTL expiry may reacquire and
 reverify a capability but may not turn an expired quarantine lease into live
-authority.
+authority. The successor trust record must carry the exact predecessor
+`genesisAnchorDigest`; the oracle recomputes both from raw bytes and a divergent
+genesis mutant fails before journal, lock, registration or network effect.
+
+The earlier freeze incorrectly treated snapshot quarantine `openScope()` as an
+exclusive lease. It is a resumable TTL-bound session over shared durable rows,
+not a tab-election primitive: multiple matching declarations may open
+concurrently and `release()` only closes the local handle. D.108d1 therefore
+uses the browser LockManager directly in `creator-adoption-activate.ts`, with an
+injective versioned name derived only after authenticated object plus genesis
+topic identity is known. In a browser realm, missing, non-callable, throwing,
+rejecting or unavailable exclusive Web Lock authority fails activation closed;
+there is no advisory fallback. The winner holds the lock for the complete live
+handle lifetime and releases it on activation failure or deactivation. The
+loser consumes no signing/live authority, cannot issue, and must reverify after
+the winner releases. Non-browser Node activation retains the existing
+process-local registration exclusion; D.108d1 does not claim multi-process Node
+writer election. The real two-tab RED holds one winner open, proves the loser
+cannot activate or issue, then releases and requires a freshly reverified loser
+to win. No new store schema, browser-storage production path or caller-provided
+lock token is allowed.
 
 The expected D.108d1 GREEN roster is exactly eight paths:
 
@@ -59514,15 +59543,63 @@ it must not create a second handle-keyed authority cache, export a raw
 caller-selected epoch preparation function, or expose snapshot/trust/signing
 material through a serializable capability. `creator-close.ts` may make the
 terminal source registration claimable exactly once for `displacedSource`;
+hot duplicate activation with a fresh reverified capability must first consult
+the existing authenticated stable-identity registration and return the same
+handle only when all runtime bindings are identical, before a second source
+claim or browser-lock request. A conflicting binding fails closed. The one-use
+source claim is therefore never the idempotency mechanism and is not consumed
+by a genuine duplicate.
+
 `v3-live.ts` may install a non-genesis journal anchor and construct the private
 successor prepared/recovered registration from already authenticated custody.
-The public non-root activation subpath accepts only the genuine D.108c
-capability, its bound close handle and ordinary runtime/store/transport
-dependencies. It derives all identity, epoch, anchor, lifecycle, trust,
-snapshot and source-disposition values from custody. No root export, wire or
-storage schema, product API, topic derivation, issuance scope, snapshot format,
-digest owner, limit or memory ceiling changes in D.108d1. A need for any ninth
-production path stops and corrects this freeze before RED.
+For the same object across epochs, its existing `displacedSource` classifier is
+generalized from cross-object recovery to accept the authenticated old anchor
+with the same object, blueprint, signer set and author lineage. The terminal
+epoch-zero registration, issuance store, journal store and activation digest
+remain the exact old source authority, so its pending outbox row can be
+classified and suppressed. The non-genesis journal branch is reachable only
+from the private successor custody owner; no public epoch switch or
+caller-selected anchor is added. The existing
+`packages/node/src/internal/v3-live-recovered-authority.ts` must remain byte-for-
+byte unchanged, and the RED pins that fact.
+
+The `@ts-drp/node/creator-adoption-activate` non-root subpath exports exactly two
+functions and no serializable authority type. `activateCreatorSuccessorAdoption`
+accepts the exact five-key object `{ capability, handle, messageQueueManager,
+networkNode, onAdmittedVertex }`; the capability and bound close handle select
+all durable and authenticated material. `reopenCreatorSuccessorAdoption` is the
+named cold path. It accepts the existing pinned creator-genesis preparation
+inputs and configured AHE, trusted blueprint catalog, snapshot quarantine,
+live-journal, issuance, runtime and transport dependencies, plus the untrusted
+snapshot declaration; it accepts no current object, epoch, anchor, lifecycle,
+trust, source-disposition or signing identity selected by the caller. The RED
+freezes its exact closed key roster before GREEN, and `packages/node/package.json`
+exports only this non-root subpath.
+
+Cold reopen starts from `recoverActiveGeneration`, walks the retained
+generation-two lineage, hashes every closure blob, reconstructs a read-only
+historical AHE view over the retained predecessor generation for the existing
+creator-trust verifier, and reruns the complete D.108b authentication. It proves
+the successor trust record has the predecessor's exact `genesisAnchorDigest`,
+reopens and verifies the snapshot declaration and every chunk/cross-link, and
+reconstructs the terminal predecessor registration plus its issuance/journal
+stores as the displaced source before activation. It performs no `swapHead` or
+other adoption CAS. A process-local WeakMap is never treated as durable input;
+process death gets a newly authenticated `active-new` capability from this
+path. Snapshot TTL expiry likewise requires a bounded reopen and full
+reverification before authority can be acquired; there is no automatic retry
+loop, and each caller attempt performs at most one acquire/reverify decision.
+
+The focused commands are pinned as `pnpm exec vitest run
+tests/phase-6a-creator-successor-activation-red.test.ts
+packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts
+--no-coverage` and `pnpm exec playwright test --config
+packages/storage-browser/playwright.phase-6a-creator-successor-activation.config.ts`.
+Both must execute their complete RED-enumerated inventories with zero skip in
+GREEN. No root export, wire or storage schema, product API, topic derivation,
+issuance scope, snapshot format, digest owner, limit or memory ceiling changes
+in D.108d1. A need for any ninth production path stops and corrects this freeze
+before RED.
 
 #### D.108d2 — product and peer proof freeze boundary
 
@@ -59534,7 +59611,8 @@ D.108d1 result in the existing room and chat, projecting reopened
 epoch/anchor/lifecycle/creator-certified trust from the active handle, and
 proving a real epoch-one operation reaches both an existing peer and a fresh
 late peer. It may not add a second activation path or accept those values from
-caller DTOs.
+caller DTOs. The displaced-source claim is terminal and is never re-exposed to
+D.108d2; D.108d2 consumes only the already-active successor registration.
 
 The D.108d1 plan-freeze review packet used parent HEAD
 `dbb753fe78c5a8d8b6fbc420fe4e53fb0bda5269`, exact one-path staged tree
@@ -59553,6 +59631,42 @@ denied the `/tmp` contract file; it returned explanatory prose rather than the
 required terminal object and is `NO_VERDICT` without retry. No reviewer changed
 the tracked tree, no P0/P1 finding was available to reproduce, no confirmation
 review ran and no Fable process ran.
+
+At the user's express instruction after those harness failures, the corrected
+plan-freeze round used a self-contained, tool-free contract so every model
+could reach the terminal schema without repository or `/tmp` reads. The common
+contract SHA-256 was
+`6b2ba2752fb3e93c3f0f066162b36aa6c32cee7c11c9e4c73f131d425d11df9c`
+and reviewed plan-freeze HEAD
+`53b8d780ed15abf23bb5977286adaea012ac1f51`. Grok/high completed in
+255.067 seconds with exit code 0 and `stop_reason=end_turn`; the runner
+conservatively classified the turn `NO_VERDICT`, while its exact public JSON
+was `CHANGES_REQUIRED`, P0=0/P1=2/P2=3. The two reproduced P1s were the
+unresolved cross-tab exclusive authority and the incoherent fresh-capability
+duplicate path. Repository reproduction disproved the review prompt's premise
+that snapshot quarantine was exclusive: `openScope()` permits concurrent
+matching declarations and `release()` is local. The correction above therefore
+selects a fail-closed lifetime-held browser Web Lock, rather than transferring a
+non-exclusive quarantine session, and short-circuits authenticated hot
+duplicates before source claim or lock acquisition.
+
+Kimi CLI 1.49.0 used exact `kimi-code/k3`, thinking enabled, the 100-step
+ceiling and no tools in session
+`f1fc7d21-d9fa-4ff7-9e13-794dbc4da0e6`; its one model launch returned
+`ACCEPTED`, P0=0/P1=0/P2=2. Its P2s asked the GREEN to select one exclusivity
+mechanism and to state explicitly that WeakMap custody never survives reload;
+both are now pinned above. Opus session
+`e5eb1088-9dc0-4f05-b87a-b1b02d1db0b6` resolved to `claude-opus-5` at
+xhigh, launched no subagent and returned `CHANGES_REQUIRED`, P0=2/P1=6/P2=4.
+Its reproduced blockers were stable genesis-topic equality, genuine cross-tab
+single-writer authority, named cold durable derivation, pre-claim duplicate
+convergence, private-only non-genesis journal custody, direct browser-runner
+invocation, an enforced zero-skip GREEN inventory and removal of the open
+quarantine-lease conditional. The freeze now assigns each one to the exact
+seven RED/eight GREEN roster. Its four P2s are also pinned: the oracle import
+allowlist, bounded TTL reverify, byte-unchanged recovered-authority owner and
+terminal source claim outside D.108d2. No confirmation review ran, no reviewer
+changed the tracked tree, and no Fable or collaboration subagent ran.
 
 The complete retained Phase-4 snapshot suite, including the genuine fresh-
 process 64 MiB peak-live child, and every retained Phase-5 creator actor,
