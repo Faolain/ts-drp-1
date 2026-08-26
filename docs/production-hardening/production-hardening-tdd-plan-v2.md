@@ -57889,7 +57889,8 @@ The tests-only RED is exactly seven paths:
 - `packages/storage-browser/tests/assets/phase-5e-creator-relearn-entry.ts`;
 - `packages/storage-browser/tests/phase-5e-creator-relearn.pw.ts`;
 - `packages/storage-browser/playwright.phase-5e-creator-relearn.config.ts`; and
-- the dedicated non-graceful death child used by that Playwright owner.
+- `packages/storage-browser/tests/process/phase-5e-creator-relearn-death-child.ts`,
+  the dedicated non-graceful death child used by that Playwright owner.
 
 The expected GREEN is exactly eight paths:
 
