@@ -57757,6 +57757,28 @@ builds the exact package dependency chain, and then passes the complete retained
 Phase-4c suite. Record the exact commands, results, clean-environment identity,
 remaining debt and signed commit/push custody here before D.107c begins.
 
+D.107b.1 RED is signed and pushed as `ad6f1c1a`. The corrected exact-two
+packet has tree `aa5b30258dfec59558a342ae2d7d48a9c62c9840`, patch object
+`a4f912914de2a511157396cdd4f5559556546f91` and SHA-256
+`7b6861f2a9fcac309c6e44fa0683b6553d22ad5ab4996306ad42339122d0aa46`.
+Its deterministic environment uses a fixed allowlist, isolates the root
+`@ts-drp/canonical` ESM failure in its own fresh process, and separately proves
+the exact package-context resolution targets for the child's dependency set.
+The RED result is 2 pass / 1 intentional readiness failure, solely the absent
+shared launcher; Prettier, ESLint and both diff checks pass.
+
+The sole D.107b.1 RED review round used pre-correction HEAD `6f4a9dc1`, staged
+tree `c7033039a1d9b9d8d2026840b4634f86e484d8c4`, patch object
+`87f6786c432c0214822a37eb0b2f628379a34064` and SHA-256
+`c08258f389b198c0ccb9b3948d860cc8e7a1d489dbaf906ac6fd0676d24519c2`.
+Grok returned `PASS`, P0=0/P1=0. Kimi completed exactly 100 checks and returned
+`PASS`, P0=0/P1=0. Opus returned `CHANGES_REQUIRED`, P0=1/P1=4: the original
+whole-child diagnosis was link-order dependent; the environment omitted
+`NODE_OPTIONS`; prohibition contents and exact resolved targets were not fully
+pinned; and readiness did not force removal of the source-relative product
+import. All five findings were corrected in the same RED round. No confirmation
+review was run.
+
 ### D.107c — persistent peer evidence and bounded re-learn
 
 D.107c adds the connected peer carrier and the only q=1 recovery gate. The RED
