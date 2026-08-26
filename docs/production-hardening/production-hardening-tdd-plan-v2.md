@@ -57608,17 +57608,21 @@ The tests-only RED is exactly three paths:
 - `tests/fixtures/phase-5e-v3/creator-close-types.ts`; and
 - `tests/phase-5e-creator-close-red.test.ts`.
 
-The expected GREEN is exactly nine paths:
+The expected GREEN is exactly ten paths:
 
 - `packages/protocol-v3/src/{index.ts,anchor-trust-singleton.ts,creator-close.ts,seal.ts,snapshot-transfer.ts}`;
 - `packages/protocol-v3/src/internal/{creator-anchor-signing-request.ts,seal-authority-custody.ts}`;
 - the protocol-v3 package export; and
-- the specific-before-bare Vite alias.
+- the specific-before-bare Vite alias; and
+- `tests/fixtures/phase-4c-v3/snapshot-stream-types.ts`, whose retained exact
+  snapshot-transfer export roster must add the encoder in the same commit.
 
 The new creator-close subpath composes facts produced by the existing compaction
 history/snapshot owners; it does not reimplement their graph traversal, fold,
 Merkle or payload logic. Snapshot-manifest encoding joins its existing decoder
-in the snapshot-transfer owner. Successor preparation is one creator-close
+in the snapshot-transfer owner. The q=1 QC evidence is assembled independently
+by the tests and accepted only through the unchanged common verifier; D.107a
+does not add a second public QC-assembly API. Successor preparation is one creator-close
 concept, not parallel `creator-close` and `anchor-trust-advance` abstractions.
 
 A required additional semantic owner, registry/schema/domain change, root
@@ -57804,6 +57808,18 @@ recoverable 100-check artifact existed, so it was neither retried nor counted as
 approval. This corrected decision keeps one trust-record classifier, one
 evidence store and one trust-advancement classifier; no confirmation review is
 authorized.
+
+The sole D.107a RED review round also closed with a same-round correction.
+Grok returned `CHANGES` after reproducing the retained snapshot export-roster
+conflict, caller-summary facade risk and header-only epoch mutants. Opus returned
+`CHANGES` after identifying four unbound CutValue/snapshot claims and the lack
+of a validly signed foreign successor-anchor case. Kimi is recorded as
+`NO_VERDICT`: its CLI rejected incompatible launch flags before any model
+session began, and the no-retry rule was honored. The corrected RED keeps graph
+traversal and Merkle derivation in compaction, binds every independently derived
+claim at the protocol seam, uses internally consistent signed advancement
+mutants, retains the Phase-4c export contract in the exact-ten GREEN, and adds
+no public QC assembler.
 
 Product capability gained only after D.107d: the creator can seal one genuine
 live epoch, persist and publish its exact q=1 certificate and snapshot, survive
