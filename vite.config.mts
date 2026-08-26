@@ -2,11 +2,15 @@ import path from "node:path";
 import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
-export default defineConfig({
+const __dirname = import.meta.dirname;
+
+const config = defineConfig({
 	plugins: [tsconfigPaths()],
 	resolve: {
 		alias: {
 			"@ts-drp/keychain/finality": path.resolve(__dirname, "packages/keychain/src/finality.ts"),
+			"@ts-drp/network/seal": path.resolve(__dirname, "packages/network/src/seal.ts"),
+			"@ts-drp/node/creator-seal": path.resolve(__dirname, "packages/node/src/creator-seal.ts"),
 			"@ts-drp/seal/creator": path.resolve(__dirname, "packages/seal/src/creator.ts"),
 			"@ts-drp/seal/internal/creator-close-intent": path.resolve(
 				__dirname,
@@ -97,3 +101,7 @@ export default defineConfig({
 		testTimeout: 10000,
 	},
 });
+
+export const workspaceAliases = Object.freeze({ ...(config.resolve?.alias as Record<string, string>) });
+
+export default config;

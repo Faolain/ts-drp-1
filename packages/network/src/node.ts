@@ -91,6 +91,7 @@ import {
 } from "./connection-budget.js";
 import { createMetricsRegister, type PrometheusMetricsRegister } from "./metrics/prometheus.js";
 import { PeerSelector } from "./peer-selector.js";
+import { SEAL_EVIDENCE_PROTOCOL, type SealEvidenceProtocolPort } from "./seal.js";
 import {
 	SNAPSHOT_CHUNK_PROTOCOL,
 	type SnapshotChunkProtocolPort,
@@ -529,6 +530,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 	private _activeUnreliableWebRtcOwner?: DRPUnreliableWebRtcOwner;
 	private _unreliableWebRtcIncoming?: (stream: Stream, connection: Connection) => Promise<void>;
 	private _snapshotChunkIncoming?: (stream: Stream, connection: Connection) => Promise<void>;
+	private _sealEvidenceIncoming?: (stream: Stream, connection: Connection) => Promise<void>;
 	private readonly _unreliableWebRtcOwner: DRPUnreliableWebRtcOwner;
 	private readonly _ingressEvidence = new WeakMap<Message, IngressEvidence>();
 	private readonly _syncAdmissions = new WeakMap<Connection, SyncSendAdmission>();
@@ -783,6 +785,140 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 				return (): void => {
 					if (incoming !== undefined && this._snapshotChunkIncoming === incoming) {
 						this._snapshotChunkIncoming = undefined;
+					}
+					selectedHandler = undefined;
+				};
+			},
+		});
+	}
+
+	/**
+	 * Creates one bounded creator-seal evidence carrier over already-open authenticated connections.
+	 * The carrier owns framing only; evidence verification and selection remain outside network.
+	 * @returns A connected-only request/response port with no dial fallback.
+	 */
+	createSealEvidenceProtocolHost(): SealEvidenceProtocolPort {
+		const maxBytes = 262_144;
+		const active = new Set<Stream>();
+		let closed = false;
+		let selectedHandler:
+			| ((input: Readonly<{ peerId: string; request: unknown; signal: AbortSignal }>) => Promise<unknown>)
+			| undefined;
+		let incoming: ((stream: Stream, connection: Connection) => Promise<void>) | undefined;
+		const failure = (message: string, cause?: unknown): Error =>
+			new Error(message, cause === undefined ? undefined : { cause });
+		const encode = (value: unknown): Uint8Array => {
+			const text = JSON.stringify(value, (_key, item: unknown) =>
+				item instanceof Uint8Array ? { $tsDrpBytes: Array.from(item) } : item
+			);
+			if (text === undefined) throw failure("seal-evidence carrier is not serializable");
+			const bytes = new TextEncoder().encode(text);
+			if (bytes.byteLength > maxBytes) throw failure("seal-evidence carrier exceeds its byte bound");
+			return bytes;
+		};
+		const decode = (bytes: Uint8Array): unknown =>
+			JSON.parse(new TextDecoder().decode(bytes), (_key, item: unknown) => {
+				if (
+					item !== null &&
+					typeof item === "object" &&
+					!Array.isArray(item) &&
+					Reflect.ownKeys(item).length === 1 &&
+					Array.isArray(Reflect.get(item, "$tsDrpBytes"))
+				) {
+					const values = Reflect.get(item, "$tsDrpBytes") as unknown[];
+					if (values.every((value) => Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 255)) {
+						return Uint8Array.from(values as number[]);
+					}
+				}
+				return item;
+			});
+		const connectedPeers = (): readonly string[] => {
+			if (closed || this._node === undefined) return [];
+			return [
+				...new Set(
+					this._node
+						.getConnections()
+						.filter(({ status }) => status === "open")
+						.map(({ remotePeer }) => remotePeer.toString())
+				),
+			].sort();
+		};
+		return Object.freeze({
+			localPeerId: this.peerId,
+			close: (): Promise<void> => {
+				if (closed) return Promise.resolve();
+				closed = true;
+				if (incoming !== undefined && this._sealEvidenceIncoming === incoming) {
+					this._sealEvidenceIncoming = undefined;
+				}
+				selectedHandler = undefined;
+				for (const stream of [...active]) stream.abort(failure("seal-evidence protocol port closed"));
+				active.clear();
+				return Promise.resolve();
+			},
+			connectedPeers,
+			query: async (
+				peerId: string,
+				request: unknown,
+				{ signal }: Readonly<{ signal: AbortSignal }>
+			): Promise<unknown> => {
+				if (closed || this._node === undefined || signal.aborted) {
+					throw failure("seal-evidence connection is unavailable", signal.reason);
+				}
+				let connection: Connection | undefined;
+				try {
+					connection = this._node
+						.getConnections(peerIdFromString(peerId))
+						.filter(({ status }) => status === "open")
+						.sort((left, right) => left.id.localeCompare(right.id))[0];
+				} catch {
+					connection = undefined;
+				}
+				if (connection === undefined) throw failure("seal-evidence peer is not already connected");
+				const stream = await connection.newStream(SEAL_EVIDENCE_PROTOCOL, { signal });
+				active.add(stream);
+				try {
+					await writeUint8ArrayFrame(stream, encode(request));
+					if (signal.aborted) throw failure("seal-evidence query was aborted", signal.reason);
+					return decode(new Uint8Array(await readUint8ArrayFrame(stream, maxBytes)));
+				} finally {
+					active.delete(stream);
+					await stream.close().catch(() => undefined);
+				}
+			},
+			serve: (
+				handler: (input: Readonly<{ peerId: string; request: unknown; signal: AbortSignal }>) => Promise<unknown>
+			): (() => void) => {
+				if (closed || selectedHandler !== undefined || this._sealEvidenceIncoming !== undefined) {
+					throw new TypeError("seal-evidence protocol server is unavailable");
+				}
+				selectedHandler = handler;
+				incoming = async (stream, connection): Promise<void> => {
+					const selected = selectedHandler;
+					if (closed || selected === undefined) {
+						stream.abort(failure("seal-evidence protocol server is unavailable"));
+						return;
+					}
+					active.add(stream);
+					const controller = new AbortController();
+					try {
+						const request = decode(new Uint8Array(await readUint8ArrayFrame(stream, maxBytes)));
+						const response = await selected({
+							peerId: connection.remotePeer.toString(),
+							request,
+							signal: controller.signal,
+						});
+						await writeUint8ArrayFrame(stream, encode(response));
+					} finally {
+						controller.abort();
+						active.delete(stream);
+						await stream.close().catch(() => undefined);
+					}
+				};
+				this._sealEvidenceIncoming = incoming;
+				return (): void => {
+					if (incoming !== undefined && this._sealEvidenceIncoming === incoming) {
+						this._sealEvidenceIncoming = undefined;
 					}
 					selectedHandler = undefined;
 				};
@@ -1858,6 +1994,7 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 		if (this._node?.status === IntervalRunnerState.Stopped) throw new Error("Node not started");
 		this._deactivateUnreliableWebRtcOwner();
 		this._snapshotChunkIncoming = undefined;
+		this._sealEvidenceIncoming = undefined;
 		this._peerSelector?.stop();
 		this._peerSelector = undefined;
 		this._connectionAdmission?.stop();
@@ -2762,6 +2899,18 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 				const listener = this._snapshotChunkIncoming;
 				if (listener === undefined) {
 					stream.abort(new Error("snapshot protocol owner is unavailable"));
+					return;
+				}
+				await listener(stream, connection);
+			},
+			{ maxInboundStreams: 4, maxOutboundStreams: 4 }
+		);
+		await this._node?.handle(
+			SEAL_EVIDENCE_PROTOCOL,
+			async (stream, connection): Promise<void> => {
+				const listener = this._sealEvidenceIncoming;
+				if (listener === undefined) {
+					stream.abort(new Error("seal-evidence protocol owner is unavailable"));
 					return;
 				}
 				await listener(stream, connection);

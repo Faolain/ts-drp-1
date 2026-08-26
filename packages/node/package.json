@@ -30,6 +30,10 @@
 		"./snapshot-transfer": {
 			"types": "./dist/src/snapshot-transfer.d.ts",
 			"import": "./dist/src/snapshot-transfer.js"
+		},
+		"./creator-seal": {
+			"types": "./dist/src/creator-seal.d.ts",
+			"import": "./dist/src/creator-seal.js"
 		}
 	},
 	"scripts": {

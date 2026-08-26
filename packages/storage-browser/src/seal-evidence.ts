@@ -3,7 +3,9 @@ import {
 	mintCreatorCloseEvidenceStore,
 } from "@ts-drp/seal/internal/creator-close-intent";
 
-import { openInternalSealEvidenceStore } from "./internal/seal-evidence-store.js";
+import { openInternalSealEvidenceStore, type PeerSealEvidence } from "./internal/seal-evidence-store.js";
+
+export type { PeerSealEvidence } from "./internal/seal-evidence-store.js";
 
 /**
  * Opens observation-only creator-close evidence custody on the primary browser database.
@@ -14,6 +16,13 @@ export async function openBrowserSealEvidenceStore(input: Readonly<{ databaseNam
 	Readonly<{
 		close(): Promise<void>;
 		observation: Readonly<{ evidenceCount: number; incarnation: string; version: 3 }>;
+		persistPeerEvidence(
+			input: Readonly<{ evidence: PeerSealEvidence }>
+		): Promise<Readonly<{ duplicate: boolean; ok: true } | { ok: false; reason: string }>>;
+		restorePeerEvidence(
+			input: Readonly<{ evidence: PeerSealEvidence }>
+		): Promise<Readonly<{ duplicate: boolean; ok: true } | { ok: false; reason: string }>>;
+		servePeerEvidence(input: Readonly<{ objectId: string; signerId: string }>): Promise<PeerSealEvidence | null>;
 		store: CreatorCloseEvidenceStore;
 	}>
 > {
@@ -35,6 +44,9 @@ export async function openBrowserSealEvidenceStore(input: Readonly<{ databaseNam
 			incarnation: internal.incarnation,
 			version: 3 as const,
 		}),
+		persistPeerEvidence: ({ evidence }) => internal.persistPeerEvidence(evidence),
+		restorePeerEvidence: ({ evidence }) => internal.restorePeerEvidence(evidence),
+		servePeerEvidence: ({ objectId, signerId }) => internal.servePeerEvidence(objectId, signerId),
 		store: mintCreatorCloseEvidenceStore({
 			put: (record, expectedPhase) => internal.put(record, expectedPhase),
 			readAll: () => internal.readAll(),

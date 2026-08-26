@@ -1,4 +1,4 @@
-import { compareBytes } from "@ts-drp/canonical";
+import { compareBytes, decodeCanonical, hashDomain } from "@ts-drp/canonical";
 import {
 	copyCreatorCloseEvidenceRecord,
 	type CreatorCloseEvidencePhase,
@@ -30,6 +30,25 @@ export interface InternalSealEvidenceStore {
 		expectedPhase: CreatorCloseEvidencePhase | null
 	): Promise<Readonly<{ duplicate: boolean; ok: true } | { ok: false; reason: string }>>;
 	readAll(): Promise<readonly CreatorCloseEvidenceRecord[]>;
+	persistPeerEvidence(
+		evidence: PeerSealEvidence
+	): Promise<Readonly<{ duplicate: boolean; ok: true } | { ok: false; reason: string }>>;
+	restorePeerEvidence(
+		evidence: PeerSealEvidence
+	): Promise<Readonly<{ duplicate: boolean; ok: true } | { ok: false; reason: string }>>;
+	servePeerEvidence(objectId: string, signerId: string): Promise<PeerSealEvidence | null>;
+}
+
+export interface PeerSealEvidence {
+	readonly carrier: Readonly<{
+		readonly exactCanonicalPreimageBytes: Uint8Array;
+		readonly signature: Uint8Array;
+	}>;
+	readonly exactCanonicalCommitQcBytes: Uint8Array;
+	readonly exactCanonicalCutValueBytes: Uint8Array;
+	readonly exactCanonicalTrustStateRecordBytes: Uint8Array;
+	readonly kind: "drp-creator-seal-evidence";
+	readonly signerPublicKey: Uint8Array;
 }
 
 function plainRecord(value: unknown): value is Readonly<Record<string, unknown>> {
@@ -95,6 +114,102 @@ function copiedRecord(value: unknown): CreatorCloseEvidenceRecord | undefined {
 		storageIncarnation: value.storageIncarnation,
 		valueDigest: value.valueDigest,
 	});
+}
+
+function copiedPeerEvidence(value: unknown): PeerSealEvidence | undefined {
+	if (!plainRecord(value) || Reflect.ownKeys(value).length !== 6 || value.kind !== "drp-creator-seal-evidence") {
+		return undefined;
+	}
+	if (!plainRecord(value.carrier) || Reflect.ownKeys(value.carrier).length !== 2) return undefined;
+	const preimage = exactBytes(value.carrier.exactCanonicalPreimageBytes);
+	const signature = exactBytes(value.carrier.signature);
+	const commitQc = exactBytes(value.exactCanonicalCommitQcBytes);
+	const cut = exactBytes(value.exactCanonicalCutValueBytes);
+	const trust = exactBytes(value.exactCanonicalTrustStateRecordBytes);
+	const publicKey = exactBytes(value.signerPublicKey);
+	if (
+		preimage === undefined ||
+		preimage === null ||
+		signature === undefined ||
+		signature === null ||
+		signature.byteLength !== 64 ||
+		commitQc === undefined ||
+		commitQc === null ||
+		cut === undefined ||
+		cut === null ||
+		trust === undefined ||
+		trust === null ||
+		publicKey === undefined ||
+		publicKey === null ||
+		publicKey.byteLength !== 32
+	) {
+		return undefined;
+	}
+	return Object.freeze({
+		carrier: Object.freeze({ exactCanonicalPreimageBytes: preimage, signature }),
+		exactCanonicalCommitQcBytes: commitQc,
+		exactCanonicalCutValueBytes: cut,
+		exactCanonicalTrustStateRecordBytes: trust,
+		kind: "drp-creator-seal-evidence" as const,
+		signerPublicKey: publicKey,
+	});
+}
+
+function samePeerEvidence(left: PeerSealEvidence, right: PeerSealEvidence): boolean {
+	return (
+		compareBytes(left.carrier.exactCanonicalPreimageBytes, right.carrier.exactCanonicalPreimageBytes) === 0 &&
+		compareBytes(left.carrier.signature, right.carrier.signature) === 0 &&
+		compareBytes(left.exactCanonicalCommitQcBytes, right.exactCanonicalCommitQcBytes) === 0 &&
+		compareBytes(left.exactCanonicalCutValueBytes, right.exactCanonicalCutValueBytes) === 0 &&
+		compareBytes(left.exactCanonicalTrustStateRecordBytes, right.exactCanonicalTrustStateRecordBytes) === 0 &&
+		compareBytes(left.signerPublicKey, right.signerPublicKey) === 0
+	);
+}
+
+function peerIdentity(
+	evidence: PeerSealEvidence
+): Readonly<{ anchor: string; epoch: 0; objectId: string; signerId: string; valueDigest: string }> | undefined {
+	try {
+		const vote = decodeCanonical(evidence.carrier.exactCanonicalPreimageBytes);
+		const qc = decodeCanonical(evidence.exactCanonicalCommitQcBytes);
+		const cut = decodeCanonical(evidence.exactCanonicalCutValueBytes);
+		if (
+			!plainRecord(vote) ||
+			!plainRecord(qc) ||
+			!plainRecord(cut) ||
+			vote.kind !== "drp-seal-vote" ||
+			vote.phase !== "commit" ||
+			vote.epoch !== 0 ||
+			qc.kind !== "drp-seal-qc" ||
+			qc.phase !== "commit" ||
+			qc.objectId !== vote.objectId ||
+			qc.epoch !== vote.epoch ||
+			cut.kind !== "drp-hard-epoch-cut" ||
+			cut.objectId !== vote.objectId ||
+			cut.epoch !== vote.epoch ||
+			typeof vote.objectId !== "string" ||
+			typeof vote.signerId !== "string" ||
+			typeof cut.previousAnchor !== "string" ||
+			!digestHex.test(cut.previousAnchor)
+		) {
+			return undefined;
+		}
+		return Object.freeze({
+			anchor: cut.previousAnchor,
+			epoch: 0 as const,
+			objectId: vote.objectId,
+			signerId: vote.signerId,
+			valueDigest: Array.from(hashDomain("ts-drp/hard-epoch-cut/v3", evidence.exactCanonicalCutValueBytes), (byte) =>
+				byte.toString(16).padStart(2, "0")
+			).join(""),
+		});
+	} catch {
+		return undefined;
+	}
+}
+
+function peerEvidenceFromRow(value: unknown): PeerSealEvidence | undefined {
+	return plainRecord(value) ? copiedPeerEvidence(value.peerEvidence) : undefined;
 }
 
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {
@@ -166,6 +281,62 @@ export async function openInternalSealEvidenceStore(
 		throw new Error("invalid storage incarnation row");
 	}
 	const incarnation = meta.value;
+	const writePeerEvidence = async (
+		value: PeerSealEvidence
+	): Promise<Readonly<{ duplicate: boolean; ok: true } | { ok: false; reason: string }>> => {
+		const evidence = copiedPeerEvidence(value);
+		const identity = evidence === undefined ? undefined : peerIdentity(evidence);
+		if (evidence === undefined || identity === undefined) {
+			return Object.freeze({ ok: false as const, reason: "MALFORMED_EVIDENCE" });
+		}
+		const transaction = database.transaction(PHASE_5E_SEAL_EVIDENCE_STORE, "readwrite", {
+			durability: "strict",
+		});
+		if (transaction.durability !== "strict") {
+			transaction.abort();
+			throw new Error("strict IndexedDB durability is unavailable");
+		}
+		const completion = transactionComplete(transaction);
+		const store = transaction.objectStore(PHASE_5E_SEAL_EVIDENCE_STORE);
+		const key: [string, 0, string] = [identity.objectId, 0, identity.signerId];
+		const raw = await requestResult(store.get(key));
+		const existing = copiedRecord(raw);
+		const existingPeer = peerEvidenceFromRow(raw);
+		if (existingPeer !== undefined && samePeerEvidence(existingPeer, evidence)) {
+			await completion;
+			return Object.freeze({ duplicate: true, ok: true as const });
+		}
+		const conflicts =
+			raw !== undefined &&
+			(existingPeer !== undefined ||
+				existing === undefined ||
+				existing.anchor !== identity.anchor ||
+				existing.objectId !== identity.objectId ||
+				existing.signerId !== identity.signerId ||
+				existing.valueDigest !== identity.valueDigest ||
+				compareBytes(existing.signerPublicKey, evidence.signerPublicKey) !== 0 ||
+				compareBytes(existing.exactCanonicalCutValueBytes, evidence.exactCanonicalCutValueBytes) !== 0 ||
+				existing.exactCanonicalCommitQcBytes === null ||
+				compareBytes(existing.exactCanonicalCommitQcBytes, evidence.exactCanonicalCommitQcBytes) !== 0 ||
+				existing.exactCanonicalTrustStateRecordBytes === null ||
+				compareBytes(existing.exactCanonicalTrustStateRecordBytes, evidence.exactCanonicalTrustStateRecordBytes) !== 0);
+		if (conflicts) {
+			transaction.abort();
+			try {
+				await completion;
+			} catch {
+				// The mechanical owner returns the typed conflict below.
+			}
+			return Object.freeze({ ok: false as const, reason: "EVIDENCE_CONFLICT" });
+		}
+		const row =
+			existing === undefined
+				? { epoch: 0 as const, objectId: identity.objectId, peerEvidence: evidence, signerId: identity.signerId }
+				: { ...existing, peerEvidence: evidence };
+		await requestResult(store.put(row));
+		await completion;
+		return Object.freeze({ duplicate: false, ok: true as const });
+	};
 	return Object.freeze({
 		close: () => database.close(),
 		incarnation,
@@ -220,13 +391,31 @@ export async function openInternalSealEvidenceStore(
 			const transaction = database.transaction(PHASE_5E_SEAL_EVIDENCE_STORE, "readonly");
 			const rows = await requestResult(transaction.objectStore(PHASE_5E_SEAL_EVIDENCE_STORE).getAll());
 			await transactionComplete(transaction);
-			return Object.freeze(
-				rows.map((row) => {
-					const copied = copiedRecord(row);
-					if (copied === undefined) throw new Error("invalid durable creator-close evidence");
-					return copied;
-				})
+			const authored: CreatorCloseEvidenceRecord[] = [];
+			for (const row of rows) {
+				const copied = copiedRecord(row);
+				if (copied !== undefined) authored.push(copied);
+				else if (peerEvidenceFromRow(row) === undefined) throw new Error("invalid durable creator-close evidence");
+			}
+			return Object.freeze(authored);
+		},
+		persistPeerEvidence: writePeerEvidence,
+		restorePeerEvidence: writePeerEvidence,
+		async servePeerEvidence(objectId: string, signerId: string): Promise<PeerSealEvidence | null> {
+			if (
+				typeof objectId !== "string" ||
+				objectId.length === 0 ||
+				typeof signerId !== "string" ||
+				signerId.length === 0
+			) {
+				throw new TypeError("peer evidence identity is invalid");
+			}
+			const transaction = database.transaction(PHASE_5E_SEAL_EVIDENCE_STORE, "readonly");
+			const row = await requestResult(
+				transaction.objectStore(PHASE_5E_SEAL_EVIDENCE_STORE).get([objectId, 0, signerId])
 			);
+			await transactionComplete(transaction);
+			return peerEvidenceFromRow(row) ?? null;
 		},
 	});
 }

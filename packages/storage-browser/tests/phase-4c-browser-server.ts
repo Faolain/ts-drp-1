@@ -6,8 +6,18 @@ export interface Phase4cBrowserServer {
 	close(): Promise<void>;
 }
 
+async function workspaceAliases(): Promise<Readonly<Record<string, string>>> {
+	const configUrl = new URL("../../../vite.config.mts", import.meta.url).href;
+	const loaded = (await import(configUrl)) as Readonly<{
+		workspaceAliases?: Readonly<Record<string, string>>;
+	}>;
+	if (loaded.workspaceAliases === undefined) throw new Error("workspace alias map is unavailable");
+	return loaded.workspaceAliases;
+}
+
 async function bundle(entryPoint: string): Promise<string> {
 	const result = await build({
+		alias: await workspaceAliases(),
 		bundle: true,
 		entryPoints: [entryPoint],
 		format: "esm",
