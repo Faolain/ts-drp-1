@@ -313,7 +313,7 @@ async function runCooperativeVersionchange(): Promise<unknown> {
 			return Object.freeze({ kind: "open-error", error: serializeError(error) });
 		}
 		let blocked = false;
-		const upgrade = indexedDB.open(databaseName, 2);
+		const upgrade = indexedDB.open(databaseName, 4);
 		upgrade.onblocked = (): void => {
 			blocked = true;
 		};

@@ -30,6 +30,12 @@ export const REQUIRED_GREEN_PATHS = Object.freeze([
 	"packages/storage-browser/tests/phase-5c-seal-vote-schema.pw.ts",
 	"packages/storage-browser/tests/phase-5c-seal-vote-death.pw.ts",
 	"packages/storage-browser/tests/assets/phase-5d-round-change-entry.ts",
+	"tests/phase-4c-snapshot-quarantine-red.test.ts",
+	"packages/storage-browser/tests/fixtures/idb-adapter-browser-oracle.ts",
+	"packages/storage-browser/tests/phase-2d1-schema-lifecycle-red.pw.ts",
+	"packages/storage-browser/tests/assets/schema-lifecycle-entry.ts",
+	"tests/fixtures/phase-5e-v3/creator-actor-contract.ts",
+	"tests/phase-5e-creator-actor-red.test.ts",
 	"vite.config.mts",
 ]);
 

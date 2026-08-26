@@ -442,7 +442,7 @@ async function runVersionChangeScenario(databaseName: string): Promise<unknown> 
 	const successor = await openInternalSealVoteStore({ databaseName });
 	const pending = await successor.readPending();
 	const result = {
-		blockedLateUpgradeCommitted: successor.schema.version !== 2,
+		blockedLateUpgradeCommitted: successor.schema.version !== 3,
 		connectionClosedSynchronously,
 		lateDispatchMarked: pending.length === 0,
 		successorPendingCount: pending.length,

@@ -76,7 +76,7 @@ async function inspectRaw(page: Page, databaseName: string): Promise<unknown> {
 	}, databaseName);
 }
 
-test("fresh and exact-v1 databases become the closed version-2 eight-store schema", async ({ page }) => {
+test("fresh and exact-v1 databases become the additive version-3 nine-store schema", async ({ page }) => {
 	await installTransactionObserver(page);
 	await page.goto(server?.origin ?? "about:blank");
 	const databaseName = `phase-5c-schema-${crypto.randomUUID()}`;
@@ -97,16 +97,17 @@ test("fresh and exact-v1 databases become the closed version-2 eight-store schem
 		"generations",
 		"objects",
 		"promotions",
+		"sealEvidence",
 		"signerState",
 		"storageMeta",
 		"voteOutbox",
 		"voteSlots",
 	];
-	expect(result.fresh).toMatchObject({ stores, version: 2 });
+	expect(result.fresh).toMatchObject({ stores, version: 3 });
 	expect(result.fresh.incarnation).toMatch(/^[0-9a-f]{32,}$/u);
-	expect(result.upgraded).toEqual({ preservedLegacyRows: 4, stores, version: 2 });
+	expect(result.upgraded).toEqual({ preservedLegacyRows: 4, stores, version: 3 });
 	expect(result.malformed).toEqual({ rejected: true, unchanged: true });
-	expect(await inspectRaw(page, databaseName)).toMatchObject({ stores, version: 2 });
+	expect(await inspectRaw(page, databaseName)).toMatchObject({ stores, version: 3 });
 });
 
 test("one strict transaction owns incarnation, signer state, slot and outbox before release", async ({ page }) => {
@@ -218,7 +219,7 @@ test("worker termination reopens only the committed exact vote state", async ({ 
 	expect(reopened).toMatchObject({ pendingCount: 1, state: "exact-new" });
 	expect(await inspectRaw(page, databaseName)).toMatchObject({
 		counts: { signerState: 1, storageMeta: 1, voteOutbox: 1, voteSlots: 1 },
-		version: 2,
+		version: 3,
 	});
 });
 

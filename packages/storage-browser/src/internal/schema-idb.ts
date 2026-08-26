@@ -31,7 +31,7 @@ export const PHASE_2D_SCHEMA_AUTHORITY = Object.freeze({
 	version: 1,
 } as const);
 
-export const PHASE_5C_SCHEMA_AUTHORITY = Object.freeze({
+const PHASE_5C_LEGACY_SCHEMA_AUTHORITY = Object.freeze({
 	stores: Object.freeze([
 		...PHASE_2D_SCHEMA_AUTHORITY.stores,
 		Object.freeze({ autoIncrement: false, indexes: Object.freeze([]), keyPath: "key", name: "storageMeta" }),
@@ -57,6 +57,21 @@ export const PHASE_5C_SCHEMA_AUTHORITY = Object.freeze({
 	version: 2,
 } as const);
 
+export const PHASE_5C_SCHEMA_AUTHORITY = Object.freeze({
+	stores: Object.freeze([
+		...PHASE_5C_LEGACY_SCHEMA_AUTHORITY.stores,
+		Object.freeze({
+			autoIncrement: false,
+			indexes: Object.freeze([]),
+			keyPath: Object.freeze(["objectId", "epoch", "signerId"]),
+			name: "sealEvidence",
+		}),
+	]),
+	version: 3,
+} as const);
+
+export const PHASE_5E_SCHEMA_AUTHORITY = PHASE_5C_SCHEMA_AUTHORITY;
+
 export const PHASE_2D_SCHEMA_VERSION = PHASE_2D_SCHEMA_AUTHORITY.version;
 export const PHASE_2D_OBJECTS_STORE = PHASE_2D_SCHEMA_AUTHORITY.stores[0].name;
 export const PHASE_2D_GENERATIONS_STORE = PHASE_2D_SCHEMA_AUTHORITY.stores[1].name;
@@ -67,6 +82,8 @@ export const PHASE_5C_STORAGE_META_STORE = "storageMeta" as const;
 export const PHASE_5C_VOTE_SLOTS_STORE = "voteSlots" as const;
 export const PHASE_5C_SIGNER_STATE_STORE = "signerState" as const;
 export const PHASE_5C_VOTE_OUTBOX_STORE = "voteOutbox" as const;
+export const PHASE_5E_SCHEMA_VERSION = PHASE_5E_SCHEMA_AUTHORITY.version;
+export const PHASE_5E_SEAL_EVIDENCE_STORE = "sealEvidence" as const;
 
 export interface Phase2dStorageDecisionBinding {
 	readonly chosen: "idb-strict" | "unselected";
@@ -133,7 +150,11 @@ function exactKeyPath(actual: string | string[] | null, expected: string | reado
 
 function hasExactSchema(
 	database: IDBDatabase,
-	authority: typeof PHASE_2D_SCHEMA_AUTHORITY | typeof PHASE_5C_SCHEMA_AUTHORITY,
+	authority:
+		| typeof PHASE_2D_SCHEMA_AUTHORITY
+		| typeof PHASE_5C_LEGACY_SCHEMA_AUTHORITY
+		| typeof PHASE_5C_SCHEMA_AUTHORITY
+		| typeof PHASE_5E_SCHEMA_AUTHORITY,
 	transaction?: IDBTransaction,
 	ignoreVersion = false
 ): boolean {
@@ -206,7 +227,7 @@ function classifyOpenError(error: DOMException | null): Error {
 
 function openDatabase(databaseName: string, onVersionChange?: () => void): Promise<IDBDatabase> {
 	return new Promise((resolve, reject) => {
-		const request = indexedDB.open(databaseName, PHASE_5C_SCHEMA_VERSION);
+		const request = indexedDB.open(databaseName, PHASE_5E_SCHEMA_VERSION);
 		let blockedTimer: ReturnType<typeof setTimeout> | undefined;
 		let settled = false;
 		const clearBlockedTimer = (): void => {
@@ -216,7 +237,11 @@ function openDatabase(databaseName: string, onVersionChange?: () => void): Promi
 			"upgradeneeded",
 			(event) => {
 				const transaction = request.transaction;
-				if (settled || transaction === null || (event.oldVersion !== 0 && event.oldVersion !== 1)) {
+				if (
+					settled ||
+					transaction === null ||
+					(event.oldVersion !== 0 && event.oldVersion !== 1 && event.oldVersion !== 2)
+				) {
 					request.transaction?.abort();
 					return;
 				}
@@ -225,15 +250,31 @@ function openDatabase(databaseName: string, onVersionChange?: () => void): Promi
 						transaction.abort();
 						return;
 					}
-					createStores(request.result, PHASE_5C_SCHEMA_AUTHORITY.stores);
-				} else {
+					createStores(request.result, PHASE_5E_SCHEMA_AUTHORITY.stores);
+					transaction.objectStore(PHASE_5C_STORAGE_META_STORE).add({
+						key: "incarnation",
+						value: randomIncarnation(),
+					});
+				} else if (event.oldVersion === 1) {
 					if (!hasExactSchema(request.result, PHASE_2D_SCHEMA_AUTHORITY, transaction, true)) {
 						transaction.abort();
 						return;
 					}
-					createStores(request.result, PHASE_5C_SCHEMA_AUTHORITY.stores.slice(PHASE_2D_SCHEMA_AUTHORITY.stores.length));
+					createStores(request.result, PHASE_5E_SCHEMA_AUTHORITY.stores.slice(PHASE_2D_SCHEMA_AUTHORITY.stores.length));
+					transaction.objectStore(PHASE_5C_STORAGE_META_STORE).add({
+						key: "incarnation",
+						value: randomIncarnation(),
+					});
+				} else {
+					if (!hasExactSchema(request.result, PHASE_5C_LEGACY_SCHEMA_AUTHORITY, transaction, true)) {
+						transaction.abort();
+						return;
+					}
+					createStores(
+						request.result,
+						PHASE_5E_SCHEMA_AUTHORITY.stores.slice(PHASE_5C_LEGACY_SCHEMA_AUTHORITY.stores.length)
+					);
 				}
-				transaction.objectStore(PHASE_5C_STORAGE_META_STORE).add({ key: "incarnation", value: randomIncarnation() });
 			},
 			{ once: true }
 		);
@@ -266,7 +307,7 @@ function openDatabase(databaseName: string, onVersionChange?: () => void): Promi
 					database.close();
 					return;
 				}
-				if (!hasExactSchema(database, PHASE_5C_SCHEMA_AUTHORITY)) {
+				if (!hasExactSchema(database, PHASE_5E_SCHEMA_AUTHORITY)) {
 					database.close();
 					settled = true;
 					clearBlockedTimer();

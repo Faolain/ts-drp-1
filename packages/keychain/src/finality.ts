@@ -1,5 +1,9 @@
 import { generateKeyPairFromSeed } from "@libp2p/crypto/keys";
 import type { Ed25519PrivateKey } from "@libp2p/interface";
+import {
+	consumeCreatorAnchorSigningRequest,
+	type CreatorAnchorSigningRequest,
+} from "@ts-drp/protocol-v3/internal/creator-anchor-signing-request";
 import { consumeSealSigningRequest, type SealSigningRequest } from "@ts-drp/protocol-v3/internal/seal-signing-request";
 
 declare const finalitySignerBrand: unique symbol;
@@ -122,4 +126,32 @@ export async function signSealRegisteredDigest(
 	const digest = exactBytes(consumed, 32, "registered seal digest must be exactly 32 bytes");
 	const signature = await state.privateKey.sign(digest);
 	return copyLibrarySignature(signature);
+}
+
+/**
+ * Signs one protocol-authored, one-use creator successor-anchor request.
+ * @param input - Opaque signer and creator-anchor signing request.
+ * @returns Detached exact Ed25519 signature bytes.
+ */
+export async function signCreatorAnchorRequest(
+	input: Readonly<{
+		request: CreatorAnchorSigningRequest;
+		signer: FinalitySigner;
+	}>
+): Promise<Uint8Array> {
+	if (
+		input === null ||
+		typeof input !== "object" ||
+		Reflect.ownKeys(input).length !== 2 ||
+		!Object.hasOwn(input, "request") ||
+		!Object.hasOwn(input, "signer")
+	) {
+		throw new TypeError("creator-anchor signing input is malformed");
+	}
+	const state = signerStates.get(input.signer);
+	if (state === undefined) throw new TypeError("untrusted finality signer");
+	const consumed = consumeCreatorAnchorSigningRequest(input.request);
+	if (consumed === undefined) throw new TypeError("untrusted or consumed creator-anchor signing request");
+	const digest = exactBytes(consumed, 32, "creator anchor digest must be exactly 32 bytes");
+	return copyLibrarySignature(await state.privateKey.sign(digest));
 }

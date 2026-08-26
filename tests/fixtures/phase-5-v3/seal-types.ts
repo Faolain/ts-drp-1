@@ -44,6 +44,7 @@ export interface FinalityKeychainModule {
 			signer: unknown;
 		}>
 	>;
+	signCreatorAnchorRequest(input: Readonly<{ request: unknown; signer: unknown }>): Promise<Uint8Array>;
 	signSealRegisteredDigest(input: Readonly<{ request: unknown; signer: unknown }>): Promise<Uint8Array>;
 }
 
@@ -83,7 +84,7 @@ export interface BrowserSealVoteModule {
 			observation: Readonly<{
 				incarnation: string;
 				pendingCount: number;
-				version: 2;
+				version: 3;
 			}>;
 			store: SealStorePort;
 		}>
@@ -99,7 +100,7 @@ export interface CandidateSealModules {
 
 export const EXPECTED_EXPORTS = Object.freeze({
 	browser: Object.freeze(["openBrowserSealVoteStore"]),
-	keychain: Object.freeze(["createRecoverableFinalitySigner", "signSealRegisteredDigest"]),
+	keychain: Object.freeze(["createRecoverableFinalitySigner", "signCreatorAnchorRequest", "signSealRegisteredDigest"]),
 	protocol: Object.freeze([
 		"openSealAuthority",
 		"prepareRoundChange",

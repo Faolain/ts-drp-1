@@ -39,6 +39,12 @@ const EXPECTED_EXACT_SCHEMA = Object.freeze({
 			autoIncrement: false,
 			indexes: [],
 			keyPath: ["objectId", "epoch", "signerId"],
+			name: "sealEvidence",
+		},
+		{
+			autoIncrement: false,
+			indexes: [],
+			keyPath: ["objectId", "epoch", "signerId"],
 			name: "signerState",
 		},
 		{ autoIncrement: false, indexes: [], keyPath: "key", name: "storageMeta" },
@@ -55,7 +61,7 @@ const EXPECTED_EXACT_SCHEMA = Object.freeze({
 			name: "voteSlots",
 		},
 	],
-	version: 2,
+	version: 3,
 });
 
 const HISTORICAL_FIVE_STORE_SCHEMA = Object.freeze({
@@ -130,7 +136,7 @@ test("production opening consumes the selected decision digest before creating a
 	});
 });
 
-test("fresh production opening creates the exact eight-store zero-index private-v2 schema", async ({ page }) => {
+test("fresh production opening creates the exact nine-store zero-index private-v3 schema", async ({ page }) => {
 	await expect(runHarness(page, "runFreshSchema")).resolves.toEqual(EXPECTED_EXACT_SCHEMA);
 });
 

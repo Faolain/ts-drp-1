@@ -187,9 +187,9 @@ afterEach(async () => {
 });
 
 describe("Phase 5e durable creator actor RED", () => {
-	it("freezes the exact six RED and exact eighteen GREEN owner rosters", () => {
+	it("freezes the exact six RED and exact twenty-four GREEN owner rosters", () => {
 		expect(REQUIRED_RED_PATHS).toHaveLength(6);
-		expect(REQUIRED_GREEN_PATHS).toHaveLength(18);
+		expect(REQUIRED_GREEN_PATHS).toHaveLength(24);
 		expect(NEW_SEMANTIC_OWNERS).toEqual([
 			"packages/seal/src/creator.ts",
 			"packages/seal/src/internal/creator-close-intent.ts",
@@ -326,13 +326,24 @@ describe("Phase 5e durable creator actor RED", () => {
 	);
 
 	it.skipIf(!readiness.ready)("re-verifies complete durable QC bytes before reopening signing authority", async () => {
-		const databaseName = `phase5e-actor-corrupt-${crypto.randomUUID()}`;
-		openedDatabases.push(databaseName);
-		const first = await openCreatorActorHarness(databaseName);
-		expect(await first.actor.close({ closeInput: first.closeInput })).toMatchObject({ ok: true });
-		await first.close();
-		await corruptFinalizedQc(databaseName);
-		await expect(openCreatorActorHarness(databaseName)).rejects.toThrow(/DURABLE_QC_INVALID/u);
+		const commitDatabase = `phase5e-actor-corrupt-commit-${crypto.randomUUID()}`;
+		openedDatabases.push(commitDatabase);
+		const commitFirst = await openCreatorActorHarness(commitDatabase);
+		expect(await commitFirst.actor.close({ closeInput: commitFirst.closeInput })).toMatchObject({ ok: true });
+		await commitFirst.close();
+		await corruptFinalizedQc(commitDatabase);
+		await expect(openCreatorActorHarness(commitDatabase)).rejects.toThrow(/DURABLE_QC_INVALID/u);
+
+		const prepareDatabase = `phase5e-actor-corrupt-prepare-${crypto.randomUUID()}`;
+		openedDatabases.push(prepareDatabase);
+		const prepareFirst = await openCreatorActorHarness(prepareDatabase);
+		expect(await prepareFirst.actor.close({ closeInput: prepareFirst.closeInput })).toMatchObject({ ok: true });
+		await prepareFirst.close();
+		await mutateSealEvidence(prepareDatabase, (row) => ({
+			...row,
+			exactCanonicalPrepareQcBytes: Uint8Array.of(0xff),
+		}));
+		await expect(openCreatorActorHarness(prepareDatabase)).rejects.toThrow(/DURABLE_QC_INVALID/u);
 	});
 
 	it.skipIf(!readiness.ready)(

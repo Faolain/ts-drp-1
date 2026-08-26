@@ -32,7 +32,7 @@ export interface PendingVoteRow {
 
 export interface InternalSealVoteStore {
 	readonly incarnation: string;
-	readonly schema: Readonly<{ stores: readonly string[]; version: 2 }>;
+	readonly schema: Readonly<{ stores: readonly string[]; version: number }>;
 	commitQc(input: unknown): Promise<unknown>;
 	commitRound(input: unknown): Promise<unknown>;
 	commitRoundChange(input: unknown): Promise<unknown>;
@@ -896,6 +896,6 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			});
 		},
 		readPending,
-		schema: Object.freeze({ stores: Object.freeze(Array.from(opened.objectStoreNames)), version: 2 as const }),
+		schema: Object.freeze({ stores: Object.freeze(Array.from(opened.objectStoreNames)), version: 3 as const }),
 	});
 }

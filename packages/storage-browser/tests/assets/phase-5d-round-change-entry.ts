@@ -1,9 +1,6 @@
-import { ed25519 } from "../../../protocol-v3/node_modules/@noble/curves/ed25519.js";
 import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
-// eslint-disable-next-line import/no-unresolved -- resolved by the exact test alias to preserve singleton custody.
 import { createRecoverableFinalitySigner, signSealRegisteredDigest } from "@ts-drp/keychain/finality";
 import { installCertifiedAnchorTrustRoot } from "@ts-drp/protocol-v3";
-// eslint-disable-next-line import/no-unresolved -- resolved by the exact test alias to preserve singleton custody.
 import {
 	openSealAuthority,
 	prepareRoundChange,
@@ -12,10 +9,10 @@ import {
 	verifySealQC,
 } from "@ts-drp/protocol-v3/seal";
 import { createSealVoter } from "@ts-drp/seal";
-// eslint-disable-next-line import/no-unresolved -- resolved by the exact test alias to preserve singleton custody.
 import { createSealPacemaker, leaderForRound, type PacemakerEvent } from "@ts-drp/seal/pacemaker";
 
 import law from "../../../../tests/fixtures/phase-5d-v3/pacemaker-law-contract.json" with { type: "json" };
+import { ed25519 } from "../../../protocol-v3/node_modules/@noble/curves/ed25519.js";
 import { openBrowserSealVoteStore } from "../../src/seal-vote.js";
 
 type Signer = Readonly<{
@@ -473,7 +470,7 @@ async function runCertificateSelection(): Promise<unknown> {
 
 function corruptSignerState(databaseName: string, field: "finalizedCommitQC" | "highestPrepareQC"): Promise<void> {
 	return new Promise((resolvePromise, reject) => {
-		const request = indexedDB.open(databaseName, 2);
+		const request = indexedDB.open(databaseName, 3);
 		request.addEventListener("error", () => reject(request.error ?? new Error("corrupt reopen failed")), {
 			once: true,
 		});

@@ -251,9 +251,17 @@ describe("Phase 4c-b durable snapshot quarantine RED", () => {
 			expect(packageExports("packages/storage-node/package.json")).toEqual(
 				SNAPSHOT_QUARANTINE_PACKAGE_EXPORT_MAPS.node
 			);
-			expect(packageExports("packages/storage-browser/package.json")).toEqual(
-				SNAPSHOT_QUARANTINE_PACKAGE_EXPORT_MAPS.browser
-			);
+			expect(packageExports("packages/storage-browser/package.json")).toEqual({
+				...SNAPSHOT_QUARANTINE_PACKAGE_EXPORT_MAPS.browser,
+				"./seal-evidence": {
+					import: "./dist/src/seal-evidence.js",
+					types: "./dist/src/seal-evidence.d.ts",
+				},
+				"./seal-vote": {
+					import: "./dist/src/seal-vote.js",
+					types: "./dist/src/seal-vote.d.ts",
+				},
+			});
 			const roots = await Promise.all([
 				import("../packages/compaction/src/index.js"),
 				import("../packages/storage/src/index.js"),

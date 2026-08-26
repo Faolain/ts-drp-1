@@ -599,7 +599,7 @@ describe.sequential("Phase 5d model-first pacemaker RED", () => {
 		}
 	});
 
-	it("runs a real fake-indexeddb schema-v2 control before runtime readiness", async () => {
+	it("runs a real fake-indexeddb additive schema-v3 control before runtime readiness", async () => {
 		const databaseName = `phase5d-red-${crypto.randomUUID()}`;
 		openedDatabases.push(databaseName);
 		const opened = await openInternalSealVoteStore({ databaseName });
@@ -610,12 +610,13 @@ describe.sequential("Phase 5d model-first pacemaker RED", () => {
 					"generations",
 					"objects",
 					"promotions",
+					"sealEvidence",
 					"signerState",
 					"storageMeta",
 					"voteOutbox",
 					"voteSlots",
 				],
-				version: 2,
+				version: 3,
 			});
 			expect(opened.incarnation).toMatch(/^[0-9a-f]{32,}$/u);
 		} finally {

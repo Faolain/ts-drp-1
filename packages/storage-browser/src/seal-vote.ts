@@ -16,7 +16,7 @@ import { openInternalSealVoteStore } from "./internal/seal-vote-store.js";
 export async function openBrowserSealVoteStore(input: Readonly<{ databaseName: string }>): Promise<
 	Readonly<{
 		close(): Promise<void>;
-		observation: Readonly<{ incarnation: string; pendingCount: number; version: 2 }>;
+		observation: Readonly<{ incarnation: string; pendingCount: number; version: 3 }>;
 		store: SealStorePort;
 	}>
 > {
@@ -62,7 +62,7 @@ export async function openBrowserSealVoteStore(input: Readonly<{ databaseName: s
 		observation: Object.freeze({
 			incarnation: internal.incarnation,
 			pendingCount: pending.length,
-			version: 2 as const,
+			version: 3 as const,
 		}),
 		store,
 	});

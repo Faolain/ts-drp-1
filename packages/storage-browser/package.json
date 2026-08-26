@@ -33,6 +33,10 @@
 			"types": "./dist/src/seal-vote.d.ts",
 			"import": "./dist/src/seal-vote.js"
 		},
+		"./seal-evidence": {
+			"types": "./dist/src/seal-evidence.d.ts",
+			"import": "./dist/src/seal-evidence.js"
+		},
 		"./snapshot-transfer": {
 			"types": "./dist/src/snapshot-transfer.d.ts",
 			"import": "./dist/src/snapshot-transfer.js"
@@ -53,5 +57,9 @@
 		"@ts-drp/live-journal": "0.11.0",
 		"@ts-drp/seal": "0.11.0",
 		"@ts-drp/storage": "0.11.0"
+	},
+	"devDependencies": {
+		"@ts-drp/keychain": "0.11.0",
+		"@ts-drp/protocol-v3": "0.11.0"
 	}
 }

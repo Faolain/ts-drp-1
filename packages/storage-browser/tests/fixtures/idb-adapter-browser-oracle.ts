@@ -20,7 +20,7 @@ export interface Phase2e6DatabaseLifecycleTrace {
 }
 
 const PHASE_2E6_STORE_NAMES = ["objects", "generations", "blobs", "promotions"] as const;
-const CURRENT_PRIMARY_DATABASE_VERSION = 2;
+const CURRENT_PRIMARY_DATABASE_VERSION = 3;
 
 /**
  * Counts post-seed database creation/deletion calls in one browser realm.

@@ -7,6 +7,12 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			"@ts-drp/keychain/finality": path.resolve(__dirname, "packages/keychain/src/finality.ts"),
+			"@ts-drp/seal/creator": path.resolve(__dirname, "packages/seal/src/creator.ts"),
+			"@ts-drp/seal/internal/creator-close-intent": path.resolve(
+				__dirname,
+				"packages/seal/src/internal/creator-close-intent.ts"
+			),
+			"@ts-drp/storage-browser/seal-evidence": path.resolve(__dirname, "packages/storage-browser/src/seal-evidence.ts"),
 			"@ts-drp/protocol-v3/internal/creator-anchor-signing-request": path.resolve(
 				__dirname,
 				"packages/protocol-v3/src/internal/creator-anchor-signing-request.ts"

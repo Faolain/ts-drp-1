@@ -95,7 +95,7 @@ async function inspectRawDeathState(
 			request.onsuccess = (): void => resolvePromise(request.result);
 		});
 		try {
-			if (database.version !== 2) throw new Error(`unexpected death database version ${database.version}`);
+			if (database.version !== 3) throw new Error(`unexpected death database version ${database.version}`);
 			const required = ["signerState", "storageMeta", "voteOutbox", "voteSlots"];
 			if (!required.every((store) => database.objectStoreNames.contains(store))) {
 				throw new Error("death database is not the exact vote schema");
