@@ -255,8 +255,7 @@ async function runCase(material, index, input) {
 		return {
 			...shared,
 			issued: {
-				acceptedJournalAuthor:
-					accepted === undefined ? undefined : decodeCanonical(accepted.exactCanonicalPreimageBytes).author,
+				acceptedJournalAuthor: accepted?.sourceKind === "local-issued" ? accepted.author : undefined,
 				author: preimage.author,
 				authorSequence: preimage.authorSequence,
 				issuedRowAuthor: selected.commit.issuedRecord.scope.author,
