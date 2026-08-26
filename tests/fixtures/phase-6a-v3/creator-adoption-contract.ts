@@ -1135,20 +1135,24 @@ export function creatorAdoptionReadiness(candidate: CandidateCreatorAdoptionModu
 export function sourceGovernance(): Readonly<{
 	forbiddenRootExport: boolean;
 	noAheMutationInVerifier: boolean;
-	noProductConsumer: boolean;
+	noDirectChatVerifierConsumer: boolean;
+	roomOwnsVerifierWhenProductExists: boolean;
 }> {
 	const verifierPath = resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption.ts");
 	const verifier = existsSync(verifierPath) ? readFileSync(verifierPath, "utf8") : "";
 	const root = readFileSync(resolve(REPOSITORY_ROOT, "packages/node/src/index.ts"), "utf8");
-	const examples = ["examples/v3-chat/src/index.ts", "examples/v3-room/src/index.ts"]
-		.map((path) => readFileSync(resolve(REPOSITORY_ROOT, path), "utf8"))
-		.join("\n");
+	const chat = readFileSync(resolve(REPOSITORY_ROOT, "examples/v3-chat/src/index.ts"), "utf8");
+	const room = readFileSync(resolve(REPOSITORY_ROOT, "examples/v3-room/src/index.ts"), "utf8");
+	const productExists = /adoptCreatorSuccessor\s*\(/u.test(room);
+	const roomConsumesVerifier =
+		/@ts-drp\/node\/creator-adoption/u.test(room) && /verifyCreatorSuccessorAdoption/u.test(room);
 	return Object.freeze({
 		forbiddenRootExport: /creator-adoption|verifyCreatorSuccessorAdoption/u.test(root),
 		noAheMutationInVerifier:
 			!/\.(?:beginGeneration|putCachedBlob|promoteReference|completeGeneration|swapHead|discardGeneration)\s*\(/u.test(
 				verifier
 			),
-		noProductConsumer: !/verifyCreatorSuccessorAdoption|CreatorAdoptionIntent/u.test(examples),
+		noDirectChatVerifierConsumer: !/verifyCreatorSuccessorAdoption|CreatorAdoptionIntent|creator-adoption/u.test(chat),
+		roomOwnsVerifierWhenProductExists: !productExists || roomConsumesVerifier,
 	});
 }

@@ -183,9 +183,10 @@ export function d108cSourceGovernance(): Readonly<{
 	readonly exactFailureVocabulary: boolean;
 	readonly exactNonRootExport: boolean;
 	readonly noActivationOrIssueEffects: boolean;
-	readonly noProductConsumer: boolean;
+	readonly noDirectChatCommitConsumer: boolean;
 	readonly noRootExport: boolean;
 	readonly privateCapabilityConsumer: boolean;
+	readonly roomOwnsCommitWhenProductExists: boolean;
 }> {
 	const read = (path: string): string => {
 		const absolute = resolve(REPOSITORY_ROOT, path);
@@ -194,7 +195,11 @@ export function d108cSourceGovernance(): Readonly<{
 	const owner = read(D108C_GREEN_PATHS[0]);
 	const internal = read(D108C_GREEN_PATHS[1]);
 	const root = read("packages/node/src/index.ts");
-	const product = `${read("examples/v3-room/src/index.ts")}\n${read("examples/v3-chat/src/index.ts")}`;
+	const room = read("examples/v3-room/src/index.ts");
+	const chat = read("examples/v3-chat/src/index.ts");
+	const productExists = /adoptCreatorSuccessor\s*\(/u.test(room);
+	const roomConsumesCommit =
+		/@ts-drp\/node\/creator-adoption-commit/u.test(room) && /commitCreatorSuccessorAdoption/u.test(room);
 	const manifest = JSON.parse(read("packages/node/package.json")) as {
 		readonly exports?: Readonly<Record<string, unknown>>;
 	};
@@ -205,8 +210,9 @@ export function d108cSourceGovernance(): Readonly<{
 			entry?.types === "./dist/src/creator-adoption-commit.d.ts" &&
 			entry.import === "./dist/src/creator-adoption-commit.js",
 		noActivationOrIssueEffects: !/activateV3LivePlane|issueLocal|transactIssue|subscribe|routeV3Ingress/u.test(owner),
-		noProductConsumer: !/commitCreatorSuccessorAdoption|creator-adoption-commit/u.test(product),
+		noDirectChatCommitConsumer: !/commitCreatorSuccessorAdoption|creator-adoption-commit/u.test(chat),
 		noRootExport: !/commitCreatorSuccessorAdoption|creator-adoption-commit/u.test(root),
 		privateCapabilityConsumer: /function\s+consumePreparedCreatorSuccessorAdoption\s*\(/u.test(internal),
+		roomOwnsCommitWhenProductExists: !productExists || roomConsumesCommit,
 	});
 }

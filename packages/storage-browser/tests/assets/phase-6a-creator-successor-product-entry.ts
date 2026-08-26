@@ -1,0 +1,449 @@
+import { decodeCanonical, hashDomain } from "@ts-drp/canonical";
+
+type PlainRecord = Readonly<Record<string, unknown>>;
+
+interface RelayPacket {
+	readonly channelName: string;
+	readonly fingerprint: string;
+	readonly realmId: string;
+	readonly value: unknown;
+}
+
+interface IndexDump {
+	readonly keyPath: string | readonly string[] | null;
+	readonly multiEntry: boolean;
+	readonly name: string;
+	readonly unique: boolean;
+}
+
+interface StoreDump {
+	readonly autoIncrement: boolean;
+	readonly indexes: readonly IndexDump[];
+	readonly keyPath: string | readonly string[] | null;
+	readonly name: string;
+	readonly rows: readonly unknown[];
+}
+
+interface DatabaseDump {
+	readonly name: string;
+	readonly stores: readonly StoreDump[];
+	readonly version: number;
+}
+
+interface SuccessorCarrier {
+	readonly authority: PlainRecord;
+	readonly databases: readonly DatabaseDump[];
+	readonly snapshotDeclaration: PlainRecord;
+}
+
+interface ProductApi {
+	adoptSuccessor?(): Promise<void>;
+	close(): Promise<void>;
+	create(input: unknown): Promise<string>;
+	join(input: unknown): Promise<void>;
+	sealEpoch(): Promise<PlainRecord>;
+	send(text: string): Promise<void>;
+	snapshot(): PlainRecord;
+}
+
+declare global {
+	interface Window {
+		__phase6aProductRelayPost?(packet: RelayPacket): Promise<void>;
+		phase6aCreatorSuccessorProduct: Readonly<{
+			adoptSuccessor(): Promise<void>;
+			boot(realmId: string): Promise<void>;
+			close(): Promise<void>;
+			create(input: unknown): Promise<string>;
+			deliver(packet: RelayPacket): void;
+			exportSuccessor(databaseName: string): Promise<SuccessorCarrier>;
+			importSuccessor(carrier: SuccessorCarrier, sourceDatabaseName: string, targetDatabaseName: string): Promise<void>;
+			join(input: unknown): Promise<void>;
+			relayAudit(): Readonly<{ readonly incoming: number; readonly mismatch: number; readonly outgoing: number }>;
+			sealEpoch(): Promise<PlainRecord>;
+			send(text: string): Promise<void>;
+			snapshot(): PlainRecord;
+		}>;
+	}
+}
+
+const relayChannels = new Map<string, Set<ProductBroadcastChannel>>();
+const relayAudit = { incoming: 0, mismatch: 0, outgoing: 0 };
+let realmId = "";
+let booted = false;
+
+function normalize(value: unknown): unknown {
+	if (value instanceof Uint8Array) {
+		return { bytes: Array.from(value, (byte) => byte.toString(16).padStart(2, "0")).join("") };
+	}
+	if (Array.isArray(value)) return value.map(normalize);
+	if (value !== null && typeof value === "object") {
+		return Object.fromEntries(
+			Object.entries(value as Record<string, unknown>)
+				.sort(([left], [right]) => left.localeCompare(right))
+				.map(([key, entry]) => [key, normalize(entry)])
+		);
+	}
+	return value;
+}
+
+function fingerprint(value: unknown): string {
+	return JSON.stringify(normalize(value));
+}
+
+class ProductBroadcastChannel extends EventTarget {
+	readonly name: string;
+	onmessage: ((this: BroadcastChannel, event: MessageEvent) => unknown) | null = null;
+
+	constructor(name: string) {
+		super();
+		this.name = String(name);
+		const selected = relayChannels.get(this.name) ?? new Set<ProductBroadcastChannel>();
+		selected.add(this);
+		relayChannels.set(this.name, selected);
+	}
+
+	close(): void {
+		relayChannels.get(this.name)?.delete(this);
+	}
+
+	postMessage(value: unknown): void {
+		const packet = Object.freeze({ channelName: this.name, fingerprint: fingerprint(value), realmId, value });
+		relayAudit.outgoing += 1;
+		void window.__phase6aProductRelayPost?.(packet);
+	}
+
+	deliver(packet: RelayPacket): void {
+		relayAudit.incoming += 1;
+		if (fingerprint(packet.value) !== packet.fingerprint) relayAudit.mismatch += 1;
+		const event = new MessageEvent("message", { data: packet.value });
+		this.dispatchEvent(event);
+		this.onmessage?.call(this as unknown as BroadcastChannel, event);
+	}
+}
+
+function request<Result>(selected: IDBRequest<Result>): Promise<Result> {
+	return new Promise((resolvePromise, reject) => {
+		selected.addEventListener("success", () => resolvePromise(selected.result), { once: true });
+		selected.addEventListener("error", () => reject(selected.error ?? new Error("indexeddb request failed")), {
+			once: true,
+		});
+	});
+}
+
+function transactionDone(transaction: IDBTransaction): Promise<void> {
+	return new Promise((resolvePromise, reject) => {
+		transaction.addEventListener("complete", () => resolvePromise(), { once: true });
+		transaction.addEventListener(
+			"abort",
+			() => reject(transaction.error ?? new Error("indexeddb transaction aborted")),
+			{
+				once: true,
+			}
+		);
+		transaction.addEventListener(
+			"error",
+			() => reject(transaction.error ?? new Error("indexeddb transaction failed")),
+			{
+				once: true,
+			}
+		);
+	});
+}
+
+function mutableKeyPath(value: string | readonly string[] | null): string | string[] | null {
+	return typeof value === "string" || value === null ? value : [...value];
+}
+
+function openExistingDatabase(name: string): Promise<IDBDatabase> {
+	return new Promise((resolvePromise, reject) => {
+		const selected = indexedDB.open(name);
+		selected.addEventListener("success", () => resolvePromise(selected.result), { once: true });
+		selected.addEventListener("error", () => reject(selected.error ?? new Error("indexeddb open failed")), {
+			once: true,
+		});
+	});
+}
+
+async function dumpDatabase(name: string): Promise<DatabaseDump> {
+	const database = await openExistingDatabase(name);
+	try {
+		const names = [...database.objectStoreNames];
+		const transaction = database.transaction(names, "readonly");
+		const stores = await Promise.all(
+			names.map(async (storeName): Promise<StoreDump> => {
+				const store = transaction.objectStore(storeName);
+				return Object.freeze({
+					autoIncrement: store.autoIncrement,
+					indexes: Object.freeze(
+						[...store.indexNames].map((indexName) => {
+							const index = store.index(indexName);
+							return Object.freeze({
+								keyPath: index.keyPath,
+								multiEntry: index.multiEntry,
+								name: index.name,
+								unique: index.unique,
+							});
+						})
+					),
+					keyPath: store.keyPath,
+					name: store.name,
+					rows: Object.freeze(await request(store.getAll())),
+				});
+			})
+		);
+		await transactionDone(transaction);
+		return Object.freeze({ name, stores: Object.freeze(stores), version: database.version });
+	} finally {
+		database.close();
+	}
+}
+
+function deleteDatabase(name: string): Promise<void> {
+	return new Promise((resolvePromise, reject) => {
+		const selected = indexedDB.deleteDatabase(name);
+		selected.addEventListener("success", () => resolvePromise(), { once: true });
+		selected.addEventListener("blocked", () => reject(new Error(`indexeddb delete blocked: ${name}`)), { once: true });
+		selected.addEventListener("error", () => reject(selected.error ?? new Error("indexeddb delete failed")), {
+			once: true,
+		});
+	});
+}
+
+async function restoreDatabase(dump: DatabaseDump, targetName: string): Promise<void> {
+	await deleteDatabase(targetName);
+	const database = await new Promise<IDBDatabase>((resolvePromise, reject) => {
+		const selected = indexedDB.open(targetName, dump.version);
+		selected.addEventListener(
+			"upgradeneeded",
+			() => {
+				for (const source of dump.stores) {
+					const keyPath = mutableKeyPath(source.keyPath);
+					const store = selected.result.createObjectStore(source.name, {
+						autoIncrement: source.autoIncrement,
+						...(keyPath === null ? {} : { keyPath }),
+					});
+					for (const index of source.indexes) {
+						const indexKeyPath = mutableKeyPath(index.keyPath);
+						if (indexKeyPath === null) throw new TypeError("D.108d2 null index keyPath");
+						store.createIndex(index.name, indexKeyPath, {
+							multiEntry: index.multiEntry,
+							unique: index.unique,
+						});
+					}
+				}
+			},
+			{ once: true }
+		);
+		selected.addEventListener("success", () => resolvePromise(selected.result), { once: true });
+		selected.addEventListener("error", () => reject(selected.error ?? new Error("indexeddb restore open failed")), {
+			once: true,
+		});
+	});
+	try {
+		const transaction = database.transaction(
+			dump.stores.map(({ name }) => name),
+			"readwrite",
+			{ durability: "strict" }
+		);
+		for (const source of dump.stores) {
+			const store = transaction.objectStore(source.name);
+			for (const row of source.rows) store.add(row);
+		}
+		await transactionDone(transaction);
+	} finally {
+		database.close();
+	}
+}
+
+function hex(value: Uint8Array): string {
+	return Array.from(value, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function exactRecord(value: unknown): PlainRecord {
+	if (value === null || typeof value !== "object" || Array.isArray(value))
+		throw new TypeError("D.108d2 record invalid");
+	return value as PlainRecord;
+}
+
+async function rawAuthority(databaseName: string): Promise<PlainRecord> {
+	const database = await openExistingDatabase(databaseName);
+	try {
+		const transaction = database.transaction(["blobs", "generations", "objects"], "readonly");
+		const [objects, generations, blobs] = await Promise.all([
+			request(transaction.objectStore("objects").getAll()),
+			request(transaction.objectStore("generations").getAll()),
+			request(transaction.objectStore("blobs").getAll()),
+		]);
+		await transactionDone(transaction);
+		if (objects.length !== 1) throw new TypeError("D.108d2 active object is ambiguous");
+		const objectRow = exactRecord(objects[0]);
+		const head = exactRecord(decodeCanonical(objectRow.record as Uint8Array));
+		const generationRow = generations
+			.map(exactRecord)
+			.find((row) => row.objectId === objectRow.objectId && row.generationId === head.generationId);
+		if (generationRow === undefined) throw new TypeError("D.108d2 active generation is absent");
+		const generation = exactRecord(decodeCanonical(generationRow.record as Uint8Array));
+		const closure = generation.closure as readonly PlainRecord[];
+		const decoded = closure.map((reference) => {
+			const row = blobs.map(exactRecord).find((candidate) => candidate.digest === reference.digest);
+			if (row === undefined) throw new TypeError("D.108d2 closure blob is absent");
+			const bytes = row.bytes as Uint8Array;
+			if (hex(hashDomain("ts-drp-storage/blob/v1", bytes)) !== reference.digest) {
+				throw new TypeError("D.108d2 closure blob digest differs");
+			}
+			return exactRecord(decodeCanonical(bytes));
+		});
+		const projections = decoded.filter((value) => value.kind === "v3-live-generation-2");
+		const trusts = decoded.filter((value) => value.kind === "drp-anchor-trust-state" && value.currentEpoch === 1);
+		if (projections.length !== 1 || trusts.length !== 1) {
+			throw new TypeError("D.108d2 successor projection is ambiguous");
+		}
+		const projection = projections[0] as PlainRecord;
+		const trust = trusts[0] as PlainRecord;
+		const anchorBytes = trust.exactCanonicalCurrentAnchorPreimageBytes as Uint8Array;
+		const anchor = exactRecord(decodeCanonical(anchorBytes));
+		const anchorDigest = hex(hashDomain("ts-drp/epoch-anchor/v3", anchorBytes));
+		if (
+			anchorDigest !== trust.currentAnchorDigest ||
+			anchorDigest !== projection.anchorDigest ||
+			anchor.aclDigest !== projection.aclDigest ||
+			anchor.objectId !== projection.objectId
+		) {
+			throw new TypeError("D.108d2 raw authority differs");
+		}
+		return Object.freeze({
+			aclDigest: anchor.aclDigest,
+			anchorDigest,
+			epoch: 1,
+			genesisAnchorDigest: trust.genesisAnchorDigest,
+			lifecycle: "active",
+			objectId: trust.objectId,
+			profileId: "creator-trusted-v1",
+		});
+	} finally {
+		database.close();
+	}
+}
+
+async function rawSnapshotDeclaration(databaseName: string): Promise<PlainRecord> {
+	const database = await openExistingDatabase(`${databaseName}--drp-snapshot-quarantine-v1`);
+	try {
+		const transaction = database.transaction(["chunks", "scopes"], "readonly");
+		const [scopeRows, chunkRows] = await Promise.all([
+			request(transaction.objectStore("scopes").getAll()),
+			request(transaction.objectStore("chunks").getAll()),
+		]);
+		await transactionDone(transaction);
+		const scopes = scopeRows.map(exactRecord).filter((scope) => scope.epoch === 1 && scope.state === "verified");
+		if (scopes.length !== 1) throw new TypeError("D.108d2 snapshot scope is ambiguous");
+		const scope = scopes[0] as PlainRecord;
+		const chunks = chunkRows
+			.map(exactRecord)
+			.filter(
+				(row) =>
+					row.objectId === scope.objectId &&
+					row.epoch === scope.epoch &&
+					row.anchor === scope.anchor &&
+					row.manifestDigest === scope.manifestDigest
+			)
+			.sort((left, right) => Number(left.index) - Number(right.index));
+		if (chunks.length !== scope.chunkCount) throw new TypeError("D.108d2 snapshot chunks are incomplete");
+		return Object.freeze({
+			chunks: Object.freeze(
+				chunks.map((row) => Object.freeze({ byteLength: row.byteLength, digest: row.digest, index: row.index }))
+			),
+			exactCanonicalManifestBytes: new Uint8Array(scope.exactCanonicalManifestBytes as Uint8Array),
+			scope: Object.freeze({
+				anchor: scope.anchor,
+				epoch: scope.epoch,
+				manifestDigest: scope.manifestDigest,
+				objectId: scope.objectId,
+			}),
+			totalBytes: scope.totalBytes,
+		});
+	} finally {
+		database.close();
+	}
+}
+
+function productApi(): ProductApi {
+	const selected = Reflect.get(globalThis, "d9336V3Chat");
+	if (selected === null || typeof selected !== "object") throw new TypeError("D.108d2 chat product is unavailable");
+	return selected as ProductApi;
+}
+
+const api = Object.freeze({
+	async adoptSuccessor(): Promise<void> {
+		const adopt = productApi().adoptSuccessor;
+		if (typeof adopt !== "function") throw new TypeError("D.108d2 chat adoption is unavailable");
+		await Reflect.apply(adopt, productApi(), []);
+	},
+	async boot(selectedRealmId: string): Promise<void> {
+		if (booted) return;
+		if (typeof selectedRealmId !== "string" || selectedRealmId.length === 0)
+			throw new TypeError("D.108d2 realm is invalid");
+		realmId = selectedRealmId;
+		Object.defineProperty(globalThis, "BroadcastChannel", {
+			configurable: true,
+			value: ProductBroadcastChannel,
+			writable: true,
+		});
+		Object.defineProperty(navigator, "storage", {
+			configurable: true,
+			value: Object.freeze({ estimate: () => Promise.resolve({ quota: 1_000_000_000_000, usage: 0 }) }),
+		});
+		await import("../../../../examples/v3-chat/src/index.js");
+		booted = true;
+	},
+	close(): Promise<void> {
+		return productApi().close();
+	},
+	create(input: unknown): Promise<string> {
+		return productApi().create(input);
+	},
+	deliver(packet: RelayPacket): void {
+		if (packet.realmId === realmId) return;
+		for (const channel of relayChannels.get(packet.channelName) ?? []) channel.deliver(packet);
+	},
+	async exportSuccessor(databaseName: string): Promise<SuccessorCarrier> {
+		return Object.freeze({
+			authority: await rawAuthority(databaseName),
+			databases: Object.freeze(
+				await Promise.all([dumpDatabase(databaseName), dumpDatabase(`${databaseName}--drp-snapshot-quarantine-v1`)])
+			),
+			snapshotDeclaration: await rawSnapshotDeclaration(databaseName),
+		});
+	},
+	async importSuccessor(
+		carrier: SuccessorCarrier,
+		sourceDatabaseName: string,
+		targetDatabaseName: string
+	): Promise<void> {
+		for (const database of carrier.databases) {
+			if (!database.name.startsWith(sourceDatabaseName)) throw new TypeError("D.108d2 carrier database differs");
+			await restoreDatabase(database, `${targetDatabaseName}${database.name.slice(sourceDatabaseName.length)}`);
+		}
+	},
+	join(input: unknown): Promise<void> {
+		return productApi().join(input);
+	},
+	relayAudit(): Readonly<{ readonly incoming: number; readonly mismatch: number; readonly outgoing: number }> {
+		return Object.freeze({ ...relayAudit });
+	},
+	sealEpoch(): Promise<PlainRecord> {
+		return productApi().sealEpoch();
+	},
+	send(text: string): Promise<void> {
+		return productApi().send(text);
+	},
+	snapshot(): PlainRecord {
+		return productApi().snapshot();
+	},
+});
+
+Object.defineProperty(globalThis, "phase6aCreatorSuccessorProduct", {
+	configurable: false,
+	enumerable: true,
+	value: api,
+	writable: false,
+});

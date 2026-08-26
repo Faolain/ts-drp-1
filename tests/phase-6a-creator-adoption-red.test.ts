@@ -305,11 +305,12 @@ describe("D.108b read-only creator-successor adoption RED", () => {
 		expect(custody.consume(custody.intent, custody.owner)).toBeUndefined();
 	});
 
-	it("forbids AHE mutation, node-root widening and product consumption", () => {
+	it("forbids AHE mutation and node-root/chat widening while assigning D.108d2 room ownership", () => {
 		expect(sourceGovernance()).toEqual({
 			forbiddenRootExport: false,
 			noAheMutationInVerifier: true,
-			noProductConsumer: true,
+			noDirectChatVerifierConsumer: true,
+			roomOwnsVerifierWhenProductExists: true,
 		});
 	});
 

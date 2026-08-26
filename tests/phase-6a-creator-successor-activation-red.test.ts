@@ -239,10 +239,11 @@ describe("D.108d1 creator successor activation RED", () => {
 	it("keeps the root and products outside D.108d1", () => {
 		expect(d108d1SourceGovernance()).toEqual({
 			internalCustody: readiness.ready,
-			noProductConsumer: true,
+			noDirectChatActivationConsumer: true,
 			noRootExport: true,
 			privateEpochAnchor: readiness.ready,
 			recoveredAuthorityUnchanged: true,
+			roomOwnsActivationWhenProductExists: true,
 			webLockAuthority: readiness.ready,
 		});
 	});

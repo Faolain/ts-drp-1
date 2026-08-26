@@ -442,15 +442,23 @@ export function d108d1SourceGovernance(): Readonly<Record<string, boolean>> {
 	const internal = read(D108D1_GREEN_PATHS[5]);
 	const live = read(D108D1_GREEN_PATHS[6]);
 	const root = read("packages/node/src/index.ts");
-	const products = `${read("examples/v3-room/src/index.ts")}\n${read("examples/v3-chat/src/index.ts")}`;
+	const room = read("examples/v3-room/src/index.ts");
+	const chat = read("examples/v3-chat/src/index.ts");
+	const productExists = /adoptCreatorSuccessor\s*\(/u.test(room);
+	const roomConsumesActivation =
+		/@ts-drp\/node\/creator-adoption-activate/u.test(room) &&
+		/activateCreatorSuccessorAdoption/u.test(room) &&
+		/reopenCreatorSuccessorAdoption/u.test(room);
 	const recoveredAuthority = read("packages/node/src/v3-live-recovered-authority.ts");
 	return Object.freeze({
 		internalCustody: /installCreatorSuccessorLive|consumeCreatorSuccessorLive/u.test(internal),
-		noProductConsumer: !/activateCreatorSuccessorAdoption|creator-adoption-activate/u.test(products),
+		noDirectChatActivationConsumer:
+			!/activateCreatorSuccessorAdoption|reopenCreatorSuccessorAdoption|creator-adoption-activate/u.test(chat),
 		noRootExport: !/activateCreatorSuccessorAdoption|creator-adoption-activate/u.test(root),
 		privateEpochAnchor: /installEpochAnchor/u.test(live) && /CreatorSuccessor|creatorSuccessor/u.test(live),
 		recoveredAuthorityUnchanged:
 			createHash("sha256").update(recoveredAuthority).digest("hex") === V3_RECOVERED_AUTHORITY_SHA256,
+		roomOwnsActivationWhenProductExists: !productExists || roomConsumesActivation,
 		webLockAuthority:
 			/navigator/u.test(owner) && /locks/u.test(owner) && /request/u.test(owner) && /exclusive/u.test(owner),
 	});
