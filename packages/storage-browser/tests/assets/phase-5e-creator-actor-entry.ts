@@ -236,9 +236,11 @@ function fixture(): Readonly<{
  */
 export async function openCreatorActorHarness(databaseName: string): Promise<CreatorActorHarness> {
 	const [creator, evidenceCandidate, voteCandidate, finalityCandidate] = (await Promise.all([
-		// @ts-expect-error -- D.107b RED freezes this future literal package subpath before its GREEN owner exists.
+		// eslint-disable-next-line @typescript-eslint/ban-ts-comment -- this literal future import must remain valid across RED and GREEN.
+		// @ts-ignore -- D.107b RED freezes this literal package subpath before its GREEN owner exists.
 		import(/* @vite-ignore */ "@ts-drp/seal/creator"), // eslint-disable-line import/no-unresolved -- future exact package subpath.
-		// @ts-expect-error -- D.107b RED freezes this future literal package subpath before its GREEN owner exists.
+		// eslint-disable-next-line @typescript-eslint/ban-ts-comment -- this literal future import must remain valid across RED and GREEN.
+		// @ts-ignore -- D.107b RED freezes this literal package subpath before its GREEN owner exists.
 		import(/* @vite-ignore */ "@ts-drp/storage-browser/seal-evidence"), // eslint-disable-line import/no-unresolved -- future exact package subpath.
 		import("@ts-drp/storage-browser/seal-vote"),
 		import("@ts-drp/keychain/finality"),

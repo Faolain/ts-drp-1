@@ -22,6 +22,7 @@ export const REQUIRED_GREEN_PATHS = Object.freeze([
 	"packages/storage-browser/src/internal/schema-idb.ts",
 	"packages/storage-browser/src/internal/seal-evidence-store.ts",
 	"packages/storage-browser/src/internal/seal-vote-store.ts",
+	"packages/storage-browser/src/internal/seal-vote-test-control.ts",
 	"packages/storage-browser/package.json",
 	"packages/storage-browser/tests/phase-5c-seal-vote-schema.pw.ts",
 	"packages/storage-browser/tests/assets/phase-5d-round-change-entry.ts",

@@ -57656,13 +57656,15 @@ The tests-only RED is exactly six paths:
 - `packages/storage-browser/tests/phase-5e-creator-actor.pw.ts`; and
 - `packages/storage-browser/playwright.phase-5e-creator-actor.config.ts`.
 
-The expected GREEN is exactly thirteen paths:
+The expected GREEN is exactly fourteen paths:
 
 - `packages/keychain/src/finality.ts`;
 - `packages/seal/src/{creator.ts,internal/creator-close-intent.ts}`;
 - `packages/seal/package.json`;
 - `packages/storage-browser/src/{seal-evidence.ts,seal-vote.ts}`;
 - `packages/storage-browser/src/internal/{schema-idb.ts,seal-evidence-store.ts,seal-vote-store.ts}`;
+- the retained `packages/storage-browser/src/internal/seal-vote-test-control.ts`,
+  whose held-lock upgrade oracle compares the authoritative schema version;
 - `packages/storage-browser/package.json`;
 - the retained `packages/storage-browser/tests/phase-5c-seal-vote-schema.pw.ts` schema/transaction authority; and
 - the retained `packages/storage-browser/tests/assets/phase-5d-round-change-entry.ts`,
