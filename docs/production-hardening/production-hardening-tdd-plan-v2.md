@@ -57989,9 +57989,15 @@ The tests-only RED is expected to be exactly five paths:
 
 - `tests/fixtures/phase-5e-v3/creator-live-close-contract.ts`;
 - `tests/phase-5e-creator-live-close-red.test.ts`;
-- `tests/phase-5e-creator-live-close.pw.ts`;
-- its Playwright config; and
-- its browser entry asset.
+- `packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts`;
+- `packages/storage-browser/playwright.phase-5e-creator-live-close.config.ts`; and
+- `packages/storage-browser/tests/assets/phase-5e-creator-live-close-entry.ts`.
+
+The browser RED stays with the retained Phase-5e browser harness owner: the
+package-local config selects the package-local Playwright test, and that test
+boots the package-local entry through the shared Phase-4c browser server. This
+path assignment is frozen before RED so the exact-five custody packet has no
+implicit owner and does not create a second root browser harness.
 
 The expected GREEN is exactly eight paths:
 
