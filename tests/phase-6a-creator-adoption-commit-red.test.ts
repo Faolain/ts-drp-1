@@ -247,6 +247,17 @@ describe("D.108c one-CAS creator adoption RED", () => {
 				expect(Object.keys(result.capability as object)).toEqual([]);
 				expect(result.capability).not.toHaveProperty("activate");
 				expect(result.capability).not.toHaveProperty("issueLocal");
+				const live = (await import(pathToFileURL(resolve(REPOSITORY_ROOT, "packages/node/src/v3-live.ts")).href)) as {
+					activateV3LivePlane(input: unknown): Readonly<Record<string, unknown>>;
+				};
+				expect(
+					live.activateV3LivePlane({
+						capability: result.capability,
+						messageQueueManager: Object.freeze({}),
+						networkNode: Object.freeze({}),
+						onAdmittedVertex: () => undefined,
+					})
+				).toMatchObject({ kind: "capability-consumed", ok: false });
 				expect(fixture.controls.aheOperationCounts.get("swapHead")).toBe(1);
 			} finally {
 				await fixture.close();
