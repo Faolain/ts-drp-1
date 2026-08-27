@@ -61467,6 +61467,44 @@ deactivation failure, rather than source-pattern readiness. No node owner,
 public surface, snapshot declaration, migration wire record or activation
 authority changes in D.108e2b.
 
+The pre-RED audit fixes the test seam without widening that roster. The
+current room has no adoption-task owner, `close()` does not await an adoption
+already past its closed check, and a rejecting predecessor `deactivate()`
+escapes without deactivating the newly activated replacement. The cold
+successor path also reaches ordinary room validation when combined with
+`createOperationAdmissionPolicy`, `rebaseSourceInvite` or
+`creatorFinalitySigner`; none has the required early authority-composition
+rejection. These are the four intended RED causes. The old D.108d2 contract's
+eleven-path inherited roster and two-owner room/chat GREEN declaration must be
+replaced by this section's exact five RED owners and sole room GREEN owner;
+the retained D.108d2 product behaviors remain controls, and chat remains an
+explicit byte-identity exclusion.
+
+The browser RED may use bundler-only module wrappers in the already-frozen
+Playwright owner to count and pause the genuine verify, commit, activate and
+plane-deactivate boundaries. A test-only weak identity map unwraps its
+instrumented plane only when delegating to the real node boundary, so the
+genuine close/adoption capabilities and real browser stores, transport, queue
+and Web Lock still execute. The wrapper may reject one predecessor
+deactivation before delegating and count replacement cleanup; it may not
+replace a product result, edit production source text, expose a product hook,
+or become runtime authority. Entry-side controls and snapshots are available
+only on the test asset's existing global harness. Unit input probes call the
+real room function with effect-counting getters and require the exact early
+unsupported-composition error before any application, store, transport or
+signer read.
+
+The composite RED is ready only when concurrent callers demonstrate more than
+one underlying adoption attempt or divergent settlement; a paused adoption
+allows `close()` to resolve too early; injected predecessor-deactivation
+rejection leaves replacement cleanup at zero; and all three unsupported cold
+declaration combinations miss the exact zero-effect input rejection. GREEN
+requires one shared adoption task, close/adoption coordination, replacement
+cleanup before the predecessor error escapes, and the three-way early input
+guard in `examples/v3-room/src/index.ts` only. Retained hot adoption, cold
+reopen, migration/redirect invite preconditions, issue/close behavior and all
+D.108e2a gates must stay green.
+
 ##### D.108e2c — retained recovery-oracle strengthening
 
 D.108e2c is test infrastructure only. Before its RED, freeze the smallest
