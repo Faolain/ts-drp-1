@@ -418,6 +418,10 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 	readonly #links = new Map<string, ActiveLink>();
 	readonly #pendingLinks = new Map<string, Promise<ActiveLink | undefined>>();
 	readonly #pendingPeerConnections = new Map<RTCPeerConnection, PendingPeerConnection>();
+	readonly #replacementAdmissions = new Map<
+		string,
+		Readonly<{ readonly expiresAt: number; readonly timer: ReturnType<typeof setTimeout> }>
+	>();
 	readonly #retryLinks = new Map<string, ReturnType<typeof setTimeout>>();
 	readonly #routes = new Map<string, RouteRegistration>();
 	readonly #routesByDigest = new Map<string, RouteRegistration>();
@@ -516,6 +520,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			this.#closeAllLinks();
 			return;
 		}
+		this.#pruneReplacementAdmissions();
 		for (const peerId of [...this.#retryLinks.keys()]) {
 			if (!this.#desiredPeers().includes(peerId)) this.#clearLinkRetry(peerId);
 		}
@@ -525,6 +530,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		if (this.#closed || registration.closed || new Set(peers).size !== peers.length) return;
 		registration.membershipReconciled = true;
 		registration.peers = Object.freeze(peers.slice(0, MAX_LINKS));
+		this.#pruneReplacementAdmissions();
 		await Promise.all(
 			registration.peers.map(async (peerId) => {
 				if ((await this.#linkFor(peerId)) === undefined) this.#scheduleLinkRetry(peerId);
@@ -535,6 +541,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 	async #restart(registration: RouteRegistration): Promise<void> {
 		if (this.#closed || registration.closed) return;
 		for (const peerId of registration.peers) {
+			this.#clearReplacementAdmission(peerId);
 			this.#clearLinkRetry(peerId);
 			this.#closePendingForPeer(peerId);
 			const link = this.#links.get(peerId);
@@ -557,6 +564,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		if (!registration.membershipReconciled) {
 			const desiredPeers = [...new Set([...registration.peers, ...peers])].slice(0, MAX_LINKS);
 			registration.peers = Object.freeze(desiredPeers);
+			this.#pruneReplacementAdmissions();
 			await Promise.all(
 				desiredPeers.map(async (peerId) => {
 					const existing = this.#links.get(peerId);
@@ -619,12 +627,17 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		const replacementRequired =
 			existing !== undefined && connection !== undefined && !this.#isCurrent(existing.connection);
 		if (existing !== undefined && existing.channel.readyState === "open" && !replacementRequired) return existing;
-		if (existing !== undefined && replacementRequired) this.#dropLink(peerId, existing, "replacement");
+		if (existing !== undefined && replacementRequired) {
+			this.#reserveReplacementAdmission(peerId);
+			this.#dropLink(peerId, existing, "replacement");
+		}
 		const pending = this.#pendingLinks.get(peerId);
 		if (pending !== undefined) return pending;
+		this.#pruneReplacementAdmissions();
 		if (
 			this.#signaling.localPeerId >= peerId ||
-			(!replacementRequired && this.#links.size + this.#pendingPeerConnections.size >= MAX_LINKS)
+			this.#pendingPeerConnections.size >= MAX_LINKS ||
+			(!this.#hasAdmission(peerId) && this.#logicalAdmissionCount() + this.#pendingPeerConnections.size >= MAX_LINKS)
 		) {
 			return undefined;
 		}
@@ -689,11 +702,14 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 	}
 
 	async #handleSignalingRequest(connection: AuthenticatedWebRtcConnection, request: Uint8Array): Promise<Uint8Array> {
+		if (this.#closed || connection.transport !== "webrtc" || connection.remotePeerId >= this.#signaling.localPeerId) {
+			throw new Error("unreliable WebRTC signaling request rejected");
+		}
+		this.#pruneReplacementAdmissions();
 		if (
-			this.#closed ||
-			connection.transport !== "webrtc" ||
-			connection.remotePeerId >= this.#signaling.localPeerId ||
-			(!this.#links.has(connection.remotePeerId) && this.#links.size + this.#pendingPeerConnections.size >= MAX_LINKS)
+			this.#pendingPeerConnections.size >= MAX_LINKS ||
+			(!this.#hasAdmission(connection.remotePeerId) &&
+				this.#logicalAdmissionCount() + this.#pendingPeerConnections.size >= MAX_LINKS)
 		) {
 			throw new Error("unreliable WebRTC signaling request rejected");
 		}
@@ -795,6 +811,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 
 	#registerLink(link: ActiveLink): ActiveLink {
 		const peerId = link.connection.remotePeerId;
+		this.#clearReplacementAdmission(peerId);
 		const previous = this.#links.get(peerId);
 		if (previous !== undefined) this.#dropLink(peerId, previous, "replacement");
 		this.#links.set(peerId, link);
@@ -850,6 +867,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 
 	#closeAllLinks(): void {
 		this.#activatedPeers.clear();
+		this.#clearAllReplacementAdmissions();
 		for (const peerId of [...this.#retryLinks.keys()]) this.#clearLinkRetry(peerId);
 		for (const [pc, pending] of this.#pendingPeerConnections) {
 			pending.unsubscribeConnection();
@@ -868,6 +886,57 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 
 	#desiredPeers(): readonly string[] {
 		return [...new Set([...this.#routes.values()].flatMap(({ peers }) => peers))];
+	}
+
+	#reserveReplacementAdmission(peerId: string): void {
+		if (
+			this.#replacementAdmissions.has(peerId) ||
+			!this.#desiredPeers().includes(peerId) ||
+			this.#connectionFor(peerId) === undefined
+		) {
+			return;
+		}
+		const expiresAt = Date.now() + SETUP_TIMEOUT_MS;
+		const timer = setTimeout(() => {
+			if (this.#replacementAdmissions.get(peerId)?.timer === timer) this.#replacementAdmissions.delete(peerId);
+		}, SETUP_TIMEOUT_MS);
+		this.#replacementAdmissions.set(peerId, Object.freeze({ expiresAt, timer }));
+	}
+
+	#pruneReplacementAdmissions(): void {
+		const desiredPeers = new Set(this.#desiredPeers());
+		const now = Date.now();
+		for (const [peerId, admission] of this.#replacementAdmissions) {
+			if (
+				admission.expiresAt <= now ||
+				!desiredPeers.has(peerId) ||
+				this.#connectionFor(peerId) === undefined ||
+				this.#links.has(peerId)
+			) {
+				this.#clearReplacementAdmission(peerId);
+			}
+		}
+	}
+
+	#logicalAdmissionCount(): number {
+		const peers = new Set(this.#links.keys());
+		for (const peerId of this.#replacementAdmissions.keys()) peers.add(peerId);
+		return peers.size;
+	}
+
+	#hasAdmission(peerId: string): boolean {
+		return this.#links.has(peerId) || this.#replacementAdmissions.has(peerId);
+	}
+
+	#clearReplacementAdmission(peerId: string): void {
+		const admission = this.#replacementAdmissions.get(peerId);
+		if (admission === undefined) return;
+		clearTimeout(admission.timer);
+		this.#replacementAdmissions.delete(peerId);
+	}
+
+	#clearAllReplacementAdmissions(): void {
+		for (const peerId of [...this.#replacementAdmissions.keys()]) this.#clearReplacementAdmission(peerId);
 	}
 
 	#scheduleLinkRetry(peerId: string): void {
