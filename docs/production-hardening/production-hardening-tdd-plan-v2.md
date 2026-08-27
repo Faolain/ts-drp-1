@@ -62202,39 +62202,137 @@ P0=0/P1=0/P2=0. Opus 5/xhigh session
 Opus's two nonblocking findings have exact owners and deadlines. D.108e2e's
 GREEN must add a non-behavioral source comment stating that the sole current
 consumer owns the issued-record read/match for every nonfuture row returned by
-the private view. D.108e4, before Phase 6a exit, must add an independent
-future-row issued/outbox mismatch mutant so the private match is distinguished
-from both authentication and the fact that a read occurred. The latter joins
-the already assigned current-row mismatch-isolation cleanup. Neither is a
-reproduced product defect; no P0/P1 correction or confirmation review is
+the private view. The subsequent D.108e2e plan audit tightened the other
+deadline: its RED now owns the independent future-row issued/outbox mismatch
+mutant because the slice already requires proof of that exact private match.
+D.108e4 retains the separate current-row mismatch-isolation cleanup. Neither
+is a reproduced product defect; no P0/P1 correction or confirmation review is
 required. Review worktrees remained tracked-clean apart from their prompt
 artifacts. The main checkout retained only protected untracked paths, all 26
 inherited stashes remained, and no Fable or collaboration subagent ran.
 
 ##### D.108e2e — predecessor-view skip-budget lifetime
 
-D.108e2e is a separate correctness slice due immediately after D.108e2d and
-before D.108e3 or Phase 6a exit. Its plan freeze must first define the smallest
-genuine fixture that crosses the existing authenticated-future-row skip budget
-across multiple outer page calls, including interleaved current/future rows,
-without lowering or changing the configured limit. Its immutable RED must
-distinguish a per-recovery budget from the current per-method-call reset and
-prove cursor progress, exact row authentication, issued/outbox matching and
-fail-closed over-budget behavior. Source inspection alone is not acceptance.
+D.108e2e is a separate bounded-work correctness slice due immediately after
+D.108e2d and before D.108e3 or Phase 6a exit. Audit confirms that the exact
+authenticated parameters carrier fixes `maxEpochVertices` at 8,192. The RED
+must use that value unchanged: no reduced test parameter, production test
+branch, synthetic counter injection or weakened successor limit is allowed.
+An 8,195-row real Node SQLite issuance probe completed in about 1.13 seconds,
+and 8,195 Ed25519 signatures completed in about 0.25 seconds on the execution
+host, so the genuine boundary is practical without a fake low-limit seam.
+Those timings are feasibility observations only, not acceptance budgets.
+
+The audited tests-only RED roster is exactly the same four physical owners as
+D.108e2d but receives separate `D108E2E` constants, mode and composite:
+
+- `tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts`;
+- `tests/phase-6a-creator-successor-local-author-red.test.ts`;
+- `packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs`;
+  and
+- `packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts`.
+
+The contract freezes that exact four-path roster, the sole prospective GREEN
+owner and one new child behavior. Its new launcher invokes the existing fresh
+built-package child with an explicit `skip-budget` mode and its own memoized
+result; the retained D.108d1b/D.108e2d launch remains byte-for-byte the default
+mode and keeps its existing shared result. The root test pins exact ownership,
+nonempty files, distinct behavior and one storage-node composite. No browser
+file authors the RED because the private Node wrapper and real Node issuance
+adapter are the measurable seam, but every retained three-engine browser gate
+remains mandatory GREEN and clean-checkout evidence.
+
+The fresh child derives all rows from genuine authenticated material. It seeds
+Bob's accepted predecessor epoch-zero row at sequence 0 through the real
+`createNodeDurableIssuanceStore` transaction API, performs a genuine accepted
+creator-successor reopen, and uses the real live handle to issue the first
+successor epoch-one row at sequence 1. Detached, canonical, Bob-signed clones
+of those two admitted shapes then extend the same real lineage. Every commit
+has its selected sequence in its canonical preimage, one exact issued/outbox
+envelope and the real object/author scope. No raw SQL, production-relative
+import, Vite alias, fabricated signature, duplicate sequence or cursor reset
+is allowed.
+
+The equality control contains current sequence 0 followed by exactly 8,192
+authenticated successor rows at sequences 1 through 8,192. A new reopen must
+complete predecessor recovery: the predecessor view returns sequence 0, the
+outer recovery consumer performs its one copied-scope issued read/match, the
+next wrapper call skips exactly the signed limit with captured-scope issued
+matches, reaches the empty page and begins genuine successor recovery. The
+overall attempt may then reject at the successor's unchanged graph-capacity
+gate; that later result is pinned and is not presented as activation success.
+The causal predecessor boundary proves the limit remains inclusive. The
+retained one-future-row reopen remains the accepted under-budget activation
+control and proves each new wrapper starts with a fresh budget.
+
+The same lineage then appends an admitted predecessor/current separator at
+sequence 8,193 and one admitted successor/future row at sequence 8,194. A
+second new reopen sees three outer wrapper calls: it returns current sequence
+0; skips successor sequences 1 through 8,192 before returning current sequence
+8,193; and encounters successor sequence 8,194. The cumulative future-skip
+count is now 8,193 even though no individual wrapper call exceeds 8,192. That
+attempt must stop in predecessor recovery on sequence 8,194, before terminal
+empty-page observation, successor recovery, subscription, publication,
+issuance or handle activation. Exact result kind/detail and the existing AHE,
+snapshot-open, epoch-anchor and effect counters are frozen so a later
+successor `maxEpochVertices` rejection cannot masquerade as predecessor-budget
+enforcement.
+
+Telemetry is aggregate and bounded rather than serializing 8,195 row objects
+over IPC. For each reopen it records backing page count, first/last returned
+sequence, terminal-empty observation, strictly increasing/unique sequence
+count, captured-scope future issued-read count/range and copied-scope returned-
+row issued reads. The equality control must prove sequences 0 through 8,192
+once each plus terminal empty; the over-budget proof must prove sequences 0
+through 8,194 once each, stop on 8,194 without terminal empty, read current
+rows 0 and 8,193 through copied value-equal scopes, and attribute all skipped
+future reads to the exact captured object/author scope. Raw seeding and
+post-result evidence reads stay outside those windows.
+
+The RED also closes the Opus GREEN-review P2 at this exact seam rather than
+deferring half of its oracle. A small separate control supplies a genuinely
+authenticated future outbox row but returns a different, independently valid
+Bob-signed future issued record only to the private captured-scope read. The
+copied-scope outer read remains the genuine outbox match. Production must
+return the row and fail predecessor recovery; a mutant that performs the read
+but omits `matchingOutboxRows` would skip it and activate. This distinguishes
+the private issued/outbox match from authentication, signature validity and
+the mere fact that a read occurred. D.108e4 retains only the already assigned
+current-row mismatch-isolation cleanup.
+
+Immutable RED acceptance is one failing D.108e2e bounded-work composite with
+the equality and future-match controls green, every retained local-author
+behavior green and no production diff. The expected current failure is causal:
+the over-budget case reaches successor recovery and rejects there, rather than
+stopping within predecessor recovery. An overall rejected result alone does
+not satisfy the RED. If the real fixture cannot demonstrate that causal
+difference, needs another production owner/API, or cannot stay within its
+bounded child timeout without changing the 8,192 limit, stop and reslice.
 
 Only after that RED reproduces the defect may
-`packages/node/src/v3-live.ts` become the sole prospective GREEN owner. The
-correction may move existing private counter custody so an over-budget recovery
-fails closed; it may not change `maxEpochVertices`, accepted under-budget
-results, recovery authority, store contracts, wire formats or product APIs.
-Because this slice next edits the exact private wrapper, its GREEN also owns the
-review-assigned source comment that states the outer recovery consumer's sole
-issued-read/exact-match duty for each returned nonfuture row; the comment adds
-no behavior or owner. If the genuine fixture cannot make that distinction
-without a new seam or another production owner, stop and reslice. D.108e2e
-receives its own exact test roster, plan/RED/GREEN reviews, ordinary
-verification and isolated fresh-build proof; it does not widen D.108e2d's
-five-path union.
+`packages/node/src/v3-live.ts` become the sole GREEN owner. The smallest
+authorized correction moves the existing `skipped` custody from each
+`readOutboxPage` invocation to the private wrapper instance, which is created
+once for each predecessor recovery. It preserves the existing increment,
+strict `> maxEpochVertices` comparison, row return, outer failure path, cursor,
+authentication and exact match. The GREEN also adds the review-assigned source
+comment stating that the outer recovery consumer owns the sole issued read and
+exact match for every returned nonfuture row. No limit, accepted equality
+boundary, retained accepted under-budget result, recovery authority, store
+contract, wire format, product API or second owner may change.
+
+GREEN acceptance repeats focused D.108e2d/e2e tests, the complete retained
+Phase-4c/Phase-6a selection including the genuine fresh 64 MiB peak-live child,
+all four three-engine browser gates, affected builds/typechecks and exact-five
+lint/format/diff. A detached checkout at the exact signed candidate must begin
+without package/example `dist`, install offline with lifecycle scripts disabled
+without producing `dist`, freshly build the workspace closure and repeat the
+same gates. Plan, RED and GREEN/evidence checkpoints each receive one Grok
+4.6/high run with the full 16-turn bound and `FINAL` terminal marker, one exact
+Kimi K3 CHECK001-through-CHECK100 run and one Opus 5/xhigh no-subagent review.
+P0/P1 is corrected in the same round without confirmation review; P2 receives
+an exact owner/deadline. No Fable or collaboration subagent runs without new
+express authorization.
 
 ##### D.108e4 — retained test-oracle cleanup
 
@@ -62244,13 +62342,12 @@ D.108e2c GREEN P2 union: independently bind authenticated ACL bytes to their
 digest with a positive control, make the window-lock observation boundary
 explicit, remove the possession-probe naming/preseed ambiguity, prove one
 contiguous authority-attempt sequence from an independent observation, isolate
-both current- and future-row issued/outbox mismatches from signature or
-authentication failure, and reconcile the three inherited full-file Phase-3
-pins. It has no production GREEN owner and may not change public APIs, wire,
-store, recovery authority, limits or memory contracts. If a production-source
-change is genuinely required, stop and reslice. This assignment must not
-contaminate or delay the D.108e2d performance profile or the D.108e3 room-
-lifetime hardening slice.
+the current-row issued/outbox mismatch from signature failure, and reconcile
+the three inherited full-file Phase-3 pins. It has no production GREEN owner
+and may not change public APIs, wire, store, recovery authority, limits or
+memory contracts. If a production-source change is genuinely required, stop
+and reslice. This assignment must not contaminate or delay the D.108e2d
+performance profile or the D.108e3 room-lifetime hardening slice.
 
 Each D.108e2 sub-slice uses one immutable tests-only RED checkpoint and one
 immutable GREEN/evidence checkpoint. Each checkpoint receives one real Grok
