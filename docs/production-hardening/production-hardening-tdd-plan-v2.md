@@ -63721,6 +63721,64 @@ existing deadline; the D.108e4 evidence owner records the lease/lifecycle test
 results before combined GREEN closure. No corrected-byte confirmation review
 is authorized.
 
+The D.108e4b tests-only RED review round inspected exact signed/pushed commit
+`18f3f4de0ca5a536c8c831e8260ba092794850f4`, parent
+`4553c005660520c4d70a6d4a6664a82b2b4cae56`, tree
+`89af9ad549adf17fc3056390f22b202339b0e987`, stable patch id
+`52d25ab6deaafde056bf73813e3640eba311bba4` and raw-diff SHA-256
+`88c7a72b5a8cc3893b986e35e9e40dd2a98449cbd4d351106af578284f58b6ba`
+in three separate detached checkouts. Its focused run reproduced exactly five
+intended failures and 23 passes: the unrelated inbound admission, mixed-order
+outbound allocation, pre-expiry churn admission and both missing lease-timer
+controls failed; all three release controls and the physical same-peer
+eight-pending-PC mutation control passed.
+
+Grok 4.6/high session `01a044d4-8881-70b1-8fa7-c78fa1094049`
+completed its sole 600.402-second run with exit zero, `stop_reason=end_turn`
+and terminal `CHANGES_REQUIRED`, P0=0/P1=2/P2=1. Kimi CLI 0.38.0 exact
+`kimi-code/k3` session `session_a7e132a9-de0e-4456-83fa-013b0af601b1`
+emitted CHECK001 through CHECK100 exactly once, independently installed in its
+detached checkout, reproduced the five-failure/23-pass result twice, passed
+ESLint, Prettier and network TypeScript, and returned `CHANGES_REQUIRED`,
+P0=0/P1=1/P2=2. Its first local CLI invocation rejected the incompatible
+combination of prompt mode and `--auto` before any model session existed; the
+session above is the sole Kimi review run. Opus session
+`a053bb59-4ae4-43cb-a3bc-4918dd7ccfc3` resolved to `claude-opus-5` at xhigh,
+completed after 765.180 API seconds with zero permission denials and zero
+subagents, and returned `CHANGES_REQUIRED`, P0=1/P1=3/P2=3. No Fable or
+collaboration subagent ran.
+
+The same-round tests-only correction closes the complete reproduced P0/P1
+union without confirmation review. Opus's P0 showed that the global timer
+oracle was unsatisfiable after center close because seven still-open lower
+owners legitimately armed their retained 250 ms channel-close retries. The
+corrected control closes all lower routes first, leaving only the center's
+lease timer attributable to the `1 -> 0` assertion. Grok, Kimi and Opus all
+found that churn occurred at the same fake timestamp as reservation creation,
+so a renewing GREEN could pass the claimed original-expiry barrier; the
+correction advances 4,000 ms before churn and probes at original
+creation-plus-9,999/10,000 ms. Grok and Opus also showed that restart left zero
+links and admitted the newcomer even with a leaked reservation; the correction
+advances the retained 250 ms retries, requires seven restored links and only
+then probes the newcomer. Opus's successful-registration timer-cancellation
+gap is pinned at exact replacement restoration, and the reviewers' snapshot
+observability P2 is closed with an exact public snapshot-key set while the
+reservation is live.
+
+The corrected immutable RED is signed/pushed commit
+`bcae1b24fc1f8f1fa216279f2abe5b1847c4a688`, parent
+`18f3f4de0ca5a536c8c831e8260ba092794850f4`, tree
+`86e69519db58fcc95e17d8017d6a94f94bdce34c`, stable patch id
+`11eab3e8eef37d54022fbdaa7e94e939d086610d` and raw-diff SHA-256
+`61b6c8621d337a680ca2a89894fc38c66f3dd5dfff8d88787bdb60b6ef0f15a4`.
+It retains exactly five intended failures and 23 passes; exact-owner Prettier,
+ESLint, network `tsc --noEmit` and diff checks pass. The two remaining
+nonblocking Opus P2s belong to the D.108e4b GREEN implementer and are due
+before immutable GREEN signing: prove that a mapped or reserved peer's
+admitted-peer bypass remains subject to the physical ninth-pending-PC ceiling,
+and prove that channel/connection-close or another non-replacement drop cannot
+create an admission lease. No confirmation review is authorized.
+
 Each D.108e2 sub-slice uses one immutable tests-only RED checkpoint and one
 immutable GREEN/evidence checkpoint. Each checkpoint receives one real Grok
 4.6/high, exact Kimi K3 CHECK001 through CHECK100 and Opus 5/xhigh review.
