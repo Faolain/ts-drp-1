@@ -62288,8 +62288,10 @@ next wrapper call skips exactly the signed limit with captured-scope issued
 matches, reaches the empty page and begins genuine successor recovery. The
 fixture has one prepared successor vertex and cloned rows below the
 byte-capacity boundary, so the 8,192 successor rows then deterministically
-reject with kind `rejected` and detail `v3 recovery graph is at capacity` at
-the unchanged vertex-count gate. That later result is asserted but is not
+reject at the unchanged vertex-count gate. The public reopen result is kind
+`recovery-rejected` with detail
+`creator successor recovery failed: graph-rejected`; the internal capacity
+detail is not exposed. That later result is asserted but is not
 presented as activation success; terminal-empty observation and one
 epoch-anchor installation are the causal predecessor-boundary evidence. The
 retained one-future-row reopen remains only the accepted under-budget behavior
