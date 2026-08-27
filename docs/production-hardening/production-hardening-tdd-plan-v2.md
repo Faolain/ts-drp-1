@@ -63533,6 +63533,117 @@ the RED's frozen three-failure signature remains authoritative. Failure-path
 cleanup, both-current preconditions and authenticated-loss accounting were
 closed in `6d4fba1f`; no separate debt remains for those observations.
 
+The first D.108e4a GREEN candidate is signed/pushed commit
+`3f10ac71f6460189fb48309629f6b034199c9211`, parent
+`6b1fad4785da171f2e7f6fcad797e7ff48b65f25`, tree
+`b5cec8a3e4ca3cb876c4c50e79b592abaf3b4827`, stable patch id
+`e466b1736b4d160cc41b5fc1482749854858749e` and raw-diff SHA-256
+`4313dc897076366cfa63bd39b4621aa4f1eeff475e567d63768a3313fbf6ccc1`.
+It is rejected pending D.108e4b, not the accepted immutable GREEN. Its exact
+two-owner focused test passed 19/19; network build/typecheck, Node build and the
+retained E3-02 selection passed 10/10. The first unchanged E3-03 invocation
+failed its retained sender `maxStallMs <= 500` oracle at 4,787 ms; a second
+unchanged invocation passed 1/1 in 2.6 minutes. The root/infrastructure
+selection passed 17/17. A concurrently loaded native run passed the substantive
+combined child but missed the retained wall-time ceiling at 60,717.785 ms;
+that exact timing gate remains due alone and cannot be waived.
+
+The D.108e4a GREEN review round used three separate detached checkouts. Grok
+4.6/high session `01a044ad-ab43-7141-822d-b0f0c67d8717` completed its sole
+390.208-second run with exit zero, `stop_reason=end_turn` and terminal
+`APPROVED`, P0=0/P1=0/P2=0. Kimi CLI 0.38.0 exact `kimi-code/k3` session
+`session_0443b745-adce-4aa5-bb53-144697f99739` emitted CHECK001 through
+CHECK100 exactly once and returned `APPROVED`, P0=0/P1=0/P2=1; its P2 assigns
+the cold E3-03 stall to the combined clean-proof owner before D.108e4 closure.
+Opus session `38bb784a-c9af-4eb3-9010-2633731a2ff2` resolved to
+`claude-opus-5` at xhigh, completed after 639.809 API seconds with zero
+subagents and returned `APPROVED`, P0=0/P1=0/P2=4. Its one denied Glob outside
+the detached worktree did not prevent the file-grounded verdict. No Fable or
+collaboration subagent ran.
+
+Opus's admission-position P2 reproduced as a blocking frozen-contract defect.
+Disposable detached checkout
+`/private/tmp/ts-drp-d108e4a-capacity-diagnostic-3f10ac71` started at exact
+`3f10ac71`, installed offline with 1,525/1,526 packages reused and zero
+downloads, and added only a temporary diagnostic control. Eight lower-ID peers
+filled a higher-ID owner's eight links. After the owner observed a genuine
+replacement for one peer, its non-initiator reconcile retired that link and
+returned with seven active links. Before the original lower peer initiated its
+replacement, a ninth lower-ID newcomer was accepted: its send returned `true`
+where the frozen admission-position contract required `false`. The focused
+diagnostic produced one intended failure and nineteen skips in 617 ms. Thus
+the candidate prevents leaks and double charging for an initiating owner but
+can silently transfer a non-initiator's admitted slot to a newcomer. Source
+inspection alone is not accepted as closure. The source-order/pending witness
+and GREEN-added capacity hunk remain evidence-owner items, while the E3-03
+stall remains due in the isolated proof without changing its threshold or
+profile.
+
+###### D.108e4b — non-initiator replacement admission ownership
+
+D.108e4b is an immediate plan-freeze/RED/GREEN correction due before D.108e4a
+or D.108e4 can close. Its implementation roster is exactly
+`packages/network/tests/unreliable-webrtc-e3-01-red.test.ts` and
+`packages/network/src/unreliable-webrtc.ts`; this plan is its sole documentation
+owner. It may add one private bounded replacement-admission set and private
+count/prune helpers. It may not change a public or private interface, snapshot
+shape, counter, wire byte, route digest, packet class/retry policy, payload or
+connection limit, timeout, fallback, signaling authentication, peer-order rule,
+Node adapter, example owner or browser oracle. `MAX_LINKS` remains exactly
+eight and no application packet may be buffered or replayed.
+
+The immutable RED extends the capacity control with a higher-ID owner and
+eight already linked lower-ID peers. One admitted peer's exact authenticated
+connection disappears and a sole replacement appears. The higher-ID owner
+reconciles first, must retire the stale link with the existing `replacement`
+reason and must preserve that peer's admission while waiting for inbound
+setup. A ninth lower-ID newcomer then attempts a genuine authenticated offer;
+it must be rejected before allocating a peer connection, the owner must remain
+at seven visible links plus one private admission, and no counter or snapshot
+field may expose that reservation. The original admitted lower peer then
+reconciles over its replacement connection, is accepted despite the full
+admission count, installs the exact new connection identity and returns the
+owner to eight active links with one replacement drop. The newcomer remains
+unlinked and cannot displace the admitted peer. Current `3f10ac71` fails at the
+newcomer's send, which returns `true`.
+
+A neighboring release control makes the private ownership bounded. After the
+higher-ID owner retires the stale link and preserves admission, removal of the
+sole replacement connection followed by reconcile releases that admission;
+the newcomer may then be admitted. Closing the last route or owner also clears
+all replacement admissions. A failed replacement handshake retains ownership
+only while the peer remains desired and an exact current replacement
+connection exists. Newcomers cannot be rejected indefinitely by a disappeared
+or undesired peer.
+
+GREEN adds one private set keyed by peer ID. A reservation is created only for
+a desired peer at the same genuine-replacement decision that precedes
+`#dropLink`; it is never created for overlap, complete signaling absence,
+restart, channel/connection failure or a first-time link. Admission occupancy
+is the unique union of mapped-link peer IDs, pending-peer-connection peer IDs
+and valid replacement reservations, so the count cannot double-charge one
+peer. The inbound capacity gate treats a request from its reserved peer as the
+existing admission and rejects an unrelated newcomer when that union is eight.
+Successful `#registerLink` consumes the peer's reservation. Reconcile and route
+closure prune reservations whose peer is no longer desired, whose current
+replacement connection disappeared or whose link is already restored; owner
+close clears the set. The existing initiator path and its capacity control
+remain green. If these semantics require Node, public observability or a limit
+change, stop and reslice again.
+
+D.108e4b uses the existing focused command, exact-two owner lint/format/diff,
+network build/typecheck, Node build and retained E3-02 gate. GREEN must rerun
+E3-03 unchanged, then all combined D.108e4 ordinary and isolated gates. The
+isolated proof must include three consecutive unchanged E3-03 invocations in
+addition to the already frozen three consecutive D.93.46 invocations; a repeat
+of the 4,787 ms sender stall is a failed proof, not a threshold-adjustment
+request. The native five-test timing gate runs without concurrent model/test
+load and must remain below 60 seconds. D.108e4b receives separate signed/pushed
+plan-freeze, immutable RED and immutable GREEN checkpoints, each with separate
+Grok 4.6/high, exact Kimi K3 CHECK001 through CHECK100 and Opus 5/xhigh reviews
+under the same-round correction rules. No Fable or collaboration subagent may
+run without new express authorization.
+
 Each D.108e2 sub-slice uses one immutable tests-only RED checkpoint and one
 immutable GREEN/evidence checkpoint. Each checkpoint receives one real Grok
 4.6/high, exact Kimi K3 CHECK001 through CHECK100 and Opus 5/xhigh review.
