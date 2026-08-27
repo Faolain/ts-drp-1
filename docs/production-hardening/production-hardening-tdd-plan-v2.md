@@ -61070,13 +61070,20 @@ closed by the same correction above. No confirmation review ran.
 Grok 4.6/high session `01a040de-344e-77e1-950f-99d5e0c5d245` performed
 substantial read-only inspection for 330.107 seconds but emitted no terminal
 schema because the API returned HTTP 402, `Grok Build usage balance exhausted`.
-The honest classification is `NO_VERDICT`, not cancellation and not a review
-finding. The exact same retained session was resumed after the correction; it
-again returned the same 402 before a model turn. No second Grok session was
-created. D.108e1 therefore remains stopped before GREEN until this same session
-can resume with replenished balance and emit its terminal verdict, or an
-explicitly authorized protocol change is recorded. No Fable invocation or
-collaboration subagent ran in this slice.
+That attempt was honestly classified `NO_VERDICT`, not cancellation and not a
+review finding. After the user replenished Grok Build balance, the exact same
+retained session resumed rather than starting a replacement. It completed
+seven more read-only turns with `stopReason=end_turn`, 847,958 total tokens and
+a schema-valid terminal `APPROVED`, P0=0/P1=0/P2=2. Its first P2 identified
+that the sibling-sentinel RED depended on the ignored `node_modules` parent
+left by the old config. Signed follow-up RED commit
+`a19f86e9d234832b4a257726870458301a5d142c` now creates and removes that parent
+when absent, so the required isolated checkout cannot be masked by local state.
+Its second P2 assigns the GREEN product-entry owner and GREEN review to prove
+that relay observations record the actual `Message.objectId`, `sender` and
+`type`, not equal placeholders. No confirmation review, second Grok session,
+Fable invocation or collaboration subagent ran in this slice. The RED review
+gate is now closed and D.108e1 may proceed to its frozen GREEN roster.
 
 The rejected D.108d2 plan-freeze review inspected immutable signed commit
 `6d0c3c036c3dd5d6422391478171b1d9253705c9`, parent
