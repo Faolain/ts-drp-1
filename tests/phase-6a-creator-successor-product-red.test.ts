@@ -26,8 +26,21 @@ describe("D.108d2 creator successor room/chat product RED", () => {
 			resolve(REPOSITORY_ROOT, "packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts"),
 			"utf8"
 		);
+		const entry = readFileSync(
+			resolve(REPOSITORY_ROOT, "packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts"),
+			"utf8"
+		);
 		expect(browser.match(/test\.skip\(!PRODUCT_READY,/gu)).toHaveLength(3);
 		expect(browser.match(/test\.skip\(/gu)).toHaveLength(3);
+		expect(
+			[
+				'"@ts-drp/node/creator-adoption"',
+				'"@ts-drp/node/creator-adoption-activate"',
+				'"@ts-drp/node/creator-adoption-commit"',
+			].every((alias) => browser.includes(alias))
+		).toBe(true);
+		expect(entry).toContain("openExistingDatabase(`${databaseName}--ahe`)");
+		expect(entry).toContain("dumpDatabase(`${databaseName}--ahe`)");
 	});
 
 	it("pins the exact seven-key successor authority and rejects pre-successor or widened values", () => {
@@ -58,10 +71,11 @@ describe("D.108d2 creator successor room/chat product RED", () => {
 	it("keeps node-root and chat authority closed while assigning the room as sole node consumer", () => {
 		expect(d108d2SourceGovernance()).toEqual({
 			chatHasNoDirectNodeAdoptionConsumer: true,
-			chatHasNoSeparateAuthorityInput: true,
+			chatInputAllowsOnlyDeclarationWhenProductExists: true,
 			exactTwoGreenOwners: true,
 			noForbiddenProductReturn: true,
 			noNodeRootWidening: true,
+			roomInputAllowsOnlyDeclarationWhenProductExists: true,
 			roomIsSoleConsumerWhenProductExists: true,
 		});
 	});

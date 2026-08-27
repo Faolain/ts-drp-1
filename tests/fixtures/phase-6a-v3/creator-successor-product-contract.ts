@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import ts from "typescript";
 
 export const REPOSITORY_ROOT = resolve(import.meta.dirname, "../../..");
 
@@ -38,6 +39,34 @@ export const D108D2_BROWSER_BEHAVIORS = Object.freeze([
 	"fresh late peer cold reopen accepts the targeted retained epoch-one operation",
 ] as const);
 
+const D108D2_ROOM_INPUT_KEYS = Object.freeze([
+	"application",
+	"author",
+	"createOperationAdmissionPolicy",
+	"creatorFinalitySigner",
+	"creatorInvite",
+	"databaseName",
+	"initialLogicalTime",
+	"issuanceDatabaseName",
+	"migrationDatabaseNamespace",
+	"objectId",
+	"onAcceptedVertex",
+	"onMigrationTarget",
+	"onProjection",
+	"openTransport",
+	"publicKeyBytes",
+	"rebaseSourceInvite",
+	"signRegisteredVertexDigest",
+	"successorSnapshotDeclaration",
+] as const);
+const D108D2_CHAT_JOIN_INPUT_KEYS = Object.freeze([
+	"channelName",
+	"clientId",
+	"databaseName",
+	"invite",
+	"successorSnapshotDeclaration",
+] as const);
+
 const ADOPTION_MARKER =
 	/verifyCreatorSuccessorAdoption|commitCreatorSuccessorAdoption|activateCreatorSuccessorAdoption|reopenCreatorSuccessorAdoption/u;
 
@@ -56,6 +85,25 @@ function exampleSources(directory: string): readonly Readonly<{ readonly path: s
 			return entry.isFile() && /\.(?:mts|ts)$/u.test(entry.name) ? [Object.freeze({ path, source: read(path) })] : [];
 		})
 	);
+}
+
+function interfaceKeys(source: string, name: string): readonly string[] {
+	const parsed = ts.createSourceFile("d108d2-source.ts", source, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
+	const declaration = parsed.statements.find(
+		(statement): statement is ts.InterfaceDeclaration =>
+			ts.isInterfaceDeclaration(statement) && statement.name.text === name
+	);
+	if (declaration === undefined) return Object.freeze([]);
+	return Object.freeze(
+		declaration.members
+			.map((member) => member.name?.getText(parsed))
+			.filter((key): key is string => key !== undefined)
+			.sort()
+	);
+}
+
+function sameStrings(left: readonly string[], right: readonly string[]): boolean {
+	return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
 /**
@@ -113,8 +161,8 @@ export function d108d2SourceGovernance(): Readonly<Record<string, boolean>> {
 	].every((marker) => room.includes(marker));
 	return Object.freeze({
 		chatHasNoDirectNodeAdoptionConsumer: !ADOPTION_MARKER.test(chat),
-		chatHasNoSeparateAuthorityInput:
-			!/successor(?:AclDigest|AnchorDigest|Epoch|GenesisAnchorDigest|Lifecycle|ObjectId|ProfileId)\s*:/u.test(chat),
+		chatInputAllowsOnlyDeclarationWhenProductExists:
+			!productExists || sameStrings(interfaceKeys(chat, "JoinInput"), [...D108D2_CHAT_JOIN_INPUT_KEYS].sort()),
 		exactTwoGreenOwners:
 			D108D2_GREEN_PATHS.length === 2 &&
 			D108D2_GREEN_PATHS[0] === "examples/v3-room/src/index.ts" &&
@@ -124,6 +172,9 @@ export function d108d2SourceGovernance(): Readonly<Record<string, boolean>> {
 				`${room}\n${chat}`
 			),
 		noNodeRootWidening: !ADOPTION_MARKER.test(root),
+		roomInputAllowsOnlyDeclarationWhenProductExists:
+			!productExists ||
+			sameStrings(interfaceKeys(room, "CreateV3RoomSessionInput"), [...D108D2_ROOM_INPUT_KEYS].sort()),
 		roomIsSoleConsumerWhenProductExists:
 			!productExists ||
 			(roomConsumesAll && consumers.length === 1 && consumers[0]?.path === "examples/v3-room/src/index.ts"),

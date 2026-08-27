@@ -266,7 +266,7 @@ function exactRecord(value: unknown): PlainRecord {
 }
 
 async function rawAuthority(databaseName: string): Promise<PlainRecord> {
-	const database = await openExistingDatabase(databaseName);
+	const database = await openExistingDatabase(`${databaseName}--ahe`);
 	try {
 		const transaction = database.transaction(["blobs", "generations", "objects"], "readonly");
 		const [objects, generations, blobs] = await Promise.all([
@@ -409,7 +409,10 @@ const api = Object.freeze({
 		return Object.freeze({
 			authority: await rawAuthority(databaseName),
 			databases: Object.freeze(
-				await Promise.all([dumpDatabase(databaseName), dumpDatabase(`${databaseName}--drp-snapshot-quarantine-v1`)])
+				await Promise.all([
+					dumpDatabase(`${databaseName}--ahe`),
+					dumpDatabase(`${databaseName}--drp-snapshot-quarantine-v1`),
+				])
 			),
 			snapshotDeclaration: await rawSnapshotDeclaration(databaseName),
 		});

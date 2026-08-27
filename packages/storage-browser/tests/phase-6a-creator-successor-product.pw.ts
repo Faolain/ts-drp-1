@@ -1,8 +1,8 @@
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
-import { existsSync, readFileSync } from "node:fs";
+import { build } from "esbuild";
+import { createServer, type Server } from "node:http";
 import { resolve } from "node:path";
-
-import { type Phase4cBrowserServer, startPhase4cBrowserServer } from "./phase-4c-browser-server.js";
+import { pathToFileURL } from "node:url";
 
 const REPOSITORY_ROOT = resolve(import.meta.dirname, "../../..");
 const D108D2_BROWSER_BEHAVIORS = Object.freeze([
@@ -10,56 +10,86 @@ const D108D2_BROWSER_BEHAVIORS = Object.freeze([
 	"established peer cold reopen accepts the genuine epoch-one live operation",
 	"fresh late peer cold reopen accepts the targeted retained epoch-one operation",
 ] as const);
-
-function productReady(): boolean {
-	const read = (path: string): string => {
-		const absolute = resolve(REPOSITORY_ROOT, path);
-		return existsSync(absolute) ? readFileSync(absolute, "utf8") : "";
-	};
-	const room = read("examples/v3-room/src/index.ts");
-	const chat = read("examples/v3-chat/src/index.ts");
-	return (
-		/interface\s+ChatSnapshot[\s\S]*readonly\s+authority\s*:/u.test(chat) &&
-		/interface\s+(?:JoinInput|RoomJoinInput)[\s\S]*successorSnapshotDeclaration\??\s*:/u.test(chat) &&
-		/adoptSuccessor\s*\([^)]*\)\s*:[^{]+\{[\s\S]*\.adoptCreatorSuccessor\s*\(/u.test(chat) &&
-		/authority\s*\(\)\s*:[^{]+\{/u.test(room) &&
-		/await\s+(?:Promise\.resolve\s*\()?[^;\n]*activeHandle[^;\n]*\.deactivate\s*\(/u.test(room) &&
-		/successorSnapshotDeclaration/u.test(room) &&
-		/reopenCreatorSuccessorAdoption\s*\(/u.test(room) &&
-		/@ts-drp\/node\/creator-adoption["']/u.test(room) &&
-		/@ts-drp\/node\/creator-adoption-commit["']/u.test(room) &&
-		/@ts-drp\/node\/creator-adoption-activate["']/u.test(room) &&
-		/adoptCreatorSuccessor\s*\([^)]*\)\s*:[^{]+\{/u.test(room) &&
-		/verifyCreatorSuccessorAdoption\s*\(/u.test(room) &&
-		/commitCreatorSuccessorAdoption\s*\(/u.test(room) &&
-		/activateCreatorSuccessorAdoption\s*\(/u.test(room) &&
-		/interface\s+CreateV3RoomSessionInput[\s\S]*successorSnapshotDeclaration\??\s*:/u.test(room) &&
-		/interface\s+V3RoomSession[\s\S]*adoptCreatorSuccessor\s*\(/u.test(room) &&
-		/interface\s+V3RoomSession[\s\S]*authority\s*\(/u.test(room)
-	);
-}
-
-function isD108d2Authority(value: unknown): boolean {
-	if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
-	const record = value as Readonly<Record<string, unknown>>;
-	return (
-		Reflect.ownKeys(record).length === 7 &&
-		["aclDigest", "anchorDigest", "epoch", "genesisAnchorDigest", "lifecycle", "objectId", "profileId"].every((key) =>
-			Object.hasOwn(record, key)
-		) &&
-		record.epoch === 1 &&
-		record.lifecycle === "active" &&
-		record.profileId === "creator-trusted-v1"
-	);
-}
-
-const PRODUCT_READY = productReady();
+const contractLoad = import(
+	pathToFileURL(resolve(REPOSITORY_ROOT, "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts")).href
+) as Promise<
+	Readonly<{
+		readonly D108D2_BROWSER_BEHAVIORS: readonly [string, string, string];
+		d108d2Readiness(): Readonly<{ readonly ready: boolean }>;
+		isD108d2Authority(value: unknown): boolean;
+	}>
+>;
+let PRODUCT_READY = false;
+let sharedBrowserBehaviors: readonly string[] = [];
+let isD108d2Authority: (value: unknown) => boolean = () => false;
 const DATABASES = Object.freeze({ creator: "d108d2-creator", established: "d108d2-established", late: "d108d2-late" });
 const CHANNEL_NAME = "d108d2-successor-product";
 
+interface ProductBrowserServer {
+	readonly origin: string;
+	close(): Promise<void>;
+}
+
+async function startProductBrowserServer(entryPoint: string): Promise<ProductBrowserServer> {
+	const configUrl = new URL("../../../vite.config.mts", import.meta.url).href;
+	const loaded = (await import(configUrl)) as Readonly<{
+		workspaceAliases?: Readonly<Record<string, string>>;
+	}>;
+	if (loaded.workspaceAliases === undefined) throw new TypeError("D.108d2 workspace aliases are unavailable");
+	const aliases = Object.freeze({
+		...loaded.workspaceAliases,
+		"@ts-drp/node/creator-adoption": resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption.ts"),
+		"@ts-drp/node/creator-adoption-activate": resolve(
+			REPOSITORY_ROOT,
+			"packages/node/src/creator-adoption-activate.ts"
+		),
+		"@ts-drp/node/creator-adoption-commit": resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption-commit.ts"),
+	});
+	const bundled = await build({
+		alias: aliases,
+		bundle: true,
+		entryPoints: [entryPoint],
+		format: "esm",
+		platform: "browser",
+		write: false,
+	});
+	const entry = bundled.outputFiles[0]?.text;
+	if (entry === undefined) throw new TypeError("D.108d2 browser bundle is absent");
+	const server: Server = createServer((request, response) => {
+		const headers = {
+			"cross-origin-embedder-policy": "require-corp",
+			"cross-origin-opener-policy": "same-origin",
+		};
+		if (request.url === "/entry.js") {
+			response.writeHead(200, { ...headers, "cache-control": "no-store", "content-type": "text/javascript" });
+			response.end(entry);
+			return;
+		}
+		if (request.url === "/" || request.url === "/index.html") {
+			response.writeHead(200, { ...headers, "cache-control": "no-store", "content-type": "text/html" });
+			response.end("<!doctype html><meta charset=utf-8><script type=module src=/entry.js></script>");
+			return;
+		}
+		response.writeHead(404).end();
+	});
+	await new Promise<void>((resolvePromise, reject) => {
+		server.once("error", reject);
+		server.listen(0, "127.0.0.1", resolvePromise);
+	});
+	const address = server.address();
+	if (address === null || typeof address === "string") throw new TypeError("D.108d2 browser server did not bind");
+	return Object.freeze({
+		origin: `http://127.0.0.1:${address.port}`,
+		close: async (): Promise<void> =>
+			new Promise<void>((resolvePromise, reject) =>
+				server.close((error) => (error === undefined ? resolvePromise() : reject(error)))
+			),
+	});
+}
+
 type Carrier = Awaited<ReturnType<typeof window.phase6aCreatorSuccessorProduct.exportSuccessor>>;
 
-let servers: readonly Phase4cBrowserServer[] = [];
+let servers: readonly ProductBrowserServer[] = [];
 let context: BrowserContext | undefined;
 let creator: Page | undefined;
 let established: Page | undefined;
@@ -106,13 +136,17 @@ async function waitForText(page: Page, text: string): Promise<void> {
 test.describe.configure({ mode: "serial" });
 
 test.beforeAll(async ({ browser }) => {
+	const contract = await contractLoad;
+	PRODUCT_READY = contract.d108d2Readiness().ready;
+	sharedBrowserBehaviors = contract.D108D2_BROWSER_BEHAVIORS;
+	isD108d2Authority = contract.isD108d2Authority;
 	if (!PRODUCT_READY) return;
 	servers = Object.freeze(
 		await Promise.all(
 			["creator", "established", "late"].map(() =>
-				startPhase4cBrowserServer({
-					entryPoint: new URL("./assets/phase-6a-creator-successor-product-entry.ts", import.meta.url).pathname,
-				})
+				startProductBrowserServer(
+					new URL("./assets/phase-6a-creator-successor-product-entry.ts", import.meta.url).pathname
+				)
 			)
 		)
 	);
@@ -139,6 +173,7 @@ test.afterAll(async () => {
 });
 
 test("pins the exact successor product browser inventory", () => {
+	expect(sharedBrowserBehaviors).toEqual(D108D2_BROWSER_BEHAVIORS);
 	expect(D108D2_BROWSER_BEHAVIORS).toEqual([
 		"hot creator adoption exposes oracle authority and issues through the replacement handle",
 		"established peer cold reopen accepts the genuine epoch-one live operation",
@@ -213,6 +248,21 @@ test(D108D2_BROWSER_BEHAVIORS[2], async () => {
 		({ carrier, source, target }) => window.phase6aCreatorSuccessorProduct.importSuccessor(carrier, source, target),
 		{ carrier, source: DATABASES.creator, target: DATABASES.late }
 	);
+	const forgedDeclaration = structuredClone(carrier.snapshotDeclaration) as Readonly<Record<string, unknown>>;
+	const forgedScope = {
+		...(forgedDeclaration.scope as Readonly<Record<string, unknown>>),
+		anchor: "f".repeat(64),
+	};
+	await expect(
+		late.evaluate((input) => window.phase6aCreatorSuccessorProduct.join(input), {
+			channelName: CHANNEL_NAME,
+			clientId: "carol",
+			databaseName: DATABASES.late,
+			invite,
+			successorSnapshotDeclaration: { ...forgedDeclaration, scope: forgedScope },
+		})
+	).rejects.toThrow();
+	expect(await snapshot(late)).toMatchObject({ authority: null, ready: false });
 	await late.evaluate((input) => window.phase6aCreatorSuccessorProduct.join(input), {
 		channelName: CHANNEL_NAME,
 		clientId: "carol",
