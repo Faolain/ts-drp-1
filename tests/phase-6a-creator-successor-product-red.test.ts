@@ -8,12 +8,9 @@ import {
 	D108D2_BROWSER_BEHAVIORS,
 	D108D2_GREEN_PATHS,
 	D108D2_RED_PATHS,
-	d108d2Readiness,
 	d108d2SourceGovernance,
 	isD108d2Authority,
 } from "./fixtures/phase-6a-v3/creator-successor-product-contract.js";
-
-const readiness = d108d2Readiness();
 
 describe("D.108d2 creator successor room/chat product RED", () => {
 	it("freezes exactly eleven RED owners, two GREEN owners and three browser behaviors", () => {
@@ -30,8 +27,8 @@ describe("D.108d2 creator successor room/chat product RED", () => {
 			resolve(REPOSITORY_ROOT, "packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts"),
 			"utf8"
 		);
-		expect(browser.match(/test\.skip\(!PRODUCT_READY,/gu)).toHaveLength(3);
-		expect(browser.match(/test\.skip\(/gu)).toHaveLength(3);
+		expect(browser).not.toContain("PRODUCT_READY");
+		expect(browser).not.toContain("test.skip(");
 		expect(
 			[
 				'"@ts-drp/node/creator-adoption"',
@@ -80,15 +77,7 @@ describe("D.108d2 creator successor room/chat product RED", () => {
 		});
 	});
 
-	it("[RED readiness] requires the exact room/chat successor product contract", () => {
-		expect(readiness, `missing D.108d2 product facts: ${readiness.missing.join(", ")}`).toEqual({
-			missing: [],
-			ready: true,
-		});
-	});
-
-	it.skipIf(!readiness.ready)("uses the single composite readiness fact for product behavior", () => {
-		expect(d108d2Readiness()).toEqual({ missing: [], ready: true });
+	it("runs all product behaviors without a source-pattern readiness gate", () => {
 		expect(D108D2_BROWSER_BEHAVIORS).toHaveLength(3);
 	});
 });

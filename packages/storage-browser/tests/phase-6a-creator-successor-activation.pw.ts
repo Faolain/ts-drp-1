@@ -1,7 +1,6 @@
 import "fake-indexeddb/auto";
 
 import { expect, test } from "@playwright/test";
-import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -9,16 +8,6 @@ import { type Phase4cBrowserServer, startPhase4cBrowserServer } from "./phase-4c
 
 const PACKAGE_DIRECTORY = resolve(import.meta.dirname, "..");
 const REPOSITORY_ROOT = resolve(PACKAGE_DIRECTORY, "../..");
-const GREEN_PATHS = [
-	"packages/node/src/creator-adoption-activate.ts",
-	"packages/node/src/creator-adoption.ts",
-	"packages/node/src/creator-adoption-commit.ts",
-	"packages/node/src/creator-close.ts",
-	"packages/node/src/internal/creator-adoption-intent.ts",
-	"packages/node/src/internal/creator-successor-live.ts",
-	"packages/node/src/v3-live.ts",
-	"packages/node/package.json",
-] as const;
 const D108D1_BROWSER_BEHAVIORS = [
 	"missing or hostile LockManager authority fails activation closed",
 	"two tabs elect one lifetime-held writer then a freshly reverified loser wins after release",
@@ -27,24 +16,10 @@ const D108D1B_ORACLE_BROWSER_BEHAVIORS = [
 	"wrong-key and throwing browser possession fail before writer activation",
 ] as const;
 
-function ready(): boolean {
-	if (!GREEN_PATHS.every((path) => existsSync(resolve(REPOSITORY_ROOT, path)))) return false;
-	const manifest = JSON.parse(readFileSync(resolve(REPOSITORY_ROOT, "packages/node/package.json"), "utf8")) as {
-		readonly exports?: Readonly<Record<string, unknown>>;
-	};
-	const entry = manifest.exports?.["./creator-adoption-activate"] as Readonly<Record<string, unknown>> | undefined;
-	return (
-		entry?.types === "./dist/src/creator-adoption-activate.d.ts" &&
-		entry.import === "./dist/src/creator-adoption-activate.js"
-	);
-}
-
-const GREEN_READY = ready();
 let material: unknown;
 let server: Phase4cBrowserServer | undefined;
 
 test.beforeAll(async () => {
-	if (!GREEN_READY) return;
 	Object.defineProperty(navigator, "storage", {
 		configurable: true,
 		value: Object.freeze({ estimate: () => Promise.resolve({ quota: 1_000_000_000_000, usage: 0 }) }),
@@ -71,8 +46,6 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => server?.close());
-test.skip(!GREEN_READY, "D.108d1 successor activation owners are intentionally absent in RED");
-
 test("pins the complete browser behavior inventory", () => {
 	expect(D108D1_BROWSER_BEHAVIORS).toEqual([
 		"missing or hostile LockManager authority fails activation closed",

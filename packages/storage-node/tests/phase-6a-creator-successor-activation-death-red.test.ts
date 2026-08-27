@@ -9,16 +9,15 @@ import { openGenuineCreatorAdoptionFixture } from "../../../tests/fixtures/phase
 import {
 	createD108d1PackedDurableMaterial,
 	D108D1_CHILD_BEHAVIORS,
-	d108d1Readiness,
 	runD108d1ActivationChild,
 } from "../../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.js";
 import {
 	D108D1A_COLD_BEHAVIOR,
 	d108d1aReadiness,
 } from "../../../tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.js";
+import { isD108e1DirectSnapshotTelemetry } from "../../../tests/fixtures/phase-6a-v3/creator-successor-infrastructure-contract.js";
 
 const childPath = new URL("./fixtures/phase-6a-creator-successor-activation-child.mjs", import.meta.url);
-const readiness = d108d1Readiness();
 const identityReadiness = d108d1aReadiness();
 const directories: string[] = [];
 
@@ -51,7 +50,7 @@ describe("D.108d1 fresh-process successor activation RED", () => {
 		expect(childPath.pathname.endsWith("phase-6a-creator-successor-activation-child.mjs")).toBe(true);
 	});
 
-	it.skipIf(!readiness.ready)("fresh Node imports the built non-root successor activation subpath", async () => {
+	it("fresh Node imports the built non-root successor activation subpath", async () => {
 		const result = await runD108d1ActivationChild("probe", {});
 		expect(result.proof).toEqual({
 			exports: ["activateCreatorSuccessorAdoption", "reopenCreatorSuccessorAdoption"],
@@ -59,22 +58,20 @@ describe("D.108d1 fresh-process successor activation RED", () => {
 		});
 	});
 
-	it.skipIf(!readiness.ready)(
-		"cold reopen reconstructs active-new custody with no adoption CAS or displaced-row publication",
-		async () => {
-			const directory = mkdtempSync(join(tmpdir(), "ts-drp-d108d1-cold-"));
-			directories.push(directory);
-			const result = await runD108d1ActivationChild("cold", await durableMaterial(directory));
-			expect(result.proof).toMatchObject({
-				activation: { epoch: 1, lifecycle: "active", ok: true, recovery: "active-new" },
-				adoptionSwapCount: 0,
-				oldOutbox: { classified: "displaced", publishedAsEpochOne: false },
-				pid: expect.any(Number),
-				snapshotImportedBeforeActivation: true,
-			});
-			expect(result.proof?.pid).not.toBe(process.pid);
-		}
-	);
+	it("cold reopen reconstructs active-new custody with no adoption CAS or displaced-row publication", async () => {
+		const directory = mkdtempSync(join(tmpdir(), "ts-drp-d108d1-cold-"));
+		directories.push(directory);
+		const result = await runD108d1ActivationChild("cold", await durableMaterial(directory));
+		expect(result.proof).toMatchObject({
+			activation: { epoch: 1, lifecycle: "active", ok: true, recovery: "active-new" },
+			adoptionSwapCount: 0,
+			oldOutbox: { classified: "displaced", publishedAsEpochOne: false },
+			pid: expect.any(Number),
+			snapshotImportedBeforeActivation: true,
+		});
+		expect(isD108e1DirectSnapshotTelemetry(result.proof?.snapshotReadTelemetry)).toBe(true);
+		expect(result.proof?.pid).not.toBe(process.pid);
+	});
 
 	it.skipIf(!identityReadiness.ready)(D108D1A_COLD_BEHAVIOR, async () => {
 		const directory = mkdtempSync(join(tmpdir(), "ts-drp-d108d1a-cold-"));

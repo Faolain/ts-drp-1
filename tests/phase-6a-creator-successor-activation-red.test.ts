@@ -25,14 +25,11 @@ import {
 	D108D1_NODE_BEHAVIORS,
 	D108D1_RED_PATHS,
 	type D108d1CandidateModule,
-	d108d1Readiness,
 	d108d1SourceGovernance,
 	deriveD108d1Oracle,
 	REPOSITORY_ROOT,
 	runD108d1ActivationChild,
 } from "./fixtures/phase-6a-v3/creator-successor-activation-contract.js";
-
-const readiness = d108d1Readiness();
 
 beforeAll(() => {
 	Object.defineProperty(navigator, "storage", {
@@ -238,13 +235,13 @@ describe("D.108d1 creator successor activation RED", () => {
 
 	it("keeps the root and products outside D.108d1", () => {
 		expect(d108d1SourceGovernance()).toEqual({
-			internalCustody: readiness.ready,
+			internalCustody: true,
 			noDirectChatActivationConsumer: true,
 			noRootExport: true,
-			privateEpochAnchor: readiness.ready,
+			privateEpochAnchor: true,
 			recoveredAuthorityUnchanged: true,
 			roomOwnsActivationWhenProductExists: true,
-			webLockAuthority: readiness.ready,
+			webLockAuthority: true,
 		});
 	});
 
@@ -265,45 +262,44 @@ describe("D.108d1 creator successor activation RED", () => {
 		for (const name of D108D1_NODE_BEHAVIORS) expect(unitSource).toContain(name);
 		for (const name of D108D1_CHILD_BEHAVIORS) expect(childSource).toContain(name);
 		for (const name of D108D1_BROWSER_BEHAVIORS) expect(browserSource).toContain(name);
-		expect((unitSource.match(/it\.skipIf\(!readiness\.ready\)/gu) ?? []).length).toBe(D108D1_NODE_BEHAVIORS.length);
-		expect((childSource.match(/it\.skipIf\(!readiness\.ready\)/gu) ?? []).length).toBe(D108D1_CHILD_BEHAVIORS.length);
-		expect((browserSource.match(/test\.skip\(!GREEN_READY/gu) ?? []).length).toBe(1);
+		expect(childSource).not.toContain("it.skipIf(!readiness.ready)");
+		expect(browserSource).not.toContain("test.skip(!GREEN_READY");
 	});
 
-	it("[RED readiness] requires all eight candidate owners and the exact non-root export", () => {
-		expect(readiness, `missing D.108d1 owners: ${readiness.missing.join(", ")}`).toEqual({ missing: [], ready: true });
+	it("imports the shipped successor activation owner without a source-pattern readiness gate", async () => {
+		expect(await candidate()).toMatchObject({
+			activateCreatorSuccessorAdoption: expect.any(Function),
+			reopenCreatorSuccessorAdoption: expect.any(Function),
+		});
 	});
 
-	it.skipIf(!readiness.ready)(
-		"genuine successor imports its verified snapshot before epoch-one activation",
-		async () => {
-			const fixture = await openGenuineCreatorAdoptionFixture();
-			let result: ActiveResult | undefined;
-			try {
-				const oracle = deriveD108d1Oracle(fixture);
-				const prepared = await committed(fixture);
-				const activate = (await candidate()).activateCreatorSuccessorAdoption;
-				if (activate === undefined) throw new TypeError("D.108d1 activation export missing");
-				result = await activate({
-					capability: prepared.capability,
-					handle: fixture.handle,
-					...fixture.runtimeBindings,
-				});
-				expect(result).toMatchObject({ lifecycle: "active", ok: true, recovery: "active-new" });
-				const handle = result.handle as Readonly<Record<string, unknown>>;
-				expect(handle).toMatchObject({ epoch: 1, objectId: oracle.objectId, topic: oracle.stableTopic });
-				const journal = await fixture.journal.readiness({
-					scope: { anchorDigest: oracle.anchorDigest, epoch: 1, objectId: oracle.objectId },
-				});
-				expect(journal).toMatchObject({ ok: true, ready: true, scope: { epoch: 1 } });
-			} finally {
-				await deactivate(result);
-				await fixture.close();
-			}
+	it("genuine successor imports its verified snapshot before epoch-one activation", async () => {
+		const fixture = await openGenuineCreatorAdoptionFixture();
+		let result: ActiveResult | undefined;
+		try {
+			const oracle = deriveD108d1Oracle(fixture);
+			const prepared = await committed(fixture);
+			const activate = (await candidate()).activateCreatorSuccessorAdoption;
+			if (activate === undefined) throw new TypeError("D.108d1 activation export missing");
+			result = await activate({
+				capability: prepared.capability,
+				handle: fixture.handle,
+				...fixture.runtimeBindings,
+			});
+			expect(result).toMatchObject({ lifecycle: "active", ok: true, recovery: "active-new" });
+			const handle = result.handle as Readonly<Record<string, unknown>>;
+			expect(handle).toMatchObject({ epoch: 1, objectId: oracle.objectId, topic: oracle.stableTopic });
+			const journal = await fixture.journal.readiness({
+				scope: { anchorDigest: oracle.anchorDigest, epoch: 1, objectId: oracle.objectId },
+			});
+			expect(journal).toMatchObject({ ok: true, ready: true, scope: { epoch: 1 } });
+		} finally {
+			await deactivate(result);
+			await fixture.close();
 		}
-	);
+	});
 
-	it.skipIf(!readiness.ready)("private custody alone selects installEpochAnchor", async () => {
+	it("private custody alone selects installEpochAnchor", async () => {
 		const fixture = await openGenuineCreatorAdoptionFixture();
 		const childRuns: string[] = [];
 		try {
@@ -343,7 +339,7 @@ describe("D.108d1 creator successor activation RED", () => {
 		}
 	});
 
-	it.skipIf(!readiness.ready)("divergent genesis identity fails before every live effect", async () => {
+	it("divergent genesis identity fails before every live effect", async () => {
 		const fixture = await openGenuineCreatorAdoptionFixture();
 		let childDirectory: string | undefined;
 		try {
@@ -385,7 +381,7 @@ describe("D.108d1 creator successor activation RED", () => {
 		}
 	});
 
-	it.skipIf(!readiness.ready)("pending epoch-zero outbox is classified and never published as epoch one", async () => {
+	it("pending epoch-zero outbox is classified and never published as epoch one", async () => {
 		const fixture = await openGenuineCreatorAdoptionFixture();
 		let result: ActiveResult | undefined;
 		try {
@@ -415,7 +411,7 @@ describe("D.108d1 creator successor activation RED", () => {
 		}
 	});
 
-	it.skipIf(!readiness.ready)("old handle registration author and prepared capability are terminal", async () => {
+	it("old handle registration author and prepared capability are terminal", async () => {
 		const fixture = await openGenuineCreatorAdoptionFixture();
 		let activated: ActiveResult | undefined;
 		try {
@@ -445,7 +441,7 @@ describe("D.108d1 creator successor activation RED", () => {
 		}
 	});
 
-	it.skipIf(!readiness.ready)("hot duplicate returns the same handle before a second source claim", async () => {
+	it("hot duplicate returns the same handle before a second source claim", async () => {
 		const fixture = await openGenuineCreatorAdoptionFixture();
 		let first: ActiveResult | undefined;
 		try {
@@ -465,7 +461,7 @@ describe("D.108d1 creator successor activation RED", () => {
 		}
 	});
 
-	it.skipIf(!readiness.ready)("conflicting hot duplicate bindings fail closed", async () => {
+	it("conflicting hot duplicate bindings fail closed", async () => {
 		const fixture = await openGenuineCreatorAdoptionFixture();
 		let first: ActiveResult | undefined;
 		try {
@@ -492,46 +488,43 @@ describe("D.108d1 creator successor activation RED", () => {
 		}
 	});
 
-	it.skipIf(!readiness.ready)(
-		"post-adoption activation failure cleans up and fresh reverify performs no second swapHead",
-		async () => {
-			const fixture = await openGenuineCreatorAdoptionFixture();
-			let recovered: ActiveResult | undefined;
-			try {
-				fixture.controls.aheOperationCounts.clear();
-				const activate = (await candidate()).activateCreatorSuccessorAdoption;
-				if (activate === undefined) throw new TypeError("D.108d1 activation export missing");
-				const failedPrepared = await committed(fixture);
-				const broken = fakeNetwork(`d108d1-failure-${crypto.randomUUID()}`);
-				Object.defineProperty(broken, "subscribe", {
-					value: () => Promise.reject(new Error("D108D1_SUBSCRIBE_FAILURE")),
-				});
-				expect(
-					await activate({
-						capability: failedPrepared.capability,
-						handle: fixture.handle,
-						messageQueueManager: new MessageQueueManager<Message>({ logConfig: { level: "silent" } }),
-						networkNode: broken,
-						onAdmittedVertex: () => undefined,
-					})
-				).toMatchObject({ ok: false });
-				const replay = await committed(fixture);
-				expect(replay).toMatchObject({ ok: true, recovery: "active-new" });
-				recovered = await activate({
-					capability: replay.capability,
+	it("post-adoption activation failure cleans up and fresh reverify performs no second swapHead", async () => {
+		const fixture = await openGenuineCreatorAdoptionFixture();
+		let recovered: ActiveResult | undefined;
+		try {
+			fixture.controls.aheOperationCounts.clear();
+			const activate = (await candidate()).activateCreatorSuccessorAdoption;
+			if (activate === undefined) throw new TypeError("D.108d1 activation export missing");
+			const failedPrepared = await committed(fixture);
+			const broken = fakeNetwork(`d108d1-failure-${crypto.randomUUID()}`);
+			Object.defineProperty(broken, "subscribe", {
+				value: () => Promise.reject(new Error("D108D1_SUBSCRIBE_FAILURE")),
+			});
+			expect(
+				await activate({
+					capability: failedPrepared.capability,
 					handle: fixture.handle,
-					...runtimeBindings(`d108d1-retry-${crypto.randomUUID()}`),
-				});
-				expect(recovered).toMatchObject({ ok: true });
-				expect(fixture.controls.aheOperationCounts.get("swapHead")).toBe(1);
-			} finally {
-				await deactivate(recovered);
-				await fixture.close();
-			}
+					messageQueueManager: new MessageQueueManager<Message>({ logConfig: { level: "silent" } }),
+					networkNode: broken,
+					onAdmittedVertex: () => undefined,
+				})
+			).toMatchObject({ ok: false });
+			const replay = await committed(fixture);
+			expect(replay).toMatchObject({ ok: true, recovery: "active-new" });
+			recovered = await activate({
+				capability: replay.capability,
+				handle: fixture.handle,
+				...runtimeBindings(`d108d1-retry-${crypto.randomUUID()}`),
+			});
+			expect(recovered).toMatchObject({ ok: true });
+			expect(fixture.controls.aheOperationCounts.get("swapHead")).toBe(1);
+		} finally {
+			await deactivate(recovered);
+			await fixture.close();
 		}
-	);
+	});
 
-	it.skipIf(!readiness.ready)("TTL expiry performs one bounded full reverify attempt", async () => {
+	it("TTL expiry performs one bounded full reverify attempt", async () => {
 		const child = await childMaterial();
 		try {
 			const result = await runD108d1ActivationChild("ttl-expired", child.material);

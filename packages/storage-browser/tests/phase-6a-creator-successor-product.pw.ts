@@ -15,11 +15,9 @@ const contractLoad = import(
 ) as Promise<
 	Readonly<{
 		readonly D108D2_BROWSER_BEHAVIORS: readonly [string, string, string];
-		d108d2Readiness(): Readonly<{ readonly ready: boolean }>;
 		isD108d2Authority(value: unknown): boolean;
 	}>
 >;
-let PRODUCT_READY = false;
 let sharedBrowserBehaviors: readonly string[] = [];
 let isD108d2Authority: (value: unknown) => boolean = () => false;
 const DATABASES = Object.freeze({ creator: "d108d2-creator", established: "d108d2-established", late: "d108d2-late" });
@@ -28,6 +26,25 @@ const CHANNEL_NAME = "d108d2-successor-product";
 interface ProductBrowserServer {
 	readonly origin: string;
 	close(): Promise<void>;
+}
+
+interface RelayMessageObservation {
+	readonly data: Uint8Array;
+	readonly objectId: string;
+	readonly receiverRealmId?: string;
+	readonly sender: string;
+	readonly sequence: number;
+	readonly sourceRealmId: string;
+	readonly type: number;
+}
+
+interface RelayAudit {
+	readonly incoming: number;
+	readonly incomingMessages: readonly RelayMessageObservation[];
+	readonly mismatch: number;
+	readonly outgoing: number;
+	readonly outgoingMessages: readonly RelayMessageObservation[];
+	readonly realmId: string;
 }
 
 async function startProductBrowserServer(entryPoint: string): Promise<ProductBrowserServer> {
@@ -137,10 +154,8 @@ test.describe.configure({ mode: "serial" });
 
 test.beforeAll(async ({ browser }) => {
 	const contract = await contractLoad;
-	PRODUCT_READY = contract.d108d2Readiness().ready;
 	sharedBrowserBehaviors = contract.D108D2_BROWSER_BEHAVIORS;
 	isD108d2Authority = contract.isD108d2Authority;
-	if (!PRODUCT_READY) return;
 	servers = Object.freeze(
 		await Promise.all(
 			["creator", "established", "late"].map(() =>
@@ -182,7 +197,6 @@ test("pins the exact successor product browser inventory", () => {
 });
 
 test(D108D2_BROWSER_BEHAVIORS[0], async () => {
-	test.skip(!PRODUCT_READY, "D.108d2 product surface is intentionally absent in RED");
 	if (creator === undefined || established === undefined) throw new TypeError("D.108d2 browser realms are absent");
 	invite = await creator.evaluate((input) => window.phase6aCreatorSuccessorProduct.create(input), {
 		channelName: CHANNEL_NAME,
@@ -216,7 +230,6 @@ test(D108D2_BROWSER_BEHAVIORS[0], async () => {
 });
 
 test(D108D2_BROWSER_BEHAVIORS[1], async () => {
-	test.skip(!PRODUCT_READY, "D.108d2 product surface is intentionally absent in RED");
 	if (creator === undefined || established === undefined || carrier === undefined) {
 		throw new TypeError("D.108d2 established-peer state is absent");
 	}
@@ -240,7 +253,6 @@ test(D108D2_BROWSER_BEHAVIORS[1], async () => {
 });
 
 test(D108D2_BROWSER_BEHAVIORS[2], async () => {
-	test.skip(!PRODUCT_READY, "D.108d2 product surface is intentionally absent in RED");
 	if (creator === undefined || established === undefined || late === undefined || carrier === undefined) {
 		throw new TypeError("D.108d2 late-peer state is absent");
 	}
@@ -284,9 +296,35 @@ test(D108D2_BROWSER_BEHAVIORS[2], async () => {
 		successorSnapshotDeclaration: carrier.snapshotDeclaration,
 	});
 	expect((await snapshot(creator)).authority).toEqual(carrier.authority);
-	const audits = await Promise.all(
+	const audits = (await Promise.all(
 		[creator, established, late].map((page) => page.evaluate(() => window.phase6aCreatorSuccessorProduct.relayAudit()))
-	);
+	)) as unknown as readonly RelayAudit[];
 	expect(audits.every(({ mismatch }) => mismatch === 0)).toBe(true);
-	expect(audits.reduce((total, audit) => total + audit.incoming, 0)).toBeGreaterThan(0);
+	expect(audits.map(({ realmId }) => realmId)).toEqual(["creator", "established", "late"]);
+	const outgoing = new Map<string, RelayMessageObservation>();
+	for (const audit of audits) {
+		expect(audit.outgoingMessages).toHaveLength(audit.outgoing);
+		expect(audit.incomingMessages).toHaveLength(audit.incoming);
+		for (const observation of audit.outgoingMessages) {
+			expect(observation.sourceRealmId).toBe(audit.realmId);
+			expect(observation.data).toBeInstanceOf(Uint8Array);
+			const key = `${observation.sourceRealmId}:${observation.sequence}`;
+			expect(outgoing.has(key)).toBe(false);
+			outgoing.set(key, observation);
+		}
+	}
+	expect(outgoing.size).toBeGreaterThan(0);
+	const incoming = audits.flatMap((audit) => audit.incomingMessages.map((observation) => ({ audit, observation })));
+	expect(incoming.length).toBeGreaterThan(0);
+	for (const { audit, observation } of incoming) {
+		expect(observation.receiverRealmId).toBe(audit.realmId);
+		expect(observation.sourceRealmId).not.toBe(audit.realmId);
+		expect(observation.data).toBeInstanceOf(Uint8Array);
+		const sent = outgoing.get(`${observation.sourceRealmId}:${observation.sequence}`);
+		expect(sent).toBeDefined();
+		expect(Array.from(observation.data)).toEqual(Array.from(sent?.data ?? []));
+		expect(observation.objectId).toBe(sent?.objectId);
+		expect(observation.sender).toBe(sent?.sender);
+		expect(observation.type).toBe(sent?.type);
+	}
 });
