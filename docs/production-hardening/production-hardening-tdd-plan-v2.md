@@ -62411,7 +62411,7 @@ confirmation review.
 
 The immutable RED checkpoint is signed commit
 `5808bf7155448b0bec1f039b0e9d94c811bc2d81`, parent
-`2153fd91c974fd491151db3dfcb5f88f298423a5`. It changes exactly the frozen four
+`2153fd916b10c28ee1cf7c20a1276a1ba2493e49`. It changes exactly the frozen four
 test-infrastructure owners and no production file. The root ownership suite
 passed 8/8. The combined focused command
 `pnpm exec vitest run --coverage.enabled=false tests/phase-6a-creator-successor-local-author-red.test.ts packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts`
@@ -62450,9 +62450,88 @@ per-call mutants, without claiming a facade-keyed mutant. Finally, the owning
 Vitest timeout is 120 seconds while the child kill remains 90 seconds, so
 fixture construction cannot invert the diagnostic deadlines. Exact-four
 eslint, Prettier, `git diff --check`, the 8/8 ownership suite and the combined
-11-pass/one-named-failure RED all pass after these corrections. D.108e4 keeps
-only its previously assigned current-row mismatch cleanup; no review debt from
-this RED remains.
+11-pass/one-named-failure RED all pass after these corrections. At the RED
+checkpoint D.108e4 kept only its previously assigned current-row mismatch
+cleanup; no review debt from this RED remained.
+
+The immutable GREEN is signed commit
+`0c9b26d0db80807108d94fd52a24e2741e9a77f5`, parent
+`823ad8e2e9e484cde029eacfdd8b69521608b597`, with good signature key
+`761B99CEA81C6289`. Its complete production diff is three lines in the sole
+authorized owner `packages/node/src/v3-live.ts`: `let skipped = 0` moves from
+each `readOutboxPage` invocation to the private predecessor-wrapper instance,
+and the assigned outer-consumer issued-read ownership comment is added. The
+strict comparison, returned row, cursor, authentication, limits, authority,
+wire, store contract and product API remain unchanged. The focused command
+`pnpm exec vitest run --coverage.enabled=false tests/phase-6a-creator-successor-local-author-red.test.ts packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts`
+passed 12/12 in 46.07 seconds; the fresh skip-budget child completed in 42.220
+seconds and proved equality at 8,192, rejection on the cumulative 8,193rd
+authenticated future row, match-before-budget and a fresh counter for the new
+recovery.
+
+The retained command
+`pnpm exec vitest run tests/phase-4c-*.test.ts tests/phase-6a-*.test.ts packages/storage-node/tests/phase-6a-*.test.ts --maxWorkers=1 --minWorkers=1 --no-coverage`
+passed 16 files and 120 tests in 88.45 seconds. This includes all fifteen
+Phase-4c-a assertions and the genuine fresh-process 64 MiB peak-live memory
+child. As in the preceding D.108e2d proof, 512 chunks carried 67,108,864 body
+bytes at 131,072 bytes each. Owner mode sampled the actual body objects while
+each live write was awaited, peaked at 131,072 bytes and settled at zero; the
+retaining mutant held them through the live stream, peaked at 67,108,864
+before deliberate release and only then settled at zero. The unchanged signed
+strict ceiling was `2 * 131072 = 262144`, so the gate still proves peak live
+snapshot/chunk ownership during execution and the `<2× chunk-body`
+requirement, not merely memory remaining after completion. The four
+three-engine commands `pnpm exec playwright test --config packages/storage-browser/playwright.phase-6a-creator-successor-activation.config.ts`,
+`pnpm exec playwright test --config packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts`,
+`pnpm exec playwright test --config packages/storage-browser/playwright.phase-4c-b-snapshot-quarantine.config.ts`
+and
+`pnpm exec playwright test --config packages/storage-browser/playwright.phase-4c-c-snapshot-transfer.config.ts`
+passed 21/21, 18/18, 18/18 and 6/6 respectively across Chromium, Firefox and
+WebKit.
+
+`pnpm --filter @ts-drp/protocol-v3 --filter @ts-drp/node --filter @ts-drp/storage-node --filter @ts-drp/storage-browser build`
+and `pnpm --filter @ts-drp/storage-browser typecheck` passed. The broad Node
+typecheck retained 13 inherited diagnostics: TS6059=5, TS6307=5, TS2339=1,
+TS1360=1 and TS2322=1; the broad storage-node typecheck retained 113: TS6059=27,
+TS6307=27, TS2307=20, TS7006=37 and TS18046=1. Both reported zero diagnostics
+in the changed region. ESLint and Prettier over the exact five combined
+test/production owners, plus `git diff --check`, passed. No inherited baseline
+was hidden or widened.
+
+The clean-environment proof used detached worktree
+`/private/tmp/ts-drp-d108e2e-green-clean.wHAeNV/repo` at exact signed commit
+`0c9b26d0db80807108d94fd52a24e2741e9a77f5`. It began tracked-clean with no
+package or example `dist`. `pnpm install --offline --ignore-scripts --frozen-lockfile`
+installed all 48 workspace projects without creating `dist`; then
+`node scripts/ensure-native-deps.mjs` restored the required node-datachannel
+prebuild. The fresh closure command
+`pnpm --filter '@ts-drp/protocol-v3...' --filter '@ts-drp/node...' --filter '@ts-drp/storage-node...' --filter '@ts-drp/storage-browser...' build`
+passed 33 of 48 projects. From those newly built artifacts, the same retained
+selection passed 16 files/120 tests in 88.11 seconds, including the genuine 64
+MiB child, and the four browser matrices again passed 21/21, 18/18, 18/18 and
+6/6. Storage-browser typecheck, the unchanged 13/113 broad baselines with zero
+changed-region diagnostics, exact-five ESLint/Prettier/diff and final tracked
+status all passed. Thus neither local `dist`, lifecycle scripts, Vite aliases
+nor the main checkout's workspace state can mask package-resolution or GREEN
+defects.
+
+The GREEN review round used three separate detached worktrees at that exact
+commit. Grok 4.6/high session `01a042f2-a340-7440-82bf-ffe465d7d3b5`
+completed normally after 285.212 seconds with `stop_reason=end_turn` and
+terminal `APPROVED`, P0=0/P1=0/P2=0; no resume was required. Kimi CLI 0.38 exact
+`kimi-code/k3` session `session_11410e20-d15a-4450-bea8-596d3aea9f56`
+emitted CHECK001 through CHECK100 and terminal `APPROVED`, P0=0/P1=0/P2=0.
+Opus 5/xhigh session `7fba92e8-c2de-4cd7-97a5-696356726cf2` completed with
+exit zero, no permission denial and no subagent, returning schema-valid
+`APPROVED`, P0=0/P1=0/P2=1. No Fable or collaboration subagent ran. The P0/P1
+union is empty, so no GREEN correction or confirmation review is required.
+Opus's non-blocking P2 observes that distinct test facades do not kill a
+hypothetical counter keyed to the inner store/facade identity. D.108e4 owns a
+small tests-only same-facade two-reopen control and must close it after D.108e3
+and before Phase 6a exit; it does not change this GREEN's correct closure
+custody or reopen D.108e2e. D.108e2e is complete, with no remaining product or
+test-infrastructure debt beyond that explicitly scheduled oracle-strengthening
+control and the unchanged inherited typecheck baselines.
 
 ##### D.108e4 — retained test-oracle cleanup
 
@@ -62463,7 +62542,11 @@ digest with a positive control, make the window-lock observation boundary
 explicit, remove the possession-probe naming/preseed ambiguity, prove one
 contiguous authority-attempt sequence from an independent observation, isolate
 the current-row issued/outbox mismatch from signature failure, and reconcile
-the three inherited full-file Phase-3 pins. It has no production GREEN owner
+the three inherited full-file Phase-3 pins. It must also reuse one bounded
+issuance facade across two successive under-budget reopens and prove that the
+second reopen receives a fresh full skip allowance; this kills inner-store-
+and facade-identity-keyed skip-counter mutants without another 8,192-row
+window. It has no production GREEN owner
 and may not change public APIs, wire, store, recovery authority, limits or
 memory contracts. If a production-source change is genuinely required, stop
 and reslice. This assignment must not contaminate or delay the D.108e2d
