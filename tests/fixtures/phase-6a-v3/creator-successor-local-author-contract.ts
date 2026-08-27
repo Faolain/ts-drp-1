@@ -169,6 +169,7 @@ export function runD108d1bLocalAuthorChild(input: unknown): Promise<D108d1bChild
 					"packages/node/dist/src/creator-adoption-activate.js"
 				),
 				"@ts-drp/node/v3-live": resolve(REPOSITORY_ROOT, "packages/node/dist/src/v3-live.js"),
+				"@ts-drp/protocol-v3/latched-acl": resolve(REPOSITORY_ROOT, "packages/protocol-v3/dist/src/latched-acl.js"),
 				"@ts-drp/storage-node": resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/index.js"),
 				"@ts-drp/storage-node/issuance": resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/issuance.js"),
 				"@ts-drp/storage-node/live-journal": resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/live-journal.js"),

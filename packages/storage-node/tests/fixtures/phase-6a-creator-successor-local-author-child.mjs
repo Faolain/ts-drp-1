@@ -3,6 +3,7 @@ import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical"
 import { MessageQueueManager } from "@ts-drp/message-queue";
 /* eslint-disable import/no-unresolved -- the exact built subpath is intentionally absent in RED */
 import { reopenCreatorSuccessorAdoption } from "@ts-drp/node/creator-adoption-activate";
+import { openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";
 /* eslint-enable import/no-unresolved */
 import { createNodeDurableIssuanceStore } from "@ts-drp/storage-node/issuance";
 import { createHash, createPrivateKey, createPublicKey, sign } from "node:crypto";
@@ -176,6 +177,22 @@ function packedOracle(material) {
 	const digest = Buffer.from(established.digest).toString("hex");
 	const rows = peerMaterial.journalRows.filter((row) => row.vertexDigest === digest);
 	const row = rows[0];
+	const firstMember = acl.members[0];
+	if (firstMember === undefined || !Array.isArray(firstMember.groups) || firstMember.groups.length === 0) {
+		throw new TypeError("D.108e2c malformed-member control lacks an ACL member");
+	}
+	const malformedGroups =
+		firstMember.groups.length === 1
+			? [firstMember.groups[0], firstMember.groups[0]]
+			: [firstMember.groups[1], firstMember.groups[0], ...firstMember.groups.slice(2)];
+	const exactCanonicalMalformedAclBytes = encodeCanonical({
+		...acl,
+		members: [{ ...firstMember, groups: malformedGroups }, ...acl.members.slice(1)],
+	});
+	const malformedAclDigest = Buffer.from(hashDomain("ts-drp/latched-acl/v3", exactCanonicalMalformedAclBytes)).toString(
+		"hex"
+	);
+	const decodedMalformedAcl = decodeCanonical(exactCanonicalMalformedAclBytes);
 	return Object.freeze({
 		aclMembers: Object.freeze(
 			acl.members.map((member) =>
@@ -198,6 +215,18 @@ function packedOracle(material) {
 				row?.detachedSignature instanceof Uint8Array && sameBytes(row.detachedSignature, established.signature),
 			sourceKind: row?.sourceKind,
 			vertexDigest: row?.vertexDigest,
+		}),
+		malformedMemberControl: Object.freeze({
+			canonical: sameBytes(encodeCanonical(decodedMalformedAcl), exactCanonicalMalformedAclBytes),
+			digestMatches:
+				Buffer.from(hashDomain("ts-drp/latched-acl/v3", exactCanonicalMalformedAclBytes)).toString("hex") ===
+				malformedAclDigest,
+			result: openCanonicalLatchedAclSnapshot({
+				exactCanonicalLatchedAclBytes: exactCanonicalMalformedAclBytes,
+				expectedAclDigest: malformedAclDigest,
+				expectedEpoch: acl.epoch,
+				expectedObjectId: acl.objectId,
+			}),
 		}),
 	});
 }
@@ -247,6 +276,11 @@ function instrumentIssuanceStore(raw, effects, input) {
 		value: async (scope) => {
 			effects.lineageReads.push(scope.author);
 			effects.order.push(`lineage:${scope.author}`);
+			effects.authorityEvents.push({
+				attempt: effects.authorityAttempt,
+				author: scope.author,
+				kind: "lineage-read",
+			});
 			const lineage = await raw.readLineage(scope);
 			if (input.lineageFault === "selected-exhausted" && scope.author === input.authority.author) {
 				return { ...lineage, exhausted: true };
@@ -256,6 +290,12 @@ function instrumentIssuanceStore(raw, effects, input) {
 			}
 			if (input.lineageFault === "foreign-exhausted" && scope.author === input.lineageFaultAuthor) {
 				return { ...lineage, exhausted: true };
+			}
+			if (input.lineageFault === "negative-next" && scope.author === input.authority.author) {
+				return { ...lineage, next: -1 };
+			}
+			if (input.lineageFault === "unsafe-next" && scope.author === input.authority.author) {
+				return { ...lineage, next: Number.MAX_SAFE_INTEGER + 1 };
 			}
 			return lineage;
 		},
@@ -327,6 +367,9 @@ async function seedIssuance(material, suffix, carriers, effects, input) {
 function signerFor(material, scenario, selectedAuthority, wrongAuthority, observations, state, effects, durableValues) {
 	return async (bytes) => {
 		effects.order.push(`${state.use}:signer`);
+		if (state.use === "possession") {
+			effects.authorityEvents.push({ attempt: effects.authorityAttempt, kind: "possession-signer" });
+		}
 		observations.push({
 			bytes: Buffer.from(bytes).toString("hex"),
 			matchesDurableCarrier: durableValues.has(Buffer.from(bytes).toString("hex")),
@@ -397,6 +440,8 @@ async function runCase(material, index, input) {
 	const publications = [];
 	const effects = {
 		aheRecoverCount: 0,
+		authorityAttempt: -1,
+		authorityEvents: [],
 		installEpochAnchorCount: 0,
 		issuanceStoreShape: false,
 		lineageReads: [],
@@ -424,8 +469,9 @@ async function runCase(material, index, input) {
 		effects,
 		durableByteValues(material, 32)
 	);
-	const reopen = () =>
-		withCryptoScenario(input.scenario, () =>
+	const reopen = () => {
+		effects.authorityAttempt += 1;
+		return withCryptoScenario(input.scenario, () =>
 			reopenCreatorSuccessorAdoption({
 				...material.creatorGenesis,
 				author: input.authority.author,
@@ -441,10 +487,12 @@ async function runCase(material, index, input) {
 				store: ahe.store,
 			})
 		);
+	};
 	const shared = () => ({
 		effects: {
 			adoptionSwapCount: ahe.adoptionSwapCount(),
 			aheRecoverCount: effects.aheRecoverCount,
+			authorityEvents: effects.authorityEvents.map((event) => ({ ...event })),
 			installEpochAnchorCount: effects.installEpochAnchorCount,
 			issuanceStoreShape: effects.issuanceStoreShape,
 			lineageReads: [...effects.lineageReads],
@@ -646,6 +694,22 @@ async function matrix(material) {
 			carriers: [bobCarrier],
 			name: "ed25519-unavailable",
 			scenario: "ed25519-unavailable",
+			wrongAuthority: carol,
+		},
+		{
+			authority: bob,
+			carriers: [bobCarrier],
+			lineageFault: "negative-next",
+			name: "negative-lineage-next",
+			scenario: "valid",
+			wrongAuthority: carol,
+		},
+		{
+			authority: bob,
+			carriers: [bobCarrier],
+			lineageFault: "unsafe-next",
+			name: "unsafe-lineage-next",
+			scenario: "valid",
 			wrongAuthority: carol,
 		},
 	];

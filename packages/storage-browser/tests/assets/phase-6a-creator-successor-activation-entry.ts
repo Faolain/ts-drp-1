@@ -29,15 +29,24 @@ async function signPossession(bytes: Uint8Array, seed: Uint8Array): Promise<Uint
 }
 
 interface ContenderResult {
+	readonly databaseName: string;
 	readonly detail?: string;
 	readonly epoch?: number;
+	readonly fixtureDisposition: "harness-busy" | "production-result";
 	readonly kind?: string;
+	readonly lockAcquiredCount: number;
+	readonly lockCallbackCount: number;
 	readonly lockHeld: boolean;
 	readonly ok: boolean;
 	readonly publicationCount: number;
 	readonly recovery?: string;
 	readonly signerCount: number;
 	readonly verificationCount: number;
+}
+
+interface WindowLockObservation {
+	restore(): void;
+	snapshot(): Readonly<{ readonly lockAcquiredCount: number; readonly lockCallbackCount: number }>;
 }
 
 type PossessionSignerMode = "throw" | "valid" | "wrong-key";
@@ -206,6 +215,47 @@ function network(publications: unknown[]): PlainRecord {
 	};
 }
 
+function observeWindowLocks(): WindowLockObservation {
+	let lockAcquiredCount = 0;
+	let lockCallbackCount = 0;
+	const inert = (): WindowLockObservation => ({
+		restore: () => undefined,
+		snapshot: () => ({ lockAcquiredCount, lockCallbackCount }),
+	});
+	if (typeof window === "undefined" || window !== globalThis) return inert();
+	const descriptor = Object.getOwnPropertyDescriptor(navigator, "locks");
+	const locks = Reflect.get(navigator, "locks");
+	if (locks === null || typeof locks !== "object") return inert();
+	const request = Reflect.get(locks, "request");
+	if (typeof request !== "function") return inert();
+	Object.defineProperty(navigator, "locks", {
+		configurable: true,
+		value: Object.freeze({
+			request: (
+				name: string,
+				options: Readonly<{ readonly ifAvailable: true; readonly mode: "exclusive" }>,
+				callback: (lock: Lock | null) => Promise<void>
+			): unknown =>
+				Reflect.apply(request, locks, [
+					name,
+					options,
+					async (lock: Lock | null): Promise<void> => {
+						lockCallbackCount += 1;
+						if (lock !== null) lockAcquiredCount += 1;
+						await callback(lock);
+					},
+				]),
+		}),
+	});
+	return {
+		restore: (): void => {
+			if (descriptor === undefined) Reflect.deleteProperty(navigator, "locks");
+			else Object.defineProperty(navigator, "locks", descriptor);
+		},
+		snapshot: () => ({ lockAcquiredCount, lockCallbackCount }),
+	};
+}
+
 async function openStores(databaseName: string): Promise<
 	Readonly<{
 		issuanceStore: Awaited<ReturnType<typeof createBrowserDurableIssuanceStore>>;
@@ -341,7 +391,11 @@ export async function openContender(
 ): Promise<ContenderResult> {
 	if (activeHandle !== undefined) {
 		return {
+			databaseName,
+			fixtureDisposition: "harness-busy",
 			kind: "authority-unavailable",
+			lockAcquiredCount: 0,
+			lockCallbackCount: 0,
 			lockHeld: false,
 			ok: false,
 			publicationCount: 0,
@@ -351,6 +405,7 @@ export async function openContender(
 	}
 	const material = unpack(packedMaterial) as PlainRecord;
 	const stores = await openStores(databaseName);
+	const lockObservation = observeWindowLocks();
 	const publications: unknown[] = [];
 	let signerCount = 0;
 	let verificationCount = 0;
@@ -393,8 +448,11 @@ export async function openContender(
 				stores.store.close(),
 			]);
 			return {
+				databaseName,
 				detail: String(result.detail),
+				fixtureDisposition: "production-result",
 				kind: String(result.kind),
+				...lockObservation.snapshot(),
 				lockHeld: false,
 				ok: false,
 				publicationCount: publications.length,
@@ -406,7 +464,10 @@ export async function openContender(
 		activeHandle = handle;
 		activeStores = [stores.snapshotStore, stores.liveJournalStore, stores.issuanceStore, stores.store];
 		return {
+			databaseName,
 			epoch: Number(handle.epoch),
+			fixtureDisposition: "production-result",
+			...lockObservation.snapshot(),
 			lockHeld: true,
 			ok: true,
 			publicationCount: publications.length,
@@ -422,6 +483,8 @@ export async function openContender(
 			stores.store.close(),
 		]);
 		throw error;
+	} finally {
+		lockObservation.restore();
 	}
 }
 
@@ -429,10 +492,18 @@ async function probePossessionFailure(
 	databaseName: string,
 	packedMaterial: unknown
 ): Promise<readonly ContenderResult[]> {
-	return Promise.all([
-		openContender(databaseName, packedMaterial, "wrong-key"),
-		openContender(databaseName, packedMaterial, "throw"),
-	]);
+	let probeOrder = 0;
+	const run = async (suffix: string, signerMode: PossessionSignerMode): Promise<ContenderResult> => {
+		const selectedDatabaseName = `${databaseName}-${suffix}`;
+		await seed(selectedDatabaseName, packedMaterial);
+		const probeStartOrder = ++probeOrder;
+		const result = await openContender(selectedDatabaseName, packedMaterial, signerMode);
+		const probeFinishOrder = ++probeOrder;
+		return Object.freeze({ ...result, probeFinishOrder, probeStartOrder });
+	};
+	const wrongKey = await run("wrong-key", "wrong-key");
+	const throwing = await run("throw", "throw");
+	return Object.freeze([wrongKey, throwing]);
 }
 
 async function probeAuthorityFailure(

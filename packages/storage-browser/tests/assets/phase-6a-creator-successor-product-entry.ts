@@ -69,6 +69,8 @@ interface ProductApi {
 interface LifetimeInstrumentationSnapshot {
 	readonly activationCount: number;
 	readonly commitCount: number;
+	readonly postActivationPauseCount: number;
+	readonly postPredecessorDeactivationPauseCount: number;
 	readonly predecessorDeactivateCount: number;
 	readonly replacementDeactivateCount: number;
 	readonly replacementDeactivateCompletedCount: number;
@@ -78,8 +80,15 @@ interface LifetimeInstrumentationSnapshot {
 interface LifetimeInstrumentation {
 	cleanupReplacements(): Promise<void>;
 	configure(
-		input: Readonly<{ readonly pauseVerification?: boolean; readonly rejectPredecessorDeactivate?: boolean }>
+		input: Readonly<{
+			readonly pauseAfterActivation?: boolean;
+			readonly pauseAfterPredecessorDeactivation?: boolean;
+			readonly pauseVerification?: boolean;
+			readonly rejectPredecessorDeactivate?: boolean;
+		}>
 	): void;
+	releasePostActivation(): void;
+	releasePostPredecessorDeactivation(): void;
 	releaseVerification(): void;
 	snapshot(): LifetimeInstrumentationSnapshot;
 }
@@ -102,7 +111,12 @@ declare global {
 			close(): Promise<void>;
 			cleanupLifetimeReplacements(): Promise<void>;
 			configureLifetime(
-				input: Readonly<{ readonly pauseVerification?: boolean; readonly rejectPredecessorDeactivate?: boolean }>
+				input: Readonly<{
+					readonly pauseAfterActivation?: boolean;
+					readonly pauseAfterPredecessorDeactivation?: boolean;
+					readonly pauseVerification?: boolean;
+					readonly rejectPredecessorDeactivate?: boolean;
+				}>
 			): void;
 			concurrentAdoption(): Promise<readonly [ObservedSettlement, ObservedSettlement]>;
 			create(input: unknown): Promise<string>;
@@ -113,6 +127,8 @@ declare global {
 			lifetimeSnapshot(): LifetimeInstrumentationSnapshot &
 				Readonly<{ readonly adoptionSettled: boolean; readonly closeSettled: boolean }>;
 			relayAudit(): RelayAudit;
+			releasePostActivation(): void;
+			releasePostPredecessorDeactivation(): void;
 			releaseVerification(): void;
 			sealEpoch(): Promise<PlainRecord>;
 			send(text: string): Promise<void>;
@@ -624,7 +640,12 @@ const api = Object.freeze({
 		return instrumentation().cleanupReplacements();
 	},
 	configureLifetime(
-		input: Readonly<{ readonly pauseVerification?: boolean; readonly rejectPredecessorDeactivate?: boolean }>
+		input: Readonly<{
+			readonly pauseAfterActivation?: boolean;
+			readonly pauseAfterPredecessorDeactivation?: boolean;
+			readonly pauseVerification?: boolean;
+			readonly rejectPredecessorDeactivate?: boolean;
+		}>
 	): void {
 		adoptionSettled = false;
 		closeSettled = false;
@@ -692,6 +713,12 @@ const api = Object.freeze({
 			outgoingMessages: Object.freeze(outgoingMessages.map(copy)),
 			realmId,
 		});
+	},
+	releasePostActivation(): void {
+		instrumentation().releasePostActivation();
+	},
+	releasePostPredecessorDeactivation(): void {
+		instrumentation().releasePostPredecessorDeactivation();
 	},
 	releaseVerification(): void {
 		instrumentation().releaseVerification();
