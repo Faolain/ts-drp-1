@@ -49,6 +49,8 @@ function createState() {
     rejectPredecessorDeactivate: false,
     releaseVerification: undefined,
     replacementDeactivateCount: 0,
+    replacementDeactivateCompletedCount: 0,
+    replacementPlanes: new Set(),
     verificationCount: 0,
     verificationGate: Promise.resolve(),
   };
@@ -59,6 +61,7 @@ function createState() {
     state.predecessorDeactivateCount = 0;
     state.rejectPredecessorDeactivate = input.rejectPredecessorDeactivate === true;
     state.replacementDeactivateCount = 0;
+    state.replacementDeactivateCompletedCount = 0;
     state.verificationCount = 0;
     state.verificationGate = state.pauseVerification
       ? new Promise((resolve) => { state.releaseVerification = resolve; })
@@ -68,6 +71,9 @@ function createState() {
   Object.defineProperty(globalThis, "__d108e2bLifetimeInstrumentation", {
     configurable: false,
     value: Object.freeze({
+      cleanupReplacements: async () => {
+        await Promise.allSettled(Array.from(state.replacementPlanes, (plane) => plane.deactivate()));
+      },
       configure,
       releaseVerification: () => {
         state.pauseVerification = false;
@@ -79,6 +85,7 @@ function createState() {
         commitCount: state.commitCount,
         predecessorDeactivateCount: state.predecessorDeactivateCount,
         replacementDeactivateCount: state.replacementDeactivateCount,
+        replacementDeactivateCompletedCount: state.replacementDeactivateCompletedCount,
         verificationCount: state.verificationCount,
       }),
     }),
@@ -97,7 +104,7 @@ const instrumentPlane = (plane, kind) => {
     if (key === "deactivate") {
       Object.defineProperty(wrapper, key, {
         enumerable: descriptor.enumerable,
-        value: () => {
+        value: async () => {
           if (kind === "predecessor") {
             state.predecessorDeactivateCount += 1;
             if (state.rejectPredecessorDeactivate) {
@@ -107,7 +114,12 @@ const instrumentPlane = (plane, kind) => {
           } else {
             state.replacementDeactivateCount += 1;
           }
-          return Reflect.apply(plane.deactivate, plane, []);
+          const result = await Reflect.apply(plane.deactivate, plane, []);
+          if (kind === "replacement") {
+            state.replacementDeactivateCompletedCount += 1;
+            state.replacementPlanes.delete(wrapper);
+          }
+          return result;
         },
       });
     } else if ("value" in descriptor) {
@@ -125,6 +137,7 @@ const instrumentPlane = (plane, kind) => {
     }
   }
   Object.freeze(wrapper);
+  if (kind === "replacement") state.replacementPlanes.add(wrapper);
   instrumentedPlanes.set(wrapper, plane);
   return wrapper;
 };`;
@@ -232,6 +245,7 @@ interface LifetimeCounts {
 	readonly commitCount: number;
 	readonly predecessorDeactivateCount: number;
 	readonly replacementDeactivateCount: number;
+	readonly replacementDeactivateCompletedCount: number;
 	readonly verificationCount: number;
 }
 
@@ -537,6 +551,7 @@ let lifetimeScenario = 0;
 async function openLifetimeCreator(sealed: boolean): Promise<Page> {
 	if (creator === undefined) throw new TypeError("D.108e2b creator realm is absent");
 	await creator.evaluate(() => window.phase6aCreatorSuccessorProduct.close()).catch(() => undefined);
+	await creator.evaluate(() => window.phase6aCreatorSuccessorProduct.cleanupLifetimeReplacements());
 	lifetimeScenario += 1;
 	await creator.evaluate((input) => window.phase6aCreatorSuccessorProduct.create(input), {
 		channelName: `${CHANNEL_NAME}-lifetime-${lifetimeScenario}`,
@@ -548,7 +563,9 @@ async function openLifetimeCreator(sealed: boolean): Promise<Page> {
 }
 
 async function closeLifetimeCreator(page: Page): Promise<void> {
-	if (!page.isClosed()) await page.evaluate(() => window.phase6aCreatorSuccessorProduct.close()).catch(() => undefined);
+	if (page.isClosed()) return;
+	await page.evaluate(() => window.phase6aCreatorSuccessorProduct.close()).catch(() => undefined);
+	await page.evaluate(() => window.phase6aCreatorSuccessorProduct.cleanupLifetimeReplacements());
 }
 
 test(D108E2B_BROWSER_BEHAVIORS.join("; "), async () => {
@@ -559,6 +576,7 @@ test(D108E2B_BROWSER_BEHAVIORS.join("; "), async () => {
 			commitCount: selected.commitCount,
 			predecessorDeactivateCount: selected.predecessorDeactivateCount,
 			replacementDeactivateCount: selected.replacementDeactivateCount,
+			replacementDeactivateCompletedCount: selected.replacementDeactivateCompletedCount,
 			verificationCount: selected.verificationCount,
 		};
 	};
@@ -584,40 +602,45 @@ test(D108E2B_BROWSER_BEHAVIORS.join("; "), async () => {
 		.poll(() => closing.evaluate(() => window.phase6aCreatorSuccessorProduct.lifetimeSnapshot().verificationCount))
 		.toBe(1);
 	await closing.evaluate(() => window.phase6aCreatorSuccessorProduct.beginClose());
-	await closing.waitForTimeout(50);
 	const closeBeforeRelease = await closing.evaluate(() => window.phase6aCreatorSuccessorProduct.lifetimeSnapshot());
 	await closing.evaluate(() => window.phase6aCreatorSuccessorProduct.releaseVerification());
 	const [adoptionAfterRelease, closeAfterRelease] = await Promise.all([
 		closing.evaluate(() => window.phase6aCreatorSuccessorProduct.waitForAdoption()),
 		closing.evaluate(() => window.phase6aCreatorSuccessorProduct.waitForClose()),
 	]);
+	const closeCounts = await counts(closing);
 	await closeLifetimeCreator(closing);
 
 	const deactivation = await openLifetimeCreator(true);
 	await deactivation.evaluate(() =>
 		window.phase6aCreatorSuccessorProduct.configureLifetime({ rejectPredecessorDeactivate: true })
 	);
-	let deactivationRejected = false;
-	try {
-		await deactivation.evaluate(() => window.phase6aCreatorSuccessorProduct.adoptSuccessor());
-	} catch {
-		deactivationRejected = true;
-	}
+	await deactivation.evaluate(() => window.phase6aCreatorSuccessorProduct.beginAdoption());
+	const deactivationSettlement = await deactivation.evaluate(() =>
+		window.phase6aCreatorSuccessorProduct.waitForAdoption()
+	);
 	const deactivationCounts = await counts(deactivation);
 	const deactivationSnapshot = await snapshot(deactivation);
 	await closeLifetimeCreator(deactivation);
 
 	expect({
 		close: {
+			adoptionDetail: adoptionAfterRelease.detail,
+			adoptionOrder: adoptionAfterRelease.order,
 			adoptionSettledBeforeRelease: closeBeforeRelease.adoptionSettled,
 			adoptionStatus: adoptionAfterRelease.status,
+			cleanupBalanced:
+				closeCounts.activationCount === closeCounts.replacementDeactivateCount &&
+				closeCounts.replacementDeactivateCount === closeCounts.replacementDeactivateCompletedCount,
+			closeOrder: closeAfterRelease.order,
 			closeSettledBeforeRelease: closeBeforeRelease.closeSettled,
 			closeStatus: closeAfterRelease.status,
+			predecessorReleasedOnce: closeCounts.predecessorDeactivateCount === 1,
 		},
 		deactivation: {
 			authority: deactivationSnapshot.authority,
 			counts: deactivationCounts,
-			rejected: deactivationRejected,
+			settlement: deactivationSettlement,
 		},
 		failure: {
 			counts: failingCounts,
@@ -628,10 +651,15 @@ test(D108E2B_BROWSER_BEHAVIORS.join("; "), async () => {
 		success: { counts: successfulCounts, settlements: successfulSettlements },
 	}).toEqual({
 		close: {
+			adoptionDetail: "v3 room session is closed",
+			adoptionOrder: 1,
 			adoptionSettledBeforeRelease: false,
 			adoptionStatus: "rejected",
+			cleanupBalanced: true,
+			closeOrder: 2,
 			closeSettledBeforeRelease: false,
 			closeStatus: "fulfilled",
+			predecessorReleasedOnce: true,
 		},
 		deactivation: {
 			authority: null,
@@ -640,9 +668,22 @@ test(D108E2B_BROWSER_BEHAVIORS.join("; "), async () => {
 				commitCount: 1,
 				predecessorDeactivateCount: 1,
 				replacementDeactivateCount: 1,
+				replacementDeactivateCompletedCount: 1,
 				verificationCount: 1,
 			},
-			rejected: true,
+			settlement: {
+				detail: "D.108e2b injected predecessor deactivation failure",
+				lifetime: {
+					activationCount: 1,
+					commitCount: 1,
+					predecessorDeactivateCount: 1,
+					replacementDeactivateCount: 1,
+					replacementDeactivateCompletedCount: 1,
+					verificationCount: 1,
+				},
+				order: 1,
+				status: "rejected",
+			},
 		},
 		failure: {
 			counts: {
@@ -650,6 +691,7 @@ test(D108E2B_BROWSER_BEHAVIORS.join("; "), async () => {
 				commitCount: 0,
 				predecessorDeactivateCount: 0,
 				replacementDeactivateCount: 0,
+				replacementDeactivateCompletedCount: 0,
 				verificationCount: 1,
 			},
 			sameSettlement: true,
@@ -660,6 +702,7 @@ test(D108E2B_BROWSER_BEHAVIORS.join("; "), async () => {
 				commitCount: 1,
 				predecessorDeactivateCount: 1,
 				replacementDeactivateCount: 0,
+				replacementDeactivateCompletedCount: 0,
 				verificationCount: 1,
 			},
 			settlements: [{ status: "fulfilled" }, { status: "fulfilled" }],

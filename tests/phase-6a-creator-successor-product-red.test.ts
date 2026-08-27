@@ -70,9 +70,9 @@ describe("D.108e2b creator successor room lifetime RED", () => {
 
 	it("keeps node-root and chat authority closed while assigning the room as sole node consumer", () => {
 		expect(d108d2SourceGovernance()).toEqual({
+			chatByteIdentical: true,
 			chatHasNoDirectNodeAdoptionConsumer: true,
 			chatInputAllowsOnlyDeclarationWhenProductExists: true,
-			exactOneGreenOwner: true,
 			noForbiddenProductReturn: true,
 			noNodeRootWidening: true,
 			roomInputAllowsOnlyDeclarationWhenProductExists: true,
@@ -85,21 +85,31 @@ describe("D.108e2b creator successor room lifetime RED", () => {
 		expect(D108E2B_BROWSER_BEHAVIORS).toHaveLength(4);
 	});
 
-	it("rejects every unsupported cold successor composition before reading application authority", async () => {
-		const observations = [];
-		for (const [key, value] of [
-			["createOperationAdmissionPolicy", (): Readonly<Record<string, never>> => Object.freeze({})],
-			["creatorFinalitySigner", Object.freeze({ sign: () => Promise.resolve(new Uint8Array(64)) })],
-			["rebaseSourceInvite", "d108e2b-source-invite"],
-		] as const) {
-			let applicationReads = 0;
+	it("rejects only unsupported cold successor compositions before reading room authorities", async () => {
+		const exercise = async (
+			extra: Readonly<Record<string, unknown>>,
+			includeDeclaration: boolean
+		): Promise<Readonly<Record<string, unknown>>> => {
+			const reads = { application: 0, signer: 0, store: 0, transport: 0 };
 			const input = {
-				[key]: value,
+				...extra,
 				get application(): never {
-					applicationReads += 1;
+					reads.application += 1;
 					throw new TypeError("D.108e2b application authority was read");
 				},
-				successorSnapshotDeclaration: Object.freeze({}),
+				get databaseName(): never {
+					reads.store += 1;
+					throw new TypeError("D.108e2b store authority was read");
+				},
+				get openTransport(): never {
+					reads.transport += 1;
+					throw new TypeError("D.108e2b transport authority was read");
+				},
+				get signRegisteredVertexDigest(): never {
+					reads.signer += 1;
+					throw new TypeError("D.108e2b signer authority was read");
+				},
+				...(includeDeclaration ? { successorSnapshotDeclaration: Object.freeze({}) } : {}),
 			};
 			let detail = "fulfilled";
 			try {
@@ -107,13 +117,35 @@ describe("D.108e2b creator successor room lifetime RED", () => {
 			} catch (error) {
 				detail = error instanceof Error ? error.message : String(error);
 			}
-			observations.push(Object.freeze({ applicationReads, detail, key }));
+			return Object.freeze({ detail, reads: Object.freeze({ ...reads }) });
+		};
+
+		const unsupported = [];
+		for (const [key, value] of [
+			["createOperationAdmissionPolicy", (): Readonly<Record<string, never>> => Object.freeze({})],
+			["creatorFinalitySigner", Object.freeze({ sign: () => Promise.resolve(new Uint8Array(64)) })],
+			["rebaseSourceInvite", "d108e2b-source-invite"],
+		] as const) {
+			unsupported.push(Object.freeze({ ...(await exercise({ [key]: value }, true)), key }));
 		}
-		expect(observations).toEqual(
+		expect(unsupported).toEqual(
 			["createOperationAdmissionPolicy", "creatorFinalitySigner", "rebaseSourceInvite"].map((key) => ({
-				applicationReads: 0,
 				detail: "v3 room successor authority composition is unsupported",
 				key,
+				reads: { application: 0, signer: 0, store: 0, transport: 0 },
+			}))
+		);
+
+		const supported = await Promise.all([
+			exercise({ createOperationAdmissionPolicy: (): Readonly<Record<string, never>> => Object.freeze({}) }, false),
+			exercise({ creatorFinalitySigner: Object.freeze({}) }, false),
+			exercise({ rebaseSourceInvite: "d108e2b-source-invite" }, false),
+			exercise({}, true),
+		]);
+		expect(supported).toEqual(
+			Array.from({ length: 4 }, () => ({
+				detail: "D.108e2b application authority was read",
+				reads: { application: 1, signer: 0, store: 0, transport: 0 },
 			}))
 		);
 	});

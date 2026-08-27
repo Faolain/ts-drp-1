@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import ts from "typescript";
@@ -13,6 +14,7 @@ export const D108E2B_RED_PATHS = Object.freeze([
 ] as const);
 
 export const D108E2B_GREEN_PATHS = Object.freeze(["examples/v3-room/src/index.ts"] as const);
+const D108E2B_CHAT_SHA256 = "af384cb45ad8cffb2e56e648bdb22ea92fb8b8a053376ec2a47c34284b95fd0f";
 
 export const D108D2_AUTHORITY_KEYS = Object.freeze([
 	"aclDigest",
@@ -121,10 +123,10 @@ export function d108d2SourceGovernance(): Readonly<Record<string, boolean>> {
 		"reopenCreatorSuccessorAdoption",
 	].every((marker) => room.includes(marker));
 	return Object.freeze({
+		chatByteIdentical: createHash("sha256").update(chat).digest("hex") === D108E2B_CHAT_SHA256,
 		chatHasNoDirectNodeAdoptionConsumer: !ADOPTION_MARKER.test(chat),
 		chatInputAllowsOnlyDeclarationWhenProductExists:
 			!productExists || sameStrings(interfaceKeys(chat, "JoinInput"), [...D108D2_CHAT_JOIN_INPUT_KEYS].sort()),
-		exactOneGreenOwner: D108E2B_GREEN_PATHS.length === 1 && D108E2B_GREEN_PATHS[0] === "examples/v3-room/src/index.ts",
 		noForbiddenProductReturn:
 			!/return\s+[^;]*(?:intent|capability|activationResult|exactCanonicalTrust|snapshotReceipt|signingAuthority|displacedSource)/u.test(
 				`${room}\n${chat}`

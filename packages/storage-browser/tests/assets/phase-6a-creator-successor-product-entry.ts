@@ -71,10 +71,12 @@ interface LifetimeInstrumentationSnapshot {
 	readonly commitCount: number;
 	readonly predecessorDeactivateCount: number;
 	readonly replacementDeactivateCount: number;
+	readonly replacementDeactivateCompletedCount: number;
 	readonly verificationCount: number;
 }
 
 interface LifetimeInstrumentation {
+	cleanupReplacements(): Promise<void>;
 	configure(
 		input: Readonly<{ readonly pauseVerification?: boolean; readonly rejectPredecessorDeactivate?: boolean }>
 	): void;
@@ -84,6 +86,8 @@ interface LifetimeInstrumentation {
 
 interface ObservedSettlement {
 	readonly detail?: string;
+	readonly lifetime?: LifetimeInstrumentationSnapshot;
+	readonly order?: number;
 	readonly status: "fulfilled" | "rejected";
 }
 
@@ -96,6 +100,7 @@ declare global {
 			beginClose(): void;
 			boot(realmId: string): Promise<void>;
 			close(): Promise<void>;
+			cleanupLifetimeReplacements(): Promise<void>;
 			configureLifetime(
 				input: Readonly<{ readonly pauseVerification?: boolean; readonly rejectPredecessorDeactivate?: boolean }>
 			): void;
@@ -129,6 +134,7 @@ let realmId = "";
 let booted = false;
 let adoptionSettled = false;
 let closeSettled = false;
+let settlementSequence = 0;
 let pendingAdoption: Promise<ObservedSettlement> | undefined;
 let pendingClose: Promise<ObservedSettlement> | undefined;
 
@@ -140,16 +146,25 @@ function instrumentation(): LifetimeInstrumentation {
 	return selected as LifetimeInstrumentation;
 }
 
-function observe(task: Promise<void>, settled: () => void): Promise<ObservedSettlement> {
+function observe(task: Promise<void>, settled: () => void, capture = false): Promise<ObservedSettlement> {
+	const extras = (): Readonly<{
+		readonly lifetime?: LifetimeInstrumentationSnapshot;
+		readonly order?: number;
+	}> => {
+		if (!capture) return Object.freeze({});
+		settlementSequence += 1;
+		return Object.freeze({ lifetime: instrumentation().snapshot(), order: settlementSequence });
+	};
 	return task.then(
 		() => {
 			settled();
-			return Object.freeze({ status: "fulfilled" as const });
+			return Object.freeze({ ...extras(), status: "fulfilled" as const });
 		},
 		(error: unknown) => {
 			settled();
 			return Object.freeze({
 				detail: error instanceof Error ? error.message : String(error),
+				...extras(),
 				status: "rejected" as const,
 			});
 		}
@@ -566,16 +581,24 @@ const api = Object.freeze({
 	beginAdoption(): void {
 		if (pendingAdoption !== undefined) throw new TypeError("D.108e2b adoption observation is already active");
 		adoptionSettled = false;
-		pendingAdoption = observe(api.adoptSuccessor(), () => {
-			adoptionSettled = true;
-		});
+		pendingAdoption = observe(
+			api.adoptSuccessor(),
+			() => {
+				adoptionSettled = true;
+			},
+			true
+		);
 	},
 	beginClose(): void {
 		if (pendingClose !== undefined) throw new TypeError("D.108e2b close observation is already active");
 		closeSettled = false;
-		pendingClose = observe(productApi().close(), () => {
-			closeSettled = true;
-		});
+		pendingClose = observe(
+			productApi().close(),
+			() => {
+				closeSettled = true;
+			},
+			true
+		);
 	},
 	async boot(selectedRealmId: string): Promise<void> {
 		if (booted) return;
@@ -597,6 +620,9 @@ const api = Object.freeze({
 	close(): Promise<void> {
 		return productApi().close();
 	},
+	cleanupLifetimeReplacements(): Promise<void> {
+		return instrumentation().cleanupReplacements();
+	},
 	configureLifetime(
 		input: Readonly<{ readonly pauseVerification?: boolean; readonly rejectPredecessorDeactivate?: boolean }>
 	): void {
@@ -604,6 +630,7 @@ const api = Object.freeze({
 		closeSettled = false;
 		pendingAdoption = undefined;
 		pendingClose = undefined;
+		settlementSequence = 0;
 		instrumentation().configure(input);
 	},
 	async concurrentAdoption(): Promise<readonly [ObservedSettlement, ObservedSettlement]> {
