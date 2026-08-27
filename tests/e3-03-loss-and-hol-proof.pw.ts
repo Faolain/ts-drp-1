@@ -154,9 +154,27 @@ interface PlatformObservation extends FabricObservation {
 }
 
 interface CampaignEvidence {
+	readonly rawTransportDeltas: Readonly<{
+		readonly receiver: RawTransportDelta;
+		readonly sender: RawTransportDelta;
+	}>;
+	readonly readyStateMismatches: Readonly<{
+		readonly receiver: readonly RtcObservation[];
+		readonly sender: readonly RtcObservation[];
+	}>;
 	readonly receiverWire: readonly PlatformObservation[];
 	readonly senderWire: readonly PlatformObservation[];
 	readonly trialId: string;
+}
+
+interface RawTransportDelta {
+	readonly authenticatedConnectionLosses: number;
+	readonly lastLinkDrop: Readonly<{
+		readonly after: string;
+		readonly before: string;
+		readonly changed: boolean;
+	}>;
+	readonly linkDrops: number;
 }
 
 type NetworkProfile = Readonly<{
@@ -206,6 +224,10 @@ function installRtcObserver(): void {
 		const selectedOrdinal = ordinal;
 		ordinal += 1;
 		const atMs = Date.now();
+		const label = channel.label;
+		const maxRetransmits = channel.maxRetransmits;
+		const ordered = channel.ordered;
+		const readyState = channel.readyState;
 		const operation = bytesFrom(data)
 			.then((bytes) => {
 				if (selectedGeneration !== generation) return;
@@ -216,11 +238,11 @@ function installRtcObserver(): void {
 					connectionId: identity.connectionId,
 					direction,
 					insertionReadyState: channel.readyState,
-					label: channel.label,
-					maxRetransmits: channel.maxRetransmits,
-					ordered: channel.ordered,
+					label,
+					maxRetransmits,
+					ordered,
 					ordinal: selectedOrdinal,
-					readyState: channel.readyState,
+					readyState,
 					text: new TextDecoder().decode(bytes),
 				});
 			})
@@ -473,6 +495,21 @@ async function receiverEvidenceAtDeadline(
 		const rtc = await observer.snapshot();
 		return Object.freeze({ fabric: fabric.snapshot(selectedTrialId), rtc, zone: api.snapshot() });
 	}, trialId);
+}
+
+function rawTransportDelta(
+	before: ZoneSnapshot["rawTransport"],
+	after: ZoneSnapshot["rawTransport"]
+): RawTransportDelta {
+	return Object.freeze({
+		authenticatedConnectionLosses: after.authenticatedConnectionLosses - before.authenticatedConnectionLosses,
+		lastLinkDrop: Object.freeze({
+			after: after.lastLinkDrop,
+			before: before.lastLinkDrop,
+			changed: after.lastLinkDrop !== before.lastLinkDrop,
+		}),
+		linkDrops: after.linkDrops - before.linkDrops,
+	});
 }
 
 function platformObservations(
@@ -740,6 +777,76 @@ async function attachJson(testInfo: TestInfo, name: string, value: unknown): Pro
 	await testInfo.attach(name, { body: JSON.stringify(value, undefined, 2), contentType: "application/json" });
 }
 
+function diagnosticError(
+	error: unknown
+): Readonly<{ readonly message: string; readonly name: string; readonly stack?: string }> {
+	if (error instanceof Error) {
+		return Object.freeze({
+			message: error.message,
+			name: error.name,
+			...(error.stack === undefined ? {} : { stack: error.stack }),
+		});
+	}
+	return Object.freeze({ message: String(error), name: "NonError" });
+}
+
+async function diagnosticAttempt<T>(
+	operation: () => Promise<T>
+): Promise<Readonly<{ ok: true; value: T } | { error: ReturnType<typeof diagnosticError>; ok: false }>> {
+	let timeout: ReturnType<typeof setTimeout> | undefined;
+	try {
+		const value = await Promise.race([
+			operation(),
+			new Promise<never>((_resolve, reject) => {
+				timeout = setTimeout(() => reject(new Error("E303_DIAGNOSTIC_TIMEOUT")), 2_000);
+			}),
+		]);
+		return Object.freeze({ ok: true, value });
+	} catch (error) {
+		return Object.freeze({ error: diagnosticError(error), ok: false });
+	} finally {
+		if (timeout !== undefined) clearTimeout(timeout);
+	}
+}
+
+async function pageFailureEvidence(page: Page, trialId: string | null): Promise<unknown> {
+	if (page.isClosed()) return Object.freeze({ pageClosed: true });
+	const [networkResult, rtcResult, zoneResult] = await Promise.all([
+		diagnosticAttempt(() => network(page)),
+		diagnosticAttempt(() => rtcObservations(page)),
+		diagnosticAttempt(() => zone(page)),
+	]);
+	if (!rtcResult.ok)
+		return Object.freeze({ network: networkResult, pageClosed: false, rtc: rtcResult, zone: zoneResult });
+	const records = rtcResult.value;
+	let wire: unknown = null;
+	if (trialId !== null) {
+		try {
+			wire = Object.freeze({
+				message: platformObservations(records, "message", trialId),
+				send: platformObservations(records, "send", trialId),
+			});
+		} catch (error) {
+			wire = Object.freeze({ error: diagnosticError(error) });
+		}
+	}
+	return Object.freeze({
+		network: networkResult,
+		pageClosed: false,
+		rtc: Object.freeze({
+			count: records.length,
+			readyStateMismatches: records.filter(({ insertionReadyState, readyState }) => insertionReadyState !== readyState),
+			recentRecords: records
+				.slice(-64)
+				.map(({ text, ...record }) =>
+					Object.freeze({ ...record, textLength: text.length, textPreview: text.slice(0, 512) })
+				),
+			wire,
+		}),
+		zone: zoneResult,
+	});
+}
+
 test("freezes RTC metadata at the event boundary before async payload conversion", async ({ browser }) => {
 	const context = await browser.newContext();
 	await context.addInitScript(installRtcObserver);
@@ -870,18 +977,24 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 		const ruleIds = await emulate(cdp, profile);
 		cdpEvidence.push(Object.freeze({ label, profile, ruleIds: Object.freeze([...ruleIds]) }));
 	};
+	let activeTrialId: string | null = null;
+	let stage = "network-enable";
 	try {
 		await cdp.send("Network.enable");
 		// The global profile must exist before Chromium creates either peer-to-peer socket.
+		stage = "pre-signaling-profile";
 		await applyProfile("pre-signaling-capability", NO_LOSS);
 		expect(cdpEvidence[0]?.ruleIds).toHaveLength(1);
+		stage = "grid-open";
 		await Promise.all([openGrid(creator), openGrid(receiver)]);
+		stage = "zone-create";
 		const peers = await createZone(creator, receiver);
 		const initialCreatorNetwork = await network(creator);
 		const initialReceiverNetwork = await network(receiver);
 		const initialCreatorLinks = (await zone(creator)).rawTransport.links;
 		const initialReceiverLinks = (await zone(receiver)).rawTransport.links;
 
+		stage = "raw-total-loss-calibration";
 		const beforeTotalLoss = (await zone(receiver)).rawTransport.received;
 		await applyProfile("raw-total-loss-calibration", lossProfile(CALIBRATION_LOSS_PERCENT));
 		const totalLossSend = sendMovement(creator, 30, 20);
@@ -894,6 +1007,7 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 		expect(await network(creator)).toEqual(initialCreatorNetwork);
 		expect(await network(receiver)).toEqual(initialReceiverNetwork);
 
+		stage = "preliminary-loss-campaign";
 		await applyProfile("raw-total-loss-reset", NO_LOSS);
 		await new Promise((resolve) => setTimeout(resolve, 250));
 		const beforePreliminary = (await zone(receiver)).rawTransport.received;
@@ -914,6 +1028,7 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			sent: SAMPLE_COUNT,
 			totalLoss: { before: beforeTotalLoss, during: receivedDuringTotalLoss },
 		});
+		stage = "preliminary-reset";
 		await applyProfile("preliminary-reset", NO_LOSS);
 		await waitForOpenTransportPair(creator, receiver);
 		await waitForNetworkPair(creator, receiver, initialCreatorNetwork, initialReceiverNetwork);
@@ -939,7 +1054,9 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 		]);
 		if (readiness.some(({ reset, runTrial, snapshot }) => [reset, runTrial, snapshot].includes("undefined"))) return;
 
+		stage = "workbench-total-loss-calibration";
 		const calibrationTrialId = "e3-03-total-loss-calibration";
+		activeTrialId = calibrationTrialId;
 		await Promise.all(
 			[creator, receiver].map((page) =>
 				page.evaluate(
@@ -1005,6 +1122,7 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 		expect((await zone(receiver)).rawTransport.links).toEqual(initialReceiverLinks);
 		expect(await network(creator)).toEqual(initialCreatorNetwork);
 		expect(await network(receiver)).toEqual(initialReceiverNetwork);
+		stage = "workbench-total-loss-reset";
 		await applyProfile("workbench-total-loss-reset", NO_LOSS);
 		await workbenchCalibration;
 		await waitForOpenTransportPair(creator, receiver);
@@ -1015,6 +1133,8 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 		const campaignEvidence: CampaignEvidence[] = [];
 		for (let trial = 0; trial < TRIAL_COUNT; trial += 1) {
 			const trialId = "e3-03-" + String(trial);
+			activeTrialId = trialId;
+			stage = trialId + "-prepare";
 			await Promise.all(
 				[creator, receiver].map((page) =>
 					page.evaluate((selectedTrialId) => window.__TS_DRP_V3_ZONE__?.fabric?.reset(selectedTrialId), trialId)
@@ -1026,7 +1146,12 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			const clock = await clockEvidence(creator, receiver);
 			expect(clock.maximumSkewMs).toBeLessThanOrEqual(20);
 			const receiverRawBefore = await rawReceivedAfterQuiescence(receiver);
-			const senderRawBefore = (await zone(creator)).rawTransport.sent;
+			const [senderRawTransportBefore, receiverRawTransportBefore] = await Promise.all([
+				zone(creator).then(({ rawTransport }) => rawTransport),
+				zone(receiver).then(({ rawTransport }) => rawTransport),
+			]);
+			const senderRawBefore = senderRawTransportBefore.sent;
+			stage = trialId + "-run";
 			const trialOperation = creator.evaluate((input) => window.__TS_DRP_V3_ZONE__?.fabric?.runTrial(input), {
 				intervalMs: SAMPLE_INTERVAL_MS,
 				payloadFormat: "e3-03-ascii-v1" as const,
@@ -1049,9 +1174,11 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 				.toEqual({ raw: true, reliable: true });
 			await applyProfile(trialId + "-thirty-percent", lossProfile(CAMPAIGN_LOSS_PERCENT));
 			await trialOperation;
+			stage = trialId + "-sender-evidence";
 			const runTrialReturnedAtMs = await creator.evaluate(() => Date.now());
 			const senderRawAfter = await rawSentAfterQuiescence(creator);
-			const senderWire = platformObservations(await rtcObservations(creator), "send", trialId);
+			const senderRtc = await rtcObservations(creator);
+			const senderWire = platformObservations(senderRtc, "send", trialId);
 			const senderRawCandidateCount = senderWire.filter(({ lane, sentinel }) => lane === "raw" && !sentinel).length;
 			if (senderRawCandidateCount < PRELIMINARY_RAW_DELIVERY_FLOOR) {
 				throw new Error(
@@ -1073,11 +1200,14 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			);
 			const expectedCampaignSpanMs = (SAMPLE_COUNT - 1) * SAMPLE_INTERVAL_MS;
 			const deadlineMs = campaignStartedAtMs + expectedCampaignSpanMs + RELIABLE_OBSERVATION_TAIL_MS;
+			stage = trialId + "-deadline";
 			await new Promise((resolve) => setTimeout(resolve, Math.max(0, deadlineMs - Date.now())));
 			const receiverAtDeadline = await receiverEvidenceAtDeadline(receiver, trialId);
+			const senderRawTransportAtDeadline = (await zone(creator)).rawTransport;
 			const receiverWire = platformObservations(receiverAtDeadline.rtc, "message", trialId).filter(
 				({ receivedAtMs }) => receivedAtMs <= deadlineMs
 			);
+			stage = trialId + "-reset";
 			await applyProfile(trialId + "-reset", NO_LOSS);
 			await waitForOpenTransportPair(creator, receiver);
 			await waitForNetworkPair(creator, receiver, initialCreatorNetwork, initialReceiverNetwork);
@@ -1089,6 +1219,7 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			expectOpenTransport(senderSnapshot, peers.receiverPeerId);
 			expectOpenTransport(receiverSnapshot, peers.creatorPeerId);
 
+			stage = trialId + "-assertions";
 			const rawWire = expectRawReceiverSamples(receiverWire);
 			const raw = acceptedSequencedObservations(rawWire);
 			const reliable = expectReliableReceiverSamples(receiverWire);
@@ -1185,7 +1316,25 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 					trialId,
 				})
 			);
-			campaignEvidence.push(Object.freeze({ receiverWire, senderWire, trialId }));
+			campaignEvidence.push(
+				Object.freeze({
+					rawTransportDeltas: Object.freeze({
+						receiver: rawTransportDelta(receiverRawTransportBefore, receiverAtDeadline.zone.rawTransport),
+						sender: rawTransportDelta(senderRawTransportBefore, senderRawTransportAtDeadline),
+					}),
+					readyStateMismatches: Object.freeze({
+						receiver: Object.freeze(
+							receiverAtDeadline.rtc.filter(({ insertionReadyState, readyState }) => insertionReadyState !== readyState)
+						),
+						sender: Object.freeze(
+							senderRtc.filter(({ insertionReadyState, readyState }) => insertionReadyState !== readyState)
+						),
+					}),
+					receiverWire,
+					senderWire,
+					trialId,
+				})
+			);
 		}
 		expect(
 			campaignEvidence.reduce(
@@ -1216,6 +1365,8 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			).size
 		).toBeGreaterThanOrEqual(1);
 
+		activeTrialId = null;
+		stage = "durable-control";
 		expect((await zone(creator)).durableVertexCount).toBe(peers.durableBaseline);
 		expect((await zone(receiver)).durableVertexCount).toBe(peers.durableBaseline);
 		await Promise.all(
@@ -1247,6 +1398,7 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			observations: campaignEvidence,
 			trialCount: TRIAL_COUNT,
 		});
+		stage = "rendered-metrics";
 		for (const metric of metrics) {
 			const row = receiver.locator(`[data-e3-03-trial="${metric.trialId}"]`);
 			const readMilliseconds = async (name: string): Promise<number> => {
@@ -1276,6 +1428,22 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			await expect(row.locator('[data-metric="fallback-count"]')).toHaveText("0");
 			await expect(row.locator('[data-metric="durable-delta"]')).toHaveText("1");
 		}
+		stage = "complete";
+	} catch (error) {
+		const [creatorEvidence, receiverEvidence] = await Promise.all([
+			pageFailureEvidence(creator, activeTrialId),
+			pageFailureEvidence(receiver, activeTrialId),
+		]);
+		await attachJson(testInfo, "e3-03-failure-telemetry.json", {
+			activeTrialId,
+			browserVersion: browser.version(),
+			cdpEvidence,
+			creator: creatorEvidence,
+			error: diagnosticError(error),
+			receiver: receiverEvidence,
+			stage,
+		}).catch(() => undefined);
+		throw error;
 	} finally {
 		await emulate(cdp, NO_LOSS).catch(() => undefined);
 		await Promise.allSettled([
