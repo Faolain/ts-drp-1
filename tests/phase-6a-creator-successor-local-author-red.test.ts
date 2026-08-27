@@ -228,7 +228,9 @@ describe("D.108d1b authenticated peer-local cold issuance RED", () => {
 			"tests/e5-02-zone-referee-outcome.pw.ts",
 		]) {
 			const text = readFileSync(resolve(REPOSITORY_ROOT, relativePath), "utf8");
-			expect.soft(text, relativePath).not.toMatch(/["']@ts-drp\/canonical(?:\/[^"']*)?["']/u);
+			expect
+				.soft(text, relativePath)
+				.not.toMatch(/(?:\bfrom\s+|\bimport\s*(?:\(\s*)?|\brequire\s*\(\s*)["']@ts-drp\/canonical(?:\/[^"']*)?["']/u);
 			expect.soft(text, relativePath).toContain("workspace-package-export-file.mjs");
 		}
 	});
@@ -246,8 +248,12 @@ describe("D.108d1b authenticated peer-local cold issuance RED", () => {
 		expect(helper).toContain("transientPositions");
 		expect(helper).toContain("durableVertexCount");
 		expect(helper).toContain("acceptedOperationDigest");
+		expect(helper).toContain("document.activeElement");
+		expect(helper).toContain(".blur()");
 		expect(helper.match(/keyboard\.press\(/gu)).toHaveLength(1);
 		expect(helper.indexOf("expectReciprocalRawUnreliableLinks")).toBeLessThan(helper.indexOf("keyboard.press("));
+		expect(helper.indexOf("document.activeElement")).toBeLessThan(helper.indexOf("keyboard.press("));
+		expect(helper.indexOf(".blur()")).toBeLessThan(helper.indexOf("keyboard.press("));
 		expect(zone).toMatch(
 			/function expectReciprocalRawUnreliableLinks[\s\S]*?ts-drp-ephemeral\/1[\s\S]*?maxRetransmits:\s*0[\s\S]*?ordered:\s*false[\s\S]*?fallbackCount[\s\S]*?toBe\(0\)/u
 		);
