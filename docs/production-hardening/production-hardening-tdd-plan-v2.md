@@ -62071,6 +62071,50 @@ accepts four source-audited preparations without refactor, restores both
 browser matrices, and assigns the unprovable skip-lifetime claim to D.108e2e.
 No reviewer edited a tracked tree, and no Fable or collaboration subagent ran.
 
+The immutable D.108e2d RED is signed commit
+`85a25929506af98cf469e348cd994796417bd540`, parent
+`09cf4a8132742577c208ce8ffbe2289c0ecfd59d`, and tree
+`da70d5827e03c561446d57e6888c646d422427dc`. Its exact four-path range is the
+frozen tests-only roster and contains no production change. The focused run
+collected ten tests and passed nine; only the new fresh-process D.108e2d
+composite failed. The retained semantic composite, ownership census, future-
+row forged/malformed/read-failure controls and both current-row read-failure/
+mismatch controls passed. The first accepted Bob window returned `[0]`, then
+empty, but read issued sequence zero through both captured and copied scopes.
+The repeat window returned `[0]`, `[1]`, then empty, but read captured zero,
+copied zero and captured one. Those are exactly the two frozen duplicate-read
+failures. Exact-four ESLint, Prettier and diff checks passed. Storage-node
+typecheck reproduced only its inherited cross-package `rootDir`/file-list and
+missing-build baseline; no new D.108e2d diagnostic shape appeared.
+
+Grok 4.6/high session `01a04281-0d19-75d2-8328-bc57d7c25a36` completed its
+read-only inspection normally after 630.220 seconds with exit code zero and
+`end_turn`. Its public answer contained valid `TERMINAL_RESPONSE` JSON with
+`APPROVED`, P0=0/P1=0/P2=0, but the runner classified `NO_VERDICT` because its
+marker list recognizes `FINAL:` and not the requested `TERMINAL_RESPONSE`
+label. One tool-free turn in that same session re-emitted the identical result
+as `FINAL`, without a second review launch. Kimi CLI 0.38.0 used exact
+`kimi-code/k3` in session
+`session_29b5b721-adf1-4246-a01f-9d2275f69c46`; after a transient provider
+overload retried inside the same session, it installed and freshly built only
+its isolated worktree, reproduced the exact nine-pass/one-fail RED, emitted
+exactly CHECK001 through CHECK100 once and in order plus FINAL, and returned
+`APPROVED`, P0=0/P1=0/P2=1. Opus 5/xhigh session
+`237a43a0-66e6-489f-b562-b88d61f38430` used no subagent and returned
+schema-valid `APPROVED`, P0=0/P1=0/P2=4.
+
+The nonblocking RED-review union joins D.108e4 before Phase 6a exit: anchor the
+captured predecessor scope by author/object value and prove copied scopes are
+value-equal; isolate an issued/outbox mismatch from signature failure; pin the
+current-row controls' existing AHE-recovery, epoch-anchor and snapshot-open
+counters; verify the sole GREEN-owner path is nonempty; and decide whether the
+shared hook needs a source-versus-build freshness assertion or whether the
+mandatory isolated no-`dist` build remains the accepted authority. None is a
+reproduced product defect or weakens the current RED. All three reviewer
+worktrees remained tracked-clean; no reviewer edited the shared checkout, and
+no Fable or collaboration subagent ran. With no P0/P1, no confirmation review
+is required and D.108e2d may proceed to its one-file GREEN.
+
 ##### D.108e2e — predecessor-view skip-budget lifetime
 
 D.108e2e is a separate correctness slice due immediately after D.108e2d and
