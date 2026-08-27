@@ -3937,6 +3937,7 @@ function creatorPredecessorIssuanceStore(
 	successorAuthorization: V3LiveAuthorization,
 	expectedEpoch: number
 ): DurableIssuanceStore {
+	let skipped = 0;
 	return ObjectFreeze({
 		close: () => issuanceStore.close(),
 		compareAndMarkOutboxPublished: (input: DurableOutboxPublicationTransitionInput) =>
@@ -3945,7 +3946,6 @@ function creatorPredecessorIssuanceStore(
 		readLineage: (scope: DurableIssueScope) => issuanceStore.readLineage(scope),
 		readOutboxPage: async (input?: DurableOutboxPageInput) => {
 			let afterKey = input?.afterKey;
-			let skipped = 0;
 			for (;;) {
 				const page = await issuanceStore.readOutboxPage({
 					...(afterKey === undefined || afterKey === null ? {} : { afterKey }),
@@ -4408,6 +4408,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			if (row === undefined || (afterKey !== undefined && row.authorSequence <= afterKey[2])) {
 				return recoveryFailure("issuance-rejected", "v3 recovery outbox record is invalid");
 			}
+			// The predecessor view does not point-read a returned nonfuture row; this consumer owns its sole issued read and exact match.
 			let issuedCommit: unknown;
 			try {
 				issuedCommit = await issuance.readIssued(selectedScope, row.authorSequence);
