@@ -10,14 +10,14 @@ import {
 	D108D1B_CHILD_BEHAVIORS,
 	D108D1B_GREEN_PATHS,
 	D108D1B_ORACLE_BROWSER_BEHAVIORS,
-	D108D1B_ORACLE_CHILD_BEHAVIORS,
 	D108D1B_ORACLE_GREEN_PATHS,
 	D108D1B_ORACLE_RED_PATHS,
 	D108D1B_RED_PATHS,
 	D108D1B_REOPEN_INPUT_KEYS,
 	d108d1bChatAuthorities,
-	d108d1bOracleReadiness,
-	d108d1bReadiness,
+	D108E2C_GREEN_PATHS,
+	D108E2C_RED_PATHS,
+	D108E2C_TEST_PATHS,
 	openD108d1bMultiWriterFixture,
 } from "./fixtures/phase-6a-v3/creator-successor-local-author-contract.js";
 
@@ -46,13 +46,46 @@ describe("D.108d1b authenticated peer-local cold issuance RED", () => {
 			"packages/node/src/creator-adoption.ts",
 			"packages/node/src/v3-live.ts",
 		]);
-		expect(D108D1B_ORACLE_CHILD_BEHAVIORS).toHaveLength(1);
 		expect(D108D1B_ORACLE_BROWSER_BEHAVIORS).toHaveLength(1);
 		const browser = readFileSync(
 			resolve(REPOSITORY_ROOT, "packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts"),
 			"utf8"
 		);
 		for (const behavior of D108D1B_ORACLE_BROWSER_BEHAVIORS) expect(browser).toContain(behavior);
+	});
+
+	it("freezes the exact D.108e2c six-RED/four-GREEN tests-only ownership", () => {
+		expect(D108E2C_TEST_PATHS).toEqual([
+			"tests/phase-3a1b-p3-live-transport-red.test.ts",
+			"tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts",
+			"tests/phase-6a-creator-successor-local-author-red.test.ts",
+			"packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+			"packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts",
+			"packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts",
+			"packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts",
+			"packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts",
+			"packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+		]);
+		expect(new Set(D108E2C_TEST_PATHS).size).toBe(9);
+		expect(D108E2C_TEST_PATHS.every((path) => readFileSync(resolve(REPOSITORY_ROOT, path)).byteLength > 0)).toBe(true);
+		expect(D108E2C_RED_PATHS).toEqual([
+			"tests/phase-3a1b-p3-live-transport-red.test.ts",
+			"tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts",
+			"tests/phase-6a-creator-successor-local-author-red.test.ts",
+			"packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts",
+			"packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts",
+			"packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+		]);
+		expect(D108E2C_GREEN_PATHS).toEqual([
+			"tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts",
+			"packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+			"packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts",
+			"packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts",
+		]);
+		const greenOwners = new Set<string>(D108E2C_GREEN_PATHS);
+		expect(D108E2C_RED_PATHS.filter((path) => greenOwners.has(path))).toEqual([
+			"tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts",
+		]);
 	});
 
 	it("freezes exact nine-RED/three-GREEN ownership and the closed cold input", () => {
@@ -129,21 +162,14 @@ describe("D.108d1b authenticated peer-local cold issuance RED", () => {
 		}
 	});
 
-	it("pins the complete zero-skip GREEN child inventory to the one readiness fact", () => {
+	it("pins the complete zero-skip GREEN child inventory to direct execution", () => {
 		expect(D108D1B_CHILD_BEHAVIORS).toHaveLength(1);
 		const childSource = readFileSync(
 			resolve(REPOSITORY_ROOT, "packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts"),
 			"utf8"
 		);
 		for (const name of D108D1B_CHILD_BEHAVIORS) expect(childSource).toContain(name);
-		expect((childSource.match(/it\.skipIf\(!readiness\.ready\)/gu) ?? []).length).toBe(D108D1B_CHILD_BEHAVIORS.length);
-	});
-
-	it("[RED readiness] requires authenticated local-author selection", () => {
-		expect(d108d1bReadiness()).toEqual({ missing: [], ready: true });
-	});
-
-	it("[RED oracle readiness] requires canonical ACL, strict lineage and bounded diagnostic ownership", () => {
-		expect(d108d1bOracleReadiness()).toEqual({ missing: [], ready: true });
+		expect((childSource.match(/it\.skipIf\(/gu) ?? []).length).toBe(0);
+		expect((childSource.match(/it\(D108D1B_CHILD_BEHAVIORS\[0\]/gu) ?? []).length).toBe(D108D1B_CHILD_BEHAVIORS.length);
 	});
 });

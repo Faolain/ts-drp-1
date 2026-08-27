@@ -2061,6 +2061,71 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 		} finally {
 			Object.defineProperty(typedArrayPrototype, Symbol.iterator, iteratorDescriptor);
 		}
+
+		const domainOwners: string[] = [];
+		const consumers: string[] = [];
+		for (const production of productionSources()) {
+			const sourceFile = ts.createSourceFile(
+				production.path,
+				production.text,
+				ts.ScriptTarget.Latest,
+				true,
+				ts.ScriptKind.TS
+			);
+			let ownsDomain = false;
+			let consumesHelper = false;
+			const census = (node: ts.Node): void => {
+				if (
+					ts.isCallExpression(node) &&
+					ts.isIdentifier(node.expression) &&
+					node.expression.text === "hashDomain" &&
+					node.arguments[0] !== undefined &&
+					ts.isStringLiteral(node.arguments[0]) &&
+					node.arguments[0].text === "ts-drp/live-topic/v3"
+				) {
+					ownsDomain = true;
+				}
+				if (
+					ts.isImportDeclaration(node) &&
+					ts.isStringLiteral(node.moduleSpecifier) &&
+					node.moduleSpecifier.text === "./internal/v3-topic.js" &&
+					node.importClause?.namedBindings !== undefined &&
+					ts.isNamedImports(node.importClause.namedBindings) &&
+					node.importClause.namedBindings.elements.some(({ name }) => name.text === "deriveV3StableTopic")
+				) {
+					consumesHelper = true;
+				}
+				ts.forEachChild(node, census);
+			};
+			census(sourceFile);
+			if (ownsDomain) domainOwners.push(production.path);
+			if (consumesHelper) consumers.push(production.path);
+		}
+		expect(domainOwners).toEqual(["packages/node/src/internal/v3-topic.ts"]);
+		expect(consumers.sort()).toEqual([
+			"packages/node/src/creator-adoption-activate.ts",
+			"packages/node/src/v3-live.ts",
+		]);
+
+		const textEncoderDescriptor = Object.getOwnPropertyDescriptor(globalThis, "TextEncoder");
+		let hostileModule!: Readonly<{ deriveV3StableTopic(objectId: string, genesisAnchorDigest: string): string }>;
+		try {
+			Object.defineProperty(globalThis, "TextEncoder", {
+				configurable: true,
+				value: class D108e2cThrowingTextEncoder {
+					encode(): Uint8Array {
+						throw new TypeError("D.108e2c hostile cached TextEncoder");
+					}
+				},
+			});
+			hostileModule = (await import(
+				"../packages/node/src/internal/v3-topic.js?d108e2c-hostile-text-encoder"
+			)) as typeof hostileModule;
+		} finally {
+			if (textEncoderDescriptor === undefined) Reflect.deleteProperty(globalThis, "TextEncoder");
+			else Object.defineProperty(globalThis, "TextEncoder", textEncoderDescriptor);
+		}
+		expect(() => hostileModule.deriveV3StableTopic(objectId, genesis)).toThrow("D.108e2c hostile cached TextEncoder");
 	});
 
 	it("binds activation to the sole existing token owner and exact effect sequence", () => {

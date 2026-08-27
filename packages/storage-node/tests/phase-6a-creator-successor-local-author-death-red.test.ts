@@ -8,15 +8,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createD108d1PackedDurableMaterial } from "../../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.js";
 import {
 	D108D1B_CHILD_BEHAVIORS,
-	D108D1B_ORACLE_CHILD_BEHAVIORS,
 	d108d1bChatAuthorities,
-	d108d1bReadiness,
 	openD108d1bMultiWriterFixture,
 	runD108d1bLocalAuthorChild,
 } from "../../../tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.js";
 
 const childPath = new URL("./fixtures/phase-6a-creator-successor-local-author-child.mjs", import.meta.url);
-const readiness = d108d1bReadiness();
 const directories: string[] = [];
 
 beforeAll(() => {
@@ -44,13 +41,10 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 		expect(D108D1B_CHILD_BEHAVIORS).toEqual([
 			"fresh Node binds established and fresh chat peers while every ambiguous or unauthenticated cold reopen fails before live effects",
 		]);
-		expect(D108D1B_ORACLE_CHILD_BEHAVIORS).toEqual([
-			"fresh Node proves packed chat authority, repeated possession and strict lineage failure ordering",
-		]);
 		expect(childPath.pathname.endsWith("phase-6a-creator-successor-local-author-child.mjs")).toBe(true);
 	});
 
-	it.skipIf(!readiness.ready)(D108D1B_CHILD_BEHAVIORS[0], async () => {
+	it(D108D1B_CHILD_BEHAVIORS[0], async () => {
 		const directory = mkdtempSync(join(tmpdir(), "ts-drp-d108d1b-local-author-"));
 		directories.push(directory);
 		const result = await runD108d1bLocalAuthorChild(await durableMaterial(directory));
@@ -68,6 +62,7 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 			.sort((left, right) => left.author.localeCompare(right.author));
 		const oracle = proof?.oracle as
 			| Readonly<{
+					readonly malformedMemberControl?: Readonly<Record<string, unknown>>;
 					readonly aclMembers?: readonly Readonly<{ readonly author: string; readonly groups: readonly string[] }>[];
 					readonly bobCarrier?: Readonly<Record<string, unknown>>;
 			  }>
@@ -84,29 +79,38 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 			signatureMatches: true,
 			sourceKind: "received",
 		});
+		expect.soft(oracle?.malformedMemberControl).toEqual({
+			canonical: true,
+			digestMatches: true,
+			result: { ok: false, reason: "snapshot-mismatch" },
+		});
 		const results = proof?.results ?? [];
-		expect(results.map(({ name }) => name)).toEqual([
-			"established-bob",
-			"fresh-carol",
-			"forged-future-outbox",
-			"malformed-future-outbox",
-			"future-outbox-read-failure",
-			"copied-creator-lineage",
-			"wrong-author-right-signer",
-			"right-author-wrong-signer",
-			"two-nonzero-lineages",
-			"anchor-replay",
-			"signer-mutation",
-			"signature-alias",
-			"signer-throw",
-			"signer-reject",
-			"non-writer",
-			"selected-exhausted-lineage",
-			"foreign-exhausted-lineage",
-			"malformed-exhausted-lineage",
-			"missing-webcrypto",
-			"ed25519-unavailable",
-		]);
+		expect
+			.soft(results.map(({ name }) => name))
+			.toEqual([
+				"established-bob",
+				"fresh-carol",
+				"forged-future-outbox",
+				"malformed-future-outbox",
+				"future-outbox-read-failure",
+				"copied-creator-lineage",
+				"wrong-author-right-signer",
+				"right-author-wrong-signer",
+				"two-nonzero-lineages",
+				"anchor-replay",
+				"signer-mutation",
+				"signature-alias",
+				"signer-throw",
+				"signer-reject",
+				"non-writer",
+				"selected-exhausted-lineage",
+				"foreign-exhausted-lineage",
+				"malformed-exhausted-lineage",
+				"missing-webcrypto",
+				"ed25519-unavailable",
+				"negative-lineage-next",
+				"unsafe-lineage-next",
+			]);
 		const [established, fresh, forgedFuture, malformedFuture, backingFailure, ...rejected] = results;
 		expect(established).toMatchObject({
 			issued: {
@@ -170,6 +174,11 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 			const effects = accepted?.effects as
 				| Readonly<{
 						readonly aheRecoverCount?: number;
+						readonly authorityEvents?: readonly Readonly<{
+							readonly attempt: number;
+							readonly author?: string;
+							readonly kind: string;
+						}>[];
 						readonly issuanceStoreShape?: boolean;
 						readonly lineageReads?: readonly string[];
 						readonly order?: readonly string[];
@@ -202,6 +211,15 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 				const end = possessionIndices[positionIndex + 1] ?? order.length;
 				const selected = order.slice(position + 1, end).filter((entry) => entry.startsWith("lineage:"));
 				expect(selected).toHaveLength(7);
+			}
+			const authorityEvents = effects?.authorityEvents ?? [];
+			expect.soft(authorityEvents).toHaveLength(8 * reopenCount);
+			for (let attempt = 0; attempt < reopenCount; attempt += 1) {
+				const window = authorityEvents.filter((event) => event.attempt === attempt);
+				expect.soft(window[0]).toEqual({ attempt, kind: "possession-signer" });
+				expect
+					.soft(window.slice(1).map(({ author, kind }) => ({ author, kind })))
+					.toEqual(writerAuthors.map((author) => ({ author, kind: "lineage-read" })));
 			}
 		}
 		const establishedPossessions = (
@@ -258,6 +276,8 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 			"selected-exhausted-lineage",
 			"foreign-exhausted-lineage",
 			"malformed-exhausted-lineage",
+			"negative-lineage-next",
+			"unsafe-lineage-next",
 		]) {
 			const failure = rejected.find((candidate) => candidate.name === name);
 			expect(failure?.result).toEqual({
@@ -265,6 +285,28 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 				kind: "chain-invalid",
 				ok: false,
 			});
+		}
+		for (const candidate of results) {
+			const possessionCalls = (
+				candidate.signerCalls as readonly Readonly<{ readonly use?: string }>[] | undefined
+			)?.filter(({ use }) => use === "possession").length;
+			if (possessionCalls === undefined || possessionCalls === 0) continue;
+			const events = (
+				candidate.effects as
+					| Readonly<{
+							readonly authorityEvents?: readonly Readonly<{
+								readonly attempt: number;
+								readonly kind: string;
+							}>[];
+					  }>
+					| undefined
+			)?.authorityEvents;
+			expect.soft(events?.filter(({ kind }) => kind === "possession-signer")).toHaveLength(possessionCalls);
+			for (const lineage of events?.filter(({ kind }) => kind === "lineage-read") ?? []) {
+				expect
+					.soft(events?.findIndex((event) => event.attempt === lineage.attempt && event.kind === "possession-signer"))
+					.toBeLessThan(events?.indexOf(lineage) ?? -1);
+			}
 		}
 	});
 });

@@ -19,6 +19,9 @@ const D108E2A_BROWSER_BEHAVIORS = [
 	"dedicated worker holds the origin-wide lifetime lock against a Window contender then releases it",
 	"missing or hostile worker LockManager authority fails closed before activation",
 ] as const;
+const D108E2C_ACTIVATION_BROWSER_BEHAVIORS = [
+	"window probes distinguish production lock contention from fixture busy state and isolate possession failures",
+] as const;
 
 interface WorkerReply {
 	readonly counters?: Readonly<{
@@ -128,6 +131,9 @@ test("pins the complete browser behavior inventory", () => {
 		"dedicated worker holds the origin-wide lifetime lock against a Window contender then releases it",
 		"missing or hostile worker LockManager authority fails closed before activation",
 	]);
+	expect(D108E2C_ACTIVATION_BROWSER_BEHAVIORS).toEqual([
+		"window probes distinguish production lock contention from fixture busy state and isolate possession failures",
+	]);
 });
 
 test(D108E2A_BROWSER_BEHAVIORS[0], async ({ page }) => {
@@ -229,6 +235,90 @@ test("wrong-key and throwing browser possession fail before writer activation", 
 			verificationCount: 1,
 		}),
 	]);
+});
+
+test(D108E2C_ACTIVATION_BROWSER_BEHAVIORS[0], async ({ browser, page }) => {
+	await page.goto(server?.origin ?? "about:blank");
+	const possessionDatabase = `d108e2c-possession-${crypto.randomUUID()}`;
+	await page.evaluate(
+		({ databaseName, material: carrier }) => window.phase6aCreatorSuccessorActivation.seed(databaseName, carrier),
+		{ databaseName: possessionDatabase, material }
+	);
+	const possessionResults = (await page.evaluate(
+		({ databaseName, material: carrier }) =>
+			window.phase6aCreatorSuccessorActivation.probePossessionFailure(databaseName, carrier),
+		{ databaseName: possessionDatabase, material }
+	)) as unknown as readonly Readonly<Record<string, unknown>>[];
+	expect.soft(possessionResults).toEqual([
+		expect.objectContaining({
+			databaseName: `${possessionDatabase}-wrong-key`,
+			fixtureDisposition: "production-result",
+			lockAcquiredCount: 0,
+			lockCallbackCount: 0,
+			probeSequence: 1,
+		}),
+		expect.objectContaining({
+			databaseName: `${possessionDatabase}-throw`,
+			fixtureDisposition: "production-result",
+			lockAcquiredCount: 0,
+			lockCallbackCount: 0,
+			probeSequence: 2,
+		}),
+	]);
+	expect.soft(new Set(possessionResults.map(({ databaseName }) => databaseName)).size).toBe(2);
+
+	const context = await browser.newContext();
+	const ownerPage = await context.newPage();
+	const contenderPage = await context.newPage();
+	try {
+		await Promise.all([
+			ownerPage.goto(server?.origin ?? "about:blank"),
+			contenderPage.goto(server?.origin ?? "about:blank"),
+		]);
+		const databaseName = `d108e2c-contention-${crypto.randomUUID()}`;
+		await ownerPage.evaluate(
+			({ databaseName: selected, material: carrier }) =>
+				window.phase6aCreatorSuccessorActivation.seed(selected, carrier),
+			{ databaseName, material }
+		);
+		const owner = (await ownerPage.evaluate(
+			({ databaseName: selected, material: carrier }) =>
+				window.phase6aCreatorSuccessorActivation.openContender(selected, carrier),
+			{ databaseName, material }
+		)) as unknown as Readonly<Record<string, unknown>>;
+		const blocked = (await contenderPage.evaluate(
+			({ databaseName: selected, material: carrier }) =>
+				window.phase6aCreatorSuccessorActivation.openContender(selected, carrier),
+			{ databaseName, material }
+		)) as unknown as Readonly<Record<string, unknown>>;
+		const fixtureBusy = (await ownerPage.evaluate(
+			({ databaseName: selected, material: carrier }) =>
+				window.phase6aCreatorSuccessorActivation.openContender(selected, carrier),
+			{ databaseName, material }
+		)) as unknown as Readonly<Record<string, unknown>>;
+		expect.soft(owner).toMatchObject({
+			fixtureDisposition: "production-result",
+			lockAcquiredCount: 1,
+			lockCallbackCount: 1,
+			ok: true,
+		});
+		expect.soft(blocked).toMatchObject({
+			fixtureDisposition: "production-result",
+			kind: "authority-unavailable",
+			lockAcquiredCount: 0,
+			lockCallbackCount: 1,
+			ok: false,
+		});
+		expect.soft(fixtureBusy).toMatchObject({
+			fixtureDisposition: "harness-busy",
+			lockAcquiredCount: 0,
+			lockCallbackCount: 0,
+			ok: false,
+		});
+		expect(await ownerPage.evaluate(() => window.phase6aCreatorSuccessorActivation.release())).toBe(true);
+	} finally {
+		await context.close();
+	}
 });
 
 test("missing or hostile LockManager authority fails activation closed", async ({ page }) => {

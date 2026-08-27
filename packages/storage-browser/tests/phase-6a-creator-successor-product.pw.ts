@@ -16,6 +16,10 @@ const D108E2B_BROWSER_BEHAVIORS = Object.freeze([
 	"close joins a paused adoption before releasing lifetime ownership",
 	"predecessor deactivation failure cleans the replacement before escaping",
 ] as const);
+const D108E2C_PRODUCT_BROWSER_BEHAVIORS = Object.freeze([
+	"close at the post-activation gate cleans the successor exactly once",
+	"close at the post-predecessor-deactivation gate preserves causal cleanup",
+] as const);
 const contractLoad = import(
 	pathToFileURL(resolve(REPOSITORY_ROOT, "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts")).href
 ) as Promise<
@@ -409,6 +413,10 @@ test("pins the exact successor product browser inventory", () => {
 		"close joins a paused adoption before releasing lifetime ownership",
 		"predecessor deactivation failure cleans the replacement before escaping",
 	]);
+	expect(D108E2C_PRODUCT_BROWSER_BEHAVIORS).toEqual([
+		"close at the post-activation gate cleans the successor exactly once",
+		"close at the post-predecessor-deactivation gate preserves causal cleanup",
+	]);
 });
 
 test(D108D2_BROWSER_BEHAVIORS[0], async () => {
@@ -706,6 +714,114 @@ test(D108E2B_BROWSER_BEHAVIORS.join("; "), async () => {
 				verificationCount: 1,
 			},
 			settlements: [{ status: "fulfilled" }, { status: "fulfilled" }],
+		},
+	});
+});
+
+test(D108E2C_PRODUCT_BROWSER_BEHAVIORS.join("; "), async () => {
+	if (creator === undefined) throw new TypeError("D.108e2c creator realm is absent");
+	const readiness = await creator.evaluate(() => {
+		const api = window.phase6aCreatorSuccessorProduct as unknown as Readonly<Record<string, unknown>>;
+		return {
+			releasePostActivation: typeof Reflect.get(api, "releasePostActivation") === "function",
+			releasePostPredecessorDeactivation: typeof Reflect.get(api, "releasePostPredecessorDeactivation") === "function",
+		};
+	});
+	expect(readiness).toEqual({ releasePostActivation: true, releasePostPredecessorDeactivation: true });
+
+	const runGate = async (
+		gate: "postActivation" | "postPredecessorDeactivation"
+	): Promise<Readonly<Record<string, unknown>>> => {
+		const page = await openLifetimeCreator(true);
+		await page.evaluate((selectedGate) => {
+			const api = window.phase6aCreatorSuccessorProduct as unknown as Readonly<Record<string, unknown>>;
+			const configure = Reflect.get(api, "configureLifetime");
+			if (typeof configure !== "function") throw new TypeError("D.108e2c lifetime configuration is unavailable");
+			Reflect.apply(configure, api, [
+				selectedGate === "postActivation"
+					? { pauseAfterActivation: true }
+					: { pauseAfterPredecessorDeactivation: true },
+			]);
+		}, gate);
+		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.beginAdoption());
+		const pauseField = gate === "postActivation" ? "postActivationPauseCount" : "postPredecessorDeactivationPauseCount";
+		await expect
+			.poll(async () => {
+				const selected = await page.evaluate(() => window.phase6aCreatorSuccessorProduct.lifetimeSnapshot());
+				return Reflect.get(selected, pauseField);
+			})
+			.toBe(1);
+		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.beginClose());
+		const beforeRelease = await page.evaluate(() => window.phase6aCreatorSuccessorProduct.lifetimeSnapshot());
+		await page.evaluate((selectedGate) => {
+			const api = window.phase6aCreatorSuccessorProduct as unknown as Readonly<Record<string, unknown>>;
+			const release = Reflect.get(
+				api,
+				selectedGate === "postActivation" ? "releasePostActivation" : "releasePostPredecessorDeactivation"
+			);
+			if (typeof release !== "function") throw new TypeError("D.108e2c lifetime gate release is unavailable");
+			Reflect.apply(release, api, []);
+		}, gate);
+		const [adoption, close] = await Promise.all([
+			page.evaluate(() => window.phase6aCreatorSuccessorProduct.waitForAdoption()),
+			page.evaluate(() => window.phase6aCreatorSuccessorProduct.waitForClose()),
+		]);
+		const afterRelease = await page.evaluate(() => window.phase6aCreatorSuccessorProduct.lifetimeSnapshot());
+		const authority = (await snapshot(page)).authority;
+		await closeLifetimeCreator(page);
+		return {
+			afterRelease,
+			authority,
+			beforeRelease,
+			settlements: { adoption, close },
+		};
+	};
+
+	const postActivation = await runGate("postActivation");
+	const postPredecessorDeactivation = await runGate("postPredecessorDeactivation");
+	const finalCounts = {
+		activationCount: 1,
+		adoptionSettled: true,
+		closeSettled: true,
+		commitCount: 1,
+		predecessorDeactivateCount: 1,
+		replacementDeactivateCompletedCount: 1,
+		replacementDeactivateCount: 1,
+		verificationCount: 1,
+	};
+	expect(postActivation).toEqual({
+		afterRelease: { ...finalCounts, postActivationPauseCount: 1, postPredecessorDeactivationPauseCount: 0 },
+		authority: null,
+		beforeRelease: {
+			...finalCounts,
+			adoptionSettled: false,
+			closeSettled: false,
+			postActivationPauseCount: 1,
+			postPredecessorDeactivationPauseCount: 0,
+			predecessorDeactivateCount: 0,
+			replacementDeactivateCompletedCount: 0,
+			replacementDeactivateCount: 0,
+		},
+		settlements: {
+			adoption: { detail: "v3 room session is closed", order: 1, status: "rejected" },
+			close: { order: 2, status: "fulfilled" },
+		},
+	});
+	expect(postPredecessorDeactivation).toEqual({
+		afterRelease: { ...finalCounts, postActivationPauseCount: 0, postPredecessorDeactivationPauseCount: 1 },
+		authority: null,
+		beforeRelease: {
+			...finalCounts,
+			adoptionSettled: false,
+			closeSettled: false,
+			postActivationPauseCount: 0,
+			postPredecessorDeactivationPauseCount: 1,
+			replacementDeactivateCompletedCount: 0,
+			replacementDeactivateCount: 0,
+		},
+		settlements: {
+			adoption: { detail: "v3 room session is closed", order: 1, status: "rejected" },
+			close: { order: 2, status: "fulfilled" },
 		},
 	});
 });

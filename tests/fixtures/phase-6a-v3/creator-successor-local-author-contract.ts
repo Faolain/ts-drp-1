@@ -43,12 +43,37 @@ export const D108D1B_ORACLE_GREEN_PATHS = Object.freeze([
 	"packages/node/src/v3-live.ts",
 ] as const);
 
+export const D108E2C_TEST_PATHS = Object.freeze([
+	"tests/phase-3a1b-p3-live-transport-red.test.ts",
+	"tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts",
+	"tests/phase-6a-creator-successor-local-author-red.test.ts",
+	"packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+	"packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts",
+	"packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts",
+	"packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts",
+	"packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts",
+	"packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+] as const);
+
+export const D108E2C_RED_PATHS = Object.freeze([
+	"tests/phase-3a1b-p3-live-transport-red.test.ts",
+	"tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts",
+	"tests/phase-6a-creator-successor-local-author-red.test.ts",
+	"packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts",
+	"packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts",
+	"packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+] as const);
+
+export const D108E2C_GREEN_PATHS = Object.freeze([
+	"tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts",
+	"packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+	"packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts",
+	"packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts",
+] as const);
+
 export const D108D1B_REOPEN_INPUT_KEYS = CREATOR_SUCCESSOR_LOCAL_AUTHOR_REOPEN_INPUT_KEYS;
 export const D108D1B_CHILD_BEHAVIORS = Object.freeze([
 	"fresh Node binds established and fresh chat peers while every ambiguous or unauthenticated cold reopen fails before live effects",
-] as const);
-export const D108D1B_ORACLE_CHILD_BEHAVIORS = Object.freeze([
-	"fresh Node proves packed chat authority, repeated possession and strict lineage failure ordering",
 ] as const);
 export const D108D1B_ORACLE_BROWSER_BEHAVIORS = Object.freeze([
 	"wrong-key and throwing browser possession fail before writer activation",
