@@ -155,6 +155,7 @@ declare global {
 			beginAdoption(): void;
 			beginActivation(): void;
 			beginClose(): void;
+			beginOverlappingRehearsal(): void;
 			beginRehearsal(): void;
 			beginSend(text: string): void;
 			boot(realmId: string): Promise<void>;
@@ -181,7 +182,8 @@ declare global {
 			beginDirectSend(name: string, text: string): void;
 			closeDirectCreator(name: string): Promise<void>;
 			create(input: unknown): Promise<string>;
-			deleteDatabases(prefix: string): Promise<void>;
+			deleteDatabases(prefix: string): Promise<readonly string[]>;
+			directAdoptionSettled(name: string): boolean;
 			deliver(packet: RelayPacket): void;
 			exportSuccessor(databaseName: string): Promise<SuccessorCarrier>;
 			importSuccessor(carrier: SuccessorCarrier, sourceDatabaseName: string, targetDatabaseName: string): Promise<void>;
@@ -214,6 +216,7 @@ declare global {
 			waitForClose(): Promise<ObservedSettlement>;
 			waitForDirectAdoption(name: string): Promise<ObservedSettlement>;
 			waitForDirectClose(name: string): Promise<ObservedSettlement>;
+			waitForOverlappingRehearsal(): Promise<ObservedSettlement>;
 			waitForRehearsal(): Promise<ObservedSettlement>;
 		}>;
 	}
@@ -237,12 +240,14 @@ let settlementSequence = 0;
 let pendingAdoption: Promise<ObservedSettlement> | undefined;
 let pendingActivation: Promise<ObservedSettlement> | undefined;
 let pendingClose: Promise<ObservedSettlement> | undefined;
+let pendingOverlappingRehearsal: Promise<ObservedSettlement> | undefined;
 let pendingRehearsal: Promise<ObservedSettlement> | undefined;
 let pendingSend: Promise<ObservedSettlement> | undefined;
 let migrationReceipt: unknown;
 const directRooms = new Map<string, DirectRoomSession>();
 const pendingDirectAdoptions = new Map<string, Promise<ObservedSettlement>>();
 const pendingDirectCloses = new Map<string, Promise<ObservedSettlement>>();
+const directAdoptionSettlements = new Map<string, boolean>();
 
 function instrumentation(): LifetimeInstrumentation {
 	const selected = Reflect.get(globalThis, "__d108e2bLifetimeInstrumentation");
@@ -896,9 +901,16 @@ const api = Object.freeze({
 		if (room === undefined || pendingDirectAdoptions.has(name)) {
 			throw new TypeError("D.108e3 direct adoption observation is invalid");
 		}
+		directAdoptionSettlements.set(name, false);
 		pendingDirectAdoptions.set(
 			name,
-			observe(room.adoptCreatorSuccessor(), () => undefined, true)
+			observe(
+				room.adoptCreatorSuccessor(),
+				() => {
+					directAdoptionSettlements.set(name, true);
+				},
+				true
+			)
 		);
 	},
 	beginDirectClose(name: string): void {
@@ -937,6 +949,18 @@ const api = Object.freeze({
 			() => {
 				rehearsalSettled = true;
 			},
+			true
+		);
+	},
+	beginOverlappingRehearsal(): void {
+		if (pendingOverlappingRehearsal !== undefined) {
+			throw new TypeError("D.108e3 overlapping rehearsal observation is already active");
+		}
+		pendingOverlappingRehearsal = observe(
+			productApi()
+				.rehearseMigration()
+				.then(() => undefined),
+			() => undefined,
 			true
 		);
 	},
@@ -979,6 +1003,7 @@ const api = Object.freeze({
 		}
 		pendingDirectAdoptions.delete(name);
 		pendingDirectCloses.delete(name);
+		directAdoptionSettlements.delete(name);
 		await removeDirectDatabases(name);
 	},
 	cleanupLifetimeReplacements(): Promise<void> {
@@ -1007,6 +1032,7 @@ const api = Object.freeze({
 		pendingAdoption = undefined;
 		pendingActivation = undefined;
 		pendingClose = undefined;
+		pendingOverlappingRehearsal = undefined;
 		pendingRehearsal = undefined;
 		pendingSend = undefined;
 		settlementSequence = 0;
@@ -1022,12 +1048,19 @@ const api = Object.freeze({
 	create(input: unknown): Promise<string> {
 		return productApi().create(input);
 	},
-	async deleteDatabases(prefix: string): Promise<void> {
+	async deleteDatabases(prefix: string): Promise<readonly string[]> {
 		const names = (await indexedDB.databases())
 			.map(({ name }) => name)
 			.filter((name): name is string => name?.startsWith(prefix) === true)
 			.sort();
 		for (const name of names) await deleteDatabase(name);
+		return Object.freeze(names);
+	},
+	directAdoptionSettled(name: string): boolean {
+		if (!directRooms.has(name) || !directAdoptionSettlements.has(name)) {
+			throw new TypeError("D.108e3 direct adoption observation is absent");
+		}
+		return directAdoptionSettlements.get(name) === true;
 	},
 	deliver(packet: RelayPacket): void {
 		if (packet.realmId === realmId) return;
@@ -1164,6 +1197,14 @@ const api = Object.freeze({
 		if (pending === undefined) throw new TypeError("D.108e3 direct close observation is absent");
 		const selected = await pending;
 		pendingDirectCloses.delete(name);
+		return selected;
+	},
+	async waitForOverlappingRehearsal(): Promise<ObservedSettlement> {
+		if (pendingOverlappingRehearsal === undefined) {
+			throw new TypeError("D.108e3 overlapping rehearsal observation is absent");
+		}
+		const selected = await pendingOverlappingRehearsal;
+		pendingOverlappingRehearsal = undefined;
 		return selected;
 	},
 	async waitForRehearsal(): Promise<ObservedSettlement> {

@@ -23,6 +23,7 @@ const contractLoad = import(
 			string,
 			string,
 			string,
+			string,
 		];
 		isD108d2Authority(value: unknown): boolean;
 	}>
@@ -1107,6 +1108,7 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 		const selected = await transitionSnapshot(page);
 		return Object.freeze({
 			activationCount: Number(selected.activationCount),
+			activationSettled: selected.activationSettled === true,
 			adoptionSettled: selected.adoptionSettled === true,
 			closeSettled: selected.closeSettled === true,
 			independentVerificationCount: Number(selected.independentVerificationCount),
@@ -1115,6 +1117,7 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 			predecessorDeactivateCount: Number(selected.predecessorDeactivateCount),
 			replacementDeactivateCompletedCount: Number(selected.replacementDeactivateCompletedCount),
 			replacementDeactivateCount: Number(selected.replacementDeactivateCount),
+			rehearsalSettled: selected.rehearsalSettled === true,
 			sendSettled: selected.sendSettled === true,
 			terminalTransitionCount: Number(selected.terminalTransitionCount),
 			verificationCount: Number(selected.verificationCount),
@@ -1179,10 +1182,15 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 	const drainSuccessCounts = await selectedCounts(drainSuccess.page);
 	const drainSuccessDeletion = await drainSuccess.page.evaluate(async (prefix) => {
 		try {
-			await window.phase6aCreatorSuccessorProduct.deleteDatabases(prefix);
-			return "fulfilled";
+			return Object.freeze({
+				names: await window.phase6aCreatorSuccessorProduct.deleteDatabases(prefix),
+				status: "fulfilled" as const,
+			});
 		} catch (error) {
-			return error instanceof Error ? error.message : String(error);
+			return Object.freeze({
+				detail: error instanceof Error ? error.message : String(error),
+				status: "rejected" as const,
+			});
 		}
 	}, `d108e3-direct-${drainSuccessName}`);
 	await drainSuccess.page.evaluate(
@@ -1243,12 +1251,14 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 		)
 		.toBe(1);
 	await rehearsalThenAdoption.page.evaluate(() => window.phase6aCreatorSuccessorProduct.beginAdoption());
+	await settleBrowserTurns(rehearsalThenAdoption.page);
 	const rehearsalThenAdoptionBefore = await selectedCounts(rehearsalThenAdoption.page);
 	await rehearsalThenAdoption.page.evaluate(() => window.phase6aCreatorSuccessorProduct.releaseMigrationRecord());
 	const [rehearsalFirst, rehearsalSecond] = await Promise.all([
 		rehearsalThenAdoption.page.evaluate(() => window.phase6aCreatorSuccessorProduct.waitForRehearsal()),
 		rehearsalThenAdoption.page.evaluate(() => window.phase6aCreatorSuccessorProduct.waitForAdoption()),
 	]);
+	const rehearsalThenAdoptionAfter = await selectedCounts(rehearsalThenAdoption.page);
 	await disposeD108e3Creator(rehearsalThenAdoption);
 
 	const activationThenAdoption = await openD108e3Creator(true);
@@ -1264,12 +1274,14 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 		)
 		.toBe(1);
 	await activationThenAdoption.page.evaluate(() => window.phase6aCreatorSuccessorProduct.beginAdoption());
+	await settleBrowserTurns(activationThenAdoption.page);
 	const activationThenAdoptionBefore = await selectedCounts(activationThenAdoption.page);
 	await activationThenAdoption.page.evaluate(() => window.phase6aCreatorSuccessorProduct.releaseTerminalTransition());
 	const [activationFirst, activationSecond] = await Promise.all([
 		activationThenAdoption.page.evaluate(() => window.phase6aCreatorSuccessorProduct.waitForActivation()),
 		activationThenAdoption.page.evaluate(() => window.phase6aCreatorSuccessorProduct.waitForAdoption()),
 	]);
+	const activationThenAdoptionAfter = await selectedCounts(activationThenAdoption.page);
 	await disposeD108e3Creator(activationThenAdoption);
 
 	const adoptionThenRehearsal = await openD108e3Creator(true);
@@ -1290,6 +1302,7 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 		adoptionThenRehearsal.page.evaluate(() => window.phase6aCreatorSuccessorProduct.waitForRehearsal()),
 		adoptionThenRehearsal.page.evaluate(() => window.phase6aCreatorSuccessorProduct.waitForAdoption()),
 	]);
+	const adoptionThenRehearsalAfter = await selectedCounts(adoptionThenRehearsal.page);
 	await disposeD108e3Creator(adoptionThenRehearsal);
 
 	const adoptionThenActivation = await openD108e3Creator(true);
@@ -1312,7 +1325,29 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 		adoptionThenActivation.page.evaluate(() => window.phase6aCreatorSuccessorProduct.waitForActivation()),
 		adoptionThenActivation.page.evaluate(() => window.phase6aCreatorSuccessorProduct.waitForAdoption()),
 	]);
+	const adoptionThenActivationAfter = await selectedCounts(adoptionThenActivation.page);
 	await disposeD108e3Creator(adoptionThenActivation);
+
+	const overlappingRehearsal = await openD108e3Creator(true);
+	await configure(overlappingRehearsal.page, { pauseMigrationRecord: true });
+	await overlappingRehearsal.page.evaluate(() => window.phase6aCreatorSuccessorProduct.beginRehearsal());
+	await expect
+		.poll(() =>
+			overlappingRehearsal.page.evaluate(
+				() => window.phase6aCreatorSuccessorProduct.transitionSnapshot().migrationRecordIssueCount
+			)
+		)
+		.toBe(1);
+	await overlappingRehearsal.page.evaluate(() => window.phase6aCreatorSuccessorProduct.beginOverlappingRehearsal());
+	const overlappingRehearsalSecond = await overlappingRehearsal.page.evaluate(() =>
+		window.phase6aCreatorSuccessorProduct.waitForOverlappingRehearsal()
+	);
+	const overlappingRehearsalBefore = await selectedCounts(overlappingRehearsal.page);
+	await overlappingRehearsal.page.evaluate(() => window.phase6aCreatorSuccessorProduct.releaseMigrationRecord());
+	const overlappingRehearsalFirst = await overlappingRehearsal.page.evaluate(() =>
+		window.phase6aCreatorSuccessorProduct.waitForRehearsal()
+	);
+	await disposeD108e3Creator(overlappingRehearsal);
 
 	const independent = await openD108e3Creator(false);
 	const independentA = `independent-a-${lifetimeScenario}`;
@@ -1347,8 +1382,23 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 		(name) => window.phase6aCreatorSuccessorProduct.beginDirectAdoption(name),
 		independentB
 	);
-	await settleBrowserTurns(independent.page);
+	await expect
+		.poll(() =>
+			independent.page.evaluate(
+				(name) => window.phase6aCreatorSuccessorProduct.directAdoptionSettled(name),
+				independentB
+			)
+		)
+		.toBe(true);
 	const independentBeforeRelease = await selectedCounts(independent.page);
+	const independentSettledBeforeRelease = await independent.page.evaluate(
+		({ a, b }) =>
+			Object.freeze({
+				a: window.phase6aCreatorSuccessorProduct.directAdoptionSettled(a),
+				b: window.phase6aCreatorSuccessorProduct.directAdoptionSettled(b),
+			}),
+		{ a: independentA, b: independentB }
+	);
 	await independent.page.evaluate(() => window.phase6aCreatorSuccessorProduct.releaseVerification());
 	const [independentASettlement, independentBSettlement] = await Promise.all([
 		independent.page.evaluate(
@@ -1417,24 +1467,67 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 		},
 		serialization: {
 			activationThenAdoption: {
-				preVerification: activationThenAdoptionBefore.verificationCount,
-				settled: [activationFirst.status, activationSecond.status],
+				after: { verificationCount: activationThenAdoptionAfter.verificationCount },
+				before: {
+					firstSettled: activationThenAdoptionBefore.activationSettled,
+					preVerification: activationThenAdoptionBefore.verificationCount,
+					secondSettled: activationThenAdoptionBefore.adoptionSettled,
+				},
+				settled: [
+					{ order: activationFirst.order, status: activationFirst.status },
+					{ order: activationSecond.order, status: activationSecond.status },
+				],
 			},
 			adoptionThenActivation: {
-				preTerminal: adoptionThenActivationBefore.terminalTransitionCount,
-				settled: [adoptionBeforeActivation.status, activationAfterAdoption.status],
+				after: { terminalTransitionCount: adoptionThenActivationAfter.terminalTransitionCount },
+				before: {
+					firstSettled: adoptionThenActivationBefore.adoptionSettled,
+					preTerminal: adoptionThenActivationBefore.terminalTransitionCount,
+					secondSettled: adoptionThenActivationBefore.activationSettled,
+				},
+				settled: [
+					{ order: adoptionBeforeActivation.order, status: adoptionBeforeActivation.status },
+					{ order: activationAfterAdoption.order, status: activationAfterAdoption.status },
+				],
 			},
 			adoptionThenRehearsal: {
-				preRecord: adoptionThenRehearsalBefore.migrationRecordIssueCount,
-				settled: [adoptionBeforeRehearsal.status, rehearsalAfterAdoption.status],
+				after: { migrationRecordIssueCount: adoptionThenRehearsalAfter.migrationRecordIssueCount },
+				before: {
+					firstSettled: adoptionThenRehearsalBefore.adoptionSettled,
+					preRecord: adoptionThenRehearsalBefore.migrationRecordIssueCount,
+					secondSettled: adoptionThenRehearsalBefore.rehearsalSettled,
+				},
+				settled: [
+					{ order: adoptionBeforeRehearsal.order, status: adoptionBeforeRehearsal.status },
+					{ order: rehearsalAfterAdoption.order, status: rehearsalAfterAdoption.status },
+				],
 			},
 			independent: {
+				before: independentSettledBeforeRelease,
 				preIndependentVerification: independentBeforeRelease.independentVerificationCount,
-				settled: [independentASettlement.status, independentBSettlement.status],
+				settled: {
+					a: { order: independentASettlement.order, status: independentASettlement.status },
+					b: { order: independentBSettlement.order, status: independentBSettlement.status },
+				},
+			},
+			overlappingRehearsal: {
+				before: {
+					migrationRecordIssueCount: overlappingRehearsalBefore.migrationRecordIssueCount,
+					rehearsalSettled: overlappingRehearsalBefore.rehearsalSettled,
+				},
+				settled: { first: overlappingRehearsalFirst, second: overlappingRehearsalSecond },
 			},
 			rehearsalThenAdoption: {
-				preVerification: rehearsalThenAdoptionBefore.verificationCount,
-				settled: [rehearsalFirst.status, rehearsalSecond.status],
+				after: { verificationCount: rehearsalThenAdoptionAfter.verificationCount },
+				before: {
+					firstSettled: rehearsalThenAdoptionBefore.rehearsalSettled,
+					preVerification: rehearsalThenAdoptionBefore.verificationCount,
+					secondSettled: rehearsalThenAdoptionBefore.adoptionSettled,
+				},
+				settled: [
+					{ order: rehearsalFirst.order, status: rehearsalFirst.status },
+					{ order: rehearsalSecond.order, status: rehearsalSecond.status },
+				],
 			},
 			retry: {
 				settled: [retryFirst.status, retrySecond.status],
@@ -1493,7 +1586,10 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 			},
 			drainSuccess: {
 				counts: expect.objectContaining({ issueThrowCount: 1, predecessorDeactivateCount: 1, sendSettled: false }),
-				deletion: "fulfilled",
+				deletion: {
+					names: expect.arrayContaining([`d108e3-direct-${drainSuccessName}--ahe`]),
+					status: "fulfilled",
+				},
 				secondCounts: expect.objectContaining({ predecessorDeactivateCount: 1 }),
 				settlements: {
 					first: expect.objectContaining({
@@ -1508,11 +1604,58 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 			},
 		},
 		serialization: {
-			activationThenAdoption: { preVerification: 0, settled: expect.any(Array) },
-			adoptionThenActivation: { preTerminal: 0, settled: expect.any(Array) },
-			adoptionThenRehearsal: { preRecord: 0, settled: expect.any(Array) },
-			independent: { preIndependentVerification: 1, settled: ["fulfilled", "fulfilled"] },
-			rehearsalThenAdoption: { preVerification: 0, settled: expect.any(Array) },
+			activationThenAdoption: {
+				after: { verificationCount: 1 },
+				before: { firstSettled: false, preVerification: 0, secondSettled: false },
+				settled: [
+					{ order: 1, status: "fulfilled" },
+					{ order: 2, status: "fulfilled" },
+				],
+			},
+			adoptionThenActivation: {
+				after: { terminalTransitionCount: 1 },
+				before: { firstSettled: false, preTerminal: 0, secondSettled: false },
+				settled: [
+					{ order: 1, status: "fulfilled" },
+					{ order: 2, status: "fulfilled" },
+				],
+			},
+			adoptionThenRehearsal: {
+				after: { migrationRecordIssueCount: 1 },
+				before: { firstSettled: false, preRecord: 0, secondSettled: false },
+				settled: [
+					{ order: 1, status: "fulfilled" },
+					{ order: 2, status: "fulfilled" },
+				],
+			},
+			independent: {
+				before: { a: false, b: true },
+				preIndependentVerification: 1,
+				settled: {
+					a: { order: 2, status: "fulfilled" },
+					b: { order: 1, status: "fulfilled" },
+				},
+			},
+			overlappingRehearsal: {
+				before: { migrationRecordIssueCount: 1, rehearsalSettled: false },
+				settled: {
+					first: { lifetime: expect.any(Object), order: 2, status: "fulfilled" },
+					second: {
+						detail: "v3 room migration rehearsal is already active",
+						lifetime: expect.any(Object),
+						order: 1,
+						status: "rejected",
+					},
+				},
+			},
+			rehearsalThenAdoption: {
+				after: { verificationCount: 1 },
+				before: { firstSettled: false, preVerification: 0, secondSettled: false },
+				settled: [
+					{ order: 1, status: "fulfilled" },
+					{ order: 2, status: "fulfilled" },
+				],
+			},
 			retry: { settled: ["rejected", "fulfilled"], verificationCount: 2 },
 		},
 	});

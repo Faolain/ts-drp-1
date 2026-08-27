@@ -62,6 +62,7 @@ export const D108E3_BROWSER_BEHAVIORS = Object.freeze([
 	"activation blocks later adoption until terminal transition releases",
 	"adoption blocks later rehearsal until verification releases",
 	"adoption blocks later activation until verification releases",
+	"overlapping rehearsal retains the existing fast-fail fence",
 	"independent room sessions do not share one lifetime queue",
 	"a failed adoption releases the lifetime queue for retry",
 ] as const);

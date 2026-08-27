@@ -156,7 +156,7 @@ describe("D.108e2b creator successor room lifetime RED", () => {
 });
 
 describe("D.108e3 room lifetime transition RED", () => {
-	it("freezes four test owners, one room GREEN owner and ten causal browser behaviors", () => {
+	it("freezes four test owners, one room GREEN owner and eleven causal browser behaviors", () => {
 		expect(D108E3_RED_PATHS).toEqual([
 			"tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
 			"tests/phase-6a-creator-successor-product-red.test.ts",
@@ -166,7 +166,19 @@ describe("D.108e3 room lifetime transition RED", () => {
 		expect(new Set(D108E3_RED_PATHS).size).toBe(4);
 		expect(D108E3_RED_PATHS.every((path) => readFileSync(resolve(REPOSITORY_ROOT, path)).byteLength > 0)).toBe(true);
 		expect(D108E3_GREEN_PATHS).toEqual(["examples/v3-room/src/index.ts"]);
-		expect(D108E3_BROWSER_BEHAVIORS).toHaveLength(10);
+		expect(D108E3_BROWSER_BEHAVIORS).toEqual([
+			"cleanup failure preserves the predecessor failure in an ordered aggregate",
+			"activation failure remains primary while close joins adoption",
+			"drain failure still shuts down and releases browser ownership",
+			"drain and shutdown failure preserve ordered primary and cleanup errors",
+			"rehearsal blocks later adoption until its migration record releases",
+			"activation blocks later adoption until terminal transition releases",
+			"adoption blocks later rehearsal until verification releases",
+			"adoption blocks later activation until verification releases",
+			"overlapping rehearsal retains the existing fast-fail fence",
+			"independent room sessions do not share one lifetime queue",
+			"a failed adoption releases the lifetime queue for retry",
+		]);
 		expect(D108E2C_PRODUCT_BROWSER_BEHAVIORS).toHaveLength(2);
 		expect(D108E3_RED_PATHS.some((path) => /examples\/v3-chat|packages\/node|playwright.*config/u.test(path))).toBe(
 			false
