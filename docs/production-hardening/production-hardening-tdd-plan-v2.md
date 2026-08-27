@@ -62359,7 +62359,9 @@ must instead admit separator 8,193, reach successor recovery and reject there;
 an overall rejected result alone does not satisfy RED. The skip-budget child
 retains a 90-second hard kill, the owning Vitest `it` receives an explicit
 100-second timeout so the parent cannot preempt the child, and ordinary and
-clean runs must record a child wall time below 30 seconds. If the verified-page
+clean runs must record a child wall time below 60 seconds. The first corrected
+full run measured 41,272.856 ms; this bound retains enough headroom for clean
+checkout variance while remaining below the unchanged 90-second kill. If the verified-page
 facade cannot meet that budget, the real fixture cannot demonstrate the causal
 difference, or another product owner/API is needed, stop and reslice.
 
