@@ -63479,6 +63479,60 @@ owns E3-03 plus the Node authorization-window gate before immutable GREEN; and
 the exact D.93.46 and Node commands are now frozen. No corrected-byte
 confirmation review is authorized by the protocol.
 
+The D.108e4a immutable RED review round inspected signed/pushed commit
+`e91cf5e38367780a0478a5d77483b5431bf87776`, parent
+`3904918ce6659629244e127ca0f7a95274d5b871`, tree
+`b75e6cbd1e2098925ea43a9229c001b735a17157`, stable patch id
+`ff3c62d3b0ea376113c28cd8f1e7f2f580bf8359` and raw-diff SHA-256
+`b5f252c7499a048cf27907d42a9798a8bf241ddcb3745c71a666df35d8aa9afd`
+in three separate detached checkouts. Before review, the exact focused command
+returned the required semantic RED: nineteen tests, sixteen retained passes
+and exactly three failures--overlap send returned false, the initiator recorded
+`channel-close` rather than `replacement`, and the non-initiator retained the
+old connected peer connection. Exact-owner Prettier, ESLint, TypeScript and
+`git diff --check` passed.
+
+Grok 4.6/high session `01a04493-041f-7d30-a49c-8bffe8c592fa`
+completed its sole 510.185-second launch with exit zero,
+`stop_reason=end_turn` and terminal `APPROVED`, P0=0/P1=0/P2=0. Kimi CLI
+0.38.0 exact `kimi-code/k3` session
+`session_91b7e2f7-c174-4363-8833-d63d74fdffd1` used thinking and the 100-step
+ceiling, emitted CHECK001 through CHECK100 exactly once, independently
+installed from the primed store in its detached checkout, reproduced the exact
+three-failure/sixteen-pass result twice, passed ESLint, Prettier, network
+TypeScript and diff checks, and returned `APPROVED`, P0=0/P1=0/P2=3. Opus
+session `d2ae617d-5e40-4b87-8377-3de8b8f7a8ba` resolved to
+`claude-opus-5` at xhigh, completed after 843.555 API seconds with exit zero,
+no permission denial and zero subagents, and returned `CHANGES_REQUIRED`,
+P0=0/P1=1/P2=6. No Fable or collaboration subagent ran.
+
+Opus's reproduced P1 was material: the overlap control reached `#send` only,
+so a partial GREEN could use `#isCurrent` in `#send` while leaving `#linkFor`
+to replace the same still-current link whenever the preferred connection
+changed. Same-round signed/pushed correction
+`6d4fba1f80348a89200035a6fce26181d827b4d8`, parent `e91cf5e3`, tree
+`29b157f09cfcb224ef504ddaa163b3becc0c7ba9`, stable patch id
+`19dbbabced7d67ea43de5ca230d553eb77679991` and raw-diff SHA-256
+`af5a4c365d4d1e2b8e1b58547dfa20a13f3f00115a3858927b99a17269aa5893`
+adds a post-send reconcile while both authenticated connections remain current
+and re-pins the original link identity, zero drop delta and one peer connection.
+It also directly asserts both signaling connections, exact connection-loss
+counts and failure-safe barrier/owner cleanup. The correction retained exactly
+three intended failures and sixteen retained passes; Prettier, ESLint, network
+TypeScript and diff checks remained green. Per protocol, no confirmation review
+ran.
+
+The remaining nonblocking union has explicit owners and deadlines. The
+D.108e4a plan/evidence owner records the parameterized second-control title and
+the necessarily unpaused non-initiator branch before D.108e4 GREEN closure.
+The D.108e4a GREEN implementer must show source ordering before pending reuse,
+exercise retained eight-link capacity without leakage or double charging, and
+record both reversed overlap orders before signing immutable GREEN. Sharing one
+loop means the second overlap order is intentionally a GREEN-time assertion;
+the RED's frozen three-failure signature remains authoritative. Failure-path
+cleanup, both-current preconditions and authenticated-loss accounting were
+closed in `6d4fba1f`; no separate debt remains for those observations.
+
 Each D.108e2 sub-slice uses one immutable tests-only RED checkpoint and one
 immutable GREEN/evidence checkpoint. Each checkpoint receives one real Grok
 4.6/high, exact Kimi K3 CHECK001 through CHECK100 and Opus 5/xhigh review.
