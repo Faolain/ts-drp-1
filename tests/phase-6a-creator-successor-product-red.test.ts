@@ -6,19 +6,22 @@ import { REPOSITORY_ROOT } from "./fixtures/phase-6a-v3/creator-successor-activa
 import {
 	D108D2_AUTHORITY_KEYS,
 	D108D2_BROWSER_BEHAVIORS,
-	D108D2_GREEN_PATHS,
-	D108D2_RED_PATHS,
 	d108d2SourceGovernance,
+	D108E2B_BROWSER_BEHAVIORS,
+	D108E2B_GREEN_PATHS,
+	D108E2B_RED_PATHS,
 	isD108d2Authority,
 } from "./fixtures/phase-6a-v3/creator-successor-product-contract.js";
+import { createV3RoomSession } from "../examples/v3-room/src/index.js";
 
-describe("D.108d2 creator successor room/chat product RED", () => {
-	it("freezes exactly eleven RED owners, two GREEN owners and three browser behaviors", () => {
-		expect(D108D2_RED_PATHS).toHaveLength(11);
-		expect(new Set(D108D2_RED_PATHS).size).toBe(11);
-		expect(D108D2_GREEN_PATHS).toEqual(["examples/v3-room/src/index.ts", "examples/v3-chat/src/index.ts"]);
-		expect(D108D2_RED_PATHS.every((path) => readFileSync(resolve(REPOSITORY_ROOT, path)).byteLength > 0)).toBe(true);
+describe("D.108e2b creator successor room lifetime RED", () => {
+	it("freezes exactly five RED owners, one GREEN owner and seven browser behaviors", () => {
+		expect(D108E2B_RED_PATHS).toHaveLength(5);
+		expect(new Set(D108E2B_RED_PATHS).size).toBe(5);
+		expect(D108E2B_GREEN_PATHS).toEqual(["examples/v3-room/src/index.ts"]);
+		expect(D108E2B_RED_PATHS.every((path) => readFileSync(resolve(REPOSITORY_ROOT, path)).byteLength > 0)).toBe(true);
 		expect(D108D2_BROWSER_BEHAVIORS).toHaveLength(3);
+		expect(D108E2B_BROWSER_BEHAVIORS).toHaveLength(4);
 		const browser = readFileSync(
 			resolve(REPOSITORY_ROOT, "packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts"),
 			"utf8"
@@ -69,7 +72,7 @@ describe("D.108d2 creator successor room/chat product RED", () => {
 		expect(d108d2SourceGovernance()).toEqual({
 			chatHasNoDirectNodeAdoptionConsumer: true,
 			chatInputAllowsOnlyDeclarationWhenProductExists: true,
-			exactTwoGreenOwners: true,
+			exactOneGreenOwner: true,
 			noForbiddenProductReturn: true,
 			noNodeRootWidening: true,
 			roomInputAllowsOnlyDeclarationWhenProductExists: true,
@@ -79,5 +82,39 @@ describe("D.108d2 creator successor room/chat product RED", () => {
 
 	it("runs all product behaviors without a source-pattern readiness gate", () => {
 		expect(D108D2_BROWSER_BEHAVIORS).toHaveLength(3);
+		expect(D108E2B_BROWSER_BEHAVIORS).toHaveLength(4);
+	});
+
+	it("rejects every unsupported cold successor composition before reading application authority", async () => {
+		const observations = [];
+		for (const [key, value] of [
+			["createOperationAdmissionPolicy", (): Readonly<Record<string, never>> => Object.freeze({})],
+			["creatorFinalitySigner", Object.freeze({ sign: () => Promise.resolve(new Uint8Array(64)) })],
+			["rebaseSourceInvite", "d108e2b-source-invite"],
+		] as const) {
+			let applicationReads = 0;
+			const input = {
+				[key]: value,
+				get application(): never {
+					applicationReads += 1;
+					throw new TypeError("D.108e2b application authority was read");
+				},
+				successorSnapshotDeclaration: Object.freeze({}),
+			};
+			let detail = "fulfilled";
+			try {
+				await createV3RoomSession(input as never);
+			} catch (error) {
+				detail = error instanceof Error ? error.message : String(error);
+			}
+			observations.push(Object.freeze({ applicationReads, detail, key }));
+		}
+		expect(observations).toEqual(
+			["createOperationAdmissionPolicy", "creatorFinalitySigner", "rebaseSourceInvite"].map((key) => ({
+				applicationReads: 0,
+				detail: "v3 room successor authority composition is unsupported",
+				key,
+			}))
+		);
 	});
 });

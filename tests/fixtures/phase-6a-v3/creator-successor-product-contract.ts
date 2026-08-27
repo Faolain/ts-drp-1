@@ -4,24 +4,15 @@ import ts from "typescript";
 
 export const REPOSITORY_ROOT = resolve(import.meta.dirname, "../../..");
 
-export const D108D2_RED_PATHS = Object.freeze([
+export const D108E2B_RED_PATHS = Object.freeze([
 	"tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
 	"tests/phase-6a-creator-successor-product-red.test.ts",
 	"packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts",
 	"packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
 	"packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts",
-	"tests/fixtures/phase-6a-v3/creator-adoption-contract.ts",
-	"tests/phase-6a-creator-adoption-red.test.ts",
-	"tests/fixtures/phase-6a-v3/creator-adoption-commit-contract.ts",
-	"tests/phase-6a-creator-adoption-commit-red.test.ts",
-	"tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts",
-	"tests/phase-6a-creator-successor-activation-red.test.ts",
 ] as const);
 
-export const D108D2_GREEN_PATHS = Object.freeze([
-	"examples/v3-room/src/index.ts",
-	"examples/v3-chat/src/index.ts",
-] as const);
+export const D108E2B_GREEN_PATHS = Object.freeze(["examples/v3-room/src/index.ts"] as const);
 
 export const D108D2_AUTHORITY_KEYS = Object.freeze([
 	"aclDigest",
@@ -37,6 +28,13 @@ export const D108D2_BROWSER_BEHAVIORS = Object.freeze([
 	"hot creator adoption exposes oracle authority and issues through the replacement handle",
 	"established peer cold reopen accepts the genuine epoch-one live operation",
 	"fresh late peer cold reopen accepts the targeted retained epoch-one operation",
+] as const);
+
+export const D108E2B_BROWSER_BEHAVIORS = Object.freeze([
+	"concurrent adoption shares one success and one underlying transition",
+	"concurrent adoption shares one real verification failure",
+	"close joins a paused adoption before releasing lifetime ownership",
+	"predecessor deactivation failure cleans the replacement before escaping",
 ] as const);
 
 const D108D2_ROOM_INPUT_KEYS = Object.freeze([
@@ -111,8 +109,8 @@ function sameStrings(left: readonly string[], right: readonly string[]): boolean
  * @returns Frozen source-governance facts.
  */
 export function d108d2SourceGovernance(): Readonly<Record<string, boolean>> {
-	const room = read(D108D2_GREEN_PATHS[0]);
-	const chat = read(D108D2_GREEN_PATHS[1]);
+	const room = read(D108E2B_GREEN_PATHS[0]);
+	const chat = read("examples/v3-chat/src/index.ts");
 	const root = read("packages/node/src/index.ts");
 	const productExists = /adoptCreatorSuccessor\s*\(/u.test(room);
 	const consumers = exampleSources("examples").filter(({ source }) => ADOPTION_MARKER.test(source));
@@ -126,10 +124,7 @@ export function d108d2SourceGovernance(): Readonly<Record<string, boolean>> {
 		chatHasNoDirectNodeAdoptionConsumer: !ADOPTION_MARKER.test(chat),
 		chatInputAllowsOnlyDeclarationWhenProductExists:
 			!productExists || sameStrings(interfaceKeys(chat, "JoinInput"), [...D108D2_CHAT_JOIN_INPUT_KEYS].sort()),
-		exactTwoGreenOwners:
-			D108D2_GREEN_PATHS.length === 2 &&
-			D108D2_GREEN_PATHS[0] === "examples/v3-room/src/index.ts" &&
-			D108D2_GREEN_PATHS[1] === "examples/v3-chat/src/index.ts",
+		exactOneGreenOwner: D108E2B_GREEN_PATHS.length === 1 && D108E2B_GREEN_PATHS[0] === "examples/v3-room/src/index.ts",
 		noForbiddenProductReturn:
 			!/return\s+[^;]*(?:intent|capability|activationResult|exactCanonicalTrust|snapshotReceipt|signingAuthority|displacedSource)/u.test(
 				`${room}\n${chat}`

@@ -1,5 +1,5 @@
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
-import { build } from "esbuild";
+import { build, type Plugin } from "esbuild";
 import { createServer, type Server } from "node:http";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -10,18 +10,198 @@ const D108D2_BROWSER_BEHAVIORS = Object.freeze([
 	"established peer cold reopen accepts the genuine epoch-one live operation",
 	"fresh late peer cold reopen accepts the targeted retained epoch-one operation",
 ] as const);
+const D108E2B_BROWSER_BEHAVIORS = Object.freeze([
+	"concurrent adoption shares one success and one underlying transition",
+	"concurrent adoption shares one real verification failure",
+	"close joins a paused adoption before releasing lifetime ownership",
+	"predecessor deactivation failure cleans the replacement before escaping",
+] as const);
 const contractLoad = import(
 	pathToFileURL(resolve(REPOSITORY_ROOT, "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts")).href
 ) as Promise<
 	Readonly<{
 		readonly D108D2_BROWSER_BEHAVIORS: readonly [string, string, string];
+		readonly D108E2B_BROWSER_BEHAVIORS: readonly [string, string, string, string];
 		isD108d2Authority(value: unknown): boolean;
 	}>
 >;
 let sharedBrowserBehaviors: readonly string[] = [];
+let sharedLifetimeBehaviors: readonly string[] = [];
 let isD108d2Authority: (value: unknown) => boolean = () => false;
 const DATABASES = Object.freeze({ creator: "d108d2-creator", established: "d108d2-established", late: "d108d2-late" });
 const CHANNEL_NAME = "d108d2-successor-product";
+
+function lifetimeInstrumentationPlugin(): Plugin {
+	const v3Live = resolve(REPOSITORY_ROOT, "packages/node/src/v3-live.ts");
+	const creatorClose = resolve(REPOSITORY_ROOT, "packages/node/src/creator-close.ts");
+	const creatorAdoption = resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption.ts");
+	const creatorAdoptionCommit = resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption-commit.ts");
+	const creatorAdoptionActivate = resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption-activate.ts");
+	const shared = `
+const stateSymbol = Symbol.for("ts-drp/d108e2b/lifetime-state");
+const planeMapSymbol = Symbol.for("ts-drp/d108e2b/instrumented-planes");
+function createState() {
+  const state = {
+    activationCount: 0,
+    commitCount: 0,
+    pauseVerification: false,
+    predecessorDeactivateCount: 0,
+    rejectPredecessorDeactivate: false,
+    releaseVerification: undefined,
+    replacementDeactivateCount: 0,
+    verificationCount: 0,
+    verificationGate: Promise.resolve(),
+  };
+  const configure = (input) => {
+    state.activationCount = 0;
+    state.commitCount = 0;
+    state.pauseVerification = input.pauseVerification === true;
+    state.predecessorDeactivateCount = 0;
+    state.rejectPredecessorDeactivate = input.rejectPredecessorDeactivate === true;
+    state.replacementDeactivateCount = 0;
+    state.verificationCount = 0;
+    state.verificationGate = state.pauseVerification
+      ? new Promise((resolve) => { state.releaseVerification = resolve; })
+      : Promise.resolve();
+    if (!state.pauseVerification) state.releaseVerification = undefined;
+  };
+  Object.defineProperty(globalThis, "__d108e2bLifetimeInstrumentation", {
+    configurable: false,
+    value: Object.freeze({
+      configure,
+      releaseVerification: () => {
+        state.pauseVerification = false;
+        state.releaseVerification?.();
+        state.releaseVerification = undefined;
+      },
+      snapshot: () => Object.freeze({
+        activationCount: state.activationCount,
+        commitCount: state.commitCount,
+        predecessorDeactivateCount: state.predecessorDeactivateCount,
+        replacementDeactivateCount: state.replacementDeactivateCount,
+        verificationCount: state.verificationCount,
+      }),
+    }),
+    writable: false,
+  });
+  return state;
+}
+const state = globalThis[stateSymbol] ?? (globalThis[stateSymbol] = createState());
+const instrumentedPlanes = globalThis[planeMapSymbol] ?? (globalThis[planeMapSymbol] = new WeakMap());
+const unwrapPlane = (plane) => instrumentedPlanes.get(plane) ?? plane;
+const instrumentPlane = (plane, kind) => {
+  const wrapper = {};
+  for (const key of Reflect.ownKeys(plane)) {
+    const descriptor = Object.getOwnPropertyDescriptor(plane, key);
+    if (descriptor === undefined) continue;
+    if (key === "deactivate") {
+      Object.defineProperty(wrapper, key, {
+        enumerable: descriptor.enumerable,
+        value: () => {
+          if (kind === "predecessor") {
+            state.predecessorDeactivateCount += 1;
+            if (state.rejectPredecessorDeactivate) {
+              state.rejectPredecessorDeactivate = false;
+              return Promise.reject(new TypeError("D.108e2b injected predecessor deactivation failure"));
+            }
+          } else {
+            state.replacementDeactivateCount += 1;
+          }
+          return Reflect.apply(plane.deactivate, plane, []);
+        },
+      });
+    } else if ("value" in descriptor) {
+      Object.defineProperty(wrapper, key, {
+        enumerable: descriptor.enumerable,
+        value: typeof descriptor.value === "function"
+          ? (...args) => Reflect.apply(descriptor.value, plane, args)
+          : descriptor.value,
+      });
+    } else {
+      Object.defineProperty(wrapper, key, {
+        enumerable: descriptor.enumerable,
+        get: () => Reflect.get(plane, key, plane),
+      });
+    }
+  }
+  Object.freeze(wrapper);
+  instrumentedPlanes.set(wrapper, plane);
+  return wrapper;
+};`;
+	return {
+		name: "d108e2b-lifetime-instrumentation",
+		setup(context): void {
+			const modules = new Map<string, string>([
+				[
+					"@ts-drp/node/v3-live",
+					`${shared}
+import * as actual from ${JSON.stringify(v3Live)};
+export const prepareV3LiveGeneration = actual.prepareV3LiveGeneration;
+export const recoverV3LiveReplica = actual.recoverV3LiveReplica;
+export const routeV3Ingress = actual.routeV3Ingress;
+export const activateV3LivePlane = (input) => {
+  const result = actual.activateV3LivePlane(input);
+  return result.ok === true ? Object.freeze({ ...result, handle: instrumentPlane(result.handle, "predecessor") }) : result;
+};
+export const bindV3BlueprintLivePlane = (input) => actual.bindV3BlueprintLivePlane(
+  input !== null && typeof input === "object" && "plane" in input
+    ? { ...input, plane: unwrapPlane(input.plane) }
+    : input
+);
+export const routeV3RetainedIngress = (handle, message) => actual.routeV3RetainedIngress(unwrapPlane(handle), message);
+export const republishV3RetainedTo = (handle, targetPeerId) => actual.republishV3RetainedTo(unwrapPlane(handle), targetPeerId);`,
+				],
+				[
+					"@ts-drp/node/creator-close",
+					`${shared}
+import * as actual from ${JSON.stringify(creatorClose)};
+export const bindCreatorLiveClose = (input) => actual.bindCreatorLiveClose({ ...input, plane: unwrapPlane(input.plane) });`,
+				],
+				[
+					"@ts-drp/node/creator-adoption",
+					`${shared}
+import * as actual from ${JSON.stringify(creatorAdoption)};
+export const verifyCreatorSuccessorAdoption = async (input) => {
+  state.verificationCount += 1;
+  if (state.pauseVerification) await state.verificationGate;
+  return actual.verifyCreatorSuccessorAdoption(input);
+};`,
+				],
+				[
+					"@ts-drp/node/creator-adoption-commit",
+					`${shared}
+import * as actual from ${JSON.stringify(creatorAdoptionCommit)};
+export const commitCreatorSuccessorAdoption = async (input) => {
+  state.commitCount += 1;
+  return actual.commitCreatorSuccessorAdoption(input);
+};`,
+				],
+				[
+					"@ts-drp/node/creator-adoption-activate",
+					`${shared}
+import * as actual from ${JSON.stringify(creatorAdoptionActivate)};
+export const reopenCreatorSuccessorAdoption = actual.reopenCreatorSuccessorAdoption;
+export const activateCreatorSuccessorAdoption = async (input) => {
+  state.activationCount += 1;
+  const result = await actual.activateCreatorSuccessorAdoption(input);
+  return result.ok === true ? Object.freeze({ ...result, handle: instrumentPlane(result.handle, "replacement") }) : result;
+};`,
+				],
+			]);
+			for (const specifier of modules.keys()) {
+				context.onResolve({ filter: new RegExp(`^${specifier}$`) }, () => ({
+					namespace: "d108e2b-lifetime",
+					path: specifier,
+				}));
+			}
+			context.onLoad({ filter: /.*/, namespace: "d108e2b-lifetime" }, ({ path }) => ({
+				contents: modules.get(path),
+				loader: "js",
+				resolveDir: REPOSITORY_ROOT,
+			}));
+		},
+	};
+}
 
 interface ProductBrowserServer {
 	readonly origin: string;
@@ -47,27 +227,41 @@ interface RelayAudit {
 	readonly realmId: string;
 }
 
+interface LifetimeCounts {
+	readonly activationCount: number;
+	readonly commitCount: number;
+	readonly predecessorDeactivateCount: number;
+	readonly replacementDeactivateCount: number;
+	readonly verificationCount: number;
+}
+
 async function startProductBrowserServer(entryPoint: string): Promise<ProductBrowserServer> {
 	const configUrl = new URL("../../../vite.config.mts", import.meta.url).href;
 	const loaded = (await import(configUrl)) as Readonly<{
 		workspaceAliases?: Readonly<Record<string, string>>;
 	}>;
 	if (loaded.workspaceAliases === undefined) throw new TypeError("D.108d2 workspace aliases are unavailable");
-	const aliases = Object.freeze({
-		...loaded.workspaceAliases,
-		"@ts-drp/node/creator-adoption": resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption.ts"),
-		"@ts-drp/node/creator-adoption-activate": resolve(
-			REPOSITORY_ROOT,
-			"packages/node/src/creator-adoption-activate.ts"
-		),
-		"@ts-drp/node/creator-adoption-commit": resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption-commit.ts"),
-	});
+	const aliases = Object.freeze(
+		Object.fromEntries(
+			Object.entries(loaded.workspaceAliases).filter(
+				([specifier]) =>
+					!new Set([
+						"@ts-drp/node/creator-adoption",
+						"@ts-drp/node/creator-adoption-activate",
+						"@ts-drp/node/creator-adoption-commit",
+						"@ts-drp/node/creator-close",
+						"@ts-drp/node/v3-live",
+					]).has(specifier)
+			)
+		)
+	);
 	const bundled = await build({
 		alias: aliases,
 		bundle: true,
 		entryPoints: [entryPoint],
 		format: "esm",
 		platform: "browser",
+		plugins: [lifetimeInstrumentationPlugin()],
 		write: false,
 	});
 	const entry = bundled.outputFiles[0]?.text;
@@ -155,6 +349,7 @@ test.describe.configure({ mode: "serial" });
 test.beforeAll(async ({ browser }) => {
 	const contract = await contractLoad;
 	sharedBrowserBehaviors = contract.D108D2_BROWSER_BEHAVIORS;
+	sharedLifetimeBehaviors = contract.D108E2B_BROWSER_BEHAVIORS;
 	isD108d2Authority = contract.isD108d2Authority;
 	servers = Object.freeze(
 		await Promise.all(
@@ -193,6 +388,12 @@ test("pins the exact successor product browser inventory", () => {
 		"hot creator adoption exposes oracle authority and issues through the replacement handle",
 		"established peer cold reopen accepts the genuine epoch-one live operation",
 		"fresh late peer cold reopen accepts the targeted retained epoch-one operation",
+	]);
+	expect(sharedLifetimeBehaviors).toEqual([
+		"concurrent adoption shares one success and one underlying transition",
+		"concurrent adoption shares one real verification failure",
+		"close joins a paused adoption before releasing lifetime ownership",
+		"predecessor deactivation failure cleans the replacement before escaping",
 	]);
 });
 
@@ -329,4 +530,139 @@ test(D108D2_BROWSER_BEHAVIORS[2], async () => {
 		expect(observation.sender).toBe(sent?.sender);
 		expect(observation.type).toBe(sent?.type);
 	}
+});
+
+let lifetimeScenario = 0;
+
+async function openLifetimeCreator(sealed: boolean): Promise<Page> {
+	if (creator === undefined) throw new TypeError("D.108e2b creator realm is absent");
+	await creator.evaluate(() => window.phase6aCreatorSuccessorProduct.close()).catch(() => undefined);
+	lifetimeScenario += 1;
+	await creator.evaluate((input) => window.phase6aCreatorSuccessorProduct.create(input), {
+		channelName: `${CHANNEL_NAME}-lifetime-${lifetimeScenario}`,
+		clientId: "alice",
+		databaseName: `d108e2b-lifetime-${lifetimeScenario}`,
+	});
+	if (sealed) await creator.evaluate(() => window.phase6aCreatorSuccessorProduct.sealEpoch());
+	return creator;
+}
+
+async function closeLifetimeCreator(page: Page): Promise<void> {
+	if (!page.isClosed()) await page.evaluate(() => window.phase6aCreatorSuccessorProduct.close()).catch(() => undefined);
+}
+
+test(D108E2B_BROWSER_BEHAVIORS.join("; "), async () => {
+	const counts = async (page: Page): Promise<LifetimeCounts> => {
+		const selected = await page.evaluate(() => window.phase6aCreatorSuccessorProduct.lifetimeSnapshot());
+		return {
+			activationCount: selected.activationCount,
+			commitCount: selected.commitCount,
+			predecessorDeactivateCount: selected.predecessorDeactivateCount,
+			replacementDeactivateCount: selected.replacementDeactivateCount,
+			verificationCount: selected.verificationCount,
+		};
+	};
+
+	const successful = await openLifetimeCreator(true);
+	await successful.evaluate(() => window.phase6aCreatorSuccessorProduct.configureLifetime({}));
+	const successfulSettlements = await successful.evaluate(() =>
+		window.phase6aCreatorSuccessorProduct.concurrentAdoption()
+	);
+	const successfulCounts = await counts(successful);
+	await closeLifetimeCreator(successful);
+
+	const failing = await openLifetimeCreator(false);
+	await failing.evaluate(() => window.phase6aCreatorSuccessorProduct.configureLifetime({}));
+	const failingSettlements = await failing.evaluate(() => window.phase6aCreatorSuccessorProduct.concurrentAdoption());
+	const failingCounts = await counts(failing);
+	await closeLifetimeCreator(failing);
+
+	const closing = await openLifetimeCreator(true);
+	await closing.evaluate(() => window.phase6aCreatorSuccessorProduct.configureLifetime({ pauseVerification: true }));
+	await closing.evaluate(() => window.phase6aCreatorSuccessorProduct.beginAdoption());
+	await expect
+		.poll(() => closing.evaluate(() => window.phase6aCreatorSuccessorProduct.lifetimeSnapshot().verificationCount))
+		.toBe(1);
+	await closing.evaluate(() => window.phase6aCreatorSuccessorProduct.beginClose());
+	await closing.waitForTimeout(50);
+	const closeBeforeRelease = await closing.evaluate(() => window.phase6aCreatorSuccessorProduct.lifetimeSnapshot());
+	await closing.evaluate(() => window.phase6aCreatorSuccessorProduct.releaseVerification());
+	const [adoptionAfterRelease, closeAfterRelease] = await Promise.all([
+		closing.evaluate(() => window.phase6aCreatorSuccessorProduct.waitForAdoption()),
+		closing.evaluate(() => window.phase6aCreatorSuccessorProduct.waitForClose()),
+	]);
+	await closeLifetimeCreator(closing);
+
+	const deactivation = await openLifetimeCreator(true);
+	await deactivation.evaluate(() =>
+		window.phase6aCreatorSuccessorProduct.configureLifetime({ rejectPredecessorDeactivate: true })
+	);
+	let deactivationRejected = false;
+	try {
+		await deactivation.evaluate(() => window.phase6aCreatorSuccessorProduct.adoptSuccessor());
+	} catch {
+		deactivationRejected = true;
+	}
+	const deactivationCounts = await counts(deactivation);
+	const deactivationSnapshot = await snapshot(deactivation);
+	await closeLifetimeCreator(deactivation);
+
+	expect({
+		close: {
+			adoptionSettledBeforeRelease: closeBeforeRelease.adoptionSettled,
+			adoptionStatus: adoptionAfterRelease.status,
+			closeSettledBeforeRelease: closeBeforeRelease.closeSettled,
+			closeStatus: closeAfterRelease.status,
+		},
+		deactivation: {
+			authority: deactivationSnapshot.authority,
+			counts: deactivationCounts,
+			rejected: deactivationRejected,
+		},
+		failure: {
+			counts: failingCounts,
+			sameSettlement:
+				JSON.stringify(failingSettlements[0]) === JSON.stringify(failingSettlements[1]) &&
+				failingSettlements[0].status === "rejected",
+		},
+		success: { counts: successfulCounts, settlements: successfulSettlements },
+	}).toEqual({
+		close: {
+			adoptionSettledBeforeRelease: false,
+			adoptionStatus: "rejected",
+			closeSettledBeforeRelease: false,
+			closeStatus: "fulfilled",
+		},
+		deactivation: {
+			authority: null,
+			counts: {
+				activationCount: 1,
+				commitCount: 1,
+				predecessorDeactivateCount: 1,
+				replacementDeactivateCount: 1,
+				verificationCount: 1,
+			},
+			rejected: true,
+		},
+		failure: {
+			counts: {
+				activationCount: 0,
+				commitCount: 0,
+				predecessorDeactivateCount: 0,
+				replacementDeactivateCount: 0,
+				verificationCount: 1,
+			},
+			sameSettlement: true,
+		},
+		success: {
+			counts: {
+				activationCount: 1,
+				commitCount: 1,
+				predecessorDeactivateCount: 1,
+				replacementDeactivateCount: 0,
+				verificationCount: 1,
+			},
+			settlements: [{ status: "fulfilled" }, { status: "fulfilled" }],
+		},
+	});
 });

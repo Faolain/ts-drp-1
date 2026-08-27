@@ -66,22 +66,54 @@ interface ProductApi {
 	snapshot(): PlainRecord;
 }
 
+interface LifetimeInstrumentationSnapshot {
+	readonly activationCount: number;
+	readonly commitCount: number;
+	readonly predecessorDeactivateCount: number;
+	readonly replacementDeactivateCount: number;
+	readonly verificationCount: number;
+}
+
+interface LifetimeInstrumentation {
+	configure(
+		input: Readonly<{ readonly pauseVerification?: boolean; readonly rejectPredecessorDeactivate?: boolean }>
+	): void;
+	releaseVerification(): void;
+	snapshot(): LifetimeInstrumentationSnapshot;
+}
+
+interface ObservedSettlement {
+	readonly detail?: string;
+	readonly status: "fulfilled" | "rejected";
+}
+
 declare global {
 	interface Window {
 		__phase6aProductRelayPost?(packet: RelayPacket): Promise<void>;
 		phase6aCreatorSuccessorProduct: Readonly<{
 			adoptSuccessor(): Promise<void>;
+			beginAdoption(): void;
+			beginClose(): void;
 			boot(realmId: string): Promise<void>;
 			close(): Promise<void>;
+			configureLifetime(
+				input: Readonly<{ readonly pauseVerification?: boolean; readonly rejectPredecessorDeactivate?: boolean }>
+			): void;
+			concurrentAdoption(): Promise<readonly [ObservedSettlement, ObservedSettlement]>;
 			create(input: unknown): Promise<string>;
 			deliver(packet: RelayPacket): void;
 			exportSuccessor(databaseName: string): Promise<SuccessorCarrier>;
 			importSuccessor(carrier: SuccessorCarrier, sourceDatabaseName: string, targetDatabaseName: string): Promise<void>;
 			join(input: unknown): Promise<void>;
+			lifetimeSnapshot(): LifetimeInstrumentationSnapshot &
+				Readonly<{ readonly adoptionSettled: boolean; readonly closeSettled: boolean }>;
 			relayAudit(): RelayAudit;
+			releaseVerification(): void;
 			sealEpoch(): Promise<PlainRecord>;
 			send(text: string): Promise<void>;
 			snapshot(): PlainRecord;
+			waitForAdoption(): Promise<ObservedSettlement>;
+			waitForClose(): Promise<ObservedSettlement>;
 		}>;
 	}
 }
@@ -95,6 +127,34 @@ let relayOutgoing = 0;
 let relaySequence = 0;
 let realmId = "";
 let booted = false;
+let adoptionSettled = false;
+let closeSettled = false;
+let pendingAdoption: Promise<ObservedSettlement> | undefined;
+let pendingClose: Promise<ObservedSettlement> | undefined;
+
+function instrumentation(): LifetimeInstrumentation {
+	const selected = Reflect.get(globalThis, "__d108e2bLifetimeInstrumentation");
+	if (selected === null || typeof selected !== "object") {
+		throw new TypeError("D.108e2b lifetime instrumentation is unavailable");
+	}
+	return selected as LifetimeInstrumentation;
+}
+
+function observe(task: Promise<void>, settled: () => void): Promise<ObservedSettlement> {
+	return task.then(
+		() => {
+			settled();
+			return Object.freeze({ status: "fulfilled" as const });
+		},
+		(error: unknown) => {
+			settled();
+			return Object.freeze({
+				detail: error instanceof Error ? error.message : String(error),
+				status: "rejected" as const,
+			});
+		}
+	);
+}
 
 function normalize(value: unknown): unknown {
 	if (value instanceof Uint8Array) {
@@ -503,6 +563,20 @@ const api = Object.freeze({
 		if (typeof adopt !== "function") throw new TypeError("D.108d2 chat adoption is unavailable");
 		await Reflect.apply(adopt, productApi(), []);
 	},
+	beginAdoption(): void {
+		if (pendingAdoption !== undefined) throw new TypeError("D.108e2b adoption observation is already active");
+		adoptionSettled = false;
+		pendingAdoption = observe(api.adoptSuccessor(), () => {
+			adoptionSettled = true;
+		});
+	},
+	beginClose(): void {
+		if (pendingClose !== undefined) throw new TypeError("D.108e2b close observation is already active");
+		closeSettled = false;
+		pendingClose = observe(productApi().close(), () => {
+			closeSettled = true;
+		});
+	},
 	async boot(selectedRealmId: string): Promise<void> {
 		if (booted) return;
 		if (typeof selectedRealmId !== "string" || selectedRealmId.length === 0)
@@ -522,6 +596,22 @@ const api = Object.freeze({
 	},
 	close(): Promise<void> {
 		return productApi().close();
+	},
+	configureLifetime(
+		input: Readonly<{ readonly pauseVerification?: boolean; readonly rejectPredecessorDeactivate?: boolean }>
+	): void {
+		adoptionSettled = false;
+		closeSettled = false;
+		pendingAdoption = undefined;
+		pendingClose = undefined;
+		instrumentation().configure(input);
+	},
+	async concurrentAdoption(): Promise<readonly [ObservedSettlement, ObservedSettlement]> {
+		const [left, right] = await Promise.all([
+			observe(api.adoptSuccessor(), () => undefined),
+			observe(api.adoptSuccessor(), () => undefined),
+		]);
+		return Object.freeze([left, right]);
 	},
 	create(input: unknown): Promise<string> {
 		return productApi().create(input);
@@ -560,6 +650,10 @@ const api = Object.freeze({
 	join(input: unknown): Promise<void> {
 		return productApi().join(input);
 	},
+	lifetimeSnapshot(): LifetimeInstrumentationSnapshot &
+		Readonly<{ readonly adoptionSettled: boolean; readonly closeSettled: boolean }> {
+		return Object.freeze({ ...instrumentation().snapshot(), adoptionSettled, closeSettled });
+	},
 	relayAudit(): RelayAudit {
 		const copy = (observation: RelayMessageObservation): RelayMessageObservation =>
 			Object.freeze({ ...observation, data: Uint8Array.from(observation.data) });
@@ -572,6 +666,9 @@ const api = Object.freeze({
 			realmId,
 		});
 	},
+	releaseVerification(): void {
+		instrumentation().releaseVerification();
+	},
 	sealEpoch(): Promise<PlainRecord> {
 		return productApi().sealEpoch();
 	},
@@ -580,6 +677,18 @@ const api = Object.freeze({
 	},
 	snapshot(): PlainRecord {
 		return productApi().snapshot();
+	},
+	async waitForAdoption(): Promise<ObservedSettlement> {
+		if (pendingAdoption === undefined) throw new TypeError("D.108e2b adoption observation is absent");
+		const selected = await pendingAdoption;
+		pendingAdoption = undefined;
+		return selected;
+	},
+	async waitForClose(): Promise<ObservedSettlement> {
+		if (pendingClose === undefined) throw new TypeError("D.108e2b close observation is absent");
+		const selected = await pendingClose;
+		pendingClose = undefined;
+		return selected;
 	},
 });
 
