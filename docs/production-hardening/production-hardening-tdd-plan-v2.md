@@ -62220,8 +62220,15 @@ must use that value unchanged: no reduced test parameter, production test
 branch, synthetic counter injection or weakened successor limit is allowed.
 An 8,195-row real Node SQLite issuance probe completed in about 1.13 seconds,
 and 8,195 Ed25519 signatures completed in about 0.25 seconds on the execution
-host, so the genuine boundary is practical without a fake low-limit seam.
-Those timings are feasibility observations only, not acceptance budgets.
+host. A separate deterministic probe found the dominant adapter cost that the
+first freeze omitted: 1,000 successive `limit: 1` reads over a 1,000-row Node
+store took 4,385.93 ms because each `readOutboxPage` scans, validates, clones
+and sorts the complete closure. Driving the signed 8,192 boundary directly
+through that adapter would therefore make the retained composite quadratic
+and is forbidden. The corrected RED keeps the real durable rows and exact
+authenticated limit while materializing the verified closure once into a
+strict test-owned page facade for the recovery window. These measurements are
+feasibility evidence, not permission to weaken a gate.
 
 The audited tests-only RED roster is exactly the same four physical owners as
 D.108e2d but receives separate `D108E2E` constants, mode and composite:
@@ -62249,9 +62256,29 @@ creator-successor reopen, and uses the real live handle to issue the first
 successor epoch-one row at sequence 1. Detached, canonical, Bob-signed clones
 of those two admitted shapes then extend the same real lineage. Every commit
 has its selected sequence in its canonical preimage, one exact issued/outbox
-envelope and the real object/author scope. No raw SQL, production-relative
-import, Vite alias, fabricated signature, duplicate sequence or cursor reset
-is allowed.
+envelope and the real object/author scope. Current-after-future is a legitimate
+durable recovery state: independently live predecessor and successor payloads
+may issue against one monotonic scope, while the issuance contract validates
+scope and author sequence but intentionally does not impose epoch monotonicity.
+The test therefore models interleaved valid writers, not an invalid SQL state.
+No raw SQL, production-relative import, Vite alias, fabricated signature,
+duplicate sequence or cursor reset is allowed.
+
+At each recovery checkpoint, the child materializes the exact closure through
+at most 65 genuine Node-adapter pages of at most the contract maximum 128 rows:
+8,193 rows for equality, then 8,195 after appending the separator and final
+future row. It verifies every contiguous sequence, selected scope,
+issued/outbox equality, canonical preimage binding, digest, signature and
+expected epoch against independent `readIssued` point reads before freezing
+detached records. Recovery receives a test-owned `DurableIssuanceStore` facade
+over the corresponding immutable records. Its
+`readOutboxPage` implements the real value-scope, lexicographic `afterKey` and
+bounded-limit contract without rescanning the SQLite tables; `readIssued`
+delegates to the real store while recording object-identity and sequence
+telemetry; and `transactIssue`, `compareAndMarkOutboxPublished`, `readLineage`
+and `close` delegate unchanged. The facade neither changes product source nor
+claims Node-adapter paging performance. D.108e2d already retains real adapter
+composition; D.108e2e isolates wrapper counter custody at the authentic limit.
 
 The equality control contains current sequence 0 followed by exactly 8,192
 authenticated successor rows at sequences 1 through 8,192. A new reopen must
@@ -62259,23 +62286,35 @@ complete predecessor recovery: the predecessor view returns sequence 0, the
 outer recovery consumer performs its one copied-scope issued read/match, the
 next wrapper call skips exactly the signed limit with captured-scope issued
 matches, reaches the empty page and begins genuine successor recovery. The
-overall attempt may then reject at the successor's unchanged graph-capacity
-gate; that later result is pinned and is not presented as activation success.
-The causal predecessor boundary proves the limit remains inclusive. The
-retained one-future-row reopen remains the accepted under-budget activation
-control and proves each new wrapper starts with a fresh budget.
+fixture has one prepared successor vertex and cloned rows below the
+byte-capacity boundary, so the 8,192 successor rows then deterministically
+reject with kind `rejected` and detail `v3 recovery graph is at capacity` at
+the unchanged vertex-count gate. That later result is asserted but is not
+presented as activation success; terminal-empty observation and one
+epoch-anchor installation are the causal predecessor-boundary evidence. The
+retained one-future-row reopen remains only the accepted under-budget behavior
+control. Fresh budget custody is instead proved when the later over-budget
+reopen, on the same issuance store after the equality recovery has consumed a
+complete 8,192-skip window, must itself skip another complete 8,192-row window;
+this kills store-scoped and module-global counter mutants as well as the
+reproduced per-method-call mutant.
 
 The same lineage then appends an admitted predecessor/current separator at
 sequence 8,193 and one admitted successor/future row at sequence 8,194. A
-second new reopen sees three outer wrapper calls: it returns current sequence
-0; skips successor sequences 1 through 8,192 before returning current sequence
-8,193; and encounters successor sequence 8,194. The cumulative future-skip
-count is now 8,193 even though no individual wrapper call exceeds 8,192. That
-attempt must stop in predecessor recovery on sequence 8,194, before terminal
-empty-page observation, successor recovery, subscription, publication,
-issuance or handle activation. Exact result kind/detail and the existing AHE,
-snapshot-open, epoch-anchor and effect counters are frozen so a later
-successor `maxEpochVertices` rejection cannot masquerade as predecessor-budget
+second new reopen uses the same real issuance store but a fresh live-journal
+store, so equality-control successor writes cannot become an implicit input.
+It sees three outer wrapper calls: it returns current sequence 0; skips
+successor sequences 1 through 8,192 before returning current sequence 8,193;
+and encounters successor sequence 8,194. Sequence 8,193 must complete its
+copied-scope issued match, current classification and journal append before the
+8,194 probe; otherwise the fixture has not reproduced the counter defect. The
+cumulative future-skip count is now 8,193 even though no individual wrapper
+call exceeds 8,192. That attempt must stop in predecessor recovery on sequence
+8,194, before terminal empty-page observation, successor recovery,
+subscription, publication, issuance or handle activation. Exact result
+kind/detail and the existing AHE, snapshot-open, epoch-anchor and effect
+counters are frozen so a separator admission failure or later successor
+`maxEpochVertices` rejection cannot masquerade as predecessor-budget
 enforcement.
 
 Telemetry is aggregate and bounded rather than serializing 8,195 row objects
@@ -62283,11 +62322,15 @@ over IPC. For each reopen it records backing page count, first/last returned
 sequence, terminal-empty observation, strictly increasing/unique sequence
 count, captured-scope future issued-read count/range and copied-scope returned-
 row issued reads. The equality control must prove sequences 0 through 8,192
-once each plus terminal empty; the over-budget proof must prove sequences 0
-through 8,194 once each, stop on 8,194 without terminal empty, read current
-rows 0 and 8,193 through copied value-equal scopes, and attribute all skipped
-future reads to the exact captured object/author scope. Raw seeding and
-post-result evidence reads stay outside those windows.
+once each plus terminal empty. The over-budget proof must prove sequences 0
+through 8,194 once each and stop on 8,194 without terminal empty. Its exact
+GREEN issued-read inventory is three copied-scope outer reads at 0, 8,193 and
+8,194 plus 8,193 captured-scope wrapper reads over the non-contiguous set
+`{1..8192, 8194}`. The captured-scope read/match of 8,194 occurs before the
+budget comparison and is required fail-closed evidence even though that row is
+not skipped. Sequence 8,193's copied-scope read and successful journal append
+are separate pinned facts. Raw seeding, closure materialization and post-result
+evidence reads stay outside the bounded windows.
 
 The RED also closes the Opus GREEN-review P2 at this exact seam rather than
 deferring half of its oracle. A small separate control supplies a genuinely
@@ -62301,13 +62344,18 @@ the mere fact that a read occurred. D.108e4 retains only the already assigned
 current-row mismatch-isolation cleanup.
 
 Immutable RED acceptance is one failing D.108e2e bounded-work composite with
-the equality and future-match controls green, every retained local-author
-behavior green and no production diff. The expected current failure is causal:
-the over-budget case reaches successor recovery and rejects there, rather than
-stopping within predecessor recovery. An overall rejected result alone does
-not satisfy the RED. If the real fixture cannot demonstrate that causal
-difference, needs another production owner/API, or cannot stay within its
-bounded child timeout without changing the 8,192 limit, stop and reslice.
+every retained local-author behavior green and no production diff. Within the
+single composite, hard equality and future-match control assertions run first;
+only the final over-budget causal assertion is expected to fail. The exact RED
+inventory must contain that one named predecessor-stop mismatch and no control,
+timeout, bootstrap or adapter-resolution failure. The current implementation
+must instead admit separator 8,193, reach successor recovery and reject there;
+an overall rejected result alone does not satisfy RED. The skip-budget child
+retains a 90-second hard kill, the owning Vitest `it` receives an explicit
+100-second timeout so the parent cannot preempt the child, and ordinary and
+clean runs must record a child wall time below 30 seconds. If the verified-page
+facade cannot meet that budget, the real fixture cannot demonstrate the causal
+difference, or another product owner/API is needed, stop and reslice.
 
 Only after that RED reproduces the defect may
 `packages/node/src/v3-live.ts` become the sole GREEN owner. The smallest
@@ -62333,6 +62381,23 @@ Kimi K3 CHECK001-through-CHECK100 run and one Opus 5/xhigh no-subagent review.
 P0/P1 is corrected in the same round without confirmation review; P2 receives
 an exact owner/deadline. No Fable or collaboration subagent runs without new
 express authorization.
+
+The immutable plan-freeze review round inspected signed commit
+`fa91ac3753f480e2e10b63e85b2c0c6b5d0c8e5c` in three separate detached
+worktrees. Grok 4.6/high session `01a042b0-2502-7980-a5fc-4415fc031a56`
+reached the original 16-turn cap after 540.249 seconds without a verdict. After
+the CLI upgrade exposed session resume, one tool-free `--resume` continuation
+on that same session emitted `APPROVED`, P0=0/P1=0/P2=3. Its P2s are closed by
+pinning separator admission, isolating each reopen's journal while retaining
+the same issuance store, and setting child/parent timeouts. Kimi K3 session
+`session_c5085cc0-c651-437c-a728-ede9c4fdcfd5` and Opus 5/xhigh session
+`e8c28c1b-ba01-4aed-a2f5-7600b83c5d67` each returned
+`CHANGES_REQUIRED`, P0=0/P1=1/P2=4. Their shared P1 is closed by the measured
+real-store materialization plus immutable page facade above. Their P2s are
+closed by the exact 8,194 read inventory, correct fresh-budget attribution,
+control-before-failure assertion order and deterministic equality result. Per
+protocol these corrections remain in the same round and receive no
+confirmation review.
 
 ##### D.108e4 — retained test-oracle cleanup
 
