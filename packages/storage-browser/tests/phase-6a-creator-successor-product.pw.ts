@@ -849,6 +849,7 @@ test(D108E2C_PRODUCT_BROWSER_BEHAVIORS.join("; "), async () => {
 					...finalInstrumentationCounts,
 					postActivationPauseCount: 1,
 					postPredecessorDeactivationPauseCount: 0,
+					predecessorDeactivateCount: 0,
 				},
 				order: 1,
 				status: "rejected",
