@@ -62273,12 +62273,16 @@ expected epoch against independent `readIssued` point reads before freezing
 detached records. Recovery receives a test-owned `DurableIssuanceStore` facade
 over the corresponding immutable records. Its
 `readOutboxPage` implements the real value-scope, lexicographic `afterKey` and
-bounded-limit contract without rescanning the SQLite tables; `readIssued`
-delegates to the real store while recording object-identity and sequence
-telemetry; and `transactIssue`, `compareAndMarkOutboxPublished`, `readLineage`
-and `close` delegate unchanged. The facade neither changes product source nor
-claims Node-adapter paging performance. D.108e2d already retains real adapter
-composition; D.108e2e isolates wrapper counter custody at the authentic limit.
+bounded-limit contract without rescanning the SQLite tables. `readIssued`
+serves detached commits from the same independently verified immutable index
+while recording object-identity and sequence telemetry; the genuine Node point
+reads have already proved every indexed issued/outbox pair before recovery.
+This avoids tens of thousands of SQLite snapshot transactions without faking a
+row or signature. `transactIssue`, `compareAndMarkOutboxPublished`,
+`readLineage` and `close` delegate unchanged. The facade neither changes
+product source nor claims Node-adapter paging performance. D.108e2d already
+retains real adapter composition; D.108e2e isolates wrapper counter custody at
+the authentic limit.
 
 The equality control contains current sequence 0 followed by exactly 8,192
 authenticated successor rows at sequences 1 through 8,192. A new reopen must
