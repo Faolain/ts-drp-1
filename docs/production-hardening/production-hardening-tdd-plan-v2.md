@@ -62629,7 +62629,7 @@ legitimately retain the plane. A second close observes the memoized shutdown
 failure without a second deactivation attempt. This case kills a `try/finally`
 implementation that enters shutdown but lets its rejection mask the primary.
 
-The serialization proof runs six fresh-database cases. A rehearsal is paused
+The serialization proof runs seven fresh-database cases. A rehearsal is paused
 only after its genuine migration-record issue reaches the real plane; adoption
 started afterward must not enter verification until rehearsal releases. A
 genuine activation is paused only after its source plane reaches
@@ -62639,17 +62639,21 @@ real verification boundary; neither a rehearsal may reach its migration-record
 issue nor an activation may reach `beginTerminalTransition` until adoption
 releases. Each case records pre-release non-settlement/counters, releases its
 gate, observes ordered settlement, closes the real session and cleans only its
-own test database.
+own test database. A fifth fresh session pauses one genuine rehearsal at its
+migration-record boundary and proves a second rehearsal rejects and settles
+before release with the retained exact fast-fail diagnostic; the first remains
+unsettled, then completes after release. This makes the same-kind reservation
+placement part of RED rather than a prose-only GREEN obligation.
 
-The fifth case opens two creator sessions on separate databases in the same
+The sixth case opens two creator sessions on separate databases in the same
 realm, pauses a source transition on the first and proves a transition on the
 second reaches its genuine boundary and settles independently before the first
 gate releases. It then releases and closes both sessions separately. This is
-the behavioral control that kills a module-global queue. The sixth case starts
+the behavioral control that kills a module-global queue. The seventh case starts
 adoption on an unsealed session and observes its genuine verification failure,
 then seals that same session and retries adoption successfully. The retry must
 enter verification and settle without timeout, killing a promise tail that was
-not released after failure. Together the six cases kill a missing queue,
+not released after failure. Together the seven cases kill a missing queue,
 rehearsal-only serialization, one-direction joins, a module-global queue and a
 queue that is not released on failure.
 
@@ -62731,6 +62735,69 @@ same-kind rehearsal fence and the enumerated browser matrices before its
 evidence commit. No review finding requires a second production owner, new API,
 timeout change or confirmation review, and no Fable or collaboration subagent
 ran.
+
+The initial signed RED was commit
+`dbe1aa1f581893c3b79f34f6146f1cb2bca992c1`, parent
+`5695e7079ebf31aef61093e97dff0b30ef014174`. Its root command passed 6/6,
+the unchanged retained product selection passed 18/18 across Chromium,
+Firefox and WebKit, storage-browser build and typecheck passed, and the new
+composite reached one final deep-equality mismatch in each engine in 7.06,
+10.84 and 11.44 seconds. Firefox initially exposed a fresh-page harness
+readiness race; an explicit wait for the already exported window test facade,
+inside the existing Playwright owner, removed that harness-only failure before
+the signed RED. The candidate had exactly the four named test owners, passed
+exact-owner ESLint and Prettier checks and `git diff --check`, and preserved all
+26 stashes and protected untracked paths.
+
+The RED review round was bound to that exact signed commit in three detached
+worktrees under `/private/tmp/ts-drp-d108e3-red-reviews.589mZK`. Upgraded Grok
+4.6/high completed normally with `stop_reason=end_turn`, exit zero and terminal
+`CHANGES_REQUIRED`, P0=0/P1=2/P2=1. Kimi K3's first launcher session
+`d0af258f-d8ab-4a26-acf5-8c3be40f964b` was discarded as non-authoritative
+after its built-in grep repeatedly re-read filenames; constrained read-only
+session `e3d7f5cb-8542-4048-84dc-3ec8921de5b6` was continued rather than
+canceled when its wrapper stopped updating and emitted exactly CHECK001
+through CHECK100 plus terminal `APPROVED`, P0=0/P1=0/P2=2. Opus 5/xhigh
+session `556a5144-0ef5-47b7-8590-8697b2825766` completed with exit zero,
+schema-valid terminal `CHANGES_REQUIRED`, P0=0/P1=2/P2=3, no permission
+denial and no subagent use. No Fable or collaboration subagent ran.
+
+The complete blocking union was corrected in the same RED round at signed and
+pushed commit `3dce56c9991ed3e75ea812fd02027f70e8ad3042`, with no production
+owner. The four cross-kind cases now pin both operations unsettled before
+release, exact FIFO settlement status/order afterward and the follower's real
+post-release boundary counter. The two-room control pins B settled and A still
+pending before A's release, plus B-before-A settlement order. A new fresh-page
+control pins the retained overlapping-rehearsal fast-fail. Database deletion
+returns the sorted deleted names and must include the opened AHE database, so
+the cleanup check cannot pass vacuously; exact predecessor deactivation remains
+the shutdown proof. These changes resolve the complete Grok and Opus P1 union.
+Their timing, independence, deletion and same-kind P2 observations were also
+closed in RED rather than deferred.
+
+At the corrected RED tip, the exact commands and results were:
+
+- `pnpm exec vitest run tests/phase-6a-creator-successor-product-red.test.ts --coverage.enabled=false --maxWorkers=1 --minWorkers=1`
+  passed 6/6;
+- `pnpm --filter @ts-drp/storage-browser typecheck` and
+  `pnpm --filter @ts-drp/storage-browser build` both passed;
+- `pnpm exec eslint --max-warnings 0 tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts tests/phase-6a-creator-successor-product-red.test.ts packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts`
+  and `pnpm exec prettier --check tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts tests/phase-6a-creator-successor-product-red.test.ts packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts`
+  both passed, as did `git diff --check`;
+- `/usr/bin/time -p pnpm exec playwright test --config packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts --fail-on-flaky-tests`
+  produced the required RED shape: all 18 retained cases passed and only the
+  new composite failed once in each engine at its final equality. The composite
+  took 5.8 seconds in Chromium, 9.3 seconds in Firefox and 9.7 seconds in
+  WebKit, with 41.8 seconds reported for the matrix and 42.42 seconds wall.
+  Each failure exposed the intended room defects; the new overlapping,
+  independent-session, non-vacuous deletion and post-release counter controls
+  already matched. No timeout, boot, database, relay or alias failure occurred.
+
+The RED review artifacts remain outside the repository in their detached
+review root. The correction did not change the 90/600-second budgets, product
+API, migration semantics or owner roster. The next authorized action is the
+sole-owner GREEN in `examples/v3-room/src/index.ts`; D.108e4 remains blocked
+until D.108e3 GREEN and evidence reviews close.
 
 ##### D.108e4 — retained test-oracle cleanup
 
