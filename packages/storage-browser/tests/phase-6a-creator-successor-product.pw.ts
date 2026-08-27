@@ -1503,7 +1503,13 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 			)
 		)
 		.toBe(1);
-	const queuedAcceptedFailureBefore = await selectedCounts(queuedAcceptedFailure.page);
+	const queuedAcceptedFailureBefore = Object.freeze({
+		...(await selectedCounts(queuedAcceptedFailure.page)),
+		directAdoptionSettled: await queuedAcceptedFailure.page.evaluate(
+			(name) => window.phase6aCreatorSuccessorProduct.directAdoptionSettled(name),
+			queuedAcceptedFailureName
+		),
+	});
 	await queuedAcceptedFailure.page.evaluate(() => window.phase6aCreatorSuccessorProduct.releaseAcceptedVertexFailure());
 	await queuedAcceptedFailure.page.evaluate(() => window.phase6aCreatorSuccessorProduct.releaseMigrationRecord());
 	await queuedAcceptedFailure.page.evaluate(
@@ -1527,7 +1533,13 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 			]),
 		queuedAcceptedFailureName
 	);
-	const queuedAcceptedFailureCounts = await selectedCounts(queuedAcceptedFailure.page);
+	const queuedAcceptedFailureCounts = Object.freeze({
+		...(await selectedCounts(queuedAcceptedFailure.page)),
+		directAdoptionSettled: await queuedAcceptedFailure.page.evaluate(
+			(name) => window.phase6aCreatorSuccessorProduct.directAdoptionSettled(name),
+			queuedAcceptedFailureName
+		),
+	});
 	const queuedAcceptedFailureDeletion =
 		queuedAcceptedFailureSettlements.status === "settled"
 			? await queuedAcceptedFailure.page.evaluate(async (prefix) => {
@@ -1659,13 +1671,15 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 				before: expect.objectContaining({
 					acceptedVertexFailureCount: 1,
 					adoptionSettled: false,
+					directAdoptionSettled: false,
 					rehearsalSettled: false,
 					sendSettled: false,
 				}),
 				counts: expect.objectContaining({
 					acceptedVertexFailureCount: 1,
-					adoptionSettled: true,
+					adoptionSettled: false,
 					closeSettled: true,
+					directAdoptionSettled: true,
 					predecessorDeactivateCount: 1,
 					rehearsalSettled: true,
 					sendSettled: true,

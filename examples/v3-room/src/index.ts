@@ -1608,7 +1608,6 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		closePromise = (async (): Promise<void> => {
 			const failures: unknown[] = [];
-			await creatorSuccessorAdoptionTask?.catch(() => undefined);
 			if (creatorCloseHandle !== undefined) {
 				try {
 					await creatorCloseHandle.stop();
