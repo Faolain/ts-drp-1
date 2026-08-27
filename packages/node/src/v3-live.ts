@@ -71,6 +71,7 @@ import {
 	installCreatorSuccessorHandleAlias,
 	installCreatorSuccessorLive,
 } from "./internal/creator-successor-live.js";
+import { deriveV3StableTopic } from "./internal/v3-topic.js";
 import { classifyV3EnvelopeScope } from "./v3-envelope-scope.js";
 import { consumeRecoveredV3LiveAuthority, installRecoveredV3LiveAuthority } from "./v3-live-recovered-authority.js";
 
@@ -111,7 +112,6 @@ const TypedArrayByteLengthGetter = ObjectGetOwnPropertyDescriptor(TypedArrayProt
 const CryptoGetRandomValues = globalThis.crypto.getRandomValues;
 const ConsoleObject = globalThis.console;
 const ConsoleWarn = ConsoleObject?.warn;
-const TextEncoderConstructor = TextEncoder;
 
 const INPUT_KEYS = [
 	"authenticationProfile",
@@ -215,7 +215,6 @@ const JOURNAL_LOCAL_ROW_KEYS = [
 	"sourceKind",
 	"vertexDigest",
 ] as const;
-const V3_TOPIC_PREFIX = "drp/v3/1/";
 const SNAPSHOT_SCHEMA_VERSION = 1;
 const vertexRegistry = parameterRegistry.kinds.vertex;
 const V3_VERTEX_DOMAIN = parameterRegistry.domains.vertex;
@@ -2862,10 +2861,7 @@ function deriveV3Topic(payload: PreparedV3LivePayload): string | undefined {
 		const objectId = payload.provenance.objectId;
 		const genesisAnchorDigest = payload.trust.trust.genesisAnchorDigest;
 		if (typeof objectId !== "string" || !isDigestHex(genesisAnchorDigest)) return undefined;
-		const encoder = new TextEncoderConstructor();
-		const digest = hashDomain("ts-drp/live-topic/v3", encoder.encode(objectId), encoder.encode(genesisAnchorDigest));
-		const hex = lowerHexDigest(digest);
-		return hex === undefined || hex.length !== 64 ? undefined : `${V3_TOPIC_PREFIX}${hex}`;
+		return deriveV3StableTopic(objectId, genesisAnchorDigest);
 	} catch {
 		return undefined;
 	}

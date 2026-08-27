@@ -1,5 +1,3 @@
-import { hashDomain } from "@ts-drp/canonical";
-
 import "./creator-adoption.js";
 import "./v3-live.js";
 import {
@@ -13,6 +11,7 @@ import {
 	type CreatorSuccessorLiveMaterial,
 	type CreatorSuccessorRuntimeBindings,
 } from "./internal/creator-successor-live.js";
+import { deriveV3StableTopic } from "./internal/v3-topic.js";
 
 const HOT_KEYS = Object.freeze(["capability", "handle", "messageQueueManager", "networkNode", "onAdmittedVertex"]);
 const COLD_KEYS = Object.freeze([
@@ -87,21 +86,21 @@ function runtimeBindings(input: PlainRecord): CreatorSuccessorRuntimeBindings | 
 		: undefined;
 }
 
-function stableTopic(material: CreatorSuccessorLiveMaterial): string {
-	const encoder = new TextEncoder();
-	const digest = hashDomain(
-		"ts-drp/live-topic/v3",
-		encoder.encode(material.successor.trust.objectId),
-		encoder.encode(material.pinnedGenesisAnchorDigest)
-	);
-	return `drp/v3/1/${Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("")}`;
-}
-
 function sameBindings(left: CreatorSuccessorRuntimeBindings, right: CreatorSuccessorRuntimeBindings): boolean {
 	return (
 		left.messageQueueManager === right.messageQueueManager &&
 		left.networkNode === right.networkNode &&
 		left.onAdmittedVertex === right.onAdmittedVertex
+	);
+}
+
+function browserLockRealm(): boolean {
+	if (typeof window !== "undefined" && window === globalThis) return true;
+	return (
+		typeof navigator !== "undefined" &&
+		Reflect.get(globalThis, "document") === undefined &&
+		typeof Reflect.get(globalThis, "location") === "object" &&
+		typeof Reflect.get(globalThis, "postMessage") === "function"
 	);
 }
 
@@ -114,7 +113,7 @@ function browserLockManager():
 			): Promise<void>;
 	  }>
 	| undefined {
-	if (typeof window === "undefined" || window !== globalThis || typeof navigator === "undefined") return undefined;
+	if (typeof navigator === "undefined") return undefined;
 	const locks = Reflect.get(navigator, "locks");
 	return locks !== null && typeof locks === "object" && typeof Reflect.get(locks, "request") === "function"
 		? (locks as ReturnType<typeof browserLockManager>)
@@ -122,7 +121,7 @@ function browserLockManager():
 }
 
 async function acquireBrowserLock(topic: string): Promise<HeldLock | Failure | undefined> {
-	if (typeof window === "undefined" || window !== globalThis) return undefined;
+	if (!browserLockRealm()) return undefined;
 	const locks = browserLockManager();
 	if (locks === undefined) return failure("authority-unavailable", "browser writer lock authority is unavailable");
 	let settleAcquired: ((value: boolean) => void) | undefined;
@@ -182,7 +181,7 @@ async function activateMaterial(
 	material: CreatorSuccessorLiveMaterial,
 	bindings: CreatorSuccessorRuntimeBindings
 ): Promise<Readonly<Record<string, unknown>>> {
-	const topic = stableTopic(material);
+	const topic = deriveV3StableTopic(material.successor.trust.objectId, material.pinnedGenesisAnchorDigest);
 	const existing = activeOwners.get(topic);
 	if (existing !== undefined) {
 		return sameBindings(existing.bindings, bindings)
@@ -247,6 +246,9 @@ export async function activateCreatorSuccessorAdoption(input: unknown): Promise<
 export async function reopenCreatorSuccessorAdoption(input: unknown): Promise<Readonly<Record<string, unknown>>> {
 	const captured = capture(input, COLD_KEYS);
 	if (captured === undefined) return failure("malformed-input", "creator successor reopen input is invalid");
+	if (captured.authenticationProfile !== "creator-only") {
+		return failure("malformed-input", "creator successor authentication profile is invalid");
+	}
 	if (typeof captured.author !== "string" || typeof captured.signRegisteredVertexDigest !== "function") {
 		return failure("malformed-input", "creator successor local author input is invalid");
 	}
