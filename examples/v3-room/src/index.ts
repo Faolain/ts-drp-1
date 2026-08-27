@@ -1203,6 +1203,14 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	redirectSource?: RedirectSourceRecovery
 ): Promise<V3RoomSession<Projection>> {
 	if (
+		input.successorSnapshotDeclaration !== undefined &&
+		(input.createOperationAdmissionPolicy !== undefined ||
+			input.rebaseSourceInvite !== undefined ||
+			input.creatorFinalitySigner !== undefined)
+	) {
+		throw new TypeError("v3 room successor authority composition is unsupported");
+	}
+	if (
 		input.createOperationAdmissionPolicy !== undefined &&
 		typeof input.createOperationAdmissionPolicy !== "function"
 	) {
@@ -1569,6 +1577,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		reportRedirectBootstrapHold = resolve;
 	});
 	let closePromise: Promise<void> | undefined;
+	let creatorSuccessorAdoptionTask: Promise<void> | undefined;
 	let redirectedSession: V3RoomSession<Projection> | undefined;
 	let redirectPromise: Promise<V3RoomSession<Projection>> | undefined;
 	let retainedBootstrapReady = !retainedBootstrapHeld;
@@ -1596,6 +1605,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		closePromise = (async (): Promise<void> => {
 			const failures: unknown[] = [];
+			await creatorSuccessorAdoptionTask?.catch(() => undefined);
 			if (creatorCloseHandle !== undefined) {
 				try {
 					await creatorCloseHandle.stop();
@@ -2905,50 +2915,89 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			throw error;
 		}
 	}
+	const assertSessionOpen = (): void => {
+		if (closed) throw new TypeError("v3 room session is closed");
+	};
+	const performCreatorSuccessorAdoption = async (): Promise<void> => {
+		if (redirectPromise !== undefined) await redirectPromise;
+		assertSessionOpen();
+		if (redirectedSession !== undefined) return redirectedSession.adoptCreatorSuccessor();
+		if (terminalFailure !== undefined) throw terminalFailure;
+		if (successorProjectionAuthority !== null) return;
+		if (creatorCloseHandle === undefined) throw new TypeError("creator close authority is unavailable");
+		if (activeHandle === undefined || transport === undefined) {
+			throw new TypeError("v3 room live plane is unavailable");
+		}
+		const verified = await verifyCreatorSuccessorAdoption({
+			catalog: input.application.catalog,
+			handle: creatorCloseHandle,
+		});
+		assertSessionOpen();
+		if (!verified.ok) throw new TypeError(`v3 room successor verification failed: ${verified.kind}`);
+		const committed = await commitCreatorSuccessorAdoption({
+			handle: creatorCloseHandle,
+			intent: verified.intent,
+		});
+		assertSessionOpen();
+		if (!committed.ok) throw new TypeError(`v3 room successor commit failed: ${committed.kind}`);
+		const activated = await activateCreatorSuccessorAdoption({
+			capability: committed.capability,
+			handle: creatorCloseHandle,
+			messageQueueManager,
+			networkNode: transport.networkNode,
+			onAdmittedVertex: admittedSink as unknown as V3AdmittedVertexSink,
+		});
+		if (activated.ok !== true) {
+			assertSessionOpen();
+			throw new TypeError(`v3 room successor activation failed: ${String(activated.kind)}`);
+		}
+		const replacement = activated.handle as RoomPlaneHandle;
+		let replacementOwned = true;
+		const releaseReplacement = async (): Promise<void> => {
+			if (!replacementOwned) return;
+			await Promise.resolve(replacement.deactivate());
+			replacementOwned = false;
+		};
+		if (closed) {
+			await releaseReplacement();
+			assertSessionOpen();
+		}
+		let authority: V3RoomSuccessorAuthority;
+		try {
+			authority = successorAuthority(activated.trust, replacement);
+		} catch (error) {
+			await releaseReplacement();
+			throw error;
+		}
+		const predecessor = activeHandle;
+		try {
+			await Promise.resolve(predecessor.deactivate());
+		} catch (error) {
+			await releaseReplacement();
+			throw error;
+		}
+		if (closed) {
+			activeHandle = undefined;
+			await releaseReplacement();
+			assertSessionOpen();
+		}
+		activeHandle = replacement;
+		replacementOwned = false;
+		successorProjectionAuthority = authority;
+	};
+	const adoptCreatorSuccessor = (): Promise<void> => {
+		if (creatorSuccessorAdoptionTask !== undefined) return creatorSuccessorAdoptionTask;
+		const attempt = performCreatorSuccessorAdoption();
+		const shared = attempt.finally(() => {
+			if (creatorSuccessorAdoptionTask === shared) creatorSuccessorAdoptionTask = undefined;
+		});
+		creatorSuccessorAdoptionTask = shared;
+		return shared;
+	};
 	return Object.freeze({
 		activateMigration,
-		async adoptCreatorSuccessor(): Promise<void> {
-			if (redirectPromise !== undefined) await redirectPromise;
-			if (redirectedSession !== undefined) return redirectedSession.adoptCreatorSuccessor();
-			if (terminalFailure !== undefined) throw terminalFailure;
-			if (closed) throw new TypeError("v3 room session is closed");
-			if (successorProjectionAuthority !== null) return;
-			if (creatorCloseHandle === undefined) throw new TypeError("creator close authority is unavailable");
-			if (activeHandle === undefined || transport === undefined) {
-				throw new TypeError("v3 room live plane is unavailable");
-			}
-			const verified = await verifyCreatorSuccessorAdoption({
-				catalog: input.application.catalog,
-				handle: creatorCloseHandle,
-			});
-			if (!verified.ok) throw new TypeError(`v3 room successor verification failed: ${verified.kind}`);
-			const committed = await commitCreatorSuccessorAdoption({
-				handle: creatorCloseHandle,
-				intent: verified.intent,
-			});
-			if (!committed.ok) throw new TypeError(`v3 room successor commit failed: ${committed.kind}`);
-			const activated = await activateCreatorSuccessorAdoption({
-				capability: committed.capability,
-				handle: creatorCloseHandle,
-				messageQueueManager,
-				networkNode: transport.networkNode,
-				onAdmittedVertex: admittedSink as unknown as V3AdmittedVertexSink,
-			});
-			if (activated.ok !== true) {
-				throw new TypeError(`v3 room successor activation failed: ${String(activated.kind)}`);
-			}
-			const replacement = activated.handle as RoomPlaneHandle;
-			let authority: V3RoomSuccessorAuthority;
-			try {
-				authority = successorAuthority(activated.trust, replacement);
-			} catch (error) {
-				await Promise.resolve(replacement.deactivate());
-				throw error;
-			}
-			const predecessor = activeHandle;
-			await Promise.resolve(predecessor.deactivate());
-			activeHandle = replacement;
-			successorProjectionAuthority = authority;
+		adoptCreatorSuccessor(): Promise<void> {
+			return adoptCreatorSuccessor();
 		},
 		authority(): V3RoomSuccessorAuthority | null {
 			return redirectedSession?.authority() ?? successorProjectionAuthority;
@@ -2966,6 +3015,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		async close(): Promise<void> {
 			closed = true;
 			cancelRedirectCreation();
+			await creatorSuccessorAdoptionTask?.catch(() => undefined);
 			await rebasePromise.catch(() => undefined);
 			await migrationCompletionBarrier;
 			await drainPendingIssues();
