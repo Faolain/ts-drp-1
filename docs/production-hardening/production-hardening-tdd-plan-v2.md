@@ -62795,9 +62795,149 @@ At the corrected RED tip, the exact commands and results were:
 
 The RED review artifacts remain outside the repository in their detached
 review root. The correction did not change the 90/600-second budgets, product
-API, migration semantics or owner roster. The next authorized action is the
-sole-owner GREEN in `examples/v3-room/src/index.ts`; D.108e4 remains blocked
-until D.108e3 GREEN and evidence reviews close.
+API, migration semantics or owner roster. At that checkpoint the next
+authorized action was the sole-owner GREEN in `examples/v3-room/src/index.ts`;
+D.108e4 remained blocked until D.108e3 GREEN and evidence reviews closed.
+
+The signed semantic-oracle correction was `15411423`, and the initial GREEN
+landed as signed commits `7154e98e` and `e91203a4`. The latter snapshots
+queued migration inputs at call time while retaining the existing transition
+authority, limits and public surface. The exact five-owner combined diff from
+`15411423` was restricted to the four frozen test owners plus
+`examples/v3-room/src/index.ts`. Before review, the focused root suite passed
+6/6, the product browser matrix passed 21/21, the retained Phase-4c/Phase-6a
+selection passed 121/121 including the real 64 MiB child, the retained
+Phase-3h and Phase-5 selections and all named browser matrices passed, the
+affected builds and passing typechecks passed, and an isolated no-`dist`
+offline-install/fresh-build checkout reproduced the owned gates.
+
+The GREEN review round inspected exact signed `e91203a4` in detached
+worktrees under `/private/tmp/ts-drp-d108e3-green-reviews.oRXMwA`. Upgraded
+Grok 4.6/high completed its sole run after 1,080.395 seconds with exit zero,
+`stop_reason=end_turn`, terminal `APPROVED`, P0=0/P1=0/P2=2; the service did
+not cancel at the earlier 570-second boundary. Kimi K3 used the stable legacy
+launcher after CLI 0.38 failed before creating a lifecycle, and session
+`2c449c2e-e4ad-4084-a8c5-9515e417e870` emitted exactly CHECK001 through
+CHECK100 and terminal `APPROVED`, P0=0/P1=0/P2=0. Opus 5/xhigh session
+`5b25076a-aa80-413f-9ea6-f941609f8964` completed with exit zero, no permission
+denial and no subagent, returning schema-valid `CHANGES_REQUIRED`, P0=0/P1=1/
+P2=2. Its P1 identified a real cycle: an accepted-vertex failure enters
+`shutdown()`, `shutdown()` joins the queued adoption, and that adoption waits
+behind the still-running rehearsal whose follower is waiting for the same
+shutdown.
+
+At the user's express one-off authorization, Fable 5/xhigh also reviewed the
+same checkpoint directly, without a collaboration subagent. Native
+`claude --model fable --effort xhigh` was used because `claude-phel` was not
+available. Session `30fba3be-05d0-4c33-bea1-597653fa5e40` completed after 875
+seconds with exit zero, no permission denial and no subagent, returning
+`CHANGES_REQUIRED`, P0=0/P1=1/P2=5 and independently confirming the deadlock.
+It recommended that `closeSession()` remain the sole adoption/tail join owner
+and that low-level `shutdown()` never join adoption. This was the authorized
+one-off exception; no further Fable run is authorized without a new express
+instruction.
+
+The same-round corrective RED is signed and pushed commit
+`d8dcee4d1a2defe5349cb697010aae6db73cc922`, parent `e91203a4`. It adds one
+genuine direct-room accepted-vertex failure behind a paused real migration
+record, queues adoption behind that rehearsal, enters shutdown through the
+real accepted sink and places a bounded three-second observation around send,
+rehearsal, adoption and close. On the parent GREEN, all 18 retained browser
+groups passed and only the composite failed once per engine at its final deep
+equality: the four settlements remained pending, predecessor deactivation
+remained zero and database deletion was not attempted. Chromium, Firefox and
+WebKit reproduced the same causal state. The corrective RED also extends the
+real paused queue to three entries and pins settlement order 1/2/3; that
+control already matched on the failing parent. An attempted running-adoption
+variant was discarded before the immutable commit because a sealed
+predecessor rejects that send before `onAcceptedVertex`, so it could not drive
+the claimed boundary without fabricating production behavior. Root 6/6,
+storage-browser typecheck, exact-four ESLint/Prettier and diff checks passed.
+
+The same-round GREEN correction is signed and pushed commit
+`d9bb162e59094ff29e00bdf5ec7e9b13429f51ff`, parent `d8dcee4d`. Its complete
+production correction removes one line: internal `shutdown()` no longer
+awaits `creatorSuccessorAdoptionTask`. `closeSession()` still closes the fence
+synchronously and remains the sole owner that joins adoption, rebase, the
+lifetime tail, migration completion and pending-issue drain before invoking
+the memoized shutdown. No wire, authority, receipt, limit, memory, digest,
+snapshot, product API or second production owner changed. The browser oracle
+also replaced an incorrect page-global adoption-settled observation with the
+already-existing per-direct-room flag, proving false before release and true
+after settlement rather than weakening the assertion. The corrected product
+matrix passed 21/21 across Chromium, Firefox and WebKit in 44.6 seconds.
+
+Ordinary-checkout verification at exact `d9bb162e` passed the focused root
+6/6; the complete 16-file retained Phase-4c/Phase-6a selection 121/121 in
+91.59 seconds; Phase-3h plus the four retained Phase-5 unit files 48/48; and
+the product, activation, adoption-commit, successor-epoch, quarantine,
+transfer, creator-actor, creator-relearn and creator-live-close browser
+matrices at 21/21, 21/21, 6/6, 3/3, 18/18, 6/6, 12/12, 6/6 and 6/6. The
+D.93.36 chat matrix passed 5/5. D.93.46 zone first missed its inherited
+transient-movement poll and its exact immediate rerun passed 1/1. Protocol-v3,
+node, storage-node, storage-browser, v3-room and v3-chat builds passed;
+protocol-v3, storage-browser, v3-room and v3-chat typechecks passed; exact-five
+ESLint, Prettier and `git diff --check` passed. Broad node typecheck reproduced
+the existing 13 diagnostics (TS6059=5, TS6307=5, TS2339=1, TS1360=1,
+TS2322=1). Broad storage-node typecheck reproduced 114 inherited diagnostics
+(TS6059=27, TS6307=27, TS2307=20, TS7006=37, TS18046=1, TS7031=1); the TS7031
+is in the pre-existing creator-adoption commit fixture and none of the broad
+diagnostics names a D.108e3 owner.
+
+The retained 121-test run re-executed the signed peak-live memory proof rather
+than substituting a post-completion reading. It streamed 512 actual chunk
+bodies totaling 67,108,864 bytes at 131,072 bytes per chunk. Owner mode sampled
+the bodies while each awaited write was executing, peaked at 131,072 live
+bytes and settled at zero. The retaining mutant held all bodies through the
+live stream, peaked at 67,108,864 bytes before deliberate release and only
+then settled at zero. The unchanged signed ceiling is
+`2 * 131072 = 262144`, so the owner remains strictly below two chunk bodies
+while the mutant is detected before completion.
+
+The isolated proof used detached worktree
+`/private/tmp/ts-drp-d108e3-green-clean.ECTnuH/repo` at exact signed
+`d9bb162e`. It began tracked-clean with no package/example `dist` and remained
+no-`dist` after `pnpm install --offline --ignore-scripts --frozen-lockfile`;
+the install reused 1,525 locked packages with zero downloads. Native dependency
+restoration and the 33-project protocol-v3/node/storage-node/storage-browser
+dependency build closure passed, as did both example builds and all passing
+affected typechecks. From only those fresh artifacts, the retained selection
+passed 121/121, product and activation passed 21/21 each, adoption-commit 6/6,
+successor epoch 3/3, Phase-4c browsers 18/18 and 6/6, Phase-5 browsers 12/12,
+6/6 and 6/6, Phase-3h/Phase-5 unit tests 48/48, and chat 5/5. Exact-five lint,
+format/diff and final tracked status passed. The Phase-4c root-resolution
+control passed 3/3 before and after the root browser gates with no canonical
+shim present, so neither local `dist` nor the main checkout masked the package
+resolution proof.
+
+Two inherited browser-harness facts remain explicit rather than being hidden.
+The two root Playwright files import bare `@ts-drp/canonical` although the root
+manifest deliberately does not resolve it; their gates therefore used a
+temporary ignored test-only symlink, absent before and after the Phase-4c
+resolution control. D.108e4 owns removal of that direct-root resolution
+dependency before Phase 6a exit. The clean zone initially failed to boot until
+the full 36-project grid dependency closure, including `@ts-drp/outcome-commit`,
+was freshly built; after that build, three real-transport attempts alternated
+which of the two existing 20-second transient-movement polls expired. This is
+the same retained transport flake seen once in the ordinary checkout, where an
+immediate rerun passed, and no failure stack names a D.108e3 owner. D.108e4
+owns a tests-only readiness/oracle correction with the same deadline; it may
+not raise the timeout or weaken transient-delivery semantics.
+
+The nonblocking production review union is assigned to a new narrow
+D.108e5 plan-freeze/RED/GREEN slice after D.108e4 and before Phase 6a exit.
+Its exact room owner is `examples/v3-room/src/index.ts`, with causal coverage
+confined to the existing four D.108e3 test owners unless plan review proves a
+smaller roster. It must prove and correct redirected-source call ordering when
+adoption is invoked before rehearsal/activation while redirect creation is
+pending, and it must reject an oversized migration-activation byte view before
+any snapshot or execution-time copy while retaining call-time capture for
+bounded valid bytes. Invite encoding/capture must likewise receive a bounded
+pre-copy oracle rather than a prose claim. No limit, wire, receipt, authority
+or API change is authorized. This exact owner/deadline closes the Grok/Opus/
+Fable P2 union without silently widening the blocking deadlock correction.
+Per protocol, the reproduced P1 was corrected in the same round and receives
+no confirmation review. D.108e3 is complete; D.108e4 may now begin.
 
 ##### D.108e4 — retained test-oracle cleanup
 
@@ -62812,7 +62952,10 @@ the three inherited full-file Phase-3 pins. It must also reuse one bounded
 issuance facade across two successive under-budget reopens and prove that the
 second reopen receives a fresh full skip allowance; this kills inner-store-
 and facade-identity-keyed skip-counter mutants without another 8,192-row
-window. It has no production GREEN owner
+window. It additionally owns a tests-only package-resolution boundary for the
+root D.93.36/D.93.46 Playwright files and a causal zone transport-readiness
+oracle that removes the inherited transient poll flake without raising the
+20-second poll or weakening bidirectional transient delivery. It has no production GREEN owner
 and may not change public APIs, wire, store, recovery authority, limits or
 memory contracts. If a production-source change is genuinely required, stop
 and reslice. This assignment must not contaminate or delay the D.108e2d
