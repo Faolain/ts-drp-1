@@ -1,7 +1,6 @@
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { type Serializable, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { type GenuineCreatorAdoptionFixture, openGenuineCreatorAdoptionFixture } from "./creator-adoption-contract.js";
@@ -200,57 +199,4 @@ export function runD108d1bLocalAuthorChild(input: unknown): Promise<D108d1bChild
 			} else resolvePromise(observed);
 		});
 	});
-}
-
-/** @returns Whether every exact-three GREEN owner exposes the frozen local-author seam. */
-export function d108d1bReadiness(): Readonly<{ readonly missing: readonly string[]; readonly ready: boolean }> {
-	const missing: string[] = D108D1B_GREEN_PATHS.filter((path) => !existsSync(resolve(REPOSITORY_ROOT, path)));
-	const activation = readFileSync(resolve(REPOSITORY_ROOT, D108D1B_GREEN_PATHS[0]), "utf8");
-	const adoption = readFileSync(resolve(REPOSITORY_ROOT, D108D1B_GREEN_PATHS[1]), "utf8");
-	const internal = readFileSync(resolve(REPOSITORY_ROOT, D108D1B_GREEN_PATHS[2]), "utf8");
-	if (!/COLD_KEYS[\s\S]*["']author["'][\s\S]*["']signRegisteredVertexDigest["']/u.test(activation)) {
-		missing.push("closed cold author/signer capture");
-	}
-	if (!/getRandomValues[\s\S]*subtle\.(?:importKey|verify)/u.test(adoption)) {
-		missing.push("fresh WebCrypto possession proof");
-	}
-	if (!/CreatorSuccessorReopenInput[\s\S]*author[\s\S]*signRegisteredVertexDigest/u.test(internal)) {
-		missing.push("internal local-author carrier");
-	}
-	const callers = [
-		"packages/storage-node/tests/fixtures/phase-6a-creator-successor-activation-child.mjs",
-		"packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
-		"packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts",
-	];
-	for (const path of callers) {
-		const source = readFileSync(resolve(REPOSITORY_ROOT, path), "utf8");
-		if (
-			!/reopenCreatorSuccessorAdoption\(\{[\s\S]*author:[\s\S]*signRegisteredVertexDigest(?:\s*:|\s*[,}])/u.test(source)
-		) {
-			missing.push(`retained local-author caller: ${path}`);
-		}
-	}
-	return Object.freeze({ missing: Object.freeze(missing), ready: missing.length === 0 });
-}
-
-/** @returns Whether the two-owner oracle corrective GREEN is present. */
-export function d108d1bOracleReadiness(): Readonly<{ readonly missing: readonly string[]; readonly ready: boolean }> {
-	const source = readFileSync(resolve(REPOSITORY_ROOT, D108D1B_ORACLE_GREEN_PATHS[0]), "utf8");
-	const live = readFileSync(resolve(REPOSITORY_ROOT, D108D1B_ORACLE_GREEN_PATHS[1]), "utf8");
-	const missing: string[] = [];
-	if (!/openCanonicalLatchedAclSnapshot\([\s\S]*expectedEpoch:\s*1/u.test(source)) {
-		missing.push("authenticated successor ACL opening");
-	}
-	if (!/lineage\.exhausted\s*!==\s*false/u.test(source)) missing.push("strict false lineage discriminator");
-	for (const detail of [
-		"creator issuance ACL authority is invalid",
-		"creator issuance possession proof failed",
-		"creator issuance lineage is invalid",
-	]) {
-		if (!source.includes(detail)) missing.push(detail);
-	}
-	if (!/creatorPredecessorIssuanceStore[\s\S]*candidateEpoch\s*>\s*expectedEpoch/u.test(live)) {
-		missing.push("epoch-bounded predecessor issuance view");
-	}
-	return Object.freeze({ missing: Object.freeze(missing), ready: missing.length === 0 });
 }

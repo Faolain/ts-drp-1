@@ -65,6 +65,49 @@ function productionSources(): readonly Readonly<{ path: string; text: string }>[
 	return Object.freeze(results);
 }
 
+function topicCensusSources(): readonly Readonly<{ path: string; text: string }>[] {
+	const results = [...productionSources()];
+	const walk = (directory: string): void => {
+		for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+			const absolute = path.join(directory, entry.name);
+			if (entry.isDirectory()) {
+				walk(absolute);
+			} else if (entry.isFile() && /\.(?:cts|mts|tsx?|ts)$/u.test(entry.name)) {
+				results.push(Object.freeze({ path: path.relative(ROOT, absolute), text: fs.readFileSync(absolute, "utf8") }));
+			}
+		}
+	};
+	for (const exampleEntry of fs.readdirSync(path.join(ROOT, "examples"), { withFileTypes: true })) {
+		const sourceRoot = path.join(ROOT, "examples", exampleEntry.name, "src");
+		if (exampleEntry.isDirectory() && fs.existsSync(sourceRoot)) walk(sourceRoot);
+	}
+	return Object.freeze(results);
+}
+
+function resolvesToSource(importer: string, specifier: string, expected: string): boolean {
+	const selected = specifier.replace(/[?#].*$/u, "");
+	let unresolved: string;
+	if (selected.startsWith(".")) {
+		unresolved = path.resolve(ROOT, path.dirname(importer), selected);
+	} else {
+		const workspace = /^@ts-drp\/([^/]+)(?:\/(.+))?$/u.exec(selected);
+		if (workspace === null) return false;
+		const subpath = (workspace[2] ?? "index").replace(/^src\//u, "");
+		unresolved = path.resolve(ROOT, "packages", workspace[1] as string, "src", subpath);
+	}
+	const candidates = [
+		unresolved,
+		unresolved.replace(/\.js$/u, ".ts"),
+		unresolved.replace(/\.mjs$/u, ".mts"),
+		unresolved.replace(/\.cjs$/u, ".cts"),
+		`${unresolved}.ts`,
+		`${unresolved}.mts`,
+		`${unresolved}.cts`,
+		path.join(unresolved, "index.ts"),
+	];
+	return candidates.some((candidate) => path.normalize(candidate) === path.normalize(expected));
+}
+
 const GENERATED_MESSAGE_MODULE = "./proto/drp/v1/messages_pb.js";
 
 function isPrivateGeneratedSpecifier(specifier: string): boolean {
@@ -2064,7 +2107,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 
 		const domainOwners: string[] = [];
 		const consumers: string[] = [];
-		for (const production of productionSources()) {
+		for (const production of topicCensusSources()) {
 			const sourceFile = ts.createSourceFile(
 				production.path,
 				production.text,
@@ -2085,15 +2128,25 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 				) {
 					ownsDomain = true;
 				}
+				const consumes = (specifier: ts.Expression | undefined): void => {
+					if (
+						specifier !== undefined &&
+						ts.isStringLiteralLike(specifier) &&
+						resolvesToSource(production.path, specifier.text, helperPath)
+					) {
+						consumesHelper = true;
+					}
+				};
+				if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) consumes(node.moduleSpecifier);
+				if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)) {
+					consumes(node.moduleReference.expression);
+				}
 				if (
-					ts.isImportDeclaration(node) &&
-					ts.isStringLiteral(node.moduleSpecifier) &&
-					node.moduleSpecifier.text === "./internal/v3-topic.js" &&
-					node.importClause?.namedBindings !== undefined &&
-					ts.isNamedImports(node.importClause.namedBindings) &&
-					node.importClause.namedBindings.elements.some(({ name }) => name.text === "deriveV3StableTopic")
+					ts.isCallExpression(node) &&
+					(node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+						(ts.isIdentifier(node.expression) && node.expression.text === "require"))
 				) {
-					consumesHelper = true;
+					consumes(node.arguments[0]);
 				}
 				ts.forEachChild(node, census);
 			};

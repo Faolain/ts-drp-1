@@ -48,9 +48,17 @@ function createState() {
   const state = {
     activationCount: 0,
     commitCount: 0,
+    pauseAfterActivation: false,
+    pauseAfterPredecessorDeactivation: false,
     pauseVerification: false,
+    postActivationGate: Promise.resolve(),
+    postActivationPauseCount: 0,
+    postPredecessorDeactivationGate: Promise.resolve(),
+    postPredecessorDeactivationPauseCount: 0,
     predecessorDeactivateCount: 0,
     rejectPredecessorDeactivate: false,
+    releasePostActivation: undefined,
+    releasePostPredecessorDeactivation: undefined,
     releaseVerification: undefined,
     replacementDeactivateCount: 0,
     replacementDeactivateCompletedCount: 0,
@@ -61,15 +69,27 @@ function createState() {
   const configure = (input) => {
     state.activationCount = 0;
     state.commitCount = 0;
+    state.pauseAfterActivation = input.pauseAfterActivation === true;
+    state.pauseAfterPredecessorDeactivation = input.pauseAfterPredecessorDeactivation === true;
     state.pauseVerification = input.pauseVerification === true;
+    state.postActivationPauseCount = 0;
+    state.postPredecessorDeactivationPauseCount = 0;
     state.predecessorDeactivateCount = 0;
     state.rejectPredecessorDeactivate = input.rejectPredecessorDeactivate === true;
     state.replacementDeactivateCount = 0;
     state.replacementDeactivateCompletedCount = 0;
     state.verificationCount = 0;
+    state.postActivationGate = state.pauseAfterActivation
+      ? new Promise((resolve) => { state.releasePostActivation = resolve; })
+      : Promise.resolve();
+    state.postPredecessorDeactivationGate = state.pauseAfterPredecessorDeactivation
+      ? new Promise((resolve) => { state.releasePostPredecessorDeactivation = resolve; })
+      : Promise.resolve();
     state.verificationGate = state.pauseVerification
       ? new Promise((resolve) => { state.releaseVerification = resolve; })
       : Promise.resolve();
+    if (!state.pauseAfterActivation) state.releasePostActivation = undefined;
+    if (!state.pauseAfterPredecessorDeactivation) state.releasePostPredecessorDeactivation = undefined;
     if (!state.pauseVerification) state.releaseVerification = undefined;
   };
   Object.defineProperty(globalThis, "__d108e2bLifetimeInstrumentation", {
@@ -79,6 +99,16 @@ function createState() {
         await Promise.allSettled(Array.from(state.replacementPlanes, (plane) => plane.deactivate()));
       },
       configure,
+      releasePostActivation: () => {
+        state.pauseAfterActivation = false;
+        state.releasePostActivation?.();
+        state.releasePostActivation = undefined;
+      },
+      releasePostPredecessorDeactivation: () => {
+        state.pauseAfterPredecessorDeactivation = false;
+        state.releasePostPredecessorDeactivation?.();
+        state.releasePostPredecessorDeactivation = undefined;
+      },
       releaseVerification: () => {
         state.pauseVerification = false;
         state.releaseVerification?.();
@@ -87,6 +117,8 @@ function createState() {
       snapshot: () => Object.freeze({
         activationCount: state.activationCount,
         commitCount: state.commitCount,
+        postActivationPauseCount: state.postActivationPauseCount,
+        postPredecessorDeactivationPauseCount: state.postPredecessorDeactivationPauseCount,
         predecessorDeactivateCount: state.predecessorDeactivateCount,
         replacementDeactivateCount: state.replacementDeactivateCount,
         replacementDeactivateCompletedCount: state.replacementDeactivateCompletedCount,
@@ -119,7 +151,10 @@ const instrumentPlane = (plane, kind) => {
             state.replacementDeactivateCount += 1;
           }
           const result = await Reflect.apply(plane.deactivate, plane, []);
-          if (kind === "replacement") {
+          if (kind === "predecessor" && state.pauseAfterPredecessorDeactivation) {
+            state.postPredecessorDeactivationPauseCount += 1;
+            await state.postPredecessorDeactivationGate;
+          } else if (kind === "replacement") {
             state.replacementDeactivateCompletedCount += 1;
             state.replacementPlanes.delete(wrapper);
           }
@@ -201,6 +236,10 @@ export const reopenCreatorSuccessorAdoption = actual.reopenCreatorSuccessorAdopt
 export const activateCreatorSuccessorAdoption = async (input) => {
   state.activationCount += 1;
   const result = await actual.activateCreatorSuccessorAdoption(input);
+  if (result.ok === true && state.pauseAfterActivation) {
+    state.postActivationPauseCount += 1;
+    await state.postActivationGate;
+  }
   return result.ok === true ? Object.freeze({ ...result, handle: instrumentPlane(result.handle, "replacement") }) : result;
 };`,
 				],
@@ -684,6 +723,8 @@ test(D108E2B_BROWSER_BEHAVIORS.join("; "), async () => {
 				lifetime: {
 					activationCount: 1,
 					commitCount: 1,
+					postActivationPauseCount: 0,
+					postPredecessorDeactivationPauseCount: 0,
 					predecessorDeactivateCount: 1,
 					replacementDeactivateCount: 1,
 					replacementDeactivateCompletedCount: 1,
@@ -753,6 +794,7 @@ test(D108E2C_PRODUCT_BROWSER_BEHAVIORS.join("; "), async () => {
 			.toBe(1);
 		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.beginClose());
 		const beforeRelease = await page.evaluate(() => window.phase6aCreatorSuccessorProduct.lifetimeSnapshot());
+		const authorityBeforeRelease = (await snapshot(page)).authority;
 		await page.evaluate((selectedGate) => {
 			const api = window.phase6aCreatorSuccessorProduct as unknown as Readonly<Record<string, unknown>>;
 			const release = Reflect.get(
@@ -767,11 +809,10 @@ test(D108E2C_PRODUCT_BROWSER_BEHAVIORS.join("; "), async () => {
 			page.evaluate(() => window.phase6aCreatorSuccessorProduct.waitForClose()),
 		]);
 		const afterRelease = await page.evaluate(() => window.phase6aCreatorSuccessorProduct.lifetimeSnapshot());
-		const authority = (await snapshot(page)).authority;
 		await closeLifetimeCreator(page);
 		return {
 			afterRelease,
-			authority,
+			authorityBeforeRelease,
 			beforeRelease,
 			settlements: { adoption, close },
 		};
@@ -779,19 +820,18 @@ test(D108E2C_PRODUCT_BROWSER_BEHAVIORS.join("; "), async () => {
 
 	const postActivation = await runGate("postActivation");
 	const postPredecessorDeactivation = await runGate("postPredecessorDeactivation");
-	const finalCounts = {
+	const finalInstrumentationCounts = {
 		activationCount: 1,
-		adoptionSettled: true,
-		closeSettled: true,
 		commitCount: 1,
 		predecessorDeactivateCount: 1,
 		replacementDeactivateCompletedCount: 1,
 		replacementDeactivateCount: 1,
 		verificationCount: 1,
 	};
+	const finalCounts = { ...finalInstrumentationCounts, adoptionSettled: true, closeSettled: true };
 	expect(postActivation).toEqual({
 		afterRelease: { ...finalCounts, postActivationPauseCount: 1, postPredecessorDeactivationPauseCount: 0 },
-		authority: null,
+		authorityBeforeRelease: null,
 		beforeRelease: {
 			...finalCounts,
 			adoptionSettled: false,
@@ -803,13 +843,30 @@ test(D108E2C_PRODUCT_BROWSER_BEHAVIORS.join("; "), async () => {
 			replacementDeactivateCount: 0,
 		},
 		settlements: {
-			adoption: { detail: "v3 room session is closed", order: 1, status: "rejected" },
-			close: { order: 2, status: "fulfilled" },
+			adoption: {
+				detail: "v3 room session is closed",
+				lifetime: {
+					...finalInstrumentationCounts,
+					postActivationPauseCount: 1,
+					postPredecessorDeactivationPauseCount: 0,
+				},
+				order: 1,
+				status: "rejected",
+			},
+			close: {
+				lifetime: {
+					...finalInstrumentationCounts,
+					postActivationPauseCount: 1,
+					postPredecessorDeactivationPauseCount: 0,
+				},
+				order: 2,
+				status: "fulfilled",
+			},
 		},
 	});
 	expect(postPredecessorDeactivation).toEqual({
 		afterRelease: { ...finalCounts, postActivationPauseCount: 0, postPredecessorDeactivationPauseCount: 1 },
-		authority: null,
+		authorityBeforeRelease: null,
 		beforeRelease: {
 			...finalCounts,
 			adoptionSettled: false,
@@ -820,8 +877,25 @@ test(D108E2C_PRODUCT_BROWSER_BEHAVIORS.join("; "), async () => {
 			replacementDeactivateCount: 0,
 		},
 		settlements: {
-			adoption: { detail: "v3 room session is closed", order: 1, status: "rejected" },
-			close: { order: 2, status: "fulfilled" },
+			adoption: {
+				detail: "v3 room session is closed",
+				lifetime: {
+					...finalInstrumentationCounts,
+					postActivationPauseCount: 0,
+					postPredecessorDeactivationPauseCount: 1,
+				},
+				order: 1,
+				status: "rejected",
+			},
+			close: {
+				lifetime: {
+					...finalInstrumentationCounts,
+					postActivationPauseCount: 0,
+					postPredecessorDeactivationPauseCount: 1,
+				},
+				order: 2,
+				status: "fulfilled",
+			},
 		},
 	});
 });

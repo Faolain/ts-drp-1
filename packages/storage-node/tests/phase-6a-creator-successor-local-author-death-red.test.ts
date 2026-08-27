@@ -51,6 +51,7 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 		const proof = result.proof as
 			| Readonly<{
 					readonly authors?: Readonly<Record<string, string>>;
+					readonly oracle?: Readonly<Record<string, unknown>>;
 					readonly pid?: number;
 					readonly results?: readonly Readonly<Record<string, unknown>>[];
 			  }>
@@ -303,9 +304,10 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 			)?.authorityEvents;
 			expect.soft(events?.filter(({ kind }) => kind === "possession-signer")).toHaveLength(possessionCalls);
 			for (const lineage of events?.filter(({ kind }) => kind === "lineage-read") ?? []) {
-				expect
-					.soft(events?.findIndex((event) => event.attempt === lineage.attempt && event.kind === "possession-signer"))
-					.toBeLessThan(events?.indexOf(lineage) ?? -1);
+				const signerIndex =
+					events?.findIndex((event) => event.attempt === lineage.attempt && event.kind === "possession-signer") ?? -1;
+				expect.soft(signerIndex).toBeGreaterThanOrEqual(0);
+				expect.soft(signerIndex).toBeLessThan(events?.indexOf(lineage) ?? -1);
 			}
 		}
 	});

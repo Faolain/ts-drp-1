@@ -255,14 +255,16 @@ test(D108E2C_ACTIVATION_BROWSER_BEHAVIORS[0], async ({ browser, page }) => {
 			fixtureDisposition: "production-result",
 			lockAcquiredCount: 0,
 			lockCallbackCount: 0,
-			probeSequence: 1,
+			probeFinishOrder: 2,
+			probeStartOrder: 1,
 		}),
 		expect.objectContaining({
 			databaseName: `${possessionDatabase}-throw`,
 			fixtureDisposition: "production-result",
 			lockAcquiredCount: 0,
 			lockCallbackCount: 0,
-			probeSequence: 2,
+			probeFinishOrder: 4,
+			probeStartOrder: 3,
 		}),
 	]);
 	expect.soft(new Set(possessionResults.map(({ databaseName }) => databaseName)).size).toBe(2);
