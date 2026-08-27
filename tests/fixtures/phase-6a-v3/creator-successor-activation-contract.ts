@@ -498,7 +498,7 @@ export function d108e2aTopicGovernance(): Readonly<Record<string, boolean | numb
 	for (const path of sourcePaths) {
 		const unit = ts.createSourceFile(path, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 		const visit = (node: ts.Node): void => {
-			if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+			if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node) || ts.isTemplateHead(node)) {
 				if (node.text === "ts-drp/live-topic/v3") domainLiteralCount += 1;
 				if (node.text === "drp/v3/1/") prefixLiteralCount += 1;
 			}
