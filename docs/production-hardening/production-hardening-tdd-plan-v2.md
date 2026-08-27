@@ -61217,9 +61217,10 @@ D.108d1a and is explicitly absent from every D.108e2 roster.
 
 ##### D.108e2a — node activation boundary
 
-This is the first D.108e2 slice. Its tests-only RED roster is exactly these
-five retained paths plus one new worker asset:
+This is the first D.108e2 slice. Its corrected tests-only RED roster is exactly
+these six retained paths plus one new worker asset:
 
+- `tests/phase-3a1b-p3-live-transport-red.test.ts`;
 - `tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts`;
 - `tests/phase-6a-creator-successor-activation-red.test.ts`;
 - `packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts`;
@@ -61237,7 +61238,12 @@ The new internal helper is the sole node implementation of the existing
 `ts-drp/live-topic/v3` hash and `drp/v3/1/` rendering. It is not exported from
 the node root or package manifest and changes no topic bytes. Both ordinary v3
 activation and successor activation must consume it, and an exact source
-census must find one node implementation of the domain/prefix pair.
+census must find one node implementation of the domain/prefix pair. The
+retained Phase-3a1b source gate is in the corrected RED roster because its old
+AST predicate required the hash literal to remain in `v3-live.ts`; it now owns
+an independent exact-byte oracle plus structural proof that both callers use
+the private helper. A helper that merely re-exports or delegates back to
+`v3-live.ts`, a split domain/prefix owner or a manifest export must fail.
 
 Cold reopen must reject every runtime `authenticationProfile` value other
 than the literal `creator-only` as `malformed-input` before a store, signer,
@@ -61254,6 +61260,14 @@ and the freshly reverified Window contender then wins. The worker test records
 the real lock acquisition/callback/release counts. Non-browser Node retains
 the process-local owner policy and must not be made dependent on a synthetic
 `window`, `self` or `navigator`.
+
+The worker harness must announce readiness only after its module graph is
+loaded and its message listener is installed. Missing authority must record
+the real `navigator.locks` lookup; non-callable, synchronously throwing and
+rejecting authority must record the exact request attempt; already-held
+authority is the genuine cross-realm contender. Fail-closed results pin zero
+signer and publication effects. This telemetry is tied to the hostile boundary
+rather than inferred from the activation result.
 
 The composite readiness condition is: the source census is singular; hostile
 cold profiles perform zero downstream effects; the real worker/window
