@@ -61928,18 +61928,17 @@ closed and does not delay D.108e2d.
 ##### D.108e2d — retained recovery performance evidence
 
 D.108e2d starts only after correctness slices a-c. Its RED/evidence freeze
-must measure the private predecessor issuance view with one scope and one
-issued row and prove pagination termination, a per-recovery—not per method
-call—skip budget, and the exact count of issued-record reads and successor
-preparations. The first acceptable GREEN is evidence that current counts meet
-the frozen budget; production changes are authorized only when that signed
-profile reproduces duplicate work. If reproduced, the only prospective
-production owner is `packages/node/src/v3-live.ts`; remove the duplicate
-issued-record read and/or introduce a custody-safe non-consuming
-prepared-payload view without exposing the private store wrapper. A second
-production owner, public adapter, changed limit or changed recovery authority
-stops and reslices. This profiling slice must not delay an earlier correctness
-fix, but it must have a signed terminal result before Phase 6a exits.
+measures the private predecessor issuance view with one scope and one issued
+row, proves monotonic pagination termination, and freezes the exact number and
+attribution of backing page and issued-record reads. The signed profile is
+expected to reproduce one duplicate read of each returned current predecessor
+row. If it does, the only prospective production owner is
+`packages/node/src/v3-live.ts`, and the only authorized product correction is
+to defer the current-row issued lookup to the existing recovery consumer while
+retaining the authenticated-future-row lookup needed by the private view. A
+second production owner, cache, public adapter, changed limit, changed
+recovery authority or prepared-payload refactor stops and reslices. This
+profiling slice must have a signed terminal result before Phase 6a exits.
 
 The audited D.108e2d tests-only RED roster is exactly four existing paths:
 
@@ -61951,66 +61950,147 @@ The audited D.108e2d tests-only RED roster is exactly four existing paths:
 
 The shared contract declares and launches the exact packet, the root test pins
 the roster, the genuine fresh-process child emits the measurement and the
-storage-node test owns the behavioral assertions. No browser owner is needed:
-the performance seam is the same private node recovery/view path already
-exercised by the accepted Bob cold-reopen case. The RED may add counters and
-immutable telemetry only; it may not alter the durable material, production
-imports or acceptance behavior. All other D.108e2c owners are frozen.
+storage-node test owns the behavioral assertions. D.108e2d receives its own
+`D108E2D` behavior/composite constant; it must not append to or renumber the
+retained D.108d1b inventory. The retained and new composites share one child
+execution and one immutable result rather than running the expensive proof
+twice. No browser file joins the RED roster because the measurable seam is the
+private Node recovery/view path already exercised by the accepted Bob cold-
+reopen case. That is a statement about RED authorship only: the retained
+Phase-6a browser gates remain mandatory GREEN and clean-environment
+verification. The RED may add counters and immutable telemetry only; it may
+not alter durable material, production imports or acceptance behavior. All
+other D.108e2c owners are frozen.
 
-The profile isolates each authority/reopen attempt and counts only calls made
-through the instrumented store/catalog passed to product code; fixture seeding,
-post-result evidence reads and cleanup use the raw backing stores and are
-excluded. For Bob's initial accepted reopen, the predecessor view has exactly
-one scope and one genuine epoch-zero issued/outbox row. It must expose that row
-then terminate with a monotonic cursor, using exactly two backing page reads
-and one backing issued-record read. The current implementation is expected to
-make two backing issued-record reads for that one returned row—one while the
-private view authenticates it and one when recovery consumes it—so the signed
-RED must fail only that exact budget rather than merely assert a source shape.
+The profile isolates the predecessor-view window inside each authority/reopen
+attempt rather than treating all calls against the instrumented store as
+predecessor work. The window begins at the first backing `readOutboxPage` made
+with the exact captured predecessor issuance-scope object and ends at the
+terminal empty backing page made with that same object. It counts every
+backing issued-record read between those boundaries even when recovery passes
+a copied but value-equal scope. Successor recovery begins after that terminal
+page and is explicitly outside this budget. Fixture seeding, post-result
+evidence reads and cleanup use the raw backing stores and are also excluded.
+The RED records window boundaries, page inputs, returned sequences and issued-
+read sequences so scope copying, a non-advancing cursor or successor work
+cannot be mistaken for the predecessor profile.
+
+For Bob's initial accepted reopen, the predecessor view has exactly one scope
+and one genuine epoch-zero issued/outbox row. It must expose that row and then
+terminate, using exactly two backing page reads and one backing issued-record
+read. The current implementation is expected to make two backing issued reads
+inside that window—one while the private view authenticates the row and one
+when recovery consumes it—so the immutable RED fails only that exact budget
+rather than asserting a source shape.
 
 After Bob issues the genuine epoch-one row, the second reopen must still expose
 only the epoch-zero predecessor row and terminate. Its expected backing profile
 is three page reads (returned predecessor, skipped authenticated successor,
 terminal empty), two issued-record reads (one per distinct row), one
-authenticated future-row skip, and no repeated sequence read. The skip budget
-belongs to the one wrapper/recovery lifetime and cannot be recreated by each
-`readOutboxPage` invocation. The RED records per-attempt page inputs, returned
-sequences, issued-read sequences and catalog-resolution call sites so a
-non-advancing cursor, duplicate read, cross-attempt counter or hidden fixture
-read cannot satisfy the oracle. A secondary exact source-custody assertion may
-pin the lifetime location of that private counter, but the fresh child remains
-the acceptance authority.
+authenticated future-row skip, and no repeated sequence read. The immutable
+negative controls preserve fail-closed behavior for a current row whose
+backing issued read throws or does not match its outbox row. The retained
+forged, malformed and issued-read-failure controls for a future row remain
+green, proving that a future row is authenticated and matched before it can be
+skipped.
 
-The same per-attempt catalog telemetry must report exactly one material-open
-resolution followed by exactly four
-`prepareExistingCreatorGeneration` resolutions: two predecessor preparations
-and two successor preparations. Four is an observation budget, not an
-automatic refactor trigger. D.108e2d may introduce a custody-safe
-non-consuming prepared-payload view only if the immutable RED demonstrates
-material CPU or peak-memory cost beyond the count itself; otherwise the four
-preparations remain accepted and recorded.
+Source audit found that the private view currently recreates `skipped` inside
+each `readOutboxPage` call. Bob's one future row is far below the genuine
+`maxEpochVertices` budget, so this fixture cannot distinguish per-call from
+per-recovery lifetime, and moving the counter would tighten the result of an
+over-budget recovery. D.108e2d records that debt but does not claim to prove or
+repair it. D.108e2e below owns the behavioral fixture and any fail-closed
+correction.
+
+The preparation count is likewise a source-custody observation, not runtime
+catalog telemetry. Cold creator adoption resolves the caller-provided catalog
+once while opening material, then installs an internal `factsForCatalog`
+facade; the two predecessor and two successor
+`prepareExistingCreatorGeneration` calls resolve through that internal facade
+and are invisible to the caller's catalog counter. D.108e2d records the
+audited count of four as accepted. It freezes no CPU or peak-memory instrument
+for those calls and therefore authorizes neither a prepared-payload view nor a
+preparation refactor.
 
 The audited prospective GREEN owner is now only
 `packages/node/src/v3-live.ts`. If the expected duplicate read is reproduced,
-the private view may retain the already-authenticated current-row commit for
-the immediately following same-scope/same-sequence `readIssued` and may retain
-one remaining-skip counter for the wrapper lifetime. The cache is bounded to
-one row, is consumed once, never serves another scope/sequence, and cannot
-change backing errors, carrier comparison, authentication, cursor progression
-or recovery results. `packages/node/src/creator-adoption.ts` is removed from
-the prospective roster because the audit found no issuance read or generation
-preparation owner there. Needing that file, a second production file, a public
-hook/export, a store-contract change, a Vite alias or a test-only production
-branch stops and reslices.
+the private view authenticates the outbox row first. For a row that is not an
+authenticated future row, it returns the page without its own issued lookup;
+the existing outer recovery loop remains the sole owner of the current-row
+issued read and match. For an authenticated future row, the view performs the
+backing issued read and exact match before advancing past it. This removes no
+current-row check, does not cache a result, and preserves backing errors,
+carrier comparison, authentication, cursor progression and recovery results.
+`packages/node/src/creator-adoption.ts` is excluded because it owns lineage
+and the one material-open catalog resolution, but owns no issued-record or
+outbox-page read and no generation preparation. Needing that file, a second
+production file, a public hook/export, a store-contract change, a Vite alias
+or a test-only production branch stops and reslices.
 
 RED acceptance is one failing performance composite with every retained
 local-author behavior still passing. GREEN acceptance is the same complete
 child inventory with the exact profiles above, focused Phase-6a tests, the
 complete Phase-4c/Phase-6a retained selection including the genuine 64 MiB
-fresh child, affected builds/typechecks, exact-five-union lint/format/diff and
-an isolated no-`dist` fresh dependency build. The immutable plan, RED and
-GREEN/evidence checkpoints each receive the existing Grok 4.6/high, exact Kimi
-K3 hundred-check and Opus 5/xhigh protocol before the next slice advances.
+fresh child, Phase-6a activation 21/21 and product 18/18 across Chromium,
+Firefox and WebKit, affected builds/typechecks, exact-five-union
+lint/format/diff and an isolated no-`dist` fresh dependency build. The clean
+proof repeats those browser gates as well as the Node profile. The immutable
+plan, RED and GREEN/evidence checkpoints each receive the existing Grok
+4.6/high, exact Kimi K3 hundred-check and Opus 5/xhigh protocol before the next
+slice advances.
+
+The D.108e2d plan-freeze review inspected signed commit
+`26d2b849a6854cbc44c24fd6c6631303f667c481`, parent
+`c4da27ab3ce635247e86ab33976b9e1036fe0557`, and tree
+`75c60d192a472418cf29aa7a47ea8ac34b708351`. Grok 4.6/high session
+`01a04261-a4eb-79d2-b2f2-abfa4ca13bc6` used the skill's full 16-turn bound.
+Its initial 480.202-second pass ended `max_turns_reached` while still
+inspecting and was correctly classified `NO_VERDICT`; this was the runner's
+turn ceiling, not a service cancellation. One tool-free continuation of that
+same session supplied the terminal result without starting another review:
+`CHANGES_REQUIRED`, P0=0/P1=3/P2=1. It found that the stated read totals mixed
+predecessor and successor recovery, the caller catalog could not observe four
+internal resolutions, Bob's one skip could not prove counter lifetime, and
+the proposed cache could mask a backing failure.
+
+Kimi K3 session `session_5f747e2f-140a-4519-85d8-3910372d5907` completed
+exactly CHECK001 through CHECK100 once and in order plus FINAL. It returned
+`APPROVED`, P0=0/P1=0/P2=3, asking that the creator-adoption wording, internal
+catalog seam and predecessor-window attribution be made exact. Opus 5/xhigh
+session `d570d0db-433b-4b94-979e-869e3af3ead7` used no subagent and returned
+`CHANGES_REQUIRED`, P0=0/P1=5/P2=2. It independently reproduced the catalog,
+read-attribution and skip-lifetime defects, required the Phase-6a browser gates
+in ordinary and clean acceptance, required negative controls if a cache were
+retained, and identified the frozen-inventory collision and absence of a
+preparation CPU/memory instrument.
+
+This same-round correction resolves the union without a confirmation review:
+it pins an exact predecessor window, removes the cache, adds the current-row
+failure/mismatch controls, separates and shares the D.108e2d child composite,
+accepts four source-audited preparations without refactor, restores both
+browser matrices, and assigns the unprovable skip-lifetime claim to D.108e2e.
+No reviewer edited a tracked tree, and no Fable or collaboration subagent ran.
+
+##### D.108e2e — predecessor-view skip-budget lifetime
+
+D.108e2e is a separate correctness slice due immediately after D.108e2d and
+before D.108e3 or Phase 6a exit. Its plan freeze must first define the smallest
+genuine fixture that crosses the existing authenticated-future-row skip budget
+across multiple outer page calls, including interleaved current/future rows,
+without lowering or changing the configured limit. Its immutable RED must
+distinguish a per-recovery budget from the current per-method-call reset and
+prove cursor progress, exact row authentication, issued/outbox matching and
+fail-closed over-budget behavior. Source inspection alone is not acceptance.
+
+Only after that RED reproduces the defect may
+`packages/node/src/v3-live.ts` become the sole prospective GREEN owner. The
+correction may move existing private counter custody so an over-budget recovery
+fails closed; it may not change `maxEpochVertices`, accepted under-budget
+results, recovery authority, store contracts, wire formats or product APIs.
+If the genuine fixture cannot make that distinction without a new seam or
+another production owner, stop and reslice. D.108e2e receives its own exact
+test roster, plan/RED/GREEN reviews, ordinary verification and isolated fresh-
+build proof; it does not widen D.108e2d's five-path union.
 
 ##### D.108e4 — retained test-oracle cleanup
 
