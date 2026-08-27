@@ -1577,6 +1577,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		reportRedirectBootstrapHold = resolve;
 	});
 	let closePromise: Promise<void> | undefined;
+	let sessionCloseTask: Promise<void> | undefined;
 	let creatorSuccessorAdoptionTask: Promise<void> | undefined;
 	let redirectedSession: V3RoomSession<Projection> | undefined;
 	let redirectPromise: Promise<V3RoomSession<Projection>> | undefined;
@@ -1596,6 +1597,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		]);
 		if (outcome === "cancelled") throw new TypeError("v3 room retained bootstrap was cancelled");
 	};
+	const combineFailures = (primary: unknown, cleanup: unknown): AggregateError =>
+		new AggregateError([primary, cleanup], primary instanceof Error ? primary.message : String(primary));
 	const shutdown = (): Promise<void> => {
 		if (closePromise !== undefined) return closePromise;
 		closed = true;
@@ -1960,6 +1963,16 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	let migrationBarrier: Promise<void> | undefined;
 	let migrationCompletionBarrier: Promise<void> | undefined;
 	let migrationAcceptingFollowers = false;
+	let migrationRehearsalReserved = false;
+	let lifetimeTransitionTail: Promise<void> = Promise.resolve();
+	const enqueueLifetimeTransition = <Result>(transition: () => Promise<Result>): Promise<Result> => {
+		const selected = lifetimeTransitionTail.then(transition);
+		lifetimeTransitionTail = selected.then(
+			() => undefined,
+			() => undefined
+		);
+		return selected;
+	};
 	type MigrationFollowerResult =
 		| Readonly<{ readonly ok: true }>
 		| Readonly<{ readonly ok: false; readonly reason: unknown }>;
@@ -2392,7 +2405,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			throw error;
 		}
 	}
-	const rehearseMigration = async (
+	const performMigrationRehearsal = async (
 		rehearsalInput: V3RoomMigrationRehearsalInput
 	): Promise<V3RoomMigrationRehearsalReceipt> => {
 		if (redirectPromise !== undefined) await redirectPromise;
@@ -2702,7 +2715,20 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (pendingIssues.length > 0) scheduleDrain();
 		}
 	};
-	const activateMigration = async (
+	const rehearseMigration = async (
+		rehearsalInput: V3RoomMigrationRehearsalInput
+	): Promise<V3RoomMigrationRehearsalReceipt> => {
+		if (redirectPromise !== undefined) await redirectPromise;
+		if (redirectedSession !== undefined) return redirectedSession.rehearseMigration(rehearsalInput);
+		if (migrationRehearsalReserved) throw new TypeError("v3 room migration rehearsal is already active");
+		migrationRehearsalReserved = true;
+		try {
+			return await enqueueLifetimeTransition(() => performMigrationRehearsal(rehearsalInput));
+		} finally {
+			migrationRehearsalReserved = false;
+		}
+	};
+	const performMigrationActivation = async (
 		activationInput: V3RoomMigrationActivationInput
 	): Promise<V3RoomMigrationActivationReceipt> => {
 		if (redirectPromise !== undefined) await redirectPromise;
@@ -2905,6 +2931,13 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			targetAnchorDigest: targetCreatorInvite.pinnedGenesisAnchorDigest,
 		});
 	};
+	const activateMigration = async (
+		activationInput: V3RoomMigrationActivationInput
+	): Promise<V3RoomMigrationActivationReceipt> => {
+		if (redirectPromise !== undefined) await redirectPromise;
+		if (redirectedSession !== undefined) return redirectedSession.activateMigration(activationInput);
+		return enqueueLifetimeTransition(() => performMigrationActivation(activationInput));
+	};
 	if (redirectSource !== undefined) {
 		try {
 			await waitForRetainedBootstrap();
@@ -2932,14 +2965,14 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			catalog: input.application.catalog,
 			handle: creatorCloseHandle,
 		});
-		assertSessionOpen();
 		if (!verified.ok) throw new TypeError(`v3 room successor verification failed: ${verified.kind}`);
+		assertSessionOpen();
 		const committed = await commitCreatorSuccessorAdoption({
 			handle: creatorCloseHandle,
 			intent: verified.intent,
 		});
-		assertSessionOpen();
 		if (!committed.ok) throw new TypeError(`v3 room successor commit failed: ${committed.kind}`);
+		assertSessionOpen();
 		const activated = await activateCreatorSuccessorAdoption({
 			capability: committed.capability,
 			handle: creatorCloseHandle,
@@ -2948,7 +2981,6 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			onAdmittedVertex: admittedSink as unknown as V3AdmittedVertexSink,
 		});
 		if (activated.ok !== true) {
-			assertSessionOpen();
 			throw new TypeError(`v3 room successor activation failed: ${String(activated.kind)}`);
 		}
 		const replacement = activated.handle as RoomPlaneHandle;
@@ -2958,28 +2990,32 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			await Promise.resolve(replacement.deactivate());
 			replacementOwned = false;
 		};
+		const throwAfterReplacementCleanup = async (primary: unknown): Promise<never> => {
+			try {
+				await releaseReplacement();
+			} catch (cleanup) {
+				throw combineFailures(primary, cleanup);
+			}
+			throw primary;
+		};
 		if (closed) {
-			await releaseReplacement();
-			assertSessionOpen();
+			return throwAfterReplacementCleanup(new TypeError("v3 room session is closed"));
 		}
 		let authority: V3RoomSuccessorAuthority;
 		try {
 			authority = successorAuthority(activated.trust, replacement);
 		} catch (error) {
-			await releaseReplacement();
-			throw error;
+			return throwAfterReplacementCleanup(error);
 		}
 		const predecessor = activeHandle;
 		try {
 			await Promise.resolve(predecessor.deactivate());
 		} catch (error) {
-			await releaseReplacement();
-			throw error;
+			return throwAfterReplacementCleanup(error);
 		}
 		if (closed) {
 			activeHandle = undefined;
-			await releaseReplacement();
-			assertSessionOpen();
+			return throwAfterReplacementCleanup(new TypeError("v3 room session is closed"));
 		}
 		activeHandle = replacement;
 		replacementOwned = false;
@@ -2987,12 +3023,42 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	};
 	const adoptCreatorSuccessor = (): Promise<void> => {
 		if (creatorSuccessorAdoptionTask !== undefined) return creatorSuccessorAdoptionTask;
-		const attempt = performCreatorSuccessorAdoption();
+		const attempt = enqueueLifetimeTransition(performCreatorSuccessorAdoption);
 		const shared = attempt.finally(() => {
 			if (creatorSuccessorAdoptionTask === shared) creatorSuccessorAdoptionTask = undefined;
 		});
 		creatorSuccessorAdoptionTask = shared;
 		return shared;
+	};
+	const closeSession = (): Promise<void> => {
+		if (sessionCloseTask !== undefined) return sessionCloseTask;
+		closed = true;
+		cancelRedirectCreation();
+		const task = (async (): Promise<void> => {
+			let primaryFailure: unknown;
+			let primaryFailed = false;
+			try {
+				await creatorSuccessorAdoptionTask?.catch(() => undefined);
+				await rebasePromise.catch(() => undefined);
+				await lifetimeTransitionTail;
+				await migrationCompletionBarrier;
+				await drainPendingIssues();
+			} catch (error) {
+				primaryFailed = true;
+				primaryFailure = error;
+			}
+			const redirect = redirectPromise === undefined ? redirectedSession : await redirectPromise.catch(() => undefined);
+			await redirect?.close().catch(() => undefined);
+			try {
+				await shutdown();
+			} catch (cleanupFailure) {
+				if (primaryFailed) throw combineFailures(primaryFailure, cleanupFailure);
+				throw cleanupFailure;
+			}
+			if (primaryFailed) throw primaryFailure;
+		})();
+		sessionCloseTask = task;
+		return task;
 	};
 	return Object.freeze({
 		activateMigration,
@@ -3012,16 +3078,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			return redirectedSession?.roomId ?? successorProjectionAuthority?.anchorDigest ?? roomDescriptor.anchorDigest;
 		},
 		trustStatus: "Creator-trusted; not Byzantine-fault-tolerant." as const,
-		async close(): Promise<void> {
-			closed = true;
-			cancelRedirectCreation();
-			await creatorSuccessorAdoptionTask?.catch(() => undefined);
-			await rebasePromise.catch(() => undefined);
-			await migrationCompletionBarrier;
-			await drainPendingIssues();
-			const redirect = redirectPromise === undefined ? redirectedSession : await redirectPromise.catch(() => undefined);
-			await redirect?.close().catch(() => undefined);
-			await shutdown();
+		close(): Promise<void> {
+			return closeSession();
 		},
 		async inspectDurableHead(): ReturnType<CreatorLiveCloseHandle["inspectDurableHead"]> {
 			if (redirectPromise !== undefined) await redirectPromise;
