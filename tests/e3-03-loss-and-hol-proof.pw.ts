@@ -128,6 +128,7 @@ interface RtcObservation {
 	readonly channelId: number;
 	readonly connectionId: number;
 	readonly direction: "message" | "send";
+	readonly insertionReadyState: RTCDataChannelState;
 	readonly label: string;
 	readonly maxRetransmits: number | null;
 	readonly ordinal: number;
@@ -158,7 +159,18 @@ interface CampaignEvidence {
 	readonly trialId: string;
 }
 
-const NO_LOSS = Object.freeze({
+type NetworkProfile = Readonly<{
+	readonly connectionType: "wifi";
+	readonly downloadThroughput: number;
+	readonly latency: number;
+	readonly offline: boolean;
+	readonly packetLoss: number;
+	readonly packetQueueLength: number;
+	readonly packetReordering: boolean;
+	readonly uploadThroughput: number;
+}>;
+
+const NO_LOSS: NetworkProfile = Object.freeze({
 	connectionType: "wifi" as const,
 	downloadThroughput: -1,
 	latency: 0,
@@ -203,6 +215,7 @@ function installRtcObserver(): void {
 					channelId: identity.channelId,
 					connectionId: identity.connectionId,
 					direction,
+					insertionReadyState: channel.readyState,
 					label: channel.label,
 					maxRetransmits: channel.maxRetransmits,
 					ordered: channel.ordered,
@@ -277,7 +290,7 @@ function installRtcObserver(): void {
 	});
 }
 
-function lossProfile(packetLoss: number): Readonly<Record<string, boolean | number | string>> {
+function lossProfile(packetLoss: number): NetworkProfile {
 	return Object.freeze({
 		connectionType: "wifi",
 		downloadThroughput: -1,
@@ -290,10 +303,7 @@ function lossProfile(packetLoss: number): Readonly<Record<string, boolean | numb
 	});
 }
 
-async function emulate(
-	session: CDPSession,
-	profile: Readonly<Record<string, boolean | number | string>>
-): Promise<readonly string[]> {
+async function emulate(session: CDPSession, profile: NetworkProfile): Promise<readonly string[]> {
 	const { ruleIds } = await session.send("Network.emulateNetworkConditionsByRule", {
 		matchedNetworkConditions: [{ ...profile, urlPattern: "" }],
 	});
@@ -458,7 +468,7 @@ async function receiverEvidenceAtDeadline(
 		const api = window.__TS_DRP_V3_ZONE__;
 		const fabric = api?.fabric;
 		const observer = window.__E303_RTC_OBSERVER__;
-		if (fabric === undefined) throw new Error("E303_FABRIC_WORKBENCH_ABSENT");
+		if (api === undefined || fabric === undefined) throw new Error("E303_FABRIC_WORKBENCH_ABSENT");
 		if (observer === undefined) throw new Error("E303_RTC_OBSERVER_ABSENT");
 		const rtc = await observer.snapshot();
 		return Object.freeze({ fabric: fabric.snapshot(selectedTrialId), rtc, zone: api.snapshot() });
@@ -730,6 +740,110 @@ async function attachJson(testInfo: TestInfo, name: string, value: unknown): Pro
 	await testInfo.attach(name, { body: JSON.stringify(value, undefined, 2), contentType: "application/json" });
 }
 
+test("freezes RTC metadata at the event boundary before async payload conversion", async ({ browser }) => {
+	const context = await browser.newContext();
+	await context.addInitScript(installRtcObserver);
+	const page = await context.newPage();
+	try {
+		await page.goto("about:blank");
+		const records = await page.evaluate(async () => {
+			interface SyntheticChannelState {
+				label: string;
+				maxRetransmits: number | null;
+				ordered: boolean;
+				readyState: RTCDataChannelState;
+			}
+			const observer = window.__E303_RTC_OBSERVER__;
+			if (observer === undefined) throw new Error("E303_RTC_OBSERVER_ABSENT");
+			const connection = new RTCPeerConnection();
+			const dispatchMessage = (state: SyntheticChannelState, byte: number): void => {
+				const channelTarget = new EventTarget();
+				Object.defineProperties(channelTarget, {
+					label: { get: () => state.label },
+					maxRetransmits: { get: () => state.maxRetransmits },
+					ordered: { get: () => state.ordered },
+					readyState: { get: () => state.readyState },
+				});
+				const channel = channelTarget as unknown as RTCDataChannel;
+				const dataChannelEvent = new Event("datachannel");
+				Object.defineProperty(dataChannelEvent, "channel", { value: channel });
+				connection.dispatchEvent(dataChannelEvent);
+				channel.dispatchEvent(new MessageEvent("message", { data: Uint8Array.of(byte).buffer }));
+			};
+
+			const openState: SyntheticChannelState = {
+				label: "ts-drp-ephemeral/1",
+				maxRetransmits: 0,
+				ordered: false,
+				readyState: "open",
+			};
+			dispatchMessage(openState, 65);
+			Object.assign(openState, {
+				label: "mutated-open",
+				maxRetransmits: 4,
+				ordered: true,
+				readyState: "closing" as const,
+			});
+
+			const closingState: SyntheticChannelState = {
+				label: "ts-drp-ephemeral/1",
+				maxRetransmits: 0,
+				ordered: false,
+				readyState: "closing",
+			};
+			dispatchMessage(closingState, 66);
+			Object.assign(closingState, {
+				label: "mutated-closing",
+				maxRetransmits: 5,
+				ordered: true,
+				readyState: "closed" as const,
+			});
+
+			const observed = await observer.snapshot();
+			connection.close();
+			const first = observed[0];
+			if (first === undefined) return [];
+			return observed.map(({ atMs: _atMs, ...record }) => ({
+				...record,
+				channelId: record.channelId - first.channelId,
+				connectionId: record.connectionId - first.connectionId,
+				ordinal: record.ordinal - first.ordinal,
+			}));
+		});
+
+		expect(records).toEqual([
+			{
+				byteLength: 1,
+				channelId: 0,
+				connectionId: 0,
+				direction: "message",
+				insertionReadyState: "closing",
+				label: "ts-drp-ephemeral/1",
+				maxRetransmits: 0,
+				ordered: false,
+				ordinal: 0,
+				readyState: "open",
+				text: "A",
+			},
+			{
+				byteLength: 1,
+				channelId: 1,
+				connectionId: 0,
+				direction: "message",
+				insertionReadyState: "closed",
+				label: "ts-drp-ephemeral/1",
+				maxRetransmits: 0,
+				ordered: false,
+				ordinal: 1,
+				readyState: "closing",
+				text: "B",
+			},
+		]);
+	} finally {
+		await context.close();
+	}
+});
+
 test("three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss", async ({
 	browser,
 }, testInfo) => {
@@ -748,14 +862,11 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 	const cdpEvidence: Array<
 		Readonly<{
 			readonly label: string;
-			readonly profile: Readonly<Record<string, boolean | number | string>>;
+			readonly profile: NetworkProfile;
 			readonly ruleIds: readonly string[];
 		}>
 	> = [];
-	const applyProfile = async (
-		label: string,
-		profile: Readonly<Record<string, boolean | number | string>>
-	): Promise<void> => {
+	const applyProfile = async (label: string, profile: NetworkProfile): Promise<void> => {
 		const ruleIds = await emulate(cdp, profile);
 		cdpEvidence.push(Object.freeze({ label, profile, ruleIds: Object.freeze([...ruleIds]) }));
 	};
