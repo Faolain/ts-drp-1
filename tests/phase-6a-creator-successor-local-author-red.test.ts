@@ -193,10 +193,31 @@ describe("D.108d1b authenticated peer-local cold issuance RED", () => {
 					!(/(^|\/)tests\//u.test(path) || path.startsWith("tests/fixtures/"))
 			)
 		).toEqual([]);
-		expect(D108E4_CHILD_BEHAVIORS).toHaveLength(1);
-		expect(D108E4_ACTIVATION_BROWSER_BEHAVIORS).toHaveLength(1);
-		expect(D108E4_INFRASTRUCTURE_BEHAVIORS).toHaveLength(1);
-		expect(D108E4_ZONE_BEHAVIORS).toHaveLength(1);
+		expect(D108E4_CHILD_BEHAVIORS).toEqual([
+			"fresh Node closes the D.108e4 authenticated oracle and per-reopen budget debt",
+		]);
+		expect(D108E4_ACTIVATION_BROWSER_BEHAVIORS).toEqual([
+			"window observes lock authority before durable store opening and possession probes use exact suffixed databases",
+		]);
+		expect(D108E4_INFRASTRUCTURE_BEHAVIORS).toEqual([
+			"imports one explicit workspace package export only from its own fresh built file",
+			"rejects every non-package-self workspace export-file target",
+		]);
+		expect(D108E4_ZONE_BEHAVIORS).toEqual([
+			"waits for reciprocal raw unreliable links before one measured movement in each direction",
+		]);
+		const activationOwner = readFileSync(
+			resolve(REPOSITORY_ROOT, "packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts"),
+			"utf8"
+		);
+		const infrastructureOwner = readFileSync(
+			resolve(REPOSITORY_ROOT, "tests/phase-6a-creator-successor-infrastructure-red.test.ts"),
+			"utf8"
+		);
+		expect(activationOwner).toContain(D108E4_ACTIVATION_BROWSER_BEHAVIORS[0]);
+		for (const [index] of D108E4_INFRASTRUCTURE_BEHAVIORS.entries()) {
+			expect(infrastructureOwner).toContain(`it(D108E4_INFRASTRUCTURE_BEHAVIORS[${index}]`);
+		}
 	});
 
 	it("requires every root canonical consumer to use the D.108e4 export-file boundary", () => {
@@ -207,17 +228,35 @@ describe("D.108d1b authenticated peer-local cold issuance RED", () => {
 			"tests/e5-02-zone-referee-outcome.pw.ts",
 		]) {
 			const text = readFileSync(resolve(REPOSITORY_ROOT, relativePath), "utf8");
-			expect.soft(text, relativePath).not.toMatch(/from ["']@ts-drp\/canonical["']/u);
+			expect.soft(text, relativePath).not.toMatch(/["']@ts-drp\/canonical(?:\/[^"']*)?["']/u);
 			expect.soft(text, relativePath).toContain("workspace-package-export-file.mjs");
 		}
 	});
 
 	it(D108E4_ZONE_BEHAVIORS[0], () => {
 		const zone = readFileSync(resolve(REPOSITORY_ROOT, "tests/phase-3a1b-d9346-v3-zone.pw.ts"), "utf8");
-		expect(zone).toContain("ts-drp-ephemeral/1");
-		expect(zone).toContain("maxRetransmits");
-		expect(zone).toContain("fallback");
+		const helperStart = zone.indexOf("async function expectOneMeasuredRawMovement");
+		const helperEnd = zone.indexOf("\nfunction expectWithinInstalledBudget", helperStart);
+		expect(helperStart).toBeGreaterThanOrEqual(0);
+		expect(helperEnd).toBeGreaterThan(helperStart);
+		const helper = zone.slice(helperStart, helperEnd);
+		expect(helper).toContain("expectReciprocalRawUnreliableLinks");
+		expect(helper).toContain("rawTransport.sent");
+		expect(helper).toContain("rawTransport.received");
+		expect(helper).toContain("transientPositions");
+		expect(helper).toContain("durableVertexCount");
+		expect(helper).toContain("acceptedOperationDigest");
+		expect(helper.match(/keyboard\.press\(/gu)).toHaveLength(1);
+		expect(helper.indexOf("expectReciprocalRawUnreliableLinks")).toBeLessThan(helper.indexOf("keyboard.press("));
+		expect(zone).toMatch(
+			/function expectReciprocalRawUnreliableLinks[\s\S]*?ts-drp-ephemeral\/1[\s\S]*?maxRetransmits:\s*0[\s\S]*?ordered:\s*false[\s\S]*?fallbackCount[\s\S]*?toBe\(0\)/u
+		);
+		const movementCalls = [...zone.matchAll(/await expectOneMeasuredRawMovement\(\{/gu)];
+		expect(movementCalls).toHaveLength(3);
+		expect(zone.match(/keyboard\.press\(/gu)).toHaveLength(1);
 		expect(zone).not.toMatch(/\.poll\(\s*async\s*\(\)\s*=>\s*\{[\s\S]{0,400}?keyboard\.press\(/u);
+		const config = readFileSync(resolve(REPOSITORY_ROOT, "playwright.phase-3a1b-d9346-zone.config.ts"), "utf8");
+		expect(config).toContain("expect: { timeout: 20_000 }");
 	});
 
 	it("derives the shipped eight-member chat identities and exact writer split", () => {

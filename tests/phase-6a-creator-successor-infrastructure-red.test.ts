@@ -1,4 +1,13 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	realpathSync,
+	rmdirSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -11,6 +20,7 @@ import {
 	type D108e1ExpectedSnapshotRead,
 	isD108e1DirectSnapshotTelemetry,
 } from "./fixtures/phase-6a-v3/creator-successor-infrastructure-contract.js";
+import { D108E4_INFRASTRUCTURE_BEHAVIORS } from "./fixtures/phase-6a-v3/creator-successor-local-author-contract.js";
 import { importWorkspacePackageExportFile } from "./fixtures/shared/workspace-package-export-file.mjs";
 import { workspacePackageImportHook } from "./fixtures/shared/workspace-package-subprocess.mjs";
 
@@ -23,7 +33,7 @@ const SHIM_SIBLING_SENTINEL = resolve(REPOSITORY_ROOT, "tests/fixtures/node_modu
 const SHIM_PARENT = dirname(SHIM_SIBLING_SENTINEL);
 
 describe("D.108e1 activation test-infrastructure RED", () => {
-	it("imports one explicit workspace package export only from its own fresh built file", async () => {
+	it(D108E4_INFRASTRUCTURE_BEHAVIORS[0], async () => {
 		const directory = mkdtempSync(resolve(tmpdir(), "ts-drp-d108e4-export-file-"));
 		try {
 			mkdirSync(resolve(directory, "dist"));
@@ -38,22 +48,25 @@ describe("D.108e1 activation test-infrastructure RED", () => {
 				exportKey: ".",
 				packageDirectory: directory,
 			});
+			const packageDirectoryRealpath = realpathSync(directory);
 			expect(imported).toMatchObject({
 				module: { marker: "fresh-built-export" },
-				packageDirectoryRealpath: directory,
-				targetRealpath: resolve(directory, "dist/index.js"),
+				packageDirectoryRealpath,
+				targetRealpath: realpathSync(resolve(packageDirectoryRealpath, "dist/index.js")),
 			});
 		} finally {
 			rmSync(directory, { force: true, recursive: true });
 		}
 	});
 
-	it("rejects every non-package-self workspace export-file target", async () => {
+	it(D108E4_INFRASTRUCTURE_BEHAVIORS[1], async () => {
 		const root = mkdtempSync(resolve(tmpdir(), "ts-drp-d108e4-export-file-negative-"));
 		try {
-			const packageDirectory = resolve(root, "canonical");
+			const rootRealpath = realpathSync(root);
+			const packageDirectory = resolve(rootRealpath, "canonical");
 			mkdirSync(resolve(packageDirectory, "dist"), { recursive: true });
 			writeFileSync(resolve(packageDirectory, "dist/index.js"), "export const marker = true;\n", "utf8");
+			writeFileSync(resolve(packageDirectory, "dist/empty.js"), "", "utf8");
 			const invoke = (selectedDirectory = packageDirectory): Promise<unknown> =>
 				importWorkspacePackageExportFile({
 					expectedPackageName: "@ts-drp/canonical",
@@ -67,11 +80,17 @@ describe("D.108e1 activation test-infrastructure RED", () => {
 				["declaration-target", { name: "@ts-drp/canonical", exports: { ".": { import: "./dist/index.d.ts" } } }],
 				["empty-target", { name: "@ts-drp/canonical", exports: { ".": { import: "" } } }],
 				["escape-target", { name: "@ts-drp/canonical", exports: { ".": { import: "../outside.js" } } }],
+				[
+					"absolute-target",
+					{ name: "@ts-drp/canonical", exports: { ".": { import: resolve(rootRealpath, "outside.js") } } },
+				],
+				["missing-built-target", { name: "@ts-drp/canonical", exports: { ".": { import: "./dist/missing.js" } } }],
+				["empty-built-target", { name: "@ts-drp/canonical", exports: { ".": { import: "./dist/empty.js" } } }],
 			] as const) {
 				writeFileSync(resolve(packageDirectory, "package.json"), JSON.stringify(manifest), "utf8");
 				await expect.soft(invoke(), name).rejects.toThrow(/workspace package export file mismatch/u);
 			}
-			const nodeModulesPackage = resolve(root, "node_modules/@ts-drp/canonical");
+			const nodeModulesPackage = resolve(rootRealpath, "node_modules/@ts-drp/canonical");
 			mkdirSync(resolve(nodeModulesPackage, "dist"), { recursive: true });
 			writeFileSync(
 				resolve(nodeModulesPackage, "package.json"),

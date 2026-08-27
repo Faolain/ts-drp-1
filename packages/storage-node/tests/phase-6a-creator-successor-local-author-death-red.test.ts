@@ -71,6 +71,9 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 		expect(D108E2E_CHILD_BEHAVIORS).toEqual([
 			"fresh Node predecessor recovery enforces one cumulative authenticated future-row skip budget per recovery",
 		]);
+		expect(D108E4_CHILD_BEHAVIORS).toEqual([
+			"fresh Node closes the D.108e4 authenticated oracle and per-reopen budget debt",
+		]);
 		expect(childPath.pathname.endsWith("phase-6a-creator-successor-local-author-child.mjs")).toBe(true);
 	});
 
@@ -207,8 +210,11 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 			expect(control).toMatchObject({
 				effects: {
 					adoptionSwapCount: 0,
+					aheRecoverCount: 1,
+					installEpochAnchorCount: 0,
 					issuanceStoreShape: true,
 					publicationCount: 0,
+					snapshotOpenCount: 1,
 					subscribeCount: 0,
 					transactIssueCount: 0,
 				},
@@ -373,7 +379,6 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 			const localAuthorResult = await runSharedChild();
 			const localAuthorProof = localAuthorResult.proof as
 				| Readonly<{
-						readonly authorityWindows?: Readonly<Record<string, unknown>>;
 						readonly oracle?: Readonly<Record<string, unknown>>;
 						readonly results?: readonly Readonly<Record<string, unknown>>[];
 				  }>
@@ -383,11 +388,45 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 				bytesMatch: true,
 				digestMatches: true,
 			});
-			expect.soft(localAuthorProof?.authorityWindows).toMatchObject({
-				contiguous: true,
-				eventsPerAttempt: 8,
-				monotonicAttempts: true,
-			});
+			const writerAuthors = d108d1bChatAuthorities()
+				.filter(({ groups }) => groups.includes("writer"))
+				.map(({ author }) => author)
+				.sort();
+			for (const [name, windowCount] of [
+				["established-bob", 2],
+				["fresh-carol", 1],
+			] as const) {
+				const candidate = localAuthorProof?.results?.find((result) => result.name === name);
+				const events = (
+					candidate?.effects as
+						| Readonly<{
+								readonly authorityEvents?: readonly Readonly<{
+									readonly attempt: number;
+									readonly author?: string;
+									readonly kind: string;
+								}>[];
+						  }>
+						| undefined
+				)?.authorityEvents;
+				expect.soft(events, name).toHaveLength(windowCount * 8);
+				for (let attempt = 0; attempt < windowCount; attempt += 1) {
+					const window = events?.slice(attempt * 8, attempt * 8 + 8) ?? [];
+					expect.soft(window[0], `${name}:${attempt}:possession`).toEqual({
+						attempt,
+						kind: "possession-signer",
+					});
+					expect
+						.soft(
+							window.slice(1).map(({ attempt: observedAttempt, author, kind }) => ({
+								attempt: observedAttempt,
+								author,
+								kind,
+							})),
+							`${name}:${attempt}:lineage`
+						)
+						.toEqual(writerAuthors.map((author) => ({ attempt, author, kind: "lineage-read" })));
+				}
+			}
 			const currentMismatch = localAuthorProof?.results?.find(({ name }) => name === "current-outbox-issued-mismatch");
 			expect.soft(currentMismatch).toMatchObject({
 				effects: {

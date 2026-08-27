@@ -122,6 +122,7 @@ export const D108E4_ACTIVATION_BROWSER_BEHAVIORS = Object.freeze([
 ] as const);
 export const D108E4_INFRASTRUCTURE_BEHAVIORS = Object.freeze([
 	"imports one explicit workspace package export only from its own fresh built file",
+	"rejects every non-package-self workspace export-file target",
 ] as const);
 export const D108E4_ZONE_BEHAVIORS = Object.freeze([
 	"waits for reciprocal raw unreliable links before one measured movement in each direction",

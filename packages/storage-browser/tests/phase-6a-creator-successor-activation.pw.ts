@@ -121,6 +121,25 @@ async function terminateWorker(page: Page): Promise<void> {
 	});
 }
 
+function expectedPossessionDatabaseNames(databasePrefix: string): readonly string[] {
+	return ["throw", "wrong-key"]
+		.flatMap((suffix) => [
+			`${databasePrefix}-${suffix}-ahe`,
+			`${databasePrefix}-${suffix}-issuance--drp-issuance-v1`,
+			`${databasePrefix}-${suffix}-journal--drp-live-journal-v1`,
+			`${databasePrefix}-${suffix}-snapshot--drp-snapshot-quarantine-v1`,
+		])
+		.sort();
+}
+
+async function possessionDatabaseNames(page: Page, databasePrefix: string): Promise<readonly string[]> {
+	return page.evaluate(async (selectedPrefix) => {
+		return (await indexedDB.databases())
+			.flatMap(({ name }) => (name?.startsWith(`${selectedPrefix}-`) === true ? [name] : []))
+			.sort();
+	}, databasePrefix);
+}
+
 test.afterAll(async () => server?.close());
 test("pins the complete browser behavior inventory", () => {
 	expect(D108D1_BROWSER_BEHAVIORS).toEqual([
@@ -241,6 +260,7 @@ test("wrong-key and throwing browser possession fail before writer activation", 
 			verificationCount: 1,
 		}),
 	]);
+	expect(await possessionDatabaseNames(page, databaseName)).toEqual(expectedPossessionDatabaseNames(databaseName));
 });
 
 test(D108E2C_ACTIVATION_BROWSER_BEHAVIORS[0], async ({ browser, page }) => {
@@ -274,6 +294,9 @@ test(D108E2C_ACTIVATION_BROWSER_BEHAVIORS[0], async ({ browser, page }) => {
 		}),
 	]);
 	expect.soft(new Set(possessionResults.map(({ databaseName }) => databaseName)).size).toBe(2);
+	expect
+		.soft(await possessionDatabaseNames(page, possessionDatabase))
+		.toEqual(expectedPossessionDatabaseNames(possessionDatabase));
 
 	const context = await browser.newContext();
 	const ownerPage = await context.newPage();
@@ -332,42 +355,48 @@ test(D108E2C_ACTIVATION_BROWSER_BEHAVIORS[0], async ({ browser, page }) => {
 test(D108E4_ACTIVATION_BROWSER_BEHAVIORS[0], async ({ page }) => {
 	await page.goto(server?.origin ?? "about:blank");
 	const databaseName = `d108e4-possession-${crypto.randomUUID()}`;
-	await page.evaluate(
-		({ databaseName: selected, material: carrier }) => window.phase6aCreatorSuccessorActivation.seed(selected, carrier),
-		{ databaseName, material }
-	);
 	const results = (await page.evaluate(
 		({ databaseName: selected, material: carrier }) =>
 			window.phase6aCreatorSuccessorActivation.probePossessionFailure(selected, carrier),
 		{ databaseName, material }
 	)) as unknown as readonly Readonly<Record<string, unknown>>[];
-	for (const result of results) {
-		expect.soft(result).toMatchObject({
+	expect.soft(results).toEqual([
+		expect.objectContaining({
+			databaseName: `${databaseName}-wrong-key`,
 			firstStoreOpenOrder: 2,
 			lockObservationOrder: 1,
-		});
-	}
-	const databaseNames = await page.evaluate(async () =>
-		(await indexedDB.databases()).flatMap(({ name }) => (name === undefined ? [] : [name]))
+		}),
+		expect.objectContaining({
+			databaseName: `${databaseName}-throw`,
+			firstStoreOpenOrder: 2,
+			lockObservationOrder: 1,
+		}),
+	]);
+	expect.soft(await possessionDatabaseNames(page, databaseName)).toEqual(expectedPossessionDatabaseNames(databaseName));
+	const storeOpenFailureRestoredLocks = await page.evaluate(
+		async ({ databaseName: selected, material: carrier }) => {
+			const locks = navigator.locks;
+			const openDescriptor = Object.getOwnPropertyDescriptor(indexedDB, "open");
+			try {
+				Object.defineProperty(indexedDB, "open", {
+					configurable: true,
+					value: (): never => {
+						throw new Error("D108E4_STORE_OPEN_FAILURE");
+					},
+				});
+				await window.phase6aCreatorSuccessorActivation.openContender(selected, carrier);
+				return false;
+			} catch (error) {
+				if (!(error instanceof Error) || error.message !== "D108E4_STORE_OPEN_FAILURE") throw error;
+				return Object.is(navigator.locks, locks);
+			} finally {
+				if (openDescriptor === undefined) Reflect.deleteProperty(indexedDB, "open");
+				else Object.defineProperty(indexedDB, "open", openDescriptor);
+			}
+		},
+		{ databaseName: `${databaseName}-store-open-failure`, material }
 	);
-	const ownedDatabaseNames = databaseNames.filter((name) => name.includes(databaseName));
-	expect.soft(ownedDatabaseNames.length).toBeGreaterThan(0);
-	expect
-		.soft(ownedDatabaseNames)
-		.toEqual(
-			expect.arrayContaining(
-				ownedDatabaseNames.filter(
-					(name) => name.includes(`${databaseName}-wrong-key`) || name.includes(`${databaseName}-throw`)
-				)
-			)
-		);
-	expect
-		.soft(
-			ownedDatabaseNames.every(
-				(name) => name.includes(`${databaseName}-wrong-key`) || name.includes(`${databaseName}-throw`)
-			)
-		)
-		.toBe(true);
+	expect.soft(storeOpenFailureRestoredLocks).toBe(true);
 });
 
 test("missing or hostile LockManager authority fails activation closed", async ({ page }) => {
