@@ -954,6 +954,20 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 			const newcomerRoute = newcomer.owner.openUnreliableWebRtcRoute("zone:capacity-owner");
 			fixture.bus.connect("peer-08", "peer-99");
 			const allocatedBefore = fixture.center.peerConnections.length;
+			expect(Object.keys(fixture.centerRoute.snapshot()).sort()).toEqual([
+				"activeLinks",
+				"authenticatedConnectionLosses",
+				"backpressuredDrops",
+				"handshakeFailures",
+				"lastLinkDrop",
+				"linkDrops",
+				"links",
+				"received",
+				"routedBytesReceived",
+				"routedBytesSent",
+				"sent",
+				"unknownRouteDrops",
+			]);
 			expect(await newcomerRoute.send(["peer-99"], Uint8Array.of(8))).toBe(false);
 			expect(fixture.center.peerConnections).toHaveLength(allocatedBefore);
 			expect(fixture.centerRoute.snapshot().activeLinks).toBe(7);
@@ -971,6 +985,7 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 					}),
 				]),
 			});
+			expect(vi.getTimerCount()).toBe(0);
 		} finally {
 			newcomer?.owner.close();
 			if (fixture !== undefined) closeReservedCapacityFixture(fixture);
@@ -1010,6 +1025,7 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		let newcomer: ReturnType<typeof owner> | undefined;
 		try {
 			fixture = await reservedCapacityFixture(module, "peer-99");
+			await vi.advanceTimersByTimeAsync(4_000);
 			fixture.bus.disconnect(fixture.replacement);
 			fixture.bus.connect("peer-07", "peer-99", "webrtc", {
 				left: "churned-low",
@@ -1025,7 +1041,7 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 			newcomer = owner(module, fixture.bus, "peer-08");
 			const newcomerRoute = newcomer.owner.openUnreliableWebRtcRoute("zone:capacity-owner");
 			fixture.bus.connect("peer-08", "peer-99");
-			await vi.advanceTimersByTimeAsync(9_999);
+			await vi.advanceTimersByTimeAsync(5_999);
 			expect(await newcomerRoute.send(["peer-99"], Uint8Array.of(1))).toBe(false);
 			await vi.advanceTimersByTimeAsync(1);
 			expect(await newcomerRoute.send(["peer-99"], Uint8Array.of(2))).toBe(true);
@@ -1050,7 +1066,11 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 				if (release === "membership removal") {
 					await fixture.centerRoute.reconcile(fixture.admittedPeers.slice(0, -1));
 				}
-				if (release === "restart") await fixture.centerRoute.restart();
+				if (release === "restart") {
+					await fixture.centerRoute.restart();
+					await vi.advanceTimersByTimeAsync(250);
+					expect(fixture.centerRoute.snapshot().activeLinks).toBe(7);
+				}
 
 				newcomer = owner(module, fixture.bus, "peer-08");
 				const newcomerRoute = newcomer.owner.openUnreliableWebRtcRoute("zone:capacity-owner");
@@ -1070,6 +1090,7 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		let fixture: ReservedCapacityFixture | undefined;
 		try {
 			fixture = await reservedCapacityFixture(module, "peer-99");
+			for (const route of fixture.remoteRoutes) route.close();
 			expect(vi.getTimerCount()).toBe(1);
 			if (close === "last route") fixture.centerRoute.close();
 			else fixture.center.owner.close();
