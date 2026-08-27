@@ -428,6 +428,7 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 			expect(proof?.maxCanonicalPreimageBytes).toBeLessThan(1_024);
 			expect(proof?.wallTimeMs).toBeLessThan(60_000);
 			expect(proof?.realStore).toEqual({
+				boundedStoreShape: true,
 				equalityMaterializedRows: 8_193,
 				maximumPageLimit: 128,
 				overBudgetMaterializedRows: 8_195,
@@ -560,6 +561,6 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 				terminalEmpty: false,
 			});
 		},
-		100_000
+		120_000
 	);
 });

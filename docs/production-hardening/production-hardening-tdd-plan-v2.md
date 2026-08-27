@@ -62300,10 +62300,11 @@ observation, one epoch-anchor installation and one successor-page fault are the
 causal predecessor-boundary evidence. The
 retained one-future-row reopen remains only the accepted under-budget behavior
 control. Fresh budget custody is instead proved when the later over-budget
-reopen, on the same issuance store after the equality recovery has consumed a
-complete 8,192-skip window, must itself skip another complete 8,192-row window;
-this kills store-scoped and module-global counter mutants as well as the
-reproduced per-method-call mutant.
+reopen, backed by the same raw issuance store but receiving a new recovery
+facade after the equality recovery has consumed a complete 8,192-skip window,
+must itself skip another complete 8,192-row window. This kills module-global
+counter mutants as well as the reproduced per-method-call mutant; it does not
+claim to distinguish a hypothetical counter keyed to the test facade object.
 
 The same lineage then appends an admitted predecessor/current separator at
 sequence 8,193 and one admitted successor/future row at sequence 8,194. A
@@ -62358,7 +62359,8 @@ timeout, bootstrap or adapter-resolution failure. The current implementation
 must instead admit separator 8,193, reach successor recovery and reject there;
 an overall rejected result alone does not satisfy RED. The skip-budget child
 retains a 90-second hard kill, the owning Vitest `it` receives an explicit
-100-second timeout so the parent cannot preempt the child, and ordinary and
+120-second timeout so fixture construction cannot let the parent preempt the
+child's own deadline, and ordinary and
 clean runs must record a child wall time below 60 seconds. The first corrected
 full run measured 41,272.856 ms; this bound retains enough headroom for clean
 checkout variance while remaining below the unchanged 90-second kill. If the verified-page
@@ -62406,6 +62408,51 @@ closed by the exact 8,194 read inventory, correct fresh-budget attribution,
 control-before-failure assertion order and deterministic equality result. Per
 protocol these corrections remain in the same round and receive no
 confirmation review.
+
+The immutable RED checkpoint is signed commit
+`5808bf7155448b0bec1f039b0e9d94c811bc2d81`, parent
+`2153fd91c974fd491151db3dfcb5f88f298423a5`. It changes exactly the frozen four
+test-infrastructure owners and no production file. The root ownership suite
+passed 8/8. The combined focused command
+`pnpm exec vitest run --coverage.enabled=false tests/phase-6a-creator-successor-local-author-red.test.ts packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts`
+then produced 11 passes and exactly one failure: the over-budget assertion
+expected `creator predecessor recovery failed: admission-rejected` but current
+production returned `creator successor recovery failed: issuance-rejected`.
+All common controls and pre-failure telemetry therefore passed, including the
+separator journal append and the 8,193 captured future-row reads. The original
+run completed in 44.8 seconds; the post-review correction run completed in
+46.07 seconds with the child composite at 42.187 seconds, below the signed
+60-second acceptance bound.
+
+The RED review round used three separate detached worktrees at that exact
+commit. Grok 4.6/high session `01a042d6-b695-74d0-9f71-f5c6c72e2331`
+reached the service's 16-turn cap after 405.283 seconds and was runner-classified
+`NO_VERDICT`; the upgraded CLI then resumed that same session once, tool-free,
+and emitted terminal `APPROVED`, P0=0/P1=0/P2=0. Kimi CLI 0.38 exact
+`kimi-code/k3` session
+`session_f926d20a-6740-442b-baff-e3a8ce98315d` independently installed and
+built its isolated worktree, reproduced the 8/8 root pass and exact one-failure
+storage result in 45.89 seconds, passed exact-four eslint, and returned
+`APPROVED`, P0=0/P1=0/P2=1. Opus 5/xhigh session
+`c8399d8c-510d-4a9f-a9fb-e0ed6768aa3f` completed with exit zero, no subagent
+or permission denial, and schema-valid `APPROVED`, P0=0/P1=0/P2=5. No
+confirmation review is required because the P0/P1 union is empty.
+
+The P2 union is owned by the D.108e2e test-infrastructure correction checkpoint
+and is closed before GREEN. The shared launcher docblocks now describe their
+actual roles. The immutable facade defaults omitted limits to the real 64-row
+default, preserves the real adapter's unfiltered omitted-scope behavior, and
+pins its six-method descriptor shape against the raw Node store. A real-store
+probe observes acceptance at 128 and rejection at 129 before reporting the
+maximum, replacing a self-referential literal. The plan now accurately claims
+that the same raw store plus fresh facade kills the module-global and reproduced
+per-call mutants, without claiming a facade-keyed mutant. Finally, the owning
+Vitest timeout is 120 seconds while the child kill remains 90 seconds, so
+fixture construction cannot invert the diagnostic deadlines. Exact-four
+eslint, Prettier, `git diff --check`, the 8/8 ownership suite and the combined
+11-pass/one-named-failure RED all pass after these corrections. D.108e4 keeps
+only its previously assigned current-row mismatch cleanup; no review debt from
+this RED remains.
 
 ##### D.108e4 — retained test-oracle cleanup
 

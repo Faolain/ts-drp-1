@@ -525,6 +525,26 @@ function firstRowAfter(rows, afterKey) {
 	return low;
 }
 
+function sameStoreShape(actual, expected) {
+	const actualKeys = Reflect.ownKeys(actual);
+	const expectedKeys = Reflect.ownKeys(expected);
+	return (
+		actualKeys.length === expectedKeys.length &&
+		expectedKeys.every((key, index) => key === actualKeys[index]) &&
+		expectedKeys.every((key) => {
+			const expectedDescriptor = Object.getOwnPropertyDescriptor(expected, key);
+			const actualDescriptor = Object.getOwnPropertyDescriptor(actual, key);
+			return (
+				expectedDescriptor !== undefined &&
+				actualDescriptor !== undefined &&
+				expectedDescriptor.enumerable === actualDescriptor.enumerable &&
+				expectedDescriptor.configurable === actualDescriptor.configurable &&
+				"value" in expectedDescriptor === "value" in actualDescriptor
+			);
+		})
+	);
+}
+
 function boundedRecoveryStore(raw, rows, expectedScope, mismatchCommit) {
 	const issuedBySequence = new Map(rows.map((row) => [row.commit.authorSequence, row.commit]));
 	const telemetry = {
@@ -580,21 +600,22 @@ function boundedRecoveryStore(raw, rows, expectedScope, mismatchCommit) {
 		},
 		readLineage: (...args) => raw.readLineage(...args),
 		readOutboxPage: (input = {}) => {
-			const limit = input.limit ?? 128;
+			const limit = input.limit ?? 64;
 			if (!Number.isInteger(limit) || limit < 1 || limit > 128) {
 				throw new TypeError("D.108e2e page facade received an invalid limit");
 			}
 			const scope = input.scope;
-			if (scope === undefined || scope.author !== expectedScope.author || scope.objectId !== expectedScope.objectId) {
+			if (scope !== undefined && (scope.author !== expectedScope.author || scope.objectId !== expectedScope.objectId)) {
 				return Promise.resolve([]);
 			}
+			const first = firstRowAfter(rows, input.afterKey);
+			const selected = rows.slice(first, first + limit);
+			if (scope === undefined) return Promise.resolve(Object.freeze([...selected]));
 			telemetry.capturedScope ??= scope;
 			if (scope !== telemetry.capturedScope) {
 				telemetry.successorPageFaultCount += 1;
 				return Promise.reject(new TypeError("D.108e2e successor-stage issuance sentinel"));
 			}
-			const first = firstRowAfter(rows, input.afterKey);
-			const selected = rows.slice(first, first + limit);
 			if (scope === telemetry.capturedScope && !telemetry.terminalEmpty) {
 				telemetry.pageCount += 1;
 				if (selected.length === 0) telemetry.terminalEmpty = true;
@@ -630,6 +651,19 @@ function boundedRecoveryStore(raw, rows, expectedScope, mismatchCommit) {
 				terminalEmpty: telemetry.terminalEmpty,
 			}),
 	};
+}
+
+async function observedMaximumPageLimit(raw, scope) {
+	const maximumPage = await raw.readOutboxPage({ limit: 128, scope });
+	if (maximumPage.length !== 128) throw new TypeError("D.108e2e real maximum page probe was incomplete");
+	let rejectedAboveMaximum = false;
+	try {
+		await raw.readOutboxPage({ limit: 129, scope });
+	} catch {
+		rejectedAboveMaximum = true;
+	}
+	if (!rejectedAboveMaximum) throw new TypeError("D.108e2e real store accepted a page above the maximum");
+	return maximumPage.length;
 }
 
 function signerFor(material, scenario, selectedAuthority, wrongAuthority, observations, state, effects, durableValues) {
@@ -999,8 +1033,10 @@ async function skipBudgetProof(material) {
 			await appendCommit(raw, scope, signedCloneCommit(genuineFuture, authorSequence, bob, objectId, 1_000));
 		}
 
+		const maximumPageLimit = await observedMaximumPageLimit(raw, scope);
 		const equalityRows = await materializeVerifiedClosure(raw, scope, 8_193, bob);
 		const equalityBounded = boundedRecoveryStore(raw, equalityRows, scope);
+		const boundedStoreShape = sameStoreShape(equalityBounded.store, raw);
 		const equality = await reopenBudgetCase(material, "-d108e2e-equality", equalityBounded.store, bob);
 
 		const separator = signedCloneCommit(currentZero, 8_193, bob, objectId, 20_000);
@@ -1034,8 +1070,9 @@ async function skipBudgetProof(material) {
 			overBudget: Object.freeze({ ...overBudget, telemetry: overBudgetBounded.telemetry() }),
 			pid: process.pid,
 			realStore: Object.freeze({
+				boundedStoreShape,
 				equalityMaterializedRows: equalityRows.length,
-				maximumPageLimit: 128,
+				maximumPageLimit,
 				overBudgetMaterializedRows: overBudgetRows.length,
 			}),
 			wallTimeMs: performance.now() - startedAt,

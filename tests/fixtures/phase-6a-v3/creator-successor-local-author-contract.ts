@@ -174,7 +174,7 @@ export async function openD108d1bMultiWriterFixture(): Promise<GenuineCreatorAdo
 }
 
 /**
- * Runs the one-process genuine D.108d1b native acceptance matrix.
+ * Runs the genuine built-package local-author child in the labeled mode.
  * @param input - Packed durable successor material.
  * @param label - Stable child failure label.
  * @returns The child's single terminal proof message.
@@ -228,7 +228,7 @@ function runLocalAuthorChild(input: unknown, label: string): Promise<D108d1bChil
 }
 
 /**
- * Runs the one-process genuine D.108d1b native acceptance matrix.
+ * Runs the genuine D.108d1b built-package local-author matrix.
  * @param input - Packed durable successor material.
  * @returns The child's single terminal proof message.
  */
