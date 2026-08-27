@@ -30,6 +30,26 @@ export const D108D1_GREEN_PATHS = Object.freeze([
 	"packages/node/package.json",
 ] as const);
 
+export const D108E2A_RED_PATHS = Object.freeze([
+	"tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts",
+	"tests/phase-6a-creator-successor-activation-red.test.ts",
+	"packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts",
+	"packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-worker.ts",
+	"packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts",
+	"packages/storage-browser/playwright.phase-6a-creator-successor-activation.config.ts",
+] as const);
+
+export const D108E2A_GREEN_PATHS = Object.freeze([
+	"packages/node/src/internal/v3-topic.ts",
+	"packages/node/src/v3-live.ts",
+	"packages/node/src/creator-adoption-activate.ts",
+] as const);
+
+export const D108E2A_BROWSER_BEHAVIORS = Object.freeze([
+	"dedicated worker holds the origin-wide lifetime lock against a Window contender then releases it",
+	"missing or hostile worker LockManager authority fails closed before activation",
+] as const);
+
 export const CREATOR_SUCCESSOR_ACTIVATION_EXPORTS = Object.freeze([
 	"activateCreatorSuccessorAdoption",
 	"reopenCreatorSuccessorAdoption",
@@ -449,5 +469,34 @@ export function d108d1SourceGovernance(): Readonly<Record<string, boolean>> {
 		roomOwnsActivationWhenProductExists: !productExists || roomConsumesActivation,
 		webLockAuthority:
 			/navigator/u.test(owner) && /locks/u.test(owner) && /request/u.test(owner) && /exclusive/u.test(owner),
+	});
+}
+
+/**
+ * Returns the bounded D.108e2a node topic-owner census.
+ * @returns Whether one private helper owns the existing stable-topic bytes.
+ */
+export function d108e2aTopicGovernance(): Readonly<Record<string, boolean | number>> {
+	const readSource = (path: string): string => {
+		const absolute = resolve(REPOSITORY_ROOT, path);
+		return existsSync(absolute) ? readFileSync(absolute, "utf8") : "";
+	};
+	const paths = [
+		"packages/node/src/creator-adoption-activate.ts",
+		"packages/node/src/internal/v3-topic.ts",
+		"packages/node/src/v3-live.ts",
+	] as const;
+	const sources = paths.map((path) => readSource(path));
+	const implementationCount = sources.reduce(
+		(count, source) => count + (source.match(/ts-drp\/live-topic\/v3/gu)?.length ?? 0),
+		0
+	);
+	const helper = sources[1] ?? "";
+	return Object.freeze({
+		helperIsPrivate: !readSource("packages/node/src/index.ts").includes("v3-topic"),
+		helperPresent: helper.length > 0,
+		implementationCount,
+		ownersConsumeHelper:
+			/\.\/internal\/v3-topic\.js/u.test(sources[0] ?? "") && /\.\/internal\/v3-topic\.js/u.test(sources[2] ?? ""),
 	});
 }

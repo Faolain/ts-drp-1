@@ -1,6 +1,6 @@
 import "fake-indexeddb/auto";
 
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -15,6 +15,22 @@ const D108D1_BROWSER_BEHAVIORS = [
 const D108D1B_ORACLE_BROWSER_BEHAVIORS = [
 	"wrong-key and throwing browser possession fail before writer activation",
 ] as const;
+const D108E2A_BROWSER_BEHAVIORS = [
+	"dedicated worker holds the origin-wide lifetime lock against a Window contender then releases it",
+	"missing or hostile worker LockManager authority fails closed before activation",
+] as const;
+
+interface WorkerReply {
+	readonly counters?: Readonly<{
+		readonly acquisitionCount: number;
+		readonly callbackCount: number;
+		readonly releaseCount: number;
+	}>;
+	readonly detail?: string;
+	readonly kind: "result" | "worker-error";
+	readonly released?: boolean;
+	readonly result?: Readonly<Record<string, unknown>>;
+}
 
 let material: unknown;
 let server: Phase4cBrowserServer | undefined;
@@ -42,8 +58,38 @@ test.beforeAll(async () => {
 	}
 	server = await startPhase4cBrowserServer({
 		entryPoint: resolve(PACKAGE_DIRECTORY, "tests/assets/phase-6a-creator-successor-activation-entry.ts"),
+		workerPoint: resolve(PACKAGE_DIRECTORY, "tests/assets/phase-6a-creator-successor-activation-worker.ts"),
 	});
 });
+
+async function workerCommand(page: Page, command: Readonly<Record<string, unknown>>): Promise<WorkerReply> {
+	return page.evaluate((selected) => {
+		const owner = globalThis as typeof globalThis & { phase6aD108e2aWorker?: Worker };
+		owner.phase6aD108e2aWorker ??= new Worker("/worker.js", { type: "module" });
+		const worker = owner.phase6aD108e2aWorker;
+		const id = crypto.randomUUID();
+		return new Promise<WorkerReply>((resolvePromise, reject) => {
+			const timer = setTimeout(() => reject(new Error("D.108e2a worker response timed out")), 20_000);
+			const receive = (event: MessageEvent<WorkerReply & Readonly<{ readonly id?: string }>>): void => {
+				if (event.data.id !== id) return;
+				clearTimeout(timer);
+				worker.removeEventListener("message", receive);
+				if (event.data.kind === "worker-error") reject(new Error(event.data.detail ?? "D.108e2a worker failed"));
+				else resolvePromise(event.data);
+			};
+			worker.addEventListener("message", receive);
+			worker.postMessage({ ...selected, id });
+		});
+	}, command);
+}
+
+async function terminateWorker(page: Page): Promise<void> {
+	await page.evaluate(() => {
+		const owner = globalThis as typeof globalThis & { phase6aD108e2aWorker?: Worker };
+		owner.phase6aD108e2aWorker?.terminate();
+		delete owner.phase6aD108e2aWorker;
+	});
+}
 
 test.afterAll(async () => server?.close());
 test("pins the complete browser behavior inventory", () => {
@@ -54,6 +100,69 @@ test("pins the complete browser behavior inventory", () => {
 	expect(D108D1B_ORACLE_BROWSER_BEHAVIORS).toEqual([
 		"wrong-key and throwing browser possession fail before writer activation",
 	]);
+	expect(D108E2A_BROWSER_BEHAVIORS).toEqual([
+		"dedicated worker holds the origin-wide lifetime lock against a Window contender then releases it",
+		"missing or hostile worker LockManager authority fails closed before activation",
+	]);
+});
+
+test(D108E2A_BROWSER_BEHAVIORS[0], async ({ page }) => {
+	await page.goto(server?.origin ?? "about:blank");
+	const databaseName = `d108e2a-worker-owner-${crypto.randomUUID()}`;
+	await page.evaluate(
+		({ databaseName: selected, material: carrier }) => window.phase6aCreatorSuccessorActivation.seed(selected, carrier),
+		{ databaseName, material }
+	);
+	try {
+		const worker = await workerCommand(page, { databaseName, kind: "open", lockMode: "native", material });
+		expect(worker.result).toMatchObject({ lockHeld: true, ok: true, verificationCount: 1 });
+		expect(worker.counters).toEqual({ acquisitionCount: 1, callbackCount: 1, releaseCount: 0 });
+		const blocked = await page.evaluate(
+			({ databaseName: selected, material: carrier }) =>
+				window.phase6aCreatorSuccessorActivation.openContender(selected, carrier),
+			{ databaseName, material }
+		);
+		expect(blocked).toMatchObject({ kind: "authority-unavailable", lockHeld: false, ok: false });
+		const released = await workerCommand(page, { kind: "release" });
+		expect(released).toMatchObject({
+			counters: { acquisitionCount: 1, callbackCount: 1, releaseCount: 1 },
+			released: true,
+		});
+		const reacquired = await page.evaluate(
+			({ databaseName: selected, material: carrier }) =>
+				window.phase6aCreatorSuccessorActivation.openContender(selected, carrier),
+			{ databaseName, material }
+		);
+		expect(reacquired).toMatchObject({ lockHeld: true, ok: true, verificationCount: 1 });
+		expect(await page.evaluate(() => window.phase6aCreatorSuccessorActivation.release())).toBe(true);
+	} finally {
+		await terminateWorker(page);
+	}
+});
+
+test(D108E2A_BROWSER_BEHAVIORS[1], async ({ page }) => {
+	await page.goto(server?.origin ?? "about:blank");
+	for (const lockMode of ["missing", "rejecting"] as const) {
+		const databaseName = `d108e2a-worker-${lockMode}-${crypto.randomUUID()}`;
+		await page.evaluate(
+			({ databaseName: selected, material: carrier }) =>
+				window.phase6aCreatorSuccessorActivation.seed(selected, carrier),
+			{ databaseName, material }
+		);
+		try {
+			const observed = await workerCommand(page, { databaseName, kind: "open", lockMode, material });
+			expect(observed.result).toMatchObject({
+				kind: "authority-unavailable",
+				lockHeld: false,
+				ok: false,
+				verificationCount: 1,
+			});
+			expect(observed.counters).toEqual({ acquisitionCount: 0, callbackCount: 0, releaseCount: 0 });
+			await workerCommand(page, { kind: "release" });
+		} finally {
+			await terminateWorker(page);
+		}
+	}
 });
 
 test("wrong-key and throwing browser possession fail before writer activation", async ({ page }) => {

@@ -327,7 +327,14 @@ async function seed(databaseName: string, packedMaterial: unknown): Promise<void
 	}
 }
 
-async function openContender(
+/**
+ * Opens one instrumented browser activation contender.
+ * @param databaseName - Exact durable browser database namespace.
+ * @param packedMaterial - Authenticated successor carriers from the native fixture.
+ * @param signerMode - Possession signer behavior for the selected probe.
+ * @returns Activation result and directly observed effects.
+ */
+export async function openContender(
 	databaseName: string,
 	packedMaterial: unknown,
 	signerMode: PossessionSignerMode = "valid"
@@ -448,7 +455,11 @@ async function probeAuthorityFailure(
 	}
 }
 
-async function release(): Promise<boolean> {
+/**
+ * Releases this realm's active contender and its durable stores.
+ * @returns Whether the realm held a contender to release.
+ */
+export async function release(): Promise<boolean> {
 	if (activeHandle === undefined) return false;
 	await Promise.resolve(activeHandle.deactivate());
 	activeHandle = undefined;
