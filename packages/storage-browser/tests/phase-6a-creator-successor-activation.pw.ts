@@ -231,10 +231,6 @@ test(D108E2A_BROWSER_BEHAVIORS[1], async ({ page }) => {
 test("wrong-key and throwing browser possession fail before writer activation", async ({ page }) => {
 	await page.goto(server?.origin ?? "about:blank");
 	const databaseName = `d108d1b-possession-failure-${crypto.randomUUID()}`;
-	await page.evaluate(
-		({ databaseName: selected, material: carrier }) => window.phase6aCreatorSuccessorActivation.seed(selected, carrier),
-		{ databaseName, material }
-	);
 	const results = await page.evaluate(
 		({ databaseName: selected, material: carrier }) =>
 			window.phase6aCreatorSuccessorActivation.probePossessionFailure(selected, carrier),
@@ -266,10 +262,6 @@ test("wrong-key and throwing browser possession fail before writer activation", 
 test(D108E2C_ACTIVATION_BROWSER_BEHAVIORS[0], async ({ browser, page }) => {
 	await page.goto(server?.origin ?? "about:blank");
 	const possessionDatabase = `d108e2c-possession-${crypto.randomUUID()}`;
-	await page.evaluate(
-		({ databaseName, material: carrier }) => window.phase6aCreatorSuccessorActivation.seed(databaseName, carrier),
-		{ databaseName: possessionDatabase, material }
-	);
 	const possessionResults = (await page.evaluate(
 		({ databaseName, material: carrier }) =>
 			window.phase6aCreatorSuccessorActivation.probePossessionFailure(databaseName, carrier),

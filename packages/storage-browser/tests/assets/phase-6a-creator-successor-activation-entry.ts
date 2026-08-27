@@ -32,11 +32,13 @@ interface ContenderResult {
 	readonly databaseName: string;
 	readonly detail?: string;
 	readonly epoch?: number;
+	readonly firstStoreOpenOrder?: number;
 	readonly fixtureDisposition: "harness-busy" | "production-result";
 	readonly kind?: string;
 	readonly lockAcquiredCount: number;
 	readonly lockCallbackCount: number;
 	readonly lockHeld: boolean;
+	readonly lockObservationOrder?: number;
 	readonly ok: boolean;
 	readonly publicationCount: number;
 	readonly recovery?: string;
@@ -60,7 +62,7 @@ declare global {
 				signerMode?: PossessionSignerMode
 			): Promise<ContenderResult>;
 			probeAuthorityFailure(databaseName: string, packedMaterial: unknown): Promise<readonly ContenderResult[]>;
-			probePossessionFailure(databaseName: string, packedMaterial: unknown): Promise<readonly ContenderResult[]>;
+			probePossessionFailure(databasePrefix: string, packedMaterial: unknown): Promise<readonly ContenderResult[]>;
 			release(): Promise<boolean>;
 			seed(databaseName: string, packedMaterial: unknown): Promise<void>;
 		}>;
@@ -256,7 +258,10 @@ function observeWindowLocks(): WindowLockObservation {
 	};
 }
 
-async function openStores(databaseName: string): Promise<
+async function openStores(
+	databaseName: string,
+	onFirstStoreOpen: () => void = () => undefined
+): Promise<
 	Readonly<{
 		issuanceStore: Awaited<ReturnType<typeof createBrowserDurableIssuanceStore>>;
 		liveJournalStore: Awaited<ReturnType<typeof createBrowserDurableLiveJournalStore>>;
@@ -264,6 +269,7 @@ async function openStores(databaseName: string): Promise<
 		store: Awaited<ReturnType<typeof createBrowserAheDurableStore>>;
 	}>
 > {
+	onFirstStoreOpen();
 	const [issuanceStore, liveJournalStore, snapshotStore, store] = await Promise.all([
 		createBrowserDurableIssuanceStore({ primaryDatabaseName: `${databaseName}-issuance` }),
 		createBrowserDurableLiveJournalStore({ primaryDatabaseName: `${databaseName}-journal` }),
@@ -404,97 +410,108 @@ export async function openContender(
 		};
 	}
 	const material = unpack(packedMaterial) as PlainRecord;
-	const stores = await openStores(databaseName);
+	let observationOrder = 0;
 	const lockObservation = observeWindowLocks();
-	const publications: unknown[] = [];
-	let signerCount = 0;
-	let verificationCount = 0;
-	const countedStore = new Proxy(stores.store, {
-		get(target, property, receiver): unknown {
-			if (property !== "recoverActiveGeneration") return Reflect.get(target, property, receiver);
-			return (...args: unknown[]): ReturnType<typeof target.recoverActiveGeneration> => {
-				verificationCount += 1;
-				return target.recoverActiveGeneration(...(args as Parameters<typeof target.recoverActiveGeneration>));
-			};
-		},
-	});
-	const signRegisteredVertexDigest = async (bytes: Uint8Array): Promise<Uint8Array> => {
-		signerCount += 1;
-		if (signerMode === "throw") throw new TypeError("D.108d1b browser signer threw");
-		return signPossession(bytes, signerMode === "wrong-key" ? WRONG_AUTHOR_SEED : FIXTURE_AUTHOR_SEED);
-	};
+	const lockObservationOrder = ++observationOrder;
 	try {
-		const result = await reopenCreatorSuccessorAdoption({
-			...(material.creatorGenesis as PlainRecord),
-			author: (material.issuance as PlainRecord).scope
-				? String(((material.issuance as PlainRecord).scope as PlainRecord).author)
-				: "",
-			catalog: trustedCatalog(material),
-			issuanceStore: stores.issuanceStore,
-			liveJournalStore: stores.liveJournalStore,
-			messageQueueManager: new BrowserTestMessageQueueManager(),
-			networkNode: network(publications),
-			onAdmittedVertex: () => undefined,
-			signRegisteredVertexDigest,
-			snapshotDeclaration: (material.snapshot as PlainRecord).declaration,
-			snapshotStore: stores.snapshotStore,
-			store: countedStore,
+		let firstStoreOpenOrder = 0;
+		const stores = await openStores(databaseName, () => {
+			firstStoreOpenOrder = ++observationOrder;
 		});
-		if (result.ok !== true) {
+		const publications: unknown[] = [];
+		let signerCount = 0;
+		let verificationCount = 0;
+		const countedStore = new Proxy(stores.store, {
+			get(target, property, receiver): unknown {
+				if (property !== "recoverActiveGeneration") return Reflect.get(target, property, receiver);
+				return (...args: unknown[]): ReturnType<typeof target.recoverActiveGeneration> => {
+					verificationCount += 1;
+					return target.recoverActiveGeneration(...(args as Parameters<typeof target.recoverActiveGeneration>));
+				};
+			},
+		});
+		const signRegisteredVertexDigest = async (bytes: Uint8Array): Promise<Uint8Array> => {
+			signerCount += 1;
+			if (signerMode === "throw") throw new TypeError("D.108d1b browser signer threw");
+			return signPossession(bytes, signerMode === "wrong-key" ? WRONG_AUTHOR_SEED : FIXTURE_AUTHOR_SEED);
+		};
+		try {
+			const result = await reopenCreatorSuccessorAdoption({
+				...(material.creatorGenesis as PlainRecord),
+				author: (material.issuance as PlainRecord).scope
+					? String(((material.issuance as PlainRecord).scope as PlainRecord).author)
+					: "",
+				catalog: trustedCatalog(material),
+				issuanceStore: stores.issuanceStore,
+				liveJournalStore: stores.liveJournalStore,
+				messageQueueManager: new BrowserTestMessageQueueManager(),
+				networkNode: network(publications),
+				onAdmittedVertex: () => undefined,
+				signRegisteredVertexDigest,
+				snapshotDeclaration: (material.snapshot as PlainRecord).declaration,
+				snapshotStore: stores.snapshotStore,
+				store: countedStore,
+			});
+			if (result.ok !== true) {
+				await Promise.allSettled([
+					stores.snapshotStore.close(),
+					stores.liveJournalStore.close(),
+					stores.issuanceStore.close(),
+					stores.store.close(),
+				]);
+				return {
+					databaseName,
+					detail: String(result.detail),
+					firstStoreOpenOrder,
+					fixtureDisposition: "production-result",
+					kind: String(result.kind),
+					...lockObservation.snapshot(),
+					lockHeld: false,
+					lockObservationOrder,
+					ok: false,
+					publicationCount: publications.length,
+					signerCount,
+					verificationCount,
+				};
+			}
+			const handle = result.handle as PlainRecord & Readonly<{ deactivate(): void | Promise<void> }>;
+			activeHandle = handle;
+			activeStores = [stores.snapshotStore, stores.liveJournalStore, stores.issuanceStore, stores.store];
+			return {
+				databaseName,
+				epoch: Number(handle.epoch),
+				firstStoreOpenOrder,
+				fixtureDisposition: "production-result",
+				...lockObservation.snapshot(),
+				lockHeld: true,
+				lockObservationOrder,
+				ok: true,
+				publicationCount: publications.length,
+				recovery: String(result.recovery),
+				signerCount,
+				verificationCount,
+			};
+		} catch (error) {
 			await Promise.allSettled([
 				stores.snapshotStore.close(),
 				stores.liveJournalStore.close(),
 				stores.issuanceStore.close(),
 				stores.store.close(),
 			]);
-			return {
-				databaseName,
-				detail: String(result.detail),
-				fixtureDisposition: "production-result",
-				kind: String(result.kind),
-				...lockObservation.snapshot(),
-				lockHeld: false,
-				ok: false,
-				publicationCount: publications.length,
-				signerCount,
-				verificationCount,
-			};
+			throw error;
 		}
-		const handle = result.handle as PlainRecord & Readonly<{ deactivate(): void | Promise<void> }>;
-		activeHandle = handle;
-		activeStores = [stores.snapshotStore, stores.liveJournalStore, stores.issuanceStore, stores.store];
-		return {
-			databaseName,
-			epoch: Number(handle.epoch),
-			fixtureDisposition: "production-result",
-			...lockObservation.snapshot(),
-			lockHeld: true,
-			ok: true,
-			publicationCount: publications.length,
-			recovery: String(result.recovery),
-			signerCount,
-			verificationCount,
-		};
-	} catch (error) {
-		await Promise.allSettled([
-			stores.snapshotStore.close(),
-			stores.liveJournalStore.close(),
-			stores.issuanceStore.close(),
-			stores.store.close(),
-		]);
-		throw error;
 	} finally {
 		lockObservation.restore();
 	}
 }
 
 async function probePossessionFailure(
-	databaseName: string,
+	databasePrefix: string,
 	packedMaterial: unknown
 ): Promise<readonly ContenderResult[]> {
 	let probeOrder = 0;
 	const run = async (suffix: string, signerMode: PossessionSignerMode): Promise<ContenderResult> => {
-		const selectedDatabaseName = `${databaseName}-${suffix}`;
+		const selectedDatabaseName = `${databasePrefix}-${suffix}`;
 		await seed(selectedDatabaseName, packedMaterial);
 		const probeStartOrder = ++probeOrder;
 		const result = await openContender(selectedDatabaseName, packedMaterial, signerMode);

@@ -1,10 +1,19 @@
 import { expect, type Page, test } from "@playwright/test";
-import { decodeCanonical } from "@ts-drp/canonical";
 import { build } from "esbuild";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+
+import { importWorkspacePackageExportFile } from "./fixtures/shared/workspace-package-export-file.mjs";
+
+const { decodeCanonical } = (
+	await importWorkspacePackageExportFile({
+		expectedPackageName: "@ts-drp/canonical",
+		exportKey: ".",
+		packageDirectory: resolve(import.meta.dirname, "../packages/canonical"),
+	})
+).module as Readonly<{ decodeCanonical(bytes: Uint8Array): unknown }>;
 
 interface ChatSnapshot {
 	readonly accepted: readonly Readonly<{

@@ -1,5 +1,15 @@
 import { expect, type Page, test } from "@playwright/test";
-import { decodeCanonical } from "@ts-drp/canonical";
+import { resolve } from "node:path";
+
+import { importWorkspacePackageExportFile } from "./fixtures/shared/workspace-package-export-file.mjs";
+
+const { decodeCanonical } = (
+	await importWorkspacePackageExportFile({
+		expectedPackageName: "@ts-drp/canonical",
+		exportKey: ".",
+		packageDirectory: resolve(import.meta.dirname, "../packages/canonical"),
+	})
+).module as Readonly<{ decodeCanonical(bytes: Uint8Array): unknown }>;
 
 interface ZoneSnapshot {
 	readonly acceptedOperationDigest: string;
@@ -104,6 +114,66 @@ async function networkSnapshot(page: Page): Promise<NetworkSnapshot> {
 	});
 }
 
+async function expectReciprocalRawUnreliableLinks(
+	sender: Page,
+	receiver: Page,
+	senderPeerId: string,
+	receiverPeerId: string
+): Promise<void> {
+	await expect
+		.poll(async () => (await zone(sender)).rawTransport.links)
+		.toEqual([{ label: "ts-drp-ephemeral/1", maxRetransmits: 0, ordered: false, peerId: receiverPeerId }]);
+	await expect
+		.poll(async () => (await zone(receiver)).rawTransport.links)
+		.toEqual([{ label: "ts-drp-ephemeral/1", maxRetransmits: 0, ordered: false, peerId: senderPeerId }]);
+	expect((await zone(sender)).rawTransport.fallbackCount).toBe(0);
+	expect((await zone(receiver)).rawTransport.fallbackCount).toBe(0);
+}
+
+async function expectOneMeasuredRawMovement(input: {
+	readonly acceptedOperationDigest: string;
+	readonly durableVertexCount: number;
+	readonly key: string;
+	readonly receiver: Page;
+	readonly receiverPeerId: string;
+	readonly sender: Page;
+	readonly senderPeerId: string;
+}): Promise<void> {
+	await expectReciprocalRawUnreliableLinks(input.sender, input.receiver, input.senderPeerId, input.receiverPeerId);
+	await input.sender.evaluate(() => {
+		const selected = document.activeElement;
+		if (selected instanceof HTMLElement) selected.blur();
+	});
+	expect(
+		await input.sender.evaluate(() => {
+			const selected = document.activeElement;
+			return !(
+				selected instanceof HTMLInputElement ||
+				selected instanceof HTMLTextAreaElement ||
+				selected instanceof HTMLSelectElement
+			);
+		})
+	).toBe(true);
+	const [senderBefore, receiverBefore] = await Promise.all([zone(input.sender), zone(input.receiver)]);
+	const positionBefore = receiverBefore.transientPositions[input.senderPeerId];
+	await input.sender.keyboard.press(input.key);
+	await expect
+		.poll(async () => {
+			const [senderAfter, receiverAfter] = await Promise.all([zone(input.sender), zone(input.receiver)]);
+			return {
+				positionChanged:
+					JSON.stringify(receiverAfter.transientPositions[input.senderPeerId]) !== JSON.stringify(positionBefore),
+				receivedAdvanced: receiverAfter.rawTransport.received > receiverBefore.rawTransport.received,
+				sentAdvanced: senderAfter.rawTransport.sent > senderBefore.rawTransport.sent,
+			};
+		})
+		.toEqual({ positionChanged: true, receivedAdvanced: true, sentAdvanced: true });
+	for (const observed of await Promise.all([zone(input.sender), zone(input.receiver)])) {
+		expect(observed.durableVertexCount).toBe(input.durableVertexCount);
+		expect(observed.acceptedOperationDigest).toBe(input.acceptedOperationDigest);
+	}
+}
+
 function expectWithinInstalledBudget(snapshot: NetworkSnapshot): void {
 	expect(snapshot.connectionBudget).toEqual({ maxConnections: 48, maxParallelDials: 6, role: "browser" });
 	expect(snapshot.connections.length).toBeLessThanOrEqual(snapshot.connectionBudget.maxConnections);
@@ -169,32 +239,24 @@ test("two real network clients recover and converge one durable v3 zone while mo
 		expect(joinedAfterBlock.acceptedOperationDigest).toBe(afterBlock.acceptedOperationDigest);
 		expect(afterBlock.durableVertexCount).toBe(3);
 		expect(joinedAfterBlock.durableVertexCount).toBe(3);
-		const beforeCreatorMovement = joinedAfterBlock.transientPositions[creatorPeerId];
-		await creator.keyboard.press("w");
-		await expect
-			.poll(async () => (await zone(joiner)).transientPositions[creatorPeerId])
-			.not.toEqual(beforeCreatorMovement);
-		expect((await zone(creator)).rawTransport.sent).toBeGreaterThan(0);
-		expect((await zone(joiner)).rawTransport.received).toBeGreaterThan(0);
-		await expect
-			.poll(async () => (await zone(creator)).rawTransport.links)
-			.toEqual([{ label: "ts-drp-ephemeral/1", maxRetransmits: 0, ordered: false, peerId: joinerPeerId }]);
-		await expect
-			.poll(async () => (await zone(joiner)).rawTransport.links)
-			.toEqual([{ label: "ts-drp-ephemeral/1", maxRetransmits: 0, ordered: false, peerId: creatorPeerId }]);
-		expect((await zone(creator)).rawTransport.fallbackCount).toBe(0);
-		expect((await zone(creator)).durableVertexCount).toBe(afterBlock.durableVertexCount);
-		expect((await zone(joiner)).durableVertexCount).toBe(afterBlock.durableVertexCount);
-		expect((await zone(creator)).acceptedOperationDigest).toBe(afterBlock.acceptedOperationDigest);
-		expect((await zone(joiner)).acceptedOperationDigest).toBe(afterBlock.acceptedOperationDigest);
-
-		const beforeJoinerMovement = (await zone(creator)).transientPositions[joinerPeerId];
-		await joiner.keyboard.press("d");
-		await expect
-			.poll(async () => (await zone(creator)).transientPositions[joinerPeerId])
-			.not.toEqual(beforeJoinerMovement);
-		expect((await zone(creator)).durableVertexCount).toBe(afterBlock.durableVertexCount);
-		expect((await zone(joiner)).durableVertexCount).toBe(afterBlock.durableVertexCount);
+		await expectOneMeasuredRawMovement({
+			acceptedOperationDigest: afterBlock.acceptedOperationDigest,
+			durableVertexCount: afterBlock.durableVertexCount,
+			key: "w",
+			receiver: joiner,
+			receiverPeerId: joinerPeerId,
+			sender: creator,
+			senderPeerId: creatorPeerId,
+		});
+		await expectOneMeasuredRawMovement({
+			acceptedOperationDigest: afterBlock.acceptedOperationDigest,
+			durableVertexCount: afterBlock.durableVertexCount,
+			key: "d",
+			receiver: creator,
+			receiverPeerId: creatorPeerId,
+			sender: joiner,
+			senderPeerId: joinerPeerId,
+		});
 
 		await joiner.evaluate(() => window.__TS_DRP_V3_ZONE__?.close());
 		await joiner.close();
@@ -221,19 +283,15 @@ test("two real network clients recover and converge one durable v3 zone while mo
 		expect((await zone(joiner)).durableVertexCount).toBe(afterOfflineProgress.durableVertexCount);
 		await expect(joiner.locator('[data-block-id="offline"]')).toBeVisible();
 
-		await expect
-			.poll(
-				async () => {
-					await creator.keyboard.press("a");
-					return (await zone(joiner)).transientPositions[creatorPeerId];
-				},
-				{ intervals: [100, 250, 500, 1_000] }
-			)
-			.toBeDefined();
-		await expect
-			.poll(async () => (await zone(joiner)).rawTransport.links)
-			.toEqual([{ label: "ts-drp-ephemeral/1", maxRetransmits: 0, ordered: false, peerId: creatorPeerId }]);
-		expect((await zone(joiner)).durableVertexCount).toBe(afterOfflineProgress.durableVertexCount);
+		await expectOneMeasuredRawMovement({
+			acceptedOperationDigest: afterOfflineProgress.acceptedOperationDigest,
+			durableVertexCount: afterOfflineProgress.durableVertexCount,
+			key: "a",
+			receiver: joiner,
+			receiverPeerId: joinerPeerId,
+			sender: creator,
+			senderPeerId: creatorPeerId,
+		});
 
 		await joiner.evaluate(() => window.__TS_DRP_V3_ZONE__?.placeBlock({ id: "rejoined", kind: "glass", x: 13, y: 21 }));
 		await expect.poll(async () => (await zone(creator)).blocks).toHaveLength(3);

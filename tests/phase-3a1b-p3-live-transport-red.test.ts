@@ -237,6 +237,24 @@ function nodeBoundaryViolations(manifestText: string, importerText: string): rea
 			".": { types: "./dist/src/index.d.ts", import: "./dist/src/index.js" },
 			"./runtime": { types: "./dist/src/runtime.d.ts", import: "./dist/src/runtime.js" },
 			"./v3-live": { types: "./dist/src/v3-live.d.ts", import: "./dist/src/v3-live.js" },
+			"./snapshot-transfer": {
+				types: "./dist/src/snapshot-transfer.d.ts",
+				import: "./dist/src/snapshot-transfer.js",
+			},
+			"./creator-seal": { types: "./dist/src/creator-seal.d.ts", import: "./dist/src/creator-seal.js" },
+			"./creator-close": { types: "./dist/src/creator-close.d.ts", import: "./dist/src/creator-close.js" },
+			"./creator-adoption": {
+				types: "./dist/src/creator-adoption.d.ts",
+				import: "./dist/src/creator-adoption.js",
+			},
+			"./creator-adoption-commit": {
+				types: "./dist/src/creator-adoption-commit.d.ts",
+				import: "./dist/src/creator-adoption-commit.js",
+			},
+			"./creator-adoption-activate": {
+				types: "./dist/src/creator-adoption-activate.d.ts",
+				import: "./dist/src/creator-adoption-activate.js",
+			},
 		})
 	) {
 		violations.push("export-targets");
@@ -704,6 +722,8 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			"V3LiveDescriptor",
 			"V3LocalIssueInput",
 			"V3LocalIssueResult",
+			"V3OperationAdmissionPolicy",
+			"V3OperationAdmissionReservation",
 			"V3PlaneActivationFailureKind",
 			"V3PlaneActivationInput",
 			"V3PlaneActivationResult",
@@ -949,32 +969,22 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 				1
 			);
 
-			const originalTextEncoder = Object.getOwnPropertyDescriptor(globalThis, "TextEncoder");
+			const originalTextEncoderEncode = Object.getOwnPropertyDescriptor(TextEncoder.prototype, "encode");
 			const installThrowingTextEncoder = (): void => {
-				Object.defineProperty(globalThis, "TextEncoder", {
+				Object.defineProperty(TextEncoder.prototype, "encode", {
 					configurable: true,
-					value: class ThrowingTextEncoder {
-						encode(): Uint8Array {
-							throw new Error("synthetic topic UTF-8 failure");
-						}
+					value: (): never => {
+						throw new Error("synthetic topic UTF-8 failure");
 					},
 				});
 			};
 			const restoreTextEncoder = (): void => {
-				if (originalTextEncoder === undefined) Reflect.deleteProperty(globalThis, "TextEncoder");
-				else Object.defineProperty(globalThis, "TextEncoder", originalTextEncoder);
+				if (originalTextEncoderEncode === undefined) Reflect.deleteProperty(TextEncoder.prototype, "encode");
+				else Object.defineProperty(TextEncoder.prototype, "encode", originalTextEncoderEncode);
 			};
-			let topicSurface!: Seam3PrivateSurface & {
+			const topicSurface = surface as Seam3PrivateSurface & {
 				readonly prepareV3LiveGeneration: PrepareV3LiveGenerationForFixture;
 			};
-			try {
-				installThrowingTextEncoder();
-				topicSurface = (await import(
-					"../packages/node/src/v3-live.js?seam3-topic-derivation-failure"
-				)) as typeof topicSurface;
-			} finally {
-				restoreTextEncoder();
-			}
 			const topicFixture = await createGenuinePreparedV3Fixture({
 				prepareV3LiveGeneration: topicSurface.prepareV3LiveGeneration,
 			});
@@ -2331,6 +2341,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			"@ts-drp/rendezvous",
 			"@ts-drp/routing-browser",
 			"@ts-drp/routing-node",
+			"@ts-drp/seal",
 			"@ts-drp/storage",
 			"@ts-drp/tracer",
 			"@ts-drp/types",
@@ -2345,10 +2356,29 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 		]);
 		expect(manifest.dependencies["@ts-drp/issuance-store"]).toBe("0.11.0");
 		expect(manifest.dependencies["@ts-drp/live-journal"]).toBe("0.11.0");
+		expect(manifest.dependencies["@ts-drp/seal"]).toBe("0.11.0");
 		expect(manifest.exports).toEqual({
 			".": { types: "./dist/src/index.d.ts", import: "./dist/src/index.js" },
 			"./runtime": { types: "./dist/src/runtime.d.ts", import: "./dist/src/runtime.js" },
 			"./v3-live": { types: "./dist/src/v3-live.d.ts", import: "./dist/src/v3-live.js" },
+			"./snapshot-transfer": {
+				types: "./dist/src/snapshot-transfer.d.ts",
+				import: "./dist/src/snapshot-transfer.js",
+			},
+			"./creator-seal": { types: "./dist/src/creator-seal.d.ts", import: "./dist/src/creator-seal.js" },
+			"./creator-close": { types: "./dist/src/creator-close.d.ts", import: "./dist/src/creator-close.js" },
+			"./creator-adoption": {
+				types: "./dist/src/creator-adoption.d.ts",
+				import: "./dist/src/creator-adoption.js",
+			},
+			"./creator-adoption-commit": {
+				types: "./dist/src/creator-adoption-commit.d.ts",
+				import: "./dist/src/creator-adoption-commit.js",
+			},
+			"./creator-adoption-activate": {
+				types: "./dist/src/creator-adoption-activate.d.ts",
+				import: "./dist/src/creator-adoption-activate.js",
+			},
 		});
 		const lock = source("pnpm-lock.yaml");
 		const importer = lock.slice(lock.indexOf("  packages/node:"), lock.indexOf("  packages/object:"));
@@ -2368,10 +2398,9 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 					"      '@ts-drp/interval-runner':\n        specifier: 0.11.0\n        version: link:../interval-runner\n      '@ts-drp/issuance-store':\n        specifier: 0.11.0\n        version: link:../issuance-store\n"
 				);
 		expect(nodeBoundaryViolations(manifestControl, importerControl)).toEqual([]);
-		const unquotedImporterControl = importerControl.replace(
-			"      '@ts-drp/issuance-store':",
-			"      @ts-drp/issuance-store:"
-		);
+		const issuanceImporterHeader = importerControl.match(/^[ ]{6}(["'])@ts-drp\/issuance-store\1:$/mu)?.[0];
+		if (issuanceImporterHeader === undefined) throw new TypeError("Node issuance importer header is absent");
+		const unquotedImporterControl = importerControl.replace(issuanceImporterHeader, "      @ts-drp/issuance-store:");
 		expect(exactNodeIssuanceImporterCount(importerControl)).toBe(1);
 		expect(exactNodeIssuanceImporterCount(unquotedImporterControl)).toBe(1);
 		expect(nodeBoundaryViolations(manifestControl, unquotedImporterControl)).toEqual([]);
@@ -2394,8 +2423,8 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			nodeBoundaryViolations(
 				manifestControl,
 				importerControl.replace(
-					"      '@ts-drp/issuance-store':\n        specifier: 0.11.0",
-					"      '@ts-drp/issuance-store':\n        specifier: 0.11.1"
+					`${issuanceImporterHeader}\n        specifier: 0.11.0`,
+					`${issuanceImporterHeader}\n        specifier: 0.11.1`
 				)
 			)
 		).toContain("issuance-importer");
@@ -2415,7 +2444,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			nodeBoundaryViolations(
 				manifestControl,
 				importerControl.replace(
-					"      '@ts-drp/issuance-store':\n        specifier: 0.11.0\n        version: link:../issuance-store\n",
+					`${issuanceImporterHeader}\n        specifier: 0.11.0\n        version: link:../issuance-store\n`,
 					""
 				)
 			)

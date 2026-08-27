@@ -194,6 +194,34 @@ function packedOracle(material) {
 	const malformedAclDigest = Buffer.from(hashDomain("ts-drp/latched-acl/v3", exactCanonicalMalformedAclBytes)).toString(
 		"hex"
 	);
+	const authenticatedAnchor = decodeCanonical(material.creatorGenesis.exactCanonicalAnchorPreimageBytes);
+	if (
+		authenticatedAnchor === null ||
+		typeof authenticatedAnchor !== "object" ||
+		Array.isArray(authenticatedAnchor) ||
+		typeof authenticatedAnchor.aclDigest !== "string"
+	) {
+		throw new TypeError("D.108e4 authenticated predecessor anchor is unavailable");
+	}
+	const authenticatedAcl = material.blobs.at(-1);
+	if (authenticatedAcl?.bytes instanceof Uint8Array !== true) {
+		throw new TypeError("D.108e4 authenticated predecessor ACL is unavailable");
+	}
+	const decodedAuthenticatedAcl = decodeCanonical(authenticatedAcl.bytes);
+	if (
+		decodedAuthenticatedAcl === null ||
+		typeof decodedAuthenticatedAcl !== "object" ||
+		Array.isArray(decodedAuthenticatedAcl)
+	) {
+		throw new TypeError("D.108e4 authenticated predecessor ACL is malformed");
+	}
+	const exactCanonicalAuthenticatedAclBytes = encodeCanonical(decodedAuthenticatedAcl);
+	const authenticatedAclDigest = Buffer.from(
+		hashDomain("ts-drp/latched-acl/v3", exactCanonicalAuthenticatedAclBytes)
+	).toString("hex");
+	const retainedAuthenticatedAclDigest = Buffer.from(
+		hashDomain("ts-drp/latched-acl/v3", authenticatedAcl.bytes)
+	).toString("hex");
 	const decodedMalformedAcl = decodeCanonical(exactCanonicalMalformedAclBytes);
 	return Object.freeze({
 		aclMembers: Object.freeze(
@@ -204,6 +232,11 @@ function packedOracle(material) {
 				})
 			)
 		),
+		authenticatedAclControl: Object.freeze({
+			anchorDigestMatches: authenticatedAclDigest === authenticatedAnchor.aclDigest,
+			bytesMatch: sameBytes(exactCanonicalAuthenticatedAclBytes, authenticatedAcl.bytes),
+			digestMatches: authenticatedAclDigest === retainedAuthenticatedAclDigest,
+		}),
 		bobCarrier: Object.freeze({
 			exactlyOnce: rows.length === 1,
 			preimageMatches:
@@ -319,7 +352,41 @@ function instrumentIssuanceStore(raw, effects, input) {
 				if (input.currentOutboxFault === "read-issued-throw") {
 					throw new TypeError("D.108e2d current issued-record read failed");
 				}
-				return commit === null ? null : repeatFaultCommit(commit, input.currentOutboxFault);
+				if (commit === null) return null;
+				const alternative = signedCloneCommit(
+					commit,
+					commit.authorSequence,
+					input.authority,
+					commit.issuedRecord.scope.objectId,
+					1_000_000
+				);
+				const issuedDigest = hashDomain("ts-drp/vertex/v3", alternative.envelope.canonicalPreimageBytes);
+				const outboxDigest = hashDomain("ts-drp/vertex/v3", commit.envelope.canonicalPreimageBytes);
+				effects.issuedMismatchEvidence = Object.freeze({
+					digestEqual: sameBytes(alternative.envelope.digest, commit.envelope.digest),
+					issuedSignatureValid:
+						sameBytes(issuedDigest, alternative.envelope.digest) &&
+						verify(
+							null,
+							Buffer.from(alternative.envelope.digest),
+							input.authority.publicKey,
+							Buffer.from(alternative.envelope.signature)
+						),
+					outboxSignatureValid:
+						sameBytes(outboxDigest, commit.envelope.digest) &&
+						verify(
+							null,
+							Buffer.from(commit.envelope.digest),
+							input.authority.publicKey,
+							Buffer.from(commit.envelope.signature)
+						),
+					preimageEqual: sameBytes(alternative.envelope.canonicalPreimageBytes, commit.envelope.canonicalPreimageBytes),
+					scopeAndSequenceEqual:
+						alternative.authorSequence === commit.authorSequence &&
+						alternative.issuedRecord.scope.author === commit.issuedRecord.scope.author &&
+						alternative.issuedRecord.scope.objectId === commit.issuedRecord.scope.objectId,
+				});
+				return alternative;
 			}
 			if (!effects.repeatPhase || authorSequence !== 1 || input.repeatOutboxFault === undefined) return commit;
 			if (input.repeatOutboxFault === "read-issued-throw") {
@@ -443,6 +510,42 @@ async function appendCommit(raw, scope, commit) {
 	});
 }
 
+function authenticateMaterializedRow(row, expectedSequence, scope, selectedAuthority) {
+	const issued = row.issued;
+	if (!matchingCommit(row.commit, issued)) throw new TypeError("D.108e2e issued/outbox rows diverged");
+	const preimage = decodeCanonical(row.commit.envelope.canonicalPreimageBytes);
+	const expectedEpoch = expectedSequence === 0 || expectedSequence === 8_193 ? 0 : 1;
+	if (
+		preimage === null ||
+		typeof preimage !== "object" ||
+		Array.isArray(preimage) ||
+		preimage.author !== scope.author ||
+		preimage.objectId !== scope.objectId ||
+		preimage.authorSequence !== expectedSequence ||
+		preimage.epoch !== expectedEpoch
+	) {
+		throw new TypeError("D.108e2e canonical row binding is invalid");
+	}
+	const digest = hashDomain("ts-drp/vertex/v3", row.commit.envelope.canonicalPreimageBytes);
+	if (
+		!sameBytes(digest, row.commit.envelope.digest) ||
+		!verify(null, Buffer.from(digest), selectedAuthority.publicKey, Buffer.from(row.commit.envelope.signature))
+	) {
+		throw new TypeError("D.108e2e durable row authentication is invalid");
+	}
+	const detached = carrierCommit(
+		Object.freeze({
+			author: scope.author,
+			authorSequence: expectedSequence,
+			canonicalPreimageBytes: row.commit.envelope.canonicalPreimageBytes,
+			digest: row.commit.envelope.digest,
+			signature: row.commit.envelope.signature,
+		}),
+		scope.objectId
+	);
+	return Object.freeze({ commit: detached, publishState: row.publishState });
+}
+
 async function materializeVerifiedClosure(raw, scope, expectedCount, selectedAuthority) {
 	const lineage = await raw.readLineage(scope);
 	if (lineage.exhausted || lineage.next !== expectedCount) {
@@ -459,38 +562,7 @@ async function materializeVerifiedClosure(raw, scope, expectedCount, selectedAut
 				throw new TypeError("D.108e2e real outbox sequence is not contiguous");
 			}
 			const issued = await raw.readIssued(scope, expectedSequence);
-			if (!matchingCommit(row.commit, issued)) throw new TypeError("D.108e2e issued/outbox rows diverged");
-			const preimage = decodeCanonical(row.commit.envelope.canonicalPreimageBytes);
-			const expectedEpoch = expectedSequence === 0 || expectedSequence === 8_193 ? 0 : 1;
-			if (
-				preimage === null ||
-				typeof preimage !== "object" ||
-				Array.isArray(preimage) ||
-				preimage.author !== scope.author ||
-				preimage.objectId !== scope.objectId ||
-				preimage.authorSequence !== expectedSequence ||
-				preimage.epoch !== expectedEpoch
-			) {
-				throw new TypeError("D.108e2e canonical row binding is invalid");
-			}
-			const digest = hashDomain("ts-drp/vertex/v3", row.commit.envelope.canonicalPreimageBytes);
-			if (
-				!sameBytes(digest, row.commit.envelope.digest) ||
-				!verify(null, Buffer.from(digest), selectedAuthority.publicKey, Buffer.from(row.commit.envelope.signature))
-			) {
-				throw new TypeError("D.108e2e durable row authentication is invalid");
-			}
-			const detached = carrierCommit(
-				Object.freeze({
-					author: scope.author,
-					authorSequence: expectedSequence,
-					canonicalPreimageBytes: row.commit.envelope.canonicalPreimageBytes,
-					digest: row.commit.envelope.digest,
-					signature: row.commit.envelope.signature,
-				}),
-				scope.objectId
-			);
-			rows.push(Object.freeze({ commit: detached, publishState: row.publishState }));
+			rows.push(authenticateMaterializedRow({ ...row, issued }, expectedSequence, scope, selectedAuthority));
 		}
 		const last = rows.at(-1);
 		if (last === undefined) throw new TypeError("D.108e2e materialized page is empty");
@@ -547,7 +619,7 @@ function sameStoreShape(actual, expected) {
 
 function boundedRecoveryStore(raw, rows, expectedScope, mismatchCommit) {
 	const issuedBySequence = new Map(rows.map((row) => [row.commit.authorSequence, row.commit]));
-	const telemetry = {
+	const newTelemetry = () => ({
 		capturedIssuedCount: 0,
 		capturedIssuedFirst: null,
 		capturedIssuedLast: null,
@@ -562,7 +634,25 @@ function boundedRecoveryStore(raw, rows, expectedScope, mismatchCommit) {
 		returnedSequencesStrictlyIncreasing: true,
 		successorPageFaultCount: 0,
 		terminalEmpty: false,
-	};
+	});
+	let telemetry = newTelemetry();
+	let invocationStarted = false;
+	const snapshotTelemetry = () =>
+		Object.freeze({
+			capturedIssuedCount: telemetry.capturedIssuedCount,
+			capturedIssuedFirst: telemetry.capturedIssuedFirst,
+			capturedIssuedLast: telemetry.capturedIssuedLast,
+			capturedIssuedStrictlyIncreasing: telemetry.capturedIssuedStrictlyIncreasing,
+			capturedIssuedSum: telemetry.capturedIssuedSum,
+			copiedIssuedSequences: Object.freeze([...telemetry.copiedIssuedSequences]),
+			firstReturnedSequence: telemetry.firstReturnedSequence,
+			lastReturnedSequence: telemetry.lastReturnedSequence,
+			pageCount: telemetry.pageCount,
+			returnedSequenceCount: telemetry.returnedSequenceCount,
+			returnedSequencesStrictlyIncreasing: telemetry.returnedSequencesStrictlyIncreasing,
+			successorPageFaultCount: telemetry.successorPageFaultCount,
+			terminalEmpty: telemetry.terminalEmpty,
+		});
 	const store = Object.freeze({
 		close: () => raw.close(),
 		compareAndMarkOutboxPublished: (...args) => raw.compareAndMarkOutboxPublished(...args),
@@ -585,18 +675,7 @@ function boundedRecoveryStore(raw, rows, expectedScope, mismatchCommit) {
 				return Promise.resolve(null);
 			const commit = issuedBySequence.get(authorSequence);
 			if (commit === undefined) return Promise.resolve(null);
-			return Promise.resolve(
-				carrierCommit(
-					Object.freeze({
-						author: expectedScope.author,
-						authorSequence,
-						canonicalPreimageBytes: commit.envelope.canonicalPreimageBytes,
-						digest: commit.envelope.digest,
-						signature: commit.envelope.signature,
-					}),
-					expectedScope.objectId
-				)
-			);
+			return Promise.resolve(commit);
 		},
 		readLineage: (...args) => raw.readLineage(...args),
 		readOutboxPage: (input = {}) => {
@@ -633,23 +712,14 @@ function boundedRecoveryStore(raw, rows, expectedScope, mismatchCommit) {
 		transactIssue: (...args) => raw.transactIssue(...args),
 	});
 	return {
+		beginInvocation: () => {
+			const preceding = invocationStarted ? snapshotTelemetry() : undefined;
+			telemetry = newTelemetry();
+			invocationStarted = true;
+			return preceding;
+		},
 		store,
-		telemetry: () =>
-			Object.freeze({
-				capturedIssuedCount: telemetry.capturedIssuedCount,
-				capturedIssuedFirst: telemetry.capturedIssuedFirst,
-				capturedIssuedLast: telemetry.capturedIssuedLast,
-				capturedIssuedStrictlyIncreasing: telemetry.capturedIssuedStrictlyIncreasing,
-				capturedIssuedSum: telemetry.capturedIssuedSum,
-				copiedIssuedSequences: Object.freeze([...telemetry.copiedIssuedSequences]),
-				firstReturnedSequence: telemetry.firstReturnedSequence,
-				lastReturnedSequence: telemetry.lastReturnedSequence,
-				pageCount: telemetry.pageCount,
-				returnedSequenceCount: telemetry.returnedSequenceCount,
-				returnedSequencesStrictlyIncreasing: telemetry.returnedSequencesStrictlyIncreasing,
-				successorPageFaultCount: telemetry.successorPageFaultCount,
-				terminalEmpty: telemetry.terminalEmpty,
-			}),
+		telemetry: snapshotTelemetry,
 	};
 }
 
@@ -745,6 +815,7 @@ async function runCase(material, index, input) {
 		authorityAttempt: -1,
 		authorityEvents: [],
 		installEpochAnchorCount: 0,
+		issuedMismatchEvidence: undefined,
 		issuanceStoreShape: false,
 		lineageReads: [],
 		order: [],
@@ -815,6 +886,7 @@ async function runCase(material, index, input) {
 			transactIssueCount: effects.transactIssueCount,
 		},
 		name: input.name,
+		...(effects.issuedMismatchEvidence === undefined ? {} : { issuedMismatchEvidence: effects.issuedMismatchEvidence }),
 		signerCalls: [...observations],
 	});
 	const issuedEvidence = async (issued) => {
@@ -1037,28 +1109,76 @@ async function skipBudgetProof(material) {
 		const equalityRows = await materializeVerifiedClosure(raw, scope, 8_193, bob);
 		const equalityBounded = boundedRecoveryStore(raw, equalityRows, scope);
 		const boundedStoreShape = sameStoreShape(equalityBounded.store, raw);
-		const equality = await reopenBudgetCase(material, "-d108e2e-equality", equalityBounded.store, bob);
+		const reuseRows = Object.freeze(equalityRows.slice(0, 8_191));
+		const reuseBounded = boundedRecoveryStore(raw, reuseRows, scope);
+		const reuseFacade = reuseBounded.store;
+		const passedFacades = [];
 
 		const separator = signedCloneCommit(currentZero, 8_193, bob, objectId, 20_000);
 		const finalFuture = signedCloneCommit(genuineFuture, 8_194, bob, objectId, 1_000);
 		await appendCommit(raw, scope, separator);
 		await appendCommit(raw, scope, finalFuture);
-		const overBudgetRows = await materializeVerifiedClosure(raw, scope, 8_195, bob);
+		const overBudgetLineage = await raw.readLineage(scope);
+		if (overBudgetLineage.exhausted || overBudgetLineage.next !== 8_195) {
+			throw new TypeError("D.108e2e real over-budget lineage does not match the expected closure");
+		}
+		const overBudgetSuffix = await raw.readOutboxPage({
+			afterKey: Object.freeze([scope.objectId, scope.author, 8_192]),
+			limit: 2,
+			scope,
+		});
+		if (overBudgetSuffix.length !== 2) throw new TypeError("D.108e2e real over-budget suffix is incomplete");
+		const authenticatedOverBudgetSuffix = [];
+		for (const [offset, row] of overBudgetSuffix.entries()) {
+			const expectedSequence = 8_193 + offset;
+			if (row.commit.authorSequence !== expectedSequence) {
+				throw new TypeError("D.108e2e real over-budget suffix is not contiguous");
+			}
+			const issued = await raw.readIssued(scope, expectedSequence);
+			authenticatedOverBudgetSuffix.push(authenticateMaterializedRow({ ...row, issued }, expectedSequence, scope, bob));
+		}
+		const overBudgetRows = Object.freeze([...equalityRows, ...authenticatedOverBudgetSuffix]);
 		const overBudgetBounded = boundedRecoveryStore(raw, overBudgetRows, scope);
-		const overBudget = await reopenBudgetCase(
-			material,
-			"-d108e2e-over-budget",
-			overBudgetBounded.store,
-			bob,
-			Buffer.from(separator.envelope.digest).toString("hex")
-		);
 
 		await appendCommit(mismatchRaw, scope, currentZero);
 		await appendCommit(mismatchRaw, scope, genuineFuture);
 		const mismatchRows = await materializeVerifiedClosure(mismatchRaw, scope, 2, bob);
 		const mismatchCommit = signedCloneCommit(genuineFuture, 1, bob, objectId, 1_000_000);
 		const mismatchBounded = boundedRecoveryStore(mismatchRaw, mismatchRows, scope, mismatchCommit);
-		const mismatch = await reopenBudgetCase(material, "-d108e2e-mismatch", mismatchBounded.store, bob);
+		const equalityPromise = reopenBudgetCase(material, "-d108e2e-equality", equalityBounded.store, bob);
+		const reusePromise = (async () => {
+			const windows = [];
+			for (let invocation = 0; invocation < 2; invocation += 1) {
+				reuseBounded.beginInvocation();
+				passedFacades.push(reuseFacade);
+				const reopened = await reopenBudgetCase(material, `-d108e4-reuse-${invocation}`, reuseFacade, bob);
+				const window = reuseBounded.telemetry();
+				windows.push(
+					Object.freeze({
+						capturedIssuedCount: window.capturedIssuedCount,
+						installEpochAnchorCount: reopened.effects.installEpochAnchorCount,
+						result: reopened.result,
+						successorPageFaultCount: window.successorPageFaultCount,
+						terminalEmpty: window.terminalEmpty,
+					})
+				);
+			}
+			return windows;
+		})();
+		const overBudgetPromise = reopenBudgetCase(
+			material,
+			"-d108e2e-over-budget",
+			overBudgetBounded.store,
+			bob,
+			Buffer.from(separator.envelope.digest).toString("hex")
+		);
+		const mismatchPromise = reopenBudgetCase(material, "-d108e2e-mismatch", mismatchBounded.store, bob);
+		const [equality, reuseWindows, overBudget, mismatch] = await Promise.all([
+			equalityPromise,
+			reusePromise,
+			overBudgetPromise,
+			mismatchPromise,
+		]);
 
 		return Object.freeze({
 			equality: Object.freeze({ ...equality, telemetry: equalityBounded.telemetry() }),
@@ -1074,6 +1194,12 @@ async function skipBudgetProof(material) {
 				equalityMaterializedRows: equalityRows.length,
 				maximumPageLimit,
 				overBudgetMaterializedRows: overBudgetRows.length,
+			}),
+			reuse: Object.freeze({
+				allowance: parameters.maxEpochVertices,
+				facadeObjectIsIdentical: passedFacades.every((candidate) => Object.is(candidate, reuseFacade)),
+				materializedRows: reuseRows.length,
+				windows: Object.freeze(reuseWindows),
 			}),
 			wallTimeMs: performance.now() - startedAt,
 		});

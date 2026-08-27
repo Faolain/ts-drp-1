@@ -1,6 +1,16 @@
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { expect, type Page, test } from "@playwright/test";
-import { hashDomain } from "@ts-drp/canonical";
+import { resolve } from "node:path";
+
+import { importWorkspacePackageExportFile } from "./fixtures/shared/workspace-package-export-file.mjs";
+
+const { hashDomain } = (
+	await importWorkspacePackageExportFile({
+		expectedPackageName: "@ts-drp/canonical",
+		exportKey: ".",
+		packageDirectory: resolve(import.meta.dirname, "../packages/canonical"),
+	})
+).module as Readonly<{ hashDomain(domain: string, bytes: Uint8Array): Uint8Array }>;
 
 interface Approval {
 	readonly signatureHex: string;
