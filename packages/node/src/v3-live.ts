@@ -3957,12 +3957,6 @@ function creatorPredecessorIssuanceStore(
 				if (row === undefined || (afterKey !== undefined && afterKey !== null && row.authorSequence <= afterKey[2])) {
 					return page;
 				}
-				const issuedCommit = await issuanceStore.readIssued(issuanceScope, row.authorSequence);
-				const issuedRow = outboxRowSnapshot(
-					ObjectFreeze({ commit: issuedCommit, publishState: row.publishState }),
-					issuanceScope
-				);
-				if (issuedRow === undefined || !matchingOutboxRows(row, issuedRow)) return page;
 				const authenticated = authenticateRecoveryVertex(
 					successorPayload,
 					successorAuthorization,
@@ -3978,6 +3972,12 @@ function creatorPredecessorIssuanceStore(
 					typeof candidateEpoch === "number" &&
 					candidateEpoch > expectedEpoch
 				) {
+					const issuedCommit = await issuanceStore.readIssued(issuanceScope, row.authorSequence);
+					const issuedRow = outboxRowSnapshot(
+						ObjectFreeze({ commit: issuedCommit, publishState: row.publishState }),
+						issuanceScope
+					);
+					if (issuedRow === undefined || !matchingOutboxRows(row, issuedRow)) return page;
 					skipped += 1;
 					if (skipped > successorPayload.parameters.maxEpochVertices) return page;
 					afterKey = ObjectFreeze([issuanceScope.objectId, issuanceScope.author, row.authorSequence]) as readonly [
