@@ -61653,9 +61653,10 @@ The immutable RED assertion/metadata roster is exactly six paths:
 - `packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts`.
 
 The contract overlap is limited in RED to static nine-path ownership and
-behavior metadata; it may not add the protocol-v3 child resolution or any
-fixture emission. The Phase-3 owner closes the inherited D.108e2a debt with a
-runtime hostile-`TextEncoder` cache mutant that remains fail closed after the
+behavior metadata plus deletion of the two now-unreferenced cross-file
+readiness-regex helpers; it may not add the protocol-v3 child resolution or
+any fixture emission. The Phase-3 owner closes the inherited D.108e2a debt
+with a runtime hostile-`TextEncoder` cache mutant that remains fail closed after the
 global constructor is restored and a TypeScript-AST census proving exactly one
 production `ts-drp/live-topic/v3` domain owner with the two intended activation
 consumers. Those retained controls are expected to pass in RED and are not
@@ -61668,11 +61669,14 @@ opener result, and the negative/unsafe-`next` cases. The activation Playwright
 composite fails once per engine because results lack callback-entry,
 lock-acquired and production-versus-harness disposition telemetry and because
 the two possession probes are not sequential distinct-database cases. The
-product Playwright composite fails once per engine because neither
-post-activation pause/release gate exists. The nine-path ownership assertion,
-Phase-3 controls and all earlier behavioral cases remain green. RED may not
-edit either child/entry emitter, add a production owner or satisfy an assertion
-in the same commit. A required production edit, new public field or
+product Playwright composite fails once per engine because the product entry
+neither passes the two gate configurations through nor exposes their release
+functions. The RED-owned esbuild instrumentation contains the genuine
+post-activation and post-predecessor-deactivation interception points so GREEN
+does not need to edit a frozen assertion owner. The nine-path ownership
+assertion, Phase-3 controls and all earlier behavioral cases remain green. RED
+may not edit either child/entry emitter, add a production owner or satisfy an
+assertion in the same commit. A required production edit, new public field or
 implementation-relative import stops and reslices.
 
 The exact GREEN emission roster is four paths:
@@ -61708,14 +61712,15 @@ throwing probes run sequentially only after separately seeding visibly
 distinct names and both reach zero callbacks.
 
 The product Playwright owner keeps the frozen D.108e2b contract inventory
-unchanged and owns any D.108e2c behavior labels locally. Its two pause gates
-are test-bundle instrumentation only: one resolves immediately after
-successful successor activation and one after underlying predecessor
-deactivation completes. Beginning `close()` at either gate leaves adoption and
-close unsettled until release, then cleans the replacement exactly once,
-releases the predecessor exactly once overall, rejects adoption as closed and
-fulfills close in causal order. The shipped room and chat modules remain
-byte-identical.
+unchanged and owns any D.108e2c behavior labels locally. RED installs its two
+pause gates inside the test-bundle instrumentation plugin: one resolves
+immediately after successful successor activation and one after underlying
+predecessor deactivation completes. GREEN only widens the entry's private
+fixture facade to pass configuration through, expose both releases and surface
+the counters. Beginning `close()` at either gate leaves adoption and close
+unsettled until release, then cleans the replacement exactly once, releases the
+predecessor exactly once overall, rejects adoption as closed and fulfills close
+in causal order. The shipped room and chat modules remain byte-identical.
 
 Acceptance is due before D.108e2d RED. It requires the focused local-author
 unit/native child and all three activation/product browser engines; retained
@@ -61765,8 +61770,62 @@ instrumentation protects the retained worker counters, protocol-v3 package
 resolution/build ownership is explicit, the malformed member is a direct
 opener proof, accepted versus short-circuited lineage windows are distinct and
 the already-present mixed order is not allowed to satisfy the net-new RED.
-This is the one same-round plan correction; it receives no confirmation
+This is the one same-round plan-freeze correction; it receives no confirmation
 review.
+
+The immutable RED review round inspected signed commit
+`70d719b7a7e82d2b21982f4ffe5b7b225a7daa61`, parent `aae05007`, and the exact
+six-path range `aae05007..70d719b7`. Grok 4.6/high session
+`01a04210-ae5e-7e50-b9c6-7784a117252b` completed normally after 570.186
+seconds with exit code 0 and `stop_reason=end_turn`; the upgraded service did
+not cancel the run. Its public terminal was `APPROVED`, P0=0/P1=0/P2=2. The
+runner nevertheless classified the streamed response `NO_VERDICT`; a
+schema-constrained, tool-free continuation of that same session returned the
+identical verdict, findings and wording in one turn as valid structured JSON.
+Kimi K3 session `session_6434dca5-7628-41f0-8970-82bfca862aaa` returned
+`CHANGES_REQUIRED`, P0=0/P1=1/P2=2 and exactly 101 nonblank lines, with
+CHECK001 through CHECK100 in order and exactly once followed by FINAL. Opus
+5/xhigh session `f73ac2a6-0a85-4f6c-baa8-239047f9d0a4` used no subagent and
+returned schema-valid `CHANGES_REQUIRED`, P0=1/P1=1/P2=4. No reviewer edited
+the tree, no Fable or collaboration subagent ran and no confirmation review
+was requested.
+
+Kimi and Opus reproduced the material custody blocker: the two causal pauses
+can only be placed in the esbuild instrumentation plugin inside the product
+Playwright owner, while the original RED had frozen that owner before adding
+them. Opus also reproduced TS2339 from the native proof cast omitting its
+`oracle` member. Their lower-severity union exposed a vacuous
+`findIndex === -1` signer-order check, dead readiness regexes, a start-label that did not
+prove sequential probe completion, a post-completion authority observation,
+the settlement's already-captured lifetime field, and a consumer census that
+recognized only one literal named-import shape. Grok independently identified
+the settlement and dead-helper defects. The single same-round RED correction
+`b18d0143` adds the two genuine test-bundle gates while leaving the entry absent
+so the composite remains RED, fixes the proof type, requires a present signer,
+deletes both dead helpers, pins monotonic start/finish order, observes authority
+before gate release, includes exact lifetime settlement telemetry, and resolves
+static, namespace, export, require and dynamic imports across package and
+example source roots. Every reproduced finding is closed in D.108e2c; none is
+carried to a later owner.
+
+The corrected RED evidence used `pnpm exec vitest run
+--coverage.enabled=false tests/phase-3a1b-p3-live-transport-red.test.ts -t
+'derives only the exact stable-genesis topic and uses it as queue and wire
+identity'` (1/1 passed), and `pnpm exec vitest run --coverage.enabled=false
+tests/phase-6a-creator-successor-local-author-red.test.ts
+packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts`
+(8 collected, 7 passed, only the genuine child composite failed). The exact
+activation Playwright config collected 21 and passed 18, with only the new
+composite failing in Chromium, Firefox and WebKit; the exact product config
+collected 18 and passed 15 with the same one-composite-per-engine inventory.
+`pnpm --filter @ts-drp/storage-browser typecheck`, exact-five ESLint with zero
+warnings, Prettier and `git diff --check` passed. `pnpm --filter
+@ts-drp/storage-node typecheck` no longer reports TS2339 in the corrected owner
+but still stops on the inherited local missing-build and cross-package
+`rootDir`/file-list baseline; the GREEN/evidence dependency build must precede
+and rerun that package typecheck. The three non-contract GREEN emitters remain
+byte-identical to the immutable RED. Signed correction `b18d0143` is pushed to
+`origin/codex/phase3a1b-p6-golden-path`.
 
 ##### D.108e2d — retained recovery performance evidence
 
