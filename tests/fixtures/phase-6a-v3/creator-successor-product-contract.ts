@@ -39,6 +39,33 @@ export const D108E2B_BROWSER_BEHAVIORS = Object.freeze([
 	"predecessor deactivation failure cleans the replacement before escaping",
 ] as const);
 
+export const D108E2C_PRODUCT_BROWSER_BEHAVIORS = Object.freeze([
+	"close at the post-activation gate cleans the successor exactly once",
+	"close at the post-predecessor-deactivation gate preserves causal cleanup",
+] as const);
+
+export const D108E3_RED_PATHS = Object.freeze([
+	"tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
+	"tests/phase-6a-creator-successor-product-red.test.ts",
+	"packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts",
+	"packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+] as const);
+
+export const D108E3_GREEN_PATHS = Object.freeze(["examples/v3-room/src/index.ts"] as const);
+
+export const D108E3_BROWSER_BEHAVIORS = Object.freeze([
+	"cleanup failure preserves the predecessor failure in an ordered aggregate",
+	"activation failure remains primary while close joins adoption",
+	"drain failure still shuts down and releases browser ownership",
+	"drain and shutdown failure preserve ordered primary and cleanup errors",
+	"rehearsal blocks later adoption until its migration record releases",
+	"activation blocks later adoption until terminal transition releases",
+	"adoption blocks later rehearsal until verification releases",
+	"adoption blocks later activation until verification releases",
+	"independent room sessions do not share one lifetime queue",
+	"a failed adoption releases the lifetime queue for retry",
+] as const);
+
 const D108D2_ROOM_INPUT_KEYS = Object.freeze([
 	"application",
 	"author",

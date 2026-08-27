@@ -1,6 +1,31 @@
-import { decodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 
 type PlainRecord = Readonly<Record<string, unknown>>;
+
+interface DirectRoomSession {
+	adoptCreatorSuccessor(): Promise<void>;
+	close(): Promise<void>;
+	issue(operation: Readonly<Record<string, unknown>>): Promise<void>;
+	sealEpoch(): Promise<unknown>;
+}
+
+interface DirectKeychain {
+	readonly localAuthorId: string;
+	signWithLocalAuthor(digest: Uint8Array): Promise<Uint8Array>;
+	start(): Promise<void>;
+}
+
+interface DirectRoomDependencies {
+	readonly Keychain: new (input: Readonly<{ readonly private_key_seed: string }>) => DirectKeychain;
+	createRecoverableFinalitySigner(
+		input: Readonly<{ readonly seed: Uint8Array }>
+	): Promise<Readonly<{ readonly publicKey: Uint8Array; readonly signer: unknown }>>;
+	createV3ChatApplication(clientId: "alice"): Readonly<{
+		readonly catalog: Readonly<{ readonly blueprintDigests: readonly string[] }>;
+	}>;
+	createV3RoomCreatorInviteMaterial(input: Readonly<Record<string, unknown>>): Promise<unknown>;
+	createV3RoomSession(input: Readonly<Record<string, unknown>>): Promise<DirectRoomSession>;
+}
 
 interface RelayPacket {
 	readonly channelName: string;
@@ -57,10 +82,12 @@ interface SuccessorCarrier {
 }
 
 interface ProductApi {
+	activateMigration(receipt: unknown): Promise<unknown>;
 	adoptSuccessor?(): Promise<void>;
 	close(): Promise<void>;
 	create(input: unknown): Promise<string>;
 	join(input: unknown): Promise<void>;
+	rehearseMigration(): Promise<unknown>;
 	sealEpoch(): Promise<PlainRecord>;
 	send(text: string): Promise<void>;
 	snapshot(): PlainRecord;
@@ -77,23 +104,43 @@ interface LifetimeInstrumentationSnapshot {
 	readonly verificationCount: number;
 }
 
+interface TransitionInstrumentationSnapshot extends LifetimeInstrumentationSnapshot {
+	readonly independentVerificationCount: number;
+	readonly issueThrowCount: number;
+	readonly migrationRecordIssueCount: number;
+	readonly nestedPredecessorDeactivateCount: number;
+	readonly terminalTransitionCount: number;
+}
+
 interface LifetimeInstrumentation {
 	cleanupReplacements(): Promise<void>;
 	configure(
 		input: Readonly<{
+			readonly injectActivationFailure?: boolean;
 			readonly pauseAfterActivation?: boolean;
+			readonly pauseActivationFailure?: boolean;
 			readonly pauseAfterPredecessorDeactivation?: boolean;
+			readonly pauseMigrationRecord?: boolean;
+			readonly pauseTerminalTransition?: boolean;
 			readonly pauseVerification?: boolean;
 			readonly rejectPredecessorDeactivate?: boolean;
+			readonly rejectReplacementDeactivate?: boolean;
+			readonly retainTarget?: boolean;
+			readonly throwIssueLocal?: boolean;
 		}>
 	): void;
+	releaseActivationFailure(): void;
+	releaseMigrationRecord(): void;
 	releasePostActivation(): void;
 	releasePostPredecessorDeactivation(): void;
+	releaseTerminalTransition(): void;
 	releaseVerification(): void;
 	snapshot(): LifetimeInstrumentationSnapshot;
+	transitionSnapshot(): TransitionInstrumentationSnapshot;
 }
 
 interface ObservedSettlement {
+	readonly aggregate?: readonly string[];
 	readonly detail?: string;
 	readonly lifetime?: LifetimeInstrumentationSnapshot;
 	readonly order?: number;
@@ -106,35 +153,68 @@ declare global {
 		phase6aCreatorSuccessorProduct: Readonly<{
 			adoptSuccessor(): Promise<void>;
 			beginAdoption(): void;
+			beginActivation(): void;
 			beginClose(): void;
+			beginRehearsal(): void;
+			beginSend(text: string): void;
 			boot(realmId: string): Promise<void>;
 			close(): Promise<void>;
 			cleanupLifetimeReplacements(): Promise<void>;
 			configureLifetime(
 				input: Readonly<{
+					readonly injectActivationFailure?: boolean;
 					readonly pauseAfterActivation?: boolean;
+					readonly pauseActivationFailure?: boolean;
 					readonly pauseAfterPredecessorDeactivation?: boolean;
+					readonly pauseMigrationRecord?: boolean;
+					readonly pauseTerminalTransition?: boolean;
 					readonly pauseVerification?: boolean;
 					readonly rejectPredecessorDeactivate?: boolean;
+					readonly rejectReplacementDeactivate?: boolean;
+					readonly retainTarget?: boolean;
+					readonly throwIssueLocal?: boolean;
 				}>
 			): void;
 			concurrentAdoption(): Promise<readonly [ObservedSettlement, ObservedSettlement]>;
+			beginDirectAdoption(name: string): void;
+			beginDirectClose(name: string): void;
+			beginDirectSend(name: string, text: string): void;
+			closeDirectCreator(name: string): Promise<void>;
 			create(input: unknown): Promise<string>;
+			deleteDatabases(prefix: string): Promise<void>;
 			deliver(packet: RelayPacket): void;
 			exportSuccessor(databaseName: string): Promise<SuccessorCarrier>;
 			importSuccessor(carrier: SuccessorCarrier, sourceDatabaseName: string, targetDatabaseName: string): Promise<void>;
 			join(input: unknown): Promise<void>;
 			lifetimeSnapshot(): LifetimeInstrumentationSnapshot &
 				Readonly<{ readonly adoptionSettled: boolean; readonly closeSettled: boolean }>;
+			openDirectCreator(name: string): Promise<void>;
 			relayAudit(): RelayAudit;
+			prepareRehearsal(): Promise<void>;
+			releaseActivationFailure(): void;
+			releaseMigrationRecord(): void;
 			releasePostActivation(): void;
 			releasePostPredecessorDeactivation(): void;
+			releaseTerminalTransition(): void;
 			releaseVerification(): void;
 			sealEpoch(): Promise<PlainRecord>;
+			sealDirectCreator(name: string): Promise<void>;
 			send(text: string): Promise<void>;
 			snapshot(): PlainRecord;
+			transitionSnapshot(): TransitionInstrumentationSnapshot &
+				Readonly<{
+					readonly activationSettled: boolean;
+					readonly adoptionSettled: boolean;
+					readonly closeSettled: boolean;
+					readonly rehearsalSettled: boolean;
+					readonly sendSettled: boolean;
+				}>;
 			waitForAdoption(): Promise<ObservedSettlement>;
+			waitForActivation(): Promise<ObservedSettlement>;
 			waitForClose(): Promise<ObservedSettlement>;
+			waitForDirectAdoption(name: string): Promise<ObservedSettlement>;
+			waitForDirectClose(name: string): Promise<ObservedSettlement>;
+			waitForRehearsal(): Promise<ObservedSettlement>;
 		}>;
 	}
 }
@@ -149,10 +229,20 @@ let relaySequence = 0;
 let realmId = "";
 let booted = false;
 let adoptionSettled = false;
+let activationSettled = false;
 let closeSettled = false;
+let rehearsalSettled = false;
+let sendSettled = false;
 let settlementSequence = 0;
 let pendingAdoption: Promise<ObservedSettlement> | undefined;
+let pendingActivation: Promise<ObservedSettlement> | undefined;
 let pendingClose: Promise<ObservedSettlement> | undefined;
+let pendingRehearsal: Promise<ObservedSettlement> | undefined;
+let pendingSend: Promise<ObservedSettlement> | undefined;
+let migrationReceipt: unknown;
+const directRooms = new Map<string, DirectRoomSession>();
+const pendingDirectAdoptions = new Map<string, Promise<ObservedSettlement>>();
+const pendingDirectCloses = new Map<string, Promise<ObservedSettlement>>();
 
 function instrumentation(): LifetimeInstrumentation {
 	const selected = Reflect.get(globalThis, "__d108e2bLifetimeInstrumentation");
@@ -178,7 +268,14 @@ function observe(task: Promise<void>, settled: () => void, capture = false): Pro
 		},
 		(error: unknown) => {
 			settled();
+			const aggregate =
+				error instanceof AggregateError
+					? Object.freeze(
+							error.errors.map((entry: unknown) => (entry instanceof Error ? entry.message : String(entry)))
+						)
+					: undefined;
 			return Object.freeze({
+				...(aggregate === undefined ? {} : { aggregate }),
 				detail: error instanceof Error ? error.message : String(error),
 				...extras(),
 				status: "rejected" as const,
@@ -582,6 +679,170 @@ async function rawSnapshotDeclaration(databaseName: string): Promise<PlainRecord
 	}
 }
 
+const DIRECT_PARAMETERS = Object.freeze({
+	maxDependencies: 16,
+	maxEpochBytes: 8_388_608,
+	maxEpochVertices: 8192,
+	maxPendingBytes: 16_777_216,
+	maxPendingEntries: 4096,
+	maxSnapshotBytes: 268_435_456,
+	snapshotChunkBytes: 131_072,
+});
+
+function bytesFromHex(value: string): Uint8Array {
+	if (value.length === 0 || value.length % 2 !== 0 || !/^[0-9a-f]+$/u.test(value)) {
+		throw new TypeError("D.108e3 direct-room author is invalid");
+	}
+	return Uint8Array.from(value.match(/.{2}/gu) ?? [], (pair) => Number.parseInt(pair, 16));
+}
+
+async function localAuthorSeed(configuredSeed: string): Promise<Uint8Array> {
+	const encodedSeed = new TextEncoder().encode(configuredSeed);
+	const seed = new Uint8Array(await crypto.subtle.digest("SHA-512", encodedSeed));
+	const domain = new TextEncoder().encode("ts-drp-keychain/local-author-ed25519/v1");
+	const preimage = new Uint8Array(domain.byteLength + 1 + seed.byteLength);
+	preimage.set(domain, 0);
+	preimage[domain.byteLength] = 0;
+	preimage.set(seed, domain.byteLength + 1);
+	return new Uint8Array(await crypto.subtle.digest("SHA-256", preimage));
+}
+
+function directTransport(peerId: string): unknown {
+	const topics = new Set<string>();
+	const node = {
+		broadcastMessage: (): Promise<void> => Promise.resolve(),
+		changeTopicScoreParams: (): void => undefined,
+		connect: (): Promise<void> => Promise.resolve(),
+		connectToBootstraps: (): Promise<void> => Promise.resolve(),
+		disconnect: (): Promise<void> => Promise.resolve(),
+		getAllPeers: (): string[] => [],
+		getBootstrapNodes: (): [] => [],
+		getGroupPeers: (): [] => [],
+		getMultiaddrs: (): [] => [],
+		getPeerMultiaddrs: (): Promise<[]> => Promise.resolve([]),
+		getSubscribedTopics: (): string[] => [...topics],
+		gossipTopicFor: (): undefined => undefined,
+		isDialable: (): Promise<boolean> => Promise.resolve(true),
+		membershipVerifier: undefined,
+		peerId,
+		publishMessage: (): Promise<true> => Promise.resolve(true),
+		removeTopicScoreParams: (): void => undefined,
+		restart: (): Promise<void> => Promise.resolve(),
+		sendGroupMessageRandomPeer: (): Promise<void> => Promise.resolve(),
+		sendMessage: (): Promise<void> => Promise.resolve(),
+		start: (): Promise<void> => Promise.resolve(),
+		stop: (): Promise<void> => Promise.resolve(),
+		subscribe: (topic: string): void => {
+			topics.add(topic);
+		},
+		subscribeToMessageQueue: (): void => undefined,
+		unsubscribe: (topic: string): void => {
+			topics.delete(topic);
+		},
+	};
+	return Object.freeze({
+		close(): void {
+			return undefined;
+		},
+		networkNode: node,
+		openEphemeral(): never {
+			throw new TypeError("D.108e3 direct-room ephemeral transport is unavailable");
+		},
+		requestRetainedHistory(): void {
+			return undefined;
+		},
+		setIngressHandler(): void {
+			return undefined;
+		},
+		setRetainedPublisher(): void {
+			return undefined;
+		},
+	});
+}
+
+function directDependencies(): DirectRoomDependencies {
+	const selected = Reflect.get(globalThis, "__d108e3DirectRoomDependencies");
+	if (selected === null || typeof selected !== "object") {
+		throw new TypeError("D.108e3 direct-room dependencies are unavailable");
+	}
+	return selected as DirectRoomDependencies;
+}
+
+async function createDirectRoom(name: string): Promise<DirectRoomSession> {
+	if (name.length === 0 || directRooms.has(name)) throw new TypeError("D.108e3 direct room identity is invalid");
+	const databaseName = `d108e3-direct-${name}`;
+	const objectDigest = hex(hashDomain("ts-drp/d108e3-direct-room/v1", new TextEncoder().encode(databaseName))).slice(
+		0,
+		32
+	);
+	const objectId = `creator:${objectDigest}`;
+	const dependencies = directDependencies();
+	const authorKeychain = new dependencies.Keychain({ private_key_seed: `d108e3-direct-author-${name}` });
+	await authorKeychain.start();
+	const finalitySeed = `d108e3-direct-finality-${name}`;
+	const finalityKeychain = new dependencies.Keychain({ private_key_seed: finalitySeed });
+	await finalityKeychain.start();
+	const finality = await dependencies.createRecoverableFinalitySigner({ seed: await localAuthorSeed(finalitySeed) });
+	if (hex(finality.publicKey) !== finalityKeychain.localAuthorId) {
+		throw new TypeError("D.108e3 direct-room finality identity differs");
+	}
+	const application = dependencies.createV3ChatApplication("alice");
+	const blueprintDigest = application.catalog.blueprintDigests[0];
+	if (blueprintDigest === undefined) throw new TypeError("D.108e3 direct-room blueprint is absent");
+	const signerSet = Object.freeze([Object.freeze({ publicKey: finalityKeychain.localAuthorId, signerId: "creator" })]);
+	const creatorInvite = await dependencies.createV3RoomCreatorInviteMaterial({
+		blueprintDigest,
+		exactCanonicalApplicationStateBytes: encodeCanonical([]),
+		exactCanonicalLatchedAclBytes: encodeCanonical({
+			epoch: 0,
+			kind: "drp-v3-latched-acl",
+			members: [
+				{
+					author: authorKeychain.localAuthorId,
+					finalityKey: authorKeychain.localAuthorId,
+					groups: ["admin", "finality", "writer"],
+				},
+			],
+			objectId,
+			permissionless: false,
+			version: 1,
+		}),
+		exactCanonicalParametersCarrierBytes: encodeCanonical(DIRECT_PARAMETERS),
+		exactCanonicalProfileBytes: encodeCanonical({
+			cryptoSuiteId: "ed25519-sha256-v3",
+			profileId: "creator-trusted-v1",
+			quorum: 1,
+			signers: signerSet,
+		}),
+		exactCanonicalSignerSetBytes: encodeCanonical(signerSet),
+		objectId,
+		signGenesisAnchorDigest: (anchorDigest: Uint8Array) => finalityKeychain.signWithLocalAuthor(anchorDigest),
+	});
+	return dependencies.createV3RoomSession({
+		application,
+		author: authorKeychain.localAuthorId,
+		creatorFinalitySigner: finality.signer,
+		creatorInvite,
+		databaseName,
+		initialLogicalTime: 3,
+		issuanceDatabaseName: databaseName,
+		migrationDatabaseNamespace: databaseName,
+		objectId,
+		onAcceptedVertex: () => undefined,
+		onProjection: () => undefined,
+		openTransport: () => directTransport(authorKeychain.localAuthorId),
+		publicKeyBytes: bytesFromHex(authorKeychain.localAuthorId),
+		signRegisteredVertexDigest: (registeredDigest: Uint8Array) => authorKeychain.signWithLocalAuthor(registeredDigest),
+	});
+}
+
+async function removeDirectDatabases(name: string): Promise<void> {
+	const prefix = `d108e3-direct-${name}`;
+	for (const { name: databaseName } of await indexedDB.databases()) {
+		if (databaseName?.startsWith(prefix) === true) await deleteDatabase(databaseName);
+	}
+}
+
 function productApi(): ProductApi {
 	const selected = Reflect.get(globalThis, "d9336V3Chat");
 	if (selected === null || typeof selected !== "object") throw new TypeError("D.108d2 chat product is unavailable");
@@ -605,6 +866,20 @@ const api = Object.freeze({
 			true
 		);
 	},
+	beginActivation(): void {
+		if (pendingActivation !== undefined) throw new TypeError("D.108e3 activation observation is already active");
+		if (migrationReceipt === undefined) throw new TypeError("D.108e3 migration receipt is absent");
+		activationSettled = false;
+		pendingActivation = observe(
+			productApi()
+				.activateMigration(migrationReceipt)
+				.then(() => undefined),
+			() => {
+				activationSettled = true;
+			},
+			true
+		);
+	},
 	beginClose(): void {
 		if (pendingClose !== undefined) throw new TypeError("D.108e2b close observation is already active");
 		closeSettled = false;
@@ -612,6 +887,66 @@ const api = Object.freeze({
 			productApi().close(),
 			() => {
 				closeSettled = true;
+			},
+			true
+		);
+	},
+	beginDirectAdoption(name: string): void {
+		const room = directRooms.get(name);
+		if (room === undefined || pendingDirectAdoptions.has(name)) {
+			throw new TypeError("D.108e3 direct adoption observation is invalid");
+		}
+		pendingDirectAdoptions.set(
+			name,
+			observe(room.adoptCreatorSuccessor(), () => undefined, true)
+		);
+	},
+	beginDirectClose(name: string): void {
+		const room = directRooms.get(name);
+		if (room === undefined || pendingDirectCloses.has(name)) {
+			throw new TypeError("D.108e3 direct close observation is invalid");
+		}
+		pendingDirectCloses.set(
+			name,
+			observe(room.close(), () => undefined, true)
+		);
+	},
+	beginDirectSend(name: string, text: string): void {
+		const room = directRooms.get(name);
+		if (room === undefined || pendingSend !== undefined) {
+			throw new TypeError("D.108e3 direct send observation is invalid");
+		}
+		sendSettled = false;
+		pendingSend = observe(
+			room.issue({ action: "message", clientOperationId: crypto.randomUUID(), text }),
+			() => {
+				sendSettled = true;
+			},
+			true
+		);
+	},
+	beginRehearsal(): void {
+		if (pendingRehearsal !== undefined) throw new TypeError("D.108e3 rehearsal observation is already active");
+		rehearsalSettled = false;
+		pendingRehearsal = observe(
+			productApi()
+				.rehearseMigration()
+				.then((receipt) => {
+					migrationReceipt = receipt;
+				}),
+			() => {
+				rehearsalSettled = true;
+			},
+			true
+		);
+	},
+	beginSend(text: string): void {
+		if (pendingSend !== undefined) throw new TypeError("D.108e3 send observation is already active");
+		sendSettled = false;
+		pendingSend = observe(
+			api.send(text),
+			() => {
+				sendSettled = true;
 			},
 			true
 		);
@@ -636,21 +971,44 @@ const api = Object.freeze({
 	close(): Promise<void> {
 		return productApi().close();
 	},
+	async closeDirectCreator(name: string): Promise<void> {
+		const room = directRooms.get(name);
+		if (room !== undefined) {
+			directRooms.delete(name);
+			await room.close().catch(() => undefined);
+		}
+		pendingDirectAdoptions.delete(name);
+		pendingDirectCloses.delete(name);
+		await removeDirectDatabases(name);
+	},
 	cleanupLifetimeReplacements(): Promise<void> {
 		return instrumentation().cleanupReplacements();
 	},
 	configureLifetime(
 		input: Readonly<{
+			readonly injectActivationFailure?: boolean;
 			readonly pauseAfterActivation?: boolean;
+			readonly pauseActivationFailure?: boolean;
 			readonly pauseAfterPredecessorDeactivation?: boolean;
+			readonly pauseMigrationRecord?: boolean;
+			readonly pauseTerminalTransition?: boolean;
 			readonly pauseVerification?: boolean;
 			readonly rejectPredecessorDeactivate?: boolean;
+			readonly rejectReplacementDeactivate?: boolean;
+			readonly retainTarget?: boolean;
+			readonly throwIssueLocal?: boolean;
 		}>
 	): void {
 		adoptionSettled = false;
+		activationSettled = false;
 		closeSettled = false;
+		rehearsalSettled = false;
+		sendSettled = false;
 		pendingAdoption = undefined;
+		pendingActivation = undefined;
 		pendingClose = undefined;
+		pendingRehearsal = undefined;
+		pendingSend = undefined;
 		settlementSequence = 0;
 		instrumentation().configure(input);
 	},
@@ -663,6 +1021,13 @@ const api = Object.freeze({
 	},
 	create(input: unknown): Promise<string> {
 		return productApi().create(input);
+	},
+	async deleteDatabases(prefix: string): Promise<void> {
+		const names = (await indexedDB.databases())
+			.map(({ name }) => name)
+			.filter((name): name is string => name?.startsWith(prefix) === true)
+			.sort();
+		for (const name of names) await deleteDatabase(name);
 	},
 	deliver(packet: RelayPacket): void {
 		if (packet.realmId === realmId) return;
@@ -702,6 +1067,12 @@ const api = Object.freeze({
 		Readonly<{ readonly adoptionSettled: boolean; readonly closeSettled: boolean }> {
 		return Object.freeze({ ...instrumentation().snapshot(), adoptionSettled, closeSettled });
 	},
+	async openDirectCreator(name: string): Promise<void> {
+		directRooms.set(name, await createDirectRoom(name));
+	},
+	async prepareRehearsal(): Promise<void> {
+		migrationReceipt = await productApi().rehearseMigration();
+	},
 	relayAudit(): RelayAudit {
 		const copy = (observation: RelayMessageObservation): RelayMessageObservation =>
 			Object.freeze({ ...observation, data: Uint8Array.from(observation.data) });
@@ -714,11 +1085,20 @@ const api = Object.freeze({
 			realmId,
 		});
 	},
+	releaseActivationFailure(): void {
+		instrumentation().releaseActivationFailure();
+	},
+	releaseMigrationRecord(): void {
+		instrumentation().releaseMigrationRecord();
+	},
 	releasePostActivation(): void {
 		instrumentation().releasePostActivation();
 	},
 	releasePostPredecessorDeactivation(): void {
 		instrumentation().releasePostPredecessorDeactivation();
+	},
+	releaseTerminalTransition(): void {
+		instrumentation().releaseTerminalTransition();
 	},
 	releaseVerification(): void {
 		instrumentation().releaseVerification();
@@ -726,11 +1106,33 @@ const api = Object.freeze({
 	sealEpoch(): Promise<PlainRecord> {
 		return productApi().sealEpoch();
 	},
+	async sealDirectCreator(name: string): Promise<void> {
+		const room = directRooms.get(name);
+		if (room === undefined) throw new TypeError("D.108e3 direct room is absent");
+		await room.sealEpoch();
+	},
 	send(text: string): Promise<void> {
 		return productApi().send(text);
 	},
 	snapshot(): PlainRecord {
 		return productApi().snapshot();
+	},
+	transitionSnapshot(): TransitionInstrumentationSnapshot &
+		Readonly<{
+			readonly activationSettled: boolean;
+			readonly adoptionSettled: boolean;
+			readonly closeSettled: boolean;
+			readonly rehearsalSettled: boolean;
+			readonly sendSettled: boolean;
+		}> {
+		return Object.freeze({
+			...instrumentation().transitionSnapshot(),
+			activationSettled,
+			adoptionSettled,
+			closeSettled,
+			rehearsalSettled,
+			sendSettled,
+		});
 	},
 	async waitForAdoption(): Promise<ObservedSettlement> {
 		if (pendingAdoption === undefined) throw new TypeError("D.108e2b adoption observation is absent");
@@ -738,10 +1140,36 @@ const api = Object.freeze({
 		pendingAdoption = undefined;
 		return selected;
 	},
+	async waitForActivation(): Promise<ObservedSettlement> {
+		if (pendingActivation === undefined) throw new TypeError("D.108e3 activation observation is absent");
+		const selected = await pendingActivation;
+		pendingActivation = undefined;
+		return selected;
+	},
 	async waitForClose(): Promise<ObservedSettlement> {
 		if (pendingClose === undefined) throw new TypeError("D.108e2b close observation is absent");
 		const selected = await pendingClose;
 		pendingClose = undefined;
+		return selected;
+	},
+	async waitForDirectAdoption(name: string): Promise<ObservedSettlement> {
+		const pending = pendingDirectAdoptions.get(name);
+		if (pending === undefined) throw new TypeError("D.108e3 direct adoption observation is absent");
+		const selected = await pending;
+		pendingDirectAdoptions.delete(name);
+		return selected;
+	},
+	async waitForDirectClose(name: string): Promise<ObservedSettlement> {
+		const pending = pendingDirectCloses.get(name);
+		if (pending === undefined) throw new TypeError("D.108e3 direct close observation is absent");
+		const selected = await pending;
+		pendingDirectCloses.delete(name);
+		return selected;
+	},
+	async waitForRehearsal(): Promise<ObservedSettlement> {
+		if (pendingRehearsal === undefined) throw new TypeError("D.108e3 rehearsal observation is absent");
+		const selected = await pendingRehearsal;
+		pendingRehearsal = undefined;
 		return selected;
 	},
 });

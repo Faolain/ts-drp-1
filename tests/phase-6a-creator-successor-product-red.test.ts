@@ -10,6 +10,10 @@ import {
 	D108E2B_BROWSER_BEHAVIORS,
 	D108E2B_GREEN_PATHS,
 	D108E2B_RED_PATHS,
+	D108E2C_PRODUCT_BROWSER_BEHAVIORS,
+	D108E3_BROWSER_BEHAVIORS,
+	D108E3_GREEN_PATHS,
+	D108E3_RED_PATHS,
 	isD108d2Authority,
 } from "./fixtures/phase-6a-v3/creator-successor-product-contract.js";
 import { createV3RoomSession } from "../examples/v3-room/src/index.js";
@@ -147,6 +151,25 @@ describe("D.108e2b creator successor room lifetime RED", () => {
 				detail: "D.108e2b application authority was read",
 				reads: { application: 1, signer: 0, store: 0, transport: 0 },
 			}))
+		);
+	});
+});
+
+describe("D.108e3 room lifetime transition RED", () => {
+	it("freezes four test owners, one room GREEN owner and ten causal browser behaviors", () => {
+		expect(D108E3_RED_PATHS).toEqual([
+			"tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
+			"tests/phase-6a-creator-successor-product-red.test.ts",
+			"packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts",
+			"packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+		]);
+		expect(new Set(D108E3_RED_PATHS).size).toBe(4);
+		expect(D108E3_RED_PATHS.every((path) => readFileSync(resolve(REPOSITORY_ROOT, path)).byteLength > 0)).toBe(true);
+		expect(D108E3_GREEN_PATHS).toEqual(["examples/v3-room/src/index.ts"]);
+		expect(D108E3_BROWSER_BEHAVIORS).toHaveLength(10);
+		expect(D108E2C_PRODUCT_BROWSER_BEHAVIORS).toHaveLength(2);
+		expect(D108E3_RED_PATHS.some((path) => /examples\/v3-chat|packages\/node|playwright.*config/u.test(path))).toBe(
+			false
 		);
 	});
 });
