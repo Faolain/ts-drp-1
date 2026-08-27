@@ -60710,6 +60710,81 @@ product signing policy. The displaced-source claim stays terminal and is never
 re-exposed; both product flows consume only D.108d1's already active successor
 registration.
 
+The D.108d2 tests-only RED checkpoint was signed and pushed as immutable commit
+`f7f63cd3faa17e70b3668641d02c13fd9fb2780b`, parent
+`0a0eee1ec592d5826522ed32d4fdd5c92bc8a65a`, tree
+`fefd93cd4fb657070dea49cdad634d12c224717c`, stable patch id
+`a5c41292d63a4ada505fbfbf8f70bdaa4382ea3d` and binary-diff SHA-256
+`9c6e3a7abaf66bd0af2022a5c149a3d698556df3c215a9f6651c6fea6d53b69a`.
+It contains exactly the eleven frozen RED owners above and no production
+owner. The focused Vitest command collected five tests: three governance/oracle
+tests passed, the sole readiness assertion failed with the ten exact absent
+product facts, and its behavior proof remained intentionally skipped. The
+three retained D.108b/D.108c/D.108d1 files passed 37/37. Playwright listed
+exactly twelve tests and ran the three per-engine inventory assertions while
+the nine behavior cases remained skipped by `PRODUCT_READY` in RED.
+
+The sole RED review round inspected that immutable commit. Grok/high session
+`01a04078-db2f-7df0-a9b7-4b93f7d88df0` first stopped after 320.123 seconds
+because the runner's default sixteen-turn ceiling emitted
+`max_turns_reached`; the transport represented that client-side turn limit as
+`stop_reason=cancelled` before a terminal object. It was not a service-side
+cancellation. The same session was resumed in place—no second review launch or
+new model context—and returned `CHANGES_REQUIRED`, P0=1/P1=1/P2=1. Kimi CLI
+0.38.0 used exact `kimi-code/k3` in session
+`session_428698a0-2952-49c6-acaf-d3e21feebbcf`, emitted CHECK001 through
+CHECK100 exactly once and returned `APPROVED`, P0=0/P1=0/P2=3. Two preceding
+command-shape attempts were rejected locally before a model session and are
+not review launches. Opus session
+`71c7c72a-7b88-45e0-8993-555599db30c2` resolved to `claude-opus-5` at xhigh,
+ran for 899.460 seconds and 74 turns, launched no subagent and returned valid
+`CHANGES_REQUIRED`, P0=2/P1=2/P2=3. No reviewer changed the tracked tree, no
+confirmation review ran and no Fable or collaboration subagent ran.
+
+The same round reproduced and corrected each material P0/P1 without widening
+the tests-only roster. The independent raw oracle and copied carrier now open
+and copy the room's actual `${databaseName}--ahe` database rather than the bare
+chat database. The product-only browser server extends the frozen workspace
+aliases with exact source aliases for `@ts-drp/node/creator-adoption`,
+`@ts-drp/node/creator-adoption-commit` and
+`@ts-drp/node/creator-adoption-activate`, preventing a built-package/source
+split of the private singleton custody. All browser skips now consume the one
+contract-owned readiness function through one module load. TypeScript AST
+checks pin the exact room and chat input keys, so the declaration is the only
+new caller field, and the late-peer proof first rejects a declaration with a
+forged anchor while exposing neither readiness nor authority. Grok's separate
+typed-array carrier concern did not reproduce: Kimi's direct Playwright
+serialization probe retained `Uint8Array`, so it was not treated as a
+same-round blocker.
+
+Those corrections are signed commit
+`bfdd939dc6585a339665ea9cd8b3642c811d0b69`, parent
+`f7f63cd3faa17e70b3668641d02c13fd9fb2780b`, tree
+`42632e6b6b2b99293719474a0a0294c114a44619`, stable patch id
+`fdce7cbfb9bda5b0fa3c877d55898fe64d721a93` and binary-diff SHA-256
+`37224aef716fbe8cd9bc501cd7c0d418bb87a2d366bdbe759b0e73a83ad793a6`;
+the commit has a good signature and is pushed to
+`codex/phase3a1b-p6-golden-path`. Re-running the focused Vitest preserved the
+intended one-failure/three-pass/one-skip RED state, the retained selection
+passed 37/37, Playwright again listed twelve and reported three passed/nine
+skipped, and storage-browser `tsc --noEmit` passed. Exact-four ESLint with zero
+warnings, Prettier and `git diff --check` passed. A direct esbuild alias smoke
+bundled 217 source inputs, included all three exact `packages/node/src`
+adoption owners, included no `packages/node/dist` input and produced an
+816,078-byte browser bundle; source governance also pins the aliases and
+`--ahe` database spelling so RED cannot silently regress before behavior gates
+open.
+
+The remaining P2 ledger is assigned rather than widened into this reviewed
+round. D.108e1 owns replacing the residual source-pattern readiness/governance
+checks with structural evidence where practical, and strengthening relay
+telemetry from normalized-record comparison to explicit per-origin exact
+`Message.data`, `objectId`, `sender` and `type` observations before Phase 6a
+exit. Post-adoption close-method semantics remain the already recorded D.108e2
+product/node boundary question. These items do not weaken the D.108d2 GREEN
+zero-skip behavior inventory, authenticated authority oracle, forged-
+declaration rejection or retained transport proofs.
+
 #### D.108e — inherited activation hardening owners before Phase 6 exit
 
 D.108d1's nonblocking observations are assigned rather than silently inherited.
