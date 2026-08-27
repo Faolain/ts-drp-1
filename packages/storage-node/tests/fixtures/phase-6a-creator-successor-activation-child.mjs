@@ -262,11 +262,9 @@ export async function seedSnapshot(material, events, effects, suffix = "", selec
 			throw new Error(`snapshot chunk ${index} did not persist after port discard`);
 		}
 	}
+	const expiresAt = (await persistedScope.status()).expiresAt;
 	await persistedPort.discard();
 	await persistedScope.release();
-	const sourceScope = await raw.openScope(material.snapshot.declaration);
-	const expiresAt = (await sourceScope.status()).expiresAt;
-	const sourceQuarantine = sourceScope.verificationQuarantine;
 	const verificationRaw = createNodeSnapshotQuarantineStore({
 		primaryFilename: join(material.directory, `snapshot-verification${suffix}.sqlite`),
 	});
@@ -283,7 +281,14 @@ export async function seedSnapshot(material, events, effects, suffix = "", selec
 				return async (...args) => {
 					effects.snapshotOpenCount += 1;
 					events.push("snapshot:open-scope");
-					const opened = await verificationRaw.openScope(...args);
+					const sourceOpened = await raw.openScope(...args);
+					let opened;
+					try {
+						opened = await verificationRaw.openScope(...args);
+					} catch (error) {
+						await sourceOpened.release();
+						throw error;
+					}
 					let quarantineAccessCount = 0;
 					return new Proxy(
 						{},
@@ -292,16 +297,15 @@ export async function seedSnapshot(material, events, effects, suffix = "", selec
 								if (scopeProperty === "verificationQuarantine") {
 									quarantineAccessCount += 1;
 									if (quarantineAccessCount > 1) return opened.verificationQuarantine;
-									const quarantine = sourceQuarantine;
+									const quarantine = sourceOpened.verificationQuarantine;
 									return Object.freeze({
 										open(...openArgs) {
 											const openedPort = quarantine.open(...openArgs);
 											return Object.freeze({
 												discard: (...discardArgs) => openedPort.discard(...discardArgs),
 												async read(descriptor) {
-													if (Date.now() > expiresAt) return undefined;
 													const bytes = await openedPort.read(descriptor);
-													if (bytes !== undefined) {
+													if (bytes !== undefined && selectedMode !== "declaration-loop-mutant") {
 														directReads.push({
 															byteLength: descriptor.byteLength,
 															digest: descriptor.digest,
@@ -320,8 +324,18 @@ export async function seedSnapshot(material, events, effects, suffix = "", selec
 										},
 									});
 								}
+								if (scopeProperty === "release") {
+									return async () => {
+										await Promise.all([sourceOpened.release(), opened.release()]);
+									};
+								}
 								if (scopeProperty !== "complete") return Reflect.get(opened, scopeProperty, opened);
 								return async (...completeArgs) => {
+									if (quarantineAccessCount !== 2) {
+										throw new Error(
+											`verification quarantine access contract changed: expected 2, received ${quarantineAccessCount}`
+										);
+									}
 									completeAfterReads = directReads.length === material.snapshot.declaration.chunks.length;
 									const completed = await opened.complete(...completeArgs);
 									if (selectedMode === "declaration-loop-mutant") {
@@ -352,7 +366,6 @@ export async function seedSnapshot(material, events, effects, suffix = "", selec
 		expiresAt,
 		raw: {
 			async close() {
-				await sourceScope.release();
 				await Promise.all([raw.close(), verificationRaw.close()]);
 			},
 		},
@@ -363,7 +376,7 @@ export async function seedSnapshot(material, events, effects, suffix = "", selec
 				completeAfterReads,
 				completeBeforeSubscribe,
 				declaredChunkCount: material.snapshot.declaration.chunks.length,
-				directReadInvocationCount: selectedMode === "declaration-loop-mutant" ? 0 : directReads.length,
+				directReadInvocationCount: directReads.length,
 				reads,
 				telemetrySource: "awaited-port-read",
 			};

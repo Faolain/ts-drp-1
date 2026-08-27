@@ -89,7 +89,9 @@ declare global {
 const relayChannels = new Map<string, Set<ProductBroadcastChannel>>();
 const incomingMessages: RelayMessageObservation[] = [];
 const outgoingMessages: RelayMessageObservation[] = [];
+let relayIncoming = 0;
 let relayMismatch = 0;
+let relayOutgoing = 0;
 let relaySequence = 0;
 let realmId = "";
 let booted = false;
@@ -172,7 +174,10 @@ class ProductBroadcastChannel extends EventTarget {
 			value,
 		});
 		const observation = observeRelayMessage(value, realmId, packet.sequence);
-		if (observation !== undefined) outgoingMessages.push(observation);
+		if (observation !== undefined) {
+			relayOutgoing += 1;
+			outgoingMessages.push(observation);
+		}
 		void window.__phase6aProductRelayPost?.(packet);
 	}
 
@@ -180,7 +185,10 @@ class ProductBroadcastChannel extends EventTarget {
 		if (fingerprint(packet.value) !== packet.fingerprint) relayMismatch += 1;
 		const event = new MessageEvent("message", { data: packet.value });
 		const observation = observeRelayMessage(event.data, packet.realmId, packet.sequence, realmId);
-		if (observation !== undefined) incomingMessages.push(observation);
+		if (observation !== undefined) {
+			relayIncoming += 1;
+			incomingMessages.push(observation);
+		}
 		this.dispatchEvent(event);
 		this.onmessage?.call(this as unknown as BroadcastChannel, event);
 	}
@@ -556,10 +564,10 @@ const api = Object.freeze({
 		const copy = (observation: RelayMessageObservation): RelayMessageObservation =>
 			Object.freeze({ ...observation, data: Uint8Array.from(observation.data) });
 		return Object.freeze({
-			incoming: incomingMessages.length,
+			incoming: relayIncoming,
 			incomingMessages: Object.freeze(incomingMessages.map(copy)),
 			mismatch: relayMismatch,
-			outgoing: outgoingMessages.length,
+			outgoing: relayOutgoing,
 			outgoingMessages: Object.freeze(outgoingMessages.map(copy)),
 			realmId,
 		});
