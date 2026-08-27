@@ -62533,6 +62533,107 @@ custody or reopen D.108e2e. D.108e2e is complete, with no remaining product or
 test-infrastructure debt beyond that explicitly scheduled oracle-strengthening
 control and the unchanged inherited typecheck baselines.
 
+##### D.108e3 — room lifetime-transition serialization and fail-safe shutdown
+
+D.108e3 closes the room-lifetime P2 union assigned by the D.108e2b GREEN
+review. It is due after D.108e2e and before D.108e4 or Phase 6a exit. The room
+session owns three mutually exclusive lifetime transitions: creator-successor
+adoption, migration rehearsal and migration activation. They must execute in
+FIFO call order through one private per-session queue. This is not a new
+cross-session coordinator or public capability: separate source, target and
+redirected sessions retain independent queues, ordinary issue followers retain
+their existing migration barriers, and the queue must release in `finally`
+after success or failure so retry remains possible. Close keeps its existing
+closed fence and adoption join; this slice does not redesign migration wire,
+authority, receipt, redirect or terminal-transition semantics.
+
+The tests-only RED roster is exactly four existing product-harness owners:
+
+- `tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts`;
+- `tests/phase-6a-creator-successor-product-red.test.ts`;
+- `packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts`;
+  and
+- `packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts`.
+
+The retained product Playwright config remains unchanged. The contract freezes
+those four paths, the sole prospective GREEN owner
+`examples/v3-room/src/index.ts`, and one composite browser behavior inventory.
+The root test pins exact ownership, nonempty files, no chat/node/public owner,
+and the unchanged D.108e2b/e2c inventories. The browser harness continues to
+bundle and call the genuine room/chat product, Node adoption owners, IndexedDB
+stores, queue, relay transport and Web Lock path. Test-only wrappers may count,
+pause and inject a rejection at an already existing async boundary, but may not
+replace an accepted production transition, fabricate a room authority, add a
+product API, source-transform the room, or treat a source pattern as behavioral
+readiness.
+
+The RED has three independent failure-preservation cases. First, it injects a
+predecessor-deactivation failure and then one replacement-deactivation failure.
+The public rejection must keep the predecessor failure as its message while an
+ordered aggregate retains both the primary and cleanup failures; replacement
+cleanup is attempted exactly once and no successor authority is installed.
+Second, it pauses an injected existing-kind successor-activation failure,
+starts close, and releases the failure. The adoption rejection must remain
+`v3 room successor activation failed: authority-unavailable`, not be replaced
+by `v3 room session is closed`; close still joins it and completes shutdown.
+Third, it makes the real predecessor plane's `issueLocal` throw synchronously
+after a genuine chat send has entered the pending-issue drain. Close must reject
+with that drain failure but still run shutdown exactly once: the active plane
+is deactivated, its held browser databases can be deleted without a blocked
+upgrade, and a second close does not perform a second release. A `try/finally`
+that lets shutdown rejection mask an earlier drain failure is not sufficient;
+if both stages fail, the primary message remains public and the ordered
+aggregate retains both failures.
+
+The serialization proof runs four fresh-database cases. A rehearsal is paused
+only after its genuine migration-record issue reaches the real plane; adoption
+started afterward must not enter verification until rehearsal releases. A
+genuine activation is paused only after its source plane reaches
+`beginTerminalTransition`; adoption started afterward must likewise remain
+outside verification. In the reverse direction, adoption is paused inside the
+real verification boundary; neither a rehearsal may reach its migration-record
+issue nor an activation may reach `beginTerminalTransition` until adoption
+releases. Each case records pre-release non-settlement/counters, releases its
+gate, observes ordered settlement, closes the real session and cleans only its
+own test database. This kills a missing queue, rehearsal-only serialization,
+one-direction joins, a module-global queue and a queue that is not released on
+failure.
+
+Immutable RED acceptance is a passing root ownership test plus one new failing
+browser composite per Chromium, Firefox and WebKit. All observations are
+collected before one final deep equality so each engine reports exactly one
+named D.108e3 mismatch and no timeout, boot, database, relay or alias failure.
+The parent must expose all four defects: cleanup masks the primary error,
+closed state masks the activation failure, drain rejection prevents shutdown,
+and at least one transition crosses each missing serialization direction. All
+retained D.108d2/e2b/e2c product cases remain green. If a causal case cannot be
+driven through the existing test-only module wrappers, or another production
+owner/API is required, stop and reslice instead of widening the harness.
+
+Only after that RED may `examples/v3-room/src/index.ts` become the sole GREEN
+owner. The smallest authorized GREEN introduces one private failure-combining
+rule, one private per-session FIFO lifetime-transition queue, routes the three
+existing transitions through it, preserves the real successor-activation
+failure ahead of a concurrent closed diagnostic, and makes close enter
+idempotent shutdown unconditionally. It may not change chat, node, storage,
+wire, digest, snapshot, chunk, topic, queue, lock, signer, authority, receipt,
+terminal or public API contracts. It may not weaken close, memory or migration
+limits, and it must retain D.108e2b single-flight identity and retry semantics.
+
+GREEN acceptance repeats the focused root/product commands; the complete
+Phase-4c/Phase-6a retained selection including the genuine fresh 64 MiB
+peak-live child; retained Phase-5 creator close/actor/relearn/live-close and
+Phase-3h rehearsal/activation gates; all affected three-engine browser
+matrices; room/chat and affected package builds/typechecks; exact-five
+production/test ESLint, Prettier and diff checks; and an isolated no-`dist`
+offline-install/fresh-build proof at the exact signed candidate. The plan,
+immutable RED and GREEN/evidence checkpoints each receive one Grok 4.6/high
+review with a terminal `FINAL`, one exact Kimi K3 CHECK001-through-CHECK100
+review and one Opus 5/xhigh no-subagent review in separate detached worktrees.
+P0/P1 is corrected in the same round without confirmation review; P2 receives
+an exact owner and deadline. No Fable or collaboration subagent runs without
+new express authorization.
+
 ##### D.108e4 — retained test-oracle cleanup
 
 D.108e4 is a tests-only cleanup due after D.108e3 and before Phase 6a exit. Its
