@@ -2,6 +2,7 @@ import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical"
 import {
 	createV3RoomCreatorInviteMaterial,
 	createV3RoomSession,
+	type CreateV3RoomSessionInput,
 	type V3RoomAcceptedOperation,
 	type V3RoomApplication,
 	type V3RoomCreatorInviteMaterial,
@@ -9,6 +10,7 @@ import {
 	type V3RoomMigrationProjection,
 	type V3RoomMigrationRehearsalReceipt,
 	type V3RoomSession,
+	type V3RoomSuccessorAuthority,
 	type V3RoomTransport,
 } from "@ts-drp/example-v3-room";
 import { Keychain } from "@ts-drp/keychain";
@@ -29,6 +31,7 @@ const PARAMETERS = Object.freeze({
 });
 const CLIENT_IDS = ["alice", "bob", "carol", "dave", "erin", "frank", "grace", "heidi"] as const;
 export type ClientId = (typeof CLIENT_IDS)[number];
+type SuccessorSnapshotDeclaration = NonNullable<CreateV3RoomSessionInput["successorSnapshotDeclaration"]>;
 
 // Floors begin above the bootstrap vertex's resumed value (logical time 1 + stride 2).
 const CLIENTS: Readonly<Record<ClientId, Readonly<{ logicalTime: number; seed: string }>>> = Object.freeze({
@@ -47,6 +50,7 @@ interface JoinInput {
 	readonly clientId: ClientId;
 	readonly databaseName: string;
 	readonly invite: string;
+	readonly successorSnapshotDeclaration?: SuccessorSnapshotDeclaration;
 }
 
 interface RoomJoinInput extends Omit<JoinInput, "invite"> {
@@ -80,6 +84,7 @@ interface ChatProjection {
 interface ChatSnapshot {
 	readonly accepted: readonly AcceptedMessage[];
 	readonly acceptedOperationDigest: string;
+	readonly authority: V3RoomSuccessorAuthority | null;
 	readonly durableTranscriptDigest: string;
 	readonly latchedAcl: Readonly<{
 		readonly currentEpoch: number;
@@ -281,6 +286,7 @@ function snapshot(active: ActiveChat | undefined): ChatSnapshot {
 	return Object.freeze({
 		accepted,
 		acceptedOperationDigest: digest("ts-drp/d9336-chat-accepted-operations/v1", encodeCanonical(operationIdentities)),
+		authority: active?.room.authority() ?? null,
 		durableTranscriptDigest: digest("ts-drp/d9336-chat-durable-transcript/v1", encodeCanonical(transcript)),
 		latchedAcl: Object.freeze({
 			currentEpoch: preview?.current.epoch ?? 0,
@@ -769,6 +775,9 @@ async function joinRoom(input: RoomJoinInput): Promise<ActiveChat> {
 		},
 		publicKeyBytes: bytes(author),
 		signRegisteredVertexDigest: (registeredDigest) => keychain.signWithLocalAuthor(registeredDigest),
+		...(input.successorSnapshotDeclaration === undefined
+			? {}
+			: { successorSnapshotDeclaration: input.successorSnapshotDeclaration }),
 	});
 	source.room = room;
 	if (redirectedRoom !== undefined) retainedSourceBridges.add(room);
@@ -808,7 +817,15 @@ const api = Object.freeze({
 			clientId: input.clientId,
 			creatorInvite: input.invite,
 			databaseName: input.databaseName,
+			...(input.successorSnapshotDeclaration === undefined
+				? {}
+				: { successorSnapshotDeclaration: input.successorSnapshotDeclaration }),
 		});
+	},
+	async adoptSuccessor(): Promise<void> {
+		const selected = active;
+		if (selected === undefined) throw new TypeError("v3 chat client is not joined");
+		await selected.room.adoptCreatorSuccessor();
 	},
 	async inspectDurableHead(databaseName: string) {
 		const selected = active;
