@@ -63779,6 +63779,148 @@ admitted-peer bypass remains subject to the physical ninth-pending-PC ceiling,
 and prove that channel/connection-close or another non-replacement drop cannot
 create an admission lease. No confirmation review is authorized.
 
+The first D.108e4b GREEN candidate is signed/pushed commit
+`b8a2628bec7593c547919b540889dc75e33cd9ca`, parent
+`f98b1decb43bdae782a72335111506ed7c26af5e`, tree
+`b696ed423c3e338f73ee1555f02b5bf2fd161c42`, stable patch id
+`a1cd8ae141a860e014371d48c1e79fb61b240f35` and raw-diff SHA-256
+`1bf3c272d03faf7780daaa1080ab9f5b01502ea4f7e4bf579873e7e3b5b2de27`.
+It is a rejected GREEN candidate pending D.108e4c, not the accepted immutable
+GREEN. It adds only the frozen two owners. The private replacement-admission
+map retains the original absolute 10-second deadline and one timer per peer;
+both gates preserve the physical pending-PC count before applying the unique
+mapped/reserved logical admission count; genuine replacement retirement is
+the sole reservation site; successful registration, expiry, connection
+absence, membership removal, restart, route close and owner close clear the
+appropriate entry. No public interface, snapshot field, wire byte, digest,
+packet policy, payload or numeric limit changed.
+
+Before signing, the focused owner file passed 30/30. Its two GREEN-time
+controls prove that an already mapped peer still receives only eight physical
+pending PCs and that a ninth valid offer is rejected before allocation, and
+that a non-replacement `channel-close` drop leaves the freed slot available to
+a genuine newcomer rather than creating a lease. The combined owner/Node
+selection passed 40/40; network build/typecheck and Node build passed; and
+exact-two ESLint, Prettier and diff checks passed. The native five-test file
+passed alone with its retained child-measured `< 60_000 ms` assertion intact;
+the enclosing behavior took 60.810 seconds and the file 64.247 seconds, so
+those harness durations are recorded separately from the accepted child
+window. The sixteen-file Phase-4c/Phase-6a run passed 126/127, including the
+real 64 MiB peak-live child and every semantic assertion. Its sole failure was
+the intentionally load-sensitive native wall-time oracle at 60,365.543375 ms;
+the same file's required unloaded invocation had just passed and no ceiling
+was changed.
+
+The required unchanged E3-03 gate did not pass and may not be retried away.
+Three consecutive ordinary-checkout invocations reached the real browser
+test: the first timed out at the existing 10-second initial raw-delivery
+predicate with zero progress, and the next two completed the campaigns but
+failed the exact raw-channel evidence predicate at line 1000. Trace decoding
+on the latter found a delivered 431-byte `ts-drp-ephemeral/1` message with
+`maxRetransmits: 0`, unordered delivery and `readyState: "closing"`. This is
+not sufficient to blame the candidate. Detached diagnostic checkout
+`/private/tmp/ts-drp-d108e4b-parent-e3-03.D9HZ8H/repo` used exact parent
+`f98b1decb43bdae782a72335111506ed7c26af5e`, an offline frozen install that
+reused 1,525 packages with zero downloads, the standard native-dependency
+restoration and a fresh 40-package build. The identical E3-03 command failed
+at the same line 1000. Its trace independently recorded one delivered
+431-byte raw message on channel 363/connection 7 with
+`maxRetransmits: 0`, unordered delivery and `readyState: "closing"`. The root
+canonical shim remained absent and the detached tracked status stayed clean.
+This parent reproduction proves D.108e4b's admission code is not causal.
+
+Source diagnosis identifies a test-observer race rather than a transfer or
+transport redesign. `capture()` already freezes generation, ordinal and
+timestamp at the synchronous `send`/`message` boundary, but it waits for
+asynchronous `Blob.arrayBuffer()` conversion before reading `label`,
+`maxRetransmits`, `ordered` and `readyState`. A channel that was open when the
+message event was dispatched may therefore be closing when the fixture finally
+inserts the record. That deferred sample does not describe the event whose
+bytes are under test. Because E3-03 was frozen unchanged in D.108e4b and its
+test path is outside the exact two-owner roster, the candidate stops and
+reslices rather than changing production source, weakening the predicate or
+silently widening scope.
+
+###### D.108e4c — synchronous E3-03 RTC-observer event evidence
+
+D.108e4c is an immediate tests-only plan-freeze/RED/GREEN correction due
+before D.108e4b GREEN acceptance, combined D.108e4 GREEN review or D.108e5.
+Its exact implementation roster is only
+`tests/e3-03-loss-and-hol-proof.pw.ts`; this plan is the sole documentation
+owner. It may not change any production or example source, public or private
+product interface, snapshot, wire byte, digest, packet class/retry policy,
+payload/connection/memory limit, timeout, loss profile, browser version,
+sample count/interval/size, trial count, delivery floor, AoI/HOL threshold,
+fallback assertion or durable invariant. It may not suppress observations,
+accept a channel that was already non-open at the event boundary, retry the
+campaign, add Playwright retries or reinterpret post-completion state as
+event-time evidence.
+
+The immutable RED adds one fixture-only observer self-check beside the
+retained campaign. It gives the installed observer a synthetic channel whose
+exact metadata initially matches the real raw contract and a `Blob` whose
+`arrayBuffer()` completion is held behind an explicit promise. The control
+calls the existing `capture()` path while `readyState` is `"open"`, changes
+only the synthetic channel state to `"closing"` while byte conversion remains
+blocked, releases the conversion, awaits the observer's existing pending set
+and reads the resulting record. It requires the original event-boundary
+metadata: `label: "ts-drp-ephemeral/1"`, `maxRetransmits: 0`,
+`ordered: false` and `readyState: "open"`, together with the exact one-byte
+payload, direction, assigned identities and ordinal. Current source fails
+only the final ready-state equality with `"closing"`; a synchronous or
+non-Blob payload cannot satisfy RED because it does not cross the deferred
+boundary. The synthetic channel never enters product transport and the
+control runs in a fresh browser context, so it cannot manufacture campaign
+delivery.
+
+GREEN changes only when the observer reads immutable evidence. At the start
+of `capture()`, beside its existing synchronous generation/ordinal/timestamp
+selection and before `bytesFrom(data)`, it snapshots the channel label,
+retransmit count, ordering and ready state. The later asynchronous record
+insertion uses those selected values while retaining the converted byte length
+and text. If the channel is already `"closing"` at capture invocation, the
+record remains `"closing"` and the retained exact-open predicate still fails;
+the correction therefore restores the causal sampling boundary rather than
+weakening it. Channel/connection identities, record ordering, pending-drain
+semantics and generation reset remain unchanged.
+
+The focused RED/GREEN command selects only the new behavior through
+`pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts
+--grep "freezes RTC metadata at the event boundary before async payload
+conversion" --fail-on-flaky-tests`. RED must produce exactly one assertion
+failure after browser boot, not a module/server/timeout failure. GREEN must
+pass that behavior 1/1 and the complete config 2/2. Exact-owner ESLint,
+Prettier and `git diff --check` are mandatory. The long retained behavior
+keeps every existing byte and expectation except the event-time observer
+selection. It must then pass through
+`--grep "three fixed browser trials prove raw freshness and no head-of-line
+blocking under 30% loss"` in three consecutive invocations in both the
+ordinary checkout and the final isolated clean checkout. Any initial-delivery,
+AoI, stall, channel-contract or other retained failure resets the consecutive
+count and blocks closure; it does not authorize another fixture change.
+
+After D.108e4c GREEN, the combined immutable candidate must rerun every
+D.108e4b and D.108e4 gate: focused owner/Node tests, affected builds and
+typechecks, the native five-test timing file alone without concurrent test or
+model load, activation and retained browser matrices, all four root collection
+controls, exact D.93.36, three consecutive exact D.93.46 invocations, retained
+Phase-3h/Phase-5 selections and the complete Phase-4c/Phase-6a suite including
+the genuine fresh-process 64 MiB peak-live proof. The new detached proof starts
+without package/example `dist`, uses the frozen offline/ignore-scripts install
+and fresh dependency build, resolves the canonical export from that checkout,
+keeps the root shim absent, reruns the raw subprocess-resolution control before
+and after browser gates and finishes tracked-clean. The unloaded native timing
+file remains separate from the combined semantic selection so unrelated
+earlier work cannot consume its unchanged 60-second child budget.
+
+D.108e4c receives separate signed/pushed plan-freeze, immutable RED and
+immutable GREEN/evidence checkpoints. Each checkpoint receives one separate
+Grok 4.6/high review, exact Kimi K3 CHECK001 through CHECK100 review and Opus
+5/xhigh review against the exact immutable identifiers. Reproduced P0/P1
+findings are corrected in the same round without confirmation; every P2 gets
+an exact owner and deadline before combined D.108e4 GREEN closure. No Fable or
+collaboration subagent may run without new express authorization.
+
 Each D.108e2 sub-slice uses one immutable tests-only RED checkpoint and one
 immutable GREEN/evidence checkpoint. Each checkpoint receives one real Grok
 4.6/high, exact Kimi K3 CHECK001 through CHECK100 and Opus 5/xhigh review.
