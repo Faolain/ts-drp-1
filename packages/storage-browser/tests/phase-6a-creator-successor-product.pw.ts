@@ -24,6 +24,7 @@ const contractLoad = import(
 			string,
 			string,
 			string,
+			string,
 		];
 		isD108d2Authority(value: unknown): boolean;
 	}>
@@ -51,6 +52,8 @@ const planeIdMapSymbol = Symbol.for("ts-drp/d108e3/instrumented-plane-ids");
 const closeHandlePlaneIdMapSymbol = Symbol.for("ts-drp/d108e3/close-handle-plane-ids");
 function createState() {
   const state = {
+    acceptedVertexFailureCount: 0,
+    acceptedVertexFailureGate: Promise.resolve(),
     activationCount: 0,
     activationFailureGate: Promise.resolve(),
     commitCount: 0,
@@ -63,6 +66,7 @@ function createState() {
     nestedPredecessorDeactivateCount: 0,
     nextPlaneId: 1,
     pauseAfterActivation: false,
+    pauseAcceptedVertexFailure: false,
     pauseActivationFailure: false,
     pauseAfterPredecessorDeactivation: false,
     pauseMigrationRecord: false,
@@ -75,6 +79,7 @@ function createState() {
     predecessorDeactivateCount: 0,
     rejectPredecessorDeactivate: false,
     rejectReplacementDeactivate: false,
+    releaseAcceptedVertexFailure: undefined,
     releaseActivationFailure: undefined,
     releaseMigrationRecord: undefined,
     releasePostActivation: undefined,
@@ -92,6 +97,7 @@ function createState() {
     verificationGate: Promise.resolve(),
   };
   const configure = (input) => {
+    state.acceptedVertexFailureCount = 0;
     state.activationCount = 0;
     state.commitCount = 0;
     state.injectActivationFailure = input.injectActivationFailure === true;
@@ -100,6 +106,7 @@ function createState() {
     state.migrationRecordIssueCount = 0;
     state.nestedPredecessorDeactivateCount = 0;
     state.pauseAfterActivation = input.pauseAfterActivation === true;
+    state.pauseAcceptedVertexFailure = input.pauseAcceptedVertexFailure === true;
     state.pauseActivationFailure = input.pauseActivationFailure === true;
     state.pauseAfterPredecessorDeactivation = input.pauseAfterPredecessorDeactivation === true;
     state.pauseMigrationRecord = input.pauseMigrationRecord === true;
@@ -116,6 +123,9 @@ function createState() {
     state.terminalTransitionCount = 0;
     state.throwIssueLocal = input.throwIssueLocal === true;
     state.verificationCount = 0;
+    state.acceptedVertexFailureGate = state.pauseAcceptedVertexFailure
+      ? new Promise((resolve) => { state.releaseAcceptedVertexFailure = resolve; })
+      : Promise.resolve();
     state.activationFailureGate = state.pauseActivationFailure
       ? new Promise((resolve) => { state.releaseActivationFailure = resolve; })
       : Promise.resolve();
@@ -135,6 +145,7 @@ function createState() {
       ? new Promise((resolve) => { state.releaseTerminalTransition = resolve; })
       : Promise.resolve();
     if (!state.pauseActivationFailure) state.releaseActivationFailure = undefined;
+    if (!state.pauseAcceptedVertexFailure) state.releaseAcceptedVertexFailure = undefined;
     if (!state.pauseMigrationRecord) state.releaseMigrationRecord = undefined;
     if (!state.pauseAfterActivation) state.releasePostActivation = undefined;
     if (!state.pauseAfterPredecessorDeactivation) state.releasePostPredecessorDeactivation = undefined;
@@ -144,10 +155,21 @@ function createState() {
   Object.defineProperty(globalThis, "__d108e2bLifetimeInstrumentation", {
     configurable: false,
     value: Object.freeze({
+      acceptedVertex: async () => {
+        if (!state.pauseAcceptedVertexFailure) return;
+        state.acceptedVertexFailureCount += 1;
+        await state.acceptedVertexFailureGate;
+        throw new TypeError("D.108e3 injected accepted-vertex failure");
+      },
       cleanupReplacements: async () => {
         await Promise.allSettled(Array.from(state.replacementPlanes, (plane) => plane.deactivate()));
       },
       configure,
+      releaseAcceptedVertexFailure: () => {
+        state.pauseAcceptedVertexFailure = false;
+        state.releaseAcceptedVertexFailure?.();
+        state.releaseAcceptedVertexFailure = undefined;
+      },
       releaseActivationFailure: () => {
         state.pauseActivationFailure = false;
         state.releaseActivationFailure?.();
@@ -189,6 +211,7 @@ function createState() {
         verificationCount: state.verificationCount,
       }),
       transitionSnapshot: () => Object.freeze({
+        acceptedVertexFailureCount: state.acceptedVertexFailureCount,
         activationCount: state.activationCount,
         commitCount: state.commitCount,
         independentVerificationCount: state.independentVerificationCount,
@@ -1107,6 +1130,7 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 	const selectedCounts = async (page: Page): Promise<Readonly<Record<string, number | boolean>>> => {
 		const selected = await transitionSnapshot(page);
 		return Object.freeze({
+			acceptedVertexFailureCount: Number(selected.acceptedVertexFailureCount),
 			activationCount: Number(selected.activationCount),
 			activationSettled: selected.activationSettled === true,
 			adoptionSettled: selected.adoptionSettled === true,
@@ -1241,6 +1265,8 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 	await drainFailure.page.close();
 
 	const rehearsalThenAdoption = await openD108e3Creator(true);
+	await configure(rehearsalThenAdoption.page, {});
+	await rehearsalThenAdoption.page.evaluate(() => window.phase6aCreatorSuccessorProduct.prepareRehearsal());
 	await configure(rehearsalThenAdoption.page, { pauseMigrationRecord: true });
 	await rehearsalThenAdoption.page.evaluate(() => window.phase6aCreatorSuccessorProduct.beginRehearsal());
 	await expect
@@ -1251,12 +1277,14 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 		)
 		.toBe(1);
 	await rehearsalThenAdoption.page.evaluate(() => window.phase6aCreatorSuccessorProduct.beginAdoption());
+	await rehearsalThenAdoption.page.evaluate(() => window.phase6aCreatorSuccessorProduct.beginActivation());
 	await settleBrowserTurns(rehearsalThenAdoption.page);
 	const rehearsalThenAdoptionBefore = await selectedCounts(rehearsalThenAdoption.page);
 	await rehearsalThenAdoption.page.evaluate(() => window.phase6aCreatorSuccessorProduct.releaseMigrationRecord());
-	const [rehearsalFirst, rehearsalSecond] = await Promise.all([
+	const [rehearsalFirst, rehearsalSecond, rehearsalThird] = await Promise.all([
 		rehearsalThenAdoption.page.evaluate(() => window.phase6aCreatorSuccessorProduct.waitForRehearsal()),
 		rehearsalThenAdoption.page.evaluate(() => window.phase6aCreatorSuccessorProduct.waitForAdoption()),
+		rehearsalThenAdoption.page.evaluate(() => window.phase6aCreatorSuccessorProduct.waitForActivation()),
 	]);
 	const rehearsalThenAdoptionAfter = await selectedCounts(rehearsalThenAdoption.page);
 	await disposeD108e3Creator(rehearsalThenAdoption);
@@ -1439,8 +1467,93 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 	await retry.page.evaluate((name) => window.phase6aCreatorSuccessorProduct.closeDirectCreator(name), retryName);
 	await disposeD108e3Creator(retry);
 
+	const queuedAcceptedFailure = await openD108e3Creator(false);
+	const queuedAcceptedFailureName = `queued-accepted-failure-${lifetimeScenario}`;
+	await queuedAcceptedFailure.page.evaluate(
+		(name) => window.phase6aCreatorSuccessorProduct.openDirectCreator(name),
+		queuedAcceptedFailureName
+	);
+	await configure(queuedAcceptedFailure.page, {
+		pauseAcceptedVertexFailure: true,
+		pauseMigrationRecord: true,
+	});
+	await queuedAcceptedFailure.page.evaluate(
+		(name) => window.phase6aCreatorSuccessorProduct.beginDirectRehearsal(name),
+		queuedAcceptedFailureName
+	);
+	await expect
+		.poll(() =>
+			queuedAcceptedFailure.page.evaluate(
+				() => window.phase6aCreatorSuccessorProduct.transitionSnapshot().migrationRecordIssueCount
+			)
+		)
+		.toBe(1);
+	await queuedAcceptedFailure.page.evaluate(
+		(name) => window.phase6aCreatorSuccessorProduct.beginDirectAdoption(name),
+		queuedAcceptedFailureName
+	);
+	await queuedAcceptedFailure.page.evaluate(
+		(name) => window.phase6aCreatorSuccessorProduct.beginDirectSend(name, "queued-accepted-failure"),
+		queuedAcceptedFailureName
+	);
+	await expect
+		.poll(() =>
+			queuedAcceptedFailure.page.evaluate(
+				() => window.phase6aCreatorSuccessorProduct.transitionSnapshot().acceptedVertexFailureCount
+			)
+		)
+		.toBe(1);
+	const queuedAcceptedFailureBefore = await selectedCounts(queuedAcceptedFailure.page);
+	await queuedAcceptedFailure.page.evaluate(() => window.phase6aCreatorSuccessorProduct.releaseAcceptedVertexFailure());
+	await queuedAcceptedFailure.page.evaluate(() => window.phase6aCreatorSuccessorProduct.releaseMigrationRecord());
+	await queuedAcceptedFailure.page.evaluate(
+		(name) => window.phase6aCreatorSuccessorProduct.beginDirectClose(name),
+		queuedAcceptedFailureName
+	);
+	const queuedAcceptedFailureSettlements = await queuedAcceptedFailure.page.evaluate(
+		async (name) =>
+			Promise.race([
+				Promise.all([
+					window.phase6aCreatorSuccessorProduct.waitForSend(),
+					window.phase6aCreatorSuccessorProduct.waitForDirectRehearsal(name),
+					window.phase6aCreatorSuccessorProduct.waitForDirectAdoption(name),
+					window.phase6aCreatorSuccessorProduct.waitForDirectClose(name),
+				]).then(([send, rehearsal, adoption, close]) =>
+					Object.freeze({ adoption, close, rehearsal, send, status: "settled" as const })
+				),
+				new Promise<Readonly<{ readonly status: "pending" }>>((resolvePromise) => {
+					setTimeout(() => resolvePromise(Object.freeze({ status: "pending" as const })), 3_000);
+				}),
+			]),
+		queuedAcceptedFailureName
+	);
+	const queuedAcceptedFailureCounts = await selectedCounts(queuedAcceptedFailure.page);
+	const queuedAcceptedFailureDeletion =
+		queuedAcceptedFailureSettlements.status === "settled"
+			? await queuedAcceptedFailure.page.evaluate(async (prefix) => {
+					try {
+						return Object.freeze({
+							names: await window.phase6aCreatorSuccessorProduct.deleteDatabases(prefix),
+							status: "fulfilled" as const,
+						});
+					} catch (error) {
+						return Object.freeze({
+							detail: error instanceof Error ? error.message : String(error),
+							status: "rejected" as const,
+						});
+					}
+				}, `d108e3-direct-${queuedAcceptedFailureName}`)
+			: Object.freeze({ status: "not-attempted" as const });
+	await queuedAcceptedFailure.page.close();
+
 	expect({
 		failures: {
+			acceptedQueued: {
+				before: queuedAcceptedFailureBefore,
+				counts: queuedAcceptedFailureCounts,
+				deletion: queuedAcceptedFailureDeletion,
+				settlements: queuedAcceptedFailureSettlements,
+			},
 			activation: {
 				beforeRelease: {
 					adoptionSettled: activationBeforeRelease.adoptionSettled,
@@ -1518,15 +1631,21 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 				settled: { first: overlappingRehearsalFirst, second: overlappingRehearsalSecond },
 			},
 			rehearsalThenAdoption: {
-				after: { verificationCount: rehearsalThenAdoptionAfter.verificationCount },
+				after: {
+					terminalTransitionCount: rehearsalThenAdoptionAfter.terminalTransitionCount,
+					verificationCount: rehearsalThenAdoptionAfter.verificationCount,
+				},
 				before: {
+					activationSettled: rehearsalThenAdoptionBefore.activationSettled,
 					firstSettled: rehearsalThenAdoptionBefore.rehearsalSettled,
+					preTerminal: rehearsalThenAdoptionBefore.terminalTransitionCount,
 					preVerification: rehearsalThenAdoptionBefore.verificationCount,
 					secondSettled: rehearsalThenAdoptionBefore.adoptionSettled,
 				},
 				settled: [
 					{ order: rehearsalFirst.order, status: rehearsalFirst.status },
 					{ order: rehearsalSecond.order, status: rehearsalSecond.status },
+					{ order: rehearsalThird.order, status: rehearsalThird.status },
 				],
 			},
 			retry: {
@@ -1536,6 +1655,40 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 		},
 	}).toEqual({
 		failures: {
+			acceptedQueued: {
+				before: expect.objectContaining({
+					acceptedVertexFailureCount: 1,
+					adoptionSettled: false,
+					rehearsalSettled: false,
+					sendSettled: false,
+				}),
+				counts: expect.objectContaining({
+					acceptedVertexFailureCount: 1,
+					adoptionSettled: true,
+					closeSettled: true,
+					predecessorDeactivateCount: 1,
+					rehearsalSettled: true,
+					sendSettled: true,
+					verificationCount: 0,
+				}),
+				deletion: {
+					names: expect.arrayContaining([`d108e3-direct-${queuedAcceptedFailureName}--ahe`]),
+					status: "fulfilled",
+				},
+				settlements: {
+					adoption: expect.objectContaining({ detail: "v3 room session is closed", status: "rejected" }),
+					close: expect.objectContaining({ status: "fulfilled" }),
+					rehearsal: expect.objectContaining({
+						detail: "D.108e3 injected accepted-vertex failure",
+						status: "rejected",
+					}),
+					send: expect.objectContaining({
+						detail: "D.108e3 injected accepted-vertex failure",
+						status: "rejected",
+					}),
+					status: "settled",
+				},
+			},
 			activation: {
 				beforeRelease: { adoptionSettled: false, closeSettled: false },
 				counts: { activationCount: 1, replacementDeactivateCount: 0 },
@@ -1649,11 +1802,18 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 				},
 			},
 			rehearsalThenAdoption: {
-				after: { verificationCount: 1 },
-				before: { firstSettled: false, preVerification: 0, secondSettled: false },
+				after: { terminalTransitionCount: 0, verificationCount: 0 },
+				before: {
+					activationSettled: false,
+					firstSettled: false,
+					preTerminal: 0,
+					preVerification: 0,
+					secondSettled: false,
+				},
 				settled: [
 					{ order: 1, status: "fulfilled" },
 					{ order: 2, status: "fulfilled" },
+					{ order: 3, status: "rejected" },
 				],
 			},
 			retry: { settled: ["rejected", "fulfilled"], verificationCount: 2 },

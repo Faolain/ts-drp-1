@@ -156,7 +156,7 @@ describe("D.108e2b creator successor room lifetime RED", () => {
 });
 
 describe("D.108e3 room lifetime transition RED", () => {
-	it("freezes four test owners, one room GREEN owner and eleven causal browser behaviors", () => {
+	it("freezes four test owners, one room GREEN owner and twelve causal browser behaviors", () => {
 		expect(D108E3_RED_PATHS).toEqual([
 			"tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts",
 			"tests/phase-6a-creator-successor-product-red.test.ts",
@@ -178,6 +178,7 @@ describe("D.108e3 room lifetime transition RED", () => {
 			"overlapping rehearsal retains the existing fast-fail fence",
 			"independent room sessions do not share one lifetime queue",
 			"a failed adoption releases the lifetime queue for retry",
+			"accepted-vertex failure cannot deadlock queued adoption and shutdown",
 		]);
 		expect(D108E2C_PRODUCT_BROWSER_BEHAVIORS).toHaveLength(2);
 		expect(D108E3_RED_PATHS.some((path) => /examples\/v3-chat|packages\/node|playwright.*config/u.test(path))).toBe(

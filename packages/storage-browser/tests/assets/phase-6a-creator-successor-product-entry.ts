@@ -6,6 +6,7 @@ interface DirectRoomSession {
 	adoptCreatorSuccessor(): Promise<void>;
 	close(): Promise<void>;
 	issue(operation: Readonly<Record<string, unknown>>): Promise<void>;
+	rehearseMigration(input: Readonly<Record<string, unknown>>): Promise<unknown>;
 	sealEpoch(): Promise<unknown>;
 }
 
@@ -105,6 +106,7 @@ interface LifetimeInstrumentationSnapshot {
 }
 
 interface TransitionInstrumentationSnapshot extends LifetimeInstrumentationSnapshot {
+	readonly acceptedVertexFailureCount: number;
 	readonly independentVerificationCount: number;
 	readonly issueThrowCount: number;
 	readonly migrationRecordIssueCount: number;
@@ -113,10 +115,12 @@ interface TransitionInstrumentationSnapshot extends LifetimeInstrumentationSnaps
 }
 
 interface LifetimeInstrumentation {
+	acceptedVertex(): Promise<void>;
 	cleanupReplacements(): Promise<void>;
 	configure(
 		input: Readonly<{
 			readonly injectActivationFailure?: boolean;
+			readonly pauseAcceptedVertexFailure?: boolean;
 			readonly pauseAfterActivation?: boolean;
 			readonly pauseActivationFailure?: boolean;
 			readonly pauseAfterPredecessorDeactivation?: boolean;
@@ -129,6 +133,7 @@ interface LifetimeInstrumentation {
 			readonly throwIssueLocal?: boolean;
 		}>
 	): void;
+	releaseAcceptedVertexFailure(): void;
 	releaseActivationFailure(): void;
 	releaseMigrationRecord(): void;
 	releasePostActivation(): void;
@@ -164,6 +169,7 @@ declare global {
 			configureLifetime(
 				input: Readonly<{
 					readonly injectActivationFailure?: boolean;
+					readonly pauseAcceptedVertexFailure?: boolean;
 					readonly pauseAfterActivation?: boolean;
 					readonly pauseActivationFailure?: boolean;
 					readonly pauseAfterPredecessorDeactivation?: boolean;
@@ -179,6 +185,7 @@ declare global {
 			concurrentAdoption(): Promise<readonly [ObservedSettlement, ObservedSettlement]>;
 			beginDirectAdoption(name: string): void;
 			beginDirectClose(name: string): void;
+			beginDirectRehearsal(name: string): void;
 			beginDirectSend(name: string, text: string): void;
 			closeDirectCreator(name: string): Promise<void>;
 			create(input: unknown): Promise<string>;
@@ -193,6 +200,7 @@ declare global {
 			openDirectCreator(name: string): Promise<void>;
 			relayAudit(): RelayAudit;
 			prepareRehearsal(): Promise<void>;
+			releaseAcceptedVertexFailure(): void;
 			releaseActivationFailure(): void;
 			releaseMigrationRecord(): void;
 			releasePostActivation(): void;
@@ -216,8 +224,10 @@ declare global {
 			waitForClose(): Promise<ObservedSettlement>;
 			waitForDirectAdoption(name: string): Promise<ObservedSettlement>;
 			waitForDirectClose(name: string): Promise<ObservedSettlement>;
+			waitForDirectRehearsal(name: string): Promise<ObservedSettlement>;
 			waitForOverlappingRehearsal(): Promise<ObservedSettlement>;
 			waitForRehearsal(): Promise<ObservedSettlement>;
+			waitForSend(): Promise<ObservedSettlement>;
 		}>;
 	}
 }
@@ -247,7 +257,9 @@ let migrationReceipt: unknown;
 const directRooms = new Map<string, DirectRoomSession>();
 const pendingDirectAdoptions = new Map<string, Promise<ObservedSettlement>>();
 const pendingDirectCloses = new Map<string, Promise<ObservedSettlement>>();
+const pendingDirectRehearsals = new Map<string, Promise<ObservedSettlement>>();
 const directAdoptionSettlements = new Map<string, boolean>();
+const directRehearsalInputs = new Map<string, Readonly<Record<string, unknown>>>();
 
 function instrumentation(): LifetimeInstrumentation {
 	const selected = Reflect.get(globalThis, "__d108e2bLifetimeInstrumentation");
@@ -795,34 +807,47 @@ async function createDirectRoom(name: string): Promise<DirectRoomSession> {
 	const blueprintDigest = application.catalog.blueprintDigests[0];
 	if (blueprintDigest === undefined) throw new TypeError("D.108e3 direct-room blueprint is absent");
 	const signerSet = Object.freeze([Object.freeze({ publicKey: finalityKeychain.localAuthorId, signerId: "creator" })]);
-	const creatorInvite = await dependencies.createV3RoomCreatorInviteMaterial({
-		blueprintDigest,
-		exactCanonicalApplicationStateBytes: encodeCanonical([]),
-		exactCanonicalLatchedAclBytes: encodeCanonical({
-			epoch: 0,
-			kind: "drp-v3-latched-acl",
-			members: [
-				{
-					author: authorKeychain.localAuthorId,
-					finalityKey: authorKeychain.localAuthorId,
-					groups: ["admin", "finality", "writer"],
-				},
-			],
-			objectId,
-			permissionless: false,
-			version: 1,
-		}),
-		exactCanonicalParametersCarrierBytes: encodeCanonical(DIRECT_PARAMETERS),
-		exactCanonicalProfileBytes: encodeCanonical({
-			cryptoSuiteId: "ed25519-sha256-v3",
-			profileId: "creator-trusted-v1",
-			quorum: 1,
-			signers: signerSet,
-		}),
-		exactCanonicalSignerSetBytes: encodeCanonical(signerSet),
-		objectId,
-		signGenesisAnchorDigest: (anchorDigest: Uint8Array) => finalityKeychain.signWithLocalAuthor(anchorDigest),
-	});
+	const createInvite = (selectedObjectId: string): Promise<unknown> =>
+		dependencies.createV3RoomCreatorInviteMaterial({
+			blueprintDigest,
+			exactCanonicalApplicationStateBytes: encodeCanonical([]),
+			exactCanonicalLatchedAclBytes: encodeCanonical({
+				epoch: 0,
+				kind: "drp-v3-latched-acl",
+				members: [
+					{
+						author: authorKeychain.localAuthorId,
+						finalityKey: authorKeychain.localAuthorId,
+						groups: ["admin", "finality", "writer"],
+					},
+				],
+				objectId: selectedObjectId,
+				permissionless: false,
+				version: 1,
+			}),
+			exactCanonicalParametersCarrierBytes: encodeCanonical(DIRECT_PARAMETERS),
+			exactCanonicalProfileBytes: encodeCanonical({
+				cryptoSuiteId: "ed25519-sha256-v3",
+				profileId: "creator-trusted-v1",
+				quorum: 1,
+				signers: signerSet,
+			}),
+			exactCanonicalSignerSetBytes: encodeCanonical(signerSet),
+			objectId: selectedObjectId,
+			signGenesisAnchorDigest: (anchorDigest: Uint8Array) => finalityKeychain.signWithLocalAuthor(anchorDigest),
+		});
+	const creatorInvite = await createInvite(objectId);
+	const rehearsalNonce = hashDomain("ts-drp/d108e3-direct-rehearsal/v1", new TextEncoder().encode(name));
+	const separator = objectId.indexOf(":");
+	const targetIdentity = hashDomain(
+		"ts-drp/v3-room-migration-target-object/v1",
+		encodeCanonical({ rehearsalNonce, sourceObjectId: objectId })
+	);
+	const targetObjectId = `${objectId.slice(0, separator)}:${hex(targetIdentity.subarray(0, 16))}`;
+	directRehearsalInputs.set(
+		name,
+		Object.freeze({ rehearsalNonce, targetCreatorInvite: await createInvite(targetObjectId) })
+	);
 	return dependencies.createV3RoomSession({
 		application,
 		author: authorKeychain.localAuthorId,
@@ -833,7 +858,7 @@ async function createDirectRoom(name: string): Promise<DirectRoomSession> {
 		issuanceDatabaseName: databaseName,
 		migrationDatabaseNamespace: databaseName,
 		objectId,
-		onAcceptedVertex: () => undefined,
+		onAcceptedVertex: () => instrumentation().acceptedVertex(),
 		onProjection: () => undefined,
 		openTransport: () => directTransport(authorKeychain.localAuthorId),
 		publicKeyBytes: bytesFromHex(authorKeychain.localAuthorId),
@@ -918,9 +943,34 @@ const api = Object.freeze({
 		if (room === undefined || pendingDirectCloses.has(name)) {
 			throw new TypeError("D.108e3 direct close observation is invalid");
 		}
+		closeSettled = false;
 		pendingDirectCloses.set(
 			name,
-			observe(room.close(), () => undefined, true)
+			observe(
+				room.close(),
+				() => {
+					closeSettled = true;
+				},
+				true
+			)
+		);
+	},
+	beginDirectRehearsal(name: string): void {
+		const room = directRooms.get(name);
+		const rehearsalInput = directRehearsalInputs.get(name);
+		if (room === undefined || rehearsalInput === undefined || pendingDirectRehearsals.has(name)) {
+			throw new TypeError("D.108e3 direct rehearsal observation is invalid");
+		}
+		rehearsalSettled = false;
+		pendingDirectRehearsals.set(
+			name,
+			observe(
+				room.rehearseMigration(rehearsalInput).then(() => undefined),
+				() => {
+					rehearsalSettled = true;
+				},
+				true
+			)
 		);
 	},
 	beginDirectSend(name: string, text: string): void {
@@ -1003,7 +1053,9 @@ const api = Object.freeze({
 		}
 		pendingDirectAdoptions.delete(name);
 		pendingDirectCloses.delete(name);
+		pendingDirectRehearsals.delete(name);
 		directAdoptionSettlements.delete(name);
+		directRehearsalInputs.delete(name);
 		await removeDirectDatabases(name);
 	},
 	cleanupLifetimeReplacements(): Promise<void> {
@@ -1012,6 +1064,7 @@ const api = Object.freeze({
 	configureLifetime(
 		input: Readonly<{
 			readonly injectActivationFailure?: boolean;
+			readonly pauseAcceptedVertexFailure?: boolean;
 			readonly pauseAfterActivation?: boolean;
 			readonly pauseActivationFailure?: boolean;
 			readonly pauseAfterPredecessorDeactivation?: boolean;
@@ -1118,6 +1171,9 @@ const api = Object.freeze({
 			realmId,
 		});
 	},
+	releaseAcceptedVertexFailure(): void {
+		instrumentation().releaseAcceptedVertexFailure();
+	},
 	releaseActivationFailure(): void {
 		instrumentation().releaseActivationFailure();
 	},
@@ -1199,6 +1255,13 @@ const api = Object.freeze({
 		pendingDirectCloses.delete(name);
 		return selected;
 	},
+	async waitForDirectRehearsal(name: string): Promise<ObservedSettlement> {
+		const pending = pendingDirectRehearsals.get(name);
+		if (pending === undefined) throw new TypeError("D.108e3 direct rehearsal observation is absent");
+		const selected = await pending;
+		pendingDirectRehearsals.delete(name);
+		return selected;
+	},
 	async waitForOverlappingRehearsal(): Promise<ObservedSettlement> {
 		if (pendingOverlappingRehearsal === undefined) {
 			throw new TypeError("D.108e3 overlapping rehearsal observation is absent");
@@ -1211,6 +1274,12 @@ const api = Object.freeze({
 		if (pendingRehearsal === undefined) throw new TypeError("D.108e3 rehearsal observation is absent");
 		const selected = await pendingRehearsal;
 		pendingRehearsal = undefined;
+		return selected;
+	},
+	async waitForSend(): Promise<ObservedSettlement> {
+		if (pendingSend === undefined) throw new TypeError("D.108e3 send observation is absent");
+		const selected = await pendingSend;
+		pendingSend = undefined;
 		return selected;
 	},
 });

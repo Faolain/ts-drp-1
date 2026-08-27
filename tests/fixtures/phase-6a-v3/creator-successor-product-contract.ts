@@ -65,6 +65,7 @@ export const D108E3_BROWSER_BEHAVIORS = Object.freeze([
 	"overlapping rehearsal retains the existing fast-fail fence",
 	"independent room sessions do not share one lifetime queue",
 	"a failed adoption releases the lifetime queue for retry",
+	"accepted-vertex failure cannot deadlock queued adoption and shutdown",
 ] as const);
 
 const D108D2_ROOM_INPUT_KEYS = Object.freeze([
