@@ -822,20 +822,68 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		expect(right.peerConnections.every(({ connectionState }) => connectionState === "closed")).toBe(true);
 	});
 
-	it("caps sibling links at eight and rejects a ninth without allocating it", async () => {
+	it("caps sibling links at eight, replaces one in place, and rejects a ninth without allocating it", async () => {
 		const module = await loadOwnerModule();
 		const bus = new FakeSignalingBus();
 		const center = owner(module, bus, "peer-00");
 		const centerRoute = center.owner.openUnreliableWebRtcRoute("zone:alpha");
-		for (let index = 1; index <= 9; index += 1) {
-			const peerId = `peer-${String(index).padStart(2, "0")}`;
-			const remote = owner(module, bus, peerId);
-			remote.owner.openUnreliableWebRtcRoute("zone:alpha");
-			bus.connect("peer-00", peerId);
-			expect(await centerRoute.send([peerId], Uint8Array.of(index))).toBe(index <= 8);
+		const remotes: ReturnType<typeof owner>[] = [];
+		const admittedPeers: string[] = [];
+		let replacedPair: ReturnType<FakeSignalingBus["connect"]> | undefined;
+		let barrier: ReturnType<FakeSignalingBus["pauseResponses"]> | undefined;
+		let pending: Promise<void> | undefined;
+		try {
+			for (let index = 1; index <= 9; index += 1) {
+				const peerId = `peer-${String(index).padStart(2, "0")}`;
+				const remote = owner(module, bus, peerId);
+				remotes.push(remote);
+				remote.owner.openUnreliableWebRtcRoute("zone:alpha");
+				const pair = bus.connect("peer-00", peerId);
+				if (index <= 8) admittedPeers.push(peerId);
+				if (index === 8) replacedPair = pair;
+				expect(await centerRoute.send([peerId], Uint8Array.of(index))).toBe(index <= 8);
+			}
+			expect(center.peerConnections).toHaveLength(8);
+			expect(centerRoute.snapshot()).toMatchObject({ activeLinks: 8, linkDrops: 0 });
+
+			if (replacedPair === undefined) throw new Error("capacity replacement fixture missing");
+			const replacedPeerConnection = center.peerConnections.at(-1);
+			bus.disconnect(replacedPair);
+			const replacement = bus.connect("peer-00", "peer-08");
+			barrier = bus.pauseResponses();
+			pending = centerRoute.reconcile(admittedPeers);
+			await barrier.waitUntilPending();
+			expect(replacedPeerConnection?.connectionState).toBe("closed");
+			expect(centerRoute.snapshot()).toMatchObject({
+				activeLinks: 7,
+				lastLinkDrop: "replacement",
+				linkDrops: 1,
+			});
+
+			barrier.release();
+			await pending;
+			expect(centerRoute.snapshot()).toMatchObject({
+				activeLinks: 8,
+				lastLinkDrop: "replacement",
+				linkDrops: 1,
+				links: expect.arrayContaining([
+					expect.objectContaining({
+						connectionId: replacement.left.id,
+						generation: replacement.left.generation,
+						peerId: "peer-08",
+					}),
+				]),
+			});
+			expect(center.peerConnections.filter(({ connectionState }) => connectionState === "connected")).toHaveLength(8);
+			const allocated = center.peerConnections.length;
+			expect(await centerRoute.send(["peer-09"], Uint8Array.of(9))).toBe(false);
+			expect(center.peerConnections).toHaveLength(allocated);
+		} finally {
+			barrier?.release();
+			await pending?.catch(() => undefined);
+			center.owner.close();
+			for (const remote of remotes) remote.owner.close();
 		}
-		expect(center.peerConnections).toHaveLength(8);
-		expect(centerRoute.snapshot().activeLinks).toBe(8);
 	});
 
 	it("closes routes independently, releases the last shared link, and reuses capacity", async () => {

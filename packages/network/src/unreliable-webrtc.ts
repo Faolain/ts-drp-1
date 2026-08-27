@@ -564,7 +564,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 					if (
 						existing !== undefined &&
 						existing.channel.readyState === "open" &&
-						(connection === undefined || this.#sameConnection(existing.connection, connection))
+						(connection === undefined || this.#isCurrent(existing.connection))
 					) {
 						return;
 					}
@@ -584,7 +584,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			if (
 				link === undefined ||
 				link.channel.readyState !== "open" ||
-				(connection !== undefined && !this.#sameConnection(link.connection, connection))
+				(connection !== undefined && !this.#isCurrent(link.connection))
 			) {
 				return false;
 			}
@@ -617,8 +617,9 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		const existing = this.#links.get(peerId);
 		const connection = this.#connectionFor(peerId);
 		const replacementRequired =
-			existing !== undefined && connection !== undefined && !this.#sameConnection(existing.connection, connection);
+			existing !== undefined && connection !== undefined && !this.#isCurrent(existing.connection);
 		if (existing !== undefined && existing.channel.readyState === "open" && !replacementRequired) return existing;
+		if (existing !== undefined && replacementRequired) this.#dropLink(peerId, existing, "replacement");
 		const pending = this.#pendingLinks.get(peerId);
 		if (pending !== undefined) return pending;
 		if (
