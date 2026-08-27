@@ -61206,6 +61206,143 @@ D.108e1 is therefore closed at pushed signed commit `f979157bfc39`; the branch
 and origin agree, the complete retained Phase-4c suite has no excluded memory
 child, and D.108e2 may now begin.
 
+#### D.108e2 — successor activation, product-lifetime and retained-oracle hardening
+
+D.108e2 closes the remaining named D.108 hardening ledger before Phase 6a
+exit. The pre-RED audit found four distinct owners rather than one permissible
+mixed diff. They run in the order below. A later slice may consume the signed
+evidence of an earlier slice, but it may not add that earlier slice's owners to
+its own GREEN roster. Wrapped-handle plane identity is already closed by
+D.108d1a and is explicitly absent from every D.108e2 roster.
+
+##### D.108e2a — node activation boundary
+
+This is the first D.108e2 slice. Its tests-only RED roster is exactly these
+five retained paths plus one new worker asset:
+
+- `tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts`;
+- `tests/phase-6a-creator-successor-activation-red.test.ts`;
+- `packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts`;
+- `packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-worker.ts` (new);
+- `packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts`;
+- `packages/storage-browser/playwright.phase-6a-creator-successor-activation.config.ts`.
+
+The exact GREEN roster is three node-internal owners:
+
+- `packages/node/src/internal/v3-topic.ts` (new);
+- `packages/node/src/v3-live.ts`;
+- `packages/node/src/creator-adoption-activate.ts`.
+
+The new internal helper is the sole node implementation of the existing
+`ts-drp/live-topic/v3` hash and `drp/v3/1/` rendering. It is not exported from
+the node root or package manifest and changes no topic bytes. Both ordinary v3
+activation and successor activation must consume it, and an exact source
+census must find one node implementation of the domain/prefix pair.
+
+Cold reopen must reject every runtime `authenticationProfile` value other
+than the literal `creator-only` as `malformed-input` before a store, signer,
+snapshot, journal, queue, network or lock effect. This is validation of the
+existing private input, not a new profile or API.
+
+The browser-realm policy is explicit: a Window or DedicatedWorker that can
+run successor activation must acquire the same origin-wide, lifetime-held
+exclusive Web Lock for the stable topic. Missing, non-callable, throwing,
+rejecting or already-held LockManager authority fails closed before live
+activation in either realm. A genuine same-origin DedicatedWorker holds the
+lock while a Window contender loses, releases through handle deactivation,
+and the freshly reverified Window contender then wins. The worker test records
+the real lock acquisition/callback/release counts. Non-browser Node retains
+the process-local owner policy and must not be made dependent on a synthetic
+`window`, `self` or `navigator`.
+
+The composite readiness condition is: the source census is singular; hostile
+cold profiles perform zero downstream effects; the real worker/window
+contention and hostile-worker authority matrix pass in Chromium, Firefox and
+WebKit; the existing two-tab lifetime lock, same-binding handoff, cold child,
+local-author and handle-identity gates remain green; and no root export,
+manifest, product, wire/store format, topic, queue identity or lock name
+changes. A need for a fourth production owner stops and reslices D.108e2a.
+
+##### D.108e2b — room adoption lifetime and declaration policy
+
+D.108e2b begins only after D.108e2a is signed, reviewed and pushed. Its
+tests-only RED roster is exactly:
+
+- `tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts`;
+- `tests/phase-6a-creator-successor-product-red.test.ts`;
+- `packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts`;
+- `packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts`;
+- `packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts`.
+
+Its sole expected GREEN owner is `examples/v3-room/src/index.ts`.
+`examples/v3-chat/src/index.ts` remains a byte-identity exclusion unless a RED
+behavior proves that the chat facade itself, rather than the room session,
+owns a missing lifetime rule; that result stops and reslices instead of
+silently widening GREEN.
+
+One room session has one adoption single-flight. Concurrent callers observe
+the same success or same failure and cannot verify, commit, swap, activate or
+deactivate twice. `close()` coordinates with an in-flight adoption: no
+replacement can become reachable after close resolves, and all acquired
+handles/stores/locks are released exactly once. If predecessor deactivation
+rejects, the newly activated replacement is deactivated before the error
+escapes and the session cannot expose mixed predecessor/successor authority.
+
+A cold successor declaration combined with
+`createOperationAdmissionPolicy`, `rebaseSourceInvite` or
+`creatorFinalitySigner` fails closed at input validation until a separately
+specified authority composition exists. Non-migration callers are not
+required to supply migration-invite authority; migration and redirect paths
+retain their existing exact invite preconditions. Acceptance uses behavioral
+room/product probes, including concurrent adoption/close and injected
+deactivation failure, rather than source-pattern readiness. No node owner,
+public surface, snapshot declaration, migration wire record or activation
+authority changes in D.108e2b.
+
+##### D.108e2c — retained recovery-oracle strengthening
+
+D.108e2c is test infrastructure only. Before its RED, freeze the smallest
+exact subset of the existing local-author contract/test/child and activation
+browser owners needed to prove: Bob's signer call precedes every lineage read;
+malformed ACL members are rejected against the authenticated ACL digest; an
+unsafe or negative lineage `next` fails closed; cross-file readiness regexes
+are removed or reduced to bounded structural ownership predicates; every
+descriptive oracle-child behavior constant is bound to an executed case or
+deleted; browser lock acquisition is directly counted; and wrong-key and
+throwing possession use sequential, separately named databases so one failure
+cannot contaminate the next. Behavioral children remain the acceptance
+authority. This slice has no production GREEN owner and may not change product
+or package APIs.
+
+##### D.108e2d — retained recovery performance evidence
+
+D.108e2d starts only after correctness slices a-c. Its RED/evidence freeze
+must measure the private predecessor issuance view with one scope and one
+issued row and prove pagination termination, a per-recovery—not per method
+call—skip budget, and the exact count of issued-record reads and successor
+preparations. The first acceptable GREEN is evidence that current counts meet
+the frozen budget; production changes are authorized only when that signed
+profile reproduces duplicate work. If reproduced, the only prospective
+production owners are `packages/node/src/creator-adoption.ts` and
+`packages/node/src/v3-live.ts`; remove the duplicate issued-record read and/or
+introduce a custody-safe non-consuming prepared-payload view without exposing
+the private store wrapper. A third production owner, public adapter, changed
+limit or changed recovery authority stops and reslices. This profiling slice
+must not delay an earlier correctness fix, but it must have a signed terminal
+result before Phase 6a exits.
+
+Each D.108e2 sub-slice uses one immutable tests-only RED checkpoint and one
+immutable GREEN/evidence checkpoint. Each checkpoint receives one real Grok
+4.6/high, exact Kimi K3 CHECK001 through CHECK100 and Opus 5/xhigh review.
+Reproduced P0/P1 findings are corrected in the same round without a
+confirmation review; P2 findings receive a named owner and deadline. No Fable
+or collaboration subagent runs without new express authorization. Focused and
+retained Phase-6a tests, the complete five-file Phase-4c suite including the
+fresh 64 MiB peak-live child, affected package/example builds and typechecks,
+three-engine browser gates, exact-owner lint/format/diff checks and an isolated
+fresh-build proof remain mandatory. Signed plan-freeze, RED, GREEN/evidence
+commits and pushes close each slice; only then may the next slice begin.
+
 The rejected D.108d2 plan-freeze review inspected immutable signed commit
 `6d0c3c036c3dd5d6422391478171b1d9253705c9`, parent
 `227d0e41722e6fab66598e3f0b19fdf06141759f`, tree
