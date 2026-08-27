@@ -1608,7 +1608,7 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 				after: { verificationCount: 1 },
 				before: { firstSettled: false, preVerification: 0, secondSettled: false },
 				settled: [
-					{ order: 1, status: "fulfilled" },
+					{ order: 1, status: "rejected" },
 					{ order: 2, status: "fulfilled" },
 				],
 			},
@@ -1617,7 +1617,7 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 				before: { firstSettled: false, preTerminal: 0, secondSettled: false },
 				settled: [
 					{ order: 1, status: "fulfilled" },
-					{ order: 2, status: "fulfilled" },
+					{ order: 2, status: "rejected" },
 				],
 			},
 			adoptionThenRehearsal: {
