@@ -62289,15 +62289,15 @@ authenticated successor rows at sequences 1 through 8,192. A new reopen must
 complete predecessor recovery: the predecessor view returns sequence 0, the
 outer recovery consumer performs its one copied-scope issued read/match, the
 next wrapper call skips exactly the signed limit with captured-scope issued
-matches, reaches the empty page and begins genuine successor recovery. The
-fixture has one prepared successor vertex and cloned rows below the
-byte-capacity boundary, so the 8,192 successor rows then deterministically
-reject at the unchanged vertex-count gate. The public reopen result is kind
-`recovery-rejected` with detail
-`creator successor recovery failed: graph-rejected`; the internal capacity
-detail is not exposed. That later result is asserted but is not
-presented as activation success; terminal-empty observation and one
-epoch-anchor installation are the causal predecessor-boundary evidence. The
+matches, reaches the empty page and begins genuine successor recovery. After
+that boundary, the test facade injects exactly one successor-stage issuance
+read failure instead of reauthenticating the same 8,192 rows for an unrelated
+graph-capacity result. The public reopen result is therefore pinned to kind
+`recovery-rejected` and detail
+`creator successor recovery failed: issuance-rejected`. That later sentinel
+result is asserted but is not presented as activation success; terminal-empty
+observation, one epoch-anchor installation and one successor-page fault are the
+causal predecessor-boundary evidence. The
 retained one-future-row reopen remains only the accepted under-budget behavior
 control. Fresh budget custody is instead proved when the later over-budget
 reopen, on the same issuance store after the equality recovery has consumed a
