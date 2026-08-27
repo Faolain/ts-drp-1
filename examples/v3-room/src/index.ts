@@ -1973,6 +1973,66 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		);
 		return selected;
 	};
+	const snapshotMigrationInvite = (value: unknown): unknown => {
+		if (value === null || typeof value !== "object") return value;
+		try {
+			return encodeCreatorInvite(value as V3RoomCreatorInviteMaterial);
+		} catch {
+			return value;
+		}
+	};
+	const snapshotMigrationRehearsalInput = (
+		rehearsalInput: V3RoomMigrationRehearsalInput
+	): V3RoomMigrationRehearsalInput => {
+		const fields = exactRecord(rehearsalInput, ["rehearsalNonce", "targetCreatorInvite"]);
+		if (fields === undefined) return rehearsalInput;
+		const nonce = fields.rehearsalNonce;
+		let capturedNonce = nonce;
+		try {
+			const backing = Reflect.apply(INTRINSIC_TYPED_ARRAY_BUFFER_GETTER, nonce, []);
+			const backingLength = Reflect.apply(INTRINSIC_ARRAY_BUFFER_BYTE_LENGTH_GETTER, backing, []);
+			const byteLength = Reflect.apply(INTRINSIC_TYPED_ARRAY_BYTE_LENGTH_GETTER, nonce, []);
+			const byteOffset = Reflect.apply(INTRINSIC_TYPED_ARRAY_BYTE_OFFSET_GETTER, nonce, []);
+			const resizable =
+				INTRINSIC_ARRAY_BUFFER_RESIZABLE_GETTER !== undefined &&
+				Reflect.apply(INTRINSIC_ARRAY_BUFFER_RESIZABLE_GETTER, backing, []) === true;
+			if (
+				INTRINSIC_GET_PROTOTYPE_OF(nonce) === INTRINSIC_UINT8_ARRAY_PROTOTYPE &&
+				backing instanceof INTRINSIC_ARRAY_BUFFER &&
+				INTRINSIC_GET_PROTOTYPE_OF(backing) === INTRINSIC_ARRAY_BUFFER_PROTOTYPE &&
+				!resizable &&
+				byteLength === 32 &&
+				byteOffset === 0 &&
+				backingLength === 32
+			) {
+				capturedNonce = new INTRINSIC_UINT8_ARRAY(nonce as Uint8Array);
+			}
+		} catch {
+			// The queued owner preserves the existing invalid-input classification.
+		}
+		return Object.freeze({
+			rehearsalNonce: capturedNonce,
+			targetCreatorInvite: snapshotMigrationInvite(fields.targetCreatorInvite),
+		}) as V3RoomMigrationRehearsalInput;
+	};
+	const snapshotMigrationActivationInput = (
+		activationInput: V3RoomMigrationActivationInput
+	): V3RoomMigrationActivationInput => {
+		const fields = exactRecord(activationInput, [
+			"exactCanonicalRecordBytes",
+			"recordVertexDigest",
+			"targetCreatorInvite",
+		]);
+		if (fields === undefined) return activationInput;
+		return Object.freeze({
+			exactCanonicalRecordBytes:
+				fields.exactCanonicalRecordBytes instanceof Uint8Array
+					? new Uint8Array(fields.exactCanonicalRecordBytes)
+					: fields.exactCanonicalRecordBytes,
+			recordVertexDigest: fields.recordVertexDigest,
+			targetCreatorInvite: snapshotMigrationInvite(fields.targetCreatorInvite),
+		}) as V3RoomMigrationActivationInput;
+	};
 	type MigrationFollowerResult =
 		| Readonly<{ readonly ok: true }>
 		| Readonly<{ readonly ok: false; readonly reason: unknown }>;
@@ -2718,12 +2778,13 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	const rehearseMigration = async (
 		rehearsalInput: V3RoomMigrationRehearsalInput
 	): Promise<V3RoomMigrationRehearsalReceipt> => {
+		const capturedInput = snapshotMigrationRehearsalInput(rehearsalInput);
 		if (redirectPromise !== undefined) await redirectPromise;
-		if (redirectedSession !== undefined) return redirectedSession.rehearseMigration(rehearsalInput);
+		if (redirectedSession !== undefined) return redirectedSession.rehearseMigration(capturedInput);
 		if (migrationRehearsalReserved) throw new TypeError("v3 room migration rehearsal is already active");
 		migrationRehearsalReserved = true;
 		try {
-			return await enqueueLifetimeTransition(() => performMigrationRehearsal(rehearsalInput));
+			return await enqueueLifetimeTransition(() => performMigrationRehearsal(capturedInput));
 		} finally {
 			migrationRehearsalReserved = false;
 		}
@@ -2934,9 +2995,10 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	const activateMigration = async (
 		activationInput: V3RoomMigrationActivationInput
 	): Promise<V3RoomMigrationActivationReceipt> => {
+		const capturedInput = snapshotMigrationActivationInput(activationInput);
 		if (redirectPromise !== undefined) await redirectPromise;
-		if (redirectedSession !== undefined) return redirectedSession.activateMigration(activationInput);
-		return enqueueLifetimeTransition(() => performMigrationActivation(activationInput));
+		if (redirectedSession !== undefined) return redirectedSession.activateMigration(capturedInput);
+		return enqueueLifetimeTransition(() => performMigrationActivation(capturedInput));
 	};
 	if (redirectSource !== undefined) {
 		try {
