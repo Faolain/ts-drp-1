@@ -61085,6 +61085,127 @@ that relay observations record the actual `Message.objectId`, `sender` and
 Fable invocation or collaboration subagent ran in this slice. The RED review
 gate is now closed and D.108e1 may proceed to its frozen GREEN roster.
 
+The D.108e1 GREEN implementation is signed commit
+`2a458c259048e6838641be5206001a915acebe59`, parent
+`498d1691a3819d2ddd14bf97c7998fefeca1bcd7`, tree
+`32b95810655248cffd9e5b0d4cdcd2a643eeb162`. It changes exactly the eight
+frozen GREEN owners. The fresh launcher resolves every expected import through
+the owning package's real Node self-reference export map before registering an
+exact closed hook. The activation child observes awaited successful source-port
+reads, binds their bytes to the parent oracle and completes a separate genuine
+target quarantine before subscription. Playwright shim creation is bounded by
+global setup/teardown, and the product relay retains actual structured-cloned
+bytes plus literal object, sender and type fields. No production source,
+manifest, lockfile, API, wire/store shape, digest, authority, chunk/memory limit
+or policy changed.
+
+Ordinary-checkout acceptance used the frozen path rosters above. The focused
+command was `pnpm exec vitest run --coverage.enabled=false
+tests/phase-6a-creator-successor-infrastructure-red.test.ts
+tests/phase-6a-creator-successor-activation-red.test.ts
+packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts
+tests/phase-6a-creator-successor-product-red.test.ts --pool=forks
+--maxWorkers=1 --minWorkers=1`; it passed 28/28. The corresponding eleven-file
+retained Phase-6a command passed 70/70. `pnpm exec vitest run
+--coverage.enabled=false tests/phase-4c-snapshot-stream-red.test.ts
+tests/phase-4c-snapshot-subprocess-resolution-red.test.ts
+tests/phase-4c-snapshot-quarantine-red.test.ts
+tests/phase-4c-snapshot-pull-red.test.ts
+tests/phase-4c-v3-snapshot-transfer-composition-red.test.ts --pool=forks
+--maxWorkers=1 --minWorkers=1` passed 44/44, including the real fresh 64 MiB
+peak-live child and retaining mutant. The activation and product Playwright
+commands each passed 12/12 across Chromium, Firefox and WebKit; the exact shim
+root was absent before and after activation. `pnpm --filter @ts-drp/canonical
+--filter @ts-drp/message-queue --filter @ts-drp/node --filter
+@ts-drp/storage-node --filter @ts-drp/storage-browser build` passed all five
+builds. Canonical, message-queue and storage-browser `typecheck` passed. The
+node and storage-node test-inclusive `typecheck` commands reproduced their
+recorded worker-host/cross-root file-list, WebRTC `.emit`, compact-history and
+untyped retained-fixture debt; their production builds passed and neither
+failure is caused by an exact GREEN owner. Exact-eight `eslint
+--max-warnings=0`, exact-eight `prettier --check`, `git diff --check` and the
+checkpoint-range diff check all passed.
+
+The sole GREEN review round inspected immutable `2a458c2590`. Grok was first
+given the obsolete literal model id `grok-4.6-build`; the local CLI rejected it
+before any model session, so that was not a review launch. The actual run used
+the upgraded `grok-4.6` alias at high effort, resolved underneath to
+`grok-4.6-build`, and completed session
+`01a04127-609c-7f41-a357-bf6ee3c0f451` after 780.327 seconds with exit code 0,
+`stop_reason=end_turn`, explicit `APPROVED` JSON and no findings. The runner
+initially labeled the result `NO_VERDICT` only because the prompt requested a
+bare JSON object while its recognizer required a `FINAL:` prefix. The same
+completed session, not a replacement review, resumed once and emitted that
+terminal marker with the unchanged `APPROVED` verdict. This was neither a
+service cancellation nor a confirmation review.
+
+Kimi CLI 0.38.0 rejected one incompatible local `--plan --prompt` command
+shape before model startup. Its one real isolated review used exact
+`kimi-code/k3` session `87a4f6ec-d818-44ad-b095-0c4677fbe623`, emitted
+CHECK001 through CHECK100 exactly once in ascending order, left its worktree
+clean and returned schema-valid `APPROVED`, P0=0/P1=0/P2=4. Opus session
+`6eb52220-acad-41ae-af06-caac7910a131` resolved to `claude-opus-5` at xhigh,
+used no subagent, left its isolated worktree clean and returned schema-valid
+`CHANGES_REQUIRED`, P0=0/P1=2/P2=4. No reviewer edited the shared checkout. No
+Fable invocation or collaboration subagent ran.
+
+Both Opus P1 findings reproduced and were corrected once without a
+confirmation review. First, the original split-store seam pre-opened the source
+scope and imposed expiry with a fixture-authored clock comparison, so removing
+the production store sweep no longer killed the TTL proof. Second, the
+declaration-loop mutant copied every expected field but was rejected only
+because it volunteered count zero and a mutant label. Signed correction commit
+`f979157bfc3960484ecaf2455fd083c0e1e1ed43`, parent `2a458c2590`, tree
+`aa5b2f6a3d8a313ff605fbde8c56c9fa439010c9`, moves the source `openScope()`
+into the production-triggered call, retains the separate empty receipt-bound
+target and removes the fixture expiry gate. The source store's own sweep now
+owns expiration. The mutant suppresses only actual read observation; its
+direct count and before-completion flag are honestly derived from zero observed
+reads while its completion loop still copies all labels and hashes. The
+existing mutant marker is only a mode cross-check. The child also asserts the
+exact two-access source-read/target-receipt quarantine contract before genuine
+target completion. Independent accepted-message counters restore meaning to
+the relay count/list checks without redefining two non-message control frames
+as product messages.
+
+The final isolated proof used detached worktree
+`/private/tmp/ts-drp-d108e1-correction.5IQMH9/repo` at exact signed commit
+`f979157bfc3960484ecaf2455fd083c0e1e1ed43`. No package `dist` existed before
+install. `pnpm install --offline --ignore-scripts --frozen-lockfile` installed
+all 48 workspaces without creating `dist`; `node scripts/ensure-native-deps.mjs`
+then prepared the native dependency. `pnpm --filter @ts-drp/storage-node...
+--filter @ts-drp/node... --filter @ts-drp/storage-browser... build` freshly
+built the 33-package closure. As a deliberate disposable mutation, deleting
+only `sweep(Date.now())` from storage-node snapshot `openScope()` made the exact
+TTL test fail: the expired child instead activated successfully and reported a
+real read. Restoring that line and rebuilding storage-node restored the test.
+The combined sixteen-file retained command then passed 114/114, including the
+64 MiB proof; activation and product Playwright again passed 12/12 each across
+all three engines; the shim root remained absent. Exact-eight ESLint, Prettier,
+both diff checks and final `git status --porcelain` passed/clean. This is the
+clean-environment proof that local shims, stale builds and ignored artifacts do
+not mask the package-resolution or snapshot-oracle result.
+
+The P2 ledger is explicit. The two-access quarantine brittleness and
+declaration-loop self-label concerns are closed by the correction's exact
+access assertion and honestly measured zero-read mutant. Accepted-message
+counters are no longer derived from array length; whether future product tests
+also need an all-frame control-packet conservation denominator is assigned to
+the Phase-6a exit evidence audit, due before Phase 6a exit and before widening
+the frozen browser RED contract. Import-resolution process batching is assigned
+to the repository test-infrastructure performance owner, due before any D.108
+CI-budget optimization; correctness continues to prefer one fresh Node
+resolution per specifier. Empty shim-parent cleanup, stale-root diagnostics and
+repository-global concurrency are assigned to the Phase-6a exit evidence
+audit, due before any parallel activation-suite execution. Until then the
+fail-closed exact-root guard and serialized command remain mandatory. These are
+nonblocking hardening items, not permission to weaken the closed export-map,
+TTL, read-order, receipt-identity, cleanup or relay-byte gates.
+
+D.108e1 is therefore closed at pushed signed commit `f979157bfc39`; the branch
+and origin agree, the complete retained Phase-4c suite has no excluded memory
+child, and D.108e2 may now begin.
+
 The rejected D.108d2 plan-freeze review inspected immutable signed commit
 `6d0c3c036c3dd5d6422391478171b1d9253705c9`, parent
 `227d0e41722e6fab66598e3f0b19fdf06141759f`, tree
