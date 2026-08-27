@@ -655,13 +655,17 @@ function rawSequenceEvidence(
 		.filter(({ lane, sentinel }) => lane === "raw" && !sentinel)
 		.sort((left, right) => left.receivedAtMs - right.receivedAtMs);
 	const sequences = [...new Set(received.map(({ sequence }) => sequence))].sort((left, right) => left - right);
-	let gap = sequences[0] ?? 0;
+	const firstSequence = sequences[0];
+	const lastSequence = sequences.at(-1);
+	if (firstSequence === undefined || lastSequence === undefined) return Object.freeze({ gap: 0, maxStallMs: 0 });
+	let gap = firstSequence + 1;
 	for (let index = 1; index < sequences.length; index += 1) {
 		const previous = sequences[index - 1];
 		const current = sequences[index];
 		if (previous === undefined || current === undefined) continue;
 		gap = Math.max(gap, current - previous);
 	}
+	gap = Math.max(gap, SAMPLE_COUNT - lastSequence);
 	let maxStallMs = 0;
 	for (let index = 1; index < received.length; index += 1) {
 		const previous = received[index - 1];
