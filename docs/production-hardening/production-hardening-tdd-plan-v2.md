@@ -61614,20 +61614,24 @@ delay the completed D.108e2b correctness gate.
 ##### D.108e2c — retained recovery-oracle strengthening
 
 D.108e2c is test infrastructure only. Before its RED, freeze the smallest
-exact subset of the existing local-author contract/test/child and activation
-browser owners needed to prove: Bob's signer call precedes every lineage read;
-malformed ACL members are rejected against the authenticated ACL digest; an
-unsafe or negative lineage `next` fails closed; cross-file readiness regexes
-are removed or reduced to bounded structural ownership predicates; every
-descriptive oracle-child behavior constant is bound to an executed case or
-deleted; browser lock acquisition is directly counted; and wrong-key and
-throwing possession use sequential, separately named databases so one failure
-cannot contaminate the next. Behavioral children remain the acceptance
-authority. This slice has no production GREEN owner and may not change product
-or package APIs.
+exact subset of the existing Phase-3 topic, local-author contract/test/child,
+activation-browser and product-browser owners needed to prove: Bob's signer
+call precedes every lineage read; malformed ACL members are rejected against
+the authenticated ACL digest; an unsafe or negative lineage `next` fails
+closed; cross-file readiness regexes are removed or reduced to bounded
+structural ownership predicates; every descriptive oracle-child behavior
+constant is bound to an executed case or deleted; browser lock acquisition and
+blocked contention are directly counted; the harness-only busy result cannot
+masquerade as a production lock rejection; wrong-key and throwing possession
+use sequential, separately named databases so one failure cannot contaminate
+the next; and the two D.108e2b post-activation close branches receive causal
+pause-gate coverage. Behavioral children remain the acceptance authority.
+This slice has no production GREEN owner and may not change product or package
+APIs.
 
-The exact tests-only ownership roster is eight existing paths:
+The exact tests-only ownership roster is nine existing paths:
 
+- `tests/phase-3a1b-p3-live-transport-red.test.ts`;
 - `tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts`;
 - `tests/phase-6a-creator-successor-local-author-red.test.ts`;
 - `packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs`;
@@ -61638,48 +61642,131 @@ The exact tests-only ownership roster is eight existing paths:
   and
 - `packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts`.
 
-The immutable RED may change only those eight test owners. It freezes the
-roster, replaces the unexecuted oracle-child inventory claim with an executed
-behavior or removes it, and introduces assertions that fail only because the
-current fixtures do not yet expose the assigned observations. The native child
-must report an ordered possession/lineage event stream and execute
-digest-consistent malformed-member plus negative and unsafe-integer
-lineage-`next` controls. The activation browser must report callback-level Web
-Lock acquisition, probe wrong-key then throwing possession sequentially in two
-distinct database namespaces, and prove both fail before acquisition. The
-product browser must expose test-only pause/release gates immediately after
-successful successor activation and immediately after completed predecessor
-deactivation; beginning `close()` at either gate must leave adoption and close
-unsettled until release, then clean the replacement exactly once, release the
-predecessor exactly once overall, reject adoption as closed and fulfill close
-in causal order. A RED that requires a production edit, a new public field or
-an implementation-relative import stops and reslices.
+The immutable RED assertion/metadata roster is exactly six paths:
 
-GREEN is the same eight-owner test-infrastructure roster with no production
-owner. It may add only fixture-local counters, events, gates, mutations and
-assertions. The malformed ACL case must canonicalize a malformed member,
-derive that exact carrier's `ts-drp/latched-acl/v3` digest, and pass both to the
-existing canonical opener so a stale digest cannot create the rejection. For
-every successful possession attempt, no lineage event may precede its signer
-event and all seven writer reads must follow it; possession failures still
-read zero lineages. Negative and greater-than-safe-integer `next` values must
-produce the existing bounded lineage failure with zero live effects. Window
-lock telemetry counts entry into the native lock callback, not inferred handle
-state or request attempts. The two possession probes must run sequentially
-after separately seeding visibly distinct names. Product pause gates are
-test-bundle instrumentation only and must not alter the shipped room module.
+- `tests/phase-3a1b-p3-live-transport-red.test.ts`;
+- `tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts`;
+- `tests/phase-6a-creator-successor-local-author-red.test.ts`;
+- `packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts`;
+- `packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts`;
+  and
+- `packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts`.
+
+The contract overlap is limited in RED to static nine-path ownership and
+behavior metadata; it may not add the protocol-v3 child resolution or any
+fixture emission. The Phase-3 owner closes the inherited D.108e2a debt with a
+runtime hostile-`TextEncoder` cache mutant that remains fail closed after the
+global constructor is restored and a TypeScript-AST census proving exactly one
+production `ts-drp/live-topic/v3` domain owner with the two intended activation
+consumers. Those retained controls are expected to pass in RED and are not
+used to manufacture a failure.
+
+RED introduces three net-new failing composites. The local-author native
+composite fails because its child lacks a dedicated per-attempt
+possession/lineage event stream, the direct digest-consistent malformed-member
+opener result, and the negative/unsafe-`next` cases. The activation Playwright
+composite fails once per engine because results lack callback-entry,
+lock-acquired and production-versus-harness disposition telemetry and because
+the two possession probes are not sequential distinct-database cases. The
+product Playwright composite fails once per engine because neither
+post-activation pause/release gate exists. The nine-path ownership assertion,
+Phase-3 controls and all earlier behavioral cases remain green. RED may not
+edit either child/entry emitter, add a production owner or satisfy an assertion
+in the same commit. A required production edit, new public field or
+implementation-relative import stops and reslices.
+
+The exact GREEN emission roster is four paths:
+
+- `tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts`;
+- `packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs`;
+- `packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts`;
+  and
+- `packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts`.
+
+All five assertion owners must remain byte-identical during GREEN. GREEN has
+no production owner and may add only fixture-local resolution, counters,
+events, gates and mutations. The malformed ACL control is a direct
+child-executed invocation of the existing
+`@ts-drp/protocol-v3/latched-acl` export: it canonicalizes a malformed member,
+derives that exact carrier's `ts-drp/latched-acl/v3` digest and passes both to
+the opener so a stale digest cannot create the rejection. The local-author
+contract adds that one subpath to the closed workspace import map and the clean
+build explicitly includes `@ts-drp/protocol-v3` before child execution.
+
+Each successful accepted possession attempt has its own event window: no
+lineage event may precede its signer event and all seven writer reads follow
+it. Possession failures still read zero lineages; lineage-fault cases may
+short-circuit only after their successful possession signer. Negative and
+greater-than-safe-integer `next` values produce the existing bounded lineage
+failure with zero live effects. Window telemetry is guarded to
+`window === globalThis` so the out-of-roster DedicatedWorker counter wrapper
+cannot be double-instrumented. It counts native lock-callback entry separately
+from a non-null acquired lock. A production blocked contender reports callback
+entry with no acquisition, while the entry's early same-realm busy guard has a
+distinct fixture-only disposition and zero lock callbacks. The wrong-key and
+throwing probes run sequentially only after separately seeding visibly
+distinct names and both reach zero callbacks.
+
+The product Playwright owner keeps the frozen D.108e2b contract inventory
+unchanged and owns any D.108e2c behavior labels locally. Its two pause gates
+are test-bundle instrumentation only: one resolves immediately after
+successful successor activation and one after underlying predecessor
+deactivation completes. Beginning `close()` at either gate leaves adoption and
+close unsettled until release, then cleans the replacement exactly once,
+releases the predecessor exactly once overall, rejects adoption as closed and
+fulfills close in causal order. The shipped room and chat modules remain
+byte-identical.
 
 Acceptance is due before D.108e2d RED. It requires the focused local-author
 unit/native child and all three activation/product browser engines; retained
 D.108b-D.108e2b and Phase-6a tests; the complete five-file Phase-4c selection
 including the genuine fresh-process 64 MiB peak-live owner and retaining
-mutant; affected package and example builds/typechecks; exact-eight-owner
+mutant; affected package and example builds/typechecks; exact-nine-owner
 ESLint with zero warnings, Prettier and `git diff --check`; and an isolated
 no-`dist` offline install plus fresh dependency-closure build. The plan must
 record the immutable RED and GREEN/evidence identities, exact commands and
 results, reviewer sessions, assigned P2 debt and clean-environment package
-resolution proof. Signed commits and pushes are required before D.108e2d may
-start.
+resolution proof. Exact-owner hygiene covers the nine-path union, the six RED
+paths at RED and the four GREEN paths at GREEN. Signed commits and pushes are
+required before D.108e2d may start.
+
+The first plan-freeze review round inspected immutable signed commit
+`61688a061bee6654827d107c41bc2a75f8c86553`. Grok 4.6/high session
+`01a041f1-c456-7672-9432-a3df4a80f3b4` completed its sole read-only inspection
+normally in 750.235 seconds with `stop_reason=end_turn`; the upgraded service
+continued beyond the former 570-second cancellation point. Its substantive
+terminal was `CHANGES_REQUIRED`, P0=0/P1=1/P2=3. One extra `repair` member in
+a P2 object made the strict wrapper report `NO_VERDICT`; a one-turn tool-free
+continuation of the same session removed only that forbidden member and
+returned the identical schema-valid verdict. Kimi K3 session
+`session_34a4e73a-af1b-4e2c-b06f-58058c2ee60c` returned `APPROVED`,
+P0=0/P1=0/P2=2 after its hundred substantive checks. Its first envelope
+repeated the `CHECK001` token in a later range phrase; a tool-free format-only
+continuation of the same session changed only that phrase and produced exactly
+101 nonblank lines with CHECK001 through CHECK100 once each and the unchanged
+FINAL object. Opus 5/xhigh session
+`25ef1f62-cb1b-4619-a117-aac18240b16e` used no subagent and returned
+schema-valid `CHANGES_REQUIRED`, P0=0/P1=2/P2=4. No reviewer edited the tree,
+no Fable or collaboration subagent ran and no confirmation review is
+authorized.
+
+The same round reproduced the plan-level blockers. D.108e2a had assigned four
+tests-only observations to D.108e2c, but the eight-path freeze omitted the
+Phase-3 owner and did not name the blocked-contender or harness-busy controls.
+It also permitted the same undifferentiated owner set at RED and GREEN without
+an exact failure inventory. This correction expands the union to the one
+required ninth owner, binds all four inherited observations, separates the
+six-path assertion/metadata RED from the four-path emitter GREEN with one
+explicit metadata overlap, and freezes exactly one native plus one
+activation-browser and one product-browser failing composite. The reviewers'
+remaining pre-RED observations are also closed here: product provenance is in
+the heading, the D.108e2b inventory remains outside the change, Window-only
+instrumentation protects the retained worker counters, protocol-v3 package
+resolution/build ownership is explicit, the malformed member is a direct
+opener proof, accepted versus short-circuited lineage windows are distinct and
+the already-present mixed order is not allowed to satisfy the net-new RED.
+This is the one same-round plan correction; it receives no confirmation
+review.
 
 ##### D.108e2d — retained recovery performance evidence
 
