@@ -847,6 +847,25 @@ async function pageFailureEvidence(page: Page, trialId: string | null): Promise<
 	});
 }
 
+test("raw sequence evidence includes the fixed sample-domain boundaries", () => {
+	const observations = Array.from({ length: SAMPLE_COUNT }, (_, sequence) =>
+		Object.freeze({
+			byteLength: SAMPLE_PAYLOAD_BYTES,
+			lane: "raw" as const,
+			receivedAtMs: sequence * SAMPLE_INTERVAL_MS,
+			sentAtMs: sequence * SAMPLE_INTERVAL_MS,
+			sequence,
+			sentinel: false,
+		})
+	);
+	expect({
+		complete: rawSequenceEvidence(observations).gap,
+		internal: rawSequenceEvidence(observations.filter(({ sequence }) => sequence !== 300)).gap,
+		leading: rawSequenceEvidence(observations.slice(1)).gap,
+		trailing: rawSequenceEvidence(observations.slice(0, -1)).gap,
+	}).toEqual({ complete: 1, internal: 2, leading: 2, trailing: 2 });
+});
+
 test("freezes RTC metadata at the event boundary before async payload conversion", async ({ browser }) => {
 	const context = await browser.newContext();
 	await context.addInitScript(installRtcObserver);
