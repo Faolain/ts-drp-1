@@ -88,6 +88,22 @@ export const D108E2E_RED_PATHS = Object.freeze([
 
 export const D108E2E_GREEN_PATHS = Object.freeze(["packages/node/src/v3-live.ts"] as const);
 
+export const D108E4_TEST_PATHS = Object.freeze([
+	"tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts",
+	"tests/phase-6a-creator-successor-local-author-red.test.ts",
+	"packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+	"packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts",
+	"packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts",
+	"packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts",
+	"tests/phase-3a1b-p3-live-transport-red.test.ts",
+	"tests/fixtures/shared/workspace-package-export-file.mjs",
+	"tests/phase-6a-creator-successor-infrastructure-red.test.ts",
+	"tests/phase-3a1b-d9336-two-client-room.pw.ts",
+	"tests/phase-3a1b-d9346-v3-zone.pw.ts",
+	"tests/e5-00-zone-trade-intent.pw.ts",
+	"tests/e5-02-zone-referee-outcome.pw.ts",
+] as const);
+
 export const D108D1B_REOPEN_INPUT_KEYS = CREATOR_SUCCESSOR_LOCAL_AUTHOR_REOPEN_INPUT_KEYS;
 export const D108D1B_CHILD_BEHAVIORS = Object.freeze([
 	"fresh Node binds established and fresh chat peers while every ambiguous or unauthenticated cold reopen fails before live effects",
@@ -97,6 +113,18 @@ export const D108E2D_CHILD_BEHAVIORS = Object.freeze([
 ] as const);
 export const D108E2E_CHILD_BEHAVIORS = Object.freeze([
 	"fresh Node predecessor recovery enforces one cumulative authenticated future-row skip budget per recovery",
+] as const);
+export const D108E4_CHILD_BEHAVIORS = Object.freeze([
+	"fresh Node closes the D.108e4 authenticated oracle and per-reopen budget debt",
+] as const);
+export const D108E4_ACTIVATION_BROWSER_BEHAVIORS = Object.freeze([
+	"window observes lock authority before durable store opening and possession probes use exact suffixed databases",
+] as const);
+export const D108E4_INFRASTRUCTURE_BEHAVIORS = Object.freeze([
+	"imports one explicit workspace package export only from its own fresh built file",
+] as const);
+export const D108E4_ZONE_BEHAVIORS = Object.freeze([
+	"waits for reciprocal raw unreliable links before one measured movement in each direction",
 ] as const);
 export const D108D1B_ORACLE_BROWSER_BEHAVIORS = Object.freeze([
 	"wrong-key and throwing browser possession fail before writer activation",

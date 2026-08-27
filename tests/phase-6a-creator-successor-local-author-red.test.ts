@@ -24,6 +24,11 @@ import {
 	D108E2E_CHILD_BEHAVIORS,
 	D108E2E_GREEN_PATHS,
 	D108E2E_RED_PATHS,
+	D108E4_ACTIVATION_BROWSER_BEHAVIORS,
+	D108E4_CHILD_BEHAVIORS,
+	D108E4_INFRASTRUCTURE_BEHAVIORS,
+	D108E4_TEST_PATHS,
+	D108E4_ZONE_BEHAVIORS,
 	openD108d1bMultiWriterFixture,
 } from "./fixtures/phase-6a-v3/creator-successor-local-author-contract.js";
 
@@ -159,6 +164,60 @@ describe("D.108d1b authenticated peer-local cold issuance RED", () => {
 		);
 		for (const name of D108E2E_CHILD_BEHAVIORS) expect(childSource).toContain(name);
 		expect((childSource.match(/it\(\s*D108E2E_CHILD_BEHAVIORS\[0\]/gu) ?? []).length).toBe(1);
+	});
+
+	it("freezes the exact D.108e4 thirteen-path tests-only ownership", () => {
+		expect(D108E4_TEST_PATHS).toEqual([
+			"tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts",
+			"tests/phase-6a-creator-successor-local-author-red.test.ts",
+			"packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+			"packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts",
+			"packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts",
+			"packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts",
+			"tests/phase-3a1b-p3-live-transport-red.test.ts",
+			"tests/fixtures/shared/workspace-package-export-file.mjs",
+			"tests/phase-6a-creator-successor-infrastructure-red.test.ts",
+			"tests/phase-3a1b-d9336-two-client-room.pw.ts",
+			"tests/phase-3a1b-d9346-v3-zone.pw.ts",
+			"tests/e5-00-zone-trade-intent.pw.ts",
+			"tests/e5-02-zone-referee-outcome.pw.ts",
+		]);
+		expect(new Set(D108E4_TEST_PATHS).size).toBe(13);
+		expect(D108E4_TEST_PATHS.every((path) => readFileSync(resolve(REPOSITORY_ROOT, path)).byteLength > 0)).toBe(true);
+		expect(
+			D108E4_TEST_PATHS.filter(
+				(path) =>
+					path.includes("/src/") ||
+					path.endsWith("/package.json") ||
+					path.endsWith(".config.ts") ||
+					!(/(^|\/)tests\//u.test(path) || path.startsWith("tests/fixtures/"))
+			)
+		).toEqual([]);
+		expect(D108E4_CHILD_BEHAVIORS).toHaveLength(1);
+		expect(D108E4_ACTIVATION_BROWSER_BEHAVIORS).toHaveLength(1);
+		expect(D108E4_INFRASTRUCTURE_BEHAVIORS).toHaveLength(1);
+		expect(D108E4_ZONE_BEHAVIORS).toHaveLength(1);
+	});
+
+	it("requires every root canonical consumer to use the D.108e4 export-file boundary", () => {
+		for (const relativePath of [
+			"tests/phase-3a1b-d9336-two-client-room.pw.ts",
+			"tests/phase-3a1b-d9346-v3-zone.pw.ts",
+			"tests/e5-00-zone-trade-intent.pw.ts",
+			"tests/e5-02-zone-referee-outcome.pw.ts",
+		]) {
+			const text = readFileSync(resolve(REPOSITORY_ROOT, relativePath), "utf8");
+			expect.soft(text, relativePath).not.toMatch(/from ["']@ts-drp\/canonical["']/u);
+			expect.soft(text, relativePath).toContain("workspace-package-export-file.mjs");
+		}
+	});
+
+	it(D108E4_ZONE_BEHAVIORS[0], () => {
+		const zone = readFileSync(resolve(REPOSITORY_ROOT, "tests/phase-3a1b-d9346-v3-zone.pw.ts"), "utf8");
+		expect(zone).toContain("ts-drp-ephemeral/1");
+		expect(zone).toContain("maxRetransmits");
+		expect(zone).toContain("fallback");
+		expect(zone).not.toMatch(/\.poll\(\s*async\s*\(\)\s*=>\s*\{[\s\S]{0,400}?keyboard\.press\(/u);
 	});
 
 	it("derives the shipped eight-member chat identities and exact writer split", () => {

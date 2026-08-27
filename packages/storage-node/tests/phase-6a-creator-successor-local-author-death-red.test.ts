@@ -11,6 +11,7 @@ import {
 	d108d1bChatAuthorities,
 	D108E2D_CHILD_BEHAVIORS,
 	D108E2E_CHILD_BEHAVIORS,
+	D108E4_CHILD_BEHAVIORS,
 	openD108d1bMultiWriterFixture,
 	runD108d1bLocalAuthorChild,
 	runD108e2eSkipBudgetChild,
@@ -365,6 +366,80 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 			}
 		}
 	});
+
+	it(
+		D108E4_CHILD_BEHAVIORS[0],
+		async () => {
+			const localAuthorResult = await runSharedChild();
+			const localAuthorProof = localAuthorResult.proof as
+				| Readonly<{
+						readonly authorityWindows?: Readonly<Record<string, unknown>>;
+						readonly oracle?: Readonly<Record<string, unknown>>;
+						readonly results?: readonly Readonly<Record<string, unknown>>[];
+				  }>
+				| undefined;
+			expect.soft(localAuthorProof?.oracle?.authenticatedAclControl).toEqual({
+				anchorDigestMatches: true,
+				bytesMatch: true,
+				digestMatches: true,
+			});
+			expect.soft(localAuthorProof?.authorityWindows).toMatchObject({
+				contiguous: true,
+				eventsPerAttempt: 8,
+				monotonicAttempts: true,
+			});
+			const currentMismatch = localAuthorProof?.results?.find(({ name }) => name === "current-outbox-issued-mismatch");
+			expect.soft(currentMismatch).toMatchObject({
+				effects: {
+					aheRecoverCount: 1,
+					installEpochAnchorCount: 0,
+					snapshotOpenCount: 1,
+				},
+				issuedMismatchEvidence: {
+					digestEqual: false,
+					issuedSignatureValid: true,
+					outboxSignatureValid: true,
+					preimageEqual: false,
+					scopeAndSequenceEqual: true,
+				},
+			});
+
+			const skipBudgetResult = await runSkipBudgetChild();
+			const skipBudgetProof = skipBudgetResult.proof as
+				| Readonly<{ readonly reuse?: Readonly<Record<string, unknown>> }>
+				| undefined;
+			expect.soft(skipBudgetProof?.reuse).toMatchObject({
+				allowance: 8_192,
+				facadeObjectIsIdentical: true,
+				materializedRows: 8_191,
+				windows: [
+					{
+						capturedIssuedCount: 8_190,
+						installEpochAnchorCount: 1,
+						result: {
+							detail: "creator successor recovery failed: issuance-rejected",
+							kind: "recovery-rejected",
+							ok: false,
+						},
+						successorPageFaultCount: 1,
+						terminalEmpty: true,
+					},
+					{
+						capturedIssuedCount: 8_190,
+						installEpochAnchorCount: 1,
+						result: {
+							detail: "creator successor recovery failed: issuance-rejected",
+							kind: "recovery-rejected",
+							ok: false,
+						},
+						successorPageFaultCount: 1,
+						terminalEmpty: true,
+					},
+				],
+			});
+		},
+		120_000
+	);
 
 	it(D108E2D_CHILD_BEHAVIORS[0], async () => {
 		const result = await runSharedChild();

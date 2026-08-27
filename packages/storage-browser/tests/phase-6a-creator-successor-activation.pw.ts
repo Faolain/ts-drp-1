@@ -22,6 +22,9 @@ const D108E2A_BROWSER_BEHAVIORS = [
 const D108E2C_ACTIVATION_BROWSER_BEHAVIORS = [
 	"window probes distinguish production lock contention from fixture busy state and isolate possession failures",
 ] as const;
+const D108E4_ACTIVATION_BROWSER_BEHAVIORS = [
+	"window observes lock authority before durable store opening and possession probes use exact suffixed databases",
+] as const;
 
 interface WorkerReply {
 	readonly counters?: Readonly<{
@@ -133,6 +136,9 @@ test("pins the complete browser behavior inventory", () => {
 	]);
 	expect(D108E2C_ACTIVATION_BROWSER_BEHAVIORS).toEqual([
 		"window probes distinguish production lock contention from fixture busy state and isolate possession failures",
+	]);
+	expect(D108E4_ACTIVATION_BROWSER_BEHAVIORS).toEqual([
+		"window observes lock authority before durable store opening and possession probes use exact suffixed databases",
 	]);
 });
 
@@ -321,6 +327,47 @@ test(D108E2C_ACTIVATION_BROWSER_BEHAVIORS[0], async ({ browser, page }) => {
 	} finally {
 		await context.close();
 	}
+});
+
+test(D108E4_ACTIVATION_BROWSER_BEHAVIORS[0], async ({ page }) => {
+	await page.goto(server?.origin ?? "about:blank");
+	const databaseName = `d108e4-possession-${crypto.randomUUID()}`;
+	await page.evaluate(
+		({ databaseName: selected, material: carrier }) => window.phase6aCreatorSuccessorActivation.seed(selected, carrier),
+		{ databaseName, material }
+	);
+	const results = (await page.evaluate(
+		({ databaseName: selected, material: carrier }) =>
+			window.phase6aCreatorSuccessorActivation.probePossessionFailure(selected, carrier),
+		{ databaseName, material }
+	)) as unknown as readonly Readonly<Record<string, unknown>>[];
+	for (const result of results) {
+		expect.soft(result).toMatchObject({
+			firstStoreOpenOrder: 2,
+			lockObservationOrder: 1,
+		});
+	}
+	const databaseNames = await page.evaluate(async () =>
+		(await indexedDB.databases()).flatMap(({ name }) => (name === undefined ? [] : [name]))
+	);
+	const ownedDatabaseNames = databaseNames.filter((name) => name.includes(databaseName));
+	expect.soft(ownedDatabaseNames.length).toBeGreaterThan(0);
+	expect
+		.soft(ownedDatabaseNames)
+		.toEqual(
+			expect.arrayContaining(
+				ownedDatabaseNames.filter(
+					(name) => name.includes(`${databaseName}-wrong-key`) || name.includes(`${databaseName}-throw`)
+				)
+			)
+		);
+	expect
+		.soft(
+			ownedDatabaseNames.every(
+				(name) => name.includes(`${databaseName}-wrong-key`) || name.includes(`${databaseName}-throw`)
+			)
+		)
+		.toBe(true);
 });
 
 test("missing or hostile LockManager authority fails activation closed", async ({ page }) => {

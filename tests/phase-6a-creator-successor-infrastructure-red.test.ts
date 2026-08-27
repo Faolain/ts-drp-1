@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -10,6 +11,7 @@ import {
 	type D108e1ExpectedSnapshotRead,
 	isD108e1DirectSnapshotTelemetry,
 } from "./fixtures/phase-6a-v3/creator-successor-infrastructure-contract.js";
+import { importWorkspacePackageExportFile } from "./fixtures/shared/workspace-package-export-file.mjs";
 import { workspacePackageImportHook } from "./fixtures/shared/workspace-package-subprocess.mjs";
 
 const GLOBAL_SETUP = resolve(
@@ -21,6 +23,70 @@ const SHIM_SIBLING_SENTINEL = resolve(REPOSITORY_ROOT, "tests/fixtures/node_modu
 const SHIM_PARENT = dirname(SHIM_SIBLING_SENTINEL);
 
 describe("D.108e1 activation test-infrastructure RED", () => {
+	it("imports one explicit workspace package export only from its own fresh built file", async () => {
+		const directory = mkdtempSync(resolve(tmpdir(), "ts-drp-d108e4-export-file-"));
+		try {
+			mkdirSync(resolve(directory, "dist"));
+			writeFileSync(
+				resolve(directory, "package.json"),
+				JSON.stringify({ name: "@ts-drp/canonical", exports: { ".": { import: "./dist/index.js" } } }),
+				"utf8"
+			);
+			writeFileSync(resolve(directory, "dist/index.js"), "export const marker = 'fresh-built-export';\n", "utf8");
+			const imported = await importWorkspacePackageExportFile({
+				expectedPackageName: "@ts-drp/canonical",
+				exportKey: ".",
+				packageDirectory: directory,
+			});
+			expect(imported).toMatchObject({
+				module: { marker: "fresh-built-export" },
+				packageDirectoryRealpath: directory,
+				targetRealpath: resolve(directory, "dist/index.js"),
+			});
+		} finally {
+			rmSync(directory, { force: true, recursive: true });
+		}
+	});
+
+	it("rejects every non-package-self workspace export-file target", async () => {
+		const root = mkdtempSync(resolve(tmpdir(), "ts-drp-d108e4-export-file-negative-"));
+		try {
+			const packageDirectory = resolve(root, "canonical");
+			mkdirSync(resolve(packageDirectory, "dist"), { recursive: true });
+			writeFileSync(resolve(packageDirectory, "dist/index.js"), "export const marker = true;\n", "utf8");
+			const invoke = (selectedDirectory = packageDirectory): Promise<unknown> =>
+				importWorkspacePackageExportFile({
+					expectedPackageName: "@ts-drp/canonical",
+					exportKey: ".",
+					packageDirectory: selectedDirectory,
+				});
+			for (const [name, manifest] of [
+				["wrong-name", { name: "@ts-drp/not-canonical", exports: { ".": { import: "./dist/index.js" } } }],
+				["missing-export", { name: "@ts-drp/canonical", exports: {} }],
+				["source-target", { name: "@ts-drp/canonical", exports: { ".": { import: "./src/index.ts" } } }],
+				["declaration-target", { name: "@ts-drp/canonical", exports: { ".": { import: "./dist/index.d.ts" } } }],
+				["empty-target", { name: "@ts-drp/canonical", exports: { ".": { import: "" } } }],
+				["escape-target", { name: "@ts-drp/canonical", exports: { ".": { import: "../outside.js" } } }],
+			] as const) {
+				writeFileSync(resolve(packageDirectory, "package.json"), JSON.stringify(manifest), "utf8");
+				await expect.soft(invoke(), name).rejects.toThrow(/workspace package export file mismatch/u);
+			}
+			const nodeModulesPackage = resolve(root, "node_modules/@ts-drp/canonical");
+			mkdirSync(resolve(nodeModulesPackage, "dist"), { recursive: true });
+			writeFileSync(
+				resolve(nodeModulesPackage, "package.json"),
+				JSON.stringify({ name: "@ts-drp/canonical", exports: { ".": { import: "./dist/index.js" } } }),
+				"utf8"
+			);
+			writeFileSync(resolve(nodeModulesPackage, "dist/index.js"), "export const marker = true;\n", "utf8");
+			await expect
+				.soft(invoke(nodeModulesPackage), "node-modules-directory")
+				.rejects.toThrow(/workspace package export file mismatch/u);
+		} finally {
+			rmSync(root, { force: true, recursive: true });
+		}
+	});
+
 	it("freezes exactly seven RED and eight GREEN test-infrastructure owners", () => {
 		expect(D108E1_RED_PATHS).toHaveLength(7);
 		expect(D108E1_GREEN_PATHS).toHaveLength(8);
