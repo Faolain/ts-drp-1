@@ -10,8 +10,10 @@ import {
 	D108D1B_CHILD_BEHAVIORS,
 	d108d1bChatAuthorities,
 	D108E2D_CHILD_BEHAVIORS,
+	D108E2E_CHILD_BEHAVIORS,
 	openD108d1bMultiWriterFixture,
 	runD108d1bLocalAuthorChild,
+	runD108e2eSkipBudgetChild,
 } from "../../../tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.js";
 
 const childPath = new URL("./fixtures/phase-6a-creator-successor-local-author-child.mjs", import.meta.url);
@@ -47,6 +49,16 @@ function runSharedChild(): ReturnType<typeof runD108d1bLocalAuthorChild> {
 	return sharedChildResult;
 }
 
+let skipBudgetChildResult: ReturnType<typeof runD108e2eSkipBudgetChild> | undefined;
+
+function runSkipBudgetChild(): ReturnType<typeof runD108e2eSkipBudgetChild> {
+	if (skipBudgetChildResult !== undefined) return skipBudgetChildResult;
+	const directory = mkdtempSync(join(tmpdir(), "ts-drp-d108e2e-skip-budget-"));
+	directories.push(directory);
+	skipBudgetChildResult = durableMaterial(directory).then((material) => runD108e2eSkipBudgetChild(material));
+	return skipBudgetChildResult;
+}
+
 describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 	it("pins the complete child inventory to the genuine built-package launcher", () => {
 		expect(D108D1B_CHILD_BEHAVIORS).toEqual([
@@ -54,6 +66,9 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 		]);
 		expect(D108E2D_CHILD_BEHAVIORS).toEqual([
 			"fresh Node predecessor recovery terminates with one issued-record read per distinct current or authenticated-future row",
+		]);
+		expect(D108E2E_CHILD_BEHAVIORS).toEqual([
+			"fresh Node predecessor recovery enforces one cumulative authenticated future-row skip budget per recovery",
 		]);
 		expect(childPath.pathname.endsWith("phase-6a-creator-successor-local-author-child.mjs")).toBe(true);
 	});
@@ -390,4 +405,161 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 			],
 		});
 	});
+
+	it(
+		D108E2E_CHILD_BEHAVIORS[0],
+		async () => {
+			const result = await runSkipBudgetChild();
+			const proof = result.proof as
+				| Readonly<{
+						equality?: Readonly<Record<string, unknown>>;
+						maxCanonicalPreimageBytes?: number;
+						maxEpochVertices?: number;
+						mismatch?: Readonly<Record<string, unknown>>;
+						overBudget?: Readonly<Record<string, unknown>>;
+						pid?: number;
+						realStore?: Readonly<Record<string, unknown>>;
+						wallTimeMs?: number;
+				  }>
+				| undefined;
+			expect(proof?.pid).toEqual(expect.any(Number));
+			expect(proof?.pid).not.toBe(process.pid);
+			expect(proof?.maxEpochVertices).toBe(8_192);
+			expect(proof?.maxCanonicalPreimageBytes).toBeLessThan(1_024);
+			expect(proof?.wallTimeMs).toBeLessThan(60_000);
+			expect(proof?.realStore).toEqual({
+				equalityMaterializedRows: 8_193,
+				maximumPageLimit: 128,
+				overBudgetMaterializedRows: 8_195,
+			});
+
+			const equality = proof?.equality as
+				| Readonly<{
+						effects?: Readonly<Record<string, unknown>>;
+						result?: Readonly<Record<string, unknown>>;
+						telemetry?: Readonly<Record<string, unknown>>;
+				  }>
+				| undefined;
+			expect(equality?.result).toEqual({
+				detail: "creator successor recovery failed: issuance-rejected",
+				kind: "recovery-rejected",
+				ok: false,
+			});
+			expect(equality?.effects).toMatchObject({
+				adoptionSwapCount: 0,
+				aheRecoverCount: 1,
+				installEpochAnchorCount: 1,
+				publicationCount: 0,
+				snapshotOpenCount: 1,
+				subscribeCount: 0,
+			});
+			expect(equality?.telemetry).toEqual({
+				capturedIssuedCount: 8_192,
+				capturedIssuedFirst: 1,
+				capturedIssuedLast: 8_192,
+				capturedIssuedStrictlyIncreasing: true,
+				capturedIssuedSum: 33_558_528,
+				copiedIssuedSequences: [0],
+				firstReturnedSequence: 0,
+				lastReturnedSequence: 8_192,
+				pageCount: 8_194,
+				returnedSequenceCount: 8_193,
+				returnedSequencesStrictlyIncreasing: true,
+				successorPageFaultCount: 1,
+				terminalEmpty: true,
+			});
+
+			const mismatch = proof?.mismatch as
+				| Readonly<{
+						effects?: Readonly<Record<string, unknown>>;
+						result?: Readonly<Record<string, unknown>>;
+						telemetry?: Readonly<Record<string, unknown>>;
+				  }>
+				| undefined;
+			expect(mismatch?.result).toEqual({
+				detail: "creator predecessor recovery failed: admission-rejected",
+				kind: "recovery-rejected",
+				ok: false,
+			});
+			expect(mismatch?.effects).toMatchObject({
+				adoptionSwapCount: 0,
+				aheRecoverCount: 1,
+				installEpochAnchorCount: 0,
+				publicationCount: 0,
+				snapshotOpenCount: 1,
+				subscribeCount: 0,
+			});
+			expect(mismatch?.telemetry).toEqual({
+				capturedIssuedCount: 1,
+				capturedIssuedFirst: 1,
+				capturedIssuedLast: 1,
+				capturedIssuedStrictlyIncreasing: true,
+				capturedIssuedSum: 1,
+				copiedIssuedSequences: [0, 1],
+				firstReturnedSequence: 0,
+				lastReturnedSequence: 1,
+				pageCount: 2,
+				returnedSequenceCount: 2,
+				returnedSequencesStrictlyIncreasing: true,
+				successorPageFaultCount: 0,
+				terminalEmpty: false,
+			});
+
+			const overBudget = proof?.overBudget as
+				| Readonly<{
+						effects?: Readonly<Record<string, unknown>>;
+						result?: Readonly<Record<string, unknown>>;
+						separatorJournalAppended?: boolean;
+						telemetry?: Readonly<Record<string, unknown>>;
+				  }>
+				| undefined;
+			expect(overBudget?.separatorJournalAppended).toBe(true);
+			expect(overBudget?.effects).toMatchObject({
+				adoptionSwapCount: 0,
+				aheRecoverCount: 1,
+				publicationCount: 0,
+				snapshotOpenCount: 1,
+			});
+			expect(overBudget?.telemetry).toMatchObject({
+				capturedIssuedCount: 8_193,
+				capturedIssuedFirst: 1,
+				capturedIssuedLast: 8_194,
+				capturedIssuedStrictlyIncreasing: true,
+				capturedIssuedSum: 33_566_722,
+				firstReturnedSequence: 0,
+				lastReturnedSequence: 8_194,
+				returnedSequenceCount: 8_195,
+				returnedSequencesStrictlyIncreasing: true,
+			});
+			expect(overBudget?.result).toEqual({
+				detail: "creator predecessor recovery failed: admission-rejected",
+				kind: "recovery-rejected",
+				ok: false,
+			});
+			expect(overBudget?.effects).toMatchObject({
+				adoptionSwapCount: 0,
+				aheRecoverCount: 1,
+				installEpochAnchorCount: 0,
+				publicationCount: 0,
+				snapshotOpenCount: 1,
+				subscribeCount: 0,
+			});
+			expect(overBudget?.telemetry).toEqual({
+				capturedIssuedCount: 8_193,
+				capturedIssuedFirst: 1,
+				capturedIssuedLast: 8_194,
+				capturedIssuedStrictlyIncreasing: true,
+				capturedIssuedSum: 33_566_722,
+				copiedIssuedSequences: [0, 8_193, 8_194],
+				firstReturnedSequence: 0,
+				lastReturnedSequence: 8_194,
+				pageCount: 8_195,
+				returnedSequenceCount: 8_195,
+				returnedSequencesStrictlyIncreasing: true,
+				successorPageFaultCount: 0,
+				terminalEmpty: false,
+			});
+		},
+		100_000
+	);
 });

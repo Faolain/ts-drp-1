@@ -6,7 +6,7 @@ import { reopenCreatorSuccessorAdoption } from "@ts-drp/node/creator-adoption-ac
 import { openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl";
 /* eslint-enable import/no-unresolved */
 import { createNodeDurableIssuanceStore } from "@ts-drp/storage-node/issuance";
-import { createHash, createPrivateKey, createPublicKey, sign } from "node:crypto";
+import { createHash, createPrivateKey, createPublicKey, sign, verify } from "node:crypto";
 import { join } from "node:path";
 
 import { network, seedAhe, seedJournal, seedSnapshot, unpack } from "./phase-6a-creator-successor-activation-child.mjs";
@@ -45,11 +45,13 @@ function authority(id) {
 		key: Buffer.concat([ED25519_PKCS8_PREFIX, Buffer.from(seed)]),
 		type: "pkcs8",
 	});
-	const publicKey = createPublicKey(privateKey).export({ format: "der", type: "spki" });
+	const publicKey = createPublicKey(privateKey);
+	const publicKeyBytes = publicKey.export({ format: "der", type: "spki" });
 	return Object.freeze({
-		author: Buffer.from(publicKey).subarray(-32).toString("hex"),
+		author: Buffer.from(publicKeyBytes).subarray(-32).toString("hex"),
 		id,
 		privateKey,
+		publicKey,
 	});
 }
 
@@ -398,6 +400,238 @@ async function seedIssuance(material, suffix, carriers, effects, input) {
 	return { raw, store };
 }
 
+function signedCloneCommit(sourceCommit, authorSequence, selectedAuthority, objectId, logicalTimeOffset = 0) {
+	const decoded = decodeCanonical(sourceCommit.envelope.canonicalPreimageBytes);
+	if (decoded === null || typeof decoded !== "object" || Array.isArray(decoded)) {
+		throw new TypeError("D.108e2e source carrier is malformed");
+	}
+	const canonicalPreimageBytes = encodeCanonical({
+		...decoded,
+		authorSequence,
+		logicalTime: authorSequence + logicalTimeOffset,
+	});
+	const digest = hashDomain("ts-drp/vertex/v3", canonicalPreimageBytes);
+	return carrierCommit(
+		Object.freeze({
+			author: selectedAuthority.author,
+			authorSequence,
+			canonicalPreimageBytes,
+			digest,
+			signature: signBytes(digest, selectedAuthority),
+		}),
+		objectId
+	);
+}
+
+function matchingCommit(left, right) {
+	return (
+		left !== null &&
+		right !== null &&
+		left.authorSequence === right.authorSequence &&
+		left.issuedRecord.scope.author === right.issuedRecord.scope.author &&
+		left.issuedRecord.scope.objectId === right.issuedRecord.scope.objectId &&
+		sameBytes(left.envelope.canonicalPreimageBytes, right.envelope.canonicalPreimageBytes) &&
+		sameBytes(left.envelope.digest, right.envelope.digest) &&
+		sameBytes(left.envelope.signature, right.envelope.signature)
+	);
+}
+
+async function appendCommit(raw, scope, commit) {
+	await raw.transactIssue(scope, (selected) => {
+		if (selected !== commit.authorSequence) throw new TypeError("D.108e2e seeded lineage diverged");
+		return Promise.resolve(commit);
+	});
+}
+
+async function materializeVerifiedClosure(raw, scope, expectedCount, selectedAuthority) {
+	const lineage = await raw.readLineage(scope);
+	if (lineage.exhausted || lineage.next !== expectedCount) {
+		throw new TypeError("D.108e2e real lineage does not match the expected closure");
+	}
+	const rows = [];
+	let afterKey = null;
+	while (rows.length < expectedCount) {
+		const page = await raw.readOutboxPage({ afterKey, limit: 128, scope });
+		if (page.length === 0) throw new TypeError("D.108e2e real outbox ended before the expected closure");
+		for (const row of page) {
+			const expectedSequence = rows.length;
+			if (row.commit.authorSequence !== expectedSequence) {
+				throw new TypeError("D.108e2e real outbox sequence is not contiguous");
+			}
+			const issued = await raw.readIssued(scope, expectedSequence);
+			if (!matchingCommit(row.commit, issued)) throw new TypeError("D.108e2e issued/outbox rows diverged");
+			const preimage = decodeCanonical(row.commit.envelope.canonicalPreimageBytes);
+			const expectedEpoch = expectedSequence === 0 || expectedSequence === 8_193 ? 0 : 1;
+			if (
+				preimage === null ||
+				typeof preimage !== "object" ||
+				Array.isArray(preimage) ||
+				preimage.author !== scope.author ||
+				preimage.objectId !== scope.objectId ||
+				preimage.authorSequence !== expectedSequence ||
+				preimage.epoch !== expectedEpoch
+			) {
+				throw new TypeError("D.108e2e canonical row binding is invalid");
+			}
+			const digest = hashDomain("ts-drp/vertex/v3", row.commit.envelope.canonicalPreimageBytes);
+			if (
+				!sameBytes(digest, row.commit.envelope.digest) ||
+				!verify(null, Buffer.from(digest), selectedAuthority.publicKey, Buffer.from(row.commit.envelope.signature))
+			) {
+				throw new TypeError("D.108e2e durable row authentication is invalid");
+			}
+			const detached = carrierCommit(
+				Object.freeze({
+					author: scope.author,
+					authorSequence: expectedSequence,
+					canonicalPreimageBytes: row.commit.envelope.canonicalPreimageBytes,
+					digest: row.commit.envelope.digest,
+					signature: row.commit.envelope.signature,
+				}),
+				scope.objectId
+			);
+			rows.push(Object.freeze({ commit: detached, publishState: row.publishState }));
+		}
+		const last = rows.at(-1);
+		if (last === undefined) throw new TypeError("D.108e2e materialized page is empty");
+		afterKey = Object.freeze([scope.objectId, scope.author, last.commit.authorSequence]);
+	}
+	if (rows.length !== expectedCount) throw new TypeError("D.108e2e materialized closure exceeds its bound");
+	return Object.freeze(rows);
+}
+
+function compareOutboxKey(row, afterKey) {
+	const left = [
+		row.commit.issuedRecord.scope.objectId,
+		row.commit.issuedRecord.scope.author,
+		row.commit.authorSequence,
+	];
+	for (let index = 0; index < left.length; index += 1) {
+		if (left[index] < afterKey[index]) return -1;
+		if (left[index] > afterKey[index]) return 1;
+	}
+	return 0;
+}
+
+function firstRowAfter(rows, afterKey) {
+	if (afterKey === undefined || afterKey === null) return 0;
+	let low = 0;
+	let high = rows.length;
+	while (low < high) {
+		const middle = low + Math.floor((high - low) / 2);
+		if (compareOutboxKey(rows[middle], afterKey) <= 0) low = middle + 1;
+		else high = middle;
+	}
+	return low;
+}
+
+function boundedRecoveryStore(raw, rows, expectedScope, mismatchCommit) {
+	const issuedBySequence = new Map(rows.map((row) => [row.commit.authorSequence, row.commit]));
+	const telemetry = {
+		capturedIssuedCount: 0,
+		capturedIssuedFirst: null,
+		capturedIssuedLast: null,
+		capturedIssuedStrictlyIncreasing: true,
+		capturedIssuedSum: 0,
+		capturedScope: undefined,
+		copiedIssuedSequences: [],
+		firstReturnedSequence: null,
+		lastReturnedSequence: null,
+		pageCount: 0,
+		returnedSequenceCount: 0,
+		returnedSequencesStrictlyIncreasing: true,
+		successorPageFaultCount: 0,
+		terminalEmpty: false,
+	};
+	const store = Object.freeze({
+		close: () => raw.close(),
+		compareAndMarkOutboxPublished: (...args) => raw.compareAndMarkOutboxPublished(...args),
+		readIssued: (scope, authorSequence) => {
+			const predecessorOpen = !telemetry.terminalEmpty;
+			if (predecessorOpen && scope === telemetry.capturedScope) {
+				telemetry.capturedIssuedCount += 1;
+				telemetry.capturedIssuedFirst ??= authorSequence;
+				telemetry.capturedIssuedStrictlyIncreasing &&=
+					telemetry.capturedIssuedLast === null || authorSequence > telemetry.capturedIssuedLast;
+				telemetry.capturedIssuedLast = authorSequence;
+				telemetry.capturedIssuedSum += authorSequence;
+			} else if (predecessorOpen && telemetry.capturedScope !== undefined) {
+				telemetry.copiedIssuedSequences.push(authorSequence);
+			}
+			if (scope === telemetry.capturedScope && authorSequence === 1 && mismatchCommit !== undefined) {
+				return Promise.resolve(mismatchCommit);
+			}
+			if (scope.author !== expectedScope.author || scope.objectId !== expectedScope.objectId)
+				return Promise.resolve(null);
+			const commit = issuedBySequence.get(authorSequence);
+			if (commit === undefined) return Promise.resolve(null);
+			return Promise.resolve(
+				carrierCommit(
+					Object.freeze({
+						author: expectedScope.author,
+						authorSequence,
+						canonicalPreimageBytes: commit.envelope.canonicalPreimageBytes,
+						digest: commit.envelope.digest,
+						signature: commit.envelope.signature,
+					}),
+					expectedScope.objectId
+				)
+			);
+		},
+		readLineage: (...args) => raw.readLineage(...args),
+		readOutboxPage: (input = {}) => {
+			const limit = input.limit ?? 128;
+			if (!Number.isInteger(limit) || limit < 1 || limit > 128) {
+				throw new TypeError("D.108e2e page facade received an invalid limit");
+			}
+			const scope = input.scope;
+			if (scope === undefined || scope.author !== expectedScope.author || scope.objectId !== expectedScope.objectId) {
+				return Promise.resolve([]);
+			}
+			telemetry.capturedScope ??= scope;
+			if (scope !== telemetry.capturedScope) {
+				telemetry.successorPageFaultCount += 1;
+				return Promise.reject(new TypeError("D.108e2e successor-stage issuance sentinel"));
+			}
+			const first = firstRowAfter(rows, input.afterKey);
+			const selected = rows.slice(first, first + limit);
+			if (scope === telemetry.capturedScope && !telemetry.terminalEmpty) {
+				telemetry.pageCount += 1;
+				if (selected.length === 0) telemetry.terminalEmpty = true;
+				for (const row of selected) {
+					const sequence = row.commit.authorSequence;
+					telemetry.firstReturnedSequence ??= sequence;
+					telemetry.returnedSequencesStrictlyIncreasing &&=
+						telemetry.lastReturnedSequence === null || sequence > telemetry.lastReturnedSequence;
+					telemetry.lastReturnedSequence = sequence;
+					telemetry.returnedSequenceCount += 1;
+				}
+			}
+			return Promise.resolve(Object.freeze([...selected]));
+		},
+		transactIssue: (...args) => raw.transactIssue(...args),
+	});
+	return {
+		store,
+		telemetry: () =>
+			Object.freeze({
+				capturedIssuedCount: telemetry.capturedIssuedCount,
+				capturedIssuedFirst: telemetry.capturedIssuedFirst,
+				capturedIssuedLast: telemetry.capturedIssuedLast,
+				capturedIssuedStrictlyIncreasing: telemetry.capturedIssuedStrictlyIncreasing,
+				capturedIssuedSum: telemetry.capturedIssuedSum,
+				copiedIssuedSequences: Object.freeze([...telemetry.copiedIssuedSequences]),
+				firstReturnedSequence: telemetry.firstReturnedSequence,
+				lastReturnedSequence: telemetry.lastReturnedSequence,
+				pageCount: telemetry.pageCount,
+				returnedSequenceCount: telemetry.returnedSequenceCount,
+				returnedSequencesStrictlyIncreasing: telemetry.returnedSequencesStrictlyIncreasing,
+				successorPageFaultCount: telemetry.successorPageFaultCount,
+				terminalEmpty: telemetry.terminalEmpty,
+			}),
+	};
+}
+
 function signerFor(material, scenario, selectedAuthority, wrongAuthority, observations, state, effects, durableValues) {
 	return async (bytes) => {
 		effects.order.push(`${state.use}:signer`);
@@ -618,6 +852,199 @@ async function runCase(material, index, input) {
 	}
 }
 
+function budgetEffects() {
+	return {
+		aheRecoverCount: 0,
+		installEpochAnchorCount: 0,
+		snapshotOpenCount: 0,
+	};
+}
+
+async function openBudgetContext(material, suffix) {
+	const effects = budgetEffects();
+	const events = [];
+	const publications = [];
+	const [ahe, liveJournal, snapshot] = await Promise.all([
+		seedAhe(material, effects, suffix),
+		seedJournal(peerJournalMaterial(material), effects, suffix),
+		seedSnapshot(material, events, effects, suffix),
+	]);
+	return {
+		ahe,
+		effects,
+		events,
+		liveJournal,
+		node: network(events, publications, `d108e2e-target-${suffix}`),
+		publications,
+		snapshot,
+	};
+}
+
+async function closeBudgetContext(context) {
+	await Promise.allSettled([context.snapshot.raw.close(), context.liveJournal.raw.close(), context.ahe.raw.close()]);
+}
+
+async function reopenBudgetCase(material, suffix, issuanceStore, selectedAuthority, separatorDigest) {
+	const context = await openBudgetContext(material, suffix);
+	let activeHandle;
+	try {
+		const result = await reopenCreatorSuccessorAdoption({
+			...material.creatorGenesis,
+			author: selectedAuthority.author,
+			catalog: trustedCatalog(material),
+			issuanceStore,
+			liveJournalStore: context.liveJournal.store,
+			messageQueueManager: new MessageQueueManager({ logConfig: { level: "silent" } }),
+			networkNode: context.node,
+			onAdmittedVertex: () => undefined,
+			signRegisteredVertexDigest: (bytes) => Promise.resolve(signBytes(bytes, selectedAuthority)),
+			snapshotDeclaration: material.snapshot.declaration,
+			snapshotStore: context.snapshot.store,
+			store: context.ahe.store,
+		});
+		if (result.ok) activeHandle = result.handle;
+		let separatorJournalAppended = false;
+		if (separatorDigest !== undefined) {
+			const rows = await journalRows(context.liveJournal.raw, {
+				anchorDigest: material.oracle.genesisAnchorDigest,
+				epoch: 0,
+				objectId: material.proposed.head.objectId,
+			});
+			separatorJournalAppended = rows.some((row) => row.vertexDigest === separatorDigest);
+		}
+		return Object.freeze({
+			effects: Object.freeze({
+				adoptionSwapCount: context.ahe.adoptionSwapCount(),
+				aheRecoverCount: context.effects.aheRecoverCount,
+				installEpochAnchorCount: context.effects.installEpochAnchorCount,
+				publicationCount: context.publications.length,
+				snapshotOpenCount: context.effects.snapshotOpenCount,
+				subscribeCount: context.events.filter((event) => event === "subscribe").length,
+			}),
+			result: result.ok
+				? Object.freeze({ lifecycle: result.lifecycle, ok: true, recovery: result.recovery })
+				: Object.freeze({ detail: result.detail, kind: result.kind, ok: false }),
+			separatorJournalAppended,
+		});
+	} finally {
+		await Promise.resolve(activeHandle?.deactivate());
+		await closeBudgetContext(context);
+	}
+}
+
+async function issueGenuineFuture(material, raw, selectedAuthority) {
+	const context = await openBudgetContext(material, "-d108e2e-prime");
+	let activeHandle;
+	try {
+		const reopened = await reopenCreatorSuccessorAdoption({
+			...material.creatorGenesis,
+			author: selectedAuthority.author,
+			catalog: trustedCatalog(material),
+			issuanceStore: raw,
+			liveJournalStore: context.liveJournal.store,
+			messageQueueManager: new MessageQueueManager({ logConfig: { level: "silent" } }),
+			networkNode: context.node,
+			onAdmittedVertex: () => undefined,
+			signRegisteredVertexDigest: (bytes) => Promise.resolve(signBytes(bytes, selectedAuthority)),
+			snapshotDeclaration: material.snapshot.declaration,
+			snapshotStore: context.snapshot.store,
+			store: context.ahe.store,
+		});
+		if (!reopened.ok) throw new TypeError(`D.108e2e prime reopen failed: ${reopened.kind}`);
+		activeHandle = reopened.handle;
+		const issued = await activeHandle.issueLocal({
+			operations: [{ logicalTime: 512, operation: { action: "add", value: 512 } }],
+			signRegisteredVertexDigest: (bytes) => Promise.resolve(signBytes(bytes, selectedAuthority)),
+		});
+		if (!issued.ok || issued.authorSequence !== 1) throw new TypeError("D.108e2e genuine future issue failed");
+		const commit = await raw.readIssued(
+			Object.freeze({ author: selectedAuthority.author, objectId: material.proposed.head.objectId }),
+			1
+		);
+		if (commit === null) throw new TypeError("D.108e2e genuine future commit is unavailable");
+		return commit;
+	} finally {
+		await Promise.resolve(activeHandle?.deactivate());
+		await closeBudgetContext(context);
+	}
+}
+
+async function skipBudgetProof(material) {
+	const startedAt = performance.now();
+	if (material.establishedPeer === undefined) throw new TypeError("D.108e2e established Bob carrier is unavailable");
+	const parameters = decodeCanonical(material.creatorGenesis.exactCanonicalParametersCarrierBytes);
+	if (
+		parameters === null ||
+		typeof parameters !== "object" ||
+		Array.isArray(parameters) ||
+		parameters.maxEpochVertices !== 8_192
+	) {
+		throw new TypeError("D.108e2e authenticated maxEpochVertices is not 8192");
+	}
+	const bob = authority("bob");
+	if (material.establishedPeer.author !== bob.author) throw new TypeError("D.108e2e established carrier is not Bob's");
+	const objectId = material.proposed.head.objectId;
+	const scope = Object.freeze({ author: bob.author, objectId });
+	const raw = createNodeDurableIssuanceStore({
+		primaryFilename: join(material.directory, "issuance-local-author-d108e2e.sqlite"),
+	});
+	const mismatchRaw = createNodeDurableIssuanceStore({
+		primaryFilename: join(material.directory, "issuance-local-author-d108e2e-mismatch.sqlite"),
+	});
+	try {
+		const currentZero = carrierCommit(material.establishedPeer, objectId);
+		await appendCommit(raw, scope, currentZero);
+		const genuineFuture = await issueGenuineFuture(material, raw, bob);
+		for (let authorSequence = 2; authorSequence <= 8_192; authorSequence += 1) {
+			await appendCommit(raw, scope, signedCloneCommit(genuineFuture, authorSequence, bob, objectId, 1_000));
+		}
+
+		const equalityRows = await materializeVerifiedClosure(raw, scope, 8_193, bob);
+		const equalityBounded = boundedRecoveryStore(raw, equalityRows, scope);
+		const equality = await reopenBudgetCase(material, "-d108e2e-equality", equalityBounded.store, bob);
+
+		const separator = signedCloneCommit(currentZero, 8_193, bob, objectId, 20_000);
+		const finalFuture = signedCloneCommit(genuineFuture, 8_194, bob, objectId, 1_000);
+		await appendCommit(raw, scope, separator);
+		await appendCommit(raw, scope, finalFuture);
+		const overBudgetRows = await materializeVerifiedClosure(raw, scope, 8_195, bob);
+		const overBudgetBounded = boundedRecoveryStore(raw, overBudgetRows, scope);
+		const overBudget = await reopenBudgetCase(
+			material,
+			"-d108e2e-over-budget",
+			overBudgetBounded.store,
+			bob,
+			Buffer.from(separator.envelope.digest).toString("hex")
+		);
+
+		await appendCommit(mismatchRaw, scope, currentZero);
+		await appendCommit(mismatchRaw, scope, genuineFuture);
+		const mismatchRows = await materializeVerifiedClosure(mismatchRaw, scope, 2, bob);
+		const mismatchCommit = signedCloneCommit(genuineFuture, 1, bob, objectId, 1_000_000);
+		const mismatchBounded = boundedRecoveryStore(mismatchRaw, mismatchRows, scope, mismatchCommit);
+		const mismatch = await reopenBudgetCase(material, "-d108e2e-mismatch", mismatchBounded.store, bob);
+
+		return Object.freeze({
+			equality: Object.freeze({ ...equality, telemetry: equalityBounded.telemetry() }),
+			maxCanonicalPreimageBytes: Math.max(
+				...overBudgetRows.map((row) => row.commit.envelope.canonicalPreimageBytes.byteLength)
+			),
+			maxEpochVertices: parameters.maxEpochVertices,
+			mismatch: Object.freeze({ ...mismatch, telemetry: mismatchBounded.telemetry() }),
+			overBudget: Object.freeze({ ...overBudget, telemetry: overBudgetBounded.telemetry() }),
+			pid: process.pid,
+			realStore: Object.freeze({
+				equalityMaterializedRows: equalityRows.length,
+				maximumPageLimit: 128,
+				overBudgetMaterializedRows: overBudgetRows.length,
+			}),
+			wallTimeMs: performance.now() - startedAt,
+		});
+	} finally {
+		await Promise.allSettled([raw.close(), mismatchRaw.close()]);
+	}
+}
+
 async function matrix(material) {
 	if (material.establishedPeer === undefined) throw new TypeError("D.108d1b established peer carrier is unavailable");
 	const alice = authority("alice");
@@ -786,7 +1213,7 @@ async function matrix(material) {
 }
 
 void new Promise((resolve) => process.once("message", (message) => resolve(unpack(message))))
-	.then(matrix)
+	.then((input) => (input?.mode === "skip-budget" ? skipBudgetProof(input.material) : matrix(input)))
 	.then((proof) => send({ kind: "proof", proof }))
 	.catch((error) => {
 		send({ kind: "child-error", message: error instanceof Error ? error.message : String(error) });

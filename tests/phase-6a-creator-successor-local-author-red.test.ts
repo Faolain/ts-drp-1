@@ -21,6 +21,9 @@ import {
 	D108E2D_CHILD_BEHAVIORS,
 	D108E2D_GREEN_PATHS,
 	D108E2D_RED_PATHS,
+	D108E2E_CHILD_BEHAVIORS,
+	D108E2E_GREEN_PATHS,
+	D108E2E_RED_PATHS,
 	openD108d1bMultiWriterFixture,
 } from "./fixtures/phase-6a-v3/creator-successor-local-author-contract.js";
 
@@ -137,6 +140,25 @@ describe("D.108d1b authenticated peer-local cold issuance RED", () => {
 		);
 		for (const name of D108E2D_CHILD_BEHAVIORS) expect(childSource).toContain(name);
 		expect((childSource.match(/it\(D108E2D_CHILD_BEHAVIORS\[0\]/gu) ?? []).length).toBe(1);
+	});
+
+	it("freezes the exact D.108e2e four-RED/one-GREEN skip-budget ownership", () => {
+		expect(D108E2E_RED_PATHS).toEqual([
+			"tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts",
+			"tests/phase-6a-creator-successor-local-author-red.test.ts",
+			"packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs",
+			"packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts",
+		]);
+		expect(new Set(D108E2E_RED_PATHS).size).toBe(4);
+		expect(D108E2E_RED_PATHS.every((path) => readFileSync(resolve(REPOSITORY_ROOT, path)).byteLength > 0)).toBe(true);
+		expect(D108E2E_GREEN_PATHS).toEqual(["packages/node/src/v3-live.ts"]);
+		expect(D108E2E_CHILD_BEHAVIORS).toHaveLength(1);
+		const childSource = readFileSync(
+			resolve(REPOSITORY_ROOT, "packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts"),
+			"utf8"
+		);
+		for (const name of D108E2E_CHILD_BEHAVIORS) expect(childSource).toContain(name);
+		expect((childSource.match(/it\(\s*D108E2E_CHILD_BEHAVIORS\[0\]/gu) ?? []).length).toBe(1);
 	});
 
 	it("derives the shipped eight-member chat identities and exact writer split", () => {
