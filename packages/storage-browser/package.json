@@ -60,6 +60,7 @@
 	},
 	"devDependencies": {
 		"@ts-drp/keychain": "0.11.0",
+		"@ts-drp/node": "0.11.0",
 		"@ts-drp/protocol-v3": "0.11.0"
 	}
 }
