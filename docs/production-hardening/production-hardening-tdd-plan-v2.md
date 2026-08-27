@@ -61626,6 +61626,61 @@ cannot contaminate the next. Behavioral children remain the acceptance
 authority. This slice has no production GREEN owner and may not change product
 or package APIs.
 
+The exact tests-only ownership roster is eight existing paths:
+
+- `tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts`;
+- `tests/phase-6a-creator-successor-local-author-red.test.ts`;
+- `packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs`;
+- `packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts`;
+- `packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts`;
+- `packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts`;
+- `packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts`;
+  and
+- `packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts`.
+
+The immutable RED may change only those eight test owners. It freezes the
+roster, replaces the unexecuted oracle-child inventory claim with an executed
+behavior or removes it, and introduces assertions that fail only because the
+current fixtures do not yet expose the assigned observations. The native child
+must report an ordered possession/lineage event stream and execute
+digest-consistent malformed-member plus negative and unsafe-integer
+lineage-`next` controls. The activation browser must report callback-level Web
+Lock acquisition, probe wrong-key then throwing possession sequentially in two
+distinct database namespaces, and prove both fail before acquisition. The
+product browser must expose test-only pause/release gates immediately after
+successful successor activation and immediately after completed predecessor
+deactivation; beginning `close()` at either gate must leave adoption and close
+unsettled until release, then clean the replacement exactly once, release the
+predecessor exactly once overall, reject adoption as closed and fulfill close
+in causal order. A RED that requires a production edit, a new public field or
+an implementation-relative import stops and reslices.
+
+GREEN is the same eight-owner test-infrastructure roster with no production
+owner. It may add only fixture-local counters, events, gates, mutations and
+assertions. The malformed ACL case must canonicalize a malformed member,
+derive that exact carrier's `ts-drp/latched-acl/v3` digest, and pass both to the
+existing canonical opener so a stale digest cannot create the rejection. For
+every successful possession attempt, no lineage event may precede its signer
+event and all seven writer reads must follow it; possession failures still
+read zero lineages. Negative and greater-than-safe-integer `next` values must
+produce the existing bounded lineage failure with zero live effects. Window
+lock telemetry counts entry into the native lock callback, not inferred handle
+state or request attempts. The two possession probes must run sequentially
+after separately seeding visibly distinct names. Product pause gates are
+test-bundle instrumentation only and must not alter the shipped room module.
+
+Acceptance is due before D.108e2d RED. It requires the focused local-author
+unit/native child and all three activation/product browser engines; retained
+D.108b-D.108e2b and Phase-6a tests; the complete five-file Phase-4c selection
+including the genuine fresh-process 64 MiB peak-live owner and retaining
+mutant; affected package and example builds/typechecks; exact-eight-owner
+ESLint with zero warnings, Prettier and `git diff --check`; and an isolated
+no-`dist` offline install plus fresh dependency-closure build. The plan must
+record the immutable RED and GREEN/evidence identities, exact commands and
+results, reviewer sessions, assigned P2 debt and clean-environment package
+resolution proof. Signed commits and pushes are required before D.108e2d may
+start.
+
 ##### D.108e2d — retained recovery performance evidence
 
 D.108e2d starts only after correctness slices a-c. Its RED/evidence freeze
