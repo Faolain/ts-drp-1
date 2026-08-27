@@ -61266,8 +61266,10 @@ loaded and its message listener is installed. Missing authority must record
 the real `navigator.locks` lookup; non-callable, synchronously throwing and
 rejecting authority must record the exact request attempt; already-held
 authority is the genuine cross-realm contender. Fail-closed results pin zero
-signer and publication effects. This telemetry is tied to the hostile boundary
-rather than inferred from the activation result.
+publication/live effects and the existing exact one-attempt possession signer
+and durable re-verification counts. The lock never precedes authenticated
+stable-topic identity. This telemetry is tied to the hostile boundary rather
+than inferred from the activation result.
 
 The composite readiness condition is: the source census is singular; hostile
 cold profiles perform zero downstream effects; the real worker/window
