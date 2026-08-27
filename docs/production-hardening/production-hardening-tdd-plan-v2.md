@@ -63585,12 +63585,16 @@ D.108e4b is an immediate plan-freeze/RED/GREEN correction due before D.108e4a
 or D.108e4 can close. Its implementation roster is exactly
 `packages/network/tests/unreliable-webrtc-e3-01-red.test.ts` and
 `packages/network/src/unreliable-webrtc.ts`; this plan is its sole documentation
-owner. It may add one private bounded replacement-admission set and private
-count/prune helpers. It may not change a public or private interface, snapshot
-shape, counter, wire byte, route digest, packet class/retry policy, payload or
-connection limit, timeout, fallback, signaling authentication, peer-order rule,
-Node adapter, example owner or browser oracle. `MAX_LINKS` remains exactly
-eight and no application packet may be buffered or replayed.
+owner. It may add one private bounded replacement-admission map and private
+count/prune helpers. Each entry contains only a peer ID, the original absolute
+expiry and one timer using the existing `SETUP_TIMEOUT_MS`; connection churn
+does not renew that deadline. It may not change a public or private interface,
+snapshot shape, counter, wire byte, route digest, packet class/retry policy,
+payload or numeric connection limit, fallback, signaling authentication,
+peer-order rule, Node adapter, example owner or browser oracle. Reusing the
+existing setup duration as the admission lease is authorized; no duration
+changes. `MAX_LINKS` remains exactly eight and no application packet may be
+buffered or replayed.
 
 The immutable RED extends the capacity control with a higher-ID owner and
 eight already linked lower-ID peers. One admitted peer's exact authenticated
@@ -63607,29 +63611,72 @@ owner to eight active links with one replacement drop. The newcomer remains
 unlinked and cannot displace the admitted peer. Current `3f10ac71` fails at the
 newcomer's send, which returns `true`.
 
-A neighboring release control makes the private ownership bounded. After the
-higher-ID owner retires the stale link and preserves admission, removal of the
-sole replacement connection followed by reconcile releases that admission;
-the newcomer may then be admitted. Closing the last route or owner also clears
-all replacement admissions. A failed replacement handshake retains ownership
-only while the peer remains desired and an exact current replacement
-connection exists. Newcomers cannot be rejected indefinitely by a disappeared
+The main RED uses fake timers and holds the discriminating window open. After
+the higher-ID owner retires the link, the fixture closes only the lower peer's
+route to cancel its already armed 250 ms retry while leaving the owner's desired
+membership and the authenticated replacement connection intact. Before the
+newcomer attempt, the owner's allocated peer-connection count is unchanged and
+no replacement setup is pending. The newcomer rejection must leave that count
+unchanged. The lower peer then reopens its route and explicitly reconciles the
+reserved replacement. Thus neither an automatic retry nor the existing
+pending-peer-connection charge can make unmodified source pass.
+
+One mixed-order RED keeps the same reservation while the owner, now lower than
+an unrelated desired peer, tries outbound setup. That unrelated peer is not an
+existing admission: `#linkFor` must not allocate its peer connection or create
+a ninth link. The same admitted-peer exemption must govern outbound and inbound
+gates; a requesting peer already represented by a mapped link or reservation
+may proceed, subject to the physical pending-PC bound. This kills an
+inbound-only GREEN.
+
+A neighboring lease/lifecycle group makes the private ownership bounded.
+Before the existing 10-second lease expires, a failed handshake or a second
+same-peer replacement connection retains the original admission without
+renewing its expiry as long as at least one authenticated WebRTC connection to
+that peer remains current. At expiry, a fake-timer barrier proves the admission
+is released even if the peer remains desired and connected; the newcomer may
+then be admitted. Removal of every current WebRTC connection followed by a gate
+or reconcile also releases immediately. Membership removal, explicit route
+restart, closing the last owning route and owner close cancel the timer and
+clear the admission. Tests distinguish same-peer connection churn from
+complete connection absence; the phrase `exact current replacement connection`
+does not apply to admission ownership, only to D.108e4a link eligibility.
+Newcomers therefore cannot be rejected indefinitely by a stalled, disappeared
 or undesired peer.
 
-GREEN adds one private set keyed by peer ID. A reservation is created only for
+GREEN adds one private map keyed by peer ID. A reservation is created only for
 a desired peer at the same genuine-replacement decision that precedes
 `#dropLink`; it is never created for overlap, complete signaling absence,
-restart, channel/connection failure or a first-time link. Admission occupancy
-is the unique union of mapped-link peer IDs, pending-peer-connection peer IDs
-and valid replacement reservations, so the count cannot double-charge one
-peer. The inbound capacity gate treats a request from its reserved peer as the
-existing admission and rejects an unrelated newcomer when that union is eight.
-Successful `#registerLink` consumes the peer's reservation. Reconcile and route
-closure prune reservations whose peer is no longer desired, whose current
-replacement connection disappeared or whose link is already restored; owner
-close clears the set. The existing initiator path and its capacity control
-remain green. If these semantics require Node, public observability or a limit
-change, stop and reslice again.
+restart, channel/connection failure or a first-time link. Logical admitted
+peers are the unique union of mapped-link and valid-reservation peer IDs; only
+that pair is de-duplicated. Pending peer connections remain counted by their
+existing physical `Map<RTCPeerConnection, ...>.size`, never by unique peer ID.
+Both outbound and inbound gates first preserve the same physical bound by
+rejecting a ninth pending peer connection. A requesting peer already present
+in the logical union is its existing admission; otherwise logical admissions
+plus physical pending PCs must be below eight before allocation. The current
+already-linked inbound bypass is retained, a reserved peer receives the same
+bypass, and an unrelated inbound or outbound newcomer is rejected when the
+combined count is eight. This preserves the existing bound against repeated
+concurrent offers from one authenticated peer rather than de-duplicating them.
+
+Successful `#registerLink` consumes the peer's reservation and cancels its
+timer. Admission pruning runs after `registration.peers` is updated and before
+each outbound or inbound capacity decision. It clears an entry if the peer is
+no longer desired, no authenticated WebRTC connection for it is current, a
+link is restored or the original lease expired. A same-peer connection swap
+within the lease retains the entry without renewal. `#restart` clears entries
+for its peers before restart reconciliation; route and owner close clear and
+cancel affected entries. The existing initiator path, its failed-handshake
+retry and its capacity control remain green because its own reservation is an
+existing admission, while the physical pending-PC ceiling still applies. One
+retained mutation control replays the same valid inbound offer while answer
+creation is held: at most eight pending peer connections may exist and the
+ninth is rejected even though every request has the same authenticated peer ID.
+If these semantics require Node, public observability or a numeric limit change,
+stop and reslice again. The reservation remains intentionally absent from
+snapshots; the existing 10-second bound and lifecycle controls are the accepted
+operational diagnosis for this narrow slice.
 
 D.108e4b uses the existing focused command, exact-two owner lint/format/diff,
 network build/typecheck, Node build and retained E3-02 gate. GREEN must rerun
@@ -63643,6 +63690,36 @@ plan-freeze, immutable RED and immutable GREEN checkpoints, each with separate
 Grok 4.6/high, exact Kimi K3 CHECK001 through CHECK100 and Opus 5/xhigh reviews
 under the same-round correction rules. No Fable or collaboration subagent may
 run without new express authorization.
+
+The D.108e4b plan-freeze review round inspected exact signed/pushed commit
+`c4996c27f54ca2d1089d608dc813c3b2a1da085c`, parent
+`3f10ac71f6460189fb48309629f6b034199c9211`, tree
+`11042285b0ef92e6f8ee7a76e90156d4420166da`, stable patch id
+`9c25474179a9c5fc3ba8d223d25b152e0aae8313` and raw-diff SHA-256
+`08d2a281dd89ab283bd15160fca266217f0d7c872ae1bfb355d6afbb824e4ae2`
+in three separate detached checkouts. Grok 4.6/high session
+`01a044bc-3050-73a0-adbc-7b2a198bdf9f` completed its sole 570.295-second run
+with exit zero, `stop_reason=end_turn` and terminal `APPROVED`, P0=0/P1=0/P2=2.
+Kimi CLI 0.38.0 exact `kimi-code/k3` session
+`session_9e7ad624-9434-40db-8578-bf11f4f5a02e` emitted CHECK001 through
+CHECK100 exactly once and returned `APPROVED`, P0=0/P1=0/P2=2. Opus session
+`7c35dfbc-1b77-4f9d-8496-22cb251af609` resolved to `claude-opus-5` at xhigh,
+completed after 595.906 API seconds with zero permission denials and zero
+subagents, and returned `CHANGES_REQUIRED`, P0=2/P1=3/P2=4. No Fable or
+collaboration subagent ran.
+
+The same-round correction above closes the complete reproduced P0/P1 union
+without confirmation review. It binds identical logical admission semantics
+to both gates, preserves physical pending-PC cardinality instead of
+de-duplicating it, gives every reservation the existing 10-second deadline,
+retains same-peer connection churn only inside that original lease, freezes
+prune order and restart behavior, preserves the already-linked bypass, and
+neutralizes the 250 ms retry in the RED. Grok's two P2s and Kimi's initiator
+self-exemption P2 are now explicit. Opus's observability P2 is accepted only
+because no public surface is authorized and the reservation is bounded by the
+existing deadline; the D.108e4 evidence owner records the lease/lifecycle test
+results before combined GREEN closure. No corrected-byte confirmation review
+is authorized.
 
 Each D.108e2 sub-slice uses one immutable tests-only RED checkpoint and one
 immutable GREEN/evidence checkpoint. Each checkpoint receives one real Grok
