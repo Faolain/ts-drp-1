@@ -62943,8 +62943,11 @@ no confirmation review. D.108e3 is complete; D.108e4 may now begin.
 
 D.108e4 is a tests-only cleanup due after D.108e3 and before Phase 6a exit. Its
 plan freeze and RED close the D.108e2c/D.108e2d/D.108e2e test-review union and
-the two inherited D.108e3 clean-proof harness facts. The exact, closed roster is
-eleven test/build-infrastructure paths:
+the two inherited D.108e3 clean-proof harness facts. It also closes the same
+bare-root-import defect in the two future-contract E5 browser owners identified
+by plan review, so the root no-shim claim is repository-wide rather than true
+only for the retained D.93 pair. The exact, closed roster is thirteen
+test/build-infrastructure paths:
 
 - `tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts`;
 - `tests/phase-6a-creator-successor-local-author-red.test.ts`;
@@ -62953,14 +62956,16 @@ eleven test/build-infrastructure paths:
 - `packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts`;
 - `packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts`;
 - `tests/phase-3a1b-p3-live-transport-red.test.ts`;
-- `tests/fixtures/shared/workspace-package-import.mjs` (new);
+- `tests/fixtures/shared/workspace-package-export-file.mjs` (new);
 - `tests/phase-6a-creator-successor-infrastructure-red.test.ts`;
-- `tests/phase-3a1b-d9336-two-client-room.pw.ts`; and
-- `tests/phase-3a1b-d9346-v3-zone.pw.ts`.
+- `tests/phase-3a1b-d9336-two-client-room.pw.ts`;
+- `tests/phase-3a1b-d9346-v3-zone.pw.ts`;
+- `tests/e5-00-zone-trade-intent.pw.ts`; and
+- `tests/e5-02-zone-referee-outcome.pw.ts`.
 
 The contract owner must freeze that exact roster, its uniqueness and the
 absence of every `src/`, product manifest, product config and public-API owner.
-The immutable RED checkpoint may change only those eleven paths and must expose
+The immutable RED checkpoint may change only those thirteen paths and must expose
 the missing or misleading oracle evidence without editing product source. The
 GREEN/evidence checkpoint may correct only the same roster. If any assertion
 requires production source, a product manifest, a Vite alias or a product
@@ -62984,52 +62989,97 @@ the outbox retains the genuine row and only `readIssued` receives the genuine
 alternative. Telemetry must prove both signatures valid, both scope/sequence
 bindings equal and the digest/preimage inequality, while the existing exact
 `issuance-rejected` result and zero adoption/publication/subscription/issue
-effects remain unchanged. Fourth, the same bounded issuance facade object is
-passed to two successive under-budget cold reopens in separately opened live
-contexts. Each invocation receives the full authenticated 8,192 future-row
-skip allowance, terminates on its own empty page and succeeds; the second
-invocation must not inherit a counter keyed by either the inner store or the
-facade identity. This reuses the already materialized rows and must not add a
-second 8,192-row durable seed window.
+effects remain unchanged. Both current-row controls additionally pin their
+existing exact `aheRecoverCount: 1`, `installEpochAnchorCount: 0` and
+`snapshotOpenCount: 1`; the correction may not change those recovery-stage
+effects while making the mismatch evidence independently valid. Fourth, one
+new reuse control passes the same `Object.is`-identical bounded issuance facade
+to two successive cold reopens in separately opened live contexts. Both use
+the same already materialized 8,191-row subview: the current row plus exactly
+8,190 authenticated future skips. The authenticated production allowance
+remains exactly 8,192, so each invocation is independently under budget while
+a counter inherited from the first invocation fails during the second.
 
-The browser activation correction installs `observeWindowLocks()` before
-`openStores()` and restores the exact descriptor on every store-open failure,
-production failure, success-release and thrown path. Direct order telemetry
-must show observation before the first durable-store open and must retain the
-existing acquired/callback counts that distinguish a production lock loser
-from the fixture's realm-local busy sentinel. The possession helper is renamed
-and typed as a database-namespace prefix; the dead base-database seed is
-removed, only the exact `-wrong-key` and `-throw` databases are seeded, and the
-existing sequential start/finish evidence plus distinct database names remain
-the causal oracle. No lock, store or activation product behavior changes.
+The reuse facade exposes a fixture-side `beginInvocation()` boundary beside,
+not on, the store object. Before each `reopenBudgetCase`, that boundary
+snapshots the preceding window and resets only fixture observation state:
+captured-scope identity, terminal-empty, page/returned/captured counters and
+successor-fault count. The store object, inner store and selected materialized
+rows remain identical. An automatic reset merely because a value-equal new
+scope arrives after terminal empty is forbidden because it would make the
+successor-scope sentinel unreachable. Each window must consume exactly 8,190
+future rows, terminate on its own empty predecessor page and reach
+`installEpochAnchorCount: 1`. It then preserves the retained equality outcome:
+exact `creator successor recovery failed: issuance-rejected`,
+`successorPageFaultCount: 1` and `terminalEmpty: true`. Thus “independent
+allowance” refers to predecessor completion, not a fabricated `ok: true`
+successor result. The original single-reopen equality control and its exact
+8,192-skip/successor-sentinel telemetry remain unchanged. No second 8,192-row
+durable seed window is added.
+
+The browser activation correction installs `observeWindowLocks()` immediately
+before `openStores()` inside one outer `try` and restores the exact descriptor
+at the existing single `finally` boundary. That one restoration runs after the
+observation snapshot on store-open failure, production failure, successful
+activation return and thrown paths; it is not moved into the later lifetime-
+lock `release()` operation. Direct order telemetry must show observation
+before the first durable-store open and must retain the existing acquired/
+callback counts that distinguish a production lock loser from the fixture's
+realm-local busy sentinel. The possession helper is renamed and typed as a
+database-namespace prefix. Only the dead unsuffixed seeds at the two
+`probePossessionFailure` call sites are removed; the unsuffixed seed consumed
+by `probeAuthorityFailure` remains. The exact `-wrong-key` and `-throw`
+databases are seeded, and the existing sequential start/finish evidence plus
+distinct database names remain the causal oracle. No lock, store or activation
+product behavior changes.
 
 The full Phase-3 file is an inherited deterministic three-failure RED baseline,
-not a license to refresh unrelated snapshots. Its only GREEN edits are the
-three already-shipped facts: add the two private admission-policy/reservation
-exports to the exact private export inventory; install the now-required
-creator-close registration resolver in the combined-fault fixture; and add
-`@ts-drp/seal` to the exact Node dependency inventory. Before the freeze,
+not a license to refresh unrelated snapshots. Those three failing tests hide
+four already-shipped facts. Its only GREEN edits are: add the two private
+admission-policy/reservation exports to the exact private export inventory;
+reuse the already loaded `privateSurface()` module and its
+`prepareV3LiveGeneration` export inside the combined-fault test in
+`tests/phase-3a1b-p3-live-transport-red.test.ts`, rather than query-importing a
+second `v3-live` module that attempts to reinstall the one-shot creator-close
+resolver; add `@ts-drp/seal` to the exact Node dependency inventory; and
+refresh both the direct manifest-export equality and the
+`nodeBoundaryViolations()` expected export map from the stale three keys to the
+nine already shipped package exports. The `export-targets` mutant must remain
+non-vacuous against that refreshed map. No Phase-3 fixture path is required and
+the exact thirteen-owner roster remains closed. Before the freeze,
 `pnpm exec vitest run tests/phase-3a1b-p3-live-transport-red.test.ts
 --maxWorkers=1 --minWorkers=1 --no-coverage` produced 21 passes and exactly
 those three failures. No other full-file expectation may move.
 
-The root Playwright repair is one test-only package-self import boundary. The
-new shared helper reads the selected workspace package's own `package.json`,
-requires the manifest name and requested export key to match, selects its
+The root Playwright repair is one test-only package-self export-file boundary.
+Each caller passes the explicit repository package directory
+`<repository>/packages/canonical`; selection may not use `import.meta.resolve`,
+a `node_modules` walk or a bare package specifier. The new shared helper
+realpaths that explicit directory, reads only its own `package.json`, requires
+manifest name `@ts-drp/canonical` and requested export key `.`, selects its
 `import` target, rejects absolute/escaping/source/declaration/empty targets,
-confines the resolved real path to that package and imports the resulting
-nonempty freshly built file URL. The infrastructure test must reject a wrong
-package name, missing export, source target, declaration target, empty target
-and path escape. D.93.36 and D.93.46 lazily obtain `decodeCanonical` through
-that helper and retain their exact migration assertions. They may not use a
-root `node_modules/@ts-drp` shim, `NODE_PATH`, a Node loader hook, a Vite alias,
-a production-relative source import or a fallback to an old `dist`. The helper
+realpaths the target, confines it to the selected package realpath and imports
+the resulting nonempty freshly built file URL. The helper is deliberately
+named `workspace-package-export-file.mjs` to distinguish it from the retained
+`workspace-package-subprocess.mjs` loader/subprocess support; it neither calls
+nor reimplements that file's loader hook.
+
+The infrastructure test must reject a wrong package directory/name, a
+`node_modules` package directory, missing export, source target, declaration
+target, empty target and path escape, and must record both the package and
+target realpaths for the clean proof. D.93.36, D.93.46, E5-00 and E5-02 lazily
+obtain their canonical exports through that helper and retain their exact
+migration/future-contract assertions. They may not use a root
+`node_modules/@ts-drp` shim, `NODE_PATH`, a Node loader hook, a Vite alias, a
+production-relative source import or a fallback to an old `dist`. The helper
 does not build: a missing built export fails closed, and the isolated proof
 must create the artifact after proving all package/example `dist` directories
-absent. With the root canonical shim absent, both current `playwright --list`
-commands reproduce `Cannot find package '@ts-drp/canonical'` and zero collected
-tests; GREEN requires both lists and both real matrices to pass with the shim
-still absent.
+absent. With the root canonical shim absent, all four current `playwright
+--list` commands reproduce `Cannot find package '@ts-drp/canonical'` and zero
+collected tests; the E5-00 and E5-02 controls were reproduced independently
+after plan review with exit 1 and the exact importing owner in each error.
+GREEN requires all four lists and the two retained D.93 real matrices to pass
+with the shim still absent.
 
 The zone test's causal readiness boundary is the existing raw unreliable
 WebRTC link snapshot, not repeated movement. Before each direction's measured
@@ -63044,19 +63094,30 @@ delivery assertion may be raised, retried away or weakened. This directly
 kills the observed clean-run alternation in which either first-direction poll
 expired before link readiness.
 
-The RED evidence commands are the exact Phase-3 command above; the focused
-local-author Vitest pair; the native fresh-process death test; the activation
-Playwright matrix; and, with `node_modules/@ts-drp/canonical` absent,
-`pnpm exec playwright test --config playwright.phase-3a1b-d9336-v3-chat.config.ts
---list` plus the corresponding D.93.46 zone `--list`. The last two currently
-fail deterministically at collection on the bare import. GREEN must pass the
-focused root/local-author/native selection, the activation matrix across
-Chromium/Firefox/WebKit, D.93.36 5/5 and D.93.46 1/1, and the affected package
-builds/typechecks. It must also pass the relevant retained successor/adoption,
-snapshot and Phase-3h/Phase-5 unit/browser gates and the complete five-file
-Phase-4c Vitest suite with the genuine fresh 64 MiB peak-live memory child and
-no exclusion. Exact-eleven ESLint, Prettier, `git diff --check`, tracked-diff
-and protected-path/stash checks remain gates.
+The RED evidence commands are exactly:
+
+- `pnpm exec vitest run --coverage.enabled=false tests/phase-6a-creator-successor-local-author-red.test.ts tests/phase-6a-creator-successor-infrastructure-red.test.ts --maxWorkers=1 --minWorkers=1`;
+- `pnpm exec vitest run --coverage.enabled=false packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts --maxWorkers=1 --minWorkers=1`;
+- `pnpm exec playwright test --config packages/storage-browser/playwright.phase-6a-creator-successor-activation.config.ts --fail-on-flaky-tests`;
+- the exact Phase-3 command above;
+- `pnpm exec playwright test --config playwright.phase-3a1b-d9336-v3-chat.config.ts --list`;
+- `pnpm exec playwright test --config playwright.phase-3a1b-d9346-zone.config.ts --list`;
+- `pnpm exec playwright test --config playwright.e5-00-zone-trade-intent.config.ts --list`; and
+- `pnpm exec playwright test --config playwright.e5-02-zone-referee-outcome.config.ts --list`.
+
+With `node_modules/@ts-drp/canonical` absent, the D.93 lists currently fail
+deterministically at collection on the bare import. Before the immutable RED is
+signed, the contract owner must freeze the exact D.108e4 ownership, native,
+activation, helper and zone behavior titles and the RED ledger must name each
+intended failing assertion. A module-load, boot or unrelated retained failure
+does not count as semantic RED. GREEN must pass the focused root/local-author/
+infrastructure and native selections, the activation matrix across Chromium/
+Firefox/WebKit, D.93.36 5/5 and D.93.46 1/1, all four root collection controls
+and the affected package builds/typechecks. It must also pass the relevant
+retained successor/adoption, snapshot and Phase-3h/Phase-5 unit/browser gates
+and the complete five-file Phase-4c Vitest suite with the genuine fresh 64 MiB
+peak-live memory child and no exclusion. Exact-thirteen ESLint, Prettier,
+`git diff --check`, tracked-diff and protected-path/stash checks remain gates.
 
 The isolated proof uses a new detached clean checkout of the immutable GREEN
 commit. It records a clean tracked status, the unchanged stash count, absent
@@ -63065,10 +63126,11 @@ ignore-scripts install; freshly builds the exact dependency closure including
 canonical, Node, storage-node, storage-browser, both examples and the grid's
 outcome-commit dependency; and then runs every GREEN gate above. It must record
 the canonical built export's resolved real path and post-build timestamp, prove
-both root browser files collect and execute through that exact file, rerun the
-Phase-4c raw subprocess-resolution control before and after the browser gates,
-and finish tracked-clean with the shim still absent. Local ignored artifacts,
-stale `dist` or symlinks may not satisfy any gate.
+all four root browser files collect through that exact file and the two
+retained D.93 matrices execute through it, rerun the Phase-4c raw
+subprocess-resolution control before and after the browser gates, and finish
+tracked-clean with the shim still absent. Local ignored artifacts, stale
+`dist` or symlinks may not satisfy any gate.
 
 The plan-freeze, immutable RED and immutable GREEN/evidence commits each use
 the existing signed-commit/push workflow. The plan-freeze and RED checkpoints
@@ -63080,6 +63142,45 @@ without confirmation; every P2 receives an exact owner and deadline before
 Phase 6a exit. No Fable or collaboration subagent runs without fresh express
 authorization. D.108e5 begins only after this tests-only slice and its clean
 proof close.
+
+The plan-freeze review round inspected exact signed commit
+`50fd6fd578d3d219649157e45462397eb19dde7f`, parent
+`836464f7f41bc807ef74742cf71ff892b627f45d`, tree
+`7f90f2fa12a59c8536b0afdf2d71109a8067e9d6`, stable patch id
+`d8817db9e82818d79f2f60bab1a0d7e888d15651` and patch SHA-256
+`180676c4f18250ceb52f23d75d2e1426ec44fdde15fda201043d84e37edc087b`
+in separate detached checkouts. Grok 4.6/high session
+`01a043c6-a1f2-75c3-a973-e285eaaa086d` first reached the runner's local
+`--max-turns 16` boundary after 495.266 seconds; it was not a service timeout.
+A tool-free continuation of that same session completed one turn later with
+`stop_reason=end_turn` and schema-valid `CHANGES_REQUIRED`, P0=0/P1=2/P2=3.
+Kimi K3 session `96d9b6df-f680-4538-9dd8-c5cd13f02991` completed its
+substantive inspection, then the same resumable session emitted exactly
+CHECK001 through CHECK100 and terminal `CHANGES_REQUIRED`, P0=0/P1=1/P2=1.
+Opus 5/xhigh session `d48ae2b9-5604-452c-a85f-84cdfde5d228` completed after
+805.499 seconds with exit zero, no permission denial and zero subagents,
+returning schema-valid `CHANGES_REQUIRED`, P0=0/P1=3/P2=6. No Fable or
+collaboration subagent ran.
+
+The same-round correction above closes the complete P1 union before RED. It
+pins the current-row AHE/anchor/snapshot counters; gives the `Object.is` reuse
+case an explicit fixture-only invocation boundary while retaining the existing
+successor sentinel and `ok: false` outcome; records the masked fourth Phase-3
+manifest-export fact; and binds the resolver repair to reuse of the already
+loaded private surface inside the one rostered Phase-3 test. It also closes
+the immediately actionable P2 union by spelling every command, distinguishing
+the manifest-driven export-file helper from the retained loader helper,
+restricting possession preseed removal to its two dead call sites, retaining
+one `finally` restoration site, naming the explicit package directory and
+realpath evidence, and bringing the two remaining root canonical imports into
+the now thirteen-path roster. The RED contract owner is
+`tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts`; before
+the immutable RED commit it must freeze the exact behavior/failure-name ledger
+and the thirteen-path uniqueness/scope assertions. Captured predecessor scope
+value equality, a nonempty GREEN owner and source/build freshness were already
+closed by D.108e2e; D.108e4 owns only the current-row mismatch isolation from
+that earlier union. Per protocol, reproduced P0/P1 findings are corrected in
+this same round without a confirmation review.
 
 Each D.108e2 sub-slice uses one immutable tests-only RED checkpoint and one
 immutable GREEN/evidence checkpoint. Each checkpoint receives one real Grok
