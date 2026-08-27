@@ -63898,13 +63898,17 @@ selection and before `bytesFrom(data)`, it snapshots the channel label,
 retransmit count, ordering and ready state. The later asynchronous record
 insertion uses those selected values while retaining the converted byte length
 and text. It also records `insertionReadyState`, sampled only inside that
-continuation, as diagnostic evidence; no assertion or acceptance predicate may
-use this field. If the channel is already `"closing"` at capture invocation,
-the event-time `readyState` remains `"closing"` while
+continuation, as diagnostic evidence. The deterministic fixture self-check
+asserts its expected `"closing"`/`"closed"` insertion states so it proves that
+the async continuation remains exercised; no retained long-campaign assertion
+or acceptance predicate may use this field. If the channel is already
+`"closing"` at capture invocation, the event-time `readyState` remains
+`"closing"` while
 `insertionReadyState` may advance to `"closed"`, and the retained exact-open
 predicate still fails. The correction therefore restores the causal sampling
 boundary rather than weakening it. Channel/connection identities, record
-ordering, pending-drain semantics and generation reset remain unchanged.
+ordering, pending-drain semantics, the asynchronous insertion continuation for
+every payload branch and generation reset remain unchanged.
 
 The long campaign's existing JSON attachment is extended without changing a
 single threshold or assertion. For every trial it records every observation
@@ -64020,6 +64024,58 @@ their named RED, GREEN or combined checkpoint. No confirmation plan review is
 authorized. The direct standalone TypeScript diagnostic before this correction
 reproduced exactly the two pre-existing owner-local errors named above; passing
 that same command is now a RED and GREEN acceptance gate.
+
+The immutable D.108e4c RED is signed/pushed commit
+`94d80d74fb19e95c0c4a9ac6d02ef3ca0f3be77a`, parent
+`4d7217a717d657a9e4fd585fbffd479c8f3669db`, tree
+`c9a82dfd9ee4b06429da785bceafdce4f4b204a2`, stable patch id
+`8ab53a4f169d6716e5db698e58cfd1057f1c145b` and raw-diff SHA-256
+`8a4556d0273fd6ed48315283ebb141177e58de78e3e57cb08d19072b9ef91b3e`.
+It changes only `tests/e3-03-loss-and-hol-proof.pw.ts`. The bounded strict
+owner-file TypeScript command, exact-owner ESLint, Prettier and
+`git diff --check` passed. The focused Playwright command booted Chromium,
+executed exactly one behavior and failed exactly one deep-equality assertion.
+Both one-byte records, message directions, relative identities/ordinals and
+diagnostic insertion states `"closing"`/`"closed"` were present; the received
+label, retransmit count, ordering and event state were exactly the synchronous
+post-dispatch mutations. There was no missing record, rejected snapshot,
+timeout, module or server failure. This is the required causal RED.
+
+The RED review round accepted that exact checkpoint without a P0/P1. Grok
+4.6/high session `01a04529-0673-7182-aa12-8a982c8f688d` completed its
+file-grounded run in 315.197 seconds with exit 0 and `stop_reason=end_turn`.
+Its runner initially classified `NO_VERDICT` because five progress sentences
+preceded the terminal `APPROVED`, P0=0/P1=0/P2=0 JSON. A formatting-only
+one-turn continuation in the same resumable session used no tools, preserved
+the substantive object verbatim and returned bare JSON; direct schema/count
+validation passed. It was not a replacement review. Kimi CLI 0.38.0 used exact
+`kimi-code/k3` in session
+`session_a98d04ae-372b-40b3-8f1c-75d2c3924934`. Its substantive result was
+`APPROVED`, P0=0/P1=0/P2=1; its first rendering added one renumbering line and
+a JSON fence. A formatting-only continuation in the same session preserved
+the finding and emitted exactly 100 total and unique markers, `CHECK001`
+through `CHECK100`, no duplicate or bare token, followed by directly parseable
+JSON whose counts validated. Claude-skill Opus 5/xhigh session
+`6525077c-16d3-4092-b11b-83a109c860c8` completed in 532.495 seconds with no
+permission denial or subagent and returned schema-valid `APPROVED`,
+P0=0/P1=0/P2=4. No reviewer changed the tracked tree, no confirmation review
+ran and no Fable or collaboration subagent ran.
+
+All five nonblocking findings have explicit owners and deadlines. The plan
+owner corrected Opus's insertion-state wording above before GREEN: the
+self-check asserts the diagnostic continuation state, while the retained
+campaign may not use it for acceptance. The D.108e4c GREEN implementer must
+preserve the asynchronous insertion continuation and put the four-field freeze
+at the head of `capture()`, not in `watch()` or the message listener, before
+GREEN signing. Kimi's message-direction observation and Opus's watch-time
+observation are discharged by code review of that single shared capture head
+plus the required three consecutive long-campaign passes, whose sender-wire
+records exercise the send direction; the D.108e4 evidence owner must record
+both before combined closure. The same evidence owner must also record that
+the sibling E4 observer intentionally stays unchanged because it samples no
+`readyState` and its label/retransmit/order fields are immutable per real
+channel. This note does not widen the D.108e4c roster. No RED rewrite or
+confirmation review is authorized.
 
 Each D.108e2 sub-slice uses one immutable tests-only RED checkpoint and one
 immutable GREEN/evidence checkpoint. Each checkpoint receives one real Grok
