@@ -60785,6 +60785,140 @@ product/node boundary question. These items do not weaken the D.108d2 GREEN
 zero-skip behavior inventory, authenticated authority oracle, forged-
 declaration rejection or retained transport proofs.
 
+The D.108d2 production GREEN is signed and pushed as immutable commit
+`5c235130d26c392b5c12f9601704c14ccff46243`, parent
+`9c49817930f7b561f6bdf742570e9171c10d8287`, tree
+`6669742d95b1b677acd574459d154e9c3d6c1d15`, stable patch id
+`75fd86a2e1f95d6f580b0e7a4fb2684300a15289` and binary-diff SHA-256
+`bfac4c0436c654801843ba6240796fb90351e021def900c0e2da238870dcd82d`.
+It changes exactly `examples/v3-room/src/index.ts` and
+`examples/v3-chat/src/index.ts`. The room opens existing AHE, issuance,
+journal and snapshot stores before the cold authenticated reopen, or performs
+the bound hot verify -> commit -> activate chain, then exposes only the exact
+seven-key authority after trust/current-handle agreement. Chat forwards the
+untrusted declaration, delegates adoption and projects that room authority.
+The declaration is removed from migration/redirect target construction, and
+the refactor-clean pass made migration-record authority successor-aware rather
+than retaining a second static authority concept.
+
+Ordinary-checkout GREEN evidence passed before review. Focused D.108d2 Vitest
+passed 5/5 and its three-engine Playwright inventory passed 12/12 with zero
+skip. The retained Phase-6 unit selection passed 58/58; the three fresh-process
+death files passed 8/8; and the retained five-file Phase-4c selection passed
+44/44, including the genuine fresh Node 64 MiB peak-live owner and retaining
+mutant. Room/chat builds and typechecks, storage-browser typecheck, exact-two
+ESLint with zero warnings, Prettier and `git diff --check` passed. One adjacent
+D.93.46 extraction fixture still has its inherited literal-epoch expectation;
+detached-parent reproduction gives the same failure, so it is neither hidden
+nor attributed to D.108d2.
+
+The sole GREEN review round inspected that immutable production commit. Grok
+4.6/high session `01a040a9-87bc-7562-b0ea-d9432a349f06` completed normally in
+600.104 seconds with exit code 0, `stop_reason=end_turn` and `APPROVED`,
+P0=0/P1=0/P2=0. Kimi CLI 0.38.0 used exact `kimi-code/k3` in session
+`session_87eedf3e-39e2-4bd2-a4de-ee820b442ef5`, emitted CHECK001 through
+CHECK100 exactly once in ascending order and returned `APPROVED`,
+P0=0/P1=0/P2=3. Opus session
+`e887649a-6763-4c37-b0e8-232110d0633e` resolved to `claude-opus-5` at xhigh,
+completed 81 turns in 851.651 seconds, used only direct Read/Grep/Bash tools,
+launched no subagent and returned `APPROVED`, P0=0/P1=0/P2=3. No reviewer
+changed the tracked tree, no confirmation review ran and no Fable or
+collaboration subagent ran. Raw evidence is retained under
+`/private/tmp/ts-drp-d108d2-green-grok.zicX46`,
+`/private/tmp/ts-drp-d108d2-green-kimi.zzbO3Z` and
+`/private/tmp/ts-drp-d108d2-green-opus.ClgJ30`.
+
+The combined nonblocking review ledger is assigned to D.108e2 rather than
+silently widened into the reviewed production diff. It owns a single-flight
+adoption promise coordinated with `close()`, fail-closed handling for
+declaration combined with `createOperationAdmissionPolicy`,
+`rebaseSourceInvite` or `creatorFinalitySigner`, replacement cleanup if a
+predecessor deactivation ever rejects, and either restoration or explicit
+contracting of the unconditional migration-invite authority precondition for
+non-migration callers. Direct reproduction of the two adjacent mock-heavy room
+files showed identical red counts at parent and target—15/15 red and 18 red/2
+pass respectively—although the target fails earlier at invite parsing; no
+retained green gate or shipped chat/grid consumer regressed. These facts keep
+the items P2 while giving them an exact owner and Phase-6-exit deadline.
+
+The first isolated proof at
+`/private/tmp/ts-drp-d108d2-green-clean.0w6ILV/repo`, detached at production
+GREEN `5c235130`, began with no package/example `dist`; `pnpm install --offline
+--ignore-scripts --frozen-lockfile` installed all 48 workspace projects and a
+second discovery again found no `dist`. After `node
+scripts/ensure-native-deps.mjs` and `pnpm build:packages`, the exact fifteen-file
+Phase-4c/Phase-6 command passed 110/110, D.108d2 Playwright passed 12/12 and
+Phase-4c-b/c passed 18/18 plus 6/6. Room/chat builds and typechecks passed.
+This attempt was correctly rejected because `pnpm --filter
+@ts-drp/storage-browser typecheck` could not resolve the RED-owned direct import
+`@ts-drp/node/creator-adoption-activate`: the ordinary checkout contained a
+root workspace symlink that the lifecycle-disabled install did not create.
+The failure proved the tests package had an undeclared direct workspace dev
+dependency; it was not bypassed with an alias, ancestor module, stale artifact
+or source-relative import.
+
+That clean-proof infrastructure defect is corrected by signed and pushed
+tests-only dependency commit `d680b93a64001e43415946d5651e05835c4102b4`,
+parent `5c235130d26c392b5c12f9601704c14ccff46243`, tree
+`406f4bcef8c71253faec551c9f4651840c94ef66`, stable patch id
+`3e8abfc91a83bf0862be951b4e6d91380a8a813b` and binary-diff SHA-256
+`635b7ae3f738a40f12d357f78efc9063effdbbe75b073a491c9f8d063bd31782`.
+Its exact two owners are `packages/storage-browser/package.json` and
+`pnpm-lock.yaml`; it declares existing workspace package `@ts-drp/node@0.11.0`
+only under storage-browser `devDependencies`. It adds no production dependency,
+runtime import, source owner, API, export, wire field, digest, limit, memory
+ceiling or activation authority. Ordinary-checkout storage-browser build and
+typecheck, focused D.108d2 5/5, exact-two Prettier and both diff checks passed.
+
+The accepted isolated proof used detached checkout
+`/private/tmp/ts-drp-d108d2-corrected-clean.NePrKV/repo` at exact corrective
+commit `d680b93a64001e43415946d5651e05835c4102b4`. Before install,
+`find packages examples -type d -name dist -print -quit` returned no path.
+`pnpm install --offline --ignore-scripts --frozen-lockfile` passed for all 48
+workspace projects and the same check printed
+`NO_DIST_AFTER_IGNORE_SCRIPTS_INSTALL`. Then `node
+scripts/ensure-native-deps.mjs` and `pnpm build:packages` freshly built the
+40-package workspace closure. The exact room and chat build/typecheck commands
+and `pnpm --filter @ts-drp/storage-browser typecheck` all passed; exact-two
+production ESLint, exact-four Prettier, `git diff --check` and tracked status
+were clean.
+
+In that artifact-clean checkout, this exact combined command passed 15 files /
+110 tests:
+`pnpm exec vitest run tests/phase-4c-snapshot-stream-red.test.ts
+tests/phase-4c-snapshot-subprocess-resolution-red.test.ts
+tests/phase-4c-snapshot-quarantine-red.test.ts
+tests/phase-4c-snapshot-pull-red.test.ts
+tests/phase-4c-v3-snapshot-transfer-composition-red.test.ts
+tests/phase-6a-creator-adoption-red.test.ts
+tests/phase-6a-creator-adoption-commit-red.test.ts
+tests/phase-6a-creator-successor-activation-red.test.ts
+tests/phase-6a-creator-successor-local-author-red.test.ts
+tests/phase-6a-creator-successor-handle-identity-red.test.ts
+tests/phase-6a-creator-successor-epoch-red.test.ts
+tests/phase-6a-creator-successor-product-red.test.ts
+packages/storage-node/tests/phase-6a-creator-adoption-commit-death-red.test.ts
+packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts
+packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts
+--no-coverage`. The genuine memory child processed 64 MiB in a newly spawned
+Node process, sampled verifier body ownership during each awaited live write,
+kept the owner strictly below `2 * 131072`, settled it at zero, and made the
+retaining mutant cross that same signed ceiling before its post-run release.
+The oracle therefore still measures peak live ownership, not only memory left
+after completion.
+
+Finally, unchanged commands `pnpm exec playwright test --config
+packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts`,
+`pnpm exec playwright test --config
+packages/storage-browser/playwright.phase-4c-b-snapshot-quarantine.config.ts`
+and `pnpm exec playwright test --config
+packages/storage-browser/playwright.phase-4c-c-snapshot-transfer.config.ts`
+passed 12/12, 18/18 and 6/6 across Chromium, Firefox and WebKit. The complete
+retained Phase-4c suite therefore includes the fresh 64 MiB child with no
+exclusion, and D.108d2 closes without a stale build, Vite alias or local
+workspace symlink serving as authority. D.108e1 and D.108e2 remain the next
+required hardening owners before Phase 6a exit.
+
 #### D.108e — inherited activation hardening owners before Phase 6 exit
 
 D.108d1's nonblocking observations are assigned rather than silently inherited.
