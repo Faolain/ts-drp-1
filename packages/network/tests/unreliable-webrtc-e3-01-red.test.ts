@@ -520,6 +520,63 @@ function tick(): Promise<void> {
 	return new Promise<void>((resolve) => queueMicrotask(resolve));
 }
 
+interface ReservedCapacityFixture {
+	readonly admittedPeers: readonly string[];
+	readonly bus: FakeSignalingBus;
+	readonly center: ReturnType<typeof owner>;
+	readonly centerRoute: UnreliableWebRtcRoute;
+	readonly remotes: readonly ReturnType<typeof owner>[];
+	readonly remoteRoutes: readonly UnreliableWebRtcRoute[];
+	readonly replacement: ReturnType<FakeSignalingBus["connect"]>;
+}
+
+async function reservedCapacityFixture(module: OwnerModule, centerPeerId: string): Promise<ReservedCapacityFixture> {
+	const bus = new FakeSignalingBus();
+	const center = owner(module, bus, centerPeerId);
+	const centerRoute = center.owner.openUnreliableWebRtcRoute("zone:capacity-owner");
+	const admittedPeers = Array.from({ length: 8 }, (_value, index) => `peer-${String(index).padStart(2, "0")}`);
+	const remotes: ReturnType<typeof owner>[] = [];
+	const remoteRoutes: UnreliableWebRtcRoute[] = [];
+	const pairs: ReturnType<FakeSignalingBus["connect"]>[] = [];
+	for (const [index, peerId] of admittedPeers.entries()) {
+		const remote = owner(module, bus, peerId);
+		const remoteRoute = remote.owner.openUnreliableWebRtcRoute("zone:capacity-owner");
+		remotes.push(remote);
+		remoteRoutes.push(remoteRoute);
+		pairs.push(bus.connect(peerId, centerPeerId));
+		expect(await remoteRoute.send([centerPeerId], Uint8Array.of(index))).toBe(true);
+	}
+	await centerRoute.reconcile(admittedPeers);
+	expect(centerRoute.snapshot()).toMatchObject({ activeLinks: 8, linkDrops: 0 });
+
+	const replacedIndex = admittedPeers.length - 1;
+	const replacedPeerId = admittedPeers[replacedIndex];
+	const original = pairs[replacedIndex];
+	const replacedRoute = remoteRoutes[replacedIndex];
+	if (replacedPeerId === undefined || original === undefined || replacedRoute === undefined) {
+		throw new Error("reserved capacity fixture is incomplete");
+	}
+	bus.disconnect(original);
+	const replacement = bus.connect(replacedPeerId, centerPeerId, "webrtc", {
+		left: "replacement-low",
+		right: "replacement-owner",
+	});
+	await centerRoute.reconcile(admittedPeers);
+	replacedRoute.close();
+	expect(centerRoute.snapshot()).toMatchObject({
+		activeLinks: 7,
+		lastLinkDrop: "replacement",
+		linkDrops: 1,
+	});
+	expect(center.peerConnections).toHaveLength(8);
+	return { admittedPeers, bus, center, centerRoute, remotes, remoteRoutes, replacement };
+}
+
+function closeReservedCapacityFixture(fixture: ReservedCapacityFixture): void {
+	fixture.center.owner.close();
+	for (const remote of fixture.remotes) remote.owner.close();
+}
+
 function nodeEphemeralAdapterArguments(source: string): readonly ts.Expression[] {
 	const file = ts.createSourceFile("index.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 	const matches: ts.NewExpression[] = [];
@@ -883,6 +940,183 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 			await pending?.catch(() => undefined);
 			center.owner.close();
 			for (const remote of remotes) remote.owner.close();
+		}
+	});
+
+	it("reserves a retired inbound link's capacity until its current replacement registers", async () => {
+		const module = await loadOwnerModule();
+		vi.useFakeTimers();
+		let fixture: ReservedCapacityFixture | undefined;
+		let newcomer: ReturnType<typeof owner> | undefined;
+		try {
+			fixture = await reservedCapacityFixture(module, "peer-99");
+			newcomer = owner(module, fixture.bus, "peer-08");
+			const newcomerRoute = newcomer.owner.openUnreliableWebRtcRoute("zone:capacity-owner");
+			fixture.bus.connect("peer-08", "peer-99");
+			const allocatedBefore = fixture.center.peerConnections.length;
+			expect(await newcomerRoute.send(["peer-99"], Uint8Array.of(8))).toBe(false);
+			expect(fixture.center.peerConnections).toHaveLength(allocatedBefore);
+			expect(fixture.centerRoute.snapshot().activeLinks).toBe(7);
+
+			const restoredRoute = fixture.remotes.at(-1)?.owner.openUnreliableWebRtcRoute("zone:capacity-owner");
+			if (restoredRoute === undefined) throw new Error("reserved peer route missing");
+			await restoredRoute.reconcile(["peer-99"]);
+			expect(fixture.centerRoute.snapshot()).toMatchObject({
+				activeLinks: 8,
+				links: expect.arrayContaining([
+					expect.objectContaining({
+						connectionId: fixture.replacement.right.id,
+						generation: fixture.replacement.right.generation,
+						peerId: "peer-07",
+					}),
+				]),
+			});
+		} finally {
+			newcomer?.owner.close();
+			if (fixture !== undefined) closeReservedCapacityFixture(fixture);
+			vi.useRealTimers();
+		}
+	});
+
+	it("applies the same reserved admission to a mixed-order outbound capacity attempt", async () => {
+		const module = await loadOwnerModule();
+		vi.useFakeTimers();
+		let fixture: ReservedCapacityFixture | undefined;
+		let higher: ReturnType<typeof owner> | undefined;
+		try {
+			fixture = await reservedCapacityFixture(module, "peer-50");
+			higher = owner(module, fixture.bus, "peer-99");
+			higher.owner.openUnreliableWebRtcRoute("zone:outbound-capacity");
+			fixture.bus.connect("peer-50", "peer-99");
+			const outboundRoute = fixture.center.owner.openUnreliableWebRtcRoute("zone:outbound-capacity");
+			const allocatedBefore = fixture.center.peerConnections.length;
+			await outboundRoute.reconcile(["peer-99"]);
+			expect(fixture.center.peerConnections).toHaveLength(allocatedBefore);
+			expect(fixture.centerRoute.snapshot()).toMatchObject({ activeLinks: 7 });
+			expect(fixture.centerRoute.snapshot().links).not.toEqual(
+				expect.arrayContaining([expect.objectContaining({ peerId: "peer-99" })])
+			);
+		} finally {
+			higher?.owner.close();
+			if (fixture !== undefined) closeReservedCapacityFixture(fixture);
+			vi.useRealTimers();
+		}
+	});
+
+	it("bounds replacement admission across failed same-peer churn and the original setup deadline", async () => {
+		const module = await loadOwnerModule();
+		vi.useFakeTimers();
+		let fixture: ReservedCapacityFixture | undefined;
+		let newcomer: ReturnType<typeof owner> | undefined;
+		try {
+			fixture = await reservedCapacityFixture(module, "peer-99");
+			fixture.bus.disconnect(fixture.replacement);
+			fixture.bus.connect("peer-07", "peer-99", "webrtc", {
+				left: "churned-low",
+				right: "churned-owner",
+			});
+			fixture.bus.requestTransform = (): Uint8Array => Uint8Array.of(255, 0, 255);
+			const churnedRoute = fixture.remotes.at(-1)?.owner.openUnreliableWebRtcRoute("zone:capacity-owner");
+			if (churnedRoute === undefined) throw new Error("churned reserved peer route missing");
+			await churnedRoute.reconcile(["peer-99"]);
+			churnedRoute.close();
+			fixture.bus.requestTransform = (request): Uint8Array => request;
+
+			newcomer = owner(module, fixture.bus, "peer-08");
+			const newcomerRoute = newcomer.owner.openUnreliableWebRtcRoute("zone:capacity-owner");
+			fixture.bus.connect("peer-08", "peer-99");
+			await vi.advanceTimersByTimeAsync(9_999);
+			expect(await newcomerRoute.send(["peer-99"], Uint8Array.of(1))).toBe(false);
+			await vi.advanceTimersByTimeAsync(1);
+			expect(await newcomerRoute.send(["peer-99"], Uint8Array.of(2))).toBe(true);
+			expect(fixture.centerRoute.snapshot().activeLinks).toBe(8);
+		} finally {
+			newcomer?.owner.close();
+			if (fixture !== undefined) closeReservedCapacityFixture(fixture);
+			vi.useRealTimers();
+		}
+	});
+
+	it.each(["connection absence", "membership removal", "restart"] as const)(
+		"releases replacement admission on %s",
+		async (release) => {
+			const module = await loadOwnerModule();
+			vi.useFakeTimers();
+			let fixture: ReservedCapacityFixture | undefined;
+			let newcomer: ReturnType<typeof owner> | undefined;
+			try {
+				fixture = await reservedCapacityFixture(module, "peer-99");
+				if (release === "connection absence") fixture.bus.disconnect(fixture.replacement);
+				if (release === "membership removal") {
+					await fixture.centerRoute.reconcile(fixture.admittedPeers.slice(0, -1));
+				}
+				if (release === "restart") await fixture.centerRoute.restart();
+
+				newcomer = owner(module, fixture.bus, "peer-08");
+				const newcomerRoute = newcomer.owner.openUnreliableWebRtcRoute("zone:capacity-owner");
+				fixture.bus.connect("peer-08", "peer-99");
+				expect(await newcomerRoute.send(["peer-99"], Uint8Array.of(3))).toBe(true);
+			} finally {
+				newcomer?.owner.close();
+				if (fixture !== undefined) closeReservedCapacityFixture(fixture);
+				vi.useRealTimers();
+			}
+		}
+	);
+
+	it.each(["last route", "owner"] as const)("cancels the bounded admission timer on %s close", async (close) => {
+		const module = await loadOwnerModule();
+		vi.useFakeTimers();
+		let fixture: ReservedCapacityFixture | undefined;
+		try {
+			fixture = await reservedCapacityFixture(module, "peer-99");
+			expect(vi.getTimerCount()).toBe(1);
+			if (close === "last route") fixture.centerRoute.close();
+			else fixture.center.owner.close();
+			expect(vi.getTimerCount()).toBe(0);
+		} finally {
+			if (fixture !== undefined) closeReservedCapacityFixture(fixture);
+			vi.useRealTimers();
+		}
+	});
+
+	it("retains the physical eight-PC ceiling for repeated valid offers from one authenticated peer", async () => {
+		const module = await loadOwnerModule();
+		vi.useFakeTimers();
+		const bus = new FakeSignalingBus();
+		const lower = owner(module, bus, "peer-00");
+		const higher = owner(module, bus, "peer-99", { hangAnswer: true });
+		const pair = bus.connect("peer-00", "peer-99");
+		higher.owner.openUnreliableWebRtcRoute("zone:pending-bound");
+		const offerSource = new FakePeerConnection();
+		offerSource.createDataChannel(RAW_LABEL, { maxRetransmits: 0, ordered: false });
+		const offer = await offerSource.createOffer();
+		const validOffer = new TextEncoder().encode(JSON.stringify({ candidates: [], sdp: offer.sdp, type: "offer" }));
+		const attempts: Promise<"rejected" | "resolved">[] = [];
+		try {
+			for (let index = 0; index < 8; index += 1) {
+				const attempt = pair.left.exchange(validOffer, new AbortController().signal);
+				attempts.push(
+					attempt.then(
+						() => "resolved" as const,
+						() => "rejected" as const
+					)
+				);
+				await tick();
+				expect(higher.peerConnections).toHaveLength(index + 1);
+			}
+			await expect(pair.left.exchange(validOffer, new AbortController().signal)).rejects.toThrow(
+				"unreliable WebRTC signaling request rejected"
+			);
+			expect(higher.peerConnections).toHaveLength(8);
+			await vi.advanceTimersByTimeAsync(10_000);
+			expect(await Promise.all(attempts)).toEqual(Array.from({ length: 8 }, () => "rejected"));
+			expect(higher.peerConnections.every(({ connectionState }) => connectionState === "closed")).toBe(true);
+		} finally {
+			offerSource.close();
+			lower.owner.close();
+			higher.owner.close();
+			vi.useRealTimers();
 		}
 	});
 
