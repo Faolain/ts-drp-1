@@ -64100,6 +64100,103 @@ teardown evidence. This is due before the first restarted campaign invocation
 is counted. No RED rewrite, threshold change or confirmation review is
 authorized.
 
+The first D.108e4d GREEN candidate is signed/pushed commit
+`ebcb24bec05c59ffa10f07404161f019fcb228b3`, parent
+`8d4a4a8cf6b2d5e2bc5afd5f33122f22c63a6967`, tree
+`b867214b5ec1390035b3d4b6acb1d4adffedc389`, stable patch id
+`c957117fe83c21d58ec7f9aeab305887155b66c8` and raw-diff SHA-256
+`bbba16f155eb26ea873eea5189d98c959f30478a9bc1edff630e4c94f32e0a31`.
+It implements genuine virtual-boundary distances and the explicit empty-input
+result in only the exact test owner. The deterministic domain and observer
+behaviors passed together 2/2; bounded strict TypeScript, exact-owner typed
+ESLint, Prettier and `git diff --check` passed. It is a rejected GREEN
+candidate, not the accepted D.108e4d GREEN, because the one permitted complete
+config invocation exposed a distinct retained product-recovery failure.
+
+The complete-config JSON reporter artifact has SHA-256
+`79d67f2f77238756c35e5ff9d341e562b5c03aafd8c08f97968e31407c22c076`;
+its decoded failure attachment has SHA-256
+`573923d25633a33bb2d9e7c74d2b5fda859632142266d1d0a80a9d03671fe992`.
+The two deterministic behaviors passed, then the retained campaign failed
+after 39.280 seconds at stage `preliminary-reset`, before any fixed trial.
+CDP had applied a distinct zero-loss rule after the 30% preliminary profile;
+both pages remained open, both peer sessions retained the expected peers,
+both durable counts remained two and both peer-to-author mappings remained
+present. Each raw snapshot still advertised one exact raw-link descriptor,
+but 100 movement probes across the unchanged 10-second delivery predicate
+produced zero new raw sends and zero new raw receives. The creator stayed at
+321 sends and the receiver at 203 receives. Both sides had advanced
+`authenticatedConnectionLosses` to one while retaining `linkDrops: 0` and
+`lastLinkDrop: "none"`. The observer's recent records contained only reliable
+channels; no raw `RTCDataChannel.send` reached the observer after reset.
+
+This evidence makes the failure particular rather than probabilistic. The
+descriptor-count predicate in `waitForOpenTransportPair()` is not an open-state
+oracle, as D.108e4a already records, but the following `waitForRawDelivery()`
+is a real delivery probe and is the failing gate. For an already-reconciled
+route, private `#send()` returns false when its mapped channel is non-open or
+its authenticated connection is no longer current. That branch neither calls
+`#linkFor()` nor schedules recovery. Since membership is already reconciled,
+the setup branch guarded by `!registration.membershipReconciled` cannot repair
+the link; the snapshot can therefore retain a non-usable descriptor until a
+separate close/reconcile event arrives. Changing the browser helper, retrying
+movement, extending its timeout or invoking the explicit workbench restart
+would weaken the retained automatic-recovery gate. Per the frozen stop/reslice
+rule, product source is required and D.108e4d stops here.
+
+###### D.108e4e — failed-send raw-link recovery trigger
+
+D.108e4e is an immediate narrow product RED/GREEN slice due before D.108e4d,
+D.108e4c, D.108e4b or combined D.108e4 can close. Its exact implementation
+roster is only `packages/network/tests/unreliable-webrtc-e3-01-red.test.ts`
+and `packages/network/src/unreliable-webrtc.ts`; this plan is the sole
+documentation owner. It may change only private recovery triggering for an
+already-reconciled route whose mapped raw link is unusable. It may not change
+any public or private interface, snapshot/counter shape, wire byte, digest,
+packet class, payload/connection limit, setup duration, admission lease,
+fallback, signaling authentication, peer-order rule, Node/example/test owner
+or browser threshold. In particular, `send()` must return false for the
+current payload, and must not retain, buffer, replay or retry that payload
+while recovery runs.
+
+The immutable RED adds a causal unit control beside the existing D.108e4a/b
+replacement controls. After membership reconciliation and one established
+raw link, it makes that mapped link unusable without delivering its close
+event, then performs exactly one send. That send must return false, deliver
+zero copies and leave `sent` unchanged, while starting at most one
+deduplicated recovery setup. Repeated failed sends before the setup settles
+must not create another peer connection, extend the existing absolute setup
+deadline or retain any payload. The control runs in both peer-ID orderings so
+the initiator starts one outbound setup and the non-initiator waits for the
+one inbound setup. Once the replacement is explicitly opened, a new distinct
+payload sent by a later call must deliver exactly once. Existing
+replacement-drop, admission-position, authentication-loss, handshake-failure,
+close and capacity counters remain exact. A companion branch uses a mapped
+open link whose authenticated connection has disappeared while one genuine
+replacement connection is current, proving the same failed-send trigger
+reaches the existing D.108e4a replacement path without a separate reconcile
+notification.
+
+GREEN may only invoke the existing deduplicated private link acquisition from
+the unusable-target branch before returning false. Existing `#pendingLinks`,
+single-initiator ordering, replacement admission and retry scheduling remain
+the sole setup owners. The current application bytes may not cross the setup
+promise. A still-open mapped link on any still-current overlapping
+authenticated connection remains send-eligible exactly as D.108e4a pins, and
+complete signaling absence alone still does not retire it. If those
+invariants cannot be preserved in the exact two owners, stop and reslice.
+
+RED and GREEN use the existing focused unreliable-WebRTC unit command,
+network build/typecheck, exact-two ESLint/Prettier and `git diff --check`.
+GREEN additionally runs the retained Node E3-02 selection and one complete
+E3-03 config invocation with failure telemetry enabled. Only a 3/3 pass may
+restart the consecutive campaign gate; any different failure is diagnosed
+before another invocation. D.108e4e receives separate signed/pushed immutable
+RED and GREEN/evidence checkpoints and the existing Grok 4.6/high, exact Kimi
+K3 CHECK001 through CHECK100 and Opus 5/xhigh review protocol. P0/P1 findings
+are corrected in the same round and every P2 receives an owner/deadline. No
+Fable or collaboration subagent may run without new express authorization.
+
 The first D.108e4c plan-freeze review round inspected signed/pushed commit
 `eb3de05b6054ac6fdd158d2530bad1798f87f10f`, parent
 `b8a2628bec7593c547919b540889dc75e33cd9ca`, tree
