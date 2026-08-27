@@ -61279,6 +61279,158 @@ local-author and handle-identity gates remain green; and no root export,
 manifest, product, wire/store format, topic, queue identity or lock name
 changes. A need for a fourth production owner stops and reslices D.108e2a.
 
+The D.108e2a freeze and RED custody are complete. The signed plan freeze is
+`05e35259`, its same-round plan correction is `f01d1baf`, and the authenticated
+signer-order correction is `e33a687b`. The first immutable tests-only RED was
+`1469b21`; all reproduced P0/P1 findings from its one Grok/Kimi/Opus round were
+corrected without a confirmation review in `615a52e7`, `5bfd2904` and
+`91abb7bb`. The corrected RED changed only the seven paths frozen above. Its
+one composite readiness failure proved the missing private topic owner, exact
+cold-profile boundary and real Window/DedicatedWorker Web Lock policy while
+the retained behavioral controls remained green.
+
+The immutable GREEN checkpoint is signed commit
+`33b30347632dad3b7bbdc5bf6cb3dee1aeef93ae`, parent
+`91abb7bb59d724bc65a532c00ddb41214ca27aec`, tree
+`fbb60958e1e2eba01b03e14726a374724433b9f5`. It changes exactly the frozen
+three production owners. `internal/v3-topic.ts` is private and is the sole
+node owner of the unchanged topic domain and rendering prefix; both ordinary
+v3 activation and successor activation consume it. Cold reopen admits only
+the primitive literal `creator-only` before any downstream effect. Window and
+DedicatedWorker take the same origin-wide lifetime Web Lock after
+authentication, while Node keeps process-local ownership. There is no new
+export, package-manifest entry, dependency, API, topic/lock name, wire/store
+format, queue identity, memory limit or activation authority.
+
+Ordinary-checkout GREEN verification passed the node build; the seventeen
+activation contract cases; the exact retained Phase-3 stable-topic oracle; the
+eighteen-case activation browser matrix in Chromium, Firefox and WebKit; the
+complete five-file Phase-4c selection 44/44; the root Phase-6a selection
+63/63; the storage-node death selection 9/9; the product browser matrix 12/12;
+Phase-4c-b 18/18 and Phase-4c-c 6/6 across all three engines; and
+storage-browser typecheck. Exact-owner ESLint with zero warnings, Prettier and
+`git diff --check` passed. Node's broad test-project typecheck still reports
+the recorded unrelated `rootDir`/file-list/test-helper baseline and is not an
+affected-production regression. The older complete Phase-3 transport file
+also retains unrelated stale export/dependency and one-shot resolver failures;
+the owned exact stable-topic assertion is the deliberately filtered gate and
+passes.
+
+The first isolated proof used detached commit `33b30347632dad` at
+`/private/tmp/ts-drp-d108e2a-green-clean.DCq1Eh/repo`. Package/example `dist`
+discovery was empty both before and after `pnpm install --offline
+--ignore-scripts --frozen-lockfile` for all 48 workspace projects. After
+`node scripts/ensure-native-deps.mjs`, the exact node, storage-node and
+storage-browser dependency closure built successfully with scope 33/48. The
+combined sixteen-file retained Vitest command passed 116/116, the exact
+Phase-3 topic assertion passed 1/1, and activation 18/18, product 12/12,
+Phase-4c-b 18/18 and Phase-4c-c 6/6 passed across all three browser engines.
+Storage-browser typecheck, exact-owner lint/format/diff/status and the absent
+browser shim root also passed. Thus no source alias, ancestor package, stale
+build or ignored artifact supplied package resolution or runtime behavior.
+
+The GREEN review round inspected that one immutable commit in isolated clean
+worktrees under
+`/private/tmp/ts-drp-d108e2a-green-reviews.u8U58N`. Upgraded Grok 4.6/high
+completed the same sole run in 780.158 seconds with exit code 0,
+`stop_reason=end_turn`, `timed_out=false` and terminal `APPROVED`; it passed the
+old 570-second service-cancellation point without a relaunch. Its public
+terminal and runner status are `grok-output/public.txt` and
+`grok-output/status.json`. Kimi CLI 0.38.0 used exact `kimi-code/k3`, high, in
+session `session_921fc65f-3c2c-411c-9388-39420667c61a`. Its initial plan-mode
+attempts to start two internal explorers were interrupted immediately; both
+failed/interrupted partial outputs are inadmissible and supplied no accepted
+evidence. The same session then performed the review directly with Agent and
+AgentSwarm forbidden. A tool-free formatting normalization of its already
+finished answer produced CHECK001 through CHECK100 exactly once, in order,
+and parseable terminal `APPROVED` with zero P0/P1. Opus 5/xhigh session
+`b9106866-0df4-4970-b7bf-2e34f0056974` completed its original 94-turn review
+in 1,013,546 ms, launched no Agent, and returned `APPROVED` with zero P0/P1;
+the same session normalized only the markdown-wrapped terminal JSON without
+reinspection. Every review worktree remained clean. No confirmation review,
+Fable process or collaboration subagent ran.
+
+Opus's iterator-hardening observation was independently reproduced and
+reclassified from P2 to P1 before closure. Poisoning
+`%TypedArray%.prototype[Symbol.iterator]` changed the helper's topic bytes even
+though the replaced v3-live renderer remained stable. The retained exact-topic
+test first gained a runtime poison mutant and failed for the intended reason;
+signed same-round correction `d0b06b5a7b04451e15034f9f1a10fdcccb025320`,
+parent `33b30347632dad3b7bbdc5bf6cb3dee1aeef93ae`, tree
+`6e26014399468a5d4b5e0a90e88187f2238e9f35`, then restored the stricter
+captured byte-length getter, captured reflection primitives and indexed byte
+reads. Untampered topic bytes remain identical. The correction touches only
+the private helper and the already-frozen retained Phase-3 test; no production
+scope was added. Per protocol, the reproduced P1 was corrected in the same
+round and did not receive a confirmation review.
+
+The corrected ordinary proof passed the node build, exact topic oracle and
+poison mutant 1/1, activation unit contract 17/17, complete Phase-4c 44/44,
+root Phase-6a 63/63, activation Playwright 18/18 in all three engines,
+storage-browser typecheck, and exact changed-owner ESLint, Prettier and diff
+checks. The final isolated proof used detached exact commit
+`d0b06b5a7b04451e15034f9f1a10fdcccb025320` at
+`/private/tmp/ts-drp-d108e2a-corrected.kRTuJj/repo`. No package/example `dist`
+existed before the lifecycle-disabled frozen offline install or after it.
+Native dependency restoration and the exact 33/48 build closure passed. The
+same combined sixteen-file retained command passed 116/116, the exact
+Phase-3 topic oracle and mutant passed 1/1, activation Playwright passed 18/18
+across all engines, and storage-browser typecheck plus exact changed-owner
+lint, format, diff and clean tracked status passed. The browser shim root was
+absent after execution.
+
+The reproducible command ledger is explicit. The clean install/build sequence
+was `pnpm install --offline --ignore-scripts --frozen-lockfile`, `node
+scripts/ensure-native-deps.mjs`, then `pnpm --filter
+@ts-drp/storage-node... --filter @ts-drp/storage-browser... --filter
+@ts-drp/node... build`. The 116-test retained gate was `pnpm exec vitest run
+tests/phase-4c-*.test.ts tests/phase-6a-*.test.ts
+packages/storage-node/tests/phase-6a-*.test.ts --maxWorkers=1 --minWorkers=1`.
+The exact topic gate used `pnpm exec vitest run
+tests/phase-3a1b-p3-live-transport-red.test.ts -t 'derives stable live topics
+with an exact independent byte oracle' --maxWorkers=1 --minWorkers=1`.
+Browser gates used `pnpm exec playwright test` with, respectively,
+`packages/storage-browser/playwright.phase-6a-creator-successor-activation.config.ts`,
+`packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts`,
+`packages/storage-browser/playwright.phase-4c-b-snapshot-quarantine.config.ts`
+and
+`packages/storage-browser/playwright.phase-4c-c-snapshot-transfer.config.ts`
+passed through `--config`. `pnpm --filter
+@ts-drp/storage-browser typecheck`, exact-path `pnpm exec eslint --max-warnings
+0`, `pnpm exec prettier --check`, `git diff --check` and `git status --short`
+closed the affected-owner checks.
+
+That 116/116 clean selection includes the genuine fresh Node 64 MiB memory
+child with no exclusion. Owner mode counts the actual chunk-body objects that
+are simultaneously live while the stream is executing, records their peak,
+stays strictly below the signed `2 * 131072` byte ceiling, and settles at zero.
+The retaining mutant keeps the actual received bodies through the live stream,
+crosses the same ceiling before completion, and settles at zero only after the
+deliberate release. The acceptance signal therefore measures peak live
+snapshot/chunk ownership during execution, not heap or ownership remaining
+after completion, and neither the memory limit nor the signed `<2x chunk-body`
+contract was weakened.
+
+The remaining GREEN observations are assigned rather than hidden. Poisoned
+browser-realm signals and exact rejected-lock diagnostic wording belong to a
+future node-boundary hardening slice before Phase 6 exit. SharedWorker and
+ServiceWorker are outside the frozen Window/DedicatedWorker policy and have no
+current source use; any future support requires its own slice. The stale
+hostile-`TextEncoder` cache mutant, a stronger topic-census scanner, explicit
+blocked-contender counters, and separation of the harness-only busy result are
+assigned to tests-only D.108e2c. The inherited raw-deactivate rejection that
+can retain topic/lock ownership is an explicit D.108e2b acceptance case. The
+known broad Phase-3 and node typecheck baselines remain recorded and cannot be
+used to relax an owned gate.
+
+D.108e2a is therefore closed at pushed signed corrected implementation commit
+`d0b06b5a7b04451e15034f9f1a10fdcccb025320`: the immutable GREEN and its
+same-round P1 correction are reproducible from clean state, all required
+reviewers reached valid terminal verdicts, the complete retained Phase-4c
+suite includes the real 64 MiB peak-live proof, and every protected untracked
+path and existing stash remains untouched. D.108e2b may begin only after this
+evidence update is signed and pushed.
+
 ##### D.108e2b — room adoption lifetime and declaration policy
 
 D.108e2b begins only after D.108e2a is signed, reviewed and pushed. Its
