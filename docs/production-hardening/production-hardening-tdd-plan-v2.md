@@ -61827,6 +61827,104 @@ and rerun that package typecheck. The three non-contract GREEN emitters remain
 byte-identical to the immutable RED. Signed correction `b18d0143` is pushed to
 `origin/codex/phase3a1b-p6-golden-path`.
 
+GREEN first exposed one impossible causal assertion in the corrected RED: the
+adoption settlement is captured before the predecessor-release gate, so it
+cannot already report one predecessor release. The exact four GREEN owners
+were temporarily stashed, the single frozen product assertion was corrected
+from one release to zero, and signed commit
+`d5548f1e82317386b6861e80ea5573ad0af861c9` was pushed before the GREEN work
+was restored. The corrected RED retained its intended inventory: the native
+selection had only the genuine child composite failing, and each product
+browser still had only the new composite failing. This was a test
+causal-feasibility correction, not a product change; the protected stash count
+returned to 26.
+
+The D.108e2c GREEN is signed commit
+`15fca6c5958aeaa664a1a1ef102356d3630f04aa`, pushed to
+`origin/codex/phase3a1b-p6-golden-path`. Its diff is restricted to the exact
+four frozen emitters: the shared local-author contract, fresh Node child,
+activation browser entry and product browser entry. The other five frozen
+assertion owners are byte-identical to `d5548f1e`. The child now opens the
+malformed member through the authenticated ACL opener, reports distinct
+possession-signing and lineage-read events for every attempt, and executes the
+negative and unsafe `next` cases. The activation entry separates harness busy
+from production contention, counts window-lock callbacks/acquisitions, and
+runs separately named wrong-key and throwing possession probes in proven
+sequence. The product entry forwards only the already-frozen private pause
+instrumentation. No production source, public API, wire, authority, digest,
+limit or memory contract changed.
+
+Ordinary-checkout GREEN verification passed the focused native selection 8/8,
+activation Playwright 21/21 and product Playwright 18/18 across Chromium,
+Firefox and WebKit. The retained Phase-4c/Phase-6a Vitest selection passed 16
+files and 116 tests with the genuine fresh-process 64 MiB child included;
+Phase-3 topic identity passed 1/1; retained Phase-5 Vitest passed 39/39; its
+actor, relearn and live-close browsers passed 12/12, 6/6 and 6/6; and retained
+Phase-4c quarantine and transfer browsers passed 18/18 and 6/6. Builds passed
+for protocol-v3, node, storage-node, storage-browser, v3-room and v3-chat.
+Protocol-v3 public-audit, storage-browser and both example typechecks passed.
+Node and storage-node typechecks reproduced only their inherited broad
+cross-root/file-list, WebRTC emitter and compact-history baseline failures;
+none names an exact D.108e2c owner. Exact-nine ESLint with zero warnings,
+Prettier and `git diff --check` passed.
+
+That retained run re-executed the signed D.108e2b live-memory contract rather
+than substituting a post-completion reading: 512 chunks totaled 67,108,864
+bytes, each chunk body was 131,072 bytes, the owner peaked at 131,072 live
+bytes while awaited writes were executing and settled at zero, satisfying the
+signed `< 2 * chunkBodyBytes` ceiling of 262,144 bytes. The deliberate
+retaining mutant peaked at 67,108,864 live bytes before release, was detected,
+and also settled at zero only afterward. The child therefore still proves
+peak snapshot/chunk ownership during execution and cannot pass merely from
+memory remaining after completion.
+
+The isolated proof used detached worktree
+`/private/tmp/ts-drp-d108e2c-green.VdJkZb/repo` at exact signed GREEN SHA
+`15fca6c5`. Before installation, and again after `pnpm install --offline
+--ignore-scripts --frozen-lockfile`, `find packages examples -type d -name
+dist` found no build output. `node scripts/ensure-native-deps.mjs` followed by
+the filtered protocol-v3, storage-node, storage-browser and node dependency
+closure built 33 fresh workspace projects. From only those fresh products,
+the clean checkout passed the retained 16-file/116-test Phase-4c/Phase-6a
+selection including the real 64 MiB child; activation 21/21; product 18/18;
+Phase-4c browsers 18/18 and 6/6; Phase-3 topic identity 1/1; Phase-5 Vitest
+39/39; Phase-5 actor and relearn browsers 12/12 and 6/6; both example builds;
+the protocol-v3, storage-browser and example typechecks; and exact-nine
+lint/format/diff and frozen-assertion checks. The first combined Phase-5
+live-close browser invocation hit the retained Firefox page-bootstrap race
+with `window.phase5eCreatorLiveClose` not yet installed (5/6); its exact
+immediate three-engine rerun passed 6/6, matching the ordinary checkout. Clean
+node/storage-node typechecks reproduced the same inherited baseline and no
+D.108e2c-specific diagnostic. The clean tracked status remained empty.
+
+The GREEN review round inspected signed `15fca6c5`. Grok 4.6/high session
+`01a04242-75fa-7d60-b7f2-cdac4404ea52` first stopped at
+`max_turns_reached` because the runner was mistakenly invoked with
+`--max-turns 12`, below the skill's 16-turn default; the resulting canceled
+stop after 420.156 seconds was our invocation bound, not an upgraded-service
+cancellation. A tool-free continuation of that same session supplied the
+terminal schema without starting an independent review: `APPROVED`, P0=0,
+P1=0, P2=1. Kimi K3 session
+`session_1b2b8b8a-9e52-4fec-9494-c0132db4b997` returned `APPROVED`, P0=0,
+P1=0, P2=2 and, after a format-only same-session continuation removed one
+preface line, exactly CHECK001 through CHECK100 once and in order plus FINAL.
+Opus 5/xhigh session `6c727d8c-b4fa-41ea-b95e-62643b5cfac6` used no
+subagent and returned `APPROVED`, P0=0, P1=0, P2=4. Two rejected Kimi command
+shapes failed CLI parsing before creating a model session. No reviewer edited
+the tree, and no Fable or collaboration subagent ran.
+
+The non-blocking review union is assigned to D.108e4 before Phase 6a exit:
+replace the malformed-ACL self-hash comparison with an independent
+bytes/digest positive control; install or explicitly pin lock observation
+before store opening; rename the database-prefix probe contract and remove its
+dead base preseed; replace same-site signer counters with an independent
+contiguous-attempt invariant; and reconcile the inherited three full-file
+Phase-3 stale pins (private export count, registration-resolver setup and node
+dependency count). Those full-file failures are outside the focused
+D.108e2c topic and their owners are byte-identical to the corrected RED. There
+is no P0/P1 correction and therefore no confirmation review. D.108e2c is
+closed and does not delay D.108e2d.
+
 ##### D.108e2d — retained recovery performance evidence
 
 D.108e2d starts only after correctness slices a-c. Its RED/evidence freeze
@@ -61843,6 +61941,20 @@ the private store wrapper. A third production owner, public adapter, changed
 limit or changed recovery authority stops and reslices. This profiling slice
 must not delay an earlier correctness fix, but it must have a signed terminal
 result before Phase 6a exits.
+
+##### D.108e4 — retained test-oracle cleanup
+
+D.108e4 is a tests-only cleanup due after D.108e3 and before Phase 6a exit. Its
+plan freeze and RED must name the smallest exact roster needed to close the
+D.108e2c GREEN P2 union: independently bind authenticated ACL bytes to their
+digest with a positive control, make the window-lock observation boundary
+explicit, remove the possession-probe naming/preseed ambiguity, prove one
+contiguous authority-attempt sequence from an independent observation, and
+reconcile the three inherited full-file Phase-3 pins. It has no production
+GREEN owner and may not change public APIs, wire, store, recovery authority,
+limits or memory contracts. If a production-source change is genuinely
+required, stop and reslice. This assignment must not contaminate or delay the
+D.108e2d performance profile or the D.108e3 room-lifetime hardening slice.
 
 Each D.108e2 sub-slice uses one immutable tests-only RED checkpoint and one
 immutable GREEN/evidence checkpoint. Each checkpoint receives one real Grok
