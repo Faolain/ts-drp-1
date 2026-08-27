@@ -198,6 +198,50 @@ async function dumpDatabase(name: string): Promise<DatabaseDump> {
 	}
 }
 
+async function portableJournalDump(databaseName: string): Promise<DatabaseDump> {
+	const [journal, issuance] = await Promise.all([
+		dumpDatabase(`${databaseName}--drp-live-journal-v1`),
+		dumpDatabase(`${databaseName}--drp-issuance-v1`),
+	]);
+	const issuedRows = issuance.stores.find(({ name }) => name === "issuedRecords")?.rows.map(exactRecord) ?? [];
+	return Object.freeze({
+		...journal,
+		stores: Object.freeze(
+			journal.stores.map((store) =>
+				store.name !== "acceptedEntries"
+					? store
+					: Object.freeze({
+							...store,
+							rows: Object.freeze(
+								store.rows.map((value) => {
+									const row = exactRecord(value);
+									if (row.sourceKind !== "local-issued") return row;
+									const issued = issuedRows.find(
+										(candidate) =>
+											candidate.objectId === row.objectId &&
+											candidate.author === row.localAuthor &&
+											candidate.authorSequence === row.localAuthorSequence &&
+											hex(candidate.digest as Uint8Array) === row.vertexDigest
+									);
+									if (issued === undefined) throw new TypeError("D.108d2 journal carrier is unavailable");
+									return Object.freeze({
+										anchorDigest: row.anchorDigest,
+										detachedSignature: issued.signature,
+										epoch: row.epoch,
+										exactCanonicalPreimageBytes: issued.canonicalPreimageBytes,
+										journalSequence: row.journalSequence,
+										objectId: row.objectId,
+										sourceKind: "received",
+										vertexDigest: row.vertexDigest,
+									});
+								})
+							),
+						})
+			)
+		),
+	});
+}
+
 function deleteDatabase(name: string): Promise<void> {
 	return new Promise((resolvePromise, reject) => {
 		const selected = indexedDB.deleteDatabase(name);
@@ -342,7 +386,7 @@ async function rawSnapshotDeclaration(databaseName: string): Promise<PlainRecord
 			request(transaction.objectStore("chunks").getAll()),
 		]);
 		await transactionDone(transaction);
-		const scopes = scopeRows.map(exactRecord).filter((scope) => scope.epoch === 1 && scope.state === "verified");
+		const scopes = scopeRows.map(exactRecord).filter((scope) => scope.state === "verified");
 		if (scopes.length !== 1) throw new TypeError("D.108d2 snapshot scope is ambiguous");
 		const scope = scopes[0] as PlainRecord;
 		const chunks = chunkRows
@@ -419,6 +463,7 @@ const api = Object.freeze({
 			databases: Object.freeze(
 				await Promise.all([
 					dumpDatabase(`${databaseName}--ahe`),
+					portableJournalDump(databaseName),
 					dumpDatabase(`${databaseName}--drp-snapshot-quarantine-v1`),
 				])
 			),
@@ -430,9 +475,13 @@ const api = Object.freeze({
 		sourceDatabaseName: string,
 		targetDatabaseName: string
 	): Promise<void> {
+		const targetJournalName = `${targetDatabaseName}--drp-live-journal-v1`;
+		const targetHasJournal = (await indexedDB.databases()).some(({ name }) => name === targetJournalName);
 		for (const database of carrier.databases) {
 			if (!database.name.startsWith(sourceDatabaseName)) throw new TypeError("D.108d2 carrier database differs");
-			await restoreDatabase(database, `${targetDatabaseName}${database.name.slice(sourceDatabaseName.length)}`);
+			const targetName = `${targetDatabaseName}${database.name.slice(sourceDatabaseName.length)}`;
+			if (targetName === targetJournalName && targetHasJournal) continue;
+			await restoreDatabase(database, targetName);
 		}
 	},
 	join(input: unknown): Promise<void> {
