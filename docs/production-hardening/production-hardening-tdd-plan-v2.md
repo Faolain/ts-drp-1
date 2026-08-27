@@ -63980,6 +63980,74 @@ every P2 gets an exact owner and deadline before combined D.108e4 GREEN
 closure. No Fable or collaboration subagent may run without new express
 authorization.
 
+###### D.108e4d — complete-domain E3-03 raw-loss evidence
+
+D.108e4d is a narrow tests-only correction discovered by failure-safe
+instrumentation during the D.108e4c GREEN gate. It blocks further consecutive
+campaign attempts and D.108e4c GREEN acceptance. Its exact implementation
+owner is `tests/e3-03-loss-and-hol-proof.pw.ts`; this plan remains the sole
+documentation owner. It changes no product or example source, public or
+private product interface, observer event boundary, snapshot, wire byte,
+digest, packet class/retry policy, loss profile, browser version, sample
+count/interval/size, trial count, delivery floor, AoI/HOL threshold, timeout,
+fallback assertion or durable invariant. It may not add a retry, suppress a
+failure or treat a passing rerun as diagnosis.
+
+The diagnostic run used the unchanged retained long-campaign selection with
+the JSON reporter and a failure-only attachment. The reporter artifact
+`.logs/d108e4c-green/instrumented-diagnostic.json` has SHA-256
+`47f1887fe1bd439548c0f8e54e1a6d81408b17b2a850a578abcf1904b92689d6`;
+its extracted `e3-03-failure-telemetry.json` attachment has SHA-256
+`bc8a168992a8c53078c5f008114359b6b5a4281144fee55473ef8a2c762dc908`.
+The run failed after 108.620 seconds at the existing
+`receiverSequence.gap > 1` assertion in trial `e3-03-1`, stage
+`e3-03-1-assertions`. Both pages remained open. CDP returned one rule id for
+the intended 30% profile and another for the subsequent zero-loss reset.
+Both network sessions retained their expected two peers, and both raw
+transports retained one open raw link after reset. The creator observer saw
+raw sequences 0 through 119 on one connection; the receiver saw exactly the
+same contiguous raw sequences on the corresponding connection. The fabric
+still reported 600 raw and 600 reliable attempts. Cumulative transport state
+showed authenticated connection loss and four link drops on both sides, with
+`lastLinkDrop` equal to `replacement` on the creator and `channel-close` on
+the receiver. The reliable lane separately omitted sequence 11 and crossed
+multiple connection identities. This rules out module/server/browser death,
+missing CDP application and an observer-record mutation as causes.
+
+The particular defect is in the retained proof helper, not the product. Its
+fixed sequence domain is 0 through `SAMPLE_COUNT - 1`, but
+`rawSequenceEvidence()` measures only its first observed sequence and gaps
+between observed sequences. It never compares the last observation with the
+fixed domain end. Consequently the genuinely missing suffix 120 through 599
+is reported as gap 1, indistinguishable from a complete consecutive sequence.
+It similarly undercounts a one-sample missing prefix. The product-visible
+facts already distinguish attempted from sent/delivered samples; completing
+the domain calculation records where the loss occurred without changing what
+counts as loss or weakening the existing signed `gap > 1` gate.
+
+The immutable RED adds one deterministic pure-helper behavior in the existing
+owner. It constructs complete, one-sample-prefix-loss,
+one-sample-internal-loss and one-sample-suffix-loss sequences over the exact
+600-sample domain and makes one deep-equality assertion that their maximum
+sequence distances are respectively 1, 2, 2 and 2. Current source reaches
+that assertion and reports 1 for the prefix and suffix cases. GREEN changes
+only `rawSequenceEvidence()` so the fixed domain boundaries participate in
+the same distance calculation; the existing campaign call, metric and
+`toBeGreaterThan(1)` assertion remain unchanged. The failure-only telemetry
+stays attached on failure and has no pass/fail role.
+
+RED and GREEN must run the exact deterministic behavior, bounded standalone
+TypeScript command, exact-owner typed ESLint, Prettier and `git diff --check`.
+After GREEN, run the focused D.108e4c observer behavior and the complete E3-03
+config once. Only if those pass may the ordinary three-consecutive campaign
+gate restart from zero. A different retained failure must be diagnosed from
+the failure attachment before another attempt; it may not trigger a rerun
+loop. D.108e4d receives its own immutable RED and GREEN/evidence signed/pushed
+checkpoints and the existing Grok 4.6/high, exact Kimi K3 CHECK001 through
+CHECK100 and Opus 5/xhigh review protocol. P0/P1 findings are corrected in the
+same round; every P2 receives an owner and deadline. No Fable or collaboration
+subagent may run without new express authorization.
+
 The first D.108e4c plan-freeze review round inspected signed/pushed commit
 `eb3de05b6054ac6fdd158d2530bad1798f87f10f`, parent
 `b8a2628bec7593c547919b540889dc75e33cd9ca`, tree
