@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, mkdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -18,6 +18,7 @@ const GLOBAL_SETUP = resolve(
 );
 const SHIM_ROOT = resolve(REPOSITORY_ROOT, "tests/fixtures/node_modules/@ts-drp");
 const SHIM_SIBLING_SENTINEL = resolve(REPOSITORY_ROOT, "tests/fixtures/node_modules/d108e1-caller-owned.txt");
+const SHIM_PARENT = dirname(SHIM_SIBLING_SENTINEL);
 
 describe("D.108e1 activation test-infrastructure RED", () => {
 	it("freezes exactly seven RED and eight GREEN test-infrastructure owners", () => {
@@ -100,32 +101,39 @@ describe("D.108e1 activation test-infrastructure RED", () => {
 		const setup = (await import(`${pathToFileURL(GLOBAL_SETUP).href}?d108e1=${crypto.randomUUID()}`)) as Readonly<{
 			default(): Promise<() => void>;
 		}>;
-		writeFileSync(SHIM_SIBLING_SENTINEL, "sibling-owned", "utf8");
+		const parentExisted = existsSync(SHIM_PARENT);
+		mkdirSync(SHIM_PARENT, { recursive: true });
 		try {
-			const cleanup = await setup.default();
-			expect(existsSync(SHIM_ROOT)).toBe(true);
+			writeFileSync(SHIM_SIBLING_SENTINEL, "sibling-owned", "utf8");
 			try {
-				throw new Error("D108E1_SIMULATED_TEST_FAILURE");
-			} catch (error) {
-				expect(error).toEqual(new Error("D108E1_SIMULATED_TEST_FAILURE"));
+				const cleanup = await setup.default();
+				expect(existsSync(SHIM_ROOT)).toBe(true);
+				try {
+					throw new Error("D108E1_SIMULATED_TEST_FAILURE");
+				} catch (error) {
+					expect(error).toEqual(new Error("D108E1_SIMULATED_TEST_FAILURE"));
+				} finally {
+					cleanup();
+				}
+				expect(existsSync(SHIM_ROOT)).toBe(false);
+				expect(readFileSync(SHIM_SIBLING_SENTINEL, "utf8")).toBe("sibling-owned");
 			} finally {
-				cleanup();
+				rmSync(SHIM_ROOT, { force: true, recursive: true });
 			}
-			expect(existsSync(SHIM_ROOT)).toBe(false);
-			expect(readFileSync(SHIM_SIBLING_SENTINEL, "utf8")).toBe("sibling-owned");
+
+			mkdirSync(SHIM_ROOT, { recursive: true });
+			const sentinel = resolve(SHIM_ROOT, "preexisting.txt");
+			writeFileSync(sentinel, "caller-owned", "utf8");
+			try {
+				await expect(setup.default()).rejects.toThrow(/workspace package shim root already exists/u);
+				expect(readFileSync(sentinel, "utf8")).toBe("caller-owned");
+			} finally {
+				rmSync(SHIM_ROOT, { force: true, recursive: true });
+			}
 		} finally {
 			rmSync(SHIM_SIBLING_SENTINEL, { force: true });
 			rmSync(SHIM_ROOT, { force: true, recursive: true });
-		}
-
-		mkdirSync(SHIM_ROOT, { recursive: true });
-		const sentinel = resolve(SHIM_ROOT, "preexisting.txt");
-		writeFileSync(sentinel, "caller-owned", "utf8");
-		try {
-			await expect(setup.default()).rejects.toThrow(/workspace package shim root already exists/u);
-			expect(readFileSync(sentinel, "utf8")).toBe("caller-owned");
-		} finally {
-			rmSync(SHIM_ROOT, { force: true, recursive: true });
+			if (!parentExisted) rmdirSync(SHIM_PARENT);
 		}
 	});
 });
