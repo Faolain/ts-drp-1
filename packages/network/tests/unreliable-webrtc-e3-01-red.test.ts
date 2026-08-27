@@ -1494,6 +1494,158 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		}
 	);
 
+	it.each(["initiator", "non-initiator"] as const)(
+		"starts one failed-send recovery without retaining payloads as the %s",
+		async (role) => {
+			const module = await loadOwnerModule();
+			const bus = new FakeSignalingBus();
+			const low = owner(module, bus, "peer-a");
+			const high = owner(module, bus, "peer-b");
+			let recoveryBarrier: ReturnType<FakeSignalingBus["pauseResponses"]> | undefined;
+			try {
+				bus.connect("peer-a", "peer-b");
+				const lowRoute = low.owner.openUnreliableWebRtcRoute("zone:failed-send-recovery");
+				const highRoute = high.owner.openUnreliableWebRtcRoute("zone:failed-send-recovery");
+				const remote = role === "initiator" ? high : low;
+				const localRoute = role === "initiator" ? lowRoute : highRoute;
+				const remoteRoute = role === "initiator" ? highRoute : lowRoute;
+				const received: Uint8Array[] = [];
+				remoteRoute.onMessage(({ bytes }) => received.push(bytes.slice()));
+
+				await Promise.all([lowRoute.reconcile(["peer-b"]), highRoute.reconcile(["peer-a"])]);
+				expect(low.peerConnections).toHaveLength(1);
+				expect(high.peerConnections).toHaveLength(1);
+				for (const endpoint of [low, high]) {
+					const channel = endpoint.peerConnections[0]?.channels[0];
+					if (channel === undefined) throw new Error("established raw channel missing");
+					channel.readyState = "closing";
+				}
+
+				recoveryBarrier = bus.pauseResponses();
+				expect(await localRoute.send([role === "initiator" ? "peer-b" : "peer-a"], Uint8Array.of(11))).toBe(false);
+				expect(await localRoute.send([role === "initiator" ? "peer-b" : "peer-a"], Uint8Array.of(12))).toBe(false);
+				expect(localRoute.snapshot().sent).toBe(0);
+				expect(received).toEqual([]);
+
+				if (role === "non-initiator") {
+					expect(high.peerConnections).toHaveLength(1);
+					expect(await lowRoute.send(["peer-b"], Uint8Array.of(21))).toBe(false);
+				}
+				await tick();
+				expect(low.peerConnections).toHaveLength(2);
+				expect(high.peerConnections).toHaveLength(2);
+				await recoveryBarrier.waitUntilPending();
+				expect(low.peerConnections).toHaveLength(2);
+				expect(high.peerConnections).toHaveLength(2);
+				expect(localRoute.snapshot().sent).toBe(0);
+				expect(received).toEqual([]);
+
+				recoveryBarrier.release();
+				await vi.waitFor(() => expect(localRoute.snapshot().activeLinks).toBe(1));
+				expect(await localRoute.send([role === "initiator" ? "peer-b" : "peer-a"], Uint8Array.of(13))).toBe(true);
+				await tick();
+				expect(received).toEqual([Uint8Array.of(13)]);
+				expect(localRoute.snapshot()).toMatchObject({
+					activeLinks: 1,
+					lastLinkDrop: "replacement",
+					linkDrops: 1,
+					sent: 1,
+				});
+				expect(remote.peerConnections).toHaveLength(2);
+			} finally {
+				recoveryBarrier?.release();
+				low.owner.close();
+				high.owner.close();
+			}
+		}
+	);
+
+	it("keeps the first absolute recovery deadline across repeated failed sends", async () => {
+		const module = await loadOwnerModule();
+		const bus = new FakeSignalingBus();
+		const left = owner(module, bus, "peer-a");
+		const right = owner(module, bus, "peer-b");
+		const leftRoute = left.owner.openUnreliableWebRtcRoute("zone:failed-send-deadline");
+		const rightRoute = right.owner.openUnreliableWebRtcRoute("zone:failed-send-deadline");
+		let recoveryBarrier: ReturnType<FakeSignalingBus["pauseResponses"]> | undefined;
+		try {
+			bus.connect("peer-a", "peer-b");
+			await Promise.all([leftRoute.reconcile(["peer-b"]), rightRoute.reconcile(["peer-a"])]);
+			for (const endpoint of [left, right]) {
+				const channel = endpoint.peerConnections[0]?.channels[0];
+				if (channel === undefined) throw new Error("established raw channel missing");
+				channel.readyState = "closing";
+			}
+
+			vi.useFakeTimers();
+			recoveryBarrier = bus.pauseResponses();
+			expect(await leftRoute.send(["peer-b"], Uint8Array.of(41))).toBe(false);
+			await tick();
+			expect(left.peerConnections).toHaveLength(2);
+			await recoveryBarrier.waitUntilPending();
+
+			await vi.advanceTimersByTimeAsync(5_000);
+			expect(await leftRoute.send(["peer-b"], Uint8Array.of(42))).toBe(false);
+			expect(left.peerConnections).toHaveLength(2);
+			await vi.advanceTimersByTimeAsync(4_999);
+			expect(leftRoute.snapshot().handshakeFailures).toBe(0);
+			await vi.advanceTimersByTimeAsync(1);
+			expect(leftRoute.snapshot()).toMatchObject({ handshakeFailures: 1, sent: 0 });
+			expect(left.peerConnections).toHaveLength(2);
+		} finally {
+			recoveryBarrier?.release();
+			vi.useRealTimers();
+			left.owner.close();
+			right.owner.close();
+		}
+	});
+
+	it("uses a failed send to replace a reconciled link whose authenticated connection is stale", async () => {
+		const module = await loadOwnerModule();
+		const bus = new FakeSignalingBus();
+		const left = owner(module, bus, "peer-a");
+		const right = owner(module, bus, "peer-b");
+		let recoveryBarrier: ReturnType<FakeSignalingBus["pauseResponses"]> | undefined;
+		try {
+			const original = bus.connect("peer-a", "peer-b");
+			const leftRoute = left.owner.openUnreliableWebRtcRoute("zone:stale-send-recovery");
+			const rightRoute = right.owner.openUnreliableWebRtcRoute("zone:stale-send-recovery");
+			const received: Uint8Array[] = [];
+			rightRoute.onMessage(({ bytes }) => received.push(bytes.slice()));
+			await Promise.all([leftRoute.reconcile(["peer-b"]), rightRoute.reconcile(["peer-a"])]);
+			expect(left.peerConnections).toHaveLength(1);
+
+			bus.disconnect(original);
+			const replacement = bus.connect("peer-a", "peer-b");
+			recoveryBarrier = bus.pauseResponses();
+			expect(await leftRoute.send(["peer-b"], Uint8Array.of(31))).toBe(false);
+			await tick();
+			expect(left.peerConnections).toHaveLength(2);
+			await recoveryBarrier.waitUntilPending();
+			expect(leftRoute.snapshot()).toMatchObject({
+				activeLinks: 0,
+				authenticatedConnectionLosses: 1,
+				lastLinkDrop: "replacement",
+				linkDrops: 1,
+				sent: 0,
+			});
+			expect(received).toEqual([]);
+
+			recoveryBarrier.release();
+			await vi.waitFor(() =>
+				expect(leftRoute.snapshot().links[0]).toMatchObject({ generation: replacement.left.generation })
+			);
+			expect(await leftRoute.send(["peer-b"], Uint8Array.of(32))).toBe(true);
+			await tick();
+			expect(received).toEqual([Uint8Array.of(32)]);
+			expect(leftRoute.snapshot().sent).toBe(1);
+		} finally {
+			recoveryBarrier?.release();
+			left.owner.close();
+			right.owner.close();
+		}
+	});
+
 	it("rejects unknown routes, retains established raw links, and cannot revive stale signaling", async () => {
 		const module = await loadOwnerModule();
 		const bus = new FakeSignalingBus();
