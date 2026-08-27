@@ -44,8 +44,19 @@ interface IncomingSignalingStream {
 
 interface UnreliableWebRtcSnapshot {
 	readonly activeLinks: number;
+	readonly authenticatedConnectionLosses: number;
 	readonly backpressuredDrops: number;
 	readonly handshakeFailures: number;
+	readonly lastLinkDrop:
+		| "channel-close"
+		| "connection-close"
+		| "connection-failed"
+		| "owner-close"
+		| "replacement"
+		| "restart"
+		| "send-error"
+		| undefined;
+	readonly linkDrops: number;
 	readonly received: number;
 	readonly sent: number;
 	readonly unknownRouteDrops: number;
@@ -64,6 +75,7 @@ interface UnreliableWebRtcRoute {
 	readonly maxPayloadBytes: number;
 	close(): void;
 	onMessage(listener: (ingress: { readonly bytes: Uint8Array; readonly sender: string }) => void): () => void;
+	reconcile(peers: readonly string[]): Promise<void>;
 	send(peers: readonly string[], bytes: Uint8Array): Promise<boolean>;
 	restart(): Promise<void>;
 	snapshot(): UnreliableWebRtcSnapshot;
@@ -386,7 +398,8 @@ class FakeSignalingBus {
 	connect(
 		leftPeerId: string,
 		rightPeerId: string,
-		transport: "other" | "webrtc" = "webrtc"
+		transport: "other" | "webrtc" = "webrtc",
+		ids?: Readonly<{ readonly left: string; readonly right: string }>
 	): Readonly<{ left: MutableConnection; right: MutableConnection }> {
 		const left = this.#endpoint(leftPeerId);
 		const right = this.#endpoint(rightPeerId);
@@ -435,8 +448,8 @@ class FakeSignalingBus {
 				transport,
 			};
 		};
-		pair.left = connection(left, right, rightPeerId, `conn-${pairId}-left`, () => pair.right);
-		pair.right = connection(right, left, leftPeerId, `conn-${pairId}-right`, () => pair.left);
+		pair.left = connection(left, right, rightPeerId, ids?.left ?? `conn-${pairId}-left`, () => pair.right);
+		pair.right = connection(right, left, leftPeerId, ids?.right ?? `conn-${pairId}-right`, () => pair.left);
 		left.connections.set(pair.left.id, pair.left);
 		right.connections.set(pair.right.id, pair.right);
 		return pair;
@@ -943,6 +956,131 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 			vi.useRealTimers();
 		}
 	});
+
+	it("retains the established raw link while its authenticated connection remains current beside an overlapping connection", async () => {
+		const module = await loadOwnerModule();
+		for (const [name, establishedIds, overlappingIds] of [
+			[
+				"overlap sorts before established",
+				{ left: "z-established-left", right: "z-established-right" },
+				{ left: "a-overlap-left", right: "a-overlap-right" },
+			],
+			[
+				"established sorts before overlap",
+				{ left: "a-established-left", right: "a-established-right" },
+				{ left: "z-overlap-left", right: "z-overlap-right" },
+			],
+		] as const) {
+			const bus = new FakeSignalingBus();
+			const left = owner(module, bus, "peer-a");
+			const right = owner(module, bus, "peer-b");
+			const established = bus.connect("peer-a", "peer-b", "webrtc", establishedIds);
+			const leftRoute = left.owner.openUnreliableWebRtcRoute("zone:alpha");
+			const rightRoute = right.owner.openUnreliableWebRtcRoute("zone:alpha");
+			const received: Uint8Array[] = [];
+			rightRoute.onMessage(({ bytes }) => received.push(bytes.slice()));
+			await Promise.all([leftRoute.reconcile(["peer-b"]), rightRoute.reconcile(["peer-a"])]);
+			expect(leftRoute.snapshot(), name).toMatchObject({
+				activeLinks: 1,
+				lastLinkDrop: undefined,
+				linkDrops: 0,
+				links: [{ connectionId: established.left.id, generation: established.left.generation }],
+			});
+
+			bus.connect("peer-a", "peer-b", "webrtc", overlappingIds);
+			expect(await leftRoute.send(["peer-b"], Uint8Array.of(7)), name).toBe(true);
+			await tick();
+			expect(received, name).toEqual([Uint8Array.of(7)]);
+			expect(leftRoute.snapshot(), name).toMatchObject({
+				activeLinks: 1,
+				lastLinkDrop: undefined,
+				linkDrops: 0,
+				links: [{ connectionId: established.left.id, generation: established.left.generation }],
+			});
+			expect(left.peerConnections, name).toHaveLength(1);
+			expect(right.peerConnections, name).toHaveLength(1);
+			left.owner.close();
+			right.owner.close();
+		}
+	});
+
+	it.each([
+		["initiator", "peer-b"],
+		["non-initiator", "peer-a"],
+	] as const)(
+		"retires a disappeared authenticated link before replacement setup as the %s",
+		async (role, remotePeerId) => {
+			const module = await loadOwnerModule();
+			const bus = new FakeSignalingBus();
+			const low = owner(module, bus, "peer-a");
+			const high = owner(module, bus, "peer-b");
+			const local = role === "initiator" ? low : high;
+			const remote = role === "initiator" ? high : low;
+			const original = bus.connect("peer-a", "peer-b");
+			const lowRoute = low.owner.openUnreliableWebRtcRoute("zone:alpha");
+			const highRoute = high.owner.openUnreliableWebRtcRoute("zone:alpha");
+			const localRoute = role === "initiator" ? lowRoute : highRoute;
+			const remoteRoute = role === "initiator" ? highRoute : lowRoute;
+			const received: Uint8Array[] = [];
+			remoteRoute.onMessage(({ bytes }) => received.push(bytes.slice()));
+			await Promise.all([lowRoute.reconcile(["peer-b"]), highRoute.reconcile(["peer-a"])]);
+			expect(localRoute.snapshot()).toMatchObject({ activeLinks: 1, lastLinkDrop: undefined, linkDrops: 0 });
+
+			bus.disconnect(original);
+			const replacement = bus.connect("peer-a", "peer-b");
+			let pending: Promise<void> | undefined;
+			let barrier: ReturnType<FakeSignalingBus["pauseResponses"]> | undefined;
+			if (role === "initiator") {
+				barrier = bus.pauseResponses();
+				pending = localRoute.reconcile([remotePeerId]);
+				await barrier.waitUntilPending();
+			} else {
+				await localRoute.reconcile([remotePeerId]);
+			}
+			expect(local.peerConnections[0]?.connectionState).toBe("closed");
+			expect(localRoute.snapshot()).toMatchObject({
+				activeLinks: 0,
+				lastLinkDrop: "replacement",
+				linkDrops: 1,
+				links: [],
+				sent: 0,
+			});
+
+			if (role === "non-initiator") {
+				barrier = bus.pauseResponses();
+				pending = lowRoute.reconcile(["peer-b"]);
+				await barrier.waitUntilPending();
+			}
+			barrier?.release();
+			await pending;
+			const localReplacement = role === "initiator" ? replacement.left : replacement.right;
+			expect(localRoute.snapshot()).toMatchObject({
+				activeLinks: 1,
+				lastLinkDrop: "replacement",
+				linkDrops: 1,
+				links: [{ connectionId: localReplacement.id, generation: localReplacement.generation }],
+			});
+			expect(await localRoute.send([remotePeerId], Uint8Array.of(9))).toBe(true);
+			await tick();
+			expect(received).toEqual([Uint8Array.of(9)]);
+
+			bus.disconnect(replacement);
+			bus.connect("peer-a", "peer-b");
+			bus.responseTransform = (): Uint8Array => Uint8Array.of(255, 0, 255);
+			await localRoute.reconcile([remotePeerId]);
+			expect(localRoute.snapshot()).toMatchObject({
+				activeLinks: 0,
+				handshakeFailures: role === "initiator" ? 1 : 0,
+				lastLinkDrop: "replacement",
+				linkDrops: 2,
+				links: [],
+			});
+			expect(local.signaling.connections()).toHaveLength(1);
+			expect(remote.signaling.connections()).toHaveLength(1);
+			low.owner.close();
+			high.owner.close();
+		}
+	);
 
 	it("rejects unknown routes, retains established raw links, and cannot revive stale signaling", async () => {
 		const module = await loadOwnerModule();
