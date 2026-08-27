@@ -63287,18 +63287,43 @@ did not reliably establish the route. Calling the existing fabric reset before
 the gate failed one of three; combining reset with an AOI readiness loop caused
 21/22 `restart` link drops and empty link snapshots, so it would manufacture
 transport churn rather than prove readiness. No such experiment changed the
-main checkout. Source and existing-unit-test inspection found the causal seam:
-`UnreliableWebRtcOwner.#linkFor` detects that an exposed established raw link
-belongs to an authenticated connection superseded by the current signaling
-connection, but retains and reports that stale link throughout replacement
-setup. `#send` correctly returns false for that mismatch. Thus the frozen
-D.108e4 raw-link snapshot is not a send-readiness oracle during replacement,
-and no tests-only correction can make it one without retrying measured
-movement, weakening the assertion or adding a product-facing probe. Per the
-frozen stop/reslice rule, D.108e4 GREEN and its review round remain blocked
-until the following narrow product correction closes.
+main checkout.
 
-###### D.108e4a — current authenticated raw-link reconciliation
+The plan-review round correctly rejected source inspection alone as causal
+proof. A temporary diagnostic build in the same isolated checkout exposed only
+existing private connection/link identities and counters; it was never copied
+to the main checkout and is not a product/API proposal. One exact failing
+creator-to-joiner direction recorded two simultaneously live authenticated
+WebRTC connections on the sender for the same peer: generation 4 connection
+`6oehv91787856211310` and generation 3 connection
+`d04b6s1787856211297`. The reported raw link was bound to the generation 3
+connection, which remained present in `connections()`, while lexicographic
+selection chose the generation 4 connection. The sender had zero authenticated
+connection losses, zero backpressured drops, zero handshake failures, zero
+link drops, `lastLinkDrop: "none"`, no pending replacement peer and one exact
+raw link. Both peer-to-author mappings were present and both authors were the
+room's current writers. The local movement projection advanced, proving the
+keypress and `move()` ran, while raw `sent` remained zero and the remote
+projection did not advance. Independent repeats reproduced the same shape in
+different directions. This discriminates focus, over-limit, backpressure,
+missing authorization, channel absence and failed/pending replacement: the
+real defect is that `#send` treats a still-current authenticated link as stale
+merely because another overlapping connection sorts first.
+
+Source inspection then gives the exact two branches. `#connectionFor` is a
+preferred candidate selector for new setup; it is not proof that every other
+authenticated connection disappeared. Current `#send` and `#linkFor` compare
+the mapped link only with that preferred candidate, so overlapping live
+connections create a false mismatch. Separately, when the link's authenticated
+connection has genuinely disappeared and a replacement is current, `#linkFor`
+does retain and report the truly stale link throughout replacement setup. Thus
+the frozen D.108e4 raw-link snapshot is not a send-readiness oracle, and no
+tests-only correction can make it one without retrying measured movement,
+weakening the assertion or adding a product-facing probe. Per the frozen
+stop/reslice rule, D.108e4 GREEN and its review round remain blocked until the
+following narrow product correction closes both cases.
+
+###### D.108e4a — current authenticated raw-link selection and reconciliation
 
 D.108e4a is an immediate plan-freeze/RED/GREEN sub-slice due before D.108e4
 GREEN can be accepted or reviewed. Its exact implementation roster is only
@@ -63310,42 +63335,92 @@ connection limit, timeout, fallback behavior, signaling authentication rule,
 or any example/product owner. In particular, it may not make `send` retry or
 retain the payload while a replacement handshake runs.
 
-The immutable RED adds one causal control beside the existing retained-link
-test. After an established raw link survives loss of its authenticated
-signaling connection, the control installs a different current authenticated
-connection and pauses its replacement signaling response. An explicit
-`reconcile` must retire the superseded raw link before awaiting that response:
-the old peer connection is closed, `activeLinks` and `links` expose no
-send-ineligible stale entry during the pending handshake, and no bytes are
-sent. Releasing the response must install exactly one link bound to the new
-connection generation, after which one send succeeds and is received once.
+The immutable RED adds two causal controls beside the existing retained-link
+test. The first, named `retains the established raw link while its authenticated
+connection remains current beside an overlapping connection`, establishes a
+link on a connection whose ID sorts after a subsequently added second live
+connection. Both connections remain in `signaling.connections()`. With route
+membership already reconciled and no replacement handshake, one send over the
+established link must succeed and arrive once; its connection generation,
+`activeLinks: 1`, `linkDrops: 0`, unchanged `lastLinkDrop` and zero additional
+peer connections remain exact. Current source fails this control because it
+compares only with the newly preferred connection and returns false. The same
+control is repeated with reversed connection-ID order so preference, not
+generation number or insertion order, is the killed mutant.
+
+The second control, named `retires a disappeared authenticated link before
+replacement setup on both peer orderings`, removes the established link's
+authenticated connection, installs a different sole current connection and
+pauses its replacement signaling response. It starts `reconcile` without
+awaiting, observes the existing `waitUntilPending()` barrier and only then
+asserts that the old peer connection is closed, `activeLinks: 0`, `links: []`,
+`sent` is unchanged, `linkDrops` advanced exactly once and `lastLinkDrop` is
+the existing closed value `"replacement"`. Releasing the response and awaiting
+the retained reconcile promise must install exactly one link bound to the new
+generation without a second drop increment, after which one send succeeds and
+is received once. The control runs once with the local peer as initiator and
+once with it as non-initiator; replacement retirement therefore occurs before
+pending reuse and before the single-initiator/capacity return, while only the
+designated peer initiates setup. A failed replacement-handshake branch pins the
+same single deliberate replacement drop plus the existing handshake-failure
+accounting and retry behavior.
+
 The retained neighboring branch remains mandatory: while no replacement
 authenticated connection exists, the already authenticated raw link stays
-active and sends successfully. This distinguishes current-connection
-reconciliation from tearing raw transport down merely because signaling was
-lost.
+active and sends successfully with zero replacement-drop delta. This
+distinguishes overlapping-current selection, genuine current-connection
+replacement and mere signaling absence.
 
-GREEN is confined to retiring the detected superseded link at the private
-`#linkFor` replacement boundary before replacement setup is awaited. Existing
-drop accounting and the single initiator rule remain authoritative; scheduled
-link reconciliation may establish the new channel, but no application packet
-is buffered, replayed or retried. The existing malformed signaling, deadline,
-capacity, close, backpressure, authentication-loss and stale-signaling tests
-must remain unchanged and pass.
+GREEN changes only private connection qualification and replacement ordering.
+`#connectionFor` remains the deterministic preferred candidate for creating a
+new link. A mapped open link is send-eligible whenever its authenticated
+connection is still present according to the existing `#isCurrent` identity
+predicate, even if another live connection sorts first. It is retained across
+complete signaling absence exactly as today. Only when at least one current
+authenticated connection exists and the mapped connection is no longer among
+them is replacement required. That same predicate governs both `#send` and
+`#linkFor`; it may not be weakened to peer-ID equality or connection presence
+without full identity/generation equality.
+
+For genuine replacement, `#linkFor` calls the existing `#dropLink` with reason
+`"replacement"` before pending reuse and before the single-initiator/capacity
+return. The initiator may then establish the preferred replacement while the
+other peer waits for inbound accept. No enum member, counter, reservation,
+snapshot field or interface is added. Existing capacity remains eight and the
+capacity test must prove a replacement cannot leak, double-charge or silently
+lose its existing admission position; if this cannot be preserved inside the
+two owners, stop and reslice rather than change the limit or Node adapter.
+Scheduled link reconciliation may establish the new channel, but no
+application packet is buffered, replayed or retried. The existing malformed
+signaling, deadline, capacity, close, backpressure, authentication-loss and
+stale-signaling tests must remain unchanged and pass.
 
 The D.108e4a focused RED/GREEN command is
 `pnpm exec vitest run --coverage.enabled=false
 packages/network/tests/unreliable-webrtc-e3-01-red.test.ts --maxWorkers=1
 --minWorkers=1`. GREEN additionally requires the network build/typecheck,
-exact-two ESLint and Prettier checks, `git diff --check`, the affected Node
-ephemeral WebRTC test, and the complete D.108e4 focused and retained gates.
+exact-two ESLint and Prettier checks, `git diff --check`,
+`pnpm exec vitest run --coverage.enabled=false
+packages/node/tests/ephemeral-webrtc-e3-02-red.test.ts --maxWorkers=1
+--minWorkers=1`, the dedicated E3-03 raw loss/HOL browser proof through
+`pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts
+--fail-on-flaky-tests`, and the complete D.108e4 focused and retained gates.
+The existing Node adapter gate must remain green. The authorization-window
+proof is the frozen production invariant that early retirement is reachable
+only after a current replacement connection exists, so `getAllPeers()` keeps
+the peer in `transportPeers()` while the raw-link entry is absent. If GREEN
+cannot demonstrate that invariant from the two owners and retained gate, stop
+and reslice; no Node owner may change in this slice.
 The isolated proof must start from a new detached checkout of the immutable
 combined GREEN, repeat the absent-`dist`/offline-install/fresh-build controls,
-and pass D.93.46 at least three consecutive times with exactly one keypress per
-measured direction, the unchanged 20-second poll and unchanged durable
-invariants. It must then complete the rest of the frozen D.108e4 clean proof,
-including the fresh 64 MiB peak-live child, with the root canonical shim still
-absent and tracked status clean.
+and run
+`pnpm exec playwright test --config playwright.phase-3a1b-d9346-zone.config.ts
+--repeat-each=3 --fail-on-flaky-tests` in three consecutive clean invocations.
+Every invocation retains exactly one keypress per measured direction, the
+unchanged 20-second poll and unchanged durable invariants. It must then
+complete the rest of the frozen D.108e4 clean proof, including the fresh
+64 MiB peak-live child, with the root canonical shim still absent and tracked
+status clean.
 
 D.108e4a receives separate signed/pushed plan-freeze, immutable RED and
 immutable GREEN checkpoints. Each checkpoint uses separate Grok 4.6/high,
@@ -63355,6 +63430,54 @@ without confirmation review and every P2 receives an owner and deadline before
 Phase 6a exit. No Fable or collaboration subagent may run without fresh express
 authorization. Only after D.108e4a and the complete combined clean proof pass
 may D.108e4 receive its GREEN review/evidence closure and D.108e5 begin.
+
+The D.108e4a plan-freeze review round inspected exact signed commit
+`1a90eff28f92b79ebc1af636ddce973ee249d73c`, parent
+`9e7ec2b45130f09186f2a41da913f0d1639bfc7a`, tree
+`e2d1c68af0fbc7e5440d0bc9b02c8f91aaa94ec7`, stable patch id
+`d911c1b0987d1be482f0ecfc1e533b9d63f93fe8` and raw-diff SHA-256
+`02879f8ca77096bfa82f3c9944faaf2fb7e3d648ff38c74fceda73f0b49d9277`
+in three separate detached checkouts. The first Grok 4.6/high tool-based run,
+session `01a0446a-e913-70f0-9a62-4dfb4266bed0`, completed 23 turns with
+`stopReason=end_turn` after 720.198 seconds and produced a substantive
+APPROVED/P2 JSON after progress prose. The runner honestly labeled that output
+`NO_VERDICT` because the response violated the requested whole-response JSON
+contract. One corrected replacement launch received the same immutable facts
+as a self-contained tool-free packet. Grok session
+`01a04478-1ab0-7d11-8fa8-27cf45c4dff0` completed one model turn with
+`stopReason=end_turn` after 300.054 seconds and emitted only a schema-valid
+`APPROVED`, P0=0/P1=0/P2=2 JSON. The runner's legacy marker-only heuristic
+still wrote `NO_VERDICT` because it recognizes `RESULT:` rather than bare JSON;
+direct `jq` schema validation passed, so the explicit terminal response is the
+authoritative verdict. No third Grok launch ran.
+
+Kimi CLI 0.38.0 used exact `kimi-code/k3`, thinking and the 100-step ceiling
+in session `session_55d324b4-b5f1-446d-abb6-da2828490450`. The two local
+launcher attempts that combined prompt mode with `--auto`/`--yolo` were
+rejected before any model session; the corrected native invocation created the
+sole model session, emitted exactly CHECK001 through CHECK100 and returned
+`APPROVED`, P0=0/P1=0/P2=3. Opus session
+`ddbd1cef-81b7-471e-b3f7-dc61822b0ad9` resolved to
+`claude-opus-5` at xhigh, completed after 559.886 API seconds with exit zero,
+no permission denial and zero subagents, and returned `CHANGES_REQUIRED`,
+P0=0/P1=4/P2=6. No Fable or collaboration subagent ran.
+
+The same-round correction above closes the complete reproduced P1 union
+without confirmation review. Temporary isolated instrumentation directly
+discriminated the overlapping-current selector mismatch from backpressure,
+authorization, channel absence, focus and failed/pending replacement. The RED
+now reaches the actual failing `#send` path without depending on a future
+reconcile trigger, covers both live-overlap preference orders and both genuine
+replacement peer orders, freezes exact replacement-drop accounting and names
+the pause order. GREEN separates `#isCurrent` send eligibility from
+`#connectionFor` setup preference, while retaining the signaling-absent raw
+link and retiring a genuinely disappeared connection before either initiator
+gate. The P2 union is also assigned: the existing test owner covers the exact
+preference predicate, paused barrier, failed handshake, non-initiator and
+capacity-reservation cases before RED/GREEN as stated; the GREEN implementer
+owns E3-03 plus the Node authorization-window gate before immutable GREEN; and
+the exact D.93.46 and Node commands are now frozen. No corrected-byte
+confirmation review is authorized by the protocol.
 
 Each D.108e2 sub-slice uses one immutable tests-only RED checkpoint and one
 immutable GREEN/evidence checkpoint. Each checkpoint receives one real Grok
