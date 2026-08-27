@@ -63182,6 +63182,68 @@ closed by D.108e2e; D.108e4 owns only the current-row mismatch isolation from
 that earlier union. Per protocol, reproduced P0/P1 findings are corrected in
 this same round without a confirmation review.
 
+The immutable D.108e4 RED review round inspected exact signed commit
+`266f25d8be8ace6c3ff32d07c03b046da34875b3`, parent
+`c690feebcef6d718bc07cc72a292f22c54243d9c`, tree
+`abc4df64887795b7aa26f22d5e4359283b172763`, stable patch id
+`8124a133031253a4e6bbf244ef7d476da4462a0b` and patch SHA-256
+`c1c76ab2b99a3b479054ed893f5fc9710ed9d5d0426e2c645e7bbffb28e36773`
+in three separate detached checkouts. The first Grok 4.6/high runner launch,
+session `01a0440d-1672-7020-ad29-9a63f7893c16`, honestly closed as
+`NO_VERDICT` after 405.133 seconds: raw service evidence said
+`max_turns_reached`, because the runner silently injected `--max-turns 16`;
+this was neither a service cancellation nor a terminal review. Because that
+runner also used non-resumable `--no-memory`, one corrected replacement launch
+received the same immutable packet with an explicit 64-turn ceiling. Grok
+session `01a04414-99ee-7f23-b83f-943f08687973` completed after eighteen turns
+with `stopReason=end_turn` and schema-valid `CHANGES_REQUIRED`, P0=0/P1=1/P2=0.
+Kimi K3 session `ed9ac22e-e0c2-40e5-bc98-63f267854dc2` used thinking and the
+100-step ceiling, emitted exactly CHECK001 through CHECK100 and terminal
+`CHANGES_REQUIRED`, P0=0/P1=1/P2=4. Opus 5/xhigh session
+`2ab50e69-c9e5-4a3c-a89a-6447aa649ed4` completed with exit zero after
+751.298 API seconds, no permission denial and zero subagents, returning
+schema-valid `CHANGES_REQUIRED`, P0=0/P1=5/P2=7. No Fable or collaboration
+subagent ran.
+
+The complete reproduced P1 union was corrected without confirmation review in
+signed commit `395b32db74e2c9ff797118167c1cf36850d23961`, parent
+`266f25d8be8ace6c3ff32d07c03b046da34875b3`, tree
+`cb17442d47fbbb845279e331d2f58dcb2bf481d1`, stable patch id
+`204483998204596594131c66f32acc3ea5c43d50` and patch SHA-256
+`14a95390cfad76729b6ceaeca25902c61a269a644bd243624a89e1b3d4695967`.
+The corrected RED consumes raw append-only authority events in contiguous
+eight-event windows instead of trusting fixture booleans; pins recovery-stage
+counters on both current-row controls; moves exact possession-database
+assertions to the two real dead-preseed call sites; makes the new order oracle
+exactly two-result; and requires one shared measured-movement helper whose
+reciprocal raw-link readiness precedes its sole keypress while sent, received,
+position, durable count and digest evidence remain present. The root guard now
+forbids every quoted canonical bare/subpath specifier, including dynamic
+imports. The helper controls use realpaths and add absolute, missing-built and
+empty-built negatives. Exact behavior-title cross-binding, the redundant
+browser assertion, descriptor restoration after a forced store-open failure
+and the remaining immediately actionable P2s are also closed in the RED.
+Opus's runtime-risk P2 is owned by the D.108e4 GREEN implementer and was
+already bounded by the corrected native RED: the combined shared/reuse child
+behavior completed in 49.181 seconds, while the retained skip-budget wall-time
+assertion stayed green under its exact 60-second ceiling.
+
+Corrected RED evidence is deterministic. The focused root/infrastructure
+command produced 13 passes and exactly four named semantic failures: all four
+root canonical consumers, the measured zone movement, the helper positive and
+the helper negative. The native command produced four passes and exactly the
+single D.108e4 child behavior failure; its retained authority sequence and both
+current-row counter controls already passed. The activation matrix produced 15
+passes and exactly nine semantic failures: in each of Chromium, Firefox and
+WebKit, the two existing possession behaviors exposed their four dead
+unsuffixed databases and the new D.108e4 behavior exposed only absent
+`lockObservationOrder: 1`/`firstStoreOpenOrder: 2`. All three engines executed
+`indexedDB.databases()` and the forced store-open restoration control without
+API, boot or module error. Exact-five ESLint, Prettier and `git diff --check`
+passed. The corrected commit was signed, pushed, matched its remote, retained
+all 26 stashes and protected untracked paths, and left
+`node_modules/@ts-drp/canonical` absent.
+
 Each D.108e2 sub-slice uses one immutable tests-only RED checkpoint and one
 immutable GREEN/evidence checkpoint. Each checkpoint receives one real Grok
 4.6/high, exact Kimi K3 CHECK001 through CHECK100 and Opus 5/xhigh review.
