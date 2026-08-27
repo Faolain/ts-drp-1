@@ -2003,7 +2003,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 		expect(surface.routeV3Ingress(network, v3)).toBe(true);
 	});
 
-	it("derives only the exact stable-genesis topic and uses it as queue and wire identity", () => {
+	it("derives only the exact stable-genesis topic and uses it as queue and wire identity", async () => {
 		const liveSource = source("packages/node/src/v3-live.ts");
 		const activationSource = source("packages/node/src/creator-adoption-activate.ts");
 		const helperPath = path.join(ROOT, "packages/node/src/internal/v3-topic.ts");
@@ -2042,6 +2042,25 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 		expect(genesisIdentifiers).not.toContain("currentAnchorDigest");
 		expect(topLevelFunction(helperSource, "deriveV3StableTopic")).toBeDefined();
 		expect(liveSource).toMatch(/queueId\s*:\s*topic/u);
+
+		const { deriveV3StableTopic } = await import("../packages/node/src/internal/v3-topic.js");
+		const expectedTopic = deriveV3StableTopic(objectId, genesis);
+		const typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype) as object;
+		const iteratorDescriptor = Object.getOwnPropertyDescriptor(typedArrayPrototype, Symbol.iterator);
+		if (iteratorDescriptor === undefined) throw new TypeError("missing typed-array iterator intrinsic");
+		try {
+			Object.defineProperty(typedArrayPrototype, Symbol.iterator, {
+				...iteratorDescriptor,
+				value: function* invertedTypedArrayIterator(this: Uint8Array): Generator<number> {
+					for (let index = 0; index < this.length; index += 1) {
+						yield (this[index] as number) ^ 0xff;
+					}
+				},
+			});
+			expect(deriveV3StableTopic(objectId, genesis)).toBe(expectedTopic);
+		} finally {
+			Object.defineProperty(typedArrayPrototype, Symbol.iterator, iteratorDescriptor);
+		}
 	});
 
 	it("binds activation to the sole existing token owner and exact effect sequence", () => {
