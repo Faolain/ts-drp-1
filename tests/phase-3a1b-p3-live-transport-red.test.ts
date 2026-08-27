@@ -2005,12 +2005,18 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 
 	it("derives only the exact stable-genesis topic and uses it as queue and wire identity", () => {
 		const liveSource = source("packages/node/src/v3-live.ts");
+		const activationSource = source("packages/node/src/creator-adoption-activate.ts");
+		const helperPath = path.join(ROOT, "packages/node/src/internal/v3-topic.ts");
 		const objectId = `creator:${"a".repeat(32)}`;
 		const genesis = "b".repeat(64);
 		expect(exactTopic(objectId, genesis)).toMatch(/^drp\/v3\/1\/[0-9a-f]{64}$/u);
-		expect(liveSource).toContain('"ts-drp/live-topic/v3"');
-		expect(liveSource).toContain('"drp/v3/1/"');
-		const unit = ts.createSourceFile("v3-live.ts", liveSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+		expect(fs.existsSync(helperPath)).toBe(true);
+		const helperSource = fs.existsSync(helperPath) ? fs.readFileSync(helperPath, "utf8") : "";
+		expect(liveSource).toContain('from "./internal/v3-topic.js"');
+		expect(activationSource).toContain('from "./internal/v3-topic.js"');
+		expect(helperSource).toContain('"ts-drp/live-topic/v3"');
+		expect(helperSource).toContain('"drp/v3/1/"');
+		const unit = ts.createSourceFile("v3-topic.ts", helperSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 		const topicHashes: ts.CallExpression[] = [];
 		const visit = (node: ts.Node): void => {
 			if (
@@ -2034,6 +2040,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 		expect(genesisIdentifiers).toContain("genesisAnchorDigest");
 		expect(genesisIdentifiers).not.toContain("anchorDigest");
 		expect(genesisIdentifiers).not.toContain("currentAnchorDigest");
+		expect(topLevelFunction(helperSource, "deriveV3StableTopic")).toBeDefined();
 		expect(liveSource).toMatch(/queueId\s*:\s*topic/u);
 	});
 

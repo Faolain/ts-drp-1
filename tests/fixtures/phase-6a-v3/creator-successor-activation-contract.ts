@@ -1,8 +1,9 @@
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { type Serializable, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import ts from "typescript";
 
 import type { GenuineCreatorAdoptionFixture } from "./creator-adoption-contract.js";
 import { workspacePackageImportHook } from "../shared/workspace-package-subprocess.mjs";
@@ -31,6 +32,7 @@ export const D108D1_GREEN_PATHS = Object.freeze([
 ] as const);
 
 export const D108E2A_RED_PATHS = Object.freeze([
+	"tests/phase-3a1b-p3-live-transport-red.test.ts",
 	"tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts",
 	"tests/phase-6a-creator-successor-activation-red.test.ts",
 	"packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts",
@@ -481,22 +483,42 @@ export function d108e2aTopicGovernance(): Readonly<Record<string, boolean | numb
 		const absolute = resolve(REPOSITORY_ROOT, path);
 		return existsSync(absolute) ? readFileSync(absolute, "utf8") : "";
 	};
-	const paths = [
-		"packages/node/src/creator-adoption-activate.ts",
-		"packages/node/src/internal/v3-topic.ts",
-		"packages/node/src/v3-live.ts",
-	] as const;
-	const sources = paths.map((path) => readSource(path));
-	const implementationCount = sources.reduce(
-		(count, source) => count + (source.match(/ts-drp\/live-topic\/v3/gu)?.length ?? 0),
-		0
-	);
-	const helper = sources[1] ?? "";
+	const sourceRoot = resolve(REPOSITORY_ROOT, "packages/node/src");
+	const sourcePaths: string[] = [];
+	const walk = (directory: string): void => {
+		for (const entry of readdirSync(directory, { withFileTypes: true })) {
+			const absolute = resolve(directory, entry.name);
+			if (entry.isDirectory()) walk(absolute);
+			else if (entry.isFile() && /\.ts$/u.test(entry.name)) sourcePaths.push(absolute);
+		}
+	};
+	walk(sourceRoot);
+	let domainLiteralCount = 0;
+	let prefixLiteralCount = 0;
+	for (const path of sourcePaths) {
+		const unit = ts.createSourceFile(path, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+		const visit = (node: ts.Node): void => {
+			if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
+				if (node.text === "ts-drp/live-topic/v3") domainLiteralCount += 1;
+				if (node.text === "drp/v3/1/") prefixLiteralCount += 1;
+			}
+			ts.forEachChild(node, visit);
+		};
+		visit(unit);
+	}
+	const activation = readSource("packages/node/src/creator-adoption-activate.ts");
+	const helper = readSource("packages/node/src/internal/v3-topic.ts");
+	const live = readSource("packages/node/src/v3-live.ts");
+	const manifest = readSource("packages/node/package.json");
 	return Object.freeze({
-		helperIsPrivate: !readSource("packages/node/src/index.ts").includes("v3-topic"),
+		domainLiteralCount,
+		helperIsPrivate: !readSource("packages/node/src/index.ts").includes("v3-topic") && !manifest.includes("v3-topic"),
+		helperOwnsDerivation:
+			/export\s+function\s+deriveV3StableTopic\s*\(/u.test(helper) &&
+			/hashDomain\s*\(\s*["']ts-drp\/live-topic\/v3["']/u.test(helper) &&
+			helper.includes("drp/v3/1/"),
 		helperPresent: helper.length > 0,
-		implementationCount,
-		ownersConsumeHelper:
-			/\.\/internal\/v3-topic\.js/u.test(sources[0] ?? "") && /\.\/internal\/v3-topic\.js/u.test(sources[2] ?? ""),
+		ownersConsumeHelper: /\.\/internal\/v3-topic\.js/u.test(activation) && /\.\/internal\/v3-topic\.js/u.test(live),
+		prefixLiteralCount,
 	});
 }

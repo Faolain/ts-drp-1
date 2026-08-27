@@ -24,6 +24,7 @@ interface WorkerReply {
 	readonly counters?: Readonly<{
 		readonly acquisitionCount: number;
 		readonly callbackCount: number;
+		readonly lookupCount: number;
 		readonly releaseCount: number;
 	}>;
 	readonly detail?: string;
@@ -63,10 +64,29 @@ test.beforeAll(async () => {
 });
 
 async function workerCommand(page: Page, command: Readonly<Record<string, unknown>>): Promise<WorkerReply> {
-	return page.evaluate((selected) => {
-		const owner = globalThis as typeof globalThis & { phase6aD108e2aWorker?: Worker };
-		owner.phase6aD108e2aWorker ??= new Worker("/worker.js", { type: "module" });
+	return page.evaluate(async (selected) => {
+		const owner = globalThis as typeof globalThis & {
+			phase6aD108e2aWorker?: Worker;
+			phase6aD108e2aWorkerReady?: Promise<void>;
+		};
+		if (owner.phase6aD108e2aWorker === undefined) {
+			owner.phase6aD108e2aWorker = new Worker("/worker.js", { type: "module" });
+			owner.phase6aD108e2aWorkerReady = new Promise<void>((resolvePromise, reject) => {
+				const timer = setTimeout(() => reject(new Error("D.108e2a worker ready timed out")), 20_000);
+				owner.phase6aD108e2aWorker?.addEventListener(
+					"message",
+					(event: MessageEvent<Readonly<{ readonly kind?: string }>>) => {
+						if (event.data.kind !== "ready") return;
+						clearTimeout(timer);
+						resolvePromise();
+					},
+					{ once: true }
+				);
+			});
+		}
+		await owner.phase6aD108e2aWorkerReady;
 		const worker = owner.phase6aD108e2aWorker;
+		if (worker === undefined) throw new TypeError("D.108e2a worker is unavailable");
 		const id = crypto.randomUUID();
 		return new Promise<WorkerReply>((resolvePromise, reject) => {
 			const timer = setTimeout(() => reject(new Error("D.108e2a worker response timed out")), 20_000);
@@ -85,9 +105,13 @@ async function workerCommand(page: Page, command: Readonly<Record<string, unknow
 
 async function terminateWorker(page: Page): Promise<void> {
 	await page.evaluate(() => {
-		const owner = globalThis as typeof globalThis & { phase6aD108e2aWorker?: Worker };
+		const owner = globalThis as typeof globalThis & {
+			phase6aD108e2aWorker?: Worker;
+			phase6aD108e2aWorkerReady?: Promise<void>;
+		};
 		owner.phase6aD108e2aWorker?.terminate();
 		delete owner.phase6aD108e2aWorker;
+		delete owner.phase6aD108e2aWorkerReady;
 	});
 }
 
@@ -116,7 +140,8 @@ test(D108E2A_BROWSER_BEHAVIORS[0], async ({ page }) => {
 	try {
 		const worker = await workerCommand(page, { databaseName, kind: "open", lockMode: "native", material });
 		expect(worker.result).toMatchObject({ lockHeld: true, ok: true, verificationCount: 1 });
-		expect(worker.counters).toEqual({ acquisitionCount: 1, callbackCount: 1, releaseCount: 0 });
+		expect(worker.counters).toEqual({ acquisitionCount: 1, callbackCount: 1, lookupCount: 1, releaseCount: 0 });
+		expect(worker.result).toMatchObject({ epoch: 1, publicationCount: 0, recovery: "active-new", signerCount: 1 });
 		const blocked = await page.evaluate(
 			({ databaseName: selected, material: carrier }) =>
 				window.phase6aCreatorSuccessorActivation.openContender(selected, carrier),
@@ -125,7 +150,7 @@ test(D108E2A_BROWSER_BEHAVIORS[0], async ({ page }) => {
 		expect(blocked).toMatchObject({ kind: "authority-unavailable", lockHeld: false, ok: false });
 		const released = await workerCommand(page, { kind: "release" });
 		expect(released).toMatchObject({
-			counters: { acquisitionCount: 1, callbackCount: 1, releaseCount: 1 },
+			counters: { acquisitionCount: 1, callbackCount: 1, lookupCount: 1, releaseCount: 1 },
 			released: true,
 		});
 		const reacquired = await page.evaluate(
@@ -142,7 +167,7 @@ test(D108E2A_BROWSER_BEHAVIORS[0], async ({ page }) => {
 
 test(D108E2A_BROWSER_BEHAVIORS[1], async ({ page }) => {
 	await page.goto(server?.origin ?? "about:blank");
-	for (const lockMode of ["missing", "rejecting"] as const) {
+	for (const lockMode of ["missing", "non-callable", "throwing", "rejecting"] as const) {
 		const databaseName = `d108e2a-worker-${lockMode}-${crypto.randomUUID()}`;
 		await page.evaluate(
 			({ databaseName: selected, material: carrier }) =>
@@ -155,10 +180,17 @@ test(D108E2A_BROWSER_BEHAVIORS[1], async ({ page }) => {
 				kind: "authority-unavailable",
 				lockHeld: false,
 				ok: false,
+				publicationCount: 0,
+				signerCount: 1,
 				verificationCount: 1,
 			});
-			expect(observed.counters).toEqual({ acquisitionCount: 0, callbackCount: 0, releaseCount: 0 });
-			await workerCommand(page, { kind: "release" });
+			expect(observed.counters).toEqual({
+				acquisitionCount: lockMode === "throwing" || lockMode === "rejecting" ? 1 : 0,
+				callbackCount: 0,
+				lookupCount: 1,
+				releaseCount: 0,
+			});
+			expect(await workerCommand(page, { kind: "release" })).toMatchObject({ released: false });
 		} finally {
 			await terminateWorker(page);
 		}

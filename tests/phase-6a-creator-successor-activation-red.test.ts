@@ -134,57 +134,86 @@ async function childMaterial(
 
 describe("D.108d1 creator successor activation RED", () => {
 	it("freezes the D.108e2a activation boundary and its single topic owner", () => {
-		expect(D108E2A_RED_PATHS).toHaveLength(6);
-		expect(new Set(D108E2A_RED_PATHS).size).toBe(6);
+		expect(D108E2A_RED_PATHS).toHaveLength(7);
+		expect(new Set(D108E2A_RED_PATHS).size).toBe(7);
 		expect(D108E2A_RED_PATHS.every((path) => readFileSync(resolve(REPOSITORY_ROOT, path)).byteLength > 0)).toBe(true);
 		expect(D108E2A_GREEN_PATHS).toEqual([
 			"packages/node/src/internal/v3-topic.ts",
 			"packages/node/src/v3-live.ts",
 			"packages/node/src/creator-adoption-activate.ts",
 		]);
-		expect(D108E2A_BROWSER_BEHAVIORS).toHaveLength(2);
+		expect(D108E2A_BROWSER_BEHAVIORS).toEqual([
+			"dedicated worker holds the origin-wide lifetime lock against a Window contender then releases it",
+			"missing or hostile worker LockManager authority fails closed before activation",
+		]);
+		const browserSource = readFileSync(
+			resolve(REPOSITORY_ROOT, "packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts"),
+			"utf8"
+		);
+		for (const behavior of D108E2A_BROWSER_BEHAVIORS) expect(browserSource).toContain(behavior);
 		expect(d108e2aTopicGovernance()).toEqual({
+			domainLiteralCount: 1,
 			helperIsPrivate: true,
+			helperOwnsDerivation: true,
 			helperPresent: true,
-			implementationCount: 1,
 			ownersConsumeHelper: true,
+			prefixLiteralCount: 1,
 		});
 	});
 
 	it("rejects a hostile cold authentication profile before every downstream effect", async () => {
 		const reopen = (await candidate()).reopenCreatorSuccessorAdoption;
 		if (reopen === undefined) throw new TypeError("D.108e2a reopen export missing");
-		let signerCount = 0;
-		let propertyReadCount = 0;
-		const downstream = new Proxy(Object.create(null) as Record<string, unknown>, {
-			get: (): never => {
-				propertyReadCount += 1;
-				throw new TypeError("D108E2A_DOWNSTREAM_EFFECT");
-			},
-		});
-		const result = await reopen({
-			authenticationProfile: "attacker-selected",
-			author: "d108e2a-hostile-author",
-			catalog: downstream,
-			detachedSignature: new Uint8Array(),
-			exactCanonicalAnchorPreimageBytes: new Uint8Array(),
-			exactCanonicalParametersCarrierBytes: new Uint8Array(),
-			issuanceStore: downstream,
-			liveJournalStore: downstream,
-			messageQueueManager: downstream,
-			networkNode: downstream,
-			onAdmittedVertex: () => undefined,
-			pinnedGenesisAnchorDigest: "0".repeat(64),
-			signRegisteredVertexDigest: (): Promise<Uint8Array> => {
-				signerCount += 1;
-				return Promise.resolve(new Uint8Array());
-			},
-			snapshotDeclaration: downstream,
-			snapshotStore: downstream,
-			store: downstream,
-		});
-		expect(result).toEqual(expect.objectContaining({ kind: "malformed-input", ok: false }));
-		expect({ propertyReadCount, signerCount }).toEqual({ propertyReadCount: 0, signerCount: 0 });
+		const run = async (authenticationProfile: unknown): Promise<Readonly<Record<string, number | unknown>>> => {
+			let signerCount = 0;
+			let propertyReadCount = 0;
+			const downstream = new Proxy(Object.create(null) as Record<string, unknown>, {
+				get: (): never => {
+					propertyReadCount += 1;
+					throw new TypeError("D108E2A_DOWNSTREAM_EFFECT");
+				},
+			});
+			const result = await reopen({
+				authenticationProfile,
+				author: "d108e2a-hostile-author",
+				catalog: downstream,
+				detachedSignature: new Uint8Array(),
+				exactCanonicalAnchorPreimageBytes: new Uint8Array(),
+				exactCanonicalParametersCarrierBytes: new Uint8Array(),
+				issuanceStore: downstream,
+				liveJournalStore: downstream,
+				messageQueueManager: downstream,
+				networkNode: downstream,
+				onAdmittedVertex: () => undefined,
+				pinnedGenesisAnchorDigest: "0".repeat(64),
+				signRegisteredVertexDigest: (): Promise<Uint8Array> => {
+					signerCount += 1;
+					return Promise.resolve(new Uint8Array());
+				},
+				snapshotDeclaration: downstream,
+				snapshotStore: downstream,
+				store: downstream,
+			});
+			return Object.freeze({ propertyReadCount, result, signerCount });
+		};
+		for (const profile of [
+			"attacker-selected",
+			"creator-only ",
+			"Creator-Only",
+			"creator-onlyX",
+			"",
+			0,
+			new String("creator-only"),
+		] as const) {
+			expect(await run(profile)).toEqual({
+				propertyReadCount: 0,
+				result: expect.objectContaining({ kind: "malformed-input", ok: false }),
+				signerCount: 0,
+			});
+		}
+		const literal = await run("creator-only");
+		expect(literal.result).toEqual(expect.objectContaining({ kind: "internal-invariant", ok: false }));
+		expect(literal.propertyReadCount).toBeGreaterThan(0);
 	});
 
 	it("freezes exactly seven RED and eight GREEN owners", () => {

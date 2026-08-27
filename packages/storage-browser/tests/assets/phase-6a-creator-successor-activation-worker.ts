@@ -1,6 +1,6 @@
 import { openContender, release } from "./phase-6a-creator-successor-activation-entry.js";
 
-type LockMode = "missing" | "native" | "rejecting";
+type LockMode = "missing" | "native" | "non-callable" | "rejecting" | "throwing";
 
 interface WorkerRequest {
 	readonly databaseName?: string;
@@ -12,40 +12,47 @@ interface WorkerRequest {
 
 let acquisitionCount = 0;
 let callbackCount = 0;
+let lookupCount = 0;
 let releaseCount = 0;
 
 function counters(): Readonly<Record<string, number>> {
-	return Object.freeze({ acquisitionCount, callbackCount, releaseCount });
+	return Object.freeze({ acquisitionCount, callbackCount, lookupCount, releaseCount });
 }
 
 function installObservedLocks(mode: LockMode): void {
 	const native = navigator.locks;
-	if (mode === "missing") {
-		Object.defineProperty(navigator, "locks", { configurable: true, value: undefined });
-		return;
-	}
-	if (mode === "rejecting") {
-		Object.defineProperty(navigator, "locks", {
-			configurable: true,
-			value: Object.freeze({ request: () => Promise.reject(new Error("D108E2A_WORKER_LOCK_REJECTED")) }),
-		});
-		return;
-	}
+	const request =
+		mode === "missing"
+			? undefined
+			: mode === "non-callable"
+				? 42
+				: mode === "rejecting"
+					? (): Promise<never> => {
+							acquisitionCount += 1;
+							return Promise.reject(new Error("D108E2A_WORKER_LOCK_REJECTED"));
+						}
+					: mode === "throwing"
+						? (): never => {
+								acquisitionCount += 1;
+								throw new Error("D108E2A_WORKER_LOCK_THREW");
+							}
+						: (name: string, options: LockOptions, callback: (lock: Lock | null) => Promise<void>): Promise<void> => {
+								acquisitionCount += 1;
+								return native
+									.request(name, options, async (lock) => {
+										callbackCount += 1;
+										await callback(lock);
+									})
+									.finally(() => {
+										releaseCount += 1;
+									});
+							};
 	Object.defineProperty(navigator, "locks", {
 		configurable: true,
-		value: Object.freeze({
-			request: (name: string, options: LockOptions, callback: (lock: Lock | null) => Promise<void>) => {
-				acquisitionCount += 1;
-				return native
-					.request(name, options, async (lock) => {
-						callbackCount += 1;
-						await callback(lock);
-					})
-					.finally(() => {
-						releaseCount += 1;
-					});
-			},
-		}),
+		get: (): unknown => {
+			lookupCount += 1;
+			return mode === "missing" ? undefined : Object.freeze({ request });
+		},
 	});
 }
 
@@ -73,3 +80,5 @@ self.addEventListener("message", (event: MessageEvent<WorkerRequest>) => {
 		}
 	})();
 });
+
+self.postMessage({ kind: "ready" });
