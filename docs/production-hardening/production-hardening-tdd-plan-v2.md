@@ -63831,15 +63831,19 @@ This parent reproduction proves D.108e4b's admission code is not causal.
 
 Source diagnosis identifies a test-observer race rather than a transfer or
 transport redesign. `capture()` already freezes generation, ordinal and
-timestamp at the synchronous `send`/`message` boundary, but it waits for
-asynchronous `Blob.arrayBuffer()` conversion before reading `label`,
-`maxRetransmits`, `ordered` and `readyState`. A channel that was open when the
-message event was dispatched may therefore be closing when the fixture finally
-inserts the record. That deferred sample does not describe the event whose
-bytes are under test. Because E3-03 was frozen unchanged in D.108e4b and its
-test path is outside the exact two-owner roster, the candidate stops and
-reslices rather than changing production source, weakening the predicate or
-silently widening scope.
+timestamp at the synchronous `send`/`message` boundary, but `bytesFrom()` is
+an `async` function for every accepted payload type and the observer reads
+`label`, `maxRetransmits`, `ordered` and `readyState` only in the following
+promise continuation. The real campaign does not use the `Blob` branch:
+`packages/network/src/unreliable-webrtc.ts` pins both raw data-channel paths to
+`binaryType = "arraybuffer"` and sends the `Uint8Array` envelope. Its deferral
+is the unconditional microtask boundary, not `Blob.arrayBuffer()`. A channel
+that was open when `send` or `message` occurred may therefore be closing when
+the fixture inserts the record. That deferred sample does not describe the
+event whose bytes are under test. Because E3-03 was frozen unchanged in
+D.108e4b and its test path is outside the exact two-owner roster, the candidate
+stops and reslices rather than changing production source, weakening the
+predicate or silently widening scope.
 
 ###### D.108e4c — synchronous E3-03 RTC-observer event evidence
 
@@ -63857,42 +63861,86 @@ campaign, add Playwright retries or reinterpret post-completion state as
 event-time evidence.
 
 The immutable RED adds one fixture-only observer self-check beside the
-retained campaign. It gives the installed observer a synthetic channel whose
-exact metadata initially matches the real raw contract and a `Blob` whose
-`arrayBuffer()` completion is held behind an explicit promise. The control
-calls the existing `capture()` path while `readyState` is `"open"`, changes
-only the synthetic channel state to `"closing"` while byte conversion remains
-blocked, releases the conversion, awaits the observer's existing pending set
-and reads the resulting record. It requires the original event-boundary
-metadata: `label: "ts-drp-ephemeral/1"`, `maxRetransmits: 0`,
-`ordered: false` and `readyState: "open"`, together with the exact one-byte
-payload, direction, assigned identities and ordinal. Current source fails
-only the final ready-state equality with `"closing"`; a synchronous or
-non-Blob payload cannot satisfy RED because it does not cross the deferred
-boundary. The synthetic channel never enters product transport and the
-control runs in a fresh browser context, so it cannot manufacture campaign
-delivery.
+retained campaign. It runs in a new context at `about:blank`, after the
+existing init script has installed the observer but without booting the grid.
+The test constructs one native `RTCPeerConnection` through the observed
+constructor, dispatches a synthetic `datachannel` event whose `channel` is a
+getter-backed `EventTarget`, and then dispatches a `MessageEvent` on that
+channel. This exact route reaches the existing closure-private `watch()` and
+`capture()` functions, assigns the existing private connection/channel
+identities and exercises the normal pending set. RED must not add, expose or
+rename an observer hook, relax the identity gate, patch native `send`, change
+the capture signature or use product transport.
+
+The one behavior creates two synthetic channels and makes one deep-equality
+assertion over both normalized records. The first channel reports the exact
+raw contract at dispatch—`label: "ts-drp-ephemeral/1"`,
+`maxRetransmits: 0`, `ordered: false`, `readyState: "open"`—and carries a
+one-byte `ArrayBuffer`, matching the campaign receive path. Immediately after
+the synchronous `message` dispatch and before the promise continuation, its
+getter backing is changed to a different label, retransmit count and ordering
+plus `readyState: "closing"`. The second channel begins already
+`"closing"` with the original raw label/count/order, dispatches a distinct
+one-byte `ArrayBuffer`, then changes all four getters again and ends
+`"closed"`. The expected records retain all four event-boundary values, the
+exact decoded bytes and direction, and relative identity/ordinal allocation;
+they also retain the diagnostic insertion-time state described below.
+Exactly two records are mandatory. Thus suppression or hardcoded `"open"`
+cannot pass, and freezing only `readyState` cannot pass. Current source reaches
+one assertion after browser boot and fails that assertion because its deferred
+fields contain the synchronously mutated values. No held `Blob` is used or
+needed: the causal and deterministic boundary is the ordinary async
+`bytesFrom()` continuation exercised by the campaign's `ArrayBuffer` path.
 
 GREEN changes only when the observer reads immutable evidence. At the start
 of `capture()`, beside its existing synchronous generation/ordinal/timestamp
 selection and before `bytesFrom(data)`, it snapshots the channel label,
 retransmit count, ordering and ready state. The later asynchronous record
 insertion uses those selected values while retaining the converted byte length
-and text. If the channel is already `"closing"` at capture invocation, the
-record remains `"closing"` and the retained exact-open predicate still fails;
-the correction therefore restores the causal sampling boundary rather than
-weakening it. Channel/connection identities, record ordering, pending-drain
-semantics and generation reset remain unchanged.
+and text. It also records `insertionReadyState`, sampled only inside that
+continuation, as diagnostic evidence; no assertion or acceptance predicate may
+use this field. If the channel is already `"closing"` at capture invocation,
+the event-time `readyState` remains `"closing"` while
+`insertionReadyState` may advance to `"closed"`, and the retained exact-open
+predicate still fails. The correction therefore restores the causal sampling
+boundary rather than weakening it. Channel/connection identities, record
+ordering, pending-drain semantics and generation reset remain unchanged.
+
+The long campaign's existing JSON attachment is extended without changing a
+single threshold or assertion. For every trial it records every observation
+whose event-time `readyState` differs from `insertionReadyState`, including
+the full record identity and direction. It also records sender and receiver
+before/after deltas for `rawTransport.linkDrops`, `lastLinkDrop` and
+`authenticatedConnectionLosses`. These are diagnostic attachments, never new
+pass/fail criteria. Together with the deterministic two-record control, they
+distinguish an `"open"`-at-event/`"closing"`-at-insertion sampling race from
+a channel already closing at dispatch, and keep any genuine link teardown
+visible rather than converting it silently into a pass.
 
 The focused RED/GREEN command selects only the new behavior through
 `pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts
 --grep "freezes RTC metadata at the event boundary before async payload
 conversion" --fail-on-flaky-tests`. RED must produce exactly one assertion
-failure after browser boot, not a module/server/timeout failure. GREEN must
-pass that behavior 1/1 and the complete config 2/2. Exact-owner ESLint,
-Prettier and `git diff --check` are mandatory. The long retained behavior
-keeps every existing byte and expectation except the event-time observer
-selection. It must then pass through
+failure after browser boot, not a missing-record, module/server/timeout or
+rejected-snapshot failure. GREEN must pass that behavior 1/1 and the complete
+config 2/2. The owner file currently has two pre-existing standalone-compiler
+errors: the loss-profile return is typed too loosely for `NetworkConditions`,
+and `receiverEvidenceAtDeadline()` does not explicitly narrow an optional zone
+API. RED may make only behavior-preserving type refinements for those two
+sites, after which both RED and GREEN must pass this bounded owner-file
+command:
+
+```sh
+pnpm exec tsc --noEmit --strict --skipLibCheck --target ES2023 \
+  --module NodeNext --moduleResolution NodeNext \
+  --lib ES2023,DOM,DOM.Iterable --types node,@playwright/test \
+  tests/e3-03-loss-and-hol-proof.pw.ts
+```
+
+Exact-owner typed ESLint, Prettier and `git diff --check` are also mandatory.
+The long retained behavior keeps every existing expectation except selecting
+observer metadata at the event boundary and adds only the diagnostic
+attachment fields. It must then pass through
 `--grep "three fixed browser trials prove raw freshness and no head-of-line
 blocking under 30% loss"` in three consecutive invocations in both the
 ordinary checkout and the final isolated clean checkout. Any initial-delivery,
@@ -63900,26 +63948,78 @@ AoI, stall, channel-contract or other retained failure resets the consecutive
 count and blocks closure; it does not authorize another fixture change.
 
 After D.108e4c GREEN, the combined immutable candidate must rerun every
-D.108e4b and D.108e4 gate: focused owner/Node tests, affected builds and
-typechecks, the native five-test timing file alone without concurrent test or
-model load, activation and retained browser matrices, all four root collection
-controls, exact D.93.36, three consecutive exact D.93.46 invocations, retained
-Phase-3h/Phase-5 selections and the complete Phase-4c/Phase-6a suite including
-the genuine fresh-process 64 MiB peak-live proof. The new detached proof starts
-without package/example `dist`, uses the frozen offline/ignore-scripts install
-and fresh dependency build, resolves the canonical export from that checkout,
+D.108e4b and D.108e4 gate: the new focused observer self-check, the complete
+E3-03 config 2/2, three consecutive retained long-campaign invocations,
+focused owner/Node tests, affected builds and typechecks, the native five-test
+timing file alone without concurrent test or model load, activation and
+retained browser matrices, all four root collection controls, exact D.93.36,
+three consecutive exact D.93.46 invocations, retained Phase-3h/Phase-5
+selections and the complete Phase-4c/Phase-6a suite including the genuine
+fresh-process 64 MiB peak-live proof. The new detached proof starts without
+package/example `dist`, uses the frozen offline/ignore-scripts install and
+fresh dependency build, resolves the canonical export from that checkout,
 keeps the root shim absent, reruns the raw subprocess-resolution control before
-and after browser gates and finishes tracked-clean. The unloaded native timing
-file remains separate from the combined semantic selection so unrelated
-earlier work cannot consume its unchanged 60-second child budget.
+and after browser gates, reruns the focused observer behavior and complete
+E3-03 config, completes its own three consecutive long-campaign passes and
+finishes tracked-clean. The unloaded native timing file remains separate from
+the combined semantic selection so unrelated earlier work cannot consume its
+unchanged 60-second child budget.
 
 D.108e4c receives separate signed/pushed plan-freeze, immutable RED and
 immutable GREEN/evidence checkpoints. Each checkpoint receives one separate
 Grok 4.6/high review, exact Kimi K3 CHECK001 through CHECK100 review and Opus
-5/xhigh review against the exact immutable identifiers. Reproduced P0/P1
-findings are corrected in the same round without confirmation; every P2 gets
-an exact owner and deadline before combined D.108e4 GREEN closure. No Fable or
-collaboration subagent may run without new express authorization.
+5/xhigh review against the exact immutable identifiers. D.108e4b still
+receives its own separate GREEN review round against the exact product
+candidate after the combined proof; no D.108e4c review discharges it.
+Reproduced P0/P1 findings are corrected in the same round without confirmation;
+every P2 gets an exact owner and deadline before combined D.108e4 GREEN
+closure. No Fable or collaboration subagent may run without new express
+authorization.
+
+The first D.108e4c plan-freeze review round inspected signed/pushed commit
+`eb3de05b6054ac6fdd158d2530bad1798f87f10f`, parent
+`b8a2628bec7593c547919b540889dc75e33cd9ca`, tree
+`01a07ea670096bce453efeaa1a79fd73464aa8f7`, stable patch id
+`38f89cccf774e3acdc9a87524a90330a8c40d545` and raw-diff SHA-256
+`d244065fdd18d5300da431ef3f4888e0ccb43c89f27e9aa39c0a2c733547b5f3`.
+Grok 4.6/high's file-grounded session
+`01a0450d-de9d-7d23-8f5a-431b47a052c6` completed its sole 510.110-second run
+with exit 0 and `stop_reason=end_turn`; the wrapper returned `NO_VERDICT`
+because inspection prose preceded its terminal JSON. Its substantive result
+was `CHANGES_REQUIRED`, P0=0/P1=1/P2=1. The permitted tool-free replacement,
+session `01a04516-c2cb-7e92-a3dc-465d20f326a6`, completed in 180.039 seconds
+with exit 0 and `stop_reason=end_turn`. The wrapper again applied its legacy
+`NO_VERDICT` marker heuristic, but `public.txt` contained exactly one bare JSON
+object and direct `jq` schema/count validation accepted the terminal
+`CHANGES_REQUIRED`, P0=1/P1=1/P2=0 verdict. The union requires an
+already-closing control and the exact private observer entrypoint; both are
+owned by the D.108e4c RED implementer and are corrected above before RED.
+
+Kimi's file-grounded `kimi-code/k3` session
+`session_35c26c71-e87b-48b9-8fca-664bcd60299f` returned `APPROVED`,
+P0=0/P1=0/P2=2. Its original prose mentioned four check labels twice. A
+format-only continuation in the same session preserved the verdict and
+findings while emitting exactly 100 total and 100 unique markers,
+`CHECK001` through `CHECK100`, with no duplicates or bare `CHECK` token. Its
+two P2s require the true unconditional async rationale and mutations that make
+all four metadata fields load-bearing; the plan owner and RED implementer own
+them respectively, both corrected above before RED. A separately started Kimi
+replacement is discarded because its prompt incorrectly presented the desired
+corrections as frozen facts; it is not review evidence.
+
+Claude-skill Opus 5/xhigh session
+`e3f10036-bce8-42fd-a2ab-afc2b5c940df` completed in 591.589 seconds with no
+permission denial or subagent and returned schema-valid `CHANGES_REQUIRED`,
+P0=0/P1=3/P2=4. Its P1 union requires the campaign's real ArrayBuffer/microtask
+diagnosis, insertion-time/counter diagnostics and the reachable private event
+route. Its P2 union requires all-four-field mutation, a blank deterministic
+document, explicit combined/D.108e4b review ownership and owner-file TypeScript
+validation. The plan owner, RED implementer, GREEN implementer and D.108e4
+evidence owner own the corresponding corrections above; all are due before
+their named RED, GREEN or combined checkpoint. No confirmation plan review is
+authorized. The direct standalone TypeScript diagnostic before this correction
+reproduced exactly the two pre-existing owner-local errors named above; passing
+that same command is now a RED and GREEN acceptance gate.
 
 Each D.108e2 sub-slice uses one immutable tests-only RED checkpoint and one
 immutable GREEN/evidence checkpoint. Each checkpoint receives one real Grok
