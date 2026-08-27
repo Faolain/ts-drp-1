@@ -62115,6 +62115,102 @@ worktrees remained tracked-clean; no reviewer edited the shared checkout, and
 no Fable or collaboration subagent ran. With no P0/P1, no confirmation review
 is required and D.108e2d may proceed to its one-file GREEN.
 
+The D.108e2d GREEN is signed and pushed commit
+`4112941203e6fcd6cb549ce49b10146e4b913286`, parent
+`191372caefbef1c9af49ce89d9acb5db93ccb6e0`, tree
+`4e80f9aebc93c6ab3729c1c42055231a2ea8617d`. Its complete diff is six
+insertions and six deletions in the sole frozen production owner,
+`packages/node/src/v3-live.ts`. The identical issued-record read/match block
+moved below the authenticated-future predicate. A nonfuture/current row now
+returns to the existing outer recovery consumer, which remains the sole owner
+of its issued read and exact outbox match; an authenticated future row still
+performs and matches the private issued read before it may advance. No cache,
+second owner, public/test API, store contract, authority, wire format, limit,
+memory ceiling or preparation call changed. The four
+`prepareExistingCreatorGeneration` calls and the deliberately later-owned
+per-method-call skip counter remain source-audited and unchanged.
+
+The ordinary-checkout command ledger passed:
+
+- `pnpm exec vitest run
+tests/phase-6a-creator-successor-local-author-red.test.ts
+packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts
+--maxWorkers=1 --minWorkers=1 --no-coverage`: 10/10;
+- `pnpm exec vitest run tests/phase-4c-*.test.ts
+tests/phase-6a-*.test.ts
+packages/storage-node/tests/phase-6a-*.test.ts --maxWorkers=1
+--minWorkers=1 --no-coverage`: 16 files / 118 tests;
+- `pnpm exec playwright test --config
+packages/storage-browser/playwright.phase-6a-creator-successor-activation.config.ts`,
+  the corresponding product config, the Phase-4c-b quarantine config and the
+  Phase-4c-c transfer config: respectively 21/21, 18/18, 18/18 and 6/6
+  across Chromium, Firefox and WebKit;
+- protocol-v3, node, storage-node and storage-browser builds, plus
+  `pnpm --filter @ts-drp/storage-browser typecheck`, passed; and
+- exact-five `pnpm exec eslint --max-warnings 0`, `pnpm exec prettier
+--check`, exact-owner diff census and `git diff --check` passed.
+
+The broad node and storage-node typechecks remain disclosed baselines rather
+than false GREEN claims. In both ordinary and clean checkouts, `pnpm --filter
+@ts-drp/node typecheck` reproduced 13 inherited diagnostics: five TS6059,
+five TS6307, one WebRTC TS2339 and two compact-history TS1360/TS2322, with zero
+diagnostics in the changed region. `pnpm --filter @ts-drp/storage-node
+typecheck` reproduced 113 inherited diagnostics: 27 TS6059, 27 TS6307, 20
+missing-build TS2307 and 37 implicit-parameter TS7006, again with zero in the
+changed region. Neither baseline is attributed to or relaxed by D.108e2d.
+
+The exact clean-environment proof used detached checkout
+`/private/tmp/ts-drp-d108e2d-green-clean.Hrh16d/repo` at the signed GREEN.
+Before install it had no package/example `dist` and clean tracked status.
+`pnpm install --offline --ignore-scripts --frozen-lockfile` passed for all 48
+workspaces and still produced no `dist`; `node scripts/ensure-native-deps.mjs`
+then restored native dependencies. `pnpm --filter '@ts-drp/protocol-v3...'
+--filter '@ts-drp/node...' --filter '@ts-drp/storage-node...' --filter
+'@ts-drp/storage-browser...' build` freshly built the 33/48 dependency
+closure. The same 16-file/118-test retained command, all four three-engine
+browser commands, storage-browser typecheck, exact-five lint/format/diff and
+tracked-status checks then passed. The fresh Phase-4c child therefore booted
+and imported the intended newly built workspace packages without Vite aliases,
+pre-existing output, production-relative imports or local checkout state.
+
+That retained run executed the genuine 64 MiB proof with no exclusion: 512
+chunks carried 67,108,864 body bytes at 131,072 bytes per chunk. The owner
+instrument sampled the actual chunk-body objects while each live write was
+awaited, peaked at 131,072 bytes and settled at zero. Its signed strict ceiling
+remained `2 * 131072 = 262144`, so the peak was genuinely `<2x` during
+execution. The retaining mutant held those same body objects through the live
+stream, peaked at 67,108,864 before deliberate release, crossed the signed
+ceiling and settled at zero only afterward. This distinguishes peak live
+snapshot/chunk ownership from memory remaining after completion and preserves
+the Phase-4c semantic and memory contracts.
+
+The GREEN review round inspected that exact signed commit in three separate
+detached worktrees. Grok 4.6/high session
+`01a0429b-c49a-7310-ac78-68e0418e4b71` ran once under the upgraded service
+with the full 16-turn bound, completed in 270.150 seconds with exit zero,
+`stop_reason=end_turn`, runner-classified `TERMINAL_RESPONSE`, and a directly
+recognized `FINAL`: `APPROVED`, P0=0/P1=0/P2=0. Its public-result SHA-256 is
+`e260bf325da46fe9de0613748e7c39be2697cf5420df1215527389eabfcb4bd3`.
+Kimi CLI 0.38.0 exact `kimi-code/k3` session
+`session_efe2ed62-ee4d-4b5c-9b3d-a55dbffdb6d1` emitted exactly CHECK001
+through CHECK100 once and in order plus FINAL and returned `APPROVED`,
+P0=0/P1=0/P2=0. Opus 5/xhigh session
+`325f5c59-d91e-4241-99bd-0b4effbd1dd7` completed with exit zero, exact model
+`claude-opus-5`, no permission denial or subagent, and schema-valid
+`APPROVED`, P0=0/P1=0/P2=2.
+
+Opus's two nonblocking findings have exact owners and deadlines. D.108e2e's
+GREEN must add a non-behavioral source comment stating that the sole current
+consumer owns the issued-record read/match for every nonfuture row returned by
+the private view. D.108e4, before Phase 6a exit, must add an independent
+future-row issued/outbox mismatch mutant so the private match is distinguished
+from both authentication and the fact that a read occurred. The latter joins
+the already assigned current-row mismatch-isolation cleanup. Neither is a
+reproduced product defect; no P0/P1 correction or confirmation review is
+required. Review worktrees remained tracked-clean apart from their prompt
+artifacts. The main checkout retained only protected untracked paths, all 26
+inherited stashes remained, and no Fable or collaboration subagent ran.
+
 ##### D.108e2e — predecessor-view skip-budget lifetime
 
 D.108e2e is a separate correctness slice due immediately after D.108e2d and
@@ -62131,10 +62227,14 @@ Only after that RED reproduces the defect may
 correction may move existing private counter custody so an over-budget recovery
 fails closed; it may not change `maxEpochVertices`, accepted under-budget
 results, recovery authority, store contracts, wire formats or product APIs.
-If the genuine fixture cannot make that distinction without a new seam or
-another production owner, stop and reslice. D.108e2e receives its own exact
-test roster, plan/RED/GREEN reviews, ordinary verification and isolated fresh-
-build proof; it does not widen D.108e2d's five-path union.
+Because this slice next edits the exact private wrapper, its GREEN also owns the
+review-assigned source comment that states the outer recovery consumer's sole
+issued-read/exact-match duty for each returned nonfuture row; the comment adds
+no behavior or owner. If the genuine fixture cannot make that distinction
+without a new seam or another production owner, stop and reslice. D.108e2e
+receives its own exact test roster, plan/RED/GREEN reviews, ordinary
+verification and isolated fresh-build proof; it does not widen D.108e2d's
+five-path union.
 
 ##### D.108e4 — retained test-oracle cleanup
 
@@ -62143,12 +62243,14 @@ plan freeze and RED must name the smallest exact roster needed to close the
 D.108e2c GREEN P2 union: independently bind authenticated ACL bytes to their
 digest with a positive control, make the window-lock observation boundary
 explicit, remove the possession-probe naming/preseed ambiguity, prove one
-contiguous authority-attempt sequence from an independent observation, and
-reconcile the three inherited full-file Phase-3 pins. It has no production
-GREEN owner and may not change public APIs, wire, store, recovery authority,
-limits or memory contracts. If a production-source change is genuinely
-required, stop and reslice. This assignment must not contaminate or delay the
-D.108e2d performance profile or the D.108e3 room-lifetime hardening slice.
+contiguous authority-attempt sequence from an independent observation, isolate
+both current- and future-row issued/outbox mismatches from signature or
+authentication failure, and reconcile the three inherited full-file Phase-3
+pins. It has no production GREEN owner and may not change public APIs, wire,
+store, recovery authority, limits or memory contracts. If a production-source
+change is genuinely required, stop and reslice. This assignment must not
+contaminate or delay the D.108e2d performance profile or the D.108e3 room-
+lifetime hardening slice.
 
 Each D.108e2 sub-slice uses one immutable tests-only RED checkpoint and one
 immutable GREEN/evidence checkpoint. Each checkpoint receives one real Grok
