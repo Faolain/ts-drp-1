@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -15,6 +15,7 @@ const GLOBAL_SETUP = resolve(
 	REPOSITORY_ROOT,
 	"packages/storage-browser/tests/phase-6a-creator-successor-activation-global-setup.ts"
 );
+const SHIM_ROOT = resolve(REPOSITORY_ROOT, "tests/fixtures/node_modules/@ts-drp");
 
 describe("D.108e1 activation test-infrastructure RED", () => {
 	it("freezes exactly seven RED and eight GREEN test-infrastructure owners", () => {
@@ -63,6 +64,7 @@ describe("D.108e1 activation test-infrastructure RED", () => {
 
 	it("moves package shims behind one bounded Playwright global-setup owner", async () => {
 		expect(existsSync(GLOBAL_SETUP)).toBe(true);
+		expect(existsSync(SHIM_ROOT)).toBe(false);
 		const config = (await import(
 			`${
 				pathToFileURL(
@@ -74,5 +76,29 @@ describe("D.108e1 activation test-infrastructure RED", () => {
 			}?d108e1=${crypto.randomUUID()}`
 		)) as Readonly<{ readonly default?: Readonly<{ readonly globalSetup?: string }> }>;
 		expect(config.default?.globalSetup).toBe("./tests/phase-6a-creator-successor-activation-global-setup.ts");
+		expect(existsSync(SHIM_ROOT)).toBe(false);
+		const setup = (await import(`${pathToFileURL(GLOBAL_SETUP).href}?d108e1=${crypto.randomUUID()}`)) as Readonly<{
+			default(): Promise<() => void>;
+		}>;
+		const cleanup = await setup.default();
+		expect(existsSync(SHIM_ROOT)).toBe(true);
+		try {
+			throw new Error("D108E1_SIMULATED_TEST_FAILURE");
+		} catch (error) {
+			expect(error).toEqual(new Error("D108E1_SIMULATED_TEST_FAILURE"));
+		} finally {
+			cleanup();
+		}
+		expect(existsSync(SHIM_ROOT)).toBe(false);
+
+		mkdirSync(SHIM_ROOT, { recursive: true });
+		const sentinel = resolve(SHIM_ROOT, "preexisting.txt");
+		writeFileSync(sentinel, "caller-owned", "utf8");
+		try {
+			await expect(setup.default()).rejects.toThrow(/workspace package shim root already exists/u);
+			expect(readFileSync(sentinel, "utf8")).toBe("caller-owned");
+		} finally {
+			rmSync(SHIM_ROOT, { force: true, recursive: true });
+		}
 	});
 });
