@@ -60933,6 +60933,90 @@ required review round after D.108d2; both must close before Phase 6a exits.
 None is permission to weaken the already executed D.108d1 authority, snapshot,
 memory, transport or recovery gates.
 
+#### D.108e1 — activation test-infrastructure closure
+
+This slice closes only test/build-infrastructure debt. Its purpose is to make
+the retained activation evidence say what actually happened: a fresh child
+resolved freshly built package exports, read every snapshot chunk through the
+verification-quarantine port before completion and activation, and relayed the
+browser message fields without normalizing away an origin-specific mismatch.
+It adds no product source, API, export, dependency, wire/store/snapshot shape,
+digest owner, chunk or memory limit, activation authority or recovery policy.
+Any need for production-source or manifest/lockfile changes stops this slice
+and requires a new freeze.
+
+The tests-only RED roster is exactly these seven paths:
+
+- new `tests/fixtures/phase-6a-v3/creator-successor-infrastructure-contract.ts`;
+- new `tests/phase-6a-creator-successor-infrastructure-red.test.ts`;
+- `tests/phase-6a-creator-successor-activation-red.test.ts`;
+- `packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts`;
+- `packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts`;
+- `tests/phase-6a-creator-successor-product-red.test.ts`; and
+- `packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts`.
+
+The GREEN roster is exactly these eight test-infrastructure paths:
+
+- `tests/fixtures/shared/workspace-package-subprocess.mjs`;
+- `tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts`;
+- `tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts`;
+- `packages/storage-node/tests/fixtures/phase-6a-creator-successor-activation-child.mjs`;
+- new `packages/storage-browser/tests/phase-6a-creator-successor-activation-global-setup.ts`;
+- `packages/storage-browser/playwright.phase-6a-creator-successor-activation.config.ts`;
+- `tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts`; and
+- `packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts`.
+
+The fresh-process launcher must derive each hooked target from the owning
+workspace package's real import export map and compare it with the exact
+expected freshly built file before registering the closed hook. A wrong but
+nonempty file must fail before child startup. Resolution and child execution
+retain the deterministic environment used by the Phase-4c launcher; source
+aliases, ignored shims, ancestor modules and stale `dist` files are not
+authority. The unchanged Phase-4c 64 MiB child remains a required retained
+proof.
+
+The activation child must wrap the actual
+`verificationQuarantine.open(signal)` port. Telemetry is emitted only after an
+awaited `read(descriptor)` succeeds and records the descriptor index, digest
+and declared byte length together with the observed byte length. Acceptance
+requires the exact declared chunk sequence once each, every successful read
+before `complete`, completion before subscription, and an independently
+rejected completion-derived/fabricated telemetry control. A loop over
+declaration chunks inside `complete` cannot satisfy the oracle.
+
+The activation Playwright config must become module-load side-effect free. Its
+global setup owns one previously absent fixture shim root, fails closed if that
+root already exists, creates only package-manifest/export and built-directory
+links required by the Node-side fixture graph, and returns teardown that
+removes exactly that owned root. The now-declared storage-browser Node test
+dependency remains pnpm-owned and is not recreated or removed. Unit evidence
+exercises setup and teardown, and the real three-engine command must leave the
+shim root absent after exit, including a failing-test cleanup control.
+
+Already-shipped behavior no longer needs source-pattern readiness skips:
+D.108d1 activation and D.108d2 product tests execute unconditionally.
+Non-behavioral public-boundary/sole-owner governance may retain structural AST
+or export-shape checks where runtime behavior cannot prove absence. The product
+relay records each structured-clone `Message.data`, `objectId`, `sender` and
+`type` at its source and every receiving origin. The browser oracle pairs those
+observations by immutable source-realm sequence and compares the actual byte
+arrays and literal scalar fields; a normalized fingerprint alone is
+insufficient.
+
+RED and GREEN each receive one immutable Grok 4.6/high, exact Kimi K3
+CHECK001-CHECK100 and Opus 5/xhigh review round. Same-round reproduced P0/P1
+findings are corrected once without a confirmation review; P2 findings are
+recorded and assigned. Fable is not authorized. Acceptance runs the focused
+D.108e1 unit/death/browser owners, the complete retained D.108b through
+D.108d2 selection, Phase-4c's full retained suite including the genuine fresh
+64 MiB peak-live owner and retaining mutant, affected package builds and
+typechecks, exact-owner zero-warning lint, Prettier and both diff checks.
+GREEN additionally requires an isolated no-`dist` offline install followed by
+a fresh dependency-closure build, exact export-map resolution, all retained
+tests, and an absent shim root before and after the browser command. Signed,
+pushed plan-freeze, RED, GREEN and evidence commits close D.108e1; only then may
+D.108e2 start.
+
 The rejected D.108d2 plan-freeze review inspected immutable signed commit
 `6d0c3c036c3dd5d6422391478171b1d9253705c9`, parent
 `227d0e41722e6fab66598e3f0b19fdf06141759f`, tree
