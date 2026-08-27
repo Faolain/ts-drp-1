@@ -137,7 +137,13 @@ export interface D108d1Oracle {
 	readonly stateDigest: string;
 }
 
-export type D108d1ChildMode = "cold" | "divergent-genesis" | "extra-epoch" | "probe" | "ttl-expired";
+export type D108d1ChildMode =
+	| "cold"
+	| "declaration-loop-mutant"
+	| "divergent-genesis"
+	| "extra-epoch"
+	| "probe"
+	| "ttl-expired";
 
 export interface D108d1ChildMessage {
 	readonly kind: string;
@@ -279,19 +285,21 @@ export function runD108d1ActivationChild(mode: D108d1ChildMode, input: unknown):
 			"packages/storage-node/tests/fixtures/phase-6a-creator-successor-activation-child.mjs"
 		);
 		const importHook = workspacePackageImportHook({
-			"@ts-drp/message-queue": resolve(REPOSITORY_ROOT, "packages/message-queue/dist/src/index.js"),
-			"@ts-drp/node/creator-adoption-activate": resolve(
-				REPOSITORY_ROOT,
-				"packages/node/dist/src/creator-adoption-activate.js"
-			),
-			"@ts-drp/node/v3-live": resolve(REPOSITORY_ROOT, "packages/node/dist/src/v3-live.js"),
-			"@ts-drp/storage-node": resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/index.js"),
-			"@ts-drp/storage-node/issuance": resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/issuance.js"),
-			"@ts-drp/storage-node/live-journal": resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/live-journal.js"),
-			"@ts-drp/storage-node/snapshot-transfer": resolve(
-				REPOSITORY_ROOT,
-				"packages/storage-node/dist/src/snapshot-transfer.js"
-			),
+			expectedImports: {
+				"@ts-drp/message-queue": resolve(REPOSITORY_ROOT, "packages/message-queue/dist/src/index.js"),
+				"@ts-drp/node/creator-adoption-activate": resolve(
+					REPOSITORY_ROOT,
+					"packages/node/dist/src/creator-adoption-activate.js"
+				),
+				"@ts-drp/node/v3-live": resolve(REPOSITORY_ROOT, "packages/node/dist/src/v3-live.js"),
+				"@ts-drp/storage-node": resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/index.js"),
+				"@ts-drp/storage-node/issuance": resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/issuance.js"),
+				"@ts-drp/storage-node/live-journal": resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/live-journal.js"),
+				"@ts-drp/storage-node/snapshot-transfer": resolve(
+					REPOSITORY_ROOT,
+					"packages/storage-node/dist/src/snapshot-transfer.js"
+				),
+			},
 		});
 		const child = spawn(process.execPath, [importHook, childPath, mode], {
 			stdio: ["ignore", "ignore", "pipe", "ipc"],
@@ -407,26 +415,6 @@ export function deriveD108d1Oracle(fixture: GenuineCreatorAdoptionFixture): D108
 		stableTopic: `drp/v3/1/${stableTopicDigest}`,
 		stateDigest: String(anchor.stateDigest),
 	});
-}
-
-/**
- * Returns the single composite D.108d1 production readiness fact.
- * @returns Frozen readiness plus every absent owner.
- */
-export function d108d1Readiness(): Readonly<{ readonly missing: readonly string[]; readonly ready: boolean }> {
-	const missing: string[] = D108D1_GREEN_PATHS.filter((path) => !existsSync(resolve(REPOSITORY_ROOT, path)));
-	const manifestPath = resolve(REPOSITORY_ROOT, "packages/node/package.json");
-	if (existsSync(manifestPath)) {
-		const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as { readonly exports?: Record<string, unknown> };
-		const entry = manifest.exports?.["./creator-adoption-activate"] as Readonly<Record<string, unknown>> | undefined;
-		if (
-			entry?.types !== "./dist/src/creator-adoption-activate.d.ts" ||
-			entry.import !== "./dist/src/creator-adoption-activate.js"
-		) {
-			missing.push("package export");
-		}
-	}
-	return Object.freeze({ missing: Object.freeze(missing), ready: missing.length === 0 });
 }
 
 /**

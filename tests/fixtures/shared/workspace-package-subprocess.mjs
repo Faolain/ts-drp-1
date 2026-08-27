@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type */
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, parse } from "node:path";
+import { fileURLToPath } from "node:url";
 
 function deterministicEnvironment() {
 	const environment = {};
@@ -83,13 +84,19 @@ export function runWorkspacePackageSubprocess(input) {
 
 /**
  * Creates a fresh-process Node import hook bound to exact freshly built files.
- * @param expectedImports - Bare specifiers mapped to their exact built targets.
+ * @param input - Bare specifiers mapped to their exact built targets.
  * @returns One `--import` argument that registers the closed resolver.
  */
-export function workspacePackageImportHook(expectedImports) {
-	if (!plainRecord(expectedImports) || Object.keys(expectedImports).length === 0) {
+export function workspacePackageImportHook(input) {
+	if (
+		!plainRecord(input) ||
+		Reflect.ownKeys(input).some((key) => String(key) !== "expectedImports") ||
+		!plainRecord(input.expectedImports) ||
+		Object.keys(input.expectedImports).length === 0
+	) {
 		throw new TypeError("workspace package import hook is malformed");
 	}
+	const expectedImports = input.expectedImports;
 	const resolved = {};
 	for (const [specifier, expectedPath] of Object.entries(expectedImports)) {
 		if (
@@ -97,11 +104,44 @@ export function workspacePackageImportHook(expectedImports) {
 			specifier.length === 0 ||
 			typeof expectedPath !== "string" ||
 			expectedPath.length === 0 ||
+			!existsSync(expectedPath) ||
 			readFileSync(expectedPath).byteLength === 0
 		) {
-			throw new TypeError(`workspace package import hook target is invalid for ${specifier}`);
+			throw new Error(`workspace package target mismatch for ${specifier}`);
 		}
-		resolved[specifier] = pathToFileURL(expectedPath).href;
+		const parts = specifier.split("/");
+		const packageName = specifier.startsWith("@") ? parts.slice(0, 2).join("/") : parts[0];
+		let packageDirectory = dirname(expectedPath);
+		const filesystemRoot = parse(packageDirectory).root;
+		while (packageDirectory !== filesystemRoot && !existsSync(`${packageDirectory}/package.json`)) {
+			packageDirectory = dirname(packageDirectory);
+		}
+		if (!existsSync(`${packageDirectory}/package.json`)) {
+			throw new Error(`workspace package target mismatch for ${specifier}`);
+		}
+		const manifest = JSON.parse(readFileSync(`${packageDirectory}/package.json`, "utf8"));
+		if (!plainRecord(manifest) || manifest.name !== packageName) {
+			throw new Error(`workspace package target mismatch for ${specifier}`);
+		}
+		let resolvedUrl;
+		try {
+			resolvedUrl = execFileSync(
+				process.execPath,
+				["--input-type=module", "--eval", `process.stdout.write(import.meta.resolve(${JSON.stringify(specifier)}))`],
+				{
+					cwd: packageDirectory,
+					encoding: "utf8",
+					env: deterministicEnvironment(),
+					maxBuffer: 1024 * 1024,
+				}
+			).trim();
+		} catch {
+			throw new Error(`workspace package target mismatch for ${specifier}`);
+		}
+		if (resolvedUrl.length === 0 || fileURLToPath(resolvedUrl) !== expectedPath) {
+			throw new Error(`workspace package target mismatch for ${specifier}`);
+		}
+		resolved[specifier] = resolvedUrl;
 	}
 	const hookSource =
 		`const targets=${JSON.stringify(resolved)};` +

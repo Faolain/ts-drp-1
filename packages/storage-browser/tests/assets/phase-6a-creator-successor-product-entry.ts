@@ -6,7 +6,27 @@ interface RelayPacket {
 	readonly channelName: string;
 	readonly fingerprint: string;
 	readonly realmId: string;
+	readonly sequence: number;
 	readonly value: unknown;
+}
+
+interface RelayMessageObservation {
+	readonly data: Uint8Array;
+	readonly objectId: string;
+	readonly receiverRealmId?: string;
+	readonly sender: string;
+	readonly sequence: number;
+	readonly sourceRealmId: string;
+	readonly type: number;
+}
+
+interface RelayAudit {
+	readonly incoming: number;
+	readonly incomingMessages: readonly RelayMessageObservation[];
+	readonly mismatch: number;
+	readonly outgoing: number;
+	readonly outgoingMessages: readonly RelayMessageObservation[];
+	readonly realmId: string;
 }
 
 interface IndexDump {
@@ -58,7 +78,7 @@ declare global {
 			exportSuccessor(databaseName: string): Promise<SuccessorCarrier>;
 			importSuccessor(carrier: SuccessorCarrier, sourceDatabaseName: string, targetDatabaseName: string): Promise<void>;
 			join(input: unknown): Promise<void>;
-			relayAudit(): Readonly<{ readonly incoming: number; readonly mismatch: number; readonly outgoing: number }>;
+			relayAudit(): RelayAudit;
 			sealEpoch(): Promise<PlainRecord>;
 			send(text: string): Promise<void>;
 			snapshot(): PlainRecord;
@@ -67,7 +87,10 @@ declare global {
 }
 
 const relayChannels = new Map<string, Set<ProductBroadcastChannel>>();
-const relayAudit = { incoming: 0, mismatch: 0, outgoing: 0 };
+const incomingMessages: RelayMessageObservation[] = [];
+const outgoingMessages: RelayMessageObservation[] = [];
+let relayMismatch = 0;
+let relaySequence = 0;
 let realmId = "";
 let booted = false;
 
@@ -90,6 +113,39 @@ function fingerprint(value: unknown): string {
 	return JSON.stringify(normalize(value));
 }
 
+function observeRelayMessage(
+	value: unknown,
+	sourceRealmId: string,
+	sequence: number,
+	receiverRealmId?: string
+): RelayMessageObservation | undefined {
+	if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
+	const message = Reflect.get(value, "message") as unknown;
+	if (message === null || typeof message !== "object" || Array.isArray(message)) return undefined;
+	const data = Reflect.get(message, "data") as unknown;
+	const objectId = Reflect.get(message, "objectId") as unknown;
+	const sender = Reflect.get(message, "sender") as unknown;
+	const type = Reflect.get(message, "type") as unknown;
+	if (
+		!(data instanceof Uint8Array) ||
+		data.byteLength === 0 ||
+		typeof objectId !== "string" ||
+		typeof sender !== "string" ||
+		typeof type !== "number"
+	) {
+		return undefined;
+	}
+	return Object.freeze({
+		data: Uint8Array.from(data),
+		objectId,
+		...(receiverRealmId === undefined ? {} : { receiverRealmId }),
+		sender,
+		sequence,
+		sourceRealmId,
+		type,
+	});
+}
+
 class ProductBroadcastChannel extends EventTarget {
 	readonly name: string;
 	onmessage: ((this: BroadcastChannel, event: MessageEvent) => unknown) | null = null;
@@ -107,15 +163,24 @@ class ProductBroadcastChannel extends EventTarget {
 	}
 
 	postMessage(value: unknown): void {
-		const packet = Object.freeze({ channelName: this.name, fingerprint: fingerprint(value), realmId, value });
-		relayAudit.outgoing += 1;
+		relaySequence += 1;
+		const packet = Object.freeze({
+			channelName: this.name,
+			fingerprint: fingerprint(value),
+			realmId,
+			sequence: relaySequence,
+			value,
+		});
+		const observation = observeRelayMessage(value, realmId, packet.sequence);
+		if (observation !== undefined) outgoingMessages.push(observation);
 		void window.__phase6aProductRelayPost?.(packet);
 	}
 
 	deliver(packet: RelayPacket): void {
-		relayAudit.incoming += 1;
-		if (fingerprint(packet.value) !== packet.fingerprint) relayAudit.mismatch += 1;
+		if (fingerprint(packet.value) !== packet.fingerprint) relayMismatch += 1;
 		const event = new MessageEvent("message", { data: packet.value });
+		const observation = observeRelayMessage(event.data, packet.realmId, packet.sequence, realmId);
+		if (observation !== undefined) incomingMessages.push(observation);
 		this.dispatchEvent(event);
 		this.onmessage?.call(this as unknown as BroadcastChannel, event);
 	}
@@ -487,8 +552,17 @@ const api = Object.freeze({
 	join(input: unknown): Promise<void> {
 		return productApi().join(input);
 	},
-	relayAudit(): Readonly<{ readonly incoming: number; readonly mismatch: number; readonly outgoing: number }> {
-		return Object.freeze({ ...relayAudit });
+	relayAudit(): RelayAudit {
+		const copy = (observation: RelayMessageObservation): RelayMessageObservation =>
+			Object.freeze({ ...observation, data: Uint8Array.from(observation.data) });
+		return Object.freeze({
+			incoming: incomingMessages.length,
+			incomingMessages: Object.freeze(incomingMessages.map(copy)),
+			mismatch: relayMismatch,
+			outgoing: outgoingMessages.length,
+			outgoingMessages: Object.freeze(outgoingMessages.map(copy)),
+			realmId,
+		});
 	},
 	sealEpoch(): Promise<PlainRecord> {
 		return productApi().sealEpoch();

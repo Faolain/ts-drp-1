@@ -107,43 +107,6 @@ function sameStrings(left: readonly string[], right: readonly string[]): boolean
 }
 
 /**
- * Reports the one composite product readiness fact used by every D.108d2 behavior gate.
- * @returns Missing frozen surface/effect facts and the composite decision.
- */
-export function d108d2Readiness(): Readonly<{ readonly missing: readonly string[]; readonly ready: boolean }> {
-	const room = read(D108D2_GREEN_PATHS[0]);
-	const chat = read(D108D2_GREEN_PATHS[1]);
-	const facts = Object.freeze({
-		chatAuthoritySnapshot: /interface\s+ChatSnapshot[\s\S]*readonly\s+authority\s*:/u.test(chat),
-		chatForwardsDeclaration: /interface\s+(?:JoinInput|RoomJoinInput)[\s\S]*successorSnapshotDeclaration\??\s*:/u.test(
-			chat
-		),
-		chatThinAdoption: /adoptSuccessor\s*\([^)]*\)\s*:[^{]+\{[\s\S]*\.adoptCreatorSuccessor\s*\(/u.test(chat),
-		roomAuthorityProjection:
-			/authority\s*\(\)\s*:[^{]+\{/u.test(room) && D108D2_AUTHORITY_KEYS.every((key) => room.includes(key)),
-		roomAwaitsDeactivate: /await\s+(?:Promise\.resolve\s*\()?[^;\n]*activeHandle[^;\n]*\.deactivate\s*\(/u.test(room),
-		roomColdReopen: /successorSnapshotDeclaration/u.test(room) && /reopenCreatorSuccessorAdoption\s*\(/u.test(room),
-		roomConsumesExactSubpaths:
-			/@ts-drp\/node\/creator-adoption["']/u.test(room) &&
-			/@ts-drp\/node\/creator-adoption-commit["']/u.test(room) &&
-			/@ts-drp\/node\/creator-adoption-activate["']/u.test(room),
-		roomHotChain:
-			/adoptCreatorSuccessor\s*\([^)]*\)\s*:[^{]+\{/u.test(room) &&
-			/verifyCreatorSuccessorAdoption\s*\(/u.test(room) &&
-			/commitCreatorSuccessorAdoption\s*\(/u.test(room) &&
-			/activateCreatorSuccessorAdoption\s*\(/u.test(room),
-		roomInputDeclaration: /interface\s+CreateV3RoomSessionInput[\s\S]*successorSnapshotDeclaration\??\s*:/u.test(room),
-		roomSessionSurface:
-			/interface\s+V3RoomSession[\s\S]*adoptCreatorSuccessor\s*\(/u.test(room) &&
-			/interface\s+V3RoomSession[\s\S]*authority\s*\(/u.test(room),
-	});
-	const missing = Object.entries(facts)
-		.filter(([, present]) => !present)
-		.map(([name]) => name);
-	return Object.freeze({ missing: Object.freeze(missing), ready: missing.length === 0 });
-}
-
-/**
  * Enforces the product-only ownership and non-escalation boundary around D.108d2.
  * @returns Frozen source-governance facts.
  */

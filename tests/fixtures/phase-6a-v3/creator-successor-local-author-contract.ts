@@ -137,20 +137,22 @@ export function runD108d1bLocalAuthorChild(input: unknown): Promise<D108d1bChild
 			"packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs"
 		);
 		const importHook = workspacePackageImportHook({
-			"@ts-drp/canonical": resolve(REPOSITORY_ROOT, "packages/canonical/dist/src/index.js"),
-			"@ts-drp/message-queue": resolve(REPOSITORY_ROOT, "packages/message-queue/dist/src/index.js"),
-			"@ts-drp/node/creator-adoption-activate": resolve(
-				REPOSITORY_ROOT,
-				"packages/node/dist/src/creator-adoption-activate.js"
-			),
-			"@ts-drp/node/v3-live": resolve(REPOSITORY_ROOT, "packages/node/dist/src/v3-live.js"),
-			"@ts-drp/storage-node": resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/index.js"),
-			"@ts-drp/storage-node/issuance": resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/issuance.js"),
-			"@ts-drp/storage-node/live-journal": resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/live-journal.js"),
-			"@ts-drp/storage-node/snapshot-transfer": resolve(
-				REPOSITORY_ROOT,
-				"packages/storage-node/dist/src/snapshot-transfer.js"
-			),
+			expectedImports: {
+				"@ts-drp/canonical": resolve(REPOSITORY_ROOT, "packages/canonical/dist/src/index.js"),
+				"@ts-drp/message-queue": resolve(REPOSITORY_ROOT, "packages/message-queue/dist/src/index.js"),
+				"@ts-drp/node/creator-adoption-activate": resolve(
+					REPOSITORY_ROOT,
+					"packages/node/dist/src/creator-adoption-activate.js"
+				),
+				"@ts-drp/node/v3-live": resolve(REPOSITORY_ROOT, "packages/node/dist/src/v3-live.js"),
+				"@ts-drp/storage-node": resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/index.js"),
+				"@ts-drp/storage-node/issuance": resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/issuance.js"),
+				"@ts-drp/storage-node/live-journal": resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/live-journal.js"),
+				"@ts-drp/storage-node/snapshot-transfer": resolve(
+					REPOSITORY_ROOT,
+					"packages/storage-node/dist/src/snapshot-transfer.js"
+				),
+			},
 		});
 		const child = spawn(process.execPath, [importHook, childPath], {
 			stdio: ["ignore", "ignore", "pipe", "ipc"],

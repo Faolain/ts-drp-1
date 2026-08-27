@@ -12,7 +12,7 @@ import { createSqliteAheDurableStore } from "@ts-drp/storage-node";
 import { createNodeDurableIssuanceStore } from "@ts-drp/storage-node/issuance";
 import { createNodeDurableLiveJournalStore } from "@ts-drp/storage-node/live-journal";
 import { createNodeSnapshotQuarantineStore } from "@ts-drp/storage-node/snapshot-transfer";
-import { createPrivateKey, sign } from "node:crypto";
+import { createHash, createPrivateKey, sign } from "node:crypto";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -243,7 +243,7 @@ export async function seedJournal(material, effects, suffix = "") {
 }
 
 /** Seeds one genuine native snapshot quarantine. */
-export async function seedSnapshot(material, events, effects, suffix = "") {
+export async function seedSnapshot(material, events, effects, suffix = "", selectedMode = "cold") {
 	const raw = createNodeSnapshotQuarantineStore({
 		primaryFilename: join(material.directory, `snapshot${suffix}.sqlite`),
 	});
@@ -253,7 +253,6 @@ export async function seedSnapshot(material, events, effects, suffix = "") {
 		await port.write(material.snapshot.declaration.chunks[index], material.snapshot.chunks[index]);
 	}
 	await port.discard();
-	const expiresAt = (await scope.status()).expiresAt;
 	await scope.release();
 	const persistedScope = await raw.openScope(material.snapshot.declaration);
 	const persistedPort = persistedScope.verificationQuarantine.open(new AbortController().signal);
@@ -265,25 +264,79 @@ export async function seedSnapshot(material, events, effects, suffix = "") {
 	}
 	await persistedPort.discard();
 	await persistedScope.release();
+	const sourceScope = await raw.openScope(material.snapshot.declaration);
+	const expiresAt = (await sourceScope.status()).expiresAt;
+	const sourceQuarantine = sourceScope.verificationQuarantine;
+	const verificationRaw = createNodeSnapshotQuarantineStore({
+		primaryFilename: join(material.directory, `snapshot-verification${suffix}.sqlite`),
+	});
+	const expirationScope = await verificationRaw.openScope(material.snapshot.declaration);
+	await expirationScope.release();
+	const directReads = [];
+	const completionDerivedReads = [];
+	let completeAfterReads = false;
 	const store = new Proxy(
 		{},
 		{
 			get(_target, property) {
-				if (property !== "openScope") return Reflect.get(raw, property, raw);
+				if (property !== "openScope") return Reflect.get(verificationRaw, property, verificationRaw);
 				return async (...args) => {
 					effects.snapshotOpenCount += 1;
 					events.push("snapshot:open-scope");
-					const opened = await raw.openScope(...args);
+					const opened = await verificationRaw.openScope(...args);
+					let quarantineAccessCount = 0;
 					return new Proxy(
 						{},
 						{
 							get(_scopeTarget, scopeProperty) {
-								if (scopeProperty === "verificationQuarantine") return opened.verificationQuarantine;
+								if (scopeProperty === "verificationQuarantine") {
+									quarantineAccessCount += 1;
+									if (quarantineAccessCount > 1) return opened.verificationQuarantine;
+									const quarantine = sourceQuarantine;
+									return Object.freeze({
+										open(...openArgs) {
+											const openedPort = quarantine.open(...openArgs);
+											return Object.freeze({
+												discard: (...discardArgs) => openedPort.discard(...discardArgs),
+												async read(descriptor) {
+													if (Date.now() > expiresAt) return undefined;
+													const bytes = await openedPort.read(descriptor);
+													if (bytes !== undefined) {
+														directReads.push({
+															byteLength: descriptor.byteLength,
+															digest: descriptor.digest,
+															index: descriptor.index,
+															observedBodySha256: createHash("sha256").update(bytes).digest("hex"),
+															observedByteLength: bytes.byteLength,
+															readInvocationOrdinal: directReads.length + 1,
+															source: "verification-quarantine-port",
+														});
+														events.push(`snapshot:read:${descriptor.index}`);
+													}
+													return bytes;
+												},
+												write: (...writeArgs) => openedPort.write(...writeArgs),
+											});
+										},
+									});
+								}
 								if (scopeProperty !== "complete") return Reflect.get(opened, scopeProperty, opened);
 								return async (...completeArgs) => {
+									completeAfterReads = directReads.length === material.snapshot.declaration.chunks.length;
 									const completed = await opened.complete(...completeArgs);
-									for (const descriptor of material.snapshot.declaration.chunks) {
-										events.push(`snapshot:read:${descriptor.index}`);
+									if (selectedMode === "declaration-loop-mutant") {
+										for (const [index, descriptor] of material.snapshot.declaration.chunks.entries()) {
+											const bytes = material.snapshot.chunks[index];
+											completionDerivedReads.push({
+												byteLength: descriptor.byteLength,
+												digest: descriptor.digest,
+												index: descriptor.index,
+												observedBodySha256: createHash("sha256").update(bytes).digest("hex"),
+												observedByteLength: bytes.byteLength,
+												readInvocationOrdinal: index + 1,
+												source: "verification-quarantine-port",
+											});
+										}
 									}
 									events.push("snapshot:complete");
 									return completed;
@@ -295,7 +348,27 @@ export async function seedSnapshot(material, events, effects, suffix = "") {
 			},
 		}
 	);
-	return { expiresAt, raw, store };
+	return {
+		expiresAt,
+		raw: {
+			async close() {
+				await sourceScope.release();
+				await Promise.all([raw.close(), verificationRaw.close()]);
+			},
+		},
+		store,
+		telemetry(completeBeforeSubscribe) {
+			const reads = selectedMode === "declaration-loop-mutant" ? completionDerivedReads : directReads;
+			return {
+				completeAfterReads,
+				completeBeforeSubscribe,
+				declaredChunkCount: material.snapshot.declaration.chunks.length,
+				directReadInvocationCount: selectedMode === "declaration-loop-mutant" ? 0 : directReads.length,
+				reads,
+				telemetrySource: "awaited-port-read",
+			};
+		},
+	};
 }
 
 function containsDigest(value, expected) {
@@ -318,7 +391,7 @@ async function cold(material, selectedMode) {
 	const ahe = await seedAhe(material, effects);
 	const issuanceStore = await seedIssuance(material);
 	const liveJournal = await seedJournal(material, effects);
-	const snapshot = await seedSnapshot(material, events, effects);
+	const snapshot = await seedSnapshot(material, events, effects, "", selectedMode);
 	const secondStores =
 		material.d108d1aIdentity === true
 			? {
@@ -434,11 +507,15 @@ async function cold(material, selectedMode) {
 				classified: displaced.kind,
 				publishedAsEpochOne: publications.some((publication) => containsDigest(publication, oldDigest)),
 			},
+			snapshotReadTelemetry: snapshot.telemetry(
+				snapshotCompletionIndex >= 0 && snapshotCompletionIndex < subscribeIndex
+			),
 			snapshotImportedBeforeActivation:
 				snapshotReadCount === material.snapshot.declaration.chunks.length &&
 				snapshotCompletionIndex >= 0 &&
 				snapshotCompletionIndex < subscribeIndex,
 			trust: result.trust,
+			...(selectedMode === "declaration-loop-mutant" ? { telemetryMutant: "declaration-loop" } : {}),
 		};
 	} finally {
 		Date.now = originalNow;
