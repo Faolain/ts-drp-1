@@ -63244,6 +63244,118 @@ passed. The corrected commit was signed, pushed, matched its remote, retained
 all 26 stashes and protected untracked paths, and left
 `node_modules/@ts-drp/canonical` absent.
 
+The first D.108e4 GREEN candidate is signed commit
+`9e7ec2b45130f09186f2a41da913f0d1639bfc7a`, parent
+`1a9e75372ec653469db690a983680bf40a860ebf`, tree
+`7df533d9f730c417a5456bc08827e029e2dbeca4`, stable patch id
+`c3134b3e9ec485ee3dcb667572e056090d04020a` and patch SHA-256
+`f558be982671d9719b3ff9088a77bf824f31875c0ca90361704430e2c099716b`.
+It is a rejected GREEN candidate, not the immutable accepted GREEN. In the
+ordinary checkout its focused implementation gates, affected builds and
+typechecks, exact-thirteen lint/format/diff gates, all four root collection
+controls, retained Phase-3h/Phase-5 tests and the retained Phase-4c/Phase-6a
+selection passed. The latter produced 127/127 passes, included the genuine
+fresh-process 64 MiB peak-live memory child without exclusion and completed
+the combined native D.108e4 behavior in 58.235 seconds under its retained
+60-second ceiling. The ordinary D.93.46 matrix also passed three consecutive
+executions.
+
+That local result did not survive the mandatory isolated proof. Detached
+checkout `/private/tmp/ts-drp-d108e4-green.dwYsII/repo` began at exact commit
+`9e7ec2b45130f09186f2a41da913f0d1639bfc7a` with clean tracked status, all 26
+stashes, no root canonical shim and no package/example `dist`. The frozen
+`pnpm install --offline --ignore-scripts --frozen-lockfile` reused 1,525 of
+1,526 packages and downloaded none; the exact filtered build then freshly
+built 38/48 workspace projects. The canonical helper resolved
+`/private/tmp/ts-drp-d108e4-green.dwYsII/repo/packages/canonical/dist/src/index.js`,
+size 21,858 bytes, with post-build timestamp `2026-08-27T13:46:03-0400`.
+The raw subprocess-resolution control passed 3/3, focused root/infrastructure
+passed 17/17, full Phase 3 passed 24/24, native passed 5/5 with the combined
+behavior at 58.729 seconds, all four root lists passed, activation passed
+24/24 and D.93.36 passed 5/5. However,
+`pnpm exec playwright test --config playwright.phase-3a1b-d9346-zone.config.ts
+--repeat-each=3 --fail-on-flaky-tests` failed 3/3. Each repeat reached the
+reciprocal raw-link snapshot boundary and then failed a different one of the
+three measured directions with unchanged sender `sent`, receiver `received`
+and receiver position for the exact 20-second poll.
+
+Focused diagnosis ruled out keyboard focus: bringing the page to the front,
+blurring the active element and proving a non-input target still failed two of
+three repeats. Simultaneously observing both reciprocal links and requiring a
+one-second stable window still failed one of three. A non-movement AOI publish
+did not reliably establish the route. Calling the existing fabric reset before
+the gate failed one of three; combining reset with an AOI readiness loop caused
+21/22 `restart` link drops and empty link snapshots, so it would manufacture
+transport churn rather than prove readiness. No such experiment changed the
+main checkout. Source and existing-unit-test inspection found the causal seam:
+`UnreliableWebRtcOwner.#linkFor` detects that an exposed established raw link
+belongs to an authenticated connection superseded by the current signaling
+connection, but retains and reports that stale link throughout replacement
+setup. `#send` correctly returns false for that mismatch. Thus the frozen
+D.108e4 raw-link snapshot is not a send-readiness oracle during replacement,
+and no tests-only correction can make it one without retrying measured
+movement, weakening the assertion or adding a product-facing probe. Per the
+frozen stop/reslice rule, D.108e4 GREEN and its review round remain blocked
+until the following narrow product correction closes.
+
+###### D.108e4a — current authenticated raw-link reconciliation
+
+D.108e4a is an immediate plan-freeze/RED/GREEN sub-slice due before D.108e4
+GREEN can be accepted or reviewed. Its exact implementation roster is only
+`packages/network/tests/unreliable-webrtc-e3-01-red.test.ts` and
+`packages/network/src/unreliable-webrtc.ts`; this plan record is the only
+documentation owner. It may not change a public or private interface, snapshot
+shape, wire byte, route digest, delivery class, packet retry policy, payload or
+connection limit, timeout, fallback behavior, signaling authentication rule,
+or any example/product owner. In particular, it may not make `send` retry or
+retain the payload while a replacement handshake runs.
+
+The immutable RED adds one causal control beside the existing retained-link
+test. After an established raw link survives loss of its authenticated
+signaling connection, the control installs a different current authenticated
+connection and pauses its replacement signaling response. An explicit
+`reconcile` must retire the superseded raw link before awaiting that response:
+the old peer connection is closed, `activeLinks` and `links` expose no
+send-ineligible stale entry during the pending handshake, and no bytes are
+sent. Releasing the response must install exactly one link bound to the new
+connection generation, after which one send succeeds and is received once.
+The retained neighboring branch remains mandatory: while no replacement
+authenticated connection exists, the already authenticated raw link stays
+active and sends successfully. This distinguishes current-connection
+reconciliation from tearing raw transport down merely because signaling was
+lost.
+
+GREEN is confined to retiring the detected superseded link at the private
+`#linkFor` replacement boundary before replacement setup is awaited. Existing
+drop accounting and the single initiator rule remain authoritative; scheduled
+link reconciliation may establish the new channel, but no application packet
+is buffered, replayed or retried. The existing malformed signaling, deadline,
+capacity, close, backpressure, authentication-loss and stale-signaling tests
+must remain unchanged and pass.
+
+The D.108e4a focused RED/GREEN command is
+`pnpm exec vitest run --coverage.enabled=false
+packages/network/tests/unreliable-webrtc-e3-01-red.test.ts --maxWorkers=1
+--minWorkers=1`. GREEN additionally requires the network build/typecheck,
+exact-two ESLint and Prettier checks, `git diff --check`, the affected Node
+ephemeral WebRTC test, and the complete D.108e4 focused and retained gates.
+The isolated proof must start from a new detached checkout of the immutable
+combined GREEN, repeat the absent-`dist`/offline-install/fresh-build controls,
+and pass D.93.46 at least three consecutive times with exactly one keypress per
+measured direction, the unchanged 20-second poll and unchanged durable
+invariants. It must then complete the rest of the frozen D.108e4 clean proof,
+including the fresh 64 MiB peak-live child, with the root canonical shim still
+absent and tracked status clean.
+
+D.108e4a receives separate signed/pushed plan-freeze, immutable RED and
+immutable GREEN checkpoints. Each checkpoint uses separate Grok 4.6/high,
+exact Kimi K3 CHECK001 through CHECK100 and Opus 5/xhigh reviews under the
+existing same-round correction rules. Reproduced P0/P1 findings are corrected
+without confirmation review and every P2 receives an owner and deadline before
+Phase 6a exit. No Fable or collaboration subagent may run without fresh express
+authorization. Only after D.108e4a and the complete combined clean proof pass
+may D.108e4 receive its GREEN review/evidence closure and D.108e5 begin.
+
 Each D.108e2 sub-slice uses one immutable tests-only RED checkpoint and one
 immutable GREEN/evidence checkpoint. Each checkpoint receives one real Grok
 4.6/high, exact Kimi K3 CHECK001 through CHECK100 and Opus 5/xhigh review.
