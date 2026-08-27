@@ -61017,6 +61017,67 @@ tests, and an absent shim root before and after the browser command. Signed,
 pushed plan-freeze, RED, GREEN and evidence commits close D.108e1; only then may
 D.108e2 start.
 
+The D.108e1 plan freeze is signed commit
+`d57e1011e927ac79048e8763326b5d50557cdbab`. The initial tests-only RED landed
+as signed commits `bc69d214df889ac5f080d1dd460c23188911e228` and
+`ee3bd1796e090275c66612bd21a884a267501fc4`; the same-round review correction is
+signed commit `442177bba021f39623d416b94ac1d65df9a6e342`. The corrected immutable RED
+checkpoint has parent `ee3bd1796e090275c66612bd21a884a267501fc4`, tree
+`8c5a326a3473626209027ff2d1c20b5441998dd6`, full-range stable patch id
+`22d881ec98464acb673e5a5bf178946cf8635ee6` and full-range binary-diff SHA-256
+`cdb8c5fe3e0b43d3b42d5fdb8fcecb1dba540b5813cef90c5335adbe9fd805df`.
+The full range from the plan freeze remains set-equal to the seven frozen RED
+owners and contains no production, manifest, lockfile or GREEN-owner change.
+
+Before correction, the focused four-file Vitest command executed 27 tests:
+24 passed and the exact three intended infrastructure failures were the old
+hook rejecting `{ expectedImports }`, the absent global-setup owner and the
+fresh child omitting direct-read telemetry. Activation Playwright executed
+12/12 across Chromium, Firefox and WebKit with no skip; product Playwright
+executed 9/12, with exactly one missing relay-observation failure per engine.
+After the same-round correction, the focused command executes 28 tests: the
+same 24 pass and four intentional failures add the child-executed
+`declaration-loop-mutant` control. Exact-seven ESLint with zero warnings,
+Prettier, storage-browser typecheck and both diff checks pass. The ignored shim
+root left by the old module-load config was not deleted: it was moved intact to
+`/private/tmp/ts-drp-d108e1-shim-backup.IIOIUX/@ts-drp` so the RED precondition
+could be reproduced deterministically without touching pnpm-owned or protected
+paths.
+
+Opus 5/xhigh session `38a3d237-6192-42a2-bbe1-95f192763d36` launched no
+subagent, changed no clone file and returned schema-valid `CHANGES_REQUIRED`,
+P0=0/P1=2/P2=5. Both P1 findings reproduced: the first wrong-file control did
+not force real export-map resolution, and self-reported telemetry labels did
+not kill a declaration loop inside `complete`. The one allowed same-round
+correction adds a positive built non-root export plus cross-package,
+same-package, types-condition and source-relative rejections; it also binds
+each read to parent-held declaration metadata and the SHA-256/length of the
+transferred body, counts actual read invocations, and requires a fresh-child
+declaration-loop mutant to be rejected even when it copies the direct-read
+labels. The correction also incorporates the in-roster P2 hardening: the
+already-shipped D.108d1a death behavior is unconditional, teardown preserves a
+caller-owned sibling, and relay observations have a positive byte-length
+floor. The two dead composite readiness helpers remain assigned to their
+already-frozen GREEN contract owners for deletion.
+
+Kimi CLI 0.38.0 used exact `kimi-code/k3` in isolated-clone session
+`session_830c0aca-dde2-4f3d-8dfc-2bba2fba9cfe`, emitted CHECK001 through
+CHECK100 exactly once in ascending order, changed no tracked file and returned
+schema-valid `APPROVED`, P0=0/P1=0/P2=2. Its two P2 observations—the residual
+D.108d1a readiness gate and the cross-package-only import negative—are both
+closed by the same correction above. No confirmation review ran.
+
+Grok 4.6/high session `01a040de-344e-77e1-950f-99d5e0c5d245` performed
+substantial read-only inspection for 330.107 seconds but emitted no terminal
+schema because the API returned HTTP 402, `Grok Build usage balance exhausted`.
+The honest classification is `NO_VERDICT`, not cancellation and not a review
+finding. The exact same retained session was resumed after the correction; it
+again returned the same 402 before a model turn. No second Grok session was
+created. D.108e1 therefore remains stopped before GREEN until this same session
+can resume with replenished balance and emit its terminal verdict, or an
+explicitly authorized protocol change is recorded. No Fable invocation or
+collaboration subagent ran in this slice.
+
 The rejected D.108d2 plan-freeze review inspected immutable signed commit
 `6d0c3c036c3dd5d6422391478171b1d9253705c9`, parent
 `227d0e41722e6fab66598e3f0b19fdf06141759f`, tree
