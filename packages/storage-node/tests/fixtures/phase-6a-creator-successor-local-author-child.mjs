@@ -303,7 +303,22 @@ function instrumentIssuanceStore(raw, effects, input) {
 	descriptors.readIssued = {
 		...readIssued,
 		value: async (scope, authorSequence) => {
+			const predecessorWindow = effects.predecessorWindows.find(
+				(window) => window.attempt === effects.authorityAttempt && !window.complete
+			);
+			if (predecessorWindow !== undefined) {
+				predecessorWindow.issuedReads.push({
+					authorSequence,
+					scopeIdentity: scope === predecessorWindow.scope ? "captured" : "copied",
+				});
+			}
 			const commit = await raw.readIssued(scope, authorSequence);
+			if (authorSequence === 0 && input.currentOutboxFault !== undefined) {
+				if (input.currentOutboxFault === "read-issued-throw") {
+					throw new TypeError("D.108e2d current issued-record read failed");
+				}
+				return commit === null ? null : repeatFaultCommit(commit, input.currentOutboxFault);
+			}
 			if (!effects.repeatPhase || authorSequence !== 1 || input.repeatOutboxFault === undefined) return commit;
 			if (input.repeatOutboxFault === "read-issued-throw") {
 				throw new TypeError("D.108d1b repeat issued-record read failed");
@@ -314,7 +329,26 @@ function instrumentIssuanceStore(raw, effects, input) {
 	descriptors.readOutboxPage = {
 		...readOutboxPage,
 		value: async (...args) => {
+			const request = args[0];
+			let predecessorWindow = effects.predecessorWindows.find((window) => window.attempt === effects.authorityAttempt);
+			if (predecessorWindow === undefined) {
+				predecessorWindow = {
+					attempt: effects.authorityAttempt,
+					complete: false,
+					issuedReads: [],
+					pages: [],
+					scope: request?.scope,
+				};
+				effects.predecessorWindows.push(predecessorWindow);
+			}
 			const rows = await raw.readOutboxPage(...args);
+			if (!predecessorWindow.complete && request?.scope === predecessorWindow.scope) {
+				predecessorWindow.pages.push({
+					afterSequence: Array.isArray(request?.afterKey) ? request.afterKey[2] : null,
+					returnedSequences: rows.map((row) => row.commit.authorSequence),
+				});
+				if (rows.length === 0) predecessorWindow.complete = true;
+			}
 			if (!effects.repeatPhase || input.repeatOutboxFault === undefined) return rows;
 			return rows.map((row) =>
 				row.commit.authorSequence === 1 && input.repeatOutboxFault !== "read-issued-throw"
@@ -446,6 +480,7 @@ async function runCase(material, index, input) {
 		issuanceStoreShape: false,
 		lineageReads: [],
 		order: [],
+		predecessorWindows: [],
 		repeatPhase: false,
 		snapshotOpenCount: 0,
 		transactIssueCount: 0,
@@ -497,6 +532,15 @@ async function runCase(material, index, input) {
 			issuanceStoreShape: effects.issuanceStoreShape,
 			lineageReads: [...effects.lineageReads],
 			order: [...effects.order],
+			predecessorWindows: effects.predecessorWindows.map((window) => ({
+				attempt: window.attempt,
+				complete: window.complete,
+				issuedReads: window.issuedReads.map((read) => ({ ...read })),
+				pages: window.pages.map((page) => ({
+					afterSequence: page.afterSequence,
+					returnedSequences: [...page.returnedSequences],
+				})),
+			})),
 			publicationCount: publications.length,
 			snapshotOpenCount: effects.snapshotOpenCount,
 			subscribeCount: events.filter((event) => event === "subscribe").length,
@@ -620,6 +664,22 @@ async function matrix(material) {
 			name: "future-outbox-read-failure",
 			repeat: true,
 			repeatOutboxFault: "read-issued-throw",
+			scenario: "valid",
+			wrongAuthority: carol,
+		},
+		{
+			authority: bob,
+			carriers: [bobCarrier],
+			currentOutboxFault: "read-issued-throw",
+			name: "current-outbox-read-failure",
+			scenario: "valid",
+			wrongAuthority: carol,
+		},
+		{
+			authority: bob,
+			carriers: [bobCarrier],
+			currentOutboxFault: "issued-mismatch",
+			name: "current-outbox-issued-mismatch",
 			scenario: "valid",
 			wrongAuthority: carol,
 		},

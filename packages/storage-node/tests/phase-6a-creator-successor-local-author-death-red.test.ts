@@ -9,6 +9,7 @@ import { createD108d1PackedDurableMaterial } from "../../../tests/fixtures/phase
 import {
 	D108D1B_CHILD_BEHAVIORS,
 	d108d1bChatAuthorities,
+	D108E2D_CHILD_BEHAVIORS,
 	openD108d1bMultiWriterFixture,
 	runD108d1bLocalAuthorChild,
 } from "../../../tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.js";
@@ -36,18 +37,29 @@ async function durableMaterial(directory: string): Promise<unknown> {
 	}
 }
 
+let sharedChildResult: ReturnType<typeof runD108d1bLocalAuthorChild> | undefined;
+
+function runSharedChild(): ReturnType<typeof runD108d1bLocalAuthorChild> {
+	if (sharedChildResult !== undefined) return sharedChildResult;
+	const directory = mkdtempSync(join(tmpdir(), "ts-drp-d108d1b-local-author-"));
+	directories.push(directory);
+	sharedChildResult = durableMaterial(directory).then((material) => runD108d1bLocalAuthorChild(material));
+	return sharedChildResult;
+}
+
 describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 	it("pins the complete child inventory to the genuine built-package launcher", () => {
 		expect(D108D1B_CHILD_BEHAVIORS).toEqual([
 			"fresh Node binds established and fresh chat peers while every ambiguous or unauthenticated cold reopen fails before live effects",
 		]);
+		expect(D108E2D_CHILD_BEHAVIORS).toEqual([
+			"fresh Node predecessor recovery terminates with one issued-record read per distinct current or authenticated-future row",
+		]);
 		expect(childPath.pathname.endsWith("phase-6a-creator-successor-local-author-child.mjs")).toBe(true);
 	});
 
 	it(D108D1B_CHILD_BEHAVIORS[0], async () => {
-		const directory = mkdtempSync(join(tmpdir(), "ts-drp-d108d1b-local-author-"));
-		directories.push(directory);
-		const result = await runD108d1bLocalAuthorChild(await durableMaterial(directory));
+		const result = await runSharedChild();
 		const proof = result.proof as
 			| Readonly<{
 					readonly authors?: Readonly<Record<string, string>>;
@@ -94,6 +106,8 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 				"forged-future-outbox",
 				"malformed-future-outbox",
 				"future-outbox-read-failure",
+				"current-outbox-read-failure",
+				"current-outbox-issued-mismatch",
 				"copied-creator-lineage",
 				"wrong-author-right-signer",
 				"right-author-wrong-signer",
@@ -112,7 +126,16 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 				"negative-lineage-next",
 				"unsafe-lineage-next",
 			]);
-		const [established, fresh, forgedFuture, malformedFuture, backingFailure, ...rejected] = results;
+		const [
+			established,
+			fresh,
+			forgedFuture,
+			malformedFuture,
+			backingFailure,
+			currentBackingFailure,
+			currentMismatch,
+			...rejected
+		] = results;
 		expect(established).toMatchObject({
 			issued: {
 				acceptedJournalAuthor: proof?.authors?.bob,
@@ -162,6 +185,22 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 				issued: { author: proof?.authors?.bob, authorSequence: 1 },
 				repeat: { result: { detail, kind: "recovery-rejected", ok: false } },
 				result: { lifecycle: "active", ok: true, recovery: "active-new" },
+			});
+		}
+		for (const control of [currentBackingFailure, currentMismatch]) {
+			expect(control).toMatchObject({
+				effects: {
+					adoptionSwapCount: 0,
+					issuanceStoreShape: true,
+					publicationCount: 0,
+					subscribeCount: 0,
+					transactIssueCount: 0,
+				},
+				result: {
+					detail: "creator predecessor recovery failed: issuance-rejected",
+					kind: "recovery-rejected",
+					ok: false,
+				},
 			});
 		}
 		const writerAuthors = d108d1bChatAuthorities()
@@ -310,5 +349,45 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 				expect.soft(signerIndex).toBeLessThan(events?.indexOf(lineage) ?? -1);
 			}
 		}
+	});
+
+	it(D108E2D_CHILD_BEHAVIORS[0], async () => {
+		const result = await runSharedChild();
+		const proof = result.proof as
+			| Readonly<{
+					readonly results?: readonly Readonly<Record<string, unknown>>[];
+			  }>
+			| undefined;
+		const established = proof?.results?.find(({ name }) => name === "established-bob");
+		const windows = (
+			established?.effects as
+				| Readonly<{
+						readonly predecessorWindows?: readonly Readonly<Record<string, unknown>>[];
+				  }>
+				| undefined
+		)?.predecessorWindows;
+		expect(windows).toHaveLength(2);
+		expect.soft(windows?.[0]).toEqual({
+			attempt: 0,
+			complete: true,
+			issuedReads: [{ authorSequence: 0, scopeIdentity: "copied" }],
+			pages: [
+				{ afterSequence: null, returnedSequences: [0] },
+				{ afterSequence: 0, returnedSequences: [] },
+			],
+		});
+		expect.soft(windows?.[1]).toEqual({
+			attempt: 1,
+			complete: true,
+			issuedReads: [
+				{ authorSequence: 0, scopeIdentity: "copied" },
+				{ authorSequence: 1, scopeIdentity: "captured" },
+			],
+			pages: [
+				{ afterSequence: null, returnedSequences: [0] },
+				{ afterSequence: 0, returnedSequences: [1] },
+				{ afterSequence: 1, returnedSequences: [] },
+			],
+		});
 	});
 });
