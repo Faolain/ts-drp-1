@@ -308,6 +308,7 @@ test(D108D2_BROWSER_BEHAVIORS[2], async () => {
 		for (const observation of audit.outgoingMessages) {
 			expect(observation.sourceRealmId).toBe(audit.realmId);
 			expect(observation.data).toBeInstanceOf(Uint8Array);
+			expect(observation.data.byteLength).toBeGreaterThan(0);
 			const key = `${observation.sourceRealmId}:${observation.sequence}`;
 			expect(outgoing.has(key)).toBe(false);
 			outgoing.set(key, observation);
@@ -320,6 +321,7 @@ test(D108D2_BROWSER_BEHAVIORS[2], async () => {
 		expect(observation.receiverRealmId).toBe(audit.realmId);
 		expect(observation.sourceRealmId).not.toBe(audit.realmId);
 		expect(observation.data).toBeInstanceOf(Uint8Array);
+		expect(observation.data.byteLength).toBeGreaterThan(0);
 		const sent = outgoing.get(`${observation.sourceRealmId}:${observation.sequence}`);
 		expect(sent).toBeDefined();
 		expect(Array.from(observation.data)).toEqual(Array.from(sent?.data ?? []));

@@ -7,6 +7,7 @@ import { REPOSITORY_ROOT } from "./fixtures/phase-6a-v3/creator-successor-activa
 import {
 	D108E1_GREEN_PATHS,
 	D108E1_RED_PATHS,
+	type D108e1ExpectedSnapshotRead,
 	isD108e1DirectSnapshotTelemetry,
 } from "./fixtures/phase-6a-v3/creator-successor-infrastructure-contract.js";
 import { workspacePackageImportHook } from "./fixtures/shared/workspace-package-subprocess.mjs";
@@ -16,6 +17,7 @@ const GLOBAL_SETUP = resolve(
 	"packages/storage-browser/tests/phase-6a-creator-successor-activation-global-setup.ts"
 );
 const SHIM_ROOT = resolve(REPOSITORY_ROOT, "tests/fixtures/node_modules/@ts-drp");
+const SHIM_SIBLING_SENTINEL = resolve(REPOSITORY_ROOT, "tests/fixtures/node_modules/d108e1-caller-owned.txt");
 
 describe("D.108e1 activation test-infrastructure RED", () => {
 	it("freezes exactly seven RED and eight GREEN test-infrastructure owners", () => {
@@ -28,37 +30,55 @@ describe("D.108e1 activation test-infrastructure RED", () => {
 
 	it("binds the closed hook only after the package's own built export map resolves the exact target", () => {
 		const canonical = resolve(REPOSITORY_ROOT, "packages/canonical/dist/src/index.js");
+		const activation = resolve(REPOSITORY_ROOT, "packages/node/dist/src/creator-adoption-activate.js");
 		expect(
 			workspacePackageImportHook({
-				expectedImports: { "@ts-drp/canonical": canonical },
-			})
-		).toMatch(/^--import=data:text\/javascript;base64,/u);
-		expect(() =>
-			workspacePackageImportHook({
 				expectedImports: {
-					"@ts-drp/canonical": resolve(REPOSITORY_ROOT, "packages/compaction/dist/src/snapshot-stream.js"),
+					"@ts-drp/canonical": canonical,
+					"@ts-drp/node/creator-adoption-activate": activation,
 				},
 			})
-		).toThrow(/workspace package target mismatch for @ts-drp\/canonical/u);
+		).toMatch(/^--import=data:text\/javascript;base64,/u);
+		for (const wrongTarget of [
+			resolve(REPOSITORY_ROOT, "packages/compaction/dist/src/snapshot-stream.js"),
+			resolve(REPOSITORY_ROOT, "packages/canonical/dist/src/domain-hash-stream.js"),
+			resolve(REPOSITORY_ROOT, "packages/canonical/dist/src/index.d.ts"),
+			resolve(REPOSITORY_ROOT, "packages/canonical/src/index.ts"),
+		]) {
+			expect(() =>
+				workspacePackageImportHook({
+					expectedImports: { "@ts-drp/canonical": wrongTarget },
+				})
+			).toThrow(/workspace package target mismatch for @ts-drp\/canonical/u);
+		}
 	});
 
 	it("rejects completion-derived snapshot telemetry", () => {
+		const expectedReads = Object.freeze([
+			Object.freeze({ bodySha256: "b".repeat(64), byteLength: 32, digest: "a".repeat(64), index: 0 }),
+		] satisfies readonly D108e1ExpectedSnapshotRead[]);
 		expect(
-			isD108e1DirectSnapshotTelemetry({
-				completeAfterReads: true,
-				completeBeforeSubscribe: true,
-				declaredChunkCount: 1,
-				reads: [
-					{
-						byteLength: 32,
-						digest: "a".repeat(64),
-						index: 0,
-						observedByteLength: 32,
-						source: "snapshot-complete-loop",
-					},
-				],
-				telemetrySource: "completion-derived",
-			})
+			isD108e1DirectSnapshotTelemetry(
+				{
+					completeAfterReads: true,
+					completeBeforeSubscribe: true,
+					declaredChunkCount: 1,
+					directReadInvocationCount: 0,
+					reads: [
+						{
+							byteLength: 32,
+							digest: "a".repeat(64),
+							index: 0,
+							observedBodySha256: "b".repeat(64),
+							observedByteLength: 32,
+							readInvocationOrdinal: 1,
+							source: "verification-quarantine-port",
+						},
+					],
+					telemetrySource: "awaited-port-read",
+				},
+				expectedReads
+			)
 		).toBe(false);
 	});
 
@@ -80,16 +100,23 @@ describe("D.108e1 activation test-infrastructure RED", () => {
 		const setup = (await import(`${pathToFileURL(GLOBAL_SETUP).href}?d108e1=${crypto.randomUUID()}`)) as Readonly<{
 			default(): Promise<() => void>;
 		}>;
-		const cleanup = await setup.default();
-		expect(existsSync(SHIM_ROOT)).toBe(true);
+		writeFileSync(SHIM_SIBLING_SENTINEL, "sibling-owned", "utf8");
 		try {
-			throw new Error("D108E1_SIMULATED_TEST_FAILURE");
-		} catch (error) {
-			expect(error).toEqual(new Error("D108E1_SIMULATED_TEST_FAILURE"));
+			const cleanup = await setup.default();
+			expect(existsSync(SHIM_ROOT)).toBe(true);
+			try {
+				throw new Error("D108E1_SIMULATED_TEST_FAILURE");
+			} catch (error) {
+				expect(error).toEqual(new Error("D108E1_SIMULATED_TEST_FAILURE"));
+			} finally {
+				cleanup();
+			}
+			expect(existsSync(SHIM_ROOT)).toBe(false);
+			expect(readFileSync(SHIM_SIBLING_SENTINEL, "utf8")).toBe("sibling-owned");
 		} finally {
-			cleanup();
+			rmSync(SHIM_SIBLING_SENTINEL, { force: true });
+			rmSync(SHIM_ROOT, { force: true, recursive: true });
 		}
-		expect(existsSync(SHIM_ROOT)).toBe(false);
 
 		mkdirSync(SHIM_ROOT, { recursive: true });
 		const sentinel = resolve(SHIM_ROOT, "preexisting.txt");

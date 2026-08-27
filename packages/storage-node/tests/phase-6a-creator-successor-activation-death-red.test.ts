@@ -11,14 +11,13 @@ import {
 	D108D1_CHILD_BEHAVIORS,
 	runD108d1ActivationChild,
 } from "../../../tests/fixtures/phase-6a-v3/creator-successor-activation-contract.js";
+import { D108D1A_COLD_BEHAVIOR } from "../../../tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.js";
 import {
-	D108D1A_COLD_BEHAVIOR,
-	d108d1aReadiness,
-} from "../../../tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.js";
-import { isD108e1DirectSnapshotTelemetry } from "../../../tests/fixtures/phase-6a-v3/creator-successor-infrastructure-contract.js";
+	d108e1ExpectedSnapshotReads,
+	isD108e1DirectSnapshotTelemetry,
+} from "../../../tests/fixtures/phase-6a-v3/creator-successor-infrastructure-contract.js";
 
 const childPath = new URL("./fixtures/phase-6a-creator-successor-activation-child.mjs", import.meta.url);
-const identityReadiness = d108d1aReadiness();
 const directories: string[] = [];
 
 beforeAll(() => {
@@ -61,7 +60,9 @@ describe("D.108d1 fresh-process successor activation RED", () => {
 	it("cold reopen reconstructs active-new custody with no adoption CAS or displaced-row publication", async () => {
 		const directory = mkdtempSync(join(tmpdir(), "ts-drp-d108d1-cold-"));
 		directories.push(directory);
-		const result = await runD108d1ActivationChild("cold", await durableMaterial(directory));
+		const material = await durableMaterial(directory);
+		const expectedReads = d108e1ExpectedSnapshotReads(material);
+		const result = await runD108d1ActivationChild("cold", material);
 		expect(result.proof).toMatchObject({
 			activation: { epoch: 1, lifecycle: "active", ok: true, recovery: "active-new" },
 			adoptionSwapCount: 0,
@@ -69,11 +70,22 @@ describe("D.108d1 fresh-process successor activation RED", () => {
 			pid: expect.any(Number),
 			snapshotImportedBeforeActivation: true,
 		});
-		expect(isD108e1DirectSnapshotTelemetry(result.proof?.snapshotReadTelemetry)).toBe(true);
+		expect(isD108e1DirectSnapshotTelemetry(result.proof?.snapshotReadTelemetry, expectedReads)).toBe(true);
 		expect(result.proof?.pid).not.toBe(process.pid);
 	});
 
-	it.skipIf(!identityReadiness.ready)(D108D1A_COLD_BEHAVIOR, async () => {
+	it("kills declaration-loop telemetry even when it copies the direct-read labels", async () => {
+		const directory = mkdtempSync(join(tmpdir(), "ts-drp-d108e1-mutant-"));
+		directories.push(directory);
+		const material = await durableMaterial(directory);
+		const result = await runD108d1ActivationChild("declaration-loop-mutant" as never, material);
+		expect(result.proof).toMatchObject({ telemetryMutant: "declaration-loop" });
+		expect(
+			isD108e1DirectSnapshotTelemetry(result.proof?.snapshotReadTelemetry, d108e1ExpectedSnapshotReads(material))
+		).toBe(false);
+	});
+
+	it(D108D1A_COLD_BEHAVIOR, async () => {
 		const directory = mkdtempSync(join(tmpdir(), "ts-drp-d108d1a-cold-"));
 		directories.push(directory);
 		const material = await durableMaterial(directory);
