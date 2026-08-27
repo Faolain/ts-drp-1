@@ -63927,7 +63927,8 @@ The focused RED/GREEN command selects only the new behavior through
 conversion" --fail-on-flaky-tests`. RED must produce exactly one assertion
 failure after browser boot, not a missing-record, module/server/timeout or
 rejected-snapshot failure. GREEN must pass that behavior 1/1 and the complete
-config 2/2. The owner file currently has two pre-existing standalone-compiler
+config 3/3 after D.108e4d adds its deterministic helper behavior. The owner
+file currently has two pre-existing standalone-compiler
 errors: the loss-profile return is typed too loosely for `NetworkConditions`,
 and `receiverEvidenceAtDeadline()` does not explicitly narrow an optional zone
 API. RED may make only behavior-preserving type refinements for those two
@@ -63953,7 +63954,7 @@ count and blocks closure; it does not authorize another fixture change.
 
 After D.108e4c GREEN, the combined immutable candidate must rerun every
 D.108e4b and D.108e4 gate: the new focused observer self-check, the complete
-E3-03 config 2/2, three consecutive retained long-campaign invocations,
+E3-03 config 3/3, three consecutive retained long-campaign invocations,
 focused owner/Node tests, affected builds and typechecks, the native five-test
 timing file alone without concurrent test or model load, activation and
 retained browser matrices, all four root collection controls, exact D.93.36,
@@ -64038,6 +64039,11 @@ stays attached on failure and has no pass/fail role.
 
 RED and GREEN must run the exact deterministic behavior, bounded standalone
 TypeScript command, exact-owner typed ESLint, Prettier and `git diff --check`.
+The RED evidence must be the one deep-equality assertion with only the prefix
+and suffix values wrong; GREEN must be that behavior's pass. A web-server,
+module, collection or timeout failure does not satisfy either checkpoint even
+though the pure behavior shares the retained Playwright config and its four
+web-server processes.
 After GREEN, run the focused D.108e4c observer behavior and the complete E3-03
 config once. Only if those pass may the ordinary three-consecutive campaign
 gate restart from zero. A different retained failure must be diagnosed from
@@ -64047,6 +64053,52 @@ checkpoints and the existing Grok 4.6/high, exact Kimi K3 CHECK001 through
 CHECK100 and Opus 5/xhigh review protocol. P0/P1 findings are corrected in the
 same round; every P2 receives an owner and deadline. No Fable or collaboration
 subagent may run without new express authorization.
+
+The immutable D.108e4d RED is signed/pushed commit
+`34247590087cb4e80d88fe001b64c2660ce81801`, parent
+`804b2b1c2c1002825c97d2d7ce175d21398c304c`, tree
+`c9b53a269c1a055c5da06e00688b26053ceeea37`, stable patch id
+`82ba37b239a27294383f60a7b999ec708e5eac3a` and raw-diff SHA-256
+`d8c87f1b26bc0303541e2e50621f94648c6ac283eed7e79f92134a689556ef37`.
+It adds only the one deterministic 600-sample helper behavior to the exact
+test owner. The focused grep ran exactly one behavior and failed exactly one
+deep-equality assertion: complete/internal were the required 1/2, while
+prefix/suffix were the diagnosed 1/1 rather than 2/2. There was no module,
+server, collection, timeout or browser failure. Bounded strict owner-file
+TypeScript, exact-owner typed ESLint, Prettier and `git diff --check` passed.
+
+All three independent RED reviewers approved with zero P0/P1. Grok 4.6/high
+session `01a0457d-bf3e-7193-947c-7823638fe5aa` completed its one substantive
+read-only run in 285.104 seconds with exit 0 and `stop_reason=end_turn`.
+Progress sentences before its schema-valid terminal `APPROVED`, P0=0/P1=0/P2=0
+object caused the wrapper's `NO_VERDICT` formatting classification. A
+tool-free formatting continuation in that same session returned the identical
+object alone; it was not a replacement review. Exact Kimi K3 session
+`609a813d-6232-4306-8525-b3e149b6435a` returned substantive `APPROVED`,
+P0=0/P1=0/P2=2. Its first rendering contained CHECK001 through CHECK100 plus
+one extra `CHECK078-recheck` line. A no-tool formatting continuation in the
+same session preserved the verdict/findings and returned exactly 100 total
+and unique markers, CHECK001 through CHECK100, with no duplicate or bare
+marker, followed by valid JSON. Claude-skill Opus 5/xhigh session
+`93bba082-c90e-4542-87e0-e04ffed6a629` returned schema-valid `APPROVED`,
+P0=0/P1=0/P2=4. No reviewer changed the tracked tree, no replacement or
+confirmation review ran, and no Fable or collaboration subagent ran.
+
+The five unique P2 obligations have exact owners and deadlines. The plan
+owner corrected the complete-config count from 2/2 to 3/3 and added the
+failure discriminator above before GREEN. The D.108e4d GREEN implementer must
+compute genuine distances from virtual boundary -1 to the first sequence and
+from the last sequence to exclusive boundary `SAMPLE_COUNT`; a clamped or
+boolean endpoint contribution is forbidden. Empty observations must return
+explicit `{ gap: 0, maxStallMs: 0 }`, preserving current non-vacuous behavior;
+the retained campaign's existing non-empty assertion stays before its gap
+gate. These implementation obligations are due before the D.108e4d GREEN
+checkpoint. The D.108e4 evidence owner must inspect every restarted passing
+campaign attachment's raw transport deltas before counting it and, when a
+truncated sequence fails, record which later AoI/HOL assertion retains the
+teardown evidence. This is due before the first restarted campaign invocation
+is counted. No RED rewrite, threshold change or confirmation review is
+authorized.
 
 The first D.108e4c plan-freeze review round inspected signed/pushed commit
 `eb3de05b6054ac6fdd158d2530bad1798f87f10f`, parent
