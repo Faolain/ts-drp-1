@@ -2015,7 +2015,7 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 		expect(liveSource).toContain('from "./internal/v3-topic.js"');
 		expect(activationSource).toContain('from "./internal/v3-topic.js"');
 		expect(helperSource).toContain('"ts-drp/live-topic/v3"');
-		expect(helperSource).toContain('"drp/v3/1/"');
+		expect(helperSource).toContain("drp/v3/1/");
 		const unit = ts.createSourceFile("v3-topic.ts", helperSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 		const topicHashes: ts.CallExpression[] = [];
 		const visit = (node: ts.Node): void => {
