@@ -277,12 +277,20 @@ async function rawAuthority(databaseName: string): Promise<PlainRecord> {
 		await transactionDone(transaction);
 		if (objects.length !== 1) throw new TypeError("D.108d2 active object is ambiguous");
 		const objectRow = exactRecord(objects[0]);
-		const head = exactRecord(decodeCanonical(objectRow.record as Uint8Array));
+		const headEnvelope = exactRecord(decodeCanonical(objectRow.record as Uint8Array));
+		if (headEnvelope.kind !== "head" || headEnvelope.storageSchemaVersion !== 1) {
+			throw new TypeError("D.108d2 active head envelope is invalid");
+		}
+		const head = exactRecord(headEnvelope.body);
 		const generationRow = generations
 			.map(exactRecord)
 			.find((row) => row.objectId === objectRow.objectId && row.generationId === head.generationId);
 		if (generationRow === undefined) throw new TypeError("D.108d2 active generation is absent");
-		const generation = exactRecord(decodeCanonical(generationRow.record as Uint8Array));
+		const generationEnvelope = exactRecord(decodeCanonical(generationRow.record as Uint8Array));
+		if (generationEnvelope.kind !== "generation" || generationEnvelope.storageSchemaVersion !== 1) {
+			throw new TypeError("D.108d2 active generation envelope is invalid");
+		}
+		const generation = exactRecord(generationEnvelope.body);
 		const closure = generation.closure as readonly PlainRecord[];
 		const decoded = closure.map((reference) => {
 			const row = blobs.map(exactRecord).find((candidate) => candidate.digest === reference.digest);
