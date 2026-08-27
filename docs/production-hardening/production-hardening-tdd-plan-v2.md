@@ -61505,6 +61505,112 @@ guard in `examples/v3-room/src/index.ts` only. Retained hot adoption, cold
 reopen, migration/redirect invite preconditions, issue/close behavior and all
 D.108e2a gates must stay green.
 
+D.108e2b is closed at signed and pushed GREEN commit
+`2562341a237bc9cd749cb04532a49be85d8732d0`, parent
+`ed76b5bcfb377898323235004b4dbda4089e30ef`, tree
+`fd8c70b081b2b283f33093584c39ab5f8f2a0831`, stable patch id
+`0945cb32c5790e589d944caf98789ae044a362d7` and diff SHA-256
+`34ba80c30c68dab7df5526260ca2ab1dc89e11eefb69d7157f4857d0af600bf7`.
+The GREEN diff is exactly `examples/v3-room/src/index.ts`; the pinned chat
+SHA-256 remains `af384cb45ad8cffb2e56e648bdb22ea92fb8b8a053376ec2a47c34284b95fd0f`,
+and no node, wire, store, authority or API owner changed. The room now rejects
+the three cold declaration compositions before the effect-counting getters,
+owns one retry-safe in-flight adoption task, checks the closed fence after
+each asynchronous adoption boundary, joins that task before teardown, and
+awaits replacement cleanup before a predecessor-deactivation error escapes.
+
+The immutable RED was signed and pushed as
+`b5abc01b15c35d80ebe5b831bb26a87c2af132e5`. Its review round found material
+oracle gaps rather than changing the product contract: Opus required causal
+settlement ordering and close-path release evidence; Grok and Kimi identified
+the incomplete application-only composition probe. The same round corrected
+those reproduced findings without a confirmation review in signed and pushed
+commit `ed76b5bcfb377898323235004b4dbda4089e30ef`, parent
+`b5abc01b15c35d80ebe5b831bb26a87c2af132e5`, tree
+`da3686599e7af952845ecf1581b91cb483c33b18`, stable patch id
+`595913f0513d4e1f825fd19e5b98bcfc28eabfae` and diff SHA-256
+`4298d12a1e07789016d7dd1e0b264e991bdb42f3465af0b71872ec2a53e4e4d2`.
+The correction replaced the 50 ms close race with monotonic settlement order,
+captured completed replacement deactivation at rejection settlement, asserted
+all application/store/transport/signer effects at zero, added supported inverse
+compositions, pinned chat byte identity, and isolated shared-topic lifetime
+scenarios with test-only cleanup after each result was captured. Corrected RED
+remained exactly one unit composite failure and one composite failure per
+browser, while all twelve retained browser controls stayed green.
+
+The GREEN checkpoint received three valid terminal reviews and no P0/P1.
+Grok 4.6/high ran once under the upgraded service for 660.245 seconds and
+finished with exit 0, `stop_reason=end_turn`, `TERMINAL_RESPONSE` and
+`APPROVED` with no findings. Kimi K3/high inspected the same immutable commit,
+returned `APPROVED` with two P2 diagnostics, and its same session performed a
+tool-free format-only normalization; the retained terminal has exactly 101
+non-empty lines, ordered `CHECK001` through `CHECK100` once each, followed by
+the strict JSON `FINAL`. Opus 5/xhigh completed with exit 0, model
+`claude-opus-5`, no permission denial or spawned agent, `APPROVED`, zero P0/P1
+and four P2 observations. No Fable or collaboration subagent ran.
+
+The ordinary-checkout command ledger passed as follows:
+
+- `pnpm exec vitest run tests/phase-6a-creator-successor-product-red.test.ts
+--no-coverage`: 5/5;
+- product Playwright through
+  `packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts`:
+  15/15 across Chromium, Firefox and WebKit;
+- `pnpm exec vitest run tests/phase-4c-*.test.ts tests/phase-6a-*.test.ts
+packages/storage-node/tests/phase-6a-*.test.ts --maxWorkers=1
+--minWorkers=1 --no-coverage`: 16 files / 117 tests;
+- Phase-5 creator close/actor/relearn/live-close Vitest: 39/39; retained actor,
+  relearn and live-close Playwright: 12/12, 6/6 and 6/6;
+- room and chat build/typecheck, storage-browser typecheck, exact-owner ESLint,
+  Prettier and both diff checks passed.
+
+The old broad D.93.46b and Phase-3g fixture selection still fails at its
+already-recorded invalid or truncated migration-invite baseline; the GREEN
+guard is not on those failure stacks, and the genuine Phase-3h migration
+rehearsal remains 9/9. This baseline is not attributed to D.108e2b and did not
+relax an owned gate.
+
+The isolated proof used detached worktree
+`/private/tmp/ts-drp-d108e2b-clean.0hhh4x/repo` at the exact GREEN commit with
+no inherited `node_modules` or build output. `pnpm install --offline
+--ignore-scripts --frozen-lockfile` installed all 1,526 locked packages with
+zero package downloads, `node scripts/ensure-native-deps.mjs` supplied the
+missing native prebuild, and filtered dependency builds for storage-node,
+storage-browser and node plus both example builds completed from that state.
+The same clean worktree passed the 117-test retained selection and product
+Playwright 15/15, then passed affected typechecks and exact lint/format/diff
+checks with an empty tracked status.
+
+The clean retained selection includes the genuine fresh Node 64 MiB child with
+no exclusion. A direct invocation through
+`runWorkspacePackageSubprocess` resolved `@ts-drp/canonical` to the clean
+`packages/canonical/dist/src/index.js` and
+`@ts-drp/compaction/snapshot-stream` to the clean
+`packages/compaction/dist/src/snapshot-stream.js`, passed only those exact file
+URLs to a new `--expose-gc` process, and produced: owner
+`chunkCount=512`, `reopenedChunkCount=512`, `exactByteLength=67108864`,
+`chunkBodyBytes=131072`, `maxMemoryBytes=262144`,
+`peakVerifierBodyBytes=131072`, `settledVerifierBodyBytes=0`; retaining mutant
+`peakVerifierBodyBytes=67108864`, `retainedBodyMutantDetected=true`,
+`settledVerifierBodyBytes=0`. Thus the signed `<2 * chunkBodyBytes` owner bound
+is measured while each awaited write is live, and the mutant crosses that
+same bound before its deliberate post-run release. A bare manual child call
+without the launcher's closed resolution map intentionally rejects `missing
+exact workspace package resolutions`; it is not an accepted or masked route.
+
+GREEN P2 observations are assigned rather than hidden. D.108e2c, before its
+immutable RED, owns test-only pause gates after successor activation and after
+predecessor deactivation so the two post-activation close branches receive
+causal cleanup and exact-once coverage. A new D.108e3 room-lifetime hardening
+freeze is due after D.108e2d and before Phase 6a exit; it must separately test
+and decide cleanup-error preservation, activation-failure versus closed-error
+diagnostics, unconditional shutdown when `drainPendingIssues()` rejects, and
+serialization between creator-successor adoption and migration
+rehearsal/activation. D.108e3 may name the room as a production owner only
+after its own RED reproduces a defect; it may not widen chat, node APIs, wire,
+store, authority or memory contracts. These P2 assignments do not reopen or
+delay the completed D.108e2b correctness gate.
+
 ##### D.108e2c — retained recovery-oracle strengthening
 
 D.108e2c is test infrastructure only. Before its RED, freeze the smallest
