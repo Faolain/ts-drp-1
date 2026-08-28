@@ -68238,3 +68238,96 @@ ordinary ledger from its first command at the new final signed behavior tree.
 The earlier 17/17 result cannot compose across this test-tree change. The
 detached proof, complete five-test E3-03 campaign and both three-consecutive
 campaign ledgers remain unexecuted; this slice authorizes none of them.
+
+The one D.108e4s GREEN attempt ran at exact signed/pushed correction
+`2694a76ed490ecd4ef8aeb65a1ea128f0bf3f51d` and did not produce a terminal
+child proof. It is not retried and D.108e4s does not close. Its supposedly
+quiet preflight was invalidated before launch: the preserved ambient snapshot
+already shows an unrelated eight-worker Vitest run in another repository at
+seven seconds elapsed, plus OrbStack at 154.7% CPU and load averages
+`9.94,11.82,16.48`. The execution wrapper failed to stop after recording that
+process, so this is a custody defect as well as scheduling evidence; it is not
+misreported as a no-overlap sample.
+
+The shared D.108e2e child reached the unchanged 90-second launcher kill before
+emitting a terminal proof. The parent produced exactly one
+`D108E4L_TIMING ` unavailable record with `classification=timeout` and
+`launcherContractErasedKind=true`, no `D108E4M_PROFILE ` record, then reported
+3/5 tests with the same memoized timeout rejecting both consumers. Vitest
+reported 100.21 seconds and `/usr/bin/time` real/user/sys
+102.34/70.09/5.97 seconds. Ambient/stdout/stderr/status/unavailable-line
+SHA-256 values are
+`b6bf1cbd2e24f722b12422e63b812e584a5a1d2354f1899eed42e0ff2da603b3`,
+`bf7a86b64933473857702a50af1a9d3001a258695142803dbeaade6ff2a3cde8`,
+`211c3ef0a162f6888a781dbf189e4b5f02607b62dad01c4add87f8d8d5f83fc0`,
+`4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`
+and `c4433dbc886300794459a8ee90d0bdb2ab2c6cb637a082f353bb9fb00b7bc2f9`.
+Custody is under `.logs/d108e4s-green-2694a76e/`. Because no terminal proof
+exists, this run cannot establish a new child duration, semantic regression or
+executing owner. It confirms only that fixed shared-host wall gates cannot be
+used as product correctness evidence and that the existing launcher still
+classifies a nonterminal child rather than hanging the test indefinitely.
+
+###### D.108e4t — semantic-first private-launcher reliability
+
+D.108e4t is the pre-committed D.108e4s failure route. It is a narrow test-
+infrastructure change against exactly these two executable owners:
+
+- `tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts`;
+- `packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts`.
+
+It changes no child fixture, product/example source, public or private product
+API, package manifest, lockfile, build configuration, import hook, workspace
+resolution, cryptographic operation, recovery workload/count, row/memory
+limit, timing telemetry schema or semantic assertion. The current 90-second
+timeout failure is its immutable RED; no additional RED run is authorized.
+
+The GREEN candidate removes only the hard parent
+`expect(proof?.wallTimeMs).toBeLessThan(...)` correctness assertion. The child
+still emits `wallTimeMs`; the parent still validates its nonnegative type,
+identity with the signed proof, exact phase coverage, contiguous boundaries,
+duration arithmetic, member containment and the complete phase/member count
+rosters. Timing remains observable evidence but is no longer a false product
+latency contract.
+
+The private `runLocalAuthorChild` helper receives one required `timeoutMs`
+parameter. `runD108d1bLocalAuthorChild` explicitly retains `90_000`; only
+`runD108e2eSkipBudgetChild`, whose genuine worst-case cryptographic workload
+produced every retained long run, passes `120_000`. Both exported function
+signatures remain unchanged. The two existing parent tests that consume the
+memoized D.108e2e promise move from 120,000 to 150,000 ms, preserving a nominal
+30-second parent-test margin over its launcher. The launcher remains a hard
+hang kill and classifies timeout before Vitest aborts; no unbounded wait is
+introduced. A 120-second D.108e2e kill is the smallest round 30-second increase
+over the prior launcher while remaining 30 seconds below both consuming tests;
+it is scheduling allowance, not a product-latency inference from aggregate
+parent/child process CPU, and it does not change the ordinary D.108d1b contract.
+
+Freeze this exact candidate and rationale in one signed/pushed checkpoint,
+then run normal read-only Grok 4.6/high, exact Kimi K3 `CHECK001` through
+`CHECK100` and Opus 5/xhigh review before execution. P0/P1 findings are
+corrected in the same round and every P2 receives an exact owner and
+2026-09-04 deadline. No confirmation review, Fable or collaboration subagent
+runs. Static acceptance is exact-owner ESLint and Prettier, `git diff
+--check` and the retained source-shape owner. The affected storage-node package
+typecheck retains its inherited-baseline policy: zero diagnostics may name an
+exact D.108e4t owner while unrelated diagnostics are recorded rather than
+relabeled green. No product build is implied by these test-only changes.
+
+Before the one GREEN, a separate 30-second preflight samples every five
+seconds and must show no Vitest, Playwright or task-owned reviewer process; a
+positive sample stops without launching. After a clean preflight, run exactly
+once:
+
+```bash
+env -u TS_DRP_D108E4M_PROFILE /usr/bin/time -p pnpm exec vitest run --coverage.enabled=false packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts --maxWorkers=1 --minWorkers=1
+```
+
+GREEN requires 5/5, zero profile lines, exactly one valid terminal timing
+record with empty `memberCountErrors`, all semantic assertions reached, and no
+launcher/Vitest timeout. Record the child wall time and phase ledger as
+telemetry only. Failure permits no retry, timeout raise, workload reduction or
+product change; it stops for a dedicated-resource execution decision. A GREEN
+restores authority to restart D.108e4k from its first command at the new final
+behavior tree. It does not compose either failed D.108e4k attempt, authorize
+the detached proof early or authorize any E3-03 campaign.

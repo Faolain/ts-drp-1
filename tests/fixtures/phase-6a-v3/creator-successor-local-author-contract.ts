@@ -206,9 +206,10 @@ export async function openD108d1bMultiWriterFixture(): Promise<GenuineCreatorAdo
  * Runs the genuine built-package local-author child in the labeled mode.
  * @param input - Packed durable successor material.
  * @param label - Stable child failure label.
+ * @param timeoutMs - Mode-specific hard hang timeout.
  * @returns The child's single terminal proof message.
  */
-function runLocalAuthorChild(input: unknown, label: string): Promise<D108d1bChildMessage> {
+function runLocalAuthorChild(input: unknown, label: string, timeoutMs: number): Promise<D108d1bChildMessage> {
 	return new Promise((resolvePromise, reject) => {
 		const childPath = resolve(
 			REPOSITORY_ROOT,
@@ -241,7 +242,7 @@ function runLocalAuthorChild(input: unknown, label: string): Promise<D108d1bChil
 		const timer = setTimeout(() => {
 			child.kill("SIGKILL");
 			reject(new Error(`${label} child timeout: ${stderr}`));
-		}, 90_000);
+		}, timeoutMs);
 		child.stderr?.setEncoding("utf8");
 		child.stderr?.on("data", (value: string) => (stderr += value));
 		child.on("message", (message: D108d1bChildMessage) => (observed = message));
@@ -262,7 +263,7 @@ function runLocalAuthorChild(input: unknown, label: string): Promise<D108d1bChil
  * @returns The child's single terminal proof message.
  */
 export function runD108d1bLocalAuthorChild(input: unknown): Promise<D108d1bChildMessage> {
-	return runLocalAuthorChild(input, "D.108d1b");
+	return runLocalAuthorChild(input, "D.108d1b", 90_000);
 }
 
 /**
@@ -271,5 +272,5 @@ export function runD108d1bLocalAuthorChild(input: unknown): Promise<D108d1bChild
  * @returns The child's single terminal proof message.
  */
 export function runD108e2eSkipBudgetChild(input: unknown): Promise<D108d1bChildMessage> {
-	return runLocalAuthorChild(Object.freeze({ material: input, mode: "skip-budget" }), "D.108e2e");
+	return runLocalAuthorChild(Object.freeze({ material: input, mode: "skip-budget" }), "D.108e2e", 120_000);
 }
