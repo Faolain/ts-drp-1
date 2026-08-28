@@ -25,10 +25,13 @@ interface FabricObservation {
 interface FabricTransportEvidence {
 	readonly fallbackCount: 0;
 	readonly raw: readonly Readonly<{
+		readonly connectionId: string;
+		readonly generation: number;
 		readonly iceRestarts: 0;
 		readonly maxRetransmits: 0;
 		readonly ordered: false;
 		readonly peerId: string;
+		readonly remoteAddr: string;
 		readonly readyState: "open";
 	}>[];
 }
@@ -95,6 +98,43 @@ interface GridNetworkSnapshot {
 	readonly peerId: string;
 }
 
+interface GridNetworkTestSession {
+	readonly node: Readonly<{
+		readonly networkNode: Readonly<{
+			connect(addresses: readonly unknown[]): Promise<void>;
+			disconnect(peerId: string): Promise<void>;
+			getPeerMultiaddrs(peerId: string): Promise<readonly Readonly<{ readonly multiaddr: unknown }>[]>;
+		}>;
+	}>;
+	snapshot(): GridNetworkSnapshot;
+}
+
+type Libp2pMonitorEventKind =
+	| "connection-abort"
+	| "connection-close"
+	| "ping-failure"
+	| "ping-read-success"
+	| "ping-start"
+	| "ping-stream-open"
+	| "ping-write-success";
+
+interface Libp2pMonitorObservation {
+	readonly atMonotonicMs: number;
+	readonly atWallMs: number;
+	readonly connectionId: string;
+	readonly event: Libp2pMonitorEventKind;
+	readonly owner: string;
+	readonly peerId: string;
+	readonly reason?: string;
+	readonly schemaVersion: 1;
+	readonly sequence: number;
+}
+
+interface Libp2pMonitorObserver {
+	reset(): void;
+	snapshot(): readonly Libp2pMonitorObservation[];
+}
+
 interface NetworkSnapshot {
 	readonly connections: readonly string[];
 	readonly peerId: string;
@@ -103,7 +143,8 @@ interface NetworkSnapshot {
 declare global {
 	interface Window {
 		readonly __E303_RTC_OBSERVER__?: RtcObserver;
-		readonly __TS_DRP_GRID_SESSION__?: { snapshot(): GridNetworkSnapshot };
+		readonly __E303_LIBP2P_MONITOR_OBSERVER__?: Libp2pMonitorObserver;
+		readonly __TS_DRP_GRID_SESSION__?: GridNetworkTestSession;
 		readonly __TS_DRP_V3_ZONE__?: ZoneApi;
 	}
 }
@@ -139,7 +180,50 @@ interface RtcObservation {
 	readonly text: string;
 }
 
+type RtcLifecycleKind =
+	| "channel-close-call"
+	| "channel-close-event"
+	| "channel-handler-installed"
+	| "channel-message"
+	| "channel-open-event"
+	| "channel-send-attempt"
+	| "channel-send-failure"
+	| "channel-send-success"
+	| "connection-close-call"
+	| "connection-created"
+	| "connection-state"
+	| "ice-connection-state"
+	| "ice-gathering-state"
+	| "signaling-state";
+
+interface RtcLifecycleObservation {
+	readonly atMonotonicMs: number;
+	readonly atWallMs: number;
+	readonly bufferedAmount?: number;
+	readonly channelId?: number;
+	readonly connectionId: number;
+	readonly event: RtcLifecycleKind;
+	readonly handoffId: string;
+	readonly label?: string;
+	readonly owner: string;
+	readonly readyState?: RTCDataChannelState;
+	readonly schemaVersion: 1;
+	readonly sequence: number;
+	readonly state?: string;
+}
+
+interface RtcChannelStateObservation {
+	readonly bufferedAmount: number;
+	readonly channelId: number;
+	readonly connectionId: number;
+	readonly label: string;
+	readonly readyState: RTCDataChannelState;
+	readonly schemaVersion: 1;
+}
+
 interface RtcObserver {
+	channelStateSnapshot(): readonly RtcChannelStateObservation[];
+	lifecycleSnapshot(): Promise<readonly RtcLifecycleObservation[]>;
 	reset(): void;
 	snapshot(): Promise<readonly RtcObservation[]>;
 }
@@ -298,10 +382,44 @@ function installRtcObserver(): void {
 	let nextChannelId = 0;
 	let nextConnectionId = 0;
 	let ordinal = 0;
+	let lifecycleSequence = 0;
 	const records: RtcObservation[] = [];
+	const lifecycleRecords: RtcLifecycleObservation[] = [];
 	const pending = new Set<Promise<void>>();
+	const watchedChannels = new Set<RTCDataChannel>();
 	const channelIdentities = new WeakMap<RTCDataChannel, Readonly<{ channelId: number; connectionId: number }>>();
 	const connectionIdentities = new WeakMap<RTCPeerConnection, number>();
+	const recordLifecycle = (
+		event: RtcLifecycleKind,
+		connectionId: number,
+		input: Readonly<{
+			readonly bufferedAmount?: number;
+			readonly channelId?: number;
+			readonly label?: string;
+			readonly owner: string;
+			readonly readyState?: RTCDataChannelState;
+			readonly state?: string;
+		}>
+	): void => {
+		lifecycleRecords.push(
+			Object.freeze({
+				atMonotonicMs: performance.now(),
+				atWallMs: Date.now(),
+				bufferedAmount: input.bufferedAmount,
+				channelId: input.channelId,
+				connectionId,
+				event,
+				handoffId: `${connectionId}:${input.channelId ?? "pc"}`,
+				label: input.label,
+				owner: input.owner,
+				readyState: input.readyState,
+				schemaVersion: 1 as const,
+				sequence: lifecycleSequence,
+				state: input.state,
+			})
+		);
+		lifecycleSequence += 1;
+	};
 	const bytesFrom = async (data: RtcData): Promise<Uint8Array> => {
 		if (typeof data === "string") return new TextEncoder().encode(data);
 		if (data instanceof Blob) return new Uint8Array(await data.arrayBuffer());
@@ -342,13 +460,51 @@ function installRtcObserver(): void {
 	};
 	const watch = (channel: RTCDataChannel, connectionId: number): RTCDataChannel => {
 		if (channelIdentities.has(channel)) return channel;
-		channelIdentities.set(channel, Object.freeze({ channelId: nextChannelId, connectionId }));
+		const channelId = nextChannelId;
+		channelIdentities.set(channel, Object.freeze({ channelId, connectionId }));
+		watchedChannels.add(channel);
 		nextChannelId += 1;
-		channel.addEventListener("message", (event) => capture(channel, "message", event.data as RtcData));
+		recordLifecycle("channel-handler-installed", connectionId, {
+			bufferedAmount: channel.bufferedAmount,
+			channelId,
+			label: channel.label,
+			owner: "rtc-observer-datachannel-handler",
+			readyState: channel.readyState,
+		});
+		channel.addEventListener("open", () =>
+			recordLifecycle("channel-open-event", connectionId, {
+				bufferedAmount: channel.bufferedAmount,
+				channelId,
+				label: channel.label,
+				owner: "rtc-datachannel-open-event",
+				readyState: channel.readyState,
+			})
+		);
+		channel.addEventListener("close", () =>
+			recordLifecycle("channel-close-event", connectionId, {
+				bufferedAmount: channel.bufferedAmount,
+				channelId,
+				label: channel.label,
+				owner: "rtc-datachannel-close-event",
+				readyState: channel.readyState,
+			})
+		);
+		channel.addEventListener("message", (event) => {
+			recordLifecycle("channel-message", connectionId, {
+				bufferedAmount: channel.bufferedAmount,
+				channelId,
+				label: channel.label,
+				owner: "rtc-datachannel-message-event",
+				readyState: channel.readyState,
+			});
+			capture(channel, "message", event.data as RtcData);
+		});
 		return channel;
 	};
 	const NativePeerConnection = window.RTCPeerConnection;
 	const nativeCreateDataChannel = NativePeerConnection.prototype.createDataChannel;
+	const nativePeerConnectionClose = NativePeerConnection.prototype.close;
+	const nativeDataChannelClose = RTCDataChannel.prototype.close;
 	Object.defineProperty(NativePeerConnection.prototype, "createDataChannel", {
 		configurable: true,
 		value(this: RTCPeerConnection, label: string, options?: RTCDataChannelInit): RTCDataChannel {
@@ -362,8 +518,66 @@ function installRtcObserver(): void {
 	Object.defineProperty(RTCDataChannel.prototype, "send", {
 		configurable: true,
 		value(this: RTCDataChannel, data: RtcData): void {
+			const identity = channelIdentities.get(this);
+			if (identity === undefined) throw new Error("E303_RTC_CHANNEL_IDENTITY_ABSENT");
+			recordLifecycle("channel-send-attempt", identity.connectionId, {
+				bufferedAmount: this.bufferedAmount,
+				channelId: identity.channelId,
+				label: this.label,
+				owner: "rtc-datachannel-send",
+				readyState: this.readyState,
+			});
 			capture(this, "send", data);
-			Reflect.apply(nativeSend, this, [data]);
+			try {
+				Reflect.apply(nativeSend, this, [data]);
+				recordLifecycle("channel-send-success", identity.connectionId, {
+					bufferedAmount: this.bufferedAmount,
+					channelId: identity.channelId,
+					label: this.label,
+					owner: "rtc-datachannel-send",
+					readyState: this.readyState,
+				});
+			} catch (error) {
+				recordLifecycle("channel-send-failure", identity.connectionId, {
+					bufferedAmount: this.bufferedAmount,
+					channelId: identity.channelId,
+					label: this.label,
+					owner: error instanceof Error ? error.name : "rtc-datachannel-send-error",
+					readyState: this.readyState,
+				});
+				throw error;
+			}
+		},
+		writable: true,
+	});
+	Object.defineProperty(RTCDataChannel.prototype, "close", {
+		configurable: true,
+		value(this: RTCDataChannel): void {
+			const identity = channelIdentities.get(this);
+			if (identity !== undefined) {
+				recordLifecycle("channel-close-call", identity.connectionId, {
+					bufferedAmount: this.bufferedAmount,
+					channelId: identity.channelId,
+					label: this.label,
+					owner: "rtc-datachannel-close",
+					readyState: this.readyState,
+				});
+			}
+			Reflect.apply(nativeDataChannelClose, this, []);
+		},
+		writable: true,
+	});
+	Object.defineProperty(NativePeerConnection.prototype, "close", {
+		configurable: true,
+		value(this: RTCPeerConnection): void {
+			const connectionId = connectionIdentities.get(this);
+			if (connectionId !== undefined) {
+				recordLifecycle("connection-close-call", connectionId, {
+					owner: "rtc-peerconnection-close",
+					state: this.connectionState,
+				});
+			}
+			Reflect.apply(nativePeerConnectionClose, this, []);
 		},
 		writable: true,
 	});
@@ -374,6 +588,34 @@ function installRtcObserver(): void {
 		const connectionId = nextConnectionId;
 		nextConnectionId += 1;
 		connectionIdentities.set(connection, connectionId);
+		recordLifecycle("connection-created", connectionId, {
+			owner: "rtc-peerconnection-constructor",
+			state: connection.connectionState,
+		});
+		connection.addEventListener("connectionstatechange", () =>
+			recordLifecycle("connection-state", connectionId, {
+				owner: "rtc-peerconnection-state-event",
+				state: connection.connectionState,
+			})
+		);
+		connection.addEventListener("iceconnectionstatechange", () =>
+			recordLifecycle("ice-connection-state", connectionId, {
+				owner: "rtc-peerconnection-ice-event",
+				state: connection.iceConnectionState,
+			})
+		);
+		connection.addEventListener("icegatheringstatechange", () =>
+			recordLifecycle("ice-gathering-state", connectionId, {
+				owner: "rtc-peerconnection-ice-gathering-event",
+				state: connection.iceGatheringState,
+			})
+		);
+		connection.addEventListener("signalingstatechange", () =>
+			recordLifecycle("signaling-state", connectionId, {
+				owner: "rtc-peerconnection-signaling-event",
+				state: connection.signalingState,
+			})
+		);
 		connection.addEventListener("datachannel", (event) => watch(event.channel, connectionId));
 		return connection;
 	} as unknown as typeof RTCPeerConnection;
@@ -387,9 +629,34 @@ function installRtcObserver(): void {
 	Object.defineProperty(observedWindow, "__E303_RTC_OBSERVER__", {
 		configurable: false,
 		value: Object.freeze({
+			channelStateSnapshot(): readonly RtcChannelStateObservation[] {
+				return [...watchedChannels]
+					.map((channel) => {
+						const identity = channelIdentities.get(channel);
+						if (identity === undefined) throw new Error("E303_RTC_CHANNEL_IDENTITY_ABSENT");
+						return Object.freeze({
+							bufferedAmount: channel.bufferedAmount,
+							channelId: identity.channelId,
+							connectionId: identity.connectionId,
+							label: channel.label,
+							readyState: channel.readyState,
+							schemaVersion: 1 as const,
+						});
+					})
+					.sort((left, right) => left.connectionId - right.connectionId || left.channelId - right.channelId);
+			},
+			async lifecycleSnapshot(): Promise<readonly RtcLifecycleObservation[]> {
+				await Promise.all([...pending]);
+				return lifecycleRecords
+					.slice()
+					.sort((left, right) => left.sequence - right.sequence)
+					.map((record) => Object.freeze({ ...record }));
+			},
 			reset(): void {
 				generation += 1;
 				records.length = 0;
+				lifecycleRecords.length = 0;
+				lifecycleSequence = 0;
 			},
 			async snapshot(): Promise<readonly RtcObservation[]> {
 				await Promise.all([...pending]);
@@ -551,6 +818,154 @@ async function fabricSnapshot(page: Page, trialId: string): Promise<FabricTrialS
 	}, trialId);
 }
 
+async function installLibp2pMonitorObserver(page: Page): Promise<void> {
+	await page.evaluate(() => {
+		if (window.__E303_LIBP2P_MONITOR_OBSERVER__ !== undefined) return;
+		type StreamLike = Readonly<{
+			addEventListener(type: "close" | "message", listener: (event: Event) => void): void;
+			close(options?: unknown): Promise<void>;
+			send(data: Uint8Array): boolean;
+		}>;
+		type ConnectionLike = Readonly<{
+			readonly id: string;
+			readonly remotePeer: Readonly<{ toString(): string }>;
+			abort(error?: Error): void;
+			addEventListener(type: "close", listener: () => void): void;
+			newStream(protocol: string | readonly string[], options?: unknown): Promise<StreamLike>;
+		}>;
+		type HostLike = Readonly<{
+			addEventListener(type: "connection:open", listener: (event: CustomEvent<ConnectionLike>) => void): void;
+			getConnections(): readonly ConnectionLike[];
+		}>;
+		const session = window.__TS_DRP_GRID_SESSION__ as
+			| (GridNetworkTestSession & {
+					readonly node: {
+						readonly networkNode: { readonly _node?: HostLike };
+					};
+			  })
+			| undefined;
+		const host = session?.node.networkNode._node;
+		if (host === undefined) throw new Error("E303_LIBP2P_HOST_ABSENT");
+		let sequence = 0;
+		const records: Libp2pMonitorObservation[] = [];
+		const wrapped = new WeakSet<object>();
+		const pingInFlight = new Map<string, boolean>();
+		const record = (
+			connection: ConnectionLike,
+			event: Libp2pMonitorEventKind,
+			owner: string,
+			reason?: string
+		): void => {
+			records.push(
+				Object.freeze({
+					atMonotonicMs: performance.now(),
+					atWallMs: Date.now(),
+					connectionId: connection.id,
+					event,
+					owner,
+					peerId: connection.remotePeer.toString(),
+					reason,
+					schemaVersion: 1 as const,
+					sequence,
+				})
+			);
+			sequence += 1;
+		};
+		const instrument = (connection: ConnectionLike): void => {
+			if (wrapped.has(connection)) return;
+			wrapped.add(connection);
+			const nativeAbort = connection.abort.bind(connection);
+			const nativeNewStream = connection.newStream.bind(connection);
+			Object.defineProperty(connection, "abort", {
+				configurable: true,
+				value(error?: Error): void {
+					const stack = new Error().stack ?? "";
+					const monitorOwned = stack.includes("connection-monitor");
+					if (monitorOwned && pingInFlight.get(connection.id) === true) {
+						record(connection, "ping-failure", "libp2p-connection-monitor", error?.name ?? error?.message);
+						pingInFlight.delete(connection.id);
+					}
+					record(
+						connection,
+						"connection-abort",
+						monitorOwned ? "libp2p-connection-monitor" : "other-owner",
+						error?.name ?? error?.message
+					);
+					nativeAbort(error);
+				},
+				writable: true,
+			});
+			Object.defineProperty(connection, "newStream", {
+				configurable: true,
+				async value(protocol: string | readonly string[], options?: unknown): Promise<StreamLike> {
+					const protocols = typeof protocol === "string" ? [protocol] : protocol;
+					const ping = protocols.includes("/ipfs/ping/1.0.0");
+					if (ping) {
+						record(connection, "ping-start", "libp2p-connection-monitor");
+						pingInFlight.set(connection.id, true);
+					}
+					try {
+						const stream = await nativeNewStream(protocol, options);
+						if (!ping) return stream;
+						record(connection, "ping-stream-open", "libp2p-connection-monitor");
+						stream.addEventListener("message", () =>
+							record(connection, "ping-read-success", "libp2p-connection-monitor")
+						);
+						stream.addEventListener("close", () => pingInFlight.delete(connection.id));
+						return new Proxy(stream, {
+							get(target, property, receiver): unknown {
+								if (property === "send") {
+									return (data: Uint8Array): boolean => {
+										const accepted = target.send(data);
+										record(connection, "ping-write-success", "libp2p-connection-monitor");
+										return accepted;
+									};
+								}
+								if (property === "close") {
+									return async (closeOptions?: unknown): Promise<void> => {
+										await target.close(closeOptions);
+										pingInFlight.delete(connection.id);
+									};
+								}
+								const value = Reflect.get(target, property, receiver) as unknown;
+								return typeof value === "function" ? value.bind(target) : value;
+							},
+						});
+					} catch (error) {
+						if (ping) {
+							record(
+								connection,
+								"ping-failure",
+								"libp2p-connection-monitor",
+								error instanceof Error ? error.name : String(error)
+							);
+							pingInFlight.delete(connection.id);
+						}
+						throw error;
+					}
+				},
+				writable: true,
+			});
+			connection.addEventListener("close", () => record(connection, "connection-close", "libp2p-connection"));
+		};
+		for (const connection of host.getConnections()) instrument(connection);
+		host.addEventListener("connection:open", (event) => instrument(event.detail));
+		Object.defineProperty(window, "__E303_LIBP2P_MONITOR_OBSERVER__", {
+			configurable: false,
+			value: Object.freeze({
+				reset(): void {
+					records.length = 0;
+					sequence = 0;
+				},
+				snapshot(): readonly Libp2pMonitorObservation[] {
+					return records.slice().map((record) => Object.freeze({ ...record }));
+				},
+			}),
+			writable: false,
+		});
+	});
+}
+
 async function resetRtcObserver(page: Page): Promise<void> {
 	await page.evaluate(() => {
 		const observer = window.__E303_RTC_OBSERVER__;
@@ -563,6 +978,30 @@ async function rtcObservations(page: Page): Promise<readonly RtcObservation[]> {
 	return page.evaluate(async () => {
 		const observer = window.__E303_RTC_OBSERVER__;
 		if (observer === undefined) throw new Error("E303_RTC_OBSERVER_ABSENT");
+		return observer.snapshot();
+	});
+}
+
+async function rtcLifecycleObservations(page: Page): Promise<readonly RtcLifecycleObservation[]> {
+	return page.evaluate(async () => {
+		const observer = window.__E303_RTC_OBSERVER__;
+		if (observer === undefined) throw new Error("E303_RTC_OBSERVER_ABSENT");
+		return observer.lifecycleSnapshot();
+	});
+}
+
+async function rtcChannelStates(page: Page): Promise<readonly RtcChannelStateObservation[]> {
+	return page.evaluate(() => {
+		const observer = window.__E303_RTC_OBSERVER__;
+		if (observer === undefined) throw new Error("E303_RTC_OBSERVER_ABSENT");
+		return observer.channelStateSnapshot();
+	});
+}
+
+async function libp2pMonitorObservations(page: Page): Promise<readonly Libp2pMonitorObservation[]> {
+	return page.evaluate(() => {
+		const observer = window.__E303_LIBP2P_MONITOR_OBSERVER__;
+		if (observer === undefined) throw new Error("E303_LIBP2P_MONITOR_OBSERVER_ABSENT");
 		return observer.snapshot();
 	});
 }
@@ -1465,6 +1904,256 @@ test("freezes RTC metadata at the event boundary before async payload conversion
 		await context.close();
 	}
 });
+
+if (process.env["D108E4G_TELEMETRY"] === "1") {
+	test("records a versioned and causally joined RTC lifecycle without changing delivery", async ({ browser }) => {
+		const context = await browser.newContext();
+		await context.addInitScript(installRtcObserver);
+		const page = await context.newPage();
+		try {
+			await page.goto("about:blank");
+			const evidence = await page.evaluate(async () => {
+				const observer = window.__E303_RTC_OBSERVER__;
+				if (observer === undefined) throw new Error("E303_RTC_OBSERVER_ABSENT");
+				const left = new RTCPeerConnection();
+				const right = new RTCPeerConnection();
+				left.addEventListener("icecandidate", (event) => {
+					if (event.candidate !== null) void right.addIceCandidate(event.candidate);
+				});
+				right.addEventListener("icecandidate", (event) => {
+					if (event.candidate !== null) void left.addIceCandidate(event.candidate);
+				});
+				let settleRightChannel: ((channel: RTCDataChannel) => void) | undefined;
+				const rightChannel = new Promise<RTCDataChannel>((resolve) => {
+					settleRightChannel = resolve;
+				});
+				right.addEventListener("datachannel", (event) => settleRightChannel?.(event.channel), { once: true });
+				const outbound = left.createDataChannel("ts-drp-ephemeral/1", {
+					maxRetransmits: 0,
+					ordered: false,
+				});
+				const offer = await left.createOffer();
+				await left.setLocalDescription(offer);
+				await right.setRemoteDescription(offer);
+				const answer = await right.createAnswer();
+				await right.setLocalDescription(answer);
+				await left.setRemoteDescription(answer);
+				const inbound = await rightChannel;
+				inbound.binaryType = "arraybuffer";
+				await Promise.all(
+					[outbound, inbound].map((channel) =>
+						channel.readyState === "open"
+							? Promise.resolve()
+							: new Promise<void>((resolve, reject) => {
+									channel.addEventListener("open", () => resolve(), { once: true });
+									channel.addEventListener("close", () => reject(new Error("RTC_SELF_CHECK_CLOSED")), {
+										once: true,
+									});
+								})
+					)
+				);
+				const received = new Promise<string>((resolve) => {
+					inbound.addEventListener(
+						"message",
+						(event) => resolve(new TextDecoder().decode(new Uint8Array(event.data as ArrayBuffer))),
+						{ once: true }
+					);
+				});
+				outbound.send(Uint8Array.of(65));
+				const text = await received;
+				outbound.close();
+				left.close();
+				right.close();
+				await new Promise((resolve) => setTimeout(resolve, 0));
+				return Object.freeze({ lifecycle: await observer.lifecycleSnapshot(), text });
+			});
+
+			expect(evidence.text).toBe("A");
+			expect(evidence.lifecycle).not.toHaveLength(0);
+			expect(evidence.lifecycle.map(({ sequence }) => sequence)).toEqual(
+				Array.from({ length: evidence.lifecycle.length }, (_value, index) => index)
+			);
+			expect(evidence.lifecycle.every(({ schemaVersion }) => schemaVersion === 1)).toBe(true);
+			for (let index = 1; index < evidence.lifecycle.length; index += 1) {
+				expect(evidence.lifecycle[index]?.atMonotonicMs).toBeGreaterThanOrEqual(
+					evidence.lifecycle[index - 1]?.atMonotonicMs ?? 0
+				);
+			}
+			const kinds = evidence.lifecycle.map(({ event }) => event);
+			expect(kinds).toEqual(
+				expect.arrayContaining([
+					"channel-close-call",
+					"channel-handler-installed",
+					"channel-message",
+					"channel-open-event",
+					"channel-send-attempt",
+					"channel-send-success",
+					"connection-close-call",
+					"connection-created",
+					"connection-state",
+					"ice-connection-state",
+					"ice-gathering-state",
+					"signaling-state",
+				])
+			);
+			const handler = evidence.lifecycle.find(({ event }) => event === "channel-handler-installed");
+			if (handler === undefined) throw new Error("D108E4G_RTC_HANDLER_EVENT_ABSENT");
+			const remoteOpen = evidence.lifecycle.find(
+				({ channelId, connectionId, event }) =>
+					event === "channel-open-event" && channelId === handler.channelId && connectionId === handler.connectionId
+			);
+			expect(remoteOpen?.sequence).toBeGreaterThan(handler.sequence);
+		} finally {
+			await context.close();
+		}
+	});
+}
+
+if (process.env["D108E4G_TELEMETRY"] === "1") {
+	test("attributes stale authenticated replacement before changing the raw owner", async ({ browser }, testInfo) => {
+		test.setTimeout(180_000);
+		const creatorContext = await browser.newContext();
+		const receiverContext = await browser.newContext();
+		await Promise.all([
+			creatorContext.addInitScript(installRtcObserver),
+			receiverContext.addInitScript(installRtcObserver),
+		]);
+		const creator = await creatorContext.newPage();
+		const receiver = await receiverContext.newPage();
+		const trialId = "d108e4g-current-owner";
+		try {
+			await Promise.all([openGrid(creator), openGrid(receiver)]);
+			const peers = await createZone(creator, receiver);
+			await Promise.all([installLibp2pMonitorObserver(creator), installLibp2pMonitorObserver(receiver)]);
+			await Promise.all(
+				[creator, receiver].map((page) =>
+					page.evaluate((selectedTrialId) => window.__TS_DRP_V3_ZONE__?.fabric?.reset(selectedTrialId), trialId)
+				)
+			);
+			await waitForOpenTransportPair(creator, receiver);
+			const initialNetworks = await Promise.all([network(creator), network(receiver)]);
+			const [initialCreatorFabric, initialReceiverFabric, initialCreatorZone, initialReceiverZone] = await Promise.all([
+				fabricSnapshot(creator, trialId),
+				fabricSnapshot(receiver, trialId),
+				zone(creator),
+				zone(receiver),
+			]);
+			const creatorIsInitiator = peers.creatorPeerId < peers.receiverPeerId;
+			const initiator = creatorIsInitiator ? creator : receiver;
+			const responder = creatorIsInitiator ? receiver : creator;
+			const initiatorPeerId = creatorIsInitiator ? peers.creatorPeerId : peers.receiverPeerId;
+			const responderPeerId = creatorIsInitiator ? peers.receiverPeerId : peers.creatorPeerId;
+			const initialInitiatorFabric = creatorIsInitiator ? initialCreatorFabric : initialReceiverFabric;
+			const initialInitiatorZone = creatorIsInitiator ? initialCreatorZone : initialReceiverZone;
+			const initialResponderZone = creatorIsInitiator ? initialReceiverZone : initialCreatorZone;
+			const oldRaw = initialInitiatorFabric.transport.raw[0];
+			if (oldRaw === undefined) throw new Error("D108E4G_OLD_RAW_LINK_ABSENT");
+			const oldRtcChannels = (await rtcChannelStates(initiator)).filter(
+				({ label, readyState }) => label === "ts-drp-ephemeral/1" && readyState === "open"
+			);
+			expect(oldRtcChannels, "the two-peer control must have one exact open raw RTC owner").toHaveLength(1);
+			const oldRtc = oldRtcChannels[0];
+			if (oldRtc === undefined) throw new Error("D108E4G_OLD_RTC_OWNER_ABSENT");
+			await Promise.all([resetRtcObserver(creator), resetRtcObserver(receiver)]);
+			await Promise.all(
+				[creator, receiver].map((page) => page.evaluate(() => window.__E303_LIBP2P_MONITOR_OBSERVER__?.reset()))
+			);
+
+			await initiator.evaluate(async (remotePeerId) => {
+				const networkNode = window.__TS_DRP_GRID_SESSION__?.node.networkNode;
+				if (networkNode === undefined) throw new Error("D108E4G_NETWORK_NODE_ABSENT");
+				const addresses = await networkNode.getPeerMultiaddrs(remotePeerId);
+				if (addresses.length === 0) throw new Error("D108E4G_REMOTE_ADDRESS_ABSENT");
+				await networkNode.disconnect(remotePeerId);
+				await networkNode.connect(addresses.map(({ multiaddr }) => multiaddr));
+			}, responderPeerId);
+			await waitForNetworkPair(
+				creator,
+				receiver,
+				initialNetworks[0] as NetworkSnapshot,
+				initialNetworks[1] as NetworkSnapshot
+			);
+			await sendMovement(initiator, 1, 1);
+			await expect
+				.poll(async () => (await zone(initiator)).rawTransport.linkDrops, { timeout: 20_000 })
+				.toBeGreaterThan(initialInitiatorZone.rawTransport.linkDrops);
+			await waitForOpenTransportPair(creator, receiver);
+			await waitForRawDelivery(initiator, responder);
+
+			const [
+				initiatorFabric,
+				initiatorZone,
+				responderZone,
+				initiatorChannels,
+				initiatorRtc,
+				responderRtc,
+				initiatorMonitor,
+				responderMonitor,
+			] = await Promise.all([
+				fabricSnapshot(initiator, trialId),
+				zone(initiator),
+				zone(responder),
+				rtcChannelStates(initiator),
+				rtcLifecycleObservations(initiator),
+				rtcLifecycleObservations(responder),
+				libp2pMonitorObservations(initiator),
+				libp2pMonitorObservations(responder),
+			]);
+			const newRaw = initiatorFabric.transport.raw[0];
+			if (newRaw === undefined) throw new Error("D108E4G_NEW_RAW_LINK_ABSENT");
+			const newRtcChannels = initiatorChannels.filter(
+				({ channelId, connectionId, label, readyState }) =>
+					label === "ts-drp-ephemeral/1" &&
+					readyState === "open" &&
+					(connectionId !== oldRtc.connectionId || channelId !== oldRtc.channelId)
+			);
+			expect(newRtcChannels, "the replacement must have one exact open raw RTC owner").toHaveLength(1);
+			const newRtc = newRtcChannels[0];
+			if (newRtc === undefined) throw new Error("D108E4G_NEW_RTC_OWNER_ABSENT");
+			const openRawClose = initiatorRtc.find(
+				({ channelId, connectionId, event, readyState }) =>
+					event === "channel-close-call" &&
+					connectionId === oldRtc.connectionId &&
+					channelId === oldRtc.channelId &&
+					readyState === "open"
+			);
+			const newRawOpen = initiatorRtc.find(
+				({ channelId, connectionId, event }) =>
+					event === "channel-open-event" && connectionId === newRtc.connectionId && channelId === newRtc.channelId
+			);
+			const evidence = Object.freeze({
+				initiator: Object.freeze({
+					monitor: initiatorMonitor,
+					peerId: initiatorPeerId,
+					rawAfter: Object.freeze({ authenticated: newRaw, rtc: newRtc }),
+					rawBefore: Object.freeze({ authenticated: oldRaw, rtc: oldRtc }),
+					rtc: initiatorRtc,
+					zoneAfter: initiatorZone.rawTransport,
+					zoneBefore: initialInitiatorZone.rawTransport,
+				}),
+				responder: Object.freeze({
+					monitor: responderMonitor,
+					peerId: responderPeerId,
+					rtc: responderRtc,
+					zoneAfter: responderZone.rawTransport,
+					zoneBefore: initialResponderZone.rawTransport,
+				}),
+			});
+			await attachJson(testInfo, "d108e4g-current-owner-lifecycle.json", evidence);
+
+			expect(openRawClose, "the stale-authenticated arm must close an otherwise-open raw channel").toBeDefined();
+			expect(newRawOpen, "the replacement raw channel must emit its own joined open event").toBeDefined();
+			expect(openRawClose?.sequence).toBeLessThan(newRawOpen?.sequence ?? -1);
+			expect(initiatorZone.rawTransport.lastLinkDrop).toBe("replacement");
+			expect(newRaw.connectionId).not.toBe(oldRaw.connectionId);
+			expect(newRaw.generation).toBeGreaterThan(oldRaw.generation);
+			expect(initiatorMonitor.every(({ schemaVersion }) => schemaVersion === 1)).toBe(true);
+			expect(responderMonitor.every(({ schemaVersion }) => schemaVersion === 1)).toBe(true);
+		} finally {
+			await Promise.all([creatorContext.close(), receiverContext.close()]);
+		}
+	});
+}
 
 test("three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss", async ({
 	browser,

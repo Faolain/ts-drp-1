@@ -105,10 +105,13 @@ export interface ZoneFabricWorkbench {
 		readonly transport: Readonly<{
 			readonly fallbackCount: 0;
 			readonly raw: readonly Readonly<{
+				readonly connectionId: string;
+				readonly generation: number;
 				readonly iceRestarts: 0;
 				readonly maxRetransmits: 0;
 				readonly ordered: false;
 				readonly peerId: string;
+				readonly remoteAddr: string;
 				readonly readyState: "open";
 			}>[];
 		}>;
@@ -804,12 +807,15 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 				transport: Object.freeze({
 					fallbackCount: 0 as const,
 					raw: Object.freeze(
-						(raw?.links ?? []).map(({ maxRetransmits, ordered, peerId }) =>
+						(raw?.links ?? []).map(({ connectionId, generation, maxRetransmits, ordered, peerId, remoteAddr }) =>
 							Object.freeze({
+								connectionId,
+								generation,
 								iceRestarts: 0 as const,
 								maxRetransmits: maxRetransmits as 0,
 								ordered: ordered as false,
 								peerId,
+								remoteAddr,
 								readyState: "open" as const,
 							})
 						)
