@@ -52,6 +52,79 @@ const D108E4L_MEMBER_COUNTS = Object.freeze([
 	{ pageCount: 2, returnedSequenceCount: 2 },
 ]);
 const D108E4L_STEP_NAMES = Object.freeze(["context-seed", "reopen-and-evidence", "close-context"]);
+const D108E4M_FACADE_METHODS = Object.freeze([
+	"close",
+	"compareAndMarkOutboxPublished",
+	"readIssued",
+	"readLineage",
+	"readOutboxPage",
+	"transactIssue",
+]);
+const D108E4M_MEMBER_NAMES = Object.freeze(["equality", "reuse-0", "reuse-1", "over-budget", "mismatch"]);
+const D108E4M_LEAF_CLASSES = Object.freeze([
+	"root",
+	"program",
+	"idle",
+	"garbage-collector",
+	"native",
+	"third-party",
+	"test-fixture",
+	"node-product",
+	"storage-node-product",
+	"workspace-dependency",
+	"runtime-or-native",
+	"other",
+]);
+const D108E4M_NEAREST_OWNER_CLASSES = Object.freeze([
+	"test-fixture",
+	"node-product",
+	"storage-node-product",
+	"workspace-dependency",
+	"third-party",
+	"runtime-or-native",
+	"other",
+	"unattributed-runtime",
+	"unattributed-gc",
+]);
+const D108E4M_PROFILE_KEYS = Object.freeze(
+	[
+		"concurrentDurationMs",
+		"deltaCount",
+		"dominance",
+		"facades",
+		"idleMicros",
+		"idleSampleCount",
+		"leafTotals",
+		"nearestOwnerTotals",
+		"outcome",
+		"pid",
+		"profileCoverageRatio",
+		"profileDurationMicros",
+		"profileEndTimeMicros",
+		"profileStartTimeMicros",
+		"sampleCount",
+		"sampledMicros",
+		"samplingIntervalMicros",
+		"schema",
+		"topFrames",
+		"unsampledMicros",
+		"zeroDeltaCount",
+	].sort()
+);
+const D108E4M_UNAVAILABLE_KEYS = Object.freeze(
+	["classification", "message", "outcome", "pid", "profileStarted", "profileStopped", "schema"].sort()
+);
+const D108E4M_UNAVAILABLE_CLASSIFICATIONS = Object.freeze([
+	"inspector-start-failed",
+	"inspector-stop-failed",
+	"profile-structural-malformation",
+	"missing-terminal-proof",
+	"launcher-or-child-error",
+]);
+
+function d108e4mProfileEnabled(value: string | undefined = process.env.TS_DRP_D108E4M_PROFILE): boolean {
+	return value === "1";
+}
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
 	return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -63,6 +136,10 @@ function isNonnegativeNumber(value: unknown): value is number {
 
 function sameJson(left: unknown, right: unknown): boolean {
 	return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function ordinalCompare(left: string, right: string): number {
+	return left < right ? -1 : left > right ? 1 : 0;
 }
 
 function validateSpan(
@@ -193,10 +270,310 @@ function d108e4lValidation(result: unknown): Readonly<{ errors: string[]; member
 	return { errors, memberCountErrors };
 }
 
+function isNonnegativeInteger(value: unknown): value is number {
+	return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+
+function d108e4mCounterValidation(
+	errors: string[],
+	value: unknown,
+	expectedNames: readonly string[],
+	label: string
+): Readonly<{ micros: number; sampleCount: number }> {
+	const counters = Array.isArray(value) ? value : [];
+	if (
+		!sameJson(
+			counters.map((counter) => (isRecord(counter) ? counter.name : undefined)),
+			expectedNames
+		)
+	) {
+		errors.push(`${label}:roster`);
+	}
+	let micros = 0;
+	let sampleCount = 0;
+	for (const [index, name] of expectedNames.entries()) {
+		const counter = isRecord(counters[index]) ? counters[index] : undefined;
+		if (!sameJson(Object.keys(counter ?? {}).sort(), ["micros", "name", "sampleCount"])) {
+			errors.push(`${label}:${name}:keys`);
+		}
+		if (!isNonnegativeInteger(counter?.micros)) errors.push(`${label}:${name}:micros`);
+		else micros += counter.micros;
+		if (!isNonnegativeInteger(counter?.sampleCount)) errors.push(`${label}:${name}:sampleCount`);
+		else sampleCount += counter.sampleCount;
+	}
+	return { micros, sampleCount };
+}
+
+function d108e4mValidation(
+	result: unknown
+): Readonly<{ errors: string[]; record?: Readonly<Record<string, unknown>> }> {
+	const errors: string[] = [];
+	const message = isRecord(result) ? result : undefined;
+	const proof = isRecord(message?.proof) ? message.proof : undefined;
+	const record = isRecord(proof?.d108e4m) ? proof.d108e4m : undefined;
+	if (!d108e4mProfileEnabled()) {
+		if (record !== undefined) errors.push("ordinary-mode:unexpected-record");
+		return { errors, record };
+	}
+	if (record === undefined) return { errors: ["d108e4m:record"] };
+	if (record.schema !== "d108e4m-v1") errors.push("d108e4m:schema");
+	if (!isNonnegativeInteger(record.pid) || record.pid === process.pid || record.pid !== proof?.pid) {
+		errors.push("d108e4m:pid");
+	}
+	if (record.outcome === "unavailable") {
+		if (!sameJson(Object.keys(record).sort(), D108E4M_UNAVAILABLE_KEYS)) errors.push("unavailable:keys");
+		if (!D108E4M_UNAVAILABLE_CLASSIFICATIONS.includes(String(record.classification))) {
+			errors.push("unavailable:classification");
+		}
+		if (typeof record.message !== "string" || record.message.length > 512) errors.push("unavailable:message");
+		if (typeof record.profileStarted !== "boolean") errors.push("unavailable:profileStarted");
+		if (typeof record.profileStopped !== "boolean") errors.push("unavailable:profileStopped");
+		if (record.profileStopped === true && record.profileStarted !== true) errors.push("unavailable:stop-before-start");
+		errors.push(`unavailable:${String(record.classification)}`);
+		return { errors, record };
+	}
+	if (record.outcome !== "profile") errors.push("profile:outcome");
+	if (!sameJson(Object.keys(record).sort(), D108E4M_PROFILE_KEYS)) errors.push("profile:keys");
+	for (const field of [
+		"profileStartTimeMicros",
+		"profileEndTimeMicros",
+		"profileDurationMicros",
+		"sampledMicros",
+		"unsampledMicros",
+		"sampleCount",
+		"deltaCount",
+		"zeroDeltaCount",
+		"idleMicros",
+		"idleSampleCount",
+	]) {
+		if (!isNonnegativeInteger(record[field])) errors.push(`profile:${field}`);
+	}
+	if (record.samplingIntervalMicros !== 1_000) errors.push("profile:samplingIntervalMicros");
+	if (!isNonnegativeNumber(record.concurrentDurationMs) || record.concurrentDurationMs === 0) {
+		errors.push("profile:concurrentDurationMs");
+	}
+	if (
+		!isNonnegativeNumber(record.profileCoverageRatio) ||
+		record.profileCoverageRatio === 0 ||
+		record.profileCoverageRatio > 1
+	) {
+		errors.push("profile:profileCoverageRatio");
+	}
+	if (
+		isNonnegativeInteger(record.profileStartTimeMicros) &&
+		isNonnegativeInteger(record.profileEndTimeMicros) &&
+		isNonnegativeInteger(record.profileDurationMicros) &&
+		record.profileDurationMicros !== record.profileEndTimeMicros - record.profileStartTimeMicros
+	) {
+		errors.push("profile:duration-arithmetic");
+	}
+	if (
+		isNonnegativeInteger(record.profileDurationMicros) &&
+		isNonnegativeInteger(record.sampledMicros) &&
+		isNonnegativeInteger(record.unsampledMicros) &&
+		record.profileDurationMicros !== record.sampledMicros + record.unsampledMicros
+	) {
+		errors.push("profile:sampled-arithmetic");
+	}
+	if (
+		isNonnegativeInteger(record.sampleCount) &&
+		isNonnegativeInteger(record.deltaCount) &&
+		record.sampleCount !== record.deltaCount
+	) {
+		errors.push("profile:sample-delta-count");
+	}
+	if (
+		isNonnegativeInteger(record.zeroDeltaCount) &&
+		isNonnegativeInteger(record.deltaCount) &&
+		record.zeroDeltaCount > record.deltaCount
+	) {
+		errors.push("profile:zeroDeltaCount");
+	}
+	if (
+		isNonnegativeInteger(record.profileDurationMicros) &&
+		isNonnegativeNumber(record.concurrentDurationMs) &&
+		isNonnegativeNumber(record.profileCoverageRatio) &&
+		record.profileCoverageRatio !== record.profileDurationMicros / (record.concurrentDurationMs * 1_000)
+	) {
+		errors.push("profile:coverage-arithmetic");
+	}
+
+	const leafTotals = d108e4mCounterValidation(errors, record.leafTotals, D108E4M_LEAF_CLASSES, "leafTotals");
+	const nearestTotals = d108e4mCounterValidation(
+		errors,
+		record.nearestOwnerTotals,
+		D108E4M_NEAREST_OWNER_CLASSES,
+		"nearestOwnerTotals"
+	);
+	if (isNonnegativeInteger(record.sampledMicros) && leafTotals.micros !== record.sampledMicros) {
+		errors.push("leafTotals:micros-sum");
+	}
+	if (isNonnegativeInteger(record.sampleCount) && leafTotals.sampleCount !== record.sampleCount) {
+		errors.push("leafTotals:sampleCount-sum");
+	}
+	if (
+		isNonnegativeInteger(record.sampledMicros) &&
+		isNonnegativeInteger(record.idleMicros) &&
+		nearestTotals.micros + record.idleMicros !== record.sampledMicros
+	) {
+		errors.push("nearestOwnerTotals:micros-sum");
+	}
+	if (
+		isNonnegativeInteger(record.sampleCount) &&
+		isNonnegativeInteger(record.idleSampleCount) &&
+		nearestTotals.sampleCount + record.idleSampleCount !== record.sampleCount
+	) {
+		errors.push("nearestOwnerTotals:sampleCount-sum");
+	}
+	const leafArray = Array.isArray(record.leafTotals) ? record.leafTotals : [];
+	const idleCounter = isRecord(leafArray[2]) ? leafArray[2] : undefined;
+	if (idleCounter?.micros !== record.idleMicros || idleCounter?.sampleCount !== record.idleSampleCount) {
+		errors.push("profile:idle-counter");
+	}
+
+	const dominance = isRecord(record.dominance) ? record.dominance : undefined;
+	const dominanceKeys = [
+		"denominatorMicros",
+		"runnerUp",
+		"runnerUpBasisPoints",
+		"runnerUpMicros",
+		"winner",
+		"winnerBasisPoints",
+		"winnerMicros",
+	].sort();
+	if (!sameJson(Object.keys(dominance ?? {}).sort(), dominanceKeys)) errors.push("dominance:keys");
+	const nearestArray = Array.isArray(record.nearestOwnerTotals)
+		? (record.nearestOwnerTotals.filter(isRecord) as Readonly<Record<string, unknown>>[])
+		: [];
+	const ranked = [...nearestArray].sort((left, right) => {
+		const leftMicros = isNonnegativeInteger(left.micros) ? left.micros : 0;
+		const rightMicros = isNonnegativeInteger(right.micros) ? right.micros : 0;
+		return rightMicros - leftMicros || ordinalCompare(String(left.name), String(right.name));
+	});
+	const leading = ranked[0];
+	const runnerUp = ranked[1];
+	if (leading !== undefined && runnerUp !== undefined && nearestTotals.micros > 0) {
+		const leadingMicros = isNonnegativeInteger(leading.micros) ? leading.micros : 0;
+		const runnerUpMicros = isNonnegativeInteger(runnerUp.micros) ? runnerUp.micros : 0;
+		const dominant =
+			leadingMicros * 2 > nearestTotals.micros && (leadingMicros - runnerUpMicros) * 10 >= nearestTotals.micros;
+		if (dominance?.denominatorMicros !== nearestTotals.micros) errors.push("dominance:denominatorMicros");
+		if (dominance?.winner !== (dominant ? leading.name : "mixed")) errors.push("dominance:winner");
+		if (dominance?.winnerMicros !== leadingMicros) errors.push("dominance:winnerMicros");
+		if (dominance?.runnerUp !== runnerUp.name) errors.push("dominance:runnerUp");
+		if (dominance?.runnerUpMicros !== runnerUpMicros) errors.push("dominance:runnerUpMicros");
+		if (dominance?.winnerBasisPoints !== Math.floor((leadingMicros * 10_000) / nearestTotals.micros)) {
+			errors.push("dominance:winnerBasisPoints");
+		}
+		if (dominance?.runnerUpBasisPoints !== Math.floor((runnerUpMicros * 10_000) / nearestTotals.micros)) {
+			errors.push("dominance:runnerUpBasisPoints");
+		}
+	} else errors.push("dominance:ranking");
+
+	const topFrames = Array.isArray(record.topFrames) ? record.topFrames : [];
+	if (topFrames.length > 40) errors.push("topFrames:length");
+	let precedingFrame: Readonly<Record<string, unknown>> | undefined;
+	for (const [index, value] of topFrames.entries()) {
+		const frame = isRecord(value) ? value : undefined;
+		if (frame === undefined) {
+			errors.push(`topFrames:${index}:record`);
+			continue;
+		}
+		if (
+			!sameJson(Object.keys(frame).sort(), [
+				"columnNumber",
+				"functionName",
+				"leafClass",
+				"lineNumber",
+				"nearestOwner",
+				"sampleCount",
+				"selfMicros",
+				"url",
+			])
+		) {
+			errors.push(`topFrames:${index}:keys`);
+		}
+		if (!D108E4M_LEAF_CLASSES.includes(String(frame.leafClass))) errors.push(`topFrames:${index}:leafClass`);
+		if (typeof frame.functionName !== "string") errors.push(`topFrames:${index}:functionName`);
+		if (typeof frame.url !== "string" || frame.url.startsWith("file:") || frame.url.includes("/Users/")) {
+			errors.push(`topFrames:${index}:url`);
+		}
+		if (
+			typeof frame.lineNumber !== "number" ||
+			!Number.isSafeInteger(frame.lineNumber) ||
+			typeof frame.columnNumber !== "number" ||
+			!Number.isSafeInteger(frame.columnNumber)
+		) {
+			errors.push(`topFrames:${index}:coordinates`);
+		}
+		if (!isNonnegativeInteger(frame.sampleCount)) errors.push(`topFrames:${index}:sampleCount`);
+		if (!isNonnegativeInteger(frame.selfMicros)) errors.push(`topFrames:${index}:selfMicros`);
+		if (precedingFrame !== undefined) {
+			const precedingMicros = Number(precedingFrame.selfMicros);
+			const currentMicros = Number(frame.selfMicros);
+			const precedingIdentity = `${String(precedingFrame.url)}\u0000${String(precedingFrame.functionName)}\u0000${String(precedingFrame.lineNumber)}\u0000${String(precedingFrame.columnNumber)}`;
+			const currentIdentity = `${String(frame.url)}\u0000${String(frame.functionName)}\u0000${String(frame.lineNumber)}\u0000${String(frame.columnNumber)}`;
+			if (
+				precedingMicros < currentMicros ||
+				(precedingMicros === currentMicros && precedingIdentity > currentIdentity)
+			) {
+				errors.push(`topFrames:${index}:order`);
+			}
+		}
+		precedingFrame = frame;
+	}
+
+	const facades = Array.isArray(record.facades) ? record.facades : [];
+	if (
+		!sameJson(
+			facades.map((facade) => (isRecord(facade) ? facade.name : undefined)),
+			D108E4M_MEMBER_NAMES
+		)
+	) {
+		errors.push("facades:roster");
+	}
+	for (const [index, name] of D108E4M_MEMBER_NAMES.entries()) {
+		const facade = isRecord(facades[index]) ? facades[index] : undefined;
+		if (!sameJson(Object.keys(facade ?? {}).sort(), ["methods", "name"])) errors.push(`facades:${name}:keys`);
+		const methods = Array.isArray(facade?.methods) ? facade.methods : [];
+		if (
+			!sameJson(
+				methods.map((method) => (isRecord(method) ? method.method : undefined)),
+				D108E4M_FACADE_METHODS
+			)
+		) {
+			errors.push(`facades:${name}:methods`);
+		}
+		for (const [methodIndex, methodName] of D108E4M_FACADE_METHODS.entries()) {
+			const method = isRecord(methods[methodIndex]) ? methods[methodIndex] : undefined;
+			if (!sameJson(Object.keys(method ?? {}).sort(), ["callCount", "method", "syncBodyMs"])) {
+				errors.push(`facades:${name}:${methodName}:keys`);
+			}
+			if (!isNonnegativeInteger(method?.callCount)) errors.push(`facades:${name}:${methodName}:callCount`);
+			if (!isNonnegativeNumber(method?.syncBodyMs)) errors.push(`facades:${name}:${methodName}:syncBodyMs`);
+		}
+	}
+	return { errors, record };
+}
+
 function emitD108e4lProof(result: unknown): void {
 	const message = isRecord(result) ? result : undefined;
 	const proof = isRecord(message?.proof) ? message.proof : undefined;
+	const d108e4m = d108e4mValidation(result);
 	const validation = d108e4lValidation(result);
+	if (d108e4mProfileEnabled()) {
+		const profile =
+			d108e4m.record === undefined
+				? Object.freeze({
+						outcome: "invalid-envelope",
+						proofKeys: Object.freeze(Object.keys(proof ?? {}).sort()),
+						schema: "d108e4m-v1",
+					})
+				: d108e4m.record;
+		console.log(
+			`D108E4M_PROFILE ${JSON.stringify(Object.freeze({ ...profile, validationErrors: Object.freeze(d108e4m.errors) }))}`
+		);
+	}
 	const timing = isRecord(proof?.timing)
 		? Object.freeze({ ...proof.timing, memberCountErrors: Object.freeze(validation.memberCountErrors) })
 		: Object.freeze({
@@ -206,6 +583,17 @@ function emitD108e4lProof(result: unknown): void {
 			});
 	console.log(`D108E4L_TIMING ${JSON.stringify(timing)}`);
 	expect(validation.errors).toEqual([]);
+	if (d108e4mProfileEnabled()) expect.soft(d108e4m.errors).toEqual([]);
+	else expect(d108e4m.errors).toEqual([]);
+}
+
+function emitD108e4mUnavailable(error: unknown): void {
+	if (!d108e4mProfileEnabled()) return;
+	const message = error instanceof Error ? error.message : String(error);
+	const classification = message.includes("child failed") ? "missing-terminal-proof" : "launcher-or-child-error";
+	console.log(
+		`D108E4M_PROFILE ${JSON.stringify({ classification, message: message.slice(0, 512), outcome: "unavailable", pid: null, profileStarted: false, profileStopped: false, schema: "d108e4m-v1", validationErrors: [`unavailable:${classification}`] })}`
+	);
 }
 
 function emitD108e4lUnavailable(error: unknown): void {
@@ -263,6 +651,7 @@ function runSkipBudgetChild(): ReturnType<typeof runD108e2eSkipBudgetChild> {
 			return result;
 		},
 		(error: unknown) => {
+			emitD108e4mUnavailable(error);
 			emitD108e4lUnavailable(error);
 			throw error;
 		}
@@ -284,6 +673,11 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 		expect(D108E4_CHILD_BEHAVIORS).toEqual([
 			"fresh Node closes the D.108e4 authenticated oracle and per-reopen budget debt",
 		]);
+		expect(d108e4mProfileEnabled(undefined)).toBe(false);
+		expect(d108e4mProfileEnabled("")).toBe(false);
+		expect(d108e4mProfileEnabled("true")).toBe(false);
+		expect(d108e4mProfileEnabled("0")).toBe(false);
+		expect(d108e4mProfileEnabled("1")).toBe(true);
 		expect(childPath.pathname.endsWith("phase-6a-creator-successor-local-author-child.mjs")).toBe(true);
 	});
 

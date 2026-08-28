@@ -7,8 +7,11 @@ import { openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl
 /* eslint-enable import/no-unresolved */
 import { createNodeDurableIssuanceStore } from "@ts-drp/storage-node/issuance";
 import { createHash, createPrivateKey, createPublicKey, sign, verify } from "node:crypto";
+import { realpathSync } from "node:fs";
+import { Session } from "node:inspector/promises";
 import { availableParallelism } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, relative, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { network, seedAhe, seedJournal, seedSnapshot, unpack } from "./phase-6a-creator-successor-activation-child.mjs";
 
@@ -24,6 +27,41 @@ const CHAT_SEEDS = Object.freeze({
 });
 const LOCAL_AUTHOR_DOMAIN = new TextEncoder().encode("ts-drp-keychain/local-author-ed25519/v1");
 const ED25519_PKCS8_PREFIX = Buffer.from("302e020100300506032b657004220420", "hex");
+const D108E4M_PROFILE_ENABLED = process.env.TS_DRP_D108E4M_PROFILE === "1";
+const D108E4M_REPOSITORY_ROOT = D108E4M_PROFILE_ENABLED ? realpathSync(process.cwd()) : undefined;
+const D108E4M_FACADE_METHODS = Object.freeze([
+	"close",
+	"compareAndMarkOutboxPublished",
+	"readIssued",
+	"readLineage",
+	"readOutboxPage",
+	"transactIssue",
+]);
+const D108E4M_LEAF_CLASSES = Object.freeze([
+	"root",
+	"program",
+	"idle",
+	"garbage-collector",
+	"native",
+	"third-party",
+	"test-fixture",
+	"node-product",
+	"storage-node-product",
+	"workspace-dependency",
+	"runtime-or-native",
+	"other",
+]);
+const D108E4M_NEAREST_OWNER_CLASSES = Object.freeze([
+	"test-fixture",
+	"node-product",
+	"storage-node-product",
+	"workspace-dependency",
+	"third-party",
+	"runtime-or-native",
+	"other",
+	"unattributed-runtime",
+	"unattributed-gc",
+]);
 
 function send(value) {
 	if (typeof process.send === "function") process.send(value);
@@ -618,7 +656,14 @@ function sameStoreShape(actual, expected) {
 	);
 }
 
-function boundedRecoveryStore(raw, rows, expectedScope, mismatchCommit) {
+function newD108e4mFacadeTiming(name) {
+	return {
+		methods: Object.fromEntries(D108E4M_FACADE_METHODS.map((method) => [method, { callCount: 0, syncBodyMs: 0 }])),
+		name,
+	};
+}
+
+function boundedRecoveryStore(raw, rows, expectedScope, mismatchCommit, initialDiagnosticName) {
 	const issuedBySequence = new Map(rows.map((row) => [row.commit.authorSequence, row.commit]));
 	const newTelemetry = () => ({
 		capturedIssuedCount: 0,
@@ -637,7 +682,28 @@ function boundedRecoveryStore(raw, rows, expectedScope, mismatchCommit) {
 		terminalEmpty: false,
 	});
 	let telemetry = newTelemetry();
+	let facadeTiming = newD108e4mFacadeTiming(initialDiagnosticName);
 	let invocationStarted = false;
+	const measureFacade = (method, operation) => {
+		if (!D108E4M_PROFILE_ENABLED) return operation();
+		const startedAt = performance.now();
+		try {
+			return operation();
+		} finally {
+			const timing = facadeTiming.methods[method];
+			timing.callCount += 1;
+			timing.syncBodyMs += performance.now() - startedAt;
+		}
+	};
+	const snapshotFacadeTiming = () =>
+		D108E4M_PROFILE_ENABLED
+			? Object.freeze({
+					methods: Object.freeze(
+						D108E4M_FACADE_METHODS.map((method) => Object.freeze({ method, ...facadeTiming.methods[method] }))
+					),
+					name: facadeTiming.name,
+				})
+			: undefined;
 	const snapshotTelemetry = () =>
 		Object.freeze({
 			capturedIssuedCount: telemetry.capturedIssuedCount,
@@ -655,70 +721,78 @@ function boundedRecoveryStore(raw, rows, expectedScope, mismatchCommit) {
 			terminalEmpty: telemetry.terminalEmpty,
 		});
 	const store = Object.freeze({
-		close: () => raw.close(),
-		compareAndMarkOutboxPublished: (...args) => raw.compareAndMarkOutboxPublished(...args),
-		readIssued: (scope, authorSequence) => {
-			const predecessorOpen = !telemetry.terminalEmpty;
-			if (predecessorOpen && scope === telemetry.capturedScope) {
-				telemetry.capturedIssuedCount += 1;
-				telemetry.capturedIssuedFirst ??= authorSequence;
-				telemetry.capturedIssuedStrictlyIncreasing &&=
-					telemetry.capturedIssuedLast === null || authorSequence > telemetry.capturedIssuedLast;
-				telemetry.capturedIssuedLast = authorSequence;
-				telemetry.capturedIssuedSum += authorSequence;
-			} else if (predecessorOpen && telemetry.capturedScope !== undefined) {
-				telemetry.copiedIssuedSequences.push(authorSequence);
-			}
-			if (scope === telemetry.capturedScope && authorSequence === 1 && mismatchCommit !== undefined) {
-				return Promise.resolve(mismatchCommit);
-			}
-			if (scope.author !== expectedScope.author || scope.objectId !== expectedScope.objectId)
-				return Promise.resolve(null);
-			const commit = issuedBySequence.get(authorSequence);
-			if (commit === undefined) return Promise.resolve(null);
-			return Promise.resolve(commit);
-		},
-		readLineage: (...args) => raw.readLineage(...args),
-		readOutboxPage: (input = {}) => {
-			const limit = input.limit ?? 64;
-			if (!Number.isInteger(limit) || limit < 1 || limit > 128) {
-				throw new TypeError("D.108e2e page facade received an invalid limit");
-			}
-			const scope = input.scope;
-			if (scope !== undefined && (scope.author !== expectedScope.author || scope.objectId !== expectedScope.objectId)) {
-				return Promise.resolve([]);
-			}
-			const first = firstRowAfter(rows, input.afterKey);
-			const selected = rows.slice(first, first + limit);
-			if (scope === undefined) return Promise.resolve(Object.freeze([...selected]));
-			telemetry.capturedScope ??= scope;
-			if (scope !== telemetry.capturedScope) {
-				telemetry.successorPageFaultCount += 1;
-				return Promise.reject(new TypeError("D.108e2e successor-stage issuance sentinel"));
-			}
-			if (scope === telemetry.capturedScope && !telemetry.terminalEmpty) {
-				telemetry.pageCount += 1;
-				if (selected.length === 0) telemetry.terminalEmpty = true;
-				for (const row of selected) {
-					const sequence = row.commit.authorSequence;
-					telemetry.firstReturnedSequence ??= sequence;
-					telemetry.returnedSequencesStrictlyIncreasing &&=
-						telemetry.lastReturnedSequence === null || sequence > telemetry.lastReturnedSequence;
-					telemetry.lastReturnedSequence = sequence;
-					telemetry.returnedSequenceCount += 1;
+		close: () => measureFacade("close", () => raw.close()),
+		compareAndMarkOutboxPublished: (...args) =>
+			measureFacade("compareAndMarkOutboxPublished", () => raw.compareAndMarkOutboxPublished(...args)),
+		readIssued: (scope, authorSequence) =>
+			measureFacade("readIssued", () => {
+				const predecessorOpen = !telemetry.terminalEmpty;
+				if (predecessorOpen && scope === telemetry.capturedScope) {
+					telemetry.capturedIssuedCount += 1;
+					telemetry.capturedIssuedFirst ??= authorSequence;
+					telemetry.capturedIssuedStrictlyIncreasing &&=
+						telemetry.capturedIssuedLast === null || authorSequence > telemetry.capturedIssuedLast;
+					telemetry.capturedIssuedLast = authorSequence;
+					telemetry.capturedIssuedSum += authorSequence;
+				} else if (predecessorOpen && telemetry.capturedScope !== undefined) {
+					telemetry.copiedIssuedSequences.push(authorSequence);
 				}
-			}
-			return Promise.resolve(Object.freeze([...selected]));
-		},
-		transactIssue: (...args) => raw.transactIssue(...args),
+				if (scope === telemetry.capturedScope && authorSequence === 1 && mismatchCommit !== undefined) {
+					return Promise.resolve(mismatchCommit);
+				}
+				if (scope.author !== expectedScope.author || scope.objectId !== expectedScope.objectId)
+					return Promise.resolve(null);
+				const commit = issuedBySequence.get(authorSequence);
+				if (commit === undefined) return Promise.resolve(null);
+				return Promise.resolve(commit);
+			}),
+		readLineage: (...args) => measureFacade("readLineage", () => raw.readLineage(...args)),
+		readOutboxPage: (input = {}) =>
+			measureFacade("readOutboxPage", () => {
+				const limit = input.limit ?? 64;
+				if (!Number.isInteger(limit) || limit < 1 || limit > 128) {
+					throw new TypeError("D.108e2e page facade received an invalid limit");
+				}
+				const scope = input.scope;
+				if (
+					scope !== undefined &&
+					(scope.author !== expectedScope.author || scope.objectId !== expectedScope.objectId)
+				) {
+					return Promise.resolve([]);
+				}
+				const first = firstRowAfter(rows, input.afterKey);
+				const selected = rows.slice(first, first + limit);
+				if (scope === undefined) return Promise.resolve(Object.freeze([...selected]));
+				telemetry.capturedScope ??= scope;
+				if (scope !== telemetry.capturedScope) {
+					telemetry.successorPageFaultCount += 1;
+					return Promise.reject(new TypeError("D.108e2e successor-stage issuance sentinel"));
+				}
+				if (scope === telemetry.capturedScope && !telemetry.terminalEmpty) {
+					telemetry.pageCount += 1;
+					if (selected.length === 0) telemetry.terminalEmpty = true;
+					for (const row of selected) {
+						const sequence = row.commit.authorSequence;
+						telemetry.firstReturnedSequence ??= sequence;
+						telemetry.returnedSequencesStrictlyIncreasing &&=
+							telemetry.lastReturnedSequence === null || sequence > telemetry.lastReturnedSequence;
+						telemetry.lastReturnedSequence = sequence;
+						telemetry.returnedSequenceCount += 1;
+					}
+				}
+				return Promise.resolve(Object.freeze([...selected]));
+			}),
+		transactIssue: (...args) => measureFacade("transactIssue", () => raw.transactIssue(...args)),
 	});
 	return {
-		beginInvocation: () => {
+		beginInvocation: (diagnosticName) => {
 			const preceding = invocationStarted ? snapshotTelemetry() : undefined;
 			telemetry = newTelemetry();
+			facadeTiming = newD108e4mFacadeTiming(diagnosticName ?? initialDiagnosticName);
 			invocationStarted = true;
 			return preceding;
 		},
+		facadeTiming: snapshotFacadeTiming,
 		store,
 		telemetry: snapshotTelemetry,
 	};
@@ -1154,6 +1228,230 @@ function timingPhase(name, start, end, counts) {
 	});
 }
 
+function d108e4mUnavailable(classification, error, profileStarted, profileStopped) {
+	return Object.freeze({
+		classification,
+		message: (error instanceof Error ? error.message : String(error)).slice(0, 512),
+		outcome: "unavailable",
+		pid: process.pid,
+		profileStarted,
+		profileStopped,
+		schema: "d108e4m-v1",
+	});
+}
+
+function ordinalCompare(left, right) {
+	return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function normalizeD108e4mFrameUrl(url) {
+	if (url === "") return "";
+	if (url.startsWith("node:") || url.startsWith("internal/")) return url;
+	if (url.startsWith("data:")) return "data:";
+	if (!url.startsWith("file:")) return url.includes(":") ? url.split(":", 1)[0] + ":" : "external-file";
+	const filename = realpathSync(fileURLToPath(url));
+	if (D108E4M_REPOSITORY_ROOT === undefined) throw new TypeError("D.108e4m repository root is unavailable");
+	const repositoryRelative = relative(D108E4M_REPOSITORY_ROOT, filename);
+	if (repositoryRelative === "" || (!repositoryRelative.startsWith(`..${sep}`) && !isAbsolute(repositoryRelative))) {
+		return repositoryRelative.replaceAll(sep, "/");
+	}
+	const portable = filename.replaceAll(sep, "/");
+	const nodeModulesIndex = portable.lastIndexOf("/node_modules/");
+	const pnpmIndex = portable.lastIndexOf("/.pnpm/");
+	const dependencyIndex = Math.max(nodeModulesIndex, pnpmIndex);
+	return dependencyIndex >= 0 ? portable.slice(dependencyIndex + 1) : "external-file";
+}
+
+function d108e4mUrlClass(url) {
+	if (url.includes("node_modules/") || url.includes(".pnpm/")) return "third-party";
+	if (url.startsWith("packages/storage-node/tests/") || url.startsWith("tests/fixtures/")) return "test-fixture";
+	if (url.startsWith("packages/node/dist/") || url.startsWith("packages/node/src/")) return "node-product";
+	if (url.startsWith("packages/storage-node/dist/") || url.startsWith("packages/storage-node/src/")) {
+		return "storage-node-product";
+	}
+	if (/^packages\/[^/]+\/(?:dist|src)\//u.test(url)) return "workspace-dependency";
+	if (url === "" || url.startsWith("node:") || url.startsWith("internal/") || url.startsWith("data:")) {
+		return "runtime-or-native";
+	}
+	return "other";
+}
+
+function d108e4mLeafClass(frame, normalizedUrl) {
+	if (frame.functionName === "(root)") return "root";
+	if (frame.functionName === "(program)") return "program";
+	if (frame.functionName === "(idle)") return "idle";
+	if (frame.functionName === "(garbage collector)") return "garbage-collector";
+	if (normalizedUrl === "") return "native";
+	return d108e4mUrlClass(normalizedUrl);
+}
+
+function d108e4mNearestOwner(nodeId, frameInfoById, parentById, leafClass) {
+	const attributable = new Set([
+		"test-fixture",
+		"node-product",
+		"storage-node-product",
+		"workspace-dependency",
+		"third-party",
+	]);
+	let selectedId = nodeId;
+	const visited = new Set();
+	while (selectedId !== undefined && !visited.has(selectedId)) {
+		visited.add(selectedId);
+		const frameInfo = frameInfoById.get(selectedId);
+		if (frameInfo === undefined) break;
+		const selectedClass = d108e4mUrlClass(frameInfo.normalizedUrl);
+		if (attributable.has(selectedClass) || selectedClass === "other") return selectedClass;
+		selectedId = parentById.get(selectedId);
+	}
+	return leafClass === "garbage-collector" ? "unattributed-gc" : "unattributed-runtime";
+}
+
+function d108e4mCounterRoster(names) {
+	return new Map(names.map((name) => [name, { micros: 0, name, sampleCount: 0 }]));
+}
+
+function d108e4mFrozenCounters(counters, names) {
+	return Object.freeze(names.map((name) => Object.freeze({ ...counters.get(name) })));
+}
+
+function reduceD108e4mProfile(profile, concurrentDurationMs, facades) {
+	if (!Array.isArray(profile?.nodes) || !Array.isArray(profile.samples) || !Array.isArray(profile.timeDeltas)) {
+		throw new TypeError("D.108e4m profile arrays are unavailable");
+	}
+	if (profile.samples.length !== profile.timeDeltas.length || profile.samples.length === 0) {
+		throw new TypeError("D.108e4m sample and delta counts do not match");
+	}
+	const nodeById = new Map();
+	const frameInfoById = new Map();
+	const parentById = new Map();
+	for (const node of profile.nodes) {
+		if (!Number.isInteger(node?.id) || nodeById.has(node.id) || node?.callFrame === undefined) {
+			throw new TypeError("D.108e4m profile node is malformed");
+		}
+		nodeById.set(node.id, node);
+		const normalizedUrl = normalizeD108e4mFrameUrl(node.callFrame.url);
+		frameInfoById.set(node.id, {
+			leafClass: d108e4mLeafClass(node.callFrame, normalizedUrl),
+			normalizedUrl,
+		});
+	}
+	for (const node of profile.nodes) {
+		for (const childId of node.children ?? []) {
+			if (!nodeById.has(childId) || parentById.has(childId)) {
+				throw new TypeError("D.108e4m profile parentage is malformed");
+			}
+			parentById.set(childId, node.id);
+		}
+	}
+	const leafCounters = d108e4mCounterRoster(D108E4M_LEAF_CLASSES);
+	const nearestCounters = d108e4mCounterRoster(D108E4M_NEAREST_OWNER_CLASSES);
+	const frames = new Map();
+	let sampledMicros = 0;
+	let zeroDeltaCount = 0;
+	for (const [index, nodeId] of profile.samples.entries()) {
+		const delta = profile.timeDeltas[index];
+		if (!Number.isSafeInteger(delta) || delta < 0) throw new TypeError("D.108e4m profile delta is malformed");
+		if (delta === 0) zeroDeltaCount += 1;
+		const node = nodeById.get(nodeId);
+		if (node === undefined) throw new TypeError("D.108e4m sample node is unavailable");
+		const frame = node.callFrame;
+		const frameInfo = frameInfoById.get(nodeId);
+		if (frameInfo === undefined) throw new TypeError("D.108e4m frame info is unavailable");
+		const { leafClass, normalizedUrl } = frameInfo;
+		const leafCounter = leafCounters.get(leafClass);
+		if (leafCounter === undefined) throw new TypeError("D.108e4m leaf class is unavailable");
+		leafCounter.micros += delta;
+		leafCounter.sampleCount += 1;
+		sampledMicros += delta;
+		const nearestOwner =
+			leafClass === "idle" ? "idle" : d108e4mNearestOwner(nodeId, frameInfoById, parentById, leafClass);
+		if (nearestOwner !== "idle") {
+			const nearestCounter = nearestCounters.get(nearestOwner);
+			if (nearestCounter === undefined) throw new TypeError("D.108e4m nearest owner is unavailable");
+			nearestCounter.micros += delta;
+			nearestCounter.sampleCount += 1;
+		}
+		const identity = `${normalizedUrl}\u0000${frame.functionName}\u0000${frame.lineNumber}\u0000${frame.columnNumber}`;
+		const retained = frames.get(identity);
+		if (retained === undefined) {
+			frames.set(identity, {
+				columnNumber: frame.columnNumber,
+				functionName: frame.functionName,
+				identity,
+				leafClass,
+				lineNumber: frame.lineNumber,
+				nearestOwner,
+				sampleCount: 1,
+				selfMicros: delta,
+				url: normalizedUrl,
+			});
+		} else {
+			retained.sampleCount += 1;
+			retained.selfMicros += delta;
+			if (retained.nearestOwner !== nearestOwner) retained.nearestOwner = "mixed-ancestor";
+		}
+	}
+	if (!Number.isSafeInteger(profile.startTime) || !Number.isSafeInteger(profile.endTime)) {
+		throw new TypeError("D.108e4m profile clock is malformed");
+	}
+	const profileDurationMicros = profile.endTime - profile.startTime;
+	const unsampledMicros = profileDurationMicros - sampledMicros;
+	if (profileDurationMicros <= 0 || unsampledMicros < 0 || !Number.isSafeInteger(unsampledMicros)) {
+		throw new TypeError("D.108e4m profile duration is malformed");
+	}
+	const leafTotals = d108e4mFrozenCounters(leafCounters, D108E4M_LEAF_CLASSES);
+	const nearestOwnerTotals = d108e4mFrozenCounters(nearestCounters, D108E4M_NEAREST_OWNER_CLASSES);
+	const idle = leafCounters.get("idle");
+	const ranked = [...nearestOwnerTotals].sort(
+		(left, right) => right.micros - left.micros || ordinalCompare(left.name, right.name)
+	);
+	const leading = ranked[0];
+	const runnerUp = ranked[1];
+	const denominatorMicros = ranked.reduce((total, entry) => total + entry.micros, 0);
+	if (leading === undefined || runnerUp === undefined || denominatorMicros <= 0) {
+		throw new TypeError("D.108e4m dominance denominator is unavailable");
+	}
+	const isDominant =
+		leading.micros * 2 > denominatorMicros && (leading.micros - runnerUp.micros) * 10 >= denominatorMicros;
+	const topFrames = Object.freeze(
+		[...frames.values()]
+			.sort((left, right) => right.selfMicros - left.selfMicros || ordinalCompare(left.identity, right.identity))
+			.slice(0, 40)
+			.map(({ identity: _identity, ...frame }) => Object.freeze(frame))
+	);
+	return Object.freeze({
+		concurrentDurationMs,
+		deltaCount: profile.timeDeltas.length,
+		dominance: Object.freeze({
+			denominatorMicros,
+			runnerUp: runnerUp.name,
+			runnerUpBasisPoints: Math.floor((runnerUp.micros * 10_000) / denominatorMicros),
+			runnerUpMicros: runnerUp.micros,
+			winner: isDominant ? leading.name : "mixed",
+			winnerBasisPoints: Math.floor((leading.micros * 10_000) / denominatorMicros),
+			winnerMicros: leading.micros,
+		}),
+		facades: Object.freeze(facades),
+		idleMicros: idle.micros,
+		idleSampleCount: idle.sampleCount,
+		leafTotals,
+		nearestOwnerTotals,
+		outcome: "profile",
+		pid: process.pid,
+		profileCoverageRatio: profileDurationMicros / (concurrentDurationMs * 1_000),
+		profileDurationMicros,
+		profileEndTimeMicros: profile.endTime,
+		profileStartTimeMicros: profile.startTime,
+		sampleCount: profile.samples.length,
+		sampledMicros,
+		samplingIntervalMicros: 1_000,
+		schema: "d108e4m-v1",
+		topFrames,
+		unsampledMicros,
+		zeroDeltaCount,
+	});
+}
+
 async function skipBudgetProof(material) {
 	const startedAt = performance.now();
 	const phases = [];
@@ -1199,10 +1497,10 @@ async function skipBudgetProof(material) {
 		const maximumPageLimit = await observedMaximumPageLimit(raw, scope);
 		closePhase("maximum-page-probe", { maximumPageLimit, probeCount: 1 });
 		const equalityRows = await materializeVerifiedClosure(raw, scope, 8_193, bob);
-		const equalityBounded = boundedRecoveryStore(raw, equalityRows, scope);
+		const equalityBounded = boundedRecoveryStore(raw, equalityRows, scope, undefined, "equality");
 		const boundedStoreShape = sameStoreShape(equalityBounded.store, raw);
 		const reuseRows = Object.freeze(equalityRows.slice(0, 8_191));
-		const reuseBounded = boundedRecoveryStore(raw, reuseRows, scope);
+		const reuseBounded = boundedRecoveryStore(raw, reuseRows, scope, undefined, "reuse-0");
 		const reuseFacade = reuseBounded.store;
 		const passedFacades = [];
 		closePhase("equality-materialization-and-facades", {
@@ -1234,7 +1532,7 @@ async function skipBudgetProof(material) {
 			authenticatedOverBudgetSuffix.push(authenticateMaterializedRow({ ...row, issued }, expectedSequence, scope, bob));
 		}
 		const overBudgetRows = Object.freeze([...equalityRows, ...authenticatedOverBudgetSuffix]);
-		const overBudgetBounded = boundedRecoveryStore(raw, overBudgetRows, scope);
+		const overBudgetBounded = boundedRecoveryStore(raw, overBudgetRows, scope, undefined, "over-budget");
 		closePhase("over-budget-preparation", {
 			appendCount: 2,
 			authenticatedSuffixCount: authenticatedOverBudgetSuffix.length,
@@ -1245,10 +1543,35 @@ async function skipBudgetProof(material) {
 		await appendCommit(mismatchRaw, scope, genuineFuture);
 		const mismatchRows = await materializeVerifiedClosure(mismatchRaw, scope, 2, bob);
 		const mismatchCommit = signedCloneCommit(genuineFuture, 1, bob, objectId, 1_000_000);
-		const mismatchBounded = boundedRecoveryStore(mismatchRaw, mismatchRows, scope, mismatchCommit);
+		const mismatchBounded = boundedRecoveryStore(mismatchRaw, mismatchRows, scope, mismatchCommit, "mismatch");
 		closePhase("mismatch-preparation", { appendCount: 2, materializedRowCount: mismatchRows.length });
+		const concurrentStartedAt = phaseStart;
+		let d108e4mSession;
+		let d108e4mProfile;
+		let d108e4mProof;
+		let d108e4mProfileStarted = false;
+		let d108e4mProfileStopped = false;
+		if (D108E4M_PROFILE_ENABLED) {
+			try {
+				d108e4mSession = new Session();
+				d108e4mSession.connect();
+				await d108e4mSession.post("Profiler.enable");
+				await d108e4mSession.post("Profiler.setSamplingInterval", { interval: 1_000 });
+				await d108e4mSession.post("Profiler.start");
+				d108e4mProfileStarted = true;
+			} catch (error) {
+				d108e4mProof = d108e4mUnavailable("inspector-start-failed", error, false, false);
+				try {
+					d108e4mSession?.disconnect();
+				} catch {
+					// The start failure above owns the unavailable classification.
+				}
+				d108e4mSession = undefined;
+			}
+		}
 
 		const recoveryTimings = new Map();
+		const recoveryFacadeTimings = new Map();
 		const recoveryTiming = (name) =>
 			Object.freeze({
 				name,
@@ -1266,7 +1589,7 @@ async function skipBudgetProof(material) {
 		const reusePromise = (async () => {
 			const windows = [];
 			for (let invocation = 0; invocation < 2; invocation += 1) {
-				reuseBounded.beginInvocation();
+				reuseBounded.beginInvocation(`reuse-${invocation}`);
 				passedFacades.push(reuseFacade);
 				const reopened = await reopenBudgetCase(
 					material,
@@ -1277,6 +1600,7 @@ async function skipBudgetProof(material) {
 					recoveryTiming(`reuse-${invocation}`)
 				);
 				const window = reuseBounded.telemetry();
+				recoveryFacadeTimings.set(`reuse-${invocation}`, reuseBounded.facadeTiming());
 				windows.push(
 					Object.freeze({
 						capturedIssuedCount: window.capturedIssuedCount,
@@ -1311,7 +1635,45 @@ async function skipBudgetProof(material) {
 			overBudgetPromise,
 			mismatchPromise,
 		]);
-		closePhase("concurrent-recoveries", { recoveryCount: 5 });
+		if (d108e4mSession !== undefined) {
+			try {
+				({ profile: d108e4mProfile } = await d108e4mSession.post("Profiler.stop"));
+				d108e4mProfileStopped = true;
+			} catch (error) {
+				d108e4mProof = d108e4mUnavailable("inspector-stop-failed", error, d108e4mProfileStarted, false);
+			} finally {
+				try {
+					d108e4mSession.disconnect();
+				} catch {
+					// The profiler result already owns this diagnostic path.
+				}
+			}
+		}
+		const concurrentFinishedAt = closePhase("concurrent-recoveries", { recoveryCount: 5 });
+		if (D108E4M_PROFILE_ENABLED && d108e4mProof === undefined) {
+			try {
+				recoveryFacadeTimings.set("equality", equalityBounded.facadeTiming());
+				recoveryFacadeTimings.set("over-budget", overBudgetBounded.facadeTiming());
+				recoveryFacadeTimings.set("mismatch", mismatchBounded.facadeTiming());
+				const facadeNames = ["equality", "reuse-0", "reuse-1", "over-budget", "mismatch"];
+				const facades = facadeNames.map((name) => recoveryFacadeTimings.get(name));
+				if (facades.some((facade) => facade === undefined)) {
+					throw new TypeError("D.108e4m facade timing is unavailable");
+				}
+				d108e4mProof = reduceD108e4mProfile(
+					d108e4mProfile,
+					concurrentFinishedAt.offsetMs - concurrentStartedAt.offsetMs,
+					facades
+				);
+			} catch (error) {
+				d108e4mProof = d108e4mUnavailable(
+					"profile-structural-malformation",
+					error,
+					d108e4mProfileStarted,
+					d108e4mProfileStopped
+				);
+			}
+		}
 
 		const equalityTelemetry = equalityBounded.telemetry();
 		const mismatchTelemetry = mismatchBounded.telemetry();
@@ -1343,6 +1705,7 @@ async function skipBudgetProof(material) {
 			memberNames.map((name) => Object.freeze({ ...recoveryTimings.get(name), counts: memberCounts[name] }))
 		);
 		const proofValues = Object.freeze({
+			...(D108E4M_PROFILE_ENABLED ? { d108e4m: d108e4mProof } : {}),
 			equality: Object.freeze({ ...equality, telemetry: equalityTelemetry }),
 			maxCanonicalPreimageBytes: Math.max(
 				...overBudgetRows.map((row) => row.commit.envelope.canonicalPreimageBytes.byteLength)
