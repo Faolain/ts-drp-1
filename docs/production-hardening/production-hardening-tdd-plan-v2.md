@@ -68931,3 +68931,102 @@ command at the exact signed test subtree recorded above after this plan-only
 implementation-review checkpoint is signed and pushed. The complete E3-03
 config, retained three-trial campaign and both campaign ledgers remain
 unauthorized.
+
+###### D.108e4x — late-authority raw-route reconciliation
+
+The D.108e4k restart at exact signed/pushed checkpoint
+`e76012eced90fcc3a8a6c32f16be027247298f86` passed every ordinary gate through
+the first two consecutive D.93.46 invocations, then stopped at the third exact
+D.93.46 invocation. The focused root/infrastructure owner passed 17/17; the
+unloaded native timing owner passed 5/5 and emitted exactly one valid
+`d108e4l-v1` proof with empty `memberCountErrors`, zero `D108E4M_PROFILE`
+records and telemetry-only `wallTimeMs=62_497.985417`; Phase-3 transport passed
+24/24; network plus E3-02 passed 58/58; the focused observer passed 1/1; the
+E3-03 inventories were exact 5/8/7 and the positive non-campaign selection
+passed 7/7 with the retained three-trial title absent; Phase-3h plus the four
+frozen Phase-5e owners passed 61/61; the Phase-4c/Phase-6a semantic selection
+passed 15 files/122 tests including the genuine fresh-process 64 MiB child;
+the first standalone subprocess-resolution control passed 3/3; the four
+browser configurations listed 5/1/1/1; D.93.36 passed 5/5; and the first two
+exact D.93.46 `--repeat-each=3 --fail-on-flaky-tests` invocations passed 3/3.
+No root canonical shim appeared. The complete E3-03 campaign remained absent.
+
+The third D.93.46 invocation passed its first two repeats and failed repeat 2
+of the third invocation after the sender's exact raw-link poll remained empty
+for 20 seconds. Durable recovery and convergence had completed: the terminal
+snapshot carried `durableVertexCount=3` and the exact two-member
+`transportPeerAuthors` roster. Raw telemetry was
+`links=[]`, `authenticatedConnectionLosses=0`, `handshakeFailures=0`,
+`linkDrops=0`, `lastLinkDrop=none`, `sent=0` and `received=0`. Thus this is a
+demonstrated local raw-readiness failure, not evidence of a js-libp2p abort,
+false-positive connection monitor, failed raw handshake or break-before-make
+replacement. The third-invocation stdout/stderr/status SHA-256 values are
+`3642181a6f36056903481b617427ffe7ccfb417cd81c84e75c2addb4b0a00682`,
+`923b32cf6a1fe289f9deab859ef3e8db9929b63e66efa1ec26bd9d823e5ef6c4`
+and `4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`.
+The retained trace, error context and diagnosis are under
+`.logs/d108e4k-final-e76012ec/ordinary/13-d9346-failure-artifacts/` with
+SHA-256 values
+`3498dd4784640ccac30cb2b69e0461dbb6daba9fc8857d3813f3edb19acdd8e7`,
+`9b138d8febd6472a406edb56a39e285215ef50b357d783e629fef7f835384d0a`
+and `a5a095303f7c5f17dd7d5484063b7e3b224b00eff8161cb77c7f4b309e65fc32`.
+No later ordinary gate or isolated proof ran, and the D.93.46 consecutive
+ledger is invalid. There is no retry evidence to reinterpret as GREEN.
+
+Static tracing gives one narrow falsifiable owner hypothesis. A v3 channel can
+open while `currentAuthority()` or the remote peer-to-author projection is not
+yet ready. `NodeEphemeralAdapter.openAuthorized()` then completes
+`rawRoute.reconcile([])`. If the reliable connection and group-peer events
+already occurred, a later durable projection change does not itself invoke
+`reconcileRaw()`. The route therefore retains an already-reconciled empty
+membership even though the live provider subsequently returns the exact
+two-writer roster. This explains the observed zero-failure/zero-drop empty
+route, but remains a hypothesis until the deterministic RED below fails for
+that exact transition.
+
+D.108e4x is a narrow event-driven reconciliation slice. Its RED changes only
+`packages/node/tests/ephemeral-webrtc-e3-02-red.test.ts`. The controlled raw
+bus starts with an already connected peer while the mutable provider exposes
+no current authority and no remote roster entry; the first open must reconcile
+an empty route. RED then makes the same provider expose the exact current
+authority, peer-to-author mapping and writer, invokes the existing idempotent
+`openAuthorized()` surface again with the identical object and options, and
+requires the same channel identity, an exact `['peer-b']` reconciliation and
+successful first raw publication with no reliable fallback. Current behavior
+must fail because the existing-registration branch returns before refreshing
+the raw route. A RED for any different reason stops and reslices.
+
+GREEN may change only `packages/node/src/ephemeral.ts` and
+`examples/grid/src/v3-zone.ts`. The adapter registration may retain one
+private reconciliation closure built from the original live provider; an
+idempotent identical `openAuthorized()` must invoke that closure before
+returning the existing channel. The zone's existing `onProjection` callback
+may idempotently reopen the already-active room channel with the identical
+frozen options only when both the room and channel exist, thereby notifying
+the adapter at the actual durable projection event. The returned object must
+be the existing channel. Reconciliation must be make-preserving: no
+`restartUnreliable()`, route close, link close, retry timer, polling interval,
+snapshot side effect or synthetic network event is allowed. No public or
+private API, dependency, config, timeout, transport limit, fallback, wire,
+digest, authority, snapshot or activation behavior may change. If these exact
+owners cannot close the deterministic RED and unchanged D.93.46 contract, stop
+and reslice rather than adding a new notification API or weakening readiness.
+
+Freeze this plan in a signed/pushed checkpoint and run the normal read-only
+Grok 4.6/high, exact Kimi K3 `CHECK001` through `CHECK100`, and Opus 5/xhigh
+plan review. No Fable or collaboration subagent runs. Correct every P0/P1 in
+the same round without confirmation and assign every P2 to the plan owner with
+deadline 2026-09-04. Then add the one RED and run only its exact title once,
+recording the expected failure and unchanged 10/10 retained remainder. After
+GREEN, run the exact new E3-02 file for 11/11; network E3-01 plus E3-02 for
+59/59; the unchanged D.93.46 command once with `--repeat-each=3
+--fail-on-flaky-tests` for 3/3; exact-owner typecheck, ESLint, Prettier and
+`git diff --check`; and the relevant retained Phase-3 transport and E3-03
+non-campaign observer tests. A failure stops without retry. The signed/pushed
+GREEN then receives the normal Grok/Kimi/Opus implementation review.
+
+Because D.108e4x changes product, example and test trees, every partial
+D.108e4k execution result above becomes historical diagnosis only. After
+D.108e4x GREEN and implementation review close, D.108e4k must restart from
+command one at the new exact signed tree. The complete E3-03 config, retained
+three-trial campaign and both campaign ledgers remain unauthorized.
