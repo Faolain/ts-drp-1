@@ -66921,8 +66921,9 @@ example, test, configuration, dependency or lockfile behavior, and it creates
 no RED/GREEN implementation pair. Its behavior baseline is the accepted
 D.108e4i GREEN at `cc112d220539157b5d81394d2574286ef49c159d`; the later
 D.108e4j commits change only this plan. The exact product, test, example,
-Playwright-config, package-manifest and lockfile trees must remain byte-identical
-to that baseline throughout this slice.
+Playwright/build/workspace configuration, package-manifest, lockfile and
+`scripts/` trees must remain byte-identical to that baseline throughout this
+slice.
 
 This split exists because the one D.108e4j campaign authorization is consumed,
 while the combined proof contains useful independent gates that do not execute
@@ -66953,10 +66954,19 @@ reproduction with deterministic before/failure/after/abort telemetry and an
 unpatched failing assertion. The related js-libp2p issues #2646/#3459, #1835,
 #3015 and #3201/#3205 remain context, not fixes.
 
-The ordinary non-campaign command ledger is frozen as follows. Commands that
-produce JSON use distinct `.logs/d108e4k-*` paths and retain stderr separately.
+The ordinary non-campaign command ledger is frozen below and executes as one
+shell block. It uses a positive allowlist for the seven E3-03 non-campaign
+titles; a negative filter is forbidden. The unqualified list must be exactly
+five titles including the
+retained three-trial title, the qualified list exactly eight and the positive
+selection exactly seven with that retained title absent. The selected run must
+then pass exactly 7/7 with zero skip, flake, unexpected or retry. A count or
+title mismatch stops before execution, so a renamed title cannot turn the
+selection into an unauthorized campaign.
 
 ```sh
+readonly D108E4K_NON_CAMPAIGN_PATTERN='^(validates schema-v3 replacement custody without cross-peer clocks|raw sequence evidence includes the fixed sample-domain boundaries|partitions receiver evidence by exact product roster without losing observations|separates rendered product-roster metrics from boundary-aware application evidence|freezes RTC metadata at the event boundary before async payload conversion|records a versioned and causally joined RTC lifecycle without changing delivery|proves replacement open before retiring the stale authenticated raw owner)$'
+
 pnpm exec vitest run --coverage.enabled=false \
   tests/phase-6a-creator-successor-local-author-red.test.ts \
   tests/phase-6a-creator-successor-infrastructure-red.test.ts \
@@ -66978,78 +66988,198 @@ pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts \
   --grep "freezes RTC metadata at the event boundary before async payload conversion" \
   --fail-on-flaky-tests
 
+pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts \
+  --list
 D108E4G_TELEMETRY=1 D108E4H_TELEMETRY=1 \
   pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts \
-  --grep-invert "three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss" \
-  --reporter=json --fail-on-flaky-tests
+  --list
+D108E4G_TELEMETRY=1 D108E4H_TELEMETRY=1 \
+  pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep "$D108E4K_NON_CAMPAIGN_PATTERN" --list
+PLAYWRIGHT_JSON_OUTPUT_NAME=.logs/d108e4k-non-campaign-e3-03.json \
+  D108E4G_TELEMETRY=1 D108E4H_TELEMETRY=1 \
+  pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep "$D108E4K_NON_CAMPAIGN_PATTERN" --reporter=json \
+  --fail-on-flaky-tests 2> .logs/d108e4k-non-campaign-e3-03.stderr.log
 
-pnpm exec playwright test --config playwright.phase-3a1b-d9336-v3-chat.config.ts \
-  --list
-pnpm exec playwright test --config playwright.phase-3a1b-d9346-zone.config.ts \
-  --list
-pnpm exec playwright test --config playwright.e5-00-zone-trade-intent.config.ts \
-  --list
-pnpm exec playwright test --config playwright.e5-02-zone-referee-outcome.config.ts \
-  --list
-pnpm exec playwright test --config playwright.phase-3a1b-d9336-v3-chat.config.ts \
-  --fail-on-flaky-tests
-pnpm exec playwright test --config playwright.phase-3a1b-d9346-zone.config.ts \
-  --repeat-each=3 --fail-on-flaky-tests
+pnpm exec vitest run --coverage.enabled=false \
+  tests/phase-3h-chat-zone-migration-red.test.ts \
+  tests/phase-3h-v3-migration-record-red.test.ts \
+  tests/phase-3h-v3-room-activation-red.test.ts \
+  tests/phase-3h-v3-room-rehearsal-red.test.ts \
+  tests/phase-3h-v3-terminal-transition-red.test.ts \
+  tests/phase-5e-creator-actor-red.test.ts \
+  tests/phase-5e-creator-close-red.test.ts \
+  tests/phase-5e-creator-live-close-red.test.ts \
+  tests/phase-5e-creator-relearn-red.test.ts \
+  --maxWorkers=1 --minWorkers=1
+
+pnpm exec vitest run --coverage.enabled=false \
+  tests/phase-4c-snapshot-pull-red.test.ts \
+  tests/phase-4c-snapshot-quarantine-red.test.ts \
+  tests/phase-4c-snapshot-stream-red.test.ts \
+  tests/phase-4c-snapshot-subprocess-resolution-red.test.ts \
+  tests/phase-4c-v3-snapshot-transfer-composition-red.test.ts \
+  tests/phase-6a-creator-adoption-commit-red.test.ts \
+  tests/phase-6a-creator-adoption-red.test.ts \
+  tests/phase-6a-creator-successor-activation-red.test.ts \
+  tests/phase-6a-creator-successor-epoch-red.test.ts \
+  tests/phase-6a-creator-successor-handle-identity-red.test.ts \
+  tests/phase-6a-creator-successor-infrastructure-red.test.ts \
+  tests/phase-6a-creator-successor-local-author-red.test.ts \
+  tests/phase-6a-creator-successor-product-red.test.ts \
+  packages/storage-node/tests/phase-6a-creator-adoption-commit-death-red.test.ts \
+  packages/storage-node/tests/phase-6a-creator-successor-activation-death-red.test.ts \
+  --maxWorkers=1 --minWorkers=1
+
+pnpm exec vitest run --coverage.enabled=false \
+  tests/phase-4c-snapshot-subprocess-resolution-red.test.ts \
+  --maxWorkers=1 --minWorkers=1
+
+pnpm exec playwright test --config playwright.phase-3a1b-d9336-v3-chat.config.ts --list
+pnpm exec playwright test --config playwright.phase-3a1b-d9346-zone.config.ts --list
+pnpm exec playwright test --config playwright.e5-00-zone-trade-intent.config.ts --list
+pnpm exec playwright test --config playwright.e5-02-zone-referee-outcome.config.ts --list
+
+pnpm exec playwright test --config playwright.phase-3a1b-d9336-v3-chat.config.ts --fail-on-flaky-tests
+pnpm exec playwright test --config playwright.phase-3a1b-d9346-zone.config.ts --repeat-each=3 --fail-on-flaky-tests
+pnpm exec playwright test --config packages/storage-browser/playwright.phase-4c-b-snapshot-quarantine.config.ts --fail-on-flaky-tests
+pnpm exec playwright test --config packages/storage-browser/playwright.phase-4c-c-snapshot-transfer.config.ts --fail-on-flaky-tests
+pnpm exec playwright test --config packages/storage-browser/playwright.phase-5e-creator-actor.config.ts --fail-on-flaky-tests
+pnpm exec playwright test --config packages/storage-browser/playwright.phase-5e-creator-relearn.config.ts --fail-on-flaky-tests
+pnpm exec playwright test --config packages/storage-browser/playwright.phase-5e-creator-live-close.config.ts --fail-on-flaky-tests
+pnpm exec playwright test --config packages/storage-browser/playwright.phase-6a-creator-adoption-commit.config.ts --fail-on-flaky-tests
+pnpm exec playwright test --config packages/storage-browser/playwright.phase-6a-creator-successor-activation.config.ts --fail-on-flaky-tests
+pnpm exec playwright test --config packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts --fail-on-flaky-tests
+pnpm exec playwright test --config packages/storage-browser/playwright.phase-6a-successor-epoch.config.ts --fail-on-flaky-tests
+
+pnpm exec vitest run --coverage.enabled=false \
+  tests/phase-4c-snapshot-subprocess-resolution-red.test.ts \
+  --maxWorkers=1 --minWorkers=1
+
+pnpm --filter '@ts-drp/canonical...' \
+  --filter '@ts-drp/protocol-v3...' \
+  --filter '@ts-drp/network...' \
+  --filter '@ts-drp/node...' \
+  --filter '@ts-drp/storage-node...' \
+  --filter '@ts-drp/storage-browser...' \
+  --filter '@ts-drp/outcome-commit...' \
+  --filter '@ts-drp/example-v3-room...' \
+  --filter 'ts-drp-example-v3-chat...' \
+  --filter 'ts-drp-example-grid...' build
+
+pnpm --filter @ts-drp/canonical typecheck
+pnpm --filter @ts-drp/protocol-v3 typecheck
+pnpm --filter @ts-drp/network typecheck
+pnpm --filter @ts-drp/storage-browser typecheck
+pnpm --filter @ts-drp/outcome-commit typecheck
+pnpm --filter @ts-drp/example-v3-room typecheck
+pnpm --filter ts-drp-example-v3-chat typecheck
+pnpm --filter ts-drp-example-grid typecheck
+
+pnpm exec tsc --noEmit --strict --skipLibCheck --target ES2023 \
+  --module NodeNext --moduleResolution NodeNext \
+  --lib ES2023,DOM,DOM.Iterable --types node,@playwright/test \
+  tests/e3-03-loss-and-hol-proof.pw.ts
+
+pnpm exec eslint --max-warnings=0 \
+  examples/grid/src/v3-zone.ts \
+  packages/network/src/unreliable-webrtc.ts \
+  packages/network/tests/unreliable-webrtc-e3-01-red.test.ts \
+  packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts \
+  packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts \
+  packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs \
+  packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts \
+  tests/e3-03-loss-and-hol-proof.pw.ts \
+  tests/e5-00-zone-trade-intent.pw.ts \
+  tests/e5-02-zone-referee-outcome.pw.ts \
+  tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts \
+  tests/fixtures/shared/workspace-package-export-file.mjs \
+  tests/phase-3a1b-d9336-two-client-room.pw.ts \
+  tests/phase-3a1b-d9346-v3-zone.pw.ts \
+  tests/phase-3a1b-p3-live-transport-red.test.ts \
+  tests/phase-6a-creator-successor-infrastructure-red.test.ts \
+  tests/phase-6a-creator-successor-local-author-red.test.ts
+
+pnpm exec prettier --check \
+  docs/production-hardening/production-hardening-tdd-plan-v2.md \
+  examples/grid/src/v3-zone.ts \
+  packages/network/src/unreliable-webrtc.ts \
+  packages/network/tests/unreliable-webrtc-e3-01-red.test.ts \
+  packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts \
+  packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts \
+  packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs \
+  packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts \
+  tests/e3-03-loss-and-hol-proof.pw.ts \
+  tests/e5-00-zone-trade-intent.pw.ts \
+  tests/e5-02-zone-referee-outcome.pw.ts \
+  tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts \
+  tests/fixtures/shared/workspace-package-export-file.mjs \
+  tests/phase-3a1b-d9336-two-client-room.pw.ts \
+  tests/phase-3a1b-d9346-v3-zone.pw.ts \
+  tests/phase-3a1b-p3-live-transport-red.test.ts \
+  tests/phase-6a-creator-successor-infrastructure-red.test.ts \
+  tests/phase-6a-creator-successor-local-author-red.test.ts
+
+git diff --check 50fd6fd578d3d219649157e45462397eb19dde7f^..HEAD
 ```
 
+The expected ordinary and isolated results are respectively 17/17 for the
+focused root/infrastructure command, 5/5 for the unloaded native timing file,
+24/24 for the full Phase-3 owner, 58/58 for network plus E3-02, 1/1 for the
+focused observer, 5/8/7 listed E3-03 inventories and 7/7 for the positive
+non-campaign execution, 48/48 for the five Phase-3h plus four frozen Phase-5e
+unit owners, 15 files/122 tests for the Phase-4c/Phase-6a semantic selection,
+and 3/3 for each standalone subprocess-resolution control. The browser
+expectations are D.93.36 5/5; each D.93.46 repeat invocation 3/3; Phase-4c-b/c
+18/18 and 6/6; Phase-5e actor/relearn/live-close 12/12, 6/6 and 6/6; and
+Phase-6a adoption-commit/activation/product/epoch 6/6, 24/24, 21/21 and 3/3.
+
 The exact D.93.46 command runs in three consecutive invocations; any failure
-resets that non-campaign ledger. The native five-test file runs alone, without
-a model review or another test process, and must preserve its child-measured
-`< 60_000 ms` acceptance rather than substituting the enclosing process wall
-time. The root canonical shim must be absent before and after every root
-collection or D.93 execution.
+resets that non-campaign ledger. The native five-test timing file is exactly
+`packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts`.
+It runs alone, without a model review or another test process, and preserves
+its child-measured `< 60_000 ms` acceptance; `/usr/bin/time -p` is surrounding
+telemetry only. That file is deliberately absent from the 15-file semantic
+selection. The historical 16-file glob and every combined selection containing
+the timing file are forbidden. The root canonical shim is absent before and
+after every root collection or D.93 execution.
 
-The retained unit selection is the five tracked Phase-3h files, all tracked
-Phase-5a/5d/5e Vitest owners, the five exact Phase-4c root owners, the eight
-exact Phase-6a root owners and the three exact Phase-6a storage-node death
-owners. The Phase-4c/Phase-6a portion runs with one worker and coverage disabled;
-it must include the genuine fresh-process 64 MiB child without exclusion. That
-child must again sample peak simultaneously live chunk-body ownership during
-each awaited write, keep the signed owner peak strictly below
-`2 * 131072`, settle at zero, and make the retaining mutant cross the same
-ceiling before release. Post-completion residue alone cannot satisfy the gate.
+The five Phase-4c owners in the 15-file selection include the genuine
+fresh-process 64 MiB child without exclusion. It again samples peak
+simultaneously live chunk-body ownership during each awaited write, keeps the
+signed owner peak strictly below `2 * 131072`, settles at zero, and makes the
+retaining mutant cross the same ceiling before release. Post-completion residue
+alone cannot satisfy the gate. A failing command is evidence assigned to its
+exact owner, not permission to retry, raise a timeout, weaken an assertion or
+change product behavior inside D.108e4k.
 
-The retained browser matrices are D.93.36, D.93.46, Phase-4c-b,
-Phase-4c-c, Phase-5d, all three Phase-5e configs, Phase-6a adoption-commit,
-successor activation, successor product and successor epoch. Every matrix uses
-`--fail-on-flaky-tests`; D.93.46 additionally uses its frozen
-`--repeat-each=3`. A failing matrix is evidence assigned to its exact owner,
-not permission to retry, raise a timeout, weaken an assertion or change product
-behavior inside D.108e4k.
+The broad `pnpm --filter @ts-drp/node typecheck` and
+`pnpm --filter @ts-drp/storage-node typecheck` commands also run separately and
+retain their recorded nonzero inherited baselines; both must show zero
+diagnostics in the D.108e4 owner roster and are not relabeled green. ESLint and
+Prettier run over the exact tracked D.108e4 behavior roster above, excluding
+this plan from ESLint and including it in Prettier. The exact roster comparison
+against `git diff --name-only 50fd6fd^ cc112d22`, stash-count, protected-path
+and tracked-status checks complete the static gate.
 
-Affected build custody is the recursive fresh build closure rooted at
-`@ts-drp/canonical`, `@ts-drp/protocol-v3`, `@ts-drp/network`, `@ts-drp/node`,
-`@ts-drp/storage-node`, `@ts-drp/storage-browser`,
-`@ts-drp/outcome-commit`, `@ts-drp/example-v3-room`,
-`ts-drp-example-v3-chat` and `ts-drp-example-grid`. Exact production
-typechecks run for canonical, protocol-v3, network, storage-browser,
-outcome-commit, v3-room, v3-chat and grid. The broad Node and storage-node
-typechecks remain recorded inherited baselines and must show zero diagnostic
-in any D.108e4 owner; they are not silently relabeled green. Standalone strict
-TypeScript for `tests/e3-03-loss-and-hol-proof.pw.ts`, ESLint and Prettier over
-the frozen D.108e4 plus D.108e4a-i owners, `git diff --check`, checkpoint-range
-diff, stash-count, protected-path and tracked-status checks complete the static
-gate.
-
-The isolated proof starts from a new detached checkout of the immutable
-D.108e4k plan-freeze descendant. Before installation it records no package or
-example `dist`, no root `node_modules/@ts-drp/canonical` shim and clean tracked
-status. It runs exactly `pnpm install --offline --ignore-scripts
---frozen-lockfile`, proves installation created no `dist`, runs
-`node scripts/ensure-native-deps.mjs`, then freshly builds the affected closure
-above. It records the canonical package and built-export realpaths, file size
-and post-build timestamp. The raw Phase-4c subprocess-resolution control runs
-before and after all browser gates. The isolated checkout then repeats every
-non-campaign gate above, including the three D.93.46 invocations and unloaded
-native timing gate, but still excludes the complete E3-03 config and retained
-three-trial behavior. It finishes tracked-clean with no root shim. Main-checkout
-ignored artifacts, ancestor modules, Vite aliases, source-relative imports,
-stale `dist` or lifecycle scripts cannot satisfy any gate.
+The isolated proof starts from a new detached checkout of the exact signed
+same-round D.108e4k correction commit recorded below before execution. Before
+installation it records no package or example `dist`, no root
+`node_modules/@ts-drp/canonical` shim and clean tracked status. It runs exactly
+`pnpm install --offline --ignore-scripts --frozen-lockfile`, proves installation
+created no `dist`, runs `node scripts/ensure-native-deps.mjs`, then freshly
+builds the affected closure above. It records the canonical package and
+built-export realpaths, file size and post-build timestamp. The four root lists
+and both D.93 matrices must collect or execute through that exact recorded
+freshly built export, with the root shim absent before and after. The raw
+Phase-4c subprocess-resolution control runs before and after all browser gates.
+The isolated checkout then repeats every non-campaign gate above, including the
+three D.93.46 invocations and unloaded native timing gate, but still excludes
+the complete E3-03 config and retained three-trial behavior. It finishes
+tracked-clean with no root shim. Main-checkout ignored artifacts, ancestor
+modules, Vite aliases, source-relative imports, stale `dist` or lifecycle
+scripts cannot satisfy any gate.
 
 D.108e4k receives one signed/pushed plan freeze and the normal read-only Grok
 4.6/high, exact Kimi K3 `CHECK001` through `CHECK100` and Opus 5/xhigh plan
@@ -67063,3 +67193,68 @@ D.108e4a/b/c/d or aggregate D.108e4, cannot perform D.108e4b's separate GREEN
 review and cannot permit D.108e5. Those transitions remain blocked until fresh
 express authorization covers the complete current five-test E3-03 config and
 both exact three-consecutive campaign ledgers.
+
+The D.108e4k non-campaign results may compose with that later authorized
+campaign proof only when the product, test, example, Playwright/build/workspace
+configuration, scripts, package-manifest and lockfile trees are byte-identical
+to `cc112d22`, the D.108e4k evidence checkpoint and every later campaign
+execution. A change to any of those trees voids this split and requires both
+the non-campaign and campaign halves of the complete combined proof at the new
+tree. Plan-only evidence custody may advance without invalidating that identity.
+
+The formal plan review round inspected exact immutable signed/pushed commit
+`b3fcca8ab0e6b6b3576e24c0fb018769f6fd15c6`, parent
+`194093b2b621f95d6a577a566c5719e21d4aee7e`, tree
+`3b5bc95574385e44df819bf15d19bb328fc5d330`, stable patch id
+`f093d898af12615eca9cf93ffc1b98f430264174` and raw-diff SHA-256
+`cf27a574696905a732256f791ab01ba73fb2625a4a45dc57eaef762c9c5fd970`.
+It had a good signature, was pushed and changed only this plan.
+
+Grok 4.6/high completed its one read-only inspection after 570.193 seconds
+with exit zero, `end_turn`, no timeout and the requested 64-turn ceiling. The
+runner honestly classified it `NO_VERDICT` because progress prose preceded its
+terminal object; the embedded object was `CHANGES_REQUIRED`, P0=2/P1=1/P2=0
+and is finding input, not a formal verdict. It identified the unsafe negative
+selection, incomplete retained ledger, timing-file recombination and unpinned
+isolated checkout. Event/public/status SHA-256 values are
+`55fd41bb2303856b40cd9088b5a4cb8a99cc09175a555508bc03a5ad3b7e7a1a`,
+`1868c64b78ab5516fc98f7768260a908727d3f91d1957a88d300365d95aa2e84`
+and `c17d925c6ddc5d3bcde235ce8c9cd08f78422f1435e405a0cb82e889e578e5fe`.
+The non-resumable runner was not relaunched and the prose-wrapped result is not
+called approval.
+
+Kimi CLI 0.38.0 exact `kimi-code/k3` session
+`session_f2edf727-080c-4d05-b668-c7cf301a0207` emitted exactly 100 total,
+unique and ordered `CHECK001` through `CHECK100` markers and returned
+`APPROVED`, P0=0/P1=0/P2=2. It identified the unspelled retained commands and
+the accidental widening from the frozen four Phase-5e files. Stream/stderr
+SHA-256 values are
+`b4c6e6feb2c8c391d739aadb9fe9d2f9dc1dd6447a2260a1d62226cf3de93b49`
+and `1d9168234d941d487baadf18e6c3179502eff2e08df11c85ee85ded513eea27f`.
+
+Opus 5/xhigh session `0ffbfac0-4981-4a52-8a6b-8b51520c0de0` resolved to
+`claude-opus-5`, completed 53 turns in 734.389 seconds with no error or
+subagent and returned schema-valid `CHANGES_REQUIRED`, P0=0/P1=3/P2=5. Its
+P1s independently required exact 5/8/7 inventory gates, the complete retained
+command ledger and same-tree composition with later campaign evidence. Its P2s
+required the frozen four-file Phase-5 scope, JSON/stderr destinations, exact
+isolated commit, unambiguous native timing owner and build/script identity.
+JSON/stderr SHA-256 values are
+`ae307cc0104b5c8b7e14a2650634e4f699643313546a6a608b1e465b2f91195e`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+One preceding Opus command-shape attempt exited before model startup because a
+variadic tool flag consumed the prompt; it created no model session and is not
+a review.
+
+The same-round correction above closes the reproduced P0/P1 union and owns the
+complete P2 union before execution. It replaces negative selection with an
+exact positive seven-title allowlist plus 5/8/7 list gates; spells every unit,
+browser, build and typecheck command with expected counts; restores only the
+four frozen Phase-5e owners and frozen matrices; excludes the unloaded timing
+file from every combined semantic command; binds the root browsers to the
+fresh canonical export; freezes build/script identity; and requires later
+campaign evidence to share the same behavior tree. The D.108e4k plan and
+evidence owners must record the exact correction commit, result hashes and
+clean-checkout identity by 2026-09-04. No confirmation review, Grok relaunch,
+Fable review, campaign, production/libp2p change or collaboration subagent is
+authorized.
