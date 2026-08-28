@@ -94,12 +94,13 @@ function validateSpan(
 	return value;
 }
 
-function d108e4lValidationErrors(result: unknown): string[] {
+function d108e4lValidation(result: unknown): Readonly<{ errors: string[]; memberCountErrors: string[] }> {
 	const errors: string[] = [];
+	const memberCountErrors: string[] = [];
 	const message = isRecord(result) ? result : undefined;
 	const proof = isRecord(message?.proof) ? message.proof : undefined;
 	const timing = isRecord(proof?.timing) ? proof.timing : undefined;
-	if (timing === undefined) return ["timing:record"];
+	if (timing === undefined) return { errors: ["timing:record"], memberCountErrors };
 	if (timing.schema !== "d108e4l-v1") errors.push("timing:schema");
 	if (timing.outcome !== "proof") errors.push("timing:outcome");
 	if (timing.nodeVersion !== process.version) errors.push("timing:nodeVersion");
@@ -163,7 +164,7 @@ function d108e4lValidationErrors(result: unknown): string[] {
 	for (const [index, expectedName] of D108E4L_MEMBER_NAMES.entries()) {
 		const member = validateSpan(errors, members[index], expectedName, concurrentStart, concurrentEnd);
 		if (member === undefined) continue;
-		if (!sameJson(member.counts, D108E4L_MEMBER_COUNTS[index])) errors.push(`${expectedName}:counts`);
+		if (!sameJson(member.counts, D108E4L_MEMBER_COUNTS[index])) memberCountErrors.push(`${expectedName}:counts`);
 		const steps = Array.isArray(member.steps) ? member.steps : [];
 		if (
 			!sameJson(
@@ -184,24 +185,27 @@ function d108e4lValidationErrors(result: unknown): string[] {
 	}
 	const reuseZero = isRecord(members[1]) ? members[1] : undefined;
 	const reuseOne = isRecord(members[2]) ? members[2] : undefined;
-	if (
-		!isNonnegativeNumber(reuseZero?.endOffsetMs) ||
-		!isNonnegativeNumber(reuseOne?.startOffsetMs) ||
-		reuseZero.endOffsetMs > reuseOne.startOffsetMs
-	) {
+	const reuseZeroEnd = reuseZero?.endOffsetMs;
+	const reuseOneStart = reuseOne?.startOffsetMs;
+	if (!isNonnegativeNumber(reuseZeroEnd) || !isNonnegativeNumber(reuseOneStart) || reuseZeroEnd > reuseOneStart) {
 		errors.push("members:reuse-order");
 	}
-	return errors;
+	return { errors, memberCountErrors };
 }
 
 function emitD108e4lProof(result: unknown): void {
 	const message = isRecord(result) ? result : undefined;
 	const proof = isRecord(message?.proof) ? message.proof : undefined;
+	const validation = d108e4lValidation(result);
 	const timing = isRecord(proof?.timing)
-		? proof.timing
-		: Object.freeze({ outcome: "invalid-proof", schema: "d108e4l-v1" });
+		? Object.freeze({ ...proof.timing, memberCountErrors: Object.freeze(validation.memberCountErrors) })
+		: Object.freeze({
+				outcome: "invalid-proof",
+				proofKeys: Object.freeze(Object.keys(proof ?? {}).sort()),
+				schema: "d108e4l-v1",
+			});
 	console.log(`D108E4L_TIMING ${JSON.stringify(timing)}`);
-	expect(d108e4lValidationErrors(result)).toEqual([]);
+	expect(validation.errors).toEqual([]);
 }
 
 function emitD108e4lUnavailable(error: unknown): void {
@@ -209,10 +213,10 @@ function emitD108e4lUnavailable(error: unknown): void {
 	const classification = message.includes("child timeout")
 		? "timeout"
 		: message.includes("child failed")
-			? "child-failed"
-			: "launcher-or-child-error";
+			? "missing-terminal-proof"
+			: "unclassified-child-or-launcher-error";
 	console.log(
-		`D108E4L_TIMING ${JSON.stringify({ classification, message, outcome: "unavailable", schema: "d108e4l-v1" })}`
+		`D108E4L_TIMING ${JSON.stringify({ classification, launcherContractErasedKind: true, message, outcome: "unavailable", schema: "d108e4l-v1" })}`
 	);
 }
 
