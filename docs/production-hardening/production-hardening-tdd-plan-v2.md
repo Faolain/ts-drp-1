@@ -65430,11 +65430,83 @@ debt remains. The connection-monitor false-positive predicate has not been
 satisfied, no upstream attribution or MVRE is authorized, and no js-libp2p
 package/configuration behavior changed.
 
-No complete E3-03 campaign has run in this correction sequence. The
-deterministic RED/GREEN, telemetry, review and focused gates now admit exactly
-one complete campaign. D.108e4g and rejected D.108e4f remain open until that
-single unchanged 5/5 campaign passes; a different outcome must be assigned to
-its telemetry owner without rerun.
+The sole admitted complete E3-03 campaign then ran exactly once with
+`pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts
+--reporter=json --fail-on-flaky-tests`. It completed in 157.510 seconds with
+exactly 5/5 expected, zero skipped, flaky, unexpected or retried tests. JSON,
+stderr, fixed-campaign and preliminary-calibration SHA-256 values are
+`c5900f3dbccdd7e5b750b58e514846d3e61f69021bfe7642228ea7fcf3bc45bc`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`,
+`6d6316df607337dfe1d3fd1b6fed6d305ee0e06c0462db4352eec23ef6fbd833`
+and `8dff45fba9fead3bd6afbcab6a47f377f9da86f05734aed5ff61131d472cc465`.
+All three trials recorded signed `rawMaxStallMs === 44`, well below 500;
+raw deliveries/gaps were 402/8, 388/7 and 401/10; clock skew was 1 ms each;
+and every product channel sequence was monotonic.
+
+That sole campaign is performance-green but D.108e4g-closure-red. Trial
+`e3-03-1` recorded receiver `authenticatedConnectionLosses +1`,
+`linkDrops +1` and `lastLinkDrop: restart -> replacement`, while the canonical
+campaign attachment contains no schema-v2 lifecycle or monitor record at all:
+no replacement open/register/retire chain, responder product-handler event,
+first B attempt/disposition or post-registration send is present. The passing
+test therefore exposed a test-evidence custody omission rather than a product
+continuity failure. The run is not repeated, D.108e4g/D.108e4f remain open and
+the exact next owner is D.108e4h below.
+
+###### D.108e4h — replacement-lifecycle custody in the complete campaign
+
+D.108e4h is a tests-only evidence slice owned exclusively by
+`tests/e3-03-loss-and-hol-proof.pw.ts`, due before any further complete E3-03
+invocation. It must not change production source, the five-test inventory,
+loss/timing thresholds, product APIs, wire formats, connection-monitor policy
+or snapshot owners. It adds schema-v3 campaign custody without changing the
+already-passing product behavior.
+
+Every trial records both endpoints' RTC lifecycle, monitor observations,
+raw authenticated before/deadline identities, raw RTC channel states and raw
+transport deltas at the same authoritative deadline as its receiver evidence.
+The trial validator is unconditional about closed shape and conditional about
+replacement semantics. With no authenticated/link-drop replacement delta it
+requires valid empty-or-nonreplacement lifecycle custody. With a replacement
+delta it requires one exact old/new authenticated and RTC identity chain,
+B open before local A retirement, A classified retiring until close drain, one
+first-B attempt with one success/failure terminal, the first successful
+post-registration send, no raw refusal while A was usable, and exact pending/
+retiring ingress disposition counts. Missing, duplicate, ambiguous or
+unjoined evidence fails before attachment publication.
+
+Cross-peer handler-before-send is causal rather than clock-derived. The
+test-only observer uses a same-origin `BroadcastChannel` witness: installing a
+product message handler on a raw B channel broadcasts its responder-local
+connection/channel identity; receipt creates an initiator-local witness event;
+and each raw send attempt records the latest post-reset witness sequence. The
+observer never waits on, gates, buffers, replays or changes the native send.
+A replacement attempt is admissible only when its local witness sequence is
+defined and precedes the attempt sequence. Reset clears both lifecycle records
+and witness state so A or a prior trial cannot satisfy B. This is evidence-only
+causality, not a product acknowledgment/control frame.
+
+RED first extracts a pure closed validator plus synthetic no-replacement and
+replacement fixtures. Current attachment shape fails specifically for absent
+lifecycle/monitor/witness custody; malformed joins, stale witnesses and
+duplicate terminals also fail, while the no-replacement control passes. A
+focused two-context browser RED then makes the handler broadcast and native
+send return/error transparency load-bearing without running the complete
+campaign. GREEN captures the exact deadline snapshots, publishes them through
+the existing attachment and makes those deterministic tests plus the existing
+five focused D.108e4g behaviors pass.
+
+D.108e4h receives its own signed/pushed plan, immutable RED and GREEN/evidence
+checkpoints and the normal Grok 4.6/high, exact Kimi K3 CHECK001-CHECK100 and
+Opus 5/xhigh review rounds. P0/P1 corrections remain same-round without
+confirmation review; P2s receive an owner/deadline. Fable is excluded. Gates
+are the complete unit owner, retained E3-02, focused six-behavior browser set,
+network/grid build/typecheck and exact-owner lint/format/diff checks. Only after
+all pass may the plan authorize exactly one replacement complete campaign.
+That campaign must be 5/5 with zero skip/flake/unexpected, all three
+`rawMaxStallMs <= 500`, and any replacement must pass the new lifecycle
+validator from its own attachment. A different outcome is assigned without
+rerun.
 
 Standalone test-owner TypeScript, affected grid build/typecheck, exact-owner
 ESLint/Prettier and diff check pass. Their material SHAs are
