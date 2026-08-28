@@ -67346,13 +67346,19 @@ The telemetry envelope is frozen to schema `d108e4l-v1`, `process.version`,
 receipt of the one memoized child result, the parent helper uses exactly one
 `console.log` whose payload line begins `D108E4L_TIMING `, before any schema or
 timing assertion. It then hard-validates the exact ten-name roster, exact five
-concurrent-member roster, counts, field types, zero/contiguous/final boundary
-identity, duration arithmetic, nonnegative values, outer nonoverlap and member
-containment. Emission therefore survives a schema rejection. The existing
-D.108e4 test remains the launching/cost-bearing consumer and the later D.108e2e
-test retains the unchanged hard `< 60_000` assertion and all later semantic
-assertions; no sixth test is added and the two existing `it(` call shapes pinned
-by `tests/phase-6a-creator-successor-local-author-red.test.ts:147,166` may not be
+concurrent-member roster, phase counts, field types, zero/contiguous/final
+boundary identity, duration arithmetic, nonnegative values, outer nonoverlap
+and member containment. The five duplicated recovery-counter comparisons are
+reported as `memberCountErrors` in that same custody line but do not reject the
+memoized promise before the retained ceiling and existing semantic assertions
+can run. Emission therefore survives a schema rejection without promoting
+previously soft semantic counters into an earlier hard gate. If `proof.timing`
+is absent or renamed, the invalid-proof record preserves the sorted top-level
+proof-key roster. The existing D.108e4 test remains the launching/cost-bearing
+consumer and the later D.108e2e test retains the unchanged hard `< 60_000`
+assertion and all later semantic assertions; no sixth test is added and the two
+existing `it(` call shapes pinned by
+`tests/phase-6a-creator-successor-local-author-red.test.ts:147,166` may not be
 reformatted.
 
 That full record is guaranteed only after a terminal proof reaches the parent.
@@ -67360,9 +67366,12 @@ The frozen shared launcher ignores child stdout, kills at 90,000 ms, and rejects
 and discards a child-error or nonzero-exit message. The two-file slice therefore
 cannot claim phase attribution on those paths. Its memoized parent helper
 instead emits exactly one `D108E4L_TIMING ` record with schema `d108e4l-v1`,
-`outcome="unavailable"` and the caught error classification before rethrowing.
-A timeout, IPC failure, child error or missing terminal proof then stops without
-rerun and opens D.108e4m against exact owner
+`outcome="unavailable"`, the caught message and one honest classification:
+`timeout`, `missing-terminal-proof` or
+`unclassified-child-or-launcher-error`. The last value records that the frozen
+launcher erased the structured child-error kind rather than pretending that
+substring matching can recover it. A timeout, IPC failure, child error or
+missing terminal proof then stops without rerun and opens D.108e4m against exact owner
 `tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts` for a
 separately reviewed progress-telemetry transport; it does not widen D.108e4l.
 
@@ -67452,3 +67461,72 @@ branch.
 No confirmation review, reviewer relaunch, instrumentation execution, Fable,
 campaign, production change or upstream attribution is authorized by the
 correction itself.
+
+The two-owner instrumentation checkpoint is signed/pushed commit
+`c865a755a852a50412374a9a50b9802fc142c737`, parent
+`a3ec1e67c0f545e09b68d2d5f27cb388e8f00bf6`, tree
+`64033737bc60dfcd9460b061d6cd98e321ff8776`, stable patch id
+`64d9c199689ad4108f13f36792bda4ef4bca7a18` and raw-diff SHA-256
+`dcb81163dd57065e6ad5a005c74c6aa7a7e8e26f15ff41111055aee50684ac18`.
+It has a good signature and is contained by the remote branch. Its pre-review
+`node --check`, exact-owner ESLint/Prettier and `git diff --check` gate passed;
+stdout/stderr/status SHA-256 values are
+`17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+The separate source-shape guard returned exactly one D.108e2d match, one
+D.108e2e match and both titles; stdout/stderr/status hashes are
+`a73597410a48981ed1f993278d7d909e7032c2e71f29cd02cbf0da3509fdbbbe`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+An additional premature `pnpm --filter @ts-drp/storage-node typecheck`
+diagnostic was not accepted as a gate: before the frozen package-build order it
+failed on inherited cross-package `rootDir`/file-list, missing built workspace
+declarations and existing fixture implicit-any diagnostics. The required
+build-before-typecheck gate remains pending after the timing evidence.
+
+The formal instrumentation review completed before any timing execution. Grok
+4.6/high continued producing read-only evidence beyond the former 570-second
+service boundary, then the local runner terminated it at its explicit 720-second
+bound. Its status is honestly `NO_VERDICT_TIMEOUT`, duration 720.349 seconds,
+exit -15, no terminal schema and no public finding; it was not relaunched or
+resumed. Event/public/status SHA-256 values are
+`27f623b06783cbcb8cafc29f13466aac87460de403c71a8918e8f215b64c0223`,
+`42003d5da41c1e783d23c09027d46dd6a495c026aaf5a04f7222902d3adda0ea`
+and `21ae7701fefab01c73a61a8dee153691c2eb5d49744cb6f7b5f862ac41eb225a`.
+
+Kimi CLI 0.38.0 exact `kimi-code/k3` session
+`session_9b68f50e-93d3-4791-8786-cad8ed0d9c87` emitted exactly 100 total,
+unique and ordered `CHECK001` through `CHECK100` markers plus one terminal
+`RESULT`. It returned `APPROVED`, P0=0/P1=0/P2=1; its P2 requested explicit
+TypeScript proof for the reuse-span optional-chain narrowing. Stream/stderr
+SHA-256 values are
+`35db7a26000f217c524ee2cb7300823786378fc57fbc22ca17ab94406afeaedd`
+and `b135c24dea675e2d7e9f7887b54d5ac9016f428a02728fa83a990f416751f4e3`.
+The first Kimi command-shape attempt combined incompatible prompt/auto modes,
+exited before model startup and is not a review.
+
+Opus 5/xhigh session `6f6477d3-d8e9-4d05-a195-da9e2cb2765d` resolved to
+`claude-opus-5`, completed 36 turns in 860.245 seconds with no error or
+subagent, and returned schema-valid `APPROVED`, P0=0/P1=0/P2=3. Its P2s asked
+the invalid-proof line to retain bounded received-proof identity, prevented
+duplicated member counters from preempting the ceiling, and corrected the
+unavailable taxonomy after the launcher erases child-error identity.
+JSON/stderr SHA-256 values are
+`f808131949ef2328c84d75862a13db73a51bf5fc33724f89caead2561efc4ed6`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+The same-round P2 union was assigned to the D.108e4l instrumentation/evidence
+owner with the required 2026-09-04 deadline and corrected without a confirmation
+review. The exact correction is signed/pushed commit
+`b2af20de098decedad3024cd073583c8cea5e622`, parent
+`c865a755a852a50412374a9a50b9802fc142c737`, tree
+`7d80a510321dab3588666245596a73c888b1fc90`, stable patch id
+`5d63aef970535e397f9e4c7b74b558ec96f1cfca` and raw-diff SHA-256
+`48aef50aa78442ac91adc93dace3f139e10ae7dd8b9e6a4ef386e80609043b2a`.
+Its exact-owner static gate passed with stdout/stderr/status SHA-256 values
+`17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+The timing execution remains pending; no reviewer, model, browser or test
+process may overlap it.
