@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, type Response, test } from "@playwright/test";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -63,6 +63,150 @@ function expectedCombinedClosure(
 
 let server: Phase4cBrowserServer | undefined;
 
+const FIXTURE_WAIT_MS = 5_000;
+const TELEMETRY_ENTRY_LIMIT = 5;
+const TELEMETRY_TEXT_LIMIT = 512;
+const LIVE_CLOSE_API_FUNCTIONS = [
+	"close",
+	"create",
+	"inspectDurableHead",
+	"join",
+	"sealEpoch",
+	"send",
+	"snapshot",
+	"status",
+] as const;
+
+type LiveCloseApiState =
+	| Readonly<{ kind: "absent" }>
+	| Readonly<{ kind: "missing-functions"; missing: readonly string[] }>
+	| Readonly<{ kind: "non-object"; valueType: string }>
+	| Readonly<{ kind: "ready" }>;
+
+interface FixtureTelemetry {
+	readonly consoleErrors: string[];
+	readonly pageErrors: string[];
+	readonly requestFailures: Readonly<{ error: string; url: string }>[];
+	readonly responses: Readonly<{ contentType: string; status: number; url: string }>[];
+}
+
+function boundedText(value: unknown): string {
+	return String(value).slice(0, TELEMETRY_TEXT_LIMIT);
+}
+
+function recordBounded<T>(target: T[], value: T): void {
+	if (target.length < TELEMETRY_ENTRY_LIMIT) target.push(value);
+}
+
+function requireServerOrigin(): string {
+	if (server === undefined) throw new TypeError("phase-5e live-close server is unavailable");
+	return server.origin;
+}
+
+function matchesExactUrl(response: Response, expected: string): boolean {
+	return response.url() === expected;
+}
+
+async function inspectLiveCloseApi(page: Page): Promise<LiveCloseApiState> {
+	return page.evaluate((functionNames) => {
+		if (!Object.hasOwn(window, "phase5eCreatorLiveClose")) return { kind: "absent" } as const;
+		const value: unknown = Reflect.get(window, "phase5eCreatorLiveClose");
+		if (value === null || typeof value !== "object") {
+			return { kind: "non-object", valueType: value === null ? "null" : typeof value } as const;
+		}
+		const missing = functionNames.filter((name) => typeof Reflect.get(value, name) !== "function");
+		return missing.length === 0 ? ({ kind: "ready" } as const) : ({ kind: "missing-functions", missing } as const);
+	}, LIVE_CLOSE_API_FUNCTIONS);
+}
+
+async function loadCreatorLiveCloseFixture(page: Page, origin: string): Promise<void> {
+	const telemetry: FixtureTelemetry = {
+		consoleErrors: [],
+		pageErrors: [],
+		requestFailures: [],
+		responses: [],
+	};
+	const documentUrl = `${origin}/`;
+	const entryUrl = `${origin}/entry.js`;
+	const onConsole = (message: { text(): string; type(): string }): void => {
+		if (message.type() === "error") recordBounded(telemetry.consoleErrors, boundedText(message.text()));
+	};
+	const onPageError = (error: Error): void => recordBounded(telemetry.pageErrors, boundedText(error.message));
+	const onRequestFailed = (request: { failure(): null | { errorText: string }; url(): string }): void => {
+		recordBounded(telemetry.requestFailures, {
+			error: boundedText(request.failure()?.errorText ?? "unknown request failure"),
+			url: boundedText(request.url()),
+		});
+	};
+	const onResponse = (response: Response): void => {
+		if (response.url() !== documentUrl && response.url() !== entryUrl) return;
+		recordBounded(telemetry.responses, {
+			contentType: boundedText(response.headers()["content-type"] ?? ""),
+			status: response.status(),
+			url: boundedText(response.url()),
+		});
+	};
+	page.on("console", onConsole);
+	page.on("pageerror", onPageError);
+	page.on("requestfailed", onRequestFailed);
+	page.on("response", onResponse);
+
+	try {
+		const documentResponsePromise = page.waitForResponse((response) => matchesExactUrl(response, documentUrl), {
+			timeout: FIXTURE_WAIT_MS,
+		});
+		const entryResponsePromise = page.waitForResponse((response) => matchesExactUrl(response, entryUrl), {
+			timeout: FIXTURE_WAIT_MS,
+		});
+		const [documentResponse, entryResponse] = await Promise.all([
+			documentResponsePromise,
+			entryResponsePromise,
+			page.goto(origin),
+		]);
+		const documentContentType = documentResponse.headers()["content-type"] ?? "";
+		if (!documentResponse.ok() || !documentContentType.startsWith("text/html")) {
+			throw new TypeError("phase-5e live-close document response is invalid");
+		}
+		const entryContentType = entryResponse.headers()["content-type"] ?? "";
+		if (!entryResponse.ok() || !entryContentType.startsWith("text/javascript")) {
+			throw new TypeError("phase-5e live-close entry response is invalid");
+		}
+		await page.waitForFunction(
+			(functionNames) => {
+				const value: unknown = Reflect.get(window, "phase5eCreatorLiveClose");
+				return (
+					value !== null &&
+					typeof value === "object" &&
+					functionNames.every((name) => typeof Reflect.get(value, name) === "function")
+				);
+			},
+			LIVE_CLOSE_API_FUNCTIONS,
+			{ timeout: FIXTURE_WAIT_MS }
+		);
+		if (telemetry.consoleErrors.length > 0 || telemetry.pageErrors.length > 0 || telemetry.requestFailures.length > 0) {
+			throw new TypeError("phase-5e live-close bootstrap emitted an error");
+		}
+	} catch (cause) {
+		const apiState = await inspectLiveCloseApi(page).catch((error: unknown) => ({
+			kind: "non-object" as const,
+			valueType: `inspection-failed:${boundedText(error)}`,
+		}));
+		throw new Error(
+			`phase-5e live-close fixture readiness failed: ${JSON.stringify({
+				apiState,
+				cause: boundedText(cause),
+				telemetry,
+			})}`,
+			{ cause }
+		);
+	} finally {
+		page.off("console", onConsole);
+		page.off("pageerror", onPageError);
+		page.off("requestfailed", onRequestFailed);
+		page.off("response", onResponse);
+	}
+}
+
 interface CreatorLiveCloseApi {
 	close(): Promise<void>;
 	create(input: Readonly<{ channelName: string; clientId: "alice"; databaseName: string }>): Promise<string>;
@@ -112,8 +256,29 @@ test.beforeAll(async () => {
 test.afterAll(async () => server?.close());
 test.skip(!GREEN_READY, "D.107d live close owners are intentionally absent in RED");
 
+test("reports bounded telemetry when the entry bootstrap fails", async ({ page }) => {
+	const origin = requireServerOrigin();
+	const entryUrl = `${origin}/entry.js`;
+	await page.route(entryUrl, (route) => route.abort("failed"));
+	try {
+		let captured: unknown;
+		try {
+			await loadCreatorLiveCloseFixture(page, origin);
+		} catch (error) {
+			captured = error;
+		}
+		expect(captured).toBeInstanceOf(Error);
+		const message = String(captured);
+		expect(message).toContain('"requestFailures"');
+		expect(message).toContain(entryUrl);
+		expect(message).toMatch(/"apiState":\{"kind":"(?:absent|non-object)"/u);
+	} finally {
+		await page.unroute(entryUrl);
+	}
+});
+
 test("closes a genuine non-empty creator room and terminalizes the old live handle", async ({ page }) => {
-	await page.goto(server?.origin ?? "about:blank");
+	await loadCreatorLiveCloseFixture(page, requireServerOrigin());
 	const run = crypto.randomUUID();
 	const databaseName = `phase5e-live-close-${run}`;
 	const channelName = `phase5e-live-close-${run}`;
@@ -190,10 +355,11 @@ test("does not let a connected joined peer claim creator close authority", async
 	const peer = await context.newPage();
 	const latePeer = await context.newPage();
 	try {
+		const origin = requireServerOrigin();
 		await Promise.all([
-			creator.goto(server?.origin ?? "about:blank"),
-			peer.goto(server?.origin ?? "about:blank"),
-			latePeer.goto(server?.origin ?? "about:blank"),
+			loadCreatorLiveCloseFixture(creator, origin),
+			loadCreatorLiveCloseFixture(peer, origin),
+			loadCreatorLiveCloseFixture(latePeer, origin),
 		]);
 		const invite = await creator.evaluate((input) => window.phase5eCreatorLiveClose.create(input), {
 			channelName,
