@@ -1576,7 +1576,10 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 				expect(lowReceived).toEqual([]);
 				expect(highReceived).toEqual([]);
 
-				if (role === "non-initiator") await vi.advanceTimersByTimeAsync(250);
+				if (role === "non-initiator") {
+					expect(low.peerConnections).toHaveLength(1);
+					await vi.advanceTimersByTimeAsync(250);
+				}
 				expect(low.peerConnections).toHaveLength(2);
 				await recoveryBarrier.waitUntilPending();
 				expect(low.peerConnections).toHaveLength(2);
@@ -1617,6 +1620,7 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 				await vi.advanceTimersByTimeAsync(250);
 				expect(low.peerConnections).toHaveLength(2);
 				expect(high.peerConnections).toHaveLength(2);
+				expect(vi.getTimerCount()).toBe(0);
 			} finally {
 				recoveryBarrier?.release();
 				vi.useRealTimers();
@@ -1722,18 +1726,28 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 				expect(lowReceived).toEqual([]);
 				expect(highReceived).toEqual([]);
 
-				if (role === "non-initiator") await vi.advanceTimersByTimeAsync(250);
+				if (role === "non-initiator") {
+					expect(low.peerConnections).toHaveLength(1);
+					await vi.advanceTimersByTimeAsync(250);
+				}
 				expect(low.peerConnections).toHaveLength(2);
 				await recoveryBarrier.waitUntilPending();
 				expect(high.peerConnections).toHaveLength(2);
 				expect(bus.exchangeRecords.map(({ remotePeerId }) => remotePeerId)).toEqual(["peer-b", "peer-b"]);
 
-				recoveryBarrier.release();
 				const localReplacement = role === "initiator" ? replacement.left : replacement.right;
 				const remoteReplacement = role === "initiator" ? replacement.right : replacement.left;
-				await vi.waitFor(() =>
-					expect(localRoute.snapshot().links[0]).toMatchObject({ generation: localReplacement.generation })
-				);
+				recoveryBarrier.release();
+				await vi.waitFor(() => {
+					expect(localRoute.snapshot().links[0]).toMatchObject({
+						connectionId: localReplacement.id,
+						generation: localReplacement.generation,
+					});
+					expect(remoteRoute.snapshot().links[0]).toMatchObject({
+						connectionId: remoteReplacement.id,
+						generation: remoteReplacement.generation,
+					});
+				});
 				expect(await localRoute.send([role === "initiator" ? "peer-b" : "peer-a"], Uint8Array.of(32))).toBe(true);
 				await tick();
 				expect(lowReceived).toEqual(role === "non-initiator" ? [Uint8Array.of(32)] : []);
@@ -1745,7 +1759,7 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 					handshakeFailures: 0,
 					lastLinkDrop: "replacement",
 					linkDrops: 1,
-					links: [{ generation: localReplacement.generation }],
+					links: [{ connectionId: localReplacement.id, generation: localReplacement.generation }],
 					received: 0,
 					sent: 1,
 					unknownRouteDrops: 0,
@@ -1757,7 +1771,7 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 					handshakeFailures: 0,
 					lastLinkDrop: "channel-close",
 					linkDrops: 1,
-					links: [{ generation: remoteReplacement.generation }],
+					links: [{ connectionId: remoteReplacement.id, generation: remoteReplacement.generation }],
 					received: 1,
 					sent: 0,
 					unknownRouteDrops: 0,
@@ -1765,6 +1779,7 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 				await vi.advanceTimersByTimeAsync(250);
 				expect(low.peerConnections).toHaveLength(2);
 				expect(high.peerConnections).toHaveLength(2);
+				expect(vi.getTimerCount()).toBe(0);
 			} finally {
 				recoveryBarrier?.release();
 				vi.useRealTimers();
