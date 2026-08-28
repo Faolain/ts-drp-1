@@ -66672,3 +66672,63 @@ operation types, the two literal-zero backend statements and full epoch-one
 round trip, the NoHead terminal/request budget for history walking, and explicit
 reuse of `assertTrustPreserved` plus the current empty-accumulator close owner.
 No confirmation review and no Fable review ran.
+
+###### D.108e4j — terminal corrected-oracle campaign closure
+
+D.108e4j is an evidence-only closure slice after D.108e4i and before
+D.108e4f/D.108e4g/D.108e4h or aggregate D.108e4 may close. It changes no test
+or product behavior and therefore does not create another RED/GREEN
+implementation pair: its behavior owner is the accepted, separately reviewed
+D.108e4i GREEN at `cc112d220539157b5d81394d2574286ef49c159d`. This slice
+exists solely because the one D.108e4h campaign used the pre-D.108e4i
+validator. Its complete attachment proves the third trial's directional
+custody now accepted by the corrected pure validator, but the throw occurred
+before that trial's remaining performance assertions, the aggregate
+three-trial assertions, rendered-metric assertions and final durable-control
+round trip executed. The historical 4/5 reporter therefore cannot be relabeled
+5/5 from the attachment alone.
+
+The D.108e4j plan freeze receives the normal Grok 4.6/high, exact Kimi K3
+`CHECK001` through `CHECK100` and Opus 5/xhigh review before execution. P0/P1
+findings are corrected in the same round without confirmation review; every P2
+receives an exact owner and deadline before the campaign. Reviewers must decide
+whether the evidence gap above justifies one terminal invocation, whether the
+prerequisites prevent a blind retry and whether the acceptance/failure custody
+below is complete. Fable and collaboration subagents are excluded.
+
+The immutable prerequisites are the final D.108e4i results: selected corrected
+validator 1/1; complete non-campaign D.108e4g+D.108e4h selection 7/7; retained
+network raw-sidecar plus E3-02 owners 58/58; exact unqualified/qualified
+inventories 5/8; affected network/grid build and typecheck; and exact-owner
+TypeScript, ESLint, Prettier and diff checks. The plan-only descendant must
+retain the exact tracked test and product tree from `cc112d22`; if any tracked
+test, product, dependency, browser/version, loss/timing threshold, config or
+five-test inventory owner changes, this authorization is void and must be
+reviewed again. This is a terminal integration execution after deterministic
+GREEN, not permission to sample for a favorable outcome.
+
+After the plan review is accepted, exactly one invocation is authorized:
+
+```text
+PLAYWRIGHT_JSON_OUTPUT_NAME=.logs/d108e4j-terminal-campaign.json pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --reporter=json --fail-on-flaky-tests
+```
+
+Acceptance is exactly five expected, zero unexpected, skipped and flaky tests.
+The fixed three-trial behavior must complete all three trials, every signed
+`rawMaxStallMs <= 500`, the aggregate connection/delivery gates, rendered
+metrics and the final durable-control round trip. Its always-attached campaign
+JSON must retain all three trial evidence envelopes and the exact browser
+version. If the invocation fails, its failure attachment is the sole new
+evidence owner, the failure is assigned to an exact next slice and the campaign
+is not rerun. A pass closes D.108e4f, D.108e4g and D.108e4h together, accepts
+the aggregate D.108e4 tests-only cleanup and permits D.108e5 to begin.
+
+Upstream attribution remains impossible in this slice unless the new attachment
+independently satisfies every already frozen otherwise-usable false-positive
+operand. If it does, D.108e4j stops without changing js-libp2p or claiming
+aggregate D.108e4 closure and reslices the separately reviewed exact-lock,
+public-libp2p two-peer, one-command, unpatched-failure MVRE. Otherwise the
+related upstream issues remain context only. No js-libp2p patch/upgrade,
+connection-monitor disablement, ping-threshold change, product API, wire,
+digest, limit, memory, activation-authority or broad dependency change is
+authorized.
