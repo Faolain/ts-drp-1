@@ -68408,7 +68408,25 @@ strictly below `os.availableParallelism()` (`10` on this host), and no
 unrelated process at or above 100% CPU. Any positive sample stops without
 launching. These evidence-derived limits reject both invalid attempts while
 admitting the earlier D.108e4q GREEN environment; they are execution custody,
-not a product gate. After a clean preflight, run exactly once:
+not a product gate.
+
+The first D.108e4t preflight at corrected checkpoint `dc13c220` rejected all
+six samples and did not launch the GREEN. An unrelated Heimdall Vitest process
+(`18870`/`18873`) remained live throughout, while one-minute load declined
+only from `19.6591796875` to `14.3818359375`, never below the required `10`.
+The read-only reviewer-process matcher also matched its own `zsh`/`awk`
+command text because the patterns appeared in that command line. That matcher
+result is discarded as a source-shape error rather than treated as a reviewer
+or code failure; the independently observed Vitest process and load each make
+the no-launch decision valid. A later preflight must match reviewer executable
+plus arguments while excluding its own PID ancestry. Preflight log/status
+SHA-256 values are
+`af9bcbc7e2405f35443a26e82eb59b8e104956fa0af60abcacba56d45acf2685`
+and `4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`;
+custody is under `.logs/d108e4t-green-dc13c220/`. This rejection consumes no
+GREEN attempt.
+
+After a clean preflight, run exactly once:
 
 ```bash
 env -u TS_DRP_D108E4M_PROFILE /usr/bin/time -p pnpm exec vitest run --coverage.enabled=false packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts --maxWorkers=1 --minWorkers=1
