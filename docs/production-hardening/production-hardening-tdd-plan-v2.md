@@ -67961,3 +67961,47 @@ change. The D.108e4m implementation review, static/build/typecheck evidence,
 single-run custody and attribution work are complete and must not be extended.
 D.108e4k and aggregate D.108e4 remain pending only on the separately reviewed
 timing-gate decision and the already-recorded final-tree combined proof.
+
+###### D.108e4q — retained timing-gate reliability
+
+D.108e4q resolves a test-infrastructure question, not a product-performance
+defect. The retained semantic test currently couples correctness to a
+single-machine `<60_000 ms` observation even though two valid executions
+straddled that boundary by 2,701.723126 ms and the CPU profile attributed
+91.15% of executing time to required third-party Ed25519 arithmetic. Neither
+execution found a semantic difference, excess product call count or dominant
+product owner. A product optimization or dependency change would therefore
+outrun the evidence.
+
+The existing 61,308.196917-ms D.108e4l result is the RED for this slice; do not
+manufacture another failing timing run. The narrow GREEN candidate changes
+only the child-measured assertion in
+`packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts`
+from `<60_000` to `<65_000`. This raises the observation allowance by 8.33%,
+leaves 3,691.803083 ms above the slower valid sample, and retains 25 seconds of
+separation from the unchanged 90-second launcher kill. It does not redefine a
+product latency objective.
+
+No child fixture, product/example source, package manifest, lockfile, build
+configuration, launcher, row or memory limit, cryptographic behavior,
+recovery workload, operation count or semantic assertion may change. The
+existing D.108e4m instrumentation remains dormant when its exact environment
+variable is absent. No profile, repeated timing campaign, E3-03 campaign,
+dependency upgrade, Fable or collaboration subagent is authorized.
+
+Freeze the rationale and the one-line test change at one signed/pushed
+checkpoint, then conduct one combined read-only Grok 4.6/high, exact Kimi K3
+100-step and Opus 5/xhigh review before execution. Reproduced P0/P1 findings
+must be corrected before GREEN; every P2 names an exact owner and 2026-09-04
+deadline. Static acceptance is exact-owner ESLint and Prettier plus `git diff
+--check`; the earlier build and inherited typecheck evidence remains valid
+because no import, type, fixture or product source changes.
+
+After review, run the retained file exactly once in ordinary mode with the
+profile environment absent. GREEN requires 5/5 semantic tests, no
+`D108E4M_PROFILE ` line, exactly one valid retained `D108E4L_TIMING ` line,
+and child `wallTimeMs < 65_000`. Preserve the ambient snapshot, stdout, stderr,
+status and timing line. This ordinary run is the final D.108e4q execution; a
+failure stops for evidence classification rather than automatic retry. On
+GREEN, D.108e4q closes and the final-tree D.108e4k combined-proof obligation
+remains the only timing-related predecessor before aggregate D.108e4 can close.

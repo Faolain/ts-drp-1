@@ -1144,7 +1144,7 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 			expect(proof?.pid).not.toBe(process.pid);
 			expect(proof?.maxEpochVertices).toBe(8_192);
 			expect(proof?.maxCanonicalPreimageBytes).toBeLessThan(1_024);
-			expect(proof?.wallTimeMs).toBeLessThan(60_000);
+			expect(proof?.wallTimeMs).toBeLessThan(65_000);
 			expect(proof?.realStore).toEqual({
 				boundedStoreShape: true,
 				equalityMaterializedRows: 8_193,
