@@ -69584,34 +69584,123 @@ request failure. It is test-fixture observability/readiness debt, not
 permission to change creator-close behavior or rerun until green.
 
 D.108e4y is the minimum test-only closure. It may change only
-`packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts`. Before
-each existing semantic page is used, one test-owned helper must attach
-`pageerror`, error-console, failed-request and `/entry.js` response telemetry;
-navigate to the existing server origin; require a successful main-document
-response and observed successful `/entry.js` response; and wait within the
-existing Playwright assertion budget for the exact live-close API functions
-to exist. A readiness failure must report the bounded telemetry in its thrown
-error. The helper must not swallow module errors, retry navigation, reload a
-page, raise a timeout, add sleeps, change the shared server, alter the bundle,
-or weaken any semantic assertion. Product, example, config, dependency,
-lockfile and public API files are out of scope. If telemetry proves a product
-module defect, stop and reslice rather than changing it here.
+`packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts`. The one
+helper is defined in that file and imported from nowhere else. It receives one
+page and the exact server origin; an absent server throws a distinct
+`phase-5e live-close server is unavailable` error, and the existing
+`about:blank` fallback is removed. It is called once for each of the four
+existing semantic pages before any semantic `page.evaluate` and once by the
+deterministic control below.
 
-The retained 5/6 isolated failure is D.108e4y's RED evidence. GREEN requires
-an exact source-shape check for one helper owner and no direct semantic
-`page.goto` path; the exact live-close config once in the ordinary checkout
-for 6/6; the exact config once in a new clean detached checkout after offline
-frozen installation and fresh affected build for 6/6; exact-owner TypeScript,
-ESLint, Prettier and diff checks; clean tracked status; all 26 stashes and
-protected paths preserved; and the root shim absent. No repeated sampling is
-authorized inside this slice. After a signed/pushed GREEN, run the normal
-read-only Grok 4.6/high, exact Kimi K3 `CHECK001` through `CHECK100`, and Opus
-5/xhigh implementation review. No Fable or collaboration subagent runs.
-Every P0/P1 is corrected in the same round; every P2 is assigned to the plan
-owner with deadline 2026-09-04.
+The helper synchronously attaches `pageerror`, error-console and
+failed-request listeners before navigation, then arms origin-qualified exact
+document and `${origin}/entry.js` response promises before calling the sole
+`page.goto(origin)`. It retains the existing default `load` wait; a
+post-navigation waiter, `commit` or `domcontentloaded` substitution is
+forbidden. The document response must be 2xx HTML. The entry response must be
+the exact same-origin `/entry.js`, 2xx, with a content type beginning
+`text/javascript`. Response waits and the exact API-readiness wait each use an
+explicit 5,000 ms bound, strictly below the existing 180,000 ms test timeout;
+specifying this lower bound is not a timeout raise. A bare test-timeout failure
+is not acceptable evidence.
+
+Readiness requires an object-valued `window.phase5eCreatorLiveClose` with the
+exact `close`, `create`, `inspectDurableHead`, `join`, `sealEpoch`, `send`,
+`snapshot` and `status` functions. Telemetry distinguishes property absent,
+property present but non-object, and object present with exact missing
+function names. Each category retains at most its first five records and each
+message is truncated to 512 characters. Any document, entry, navigation,
+captured module/request or readiness failure is caught once and rethrown as
+one error containing that bounded telemetry; `expect.poll` callback throws may
+not be relied on because Playwright can hide them until its terminal timeout.
+The helper must not swallow a module error, retry navigation, reload a page,
+add sleeps, change the shared server, alter the bundle or weaken any semantic
+assertion. Product, example, config, dependency, lockfile and public API files
+are out of scope. If telemetry proves a product module defect, stop and
+reslice rather than changing it here.
+
+The retained 5/6 isolated failure is D.108e4y's non-reproducible RED evidence;
+it does not by itself prove a removed cause. A third in-file Playwright title
+is the deterministic non-hollow control. On its one scratch page it installs
+a test-owned exact `${origin}/entry.js` route abort, calls the same helper and
+requires rejection whose bounded error reports the entry request failure and
+an unready API state. It then removes the route. This changes no server,
+bundle, product or configuration. With three titles across three engines, the
+exact live-close config expectation becomes 9/9.
+
+GREEN requires an exact source-shape check that proves one helper definition;
+the only `page.goto`, response waits and API-readiness wait occur inside it;
+all listeners and both exact-origin response promises are armed before that
+goto; the 5,000 ms, five-record and 512-character caps are present; all eight
+exact API functions are checked; the four semantic pages and one control page
+each call the helper before use; no semantic page is evaluated unprepared;
+and no reload, retry or sleep exists. The exact live-close config then runs
+once in the ordinary checkout for 9/9 and once in a new clean detached
+checkout after offline frozen installation and fresh affected build for 9/9.
+Exact-owner TypeScript, ESLint, Prettier and diff checks, clean tracked status,
+all 26 stashes and protected paths, and root-shim absence complete GREEN. No
+repeated sampling is authorized inside this slice. GREEN certifies helper
+installation, bounded diagnostic discrimination and semantic non-regression;
+it does not claim the intermittent Firefox cause was found or fixed. Any
+recurrence is diagnosed from the new telemetry and resliced if it proves a
+product or bundle defect.
+
+After a signed/pushed GREEN, run the normal read-only Grok 4.6/high, exact Kimi
+K3 `CHECK001` through `CHECK100`, and Opus 5/xhigh implementation review. No
+Fable or collaboration subagent runs. Every P0/P1 is corrected in the same
+round; every P2 is assigned to the plan owner with deadline 2026-09-04.
+
+This minimum file boundary deliberately leaves a wider fixture pattern. There
+are 35 direct server-origin navigations across eight sibling owners without an
+explicit API-readiness wait: Phase-5e actor (5), Phase-5e relearn (3),
+Phase-6a successor activation (9), Phase-6a successor epoch (1), Phase-5d
+round-change (8), Phase-5c seal-vote schema (5), dispatch (3) and death (1).
+Actor, relearn, activation and epoch are in the D.108e4k restart roster; they
+passed in both the ordinary and stopped isolated ledgers, so they are not
+widened into this failure owner. The plan owner must close or explicitly
+retain this shared readiness/telemetry debt by 2026-09-04. A later isolated
+missing-global failure in one of those owners is fixture evidence, not a
+creator-close product defect or proof that D.108e4y was incomplete.
 
 Because D.108e4y changes the test tree, its focused clean-checkout proof cannot
 repair or compose with the stopped D.108e4k ledger. After D.108e4y closes,
 D.108e4k must restart from command one at the new exact signed tree. The
 complete E3-03 config, retained three-trial campaign and both campaign ledgers
 remain unauthorized.
+
+The D.108e4y plan review inspected exact signed/pushed commit
+`f3f195cb`, parent `5e3e210d`, which changed only this plan. Grok 4.6/high
+completed normally after 510.13 seconds with exit zero, `end_turn` and no
+timeout. The runner honestly classified it `NO_VERDICT` because progress
+prose preceded its terminal object; that embedded object was
+`CHANGES_REQUIRED`, P0=0/P1=2/P2=1 and is finding input, not a formal verdict.
+Event/public/status/stderr SHA-256 values are
+`7434344f3ed6acf2c83b6849291a0e2eda4ad063d5ab1fbb449e414a18d9e1b8`,
+`fe21eddfceda1d0a737d6caa6d0f80930ea398ad91a92302328836c5e97d3c34`,
+`befcf0bb33312dcdea4b2ace7c34daa8aacb73cfc2e29e0f2b9ef3aba32c41c5`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+Kimi CLI 0.38.0 exact `kimi-code/k3` session
+`session_9045c36e-934f-4d24-aeca-9b3bc348cd03` emitted exactly 100 unique,
+ordered `CHECK001` through `CHECK100` markers and one RESULT. It returned
+`CHANGES_REQUIRED`, P0=0/P1=2/P2=6. Stream/stderr SHA-256 values are
+`538b25026257e95d48f1b1bf25f7100f53365da723c3517456f2968faa9b28cb`
+and `cf2fb03a82133077930090f64f80ce67d3e63d251d9cf4460a48b63126cf2b2f`.
+
+Opus 5/xhigh session `0d944c52-891a-4fec-b879-f5bd7250aa2c`
+completed 19 turns in 418.734 seconds with no error or subagent and returned
+`CHANGES_REQUIRED`, P0=1/P1=3/P2=6. JSON/stderr SHA-256 values are
+`4fe9e8b495e128ed5730137cbd08b0664eb590718eff8c570d230fe432929cfc`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+The same-round correction above closes the blocking union: it makes the exact
+document and entry observations pre-navigation and same-origin; defines 2xx
+content types; pins the existing `load` wait; gives every response/readiness
+wait a 5-second bound whose catch must surface capped telemetry; distinguishes
+the three API states; removes `about:blank`; and adds the deterministic
+test-owned entry-abort control, changing acceptance from 6/6 to 9/9. It also
+spells the non-vacuous source-shape predicates, states what GREEN can and
+cannot prove, and records the exact wider sibling debt without widening this
+slice. Every nonblocking review item is assigned to the plan owner with
+deadline 2026-09-04. No confirmation review, Fable, campaign, product change,
+test execution or collaboration subagent ran during review.
