@@ -360,6 +360,82 @@ interface RawTransportDelta {
 	readonly linkDrops: number;
 }
 
+interface D108e4hAuthenticatedIdentity {
+	readonly connectionId: string;
+	readonly generation: number;
+	readonly peerId: string;
+}
+
+interface D108e4hRtcIdentity {
+	readonly channelId: number;
+	readonly connectionId: number;
+	readonly label: "ts-drp-ephemeral/1";
+	readonly readyState: RTCDataChannelState;
+}
+
+interface D108e4hBoundaryCustody {
+	readonly authenticated: readonly D108e4hAuthenticatedIdentity[];
+	readonly rtc: readonly D108e4hRtcIdentity[];
+	readonly rawTransport: ZoneSnapshot["rawTransport"];
+}
+
+interface D108e4hLifecycleObservation {
+	readonly attemptId?: number;
+	readonly channelId?: number;
+	readonly connectionId: number;
+	readonly event: RtcLifecycleKind;
+	readonly owner: string;
+	readonly readyState?: RTCDataChannelState;
+	readonly schemaVersion: 3;
+	readonly sequence: number;
+	readonly trialId: string;
+}
+
+interface D108e4hMonitorObservation {
+	readonly carryIn: boolean;
+	readonly connectionId: string;
+	readonly event: Libp2pMonitorEventKind | "monitor-epoch-start";
+	readonly owner: string;
+	readonly peerId: string;
+	readonly pingId: string;
+	readonly schemaVersion: 3;
+	readonly sequence: number;
+	readonly trialId: string;
+}
+
+interface D108e4hRawSend {
+	readonly attemptId: number;
+	readonly channelId: number;
+	readonly connectionId: number;
+	readonly sequence: number;
+}
+
+interface D108e4hEndpointCustody {
+	readonly acceptedRaw: readonly AcceptedObservationIdentity[];
+	readonly deadline: D108e4hBoundaryCustody;
+	readonly lifecycle: readonly D108e4hLifecycleObservation[];
+	readonly monitor: readonly D108e4hMonitorObservation[];
+	readonly peerId: string;
+	readonly prepare: D108e4hBoundaryCustody;
+	readonly rawSends: readonly D108e4hRawSend[];
+	readonly rejectedRaw: readonly AcceptedObservationIdentity[];
+	readonly transmitsRawTrial: boolean;
+}
+
+interface D108e4hValidationInput {
+	readonly endpoints: Readonly<{
+		readonly creator: D108e4hEndpointCustody;
+		readonly receiver: D108e4hEndpointCustody;
+	}>;
+	readonly rawTransportDeltas: Readonly<{
+		readonly creator: RawTransportDelta;
+		readonly receiver: RawTransportDelta;
+	}>;
+	readonly sampleCount: number;
+	readonly schemaVersion: 3;
+	readonly trialId: string;
+}
+
 type NetworkProfile = Readonly<{
 	readonly connectionType: "wifi";
 	readonly downloadThroughput: number;
@@ -1692,6 +1768,694 @@ async function pageFailureEvidence(page: Page, trialId: string | null): Promise<
 			wire,
 		}),
 		zone: zoneResult,
+	});
+}
+
+type D108e4hFixtureMode =
+	| "creator-replacement"
+	| "none"
+	| "receiver-channel-close"
+	| "receiver-repeated-replacement"
+	| "receiver-replacement";
+
+function d108e4hRawTransport(
+	peerId: string,
+	input: Readonly<{
+		readonly authenticatedConnectionLosses?: number;
+		readonly lastLinkDrop?: string;
+		readonly linkDrops?: number;
+		readonly received?: number;
+		readonly sent?: number;
+	}> = {}
+): ZoneSnapshot["rawTransport"] {
+	return Object.freeze({
+		authenticatedConnectionLosses: input.authenticatedConnectionLosses ?? 0,
+		backpressuredDrops: 0,
+		fallbackCount: 0 as const,
+		handshakeFailures: 0,
+		lastLinkDrop: input.lastLinkDrop ?? "restart",
+		linkDrops: input.linkDrops ?? 0,
+		links: Object.freeze([
+			Object.freeze({
+				label: "ts-drp-ephemeral/1" as const,
+				maxRetransmits: 0 as const,
+				ordered: false as const,
+				peerId,
+			}),
+		]),
+		received: input.received ?? 0,
+		sent: input.sent ?? 0,
+	});
+}
+
+function d108e4hBoundary(
+	localPeerId: string,
+	remotePeerId: string,
+	connection: "A" | "B",
+	rawTransport: ZoneSnapshot["rawTransport"]
+): D108e4hBoundaryCustody {
+	const selected = connection === "A" ? 1 : 2;
+	return Object.freeze({
+		authenticated: Object.freeze([
+			Object.freeze({
+				connectionId: `${localPeerId}-${connection}`,
+				generation: selected,
+				peerId: remotePeerId,
+			}),
+		]),
+		rawTransport,
+		rtc: Object.freeze([
+			Object.freeze({
+				channelId: selected,
+				connectionId: selected,
+				label: "ts-drp-ephemeral/1" as const,
+				readyState: "open" as const,
+			}),
+		]),
+	});
+}
+
+function d108e4hMonitor(trialId: string, peerId: string): readonly D108e4hMonitorObservation[] {
+	return Object.freeze([
+		Object.freeze({
+			carryIn: false,
+			connectionId: `${peerId}-reliable`,
+			event: "monitor-epoch-start" as const,
+			owner: "e3-03-monitor-observer",
+			peerId,
+			pingId: `${trialId}:epoch`,
+			schemaVersion: 3 as const,
+			sequence: 0,
+			trialId,
+		}),
+	]);
+}
+
+function d108e4hSendEvidence(
+	trialId: string,
+	connectionId: number,
+	channelId: number,
+	sequenceOffset: number
+): Readonly<{
+	readonly lifecycle: readonly D108e4hLifecycleObservation[];
+	readonly rawSends: readonly D108e4hRawSend[];
+}> {
+	const lifecycle: D108e4hLifecycleObservation[] = [];
+	const rawSends: D108e4hRawSend[] = [];
+	for (let sequence = 0; sequence < SAMPLE_COUNT; sequence += 1) {
+		const attemptId = sequence;
+		rawSends.push(Object.freeze({ attemptId, channelId, connectionId, sequence }));
+		lifecycle.push(
+			Object.freeze({
+				attemptId,
+				channelId,
+				connectionId,
+				event: "channel-send-attempt" as const,
+				owner: "rtc-datachannel-send",
+				readyState: "open" as const,
+				schemaVersion: 3 as const,
+				sequence: sequenceOffset + sequence * 2,
+				trialId,
+			}),
+			Object.freeze({
+				attemptId,
+				channelId,
+				connectionId,
+				event: "channel-send-success" as const,
+				owner: "rtc-datachannel-send",
+				readyState: "open" as const,
+				schemaVersion: 3 as const,
+				sequence: sequenceOffset + sequence * 2 + 1,
+				trialId,
+			})
+		);
+	}
+	return Object.freeze({ lifecycle: Object.freeze(lifecycle), rawSends: Object.freeze(rawSends) });
+}
+
+function d108e4hAcceptedRaw(connectionId: number, channelId: number, sequence: number): AcceptedObservationIdentity {
+	return Object.freeze({
+		channelId,
+		connectionId,
+		insertionReadyState: "open",
+		lane: "raw",
+		ordinal: sequence,
+		readyState: "open",
+		receivedAtMs: sequence,
+		sentAtMs: 10_000 + sequence,
+		sequence,
+		sentinel: false,
+	});
+}
+
+function d108e4hFixture(mode: D108e4hFixtureMode): D108e4hValidationInput {
+	const trialId = `d108e4h-${mode}`;
+	const creatorPeerId = "peer-creator";
+	const receiverPeerId = "peer-receiver";
+	const creatorReplacement = mode === "creator-replacement";
+	const receiverReplacement = mode === "receiver-replacement" || mode === "receiver-repeated-replacement";
+	const receiverChannelClose = mode === "receiver-channel-close";
+	const receiverTransition = receiverReplacement || receiverChannelClose;
+	const creatorPrepareReason = "restart";
+	const receiverPrepareReason = mode === "receiver-repeated-replacement" ? "replacement" : "restart";
+	const creatorDeadlineReason = creatorReplacement ? "replacement" : creatorPrepareReason;
+	const receiverDeadlineReason = receiverReplacement
+		? "replacement"
+		: receiverChannelClose
+			? "channel-close"
+			: receiverPrepareReason;
+	const creatorPrepareTransport = d108e4hRawTransport(receiverPeerId, {
+		lastLinkDrop: creatorPrepareReason,
+		linkDrops: 4,
+	});
+	const receiverPrepareTransport = d108e4hRawTransport(creatorPeerId, {
+		lastLinkDrop: receiverPrepareReason,
+		linkDrops: 7,
+	});
+	const creatorDeadlineTransport = d108e4hRawTransport(receiverPeerId, {
+		authenticatedConnectionLosses: creatorReplacement ? 1 : 0,
+		lastLinkDrop: creatorDeadlineReason,
+		linkDrops: creatorReplacement ? 5 : 4,
+		sent: SAMPLE_COUNT,
+	});
+	const receiverDeadlineTransport = d108e4hRawTransport(creatorPeerId, {
+		authenticatedConnectionLosses: mode === "none" ? 1 : receiverTransition ? 1 : 0,
+		lastLinkDrop: receiverDeadlineReason,
+		linkDrops: receiverTransition ? 8 : 7,
+		received: 1,
+	});
+	const creatorSend = d108e4hSendEvidence(
+		trialId,
+		creatorReplacement ? 2 : 1,
+		creatorReplacement ? 2 : 1,
+		creatorReplacement ? 3 : 0
+	);
+	const creatorTransitionLifecycle: readonly D108e4hLifecycleObservation[] = creatorReplacement
+		? Object.freeze([
+				Object.freeze({
+					channelId: 2,
+					connectionId: 2,
+					event: "channel-open-event" as const,
+					owner: "rtc-datachannel-open-event",
+					readyState: "open" as const,
+					schemaVersion: 3 as const,
+					sequence: 0,
+					trialId,
+				}),
+				Object.freeze({
+					channelId: 1,
+					connectionId: 1,
+					event: "channel-close-call" as const,
+					owner: "product-unreliable-webrtc",
+					readyState: "open" as const,
+					schemaVersion: 3 as const,
+					sequence: 1,
+					trialId,
+				}),
+				Object.freeze({
+					channelId: 1,
+					connectionId: 1,
+					event: "channel-close-event" as const,
+					owner: "rtc-datachannel-close-event",
+					readyState: "closed" as const,
+					schemaVersion: 3 as const,
+					sequence: 2,
+					trialId,
+				}),
+			])
+		: Object.freeze([]);
+	const receiverTransitionLifecycle: readonly D108e4hLifecycleObservation[] = receiverTransition
+		? Object.freeze([
+				Object.freeze({
+					channelId: 2,
+					connectionId: 2,
+					event: "channel-message-handler-installed" as const,
+					owner: "product-unreliable-webrtc",
+					readyState: "open" as const,
+					schemaVersion: 3 as const,
+					sequence: 0,
+					trialId,
+				}),
+				Object.freeze({
+					channelId: 2,
+					connectionId: 2,
+					event: "channel-open-event" as const,
+					owner: "rtc-datachannel-open-event",
+					readyState: "open" as const,
+					schemaVersion: 3 as const,
+					sequence: 1,
+					trialId,
+				}),
+				Object.freeze({
+					channelId: 1,
+					connectionId: 1,
+					event: "channel-close-call" as const,
+					owner: "product-unreliable-webrtc",
+					readyState: "open" as const,
+					schemaVersion: 3 as const,
+					sequence: 2,
+					trialId,
+				}),
+				Object.freeze({
+					channelId: 1,
+					connectionId: 1,
+					event: "channel-close-event" as const,
+					owner: "rtc-datachannel-close-event",
+					readyState: "closed" as const,
+					schemaVersion: 3 as const,
+					sequence: 3,
+					trialId,
+				}),
+				Object.freeze({
+					channelId: 2,
+					connectionId: 2,
+					event: "channel-message" as const,
+					owner: "rtc-datachannel-message-event",
+					readyState: "open" as const,
+					schemaVersion: 3 as const,
+					sequence: 4,
+					trialId,
+				}),
+			])
+		: Object.freeze([
+				Object.freeze({
+					channelId: 1,
+					connectionId: 1,
+					event: "channel-message" as const,
+					owner: "rtc-datachannel-message-event",
+					readyState: "open" as const,
+					schemaVersion: 3 as const,
+					sequence: 0,
+					trialId,
+				}),
+			]);
+	const delta = (before: ZoneSnapshot["rawTransport"], after: ZoneSnapshot["rawTransport"]): RawTransportDelta =>
+		rawTransportDelta(before, after);
+	return Object.freeze({
+		endpoints: Object.freeze({
+			creator: Object.freeze({
+				acceptedRaw: Object.freeze([]),
+				deadline: d108e4hBoundary(
+					creatorPeerId,
+					receiverPeerId,
+					creatorReplacement ? "B" : "A",
+					creatorDeadlineTransport
+				),
+				lifecycle: Object.freeze([...creatorTransitionLifecycle, ...creatorSend.lifecycle]),
+				monitor: d108e4hMonitor(trialId, creatorPeerId),
+				peerId: creatorPeerId,
+				prepare: d108e4hBoundary(creatorPeerId, receiverPeerId, "A", creatorPrepareTransport),
+				rawSends: creatorSend.rawSends,
+				rejectedRaw: Object.freeze([]),
+				transmitsRawTrial: true,
+			}),
+			receiver: Object.freeze({
+				acceptedRaw: Object.freeze([receiverTransition ? d108e4hAcceptedRaw(2, 2, 0) : d108e4hAcceptedRaw(1, 1, 0)]),
+				deadline: d108e4hBoundary(
+					receiverPeerId,
+					creatorPeerId,
+					receiverTransition ? "B" : "A",
+					receiverDeadlineTransport
+				),
+				lifecycle: receiverTransitionLifecycle,
+				monitor: d108e4hMonitor(trialId, receiverPeerId),
+				peerId: receiverPeerId,
+				prepare: d108e4hBoundary(receiverPeerId, creatorPeerId, "A", receiverPrepareTransport),
+				rawSends: Object.freeze([]),
+				rejectedRaw: Object.freeze([]),
+				transmitsRawTrial: false,
+			}),
+		}),
+		rawTransportDeltas: Object.freeze({
+			creator: delta(creatorPrepareTransport, creatorDeadlineTransport),
+			receiver: delta(receiverPrepareTransport, receiverDeadlineTransport),
+		}),
+		sampleCount: SAMPLE_COUNT,
+		schemaVersion: 3 as const,
+		trialId,
+	});
+}
+
+function validateD108e4hCampaignCustody(_input: D108e4hValidationInput): void {
+	throw new Error("D108E4H_RED_UNIMPLEMENTED");
+}
+
+if (process.env["D108E4H_TELEMETRY"] === "1") {
+	test("validates schema-v3 replacement custody without cross-peer clocks", () => {
+		const noReplacement = d108e4hFixture("none");
+		const creatorReplacement = d108e4hFixture("creator-replacement");
+		const receiverReplacement = d108e4hFixture("receiver-replacement");
+		const repeatedReplacement = d108e4hFixture("receiver-repeated-replacement");
+		const receiverChannelClose = d108e4hFixture("receiver-channel-close");
+		const carryInMonitor = Object.freeze({
+			...noReplacement,
+			endpoints: Object.freeze({
+				...noReplacement.endpoints,
+				receiver: Object.freeze({
+					...noReplacement.endpoints.receiver,
+					monitor: Object.freeze([
+						...noReplacement.endpoints.receiver.monitor,
+						Object.freeze({
+							carryIn: true,
+							connectionId: "peer-receiver-reliable",
+							event: "ping-start" as const,
+							owner: "libp2p-connection-monitor",
+							peerId: "peer-receiver",
+							pingId: `${noReplacement.trialId}:carry-in:0`,
+							schemaVersion: 3 as const,
+							sequence: 1,
+							trialId: noReplacement.trialId,
+						}),
+					]),
+				}),
+			}),
+		});
+		for (const fixture of [
+			noReplacement,
+			creatorReplacement,
+			receiverReplacement,
+			repeatedReplacement,
+			receiverChannelClose,
+			carryInMonitor,
+		]) {
+			expect(() => validateD108e4hCampaignCustody(fixture)).not.toThrow();
+		}
+		const withReceiverLifecycle = (
+			fixture: D108e4hValidationInput,
+			lifecycle: readonly D108e4hLifecycleObservation[]
+		): D108e4hValidationInput =>
+			Object.freeze({
+				...fixture,
+				endpoints: Object.freeze({
+					...fixture.endpoints,
+					receiver: Object.freeze({ ...fixture.endpoints.receiver, lifecycle: Object.freeze(lifecycle) }),
+				}),
+			});
+		const withReceiverDeadlineTransport = (
+			fixture: D108e4hValidationInput,
+			rawTransport: ZoneSnapshot["rawTransport"]
+		): D108e4hValidationInput =>
+			Object.freeze({
+				...fixture,
+				endpoints: Object.freeze({
+					...fixture.endpoints,
+					receiver: Object.freeze({
+						...fixture.endpoints.receiver,
+						deadline: Object.freeze({ ...fixture.endpoints.receiver.deadline, rawTransport }),
+					}),
+				}),
+				rawTransportDeltas: Object.freeze({
+					...fixture.rawTransportDeltas,
+					receiver: rawTransportDelta(fixture.endpoints.receiver.prepare.rawTransport, rawTransport),
+				}),
+			});
+		const withCreatorDeadlineTransport = (
+			fixture: D108e4hValidationInput,
+			rawTransport: ZoneSnapshot["rawTransport"]
+		): D108e4hValidationInput =>
+			Object.freeze({
+				...fixture,
+				endpoints: Object.freeze({
+					...fixture.endpoints,
+					creator: Object.freeze({
+						...fixture.endpoints.creator,
+						deadline: Object.freeze({ ...fixture.endpoints.creator.deadline, rawTransport }),
+					}),
+				}),
+				rawTransportDeltas: Object.freeze({
+					...fixture.rawTransportDeltas,
+					creator: rawTransportDelta(fixture.endpoints.creator.prepare.rawTransport, rawTransport),
+				}),
+			});
+
+		const wrongEnvelopeSchema = Object.freeze({
+			...noReplacement,
+			schemaVersion: 2,
+		}) as unknown as D108e4hValidationInput;
+		expect(() => validateD108e4hCampaignCustody(wrongEnvelopeSchema)).toThrowError("D108E4H_SCHEMA_INVALID");
+		const wrongLifecycleSchema = withReceiverLifecycle(
+			receiverReplacement,
+			receiverReplacement.endpoints.receiver.lifecycle.map((record, index) =>
+				index === 0
+					? (Object.freeze({ ...record, schemaVersion: 2 }) as unknown as D108e4hLifecycleObservation)
+					: record
+			)
+		);
+		expect(() => validateD108e4hCampaignCustody(wrongLifecycleSchema)).toThrowError("D108E4H_SCHEMA_INVALID");
+		const wrongMonitorSchema = Object.freeze({
+			...noReplacement,
+			endpoints: Object.freeze({
+				...noReplacement.endpoints,
+				receiver: Object.freeze({
+					...noReplacement.endpoints.receiver,
+					monitor: Object.freeze(
+						noReplacement.endpoints.receiver.monitor.map(
+							(record) => Object.freeze({ ...record, schemaVersion: 2 }) as unknown as D108e4hMonitorObservation
+						)
+					),
+				}),
+			}),
+		});
+		expect(() => validateD108e4hCampaignCustody(wrongMonitorSchema)).toThrowError("D108E4H_SCHEMA_INVALID");
+
+		const missingMonitor = Object.freeze({
+			...noReplacement,
+			endpoints: Object.freeze({
+				...noReplacement.endpoints,
+				receiver: Object.freeze({ ...noReplacement.endpoints.receiver, monitor: Object.freeze([]) }),
+			}),
+		});
+		expect(() => validateD108e4hCampaignCustody(missingMonitor)).toThrowError("D108E4H_MONITOR_CUSTODY_ABSENT");
+
+		const staleEpoch = Object.freeze({
+			...receiverReplacement,
+			endpoints: Object.freeze({
+				...receiverReplacement.endpoints,
+				receiver: Object.freeze({
+					...receiverReplacement.endpoints.receiver,
+					lifecycle: Object.freeze(
+						receiverReplacement.endpoints.receiver.lifecycle.map((record, index) =>
+							index === 0 ? Object.freeze({ ...record, trialId: "stale-trial" }) : record
+						)
+					),
+				}),
+			}),
+		});
+		expect(() => validateD108e4hCampaignCustody(staleEpoch)).toThrowError("D108E4H_TRIAL_MISMATCH");
+		const staleMonitorEpoch = Object.freeze({
+			...noReplacement,
+			endpoints: Object.freeze({
+				...noReplacement.endpoints,
+				receiver: Object.freeze({
+					...noReplacement.endpoints.receiver,
+					monitor: Object.freeze(
+						noReplacement.endpoints.receiver.monitor.map((record) =>
+							Object.freeze({ ...record, trialId: "stale-trial" })
+						)
+					),
+				}),
+			}),
+		});
+		expect(() => validateD108e4hCampaignCustody(staleMonitorEpoch)).toThrowError("D108E4H_TRIAL_MISMATCH");
+
+		const ambiguousDrop = withReceiverDeadlineTransport(
+			receiverReplacement,
+			d108e4hRawTransport("peer-creator", {
+				authenticatedConnectionLosses: 1,
+				lastLinkDrop: "replacement",
+				linkDrops: 9,
+				received: 1,
+			})
+		);
+		expect(() => validateD108e4hCampaignCustody(ambiguousDrop)).toThrowError("D108E4H_DROP_AMBIGUOUS");
+		const unsupportedDrop = withReceiverDeadlineTransport(
+			receiverReplacement,
+			d108e4hRawTransport("peer-creator", {
+				authenticatedConnectionLosses: 1,
+				lastLinkDrop: "send-error",
+				linkDrops: 8,
+				received: 1,
+			})
+		);
+		expect(() => validateD108e4hCampaignCustody(unsupportedDrop)).toThrowError("D108E4H_DROP_AMBIGUOUS");
+
+		const missingIdentity = Object.freeze({
+			...receiverReplacement,
+			endpoints: Object.freeze({
+				...receiverReplacement.endpoints,
+				receiver: Object.freeze({
+					...receiverReplacement.endpoints.receiver,
+					deadline: Object.freeze({
+						...receiverReplacement.endpoints.receiver.deadline,
+						authenticated: Object.freeze([]),
+					}),
+				}),
+			}),
+		});
+		expect(() => validateD108e4hCampaignCustody(missingIdentity)).toThrowError("D108E4H_IDENTITY_JOIN_INVALID");
+
+		const firstSuccess = creatorReplacement.endpoints.creator.lifecycle.find(
+			({ event }) => event === "channel-send-success"
+		);
+		if (firstSuccess === undefined) throw new Error("D108E4H_FIXTURE_SUCCESS_ABSENT");
+		const finalLifecycleSequence = Math.max(
+			...creatorReplacement.endpoints.creator.lifecycle.map(({ sequence }) => sequence)
+		);
+		const duplicateTerminal = Object.freeze({
+			...creatorReplacement,
+			endpoints: Object.freeze({
+				...creatorReplacement.endpoints,
+				creator: Object.freeze({
+					...creatorReplacement.endpoints.creator,
+					lifecycle: Object.freeze([
+						...creatorReplacement.endpoints.creator.lifecycle,
+						Object.freeze({
+							...firstSuccess,
+							sequence: finalLifecycleSequence + 1,
+						}),
+					]),
+				}),
+			}),
+		});
+		expect(() => validateD108e4hCampaignCustody(duplicateTerminal)).toThrowError(
+			"D108E4H_ATTEMPT_TERMINAL_CARDINALITY"
+		);
+		const missingTerminal = Object.freeze({
+			...creatorReplacement,
+			endpoints: Object.freeze({
+				...creatorReplacement.endpoints,
+				creator: Object.freeze({
+					...creatorReplacement.endpoints.creator,
+					lifecycle: Object.freeze(
+						creatorReplacement.endpoints.creator.lifecycle.filter((record) => record !== firstSuccess)
+					),
+				}),
+			}),
+		});
+		expect(() => validateD108e4hCampaignCustody(missingTerminal)).toThrowError("D108E4H_ATTEMPT_TERMINAL_CARDINALITY");
+
+		const receiverLifecycle = receiverReplacement.endpoints.receiver.lifecycle;
+		const closeBeforeOpen = withReceiverLifecycle(
+			receiverReplacement,
+			receiverLifecycle.map((record, index) => {
+				if (index === 1)
+					return Object.freeze({
+						...record,
+						channelId: 1,
+						connectionId: 1,
+						event: "channel-close-call" as const,
+						owner: "product-unreliable-webrtc",
+					});
+				if (index === 2)
+					return Object.freeze({
+						...record,
+						channelId: 2,
+						connectionId: 2,
+						event: "channel-open-event" as const,
+						owner: "rtc-datachannel-open-event",
+					});
+				return record;
+			})
+		);
+		expect(() => validateD108e4hCampaignCustody(closeBeforeOpen)).toThrowError("D108E4H_LIFECYCLE_ORDER_INVALID");
+		const closeEventBeforeCall = withReceiverLifecycle(
+			receiverReplacement,
+			receiverLifecycle.map((record, index) => {
+				if (index === 2)
+					return Object.freeze({
+						...record,
+						event: "channel-close-event" as const,
+						owner: "rtc-datachannel-close-event",
+						readyState: "closed" as const,
+					});
+				if (index === 3)
+					return Object.freeze({
+						...record,
+						event: "channel-close-call" as const,
+						owner: "product-unreliable-webrtc",
+						readyState: "open" as const,
+					});
+				return record;
+			})
+		);
+		expect(() => validateD108e4hCampaignCustody(closeEventBeforeCall)).toThrowError("D108E4H_LIFECYCLE_ORDER_INVALID");
+
+		const missingOverlap = Object.freeze({
+			...receiverReplacement,
+			endpoints: Object.freeze({
+				...receiverReplacement.endpoints,
+				receiver: Object.freeze({ ...receiverReplacement.endpoints.receiver, acceptedRaw: Object.freeze([]) }),
+			}),
+		});
+		expect(() => validateD108e4hCampaignCustody(missingOverlap)).toThrowError("D108E4H_OVERLAP_LEDGER_INVALID");
+		const acceptedB = receiverReplacement.endpoints.receiver.acceptedRaw[0];
+		if (acceptedB === undefined) throw new Error("D108E4H_FIXTURE_ACCEPTED_RAW_ABSENT");
+		const duplicateOverlap = Object.freeze({
+			...receiverReplacement,
+			endpoints: Object.freeze({
+				...receiverReplacement.endpoints,
+				receiver: Object.freeze({
+					...receiverReplacement.endpoints.receiver,
+					acceptedRaw: Object.freeze([acceptedB, acceptedB]),
+				}),
+			}),
+		});
+		expect(() => validateD108e4hCampaignCustody(duplicateOverlap)).toThrowError("D108E4H_OVERLAP_LEDGER_INVALID");
+		const crossSetOverlap = Object.freeze({
+			...receiverReplacement,
+			endpoints: Object.freeze({
+				...receiverReplacement.endpoints,
+				receiver: Object.freeze({
+					...receiverReplacement.endpoints.receiver,
+					rejectedRaw: Object.freeze([acceptedB]),
+				}),
+			}),
+		});
+		expect(() => validateD108e4hCampaignCustody(crossSetOverlap)).toThrowError("D108E4H_OVERLAP_LEDGER_INVALID");
+
+		const missingRawSequence = Object.freeze({
+			...creatorReplacement,
+			endpoints: Object.freeze({
+				...creatorReplacement.endpoints,
+				creator: Object.freeze({
+					...creatorReplacement.endpoints.creator,
+					rawSends: Object.freeze(creatorReplacement.endpoints.creator.rawSends.slice(0, -1)),
+				}),
+			}),
+		});
+		expect(() => validateD108e4hCampaignCustody(missingRawSequence)).toThrowError("D108E4H_RAW_SEND_DOMAIN_INVALID");
+		const lastRawSend = creatorReplacement.endpoints.creator.rawSends.at(-1);
+		if (lastRawSend === undefined) throw new Error("D108E4H_FIXTURE_RAW_SEND_ABSENT");
+		const duplicateRawSequence = Object.freeze({
+			...creatorReplacement,
+			endpoints: Object.freeze({
+				...creatorReplacement.endpoints,
+				creator: Object.freeze({
+					...creatorReplacement.endpoints.creator,
+					rawSends: Object.freeze([
+						...creatorReplacement.endpoints.creator.rawSends.slice(0, -1),
+						Object.freeze({ ...lastRawSend, sequence: SAMPLE_COUNT - 2 }),
+					]),
+				}),
+			}),
+		});
+		expect(() => validateD108e4hCampaignCustody(duplicateRawSequence)).toThrowError("D108E4H_RAW_SEND_DOMAIN_INVALID");
+		const creatorBackpressure = withCreatorDeadlineTransport(
+			creatorReplacement,
+			Object.freeze({
+				...creatorReplacement.endpoints.creator.deadline.rawTransport,
+				backpressuredDrops: 1,
+			})
+		);
+		expect(() => validateD108e4hCampaignCustody(creatorBackpressure)).toThrowError("D108E4H_RAW_BACKPRESSURE");
+		const inconsistentSentCounter = withCreatorDeadlineTransport(
+			creatorReplacement,
+			Object.freeze({
+				...creatorReplacement.endpoints.creator.deadline.rawTransport,
+				sent: SAMPLE_COUNT - 1,
+			})
+		);
+		expect(() => validateD108e4hCampaignCustody(inconsistentSentCounter)).toThrowError("D108E4H_RAW_COUNTER_MISMATCH");
 	});
 }
 
