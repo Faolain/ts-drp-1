@@ -67258,3 +67258,13 @@ evidence owners must record the exact correction commit, result hashes and
 clean-checkout identity by 2026-09-04. No confirmation review, Grok relaunch,
 Fable review, campaign, production/libp2p change or collaboration subagent is
 authorized.
+
+The accepted same-round correction is exact signed/pushed commit
+`422be4009c10e7dcc4a1d5a08b0599e56f63063f`, parent
+`b3fcca8ab0e6b6b3576e24c0fb018769f6fd15c6`, tree
+`17e7f1386dfe5e4de86e216de0083bb9337e19ce`, stable patch id
+`9a2b7d03ae1e59cadf1c3cb634873ef609ce4737` and raw-diff SHA-256
+`252a8e30ef5856d2a47a7cf117e770e36f3884c33b04fe52249e3d09405a0430`.
+It has a good signature, changes only this plan and is the exact detached
+checkout commit for the D.108e4k isolated proof. Every behavior and build-input
+tree named above remains byte-identical to `cc112d22`.
