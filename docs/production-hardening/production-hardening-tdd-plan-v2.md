@@ -66727,10 +66727,11 @@ attachment. On failure it also records SHA-256 for the decoded
 artifact. This custody is due by 2026-09-04.
 
 A pass accepts D.108e4e, D.108e4f, D.108e4g and D.108e4h together. If every
-trial records zero product link drops, the campaign is only the missing
-three-trial performance, aggregate, rendered-metric and durable-control
-evidence; the focused D.108e4g browser proof and D.108e4i preserved e3-03-2
-replay remain the directional replacement-custody owners. D.108e4a remains
+trial records zero prepare-to-deadline product link-drop deltas and no
+`lastLinkDrop === "replacement"`, the campaign is only the missing three-trial
+performance, aggregate, rendered-metric and durable-control evidence; the
+focused D.108e4g browser proof and D.108e4i preserved e3-03-2 replay remain the
+directional replacement-custody owners. D.108e4a remains
 rejected pending D.108e4b acceptance; D.108e4b remains rejected pending the
 combined proof and its own separate GREEN review; D.108e4c remains open on its
 unchanged combined proof; and D.108e4d remains rejected pending that combined
