@@ -1527,7 +1527,7 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 			const high = owner(module, bus, "peer-b");
 			let recoveryBarrier: ReturnType<FakeSignalingBus["pauseResponses"]> | undefined;
 			try {
-				bus.connect("peer-a", "peer-b");
+				const connection = bus.connect("peer-a", "peer-b");
 				const lowRoute = low.owner.openUnreliableWebRtcRoute("zone:failed-send-recovery");
 				const highRoute = high.owner.openUnreliableWebRtcRoute("zone:failed-send-recovery");
 				const localRoute = role === "initiator" ? lowRoute : highRoute;
@@ -1578,7 +1578,9 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 
 				if (role === "non-initiator") {
 					expect(low.peerConnections).toHaveLength(1);
-					await vi.advanceTimersByTimeAsync(250);
+					await vi.advanceTimersByTimeAsync(249);
+					expect(low.peerConnections).toHaveLength(1);
+					await vi.advanceTimersByTimeAsync(1);
 				}
 				expect(low.peerConnections).toHaveLength(2);
 				await recoveryBarrier.waitUntilPending();
@@ -1590,7 +1592,16 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 				expect(highReceived).toEqual([]);
 
 				recoveryBarrier.release();
-				await vi.waitFor(() => expect(lowRoute.snapshot().activeLinks).toBe(1));
+				await vi.waitFor(() => {
+					expect(lowRoute.snapshot().links[0]).toMatchObject({
+						connectionId: connection.left.id,
+						generation: connection.left.generation,
+					});
+					expect(highRoute.snapshot().links[0]).toMatchObject({
+						connectionId: connection.right.id,
+						generation: connection.right.generation,
+					});
+				});
 				expect(await localRoute.send([role === "initiator" ? "peer-b" : "peer-a"], Uint8Array.of(13))).toBe(true);
 				await tick();
 				expect(lowReceived).toEqual(role === "non-initiator" ? [Uint8Array.of(13)] : []);
@@ -1728,7 +1739,9 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 
 				if (role === "non-initiator") {
 					expect(low.peerConnections).toHaveLength(1);
-					await vi.advanceTimersByTimeAsync(250);
+					await vi.advanceTimersByTimeAsync(249);
+					expect(low.peerConnections).toHaveLength(1);
+					await vi.advanceTimersByTimeAsync(1);
 				}
 				expect(low.peerConnections).toHaveLength(2);
 				await recoveryBarrier.waitUntilPending();
@@ -1788,6 +1801,39 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 			}
 		}
 	);
+
+	it("does not recover an unusable mapped link after its peer leaves desired membership", async () => {
+		const module = await loadOwnerModule();
+		const bus = new FakeSignalingBus();
+		const low = owner(module, bus, "peer-a");
+		const high = owner(module, bus, "peer-b");
+		try {
+			bus.connect("peer-a", "peer-b");
+			const lowRoute = low.owner.openUnreliableWebRtcRoute("zone:undesired-send-recovery");
+			const highRoute = high.owner.openUnreliableWebRtcRoute("zone:undesired-send-recovery");
+			await Promise.all([lowRoute.reconcile(["peer-b"]), highRoute.reconcile(["peer-a"])]);
+			expect(low.peerConnections).toHaveLength(1);
+			await lowRoute.reconcile([]);
+			const channel = low.peerConnections[0]?.channels[0];
+			if (channel === undefined) throw new Error("established raw channel missing");
+			channel.readyState = "closing";
+
+			expect(await lowRoute.send(["peer-b"], Uint8Array.of(51))).toBe(false);
+			expect(lowRoute.snapshot()).toMatchObject({
+				activeLinks: 1,
+				backpressuredDrops: 0,
+				lastLinkDrop: undefined,
+				linkDrops: 0,
+				sent: 0,
+				unknownRouteDrops: 0,
+			});
+			expect(low.peerConnections).toHaveLength(1);
+			expect(high.peerConnections).toHaveLength(1);
+		} finally {
+			low.owner.close();
+			high.owner.close();
+		}
+	});
 
 	it("rejects unknown routes, retains established raw links, and cannot revive stale signaling", async () => {
 		const module = await loadOwnerModule();

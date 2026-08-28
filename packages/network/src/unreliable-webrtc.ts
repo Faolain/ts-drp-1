@@ -594,6 +594,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 				link.channel.readyState !== "open" ||
 				(connection !== undefined && !this.#isCurrent(link.connection))
 			) {
+				if (link !== undefined && this.#desiredPeers().includes(peerId)) void this.#linkFor(peerId);
 				return false;
 			}
 			targets.push({ link, peerId });
@@ -625,7 +626,8 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		const existing = this.#links.get(peerId);
 		const connection = this.#connectionFor(peerId);
 		const replacementRequired =
-			existing !== undefined && connection !== undefined && !this.#isCurrent(existing.connection);
+			existing !== undefined &&
+			(existing.channel.readyState !== "open" || (connection !== undefined && !this.#isCurrent(existing.connection)));
 		if (existing !== undefined && existing.channel.readyState === "open" && !replacementRequired) return existing;
 		if (existing !== undefined && replacementRequired) {
 			this.#reserveReplacementAdmission(peerId);
