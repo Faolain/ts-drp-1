@@ -34,6 +34,7 @@ interface ControlledNode {
 	readonly channel: EphemeralChannel;
 	readonly direct: Message[];
 	readonly owner: ControlledRawOwner | null;
+	readonly provider: EphemeralAuthorizationProvider;
 	readonly published: Message[];
 }
 
@@ -79,6 +80,7 @@ function controlledNode(input: {
 		channel: adapter.openAuthorized("zone", provider, OPTIONS),
 		direct,
 		owner,
+		provider,
 		published,
 	};
 }
@@ -99,6 +101,46 @@ function expectNoReliable(node: ControlledNode): void {
 }
 
 describe("E3-02 v3 zone transport adoption RED", () => {
+	it("refreshes an idempotently reopened route after eligibility becomes usable", async () => {
+		const bus = new ControlledRawBus();
+		bus.connect("peer-a", "peer-b");
+		const roster = new Map([["peer-a", "author-a"]]);
+		const writers = new Set(["author-a"]);
+		const left = controlledNode({
+			bus,
+			localPeerId: "peer-a",
+			peers: ["peer-b"],
+			raw: true,
+			roster,
+			writers,
+		});
+		const route = onlyRoute(left.owner);
+		expect(route.reconciledPeers).toEqual([[]]);
+
+		roster.set("peer-b", "author-b");
+		writers.add("author-b");
+		const right = controlledNode({
+			bus,
+			localPeerId: "peer-b",
+			peers: ["peer-a"],
+			raw: true,
+			roster,
+			writers,
+		});
+		try {
+			const reopened = left.adapter.openAuthorized("zone", left.provider, OPTIONS);
+			expect(reopened).toBe(left.channel);
+			expect(route.reconciledPeers.at(-1)).toEqual(["peer-b"]);
+			expect(await reopened.publish({ class: "unreliable-sequenced", key: "movement", payload: payload("east") })).toBe(
+				true
+			);
+			expectNoReliable(left);
+		} finally {
+			left.channel.close();
+			right.channel.close();
+		}
+	});
+
 	it("selects authority-derived raw lanes and intersects live writers with connected peers", async () => {
 		const bus = new ControlledRawBus();
 		bus.connect("peer-a", "peer-b");

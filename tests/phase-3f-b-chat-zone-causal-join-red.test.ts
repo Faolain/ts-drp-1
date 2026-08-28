@@ -9,52 +9,84 @@ vi.mock("../packages/storage-browser/dist/src/index.js", async (importOriginal) 
 	...(await importOriginal()),
 }));
 
-const roomEntryProbe = vi.hoisted(() => ({ applications: [] as unknown[] }));
+const roomEntryProbe = vi.hoisted(() => ({
+	applications: [] as unknown[],
+	sessions: [] as Array<{
+		readonly channel: unknown;
+		committedProjection: boolean;
+		emitProjection(value: unknown): void;
+		readonly openCommittedProjection: boolean[];
+		readonly openOptions: unknown[];
+	}>,
+}));
 
 vi.mock("../examples/v3-room/src/index.js", async (importOriginal) => {
 	const current = await importOriginal<Record<string, unknown>>();
 	return {
 		...current,
-		createV3RoomSession: vi.fn((input: Readonly<{ readonly application: unknown; readonly objectId: string }>) => {
-			roomEntryProbe.applications.push(input.application);
-			return Promise.resolve(
-				Object.freeze({
-					invite: "00",
-					objectId: input.objectId,
-					roomId: input.objectId,
-					trustStatus: "Creator-trusted; not Byzantine-fault-tolerant.",
-					close: () => Promise.resolve(),
-					issue: () => Promise.resolve(),
-					openEphemeral: () =>
+		createV3RoomSession: vi.fn(
+			(
+				input: Readonly<{
+					readonly application: unknown;
+					readonly objectId: string;
+					onProjection(value: unknown): void;
+				}>
+			) => {
+				roomEntryProbe.applications.push(input.application);
+				const channel = Object.freeze({
+					close: () => undefined,
+					publish: () => Promise.resolve(true),
+					stats: () =>
 						Object.freeze({
-							close: () => undefined,
-							publish: () => Promise.resolve(true),
-							stats: () =>
-								Object.freeze({
-									authorityMismatch: 0,
-									delivered: 0,
-									dropped: 0,
-									localSequencedKeys: 0,
-									malformed: 0,
-									overLimit: 0,
-									published: 0,
-									rateLimited: 0,
-									received: 0,
-									remoteSequencedKeys: 0,
-									sequencedKeys: 0,
-									sequencedSenders: 0,
-									stale: 0,
-									subscriberFailures: 0,
-									unauthorized: 0,
-									writerBuckets: 0,
-								}),
-							subscribe: (): (() => void) => () => undefined,
+							authorityMismatch: 0,
+							delivered: 0,
+							dropped: 0,
+							localSequencedKeys: 0,
+							malformed: 0,
+							overLimit: 0,
+							published: 0,
+							rateLimited: 0,
+							received: 0,
+							remoteSequencedKeys: 0,
+							sequencedKeys: 0,
+							sequencedSenders: 0,
+							stale: 0,
+							subscriberFailures: 0,
+							unauthorized: 0,
+							writerBuckets: 0,
 						}),
-					previewLatchedAcl: () => Object.freeze({ current: Object.freeze({ epoch: 0 }) }),
-					projection: () => Object.freeze({}),
-				})
-			);
-		}),
+					subscribe: (): (() => void) => () => undefined,
+				});
+				const session = {
+					channel,
+					committedProjection: false,
+					emitProjection(value: unknown): void {
+						input.onProjection(value);
+						this.committedProjection = true;
+					},
+					openCommittedProjection: [] as boolean[],
+					openOptions: [] as unknown[],
+				};
+				roomEntryProbe.sessions.push(session);
+				return Promise.resolve(
+					Object.freeze({
+						invite: "00",
+						objectId: input.objectId,
+						roomId: input.objectId,
+						trustStatus: "Creator-trusted; not Byzantine-fault-tolerant.",
+						close: () => Promise.resolve(),
+						issue: () => Promise.resolve(),
+						openEphemeral: (options: unknown) => {
+							session.openOptions.push(options);
+							session.openCommittedProjection.push(session.committedProjection);
+							return channel;
+						},
+						previewLatchedAcl: () => Object.freeze({ current: Object.freeze({ epoch: 0 }) }),
+						projection: () => Object.freeze({}),
+					})
+				);
+			}
+		),
 	};
 });
 
@@ -248,7 +280,9 @@ describe("Phase 3f-b real chat and zone causalJoin composition RED", () => {
 			)
 		);
 		const entryApplication = roomEntryProbe.applications[beforeEntry] as ProductApplication | undefined;
+		const entrySession = roomEntryProbe.sessions[beforeEntry];
 		expect(entryApplication).toBeDefined();
+		expect(entrySession).toBeDefined();
 		if (entryApplication !== undefined) {
 			const entryMembers = Object.freeze([
 				Object.freeze({ author: localAuthor, order: 0, peerId: localPeerId }),
@@ -272,6 +306,26 @@ describe("Phase 3f-b real chat and zone causalJoin composition RED", () => {
 					localAuthor
 				),
 			]);
+			if (entrySession !== undefined) {
+				const projection = entryApplication.projectAcceptedOperations([
+					accepted(
+						Object.freeze({ action: "join", roster: Object.freeze({ entries: entryMembers }) }),
+						0x41,
+						localAuthor
+					),
+				]);
+				const openCount = entrySession.openOptions.length;
+				entrySession.emitProjection(projection);
+				expect(entrySession.openOptions).toHaveLength(openCount);
+				await Promise.resolve();
+				expect(entrySession.openOptions).toHaveLength(openCount + 1);
+				expect(entrySession.openOptions.at(-1)).toEqual({
+					maxMessageBytes: 65_536,
+					maxSequencedKeys: 9,
+					maxSequencedSenders: 2,
+				});
+				expect(entrySession.openCommittedProjection.at(-1)).toBe(true);
+			}
 		}
 		await zoneApi.close();
 		const frontier = await runFrontierScenario(17, {

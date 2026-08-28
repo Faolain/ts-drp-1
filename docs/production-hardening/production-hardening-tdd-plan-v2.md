@@ -69110,3 +69110,27 @@ closed-session notification, original-provider equivalence, explicit sole RED
 discriminator, sharpened non-upstream diagnosis, discarded reopen return, and
 the named non-grid generalization debt. No confirmation review, Fable,
 campaign, production execution or collaboration subagent ran during review.
+
+The D.108e4x test-only RED changes exactly
+`packages/node/tests/ephemeral-webrtc-e3-02-red.test.ts` and
+`tests/phase-3f-b-chat-zone-causal-join-red.test.ts`. The exact new adapter
+title failed with the expected final membership mismatch: received `[]`,
+expected `['peer-b']`; its same-channel and publication controls were after the
+discriminator and therefore were not misreported as evaluated. Stdout,
+stderr and status SHA-256 values are
+`b81b636a73292330c6d29e6ba9fba00a981db37d99c1dde82c4c3173a51da2d1`,
+`10dcb428c0952cc22ce3dd11bffb6963e66c62b6deea2eedc71b4cf77974f7b5`
+and `4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`.
+
+The first zone-title attempt exposed a test-authoring placement error
+(`entrySession is not defined`) before the new discriminator. It is retained
+under `.logs/d108e4x-red-23443a16/02-zone.*` and is not called RED evidence.
+Moving that declaration from the chat title to the zone title changed no
+behavior or production source. The corrected exact zone-title run then failed
+only at the new post-microtask open-count assertion: received one initial open,
+expected two. Stdout/stderr/status SHA-256 values are
+`c6b2132b06edf17bf2b0effced7297a32eb14bd8532bb88b74ac77c9d2508d39`,
+`e41922b7b58e11e6463cb90150c8e9cf6542fda570c0efb1dc25370822d428be`
+and `4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`.
+Both valid REDs are deterministic and fail at their exact reviewed seams. No
+product, example, browser, campaign or other test command ran.
