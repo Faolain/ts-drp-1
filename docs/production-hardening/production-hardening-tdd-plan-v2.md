@@ -67371,9 +67371,11 @@ instead emits exactly one `D108E4L_TIMING ` record with schema `d108e4l-v1`,
 `unclassified-child-or-launcher-error`. The last value records that the frozen
 launcher erased the structured child-error kind rather than pretending that
 substring matching can recover it. A timeout, IPC failure, child error or
-missing terminal proof then stops without rerun and opens D.108e4m against exact owner
-`tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts` for a
-separately reviewed progress-telemetry transport; it does not widen D.108e4l.
+missing terminal proof then stops without rerun and opens D.108e4r against exact
+owner `tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts`
+for a separately reviewed progress-telemetry transport. The original
+D.108e4m forward reference is superseded by this exact D.108e4r assignment; it
+does not widen D.108e4l.
 
 After implementation, run exact-two-owner ESLint, Prettier, `node --check` and
 `git diff --check`, plus a read-only assertion that the two source-shape regexes
@@ -67390,9 +67392,11 @@ record is diagnostic evidence, not permission to alter behavior. Attribution
 follows the executing code, not the phase label: fixture-only validation,
 signing, facade or proof assembly remains a separately reviewed D.108e4m test-
 infrastructure slice in the child fixture; time in `transactIssue`,
-`readOutboxPage`, `readIssued` or `readLineage` reslices D.108e4n against
-`packages/storage-node/src/issuance.ts`; time in
-`reopenCreatorSuccessorAdoption` reslices D.108e4o against
+`readOutboxPage`, `readIssued` or `readLineage` reslices D.108e4n against the
+exact mapped `packages/storage-node/src` owner; time in
+`reopenCreatorSuccessorAdoption` reslices D.108e4o against the exact mapped
+`packages/node/src` owner, whose imported entry point is
+`packages/node/src/creator-adoption-activate.ts`, not the earlier provisional
 `packages/node/src/v3-live.ts`; and a mixed phase that cannot distinguish those
 owners first reslices D.108e4m for narrower test-only attribution. No production
 file changes in D.108e4l. A sub-60 instrumented sample cannot causally explain
@@ -67589,73 +67593,138 @@ recovery acceptance may change. The existing concurrent `Promise.all`, reuse
 ordering, exact rows, operation counts and semantic assertions remain
 unchanged. A need to edit any production source stops and reslices D.108e4m.
 
-Profiling is opt-in only when the parent command carries exact environment
-`TS_DRP_D108E4M_PROFILE=1`, which the fresh child inherits. The ordinary
-retained suite path must not start an inspector session or emit D.108e4m
-telemetry. In profile mode the child uses Node's built-in
-`node:inspector/promises` `Session`, sets the CPU sampling interval to exactly
-`1_000` microseconds, and enables/starts immediately after the
-`mismatch-preparation` boundary. It stops immediately after the unchanged
-`Promise.all` resolves and before the `concurrent-recoveries` boundary closes,
-then disconnects. The profiler therefore samples the complete dominant
-concurrent block, including normal async scheduling, but not the 8,193-row
-pre-materialization phase. Inspector start/stop overhead remains inside the
-diagnostic wall ledger. This run cannot satisfy or refute `<60_000`; the
-ceiling stays present and unchanged and an expected exit `1` is not a new RED.
+Profiling and every D.108e4m façade counter are opt-in only when the parent
+command carries exact environment `TS_DRP_D108E4M_PROFILE=1`, which the fresh
+child inherits. A pure parent predicate is true only for exact string `"1"`;
+the existing inventory test pins false for `undefined`, `""`, `"true"` and
+`"0"`, and true for `"1"`. The frozen source-shape guard additionally proves
+that inspector construction/start and façade-counter validation are nested
+under that predicate. In ordinary mode the child starts no inspector, collects
+no façade timing, omits proof key `d108e4m`, emits no `D108E4M_PROFILE ` line,
+and the parent treats all four absences as required rather than erroneous.
 
-The child reduces the CPU profile in memory and never sends the raw profile.
-For every sample, its matching `timeDeltas` microseconds are assigned to the
-sampled leaf node id. Frames are aggregated by exact `functionName`, `url`,
-zero-based `lineNumber` and `columnNumber`; the top 40 by descending
-`selfMicros`, then stable lexical frame identity, are retained with
-`sampleCount`, `selfMicros` and one frozen ownership classification. Exact
-ownership rules, applied in order to normalized frame URLs, are:
+In profile mode the child uses Node's built-in `node:inspector/promises`
+`Session` with exact call order `connect`, `Profiler.enable`,
+`Profiler.setSamplingInterval({ interval: 1_000 })`, `Profiler.start`. It does
+so after the `mismatch-preparation` boundary and before creating any of the four
+promises consumed by the unchanged `Promise.all`. Immediately after that await
+resolves it posts `Profiler.stop`, disconnects in `finally`, and only then
+closes the `concurrent-recoveries` boundary. The 1,000-microsecond value is
+Node/V8's current default but remains explicit. The profile thus encloses every
+recovery promise from creation through settlement; inspector enable/start/stop,
+continuous sampling and in-process profile-transfer overhead remain disclosed
+inside the diagnostic phase. Reduction occurs only after that phase closes, so
+its cost belongs to `proof-assembly`. The recorded D.108e4l child leaves
+`28_691.803083 ms` below the frozen 90,000-ms launcher kill, but that is not an
+overhead guarantee. A launcher kill becomes the unavailable route below. This
+run cannot satisfy or refute `<60_000`; the ceiling remains unchanged and an
+expected exit `1` is not a new RED.
 
-1. `test-fixture` for this repository's `/packages/storage-node/tests/` or
-   `/tests/fixtures/` paths;
-2. `node-product` for `/packages/node/dist/` paths, mapped back to
-   `packages/node/src` ownership;
-3. `storage-node-product` for `/packages/storage-node/dist/` paths, mapped back
-   to `packages/storage-node/src` ownership;
-4. `workspace-dependency` for any other repository `/packages/*/dist/` path;
-5. `third-party` for `/node_modules/` or `/.pnpm/` paths;
-6. `runtime-or-native` for an empty URL or a `node:`/`internal/` URL;
+Inspector setup, stop and reduction are fail-soft around the semantic proof.
+Each is caught so the unchanged skip-budget recoveries still complete and the
+child still sends the full D.108e4l proof. A failure adds sibling proof key
+`d108e4m` with exact unavailable roster `schema`, `outcome`, `pid`,
+`classification`, `message`, `profileStarted`, `profileStopped`. The allowed
+classifications are `inspector-start-failed`, `inspector-stop-failed` and
+`profile-structural-malformation`. If no terminal proof reaches the parent, it
+constructs the same bounded roster with classification `missing-terminal-proof`
+or `launcher-or-child-error`; the latter honestly reflects the launcher's
+erased child-error kind. No unavailable record fabricates ownership or
+authorizes a second profile run.
+
+The child reduces the CPU profile in memory and never sends it raw. Delta at
+index `i` is credited to sample id at index `i`; the first delta is therefore
+relative to `profile.startTime`, per the protocol convention. Zero deltas are
+valid and counted; a negative or noninteger delta, length mismatch or unknown
+sample node is a structural malformation and is never clamped. The reduction
+records `profileDurationMicros=endTime-startTime`, `sampledMicros` as the delta
+sum, and nonnegative `unsampledMicros=profileDurationMicros-sampledMicros`.
+Those three integers must reconcile exactly. It also records profile-window
+and concurrent-phase durations and their ratio, while exact code placement
+proves that the work interval lies inside both.
+
+Every sampled leaf first receives one leaf class. Exact function names
+`(root)`, `(program)`, `(idle)` and `(garbage collector)` are separate synthetic
+classes before URL rules; `(idle)` is disclosed wait and excluded from the CPU
+routing denominator. Empty-URL native frames are `native`, not silently
+combined with idle. For each non-idle leaf, the reducer reconstructs parent ids
+from every profile node's `children` and walks toward the root to the nearest
+frame matching an attributable URL rule. It emits both exact leaf-self totals
+and exact `nearestOwnerMicros` totals. Unresolved native/synthetic time stays
+`unattributed-runtime`; garbage-collector time is credited to its nearest owner
+when one exists and remains an explicit unresolved GC class otherwise. Both
+ledgers plus idle reconcile exactly to `sampledMicros`; routing uses only the
+nearest-owner non-idle ledger.
+
+Frame URLs are normalized before classification or IPC: `file:` URLs use
+`realpathSync(fileURLToPath(url))`; paths below `realpathSync(process.cwd())`
+become repository-relative POSIX paths; an external dependency retains only
+its suffix from the last
+`node_modules/` or `.pnpm/`; `node:`/`internal/` and `data:` URLs retain those
+schemes; no absolute home path is emitted. Rules then run in exact order:
+
+1. `third-party` for normalized `node_modules/` or `.pnpm/` suffixes;
+2. `test-fixture` for repository-relative `packages/storage-node/tests/` or
+   `tests/fixtures/` paths;
+3. `node-product` for repository-relative `packages/node/dist/` or
+   `packages/node/src/` paths, with `dist/src/<name>.js` mechanically mapped to
+   `src/<name>.ts` ownership;
+4. `storage-node-product` for repository-relative
+   `packages/storage-node/dist/` or `packages/storage-node/src/` paths with the
+   same built-to-source mapping;
+5. `workspace-dependency` for another repository-relative `packages/*/dist/`
+   or `packages/*/src/` path;
+6. `runtime-or-native` for `node:`/`internal/`, `data:`, empty native or
+   unresolved synthetic frames;
 7. `other` otherwise.
 
-The envelope reports exact schema `d108e4m-v1`, `outcome="profile"`, requested
-sampling interval, profile `startTime`/`endTime`, sample and delta counts,
-summed sampled microseconds, the ownership totals over all samples, their
-sample counts, the bounded top-frame roster and the inherited child PID. It
-validates that sample/delta lengths match, every sample resolves to one node,
-all deltas and aggregates are finite nonnegative integers, ownership totals
-sum exactly to total sampled microseconds, ownership sample counts sum exactly
-to sample count, the roster is at most 40, and the PID equals the proof PID but
-not the Vitest PID. Unsupported inspector startup, malformed profile or a
-missing terminal proof emits one honest `D108E4M_PROFILE` record with
-`outcome="unavailable"` and the caught classification; it does not fabricate
-ownership or authorize a rerun.
+Frames aggregate by exact `functionName`, normalized `url`, `lineNumber` and
+`columnNumber`. Coordinates are zero-based for real script frames and `-1` for
+native/synthetic frames; product coordinates name built JavaScript, not mapped
+TypeScript lines. The top 40 sort by descending `selfMicros`, then an ordinal
+`<`/`>` comparison—not `localeCompare`—over
+`url\u0000functionName\u0000lineNumber\u0000columnNumber`. Each reports leaf
+class, nearest owner, `sampleCount` and `selfMicros`; totals use every sample,
+not only the roster.
 
-In parallel with sampling, only the test-owned `boundedRecoveryStore` façades
-collect cumulative synchronous-body cost. The collector brackets the local
-body or delegated-call dispatch of exact methods `close`,
+Exact profile roster under proof key `d108e4m` is `schema`, `outcome`, `pid`,
+`samplingIntervalMicros`, `profileStartTimeMicros`, `profileEndTimeMicros`,
+`profileDurationMicros`, `sampledMicros`, `unsampledMicros`, `sampleCount`,
+`deltaCount`, `zeroDeltaCount`, `idleMicros`, `idleSampleCount`,
+`concurrentDurationMs`, `profileCoverageRatio`, `leafTotals`,
+`nearestOwnerTotals`, `dominance`, `topFrames`, `facades`. Schema is
+`d108e4m-v1`, outcome is `profile`, PID equals the proof PID but not Vitest's,
+the roster is at most 40, and every count/sum invariant above is hard-validated.
+`dominance` records denominator, winner, runner-up, both integer microsecond
+totals and floor basis points. A winner is dominant only if
+`winnerMicros * 2 > denominatorMicros` and
+`(winnerMicros-runnerUpMicros) * 10 >= denominatorMicros`; otherwise it is
+exactly `mixed`. This avoids floating-point routing judgments.
+
+Only in profile mode, the test-owned `boundedRecoveryStore` façades collect
+cumulative synchronous-body wall cost around exact methods `close`,
 `compareAndMarkOutboxPublished`, `readIssued`, `readLineage`,
-`readOutboxPage` and `transactIssue` with `performance.now()`. It never awaits
-inside a wrapper, changes a returned promise, instruments per-row product code
-or interprets overlapping promise wall as CPU. Each record reports method
-`callCount` and cumulative `syncBodyMs`; the exact member roster is
-`equality`, `reuse-0`, `reuse-1`, `over-budget`, `mismatch`, with the reuse
-collector reset at the same existing `beginInvocation()` boundary. Parent
-validation pins those six method names and five members, finite nonnegative
-values, integer counts, and retains the existing semantic count comparisons.
+`readOutboxPage` and `transactIssue`. The wrapper never awaits or changes a
+return value. These preemption-inclusive `syncBodyMs` values may include
+delegated raw/native dispatch and corroborate method ordering only; they are
+not CPU and never define an ownership class. Each member reports method
+`callCount` and cumulative `syncBodyMs` for exact roster `equality`, `reuse-0`,
+`reuse-1`, `over-budget`, `mismatch`; reuse resets at the existing
+`beginInvocation()` boundary. All collector state/accessors live beside
+`beginInvocation` and `telemetry` in the returned closure wrapper, never as an
+own property of the frozen `store`, preserving `sameStoreShape`.
 
-On first receipt of the memoized child result in profile mode, the parent emits
-exactly one `D108E4M_PROFILE ` JSON line before D.108e4l hard validation and
-before the unchanged `<60_000` assertion. The existing exactly-one
-`D108E4L_TIMING ` line remains. The parent rejects malformed D.108e4m schema
-after emission; the later existing semantic assertions still execute only
-when both telemetry schemas are valid. Profile absence in ordinary mode is
-required, not an error. No raw inspector profile, environment secret or
-unbounded frame collection crosses IPC.
+On first memoized proof receipt in profile mode the parent prepares both
+validations, emits exactly one `D108E4M_PROFILE ` line, then exactly one retained
+`D108E4L_TIMING ` line. D.108e4l's existing hard schema assertion follows both
+emissions. D.108e4m envelope errors are recorded in the new line and asserted
+with `expect.soft` only after both lines, so diagnostic-schema defects cannot
+preempt the existing D.108e4 reuse semantics or later retained tests; they
+still fail the run. The unchanged `<60_000` assertion and all semantic
+assertions remain. Child-side profile malformation means the fail-soft
+unavailable envelope; parent-side envelope-schema rejection means that soft
+test failure. No raw inspector profile, absolute host path, environment secret
+or unbounded frame collection crosses IPC.
 
 Before implementation, this freeze receives one signed/pushed plan commit and
 the normal read-only Grok 4.6/high, exact Kimi K3 `CHECK001` through
@@ -67663,9 +67732,15 @@ the normal read-only Grok 4.6/high, exact Kimi K3 `CHECK001` through
 in the same round; each P2 receives an exact owner and 2026-09-04 deadline.
 No Fable or collaboration subagent runs. After the exact-two-owner edit, run
 `node --check`, exact-owner ESLint and Prettier, `git diff --check`, the frozen
-source-shape guard, and the affected build-before-typecheck gate. The signed/
-pushed instrumentation checkpoint then receives the same three-review round
-and same-round correction policy before execution.
+source-shape guard including the ordinary-mode predicate checks, and freshly
+build the affected workspace closure. The broad node and storage-node
+typechecks retain the D.108e4k nonzero inherited baseline: their acceptance is
+zero diagnostics naming either exact D.108e4m owner, while every out-of-roster
+diagnostic is recorded and compared rather than relabeled green. A new or
+changed out-of-roster diagnostic stops and opens a separately reviewed config
+slice against its exact tsconfig/source owner. The signed/pushed instrumentation
+checkpoint then receives the same three-review round and same-round correction
+policy before execution.
 
 After those gates, run exactly once with no task-owned reviewer or other test
 process and preserve an ambient snapshot:
@@ -67676,14 +67751,90 @@ TS_DRP_D108E4M_PROFILE=1 /usr/bin/time -p pnpm exec vitest run --coverage.enable
 
 Custody covers stdout, stderr, exit status, ambient snapshot, the sole extracted
 `D108E4M_PROFILE ` line and the retained `D108E4L_TIMING ` line. No second
-D.108e4m profile run is permitted. Route by all-sample ownership totals and
-top frames, using façade synchronous totals only as corroboration: dominant
-test-fixture ownership opens a separately reviewed D.108e4n test-only repair;
-dominant `node-product` opens D.108e4o against the exact mapped source owner;
-dominant `storage-node-product` opens D.108e4p against the exact mapped source
-owner; dominant dependency/runtime work or a mixed result opens D.108e4q for a
-narrower reviewed attribution or MVRE as appropriate. A product optimization
-is never made inside D.108e4m. The first later ordinary non-profile acceptance
-run requires a separately reviewed repair and margin/variance gate; D.108e4k,
-D.108e4a/b/c/d, aggregate D.108e4, D.108e5 and every E3-03 campaign remain
-blocked meanwhile.
+D.108e4m profile run is permitted. Route mechanically from `dominance` over
+the complete nearest-owner non-idle totals, with leaf frames and façade wall
+totals only corroborative: dominant `test-fixture` opens separately reviewed
+D.108e4p test-only repair; dominant `node-product` opens D.108e4o against the
+exact mapped `packages/node/src` owner; dominant `storage-node-product` opens
+D.108e4n against the exact mapped `packages/storage-node/src` owner; a
+dominant workspace dependency, third party, runtime/unattributed class or exact
+`mixed` result opens D.108e4q for narrower reviewed attribution or an MVRE.
+Unavailable `inspector-start-failed`, `inspector-stop-failed` or
+`profile-structural-malformation` opens D.108e4r against the two D.108e4m test
+owners; `missing-terminal-proof` or `launcher-or-child-error` opens D.108e4r
+against `tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts`.
+D.108e4r may design fresh evidence transport but has no inherited authorization
+to execute a second profile. A product optimization is never made inside
+D.108e4m.
+
+D.108e4k's original byte-identity baseline at `cc112d22` was voided when
+instrumentation checkpoint `c865a755` first edited its frozen test tree. The
+plan-only D.108e4m freeze does not restore it, and no earlier D.108e4k result is
+accepted as the final combined proof. After the eventual reviewed repair, both
+the non-campaign and separately authorized campaign halves must run at one new
+final signed tree; no current campaign authorization is implied. The first
+later ordinary non-profile acceptance run likewise requires a separately
+reviewed repair and margin/variance gate. D.108e4k, D.108e4a/b/c/d, aggregate
+D.108e4, D.108e5 and every E3-03 campaign remain blocked meanwhile.
+
+The plan review of signed/pushed freeze
+`651aab44b0585a49e26a0f70853609a6233bf6fa`, parent
+`110b1906dce23765d8448ff5fc04ab6603c30a0a`, tree
+`f5f9770bf2047acce4dcf7b7993dd0c05687e1e5`, stable patch id
+`be63925c7cb4124eb3abb9c9c012f856b4dcd513` and raw-diff SHA-256
+`cb3e6e11f0dcd67821b9dbde66414dcdb26dc5fd87ac70856d59a5d94a8f5704`
+completed before any instrumentation change. The commit has a good signature,
+changes only this plan and is contained by the remote branch.
+
+Grok 4.6/high's initial read-only inspection was canceled by the service at
+`600.229` seconds, after 900 events, before terminal schema. The runner
+correctly recorded `NO_VERDICT`, `stop_reason=cancelled`, not a timeout or
+approval. The same preserved session `01a04943-ec2e-7dc0-8b81-96ee525a0f57`
+then received one tool-free terminal-synthesis continuation and ended normally
+in one turn with schema-valid `CHANGES_REQUIRED`, P0=3/P1=4/P2=1. Initial
+event/public/status and continuation-event/stderr SHA-256 values are
+`8289c7d34b8abf2826f3e31a236d205b3df950e36cc5a14feae357133726fe4c`,
+`6c451f233c04302e52dd8c26a4e9a255400281838c017c490193b9e2dea4b6cc`,
+`072db476cce71ecd9123598c716db33cb41e126750a3f845cc849556651b35c5`,
+`80170ccedd21433c5b74e4bb2bb8553c78e3de5c76bd52f927e307aef8714121`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+Its blockers were slice-id collision, undefined dominance, an inherited-failing
+typecheck promoted to a hard gate, fail-soft profiler isolation, dual-line
+custody ordering, URL/native attribution and façade semantics.
+
+Kimi CLI 0.38.0 exact `kimi-code/k3` session
+`session_cf4c2c62-9003-4ce3-9f64-e4214a4630ac` emitted exactly 100 unique
+ordered `CHECK001` through `CHECK100` markers and one terminal `RESULT`. It
+returned `APPROVED`, P0=0/P1=0/P2=4. Its P2s pin the façade opt-in, first-delta
+convention, normalized rather than absolute roster URLs, and exact inspector
+call/boundary order. Stream/stderr SHA-256 values are
+`bca1452a074acd1afb969fc9a344d3e72fbd39a7a6ae655e54baec8939372f62`
+and `fec7ca87dd57169b55bb41c22e7e3adbf61eaba80c844222747951bc68e218e4`.
+One preceding custom-agent invocation failed local validation before model
+startup and is not a review.
+
+The first Opus 5/xhigh session `86c54ee0-bb1c-4c86-b686-bedcac30478d`
+returned useful `CHANGES_REQUIRED` findings but self-disclosed one no-op shell
+call despite the read-only contract. It is rejected as the formal verdict; its
+finding union is nevertheless corrected here. JSON/stderr SHA-256 values are
+`bf5a20973b6f608b7c9853fdeb3a2b14def182e6cd2197c0e36b210b56e61773`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+The policy-correct replacement used only `Read`, `Grep` and `Glob`. Session
+`31a3acba-c0a8-4491-b049-7271eb1a3d7b` resolved solely to
+`claude-opus-5`, completed 30 turns in 735.313 API seconds without a subagent,
+and returned schema-valid `CHANGES_REQUIRED`, P0=2/P1=7/P2=9. JSON/stderr
+SHA-256 values are
+`d445e793188534363dd068e788c227d36861e10384fe21ed1f586e29903b1d1a`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+This same-round correction closes the reproduced P0/P1 union before any code
+edit: it separates idle/synthetic/native leaf time, adds nearest-owner parent
+walks, numeric dominance, fail-soft proof retention, exact schemas and emit
+order, ordinary-mode guards, URL normalization, typecheck-baseline semantics,
+unavailable routing, slice-id ownership and D.108e4k baseline voiding. Every
+P2 from Kimi, Grok, the rejected first Opus run and the formal Opus run is
+assigned to the D.108e4m plan/instrumentation owner with deadline 2026-09-04;
+the correction completes the plan-owned wording items now and carries the
+implementation assertions into the exact two-owner checkpoint. No confirmation
+review, profiler/test execution, Fable, campaign or production change is
+authorized by this correction alone.
