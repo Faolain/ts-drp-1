@@ -64370,6 +64370,281 @@ mapped-link guard and the desired-peer guard; missing or undesired targets may
 not invoke acquisition. All previous GREEN evidence obligations remain due
 before acceptance.
 
+The first D.108e4e.1 GREEN candidate is signed/pushed commit
+`298b574520d3356228950378cb5f77ede8f72db8`, parent
+`d2e2c3455f1e4a670e3e1fd7bd91fed31ca238e7`, tree
+`3ddd366a48a2d046c92faea351864ea130d65a9c`, stable patch id
+`f581dc88263dad519bd8c7a1cd3f4338fd83f8ab` and raw-diff SHA-256
+`112e319a3ead3b5e488149918709e53913af86b7b205cd0f23ae30658c1c4e34`.
+It changes exactly the two frozen owners. The private failed-target branch
+invokes the existing acquisition only for an existing desired mapped link and
+still returns false; the existing replacement predicate additionally treats a
+non-open mapped channel as unusable before the unchanged reservation, drop,
+peer-order, retry, pending-link and deadline owners. The GREEN evidence added
+the required 249+1 boundary, both-side non-open link identities and undesired
+mapped-link control. Focused evidence SHA-256
+`f5338e1ccb264319e0c058a5d2bd4562465798157059c285defb5812be7ac585`
+reports 6/6; complete-owner SHA-256
+`d72ee761a695b788e2c2566d058a6591495465cff8c36f865f6bd4c20155178f`
+reports 36/36; retained Node E3-02 SHA-256
+`d73ad5c41c6c83d2cc72d431b32379ea8132ba84646eb0cee86ca1b62b7cb06f`
+reports 10/10. Network build/typecheck, exact-two ESLint/Prettier and
+`git diff --check` passed. A read-only local Codex review found no defect in
+the two tracked owners; its sole P1 was to keep the two already-protected,
+intentionally stale untracked protocol-v2 RED files out of this checkpoint,
+which exact staging did.
+
+All three required GREEN reviewers approve the immutable object with zero
+P0/P1. Grok 4.6/high session
+`01a045fd-f537-7573-b784-ee57f2a6346c` completed its substantive run in
+525.261 seconds with exit zero, `end_turn` and no timeout. Its public response
+had three progress sentences before a terminal `APPROVED`, P0=0/P1=0/P2=0
+object, so the wrapper honestly recorded `NO_VERDICT`; a one-turn same-session
+normalization used no tools or new reasoning and emitted the identical bare
+JSON object. Exact Kimi K3 session
+`session_211679e6-fd53-4d8d-890f-dd3b2206a5ac` emitted exactly 100 total,
+unique and ordered CHECK001 through CHECK100 markers followed by valid
+`APPROVED`, P0=0/P1=0/P2=0 JSON. Claude-skill Opus 5/xhigh session
+`60780735-479a-4080-b1b5-24c9bc9dc9a9` completed with no permission denial or
+subagent and returned schema-valid `APPROVED`, P0=0/P1=0/P2=5. No reviewer
+changed tracked state and no Fable or collaboration subagent ran in the GREEN
+round.
+
+The Opus P2 ledger is nonblocking but has exact ownership. Multi-peer
+first-invalid recovery remains the explicit D.108e4e.1 deferral above and is
+owned by the combined D.108e4 closure owner by 2026-09-10. Terminal rejection
+handling for all three pre-existing fire-and-forget acquisition sites and the
+redundant open-channel conjunct are owned by a separately reviewed
+`unreliable-webrtc.ts` cleanup slice before combined D.108e4 closure, also by
+2026-09-10; neither authorizes widening this candidate. D.108e4f below owns
+real-browser recovery-wait diagnostics by 2026-09-03 and must state explicitly
+that the unit 249+1 assertion pins the existing retry owner's timer boundary,
+not a browser recovery latency ceiling. The D.108e4f GREEN evidence owner also
+owns the still-required complete E3-03 invocation before D.108e4e acceptance.
+
+The required one-off complete E3-03 config did not pass, so `298b5745` remains
+a rejected evidence candidate pending D.108e4f rather than an accepted GREEN.
+The exact command was `pnpm exec playwright test --config
+playwright.e3-03-loss-and-hol.config.ts --fail-on-flaky-tests
+--reporter=json`; it ran once and was not retried. Reporter SHA-256
+`7f7af6f581543b889beba5565367d66e48ed051839ea8f4f54973653ae54d196`
+reports the deterministic helper and observer self-check passing, then the
+retained campaign failing after 112.648 seconds at its existing line-1253
+counter equality in trial `e3-03-1`, stage `e3-03-1-assertions`: product raw
+ingress increased by 400 while the observer returned 402 parseable raw
+message events. The extracted failure attachment has SHA-256
+`3a1ee48adf3a36aff6a37905eb37982d1a6be77b2dcd0cbdb3cfb110f4a427d0`.
+Both pages remained open, each network snapshot retained the expected two
+peers and each raw transport retained one open link after reset;
+`backpressuredDrops` and `handshakeFailures` stayed zero. The creator observer
+recorded 598 open raw sends, sequences 0 through 597, so failed sends 598 and
+599 did not cross the RTC send boundary. The receiver observer recorded 402
+nonduplicated raw messages on one channel/connection: 400 event-time-open
+records plus sequences 591 and 592 whose event-time state was already
+`"closing"`. The product trial metric and raw-ingress counter both reported
+exactly 400. Cumulative replacement activity remained visible through six
+link drops per side and authenticated-connection losses; the recovered links
+were open when failure telemetry was captured.
+
+The expressly authorized one-off Fable 5/high advisory then inspected the
+actual uncommitted reslice, immutable product candidate and preserved failure
+attachment without editing or spawning a subagent. Session
+`ab25ad35-164e-4dbb-b1f7-42e2f1eac394` completed normally after 650.338 API
+seconds with first-party `claude-fable-5`, no fallback or permission denial,
+and returned `CHANGES_REQUIRED`. Raw result SHA-256 is
+`9aaf150206b966b128564eae09ca4ed79c4d45220b8cac5e6d6d262351cad909`.
+It agreed that 402 versus 400 is an observer/product acceptance-domain
+mismatch, then found a second same-owner mismatch that the preserved run
+already predicts: boundary-aware application loss would report a trailing gap
+of 10 after accepted sequence 590, while the product-rendered arrival-order
+metric reports 7. The retained line-1444 comparison has never executed after
+D.108e4d made the test helper boundary-aware because both later complete runs
+failed earlier. D.108e4f therefore owns both tests-only oracle domains before
+another complete-config invocation. No further Fable review is authorized
+without a new express request.
+
+###### D.108e4f — product-accepted raw ingress observer domain
+
+D.108e4f is an immediate narrow tests-only oracle correction due before
+D.108e4e, D.108e4d, D.108e4c, D.108e4b or combined D.108e4 can close. Its
+exact implementation owner is `tests/e3-03-loss-and-hol-proof.pw.ts`; this
+plan is the sole documentation owner. It changes no product or example source,
+public or private interface, observer capture boundary, snapshot, wire byte,
+digest, packet/retry policy, loss profile, browser version, sample
+count/interval/size, trial count, delivery floor, AoI/HOL threshold, timeout,
+fallback assertion or durable invariant. It may not use insertion-time state
+for acceptance, suppress a record, accept an event whose event-time channel
+state is non-open, retry a failed campaign or reinterpret post-completion state
+as event evidence. It may carry the observer's already-frozen insertion-time
+state into the test-only parsed record solely to kill misuse of that field; the
+field has no acceptance or product-equivalence authority.
+
+The sole new observation is test-owned and reads an existing public diagnostic,
+not a product API: for each received RTC message, the already-first observer
+samples `rawTransport.received` synchronously before later listeners run and in
+a queued microtask after the dispatch completes. The existing observer
+self-check installs a bounded fake zone counter plus one later product-like
+listener and pins exact per-event deltas one and zero. The real campaign accepts
+only deltas in `{0, 1}`. This witnesses element membership rather than inferring
+it from aggregate cardinality, without changing RTC metadata selection, payload
+conversion, listener order or product source.
+
+The failure is an overbroad equality domain, not authority to accept stale
+ingress. `platformObservations()` correctly exposes all parseable RTC raw
+message events, including the two events whose frozen event-time state was
+already `"closing"`. The retained line-1253 equality incorrectly assigns all
+such observer events to product ingress. Production deliberately rejects an
+event after its `ActiveLink` is no longer the mapped identity: private
+`#receive()` returns before parsing or counters when `#links.get(peerId) !==
+link`. The exact 402 versus 400 difference, the two non-open records, the
+product's matching 400 trial metric and synchronous delete-before-close
+ordering make stale-link rejection the supported diagnosis, but aggregate
+cardinality alone does not prove which two events product ingress rejected.
+The per-event counter witness above closes that remaining cancellation hole.
+Counting a non-open product-rejected event as accepted would weaken both
+D.108e4c's explicit non-open rejection and the product's link-identity guard;
+any product-accepted non-open event remains an explicit contract failure.
+
+The same attachment proves that boundary-aware loss and rendered fabric
+telemetry are different contracts. The application-domain loss helper sorts
+unique accepted sequences and includes leading, internal and fixed
+`SAMPLE_COUNT` suffix boundaries; accepted sequence 590 therefore leaves a
+gap of 10. The rendered owner computes `maxGap` over product-accepted raw
+observations in arrival order, initializes from the first sequence and has no
+virtual suffix; it reported 7. Likewise, the rendered `rawDelivered` counts
+all product-accepted observations, while the application's AoI/HOL input may
+discard non-increasing sequences through its existing watermark. D.108e4f
+must preserve both meanings rather than weakening the signed boundary-aware
+loss witness or changing the product-rendered owner.
+
+The immutable RED refactors only the existing receiver-evidence and metric
+helpers and adds exactly two deterministic pure behaviors in the same file.
+It also implements and extends the retained observer self-check for the
+per-event before/after counter witness above; that retained behavior must stay
+green in RED. The first new behavior is titled `partitions receiver raw
+evidence by per-event product acceptance without losing observations`. Its
+frozen records are interleaved rather than grouped and carry the following
+event/insertion state plus witnessed product-received delta: `open/open/1`,
+`open/closing/1`, `open/open/0`, `closing/closing/0`,
+`closing/closed/0`, `closed/closed/0`, `connecting/connecting/0`, the
+deliberately impossible `closing/open/0`, and `closing/closing/1`.
+Product-accepted and product-rejected sets are determined only by delta one or
+zero; the final non-open accepted record proves state is a separate contract
+check rather than a membership proxy. Per-element assertions require the exact
+original frozen objects, and ordinal-sorted concatenation of both partitions
+must reconstruct the input. These controls kill aggregate cancellation,
+event/insertion-state classification, denylist, OR-combined, prefix/suffix
+split, suppression and reconstruction-by-copy implementations.
+
+The second behavior is titled `separates rendered fabric metrics from
+boundary-aware application evidence`. Its exact sample domain is 600, interval
+100 and deadline 700. Raw observations in arrival order are sequence 30
+(`sentAt=300`, `receivedAt=500`), sequence 32 (`500`, `500`) and sequence 31
+(`400`, `600`); the sole reliable observation is sequence 30 (`300`, `600`).
+Thus product-rendered evidence must be raw `maxGap=30`, delivered 3, dropped
+597, AoI p50/p95 100/200, and reliable delivered 1, dropped 599, AoI p50/p95
+200/400. The unchanged application domain starts at sender time zero,
+watermarks raw to sequences 30/32 and must remain raw delivered 2,
+boundary-aware gap 568, AoI p50/p95 100/400, with reliable AoI p50/p95
+300/500. This one vector pins leading, internal and suffix loss, arrival
+inversion, the receiver-derived rendered start time and pre-watermark delivery.
+RED preserves the current broad receiver and shared application/rendered
+assumptions, so exactly the partition deep equality and rendered-domain deep
+equality fail after collection; every retained behavior passes. Missing
+symbols, compile, server, browser, timeout or campaign failures are not
+accepted RED evidence.
+
+GREEN changes only those test helpers and retained consumers. Per-event delta
+one is the sole product-accepted receiver set; delta zero is explicitly
+product-rejected even when event-time state remains open. The aggregate raw
+counter delta must equal both the sum of witnessed per-event deltas and the
+accepted cardinality, so opposite membership errors cannot cancel. Both
+partitions must be disjoint and reconstruct the complete observer set. Every
+product-accepted retained campaign record must additionally have event-time
+state exactly `"open"`; a non-open delta-one record is the explicit D.108e4c
+contract failure exercised only as a classifier control in the pure behavior.
+Product-rejected records may be `"open"`, `"closing"` or `"closed"` and retain
+their state as evidence; `"connecting"` is a pure rejection control but is not
+valid retained campaign evidence. Insertion-time state has no membership or
+contract authority.
+
+Existing uniqueness and sequence-range controls apply to the complete observer
+set. Label, `maxRetransmits`, ordering, byte/carrier and immutable
+connection/channel identity controls apply to both partitions. Existing
+wire-delivery floors continue to use the complete observer set. Sender
+freshness remains on the unchanged sender-wire domain. The signed
+boundary-aware `gap > 1`, watermark-filtered application AoI/HOL calculations
+and post-reliable raw-delivery witness use only product-accepted ingress and
+retain the sender-derived campaign start time.
+
+The UI equalities use a distinct accepted-rendered domain that exactly mirrors
+the existing example owner: all witnessed product-accepted raw/reliable
+observations, arrival order, first-sequence `maxGap` initialization, no virtual
+leading/suffix boundary, no application watermark, and AoI starting at the
+minimum `sentAtMs` among accepted nonsentinel raw and reliable observations.
+The attachment records rendered-domain raw/reliable delivery and AoI plus raw
+`maxGap` alongside the unchanged application gap/count/AoI and a
+complete-observer diagnostic gap. The test compares every rendered UI field
+only with rendered-domain values. A route rejection, stale-but-open identity or
+initiator pre-registration window now yields a witnessed delta zero and cannot
+masquerade as product acceptance. No product API or current-link marker is
+added.
+
+The campaign attachment additionally records bounded elapsed time and
+before/after raw-transport state per prepare, run, deadline and reset stage,
+including link-drop, last-drop, authenticated-loss, handshake-failure and
+backpressure deltas, links at deadline and the lexicographic role. This keeps
+reset-induced cumulative drops distinct from a mid-trial teardown. It also
+records partition cardinalities, every rejected record's event/insertion
+state, sequence, ordinal, immutable identities and before/after product counter,
+plus the corresponding accepted identities, per-channel monotonicity,
+arrival-inversion count and clock skew. The diagnostic has no threshold role
+and discharges only the real-browser latency P2; the unit 249+1 assertion
+remains solely the retry-owner boundary.
+
+Two nonblocking instrumentation questions remain separately owned by the
+exact `examples/grid/src/v3-zone.ts` cleanup owner before combined D.108e4
+closure on 2026-09-10: whether the rendered product metric should eventually
+include fixed-domain suffix loss, and whether the example diagnostic
+projection should expose existing `unknownRouteDrops`. Neither changes
+D.108e4f. The per-event witness and its listener-order rationale must be
+recorded in GREEN evidence by the D.108e4f owner by 2026-09-03.
+
+The pre-sign read-only local Codex review, session
+`01a04624-f188-7a80-90f7-3f40506302e8` with raw transcript SHA-256
+`8d8eef5567ad0018230067a3606568723ba24366872049db8cad22f6e2950a4e`,
+found four P1s and one P2 in the earlier uncommitted draft. The correction above
+replaces aggregate state-proxy membership with the per-event counter witness,
+freezes the complete five-test inventory, pins the rendered AoI start-time
+domain and exact RED vector/invocation, and assigns both deferred projections
+to the exact example owner. The reviewer did not edit tracked state or run a
+test; protected untracked paths supplied no evidence.
+
+RED and GREEN select exactly the two new deterministic behaviors through
+`pnpm exec playwright test --config
+playwright.e3-03-loss-and-hol.config.ts --grep "partitions receiver raw
+evidence|separates rendered fabric metrics" --fail-on-flaky-tests
+--reporter=json`. RED is exactly 2 failed / 0 passed / 0 skipped at the two
+named deep equalities. GREEN is exactly 2 passed / 0 failed / 0 skipped. Both
+checkpoints separately run the retained D.108e4c observer behavior through its
+existing exact-title grep and require 1/1. They also run the bounded standalone
+owner-file TypeScript command frozen in D.108e4c, exact-owner typed ESLint,
+Prettier and `git diff --check`.
+
+GREEN then runs the complete E3-03 config exactly once with JSON reporter and
+`--fail-on-flaky-tests`. The owner has three retained behaviors and adds two,
+so only exactly 5/5 with zero skip may accept D.108e4f and D.108e4e or restart
+the ordinary consecutive campaign gate. Its always-attached evidence must
+identify the first failing stage/line and retain all per-event acceptance,
+partition, rendered-domain and per-stage diagnostics above whether the campaign
+passes or fails. Any different failure must be assigned from its preserved
+attachment before another invocation. D.108e4f receives separate signed/pushed
+plan-freeze, immutable RED and GREEN/evidence checkpoints and separate existing
+Grok 4.6/high, exact Kimi K3 CHECK001 through CHECK100 and Opus 5/xhigh review
+rounds. P0/P1 findings are corrected in the same round and every P2 receives
+an exact owner/deadline. No Fable or collaboration subagent may run without new
+express authorization.
+
 The first D.108e4c plan-freeze review round inspected signed/pushed commit
 `eb3de05b6054ac6fdd158d2530bad1798f87f10f`, parent
 `b8a2628bec7593c547919b540889dc75e33cd9ca`, tree
