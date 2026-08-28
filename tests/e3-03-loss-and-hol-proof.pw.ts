@@ -221,9 +221,10 @@ interface RtcLifecycleObservation {
 	readonly owner: string;
 	readonly attemptId?: number;
 	readonly readyState?: RTCDataChannelState;
-	readonly schemaVersion: 2;
+	readonly schemaVersion: 3;
 	readonly sequence: number;
 	readonly state?: string;
+	readonly trialId: string;
 }
 
 interface RtcChannelStateObservation {
@@ -246,7 +247,7 @@ interface RtcObserver {
 	channelStateSnapshot(): readonly RtcChannelStateObservation[];
 	custodySnapshot(): Promise<RtcCustodySnapshot>;
 	lifecycleSnapshot(): Promise<readonly RtcLifecycleObservation[]>;
-	reset(): void;
+	reset(trialId: string): void;
 	snapshot(): Promise<readonly RtcObservation[]>;
 }
 
@@ -502,6 +503,7 @@ function installRtcObserver(): void {
 	let ordinal = 0;
 	let lifecycleSequence = 0;
 	let nextAttemptId = 0;
+	let activeTrialId = "observer-install";
 	const records: RtcObservation[] = [];
 	const lifecycleRecords: RtcLifecycleObservation[] = [];
 	const pending = new Set<Promise<void>>();
@@ -561,9 +563,10 @@ function installRtcObserver(): void {
 				label: input.label,
 				owner: input.owner,
 				readyState: input.readyState,
-				schemaVersion: 2 as const,
+				schemaVersion: 3 as const,
 				sequence: selectedSequence,
 				state: input.state,
+				trialId: activeTrialId,
 			})
 		);
 		lifecycleSequence += 1;
@@ -937,7 +940,8 @@ function installRtcObserver(): void {
 					.sort((left, right) => left.sequence - right.sequence)
 					.map((record) => Object.freeze({ ...record }));
 			},
-			reset(): void {
+			reset(trialId: string): void {
+				activeTrialId = trialId;
 				generation += 1;
 				records.length = 0;
 				lifecycleRecords.length = 0;
@@ -1142,6 +1146,7 @@ async function installLibp2pMonitorObserver(page: Page): Promise<void> {
 			readonly connection: ConnectionLike;
 			failureRecorded: boolean;
 			readonly pingId: string;
+			successObserved: boolean;
 		};
 		const pingInFlight = new Map<string, PingEvidence>();
 		const failedPingAwaitingAbort = new Map<string, PingEvidence>();
@@ -1210,6 +1215,7 @@ async function installLibp2pMonitorObserver(page: Page): Promise<void> {
 								connection,
 								failureRecorded: false,
 								pingId: `${activeTrialId}:ping:${nextPingOrdinal}`,
+								successObserved: false,
 							}
 						: undefined;
 					if (ping) {
@@ -1226,15 +1232,20 @@ async function installLibp2pMonitorObserver(page: Page): Promise<void> {
 							carryIn: pingEvidence?.carryIn,
 							pingId: pingEvidence?.pingId,
 						});
-						stream.addEventListener("message", () =>
+						stream.addEventListener("message", () => {
+							if (pingEvidence !== undefined) pingEvidence.successObserved = true;
 							record(connection, "ping-read-success", "libp2p-connection-monitor", {
 								carryIn: pingEvidence?.carryIn,
 								pingId: pingEvidence?.pingId,
-							})
-						);
+							});
+						});
 						stream.addEventListener("close", () => {
 							pingInFlight.delete(connection.id);
-							failedPingAwaitingAbort.delete(connection.id);
+							if (pingEvidence === undefined || pingEvidence.successObserved) {
+								failedPingAwaitingAbort.delete(connection.id);
+							} else {
+								failedPingAwaitingAbort.set(connection.id, pingEvidence);
+							}
 						});
 						return new Proxy(stream, {
 							get(target, property, receiver): unknown {
@@ -1321,12 +1332,12 @@ async function installLibp2pMonitorObserver(page: Page): Promise<void> {
 	});
 }
 
-async function resetRtcObserver(page: Page): Promise<void> {
-	await page.evaluate(() => {
+async function resetRtcObserver(page: Page, trialId: string): Promise<void> {
+	await page.evaluate((selectedTrialId) => {
 		const observer = window.__E303_RTC_OBSERVER__;
 		if (observer === undefined) throw new Error("E303_RTC_OBSERVER_ABSENT");
-		observer.reset();
-	});
+		observer.reset(selectedTrialId);
+	}, trialId);
 }
 
 async function rtcObservations(page: Page): Promise<readonly RtcObservation[]> {
@@ -1418,6 +1429,10 @@ function d108e4hLifecycleFromCapture(
 	records: readonly RtcLifecycleObservation[],
 	trialId: string
 ): readonly D108e4hLifecycleObservation[] {
+	d108e4hAssert(
+		records.every(({ schemaVersion, trialId: recordTrialId }) => schemaVersion === 3 && recordTrialId === trialId),
+		"D108E4H_TRIAL_MISMATCH"
+	);
 	return Object.freeze(
 		records.map((record) =>
 			Object.freeze({
@@ -1432,10 +1447,10 @@ function d108e4hLifecycleFromCapture(
 				label: record.label,
 				owner: record.owner,
 				readyState: record.readyState,
-				schemaVersion: 3 as const,
+				schemaVersion: record.schemaVersion,
 				sequence: record.sequence,
 				state: record.state,
-				trialId,
+				trialId: record.trialId,
 			})
 		)
 	);
@@ -2485,8 +2500,11 @@ function d108e4hAssertAttemptCustody(
 	);
 	if (replaced) {
 		const replacementOpen = endpoint.lifecycle.find(
-			({ connectionId, event, label }) =>
-				connectionId === after.connectionId && event === "channel-open-event" && label === "ts-drp-ephemeral/1"
+			({ channelId, connectionId, event, label }) =>
+				connectionId === after.connectionId &&
+				channelId === after.channelId &&
+				event === "channel-open-event" &&
+				label === "ts-drp-ephemeral/1"
 		);
 		d108e4hAssert(replacementOpen !== undefined, "D108E4H_LIFECYCLE_CUSTODY_ABSENT");
 		for (const send of endpoint.rawSends) {
@@ -2538,16 +2556,25 @@ function d108e4hAssertOverlapCustody(
 	);
 	if (!replaced) return;
 	const replacementOpen = endpoint.lifecycle.find(
-		({ connectionId, event, label }) =>
-			connectionId === after.connectionId && event === "channel-open-event" && label === "ts-drp-ephemeral/1"
+		({ channelId, connectionId, event, label }) =>
+			connectionId === after.connectionId &&
+			channelId === after.channelId &&
+			event === "channel-open-event" &&
+			label === "ts-drp-ephemeral/1"
 	);
 	const oldCloseCall = endpoint.lifecycle.find(
-		({ connectionId, event, label }) =>
-			connectionId === before.connectionId && event === "channel-close-call" && label === "ts-drp-ephemeral/1"
+		({ channelId, connectionId, event, label }) =>
+			connectionId === before.connectionId &&
+			channelId === before.channelId &&
+			event === "channel-close-call" &&
+			label === "ts-drp-ephemeral/1"
 	);
 	const oldCloseEvent = endpoint.lifecycle.find(
-		({ connectionId, event, label }) =>
-			connectionId === before.connectionId && event === "channel-close-event" && label === "ts-drp-ephemeral/1"
+		({ channelId, connectionId, event, label }) =>
+			connectionId === before.connectionId &&
+			channelId === before.channelId &&
+			event === "channel-close-event" &&
+			label === "ts-drp-ephemeral/1"
 	);
 	d108e4hAssert(
 		replacementOpen !== undefined &&
@@ -2562,10 +2589,12 @@ function d108e4hAssertOverlapCustody(
 	);
 	if (replacementMessages.length > 0) {
 		const handler = endpoint.lifecycle.find(
-			({ connectionId, event, label }) =>
+			({ channelId, connectionId, event, label, owner }) =>
 				connectionId === after.connectionId &&
+				channelId === after.channelId &&
 				event === "channel-message-handler-installed" &&
-				label === "ts-drp-ephemeral/1"
+				label === "ts-drp-ephemeral/1" &&
+				owner === "product-unreliable-webrtc"
 		);
 		d108e4hAssert(
 			handler !== undefined &&
@@ -2588,14 +2617,7 @@ function d108e4hAssertOverlapCustody(
 					connectionId === after.connectionId &&
 					channelId === after.channelId &&
 					replacementOpen.sequence < lifecycleSequence
-			) &&
-				endpoint.acceptedRaw.some(
-					({ channelId, connectionId, lifecycleSequence }) =>
-						connectionId === before.connectionId &&
-						channelId === before.channelId &&
-						replacementOpen.sequence < lifecycleSequence &&
-						lifecycleSequence < oldCloseCall.sequence
-				),
+			),
 			"D108E4H_OVERLAP_LEDGER_INVALID"
 		);
 	}
@@ -2639,10 +2661,38 @@ function d108e4hValidateEndpoint(
 	);
 	if (replaced && delta.lastLinkDrop.after === "channel-close") {
 		const closeCall = endpoint.lifecycle.find(
-			({ connectionId, event, label }) =>
-				connectionId === before.connectionId && event === "channel-close-call" && label === "ts-drp-ephemeral/1"
+			({ channelId, connectionId, event, label }) =>
+				connectionId === before.connectionId &&
+				channelId === before.channelId &&
+				event === "channel-close-call" &&
+				label === "ts-drp-ephemeral/1"
 		);
 		d108e4hAssert(closeCall?.bufferedAmount === 0, "D108E4H_CHANNEL_CLOSE_DRAIN_INVALID");
+		const closeEvent = endpoint.lifecycle.find(
+			({ channelId, connectionId, event, label }) =>
+				connectionId === before.connectionId &&
+				channelId === before.channelId &&
+				event === "channel-close-event" &&
+				label === "ts-drp-ephemeral/1"
+		);
+		d108e4hAssert(closeEvent !== undefined, "D108E4H_LIFECYCLE_CUSTODY_ABSENT");
+		const acceptedAfterPromotion = endpoint.acceptedRaw.some(
+			({ channelId, connectionId, lifecycleSequence }) =>
+				connectionId === after.connectionId && channelId === after.channelId && lifecycleSequence > closeEvent.sequence
+		);
+		const sendAfterPromotion = endpoint.rawSends.some(({ attemptId, channelId, connectionId }) => {
+			if (connectionId !== after.connectionId || channelId !== after.channelId) return false;
+			return endpoint.lifecycle.some(
+				(record) =>
+					record.event === "channel-send-attempt" &&
+					record.attemptId === attemptId &&
+					record.sequence > closeEvent.sequence
+			);
+		});
+		d108e4hAssert(
+			endpoint.transmitsRawTrial ? sendAfterPromotion : acceptedAfterPromotion,
+			"D108E4H_CHANNEL_CLOSE_INGRESS_INVALID"
+		);
 	}
 }
 
@@ -3407,7 +3457,7 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 				}),
 			}),
 		});
-		expect(() => validateD108e4hCampaignCustody(allOverlapARejected)).toThrowError("D108E4H_OVERLAP_LEDGER_INVALID");
+		expect(() => validateD108e4hCampaignCustody(allOverlapARejected)).not.toThrow();
 		const handlerAfterFirstBMessage = Object.freeze({
 			...receiverReplacement,
 			endpoints: Object.freeze({
@@ -3416,23 +3466,81 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 					...receiverReplacement.endpoints.receiver,
 					acceptedRaw: Object.freeze(
 						receiverReplacement.endpoints.receiver.acceptedRaw.map((record, index) =>
-							index === 1 ? Object.freeze({ ...record, lifecycleSequence: 0 }) : record
+							index === 0
+								? Object.freeze({ ...record, lifecycleSequence: 3 })
+								: index === 1
+									? Object.freeze({ ...record, lifecycleSequence: 0 })
+									: Object.freeze({ ...record, lifecycleSequence: 7 })
 						)
 					),
-					lifecycle: Object.freeze(
-						receiverLifecycle.map((record, index) => {
-							if (index === 0)
-								return Object.freeze({ ...(receiverLifecycle[3] as D108e4hLifecycleObservation), sequence: 0 });
-							if (index === 3)
-								return Object.freeze({ ...(receiverLifecycle[0] as D108e4hLifecycleObservation), sequence: 3 });
-							return record;
-						})
+					lifecycle: Object.freeze([
+						Object.freeze({ ...(receiverLifecycle[3] as D108e4hLifecycleObservation), sequence: 0 }),
+						Object.freeze({
+							...(receiverLifecycle[0] as D108e4hLifecycleObservation),
+							owner: "rtc-observer",
+							sequence: 1,
+						}),
+						Object.freeze({ ...(receiverLifecycle[1] as D108e4hLifecycleObservation), sequence: 2 }),
+						Object.freeze({ ...(receiverLifecycle[2] as D108e4hLifecycleObservation), sequence: 3 }),
+						Object.freeze({ ...(receiverLifecycle[0] as D108e4hLifecycleObservation), sequence: 4 }),
+						Object.freeze({ ...(receiverLifecycle[4] as D108e4hLifecycleObservation), sequence: 5 }),
+						Object.freeze({ ...(receiverLifecycle[5] as D108e4hLifecycleObservation), sequence: 6 }),
+						Object.freeze({ ...(receiverLifecycle[6] as D108e4hLifecycleObservation), sequence: 7 }),
+						Object.freeze({ ...(receiverLifecycle[7] as D108e4hLifecycleObservation), sequence: 8 }),
+					]),
+					rejectedRaw: Object.freeze(
+						receiverReplacement.endpoints.receiver.rejectedRaw.map((record) =>
+							Object.freeze({ ...record, lifecycleSequence: 8 })
+						)
 					),
 				}),
 			}),
 		});
 		expect(() => validateD108e4hCampaignCustody(handlerAfterFirstBMessage)).toThrowError(
 			"D108E4H_LIFECYCLE_ORDER_INVALID"
+		);
+		const wrongReplacementChannel = withReceiverLifecycle(
+			receiverReplacement,
+			receiverLifecycle.map((record) =>
+				record.event === "channel-open-event"
+					? Object.freeze({ ...record, channelId: D108E4H_RTC_B.channelId + 1 })
+					: record
+			)
+		);
+		expect(() => validateD108e4hCampaignCustody(wrongReplacementChannel)).toThrowError(
+			"D108E4H_LIFECYCLE_ORDER_INVALID"
+		);
+		const postPromotionB = receiverChannelClose.endpoints.receiver.acceptedRaw.find(
+			({ connectionId, lifecycleSequence }) => connectionId === D108E4H_RTC_B.connectionId && lifecycleSequence === 6
+		);
+		if (postPromotionB === undefined) throw new Error("D108E4H_FIXTURE_POST_PROMOTION_B_ABSENT");
+		const channelCloseWithoutPostPromotionIngressBase = withReceiverDeadlineTransport(
+			receiverChannelClose,
+			Object.freeze({
+				...receiverChannelClose.endpoints.receiver.deadline.rawTransport,
+				received: 2,
+			})
+		);
+		const channelCloseWithoutPostPromotionIngress = Object.freeze({
+			...channelCloseWithoutPostPromotionIngressBase,
+			endpoints: Object.freeze({
+				...channelCloseWithoutPostPromotionIngressBase.endpoints,
+				receiver: Object.freeze({
+					...channelCloseWithoutPostPromotionIngressBase.endpoints.receiver,
+					acceptedRaw: Object.freeze(
+						channelCloseWithoutPostPromotionIngressBase.endpoints.receiver.acceptedRaw.filter(
+							(record) => record !== postPromotionB
+						)
+					),
+					rejectedRaw: Object.freeze([
+						...channelCloseWithoutPostPromotionIngressBase.endpoints.receiver.rejectedRaw,
+						postPromotionB,
+					]),
+				}),
+			}),
+		});
+		expect(() => validateD108e4hCampaignCustody(channelCloseWithoutPostPromotionIngress)).toThrowError(
+			"D108E4H_CHANNEL_CLOSE_INGRESS_INVALID"
 		);
 
 		const missingRawSequence = Object.freeze({
@@ -3977,7 +4085,9 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 			expect(evidence.lifecycle.map(({ sequence }) => sequence)).toEqual(
 				Array.from({ length: evidence.lifecycle.length }, (_value, index) => index)
 			);
-			expect(evidence.lifecycle.every(({ schemaVersion }) => schemaVersion === 2)).toBe(true);
+			expect(
+				evidence.lifecycle.every(({ schemaVersion, trialId }) => schemaVersion === 3 && trialId === "observer-install")
+			).toBe(true);
 			for (let index = 1; index < evidence.lifecycle.length; index += 1) {
 				expect(evidence.lifecycle[index]?.atMonotonicMs).toBeGreaterThanOrEqual(
 					evidence.lifecycle[index - 1]?.atMonotonicMs ?? 0
@@ -4028,6 +4138,75 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 					event === "channel-open-event" && channelId === handler.channelId && connectionId === handler.connectionId
 			);
 			expect(remoteOpen?.sequence).toBeGreaterThan(handler.sequence);
+
+			await page.evaluate(() => {
+				const stream = new EventTarget() as EventTarget & {
+					close(options?: unknown): Promise<void>;
+					send(data: Uint8Array): boolean;
+				};
+				stream.close = (): Promise<void> => Promise.resolve();
+				stream.send = (): boolean => true;
+				const connection = new EventTarget() as EventTarget & {
+					abort(error?: Error): void;
+					readonly id: string;
+					newStream(protocol: string | readonly string[], options?: unknown): Promise<typeof stream>;
+					readonly remotePeer: Readonly<{ toString(): string }>;
+				};
+				connection.abort = (): void => undefined;
+				Object.defineProperty(connection, "id", { value: "monitor-self-check-connection" });
+				connection.newStream = (): Promise<typeof stream> => Promise.resolve(stream);
+				Object.defineProperty(connection, "remotePeer", {
+					value: Object.freeze({ toString: (): string => "monitor-self-check-peer" }),
+				});
+				const host = new EventTarget() as EventTarget & { getConnections(): readonly [typeof connection] };
+				host.getConnections = (): readonly [typeof connection] => [connection];
+				const selfCheckWindow = window as typeof window & {
+					__D108E4H_MONITOR_SELF_CHECK__?: Readonly<{ connection: typeof connection; stream: typeof stream }>;
+				};
+				Object.defineProperty(selfCheckWindow, "__TS_DRP_GRID_SESSION__", {
+					configurable: true,
+					value: Object.freeze({ node: Object.freeze({ networkNode: Object.freeze({ _node: host }) }) }),
+				});
+				Object.defineProperty(selfCheckWindow, "__D108E4H_MONITOR_SELF_CHECK__", {
+					configurable: true,
+					value: Object.freeze({ connection, stream }),
+				});
+			});
+			await installLibp2pMonitorObserver(page);
+			await resetLibp2pMonitorObserver(page, "d108e4h-monitor-self-check");
+			const monitorEvidence = await page.evaluate(async () => {
+				const selfCheckWindow = window as typeof window & {
+					__D108E4H_MONITOR_SELF_CHECK__?: Readonly<{
+						connection: Readonly<{
+							abort(error?: Error): void;
+							newStream(protocol: string | readonly string[], options?: unknown): Promise<unknown>;
+						}>;
+						stream: EventTarget;
+					}>;
+				};
+				const selfCheck = selfCheckWindow.__D108E4H_MONITOR_SELF_CHECK__;
+				const observer = window.__E303_LIBP2P_MONITOR_OBSERVER__;
+				if (selfCheck === undefined || observer === undefined) {
+					throw new Error("D108E4H_MONITOR_SELF_CHECK_ABSENT");
+				}
+				await selfCheck.connection.newStream("/ipfs/ping/1.0.0");
+				selfCheck.stream.dispatchEvent(new Event("close"));
+				const monitorOwner = {
+					"connection-monitor"(connection: typeof selfCheck.connection): void {
+						connection.abort(new Error("D108E4H_SYNTHETIC_PING_TIMEOUT"));
+					},
+				};
+				monitorOwner["connection-monitor"](selfCheck.connection);
+				return observer.snapshot();
+			});
+			const joinedMonitorPing = monitorEvidence.filter(
+				({ event }) => event === "ping-start" || event === "ping-failure" || event === "connection-abort"
+			);
+			expect(joinedMonitorPing.map(({ event }) => event)).toEqual(["ping-start", "ping-failure", "connection-abort"]);
+			expect(new Set(joinedMonitorPing.map(({ pingId }) => pingId))).toEqual(
+				new Set(["d108e4h-monitor-self-check:ping:0"])
+			);
+			expect(joinedMonitorPing.every(({ owner }) => owner === "libp2p-connection-monitor")).toBe(true);
 		} finally {
 			await context.close();
 		}
@@ -4085,7 +4264,7 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 			expect(oldResponderRtcChannels, "the responder control must have one exact open raw RTC owner").toHaveLength(1);
 			const oldResponderRtc = oldResponderRtcChannels[0];
 			if (oldResponderRtc === undefined) throw new Error("D108E4G_OLD_RESPONDER_RTC_OWNER_ABSENT");
-			await Promise.all([resetRtcObserver(creator), resetRtcObserver(receiver)]);
+			await Promise.all([resetRtcObserver(creator, trialId), resetRtcObserver(receiver, trialId)]);
 			await Promise.all(
 				[creator, receiver].map((page) =>
 					page.evaluate((selectedTrialId) => window.__E303_LIBP2P_MONITOR_OBSERVER__?.reset(selectedTrialId), trialId)
@@ -4430,8 +4609,8 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 		await waitForOpenTransportPair(creator, receiver);
 		await waitForNetworkPair(creator, receiver, initialCreatorNetwork, initialReceiverNetwork);
 		await Promise.all([
-			resetRtcObserver(creator),
-			resetRtcObserver(receiver),
+			resetRtcObserver(creator, calibrationTrialId),
+			resetRtcObserver(receiver, calibrationTrialId),
 			resetLibp2pMonitorObserver(creator, calibrationTrialId),
 			resetLibp2pMonitorObserver(receiver, calibrationTrialId),
 		]);
@@ -4535,8 +4714,8 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 				prepareCustody: Object.freeze({ creator: creatorPrepareCustody, receiver: receiverPrepareCustody }),
 			});
 			await Promise.all([
-				resetRtcObserver(creator),
-				resetRtcObserver(receiver),
+				resetRtcObserver(creator, trialId),
+				resetRtcObserver(receiver, trialId),
 				resetLibp2pMonitorObserver(creator, trialId),
 				resetLibp2pMonitorObserver(receiver, trialId),
 			]);
@@ -4626,8 +4805,11 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 				d108e4hPageCapture(receiver, trialId),
 			]);
 			const senderRawTransportAtDeadline = creatorAtDeadline.zone.rawTransport;
+			const creatorProductRoster = productRosterFromSnapshot(creatorAtDeadline.fabric);
 			const productRoster = productRosterFromSnapshot(receiverAtDeadline.fabric);
 			const senderWireAtDeadline = platformObservations(creatorAtDeadline.rtc.records, "send", trialId);
+			const creatorMessageWireAtDeadline = platformObservations(creatorAtDeadline.rtc.records, "message", trialId);
+			const receiverSendWireAtDeadline = platformObservations(receiverAtDeadline.rtc.records, "send", trialId);
 			const receiverWire = platformObservations(receiverAtDeadline.rtc.records, "message", trialId);
 			const deadlineStage = transportStageEvidence(
 				Date.now() - trialEvidenceStartedAtMs,
@@ -4677,6 +4859,7 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			expectOpenTransport(receiverSnapshot, peers.creatorPeerId);
 
 			stage = trialId + "-assertions";
+			const creatorPartition = partitionReceiverEvidence(creatorMessageWireAtDeadline, creatorProductRoster);
 			const receiverPartition = partitionReceiverEvidence(receiverWire, productRoster);
 			const acceptedObservationIdentities = Object.freeze(
 				receiverPartition.productAccepted.map(acceptedObservationIdentity)
@@ -4723,11 +4906,11 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			const replacementCustody = Object.freeze({
 				endpoints: Object.freeze({
 					creator: d108e4hEndpointFromCapture(creatorAtDeadline, {
-						acceptedRaw: Object.freeze([]),
+						acceptedRaw: creatorPartition.productAccepted,
 						peerId: peers.creatorPeerId,
 						prepare: creatorPrepareCustody,
 						rawSends: senderWireAtDeadline,
-						rejectedRaw: Object.freeze([]),
+						rejectedRaw: creatorPartition.productRejected,
 						remotePeerId: peers.receiverPeerId,
 						transmitsRawTrial: true,
 						trialId,
@@ -4736,7 +4919,7 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 						acceptedRaw: receiverPartition.productAccepted,
 						peerId: peers.receiverPeerId,
 						prepare: receiverPrepareCustody,
-						rawSends: Object.freeze([]),
+						rawSends: receiverSendWireAtDeadline,
 						rejectedRaw: receiverPartition.productRejected,
 						remotePeerId: peers.creatorPeerId,
 						transmitsRawTrial: false,
@@ -4751,8 +4934,8 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 				schemaVersion: 3 as const,
 				trialId,
 			}) satisfies D108e4hValidationInput;
-			validateD108e4hCampaignCustody(replacementCustody);
 			updateTrialProgress({ replacementCustody });
+			validateD108e4hCampaignCustody(replacementCustody);
 			const trialEvidence = Object.freeze({
 				acceptedObservationIdentities,
 				application: Object.freeze({
