@@ -35,6 +35,7 @@ interface FabricTransportEvidence {
 
 interface FabricTrialSnapshot {
 	readonly attempted: Readonly<{ readonly raw: number; readonly reliable: number }>;
+	readonly observations: readonly FabricObservation[];
 	readonly transport: FabricTransportEvidence;
 	readonly trialId: string;
 }
@@ -147,10 +148,28 @@ interface PlatformObservation extends FabricObservation {
 	readonly channelLabel: string;
 	readonly channelId: number;
 	readonly connectionId: number;
+	readonly insertionReadyState: RTCDataChannelState;
 	readonly maxRetransmits: number | null;
 	readonly ordered: boolean;
 	readonly ordinal: number;
 	readonly readyState: RTCDataChannelState;
+}
+
+interface ReceiverEvidencePartition {
+	readonly productAccepted: readonly PlatformObservation[];
+	readonly productRejected: readonly PlatformObservation[];
+}
+
+interface RenderedFabricEvidence {
+	readonly maxGap: number;
+	readonly rawAoIP50Ms: number;
+	readonly rawAoIP95Ms: number;
+	readonly rawDelivered: number;
+	readonly rawDropped: number;
+	readonly reliableAoIP50Ms: number;
+	readonly reliableAoIP95Ms: number;
+	readonly reliableDelivered: number;
+	readonly reliableDropped: number;
 }
 
 interface CampaignEvidence {
@@ -539,6 +558,7 @@ function platformObservations(
 				channelId: record.channelId,
 				channelLabel: record.label,
 				connectionId: record.connectionId,
+				insertionReadyState: record.insertionReadyState,
 				lane,
 				maxRetransmits: record.maxRetransmits,
 				ordered: record.ordered,
@@ -598,8 +618,20 @@ function expectReliableSenderSamples(observations: readonly PlatformObservation[
 	return samples;
 }
 
-function acceptedSequencedObservations(observations: readonly PlatformObservation[]): readonly PlatformObservation[] {
-	const accepted: PlatformObservation[] = [];
+function partitionReceiverEvidence(
+	observations: readonly PlatformObservation[],
+	_productRoster: readonly FabricObservation[]
+): ReceiverEvidencePartition {
+	return Object.freeze({
+		productAccepted: Object.freeze([...observations]),
+		productRejected: Object.freeze([]),
+	});
+}
+
+function acceptedSequencedObservations<Observation extends FabricObservation>(
+	observations: readonly Observation[]
+): readonly Observation[] {
+	const accepted: Observation[] = [];
 	let watermark = -1;
 	for (const observation of observations) {
 		if (observation.sequence <= watermark) continue;
@@ -630,7 +662,8 @@ function percentile(values: readonly number[], quantile: number): number {
 function ageOfInformation(
 	observations: readonly FabricObservation[],
 	startedAtMs: number,
-	deadlineMs: number
+	deadlineMs: number,
+	intervalMs: number
 ): readonly number[] {
 	const delivered = observations
 		.filter(({ sentinel }) => !sentinel)
@@ -638,7 +671,7 @@ function ageOfInformation(
 	const ages: number[] = [];
 	let cursor = 0;
 	let freshestSentAt = startedAtMs;
-	for (let sampledAt = startedAtMs; sampledAt <= deadlineMs; sampledAt += SAMPLE_INTERVAL_MS) {
+	for (let sampledAt = startedAtMs; sampledAt <= deadlineMs; sampledAt += intervalMs) {
 		while (cursor < delivered.length && (delivered[cursor]?.receivedAtMs ?? Number.POSITIVE_INFINITY) <= sampledAt) {
 			freshestSentAt = Math.max(freshestSentAt, delivered[cursor]?.sentAtMs ?? freshestSentAt);
 			cursor += 1;
@@ -646,6 +679,37 @@ function ageOfInformation(
 		ages.push(sampledAt - freshestSentAt);
 	}
 	return ages;
+}
+
+function renderedProductRosterMetrics(
+	observations: readonly FabricObservation[],
+	startedAtMs: number,
+	deadlineMs: number,
+	intervalMs: number,
+	sampleCount: number
+): RenderedFabricEvidence {
+	const raw = acceptedSequencedObservations(observations.filter(({ lane, sentinel }) => lane === "raw" && !sentinel));
+	const reliableBySequence = new Map<number, FabricObservation>();
+	for (const observation of observations) {
+		if (observation.lane !== "reliable" || observation.sentinel || reliableBySequence.has(observation.sequence)) {
+			continue;
+		}
+		reliableBySequence.set(observation.sequence, observation);
+	}
+	const reliable = [...reliableBySequence.values()];
+	const rawAoI = ageOfInformation(raw, startedAtMs, deadlineMs, intervalMs);
+	const reliableAoI = ageOfInformation(reliable, startedAtMs, deadlineMs, intervalMs);
+	return Object.freeze({
+		maxGap: rawSequenceEvidence(raw).gap,
+		rawAoIP50Ms: percentile(rawAoI, 0.5),
+		rawAoIP95Ms: percentile(rawAoI, 0.95),
+		rawDelivered: raw.length,
+		rawDropped: sampleCount - raw.length,
+		reliableAoIP50Ms: percentile(reliableAoI, 0.5),
+		reliableAoIP95Ms: percentile(reliableAoI, 0.95),
+		reliableDelivered: reliable.length,
+		reliableDropped: sampleCount - reliable.length,
+	});
 }
 
 function rawSequenceEvidence(
@@ -868,6 +932,137 @@ test("raw sequence evidence includes the fixed sample-domain boundaries", () => 
 		leading: rawSequenceEvidence(observations.slice(1)).gap,
 		trailing: rawSequenceEvidence(observations.slice(0, -1)).gap,
 	}).toEqual({ complete: 1, internal: 2, leading: 2, trailing: 2 });
+});
+
+test("partitions receiver evidence by exact product roster without losing observations", () => {
+	const observation = (
+		ordinal: number,
+		lane: FabricObservation["lane"],
+		sequence: number,
+		sentAtMs: number,
+		readyState: RTCDataChannelState,
+		insertionReadyState: RTCDataChannelState
+	): PlatformObservation =>
+		Object.freeze({
+			byteLength: SAMPLE_PAYLOAD_BYTES,
+			carrierByteLength: SAMPLE_PAYLOAD_BYTES,
+			channelId: lane === "raw" ? 1 : 2,
+			channelLabel: lane === "raw" ? "ts-drp-ephemeral/1" : "",
+			connectionId: 1,
+			insertionReadyState,
+			lane,
+			maxRetransmits: lane === "raw" ? 0 : null,
+			ordered: lane === "reliable",
+			ordinal,
+			receivedAtMs: 1_000 + ordinal,
+			readyState,
+			sentAtMs,
+			sequence,
+			sentinel: false,
+		});
+	const observations = Object.freeze([
+		observation(0, "raw", 1, 100, "open", "open"),
+		observation(1, "raw", 2, 200, "open", "open"),
+		observation(2, "reliable", 3, 300, "open", "open"),
+		observation(3, "reliable", 3, 301, "open", "open"),
+		observation(4, "reliable", 4, 400, "open", "open"),
+		observation(5, "reliable", 4, 400, "open", "open"),
+		observation(6, "raw", 5, 500, "closing", "closing"),
+		observation(7, "raw", 6, 600, "closing", "open"),
+	]);
+	const productObservation = (source: PlatformObservation, receivedAtMs: number): FabricObservation =>
+		Object.freeze({
+			byteLength: source.byteLength,
+			lane: source.lane,
+			receivedAtMs,
+			sentAtMs: source.sentAtMs,
+			sequence: source.sequence,
+			sentinel: source.sentinel,
+		});
+	const productRoster = Object.freeze([
+		productObservation(observations[0] as PlatformObservation, 2_000),
+		productObservation(observations[2] as PlatformObservation, 2_001),
+		productObservation(observations[4] as PlatformObservation, 2_002),
+		productObservation(observations[6] as PlatformObservation, 2_003),
+	]);
+	const partition = partitionReceiverEvidence(observations, productRoster);
+
+	expect(partition).toEqual({
+		productAccepted: [observations[0], observations[2], observations[4], observations[6]],
+		productRejected: [observations[1], observations[3], observations[5], observations[7]],
+	});
+	for (const accepted of partition.productAccepted) {
+		expect(observations).toContain(accepted);
+	}
+	expect(
+		[...partition.productAccepted, ...partition.productRejected].sort((left, right) => left.ordinal - right.ordinal)
+	).toEqual(observations);
+});
+
+test("separates rendered product-roster metrics from boundary-aware application evidence", () => {
+	const observations = Object.freeze([
+		Object.freeze({
+			byteLength: SAMPLE_PAYLOAD_BYTES,
+			lane: "raw" as const,
+			receivedAtMs: 500,
+			sentAtMs: 300,
+			sequence: 30,
+			sentinel: false,
+		}),
+		Object.freeze({
+			byteLength: SAMPLE_PAYLOAD_BYTES,
+			lane: "raw" as const,
+			receivedAtMs: 500,
+			sentAtMs: 500,
+			sequence: 32,
+			sentinel: false,
+		}),
+		Object.freeze({
+			byteLength: SAMPLE_PAYLOAD_BYTES,
+			lane: "raw" as const,
+			receivedAtMs: 600,
+			sentAtMs: 400,
+			sequence: 31,
+			sentinel: false,
+		}),
+		Object.freeze({
+			byteLength: SAMPLE_PAYLOAD_BYTES,
+			lane: "reliable" as const,
+			receivedAtMs: 600,
+			sentAtMs: 300,
+			sequence: 30,
+			sentinel: false,
+		}),
+	]);
+	const applicationRaw = acceptedSequencedObservations(observations.filter(({ lane }) => lane === "raw"));
+	const applicationReliable = observations.filter(({ lane }) => lane === "reliable");
+
+	expect({
+		rawAoIP50Ms: percentile(ageOfInformation(applicationRaw, 0, 700, 100), 0.5),
+		rawAoIP95Ms: percentile(ageOfInformation(applicationRaw, 0, 700, 100), 0.95),
+		rawDelivered: applicationRaw.length,
+		rawGap: rawSequenceEvidence(applicationRaw).gap,
+		reliableAoIP50Ms: percentile(ageOfInformation(applicationReliable, 0, 700, 100), 0.5),
+		reliableAoIP95Ms: percentile(ageOfInformation(applicationReliable, 0, 700, 100), 0.95),
+	}).toEqual({
+		rawAoIP50Ms: 100,
+		rawAoIP95Ms: 400,
+		rawDelivered: 2,
+		rawGap: 568,
+		reliableAoIP50Ms: 300,
+		reliableAoIP95Ms: 500,
+	});
+	expect(renderedProductRosterMetrics(observations, 0, 700, 100, SAMPLE_COUNT)).toEqual({
+		maxGap: 30,
+		rawAoIP50Ms: 100,
+		rawAoIP95Ms: 200,
+		rawDelivered: 3,
+		rawDropped: 597,
+		reliableAoIP50Ms: 200,
+		reliableAoIP95Ms: 400,
+		reliableDelivered: 1,
+		reliableDropped: 599,
+	});
 });
 
 test("freezes RTC metadata at the event boundary before async payload conversion", async ({ browser }) => {
@@ -1310,8 +1505,8 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			const senderSequence = rawSequenceEvidence(senderRaw);
 			expect(receiverSequence.gap).toBeGreaterThan(1);
 			expect(senderSequence.maxStallMs).toBeLessThanOrEqual(500);
-			const rawAoI = ageOfInformation(raw, campaignStartedAtMs, deadlineMs);
-			const reliableAoI = ageOfInformation(reliable, campaignStartedAtMs, deadlineMs);
+			const rawAoI = ageOfInformation(raw, campaignStartedAtMs, deadlineMs, SAMPLE_INTERVAL_MS);
+			const reliableAoI = ageOfInformation(reliable, campaignStartedAtMs, deadlineMs, SAMPLE_INTERVAL_MS);
 			const rawAoIP50Ms = percentile(rawAoI, 0.5);
 			const rawAoIP95Ms = percentile(rawAoI, 0.95);
 			const reliableAoIP50Ms = percentile(reliableAoI, 0.5);
