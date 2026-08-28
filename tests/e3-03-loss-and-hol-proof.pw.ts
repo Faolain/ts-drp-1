@@ -181,10 +181,12 @@ interface RtcObservation {
 }
 
 type RtcLifecycleKind =
+	| "answer-created"
 	| "channel-close-call"
 	| "channel-close-event"
 	| "channel-handler-installed"
 	| "channel-message"
+	| "channel-message-handler-installed"
 	| "channel-open-event"
 	| "channel-send-attempt"
 	| "channel-send-failure"
@@ -193,19 +195,25 @@ type RtcLifecycleKind =
 	| "connection-created"
 	| "connection-state"
 	| "ice-connection-state"
+	| "ice-candidate-add"
 	| "ice-gathering-state"
+	| "local-description"
+	| "offer-created"
+	| "remote-description"
 	| "signaling-state";
 
 interface RtcLifecycleObservation {
 	readonly atMonotonicMs: number;
 	readonly atWallMs: number;
 	readonly bufferedAmount?: number;
+	readonly callsite?: string;
 	readonly channelId?: number;
 	readonly connectionId: number;
 	readonly event: RtcLifecycleKind;
 	readonly handoffId: string;
 	readonly label?: string;
 	readonly owner: string;
+	readonly attemptId?: number;
 	readonly readyState?: RTCDataChannelState;
 	readonly schemaVersion: 1;
 	readonly sequence: number;
@@ -383,17 +391,43 @@ function installRtcObserver(): void {
 	let nextConnectionId = 0;
 	let ordinal = 0;
 	let lifecycleSequence = 0;
+	let nextAttemptId = 0;
 	const records: RtcObservation[] = [];
 	const lifecycleRecords: RtcLifecycleObservation[] = [];
 	const pending = new Set<Promise<void>>();
 	const watchedChannels = new Set<RTCDataChannel>();
 	const channelIdentities = new WeakMap<RTCDataChannel, Readonly<{ channelId: number; connectionId: number }>>();
 	const connectionIdentities = new WeakMap<RTCPeerConnection, number>();
+	const callAttribution = (): Readonly<{ callsite: string; owner: string }> => {
+		const stack = new Error().stack ?? "";
+		const callsite =
+			stack
+				.split("\n")
+				.map((line) => line.trim())
+				.find(
+					(line) =>
+						line.startsWith("at ") &&
+						!line.includes("callAttribution") &&
+						!line.includes("RTCDataChannel.value") &&
+						!line.includes("RTCPeerConnection.value")
+				) ?? "at unknown";
+		const normalizedCallsite = callsite
+			.replaceAll(window.location.origin, "<origin>")
+			.replace(/(?:<origin>\/@fs)?\/[^ )]+\/(examples|packages|tests)\//u, "<workspace>/$1/")
+			.replace(/[?#][^ )]+/g, "")
+			.slice(0, 240);
+		return Object.freeze({
+			callsite: normalizedCallsite,
+			owner: normalizedCallsite.includes("unreliable-webrtc") ? "product-unreliable-webrtc" : "rtc-observer-or-harness",
+		});
+	};
 	const recordLifecycle = (
 		event: RtcLifecycleKind,
 		connectionId: number,
 		input: Readonly<{
+			readonly attemptId?: number;
 			readonly bufferedAmount?: number;
+			readonly callsite?: string;
 			readonly channelId?: number;
 			readonly label?: string;
 			readonly owner: string;
@@ -401,11 +435,14 @@ function installRtcObserver(): void {
 			readonly state?: string;
 		}>
 	): void => {
+		const atMonotonicMs = performance.now();
 		lifecycleRecords.push(
 			Object.freeze({
-				atMonotonicMs: performance.now(),
-				atWallMs: Date.now(),
+				attemptId: input.attemptId,
+				atMonotonicMs,
+				atWallMs: performance.timeOrigin + atMonotonicMs,
 				bufferedAmount: input.bufferedAmount,
+				callsite: input.callsite,
 				channelId: input.channelId,
 				connectionId,
 				event,
@@ -503,8 +540,37 @@ function installRtcObserver(): void {
 	};
 	const NativePeerConnection = window.RTCPeerConnection;
 	const nativeCreateDataChannel = NativePeerConnection.prototype.createDataChannel;
+	const nativeCreateAnswer = NativePeerConnection.prototype.createAnswer;
+	const nativeCreateOffer = NativePeerConnection.prototype.createOffer;
+	const nativeAddIceCandidate = NativePeerConnection.prototype.addIceCandidate;
+	const nativeSetLocalDescription = NativePeerConnection.prototype.setLocalDescription;
+	const nativeSetRemoteDescription = NativePeerConnection.prototype.setRemoteDescription;
 	const nativePeerConnectionClose = NativePeerConnection.prototype.close;
+	const nativeDataChannelAddEventListener = RTCDataChannel.prototype.addEventListener;
 	const nativeDataChannelClose = RTCDataChannel.prototype.close;
+	Object.defineProperty(RTCDataChannel.prototype, "addEventListener", {
+		configurable: true,
+		value(
+			this: RTCDataChannel,
+			type: string,
+			listener: EventListenerOrEventListenerObject | null,
+			options?: boolean | AddEventListenerOptions
+		): void {
+			const identity = channelIdentities.get(this);
+			if (type === "message" && identity !== undefined) {
+				const attribution = callAttribution();
+				recordLifecycle("channel-message-handler-installed", identity.connectionId, {
+					...attribution,
+					bufferedAmount: this.bufferedAmount,
+					channelId: identity.channelId,
+					label: this.label,
+					readyState: this.readyState,
+				});
+			}
+			Reflect.apply(nativeDataChannelAddEventListener, this, [type, listener, options]);
+		},
+		writable: true,
+	});
 	Object.defineProperty(NativePeerConnection.prototype, "createDataChannel", {
 		configurable: true,
 		value(this: RTCPeerConnection, label: string, options?: RTCDataChannelInit): RTCDataChannel {
@@ -520,7 +586,10 @@ function installRtcObserver(): void {
 		value(this: RTCDataChannel, data: RtcData): void {
 			const identity = channelIdentities.get(this);
 			if (identity === undefined) throw new Error("E303_RTC_CHANNEL_IDENTITY_ABSENT");
+			const attemptId = nextAttemptId;
+			nextAttemptId += 1;
 			recordLifecycle("channel-send-attempt", identity.connectionId, {
+				attemptId,
 				bufferedAmount: this.bufferedAmount,
 				channelId: identity.channelId,
 				label: this.label,
@@ -531,6 +600,7 @@ function installRtcObserver(): void {
 			try {
 				Reflect.apply(nativeSend, this, [data]);
 				recordLifecycle("channel-send-success", identity.connectionId, {
+					attemptId,
 					bufferedAmount: this.bufferedAmount,
 					channelId: identity.channelId,
 					label: this.label,
@@ -539,6 +609,7 @@ function installRtcObserver(): void {
 				});
 			} catch (error) {
 				recordLifecycle("channel-send-failure", identity.connectionId, {
+					attemptId,
 					bufferedAmount: this.bufferedAmount,
 					channelId: identity.channelId,
 					label: this.label,
@@ -555,11 +626,12 @@ function installRtcObserver(): void {
 		value(this: RTCDataChannel): void {
 			const identity = channelIdentities.get(this);
 			if (identity !== undefined) {
+				const attribution = callAttribution();
 				recordLifecycle("channel-close-call", identity.connectionId, {
+					...attribution,
 					bufferedAmount: this.bufferedAmount,
 					channelId: identity.channelId,
 					label: this.label,
-					owner: "rtc-datachannel-close",
 					readyState: this.readyState,
 				});
 			}
@@ -572,12 +644,77 @@ function installRtcObserver(): void {
 		value(this: RTCPeerConnection): void {
 			const connectionId = connectionIdentities.get(this);
 			if (connectionId !== undefined) {
+				const attribution = callAttribution();
 				recordLifecycle("connection-close-call", connectionId, {
-					owner: "rtc-peerconnection-close",
+					...attribution,
 					state: this.connectionState,
 				});
 			}
 			Reflect.apply(nativePeerConnectionClose, this, []);
+		},
+		writable: true,
+	});
+	const wrapDescriptionFactory = (
+		method: "createAnswer" | "createOffer",
+		nativeMethod: typeof nativeCreateAnswer | typeof nativeCreateOffer,
+		event: "answer-created" | "offer-created"
+	): void => {
+		Object.defineProperty(NativePeerConnection.prototype, method, {
+			configurable: true,
+			async value(
+				this: RTCPeerConnection,
+				options?: RTCAnswerOptions & RTCOfferOptions
+			): Promise<RTCSessionDescriptionInit> {
+				const description = await Reflect.apply(nativeMethod, this, [options]);
+				const connectionId = connectionIdentities.get(this);
+				if (connectionId === undefined) throw new Error("E303_RTC_CONNECTION_IDENTITY_ABSENT");
+				recordLifecycle(event, connectionId, {
+					owner: "rtc-peerconnection-signaling",
+					state: description.type,
+				});
+				return description;
+			},
+			writable: true,
+		});
+	};
+	wrapDescriptionFactory("createAnswer", nativeCreateAnswer, "answer-created");
+	wrapDescriptionFactory("createOffer", nativeCreateOffer, "offer-created");
+	Object.defineProperty(NativePeerConnection.prototype, "setLocalDescription", {
+		configurable: true,
+		async value(this: RTCPeerConnection, description?: RTCLocalSessionDescriptionInit): Promise<void> {
+			await Reflect.apply(nativeSetLocalDescription, this, [description]);
+			const connectionId = connectionIdentities.get(this);
+			if (connectionId === undefined) throw new Error("E303_RTC_CONNECTION_IDENTITY_ABSENT");
+			recordLifecycle("local-description", connectionId, {
+				owner: "rtc-peerconnection-signaling",
+				state: this.localDescription?.type ?? description?.type,
+			});
+		},
+		writable: true,
+	});
+	Object.defineProperty(NativePeerConnection.prototype, "setRemoteDescription", {
+		configurable: true,
+		async value(this: RTCPeerConnection, description: RTCSessionDescriptionInit): Promise<void> {
+			await Reflect.apply(nativeSetRemoteDescription, this, [description]);
+			const connectionId = connectionIdentities.get(this);
+			if (connectionId === undefined) throw new Error("E303_RTC_CONNECTION_IDENTITY_ABSENT");
+			recordLifecycle("remote-description", connectionId, {
+				owner: "rtc-peerconnection-signaling",
+				state: description.type,
+			});
+		},
+		writable: true,
+	});
+	Object.defineProperty(NativePeerConnection.prototype, "addIceCandidate", {
+		configurable: true,
+		async value(this: RTCPeerConnection, candidate?: RTCIceCandidateInit | RTCIceCandidate | null): Promise<void> {
+			await Reflect.apply(nativeAddIceCandidate, this, [candidate]);
+			const connectionId = connectionIdentities.get(this);
+			if (connectionId === undefined) throw new Error("E303_RTC_CONNECTION_IDENTITY_ABSENT");
+			recordLifecycle("ice-candidate-add", connectionId, {
+				owner: "rtc-peerconnection-signaling",
+				state: candidate === null || candidate === undefined ? "complete" : "candidate",
+			});
 		},
 		writable: true,
 	});
@@ -657,6 +794,7 @@ function installRtcObserver(): void {
 				records.length = 0;
 				lifecycleRecords.length = 0;
 				lifecycleSequence = 0;
+				nextAttemptId = 0;
 			},
 			async snapshot(): Promise<readonly RtcObservation[]> {
 				await Promise.all([...pending]);
@@ -1985,17 +2123,37 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 					"channel-close-call",
 					"channel-handler-installed",
 					"channel-message",
+					"channel-message-handler-installed",
 					"channel-open-event",
 					"channel-send-attempt",
 					"channel-send-success",
+					"answer-created",
 					"connection-close-call",
 					"connection-created",
 					"connection-state",
+					"ice-candidate-add",
 					"ice-connection-state",
 					"ice-gathering-state",
+					"local-description",
+					"offer-created",
+					"remote-description",
 					"signaling-state",
 				])
 			);
+			const sendAttempts = evidence.lifecycle.filter(({ event }) => event === "channel-send-attempt");
+			expect(sendAttempts).not.toHaveLength(0);
+			for (const attempt of sendAttempts) {
+				expect(attempt.attemptId).toBeDefined();
+				expect(
+					evidence.lifecycle.some(
+						({ attemptId, channelId, connectionId, event }) =>
+							attemptId === attempt.attemptId &&
+							channelId === attempt.channelId &&
+							connectionId === attempt.connectionId &&
+							event === "channel-send-success"
+					)
+				).toBe(true);
+			}
 			const handler = evidence.lifecycle.find(({ event }) => event === "channel-handler-installed");
 			if (handler === undefined) throw new Error("D108E4G_RTC_HANDLER_EVENT_ABSENT");
 			const remoteOpen = evidence.lifecycle.find(
@@ -2010,7 +2168,7 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 }
 
 if (process.env["D108E4G_TELEMETRY"] === "1") {
-	test("attributes stale authenticated replacement before changing the raw owner", async ({ browser }, testInfo) => {
+	test("proves replacement open before retiring the stale authenticated raw owner", async ({ browser }, testInfo) => {
 		test.setTimeout(180_000);
 		const creatorContext = await browser.newContext();
 		const receiverContext = await browser.newContext();
@@ -2054,6 +2212,12 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 			expect(oldRtcChannels, "the two-peer control must have one exact open raw RTC owner").toHaveLength(1);
 			const oldRtc = oldRtcChannels[0];
 			if (oldRtc === undefined) throw new Error("D108E4G_OLD_RTC_OWNER_ABSENT");
+			const oldResponderRtcChannels = (await rtcChannelStates(responder)).filter(
+				({ label, readyState }) => label === "ts-drp-ephemeral/1" && readyState === "open"
+			);
+			expect(oldResponderRtcChannels, "the responder control must have one exact open raw RTC owner").toHaveLength(1);
+			const oldResponderRtc = oldResponderRtcChannels[0];
+			if (oldResponderRtc === undefined) throw new Error("D108E4G_OLD_RESPONDER_RTC_OWNER_ABSENT");
 			await Promise.all([resetRtcObserver(creator), resetRtcObserver(receiver)]);
 			await Promise.all(
 				[creator, receiver].map((page) => page.evaluate(() => window.__E303_LIBP2P_MONITOR_OBSERVER__?.reset()))
@@ -2085,6 +2249,7 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 				initiatorZone,
 				responderZone,
 				initiatorChannels,
+				responderChannels,
 				initiatorRtc,
 				responderRtc,
 				initiatorMonitor,
@@ -2094,6 +2259,7 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 				zone(initiator),
 				zone(responder),
 				rtcChannelStates(initiator),
+				rtcChannelStates(responder),
 				rtcLifecycleObservations(initiator),
 				rtcLifecycleObservations(responder),
 				libp2pMonitorObservations(initiator),
@@ -2110,6 +2276,15 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 			expect(newRtcChannels, "the replacement must have one exact open raw RTC owner").toHaveLength(1);
 			const newRtc = newRtcChannels[0];
 			if (newRtc === undefined) throw new Error("D108E4G_NEW_RTC_OWNER_ABSENT");
+			const newResponderRtcChannels = responderChannels.filter(
+				({ channelId, connectionId, label, readyState }) =>
+					label === "ts-drp-ephemeral/1" &&
+					readyState === "open" &&
+					(connectionId !== oldResponderRtc.connectionId || channelId !== oldResponderRtc.channelId)
+			);
+			expect(newResponderRtcChannels, "the responder must have one exact replacement RTC owner").toHaveLength(1);
+			const newResponderRtc = newResponderRtcChannels[0];
+			if (newResponderRtc === undefined) throw new Error("D108E4G_NEW_RESPONDER_RTC_OWNER_ABSENT");
 			const openRawClose = initiatorRtc.find(
 				({ channelId, connectionId, event, readyState }) =>
 					event === "channel-close-call" &&
@@ -2120,6 +2295,30 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 			const newRawOpen = initiatorRtc.find(
 				({ channelId, connectionId, event }) =>
 					event === "channel-open-event" && connectionId === newRtc.connectionId && channelId === newRtc.channelId
+			);
+			const newRawSendAttempt = initiatorRtc.find(
+				({ channelId, connectionId, event }) =>
+					event === "channel-send-attempt" && connectionId === newRtc.connectionId && channelId === newRtc.channelId
+			);
+			const newRawSendSuccess = initiatorRtc.find(
+				({ attemptId, channelId, connectionId, event }) =>
+					event === "channel-send-success" &&
+					attemptId === newRawSendAttempt?.attemptId &&
+					connectionId === newRtc.connectionId &&
+					channelId === newRtc.channelId
+			);
+			const responderProductHandler = responderRtc.find(
+				({ channelId, connectionId, event, owner }) =>
+					event === "channel-message-handler-installed" &&
+					owner === "product-unreliable-webrtc" &&
+					connectionId === newResponderRtc.connectionId &&
+					channelId === newResponderRtc.channelId
+			);
+			const responderFirstMessage = responderRtc.find(
+				({ channelId, connectionId, event }) =>
+					event === "channel-message" &&
+					connectionId === newResponderRtc.connectionId &&
+					channelId === newResponderRtc.channelId
 			);
 			const evidence = Object.freeze({
 				initiator: Object.freeze({
@@ -2134,6 +2333,8 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 				responder: Object.freeze({
 					monitor: responderMonitor,
 					peerId: responderPeerId,
+					rawAfter: Object.freeze({ rtc: newResponderRtc }),
+					rawBefore: Object.freeze({ rtc: oldResponderRtc }),
 					rtc: responderRtc,
 					zoneAfter: responderZone.rawTransport,
 					zoneBefore: initialResponderZone.rawTransport,
@@ -2141,9 +2342,25 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 			});
 			await attachJson(testInfo, "d108e4g-current-owner-lifecycle.json", evidence);
 
-			expect(openRawClose, "the stale-authenticated arm must close an otherwise-open raw channel").toBeDefined();
+			expect(openRawClose, "handoff must retire the exact previously-open raw channel").toBeDefined();
 			expect(newRawOpen, "the replacement raw channel must emit its own joined open event").toBeDefined();
-			expect(openRawClose?.sequence).toBeLessThan(newRawOpen?.sequence ?? -1);
+			expect(newRawOpen?.sequence).toBeLessThan(openRawClose?.sequence ?? -1);
+			expect(newRawSendAttempt, "the replacement must record its first exact send attempt").toBeDefined();
+			expect(
+				newRawSendSuccess,
+				"the replacement send attempt must have an exact successful terminal event"
+			).toBeDefined();
+			expect(newRawSendAttempt?.sequence).toBeGreaterThan(openRawClose?.sequence ?? Number.MAX_SAFE_INTEGER);
+			expect(newRawSendSuccess?.sequence).toBeGreaterThan(newRawSendAttempt?.sequence ?? Number.MAX_SAFE_INTEGER);
+			expect(
+				responderProductHandler,
+				"the responder must attribute the replacement product message handler"
+			).toBeDefined();
+			expect(responderFirstMessage, "the responder must observe the first replacement message").toBeDefined();
+			expect(responderProductHandler?.sequence).toBeLessThan(
+				responderFirstMessage?.sequence ?? Number.MIN_SAFE_INTEGER
+			);
+			expect(responderProductHandler?.atWallMs).toBeLessThan(newRawSendAttempt?.atWallMs ?? Number.MIN_SAFE_INTEGER);
 			expect(initiatorZone.rawTransport.lastLinkDrop).toBe("replacement");
 			expect(newRaw.connectionId).not.toBe(oldRaw.connectionId);
 			expect(newRaw.generation).toBeGreaterThan(oldRaw.generation);
