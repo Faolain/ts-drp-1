@@ -68494,7 +68494,8 @@ D.108e4u is a plan/execution-infrastructure correction discovered during the
 restarted D.108e4k ordinary ledger. It changes no product, example, test,
 configuration, dependency, lockfile, package manifest, workload, assertion,
 timeout, telemetry schema or campaign authorization. The preceding ordinary
-gates at exact behavior tree `9f54fdb4` remain valid and are not rerun: focused
+gates at behavior tree `de44f8dd3d0d7e57cfd9fe6da0ff66172ba4e943` of
+commit `9f54fdb4` remain valid and are not rerun: focused
 root/infrastructure passed 17/17, the standalone native owner passed 5/5 with
 one valid terminal proof and no timeout, Phase-3 transport passed 24/24,
 network plus E3-02 passed 58/58 and the focused observer passed 1/1.
@@ -68505,8 +68506,10 @@ telemetry-qualified inventory listed the exact eight expected titles, but the
 positive `--grep` list exited one with zero tests. Playwright matches `--grep`
 against a full title path prefixed by file/suite identity, so the reviewed
 leading `^` prevented every intended title from matching. This is not a title,
-product or test failure, and no E3-03 test body or retained three-trial campaign
-executed. The unqualified/qualified/zero-selected stdout SHA-256 values are
+product or test failure, and that failed command executed no E3-03 test body.
+The only E3-03 body executed this round was the separately authorized focused
+observer at line 4422, which passed 1/1; the retained three-trial campaign did
+not execute. The unqualified/qualified/zero-selected stdout SHA-256 values are
 `f91595332e71ee297cabc297fd99b6180cf97dfe1d976c568e069e894582e006`,
 `4a289fde5c1b2b6b3416bcbf2ca7d67dd3aa0f862502fd00cd3e92844fc11374`
 and `4f5b1bb7df1808d911ebe868d2fd384e0f1fedd73e2ec2b10f7babd43948c5f0`;
@@ -68517,6 +68520,13 @@ The minimal correction above removes only the leading anchor and retains the
 trailing `$`, exact seven-title alternation and positive-selection policy. A
 read-only probe of that exact suffix-anchored pattern exited zero, listed
 exactly the intended seven titles and omitted the retained three-trial title.
+The seven current titles are mutually non-suffix and untagged; a later
+suffix-collision can over-select and a later tag can under-select, but either
+change fails the mandatory exact-seven title/count stop before execution. The
+probe custody did not retain the invocation or pattern hash, so byte-exact
+pattern identity is established by the required correction-checkpoint rerun,
+not by this probe alone. The hashes below were manually recomputed during the
+Kimi and Opus reviews.
 Its stdout/stderr/status SHA-256 values are
 `5b2e723b64e830a2cfc9f46416c60d9abc36900c5f47172e5f13972b28a173e4`,
 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
@@ -68530,7 +68540,42 @@ in the same round without confirmation; every P2 receives an exact owner and
 2026-09-04 deadline. No Fable or collaboration subagent runs. After review,
 rerun the complete 5/8/7 list triplet at the correction checkpoint, require
 the root canonical shim absent before and after, then execute the selected
-7/7 once. The already-passed behavior gates compose because this checkpoint
-changes only the plan and the failed command executed no test body. Any title
-or count mismatch still stops before execution. The complete E3-03 config,
-retained three-trial test and all campaign ledgers remain unauthorized.
+7/7 once. After 7/7, resume the frozen ordinary ledger at the Phase-3h/Phase-5e
+Vitest command and run through `git diff --check` with every recorded expected
+count; the isolated detached-checkout proof at the signed correction/evidence
+commit remains due. The five enumerated already-passed behavior gates compose
+because this checkpoint changes only the plan, none of those five gates reads
+this document and the failed inventory command executed no test body. Plan
+text is load-bearing for `packages/protocol-v2/tests/hardening-gates.test.ts`,
+so this composition claim does not extend to a gate that reads this document.
+Any title or count mismatch still stops before execution. The complete E3-03
+config, retained three-trial test and all campaign ledgers remain unauthorized.
+
+The D.108e4u formal review round is complete against signed commit
+`52653361d7fc08970283466aa8fd56496edf7a95`. Grok 4.6/high completed its
+substantive read-only inspection in 225.086 seconds and emitted an APPROVED
+terminal object with no findings, but the wrapper first classified the run
+`NO_VERDICT` because progress prose preceded that object. A no-inspection,
+same-session structured-format continuation (session
+`01a049e2-d6ad-7d63-b62e-51dfc83d49e1`) preserved APPROVED with zero P0/P1/P2;
+its JSON SHA-256 is
+`97dc1c60c165a82b794bb94331663358b9d014eb70c94b83fafc5bc797d77c6e`.
+Kimi K3 session `session_443bf791-a273-43bc-8799-d28813919170` returned exactly
+100 ordered, unique checks and one APPROVED result with zero P0/P1 and two P2;
+its stream SHA-256 is
+`68d0b96ac564aebdf86050ca399bb642ef3313784d5cfe7e904ff90a59be209f`.
+Two rejected CLI argument combinations occurred before any Kimi model/session
+started and are not review attempts. Opus 5/xhigh session
+`0ac621dd-3358-4df1-95c9-53a6b19fa3fd` completed in 26 turns and returned
+CHANGES_REQUIRED with zero P0, two P1 and four P2; its JSON SHA-256 is
+`916e77f3ece8adc585b1ca674057ec70e596da8eb6bec1bae230a0328684b263`.
+The two P1 accounting defects are corrected in this same round above, without
+a confirmation review.
+
+Every nonblocking finding is owned by the plan owner with deadline 2026-09-04:
+retain the exact-seven fail-closed suffix-uniqueness/tag invariant; retain the
+manual checksum-verification record; bind probe identity through the fresh
+triplet rerun; limit plan-only gate composition to gates that do not read this
+document; record commit versus tree identity explicitly; and preserve the
+untagged-title requirement. These items are now recorded above and remain
+closure evidence rather than product work.
