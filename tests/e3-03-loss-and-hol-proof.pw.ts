@@ -628,6 +628,11 @@ function partitionReceiverEvidence(
 	});
 }
 
+function productRosterFromSnapshot(snapshot: FabricTrialSnapshot): readonly FabricObservation[] {
+	if (!Array.isArray(snapshot.observations)) throw new Error("E303_FABRIC_OBSERVATIONS_ABSENT");
+	return snapshot.observations;
+}
+
 function acceptedSequencedObservations<Observation extends FabricObservation>(
 	observations: readonly Observation[]
 ): readonly Observation[] {
@@ -683,11 +688,11 @@ function ageOfInformation(
 
 function renderedProductRosterMetrics(
 	observations: readonly FabricObservation[],
-	startedAtMs: number,
 	deadlineMs: number,
 	intervalMs: number,
 	sampleCount: number
 ): RenderedFabricEvidence {
+	const startedAtMs = 0;
 	const raw = acceptedSequencedObservations(observations.filter(({ lane, sentinel }) => lane === "raw" && !sentinel));
 	const reliableBySequence = new Map<number, FabricObservation>();
 	for (const observation of observations) {
@@ -961,14 +966,15 @@ test("partitions receiver evidence by exact product roster without losing observ
 			sentinel: false,
 		});
 	const observations = Object.freeze([
-		observation(0, "raw", 1, 100, "open", "open"),
-		observation(1, "raw", 2, 200, "open", "open"),
-		observation(2, "reliable", 3, 300, "open", "open"),
-		observation(3, "reliable", 3, 301, "open", "open"),
-		observation(4, "reliable", 4, 400, "open", "open"),
+		observation(0, "reliable", 1, 100, "open", "open"),
+		observation(1, "raw", 1, 100, "open", "open"),
+		observation(2, "raw", 2, 200, "open", "open"),
+		observation(3, "reliable", 3, 300, "open", "open"),
+		observation(4, "reliable", 3, 301, "open", "open"),
 		observation(5, "reliable", 4, 400, "open", "open"),
-		observation(6, "raw", 5, 500, "closing", "closing"),
-		observation(7, "raw", 6, 600, "closing", "open"),
+		observation(6, "reliable", 4, 400, "open", "open"),
+		observation(7, "raw", 5, 500, "closing", "closing"),
+		observation(8, "raw", 6, 600, "closing", "open"),
 	]);
 	const productObservation = (source: PlatformObservation, receivedAtMs: number): FabricObservation =>
 		Object.freeze({
@@ -980,23 +986,46 @@ test("partitions receiver evidence by exact product roster without losing observ
 			sentinel: source.sentinel,
 		});
 	const productRoster = Object.freeze([
-		productObservation(observations[0] as PlatformObservation, 2_000),
-		productObservation(observations[2] as PlatformObservation, 2_001),
-		productObservation(observations[4] as PlatformObservation, 2_002),
-		productObservation(observations[6] as PlatformObservation, 2_003),
+		productObservation(observations[1] as PlatformObservation, 2_000),
+		productObservation(observations[4] as PlatformObservation, 2_001),
+		productObservation(observations[5] as PlatformObservation, 2_002),
+		productObservation(observations[7] as PlatformObservation, 2_003),
 	]);
+	expect(() =>
+		productRosterFromSnapshot({
+			attempted: { raw: 0, reliable: 0 },
+			transport: { fallbackCount: 0, raw: [] },
+			trialId: "missing-observations",
+		} as unknown as FabricTrialSnapshot)
+	).toThrow("E303_FABRIC_OBSERVATIONS_ABSENT");
 	const partition = partitionReceiverEvidence(observations, productRoster);
 
 	expect(partition).toEqual({
-		productAccepted: [observations[0], observations[2], observations[4], observations[6]],
-		productRejected: [observations[1], observations[3], observations[5], observations[7]],
+		productAccepted: [observations[1], observations[4], observations[5], observations[7]],
+		productRejected: [observations[0], observations[2], observations[3], observations[6], observations[8]],
 	});
-	for (const accepted of partition.productAccepted) {
-		expect(observations).toContain(accepted);
+	for (const member of [...partition.productAccepted, ...partition.productRejected]) {
+		const original = observations.find(({ ordinal }) => ordinal === member.ordinal);
+		expect(member).toBe(original);
 	}
 	expect(
 		[...partition.productAccepted, ...partition.productRejected].sort((left, right) => left.ordinal - right.ordinal)
 	).toEqual(observations);
+	expect(partition.productAccepted.map(({ lane, sentAtMs, sequence }) => ({ lane, sentAtMs, sequence }))).toEqual(
+		productRoster.map(({ lane, sentAtMs, sequence }) => ({ lane, sentAtMs, sequence }))
+	);
+	const unmatchedProduct = Object.freeze([
+		...productRoster,
+		Object.freeze({
+			byteLength: SAMPLE_PAYLOAD_BYTES,
+			lane: "reliable" as const,
+			receivedAtMs: 2_004,
+			sentAtMs: 999,
+			sequence: 999,
+			sentinel: false,
+		}),
+	]);
+	expect(() => partitionReceiverEvidence(observations, unmatchedProduct)).toThrow("E303_PRODUCT_ROSTER_UNMATCHED");
 });
 
 test("separates rendered product-roster metrics from boundary-aware application evidence", () => {
@@ -1033,9 +1062,29 @@ test("separates rendered product-roster metrics from boundary-aware application 
 			sequence: 30,
 			sentinel: false,
 		}),
+		Object.freeze({
+			byteLength: SAMPLE_PAYLOAD_BYTES,
+			lane: "reliable" as const,
+			receivedAtMs: 650,
+			sentAtMs: 300,
+			sequence: 30,
+			sentinel: false,
+		}),
+		Object.freeze({
+			byteLength: SAMPLE_PAYLOAD_BYTES,
+			lane: "raw" as const,
+			receivedAtMs: 0,
+			sentAtMs: 0,
+			sequence: 599,
+			sentinel: true,
+		}),
 	]);
-	const applicationRaw = acceptedSequencedObservations(observations.filter(({ lane }) => lane === "raw"));
-	const applicationReliable = observations.filter(({ lane }) => lane === "reliable");
+	const applicationRaw = acceptedSequencedObservations(
+		observations.filter(({ lane, sentinel }) => lane === "raw" && !sentinel)
+	);
+	const applicationReliable = acceptedSequencedObservations(
+		observations.filter(({ lane, sentinel }) => lane === "reliable" && !sentinel)
+	);
 
 	expect({
 		rawAoIP50Ms: percentile(ageOfInformation(applicationRaw, 0, 700, 100), 0.5),
@@ -1052,7 +1101,7 @@ test("separates rendered product-roster metrics from boundary-aware application 
 		reliableAoIP50Ms: 300,
 		reliableAoIP95Ms: 500,
 	});
-	expect(renderedProductRosterMetrics(observations, 0, 700, 100, SAMPLE_COUNT)).toEqual({
+	expect(renderedProductRosterMetrics(observations, 700, 100, SAMPLE_COUNT)).toEqual({
 		maxGap: 30,
 		rawAoIP50Ms: 100,
 		rawAoIP95Ms: 200,
@@ -1062,6 +1111,63 @@ test("separates rendered product-roster metrics from boundary-aware application 
 		reliableAoIP95Ms: 400,
 		reliableDelivered: 1,
 		reliableDropped: 599,
+	});
+	const arrivalOrderControl = Object.freeze([
+		Object.freeze({
+			byteLength: SAMPLE_PAYLOAD_BYTES,
+			lane: "raw" as const,
+			receivedAtMs: 100,
+			sentAtMs: 0,
+			sequence: 2,
+			sentinel: false,
+		}),
+		Object.freeze({
+			byteLength: SAMPLE_PAYLOAD_BYTES,
+			lane: "raw" as const,
+			receivedAtMs: 200,
+			sentAtMs: 0,
+			sequence: 10,
+			sentinel: false,
+		}),
+		Object.freeze({
+			byteLength: SAMPLE_PAYLOAD_BYTES,
+			lane: "raw" as const,
+			receivedAtMs: 300,
+			sentAtMs: 0,
+			sequence: 3,
+			sentinel: false,
+		}),
+		Object.freeze({
+			byteLength: SAMPLE_PAYLOAD_BYTES,
+			lane: "reliable" as const,
+			receivedAtMs: 100,
+			sentAtMs: 0,
+			sequence: 0,
+			sentinel: false,
+		}),
+	]);
+	expect(renderedProductRosterMetrics(arrivalOrderControl, 300, 100, 12).maxGap).toBe(8);
+	const bothLaneStartControl = Object.freeze([
+		Object.freeze({
+			byteLength: SAMPLE_PAYLOAD_BYTES,
+			lane: "raw" as const,
+			receivedAtMs: 500,
+			sentAtMs: 300,
+			sequence: 30,
+			sentinel: false,
+		}),
+		Object.freeze({
+			byteLength: SAMPLE_PAYLOAD_BYTES,
+			lane: "reliable" as const,
+			receivedAtMs: 600,
+			sentAtMs: 0,
+			sequence: 0,
+			sentinel: false,
+		}),
+	]);
+	expect(renderedProductRosterMetrics(bothLaneStartControl, 700, 100, SAMPLE_COUNT)).toMatchObject({
+		rawAoIP50Ms: 200,
+		rawAoIP95Ms: 400,
 	});
 });
 
