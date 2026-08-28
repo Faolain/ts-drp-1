@@ -68867,3 +68867,67 @@ and
 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` /
 `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
 No product defect or product-source change was demonstrated or introduced.
+
+The label above is now precise: `437552fc13fa6928634398cb5f4402ef0b3de443`
+is GREEN commit `453ebf0a`'s full root tree, while evidence commit `475bd2cc`
+has root tree `08f7cec116eb783cb841ab1c5fe9a2f5f5474c6c`. Their `tests`,
+`examples` and `packages` subtree identities are byte-identical respectively
+at `ae7ea1e7ad685ee14a772948517dcc57ed20da5e`,
+`20644d7cc4b0df28b5c2af302fad79dea7a62205` and
+`7b7a8dea463f13fcd45a30917190d0cf8dd155ad`; only plan custody advances.
+
+Exact command records were added after execution to the existing GREEN custody
+to close command discoverability without pretending they were contemporaneous
+launcher artifacts. The six command-file SHA-256 values in gate order are
+`d6405bd299de76d8e48fb866120b1e152930df95c2b1de53e9a1681b7705fc75`,
+`dfb42a44f958df7630003be5d22420b552284ee1b09f5d2538d8a96d26e08276`,
+`7ca99b6b19287f6b7fa7cead7fc90dfa83517390063a7996da8a52734305dee8`,
+`56a36c0f4373082053d20bdd8a6c1479e44a5173b116006886c133059627e519`,
+`7d316b999f89a893faf801c79dd14e26a61fea19c2c4bfd1736093de93414209`
+and `d9ef3d1695645413cdc098707c0b447cc19275eb61556bf9d84a09633cf075a6`.
+The final implementation-review/evidence plan delta receives a fresh Prettier
+check immediately before its signed checkpoint, so the earlier 05 artifact is
+scoped to the plan at the GREEN-gate commit rather than misrepresented as
+covering later evidence prose.
+
+The D.108e4v/w implementation review inspected exact signed range
+`3d18ad5c7ac6a6e93137c43794927e027945936f..475bd2cc98b39f1d212fbc697951d96721f8436f`.
+Custody is under `.logs/d108e4vw-implementation-review-475bd2cc/`; the earlier
+D.108e4w plan-review custody is explicitly
+`.logs/d108e4w-plan-review-3d18ad5c/`. Grok 4.6/high completed its one
+substantive review in 240.093 seconds with exit zero and `end_turn`; the wrapper
+honestly classified the prose-wrapped output `NO_VERDICT`, whose terminal
+object was APPROVED with zero findings. Event/public/status SHA-256 values are
+`27b8edd19ab9c52644af53cdcee5895decdddb5f2e256bea67678d0e9e59e3ec`,
+`1b57a5c34b6fd9a030cfb6088014fbdfa0808490fcab72555b0faeeb5bc39460`
+and `e9cd9caaf6c6a96c5eb3b6aca1e5328853850c80e188d8d1206ddf375a6ca47f`.
+No-inspection same-session continuation
+`01a04a18-9455-7350-bf58-fe205a894224` preserved schema-valid APPROVED with
+zero P0/P1/P2; JSON SHA-256 is
+`34d24b2c8b4565b1df6d660557c80592960248e0d6daf11a50a3349362a192bc`.
+
+Kimi K3 session `session_0036d05f-63a5-45c6-8cd0-149b480c3da3` returned
+exactly 100 ordered, unique checks and one `PASS` result with zero P0/P1 and
+three P2. Stream/stderr SHA-256 values are
+`acd215c01f6eb79cedf3c1d1888d9ac89e14c7f291f7cc605f222096145659e6`
+and `6c088ccc0ace9bbd971ac530e90b45daa8dda13f97122253e3e85bd71d4dc19a`.
+Opus 5/xhigh session `cf42e9bb-8f6e-49f1-aea9-28f360fabdac` completed 41
+turns in 461.499 seconds with no error or subagent and returned APPROVED with
+zero P0/P1 and three P2. JSON/stderr SHA-256 values are
+`9a2351b20a7a8e8a6165c3ef0be0735ea8a30c47d5fcb7f2a4eafcbf97ea5265`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+The nonblocking union is owned by the plan owner with deadline 2026-09-04 and
+closed or retained explicitly here: both review custody paths and both root
+trees are recorded; exact commands are now discoverable; final plan formatting
+is checked at its checkpoint; protected untracked author-sequence tests remain
+preserved and outside signed Git-tree identity; and the four longer-lived mock
+fidelity items remain assigned above. Protected untracked files do not enter
+the explicit D.108e4k file selections and may not be removed or sequestered by
+this slice.
+
+D.108e4v and D.108e4w are closed. D.108e4k may restart from its first ordinary
+command at the exact signed test subtree recorded above after this plan-only
+implementation-review checkpoint is signed and pushed. The complete E3-03
+config, retained three-trial campaign and both campaign ledgers remain
+unauthorized.
