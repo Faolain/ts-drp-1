@@ -69194,3 +69194,71 @@ All 26 stashes and every protected untracked path remain present. The root
 canonical shim is absent. The complete E3-03 campaign did not run. D.108e4x
 behavior is GREEN but remains open pending the required Grok/Kimi/Opus
 implementation review; D.108e4k has not restarted.
+
+The required D.108e4x implementation review inspected exact signed range
+`8ba83370cdc82765e02256d9e6d71bfebb3c7e0a..bde237b5f1f11ae5d81aee8dd2dea3be6d172c34`.
+Grok 4.6/high completed after 600.17 seconds with exit zero, `end_turn`, no
+timeout and a substantive terminal PASS with zero P0/P1 and three P2. Its
+wrapper honestly recorded `NO_VERDICT` because progress prose preceded the
+terminal object. Event/public/status/stderr SHA-256 values are
+`9d8941a5c5d0c317962ef9d2bbf98649ff9d34b3d946038ce9b7c0ef725da981`,
+`baed57ac146458f656060fb569077c045ba98c8409cbddb3f1afed323c30bb34`,
+`451e86f266172a43d15680a1e619ee4bd850e9073e1df308675662ea3942d34c`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+Kimi exact K3 session `session_bd50c8a3-f666-439a-939b-2e4861e3968c`
+emitted exactly 100 unique ordered `CHECK001` through `CHECK100` records and
+one RESULT: PASS with zero P0/P1 and three P2. Stream/stderr SHA-256 values are
+`cdef7d074e2de99bad2b4bbccf67d6cf69bf76a3405dbfd182cf32357d7def3c`
+and `e16fd1dc74685e1c1660c8c98679aebdadb43d8bece75bdbd12b8a940e9681a9`.
+Opus 5/xhigh session `21337c6a-cdb9-4141-871d-0ec4462fc7ad` completed 33
+turns in 660.493 seconds with no error or subagent. It returned
+CHANGES_REQUIRED with zero P0, one P1 and four P2. JSON/stderr SHA-256 values
+are `e13f2f6531d7165844649b096aaad142a2d53c37c847cc0cc18573ecfd035cbe`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+The blocking union is one lifecycle defect. Declining every empty eligibility
+sample preserves lazy first-send continuity, but after a previously desired
+peer loses its authenticated connection the retained desired-peer entry lets
+the raw owner's 250 ms retry callback re-arm forever. Live channel ingress and
+egress authorization remain intact; this is resource ownership, not an
+authorization hole. The same-round correction expands GREEN ownership only to
+`packages/network/src/unreliable-webrtc.ts`: `#scheduleLinkRetry` must decline
+when no authenticated WebRTC connection exists. Existing peer-connection
+events already invoke adapter reconciliation, so a later authenticated
+connection remains the event-driven reactivation owner. No new API, event,
+timer, timeout, poll, dependency, config or upstream change is permitted.
+
+The correction RED is one fake-timer title in the existing E3-01 owner. It
+establishes a genuine raw link, removes the authenticated connection, closes
+the raw channel and requires zero owned retry timers immediately and after one
+second. It then restores the authenticated connection, explicitly reconciles
+through the existing event-owned seam and requires the raw link to reopen.
+Current code must fail only at the first zero-timer assertion. The existing
+adapter RED is also tightened to require exact history `[['peer-b']]`, proving
+that the repaired initial empty state never called destructive
+`reconcile([])`. This test-precondition correction is an explicit amendment to
+the frozen test scope, not an undisclosed GREEN expansion.
+
+Run the new exact RED title once before the owner correction. After GREEN, run
+that title, the exact E3-01 owner, E3-02 11/11, Phase-3f-b 2/2, the retained
+Phase-3 transport and focused E3-03 observer, affected package builds and
+typechecks, exact-owner ESLint/Prettier/diff checks, and the unchanged D.93.46
+three-invocation ledger. Any failure stops without retry. The complete E3-03
+campaign remains unauthorized. The implementation-review P2 union is owned by
+the plan owner with deadline 2026-09-04: the pre-latch `restart()` empty-set
+path, retained-provider/reopen documentation, non-grid generalization, exact
+static command rosters, and final campaign evidence when separately
+authorized. D.108e4x and D.108e4k remain open until this same-round correction
+and its implementation review close.
+
+The same-round correction RED ran once against signed implementation-review
+tree `bde237b5f1f11ae5d81aee8dd2dea3be6d172c34`. The exact new title failed at
+its sole timer discriminator immediately after authenticated connection loss
+and raw-channel close: received one owned timer, expected zero. The later
+one-second and reconnection controls therefore were not reported as evaluated.
+Stdout/stderr/status SHA-256 values are
+`bbd0ebe95e3b7a0840cbc130a1a2d466f445969c3d9ac3ae2465dbfd3b608d6c`,
+`af91caa050293eeb3cd23894a962035e3e9eff4862d4254f2e4b89c697969f65`
+and `4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`.
+No product source, other test, campaign or browser command ran for RED.

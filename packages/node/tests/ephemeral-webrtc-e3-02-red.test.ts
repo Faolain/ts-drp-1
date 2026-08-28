@@ -130,7 +130,7 @@ describe("E3-02 v3 zone transport adoption RED", () => {
 		try {
 			const reopened = left.adapter.openAuthorized("zone", left.provider, OPTIONS);
 			expect(reopened).toBe(left.channel);
-			expect(route.reconciledPeers.at(-1)).toEqual(["peer-b"]);
+			expect(route.reconciledPeers).toEqual([["peer-b"]]);
 			expect(await reopened.publish({ class: "unreliable-sequenced", key: "movement", payload: payload("east") })).toBe(
 				true
 			);

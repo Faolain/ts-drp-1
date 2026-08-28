@@ -2335,6 +2335,38 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		}
 	});
 
+	it("does not retain a retry timer while the desired peer has no authenticated connection", async () => {
+		const module = await loadOwnerModule();
+		const bus = new FakeSignalingBus();
+		const low = owner(module, bus, "peer-a");
+		const high = owner(module, bus, "peer-b");
+		try {
+			const original = bus.connect("peer-a", "peer-b");
+			const lowRoute = low.owner.openUnreliableWebRtcRoute("zone:disconnected-retry-release");
+			const highRoute = high.owner.openUnreliableWebRtcRoute("zone:disconnected-retry-release");
+			await Promise.all([lowRoute.reconcile(["peer-b"]), highRoute.reconcile(["peer-a"])]);
+			const lowChannel = low.peerConnections[0]?.channels[0];
+			if (lowChannel === undefined) throw new Error("established raw channel missing");
+
+			vi.useFakeTimers();
+			bus.disconnect(original);
+			lowChannel.close();
+			expect(lowRoute.snapshot()).toMatchObject({ activeLinks: 0, lastLinkDrop: "channel-close", linkDrops: 1 });
+			expect(vi.getTimerCount()).toBe(0);
+			await vi.advanceTimersByTimeAsync(1_000);
+			expect(low.peerConnections).toHaveLength(1);
+			expect(vi.getTimerCount()).toBe(0);
+
+			bus.connect("peer-a", "peer-b");
+			await Promise.all([lowRoute.reconcile(["peer-b"]), highRoute.reconcile(["peer-a"])]);
+			expect(lowRoute.snapshot().activeLinks).toBe(1);
+		} finally {
+			vi.useRealTimers();
+			low.owner.close();
+			high.owner.close();
+		}
+	});
+
 	it.each(["initiator", "non-initiator"] as const)(
 		"does not start stale-open replacement after its peer leaves desired membership as the %s",
 		async (role) => {
