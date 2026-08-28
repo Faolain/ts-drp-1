@@ -65905,31 +65905,39 @@ the already frozen product deadline. The failed complete campaign is not run
 again in this slice; its persisted attachment is the regression evidence.
 
 RED adds compact pure-validator fixtures for both directional browser
-orderings observed above. The local `replacement` branch must accept B open and
-the exact B product handler before A's product-owned close-call, allow A's
-asynchronous close event to be absent at the deadline, and, when that event is
-present, require it after the close-call. Any B trial send must still join an
-exact post-open, post-handler native attempt/success; all `SAMPLE_COUNT` sends,
-zero failures and zero backpressure remain mandatory. The remote
-`channel-close` branch must accept the exact B product handler and B open before
-the old A close-event, followed by the product's optional/idempotent close-call;
-accepted A traffic must precede the close event. Reversing either
-make-before-break ordering, using the wrong channel/owner, sending B before it
-is usable, accepting A after remote close, or losing an attempt terminal stays
-a deterministic negative.
+orderings observed above. Branch selection remains keyed only by the exact
+single-drop product reason, `replacement` or `channel-close`; "local" and
+"remote" describe who called close and never alias `transmitsRawTrial`. The
+role axis remains independent, and RED covers all four reason-by-role
+combinations. The local `replacement` branch must accept B open and the exact B
+product handler before A's product-owned close-call, allow A's asynchronous
+close event to be absent at the deadline, and, when that event is present,
+require it after the close-call. Any B trial send must still join an exact
+post-open, post-handler native attempt/success; all `SAMPLE_COUNT` sends, zero
+failures and zero backpressure remain mandatory. The remote `channel-close`
+branch must accept the exact B product handler and B open before the old A
+close-event, followed by a mandatory product-owned idempotent close-call whose
+`bufferedAmount` is zero. Accepted A traffic must precede the close event.
+Reversing either make-before-break ordering, omitting the channel-close call,
+using the wrong channel/owner, sending B before it is usable, accepting A after
+remote close, or losing an attempt terminal stays a deterministic negative.
 
 The natural campaign must account every observed A/B message exactly once but
 must not require any B message to survive packet loss. When B messages exist,
-each still joins the exact product handler/open and accepted/rejected roster;
-when no B message exists, native B send success on the transmitter remains
-valid continuity evidence and the deterministic
+each valid raw B message still joins the exact product handler/open and must be
+in the accepted product roster; a post-handler B rejection is a deterministic
+continuity failure rather than lawful loss. When no B message exists, native B
+send success on the transmitter remains valid continuity evidence and the
+deterministic
 `playwright-serial-command-gate` remains the causal cross-peer B-handler-before-
-send/delivery owner. The existing synthetic `channel-close` positive is split:
-one control retains real post-promotion B ingress, while a second loss-safe
-control has zero B delivery and must pass. A negative may remove B readiness or
-native success, but may not turn probabilistic delivery into an acceptance
-gate. This corrects the oracle without weakening make-before-break, complete
-native-send custody, overlap accounting or failed-replacement retention.
+one control retains accepted post-promotion B ingress, while a second loss-safe
+control has zero B delivery and must pass. The same accepted-ingress/zero-B
+split is required for nontransmitting `replacement`. Matching negatives retain
+B readiness, native success and complete accounting while putting an arrived B
+message in the rejected roster. A negative may remove B readiness or native
+success, but may not turn probabilistic delivery into an acceptance gate. This
+corrects the oracle without weakening make-before-break, complete native-send
+custody, overlap accounting or failed-replacement retention.
 
 D.108e4i receives a signed/pushed documentation freeze, a separate immutable
 tests-only RED and a separate GREEN/evidence checkpoint. The plan, RED and
@@ -65939,13 +65947,61 @@ and every P2 receives an exact owner/deadline. Fable remains excluded. RED and
 GREEN gates are the selected validator, monitor self-check and serial command
 gate, the complete non-campaign D.108e4g+D.108e4h selection, retained E3-02 and
 network raw-sidecar owners, affected network/grid build and typecheck, and
-exact-owner TypeScript/ESLint/Prettier/diff checks. GREEN must also replay the
-decoded preserved `e3-03-2` custody through the pure validator without a new
-campaign or product execution, either directly from the ignored artifact in
-the evidence checkout or through an exact compact fixture whose identity,
-counts and pivotal sequences are asserted first. D.108e4f/D.108e4g/D.108e4h
-remain open until these gates pass; any later complete campaign requires a new
-explicitly planned authorization rather than inheriting the consumed one.
+exact-owner TypeScript/ESLint/Prettier/diff checks. Both checkpoints enumerate
+exactly five unqualified and eight D.108e4g+D.108e4h-qualified test titles;
+D.108e4i adds fixtures inside the existing validator title rather than a ninth
+title. GREEN must also replay the decoded preserved `e3-03-2` custody through
+the pure validator without a new campaign or product execution, either directly
+from the ignored artifact in the evidence checkout or through an exact compact
+fixture whose identity, counts and pivotal sequences are asserted first.
+D.108e4f/D.108e4g/D.108e4h remain open until these gates pass; any later
+complete campaign requires a new explicitly planned authorization rather than
+inheriting the consumed one.
+
+The formal D.108e4i plan round inspected immutable signed/pushed commit
+`c4795f6a5ef56adcc1d7667fe40d470c01268bf2`, parent
+`cf88ef9b6ac729bab58267f3b33ca1633a42c8a1`, tree
+`846a7aa22af179fee2e4cb6da29eae22ff472853`, stable patch id
+`7e5b352c36ccbe7f4f4ed3873dded94d3154fa63` and raw-diff SHA-256
+`ed634d114b8777285df5f885d56dbc6a0273c92c636a895cd96db49dc665f99b`.
+The commit was documentation-only, exact-owner and had a good signature.
+
+Grok 4.6/high session `01a04803-495d-7c52-b749-10ec036eed7b`
+completed its sole substantive run normally in 720.244 seconds with exit zero,
+`end_turn` and no timeout. The runner initially classified `NO_VERDICT` only
+because inspection prose preceded the terminal JSON; the substantive result
+was `APPROVED`, P0=0/P1=0/P2=1. Public/status/event-stream SHA-256 values are
+`21bcbd5b83f4ef50b5520c4e8bb6559e3b9184ecb02a348597f3aa3626e1a40d`,
+`ad3921df91f5ddd15e893b411134302bc0aa26e53b3755e3bb25fbb1b045830f`
+and `4456facb5a6f701286cebd2951fb4266d3840f4ac84923b12676b0e87f8e85f3`.
+The same completed session used one no-inspection turn to emit the unchanged
+bare JSON object; re-emission stream/stderr SHA-256 values are
+`dc37810f87827b9787d304f4dff37c3927ba7572a7010ac277510a83eff3741f`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+Its P2 required reason-keyed directional semantics independent of transmitter
+role and lawful-arrival acceptance distinct from the zero-B control.
+
+Kimi CLI 1.49.0 exact `kimi-code/k3` session
+`f40bfdd5-f4bf-45d2-87b9-01c5f06ddb51` emitted 100 total, unique and ordered
+markers and one terminal `RESULT`. It returned `APPROVED`, P0=0/P1=0/P2=0.
+Stream/stderr SHA-256 values are
+`95a59c29bcedf6f72cbee3c3c122bd8d16f9ca22007e4faf088ac6af01f5624f`
+and `6f54242e2e52ecfd1993a7c19d8b08a265a0a7f71c8e81c7371afbc18f52baf1`.
+
+Opus 5/xhigh session `45ff7334-bd0e-4b27-ad53-7c6c408b7a15`
+completed normally after 31 turns with `end_turn`, no error, permission denial
+or subagent. It returned `CHANGES_REQUIRED`, P0=0/P1=2/P2=3. Raw JSON/stderr
+SHA-256 values are
+`47eb17011ed16e064fac022feb0d3e5776ae4b4ec7e8e93b0b2f01f6d4cd6299`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+Its P1s correctly found that an arrived post-handler B message must be accepted,
+not merely accounted accepted-or-rejected, and that `channel-close` always owns
+a product close-call whose zero-buffered drain must remain mandatory even
+though its order follows the remote close event. Its P2s required exact
+reason-versus-role separation, zero-B controls for both replacement reasons and
+restoration of the 5/8 inventory gates. The same-round correction above
+discharges the complete P1/P2 union before RED. No confirmation review, Fable,
+production/libp2p change or complete campaign was run.
 
 The initial D.108e4g RED is signed/pushed commit
 `815f2d084f196929aeee59b01271b18e8c7463c0`, parent
