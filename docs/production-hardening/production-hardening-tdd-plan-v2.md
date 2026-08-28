@@ -65719,15 +65719,134 @@ and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
 No confirmation review, Fable, production/libp2p change or complete E3-03
 campaign was invoked.
 
+The initial D.108e4h GREEN is signed/pushed commit
+`9f26efbf8dc30375643e037ac53b4f53ad3b1695`, parent
+`e527fab25ce005bf523f77db1b8a79a11a9a1e50`, tree
+`b8a6be5547b598a5297b04ca35503bf8e9b412f0`, stable patch id
+`8e94e7d243416b361881cbc12f347e1ff711a973` and raw-diff SHA-256
+`6bf120b1039ba0980a0a582ed848cc1a7d44820628bab311f73e8211a55828d8`.
+It has a good signature and changes only the exact test owner. It implements
+the pure schema-v3 validator, both-endpoint prepare/deadline capture,
+peer-local attempt/message joins, atomic deadline snapshots and persisted
+campaign custody without changing production behavior. The pre-sign advisory
+Codex review found that the provisional overlap fixture did not make accepted
+traffic on both identities load-bearing. That was corrected before the commit;
+public/stderr SHA-256 values are
+`b73e5f8a25dcc626998f325a5d4ab7640d1aa34f0f2c57d95ae87d73b1086cf3`
+and `286e97dd2a50f075cf00d109e394ef6ec1aa3279adf178042e474a323f9ce022`.
+
+The required formal GREEN round rejected that immutable checkpoint. Grok
+4.6/high session `01a047cd-2db6-7751-bf6a-60c56cc1f062` completed its sole
+substantive run normally in 810.237 seconds with exit zero, `end_turn` and no
+timeout. Its wrapper reported `NO_VERDICT` only because inspection prose
+preceded the valid terminal object; the substantive result was
+`CHANGES_REQUIRED`, P0=0/P1=1/P2=0. It correctly found that requiring a
+nonempty accepted-A overlap after B opened would reject a lawful natural
+campaign. Public/status/event-stream SHA-256 values are
+`1f31259696ab753411dff92dca72fa977bc800f2ad6cf94a85771dca347eb4a6`,
+`5b00abff53cef22e45667be525774a60155a24f07be871d57b096ab3873096e3`
+and `213583da943c47d5f6d5f407315bf4eaaccbb096a778c3485ee9f3300eac7233`.
+One same-session, no-inspection formatting turn re-emitted the completed
+finding without repeating review; stream/stderr/extracted-terminal SHA-256
+values are
+`6304e5bdcb889b41648cca66d32c89b16b64b3f445c8f39e1a450c36cc76f31b`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+and `fdf246f3eb242367ac380cc7c5b2b8964bd76aa91ba26dc0806c8354200e62a8`.
+
+Exact Kimi K3 session
+`session_70a038b0-39ee-4ecd-9207-46d9e51ca063` returned
+`CHANGES_REQUIRED`, P0=0/P1=1/P2=1: `channel-close` lacked a required
+post-promotion B ingress/send witness, while the accepted-A overlap
+nonemptiness was overapplied. Its initial stream/stderr/terminal SHA-256 values
+are `3d360d05e1fdb8a24acaa02466b61295b6f7743c5f40e4a68c7c5bd529176821`,
+`58a67ba5ce966e36b748616b4091800ba0023be49377702ee1711f6af7527179`
+and `8b9d331005af85e0459267b6bf67f01b3579399e120e03b73c2f479f94bb1e64`.
+Its same-session no-inspection re-emission produced exactly 101 nonempty lines,
+ordered `CHECK001` through `CHECK100` then one `RESULT`; stream/stderr/terminal
+SHA-256 values are
+`e90373202724dc0f400f558361bbac1a162583c933c3d466bc9c94ad96a8236e`,
+`3f31f5d78eca9372138247ac242c3a2cb13c4f09a27247d27f11f16a7580c093`
+and `22fa407b990114a2d1c73a1d9cd15ad5ef6d256afab71db05efb06100fdc80da`.
+
+Opus 5/xhigh session `cffd7a66-fde5-47bd-9571-37a84c7e0f6e`
+completed after 88 turns with `end_turn` and returned `CHANGES_REQUIRED`,
+P0=0/P1=3/P2=3. Its P1s required the exact product-owned handler and channel
+join, preservation of unresolved ping custody across monitor stream-close to
+later abort, and publication of the custody envelope before validation can
+throw. Its P2s required observer-owned schema/trial epochs, exact channel ids
+on open/close joins and evidence derived from both endpoints rather than
+hardcoded empty creator-ingress/receiver-send arrays. Every P2 was assigned to
+the D.108e4h same-round correction owner with the deadline before any complete
+campaign. Raw/stderr SHA-256 values are
+`27c7ee8dbb874204d11a07884ffea6760ba5dfc52c7278014c832f971734a02d`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+The accepted same-round GREEN correction is signed/pushed commit
+`cf59de31443dc75bd68dccd300582a50fd0f7bbd`, parent
+`9f26efbf8dc30375643e037ac53b4f53ad3b1695`, tree
+`3b55857a3184e69256a7bc136f8c72e29ee924fe`, stable patch id
+`3782593f2c1ed131332f9153fb8a9da4d116f83e` and raw-diff SHA-256
+`a97512bb9e5cccd19fc3eb5dd4a330c7f0a3a05d1fe48bb35d20248854e011cb`.
+It has a good signature and remains tests-only. Accepted A overlap is now
+optional while complete accepted/rejected accounting remains closed; B
+handler/open/message joins use exact connection/channel identity and the
+product owner; `channel-close` requires accepted B ingress or a joined B send
+after the old close event. Observer records own schema 3 and trial id. An
+unresolved monitor ping survives stream close until its joined monitor-owned
+abort, and a deterministic browser self-check pins the exact
+`ping-start -> ping-failure -> connection-abort` sequence under one ping id.
+Both endpoints derive message and send custody from their own captures, and
+the complete envelope is saved before validation. Exact negative controls pin
+the handler owner, channel id and post-promotion ingress without restoring the
+invalid accepted-A requirement. These corrections discharge the complete
+formal P1/P2 union; no confirmation review was run.
+
+The corrected pure validator and monitor browser self-check each passed 1/1.
+The complete non-campaign D.108e4g+D.108e4h command explicitly inverted the
+three-trial campaign and passed exactly 7/7 with zero skipped, flaky or
+unexpected tests; JSON SHA-256 is
+`25ec7b2597796e203787d862eccf441762e3c44e737fe7bcab63ca97158b9ba8`.
+The retained command explicitly disabled unrelated repository-wide coverage
+and passed the 48 network-owner plus 10 E3-02 assertions, 58/58; JSON SHA-256
+is `a7ec928f2d358582f70ff13a79e5cc5fbe3e043008be49bc4e69326a0a9aa2b5`.
+An earlier pseudo-terminal log-capture attempt also passed all 58 assertions
+but was rejected as gate evidence because it enabled broad coverage and exited
+on the unrelated 70% global threshold. It was not a product/test retry or a
+campaign invocation. Network build/typecheck and grid build/typecheck passed;
+log SHA-256 values are respectively
+`43d28e87a618632c8a7d25821ec3443d1fcc667941175a1a57349ddb6d51049c`,
+`cad38c1c080e4c8375a957b7f86a0fc99d47ad5be0092ec7e4a5ef501d49859b`,
+`47159e846c33b6f305be6af8b1536a81a8fb313b078945fae8beb2be8fc4147a`
+and `355a8d9c67c43f25d685737002e4eccb74272e557a3e3228f89bee9458041a92`.
+Standalone owner TypeScript, exact-owner ESLint/Prettier and
+`git diff --check` also passed. No complete E3-03 campaign, Fable invocation,
+production change or js-libp2p behavior/configuration change occurred.
+A later generic advisory Codex launch was terminated and excluded from
+evidence when it expanded beyond the tracked plan diff into protected untracked
+paths. It made no tracked edit; its unrelated protected-test output is not a
+review verdict or gate.
+
 The upstream boundary remains fail-closed. The local
 `unreliable-webrtc.ts` break-before-make continuity defect is the demonstrated
 blocker; the connection-monitor abort remains only an unproven trigger. An
 upstream issue is not attributed, proposed or acted on unless D.108e4h evidence
-satisfies every operand of the strict otherwise-usable predicate above. If it
-does, work stops and reslices: the separately reviewed upstream slice must ship
-the pinned two-peer, single-command minimal viable reproducible example before
-any issue report, dependency change or mitigation is considered. The related
-js-libp2p issues and pull requests remain context only and are not fixes.
+satisfies every operand of the strict otherwise-usable predicate. One exact,
+non-carry-in ping id must join monitor-owned start, failure and abort; the same
+authenticated connection must remain current; its peer connection must remain
+`connected`, ICE `connected`/`completed` and signaling `stable` with no earlier
+product/monitor close call; and bidirectional protocol traffic on that exact
+connection must succeed after the ping failure and before the abort. Missing,
+aggregate, cross-connection or pre-failure traffic cannot satisfy the
+predicate. If every operand is proven, work stops and reslices rather than
+changing this product slice. The separately reviewed upstream slice must first
+ship a clean-checkout, pinned two-peer minimal viable reproducible example:
+exact lock-resolved `libp2p@3.3.5` and transport dependencies, recorded
+Node/browser versions, public libp2p construction rather than TS-DRP lifecycle
+code, one command, deterministic traffic-before/failure/traffic-after/abort
+trace and an explicit unpatched failing assertion. Only that artifact may
+support an upstream report or later dependency/mitigation proposal. The
+related js-libp2p issues and pull requests remain context only and are not
+fixes.
 
 The initial D.108e4g RED is signed/pushed commit
 `815f2d084f196929aeee59b01271b18e8c7463c0`, parent
