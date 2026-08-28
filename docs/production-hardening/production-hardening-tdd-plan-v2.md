@@ -67128,7 +67128,7 @@ The expected ordinary and isolated results are respectively 17/17 for the
 focused root/infrastructure command, 5/5 for the unloaded native timing file,
 24/24 for the full Phase-3 owner, 58/58 for network plus E3-02, 1/1 for the
 focused observer, 5/8/7 listed E3-03 inventories and 7/7 for the positive
-non-campaign execution, 48/48 for the five Phase-3h plus four frozen Phase-5e
+non-campaign execution, 61/61 for the five Phase-3h plus four frozen Phase-5e
 unit owners, 15 files/122 tests for the Phase-4c/Phase-6a semantic selection,
 and 3/3 for each standalone subprocess-resolution control. The browser
 expectations are D.93.36 5/5; each D.93.46 repeat invocation 3/3; Phase-4c-b/c
@@ -68579,3 +68579,48 @@ triplet rerun; limit plan-only gate composition to gates that do not read this
 document; record commit versus tree identity explicitly; and preserve the
 untagged-title requirement. These items are now recorded above and remain
 closure evidence rather than product work.
+
+###### D.108e4v — retained zone-operation roster reconciliation
+
+D.108e4v owns the next fail-closed D.108e4k stop as a narrow retained-test and
+plan correction. It changes only this plan and
+`tests/phase-3h-chat-zone-migration-red.test.ts`; it changes no product,
+example, fixture, configuration, dependency, lockfile, package manifest,
+timeout, browser selection, telemetry, campaign authorization or product API.
+The exact failing command at signed commit `97e092b2b15550b6ce99ff25c1818d78af40489b`
+collected nine files and 61 tests, passed 60 and failed only
+`adds one non-batchable neutral migration record to the genuine zone blueprint`.
+The received sorted operation roster contained `commit-outcome-v1` between
+`causalJoin` and `join`; the retained expected roster omitted it. Stdout,
+stderr and status SHA-256 values are
+`23b446abe06bb289d7c0f6ea06b1477523384de3ac06f504aa2b1a7343da8244`,
+`4c712a3915236864a860b86d0fa88ee025b03db5a3ea0496028fc8e70d8213b0`
+and `4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`.
+No later ordinary or isolated D.108e4k gate ran.
+
+This RED is not evidence of a product defect. Blame fixes the stale six-name
+expectation to Phase-3h commits `7d143622`/`d2568d25` on 2026-08-21/22, while
+signed product commit `be4e80865d57ef748c20cb931f6f241366ddeff9` intentionally added the
+authenticated `commit-outcome-v1` reducer and blueprint operation on
+2026-08-24. That product commit is already an ancestor of the accepted
+D.108e4i behavior baseline `cc112d22`. The reconciliation therefore adds only
+the one exact expected operation string at its observed sorted position and
+corrects the D.108e4k nine-file expectation from stale 48/48 to actual 61/61.
+It may not remove, weaken, wildcard or partially compare the roster assertion.
+
+Freeze this plan/RED record in one signed/pushed checkpoint. Before the test
+change, run the normal read-only Grok 4.6/high, exact Kimi K3 `CHECK001` through
+`CHECK100` and Opus 5/xhigh plan review. P0/P1 findings are corrected in the
+same round without confirmation; each P2 receives the plan owner and
+2026-09-04 deadline. No Fable or collaboration subagent runs. GREEN changes
+only the retained expected array, then runs the focused file once for exact
+2/2 and the frozen nine-file command once for exact 61/61. Run exact-owner
+TypeScript/ESLint/Prettier and `git diff --check`, record hashes, sign and push.
+Any other failure stops without retry or production change.
+
+Because this is a tracked test-tree change, it voids composition of all earlier
+D.108e4k execution evidence even though product behavior is unchanged. Only
+after D.108e4v GREEN and its required Grok/Kimi/Opus implementation review may
+D.108e4k restart from its first ordinary command at the new exact signed tree.
+The complete E3-03 config, retained three-trial campaign and both campaign
+ledgers remain unauthorized.
