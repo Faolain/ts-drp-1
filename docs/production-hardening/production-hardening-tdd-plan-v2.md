@@ -69382,3 +69382,50 @@ route reconciliation; stdout/stderr/status SHA-256 values are
 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
 and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
 No product source, browser or campaign command ran for RED.
+
+The connection-event GREEN changes only `packages/network/src/node.ts`: every
+libp2p `connection:open` now notifies existing peer-connection subscribers,
+while `peer:connect` remains logging-only. The exact Node RED, adapter-chain
+control and disconnected-retry owner each passed 1/1. Their stdout SHA-256
+values are
+`4f6241f5579ad8f666a521074c0ef0de40aa53202b909b9f7c1b0a02f1e074e3`,
+`188a443e35180116d60838aca7f996a4e514d6366e27e19331b4c0be16d4d6c4`
+and `557258e87e3fe71c5b033fc8597b73390dcaa32688af19f0389500ca99b749b1`;
+all statuses were zero.
+
+The full host-factory owner passed 16/16; E3-01 plus E3-02 passed 61/61;
+Phase-3f-b passed 2/2; retained Phase-3 transport passed 24/24; and the focused
+E3-03 observer passed 1/1. Their stdout SHA-256 values are
+`83379d092715fcc010d1ad65b78ba5a631caead8ea1d891c7aa435e866b5f3da`,
+`b61ec5f8dab0a2f0948fdb5da06759d45cba24d4ae0317e7267b4f32c74be430`,
+`7e4c531d4d9bc9f8a6bcfca1d3e811abd8d42ad1e1e6d5bb2462409cac5491e1`,
+`eba0eb3cd1a2ae9e764286e9d0c7ee6e658acbf24c69538000fc2c37251b3671`
+and `6e72a39c2753df9509c222171b18e54961f45036f8a53390de9369e2943ef2e6`;
+all statuses were zero. The complete E3-03 campaign remained absent.
+
+Affected dependency builds, network/grid typechecks, Prettier and diff check
+passed. Build stdout SHA-256 is
+`390b77b206ee0ba4a445dfef3d474bf99f6ff555e8605374332a776d01845f39`.
+The broad exact-owner ESLint selection reported zero errors and the existing
+20 `packages/network/src/node.ts` JSDoc warnings; `--max-warnings=0` made that
+baseline exit one. A second `--quiet --max-warnings=0` probe confirmed ESLint
+still counts hidden warnings and also exited one. The correctly shaped
+error-only `eslint --quiet` gate passed with empty stdout/stderr and status
+SHA-256 `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+No unrelated JSDoc was edited.
+
+The unchanged D.93.46 command passed three consecutive invocations at 3/3 in
+1.5, 1.2 and 1.4 minutes without retry or flake. Stdout SHA-256 values are
+`2b3511b75ce8d05f5244ac40e99803c37822e265976900b02771ac39a7bceddb`,
+`516747b3fc898aad7246964156627963943d6631b1599e4f72f210260fe58d7b`
+and `0ef5a1bd95e1c15504c2e153e9628bfd28f1fc1256d30a69d0dbda64ce2c5f08`;
+stderr SHA-256 values are
+`4eb5f704f28be18df5e49ef2594c994ef7700a0ccd4e2a423c5648c749186f80`,
+`741787d482ca028027e69fe5dd19af429bd050e5b2ec36e5e2742d9c309990bb`
+and `e8a6216316dfe501a607864da0e97f25d2dbac6dce485ddb409689cfe425d538`;
+all statuses were zero.
+
+All protected untracked paths and 26 stashes remain preserved; the root shim
+is absent. D.108e4x is behaviorally GREEN but remains open until this
+connection-event GREEN is signed/pushed and the final corrected-range
+Grok/Kimi/Opus review closes. D.108e4k has not restarted.

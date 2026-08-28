@@ -1297,10 +1297,13 @@ export class DRPNetworkNode implements DRPNetworkNodeInterface {
 
 		log.info("::start: Successfuly started DRP network w/ peer_id", this.peerId);
 
-		this._node.addEventListener("peer:connect", (event: CustomEvent<PeerId>) => {
-			const peerId = event.detail.toString();
-			log.info("::start::peer::connect", peerId);
+		this._node.addEventListener("connection:open", (event: CustomEvent<Connection>) => {
+			const peerId = event.detail.remotePeer.toString();
+			log.info("::start::connection::open", peerId);
 			this.notifyPeerConnection(peerId);
+		});
+		this._node.addEventListener("peer:connect", (event: CustomEvent<PeerId>) => {
+			log.info("::start::peer::connect", event.detail.toString());
 		});
 		this._node.addEventListener("peer:disconnect", (event: CustomEvent<PeerId>) => {
 			const peerId = event.detail.toString();
