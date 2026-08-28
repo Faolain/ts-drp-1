@@ -65309,6 +65309,78 @@ ordering assertion, instruments the installed js-libp2p 3.1.2 MessageStream
 monitor-owned abort, and satisfies both lint rules. The review was advisory;
 no confirmation review was run. No complete E3-03 campaign was invoked.
 
+The initial D.108e4g RED is signed/pushed commit
+`815f2d084f196929aeee59b01271b18e8c7463c0`, parent
+`341f19826f919de147fcea54751c339fd1b088cf`, tree
+`33bf7380a894a20057435572796726dd0c4fe5ca`, stable patch id
+`90dfe4cb2f02b7576ca81854b7731d88d34cd229` and raw-diff SHA-256
+`26034fddf32614f809d2d360d6075d33a6713881a17194112ee697621ce26838`.
+It has a good signature and changes only the exact unit RED owner. Current
+source produced eight causal failures while 33 controls passed. The accepted
+same-round correction is signed/pushed commit
+`757944978fa69cc58868102f2279b91e10cc19cf`, parent
+`815f2d084f196929aeee59b01271b18e8c7463c0`, tree
+`e6e026a8a15f931fa3d30a80d37f6220a585144f`, stable patch id
+`478203d2ff7b8ca2fa41352d79de88afcd5d71e9` and raw-diff SHA-256
+`76b2eff1a9624979f15f51cb9fb6849c7f92bab0915273afa8845499659a4847`.
+It also has a good signature and remains exact-owner/test-only.
+
+The normal Grok 4.6/high RED review completed its sole run normally in
+480.258 seconds with exit zero, `end_turn` and no timeout. The wrapper reported
+`NO_VERDICT` only because inspection prose preceded the terminal object; the
+substantive object was `CHANGES_REQUIRED`, P0=3/P1=3/P2=0. Public, status and
+event-stream SHA-256 are respectively
+`15884507ffcf03b0e067e3a36d204aa06c0666fe0bfdce649ac67b768e7b035e`,
+`0ce8aa2de8d26a5f2a269058041e27b340cbcc85926f440529584223f440ca0f`
+and `17c1833afa0ad2e3b99f583e876d5060a368526e268e438a7133fdfeb5610225`.
+It found the still-superseded stale-send and seven-active capacity controls,
+the impossible eight-slot terminal reason, missing failure cleanup, incomplete
+directional handoff exactness and absent concurrent-pressure coverage.
+
+Kimi CLI 0.38.0 exact `kimi-code/k3` session
+`session_4ba218a6-f2f5-40dd-a53a-a95894fb5346` independently verified custody
+and emitted exactly 100 total, unique and ordered `CHECK001` through
+`CHECK100` markers followed by one `APPROVED` result with P0=0/P1=0/P2=2.
+Stream/stderr SHA-256 are
+`0990012b76cae9ff72eef13f75f19e7605b63fd380777f2a6bc604c0d64d4f2e`
+and `e4c0511ab25bf6f1c40da8bc12b35209ba23d9b59b587e176743dc175de18005`.
+Its P2s require process-global barrier cleanup and an unambiguous eight-slot
+drop reason; both were promoted into the same-round correction.
+
+Claude-skill Opus 5/xhigh session
+`118c9aff-9f0c-4cdb-980a-e986517040c5` completed normally in 619.730 seconds,
+24 turns, with no error and returned `CHANGES_REQUIRED`, P0=5/P1=5/P2=2.
+Raw/stderr SHA-256 are
+`94065413877ed891bd4a8436b3b0adfdb0ded80c9e52435985e59d5f9bf97c68`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+It independently found the same stale-send/capacity contradictions and added
+role-dependent close ownership, the impossible public drop-reason/counter
+pair, unarmed-barrier microtask perturbation, handler-before-open ordering and
+exact cleanup/count requirements.
+
+The same-round correction resolves the P0/P1 union without confirmation
+review. It re-homes retained admission/timer controls onto deliberately
+non-open A links; rewrites every named stale-open send assertion; adds
+seven-active overlap and concurrent-pressure REDs; couples the eight-slot
+close reason/counter; makes success close ownership role-dependent; avoids an
+unarmed barrier await; clears unconsumed process-global barriers; holds normal
+registration only after the inbound handler has observed open B; adds a
+separate reversed handler barrier that proves B is never selected early; uses
+unique A-before/A-pending/B-after payloads; and expands every failed setup
+vector with delivery, physical cleanup and pre-retry assertions. The exact-key
+public snapshot tripwire remains unchanged in the re-homed control.
+
+Under current product source the corrected complete owner is exactly 14
+causal failures / 30 passing controls in 278 ms, with no unhandled error.
+Its log SHA-256 is
+`c674524db05d7a2310db6ae2678a85d54c2853666c0f63a1d255505d576733dd`.
+Standalone owner TypeScript, exact-owner ESLint/Prettier and diff check pass;
+the empty TypeScript/ESLint/diff logs hash to
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+and the Prettier log hashes to
+`17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20`.
+No product behavior changed and no complete E3-03 campaign was invoked.
+
 The first D.108e4c plan-freeze review round inspected signed/pushed commit
 `eb3de05b6054ac6fdd158d2530bad1798f87f10f`, parent
 `b8a2628bec7593c547919b540889dc75e33cd9ca`, tree
