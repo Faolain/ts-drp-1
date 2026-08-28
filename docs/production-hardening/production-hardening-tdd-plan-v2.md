@@ -67273,11 +67273,15 @@ The first D.108e4k ordinary execution stopped at its first timing-sensitive
 gate rather than rerunning it or continuing into an evidence campaign. With no
 model, browser or other test process concurrent, the exact unloaded native
 timing command above produced 4/5 passes and one failure. The child completed
-every semantic assertion but reported its own `wallTimeMs` as
-`61_399.244417`, violating the unchanged `< 60_000` requirement. Enclosing
-file/test wall times were 66.58/65.215 seconds and `/usr/bin/time -p` reported
-67.72 real, 67.21 user and 3.67 system seconds; none substitutes for the child
-acceptance value. Stdout/stderr SHA-256 values are
+its internal invariant checks and returned its terminal proof with
+`wallTimeMs=61_399.244417`. The parent's four pre-ceiling assertions passed,
+then its unchanged `< 60_000` assertion failed; the parent assertions after
+that ceiling were not evaluated. Vitest reported 66.58 seconds for the file,
+65.215 seconds for all tests, 62.214 seconds for the earlier D.108e4 test that
+launched the memoized child and 5 ms for the later D.108e2e test that consumed
+the proof and failed the ceiling. `/usr/bin/time -p` reported 67.72 real, 67.21
+user and 3.67 system seconds. None substitutes for the signed child acceptance
+value. Stdout/stderr SHA-256 values are
 `3185d041617f236f1c480561968bd2e7c117f561b519b76693deae507114911c`
 and `8d9ff43a55e100201828dca0e73d8b7e2b7df19301882ed060d8550de72dbfd4`.
 The other ordinary commands and the detached clean proof did not run because
@@ -67303,43 +67307,91 @@ change. If attribution requires a production-source or store-interface change,
 D.108e4l stops and reslices rather than widening.
 
 The child keeps the existing `performance.now()` start and signed aggregate
-`wallTimeMs`, then records monotonic phase boundaries around the already
-existing operations: store open; current-row plus genuine-future preparation;
-the 8,191 sequential authenticated-future appends; maximum-page probe;
-8,193-row equality materialization; over-budget suffix append/read/
-authentication; mismatch materialization; and the concurrent equality,
-two-invocation reuse, over-budget and mismatch recoveries. Each record contains
-only its fixed phase name, start/end offsets, duration, row/operation count and
-process resource-usage deltas. The envelope also records the exact Node
-version, platform, architecture and available parallelism. Phase offsets must
-be nonnegative, increasing, nonoverlapping and bounded by aggregate
-`wallTimeMs`; their durations must equal `end - start`, and the final phase end
-must agree with the aggregate within a frozen 10 ms instrumentation tolerance.
-No new sleeps, samples, retries, alternate data path or asynchronous work is
-added.
+`wallTimeMs`. Ten exact sequential wall phases tile that entire interval in
+this order: `preflight-and-store-open`, `current-row`, `genuine-future`,
+`authenticated-future-appends`, `maximum-page-probe`,
+`equality-materialization-and-facades`, `over-budget-preparation`,
+`mismatch-preparation`, `concurrent-recoveries` and `proof-assembly`. The first
+phase starts at offset zero from the same `startedAt` sample; every next start
+is the preceding end; and the `proof-assembly` end is the same final sample
+used for `wallTimeMs`. Thus exact boundary identity, rather than a tolerance or
+new timing threshold, proves complete coverage. The phases include parameter
+validation and both store opens; all store/facade construction, shape checks
+and row slicing; every sign/append/read/authentication operation; and telemetry
+and proof-value assembly. Each phase records its fixed name, start/end offsets,
+derived duration, exact row/operation count, and the delta between its two
+reused `process.resourceUsage()` boundaries for `userCPUTime`, `systemCPUTime`,
+`fsRead`, `fsWrite` and `involuntaryContextSwitches`. It records the ending
+`maxRSS` high-water value separately as `maxRssKiB`, never as a delta. Eleven
+boundary snapshots serve the ten phases; there is no per-row or periodic
+sampling.
 
-The parent test validates that closed schema before the unchanged `< 60_000`
-assertion and always emits one single-line `D108E4L_TIMING ` JSON record, so a
-passing or failing run retains the same attribution evidence. It pins the
-expected append/materialization/recovery counts and rejects a missing,
-duplicated, reordered, overlapping, negative or aggregate-incoherent phase.
-The telemetry is diagnostic only: no phase threshold is introduced, no phase
-is excluded from `wallTimeMs`, and the original ceiling remains the sole timing
-acceptance. Exact surrounding test inventory and every semantic assertion stay
-unchanged.
+`concurrent-recoveries` remains one nonoverlapping outer wall phase around the
+existing `Promise.all`. It contains five explicitly overlapping member records
+named `equality`, `reuse-0`, `reuse-1`, `over-budget` and `mismatch`. Each member
+is bounded by the outer phase and records its existing context-seed,
+reopen/evidence and close boundaries plus the already asserted recovery/store
+counters. The reuse members remain sequential with respect to one another;
+overlap with the other three members is expected. No promise, await, sleep,
+retry, alternate data path or asynchronous work is added. The exact workload
+remains 8,191 authenticated-future appends, equality materialization of 8,193
+rows, over-budget materialization of 8,195 rows, one equality recovery, two
+reuse recoveries, one over-budget recovery and one mismatch recovery. The row
+counts may not be reduced, sequential appends may not be batched, and no
+genuine store may be replaced by a fake as a timing remedy.
 
-After implementation and exact-two-owner ESLint/Prettier/`node --check`/
-`git diff --check`, run the native five-test timing file exactly once, alone,
-with no model or other test process. Its stdout/stderr and extracted
-`D108E4L_TIMING` line receive SHA-256 custody. If it remains red, the phase
-ledger assigns the next exact owner without rerun: fixture seeding or evidence
-construction stays test-infrastructure; recovery/store time that requires
-production work stops and receives a separately reviewed product-performance
-slice. If it passes, the phase ledger must still explain the prior 61.399-second
-failure and demonstrate sufficient deterministic margin; a single sub-60
-sample is not permission to close the slice or D.108e4k. Only an accepted
-attribution and corresponding deterministic correction may authorize a fresh
-unloaded acceptance run.
+The telemetry envelope is frozen to schema `d108e4l-v1`, `process.version`,
+`process.platform`, `process.arch`, `os.availableParallelism()`, the returned
+`proof.pid`, and the same signed `wallTimeMs` used by the ceiling. On first
+receipt of the one memoized child result, the parent helper uses exactly one
+`console.log` whose payload line begins `D108E4L_TIMING `, before any schema or
+timing assertion. It then hard-validates the exact ten-name roster, exact five
+concurrent-member roster, counts, field types, zero/contiguous/final boundary
+identity, duration arithmetic, nonnegative values, outer nonoverlap and member
+containment. Emission therefore survives a schema rejection. The existing
+D.108e4 test remains the launching/cost-bearing consumer and the later D.108e2e
+test retains the unchanged hard `< 60_000` assertion and all later semantic
+assertions; no sixth test is added and the two existing `it(` call shapes pinned
+by `tests/phase-6a-creator-successor-local-author-red.test.ts:147,166` may not be
+reformatted.
+
+That full record is guaranteed only after a terminal proof reaches the parent.
+The frozen shared launcher ignores child stdout, kills at 90,000 ms, and rejects
+and discards a child-error or nonzero-exit message. The two-file slice therefore
+cannot claim phase attribution on those paths. Its memoized parent helper
+instead emits exactly one `D108E4L_TIMING ` record with schema `d108e4l-v1`,
+`outcome="unavailable"` and the caught error classification before rethrowing.
+A timeout, IPC failure, child error or missing terminal proof then stops without
+rerun and opens D.108e4m against exact owner
+`tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts` for a
+separately reviewed progress-telemetry transport; it does not widen D.108e4l.
+
+After implementation, run exact-two-owner ESLint, Prettier, `node --check` and
+`git diff --check`, plus a read-only assertion that the two source-shape regexes
+and behavior titles above still match. Then run exactly once, alone with no
+model/browser/other test process, the same command that produced RED:
+
+```bash
+/usr/bin/time -p pnpm exec vitest run --coverage.enabled=false packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts --maxWorkers=1 --minWorkers=1
+```
+
+The command's stdout/stderr and the sole payload line extracted with
+`rg '^D108E4L_TIMING ' <stdout-log>` receive SHA-256 custody. A valid still-red
+record is diagnostic evidence, not permission to alter behavior. Attribution
+follows the executing code, not the phase label: fixture-only validation,
+signing, facade or proof assembly remains a separately reviewed D.108e4m test-
+infrastructure slice in the child fixture; time in `transactIssue`,
+`readOutboxPage`, `readIssued` or `readLineage` reslices D.108e4n against
+`packages/storage-node/src/issuance.ts`; time in
+`reopenCreatorSuccessorAdoption` reslices D.108e4o against
+`packages/node/src/v3-live.ts`; and a mixed phase that cannot distinguish those
+owners first reslices D.108e4m for narrower test-only attribution. No production
+file changes in D.108e4l. A sub-60 instrumented sample cannot causally explain
+the prior uninstrumented miss: record its exact `60_000-wallTimeMs` margin and
+phase ledger, classify it as inconclusive variance, leave D.108e4l/D.108e4k
+open, and require a separately reviewed margin/variance slice before any fresh
+acceptance run. There is no undefined "sufficient margin" branch and no blind
+retry.
 
 D.108e4l receives a signed/pushed plan freeze and the normal Grok 4.6/high,
 exact Kimi K3 `CHECK001` through `CHECK100` and Opus 5/xhigh plan review before
@@ -67350,3 +67402,45 @@ receives an exact owner and 2026-09-04 deadline. No Fable, collaboration
 subagent, E3-03 complete config/campaign, libp2p change, upstream attribution or
 MVRE runs in this slice. D.108e4a/b/c/d, aggregate D.108e4 and D.108e5 remain
 blocked.
+
+The review of signed/pushed plan freeze `82f25559a7ec6bf4ac71292a7effc51b25fd16f4`
+completed without a confirmation run. Grok 4.6/high inspected for 570.205
+seconds and ended normally with exit 0, `stop_reason=end_turn` and no timeout;
+the runner honestly classified `NO_VERDICT` because progress prose preceded
+the terminal schema. Its public payload was `CHANGES_REQUIRED`, P0=2/P1=1/P2=1,
+requiring mixed-code-path attribution, exactly-once emit-before-assert behavior,
+the exact unloaded command, fail-closed pass handling and self-binding envelope
+fields. Event/public/status SHA-256 values are
+`c4ef4e0a7f7b027dd5638347f794139934a948108c9e0e40edf777170cbd7481`,
+`8659d92126a7ef40345b685c639c7c5fe87f04bbde06e0b7ec4009c8ebbc51ed`
+and `9a7f8739b5ab5cc7e563f0ff060c3311feadbcdb8ad4fa0b8ef9ede6182ffc03`.
+It was not relaunched.
+
+Kimi CLI 0.38.0 exact `kimi-code/k3` session
+`session_0bd4f4d2-d7ec-443e-af40-eaa2c3c4d594` emitted exactly 100 unique
+ordered `CHECK001` through `CHECK100` markers and one terminal `RESULT`. It
+returned `CHANGES_REQUIRED`, P0=0/P1=4/P2=0: the ledger permitted gaps, the
+nonoverlap rule contradicted concurrent recovery, error paths could lose
+evidence, and pass/red branches lacked deterministic ownership. Stream/stderr
+SHA-256 values are
+`e81cf5d97972156a58c563366e06756f130ae274de384cb9bfa4475d54db4447`
+and `8581e9db1d172654844b7f59b6493d67be14e3546c50cdad7540afc82ebef835`.
+
+Opus 5/xhigh session `cc65c089-f0e1-4abf-b922-7b5e98707fa2` resolved to
+`claude-opus-5`, completed 18 turns in 499.051 seconds with no error or
+subagent, and returned schema-valid `CHANGES_REQUIRED`, P0=3/P1=4/P2=3. It
+required exact whole-window tiling, an honest terminal-proof-only evidence
+claim, a frozen concurrent-member roster, code-path rather than phase-label
+ownership, preserved source-shape guards, emit-before-hard-validation ordering,
+precise RED wording, pinned resource fields/channel and correct test-duration
+attribution. JSON/stderr SHA-256 values are
+`43dfa22b83a0e74c3a480ad830c1fe71282f014ec0c6151317ed7b82a46bbe7a`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+The same-round correction above closes the complete P0/P1 union before any
+instrumentation edit. It assigns every P2 to the D.108e4l plan owner, except the
+historical duration wording assigned to the D.108e4k evidence owner, with a
+2026-09-04 deadline; this correction completes those documentation owners now.
+No confirmation review, reviewer relaunch, instrumentation execution, Fable,
+campaign, production change or upstream attribution is authorized by the
+correction itself.
