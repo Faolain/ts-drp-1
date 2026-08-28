@@ -67441,6 +67441,14 @@ The same-round correction above closes the complete P0/P1 union before any
 instrumentation edit. It assigns every P2 to the D.108e4l plan owner, except the
 historical duration wording assigned to the D.108e4k evidence owner, with a
 2026-09-04 deadline; this correction completes those documentation owners now.
+The accepted correction is signed/pushed commit
+`d3acf56b71182bd0878868b417bfd5ab22399fb8`, parent
+`82f25559a7ec6bf4ac71292a7effc51b25fd16f4`, tree
+`6e2edcb9c2f46816852a2715720e4f947f96290b`, stable patch id
+`9938d1365ba8c9fb5280a3d79742586778e79595` and raw-diff SHA-256
+`054a00a25a9c067d972eaee60d560df7519b56f33af84c262c34baf92ed520bf`.
+It has a good signature, changes only this plan and is contained by the remote
+branch.
 No confirmation review, reviewer relaunch, instrumentation execution, Fable,
 campaign, production change or upstream attribution is authorized by the
 correction itself.
