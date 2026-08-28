@@ -69262,3 +69262,49 @@ Stdout/stderr/status SHA-256 values are
 `af91caa050293eeb3cd23894a962035e3e9eff4862d4254f2e4b89c697969f65`
 and `4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`.
 No product source, other test, campaign or browser command ran for RED.
+
+The same-round GREEN adds one guard to the raw owner's existing retry
+scheduler: a peer without a current authenticated WebRTC connection cannot own
+the retry timer. It adds no timer, threshold, callback or API. The deterministic
+title passed its timer-release and explicit event-driven reconnection controls
+1/1. The first focused GREEN shell invocation omitted
+`--coverage.enabled=false`; the test passed, but repository-wide coverage
+correctly exited one because a one-test selection covered 0.69% against the
+70% global threshold. That command-shape error is retained under
+`.logs/d108e4x-review-correction-green-7f2171e2/01-exact.*` and is not a GREEN
+gate. The corrected focused command passed with stdout/stderr/status SHA-256
+values
+`7da2df9501dd8bc76cb4ae40a69f52de2d1a20f067c9007e3810d0dc1d55bf35`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+
+The full network E3-01 plus node E3-02 selection passed 60/60; Phase-3f-b
+passed 2/2; retained Phase-3 transport passed 24/24; and the focused E3-03
+observer passed 1/1. Their stdout SHA-256 values are
+`e24b9d8e0d4a63535d87430dad727c54ba7b670a8a13f84313d323df208d6f65`,
+`895cfd131dbd9c5796087eadfa897871f347e703fd720f413c46b21a43a5f05b`,
+`c6f2d1938b017d79cca943a4225786929b434542dc5aa4fa28c72415cf5157ef`
+and `ff599f40be7ea188111184add79e7a9792f8f22356b95b4fd42f865d71d13fa9`;
+all statuses were zero. The complete E3-03 campaign remained absent.
+
+Affected network/node/grid dependency builds passed, as did network and grid
+typechecks, exact-owner ESLint, Prettier and `git diff --check`. Build stdout
+SHA-256 is
+`efbd4d4dfc99927c57944ff2e8f7ba9ce6d018df904af19b520a2b9b755446e1`;
+every static status SHA-256 is the zero-status
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+The unchanged exact D.93.46 command then passed three consecutive invocations
+at 3/3 in 1.5 minutes each without retry. Their stdout SHA-256 is uniformly
+`2b3511b75ce8d05f5244ac40e99803c37822e265976900b02771ac39a7bceddb`;
+stderr SHA-256 values are
+`b8963c9cf61e204d56dd0333411d40a860fb24a6cdc14255a27acbbdb64303db`,
+`7d2fec657bdf497ea9139086afb5fb6ea1a3558809bdbebce7457be21c4757df`
+and `8b934f3d4b8aff28e33ff8d7cd2213c3cc88d8a72a26dad4debbc44ba83d42c5`;
+all statuses were zero. The previously observed third-invocation raw-readiness
+failure did not recur.
+
+All 26 stashes and protected untracked paths remain preserved; no root
+canonical shim exists. D.108e4x is behaviorally GREEN at this working tree but
+remains open until its correction commit is signed/pushed and the required
+Grok/Kimi/Opus review of the corrected exact range closes. D.108e4k has not
+restarted.

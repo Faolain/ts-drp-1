@@ -1033,6 +1033,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			this.#closed ||
 			this.#signaling.localPeerId >= peerId ||
 			!this.#desiredPeers().includes(peerId) ||
+			this.#connectionFor(peerId) === undefined ||
 			this.#retryLinks.has(peerId)
 		) {
 			return;
