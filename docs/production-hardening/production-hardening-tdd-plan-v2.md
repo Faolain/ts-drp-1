@@ -67838,3 +67838,12 @@ the correction completes the plan-owned wording items now and carries the
 implementation assertions into the exact two-owner checkpoint. No confirmation
 review, profiler/test execution, Fable, campaign or production change is
 authorized by this correction alone.
+
+The exact same-round correction is signed/pushed commit
+`69620a8fb6a9506c1c0815123eba9251a3540335`, parent
+`651aab44b0585a49e26a0f70853609a6233bf6fa`, tree
+`68ce5b381a7a5b956d256a4007910c4c4a0543cc`, stable patch id
+`f19d3ee6369eba0c41543ecdcd742ba2c0d76a5e` and raw-diff SHA-256
+`2b20ffe69e4970875ef641149d3911615cc39b33e0e6c8dd387774a38665de3f`.
+It has a good signature, changes only this plan and is contained by the remote
+branch. Instrumentation may now begin against this corrected freeze.
