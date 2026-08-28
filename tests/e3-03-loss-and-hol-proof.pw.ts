@@ -173,9 +173,55 @@ interface RenderedFabricEvidence {
 	readonly reliableDropped: number;
 }
 
+interface AcceptedObservationIdentity {
+	readonly channelId: number;
+	readonly connectionId: number;
+	readonly insertionReadyState: RTCDataChannelState;
+	readonly lane: FabricObservation["lane"];
+	readonly ordinal: number;
+	readonly readyState: RTCDataChannelState;
+	readonly receivedAtMs: number;
+	readonly sentAtMs: number;
+	readonly sequence: number;
+	readonly sentinel: boolean;
+}
+
+interface ChannelSequenceEvidence {
+	readonly channelId: number;
+	readonly connectionId: number;
+	readonly lane: FabricObservation["lane"];
+	readonly monotonic: boolean;
+}
+
 interface CampaignEvidence {
+	readonly acceptedObservationIdentities: readonly AcceptedObservationIdentity[];
+	readonly application: Readonly<{
+		readonly rawAoIP50Ms: number;
+		readonly rawAoIP95Ms: number;
+		readonly rawDelivered: number;
+		readonly rawDeliveredAfterReliableStart: number;
+		readonly rawGap: number;
+		readonly rawMaxStallMs: number;
+		readonly reliableAoIP50Ms: number;
+		readonly reliableAoIP95Ms: number;
+		readonly reliableDelivered: number;
+	}>;
+	readonly perChannelMonotonicity: readonly ChannelSequenceEvidence[];
+	readonly rawArrivalInversionCount: number;
+	readonly clockSamples: readonly number[];
+	readonly clockSkewMs: number;
 	readonly completeObserverRawGap: number;
-	readonly productAccepted: readonly PlatformObservation[];
+	readonly lexicographicRole: Readonly<{
+		readonly creatorPeerId: string;
+		readonly initiator: "creator" | "receiver";
+		readonly receiverPeerId: string;
+	}>;
+	readonly partitionCardinalities: Readonly<{
+		readonly accepted: number;
+		readonly observer: number;
+		readonly rejected: number;
+		readonly roster: number;
+	}>;
 	readonly productRejected: readonly PlatformObservation[];
 	readonly productRoster: readonly FabricObservation[];
 	readonly rawCounter: Readonly<{
@@ -192,6 +238,7 @@ interface CampaignEvidence {
 		readonly receiver: readonly RtcObservation[];
 		readonly sender: readonly RtcObservation[];
 	}>;
+	readonly rendered: RenderedFabricEvidence;
 	readonly receiverWire: readonly PlatformObservation[];
 	readonly stages: Readonly<{
 		readonly deadline: TransportStageEvidence;
@@ -211,6 +258,8 @@ interface TransportStageEvidence {
 
 interface RawTransportDelta {
 	readonly authenticatedConnectionLosses: number;
+	readonly backpressuredDrops: number;
+	readonly handshakeFailures: number;
 	readonly lastLinkDrop: Readonly<{
 		readonly after: string;
 		readonly before: string;
@@ -545,6 +594,8 @@ function rawTransportDelta(
 ): RawTransportDelta {
 	return Object.freeze({
 		authenticatedConnectionLosses: after.authenticatedConnectionLosses - before.authenticatedConnectionLosses,
+		backpressuredDrops: after.backpressuredDrops - before.backpressuredDrops,
+		handshakeFailures: after.handshakeFailures - before.handshakeFailures,
 		lastLinkDrop: Object.freeze({
 			after: after.lastLinkDrop,
 			before: before.lastLinkDrop,
@@ -621,15 +672,19 @@ function expectRawSenderSamples(observations: readonly PlatformObservation[]): r
 	return samples;
 }
 
-function expectReliableReceiverSamples(observations: readonly PlatformObservation[]): readonly PlatformObservation[] {
+function expectReliableReceiverSamples(observations: readonly PlatformObservation[]): void {
 	const wireSamples = observations.filter(({ lane, sentinel }) => lane === "reliable" && !sentinel);
 	expect(wireSamples.length).toBeGreaterThan(0);
 	expect(wireSamples.map(({ sequence }) => sequence)).toEqual(
 		[...wireSamples].map(({ sequence }) => sequence).sort((a, b) => a - b)
 	);
 	expect(wireSamples.every(({ sequence }) => sequence >= 0 && sequence < SAMPLE_COUNT)).toBe(true);
+}
+
+function firstReliableBySequence(observations: readonly PlatformObservation[]): readonly PlatformObservation[] {
 	const firstBySequence = new Map<number, PlatformObservation>();
-	for (const sample of wireSamples) {
+	for (const sample of observations) {
+		if (sample.lane !== "reliable" || sample.sentinel) continue;
 		if (!firstBySequence.has(sample.sequence)) firstBySequence.set(sample.sequence, sample);
 	}
 	const logicalSamples = [...firstBySequence.values()];
@@ -677,6 +732,73 @@ function partitionReceiverEvidence(
 		productAccepted: Object.freeze(productAccepted),
 		productRejected: Object.freeze(productRejected),
 	});
+}
+
+function acceptedObservationIdentity(observation: PlatformObservation): AcceptedObservationIdentity {
+	return Object.freeze({
+		channelId: observation.channelId,
+		connectionId: observation.connectionId,
+		insertionReadyState: observation.insertionReadyState,
+		lane: observation.lane,
+		ordinal: observation.ordinal,
+		readyState: observation.readyState,
+		receivedAtMs: observation.receivedAtMs,
+		sentAtMs: observation.sentAtMs,
+		sequence: observation.sequence,
+		sentinel: observation.sentinel,
+	});
+}
+
+function arrivalInversionCount(observations: readonly PlatformObservation[]): number {
+	let inversions = 0;
+	let previousSequence: number | undefined;
+	for (const observation of observations) {
+		if (observation.lane !== "raw" || observation.sentinel) continue;
+		if (previousSequence !== undefined && observation.sequence < previousSequence) inversions += 1;
+		previousSequence = observation.sequence;
+	}
+	return inversions;
+}
+
+function channelSequenceEvidence(observations: readonly PlatformObservation[]): readonly ChannelSequenceEvidence[] {
+	const channels = new Map<
+		string,
+		{
+			channelId: number;
+			connectionId: number;
+			lane: FabricObservation["lane"];
+			monotonic: boolean;
+			previousSequence: number | undefined;
+		}
+	>();
+	for (const observation of observations) {
+		if (observation.sentinel) continue;
+		const key = `${observation.lane}|${observation.connectionId}|${observation.channelId}`;
+		const channel = channels.get(key) ?? {
+			channelId: observation.channelId,
+			connectionId: observation.connectionId,
+			lane: observation.lane,
+			monotonic: true,
+			previousSequence: undefined,
+		};
+		if (channel.previousSequence !== undefined && observation.sequence < channel.previousSequence) {
+			channel.monotonic = false;
+		}
+		channel.previousSequence = observation.sequence;
+		channels.set(key, channel);
+	}
+	return Object.freeze(
+		[...channels.values()]
+			.map(({ channelId, connectionId, lane, monotonic }) =>
+				Object.freeze({ channelId, connectionId, lane, monotonic })
+			)
+			.sort(
+				(left, right) =>
+					left.connectionId - right.connectionId ||
+					left.channelId - right.channelId ||
+					(left.lane < right.lane ? -1 : left.lane > right.lane ? 1 : 0)
+			)
+	);
 }
 
 function productRosterFromSnapshot(snapshot: FabricTrialSnapshot): readonly FabricObservation[] {
@@ -1373,7 +1495,7 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 	let activeTrialId: string | null = null;
 	const campaignEvidence: CampaignEvidence[] = [];
 	const metrics: CampaignMetric[] = [];
-	let currentTrialEvidence: CampaignEvidence | undefined;
+	let currentTrialEvidence: Readonly<Record<string, unknown>> | CampaignEvidence | undefined;
 	let stage = "network-enable";
 	try {
 		await cdp.send("Network.enable");
@@ -1527,7 +1649,18 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 
 		for (let trial = 0; trial < TRIAL_COUNT; trial += 1) {
 			const trialId = "e3-03-" + String(trial);
+			const lexicographicRole = Object.freeze({
+				creatorPeerId: peers.creatorPeerId,
+				initiator: peers.creatorPeerId < peers.receiverPeerId ? ("creator" as const) : ("receiver" as const),
+				receiverPeerId: peers.receiverPeerId,
+			});
+			let trialProgress: Readonly<Record<string, unknown>> = Object.freeze({ lexicographicRole, trialId });
+			const updateTrialProgress = (patch: Readonly<Record<string, unknown>>): void => {
+				trialProgress = Object.freeze({ ...trialProgress, ...patch });
+				currentTrialEvidence = trialProgress;
+			};
 			activeTrialId = trialId;
+			currentTrialEvidence = trialProgress;
 			stage = trialId + "-prepare";
 			await Promise.all(
 				[creator, receiver].map((page) =>
@@ -1538,6 +1671,7 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			await waitForNetworkPair(creator, receiver, initialCreatorNetwork, initialReceiverNetwork);
 			await Promise.all([resetRtcObserver(creator), resetRtcObserver(receiver)]);
 			const clock = await clockEvidence(creator, receiver);
+			updateTrialProgress({ clockSamples: clock.samples, clockSkewMs: clock.maximumSkewMs });
 			expect(clock.maximumSkewMs).toBeLessThanOrEqual(20);
 			const receiverRawBefore = await rawReceivedAfterQuiescence(receiver);
 			const [senderRawTransportBefore, receiverRawTransportBefore] = await Promise.all([
@@ -1546,6 +1680,7 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			]);
 			const trialEvidenceStartedAtMs = Date.now();
 			const prepareStage = transportStageEvidence(0, senderRawTransportBefore, receiverRawTransportBefore);
+			updateTrialProgress({ stages: Object.freeze({ prepare: prepareStage }) });
 			const senderRawBefore = senderRawTransportBefore.sent;
 			stage = trialId + "-run";
 			const trialOperation = creator.evaluate((input) => window.__TS_DRP_V3_ZONE__?.fabric?.runTrial(input), {
@@ -1581,10 +1716,14 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 				senderRawTransportAtRunReturn,
 				receiverRawTransportAtRunReturn
 			);
+			updateTrialProgress({
+				stages: Object.freeze({ prepare: prepareStage, runReturned: runReturnedStage }),
+			});
 			const senderRawAfter = await rawSentAfterQuiescence(creator);
 			const senderRtc = await rtcObservations(creator);
 			const senderWire = platformObservations(senderRtc, "send", trialId);
 			const senderRawCandidateCount = senderWire.filter(({ lane, sentinel }) => lane === "raw" && !sentinel).length;
+			updateTrialProgress({ senderRawCandidateCount, senderWire });
 			if (senderRawCandidateCount < PRELIMINARY_RAW_DELIVERY_FLOOR) {
 				throw new Error(
 					`E303_RAW_SENDER_FLOOR:${JSON.stringify({
@@ -1607,25 +1746,39 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			const deadlineMs = campaignStartedAtMs + expectedCampaignSpanMs + RELIABLE_OBSERVATION_TAIL_MS;
 			stage = trialId + "-deadline";
 			await new Promise((resolve) => setTimeout(resolve, Math.max(0, deadlineMs - Date.now())));
-			let receiverAtDeadline = await receiverEvidenceAtDeadline(receiver, trialId);
+			const preliminaryReceiverSnapshot = await fabricSnapshot(receiver, trialId);
+			updateTrialProgress({ preliminaryReceiverSnapshot });
+			const preliminaryProductRoster = productRosterFromSnapshot(preliminaryReceiverSnapshot);
+			updateTrialProgress({ preliminaryProductRoster });
 			const productDeadlineMs = productDeadlineFromRoster(
-				productRosterFromSnapshot(receiverAtDeadline.fabric),
+				preliminaryProductRoster,
 				SAMPLE_INTERVAL_MS,
 				SAMPLE_COUNT,
 				RELIABLE_OBSERVATION_TAIL_MS
 			);
 			const receiverNowMs = await receiver.evaluate(() => Date.now());
-			if (receiverNowMs < productDeadlineMs) {
-				await new Promise((resolve) => setTimeout(resolve, productDeadlineMs - receiverNowMs));
-				receiverAtDeadline = await receiverEvidenceAtDeadline(receiver, trialId);
-			}
+			updateTrialProgress({ productDeadlineMs, receiverNowMs });
+			await new Promise((resolve) => setTimeout(resolve, Math.max(0, productDeadlineMs + 1 - receiverNowMs)));
+			const receiverAtDeadline = await receiverEvidenceAtDeadline(receiver, trialId);
 			const senderRawTransportAtDeadline = (await zone(creator)).rawTransport;
+			const productRoster = productRosterFromSnapshot(receiverAtDeadline.fabric);
 			const receiverWire = platformObservations(receiverAtDeadline.rtc, "message", trialId);
 			const deadlineStage = transportStageEvidence(
 				Date.now() - trialEvidenceStartedAtMs,
 				senderRawTransportAtDeadline,
 				receiverAtDeadline.zone.rawTransport
 			);
+			updateTrialProgress({
+				preliminaryProductRoster: undefined,
+				productRoster,
+				receiverRawTransportAtDeadline: receiverAtDeadline.zone.rawTransport,
+				receiverWire,
+				stages: Object.freeze({
+					deadline: deadlineStage,
+					prepare: prepareStage,
+					runReturned: runReturnedStage,
+				}),
+			});
 			stage = trialId + "-reset";
 			await applyProfile(trialId + "-reset", NO_LOSS);
 			await waitForOpenTransportPair(creator, receiver);
@@ -1641,19 +1794,41 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 				senderAfterReset.rawTransport,
 				receiverAfterReset.rawTransport
 			);
+			updateTrialProgress({
+				stages: Object.freeze({
+					deadline: deadlineStage,
+					prepare: prepareStage,
+					reset: resetStage,
+					runReturned: runReturnedStage,
+				}),
+			});
 			expect(senderSnapshot.attempted).toEqual({ raw: SAMPLE_COUNT, reliable: SAMPLE_COUNT });
 			expectOpenTransport(senderSnapshot, peers.receiverPeerId);
 			expectOpenTransport(receiverSnapshot, peers.creatorPeerId);
 
 			stage = trialId + "-assertions";
-			const productRoster = productRosterFromSnapshot(receiverAtDeadline.fabric);
 			const receiverPartition = partitionReceiverEvidence(receiverWire, productRoster);
+			const acceptedObservationIdentities = Object.freeze(
+				receiverPartition.productAccepted.map(acceptedObservationIdentity)
+			);
+			const partitionCardinalities = Object.freeze({
+				accepted: receiverPartition.productAccepted.length,
+				observer: receiverWire.length,
+				rejected: receiverPartition.productRejected.length,
+				roster: productRoster.length,
+			});
+			updateTrialProgress({
+				acceptedObservationIdentities,
+				partitionCardinalities,
+				productRejected: receiverPartition.productRejected,
+			});
 			const rawWire = expectRawReceiverSamples(receiverWire);
 			const acceptedRawWire = receiverPartition.productAccepted.filter(
 				({ lane, sentinel }) => lane === "raw" && !sentinel
 			);
 			const raw = acceptedSequencedObservations(acceptedRawWire);
-			const reliable = expectReliableReceiverSamples(receiverPartition.productAccepted);
+			expectReliableReceiverSamples(receiverWire);
+			const reliable = firstReliableBySequence(receiverPartition.productAccepted);
 			const reliableWire = receiverWire.filter(({ lane, sentinel }) => lane === "reliable" && !sentinel);
 			expect(receiverWire.filter(({ lane, sentinel }) => lane === "reliable" && sentinel)).toEqual([]);
 			expect(rawWire.length).toBeGreaterThan(0);
@@ -1661,11 +1836,42 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			expect(senderRawAfter - senderRawBefore).toBe(senderRaw.length);
 			const receiverRawCounterDelta = receiverAtDeadline.zone.rawTransport.received - receiverRawBefore;
 			const productRosterRawCount = productRoster.filter(({ lane, sentinel }) => lane === "raw" && !sentinel).length;
+			const receiverSequence = rawSequenceEvidence(raw);
+			const senderSequence = rawSequenceEvidence(senderRaw);
+			const rawAoI = ageOfInformation(raw, campaignStartedAtMs, deadlineMs, SAMPLE_INTERVAL_MS);
+			const reliableAoI = ageOfInformation(reliable, campaignStartedAtMs, deadlineMs, SAMPLE_INTERVAL_MS);
+			const rawAoIP50Ms = percentile(rawAoI, 0.5);
+			const rawAoIP95Ms = percentile(rawAoI, 0.95);
+			const reliableAoIP50Ms = percentile(reliableAoI, 0.5);
+			const reliableAoIP95Ms = percentile(reliableAoI, 0.95);
+			const firstReliableReceivedAtMs = reliable[0]?.receivedAtMs;
+			if (firstReliableReceivedAtMs === undefined) throw new Error("E303_RELIABLE_OBSERVATION_ABSENT");
+			const rawDeliveredAfterReliableStart = raw.filter(
+				({ receivedAtMs }) => receivedAtMs > firstReliableReceivedAtMs
+			).length;
+			const rendered = renderedProductRosterMetrics(productRoster, productDeadlineMs, SAMPLE_INTERVAL_MS, SAMPLE_COUNT);
 			const trialEvidence = Object.freeze({
+				acceptedObservationIdentities,
+				application: Object.freeze({
+					rawAoIP50Ms,
+					rawAoIP95Ms,
+					rawDelivered: raw.length,
+					rawDeliveredAfterReliableStart,
+					rawGap: receiverSequence.gap,
+					rawMaxStallMs: senderSequence.maxStallMs,
+					reliableAoIP50Ms,
+					reliableAoIP95Ms,
+					reliableDelivered: reliable.length,
+				}),
+				clockSamples: clock.samples,
+				clockSkewMs: clock.maximumSkewMs,
 				completeObserverRawGap: rawSequenceEvidence(rawWire).gap,
-				productAccepted: receiverPartition.productAccepted,
+				lexicographicRole,
+				partitionCardinalities,
+				perChannelMonotonicity: channelSequenceEvidence(receiverPartition.productAccepted),
 				productRejected: receiverPartition.productRejected,
 				productRoster,
+				rawArrivalInversionCount: arrivalInversionCount(receiverPartition.productAccepted),
 				rawCounter: Object.freeze({
 					after: receiverAtDeadline.zone.rawTransport.received,
 					before: receiverRawBefore,
@@ -1684,6 +1890,7 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 						senderRtc.filter(({ insertionReadyState, readyState }) => insertionReadyState !== readyState)
 					),
 				}),
+				rendered,
 				receiverWire,
 				stages: Object.freeze({
 					deadline: deadlineStage,
@@ -1754,24 +1961,10 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			expect(
 				scheduledReliable.every(({ receivedAtMs, sentAtMs }) => receivedAtMs >= sentAtMs && receivedAtMs <= deadlineMs)
 			).toBe(true);
-			const receiverSequence = rawSequenceEvidence(raw);
-			const senderSequence = rawSequenceEvidence(senderRaw);
 			expect(receiverSequence.gap).toBeGreaterThan(1);
 			expect(senderSequence.maxStallMs).toBeLessThanOrEqual(500);
-			const rawAoI = ageOfInformation(raw, campaignStartedAtMs, deadlineMs, SAMPLE_INTERVAL_MS);
-			const reliableAoI = ageOfInformation(reliable, campaignStartedAtMs, deadlineMs, SAMPLE_INTERVAL_MS);
-			const rawAoIP50Ms = percentile(rawAoI, 0.5);
-			const rawAoIP95Ms = percentile(rawAoI, 0.95);
-			const reliableAoIP50Ms = percentile(reliableAoI, 0.5);
-			const reliableAoIP95Ms = percentile(reliableAoI, 0.95);
 			expect(rawAoIP95Ms).toBeLessThanOrEqual(reliableAoIP95Ms * 0.8);
-			const firstReliableReceivedAtMs = reliable[0]?.receivedAtMs;
-			if (firstReliableReceivedAtMs === undefined) throw new Error("E303_RELIABLE_OBSERVATION_ABSENT");
-			const rawDeliveredAfterReliableStart = raw.filter(
-				({ receivedAtMs }) => receivedAtMs > firstReliableReceivedAtMs
-			).length;
 			expect(rawDeliveredAfterReliableStart).toBeGreaterThanOrEqual(10);
-			const rendered = renderedProductRosterMetrics(productRoster, productDeadlineMs, SAMPLE_INTERVAL_MS, SAMPLE_COUNT);
 			metrics.push(
 				Object.freeze({
 					clockSamples: clock.samples,
