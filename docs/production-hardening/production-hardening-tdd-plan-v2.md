@@ -66801,3 +66801,48 @@ by 2026-09-04, and replacement-free classification belongs to the D.108e4j
 plan owner by 2026-09-04. Grok and Kimi's approval of the broader closure claim
 does not override the reproduced frozen-gate conflict. No confirmation review,
 Fable review or collaboration subagent ran.
+
+The accepted same-round plan correction is signed/pushed commit
+`f8edc6b45b80637a570def990a35dee7d7a9220d`, parent
+`4547e46a7926c0a2c1cc375996633ac871d4fdae`, tree
+`76f238c73e6dd3c27cc7bc2f68a82907b3ef0af4`, stable patch id
+`c504469d94b8590f6e1d4f229fd077b00fec48b4` and raw-diff SHA-256
+`17292e3974c08e1f1d1512861a5ebc31b369e2a3d978c92a75b788091b417650`.
+It has a good signature and changes only this plan. The tracked test, product,
+example, E3-03 config, dependency and lockfile tree remains byte-identical to
+the accepted D.108e4i GREEN at `cc112d22`.
+
+The one D.108e4j-authorized invocation then ran exactly once with the frozen
+command above. It exited zero after 171.918 seconds with exactly five expected,
+zero unexpected, zero skipped and zero flaky tests; every result used retry
+zero. The four deterministic controls passed before the retained three-trial
+behavior, which passed in 165.282 seconds. Reporter and stderr SHA-256 values
+are `ce73272a864bd0f67a17923d53777d7fab2d8656f8211cf9b808f51f6d751abb`
+and `3011029015719c5f8ac45d9f3307a09c4555517d9cf156d2ef5596bb9bd1b72e`.
+The decoded `e3-03-fixed-loss-campaign.json` SHA-256 is
+`81357d9eafdc6bde910032b56f5421a0106a25639c2f33d15a8a2d6f3db61aa0`.
+No failure telemetry, trace or error-context artifact exists because the sole
+invocation passed.
+
+The decoded attachment records exact Chromium `151.0.7922.34`, trial count
+three and three complete evidence envelopes. Signed `rawMaxStallMs` values are
+44, 48 and 46 ms, all strictly below the unchanged 500 ms ceiling. Raw delivery
+was 415, 413 and 416 samples; reliable delivery was 12, 10 and 14. The passing
+test executed the aggregate connection/delivery gates, final durable-control
+round trip and rendered-metric assertions after all three trial bodies. Every
+trial records zero product `linkDrops` on both peers and unchanged
+`lastLinkDrop`; the terminal campaign is therefore performance/aggregate/
+rendered/durable evidence only. Directional replacement custody remains owned
+by the focused D.108e4g browser proof and D.108e4i preserved e3-03-2 replay.
+
+Authenticated connection losses and some ping failures remained observable,
+but every recorded connection abort was owned by `other-owner`, not
+`libp2p-connection-monitor`; no exact monitor-owned
+`start -> failure -> abort` chain exists. Combined with zero product link drops,
+the strict otherwise-usable false-positive predicate is false. This run does
+not authorize an upstream attribution or MVRE, and the recorded js-libp2p
+issues remain context only. The result is a D.108e4e/f/g/h acceptance candidate
+pending the separately required immutable evidence review round. D.108e4a/b/c/d,
+aggregate D.108e4 and D.108e5 remain open exactly as frozen above. No campaign
+rerun, Fable review, product/libp2p change or protected-untracked mutation
+occurred.
