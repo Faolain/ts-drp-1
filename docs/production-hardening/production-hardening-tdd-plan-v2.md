@@ -65108,13 +65108,28 @@ registers` and its mixed-order sibling replace the retired-link/timer model
 raw links, and cannot revive stale signaling` change first send false/
   activeLinks 0 to first send true/activeLinks 1 while exactly one replacement
   starts; post-handoff delivery remains exact.
+- `keeps an already mapped peer inside the physical eight-pending-PC ceiling`
+  and `retains the physical eight-PC ceiling for repeated valid offers from one
+authenticated peer` encoded cumulative-allocation behavior that could place
+  pending PCs on top of eight mapped PCs and could allocate more than one B for
+  the same peer. They are superseded by three causal controls: every non-closed
+  mapped/pending/retiring PC counts toward the global eight, a non-open mapped
+  sidecar still prevents a ninth PC, and a second same-peer offer is refused
+  while the first is pending.
+- The initial RED's role-dependent `lastLinkDrop` expectations named
+  `channel-close` on the lower initiator and `replacement` on the upper
+  responder. That was opposite to this section's frozen coordinator contract.
+  The corrected RED names `replacement` on the lower peer that maps B and
+  retires A, and `channel-close` on the upper peer that promotes held B. This
+  correction is an explicit RED re-acceptance, not a GREEN-owned assertion
+  inversion.
 
 All assertions outside that explicit supersession list remain byte-for-byte
 controls: undesired-peer membership, overlapping-current selection, non-open
 unusable-link recovery, unknown/closed-route ACL, no duplicate mapped ingress,
-handshake bounds, eight pending offers and physical `MAX_LINKS`. RED is causal
-only when the new/reclassified continuity assertions fail under current source
-while every non-superseded control passes.
+handshake bounds and physical `MAX_LINKS`. RED is causal only when the new/
+reclassified continuity assertions fail under current source while every
+non-superseded control passes.
 
 GREEN replaces D.108e4a's retire-before-setup assumption only for a desired,
 already-authorized, same-peer open raw sidecar with a current authenticated
@@ -65284,6 +65299,142 @@ distinct replacement raw channel's open event. It also records
 `lastLinkDrop === "replacement"` and a newer authenticated generation. This
 confirms the local stale-authenticated break-before-make arm; it does not
 classify any monitor decision as false positive or upstream.
+
+The initial D.108e4g GREEN is signed/pushed commit
+`df2d75fefd6fb3e1cc57944da8f83b2cf83eda67`, parent
+`8cd33e9d04559ebb9c5c40b03755dcf0bd9254eb`, tree
+`d3d07d69750a55e38510042e1a133c3c17cb6c9e`, stable patch id
+`1fd26cc30327d4aaf394d056034bfbf4eb844f87` and raw-diff SHA-256
+`f372d6c10718274cdeed07dd1a56bccd9cffb6c0c32f4beba596ff8dafb45fec`.
+It has a good signature and changes exactly the private network owner, its unit
+owner and the frozen browser telemetry owner. That checkpoint is rejected by
+its formal GREEN review and is not closure evidence.
+
+Grok 4.6/high session `01a04736-6a3b-7a11-9d4f-6a2a08e92780`
+completed its sole run normally in 810.248 seconds with exit zero,
+`stop_reason=end_turn` and no timeout. The runner reported `NO_VERDICT` only
+because inspection prose preceded the terminal object; the recorded
+substantive object is `CHANGES_REQUIRED`, P0=0/P1=3/P2=1. Public, status and
+event-stream SHA-256 values are respectively
+`8d10210278dd3bf6ebf9cca54e57dbce69721b72a5c1120642f26e7ce9adc939`,
+`4b46f5808307b6814530eeca91e9395dfd547214ebccec22524a32459a231f96`
+and `83851dadcc072045a78555132a8e66ddfa0de95abb2fd6fca8d6a6a86542b3b2`.
+It found the missing desired-peer guard, same-peer/global physical admission
+holes, an unexercised retiring-ingress branch and the map-before-retiring
+same-turn window.
+
+Kimi CLI 0.38.0 used exact `kimi-code/k3`, thinking enabled and the 100-step
+ceiling in session `session_f68a6488-0bf9-47a3-a6a8-0cf5d1ed41e9`.
+It emitted exactly 100 total, unique and ordered `CHECK001` through `CHECK100`
+markers and one terminal `APPROVED`, P0=0/P1=0/P2=2 result. Stream, stderr and
+extracted-terminal SHA-256 values are
+`e17ebb93795dd2599221bf5dbda8cf5a0a22759e71a2bc0ea2fc89cca29cdfa4`,
+`71a8073bf37c87a17f03ef06660a37a29a70bc073c4fbf8051c964ee90049781`
+and `1f54ec6e0bde743b3490aa6eff100bc53d64165f410162c102e07c506c213191`.
+Its P2s identified the cross-context wall-clock comparison and missing native
+send-error self-check.
+
+Claude-skill Opus 5/xhigh session
+`e6e0fb12-62ac-400d-ac30-9ae57b315b1d` completed normally in 837.262 seconds
+and 42 turns, launched no subagent, incurred no permission denial and returned
+schema-valid `CHANGES_REQUIRED`, P0=0/P1=6/P2=5. Raw/stderr SHA-256 values are
+`c2aa12deee2097752d8eb3ddc8b6eccfa3801248931df0422010c837c3395492`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+It independently found the RED-control and close-owner inversions, unreachable
+retiring ingress, abrupt-PC-close cleanup defect, cross-clock gate and missing
+reverse-direction window. Its P2s covered promotion ordering/currency,
+held-pending cleanup, schema versioning and wrapper transparency. No formal
+reviewer was relaunched, no confirmation review ran and no Fable or
+collaboration subagent ran.
+
+The same-round corrective RED is signed/pushed commit
+`ab645cda0dd03b0faa3ab8cb6f1637a3730023b0`, parent
+`df2d75fefd6fb3e1cc57944da8f83b2cf83eda67`, tree
+`ea84211fe4f99e663f40ea0cd7ffd46f7effac71`, stable patch id
+`9a064f67e0fb4fde22eaf88cae66250d7c9a947c` and raw-diff SHA-256
+`8556c736933c3980b1646cb9b635cc571be5a0e482c9d4160da7612ce9f3d538`.
+It has a good signature and changes only the exact unit owner. Against the
+reviewed source, the complete owner produced exactly five causal failures and
+42 controls in 475 ms: ninth-PC allocation beside a non-open mapped sidecar,
+duplicate same-peer pending allocation, both role-orderings abruptly closing A
+before retiring ingress drained, and undesired-initiator replacement. Log
+SHA-256 is
+`21b5f715158781f0e9a5c19103816f354b22a16c019ca44c0a8329f2305a16f1`.
+The explicit supersession and close-owner corrections above repair the RED
+evidence-integrity findings rather than hiding them in GREEN.
+
+The same-round corrected GREEN is signed/pushed commit
+`ca6c7a39f25972b913c4bb99e18793efe7eaeca5`, parent
+`ab645cda0dd03b0faa3ab8cb6f1637a3730023b0`, tree
+`2abe6f9bd5768ba94c95fe265c844f95158c7958`, stable patch id
+`320bb1afa4deb41b3b373402ee6a1ccc03f6eaaf` and raw-diff SHA-256
+`ad66f8a8893454ef4650491db1448b5b880c2ea0daff7139dd6eb0df16a99962`.
+It has a good signature. Stale-open setup is desired-gated; global admission
+deduplicates mapped, pending and retiring non-closed PCs and permits one
+pending PC per peer; A is classified retiring before B is published; and
+failed/current pending cleanup is exact. Replacement retirement now runs the
+data-channel closing procedure and keeps A as retiring ingress until its close
+event, then closes the PC. It does not call `RTCPeerConnection.close()` first,
+whose abrupt-close algorithm sets data channels and connection state closed
+without the events the provisional cleanup depended on. No grace timer,
+payload buffer, wire change or new API was introduced.
+
+The browser observer is schema v2, uses `Date.now()` consistently for
+supporting wall time and preserves peer-local monotonic sequence as the
+ordering authority. Successful and throwing signaling/send paths prove native
+result/error transparency. The cross-peer comparison no longer compares two
+clocks: Playwright first observes the exact responder product-handler event,
+asserts zero initiator B attempts, then serially permits the first movement.
+One intermediate focused run correctly failed because its gate was placed
+after that movement and observed one pre-gate B attempt; JSON SHA-256 is
+`8e6d2c7aac1731e9d31e13e8883573d0c0af58e361675b1f29d8dedea897eb50`.
+Moving the gate before all permitted B sends made the condition causal rather
+than timing-dependent.
+
+The final focused command was
+`D108E4G_TELEMETRY=1 pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts -g <five exact titles> --reporter=json`.
+It passed exactly 5/5 with zero skipped, flaky or unexpected tests in 11.874
+seconds. JSON/stderr and canonical-lifecycle SHA-256 values are
+`73898436bde48821ffd3c96dfc46b72c09d040c01abeb7c8c4ae536ad3e5e22f`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+and `52d7776d843b33b479f0653abc811686a99018260a5289ba78cc89321024f0b4`.
+The attachment records schema v2, exact initiator RTC identity 5/29, responder
+identity 5/35, responder product-handler sequence 290, zero B attempts before
+the serial gate, then joined first-B attempt/success sequences 336/337.
+
+The exact retained command with coverage disabled passed 48/48 unit-owner and
+10/10 E3-02 assertions; log SHA-256 is
+`67288328aca410c8d97a8dc9485ca51b43618ec34003c467c53718272ed32de5`.
+Network build/typecheck and grid typecheck/build passed; their log SHA-256
+values are respectively
+`71a4ed56486bf60b30144c8f4da38c2d1bc605fbdaf9007467d3ac977241f407`,
+`a03fca5f6b2fcbcbfcf4737e44ea887d83bb4815889e77f1e79b6abc2e0c981a`,
+`087eba9acd40302f69876972072fe38b513f0ba47b13ec083ed1f5c79586642f`
+and `209f6247cdd42f34e7f37d8b6f318cbeeaf01312baa40f8ab74cee0711f2caee`.
+Exact-three-owner ESLint, Prettier and `git diff --check` passed; their log
+SHA-256 values are
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`,
+`17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+The required advisory Codex review found one P2 in the provisional correction:
+requiring local desired membership when promoting B broke the supported
+authenticated inbound-before-reconcile path. Public/stderr SHA-256 values are
+`95ba121184489971a03a0b3c5ba2b1b2b550c1f963a6eec32789be4209bb052f`
+and `2010154922b5bac4c59ee0ca6d9f956f7158bd08ea5fc4ba924a7283fa661105`.
+The implementer reproduced it without a retry-masking poll, added the exact
+control and retained the existing admission semantics while requiring the
+pending authenticated connection to remain current. All formal P2s are owned
+by the D.108e4g correction implementer and discharged in `ca6c7a39`; no review
+debt remains. The connection-monitor false-positive predicate has not been
+satisfied, no upstream attribution or MVRE is authorized, and no js-libp2p
+package/configuration behavior changed.
+
+No complete E3-03 campaign has run in this correction sequence. The
+deterministic RED/GREEN, telemetry, review and focused gates now admit exactly
+one complete campaign. D.108e4g and rejected D.108e4f remain open until that
+single unchanged 5/5 campaign passes; a different outcome must be assigned to
+its telemetry owner without rerun.
 
 Standalone test-owner TypeScript, affected grid build/typecheck, exact-owner
 ESLint/Prettier and diff check pass. Their material SHAs are
