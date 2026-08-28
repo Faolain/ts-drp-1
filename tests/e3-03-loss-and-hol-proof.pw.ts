@@ -112,6 +112,7 @@ interface GridNetworkTestSession {
 type Libp2pMonitorEventKind =
 	| "connection-abort"
 	| "connection-close"
+	| "monitor-epoch-start"
 	| "ping-failure"
 	| "ping-read-success"
 	| "ping-start"
@@ -121,17 +122,20 @@ type Libp2pMonitorEventKind =
 interface Libp2pMonitorObservation {
 	readonly atMonotonicMs: number;
 	readonly atWallMs: number;
+	readonly carryIn: boolean;
 	readonly connectionId: string;
 	readonly event: Libp2pMonitorEventKind;
 	readonly owner: string;
 	readonly peerId: string;
+	readonly pingId: string;
 	readonly reason?: string;
-	readonly schemaVersion: 2;
+	readonly schemaVersion: 3;
 	readonly sequence: number;
+	readonly trialId: string;
 }
 
 interface Libp2pMonitorObserver {
-	reset(): void;
+	reset(trialId: string): void;
 	snapshot(): readonly Libp2pMonitorObservation[];
 }
 
@@ -166,12 +170,14 @@ interface CampaignMetric {
 }
 
 interface RtcObservation {
+	readonly attemptId?: number;
 	readonly atMs: number;
 	readonly byteLength: number;
 	readonly channelId: number;
 	readonly connectionId: number;
 	readonly direction: "message" | "send";
 	readonly insertionReadyState: RTCDataChannelState;
+	readonly lifecycleSequence?: number;
 	readonly label: string;
 	readonly maxRetransmits: number | null;
 	readonly ordinal: number;
@@ -229,19 +235,29 @@ interface RtcChannelStateObservation {
 	readonly schemaVersion: 2;
 }
 
+interface RtcCustodySnapshot {
+	readonly channelStates: readonly RtcChannelStateObservation[];
+	readonly lifecycle: readonly RtcLifecycleObservation[];
+	readonly lifecycleSequenceFence: number;
+	readonly records: readonly RtcObservation[];
+}
+
 interface RtcObserver {
 	channelStateSnapshot(): readonly RtcChannelStateObservation[];
+	custodySnapshot(): Promise<RtcCustodySnapshot>;
 	lifecycleSnapshot(): Promise<readonly RtcLifecycleObservation[]>;
 	reset(): void;
 	snapshot(): Promise<readonly RtcObservation[]>;
 }
 
 interface PlatformObservation extends FabricObservation {
+	readonly attemptId?: number;
 	readonly carrierByteLength: number;
 	readonly channelLabel: string;
 	readonly channelId: number;
 	readonly connectionId: number;
 	readonly insertionReadyState: RTCDataChannelState;
+	readonly lifecycleSequence?: number;
 	readonly maxRetransmits: number | null;
 	readonly ordered: boolean;
 	readonly ordinal: number;
@@ -332,6 +348,7 @@ interface CampaignEvidence {
 	}>;
 	readonly rendered: RenderedFabricEvidence;
 	readonly receiverWire: readonly PlatformObservation[];
+	readonly replacementCustody: D108e4hValidationInput;
 	readonly stages: Readonly<{
 		readonly deadline: TransportStageEvidence;
 		readonly prepare: TransportStageEvidence;
@@ -381,14 +398,19 @@ interface D108e4hBoundaryCustody {
 
 interface D108e4hLifecycleObservation {
 	readonly attemptId?: number;
+	readonly atMonotonicMs?: number;
+	readonly atWallMs?: number;
 	readonly bufferedAmount?: number;
+	readonly callsite?: string;
 	readonly channelId?: number;
 	readonly connectionId: number;
 	readonly event: RtcLifecycleKind;
+	readonly label?: string;
 	readonly owner: string;
 	readonly readyState?: RTCDataChannelState;
 	readonly schemaVersion: 3;
 	readonly sequence: number;
+	readonly state?: string;
 	readonly trialId: string;
 }
 
@@ -439,6 +461,13 @@ interface D108e4hValidationInput {
 	readonly sampleCount: number;
 	readonly schemaVersion: 3;
 	readonly trialId: string;
+}
+
+interface D108e4hPageCapture {
+	readonly fabric: FabricTrialSnapshot;
+	readonly monitor: readonly Libp2pMonitorObservation[];
+	readonly rtc: RtcCustodySnapshot;
+	readonly zone: ZoneSnapshot;
 }
 
 type NetworkProfile = Readonly<{
@@ -515,8 +544,9 @@ function installRtcObserver(): void {
 			readonly readyState?: RTCDataChannelState;
 			readonly state?: string;
 		}>
-	): void => {
+	): number => {
 		const atMonotonicMs = performance.now();
+		const selectedSequence = lifecycleSequence;
 		lifecycleRecords.push(
 			Object.freeze({
 				attemptId: input.attemptId,
@@ -532,11 +562,12 @@ function installRtcObserver(): void {
 				owner: input.owner,
 				readyState: input.readyState,
 				schemaVersion: 2 as const,
-				sequence: lifecycleSequence,
+				sequence: selectedSequence,
 				state: input.state,
 			})
 		);
 		lifecycleSequence += 1;
+		return selectedSequence;
 	};
 	const bytesFrom = async (data: RtcData): Promise<Uint8Array> => {
 		if (typeof data === "string") return new TextEncoder().encode(data);
@@ -544,7 +575,13 @@ function installRtcObserver(): void {
 		if (data instanceof ArrayBuffer) return new Uint8Array(data.slice(0));
 		return new Uint8Array(data.buffer, data.byteOffset, data.byteLength).slice();
 	};
-	const capture = (channel: RTCDataChannel, direction: "message" | "send", data: RtcData): void => {
+	const capture = (
+		channel: RTCDataChannel,
+		direction: "message" | "send",
+		data: RtcData,
+		lifecycleSequence: number,
+		attemptId?: number
+	): void => {
 		const identity = channelIdentities.get(channel);
 		if (identity === undefined) throw new Error("E303_RTC_CHANNEL_IDENTITY_ABSENT");
 		const selectedGeneration = generation;
@@ -559,12 +596,14 @@ function installRtcObserver(): void {
 			.then((bytes) => {
 				if (selectedGeneration !== generation) return;
 				records.push({
+					...(attemptId === undefined ? {} : { attemptId }),
 					atMs,
 					byteLength: bytes.byteLength,
 					channelId: identity.channelId,
 					connectionId: identity.connectionId,
 					direction,
 					insertionReadyState: channel.readyState,
+					lifecycleSequence,
 					label,
 					maxRetransmits,
 					ordered,
@@ -608,14 +647,14 @@ function installRtcObserver(): void {
 			})
 		);
 		channel.addEventListener("message", (event) => {
-			recordLifecycle("channel-message", connectionId, {
+			const messageSequence = recordLifecycle("channel-message", connectionId, {
 				bufferedAmount: channel.bufferedAmount,
 				channelId,
 				label: channel.label,
 				owner: "rtc-datachannel-message-event",
 				readyState: channel.readyState,
 			});
-			capture(channel, "message", event.data as RtcData);
+			capture(channel, "message", event.data as RtcData, messageSequence);
 		});
 		return channel;
 	};
@@ -672,7 +711,7 @@ function installRtcObserver(): void {
 			}
 			const attemptId = nextAttemptId;
 			nextAttemptId += 1;
-			recordLifecycle("channel-send-attempt", identity.connectionId, {
+			const attemptSequence = recordLifecycle("channel-send-attempt", identity.connectionId, {
 				attemptId,
 				bufferedAmount: this.bufferedAmount,
 				channelId: identity.channelId,
@@ -680,7 +719,7 @@ function installRtcObserver(): void {
 				owner: "rtc-datachannel-send",
 				readyState: this.readyState,
 			});
-			capture(this, "send", data);
+			capture(this, "send", data, attemptSequence, attemptId);
 			try {
 				Reflect.apply(nativeSend, this, [data]);
 				recordLifecycle("channel-send-success", identity.connectionId, {
@@ -851,24 +890,45 @@ function installRtcObserver(): void {
 		value: ObservedPeerConnection,
 		writable: true,
 	});
+	const snapshotChannelStates = (): readonly RtcChannelStateObservation[] =>
+		[...watchedChannels]
+			.map((channel) => {
+				const identity = channelIdentities.get(channel);
+				if (identity === undefined) throw new Error("E303_RTC_CHANNEL_IDENTITY_ABSENT");
+				return Object.freeze({
+					bufferedAmount: channel.bufferedAmount,
+					channelId: identity.channelId,
+					connectionId: identity.connectionId,
+					label: channel.label,
+					readyState: channel.readyState,
+					schemaVersion: 2 as const,
+				});
+			})
+			.sort((left, right) => left.connectionId - right.connectionId || left.channelId - right.channelId);
 	Object.defineProperty(observedWindow, "__E303_RTC_OBSERVER__", {
 		configurable: false,
 		value: Object.freeze({
 			channelStateSnapshot(): readonly RtcChannelStateObservation[] {
-				return [...watchedChannels]
-					.map((channel) => {
-						const identity = channelIdentities.get(channel);
-						if (identity === undefined) throw new Error("E303_RTC_CHANNEL_IDENTITY_ABSENT");
-						return Object.freeze({
-							bufferedAmount: channel.bufferedAmount,
-							channelId: identity.channelId,
-							connectionId: identity.connectionId,
-							label: channel.label,
-							readyState: channel.readyState,
-							schemaVersion: 2 as const,
-						});
-					})
-					.sort((left, right) => left.connectionId - right.connectionId || left.channelId - right.channelId);
+				return snapshotChannelStates();
+			},
+			async custodySnapshot() {
+				await Promise.all([...pending]);
+				const lifecycleSequenceFence = lifecycleSequence;
+				return Object.freeze({
+					channelStates: Object.freeze(snapshotChannelStates()),
+					lifecycle: Object.freeze(
+						lifecycleRecords
+							.filter(({ sequence }) => sequence < lifecycleSequenceFence)
+							.map((record) => Object.freeze({ ...record }))
+					),
+					lifecycleSequenceFence,
+					records: Object.freeze(
+						records
+							.slice()
+							.sort((left, right) => left.ordinal - right.ordinal)
+							.map((record) => Object.freeze({ ...record }))
+					),
+				});
 			},
 			async lifecycleSnapshot(): Promise<readonly RtcLifecycleObservation[]> {
 				await Promise.all([...pending]);
@@ -1072,27 +1132,39 @@ async function installLibp2pMonitorObserver(page: Page): Promise<void> {
 			| undefined;
 		const host = session?.node.networkNode._node;
 		if (host === undefined) throw new Error("E303_LIBP2P_HOST_ABSENT");
+		let activeTrialId = "observer-install";
+		let nextPingOrdinal = 0;
 		let sequence = 0;
 		const records: Libp2pMonitorObservation[] = [];
 		const wrapped = new WeakSet<object>();
-		const pingInFlight = new Map<string, boolean>();
+		type PingEvidence = {
+			carryIn: boolean;
+			readonly connection: ConnectionLike;
+			failureRecorded: boolean;
+			readonly pingId: string;
+		};
+		const pingInFlight = new Map<string, PingEvidence>();
+		const failedPingAwaitingAbort = new Map<string, PingEvidence>();
 		const record = (
 			connection: ConnectionLike,
 			event: Libp2pMonitorEventKind,
 			owner: string,
-			reason?: string
+			input: Readonly<{ readonly carryIn?: boolean; readonly pingId?: string; readonly reason?: string }> = {}
 		): void => {
 			records.push(
 				Object.freeze({
 					atMonotonicMs: performance.now(),
 					atWallMs: Date.now(),
+					carryIn: input.carryIn ?? false,
 					connectionId: connection.id,
 					event,
 					owner,
 					peerId: connection.remotePeer.toString(),
-					reason,
-					schemaVersion: 2 as const,
+					pingId: input.pingId ?? `${activeTrialId}:event:${connection.id}:${sequence}`,
+					reason: input.reason,
+					schemaVersion: 3 as const,
 					sequence,
+					trialId: activeTrialId,
 				})
 			);
 			sequence += 1;
@@ -1107,16 +1179,22 @@ async function installLibp2pMonitorObserver(page: Page): Promise<void> {
 				value(error?: Error): void {
 					const stack = new Error().stack ?? "";
 					const monitorOwned = stack.includes("connection-monitor");
-					if (monitorOwned && pingInFlight.get(connection.id) === true) {
-						record(connection, "ping-failure", "libp2p-connection-monitor", error?.name ?? error?.message);
-						pingInFlight.delete(connection.id);
+					const ping = pingInFlight.get(connection.id) ?? failedPingAwaitingAbort.get(connection.id);
+					if (monitorOwned && ping !== undefined && !ping.failureRecorded) {
+						record(connection, "ping-failure", "libp2p-connection-monitor", {
+							carryIn: ping.carryIn,
+							pingId: ping.pingId,
+							reason: error?.name ?? error?.message,
+						});
+						ping.failureRecorded = true;
 					}
-					record(
-						connection,
-						"connection-abort",
-						monitorOwned ? "libp2p-connection-monitor" : "other-owner",
-						error?.name ?? error?.message
-					);
+					pingInFlight.delete(connection.id);
+					failedPingAwaitingAbort.delete(connection.id);
+					record(connection, "connection-abort", monitorOwned ? "libp2p-connection-monitor" : "other-owner", {
+						carryIn: ping?.carryIn,
+						pingId: ping?.pingId,
+						reason: error?.name ?? error?.message,
+					});
 					nativeAbort(error);
 				},
 				writable: true,
@@ -1126,24 +1204,47 @@ async function installLibp2pMonitorObserver(page: Page): Promise<void> {
 				async value(protocol: string | readonly string[], options?: unknown): Promise<StreamLike> {
 					const protocols = typeof protocol === "string" ? [protocol] : protocol;
 					const ping = protocols.includes("/ipfs/ping/1.0.0");
+					const pingEvidence = ping
+						? {
+								carryIn: false,
+								connection,
+								failureRecorded: false,
+								pingId: `${activeTrialId}:ping:${nextPingOrdinal}`,
+							}
+						: undefined;
 					if (ping) {
-						record(connection, "ping-start", "libp2p-connection-monitor");
-						pingInFlight.set(connection.id, true);
+						nextPingOrdinal += 1;
+						record(connection, "ping-start", "libp2p-connection-monitor", {
+							pingId: pingEvidence?.pingId,
+						});
+						if (pingEvidence !== undefined) pingInFlight.set(connection.id, pingEvidence);
 					}
 					try {
 						const stream = await nativeNewStream(protocol, options);
 						if (!ping) return stream;
-						record(connection, "ping-stream-open", "libp2p-connection-monitor");
+						record(connection, "ping-stream-open", "libp2p-connection-monitor", {
+							carryIn: pingEvidence?.carryIn,
+							pingId: pingEvidence?.pingId,
+						});
 						stream.addEventListener("message", () =>
-							record(connection, "ping-read-success", "libp2p-connection-monitor")
+							record(connection, "ping-read-success", "libp2p-connection-monitor", {
+								carryIn: pingEvidence?.carryIn,
+								pingId: pingEvidence?.pingId,
+							})
 						);
-						stream.addEventListener("close", () => pingInFlight.delete(connection.id));
+						stream.addEventListener("close", () => {
+							pingInFlight.delete(connection.id);
+							failedPingAwaitingAbort.delete(connection.id);
+						});
 						return new Proxy(stream, {
 							get(target, property, receiver): unknown {
 								if (property === "send") {
 									return (data: Uint8Array): boolean => {
 										const accepted = target.send(data);
-										record(connection, "ping-write-success", "libp2p-connection-monitor");
+										record(connection, "ping-write-success", "libp2p-connection-monitor", {
+											carryIn: pingEvidence?.carryIn,
+											pingId: pingEvidence?.pingId,
+										});
 										return accepted;
 									};
 								}
@@ -1151,6 +1252,7 @@ async function installLibp2pMonitorObserver(page: Page): Promise<void> {
 									return async (closeOptions?: unknown): Promise<void> => {
 										await target.close(closeOptions);
 										pingInFlight.delete(connection.id);
+										failedPingAwaitingAbort.delete(connection.id);
 									};
 								}
 								const value = Reflect.get(target, property, receiver) as unknown;
@@ -1159,12 +1261,15 @@ async function installLibp2pMonitorObserver(page: Page): Promise<void> {
 						});
 					} catch (error) {
 						if (ping) {
-							record(
-								connection,
-								"ping-failure",
-								"libp2p-connection-monitor",
-								error instanceof Error ? error.name : String(error)
-							);
+							record(connection, "ping-failure", "libp2p-connection-monitor", {
+								carryIn: pingEvidence?.carryIn,
+								pingId: pingEvidence?.pingId,
+								reason: error instanceof Error ? error.name : String(error),
+							});
+							if (pingEvidence !== undefined) {
+								pingEvidence.failureRecorded = true;
+								failedPingAwaitingAbort.set(connection.id, pingEvidence);
+							}
 							pingInFlight.delete(connection.id);
 						}
 						throw error;
@@ -1179,9 +1284,33 @@ async function installLibp2pMonitorObserver(page: Page): Promise<void> {
 		Object.defineProperty(window, "__E303_LIBP2P_MONITOR_OBSERVER__", {
 			configurable: false,
 			value: Object.freeze({
-				reset(): void {
+				reset(trialId: string): void {
+					activeTrialId = trialId;
 					records.length = 0;
 					sequence = 0;
+					for (const connection of host.getConnections()) {
+						record(connection, "monitor-epoch-start", "e3-03-monitor-observer", {
+							pingId: `${trialId}:epoch:${connection.id}`,
+						});
+					}
+					for (const ping of pingInFlight.values()) {
+						ping.carryIn = true;
+						record(ping.connection, "ping-start", "libp2p-connection-monitor", {
+							carryIn: true,
+							pingId: ping.pingId,
+						});
+					}
+					for (const ping of failedPingAwaitingAbort.values()) {
+						ping.carryIn = true;
+						record(ping.connection, "ping-start", "libp2p-connection-monitor", {
+							carryIn: true,
+							pingId: ping.pingId,
+						});
+						record(ping.connection, "ping-failure", "libp2p-connection-monitor", {
+							carryIn: true,
+							pingId: ping.pingId,
+						});
+					}
 				},
 				snapshot(): readonly Libp2pMonitorObservation[] {
 					return records.slice().map((record) => Object.freeze({ ...record }));
@@ -1232,25 +1361,135 @@ async function libp2pMonitorObservations(page: Page): Promise<readonly Libp2pMon
 	});
 }
 
-async function receiverEvidenceAtDeadline(
-	page: Page,
-	trialId: string
-): Promise<
-	Readonly<{
-		readonly fabric: FabricTrialSnapshot;
-		readonly rtc: readonly RtcObservation[];
-		readonly zone: ZoneSnapshot;
-	}>
-> {
+async function resetLibp2pMonitorObserver(page: Page, trialId: string): Promise<void> {
+	await page.evaluate((selectedTrialId) => {
+		const observer = window.__E303_LIBP2P_MONITOR_OBSERVER__;
+		if (observer === undefined) throw new Error("E303_LIBP2P_MONITOR_OBSERVER_ABSENT");
+		observer.reset(selectedTrialId);
+	}, trialId);
+}
+
+async function d108e4hPageCapture(page: Page, trialId: string): Promise<D108e4hPageCapture> {
 	return page.evaluate(async (selectedTrialId) => {
 		const api = window.__TS_DRP_V3_ZONE__;
 		const fabric = api?.fabric;
-		const observer = window.__E303_RTC_OBSERVER__;
+		const rtc = window.__E303_RTC_OBSERVER__;
+		const monitor = window.__E303_LIBP2P_MONITOR_OBSERVER__;
 		if (api === undefined || fabric === undefined) throw new Error("E303_FABRIC_WORKBENCH_ABSENT");
-		if (observer === undefined) throw new Error("E303_RTC_OBSERVER_ABSENT");
-		const rtc = await observer.snapshot();
-		return Object.freeze({ fabric: fabric.snapshot(selectedTrialId), rtc, zone: api.snapshot() });
+		if (rtc === undefined) throw new Error("E303_RTC_OBSERVER_ABSENT");
+		if (monitor === undefined) throw new Error("E303_LIBP2P_MONITOR_OBSERVER_ABSENT");
+		const rtcCustody = await rtc.custodySnapshot();
+		return Object.freeze({
+			fabric: fabric.snapshot(selectedTrialId),
+			monitor: monitor.snapshot(),
+			rtc: rtcCustody,
+			zone: api.snapshot(),
+		});
 	}, trialId);
+}
+
+function d108e4hBoundaryFromCapture(
+	capture: Pick<D108e4hPageCapture, "fabric" | "rtc" | "zone">,
+	remotePeerId: string
+): D108e4hBoundaryCustody {
+	return Object.freeze({
+		authenticated: Object.freeze(
+			capture.fabric.transport.raw
+				.filter(({ peerId }) => peerId === remotePeerId)
+				.map(({ connectionId, generation, peerId }) => Object.freeze({ connectionId, generation, peerId }))
+		),
+		rawTransport: capture.zone.rawTransport,
+		rtc: Object.freeze(
+			capture.rtc.channelStates
+				.filter(({ label, readyState }) => label === "ts-drp-ephemeral/1" && readyState === "open")
+				.map(({ channelId, connectionId }) =>
+					Object.freeze({
+						channelId,
+						connectionId,
+						label: "ts-drp-ephemeral/1" as const,
+						readyState: "open" as const,
+					})
+				)
+		),
+	});
+}
+
+function d108e4hLifecycleFromCapture(
+	records: readonly RtcLifecycleObservation[],
+	trialId: string
+): readonly D108e4hLifecycleObservation[] {
+	return Object.freeze(
+		records.map((record) =>
+			Object.freeze({
+				attemptId: record.attemptId,
+				atMonotonicMs: record.atMonotonicMs,
+				atWallMs: record.atWallMs,
+				bufferedAmount: record.bufferedAmount,
+				callsite: record.callsite,
+				channelId: record.channelId,
+				connectionId: record.connectionId,
+				event: record.event,
+				label: record.label,
+				owner: record.owner,
+				readyState: record.readyState,
+				schemaVersion: 3 as const,
+				sequence: record.sequence,
+				state: record.state,
+				trialId,
+			})
+		)
+	);
+}
+
+function d108e4hRawSendsFromWire(records: readonly PlatformObservation[]): readonly D108e4hRawSend[] {
+	return Object.freeze(
+		records
+			.filter(({ lane, sentinel }) => lane === "raw" && !sentinel)
+			.map(({ attemptId, channelId, connectionId, sequence }) => {
+				if (attemptId === undefined) throw new Error("D108E4H_RAW_ATTEMPT_ID_ABSENT");
+				return Object.freeze({ attemptId, channelId, connectionId, sequence });
+			})
+	);
+}
+
+function d108e4hOverlapFromWire(records: readonly PlatformObservation[]): readonly D108e4hOverlapObservation[] {
+	return Object.freeze(
+		records
+			.filter(({ lane, sentinel }) => lane === "raw" && !sentinel)
+			.map((record) => {
+				if (record.lifecycleSequence === undefined) throw new Error("D108E4H_LIFECYCLE_SEQUENCE_ABSENT");
+				return Object.freeze({
+					...acceptedObservationIdentity(record),
+					lifecycleSequence: record.lifecycleSequence,
+				});
+			})
+	);
+}
+
+function d108e4hEndpointFromCapture(
+	capture: D108e4hPageCapture,
+	input: Readonly<{
+		readonly acceptedRaw: readonly PlatformObservation[];
+		readonly peerId: string;
+		readonly prepare: D108e4hBoundaryCustody;
+		readonly rawSends: readonly PlatformObservation[];
+		readonly rejectedRaw: readonly PlatformObservation[];
+		readonly remotePeerId: string;
+		readonly transmitsRawTrial: boolean;
+		readonly trialId: string;
+	}>
+): D108e4hEndpointCustody {
+	return Object.freeze({
+		acceptedRaw: d108e4hOverlapFromWire(input.acceptedRaw),
+		deadline: d108e4hBoundaryFromCapture(capture, input.remotePeerId),
+		lifecycle: d108e4hLifecycleFromCapture(capture.rtc.lifecycle, input.trialId),
+		monitor: Object.freeze(capture.monitor.filter(({ peerId }) => peerId === input.remotePeerId)),
+		peerId: input.peerId,
+		prepare: input.prepare,
+		rawSends: d108e4hRawSendsFromWire(input.rawSends),
+		rejectedRaw: d108e4hOverlapFromWire(input.rejectedRaw),
+		transmitsRawTrial: input.transmitsRawTrial,
+	});
 }
 
 function rawTransportDelta(
@@ -1300,6 +1539,7 @@ function platformObservations(
 		}
 		observations.push(
 			Object.freeze({
+				attemptId: record.attemptId,
 				byteLength: match[0].length,
 				carrierByteLength: record.byteLength,
 				channelId: record.channelId,
@@ -1307,6 +1547,7 @@ function platformObservations(
 				connectionId: record.connectionId,
 				insertionReadyState: record.insertionReadyState,
 				lane,
+				lifecycleSequence: record.lifecycleSequence,
 				maxRetransmits: record.maxRetransmits,
 				ordered: record.ordered,
 				ordinal: record.ordinal,
@@ -1887,6 +2128,7 @@ function d108e4hLifecycle(
 		channelId: rtc.channelId,
 		connectionId: rtc.connectionId,
 		event,
+		label: rtc.label,
 		owner,
 		readyState: input.readyState ?? rtc.readyState,
 		schemaVersion: 3 as const,
@@ -2081,8 +2323,358 @@ function d108e4hFixture(mode: D108e4hFixtureMode): D108e4hValidationInput {
 	});
 }
 
-function validateD108e4hCampaignCustody(_input: D108e4hValidationInput): void {
-	throw new Error("D108E4H_RED_UNIMPLEMENTED");
+function d108e4hAssert(condition: unknown, code: string): asserts condition {
+	if (!condition) throw new Error(code);
+}
+
+function d108e4hAssertClosedSequence(records: readonly { readonly sequence: number }[]): void {
+	let previous = -1;
+	for (const { sequence } of records) {
+		d108e4hAssert(Number.isSafeInteger(sequence) && sequence >= 0 && sequence > previous, "D108E4H_SEQUENCE_INVALID");
+		previous = sequence;
+	}
+}
+
+function d108e4hOnly<T>(records: readonly T[]): T {
+	d108e4hAssert(records.length === 1, "D108E4H_IDENTITY_JOIN_INVALID");
+	return records[0] as T;
+}
+
+function d108e4hAssertDelta(actual: RawTransportDelta, expected: RawTransportDelta): void {
+	d108e4hAssert(
+		actual.authenticatedConnectionLosses === expected.authenticatedConnectionLosses &&
+			actual.backpressuredDrops === expected.backpressuredDrops &&
+			actual.handshakeFailures === expected.handshakeFailures &&
+			actual.linkDrops === expected.linkDrops &&
+			actual.lastLinkDrop.after === expected.lastLinkDrop.after &&
+			actual.lastLinkDrop.before === expected.lastLinkDrop.before &&
+			actual.lastLinkDrop.changed === expected.lastLinkDrop.changed,
+		"D108E4H_DELTA_MISMATCH"
+	);
+}
+
+function d108e4hAssertBoundaryIdentity(
+	endpoint: D108e4hEndpointCustody,
+	remotePeerId: string,
+	replaced: boolean
+): Readonly<{ readonly after: D108e4hRtcIdentity; readonly before: D108e4hRtcIdentity }> {
+	const beforeAuthenticated = d108e4hOnly(endpoint.prepare.authenticated);
+	const afterAuthenticated = d108e4hOnly(endpoint.deadline.authenticated);
+	const beforeRtc = d108e4hOnly(endpoint.prepare.rtc);
+	const afterRtc = d108e4hOnly(endpoint.deadline.rtc);
+	d108e4hAssert(
+		beforeAuthenticated.peerId === remotePeerId &&
+			afterAuthenticated.peerId === remotePeerId &&
+			beforeRtc.label === "ts-drp-ephemeral/1" &&
+			afterRtc.label === "ts-drp-ephemeral/1" &&
+			beforeRtc.readyState === "open" &&
+			afterRtc.readyState === "open",
+		"D108E4H_IDENTITY_JOIN_INVALID"
+	);
+	const authenticatedChanged =
+		beforeAuthenticated.connectionId !== afterAuthenticated.connectionId &&
+		beforeAuthenticated.generation < afterAuthenticated.generation;
+	const rtcChanged = beforeRtc.connectionId !== afterRtc.connectionId && beforeRtc.channelId !== afterRtc.channelId;
+	if (replaced) {
+		d108e4hAssert(authenticatedChanged && rtcChanged, "D108E4H_IDENTITY_JOIN_INVALID");
+	} else {
+		d108e4hAssert(
+			beforeAuthenticated.connectionId === afterAuthenticated.connectionId &&
+				beforeAuthenticated.generation === afterAuthenticated.generation &&
+				beforeRtc.connectionId === afterRtc.connectionId &&
+				beforeRtc.channelId === afterRtc.channelId,
+			"D108E4H_IDENTITY_JOIN_INVALID"
+		);
+	}
+	return Object.freeze({ after: afterRtc, before: beforeRtc });
+}
+
+function d108e4hAssertMonitor(endpoint: D108e4hEndpointCustody, remotePeerId: string, trialId: string): void {
+	d108e4hAssert(endpoint.monitor.length > 0, "D108E4H_MONITOR_CUSTODY_ABSENT");
+	d108e4hAssertClosedSequence(endpoint.monitor);
+	const byPing = new Map<string, D108e4hMonitorObservation[]>();
+	for (const record of endpoint.monitor) {
+		d108e4hAssert(record.schemaVersion === 3, "D108E4H_SCHEMA_INVALID");
+		d108e4hAssert(record.trialId === trialId, "D108E4H_TRIAL_MISMATCH");
+		d108e4hAssert(record.peerId === remotePeerId, "D108E4H_MONITOR_PEER_INVALID");
+		d108e4hAssert(record.pingId.length > 0, "D108E4H_MONITOR_PING_CUSTODY_INVALID");
+		const records = byPing.get(record.pingId) ?? [];
+		records.push(record);
+		byPing.set(record.pingId, records);
+	}
+	for (const records of byPing.values()) {
+		const carryIn = new Set(records.map((record) => record.carryIn));
+		const uniqueEvents = ["monitor-epoch-start", "ping-start", "ping-failure", "connection-abort"] as const;
+		d108e4hAssert(
+			carryIn.size === 1 &&
+				uniqueEvents.every((event) => records.filter((record) => record.event === event).length <= 1),
+			"D108E4H_MONITOR_PING_CUSTODY_INVALID"
+		);
+		const start = records.find(({ event }) => event === "ping-start");
+		const failure = records.find(({ event }) => event === "ping-failure");
+		const abort = records.find(({ event }) => event === "connection-abort");
+		if (records.some(({ event }) => event.startsWith("ping-"))) {
+			d108e4hAssert(start !== undefined, "D108E4H_MONITOR_PING_CUSTODY_INVALID");
+		}
+		if (failure !== undefined && start !== undefined) {
+			d108e4hAssert(start !== undefined && start.sequence < failure.sequence, "D108E4H_MONITOR_PING_CUSTODY_INVALID");
+		}
+		if (abort?.owner === "libp2p-connection-monitor") {
+			d108e4hAssert(failure !== undefined && failure.sequence < abort.sequence, "D108E4H_MONITOR_PING_CUSTODY_INVALID");
+		}
+	}
+}
+
+function d108e4hAssertAttemptCustody(
+	endpoint: D108e4hEndpointCustody,
+	before: D108e4hRtcIdentity,
+	after: D108e4hRtcIdentity,
+	replaced: boolean,
+	sampleCount: number
+): void {
+	const attempts = endpoint.lifecycle.filter(
+		({ event, label }) => event === "channel-send-attempt" && label === "ts-drp-ephemeral/1"
+	);
+	const terminals = endpoint.lifecycle.filter(
+		({ event, label }) =>
+			label === "ts-drp-ephemeral/1" && (event === "channel-send-success" || event === "channel-send-failure")
+	);
+	if (!endpoint.transmitsRawTrial) {
+		d108e4hAssert(
+			endpoint.rawSends.length === 0 && attempts.length === 0 && terminals.length === 0,
+			"D108E4H_RAW_SEND_ROLE_INVALID"
+		);
+		return;
+	}
+	d108e4hAssert(endpoint.rawSends.length > 0, "D108E4H_RAW_SEND_ROLE_INVALID");
+	const sequences = new Set<number>();
+	const attemptIds = new Set<number>();
+	for (const send of endpoint.rawSends) {
+		d108e4hAssert(
+			Number.isSafeInteger(send.sequence) &&
+				send.sequence >= 0 &&
+				send.sequence < sampleCount &&
+				!sequences.has(send.sequence),
+			"D108E4H_RAW_SEND_DOMAIN_INVALID"
+		);
+		sequences.add(send.sequence);
+		d108e4hAssert(!attemptIds.has(send.attemptId), "D108E4H_IDENTITY_JOIN_INVALID");
+		attemptIds.add(send.attemptId);
+		const joinedAttempts = attempts.filter(({ attemptId }) => attemptId === send.attemptId);
+		d108e4hAssert(joinedAttempts.length === 1, "D108E4H_IDENTITY_JOIN_INVALID");
+		const attempt = joinedAttempts[0] as D108e4hLifecycleObservation;
+		d108e4hAssert(
+			attempt.channelId === send.channelId && attempt.connectionId === send.connectionId,
+			"D108E4H_IDENTITY_JOIN_INVALID"
+		);
+		const joinedTerminals = terminals.filter(({ attemptId }) => attemptId === send.attemptId);
+		d108e4hAssert(joinedTerminals.length === 1, "D108E4H_ATTEMPT_TERMINAL_CARDINALITY");
+		const terminal = joinedTerminals[0] as D108e4hLifecycleObservation;
+		d108e4hAssert(
+			terminal.channelId === send.channelId && terminal.connectionId === send.connectionId,
+			"D108E4H_IDENTITY_JOIN_INVALID"
+		);
+		d108e4hAssert(terminal.event === "channel-send-success", "D108E4H_RAW_SEND_NOT_SUCCESSFUL");
+		d108e4hAssert(attempt.sequence < terminal.sequence, "D108E4H_LIFECYCLE_ORDER_INVALID");
+	}
+	d108e4hAssert(sequences.size === sampleCount, "D108E4H_RAW_SEND_DOMAIN_INVALID");
+	d108e4hAssert(
+		attempts.every(({ attemptId }) => attemptId !== undefined && attemptIds.has(attemptId)) &&
+			terminals.every(({ attemptId }) => attemptId !== undefined && attemptIds.has(attemptId)),
+		"D108E4H_IDENTITY_JOIN_INVALID"
+	);
+	if (replaced) {
+		const replacementOpen = endpoint.lifecycle.find(
+			({ connectionId, event, label }) =>
+				connectionId === after.connectionId && event === "channel-open-event" && label === "ts-drp-ephemeral/1"
+		);
+		d108e4hAssert(replacementOpen !== undefined, "D108E4H_LIFECYCLE_CUSTODY_ABSENT");
+		for (const send of endpoint.rawSends) {
+			if (send.connectionId !== after.connectionId || send.channelId !== after.channelId) continue;
+			const attempt = attempts.find(({ attemptId }) => attemptId === send.attemptId);
+			d108e4hAssert(
+				attempt !== undefined && replacementOpen.sequence < attempt.sequence,
+				"D108E4H_LIFECYCLE_ORDER_INVALID"
+			);
+		}
+	}
+	d108e4hAssert(
+		endpoint.rawSends.every(
+			({ channelId, connectionId }) =>
+				(connectionId === before.connectionId && channelId === before.channelId) ||
+				(connectionId === after.connectionId && channelId === after.channelId)
+		),
+		"D108E4H_IDENTITY_JOIN_INVALID"
+	);
+}
+
+function d108e4hAssertOverlapCustody(
+	endpoint: D108e4hEndpointCustody,
+	before: D108e4hRtcIdentity,
+	after: D108e4hRtcIdentity,
+	replaced: boolean
+): void {
+	const messages = endpoint.lifecycle.filter(
+		({ event, label }) => event === "channel-message" && label === "ts-drp-ephemeral/1"
+	);
+	const ledger = [...endpoint.acceptedRaw, ...endpoint.rejectedRaw];
+	const joined = new Set<number>();
+	for (const record of ledger) {
+		d108e4hAssert(!joined.has(record.lifecycleSequence), "D108E4H_OVERLAP_LEDGER_INVALID");
+		joined.add(record.lifecycleSequence);
+		const message = messages.find(({ sequence }) => sequence === record.lifecycleSequence);
+		d108e4hAssert(
+			message !== undefined &&
+				message.connectionId === record.connectionId &&
+				message.channelId === record.channelId &&
+				record.lane === "raw" &&
+				!record.sentinel,
+			"D108E4H_OVERLAP_LEDGER_INVALID"
+		);
+	}
+	d108e4hAssert(
+		messages.length === ledger.length && messages.every(({ sequence }) => joined.has(sequence)),
+		"D108E4H_OVERLAP_LEDGER_INVALID"
+	);
+	if (!replaced) return;
+	const replacementOpen = endpoint.lifecycle.find(
+		({ connectionId, event, label }) =>
+			connectionId === after.connectionId && event === "channel-open-event" && label === "ts-drp-ephemeral/1"
+	);
+	const oldCloseCall = endpoint.lifecycle.find(
+		({ connectionId, event, label }) =>
+			connectionId === before.connectionId && event === "channel-close-call" && label === "ts-drp-ephemeral/1"
+	);
+	const oldCloseEvent = endpoint.lifecycle.find(
+		({ connectionId, event, label }) =>
+			connectionId === before.connectionId && event === "channel-close-event" && label === "ts-drp-ephemeral/1"
+	);
+	d108e4hAssert(
+		replacementOpen !== undefined &&
+			oldCloseCall !== undefined &&
+			oldCloseEvent !== undefined &&
+			replacementOpen.sequence < oldCloseCall.sequence &&
+			oldCloseCall.sequence < oldCloseEvent.sequence,
+		"D108E4H_LIFECYCLE_ORDER_INVALID"
+	);
+	const replacementMessages = messages.filter(
+		({ channelId, connectionId }) => connectionId === after.connectionId && channelId === after.channelId
+	);
+	if (replacementMessages.length > 0) {
+		const handler = endpoint.lifecycle.find(
+			({ connectionId, event, label }) =>
+				connectionId === after.connectionId &&
+				event === "channel-message-handler-installed" &&
+				label === "ts-drp-ephemeral/1"
+		);
+		d108e4hAssert(
+			handler !== undefined &&
+				replacementMessages.every(
+					({ sequence }) =>
+						handler.sequence < sequence && (replacementOpen as D108e4hLifecycleObservation).sequence < sequence
+				),
+			"D108E4H_LIFECYCLE_ORDER_INVALID"
+		);
+	}
+	for (const accepted of endpoint.acceptedRaw) {
+		if (accepted.connectionId === before.connectionId && accepted.channelId === before.channelId) {
+			d108e4hAssert(accepted.lifecycleSequence < oldCloseCall.sequence, "D108E4H_OVERLAP_LEDGER_INVALID");
+		}
+	}
+	if (!endpoint.transmitsRawTrial) {
+		d108e4hAssert(
+			endpoint.acceptedRaw.some(
+				({ channelId, connectionId, lifecycleSequence }) =>
+					connectionId === after.connectionId &&
+					channelId === after.channelId &&
+					replacementOpen.sequence < lifecycleSequence
+			) &&
+				endpoint.acceptedRaw.some(
+					({ channelId, connectionId, lifecycleSequence }) =>
+						connectionId === before.connectionId &&
+						channelId === before.channelId &&
+						replacementOpen.sequence < lifecycleSequence &&
+						lifecycleSequence < oldCloseCall.sequence
+				),
+			"D108E4H_OVERLAP_LEDGER_INVALID"
+		);
+	}
+}
+
+function d108e4hValidateEndpoint(
+	endpoint: D108e4hEndpointCustody,
+	remotePeerId: string,
+	delta: RawTransportDelta,
+	sampleCount: number,
+	trialId: string
+): void {
+	d108e4hAssert(endpoint.lifecycle.length > 0, "D108E4H_LIFECYCLE_CUSTODY_ABSENT");
+	for (const record of endpoint.lifecycle) {
+		d108e4hAssert(record.schemaVersion === 3, "D108E4H_SCHEMA_INVALID");
+		d108e4hAssert(record.trialId === trialId, "D108E4H_TRIAL_MISMATCH");
+	}
+	d108e4hAssertClosedSequence(endpoint.lifecycle);
+	d108e4hAssertMonitor(endpoint, remotePeerId, trialId);
+	const expectedDelta = rawTransportDelta(endpoint.prepare.rawTransport, endpoint.deadline.rawTransport);
+	d108e4hAssertDelta(delta, expectedDelta);
+	d108e4hAssert(
+		Number.isSafeInteger(delta.linkDrops) && delta.linkDrops >= 0 && delta.linkDrops <= 1,
+		"D108E4H_DROP_COUNT_AMBIGUOUS"
+	);
+	const replaced = delta.linkDrops === 1;
+	if (replaced) {
+		d108e4hAssert(
+			delta.lastLinkDrop.after === "replacement" || delta.lastLinkDrop.after === "channel-close",
+			"D108E4H_DROP_REASON_UNSUPPORTED"
+		);
+	}
+	const { after, before } = d108e4hAssertBoundaryIdentity(endpoint, remotePeerId, replaced);
+	d108e4hAssertAttemptCustody(endpoint, before, after, replaced, sampleCount);
+	d108e4hAssertOverlapCustody(endpoint, before, after, replaced);
+	d108e4hAssert(delta.backpressuredDrops === 0, "D108E4H_RAW_BACKPRESSURE");
+	d108e4hAssert(
+		endpoint.deadline.rawTransport.sent - endpoint.prepare.rawTransport.sent === endpoint.rawSends.length &&
+			endpoint.deadline.rawTransport.received - endpoint.prepare.rawTransport.received === endpoint.acceptedRaw.length,
+		"D108E4H_RAW_COUNTER_MISMATCH"
+	);
+	if (replaced && delta.lastLinkDrop.after === "channel-close") {
+		const closeCall = endpoint.lifecycle.find(
+			({ connectionId, event, label }) =>
+				connectionId === before.connectionId && event === "channel-close-call" && label === "ts-drp-ephemeral/1"
+		);
+		d108e4hAssert(closeCall?.bufferedAmount === 0, "D108E4H_CHANNEL_CLOSE_DRAIN_INVALID");
+	}
+}
+
+function validateD108e4hCampaignCustody(input: D108e4hValidationInput): void {
+	d108e4hAssert(
+		input !== null &&
+			typeof input === "object" &&
+			input.endpoints !== null &&
+			typeof input.endpoints === "object" &&
+			input.endpoints.creator !== undefined &&
+			input.endpoints.receiver !== undefined,
+		"D108E4H_ENDPOINT_CUSTODY_ABSENT"
+	);
+	d108e4hAssert(input.schemaVersion === 3, "D108E4H_SCHEMA_INVALID");
+	d108e4hAssert(
+		Number.isSafeInteger(input.sampleCount) && input.sampleCount > 0 && input.trialId.length > 0,
+		"D108E4H_SCHEMA_INVALID"
+	);
+	d108e4hValidateEndpoint(
+		input.endpoints.creator,
+		input.endpoints.receiver.peerId,
+		input.rawTransportDeltas.creator,
+		input.sampleCount,
+		input.trialId
+	);
+	d108e4hValidateEndpoint(
+		input.endpoints.receiver,
+		input.endpoints.creator.peerId,
+		input.rawTransportDeltas.receiver,
+		input.sampleCount,
+		input.trialId
+	);
 }
 
 if (process.env["D108E4H_TELEMETRY"] === "1") {
@@ -2767,6 +3359,55 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 			}),
 		});
 		expect(() => validateD108e4hCampaignCustody(acceptedAAfterClose)).toThrowError("D108E4H_OVERLAP_LEDGER_INVALID");
+		const acceptedReplacementB = receiverReplacement.endpoints.receiver.acceptedRaw.filter(
+			({ connectionId }) => connectionId === D108E4H_RTC_B.connectionId
+		);
+		const acceptedOverlapA = receiverReplacement.endpoints.receiver.acceptedRaw.filter(
+			({ connectionId }) => connectionId === D108E4H_RTC_A.connectionId
+		);
+		const allReplacementBRejectedBase = withReceiverDeadlineTransport(
+			receiverReplacement,
+			Object.freeze({
+				...receiverReplacement.endpoints.receiver.deadline.rawTransport,
+				received: acceptedOverlapA.length,
+			})
+		);
+		const allReplacementBRejected = Object.freeze({
+			...allReplacementBRejectedBase,
+			endpoints: Object.freeze({
+				...allReplacementBRejectedBase.endpoints,
+				receiver: Object.freeze({
+					...allReplacementBRejectedBase.endpoints.receiver,
+					acceptedRaw: Object.freeze(acceptedOverlapA),
+					rejectedRaw: Object.freeze([
+						...allReplacementBRejectedBase.endpoints.receiver.rejectedRaw,
+						...acceptedReplacementB,
+					]),
+				}),
+			}),
+		});
+		expect(() => validateD108e4hCampaignCustody(allReplacementBRejected)).toThrowError(
+			"D108E4H_OVERLAP_LEDGER_INVALID"
+		);
+		const allOverlapARejectedBase = withReceiverDeadlineTransport(
+			receiverReplacement,
+			Object.freeze({
+				...receiverReplacement.endpoints.receiver.deadline.rawTransport,
+				received: acceptedReplacementB.length,
+			})
+		);
+		const allOverlapARejected = Object.freeze({
+			...allOverlapARejectedBase,
+			endpoints: Object.freeze({
+				...allOverlapARejectedBase.endpoints,
+				receiver: Object.freeze({
+					...allOverlapARejectedBase.endpoints.receiver,
+					acceptedRaw: Object.freeze(acceptedReplacementB),
+					rejectedRaw: Object.freeze([...allOverlapARejectedBase.endpoints.receiver.rejectedRaw, ...acceptedOverlapA]),
+				}),
+			}),
+		});
+		expect(() => validateD108e4hCampaignCustody(allOverlapARejected)).toThrowError("D108E4H_OVERLAP_LEDGER_INVALID");
 		const handlerAfterFirstBMessage = Object.freeze({
 			...receiverReplacement,
 			endpoints: Object.freeze({
@@ -3211,6 +3852,7 @@ test("freezes RTC metadata at the event boundary before async payload conversion
 				direction: "message",
 				insertionReadyState: "closing",
 				label: "ts-drp-ephemeral/1",
+				lifecycleSequence: 2,
 				maxRetransmits: 0,
 				ordered: false,
 				ordinal: 0,
@@ -3224,6 +3866,7 @@ test("freezes RTC metadata at the event boundary before async payload conversion
 				direction: "message",
 				insertionReadyState: "closed",
 				label: "ts-drp-ephemeral/1",
+				lifecycleSequence: 4,
 				maxRetransmits: 0,
 				ordered: false,
 				ordinal: 1,
@@ -3444,7 +4087,9 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 			if (oldResponderRtc === undefined) throw new Error("D108E4G_OLD_RESPONDER_RTC_OWNER_ABSENT");
 			await Promise.all([resetRtcObserver(creator), resetRtcObserver(receiver)]);
 			await Promise.all(
-				[creator, receiver].map((page) => page.evaluate(() => window.__E303_LIBP2P_MONITOR_OBSERVER__?.reset()))
+				[creator, receiver].map((page) =>
+					page.evaluate((selectedTrialId) => window.__E303_LIBP2P_MONITOR_OBSERVER__?.reset(selectedTrialId), trialId)
+				)
 			);
 
 			await initiator.evaluate(async (remotePeerId) => {
@@ -3648,8 +4293,16 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 			expect(initiatorZone.rawTransport.lastLinkDrop).toBe("replacement");
 			expect(newRaw.connectionId).not.toBe(oldRaw.connectionId);
 			expect(newRaw.generation).toBeGreaterThan(oldRaw.generation);
-			expect(initiatorMonitor.every(({ schemaVersion }) => schemaVersion === 2)).toBe(true);
-			expect(responderMonitor.every(({ schemaVersion }) => schemaVersion === 2)).toBe(true);
+			expect(
+				initiatorMonitor.every(
+					({ schemaVersion, trialId: recordTrialId }) => schemaVersion === 3 && recordTrialId === trialId
+				)
+			).toBe(true);
+			expect(
+				responderMonitor.every(
+					({ schemaVersion, trialId: recordTrialId }) => schemaVersion === 3 && recordTrialId === trialId
+				)
+			).toBe(true);
 		} finally {
 			await Promise.all([creatorContext.close(), receiverContext.close()]);
 		}
@@ -3697,6 +4350,7 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 		await Promise.all([openGrid(creator), openGrid(receiver)]);
 		stage = "zone-create";
 		const peers = await createZone(creator, receiver);
+		await Promise.all([installLibp2pMonitorObserver(creator), installLibp2pMonitorObserver(receiver)]);
 		const initialCreatorNetwork = await network(creator);
 		const initialReceiverNetwork = await network(receiver);
 		const initialCreatorLinks = (await zone(creator)).rawTransport.links;
@@ -3775,7 +4429,12 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 		);
 		await waitForOpenTransportPair(creator, receiver);
 		await waitForNetworkPair(creator, receiver, initialCreatorNetwork, initialReceiverNetwork);
-		await Promise.all([resetRtcObserver(creator), resetRtcObserver(receiver)]);
+		await Promise.all([
+			resetRtcObserver(creator),
+			resetRtcObserver(receiver),
+			resetLibp2pMonitorObserver(creator, calibrationTrialId),
+			resetLibp2pMonitorObserver(receiver, calibrationTrialId),
+		]);
 		expectOpenTransport(await fabricSnapshot(creator, calibrationTrialId), peers.receiverPeerId);
 		expectOpenTransport(await fabricSnapshot(receiver, calibrationTrialId), peers.creatorPeerId);
 		const workbenchCalibration = creator.evaluate((input) => window.__TS_DRP_V3_ZONE__?.fabric?.runTrial(input), {
@@ -3859,14 +4518,27 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			);
 			await waitForOpenTransportPair(creator, receiver);
 			await waitForNetworkPair(creator, receiver, initialCreatorNetwork, initialReceiverNetwork);
-			await Promise.all([resetRtcObserver(creator), resetRtcObserver(receiver)]);
 			const clock = await clockEvidence(creator, receiver);
 			updateTrialProgress({ clockSamples: clock.samples, clockSkewMs: clock.maximumSkewMs });
 			expect(clock.maximumSkewMs).toBeLessThanOrEqual(20);
 			const receiverRawBefore = await rawReceivedAfterQuiescence(receiver);
-			const [senderRawTransportBefore, receiverRawTransportBefore] = await Promise.all([
-				zone(creator).then(({ rawTransport }) => rawTransport),
-				zone(receiver).then(({ rawTransport }) => rawTransport),
+			const [creatorPrepareCapture, receiverPrepareCapture] = await Promise.all([
+				d108e4hPageCapture(creator, trialId),
+				d108e4hPageCapture(receiver, trialId),
+			]);
+			const creatorPrepareCustody = d108e4hBoundaryFromCapture(creatorPrepareCapture, peers.receiverPeerId);
+			const receiverPrepareCustody = d108e4hBoundaryFromCapture(receiverPrepareCapture, peers.creatorPeerId);
+			const senderRawTransportBefore = creatorPrepareCapture.zone.rawTransport;
+			const receiverRawTransportBefore = receiverPrepareCapture.zone.rawTransport;
+			expect(receiverRawTransportBefore.received).toBe(receiverRawBefore);
+			updateTrialProgress({
+				prepareCustody: Object.freeze({ creator: creatorPrepareCustody, receiver: receiverPrepareCustody }),
+			});
+			await Promise.all([
+				resetRtcObserver(creator),
+				resetRtcObserver(receiver),
+				resetLibp2pMonitorObserver(creator, trialId),
+				resetLibp2pMonitorObserver(receiver, trialId),
 			]);
 			const trialEvidenceStartedAtMs = Date.now();
 			const prepareStage = transportStageEvidence(0, senderRawTransportBefore, receiverRawTransportBefore);
@@ -3949,10 +4621,14 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			const receiverNowMs = await receiver.evaluate(() => Date.now());
 			updateTrialProgress({ productDeadlineMs, receiverNowMs });
 			await new Promise((resolve) => setTimeout(resolve, Math.max(0, productDeadlineMs + 1 - receiverNowMs)));
-			const receiverAtDeadline = await receiverEvidenceAtDeadline(receiver, trialId);
-			const senderRawTransportAtDeadline = (await zone(creator)).rawTransport;
+			const [creatorAtDeadline, receiverAtDeadline] = await Promise.all([
+				d108e4hPageCapture(creator, trialId),
+				d108e4hPageCapture(receiver, trialId),
+			]);
+			const senderRawTransportAtDeadline = creatorAtDeadline.zone.rawTransport;
 			const productRoster = productRosterFromSnapshot(receiverAtDeadline.fabric);
-			const receiverWire = platformObservations(receiverAtDeadline.rtc, "message", trialId);
+			const senderWireAtDeadline = platformObservations(creatorAtDeadline.rtc.records, "send", trialId);
+			const receiverWire = platformObservations(receiverAtDeadline.rtc.records, "message", trialId);
 			const deadlineStage = transportStageEvidence(
 				Date.now() - trialEvidenceStartedAtMs,
 				senderRawTransportAtDeadline,
@@ -3961,6 +4637,10 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			updateTrialProgress({
 				preliminaryProductRoster: undefined,
 				productRoster,
+				rtcSequenceFences: Object.freeze({
+					creator: creatorAtDeadline.rtc.lifecycleSequenceFence,
+					receiver: receiverAtDeadline.rtc.lifecycleSequenceFence,
+				}),
 				receiverRawTransportAtDeadline: receiverAtDeadline.zone.rawTransport,
 				receiverWire,
 				stages: Object.freeze({
@@ -4040,6 +4720,39 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 				({ receivedAtMs }) => receivedAtMs > firstReliableReceivedAtMs
 			).length;
 			const rendered = renderedProductRosterMetrics(productRoster, productDeadlineMs, SAMPLE_INTERVAL_MS, SAMPLE_COUNT);
+			const replacementCustody = Object.freeze({
+				endpoints: Object.freeze({
+					creator: d108e4hEndpointFromCapture(creatorAtDeadline, {
+						acceptedRaw: Object.freeze([]),
+						peerId: peers.creatorPeerId,
+						prepare: creatorPrepareCustody,
+						rawSends: senderWireAtDeadline,
+						rejectedRaw: Object.freeze([]),
+						remotePeerId: peers.receiverPeerId,
+						transmitsRawTrial: true,
+						trialId,
+					}),
+					receiver: d108e4hEndpointFromCapture(receiverAtDeadline, {
+						acceptedRaw: receiverPartition.productAccepted,
+						peerId: peers.receiverPeerId,
+						prepare: receiverPrepareCustody,
+						rawSends: Object.freeze([]),
+						rejectedRaw: receiverPartition.productRejected,
+						remotePeerId: peers.creatorPeerId,
+						transmitsRawTrial: false,
+						trialId,
+					}),
+				}),
+				rawTransportDeltas: Object.freeze({
+					creator: rawTransportDelta(senderRawTransportBefore, senderRawTransportAtDeadline),
+					receiver: rawTransportDelta(receiverRawTransportBefore, receiverAtDeadline.zone.rawTransport),
+				}),
+				sampleCount: SAMPLE_COUNT,
+				schemaVersion: 3 as const,
+				trialId,
+			}) satisfies D108e4hValidationInput;
+			validateD108e4hCampaignCustody(replacementCustody);
+			updateTrialProgress({ replacementCustody });
 			const trialEvidence = Object.freeze({
 				acceptedObservationIdentities,
 				application: Object.freeze({
@@ -4074,21 +4787,26 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 				}),
 				readyStateMismatches: Object.freeze({
 					receiver: Object.freeze(
-						receiverAtDeadline.rtc.filter(({ insertionReadyState, readyState }) => insertionReadyState !== readyState)
+						receiverAtDeadline.rtc.records.filter(
+							({ insertionReadyState, readyState }) => insertionReadyState !== readyState
+						)
 					),
 					sender: Object.freeze(
-						senderRtc.filter(({ insertionReadyState, readyState }) => insertionReadyState !== readyState)
+						creatorAtDeadline.rtc.records.filter(
+							({ insertionReadyState, readyState }) => insertionReadyState !== readyState
+						)
 					),
 				}),
 				rendered,
 				receiverWire,
+				replacementCustody,
 				stages: Object.freeze({
 					deadline: deadlineStage,
 					prepare: prepareStage,
 					reset: resetStage,
 					runReturned: runReturnedStage,
 				}),
-				senderWire,
+				senderWire: senderWireAtDeadline,
 				trialId,
 			}) satisfies CampaignEvidence;
 			currentTrialEvidence = trialEvidence;
