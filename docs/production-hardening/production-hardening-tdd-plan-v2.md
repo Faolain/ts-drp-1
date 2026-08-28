@@ -69134,3 +69134,63 @@ expected two. Stdout/stderr/status SHA-256 values are
 and `4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`.
 Both valid REDs are deterministic and fail at their exact reviewed seams. No
 product, example, browser, campaign or other test command ran.
+
+Signed/pushed RED checkpoint `8ba83370cdc82765e02256d9e6d71bfebb3c7e0a`
+has parent `23443a1637bb11e9a54c0cd83ebf96050a21a526` and tree
+`c38a55501e4992729e5d97d50b38134f752f0e31`. Before GREEN, the adapter
+precondition was corrected from requiring one destructive initial
+`reconcile([])` call to treating either no call or an empty last call as the
+same empty state, because GREEN explicitly forbids `reconcile([])`. The exact
+title was revalidated once and still failed only at received `[]` versus
+expected `['peer-b']`; stdout/stderr/status SHA-256 values are
+`cbe96a0a02dfa534559c42edea4bd858cb2e112b95d84e66d18999ddea3db20f`,
+`10dcb428c0952cc22ce3dd11bffb6963e66c62b6deea2eedc71b4cf77974f7b5`
+and `4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`.
+
+The D.108e4x GREEN is exact signed/pushed commit
+`0fe18e33c9e92d2a74da282f7570539099f6bad3`, parent
+`8ba83370cdc82765e02256d9e6d71bfebb3c7e0a` and tree
+`20c0a09ea838a0981b82c171e8b30471d0cd73f0`. It changes only the adapter,
+grid event hook and corrected adapter RED precondition. The adapter retains and
+invokes its private reconcile closure for identical reopens and declines empty
+eligible sets. The grid hook queues one identity-guarded microtask and contains
+a stale/closed reopen. No API, timer, retry, poll, fallback, limit, dependency,
+configuration, wire, authority, snapshot or upstream behavior changed.
+
+Both exact RED titles passed 1/1. The full E3-02 owner passed 11/11; Phase-3f-b
+passed 2/2; and network E3-01 plus E3-02 passed 59/59. Their full-owner
+stdout SHA-256 values are respectively
+`49c97a552b8fc41c8459d8289e5a9ab6862ed2a844304a09c8110c4f5db29f60`,
+`82eff34d5107a1b30f97e653c8e0ee29755eeaeecdee8992b9771d0248f1aefe`
+and `e25b2614c79b34346183e7a9f2a51f94005326f1a3a1b19fa7715b079bf557a4`;
+every status was zero. The unchanged D.93.46 command then passed three
+consecutive invocations at exact 3/3 in 1.3, 1.4 and 1.2 minutes. Invocation
+stdout SHA-256 values are
+`225dd2d9b6c2cf6514d677c4aaaba03c3dad0441d2632ec714b0628b31604f6e`,
+`0ef5a1bd95e1c15504c2e153e9628bfd28f1fc1256d30a69d0dbda64ce2c5f08`
+and `516747b3fc898aad7246964156627963943d6631b1599e4f72f210260fe58d7b`;
+stderr SHA-256 values are
+`d5cd785f028b688bdf521ce8adb6fbc574b2711adca1232b01f4fed29534ae67`,
+`39911f5f26b0f15353349417b2196122154d96d1dd2aa91805e29c98c17242c4`
+and `1db0369717f33c4b0f1234938f0c59009cb6868a5d56d4fbce6fdee5125ad61a`;
+all three statuses were zero. There was no retry, flake, skip or root shim.
+
+Retained Phase-3 transport passed 24/24 and the focused E3-03 observer passed
+1/1. The final affected node/grid dependency build passed, as did grid
+typecheck, strict exact `packages/node/src/ephemeral.ts` TypeScript, exact-owner
+ESLint, Prettier and `git diff --check`. The final build stdout SHA-256 is
+`4894c71e1a651d4d28bcc5d91df4a4279b6014fcab3fa8c7e8d457afaf46ac57`;
+the final static status SHA-256 is uniformly
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+The first ESLint attempt found only the new function-property signature and
+passed after its type-only method-shorthand correction; behavior was not
+rerun. Broad `@ts-drp/node` typecheck reproduced only its retained
+`worker-host` TS6059/TS6307 rootDir/file-list baseline. A standalone test-file
+TypeScript probe likewise reproduced only the unchanged 2026-08-24
+`foreign.emit` typing at line 486; the changed source itself is diagnostic
+free and the full Vitest owner compiled and passed 11/11.
+
+All 26 stashes and every protected untracked path remain present. The root
+canonical shim is absent. The complete E3-03 campaign did not run. D.108e4x
+behavior is GREEN but remains open pending the required Grok/Kimi/Opus
+implementation review; D.108e4k has not restarted.
