@@ -68440,3 +68440,50 @@ product change; it stops for a dedicated-resource execution decision. A GREEN
 restores authority to restart D.108e4k from its first command at the new final
 behavior tree. It does not compose either failed D.108e4k attempt, authorize
 the detached proof early or authorize any E3-03 campaign.
+
+The later corrected preflight at signed/pushed head `9637bff7` removed the
+self-match and correctly distinguished task-owned reviewers, but rejected
+before launch when an unrelated Grok startup reached 221% CPU. A subsequent
+six-sample preflight began below the load limit at `8.654296875` but rejected
+samples two through six at `11.244140625`, `11.98095703125`,
+`11.181640625`, `11.3271484375` and `10.98046875`. It found no test or
+task-owned reviewer process and no process at or above 100% CPU. Neither
+rejection launched the test or consumed the GREEN. Their retained custody is
+under `.logs/d108e4t-green-9637bff7/`; the latter preflight log/status SHA-256
+values are
+`2fb796b45c0a6d572c5cae3aac532fc1275827214d66c901fc14cbc28c15c212`
+and `4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`.
+
+The user then expressly overrode the clean-preflight execution-custody
+condition and authorized the single GREEN to run under the disclosed shared-
+host state. This did not weaken any executable assertion, timeout, workload or
+semantic acceptance. The exact command above ran once at head
+`9637bff73d0a72a243b9bfcb083cce5155d6eb1c`, tree
+`e19e462750f6eaed6d6d2419f186578a6f1e5642`, with the profile variable
+unset. It exited zero: one file and all 5/5 tests passed, exactly one
+`D108E4L_TIMING` record reported `outcome=proof`, zero `D108E4M_PROFILE`
+lines were emitted, `memberCountErrors` was empty, the exact ten-phase and
+five-member rosters passed, phase boundaries were contiguous, duration
+arithmetic passed and neither launcher nor Vitest timed out. The child wall
+time was `65,506.578500 ms`; Vitest reported `71.72 s` overall and
+`/usr/bin/time -p` reported real/user/sys `72.81/68.07/4.13 s`.
+
+The phase telemetry was: preflight/store-open `4.877709 ms`, current row
+`1.607583 ms`, genuine future `212.296500 ms`, authenticated future appends
+`2,872.054167 ms`, maximum-page probe `189.440416 ms`, equality
+materialization/facades `9,839.025584 ms`, over-budget preparation
+`121.194291 ms`, mismatch preparation `1.951125 ms`, concurrent recoveries
+`52,262.589209 ms` and proof assembly `1.541916 ms`. These values remain
+telemetry, not correctness ceilings. Stdout/stderr/status/execution-context
+SHA-256 values are
+`73b1de6800736a87d561dfdfd77ea9d3b9f3c150eaf76164e57f52b67578a36f`,
+`c26fd039fe4f59e6497d8059c044e0821ae698f6ddf3abd3a32190e98ffabb85`,
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`
+and `6a77592a0f9285279f0bf7652388a4343e227fbf7c740992f96e90b3654278fb`.
+Custody is under `.logs/d108e4t-green-9637bff7/`.
+
+D.108e4t is closed. It demonstrates no product defect and changes no product
+source or dependency. The completed D.108e4m profile and D.108e4t review/static
+steps remain closed rather than extended. D.108e4k is now authorized to
+restart from its first ordinary command at this final behavior tree; the
+complete E3-03 campaign and all campaign ledgers remain unauthorized.
