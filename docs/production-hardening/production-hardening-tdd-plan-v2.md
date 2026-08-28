@@ -68095,3 +68095,85 @@ ownership evidence also remain closed rather than extended. The final
 evidence edit passed Prettier, exact-owner ESLint and `git diff --check` with
 no diagnostics. D.108e4k's separately frozen final-tree combined proof is the
 smallest remaining action.
+
+###### D.108e4s — final-tree timing variance closure
+
+D.108e4s is a second and final narrow test-infrastructure correction to the
+child wall-time gate. It does not reopen CPU attribution, allege a product
+defect or authorize product, fixture, workload, dependency, API, launcher,
+instrumentation or campaign changes. D.108e4q's reviewed one-line `<65_000`
+repair passed its single ordinary GREEN, but the first final-tree D.108e4k
+acceptance attempt proved that bound is still not reliable under disclosed
+host scheduling variance.
+
+At exact signed/pushed tree `52bef8b6a604a9f918e76e5aceaddcda2da4ea93`,
+the ordinary D.108e4k ledger first passed its focused root/infrastructure gate
+exactly 17/17. Stdout/stderr/status SHA-256 values are
+`50b9a3b2f059a4ee004e0cb063d5c5a541e564eadb341c747ee65e8b4e512c59`,
+`50ea22a74ceca4bc7d48d3afa73867f59105362e54c6f15df6c1b4e898bfc507`
+and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+The ledger then stopped at the exact unloaded native command without running
+any later ordinary gate or detached-checkout proof. The child returned one
+valid `d108e4l-v1` terminal proof at `wallTimeMs=66_835.340750`, exactly
+1,835.340750 ms above `<65_000`; `memberCountErrors` was empty. The parent
+schema, roster, arithmetic and four pre-ceiling assertions passed. The later
+parent assertions did not execute, so this failure is not overstated as a
+complete semantic pass; the identical final behavior tree's preceding
+D.108e4q GREEN remains the complete 5/5 semantic evidence.
+
+The ambient snapshot at `2026-08-28T18:15:33Z` recorded load averages
+`15.64,15.19,12.66`, Time Machine at 50.5% CPU and an unrelated Fable process
+in another repository at 2.9%; no other test process or task-owned reviewer
+overlapped the invocation. The concurrent-recoveries phase consumed
+52,421.974666 ms wall and 48,594.711 ms CPU, a CPU/wall ratio of
+`0.926991234`, compared with `0.965504707` in the D.108e4q GREEN. Its wall
+duration increased 5,159.059583 ms while measured CPU increased only
+2,962.144 ms. That is scheduling/host variance evidence, not evidence that a
+product owner newly became dominant. No rerun is authorized as diagnosis.
+
+Ambient/stdout/stderr/status/timing-line SHA-256 values are
+`bdfc55e2618cde980efd2777a50dd130e3d324c8eb085f0f242d15822807f801`,
+`9578c5ee60e2addbf6c66d44c122666255fb569870ed7c66693c2e1dddfbf064`,
+`165f40373dfff8c51cb280565c975de952a128a9332c0586897b7e77e6d0c8cb`,
+`4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`
+and `a7a67e691f8d8ae3b984b37c8705b24540f0b6f9da93b9f7f0ed8ba423164f45`.
+Custody is under `.logs/d108e4k-final-52bef8b6/ordinary/`. This failed
+invocation is the immutable D.108e4s RED; it is not counted toward D.108e4k.
+
+The five comparable child observations are 61,399.244417, 61,308.196917,
+58,606.473791, 61,964.920917 and 66,835.340750 ms. Their minimum-to-maximum
+spread is 8,228.866959 ms. The narrow GREEN candidate changes only the parent
+assertion from `<65_000` to `<76_000`. It leaves 9,164.659250 ms above the
+new maximum, exceeding the complete observed spread, and retains 14 seconds
+before the unchanged 90-second launcher kill. `<75_000` would leave only
+8,164.659250 ms, less than that spread, so 76,000 ms is the smallest whole
+1,000-ms bound preserving the already-reviewed headroom rule. The ceiling is
+strictly test-infrastructure scheduling allowance, not a product latency
+objective.
+
+No child fixture, product/example source, package manifest, lockfile, build
+configuration, launcher, row/memory limit, cryptographic operation, recovery
+workload, semantic assertion or D.108e4m telemetry owner may change. Freeze
+the one-line test change and this rationale at one signed/pushed checkpoint,
+then run the normal read-only Grok 4.6/high, exact Kimi K3 `CHECK001` through
+`CHECK100` and Opus 5/xhigh review before execution. Reproduced P0/P1 findings
+are corrected in the same round; every unresolved P2 receives an exact owner
+and 2026-09-04 deadline. No Fable or collaboration subagent runs.
+
+Static acceptance is exact-owner ESLint and Prettier plus `git diff --check`.
+Earlier build/typecheck evidence remains applicable because no import, type,
+fixture or product owner changes. After review, execute the same ordinary
+non-profile command exactly once with an ambient snapshot and no other test
+process or task-owned reviewer. GREEN requires 5/5, zero `D108E4M_PROFILE `
+lines, exactly one valid `D108E4L_TIMING ` line, empty `memberCountErrors` and
+child `wallTimeMs < 76_000`. Record the exact margin and phase ledger. A
+failure does not authorize a retry, another incremental ceiling raise or more
+profiling; it stops and reslices whether this nondeterministic wall assertion
+should be removed in favor of semantic proof plus the existing 90-second hang
+kill.
+
+Only a D.108e4s GREEN restores authority to restart the complete D.108e4k
+ordinary ledger from its first command at the new final signed behavior tree.
+The earlier 17/17 result cannot compose across this test-tree change. The
+detached proof, complete five-test E3-03 campaign and both three-consecutive
+campaign ledgers remain unexecuted; this slice authorizes none of them.
