@@ -66912,3 +66912,154 @@ D.108e4, and it does not permit D.108e5. Their full combined ordinary/isolated
 proof and D.108e4b's separate GREEN review remain due. No confirmation review,
 Fable review, new campaign, production/libp2p change or collaboration subagent
 ran.
+
+###### D.108e4k — combined non-campaign readiness proof
+
+D.108e4k is an evidence-only split of the still-open D.108e4c combined gate.
+It changes only this plan and execution logs. It does not change product,
+example, test, configuration, dependency or lockfile behavior, and it creates
+no RED/GREEN implementation pair. Its behavior baseline is the accepted
+D.108e4i GREEN at `cc112d220539157b5d81394d2574286ef49c159d`; the later
+D.108e4j commits change only this plan. The exact product, test, example,
+Playwright-config, package-manifest and lockfile trees must remain byte-identical
+to that baseline throughout this slice.
+
+This split exists because the one D.108e4j campaign authorization is consumed,
+while the combined proof contains useful independent gates that do not execute
+the retained three-trial behavior. D.108e4k may run those non-campaign gates in
+the ordinary checkout and a fresh detached checkout. It may not run the
+complete E3-03 config, select the retained three-trial behavior, count the
+D.108e4j terminal invocation toward either still-due consecutive ledger or
+authorize any later campaign. The D.108e4c phrase “complete E3-03 config 3/3”
+predates the deterministic D.108e4d/f controls. Its current meaning is the
+entire unqualified five-test inventory, exactly 5/5, including the retained
+three-trial behavior. That current complete-config gate and both ordinary and
+isolated three-consecutive campaign ledgers remain blocked on a fresh,
+separately reviewed express authorization.
+
+The demonstrated defect and upstream boundary do not change. D.108e4g fixed
+the local `unreliable-webrtc.ts` break-before-make lifecycle: a usable old raw
+sidecar must not be retired until its authenticated replacement is usable, and
+a failed replacement retains the old sidecar. The js-libp2p connection monitor
+remains only a possible trigger; the recorded reliable connection was wedged,
+the last complete campaign attributed every abort to `other-owner`, and the
+strict otherwise-usable false-positive predicate is false. No dependency
+upgrade or patch, monitor disablement, ping-threshold change or upstream claim
+is authorized. If later campaign telemetry proves every already frozen
+false-positive operand, work stops and reslices the separate upstream report
+specified in D.108e4g/i. Its first acceptance artifact must be a clean-checkout,
+exact-lock, public-libp2p, two-browser-peer, single-command minimal viable
+reproduction with deterministic before/failure/after/abort telemetry and an
+unpatched failing assertion. The related js-libp2p issues #2646/#3459, #1835,
+#3015 and #3201/#3205 remain context, not fixes.
+
+The ordinary non-campaign command ledger is frozen as follows. Commands that
+produce JSON use distinct `.logs/d108e4k-*` paths and retain stderr separately.
+
+```sh
+pnpm exec vitest run --coverage.enabled=false \
+  tests/phase-6a-creator-successor-local-author-red.test.ts \
+  tests/phase-6a-creator-successor-infrastructure-red.test.ts \
+  --maxWorkers=1 --minWorkers=1
+
+/usr/bin/time -p pnpm exec vitest run --coverage.enabled=false \
+  packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts \
+  --maxWorkers=1 --minWorkers=1
+
+pnpm exec vitest run tests/phase-3a1b-p3-live-transport-red.test.ts \
+  --maxWorkers=1 --minWorkers=1 --no-coverage
+
+pnpm exec vitest run --coverage.enabled=false \
+  packages/network/tests/unreliable-webrtc-e3-01-red.test.ts \
+  packages/node/tests/ephemeral-webrtc-e3-02-red.test.ts \
+  --maxWorkers=1 --minWorkers=1
+
+pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep "freezes RTC metadata at the event boundary before async payload conversion" \
+  --fail-on-flaky-tests
+
+D108E4G_TELEMETRY=1 D108E4H_TELEMETRY=1 \
+  pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep-invert "three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss" \
+  --reporter=json --fail-on-flaky-tests
+
+pnpm exec playwright test --config playwright.phase-3a1b-d9336-v3-chat.config.ts \
+  --list
+pnpm exec playwright test --config playwright.phase-3a1b-d9346-zone.config.ts \
+  --list
+pnpm exec playwright test --config playwright.e5-00-zone-trade-intent.config.ts \
+  --list
+pnpm exec playwright test --config playwright.e5-02-zone-referee-outcome.config.ts \
+  --list
+pnpm exec playwright test --config playwright.phase-3a1b-d9336-v3-chat.config.ts \
+  --fail-on-flaky-tests
+pnpm exec playwright test --config playwright.phase-3a1b-d9346-zone.config.ts \
+  --repeat-each=3 --fail-on-flaky-tests
+```
+
+The exact D.93.46 command runs in three consecutive invocations; any failure
+resets that non-campaign ledger. The native five-test file runs alone, without
+a model review or another test process, and must preserve its child-measured
+`< 60_000 ms` acceptance rather than substituting the enclosing process wall
+time. The root canonical shim must be absent before and after every root
+collection or D.93 execution.
+
+The retained unit selection is the five tracked Phase-3h files, all tracked
+Phase-5a/5d/5e Vitest owners, the five exact Phase-4c root owners, the eight
+exact Phase-6a root owners and the three exact Phase-6a storage-node death
+owners. The Phase-4c/Phase-6a portion runs with one worker and coverage disabled;
+it must include the genuine fresh-process 64 MiB child without exclusion. That
+child must again sample peak simultaneously live chunk-body ownership during
+each awaited write, keep the signed owner peak strictly below
+`2 * 131072`, settle at zero, and make the retaining mutant cross the same
+ceiling before release. Post-completion residue alone cannot satisfy the gate.
+
+The retained browser matrices are D.93.36, D.93.46, Phase-4c-b,
+Phase-4c-c, Phase-5d, all three Phase-5e configs, Phase-6a adoption-commit,
+successor activation, successor product and successor epoch. Every matrix uses
+`--fail-on-flaky-tests`; D.93.46 additionally uses its frozen
+`--repeat-each=3`. A failing matrix is evidence assigned to its exact owner,
+not permission to retry, raise a timeout, weaken an assertion or change product
+behavior inside D.108e4k.
+
+Affected build custody is the recursive fresh build closure rooted at
+`@ts-drp/canonical`, `@ts-drp/protocol-v3`, `@ts-drp/network`, `@ts-drp/node`,
+`@ts-drp/storage-node`, `@ts-drp/storage-browser`,
+`@ts-drp/outcome-commit`, `@ts-drp/example-v3-room`,
+`ts-drp-example-v3-chat` and `ts-drp-example-grid`. Exact production
+typechecks run for canonical, protocol-v3, network, storage-browser,
+outcome-commit, v3-room, v3-chat and grid. The broad Node and storage-node
+typechecks remain recorded inherited baselines and must show zero diagnostic
+in any D.108e4 owner; they are not silently relabeled green. Standalone strict
+TypeScript for `tests/e3-03-loss-and-hol-proof.pw.ts`, ESLint and Prettier over
+the frozen D.108e4 plus D.108e4a-i owners, `git diff --check`, checkpoint-range
+diff, stash-count, protected-path and tracked-status checks complete the static
+gate.
+
+The isolated proof starts from a new detached checkout of the immutable
+D.108e4k plan-freeze descendant. Before installation it records no package or
+example `dist`, no root `node_modules/@ts-drp/canonical` shim and clean tracked
+status. It runs exactly `pnpm install --offline --ignore-scripts
+--frozen-lockfile`, proves installation created no `dist`, runs
+`node scripts/ensure-native-deps.mjs`, then freshly builds the affected closure
+above. It records the canonical package and built-export realpaths, file size
+and post-build timestamp. The raw Phase-4c subprocess-resolution control runs
+before and after all browser gates. The isolated checkout then repeats every
+non-campaign gate above, including the three D.93.46 invocations and unloaded
+native timing gate, but still excludes the complete E3-03 config and retained
+three-trial behavior. It finishes tracked-clean with no root shim. Main-checkout
+ignored artifacts, ancestor modules, Vite aliases, source-relative imports,
+stale `dist` or lifecycle scripts cannot satisfy any gate.
+
+D.108e4k receives one signed/pushed plan freeze and the normal read-only Grok
+4.6/high, exact Kimi K3 `CHECK001` through `CHECK100` and Opus 5/xhigh plan
+review before execution. P0/P1 findings are corrected in the same round without
+confirmation; each P2 receives an exact owner and deadline. After the ordinary
+and isolated non-campaign runs, their commands, results, timings, hashes,
+checkout identity, export realpaths and remaining campaign debt are recorded
+in a separate signed/pushed evidence checkpoint and receive the same evidence
+review round. No Fable or collaboration subagent runs. This slice cannot accept
+D.108e4a/b/c/d or aggregate D.108e4, cannot perform D.108e4b's separate GREEN
+review and cannot permit D.108e5. Those transitions remain blocked until fresh
+express authorization covers the complete current five-test E3-03 config and
+both exact three-consecutive campaign ledgers.
