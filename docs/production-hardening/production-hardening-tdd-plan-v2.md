@@ -69429,3 +69429,55 @@ All protected untracked paths and 26 stashes remain preserved; the root shim
 is absent. D.108e4x is behaviorally GREEN but remains open until this
 connection-event GREEN is signed/pushed and the final corrected-range
 Grok/Kimi/Opus review closes. D.108e4k has not restarted.
+
+The final corrected-range review inspected exact signed range
+`8ba83370cdc82765e02256d9e6d71bfebb3c7e0a..7a1c0f89f6da19c1ffcf4365f971675b4bc351e5`.
+Grok 4.6/high completed normally after 510.156 seconds with exit zero,
+`end_turn` and no timeout. Its wrapper retained `NO_VERDICT` because progress
+prose preceded the terminal object; the substantive object was PASS with zero
+P0/P1 and three P2. Event/public/status/stderr SHA-256 values are
+`de5bdd3827a999d519ae58473be430c3f957874050eadc96a7facc6780d51545`,
+`383b5e63ed0ef58fe13cbeeefff0cc081a959f766c55de6d081a7c23cae5b6c4`,
+`cc7e7fd1f52310a9f75f3928d03cba8f89d366a7c323c4215a6a4337e921b7c9`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+Kimi exact K3 session `session_8a88fa82-91ab-4d43-a685-33c346fe22bd`
+emitted exactly 100 unique ordered `CHECK001` through `CHECK100` records and
+one RESULT: PASS with zero P0/P1 and six P2. Stream/stderr SHA-256 values are
+`9fab388e045c5609014a11fd61829f670975bdd571fc816a5f090b24dcde4619`
+and `e0a6c27731f54677e9b7e0ef3bc899fa569327e6a63fdc3a79b1db1a8c30e6b4`.
+Opus 5/xhigh session `55e12f6a-81dd-48d8-a21d-075b5f77ee35`
+completed 61 turns in 712.831 seconds with no error or subagent and returned
+APPROVED with zero P0/P1 and eight P2. JSON/stderr SHA-256 values are
+`699b9d44720310c8b6dafc967d577e8452f151ce795d874e1f980d6c533e8d5c`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+The reviewers independently confirmed both corrections: a disconnected peer
+cannot own the 250 ms retry timer; a timer already armed wakes at most once;
+`connection:open` supplies a per-transport event for WebRTC upgrades and
+replacements beside retained relay connections; `peer:connect` no longer
+duplicates it; adapter reconciliation remains idempotent; and make-before-
+break, lazy first-send, deadlines, authorization, close/restart cleanup and
+public signatures remain intact. Both REDs and their controls are deterministic
+and non-hollow. The complete E3-03 campaign remained absent.
+
+The final nonblocking union is assigned to the plan owner with deadline
+2026-09-04: document per-connection multiplicity and connect/disconnect
+asymmetry; record the bounded extra retained-history request in
+`NodeRoomNetworkAdapter`; isolate throwing peer-connection subscribers; add
+backoff or an attempt ceiling for fast-failing handshakes with a still-current
+connection; generalize late-authority notification beyond grid; gate the grid
+microtask by an authority/eligibility fingerprint if commit frequency makes
+it material; close the empty-set `restart()` and retained-first-provider debts;
+and, when separately authorized, corroborate genuine same-peer second-
+connection emission in the complete E3-03 campaign. The existing stale desired
+membership and single bounded stale-wake debts remain included in that owner
+set rather than silently closed.
+
+D.108e4x is closed. Its exact six-commit implementation range is signed and
+pushed, all required deterministic and retained gates passed, all three final
+reviews carry zero P0/P1, no Fable ran, and protected paths/stashes remain
+untouched. D.108e4k must restart from its first ordinary command at the next
+signed/pushed plan-only checkpoint; none of the historical partial D.108e4k
+ledgers is valid for the new tree. The complete E3-03 campaign remains
+unauthorized.
