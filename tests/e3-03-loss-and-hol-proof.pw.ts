@@ -2060,6 +2060,7 @@ function d108e4hRawTransport(
 	peerId: string,
 	input: Readonly<{
 		readonly authenticatedConnectionLosses?: number;
+		readonly handshakeFailures?: number;
 		readonly lastLinkDrop?: string;
 		readonly linkDrops?: number;
 		readonly received?: number;
@@ -2070,7 +2071,7 @@ function d108e4hRawTransport(
 		authenticatedConnectionLosses: input.authenticatedConnectionLosses ?? 0,
 		backpressuredDrops: 0,
 		fallbackCount: 0 as const,
-		handshakeFailures: 0,
+		handshakeFailures: input.handshakeFailures ?? 0,
 		lastLinkDrop: input.lastLinkDrop ?? "restart",
 		linkDrops: input.linkDrops ?? 0,
 		links: Object.freeze([
@@ -2261,10 +2262,19 @@ function d108e4hFixture(mode: D108e4hFixtureMode): D108e4hValidationInput {
 		? Object.freeze([
 				d108e4hLifecycle(trialId, 600, "channel-open-event", D108E4H_RTC_B, "rtc-datachannel-open-event"),
 				d108e4hLifecycle(trialId, 601, "channel-message-handler-installed", D108E4H_RTC_B, "product-unreliable-webrtc"),
-				d108e4hLifecycle(trialId, 602, "channel-close-call", D108E4H_RTC_A, "product-unreliable-webrtc"),
-				d108e4hLifecycle(trialId, 603, "channel-close-event", D108E4H_RTC_A, "rtc-datachannel-close-event", {
-					readyState: "closed",
-				}),
+				...(mode === "creator-channel-close"
+					? [
+							d108e4hLifecycle(trialId, 602, "channel-close-event", D108E4H_RTC_A, "rtc-datachannel-close-event", {
+								readyState: "closed",
+							}),
+							d108e4hLifecycle(trialId, 603, "channel-close-call", D108E4H_RTC_A, "product-unreliable-webrtc"),
+						]
+					: [
+							d108e4hLifecycle(trialId, 602, "channel-close-call", D108E4H_RTC_A, "product-unreliable-webrtc"),
+							d108e4hLifecycle(trialId, 603, "channel-close-event", D108E4H_RTC_A, "rtc-datachannel-close-event", {
+								readyState: "closed",
+							}),
+						]),
 			])
 		: Object.freeze([]);
 	const creatorSendB = creatorTransition
@@ -2276,10 +2286,19 @@ function d108e4hFixture(mode: D108e4hFixtureMode): D108e4hValidationInput {
 				d108e4hLifecycle(trialId, 1, "channel-open-event", D108E4H_RTC_B, "rtc-datachannel-open-event"),
 				d108e4hLifecycle(trialId, 2, "channel-message", D108E4H_RTC_B, "rtc-datachannel-message-event"),
 				d108e4hLifecycle(trialId, 3, "channel-message", D108E4H_RTC_A, "rtc-datachannel-message-event"),
-				d108e4hLifecycle(trialId, 4, "channel-close-call", D108E4H_RTC_A, "product-unreliable-webrtc"),
-				d108e4hLifecycle(trialId, 5, "channel-close-event", D108E4H_RTC_A, "rtc-datachannel-close-event", {
-					readyState: "closed",
-				}),
+				...(receiverChannelClose
+					? [
+							d108e4hLifecycle(trialId, 4, "channel-close-event", D108E4H_RTC_A, "rtc-datachannel-close-event", {
+								readyState: "closed",
+							}),
+							d108e4hLifecycle(trialId, 5, "channel-close-call", D108E4H_RTC_A, "product-unreliable-webrtc"),
+						]
+					: [
+							d108e4hLifecycle(trialId, 4, "channel-close-call", D108E4H_RTC_A, "product-unreliable-webrtc"),
+							d108e4hLifecycle(trialId, 5, "channel-close-event", D108E4H_RTC_A, "rtc-datachannel-close-event", {
+								readyState: "closed",
+							}),
+						]),
 				d108e4hLifecycle(trialId, 6, "channel-message", D108E4H_RTC_B, "rtc-datachannel-message-event"),
 				d108e4hLifecycle(trialId, 7, "channel-message", D108E4H_RTC_A, "rtc-datachannel-message-event", {
 					readyState: "closed",
@@ -2335,6 +2354,119 @@ function d108e4hFixture(mode: D108e4hFixtureMode): D108e4hValidationInput {
 		}),
 		sampleCount: SAMPLE_COUNT,
 		schemaVersion: 3 as const,
+		trialId,
+	});
+}
+
+function d108e4iPreservedCampaignReplay(): D108e4hValidationInput {
+	const trialId = "e3-03-2";
+	const creatorPeerId = "peer-creator";
+	const receiverPeerId = "peer-receiver";
+	const creatorA = Object.freeze({ ...D108E4H_RTC_A, channelId: 416, connectionId: 10 });
+	const creatorB = Object.freeze({ ...D108E4H_RTC_B, channelId: 437, connectionId: 12 });
+	const receiverA = Object.freeze({ ...D108E4H_RTC_A, channelId: 413, connectionId: 9 });
+	const receiverB = Object.freeze({ ...D108E4H_RTC_B, channelId: 438, connectionId: 11 });
+	const creatorSendA = d108e4hSendSlice(trialId, creatorA, 0, 595, 0);
+	const creatorSendB = d108e4hSendSlice(trialId, creatorB, 595, 5, 1_752);
+	const creatorPrepareTransport = d108e4hRawTransport(receiverPeerId, {
+		authenticatedConnectionLosses: 2,
+		handshakeFailures: 2,
+		lastLinkDrop: "restart",
+		linkDrops: 4,
+		sent: 2_134,
+	});
+	const creatorDeadlineTransport = d108e4hRawTransport(receiverPeerId, {
+		authenticatedConnectionLosses: 3,
+		handshakeFailures: 2,
+		lastLinkDrop: "replacement",
+		linkDrops: 5,
+		sent: 2_734,
+	});
+	const receiverPrepareTransport = d108e4hRawTransport(creatorPeerId, {
+		authenticatedConnectionLosses: 2,
+		handshakeFailures: 1,
+		lastLinkDrop: "restart",
+		linkDrops: 4,
+		received: 1_505,
+	});
+	const receiverDeadlineTransport = d108e4hRawTransport(creatorPeerId, {
+		authenticatedConnectionLosses: 3,
+		handshakeFailures: 1,
+		lastLinkDrop: "channel-close",
+		linkDrops: 5,
+		received: 1_923,
+	});
+	const receiverMessages = Object.freeze(
+		Array.from({ length: 418 }, (_, index) =>
+			d108e4hLifecycle(
+				trialId,
+				index === 417 ? 953 : index,
+				"channel-message",
+				receiverA,
+				"rtc-datachannel-message-event"
+			)
+		)
+	);
+	const receiverAccepted = Object.freeze(
+		receiverMessages.map(({ sequence }, index) => d108e4hAcceptedRaw(receiverA, index, sequence))
+	);
+	const boundary = (
+		peerId: string,
+		generation: number,
+		authenticatedConnectionId: string,
+		rtc: D108e4hRtcIdentity,
+		rawTransport: ZoneSnapshot["rawTransport"]
+	): D108e4hBoundaryCustody =>
+		Object.freeze({
+			authenticated: Object.freeze([Object.freeze({ connectionId: authenticatedConnectionId, generation, peerId })]),
+			rawTransport,
+			rtc: Object.freeze([rtc]),
+		});
+	return Object.freeze({
+		endpoints: Object.freeze({
+			creator: Object.freeze({
+				acceptedRaw: Object.freeze([]),
+				deadline: boundary(receiverPeerId, 8, "creator-authenticated-B", creatorB, creatorDeadlineTransport),
+				lifecycle: Object.freeze([
+					...creatorSendA.lifecycle,
+					d108e4hLifecycle(trialId, 1_749, "channel-open-event", creatorB, "rtc-datachannel-open-event"),
+					d108e4hLifecycle(trialId, 1_750, "channel-message-handler-installed", creatorB, "product-unreliable-webrtc"),
+					d108e4hLifecycle(trialId, 1_751, "channel-close-call", creatorA, "product-unreliable-webrtc"),
+					...creatorSendB.lifecycle,
+				]),
+				monitor: d108e4hMonitor(trialId, receiverPeerId),
+				peerId: creatorPeerId,
+				prepare: boundary(receiverPeerId, 6, "creator-authenticated-A", creatorA, creatorPrepareTransport),
+				rawSends: Object.freeze([...creatorSendA.rawSends, ...creatorSendB.rawSends]),
+				rejectedRaw: Object.freeze([]),
+				transmitsRawTrial: true,
+			}),
+			receiver: Object.freeze({
+				acceptedRaw: receiverAccepted,
+				deadline: boundary(creatorPeerId, 8, "receiver-authenticated-B", receiverB, receiverDeadlineTransport),
+				lifecycle: Object.freeze([
+					...receiverMessages,
+					d108e4hLifecycle(trialId, 956, "channel-message-handler-installed", receiverB, "product-unreliable-webrtc"),
+					d108e4hLifecycle(trialId, 957, "channel-open-event", receiverB, "rtc-datachannel-open-event"),
+					d108e4hLifecycle(trialId, 1_115, "channel-close-event", receiverA, "rtc-datachannel-close-event", {
+						readyState: "closed",
+					}),
+					d108e4hLifecycle(trialId, 1_116, "channel-close-call", receiverA, "product-unreliable-webrtc"),
+				]),
+				monitor: d108e4hMonitor(trialId, creatorPeerId),
+				peerId: receiverPeerId,
+				prepare: boundary(creatorPeerId, 6, "receiver-authenticated-A", receiverA, receiverPrepareTransport),
+				rawSends: Object.freeze([]),
+				rejectedRaw: Object.freeze([]),
+				transmitsRawTrial: false,
+			}),
+		}),
+		rawTransportDeltas: Object.freeze({
+			creator: rawTransportDelta(creatorPrepareTransport, creatorDeadlineTransport),
+			receiver: rawTransportDelta(receiverPrepareTransport, receiverDeadlineTransport),
+		}),
+		sampleCount: SAMPLE_COUNT,
+		schemaVersion: 3,
 		trialId,
 	});
 }
@@ -2500,19 +2632,31 @@ function d108e4hAssertAttemptCustody(
 		"D108E4H_IDENTITY_JOIN_INVALID"
 	);
 	if (replaced) {
-		const replacementOpen = endpoint.lifecycle.find(
+		const replacementOpens = endpoint.lifecycle.filter(
 			({ channelId, connectionId, event, label }) =>
 				connectionId === after.connectionId &&
 				channelId === after.channelId &&
 				event === "channel-open-event" &&
 				label === "ts-drp-ephemeral/1"
 		);
-		d108e4hAssert(replacementOpen !== undefined, "D108E4H_LIFECYCLE_CUSTODY_ABSENT");
+		const replacementHandlers = endpoint.lifecycle.filter(
+			({ channelId, connectionId, event, label, owner }) =>
+				connectionId === after.connectionId &&
+				channelId === after.channelId &&
+				event === "channel-message-handler-installed" &&
+				label === "ts-drp-ephemeral/1" &&
+				owner === "product-unreliable-webrtc"
+		);
+		d108e4hAssert(replacementOpens.length === 1 && replacementHandlers.length === 1, "D108E4H_LIFECYCLE_ORDER_INVALID");
+		const replacementOpen = replacementOpens[0] as D108e4hLifecycleObservation;
+		const replacementHandler = replacementHandlers[0] as D108e4hLifecycleObservation;
 		for (const send of endpoint.rawSends) {
 			if (send.connectionId !== after.connectionId || send.channelId !== after.channelId) continue;
 			const attempt = attempts.find(({ attemptId }) => attemptId === send.attemptId);
 			d108e4hAssert(
-				attempt !== undefined && replacementOpen.sequence < attempt.sequence,
+				attempt !== undefined &&
+					replacementOpen.sequence < attempt.sequence &&
+					replacementHandler.sequence < attempt.sequence,
 				"D108E4H_LIFECYCLE_ORDER_INVALID"
 			);
 		}
@@ -2531,7 +2675,8 @@ function d108e4hAssertOverlapCustody(
 	endpoint: D108e4hEndpointCustody,
 	before: D108e4hRtcIdentity,
 	after: D108e4hRtcIdentity,
-	replaced: boolean
+	replaced: boolean,
+	transitionReason: "channel-close" | "replacement" | undefined
 ): void {
 	const messages = endpoint.lifecycle.filter(
 		({ event, label }) => event === "channel-message" && label === "ts-drp-ephemeral/1"
@@ -2556,71 +2701,100 @@ function d108e4hAssertOverlapCustody(
 		"D108E4H_OVERLAP_LEDGER_INVALID"
 	);
 	if (!replaced) return;
-	const replacementOpen = endpoint.lifecycle.find(
+	const replacementOpens = endpoint.lifecycle.filter(
 		({ channelId, connectionId, event, label }) =>
 			connectionId === after.connectionId &&
 			channelId === after.channelId &&
 			event === "channel-open-event" &&
 			label === "ts-drp-ephemeral/1"
 	);
-	const oldCloseCall = endpoint.lifecycle.find(
-		({ channelId, connectionId, event, label }) =>
+	const replacementHandlers = endpoint.lifecycle.filter(
+		({ channelId, connectionId, event, label, owner }) =>
+			connectionId === after.connectionId &&
+			channelId === after.channelId &&
+			event === "channel-message-handler-installed" &&
+			label === "ts-drp-ephemeral/1" &&
+			owner === "product-unreliable-webrtc"
+	);
+	const oldCloseCalls = endpoint.lifecycle.filter(
+		({ channelId, connectionId, event, label, owner }) =>
 			connectionId === before.connectionId &&
 			channelId === before.channelId &&
 			event === "channel-close-call" &&
-			label === "ts-drp-ephemeral/1"
+			label === "ts-drp-ephemeral/1" &&
+			owner === "product-unreliable-webrtc"
 	);
-	const oldCloseEvent = endpoint.lifecycle.find(
-		({ channelId, connectionId, event, label }) =>
+	const oldCloseEvents = endpoint.lifecycle.filter(
+		({ channelId, connectionId, event, label, owner }) =>
 			connectionId === before.connectionId &&
 			channelId === before.channelId &&
 			event === "channel-close-event" &&
-			label === "ts-drp-ephemeral/1"
+			label === "ts-drp-ephemeral/1" &&
+			owner === "rtc-datachannel-close-event"
 	);
-	d108e4hAssert(
-		replacementOpen !== undefined &&
-			oldCloseCall !== undefined &&
-			oldCloseEvent !== undefined &&
+	d108e4hAssert(replacementOpens.length === 1 && replacementHandlers.length === 1, "D108E4H_LIFECYCLE_ORDER_INVALID");
+	const replacementOpen = replacementOpens[0] as D108e4hLifecycleObservation;
+	const replacementHandler = replacementHandlers[0] as D108e4hLifecycleObservation;
+	let acceptedBefore: D108e4hLifecycleObservation;
+	if (transitionReason === "channel-close") {
+		d108e4hAssert(
+			oldCloseCalls.length === 1 && oldCloseCalls[0]?.bufferedAmount === 0,
+			"D108E4H_CHANNEL_CLOSE_DRAIN_INVALID"
+		);
+		d108e4hAssert(oldCloseEvents.length === 1, "D108E4H_LIFECYCLE_CUSTODY_ABSENT");
+		const oldCloseCall = oldCloseCalls[0] as D108e4hLifecycleObservation;
+		const oldCloseEvent = oldCloseEvents[0] as D108e4hLifecycleObservation;
+		d108e4hAssert(
+			replacementOpen.sequence < oldCloseEvent.sequence &&
+				replacementHandler.sequence < oldCloseEvent.sequence &&
+				oldCloseEvent.sequence < oldCloseCall.sequence,
+			"D108E4H_LIFECYCLE_ORDER_INVALID"
+		);
+		const postCloseReplacementMessages = messages.filter(
+			({ channelId, connectionId, sequence }) =>
+				connectionId === after.connectionId && channelId === after.channelId && sequence > oldCloseEvent.sequence
+		);
+		d108e4hAssert(
+			postCloseReplacementMessages.every(({ sequence }) =>
+				endpoint.acceptedRaw.some(({ lifecycleSequence }) => lifecycleSequence === sequence)
+			),
+			"D108E4H_CHANNEL_CLOSE_INGRESS_INVALID"
+		);
+		acceptedBefore = oldCloseEvent;
+	} else {
+		d108e4hAssert(
+			transitionReason === "replacement" && oldCloseCalls.length === 1 && oldCloseEvents.length <= 1,
+			"D108E4H_LIFECYCLE_ORDER_INVALID"
+		);
+		const oldCloseCall = oldCloseCalls[0] as D108e4hLifecycleObservation;
+		const oldCloseEvent = oldCloseEvents[0];
+		d108e4hAssert(
 			replacementOpen.sequence < oldCloseCall.sequence &&
-			oldCloseCall.sequence < oldCloseEvent.sequence,
-		"D108E4H_LIFECYCLE_ORDER_INVALID"
-	);
+				replacementHandler.sequence < oldCloseCall.sequence &&
+				(oldCloseEvent === undefined || oldCloseCall.sequence < oldCloseEvent.sequence),
+			"D108E4H_LIFECYCLE_ORDER_INVALID"
+		);
+		acceptedBefore = oldCloseCall;
+	}
 	const replacementMessages = messages.filter(
 		({ channelId, connectionId }) => connectionId === after.connectionId && channelId === after.channelId
 	);
-	if (replacementMessages.length > 0) {
-		const handler = endpoint.lifecycle.find(
-			({ channelId, connectionId, event, label, owner }) =>
-				connectionId === after.connectionId &&
-				channelId === after.channelId &&
-				event === "channel-message-handler-installed" &&
-				label === "ts-drp-ephemeral/1" &&
-				owner === "product-unreliable-webrtc"
-		);
-		d108e4hAssert(
-			handler !== undefined &&
-				replacementMessages.every(
-					({ sequence }) =>
-						handler.sequence < sequence && (replacementOpen as D108e4hLifecycleObservation).sequence < sequence
-				),
-			"D108E4H_LIFECYCLE_ORDER_INVALID"
-		);
-	}
+	d108e4hAssert(
+		replacementMessages.every(
+			({ sequence }) => replacementHandler.sequence < sequence && replacementOpen.sequence < sequence
+		),
+		"D108E4H_LIFECYCLE_ORDER_INVALID"
+	);
+	d108e4hAssert(
+		replacementMessages.every(({ sequence }) =>
+			endpoint.acceptedRaw.some(({ lifecycleSequence }) => lifecycleSequence === sequence)
+		),
+		"D108E4H_OVERLAP_LEDGER_INVALID"
+	);
 	for (const accepted of endpoint.acceptedRaw) {
 		if (accepted.connectionId === before.connectionId && accepted.channelId === before.channelId) {
-			d108e4hAssert(accepted.lifecycleSequence < oldCloseCall.sequence, "D108E4H_OVERLAP_LEDGER_INVALID");
+			d108e4hAssert(accepted.lifecycleSequence < acceptedBefore.sequence, "D108E4H_OVERLAP_LEDGER_INVALID");
 		}
-	}
-	if (!endpoint.transmitsRawTrial) {
-		d108e4hAssert(
-			endpoint.acceptedRaw.some(
-				({ channelId, connectionId, lifecycleSequence }) =>
-					connectionId === after.connectionId &&
-					channelId === after.channelId &&
-					replacementOpen.sequence < lifecycleSequence
-			),
-			"D108E4H_OVERLAP_LEDGER_INVALID"
-		);
 	}
 }
 
@@ -2645,56 +2819,24 @@ function d108e4hValidateEndpoint(
 		"D108E4H_DROP_COUNT_AMBIGUOUS"
 	);
 	const replaced = delta.linkDrops === 1;
+	let transitionReason: "channel-close" | "replacement" | undefined;
 	if (replaced) {
+		const recordedReason = delta.lastLinkDrop.after;
 		d108e4hAssert(
-			delta.lastLinkDrop.after === "replacement" || delta.lastLinkDrop.after === "channel-close",
+			recordedReason === "replacement" || recordedReason === "channel-close",
 			"D108E4H_DROP_REASON_UNSUPPORTED"
 		);
+		transitionReason = recordedReason;
 	}
 	const { after, before } = d108e4hAssertBoundaryIdentity(endpoint, remotePeerId, replaced);
 	d108e4hAssertAttemptCustody(endpoint, before, after, replaced, sampleCount);
-	d108e4hAssertOverlapCustody(endpoint, before, after, replaced);
+	d108e4hAssertOverlapCustody(endpoint, before, after, replaced, transitionReason);
 	d108e4hAssert(delta.backpressuredDrops === 0, "D108E4H_RAW_BACKPRESSURE");
 	d108e4hAssert(
 		endpoint.deadline.rawTransport.sent - endpoint.prepare.rawTransport.sent === endpoint.rawSends.length &&
 			endpoint.deadline.rawTransport.received - endpoint.prepare.rawTransport.received === endpoint.acceptedRaw.length,
 		"D108E4H_RAW_COUNTER_MISMATCH"
 	);
-	if (replaced && delta.lastLinkDrop.after === "channel-close") {
-		const closeCall = endpoint.lifecycle.find(
-			({ channelId, connectionId, event, label }) =>
-				connectionId === before.connectionId &&
-				channelId === before.channelId &&
-				event === "channel-close-call" &&
-				label === "ts-drp-ephemeral/1"
-		);
-		d108e4hAssert(closeCall?.bufferedAmount === 0, "D108E4H_CHANNEL_CLOSE_DRAIN_INVALID");
-		const closeEvent = endpoint.lifecycle.find(
-			({ channelId, connectionId, event, label }) =>
-				connectionId === before.connectionId &&
-				channelId === before.channelId &&
-				event === "channel-close-event" &&
-				label === "ts-drp-ephemeral/1"
-		);
-		d108e4hAssert(closeEvent !== undefined, "D108E4H_LIFECYCLE_CUSTODY_ABSENT");
-		const acceptedAfterPromotion = endpoint.acceptedRaw.some(
-			({ channelId, connectionId, lifecycleSequence }) =>
-				connectionId === after.connectionId && channelId === after.channelId && lifecycleSequence > closeEvent.sequence
-		);
-		const sendAfterPromotion = endpoint.rawSends.some(({ attemptId, channelId, connectionId }) => {
-			if (connectionId !== after.connectionId || channelId !== after.channelId) return false;
-			return endpoint.lifecycle.some(
-				(record) =>
-					record.event === "channel-send-attempt" &&
-					record.attemptId === attemptId &&
-					record.sequence > closeEvent.sequence
-			);
-		});
-		d108e4hAssert(
-			endpoint.transmitsRawTrial ? sendAfterPromotion : acceptedAfterPromotion,
-			"D108E4H_CHANNEL_CLOSE_INGRESS_INVALID"
-		);
-	}
 }
 
 function validateD108e4hCampaignCustody(input: D108e4hValidationInput): void {
@@ -2737,6 +2879,66 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 		const receiverReplacement = d108e4hFixture("receiver-replacement");
 		const repeatedReplacement = d108e4hFixture("receiver-repeated-replacement");
 		const receiverChannelClose = d108e4hFixture("receiver-channel-close");
+		const preservedCampaignReplay = d108e4iPreservedCampaignReplay();
+		const replayCreator = preservedCampaignReplay.endpoints.creator;
+		const replayReceiver = preservedCampaignReplay.endpoints.receiver;
+		expect([
+			replayCreator.prepare.rtc.map(({ channelId, connectionId }) => [connectionId, channelId]),
+			replayCreator.deadline.rtc.map(({ channelId, connectionId }) => [connectionId, channelId]),
+			replayReceiver.prepare.rtc.map(({ channelId, connectionId }) => [connectionId, channelId]),
+			replayReceiver.deadline.rtc.map(({ channelId, connectionId }) => [connectionId, channelId]),
+		]).toEqual([[[10, 416]], [[12, 437]], [[9, 413]], [[11, 438]]]);
+		expect(
+			[10, 12].map((connectionId) => replayCreator.rawSends.filter((send) => send.connectionId === connectionId).length)
+		).toEqual([595, 5]);
+		expect({
+			receiverA: replayReceiver.acceptedRaw.filter(({ connectionId }) => connectionId === 9).length,
+			receiverB: replayReceiver.acceptedRaw.filter(({ connectionId }) => connectionId === 11).length,
+		}).toEqual({ receiverA: 418, receiverB: 0 });
+		expect(
+			replayCreator.lifecycle
+				.filter(
+					({ channelId, connectionId, event, owner }) =>
+						(connectionId === 12 && channelId === 437) ||
+						(event === "channel-close-call" && owner === "product-unreliable-webrtc")
+				)
+				.filter(({ event }) =>
+					[
+						"channel-open-event",
+						"channel-message-handler-installed",
+						"channel-close-call",
+						"channel-send-attempt",
+						"channel-send-success",
+					].includes(event)
+				)
+				.slice(0, 5)
+				.map(({ event, sequence }) => [sequence, event])
+		).toEqual([
+			[1_749, "channel-open-event"],
+			[1_750, "channel-message-handler-installed"],
+			[1_751, "channel-close-call"],
+			[1_752, "channel-send-attempt"],
+			[1_753, "channel-send-success"],
+		]);
+		expect(
+			replayReceiver.lifecycle
+				.filter(
+					({ channelId, connectionId, event, owner }) =>
+						(connectionId === 11 && channelId === 438 && owner === "product-unreliable-webrtc") ||
+						(event === "channel-open-event" && connectionId === 11 && channelId === 438) ||
+						(connectionId === 9 &&
+							channelId === 413 &&
+							(event === "channel-close-event" ||
+								(event === "channel-close-call" && owner === "product-unreliable-webrtc")))
+				)
+				.map(({ event, sequence }) => [sequence, event])
+		).toEqual([
+			[956, "channel-message-handler-installed"],
+			[957, "channel-open-event"],
+			[1_115, "channel-close-event"],
+			[1_116, "channel-close-call"],
+		]);
+		expect(() => validateD108e4hCampaignCustody(preservedCampaignReplay)).not.toThrow();
 		const carryInMonitor = Object.freeze({
 			...noReplacement,
 			endpoints: Object.freeze({
@@ -2864,41 +3066,11 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 					)
 			)
 		);
-		const creatorChannelCloseRemoteOrder = withCreatorLifecycle(
-			creatorChannelClose,
-			creatorChannelClose.endpoints.creator.lifecycle.flatMap((record) => {
-				if (
-					record.event === "channel-close-call" &&
-					record.connectionId === D108E4H_RTC_A.connectionId &&
-					record.channelId === D108E4H_RTC_A.channelId
-				) {
-					return Object.freeze([]);
-				}
-				if (
-					record.event === "channel-close-event" &&
-					record.connectionId === D108E4H_RTC_A.connectionId &&
-					record.channelId === D108E4H_RTC_A.channelId
-				) {
-					const closeCall = creatorChannelClose.endpoints.creator.lifecycle.find(
-						(candidate) =>
-							candidate.event === "channel-close-call" &&
-							candidate.connectionId === D108E4H_RTC_A.connectionId &&
-							candidate.channelId === D108E4H_RTC_A.channelId
-					);
-					if (closeCall === undefined) throw new Error("D108E4I_FIXTURE_CLOSE_CALL_ABSENT");
-					return Object.freeze([
-						Object.freeze({ ...record, sequence: closeCall.sequence }),
-						Object.freeze({ ...closeCall, sequence: record.sequence }),
-					]);
-				}
-				return Object.freeze([record]);
-			})
-		);
+		const creatorChannelCloseRemoteOrder = creatorChannelClose;
 		const receiverDirectionalFixture = (
 			fixture: D108e4hValidationInput,
 			input: Readonly<{
 				readonly omitCloseEvent?: boolean;
-				readonly remoteOrder?: boolean;
 				readonly removeBDelivery?: boolean;
 			}>
 		): D108e4hValidationInput => {
@@ -2915,13 +3087,6 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 					received: accepted.length,
 				})
 			);
-			const closeCall = fixture.endpoints.receiver.lifecycle.find(
-				(record) =>
-					record.event === "channel-close-call" &&
-					record.connectionId === D108E4H_RTC_A.connectionId &&
-					record.channelId === D108E4H_RTC_A.channelId
-			);
-			if (closeCall === undefined) throw new Error("D108E4I_FIXTURE_CLOSE_CALL_ABSENT");
 			const lifecycle = fixture.endpoints.receiver.lifecycle.flatMap((record) => {
 				if (
 					input.removeBDelivery &&
@@ -2938,18 +3103,6 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 					record.channelId === D108E4H_RTC_A.channelId
 				) {
 					return Object.freeze([]);
-				}
-				if (!input.remoteOrder) return Object.freeze([record]);
-				if (record === closeCall) return Object.freeze([]);
-				if (
-					record.event === "channel-close-event" &&
-					record.connectionId === D108E4H_RTC_A.connectionId &&
-					record.channelId === D108E4H_RTC_A.channelId
-				) {
-					return Object.freeze([
-						Object.freeze({ ...record, sequence: closeCall.sequence }),
-						Object.freeze({ ...closeCall, sequence: record.sequence }),
-					]);
 				}
 				return Object.freeze([record]);
 			});
@@ -2971,9 +3124,8 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 		const receiverReplacementWithoutBDelivery = receiverDirectionalFixture(receiverReplacement, {
 			removeBDelivery: true,
 		});
-		const receiverChannelCloseRemoteOrder = receiverDirectionalFixture(receiverChannelClose, { remoteOrder: true });
+		const receiverChannelCloseRemoteOrder = receiverDirectionalFixture(receiverChannelClose, {});
 		const receiverChannelCloseRemoteOrderWithoutBDelivery = receiverDirectionalFixture(receiverChannelClose, {
-			remoteOrder: true,
 			removeBDelivery: true,
 		});
 		for (const [name, fixture] of [
@@ -3848,6 +4000,13 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 		expect(() => validateD108e4hCampaignCustody(wrongReplacementChannel)).toThrowError(
 			"D108E4H_LIFECYCLE_ORDER_INVALID"
 		);
+		const wrongCloseEventOwner = withReceiverLifecycle(
+			receiverChannelClose,
+			receiverChannelClose.endpoints.receiver.lifecycle.map((record) =>
+				record.event === "channel-close-event" ? Object.freeze({ ...record, owner: "rtc-observer-or-harness" }) : record
+			)
+		);
+		expect(() => validateD108e4hCampaignCustody(wrongCloseEventOwner)).toThrowError("D108E4H_LIFECYCLE_CUSTODY_ABSENT");
 		const postPromotionB = receiverChannelClose.endpoints.receiver.acceptedRaw.find(
 			({ connectionId, lifecycleSequence }) => connectionId === D108E4H_RTC_B.connectionId && lifecycleSequence === 6
 		);
