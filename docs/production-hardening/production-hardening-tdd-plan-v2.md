@@ -64813,6 +64813,235 @@ Bounded TypeScript, grid build/typecheck, exact-owner ESLint/Prettier and diff
 checks passed. It changes only the test owner, has a good signature and is the
 accepted RED for GREEN.
 
+The first D.108e4f GREEN candidate is rejected rather than accepted. Its
+signed/pushed commit is `b64d3539b1e7435bc13dd30262d467a7a9ad32dc`, parent
+`83d14dfab44c1d8bccc080c93b891466dabef543`, tree
+`df6175640b34d2a2fe1809e1d63ff6768b445226`, stable patch id
+`b896693dc7165b233e48391e3014673006f04348` and raw-diff SHA-256
+`9e0da2f89d534ccd8ae1038f542ea8384e2a001f7705a784381112e3e2dd9d50`.
+The focused integrated 2/2 and retained observer 1/1 passed under JSON
+SHA-256 values
+`fd279ff0ccdf3e3cf77b76fe34f57ffa17c55ff1083e917f294abd5afd3dcd0d`
+and `691a51f8975f5f39621b144fbce0f2454426e75188eef297443923ac93a2fe1a`
+respectively. The one authorized complete E3-03 invocation was exactly:
+
+```text
+pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --fail-on-flaky-tests --reporter=json
+```
+
+Its JSON report `.logs/d108e4f-green-complete.json`, SHA-256
+`a29604193eb94ffaaa01afc6a7bdf558c0e9743a81b6a37fc33b213382b3b694`,
+records 4 expected / 1 unexpected / 0 skipped / 0 flaky. Its preserved
+`failure-telemetry.json`, SHA-256
+`268ef2f560b09685c53f94779759676f71303e5b24ed234b7057d56157061f5a`,
+shows trial `e3-03-1` failed the unchanged sender `maxStallMs <= 500` gate at
+4,426 ms. Sender sequence 455 on connection generation 6/raw channel 381 was
+followed by sequence 589 on generation 8/channel 399; sequences 456 through
+588 were absent. The sender attempted 600 sends and 467 succeeded. The
+product roster, observer and raw counter agree exactly in both completed
+trials: 430/430/413 in trial zero and 321/321/310 in trial one, with zero
+rejected records in trial one. Handshake failures and backpressured drops did
+not move. Authenticated loss and replacement/channel-close counters did move
+around the 4,426 ms hole. This is a real raw-sidecar replacement interval, not
+an observer partition, deadline race, scheduler proxy, roster-membership or
+backpressure artifact. The failure attachment is the evidence owner; no
+complete E3-03 rerun is allowed merely to sample another outcome.
+
+The rejected candidate's sole formal GREEN review round reached the following
+union. Grok 4.6/high session `01a0468c-87db-7a20-9f8d-54d1e47ad2fc`
+completed normally in 570.172 seconds with exit zero and `end_turn`. Its
+wrapper reported `NO_VERDICT` because progress prose preceded the terminal
+object, while its substantive terminal result was `CHANGES_REQUIRED`,
+P0=1/P1=0/P2=1: 4/5 rejects GREEN and the named diagnostics were incomplete.
+Status, public-result and event-stream SHA-256 values are respectively
+`f53466c90938cf4218c36dfecfa9bf593239ed99905f0127c04424ca44b8aaae`,
+`8b64ee61a78d759590e23e69659e81827ce023e07626cc51cf01deaba8bada33`
+and `fe8d764893f3d113407cb2c82ebfec7d2b9ceef352dc00ede973fe60e7e5c2c5`.
+Exact Kimi K3 session `9485177e-3af1-4777-bdb9-ab5bc60c6870`
+emitted exactly 100 total, unique and ordered `CHECK001` through `CHECK100`
+markers and returned `CHANGES_REQUIRED`, P0=0/P1=1/P2=2. Stream SHA-256 is
+`c9f2753a6d0d84bafbbf901f7e5694b473a894f56e4da0d6a347e667691dfb19`.
+Its P1 is the same 4/5 replacement gap. Its deadline-jitter P2 is closed by
+the authoritative receiver-clock snapshot below; its log-naming P2 designates
+the integrated focused report above as canonical without rerunning it.
+Claude-skill Opus 5/xhigh session `9085cc6f-21c9-491b-9ba0-87556657c6c4`
+completed in 868.459 seconds with no error, permission denial or subagent and
+returned `CHANGES_REQUIRED`, P0=2/P1=3/P2=3. Raw-result SHA-256 is
+`6c195bd7f20bdf2e4e71b0d3dbb0a07382989671df147ecea72c45ef3e675689`.
+Its P0 union is the incomplete full gate and the unassigned recovery owner.
+Its P1 evidence-integrity union and two diagnostic/attachment P2s are closed
+by the correction below. Its send-path mapping-reacquisition P2 is recorded as
+context but cannot by itself satisfy 500 ms: it can save at most the retry
+delay for one lexicographic role and nothing for the other. The continuity
+owner below supersedes that incomplete remedy.
+
+The same-round evidence correction is signed/pushed commit
+`c7c8f1bb06cc05fd67af99930bc3b91598fc8459`, parent
+`b64d3539b1e7435bc13dd30262d467a7a9ad32dc`, tree
+`36c29be2aa94054d099b471723e243e58fe10f1f`, stable patch id
+`ea66a340987d0a9588ad31c61fb028303a6c41c9` and raw-diff SHA-256
+`569dc194e8c91b4304ed29d90fa9954172a3503be46e72a4c5a2be9eda3a5b8c`.
+It changes only `tests/e3-03-loss-and-hol-proof.pw.ts`, has a good signature
+and does not change product behavior. It validates complete reliable wire
+ordering before projecting accepted records; derives and awaits the product
+deadline before taking one authoritative receiver snapshot; incrementally
+persists trial-stage evidence; stores compact accepted identities rather than
+duplicating full payloads; and records named role, clock, arrival-inversion,
+per-channel monotonicity, rendered/application metrics and all raw-transport
+deltas before the 500 ms assertion. Final focused 2/2 and retained-observer
+1/1 JSON SHA-256 values are
+`585b7b1e0e55b82c9a64116eeb76911556d9541178ee9ccf8a8cb2f8578b82e0`
+and `93aad783040011a9d815575441275d6ee7790ee2cdb6c26c8d33fb8ed61816da`.
+The standalone test-owner TypeScript check, affected grid build/typecheck,
+exact-owner ESLint/Prettier and `git diff --check` passed; build-log SHA-256 is
+`a93fb00af6f850a762e1290fe458e5ae57f1ba4cd6299478c2512472c472bd7b`
+and typecheck-log SHA-256 is
+`087eba9acd40302f69876972072fe38b513f0ba47b13ec083ed1f5c79586642f`.
+The complete campaign was correctly not rerun. D.108e4f remains rejected
+until its unchanged complete 5/5 gate passes after D.108e4g.
+
+A read-only local Codex review of the corrected work returned no tracked-code
+finding. Its public result SHA-256 is
+`ef195cd563ff298ad2f2db105903a4cee3edd573e8624af03a154fd5d1ddb9e5`.
+Its two P1s concerned protected untracked legacy tests and cache size. They are
+not submission findings: exact-path staging excludes those user-owned paths,
+and deleting them would violate the protected-state constraint. The one-off
+authorized Fable High review, session
+`ca129ee2-86e3-4233-8ff9-1c7d24727436`, ended normally after 1,226.506
+seconds. Its raw stream SHA-256 is
+`29df13df5fa563268c2dcec110026fd8be6765a8197d64cf0fa9b50cd7c0166e`.
+It is non-quorum advisory evidence only, identified the same break-before-make
+continuity defect and was not reused. No further Fable invocation is
+authorized.
+
+###### D.108e4g — make-before-break raw-sidecar continuity under authenticated replacement
+
+D.108e4g is the narrow recovery owner created by the rejected D.108e4f GREEN.
+The demonstrated blocker is local to
+`packages/network/src/unreliable-webrtc.ts`: when authenticated connection
+identity changes, `#linkFor` reserves replacement admission and drops an open
+raw sidecar before the replacement is usable. `#send` can trigger the same
+retirement when it observes that the open link's authenticated connection is
+not current. This break-before-make transition creates an avoidable raw outage
+even when the old `RTCDataChannel` remains open and usable. D.108e4g changes
+that lifecycle only: an open old raw link remains the active send/ingress owner
+while one authenticated same-peer replacement is pending; the old link is
+retired exactly after the replacement has opened and atomically registered, or
+when the old channel/peer connection itself closes or fails. A failed or timed
+out replacement retains the usable old link and increments the existing
+handshake-failure evidence. No payload buffering, duplicate active ingress,
+new public API, wire-format change, digest-owner change, chunk/connection
+limit, memory ceiling or activation-authority change is authorized.
+
+The observed js-libp2p connection-monitor abort is an unproven trigger, not
+the root-cause attribution. The reliable connection was already wedged, so
+the abort may be correct liveness behavior. D.108e4g must not upgrade or patch
+js-libp2p, disable its connection monitor, alter ping/abort thresholds or
+attribute the failure upstream without telemetry proving that the monitor
+aborted an otherwise usable authenticated connection. The following upstream
+items are related continuity and cleanup context only, not proposed fixes:
+
+- [js-libp2p issue #2646](https://github.com/libp2p/js-libp2p/issues/2646)
+  reports a half-open connection after failed WebRTC establishment;
+  [PR #3459](https://github.com/libp2p/js-libp2p/pull/3459) proposes initial
+  terminal-state detection.
+- [issue #1835](https://github.com/libp2p/js-libp2p/issues/1835) concerns
+  delayed shutdown/reconnect cleanup that can affect a same-peer replacement.
+- [issue #3015](https://github.com/libp2p/js-libp2p/issues/3015) concerns a
+  failed WebRTC upgrade dropping its relay circuit.
+- [issue #3201](https://github.com/libp2p/js-libp2p/issues/3201) and merged
+  [PR #3205](https://github.com/libp2p/js-libp2p/pull/3205) concern preserving
+  relay streams across a WebRTC upgrade.
+
+Before another complete E3-03 invocation, D.108e4g-a freezes deterministic
+lifecycle telemetry and an immutable both-peer-orderings RED. The browser
+telemetry must timestamp and attribute: ping start, success, failure and abort
+including abort owner/reason; each authenticated `RTCPeerConnection`'s
+signaling, ICE and connection states; every `RTCPeerConnection.close()` and
+`RTCDataChannel.close()` caller with owner and stack; signaling offer, answer
+and candidate phases; raw-send refusal; active mapping deletion; desired-peer
+acquisition; replacement peer-connection creation, data-channel open and
+registration; old-link retirement; and the first successful post-replacement
+send. It must retain the scheduler's due, capture and insertion timestamps so
+transport silence cannot be confused with test-runner delay. Prototype-level
+browser instrumentation and the existing private example workbench seam are
+permitted. Any workbench snapshot-shape extension is explicitly a private
+test/example seam change and must be reviewed as such; it is not a product API.
+The telemetry self-check must deterministically exercise and observe every
+event class before production behavior changes. Missing or internally
+inconsistent lifecycle evidence fails closed.
+
+The immutable unit RED owner is
+`packages/network/tests/unreliable-webrtc-e3-01-red.test.ts`; GREEN may change
+only that test owner and `packages/network/src/unreliable-webrtc.ts` unless the
+reviewed telemetry checkpoint names an additional exact test/example owner.
+The RED runs both lexicographic peer orderings. In each ordering it establishes
+old authenticated connection A and its raw link, introduces authenticated
+connection B while holding B's answer/open phase, then reconciles and sends
+from both role-specific paths. While B is pending, the assertions require A to
+remain mapped, `send()` to return true and exactly one payload to arrive.
+After releasing B, B must open and register before exactly one replacement
+drop retires A; the next send must arrive exactly once through B. A separate
+failed-replacement vector rejects or times out B and requires A to remain
+mapped and sendable, the handshake-failure counter to advance, and no
+replacement drop. Existing undesired-peer, multi-peer, admission, connection
+loss, stale signaling, route ACL, no-duplicate-delivery and eight-PC ceiling
+controls remain retained. RED is causal only when these new positive
+continuity assertions fail under the current break-before-make owner while the
+retained controls pass.
+
+GREEN replaces D.108e4a's retire-before-setup assumption only for a desired,
+already-authorized, same-peer open raw sidecar with a current authenticated
+replacement candidate. Authorization remains tied to the authenticated peer;
+the existing route header and ingress ACL remain authoritative; the old link
+does not admit a new peer or route. At most one link is the mapped send/ingress
+owner, and registration performs the atomic handoff before closing the old
+physical sidecar. A non-open old link is still dropped immediately, and an
+undesired peer is never retained. This is make-before-break continuity, not a
+hot-standby topology or a changed retry budget.
+
+D.108e4g-a first records a signed/pushed telemetry/RED plan checkpoint and
+runs the normal Grok 4.6/high, exact Kimi K3 100-step and Claude-skill Opus
+5/xhigh review round against that immutable commit. P0/P1 findings are
+corrected in the same round without confirmation review; every P2 receives an
+exact owner and deadline. No production behavior may change before that
+review. Fable is excluded. The accepted RED then receives its separate review
+round, followed by the narrow GREEN and its separate review round under the
+existing protocol.
+
+RED and GREEN run the exact named new behaviors, the complete retained
+`unreliable-webrtc-e3-01-red.test.ts` owner, affected network build/typecheck,
+standalone owner TypeScript where applicable, exact-owner ESLint/Prettier and
+`git diff --check`. They also run the retained E3-02 and focused D.108e4f
+observer/product-roster tests. GREEN is not eligible for a complete campaign
+until the deterministic both-orderings continuity test, failed-replacement
+retention test and telemetry self-check all pass with zero skip or flake.
+
+After those gates pass, the owner may run exactly one new complete E3-03
+campaign with the unchanged five-test inventory, JSON reporter and
+`--fail-on-flaky-tests`. Acceptance remains exactly 5/5 with zero skipped or
+flaky tests and every trial's signed `maxStallMs <= 500`. If authenticated
+replacement occurs, the attachment must prove replacement open/registration
+preceded old-link retirement, show the first successful post-replacement send
+and show no raw refusal while the old link remained usable. If the one allowed
+campaign produces a different failure, its telemetry assigns the next owner
+before any rerun. Only complete 5/5 acceptance closes D.108e4g, reclassifies
+D.108e4f GREEN as accepted and resumes D.108e4e/D.108e5.
+
+If and only if the frozen telemetry proves that js-libp2p's connection monitor
+aborted an otherwise usable authenticated reliable connection, D.108e4g stops
+without changing that dependency and creates a separately reviewed upstream
+reproduction/report slice. Its first deliverable is a minimal viable
+reproducible example pinned to the exact installed js-libp2p and transport
+versions: two browser peers, the smallest deterministic signaling/network
+profile that triggers the monitor decision, timestamped ping/abort and
+PeerConnection lifecycle evidence, expected versus observed behavior, and a
+single-command test. It must exclude the ts-drp raw-sidecar owner if the abort
+reproduces without it; otherwise it must reduce that owner to the smallest
+trigger and state why it is necessary. The upstream slice owns issue matching,
+bisect or report preparation. It does not authorize a dependency upgrade,
+patch, monitor disablement or threshold change in D.108e4g.
+
 The first D.108e4c plan-freeze review round inspected signed/pushed commit
 `eb3de05b6054ac6fdd158d2530bad1798f87f10f`, parent
 `b8a2628bec7593c547919b540889dc75e33cd9ca`, tree
