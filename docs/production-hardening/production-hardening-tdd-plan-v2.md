@@ -68973,60 +68973,140 @@ and `a5a095303f7c5f17dd7d5484063b7e3b224b00eff8161cb77c7f4b309e65fc32`.
 No later ordinary gate or isolated proof ran, and the D.93.46 consecutive
 ledger is invalid. There is no retry evidence to reinterpret as GREEN.
 
-Static tracing gives one narrow falsifiable owner hypothesis. A v3 channel can
-open while `currentAuthority()` or the remote peer-to-author projection is not
-yet ready. `NodeEphemeralAdapter.openAuthorized()` then completes
-`rawRoute.reconcile([])`. If the reliable connection and group-peer events
-already occurred, a later durable projection change does not itself invoke
-`reconcileRaw()`. The route therefore retains an already-reconciled empty
-membership even though the live provider subsequently returns the exact
-two-writer roster. This explains the observed zero-failure/zero-drop empty
-route, but remains a hypothesis until the deterministic RED below fails for
-that exact transition.
+Static tracing proves a narrower mechanism, not the exact late input. The raw
+route's first `reconcile([])` sets `membershipReconciled=true` and an empty peer
+set in `packages/network/src/unreliable-webrtc.ts`; that disables its lazy
+first-send setup. `NodeEphemeralAdapter` later reconciles only for a group-peer
+change, peer-connection change or raw ingress. No durable projection event
+invokes it. Therefore any eligibility input that becomes usable after the last
+network event can strand an already-reconciled empty route with precisely the
+observed zero-send/zero-failure/zero-drop telemetry. The retained trace does
+not prove whether the late input was transport membership, roster visibility
+or another local eligibility operand. Per-handle authority is latched and the
+creator roster was already complete, so D.108e4x does not claim a post-open
+authority birth or upstream trigger.
 
-D.108e4x is a narrow event-driven reconciliation slice. Its RED changes only
-`packages/node/tests/ephemeral-webrtc-e3-02-red.test.ts`. The controlled raw
-bus starts with an already connected peer while the mutable provider exposes
-no current authority and no remote roster entry; the first open must reconcile
-an empty route. RED then makes the same provider expose the exact current
-authority, peer-to-author mapping and writer, invokes the existing idempotent
-`openAuthorized()` surface again with the identical object and options, and
-requires the same channel identity, an exact `['peer-b']` reconciliation and
-successful first raw publication with no reliable fallback. Current behavior
-must fail because the existing-registration branch returns before refreshing
-the raw route. A RED for any different reason stops and reslices.
+D.108e4x is a narrow event-driven reconciliation slice with two deterministic
+RED owners. `packages/node/tests/ephemeral-webrtc-e3-02-red.test.ts` uses the
+controlled raw bus with the peer already connected, performs an initial open
+whose live eligibility is empty, makes the same provider return the exact
+eligible peer, then invokes existing `openAuthorized()` with the identical
+object and options. It requires the same channel identity and exact final
+`reconciledPeers=['peer-b']`. That membership assertion is the sole RED
+discriminator: same-channel identity and successful publication with no
+reliable fallback are controls that already pass before GREEN. Any other RED
+failure stops and reslices.
+
+`tests/phase-3f-b-chat-zone-causal-join-red.test.ts` supplies the second RED
+without a browser or clock. Its existing room double records the singleton
+channel, open count, options and an underlying committed-projection marker. A
+test-owned projection driver invokes the captured `onProjection` callback and
+only after it returns advances that marker, matching the real v3-room commit
+ordering. The existing zone title then requires no synchronous reopen, exactly
+one idempotent reopen in the following microtask, identical frozen options,
+the same channel, and observation of the advanced marker. Current behavior
+must fail only because it performs no projection-driven reopen. This is the
+deterministic zone-owner gate missing from the first plan draft.
 
 GREEN may change only `packages/node/src/ephemeral.ts` and
-`examples/grid/src/v3-zone.ts`. The adapter registration may retain one
-private reconciliation closure built from the original live provider; an
-idempotent identical `openAuthorized()` must invoke that closure before
-returning the existing channel. The zone's existing `onProjection` callback
-may idempotently reopen the already-active room channel with the identical
-frozen options only when both the room and channel exist, thereby notifying
-the adapter at the actual durable projection event. The returned object must
-be the existing channel. Reconciliation must be make-preserving: no
+`examples/grid/src/v3-zone.ts`. The adapter registration retains one private
+reconciliation closure over the original provider. Providers produced by
+reopening the same live room/object are interchangeable views over the same
+session bindings; no provider identity becomes product state. An idempotent
+identical `openAuthorized()` invokes the stored closure before returning the
+existing channel. The closure does nothing when current authority is absent or
+the computed eligible peer set is empty. It never calls `reconcile([])`, so an
+empty sample cannot latch membership or overwrite a prior nonempty membership;
+authorization checks still prevent publication to a removed writer.
+
+The zone's existing `onProjection` callback captures the exact current room
+and channel, then schedules one `queueMicrotask` notification. After the
+callback returns, the real room has assigned its new projection. The microtask
+continues only if both captured identities are still current, calls the
+existing `room.openEphemeral(ZONE_EPHEMERAL_OPTIONS)`, and discards the return;
+same-channel identity is asserted by the adapter RED rather than by throwing
+inside durable projection. A synchronous closed/terminal-session reopen error
+is contained locally so optional raw readiness cannot terminalize durable
+convergence. This microtask is a single event-bound notification, not a retry,
+timer or poll.
+
+Reconciliation must be make-preserving: no `reconcile([])`,
 `restartUnreliable()`, route close, link close, retry timer, polling interval,
 snapshot side effect or synthetic network event is allowed. No public or
 private API, dependency, config, timeout, transport limit, fallback, wire,
 digest, authority, snapshot or activation behavior may change. If these exact
-owners cannot close the deterministic RED and unchanged D.93.46 contract, stop
-and reslice rather than adding a new notification API or weakening readiness.
+owners cannot close both deterministic REDs and the unchanged D.93.46
+contract, stop and reslice rather than adding a new notification API or
+weakening readiness.
 
 Freeze this plan in a signed/pushed checkpoint and run the normal read-only
 Grok 4.6/high, exact Kimi K3 `CHECK001` through `CHECK100`, and Opus 5/xhigh
 plan review. No Fable or collaboration subagent runs. Correct every P0/P1 in
 the same round without confirmation and assign every P2 to the plan owner with
-deadline 2026-09-04. Then add the one RED and run only its exact title once,
-recording the expected failure and unchanged 10/10 retained remainder. After
-GREEN, run the exact new E3-02 file for 11/11; network E3-01 plus E3-02 for
-59/59; the unchanged D.93.46 command once with `--repeat-each=3
---fail-on-flaky-tests` for 3/3; exact-owner typecheck, ESLint, Prettier and
-`git diff --check`; and the relevant retained Phase-3 transport and E3-03
-non-campaign observer tests. A failure stops without retry. The signed/pushed
-GREEN then receives the normal Grok/Kimi/Opus implementation review.
+deadline 2026-09-04. Then add both RED assertions. Run only the new E3-02 title
+once and the existing exact Phase-3f-b zone title once; each must fail at its
+one specified new discriminator while the pre-existing assertions remain
+green. After GREEN, run the exact E3-02 file for 11/11; the Phase-3f-b file for
+2/2; network E3-01 plus E3-02 for 59/59; and the unchanged exact D.93.46
+`--repeat-each=3 --fail-on-flaky-tests` command in three consecutive
+invocations, each 3/3. A single 3/3 is only smoke and cannot accept this slice.
+Also run exact-owner package typechecks, ESLint, Prettier and
+`git diff --check`, plus the retained Phase-3 transport and E3-03 non-campaign
+observer tests. Any failure invalidates the D.93.46 ledger and stops without
+retry. The signed/pushed GREEN then receives the normal Grok/Kimi/Opus
+implementation review.
+
+The restarted D.108e4k ESLint and Prettier rosters must include
+`packages/node/src/ephemeral.ts`,
+`packages/node/tests/ephemeral-webrtc-e3-02-red.test.ts` and
+`tests/phase-3f-b-chat-zone-causal-join-red.test.ts`. The plan owner also owns
+one nonblocking generalization debt with deadline 2026-09-04: determine whether
+non-grid future v3-room ephemeral consumers need a causal authorization-change
+notification. This example-local event hook is not represented as that broader
+API or resolution.
 
 Because D.108e4x changes product, example and test trees, every partial
 D.108e4k execution result above becomes historical diagnosis only. After
 D.108e4x GREEN and implementation review close, D.108e4k must restart from
 command one at the new exact signed tree. The complete E3-03 config, retained
 three-trial campaign and both campaign ledgers remain unauthorized.
+
+The D.108e4x plan review inspected exact signed/pushed commit
+`df12c0e5228db57495b6442db63e94c4a121de19`, parent
+`e76012eced90fcc3a8a6c32f16be027247298f86` and tree
+`5073b4edfe61f13710b930e748cb0aff2ea33c51`.
+
+Grok 4.6/high completed its one substantive read-only review after 660.157
+seconds with exit zero, `end_turn` and no timeout. The wrapper correctly
+classified it `NO_VERDICT` because progress prose preceded the terminal
+object. That object was CHANGES_REQUIRED with zero P0, one P1 and three P2 and
+is finding input, not a formal verdict. Event/public/status/stderr SHA-256
+values are
+`c90df760e4c53319157570c604f451159dcc094679618be95c267718a0f7d6b7`,
+`6e2ebc83b7f556ab2af8615ef171e76120bc25d19aad2f90626523c4c01a2d53`,
+`b3132c2bd817780149dcfe71adcd4279b96e55bfa17ceb9e3ce57dad590879ee`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+Kimi CLI exact `kimi-code/k3` session
+`session_dafee787-2b42-4212-9fea-cacaebc9853e` emitted exactly 100 unique,
+ordered `CHECK001` through `CHECK100` markers and one terminal result. It
+returned changes-requested with one P0, two P1 and three P2. Stream/stderr
+SHA-256 values are
+`0cdbee9df34071a575e050cb7c05e2fc908071ed06484cb04c23be01bc800a95`
+and `21518e37ebe47e255623c4e3d60134e93a3fee71f343483d2046c81f6555f015`.
+
+Opus 5/xhigh session `8dbfa074-46b7-4cf7-ab9f-e5cf2acbd3f2`
+completed 31 turns in 532.919 seconds with no error or subagent and returned
+CHANGES_REQUIRED with one P0, four P1 and four P2. JSON/stderr SHA-256 values
+are `2d6ed82b31176f5f9decf8493007ad620303244636b92e615947a94d1001ad63`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+The same-round correction above closes the P0/P1 union by adding a
+deterministic zone-owner RED, observing room projection only after commit via
+one microtask, making empty reconciliation non-destructive, and requiring the
+same three-invocation ledger that exposed the defect. The plan owner owns the
+complete P2 union with deadline 2026-09-04: exact static rosters, contained
+closed-session notification, original-provider equivalence, explicit sole RED
+discriminator, sharpened non-upstream diagnosis, discarded reopen return, and
+the named non-grid generalization debt. No confirmation review, Fable,
+campaign, production execution or collaboration subagent ran during review.
