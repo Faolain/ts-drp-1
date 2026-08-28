@@ -66918,12 +66918,14 @@ ran.
 D.108e4k is an evidence-only split of the still-open D.108e4c combined gate.
 It changes only this plan and execution logs. It does not change product,
 example, test, configuration, dependency or lockfile behavior, and it creates
-no RED/GREEN implementation pair. Its behavior baseline is the accepted
-D.108e4i GREEN at `cc112d220539157b5d81394d2574286ef49c159d`; the later
-D.108e4j commits change only this plan. The exact product, test, example,
+no RED/GREEN implementation pair. Its historical behavior baseline was the
+accepted D.108e4i GREEN at `cc112d220539157b5d81394d2574286ef49c159d`.
+D.108e4m/t and then D.108e4v supersede that test-tree baseline. The current
+restart baseline is the exact signed D.108e4v GREEN/evidence tree recorded
+below; D.108e4k cannot execute until that checkpoint exists. Product, example,
 Playwright/build/workspace configuration, package-manifest, lockfile and
-`scripts/` trees must remain byte-identical to that baseline throughout this
-slice.
+`scripts/` trees remain byte-identical to `cc112d22`; the test tree must remain
+byte-identical to the D.108e4v checkpoint throughout the restarted slice.
 
 This split exists because the one D.108e4j campaign authorization is consumed,
 while the combined proof contains useful independent gates that do not execute
@@ -67095,6 +67097,9 @@ pnpm exec eslint --max-warnings=0 \
   tests/e5-02-zone-referee-outcome.pw.ts \
   tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts \
   tests/fixtures/shared/workspace-package-export-file.mjs \
+  tests/phase-3f-b-chat-zone-causal-join-red.test.ts \
+  tests/phase-3f-c-chat-zone-batching-red.test.ts \
+  tests/phase-3h-chat-zone-migration-red.test.ts \
   tests/phase-3a1b-d9336-two-client-room.pw.ts \
   tests/phase-3a1b-d9346-v3-zone.pw.ts \
   tests/phase-3a1b-p3-live-transport-red.test.ts \
@@ -67115,6 +67120,9 @@ pnpm exec prettier --check \
   tests/e5-02-zone-referee-outcome.pw.ts \
   tests/fixtures/phase-6a-v3/creator-successor-local-author-contract.ts \
   tests/fixtures/shared/workspace-package-export-file.mjs \
+  tests/phase-3f-b-chat-zone-causal-join-red.test.ts \
+  tests/phase-3f-c-chat-zone-batching-red.test.ts \
+  tests/phase-3h-chat-zone-migration-red.test.ts \
   tests/phase-3a1b-d9336-two-client-room.pw.ts \
   tests/phase-3a1b-d9346-v3-zone.pw.ts \
   tests/phase-3a1b-p3-live-transport-red.test.ts \
@@ -67201,10 +67209,11 @@ both exact three-consecutive campaign ledgers.
 The D.108e4k non-campaign results may compose with that later authorized
 campaign proof only when the product, test, example, Playwright/build/workspace
 configuration, scripts, package-manifest and lockfile trees are byte-identical
-to `cc112d22`, the D.108e4k evidence checkpoint and every later campaign
-execution. A change to any of those trees voids this split and requires both
-the non-campaign and campaign halves of the complete combined proof at the new
-tree. Plan-only evidence custody may advance without invalidating that identity.
+to the signed D.108e4v GREEN/evidence tree, the D.108e4k evidence checkpoint
+and every later campaign execution. A change to any of those trees voids this
+split and requires both the non-campaign and campaign halves of the complete
+combined proof at the new tree. Plan-only evidence custody may advance without
+invalidating that identity.
 
 The formal plan review round inspected exact immutable signed/pushed commit
 `b3fcca8ab0e6b6b3576e24c0fb018769f6fd15c6`, parent
@@ -68499,6 +68508,9 @@ commit `9f54fdb4` remain valid and are not rerun: focused
 root/infrastructure passed 17/17, the standalone native owner passed 5/5 with
 one valid terminal proof and no timeout, Phase-3 transport passed 24/24,
 network plus E3-02 passed 58/58 and the focused observer passed 1/1.
+Those composition statements applied only at the D.108e4u correction tree.
+D.108e4v's tracked test-tree change voids them and requires the restarted
+D.108e4k ledger to run again from its first ordinary command.
 
 The immutable command-shape RED is the first three-command inventory block.
 The unqualified inventory listed the exact five expected titles and the
@@ -68583,11 +68595,14 @@ closure evidence rather than product work.
 ###### D.108e4v — retained zone-operation roster reconciliation
 
 D.108e4v owns the next fail-closed D.108e4k stop as a narrow retained-test and
-plan correction. It changes only this plan and
+plan correction. It changes only this plan and the three exact stale roster
+owners `tests/phase-3f-b-chat-zone-causal-join-red.test.ts`,
+`tests/phase-3f-c-chat-zone-batching-red.test.ts` and
 `tests/phase-3h-chat-zone-migration-red.test.ts`; it changes no product,
 example, fixture, configuration, dependency, lockfile, package manifest,
 timeout, browser selection, telemetry, campaign authorization or product API.
 The exact failing command at signed commit `97e092b2b15550b6ce99ff25c1818d78af40489b`
+and tree `3fbd482371408b5b13174415e1b668ac80459134`
 collected nine files and 61 tests, passed 60 and failed only
 `adds one non-batchable neutral migration record to the genuine zone blueprint`.
 The received sorted operation roster contained `commit-outcome-v1` between
@@ -68596,7 +68611,31 @@ stderr and status SHA-256 values are
 `23b446abe06bb289d7c0f6ea06b1477523384de3ac06f504aa2b1a7343da8244`,
 `4c712a3915236864a860b86d0fa88ee025b03db5a3ea0496028fc8e70d8213b0`
 and `4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`.
+Custody is under `.logs/d108e4u-inventory-97e092b2/`; the D.108e4v name was
+assigned only after this D.108e4u continuation reached the deterministic stop.
 No later ordinary or isolated D.108e4k gate ran.
+
+Immediately before that stop, the corrected triplet listed exact 5/8/7 with
+the retained campaign absent from the seven; the three stdout SHA-256 values
+are `f91595332e71ee297cabc297fd99b6180cf97dfe1d976c568e069e894582e006`,
+`4a289fde5c1b2b6b3416bcbf2ca7d67dd3aa0f862502fd00cd3e92844fc11374`
+and `5b2e723b64e830a2cfc9f46416c60d9abc36900c5f47172e5f13972b28a173e4`.
+All three stderr files were empty; all three statuses and both shim-absence
+statuses were zero with SHA-256
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+This byte-identical seven-list closes D.108e4u's probe-identity P2. The selected
+non-campaign run then passed exact 7/7 with zero skipped, unexpected or flaky
+in 14.382 seconds. JSON/stdout/stderr/status SHA-256 values are
+`57577ee21e55ba53043d3eb2db326d5493d29c8f249179b88df6fe142af516d3`,
+`a11263356ddb664450606680b0aaa4236953fcddaac7090fe908dd29bbd227c7`,
+`76eae778233f5d77da43561fff2b8db19c19a6cfbe272b63595a94cad6a32d75`
+and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`;
+JSON/stderr custody is `.logs/d108e4k-non-campaign-e3-03.json` and
+`.logs/d108e4k-non-campaign-e3-03.stderr.log`. Seven E3-03 bodies therefore
+executed, but all evidence in this paragraph is void for later composition
+because D.108e4v changes the tracked test tree. One preceding local wrapper
+stopped after a read-only unqualified list because it tried to assign zsh's
+reserved `status` variable; it ran no test body and is not a repository failure.
 
 This RED is not evidence of a product defect. Blame fixes the stale six-name
 expectation to Phase-3h commits `7d143622`/`d2568d25` on 2026-08-21/22, while
@@ -68604,23 +68643,82 @@ signed product commit `be4e80865d57ef748c20cb931f6f241366ddeff9` intentionally a
 authenticated `commit-outcome-v1` reducer and blueprint operation on
 2026-08-24. That product commit is already an ancestor of the accepted
 D.108e4i behavior baseline `cc112d22`. The reconciliation therefore adds only
-the one exact expected operation string at its observed sorted position and
-corrects the D.108e4k nine-file expectation from stale 48/48 to actual 61/61.
-It may not remove, weaken, wildcard or partially compare the roster assertion.
+the one exact expected operation string at its observed sorted position.
+
+The same stale exact roster occurs in the two Phase-3f owners named above. One
+pre-GREEN class proof at plan checkpoint `2713a463` ran all three files and
+produced exactly 3/6: every chat test passed and every zone test failed on the
+same missing string at the same sorted position. Its stdout/stderr/status
+SHA-256 values are
+`e23cd10781b3a885a350118838766a22e7c49ac53c7a3cfcc8ea3827f5cc09b5`,
+`24a1895700df79412329daf12a6aeef9b244a2a1c77596599d0bde0224209046`
+and `4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`;
+custody is under `.logs/d108e4v-red-class-2713a463/`. The reconciliation adds
+only the same exact expected string to each of the three arrays and corrects
+the D.108e4k nine-file expectation from stale 48/48 to actual 61/61. It may not
+remove, weaken, wildcard or partially compare any roster assertion.
 
 Freeze this plan/RED record in one signed/pushed checkpoint. Before the test
 change, run the normal read-only Grok 4.6/high, exact Kimi K3 `CHECK001` through
 `CHECK100` and Opus 5/xhigh plan review. P0/P1 findings are corrected in the
 same round without confirmation; each P2 receives the plan owner and
 2026-09-04 deadline. No Fable or collaboration subagent runs. GREEN changes
-only the retained expected array, then runs the focused file once for exact
-2/2 and the frozen nine-file command once for exact 61/61. Run exact-owner
-TypeScript/ESLint/Prettier and `git diff --check`, record hashes, sign and push.
-Any other failure stops without retry or production change.
+only the three retained expected arrays, then runs those three files together
+once for exact 6/6 and the frozen nine-file command once for exact 61/61. Those
+Vitest commands are the exact TypeScript transform/collection gates. A raw
+standalone `tsc` probe is not an owner gate: the root intentionally has no
+canonical workspace shim and these historical fixtures are not standalone
+strict-TS owners, so such a probe reports unrelated resolution/fixture
+diagnostics and is not treated as a code failure. Run exactly
+`pnpm exec eslint --max-warnings=0` over the three changed tests,
+`pnpm exec prettier --check` over this plan and the three tests, then
+`git diff --check`. Add the three tests to the restarted D.108e4k ESLint and
+Prettier roster; the historical `50fd6fd^..cc112d22` roster comparison remains
+historical rather than pretending to cover D.108e4v. Record hashes, sign and
+push. Any other failure stops without retry or production change.
 
 Because this is a tracked test-tree change, it voids composition of all earlier
 D.108e4k execution evidence even though product behavior is unchanged. Only
 after D.108e4v GREEN and its required Grok/Kimi/Opus implementation review may
 D.108e4k restart from its first ordinary command at the new exact signed tree.
+This explicitly supersedes D.108e4u's mid-ledger resume instruction and the
+original `cc112d22` test-tree precondition.
 The complete E3-03 config, retained three-trial campaign and both campaign
 ledgers remain unauthorized.
+
+The D.108e4v plan review inspected exact signed/pushed commit
+`2713a4638726a074ee26a1d331e4ca82a8c60829`, parent
+`97e092b2b15550b6ce99ff25c1818d78af40489b` and tree
+`2d46d5a8000b0f682707ca4a3029ea9ea6372c03`. Grok 4.6/high completed its one
+substantive read-only inspection in 330.113 seconds with exit zero and
+`end_turn`. The wrapper honestly classified it `NO_VERDICT` because progress
+prose preceded the terminal object; that object was APPROVED with zero P0/P1
+and one P2 for the omitted RED custody path. Event/public/status SHA-256 values
+are `e9c445780b0e45fe2b4ce2ba553b400024d3b24718e2fac464b18ab156561ef4`,
+`399c3dd7d5c9735d55041c6555928b9042a12c0b9b91c6d48bab71e7b5c8700c`
+and `aaef23b83832515fdce3356ff00b0234856a5e5e0c530c581173df655479dd31`.
+A no-inspection same-session continuation
+`01a049f1-155c-7e13-bf03-1d782caeb11a` returned the unchanged schema-valid
+APPROVED verdict in one turn; JSON SHA-256 is
+`d5990f8ec90c8f2fac971c856510dac9ee31c40b14e44211c923841d291a1166`.
+
+Kimi K3 session `session_5b7f8267-f18c-43d8-8173-6eaf023a2dc3` returned
+exactly 100 ordered, unique checks and one APPROVED result with zero P0/P1 and
+three P2 for custody, supersession and static-owner precision. Stream/stderr
+SHA-256 values are
+`3931a7bfda14eaeaed1f8cec387b6f55adff269f451fbe2635939ca553103641`
+and `ecabbbcfd5220c087de31251a39598c25e158f07b0e08042268eff476b659e0e`.
+Opus 5/xhigh session `a4eb7751-754c-4c18-934a-390e08775703` completed 49
+turns in 565.267 seconds with no error or subagent and returned
+CHANGES_REQUIRED with zero P0, three P1 and three P2. JSON/stderr SHA-256
+values are
+`adb46f10a465083679c20b37b299689faa86bc263aabf5de88e6d49eb02bd02f`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+The same-round correction above closes Opus's P1 union by assigning the two
+identical Phase-3f roster owners, recording every already-executed D.108e4u
+gate and re-anchoring D.108e4k's live test-tree baseline. Every P2 is owned by
+the plan owner with deadline 2026-09-04: retain exact RED and review custody,
+tree identity, explicit D.108e4u supersession, exact changed-test static gates
+and the expanded restarted roster. These are corrected above without a
+confirmation review.
