@@ -68832,3 +68832,38 @@ required all-zero `stats()` fixture, distinguishing the observed objectId
 failure from statically predicted consumers, and re-anchoring D.108e4k to the
 eventual D.108e4v/w GREEN tree. Every P2 is owned by the plan owner with the
 2026-09-04 deadline above. No confirmation review runs.
+
+The D.108e4v/w test-only GREEN is exact signed/pushed commit
+`453ebf0a26a34870d2861fe82b4423bd34f4d89c`, parent
+`159729d57e0029ad3e4b558151857ebb980fba5c` and behavior/test tree
+`437552fc13fa6928634398cb5f4402ef0b3de443`; it has a good signature and
+changes only `tests/phase-3f-b-chat-zone-causal-join-red.test.ts` by adding the
+four reviewed inert fixture members. Custody is under
+`.logs/d108e4w-green-159729d5/`.
+
+The exact Phase-3f-b owner passed 2/2. Its stdout/stderr/status SHA-256 values
+are `87663b45f7eb8f70aa1f3924775999e4e34cc30401b6d5fdaa919c1d8a607a70`,
+`8796b3505dab7ee8b59ed47ae3d7adba0589fb4d3be5492bfe3ad2351346110c`
+and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+The resumed three-file owner passed exact 6/6; stdout/stderr/status SHA-256
+values are `6ed07e09aba7518fe1fcdd0d4d1ac27802a784bf2f292f3fcb747f0bffd869cc`,
+`8e93fa053dcdc6f9bb7b4172169c0c6ae6b562992a6a634bc56ec2c5204a0fa3`
+and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+The frozen nine-file owner passed exact 61/61; stdout/stderr/status SHA-256
+values are `2d824c2c1dc44bda57fd4873a5e222303934b3cd86c095bf50c0fbe5400afe80`,
+`1599dd3bb72b0cdd4f43d628800fe766e024c75553bc7bef3020f282dd5c3b1d`
+and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+
+Exact-owner ESLint, Prettier and `git diff --check` passed. Their
+stdout/stderr/status SHA-256 triples are respectively
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` /
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` /
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`,
+`17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20` /
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` /
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`
+and
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` /
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` /
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+No product defect or product-source change was demonstrated or introduced.
