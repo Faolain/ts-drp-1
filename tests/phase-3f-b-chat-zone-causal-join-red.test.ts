@@ -20,6 +20,7 @@ vi.mock("../examples/v3-room/src/index.js", async (importOriginal) => {
 			return Promise.resolve(
 				Object.freeze({
 					invite: "00",
+					objectId: input.objectId,
 					roomId: input.objectId,
 					trustStatus: "Creator-trusted; not Byzantine-fault-tolerant.",
 					close: () => Promise.resolve(),
@@ -28,9 +29,28 @@ vi.mock("../examples/v3-room/src/index.js", async (importOriginal) => {
 						Object.freeze({
 							close: () => undefined,
 							publish: () => Promise.resolve(true),
+							stats: () =>
+								Object.freeze({
+									authorityMismatch: 0,
+									delivered: 0,
+									dropped: 0,
+									localSequencedKeys: 0,
+									malformed: 0,
+									overLimit: 0,
+									published: 0,
+									rateLimited: 0,
+									received: 0,
+									remoteSequencedKeys: 0,
+									sequencedKeys: 0,
+									sequencedSenders: 0,
+									stale: 0,
+									subscriberFailures: 0,
+									unauthorized: 0,
+									writerBuckets: 0,
+								}),
 							subscribe: (): (() => void) => () => undefined,
 						}),
-					previewLatchedAcl: () => Object.freeze({}),
+					previewLatchedAcl: () => Object.freeze({ current: Object.freeze({ epoch: 0 }) }),
 					projection: () => Object.freeze({}),
 				})
 			);
@@ -205,6 +225,7 @@ describe("Phase 3f-b real chat and zone causalJoin composition RED", () => {
 		const localPeerId = "zone-creator-peer";
 		const zoneApi = Reflect.apply(Reflect.get(zone, "createV3ZoneApi") as (...args: unknown[]) => unknown, undefined, [
 			Object.freeze({
+				ephemeralUnreliableWebRtcSnapshot: () => undefined,
 				keychain: Object.freeze({
 					localAuthorId: localAuthor,
 					signWithLocalAuthor: () => Promise.resolve(new Uint8Array(64).fill(0x41)),
