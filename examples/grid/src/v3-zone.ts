@@ -101,6 +101,7 @@ export interface ZoneFabricWorkbench {
 	runTrial(input: FabricRunInput): Promise<void>;
 	snapshot(trialId: string): Readonly<{
 		readonly attempted: Readonly<{ readonly raw: number; readonly reliable: number }>;
+		readonly observations: readonly Readonly<FabricObservation>[];
 		readonly transport: Readonly<{
 			readonly fallbackCount: 0;
 			readonly raw: readonly Readonly<{
@@ -799,6 +800,7 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 			const raw = node.ephemeralUnreliableWebRtcSnapshot(zoneId);
 			return Object.freeze({
 				attempted: Object.freeze({ raw: trial.attemptedRaw, reliable: trial.attemptedReliable }),
+				observations: Object.freeze([...trial.observations]),
 				transport: Object.freeze({
 					fallbackCount: 0 as const,
 					raw: Object.freeze(

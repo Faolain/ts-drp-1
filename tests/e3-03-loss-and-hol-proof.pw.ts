@@ -120,6 +120,7 @@ interface CampaignMetric {
 	readonly reliableAoIP50Ms: number;
 	readonly reliableAoIP95Ms: number;
 	readonly reliableDelivered: number;
+	readonly rendered: RenderedFabricEvidence;
 	readonly trialId: string;
 }
 
@@ -173,6 +174,16 @@ interface RenderedFabricEvidence {
 }
 
 interface CampaignEvidence {
+	readonly completeObserverRawGap: number;
+	readonly productAccepted: readonly PlatformObservation[];
+	readonly productRejected: readonly PlatformObservation[];
+	readonly productRoster: readonly FabricObservation[];
+	readonly rawCounter: Readonly<{
+		readonly after: number;
+		readonly before: number;
+		readonly matchedObserver: number;
+		readonly productRoster: number;
+	}>;
 	readonly rawTransportDeltas: Readonly<{
 		readonly receiver: RawTransportDelta;
 		readonly sender: RawTransportDelta;
@@ -182,8 +193,20 @@ interface CampaignEvidence {
 		readonly sender: readonly RtcObservation[];
 	}>;
 	readonly receiverWire: readonly PlatformObservation[];
+	readonly stages: Readonly<{
+		readonly deadline: TransportStageEvidence;
+		readonly prepare: TransportStageEvidence;
+		readonly reset: TransportStageEvidence;
+		readonly runReturned: TransportStageEvidence;
+	}>;
 	readonly senderWire: readonly PlatformObservation[];
 	readonly trialId: string;
+}
+
+interface TransportStageEvidence {
+	readonly atMs: number;
+	readonly creator: ZoneSnapshot["rawTransport"];
+	readonly receiver: ZoneSnapshot["rawTransport"];
 }
 
 interface RawTransportDelta {
@@ -531,6 +554,14 @@ function rawTransportDelta(
 	});
 }
 
+function transportStageEvidence(
+	atMs: number,
+	creator: ZoneSnapshot["rawTransport"],
+	receiver: ZoneSnapshot["rawTransport"]
+): TransportStageEvidence {
+	return Object.freeze({ atMs, creator, receiver });
+}
+
 function platformObservations(
 	records: readonly RtcObservation[],
 	direction: RtcObservation["direction"],
@@ -620,11 +651,31 @@ function expectReliableSenderSamples(observations: readonly PlatformObservation[
 
 function partitionReceiverEvidence(
 	observations: readonly PlatformObservation[],
-	_productRoster: readonly FabricObservation[]
+	productRoster: readonly FabricObservation[]
 ): ReceiverEvidencePartition {
+	const key = ({ lane, sentAtMs, sequence }: FabricObservation): string => `${lane}|${sequence}|${sentAtMs}`;
+	const remaining = new Map<string, number>();
+	for (const productObservation of productRoster) {
+		const productKey = key(productObservation);
+		remaining.set(productKey, (remaining.get(productKey) ?? 0) + 1);
+	}
+	const productAccepted: PlatformObservation[] = [];
+	const productRejected: PlatformObservation[] = [];
+	for (const observation of observations) {
+		const observationKey = key(observation);
+		const count = remaining.get(observationKey) ?? 0;
+		if (count === 0) {
+			productRejected.push(observation);
+			continue;
+		}
+		productAccepted.push(observation);
+		if (count === 1) remaining.delete(observationKey);
+		else remaining.set(observationKey, count - 1);
+	}
+	if (remaining.size !== 0) throw new Error("E303_PRODUCT_ROSTER_UNMATCHED");
 	return Object.freeze({
-		productAccepted: Object.freeze([...observations]),
-		productRejected: Object.freeze([]),
+		productAccepted: Object.freeze(productAccepted),
+		productRejected: Object.freeze(productRejected),
 	});
 }
 
@@ -692,8 +743,10 @@ function renderedProductRosterMetrics(
 	intervalMs: number,
 	sampleCount: number
 ): RenderedFabricEvidence {
-	const startedAtMs = 0;
-	const raw = acceptedSequencedObservations(observations.filter(({ lane, sentinel }) => lane === "raw" && !sentinel));
+	const accepted = observations.filter(({ sentinel }) => !sentinel);
+	if (accepted.length === 0) throw new Error("E303_PRODUCT_ROSTER_EMPTY");
+	const startedAtMs = Math.min(...accepted.map(({ sentAtMs }) => sentAtMs));
+	const raw = observations.filter(({ lane, sentinel }) => lane === "raw" && !sentinel);
 	const reliableBySequence = new Map<number, FabricObservation>();
 	for (const observation of observations) {
 		if (observation.lane !== "reliable" || observation.sentinel || reliableBySequence.has(observation.sequence)) {
@@ -704,8 +757,13 @@ function renderedProductRosterMetrics(
 	const reliable = [...reliableBySequence.values()];
 	const rawAoI = ageOfInformation(raw, startedAtMs, deadlineMs, intervalMs);
 	const reliableAoI = ageOfInformation(reliable, startedAtMs, deadlineMs, intervalMs);
+	const receivedRaw = [...raw].sort((left, right) => left.receivedAtMs - right.receivedAtMs);
+	let maxGap = receivedRaw[0]?.sequence ?? 0;
+	for (let index = 1; index < receivedRaw.length; index += 1) {
+		maxGap = Math.max(maxGap, (receivedRaw[index]?.sequence ?? 0) - (receivedRaw[index - 1]?.sequence ?? 0));
+	}
 	return Object.freeze({
-		maxGap: rawSequenceEvidence(raw).gap,
+		maxGap,
 		rawAoIP50Ms: percentile(rawAoI, 0.5),
 		rawAoIP95Ms: percentile(rawAoI, 0.95),
 		rawDelivered: raw.length,
@@ -715,6 +773,17 @@ function renderedProductRosterMetrics(
 		reliableDelivered: reliable.length,
 		reliableDropped: sampleCount - reliable.length,
 	});
+}
+
+function productDeadlineFromRoster(
+	productRoster: readonly FabricObservation[],
+	intervalMs: number,
+	sampleCount: number,
+	tailMs: number
+): number {
+	const first = productRoster[0];
+	if (first === undefined || first.sentinel) throw new Error("E303_PRODUCT_ROSTER_START_ABSENT");
+	return first.sentAtMs - first.sequence * intervalMs + (sampleCount - 1) * intervalMs + tailMs;
 }
 
 function rawSequenceEvidence(
@@ -1302,6 +1371,9 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 		cdpEvidence.push(Object.freeze({ label, profile, ruleIds: Object.freeze([...ruleIds]) }));
 	};
 	let activeTrialId: string | null = null;
+	const campaignEvidence: CampaignEvidence[] = [];
+	const metrics: CampaignMetric[] = [];
+	let currentTrialEvidence: CampaignEvidence | undefined;
 	let stage = "network-enable";
 	try {
 		await cdp.send("Network.enable");
@@ -1453,8 +1525,6 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 		await waitForNetworkPair(creator, receiver, initialCreatorNetwork, initialReceiverNetwork);
 		await waitForRawDelivery(creator, receiver);
 
-		const metrics: CampaignMetric[] = [];
-		const campaignEvidence: CampaignEvidence[] = [];
 		for (let trial = 0; trial < TRIAL_COUNT; trial += 1) {
 			const trialId = "e3-03-" + String(trial);
 			activeTrialId = trialId;
@@ -1474,6 +1544,8 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 				zone(creator).then(({ rawTransport }) => rawTransport),
 				zone(receiver).then(({ rawTransport }) => rawTransport),
 			]);
+			const trialEvidenceStartedAtMs = Date.now();
+			const prepareStage = transportStageEvidence(0, senderRawTransportBefore, receiverRawTransportBefore);
 			const senderRawBefore = senderRawTransportBefore.sent;
 			stage = trialId + "-run";
 			const trialOperation = creator.evaluate((input) => window.__TS_DRP_V3_ZONE__?.fabric?.runTrial(input), {
@@ -1500,6 +1572,15 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			await trialOperation;
 			stage = trialId + "-sender-evidence";
 			const runTrialReturnedAtMs = await creator.evaluate(() => Date.now());
+			const [senderRawTransportAtRunReturn, receiverRawTransportAtRunReturn] = await Promise.all([
+				zone(creator).then(({ rawTransport }) => rawTransport),
+				zone(receiver).then(({ rawTransport }) => rawTransport),
+			]);
+			const runReturnedStage = transportStageEvidence(
+				Date.now() - trialEvidenceStartedAtMs,
+				senderRawTransportAtRunReturn,
+				receiverRawTransportAtRunReturn
+			);
 			const senderRawAfter = await rawSentAfterQuiescence(creator);
 			const senderRtc = await rtcObservations(creator);
 			const senderWire = platformObservations(senderRtc, "send", trialId);
@@ -1526,56 +1607,122 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			const deadlineMs = campaignStartedAtMs + expectedCampaignSpanMs + RELIABLE_OBSERVATION_TAIL_MS;
 			stage = trialId + "-deadline";
 			await new Promise((resolve) => setTimeout(resolve, Math.max(0, deadlineMs - Date.now())));
-			const receiverAtDeadline = await receiverEvidenceAtDeadline(receiver, trialId);
+			let receiverAtDeadline = await receiverEvidenceAtDeadline(receiver, trialId);
+			const productDeadlineMs = productDeadlineFromRoster(
+				productRosterFromSnapshot(receiverAtDeadline.fabric),
+				SAMPLE_INTERVAL_MS,
+				SAMPLE_COUNT,
+				RELIABLE_OBSERVATION_TAIL_MS
+			);
+			const receiverNowMs = await receiver.evaluate(() => Date.now());
+			if (receiverNowMs < productDeadlineMs) {
+				await new Promise((resolve) => setTimeout(resolve, productDeadlineMs - receiverNowMs));
+				receiverAtDeadline = await receiverEvidenceAtDeadline(receiver, trialId);
+			}
 			const senderRawTransportAtDeadline = (await zone(creator)).rawTransport;
-			const receiverWire = platformObservations(receiverAtDeadline.rtc, "message", trialId).filter(
-				({ receivedAtMs }) => receivedAtMs <= deadlineMs
+			const receiverWire = platformObservations(receiverAtDeadline.rtc, "message", trialId);
+			const deadlineStage = transportStageEvidence(
+				Date.now() - trialEvidenceStartedAtMs,
+				senderRawTransportAtDeadline,
+				receiverAtDeadline.zone.rawTransport
 			);
 			stage = trialId + "-reset";
 			await applyProfile(trialId + "-reset", NO_LOSS);
 			await waitForOpenTransportPair(creator, receiver);
 			await waitForNetworkPair(creator, receiver, initialCreatorNetwork, initialReceiverNetwork);
-			const [senderSnapshot, receiverSnapshot] = await Promise.all([
+			const [senderSnapshot, receiverSnapshot, senderAfterReset, receiverAfterReset] = await Promise.all([
 				fabricSnapshot(creator, trialId),
 				fabricSnapshot(receiver, trialId),
+				zone(creator),
+				zone(receiver),
 			]);
+			const resetStage = transportStageEvidence(
+				Date.now() - trialEvidenceStartedAtMs,
+				senderAfterReset.rawTransport,
+				receiverAfterReset.rawTransport
+			);
 			expect(senderSnapshot.attempted).toEqual({ raw: SAMPLE_COUNT, reliable: SAMPLE_COUNT });
 			expectOpenTransport(senderSnapshot, peers.receiverPeerId);
 			expectOpenTransport(receiverSnapshot, peers.creatorPeerId);
 
 			stage = trialId + "-assertions";
+			const productRoster = productRosterFromSnapshot(receiverAtDeadline.fabric);
+			const receiverPartition = partitionReceiverEvidence(receiverWire, productRoster);
 			const rawWire = expectRawReceiverSamples(receiverWire);
-			const raw = acceptedSequencedObservations(rawWire);
-			const reliable = expectReliableReceiverSamples(receiverWire);
+			const acceptedRawWire = receiverPartition.productAccepted.filter(
+				({ lane, sentinel }) => lane === "raw" && !sentinel
+			);
+			const raw = acceptedSequencedObservations(acceptedRawWire);
+			const reliable = expectReliableReceiverSamples(receiverPartition.productAccepted);
+			const reliableWire = receiverWire.filter(({ lane, sentinel }) => lane === "reliable" && !sentinel);
 			expect(receiverWire.filter(({ lane, sentinel }) => lane === "reliable" && sentinel)).toEqual([]);
 			expect(rawWire.length).toBeGreaterThan(0);
 			expect(raw.length).toBeGreaterThan(0);
 			expect(senderRawAfter - senderRawBefore).toBe(senderRaw.length);
-			expect(receiverAtDeadline.zone.rawTransport.received - receiverRawBefore).toBe(rawWire.length);
+			const receiverRawCounterDelta = receiverAtDeadline.zone.rawTransport.received - receiverRawBefore;
+			const productRosterRawCount = productRoster.filter(({ lane, sentinel }) => lane === "raw" && !sentinel).length;
+			const trialEvidence = Object.freeze({
+				completeObserverRawGap: rawSequenceEvidence(rawWire).gap,
+				productAccepted: receiverPartition.productAccepted,
+				productRejected: receiverPartition.productRejected,
+				productRoster,
+				rawCounter: Object.freeze({
+					after: receiverAtDeadline.zone.rawTransport.received,
+					before: receiverRawBefore,
+					matchedObserver: acceptedRawWire.length,
+					productRoster: productRosterRawCount,
+				}),
+				rawTransportDeltas: Object.freeze({
+					receiver: rawTransportDelta(receiverRawTransportBefore, receiverAtDeadline.zone.rawTransport),
+					sender: rawTransportDelta(senderRawTransportBefore, senderRawTransportAtDeadline),
+				}),
+				readyStateMismatches: Object.freeze({
+					receiver: Object.freeze(
+						receiverAtDeadline.rtc.filter(({ insertionReadyState, readyState }) => insertionReadyState !== readyState)
+					),
+					sender: Object.freeze(
+						senderRtc.filter(({ insertionReadyState, readyState }) => insertionReadyState !== readyState)
+					),
+				}),
+				receiverWire,
+				stages: Object.freeze({
+					deadline: deadlineStage,
+					prepare: prepareStage,
+					reset: resetStage,
+					runReturned: runReturnedStage,
+				}),
+				senderWire,
+				trialId,
+			}) satisfies CampaignEvidence;
+			currentTrialEvidence = trialEvidence;
+			expect(receiverRawCounterDelta).toBe(acceptedRawWire.length);
+			expect(productRosterRawCount).toBe(acceptedRawWire.length);
 			expect(
 				[...senderRaw, ...rawWire].every(
-					({ byteLength, carrierByteLength, channelLabel, maxRetransmits, ordered, readyState }) =>
+					({ byteLength, carrierByteLength, channelLabel, maxRetransmits, ordered }) =>
 						byteLength === SAMPLE_PAYLOAD_BYTES &&
 						carrierByteLength >= byteLength &&
 						carrierByteLength <= byteLength + 1_024 &&
 						channelLabel === "ts-drp-ephemeral/1" &&
 						maxRetransmits === 0 &&
-						!ordered &&
-						readyState === "open"
+						!ordered
 				)
 			).toBe(true);
 			expect(
-				[...senderReliable, ...reliable].every(
-					({ byteLength, carrierByteLength, channelLabel, maxRetransmits, ordered, readyState }) =>
+				[...senderReliable, ...reliableWire].every(
+					({ byteLength, carrierByteLength, channelLabel, maxRetransmits, ordered }) =>
 						byteLength === SAMPLE_PAYLOAD_BYTES &&
 						carrierByteLength >= byteLength &&
 						carrierByteLength <= byteLength + 1_024 &&
 						channelLabel === "" &&
 						maxRetransmits === null &&
-						ordered &&
-						readyState === "open"
+						ordered
 				)
 			).toBe(true);
+			expect(senderRaw.every(({ readyState }) => readyState === "open")).toBe(true);
+			expect(senderReliable.every(({ readyState }) => readyState === "open")).toBe(true);
+			expect(receiverPartition.productAccepted.every(({ readyState }) => readyState === "open")).toBe(true);
+			expect(receiverPartition.productRejected.every(({ readyState }) => readyState !== "connecting")).toBe(true);
 			expect(
 				senderSentinels.every(
 					({ byteLength, carrierByteLength, channelLabel, maxRetransmits, ordered, readyState }) =>
@@ -1624,6 +1771,7 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 				({ receivedAtMs }) => receivedAtMs > firstReliableReceivedAtMs
 			).length;
 			expect(rawDeliveredAfterReliableStart).toBeGreaterThanOrEqual(10);
+			const rendered = renderedProductRosterMetrics(productRoster, productDeadlineMs, SAMPLE_INTERVAL_MS, SAMPLE_COUNT);
 			metrics.push(
 				Object.freeze({
 					clockSamples: clock.samples,
@@ -1637,28 +1785,12 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 					reliableAoIP50Ms,
 					reliableAoIP95Ms,
 					reliableDelivered: reliable.length,
+					rendered,
 					trialId,
 				})
 			);
-			campaignEvidence.push(
-				Object.freeze({
-					rawTransportDeltas: Object.freeze({
-						receiver: rawTransportDelta(receiverRawTransportBefore, receiverAtDeadline.zone.rawTransport),
-						sender: rawTransportDelta(senderRawTransportBefore, senderRawTransportAtDeadline),
-					}),
-					readyStateMismatches: Object.freeze({
-						receiver: Object.freeze(
-							receiverAtDeadline.rtc.filter(({ insertionReadyState, readyState }) => insertionReadyState !== readyState)
-						),
-						sender: Object.freeze(
-							senderRtc.filter(({ insertionReadyState, readyState }) => insertionReadyState !== readyState)
-						),
-					}),
-					receiverWire,
-					senderWire,
-					trialId,
-				})
-			);
+			campaignEvidence.push(trialEvidence);
+			currentTrialEvidence = undefined;
 		}
 		expect(
 			campaignEvidence.reduce(
@@ -1737,18 +1869,18 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			const renderedRawP95 = await readMilliseconds("raw-aoi-p95");
 			const renderedReliableP50 = await readMilliseconds("reliable-aoi-p50");
 			const renderedReliableP95 = await readMilliseconds("reliable-aoi-p95");
-			expect(Math.abs(renderedRawP50 - metric.rawAoIP50Ms)).toBeLessThanOrEqual(10);
-			expect(Math.abs(renderedRawP95 - metric.rawAoIP95Ms)).toBeLessThanOrEqual(10);
-			expect(Math.abs(renderedReliableP50 - metric.reliableAoIP50Ms)).toBeLessThanOrEqual(10);
-			expect(Math.abs(renderedReliableP95 - metric.reliableAoIP95Ms)).toBeLessThanOrEqual(10);
+			expect(renderedRawP50).toBe(metric.rendered.rawAoIP50Ms);
+			expect(renderedRawP95).toBe(metric.rendered.rawAoIP95Ms);
+			expect(renderedReliableP50).toBe(metric.rendered.reliableAoIP50Ms);
+			expect(renderedReliableP95).toBe(metric.rendered.reliableAoIP95Ms);
 			expect(renderedRawP95).toBeLessThanOrEqual(renderedReliableP95 * 0.8);
-			await expect(row.locator('[data-metric="max-gap"]')).toHaveText(String(metric.rawGap));
-			await expect(row.locator('[data-metric="raw-delivered"]')).toHaveText(String(metric.rawDelivered));
-			await expect(row.locator('[data-metric="raw-dropped"]')).toHaveText(String(SAMPLE_COUNT - metric.rawDelivered));
-			await expect(row.locator('[data-metric="reliable-delivered"]')).toHaveText(String(metric.reliableDelivered));
-			await expect(row.locator('[data-metric="reliable-dropped"]')).toHaveText(
-				String(SAMPLE_COUNT - metric.reliableDelivered)
+			await expect(row.locator('[data-metric="max-gap"]')).toHaveText(String(metric.rendered.maxGap));
+			await expect(row.locator('[data-metric="raw-delivered"]')).toHaveText(String(metric.rendered.rawDelivered));
+			await expect(row.locator('[data-metric="raw-dropped"]')).toHaveText(String(metric.rendered.rawDropped));
+			await expect(row.locator('[data-metric="reliable-delivered"]')).toHaveText(
+				String(metric.rendered.reliableDelivered)
 			);
+			await expect(row.locator('[data-metric="reliable-dropped"]')).toHaveText(String(metric.rendered.reliableDropped));
 			await expect(row.locator('[data-metric="fallback-count"]')).toHaveText("0");
 			await expect(row.locator('[data-metric="durable-delta"]')).toHaveText("1");
 		}
@@ -1761,9 +1893,12 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 		await attachJson(testInfo, "e3-03-failure-telemetry.json", {
 			activeTrialId,
 			browserVersion: browser.version(),
+			campaignEvidence,
 			cdpEvidence,
 			creator: creatorEvidence,
+			currentTrialEvidence,
 			error: diagnosticError(error),
+			metrics,
 			receiver: receiverEvidence,
 			stage,
 		}).catch(() => undefined);
