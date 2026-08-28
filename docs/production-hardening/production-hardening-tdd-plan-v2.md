@@ -68023,3 +68023,75 @@ the phase ledger. This ordinary run is the final D.108e4q execution; a failure
 stops for evidence classification rather than automatic retry. On
 GREEN, D.108e4q closes and the final-tree D.108e4k combined-proof obligation
 remains the only timing-related predecessor before aggregate D.108e4 can close.
+
+The signed/pushed D.108e4q behavior checkpoint is
+`8da08ae6b8cdc0da748c1b3b7e0bb7f5a0e4cfaa`, parent `a649fc79`, tree
+`abf8ef13713e5a7a770185e65111c3c73c6645c2`, stable patch id
+`f67c49ecb4734c49d6d874b926f4d751302e2454` and raw-diff SHA-256
+`6875e6ab735bbf360a0a16d6db63e712986d04835ff02cc0aa4859c23ab46c0d`.
+It changes exactly the plan and the one child-wall assertion from `<60_000`
+to `<65_000`; its signature is good and the remote branch contains it.
+Exact-owner ESLint and Prettier plus `git diff --check` passed before review.
+
+The required combined read-only review ran against that exact checkpoint.
+Kimi K3 session `session_26dd0fc4-4f01-4e47-8f3f-c16d6d159d2a` emitted exactly
+100 unique ordered `CHECK001`–`CHECK100` markers and one terminal `RESULT`, approving with
+P0/P1/P2 all zero; its stream/stderr SHA-256 values are
+`24f27cb11316803c36510036a564c7b17369587aba7806c35365eff3b2e7b79c`
+and `770e39c9288d1346f8f1b5683a0881aaa38528de981990096193d321c041dcba`.
+Opus 5/xhigh session `68779b1f-2397-45e4-b9a6-d7282028b968` completed 24
+turns without a subagent and returned P0=0/P1=2/P2=3; its JSON/stderr SHA-256
+values are `3df1b2417f541f519b08f8c99d4a67af42ec7da2fa0003f39fad7053eb4e1da4`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+Normal Grok 4.6/high completed normally after
+570.124 seconds with P0/P1 zero and P2=2; its events/public/status/stderr/diff
+SHA-256 values are
+`644e966bdeb0645261d71d0f2d296f2f30bd794a5d6e3f72a0722bc5e7d79c5`,
+`8047c49f3bc5240caa4c970edeabd63ac7627c23c8aa87d30c5e7d6bd4e11188`,
+`092b99078334be9832de9479b5eb69727ad816daccc4e50e208451c6ebce2bd5`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+and
+`242c6e1b6290b0c5c61f8738bc60594f41c0a518de8fcf3f0cb65f3011b948bf`.
+The complete review custody is under `.logs/d108e4q-review-8da08ae6/`.
+
+The same-round signed/pushed plan-only correction is `513acccb4305389430de70656ca88b43b501a4c1`.
+It resolves every reproduced finding before execution: the live D.108e4k
+ledger now points to the superseding `<65_000` gate; historical `<60_000`
+wording is explicitly historical; all three retained observations, their
+2,792.770626-ms spread and the exact 65,000-ms headroom rule are recorded;
+the source-shape gate's ceiling insensitivity is explicit; and the ordinary
+command, margin and phase-ledger custody are frozen. These are mechanical
+plan corrections only; they do not change the reviewed code or require a new
+execution or review round.
+
+The one authorized ordinary GREEN then ran exactly once at `513acccb` with
+the frozen command and no task-owned reviewer or test process. The ambient
+snapshot at `2026-08-28T18:06:54Z` disclosed load averages `8.54,8.94,9.44`,
+an unrelated TypeScript build in another repository at 99.9% CPU and the
+ordinary WindowServer/browser load; no retry was permitted or taken. The
+invocation exited 0: all five semantic tests passed, no `D108E4M_PROFILE `
+line appeared, exactly one valid `D108E4L_TIMING ` line reported
+`outcome=proof`, and `memberCountErrors` was empty. The child completed at
+`wallTimeMs=61_964.920917`, leaving exactly 3,035.079083 ms inside `<65_000`.
+Vitest reported 67.97 seconds overall and `/usr/bin/time` reported
+real/user/sys 69.00/67.30/4.01 seconds.
+
+The preserved phase ledger is: preflight/store-open 5.836084 ms, current-row
+1.721041 ms, genuine-future 221.205042 ms, authenticated-future-appends
+2,590.498583 ms, maximum-page-probe 149.236625 ms,
+equality-materialization/facades 11,601.828250 ms, over-budget preparation
+128.060709 ms, mismatch preparation 1.978625 ms, concurrent recoveries
+47,262.915083 ms and proof assembly 1.640875 ms. Ambient/stdout/stderr/status/
+timing-line SHA-256 values are
+`f64f4beddfc51f3a94ee746ef5873dd76d14d992eb5d61337717e5388bef0135`,
+`da6185e937e79df83265d47e0c5c834268cf9705aa4c4f3f44857dffbeaeb323`,
+`177fe89290ebba0660eb8bd49808be87bd8bcc9f2cdf9479de6db3dcdf7022f5`,
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`
+and `79cc4be971969d47f08950491725b026b76d8d08e7e12a4d80df922b71a05e0c`.
+The stdout is the preserved timing-line artifact. This closes D.108e4q with
+no demonstrated product defect, no production/dependency change and no
+additional instrumentation. The completed D.108e4m review, profile and
+ownership evidence also remain closed rather than extended. The final
+evidence edit passed Prettier, exact-owner ESLint and `git diff --check` with
+no diagnostics. D.108e4k's separately frozen final-tree combined proof is the
+smallest remaining action.
