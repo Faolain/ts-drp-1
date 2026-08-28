@@ -65930,14 +65930,15 @@ continuity failure rather than lawful loss. When no B message exists, native B
 send success on the transmitter remains valid continuity evidence and the
 deterministic
 `playwright-serial-command-gate` remains the causal cross-peer B-handler-before-
-one control retains accepted post-promotion B ingress, while a second loss-safe
-control has zero B delivery and must pass. The same accepted-ingress/zero-B
-split is required for nontransmitting `replacement`. Matching negatives retain
-B readiness, native success and complete accounting while putting an arrived B
-message in the rejected roster. A negative may remove B readiness or native
-success, but may not turn probabilistic delivery into an acceptance gate. This
-corrects the oracle without weakening make-before-break, complete native-send
-custody, overlap accounting or failed-replacement retention.
+send/delivery owner. For each reason, one control retains accepted
+post-promotion B ingress while a second loss-safe control has zero B delivery
+and must pass. The same accepted-ingress/zero-B split is required for
+nontransmitting `replacement`. Matching negatives retain B readiness, native
+success and complete accounting while putting an arrived B message in the
+rejected roster. A negative may remove B readiness or native success, but may
+not turn probabilistic delivery into an acceptance gate. This corrects the
+oracle without weakening make-before-break, complete native-send custody,
+overlap accounting or failed-replacement retention.
 
 D.108e4i receives a signed/pushed documentation freeze, a separate immutable
 tests-only RED and a separate GREEN/evidence checkpoint. The plan, RED and
@@ -66002,6 +66003,81 @@ reason-versus-role separation, zero-B controls for both replacement reasons and
 restoration of the 5/8 inventory gates. The same-round correction above
 discharges the complete P1/P2 union before RED. No confirmation review, Fable,
 production/libp2p change or complete campaign was run.
+
+The initial immutable D.108e4i RED is signed/pushed commit
+`44f0aabaea136dd565775a4e5bf220a9d18e57d2`, parent
+`b1c3c48e7c8a3309863d71bea6ad85ada2956dbe`, tree
+`bb47356a6629dac2088407e18d6289ec83d9a754`, stable patch id
+`684f0056e1e5b99d208c3840e1ddb931f73d1923` and raw-diff SHA-256
+`031e94a5ba0aad12ce8054a1cc338ea565a0ee7157be25428ae3681135ef74f2`.
+It has a good signature and changes only the exact test owner. The selected
+validator failed one title with five intentional soft errors covering all four
+reason-by-role positives and the mandatory channel-close drain-call error.
+JSON SHA-256 is
+`f874246d39e3924ecc261d73fb205587400e6156419a99ee9b2b3e9029754709`;
+unqualified/qualified inventories remained exactly 5/8, and owner TypeScript,
+ESLint, Prettier and diff checks passed.
+
+Grok 4.6/high RED session `01a04817-48a1-79b0-83a9-fddd46ca85aa`
+completed its sole substantive run normally in 690.324 seconds with exit zero,
+`end_turn` and no timeout. The wrapper reported `NO_VERDICT` only because
+inspection prose preceded the terminal object; the substantive result was
+`CHANGES_REQUIRED`, P0=1/P1=3/P2=1. Public/status/event-stream SHA-256 values
+are `20d5fa9029f06bcbf32d6aade020366cbfc40eb422969d9ee25b3a0f0502b119`,
+`e60241bd103e4071719571f6b483b14cd353595ef775e033763312c3d629e940`
+and `f5624b0d9130f5e401b8e1e1f74c97270da497d94b276fb4d2bb975971e1a96e`.
+The same completed session used one no-inspection turn to re-emit the unchanged
+bare JSON object; stream/stderr SHA-256 values are
+`a7537dabcc7dd91011283bbd3f059076449102c29c25d9d964ef010b2de96fc2`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+Kimi CLI 1.49.0 exact `kimi-code/k3` RED session
+`78c9704d-1e30-4f04-bced-6ef9477c343e` emitted 100 unique ordered markers and
+one terminal result. It returned `APPROVED`, P0=0/P1=0/P2=2. Stream/stderr
+SHA-256 values are
+`e18bdfe354b5571cd28a6a21b15cc559c506e5a219c816b21ecc6311cfa8bcf8`
+and `9cea10baabb9ad82f79c374a470f2e13dc8e738955c20fb1aac91069fd8f3529`.
+
+Opus 5/xhigh RED session `e8bf3f20-25c2-4a48-9582-bfec5da803fb`
+completed normally after 18 turns with `end_turn`, no error, permission denial
+or subagent. It returned `CHANGES_REQUIRED`, P0=0/P1=2/P2=4. Raw JSON/stderr
+SHA-256 values are
+`361aa17b2c967537fef334f75bde8cd226601fbe10d37ff8de4b09bbc3905c65`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+The formal P0/P1 union found that shared transmitter positives lacked the exact
+B product handler; close-event absence was pinned only on a transmitter;
+channel-close remote order was conjoined with zero B delivery; missing-call
+error isolation still had unrelated ingress pressure; and no sender or
+channel-close reversal negative prevented a role-keyed or reason-skipping
+GREEN. The P2 union required a close-event rather than later-call accepted-A
+cutoff negative, removal of the literal B-send sequence offset, preservation of
+exact negative error ownership and repair of the spliced plan sentence above.
+Every finding is discharged by the same-round tests-only correction below plus
+this documentation correction; no confirmation review ran.
+
+The accepted corrected RED is signed/pushed commit
+`329677757244f8957febe142ddbea1b16ad3af35`, parent
+`44f0aabaea136dd565775a4e5bf220a9d18e57d2`, tree
+`17291e5442f8b566f08b36341aedaa64b2b4549a`, stable patch id
+`8dd7bc76a0b46b834ecded8f1a0f0623fcaf7470` and raw-diff SHA-256
+`8ed5c1b9937b5f86c72f896bb85809845308e82a4cdaa593196d6b0e57f13cf1`.
+It has a good signature and remains exact-owner/test-only. The shared creator
+factory now carries an exact B product handler with sequence-derived sends.
+Independent positives cover replacement close-event absence on both roles,
+zero-B replacement, accepted-B and zero-B channel-close, and remote ordering on
+both roles. Passing controls reject creator close-event-before-call,
+close-before-B-open and channel-close-before-B-ready. Additional isolated REDs
+pin send-before-handler, the mandatory zero-buffer close-call and accepted A in
+the otherwise tempting close-event-to-call interval.
+
+The corrected selected RED failed exactly one title with nine intentional soft
+errors and no skip/flake: the six independent lawful positives plus the three
+new exact-error owners. JSON SHA-256 is
+`d026d7a754f165f6f33bbb53da9b73c13bb40de4b3ce5d6a64d572675b3c1758`.
+Unqualified/qualified inventories again remained exactly 5/8; exact-owner
+TypeScript, ESLint, Prettier and diff checks passed. No complete campaign,
+Fable, production change or js-libp2p behavior/configuration change occurred.
 
 The initial D.108e4g RED is signed/pushed commit
 `815f2d084f196929aeee59b01271b18e8c7463c0`, parent
