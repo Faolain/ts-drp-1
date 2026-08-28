@@ -65848,6 +65848,105 @@ support an upstream report or later dependency/mitigation proposal. The
 related js-libp2p issues and pull requests remain context only and are not
 fixes.
 
+The one D.108e4h-authorized complete E3-03 campaign then ran exactly once with
+`PLAYWRIGHT_JSON_OUTPUT_NAME=.logs/d108e4h-corrected-complete-campaign.json
+pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts
+--reporter=json --fail-on-flaky-tests`. It completed in 168.285 seconds with
+four expected, one unexpected, zero skipped and zero flaky tests. The only
+failure was the fixed three-trial campaign in trial `e3-03-2`, stage
+`e3-03-2-assertions`, at `D108E4H_LIFECYCLE_ORDER_INVALID`; the first two
+trials had already completed with raw maximum stalls of 45 ms. The JSON,
+decoded failure-telemetry, trace and error-context SHA-256 values are
+`2535dcddca1fcc3765e8df4c7d2b315be05ffcbce16b0c519544130d03478b48`,
+`abd9961a5080c3962b301ebed43a93233395dd4da91cfd3024ce3792efc902c9`,
+`e15e3a004a9f4a1cc38138a73098f51ab8c3e214f7b12ef0fd8529771f12f595`
+and `94cd3f8f2673f7aa211ad54991e1afb449428ae447e40055510289c89e9e024f`.
+The complete current-trial custody was attached before validation threw, so
+this result is assigned without rerun.
+
+The attachment proves a narrower test-evidence defect, not a new product or
+upstream defect. On the transmitting creator, A was RTC identity `(10,416)`
+and B `(12,437)`. The peer-local sequence was B open 1749, B product handler
+1750, A product close-call 1751 and the first successful B send 1753; all 600
+native sends succeeded without backpressure, 595 on A and five on B. The
+sender's asynchronous A close event had not arrived at the product-deadline
+snapshot. On the nontransmitting receiver, A was `(9,413)` and B `(11,438)`:
+the B product handler at 956 and B open at 957 preceded the remote A close
+event at 1115, after which the product made its harmless idempotent close-call
+at 1116. All 418 accepted raw messages belonged to A; none of the five
+successfully sent B packets survived the configured 30% loss. Requiring every
+endpoint to show `A close-call -> A close-event`, and requiring a nonempty B
+delivery in a lossy natural campaign, therefore rejects genuine directional
+RTC semantics and makes packet loss an oracle. Neither condition is part of
+the local make-before-break contract.
+
+The monitor evidence also closes the upstream branch for this incident. The
+creator's old-connection ping `e3-03-2:ping:39` reached stream-open,
+write-success and read-success before an abort owned by `other-owner`. The
+receiver's `e3-03-2:ping:40` did record a ping failure, but its joined abort was
+also owned by `other-owner`, followed by connection close; later replacement
+connections completed their pings. Thus no exact monitor-owned
+`start -> failure -> abort` chain exists, much less the required post-failure
+bidirectional traffic on the same still-usable authenticated connection. The
+strict false-positive predicate is false. No upstream attribution, report,
+dependency change or MVRE is authorized by this campaign. If a later artifact
+satisfies every predicate operand, work still stops for the separate pinned
+two-peer, public-libp2p, one-command, unpatched-failure MVRE already specified
+above before any upstream claim is made.
+
+###### D.108e4i — directional close custody and loss-safe replacement evidence
+
+D.108e4i is the immediate tests-only correction owner, due before D.108e4f,
+D.108e4g or D.108e4h can close and before any further complete E3-03 campaign.
+Its exact tracked owner is `tests/e3-03-loss-and-hol-proof.pw.ts`. It must not
+change production or js-libp2p source/configuration, product APIs, the five-test
+inventory, wire formats, loss/timing thresholds, connection-monitor policy or
+the already frozen product deadline. The failed complete campaign is not run
+again in this slice; its persisted attachment is the regression evidence.
+
+RED adds compact pure-validator fixtures for both directional browser
+orderings observed above. The local `replacement` branch must accept B open and
+the exact B product handler before A's product-owned close-call, allow A's
+asynchronous close event to be absent at the deadline, and, when that event is
+present, require it after the close-call. Any B trial send must still join an
+exact post-open, post-handler native attempt/success; all `SAMPLE_COUNT` sends,
+zero failures and zero backpressure remain mandatory. The remote
+`channel-close` branch must accept the exact B product handler and B open before
+the old A close-event, followed by the product's optional/idempotent close-call;
+accepted A traffic must precede the close event. Reversing either
+make-before-break ordering, using the wrong channel/owner, sending B before it
+is usable, accepting A after remote close, or losing an attempt terminal stays
+a deterministic negative.
+
+The natural campaign must account every observed A/B message exactly once but
+must not require any B message to survive packet loss. When B messages exist,
+each still joins the exact product handler/open and accepted/rejected roster;
+when no B message exists, native B send success on the transmitter remains
+valid continuity evidence and the deterministic
+`playwright-serial-command-gate` remains the causal cross-peer B-handler-before-
+send/delivery owner. The existing synthetic `channel-close` positive is split:
+one control retains real post-promotion B ingress, while a second loss-safe
+control has zero B delivery and must pass. A negative may remove B readiness or
+native success, but may not turn probabilistic delivery into an acceptance
+gate. This corrects the oracle without weakening make-before-break, complete
+native-send custody, overlap accounting or failed-replacement retention.
+
+D.108e4i receives a signed/pushed documentation freeze, a separate immutable
+tests-only RED and a separate GREEN/evidence checkpoint. The plan, RED and
+GREEN each receive the normal Grok review, exact Kimi K3 100-check review and
+Opus 5/xhigh review required by this plan; P0/P1 corrections remain same-round
+and every P2 receives an exact owner/deadline. Fable remains excluded. RED and
+GREEN gates are the selected validator, monitor self-check and serial command
+gate, the complete non-campaign D.108e4g+D.108e4h selection, retained E3-02 and
+network raw-sidecar owners, affected network/grid build and typecheck, and
+exact-owner TypeScript/ESLint/Prettier/diff checks. GREEN must also replay the
+decoded preserved `e3-03-2` custody through the pure validator without a new
+campaign or product execution, either directly from the ignored artifact in
+the evidence checkout or through an exact compact fixture whose identity,
+counts and pivotal sequences are asserted first. D.108e4f/D.108e4g/D.108e4h
+remain open until these gates pass; any later complete campaign requires a new
+explicitly planned authorization rather than inheriting the consumed one.
+
 The initial D.108e4g RED is signed/pushed commit
 `815f2d084f196929aeee59b01271b18e8c7463c0`, parent
 `341f19826f919de147fcea54751c339fd1b088cf`, tree
