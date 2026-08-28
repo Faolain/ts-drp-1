@@ -67528,5 +67528,162 @@ Its exact-owner static gate passed with stdout/stderr/status SHA-256 values
 `17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20`,
 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
 and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
-The timing execution remains pending; no reviewer, model, browser or test
-process may overlap it.
+The sole D.108e4l timing execution is complete. Two automatic quiet-window
+monitors stopped before launch and consumed no timing run because their
+respective `85%` and `50%` idle thresholds never held; neither created the
+reserved timing logs. The user then explicitly authorized progress with the
+remaining unrelated processes left untouched. The pre-run snapshot at
+`2026-08-28T16:36:33Z` recorded load averages `6.89, 9.28, 10.41`, `67.44%`
+idle CPU, one unrelated Fable process in another repository at `4.4%` CPU,
+other listed model/browser processes at `0.0-0.1%`, and no task-owned reviewer
+or test process. Its SHA-256 is
+`1580372fb632345eb951415f81568e82bbff16d3d157c5970895fbf1d4664e3c`.
+This disclosed ambient overlap means the invocation is diagnostic evidence,
+not an unloaded acceptance sample; it does not authorize a retry.
+
+The exact frozen command ran once:
+
+```bash
+/usr/bin/time -p pnpm exec vitest run --coverage.enabled=false packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts --maxWorkers=1 --minWorkers=1
+```
+
+It exited `1` with four of five tests passing. The same retained ceiling alone
+failed: child `wallTimeMs=61_308.196917`, or `1_308.196917 ms` above the signed
+`<60_000` requirement. Vitest reported file duration `66.70 s`, the launching
+D.108e4 test at `62.160 s`, and the later assertion-owning D.108e2e test at
+`6 ms`; `/usr/bin/time` recorded real/user/sys `67.89/66.78/3.70 s`. The
+`d108e4l-v1` payload was valid, had `outcome="proof"`, exactly one custody line
+and no `memberCountErrors`. Stdout/stderr/status/custody-line SHA-256 values are
+`6ed7179690d3306e5d76aedbce6f580613097ba71556fd00820f4ff0d4ff2cde`,
+`e529993404149ee779d5b523fc928e9a3ff1edcb762c0b1a3e981608f211583d`,
+`4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`
+and `dece2ffcdeaa2a403d5939552a521bd33e462fd7ff2fee8137868f7ad6c4914e`.
+
+The ledger assigns `48_616.072875 ms` (`79.2978%`) to
+`concurrent-recoveries`, with `45_522.449 ms` user CPU, `750.516 ms` system
+CPU, a `0.951803843` CPU/wall ratio and `110,921` involuntary context
+switches. `equality-materialization-and-facades` is the next largest phase at
+`9_908.0265 ms` (`16.161%`). The concurrent member spans are not causal CPU
+ownership: the two-row `mismatch` arm reports `36_728.407541 ms` in
+`reopen-and-evidence`, essentially the same overlapped wall as the 8,195-row
+`over-budget` arm at `36_617.475625 ms`. Shared event-loop and scheduler wait
+therefore contaminate each member's wall span. D.108e4l closes as a valid RED
+localization, while D.108e4k and aggregate D.108e4 remain open. Per the frozen
+mixed-owner route, D.108e4m must distinguish executing ownership before any
+production change.
+
+###### D.108e4m — sampled CPU and bounded-facade attribution
+
+D.108e4m is a one-run, non-campaign diagnostic slice. It answers only whether
+the dominant D.108e4l concurrent-recovery CPU is owned by the test façade,
+`packages/node` recovery, `packages/storage-node` issuance, another workspace
+package, a third-party dependency or runtime/native work. It may edit only:
+
+- `packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs`;
+- `packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts`.
+
+No product/example source, package manifest, lockfile, build config, public or
+private product API, durable-store interface, launcher contract, snapshot/wire/
+digest/authority owner, row/chunk/memory/connection limit, timing ceiling or
+recovery acceptance may change. The existing concurrent `Promise.all`, reuse
+ordering, exact rows, operation counts and semantic assertions remain
+unchanged. A need to edit any production source stops and reslices D.108e4m.
+
+Profiling is opt-in only when the parent command carries exact environment
+`TS_DRP_D108E4M_PROFILE=1`, which the fresh child inherits. The ordinary
+retained suite path must not start an inspector session or emit D.108e4m
+telemetry. In profile mode the child uses Node's built-in
+`node:inspector/promises` `Session`, sets the CPU sampling interval to exactly
+`1_000` microseconds, and enables/starts immediately after the
+`mismatch-preparation` boundary. It stops immediately after the unchanged
+`Promise.all` resolves and before the `concurrent-recoveries` boundary closes,
+then disconnects. The profiler therefore samples the complete dominant
+concurrent block, including normal async scheduling, but not the 8,193-row
+pre-materialization phase. Inspector start/stop overhead remains inside the
+diagnostic wall ledger. This run cannot satisfy or refute `<60_000`; the
+ceiling stays present and unchanged and an expected exit `1` is not a new RED.
+
+The child reduces the CPU profile in memory and never sends the raw profile.
+For every sample, its matching `timeDeltas` microseconds are assigned to the
+sampled leaf node id. Frames are aggregated by exact `functionName`, `url`,
+zero-based `lineNumber` and `columnNumber`; the top 40 by descending
+`selfMicros`, then stable lexical frame identity, are retained with
+`sampleCount`, `selfMicros` and one frozen ownership classification. Exact
+ownership rules, applied in order to normalized frame URLs, are:
+
+1. `test-fixture` for this repository's `/packages/storage-node/tests/` or
+   `/tests/fixtures/` paths;
+2. `node-product` for `/packages/node/dist/` paths, mapped back to
+   `packages/node/src` ownership;
+3. `storage-node-product` for `/packages/storage-node/dist/` paths, mapped back
+   to `packages/storage-node/src` ownership;
+4. `workspace-dependency` for any other repository `/packages/*/dist/` path;
+5. `third-party` for `/node_modules/` or `/.pnpm/` paths;
+6. `runtime-or-native` for an empty URL or a `node:`/`internal/` URL;
+7. `other` otherwise.
+
+The envelope reports exact schema `d108e4m-v1`, `outcome="profile"`, requested
+sampling interval, profile `startTime`/`endTime`, sample and delta counts,
+summed sampled microseconds, the ownership totals over all samples, their
+sample counts, the bounded top-frame roster and the inherited child PID. It
+validates that sample/delta lengths match, every sample resolves to one node,
+all deltas and aggregates are finite nonnegative integers, ownership totals
+sum exactly to total sampled microseconds, ownership sample counts sum exactly
+to sample count, the roster is at most 40, and the PID equals the proof PID but
+not the Vitest PID. Unsupported inspector startup, malformed profile or a
+missing terminal proof emits one honest `D108E4M_PROFILE` record with
+`outcome="unavailable"` and the caught classification; it does not fabricate
+ownership or authorize a rerun.
+
+In parallel with sampling, only the test-owned `boundedRecoveryStore` façades
+collect cumulative synchronous-body cost. The collector brackets the local
+body or delegated-call dispatch of exact methods `close`,
+`compareAndMarkOutboxPublished`, `readIssued`, `readLineage`,
+`readOutboxPage` and `transactIssue` with `performance.now()`. It never awaits
+inside a wrapper, changes a returned promise, instruments per-row product code
+or interprets overlapping promise wall as CPU. Each record reports method
+`callCount` and cumulative `syncBodyMs`; the exact member roster is
+`equality`, `reuse-0`, `reuse-1`, `over-budget`, `mismatch`, with the reuse
+collector reset at the same existing `beginInvocation()` boundary. Parent
+validation pins those six method names and five members, finite nonnegative
+values, integer counts, and retains the existing semantic count comparisons.
+
+On first receipt of the memoized child result in profile mode, the parent emits
+exactly one `D108E4M_PROFILE ` JSON line before D.108e4l hard validation and
+before the unchanged `<60_000` assertion. The existing exactly-one
+`D108E4L_TIMING ` line remains. The parent rejects malformed D.108e4m schema
+after emission; the later existing semantic assertions still execute only
+when both telemetry schemas are valid. Profile absence in ordinary mode is
+required, not an error. No raw inspector profile, environment secret or
+unbounded frame collection crosses IPC.
+
+Before implementation, this freeze receives one signed/pushed plan commit and
+the normal read-only Grok 4.6/high, exact Kimi K3 `CHECK001` through
+`CHECK100`, and Opus 5/xhigh review round. Reproduced P0/P1 findings are fixed
+in the same round; each P2 receives an exact owner and 2026-09-04 deadline.
+No Fable or collaboration subagent runs. After the exact-two-owner edit, run
+`node --check`, exact-owner ESLint and Prettier, `git diff --check`, the frozen
+source-shape guard, and the affected build-before-typecheck gate. The signed/
+pushed instrumentation checkpoint then receives the same three-review round
+and same-round correction policy before execution.
+
+After those gates, run exactly once with no task-owned reviewer or other test
+process and preserve an ambient snapshot:
+
+```bash
+TS_DRP_D108E4M_PROFILE=1 /usr/bin/time -p pnpm exec vitest run --coverage.enabled=false packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts --maxWorkers=1 --minWorkers=1
+```
+
+Custody covers stdout, stderr, exit status, ambient snapshot, the sole extracted
+`D108E4M_PROFILE ` line and the retained `D108E4L_TIMING ` line. No second
+D.108e4m profile run is permitted. Route by all-sample ownership totals and
+top frames, using façade synchronous totals only as corroboration: dominant
+test-fixture ownership opens a separately reviewed D.108e4n test-only repair;
+dominant `node-product` opens D.108e4o against the exact mapped source owner;
+dominant `storage-node-product` opens D.108e4p against the exact mapped source
+owner; dominant dependency/runtime work or a mixed result opens D.108e4q for a
+narrower reviewed attribution or MVRE as appropriate. A product optimization
+is never made inside D.108e4m. The first later ordinary non-profile acceptance
+run requires a separately reviewed repair and margin/variance gate; D.108e4k,
+D.108e4a/b/c/d, aggregate D.108e4, D.108e5 and every E3-03 campaign remain
+blocked meanwhile.
