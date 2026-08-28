@@ -246,7 +246,10 @@ function runLocalAuthorChild(input: unknown, label: string, timeoutMs: number): 
 		child.stderr?.setEncoding("utf8");
 		child.stderr?.on("data", (value: string) => (stderr += value));
 		child.on("message", (message: D108d1bChildMessage) => (observed = message));
-		child.once("error", reject);
+		child.once("error", (error) => {
+			clearTimeout(timer);
+			reject(error);
+		});
 		child.once("spawn", () => child.send(input as Serializable));
 		child.once("exit", (code) => {
 			clearTimeout(timer);

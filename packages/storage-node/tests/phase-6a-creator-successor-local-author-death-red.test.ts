@@ -1137,7 +1137,6 @@ describe("D.108d1b authenticated peer-local fresh-process issuance RED", () => {
 						overBudget?: Readonly<Record<string, unknown>>;
 						pid?: number;
 						realStore?: Readonly<Record<string, unknown>>;
-						wallTimeMs?: number;
 				  }>
 				| undefined;
 			expect(proof?.pid).toEqual(expect.any(Number));

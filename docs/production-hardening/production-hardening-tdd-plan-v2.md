@@ -67138,10 +67138,13 @@ Phase-6a adoption-commit/activation/product/epoch 6/6, 24/24, 21/21 and 3/3.
 The exact D.93.46 command runs in three consecutive invocations; any failure
 resets that non-campaign ledger. The native five-test timing file is exactly
 `packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts`.
-It runs alone, without a model review or another test process, and preserves
-its child-measured `< 76_000 ms` acceptance as superseded by D.108e4s;
-`/usr/bin/time -p` is surrounding telemetry only. That file is deliberately
-absent from the 15-file semantic
+It runs alone, without a model review or another test process. Its D.108e4t
+acceptance is 5/5, zero `D108E4M_PROFILE ` lines, exactly one valid terminal
+`D108E4L_TIMING ` record with empty `memberCountErrors`, every semantic
+assertion reached and no launcher or Vitest timeout. Child `wallTimeMs`, the
+phase ledger and `/usr/bin/time -p` are telemetry only; the historical
+`<76_000 ms` D.108e4s gate is not reimposed. That file is deliberately absent
+from the 15-file semantic
 selection. The historical 16-file glob and every combined selection containing
 the timing file are forbidden. The root canonical shim is absent before and
 after every root collection or D.93 execution.
@@ -67364,9 +67367,11 @@ existing `it(` call shapes pinned by
 reformatted.
 
 That full record is guaranteed only after a terminal proof reaches the parent.
-The frozen shared launcher ignores child stdout, kills at 90,000 ms, and rejects
-and discards a child-error or nonzero-exit message. The two-file slice therefore
-cannot claim phase attribution on those paths. Its memoized parent helper
+At this historical D.108e4l point the frozen shared launcher ignored child
+stdout and killed both modes at 90,000 ms. D.108e4t later retained 90,000 ms
+for D.108d1b and assigned 120,000 ms only to D.108e2e. Both reject and discard
+a child-error or nonzero-exit message. The two-file slice therefore cannot
+claim phase attribution on those paths. Its memoized parent helper
 instead emits exactly one `D108E4L_TIMING ` record with schema `d108e4l-v1`,
 `outcome="unavailable"`, the caught message and one honest classification:
 `timeout`, `missing-terminal-proof` or
@@ -68297,27 +68302,113 @@ produced every retained long run, passes `120_000`. Both exported function
 signatures remain unchanged. The two existing parent tests that consume the
 memoized D.108e2e promise move from 120,000 to 150,000 ms, preserving a nominal
 30-second parent-test margin over its launcher. The launcher remains a hard
-hang kill and classifies timeout before Vitest aborts; no unbounded wait is
-introduced. A 120-second D.108e2e kill is the smallest round 30-second increase
-over the prior launcher while remaining 30 seconds below both consuming tests;
-it is scheduling allowance, not a product-latency inference from aggregate
-parent/child process CPU, and it does not change the ordinary D.108d1b contract.
+hang kill; on the D.108e2e route it classifies timeout before either 150-second
+Vitest timeout, so no unbounded wait is introduced. The D.108d1b consumers
+retain the 10-second root Vitest default, making their unchanged 90-second
+launcher a process-leak guard rather than their classifying deadline. A
+120-second D.108e2e kill is the smallest round 30-second increase over the
+prior launcher while remaining 30 seconds below both consuming tests. It is
+an unverified scheduling allowance, not a product-latency inference: the
+90-second-killed run supplies no duration upper bound. A second timeout routes
+directly to the dedicated-resource decision with no further increase. The
+helper's spawn-error handler now clears the mode-specific timer before
+rejecting, so the larger D.108e2e allowance cannot leave a 120-second dangling
+event-loop handle. The ordinary D.108d1b contract otherwise remains unchanged.
 
 Freeze this exact candidate and rationale in one signed/pushed checkpoint,
 then run normal read-only Grok 4.6/high, exact Kimi K3 `CHECK001` through
 `CHECK100` and Opus 5/xhigh review before execution. P0/P1 findings are
 corrected in the same round and every P2 receives an exact owner and
 2026-09-04 deadline. No confirmation review, Fable or collaboration subagent
-runs. Static acceptance is exact-owner ESLint and Prettier, `git diff
---check` and the retained source-shape owner. The affected storage-node package
-typecheck retains its inherited-baseline policy: zero diagnostics may name an
-exact D.108e4t owner while unrelated diagnostics are recorded rather than
-relabeled green. No product build is implied by these test-only changes.
+runs.
+
+The formal review round inspected exact immutable signed/pushed checkpoint
+`7ca5f1288899930ca87d9ae353fa78226eea594e`, parent `2694a76e`, tree
+`ddbd3bbb9725af0bb5fe53ac6165e3610023f1b3`, stable patch id
+`41f77a15336515cbf176d4fc6e371c73cabc0578` and raw-diff SHA-256
+`4315b3d70425c0f109f3e5674e1e0593368d642e38a2eff704403827527cb7d4`.
+It has a good signature, is contained by the remote branch and changes only
+the plan and the exact two test-infrastructure owners.
+
+Normal Grok 4.6/high completed normally after 435.177 seconds with exit zero,
+`end_turn`, no timeout and terminal `CHANGES_REQUIRED`, P0=0/P1=1/P2=1. Its
+P1 is the live D.108e4k `<76_000` coupling and its P2 is the historical shared-
+90-second launcher wording; the plan owner corrects both above by 2026-09-04.
+Events/public/status/stderr/diff SHA-256 values are
+`65c8a00bcb3facc8b25c84a35e2c09d3603c3e0d95453497d2ce3d0a755481c7`,
+`bfa15c2d894ccf1cca3c4840eb11d305dccdf5b27f4f35f9fb9bc4a9829569a4`,
+`cce89a244566106a851f10e6388a831d556bd6d28544bedeb5ff554718063bbc`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+and `e3c6db5425c8c72b4bd31c423497de01045d805a5487e59f09efe24e84f8dca3`.
+
+Kimi CLI 0.38.0 exact `kimi-code/k3` session
+`session_9c0b78dc-a387-4fa5-a208-1e2d35fc7426` emitted exactly 100 unique
+ordered `CHECK001` through `CHECK100` markers and one terminal `RESULT`. It
+returned `APPROVED`, P0/P1 zero and P2=1. The P2 is the pre-existing mismatch
+between the 10-second root default on the fast D.108d1b consumers and their
+90-second process-leak guard. It is assigned to the parent-test owner at
+`packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts`
+with deadline 2026-09-04; D.108e4t documents but does not widen that distinct
+path. Stream/stderr/status SHA-256 values are
+`a64729868edca06e97c8e4e84a3574b886173a335fdd889e1161b02e3e5867ad`,
+`707bfa6d58450515f8e4defc93ac59a2736ddfa1586e97587bf8c647f8623f43`
+and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+
+Opus 5/xhigh session `66d88047-4cd2-4e8b-9e0c-34a5fbc01c42` resolved to
+`claude-opus-5`, completed 34 turns and 389.394 seconds with no error or
+subagent, and returned schema-valid `CHANGES_REQUIRED`, P0=0/P1=1/P2=4. Its
+P1 is the same live D.108e4k coupling corrected above. The D.108e4t plan owner
+closes its load-preflight and timeout-ordering P2s below and above by
+2026-09-04; the launcher owner closes its timer-leak P2 in the reviewed helper
+above; and the parent-test owner removes the inert local `wallTimeMs` type
+member while retaining the validator's real field identity check. JSON/
+stderr/status SHA-256 values are
+`13c00bc908cd2944b90692ab818d4d2f24635a60d1fc68ad9e81b2eb0bfbaa46`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+The complete review custody is under `.logs/d108e4t-review-7ca5f128/`.
+
+The same-round correction resolves the reproduced P0/P1 union and complete
+D.108e4t-owned P2 union before execution. The two tiny executable corrections
+are the reviewers' exact leak cleanup and dead-type removal shapes; neither
+changes timeout values, semantic behavior, workload or product code. Per the
+frozen same-round policy, no confirmation review or new RED runs.
+
+Static acceptance is exact-owner ESLint and Prettier, `git diff --check` and
+the retained source-shape owner. The affected storage-node package typecheck
+retains its inherited-baseline policy: its complete diagnostic output must be
+byte-identical to the D.108e4m baseline rather than relabeled green. No product
+build is implied by these test-only changes.
+
+The corrected candidate's exact-owner Prettier, ESLint, diff and read-only
+source-shape gates passed. The source-shape record is exactly
+`{"d108e2d":1,"d108e2e":1,"d108d1b":1,"skipIf":0,"wallExpect":0,"timeouts150":2}`.
+Prettier stdout/stderr/status SHA-256 values are
+`17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+ESLint and diff stdout/stderr are empty with the same zero-status hash;
+source-shape stdout/stderr/status hashes are
+`b78d7beddb38f0c520d2cf6d0b3c942cf2d4e66171abb4ad07d6048e9d7b0704`,
+the empty-file hash and the same zero-status hash.
+
+`pnpm --filter @ts-drp/storage-node typecheck` retained exit 2 with exact
+TS6059=27, TS6307=27, TS2307=20, TS7006=37, TS18046=1 and TS7031=1. Its
+stdout is byte-identical to the D.108e4m baseline at SHA-256
+`1a6c998253e94377d36ba9e4b03ad958fd4d28de4ac88de6a7be932e20f3a0e3`;
+stderr is empty and the status-file hash is
+`53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3`.
+No diagnostic was added or changed. Static custody is under
+`.logs/d108e4t-static-7ca5f128-correction/`.
 
 Before the one GREEN, a separate 30-second preflight samples every five
-seconds and must show no Vitest, Playwright or task-owned reviewer process; a
-positive sample stops without launching. After a clean preflight, run exactly
-once:
+seconds. Every sample records load averages and the top CPU roster and must
+show no Vitest, Playwright or task-owned reviewer process, one-minute load
+strictly below `os.availableParallelism()` (`10` on this host), and no
+unrelated process at or above 100% CPU. Any positive sample stops without
+launching. These evidence-derived limits reject both invalid attempts while
+admitting the earlier D.108e4q GREEN environment; they are execution custody,
+not a product gate. After a clean preflight, run exactly once:
 
 ```bash
 env -u TS_DRP_D108E4M_PROFILE /usr/bin/time -p pnpm exec vitest run --coverage.enabled=false packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts --maxWorkers=1 --minWorkers=1
