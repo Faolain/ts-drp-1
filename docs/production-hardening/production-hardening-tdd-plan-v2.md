@@ -65262,6 +65262,53 @@ retiring ingress states, a real-browser pending-handler/open-order gate and a
 stop condition that forbids wire acknowledgments, grace guesses or buffers.
 The reviewer made no tracked edit and is advisory, not a confirmation quorum.
 
+The D.108e4g-a browser-attribution checkpoint is signed/pushed commit
+`746200206d7601becbc8a511a5f447e51b625fd5`, parent
+`f7e7676a267ecaf54eeeaeec8ee215c57547b860`, tree
+`12e21c9efe522a5ffa5e359e330b886c8a088110`, stable patch id
+`7df143013521bef11564971627121991ffcec7ea` and raw-diff SHA-256
+`390e087164ac52bf62b7028f575ef741876fb5ba3eef6c0adfcd6e39bb4a78ca`.
+It changes only the two frozen tests/example telemetry owners and has a good
+signature. `D108E4G_TELEMETRY=1` exposes the two new focused behaviors while
+the unqualified config inventory remains exactly five; list SHAs are
+`f429951c4708269345eb25e68978999e8e7110dca6d6c6f71a87733f1348b8c8`
+and `5dd3ac60ef325060b1029323abfb32e938c6397058c715e4182e045f63b2a8f2`.
+The opt-in lifecycle self-check and current-owner reproduction pass 2/2 with
+zero skip/flake in 12.870 seconds; JSON and canonical-attachment SHA-256 are
+`a983eceb9bf27e16cc697b7639a89fa98ad232b42fe406befc8aafecdd94ac55`
+and `ed45cff3c39981383ded4d17ea5da13155a1528c534f2438bc496c620a7a039b`.
+The latter joins the exact pre-cycle raw owner as authenticated connection id
+plus peer-local RTC connection/channel ids, records that exact channel's
+decision-time `readyState === "open"`, and proves its close call precedes the
+distinct replacement raw channel's open event. It also records
+`lastLinkDrop === "replacement"` and a newer authenticated generation. This
+confirms the local stale-authenticated break-before-make arm; it does not
+classify any monitor decision as false positive or upstream.
+
+Standalone test-owner TypeScript, affected grid build/typecheck, exact-owner
+ESLint/Prettier and diff check pass. Their material SHAs are
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`,
+`6e106d68403bcd9b3502564a250d49908e6dd2539f862df7400db0a2bf99c635`,
+`087eba9acd40302f69876972072fe38b513f0ba47b13ec083ed1f5c79586642f`
+and `17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20`.
+The first ordinary repository-wide lint attempt exhausted its inherited 4 GiB
+lint-process heap. An 8 GiB lint-process-only rerun completed and retained the
+pre-existing broad fixture lint debt; it introduced no exact-owner error and
+did not change a product or campaign memory ceiling. Its log SHA-256 is
+`a9eea87e4b94626325c20eab0fc030926628e155240184e20a17ffb0edb881c8`.
+
+The required read-only Codex review returned P1=4: the initial close assertion
+was not joined to the replaced channel, the ping observer modeled the obsolete
+iterable stream API, and two root-lint rules rejected the provisional types.
+Public/stderr SHA-256 are
+`8c1890168702436ec117380415d22c74ce24af4b160615e0869f6d845be6f776`
+and `b926c9b2642d8211b18732e063c9ec2673aca48930bfa11a14e3f0be004c179e`.
+The same-round correction adds the exact authenticated/RTC owner join and
+ordering assertion, instruments the installed js-libp2p 3.1.2 MessageStream
+`send`/`message` path, records a still-pending heartbeat failure at a
+monitor-owned abort, and satisfies both lint rules. The review was advisory;
+no confirmation review was run. No complete E3-03 campaign was invoked.
+
 The first D.108e4c plan-freeze review round inspected signed/pushed commit
 `eb3de05b6054ac6fdd158d2530bad1798f87f10f`, parent
 `b8a2628bec7593c547919b540889dc75e33cd9ca`, tree
