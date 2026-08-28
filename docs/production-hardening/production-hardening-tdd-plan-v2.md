@@ -66676,8 +66676,8 @@ No confirmation review and no Fable review ran.
 ###### D.108e4j — terminal corrected-oracle campaign closure
 
 D.108e4j is an evidence-only closure slice after D.108e4i and before
-D.108e4f/D.108e4g/D.108e4h or aggregate D.108e4 may close. It changes no test
-or product behavior and therefore does not create another RED/GREEN
+D.108e4e/D.108e4f/D.108e4g/D.108e4h may close. It changes no test or product
+behavior and therefore does not create another RED/GREEN
 implementation pair: its behavior owner is the accepted, separately reviewed
 D.108e4i GREEN at `cc112d220539157b5d81394d2574286ef49c159d`. This slice
 exists solely because the one D.108e4h campaign used the pre-D.108e4i
@@ -66710,7 +66710,7 @@ GREEN, not permission to sample for a favorable outcome.
 After the plan review is accepted, exactly one invocation is authorized:
 
 ```text
-PLAYWRIGHT_JSON_OUTPUT_NAME=.logs/d108e4j-terminal-campaign.json pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --reporter=json --fail-on-flaky-tests
+PLAYWRIGHT_JSON_OUTPUT_NAME=.logs/d108e4j-terminal-campaign.json pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --reporter=json --fail-on-flaky-tests 2> .logs/d108e4j-terminal-campaign.stderr.log
 ```
 
 Acceptance is exactly five expected, zero unexpected, skipped and flaky tests.
@@ -66720,8 +66720,36 @@ metrics and the final durable-control round trip. Its always-attached campaign
 JSON must retain all three trial evidence envelopes and the exact browser
 version. If the invocation fails, its failure attachment is the sole new
 evidence owner, the failure is assigned to an exact next slice and the campaign
-is not rerun. A pass closes D.108e4f, D.108e4g and D.108e4h together, accepts
-the aggregate D.108e4 tests-only cleanup and permits D.108e5 to begin.
+is not rerun. The D.108e4j evidence owner records SHA-256 custody for the JSON
+reporter artifact, stderr and decoded `e3-03-fixed-loss-campaign.json`
+attachment. On failure it also records SHA-256 for the decoded
+`e3-03-failure-telemetry.json` and every retained trace and error-context
+artifact. This custody is due by 2026-09-04.
+
+A pass accepts D.108e4e, D.108e4f, D.108e4g and D.108e4h together. If every
+trial records zero product link drops, the campaign is only the missing
+three-trial performance, aggregate, rendered-metric and durable-control
+evidence; the focused D.108e4g browser proof and D.108e4i preserved e3-03-2
+replay remain the directional replacement-custody owners. D.108e4a remains
+rejected pending D.108e4b acceptance; D.108e4b remains rejected pending the
+combined proof and its own separate GREEN review; D.108e4c remains open on its
+unchanged combined proof; and D.108e4d remains rejected pending that combined
+proof. Aggregate D.108e4 closure and D.108e5 entry therefore remain blocked.
+The still-due combined proof includes the complete config 3/3, three
+consecutive retained long-campaign invocations in the ordinary checkout, its
+own three consecutive long-campaign passes in the isolated clean checkout,
+the exact D.93.36 gate, three consecutive exact D.93.46 invocations, retained
+Phase-3h/Phase-5 selections and the complete Phase-4c/Phase-6a suite including
+the genuine fresh-process 64 MiB peak-live proof. None of those later complete
+E3-03 invocations inherits this one-run authorization; they require a new,
+separately reviewed authorization.
+
+The terminal result is recorded in a separate signed/pushed D.108e4j evidence
+checkpoint. Before any of the four acceptances above is recorded, that exact
+immutable checkpoint receives one normal Grok 4.6/high, exact Kimi K3
+`CHECK001` through `CHECK100` and Opus 5/xhigh review. Reproduced P0/P1 findings
+are corrected in the same round without confirmation and every P2 receives an
+exact owner and deadline.
 
 Upstream attribution remains impossible in this slice unless the new attachment
 independently satisfies every already frozen otherwise-usable false-positive
@@ -66732,3 +66760,44 @@ related upstream issues remain context only. No js-libp2p patch/upgrade,
 connection-monitor disablement, ping-threshold change, product API, wire,
 digest, limit, memory, activation-authority or broad dependency change is
 authorized.
+
+The D.108e4j plan-freeze review round inspected exact signed/pushed commit
+`4547e46a7926c0a2c1cc375996633ac871d4fdae`, parent
+`5a9236937700dc21b8a38f5e735a86f77c063058`, tree
+`c6ccb3759e3589334b6da7f570651e3c8fc666e5`, stable patch id
+`383ddc4e10a208b77ccfdf1bb741f681b09df6a6` and raw-diff SHA-256
+`d15e58f37e9b26fa5a607ffa1ebc1dd7db0df6d0268a20b11c0839e9505395c7`.
+The roster was this plan file only, and its signature was good. Grok 4.6/high
+session `01a04854-de7d-7e30-94d1-3868f1fd411b` completed its sole substantive
+inspection in 360.157 seconds with exit zero and `end_turn`; the wrapper first
+classified it `NO_VERDICT` solely because progress prose preceded the terminal
+object. A no-inspection same-session formatting continuation emitted the bare
+unchanged `APPROVED`, P0=0/P1=0/P2=0 object; its JSONL and stderr SHA-256 are
+`82df0c96435c396231fd6a14dfec18bfe9d3ebf0e30f835b67be74c6a73da6b0`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+The actual exact `kimi-code/k3` review was session
+`session_a766b54a-cb7e-474c-89a6-0cf84c58dc4c`. The earlier local
+`--auto --prompt` parser rejection created no model session and was not a
+review. The substantive response was `APPROVED`, P0=0/P1=0/P2=0 but included
+one extra prose line whose prefix resembled marker 084. A no-inspection
+same-session formatting continuation emitted exactly 100 ordered markers and
+the unchanged result. Its JSONL and stderr SHA-256 are
+`4b850d462ecd4ab300fa4a0752462570f0a581a44ece97eabde7e85fe0130393`
+and `3f31f5d78eca9372138247ac242c3a2cb13c4f09a27247d27f11f16a7580c093`.
+
+Opus 5/xhigh session `ebe8f7bb-d559-45cf-b05b-60863bd738a8` resolved to
+`claude-opus-5`, completed in 471.374 seconds without a subagent and returned
+`CHANGES_REQUIRED`, P0=1/P1=2/P2=2. Its result JSON and stderr SHA-256 are
+`b0e25d46bb8eefffff5cb2c50f00e7eb718a9f674470b1ae011bbd4614193842`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+The reproduced P0 was that one terminal invocation cannot discharge the
+frozen combined ordinary/isolated consecutive-campaign and retained-suite
+gates or permit D.108e5. The P1s required the exact D.108e4e/a/b/c/d
+disposition and a separately reviewed evidence checkpoint. Those blocking
+findings are corrected above in this same round. Opus's two P2s are also
+assigned above: artifact-hash custody belongs to the D.108e4j evidence owner
+by 2026-09-04, and replacement-free classification belongs to the D.108e4j
+plan owner by 2026-09-04. Grok and Kimi's approval of the broader closure claim
+does not override the reproduced frozen-gate conflict. No confirmation review,
+Fable review or collaboration subagent ran.
