@@ -422,7 +422,7 @@ class FakeSignalingBus {
 					local.connections.delete(id);
 					for (const listener of closeListeners) listener();
 				},
-				exchange: async (request): Promise<Uint8Array> => {
+				exchange: async (request, signal): Promise<Uint8Array> => {
 					if (closed || remote.handler === undefined) throw new Error("fake signaling handler missing");
 					this.exchangeRecords.push({
 						connectionId: id,
@@ -432,7 +432,7 @@ class FakeSignalingBus {
 					});
 					const response = await remote.handler(reverse(), this.requestTransform(request.slice()));
 					this.#resolvePendingObserved?.();
-					if (this.#pendingResponse !== undefined) await this.#pendingResponse;
+					await this.#waitForResponse(signal);
 					return this.responseTransform(response.slice());
 				},
 				generation,
@@ -475,6 +475,30 @@ class FakeSignalingBus {
 			},
 			waitUntilPending: (): Promise<void> => this.#pendingObserved ?? Promise.resolve(),
 		};
+	}
+
+	async #waitForResponse(signal: AbortSignal): Promise<void> {
+		const pending = this.#pendingResponse;
+		if (pending === undefined) return;
+		await new Promise<void>((resolve, reject) => {
+			let settled = false;
+			const finish = (complete: () => void): void => {
+				if (settled) return;
+				settled = true;
+				signal.removeEventListener("abort", onAbort);
+				complete();
+			};
+			const onAbort = (): void =>
+				finish(() =>
+					reject(signal.reason instanceof Error ? signal.reason : new Error("fake signaling exchange aborted"))
+				);
+			if (signal.aborted) onAbort();
+			else signal.addEventListener("abort", onAbort, { once: true });
+			void pending.then(
+				() => finish(resolve),
+				(error: unknown) => finish(() => reject(error))
+			);
+		});
 	}
 
 	#endpoint(peerId: string): MutableEndpoint {
@@ -1506,11 +1530,11 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 				bus.connect("peer-a", "peer-b");
 				const lowRoute = low.owner.openUnreliableWebRtcRoute("zone:failed-send-recovery");
 				const highRoute = high.owner.openUnreliableWebRtcRoute("zone:failed-send-recovery");
-				const remote = role === "initiator" ? high : low;
 				const localRoute = role === "initiator" ? lowRoute : highRoute;
-				const remoteRoute = role === "initiator" ? highRoute : lowRoute;
-				const received: Uint8Array[] = [];
-				remoteRoute.onMessage(({ bytes }) => received.push(bytes.slice()));
+				const lowReceived: Uint8Array[] = [];
+				const highReceived: Uint8Array[] = [];
+				lowRoute.onMessage(({ bytes }) => lowReceived.push(bytes.slice()));
+				highRoute.onMessage(({ bytes }) => highReceived.push(bytes.slice()));
 
 				await Promise.all([lowRoute.reconcile(["peer-b"]), highRoute.reconcile(["peer-a"])]);
 				expect(low.peerConnections).toHaveLength(1);
@@ -1525,33 +1549,45 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 				expect(await localRoute.send([role === "initiator" ? "peer-b" : "peer-a"], Uint8Array.of(11))).toBe(false);
 				expect(await localRoute.send([role === "initiator" ? "peer-b" : "peer-a"], Uint8Array.of(12))).toBe(false);
 				expect(localRoute.snapshot().sent).toBe(0);
-				expect(received).toEqual([]);
+				expect(lowReceived).toEqual([]);
+				expect(highReceived).toEqual([]);
 
 				if (role === "non-initiator") {
 					expect(high.peerConnections).toHaveLength(1);
 					expect(await lowRoute.send(["peer-b"], Uint8Array.of(21))).toBe(false);
+					expect(lowRoute.snapshot().sent).toBe(0);
 				}
-				await tick();
 				expect(low.peerConnections).toHaveLength(2);
-				expect(high.peerConnections).toHaveLength(2);
 				await recoveryBarrier.waitUntilPending();
 				expect(low.peerConnections).toHaveLength(2);
 				expect(high.peerConnections).toHaveLength(2);
+				expect(bus.exchangeRecords.map(({ remotePeerId }) => remotePeerId)).toEqual(["peer-b", "peer-b"]);
 				expect(localRoute.snapshot().sent).toBe(0);
-				expect(received).toEqual([]);
+				expect(lowReceived).toEqual([]);
+				expect(highReceived).toEqual([]);
 
 				recoveryBarrier.release();
-				await vi.waitFor(() => expect(localRoute.snapshot().activeLinks).toBe(1));
+				await vi.waitFor(() => expect(lowRoute.snapshot().activeLinks).toBe(1));
 				expect(await localRoute.send([role === "initiator" ? "peer-b" : "peer-a"], Uint8Array.of(13))).toBe(true);
 				await tick();
-				expect(received).toEqual([Uint8Array.of(13)]);
-				expect(localRoute.snapshot()).toMatchObject({
+				expect(lowReceived).toEqual(role === "non-initiator" ? [Uint8Array.of(13)] : []);
+				expect(highReceived).toEqual(role === "initiator" ? [Uint8Array.of(13)] : []);
+				expect(lowRoute.snapshot()).toMatchObject({
 					activeLinks: 1,
+					authenticatedConnectionLosses: 0,
+					handshakeFailures: 0,
+					lastLinkDrop: "channel-close",
+					linkDrops: 1,
+					sent: role === "initiator" ? 1 : 0,
+				});
+				expect(highRoute.snapshot()).toMatchObject({
+					activeLinks: 1,
+					authenticatedConnectionLosses: 0,
+					handshakeFailures: 0,
 					lastLinkDrop: "replacement",
 					linkDrops: 1,
-					sent: 1,
+					sent: role === "non-initiator" ? 1 : 0,
 				});
-				expect(remote.peerConnections).toHaveLength(2);
 			} finally {
 				recoveryBarrier?.release();
 				low.owner.close();
@@ -1580,9 +1616,9 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 			vi.useFakeTimers();
 			recoveryBarrier = bus.pauseResponses();
 			expect(await leftRoute.send(["peer-b"], Uint8Array.of(41))).toBe(false);
-			await tick();
 			expect(left.peerConnections).toHaveLength(2);
 			await recoveryBarrier.waitUntilPending();
+			expect(right.peerConnections).toHaveLength(2);
 
 			await vi.advanceTimersByTimeAsync(5_000);
 			expect(await leftRoute.send(["peer-b"], Uint8Array.of(42))).toBe(false);
@@ -1592,6 +1628,7 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 			await vi.advanceTimersByTimeAsync(1);
 			expect(leftRoute.snapshot()).toMatchObject({ handshakeFailures: 1, sent: 0 });
 			expect(left.peerConnections).toHaveLength(2);
+			// The first absolute setup has settled. Its existing retry owner may start a later setup after this checkpoint.
 		} finally {
 			recoveryBarrier?.release();
 			vi.useRealTimers();
@@ -1619,12 +1656,13 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 			const replacement = bus.connect("peer-a", "peer-b");
 			recoveryBarrier = bus.pauseResponses();
 			expect(await leftRoute.send(["peer-b"], Uint8Array.of(31))).toBe(false);
-			await tick();
 			expect(left.peerConnections).toHaveLength(2);
 			await recoveryBarrier.waitUntilPending();
+			expect(right.peerConnections).toHaveLength(2);
 			expect(leftRoute.snapshot()).toMatchObject({
 				activeLinks: 0,
 				authenticatedConnectionLosses: 1,
+				handshakeFailures: 0,
 				lastLinkDrop: "replacement",
 				linkDrops: 1,
 				sent: 0,
