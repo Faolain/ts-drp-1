@@ -67847,3 +67847,117 @@ The exact same-round correction is signed/pushed commit
 `2b20ffe69e4970875ef641149d3911615cc39b33e0e6c8dd387774a38665de3f`.
 It has a good signature, changes only this plan and is contained by the remote
 branch. Instrumentation may now begin against this corrected freeze.
+
+The signed/pushed D.108e4m instrumentation checkpoint is
+`ee8a64a9921aace00509d9e4d76e062ef74eb0d1`, parent
+`ab40021728df730105d1844542e3a189c936b696`, tree
+`08f93ee72726078f906b63f155cad264b96b5752`, stable patch id
+`3849f96013dd11b2c1e8401112a39031577b99da` and raw-diff SHA-256
+`bc56cedc41390abfca4df0fa591b28d1137556b171c8458988931ea0b8a69900`.
+It has a good signature, changes exactly the two frozen test owners and is
+contained by the remote branch. The affected five-package build, `node
+--check`, exact-owner ESLint and Prettier, `git diff --check`, the cheap
+ordinary-mode inventory test and the source-shape gate passed. The first local
+source-shape command incorrectly searched the parent for constants imported
+from the contract and returned `d108e2d=0,d108e2e=0`; that was a faulty check,
+not a code failure. The corrected read-only check reads the contract owner and
+returned exactly
+`{"d108e2d":1,"d108e2e":1,"titles":true,"predicate":true,"childGate":true}`.
+Broad Node typecheck reproduced its exact inherited 13-diagnostic roster.
+Broad storage-node typecheck reproduced the inherited code roster
+TS6059=27, TS6307=27, TS2307=20, TS7006=37, TS18046=1 and TS7031=1; no new
+D.108e4m diagnostic exists.
+
+The required read-only implementation review completed before execution.
+Grok 4.6/high ended normally after 750.235 seconds with
+`CHANGES_REQUIRED`, P0=0/P1=1/P2=2. Its P1 correctly found that the parent's
+default argument converted the inventory's explicit `undefined` into the live
+`"1"` environment during the authorized command. Events/public/status/stderr
+SHA-256 values are
+`ce2e53ba7cb1c13e4f9383e8180512e512d35e6ad2c919730ec6cee1f51c10ab`,
+`8f565137421d831b7f5a74debfc3dcc906e829716ba874e1b64149ef78a3220b`,
+`7a15b4b87a22aae9d477322a765bc197d4e30bd79de0750dd29a5b3e0660e456`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+Exact Kimi K3 session `session_ce41d599-28e1-4d98-9eed-4365e5b786f9`
+reached its local loop guard after substantive inspection but before schema;
+the same preserved session read the missing ranges and then emitted exactly
+100 unique ordered `CHECK001` through `CHECK100` markers plus one `RESULT`.
+It returned `APPROVED`, P0=0/P1=0/P2=2. Continuation stream/stderr SHA-256
+values are
+`1ad952950ac9b4ffb631c1ae4999c9869b0b34dbc454597782e527dd29ac692d`
+and `2366224155a02351a68655435cc05d576083cb84f5b8f18f84086fd121c35d12`.
+Opus 5/xhigh session `62c055f3-9e0a-4ac4-aade-2b56a125a753` used only
+Read/Grep/Glob, spawned no subagent, resolved to `claude-opus-5`, completed 34
+turns and returned `APPROVED`, P0=0/P1=0/P2=6. JSON/stderr SHA-256 values are
+`49c67aec3dcda2345f16b393851512afd267b16f32001b940afa60de2752d9c3`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+No Fable ran.
+
+The sole blocking review correction is signed/pushed commit
+`5ee696a06e07b1371bf8b11a8383c3b5d31e8467`, parent
+`ee8a64a9921aace00509d9e4d76e062ef74eb0d1`, tree
+`39af83bb8346febd128fc3406d5eb4e8d7d725c7`, stable patch id
+`32ab601106c4be43e043fe53246bc79bc2a7fbcb` and raw-diff SHA-256
+`43e0d7fde96165ea7e4c36933c7e7075ded0a01c4402683213ce404d5899da19`.
+It removes the default, passes the environment explicitly at operational call
+sites, has a good signature and is contained by the remote branch. Exact-owner
+lint/format/diff passed, as did the inventory test both without the variable
+and with exact `TS_DRP_D108E4M_PROFILE=1`, plus the corrected source-shape
+gate. The nonblocking review union—normalization/message hardening, guaranteed
+disconnect after a semantic rejection, the coverage-ratio upper guard,
+source-shape regression exposure, root-anchor self-check and top-frame mixed
+owner documentation—is assigned to the two D.108e4m test owners with deadline
+2026-09-04. None changes this run's ownership result or demonstrates a product
+defect, so it does not justify more instrumentation before the frozen run.
+
+The one authorized D.108e4m profile ran exactly once at `5ee696a0` with the
+frozen command. No task-owned reviewer or test process overlapped it. The
+ambient snapshot at `2026-08-28T17:47:36Z` disclosed load averages
+`16.27,11.64,11.46`, Spotlight processes at 45.4% and 18.7% CPU, WindowServer
+at 33.5%, and an unrelated Fable process in another repository at 6.6%; its
+SHA-256 is
+`a0d282de4cc4069558a0ee16491f1e1aec03cd03fe209495b1ddc260d4383dc6`.
+The invocation exited 0: all five tests passed, the profile and timing lines
+were each emitted exactly once with no validation/member-count errors, and the
+unchanged child gate passed at `wallTimeMs=58_606.473791`, 1,393.526209 ms
+inside `<60_000`. Vitest completed in 63.60 seconds and `/usr/bin/time`
+reported real/user/sys 64.36/66.18/3.53 seconds. Ambient/stdout/stderr/status/
+profile-line/timing-line SHA-256 values are
+`a0d282de4cc4069558a0ee16491f1e1aec03cd03fe209495b1ddc260d4383dc6`,
+`3d99ef8894294fe63f0b5e5d116999f6d1916a931fe557b3bcdf17eaabfde37d`,
+`c2be97955d2ee335af644c75dc5e76e454b7a2a61092bc96d7fe6017bf419a70`,
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`,
+`9eec56580de5653f462b1bc79777ffaea5026a63a61504f8b805e46ff1c3976c`
+and `417b6bd6b32b04932a431ed62075e46f141fc2a975a48f88da0fbfb3b5a1086c`.
+No second profile run is authorized or needed.
+
+The profile establishes executing ownership, not a product defect. The
+46,227.993583-ms concurrent phase was CPU-saturated at CPU/wall
+`0.999339716`, and the 46,218.625-ms profile covered 99.9797% of it. Exact
+dominance is `third-party`: 42,129,831 of 46,217,750 non-idle microseconds, or
+91.15%, versus runner-up `workspace-dependency` at 3.85%. The leading frames
+are `@noble/curves` Ed25519 modular arithmetic (`mod`, `pow2`, `double` and
+`add`). Nearest `node-product` is 2.43%, `storage-node-product` 0.32%,
+`test-fixture` 0.56%, unresolved GC 1.66%, and idle is zero. The five façade
+synchronous totals sum to less than 175 ms despite 65,587 calls. This rules
+out the test façade, Node recovery body and storage-node issuance body as the
+dominant executing owners. It does not prove unnecessary verification,
+incorrect cryptography or any other product bug: the frozen worst-case fixture
+requires genuine authenticated verification, and no call-count or semantic
+excess has been demonstrated.
+
+The timing evidence instead shows a brittle boundary: two semantically clean
+executions at nearby signed trees straddle the same ceiling, first
+61,308.196917 ms and then 58,606.473791 ms, a 2,701.723126-ms swing. D.108e4m
+and the D.108e4l ownership question therefore close. D.108e4q opens narrowly
+as test-gate reliability work, not a product optimization: review whether the
+single-sample `<60_000` assertion should become a modestly larger bound (the
+first candidate is `<65_000`, still 25 seconds below the unchanged 90-second
+launcher kill) while every semantic assertion, operation count, row bound and
+launcher kill remain fixed. D.108e4q may use the two retained timing records
+and this profile; it has no inherited authority for another profile, repeated
+timing campaign, dependency upgrade, cryptographic shortcut or product-source
+change. The D.108e4m implementation review, static/build/typecheck evidence,
+single-run custody and attribution work are complete and must not be extended.
+D.108e4k and aggregate D.108e4 remain pending only on the separately reviewed
+timing-gate decision and the already-recorded final-tree combined proof.
