@@ -19,6 +19,202 @@ import {
 
 const childPath = new URL("./fixtures/phase-6a-creator-successor-local-author-child.mjs", import.meta.url);
 const directories: string[] = [];
+const D108E4L_PHASE_NAMES = Object.freeze([
+	"preflight-and-store-open",
+	"current-row",
+	"genuine-future",
+	"authenticated-future-appends",
+	"maximum-page-probe",
+	"equality-materialization-and-facades",
+	"over-budget-preparation",
+	"mismatch-preparation",
+	"concurrent-recoveries",
+	"proof-assembly",
+]);
+const D108E4L_PHASE_COUNTS = Object.freeze([
+	{ storeOpenCount: 2 },
+	{ appendCount: 1 },
+	{ genuineFutureCount: 1 },
+	{ appendCount: 8_191 },
+	{ maximumPageLimit: 128, probeCount: 1 },
+	{ facadeCount: 2, materializedRowCount: 8_193 },
+	{ appendCount: 2, authenticatedSuffixCount: 2, materializedRowCount: 8_195 },
+	{ appendCount: 2, materializedRowCount: 2 },
+	{ recoveryCount: 5 },
+	{ proofCount: 1 },
+]);
+const D108E4L_MEMBER_NAMES = Object.freeze(["equality", "reuse-0", "reuse-1", "over-budget", "mismatch"]);
+const D108E4L_MEMBER_COUNTS = Object.freeze([
+	{ pageCount: 8_194, returnedSequenceCount: 8_193 },
+	{ capturedIssuedCount: 8_190, successorPageFaultCount: 1 },
+	{ capturedIssuedCount: 8_190, successorPageFaultCount: 1 },
+	{ pageCount: 8_195, returnedSequenceCount: 8_195 },
+	{ pageCount: 2, returnedSequenceCount: 2 },
+]);
+const D108E4L_STEP_NAMES = Object.freeze(["context-seed", "reopen-and-evidence", "close-context"]);
+
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+	return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function isNonnegativeNumber(value: unknown): value is number {
+	return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function sameJson(left: unknown, right: unknown): boolean {
+	return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function validateSpan(
+	errors: string[],
+	value: unknown,
+	expectedName: string,
+	minimumOffset: number,
+	maximumOffset: number
+): Readonly<Record<string, unknown>> | undefined {
+	if (!isRecord(value)) {
+		errors.push(`${expectedName}:record`);
+		return undefined;
+	}
+	if (value.name !== expectedName) errors.push(`${expectedName}:name`);
+	if (!isNonnegativeNumber(value.startOffsetMs)) errors.push(`${expectedName}:start`);
+	if (!isNonnegativeNumber(value.endOffsetMs)) errors.push(`${expectedName}:end`);
+	if (!isNonnegativeNumber(value.durationMs)) errors.push(`${expectedName}:duration`);
+	if (
+		isNonnegativeNumber(value.startOffsetMs) &&
+		isNonnegativeNumber(value.endOffsetMs) &&
+		isNonnegativeNumber(value.durationMs)
+	) {
+		if (value.startOffsetMs < minimumOffset || value.endOffsetMs > maximumOffset) {
+			errors.push(`${expectedName}:bounds`);
+		}
+		if (value.endOffsetMs < value.startOffsetMs) errors.push(`${expectedName}:order`);
+		if (value.durationMs !== value.endOffsetMs - value.startOffsetMs) errors.push(`${expectedName}:arithmetic`);
+	}
+	return value;
+}
+
+function d108e4lValidationErrors(result: unknown): string[] {
+	const errors: string[] = [];
+	const message = isRecord(result) ? result : undefined;
+	const proof = isRecord(message?.proof) ? message.proof : undefined;
+	const timing = isRecord(proof?.timing) ? proof.timing : undefined;
+	if (timing === undefined) return ["timing:record"];
+	if (timing.schema !== "d108e4l-v1") errors.push("timing:schema");
+	if (timing.outcome !== "proof") errors.push("timing:outcome");
+	if (timing.nodeVersion !== process.version) errors.push("timing:nodeVersion");
+	if (timing.platform !== process.platform) errors.push("timing:platform");
+	if (timing.arch !== process.arch) errors.push("timing:arch");
+	if (
+		typeof timing.availableParallelism !== "number" ||
+		!Number.isInteger(timing.availableParallelism) ||
+		timing.availableParallelism <= 0
+	) {
+		errors.push("timing:availableParallelism");
+	}
+	if (
+		typeof timing.pid !== "number" ||
+		!Number.isInteger(timing.pid) ||
+		timing.pid === process.pid ||
+		timing.pid !== proof?.pid
+	)
+		errors.push("timing:pid");
+	if (!isNonnegativeNumber(timing.wallTimeMs) || timing.wallTimeMs !== proof?.wallTimeMs) {
+		errors.push("timing:wallTimeMs");
+	}
+
+	const wallTimeMs = isNonnegativeNumber(timing.wallTimeMs) ? timing.wallTimeMs : 0;
+	const phases = Array.isArray(timing.phases) ? timing.phases : [];
+	if (
+		!sameJson(
+			phases.map((phase) => (isRecord(phase) ? phase.name : undefined)),
+			D108E4L_PHASE_NAMES
+		)
+	) {
+		errors.push("phases:roster");
+	}
+	let expectedStart = 0;
+	for (const [index, expectedName] of D108E4L_PHASE_NAMES.entries()) {
+		const phase = validateSpan(errors, phases[index], expectedName, 0, wallTimeMs);
+		if (phase === undefined) continue;
+		if (phase.startOffsetMs !== expectedStart) errors.push(`${expectedName}:contiguous`);
+		if (isNonnegativeNumber(phase.endOffsetMs)) expectedStart = phase.endOffsetMs;
+		if (!sameJson(phase.counts, D108E4L_PHASE_COUNTS[index])) errors.push(`${expectedName}:counts`);
+		if (!isNonnegativeNumber(phase.maxRssKiB)) errors.push(`${expectedName}:maxRssKiB`);
+		const resourceDelta = isRecord(phase.resourceDelta) ? phase.resourceDelta : undefined;
+		for (const field of ["userCPUTime", "systemCPUTime", "fsRead", "fsWrite", "involuntaryContextSwitches"]) {
+			if (!isNonnegativeNumber(resourceDelta?.[field])) errors.push(`${expectedName}:resourceDelta:${field}`);
+		}
+	}
+	if (expectedStart !== wallTimeMs) errors.push("phases:final-boundary");
+
+	const concurrent = isRecord(phases[8]) ? phases[8] : undefined;
+	const concurrentStart = isNonnegativeNumber(concurrent?.startOffsetMs) ? concurrent.startOffsetMs : 0;
+	const concurrentEnd = isNonnegativeNumber(concurrent?.endOffsetMs) ? concurrent.endOffsetMs : wallTimeMs;
+	const members = Array.isArray(timing.members) ? timing.members : [];
+	if (
+		!sameJson(
+			members.map((member) => (isRecord(member) ? member.name : undefined)),
+			D108E4L_MEMBER_NAMES
+		)
+	) {
+		errors.push("members:roster");
+	}
+	for (const [index, expectedName] of D108E4L_MEMBER_NAMES.entries()) {
+		const member = validateSpan(errors, members[index], expectedName, concurrentStart, concurrentEnd);
+		if (member === undefined) continue;
+		if (!sameJson(member.counts, D108E4L_MEMBER_COUNTS[index])) errors.push(`${expectedName}:counts`);
+		const steps = Array.isArray(member.steps) ? member.steps : [];
+		if (
+			!sameJson(
+				steps.map((step) => (isRecord(step) ? step.name : undefined)),
+				D108E4L_STEP_NAMES
+			)
+		) {
+			errors.push(`${expectedName}:steps`);
+		}
+		let stepStart = isNonnegativeNumber(member.startOffsetMs) ? member.startOffsetMs : concurrentStart;
+		for (const [stepIndex, stepName] of D108E4L_STEP_NAMES.entries()) {
+			const step = validateSpan(errors, steps[stepIndex], stepName, concurrentStart, concurrentEnd);
+			if (step === undefined) continue;
+			if (step.startOffsetMs !== stepStart) errors.push(`${expectedName}:${stepName}:contiguous`);
+			if (isNonnegativeNumber(step.endOffsetMs)) stepStart = step.endOffsetMs;
+		}
+		if (stepStart !== member.endOffsetMs) errors.push(`${expectedName}:steps-final-boundary`);
+	}
+	const reuseZero = isRecord(members[1]) ? members[1] : undefined;
+	const reuseOne = isRecord(members[2]) ? members[2] : undefined;
+	if (
+		!isNonnegativeNumber(reuseZero?.endOffsetMs) ||
+		!isNonnegativeNumber(reuseOne?.startOffsetMs) ||
+		reuseZero.endOffsetMs > reuseOne.startOffsetMs
+	) {
+		errors.push("members:reuse-order");
+	}
+	return errors;
+}
+
+function emitD108e4lProof(result: unknown): void {
+	const message = isRecord(result) ? result : undefined;
+	const proof = isRecord(message?.proof) ? message.proof : undefined;
+	const timing = isRecord(proof?.timing)
+		? proof.timing
+		: Object.freeze({ outcome: "invalid-proof", schema: "d108e4l-v1" });
+	console.log(`D108E4L_TIMING ${JSON.stringify(timing)}`);
+	expect(d108e4lValidationErrors(result)).toEqual([]);
+}
+
+function emitD108e4lUnavailable(error: unknown): void {
+	const message = error instanceof Error ? error.message : String(error);
+	const classification = message.includes("child timeout")
+		? "timeout"
+		: message.includes("child failed")
+			? "child-failed"
+			: "launcher-or-child-error";
+	console.log(
+		`D108E4L_TIMING ${JSON.stringify({ classification, message, outcome: "unavailable", schema: "d108e4l-v1" })}`
+	);
+}
 
 beforeAll(() => {
 	Object.defineProperty(navigator, "storage", {
@@ -56,7 +252,17 @@ function runSkipBudgetChild(): ReturnType<typeof runD108e2eSkipBudgetChild> {
 	if (skipBudgetChildResult !== undefined) return skipBudgetChildResult;
 	const directory = mkdtempSync(join(tmpdir(), "ts-drp-d108e2e-skip-budget-"));
 	directories.push(directory);
-	skipBudgetChildResult = durableMaterial(directory).then((material) => runD108e2eSkipBudgetChild(material));
+	const launched = durableMaterial(directory).then((material) => runD108e2eSkipBudgetChild(material));
+	skipBudgetChildResult = launched.then(
+		(result) => {
+			emitD108e4lProof(result);
+			return result;
+		},
+		(error: unknown) => {
+			emitD108e4lUnavailable(error);
+			throw error;
+		}
+	);
 	return skipBudgetChildResult;
 }
 

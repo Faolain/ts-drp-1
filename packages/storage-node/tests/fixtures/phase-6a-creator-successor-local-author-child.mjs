@@ -7,6 +7,7 @@ import { openCanonicalLatchedAclSnapshot } from "@ts-drp/protocol-v3/latched-acl
 /* eslint-enable import/no-unresolved */
 import { createNodeDurableIssuanceStore } from "@ts-drp/storage-node/issuance";
 import { createHash, createPrivateKey, createPublicKey, sign, verify } from "node:crypto";
+import { availableParallelism } from "node:os";
 import { join } from "node:path";
 
 import { network, seedAhe, seedJournal, seedSnapshot, unpack } from "./phase-6a-creator-successor-activation-child.mjs";
@@ -990,9 +991,13 @@ async function closeBudgetContext(context) {
 	await Promise.allSettled([context.snapshot.raw.close(), context.liveJournal.raw.close(), context.ahe.raw.close()]);
 }
 
-async function reopenBudgetCase(material, suffix, issuanceStore, selectedAuthority, separatorDigest) {
+async function reopenBudgetCase(material, suffix, issuanceStore, selectedAuthority, separatorDigest, diagnosticTiming) {
+	const memberStartedAt = diagnosticTiming?.offset();
 	const context = await openBudgetContext(material, suffix);
+	const contextReadyAt = diagnosticTiming?.offset();
 	let activeHandle;
+	let completed;
+	let evidenceReadyAt;
 	try {
 		const result = await reopenCreatorSuccessorAdoption({
 			...material.creatorGenesis,
@@ -1018,7 +1023,7 @@ async function reopenBudgetCase(material, suffix, issuanceStore, selectedAuthori
 			});
 			separatorJournalAppended = rows.some((row) => row.vertexDigest === separatorDigest);
 		}
-		return Object.freeze({
+		completed = Object.freeze({
 			effects: Object.freeze({
 				adoptionSwapCount: context.ahe.adoptionSwapCount(),
 				aheRecoverCount: context.effects.aheRecoverCount,
@@ -1032,10 +1037,50 @@ async function reopenBudgetCase(material, suffix, issuanceStore, selectedAuthori
 				: Object.freeze({ detail: result.detail, kind: result.kind, ok: false }),
 			separatorJournalAppended,
 		});
+		evidenceReadyAt = diagnosticTiming?.offset();
 	} finally {
+		const closeStartedAt = evidenceReadyAt ?? diagnosticTiming?.offset();
 		await Promise.resolve(activeHandle?.deactivate());
 		await closeBudgetContext(context);
+		const memberEndedAt = diagnosticTiming?.offset();
+		if (
+			diagnosticTiming !== undefined &&
+			memberStartedAt !== undefined &&
+			contextReadyAt !== undefined &&
+			closeStartedAt !== undefined &&
+			memberEndedAt !== undefined
+		) {
+			diagnosticTiming.record(
+				Object.freeze({
+					durationMs: memberEndedAt - memberStartedAt,
+					endOffsetMs: memberEndedAt,
+					name: diagnosticTiming.name,
+					startOffsetMs: memberStartedAt,
+					steps: Object.freeze([
+						Object.freeze({
+							durationMs: contextReadyAt - memberStartedAt,
+							endOffsetMs: contextReadyAt,
+							name: "context-seed",
+							startOffsetMs: memberStartedAt,
+						}),
+						Object.freeze({
+							durationMs: closeStartedAt - contextReadyAt,
+							endOffsetMs: closeStartedAt,
+							name: "reopen-and-evidence",
+							startOffsetMs: contextReadyAt,
+						}),
+						Object.freeze({
+							durationMs: memberEndedAt - closeStartedAt,
+							endOffsetMs: memberEndedAt,
+							name: "close-context",
+							startOffsetMs: closeStartedAt,
+						}),
+					]),
+				})
+			);
+		}
 	}
+	return completed;
 }
 
 async function issueGenuineFuture(material, raw, selectedAuthority) {
@@ -1075,8 +1120,50 @@ async function issueGenuineFuture(material, raw, selectedAuthority) {
 	}
 }
 
+function timingResourceSnapshot() {
+	const usage = process.resourceUsage();
+	return Object.freeze({
+		fsRead: usage.fsRead,
+		fsWrite: usage.fsWrite,
+		involuntaryContextSwitches: usage.involuntaryContextSwitches,
+		maxRssKiB: usage.maxRSS,
+		systemCPUTime: usage.systemCPUTime,
+		userCPUTime: usage.userCPUTime,
+	});
+}
+
+function timingBoundary(startedAt, offsetMs = performance.now() - startedAt) {
+	return Object.freeze({ offsetMs, resource: timingResourceSnapshot() });
+}
+
+function timingPhase(name, start, end, counts) {
+	return Object.freeze({
+		counts: Object.freeze(counts),
+		durationMs: end.offsetMs - start.offsetMs,
+		endOffsetMs: end.offsetMs,
+		maxRssKiB: end.resource.maxRssKiB,
+		name,
+		resourceDelta: Object.freeze({
+			fsRead: end.resource.fsRead - start.resource.fsRead,
+			fsWrite: end.resource.fsWrite - start.resource.fsWrite,
+			involuntaryContextSwitches: end.resource.involuntaryContextSwitches - start.resource.involuntaryContextSwitches,
+			systemCPUTime: end.resource.systemCPUTime - start.resource.systemCPUTime,
+			userCPUTime: end.resource.userCPUTime - start.resource.userCPUTime,
+		}),
+		startOffsetMs: start.offsetMs,
+	});
+}
+
 async function skipBudgetProof(material) {
 	const startedAt = performance.now();
+	const phases = [];
+	let phaseStart = timingBoundary(startedAt, 0);
+	const closePhase = (name, counts) => {
+		const phaseEnd = timingBoundary(startedAt);
+		phases.push(timingPhase(name, phaseStart, phaseEnd, counts));
+		phaseStart = phaseEnd;
+		return phaseEnd;
+	};
 	if (material.establishedPeer === undefined) throw new TypeError("D.108e2e established Bob carrier is unavailable");
 	const parameters = decodeCanonical(material.creatorGenesis.exactCanonicalParametersCarrierBytes);
 	if (
@@ -1097,15 +1184,20 @@ async function skipBudgetProof(material) {
 	const mismatchRaw = createNodeDurableIssuanceStore({
 		primaryFilename: join(material.directory, "issuance-local-author-d108e2e-mismatch.sqlite"),
 	});
+	closePhase("preflight-and-store-open", { storeOpenCount: 2 });
 	try {
 		const currentZero = carrierCommit(material.establishedPeer, objectId);
 		await appendCommit(raw, scope, currentZero);
+		closePhase("current-row", { appendCount: 1 });
 		const genuineFuture = await issueGenuineFuture(material, raw, bob);
+		closePhase("genuine-future", { genuineFutureCount: 1 });
 		for (let authorSequence = 2; authorSequence <= 8_192; authorSequence += 1) {
 			await appendCommit(raw, scope, signedCloneCommit(genuineFuture, authorSequence, bob, objectId, 1_000));
 		}
+		closePhase("authenticated-future-appends", { appendCount: 8_191 });
 
 		const maximumPageLimit = await observedMaximumPageLimit(raw, scope);
+		closePhase("maximum-page-probe", { maximumPageLimit, probeCount: 1 });
 		const equalityRows = await materializeVerifiedClosure(raw, scope, 8_193, bob);
 		const equalityBounded = boundedRecoveryStore(raw, equalityRows, scope);
 		const boundedStoreShape = sameStoreShape(equalityBounded.store, raw);
@@ -1113,6 +1205,10 @@ async function skipBudgetProof(material) {
 		const reuseBounded = boundedRecoveryStore(raw, reuseRows, scope);
 		const reuseFacade = reuseBounded.store;
 		const passedFacades = [];
+		closePhase("equality-materialization-and-facades", {
+			facadeCount: 2,
+			materializedRowCount: equalityRows.length,
+		});
 
 		const separator = signedCloneCommit(currentZero, 8_193, bob, objectId, 20_000);
 		const finalFuture = signedCloneCommit(genuineFuture, 8_194, bob, objectId, 1_000);
@@ -1139,19 +1235,47 @@ async function skipBudgetProof(material) {
 		}
 		const overBudgetRows = Object.freeze([...equalityRows, ...authenticatedOverBudgetSuffix]);
 		const overBudgetBounded = boundedRecoveryStore(raw, overBudgetRows, scope);
+		closePhase("over-budget-preparation", {
+			appendCount: 2,
+			authenticatedSuffixCount: authenticatedOverBudgetSuffix.length,
+			materializedRowCount: overBudgetRows.length,
+		});
 
 		await appendCommit(mismatchRaw, scope, currentZero);
 		await appendCommit(mismatchRaw, scope, genuineFuture);
 		const mismatchRows = await materializeVerifiedClosure(mismatchRaw, scope, 2, bob);
 		const mismatchCommit = signedCloneCommit(genuineFuture, 1, bob, objectId, 1_000_000);
 		const mismatchBounded = boundedRecoveryStore(mismatchRaw, mismatchRows, scope, mismatchCommit);
-		const equalityPromise = reopenBudgetCase(material, "-d108e2e-equality", equalityBounded.store, bob);
+		closePhase("mismatch-preparation", { appendCount: 2, materializedRowCount: mismatchRows.length });
+
+		const recoveryTimings = new Map();
+		const recoveryTiming = (name) =>
+			Object.freeze({
+				name,
+				offset: () => performance.now() - startedAt,
+				record: (record) => recoveryTimings.set(name, record),
+			});
+		const equalityPromise = reopenBudgetCase(
+			material,
+			"-d108e2e-equality",
+			equalityBounded.store,
+			bob,
+			undefined,
+			recoveryTiming("equality")
+		);
 		const reusePromise = (async () => {
 			const windows = [];
 			for (let invocation = 0; invocation < 2; invocation += 1) {
 				reuseBounded.beginInvocation();
 				passedFacades.push(reuseFacade);
-				const reopened = await reopenBudgetCase(material, `-d108e4-reuse-${invocation}`, reuseFacade, bob);
+				const reopened = await reopenBudgetCase(
+					material,
+					`-d108e4-reuse-${invocation}`,
+					reuseFacade,
+					bob,
+					undefined,
+					recoveryTiming(`reuse-${invocation}`)
+				);
 				const window = reuseBounded.telemetry();
 				windows.push(
 					Object.freeze({
@@ -1170,24 +1294,62 @@ async function skipBudgetProof(material) {
 			"-d108e2e-over-budget",
 			overBudgetBounded.store,
 			bob,
-			Buffer.from(separator.envelope.digest).toString("hex")
+			Buffer.from(separator.envelope.digest).toString("hex"),
+			recoveryTiming("over-budget")
 		);
-		const mismatchPromise = reopenBudgetCase(material, "-d108e2e-mismatch", mismatchBounded.store, bob);
+		const mismatchPromise = reopenBudgetCase(
+			material,
+			"-d108e2e-mismatch",
+			mismatchBounded.store,
+			bob,
+			undefined,
+			recoveryTiming("mismatch")
+		);
 		const [equality, reuseWindows, overBudget, mismatch] = await Promise.all([
 			equalityPromise,
 			reusePromise,
 			overBudgetPromise,
 			mismatchPromise,
 		]);
+		closePhase("concurrent-recoveries", { recoveryCount: 5 });
 
-		return Object.freeze({
-			equality: Object.freeze({ ...equality, telemetry: equalityBounded.telemetry() }),
+		const equalityTelemetry = equalityBounded.telemetry();
+		const mismatchTelemetry = mismatchBounded.telemetry();
+		const overBudgetTelemetry = overBudgetBounded.telemetry();
+		const memberCounts = Object.freeze({
+			"equality": Object.freeze({
+				pageCount: equalityTelemetry.pageCount,
+				returnedSequenceCount: equalityTelemetry.returnedSequenceCount,
+			}),
+			"mismatch": Object.freeze({
+				pageCount: mismatchTelemetry.pageCount,
+				returnedSequenceCount: mismatchTelemetry.returnedSequenceCount,
+			}),
+			"over-budget": Object.freeze({
+				pageCount: overBudgetTelemetry.pageCount,
+				returnedSequenceCount: overBudgetTelemetry.returnedSequenceCount,
+			}),
+			"reuse-0": Object.freeze({
+				capturedIssuedCount: reuseWindows[0]?.capturedIssuedCount,
+				successorPageFaultCount: reuseWindows[0]?.successorPageFaultCount,
+			}),
+			"reuse-1": Object.freeze({
+				capturedIssuedCount: reuseWindows[1]?.capturedIssuedCount,
+				successorPageFaultCount: reuseWindows[1]?.successorPageFaultCount,
+			}),
+		});
+		const memberNames = ["equality", "reuse-0", "reuse-1", "over-budget", "mismatch"];
+		const members = Object.freeze(
+			memberNames.map((name) => Object.freeze({ ...recoveryTimings.get(name), counts: memberCounts[name] }))
+		);
+		const proofValues = Object.freeze({
+			equality: Object.freeze({ ...equality, telemetry: equalityTelemetry }),
 			maxCanonicalPreimageBytes: Math.max(
 				...overBudgetRows.map((row) => row.commit.envelope.canonicalPreimageBytes.byteLength)
 			),
 			maxEpochVertices: parameters.maxEpochVertices,
-			mismatch: Object.freeze({ ...mismatch, telemetry: mismatchBounded.telemetry() }),
-			overBudget: Object.freeze({ ...overBudget, telemetry: overBudgetBounded.telemetry() }),
+			mismatch: Object.freeze({ ...mismatch, telemetry: mismatchTelemetry }),
+			overBudget: Object.freeze({ ...overBudget, telemetry: overBudgetTelemetry }),
 			pid: process.pid,
 			realStore: Object.freeze({
 				boundedStoreShape,
@@ -1201,7 +1363,24 @@ async function skipBudgetProof(material) {
 				materializedRows: reuseRows.length,
 				windows: Object.freeze(reuseWindows),
 			}),
-			wallTimeMs: performance.now() - startedAt,
+		});
+		const finishedAt = closePhase("proof-assembly", { proofCount: 1 });
+		const wallTimeMs = finishedAt.offsetMs;
+		return Object.freeze({
+			...proofValues,
+			timing: Object.freeze({
+				arch: process.arch,
+				availableParallelism: availableParallelism(),
+				members,
+				nodeVersion: process.version,
+				outcome: "proof",
+				phases: Object.freeze(phases),
+				pid: process.pid,
+				platform: process.platform,
+				schema: "d108e4l-v1",
+				wallTimeMs,
+			}),
+			wallTimeMs,
 		});
 	} finally {
 		await Promise.allSettled([raw.close(), mismatchRaw.close()]);
