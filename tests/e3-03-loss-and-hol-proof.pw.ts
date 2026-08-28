@@ -126,7 +126,7 @@ interface Libp2pMonitorObservation {
 	readonly owner: string;
 	readonly peerId: string;
 	readonly reason?: string;
-	readonly schemaVersion: 1;
+	readonly schemaVersion: 2;
 	readonly sequence: number;
 }
 
@@ -215,7 +215,7 @@ interface RtcLifecycleObservation {
 	readonly owner: string;
 	readonly attemptId?: number;
 	readonly readyState?: RTCDataChannelState;
-	readonly schemaVersion: 1;
+	readonly schemaVersion: 2;
 	readonly sequence: number;
 	readonly state?: string;
 }
@@ -226,7 +226,7 @@ interface RtcChannelStateObservation {
 	readonly connectionId: number;
 	readonly label: string;
 	readonly readyState: RTCDataChannelState;
-	readonly schemaVersion: 1;
+	readonly schemaVersion: 2;
 }
 
 interface RtcObserver {
@@ -440,7 +440,7 @@ function installRtcObserver(): void {
 			Object.freeze({
 				attemptId: input.attemptId,
 				atMonotonicMs,
-				atWallMs: performance.timeOrigin + atMonotonicMs,
+				atWallMs: Date.now(),
 				bufferedAmount: input.bufferedAmount,
 				callsite: input.callsite,
 				channelId: input.channelId,
@@ -450,7 +450,7 @@ function installRtcObserver(): void {
 				label: input.label,
 				owner: input.owner,
 				readyState: input.readyState,
-				schemaVersion: 1 as const,
+				schemaVersion: 2 as const,
 				sequence: lifecycleSequence,
 				state: input.state,
 			})
@@ -574,9 +574,9 @@ function installRtcObserver(): void {
 	Object.defineProperty(NativePeerConnection.prototype, "createDataChannel", {
 		configurable: true,
 		value(this: RTCPeerConnection, label: string, options?: RTCDataChannelInit): RTCDataChannel {
+			const channel = nativeCreateDataChannel.call(this, label, options);
 			const connectionId = connectionIdentities.get(this);
-			if (connectionId === undefined) throw new Error("E303_RTC_CONNECTION_IDENTITY_ABSENT");
-			return watch(nativeCreateDataChannel.call(this, label, options), connectionId);
+			return connectionId === undefined ? channel : watch(channel, connectionId);
 		},
 		writable: true,
 	});
@@ -585,7 +585,10 @@ function installRtcObserver(): void {
 		configurable: true,
 		value(this: RTCDataChannel, data: RtcData): void {
 			const identity = channelIdentities.get(this);
-			if (identity === undefined) throw new Error("E303_RTC_CHANNEL_IDENTITY_ABSENT");
+			if (identity === undefined) {
+				Reflect.apply(nativeSend, this, [data]);
+				return;
+			}
 			const attemptId = nextAttemptId;
 			nextAttemptId += 1;
 			recordLifecycle("channel-send-attempt", identity.connectionId, {
@@ -667,11 +670,12 @@ function installRtcObserver(): void {
 			): Promise<RTCSessionDescriptionInit> {
 				const description = await Reflect.apply(nativeMethod, this, [options]);
 				const connectionId = connectionIdentities.get(this);
-				if (connectionId === undefined) throw new Error("E303_RTC_CONNECTION_IDENTITY_ABSENT");
-				recordLifecycle(event, connectionId, {
-					owner: "rtc-peerconnection-signaling",
-					state: description.type,
-				});
+				if (connectionId !== undefined) {
+					recordLifecycle(event, connectionId, {
+						owner: "rtc-peerconnection-signaling",
+						state: description.type,
+					});
+				}
 				return description;
 			},
 			writable: true,
@@ -684,11 +688,12 @@ function installRtcObserver(): void {
 		async value(this: RTCPeerConnection, description?: RTCLocalSessionDescriptionInit): Promise<void> {
 			await Reflect.apply(nativeSetLocalDescription, this, [description]);
 			const connectionId = connectionIdentities.get(this);
-			if (connectionId === undefined) throw new Error("E303_RTC_CONNECTION_IDENTITY_ABSENT");
-			recordLifecycle("local-description", connectionId, {
-				owner: "rtc-peerconnection-signaling",
-				state: this.localDescription?.type ?? description?.type,
-			});
+			if (connectionId !== undefined) {
+				recordLifecycle("local-description", connectionId, {
+					owner: "rtc-peerconnection-signaling",
+					state: this.localDescription?.type ?? description?.type,
+				});
+			}
 		},
 		writable: true,
 	});
@@ -697,11 +702,12 @@ function installRtcObserver(): void {
 		async value(this: RTCPeerConnection, description: RTCSessionDescriptionInit): Promise<void> {
 			await Reflect.apply(nativeSetRemoteDescription, this, [description]);
 			const connectionId = connectionIdentities.get(this);
-			if (connectionId === undefined) throw new Error("E303_RTC_CONNECTION_IDENTITY_ABSENT");
-			recordLifecycle("remote-description", connectionId, {
-				owner: "rtc-peerconnection-signaling",
-				state: description.type,
-			});
+			if (connectionId !== undefined) {
+				recordLifecycle("remote-description", connectionId, {
+					owner: "rtc-peerconnection-signaling",
+					state: description.type,
+				});
+			}
 		},
 		writable: true,
 	});
@@ -710,11 +716,12 @@ function installRtcObserver(): void {
 		async value(this: RTCPeerConnection, candidate?: RTCIceCandidateInit | RTCIceCandidate | null): Promise<void> {
 			await Reflect.apply(nativeAddIceCandidate, this, [candidate]);
 			const connectionId = connectionIdentities.get(this);
-			if (connectionId === undefined) throw new Error("E303_RTC_CONNECTION_IDENTITY_ABSENT");
-			recordLifecycle("ice-candidate-add", connectionId, {
-				owner: "rtc-peerconnection-signaling",
-				state: candidate === null || candidate === undefined ? "complete" : "candidate",
-			});
+			if (connectionId !== undefined) {
+				recordLifecycle("ice-candidate-add", connectionId, {
+					owner: "rtc-peerconnection-signaling",
+					state: candidate === null || candidate === undefined ? "complete" : "candidate",
+				});
+			}
 		},
 		writable: true,
 	});
@@ -777,7 +784,7 @@ function installRtcObserver(): void {
 							connectionId: identity.connectionId,
 							label: channel.label,
 							readyState: channel.readyState,
-							schemaVersion: 1 as const,
+							schemaVersion: 2 as const,
 						});
 					})
 					.sort((left, right) => left.connectionId - right.connectionId || left.channelId - right.channelId);
@@ -1003,7 +1010,7 @@ async function installLibp2pMonitorObserver(page: Page): Promise<void> {
 					owner,
 					peerId: connection.remotePeer.toString(),
 					reason,
-					schemaVersion: 1 as const,
+					schemaVersion: 2 as const,
 					sequence,
 				})
 			);
@@ -2100,18 +2107,48 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 				outbound.send(Uint8Array.of(65));
 				const text = await received;
 				outbound.close();
+				let sendFailureName = "absent";
+				try {
+					outbound.send(Uint8Array.of(66));
+				} catch (error) {
+					sendFailureName = error instanceof Error ? error.name : "non-error";
+				}
+				const closed = new RTCPeerConnection();
+				closed.close();
+				const signalingFailureNames: string[] = [];
+				for (const operation of [
+					(): Promise<RTCSessionDescriptionInit> => closed.createOffer(),
+					(): Promise<RTCSessionDescriptionInit> => closed.createAnswer(),
+					(): Promise<void> => closed.setLocalDescription({ sdp: "v=0\r\n", type: "offer" }),
+					(): Promise<void> => closed.setRemoteDescription({ sdp: "v=0\r\n", type: "answer" }),
+					(): Promise<void> => closed.addIceCandidate(null),
+				]) {
+					try {
+						await operation();
+						signalingFailureNames.push("absent");
+					} catch (error) {
+						signalingFailureNames.push(error instanceof Error ? error.name : "non-error");
+					}
+				}
 				left.close();
 				right.close();
 				await new Promise((resolve) => setTimeout(resolve, 0));
-				return Object.freeze({ lifecycle: await observer.lifecycleSnapshot(), text });
+				return Object.freeze({
+					lifecycle: await observer.lifecycleSnapshot(),
+					sendFailureName,
+					signalingFailureNames,
+					text,
+				});
 			});
 
 			expect(evidence.text).toBe("A");
+			expect(evidence.sendFailureName).toBe("InvalidStateError");
+			expect(evidence.signalingFailureNames).toEqual(Array.from({ length: 5 }, () => "InvalidStateError"));
 			expect(evidence.lifecycle).not.toHaveLength(0);
 			expect(evidence.lifecycle.map(({ sequence }) => sequence)).toEqual(
 				Array.from({ length: evidence.lifecycle.length }, (_value, index) => index)
 			);
-			expect(evidence.lifecycle.every(({ schemaVersion }) => schemaVersion === 1)).toBe(true);
+			expect(evidence.lifecycle.every(({ schemaVersion }) => schemaVersion === 2)).toBe(true);
 			for (let index = 1; index < evidence.lifecycle.length; index += 1) {
 				expect(evidence.lifecycle[index]?.atMonotonicMs).toBeGreaterThanOrEqual(
 					evidence.lifecycle[index - 1]?.atMonotonicMs ?? 0
@@ -2126,6 +2163,7 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 					"channel-message-handler-installed",
 					"channel-open-event",
 					"channel-send-attempt",
+					"channel-send-failure",
 					"channel-send-success",
 					"answer-created",
 					"connection-close-call",
@@ -2145,14 +2183,14 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 			for (const attempt of sendAttempts) {
 				expect(attempt.attemptId).toBeDefined();
 				expect(
-					evidence.lifecycle.some(
+					evidence.lifecycle.filter(
 						({ attemptId, channelId, connectionId, event }) =>
 							attemptId === attempt.attemptId &&
 							channelId === attempt.channelId &&
 							connectionId === attempt.connectionId &&
-							event === "channel-send-success"
+							(event === "channel-send-success" || event === "channel-send-failure")
 					)
-				).toBe(true);
+				).toHaveLength(1);
 			}
 			const handler = evidence.lifecycle.find(({ event }) => event === "channel-handler-installed");
 			if (handler === undefined) throw new Error("D108E4G_RTC_HANDLER_EVENT_ABSENT");
@@ -2237,11 +2275,67 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 				initialNetworks[0] as NetworkSnapshot,
 				initialNetworks[1] as NetworkSnapshot
 			);
-			await sendMovement(initiator, 1, 1);
 			await expect
 				.poll(async () => (await zone(initiator)).rawTransport.linkDrops, { timeout: 20_000 })
 				.toBeGreaterThan(initialInitiatorZone.rawTransport.linkDrops);
 			await waitForOpenTransportPair(creator, receiver);
+			const preSendInitiatorChannels = (await rtcChannelStates(initiator)).filter(
+				({ channelId, connectionId, label, readyState }) =>
+					label === "ts-drp-ephemeral/1" &&
+					readyState === "open" &&
+					(connectionId !== oldRtc.connectionId || channelId !== oldRtc.channelId)
+			);
+			const preSendResponderChannels = (await rtcChannelStates(responder)).filter(
+				({ channelId, connectionId, label, readyState }) =>
+					label === "ts-drp-ephemeral/1" &&
+					readyState === "open" &&
+					(connectionId !== oldResponderRtc.connectionId || channelId !== oldResponderRtc.channelId)
+			);
+			expect(preSendInitiatorChannels, "the replacement send owner must be open at the causal gate").toHaveLength(1);
+			expect(preSendResponderChannels, "the replacement ingress owner must be open at the causal gate").toHaveLength(1);
+			const preSendInitiator = preSendInitiatorChannels[0];
+			const preSendResponder = preSendResponderChannels[0];
+			if (preSendInitiator === undefined || preSendResponder === undefined) {
+				throw new Error("D108E4G_CAUSAL_GATE_REPLACEMENT_ABSENT");
+			}
+			await expect
+				.poll(
+					async () =>
+						(await rtcLifecycleObservations(responder)).some(
+							({ channelId, connectionId, event, owner }) =>
+								event === "channel-message-handler-installed" &&
+								owner === "product-unreliable-webrtc" &&
+								connectionId === preSendResponder.connectionId &&
+								channelId === preSendResponder.channelId
+						),
+					{ timeout: 20_000 }
+				)
+				.toBe(true);
+			const responderBeforeSend = await rtcLifecycleObservations(responder);
+			const responderHandlerAtGate = responderBeforeSend.find(
+				({ channelId, connectionId, event, owner }) =>
+					event === "channel-message-handler-installed" &&
+					owner === "product-unreliable-webrtc" &&
+					connectionId === preSendResponder.connectionId &&
+					channelId === preSendResponder.channelId
+			);
+			const initiatorBeforeSend = await rtcLifecycleObservations(initiator);
+			const replacementAttemptsBeforeGate = initiatorBeforeSend.filter(
+				({ channelId, connectionId, event }) =>
+					event === "channel-send-attempt" &&
+					connectionId === preSendInitiator.connectionId &&
+					channelId === preSendInitiator.channelId
+			);
+			expect(responderHandlerAtGate).toBeDefined();
+			expect(replacementAttemptsBeforeGate).toHaveLength(0);
+			const causalHandlerBeforeSendGate = Object.freeze({
+				initiatorReplacement: preSendInitiator,
+				initiatorReplacementAttemptsBeforeGate: replacementAttemptsBeforeGate.length,
+				owner: "playwright-serial-command-gate",
+				responderHandler: responderHandlerAtGate,
+				responderReplacement: preSendResponder,
+			});
+			await sendMovement(initiator, 1, 1);
 			await waitForRawDelivery(initiator, responder);
 
 			const [
@@ -2321,6 +2415,7 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 					channelId === newResponderRtc.channelId
 			);
 			const evidence = Object.freeze({
+				causalHandlerBeforeSendGate,
 				initiator: Object.freeze({
 					monitor: initiatorMonitor,
 					peerId: initiatorPeerId,
@@ -2360,12 +2455,15 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 			expect(responderProductHandler?.sequence).toBeLessThan(
 				responderFirstMessage?.sequence ?? Number.MIN_SAFE_INTEGER
 			);
-			expect(responderProductHandler?.atWallMs).toBeLessThan(newRawSendAttempt?.atWallMs ?? Number.MIN_SAFE_INTEGER);
+			expect(newRtc.connectionId).toBe(causalHandlerBeforeSendGate.initiatorReplacement.connectionId);
+			expect(newRtc.channelId).toBe(causalHandlerBeforeSendGate.initiatorReplacement.channelId);
+			expect(newResponderRtc.connectionId).toBe(causalHandlerBeforeSendGate.responderReplacement.connectionId);
+			expect(newResponderRtc.channelId).toBe(causalHandlerBeforeSendGate.responderReplacement.channelId);
 			expect(initiatorZone.rawTransport.lastLinkDrop).toBe("replacement");
 			expect(newRaw.connectionId).not.toBe(oldRaw.connectionId);
 			expect(newRaw.generation).toBeGreaterThan(oldRaw.generation);
-			expect(initiatorMonitor.every(({ schemaVersion }) => schemaVersion === 1)).toBe(true);
-			expect(responderMonitor.every(({ schemaVersion }) => schemaVersion === 1)).toBe(true);
+			expect(initiatorMonitor.every(({ schemaVersion }) => schemaVersion === 2)).toBe(true);
+			expect(responderMonitor.every(({ schemaVersion }) => schemaVersion === 2)).toBe(true);
 		} finally {
 			await Promise.all([creatorContext.close(), receiverContext.close()]);
 		}

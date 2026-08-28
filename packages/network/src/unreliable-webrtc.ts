@@ -598,7 +598,9 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 				if (link !== undefined && this.#desiredPeers().includes(peerId)) void this.#linkFor(peerId);
 				return false;
 			}
-			if (connection !== undefined && !this.#isCurrent(link.connection)) void this.#linkFor(peerId);
+			if (connection !== undefined && !this.#isCurrent(link.connection) && this.#desiredPeers().includes(peerId)) {
+				void this.#linkFor(peerId);
+			}
 			targets.push({ link, peerId });
 		}
 		if (targets.some(({ link }) => link.channel.bufferedAmount > BUFFERED_AMOUNT_CEILING)) {
@@ -640,11 +642,11 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		}
 		const pending = this.#pendingLinks.get(peerId);
 		if (pending !== undefined) return staleOpen ? existing : pending;
+		if (staleOpen && this.#retiringInboundLinks.has(peerId)) return existing;
 		this.#pruneReplacementAdmissions();
 		if (
 			this.#signaling.localPeerId >= peerId ||
-			this.#pendingPeerConnections.size >= MAX_LINKS ||
-			(staleOpen && this.#links.size + this.#pendingPeerConnections.size >= MAX_LINKS) ||
+			this.#physicalPeerConnectionCount() >= MAX_LINKS ||
 			(!this.#hasAdmission(peerId) && this.#logicalAdmissionCount() + this.#pendingPeerConnections.size >= MAX_LINKS)
 		) {
 			return staleOpen ? existing : undefined;
@@ -722,10 +724,9 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			throw new Error("unreliable WebRTC signaling request rejected");
 		}
 		this.#pruneReplacementAdmissions();
-		const existing = this.#links.get(connection.remotePeerId);
 		if (
-			this.#pendingPeerConnections.size >= MAX_LINKS ||
-			(existing?.channel.readyState === "open" && this.#links.size + this.#pendingPeerConnections.size >= MAX_LINKS) ||
+			this.#hasPendingPeerConnection(connection.remotePeerId) ||
+			this.#physicalPeerConnectionCount() >= MAX_LINKS ||
 			(!this.#hasAdmission(connection.remotePeerId) &&
 				this.#logicalAdmissionCount() + this.#pendingPeerConnections.size >= MAX_LINKS)
 		) {
@@ -838,11 +839,11 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		this.#clearReplacementAdmission(peerId);
 		this.#clearLinkRetry(peerId);
 		const previous = this.#links.get(peerId);
+		if (previous !== undefined && previous !== link) this.#retiringInboundLinks.set(peerId, previous);
 		this.#links.set(peerId, link);
 		this.#activatedPeers.add(peerId);
 		if (!prepared) this.#prepareLink(peerId, link);
 		if (previous !== undefined && previous !== link) {
-			this.#retiringInboundLinks.set(peerId, previous);
 			this.#dropLink(peerId, previous, "replacement");
 		}
 		return link;
@@ -854,7 +855,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			"close",
 			() => {
 				if (this.#pendingInboundLinks.get(peerId) === link) this.#discardPendingInbound(peerId, link);
-				else if (this.#retiringInboundLinks.get(peerId) === link) this.#retiringInboundLinks.delete(peerId);
+				else if (this.#retiringInboundLinks.get(peerId) === link) this.#finishRetiringLink(peerId, link);
 				else this.#dropLink(peerId, link, "channel-close");
 			},
 			{ once: true }
@@ -862,7 +863,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		link.pc.addEventListener("connectionstatechange", () => {
 			if (link.pc.connectionState !== "closed" && link.pc.connectionState !== "failed") return;
 			if (this.#pendingInboundLinks.get(peerId) === link) this.#discardPendingInbound(peerId, link);
-			else if (this.#retiringInboundLinks.get(peerId) === link) this.#retiringInboundLinks.delete(peerId);
+			else if (this.#retiringInboundLinks.get(peerId) === link) this.#finishRetiringLink(peerId, link);
 			else
 				this.#dropLink(peerId, link, link.pc.connectionState === "closed" ? "connection-close" : "connection-failed");
 		});
@@ -889,6 +890,10 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 	#promotePendingInbound(peerId: string): boolean {
 		const pending = this.#pendingInboundLinks.get(peerId);
 		if (pending === undefined || pending.closing || pending.channel.readyState !== "open") return false;
+		if (!this.#isCurrent(pending.connection)) {
+			this.#discardPendingInbound(peerId, pending);
+			return false;
+		}
 		this.#pendingInboundLinks.delete(peerId);
 		this.#pendingPeerConnections.delete(pending.pc);
 		this.#registerLink(pending, true);
@@ -937,22 +942,28 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		if (this.#links.get(peerId) === link) this.#links.delete(peerId);
 		link.unsubscribeConnection();
 		link.channel.close();
+		if (this.#retiringInboundLinks.get(peerId) !== link) link.pc.close();
+		if (!this.#links.has(peerId) && !this.#promotePendingInbound(peerId)) this.#scheduleLinkRetry(peerId);
+	}
+
+	#finishRetiringLink(peerId: string, link: ActiveLink): void {
+		if (this.#retiringInboundLinks.get(peerId) !== link) return;
+		this.#retiringInboundLinks.delete(peerId);
 		link.pc.close();
-		if (!this.#promotePendingInbound(peerId) && !this.#links.has(peerId)) this.#scheduleLinkRetry(peerId);
 	}
 
 	#closeAllLinks(): void {
 		this.#activatedPeers.clear();
 		this.#clearAllReplacementAdmissions();
 		for (const peerId of [...this.#retryLinks.keys()]) this.#clearLinkRetry(peerId);
+		for (const [peerId, link] of [...this.#pendingInboundLinks]) this.#discardPendingInbound(peerId, link);
 		for (const [pc, pending] of this.#pendingPeerConnections) {
 			pending.unsubscribeConnection();
 			pc.close();
 		}
 		this.#pendingPeerConnections.clear();
-		for (const [peerId, link] of [...this.#pendingInboundLinks]) this.#discardPendingInbound(peerId, link);
+		for (const [peerId, link] of [...this.#retiringInboundLinks]) this.#finishRetiringLink(peerId, link);
 		for (const [peerId, link] of [...this.#links]) this.#dropLink(peerId, link, "owner-close");
-		this.#retiringInboundLinks.clear();
 	}
 
 	#clearLinkRetry(peerId: string): void {
@@ -1036,12 +1047,27 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 	}
 
 	#closePendingForPeer(peerId: string): void {
+		const pendingInbound = this.#pendingInboundLinks.get(peerId);
+		if (pendingInbound !== undefined) this.#discardPendingInbound(peerId, pendingInbound);
 		for (const [pc, pending] of this.#pendingPeerConnections) {
 			if (pending.peerId !== peerId) continue;
 			this.#pendingPeerConnections.delete(pc);
 			pending.unsubscribeConnection();
 			pc.close();
 		}
+	}
+
+	#hasPendingPeerConnection(peerId: string): boolean {
+		return [...this.#pendingPeerConnections.values()].some((pending) => pending.peerId === peerId);
+	}
+
+	#physicalPeerConnectionCount(): number {
+		const peerConnections = new Set<RTCPeerConnection>();
+		for (const link of this.#links.values()) peerConnections.add(link.pc);
+		for (const link of this.#pendingInboundLinks.values()) peerConnections.add(link.pc);
+		for (const pc of this.#pendingPeerConnections.keys()) peerConnections.add(pc);
+		for (const link of this.#retiringInboundLinks.values()) peerConnections.add(link.pc);
+		return [...peerConnections].filter(({ connectionState }) => connectionState !== "closed").length;
 	}
 
 	#snapshot(): DRPUnreliableWebRtcSnapshot {

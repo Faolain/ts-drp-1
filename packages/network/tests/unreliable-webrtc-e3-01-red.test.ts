@@ -1949,6 +1949,37 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		}
 	});
 
+	it("promotes authenticated inbound replacement before the receiver has reconciled membership", async () => {
+		const module = await loadOwnerModule();
+		const bus = new FakeSignalingBus();
+		const low = owner(module, bus, "peer-a");
+		const high = owner(module, bus, "peer-b");
+		try {
+			const original = bus.connect("peer-a", "peer-b");
+			const lowRoute = low.owner.openUnreliableWebRtcRoute("zone:inbound-before-reconcile");
+			const highRoute = high.owner.openUnreliableWebRtcRoute("zone:inbound-before-reconcile");
+			const received: Uint8Array[] = [];
+			highRoute.onMessage(({ bytes }) => received.push(bytes.slice()));
+			await lowRoute.reconcile(["peer-b"]);
+			expect(highRoute.snapshot().activeLinks).toBe(1);
+
+			bus.disconnect(original);
+			const replacement = bus.connect("peer-a", "peer-b");
+			await lowRoute.reconcile(["peer-b"]);
+			expect(highRoute.snapshot().links).toEqual([
+				expect.objectContaining({ connectionId: replacement.right.id, generation: replacement.right.generation }),
+			]);
+			expect(low.peerConnections).toHaveLength(2);
+			expect(high.peerConnections).toHaveLength(2);
+			expect(await lowRoute.send(["peer-b"], Uint8Array.of(23))).toBe(true);
+			await tick();
+			expect(received).toEqual([Uint8Array.of(23)]);
+		} finally {
+			low.owner.close();
+			high.owner.close();
+		}
+	});
+
 	it("never selects B before the responder installs its inbound handler", async () => {
 		const module = await loadOwnerModule();
 		const bus = new FakeSignalingBus();
