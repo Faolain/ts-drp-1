@@ -66965,7 +66965,7 @@ title mismatch stops before execution, so a renamed title cannot turn the
 selection into an unauthorized campaign.
 
 ```sh
-readonly D108E4K_NON_CAMPAIGN_PATTERN='^(validates schema-v3 replacement custody without cross-peer clocks|raw sequence evidence includes the fixed sample-domain boundaries|partitions receiver evidence by exact product roster without losing observations|separates rendered product-roster metrics from boundary-aware application evidence|freezes RTC metadata at the event boundary before async payload conversion|records a versioned and causally joined RTC lifecycle without changing delivery|proves replacement open before retiring the stale authenticated raw owner)$'
+readonly D108E4K_NON_CAMPAIGN_PATTERN='(validates schema-v3 replacement custody without cross-peer clocks|raw sequence evidence includes the fixed sample-domain boundaries|partitions receiver evidence by exact product roster without losing observations|separates rendered product-roster metrics from boundary-aware application evidence|freezes RTC metadata at the event boundary before async payload conversion|records a versioned and causally joined RTC lifecycle without changing delivery|proves replacement open before retiring the stale authenticated raw owner)$'
 
 pnpm exec vitest run --coverage.enabled=false \
   tests/phase-6a-creator-successor-local-author-red.test.ts \
@@ -68487,3 +68487,50 @@ source or dependency. The completed D.108e4m profile and D.108e4t review/static
 steps remain closed rather than extended. D.108e4k is now authorized to
 restart from its first ordinary command at this final behavior tree; the
 complete E3-03 campaign and all campaign ledgers remain unauthorized.
+
+###### D.108e4u — D.108e4k positive-list command correction
+
+D.108e4u is a plan/execution-infrastructure correction discovered during the
+restarted D.108e4k ordinary ledger. It changes no product, example, test,
+configuration, dependency, lockfile, package manifest, workload, assertion,
+timeout, telemetry schema or campaign authorization. The preceding ordinary
+gates at exact behavior tree `9f54fdb4` remain valid and are not rerun: focused
+root/infrastructure passed 17/17, the standalone native owner passed 5/5 with
+one valid terminal proof and no timeout, Phase-3 transport passed 24/24,
+network plus E3-02 passed 58/58 and the focused observer passed 1/1.
+
+The immutable command-shape RED is the first three-command inventory block.
+The unqualified inventory listed the exact five expected titles and the
+telemetry-qualified inventory listed the exact eight expected titles, but the
+positive `--grep` list exited one with zero tests. Playwright matches `--grep`
+against a full title path prefixed by file/suite identity, so the reviewed
+leading `^` prevented every intended title from matching. This is not a title,
+product or test failure, and no E3-03 test body or retained three-trial campaign
+executed. The unqualified/qualified/zero-selected stdout SHA-256 values are
+`f91595332e71ee297cabc297fd99b6180cf97dfe1d976c568e069e894582e006`,
+`4a289fde5c1b2b6b3416bcbf2ca7d67dd3aa0f862502fd00cd3e92844fc11374`
+and `4f5b1bb7df1808d911ebe868d2fd384e0f1fedd73e2ec2b10f7babd43948c5f0`;
+the zero-selected stderr SHA-256 is
+`fff73959051c60da4071060e40e4bd539d75e5540039f5f2d8d3876e91b16e3a`.
+
+The minimal correction above removes only the leading anchor and retains the
+trailing `$`, exact seven-title alternation and positive-selection policy. A
+read-only probe of that exact suffix-anchored pattern exited zero, listed
+exactly the intended seven titles and omitted the retained three-trial title.
+Its stdout/stderr/status SHA-256 values are
+`5b2e723b64e830a2cfc9f46416c60d9abc36900c5f47172e5f13972b28a173e4`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+Custody is under `.logs/d108e4k-final-9f54fdb4/ordinary/`.
+
+Freeze this plan-only correction in one signed/pushed checkpoint and run the
+normal read-only Grok 4.6/high, exact Kimi K3 `CHECK001` through `CHECK100` and
+Opus 5/xhigh review before any seven-test execution. P0/P1 findings are fixed
+in the same round without confirmation; every P2 receives an exact owner and
+2026-09-04 deadline. No Fable or collaboration subagent runs. After review,
+rerun the complete 5/8/7 list triplet at the correction checkpoint, require
+the root canonical shim absent before and after, then execute the selected
+7/7 once. The already-passed behavior gates compose because this checkpoint
+changes only the plan and the failed command executed no test body. Any title
+or count mismatch still stops before execution. The complete E3-03 config,
+retained three-trial test and all campaign ledgers remain unauthorized.
