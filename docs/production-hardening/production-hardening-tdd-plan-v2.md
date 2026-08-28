@@ -66079,6 +66079,116 @@ Unqualified/qualified inventories again remained exactly 5/8; exact-owner
 TypeScript, ESLint, Prettier and diff checks passed. No complete campaign,
 Fable, production change or js-libp2p behavior/configuration change occurred.
 
+The initial D.108e4i GREEN is signed/pushed commit
+`64fefeff1423168b7d8c6742a7c05f5043d6d670`, parent
+`f8b6707a78c35c75bda1da3911b551de7d1eadbc`, tree
+`dc94432d59914932c5b64dab8048c59f209d01b7`, stable patch id
+`1402d4816d526b138caa0f7c13772e0e0420e4f4` and raw-diff SHA-256
+`7990be09a581343f873539dc3c6ec147ac151370b6c3ad7ce0addb116d0a2be1`.
+It has a good signature and changes only the exact test owner. The pure
+validator now selects directional custody from the exact product drop reason:
+`replacement` requires B open and its product handler before the product-owned
+A close-call, with the native close event optional at the deadline and later
+when present; `channel-close` requires B open and its product handler before
+the native A close-event, followed by the mandatory zero-buffer product
+close-call. Accepted A uses the branch-specific cutoff. Every arrived B is
+accepted, zero-B delivery remains lawful under configured loss and every B
+native attempt follows the exact open and handler. The compact preserved
+`e3-03-2` replay first asserts both A/B identities, the 595/5 sender split, the
+418-A/zero-B receiver roster and pivotal sequences, then executes the same
+pure validator as the campaign path.
+
+The required GREEN review round inspected that immutable commit. Grok
+4.6/high session `01a0483d-aa8c-7360-ba05-9707a03d7aee` completed normally
+in 450.458 seconds with exit zero and `end_turn`. The wrapper conservatively
+reported `NO_VERDICT` solely because inspection prose preceded the terminal
+object; the substantive verdict was `APPROVED`, P0=0/P1=0/P2=0. One
+same-session, no-inspection turn re-emitted the unchanged bare object. Public,
+status, event-stream, re-emission-stream and re-emission-stderr SHA-256 values
+are respectively
+`d93fb0deb96eba5cfc9a822c023ce06a521c3600c8f4e5e36e84605044bfcd6a`,
+`f36a20d7cfbddf4bbb8162ece59cdb82090b61950bdcf5ca6da28a1a4205e65e`,
+`fb02f326915f15df3f84361009441c2af749fd113732d585ca61d8aed6692832`,
+`cbec2194dce827751de22b5e2497da242183a9c72fd3ad192bbc2e7bbba0e890`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+Kimi CLI 1.49.0 exact `kimi-code/k3` session
+`session_ae3990b2-472c-4517-a19a-1fb1bfe76620` emitted exactly 100 total,
+unique and ordered markers and one terminal result. It returned `APPROVED`,
+P0=0/P1=0/P2=0. Stream/stderr SHA-256 values are
+`a65eae600421a2948ff2453a164b3c127555665e5422ecf5d9418f7f36b4aac0`
+and `514636ae4d5d574412edb55ec8f087b5c26762bc8d0a6ff04f522672a1d825e3`.
+
+Claude-skill Opus 5/xhigh session
+`d796fab2-2447-4669-86d6-7290f43c5cba` completed normally in 459.688
+seconds after 20 turns with `end_turn`, no error, permission denial or
+subagent. It returned `APPROVED`, P0=0/P1=0/P2=3. Raw/stderr SHA-256 values
+are `9b02a111b6770c24ae6e28b50720a3060205a9de6d160b91b866edf79f3d7f54`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+Its P2s assigned duplicate channel-close positive aliases, missing exact
+negative owners for channel-close event-before-call and replacement
+close-call cardinality, and the unpinned B open-event owner to the D.108e4i
+GREEN implementer by 2026-09-04. The same-round correction removes the
+duplicates, pins `rtc-datachannel-open-event` in both validator joins, and adds
+isolated wrong-open-owner, missing replacement close-call and channel-close
+call-before-event negatives. No confirmation review ran.
+
+The accepted corrected GREEN is signed/pushed commit
+`cc112d220539157b5d81394d2574286ef49c159d`, parent
+`64fefeff1423168b7d8c6742a7c05f5043d6d670`, tree
+`7ced687b83fc6b1735f8ff31653e0d641c1030d1`, stable patch id
+`153397009c624b1443f1eae29444aecb1309f9dc` and raw-diff SHA-256
+`ec6c71c3bf1c4191236adcaf5c137c623b5bfe4ddd1ab40e3b1a45e0a79b4307`.
+It has a good signature, remains exact-owner/test-only and discharges the full
+formal P2 union before its deadline. The pre-sign Codex review, session
+`01a04834-3379-7823-8e1b-d9b59443e277`, found the valid missing exact
+close-event owner; it was corrected before the initial GREEN commit. Its log
+SHA-256 is
+`95c91f5ea170ab167256c54ddd8173970d00a23c663c3c585f78ac276c04ccff`.
+Its other comments concerned the explicitly protected untracked protocol-v2
+tests and generated local evidence. Those are not submission findings:
+selective staging preserves and excludes those user-owned paths. The review's
+read-only run of the intentionally stale protected tests is not a project
+gate and changed no file.
+
+The final commands ran the selected validator under
+`D108E4H_TELEMETRY=1`, the complete non-campaign selection under both
+`D108E4G_TELEMETRY=1` and `D108E4H_TELEMETRY=1` with the three-trial campaign
+inverted, the retained network raw-sidecar plus E3-02 Vitest owners with broad
+coverage disabled, affected network/grid build and typecheck, standalone test
+owner TypeScript, exact-owner ESLint/Prettier, `git diff --check` and qualified
+and unqualified Playwright `--list` inventories. The validator passed 1/1,
+the non-campaign selection 7/7 and the retained owners 58/58; inventories were
+exactly 5/8. Their final JSON SHA-256 values are respectively
+`7ce3f0336d3a42787dc44dee458684ac18c6ff5925f76e88395d2c3ece205f6a`,
+`6ad07e4763cec577baef991e85873266144725debd22b2d0ef24db62000af0f7`,
+`a0944c1871b515bc92595b847f590b6ba55c1bcd70730e06f3585c27ec21fd70`,
+`16d87007120d097145f541472b21e9e43bec90ae1c59095bf490e449fc6b3c54`
+and `91bc102aea46c63131dbe3194d2ab64886cf18e4932117e7e9c42ca8e528e924`.
+Network build/typecheck and grid build/typecheck passed; log SHA-256 values are
+`43d28e87a618632c8a7d25821ec3443d1fcc667941175a1a57349ddb6d51049c`,
+`cad38c1c080e4c8375a957b7f86a0fc99d47ad5be0092ec7e4a5ef501d49859b`,
+`a57135ca99c214df93bbbebff2c53d0cf114f63bc02b4d9ad6b43db099aaa55d`
+and `355a8d9c67c43f25d685737002e4eccb74272e557a3e3228f89bee9458041a92`.
+Standalone TypeScript, ESLint and diff checks passed with four-byte newline
+logs; Prettier passed with SHA-256
+`898bfd705211753dd354c48175a125914d5b1449d5bbfa8c82f4011fef802a92`.
+
+D.108e4i is complete with no remaining local debt. D.108e4f/D.108e4g/
+D.108e4h are not silently widened or given another campaign: the one complete
+campaign authorization remains consumed, and any later complete run requires
+a new explicit plan authorization. The preserved failing attachment now passes
+the corrected pure validator, while its monitor custody still makes the strict
+upstream false-positive predicate false. The demonstrated blocker remains the
+local `unreliable-webrtc.ts` break-before-make defect; no js-libp2p attribution,
+patch, upgrade, monitor disablement or threshold change is authorized. If a
+future artifact proves every false-positive operand, work must stop and reslice
+an independently reviewed upstream report whose first acceptance artifact is
+the already frozen clean-checkout, exact-lock, public-libp2p, two-peer,
+single-command MVRE with deterministic before/failure/after/abort telemetry and
+an unpatched failing assertion. An upstream claim without that MVRE is invalid.
+The related js-libp2p issues and pull requests remain context only.
+
 The initial D.108e4g RED is signed/pushed commit
 `815f2d084f196929aeee59b01271b18e8c7463c0`, parent
 `341f19826f919de147fcea54751c339fd1b088cf`, tree
