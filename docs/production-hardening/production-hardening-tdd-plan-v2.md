@@ -64300,6 +64300,76 @@ the plan owner must move or explicitly regroup the inherited subsections
 before combined D.108e4 closure so their current physical position after this
 D.108e4e amendment cannot be mistaken for D.108e4e evidence.
 
+The D.108e4e.1 plan correction is signed/pushed commit
+`d78d4da8192f1e478cf78846844af176500fc36b`, parent
+`880c1f99d88033e17f17b9f6be5572775f701895`, tree
+`44bb21c46d53074f7e5fdb92a0cdcd204afb0919`, stable patch id
+`a739f46b5e9864321f3c6097523c7ceef9974671` and raw-diff SHA-256
+`3f3066728ea8f9d6092a84f7a434ea7c4f06a5343d36733c26ac6c8b88793828`.
+Its first role-complete RED is signed/pushed commit
+`365f01535701b5f1a00a10a765cd2c39e0655082`, parent
+`d78d4da8192f1e478cf78846844af176500fc36b`, tree
+`d1059de750f64b8b421bfacbc898fd21e34580cd`, stable patch id
+`ecd8f7709d04cdb5629540b7520161f617c55a4e` and raw-diff SHA-256
+`d12f9e1e5db07a5965cea4488636ca671b05b5d36894dd06207a80277164589d`.
+Grok approved it with no findings and exact Kimi K3 approved it with one
+GREEN-time desired-peer P2, but Opus 5/xhigh session
+`29e48b38-7b1d-48b6-b179-3fd32bb49dfc` found one P0: the stale
+non-initiator's later send could run after only the already-registered sender
+matched, before the lower receiver registered its message listener. Opus also
+required a pre-retry connection count, side-specific connection identities
+and terminal timer settlement. That immutable object is therefore rejected;
+its approvals do not accept the successor.
+
+The tests-only same-round correction is signed/pushed commit
+`2a61b0671606d62c53d802c6e6af7b5284b4ae4a`, parent
+`365f01535701b5f1a00a10a765cd2c39e0655082`, tree
+`d721324fcc6bbe263752df310b1fe39fa6a45ad9`, stable patch id
+`3db42cf0c6d353e7353ba2f91eb74e285b81e33a` and raw-diff SHA-256
+`c58804eba145023f3b700a036d11683160449d9f5177c603dc40027637390162`.
+It changes only the test owner. Both stale replacement links must now match
+their side-specific connection id and generation before the later payload;
+the lower peer remains at one peer connection before the retry advance; and
+both recovery controls finish with zero fake timers. Selected evidence
+`.logs/d108e4e-role-complete-red-correction/focused.json` has SHA-256
+`caedd5b57250898b3e2fb949cccb303730e83d4612f91d8252bf9b02dede7ed2`
+and reports five selected failures plus 30 skipped. Complete-owner evidence
+has SHA-256
+`0246892b24d24cf3d662a222c2ea5926274440fd048a14de7f3770365f902dc9`
+and reports 35 total, 30 retained passes, the same five intentional failures
+and zero skips. The non-open and stale role pairs fail at their first
+sender-retirement snapshot; the deadline control fails at missing peer
+connection two. Every failure precedes its barrier wait. Network typecheck,
+exact-owner typed ESLint, Prettier and `git diff --check` passed.
+
+All three required successor RED reviewers approve with zero P0/P1. Grok
+4.6/high session `01a045e6-48f6-78d3-a1e4-af69987aea2f` completed its one
+substantive run in 630.116 seconds with exit zero, `end_turn` and no timeout.
+Its progress prose before a terminal `APPROVED`, P0=0/P1=0/P2=0 object caused
+the wrapper's formatting-only `NO_VERDICT`; a no-tool continuation in the
+same session returned the identical schema-valid structured object. Exact
+Kimi K3 session `session_13ad130c-eca1-467d-915f-6499fb9e196e` returned
+exactly 100 total and unique CHECK001 through CHECK100 markers followed by
+valid `APPROVED`, P0=0/P1=0/P2=0 JSON. Claude-skill Opus 5/xhigh session
+`82d03396-dac4-4ac0-819f-67f89de9417f` returned schema-valid `APPROVED`,
+P0=0/P1=0/P2=3, with no permission denial. No reviewer changed the tracked
+tree, no Fable ran in either checkpoint round, and the one prior expressly
+authorized Fable run remains the only Fable invocation.
+
+The three Opus P2s and Kimi's earlier overlapping desired-peer P2 are assigned
+to the D.108e4e.1 GREEN evidence owner before GREEN acceptance, without a
+confirmation review. The GREEN test/evidence change must split each higher
+sender's retry advance into 249 ms plus 1 ms, pinning one lower peer connection
+at 249 and two at 250. It must add a retained control in the existing test
+owner proving that an unusable mapped link for a peer removed from desired
+membership stays mapped, returns false, records no drop and starts no setup.
+It must also make the non-open later-send gate observe both registered link
+identities, matching the stale control. These are discriminator controls, not
+new transport behavior. The GREEN source must still include both an existing
+mapped-link guard and the desired-peer guard; missing or undesired targets may
+not invoke acquisition. All previous GREEN evidence obligations remain due
+before acceptance.
+
 The first D.108e4c plan-freeze review round inspected signed/pushed commit
 `eb3de05b6054ac6fdd158d2530bad1798f87f10f`, parent
 `b8a2628bec7593c547919b540889dc75e33cd9ca`, tree
