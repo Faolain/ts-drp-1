@@ -66921,11 +66921,11 @@ example, test, configuration, dependency or lockfile behavior, and it creates
 no RED/GREEN implementation pair. Its historical behavior baseline was the
 accepted D.108e4i GREEN at `cc112d220539157b5d81394d2574286ef49c159d`.
 D.108e4m/t and then D.108e4v supersede that test-tree baseline. The current
-restart baseline is the exact signed D.108e4v GREEN/evidence tree recorded
+restart baseline is the exact signed D.108e4v/w GREEN/evidence tree recorded
 below; D.108e4k cannot execute until that checkpoint exists. Product, example,
 Playwright/build/workspace configuration, package-manifest, lockfile and
 `scripts/` trees remain byte-identical to `cc112d22`; the test tree must remain
-byte-identical to the D.108e4v checkpoint throughout the restarted slice.
+byte-identical to the D.108e4v/w checkpoint throughout the restarted slice.
 
 This split exists because the one D.108e4j campaign authorization is consumed,
 while the combined proof contains useful independent gates that do not execute
@@ -67209,7 +67209,7 @@ both exact three-consecutive campaign ledgers.
 The D.108e4k non-campaign results may compose with that later authorized
 campaign proof only when the product, test, example, Playwright/build/workspace
 configuration, scripts, package-manifest and lockfile trees are byte-identical
-to the signed D.108e4v GREEN/evidence tree, the D.108e4k evidence checkpoint
+to the signed D.108e4v/w GREEN/evidence tree, the D.108e4k evidence checkpoint
 and every later campaign execution. A change to any of those trees voids this
 split and requires both the non-campaign and campaign halves of the complete
 combined proof at the new tree. Plan-only evidence custody may advance without
@@ -68729,7 +68729,15 @@ D.108e4v's one authorized three-file GREEN invocation stopped at exact 5/6.
 Both Phase-3f-c and Phase-3h passed 2/2 after their one-string roster changes;
 Phase-3f-b's chat owner passed and its zone owner advanced beyond the corrected
 roster, then failed at `examples/grid/src/v3-zone.ts:456` while emitting the
-post-open projection. Stdout/stderr/status SHA-256 values are
+post-open projection. The exact observed error was
+`TypeError: Cannot read properties of undefined (reading 'length')` at
+`v3-zone.ts:456:22`: the mock returned no `objectId`, so
+`zoneId = opened.objectId` at line 687 assigned `undefined`. The exact command
+was `pnpm exec vitest run --coverage.enabled=false` over the Phase-3f-b,
+Phase-3f-c and Phase-3h chat/zone files with
+`--maxWorkers=1 --minWorkers=1`; the failing title was
+`uses the genuine zone package while retaining durable join telemetry`.
+Stdout/stderr/status SHA-256 values are
 `2dac710ec540d12665fd583e3a45147143103620da64a82b9dbee6ceeabf2c93`,
 `920368f705cd990bcf4b831c657222eabe7d8e1702bf792c27dd40927ddafdfc`
 and `4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`;
@@ -68737,24 +68745,34 @@ custody is under `.logs/d108e4v-green-cc8700e9/`. No D.108e4v nine-file or
 static gate and no D.108e4k restart command ran.
 
 D.108e4w owns that newly reachable failure as a narrow retained-test fixture
-correction. It changes only this plan and
-`tests/phase-3f-b-chat-zone-causal-join-red.test.ts`; the three roster strings
-already added by D.108e4v remain exact RED-checkpoint changes. It changes no
-product, example, package, public/private product API, wire/authority owner,
+correction. Signed RED checkpoint `3d18ad5c7ac6a6e93137c43794927e027945936f`
+first freezes this plan plus the three roster strings added under D.108e4v
+authority in the preceding uncommitted partial-candidate tree. D.108e4w GREEN
+then changes only fixture fields in
+`tests/phase-3f-b-chat-zone-causal-join-red.test.ts`. It changes no product,
+example, package, public/private product API, wire/authority owner,
 configuration, dependency, lockfile, timeout, telemetry or campaign authority.
-The failure is not evidence that `createV3ZoneApi` is defective. The Phase-3f-b
-mock predates three accepted consumers now reached by the genuine API: session
-`objectId` assigned at the post-open boundary, `previewLatchedAcl().current`
-used to derive the current outcome context, and
-`node.ephemeralUnreliableWebRtcSnapshot()` used for optional raw evidence.
+The observed failure is not evidence that `createV3ZoneApi` is defective.
+Static tracing identifies the next exact consumers after the missing session
+`objectId`: `previewLatchedAcl().current` for outcome context,
+the first-argument DRPNode mock's `ephemeralUnreliableWebRtcSnapshot()` for
+optional raw evidence, and the opened ephemeral channel's `stats()` for
+`overLimit`. Those three were predicted downstream faults, not reached frames.
 
 GREEN may add only these exact inert fixture fields:
 
 - returned room `objectId: input.objectId`;
 - returned room `previewLatchedAcl()` with a frozen `current` carrying exact
   safe-integer `epoch: 0` (replacing the obsolete empty object); and
-- node `ephemeralUnreliableWebRtcSnapshot: () => undefined`, which models the
-  documented no-active-route result without fabricating raw evidence.
+- `ephemeralUnreliableWebRtcSnapshot: () => undefined` on the outer
+  `createV3ZoneApi` DRPNode mock, not its nested `networkNode` and not the room,
+  modeling the documented no-active-route result without raw evidence; and
+- `stats()` on the existing `openEphemeral()` return, yielding a frozen
+  all-zero `EphemeralStats` with exact fields `authorityMismatch`, `delivered`,
+  `dropped`, `localSequencedKeys`, `malformed`, `overLimit`, `published`,
+  `rateLimited`, `received`, `remoteSequencedKeys`, `sequencedKeys`,
+  `sequencedSenders`, `stale`, `subscriberFailures`, `unauthorized` and
+  `writerBuckets`.
 
 No production guard, fallback or compatibility behavior may be added. Freeze
 this D.108e4v partial-candidate/D.108e4w RED record in one signed/pushed
@@ -68762,13 +68780,55 @@ checkpoint and run the normal read-only Grok 4.6/high, exact Kimi K3
 `CHECK001` through `CHECK100` and Opus 5/xhigh plan review. Fix P0/P1 in the
 same round without confirmation and assign every P2 to the plan owner with
 deadline 2026-09-04. No Fable or collaboration subagent runs. After review,
-change the three exact fixture fields, run the Phase-3f-b file once for exact
-2/2, then resume D.108e4v with the three-file exact 6/6 command once and the
-nine-file exact 61/61 command once. Run the exact D.108e4v ESLint, Prettier and
-diff gates. Any other failure stops without retry or product change.
+change the four exact fixture fields. Run once exactly
+`pnpm exec vitest run --coverage.enabled=false tests/phase-3f-b-chat-zone-causal-join-red.test.ts --maxWorkers=1 --minWorkers=1`
+for 2/2, then resume D.108e4v with its exact three-file 6/6 command once and
+the exact nine-file 61/61 command once. Run the exact D.108e4v ESLint, Prettier
+and diff gates. The still-unexecuted Phase-3f-b tail remains protected by the
+fail-closed rule: any other failure stops without retry or product change.
 
 Only after those gates pass, the signed/pushed D.108e4v/w GREEN receives the
 required Grok/Kimi/Opus implementation review. Then D.108e4k may restart from
 its first ordinary command at that exact signed test tree. The complete E3-03
 config, retained three-trial campaign and both campaign ledgers remain
 unauthorized.
+
+The plan owner owns these nonblocking fixture-fidelity debts with deadline
+2026-09-04: replace the epoch-only ACL preview with an exact attainable ACL
+fixture or document its intentional minimality; separate the mock `roomId`
+from `objectId`; reconcile the latent equivalent Phase-3f-c room mock; and add
+a structural mock-contract pin for the session/channel/DRPNode shapes. None is
+used to claim broader fixture fidelity or to widen D.108e4w GREEN.
+
+The D.108e4w plan review inspected exact signed/pushed commit
+`3d18ad5c7ac6a6e93137c43794927e027945936f`, parent
+`cc8700e9d9b1582a3a0712eb8030f31850109a41` and tree
+`ffa27e2d27a4fe5fd8c18bc50db988fa6e447074`. Grok 4.6/high completed its one
+substantive inspection in 405.143 seconds with exit zero and `end_turn`; the
+wrapper honestly classified the prose-wrapped result `NO_VERDICT`. Its terminal
+object was CHANGES_REQUIRED with one P0, one P1 and three P2. Event/public/status
+SHA-256 values are
+`6fe00de4f0f6e400d0739a2890738cf55abce7501ddf645b65d6debc6a93aa3f`,
+`76dc51ce6376080f8c57572afc24c612044597e64e610d1da7a6ed547ee65049`
+and `9436e6698fa2b0b35a14f111f32d5aa76a6f0e42484cff03ab66d233e3091c89`.
+No-inspection same-session continuation
+`01a04a04-f3ae-7303-b1fd-2cf65f8ba658` preserved that exact schema in one
+turn; JSON SHA-256 is
+`ce91eca50d510756fb723ba75ccee63cdb7fb321a06dc8613f67a5dcc19e4241`.
+
+Kimi K3 session `session_aad62a4b-61c4-49eb-a685-fbed05d794ef` returned
+exactly 100 ordered, unique checks and one CHANGES_REQUIRED result with zero
+P0, one P1 and two P2. Stream/stderr SHA-256 values are
+`326292795362c9ba11562e225f69e41c2f3adcfe87caa24985e0f2ff512646ee`
+and `79a99c7210e6b706f1b64747d04b01861046fee34d3085a58d72d5d277ccb8e8`.
+Opus 5/xhigh session `fd379c37-a51c-4386-86c8-9b98eb51b6f1` completed 53
+turns in 565.039 seconds with no error or subagent and returned
+CHANGES_REQUIRED with one P0, one P1 and five P2. JSON/stderr SHA-256 values
+are `9f45380b090f37ea20db80c2791952f04a136922f779f7e6036f62fcba522a96`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+The same-round correction above closes the blocking union by authorizing the
+required all-zero `stats()` fixture, distinguishing the observed objectId
+failure from statically predicted consumers, and re-anchoring D.108e4k to the
+eventual D.108e4v/w GREEN tree. Every P2 is owned by the plan owner with the
+2026-09-04 deadline above. No confirmation review runs.
