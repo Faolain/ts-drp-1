@@ -137,6 +137,7 @@ describe("Phase 3h chat and zone migration composition RED", () => {
 		expect(operationNames(application)).toEqual([
 			"applicationBatch",
 			"causalJoin",
+			"commit-outcome-v1",
 			"join",
 			"migrationActivation",
 			"migrationRecord",

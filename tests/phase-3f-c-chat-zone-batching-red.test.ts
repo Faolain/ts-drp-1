@@ -255,6 +255,7 @@ describe("Phase 3f-c real chat and zone batching composition RED", () => {
 		expect(operationNames(application)).toEqual([
 			"applicationBatch",
 			"causalJoin",
+			"commit-outcome-v1",
 			"join",
 			"migrationActivation",
 			"migrationRecord",

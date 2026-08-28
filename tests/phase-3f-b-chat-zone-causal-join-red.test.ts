@@ -193,6 +193,7 @@ describe("Phase 3f-b real chat and zone causalJoin composition RED", () => {
 		expectExactOperations(application, [
 			"applicationBatch",
 			"causalJoin",
+			"commit-outcome-v1",
 			"join",
 			"migrationActivation",
 			"migrationRecord",

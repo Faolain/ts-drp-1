@@ -68722,3 +68722,53 @@ the plan owner with deadline 2026-09-04: retain exact RED and review custody,
 tree identity, explicit D.108e4u supersession, exact changed-test static gates
 and the expanded restarted roster. These are corrected above without a
 confirmation review.
+
+###### D.108e4w — Phase-3f-b zone-room mock contract reconciliation
+
+D.108e4v's one authorized three-file GREEN invocation stopped at exact 5/6.
+Both Phase-3f-c and Phase-3h passed 2/2 after their one-string roster changes;
+Phase-3f-b's chat owner passed and its zone owner advanced beyond the corrected
+roster, then failed at `examples/grid/src/v3-zone.ts:456` while emitting the
+post-open projection. Stdout/stderr/status SHA-256 values are
+`2dac710ec540d12665fd583e3a45147143103620da64a82b9dbee6ceeabf2c93`,
+`920368f705cd990bcf4b831c657222eabe7d8e1702bf792c27dd40927ddafdfc`
+and `4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`;
+custody is under `.logs/d108e4v-green-cc8700e9/`. No D.108e4v nine-file or
+static gate and no D.108e4k restart command ran.
+
+D.108e4w owns that newly reachable failure as a narrow retained-test fixture
+correction. It changes only this plan and
+`tests/phase-3f-b-chat-zone-causal-join-red.test.ts`; the three roster strings
+already added by D.108e4v remain exact RED-checkpoint changes. It changes no
+product, example, package, public/private product API, wire/authority owner,
+configuration, dependency, lockfile, timeout, telemetry or campaign authority.
+The failure is not evidence that `createV3ZoneApi` is defective. The Phase-3f-b
+mock predates three accepted consumers now reached by the genuine API: session
+`objectId` assigned at the post-open boundary, `previewLatchedAcl().current`
+used to derive the current outcome context, and
+`node.ephemeralUnreliableWebRtcSnapshot()` used for optional raw evidence.
+
+GREEN may add only these exact inert fixture fields:
+
+- returned room `objectId: input.objectId`;
+- returned room `previewLatchedAcl()` with a frozen `current` carrying exact
+  safe-integer `epoch: 0` (replacing the obsolete empty object); and
+- node `ephemeralUnreliableWebRtcSnapshot: () => undefined`, which models the
+  documented no-active-route result without fabricating raw evidence.
+
+No production guard, fallback or compatibility behavior may be added. Freeze
+this D.108e4v partial-candidate/D.108e4w RED record in one signed/pushed
+checkpoint and run the normal read-only Grok 4.6/high, exact Kimi K3
+`CHECK001` through `CHECK100` and Opus 5/xhigh plan review. Fix P0/P1 in the
+same round without confirmation and assign every P2 to the plan owner with
+deadline 2026-09-04. No Fable or collaboration subagent runs. After review,
+change the three exact fixture fields, run the Phase-3f-b file once for exact
+2/2, then resume D.108e4v with the three-file exact 6/6 command once and the
+nine-file exact 61/61 command once. Run the exact D.108e4v ESLint, Prettier and
+diff gates. Any other failure stops without retry or product change.
+
+Only after those gates pass, the signed/pushed D.108e4v/w GREEN receives the
+required Grok/Kimi/Opus implementation review. Then D.108e4k may restart from
+its first ordinary command at that exact signed test tree. The complete E3-03
+config, retained three-trial campaign and both campaign ledgers remain
+unauthorized.
