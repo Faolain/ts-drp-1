@@ -65630,6 +65630,105 @@ ordering assertion, instruments the installed js-libp2p 3.1.2 MessageStream
 monitor-owned abort, and satisfies both lint rules. The review was advisory;
 no confirmation review was run. No complete E3-03 campaign was invoked.
 
+The immutable D.108e4h RED is signed/pushed commit
+`275c8fa9cd510d4be32a1cb2c4e9a22b6d06ad70`, parent
+`7c35a856e11d064e43b117324394e0e39f588a95`, tree
+`7d9e5ea7c6344277cb3d088d704866264e07b4fa`, stable patch id
+`7d45fbbb816f42f0cacd8f95a534e3296f995479` and raw-diff SHA-256
+`ec70e164eb4ea70c1377bd9e47023d80831143c82d454c04cbf6a647151baa9e`.
+It has a good signature, changes only the exact test owner and leaves the
+validator deliberately throwing `D108E4H_RED_UNIMPLEMENTED`. The selected RED
+failed exactly once for that stub; JSON/stderr SHA-256 values are
+`76afcaf15e1324d5e3d42f2d65d9b0f2f98208c560e8a6f88dfc0aab863f6ae0`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+The unqualified and D.108e4g+D.108e4h-qualified inventories remained exactly
+5 and 8; their SHA-256 values are
+`a4a8cf37b9d78798c55ba4a049bf9d5d15f90e872215f08069ac3e2ef9426f22`
+and `6236c2bb03dcc41308744aa531c4266d5f61a3d9ae7a151e43c7c65c0eb6833f`.
+
+The normal Grok 4.6/high RED review session
+`01a04796-ab47-7150-919f-f2c49ad0ae56` completed its sole substantive run
+normally in 750.241 seconds with exit zero and `end_turn`. The wrapper first
+reported `NO_VERDICT` only because inspection prose preceded the terminal
+object. A same-session no-inspection turn re-emitted the already-completed
+finding as valid bare JSON; no second review was run. The substantive result
+was `CHANGES_REQUIRED`, P0=0/P1=4/P2=3. Public/status/event-stream,
+re-emission-stream/re-emission-stderr and extracted-terminal SHA-256 values are
+respectively
+`3f0b2860fe8ffdc56e261f2397c527499a09eccfe4a983db165fb2a3ccc24a2a`,
+`237ed2f6021abdf19fd27eb637a72421c3e8b3b26dd06cd4b23b3fac5bf8f740`,
+`15884daf686ff8a267fae2eb6009b1509e3c5d69ff20433eca803503b9b75185`,
+`10ecba482734f2d2a2806235a4d5d21cac9a61a6d7e440c067a7f6b995d84cd8`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+and `221070539b1c625c7c8cd6d4849864ef326e7fa91e2ff3945246b3660827d71a`.
+
+Kimi CLI 0.38.0 exact `kimi-code/k3` RED session
+`session_a05c0289-90f5-4ea1-afe5-068b39cc1c88` emitted exactly 100 total,
+unique and ordered `CHECK001` through `CHECK100` markers followed by one
+`RESULT`. It returned `APPROVED`, P0=0/P1=0/P2=3. Stream/stderr SHA-256 values
+are
+`3cb4c1f4a437ce34a896b6da6c58b25c6476c4ce6cea0b049755a190fc75c134`
+and `173862ee86eae17b588beeeaa6a4dc15963c47472c11e61df6bf7eb2d51939c4`.
+Its P2s required a nontransmitter-send negative, a B-send-before-open negative
+and a carry-in failure/abort semantic negative.
+
+Claude-skill Opus 5/xhigh RED session
+`caeec2cd-99fe-49a8-93f2-593aa54be490` completed normally after 35 turns and
+returned `CHANGES_REQUIRED`, P0=0/P1=7/P2=4. Raw/stderr SHA-256 values are
+`2fac6573199d447ee70d3ef2b8a7c6c712435faff707e93c89118309e88db0ea`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+The formal P1 union rejected the initial RED because identity joins, carry-in
+ping custody, peer-local overlap ordering, endpoint roles, A/B send domains and
+failed-send semantics were not yet forced. Formal P2s required isolated
+counter-safe negatives, explicit `channel-close` drain evidence, runtime
+endpoint symmetry, separate drop-count/reason errors, persisted zero-drop
+reason control and closed peer-local sequence checks. Every P2 was assigned to
+the D.108e4h RED owner with the deadline before GREEN and is discharged by the
+same-round correction below; none is deferred.
+
+The accepted same-round RED correction is signed/pushed commit
+`f32846f99bed1c783de1ed6bebb02e418237ab52`, parent
+`275c8fa9cd510d4be32a1cb2c4e9a22b6d06ad70`, tree
+`93368e597a5096aa3f4b7e1e7f14c9a070046d2b`, stable patch id
+`f9a1f20658f70eeb41d4d2c7a06d06ff4f449e47` and raw-diff SHA-256
+`bc5e1f2f9e1fb3d5abca55f812df0466cbd31f4c8662b5d9af0838c3a23550b6`.
+It also has a good signature and remains exact-owner/test-only. Distinct
+authenticated generation, peer-connection, channel, attempt, payload and
+lifecycle identities now make A/B joins non-hollow. The fixtures split 600
+native sends across A/B, require B open before its first attempt/success, reject
+send failure and illicit endpoint roles, account pre-close overlap and
+post-close rejection by lifecycle sequence, join monitor records to the remote
+peer and named carry-in ping, and cover replacement/channel-close, repeated and
+persisted reasons, both endpoint counters, delta custody and endpoint absence.
+All negative fixtures preserve unrelated counters where needed so the named
+error remains the isolated first violated invariant.
+
+The corrected selected RED again failed exactly once and solely at
+`D108E4H_RED_UNIMPLEMENTED`; JSON/stderr SHA-256 values are
+`fec087c9fee48661600893b4e3d92d50e8247b92aba0b18e8b6d9fd920773358`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+Unqualified/qualified inventories again remained exactly 5/8; SHA-256 values
+are `cc073d765490e61512379901697f918410c933a9728d1b3ea15ad3d6448f7bbf`
+and `c399d8af62a6307455c341562e0e38bb246d21ca53c3b21b01670ce21f7cf7b4`.
+Standalone owner TypeScript, exact-owner ESLint, Prettier and diff check passed;
+their SHA-256 values are respectively
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`,
+`17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+No confirmation review, Fable, production/libp2p change or complete E3-03
+campaign was invoked.
+
+The upstream boundary remains fail-closed. The local
+`unreliable-webrtc.ts` break-before-make continuity defect is the demonstrated
+blocker; the connection-monitor abort remains only an unproven trigger. An
+upstream issue is not attributed, proposed or acted on unless D.108e4h evidence
+satisfies every operand of the strict otherwise-usable predicate above. If it
+does, work stops and reslices: the separately reviewed upstream slice must ship
+the pinned two-peer, single-command minimal viable reproducible example before
+any issue report, dependency change or mitigation is considered. The related
+js-libp2p issues and pull requests remain context only and are not fixes.
+
 The initial D.108e4g RED is signed/pushed commit
 `815f2d084f196929aeee59b01271b18e8c7463c0`, parent
 `341f19826f919de147fcea54751c339fd1b088cf`, tree
