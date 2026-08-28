@@ -122,7 +122,7 @@ const D108E4M_UNAVAILABLE_CLASSIFICATIONS = Object.freeze([
 	"launcher-or-child-error",
 ]);
 
-function d108e4mProfileEnabled(value: string | undefined = process.env.TS_DRP_D108E4M_PROFILE): boolean {
+function d108e4mProfileEnabled(value: string | undefined): boolean {
 	return value === "1";
 }
 
@@ -311,7 +311,7 @@ function d108e4mValidation(
 	const message = isRecord(result) ? result : undefined;
 	const proof = isRecord(message?.proof) ? message.proof : undefined;
 	const record = isRecord(proof?.d108e4m) ? proof.d108e4m : undefined;
-	if (!d108e4mProfileEnabled()) {
+	if (!d108e4mProfileEnabled(process.env.TS_DRP_D108E4M_PROFILE)) {
 		if (record !== undefined) errors.push("ordinary-mode:unexpected-record");
 		return { errors, record };
 	}
@@ -561,7 +561,7 @@ function emitD108e4lProof(result: unknown): void {
 	const proof = isRecord(message?.proof) ? message.proof : undefined;
 	const d108e4m = d108e4mValidation(result);
 	const validation = d108e4lValidation(result);
-	if (d108e4mProfileEnabled()) {
+	if (d108e4mProfileEnabled(process.env.TS_DRP_D108E4M_PROFILE)) {
 		const profile =
 			d108e4m.record === undefined
 				? Object.freeze({
@@ -583,12 +583,12 @@ function emitD108e4lProof(result: unknown): void {
 			});
 	console.log(`D108E4L_TIMING ${JSON.stringify(timing)}`);
 	expect(validation.errors).toEqual([]);
-	if (d108e4mProfileEnabled()) expect.soft(d108e4m.errors).toEqual([]);
+	if (d108e4mProfileEnabled(process.env.TS_DRP_D108E4M_PROFILE)) expect.soft(d108e4m.errors).toEqual([]);
 	else expect(d108e4m.errors).toEqual([]);
 }
 
 function emitD108e4mUnavailable(error: unknown): void {
-	if (!d108e4mProfileEnabled()) return;
+	if (!d108e4mProfileEnabled(process.env.TS_DRP_D108E4M_PROFILE)) return;
 	const message = error instanceof Error ? error.message : String(error);
 	const classification = message.includes("child failed") ? "missing-terminal-proof" : "launcher-or-child-error";
 	console.log(
