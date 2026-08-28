@@ -64197,6 +64197,109 @@ K3 CHECK001 through CHECK100 and Opus 5/xhigh review protocol. P0/P1 findings
 are corrected in the same round and every P2 receives an owner/deadline. No
 Fable or collaboration subagent may run without new express authorization.
 
+The first D.108e4e RED is signed/pushed commit
+`475d5cab8ab89bfa1dc2186904120986c3c6404f`, parent
+`330cdd00fb17818bea9083977c2464ed36aac582`, tree
+`282d67734427128750b996c8a2c6e1a4973306b1`, stable patch id
+`5364af7ccaee0450ceadb0adef6651415b70e812` and raw-diff SHA-256
+`cf003863faa9d099935cb6a40462c3ae3cdc1a285133faa20f12e931960e6cba`.
+Its review union rejected it: the post-recovery active-link wait could already
+be true on the stale owner, the initiator-side `replacement` expectation was
+unreachable, the reverse payload was not observable, and the paused fake did
+not settle on the production deadline abort. The tests-only same-round
+correction is signed/pushed commit
+`880c1f99d88033e17f17b9f6be5572775f701895`, parent
+`475d5cab8ab89bfa1dc2186904120986c3c6404f`, tree
+`452ebbef0f2985d21e2e557d47f727bed25a1586`, stable patch id
+`713f617e54c4355e5be6b379c5308317a7cbf828` and raw-diff SHA-256
+`cabbb6a66dd8fbd42c60f36e2395b460f99ebadfbc26728895c48b47af4f1c25`.
+Its selected evidence ran four behaviors, all failing only at the expected
+missing second peer connection; its complete owner evidence ran 34 behaviors,
+30 retained passes plus the same four intentional failures and zero skips.
+Network typecheck, exact-owner typed ESLint, Prettier and `git diff --check`
+passed.
+
+The corrective RED's required review round approved that immutable object.
+Grok 4.6/high session `01a045b2-cdd0-7e20-b154-402f2788f7e5` completed its
+one substantive run with exit zero and `end_turn`; prose before the terminal
+object caused a wrapper `NO_VERDICT`, and a same-session format-only
+continuation returned the same schema-valid `APPROVED`, P0=0/P1=0/P2=1
+result alone. Exact Kimi K3 session
+`session_59e67712-0c7d-4023-855e-5933504ebf4f` returned exactly 100 total and
+unique CHECK001 through CHECK100 markers followed by valid `APPROVED`,
+P0=0/P1=0/P2=0 JSON. Claude-skill Opus 5/xhigh session
+`7f197b21-369d-45dc-94b8-86e3872b469d` returned schema-valid `APPROVED`,
+P0=0/P1=0/P2=4. Its P2s are owned by the GREEN evidence owner before GREEN
+acceptance: pin unchanged `received`, `backpressuredDrops` and
+`unknownRouteDrops`; record the deterministic remote-replacement close
+cascade; identify the separate deduplication and absolute-deadline controls;
+and prove terminal peer-connection counts remain two with no pending setup.
+The Grok P2 has the same owner/deadline and forbids moving retry, deadline,
+payload or setup ownership out of the existing private owners.
+
+One expressly authorized, one-off Fable 5/high read-only course review then
+completed as session `a3f3cd75-870c-4d6d-b4e2-b61c7eb1cd85` with
+`is_error:false`, `stop_reason:end_turn`, no edits and no subagents. No further
+Fable invocation is authorized. Its `CHANGES_REQUIRED` report found a
+substantive false-GREEN missed by the checkpoint reviewers: the
+non-initiator non-open control's failed send calls the current `#linkFor()` but
+that method returns under peer ordering without retiring the unusable link;
+the test's later reverse send from the lower peer is what actually starts
+recovery. An implementation guarded to the lower peer would therefore pass
+the four controls while leaving a higher sending peer stuck. The same review
+requested the already-captured backpressure discriminator. Direct extraction
+of the signed-recorded `573923d2...` failure attachment proves
+`backpressuredDrops:0` and `handshakeFailures:0` on both creator and receiver;
+the creator was lexicographically lower than the receiver in that particular
+failure. The attachment still cannot distinguish a non-open current channel
+from an open link on a stale authenticated connection because it exposes
+neither channel ready state nor connection identity. Blind campaign reruns
+remain forbidden.
+
+###### D.108e4e.1 — causal role-complete recovery correction
+
+D.108e4e.1 is the same narrow slice, not a new transport design. Before
+product GREEN, a second tests-only corrective RED removes the reverse-send
+recovery crutch. The non-open control runs both peer orderings and requires
+the original failed sender to retire its existing unusable mapped link: the
+sender records one `replacement` drop and the peer records one
+`channel-close` drop. The lower sender starts its one deduplicated setup
+immediately; the higher sender starts no outbound setup, while the peer close
+cascade activates the unchanged lower-peer retry owner and starts exactly one
+setup at its existing 250 ms boundary. No failed payload crosses either path.
+The stale-authenticated control also runs both peer orderings with the same
+causal role proof, exact authentication/drop/handshake counters, new-payload
+single delivery and exact connection generation. Missing-link sends remain
+false and may not start setup. Multi-peer recovery policy is outside this
+single-peer E3 defect and remains unchanged: the existing loop returns on its
+first unusable target. A later failed send after a settled setup may use the
+existing retry/acquisition behavior; this slice adds no backoff owner.
+
+The permitted GREEN remains two private changes in
+`packages/network/src/unreliable-webrtc.ts`. First, the existing `#linkFor()`
+replacement predicate may treat an existing non-open mapped channel exactly
+like its existing stale-connection replacement case: reserve through the
+existing admission owner, retire it through the existing `#dropLink()` owner,
+then preserve the existing peer-order, deduplication, retry and absolute
+deadline flow. Second, the reconciled invalid-target branch may invoke that
+existing `#linkFor()` fire-and-forget only when the mapped link exists and the
+peer remains desired, then return false. It may not invoke acquisition for a
+missing or undesired peer, await setup, retain bytes, iterate past the first
+invalid target, create another retry/deadline/admission owner or change any
+counter meaning. If the role-complete RED cannot pass with only those two
+private source expressions, stop and reslice again.
+
+The D.108e4e.1 corrective RED receives a fresh immutable signed/pushed object
+and the required Grok 4.6/high, exact Kimi K3 CHECK001 through CHECK100 and
+Opus 5/xhigh review round because it materially strengthens causal coverage.
+The previous approvals remain historical evidence and do not approve the new
+object. P0/P1 findings are corrected in the same round; P2 requires an owner
+and deadline without a confirmation review. Only after that RED closes may
+GREEN begin. The D.108e4c records that follow retain their original ownership;
+the plan owner must move or explicitly regroup the inherited subsections
+before combined D.108e4 closure so their current physical position after this
+D.108e4e amendment cannot be mistaken for D.108e4e evidence.
+
 The first D.108e4c plan-freeze review round inspected signed/pushed commit
 `eb3de05b6054ac6fdd158d2530bad1798f87f10f`, parent
 `b8a2628bec7593c547919b540889dc75e33cd9ca`, tree
