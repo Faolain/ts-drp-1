@@ -67268,3 +67268,85 @@ The accepted same-round correction is exact signed/pushed commit
 It has a good signature, changes only this plan and is the exact detached
 checkout commit for the D.108e4k isolated proof. Every behavior and build-input
 tree named above remains byte-identical to `cc112d22`.
+
+The first D.108e4k ordinary execution stopped at its first timing-sensitive
+gate rather than rerunning it or continuing into an evidence campaign. With no
+model, browser or other test process concurrent, the exact unloaded native
+timing command above produced 4/5 passes and one failure. The child completed
+every semantic assertion but reported its own `wallTimeMs` as
+`61_399.244417`, violating the unchanged `< 60_000` requirement. Enclosing
+file/test wall times were 66.58/65.215 seconds and `/usr/bin/time -p` reported
+67.72 real, 67.21 user and 3.67 system seconds; none substitutes for the child
+acceptance value. Stdout/stderr SHA-256 values are
+`3185d041617f236f1c480561968bd2e7c117f561b519b76693deae507114911c`
+and `8d9ff43a55e100201828dca0e73d8b7e2b7df19301882ed060d8550de72dbfd4`.
+The other ordinary commands and the detached clean proof did not run because
+the frozen ledger is fail-closed. D.108e4k remains open and its evidence review
+has not begun.
+
+###### D.108e4l — native timing attribution before another execution
+
+D.108e4l is the immediate narrow test-infrastructure instrumentation owner
+created by the unloaded D.108e4k failure. The failed invocation above is its
+immutable RED evidence: it proves the retained ceiling is currently red while
+the child reports only one aggregate duration. No second pre-instrumentation
+execution is authorized, and an incidental passing rerun cannot close or
+diagnose the failure. This slice changes exactly two tracked owners:
+
+- `packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs`;
+- `packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts`.
+
+No product/example source, package manifest, lockfile, build config, public or
+private product API, durable-store API, snapshot/wire/digest/authority owner,
+row/chunk/memory/connection limit, timing ceiling or recovery acceptance may
+change. If attribution requires a production-source or store-interface change,
+D.108e4l stops and reslices rather than widening.
+
+The child keeps the existing `performance.now()` start and signed aggregate
+`wallTimeMs`, then records monotonic phase boundaries around the already
+existing operations: store open; current-row plus genuine-future preparation;
+the 8,191 sequential authenticated-future appends; maximum-page probe;
+8,193-row equality materialization; over-budget suffix append/read/
+authentication; mismatch materialization; and the concurrent equality,
+two-invocation reuse, over-budget and mismatch recoveries. Each record contains
+only its fixed phase name, start/end offsets, duration, row/operation count and
+process resource-usage deltas. The envelope also records the exact Node
+version, platform, architecture and available parallelism. Phase offsets must
+be nonnegative, increasing, nonoverlapping and bounded by aggregate
+`wallTimeMs`; their durations must equal `end - start`, and the final phase end
+must agree with the aggregate within a frozen 10 ms instrumentation tolerance.
+No new sleeps, samples, retries, alternate data path or asynchronous work is
+added.
+
+The parent test validates that closed schema before the unchanged `< 60_000`
+assertion and always emits one single-line `D108E4L_TIMING ` JSON record, so a
+passing or failing run retains the same attribution evidence. It pins the
+expected append/materialization/recovery counts and rejects a missing,
+duplicated, reordered, overlapping, negative or aggregate-incoherent phase.
+The telemetry is diagnostic only: no phase threshold is introduced, no phase
+is excluded from `wallTimeMs`, and the original ceiling remains the sole timing
+acceptance. Exact surrounding test inventory and every semantic assertion stay
+unchanged.
+
+After implementation and exact-two-owner ESLint/Prettier/`node --check`/
+`git diff --check`, run the native five-test timing file exactly once, alone,
+with no model or other test process. Its stdout/stderr and extracted
+`D108E4L_TIMING` line receive SHA-256 custody. If it remains red, the phase
+ledger assigns the next exact owner without rerun: fixture seeding or evidence
+construction stays test-infrastructure; recovery/store time that requires
+production work stops and receives a separately reviewed product-performance
+slice. If it passes, the phase ledger must still explain the prior 61.399-second
+failure and demonstrate sufficient deterministic margin; a single sub-60
+sample is not permission to close the slice or D.108e4k. Only an accepted
+attribution and corresponding deterministic correction may authorize a fresh
+unloaded acceptance run.
+
+D.108e4l receives a signed/pushed plan freeze and the normal Grok 4.6/high,
+exact Kimi K3 `CHECK001` through `CHECK100` and Opus 5/xhigh plan review before
+the two-owner instrumentation change. The instrumentation checkpoint then
+receives its own review round before its one allowed execution. Reproduced
+P0/P1 findings are corrected in the same round without confirmation; every P2
+receives an exact owner and 2026-09-04 deadline. No Fable, collaboration
+subagent, E3-03 complete config/campaign, libp2p change, upstream attribution or
+MVRE runs in this slice. D.108e4a/b/c/d, aggregate D.108e4 and D.108e5 remain
+blocked.
