@@ -2852,6 +2852,173 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 				}),
 			});
 
+		const creatorReplacementWithoutCloseEvent = withCreatorLifecycle(
+			creatorReplacement,
+			creatorReplacement.endpoints.creator.lifecycle.flatMap((record) => {
+				if (
+					record.event === "channel-open-event" &&
+					record.connectionId === D108E4H_RTC_B.connectionId &&
+					record.channelId === D108E4H_RTC_B.channelId
+				) {
+					return Object.freeze([
+						record,
+						d108e4hLifecycle(
+							creatorReplacement.trialId,
+							record.sequence + 1,
+							"channel-message-handler-installed",
+							D108E4H_RTC_B,
+							"product-unreliable-webrtc"
+						),
+					]);
+				}
+				if (
+					record.event === "channel-close-call" &&
+					record.connectionId === D108E4H_RTC_A.connectionId &&
+					record.channelId === D108E4H_RTC_A.channelId
+				) {
+					return Object.freeze([Object.freeze({ ...record, sequence: record.sequence + 1 })]);
+				}
+				if (
+					record.event === "channel-close-event" &&
+					record.connectionId === D108E4H_RTC_A.connectionId &&
+					record.channelId === D108E4H_RTC_A.channelId
+				) {
+					return Object.freeze([]);
+				}
+				return Object.freeze([record]);
+			})
+		);
+		const creatorChannelCloseRemoteOrder = withCreatorLifecycle(
+			creatorChannelClose,
+			creatorChannelClose.endpoints.creator.lifecycle.flatMap((record) => {
+				if (
+					record.event === "channel-open-event" &&
+					record.connectionId === D108E4H_RTC_B.connectionId &&
+					record.channelId === D108E4H_RTC_B.channelId
+				) {
+					return Object.freeze([
+						record,
+						d108e4hLifecycle(
+							creatorChannelClose.trialId,
+							record.sequence + 1,
+							"channel-message-handler-installed",
+							D108E4H_RTC_B,
+							"product-unreliable-webrtc"
+						),
+					]);
+				}
+				if (
+					record.event === "channel-close-call" &&
+					record.connectionId === D108E4H_RTC_A.connectionId &&
+					record.channelId === D108E4H_RTC_A.channelId
+				) {
+					return Object.freeze([]);
+				}
+				if (
+					record.event === "channel-close-event" &&
+					record.connectionId === D108E4H_RTC_A.connectionId &&
+					record.channelId === D108E4H_RTC_A.channelId
+				) {
+					const closeCall = creatorChannelClose.endpoints.creator.lifecycle.find(
+						(candidate) =>
+							candidate.event === "channel-close-call" &&
+							candidate.connectionId === D108E4H_RTC_A.connectionId &&
+							candidate.channelId === D108E4H_RTC_A.channelId
+					);
+					if (closeCall === undefined) throw new Error("D108E4I_FIXTURE_CLOSE_CALL_ABSENT");
+					return Object.freeze([record, Object.freeze({ ...closeCall, sequence: record.sequence + 1 })]);
+				}
+				return Object.freeze([
+					record.connectionId === D108E4H_RTC_B.connectionId && record.sequence >= 603
+						? Object.freeze({ ...record, sequence: record.sequence + 1 })
+						: record,
+				]);
+			})
+		);
+		const lossSafeReceiverFixture = (
+			fixture: D108e4hValidationInput,
+			closeEventBeforeCall: boolean
+		): D108e4hValidationInput => {
+			const acceptedA = fixture.endpoints.receiver.acceptedRaw.filter(
+				({ channelId, connectionId }) =>
+					connectionId === D108E4H_RTC_A.connectionId && channelId === D108E4H_RTC_A.channelId
+			);
+			const transportAdjusted = withReceiverDeadlineTransport(
+				fixture,
+				Object.freeze({
+					...fixture.endpoints.receiver.deadline.rawTransport,
+					received: acceptedA.length,
+				})
+			);
+			const closeCall = fixture.endpoints.receiver.lifecycle.find(
+				(record) =>
+					record.event === "channel-close-call" &&
+					record.connectionId === D108E4H_RTC_A.connectionId &&
+					record.channelId === D108E4H_RTC_A.channelId
+			);
+			if (closeCall === undefined) throw new Error("D108E4I_FIXTURE_CLOSE_CALL_ABSENT");
+			const lifecycle = fixture.endpoints.receiver.lifecycle.flatMap((record) => {
+				if (
+					record.event === "channel-message" &&
+					record.connectionId === D108E4H_RTC_B.connectionId &&
+					record.channelId === D108E4H_RTC_B.channelId
+				) {
+					return Object.freeze([]);
+				}
+				if (!closeEventBeforeCall) return Object.freeze([record]);
+				if (record === closeCall) return Object.freeze([]);
+				if (
+					record.event === "channel-close-event" &&
+					record.connectionId === D108E4H_RTC_A.connectionId &&
+					record.channelId === D108E4H_RTC_A.channelId
+				) {
+					return Object.freeze([
+						Object.freeze({ ...record, sequence: closeCall.sequence }),
+						Object.freeze({ ...closeCall, sequence: record.sequence }),
+					]);
+				}
+				return Object.freeze([record]);
+			});
+			return Object.freeze({
+				...transportAdjusted,
+				endpoints: Object.freeze({
+					...transportAdjusted.endpoints,
+					receiver: Object.freeze({
+						...transportAdjusted.endpoints.receiver,
+						acceptedRaw: Object.freeze(acceptedA),
+						lifecycle: Object.freeze(lifecycle),
+					}),
+				}),
+			});
+		};
+		const receiverReplacementWithoutBDelivery = lossSafeReceiverFixture(receiverReplacement, false);
+		const receiverChannelCloseRemoteOrderWithoutBDelivery = lossSafeReceiverFixture(receiverChannelClose, true);
+		for (const [name, fixture] of [
+			["replacement/transmitter without deadline close-event", creatorReplacementWithoutCloseEvent],
+			["replacement/nontransmitter without B delivery", receiverReplacementWithoutBDelivery],
+			["channel-close/transmitter remote order", creatorChannelCloseRemoteOrder],
+			["channel-close/nontransmitter without B delivery", receiverChannelCloseRemoteOrderWithoutBDelivery],
+		] as const) {
+			expect.soft(() => validateD108e4hCampaignCustody(fixture), `D108E4I_RED ${name}`).not.toThrow();
+		}
+		const channelCloseWithoutProductCall = withReceiverLifecycle(
+			receiverChannelCloseRemoteOrderWithoutBDelivery,
+			receiverChannelCloseRemoteOrderWithoutBDelivery.endpoints.receiver.lifecycle.filter(
+				({ channelId, connectionId, event }) =>
+					!(
+						event === "channel-close-call" &&
+						connectionId === D108E4H_RTC_A.connectionId &&
+						channelId === D108E4H_RTC_A.channelId
+					)
+			)
+		);
+		expect
+			.soft(
+				() => validateD108e4hCampaignCustody(channelCloseWithoutProductCall),
+				"D108E4I_RED channel-close owns a mandatory zero-buffer product close-call"
+			)
+			.toThrowError("D108E4H_CHANNEL_CLOSE_DRAIN_INVALID");
+
 		const wrongEnvelopeSchema = Object.freeze({
 			...noReplacement,
 			schemaVersion: 2,
