@@ -2633,11 +2633,12 @@ function d108e4hAssertAttemptCustody(
 	);
 	if (replaced) {
 		const replacementOpens = endpoint.lifecycle.filter(
-			({ channelId, connectionId, event, label }) =>
+			({ channelId, connectionId, event, label, owner }) =>
 				connectionId === after.connectionId &&
 				channelId === after.channelId &&
 				event === "channel-open-event" &&
-				label === "ts-drp-ephemeral/1"
+				label === "ts-drp-ephemeral/1" &&
+				owner === "rtc-datachannel-open-event"
 		);
 		const replacementHandlers = endpoint.lifecycle.filter(
 			({ channelId, connectionId, event, label, owner }) =>
@@ -2702,11 +2703,12 @@ function d108e4hAssertOverlapCustody(
 	);
 	if (!replaced) return;
 	const replacementOpens = endpoint.lifecycle.filter(
-		({ channelId, connectionId, event, label }) =>
+		({ channelId, connectionId, event, label, owner }) =>
 			connectionId === after.connectionId &&
 			channelId === after.channelId &&
 			event === "channel-open-event" &&
-			label === "ts-drp-ephemeral/1"
+			label === "ts-drp-ephemeral/1" &&
+			owner === "rtc-datachannel-open-event"
 	);
 	const replacementHandlers = endpoint.lifecycle.filter(
 		({ channelId, connectionId, event, label, owner }) =>
@@ -3066,7 +3068,6 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 					)
 			)
 		);
-		const creatorChannelCloseRemoteOrder = creatorChannelClose;
 		const receiverDirectionalFixture = (
 			fixture: D108e4hValidationInput,
 			input: Readonly<{
@@ -3124,23 +3125,20 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 		const receiverReplacementWithoutBDelivery = receiverDirectionalFixture(receiverReplacement, {
 			removeBDelivery: true,
 		});
-		const receiverChannelCloseRemoteOrder = receiverDirectionalFixture(receiverChannelClose, {});
-		const receiverChannelCloseRemoteOrderWithoutBDelivery = receiverDirectionalFixture(receiverChannelClose, {
+		const receiverChannelCloseWithoutBDelivery = receiverDirectionalFixture(receiverChannelClose, {
 			removeBDelivery: true,
 		});
 		for (const [name, fixture] of [
 			["replacement/transmitter without deadline close-event", creatorReplacementWithoutCloseEvent],
 			["replacement/nontransmitter without deadline close-event", receiverReplacementWithoutCloseEvent],
 			["replacement/nontransmitter without B delivery", receiverReplacementWithoutBDelivery],
-			["channel-close/transmitter remote order", creatorChannelCloseRemoteOrder],
-			["channel-close/nontransmitter remote order with accepted B", receiverChannelCloseRemoteOrder],
-			["channel-close/nontransmitter without B delivery", receiverChannelCloseRemoteOrderWithoutBDelivery],
+			["channel-close/nontransmitter without B delivery", receiverChannelCloseWithoutBDelivery],
 		] as const) {
 			expect.soft(() => validateD108e4hCampaignCustody(fixture), `D108E4I_RED ${name}`).not.toThrow();
 		}
 		const channelCloseWithoutProductCall = withReceiverLifecycle(
-			receiverChannelCloseRemoteOrder,
-			receiverChannelCloseRemoteOrder.endpoints.receiver.lifecycle.filter(
+			receiverChannelClose,
+			receiverChannelClose.endpoints.receiver.lifecycle.filter(
 				({ channelId, connectionId, event }) =>
 					!(
 						event === "channel-close-call" &&
@@ -3216,31 +3214,31 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 			)
 			.toThrowError("D108E4H_LIFECYCLE_ORDER_INVALID");
 
-		const receiverChannelCloseHandler = receiverChannelCloseRemoteOrder.endpoints.receiver.lifecycle.find(
+		const receiverChannelCloseHandler = receiverChannelClose.endpoints.receiver.lifecycle.find(
 			({ channelId, connectionId, event }) =>
 				event === "channel-message-handler-installed" &&
 				connectionId === D108E4H_RTC_B.connectionId &&
 				channelId === D108E4H_RTC_B.channelId
 		);
-		const receiverChannelCloseOpen = receiverChannelCloseRemoteOrder.endpoints.receiver.lifecycle.find(
+		const receiverChannelCloseOpen = receiverChannelClose.endpoints.receiver.lifecycle.find(
 			({ channelId, connectionId, event }) =>
 				event === "channel-open-event" &&
 				connectionId === D108E4H_RTC_B.connectionId &&
 				channelId === D108E4H_RTC_B.channelId
 		);
-		const receiverChannelCloseFirstB = receiverChannelCloseRemoteOrder.endpoints.receiver.lifecycle.find(
+		const receiverChannelCloseFirstB = receiverChannelClose.endpoints.receiver.lifecycle.find(
 			({ channelId, connectionId, event }) =>
 				event === "channel-message" &&
 				connectionId === D108E4H_RTC_B.connectionId &&
 				channelId === D108E4H_RTC_B.channelId
 		);
-		const receiverChannelCloseAcceptedA = receiverChannelCloseRemoteOrder.endpoints.receiver.lifecycle.find(
+		const receiverChannelCloseAcceptedA = receiverChannelClose.endpoints.receiver.lifecycle.find(
 			({ channelId, connectionId, event }) =>
 				event === "channel-message" &&
 				connectionId === D108E4H_RTC_A.connectionId &&
 				channelId === D108E4H_RTC_A.channelId
 		);
-		const receiverChannelCloseEvent = receiverChannelCloseRemoteOrder.endpoints.receiver.lifecycle.find(
+		const receiverChannelCloseEvent = receiverChannelClose.endpoints.receiver.lifecycle.find(
 			({ channelId, connectionId, event }) =>
 				event === "channel-close-event" &&
 				connectionId === D108E4H_RTC_A.connectionId &&
@@ -3256,9 +3254,9 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 			throw new Error("D108E4I_FIXTURE_CHANNEL_CLOSE_RECORD_ABSENT");
 		}
 		const channelCloseBeforeBReadyBase = withReceiverLifecycle(
-			receiverChannelCloseRemoteOrder,
+			receiverChannelClose,
 			Object.freeze(
-				receiverChannelCloseRemoteOrder.endpoints.receiver.lifecycle
+				receiverChannelClose.endpoints.receiver.lifecycle
 					.map((record) =>
 						record === receiverChannelCloseAcceptedA
 							? Object.freeze({ ...record, sequence: 0 })
@@ -3297,13 +3295,13 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 			"D108E4H_LIFECYCLE_ORDER_INVALID"
 		);
 
-		const postCloseAcceptedA = receiverChannelCloseRemoteOrder.endpoints.receiver.rejectedRaw[0];
+		const postCloseAcceptedA = receiverChannelClose.endpoints.receiver.rejectedRaw[0];
 		if (postCloseAcceptedA === undefined) throw new Error("D108E4I_FIXTURE_POST_CLOSE_A_ABSENT");
 		const channelCloseAcceptedABetweenEventAndCallBase = withReceiverDeadlineTransport(
-			receiverChannelCloseRemoteOrder,
+			receiverChannelClose,
 			Object.freeze({
-				...receiverChannelCloseRemoteOrder.endpoints.receiver.deadline.rawTransport,
-				received: receiverChannelCloseRemoteOrder.endpoints.receiver.acceptedRaw.length + 1,
+				...receiverChannelClose.endpoints.receiver.deadline.rawTransport,
+				received: receiverChannelClose.endpoints.receiver.acceptedRaw.length + 1,
 			})
 		);
 		const channelCloseAcceptedABetweenEventAndCall = Object.freeze({
@@ -3786,6 +3784,40 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 			})
 		);
 		expect(() => validateD108e4hCampaignCustody(closeEventBeforeCall)).toThrowError("D108E4H_LIFECYCLE_ORDER_INVALID");
+		const replacementWithoutProductCall = withReceiverLifecycle(
+			receiverReplacement,
+			receiverReplacement.endpoints.receiver.lifecycle.filter(
+				({ channelId, connectionId, event, owner }) =>
+					!(
+						event === "channel-close-call" &&
+						owner === "product-unreliable-webrtc" &&
+						connectionId === D108E4H_RTC_A.connectionId &&
+						channelId === D108E4H_RTC_A.channelId
+					)
+			)
+		);
+		expect(() => validateD108e4hCampaignCustody(replacementWithoutProductCall)).toThrowError(
+			"D108E4H_LIFECYCLE_ORDER_INVALID"
+		);
+		const channelCloseCallBeforeEvent = withReceiverLifecycle(
+			receiverChannelClose,
+			receiverChannelClose.endpoints.receiver.lifecycle.map((record, index) => {
+				if (index === 4)
+					return Object.freeze({
+						...(receiverChannelClose.endpoints.receiver.lifecycle[5] as D108e4hLifecycleObservation),
+						sequence: 4,
+					});
+				if (index === 5)
+					return Object.freeze({
+						...(receiverChannelClose.endpoints.receiver.lifecycle[4] as D108e4hLifecycleObservation),
+						sequence: 5,
+					});
+				return record;
+			})
+		);
+		expect(() => validateD108e4hCampaignCustody(channelCloseCallBeforeEvent)).toThrowError(
+			"D108E4H_LIFECYCLE_ORDER_INVALID"
+		);
 
 		const receiverWithTwoAccepted = withReceiverDeadlineTransport(
 			receiverReplacement,
@@ -3998,6 +4030,15 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 			)
 		);
 		expect(() => validateD108e4hCampaignCustody(wrongReplacementChannel)).toThrowError(
+			"D108E4H_LIFECYCLE_ORDER_INVALID"
+		);
+		const wrongReplacementOpenOwner = withReceiverLifecycle(
+			receiverReplacement,
+			receiverLifecycle.map((record) =>
+				record.event === "channel-open-event" ? Object.freeze({ ...record, owner: "rtc-observer-or-harness" }) : record
+			)
+		);
+		expect(() => validateD108e4hCampaignCustody(wrongReplacementOpenOwner)).toThrowError(
 			"D108E4H_LIFECYCLE_ORDER_INVALID"
 		);
 		const wrongCloseEventOwner = withReceiverLifecycle(
