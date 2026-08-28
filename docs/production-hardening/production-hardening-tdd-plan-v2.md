@@ -64917,21 +64917,62 @@ authorized.
 ###### D.108e4g — make-before-break raw-sidecar continuity under authenticated replacement
 
 D.108e4g is the narrow recovery owner created by the rejected D.108e4f GREEN.
-The demonstrated blocker is local to
-`packages/network/src/unreliable-webrtc.ts`: when authenticated connection
-identity changes, `#linkFor` reserves replacement admission and drops an open
-raw sidecar before the replacement is usable. `#send` can trigger the same
-retirement when it observes that the open link's authenticated connection is
-not current. This break-before-make transition creates an avoidable raw outage
-even when the old `RTCDataChannel` remains open and usable. D.108e4g changes
-that lifecycle only: an open old raw link remains the active send/ingress owner
-while one authenticated same-peer replacement is pending; the old link is
-retired exactly after the replacement has opened and atomically registered, or
-when the old channel/peer connection itself closes or fails. A failed or timed
-out replacement retains the usable old link and increments the existing
-handshake-failure evidence. No payload buffering, duplicate active ingress,
-new public API, wire-format change, digest-owner change, chunk/connection
-limit, memory ceiling or activation-authority change is authorized.
+The local source defect is in `packages/network/src/unreliable-webrtc.ts`:
+when authenticated connection identity changes, `#linkFor` reserves
+replacement admission and drops an old raw sidecar before the replacement is
+usable; `#send` also refuses the old link and invokes that path when the old
+connection is no longer current. The 4,426 ms campaign evidence is consistent
+with this break-before-make transition but its historical attachment does not
+record the old channel's decision-time state or which arm of
+`replacementRequired` fired. D.108e4g-a must therefore discriminate the branch
+under unchanged product behavior before GREEN: it records old-channel
+`readyState` and `bufferedAmount`, old and selected authenticated connection
+id/generation, and whether channel-not-open or connection-not-current selected
+retirement. At least one focused, non-campaign current-owner browser
+reproduction must show `lastLinkDrop === "replacement"`, the old channel still
+`"open"` at the decision and the connection-not-current arm selected. If this
+cannot be produced with the exact tests/example owners below, stop and reslice
+a tests-only control seam; do not spend the sole complete campaign or change
+production behavior on an unconfirmed branch.
+
+After that gate, D.108e4g changes the local lifecycle only. An open old raw
+link remains the active send/ingress owner while one authenticated same-peer
+replacement is eligible or pending. `send()` continues to use that mapped old
+link and also starts or joins the single replacement setup; it may not obtain a
+hollow GREEN by merely returning true forever. The old link is retired only
+after the replacement has opened and atomically registered, or when the old
+channel/peer connection itself closes or fails. A rejected or timed-out
+replacement retains the usable old link, increments the existing handshake
+failure exactly once and clears its pending setup, admission and timer state.
+No payload buffering, duplicate mapped ingress, new public API, wire-format
+change, digest-owner change, chunk/connection limit, memory ceiling or
+activation-authority change is authorized.
+
+D.108e4g-b is the required directional-handoff reslice inside that same local
+owner. A no-wire-change design cannot prove that both JavaScript registration
+callbacks have completed before either endpoint can send. It therefore keeps
+exactly one mapped send owner while permitting two narrowly classified ingress
+states during the handoff: the exact desired/authenticated same-peer B channel
+is `pending-ingress` after its inbound data-channel handler is installed, and
+the displaced A channel is `retiring-ingress` until its close event drains.
+Both deliver immediately through the unchanged route digest and ACL; neither
+buffers or replays payloads, neither may send, and neither admits another peer
+or handoff generation. The lower lexicographic initiator's B-open event is the
+handoff coordinator; only after the focused real-browser self-check proves the
+remote pending-ingress handler is installed before the initiator's first B
+send may the lower peer map B and close A. The upper peer promotes its already
+open B when A closes. If that browser ordering is not demonstrated, stop and
+reslice: do not add an acknowledgment/control frame, grace timer or payload
+buffer under D.108e4g.
+
+Pending/retiring ingress is not a general second active link. It exists only
+for one handoff id, is removed on success/failure/close and is counted in the
+physical ceiling. The production sender transmits each attempt through one
+mapped channel only. RED interleaves uniquely identified payloads immediately
+before, during and after handoff and requires each to arrive exactly once; any
+owner-induced duplicate or loss fails. This explicitly resolves the
+asymmetric window without pretending a test barrier is cross-peer production
+coordination.
 
 The observed js-libp2p connection-monitor abort is an unproven trigger, not
 the root-cause attribution. The reliable connection was already wedged, so
@@ -64955,50 +64996,139 @@ items are related continuity and cleanup context only, not proposed fixes:
 
 Before another complete E3-03 invocation, D.108e4g-a freezes deterministic
 lifecycle telemetry and an immutable both-peer-orderings RED. The browser
-telemetry must timestamp and attribute: ping start, success, failure and abort
-including abort owner/reason; each authenticated `RTCPeerConnection`'s
-signaling, ICE and connection states; every `RTCPeerConnection.close()` and
-`RTCDataChannel.close()` caller with owner and stack; signaling offer, answer
-and candidate phases; raw-send refusal; active mapping deletion; desired-peer
-acquisition; replacement peer-connection creation, data-channel open and
-registration; old-link retirement; and the first successful post-replacement
-send. It must retain the scheduler's due, capture and insertion timestamps so
-transport silence cannot be confused with test-runner delay. Prototype-level
-browser instrumentation and the existing private example workbench seam are
-permitted. Any workbench snapshot-shape extension is explicitly a private
-test/example seam change and must be reviewed as such; it is not a product API.
-The telemetry self-check must deterministically exercise and observe every
-event class before production behavior changes. Missing or internally
-inconsistent lifecycle evidence fails closed.
+telemetry schema is versioned and gives every event a peer-local monotonic
+sequence plus monotonic and wall-clock timestamps, peer id, authenticated
+connection id/generation, peer-connection id, data-channel id and handoff id.
+Send events additionally carry an attempt id. Stack evidence is normalized to
+a bounded owner token and first repository frame; arbitrary machine paths are
+not evidence. The schema timestamps and attributes:
 
-The immutable unit RED owner is
-`packages/network/tests/unreliable-webrtc-e3-01-red.test.ts`; GREEN may change
-only that test owner and `packages/network/src/unreliable-webrtc.ts` unless the
-reviewed telemetry checkpoint names an additional exact test/example owner.
-The RED runs both lexicographic peer orderings. In each ordering it establishes
-old authenticated connection A and its raw link, introduces authenticated
-connection B while holding B's answer/open phase, then reconciles and sends
-from both role-specific paths. While B is pending, the assertions require A to
-remain mapped, `send()` to return true and exactly one payload to arrive.
-After releasing B, B must open and register before exactly one replacement
-drop retires A; the next send must arrive exactly once through B. A separate
-failed-replacement vector rejects or times out B and requires A to remain
-mapped and sendable, the handshake-failure counter to advance, and no
-replacement drop. Existing undesired-peer, multi-peer, admission, connection
-loss, stale signaling, route ACL, no-duplicate-delivery and eight-PC ceiling
-controls remain retained. RED is causal only when these new positive
-continuity assertions fail under the current break-before-make owner while the
-retained controls pass.
+- ping start, success, failure and abort, including abort owner/reason;
+- each authenticated `RTCPeerConnection` signaling, ICE and connection state;
+- every `RTCPeerConnection.close()` and `RTCDataChannel.close()` call with
+  decision-time ready state, buffered amount, owner and normalized stack;
+- signaling offer, answer and candidate phases;
+- raw-send attempt, refusal and success;
+- active mapping deletion, desired-peer acquisition and pending-setup cleanup;
+- replacement peer-connection creation, data-channel open, registration on
+  both peers, old-link retirement and selected `replacementRequired` arm;
+- payloads observed on an opened but not yet registered replacement channel,
+  their pending-ingress disposition, retiring-old in-flight arrivals, the
+  first attempted replacement-channel send and its disposition, and the first
+  successful post-registration send; and
+- scheduler due, capture and insertion times, plus per-reason drop tallies,
+  so transport silence cannot be confused with test-runner delay.
+
+Unique ids and the peer-local sequence make every create/open/register/drop/
+send chain joinable without wall-clock equality. The self-check fails on a
+missing, duplicate, unjoined or order-inconsistent event, and asserts that the
+observer preserves native method return values, thrown errors and sent bytes.
+The unit self-check deterministically covers refusal, mapping, acquisition,
+create/open/register/drop/cleanup, close ownership and first post-handoff
+send. Ping/abort and real ICE/state coverage belong to the focused browser
+self-check and campaign attachment rather than a fake unit event. A separate
+deterministic responder barrier holds data-channel open and registration
+completion; `vi.waitFor` or a bare tick is not handoff-order evidence.
+
+The exact D.108e4g-a telemetry owners are
+`tests/e3-03-loss-and-hol-proof.pw.ts` for the versioned observer, focused
+current-owner reproduction, self-check and canonical JSON attachment, and
+`examples/grid/src/v3-zone.ts` for the existing private `fabric.snapshot`
+projection only. The exact RED owner is
+`packages/network/tests/unreliable-webrtc-e3-01-red.test.ts`. The public
+`DRPUnreliableWebRtcSnapshot` in
+`packages/network/src/unreliable-webrtc.ts`, its exact-key tripwire in the RED
+owner, `packages/node/src/index.ts` and
+`packages/node/tests/fixtures/controlled-unreliable-webrtc.ts` must not change
+for telemetry. A private `ZoneFabricWorkbench.snapshot` shape extension is an
+example/test seam, not a product API. No other telemetry, fixture, schema,
+config or source owner may change. If these two telemetry owners cannot expose
+the branch, mapping and abort attribution without a production-source debug
+API, D.108e4g-a stops and reslices instead of silently adding one.
+
+The immutable unit RED runs both lexicographic peer orderings. In the
+initiator ordering it holds the answer and open barriers; in the non-initiator
+ordering it holds the current-B inbound accept before registration. Each
+ordering establishes authenticated connection A and its raw link, introduces
+authenticated connection B, then exercises both reconcile and a separate
+send-only path that never calls reconcile after identity changes. While B is
+pending, A remains mapped, `send()` returns true, starts or joins exactly one
+setup and delivers exactly one payload. After releasing the explicit open and
+pending-handler barriers, the lower B-open event must follow installation of
+the upper pending-ingress handler. The first B send is accepted by B whether
+the upper callback is still pending or has promoted it; the lower mapping
+precedes local A retirement; the upper A-close path promotes its already-open
+B; and exactly one replacement drop occurs per endpoint. Unique A-before,
+A-in-flight and B-first payloads each arrive exactly once, pending/retry timers
+are zero and no message is buffered. A deliberately reversed pending-handler
+barrier must fail closed without sending B. If real browser proof contradicts
+that ordering, the GREEN owner stops and reslices rather than adding a wire
+change or buffer.
+
+Failed replacement is a four-vector matrix: local initiator and local
+non-initiator crossed with explicit signaling rejection and original-deadline
+timeout. Every vector requires A to remain mapped and sendable, exactly one
+handshake failure, no replacement drop, no payload retention, no leaked
+pending PC/admission/timer and no immediate second setup before the existing
+retry owner becomes due. A later permitted retry remains bounded by the
+original retry contract.
+
+The physical connection ceiling remains eight. A usable retained link consumes
+one physical slot and each pending peer connection consumes one; there is at
+most one pending replacement per peer and the global sum of non-closed active
+plus pending peer connections never exceeds `MAX_LINKS`. At seven active
+links, one same-peer replacement may occupy the eighth slot while every
+newcomer is refused; atomic handoff returns the count to seven. At eight active
+links, replacement creation is deferred without closing A or refusing sends;
+zero ninth PC is allocated and newcomers remain refused. Only when A itself
+closes/fails and frees its slot may B start. Concurrent replacements consume
+only genuinely free slots and the remainder stay deferred. Retained links do
+not create redundant replacement-admission timers; successful handoff clears
+retry state, and failed setup clears only its own pending state. RED covers
+seven/eight occupancy, concurrent replacement pressure, cleanup and exact
+non-closed physical counts rather than cumulative allocations.
+
+The following frozen assertions encode the superseded D.108e4a/e4e
+retire-before-setup contract and are rewritten as RED owners, not retained
+controls:
+
+- `caps sibling links at eight, replaces one in place, and rejects a ninth
+without allocating it` changes its pending-replacement expectation from old
+  PC closed/activeLinks 7/drop 1 to old PC open/activeLinks 8/drop 0 and zero
+  ninth allocation; because occupancy is full, replacement remains deferred.
+- `reserves a retired inbound link's capacity until its current replacement
+registers` and its mixed-order sibling replace the retired-link/timer model
+  with the seven-active overlap and eight-active defer rules above.
+- `retires a disappeared authenticated link before replacement setup as the
+%s` becomes the both-orderings continuity plus failed-replacement matrix;
+  activeLinks remains 1 and drop count remains zero while B is pending or
+  fails, then B registration precedes exactly one replacement drop.
+- `uses a failed send to replace a reconciled stale link as the %s` and the
+  stale-connection segments in `rejects unknown routes, retains established
+raw links, and cannot revive stale signaling` change first send false/
+  activeLinks 0 to first send true/activeLinks 1 while exactly one replacement
+  starts; post-handoff delivery remains exact.
+
+All assertions outside that explicit supersession list remain byte-for-byte
+controls: undesired-peer membership, overlapping-current selection, non-open
+unusable-link recovery, unknown/closed-route ACL, no duplicate mapped ingress,
+handshake bounds, eight pending offers and physical `MAX_LINKS`. RED is causal
+only when the new/reclassified continuity assertions fail under current source
+while every non-superseded control passes.
 
 GREEN replaces D.108e4a's retire-before-setup assumption only for a desired,
 already-authorized, same-peer open raw sidecar with a current authenticated
 replacement candidate. Authorization remains tied to the authenticated peer;
 the existing route header and ingress ACL remain authoritative; the old link
 does not admit a new peer or route. At most one link is the mapped send/ingress
-owner, and registration performs the atomic handoff before closing the old
-physical sidecar. A non-open old link is still dropped immediately, and an
-undesired peer is never retained. This is make-before-break continuity, not a
-hot-standby topology or a changed retry budget.
+owner; only the exact handoff-scoped pending/retiring channels have transitional
+ingress eligibility. Registration installs the new mapping before
+closing/counting the old physical sidecar and does not let old-link retirement
+schedule a stale retry.
+A non-open old link is still dropped immediately, an undesired peer is never
+retained, and an at-capacity usable link defers rather than allocates. This is
+bounded make-before-break continuity when a physical slot exists, not a hot
+standby topology, ninth connection or changed retry budget.
 
 D.108e4g-a first records a signed/pushed telemetry/RED plan checkpoint and
 runs the normal Grok 4.6/high, exact Kimi K3 100-step and Claude-skill Opus
@@ -65014,24 +65144,46 @@ RED and GREEN run the exact named new behaviors, the complete retained
 standalone owner TypeScript where applicable, exact-owner ESLint/Prettier and
 `git diff --check`. They also run the retained E3-02 and focused D.108e4f
 observer/product-roster tests. GREEN is not eligible for a complete campaign
-until the deterministic both-orderings continuity test, failed-replacement
-retention test and telemetry self-check all pass with zero skip or flake.
+until the branch-discriminating focused current-owner browser proof, versioned
+telemetry self-check, both-orderings/send-only continuity tests, four-vector
+failed-replacement retention, seven/eight/concurrent capacity tests and
+directional pending/retiring-ingress handoff proof all pass with zero skip or
+flake. This deterministic focused browser proof must itself witness the
+relevant replacement and prove the pending-handler/open ordering, so a later
+replacement-free full campaign is performance evidence rather than a vacuous
+integration proof.
 
 After those gates pass, the owner may run exactly one new complete E3-03
 campaign with the unchanged five-test inventory, JSON reporter and
 `--fail-on-flaky-tests`. Acceptance remains exactly 5/5 with zero skipped or
 flaky tests and every trial's signed `maxStallMs <= 500`. If authenticated
 replacement occurs, the attachment must prove replacement open/registration
-preceded old-link retirement, show the first successful post-replacement send
-and show no raw refusal while the old link remained usable. If the one allowed
-campaign produces a different failure, its telemetry assigns the next owner
-before any rerun. Only complete 5/5 acceptance closes D.108e4g, reclassifies
-D.108e4f GREEN as accepted and resumes D.108e4e/D.108e5.
+on the initiating endpoint preceded its first B attempt and local old-link
+retirement, prove the remote pending-ingress handler was already installed,
+account for pending-B and retiring-A arrivals, show the first B attempt/
+disposition and first successful post-registration send, and show no raw
+refusal while the old link remained usable. The already-required focused
+browser proof prevents a replacement-free full campaign from being the sole
+exercise of GREEN. If the one allowed campaign produces a different failure,
+its telemetry assigns the next owner before any rerun. Only complete 5/5
+acceptance plus the preceding deterministic replacement proof closes
+D.108e4g, reclassifies D.108e4f GREEN as accepted and resumes
+D.108e4e/D.108e5.
 
-If and only if the frozen telemetry proves that js-libp2p's connection monitor
-aborted an otherwise usable authenticated reliable connection, D.108e4g stops
-without changing that dependency and creates a separately reviewed upstream
-reproduction/report slice. Its first deliverable is a minimal viable
+"Otherwise usable" is fail-closed and operational, not an impression from
+connected state. An upstream false positive exists only when the same
+authenticated connection has no product-owned local close, its signaling/ICE/
+connection states remain nonterminal, the abort owner/reason is the monitor,
+and an already-existing authenticated reliable signaling or ping round trip
+completes successfully at or after the abort decision and before physical
+close. A merely recent success, `connected` state, an in-flight request that
+never completes or ambiguous ordering does not satisfy the predicate. The
+telemetry schema records the boolean operands and truth table on every abort;
+the plan reviewer must accept that predicate before the campaign.
+
+If and only if all operands prove that false positive, D.108e4g stops without
+changing js-libp2p and creates a separately reviewed upstream reproduction/
+report slice. Its first deliverable is a minimal viable
 reproducible example pinned to the exact installed js-libp2p and transport
 versions: two browser peers, the smallest deterministic signaling/network
 profile that triggers the monitor decision, timestamped ping/abort and
@@ -65041,6 +65193,74 @@ reproduces without it; otherwise it must reduce that owner to the smallest
 trigger and state why it is necessary. The upstream slice owns issue matching,
 bisect or report preparation. It does not authorize a dependency upgrade,
 patch, monitor disablement or threshold change in D.108e4g.
+
+The first formal D.108e4g plan review inspected signed/pushed commit
+`8c7a2a2fca5731a9efe416faf4e31616243167d2`, parent
+`c7c8f1bb06cc05fd67af99930bc3b91598fc8459`, tree
+`42d3a3e33f57a8b727da8d375317299774c4cf28`, stable patch id
+`0720b815ab71eebb4cb8a5b7f50d5d15108d053f` and raw-diff SHA-256
+`5e48aae859c9c77caa9007a4661ae181a5e9d70579dd641707e05ccee9026491`.
+It was documentation-only, exact-one-owner and had a good signature.
+
+Grok 4.6/high session `01a046c7-96cf-7820-8cc8-67b6bb05da3f`
+completed normally in 495.241 seconds with exit zero, `end_turn` and no
+timeout. Its runner reported `NO_VERDICT` only because inspection prose
+preceded the terminal object; the substantive object was `CHANGES_REQUIRED`,
+P0=2/P1=1/P2=2. Public-result, status and event-stream SHA-256 values are
+respectively
+`74ffbcd6340a03100a72b04a274aeef793fbe0adfd9834e8a649e89bf0bf544d`,
+`02b0388c02c8d0e3dd32d0d32a20a0842ed7318786f4d4810e630c7bc607751c`
+and `6bc53df403948591c0df03fef420d847b31db8d84e2f7d6da31c532c9b8fb81a`.
+It found opposite retained assertions, the eight-PC overlap contradiction,
+unnamed telemetry owners, the non-initiator hold phase and remote close race.
+
+Kimi CLI 0.38.0 exact `kimi-code/k3` session
+`session_a41a8b5e-72de-4e4e-8e7f-99398d70e20d` used one substantive no-tools
+authenticated packet containing the exact plan diff and relevant source/test
+excerpts. It emitted exactly 100 total, unique and ordered `CHECK001` through
+`CHECK100` markers followed by one terminal `CHANGES_REQUIRED` object,
+P0=2/P1=5/P2=0. Stream SHA-256 is
+`8e0b3ae0d5301a94cce9e4f39612634adf4bc3f70b29649a78785416a9bb736a`.
+It added the replacement-free campaign, failed-replacement matrix, telemetry
+correlation/determinism, both-end handoff and objective-upstream-predicate
+findings. Its preceding YAML-agent launch failed locally before a model
+session because CLI 0.38.0 requires Markdown frontmatter; it emitted no review
+and is not evidence.
+
+Claude-skill Opus 5/xhigh session
+`3af03927-88ff-42dc-bbb7-a70cc6a22fb0` completed normally in 421.032 seconds
+with exit zero, `end_turn`, no permission denial or subagent and returned
+`CHANGES_REQUIRED`, P0=2/P1=6/P2=2. Raw-result SHA-256 is
+`23f3d7e66d939996fd4b95a1f7c19c397f3a4bc52b04cecb76b5646ae232d49b`.
+It added decision-arm discrimination, send-only replacement, opened-but-
+unregistered ingress, exact snapshot tripwires, deterministic responder
+barriers, operational upstream usability and retry/admission timer hygiene.
+Its preceding stdin-packaging launch failed before a model session or output
+and is not review evidence.
+
+The same-round correction above resolves the P0/P1 union without confirmation
+review: it names the superseded assertions and their replacements; preserves
+the eight-PC ceiling with slot-aware overlap/defer semantics; requires
+unchanged-owner branch discrimination; makes send start replacement; expands
+failure and capacity matrices; names exact telemetry owners and public-shape
+tripwires; specifies correlated fail-closed telemetry, both-end barriers and
+ingress evidence; requires a deterministic focused browser replacement proof;
+and defines the upstream false-positive truth table. Grok's remote-close P2 is
+owned by the D.108e4g GREEN implementer and the focused both-end proof by
+2026-09-04. Opus's retry/admission timer P2s are promoted into RED/GREEN
+cleanup assertions due at the accepted RED and GREEN checkpoints respectively.
+No confirmation plan review is authorized.
+
+The post-correction read-only Codex review found one P1: the first correction
+required two-sided registration-before-send even though existing answer/
+detached-finish signaling has no cross-peer registration acknowledgment. Its
+public result SHA-256 is
+`501a432dab703e5141df0435ad513cec77d82621fb0234255d0d0d69d85fda31`.
+D.108e4g-b above resolves it before commit by replacing the impossible
+two-sided atomicity claim with one send owner plus exact same-peer pending and
+retiring ingress states, a real-browser pending-handler/open-order gate and a
+stop condition that forbids wire acknowledgments, grace guesses or buffers.
+The reviewer made no tracked edit and is advisory, not a confirmation quorum.
 
 The first D.108e4c plan-freeze review round inspected signed/pushed commit
 `eb3de05b6054ac6fdd158d2530bad1798f87f10f`, parent
