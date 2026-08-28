@@ -33,6 +33,7 @@ interface ControlledNode {
 	readonly adapter: NodeEphemeralAdapter;
 	readonly channel: EphemeralChannel;
 	readonly direct: Message[];
+	notifyPeerConnection(peerId: string): void;
 	readonly owner: ControlledRawOwner | null;
 	readonly provider: EphemeralAuthorizationProvider;
 	readonly published: Message[];
@@ -52,6 +53,7 @@ function controlledNode(input: {
 }): ControlledNode {
 	const direct: Message[] = [];
 	const published: Message[] = [];
+	let peerConnectionHandler: ((peerId: string) => void) | undefined;
 	const owner = input.raw ? input.bus.owner(input.localPeerId) : null;
 	const network = {
 		getAllPeers: (): readonly string[] => [...input.peers],
@@ -66,6 +68,12 @@ function controlledNode(input: {
 			return Promise.resolve();
 		},
 		subscribe: (): void => undefined,
+		subscribeToPeerConnections: (handler: (peerId: string) => void): (() => void) => {
+			peerConnectionHandler = handler;
+			return (): void => {
+				if (peerConnectionHandler === handler) peerConnectionHandler = undefined;
+			};
+		},
 		subscribeToPeerDisconnects: (): (() => void) => (): void => undefined,
 		unsubscribe: (): void => undefined,
 	} as unknown as DRPNetworkNode;
@@ -79,6 +87,7 @@ function controlledNode(input: {
 		adapter,
 		channel: adapter.openAuthorized("zone", provider, OPTIONS),
 		direct,
+		notifyPeerConnection: (peerId): void => peerConnectionHandler?.(peerId),
 		owner,
 		provider,
 		published,
@@ -134,6 +143,34 @@ describe("E3-02 v3 zone transport adoption RED", () => {
 			expect(await reopened.publish({ class: "unreliable-sequenced", key: "movement", payload: payload("east") })).toBe(
 				true
 			);
+			expectNoReliable(left);
+		} finally {
+			left.channel.close();
+			right.channel.close();
+		}
+	});
+
+	it("reactivates an eligible raw route from a transport-connection notification without reopening", async () => {
+		const bus = new ControlledRawBus();
+		const peers: string[] = [];
+		const roster = new Map([
+			["peer-a", "author-a"],
+			["peer-b", "author-b"],
+		]);
+		const writers = new Set(["author-a", "author-b"]);
+		const left = controlledNode({ bus, localPeerId: "peer-a", peers, raw: true, roster, writers });
+		const route = onlyRoute(left.owner);
+		expect(route.reconciledPeers).toEqual([]);
+
+		peers.push("peer-b");
+		bus.connect("peer-a", "peer-b");
+		const right = controlledNode({ bus, localPeerId: "peer-b", peers: ["peer-a"], raw: true, roster, writers });
+		try {
+			left.notifyPeerConnection("peer-b");
+			expect(route.reconciledPeers).toEqual([["peer-b"]]);
+			expect(
+				await left.channel.publish({ class: "unreliable-unordered", key: null, payload: payload("connection-open") })
+			).toBe(true);
 			expectNoReliable(left);
 		} finally {
 			left.channel.close();

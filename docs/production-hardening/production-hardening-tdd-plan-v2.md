@@ -69308,3 +69308,77 @@ canonical shim exists. D.108e4x is behaviorally GREEN at this working tree but
 remains open until its correction commit is signed/pushed and the required
 Grok/Kimi/Opus review of the corrected exact range closes. D.108e4k has not
 restarted.
+
+The required correction review inspected exact signed range
+`8ba83370cdc82765e02256d9e6d71bfebb3c7e0a..e5ea0837ce53e230f179d5c37c93ef287f65c209`.
+Grok 4.6/high completed normally after 660.188 seconds with exit zero,
+`end_turn` and no timeout. Progress prose before its terminal object made the
+wrapper honestly classify `NO_VERDICT`; the substantive object was
+CHANGES_REQUIRED with zero P0, one P1 and one P2. Event/public/status/stderr
+SHA-256 values are
+`fa6a40fa3cba7178794dff30ffe0f0c40ed670a75c04854e283d66ebffd6dc37`,
+`f36b013d938841f2d89cdd75595307abd88d41bce3623b6bb931cca468bdc2a5`,
+`d54287e06832569da6e3e6f1f72ef8f350de829999a825a34fcfb3b105943daf`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+Kimi exact K3 session `session_f6bfaca0-660e-4d3f-893d-48ec9cf2de04`
+emitted exactly 100 unique ordered `CHECK001` through `CHECK100` records and
+one RESULT: PASS with zero P0/P1 and four P2. The upgraded CLI rejected
+`--auto` and then `--yolo` when combined with noninteractive `--prompt`; both
+were zero-token command-shape errors, and the sole model run used the minimal
+supported prompt-mode command. Stream/stderr SHA-256 values are
+`4a533b37cf909d5cb2110e4b3c687a2d7e0cf13e232b56277752c07d83e03fa8`
+and `262f8dec669018acdf48b20935427b3d20e3f7de6fc27a06dcf9ad33d7830bb7`.
+Opus 5/xhigh session `3c719cdb-dfb3-4ba7-bd95-d45426f0072c` completed 78
+turns in 822.926 seconds with no error or subagent and returned
+CHANGES_REQUIRED with zero P0, two P1 and four P2. JSON/stderr SHA-256 values
+are `0a4541fbeb16f2bb4044f15d9b32a88681f2f23a48356c375b55584b48d0ce56`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+The blocking union corrects the prior GREEN's reactivation claim. Libp2p
+`peer:connect` is peer-deduplicated: it fires for the first connection to a
+peer, not when a WebRTC transport appears beside an existing relay or
+WebSocket connection. Therefore suppressing the no-WebRTC retry loop can leave
+an authorized initiator with no raw link and no reactivation event. The plan's
+earlier statement that a later authenticated connection necessarily invokes
+adapter reconciliation is false and is superseded here.
+
+The narrow same-round correction changes the existing event owner, not its
+API: `DRPNetworkNode.start()` must drive `subscribeToPeerConnections` from
+libp2p `connection:open`, once for every authenticated transport connection,
+while `peer:connect` remains logging-only. This gives WebRTC upgrade and
+replacement their existing adapter `reconcileRaw()` path without restoring a
+retry timer, adding a callback API, polling, or changing js-libp2p. One genuine
+Node RED dispatches two `connection:open` events for the same peer and requires
+two notifications, then dispatches peer-level `peer:connect` and requires no
+duplicate notification. One adapter-chain control drives the captured
+transport-connection handler without reopening or directly calling the raw
+route, requires exact `[['peer-b']]` reconciliation, successful raw send and
+zero reliable fallback. Current production must fail only the Node event RED;
+the adapter control may already pass and is not misrepresented as RED.
+
+GREEN may now additionally change only `packages/network/src/node.ts`. Run the
+exact Node RED and adapter control, then full host-factory, E3-01/E3-02,
+Phase-3f-b, retained Phase-3 transport, focused E3-03 observer, builds,
+typechecks, exact-owner lint/format/diff, and the three-consecutive-invocation
+D.93.46 ledger. Any semantic failure stops without retry. The complete E3-03
+campaign remains unauthorized. Review P2s remain with the plan owner due
+2026-09-04, including stale desired membership, pre-latch empty restart,
+retained provider documentation, direct raw-owner event-contract docs, and the
+one bounded stale timer wake-up. D.108e4x and D.108e4k remain open.
+
+The connection-event RED ran once against signed correction tree
+`e5ea0837ce53e230f179d5c37c93ef287f65c209` and failed only at the first
+connection-level notification assertion: two same-peer `connection:open`
+events produced `[]`, expected `['peer-existing','peer-existing']`. The later
+peer-level no-duplicate control was after the discriminator and was not
+reported as evaluated. Stdout/stderr/status SHA-256 values are
+`cc9c0c933a2b69e0e18f9c8a7536b9c89b2f12e039563ded6e401870a8cc887c`,
+`a1a1225f092f1b569d50d2871295e932b90d29390a172ff2e3ab0b92b238a3fd`
+and `4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`.
+The separate adapter-chain control passed 1/1 without reopening or direct raw
+route reconciliation; stdout/stderr/status SHA-256 values are
+`22ddaa02b6ea989e34f8717ad294b93dbb136f3768650180eef97f90ceb23d8d`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+No product source, browser or campaign command ran for RED.

@@ -52,6 +52,24 @@ describe("DRPNetworkNode host factory", () => {
 		expect(node.getSubscribedTopics()).toContain(DRP_INTERVAL_DISCOVERY_TOPIC);
 	});
 
+	test("notifies every authenticated transport connection instead of only the peer's first connection", async () => {
+		const node = new DRPNetworkNode(config, { hostFactory: injectedFactory });
+		startedNodes.push(node);
+		const observed: string[] = [];
+		node.subscribeToPeerConnections((peerId) => observed.push(peerId));
+		await node.start();
+		const host = node["_node"];
+		if (host === undefined) throw new Error("started host missing");
+		const remotePeer = { toString: (): string => "peer-existing" };
+
+		host.dispatchEvent(new CustomEvent("connection:open", { detail: { remotePeer } }) as never);
+		host.dispatchEvent(new CustomEvent("connection:open", { detail: { remotePeer } }) as never);
+		expect(observed).toEqual(["peer-existing", "peer-existing"]);
+
+		host.dispatchEvent(new CustomEvent("peer:connect", { detail: remotePeer }) as never);
+		expect(observed).toEqual(["peer-existing", "peer-existing"]);
+	});
+
 	test("preserves production discovery and PX defaults in its immutable snapshot", async () => {
 		let observedSnapshot: DRPNetworkHostFactoryContext["snapshot"] | undefined;
 		const node = new DRPNetworkNode(config, {
