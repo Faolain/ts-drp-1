@@ -23,6 +23,7 @@ interface ObjectRegistration {
 	readonly mode: "legacy" | "v3";
 	readonly options: EphemeralChannelOptions;
 	readonly rawRoute: DRPUnreliableWebRtcRoute | undefined;
+	reconcileRaw(): void;
 }
 
 interface TopicRegistration {
@@ -150,6 +151,7 @@ export class NodeEphemeralAdapter {
 			) {
 				throw new Error("ephemeral channel options differ from the active object channel");
 			}
+			existing.reconcileRaw();
 			return existing.channel;
 		}
 		if (requireLegacyObject && this.#getObject(objectId) === undefined) {
@@ -186,7 +188,9 @@ export class NodeEphemeralAdapter {
 		};
 		const reconcileRaw = (): void => {
 			if (rawRoute === undefined) return;
-			void rawRoute.reconcile(authorizedPeers()).catch(() => undefined);
+			const peers = authorizedPeers();
+			if (peers.length === 0) return;
+			void rawRoute.reconcile(peers).catch(() => undefined);
 		};
 		const channel = createEphemeralChannel(
 			{
@@ -272,6 +276,7 @@ export class NodeEphemeralAdapter {
 			mode: requireLegacyObject ? "legacy" : "v3",
 			options: { ...options },
 			rawRoute,
+			reconcileRaw,
 		});
 		this.#byTopic.set(topic, registration);
 		try {

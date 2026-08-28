@@ -115,7 +115,7 @@ describe("E3-02 v3 zone transport adoption RED", () => {
 			writers,
 		});
 		const route = onlyRoute(left.owner);
-		expect(route.reconciledPeers).toEqual([[]]);
+		expect(route.reconciledPeers.at(-1) ?? []).toEqual([]);
 
 		roster.set("peer-b", "author-b");
 		writers.add("author-b");

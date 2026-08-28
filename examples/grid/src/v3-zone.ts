@@ -671,6 +671,18 @@ export function createV3ZoneApi(node: DRPNode, onProjection: (snapshot: ZoneSnap
 							recoveredTradeIntent = room === undefined;
 						}
 					}
+					const selectedRoom = room;
+					const selectedEphemeral = ephemeral;
+					if (selectedRoom !== undefined && selectedEphemeral !== undefined) {
+						queueMicrotask((): void => {
+							if (room !== selectedRoom || ephemeral !== selectedEphemeral) return;
+							try {
+								selectedRoom.openEphemeral(ZONE_EPHEMERAL_OPTIONS);
+							} catch {
+								// Optional raw reconciliation cannot terminalize an accepted durable projection.
+							}
+						});
+					}
 					emit();
 				},
 				openTransport: (openedObjectId) => node.openRoomNetwork(openedObjectId),
