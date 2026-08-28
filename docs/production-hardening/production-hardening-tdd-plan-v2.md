@@ -64544,12 +64544,24 @@ cancellation, state classification, raw-only classification,
 sequence-only reliable matching, denylist, prefix/suffix split, suppression and
 reconstruction-by-copy implementations.
 
+The corrected vector makes every exact-key coordinate and ordinal allocation
+load-bearing. A lower-ordinal reliable record shares the accepted raw record's
+sequence and send time but is rejected; the accepted reliable member of a
+distinct-send duplicate is the later member; the same-key duplicate remains
+first-wins; and accepted ordinals are non-arithmetic. The behavior requires a
+named `E303_PRODUCT_ROSTER_UNMATCHED` failure when any roster multiplicity is
+left after allocation, pins identity for every member of both partitions and
+pins a named runtime failure when the example snapshot omits its observations
+field.
+
 The second behavior is titled `separates rendered product-roster metrics from
 boundary-aware application evidence`. Its exact product-roster sample domain
 is 600, interval 100 and deadline 700. Raw observations in arrival order are
 sequence 30 (`sentAt=300`, `receivedAt=500`), sequence 32 (`500`, `500`) and
 sequence 31 (`400`, `600`); the sole reliable observation is sequence 30
-(`300`, `600`).
+(`300`, `600`). A later same-key reliable duplicate and an excluded sentinel
+make deduplication and sentinel exclusion load-bearing without changing those
+logical values.
 Thus product-rendered evidence must be raw `maxGap=30`, delivered 3, dropped
 597, AoI p50/p95 100/200, and reliable delivered 1, dropped 599, AoI p50/p95
 200/400. The unchanged application domain starts at sender time zero,
@@ -64563,6 +64575,12 @@ current broad receiver and shared application/rendered assumptions, so exactly
 the partition deep equality and rendered-domain deep equality fail after
 collection; every retained behavior passes. Missing symbols, compile, server,
 browser, timeout or campaign failures are not accepted RED evidence.
+
+The same rendered behavior additionally freezes an arrival-order control whose
+raw sequences 2/10/3 yield product `maxGap=8` rather than sorted-sequence 7,
+and a both-lane start control whose earlier reliable send changes raw AoI to
+p50/p95 200/400. GREEN removes the obsolete caller-provided rendered start
+parameter and derives the start only from the accepted nonsentinel roster.
 
 GREEN exposes the immutable accepted-observation roster through the existing
 example workbench snapshot, then changes only the test helpers and retained
@@ -64708,13 +64726,92 @@ the ordinary consecutive campaign gate. Its always-attached evidence must
 identify the first failing stage/line and retain the complete observer set,
 product-roster partition, rendered-domain and per-stage diagnostics above
 whether the campaign passes or fails. Any different failure must be assigned
-from its preserved
-attachment before another invocation. D.108e4f receives separate signed/pushed
+from its preserved attachment before another invocation. D.108e4f receives separate signed/pushed
 plan-freeze, immutable RED and GREEN/evidence checkpoints and separate existing
 Grok 4.6/high, exact Kimi K3 CHECK001 through CHECK100 and Opus 5/xhigh review
 rounds. P0/P1 findings are corrected in the same round and every P2 receives
 an exact owner/deadline. No Fable or collaboration subagent may run without new
 express authorization.
+
+The same-round corrected plan is signed/pushed commit
+`3d3d26cf7b67bf10feddd02f8ebd463605706707`, parent
+`03c1ee5e5bf9d264453e7aca15426219f171c999`, tree
+`863edf73848adb14727a05afdf9bcf4fdec9cee3`, stable patch id
+`d6c526762d9f11eab2a8f7a041c1a5f259f1c130` and raw-diff SHA-256
+`814b82fd45988e1b69cb8b107c42add793199af239899d2f5ef09514a63b3dfd`.
+It is documentation-only, has a good signature and replaces hot-path counter
+sampling with the post-acceptance workbench roster described above.
+
+The initial immutable RED is signed/pushed commit
+`9a79542617cf16c85e8eaee2e21a20a9ad0bbb17`, parent
+`3d3d26cf7b67bf10feddd02f8ebd463605706707`, tree
+`e7228d14c13529f128bf6b37224d950c76049fa0`, stable patch id
+`4f361c504ecb7073be486c1d40e068f7e58a2b9c` and raw-diff SHA-256
+`968d9eab12570f96da19ec5c13b392b9687c527feef11e257e6352bba6bed6a4`.
+It changes only the test owner and has a good signature. Focused JSON SHA-256
+`fad4f7b14dbddc2d4c42be9573ac7c25b71af2928ce5befd76b97727361ae12a`
+reports exactly 0 passed / 2 failed / 0 skipped / 0 flaky at the two named deep
+equalities. Retained-observer SHA-256
+`1f95fcb0501e04ad035f52e58930baea927c315e5b6a6103f89d8d51e63dae9a`
+reports 1/1. The bounded TypeScript command, grid build/typecheck, exact-owner
+ESLint/Prettier and diff checks passed.
+
+The sole RED review round found no P0 and confirmed both failures were causal,
+but its P1 union found the first roster vector underdetermined. Grok 4.6/high
+session `01a0466a-b7b1-78f2-8f89-e83a27ed7078` completed normally in 570.112
+seconds with exit zero, `end_turn` and no timeout. Its wrapper recorded
+`NO_VERDICT` because progress prose preceded the terminal object; the
+substantive result was `CHANGES_REQUIRED`, P0=0/P1=1/P2=0. Status, public and
+event-stream SHA-256 values are respectively
+`d0315a5aaa3ef1ac0c6f6a31879a516819e80ab550198139c57e670a7a187648`,
+`e1a08dade25e70d2548e00d87739bc5f283bc3564782a609a5d68a8864cd2179`
+and `029d950ba97a414b5728ea049218ac0ba6bbc486e2289b40dfb811f6d9413574`.
+It found the even-ordinal/first-sequence cheat.
+
+Exact Kimi K3 session `a4c3a321-8d80-4cc8-b377-3d3c4592316a` substantively
+returned `APPROVED`, P0=0/P1=0/P2=2 for the same parity and sequence-only
+weaknesses. Its first terminal block contained the required 100 ordered markers
+plus one accidental `CHECK037b` line. A format-only continuation in the same
+session used no tools or new reasoning and preserved the verdict/findings while
+emitting exactly 100 total, unique and ordered `CHECK001` through `CHECK100`
+markers plus one valid result line. Initial and normalized stream SHA-256 values
+are respectively
+`20c7ddde6fd92abcbc264c61139f00de8d835dc68b7e37eedc48a0bb43897ca1`
+and `8cc4568b0c16a545fac28da8a07a0d07d272858a2be3196639f854d9573b8bb3`.
+
+Claude-skill Opus 5/xhigh session
+`9f0c7662-e755-4a09-8f8a-4a50a330f34a` completed in 578.916 seconds with no
+error, permission denial or subagent and returned schema-valid
+`CHANGES_REQUIRED`, P0=0/P1=2/P2=3. It added that lane/send-time coordinates,
+unmatched roster multiplicity, sentinel exclusion, reliable deduplication,
+arrival order, both-lane start derivation and runtime snapshot shape were not
+all load-bearing. Raw result SHA-256 is
+`47d402c462ee1e7c1e2044a67013da7fa5c10698cddb2207df31df2050dae79d`.
+
+The same RED round corrected the complete union without a confirmation review.
+The exact-key vector is now cross-lane, later-distinct-send, first-same-key and
+non-arithmetic; every returned object is identity-pinned; leftover roster
+multiplicity throws; and a missing snapshot roster has a named runtime guard.
+The rendered behavior now carries sentinel and reliable-duplicate controls plus
+separate arrival-order and both-lane-start controls, and its dead caller start
+parameter is gone. Every reviewer P2 is owned by the D.108e4f GREEN implementer
+and discharged by these controls or their retained campaign consumer by
+2026-09-03.
+
+The corrected RED is signed/pushed commit
+`b4be0a3d5a9f1be9035af2401a46416665345123`, parent
+`9a79542617cf16c85e8eaee2e21a20a9ad0bbb17`, tree
+`cd6926e38e1d6923ce06a86eab2573486690584e`, stable patch id
+`de330b8de9181f9bdf365f4f3f688ed47014d4a7` and raw-diff SHA-256
+`7c620b2b5a0e707c0f4b78158d307992c777ed338498682251c43aa31357b181`.
+It retains exactly 0 passed / 2 failed / 0 skipped / 0 flaky at the named deep
+equalities under focused JSON SHA-256
+`bee6e9a63e9a3e233b8e40899da3071ae75da27de14f08349a0fb046f42e46cd`
+and retained observer 1/1 under SHA-256
+`b7a9e63759262e086f2332191455f89389b2316ab74f8b4d588a3d5e55124745`.
+Bounded TypeScript, grid build/typecheck, exact-owner ESLint/Prettier and diff
+checks passed. It changes only the test owner, has a good signature and is the
+accepted RED for GREEN.
 
 The first D.108e4c plan-freeze review round inspected signed/pushed commit
 `eb3de05b6054ac6fdd158d2530bad1798f87f10f`, parent
