@@ -202,9 +202,48 @@ interface FakePeerConnectionOptions {
 	readonly sdpBytes?: number;
 }
 
+class FakeInboundOpenBarrier {
+	readonly #pending: Promise<void>;
+	readonly #release: Promise<void>;
+	#resolvePending: (() => void) | undefined;
+	#resolveRelease: (() => void) | undefined;
+
+	constructor() {
+		this.#pending = new Promise<void>((resolve) => {
+			this.#resolvePending = resolve;
+		});
+		this.#release = new Promise<void>((resolve) => {
+			this.#resolveRelease = resolve;
+		});
+	}
+
+	async hold(): Promise<void> {
+		this.#resolvePending?.();
+		await this.#release;
+	}
+
+	release(): void {
+		this.#resolveRelease?.();
+	}
+
+	waitUntilPending(): Promise<void> {
+		return this.#pending;
+	}
+}
+
 class FakePeerConnection {
 	static nextId = 1;
+	static nextInboundOpenBarrier: FakeInboundOpenBarrier | undefined;
 	static readonly registry = new Map<string, FakePeerConnection>();
+
+	static pauseNextInboundOpen(): FakeInboundOpenBarrier {
+		if (FakePeerConnection.nextInboundOpenBarrier !== undefined) {
+			throw new Error("fake inbound-open barrier is already armed");
+		}
+		const barrier = new FakeInboundOpenBarrier();
+		FakePeerConnection.nextInboundOpenBarrier = barrier;
+		return barrier;
+	}
 
 	connectionState: RTCPeerConnectionState = "new";
 	iceGatheringState: RTCIceGatheringState = "new";
@@ -311,7 +350,7 @@ class FakePeerConnection {
 		return Promise.resolve();
 	}
 
-	setRemoteDescription(description: RTCSessionDescriptionInit): Promise<void> {
+	async setRemoteDescription(description: RTCSessionDescriptionInit): Promise<void> {
 		this.remoteDescription = description as RTCSessionDescription;
 		const remoteId = /a=mid:(pc-\d+)/u.exec(description.sdp ?? "")?.[1];
 		const remote = remoteId === undefined ? undefined : FakePeerConnection.registry.get(remoteId);
@@ -319,6 +358,9 @@ class FakePeerConnection {
 		this.connectionState = "connected";
 		remote.connectionState = "connected";
 		if (description.type === "offer") {
+			const barrier = FakePeerConnection.nextInboundOpenBarrier;
+			FakePeerConnection.nextInboundOpenBarrier = undefined;
+			await barrier?.hold();
 			for (const outbound of remote.channels) {
 				const inbound = new FakeDataChannel(this.#options.inboundChannel?.label ?? outbound.label, {
 					maxRetransmits: this.#options.inboundChannel?.maxRetransmits ?? outbound.maxRetransmits ?? undefined,
@@ -335,7 +377,6 @@ class FakePeerConnection {
 		}
 		this.#emit("connectionstatechange", new Event("connectionstatechange"));
 		remote.#emit("connectionstatechange", new Event("connectionstatechange"));
-		return Promise.resolve();
 	}
 
 	#description(type: "answer" | "offer"): string {
@@ -944,15 +985,23 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 			const replacedPeerConnection = center.peerConnections.at(-1);
 			bus.disconnect(replacedPair);
 			const replacement = bus.connect("peer-00", "peer-08");
+			await centerRoute.reconcile(admittedPeers);
+			expect(replacedPeerConnection?.connectionState).toBe("connected");
+			expect(centerRoute.snapshot()).toMatchObject({
+				activeLinks: 8,
+				lastLinkDrop: undefined,
+				linkDrops: 0,
+			});
+			expect(center.peerConnections).toHaveLength(8);
+			expect(center.peerConnections.filter(({ connectionState }) => connectionState !== "closed")).toHaveLength(8);
+			expect(await centerRoute.send(["peer-08"], Uint8Array.of(80))).toBe(true);
+
+			replacedPeerConnection?.close();
 			barrier = bus.pauseResponses();
 			pending = centerRoute.reconcile(admittedPeers);
 			await barrier.waitUntilPending();
-			expect(replacedPeerConnection?.connectionState).toBe("closed");
-			expect(centerRoute.snapshot()).toMatchObject({
-				activeLinks: 7,
-				lastLinkDrop: "replacement",
-				linkDrops: 1,
-			});
+			expect(centerRoute.snapshot()).toMatchObject({ activeLinks: 7, lastLinkDrop: "connection-close", linkDrops: 1 });
+			expect(center.peerConnections.filter(({ connectionState }) => connectionState !== "closed")).toHaveLength(8);
 
 			barrier.release();
 			await pending;
@@ -1437,17 +1486,16 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		["initiator", "peer-b"],
 		["non-initiator", "peer-a"],
 	] as const)(
-		"retires a disappeared authenticated link before replacement setup as the %s",
+		"keeps the exact old raw link usable until its authenticated replacement opens as the %s",
 		async (role, remotePeerId) => {
 			const module = await loadOwnerModule();
 			const bus = new FakeSignalingBus();
 			const low = owner(module, bus, "peer-a");
 			const high = owner(module, bus, "peer-b");
 			let pending: Promise<void> | undefined;
-			let barrier: ReturnType<FakeSignalingBus["pauseResponses"]> | undefined;
+			let barrier: FakeInboundOpenBarrier | undefined;
 			try {
 				const local = role === "initiator" ? low : high;
-				const remote = role === "initiator" ? high : low;
 				const original = bus.connect("peer-a", "peer-b");
 				const lowRoute = low.owner.openUnreliableWebRtcRoute("zone:alpha");
 				const highRoute = high.owner.openUnreliableWebRtcRoute("zone:alpha");
@@ -1457,33 +1505,35 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 				remoteRoute.onMessage(({ bytes }) => received.push(bytes.slice()));
 				await Promise.all([lowRoute.reconcile(["peer-b"]), highRoute.reconcile(["peer-a"])]);
 				expect(localRoute.snapshot()).toMatchObject({ activeLinks: 1, lastLinkDrop: undefined, linkDrops: 0 });
+				const oldConnection = localRoute.snapshot().links[0];
+				if (oldConnection === undefined) throw new Error("old raw link missing");
 
 				bus.disconnect(original);
 				const replacement = bus.connect("peer-a", "peer-b");
+				barrier = FakePeerConnection.pauseNextInboundOpen();
 				if (role === "initiator") {
-					barrier = bus.pauseResponses();
 					pending = localRoute.reconcile([remotePeerId]);
-					await barrier.waitUntilPending();
 				} else {
 					await localRoute.reconcile([remotePeerId]);
+					pending = lowRoute.reconcile(["peer-b"]);
 				}
-				expect(local.peerConnections[0]?.connectionState).toBe("closed");
+				await barrier.waitUntilPending();
+				expect(local.peerConnections[0]?.connectionState).toBe("connected");
 				expect(localRoute.snapshot()).toMatchObject({
-					activeLinks: 0,
+					activeLinks: 1,
 					authenticatedConnectionLosses: 1,
-					lastLinkDrop: "replacement",
-					linkDrops: 1,
-					links: [],
+					lastLinkDrop: undefined,
+					linkDrops: 0,
+					links: [{ connectionId: oldConnection.connectionId, generation: oldConnection.generation }],
 					sent: 0,
 				});
+				expect(await localRoute.send([remotePeerId], Uint8Array.of(7))).toBe(true);
+				await tick();
+				expect(received).toEqual([Uint8Array.of(7)]);
 
-				if (role === "non-initiator") {
-					barrier = bus.pauseResponses();
-					pending = lowRoute.reconcile(["peer-b"]);
-					await barrier.waitUntilPending();
-				}
-				barrier?.release();
+				barrier.release();
 				await pending;
+				await tick();
 				const localReplacement = role === "initiator" ? replacement.left : replacement.right;
 				expect(localRoute.snapshot()).toMatchObject({
 					activeLinks: 1,
@@ -1493,22 +1543,7 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 				});
 				expect(await localRoute.send([remotePeerId], Uint8Array.of(9))).toBe(true);
 				await tick();
-				expect(received).toEqual([Uint8Array.of(9)]);
-
-				bus.disconnect(replacement);
-				bus.connect("peer-a", "peer-b");
-				bus.responseTransform = (): Uint8Array => Uint8Array.of(255, 0, 255);
-				await localRoute.reconcile([remotePeerId]);
-				expect(localRoute.snapshot()).toMatchObject({
-					activeLinks: 0,
-					authenticatedConnectionLosses: 2,
-					handshakeFailures: role === "initiator" ? 1 : 0,
-					lastLinkDrop: "replacement",
-					linkDrops: 2,
-					links: [],
-				});
-				expect(local.signaling.connections()).toHaveLength(1);
-				expect(remote.signaling.connections()).toHaveLength(1);
+				expect(received).toEqual([Uint8Array.of(7), Uint8Array.of(9)]);
 			} finally {
 				barrier?.release();
 				await pending?.catch(() => undefined);
@@ -1517,6 +1552,116 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 			}
 		}
 	);
+
+	it.each([
+		["initiator", "rejection"],
+		["initiator", "timeout"],
+		["non-initiator", "rejection"],
+		["non-initiator", "timeout"],
+	] as const)("retains the usable old link after %s replacement %s", async (role, failure) => {
+		const module = await loadOwnerModule();
+		const bus = new FakeSignalingBus();
+		const low = owner(module, bus, "peer-a");
+		const high = owner(module, bus, "peer-b");
+		let barrier: FakeInboundOpenBarrier | undefined;
+		let pending: Promise<void> | undefined;
+		try {
+			const local = role === "initiator" ? low : high;
+			const localRoute = local.owner.openUnreliableWebRtcRoute("zone:failed-replacement-retention");
+			const lowRoute =
+				role === "initiator" ? localRoute : low.owner.openUnreliableWebRtcRoute("zone:failed-replacement-retention");
+			const highRoute =
+				role === "non-initiator"
+					? localRoute
+					: high.owner.openUnreliableWebRtcRoute("zone:failed-replacement-retention");
+			const original = bus.connect("peer-a", "peer-b");
+			await Promise.all([lowRoute.reconcile(["peer-b"]), highRoute.reconcile(["peer-a"])]);
+			const old = localRoute.snapshot().links[0];
+			if (old === undefined) throw new Error("old failed-replacement raw link missing");
+
+			bus.disconnect(original);
+			bus.connect("peer-a", "peer-b");
+			if (role === "non-initiator") await localRoute.reconcile(["peer-a"]);
+			if (failure === "rejection") {
+				bus.requestTransform = (): Uint8Array => Uint8Array.of(255, 0, 255);
+			} else {
+				vi.useFakeTimers();
+				barrier = FakePeerConnection.pauseNextInboundOpen();
+			}
+			pending = lowRoute.reconcile(["peer-b"]);
+			if (barrier !== undefined) {
+				await barrier.waitUntilPending();
+				await vi.advanceTimersByTimeAsync(10_000);
+			}
+			await pending;
+			expect(local.peerConnections[0]?.connectionState).toBe("connected");
+			expect(localRoute.snapshot()).toMatchObject({
+				activeLinks: 1,
+				handshakeFailures: 1,
+				lastLinkDrop: undefined,
+				linkDrops: 0,
+				links: [{ connectionId: old.connectionId, generation: old.generation }],
+			});
+			expect(await localRoute.send([role === "initiator" ? "peer-b" : "peer-a"], Uint8Array.of(31))).toBe(true);
+		} finally {
+			barrier?.release();
+			await pending?.catch(() => undefined);
+			vi.useRealTimers();
+			low.owner.close();
+			high.owner.close();
+		}
+	});
+
+	it("keeps both old links usable when send alone discovers replacement", async () => {
+		const module = await loadOwnerModule();
+		const bus = new FakeSignalingBus();
+		const low = owner(module, bus, "peer-a");
+		const high = owner(module, bus, "peer-b");
+		let barrier: FakeInboundOpenBarrier | undefined;
+		try {
+			const original = bus.connect("peer-a", "peer-b");
+			const lowRoute = low.owner.openUnreliableWebRtcRoute("zone:send-only-continuity");
+			const highRoute = high.owner.openUnreliableWebRtcRoute("zone:send-only-continuity");
+			const lowReceived: Uint8Array[] = [];
+			const highReceived: Uint8Array[] = [];
+			lowRoute.onMessage(({ bytes }) => lowReceived.push(bytes.slice()));
+			highRoute.onMessage(({ bytes }) => highReceived.push(bytes.slice()));
+			await Promise.all([lowRoute.reconcile(["peer-b"]), highRoute.reconcile(["peer-a"])]);
+			const oldLow = lowRoute.snapshot().links[0];
+			const oldHigh = highRoute.snapshot().links[0];
+			if (oldLow === undefined || oldHigh === undefined) throw new Error("old send-only raw links missing");
+
+			bus.disconnect(original);
+			bus.connect("peer-a", "peer-b");
+			barrier = FakePeerConnection.pauseNextInboundOpen();
+			const [lowSent, highSent] = await Promise.all([
+				lowRoute.send(["peer-b"], Uint8Array.of(21)),
+				highRoute.send(["peer-a"], Uint8Array.of(22)),
+			]);
+			expect(lowSent).toBe(true);
+			expect(highSent).toBe(true);
+			await barrier.waitUntilPending();
+			await tick();
+			expect(lowReceived).toEqual([Uint8Array.of(22)]);
+			expect(highReceived).toEqual([Uint8Array.of(21)]);
+			expect(lowRoute.snapshot()).toMatchObject({
+				activeLinks: 1,
+				lastLinkDrop: undefined,
+				linkDrops: 0,
+				links: [{ connectionId: oldLow.connectionId, generation: oldLow.generation }],
+			});
+			expect(highRoute.snapshot()).toMatchObject({
+				activeLinks: 1,
+				lastLinkDrop: undefined,
+				linkDrops: 0,
+				links: [{ connectionId: oldHigh.connectionId, generation: oldHigh.generation }],
+			});
+		} finally {
+			barrier?.release();
+			low.owner.close();
+			high.owner.close();
+		}
+	});
 
 	it.each(["initiator", "non-initiator"] as const)(
 		"starts one failed-send recovery without retaining payloads as the %s",
