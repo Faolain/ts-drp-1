@@ -65462,51 +65462,149 @@ loss/timing thresholds, product APIs, wire formats, connection-monitor policy
 or snapshot owners. It adds schema-v3 campaign custody without changing the
 already-passing product behavior.
 
-Every trial records both endpoints' RTC lifecycle, monitor observations,
-raw authenticated before/deadline identities, raw RTC channel states and raw
-transport deltas at the same authoritative deadline as its receiver evidence.
-The trial validator is unconditional about closed shape and conditional about
-replacement semantics. With no authenticated/link-drop replacement delta it
-requires valid empty-or-nonreplacement lifecycle custody. With a replacement
-delta it requires one exact old/new authenticated and RTC identity chain,
-B open before local A retirement, A classified retiring until close drain, one
-first-B attempt with one success/failure terminal, the first successful
-post-registration send, no raw refusal while A was usable, and exact pending/
-retiring ingress disposition counts. Missing, duplicate, ambiguous or
-unjoined evidence fails before attachment publication.
+Every trial receives one schema-v3 custody envelope. After the existing fabric
+reset and open/network checks, but before observer reset, each endpoint records
+its prepare-time `fabric.snapshot` authenticated `connectionId`/`generation`,
+zone counters and the unique open ephemeral RTC channel identity. RTC and
+monitor reset then start an explicit trial id/epoch. Monitor reset records any
+carry-in ping ids rather than silently converting a pre-reset ping into a
+current-trial failure; such carry-in can never satisfy the upstream
+false-positive predicate. At the product deadline and before the `NO_LOSS`
+reset, one page-local evaluation per endpoint captures a sequence-fenced RTC
+lifecycle, filtered ephemeral channel states, monitor observations,
+`fabric.snapshot` and zone counters. The two evaluations may run concurrently,
+but no cross-endpoint timestamp or sequence comparison is allowed.
 
-Cross-peer handler-before-send is causal rather than clock-derived. The
-test-only observer uses a same-origin `BroadcastChannel` witness: installing a
-product message handler on a raw B channel broadcasts its responder-local
-connection/channel identity; receipt creates an initiator-local witness event;
-and each raw send attempt records the latest post-reset witness sequence. The
-observer never waits on, gates, buffers, replays or changes the native send.
-A replacement attempt is admissible only when its local witness sequence is
-defined and precedes the attempt sequence. Reset clears both lifecycle records
-and witness state so A or a prior trial cannot satisfy B. This is evidence-only
-causality, not a product acknowledgment/control frame.
+The validator is unconditionally closed about schema, trial epoch, monotonic
+peer-local sequences, unique attempt terminals, prepare/deadline identities and
+both-endpoint presence. Its semantic branch is keyed only by product-owned zone
+`linkDrops` and `lastLinkDrop`, never by observer events or by a bare
+`authenticatedConnectionLosses` delta. Zero link drops is nonreplacement
+custody even when authenticated losses rise. Exactly one link drop selects the
+endpoint-local `replacement` or `channel-close` branch from the final reason,
+whether that persistent last-writer field changed or repeated the preceding
+trial's reason. More than one drop or a final reason outside those two values is
+ambiguous and fails with its exact counters before attachment publication.
 
-RED first extracts a pure closed validator plus synthetic no-replacement and
-replacement fixtures. Current attachment shape fails specifically for absent
-lifecycle/monitor/witness custody; malformed joins, stale witnesses and
-duplicate terminals also fail, while the no-replacement control passes. A
-focused two-context browser RED then makes the handler broadcast and native
-send return/error transparency load-bearing without running the complete
-campaign. GREEN captures the exact deadline snapshots, publishes them through
-the existing attachment and makes those deterministic tests plus the existing
-five focused D.108e4g behaviors pass.
+The `replacement` branch joins A/B from the unique prepare/deadline
+authenticated identities and exact old/new ephemeral RTC identities; the old
+and new RTC ids are not mislabeled as one observer handoff id. It requires B
+open before A close-call, A close-call before A close-event and complete
+attempt/terminal joins. On the endpoint that transmits the trial's raw samples,
+all `SAMPLE_COUNT` unique sequence ids must reach one native send success across
+A/B with zero backpressure; if B carries a trial sample, its first attempt and
+first successful post-open send are named exactly. A nontransmitting endpoint
+instead proves zero trial raw sends and joins every B message to the local
+product handler and accepted product roster. The `channel-close` branch proves
+the held B handler/open identity, A close drain and B ingress after promotion.
+
+Campaign evidence does not pretend to observe private pending/retiring map
+labels. It publishes an exact overlap ledger: accepted/rejected raw messages by
+A/B identity and by the peer-local B-open/A-close interval, with every observed
+payload accounted once. The internal pending/retiring classifications and
+failed-replacement refusal paths remain load-bearing in the retained
+`packages/network/tests/unreliable-webrtc-e3-01-red.test.ts` owner. The campaign
+sender's complete 600-sequence native-success domain plus zero backpressure is
+the observable refusal control; no new product counter or debug API is added.
+
+Cross-peer handler-before-send remains owned by the already-passing focused
+`playwright-serial-command-gate`: Playwright observes the exact responder
+product handler, proves zero B attempts and only then permits its single test
+movement. The natural campaign is never gated and compares no peer clocks. It
+requires only peer-local facts: handler before first B message on the responder,
+and open/register/close/send ordering on the endpoint where those events occur.
+The rejected `BroadcastChannel` design is not implemented: the peers use
+separate Playwright browser contexts/storage partitions, and an asynchronous
+mailbox would be both undeliverable and race-prone here.
+
+RED extracts one pure closed validator behind `D108E4H_TELEMETRY=1`. Synthetic
+fixtures cover no replacement with a bare authenticated loss, transmitting and
+nontransmitting `replacement`, `channel-close`, carry-in monitor state, missing
+custody, stale epoch, malformed identity joins, repeated same-reason and
+multiple/ambiguous drops, and missing/duplicate attempt terminals. The current
+campaign attachment fails
+specifically because schema-v3 lifecycle/monitor custody is absent; the
+nonreplacement control passes. Existing browser tests remain the owners for
+native result/error transparency and the serial causal gate, so D.108e4h does
+not add a duplicate browser proof or consume a campaign in RED. GREEN installs
+the monitor observer after zone creation, resets both observers for every trial,
+captures both endpoint envelopes and publishes only validated evidence.
 
 D.108e4h receives its own signed/pushed plan, immutable RED and GREEN/evidence
 checkpoints and the normal Grok 4.6/high, exact Kimi K3 CHECK001-CHECK100 and
 Opus 5/xhigh review rounds. P0/P1 corrections remain same-round without
 confirmation review; P2s receive an owner/deadline. Fable is excluded. Gates
 are the complete unit owner, retained E3-02, focused six-behavior browser set,
-network/grid build/typecheck and exact-owner lint/format/diff checks. Only after
-all pass may the plan authorize exactly one replacement complete campaign.
-That campaign must be 5/5 with zero skip/flake/unexpected, all three
-`rawMaxStallMs <= 500`, and any replacement must pass the new lifecycle
-validator from its own attachment. A different outcome is assigned without
-rerun.
+network/grid build/typecheck and exact-owner lint/format/diff checks. Every new
+D.108e4h test is environment-gated: the unqualified inventory remains exactly
+five, enabling D.108e4g plus D.108e4h telemetry lists exactly eight and the
+focused command selects the prior five titles plus the one validator title.
+Only after all pass may the plan authorize exactly one corrected-evidence
+complete campaign. That unchanged campaign command must remain 5/5 with zero
+skip/flake/unexpected, all three `rawMaxStallMs <= 500`, and any product-counter
+replacement must pass the endpoint-role validator from its own attachment. A
+different outcome is assigned without rerun.
+
+The formal D.108e4h plan round inspected signed/pushed commit
+`1b829b6b250826157821dde69c989706e87577c6`, parent
+`82abf182e1fc04646390e1aef65eb0f693572bfb`, tree
+`75344552a5f6c5bb17de2ba7d8d126fc6dfbd6ad`, stable patch id
+`fa091a8cf7b01b2629bd760ff3545f4ceec1c723` and raw-diff SHA-256
+`49523ba5cce801ea52bff9cebf5b5a74d01f401266cfb41ed18641a948d687f3`.
+The commit was documentation-only, exact-one-owner and had a good signature.
+
+Grok 4.6/high session `01a04771-e816-7cd2-aba3-a44b11dce030`
+completed its sole substantive run normally in 540.203 seconds with exit zero,
+`end_turn` and no timeout. The runner initially classified `NO_VERDICT` only
+because inspection prose preceded the terminal JSON. The same completed session
+then used one no-inspection turn to re-emit one valid bare JSON object; it did
+not repeat the review. The substantive result was `CHANGES_REQUIRED`, P0=0,
+P1=5 and P2=1. Public/status/event-stream/re-emission-stream and extracted
+terminal SHA-256 values are respectively
+`3ee843b8f41c3e70986f0ccf80b02d4969f9a8eeb91ccbc26a513b838d0b6136`,
+`3a8447da8438c27577c8d95984c5a286605b68ec4314f3c157bb1e6adf3385f4`,
+`a2eb7126de141edc5252793288f3a791a89142f3e0815d52adada93525507bd4`,
+`64d97057d9ab8050527edf203da36aa8f884f19250bb54acdb742259bd0f513e`
+and `5dd7e4ed1f2d1adc8a4df342e603560d2a0aeb1674332045e738e48bad62179a`.
+
+Kimi CLI 0.38.0 exact `kimi-code/k3` session
+`session_63fd63cc-8bbb-497f-99e9-779c1ceb0d6d` completed one substantive
+repository-grounded review. Its first terminal content contained the required
+100 ordered markers and result but also a prose preamble. The same session used
+one no-inspection re-emission turn and produced exactly 101 nonempty lines:
+unique ordered `CHECK001` through `CHECK100`, then one `RESULT`. Its substantive
+result was `CHANGES_REQUIRED`, P0=0, P1=2 and P2=1. Initial stream/stderr,
+re-emission stream/stderr and extracted-terminal SHA-256 values are respectively
+`857846e599316f6c16dcdd41ccffb8b93fc7b9a2e6b586f062310d66bd92127a`,
+`ef589ee65b87550f3ea7a137b201ff89ed91e329149bae22e1a02fa4adc7a538`,
+`3c7bf0b0c06282239ad19aff15abb54dbac8d9d5c3ac291cc869080ed6d118a0`,
+`3f31f5d78eca9372138247ac242c3a2cb13c4f09a27247d27f11f16a7580c093`
+and `aae04490485b554463b188c2898f339a66c340b439341f13b262315cfb07ccfe`.
+
+Opus 5/xhigh session `f16e58b9-62cd-444a-aec1-6906c0ea5e36`
+completed normally after 45 turns with `end_turn`, no error and no
+subagent/permission denial. It returned `CHANGES_REQUIRED`, P0=0, P1=6 and
+P2=5. Raw JSON/stderr SHA-256 values are
+`337aaedb100d3847312a3734e583156970d716d01efd397445d7d012ae05618c`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+The same-round union correction removes the impossible cross-context mailbox,
+anchors the trigger to product counters, splits endpoint roles and transmitting
+opportunity, replaces private-state claims with observable overlap custody,
+names monitor install/reset and prepare/deadline capture, filters historical
+channel state, preserves the exact five-test default inventory and assigns all
+P2s to the D.108e4h RED owner before RED acceptance. No confirmation review was
+run. No Fable, product change, libp2p change or complete E3-03 campaign was
+invoked.
+
+The required advisory Codex review found one applicable P1: requiring the
+persistent `lastLinkDrop` value to change would reject consecutive single drops
+with the same reason. The same-round correction branches on the exact one-drop
+delta plus allowed final reason and adds the repeated-reason fixture. Its other
+P1 concerned the two protected untracked protocol-v2 REDs; they are not changed,
+staged or included by this exact-owner slice. Public/stderr SHA-256 values are
+`93eb31f278d4cad08c8a81330ff4924629e64f18a8942360f23ae05f898c8899`
+and `bde5e989a1f281594023ba2c616a3bd15b396c3f4b5390ea2d61f728332b55cb`.
 
 Standalone test-owner TypeScript, affected grid build/typecheck, exact-owner
 ESLint/Prettier and diff check pass. Their material SHAs are
