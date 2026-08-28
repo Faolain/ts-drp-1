@@ -69481,3 +69481,137 @@ untouched. D.108e4k must restart from its first ordinary command at the next
 signed/pushed plan-only checkpoint; none of the historical partial D.108e4k
 ledgers is valid for the new tree. The complete E3-03 campaign remains
 unauthorized.
+
+###### D.108e4y — isolated browser-entry readiness evidence
+
+D.108e4k restarted from command one at exact signed/pushed plan-only
+checkpoint `5e3e210d09c58001fa380d5946ea416f77aac52c`. Its complete ordinary
+non-campaign ledger passed. The focused root/infrastructure owner passed
+17/17; the unloaded native owner passed 5/5 with exactly one valid
+`d108e4l-v1` record, empty `memberCountErrors`, zero `D108E4M_PROFILE`
+records and telemetry-only `wallTimeMs=58_911.42875`; Phase-3 transport passed
+24/24; network plus E3-02 passed 61/61; the focused observer passed 1/1; the
+E3-03 inventories were exact 5/8/7 and the positive non-campaign selection
+passed 7/7 with zero skip, retry, flake or unexpected result and the retained
+three-trial title absent; Phase-3h plus the four frozen Phase-5e owners passed
+61/61; and the Phase-4c/Phase-6a selection passed 15 files/122 tests. That
+selection included the genuine fresh-process 64 MiB child and its peak-live
+ownership, signed `<2 * 131072`, zero-settlement and retaining-mutant
+discriminators. Both standalone subprocess-resolution controls passed 3/3.
+
+Every ordinary browser owner passed: D.93.36 5/5; three consecutive D.93.46
+invocations 3/3 in 1.5, 1.3 and 1.5 minutes; Phase-4c-b/c 18/18 and 6/6;
+Phase-5e actor/relearn/live-close 12/12, 6/6 and 6/6; and Phase-6a
+adoption-commit/activation/product/epoch 6/6, 24/24, 21/21 and 3/3. The
+affected closure build, eight green package typechecks, strict E3-03 proof-file
+TypeScript, Prettier and diff check passed. Broad node and storage-node
+typechecks reproduced only their recorded inherited nonzero configuration and
+test baselines. The expanded exact-owner ESLint roster had zero errors and the
+existing 20 `packages/network/src/node.ts` JSDoc warnings; its reviewed
+error-only gate passed. All 26 stashes and protected untracked paths remained
+present, and the root canonical shim remained absent.
+
+Ordinary native stdout/stderr SHA-256 values are
+`694dd5083a5eb22844affc855bd2613bea59d97c724c09f6c9b92b3bbbe6ee34`
+and `e168caaaba22585c91331c188d74de06d0d325577b6af58e85179e5189d71adc`.
+The non-campaign JSON and Phase-4c/Phase-6a stdout SHA-256 values are
+`2d7f3ae3765dc97d6ac80fbb27cf03378a7193364e53df7f0684c1e1e63e59da`
+and `9375e5dcf9fcb4568ed442e7e18d3dcdc495089b337e09988bcebf8ece83cc6f`.
+The three D.93.46 stdout SHA-256 values are
+`2b3511b75ce8d05f5244ac40e99803c37822e265976900b02771ac39a7bceddb`,
+`225dd2d9b6c2cf6514d677c4aaaba03c3dad0441d2632ec714b0628b31604f6e`
+and `2b3511b75ce8d05f5244ac40e99803c37822e265976900b02771ac39a7bceddb`.
+The complete ordinary evidence is under
+`.logs/d108e4k-final-5e3e210d/ordinary/`.
+
+The isolated proof used new detached checkout
+`/private/tmp/ts-drp-d108e4k-5e3e210d.4gQ8Dk` at the exact same commit. Before
+installation it had clean tracked status, no package/example `dist` and no
+root canonical shim. Exact `pnpm install --offline --ignore-scripts
+--frozen-lockfile` passed and created no `dist`; native dependency preparation
+and the freshly built affected closure passed. The canonical export resolved
+inside that checkout to
+`/private/tmp/ts-drp-d108e4k-5e3e210d.4gQ8Dk/packages/canonical/dist/src/index.js`,
+size 21,858 bytes, with post-build timestamp `2026-08-28T19:13:35-0400`.
+
+Against those freshly built exports, the isolated focused owner passed 17/17;
+the one unloaded native invocation passed 5/5 with one valid terminal record,
+empty `memberCountErrors`, zero profile records and
+`wallTimeMs=57_831.416`; transport passed 24/24; network plus E3-02 passed
+61/61; the observer passed 1/1; inventories were exact 5/8/7; the positive
+selection passed 7/7 with zero skip, retry, flake or unexpected result;
+Phase-3h/Phase-5e passed 61/61; Phase-4c/Phase-6a passed 15 files/122 tests
+including the genuine 64 MiB child; the first subprocess control passed 3/3;
+D.93.36 passed 5/5; three consecutive D.93.46 invocations passed 3/3 in 1.5,
+1.3 and 1.4 minutes; Phase-4c-b/c passed 18/18 and 6/6; Phase-5e actor and
+relearn passed 12/12 and 6/6. The root shim remained absent throughout.
+Isolated native stdout/stderr SHA-256 values are
+`ff83f7bd0da91c99d07c5c61557a2363a80a42d6f69c820acf00d280b2815c14`
+and `ccac92c80fa7d08ee2217704cc8b3a6a12577a48dc8cf694fb20231e48b7b1a7`;
+non-campaign JSON and Phase-4c/Phase-6a stdout values are
+`c1f0952943470803b847d2e41dbf2649acacd6f3f863510dfa50b1938f0e7c16`
+and `1a7d7f5b39a14b7d94d4b319e2ab670fc2ae651f31b49ba73e7ec1a78356ecf2`;
+and the three D.93.46 stdout values are
+`2b3511b75ce8d05f5244ac40e99803c37822e265976900b02771ac39a7bceddb`,
+`225dd2d9b6c2cf6514d677c4aaaba03c3dad0441d2632ec714b0628b31604f6e`
+and `0ef5a1bd95e1c15504c2e153e9628bfd28f1fc1256d30a69d0dbda64ce2c5f08`.
+
+The isolated ledger then stopped without retry at Phase-5e live-close. Its
+Chromium pair passed, the first Firefox title failed before product behavior
+because `window.phase5eCreatorLiveClose` was undefined at the first
+`page.evaluate`, the second Firefox title passed using three fresh pages, and
+the WebKit pair passed. The exact result is 5/6, not GREEN. Stdout, stderr,
+status and error-context SHA-256 values are
+`cf1d8f574484b916514b3482466753ea6a278db400f1cd67ce8595057e0e43ea`,
+`a03354e3ced5ba690dc37c5cec574d8af4f16ff14f45352786cc4317e1545b30`,
+`4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`
+and `e74878069f2b235594ad0189b028d1d647fd89f50e14e5ab5609b6bdf505a2de`.
+The complete isolated evidence is under
+`.logs/d108e4k-final-5e3e210d/isolated/`. No later isolated browser, repeat
+subprocess, build, typecheck or static gate ran. D.108e4k remains open and the
+isolated ledger is invalid.
+
+This failure does not demonstrate a creator-close product defect. The failed
+title reached no `create`, send, durable, close or terminal assertion; the same
+title passed in the ordinary checkout and in isolated Chromium/WebKit, and
+the next isolated Firefox title loaded the same bundle and passed. The shared
+server returns a module script, but the live-close test proceeds from
+`page.goto()` directly to semantic evaluation and records no `/entry.js`
+response, module exception, console error, failed request or exact API
+readiness state. The available evidence therefore cannot distinguish a
+Firefox navigation/module-load race from a transient bundle evaluation or
+request failure. It is test-fixture observability/readiness debt, not
+permission to change creator-close behavior or rerun until green.
+
+D.108e4y is the minimum test-only closure. It may change only
+`packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts`. Before
+each existing semantic page is used, one test-owned helper must attach
+`pageerror`, error-console, failed-request and `/entry.js` response telemetry;
+navigate to the existing server origin; require a successful main-document
+response and observed successful `/entry.js` response; and wait within the
+existing Playwright assertion budget for the exact live-close API functions
+to exist. A readiness failure must report the bounded telemetry in its thrown
+error. The helper must not swallow module errors, retry navigation, reload a
+page, raise a timeout, add sleeps, change the shared server, alter the bundle,
+or weaken any semantic assertion. Product, example, config, dependency,
+lockfile and public API files are out of scope. If telemetry proves a product
+module defect, stop and reslice rather than changing it here.
+
+The retained 5/6 isolated failure is D.108e4y's RED evidence. GREEN requires
+an exact source-shape check for one helper owner and no direct semantic
+`page.goto` path; the exact live-close config once in the ordinary checkout
+for 6/6; the exact config once in a new clean detached checkout after offline
+frozen installation and fresh affected build for 6/6; exact-owner TypeScript,
+ESLint, Prettier and diff checks; clean tracked status; all 26 stashes and
+protected paths preserved; and the root shim absent. No repeated sampling is
+authorized inside this slice. After a signed/pushed GREEN, run the normal
+read-only Grok 4.6/high, exact Kimi K3 `CHECK001` through `CHECK100`, and Opus
+5/xhigh implementation review. No Fable or collaboration subagent runs.
+Every P0/P1 is corrected in the same round; every P2 is assigned to the plan
+owner with deadline 2026-09-04.
+
+Because D.108e4y changes the test tree, its focused clean-checkout proof cannot
+repair or compose with the stopped D.108e4k ledger. After D.108e4y closes,
+D.108e4k must restart from command one at the new exact signed tree. The
+complete E3-03 config, retained three-trial campaign and both campaign ledgers
+remain unauthorized.
