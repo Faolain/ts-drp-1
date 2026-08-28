@@ -66830,19 +66830,84 @@ three and three complete evidence envelopes. Signed `rawMaxStallMs` values are
 was 415, 413 and 416 samples; reliable delivery was 12, 10 and 14. The passing
 test executed the aggregate connection/delivery gates, final durable-control
 round trip and rendered-metric assertions after all three trial bodies. Every
-trial records zero product `linkDrops` on both peers and unchanged
-`lastLinkDrop`; the terminal campaign is therefore performance/aggregate/
-rendered/durable evidence only. Directional replacement custody remains owned
-by the focused D.108e4g browser proof and D.108e4i preserved e3-03-2 replay.
+trial records a zero prepare-to-deadline product `linkDrops` delta on both
+peers. The absolute creator/receiver counters were 2/2, 3/3 and 4/4 at the
+three prepare stages and remained equal at each matching deadline; those
+increments belong to the inter-trial `fabric.reset` boundaries. Every stage's
+`lastLinkDrop` remained `restart` and never became `replacement`. The terminal
+campaign is therefore performance/aggregate/rendered/durable evidence only.
+Directional replacement custody remains owned by the focused D.108e4g browser
+proof and D.108e4i preserved e3-03-2 replay.
 
 Authenticated connection losses and some ping failures remained observable,
 but every recorded connection abort was owned by `other-owner`, not
 `libp2p-connection-monitor`; no exact monitor-owned
-`start -> failure -> abort` chain exists. Combined with zero product link drops,
-the strict otherwise-usable false-positive predicate is false. This run does
-not authorize an upstream attribution or MVRE, and the recorded js-libp2p
-issues remain context only. The result is a D.108e4e/f/g/h acceptance candidate
-pending the separately required immutable evidence review round. D.108e4a/b/c/d,
-aggregate D.108e4 and D.108e5 remain open exactly as frozen above. No campaign
-rerun, Fable review, product/libp2p change or protected-untracked mutation
-occurred.
+`start -> failure -> abort` chain exists. Three exact same-connection,
+same-reason, adjacent-sequence pairs remain useful directional context:
+`6vz56x1787920710710` had `TimeoutError` at sequences 17/18 one millisecond
+apart, `9h2szf1787920785038` had `TimeoutError` at 29/30 in the same
+millisecond, and `1gaeo81787920844663` had `OperationError` at 37/38 in the
+same millisecond. In every pair the ping failure is monitor-owned but the abort
+is `other-owner`, so frozen operand three remains false. Combined with the
+zero within-trial product link-drop deltas and absence of a `replacement`
+reason, the strict otherwise-usable false-positive predicate is false. This
+run does not authorize an upstream attribution or MVRE, and the recorded
+js-libp2p issues remain context only. The result is a D.108e4e/f/g/h acceptance
+candidate pending the separately required immutable evidence review round.
+D.108e4a/b/c/d, aggregate D.108e4 and D.108e5 remain open exactly as frozen
+above. No campaign rerun, Fable review, product/libp2p change or
+protected-untracked mutation occurred.
+
+The formal D.108e4j evidence round inspected exact immutable signed/pushed
+commit `0bb270242df3e052f24df9e50eddd01317cacf98`, parent
+`f8edc6b45b80637a570def990a35dee7d7a9220d`, tree
+`da47c8f08aa363bb518b594622d8a98b51b57361`, stable patch id
+`b81cd7aa2afe923628cddaa4bfb22e0199cf97f7` and raw-diff SHA-256
+`ee519fbb6b020c8c3c0b2943c2f7dbb82a7b20344c6e265804636e695f54d435`.
+It had a good signature, was pushed and changed only this plan.
+
+Grok 4.6/high session `01a04868-006f-7c20-b9aa-f85546dd78aa`
+actively inspected the packet for 285.245 seconds but hit the local runner's
+default 16-turn ceiling. The terminal event was `max_turns_reached` followed by
+`stopReason=cancelled`, not a service timeout, so that first turn is honestly
+`NO_VERDICT`. Event/public/status SHA-256 values are
+`f7e35d2ac8199ddcd913ce27da524c324a7f494e51f74cbf8919db530af09ea6`,
+`7243110bf2f23db51ce02c9dfbc728f39a61988bb8f83141fe3bdd4f4a3f100f`
+and `a34587b3caacfbb515e7bafba33c0c5793c439eb6d16b6affd11a88d7e56094b`.
+The same session then received one no-more-tools terminal continuation rather
+than a new review and returned bare schema-valid `APPROVED`, P0=0/P1=0/P2=0.
+Continuation stream/stderr SHA-256 values are
+`534b7adc1b148896552982123531a9815b40b9ae1e44d6b5844d98baf590eb69`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+Kimi CLI 0.38.0 exact `kimi-code/k3` session
+`session_70a69d3e-a952-416f-9b6b-18951a6467f3` independently recomputed the
+commit and artifact custody, emitted exactly 100 total, unique and ordered
+`CHECK001` through `CHECK100` markers and returned `APPROVED`, P0=0/P1=0/P2=0.
+Stream/stderr SHA-256 values are
+`1280bcc0d092ca07f16c37f2fca5438b8ce6399eea53ca2e5bdbf48497ab340e`
+and `80b3b476497310fa8debd696d4cf692e30bac21f93874c6dc0de6508603336b1`.
+Its audit materialized one derived decoded copy under `/tmp` but did not change
+tracked or protected workspace state.
+
+Opus 5/xhigh session `a217b64f-6979-49d2-87de-18b3ca6beeac` completed in
+349.242 seconds after 41 turns with no error or subagent and returned
+`APPROVED`, P0=0/P1=0/P2=2. JSON/stderr SHA-256 values are
+`4fb8eeb1384d078afc34e53c883f4b2c0b4cb7bee7db59fd695bff0dad17f430`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+Its shell hash/signature attempts were denied by the read-only tool roster, but
+it independently inspected every substantive artifact field and source-order
+gate. The two P2s required exact absolute-versus-delta `linkDrops` wording and
+retention of the three monitor-failure/other-owner-abort adjacencies. The
+D.108e4j plan and evidence owners discharge both above by 2026-09-04 without a
+rerun, predicate change or upstream claim.
+
+With zero reproduced P0/P1 across the evidence round and the complete P2 union
+owned and corrected above, D.108e4e candidate `298b5745`, D.108e4f candidate
+`b64d3539`, corrected D.108e4g GREEN `ca6c7a39` and corrected D.108e4h GREEN
+`cf59de31` are accepted under the D.108e4i directional validator and this
+terminal 5/5 evidence. This does not accept D.108e4a/b/c/d or aggregate
+D.108e4, and it does not permit D.108e5. Their full combined ordinary/isolated
+proof and D.108e4b's separate GREEN review remain due. No confirmation review,
+Fable review, new campaign, production/libp2p change or collaboration subagent
+ran.
