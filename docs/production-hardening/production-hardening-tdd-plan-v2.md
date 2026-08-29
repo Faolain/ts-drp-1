@@ -71740,6 +71740,18 @@ and
 `2cbee7a819d47918e48693e9fb22a3bfbfdbe410f39a423da8d76937a3a0a1cb` /
 `ea7b58389dd25ac9d57b99b23c0da5fcf8f761fd64108028fd956be9d66b2160` /
 `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+Ownership stdout/stderr/time SHA-256 values are
+`452ac24202d043cac63547a9b4e693e227cbda4fe898427d8ad764a44dc4f109` /
+`5eac37148b28e53d4c5c985c0bcfe80c78198456db9b7c85f7654f00eff702af` /
+`f7edfbacb33b00481910815a35b28396960cdb1758a6b1b6e959e876183806c4`;
+lifecycle/identity values are
+`452ac24202d043cac63547a9b4e693e227cbda4fe898427d8ad764a44dc4f109` /
+`36ce83056edec3139e7f5cffecfef11c4ee44b5243d344442ff38d169bfc2c71` /
+`65e709f06a8f71faf4cb185fa8a3ac4434cc88d00c697f170843de54a61c69a6`;
+and retained-seven values are
+`1091bb742b65763d58d4c01551ea5f92880eee322bc636a207e730ffd7896de8` /
+`794c55f178e30b228ee28437a0ee8ff3dca0eac074c54db1343b0a5b8d8dd521` /
+`fd78a9d3fabd27972be9a26a5619c57db8e0422ed4e41e064cb0ff7cae7b0742`.
 No reviewer, Fable run or long campaign ran during the sweep.
 
 Affected `@ts-drp/network` build/typecheck and `./examples/grid`
@@ -71765,6 +71777,119 @@ The complete GREEN `SHA256SUMS` excludes itself and has SHA-256
 `3843c3c2547119fedc3661f542fe27f7691f3e766c00dd936041140ec3b48549`.
 This GREEN evidence authorizes only the formal read-only Grok/Kimi/Opus GREEN
 review after the signed/pushed checkpoint; it grants no campaign authority.
+
+That formal GREEN review inspected exact signed/pushed commit
+`72b59de347a7fac3de9073a10278bceb8e9eef9a`, parent
+`7abcf9dda91222b7260499dd4169d251c93b7118`, in read-only/detached contexts.
+Reviewers ran no tests, made no shared-checkout changes and invoked neither
+Fable nor a subagent.
+
+- Grok 4.6/high session `01a04c36-8bcd-7012-ab55-d18d4d1ab834` ended
+  normally with `end_turn` after 675.282 seconds and substantive APPROVED,
+  P0=0/P1=0/P2=3. Its public stream included progress text before the valid
+  terminal result, so one tool-free one-turn continuation of that same session
+  re-emitted the unchanged verdict/findings as exactly one `RESULT:` line.
+  Events/public/status/stderr/final-line/status SHA-256 values are
+  `05aaba56c23d5406c907ca73958ecda1c5ce79d11d06dacd122190ebc4f4f2ee`,
+  `edaf40d20b570ae3bcbcfd7468d8ec67b94d5c860f347754b9bdaa86b549de18`,
+  `ad5773482370f493dec0411d2e070d5fbfe225950ee7113c0c70a41e24ef682e`,
+  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`,
+  `3306ca52ef95e31ab4222ee2aa301b393d49d811b2a89c777cde72146f3f7ec9`
+  and
+  `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+- Exact `kimi-cli` 1.49.0 / `kimi-code/k3` session
+  `97293d65-a90e-4f05-bb20-149331ce893a` returned zero with substantive
+  APPROVED, P0=0/P1=0/P2=3. Its stream contained a separate progress message;
+  one tool-free continuation of the same session re-emitted unchanged findings
+  as exactly 101 nonempty lines: ordered unique `CHECK001` through `CHECK100`,
+  then RESULT. Stream/initial-text/stderr/status/final-text/final-status SHA-256
+  values are
+  `f4c9587caef9abb0009a82dd89a4968e16283fa3feef3db023086a6dff84447b`,
+  `4e8e9f9fd916e9d3578dbbb4725ac48d1b4583d06e019446644d2d6498970e75`,
+  `58e55e7e59f5c8f661d00ba4536a6a6da2e90fb97aed40da1c48f378ce282cbc`,
+  `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`,
+  `259472ea6e81d78363ed049f72f5ac13fd69fc19f5dd27250030ca5d817d2703`
+  and
+  `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+- Opus 5/xhigh session `71ae5bf4-75f9-4a39-90cd-2a599e5c9d2f`
+  completed 40 turns in 689.410 seconds with `is_error=false`, no permission
+  denial, no subagent and structured CHANGES_REQUIRED, P0=0/P1=1/P2=4.
+  JSON/stderr/status SHA-256 values are
+  `4fbf58babdf994a30b9c179b53cf5b88ad34c768d07dde8e38cc35a8c9bb783e`,
+  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+  and
+  `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+
+The same-round review correction remains test/plan-only. Opus's sole P1 was
+valid: `zeroOwnerRtcAdvance` had zero local owners and advanced RTC identities,
+but also retained advanced authenticated identities, so it failed
+authenticated stability before proving the intended zero-owner RTC-stability
+branch. The corrected mutant now hard-pins both authenticated identities to
+their prepare values while retaining both advanced deadline RTC identities.
+It therefore throws `D108E4H_IDENTITY_JOIN_INVALID` for RTC advancement under
+the actual peer-dependent classifier; weakening `isIncomingReplacement` to
+local count zero would instead enter the incoming lifecycle branch and change
+the exact error, so the soft mutant catches that regression.
+
+The nonblocking coverage union was also closed without changing production
+behavior. Five focused mutants extend the D.108e4ac roster from 14 to 19:
+receiver-local missing open event; wrong readiness owner; duplicate exact
+open-readiness handler; new-identity close before old close; and product
+handler after old close. Each throws exact
+`D108E4H_LIFECYCLE_ORDER_INVALID`. Together they isolate the nontransmitting
+local-replacement path, readiness owner/cardinality, new-identity close
+exclusion and product-handler-before-close guard. The existing unusable
+selected-candidate mutant remains, while the new-identity-close mutant also
+pins the separate failed-replacement retirement safety clause identified by
+Grok and Kimi.
+
+The review-correction focused test ran once, returned zero in 7.772 seconds
+and reported one expected test with retry zero and zero skipped, unexpected,
+flaky, top-level, hard or soft errors. The retained seven-title suite then ran
+once, returned zero in 13.882 seconds and reported seven expected tests with
+the same empty error buckets. Command/reporter/stdout/stderr/status/time
+SHA-256 values are respectively
+`2530b255de9ca1a6d937163003b7829ac528cae7b19ad5914fdcb22a74e483e4` /
+`5a36e4442150a64a6db231c975e697b1b23ad0f2f6ee289a61499a491e22c3d6` /
+`66dbfff1998a8a78236aa9535adab89779a605e697db9cf87da9a21e224425ac` /
+`8c5ceda456821c40012d1d3eb9851d924d032cd55c44f451c572ed124b08eecd` /
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa` /
+`90c4a83aea5eebe3f2915917c16178e019f16513981bf7a56596cbb41033b6a6`
+and
+`5245d517b63bc13d24d415c73024fc45aa114c9c05c52fea54379c5a93d5534b` /
+`a87f75859b4c61838534f584e3681db5491f922f5ad58cc03d7be1d8b5f0611a` /
+`f2b25e691c9672342146d3fb57487253c0f5baad893ce735241c7c96dcef9112` /
+`c58a18379796556f7b12b653c12e34d704fa62aff08d5fbba96e2f721e095518` /
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa` /
+`baeb918474437b175dc87fd9d50c75b9d9552fec04a06943af11d8abc2c312a3`.
+
+A dedicated `pnpm typecheck` artifact now preserves status one rather than
+folding it into the package ledger. Its only errors remain in the inherited
+Phase-1i-b RED fixture and helper; their working SHA-256 values
+`951605a320051fd0fabd29033525303f3004dcad62ab45352cc0b6e79bc2bf4d`
+and
+`f8fff92c8f0d61b283051003eeb1b076156835861bfe4251c59f7c3e0e4e6dee`
+equal exact GREEN HEAD. Root command/stdout/stderr/status/time SHA-256 values
+are
+`64a7977be7ac23ef0e7d7ee3b4981b3b7eb3e2642e2aaa8f7d70bf74f616916f`,
+`09d56d21353c2f62934e987574825cb9e31bba5c6f37301ffc8a367dbabe823d`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`,
+`4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`
+and
+`f3e3ca9fe0d71a67e9960a94d02294723de753786ee50a30783a0e215179272c`.
+Final exact-owner checks returned zero. The corrected test-owner SHA-256 is
+`6ef1b53c744d3be795cd53daf82359e2deac3f4d21b0fc382250f468cb5fc9d5`;
+its diff from reviewed GREEN checkpoint
+`72b59de347a7fac3de9073a10278bceb8e9eef9a` is
+`ede3daf700edc88fa655229e79eeb71f5cad8adf3b8cbf32950feaa89385a8aa`.
+Complete review and correction `SHA256SUMS` files exclude themselves and have
+SHA-256
+`dd04e18c3b7e5862f481b67e0c59cef4ac161e4bb4010f2e45e04da51a74a34a`
+and
+`daf401395d517fb4a9ee8b0ca24ba5d3872fc6cb02b978712ffbbed40445445e`.
+Protected `.logs/` custody remains intentionally untracked; its signed plan
+hashes are the durable disclosure, and no protected path or stash was altered.
+The review correction grants no campaign authority.
 
 D.108e4b's separate GREEN review, aggregate D.108e4 closure and D.108e5 remain
 blocked until D.108e4ac and a replacement six-pass campaign close.

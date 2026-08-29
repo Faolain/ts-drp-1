@@ -4243,6 +4243,7 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 		const dualCreator = dualLocalMutationBase.endpoints.creator;
 		const dualReceiver = dualLocalMutationBase.endpoints.receiver;
 		const dualCreatorAfter = d108e4hOnly(dualCreator.deadline.rtc);
+		const dualReceiverAfter = d108e4hOnly(dualReceiver.deadline.rtc);
 		const withDualCreatorDeadline = (
 			fixture: D108e4hValidationInput,
 			deadline: D108e4hBoundaryCustody
@@ -4271,10 +4272,34 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 			lastLinkDrop: dualReceiver.prepare.rawTransport.lastLinkDrop,
 			linkDrops: dualReceiver.prepare.rawTransport.linkDrops,
 		});
+		const zeroOwnerStableAuthenticated = Object.freeze({
+			...dualLocalMutationBase,
+			endpoints: Object.freeze({
+				creator: Object.freeze({
+					...dualCreator,
+					deadline: Object.freeze({ ...dualCreator.deadline, authenticated: dualCreator.prepare.authenticated }),
+				}),
+				receiver: Object.freeze({
+					...dualReceiver,
+					deadline: Object.freeze({ ...dualReceiver.deadline, authenticated: dualReceiver.prepare.authenticated }),
+				}),
+			}),
+		});
 		const zeroOwnerRtcAdvance = withReceiverDeadlineTransport(
-			withCreatorDeadlineTransport(dualLocalMutationBase, zeroOwnerCreatorTransport),
+			withCreatorDeadlineTransport(zeroOwnerStableAuthenticated, zeroOwnerCreatorTransport),
 			zeroOwnerReceiverTransport
 		);
+		expect({
+			creatorAuthenticated: zeroOwnerRtcAdvance.endpoints.creator.deadline.authenticated,
+			creatorRtc: zeroOwnerRtcAdvance.endpoints.creator.deadline.rtc,
+			receiverAuthenticated: zeroOwnerRtcAdvance.endpoints.receiver.deadline.authenticated,
+			receiverRtc: zeroOwnerRtcAdvance.endpoints.receiver.deadline.rtc,
+		}).toEqual({
+			creatorAuthenticated: dualCreator.prepare.authenticated,
+			creatorRtc: dualCreator.deadline.rtc,
+			receiverAuthenticated: dualReceiver.prepare.authenticated,
+			receiverRtc: dualReceiver.deadline.rtc,
+		});
 
 		const dualLocalUnsupportedReason = withCreatorDeadlineTransport(
 			dualLocalMutationBase,
@@ -4305,6 +4330,11 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 			channelId === dualCreatorAfter.channelId &&
 			event === "channel-message-handler-installed" &&
 			owner === "product-unreliable-webrtc";
+		const isDualReceiverOpen = ({ channelId, connectionId, event, owner }: D108e4hLifecycleObservation): boolean =>
+			connectionId === dualReceiverAfter.connectionId &&
+			channelId === dualReceiverAfter.channelId &&
+			event === "channel-open-event" &&
+			owner === "rtc-datachannel-open-event";
 		const dualLocalMissingOpen = withCreatorLifecycle(
 			dualLocalMutationBase,
 			dualCreator.lifecycle.filter((record) => !isDualCreatorOpen(record))
@@ -4327,6 +4357,10 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 		const dualLocalMissingProductHandler = withCreatorLifecycle(
 			dualLocalMutationBase,
 			dualCreator.lifecycle.filter((record) => !isDualCreatorProductHandler(record))
+		);
+		const dualLocalReceiverMissingOpen = withReceiverLifecycle(
+			dualLocalMutationBase,
+			dualReceiver.lifecycle.filter((record) => !isDualReceiverOpen(record))
 		);
 		const dualLocalWrongOldCloseIdentity = withCreatorLifecycle(
 			dualLocalMutationBase,
@@ -4354,6 +4388,31 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 				)
 			)
 		);
+		const dualLocalReadinessWrongOwner = withCreatorLifecycle(
+			dualLocalMutationBase,
+			Object.freeze(
+				dualCreator.lifecycle.map((record) =>
+					record.sequence === 1_653 && record.event === "channel-handler-installed"
+						? Object.freeze({ ...record, owner: "rtc-observer-or-harness" as const })
+						: record
+				)
+			)
+		);
+		const dualLocalDuplicateReadiness = withCreatorLifecycle(
+			dualLocalMutationBase,
+			Object.freeze(
+				[
+					...dualCreator.lifecycle,
+					d108e4hLifecycle(
+						dualLocalMutationBase.trialId,
+						1_652,
+						"channel-handler-installed",
+						dualCreatorAfter,
+						"rtc-observer-datachannel-handler"
+					),
+				].sort((a, b) => a.sequence - b.sequence)
+			)
+		);
 		const dualLocalCloseBeforeReadiness = withCreatorLifecycle(
 			dualLocalMutationBase,
 			Object.freeze(
@@ -4363,6 +4422,37 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 							return Object.freeze({ ...record, sequence: 1_658 });
 						}
 						return record.sequence >= 1_658 ? Object.freeze({ ...record, sequence: record.sequence + 1 }) : record;
+					})
+					.sort((a, b) => a.sequence - b.sequence)
+			)
+		);
+		const dualLocalNewIdentityCloseBeforeOldClose = withCreatorLifecycle(
+			dualLocalMutationBase,
+			Object.freeze(
+				[
+					...dualCreator.lifecycle,
+					d108e4hLifecycle(
+						dualLocalMutationBase.trialId,
+						1_652,
+						"channel-close-call",
+						dualCreatorAfter,
+						"product-unreliable-webrtc"
+					),
+				].sort((a, b) => a.sequence - b.sequence)
+			)
+		);
+		const dualLocalProductHandlerAfterOldClose = withCreatorLifecycle(
+			dualLocalMutationBase,
+			Object.freeze(
+				dualCreator.lifecycle
+					.map((record) => {
+						if (record.sequence === 1_655 && isDualCreatorProductHandler(record)) {
+							return Object.freeze({ ...record, sequence: 1_657 });
+						}
+						if (record.sequence === 1_657 && isDualCreatorOpen(record)) {
+							return Object.freeze({ ...record, sequence: 1_655 });
+						}
+						return record;
 					})
 					.sort((a, b) => a.sequence - b.sequence)
 			)
@@ -4410,9 +4500,18 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 			["dualLocalMissingOpen", dualLocalMissingOpen, "D108E4H_LIFECYCLE_ORDER_INVALID"],
 			["dualLocalDuplicateOpen", dualLocalDuplicateOpen, "D108E4H_LIFECYCLE_ORDER_INVALID"],
 			["dualLocalMissingProductHandler", dualLocalMissingProductHandler, "D108E4H_LIFECYCLE_ORDER_INVALID"],
+			["dualLocalReceiverMissingOpen", dualLocalReceiverMissingOpen, "D108E4H_LIFECYCLE_ORDER_INVALID"],
 			["dualLocalWrongOldCloseIdentity", dualLocalWrongOldCloseIdentity, "D108E4H_LIFECYCLE_ORDER_INVALID"],
 			["dualLocalReadinessNotOpen", dualLocalReadinessNotOpen, "D108E4H_LIFECYCLE_ORDER_INVALID"],
+			["dualLocalReadinessWrongOwner", dualLocalReadinessWrongOwner, "D108E4H_LIFECYCLE_ORDER_INVALID"],
+			["dualLocalDuplicateReadiness", dualLocalDuplicateReadiness, "D108E4H_LIFECYCLE_ORDER_INVALID"],
 			["dualLocalCloseBeforeReadiness", dualLocalCloseBeforeReadiness, "D108E4H_LIFECYCLE_ORDER_INVALID"],
+			[
+				"dualLocalNewIdentityCloseBeforeOldClose",
+				dualLocalNewIdentityCloseBeforeOldClose,
+				"D108E4H_LIFECYCLE_ORDER_INVALID",
+			],
+			["dualLocalProductHandlerAfterOldClose", dualLocalProductHandlerAfterOldClose, "D108E4H_LIFECYCLE_ORDER_INVALID"],
 			[
 				"dualLocalFailedReplacementDisplacement",
 				dualLocalFailedReplacementDisplacement,
