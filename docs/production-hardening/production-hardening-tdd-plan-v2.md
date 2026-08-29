@@ -69704,3 +69704,92 @@ cannot prove, and records the exact wider sibling debt without widening this
 slice. Every nonblocking review item is assigned to the plan owner with
 deadline 2026-09-04. No confirmation review, Fable, campaign, product change,
 test execution or collaboration subagent ran during review.
+
+The D.108e4y one-file GREEN candidate is exact signed/pushed commit
+`14eb04e499c8095966a8ee688a6a9e54a19beefe`, parent `54f799eb`. It added the
+file-local fixture loader, removed `about:blank`, routed every existing page
+through readiness and added the deterministic entry-abort title. The
+TypeScript-AST source-shape gate, exact TypeScript, ESLint, Prettier and diff
+checks passed. The ordinary exact config passed once at 9/9. A new detached
+checkout `/private/tmp/ts-drp-d108e4y-14eb04e4.gpwnpl` started tracked-clean
+with no package/example `dist` or root shim, passed offline frozen installation
+without creating `dist`, passed native preparation and the fresh affected
+build, and passed the exact config once at 9/9. It finished tracked-clean with
+no root shim. Source-shape, ordinary, isolated stdout/stderr/status SHA-256
+values are respectively
+`c0eb3b9970cff6d35575244fb1add8d01d67ae30a9a28a342b0aec4c6ff02842`,
+`45b4ce16109b4e3acafa3f8357cea160296badf1ae39d6a3cdee2da9ae023034`,
+`1d1b79e226cccd8dd7bb453d819609b625cce3b0cbdf8d88958222a96c91c627`,
+`5617bbe007b606380ec7cc43d914fa383ac533d39aa4f7a97364c0f9f56fb2a8`
+and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+
+The required implementation review inspected exact signed range
+`54f799eb..14eb04e4`. Grok 4.6/high completed normally after 690.169 seconds
+with exit zero, `end_turn` and no timeout. Progress prose before the terminal
+object made the wrapper honestly classify it `NO_VERDICT`; the substantive
+object was `CHANGES_REQUIRED`, P0=0/P1=1/P2=2. Event/public/status/stderr
+SHA-256 values are
+`ef102f8806a92135c3faf4101cf748f6e975041f15f9463ab66db0d13d7eb251`,
+`7a68524a4c77deb995fca1bf928c598cac64599a1d50366b7696e0d90ecf9cf5`,
+`e5b5d038530a70fcf203ad7d3e49eff6aa2a65397c91872b24f7d886596e6cc8`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+Kimi exact K3 session `session_61cd1c6b-aac2-4ee6-9cdd-559a9ee1a90d`
+emitted exactly 100 unique ordered `CHECK001` through `CHECK100` records and
+one RESULT: `CHANGES_REQUIRED`, P0=0/P1=1/P2=3. Stream/stderr SHA-256 values
+are `992ad0c0a48a5b5fc6ebf7b4a6886ce82bdee3472110a143b5df292a62c014b0`
+and `6c6b34891e0debd3edb3c0dd3e9d6aa94308f9a3f05b929550d453b21edbd820`.
+Opus 5/xhigh session `6ea87e2c-a789-4232-b970-85c8d7305d1e`
+completed 35 turns in 467.252 seconds with no error or subagent and returned
+`CHANGES_REQUIRED`, P0=0/P1=2/P2=6. JSON/stderr SHA-256 values are
+`bf6280fafd0298856c7f6ccb3b34f3f9c15c9c4e9051d84ecf0d36fd7b5a79cd`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+The blocking union was one boundedness defect in two operations: Playwright
+1.62 gives navigation no default timeout, and the catch-path `page.evaluate`
+could also wait until the 180-second test timeout. The same-round correction
+is exact signed/pushed commit
+`10a63d9d586b85306b2862dadf6bc081eb44a20d`, parent `14eb04e4`, and changes
+only the same test file. One `AbortController` now owns both response waits and
+the `load` navigation; navigation has the same explicit 5,000 ms bound;
+failure aborts every outstanding owner before a separately bounded 2,000 ms
+API inspection; inspection failure and timeout have distinct states; and the
+timer is cleared. Readiness uses 100 ms polling. Failed requests are scoped to
+the exact document/entry URLs, console telemetry is report-only on success,
+the cause stack is bounded, and the control parses the diagnostic JSON and
+requires one nonempty exact-entry request failure plus exact absent API state.
+
+At the corrected tree, the strengthened TypeScript-AST source-shape gate
+passed, including abort ownership, explicit navigation/inspection bounds and
+structured control assertions. Exact TypeScript, ESLint, Prettier and diff
+checks passed. The exact config passed once in the ordinary checkout at 9/9.
+A second new detached checkout
+`/private/tmp/ts-drp-d108e4y-10a63d9d.PQHmN9` at exact `10a63d9d` started
+tracked-clean with no package/example `dist` or root shim, passed offline
+frozen installation without creating `dist`, native preparation and the fresh
+affected build, then passed the exact config once at 9/9. It finished
+tracked-clean with no root shim. Corrected source-shape, ordinary, isolated
+stdout/stderr/status SHA-256 values are respectively
+`1a563e93898084e4461c26bed31ebaf01faae7ea7aa4d0733ede106e174f4b1b`,
+`01f86d455aacc302e23fedb6d2a4712680dbbc0ae507d50cc1048fedd76fce83`,
+`7215a17d28812d891e0106b3ecf9609b2ee7e70950d56478f69140efe0c2f36e`,
+`61e73426ee4cbedb5bd199d24bc3eb8783aaa40b4d8312974c10490fcabf70dc`
+and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3ab86aa`.
+
+The remaining nonblocking review union is assigned to the plan owner with
+deadline 2026-09-04: expose a dropped-record count when a telemetry category
+crosses five entries; keep the explicit 5,000 ms readiness headroom under
+observation on slower runners; name future evidence directories after the
+implementation commit or add an ordinary implementation-head marker; and
+close or explicitly retain the 35-site sibling readiness debt already listed
+above. The request-failure category binding, distinct inspection states,
+timer polling, URL scoping and bounded cause stack were corrected rather than
+deferred.
+
+All 26 stashes and protected untracked paths remain present. The root shim is
+absent. No Fable, collaboration subagent, product/shared-server/config change,
+campaign or repeated same-tree sampling ran. D.108e4y is closed at exact
+signed/pushed correction `10a63d9d`. D.108e4k must now restart from command one
+at the next exact signed/pushed plan-only checkpoint; no D.108e4k evidence at
+the prior test tree composes with that restart. The complete E3-03 config and
+retained three-trial campaign remain unauthorized.
