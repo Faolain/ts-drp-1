@@ -69989,3 +69989,108 @@ isolated three-consecutive ledgers, D.108e4b's separate GREEN review and
 aggregate D.108e4 closure remain due and require the next explicit
 authorization. The complete-config pass does not authorize D.108e5. No Fable
 or collaboration subagent ran.
+
+###### D.108e4z — final ordinary and isolated retained-campaign ledgers
+
+D.108e4z is an evidence-only, fail-closed execution slice for the two remaining
+three-consecutive retained E3-03 ledgers. It changes only this plan and ignored
+execution logs. It may not change product, example, test, fixture,
+Playwright/build/workspace configuration, script, dependency, package manifest
+or lockfile behavior. It does not create another RED/GREEN pair and does not
+reinterpret the successful one-off complete-config invocation as a consecutive
+ledger result. The exact behavior tree remains
+`900778ff540c1b1b4fb2b3e29f095b7b66ef8f9f`; plan-only custody descendants may
+advance without invalidating it.
+
+Execution remains forbidden until the user expressly authorizes all six long
+invocations after this exact signed/pushed plan freeze and its review round.
+Neither this plan text, a reviewer verdict nor the prior one-off “try it anyway”
+authorization supplies that authority. The authorization covers exactly three
+ordinary and three isolated invocations of the one retained title. It does not
+cover the complete config again, a retry after failure, another sample, Fable,
+D.108e4b review or D.108e5.
+
+Before command one, record the exact commit, tree, command, wall-clock start,
+ambient process inventory, protected paths, stash count and root-shim absent
+predicate. Prove that
+`git diff --quiet 900778ff..HEAD -- packages examples tests
+playwright.e3-03-loss-and-hol.config.ts package.json pnpm-lock.yaml
+pnpm-workspace.yaml scripts` exits zero. The ordinary checkout must be
+tracked-clean apart from the protected untracked paths. The preserved detached
+checkout `/private/tmp/ts-drp-d108e4k-900778ff.nxIeoK` must remain tracked-clean
+at exact `900778ff`, with no root shim and canonical resolving to its freshly
+built 21,858-byte
+`packages/canonical/dist/src/index.js`. The ordinary and isolated config, test
+owner and `unreliable-webrtc.ts`, `node.ts` and `ephemeral.ts` SHA-256 values
+must remain pairwise identical. Any mismatch voids the slice before execution.
+
+The exact retained title is anchored, so a rename or added match fails closed:
+
+```text
+^three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$
+```
+
+Run these as six separate processes, never `--repeat-each`, and validate each
+JSON artifact before starting the next command:
+
+```sh
+PLAYWRIGHT_JSON_OUTPUT_NAME=.logs/d108e4z-campaign/ordinary-1.json \
+  pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep '^three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
+  --reporter=json --fail-on-flaky-tests
+
+PLAYWRIGHT_JSON_OUTPUT_NAME=.logs/d108e4z-campaign/ordinary-2.json \
+  pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep '^three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
+  --reporter=json --fail-on-flaky-tests
+
+PLAYWRIGHT_JSON_OUTPUT_NAME=.logs/d108e4z-campaign/ordinary-3.json \
+  pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep '^three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
+  --reporter=json --fail-on-flaky-tests
+```
+
+Then run the same three commands from
+`/private/tmp/ts-drp-d108e4k-900778ff.nxIeoK`, changing only each output name to
+`.logs/d108e4z-campaign/isolated-1.json`, `isolated-2.json` and
+`isolated-3.json`. Record separate stderr, status and start/end timestamps for
+all six commands. No task-owned reviewer, test process or profiler may overlap
+an invocation. A failure, timeout, nonzero status, title/count mismatch or
+invalid artifact stops the slice immediately. It consumes this authorization,
+resets that checkout's consecutive count to zero and does not permit a rerun.
+
+Every artifact must show exactly one expected result, zero skipped,
+unexpected and flaky results, retry zero, no top-level error and the exact
+retained title. Its decoded `e3-03-fixed-loss-campaign.json` attachment must
+have the pinned browser version, `trialCount: 3`, three metrics and three
+observation envelopes. Each trial must retain prepare, deadline, reset and
+run-returned stages; signed `rawMaxStallMs <= 500`, `rawGap > 1`, raw AoI P95
+at most 80% of reliable AoI P95 and at least ten raw deliveries after reliable
+start remain unchanged. Passing status must follow aggregate delivery and
+connection gates, the final durable-control round trip, all rendered metrics
+and stage `complete`; attachment presence alone is insufficient. Decode and
+hash the campaign and calibration attachments, reporter JSON, stderr, status
+and command/timestamp record for every invocation.
+
+After all six consecutive passes, record one signed/pushed D.108e4z evidence
+checkpoint. It receives a read-only Grok 4.6/high, exact Kimi K3 `CHECK001`
+through `CHECK100` and Opus 5/xhigh evidence review. D.108e4b then receives its
+still-separate GREEN review against the exact product candidate and composed
+final behavior/evidence tree; that review cannot be folded into D.108e4z.
+Only after both review rounds close with every P0/P1 corrected and every P2
+owned may D.108e4a/b/c/d and aggregate D.108e4 be considered for closure.
+D.108e5 remains blocked until that explicit audit. No Fable or collaboration
+subagent runs.
+
+This plan freeze itself receives one read-only Grok 4.6/high, exact Kimi K3
+`CHECK001` through `CHECK100` and Opus 5/xhigh plan review before execution.
+Reviewers must verify that the six commands are the exact remaining obligation,
+that the one-off 5/5 run is not double-counted, that failure custody is
+fail-closed, and that plan-only descendants preserve the accepted behavior
+tree. Reproduced P0/P1 findings are corrected in the same round without a
+confirmation review; every P2 receives the plan/evidence owner and deadline
+2026-09-04. Review completion still does not replace express user
+authorization.
