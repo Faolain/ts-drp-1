@@ -73479,17 +73479,18 @@ before `D108E4H_RAW_BACKPRESSURE`. Neither correction changes accepted input,
 product code or this reviewed GREEN. All three reviewers agree D.108e4am may
 close and explicitly do not authorize or recommend a campaign.
 
-###### D.108e4an — raw-only browser-drain discriminator freeze
+###### D.108e4an — raw-physical-only browser-drain discriminator freeze
 
 The demonstrated state after D.108e4am is narrower than a product bug and
 narrower than permission to relax the campaign. Product admission correctly
 implements the fixed 65,536-byte bounded-drop contract, the validator now
 attributes that condition exactly, and the failed full trial proves a 45-call
 local refusal under mixed raw/reliable execution. It still does not establish
-whether a fresh raw-only lane under the frozen Chromium/CDP profile drains
-normally or reaches the same ceiling. The smallest next action is therefore
-one new, test-only, non-campaign browser discriminator; no long campaign,
-product optimization or expectation change is authorized.
+whether a fresh raw physical lane under the frozen Chromium/CDP profile and
+exact workbench payload/schedule drains normally or reaches the same ceiling.
+The smallest next action is therefore one new, test-only, non-campaign browser
+discriminator; no long campaign, product optimization or expectation change
+is authorized.
 
 D.108e4an owns only `tests/e3-03-loss-and-hol-proof.pw.ts` plus this plan
 record. Production, examples, Playwright configuration, dependencies, browser
@@ -73497,8 +73498,10 @@ pin, 65,536-byte ceiling, 600-sample/33 ms workload, 30% loss, 40 ms latency,
 packet queue/reordering, reliable-lane behavior, campaign acceptance and
 public APIs are closed. If the discriminator requires any such change, stop
 and reslice. It uses the existing grid surface, RTC observer, two isolated
-browser contexts, CDP profile and `sendMovement`; it creates no new product or
-example seam.
+browser contexts, CDP profile and `fabric.runTrial`; it creates no new product
+or example seam. `sendMovement` is explicitly rejected here because its
+movement envelope is smaller than the preserved 398-byte body/431-byte routed
+envelope and therefore cannot distinguish the demonstrated capacity boundary.
 
 Before its browser RED, add the two accepted review controls in the same test
 owner: a combined detached creator raw-transport delta plus positive
@@ -73513,16 +73516,33 @@ must omit the retained three-trial title. It pins Chromium
 enables CDP with `NO_LOSS` before signaling, creates one zone, waits for the
 existing raw/network pair, resets the observer to one discriminator trial id,
 captures prepare transport/channel identity, applies the exact 30%/40 ms/queue
-10/reordering profile, then invokes raw-only `sendMovement` exactly 600 times
-at 33 ms. It invokes neither `fabric.runTrial` nor reliable publish and has no
-trial loop or 15-second reliable tail. After the send loop and the retained
-500 ms drain observation, it captures deadline transport and RTC custody.
+10/reordering profile, then invokes `fabric.runTrial` once with the exact
+600-sample/33 ms/256-byte input that produced the preserved 398-byte marker
+body and 431-byte routed raw envelope. It has no trial loop and uses a trial id
+outside `e3-03-[0-2]`, so the workbench schedules no 15-second deadline or
+reliable sentinel.
+
+Immediately before the run, the test installs one reversible outer wrapper
+around the already-observer-wrapped `RTCDataChannel.prototype.send`. It scans
+outbound bytes only for the exact discriminator trial's
+`E303|<trial>|reliable|` marker. Exactly matching reliable physical sends are
+counted and returned before reaching the observer/native send; every other
+byte sequence delegates unchanged to the captured wrapper. The wrapper is
+restored in `finally`. This preserves the exact workbench JavaScript loop,
+serialization, promise scheduling and raw product route while removing only
+reliable physical-channel queue ownership. The test must prove exactly 600
+reliable sends were suppressed, zero reliable sends reached the RTC observer,
+and every observed raw send has the preserved 431-byte physical amount; any
+unclassified or missing reliable send is `OWNERSHIP_UNRESOLVED`. After the
+single run returns and the retained 500 ms drain observation, it captures
+deadline transport and RTC custody.
 
 The evidence envelope must be attached even on failure and must include the
 exact CDP rule/profile, before/after raw counters and identity, fixed input
-count, native send-attempt/success/failure lifecycle, per-success
-`bufferedAmount`, peak buffered ownership, deadline channel state, elapsed
-schedule, and classification. Accounting is closed:
+count, reliable-suppression count, native raw send-attempt/success/failure
+lifecycle, observed raw/reliable physical-send counts and byte amounts,
+per-success `bufferedAmount`, peak buffered ownership, deadline channel state,
+elapsed schedule, and classification. Accounting is closed:
 `sentDelta + backpressuredDropsDelta === 600`; every native attempt has exactly
 one terminal; native successes equal `sentDelta`; one raw connection/channel
 identity owns every success; and handshake/link/authenticated-loss deltas are
@@ -73531,16 +73551,18 @@ classification.
 
 The single RED invocation classifies without retry:
 
-- `RAW_ONLY_DRAINS`: sent delta 600, backpressure delta zero, all 600 native
-  successes and stable open raw identity. This assigns the retained blocker to
-  mixed/cumulative browser-test execution; the next reviewed slice may isolate
-  one mixed raw/reliable run but may not yet rerun the campaign or change
-  acceptance.
-- `RAW_ONLY_BACKPRESSURES`: positive backpressure with exact 600-call
-  accounting, stable identity and no link/handshake/authenticated loss. This
-  demonstrates the zero-local-refusal expectation is unreliable even for the
-  raw-only frozen browser profile; stop and reslice the test/evidence contract
-  for formal review without changing it in D.108e4an.
+- `RAW_PHYSICAL_ONLY_DRAINS`: sent delta 600, backpressure delta zero, all 600
+  native raw successes and stable open raw identity, with exactly 600 reliable
+  sends suppressed before physical ownership. This assigns the retained
+  blocker to reliable-physical or cumulative browser-test execution; the next
+  reviewed slice may isolate that distinction but may not yet rerun the
+  campaign or change acceptance.
+- `RAW_PHYSICAL_ONLY_BACKPRESSURES`: positive backpressure with exact 600-call
+  raw accounting, exact reliable suppression, stable identity and no
+  link/handshake/authenticated loss. This demonstrates the zero-local-refusal
+  expectation is unreliable even without reliable physical queue ownership;
+  stop and reslice the test/evidence contract for formal review without
+  changing it in D.108e4an.
 - Any other shape is `OWNERSHIP_UNRESOLVED`; stop and diagnose the exact
   accounting/identity failure without another browser invocation.
 
