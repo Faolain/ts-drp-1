@@ -71228,8 +71228,10 @@ ordinary custody, verbatim cwd/env/argv/redirection command records, exact
 relay/test paths, exact `runReturned` field spelling, live replacement-branch
 classification, absolute before/after shim/status/process/port custody and
 named preflight directories. Review and correction still authorize zero long
-invocations. Fresh express authorization for exactly all six D.108e4ab runs
-remains absent.
+invocations. At that corrected-plan checkpoint fresh express authorization
+for exactly all six D.108e4ab runs remained absent. The user subsequently
+supplied it verbatim as: `I expressly authorize all six D.108e4ab long
+retained-campaign invocations under the frozen fail-closed rules.`
 
 The corrected eight-block source-shape/syntax ledger SHA-256 is
 `072c3ed882439668f802026b464fbebe35376de58ea6bd9f5fbcfb4f008b3e1f`.
@@ -71239,3 +71241,178 @@ and
 `ca2ebdf97d7469496b1f4b78958f9dc8447efdcb623953fee7b6996b762f6fff`.
 The corrected 32-file readiness manifest excludes itself and has SHA-256
 `ea793361e5c29ae105a2ea49214e1d4a733923aa1217355f99f91100d56e5cd8`.
+
+###### D.108e4ac — dual-local replacement validator custody
+
+The authorization-time ordinary-one preflight first stopped on an invalid
+character class in its read-only `awk` process filter. Playwright had not
+started, so that mechanical evidence-command fault consumed no invocation.
+The error is preserved in
+`.logs/d108e4ab-campaign/ordinary-1.before/preflight-attempt-1-error.txt`.
+Correcting only that filter produced a complete passing preflight at
+`2026-08-29T05:18:26Z`: exact signed/pushed ordinary HEAD
+`a6477b019eb93df49373d52a50b0a9a46003f048` and tree
+`d891ff567a0a30897eeab93bbeef2787663e1ff1`, remote branch equality, the
+accepted behavior guard against `8c9afe55df7de6ffbfcc352e405e1faacfcf899c`,
+isolated HEAD/tree `8c9afe55df7de6ffbfcc352e405e1faacfcf899c`/
+`048edbdbb0960569c04f6284ab58057d602e3f78`, empty isolated tracked status,
+the exact eight protected ordinary paths, 26 stashes, both absent root shims,
+seven pairwise-identical execution identities and all 334 pairwise-identical
+runtime files. No ts-drp reviewer, test or profiler was active and all four
+fixed ports were clear. The before-manifest SHA-256 is
+`0a274adad9e480e389e05bfd3accffda70594b15c6dd0db599519480c9f23a18`.
+
+Authorized ordinary invocation one started at `2026-08-29T05:18:51Z` and
+ended at `2026-08-29T05:20:24Z`. It consumed ordinary invocation one and
+returned status one after the retained test failed
+`D108E4H_DROP_COUNT_AMBIGUOUS` at trial-zero stage
+`e3-03-0-assertions`. The JSON reporter has the exact ordinary config path and
+title, retry zero, no top-level error, zero expected/skipped/flaky results and
+one unexpected result; total reporter duration was 92.383 seconds and test
+duration was 83.377 seconds. Preliminary calibration completed under pinned
+Chromium `151.0.7922.34`, delivered 404 of 600 against floor 100 and retained
+the genuine total-loss check at before/during `1/1`. Failure telemetry,
+error-context and trace attachments are present. A completed campaign
+attachment is correctly absent.
+
+D.108e4ab therefore stopped fail closed. Ordinary invocations two and three
+and isolated invocations one through three did not start and may not be run
+under this consumed authorization. No rerun is permitted. Both ledgers remain
+at zero consecutive passes. The post-run preflight re-established every
+identity, source, status, stash, shim, process and port invariant; its
+manifest SHA-256 is
+`28c7322e101c545bc2b3ee3c980080e39ddcbd95803b4e2d8e97f7100439311f`.
+
+The failure is a newly observed test-validator topology, not a demonstrated
+product defect. Both endpoint-local deltas are exactly
+`authenticatedConnectionLosses=1`, `backpressuredDrops=0`,
+`handshakeFailures=0`, `linkDrops=1`, with `lastLinkDrop` changing from
+`restart` to `replacement`. The creator authenticated identity advanced from
+`2f4n8z1787980768199`/generation 5 to
+`67j4of1787980800178`/generation 6 and its selected raw RTC identity advanced
+from connection/channel `5/373` to `7/399`. The receiver advanced from
+`9i8v0y1787980768201`/generation 5 to
+`6rktlz1787980796505`/generation 6 and from raw RTC `5/369` to `7/382`.
+Although the signed lexicographic initiator was the receiver, both peers
+legitimately owned one local authenticated replacement. The validator rejects
+before endpoint validation because `replacementOwners.length <= 1` encodes
+the narrower D.108e4aa asymmetric schedule as a campaign-wide invariant.
+
+The captured endpoint-local lifecycle also demonstrates usable replacement
+before old-channel retirement. Creator sequence 1654 installs the observer
+handler on new `7/399` with `readyState=open`, 1655 installs the product
+handler, 1656 is the product-owned close call on old `5/373`, and 1657 is the
+observer's open-event record for new `7/399`. The close occurs inside the
+product open callback before the later observer listener records that same
+open event; the already-open ready state and installed product handler are the
+causal readiness evidence. Receiver sequence 961 records new `7/382` open,
+962 installs its product handler and 963 closes old `5/369`. Creator traffic
+contains 507 old-RTC and 93 new-RTC send attempts; receiver traffic contains
+336 old-RTC and 64 new-RTC messages. Trial zero reached prepare,
+`runReturned`, deadline and reset, restored open transports, partitioned 413
+accepted/observed/rostered and zero rejected observations, and captured all
+600 sender raw candidates before the validator stopped it. Later application
+thresholds and the final durable-control assertion did not run, so this is
+neither a semantic pass nor evidence that every product assertion would have
+passed.
+
+Exact custody is `.logs/d108e4ab-campaign/`. Reporter, stdout, stderr,
+status, timestamps, command, calibration, failure telemetry, error context,
+trace, focused lifecycle, current-trial classification, result summary,
+terminal result and complete artifact-manifest SHA-256 values are
+`726ed5dc345b7ecffb994aded5d37fcef5cfea193d32cd33426d32e6960b6ade`,
+`14fc34c811388ff4cea7ae4148167096b41ea7a1b18fc2abb1c73adb370b21ba`,
+`44ac0fc13bfb4cdf0580823c74bded08a56228f761dea7eb035d6e170e009b4c`,
+`4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`,
+`aa40fc2465d7e46f836a59e2c20123046a51f6597623d691fe348c6d560f9488`,
+`93cac444ed2963cd34c79e2c711d1c2021600096ae395b8b49212c060eb33bf1`,
+`44e1f646bc856072f3026bd1c37bd525c0c12c5d18b780f460d22e8012cea323`,
+`765264da430e237ca1c208c5883022be0def73b1de223fa3aa171adc647459ba`,
+`f789131b13a97ba1778a082be871d3b6a8643d1d9fa195c3a0ec35dbfa503dbb`,
+`b0c9d31584f1045ab80c9db8b1a87a33a868daf94637397b599f3a9e35976a2a`,
+`865f912cd94a1b5017d1f148abdd287494dd7aa6583431662fee74c6f47eef0b`,
+`d4ba42f600214764c46559022c37148123ea85e0827c7cc33f3e22da3a3218d2`,
+`5c6e285f7dd5d814760670cb89dc8c7f51389fbcae4c448288affaae2abb8e5f`,
+`ac8aee5395b2d4a53262b2e948988350794a510438fe6a701c7b8a280954f9d2`
+and
+`20981b14cc52abcaef93d7729f1577b469e9b543bc147986d07ebc25bb00b1e7`.
+
+D.108e4ac is a narrow test-only RED/GREEN slice owned solely by
+`tests/e3-03-loss-and-hol-proof.pw.ts`. Product/example source, configs,
+fixtures outside that owner, package manifests, dependencies, lockfile, build
+behavior, browser pin, workload, loss profile, timeouts, performance
+thresholds, product counters and public APIs remain frozen. If deterministic
+replay instead exposes missing product readiness or failed-replacement
+retention, stop and reslice; do not weaken the validator to admit it.
+
+RED adds a deterministic fixture replaying the exact dual-local capture above
+and proves it currently fails specifically at the campaign-wide
+`replacementOwners.length <= 1` assertion after exact cardinality and delta
+shape checks. It also replays the creator listener interleaving—new channel
+already open plus product handler installed, product closes old, then the
+observer open-event callback records—and both page-label orderings. Existing
+zero-replacement and asymmetric one-local-replacement positives remain green.
+
+GREEN replaces the campaign-wide single-owner assumption with an
+endpoint-local classification. Each endpoint may own zero or exactly one
+local replacement. A local replacement still requires delta one, reason
+`replacement`, authenticated identity advancement, exactly one selected new
+open RTC identity, exactly one new product handler and exactly one
+product-owned old-channel close. The close may follow either the observer
+open-event record or an already-open new channel plus installed product
+handler, because listener callback order is not product causality. It may not
+precede a usable new identity. The asymmetric incoming-only rules from
+D.108e4aa remain unchanged for an endpoint with delta zero. Peer/trial joins,
+accepted/send identity joins, backpressure, failed-replacement retention and
+endpoint-local sequence ownership remain fail closed.
+
+Named mutants must reject: a dual-local endpoint without authenticated
+advancement; delta greater than one; unsupported drop reason; missing or
+duplicate selected new identity; missing product handler; product close while
+the new channel is not open; old close before both causal readiness facts;
+wrong old identity; cross-peer/trial mismatch; and failed replacement
+displacing a usable old channel. The former
+`ambiguousDoubleReplacementDrop` mutant is not silently deleted: it is split
+into a valid exact dual-local replay and mutants that isolate genuinely
+ambiguous count, identity and readiness defects.
+
+No long campaign may run in D.108e4ac. Freeze this plan-only reslice in a
+signed/pushed checkpoint and run the normal read-only Grok 4.6/high, exact
+Kimi K3 `CHECK001` through `CHECK100` plus RESULT and Opus 5/xhigh plan review
+before RED. RED and GREEN each retain their separate equivalent review
+checkpoint. Fable and collaboration subagents remain prohibited. All P2s
+belong to the D.108e4ac test/plan owner with deadline 2026-09-04. After GREEN,
+a fresh signed/pushed campaign freeze, full review and new express user
+authorization for six new invocations are required; neither the five
+unstarted D.108e4ab blocks nor their old authorization carry forward.
+
+The executable non-campaign acceptance ledger is unchanged in scope:
+
+```sh
+D108E4H_TELEMETRY=1 pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'validates schema-v3 replacement custody without cross-peer clocks$' \
+  --fail-on-flaky-tests
+
+D108E4G_TELEMETRY=1 D108E4H_TELEMETRY=1 \
+  pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep "$D108E4AA_NON_CAMPAIGN_PATTERN" --fail-on-flaky-tests
+
+pnpm --filter @ts-drp/network build
+pnpm --filter @ts-drp/network typecheck
+pnpm --filter @ts-drp/grid build
+pnpm --filter @ts-drp/grid typecheck
+pnpm exec tsc --noEmit --target ES2022 --module ESNext \
+  --moduleResolution bundler --allowImportingTsExtensions --skipLibCheck \
+  tests/e3-03-loss-and-hol-proof.pw.ts
+pnpm exec eslint tests/e3-03-loss-and-hol-proof.pw.ts
+pnpm exec prettier --check tests/e3-03-loss-and-hol-proof.pw.ts
+git diff --check
+git status --porcelain=v1
+git diff --stat -- tests/e3-03-loss-and-hol-proof.pw.ts
+git diff -- tests/e3-03-loss-and-hol-proof.pw.ts
+```
+
+D.108e4b's separate GREEN review, aggregate D.108e4 closure and D.108e5 remain
+blocked until D.108e4ac and a replacement six-pass campaign close.
