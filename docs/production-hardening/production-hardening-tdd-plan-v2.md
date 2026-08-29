@@ -73076,11 +73076,16 @@ the exact six D.108e4aj launch blocks without another authorization request.
 
 The authorized post-fix campaign created the fresh D.108e4aj evidence root
 only after signed/pushed review closure `cb51990168446a4cda1f9eddcce7e6a7385f39e5`.
-All three reviewers had exited, no ts-drp reviewer/test/profiler was active in
-any worktree, ports 4174, 4175, 51000 and 51002 were clear, the ordinary HEAD
-equaled its signed remote, the isolated checkout remained clean at accepted
-behavior `f92f0b05`, both root shims were absent, all 26 stashes and protected
-paths were unchanged, and the signed freeze manifest validated.
+All three reviewers had exited. A separate global process check found no
+ts-drp reviewer/test/profiler in any worktree; the runner independently
+checked its ordinary/isolated roots. Two unrelated retained-evidence watcher
+shells, PIDs 74439 and 86473, remained present before and after while polling
+the D.108e4ag/D.108e4ae roots every two seconds; they were neither reviewers,
+tests nor profilers, and no causal claim is made. Ports 4174, 4175, 51000 and
+51002 were clear, the ordinary HEAD equaled its signed remote, the isolated
+checkout remained clean at accepted behavior `f92f0b05`, both root shims were
+absent, all 26 stashes and protected paths were unchanged, and the signed
+freeze manifest validated.
 
 `ordinary-1` began at `2026-08-29T17:43:01Z`, passed the consuming preflight
 and ended at `2026-08-29T17:45:46Z` with Playwright status one and terminal
@@ -73089,24 +73094,35 @@ zero expected/skipped/flaky results, no top-level error, 164.277 seconds total
 and a 154.830-second failed test. Preliminary calibration completed. Trials
 `e3-03-0` and `e3-03-1` each completed their full semantic validation and
 performance evidence with all 600 raw native sends and zero backpressured
-drops. Trial `e3-03-2` reached its assertion stage and failed
+drops. Those two completed trials are diagnostic only and cannot count toward
+the stopped six-pass ledger. Trial `e3-03-2` reached its assertion stage and failed
 `D108E4H_RAW_SEND_DOMAIN_INVALID`. Under the frozen stop rule,
 `ordinary-2`, `ordinary-3` and all three isolated invocations did not start
 and may not start from this evidence root. The new ledger remains at zero
 consecutive ordinary and zero isolated passes; no rerun is permitted.
 
-The failure telemetry makes the actual failed invariant unambiguous. The
-workbench attempted all 600 raw and 600 reliable samples. The creator's first
-555 raw sequences, exactly `0..554`, reached one native RTC send success; the
-remaining contiguous `555..599` did not cross the RTC send boundary. On the
-same open raw identity `(connectionId 8, channelId 429)`, observed
-`bufferedAmount` was 431 bytes at raw send 0 and still 431 near send 399, then
-rose to 42,238 near send 499, 63,788 near send 549 and 65,943 after send 554.
-Production's unchanged 65,536-byte ceiling admitted send 554 because its
-pre-send amount was 65,512, then returned false for the final 45 calls and
-incremented `backpressuredDrops` by exactly 45. The prepare/deadline raw RTC
-identity stayed open and unchanged, `linkDrops` stayed zero and neither
-endpoint had a handshake failure. This is not the repeated-open or
+The failure telemetry makes the actual failed invariant unambiguous. The raw
+route accounts for all 600 workbench attempts as 555 native successes plus 45
+backpressured drops; the 600 reliable attempts follow from the unconditional
+workbench loop and are not separately counted by this attachment. The
+creator's first 555 raw sequences, exactly `0..554`, reached one native RTC
+send success; contiguous `555..599` did not cross the RTC send boundary. On
+the same open raw identity `(connectionId 8, channelId 429)`, observed
+`bufferedAmount` was 431 bytes after raw send 0, raw send 332/attempt 400 and
+raw send 399/attempt 473. After transient earlier excursions it was 1,724 at
+raw send 405, then rose to 42,238 at send 499, 63,788 at send 549 and 65,943
+after send 554. Production's unchanged 65,536-byte ceiling admitted send 554
+because its pre-send amount was 65,512, then returned false for the final 45
+calls and incremented `backpressuredDrops` by exactly 45. The
+prepare-to-deadline `linkDrops` and handshake-failure deltas were zero on both
+endpoints; their absolute values were four link drops each and one pre-existing
+receiver handshake failure. The creator's authenticated-connection-loss delta
+was one after the run-return snapshot and therefore after every send; the same
+delta occurred in passing trial one and the validator does not use it. The raw
+RTC identity stayed open and unchanged. A reliable-lane channel closed and was
+replaced about 0.5 seconds after the last successful raw send, and reliable
+sequence eight had a 19.9-second local deferral; these are unattributed
+cross-lane facts, not a causal assignment. This is not the repeated-open or
 replacement-ownership defect that D.108e4ah corrected.
 
 Validator order explains the surface code but not the failure. Attempt custody
@@ -73123,14 +73139,20 @@ This proves a retained capacity-contract breach, but it does not by itself
 prove a production implementation bug. The route's public behavior and
 retained unit test deliberately reject a send once the browser-owned RTC
 buffer exceeds the fixed ceiling; that bounded drop is working as designed.
-The unresolved contract question is whether the stochastic 30% loss workload
-must guarantee all 600 native send successes with zero local backpressure, as
-D.108e4h currently mandates, or whether bounded, explicitly accounted local
-drops are legitimate for an unreliable freshness lane. Raising the ceiling,
-waiting on `bufferedamountlow`, changing SCTP options, pacing or shrinking the
-fixture, or accepting backpressured drops would each change a frozen product
-or test contract. None is authorized by this failed campaign and none is made
-silently.
+D.108e4h introduced the complete 600-native-success domain plus zero
+backpressure as the observable refusal control for replacement evidence, not
+as a product capacity SLO. The byte-identical workload normally drained to at
+most one outstanding raw frame through both passing trials and raw send 399 of
+trial two, so neither a standing product-capacity shortfall nor an inherently
+unrealistic load is demonstrated. The fixed ceiling holds 152 complete
+431-byte frames, approximately 5.016 seconds at the 33 ms cadence. From raw
+send 405 through 554 the captured buffer grew by a complete frame per send for
+about 4.916 seconds; all 45 later refusals show it stayed above the ceiling for
+roughly another 1.485 seconds. The evidence therefore proves a bounded
+approximately 6.4-second drain stall of unidentified ownership. Raising the
+ceiling, waiting on `bufferedamountlow`, changing SCTP options, pacing or
+shrinking the fixture, or accepting backpressured drops would each change a
+frozen product or test contract. None is authorized or made silently.
 
 Exact campaign custody remains immutable at `.logs/d108e4aj-campaign/`.
 Reporter, failure telemetry, calibration, endpoint-local classification,
@@ -73155,15 +73177,106 @@ are
 and
 `b981a44b0316f66759fc02e0f7379d477cdfd58dfcbfb2e172cac9080c34eec5`.
 
-The smallest justified next action is a narrow plan-only capacity-contract
-reslice before any RED, GREEN or long campaign. It must use this single
-failure's existing telemetry and the retained backpressure unit contract; it
-may not rerun the campaign, change production, weaken the 65,536-byte ceiling,
-alter the workload/loss/timing profile or recategorize the failure merely to
-obtain a pass. The normal Grok/exact-Kimi/Opus plan review must decide whether
-the golden path truly requires zero local backpressure and therefore needs a
-separately scoped product-capacity design, or whether the retained campaign
-gate is an unrealistic stochastic test expectation and needs an explicitly
-reviewed evidence-domain change. Mixed or unsupported ownership stops at that
-decision boundary. D.108e4, D.108e5 and all further campaign execution remain
-blocked; Fable and collaboration subagents remain prohibited.
+The smallest justified next action is a narrow deterministic non-campaign
+discriminator. It must use this failure's existing telemetry and the retained
+backpressure unit contract; it may not rerun the campaign, change production,
+weaken the 65,536-byte ceiling, alter the workload/loss/timing profile or
+recategorize the failure to obtain a pass. One fake-RTC unit control must
+replay the captured 65,512-byte admit then 65,943-byte refusal boundary and
+account exactly 555 `true` sends plus 45 `false` sends with
+`backpressuredDrops === 45`, proving whether admission/accounting remains the
+documented pure bounded-drop behavior. One pure-validator RED must replay the
+555-success/45-drop campaign envelope and require the causal
+`D108E4H_RAW_BACKPRESSURE` code, exposing the current
+`D108E4H_RAW_SEND_DOMAIN_INVALID` precedence without changing acceptance.
+Only those deterministic results may assign a later implementation owner. A
+passing admission control plus the expected precedence RED leaves ownership
+with the browser/drain evidence contract, not product admission; any mismatch
+stops for a separately scoped product-accounting slice. D.108e4, D.108e5 and
+all further campaign execution remain blocked; Fable and collaboration
+subagents remain prohibited.
+
+###### D.108e4am — mixed-ownership review closure and deterministic discriminator freeze
+
+The required read-only review inspected exact signed/pushed diagnosis
+`736fe1b6b6d0b2e7a1888bc0c4af0bb4ae8dad2e`, tree
+`ac448951a4d233d0a081a7431b5a48b2520133e0`, and ran no test, campaign,
+profiler, Fable or collaboration subagent. All three reviewers independently
+classified ownership as C: the evidence proves a bounded drain stall and a
+retained refusal-control breach, while neither a product-capacity defect nor
+an unrealistic stochastic expectation is demonstrated.
+
+Grok 4.6/high session `01a04ea7-3761-75b2-b365-1b10ded5fdde` ended normally
+after 540.169 seconds. Progress prose before its terminal object caused the
+runner's honest `NO_VERDICT`; a same-session tool-free formatting continuation
+returned `CHANGES_REQUIRED`, P0=0/P1=1/P2=0. Exact structured-output SHA-256
+is `9f21795d7104bb1022a7e394f0f2d26bcb45dce37253f7ea439b256de6472e8f`.
+
+Exact Kimi CLI 1.49.0 / `kimi-code/k3` session
+`40c53755-83c3-4e75-93d6-3811358aedcb` emitted exactly 101 nonempty lines:
+ordered unique `CHECK001` through `CHECK100`, then one RESULT. It returned
+`APPROVED`, P0=0/P1=0/P2=3. Checklist and RESULT SHA-256 values are
+`9d4d58bf56be9de4953e945f2f081e92673380a04e876e54eb290f16d1ec51c7`
+and
+`a638cb5e00361b3b42a737221d0894de1279a532be99bd91aa0ec6a9eced17ad`.
+
+Opus 5/xhigh session `0464cb81-ebb9-4d34-94c1-f4cf8ad776d3` returned
+`CHANGES_REQUIRED`, P0=0/P1=4/P2=5. Exact structured-output SHA-256 is
+`5e78d5d03ff7cadf3f92d14deafcf25971a08d422adde92126ded2b78752a6f2`.
+The complete 39-file review manifest excludes itself, validates and has
+SHA-256
+`708387bb4b92de4a004250338404d53570d3858f222961d4834f2a8210b7d1c0`;
+review-validation SHA-256 is
+`716c7d60b63c13c78801e019f0c6de0d26996eacdbd91393521b66e4c601ebb2`.
+
+The same-round correction closes the P1 union. It records ownership C rather
+than delegating an unsupported A/B choice; restores D.108e4h's refusal-control
+rationale; discloses the authenticated-loss delta, cumulative versus delta
+counter semantics, retained watcher shells and cross-lane facts; derives the
+workbench attempt count; and replaces ambiguous buffer indexes with exact
+raw-sequence/attempt joins. In particular, immutable telemetry directly joins
+raw sequence 399 to attempt 473 and a 431-byte success amount, so Opus's claim
+that this plan anchor confused it with sequence 332/attempt 400 was itself
+incorrect; the corrected record includes both exact joins and therefore
+removes the ambiguity without accepting the false premise. No reviewed
+executable or campaign-evidence byte changes, so this exact same-round plan
+correction receives a signed/pushed checkpoint without confirmation review.
+
+D.108e4am's RED/GREEN owner roster is test-only:
+`packages/network/tests/unreliable-webrtc-e3-01-red.test.ts` and
+`tests/e3-03-loss-and-hol-proof.pw.ts`. Production, example, configuration,
+dependencies, browser pin, ceiling, workload, loss/timing thresholds,
+campaign acceptance and public APIs are closed. If either deterministic
+fixture requires production or example source, stop and reslice.
+
+RED extends the retained fake-channel backpressure behavior with a hard
+positive replay: 555 admitted sends followed by 45 calls at the captured
+over-ceiling state must return false, increment `backpressuredDrops` exactly
+45, retain one active link and create no link-drop/handshake mutation. It adds
+one causal validator mutant beside the existing creator-backpressure fixture:
+the transmitting endpoint owns only raw success sequences `0..554`, its
+prepare/deadline sent-counter delta is 555 and its backpressure delta is 45.
+That exact combined envelope must throw `D108E4H_RAW_BACKPRESSURE`. Current
+validator order instead throws `D108E4H_RAW_SEND_DOMAIN_INVALID`; this is the
+sole causal RED. All existing missing/duplicate-domain mutants preserve their
+exact domain code, and the current 600-send/one-backpressure mutant preserves
+its exact backpressure code.
+
+GREEN may only move the already-existing positive backpressure assertion
+before attempt-custody domain validation, after raw delta equality/count
+validation. It changes error attribution, not pass/fail acceptance: any
+positive backpressure still fails, a zero-backpressure incomplete domain still
+throws `D108E4H_RAW_SEND_DOMAIN_INVALID`, and complete 600-success/zero-drop
+custody remains mandatory. No counter, ceiling, sender behavior, native-send
+domain, threshold or evidence schema changes.
+
+RED runs the exact network unit title once and the exact schema-validator
+Playwright title once, with separate reporter/status custody under
+`.logs/d108e4am-red/`; no retained browser suite or campaign runs. GREEN runs
+those two focused owners once, then the retained network unit file and retained
+seven-title non-campaign Playwright allowlist once, plus affected build/typecheck
+and exact-two-owner lint/format/diff checks under `.logs/d108e4am-green/`.
+RED and GREEN receive separate signed/pushed checkpoints and normal Grok,
+exact-Kimi and Opus reviews. Only after accepted GREEN may a new plan decide
+what browser/drain evidence is required; D.108e4am itself cannot authorize a
+campaign or change the zero-backpressure refusal control.
