@@ -73723,20 +73723,29 @@ thresholds, workload, campaign acceptance and evidence bytes are closed.
 
 The bounded read-only replay audit reconstructs only values already present in
 `currentTrialEvidence` with the retained pure helper algorithms. It returned
-status zero with empty stderr. Sixteen post-custody assertions evaluate true:
-raw/product counter and partition joins, raw/reliable physical shape,
-ready-state custody, connection presence, sender timestamp/schedule/stall,
-reliable deadline, receiver loss domain, AoI ratio and raw delivery after the
-reliable start. Exact retained values are 555 creator raw sends, 45 creator
+status zero with empty stderr. All twenty replayable retained post-custody
+assertions evaluate true: the two counters, raw/reliable physical shape, three
+non-vacuous ready-state checks, four connection-presence checks, sender
+timestamp/schedule/stall, reliable deadline, receiver loss domain, AoI ratio
+and raw delivery after the reliable start. The rejected-ready-state and
+sentinel-shape assertions are included and true vacuously because both counts
+are zero. The audit records separately the true product-partition bridge, true
+zero-skew replay precondition and true deadline-domain sender-counter surrogate
+instead of miscounting them as retained post-custody assertions. Exact retained
+values are 555 creator raw sends, 45 creator
 backpressured drops, 384 accepted raw observations, receiver gap 49, sender
 maximum stall 38 ms, raw/reliable AoI P95 14,849/32,732 ms and 383 raw
 deliveries after reliable start. This does not bypass the retained
-`D108E4H_RAW_BACKPRESSURE` failure; it proves only that no second failure is
-visible among the replayable later assertions.
+`D108E4H_RAW_SEND_DOMAIN_INVALID` failure—the positive 45-drop creator
+backpressure that frozen D.108e4an precedence now reports as
+`D108E4H_RAW_BACKPRESSURE`; it proves only that no second failure is visible
+among the replayable later assertions.
 
 Exactly one retained assertion is not replayable. The live test compares
 creator-page `runTrialReturnedAtMs - campaignStartedAtMs` with the 18,767 ms
-lower bound, but the failure attachment preserves neither absolute value.
+lower bound. `campaignStartedAtMs=1788025507460` is exactly reconstructed with
+the retained test algorithm from `senderWire`; only the absolute creator-page
+`runTrialReturnedAtMs` is absent.
 `stages.runReturned.atMs=19,787` is relative to the Node-side
 `trialEvidenceStartedAtMs`, whose epoch is also absent. The recorded zero
 inter-page clock skew does not join that relative Node stage to the creator
@@ -73744,30 +73753,53 @@ page clock. Proximity to the lower bound is not proof, so the audit returns
 `D108E4AO_RUN_RETURN_JOIN_UNAVAILABLE` rather than inferring a pass.
 
 Audit script, JSON, command, status, stderr and result SHA-256 values are
-`7e08e6601dc66cb7decf03c84aafbe2e7038fd5632dba0c1dde76fb764b1b51f`,
-`b52ced7b5ed27798adca1292e283918f18f3db9232a1bc7db7445104c011d654`,
+`7587abe6badf1b43fd0d7128d600b0dcf8418c416e9328ecfb345faed69d8acf`,
+`48b0ada21220c5ebe2a81c299858589eeb353ca6c93f3976d2f6a2abc00bb723`,
 `4fcddd0e3e1346c2f0a40889467ee4d30502e650a6230878e01c384afd212b53`,
 `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`,
 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
 and
-`6e2aa06c2d68313eeb252049fb0dfbdb2f6d6cd10c3f95d24e22a6952abca134`.
-The self-excluding six-file manifest validates and has SHA-256
-`ef8ffc6bcabb097d464a9296c3bb0e7c991a6118fbcde935658391043953b088`;
+`510e658442f8bdb410ab24781ed860e5d8126bbb316f566387920c1b62b3447a`.
+The self-excluding eight-file manifest also preserves the inherited exact
+changed-path output and both owner hashes from signed plan checkpoint
+`2c58d1453840178fc5d1f8f6afb4099be3042c11`; it validates and has SHA-256
+`2589d306d777458451738857837690ed38c9f138402ef855bd78632c60820a3b`;
 validation SHA-256 is
-`db08598ff9c29f75cedbcf2ce7e03153a97430025cc2d3ee6d1c37658824349b`.
+`f1bb00ecf9888ee5ae3e69d05063d1e990b1c349e36792f660548baa654c9bf9`.
+
+Formal review of signed plan checkpoint `2c58d1453840178fc5d1f8f6afb4099be3042c11`
+found no product or runtime defect but rejected the audit ledger. Grok 4.6/high
+session `01a04f3b-0c50-74b0-adaf-f3d00cfaf385` reached APPROVED with zero
+findings and re-emitted that verdict in the same session after its wrapper
+classified progress prose plus terminal JSON as `NO_VERDICT`. Exact Kimi K3
+session `07d2a72e-1329-47c1-8e9e-cacb051d0d8e` returned 100 checks plus RESULT,
+APPROVED with one P2: the two sender ready-state assertions were not named.
+Opus 5/xhigh session `e1680051-1321-4d6a-a65f-4bdd71282548` returned
+CHANGES_REQUIRED with three P1s: the same two non-vacuous assertions were
+omitted, the audit treated exactly derivable `campaignStartedAtMs` as missing,
+and the plan named the current precedence code rather than the immutable
+attachment's failure code. Its four P2s required the ledger split, explicit
+zero-skew/vacuous checks and inherited owner-hash custody. This correction
+accepts all findings, replays the complete twenty-true/one-unavailable retained
+ledger, narrows future custody to `runTrialReturnedAtMs`, corrects the failure
+name and re-freezes the eight-file evidence root. It still changes no source,
+test expectation, product behavior or runtime authority.
 
 The originally proposed complete offline replay is therefore not executable
 from immutable evidence and D.108e4ao stops before source implementation. It
 does not establish absence of a product defect, authorize an expectation
 change or authorize a runtime retry. The smallest justified next proposal is
-a separately frozen tests-only timestamp-custody slice: preserve the two
-already-computed creator-page timestamps in `currentTrialEvidence` before the
-existing custody validator can throw, add deterministic missing/present/exact
-join controls, and leave every retained assertion unchanged. That proposal
+a separately frozen tests-only timestamp-custody slice: preserve the already
+computed creator-page `runTrialReturnedAtMs` in `currentTrialEvidence` before
+the existing custody validator can throw, add deterministic missing/present/
+exact-join controls, and leave every retained assertion unchanged. That proposal
 must define a causal RED/GREEN, exact owner, deadline and evidence schema in a
 new signed/pushed plan checkpoint and receive Grok 4.6/high, exact Kimi
 100-step and Opus 5/xhigh review before any source edit. It cannot run or
 authorize a long campaign; future telemetry is not retroactive proof for this
-immutable failure. D.108e4, D.108e5 and all campaign execution remain blocked;
-no retained campaign is authorized or recommended. Fable and collaboration
-subagents remain prohibited.
+immutable failure. The user's exact D.108e4ad six-invocation authorization is
+durable, has now been expressly reconfirmed and must not be requested again;
+authorization does not make the batch executable while this causal gate is
+open. D.108e4, D.108e5 and all campaign execution remain blocked, and no
+campaign is recommended now. Fable and collaboration subagents remain
+prohibited.
