@@ -71891,5 +71891,150 @@ Protected `.logs/` custody remains intentionally untracked; its signed plan
 hashes are the durable disclosure, and no protected path or stash was altered.
 The review correction grants no campaign authority.
 
-D.108e4b's separate GREEN review, aggregate D.108e4 closure and D.108e5 remain
-blocked until D.108e4ac and a replacement six-pass campaign close.
+###### D.108e4ad — endpoint-local retained-campaign freeze
+
+D.108e4ad supersedes D.108e4ab only as the executable freeze for a replacement
+retained campaign after D.108e4ac. The sole D.108e4ab ordinary invocation is
+immutable failed evidence: all of its semantic assertions passed, but its
+campaign-wide single-owner validator rejected a real `1/1` dual-local
+replacement. That invocation consumed the old authorization and cannot count
+as a pass. D.108e4ad starts at zero ordinary and zero isolated consecutive
+passes. It requires exactly three new ordinary and three new isolated passes;
+no earlier campaign, focused test, list probe or failed invocation counts.
+
+This is a plan/evidence-only execution slice. It changes no production source,
+test source, fixture, Playwright/build/workspace configuration, dependency,
+package manifest, lockfile, browser pin, workload, loss profile, timeout or
+performance threshold. The exact reviewed behavior commit is
+`3d9e6fe59114851c2fcd9835bed909b9bbf3e881`, with tree
+`4a29b7087af6ac626e5f468312074afd9f8c8289`. Plan-only descendants are
+admissible only while this guard exits zero:
+
+```sh
+git diff --quiet 3d9e6fe59114851c2fcd9835bed909b9bbf3e881 -- . \
+  ':(exclude)docs/production-hardening/production-hardening-tdd-plan-v2.md'
+```
+
+The fresh isolated checkout is
+`/private/tmp/ts-drp-d108e4ad-clean.c8vKTE/repo`. Readiness cloned without
+hardlinks, detached exact commit `3d9e6fe59114851c2fcd9835bed909b9bbf3e881`
+and ran exactly `pnpm install --offline --frozen-lockfile`. Setup returned zero,
+left empty tracked status and produced tree
+`4a29b7087af6ac626e5f468312074afd9f8c8289`. Neither checkout contains the
+root `node_modules/@ts-drp/canonical` shim. This checkout and freeze expire
+after 2026-09-04; purge, movement, changed identity/status or any install/build
+during execution stops the slice before Playwright.
+
+Seven execution identities are pairwise byte-identical between ordinary and
+isolated checkouts: `playwright.e3-03-loss-and-hol.config.ts`, both exact relay
+JSON configurations, `tests/e3-03-loss-and-hol-proof.pw.ts`,
+`packages/network/src/unreliable-webrtc.ts`, `packages/network/src/node.ts` and
+`packages/node/src/ephemeral.ts`. The authoritative runtime closure is the
+fresh isolated build's 334 non-declaration, non-map, non-`tsbuildinfo` `dist`
+files. Every corresponding ordinary file has the same hash. The ordinary
+checkout's unscoped 701-file inventory is retained separately and is not an
+execution identity: accumulated local artifacts cannot enlarge or redefine
+the clean closure. The ordinary and isolated suffix-only `--list` probes both
+returned zero with byte-identical output, one test in one file and exact title:
+
+```text
+three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss
+```
+
+Readiness custody is under protected, intentionally untracked
+`.logs/d108e4ad-freeze/`. Its 48-file manifest excludes itself and has SHA-256
+`5300cf6e8db6248653630d10aa31e48cb9fed365aad4c1553f97e0d308f2f906`.
+The seven-identity manifests are identical at
+`76e36d583bb019aa689d90b7b5382b9692336dd0f53c1c95ca2e41d4301a0afb`;
+the scoped 334-file runtime manifests are identical at
+`c1947b7d49b8029d12250ab137aa8081dd3aabcfe4998e8e698e7c6168f6fc08`.
+The preserved unscoped ordinary inventory hash is
+`4a77cafd5f0ceb8b0f07f953300204639de4d2e0724950f11b65af391722bfe4`.
+The byte-identical list-output hash is
+`1f9934fc7141e4aed9f842055b28428642fefedff64b67261e284cd23916e901`.
+
+The frozen standalone runner is `.logs/d108e4ad-freeze/run-one.zsh`, SHA-256
+`b780b6f81567cbe161a8ec98d26ae40c85e9fdaa64cfb689c20da0edd76f6b74`.
+Its endpoint-local derivation and validation filters have SHA-256
+`9bbea2ed9a0549acc98b331411ff49637dbc8aca64618e812be8701ab9f6b6ba`
+and
+`7f04317614aefe53b3179e9faf0489fb8ad2e01e0f23118893ba50f8dc7d23c2`.
+`zsh -n` returns zero. The filters accept the captured failed invocation's
+real `1/1` evidence as `dual-local`, with two independently advanced
+authenticated boundaries and no endpoint marked incoming; prototype SHA-256
+is `276c8f1811d5e46015bfb84c7ded88f7b6cb0cfa6db0bdcfc7530f1a0561b992`.
+A synthetic endpoint count of two returns validation status one as required.
+
+The evidence join is endpoint-local only and never compares cross-peer clocks.
+For each endpoint, `linkDrops == 1` plus
+`lastLinkDrop.after == "replacement"` means local ownership. `linkDrops == 0`
+plus exactly one peer-local replacement means incoming replacement for that
+endpoint. Thus `1/1` is dual-local and neither endpoint is incoming; `1/0` and
+`0/1` preserve peer-dependent incoming behavior. Any endpoint count outside
+zero or one, including `2/0` and `0/2`, invalidates evidence rather than being
+silently normalized. The derived record preserves each endpoint's exact raw
+delta, prepare/deadline authenticated arrays, authenticated state and deadline
+RTC selection. This evidence classifier does not replace the retained test's
+semantic assertions or relax any error, lifecycle, identity, freshness, HOL or
+performance gate.
+
+The exact evidence root is
+`/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ad-campaign/`; it is
+currently absent. No one may create it before a new express authorization for
+all six D.108e4ad invocations. After that authorization, create the root once,
+preserve the authorization message verbatim as `authorization.txt`, and copy
+the three frozen runner/filter files into it. A pre-existing root, hash
+mismatch or existing per-invocation artifact stops for custody inspection and
+does not authorize deletion or overwrite.
+
+Before and after every invocation, the frozen runner records and validates
+ordinary HEAD/tree/remote/signature/status and all 26 stashes; isolated
+HEAD/tree/empty status; both absent root shims; both seven-file identity
+manifests; both 334-file runtime manifests; ambient processes; and ports 4174,
+4175, 51000 and 51002. Ordinary status must equal exactly the protected
+eight-path roster already frozen at SHA-256
+`6059409902c4f17404bed9cc033bd839a5e78193c4ce7731458ba9201f013970`.
+Unrelated processes may run, but no reviewer, test or profiler rooted in either
+ts-drp checkout may be active and all four fixed ports must be clear.
+
+Every invocation runs in a separate shell process with the frozen 600-second
+Perl process-group watchdog, unchanged effective 300-second retained test
+budget, exact suffix title, JSON reporter and `--fail-on-flaky-tests`. The
+watchdog owns the Playwright process group, sends TERM then KILL on expiry and
+returns 124. The runner captures after-state before reporter parsing and its
+EXIT trap always writes terminal runner status plus the cumulative artifact
+manifest. It accepts only the exact absolute config file for that checkout,
+one expected retry-zero pass, zero skipped/unexpected/flaky/top-level errors,
+one preliminary calibration, one completed fixed-loss campaign attachment and
+no failure telemetry. It pins Chromium `151.0.7922.34`, exactly three trials,
+metrics and observations, and exact trial IDs `e3-03-0` through `e3-03-2`.
+The retained test continues to own all delivery, connection, lifecycle,
+freshness, final durable-control and terminal-completion semantics.
+
+After the root is created under fresh authority, execute exactly these six
+commands in order. Stop after any nonzero result; no retry, loop,
+`--repeat-each`, substitution or continuation is authorized:
+
+```sh
+/usr/bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ad-campaign/run-one.zsh ordinary-1 /Users/aristotle/Documents/Projects/ts-drp-1
+/usr/bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ad-campaign/run-one.zsh ordinary-2 /Users/aristotle/Documents/Projects/ts-drp-1
+/usr/bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ad-campaign/run-one.zsh ordinary-3 /Users/aristotle/Documents/Projects/ts-drp-1
+/usr/bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ad-campaign/run-one.zsh isolated-1 /private/tmp/ts-drp-d108e4ad-clean.c8vKTE/repo
+/usr/bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ad-campaign/run-one.zsh isolated-2 /private/tmp/ts-drp-d108e4ad-clean.c8vKTE/repo
+/usr/bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ad-campaign/run-one.zsh isolated-3 /private/tmp/ts-drp-d108e4ad-clean.c8vKTE/repo
+```
+
+This exact plan-only freeze must first be formatted, signed and pushed. Then
+normal read-only Grok 4.6/high, exact Kimi K3 `CHECK001` through `CHECK100`
+plus RESULT and Opus 5/xhigh review the plan, runner and both filters. Fable and
+collaboration subagents are prohibited. Same-round corrections require a new
+signed/pushed checkpoint; P0/P1 must close and every P2 belongs to the
+D.108e4ad plan/evidence owner with deadline 2026-09-04. Only after that review
+closes may the user provide a new express authorization for exactly all six
+D.108e4ad long invocations. D.108e4ab's prior authorization does not carry
+forward.
+
+After six consecutive passes, sign and push one D.108e4ad evidence checkpoint
+and run the separate normal three-model evidence review. D.108e4b's separate
+GREEN review, aggregate D.108e4 closure and D.108e5 remain blocked until that
+campaign and review close.
