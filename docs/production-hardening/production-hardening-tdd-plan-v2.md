@@ -74109,12 +74109,14 @@ causal decision explicitly reopens the frozen campaign.
 ###### D.108e4aq — post-custody retained-campaign reopening decision
 
 D.108e4ap is closed, so D.108e4aq owns the separately reviewed causal decision
-required above. The decision is to prepare a new fail-closed re-freeze, not to
-claim that the immutable D.108e4aj failure was repaired. That failure's twenty
-replayable post-custody assertions passed; creator raw backpressure remained the
-first demonstrated failure. The unavailable run-return join is preserved only
-through the custody validator; post-replacement preservation remains open and
-is owned below. No product defect or product fix is inferred.
+required above. The initial candidate decision was to prepare a new fail-closed
+re-freeze, not to claim that the immutable D.108e4aj failure was repaired; the
+reviewed stop below supersedes that candidate before it grants authority. That
+failure's twenty replayable post-custody assertions passed; creator raw
+backpressure remained the first demonstrated failure. Once both operands have
+entered progress custody, the unavailable run-return join is preserved through
+the custody validator; post-replacement preservation remains open and is owned
+below. No product defect or product fix is inferred.
 The next campaign may therefore run only to obtain a fresh accepted pass or a
 complete new failure attachment; its first consumed failure stops the batch.
 The D.108e4aq plan/evidence owner is this record, due before any campaign and no
@@ -74227,9 +74229,14 @@ arrival timestamps. It changes no production, product APIs, clocks, wire
 formats, workload, thresholds or any of the twenty-one expectations. Its causal
 RED must prove a simulated post-replacement failure
 attachment lacks both run-return operands; GREEN must change only the final
-evidence builder/record seam and prove the timestamp, run-return sender wire,
-deadline sender wire and existing final evidence all survive with distinct
-provenance.
+evidence custody seam and prove the timestamp, run-return sender wire, deadline
+sender wire and existing final evidence all survive with distinct provenance.
+That tests-only seam expressly includes the local `CampaignEvidence` interface,
+the progress writer and the final evidence builder/record; it does not include a
+product type or API. The progress and final records must call the run-return
+capture `runReturnSenderWire`, the final record must call the deadline capture
+`deadlineSenderWire`, and the final record must add `runTrialReturnedAtMs`.
+The old cross-record `senderWire` homonym is prohibited.
 Plan, RED and GREEN each require their normal signed/pushed Grok 4.6/high, exact
 Kimi K3 100-check and Opus 5/xhigh gates; Fable and collaboration subagents are
 prohibited. No long campaign may run in D.108e4ar.
@@ -74261,3 +74268,23 @@ attribution. Its complete post-D.108e4ar attachment would be reviewed and
 resliced from evidence. The cumulative long-run ledger is D.108e4ad one consumed
 failed ordinary invocation, D.108e4aj one consumed failed ordinary invocation,
 and D.108e4aq zero invocations.
+
+Formal confirmation review of signed/pushed plan-only correction
+`1ff916166ac5ef386b2efed2f9225898554d2ca7` closes D.108e4aq as a
+non-executable stop. Grok 4.6/high session
+`01a04fda-6e6f-7a43-a5ca-d49d9289537e` returned terminal `RESULT:`, APPROVED
+with zero findings. Exact Kimi K3 emitted exactly `CHECK001` through
+`CHECK100`, all PASS, followed by a PASS `RESULT` object; its CLI stream emitted
+no stable session identifier. Opus 5/xhigh session
+`79c9985c-ae39-47f9-bc0c-ca72c5fa7c73` returned APPROVED with zero P0, zero P1
+and four documentation-only P2s. Those P2s are closed by the bounded custody
+wording, explicit supersession, permitted tests-only seams and non-homonymous
+key contract above; no executable byte changed and no confirmation rerun is
+required. No reviewer ran a test, build, browser, profiler or campaign, invoked
+Fable or used a collaboration subagent. The self-excluding seventeen-file
+`.logs/d108e4aq-close/` manifest validates and has SHA-256
+`5cf0c48ffd118059da6f597745c9cedea050db3fb6a4715a4a4f8dab572b63db`;
+validation SHA-256 is
+`fa47a4ca4ae9822a2d7592e6ea2387f59d2eb5d1f6092636623775d87e4507e9`.
+Closure grants no readiness, root-creation or campaign authority. D.108e4ar is
+the next executable slice and remains prohibited from running a long campaign.
