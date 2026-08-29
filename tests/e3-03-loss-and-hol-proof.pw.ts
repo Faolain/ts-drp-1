@@ -3385,9 +3385,9 @@ function d108e4hValidateEndpoint(
 		transitionReason = recordedReason;
 	}
 	const { after, before } = d108e4hAssertBoundaryIdentity(endpoint, remotePeerId, replaced, incomingReplacement);
+	d108e4hAssert(delta.backpressuredDrops === 0, "D108E4H_RAW_BACKPRESSURE");
 	d108e4hAssertAttemptCustody(endpoint, before, after, replaced, sampleCount, incomingReplacement);
 	d108e4hAssertOverlapCustody(endpoint, before, after, replaced, transitionReason, incomingReplacement);
-	d108e4hAssert(delta.backpressuredDrops === 0, "D108E4H_RAW_BACKPRESSURE");
 	d108e4hAssert(
 		endpoint.deadline.rawTransport.sent - endpoint.prepare.rawTransport.sent === endpoint.rawSends.length &&
 			endpoint.deadline.rawTransport.received - endpoint.prepare.rawTransport.received === endpoint.acceptedRaw.length,
@@ -5774,6 +5774,7 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 		);
 		expect(() => validateD108e4hCampaignCustody(creatorBackpressure)).toThrowError("D108E4H_RAW_BACKPRESSURE");
 		const admittedRawSends = Object.freeze(creatorReplacement.endpoints.creator.rawSends.slice(0, 555));
+		expect([admittedRawSends.length, admittedRawSends.at(-1)?.sequence]).toEqual([555, 554]);
 		const admittedAttemptIds = new Set(admittedRawSends.map(({ attemptId }) => attemptId));
 		const capturedBackpressureBase = Object.freeze({
 			...creatorReplacement,
@@ -5804,6 +5805,15 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 				"D.108e4am captured 555-success/45-backpressure attribution"
 			)
 			.toThrowError("D108E4H_RAW_BACKPRESSURE");
+		const incompleteRawDomain = withCreatorDeadlineTransport(
+			capturedBackpressureBase,
+			Object.freeze({
+				...capturedBackpressureBase.endpoints.creator.deadline.rawTransport,
+				backpressuredDrops: capturedBackpressureBase.endpoints.creator.prepare.rawTransport.backpressuredDrops,
+				sent: capturedBackpressureBase.endpoints.creator.prepare.rawTransport.sent + admittedRawSends.length,
+			})
+		);
+		expect(() => validateD108e4hCampaignCustody(incompleteRawDomain)).toThrowError("D108E4H_RAW_SEND_DOMAIN_INVALID");
 		const inconsistentSentCounter = withCreatorDeadlineTransport(
 			creatorReplacement,
 			Object.freeze({

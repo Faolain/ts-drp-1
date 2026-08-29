@@ -1601,10 +1601,12 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		for (let sequence = 555; sequence < 600; sequence += 1) {
 			expect(await replayRoute.send(["peer-b"], new Uint8Array(398)), `refused ${sequence}`).toBe(false);
 		}
+		expect(replayChannel.sent).toHaveLength(555);
 		expect(replayRoute.snapshot()).toMatchObject({
 			activeLinks: 1,
 			backpressuredDrops: 45,
 			handshakeFailures: 0,
+			lastLinkDrop: undefined,
 			linkDrops: 0,
 			sent: 555,
 		});

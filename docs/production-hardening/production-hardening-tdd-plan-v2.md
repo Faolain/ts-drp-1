@@ -73373,3 +73373,53 @@ the frozen invariant and physical-write custody without changing production,
 error acceptance, counters, thresholds or GREEN scope. All reviewers agree
 the only behavioral GREEN remains the single existing backpressure-assertion
 move after delta/drop-count validation and before attempt custody.
+
+The D.108e4am GREEN changes only the two test owners. The existing
+`delta.backpressuredDrops === 0` assertion moves from after attempt/overlap
+custody to immediately after boundary identity and before attempt custody;
+raw-delta equality, link-drop count/reason and boundary-identity precedence
+remain ahead of it. No condition, counter or acceptance result changes. The
+reviewer controls also pin the admitted slice at length 555 ending in sequence
+554, prove the same incomplete domain at zero backpressure retains
+`D108E4H_RAW_SEND_DOMAIN_INVALID`, prove the fake channel physically wrote
+exactly 555 envelopes and prove `lastLinkDrop` remains undefined.
+
+The exact focused network title passed 1/1, and the exact focused validator
+title passed with one expected, zero skipped, zero unexpected and zero flaky.
+Their reporter SHA-256 values are
+`3b37d31f273a89ef29eb96437347cee93f46b076ec7eda0fbdc7d6cd1d274937`
+and
+`4ee4e45cb47c32b45d08e81a59d335d076367f1873c0854c0965cff3fc39d19c`.
+The full retained network owner passed 49/49; the exact retained seven-title
+non-campaign Playwright allowlist passed 7/7 with zero skipped, unexpected or
+flaky. Their reporter SHA-256 values are
+`abc9868a09af96b5182eef97bd7fde92bb05a047e48483a77e73721902b13b58`
+and
+`2dbbae78755955c34453238728300a3d2cc084c950cdb4931824ad003c6d6d77`.
+The long three-trial campaign title was absent.
+
+Network build/typecheck and grid build/typecheck all returned zero; stdout
+SHA-256 values are respectively
+`71a4ed56486bf60b30144c8f4da38c2d1bc605fbdaf9007467d3ac977241f407`,
+`a03fca5f6b2fcbcbfcf4737e44ea887d83bb4815889e77f1e79b6abc2e0c981a`,
+`d3d63b0b9676a9d4c910aad2f8c7e038bda5f3081afca821574c08c23fb6686c`
+and
+`087eba9acd40302f69876972072fe38b513f0ba47b13ec083ed1f5c79586642f`.
+The standalone changed Playwright-owner TypeScript check, exact-two-owner
+ESLint, Prettier and `git diff --check` also returned zero. The broad workspace
+typecheck returned one only in the already-recorded unchanged Phase-1i-b
+object RED/helper owners: rejected `history_storage: "archive"` and its broad
+helper union, last changed by
+`d74b56eba28eb9de26d8e643b2b30c368fa12237`. Its stdout SHA-256 is
+`d19e2ea5b65fcdfb5c915f242c1f980b2f2a34275e05f977f956d003dcf98154`.
+It is outside this exact diff and affected packages, was not rerun and does
+not invalidate this GREEN.
+
+The complete self-excluding 51-file GREEN manifest validates and has SHA-256
+`95f1948d8f22a23ab53a8c1e4254df09f9c4fd2534d9afc6764697349a09da30`.
+Protected untracked paths and 26 stashes remain unchanged. No production,
+example, configuration, dependency, public API, counter, threshold or
+campaign-acceptance byte changed; no campaign, Fable invocation or
+collaboration subagent ran. The GREEN is ready for its separate signed/pushed
+checkpoint and normal Grok/exact-Kimi/Opus review. Until that review is
+accepted, D.108e4/D.108e5 and all campaign execution remain blocked.
