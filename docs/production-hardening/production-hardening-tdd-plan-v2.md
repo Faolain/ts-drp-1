@@ -73281,8 +73281,8 @@ exact-Kimi and Opus reviews. Only after accepted GREEN may a new plan decide
 what browser/drain evidence is required; D.108e4am itself cannot authorize a
 campaign or change the zero-backpressure refusal control.
 
-The D.108e4am RED checkpoint changes only the frozen two test owners. The
-network fixture uses an isolated signaling bus and owner, admits exactly 554
+The D.108e4am RED checkpoint changes the frozen two test owners plus this plan
+record. The network fixture uses an isolated signaling bus and owner, admits exactly 554
 ordinary sends, sets the fake channel to the captured 65,512-byte state,
 admits one 398-byte body as the observed 431-byte routed envelope, then sets
 the channel to the captured 65,943-byte state and refuses exactly 45 further
@@ -73316,10 +73316,60 @@ check. The reporter and empty stderr SHA-256 values are
 `c0bca13a4aa7a5853ebf039bd242daf2a60133ed17fcd4dcc190bd5defb95a5e`
 and
 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
-The evidence directory's self-excluding 11-file manifest validates and has
+The corrected evidence directory's self-excluding 11-file manifest validates and has
 SHA-256
-`505c65affd6bcb6c8ec39a5e4ef951c1877359f157acd1a52b8cca5cf225ff41`.
+`db87c97144d7c5f79ef84bd2abd01d0209853309e1d4a93dcab7efe30bb82399`.
 No retained browser suite, campaign, production/example/config/dependency
 edit, reviewer, Fable invocation or collaboration subagent occurred. This is
 the frozen sole causal RED and authorizes only the already-specified
 test-validator assertion-order GREEN after the signed/pushed RED review.
+
+The formal RED review authenticated signed/pushed commit
+`95836e5f31b87507ea7de48f0b8e1792bc3cf1ab`, tree
+`4d96823dff374842238e34adeaa249eba0e1c3e2` and parent
+`5dcd4e4410be74c5f1069366120ce6a4cb66d539` in three isolated read-only
+worktrees. Each worktree remained tracked-clean with only its copied
+`.review-evidence/` input untracked. No reviewer ran a test, campaign or
+profiler, wrote tracked content, invoked Fable or used a subagent.
+
+Grok 4.6/high session `01a04ec1-09bf-7883-a39f-edde5364f36c`
+completed after 375.207 seconds. Its correct initial `NO_VERDICT` classification
+reflects progress prose before an otherwise valid final object, not an absent
+substantive result. The same-session tool-free/schema-constrained formatting
+continuation re-emitted `APPROVED`, P0=0/P1=0/P2=0 without changing the
+verdict. Exact structured-output SHA-256 is
+`1984911cf1920efb3d9d26fa692f07eebf7c56a332e52b12b7bfdc960b0baee8`.
+
+Exact Kimi K3 session `d122808d-4670-43f3-ae0f-c86406f9ac9d`
+returned `APPROVED`, P0=0/P1=0/P2=2. Its first terminal message contained the
+complete 100 checks and RESULT plus six progress lines; a same-session
+formatting-only continuation emitted exactly 101 nonempty lines, ordered
+unique `CHECK001` through `CHECK100` then one RESULT. Exact formatted-checklist
+and RESULT SHA-256 values are
+`215e5e66f6ad659c59c887a5c8ecca3e5aae3cec943d1690b633c155899ff7c0`
+and
+`d5d8d0d4559c0bf5d291eac637980f98a220c60a320752a66fe3644b377a1f08`.
+
+Opus 5/xhigh session `0912d78a-cfea-4994-9df4-7063836e93c4`
+returned `APPROVED`, P0=0/P1=0/P2=3, with zero permission denials and zero
+subagents. Exact structured-output SHA-256 is
+`d89ea4851cfecfcd918b25dbe9fdf009753fcba37a1c15b2accefdf08aa4d67c`.
+The complete self-excluding 32-file review manifest validates and has SHA-256
+`3135ee8ddc60a740e173478c6e9d1a13c6c533246bee5a79ff59bfd17ddd12f1`;
+review-validation SHA-256 is
+`0c235c171beaa24fa99aaa80f3cbfbe947cd9e809503edc85fdd3a1b50fc0869`.
+
+The nonblocking union is closed without changing or rerunning RED. Kimi's
+three-path wording correction is applied above, and its command-provenance nit
+is closed by recording the exact stdout/stderr redirections that produced the
+Playwright reporter bytes; that correction accounts for the new RED manifest
+hash. Opus's three assertions do not create another RED and are accepted into
+the already-authorized GREEN test checkpoint before its one focused run: pin
+the admitted slice as length 555 ending at sequence 554, add a zero-backpressure
+555-success companion that preserves
+`D108E4H_RAW_SEND_DOMAIN_INVALID`, and assert the fake channel physically wrote
+exactly 555 envelopes with `lastLinkDrop` still undefined. These strengthen
+the frozen invariant and physical-write custody without changing production,
+error acceptance, counters, thresholds or GREEN scope. All reviewers agree
+the only behavioral GREEN remains the single existing backpressure-assertion
+move after delta/drop-count validation and before attempt custody.
