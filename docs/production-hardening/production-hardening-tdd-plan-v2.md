@@ -69793,3 +69793,57 @@ signed/pushed correction `10a63d9d`. D.108e4k must now restart from command one
 at the next exact signed/pushed plan-only checkpoint; no D.108e4k evidence at
 the prior test tree composes with that restart. The complete E3-03 config and
 retained three-trial campaign remain unauthorized.
+
+D.108e4k restarted from command one at exact signed/pushed plan-only
+checkpoint `900778ff540c1b1b4fb2b3e29f095b7b66ef8f9f`. Its complete ordinary
+non-campaign ledger passed: focused 17/17; unloaded native 5/5 with one valid
+`d108e4l-v1` record, empty `memberCountErrors`, zero profile records and
+`wallTimeMs=55_663.242333`; transport 24/24; network/E3-02 61/61; observer
+1/1; exact 5/8/7 inventories; positive non-campaign 7/7 with zero skip, retry,
+flake or unexpected result; Phase-3h/Phase-5e 61/61; Phase-4c/Phase-6a 15
+files/122 tests including the genuine 64 MiB peak-live child; both subprocess
+controls 3/3; D.93.36 5/5; and three consecutive D.93.46 invocations 3/3 in
+1.4, 1.8 and 1.2 minutes. Browser owners passed Phase-4c-b/c 18/18 and 6/6,
+Phase-5e actor/relearn/live-close 12/12, 6/6 and corrected 9/9, and Phase-6a
+adoption/activation/product/epoch 6/6, 24/24, 21/21 and 3/3.
+
+The ordinary affected build, eight green package typechecks, strict proof-file
+TypeScript, error-only ESLint, Prettier and diff checks passed. Broad node and
+storage-node typechecks and the warning-count ESLint form reproduced only
+their recorded inherited nonzero baselines. Native stdout, non-campaign JSON,
+Phase-4c/Phase-6a stdout and corrected live-close stdout SHA-256 values are
+`6a674294b75eb29bd61cc772cebc9e7f210e8110e731cdd2b98f75d3607ccea4`,
+`66ede165f38106d64f418bf52a267bee44626993cbebdc0473474ecbaff0efc2`,
+`220d06a1f2fdb495844a5a26b804ddc3b7b65bb08dfd7bc145ce207fe0e46b9d`
+and `9a9986f22fd42f741bf7d08b203de39bbf45f90d12223ca2cb58f93d12e2444c`.
+
+The isolated proof used new detached checkout
+`/private/tmp/ts-drp-d108e4k-900778ff.nxIeoK` at exact `900778ff`. It started
+tracked-clean with no package/example `dist` or root shim; offline frozen
+installation created no `dist`; native preparation and the fresh affected
+build passed. It repeated the complete authorized ledger successfully:
+focused 17/17; native 5/5 with one valid record, empty `memberCountErrors`,
+zero profile records and `wallTimeMs=54_711.127375`; transport 24/24; network
+61/61; observer 1/1; exact 5/8/7 inventories; selected 7/7; unit owners 61/61
+and 15 files/122 tests including the genuine 64 MiB child; both subprocess
+controls 3/3; D.93.36 5/5; three consecutive D.93.46 invocations 3/3 in 1.3,
+1.3 and 1.3 minutes; all retained browsers at 18/18, 6/6, 12/12, 6/6, 9/9,
+6/6, 24/24, 21/21 and 3/3; eight green typechecks; strict TypeScript;
+error-only ESLint; Prettier; and diff check. The two broad package typechecks
+again reproduced only their inherited nonzero baselines. The checkout finished
+tracked-clean with no root shim.
+
+Isolated native stdout, non-campaign JSON, Phase-4c/Phase-6a stdout and
+corrected live-close stdout SHA-256 values are
+`fcde2cbd37b48b2fa6ffe97f98f8649597c2b4bbeb6c3cc6ab2c259afbee4927`,
+`bd0341102eb00a6eb7706f412b67e636d357a93e612ab170a8e2850e3b4f4d63`,
+`c3ee05601c8fba29a3d4d41424f258daee6902eb654471c34b324425cc7dcb29`
+and `8bfc5e313fb1d46036446ceb7ca23fbe58712d942a4fab032c2a5b300eabead2`.
+All 26 stashes and protected untracked paths remain present; the main root
+shim is absent. The complete E3-03 config and retained three-trial campaign did
+not run.
+
+The combined ordinary/isolated non-campaign behavior proof is complete at the
+same exact tree. D.108e4k remains open only for the required Grok/Kimi/Opus
+read-only evidence review of this signed/pushed evidence checkpoint and any
+same-round corrections. No Fable or collaboration subagent is authorized.
