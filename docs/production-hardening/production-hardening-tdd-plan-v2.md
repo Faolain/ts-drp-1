@@ -73864,11 +73864,34 @@ failure window, the later `currentTrialEvidence = trialEvidence` replacement,
 missing fixed evidence roots and the absent RED review. The correction below
 accepts all findings and supersedes the rejected paragraphs.
 
+The initial Grok wrapper classified progress prose plus terminal JSON as
+`NO_VERDICT`; the preserved terminal JSON and same-session export establish the
+CHANGES_REQUIRED verdict above. The self-excluding eighteen-file initial plan-
+review manifest validates and has SHA-256
+`df609301ab5f439c2e632e62e921156ee2475355a7c042013b2303f31c2b47bf`;
+validation SHA-256 is
+`595b895bf4ee23c067ca6e3adfeeb8ce0f41303d1a081d07699a012e3498e321`.
+
+Confirmation review of signed/pushed correction
+`e5d4d2541c741f87a81239b17193ed72db73b355` closes the plan gate. Grok
+4.6/high session `01a04f73-1d98-7361-bdb9-d4da924fe0d5` returned APPROVED with
+zero findings after a same-session formatting continuation; exact Kimi K3
+session `8df60bd2-e30c-4264-bb17-419714a66d5e` returned exactly 100 checks plus
+RESULT, APPROVED with zero P0/P1 and one terminology P2 closed below; Opus
+5/xhigh session `6bb8d3f6-9cae-4498-aaa1-276f8153cc16` returned APPROVED with
+zero P0/P1 and four recordkeeping P2s closed below. The self-excluding eighteen-
+file confirmation manifest validates and has SHA-256
+`1a7f69bca8391546d7d5a2a22c14f8f2d92c31340171f6113736a149008b40a8`;
+validation SHA-256 is
+`b5afe9b2e9df1242fd33fb5dfc6fe1d71a0d83648fdd944304f4d70d8fae053e`.
+
 RED adds one test-local pure builder whose output is used by both the focused
 control and the live progress writer. Its RED body must exactly preserve current
 behavior: it accepts the frozen accumulated progress plus
 `runTrialReturnedAtMs` and returns a frozen spread of the progress without that
-field. RED adopts this builder immediately after the existing
+field. Its RED body must reference the timestamp only with an explicit
+`void runTrialReturnedAtMs` discard so exact-owner lint passes without a RED-to-
+GREEN parameter rename. RED adopts this builder immediately after the existing
 `await creator.evaluate(() => Date.now())` and before either `zone()` capture;
 it assigns the returned progress to both `trialProgress` and
 `currentTrialEvidence`. This is a behavior-neutral extraction of the live
@@ -73893,6 +73916,11 @@ byte-frozen exact-preservation assertion and exact-boundary join assertion that
 are unreachable in RED. The focused run must end with exactly the unwrapped
 `D108E4AP_RUN_RETURN_CUSTODY_ABSENT`, with no soft failures and no browser or
 campaign launch. If any other error appears, stop.
+
+Only that final unwrapped block may consume the shared builder output. The
+wrapped ABSENT replica and every INVALID/JOIN mutant are independently hand-
+constructed frozen records, so the GREEN builder-body change cannot alter any
+negative control.
 
 GREEN changes only the shared builder body to validate and return the same
 frozen progress plus the exact non-negative safe-integer
@@ -73953,7 +73981,7 @@ trial, retained campaign, profiler or unrelated suite. Record the complete
 Playwright expected/skipped/unexpected/flaky and soft-failure sets; preserve
 exact changed paths and SHA-256 for the test and plan owners; validate a
 self-excluding manifest; and sign/push separate RED and GREEN checkpoints.
-The signed/pushed RED receives its own Grok 4.6/high, exact Kimi 100-check and
+The signed/pushed RED receives its own Grok 4.6/high, exact Kimi K3 100-check and
 Opus 5/xhigh read-only review, with same-round P0/P1 correction and explicit P2
 ownership, before any GREEN edit. GREEN receives a separate equivalent review
 only after it is focused-green. Neither review may authorize a campaign.
@@ -73962,7 +73990,9 @@ Acceptance is deterministic: the focused controls prove missing, invalid,
 precedence, below-boundary, exact-boundary and exact-preservation behavior; the
 live progress writer stores the exact creator-page `runTrialReturnedAtMs`
 immediately after it is read and before every failure point through the custody
-validator; the retained run-return span expression is unchanged; the GREEN
+validator, verified only by the RED/GREEN reviews and static gates because the
+campaign path remains frozen and is not executed at either checkpoint; the
+retained run-return span expression is unchanged; the GREEN
 record states its post-edit line and the post-edit range of all twenty-one
 retained expectations; all static gates pass; and review has no P0/P1. This
 closes future pre-final-evidence failure-attachment replay custody only.
