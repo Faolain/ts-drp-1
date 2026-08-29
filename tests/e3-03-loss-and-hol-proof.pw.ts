@@ -3456,10 +3456,7 @@ function d108e4apRunReturnTimestamp(progress: Readonly<Record<string, unknown>>)
 	return value;
 }
 
-function d108e4apAssertRunReturnJoin(
-	progress: Readonly<Record<string, unknown>>,
-	campaignStartedAtMs: number
-): void {
+function d108e4apAssertRunReturnJoin(progress: Readonly<Record<string, unknown>>, campaignStartedAtMs: number): void {
 	if (d108e4apRunReturnTimestamp(progress) - campaignStartedAtMs < D108E4AP_RUN_RETURN_BOUND_MS)
 		throw new Error("D108E4AP_RUN_RETURN_JOIN_INVALID");
 }
@@ -5904,17 +5901,11 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 		const d108e4apCampaignStartedAtMs = 1_000_000;
 		const d108e4apExactRunReturnAtMs = d108e4apCampaignStartedAtMs + D108E4AP_RUN_RETURN_BOUND_MS;
 		const d108e4apMissing = Object.freeze({ trialId: "d108e4ap-missing" });
-		expect(() => d108e4apRunReturnTimestamp(d108e4apMissing)).toThrowError(
-			"D108E4AP_RUN_RETURN_CUSTODY_ABSENT"
-		);
+		expect(() => d108e4apRunReturnTimestamp(d108e4apMissing)).toThrowError("D108E4AP_RUN_RETURN_CUSTODY_ABSENT");
 		const d108e4apNonSafe = Object.freeze({ runTrialReturnedAtMs: Number.NaN });
-		expect(() => d108e4apRunReturnTimestamp(d108e4apNonSafe)).toThrowError(
-			"D108E4AP_RUN_RETURN_CUSTODY_INVALID"
-		);
+		expect(() => d108e4apRunReturnTimestamp(d108e4apNonSafe)).toThrowError("D108E4AP_RUN_RETURN_CUSTODY_INVALID");
 		const d108e4apNegative = Object.freeze({ runTrialReturnedAtMs: -1 });
-		expect(() => d108e4apRunReturnTimestamp(d108e4apNegative)).toThrowError(
-			"D108E4AP_RUN_RETURN_CUSTODY_INVALID"
-		);
+		expect(() => d108e4apRunReturnTimestamp(d108e4apNegative)).toThrowError("D108E4AP_RUN_RETURN_CUSTODY_INVALID");
 		expect(() => d108e4apAssertRunReturnJoin(d108e4apNegative, d108e4apCampaignStartedAtMs)).toThrowError(
 			"D108E4AP_RUN_RETURN_CUSTODY_INVALID"
 		);
@@ -5932,6 +5923,7 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 		);
 		d108e4apRunReturnTimestamp(d108e4apLiveProgress);
 		expect(d108e4apLiveProgress["runTrialReturnedAtMs"]).toBe(d108e4apExactRunReturnAtMs);
+		expect(d108e4apLiveProgress["trialId"]).toBe("d108e4ap-live");
 		d108e4apAssertRunReturnJoin(d108e4apLiveProgress, d108e4apCampaignStartedAtMs);
 	});
 }

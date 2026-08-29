@@ -73900,7 +73900,7 @@ omission, not a hand-authored parallel stages literal.
 The RED batch also adds test-local custody/join assertion helpers and appends
 their control block only after the existing final focused control, so every
 retained mutant executes before the intended failure. Error precedence is
-frozen as ABSENT for a missing/undefined field, then INVALID for a present
+frozen as ABSENT for a missing own field, then INVALID for a present
 value that is not a non-negative safe integer, then JOIN_INVALID for a valid
 creator return whose span is below the bound. The bound is always derived as
 `(SAMPLE_COUNT - 1) * SAMPLE_INTERVAL_MS - 1_000`, with a separate assertion
@@ -73913,7 +73913,9 @@ also throws INVALID; one millisecond below the derived bound throws
 `D108E4AP_RUN_RETURN_JOIN_INVALID`; the exact bound passes. Last, the focused
 test calls custody unwrapped on the shared RED builder output, then contains a
 byte-frozen exact-preservation assertion and exact-boundary join assertion that
-are unreachable in RED. The focused run must end with exactly the unwrapped
+are unreachable in RED. Exact preservation covers both the timestamp and the
+input progress `trialId`, preventing GREEN from dropping the accumulated spread.
+The focused run must end with exactly the unwrapped
 `D108E4AP_RUN_RETURN_CUSTODY_ABSENT`, with no soft failures and no browser or
 campaign launch. If any other error appears, stop.
 
@@ -73973,24 +73975,45 @@ failure set and only `D108E4AP_RUN_RETURN_CUSTODY_ABSENT`; GREEN focused status
 must be zero with expected 1, unexpected/skipped/flaky 0 and an empty soft-
 failure set.
 
-The causal RED executed exactly once after the corrected plan gate closed. The
-list guard returned status zero and selected exactly one test in one file with
-the campaign title absent. The focused JSON run returned status one with
+The initial causal RED executed exactly once after the corrected plan gate
+closed. Its same-round review correction required one replacement list guard
+and one replacement focused run; the superseded artifacts were overwritten in
+the same fixed root and are not acceptance evidence. The corrected list guard
+returned status zero and selected exactly one test in one file with the campaign
+title absent. The corrected focused JSON run returned status one with
 expected 0, skipped 0, unexpected 1 and flaky 0; top-level errors were empty,
 result `softErrors` was absent/null, and the sole unexpected error was the final
 unwrapped `D108E4AP_RUN_RETURN_CUSTODY_ABSENT`. List stdout and focused JSON
 SHA-256 values are
-`d2ce7bbba3e02ab88ab9446e64e4fadb5af25164beeb2ff25be6e3d25dc33320`
+`422a9948142a469f87d265e53fe7a20a17b0986c356aca78524e7116ce8c5ae7`
 and
-`000d08b72b043568109ce5dc417d94f36593706e598345b9cc5fb4ad8e1214ae`.
-The self-excluding twelve-file `.logs/d108e4ap-red/` manifest validates and has
+`a06d6c6b83fa5df2f285443e889b06e59a711c1c8bfec98db6db3543d53a2dfc`.
+The self-excluding twenty-file `.logs/d108e4ap-red/` manifest validates and has
 SHA-256
-`3d8ad8b921b79af750ec02d2208d72a62692e20a63d92a6fe17ad424fbd00c5f`;
+`9d4afc0ae02dd776249ae5ed2ffdf2de0fc3077c0682ce109ce94f16e76d0f69`;
 validation SHA-256 is
-`2cc1f04355674ed5f6fa524fadb3c31f3ff3a8a9bd1d1fe6a0ccfd29b9476532`.
-No TypeScript, ESLint, Prettier, browser, campaign, profiler or unrelated suite
-ran at RED; the pre-run read-only overlap/port check and `git diff --check`
-reported no blocker.
+`fced6f43cfc7b62ce3e5fe77355dc2f6116c17c1bd0905245ccf395759f43f10`.
+The RED `owner-hashes.txt` pins post-edit test bytes plus inherited plan bytes
+from signed checkpoint `0ad05c1e300a46a58bc13eb00709d6617e988b16`. The
+initial RED ran no TypeScript, ESLint or Prettier. The same-round correction
+preserved exact-owner ESLint and 8 GiB Prettier command/stdout/stderr/status
+under the re-frozen RED root; both returned status zero. It did not run
+TypeScript, a browser, campaign, profiler or unrelated suite.
+
+Formal review of signed/pushed initial RED
+`c8186dda2c11cd9e93515cb7193a997de14f4bc0` accepted its causal shape but did
+not close the checkpoint. Grok 4.6/high session
+`01a04f84-1701-7412-ba8b-42d2b4a02b64` returned APPROVED with zero findings;
+exact Kimi K3 session `c79b5e3b-601f-4f63-b982-f68fc11e711b` returned exactly
+100 checks plus RESULT, APPROVED with zero findings; Opus 5/xhigh session
+`b9579b30-f3d0-4455-8a54-c79e07a04bb5` returned CHANGES_REQUIRED with two P1s
+and three P2s. The same-round correction accepts all five findings: it applies
+the exact Prettier layout at four new sites, adds the unreachable `trialId`
+carry-through assertion, discloses mixed owner-hash provenance, preserves the
+two exact-owner static gates, drops the unsupported RED diff-check claim and
+narrows ABSENT to a missing own field. No control semantics, production path or
+campaign authority changed. GREEN remains blocked until the signed/pushed RED
+correction receives confirmation review with no P0/P1.
 
 GREEN then runs only the four static commands recorded for D.108e4an—strict
 standalone TypeScript, exact-owner ESLint, 8 GiB Prettier and
