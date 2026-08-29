@@ -74105,3 +74105,79 @@ the current campaign would pass. The user's exact six-invocation D.108e4ad
 authorization remains durable and must not be requested again, but none of its
 invocations is executable until D.108e4ap closes and a separately reviewed
 causal decision explicitly reopens the frozen campaign.
+
+###### D.108e4aq — post-custody retained-campaign reopening decision
+
+D.108e4ap is closed, so D.108e4aq owns the separately reviewed causal decision
+required above. The decision is to prepare a new fail-closed re-freeze, not to
+claim that the immutable D.108e4aj failure was repaired. That failure's twenty
+replayable post-custody assertions passed; creator raw backpressure remained the
+first demonstrated failure, while the sole unavailable run-return join is now
+preserved for future failures. No product defect or product fix is inferred.
+The next campaign may therefore run only to obtain a fresh accepted pass or a
+complete new failure attachment; its first consumed failure stops the batch.
+The D.108e4aq plan/evidence owner is this record, due before any campaign and no
+later than 2026-09-05.
+
+The old `.logs/d108e4ad-*` and `.logs/d108e4aj-*` roots and every artifact under
+them remain immutable and cannot be retried, overwritten, copied as a pass or
+executed. The new fixed roots are `.logs/d108e4aq-freeze/` and
+`.logs/d108e4aq-campaign/`; both must be absent before readiness begins. The
+accepted non-plan behavior is signed/pushed GREEN
+`1a2967020203da60ee586a59a8981bd038532b3c`, tree
+`ea9b0da7c0c542bbd39f38d24d3d8d961e7426fd`. Plan-only descendants are
+admissible only while `git diff --quiet 1a2967020203da60ee586a59a8981bd038532b3c -- . ':(exclude)docs/production-hardening/production-hardening-tdd-plan-v2.md'`
+returns zero.
+
+This is test/evidence infrastructure only. Production, examples, test
+semantics, Playwright/build/workspace configuration, dependencies, browser pin,
+workload, loss profile, 600-second process-group watchdog, effective 300-second
+test budget, thresholds and product APIs are closed. Readiness creates one new
+no-hardlink clean checkout detached at the accepted behavior, runs exactly one
+offline frozen install, proves empty tracked status and matching tree, and
+builds fresh workspace artifacts. It then freezes the same seven execution
+identities and the complete non-declaration/non-map/non-`tsbuildinfo` `dist`
+runtime closure in both checkouts, proves both root canonical shims absent, and
+runs only the suffix-anchored `--list` guard in each checkout. No campaign may
+run during readiness or review.
+
+The D.108e4aj runner and two jq filters are inputs, not mutable authority. Copy
+them into the new freeze and change only the new ordinary/isolated/freeze/
+campaign paths, accepted head/tree, expiry and two known evidence-hygiene items:
+the conflict scan must reject a reviewer, test or profiler rooted in any ts-drp
+worktree, and cumulative evidence hashing must recurse through the complete
+failure tree rather than stop at depth two. Preserve all other fail-closed
+properties: required-tool inventory, exact authorization hash, preflight-before-
+consumption boundary, unique invocation artifacts, signed ordinary HEAD/remote/
+status and 26-stash custody, isolated clean identity, four clear ports, separate
+600-second process-group watchdog, after-state capture before reporter parsing,
+terminal trap, exact reporter predicates, endpoint-local classification,
+Chromium `151.0.7922.34`, three exact trials and stop-on-first-consumed-failure.
+
+The user's exact six-invocation D.108e4ad authorization is durable, has been
+expressly reconfirmed, remains unused for this new root and must never be asked
+again. Readiness must bind its canonical newline-terminated sentence with
+SHA-256 `03fdd987ba7d141645826769edc9c78376568483ca543a3183645ad510d03747`.
+Authorization alone does not bypass this plan gate, freeze evidence or review.
+
+First sign and push this plan-only decision, then obtain normal read-only Grok
+4.6/high, exact Kimi K3 100-check and Opus 5/xhigh review. Fable and
+collaboration subagents are prohibited. After zero P0/P1, create and validate
+the new readiness root, record every command/status/hash and exact clean-checkout
+proof, sign/push the freeze evidence record, and run an equivalent freeze review.
+Only then may the fresh campaign root be created exactly once with `mkdir`, the
+canonical authorization written, and reviewed runner/filters copied with
+no-clobber semantics.
+
+The executable ledger is exactly three consecutive ordinary passes followed by
+three consecutive isolated passes, each launched as a separate shell process.
+Before commands two through six, the immediately preceding terminal runner
+status must exist and equal zero. Before every command, authenticate the signed
+freeze manifest and all three campaign copies. No loop, retry, overwrite,
+`--repeat-each`, substitution or continuation after a consumed failure is
+permitted. After every invocation, validate its complete result before the next
+launch. A preflight environmental refusal remains non-consuming; after the
+atomic preflight move and EXIT-trap arm, any nonzero terminal status consumes
+that invocation and stops all remaining runs. Six passes require a signed/pushed
+campaign-evidence checkpoint and separate Grok/Kimi/Opus evidence review before
+D.108e4 or D.108e5 may resume.
