@@ -72306,7 +72306,9 @@ observer-lifetime stable and non-reusable. Already-open handler installation
 does not consume the callback anchor.
 
 `RtcLifecycleKind` extends under unchanged internal `schemaVersion: 3`; this
-test-only kind addition is not a wire schema. A new central
+test-only kind addition is not a wire schema. GREEN must delete both RED-only
+`as unknown as D108e4hLifecycleObservation` and `event as string` escape
+hatches so the compiler owns the repeat-kind split. A new central
 `d108e4hAssertOpenRepeats`-equivalent runs from `d108e4hValidateEndpoint` for
 both endpoints in every trial before transmitting, replacement or incoming
 early returns. It validates every repeat record in the complete endpoint
@@ -72321,8 +72323,10 @@ Both existing exact-one semantic-open/product-handler predicates remain in
 `d108e4hAssertAttemptCustody` and `d108e4hAssertOverlapCustody`; custody and
 raw-send ordering use only the first semantic anchor. Add a transmitting
 endpoint positive carrying one anchor plus one valid repeat so the attempt
-path is exercised, and retain the nontransmitting incoming `10/420` positive
-so overlap's pre-return path is exercised. Repeat telemetry cannot satisfy
+path is exercised, retain dual-local replay receiver identity `7/382` as the
+nontransmitting replacement positive, and retain the `d108e4hFixture("none")`
+receiver as the positive that reaches the nontransmitting/no-replacement
+attempt and overlap early-return paths. Repeat telemetry cannot satisfy
 missing readiness, product-handler, identity, ordering, ingress or
 replacement custody. All joins remain endpoint-local and sequence-based; no
 cross-peer clock comparison is introduced.
@@ -72367,6 +72371,11 @@ D108E4G_TELEMETRY=1 D108E4H_TELEMETRY=1 \
   --config playwright.e3-03-loss-and-hol.config.ts \
   --grep "$D108E4AE_FOCUSED_PATTERN" --fail-on-flaky-tests
 ```
+
+Custodied RED/GREEN executions add
+`PLAYWRIGHT_JSON_OUTPUT_NAME=<evidence-root>/focused.json` and
+`--reporter=json`; those reporter bindings do not change the title selection
+or test semantics.
 
 Its list gate must return exactly those two titles. RED and GREEN each consume
 one focused execution only after its respective list guard passes.
@@ -72542,16 +72551,16 @@ status SHA-256 values are respectively
 `4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`,
 `64671db9ce2652d06ca74f7a6e52337eb23bef85e74dd681934c9d37862e4a74`,
 `2554a7800efac99a719f6d7885d13fbeec4e2fc5461fade85c3a49cfbb26698e`,
-`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3ab86aa`,
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`,
 `d02eb9e06e7a51ea0c782a47a58fcce67c621d32a0932338edbaac8d3e6d327a`,
 `2871a05e323a4d323c7e3ea12a73397a982b886323f219a7328c3bdf2bfb3970`
 and
-`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3ab86aa`.
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
 The complete self-excluding evidence manifest validates and has SHA-256
 `e5b2b9a43ef05f473809b78294fd79148937ecec062bfd5364417cd8d6857b9f`.
 RED test-owner hash is
 `0a74a3340baaaa662cc004b42ab6c3d905ada6bfc3a9c297077816a9cf7b1b51`;
-its complete diff from reviewed plan baseline `1eea4713` and its narrow
+its complete test-owner diff from reviewed plan baseline `1eea4713` and its narrow
 fixture-correction diff from failed checkpoint `a7a57d90` have SHA-256
 `27789968d0b1f9071b133b6a91de163867f0f0ee78e7f3d0c1a6327c92b48eee`
 and
@@ -72567,3 +72576,105 @@ introduced no alternate failure owner. Only after P0/P1 closure may GREEN
 change the observer kind union/latch and central repeat validator. Do not run
 Fable, a collaboration subagent, the retained seven-title suite or any long
 campaign during RED review.
+
+###### D.108e4ag — RED-review closure
+
+The formal D.108e4af RED review completed without Fable, a collaboration
+subagent, a retained suite or a campaign. Grok 4.6/high's same-session terminal
+continuation returned `APPROVED`, P0=0/P1=0/P2=3. Exact Kimi K3 returned 101
+nonempty lines and `APPROVED`, P0=0/P1=0/P2=2. Opus 5/xhigh returned
+`CHANGES_REQUIRED`, P0=0/P1=4/P2=4. The RED is therefore rejected until the
+Opus P1 union is closed; the two approvals do not override that verdict.
+
+D.108e4ag is a bounded test/evidence correction prescribed by that review,
+not GREEN. In the same schema-validator title it adds a creator-side
+repeat-before-anchor mutant, a `d108e4hFixture("none")` receiver-side
+repeat-without-anchor mutant that reaches both nontransmitting and
+no-replacement early-return paths, a selected-after-identity close-only hard
+positive, and receiver sequence/anchor drift pins. In the same observer title
+it retains the original callback split RED and adds a post-`reset()` dispatch
+on the same channel object; the current observer must emit a new semantic open
+at sequence zero, while a generation-free GREEN latch would fail. The
+malformed-repeat roster therefore expands from seven to nine exact-code
+mutants, without changing either existing RED owner or any D.108e4aa/ac
+expectation.
+
+Custody correction retains the historical D.108e4af manifest bytes, adds the
+previously missing complete test-owner baseline diff and narrow correction
+diff as hashed artifacts, and runs a new baseline-anchored scope guard against
+`1eea4713a7a9f020893abc159bfe237b2284a5d6`. It also corrects the two truncated
+status hashes, the test-owner-diff wording, the focused JSON-reporter
+annotation and the stale `10/420` fixture description above. The review
+artifacts and this correction receive new self-excluding manifests rather than
+silently rewriting the signed historical record.
+
+After exact-owner type, lint, format, diff and baseline-scope guards pass,
+D.108e4ag may run the exact two-title focused command once under new
+`.logs/d108e4ag-red/` custody. Both GREEN-shaped positives, the selected-close
+positive, the wrong-trial control and all retained controls must pass. The
+only failures must be nine validator soft failures with their frozen codes and
+the original observer first-plus-repeat soft failure; the post-reset generation
+assertion must pass. Any other failure stops the slice. This reviewer-prescribed
+closure receives no duplicate review round: its acceptance is mechanical
+against the recorded Opus corrections, and the completed GREEN later receives
+the normal Grok/Kimi/Opus implementation review. No long campaign is
+authorized by D.108e4ag.
+
+The review record is now exact. Grok's initial 510.181-second run exited zero
+at `end_turn` but remained `NO_VERDICT` because progress text preceded the
+terminal object; its same-session continuation
+`01a04e0e-e3c0-7e13-a35c-11415b8034b1` returned `APPROVED`, P0=0/P1=0/P2=3.
+Continuation JSON SHA-256 is
+`8aa069ced804ce726245ae502798f7f8421c8c72d866ac5b784565faf1de4ee0`.
+Exact Kimi session `575384b9-a30f-4511-bc57-49ceb6d73736` returned 101
+nonempty lines and `APPROVED`, P0=0/P1=0/P2=2; stream and assistant-text
+SHA-256 values are
+`6840183f3e1ff1f32e971c681ec30d2204f4281fa35a17da9843e385906af04d`
+and
+`70bb046832728f2c77292da46d273f4ae6c2031c8f09b5be7e29878a12944375`.
+Opus session `28ec91b5-abaa-4442-9ee5-750b6a78d425` returned
+`CHANGES_REQUIRED`, P0=0/P1=4/P2=4; JSON SHA-256 is
+`00b116fc1b312879c70cc6ecffcf70743aea2070f4392b5339326cfcbffd90ab`.
+The review validation and complete self-excluding review manifest validate at
+SHA-256
+`934eae4e38bb29b59f5726feff5674e38ca93d42a965d916da681eb7bcafb8a8`
+and
+`9d18dd336722e419cacdda622ee60a267373380e98b942fb56aa0772e60848ac`.
+
+The D.108e4af historical manifest is preserved byte-for-byte as
+`SHA256SUMS.pre-review` with its signed-plan digest
+`e5b2b9a43ef05f473809b78294fd79148937ecec062bfd5364417cd8d6857b9f`.
+Its supplemented self-excluding manifest validates at
+`b18695a748d320207590be9b269504e10a6f6219d10ef657236bdfbcb2b993e3`.
+The baseline scope guard returned zero, and the newly retained baseline
+test-owner and narrow correction diffs reproduce the already recorded hashes
+`27789968d0b1f9071b133b6a91de163867f0f0ee78e7f3d0c1a6327c92b48eee`
+and
+`ca464c170ce208c104df62816d15abc157ccac01e3f263c80f7f817930bd1071`.
+
+D.108e4ag then passed its exact two-title list guard and consumed its sole
+focused execution. The reporter returned status one in 19.704 seconds with
+two unexpected, zero expected/skipped/flaky results, retry zero and no
+top-level error. The validator emitted exactly the nine frozen soft failures:
+`repeatBeforeAnchor`, `transmittingRepeatBeforeAnchor`, `repeatWrongOwner`,
+`repeatNonOpenState`, `repeatUnmatchedIdentity`,
+`repeatAfterSelectedIdentityClose`, `repeatWithoutTrialAnchor`,
+`repeatCardinalityTwo` and `nonReplacementRepeatWithoutAnchor`. Its hard
+positives and all retained controls passed. The observer emitted only the
+original first-plus-repeat soft failure; the post-reset same-object generation
+discriminator passed. This closes the Opus P1 union without changing current
+behavior.
+
+Exact correction custody is `.logs/d108e4ag-red/`. Reporter, status, time,
+summary, diagnosis and owner-check status/time SHA-256 values are respectively
+`7472a9238a3b4a4925a0d87aff66e18dc8b71dccc8e9b78f96a1ae2a5180168e`,
+`4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`,
+`56b6925e6407681d4a674a988ece7205667bec158f8ea76ad2c3980aee7bb6f7`,
+`7ed0eb36bf9c81c7be2bcc8226342005e301000d4b5e42e5860d8e4b8334a116`,
+`e23292abf2b1e55d7b85d69a2b1c3d28cf89ca265619613d3b831fa7ba4d716e`,
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`
+and
+`cb996d37312add2c8265d76857b9c8a6078f4410ee3c6cc0df7b988211d96444`.
+The complete self-excluding correction manifest validates and has SHA-256
+`2ca479824defa725062c51dbc7cc9e167e1f37735f73e385771ee711a1b29ccc`.
+No retained suite, long campaign, Fable or collaboration subagent ran.

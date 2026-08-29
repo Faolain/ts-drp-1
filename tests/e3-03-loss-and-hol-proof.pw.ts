@@ -4546,6 +4546,19 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 				dualLocalMutationBase,
 				Object.freeze([...dualReceiver.lifecycle, ...records].sort((left, right) => left.sequence - right.sequence))
 			);
+		const receiverOpenAnchors = dualReceiver.lifecycle.filter(
+			({ channelId, connectionId, event }) =>
+				connectionId === dualReceiverAfter.connectionId &&
+				channelId === dualReceiverAfter.channelId &&
+				event === "channel-open-event"
+		);
+		if (
+			receiverOpenAnchors.length !== 1 ||
+			receiverOpenAnchors[0]?.sequence !== 961 ||
+			dualReceiver.lifecycle.some(({ sequence }) => sequence === 940 || sequence === 964 || sequence === 965)
+		) {
+			throw new Error("D108E4AE_RECEIVER_REPEAT_BASE_INVALID");
+		}
 		const receiverRepeat = d108e4aeRepeatRecord(964, dualReceiverAfter);
 		const greenShapedReceiverRepeat = withReceiverRepeatRecords(receiverRepeat);
 		expect(() => validateD108e4hCampaignCustody(greenShapedReceiverRepeat)).not.toThrow();
@@ -4561,6 +4574,14 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 		expect(() => validateD108e4hCampaignCustody(transmittingRepeat)).not.toThrow();
 
 		const repeatBeforeAnchor = withReceiverRepeatRecords(d108e4aeRepeatRecord(940, dualReceiverAfter));
+		const transmittingRepeatBeforeAnchor = withCreatorLifecycle(
+			dualLocalMutationBase,
+			Object.freeze(
+				[...dualCreator.lifecycle, d108e4aeRepeatRecord(1_652, dualCreatorAfter)].sort(
+					(left, right) => left.sequence - right.sequence
+				)
+			)
+		);
 		const repeatWrongOwner = withReceiverRepeatRecords(
 			d108e4aeRepeatRecord(964, dualReceiverAfter, { owner: "rtc-datachannel-open-event" })
 		);
@@ -4575,15 +4596,18 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 		const repeatWrongTrial = withReceiverRepeatRecords(
 			d108e4aeRepeatRecord(964, dualReceiverAfter, { trialId: `${dualLocalMutationBase.trialId}:mismatch` })
 		);
+		const selectedIdentityClose = d108e4hLifecycle(
+			dualLocalMutationBase.trialId,
+			964,
+			"channel-close-event",
+			dualReceiverAfter,
+			"rtc-datachannel-close-event",
+			{ readyState: "closed" }
+		);
+		const selectedIdentityCloseOnly = withReceiverRepeatRecords(selectedIdentityClose);
+		expect(() => validateD108e4hCampaignCustody(selectedIdentityCloseOnly)).not.toThrow();
 		const repeatAfterSelectedIdentityClose = withReceiverRepeatRecords(
-			d108e4hLifecycle(
-				dualLocalMutationBase.trialId,
-				964,
-				"channel-close-event",
-				dualReceiverAfter,
-				"rtc-datachannel-close-event",
-				{ readyState: "closed" }
-			),
+			selectedIdentityClose,
 			d108e4aeRepeatRecord(965, dualReceiverAfter)
 		);
 		const dualReceiverBefore = d108e4hOnly(dualReceiver.prepare.rtc);
@@ -4592,14 +4616,25 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 			d108e4aeRepeatRecord(964, dualReceiverAfter),
 			d108e4aeRepeatRecord(965, dualReceiverAfter)
 		);
+		const noReplacementReceiver = noReplacement.endpoints.receiver;
+		const noReplacementReceiverIdentity = d108e4hOnly(noReplacementReceiver.deadline.rtc);
+		const nonReplacementRepeatWithoutAnchor = withReceiverLifecycle(
+			noReplacement,
+			Object.freeze([
+				...noReplacementReceiver.lifecycle,
+				d108e4aeRepeatRecord(1, noReplacementReceiverIdentity, { trialId: noReplacement.trialId }),
+			])
+		);
 		const repeatRedRoster = Object.freeze([
 			["repeatBeforeAnchor", repeatBeforeAnchor, "D108E4H_LIFECYCLE_ORDER_INVALID"],
+			["transmittingRepeatBeforeAnchor", transmittingRepeatBeforeAnchor, "D108E4H_LIFECYCLE_ORDER_INVALID"],
 			["repeatWrongOwner", repeatWrongOwner, "D108E4H_LIFECYCLE_ORDER_INVALID"],
 			["repeatNonOpenState", repeatNonOpenState, "D108E4H_LIFECYCLE_ORDER_INVALID"],
 			["repeatUnmatchedIdentity", repeatUnmatchedIdentity, "D108E4H_IDENTITY_JOIN_INVALID"],
 			["repeatAfterSelectedIdentityClose", repeatAfterSelectedIdentityClose, "D108E4H_LIFECYCLE_ORDER_INVALID"],
 			["repeatWithoutTrialAnchor", repeatWithoutTrialAnchor, "D108E4H_LIFECYCLE_ORDER_INVALID"],
 			["repeatCardinalityTwo", repeatCardinalityTwo, "D108E4H_LIFECYCLE_ORDER_INVALID"],
+			["nonReplacementRepeatWithoutAnchor", nonReplacementRepeatWithoutAnchor, "D108E4H_LIFECYCLE_ORDER_INVALID"],
 		] as const);
 		for (const [name, fixture, expectedError] of repeatRedRoster) {
 			expect.soft(() => validateD108e4hCampaignCustody(fixture), `D108E4AE_RED ${name}`).toThrowError(expectedError);
@@ -6179,8 +6214,13 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 				left.close();
 				right.close();
 				await new Promise((resolve) => setTimeout(resolve, 0));
+				const lifecycle = await observer.lifecycleSnapshot();
+				observer.reset("observer-repeat-generation");
+				inbound.dispatchEvent(new Event("open"));
+				const postResetLifecycle = await observer.lifecycleSnapshot();
 				return Object.freeze({
-					lifecycle: await observer.lifecycleSnapshot(),
+					lifecycle,
+					postResetLifecycle,
 					sendFailureName,
 					signalingFailureNames,
 					text,
@@ -6250,6 +6290,17 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 					["channel-open-event", "rtc-datachannel-open-event"],
 					["channel-open-repeat-event", "rtc-datachannel-open-repeat-event"],
 				]);
+			expect
+				.soft(
+					evidence.postResetLifecycle
+						.filter(
+							({ event }) =>
+								(event as string) === "channel-open-event" || (event as string) === "channel-open-repeat-event"
+						)
+						.map(({ event, owner, sequence, trialId }) => [event as string, owner, sequence, trialId]),
+					"D108E4AE_RED observer reset starts a new object generation"
+				)
+				.toEqual([["channel-open-event", "rtc-datachannel-open-event", 0, "observer-repeat-generation"]]);
 			const sendAttempts = evidence.lifecycle.filter(({ event }) => event === "channel-send-attempt");
 			expect(sendAttempts).not.toHaveLength(0);
 			for (const attempt of sendAttempts) {
