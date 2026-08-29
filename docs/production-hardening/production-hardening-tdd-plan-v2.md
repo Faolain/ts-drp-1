@@ -69993,8 +69993,8 @@ or collaboration subagent ran.
 ###### D.108e4z — final ordinary and isolated retained-campaign ledgers
 
 D.108e4z is an evidence-only, fail-closed execution slice for the two remaining
-three-consecutive retained E3-03 ledgers. It changes only this plan and ignored
-execution logs. It may not change product, example, test, fixture,
+three-consecutive retained E3-03 ledgers. It changes only this plan and
+protected untracked execution logs. It may not change product, example, test, fixture,
 Playwright/build/workspace configuration, script, dependency, package manifest
 or lockfile behavior. It does not create another RED/GREEN pair and does not
 reinterpret the successful one-off complete-config invocation as a consecutive
@@ -70002,7 +70002,8 @@ ledger result. The exact behavior tree remains
 `900778ff540c1b1b4fb2b3e29f095b7b66ef8f9f`; plan-only custody descendants may
 advance without invalidating it.
 
-Execution remains forbidden until the user expressly authorizes all six long
+`.logs/` is not gitignored. Execution remains forbidden until the user
+expressly authorizes all six long
 invocations after this exact signed/pushed plan freeze and its review round.
 Neither this plan text, a reviewer verdict nor the prior one-off “try it anyway”
 authorization supplies that authority. The authorization covers exactly three
@@ -70010,70 +70011,245 @@ ordinary and three isolated invocations of the one retained title. It does not
 cover the complete config again, a retry after failure, another sample, Fable,
 D.108e4b review or D.108e5.
 
-Before command one, record the exact commit, tree, command, wall-clock start,
-ambient process inventory, protected paths, stash count and root-shim absent
-predicate. Prove that
-`git diff --quiet 900778ff..HEAD -- packages examples tests
-playwright.e3-03-loss-and-hol.config.ts package.json pnpm-lock.yaml
-pnpm-workspace.yaml scripts` exits zero. The ordinary checkout must be
-tracked-clean apart from the protected untracked paths. The preserved detached
-checkout `/private/tmp/ts-drp-d108e4k-900778ff.nxIeoK` must remain tracked-clean
-at exact `900778ff`, with no root shim and canonical resolving to its freshly
-built 21,858-byte
-`packages/canonical/dist/src/index.js`. The ordinary and isolated config, test
-owner and `unreliable-webrtc.ts`, `node.ts` and `ephemeral.ts` SHA-256 values
-must remain pairwise identical. Any mismatch voids the slice before execution.
+Before every invocation, record the exact commit, tree, command, wall-clock
+start, ambient process inventory, expected untracked set, stash count, fixed-
+port inventory and predicate-named root-shim check. The root-shim predicate is
+exactly `test ! -e node_modules/@ts-drp/canonical` in the checkout being used,
+and it runs before and after every invocation. Ports 4174, 4175, 51000 and
+51002 must have no listener before process start because the config sets
+`reuseExistingServer: false`; a listener, reviewer, test process or profiler
+voids the preflight before the invocation and does not consume authority.
 
-The exact retained title is anchored, so a rename or added match fails closed:
+The closed-world tracked identity command is
+`git diff --quiet 900778ff..HEAD -- .
+':(exclude)docs/production-hardening/production-hardening-tdd-plan-v2.md'` and
+must exit zero before every invocation. The ordinary `git status --short`
+output must equal this explicit protected set and nothing else:
 
 ```text
-^three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$
+?? .agents/
+?? .claude/
+?? .logs/
+?? .pnpm-store/
+?? _apalache-out/
+?? packages/protocol-v2/tests/author-sequence-0g2.test.ts
+?? packages/protocol-v2/tests/local-author-sequence-issuance-0g2.test.ts
+?? skills-lock.json
 ```
 
-Run these as six separate processes, never `--repeat-each`, and validate each
-JSON artifact before starting the next command:
+The preserved detached checkout
+`/private/tmp/ts-drp-d108e4k-900778ff.nxIeoK` must be reverified immediately
+before each isolated invocation: it exists, resolves to exact `900778ff`, has
+empty `git status --short`, has no root shim and resolves canonical to the
+existing D.108e4k-built 21,858-byte
+`packages/canonical/dist/src/index.js`. D.108e4z runs no install, build or
+lifecycle script. If `/private/tmp` purges or changes that checkout, the slice
+stops before process start without consuming an invocation and requires a new
+readiness slice. This freeze expires after 2026-09-04 unless re-reviewed.
+
+The ordinary and isolated SHA-256 values must remain pairwise identical for
+`playwright.e3-03-loss-and-hol.config.ts`, both
+`configs/network-spike-relay.json` files, the exact test owner,
+`packages/network/src/unreliable-webrtc.ts`, `packages/network/src/node.ts` and
+`packages/node/src/ephemeral.ts`. Also hash and compare all runtime built-export
+files present in the isolated package/example `dist` closure against the same
+relative ordinary paths, excluding compiler-only `*.tsbuildinfo`, `*.d.ts` and
+source-map files; no runtime-byte mismatch or isolated runtime file missing
+from ordinary is allowed. Record the ordinary canonical export realpath and
+size beside the isolated one. The frozen lockfile and closed-world source guard
+remain the dependency identity; ignored `node_modules` may not be modified by
+this slice. Any mismatch voids the slice before execution.
+
+Playwright applies `--grep` to the full title path, so only the trailing anchor
+is valid. The exact retained title suffix is:
+
+```text
+three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$
+```
+
+Immediately before the first ordinary and first isolated invocation, run the
+same suffix pattern with `--list`, capture stdout/stderr/status and require
+exactly one listed title, the exact suffix above and `Total: 1 test in 1 file`.
+Hash both probes. A mismatch voids the slice before execution and does not
+consume an invocation. This is the D.108e4u correction; a leading `^` is
+forbidden because it selects zero tests.
 
 ```sh
-PLAYWRIGHT_JSON_OUTPUT_NAME=.logs/d108e4z-campaign/ordinary-1.json \
-  pnpm exec playwright test \
+cd /Users/aristotle/Documents/Projects/ts-drp-1
+set +e
+pnpm exec playwright test \
   --config playwright.e3-03-loss-and-hol.config.ts \
-  --grep '^three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
-  --reporter=json --fail-on-flaky-tests
-
-PLAYWRIGHT_JSON_OUTPUT_NAME=.logs/d108e4z-campaign/ordinary-2.json \
-  pnpm exec playwright test \
-  --config playwright.e3-03-loss-and-hol.config.ts \
-  --grep '^three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
-  --reporter=json --fail-on-flaky-tests
-
-PLAYWRIGHT_JSON_OUTPUT_NAME=.logs/d108e4z-campaign/ordinary-3.json \
-  pnpm exec playwright test \
-  --config playwright.e3-03-loss-and-hol.config.ts \
-  --grep '^three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
-  --reporter=json --fail-on-flaky-tests
+  --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
+  --list \
+  > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/ordinary-list.stdout \
+  2> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/ordinary-list.stderr
+d108e4z_status=$?
+set -e
+printf '%s\n' "$d108e4z_status" > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/ordinary-list.status
+test "$d108e4z_status" -eq 0
 ```
 
-Then run the same three commands from
-`/private/tmp/ts-drp-d108e4k-900778ff.nxIeoK`, changing only each output name to
-`.logs/d108e4z-campaign/isolated-1.json`, `isolated-2.json` and
-`isolated-3.json`. Record separate stderr, status and start/end timestamps for
-all six commands. No task-owned reviewer, test process or profiler may overlap
-an invocation. A failure, timeout, nonzero status, title/count mismatch or
-invalid artifact stops the slice immediately. It consumes this authorization,
-resets that checkout's consecutive count to zero and does not permit a rerun.
+```sh
+cd /private/tmp/ts-drp-d108e4k-900778ff.nxIeoK
+set +e
+pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
+  --list \
+  > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/isolated-list.stdout \
+  2> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/isolated-list.stderr
+d108e4z_status=$?
+set -e
+printf '%s\n' "$d108e4z_status" > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/isolated-list.status
+test "$d108e4z_status" -eq 0
+```
+
+Create absolute evidence root
+`/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/` before
+the first probe. Run the six numbered blocks below as six separate shell
+processes, never one combined shell and never `--repeat-each`; validate each
+JSON artifact before starting the next block. Every process also has a
+360-second external process-group watchdog above Playwright's unchanged
+300-second test timeout. The evidence owner monitors the unified execution
+session's elapsed time and terminates that process group at 360 seconds. A
+watchdog expiry is a terminal failure, not authority to raise either limit.
+
+```sh
+cd /Users/aristotle/Documents/Projects/ts-drp-1
+date -u +%Y-%m-%dT%H:%M:%SZ > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/ordinary-1.time
+set +e
+PLAYWRIGHT_JSON_OUTPUT_NAME=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/ordinary-1.json \
+  pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
+  --reporter=json --fail-on-flaky-tests \
+  > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/ordinary-1.stdout.log \
+  2> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/ordinary-1.stderr.log
+d108e4z_status=$?
+set -e
+printf '%s\n' "$d108e4z_status" > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/ordinary-1.status
+date -u +%Y-%m-%dT%H:%M:%SZ >> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/ordinary-1.time
+test "$d108e4z_status" -eq 0
+```
+
+```sh
+cd /Users/aristotle/Documents/Projects/ts-drp-1
+date -u +%Y-%m-%dT%H:%M:%SZ > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/ordinary-2.time
+set +e
+PLAYWRIGHT_JSON_OUTPUT_NAME=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/ordinary-2.json \
+  pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
+  --reporter=json --fail-on-flaky-tests \
+  > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/ordinary-2.stdout.log \
+  2> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/ordinary-2.stderr.log
+d108e4z_status=$?
+set -e
+printf '%s\n' "$d108e4z_status" > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/ordinary-2.status
+date -u +%Y-%m-%dT%H:%M:%SZ >> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/ordinary-2.time
+test "$d108e4z_status" -eq 0
+```
+
+```sh
+cd /Users/aristotle/Documents/Projects/ts-drp-1
+date -u +%Y-%m-%dT%H:%M:%SZ > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/ordinary-3.time
+set +e
+PLAYWRIGHT_JSON_OUTPUT_NAME=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/ordinary-3.json \
+  pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
+  --reporter=json --fail-on-flaky-tests \
+  > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/ordinary-3.stdout.log \
+  2> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/ordinary-3.stderr.log
+d108e4z_status=$?
+set -e
+printf '%s\n' "$d108e4z_status" > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/ordinary-3.status
+date -u +%Y-%m-%dT%H:%M:%SZ >> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/ordinary-3.time
+test "$d108e4z_status" -eq 0
+```
+
+```sh
+cd /private/tmp/ts-drp-d108e4k-900778ff.nxIeoK
+date -u +%Y-%m-%dT%H:%M:%SZ > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/isolated-1.time
+set +e
+PLAYWRIGHT_JSON_OUTPUT_NAME=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/isolated-1.json \
+  pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
+  --reporter=json --fail-on-flaky-tests \
+  > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/isolated-1.stdout.log \
+  2> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/isolated-1.stderr.log
+d108e4z_status=$?
+set -e
+printf '%s\n' "$d108e4z_status" > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/isolated-1.status
+date -u +%Y-%m-%dT%H:%M:%SZ >> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/isolated-1.time
+test "$d108e4z_status" -eq 0
+```
+
+```sh
+cd /private/tmp/ts-drp-d108e4k-900778ff.nxIeoK
+date -u +%Y-%m-%dT%H:%M:%SZ > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/isolated-2.time
+set +e
+PLAYWRIGHT_JSON_OUTPUT_NAME=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/isolated-2.json \
+  pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
+  --reporter=json --fail-on-flaky-tests \
+  > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/isolated-2.stdout.log \
+  2> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/isolated-2.stderr.log
+d108e4z_status=$?
+set -e
+printf '%s\n' "$d108e4z_status" > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/isolated-2.status
+date -u +%Y-%m-%dT%H:%M:%SZ >> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/isolated-2.time
+test "$d108e4z_status" -eq 0
+```
+
+```sh
+cd /private/tmp/ts-drp-d108e4k-900778ff.nxIeoK
+date -u +%Y-%m-%dT%H:%M:%SZ > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/isolated-3.time
+set +e
+PLAYWRIGHT_JSON_OUTPUT_NAME=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/isolated-3.json \
+  pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
+  --reporter=json --fail-on-flaky-tests \
+  > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/isolated-3.stdout.log \
+  2> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/isolated-3.stderr.log
+d108e4z_status=$?
+set -e
+printf '%s\n' "$d108e4z_status" > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/isolated-3.status
+date -u +%Y-%m-%dT%H:%M:%SZ >> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/isolated-3.time
+test "$d108e4z_status" -eq 0
+```
+
+Record and hash the exact command text beside each block. No task-owned or
+unrelated reviewer, test process, profiler or fixed-port listener may overlap
+an invocation. A failure, watchdog expiry, nonzero status, title/count
+mismatch or invalid artifact stops the slice immediately and does not permit a
+rerun. A fully completed three-pass ledger at this exact behavior tree remains
+valid; the other checkout's incomplete ledger is unearned, and aggregate
+D.108e4 stays open pending a newly reviewed express authorization for the
+missing ledger.
 
 Every artifact must show exactly one expected result, zero skipped,
 unexpected and flaky results, retry zero, no top-level error and the exact
 retained title. Its decoded `e3-03-fixed-loss-campaign.json` attachment must
-have the pinned browser version, `trialCount: 3`, three metrics and three
+have pinned browser version `151.0.7922.34`, `trialCount: 3`, three metrics and three
 observation envelopes. Each trial must retain prepare, deadline, reset and
 run-returned stages; signed `rawMaxStallMs <= 500`, `rawGap > 1`, raw AoI P95
 at most 80% of reliable AoI P95 and at least ten raw deliveries after reliable
 start remain unchanged. Passing status must follow aggregate delivery and
 connection gates, the final durable-control round trip, all rendered metrics
-and stage `complete`; attachment presence alone is insufficient. Decode and
-hash the campaign and calibration attachments, reporter JSON, stderr, status
-and command/timestamp record for every invocation.
+and stage `complete`; attachment presence alone is insufficient. The campaign
+attachment is emitted before rendered-metric validation and therefore cannot
+prove completion by itself. Require result status `expected`, top-level
+`stats.unexpected == 0` and absence of an
+`e3-03-failure-telemetry.json` attachment; together with process exit zero,
+these prove that later rendered assertions and terminal stage completed.
+Decode and hash `e3-03-fixed-loss-campaign.json` and exact calibration
+attachment `e3-03-preliminary-calibration.json`, reporter JSON, stdout, stderr,
+status, command/timestamp record and before/after preflight artifacts for every
+invocation.
 
 After all six consecutive passes, record one signed/pushed D.108e4z evidence
 checkpoint. It receives a read-only Grok 4.6/high, exact Kimi K3 `CHECK001`
@@ -70094,3 +70270,80 @@ tree. Reproduced P0/P1 findings are corrected in the same round without a
 confirmation review; every P2 receives the plan/evidence owner and deadline
 2026-09-04. Review completion still does not replace express user
 authorization.
+
+The D.108e4z plan review inspected exact signed/pushed plan-only commit
+`c8e4e750`, parent `d9b1817c`, over accepted behavior tree `900778ff`. Grok
+4.6/high session `01a04b16-dcce-72a2-983e-17c0dc34c7d3` actively inspected
+the plan for 255.089 seconds but hit the runner's 16-turn ceiling while reading
+Playwright internals. The runner correctly recorded `NO_VERDICT`, exit one,
+`stop_reason=cancelled`, `timed_out=false` and `Error: max turns reached`;
+events/public/status/stderr SHA-256 values are
+`ca735cbf6755f1affc6c837cc4eef39771417bc0bb042051ca3ee0a7a58a72a4`,
+`b2036e569847b1037a98f6d40de0d0ef9a3909ee298815c91d810cc1825f1504`,
+`740725e4a59327e53868e2ac23d3a3eec46441ffc4e4a778ffc84eb71e33ecd3`
+and `b3e62995cdc9d267dd575413b26c5eb3c56eb3f54d816fc4ace8f7b91c7d1b1f`.
+One tool-free synthesis continuation in that same session used the already
+collected evidence, completed one turn with `end_turn` and returned
+CHANGES_REQUIRED, P0=0/P1=3/P2=4. Stream/stderr/status SHA-256 values are
+`39a1450c3de29dc6ad4e8a8bb26103ed48ec7785e82b23b70d80591218f5bc27`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+This was a continuation, not a replacement review.
+
+Kimi exact K3 session `session_9c0b487c-da2a-4565-9ed8-dab1e68bda11`
+returned APPROVED, P0/P1 zero and five P2. Its first rendering contained all
+100 unique ordered checks plus RESULT but prefixed five progress lines. A
+tool-free formatting continuation in the same session preserved the verdict
+and findings and emitted exactly 101 nonempty lines: unique `CHECK001` through
+`CHECK100` followed by one RESULT. Final stream/stderr/status SHA-256 values
+are `9876969a5accb5cca988df529e094663b7134137f9e7011876b3a77305f5c427`,
+`3f31f5d78eca9372138247ac242c3a2cb13c4f09a27247d27f11f16a7580c093`
+and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+Kimi incorrectly accepted the leading-anchored grep as executable; the union
+therefore follows Opus's file- and retained-artifact-grounded P0 correction.
+
+Opus 5/xhigh session `ba52fc02-6195-4710-9b36-bfb3dcfbbc27` completed 41
+turns in 486.451 seconds without error or subagent and returned
+CHANGES_REQUIRED, P0=1/P1=5/P2=6. JSON/stderr/status SHA-256 values are
+`eb10cc623913a0e9e77e214e02d918ebebc60df46b62be8f94f2553b4efccdb4`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+Its P0 reproduced the exact D.108e4u defect: Playwright greps the full title
+path, so the leading `^` selects zero tests and would consume authorization on
+ordinary command one. Its five P1s required exact isolated commands and
+absolute custody, closed-world identity including relay configs and untracked
+state, runtime-build identity, command-integrated stdout/stderr/status/time
+evidence and per-invocation shim/ambient/fixed-port preflights.
+
+The same-round correction above resolves the complete P0/P1 union without a
+campaign or confirmation review. All six greps now use the proven suffix-only
+pattern; exact ordinary and isolated `--list` probes each returned one title
+and `Total: 1 test in 1 file`, with byte-identical stdout SHA-256
+`34b50ba04d086184cc539c48d35a326cd53a5e6f5ad63d006ab314ef37008bbe`
+and zero-status SHA-256
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+The commands now have explicit working directories, absolute main-checkout
+custody paths and integrated stdout/stderr/status/time records. A closed-world
+tracked guard excludes only this plan, the protected untracked roster is
+enumerated, both relay configs and exact owner paths are hashed, and each
+invocation repeats shim, status, ambient and fixed-port checks. The preserved
+checkout is reverified and time-bounded rather than assumed immortal.
+
+Runtime-dist comparison found 808 relative files shared by ordinary and the
+isolated build closure. Forty-two byte differences were compiler-only
+`*.tsbuildinfo` or one declaration file; there were zero executable/runtime
+byte mismatches and no isolated runtime file missing from ordinary. The exact
+runtime-only manifest rule above records that distinction rather than treating
+machine-path-bearing compiler metadata as executable identity. The correction
+also names browser `151.0.7922.34`, both attachment filenames, the observable
+post-attachment completion predicate, a 360-second outer watchdog and explicit
+partial-ledger composition semantics.
+
+Every P2 in the review union is assigned to the D.108e4z plan/evidence owner
+with deadline 2026-09-04 and integrated above before execution: exact path
+names, relay/config and runtime identity, predicate-named shim checks,
+per-invocation ambient/port/timeout custody, absolute isolated artifacts,
+attachment names/completion observables, preserved-checkout validity and
+partial-ledger consequences. The review round and correction authorize no
+campaign. Express user authorization for all six invocations remains absent;
+no Fable, campaign process, product/test change or collaboration subagent ran.
