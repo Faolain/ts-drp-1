@@ -72269,16 +72269,15 @@ git diff --quiet 217865acac51d7fa7dbbb1ccacffb95bf936fff9 -- . \
   ':(exclude)docs/production-hardening/production-hardening-tdd-plan-v2.md'
 ```
 
-The exact raw receiver `10/420` replay with two literal semantic
-`channel-open-event` records is a permanent negative, not a RED that GREEN
-turns positive. It must throw `D108E4H_LIFECYCLE_ORDER_INVALID` before and
-after GREEN and remains paired with the existing `dualLocalDuplicateOpen`
-mutant. A separate GREEN-shaped positive replaces sequence 946's event/owner
-with `channel-open-repeat-event` / `rtc-datachannel-open-repeat-event`; it
-retains one observer handler, one product handler, no `10/420` close and
-post-repeat ingress. That positive currently passes only because the unknown
-repeat kind is ignored, so it is an acceptance control rather than causal
-RED evidence.
+The permanent duplicate-semantic-open negative is
+`dualLocalDuplicateOpen`: it adds a second semantic open at sequence 1652 on
+creator identity `7/399` and must throw
+`D108E4H_LIFECYCLE_ORDER_INVALID` before and after GREEN. Separate
+GREEN-shaped positives add repeat telemetry at sequence 964 on receiver
+identity `7/382` and at sequence 1844 on creator identity `7/399`. They retain
+the semantic anchor and product-handler custody; before GREEN they pass only
+because the unknown repeat kind is ignored, so they are acceptance controls
+rather than causal RED evidence.
 
 The observer-level RED makes the existing self-check dispatch two open events
 on the same watched `RTCDataChannel` object. It must hard-pin that the current
@@ -72718,15 +72717,17 @@ passed 7/7 in 21.044 seconds under the same clean result conditions. No long
 campaign ran.
 
 All 40 `build:packages` targets passed. The subsequent broad workspace
-typecheck honestly returned status one only in unchanged
+typecheck aborted at the first failure: 36 of 47 projects completed clean, 10
+were terminated without a result, and `packages/object` failed in two unchanged files:
 `packages/object/tests/compact-history-observer-1i-b-red.test.ts` and
-`packages/object/tests/helpers/compact-history-observer-1i-b.ts`: those RED
+`packages/object/tests/helpers/compact-history-observer-1i-b.ts`. Those RED
 fixtures use rejected `history_storage: "archive"` values and a deliberately
 broad helper union. They are unchanged from `HEAD`, outside this slice and do
-not invalidate the GREEN owner. The actual affected `ts-drp-example-grid`
-build/typecheck and the standalone test-owner TypeScript check passed. Exact
-owner ESLint, Prettier, diff, baseline scope, source-shape, protected-untracked
-and 26-stash checks also returned zero.
+not invalidate the GREEN owner. The complete package build plus the actual
+affected `ts-drp-example-grid` build/typecheck and standalone test-owner
+TypeScript check are the coverage bound; all passed. Exact owner ESLint,
+Prettier, diff, baseline scope, source-shape, protected-untracked and 26-stash
+checks also returned zero.
 
 Exact GREEN custody is `.logs/d108e4ae-green/`. Focused reporter/status/time/
 summary SHA-256 values are
@@ -72758,3 +72759,74 @@ Freeze this GREEN in a signed push, then run the normal read-only Grok
 4.6/high, exact Kimi K3 100-step and Opus 5/xhigh implementation review. Do
 not invoke Fable, a collaboration subagent, a retained rerun or a long
 campaign. Only the review P0/P1 union may reopen D.108e4ah.
+
+###### D.108e4ai — GREEN review closure
+
+The required review inspected exact signed/pushed GREEN
+`f92f0b0585d985f362012ca3eb7aad05d3876a83`, tree
+`23d6286e5d4d00e12421c69b2cc54d4427131ed6`, and ran no test, retained
+suite, campaign, Fable or collaboration subagent. The formal union is
+`APPROVED`: Grok, exact Kimi and Opus each returned P0=0/P1=0. D.108e4ah is
+therefore accepted; only the bounded P2 roster below remains.
+
+Grok 4.6/high's initial read-only session
+`01a04e31-1bcc-7510-a77c-b4b9a2c2634c` exited zero at `end_turn` after
+840.170 seconds. Because progress prose preceded its terminal approval object,
+the runner honestly classified the initial emission `NO_VERDICT`. A one-turn,
+tool-free formatting continuation in the same session returned valid
+`APPROVED`, P0=0/P1=0/P2=2. Initial events/status and continuation JSON
+SHA-256 values are
+`401fd31595fbd222ba52fc8af51154f35700940e4aaeda95dfaf81ed15b59949`,
+`8960433ac59b70afa29894f80948e93d628e37729a4f3ef7aefa81fca1e55797`
+and
+`66d3d4c45047f34f217f505d615e14d6518aaece09e4377cd0f8e0ef28c8d3ef`.
+
+The first Kimi launcher used `--plan`, whose injected plan-file/exit contract
+conflicted with the exact 101-line output contract. It was terminated before a
+terminal answer and is retained as non-counting preflight status 130. Exact
+Kimi CLI 1.49.0 / `kimi-code/k3` session
+`05343bc5-fd8d-4449-bc53-3d0a37baa9a8` then completed the substantive review
+without plan mode. Its first answer contained the required 100 ordered checks
+and RESULT plus one leading progress line, so a same-session formatting-only
+continuation re-emitted exactly 101 nonempty lines: unique `CHECK001` through
+`CHECK100`, then one RESULT. The terminal verdict is `APPROVED`,
+P0=0/P1=0/P2=3. Preflight stream, substantive stream/text and continuation
+stream/text SHA-256 values are
+`a1e1c6082f2b080348200077428c7c8a4cf1ca4dea441150bfaa9ec6a4295feb`,
+`512ef160e60070373cfe9e743f71e7169d98041d4d192dba0418e55e46715dd1`,
+`a9f0ac72a73e2cc5addff260f596459aeb547a1b215f7d575062d0e203c30249`,
+`59928bc8a0dace6c3e00697f7be6526076d1539e7cdd388dfdddbef08b406f4e`
+and
+`30d97e818fb36f374b1c8189598a5c9d4e5c145b9ca438399e7b04901f06a2cf`.
+
+Opus's first launcher was rejected before session creation because its CLI did
+not accept the JSON Schema draft marker. Removing only that marker allowed the
+same prompt/schema to run. Opus 5/xhigh session
+`e3db1cf6-28a4-4986-ae39-7e7f13c9cdb9` completed 86 turns without error and
+returned `APPROVED`, P0=0/P1=0/P2=6. JSON/status/stderr SHA-256 values are
+`616b03cd94628ec490445a61fc4842643794f9f87ee8cec28d49b949c3d09ba0`,
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`
+and the empty-file hash
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+This same-round plan correction closes Opus's two documentary P2s: the stale
+nonexistent `10/420`/946 fixture description now names the actual
+`dualLocalDuplicateOpen` and `7/382`/`7/399` positives, and the broad typecheck
+text now records 36 completed, one failed and 10 terminated projects rather
+than implying full coverage. Review validation SHA-256 is
+`848447985a7fe1ffae9bab1c202bb11c0cdf3b9ff5d92f64c37f60fb47c1e498`;
+the complete self-excluding review manifest validates and has SHA-256
+`ab4ec179bc164d6aca4e4f5d99ec002a1ec517b8424109bcefdeb9a8228453b8`.
+
+The overlapping nonblocking P2 roster belongs to D.108e4ai test/evidence
+hygiene with deadline 2026-09-05 or before D.108e5 aggregate closure,
+whichever comes first: promote the two observer GREEN pins from soft to hard
+and rename their RED-era labels; pin the no-replacement receiver sequence-zero
+base before appending sequence one; decide and test whether repeat cardinality
+and close ordering use numeric identity alone or identity plus label; add an
+already-open adoption discriminator if that acceptance sentence remains;
+start all future multi-command affected-check scripts with `set -e`; and copy
+the supplemented D.108e4af root into future isolated review packets when its
+bytes must be independently reverified. These items do not reopen the accepted
+GREEN, weaken any current invariant or authorize a campaign. No confirmation
+review or test rerun is required for this plan/evidence-only closure.
