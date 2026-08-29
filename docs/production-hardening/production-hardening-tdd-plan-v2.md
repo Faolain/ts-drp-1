@@ -70347,3 +70347,147 @@ attachment names/completion observables, preserved-checkout validity and
 partial-ledger consequences. The review round and correction authorize no
 campaign. Express user authorization for all six invocations remains absent;
 no Fable, campaign process, product/test change or collaboration subagent ran.
+
+###### D.108e4aa — asymmetric incoming-replacement validator custody
+
+The user subsequently authorized exactly the six frozen D.108e4z invocations
+and narrowed the ambient-process preflight after its over-broad process rule
+blocked on unrelated repositories. Unrelated processes may coexist only when
+no reviewer, test or profiler rooted in either ts-drp checkout is active and
+ports 4174, 4175, 51000 and 51002 have no listener. This user-authorized
+correction preserves the task-owned non-overlap and fixed-port intent without
+granting authority to stop other work. Three consecutive preflights under the
+old wording consumed no invocation. The task-owned orphaned D.108d2 Grok PID
+33718 was terminated with `SIGTERM`; external Fable, Opus and Playwright
+processes were preserved. Custody is under
+`.logs/d108e4z-campaign/authorization-preflight-20260828/`.
+
+The corrected authorization-time preflight passed at exact signed/pushed HEAD
+`95fb23f8f15a062600354e9ef94d0e0cb55bf9fb` over accepted behavior tree
+`900778ff540c1b1b4fb2b3e29f095b7b66ef8f9f`. The ordinary status was exactly
+the eight protected untracked paths, the isolated checkout was tracked-clean
+at exact `900778ff`, both root shims were absent, the stash count was 26 and
+the closed-world behavior diff was empty. Six named source/config owners and
+266 runtime export files after excluding declarations, source maps and
+`*.tsbuildinfo` were pairwise byte-identical. Both canonical exports were
+21,858 bytes. No ts-drp reviewer, test or profiler was active and all four
+fixed ports were clear. The ordinary suffix-only `--list` probe returned
+status zero, exactly one retained title and `Total: 1 test in 1 file`; stdout,
+stderr and status SHA-256 values are
+`34b50ba04d086184cc539c48d35a326cd53a5e6f5ad63d006ab314ef37008bbe`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3ab86aa`.
+The first evidence script stopped before the probe because a loop variable
+named `path` overwrote zsh's tied `PATH`; replacing it with `file_path` and the
+absolute `/sbin/sha256sum` corrected only the evidence command. A later
+read-only validator incorrectly expected a `tests/` prefix and suite label
+that Playwright omits from `--list` output relative to `testDir`. The already
+captured probe was not rerun; its exact suffix and total were validated with
+the corrected regex. Neither evidence-command defect was a code or campaign
+failure.
+
+Ordinary invocation one started at `2026-08-29T02:00:12Z` and ended at
+`2026-08-29T02:01:35Z`. It was the first and only process started under the
+six-run authorization. The shell returned one; the reporter recorded one
+unexpected result, zero expected/skipped/flaky results, retry zero, 82.907
+seconds total and a 74.458-second failed retained test. Preliminary calibration
+completed first with pinned Chromium `151.0.7922.34`, 409 deliveries against
+floor 100 and a genuine total-loss check whose before/during counts were both
+one. Trial zero then reached `e3-03-0-assertions` and failed
+`D108E4H_IDENTITY_JOIN_INVALID`. It emitted calibration, failure telemetry,
+error context and trace attachments, but correctly emitted no completed
+campaign attachment.
+
+The failure telemetry makes the rejected topology exact. On the initiating
+creator, the authenticated identity advanced from generation 3 to 4, the raw
+RTC identity advanced from connection/channel `3/346` to `5/367`, and the
+signed local delta was one link drop with reason `replacement`. On the
+non-initiating receiver, the authenticated connection ID and generation 3
+remained stable and its signed local link-drop delta was zero, while its raw
+RTC identity legitimately advanced from `3/348` to `5/379`. Receiver lifecycle
+sequences 1247 through 1250 show the new channel handler, product message
+handler and open event. Creator sequences 2032 and 2033 show the replacement
+open and product handler before product-owned old-channel close call 2034 and
+close event 2035. Thus the evidence contains make-before-break replacement,
+not the earlier break-before-make defect.
+
+The retained validator currently derives one endpoint-wide `replaced` boolean
+only from that endpoint's local `linkDrops` delta. It then requires both
+authenticated and RTC identities to change when true, or requires both to
+remain stable when false. The receiver topology above satisfies neither
+branch: the authenticated connection is intentionally stable, the incoming
+raw sidecar changes, and only the initiating peer owns the product replacement
+drop. The prior successful complete-config trial two proves that the behavior
+is scheduling-sensitive at the observation boundary: its initiating creator
+also recorded one replacement while the receiver recorded zero, but the
+receiver's boundary snapshot still selected its old RTC identity. This new
+failure therefore demonstrates a retained test-validator coverage defect. It
+does not by itself demonstrate a product failure, a false-positive libp2p
+abort or permission to change production behavior.
+
+D.108e4z stopped fail closed immediately. Ordinary invocations two and three
+and all three isolated invocations did not start and may not be run under the
+consumed authorization. The ordinary ledger has zero consecutive passes; the
+isolated ledger is unearned. Reporter, stdout, stderr, status, timestamps,
+command, calibration, failure telemetry, current-trial evidence, compact
+identity summary, focused lifecycle, error-context and trace SHA-256 values
+are respectively
+`9f42e39fa92680c2d4f0243da2e200e17241e4f4a0316490b7933e4aeadfa72d`,
+`54d9ae9551f2f42a85039947f777f3e556cae8051a8b7fe8d427909bad2afebe`,
+`6507553ae10be7112a305196b0587b841d929434c4408213d654af0a62dd441a`,
+`4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`,
+`e407519a0278e7903535a6e6329ccbd0e33eb9377ff59c951541acf4a2ff499c`,
+`34ce2f18520bad4805087fefaf0510d185a819ef94e4f556ee77b773c375c340`,
+`a0047d8fbab16ff6779422d5b7dfb176cadd4028c6f207282636f758cf635119`,
+`7e8dcfea4225a62def77c587f71bf021c0b2eb8a316106f3823524a867d1f3ba`,
+`aa0968914451f2dda7e0366ba966b68114f971d5427763d72c865c6560850bec`,
+`a1edbd46c82bd0d2ee559912477858cb492acb147c25074474f7ff2fb53fd6ef`,
+`16fed90bdbc8ead27726eab8ea09007f219a1b97e666194eced28e3f9afdf22a`,
+`f2f228a0d85536a25f4c320e4d93f8e829588b59b43b90a7ddb22206896e0d5b`
+and `60e3843f913d7efb7fbaa27332a64a3c43874c6d1f552580ae6d0bbb633602d4`.
+Exact absolute custody is
+`/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/`.
+Post-run source identity, protected status, 26 stashes, root-shim absence,
+fixed-port clearance and absence of a ts-drp reviewer/test/profiler all held.
+
+D.108e4aa is a narrow test-only RED/GREEN slice in
+`tests/e3-03-loss-and-hol-proof.pw.ts`. It may not change production or example
+source, configs, fixtures outside that owner, package manifests, dependencies,
+lockfiles, build behavior, browser pin, workload, loss profile, timing limits,
+performance thresholds, product counters or public APIs. First, a deterministic
+fixture reproduces the exact asymmetric topology above: the initiating peer's
+authenticated and RTC identities change with one signed replacement drop,
+while the non-initiating peer keeps one authenticated identity, advances to
+exactly one new open raw RTC identity and records zero local drops. The RED
+must fail at the current endpoint-wide identity join and must include the
+opposite peer ordering.
+
+GREEN separates authenticated-connection transition, raw-RTC transition and
+local-drop ownership instead of inferring all three from one boolean. An
+asymmetric incoming replacement is accepted only when the peer identities and
+trial match, each boundary has exactly one authenticated and one selected raw
+identity, the replacement has exactly one handler and open event before old
+retirement, every accepted raw record joins to the selected channel, and the
+initiating endpoint supplies the signed replacement drop. The validator must
+remain fail closed for an RTC identity change without a new product handler or
+open event, multiple selected identities, old close before replacement open,
+cross-peer clocks, mismatched peer/trial identity, unauthenticated connection
+change, a missing initiating replacement drop, ambiguous drop counts and a
+failed replacement that displaces the usable old channel. Existing preserved
+campaign replay, both peer-ordering, channel-close, repeated-replacement and
+all mutation cases remain green.
+
+The RED checkpoint receives the normal read-only Grok 4.6/high, exact Kimi K3
+`CHECK001` through `CHECK100` and Opus 5/xhigh review. After same-round P0/P1
+correction and P2 ownership, GREEN receives its separate equivalent review.
+Run the focused D.108e4h/i/j validator tests, retained source-shape checks,
+exact-owner typecheck/lint/format/diff gates and the non-campaign retained
+E3-03 tests that do not invoke the long campaign. Do not invoke Fable or a
+collaboration subagent. Record all commands, results and hashes in this plan
+with signed/pushed checkpoints.
+
+No long E3-03 campaign runs during D.108e4aa. After GREEN and its reviews, the
+ordinary and isolated three-consecutive ledgers require a new signed/pushed
+campaign freeze, its review round and fresh express user authorization. The
+failed invocation is never reclassified or counted. D.108e4b's separate GREEN
+review, aggregate D.108e4 closure and D.108e5 remain blocked.
