@@ -73280,3 +73280,46 @@ RED and GREEN receive separate signed/pushed checkpoints and normal Grok,
 exact-Kimi and Opus reviews. Only after accepted GREEN may a new plan decide
 what browser/drain evidence is required; D.108e4am itself cannot authorize a
 campaign or change the zero-backpressure refusal control.
+
+The D.108e4am RED checkpoint changes only the frozen two test owners. The
+network fixture uses an isolated signaling bus and owner, admits exactly 554
+ordinary sends, sets the fake channel to the captured 65,512-byte state,
+admits one 398-byte body as the observed 431-byte routed envelope, then sets
+the channel to the captured 65,943-byte state and refuses exactly 45 further
+calls. Its final snapshot proves `sent === 555`,
+`backpressuredDrops === 45`, `activeLinks === 1`, `linkDrops === 0` and
+`handshakeFailures === 0`. The validator mutant retains raw-success sequences
+`0..554` and only their joined attempt/terminal lifecycle records, preserves
+the replacement lifecycle, sets the sent delta to 555 and the backpressure
+delta to 45, and adds one soft exact-code expectation so all later retained
+mutants still execute.
+
+The first network shell accidentally omitted `--coverage.enabled=false`.
+Its JSON records the selected test itself passing 1/1 with no failed test, but
+the shell exited one after applying the unrelated repository-wide 70% coverage
+threshold to the one-title selection. This is retained as a non-authoritative
+command-shape error, not a failed product/test assertion and not a retry of a
+stochastic owner. The one corrected authoritative command added
+`--coverage.enabled=false` and passed 1/1 with status zero; its JSON SHA-256 is
+`6a9211fdfad8674e52799428b02b9c4ca614d447c6ecc0ef3e2814f97ee63071`.
+The non-authoritative JSON SHA-256 is
+`5d6a96804c8dd8754ed22b9e4c29786259ba46371c12135f168fed0782b11fad`.
+
+The exact schema-validator title then ran once with
+`D108E4H_TELEMETRY=1`, the frozen config/grep, JSON reporter and
+`--fail-on-flaky-tests`. It exited one after 7.899 seconds with exactly zero
+expected, zero skipped, one unexpected and zero flaky tests. Its complete soft
+failure set contains only the D.108e4am mutant: expected
+`D108E4H_RAW_BACKPRESSURE`, received
+`D108E4H_RAW_SEND_DOMAIN_INVALID` from the existing attempt-custody domain
+check. The reporter and empty stderr SHA-256 values are
+`c0bca13a4aa7a5853ebf039bd242daf2a60133ed17fcd4dcc190bd5defb95a5e`
+and
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+The evidence directory's self-excluding 11-file manifest validates and has
+SHA-256
+`505c65affd6bcb6c8ec39a5e4ef951c1877359f157acd1a52b8cca5cf225ff41`.
+No retained browser suite, campaign, production/example/config/dependency
+edit, reviewer, Fable invocation or collaboration subagent occurred. This is
+the frozen sole causal RED and authorizes only the already-specified
+test-validator assertion-order GREEN after the signed/pushed RED review.

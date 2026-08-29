@@ -5773,6 +5773,37 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 			})
 		);
 		expect(() => validateD108e4hCampaignCustody(creatorBackpressure)).toThrowError("D108E4H_RAW_BACKPRESSURE");
+		const admittedRawSends = Object.freeze(creatorReplacement.endpoints.creator.rawSends.slice(0, 555));
+		const admittedAttemptIds = new Set(admittedRawSends.map(({ attemptId }) => attemptId));
+		const capturedBackpressureBase = Object.freeze({
+			...creatorReplacement,
+			endpoints: Object.freeze({
+				...creatorReplacement.endpoints,
+				creator: Object.freeze({
+					...creatorReplacement.endpoints.creator,
+					lifecycle: Object.freeze(
+						creatorReplacement.endpoints.creator.lifecycle.filter(
+							({ attemptId }) => attemptId === undefined || admittedAttemptIds.has(attemptId)
+						)
+					),
+					rawSends: admittedRawSends,
+				}),
+			}),
+		});
+		const capturedBackpressure = withCreatorDeadlineTransport(
+			capturedBackpressureBase,
+			Object.freeze({
+				...capturedBackpressureBase.endpoints.creator.deadline.rawTransport,
+				backpressuredDrops: capturedBackpressureBase.endpoints.creator.prepare.rawTransport.backpressuredDrops + 45,
+				sent: capturedBackpressureBase.endpoints.creator.prepare.rawTransport.sent + admittedRawSends.length,
+			})
+		);
+		expect
+			.soft(
+				() => validateD108e4hCampaignCustody(capturedBackpressure),
+				"D.108e4am captured 555-success/45-backpressure attribution"
+			)
+			.toThrowError("D108E4H_RAW_BACKPRESSURE");
 		const inconsistentSentCounter = withCreatorDeadlineTransport(
 			creatorReplacement,
 			Object.freeze({

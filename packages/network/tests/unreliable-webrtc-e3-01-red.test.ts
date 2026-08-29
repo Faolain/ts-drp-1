@@ -1584,6 +1584,31 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		expect(route.snapshot().activeLinks).toBe(1);
 		expect(await route.send(["peer-b"], Uint8Array.of(3))).toBe(true);
 
+		const replayBus = new FakeSignalingBus();
+		const replayLeft = owner(module, replayBus, "peer-a");
+		owner(module, replayBus, "peer-b").owner.openUnreliableWebRtcRoute("zone:backpressure-replay");
+		replayBus.connect("peer-a", "peer-b");
+		const replayRoute = replayLeft.owner.openUnreliableWebRtcRoute("zone:backpressure-replay");
+		for (let sequence = 0; sequence < 554; sequence += 1) {
+			expect(await replayRoute.send(["peer-b"], Uint8Array.of(sequence % 256)), `admitted ${sequence}`).toBe(true);
+		}
+		const replayChannel = replayLeft.peerConnections[0]?.channels[0];
+		if (replayChannel === undefined) throw new Error("backpressure replay channel missing");
+		replayChannel.bufferedAmount = 65_512;
+		expect(await replayRoute.send(["peer-b"], new Uint8Array(398)), "admitted 554 at captured boundary").toBe(true);
+		expect(replayChannel.sent.at(-1)).toHaveLength(431);
+		replayChannel.bufferedAmount = 65_943;
+		for (let sequence = 555; sequence < 600; sequence += 1) {
+			expect(await replayRoute.send(["peer-b"], new Uint8Array(398)), `refused ${sequence}`).toBe(false);
+		}
+		expect(replayRoute.snapshot()).toMatchObject({
+			activeLinks: 1,
+			backpressuredDrops: 45,
+			handshakeFailures: 0,
+			linkDrops: 0,
+			sent: 555,
+		});
+
 		for (const [name, leftOptions, rightOptions] of [
 			["initiator small SCTP", { maxMessageSize: MAX_ROUTED_ENVELOPE_BYTES - 1 }, {}],
 			["responder small SCTP", {}, { maxMessageSize: MAX_ROUTED_ENVELOPE_BYTES - 1 }],
