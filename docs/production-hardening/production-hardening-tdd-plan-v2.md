@@ -74070,6 +74070,25 @@ file GREEN manifest validates and has SHA-256
 `c2b709ae4ab326044121dbbb02cd82e231cd2eb62a9a1aa674e92a0a2d924843`;
 validation SHA-256 is
 `f7c04db2a7c6c397fe81c05610965a0ddd0ca6ab41fc2c23f5b34d6ba1a7ccdb`.
+The focused execution proves the exact timestamp and input `trialId` values plus
+the exact-boundary join. It does not execute the builder-side invalid rejection
+branch or assert `Object.isFrozen`; those two properties are established by the
+reviewed source and static gates only, not claimed as dedicated runtime controls.
+
+Formal review of signed/pushed GREEN
+`1a2967020203da60ee586a59a8981bd038532b3c` closes D.108e4ap. Grok 4.6/high
+session `01a04fa9-1dd5-7710-a3a5-a1c057f9ffdf` returned terminal `RESULT:`,
+APPROVED with zero findings. Exact Kimi K3 session
+`6f29bf4c-8eda-40d8-8e9f-6bc3f2559e01` returned exactly 100 checks plus RESULT
+with no preamble, APPROVED with zero findings. Opus 5/xhigh session
+`58e6b6e1-bb4a-4813-b7f8-95a27985bd5f` returned APPROVED with zero P0/P1 and
+two documentation-only P2s closed by the runtime/source qualification above.
+No reviewer executed a test, build, browser, profiler or campaign, invoked
+Fable or used a subagent. The self-excluding nineteen-file review manifest
+validates and has SHA-256
+`de3bbac21e737fad2fde552c5389e5231ec52d96d1f6f5bde6f2669c12fe2000`;
+validation SHA-256 is
+`54c0413757c3a77be6d60266a918833d67cb7a76a40dae9f2bae33a23053da75`.
 
 Acceptance is deterministic: the focused controls prove missing, invalid,
 precedence, below-boundary, exact-boundary and exact-preservation behavior; the
