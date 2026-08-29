@@ -70638,6 +70638,83 @@ git diff --stat -- tests/e3-03-loss-and-hol-proof.pw.ts
 git diff -- tests/e3-03-loss-and-hol-proof.pw.ts
 ```
 
+The D.108e4aa RED was then frozen against signed/pushed plan-correction HEAD
+`29bd1af0ed19319e53d6d7a67723c059a994f304`. Its initial test-owner SHA-256
+was `5f6938936d902ccef440c1838378206a3a88eb41501a10662c7231f72a13bded`
+and review-diff SHA-256 was
+`42b0af75868b3dc72bf11812207af0819f1c4ddf937e36a24a43cb967980dff5`.
+The single focused pure-validator invocation returned one as intended in
+8.722 seconds with one unexpected test, zero expected/skipped/flaky tests and
+two soft failures. Both page orderings reached
+`D108E4H_IDENTITY_JOIN_INVALID` from the replaced-false branch after the
+fixture's cardinality, attempt, overlap and initiating lifecycle controls
+passed. It did not invoke the long campaign.
+
+The required RED review round completed read-only without Fable or a
+collaboration subagent:
+
+- Grok 4.6/high inspected for 555.218 seconds and ended normally with
+  `end_turn`. Its public response contained CHANGES_REQUIRED, P0=1/P1=2/P2=0
+  and complete findings but omitted the requested terminal JSON wrapper, so
+  the runner correctly classified that first turn as `NO_VERDICT` rather than
+  inferring a verdict. Events/public/status SHA-256 values are
+  `06a673d1e3d6d00d1d9a2991864af6f710e290cc49d566861340c9ede7f96285`,
+  `9f8cd8e187ef61c390b148f241e218914f587b899fa442b1e9d22bfe4627843d`
+  and
+  `6e0330be8cb6915fc254188a0f8906b5d51d5fc3291cc6203fb56ccef42a0501`.
+  A one-turn, tool-free, same-session formatting continuation
+  `01a04b6b-5c2d-7c63-b568-bd2946a89b72` constrained those already emitted
+  findings to the schema without reinspection or changed substance. It
+  completed with `end_turn`; JSON/stderr/status SHA-256 values are
+  `c5ee0a23876dc13a95609b5b007dbcfcd18decf808feefd28153351c03db1997`,
+  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+  and
+  `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+- Exact `kimi-cli` 1.49.0 / `kimi-code/k3` session
+  `68927bc7-01d3-411b-bcbe-90f8622cc8fa` returned CHANGES_REQUIRED,
+  P0=0/P1=1/P2=1. Its substantive answer had five progress lines before the
+  required checks. A tool-free formatting continuation in that same session
+  produced exactly 101 nonempty lines: unique ordered `CHECK001` through
+  `CHECK100`, then one unchanged RESULT. Final stream/text/stderr/status
+  SHA-256 values are
+  `1d2656f0d8651c4370b02e18fd93b6f762412795954dad808a77e82781c08317`,
+  `838ef93834f963d83bf15975471aa00d7bbc4118afc0996c41a02a303235ef33`,
+  `5e5f7e035dc77721deb31625df3aa775863ae2e4af23d45bbf0b8b1b16757418`
+  and
+  `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+- Opus 5/xhigh session `3370675e-6914-429f-8e1b-c68012a909fc`
+  completed 44 turns in 503.222 seconds without error, permission denial or
+  subagent and returned CHANGES_REQUIRED, P0=0/P1=2/P2=2.
+  JSON/stderr/status SHA-256 values are
+  `7815bc9199b53aec1cd7e471130449a88b92e61a31fb07fcb1e7cc3d539067c3`,
+  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+  and
+  `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+
+All three upheld the test-validator classification and rejected any product
+change. The same-round union was corrected before checkpoint: the exact
+passing retained `e3-03-2` old-RTC schedule now hard-passes with creator RTC
+`9/428` to `12/444`, receiver RTC stable at `9/428`, drop deltas one/zero,
+600 old-RTC sends and 410 old-RTC accepts; captured sequence 1247 now has owner
+`rtc-observer-datachannel-handler`; a derived 2-by-2 matrix covers both
+drop-owner page orderings and both incoming handler/open orders; and the RED
+hard-pins remote peer ID, label and ready state before accepting the shared
+error code as the causal branch. No confirmation review ran.
+
+The corrected RED owner SHA-256 is
+`d457d96a57d5cde197108d73483b9172bf22e8cde6d33ff305fe2a6dfb8fcdba`.
+One corrected focused invocation returned one in 7.775 seconds with exactly
+four intended soft failures—each 2-by-2 case—and no other failure; the
+retained old-RTC positive passed before them. Corrected JSON/stdout/stderr/
+status/time SHA-256 values are
+`b0c1a6b305cda25adafc24b97159e51bed068f13c16b50b6b0fd97e5a2037e2e`,
+`dbefb37e0d76707e7a9888db2d6d68294d744009a6e5f59a6707ae1ffaf23e8b`,
+`ab01423569ec986611f5e6833dd9fa19c0582a3b3b6ccaf08e811b044c315e2a`,
+`4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`
+and `23f35eb34d14465acdba52a3655f53f635af703787066f4104d2f51e9bd919d2`.
+Targeted Prettier and `git diff --check` pass. The stash count remains 26 and
+the protected untracked roster is unchanged.
+
 No long E3-03 campaign runs during D.108e4aa. After GREEN and its reviews, the
 ordinary and isolated three-consecutive ledgers require a new signed/pushed
 campaign freeze, its review round and fresh express user authorization. The

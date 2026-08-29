@@ -2471,6 +2471,288 @@ function d108e4iPreservedCampaignReplay(): D108e4hValidationInput {
 	});
 }
 
+function d108e4aaRetainedAsymmetricReplay(
+	swapPageOrder: boolean,
+	incomingAnchorOrder: "handler-open" | "open-handler"
+): D108e4hValidationInput {
+	const trialId = "e3-03-0";
+	const creatorPeerId = "16Uiu2HAmFP8Rgu2hBrBG4ZwG7mnFHzYJDGSJ2dU3WESDoiyd7rAr";
+	const receiverPeerId = "16Uiu2HAmMuwjeZv1KiXZQUG6nQM1cEC287WknT1BJQrHit4r3EcX";
+	const creatorBefore = Object.freeze({
+		channelId: 346,
+		connectionId: 3,
+		label: "ts-drp-ephemeral/1" as const,
+		readyState: "open" as const,
+	});
+	const creatorAfter = Object.freeze({ ...creatorBefore, channelId: 367, connectionId: 5 });
+	const receiverBefore = Object.freeze({ ...creatorBefore, channelId: 348 });
+	const receiverAfter = Object.freeze({ ...creatorAfter, channelId: 379 });
+	const creatorPrepareTransport = d108e4hRawTransport(receiverPeerId, {
+		authenticatedConnectionLosses: 0,
+		lastLinkDrop: "restart",
+		linkDrops: 2,
+		sent: 933,
+	});
+	const creatorDeadlineTransport = d108e4hRawTransport(receiverPeerId, {
+		authenticatedConnectionLosses: 1,
+		lastLinkDrop: "replacement",
+		linkDrops: 3,
+		sent: 1_533,
+	});
+	const receiverPrepareTransport = d108e4hRawTransport(creatorPeerId, {
+		authenticatedConnectionLosses: 0,
+		lastLinkDrop: "restart",
+		linkDrops: 2,
+		received: 690,
+	});
+	const receiverDeadlineTransport = d108e4hRawTransport(creatorPeerId, {
+		authenticatedConnectionLosses: 1,
+		lastLinkDrop: "restart",
+		linkDrops: 2,
+		received: 1_112,
+	});
+	const boundary = (
+		peerId: string,
+		connectionId: string,
+		generation: number,
+		rtc: D108e4hRtcIdentity,
+		rawTransport: ZoneSnapshot["rawTransport"]
+	): D108e4hBoundaryCustody =>
+		Object.freeze({
+			authenticated: Object.freeze([Object.freeze({ connectionId, generation, peerId })]),
+			rawTransport,
+			rtc: Object.freeze([rtc]),
+		});
+	const creatorSend = d108e4hSendSlice(trialId, creatorBefore, 0, SAMPLE_COUNT, 0);
+	const receiverMessages = Object.freeze(
+		Array.from({ length: 422 }, (_, sequence) =>
+			d108e4hLifecycle(trialId, sequence, "channel-message", receiverBefore, "rtc-datachannel-message-event")
+		)
+	);
+	const receiverAccepted = Object.freeze(
+		receiverMessages.map(({ sequence }, payloadSequence) =>
+			d108e4hAcceptedRaw(receiverBefore, payloadSequence, sequence)
+		)
+	);
+	const receiverReplacementAnchors =
+		incomingAnchorOrder === "handler-open"
+			? Object.freeze([
+					d108e4hLifecycle(
+						trialId,
+						1_249,
+						"channel-message-handler-installed",
+						receiverAfter,
+						"product-unreliable-webrtc"
+					),
+					d108e4hLifecycle(trialId, 1_250, "channel-open-event", receiverAfter, "rtc-datachannel-open-event"),
+				])
+			: Object.freeze([
+					d108e4hLifecycle(trialId, 1_249, "channel-open-event", receiverAfter, "rtc-datachannel-open-event"),
+					d108e4hLifecycle(
+						trialId,
+						1_250,
+						"channel-message-handler-installed",
+						receiverAfter,
+						"product-unreliable-webrtc"
+					),
+				]);
+	const captured = Object.freeze({
+		endpoints: Object.freeze({
+			creator: Object.freeze({
+				acceptedRaw: Object.freeze([]),
+				deadline: boundary(receiverPeerId, "31rgyu1787968881083", 4, creatorAfter, creatorDeadlineTransport),
+				lifecycle: Object.freeze([
+					...creatorSend.lifecycle,
+					d108e4hLifecycle(trialId, 2_032, "channel-open-event", creatorAfter, "rtc-datachannel-open-event"),
+					d108e4hLifecycle(
+						trialId,
+						2_033,
+						"channel-message-handler-installed",
+						creatorAfter,
+						"product-unreliable-webrtc"
+					),
+					d108e4hLifecycle(trialId, 2_034, "channel-close-call", creatorBefore, "product-unreliable-webrtc"),
+					d108e4hLifecycle(trialId, 2_035, "channel-close-event", creatorBefore, "rtc-datachannel-close-event", {
+						readyState: "closed",
+					}),
+				]),
+				monitor: d108e4hMonitor(trialId, receiverPeerId),
+				peerId: creatorPeerId,
+				prepare: boundary(receiverPeerId, "5ckj0p1787968823124", 3, creatorBefore, creatorPrepareTransport),
+				rawSends: creatorSend.rawSends,
+				rejectedRaw: Object.freeze([]),
+				transmitsRawTrial: true,
+			}),
+			receiver: Object.freeze({
+				acceptedRaw: receiverAccepted,
+				deadline: boundary(creatorPeerId, "63ccqd1787968823119", 3, receiverAfter, receiverDeadlineTransport),
+				lifecycle: Object.freeze([
+					...receiverMessages,
+					d108e4hLifecycle(
+						trialId,
+						1_247,
+						"channel-handler-installed",
+						receiverAfter,
+						"rtc-observer-datachannel-handler"
+					),
+					d108e4hLifecycle(
+						trialId,
+						1_248,
+						"channel-message-handler-installed",
+						receiverAfter,
+						"rtc-observer-or-harness"
+					),
+					...receiverReplacementAnchors,
+				]),
+				monitor: d108e4hMonitor(trialId, creatorPeerId),
+				peerId: receiverPeerId,
+				prepare: boundary(creatorPeerId, "63ccqd1787968823119", 3, receiverBefore, receiverPrepareTransport),
+				rawSends: Object.freeze([]),
+				rejectedRaw: Object.freeze([]),
+				transmitsRawTrial: false,
+			}),
+		}),
+		rawTransportDeltas: Object.freeze({
+			creator: rawTransportDelta(creatorPrepareTransport, creatorDeadlineTransport),
+			receiver: rawTransportDelta(receiverPrepareTransport, receiverDeadlineTransport),
+		}),
+		sampleCount: SAMPLE_COUNT,
+		schemaVersion: 3 as const,
+		trialId,
+	});
+	if (!swapPageOrder) return captured;
+	return Object.freeze({
+		...captured,
+		endpoints: Object.freeze({
+			creator: captured.endpoints.receiver,
+			receiver: captured.endpoints.creator,
+		}),
+		rawTransportDeltas: Object.freeze({
+			creator: captured.rawTransportDeltas.receiver,
+			receiver: captured.rawTransportDeltas.creator,
+		}),
+	});
+}
+
+function d108e4aaRetainedOldRtcBoundaryReplay(): D108e4hValidationInput {
+	const trialId = "e3-03-2";
+	const creatorPeerId = "16Uiu2HAm5SQJx1zQbk4bdMf6tsrm3CT399qmYnqmJFTJ5cS5K56X";
+	const receiverPeerId = "16Uiu2HAmAX5is4bXzfn5UvM9MRaFA67JNLsub27SSTAFzLWasN19";
+	const oldRtc = Object.freeze({
+		channelId: 428,
+		connectionId: 9,
+		label: "ts-drp-ephemeral/1" as const,
+		readyState: "open" as const,
+	});
+	const creatorReplacement = Object.freeze({ ...oldRtc, channelId: 444, connectionId: 12 });
+	const receiverCandidate = Object.freeze({ ...creatorReplacement, channelId: 459 });
+	const creatorPrepareTransport = d108e4hRawTransport(receiverPeerId, {
+		authenticatedConnectionLosses: 1,
+		lastLinkDrop: "restart",
+		linkDrops: 4,
+		sent: 2_133,
+	});
+	const creatorDeadlineTransport = d108e4hRawTransport(receiverPeerId, {
+		authenticatedConnectionLosses: 3,
+		lastLinkDrop: "replacement",
+		linkDrops: 5,
+		sent: 2_733,
+	});
+	const receiverPrepareTransport = d108e4hRawTransport(creatorPeerId, {
+		authenticatedConnectionLosses: 2,
+		lastLinkDrop: "restart",
+		linkDrops: 4,
+		received: 1_462,
+	});
+	const receiverDeadlineTransport = d108e4hRawTransport(creatorPeerId, {
+		authenticatedConnectionLosses: 3,
+		lastLinkDrop: "restart",
+		linkDrops: 4,
+		received: 1_872,
+	});
+	const boundary = (
+		peerId: string,
+		connectionId: string,
+		generation: number,
+		rtc: D108e4hRtcIdentity,
+		rawTransport: ZoneSnapshot["rawTransport"]
+	): D108e4hBoundaryCustody =>
+		Object.freeze({
+			authenticated: Object.freeze([Object.freeze({ connectionId, generation, peerId })]),
+			rawTransport,
+			rtc: Object.freeze([rtc]),
+		});
+	const creatorSend = d108e4hSendSlice(trialId, oldRtc, 0, SAMPLE_COUNT, 0);
+	const receiverMessages = Object.freeze(
+		Array.from({ length: 410 }, (_, sequence) =>
+			d108e4hLifecycle(trialId, sequence, "channel-message", oldRtc, "rtc-datachannel-message-event")
+		)
+	);
+	return Object.freeze({
+		endpoints: Object.freeze({
+			creator: Object.freeze({
+				acceptedRaw: Object.freeze([]),
+				deadline: boundary(receiverPeerId, "89buc51787965730711", 7, creatorReplacement, creatorDeadlineTransport),
+				lifecycle: Object.freeze([
+					...creatorSend.lifecycle,
+					d108e4hLifecycle(trialId, 1_902, "channel-open-event", creatorReplacement, "rtc-datachannel-open-event"),
+					d108e4hLifecycle(
+						trialId,
+						1_903,
+						"channel-message-handler-installed",
+						creatorReplacement,
+						"product-unreliable-webrtc"
+					),
+					d108e4hLifecycle(trialId, 1_904, "channel-close-call", oldRtc, "product-unreliable-webrtc"),
+				]),
+				monitor: d108e4hMonitor(trialId, receiverPeerId),
+				peerId: creatorPeerId,
+				prepare: boundary(receiverPeerId, "cb7gwl1787965677165", 5, oldRtc, creatorPrepareTransport),
+				rawSends: creatorSend.rawSends,
+				rejectedRaw: Object.freeze([]),
+				transmitsRawTrial: true,
+			}),
+			receiver: Object.freeze({
+				acceptedRaw: Object.freeze(
+					receiverMessages.map(({ sequence }, payloadSequence) => d108e4hAcceptedRaw(oldRtc, payloadSequence, sequence))
+				),
+				deadline: boundary(creatorPeerId, "cle2721787965674006", 7, oldRtc, receiverDeadlineTransport),
+				lifecycle: Object.freeze([
+					...receiverMessages,
+					d108e4hLifecycle(
+						trialId,
+						1_157,
+						"channel-message-handler-installed",
+						receiverCandidate,
+						"rtc-observer-or-harness"
+					),
+					d108e4hLifecycle(
+						trialId,
+						1_158,
+						"channel-message-handler-installed",
+						receiverCandidate,
+						"product-unreliable-webrtc"
+					),
+					d108e4hLifecycle(trialId, 1_159, "channel-open-event", receiverCandidate, "rtc-datachannel-open-event"),
+				]),
+				monitor: d108e4hMonitor(trialId, creatorPeerId),
+				peerId: receiverPeerId,
+				prepare: boundary(creatorPeerId, "cle2721787965674006", 7, oldRtc, receiverPrepareTransport),
+				rawSends: Object.freeze([]),
+				rejectedRaw: Object.freeze([]),
+				transmitsRawTrial: false,
+			}),
+		}),
+		rawTransportDeltas: Object.freeze({
+			creator: rawTransportDelta(creatorPrepareTransport, creatorDeadlineTransport),
+			receiver: rawTransportDelta(receiverPrepareTransport, receiverDeadlineTransport),
+		}),
+		sampleCount: SAMPLE_COUNT,
+		schemaVersion: 3,
+		trialId,
+	});
+}
+
 function d108e4hAssert(condition: unknown, code: string): asserts condition {
 	if (!condition) throw new Error(code);
 }
@@ -2941,6 +3223,181 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 			[1_116, "channel-close-call"],
 		]);
 		expect(() => validateD108e4hCampaignCustody(preservedCampaignReplay)).not.toThrow();
+		const retainedOldRtcBoundary = d108e4aaRetainedOldRtcBoundaryReplay();
+		expect({
+			creatorAuthenticated: retainedOldRtcBoundary.endpoints.creator.prepare.authenticated,
+			creatorDeadlineAuthenticated: retainedOldRtcBoundary.endpoints.creator.deadline.authenticated,
+			creatorDeadlineRtc: retainedOldRtcBoundary.endpoints.creator.deadline.rtc,
+			creatorDelta: retainedOldRtcBoundary.rawTransportDeltas.creator,
+			creatorPrepareRtc: retainedOldRtcBoundary.endpoints.creator.prepare.rtc,
+			creatorRawSends: retainedOldRtcBoundary.endpoints.creator.rawSends.length,
+			receiverAccepted: retainedOldRtcBoundary.endpoints.receiver.acceptedRaw.length,
+			receiverDeadlineRtc: retainedOldRtcBoundary.endpoints.receiver.deadline.rtc,
+			receiverDelta: retainedOldRtcBoundary.rawTransportDeltas.receiver,
+			receiverPrepareRtc: retainedOldRtcBoundary.endpoints.receiver.prepare.rtc,
+		}).toMatchObject({
+			creatorAuthenticated: [{ connectionId: "cb7gwl1787965677165", generation: 5 }],
+			creatorDeadlineAuthenticated: [{ connectionId: "89buc51787965730711", generation: 7 }],
+			creatorDeadlineRtc: [{ channelId: 444, connectionId: 12 }],
+			creatorDelta: {
+				authenticatedConnectionLosses: 2,
+				lastLinkDrop: { after: "replacement", before: "restart", changed: true },
+				linkDrops: 1,
+			},
+			creatorPrepareRtc: [{ channelId: 428, connectionId: 9 }],
+			creatorRawSends: SAMPLE_COUNT,
+			receiverAccepted: 410,
+			receiverDeadlineRtc: [{ channelId: 428, connectionId: 9 }],
+			receiverDelta: {
+				authenticatedConnectionLosses: 1,
+				lastLinkDrop: { after: "restart", before: "restart", changed: false },
+				linkDrops: 0,
+			},
+			receiverPrepareRtc: [{ channelId: 428, connectionId: 9 }],
+		});
+		expect(() => validateD108e4hCampaignCustody(retainedOldRtcBoundary)).not.toThrow();
+		for (const [name, retainedReplay, initiatingPage, incomingPage, incomingAnchorOrder] of [
+			[
+				"creator drop owner / handler then open",
+				d108e4aaRetainedAsymmetricReplay(false, "handler-open"),
+				"creator",
+				"receiver",
+				"handler-open",
+			],
+			[
+				"creator drop owner / open then handler",
+				d108e4aaRetainedAsymmetricReplay(false, "open-handler"),
+				"creator",
+				"receiver",
+				"open-handler",
+			],
+			[
+				"receiver drop owner / handler then open",
+				d108e4aaRetainedAsymmetricReplay(true, "handler-open"),
+				"receiver",
+				"creator",
+				"handler-open",
+			],
+			[
+				"receiver drop owner / open then handler",
+				d108e4aaRetainedAsymmetricReplay(true, "open-handler"),
+				"receiver",
+				"creator",
+				"open-handler",
+			],
+		] as const) {
+			const initiating = retainedReplay.endpoints[initiatingPage];
+			const incoming = retainedReplay.endpoints[incomingPage];
+			const initiatingDelta = retainedReplay.rawTransportDeltas[initiatingPage];
+			const incomingDelta = retainedReplay.rawTransportDeltas[incomingPage];
+			expect({
+				incomingAccepted: incoming.acceptedRaw.length,
+				incomingAuthenticatedLosses: incomingDelta.authenticatedConnectionLosses,
+				incomingLastDrop: incomingDelta.lastLinkDrop,
+				incomingLinkDrops: incomingDelta.linkDrops,
+				initiatingAuthenticatedLosses: initiatingDelta.authenticatedConnectionLosses,
+				initiatingLastDrop: initiatingDelta.lastLinkDrop,
+				initiatingLinkDrops: initiatingDelta.linkDrops,
+				initiatingRawSends: initiating.rawSends.length,
+			}).toEqual({
+				incomingAccepted: 422,
+				incomingAuthenticatedLosses: 1,
+				incomingLastDrop: { after: "restart", before: "restart", changed: false },
+				incomingLinkDrops: 0,
+				initiatingAuthenticatedLosses: 1,
+				initiatingLastDrop: { after: "replacement", before: "restart", changed: true },
+				initiatingLinkDrops: 1,
+				initiatingRawSends: SAMPLE_COUNT,
+			});
+			expect([
+				incoming.prepare.authenticated.length,
+				incoming.deadline.authenticated.length,
+				incoming.prepare.rtc.length,
+				incoming.deadline.rtc.length,
+			]).toEqual([1, 1, 1, 1]);
+			const incomingBefore = incoming.prepare.rtc[0] as D108e4hRtcIdentity;
+			const incomingAfter = incoming.deadline.rtc[0] as D108e4hRtcIdentity;
+			const incomingBeforeAuthenticated = incoming.prepare.authenticated[0] as D108e4hAuthenticatedIdentity;
+			const incomingAfterAuthenticated = incoming.deadline.authenticated[0] as D108e4hAuthenticatedIdentity;
+			const incomingReplacementHandlers = incoming.lifecycle.filter(
+				({ channelId, connectionId, event, owner }) =>
+					connectionId === incomingAfter.connectionId &&
+					channelId === incomingAfter.channelId &&
+					event === "channel-message-handler-installed" &&
+					owner === "product-unreliable-webrtc"
+			);
+			const incomingReplacementOpens = incoming.lifecycle.filter(
+				({ channelId, connectionId, event, owner }) =>
+					connectionId === incomingAfter.connectionId &&
+					channelId === incomingAfter.channelId &&
+					event === "channel-open-event" &&
+					owner === "rtc-datachannel-open-event"
+			);
+			const incomingOldProductCloseCalls = incoming.lifecycle.filter(
+				({ channelId, connectionId, event, owner }) =>
+					connectionId === incomingBefore.connectionId &&
+					channelId === incomingBefore.channelId &&
+					event === "channel-close-call" &&
+					owner === "product-unreliable-webrtc"
+			);
+			expect([
+				incomingReplacementHandlers.length,
+				incomingReplacementOpens.length,
+				incomingOldProductCloseCalls.length,
+			]).toEqual([1, 1, 0]);
+			const incomingReplacementHandler = incomingReplacementHandlers[0] as D108e4hLifecycleObservation;
+			const incomingReplacementOpen = incomingReplacementOpens[0] as D108e4hLifecycleObservation;
+			expect(incomingReplacementHandler.sequence < incomingReplacementOpen.sequence).toBe(
+				incomingAnchorOrder === "handler-open"
+			);
+			expect({
+				authenticatedConnectionIdAfter: incomingAfterAuthenticated.connectionId,
+				authenticatedConnectionIdBefore: incomingBeforeAuthenticated.connectionId,
+				authenticatedGenerationAfter: incomingAfterAuthenticated.generation,
+				authenticatedGenerationBefore: incomingBeforeAuthenticated.generation,
+				authenticatedPeerIdAfter: incomingAfterAuthenticated.peerId,
+				authenticatedPeerIdBefore: incomingBeforeAuthenticated.peerId,
+				rtcAfter: [incomingAfter.connectionId, incomingAfter.channelId],
+				rtcBefore: [incomingBefore.connectionId, incomingBefore.channelId],
+				rtcLabelAfter: incomingAfter.label,
+				rtcLabelBefore: incomingBefore.label,
+				rtcReadyStateAfter: incomingAfter.readyState,
+				rtcReadyStateBefore: incomingBefore.readyState,
+			}).toEqual({
+				authenticatedConnectionIdAfter: "63ccqd1787968823119",
+				authenticatedConnectionIdBefore: "63ccqd1787968823119",
+				authenticatedGenerationAfter: 3,
+				authenticatedGenerationBefore: 3,
+				authenticatedPeerIdAfter: initiating.peerId,
+				authenticatedPeerIdBefore: initiating.peerId,
+				rtcAfter: [5, 379],
+				rtcBefore: [3, 348],
+				rtcLabelAfter: "ts-drp-ephemeral/1",
+				rtcLabelBefore: "ts-drp-ephemeral/1",
+				rtcReadyStateAfter: "open",
+				rtcReadyStateBefore: "open",
+			});
+			const initiatingIdentity = d108e4hAssertBoundaryIdentity(initiating, incoming.peerId, true);
+			d108e4hAssertAttemptCustody(
+				initiating,
+				initiatingIdentity.before,
+				initiatingIdentity.after,
+				true,
+				retainedReplay.sampleCount
+			);
+			d108e4hAssertOverlapCustody(initiating, initiatingIdentity.before, initiatingIdentity.after, true, "replacement");
+			d108e4hAssertAttemptCustody(incoming, incomingBefore, incomingAfter, false, retainedReplay.sampleCount);
+			d108e4hAssertOverlapCustody(incoming, incomingBefore, incomingAfter, false, undefined);
+			expect(() => d108e4hAssertBoundaryIdentity(incoming, initiating.peerId, false)).toThrowError(
+				"D108E4H_IDENTITY_JOIN_INVALID"
+			);
+			expect
+				.soft(
+					() => validateD108e4hCampaignCustody(retainedReplay),
+					`D108E4AA_RED ${name} accepts stable authenticated identity with an incoming RTC advance`
+				)
+				.not.toThrow();
+		}
 		const carryInMonitor = Object.freeze({
 			...noReplacement,
 			endpoints: Object.freeze({
