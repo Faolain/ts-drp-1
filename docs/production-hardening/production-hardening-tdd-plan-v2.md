@@ -73479,98 +73479,116 @@ before `D108E4H_RAW_BACKPRESSURE`. Neither correction changes accepted input,
 product code or this reviewed GREEN. All three reviewers agree D.108e4am may
 close and explicitly do not authorize or recommend a campaign.
 
-###### D.108e4an — raw-physical-only browser-drain discriminator freeze
+###### D.108e4an — rejected browser discriminator and deterministic-control closure
 
-The demonstrated state after D.108e4am is narrower than a product bug and
-narrower than permission to relax the campaign. Product admission correctly
-implements the fixed 65,536-byte bounded-drop contract, the validator now
-attributes that condition exactly, and the failed full trial proves a 45-call
-local refusal under mixed raw/reliable execution. It still does not establish
-whether a fresh raw physical lane under the frozen Chromium/CDP profile and
-exact workbench payload/schedule drains normally or reaches the same ceiling.
-The smallest next action is therefore one new, test-only, non-campaign browser
-discriminator; no long campaign, product optimization or expectation change
-is authorized.
+The formal plan review inspected exact signed/pushed plan-only commit
+`e191176c8f95a006d9c590208728eb77f84f3f93`, tree
+`42047ece7005d7cea75663724d90a33e4964456d` and parent
+`4d0c64dc64a9c36a0c3eab758233a9a962ff7aac` in three isolated read-only
+worktrees. No reviewer ran a test, browser, campaign or profiler, changed
+tracked content, invoked Fable or used a collaboration subagent.
 
-D.108e4an owns only `tests/e3-03-loss-and-hol-proof.pw.ts` plus this plan
-record. Production, examples, Playwright configuration, dependencies, browser
-pin, 65,536-byte ceiling, 600-sample/33 ms workload, 30% loss, 40 ms latency,
-packet queue/reordering, reliable-lane behavior, campaign acceptance and
-public APIs are closed. If the discriminator requires any such change, stop
-and reslice. It uses the existing grid surface, RTC observer, two isolated
-browser contexts, CDP profile and `fabric.runTrial`; it creates no new product
-or example seam. `sendMovement` is explicitly rejected here because its
-movement envelope is smaller than the preserved 398-byte body/431-byte routed
-envelope and therefore cannot distinguish the demonstrated capacity boundary.
+Grok 4.6/high session `01a04ef3-0d8c-7042-906c-b92217500fe8` reached its
+16-turn runner bound after 285.131 seconds while actively inspecting the
+closed workbench. The runner therefore recorded `NO_VERDICT`, exit one and
+`stop_reason=cancelled`; it did not invent a terminal result. A continuation
+in that same session completed the remaining read-only audit in three turns
+and returned `CHANGES_REQUIRED`, P0=1/P1=3/P2=1 with `end_turn`. Exact public
+structured-output SHA-256 is
+`f7929fb743ed657b69a8c7e5516d44ecae8f6ea2317c6a65f0220404aef0718a`.
 
-Before its browser RED, add the two accepted review controls in the same test
-owner: a combined detached creator raw-transport delta plus positive
-backpressure must preserve `D108E4H_DELTA_MISMATCH`, and the standalone
-file-list TypeScript command must include `--strict`. These are passing
-regression/static controls, not another behavior slice and receive no separate
-review ceremony.
+Exact Kimi K3 session `e9fc6108-b7da-4fdc-a9f8-97b3d2e6c0e0` completed the
+substantive review and returned two progress lines before its complete
+checklist. A same-session, tool-free formatting continuation emitted exactly
+101 nonempty lines: ordered unique `CHECK001` through `CHECK100`, then one
+RESULT. It returned `CHANGES_REQUIRED`, P0=1/P1=2/P2=4. Exact formatted
+checklist and RESULT SHA-256 values are
+`5afc18697678bb37a76a99910ba17a9961ffb0bca56065f25f8b06b17f62445a`
+and
+`92a0357e478be20e76e919977734e6dc843b542ddcbed21a2dd2a0ae8b915887`.
 
-The new title is gated by `D108E4AN_DRAIN=1`, must list as exactly one test and
-must omit the retained three-trial title. It pins Chromium
-`151.0.7922.34`, opens two isolated contexts with the existing RTC observer,
-enables CDP with `NO_LOSS` before signaling, creates one zone, waits for the
-existing raw/network pair, resets the observer to one discriminator trial id,
-captures prepare transport/channel identity, applies the exact 30%/40 ms/queue
-10/reordering profile, then invokes `fabric.runTrial` once with the exact
-600-sample/33 ms/256-byte input that produced the preserved 398-byte marker
-body and 431-byte routed raw envelope. It has no trial loop and uses a trial id
-outside `e3-03-[0-2]`, so the workbench schedules no 15-second deadline or
-reliable sentinel.
+Opus 5/xhigh session `e3c18e38-7c9d-425b-bafd-79346c62df8f` returned
+`CHANGES_REQUIRED`, P0=2/P1=6/P2=5, with zero permission denials and zero
+subagents. Exact canonical structured-output SHA-256 is
+`90dc35def70ab41ecc39311183b20173be9b9f40decda78b45fdf6cc2c683575`.
+The complete self-excluding 20-file review manifest validates and has SHA-256
+`8271554ef77b34626aec20520636302205127755f2189e2283cca87aa505d7c0`;
+review-validation SHA-256 is
+`9f115fbb09246ea73a846d1c1b28e8510aaa7d975e17dc591edecfd44c4ac2f1`.
 
-Immediately before the run, the test installs one reversible outer wrapper
-around the already-observer-wrapped `RTCDataChannel.prototype.send`. It scans
-outbound bytes only for the exact discriminator trial's
-`E303|<trial>|reliable|` marker. Exactly matching reliable physical sends are
-counted and returned before reaching the observer/native send; every other
-byte sequence delegates unchanged to the captured wrapper. The wrapper is
-restored in `finally`. This preserves the exact workbench JavaScript loop,
-serialization, promise scheduling and raw product route while removing only
-reliable physical-channel queue ownership. The test must prove exactly 600
-reliable sends were suppressed, zero reliable sends reached the RTC observer,
-and every observed raw send has the preserved 431-byte physical amount; any
-unclassified or missing reliable send is `OWNERSHIP_UNRESOLVED`. After the
-single run returns and the retained 500 ms drain observation, it captures
-deadline transport and RTC custody.
+The shared P0 is decisive: the frozen workbench accepts the 600-sample/33 ms
+profile only for `e3-03-[0-2]`, so the proposed non-campaign id throws
+`fabric trial profile differs` before a send. `fabric.reset(trialId)` was also
+missing, and the reliable sentinel is unconditional, producing a 601st
+marker-matching publish rather than the asserted 600. Correcting only those
+facts would still not make the experiment causal. The existing campaign
+already proves 600 raw native successes with zero local refusal in trials zero
+and one under the exact mixed workload. More importantly, suppressing only
+marker-bearing reliable payload writes leaves the per-publish libp2p stream,
+RTCDataChannel creation, DCEP and negotiation traffic on the same SCTP
+association. It therefore cannot isolate "raw physical only" or assign the
+third-trial stall to reliable physical ownership. Fire-and-forget reliable
+publishes, the known post-send authenticated-loss delta, the retained
+mid-trial loss-application point and a peer-id-dependent raw envelope size add
+further false-unresolved paths but do not change that causal rejection.
 
-The evidence envelope must be attached even on failure and must include the
-exact CDP rule/profile, before/after raw counters and identity, fixed input
-count, reliable-suppression count, native raw send-attempt/success/failure
-lifecycle, observed raw/reliable physical-send counts and byte amounts,
-per-success `bufferedAmount`, peak buffered ownership, deadline channel state,
-elapsed schedule, and classification. Accounting is closed:
-`sentDelta + backpressuredDropsDelta === 600`; every native attempt has exactly
-one terminal; native successes equal `sentDelta`; one raw connection/channel
-identity owns every success; and handshake/link/authenticated-loss deltas are
-zero. A missing join or identity/counter mutation is an error, not a drain
-classification.
+Accordingly D.108e4an consumes no browser authority. The proposed
+`D108E4AN_DRAIN=1` title, wrapper and classifications are deleted before
+implementation. No example/product/configuration/dependency/API/threshold,
+campaign expectation, 65,536-byte ceiling, 600/33/256 workload or evidence
+byte changes. No retained suite or campaign runs, and the five unstarted
+D.108e4aj launch blocks remain unconsumed and prohibited by that evidence
+root's frozen stop rule. This correction does not authorize another long
+invocation.
 
-The single RED invocation classifies without retry:
+D.108e4an now closes only the two deterministic D.108e4am review controls in
+`tests/e3-03-loss-and-hol-proof.pw.ts`. Inside the existing
+`D108E4H_TELEMETRY=1` schema-validator title, add one combined mutant whose
+creator has both an invalid detached raw-transport delta and positive
+backpressure; it must preserve the earlier exact
+`D108E4H_DELTA_MISMATCH` code rather than falling through to
+`D108E4H_RAW_BACKPRESSURE`. Add `--strict` to the existing standalone
+file-list TypeScript owner command. These are passing regression/static
+controls only; they change no accepted input or retained campaign behavior.
 
-- `RAW_PHYSICAL_ONLY_DRAINS`: sent delta 600, backpressure delta zero, all 600
-  native raw successes and stable open raw identity, with exactly 600 reliable
-  sends suppressed before physical ownership. This assigns the retained
-  blocker to reliable-physical or cumulative browser-test execution; the next
-  reviewed slice may isolate that distinction but may not yet rerun the
-  campaign or change acceptance.
-- `RAW_PHYSICAL_ONLY_BACKPRESSURES`: positive backpressure with exact 600-call
-  raw accounting, exact reliable suppression, stable identity and no
-  link/handshake/authenticated loss. This demonstrates the zero-local-refusal
-  expectation is unreliable even without reliable physical queue ownership;
-  stop and reslice the test/evidence contract for formal review without
-  changing it in D.108e4an.
-- Any other shape is `OWNERSHIP_UNRESOLVED`; stop and diagnose the exact
-  accounting/identity failure without another browser invocation.
+After the signed/pushed corrected freeze and its accepted plan confirmation,
+run one exact schema-validator list guard and one exact focused invocation:
 
-Run only the list guard and one exact-title browser invocation after the
-normal Grok 4.6/high, exact Kimi 100-step and Opus 5/xhigh plan review. The
-browser invocation is the sole D.108e4an runtime authority and is not one of
-the six long retained-campaign invocations. Run no retained browser suite or
-campaign. Record command, status, reporter, attachment, classification,
-elapsed time and hashes, then checkpoint the diagnostic result before deciding
-another implementation slice. Fable and collaboration subagents remain
-prohibited.
+```sh
+D108E4H_TELEMETRY=1 pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'validates schema-v3 replacement custody without cross-peer clocks$' \
+  --list
+
+D108E4H_TELEMETRY=1 pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'validates schema-v3 replacement custody without cross-peer clocks$' \
+  --fail-on-flaky-tests
+
+pnpm exec tsc --noEmit --target ES2022 --module ESNext \
+  --moduleResolution bundler --allowImportingTsExtensions --skipLibCheck \
+  --strict tests/e3-03-loss-and-hol-proof.pw.ts
+```
+
+Then run exact-owner ESLint, Prettier and `git diff --check`, preserving command,
+status, reporter, complete soft-failure set and hashes under the fixed
+`.logs/d108e4an-controls/` root with a validating self-excluding manifest.
+Any failure outside the new mutant's expected exact-code matrix stops the
+slice. The test-only implementation receives one signed/pushed checkpoint and
+the normal Grok 4.6/high, exact Kimi 100-step and Opus 5/xhigh implementation
+review; no separate RED/GREEN behavior cycle is created for already-passing
+controls.
+
+Only after those controls close may D.108e4ao freeze the next causal step. Its
+input is the immutable failed `e3-03-2` attachment, not another browser run.
+The smallest justified action is a pure offline replay that reconstructs the
+post-custody application evidence already present in that attachment and
+evaluates the remaining sender schedule, receiver-domain, AoI, HOL,
+ready-state, partition and counter assertions without bypassing or changing
+the retained positive-backpressure failure. If the replay exposes another
+semantic failure, that exact owner is resliced. If every later semantic
+assertion passes, the evidence demonstrates only a cumulative/scheduling
+capacity-gate reliability failure, not a product defect; a separately reviewed
+test-infrastructure expectation/variance slice may then be proposed. Missing
+replay inputs are `OWNERSHIP_UNRESOLVED` and stop without instrumentation or a
+runtime retry. Fable and collaboration subagents remain prohibited.
