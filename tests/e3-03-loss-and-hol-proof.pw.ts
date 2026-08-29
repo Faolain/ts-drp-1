@@ -4550,9 +4550,13 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 		const greenShapedReceiverRepeat = withReceiverRepeatRecords(receiverRepeat);
 		expect(() => validateD108e4hCampaignCustody(greenShapedReceiverRepeat)).not.toThrow();
 
+		const finalTransmittingLifecycle = dualCreator.lifecycle.at(-1);
+		if (finalTransmittingLifecycle?.sequence !== 1_843) {
+			throw new Error("D108E4AE_TRANSMITTING_REPEAT_BASE_INVALID");
+		}
 		const transmittingRepeat = withCreatorLifecycle(
 			dualLocalMutationBase,
-			Object.freeze([...dualCreator.lifecycle, d108e4aeRepeatRecord(1_843, dualCreatorAfter)])
+			Object.freeze([...dualCreator.lifecycle, d108e4aeRepeatRecord(1_844, dualCreatorAfter)])
 		);
 		expect(() => validateD108e4hCampaignCustody(transmittingRepeat)).not.toThrow();
 

@@ -72510,3 +72510,60 @@ soft-failure set stops again. Only that causally complete RED may receive the
 normal Grok/Kimi/Opus RED review and signed/pushed RED checkpoint. No Fable,
 collaboration subagent, retained seven-title suite or long campaign runs in
 D.108e4af.
+
+D.108e4af changed only the transmitting positive: it hard-pins the base
+creator lifecycle's last sequence to 1843 and appends the repeat at 1844.
+Standalone TypeScript, ESLint, Prettier, diff and scope guards returned zero.
+The exact list guard again selected only the two intended titles. One new
+focused invocation then returned status one in 13.969 seconds with two
+unexpected, zero expected/skipped/flaky results, retry zero and no top-level
+error. This time the complete failure set is causal and contains no hard
+fixture error.
+
+The schema-v3 validator title reached both GREEN-shaped positives and the
+wrong-trial retained control, which all passed. It then reported exactly seven
+soft failures, each because current validation did not throw the pinned code:
+`repeatBeforeAnchor`, `repeatWrongOwner`, `repeatNonOpenState`,
+`repeatUnmatchedIdentity`, `repeatAfterSelectedIdentityClose`,
+`repeatWithoutTrialAnchor` and `repeatCardinalityTwo`. The wrong-trial case is
+therefore correctly classified as a retained existing control rather than a
+new RED; the global trial gate already throws exact
+`D108E4H_TRIAL_MISMATCH`. The observer title retained exactly one soft
+first-plus-repeat deep-equality failure and received two old semantic open
+records. No other assertion failed.
+
+Exact valid-RED custody is `.logs/d108e4af-red/`. Focused command/reporter/
+stdout/stderr/status/time, list stdout/status, summary, diagnosis and owner
+status SHA-256 values are respectively
+`30f426f8063eabb5239349162d8b22b3af915cf2ef45c827e132b253ac163c54`,
+`b74291810e63ee589ae3e214d7056db43c014ec6590c0b0d1b3fc9c2fb6ea941`,
+`1fc585e2b42b553eaee00ad606f6c18de981a43bc5fab3020e7fa939808fd04f`,
+`b9948192a4a59f4a5ff6570f8ffda5655ae63714869f848191aebaa9072e3be3`,
+`4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`,
+`64671db9ce2652d06ca74f7a6e52337eb23bef85e74dd681934c9d37862e4a74`,
+`2554a7800efac99a719f6d7885d13fbeec4e2fc5461fade85c3a49cfbb26698e`,
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3ab86aa`,
+`d02eb9e06e7a51ea0c782a47a58fcce67c621d32a0932338edbaac8d3e6d327a`,
+`2871a05e323a4d323c7e3ea12a73397a982b886323f219a7328c3bdf2bfb3970`
+and
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3ab86aa`.
+The complete self-excluding evidence manifest validates and has SHA-256
+`e5b2b9a43ef05f473809b78294fd79148937ecec062bfd5364417cd8d6857b9f`.
+RED test-owner hash is
+`0a74a3340baaaa662cc004b42ab6c3d905ada6bfc3a9c297077816a9cf7b1b51`;
+its complete diff from reviewed plan baseline `1eea4713` and its narrow
+fixture-correction diff from failed checkpoint `a7a57d90` have SHA-256
+`27789968d0b1f9071b133b6a91de163867f0f0ee78e7f3d0c1a6327c92b48eee`
+and
+`ca464c170ce208c104df62816d15abc157ccac01e3f263c80f7f817930bd1071`.
+
+This is RED, not GREEN, and authorizes no campaign. Freeze it in one signed
+push and run the normal read-only Grok 4.6/high, exact Kimi K3 100-step and
+Opus 5/xhigh RED review. Review must confirm the two hard positives and
+wrong-trial control ran before the seven designed validator soft failures,
+the observer failure is exact, the raw duplicate semantic-open negative and
+all D.108e4aa/ac mutants remain present, and the one-line fixture correction
+introduced no alternate failure owner. Only after P0/P1 closure may GREEN
+change the observer kind union/latch and central repeat validator. Do not run
+Fable, a collaboration subagent, the retained seven-title suite or any long
+campaign during RED review.
