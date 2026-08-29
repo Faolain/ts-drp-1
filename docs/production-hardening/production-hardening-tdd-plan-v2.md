@@ -69938,3 +69938,54 @@ execution, D.108e4k is closed. D.108e4a/b/c/d and aggregate D.108e4 remain open;
 the complete five-test E3-03 config, retained three-trial behavior and both
 campaign ledgers still require fresh express authorization. No Fable or
 collaboration subagent ran.
+
+The user's fresh one-off “try it anyway” authorization was consumed by exactly
+one complete current E3-03 config invocation after D.108e4k closure commit
+`a5ac938f`. That commit is a signed/pushed plan-only descendant of exact
+behavior tree `900778ff`; no product, test, example, config, dependency,
+package-manifest, lockfile, build-input or script byte changed. The preflight
+found no active task-owned test or model load. It recorded one unrelated
+zero-CPU Playwright test server in another repository and one two-day-old
+zero-CPU Grok resume process; neither executed this workspace or consumed
+material CPU. No task-owned reviewer ran concurrently.
+
+The sole authorized command was:
+
+```sh
+PLAYWRIGHT_JSON_OUTPUT_NAME=.logs/d108e4-complete-config-a5ac938f/report.json \
+  pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --reporter=json --fail-on-flaky-tests
+```
+
+It passed the complete current five-test inventory 5/5 in 188.011 seconds:
+expected 5, skipped 0, unexpected 0, flaky 0, empty top-level errors and retry
+zero for every result. The four deterministic controls passed before the
+retained three-trial behavior, which passed in 180.351 seconds on Chromium
+`151.0.7922.34`. The retained attachment contains exactly three trial evidence
+envelopes. Their signed `rawMaxStallMs` values were 39, 39 and 41 ms against
+the unchanged 500 ms ceiling; raw delivered counts were 401, 391 and 410;
+raw gaps were 7, 7 and 5; and raw/reliable AoI P95 pairs were
+13,261/32,834, 13,264/32,467 and 13,265/32,765 ms. Every trial retained
+prepare, deadline, reset and run-returned stages. Trial two exercised a real
+sender replacement (`linkDrops` delta 1 and `lastLinkDrop` changed from
+`restart` to `replacement`) while still completing all performance,
+aggregate, rendered-metric and final durable-control assertions. The other
+prepare-to-deadline raw link-drop deltas were zero. No retry or second
+invocation ran.
+
+Reporter/stderr/decoded campaign/decoded calibration SHA-256 values are
+`6824b3ef01c2871c3b96338c6a82e40a4b21935f4c9718a217d87ed25dacb989`,
+`f25207d0f8f0cb407c8ad7f012dd6fe0b9825ffbf18219405bd64d597dfe543b`,
+`41da5dab80b2e30c59d0e0f9f77b47b1d61f76a0274525842f1eb77cff3c2aa7`
+and `f68650cc5bae5ba5f0cc0599de81fd38ee86dd8e44ed034346b2d37e3fe1c454`.
+Custody is under `.logs/d108e4-complete-config-a5ac938f/`.
+
+This successful entry gate demonstrates that the complete config is good to
+run at the final behavior tree. It is not counted as invocation one of either
+required three-consecutive retained-campaign ledger because the one-off
+authorization did not grant the additional six long invocations. Ordinary and
+isolated three-consecutive ledgers, D.108e4b's separate GREEN review and
+aggregate D.108e4 closure remain due and require the next explicit
+authorization. The complete-config pass does not authorize D.108e5. No Fable
+or collaboration subagent ran.
