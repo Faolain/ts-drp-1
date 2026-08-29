@@ -73723,8 +73723,9 @@ thresholds, workload, campaign acceptance and evidence bytes are closed.
 
 The bounded read-only replay audit reconstructs only values already present in
 `currentTrialEvidence` with the retained pure helper algorithms. It returned
-status zero with empty stderr. All twenty replayable retained post-custody
-assertions evaluate true: the two counters, raw/reliable physical shape, three
+status zero with empty stderr. Of the twenty-one retained post-custody
+expectations at `tests/e3-03-loss-and-hol-proof.pw.ts:7276-7338`, all twenty
+replayable ones evaluate true: the two counters, raw/reliable physical shape, three
 non-vacuous ready-state checks, four connection-presence checks, sender
 timestamp/schedule/stall, reliable deadline, receiver loss domain, AoI ratio
 and raw delivery after the reliable start. The rejected-ready-state and
@@ -73784,6 +73785,26 @@ accepts all findings, replays the complete twenty-true/one-unavailable retained
 ledger, narrows future custody to `runTrialReturnedAtMs`, corrects the failure
 name and re-freezes the eight-file evidence root. It still changes no source,
 test expectation, product behavior or runtime authority.
+
+Confirmation review of signed/pushed correction
+`970666e5d03dbc5053494e0b528634a1c778ec5f` closes the round. Grok 4.6/high
+session `01a04f4c-592e-7172-82b4-d05cf98f2707` returned APPROVED with zero
+findings; the same-session export that preserves both the initial terminal JSON
+and formatting continuation has SHA-256
+`dd3861ee302df76c90b715a751b05bbb0f5a74164da21818f07371c2e4adf7cd`.
+Exact Kimi K3 session `406ebb36-d371-4005-99ef-d59ba9b17ac9` returned exactly
+100 checks plus RESULT, APPROVED with zero P0/P1 and one P2 asking for retained
+Grok continuation provenance; the exported initial-review session now provides
+that custody at SHA-256
+`f56e794ac4a1e3a76d1877d288d0d9a0c6b223b897c64c864203886ee57a0733`.
+Opus 5/xhigh session `9026b296-fd01-4e4d-8cf1-0418e4cf356b` returned APPROVED
+with zero P0/P1 and one P2 asking the prose to pin the total ledger to its source
+range; the twenty-one/`7276-7338` sentence above closes it without changing any
+frozen audit byte. The self-excluding eighteen-file confirmation-review
+manifest validates and has SHA-256
+`864a537fcbc607f96504d35273fad7750100d0dc04f0a4fc2cbafbcf026aa32a`;
+validation SHA-256 is
+`a3ef74bf125dc470eb72be48e46d088efabdfb921d7d6d7344d39f4f57ea47ed`.
 
 The originally proposed complete offline replay is therefore not executable
 from immutable evidence and D.108e4ao stops before source implementation. It
