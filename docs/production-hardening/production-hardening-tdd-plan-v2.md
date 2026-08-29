@@ -73832,12 +73832,15 @@ is evidence custody, not product behavior: the creator page already computes
 `runTrialReturnedAtMs` immediately after `fabric.runTrial` returns, but the
 progress snapshot written before later custody validation preserves only the
 Node-relative `stages.runReturned`. If the validator throws, the one absolute
-creator-page value needed to replay test line 7325 is therefore lost. The exact
+creator-page value needed to replay the retained run-return span expression is
+therefore lost. The exact
 owner is `tests/e3-03-loss-and-hol-proof.pw.ts`; the plan/evidence owner is this
 record, and both are due before D.108e5 on 2026-09-01. Production, examples,
 configuration, dependencies, public APIs, thresholds, workload, campaign
 acceptance, the twenty-one retained expectations and all old evidence roots
-are closed.
+are closed. The D.108e4 aggregate evidence-hygiene P2 already owned through
+2026-09-05 remains open with its existing owner; D.108e4ap neither inherits nor
+discharges it.
 
 The plan checkpoint must be signed and pushed before any source edit, then
 receive Grok 4.6/high, exact Kimi K3 100-check and Opus 5/xhigh read-only plan
@@ -73846,59 +73849,123 @@ confirm that one field is sufficient, that `campaignStartedAtMs` remains
 derived from retained `senderWire`, and that no timestamp or clock from the
 Node process is substituted for creator-page `Date.now()`.
 
-RED is one deterministic addition inside the existing focused test
-`validates schema-v3 replacement custody without cross-peer clocks`. A frozen
-current-behavior run-return patch containing only `stages` must fail the new
-hard custody assertion with exact code `D108E4AP_RUN_RETURN_CUSTODY_ABSENT`.
-The same batch freezes the complete control roster: a present safe-integer
-creator timestamp is preserved exactly; a missing value throws
-`D108E4AP_RUN_RETURN_CUSTODY_ABSENT`; a non-safe or negative value throws
-`D108E4AP_RUN_RETURN_CUSTODY_INVALID`; a creator-page return/start span one
-millisecond below 18,767 throws `D108E4AP_RUN_RETURN_JOIN_INVALID`; and the
-exact 18,767 boundary passes. RED must have exactly the intended hard failure,
-no soft failures and no browser or campaign launch. If any other error appears,
-stop rather than expanding the batch.
+Formal review of signed/pushed plan checkpoint
+`93e551f0dcd9a229f2e5a1f9a36879d43b05da8f` rejected the original RED design
+before any source edit. Grok 4.6/high session
+`01a04f64-8fc3-7ea0-b742-b20661a98c8d` returned CHANGES_REQUIRED with one P1
+and three P2s; exact Kimi K3 session
+`12d2c873-5550-4991-b56b-f6cce9cedee9` returned exactly 100 checks plus RESULT,
+CHANGES_REQUIRED with one P1 and one P2; Opus 5/xhigh session
+`0e725f20-129f-4106-954c-56ed17999ad3` returned CHANGES_REQUIRED with one P0,
+four P1s and five P2s. All identified the same causal defect: a detached
+stages-only literal in the focused test would manufacture a failure that the
+live writer could not flip. Opus additionally found the pre-write `zone()`
+failure window, the later `currentTrialEvidence = trialEvidence` replacement,
+missing fixed evidence roots and the absent RED review. The correction below
+accepts all findings and supersedes the rejected paragraphs.
 
-GREEN may add only test-local pure helpers for the frozen patch and join
-controls, then replace the existing inline progress update after line 7030
-with that helper so the same frozen patch stores
-`runTrialReturnedAtMs` alongside the unchanged `prepare` and `runReturned`
-stages. The stored value must be the result of
-`await creator.evaluate(() => Date.now())` already owned by the test. It must be
-written by `updateTrialProgress` before `rawSentAfterQuiescence`, RTC capture,
-deadline waits or `validateD108e4hCampaignCustody` can throw. The live line
-7325 assertion remains byte-identical and continues deriving
-`campaignStartedAtMs` from `senderWire`; no product instrumentation, new
-product API or second timestamp is permitted.
+RED adds one test-local pure builder whose output is used by both the focused
+control and the live progress writer. Its RED body must exactly preserve current
+behavior: it accepts the frozen accumulated progress plus
+`runTrialReturnedAtMs` and returns a frozen spread of the progress without that
+field. RED adopts this builder immediately after the existing
+`await creator.evaluate(() => Date.now())` and before either `zone()` capture;
+it assigns the returned progress to both `trialProgress` and
+`currentTrialEvidence`. This is a behavior-neutral extraction of the live
+omission, not a hand-authored parallel stages literal.
 
-At RED and GREEN, first run the exact list guard and prove it selects one test
-in one file and excludes the retained campaign title:
+The RED batch also adds test-local custody/join assertion helpers and appends
+their control block only after the existing final focused control, so every
+retained mutant executes before the intended failure. Error precedence is
+frozen as ABSENT for a missing/undefined field, then INVALID for a present
+value that is not a non-negative safe integer, then JOIN_INVALID for a valid
+creator return whose span is below the bound. The bound is always derived as
+`(SAMPLE_COUNT - 1) * SAMPLE_INTERVAL_MS - 1_000`, with a separate assertion
+that it equals 18,767; no helper stores `campaignStartedAtMs`.
+
+The frozen control order is: missing replica throws
+`D108E4AP_RUN_RETURN_CUSTODY_ABSENT`; non-safe and negative values throw
+`D108E4AP_RUN_RETURN_CUSTODY_INVALID`; a combined invalid/below-boundary mutant
+also throws INVALID; one millisecond below the derived bound throws
+`D108E4AP_RUN_RETURN_JOIN_INVALID`; the exact bound passes. Last, the focused
+test calls custody unwrapped on the shared RED builder output, then contains a
+byte-frozen exact-preservation assertion and exact-boundary join assertion that
+are unreachable in RED. The focused run must end with exactly the unwrapped
+`D108E4AP_RUN_RETURN_CUSTODY_ABSENT`, with no soft failures and no browser or
+campaign launch. If any other error appears, stop.
+
+GREEN changes only the shared builder body to validate and return the same
+frozen progress plus the exact non-negative safe-integer
+`runTrialReturnedAtMs`. The live adoption and every RED control/expectation stay
+byte-identical. That one body change makes the final unwrapped custody call and
+the previously unreachable exact-preservation/join checks pass. The existing
+stages update remains byte-identical, and the retained expression
+`expect(runTrialReturnedAtMs - campaignStartedAtMs).toBeGreaterThanOrEqual(expectedCampaignSpanMs - 1_000)`
+remains byte-identical and continues deriving `campaignStartedAtMs` from the
+run-return `senderWire`. No product instrumentation, new product API, second
+timestamp or Node-clock substitution is permitted.
+
+This slice closes the attachment window only while the accumulated progress
+record remains installed: from the creator timestamp read through and including
+`validateD108e4hCampaignCustody`, before `currentTrialEvidence = trialEvidence`
+replaces it. The replacement changes `senderWire` provenance to
+`senderWireAtDeadline` and drops this test-only field, so failures among the
+later retained expectations remain a separate unproven residual. The D.108e4
+post-custody evidence owner must decide and freeze that residual before D.108e5,
+deadline 2026-09-02; D.108e4ap does not silently widen into `CampaignEvidence`.
+
+Use fixed new roots `.logs/d108e4ap-red/` and `.logs/d108e4ap-green/`; never
+write `.logs/d108e4aj-campaign/`, `.logs/d108e4an-controls/` or any
+`.review-evidence/d108e4ao-*` copy. At RED and GREEN, first record and run the
+exact list guard and prove it selects one test in one file and excludes the
+retained campaign title. Preserve its command, stdout, stderr and status under
+the checkpoint root:
 
 ```text
-D108E4H_TELEMETRY=1 pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep 'validates schema-v3 replacement custody without cross-peer clocks$' --list
+d108e4ap_root=.logs/d108e4ap-red # use .logs/d108e4ap-green at GREEN
+mkdir -p "$d108e4ap_root"
+printf '%s\n' "D108E4H_TELEMETRY=1 pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep 'validates schema-v3 replacement custody without cross-peer clocks$' --list" > "$d108e4ap_root/validator-list.command.txt"
+D108E4H_TELEMETRY=1 pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep 'validates schema-v3 replacement custody without cross-peer clocks$' --list > "$d108e4ap_root/validator-list.stdout.log" 2> "$d108e4ap_root/validator-list.stderr.log"
+printf '%s\n' "$?" > "$d108e4ap_root/validator-list.status.txt"
 ```
 
-Run the focused test exactly once per checkpoint with the JSON reporter:
+Run the focused test exactly once per checkpoint with the JSON reporter, using
+`PLAYWRIGHT_JSON_OUTPUT_NAME` under the checkpoint root and separately
+preserving command, stdout, stderr and status:
 
 ```text
-D108E4H_TELEMETRY=1 pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep 'validates schema-v3 replacement custody without cross-peer clocks$' --reporter=json --fail-on-flaky-tests
+printf '%s\n' "D108E4H_TELEMETRY=1 PLAYWRIGHT_JSON_OUTPUT_NAME=$d108e4ap_root/validator-focused.json pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep 'validates schema-v3 replacement custody without cross-peer clocks$' --reporter=json --fail-on-flaky-tests" > "$d108e4ap_root/validator-focused.command.txt"
+D108E4H_TELEMETRY=1 PLAYWRIGHT_JSON_OUTPUT_NAME="$d108e4ap_root/validator-focused.json" pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep 'validates schema-v3 replacement custody without cross-peer clocks$' --reporter=json --fail-on-flaky-tests > "$d108e4ap_root/validator-focused.stdout.log" 2> "$d108e4ap_root/validator-focused.stderr.log"
+printf '%s\n' "$?" > "$d108e4ap_root/validator-focused.status.txt"
 ```
 
-GREEN then runs strict standalone TypeScript, exact-owner ESLint, 8 GiB
-Prettier and `git diff --check` with the D.108e4an commands. Do not run a browser
-trial, retained campaign, profiler or unrelated suite. Preserve command,
-stdout, stderr and status separately; record the complete Playwright
-expected/skipped/unexpected/flaky and soft-failure sets; preserve exact changed
-paths and SHA-256 for the test and plan owners; validate a self-excluding
-manifest; and sign/push separate RED and GREEN checkpoints. Formal Grok,
-exact-Kimi and Opus implementation review occurs only after GREEN is focused-
-green and may not authorize a campaign.
+The list guard must return status zero at both checkpoints. RED focused status
+must be one with expected 0, unexpected 1, skipped 0, flaky 0, an empty soft-
+failure set and only `D108E4AP_RUN_RETURN_CUSTODY_ABSENT`; GREEN focused status
+must be zero with expected 1, unexpected/skipped/flaky 0 and an empty soft-
+failure set.
+
+GREEN then runs only the four static commands recorded for D.108e4an—strict
+standalone TypeScript, exact-owner ESLint, 8 GiB Prettier and
+`git diff --check`—with every output redirected to the new GREEN root; it does
+not copy the old root-creation or Playwright commands. Do not run a browser
+trial, retained campaign, profiler or unrelated suite. Record the complete
+Playwright expected/skipped/unexpected/flaky and soft-failure sets; preserve
+exact changed paths and SHA-256 for the test and plan owners; validate a
+self-excluding manifest; and sign/push separate RED and GREEN checkpoints.
+The signed/pushed RED receives its own Grok 4.6/high, exact Kimi 100-check and
+Opus 5/xhigh read-only review, with same-round P0/P1 correction and explicit P2
+ownership, before any GREEN edit. GREEN receives a separate equivalent review
+only after it is focused-green. Neither review may authorize a campaign.
 
 Acceptance is deterministic: the focused controls prove missing, invalid,
-below-boundary and exact-boundary behavior; the live progress writer stores the
-exact creator-page `runTrialReturnedAtMs` before every later failure point; the
-retained line 7325 semantic contract is unchanged; all static gates pass; and
-review has no P0/P1. This closes future failure-attachment replay custody only.
+precedence, below-boundary, exact-boundary and exact-preservation behavior; the
+live progress writer stores the exact creator-page `runTrialReturnedAtMs`
+immediately after it is read and before every failure point through the custody
+validator; the retained run-return span expression is unchanged; the GREEN
+record states its post-edit line and the post-edit range of all twenty-one
+retained expectations; all static gates pass; and review has no P0/P1. This
+closes future pre-final-evidence failure-attachment replay custody only.
 It cannot repair or reinterpret immutable D.108e4aj evidence and cannot prove
 the current campaign would pass. The user's exact six-invocation D.108e4ad
 authorization remains durable and must not be requested again, but none of its
