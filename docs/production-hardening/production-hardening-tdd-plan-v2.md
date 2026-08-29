@@ -72830,3 +72830,169 @@ the supplemented D.108e4af root into future isolated review packets when its
 bytes must be independently reverified. These items do not reopen the accepted
 GREEN, weaken any current invariant or authorize a campaign. No confirmation
 review or test rerun is required for this plan/evidence-only closure.
+
+###### D.108e4aj — post-fix D.108e4ad retained-campaign re-freeze
+
+D.108e4aj is a plan/evidence-only re-freeze of the six intended D.108e4ad
+retained-campaign invocations after the accepted repeated-open correction. It
+does not retry, overwrite or reinterpret the consumed D.108e4ad `ordinary-1`.
+The complete old `.logs/d108e4ad-freeze/` and `.logs/d108e4ad-campaign/`
+roots remain immutable failed evidence. The new campaign starts at zero
+ordinary and zero isolated passes and must produce exactly three consecutive
+ordinary passes followed by exactly three consecutive isolated passes.
+
+This slice changes no production, example or test source; Playwright, build or
+workspace configuration; package manifest, dependency or lockfile; browser
+pin; workload, loss profile, watchdog, test timeout or performance threshold.
+The accepted behavior is signed/pushed commit
+`f92f0b0585d985f362012ca3eb7aad05d3876a83`, tree
+`23d6286e5d4d00e12421c69b2cc54d4427131ed6`. D.108e4ai's plan-only closure
+`a44793d4888e928e8295550258aa34564ae0d83e` is the readiness parent. Every
+later plan/evidence-only descendant is admissible only while this guard exits
+zero:
+
+```sh
+git diff --quiet f92f0b0585d985f362012ca3eb7aad05d3876a83 -- . \
+  ':(exclude)docs/production-hardening/production-hardening-tdd-plan-v2.md'
+```
+
+The fresh isolated checkout is
+`/private/tmp/ts-drp-d108e4aj-clean.xPNHQk/repo`. Readiness cloned locally
+with `--no-hardlinks --no-checkout`, detached exact accepted behavior and ran
+exactly `pnpm install --offline --frozen-lockfile`. Installation returned
+zero, including the workspace postinstall builds; the checkout has empty
+tracked status and tree `23d6286e5d4d00e12421c69b2cc54d4427131ed6`.
+Neither checkout contains a root `node_modules/@ts-drp/canonical` shim. The
+checkout and freeze expire after 2026-09-05; movement, changed identity or
+status, or any install/build during campaign execution stops before
+Playwright.
+
+Seven execution identities are byte-identical between ordinary and isolated
+checkouts: `playwright.e3-03-loss-and-hol.config.ts`, both exact relay JSON
+configurations, `tests/e3-03-loss-and-hol-proof.pw.ts`,
+`packages/network/src/unreliable-webrtc.ts`, `packages/network/src/node.ts`
+and `packages/node/src/ephemeral.ts`. Their manifest SHA-256 is
+`f0a94ed9b06d31564332b274def87fc06581dcaa1af71f2ca00c0bc5963a942f`.
+The fresh build's authoritative runtime closure contains the same 334
+non-declaration, non-map, non-`tsbuildinfo` `dist` files as D.108e4ad, because
+the accepted correction is test-only. Both checkouts independently match its
+SHA-256 `c1947b7d49b8029d12250ab137aa8081dd3aabcfe4998e8e698e7c6168f6fc08`.
+Suffix-only `--list` probes in both checkouts returned zero with byte-identical
+output, one test in one file and exact title:
+
+```text
+three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss
+```
+
+Readiness custody is protected and intentionally untracked at
+`.logs/d108e4aj-freeze/`. Its 52-file self-excluding manifest validates and
+has SHA-256
+`2d09a8a7a5d481c67f3b63b4aa13adaaac4392273aaf71da11213637c8590669`.
+The standalone runner SHA-256 is
+`855e62050d61515ca849fe974a94f1f280e6515025f4e2da68d0687bd79022b9`.
+The unchanged endpoint-local classifier and independent validator SHA-256
+values are
+`99d7d65caaad75ae34370d93c230c91e16d6459ccc23594672bb2557254cced9`
+and
+`9508e84117c225c1432ffc6c0ec9b4d7eaeb7fdbc0cc55cb52b05ad63229b245`.
+`zsh -n` returned zero. The retained `1/1` dual-local and legal
+`channel-close` prototypes validate; exact `2/0` and `0/2` prototypes each
+return status one. The classifier remains evidence-only and does not replace
+any lifecycle, identity, delivery, freshness, HOL, performance or terminal
+semantic assertion in the test.
+
+The user's exact renewed instruction—`I expressly authorize all six
+D.108e4ad long retained-campaign invocations under the frozen fail-closed
+rules and do not ask for authorization about this again you are authorized`—
+authorizes the six intended D.108e4ad invocations under this post-fix re-freeze.
+It does not authorize altering the old evidence. No further authorization
+question is permitted or required. Execution nevertheless remains gated on a
+signed/pushed D.108e4aj freeze and closure of the normal read-only Grok
+4.6/high, exact Kimi K3 100-step and Opus 5/xhigh plan-review P0/P1 union.
+No long campaign may run during freeze or review.
+
+After review closure, create the new evidence root exactly once. `mkdir` is
+deliberately not `-p`, `cp -n` cannot replace evidence, and the original
+D.108e4ad authorization sentence remains the runner's byte-level grant:
+
+```sh
+set -eu
+campaign_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-campaign
+freeze_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-freeze
+mkdir "$campaign_root"
+printf '%s\n' 'I expressly authorize all six D.108e4ad long retained-campaign invocations under the frozen fail-closed rules.' > "$campaign_root/authorization.txt"
+cp -n "$freeze_root/run-one.zsh" "$campaign_root/run-one.zsh"
+cp -n "$freeze_root/endpoint-local-classification.jq" "$campaign_root/endpoint-local-classification.jq"
+cp -n "$freeze_root/classification-validation.jq" "$campaign_root/classification-validation.jq"
+test "$(shasum -a 256 "$freeze_root/SHA256SUMS" | awk '{print $1}')" = 2d09a8a7a5d481c67f3b63b4aa13adaaac4392273aaf71da11213637c8590669
+(cd "$freeze_root" && shasum -a 256 -c SHA256SUMS >/dev/null)
+test "$(shasum -a 256 "$campaign_root/authorization.txt" | awk '{print $1}')" = 03fdd987ba7d141645826769edc9c78376568483ca543a3183645ad510d03747
+test "$(shasum -a 256 "$campaign_root/run-one.zsh" | awk '{print $1}')" = 855e62050d61515ca849fe974a94f1f280e6515025f4e2da68d0687bd79022b9
+test "$(shasum -a 256 "$campaign_root/endpoint-local-classification.jq" | awk '{print $1}')" = 99d7d65caaad75ae34370d93c230c91e16d6459ccc23594672bb2557254cced9
+test "$(shasum -a 256 "$campaign_root/classification-validation.jq" | awk '{print $1}')" = 9508e84117c225c1432ffc6c0ec9b4d7eaeb7fdbc0cc55cb52b05ad63229b245
+```
+
+A pre-existing new root, any hash mismatch or any existing per-invocation
+artifact stops for custody inspection and does not authorize deletion or
+overwrite. Before and after every invocation, the frozen runner revalidates
+ordinary HEAD/remote/signature/status, the accepted-behavior diff guard, all
+26 stashes, isolated HEAD/tree/empty status, both absent root shims, both
+identity and runtime manifests, ambient processes, and ports 4174, 4175,
+51000 and 51002. The ordinary status must equal the protected eight-path
+roster frozen at SHA-256
+`6059409902c4f17404bed9cc033bd839a5e78193c4ce7731458ba9201f013970`.
+Unrelated processes may run, but no reviewer, test or profiler rooted in a
+ts-drp checkout may be active and all four fixed ports must be clear.
+
+The runner's preflight is non-consuming until it atomically moves the unique
+capture to `<name>.before` and arms the EXIT trap. After that boundary an exit
+of any kind consumes that invocation and stops the entire batch. Each launch
+runs in a separate shell process with the frozen 600-second process-group
+watchdog, unchanged effective 300-second retained-test budget, suffix-anchored
+title, JSON reporter and `--fail-on-flaky-tests`. It requires exactly one
+retry-zero pass, no skipped/unexpected/flaky/top-level errors, one preliminary
+calibration, one completed fixed-loss attachment, no failure attachment,
+Chromium `151.0.7922.34`, exactly three trials and exact IDs `e3-03-0` through
+`e3-03-2`. It preserves full stdout/stderr, reporter, timestamps, before/after
+custody, attachments, classification, Playwright failure results, terminal
+runner status and a cumulative self-excluding artifact manifest.
+
+Execute these six commands in order, each as a separate shell process. The
+common guard must precede every command; validate the complete result before
+starting the next. No retry, loop, `--repeat-each`, substitution or
+continuation after failure is allowed:
+
+```sh
+freeze_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-freeze; campaign_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-campaign; test "$(shasum -a 256 "$freeze_root/SHA256SUMS" | awk '{print $1}')" = 2d09a8a7a5d481c67f3b63b4aa13adaaac4392273aaf71da11213637c8590669 && (cd "$freeze_root" && shasum -a 256 -c SHA256SUMS >/dev/null) && test "$(shasum -a 256 "$campaign_root/run-one.zsh" | awk '{print $1}')" = 855e62050d61515ca849fe974a94f1f280e6515025f4e2da68d0687bd79022b9 && test "$(shasum -a 256 "$campaign_root/endpoint-local-classification.jq" | awk '{print $1}')" = 99d7d65caaad75ae34370d93c230c91e16d6459ccc23594672bb2557254cced9 && test "$(shasum -a 256 "$campaign_root/classification-validation.jq" | awk '{print $1}')" = 9508e84117c225c1432ffc6c0ec9b4d7eaeb7fdbc0cc55cb52b05ad63229b245 && /bin/zsh "$campaign_root/run-one.zsh" ordinary-1 /Users/aristotle/Documents/Projects/ts-drp-1 || exit 1
+```
+
+```sh
+freeze_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-freeze; campaign_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-campaign; test "$(shasum -a 256 "$freeze_root/SHA256SUMS" | awk '{print $1}')" = 2d09a8a7a5d481c67f3b63b4aa13adaaac4392273aaf71da11213637c8590669 && (cd "$freeze_root" && shasum -a 256 -c SHA256SUMS >/dev/null) && /bin/zsh "$campaign_root/run-one.zsh" ordinary-2 /Users/aristotle/Documents/Projects/ts-drp-1 || exit 1
+```
+
+```sh
+freeze_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-freeze; campaign_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-campaign; test "$(shasum -a 256 "$freeze_root/SHA256SUMS" | awk '{print $1}')" = 2d09a8a7a5d481c67f3b63b4aa13adaaac4392273aaf71da11213637c8590669 && (cd "$freeze_root" && shasum -a 256 -c SHA256SUMS >/dev/null) && /bin/zsh "$campaign_root/run-one.zsh" ordinary-3 /Users/aristotle/Documents/Projects/ts-drp-1 || exit 1
+```
+
+```sh
+freeze_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-freeze; campaign_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-campaign; test "$(shasum -a 256 "$freeze_root/SHA256SUMS" | awk '{print $1}')" = 2d09a8a7a5d481c67f3b63b4aa13adaaac4392273aaf71da11213637c8590669 && (cd "$freeze_root" && shasum -a 256 -c SHA256SUMS >/dev/null) && /bin/zsh "$campaign_root/run-one.zsh" isolated-1 /private/tmp/ts-drp-d108e4aj-clean.xPNHQk/repo || exit 1
+```
+
+```sh
+freeze_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-freeze; campaign_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-campaign; test "$(shasum -a 256 "$freeze_root/SHA256SUMS" | awk '{print $1}')" = 2d09a8a7a5d481c67f3b63b4aa13adaaac4392273aaf71da11213637c8590669 && (cd "$freeze_root" && shasum -a 256 -c SHA256SUMS >/dev/null) && /bin/zsh "$campaign_root/run-one.zsh" isolated-2 /private/tmp/ts-drp-d108e4aj-clean.xPNHQk/repo || exit 1
+```
+
+```sh
+freeze_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-freeze; campaign_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-campaign; test "$(shasum -a 256 "$freeze_root/SHA256SUMS" | awk '{print $1}')" = 2d09a8a7a5d481c67f3b63b4aa13adaaac4392273aaf71da11213637c8590669 && (cd "$freeze_root" && shasum -a 256 -c SHA256SUMS >/dev/null) && /bin/zsh "$campaign_root/run-one.zsh" isolated-3 /private/tmp/ts-drp-d108e4aj-clean.xPNHQk/repo || exit 1
+```
+
+The first command redundantly checks the three copied runner/filter hashes;
+the runner repeats those checks internally for every invocation. The later
+commands repeat the signed freeze-manifest guard and rely on that immutable
+runner's internal copy/hash checks, avoiding a second mutable command wrapper.
+After six consecutive passes, sign and push one D.108e4aj campaign-evidence
+checkpoint and run a separate normal Grok/exact-Kimi/Opus evidence review.
+Fable and collaboration subagents remain prohibited. Aggregate D.108e4 and
+D.108e5 remain blocked until the campaign and its evidence-review P0/P1 union
+close. D.108e4ai's bounded P2 hygiene remains due by 2026-09-05 or before
+D.108e5, but it is not allowed to mutate this frozen campaign owner.
