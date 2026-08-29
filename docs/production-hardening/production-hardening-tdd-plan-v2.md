@@ -70842,7 +70842,7 @@ production bytes remain unchanged. Plan-only descendants preserve this
 behavior identity only when the following guard exits zero:
 
 ```sh
-git diff --quiet 8c9afe55df7de6ffbfcc352e405e1faacfcf899c..HEAD -- . \
+git diff --quiet 8c9afe55df7de6ffbfcc352e405e1faacfcf899c -- . \
   ':(exclude)docs/production-hardening/production-hardening-tdd-plan-v2.md'
 ```
 
@@ -70853,13 +70853,27 @@ commit `8c9afe55df7de6ffbfcc352e405e1faacfcf899c`, resolves to tree
 before and after exact setup command `pnpm install --offline
 --frozen-lockfile`. That setup exited zero and completed the package build
 closure without changing the lockfile or tracked source. Both ordinary and
-isolated predicates `test ! -e node_modules/@ts-drp/canonical` pass. Both
+isolated root-shim predicates pass exactly as
+`test ! -e /Users/aristotle/Documents/Projects/ts-drp-1/node_modules/@ts-drp/canonical`
+and
+`test ! -e /private/tmp/ts-drp-d108e4ab-clean.dwW7kw/repo/node_modules/@ts-drp/canonical`.
+Both
 canonical exports are 21,858 bytes with SHA-256
 `cbc7746c51a5cd1da446865026a3e555b3aa5c69ebc9a8fa4f1f4552299aaa83`.
 
+The isolated checkout and this readiness freeze expire after 2026-09-04
+unless re-reviewed. No install, build or lifecycle script may run in either
+checkout during the six-invocation slice. If `/private/tmp` purges, moves or
+changes the isolated checkout, or it no longer has exact detached commit/tree,
+empty tracked status, both root-shim and runtime manifests or its frozen
+offline install closure, stop before Playwright starts, consume no invocation
+and require a new readiness slice.
+
 Seven execution identities are pairwise byte-identical between checkouts:
-`playwright.e3-03-loss-and-hol.config.ts`, both
-`configs/network-spike-relay*.json` files, the exact test owner,
+`playwright.e3-03-loss-and-hol.config.ts`,
+`configs/network-spike-relay.json`,
+`configs/network-spike-relay-replacement.json`,
+`tests/e3-03-loss-and-hol-proof.pw.ts`,
 `packages/network/src/unreliable-webrtc.ts`, `packages/network/src/node.ts`
 and `packages/node/src/ephemeral.ts`. The fresh isolated build contains 334
 runtime `dist` files after excluding `*.d.ts`, source maps and
@@ -70883,93 +70897,168 @@ subagents remain prohibited. A review P0/P1 is corrected in the same round
 without confirmation review; each P2 must name the plan/evidence owner and a
 deadline no later than 2026-09-04.
 
-Immediately before every invocation, re-record exact main and isolated commit
-and tree, remote main-branch head, signature, ordinary protected-untracked
-status, empty isolated tracked status, 26 stashes, both root-shim predicates,
+Immediately before and after every invocation, re-record exact main and
+isolated commit and tree, remote main-branch head, signature, ordinary status,
+empty isolated tracked status, 26 stashes, both absolute root-shim predicates,
 the seven identity manifests, the 334-file runtime manifest, ambient process
-inventory and fixed-port inventory. Under the user's narrowed ambient rule,
+inventory and fixed-port inventory. Each invocation owns exact directories
+`<invocation>.before/` and `<invocation>.after/` under the evidence root. Each
+directory contains `ordinary-head.txt`, `ordinary-tree.txt`,
+`ordinary-status.txt`, `isolated-head.txt`, `isolated-tree.txt`,
+`isolated-status.txt`, `remote-head.txt`, `signature.txt`, `stashes.txt`,
+`ordinary-root-shim.status`, `isolated-root-shim.status`,
+`ordinary-identity.sha256`, `isolated-identity.sha256`,
+`ordinary-runtime.sha256`, `isolated-runtime.sha256`, `ambient-processes.txt`
+and `fixed-ports.txt`, plus a SHA-256 manifest excluding itself.
+
+Ordinary `git status --porcelain=v1` must equal the following eight protected
+untracked paths and nothing else; any tracked modification or additional
+untracked path voids preflight:
+
+```text
+?? .agents/
+?? .claude/
+?? .logs/
+?? .pnpm-store/
+?? _apalache-out/
+?? packages/protocol-v2/tests/author-sequence-0g2.test.ts
+?? packages/protocol-v2/tests/local-author-sequence-issuance-0g2.test.ts
+?? skills-lock.json
+```
+
+Under the user's narrowed ambient rule,
 unrelated processes may coexist, but no reviewer, test or profiler rooted in
 either ts-drp checkout may be active and ports 4174, 4175, 51000 and 51002
-must have no listener. A failed preflight consumes no invocation. It must be
-corrected before execution without stopping unrelated work.
+must have no listener. A missing evidence root, failed `cd`, redirection,
+identity check or any other fault before the Playwright child starts is a
+preflight failure and consumes no invocation. It must be corrected before
+execution without stopping unrelated work.
 
 The exact evidence root is
 `/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/`.
-Create it only after express authorization. Run the six blocks below as six
+After express authorization and before ordinary invocation one, create it
+exactly once with the following readiness command. A pre-existing root stops
+the slice for custody inspection; it may not be overwritten:
+
+```sh
+cd -- /Users/aristotle/Documents/Projects/ts-drp-1 || exit 1
+mkdir /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign || exit 1
+```
+
+Run the six blocks below as six
 separate shell processes, in order, never with `--repeat-each` and never in a
-combined loop. Each unified process session has an external 360-second
-process-group watchdog over Playwright's unchanged 180-second test timeout;
-watchdog expiry is a terminal failure and does not authorize a retry or limit
-change. After each process, validate its artifact completely before starting
-the next. Any nonzero status, invalid JSON, missing attachment, unexpected,
+combined loop. Every block uses the frozen `/usr/bin/perl` process-group
+watchdog shown inline. It forks Playwright into its own process group, allows
+600 seconds over the retained test's unchanged effective 300-second
+`test.setTimeout(300_000)` budget plus web-server startup/teardown, sends TERM
+then KILL to that exact group on expiry and exits 124. The D.108e4ab
+plan/evidence owner operates it and records its timeout value and terminal
+status in each `.command` and `.status` artifact. Watchdog expiry after the
+Playwright child starts is a terminal failure and does not authorize a retry
+or limit change. After each process, validate its artifact completely before
+starting the next. Any nonzero Playwright/watchdog status, invalid JSON,
+missing attachment, unexpected,
 skipped or flaky result, retry, top-level error, failure telemetry attachment,
 title mismatch or retained semantic assertion failure stops the slice
 immediately. No rerun is authorized.
 
 ```sh
-cd /Users/aristotle/Documents/Projects/ts-drp-1
-date -u +%Y-%m-%dT%H:%M:%SZ > .logs/d108e4ab-campaign/ordinary-1.time
-printf '%s\n' "pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' --reporter=json --fail-on-flaky-tests" > .logs/d108e4ab-campaign/ordinary-1.command
+cd -- /Users/aristotle/Documents/Projects/ts-drp-1 || exit 1
+test "$(git rev-parse --show-toplevel)" = /Users/aristotle/Documents/Projects/ts-drp-1 || exit 1
+git diff --quiet 8c9afe55df7de6ffbfcc352e405e1faacfcf899c -- . \
+  ':(exclude)docs/production-hardening/production-hardening-tdd-plan-v2.md' || exit 1
+test -d /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign || exit 1
+cat > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-1.command <<'D108E4AB_COMMAND' || exit 1
+cd -- /Users/aristotle/Documents/Projects/ts-drp-1 || exit 1
+PLAYWRIGHT_JSON_OUTPUT_NAME=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-1.json /usr/bin/perl -MPOSIX=setpgid -e 'my $limit=shift @ARGV; my $pid=fork(); die "fork failed" unless defined $pid; if($pid==0){setpgid(0,0); exec @ARGV; exit 127} $SIG{ALRM}=sub { kill "TERM", -$pid; select undef,undef,undef,5; kill "KILL", -$pid; waitpid($pid,0); exit 124 }; alarm $limit; waitpid($pid,0); alarm 0; exit($? == -1 ? 125 : ($? & 127) ? 128 + ($? & 127) : $? >> 8)' 600 pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' --reporter=json --fail-on-flaky-tests > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-1.stdout.log 2> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-1.stderr.log
+D108E4AB_COMMAND
+date -u +%Y-%m-%dT%H:%M:%SZ > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-1.time || exit 1
 set +e
-PLAYWRIGHT_JSON_OUTPUT_NAME=.logs/d108e4ab-campaign/ordinary-1.json \
-  pnpm exec playwright test \
+PLAYWRIGHT_JSON_OUTPUT_NAME=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-1.json \
+  /usr/bin/perl -MPOSIX=setpgid -e 'my $limit=shift @ARGV; my $pid=fork(); die "fork failed" unless defined $pid; if($pid==0){setpgid(0,0); exec @ARGV; exit 127} $SIG{ALRM}=sub { kill "TERM", -$pid; select undef,undef,undef,5; kill "KILL", -$pid; waitpid($pid,0); exit 124 }; alarm $limit; waitpid($pid,0); alarm 0; exit($? == -1 ? 125 : ($? & 127) ? 128 + ($? & 127) : $? >> 8)' \
+  600 pnpm exec playwright test \
   --config playwright.e3-03-loss-and-hol.config.ts \
   --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
   --reporter=json --fail-on-flaky-tests \
-  > .logs/d108e4ab-campaign/ordinary-1.stdout.log \
-  2> .logs/d108e4ab-campaign/ordinary-1.stderr.log
+  > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-1.stdout.log \
+  2> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-1.stderr.log
 d108e4ab_status=$?
 set -e
-printf '%s\n' "$d108e4ab_status" > .logs/d108e4ab-campaign/ordinary-1.status
-date -u +%Y-%m-%dT%H:%M:%SZ >> .logs/d108e4ab-campaign/ordinary-1.time
+printf '%s\n' "$d108e4ab_status" > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-1.status
+date -u +%Y-%m-%dT%H:%M:%SZ >> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-1.time
 test "$d108e4ab_status" -eq 0
 ```
 
 ```sh
-cd /Users/aristotle/Documents/Projects/ts-drp-1
-date -u +%Y-%m-%dT%H:%M:%SZ > .logs/d108e4ab-campaign/ordinary-2.time
-printf '%s\n' "pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' --reporter=json --fail-on-flaky-tests" > .logs/d108e4ab-campaign/ordinary-2.command
+cd -- /Users/aristotle/Documents/Projects/ts-drp-1 || exit 1
+test "$(git rev-parse --show-toplevel)" = /Users/aristotle/Documents/Projects/ts-drp-1 || exit 1
+git diff --quiet 8c9afe55df7de6ffbfcc352e405e1faacfcf899c -- . \
+  ':(exclude)docs/production-hardening/production-hardening-tdd-plan-v2.md' || exit 1
+test -d /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign || exit 1
+cat > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-2.command <<'D108E4AB_COMMAND' || exit 1
+cd -- /Users/aristotle/Documents/Projects/ts-drp-1 || exit 1
+PLAYWRIGHT_JSON_OUTPUT_NAME=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-2.json /usr/bin/perl -MPOSIX=setpgid -e 'my $limit=shift @ARGV; my $pid=fork(); die "fork failed" unless defined $pid; if($pid==0){setpgid(0,0); exec @ARGV; exit 127} $SIG{ALRM}=sub { kill "TERM", -$pid; select undef,undef,undef,5; kill "KILL", -$pid; waitpid($pid,0); exit 124 }; alarm $limit; waitpid($pid,0); alarm 0; exit($? == -1 ? 125 : ($? & 127) ? 128 + ($? & 127) : $? >> 8)' 600 pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' --reporter=json --fail-on-flaky-tests > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-2.stdout.log 2> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-2.stderr.log
+D108E4AB_COMMAND
+date -u +%Y-%m-%dT%H:%M:%SZ > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-2.time || exit 1
 set +e
-PLAYWRIGHT_JSON_OUTPUT_NAME=.logs/d108e4ab-campaign/ordinary-2.json \
-  pnpm exec playwright test \
+PLAYWRIGHT_JSON_OUTPUT_NAME=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-2.json \
+  /usr/bin/perl -MPOSIX=setpgid -e 'my $limit=shift @ARGV; my $pid=fork(); die "fork failed" unless defined $pid; if($pid==0){setpgid(0,0); exec @ARGV; exit 127} $SIG{ALRM}=sub { kill "TERM", -$pid; select undef,undef,undef,5; kill "KILL", -$pid; waitpid($pid,0); exit 124 }; alarm $limit; waitpid($pid,0); alarm 0; exit($? == -1 ? 125 : ($? & 127) ? 128 + ($? & 127) : $? >> 8)' \
+  600 pnpm exec playwright test \
   --config playwright.e3-03-loss-and-hol.config.ts \
   --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
   --reporter=json --fail-on-flaky-tests \
-  > .logs/d108e4ab-campaign/ordinary-2.stdout.log \
-  2> .logs/d108e4ab-campaign/ordinary-2.stderr.log
+  > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-2.stdout.log \
+  2> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-2.stderr.log
 d108e4ab_status=$?
 set -e
-printf '%s\n' "$d108e4ab_status" > .logs/d108e4ab-campaign/ordinary-2.status
-date -u +%Y-%m-%dT%H:%M:%SZ >> .logs/d108e4ab-campaign/ordinary-2.time
+printf '%s\n' "$d108e4ab_status" > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-2.status
+date -u +%Y-%m-%dT%H:%M:%SZ >> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-2.time
 test "$d108e4ab_status" -eq 0
 ```
 
 ```sh
-cd /Users/aristotle/Documents/Projects/ts-drp-1
-date -u +%Y-%m-%dT%H:%M:%SZ > .logs/d108e4ab-campaign/ordinary-3.time
-printf '%s\n' "pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' --reporter=json --fail-on-flaky-tests" > .logs/d108e4ab-campaign/ordinary-3.command
+cd -- /Users/aristotle/Documents/Projects/ts-drp-1 || exit 1
+test "$(git rev-parse --show-toplevel)" = /Users/aristotle/Documents/Projects/ts-drp-1 || exit 1
+git diff --quiet 8c9afe55df7de6ffbfcc352e405e1faacfcf899c -- . \
+  ':(exclude)docs/production-hardening/production-hardening-tdd-plan-v2.md' || exit 1
+test -d /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign || exit 1
+cat > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-3.command <<'D108E4AB_COMMAND' || exit 1
+cd -- /Users/aristotle/Documents/Projects/ts-drp-1 || exit 1
+PLAYWRIGHT_JSON_OUTPUT_NAME=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-3.json /usr/bin/perl -MPOSIX=setpgid -e 'my $limit=shift @ARGV; my $pid=fork(); die "fork failed" unless defined $pid; if($pid==0){setpgid(0,0); exec @ARGV; exit 127} $SIG{ALRM}=sub { kill "TERM", -$pid; select undef,undef,undef,5; kill "KILL", -$pid; waitpid($pid,0); exit 124 }; alarm $limit; waitpid($pid,0); alarm 0; exit($? == -1 ? 125 : ($? & 127) ? 128 + ($? & 127) : $? >> 8)' 600 pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' --reporter=json --fail-on-flaky-tests > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-3.stdout.log 2> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-3.stderr.log
+D108E4AB_COMMAND
+date -u +%Y-%m-%dT%H:%M:%SZ > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-3.time || exit 1
 set +e
-PLAYWRIGHT_JSON_OUTPUT_NAME=.logs/d108e4ab-campaign/ordinary-3.json \
-  pnpm exec playwright test \
+PLAYWRIGHT_JSON_OUTPUT_NAME=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-3.json \
+  /usr/bin/perl -MPOSIX=setpgid -e 'my $limit=shift @ARGV; my $pid=fork(); die "fork failed" unless defined $pid; if($pid==0){setpgid(0,0); exec @ARGV; exit 127} $SIG{ALRM}=sub { kill "TERM", -$pid; select undef,undef,undef,5; kill "KILL", -$pid; waitpid($pid,0); exit 124 }; alarm $limit; waitpid($pid,0); alarm 0; exit($? == -1 ? 125 : ($? & 127) ? 128 + ($? & 127) : $? >> 8)' \
+  600 pnpm exec playwright test \
   --config playwright.e3-03-loss-and-hol.config.ts \
   --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
   --reporter=json --fail-on-flaky-tests \
-  > .logs/d108e4ab-campaign/ordinary-3.stdout.log \
-  2> .logs/d108e4ab-campaign/ordinary-3.stderr.log
+  > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-3.stdout.log \
+  2> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-3.stderr.log
 d108e4ab_status=$?
 set -e
-printf '%s\n' "$d108e4ab_status" > .logs/d108e4ab-campaign/ordinary-3.status
-date -u +%Y-%m-%dT%H:%M:%SZ >> .logs/d108e4ab-campaign/ordinary-3.time
+printf '%s\n' "$d108e4ab_status" > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-3.status
+date -u +%Y-%m-%dT%H:%M:%SZ >> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-3.time
 test "$d108e4ab_status" -eq 0
 ```
 
 ```sh
-cd /private/tmp/ts-drp-d108e4ab-clean.dwW7kw/repo
-date -u +%Y-%m-%dT%H:%M:%SZ > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-1.time
-printf '%s\n' "pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' --reporter=json --fail-on-flaky-tests" > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-1.command
+cd -- /private/tmp/ts-drp-d108e4ab-clean.dwW7kw/repo || exit 1
+test "$(git rev-parse HEAD)" = 8c9afe55df7de6ffbfcc352e405e1faacfcf899c || exit 1
+test "$(git rev-parse HEAD^{tree})" = 048edbdbb0960569c04f6284ab58057d602e3f78 || exit 1
+test -z "$(git status --porcelain=v1)" || exit 1
+test ! -e /private/tmp/ts-drp-d108e4ab-clean.dwW7kw/repo/node_modules/@ts-drp/canonical || exit 1
+test -d /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign || exit 1
+cat > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-1.command <<'D108E4AB_COMMAND' || exit 1
+cd -- /private/tmp/ts-drp-d108e4ab-clean.dwW7kw/repo || exit 1
+PLAYWRIGHT_JSON_OUTPUT_NAME=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-1.json /usr/bin/perl -MPOSIX=setpgid -e 'my $limit=shift @ARGV; my $pid=fork(); die "fork failed" unless defined $pid; if($pid==0){setpgid(0,0); exec @ARGV; exit 127} $SIG{ALRM}=sub { kill "TERM", -$pid; select undef,undef,undef,5; kill "KILL", -$pid; waitpid($pid,0); exit 124 }; alarm $limit; waitpid($pid,0); alarm 0; exit($? == -1 ? 125 : ($? & 127) ? 128 + ($? & 127) : $? >> 8)' 600 pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' --reporter=json --fail-on-flaky-tests > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-1.stdout.log 2> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-1.stderr.log
+D108E4AB_COMMAND
+date -u +%Y-%m-%dT%H:%M:%SZ > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-1.time || exit 1
 set +e
 PLAYWRIGHT_JSON_OUTPUT_NAME=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-1.json \
-  pnpm exec playwright test \
+  /usr/bin/perl -MPOSIX=setpgid -e 'my $limit=shift @ARGV; my $pid=fork(); die "fork failed" unless defined $pid; if($pid==0){setpgid(0,0); exec @ARGV; exit 127} $SIG{ALRM}=sub { kill "TERM", -$pid; select undef,undef,undef,5; kill "KILL", -$pid; waitpid($pid,0); exit 124 }; alarm $limit; waitpid($pid,0); alarm 0; exit($? == -1 ? 125 : ($? & 127) ? 128 + ($? & 127) : $? >> 8)' \
+  600 pnpm exec playwright test \
   --config playwright.e3-03-loss-and-hol.config.ts \
   --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
   --reporter=json --fail-on-flaky-tests \
@@ -70983,12 +71072,21 @@ test "$d108e4ab_status" -eq 0
 ```
 
 ```sh
-cd /private/tmp/ts-drp-d108e4ab-clean.dwW7kw/repo
-date -u +%Y-%m-%dT%H:%M:%SZ > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-2.time
-printf '%s\n' "pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' --reporter=json --fail-on-flaky-tests" > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-2.command
+cd -- /private/tmp/ts-drp-d108e4ab-clean.dwW7kw/repo || exit 1
+test "$(git rev-parse HEAD)" = 8c9afe55df7de6ffbfcc352e405e1faacfcf899c || exit 1
+test "$(git rev-parse HEAD^{tree})" = 048edbdbb0960569c04f6284ab58057d602e3f78 || exit 1
+test -z "$(git status --porcelain=v1)" || exit 1
+test ! -e /private/tmp/ts-drp-d108e4ab-clean.dwW7kw/repo/node_modules/@ts-drp/canonical || exit 1
+test -d /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign || exit 1
+cat > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-2.command <<'D108E4AB_COMMAND' || exit 1
+cd -- /private/tmp/ts-drp-d108e4ab-clean.dwW7kw/repo || exit 1
+PLAYWRIGHT_JSON_OUTPUT_NAME=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-2.json /usr/bin/perl -MPOSIX=setpgid -e 'my $limit=shift @ARGV; my $pid=fork(); die "fork failed" unless defined $pid; if($pid==0){setpgid(0,0); exec @ARGV; exit 127} $SIG{ALRM}=sub { kill "TERM", -$pid; select undef,undef,undef,5; kill "KILL", -$pid; waitpid($pid,0); exit 124 }; alarm $limit; waitpid($pid,0); alarm 0; exit($? == -1 ? 125 : ($? & 127) ? 128 + ($? & 127) : $? >> 8)' 600 pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' --reporter=json --fail-on-flaky-tests > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-2.stdout.log 2> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-2.stderr.log
+D108E4AB_COMMAND
+date -u +%Y-%m-%dT%H:%M:%SZ > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-2.time || exit 1
 set +e
 PLAYWRIGHT_JSON_OUTPUT_NAME=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-2.json \
-  pnpm exec playwright test \
+  /usr/bin/perl -MPOSIX=setpgid -e 'my $limit=shift @ARGV; my $pid=fork(); die "fork failed" unless defined $pid; if($pid==0){setpgid(0,0); exec @ARGV; exit 127} $SIG{ALRM}=sub { kill "TERM", -$pid; select undef,undef,undef,5; kill "KILL", -$pid; waitpid($pid,0); exit 124 }; alarm $limit; waitpid($pid,0); alarm 0; exit($? == -1 ? 125 : ($? & 127) ? 128 + ($? & 127) : $? >> 8)' \
+  600 pnpm exec playwright test \
   --config playwright.e3-03-loss-and-hol.config.ts \
   --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
   --reporter=json --fail-on-flaky-tests \
@@ -71002,12 +71100,21 @@ test "$d108e4ab_status" -eq 0
 ```
 
 ```sh
-cd /private/tmp/ts-drp-d108e4ab-clean.dwW7kw/repo
-date -u +%Y-%m-%dT%H:%M:%SZ > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-3.time
-printf '%s\n' "pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' --reporter=json --fail-on-flaky-tests" > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-3.command
+cd -- /private/tmp/ts-drp-d108e4ab-clean.dwW7kw/repo || exit 1
+test "$(git rev-parse HEAD)" = 8c9afe55df7de6ffbfcc352e405e1faacfcf899c || exit 1
+test "$(git rev-parse HEAD^{tree})" = 048edbdbb0960569c04f6284ab58057d602e3f78 || exit 1
+test -z "$(git status --porcelain=v1)" || exit 1
+test ! -e /private/tmp/ts-drp-d108e4ab-clean.dwW7kw/repo/node_modules/@ts-drp/canonical || exit 1
+test -d /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign || exit 1
+cat > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-3.command <<'D108E4AB_COMMAND' || exit 1
+cd -- /private/tmp/ts-drp-d108e4ab-clean.dwW7kw/repo || exit 1
+PLAYWRIGHT_JSON_OUTPUT_NAME=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-3.json /usr/bin/perl -MPOSIX=setpgid -e 'my $limit=shift @ARGV; my $pid=fork(); die "fork failed" unless defined $pid; if($pid==0){setpgid(0,0); exec @ARGV; exit 127} $SIG{ALRM}=sub { kill "TERM", -$pid; select undef,undef,undef,5; kill "KILL", -$pid; waitpid($pid,0); exit 124 }; alarm $limit; waitpid($pid,0); alarm 0; exit($? == -1 ? 125 : ($? & 127) ? 128 + ($? & 127) : $? >> 8)' 600 pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' --reporter=json --fail-on-flaky-tests > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-3.stdout.log 2> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-3.stderr.log
+D108E4AB_COMMAND
+date -u +%Y-%m-%dT%H:%M:%SZ > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-3.time || exit 1
 set +e
 PLAYWRIGHT_JSON_OUTPUT_NAME=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-3.json \
-  pnpm exec playwright test \
+  /usr/bin/perl -MPOSIX=setpgid -e 'my $limit=shift @ARGV; my $pid=fork(); die "fork failed" unless defined $pid; if($pid==0){setpgid(0,0); exec @ARGV; exit 127} $SIG{ALRM}=sub { kill "TERM", -$pid; select undef,undef,undef,5; kill "KILL", -$pid; waitpid($pid,0); exit 124 }; alarm $limit; waitpid($pid,0); alarm 0; exit($? == -1 ? 125 : ($? & 127) ? 128 + ($? & 127) : $? >> 8)' \
+  600 pnpm exec playwright test \
   --config playwright.e3-03-loss-and-hol.config.ts \
   --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
   --reporter=json --fail-on-flaky-tests \
@@ -71022,10 +71129,14 @@ test "$d108e4ab_status" -eq 0
 
 Every successful result must contain exactly one expected test, zero skipped,
 unexpected and flaky tests, retry zero, no top-level error and the exact
-retained title. The decoded `e3-03-fixed-loss-campaign.json` attachment must
+retained title. Each reporter's absolute `config.configFile` must equal
+`/Users/aristotle/Documents/Projects/ts-drp-1/playwright.e3-03-loss-and-hol.config.ts`
+for ordinary runs or
+`/private/tmp/ts-drp-d108e4ab-clean.dwW7kw/repo/playwright.e3-03-loss-and-hol.config.ts`
+for isolated runs. The decoded `e3-03-fixed-loss-campaign.json` attachment must
 pin Chromium `151.0.7922.34`, `trialCount: 3`, three metric records and three
 observation envelopes. Every trial must contain prepare, deadline, reset and
-run-returned stages; signed `rawMaxStallMs <= 500`, `rawGap > 1`, raw AoI P95
+`runReturned` stages; signed `rawMaxStallMs <= 500`, `rawGap > 1`, raw AoI P95
 at most 80% of reliable AoI P95 and at least ten raw deliveries after reliable
 start remain unchanged. Passing status must follow all aggregate delivery and
 connection assertions, rendered metrics, final durable-control round trip and
@@ -71033,6 +71144,15 @@ terminal stage `complete`. Require the completed campaign attachment, exact
 `e3-03-preliminary-calibration.json`, absence of
 `e3-03-failure-telemetry.json`, reporter status `expected`, process status zero
 and `stats.unexpected == 0`; attachment presence alone is insufficient.
+
+For every invocation, derive a `replacement-classification.json` from the
+three decoded observation envelopes. For each trial it records the exact
+initiating/drop-owner endpoint and whether the non-initiating endpoint's
+deadline RTC identity remained on the prepare identity or advanced. Hash that
+classification with the other artifacts. This is an evidence observable, not
+a new pass condition requiring a particular scheduling branch; it ensures the
+live occurrence or absence of the exact D.108e4aa incoming-advance topology is
+never hidden by a campaign pass.
 
 Hash the reporter, stdout, stderr, status, command, timestamps, calibration,
 campaign attachment, all before/after preflight records and the complete
@@ -71043,3 +71163,79 @@ review. D.108e4b then receives its still-separate GREEN review against the
 exact product candidate and composed final behavior/evidence tree. Only after
 both review rounds close with all P0/P1 corrected and P2 owned may aggregate
 D.108e4 closure be audited. D.108e5 remains blocked until that audit.
+
+The D.108e4ab plan review inspected exact signed/pushed plan-only freeze
+`2ff52e6afa63885022eb3d99371e24df171bf1e2`, parent behavior commit
+`8c9afe55df7de6ffbfcc352e405e1faacfcf899c`, with freeze tree
+`8659ee04884ac8df62a248bcfc942a6f2c41d6f7`. It ran no campaign, Fable or
+collaboration subagent.
+
+- Grok 4.6/high inspected read-only for 570.166 seconds and ended normally
+  with `end_turn`. Its public response contained CHANGES_REQUIRED,
+  P0=1/P1=3/P2=3, but also progress text, so the runner correctly retained
+  `NO_VERDICT` instead of inferring the terminal schema. Events/public/status/
+  stderr SHA-256 values are
+  `20918e169d2988d72b9f7716b1cfbaeb83645a80b6cf3917e2ad3f216ae4bd58`,
+  `0600cab7df0813a004cce9ca1556364edd115fe7d0923a84ea3a7ad0fa0f796c`,
+  `32fce24695dd0d1567e9af614d49cb6d9e146a4b011382883bb3bb148ca29dea`
+  and
+  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+  A one-turn, tool-free formatting continuation in same session
+  `01a04bd3-a914-7df2-8ddc-4efe3186a9b1` preserved the exact findings and
+  emitted valid structured output with `end_turn`. JSON/status SHA-256 values
+  are
+  `b7ff344c5e36f8e82a6b55fe055a318339dec8adf6b49d132432ea0fd58e48ed`
+  and
+  `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+- Exact `kimi-cli` 1.49.0 / `kimi-code/k3` session
+  `37d1118f-27de-45fd-a228-ac4d1f244bae` exited zero and emitted exactly 101
+  nonempty lines: unique ordered `CHECK001` through `CHECK100`, then one
+  RESULT and no formatting continuation. It returned APPROVED,
+  P0=0/P1=0/P2=1. Stream/text/stderr/status SHA-256 values are
+  `e51daed0535c141bf3ae85b128e4b169702350bb847210b7b4a90b3bf91d30f8`,
+  `5ce5a96e9f515f94872e2734db7d82c5d52d31eca25fb678291da4b7dfc08db6`,
+  `a592a5381b8b31c26a4372332a1dc7f4020c8a2ca23cdb7c763c691539d2dbf3`
+  and
+  `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+- Opus 5/xhigh session `8466e6c2-0413-48a4-8cbc-2bbfb73eed54`
+  completed 79 turns in 668.207 seconds without error or subagent and returned
+  CHANGES_REQUIRED, P0=1/P1=4/P2=5. Ten attempted Bash diagnostics were
+  denied by the read-only permission boundary; Opus completed from permitted
+  Read/Grep/Glob evidence and made no write. JSON/stderr/status SHA-256 values
+  are
+  `ad54b7d70388cd9af0ec5abf45c41de812a740d822e428aa050fe436ea4c382a`,
+  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+  and
+  `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+
+The same-round correction above resolves the complete P0/P1 union without a
+confirmation review. Every shell block now fails closed on `cd` and checkout
+identity before evidence or Playwright can be mislabeled; reporter acceptance
+pins the absolute ordinary or isolated config path. The guard now compares the
+accepted behavior commit to the executable working tree rather than only two
+commits, and ordinary status must equal the explicit eight-path roster. The
+evidence root has an exact post-authorization creation gate. The ephemeral
+checkout regains purge/change stop semantics, no-install/build execution and a
+2026-09-04 expiry. The effective retained timeout is correctly 300 seconds.
+An inline `/usr/bin/perl` process-group watchdog has an explicit 600-second
+budget, TERM/KILL ownership and status 124; a bounded probe returned zero for
+`/usr/bin/true`, 124 for forced expiry and left no child. All eight D.108e4ab
+shell fences pass `zsh -n`.
+
+All review P2s belong to the D.108e4ab plan/evidence owner with deadline
+2026-09-04 and are integrated above: watchdog mechanism/owner, absolute
+ordinary custody, verbatim cwd/env/argv/redirection command records, exact
+relay/test paths, exact `runReturned` field spelling, live replacement-branch
+classification, absolute before/after shim/status/process/port custody and
+named preflight directories. Review and correction still authorize zero long
+invocations. Fresh express authorization for exactly all six D.108e4ab runs
+remains absent.
+
+The corrected eight-block source-shape/syntax ledger SHA-256 is
+`072c3ed882439668f802026b464fbebe35376de58ea6bd9f5fbcfb4f008b3e1f`.
+The bounded watchdog success/expiry statuses were zero and 124 with SHA-256
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`
+and
+`ca2ebdf97d7469496b1f4b78958f9dc8447efdcb623953fee7b6996b762f6fff`.
+The corrected 32-file readiness manifest excludes itself and has SHA-256
+`ea793361e5c29ae105a2ea49214e1d4a733923aa1217355f99f91100d56e5cd8`.
