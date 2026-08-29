@@ -74112,8 +74112,9 @@ D.108e4ap is closed, so D.108e4aq owns the separately reviewed causal decision
 required above. The decision is to prepare a new fail-closed re-freeze, not to
 claim that the immutable D.108e4aj failure was repaired. That failure's twenty
 replayable post-custody assertions passed; creator raw backpressure remained the
-first demonstrated failure, while the sole unavailable run-return join is now
-preserved for future failures. No product defect or product fix is inferred.
+first demonstrated failure. The unavailable run-return join is preserved only
+through the custody validator; post-replacement preservation remains open and
+is owned below. No product defect or product fix is inferred.
 The next campaign may therefore run only to obtain a fresh accepted pass or a
 complete new failure attachment; its first consumed failure stops the batch.
 The D.108e4aq plan/evidence owner is this record, due before any campaign and no
@@ -74194,9 +74195,17 @@ A failure among those expectations can therefore still produce an incomplete
 attachment. The statement that timestamp custody was complete for every future
 failure was false.
 
-Accordingly D.108e4aq decides **not to re-freeze or run a campaign yet**. The
-entire readiness/campaign design above is void and grants no authority. Its
-prohibitions remain live: all D.108e4ad/D.108e4aj and D.108e4an/D.108e4ao/
+Accordingly D.108e4aq decides **not to re-freeze or run a campaign yet**. Every
+grant of readiness, runner-edit, root-creation or six-run execution authority
+above is void. All prohibitions and custody constraints remain live, including
+accepted behavior `1a2967020203da60ee586a59a8981bd038532b3c`, tree
+`ea9b0da7c0c542bbd39f38d24d3d8d961e7426fd`, and the repository-root
+plan-descendant diff guard. Production, examples, test semantics,
+Playwright/build/workspace configuration, dependencies, browser pin, workload,
+loss profile, watchdog, test budget, thresholds and product APIs remain closed.
+The canonical authorization sentence remains bound to SHA-256
+`03fdd987ba7d141645826769edc9c78376568483ca543a3183645ad510d03747`.
+All D.108e4ad/D.108e4aj and D.108e4an/D.108e4ao/
 D.108e4ap evidence roots remain immutable and may not be overwritten or reused.
 `.logs/d108e4aq-freeze/` and `.logs/d108e4aq-campaign/` must remain absent. The
 durable six-run authorization remains recorded and must not be requested again,
@@ -74206,13 +74215,17 @@ rejected-ready-state and sentinel-shape both had retained count zero.
 D.108e4ar owns the smallest prerequisite: a tests-only final-evidence custody
 slice in `tests/e3-03-loss-and-hol-proof.pw.ts` plus this plan, due before any
 campaign and no later than 2026-09-02. It must preserve the exact creator-page
-`runTrialReturnedAtMs` and the exact run-return `senderWire` under distinct,
-unambiguous final `CampaignEvidence` keys before
+`runTrialReturnedAtMs` and the exact run-return sender wire under distinct,
+unambiguous progress and final `CampaignEvidence` keys before
 `currentTrialEvidence = trialEvidence`. The retained deadline capture must keep
 its separate provenance; neither capture may silently replace the other. This
-discharges both halves of the D.108e4ap post-replacement residual. It changes no production, product
-APIs, clocks, wire formats, workload, thresholds or any of the twenty-one
-expectations. Its causal RED must prove a simulated post-replacement failure
+discharges both halves of the D.108e4ap post-replacement residual. The exact
+replay derivation remains: filter non-sentinel raw and reliable run-return
+samples, sort each lane by `sequence`, take each lane's element zero
+`receivedAtMs`, then take their `Math.min`; do not substitute a minimum over all
+arrival timestamps. It changes no production, product APIs, clocks, wire
+formats, workload, thresholds or any of the twenty-one expectations. Its causal
+RED must prove a simulated post-replacement failure
 attachment lacks both run-return operands; GREEN must change only the final
 evidence builder/record seam and prove the timestamp, run-return sender wire,
 deadline sender wire and existing final evidence all survive with distinct
@@ -74236,8 +74249,8 @@ paths, pre-trap residue, in-runner predecessor enforcement and checkout command/
 status custody rather than silently carrying them forward.
 The existing D.108e4ak evidence-hygiene owner remains responsible through
 2026-09-05; a future freeze may discharge but must not create parallel ownership.
-It must also bind or explicitly retain the filesystem-mode limitation because
-SHA-256 manifests do not bind mode bits. D.108e4aq's own 2026-09-05 decision
+That future freeze must also bind or explicitly retain the filesystem-mode
+limitation because SHA-256 manifests do not bind mode bits. D.108e4aq's own 2026-09-05 decision
 deadline is satisfied by this stop; downstream D.108e5 timing must be rescheduled
 rather than used to skip any review or campaign gate.
 
