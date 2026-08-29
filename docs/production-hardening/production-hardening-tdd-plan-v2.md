@@ -73900,9 +73900,10 @@ omission, not a hand-authored parallel stages literal.
 The RED batch also adds test-local custody/join assertion helpers and appends
 their control block only after the existing final focused control, so every
 retained mutant executes before the intended failure. Error precedence is
-frozen as ABSENT for a missing own field, then INVALID for a present
-value that is not a non-negative safe integer, then JOIN_INVALID for a valid
-creator return whose span is below the bound. The bound is always derived as
+frozen as ABSENT for a missing own field or an own field whose value is
+`undefined`, then INVALID for any other present value that is not a non-negative
+safe integer, then JOIN_INVALID for a valid creator return whose span is below
+the bound. The bound is always derived as
 `(SAMPLE_COUNT - 1) * SAMPLE_INTERVAL_MS - 1_000`, with a separate assertion
 that it equals 18,767; no helper stores `campaignStartedAtMs`.
 
@@ -74012,8 +74013,26 @@ the exact Prettier layout at four new sites, adds the unreachable `trialId`
 carry-through assertion, discloses mixed owner-hash provenance, preserves the
 two exact-owner static gates, drops the unsupported RED diff-check claim and
 narrows ABSENT to a missing own field. No control semantics, production path or
-campaign authority changed. GREEN remains blocked until the signed/pushed RED
-correction receives confirmation review with no P0/P1.
+campaign authority changed.
+
+Confirmation review of signed/pushed RED correction
+`0cb9ecb14a0e842148fa93a2905627ac179cf83a` closes the RED gate. Grok 4.6/high
+session `01a04f96-b0f0-7631-971a-9f98ead1bc61` returned APPROVED with zero
+findings; its valid terminal JSON initially lacked the wrapper's `RESULT:`
+marker and a same-session formatting-only continuation re-emitted the unchanged
+verdict with that marker. Exact Kimi K3 session
+`f8640825-3fe9-4470-ae83-af5644fd4307` returned exactly 100 checks plus RESULT
+after an equivalent same-session formatting-only continuation, APPROVED with
+zero P0/P1 and one docs-only P2. Opus 5/xhigh session
+`896de162-6be5-4785-b30f-d8eeb6225a72` returned APPROVED with zero P0/P1 and
+the same P2. That P2 is closed above by naming the own-but-`undefined` ABSENT
+branch and narrowing INVALID to every other present invalid value; it changes
+no test or evidence byte. All confirmation reviews prohibit campaign authority,
+and GREEN remains the previously frozen one-body builder change. The self-
+excluding twenty-five-file confirmation manifest validates and has SHA-256
+`b411caa92201dac4b4b7f5c75f7d7e4f54f6c6cb89e6c37a035eae6363644566`;
+validation SHA-256 is
+`52f851cfa0562b13842f6e782588a8c01bee6991b26f6004c15aa81e1e48110c`.
 
 GREEN then runs only the four static commands recorded for D.108e4an—strict
 standalone TypeScript, exact-owner ESLint, 8 GiB Prettier and
