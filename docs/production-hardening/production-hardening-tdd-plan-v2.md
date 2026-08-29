@@ -72170,3 +72170,114 @@ After six consecutive passes, sign and push one D.108e4ad evidence checkpoint
 and run the separate normal three-model evidence review. D.108e4b's separate
 GREEN review, aggregate D.108e4 closure and D.108e5 remain blocked until that
 campaign and review close.
+
+The authorized D.108e4ad campaign then consumed exactly one long invocation.
+`ordinary-1` completed runner preflight, armed the terminal trap and returned
+status one after 120.739 seconds, so the frozen fail-closed rule stopped the
+campaign immediately. Ordinary invocations two and three and all three
+isolated invocations did not start. They must not be launched from this
+freeze, retried or counted as passes. The earlier absent-`/usr/bin/zsh` launch
+remains a non-consuming launcher fault because it created no runner before,
+reporter or Playwright artifact. The user's authorization remains recorded and
+must not be requested again for this stopped six-invocation D.108e4ad batch.
+
+The consumed invocation passed preliminary calibration and completed trial
+`e3-03-0`. Trial `e3-03-1` reached its assertion stage and classified the
+captured replacement as endpoint-local `1/1` / `dual-local`, with both
+authenticated identities advanced and neither endpoint marked incoming. It
+then failed only at `d108e4hAssertOverlapCustody` with exact
+`D108E4H_LIFECYCLE_ORDER_INVALID`: receiver replacement identity
+connection/channel `10/420` contained two
+`channel-open-event` / `rtc-datachannel-open-event` records, at receiver
+sequences 869 and 946, while the validator requires exact cardinality one.
+Trial `e3-03-2`, rendered campaign thresholds, final durable control and
+terminal completion did not execute, so this is not a semantic pass.
+
+The preserved lifecycle distinguishes repeated observer callbacks from
+duplicate product ownership. The receiver installed exactly one observer
+channel handler at sequence 866 and exactly one
+`product-unreliable-webrtc` message handler at sequence 868. Both were already
+`readyState=open`. The first open callback followed at sequence 869; the
+second followed 2.808 seconds later at sequence 946. There was no close call
+or close event on selected identity `10/420`, and 109 subsequent
+`channel-message` records used that identity. The observer source installs
+one `open` listener once per channel and does not synthesize an open event.
+The initiating creator replacement identity `10/416` independently had one
+observer handler, one open event and one product handler. Thus the capture
+does not demonstrate two product handlers, two selected identities,
+break-before-make retirement or a product failure. It demonstrates that the
+test's exact-one raw open-callback expectation is narrower than the observed
+runtime lifecycle.
+
+Exact evidence remains immutable at
+`/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ad-campaign/`.
+Reporter/failure-telemetry/stdout/stderr/status/time/classification/calibration
+SHA-256 values are respectively
+`448e97d7cec6fd6e72ede00329838542138069a78771b6b52b1171f6fe578490`,
+`f72bdd7dab20c5cb182b66669025fc890c4e43a3323d3562ad173d3fddca68cd`,
+`afdee5b4de918cc18222cb696e824325217a791e69378957e5c143c2127ce458`,
+`27a55e324921cd282bc778a82bc9fcd6ee0be0a7b6dc296fc1e2bc6b36a072cc`,
+`4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`,
+`140adac782cb6465b0d79a6c3fb2b1e51524e45347f710b900a3889dc26dced8`,
+`588cff62394132e798bb208ede938ad669613fd080e2eaaecbb5814a83d8e244`
+and
+`ca98647f9a58f66adb566d0bc5b4f72492f48be7aa691ea50d88a5990dcbf7fc`.
+The cumulative artifact manifest excludes itself, validates every retained
+file and has SHA-256
+`194f16e37363fa1f1ce33336f2e4ab146b3ae35b25e7d622ce5cf128afd508bb`.
+Before/after checkout identities, protected status, all 26 stashes, absent
+root shims and fixed-port/process gates remained exact.
+
+###### D.108e4ae — repeated RTC open-callback observability
+
+D.108e4ae is a narrow test-observability RED/GREEN slice owned solely by
+`tests/e3-03-loss-and-hol-proof.pw.ts`. It may not change production or
+example source, Playwright/build/workspace configuration, package manifests,
+dependencies, lockfile, browser pin, workload, loss profile, timing limits,
+performance thresholds, product counters, wire behavior or public APIs. If
+the deterministic work requires any production-source change, stop and
+reslice instead of widening this owner.
+
+RED must replay the exact receiver `10/420` lifecycle above and prove the
+current exact-one `replacementOpens` predicate throws
+`D108E4H_LIFECYCLE_ORDER_INVALID` despite one observer handler, one product
+handler, no selected-identity close and usable post-callback ingress. It must
+also make the observer self-check dispatch two open callbacks on one watched
+channel and prove that current telemetry represents both as independent
+semantic `channel-open-event` records. No browser campaign is part of RED.
+
+GREEN separates semantic readiness from repeated raw callback observation.
+For each watched channel, the first open-listener callback remains the sole
+`channel-open-event` / `rtc-datachannel-open-event` readiness anchor. A later
+callback on that same object is preserved, not discarded, as
+`channel-open-repeat-event` / `rtc-datachannel-open-repeat-event`. The
+observer must still install only once per channel. Endpoint validation
+continues to require exactly one semantic open anchor and exactly one product
+handler on the selected replacement identity. Repeat telemetry is admissible
+only after that anchor, on the exact same peer/trial/connection/channel and
+label, with the exact repeat owner and `readyState=open`, and with no prior
+close call or close event on that identity. It cannot satisfy missing
+readiness, product-handler, identity, ordering, ingress or replacement
+custody. All joins remain endpoint-local and sequence-based; no cross-peer
+clock comparison is introduced.
+
+The existing duplicate semantic-open mutant remains unchanged and must still
+throw exact `D108E4H_LIFECYCLE_ORDER_INVALID`; converting a real repeat into a
+separate event kind must not weaken forged duplicate readiness rejection.
+Add focused mutants for repeat-before-first-open, wrong repeat owner,
+non-open repeat state, wrong selected identity or trial and repeat after
+selected-identity close. Preserve every D.108e4aa and D.108e4ac mutant and
+its exact error code, including endpoint-local `1/1` acceptance, `2/0` and
+`0/2` count ambiguity, asymmetric incoming behavior, zero-owner RTC
+stability, readiness ordering and failed-replacement retention.
+
+Freeze this plan/evidence checkpoint in a signed push, then run the normal
+read-only Grok 4.6/high, exact Kimi K3 `CHECK001` through `CHECK100` plus
+RESULT and Opus 5/xhigh plan review before RED. Do not invoke Fable or a
+collaboration subagent. RED and GREEN keep separate signed/pushed checkpoints
+and the same three-model review protocol. GREEN runs its focused
+non-campaign test once, then the retained seven-title non-campaign suite once,
+plus exact-owner lint/format/diff and affected typecheck/build checks. No long
+campaign may run in D.108e4ae. A later fresh campaign freeze must use new
+evidence paths and reviewed bytes; it cannot reuse or overwrite D.108e4ad
+artifacts or count its five unstarted commands.
