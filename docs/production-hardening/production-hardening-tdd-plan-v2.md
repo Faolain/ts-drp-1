@@ -72440,3 +72440,73 @@ the complete self-excluding review manifest validates and has SHA-256
 `a9aa3c2c5e5faab6088414a3760a73c2ad46b26bd141d01c8a1999d5bacd1fef`.
 This correction grants no long-campaign authority and receives no redundant
 confirmation review; the next checkpoint is deterministic RED only.
+
+The first D.108e4ae RED attempt then passed its exact two-title list guard and
+consumed the one planned focused execution. The list returned exactly the
+schema-v3 custody and RTC lifecycle titles in one file. The focused reporter
+returned status one in 12.627 seconds with two unexpected, zero expected,
+skipped or flaky results and retry zero. This was not the intended complete
+RED matrix: the schema-v3 title stopped at an unintended hard positive-fixture
+failure before any new repeat mutant executed.
+
+The cause is exact and test-local. `d108e4hSendSlice` gives the 93 replacement
+sends beginning at lifecycle 1658 two records each. The final payload's
+success therefore owns sequence `1658 + (93 - 1) * 2 + 1 = 1843`. RED also
+assigned sequence 1843 to the transmitting positive's repeat record. The
+closed-sequence guard correctly threw `D108E4H_SEQUENCE_INVALID`; the
+transmitting positive never reached attempt custody and all repeat mutants
+below it remained unexecuted. This is a RED fixture-construction defect, not a
+validator or product failure.
+
+The observer title independently produced the intended causal RED. One native
+open callback plus the explicit second dispatch on the same inbound object
+serialized as two `channel-open-event` / `rtc-datachannel-open-event` records;
+the new soft expectation required one semantic open followed by one repeat
+kind and failed only on that exact deep equality. No source outside the sole
+test owner changed, no long campaign ran and no production defect was
+demonstrated. Under the frozen stop rule, D.108e4ae receives no focused rerun
+and earns no RED checkpoint approval.
+
+Exact failed-RED custody is `.logs/d108e4ae-red/`. Focused command/reporter/
+stdout/stderr/status/time, list stdout/status, summary and diagnosis SHA-256
+values are respectively
+`3157dd2b74f20527398d41861f71096e4d0f1357c34fdc4d3812b87e89b81800`,
+`729657a9d217a5b75dd5cee3476f8c57858c15d6326abc0704cded447d89e78f`,
+`e1e5f4fcdd82223ab3b6ebcca2e29fb155729f89a5b0b17ba3f6b698d46656bc`,
+`13e655f28973af8e6ad8c662c99ccdd40799452a2d93d29d2ebab0dd09fb2297`,
+`4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`,
+`25faea7c6d78eb425276d9407c2026175911f10eb96741131c1f1d022ea8434a`,
+`cb5a543c1285c2fe5acb275b5064b484c2ac1c7cdce1b971b30a9b4503065ad4`,
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`,
+`d4b902d9693640cb36b83cb6954ba94ee108d037efc6fe1c18cb82313991d4bc`
+and
+`01590af3200f2fae9700068f165551a5149c6bbe84ee52d869b1b808fd72ad98`.
+The complete self-excluding manifest validates and has SHA-256
+`718b4ace12e7e104d055c0fe2ff82ae6497cf1ac7b420ec861c95016960066f3`.
+Failed-RED test-owner and diff hashes are
+`3ae726ff121adcce36a9aa94dd7f2ad76eef18a911024d3c30f81fb60e5c5d60`
+and
+`e465ee69f7cae62393139655b18633af16c240234423a9f95052a5161c80fca2`.
+
+###### D.108e4af — transmitting-repeat RED fixture correction
+
+D.108e4af is a single-cause continuation of D.108e4ae RED, not GREEN. Its only
+test-source change replaces the colliding transmitting-repeat sequence 1843
+with 1844, immediately after the hard-pinned existing final sequence 1843.
+Add a hard precondition that the base creator lifecycle's final record is
+exactly sequence 1843 before appending 1844, so fixture drift cannot silently
+move the positive. No observer expectation, repeat mutant, validator,
+production source, config, dependency, timeout, workload or threshold may
+change in this correction.
+
+After the source-shape/type/format guard passes, run the exact D.108e4ae
+two-title list guard and focused command once under new
+`.logs/d108e4af-red/` custody. The validator title must reach every repeat
+mutant: both GREEN-shaped positives and the wrong-trial retained control pass;
+the seven designed malformed-repeat expectations fail only because current
+validation does not throw their pinned codes. The observer title must retain
+its one exact first-plus-repeat deep-equality RED. Any hard error or different
+soft-failure set stops again. Only that causally complete RED may receive the
+normal Grok/Kimi/Opus RED review and signed/pushed RED checkpoint. No Fable,
+collaboration subagent, retained seven-title suite or long campaign runs in
+D.108e4af.
