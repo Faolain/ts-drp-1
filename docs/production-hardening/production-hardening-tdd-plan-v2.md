@@ -72896,10 +72896,13 @@ values are
 and
 `9508e84117c225c1432ffc6c0ec9b4d7eaeb7fdbc0cc55cb52b05ad63229b245`.
 `zsh -n` returned zero. The retained `1/1` dual-local and legal
-`channel-close` prototypes validate; exact `2/0` and `0/2` prototypes each
-return status one. The classifier remains evidence-only and does not replace
-any lifecycle, identity, delivery, freshness, HOL, performance or terminal
-semantic assertion in the test.
+`channel-close` prototypes validate. The two ambiguous campaign probes each
+put one endpoint at forbidden count two while retaining a count-one peer
+(`2/1` and `1/2`) and each return status one; the exact focused test mutants,
+not these campaign prototypes, retain the `2/0` and `0/2`
+`D108E4H_DROP_COUNT_AMBIGUOUS` contract. The classifier remains evidence-only
+and does not replace any lifecycle, identity, delivery, freshness, HOL,
+performance or terminal semantic assertion in the test.
 
 The user's exact renewed instruction—`I expressly authorize all six
 D.108e4ad long retained-campaign invocations under the frozen fail-closed
@@ -72919,13 +72922,14 @@ D.108e4ad authorization sentence remains the runner's byte-level grant:
 set -eu
 campaign_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-campaign
 freeze_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-freeze
+test "$(date -u +%Y%m%d)" -le 20260905
+test "$(shasum -a 256 "$freeze_root/SHA256SUMS" | awk '{print $1}')" = 2d09a8a7a5d481c67f3b63b4aa13adaaac4392273aaf71da11213637c8590669
+(cd "$freeze_root" && shasum -a 256 -c SHA256SUMS >/dev/null)
 mkdir "$campaign_root"
 printf '%s\n' 'I expressly authorize all six D.108e4ad long retained-campaign invocations under the frozen fail-closed rules.' > "$campaign_root/authorization.txt"
 cp -n "$freeze_root/run-one.zsh" "$campaign_root/run-one.zsh"
 cp -n "$freeze_root/endpoint-local-classification.jq" "$campaign_root/endpoint-local-classification.jq"
 cp -n "$freeze_root/classification-validation.jq" "$campaign_root/classification-validation.jq"
-test "$(shasum -a 256 "$freeze_root/SHA256SUMS" | awk '{print $1}')" = 2d09a8a7a5d481c67f3b63b4aa13adaaac4392273aaf71da11213637c8590669
-(cd "$freeze_root" && shasum -a 256 -c SHA256SUMS >/dev/null)
 test "$(shasum -a 256 "$campaign_root/authorization.txt" | awk '{print $1}')" = 03fdd987ba7d141645826769edc9c78376568483ca543a3183645ad510d03747
 test "$(shasum -a 256 "$campaign_root/run-one.zsh" | awk '{print $1}')" = 855e62050d61515ca849fe974a94f1f280e6515025f4e2da68d0687bd79022b9
 test "$(shasum -a 256 "$campaign_root/endpoint-local-classification.jq" | awk '{print $1}')" = 99d7d65caaad75ae34370d93c230c91e16d6459ccc23594672bb2557254cced9
@@ -72963,36 +72967,107 @@ starting the next. No retry, loop, `--repeat-each`, substitution or
 continuation after failure is allowed:
 
 ```sh
-freeze_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-freeze; campaign_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-campaign; test "$(shasum -a 256 "$freeze_root/SHA256SUMS" | awk '{print $1}')" = 2d09a8a7a5d481c67f3b63b4aa13adaaac4392273aaf71da11213637c8590669 && (cd "$freeze_root" && shasum -a 256 -c SHA256SUMS >/dev/null) && test "$(shasum -a 256 "$campaign_root/run-one.zsh" | awk '{print $1}')" = 855e62050d61515ca849fe974a94f1f280e6515025f4e2da68d0687bd79022b9 && test "$(shasum -a 256 "$campaign_root/endpoint-local-classification.jq" | awk '{print $1}')" = 99d7d65caaad75ae34370d93c230c91e16d6459ccc23594672bb2557254cced9 && test "$(shasum -a 256 "$campaign_root/classification-validation.jq" | awk '{print $1}')" = 9508e84117c225c1432ffc6c0ec9b4d7eaeb7fdbc0cc55cb52b05ad63229b245 && /bin/zsh "$campaign_root/run-one.zsh" ordinary-1 /Users/aristotle/Documents/Projects/ts-drp-1 || exit 1
+freeze_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-freeze; campaign_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-campaign; test "$(date -u +%Y%m%d)" -le 20260905 && test "$(shasum -a 256 "$freeze_root/SHA256SUMS" | awk '{print $1}')" = 2d09a8a7a5d481c67f3b63b4aa13adaaac4392273aaf71da11213637c8590669 && (cd "$freeze_root" && shasum -a 256 -c SHA256SUMS >/dev/null) && test "$(shasum -a 256 "$campaign_root/run-one.zsh" | awk '{print $1}')" = 855e62050d61515ca849fe974a94f1f280e6515025f4e2da68d0687bd79022b9 && test "$(shasum -a 256 "$campaign_root/endpoint-local-classification.jq" | awk '{print $1}')" = 99d7d65caaad75ae34370d93c230c91e16d6459ccc23594672bb2557254cced9 && test "$(shasum -a 256 "$campaign_root/classification-validation.jq" | awk '{print $1}')" = 9508e84117c225c1432ffc6c0ec9b4d7eaeb7fdbc0cc55cb52b05ad63229b245 && /bin/zsh "$campaign_root/run-one.zsh" ordinary-1 /Users/aristotle/Documents/Projects/ts-drp-1 || exit 1
 ```
 
 ```sh
-freeze_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-freeze; campaign_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-campaign; test "$(shasum -a 256 "$freeze_root/SHA256SUMS" | awk '{print $1}')" = 2d09a8a7a5d481c67f3b63b4aa13adaaac4392273aaf71da11213637c8590669 && (cd "$freeze_root" && shasum -a 256 -c SHA256SUMS >/dev/null) && /bin/zsh "$campaign_root/run-one.zsh" ordinary-2 /Users/aristotle/Documents/Projects/ts-drp-1 || exit 1
+freeze_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-freeze; campaign_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-campaign; test "$(date -u +%Y%m%d)" -le 20260905 && test -f "$campaign_root/ordinary-1.runner-status" && test "$(<"$campaign_root/ordinary-1.runner-status")" = 0 && test "$(shasum -a 256 "$freeze_root/SHA256SUMS" | awk '{print $1}')" = 2d09a8a7a5d481c67f3b63b4aa13adaaac4392273aaf71da11213637c8590669 && (cd "$freeze_root" && shasum -a 256 -c SHA256SUMS >/dev/null) && test "$(shasum -a 256 "$campaign_root/run-one.zsh" | awk '{print $1}')" = 855e62050d61515ca849fe974a94f1f280e6515025f4e2da68d0687bd79022b9 && test "$(shasum -a 256 "$campaign_root/endpoint-local-classification.jq" | awk '{print $1}')" = 99d7d65caaad75ae34370d93c230c91e16d6459ccc23594672bb2557254cced9 && test "$(shasum -a 256 "$campaign_root/classification-validation.jq" | awk '{print $1}')" = 9508e84117c225c1432ffc6c0ec9b4d7eaeb7fdbc0cc55cb52b05ad63229b245 && /bin/zsh "$campaign_root/run-one.zsh" ordinary-2 /Users/aristotle/Documents/Projects/ts-drp-1 || exit 1
 ```
 
 ```sh
-freeze_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-freeze; campaign_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-campaign; test "$(shasum -a 256 "$freeze_root/SHA256SUMS" | awk '{print $1}')" = 2d09a8a7a5d481c67f3b63b4aa13adaaac4392273aaf71da11213637c8590669 && (cd "$freeze_root" && shasum -a 256 -c SHA256SUMS >/dev/null) && /bin/zsh "$campaign_root/run-one.zsh" ordinary-3 /Users/aristotle/Documents/Projects/ts-drp-1 || exit 1
+freeze_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-freeze; campaign_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-campaign; test "$(date -u +%Y%m%d)" -le 20260905 && test -f "$campaign_root/ordinary-2.runner-status" && test "$(<"$campaign_root/ordinary-2.runner-status")" = 0 && test "$(shasum -a 256 "$freeze_root/SHA256SUMS" | awk '{print $1}')" = 2d09a8a7a5d481c67f3b63b4aa13adaaac4392273aaf71da11213637c8590669 && (cd "$freeze_root" && shasum -a 256 -c SHA256SUMS >/dev/null) && test "$(shasum -a 256 "$campaign_root/run-one.zsh" | awk '{print $1}')" = 855e62050d61515ca849fe974a94f1f280e6515025f4e2da68d0687bd79022b9 && test "$(shasum -a 256 "$campaign_root/endpoint-local-classification.jq" | awk '{print $1}')" = 99d7d65caaad75ae34370d93c230c91e16d6459ccc23594672bb2557254cced9 && test "$(shasum -a 256 "$campaign_root/classification-validation.jq" | awk '{print $1}')" = 9508e84117c225c1432ffc6c0ec9b4d7eaeb7fdbc0cc55cb52b05ad63229b245 && /bin/zsh "$campaign_root/run-one.zsh" ordinary-3 /Users/aristotle/Documents/Projects/ts-drp-1 || exit 1
 ```
 
 ```sh
-freeze_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-freeze; campaign_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-campaign; test "$(shasum -a 256 "$freeze_root/SHA256SUMS" | awk '{print $1}')" = 2d09a8a7a5d481c67f3b63b4aa13adaaac4392273aaf71da11213637c8590669 && (cd "$freeze_root" && shasum -a 256 -c SHA256SUMS >/dev/null) && /bin/zsh "$campaign_root/run-one.zsh" isolated-1 /private/tmp/ts-drp-d108e4aj-clean.xPNHQk/repo || exit 1
+freeze_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-freeze; campaign_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-campaign; test "$(date -u +%Y%m%d)" -le 20260905 && test -f "$campaign_root/ordinary-3.runner-status" && test "$(<"$campaign_root/ordinary-3.runner-status")" = 0 && test "$(shasum -a 256 "$freeze_root/SHA256SUMS" | awk '{print $1}')" = 2d09a8a7a5d481c67f3b63b4aa13adaaac4392273aaf71da11213637c8590669 && (cd "$freeze_root" && shasum -a 256 -c SHA256SUMS >/dev/null) && test "$(shasum -a 256 "$campaign_root/run-one.zsh" | awk '{print $1}')" = 855e62050d61515ca849fe974a94f1f280e6515025f4e2da68d0687bd79022b9 && test "$(shasum -a 256 "$campaign_root/endpoint-local-classification.jq" | awk '{print $1}')" = 99d7d65caaad75ae34370d93c230c91e16d6459ccc23594672bb2557254cced9 && test "$(shasum -a 256 "$campaign_root/classification-validation.jq" | awk '{print $1}')" = 9508e84117c225c1432ffc6c0ec9b4d7eaeb7fdbc0cc55cb52b05ad63229b245 && /bin/zsh "$campaign_root/run-one.zsh" isolated-1 /private/tmp/ts-drp-d108e4aj-clean.xPNHQk/repo || exit 1
 ```
 
 ```sh
-freeze_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-freeze; campaign_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-campaign; test "$(shasum -a 256 "$freeze_root/SHA256SUMS" | awk '{print $1}')" = 2d09a8a7a5d481c67f3b63b4aa13adaaac4392273aaf71da11213637c8590669 && (cd "$freeze_root" && shasum -a 256 -c SHA256SUMS >/dev/null) && /bin/zsh "$campaign_root/run-one.zsh" isolated-2 /private/tmp/ts-drp-d108e4aj-clean.xPNHQk/repo || exit 1
+freeze_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-freeze; campaign_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-campaign; test "$(date -u +%Y%m%d)" -le 20260905 && test -f "$campaign_root/isolated-1.runner-status" && test "$(<"$campaign_root/isolated-1.runner-status")" = 0 && test "$(shasum -a 256 "$freeze_root/SHA256SUMS" | awk '{print $1}')" = 2d09a8a7a5d481c67f3b63b4aa13adaaac4392273aaf71da11213637c8590669 && (cd "$freeze_root" && shasum -a 256 -c SHA256SUMS >/dev/null) && test "$(shasum -a 256 "$campaign_root/run-one.zsh" | awk '{print $1}')" = 855e62050d61515ca849fe974a94f1f280e6515025f4e2da68d0687bd79022b9 && test "$(shasum -a 256 "$campaign_root/endpoint-local-classification.jq" | awk '{print $1}')" = 99d7d65caaad75ae34370d93c230c91e16d6459ccc23594672bb2557254cced9 && test "$(shasum -a 256 "$campaign_root/classification-validation.jq" | awk '{print $1}')" = 9508e84117c225c1432ffc6c0ec9b4d7eaeb7fdbc0cc55cb52b05ad63229b245 && /bin/zsh "$campaign_root/run-one.zsh" isolated-2 /private/tmp/ts-drp-d108e4aj-clean.xPNHQk/repo || exit 1
 ```
 
 ```sh
-freeze_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-freeze; campaign_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-campaign; test "$(shasum -a 256 "$freeze_root/SHA256SUMS" | awk '{print $1}')" = 2d09a8a7a5d481c67f3b63b4aa13adaaac4392273aaf71da11213637c8590669 && (cd "$freeze_root" && shasum -a 256 -c SHA256SUMS >/dev/null) && /bin/zsh "$campaign_root/run-one.zsh" isolated-3 /private/tmp/ts-drp-d108e4aj-clean.xPNHQk/repo || exit 1
+freeze_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-freeze; campaign_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aj-campaign; test "$(date -u +%Y%m%d)" -le 20260905 && test -f "$campaign_root/isolated-2.runner-status" && test "$(<"$campaign_root/isolated-2.runner-status")" = 0 && test "$(shasum -a 256 "$freeze_root/SHA256SUMS" | awk '{print $1}')" = 2d09a8a7a5d481c67f3b63b4aa13adaaac4392273aaf71da11213637c8590669 && (cd "$freeze_root" && shasum -a 256 -c SHA256SUMS >/dev/null) && test "$(shasum -a 256 "$campaign_root/run-one.zsh" | awk '{print $1}')" = 855e62050d61515ca849fe974a94f1f280e6515025f4e2da68d0687bd79022b9 && test "$(shasum -a 256 "$campaign_root/endpoint-local-classification.jq" | awk '{print $1}')" = 99d7d65caaad75ae34370d93c230c91e16d6459ccc23594672bb2557254cced9 && test "$(shasum -a 256 "$campaign_root/classification-validation.jq" | awk '{print $1}')" = 9508e84117c225c1432ffc6c0ec9b4d7eaeb7fdbc0cc55cb52b05ad63229b245 && /bin/zsh "$campaign_root/run-one.zsh" isolated-3 /private/tmp/ts-drp-d108e4aj-clean.xPNHQk/repo || exit 1
 ```
 
-The first command redundantly checks the three copied runner/filter hashes;
-the runner repeats those checks internally for every invocation. The later
-commands repeat the signed freeze-manifest guard and rely on that immutable
-runner's internal copy/hash checks, avoiding a second mutable command wrapper.
+Every command verifies the UTC expiry, signed freeze manifest and all three
+campaign copies before executing the runner. Commands two through six also
+require the immediately preceding invocation's terminal runner status to be
+zero, so a missing or consumed failure mechanically prevents continuation.
 After six consecutive passes, sign and push one D.108e4aj campaign-evidence
 checkpoint and run a separate normal Grok/exact-Kimi/Opus evidence review.
 Fable and collaboration subagents remain prohibited. Aggregate D.108e4 and
 D.108e5 remain blocked until the campaign and its evidence-review P0/P1 union
 close. D.108e4ai's bounded P2 hygiene remains due by 2026-09-05 or before
 D.108e5, but it is not allowed to mutate this frozen campaign owner.
+
+###### D.108e4ak — post-fix campaign freeze review closure
+
+The required review inspected exact signed/pushed freeze
+`07d62644d16eff24f91e2c1ead6f789993f55e41`, tree
+`8be0244e1e5287f8c81c457c76f23cbbe54e1bcc`, and ran no test, campaign,
+Fable or collaboration subagent. The pre-correction union was P0=0/P1=1:
+Grok and Opus independently found that commands two through six executed a
+writable campaign runner without first comparing its bytes to the signed
+constant. Kimi reported the identical issue as P2. The stricter P1 severity
+governs.
+
+Grok 4.6/high session `01a04e8d-b17b-7ea2-a6d1-0c09f0139ff0` ended normally
+after 660.142 seconds but prefixed its valid terminal object with progress
+text, so the runner honestly retained `NO_VERDICT`. A same-session,
+tool-free, schema-constrained formatting continuation returned
+`CHANGES_REQUIRED`, P0=0/P1=1/P2=4. Its structured-output SHA-256 is
+`69eea7ab568b58c0e0915151ad52068e3ddf5ac37a7d60468ad568c0210afed6`.
+
+Exact Kimi CLI 1.49.0 / `kimi-code/k3` session
+`5c4f7ebc-0e3b-4abd-8350-c0a5423ccebb` completed the substantive review and
+returned two progress lines before the required checklist. A same-session
+formatting-only continuation emitted exactly 101 nonempty lines: ordered
+unique `CHECK001` through `CHECK100`, then one RESULT. It returned `APPROVED`,
+P0=0/P1=0/P2=3. Exact checklist and RESULT JSON SHA-256 values are
+`74389efac50576821cfbcd6677160a6dbb4c311076dc6e6b135a6658461c5ad5`
+and
+`28c884bd3b721ac022fa54819cd62ac90ac69cf08de631537082a6fc2f776070`.
+
+Opus 5/xhigh session `494ca410-5554-4986-803c-4d9c56d322e5` returned
+`CHANGES_REQUIRED`, P0=0/P1=1/P2=6. Its structured-output SHA-256 is
+`b7ae919c63b23193c970bd5026146f381f602fe4f251edc0709999776720082a`.
+The complete 44-file review manifest excludes itself, validates and has
+SHA-256
+`35b381dbdf354787152832a9e5c2263281fe4f49ab78af24d7f380700462fe73`.
+Review validation SHA-256 is
+`0a8732a1b4f70477679398693d92c277a05adf56d3edd3bb4422ba4e6feb50e3`.
+
+The same-round correction closes the complete P1 union without changing any
+frozen runner, filter, test, product, configuration or evidence byte. Every
+one of the six launchers now authenticates the signed freeze manifest and all
+three campaign copies before executing the runner. Commands two through six
+also require the immediately preceding terminal runner status to exist and
+equal zero, mechanically enforcing order and stop-on-failure. Every launcher
+and root setup now enforces the UTC expiry, and root setup verifies the freeze
+before it creates state. The ambiguous-prototype prose now describes the
+actual `2/1` and `1/2` bytes while preserving the exact focused-test `2/0` and
+`0/2` error contract. This plan-only correction receives a new signed/pushed
+checkpoint; because it implements the reviewers' exact shared correction and
+changes no reviewed executable artifact, the same round requires no
+confirmation review.
+
+Remaining P2s are nonblocking custody hardening owned by D.108e4ak through
+the campaign evidence review or, at latest, before D.108e5 aggregate closure
+on 2026-09-05. If a run preserves nested Playwright failure files below the
+runner's `find -maxdepth 2`, the evidence checkpoint must hash and disclose
+each omitted file separately and cannot call the cumulative manifest
+complete. The live preflight must verify that no reviewer, test or profiler is
+active in any ts-drp worktree, not merely the ordinary and isolated paths.
+The old D.108e4ad roots remain byte-immutable and must never execute; changing
+filesystem modes is deferred because existing SHA-256 manifests do not bind
+mode bits. Session-scoped tool paths, pre-trap `.preflight-*` residue,
+predecessor enforcement inside the runner itself, full recursive failure-tree
+hashing, and explicit checkout command/status custody are future runner/freeze
+hygiene; any occurrence during this campaign stops for evidence inspection
+and grants no retry. None weakens the six-pass acceptance gate or reopens the
+accepted repeated-open behavior.
+
+Once this correction is signed and pushed and all three reviewer processes
+have exited, the already-recorded user authorization permits root setup and
+the exact six D.108e4aj launch blocks without another authorization request.
