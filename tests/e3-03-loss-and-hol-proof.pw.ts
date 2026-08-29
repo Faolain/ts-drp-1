@@ -2685,8 +2685,25 @@ function d108e4acDualLocalReplacementReplay(swapPageOrder: boolean): D108e4hVali
 		});
 	const creatorOldSends = d108e4hSendSlice(trialId, creatorBefore, 0, 507, 0);
 	const creatorNewSends = d108e4hSendSlice(trialId, creatorAfter, 507, 93, 1_658);
+	const receiverOldMessageSequences = Object.freeze([
+		0, 30, 60, 90, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135,
+		136, 137, 138, 139, 140, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 167, 168, 169, 170, 171, 172, 173, 174,
+		175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197,
+		198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 227,
+		232, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 257, 258, 259,
+		260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282,
+		283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 295, 296, 316, 317, 318, 319, 320, 321, 322, 323, 348,
+		349, 350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 360, 361, 362, 405, 406, 407, 408, 409, 410, 411, 412, 415,
+		416, 417, 418, 419, 420, 421, 422, 423, 438, 439, 440, 444, 445, 446, 447, 448, 449, 450, 451, 452, 453, 454, 455,
+		456, 457, 458, 459, 460, 461, 462, 463, 464, 465, 466, 467, 468, 489, 493, 494, 495, 496, 497, 498, 499, 500, 501,
+		502, 503, 504, 505, 506, 507, 508, 509, 510, 511, 512, 513, 514, 515, 516, 517, 518, 519, 520, 521, 522, 523, 524,
+		525, 526, 527, 528, 529, 530, 531, 532, 533, 534, 535, 536, 543, 566, 567, 585, 586, 587, 588, 589, 590, 591, 642,
+		653, 654, 655, 656, 658, 659, 660, 661, 662, 670, 671, 688, 695, 741, 742, 743, 746, 747, 748, 755, 794, 805, 806,
+		820, 821, 822, 866, 867, 868, 888, 893, 895, 898, 899, 915, 916, 917, 918, 919, 920, 921, 922, 923, 924, 925, 926,
+		927, 928, 950, 951, 952, 953, 954, 955, 956, 957, 958, 959, 960,
+	]);
 	const receiverOldMessages = Object.freeze(
-		Array.from({ length: 336 }, (_, sequence) =>
+		receiverOldMessageSequences.map((sequence) =>
 			d108e4hLifecycle(trialId, sequence, "channel-message", receiverBefore, "rtc-datachannel-message-event")
 		)
 	);
@@ -2746,7 +2763,15 @@ function d108e4acDualLocalReplacementReplay(swapPageOrder: boolean): D108e4hVali
 				acceptedRaw: receiverAccepted,
 				deadline: boundary(creatorPeerId, "6rktlz1787980796505", 6, receiverAfter, receiverDeadlineTransport),
 				lifecycle: Object.freeze([
-					...receiverOldMessages,
+					...receiverOldMessages.filter(({ sequence }) => sequence < 428),
+					d108e4hLifecycle(
+						trialId,
+						428,
+						"channel-handler-installed",
+						receiverAfter,
+						"rtc-observer-datachannel-handler",
+						{ readyState: "connecting" }
+					),
 					d108e4hLifecycle(
 						trialId,
 						429,
@@ -2755,6 +2780,7 @@ function d108e4acDualLocalReplacementReplay(swapPageOrder: boolean): D108e4hVali
 						"rtc-observer-or-harness",
 						{ readyState: "connecting" }
 					),
+					...receiverOldMessages.filter(({ sequence }) => sequence > 429),
 					d108e4hLifecycle(trialId, 961, "channel-open-event", receiverAfter, "rtc-datachannel-open-event"),
 					d108e4hLifecycle(
 						trialId,
@@ -3607,6 +3633,11 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 			if (creatorLocal === undefined || receiverLocal === undefined) {
 				throw new Error("D108E4AC_DUAL_LOCAL_ENDPOINT_ABSENT");
 			}
+			expect(dualLocalReplacement.endpoints.creator.peerId).toBe(
+				swapPageOrder
+					? "16Uiu2HAkvi5DUFivZdjNxyLAxR9sATAKBCLSmKN3qoHHzxKwUttJ"
+					: "16Uiu2HAmDmbpqXW4sui8F9r1JjViSCVkSuKcL6mBnqCGUb3jNUTc"
+			);
 			expect(Object.values(dualLocalReplacement.rawTransportDeltas)).toEqual([
 				{
 					authenticatedConnectionLosses: 1,
@@ -3623,6 +3654,16 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 					linkDrops: 1,
 				},
 			]);
+			expect(dualLocalReplacement.rawTransportDeltas).toEqual({
+				creator: rawTransportDelta(
+					dualLocalReplacement.endpoints.creator.prepare.rawTransport,
+					dualLocalReplacement.endpoints.creator.deadline.rawTransport
+				),
+				receiver: rawTransportDelta(
+					dualLocalReplacement.endpoints.receiver.prepare.rawTransport,
+					dualLocalReplacement.endpoints.receiver.deadline.rawTransport
+				),
+			});
 			expect({
 				creatorAccepted: creatorLocal.acceptedRaw.length,
 				creatorAuthenticated: creatorLocal.prepare.authenticated.map(({ connectionId, generation }) => [
@@ -3636,6 +3677,12 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 				creatorRtc: [creatorLocal.prepare.rtc, creatorLocal.deadline.rtc].map((identities) =>
 					identities.map(({ channelId, connectionId }) => [connectionId, channelId])
 				),
+				creatorNewSends: creatorLocal.rawSends.filter(
+					({ channelId, connectionId }) => connectionId === 7 && channelId === 399
+				).length,
+				creatorOldSends: creatorLocal.rawSends.filter(
+					({ channelId, connectionId }) => connectionId === 5 && channelId === 373
+				).length,
 				creatorSends: creatorLocal.rawSends.length,
 				receiverAccepted: receiverLocal.acceptedRaw.length,
 				receiverAuthenticated: receiverLocal.prepare.authenticated.map(({ connectionId, generation }) => [
@@ -3649,28 +3696,72 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 				receiverRtc: [receiverLocal.prepare.rtc, receiverLocal.deadline.rtc].map((identities) =>
 					identities.map(({ channelId, connectionId }) => [connectionId, channelId])
 				),
+				receiverNewAccepted: receiverLocal.acceptedRaw.filter(
+					({ channelId, connectionId }) => connectionId === 7 && channelId === 382
+				).length,
+				receiverOldAccepted: receiverLocal.acceptedRaw.filter(
+					({ channelId, connectionId }) => connectionId === 5 && channelId === 369
+				).length,
 			}).toEqual({
 				creatorAccepted: 0,
 				creatorAuthenticated: [["2f4n8z1787980768199", 5]],
 				creatorDeadlineAuthenticated: [["67j4of1787980800178", 6]],
 				creatorRtc: [[[5, 373]], [[7, 399]]],
+				creatorNewSends: 93,
+				creatorOldSends: 507,
 				creatorSends: SAMPLE_COUNT,
 				receiverAccepted: 400,
 				receiverAuthenticated: [["9i8v0y1787980768201", 5]],
 				receiverDeadlineAuthenticated: [["6rktlz1787980796505", 6]],
 				receiverRtc: [[[5, 369]], [[7, 382]]],
+				receiverNewAccepted: 64,
+				receiverOldAccepted: 336,
 			});
 			expect(
 				creatorLocal.lifecycle
 					.filter(({ sequence }) => sequence >= 1_653 && sequence <= 1_657)
-					.map(({ event, owner, readyState, sequence }) => [sequence, event, owner, readyState])
+					.map(({ channelId, connectionId, event, owner, readyState, sequence }) => [
+						sequence,
+						event,
+						owner,
+						readyState,
+						connectionId,
+						channelId,
+					])
 			).toEqual([
-				[1_653, "channel-handler-installed", "rtc-observer-datachannel-handler", "open"],
-				[1_654, "channel-message-handler-installed", "rtc-observer-or-harness", "open"],
-				[1_655, "channel-message-handler-installed", "product-unreliable-webrtc", "open"],
-				[1_656, "channel-close-call", "product-unreliable-webrtc", "closing"],
-				[1_657, "channel-open-event", "rtc-datachannel-open-event", "open"],
+				[1_653, "channel-handler-installed", "rtc-observer-datachannel-handler", "open", 7, 399],
+				[1_654, "channel-message-handler-installed", "rtc-observer-or-harness", "open", 7, 399],
+				[1_655, "channel-message-handler-installed", "product-unreliable-webrtc", "open", 7, 399],
+				[1_656, "channel-close-call", "product-unreliable-webrtc", "closing", 5, 373],
+				[1_657, "channel-open-event", "rtc-datachannel-open-event", "open", 7, 399],
 			]);
+			expect(
+				receiverLocal.lifecycle
+					.filter(({ sequence }) => (sequence >= 428 && sequence <= 429) || (sequence >= 961 && sequence <= 963))
+					.map(({ channelId, connectionId, event, owner, readyState, sequence }) => [
+						sequence,
+						event,
+						owner,
+						readyState,
+						connectionId,
+						channelId,
+					])
+			).toEqual([
+				[428, "channel-handler-installed", "rtc-observer-datachannel-handler", "connecting", 7, 382],
+				[429, "channel-message-handler-installed", "rtc-observer-or-harness", "connecting", 7, 382],
+				[961, "channel-open-event", "rtc-datachannel-open-event", "open", 7, 382],
+				[962, "channel-message-handler-installed", "product-unreliable-webrtc", "open", 7, 382],
+				[963, "channel-close-call", "product-unreliable-webrtc", "open", 5, 369],
+			]);
+			expect(() =>
+				d108e4hAssertOverlapCustody(
+					creatorLocal,
+					d108e4hOnly(creatorLocal.prepare.rtc),
+					d108e4hOnly(creatorLocal.deadline.rtc),
+					true,
+					"replacement"
+				)
+			).toThrowError("D108E4H_LIFECYCLE_ORDER_INVALID");
 			let branchError: unknown;
 			try {
 				validateD108e4hCampaignCustody(dualLocalReplacement);

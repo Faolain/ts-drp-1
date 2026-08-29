@@ -71550,8 +71550,9 @@ The complete review-evidence `SHA256SUMS` excludes itself and has SHA-256
 `03e39097dc34cd05108cce26ded3576dc8d3b70d54ef464bb0f964727f8eb97e`.
 
 The D.108e4ac RED was then implemented against exact signed/pushed corrected
-plan base `c4eeb342af6677d3071f1a0c7541aa63c9240c0e`. It changes only
-`tests/e3-03-loss-and-hol-proof.pw.ts`. The deterministic helper freezes both
+plan base `c4eeb342af6677d3071f1a0c7541aa63c9240c0e`. Its code change is only
+`tests/e3-03-loss-and-hol-proof.pw.ts`; this paragraph is the accompanying
+evidence record. The deterministic helper freezes both
 endpoint-local deltas at exact one/replacement, authenticated boundaries
 `2f4n8z...`/generation 5 to `67j4of...`/6 and
 `9i8v0y...`/5 to `6rktlz...`/6, raw RTC `5/373` to `7/399` and `5/369` to
@@ -71581,6 +71582,90 @@ and
 The complete RED `SHA256SUMS` excludes itself and has SHA-256
 `fc9cf3b91d401d8d9301080998b0b043b04ec45696ad9acc1b4ecb7b012e5e69`.
 RED is not GREEN and authorizes no campaign execution.
+
+That RED and evidence record were frozen in signed/pushed commit
+`e148fd8e24f6be56432e12f869d8c575a2056901`, parent
+`c4eeb342af6677d3071f1a0c7541aa63c9240c0e`. The required separate RED
+implementation review ran read-only against that exact checkpoint without
+Fable, collaboration subagents, product writes, tests by reviewers or a long
+campaign.
+
+- Grok 4.6/high session `01a04c12-97e8-7850-8546-bd52d1c4507e` ended
+  normally with `end_turn` after 420.139 seconds. Its substantive result was
+  APPROVED, P0=0/P1=0/P2=1, but progress prose preceded the required RESULT
+  line, so the initial output was not accepted as a verdict. One tool-free,
+  one-turn continuation of the same session re-emitted the exact findings as
+  one schema-valid RESULT line with no new review. Events/public/status and
+  continuation JSON/stderr/status SHA-256 values are
+  `f42c56b25d80ba8d53361723e604ddd68869c9602166955ad98c109e70084ca7`,
+  `7067f2cb569c729e89a0ae34b162595fbd52995be04ee8e0977b6407b717cd96`,
+  `f0474bd00692426e3a948fc0238bd701cd199ff4e06508234f7d5a4179079fce`,
+  `d2d0111679f468bec8e1c72c33cc797672d081a983baa638093002cbed71d729`,
+  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+  and
+  `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+- Exact `kimi-cli` 1.49.0 / `kimi-code/k3` session
+  `5ef61b55-2180-4eea-8822-7e8820e92d02` returned zero and emitted exactly
+  101 nonempty lines: ordered unique CHECK001 through CHECK100, then one
+  RESULT. It returned APPROVED, P0=0/P1=0/P2=3. Stream/text/stderr/status
+  SHA-256 values are
+  `609f7fea8b47cf5adb932a7f4b0aef0c7c8d2ac5741183457a8d4684f7851b0e`,
+  `62a1aa471dc4983069bdd01817446dcf64be289a5a951a90a8e9ce212ee98080`,
+  `26e5efd7de2a33ebf6279b5f6c77fd16ef23dc26345f8b7d95dd3ccb5430de23`
+  and
+  `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+- Opus 5/xhigh session `614d2698-0ddd-4231-8783-e1326bccb920`
+  completed 44 turns in 607.701 seconds with `is_error=false`, no permission
+  denial, no subagent and structured CHANGES_REQUIRED, P0=0/P1=3/P2=4.
+  JSON/stderr/status SHA-256 values are
+  `20b02207665b39a6f5af5d7d767205acafef50ead93a13f0db9df66ad56925fa`,
+  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+  and
+  `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+
+The complete same-round P0/P1/P2 union is corrected without a confirmation
+review. The fixture now preserves all 336 exact captured receiver old-channel
+message sequences from 0 through 960, including 143 after the new channel's
+sequence-429 observer handler; restores receiver sequence 428
+`channel-handler-installed` with `readyState=connecting`; and hard-pins the
+receiver 428/429 and 961/962/963 windows with their exact RTC identities. It
+also hard-pins physical page-slot order, page-local delta derivation, the
+507/93 sender and 336/64 receiver old/new identity splits, and every creator
+1653-1657 connection/channel identity. A direct endpoint assertion proves the
+current creator overlap branch throws `D108E4H_LIFECYCLE_ORDER_INVALID` after
+the campaign-wide gate, thereby bounding the already-planned sequenced-open
+readiness GREEN instead of discovering it during GREEN. The hard
+`branchError` assertion is RED-only attribution scaffolding; GREEN must replace
+it with a positive assertion, and that replacement is not assertion
+weakening. These changes remain test/plan-only and change no product contract.
+
+One compound corrected-RED launcher was blocked before execution by the
+command-safety hook because its read-only `awk` diagnostic redirected to
+`/dev/stderr`; no subprocess or test started. After a separate clean
+process/port preflight, the single corrected focused RED returned one in
+7.832 seconds. Reporter custody remains exact: one unexpected test, zero
+expected/skipped/flaky tests, retry zero, no top-level error and exactly two
+soft failures, one for each physical page ordering, both still carrying only
+`D108E4H_DROP_COUNT_AMBIGUOUS`. No hard custody assertion failed and no long
+campaign ran. Exact-owner `tsc`, ESLint, Prettier and `git diff --check` again
+returned zero. The corrected owner SHA-256 is
+`9d98190248b408ce80be301ca4ca298fe1bbd78b42db29a8972e011281dab18e`;
+its review-correction diff SHA-256 is
+`072bb2d8779b93bab1085d3e84a4652425a8f24da8d621d071291f6c84dd3329`.
+Corrected focused command/reporter/stdout/stderr/status/time/summary SHA-256
+values are
+`b13ccb4bdc558f7640d4164565b941ffe694255490f76ecf0ed85f6c1f92652a`,
+`24b0a34613694b44da7b9be844908197d910f06d65b5f0ec0047179a07bd6442`,
+`4e952c6b95617141eb84154a8d7448ceaf7d94652db0eb02fb2648697f1817ed`,
+`095481c5b82f0ede6cd740878b667b68ccb45c27b98236aaf0d97536c53741a4`,
+`4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`,
+`2f885e5392c8888efc15e57f7171d628456a486b404000802908477cc356fda2`
+and
+`6bbf6d9eb8319072e08c5d160bb4952ca9dcb297672a99ca54c7d420563c7ff3`.
+The complete RED-review `SHA256SUMS` excludes itself and has SHA-256
+`6ffb412abd2d41481290cf5cd63dd23c6252ce51121ab09480d9f2e0ddf4baa0`.
+The corrected RED remains RED, grants no campaign authority and is ready for
+its signed/pushed correction checkpoint before GREEN.
 
 D.108e4b's separate GREEN review, aggregate D.108e4 closure and D.108e5 remain
 blocked until D.108e4ac and a replacement six-pass campaign close.
