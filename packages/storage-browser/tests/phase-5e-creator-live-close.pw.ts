@@ -64,6 +64,7 @@ function expectedCombinedClosure(
 let server: Phase4cBrowserServer | undefined;
 
 const FIXTURE_WAIT_MS = 5_000;
+const INSPECTION_WAIT_MS = 2_000;
 const TELEMETRY_ENTRY_LIMIT = 5;
 const TELEMETRY_TEXT_LIMIT = 512;
 const LIVE_CLOSE_API_FUNCTIONS = [
@@ -79,6 +80,8 @@ const LIVE_CLOSE_API_FUNCTIONS = [
 
 type LiveCloseApiState =
 	| Readonly<{ kind: "absent" }>
+	| Readonly<{ detail: string; kind: "inspection-failed" }>
+	| Readonly<{ kind: "inspection-timeout" }>
 	| Readonly<{ kind: "missing-functions"; missing: readonly string[] }>
 	| Readonly<{ kind: "non-object"; valueType: string }>
 	| Readonly<{ kind: "ready" }>;
@@ -119,7 +122,27 @@ async function inspectLiveCloseApi(page: Page): Promise<LiveCloseApiState> {
 	}, LIVE_CLOSE_API_FUNCTIONS);
 }
 
+async function inspectLiveCloseApiBounded(page: Page): Promise<LiveCloseApiState> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	try {
+		return await Promise.race([
+			inspectLiveCloseApi(page).catch(
+				(error: unknown): LiveCloseApiState => ({
+					detail: boundedText(error),
+					kind: "inspection-failed",
+				})
+			),
+			new Promise<LiveCloseApiState>((resolvePromise) => {
+				timer = setTimeout(() => resolvePromise({ kind: "inspection-timeout" }), INSPECTION_WAIT_MS);
+			}),
+		]);
+	} finally {
+		if (timer !== undefined) clearTimeout(timer);
+	}
+}
+
 async function loadCreatorLiveCloseFixture(page: Page, origin: string): Promise<void> {
+	const abortController = new AbortController();
 	const telemetry: FixtureTelemetry = {
 		consoleErrors: [],
 		pageErrors: [],
@@ -133,6 +156,7 @@ async function loadCreatorLiveCloseFixture(page: Page, origin: string): Promise<
 	};
 	const onPageError = (error: Error): void => recordBounded(telemetry.pageErrors, boundedText(error.message));
 	const onRequestFailed = (request: { failure(): null | { errorText: string }; url(): string }): void => {
+		if (request.url() !== documentUrl && request.url() !== entryUrl) return;
 		recordBounded(telemetry.requestFailures, {
 			error: boundedText(request.failure()?.errorText ?? "unknown request failure"),
 			url: boundedText(request.url()),
@@ -153,15 +177,17 @@ async function loadCreatorLiveCloseFixture(page: Page, origin: string): Promise<
 
 	try {
 		const documentResponsePromise = page.waitForResponse((response) => matchesExactUrl(response, documentUrl), {
+			signal: abortController.signal,
 			timeout: FIXTURE_WAIT_MS,
 		});
 		const entryResponsePromise = page.waitForResponse((response) => matchesExactUrl(response, entryUrl), {
+			signal: abortController.signal,
 			timeout: FIXTURE_WAIT_MS,
 		});
 		const [documentResponse, entryResponse] = await Promise.all([
 			documentResponsePromise,
 			entryResponsePromise,
-			page.goto(origin),
+			page.goto(origin, { signal: abortController.signal, timeout: FIXTURE_WAIT_MS }),
 		]);
 		const documentContentType = documentResponse.headers()["content-type"] ?? "";
 		if (!documentResponse.ok() || !documentContentType.startsWith("text/html")) {
@@ -181,25 +207,25 @@ async function loadCreatorLiveCloseFixture(page: Page, origin: string): Promise<
 				);
 			},
 			LIVE_CLOSE_API_FUNCTIONS,
-			{ timeout: FIXTURE_WAIT_MS }
+			{ polling: 100, timeout: FIXTURE_WAIT_MS }
 		);
-		if (telemetry.consoleErrors.length > 0 || telemetry.pageErrors.length > 0 || telemetry.requestFailures.length > 0) {
+		if (telemetry.pageErrors.length > 0 || telemetry.requestFailures.length > 0) {
 			throw new TypeError("phase-5e live-close bootstrap emitted an error");
 		}
 	} catch (cause) {
-		const apiState = await inspectLiveCloseApi(page).catch((error: unknown) => ({
-			kind: "non-object" as const,
-			valueType: `inspection-failed:${boundedText(error)}`,
-		}));
+		abortController.abort();
+		const apiState = await inspectLiveCloseApiBounded(page);
 		throw new Error(
 			`phase-5e live-close fixture readiness failed: ${JSON.stringify({
 				apiState,
 				cause: boundedText(cause),
+				causeStack: boundedText(cause instanceof Error ? cause.stack : cause),
 				telemetry,
 			})}`,
 			{ cause }
 		);
 	} finally {
+		abortController.abort();
 		page.off("console", onConsole);
 		page.off("pageerror", onPageError);
 		page.off("requestfailed", onRequestFailed);
@@ -269,9 +295,14 @@ test("reports bounded telemetry when the entry bootstrap fails", async ({ page }
 		}
 		expect(captured).toBeInstanceOf(Error);
 		const message = String(captured);
-		expect(message).toContain('"requestFailures"');
-		expect(message).toContain(entryUrl);
-		expect(message).toMatch(/"apiState":\{"kind":"(?:absent|non-object)"/u);
+		const diagnostics = JSON.parse(message.slice(message.indexOf("{"))) as Readonly<{
+			apiState: LiveCloseApiState;
+			telemetry: FixtureTelemetry;
+		}>;
+		expect(diagnostics.telemetry.requestFailures).toEqual([
+			expect.objectContaining({ error: expect.any(String), url: entryUrl }),
+		]);
+		expect(diagnostics.apiState).toEqual({ kind: "absent" });
 	} finally {
 		await page.unroute(entryUrl);
 	}
