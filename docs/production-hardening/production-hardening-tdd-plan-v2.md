@@ -72678,3 +72678,83 @@ and
 The complete self-excluding correction manifest validates and has SHA-256
 `2ca479824defa725062c51dbc7cc9e167e1f37735f73e385771ee711a1b29ccc`.
 No retained suite, long campaign, Fable or collaboration subagent ran.
+
+###### D.108e4ah — repeated-open GREEN
+
+The accepted RED-review closure is signed/pushed commit
+`6abbccf8b22e854f7dd48021ef84e5e29fbfd45c`, tree
+`cd348b6b32e982531c7162f14fbee9784b1e60f4`. D.108e4ah changes only
+`tests/e3-03-loss-and-hol-proof.pw.ts`; production/example source,
+configuration, dependencies, thresholds, schemas on the wire and public APIs
+remain untouched.
+
+GREEN extends internal `RtcLifecycleKind` with
+`channel-open-repeat-event`. The observer owns one
+`WeakMap<RTCDataChannel, number>` whose value is the last generation in which
+that exact object produced an open callback. The first callback for an object
+in a generation remains `channel-open-event` with owner
+`rtc-datachannel-open-event`; a later callback on that object in the same
+generation becomes `channel-open-repeat-event` with owner
+`rtc-datachannel-open-repeat-event`. `reset()` already advances generation,
+so the same object's first post-reset callback is semantic again. Watch/listener
+installation remains once per object and GREEN adds no synthetic callback.
+
+`d108e4hAssertOpenRepeats` runs centrally from
+`d108e4hValidateEndpoint`, after closed-sequence and global trial validation
+but before attempt/overlap custody. For every endpoint repeat it requires a
+joined numeric identity, exact repeat owner, `readyState=open`, exactly one
+earlier semantic open on the same trial/connection/channel/label, no earlier
+same-identity close call/event and at most one repeat per identity/trial. Both
+existing exact-one semantic-open/product-handler predicates are unchanged, so
+repeat telemetry cannot satisfy readiness or product custody. The two RED-only
+type escape hatches are gone; the remaining similarly named cast belongs to
+the retained schema-version mutant.
+
+The exact two-title GREEN list returned two tests in one file. Its sole focused
+execution passed 2/2 in 9.333 seconds, status zero, retry zero, with no skipped,
+flaky, unexpected or top-level result. The exact retained list returned seven
+tests and omitted the long three-trial campaign title. Its sole execution
+passed 7/7 in 21.044 seconds under the same clean result conditions. No long
+campaign ran.
+
+All 40 `build:packages` targets passed. The subsequent broad workspace
+typecheck honestly returned status one only in unchanged
+`packages/object/tests/compact-history-observer-1i-b-red.test.ts` and
+`packages/object/tests/helpers/compact-history-observer-1i-b.ts`: those RED
+fixtures use rejected `history_storage: "archive"` values and a deliberately
+broad helper union. They are unchanged from `HEAD`, outside this slice and do
+not invalidate the GREEN owner. The actual affected `ts-drp-example-grid`
+build/typecheck and the standalone test-owner TypeScript check passed. Exact
+owner ESLint, Prettier, diff, baseline scope, source-shape, protected-untracked
+and 26-stash checks also returned zero.
+
+Exact GREEN custody is `.logs/d108e4ae-green/`. Focused reporter/status/time/
+summary SHA-256 values are
+`dd9a083adc9ecf3ff5ce65a7868189582d85c30a230f27544f574dc8c8bd3ad4`,
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`,
+`fca7aa526755d9b109ee2afe4ef4f9343af3105634d916e8ec53dea294288c13`
+and
+`9084ab9c17f96a1df07580ce005fd376dd1504282a09c73705f18ad428026c02`.
+Retained reporter/status/time/summary SHA-256 values are
+`204aaa6ecdfd5785f0130352240226a5a629f834eb884fcb5ff36e06a104cb59`,
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`,
+`cf371842c2c6edaa541f1e58b466b4df1536dcdc32636651086d88d7b63885bf`
+and
+`919b789cfad14bdaa1cc867d1040637c5de5b085f19307b7f12c4ffe85edecbf`.
+Affected/package/owner status SHA-256 values are respectively
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`,
+`4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`
+and
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+Diagnosis, GREEN test-owner, GREEN diff and complete self-excluding manifest
+SHA-256 values are
+`669febe9678949b8eec1c8225d03267762e0a6a8c1bf54614cb0267a0544c81c`,
+`bf97ea971a0c65b9d742104acdc264a70ee157856472ccdc6ea37f766672016d`,
+`a8562294e4f0f6614331d88d8dba89073558b4dd0dcf26b7e6594d95731bb15c`
+and
+`29d11395403ac79144f73e5294dbe03e29f34aa600e85c5842e0d1ae0e2095de`.
+
+Freeze this GREEN in a signed push, then run the normal read-only Grok
+4.6/high, exact Kimi K3 100-step and Opus 5/xhigh implementation review. Do
+not invoke Fable, a collaboration subagent, a retained rerun or a long
+campaign. Only the review P0/P1 union may reopen D.108e4ah.

@@ -194,6 +194,7 @@ type RtcLifecycleKind =
 	| "channel-message"
 	| "channel-message-handler-installed"
 	| "channel-open-event"
+	| "channel-open-repeat-event"
 	| "channel-send-attempt"
 	| "channel-send-failure"
 	| "channel-send-success"
@@ -509,6 +510,7 @@ function installRtcObserver(): void {
 	const pending = new Set<Promise<void>>();
 	const watchedChannels = new Set<RTCDataChannel>();
 	const channelIdentities = new WeakMap<RTCDataChannel, Readonly<{ channelId: number; connectionId: number }>>();
+	const channelOpenGenerations = new WeakMap<RTCDataChannel, number>();
 	const connectionIdentities = new WeakMap<RTCPeerConnection, number>();
 	const callAttribution = (): Readonly<{ callsite: string; owner: string }> => {
 		const stack = new Error().stack ?? "";
@@ -631,15 +633,17 @@ function installRtcObserver(): void {
 			owner: "rtc-observer-datachannel-handler",
 			readyState: channel.readyState,
 		});
-		channel.addEventListener("open", () =>
-			recordLifecycle("channel-open-event", connectionId, {
+		channel.addEventListener("open", () => {
+			const repeated = channelOpenGenerations.get(channel) === generation;
+			channelOpenGenerations.set(channel, generation);
+			recordLifecycle(repeated ? "channel-open-repeat-event" : "channel-open-event", connectionId, {
 				bufferedAmount: channel.bufferedAmount,
 				channelId,
 				label: channel.label,
-				owner: "rtc-datachannel-open-event",
+				owner: repeated ? "rtc-datachannel-open-repeat-event" : "rtc-datachannel-open-event",
 				readyState: channel.readyState,
-			})
-		);
+			});
+		});
 		channel.addEventListener("close", () =>
 			recordLifecycle("channel-close-event", connectionId, {
 				bufferedAmount: channel.bufferedAmount,
@@ -3041,6 +3045,47 @@ function d108e4hAssertMonitor(endpoint: D108e4hEndpointCustody, remotePeerId: st
 	}
 }
 
+function d108e4hAssertOpenRepeats(lifecycle: readonly D108e4hLifecycleObservation[]): void {
+	const repeatKeys = new Set<string>();
+	for (const repeat of lifecycle.filter(({ event }) => event === "channel-open-repeat-event")) {
+		d108e4hAssert(repeat.channelId !== undefined, "D108E4H_IDENTITY_JOIN_INVALID");
+		const sameIdentity = lifecycle.filter(
+			(record) =>
+				record !== repeat && record.connectionId === repeat.connectionId && record.channelId === repeat.channelId
+		);
+		d108e4hAssert(sameIdentity.length > 0, "D108E4H_IDENTITY_JOIN_INVALID");
+		d108e4hAssert(
+			repeat.owner === "rtc-datachannel-open-repeat-event" && repeat.readyState === "open",
+			"D108E4H_LIFECYCLE_ORDER_INVALID"
+		);
+		const anchors = sameIdentity.filter(
+			({ event, label, owner, trialId }) =>
+				event === "channel-open-event" &&
+				label === repeat.label &&
+				owner === "rtc-datachannel-open-event" &&
+				trialId === repeat.trialId
+		);
+		d108e4hAssert(
+			anchors.length === 1 && (anchors[0]?.sequence ?? Number.POSITIVE_INFINITY) < repeat.sequence,
+			"D108E4H_LIFECYCLE_ORDER_INVALID"
+		);
+		d108e4hAssert(
+			sameIdentity
+				.filter(
+					({ event, label, trialId }) =>
+						label === repeat.label &&
+						trialId === repeat.trialId &&
+						(event === "channel-close-call" || event === "channel-close-event")
+				)
+				.every(({ sequence }) => repeat.sequence < sequence),
+			"D108E4H_LIFECYCLE_ORDER_INVALID"
+		);
+		const repeatKey = `${repeat.trialId}\u0000${repeat.connectionId}\u0000${repeat.channelId}\u0000${repeat.label ?? ""}`;
+		d108e4hAssert(!repeatKeys.has(repeatKey), "D108E4H_LIFECYCLE_ORDER_INVALID");
+		repeatKeys.add(repeatKey);
+	}
+}
+
 function d108e4hAssertAttemptCustody(
 	endpoint: D108e4hEndpointCustody,
 	before: D108e4hRtcIdentity,
@@ -3321,6 +3366,7 @@ function d108e4hValidateEndpoint(
 		d108e4hAssert(record.trialId === trialId, "D108E4H_TRIAL_MISMATCH");
 	}
 	d108e4hAssertClosedSequence(endpoint.lifecycle);
+	d108e4hAssertOpenRepeats(endpoint.lifecycle);
 	d108e4hAssertMonitor(endpoint, remotePeerId, trialId);
 	const expectedDelta = rawTransportDelta(endpoint.prepare.rawTransport, endpoint.deadline.rawTransport);
 	d108e4hAssertDelta(delta, expectedDelta);
@@ -4527,7 +4573,9 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 		const d108e4aeRepeatRecord = (
 			sequence: number,
 			identity: D108e4hRtcIdentity,
-			overrides: Readonly<Record<string, unknown>> = Object.freeze({})
+			overrides: Readonly<
+				Partial<Pick<D108e4hLifecycleObservation, "owner" | "readyState" | "trialId">>
+			> = Object.freeze({})
 		): D108e4hLifecycleObservation =>
 			Object.freeze({
 				...d108e4hLifecycle(
@@ -4540,7 +4588,7 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 				event: "channel-open-repeat-event",
 				owner: "rtc-datachannel-open-repeat-event",
 				...overrides,
-			}) as unknown as D108e4hLifecycleObservation;
+			});
 		const withReceiverRepeatRecords = (...records: readonly D108e4hLifecycleObservation[]): D108e4hValidationInput =>
 			withReceiverLifecycle(
 				dualLocalMutationBase,
@@ -6268,10 +6316,7 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 			);
 			const openCallbacksByIdentity = new Map<string, RtcLifecycleObservation[]>();
 			for (const record of evidence.lifecycle) {
-				if (
-					(record.event as string) !== "channel-open-event" &&
-					(record.event as string) !== "channel-open-repeat-event"
-				) {
+				if (record.event !== "channel-open-event" && record.event !== "channel-open-repeat-event") {
 					continue;
 				}
 				const key = `${record.connectionId}/${record.channelId ?? "absent"}`;
@@ -6283,7 +6328,7 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 			expect(repeatedCallbacks).toBeDefined();
 			expect
 				.soft(
-					repeatedCallbacks?.map(({ event, owner }) => [event as string, owner]),
+					repeatedCallbacks?.map(({ event, owner }) => [event, owner]),
 					"D108E4AE_RED observer emits first-open plus repeat kinds"
 				)
 				.toEqual([
@@ -6293,11 +6338,8 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 			expect
 				.soft(
 					evidence.postResetLifecycle
-						.filter(
-							({ event }) =>
-								(event as string) === "channel-open-event" || (event as string) === "channel-open-repeat-event"
-						)
-						.map(({ event, owner, sequence, trialId }) => [event as string, owner, sequence, trialId]),
+						.filter(({ event }) => event === "channel-open-event" || event === "channel-open-repeat-event")
+						.map(({ event, owner, sequence, trialId }) => [event, owner, sequence, trialId]),
 					"D108E4AE_RED observer reset starts a new object generation"
 				)
 				.toEqual([["channel-open-event", "rtc-datachannel-open-event", 0, "observer-repeat-generation"]]);
