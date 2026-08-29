@@ -74288,3 +74288,122 @@ validation SHA-256 is
 `fa47a4ca4ae9822a2d7592e6ea2387f59d2eb5d1f6092636623775d87e4507e9`.
 Closure grants no readiness, root-creation or campaign authority. D.108e4ar is
 the next executable slice and remains prohibited from running a long campaign.
+
+###### D.108e4ar — final run-return provenance custody
+
+D.108e4ar starts from signed/pushed D.108e4aq closure
+`2d3a1ad9acee09b844df1f55d85fc9b3bd29507f`, tree
+`ef65b2b5b1f97ff6caf75a4ac071610aa45e5347`. It owns only
+`tests/e3-03-loss-and-hol-proof.pw.ts`, this plan and ignored evidence under
+fixed roots `.logs/d108e4ar-plan-review/`, `.logs/d108e4ar-red/`,
+`.logs/d108e4ar-red-review/`, `.logs/d108e4ar-green/` and
+`.logs/d108e4ar-green-review/`. Production, examples, configuration,
+dependencies, browser pin, clocks, wire formats, workload, loss profile,
+watchdogs, budgets, thresholds, product APIs, the twenty-one post-custody
+expectations and every prior evidence root remain closed. The slice may not run
+the retained campaign, create a campaign/freeze root or consume any of the six
+authorized invocations.
+
+The defect is evidence replacement, not snapshot transfer or transport
+behavior. Before the final assignment, progress custody contains the exact
+creator-page `runTrialReturnedAtMs` and then the exact run-return sender wire,
+but the final `CampaignEvidence` object replaces that progress record with only
+the deadline sender wire under the ambiguous key `senderWire`. A failure in any
+of the twenty-one subsequent expectations can therefore lose both operands
+needed to replay the run-return join. D.108e4ar changes no assertion outcome; it
+only makes those already-captured values survive the replacement.
+
+The frozen final contract is:
+
+- progress custody stores the exact run-return capture as
+  `runReturnSenderWire` and never calls either capture `senderWire`;
+- final `CampaignEvidence` contains exact `runTrialReturnedAtMs`, exact
+  `runReturnSenderWire` and exact `deadlineSenderWire` keys;
+- the run-return array and deadline array retain their original object
+  identities, remain distinct even when their contents happen to match and
+  neither may be recomputed from the other;
+- finalization preserves every existing final-evidence field and produces a
+  frozen record before `currentTrialEvidence = trialEvidence`;
+- `campaignStartedAtMs` remains derived only by filtering non-sentinel raw and
+  reliable run-return samples, sorting each lane by `sequence`, taking each
+  lane's element-zero `receivedAtMs`, then applying `Math.min` to those two
+  values; and
+- failure attachment continues to consume `currentTrialEvidence` without a new
+  attachment API or fallback lookup.
+
+The permitted test-local GREEN surface is exactly the local `CampaignEvidence`
+interface, a small final-custody helper beside the retained D.108e4ap helpers,
+the deterministic focused controls, the progress writer key and the final
+evidence builder/record. The interface removes `senderWire` and adds the three
+frozen keys above. The helper reads the timestamp through the retained
+`d108e4apRunReturnTimestamp` validator, requires an own array-valued
+`runReturnSenderWire`, adds both exact run-return operands to a base record that
+already owns `deadlineSenderWire`, and freezes the merged result. Missing or
+`undefined` run-return sender custody throws
+`D108E4AR_FINAL_RUN_RETURN_CUSTODY_ABSENT`; any other non-array value throws
+`D108E4AR_FINAL_RUN_RETURN_CUSTODY_INVALID`. It does not inspect, copy, sort or
+derive observation contents.
+
+First sign and push this plan-only checkpoint. Then obtain one read-only plan
+review from Grok 4.6/high, exact Kimi K3 with exactly `CHECK001` through
+`CHECK100` plus a terminal `RESULT` object, and Opus 5/xhigh. Fable and
+collaboration subagents are prohibited. Review must verify the real source
+replacement seam, the three-key contract, exact derivation, error partition,
+owner surface, one-run bounds and absence of campaign authority. Correct any
+P0/P1 in the same round, name an owner and deadline for every P2, record a
+self-excluding SHA-256 manifest, then sign and push review closure before RED.
+
+RED adds the helper/validator and one final unwrapped deterministic control to
+`validates schema-v3 replacement custody without cross-peer clocks`; it does
+not adopt the helper in the live campaign body or change `CampaignEvidence`.
+The control constructs the current post-replacement shape with a distinct
+deadline wire but without `runTrialReturnedAtMs` or `runReturnSenderWire`, first
+asserts that the missing-key set is exactly those two names, then makes the sole
+unwrapped final-custody call. After a suffix-anchored list guard proves exactly
+one selected test in one file and the retained campaign title absent, run the
+focused test exactly once with `D108E4H_TELEMETRY=1`, JSON reporter and
+`--fail-on-flaky-tests`. Accepted RED is status one, expected 0, skipped 0,
+unexpected 1, flaky 0, empty top-level errors, absent/null result `softErrors`
+and sole unexpected error
+`D108E4AR_FINAL_RUN_RETURN_CUSTODY_ABSENT`. Any other result stops the slice.
+Run exact-owner ESLint, 8 GiB exact-owner Prettier and `git diff --check`; do not
+run TypeScript at RED because the intentional failing control, not compilation,
+owns causality. Record commands, statuses, reporter sets, changed paths and
+owner hashes in `.logs/d108e4ar-red/`, validate its self-excluding manifest,
+then sign and push RED.
+
+The signed/pushed RED receives the same Grok/Kimi/Opus review before GREEN.
+Review must prove that the failure is the intended old final-record shape, both
+missing keys are demonstrated before the terminal call, all earlier focused
+controls execute, live adoption remains absent, and no campaign or product path
+changed. Correct P0/P1 in-round without adding another focused invocation unless
+the causal output itself is invalid; record all P2 ownership, validate the
+fixed RED-review root, and sign/push closure.
+
+GREEN performs the frozen five-site adoption as one tests-only change: update
+the local interface, preserve the progress run-return wire under its new key,
+construct the final base record with `deadlineSenderWire`, finalize it with the
+shared helper so both run-return operands survive, and replace the RED terminal
+control with exact-value, array-identity, deadline-identity, accumulated-field
+and frozen-record assertions plus missing/invalid sender-custody controls. It
+must not move either browser capture or the final assignment. Run the same
+suffix-anchored list guard once and the focused JSON test exactly once. Accepted
+GREEN is status zero, expected 1, skipped 0, unexpected 0, flaky 0, empty
+top-level errors and absent/null result `softErrors`. Then run strict standalone
+TypeScript for the test owner, exact-owner ESLint, 8 GiB exact-owner Prettier and
+`git diff --check` exactly once each. Source evidence must prove the old
+interface/progress/final `senderWire` keys absent, the exact campaign-start
+derivation and twenty-one post-custody expectations byte-identical, and the
+three custody keys assigned before the unchanged final-evidence replacement.
+Record all outputs/hashes in `.logs/d108e4ar-green/`, validate a self-excluding
+manifest, then sign and push GREEN.
+
+Formal GREEN review repeats the bounded Grok/Kimi/Opus protocol and verifies
+that the focused pass exercises the shared helper adopted by the live final
+record, the three exact values remain non-homonymous, the existing final fields
+and error codes are preserved, all static gates pass and the diff contains only
+the two owner files. After zero P0/P1 and explicit P2 disposition, record and
+validate `.logs/d108e4ar-green-review/` and sign/push closure. D.108e4ar then
+closes only the post-replacement evidence-custody residual. It neither proves a
+product defect nor authorizes a retained campaign; the next action is the
+separate plan-only freeze reassessment required by D.108e4aq.
