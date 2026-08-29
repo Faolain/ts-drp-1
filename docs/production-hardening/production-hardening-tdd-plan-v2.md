@@ -70359,12 +70359,18 @@ correction preserves the task-owned non-overlap and fixed-port intent without
 granting authority to stop other work. Three consecutive preflights under the
 old wording consumed no invocation. The task-owned orphaned D.108d2 Grok PID
 33718 was terminated with `SIGTERM`; external Fable, Opus and Playwright
-processes were preserved. Custody is under
-`.logs/d108e4z-campaign/authorization-preflight-20260828/`.
+processes were preserved. The three blocked old-wording preflights and PID
+custody are under
+`.logs/d108e4z-campaign/authorization-preflight-20260828/`. The corrected
+passing preflight is separately under `.logs/d108e4z-campaign/preflight/`;
+its result is `PRECHECK_PASS under user-authorized narrow ambient rule`, its
+authorization revalidation was `2026-08-29T01:58:37Z`, and its `SHA256SUMS`
+manifest is retained there.
 
 The corrected authorization-time preflight passed at exact signed/pushed HEAD
-`95fb23f8f15a062600354e9ef94d0e0cb55bf9fb` over accepted behavior tree
-`900778ff540c1b1b4fb2b3e29f095b7b66ef8f9f`. The ordinary status was exactly
+`95fb23f8f15a062600354e9ef94d0e0cb55bf9fb`, ordinary tree
+`97d597b3470b74aaaebbe1ca482bb19aac9cf14b`, over accepted isolated behavior
+tree `a3b739d8dcbb84d93adf7d6b56453f6e11b0b82f`. The ordinary status was exactly
 the eight protected untracked paths, the isolated checkout was tracked-clean
 at exact `900778ff`, both root shims were absent, the stash count was 26 and
 the closed-world behavior diff was empty. Six named source/config owners and
@@ -70376,7 +70382,7 @@ status zero, exactly one retained title and `Total: 1 test in 1 file`; stdout,
 stderr and status SHA-256 values are
 `34b50ba04d086184cc539c48d35a326cd53a5e6f5ad63d006ab314ef37008bbe`,
 `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
-and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3ab86aa`.
+and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
 The first evidence script stopped before the probe because a loop variable
 named `path` overwrote zsh's tied `PATH`; replacing it with `file_path` and the
 absolute `/sbin/sha256sum` corrected only the evidence command. A later
@@ -70398,18 +70404,33 @@ one. Trial zero then reached `e3-03-0-assertions` and failed
 error context and trace attachments, but correctly emitted no completed
 campaign attachment.
 
-The failure telemetry makes the rejected topology exact. On the initiating
-creator, the authenticated identity advanced from generation 3 to 4, the raw
-RTC identity advanced from connection/channel `3/346` to `5/367`, and the
-signed local delta was one link drop with reason `replacement`. On the
-non-initiating receiver, the authenticated connection ID and generation 3
-remained stable and its signed local link-drop delta was zero, while its raw
-RTC identity legitimately advanced from `3/348` to `5/379`. Receiver lifecycle
-sequences 1247 through 1250 show the new channel handler, product message
-handler and open event. Creator sequences 2032 and 2033 show the replacement
-open and product handler before product-owned old-channel close call 2034 and
-close event 2035. Thus the evidence contains make-before-break replacement,
-not the earlier break-before-make defect.
+The failure telemetry makes the rejected topology exact. The initiating
+endpoint is defined by signed local replacement-drop ownership, not by its
+creator/receiver page label. In this capture that owner is the creator: its
+authenticated identity advanced from connection
+`5ckj0p1787968823124`/generation 3 to
+`31rgyu1787968881083`/generation 4, and raw RTC advanced from
+connection/channel `3/346` to `5/367`. Its complete transport delta was
+`authenticatedConnectionLosses=1`, `backpressuredDrops=0`,
+`handshakeFailures=0`, `linkDrops=1`, with `lastLinkDrop` changing from
+`restart` to `replacement`. The non-initiating receiver kept authenticated
+connection `63ccqd1787968823119`/generation 3 stable while raw RTC legitimately
+advanced from `3/348` to `5/379`. Its complete delta was
+`authenticatedConnectionLosses=1`, `backpressuredDrops=0`,
+`handshakeFailures=0`, `linkDrops=0`, with `lastLinkDrop` remaining
+`restart`/`restart`. A nonzero authenticated-loss counter is not an
+authenticated-identity transition; only the boundary connection ID and
+generation determine that transition.
+
+Receiver sequence 1247 is the observer channel-handler installation, 1248 is
+the observer/harness message handler, 1249 is the
+`product-unreliable-webrtc` message handler and 1250 is the channel-open event,
+all on `5/379`; there is no receiver product-owned old-channel close call.
+Creator sequences 2032 and 2033 are the replacement open and product handler,
+followed by product-owned old-channel close call 2034 and close event 2035.
+The relative open/handler order therefore differs across endpoints. The
+capture contains make-before-break replacement, not the earlier
+break-before-make defect.
 
 The retained validator currently derives one endpoint-wide `replaced` boolean
 only from that endpoint's local `linkDrops` delta. It then requires both
@@ -70421,17 +70442,25 @@ drop. The prior successful complete-config trial two proves that the behavior
 is scheduling-sensitive at the observation boundary: its initiating creator
 also recorded one replacement while the receiver recorded zero, but the
 receiver's boundary snapshot still selected its old RTC identity. This new
-failure therefore demonstrates a retained test-validator coverage defect. It
-does not by itself demonstrate a product failure, a false-positive libp2p
-abort or permission to change production behavior.
+failure therefore demonstrates a retained test-validator coverage defect.
+Both endpoints also recorded one `TimeoutError` connection abort for
+`e3-03-0:ping:14`, owned as `other-owner`, followed by a
+`libp2p-connection` close; the retained monitor rule only attributes the
+failure-before-abort condition when the abort owner is
+`libp2p-connection-monitor`. Those records are disclosed context, not proof of
+a false-positive monitor abort. Prior passing retained trials `e3-03-0` and
+`e3-03-2` both had receiver `authenticatedConnectionLosses=1` with a stable
+authenticated boundary identity under the same loss profile. The current
+evidence therefore does not demonstrate a product failure or authorize a
+production change.
 
 D.108e4z stopped fail closed immediately. Ordinary invocations two and three
 and all three isolated invocations did not start and may not be run under the
 consumed authorization. The ordinary ledger has zero consecutive passes; the
 isolated ledger is unearned. Reporter, stdout, stderr, status, timestamps,
 command, calibration, failure telemetry, current-trial evidence, compact
-identity summary, focused lifecycle, error-context and trace SHA-256 values
-are respectively
+identity summary, focused lifecycle, error-context, trace, result summary and
+terminal result SHA-256 values are respectively
 `9f42e39fa92680c2d4f0243da2e200e17241e4f4a0316490b7933e4aeadfa72d`,
 `54d9ae9551f2f42a85039947f777f3e556cae8051a8b7fe8d427909bad2afebe`,
 `6507553ae10be7112a305196b0587b841d929434c4408213d654af0a62dd441a`,
@@ -70443,8 +70472,14 @@ are respectively
 `aa0968914451f2dda7e0366ba966b68114f971d5427763d72c865c6560850bec`,
 `a1edbd46c82bd0d2ee559912477858cb492acb147c25074474f7ff2fb53fd6ef`,
 `16fed90bdbc8ead27726eab8ea09007f219a1b97e666194eced28e3f9afdf22a`,
-`f2f228a0d85536a25f4c320e4d93f8e829588b59b43b90a7ddb22206896e0d5b`
-and `60e3843f913d7efb7fbaa27332a64a3c43874c6d1f552580ae6d0bbb633602d4`.
+`f2f228a0d85536a25f4c320e4d93f8e829588b59b43b90a7ddb22206896e0d5b`,
+`60e3843f913d7efb7fbaa27332a64a3c43874c6d1f552580ae6d0bbb633602d4`,
+`e4ed2ceda96d5a53194a1238c628bf59d09042def5ed401c5a4cc895fd734a34`
+and `a9dbd1a7318c1201e9b90fe65b2a108cd65484a3ed8e59efda04a59634056ecd`.
+The repaired `ARTIFACT-SHA256SUMS` excludes its own self-referential path and
+now covers all 108 retained files, including the focused lifecycle, result
+summary and terminal result; its SHA-256 is
+`a5e3f366180b2d5e139e3a0aec2633389d5c0190ca784e2275931cacdef69677`.
 Exact absolute custody is
 `/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4z-campaign/`.
 Post-run source identity, protected status, 26 stashes, root-shim absence,
@@ -70455,36 +70490,153 @@ D.108e4aa is a narrow test-only RED/GREEN slice in
 source, configs, fixtures outside that owner, package manifests, dependencies,
 lockfiles, build behavior, browser pin, workload, loss profile, timing limits,
 performance thresholds, product counters or public APIs. First, a deterministic
-fixture reproduces the exact asymmetric topology above: the initiating peer's
-authenticated and RTC identities change with one signed replacement drop,
-while the non-initiating peer keeps one authenticated identity, advances to
-exactly one new open raw RTC identity and records zero local drops. The RED
-must fail at the current endpoint-wide identity join and must include the
-opposite peer ordering.
+fixture replays the exact retained values above, including both endpoints'
+`authenticatedConnectionLosses=1`, all 600 creator raw sends on old identity
+`3/346`, all 422 receiver accepts on old identity `3/348`, creator lifecycle
+2032/2033/2034/2035, receiver lifecycle 1247/1249/1250 and zero receiver
+product close calls. A second positive fixture pins the prior passing
+asymmetric `e3-03-2` boundary schedule in which the initiating endpoint owns
+one replacement drop, the non-initiating endpoint owns zero and the latter's
+deadline RTC still selects the old identity. These retained-data fixtures,
+not the existing synthetic symmetric replay alone, anchor the slice.
 
-GREEN separates authenticated-connection transition, raw-RTC transition and
-local-drop ownership instead of inferring all three from one boolean. An
-asymmetric incoming replacement is accepted only when the peer identities and
-trial match, each boundary has exactly one authenticated and one selected raw
-identity, the replacement has exactly one handler and open event before old
-retirement, every accepted raw record joins to the selected channel, and the
-initiating endpoint supplies the signed replacement drop. The validator must
-remain fail closed for an RTC identity change without a new product handler or
-open event, multiple selected identities, old close before replacement open,
-cross-peer clocks, mismatched peer/trial identity, unauthenticated connection
-change, a missing initiating replacement drop, ambiguous drop counts and a
-failed replacement that displaces the usable old channel. Existing preserved
-campaign replay, both peer-ordering, channel-close, repeated-replacement and
-all mutation cases remain green.
+RED covers both initiating-peer/drop-owner page orderings and both relative
+replacement open/handler emission orders. In each captured incoming-advance
+case it must throw `D108E4H_IDENTITY_JOIN_INVALID` specifically from the
+`d108e4hAssertBoundaryIdentity` replaced-false branch after the exact-one
+boundary cardinalities and accepted/send joins have independently passed; a
+throw from another helper or branch is not the intended RED. The fixture must
+demonstrate stable authenticated ID/generation plus changed RTC on the
+non-drop-owner endpoint, so the causal branch is unambiguous.
 
-The RED checkpoint receives the normal read-only Grok 4.6/high, exact Kimi K3
-`CHECK001` through `CHECK100` and Opus 5/xhigh review. After same-round P0/P1
-correction and P2 ownership, GREEN receives its separate equivalent review.
-Run the focused D.108e4h/i/j validator tests, retained source-shape checks,
-exact-owner typecheck/lint/format/diff gates and the non-campaign retained
-E3-03 tests that do not invoke the long campaign. Do not invoke Fable or a
-collaboration subagent. Record all commands, results and hashes in this plan
-with signed/pushed checkpoints.
+GREEN changes only test-validator structure.
+`validateD108e4hCampaignCustody` first derives one campaign-level
+classification: exactly one initiating endpoint has `linkDrops=1` and
+`lastLinkDrop.after=replacement`, while the non-initiating endpoint has
+`linkDrops=0`. It threads that classification into each endpoint validation;
+page labels do not determine initiation. Authentication transition is derived
+only from boundary connection ID/generation, never from the
+`authenticatedConnectionLosses` counter. Every peer/trial join and lifecycle
+ordering uses one endpoint's own sequence space only—never cross-peer
+sequence, `atWallMs` or `atMonotonicMs` comparisons.
+
+On the initiating endpoint, authenticated and RTC identities both advance,
+the post-boundary RTC identity has exactly one product handler and one open
+event, and exactly one product-owned old-channel close call occurs after both
+replacement anchors. On the non-initiating endpoint, authenticated identity
+stays stable and RTC may either remain on the old identity at the observation
+boundary or advance to exactly one new open identity. When it advances, the
+new identity has exactly one product handler and one open event in either
+relative order, and the endpoint has exactly zero product-owned old-channel
+close calls; observable old retirement is not required. Accepted raw records
+and raw sends may join either the prepare identity or the deadline identity.
+Old-identity records must precede the endpoint-local replacement anchors, but
+no deadline-identity traffic is required.
+
+Named deterministic incoming-path mutants remain fail closed:
+`incomingRtcWithoutProductHandler`, `incomingRtcWithoutOpen`,
+`missingInitiatorReplacementDrop`, `ambiguousDoubleReplacementDrop`,
+`nonInitiatorAuthenticatedIdentityDrift`,
+`nonInitiatorProductOldCloseCall`, `initiatorOldCloseBeforeReplacementOpen`
+and `failedIncomingReplacementDisplacesUsableOldChannel`. The last mutant
+must prove that a failed replacement cannot displace the still-usable old
+channel before delivery completes. Multiple selected identities,
+mismatched peer/trial identity and repeated replacement remain rejected.
+Existing channel-close and mutation cases remain green, but they do not
+substitute for the two retained asymmetric replay shapes.
+
+The plan freeze was signed and pushed as exact plan-only commit
+`8463378cb15b78c278fd827d9b7ae1f8041ee14c`, parent
+`95fb23f8f15a062600354e9ef94d0e0cb55bf9fb`. Its normal read-only review round
+completed without Fable or a collaboration subagent:
+
+- Grok 4.6/high completed normally with `end_turn` in 480.146 seconds and
+  returned CHANGES_REQUIRED, P0=2/P1=5/P2=3. Events/public/status/stderr
+  SHA-256 values are
+  `01f64b0fd96ad071efa3efbb070031b0609d874350304aaa6fcc89063199a50f`,
+  `0853df71c905fb67e42a06ccdc6817b95b98f3e551ac553b7d7fc97bca47662b`,
+  `6b91780d20a5800ae30574b44d044b779be46158721e914b758f58af800ecb19`
+  and
+  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+- The newer `kimi` 0.38.0 launcher failed twice before model output with
+  `Agent event 'agent.activity.updated' has no active lifecycle context`; no
+  verdict is attributed to those tool failures. Legacy `kimi-cli` 1.49.0 with
+  exact model `kimi-code/k3` then completed substantive session
+  `4a42eab7-81c3-4910-95ca-04b3280d7df6`. A tool-free formatting continuation
+  in that same session emitted exactly 101 nonempty lines: unique ordered
+  `CHECK001` through `CHECK100`, then one RESULT. It returned
+  CHANGES_REQUIRED, P0=0/P1=1/P2=2. Final stream/text/stderr/status SHA-256
+  values are
+  `c3aaf51b034d035bf211f3e97dbfab1850ea018b6f02e993186e783e8b966e9a`,
+  `3186e4f806572387d7ed9bbba4f950daed7bfe70780f5fa4ef8daa9554b0e5e6`,
+  `5b3a5bedbcc70f4d1dc1c48a78d686db8f1821cc442dba066f7c0a946065e877`
+  and
+  `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+- Opus 5/xhigh session `e31e6359-8082-4cfc-b22d-41c2d0c5319f` completed 48
+  turns in 731.943 seconds without error, permission denial or subagent and
+  returned CHANGES_REQUIRED, P0=3/P1=7/P2=4. JSON/stderr/status SHA-256 values
+  are
+  `7bed5583fcace216008a9de70854f6ef52e7d433653de9af77a3896b1d9fe176`,
+  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+  and
+  `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+
+The same-round correction above resolves the union: it permits old or new
+boundary joins instead of requiring deadline-channel traffic; separates the
+initiator's required old close call from the incoming endpoint's required
+zero product close calls; pins the causal RED branch, drop-owner definition,
+retained asymmetric fixtures, both handler/open orders and incoming mutants;
+records the complete deltas, abort context, exact trees, passing custody path,
+full hashes and repaired manifest; and freezes executable non-campaign gates.
+All P2 corrections belong to the D.108e4aa test/plan owner with deadline
+2026-09-04 and are integrated before RED. Per the protocol, this same-round
+P0/P1 correction receives no confirmation review.
+
+The RED checkpoint receives a fresh normal read-only Grok 4.6/high, exact Kimi
+K3 `CHECK001` through `CHECK100` plus RESULT and Opus 5/xhigh review. After its
+same-round P0/P1 correction and explicit P2 ownership, GREEN receives a
+separate equivalent review. Fable and collaboration subagents remain
+prohibited. Each checkpoint records the exact command, stdout, stderr, status,
+elapsed time and SHA-256 under `.logs/d108e4aa-red/` or
+`.logs/d108e4aa-green/` and then receives a signed/pushed checkpoint.
+
+The executable acceptance ledger is frozen below. The positive allowlist must
+list exactly seven tests and omit the retained three-trial campaign. Invoking
+`playwright.e3-03-loss-and-hol.config.ts` without the shown `--grep` positive
+allowlist is prohibited; a plain config invocation would start the
+unauthorized long campaign.
+
+```sh
+readonly D108E4AA_NON_CAMPAIGN_PATTERN='(validates schema-v3 replacement custody without cross-peer clocks|raw sequence evidence includes the fixed sample-domain boundaries|partitions receiver evidence by exact product roster without losing observations|separates rendered product-roster metrics from boundary-aware application evidence|freezes RTC metadata at the event boundary before async payload conversion|records a versioned and causally joined RTC lifecycle without changing delivery|proves replacement open before retiring the stale authenticated raw owner)$'
+
+D108E4H_TELEMETRY=1 pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'validates schema-v3 replacement custody without cross-peer clocks$' \
+  --fail-on-flaky-tests
+
+D108E4G_TELEMETRY=1 pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'records a versioned and causally joined RTC lifecycle without changing delivery$|proves replacement open before retiring the stale authenticated raw owner$' \
+  --fail-on-flaky-tests
+
+D108E4G_TELEMETRY=1 D108E4H_TELEMETRY=1 \
+  pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep "$D108E4AA_NON_CAMPAIGN_PATTERN" --list
+
+D108E4G_TELEMETRY=1 D108E4H_TELEMETRY=1 \
+  pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep "$D108E4AA_NON_CAMPAIGN_PATTERN" --fail-on-flaky-tests
+
+pnpm typecheck
+pnpm exec eslint tests/e3-03-loss-and-hol-proof.pw.ts
+pnpm exec prettier --check tests/e3-03-loss-and-hol-proof.pw.ts
+git diff --check
+git status --porcelain=v1
+git diff --stat -- tests/e3-03-loss-and-hol-proof.pw.ts
+git diff -- tests/e3-03-loss-and-hol-proof.pw.ts
+```
 
 No long E3-03 campaign runs during D.108e4aa. After GREEN and its reviews, the
 ordinary and isolated three-consecutive ledgers require a new signed/pushed
