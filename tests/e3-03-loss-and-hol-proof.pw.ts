@@ -3206,6 +3206,22 @@ function d108e4hAssertOverlapCustody(
 			label === "ts-drp-ephemeral/1" &&
 			owner === "rtc-datachannel-close-event"
 	);
+	const replacementOpenHandlers = endpoint.lifecycle.filter(
+		({ channelId, connectionId, event, label, owner, readyState }) =>
+			connectionId === after.connectionId &&
+			channelId === after.channelId &&
+			event === "channel-handler-installed" &&
+			label === "ts-drp-ephemeral/1" &&
+			owner === "rtc-observer-datachannel-handler" &&
+			readyState === "open"
+	);
+	const replacementCloseRecords = endpoint.lifecycle.filter(
+		({ channelId, connectionId, event, label }) =>
+			connectionId === after.connectionId &&
+			channelId === after.channelId &&
+			(event === "channel-close-call" || event === "channel-close-event") &&
+			label === "ts-drp-ephemeral/1"
+	);
 	d108e4hAssert(replacementOpens.length === 1 && replacementHandlers.length === 1, "D108E4H_LIFECYCLE_ORDER_INVALID");
 	const replacementOpen = replacementOpens[0] as D108e4hLifecycleObservation;
 	const replacementHandler = replacementHandlers[0] as D108e4hLifecycleObservation;
@@ -3256,11 +3272,14 @@ function d108e4hAssertOverlapCustody(
 			transitionReason === "replacement" && oldCloseCalls.length === 1 && oldCloseEvents.length <= 1,
 			"D108E4H_LIFECYCLE_ORDER_INVALID"
 		);
+		d108e4hAssert(replacementOpenHandlers.length <= 1, "D108E4H_LIFECYCLE_ORDER_INVALID");
 		const oldCloseCall = oldCloseCalls[0] as D108e4hLifecycleObservation;
 		const oldCloseEvent = oldCloseEvents[0];
 		d108e4hAssert(
-			replacementOpen.sequence < oldCloseCall.sequence &&
-				replacementHandler.sequence < oldCloseCall.sequence &&
+			replacementHandler.sequence < oldCloseCall.sequence &&
+				(replacementOpen.sequence < oldCloseCall.sequence ||
+					replacementOpenHandlers.some(({ sequence }) => sequence < oldCloseCall.sequence)) &&
+				replacementCloseRecords.every(({ sequence }) => oldCloseCall.sequence < sequence) &&
 				(oldCloseEvent === undefined || oldCloseCall.sequence < oldCloseEvent.sequence),
 			"D108E4H_LIFECYCLE_ORDER_INVALID"
 		);
@@ -3350,10 +3369,10 @@ function validateD108e4hCampaignCustody(input: D108e4hValidationInput): void {
 		const delta = input.rawTransportDeltas[name];
 		return delta.linkDrops === 1 && delta.lastLinkDrop.after === "replacement";
 	});
-	d108e4hAssert(replacementOwners.length <= 1, "D108E4H_DROP_COUNT_AMBIGUOUS");
-	const replacementOwner = replacementOwners[0];
-	const isIncomingReplacement = (name: (typeof endpointNames)[number]): boolean =>
-		replacementOwner !== undefined && name !== replacementOwner && input.rawTransportDeltas[name].linkDrops === 0;
+	const isIncomingReplacement = (name: (typeof endpointNames)[number]): boolean => {
+		const peerName = name === "creator" ? "receiver" : "creator";
+		return input.rawTransportDeltas[name].linkDrops === 0 && replacementOwners.includes(peerName);
+	};
 	d108e4hValidateEndpoint(
 		input.endpoints.creator,
 		input.endpoints.receiver.peerId,
@@ -3761,21 +3780,11 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 					true,
 					"replacement"
 				)
-			).toThrowError("D108E4H_LIFECYCLE_ORDER_INVALID");
-			let branchError: unknown;
-			try {
-				validateD108e4hCampaignCustody(dualLocalReplacement);
-			} catch (error) {
-				branchError = error;
-			}
-			expect(branchError).toBeInstanceOf(Error);
-			expect((branchError as Error).message).toBe("D108E4H_DROP_COUNT_AMBIGUOUS");
-			expect
-				.soft(
-					() => validateD108e4hCampaignCustody(dualLocalReplacement),
-					`D108E4AC_RED ${name} accepts exact dual-local replacement ownership`
-				)
-				.not.toThrow();
+			).not.toThrow();
+			expect(
+				() => validateD108e4hCampaignCustody(dualLocalReplacement),
+				`D108E4AC_GREEN ${name} accepts exact dual-local replacement ownership`
+			).not.toThrow();
 		}
 		const carryInMonitor = Object.freeze({
 			...noReplacement,
@@ -4109,12 +4118,12 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 		expect
 			.soft(() => validateD108e4hCampaignCustody(missingInitiatorReplacementDrop), "missingInitiatorReplacementDrop")
 			.toThrowError("D108E4H_IDENTITY_JOIN_INVALID");
-		const ambiguousDoubleReplacementDrop = withReceiverDeadlineTransport(
-			incomingMutationBase,
+		const ambiguousDoubleReplacementDrop = withCreatorDeadlineTransport(
+			creatorReplacement,
 			Object.freeze({
-				...incomingMutationBase.endpoints.receiver.deadline.rawTransport,
+				...creatorReplacement.endpoints.creator.deadline.rawTransport,
 				lastLinkDrop: "replacement",
-				linkDrops: incomingMutationBase.endpoints.receiver.prepare.rawTransport.linkDrops + 1,
+				linkDrops: creatorReplacement.endpoints.creator.prepare.rawTransport.linkDrops + 2,
 			})
 		);
 		expect
@@ -4229,6 +4238,192 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 				"failedIncomingReplacementDisplacesUsableOldChannel"
 			)
 			.toThrowError("D108E4H_LIFECYCLE_ORDER_INVALID");
+
+		const dualLocalMutationBase = d108e4acDualLocalReplacementReplay(false);
+		const dualCreator = dualLocalMutationBase.endpoints.creator;
+		const dualReceiver = dualLocalMutationBase.endpoints.receiver;
+		const dualCreatorAfter = d108e4hOnly(dualCreator.deadline.rtc);
+		const withDualCreatorDeadline = (
+			fixture: D108e4hValidationInput,
+			deadline: D108e4hBoundaryCustody
+		): D108e4hValidationInput =>
+			Object.freeze({
+				...fixture,
+				endpoints: Object.freeze({
+					...fixture.endpoints,
+					creator: Object.freeze({ ...fixture.endpoints.creator, deadline }),
+				}),
+			});
+		const dualLocalWithoutAuthenticatedAdvance = withDualCreatorDeadline(
+			dualLocalMutationBase,
+			Object.freeze({ ...dualCreator.deadline, authenticated: dualCreator.prepare.authenticated })
+		);
+
+		const zeroOwnerCreatorTransport = Object.freeze({
+			...dualCreator.deadline.rawTransport,
+			authenticatedConnectionLosses: dualCreator.prepare.rawTransport.authenticatedConnectionLosses,
+			lastLinkDrop: dualCreator.prepare.rawTransport.lastLinkDrop,
+			linkDrops: dualCreator.prepare.rawTransport.linkDrops,
+		});
+		const zeroOwnerReceiverTransport = Object.freeze({
+			...dualReceiver.deadline.rawTransport,
+			authenticatedConnectionLosses: dualReceiver.prepare.rawTransport.authenticatedConnectionLosses,
+			lastLinkDrop: dualReceiver.prepare.rawTransport.lastLinkDrop,
+			linkDrops: dualReceiver.prepare.rawTransport.linkDrops,
+		});
+		const zeroOwnerRtcAdvance = withReceiverDeadlineTransport(
+			withCreatorDeadlineTransport(dualLocalMutationBase, zeroOwnerCreatorTransport),
+			zeroOwnerReceiverTransport
+		);
+
+		const dualLocalUnsupportedReason = withCreatorDeadlineTransport(
+			dualLocalMutationBase,
+			Object.freeze({ ...dualCreator.deadline.rawTransport, lastLinkDrop: "restart" })
+		);
+
+		const dualLocalMissingSelectedIdentity = withDualCreatorDeadline(
+			dualLocalMutationBase,
+			Object.freeze({ ...dualCreator.deadline, rtc: Object.freeze([]) })
+		);
+		const dualLocalDuplicateSelectedIdentity = withDualCreatorDeadline(
+			dualLocalMutationBase,
+			Object.freeze({ ...dualCreator.deadline, rtc: Object.freeze([dualCreatorAfter, dualCreatorAfter]) })
+		);
+
+		const isDualCreatorOpen = ({ channelId, connectionId, event, owner }: D108e4hLifecycleObservation): boolean =>
+			connectionId === dualCreatorAfter.connectionId &&
+			channelId === dualCreatorAfter.channelId &&
+			event === "channel-open-event" &&
+			owner === "rtc-datachannel-open-event";
+		const isDualCreatorProductHandler = ({
+			channelId,
+			connectionId,
+			event,
+			owner,
+		}: D108e4hLifecycleObservation): boolean =>
+			connectionId === dualCreatorAfter.connectionId &&
+			channelId === dualCreatorAfter.channelId &&
+			event === "channel-message-handler-installed" &&
+			owner === "product-unreliable-webrtc";
+		const dualLocalMissingOpen = withCreatorLifecycle(
+			dualLocalMutationBase,
+			dualCreator.lifecycle.filter((record) => !isDualCreatorOpen(record))
+		);
+		const dualLocalDuplicateOpen = withCreatorLifecycle(
+			dualLocalMutationBase,
+			Object.freeze(
+				[
+					...dualCreator.lifecycle,
+					d108e4hLifecycle(
+						dualLocalMutationBase.trialId,
+						1_652,
+						"channel-open-event",
+						dualCreatorAfter,
+						"rtc-datachannel-open-event"
+					),
+				].sort((a, b) => a.sequence - b.sequence)
+			)
+		);
+		const dualLocalMissingProductHandler = withCreatorLifecycle(
+			dualLocalMutationBase,
+			dualCreator.lifecycle.filter((record) => !isDualCreatorProductHandler(record))
+		);
+		const dualLocalWrongOldCloseIdentity = withCreatorLifecycle(
+			dualLocalMutationBase,
+			Object.freeze(
+				dualCreator.lifecycle.map((record) =>
+					record.sequence === 1_656 &&
+					record.event === "channel-close-call" &&
+					record.owner === "product-unreliable-webrtc"
+						? Object.freeze({
+								...record,
+								channelId: dualCreatorAfter.channelId,
+								connectionId: dualCreatorAfter.connectionId,
+							})
+						: record
+				)
+			)
+		);
+		const dualLocalReadinessNotOpen = withCreatorLifecycle(
+			dualLocalMutationBase,
+			Object.freeze(
+				dualCreator.lifecycle.map((record) =>
+					record.sequence === 1_653 && record.event === "channel-handler-installed"
+						? Object.freeze({ ...record, readyState: "connecting" as const })
+						: record
+				)
+			)
+		);
+		const dualLocalCloseBeforeReadiness = withCreatorLifecycle(
+			dualLocalMutationBase,
+			Object.freeze(
+				dualCreator.lifecycle
+					.map((record) => {
+						if (record.sequence === 1_653 && record.event === "channel-handler-installed") {
+							return Object.freeze({ ...record, sequence: 1_658 });
+						}
+						return record.sequence >= 1_658 ? Object.freeze({ ...record, sequence: record.sequence + 1 }) : record;
+					})
+					.sort((a, b) => a.sequence - b.sequence)
+			)
+		);
+
+		const failedReplacementCandidate = Object.freeze({
+			channelId: 444,
+			connectionId: 9,
+			label: "ts-drp-ephemeral/1" as const,
+			readyState: "open" as const,
+		});
+		const dualLocalFailedReplacementDisplacement = withDualCreatorDeadline(
+			dualLocalMutationBase,
+			Object.freeze({ ...dualCreator.deadline, rtc: Object.freeze([failedReplacementCandidate]) })
+		);
+
+		const dualCreatorDeadlineAuthenticated = d108e4hOnly(dualCreator.deadline.authenticated);
+		const dualLocalBoundaryPeerMismatch = withDualCreatorDeadline(
+			dualLocalMutationBase,
+			Object.freeze({
+				...dualCreator.deadline,
+				authenticated: Object.freeze([
+					Object.freeze({
+						...dualCreatorDeadlineAuthenticated,
+						peerId: `${dualCreatorDeadlineAuthenticated.peerId}:mismatch`,
+					}),
+				]),
+			})
+		);
+
+		const dualLocalLifecycleTrialMismatch = withCreatorLifecycle(
+			dualLocalMutationBase,
+			Object.freeze(
+				dualCreator.lifecycle.map((record) =>
+					record.sequence === 1_653 ? Object.freeze({ ...record, trialId: `${record.trialId}:mismatch` }) : record
+				)
+			)
+		);
+		const dualLocalMutantRoster = Object.freeze([
+			["dualLocalWithoutAuthenticatedAdvance", dualLocalWithoutAuthenticatedAdvance, "D108E4H_IDENTITY_JOIN_INVALID"],
+			["zeroOwnerRtcAdvance", zeroOwnerRtcAdvance, "D108E4H_IDENTITY_JOIN_INVALID"],
+			["dualLocalUnsupportedReason", dualLocalUnsupportedReason, "D108E4H_DROP_REASON_UNSUPPORTED"],
+			["dualLocalMissingSelectedIdentity", dualLocalMissingSelectedIdentity, "D108E4H_IDENTITY_JOIN_INVALID"],
+			["dualLocalDuplicateSelectedIdentity", dualLocalDuplicateSelectedIdentity, "D108E4H_IDENTITY_JOIN_INVALID"],
+			["dualLocalMissingOpen", dualLocalMissingOpen, "D108E4H_LIFECYCLE_ORDER_INVALID"],
+			["dualLocalDuplicateOpen", dualLocalDuplicateOpen, "D108E4H_LIFECYCLE_ORDER_INVALID"],
+			["dualLocalMissingProductHandler", dualLocalMissingProductHandler, "D108E4H_LIFECYCLE_ORDER_INVALID"],
+			["dualLocalWrongOldCloseIdentity", dualLocalWrongOldCloseIdentity, "D108E4H_LIFECYCLE_ORDER_INVALID"],
+			["dualLocalReadinessNotOpen", dualLocalReadinessNotOpen, "D108E4H_LIFECYCLE_ORDER_INVALID"],
+			["dualLocalCloseBeforeReadiness", dualLocalCloseBeforeReadiness, "D108E4H_LIFECYCLE_ORDER_INVALID"],
+			[
+				"dualLocalFailedReplacementDisplacement",
+				dualLocalFailedReplacementDisplacement,
+				"D108E4H_LIFECYCLE_ORDER_INVALID",
+			],
+			["dualLocalBoundaryPeerMismatch", dualLocalBoundaryPeerMismatch, "D108E4H_IDENTITY_JOIN_INVALID"],
+			["dualLocalLifecycleTrialMismatch", dualLocalLifecycleTrialMismatch, "D108E4H_TRIAL_MISMATCH"],
+		] as const);
+		for (const [name, fixture, expectedError] of dualLocalMutantRoster) {
+			expect.soft(() => validateD108e4hCampaignCustody(fixture), name).toThrowError(expectedError);
+		}
 
 		const creatorReplacementWithoutCloseEvent = withCreatorLifecycle(
 			creatorReplacement,
@@ -4695,6 +4890,27 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 			})
 		);
 		expect(() => validateD108e4hCampaignCustody(ambiguousDrop)).toThrowError("D108E4H_DROP_COUNT_AMBIGUOUS");
+		const ownershipTruthTable = [
+			["0/0", noReplacement, [0, 0], undefined],
+			["1/0", creatorReplacement, [1, 0], undefined],
+			["0/1", receiverReplacement, [0, 1], undefined],
+			["1/1", d108e4acDualLocalReplacementReplay(false), [1, 1], undefined],
+			["2/0", ambiguousDoubleReplacementDrop, [2, 0], "D108E4H_DROP_COUNT_AMBIGUOUS"],
+			["0/2", ambiguousDrop, [0, 2], "D108E4H_DROP_COUNT_AMBIGUOUS"],
+		] as const;
+		for (const [name, fixture, counts, expectedError] of ownershipTruthTable) {
+			expect(
+				[fixture.rawTransportDeltas.creator.linkDrops, fixture.rawTransportDeltas.receiver.linkDrops],
+				`D108E4AC_OWNERSHIP_COUNTS ${name}`
+			).toEqual(counts);
+			if (expectedError === undefined) {
+				expect(() => validateD108e4hCampaignCustody(fixture), `D108E4AC_OWNERSHIP_RESULT ${name}`).not.toThrow();
+			} else {
+				expect(() => validateD108e4hCampaignCustody(fixture), `D108E4AC_OWNERSHIP_RESULT ${name}`).toThrowError(
+					expectedError
+				);
+			}
+		}
 		const unsupportedDrop = withReceiverDeadlineTransport(
 			receiverReplacement,
 			d108e4hRawTransport("peer-creator", {

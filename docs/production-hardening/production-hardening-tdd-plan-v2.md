@@ -71481,8 +71481,8 @@ D108E4G_TELEMETRY=1 D108E4H_TELEMETRY=1 \
 
 pnpm --filter @ts-drp/network build
 pnpm --filter @ts-drp/network typecheck
-pnpm --filter @ts-drp/grid build
-pnpm --filter @ts-drp/grid typecheck
+pnpm --filter ./examples/grid build
+pnpm --filter ./examples/grid typecheck
 pnpm typecheck
 pnpm exec tsc --noEmit --target ES2022 --module ESNext \
   --moduleResolution bundler --allowImportingTsExtensions --skipLibCheck \
@@ -71666,6 +71666,105 @@ The complete RED-review `SHA256SUMS` excludes itself and has SHA-256
 `6ffb412abd2d41481290cf5cd63dd23c6252ce51121ab09480d9f2e0ddf4baa0`.
 The corrected RED remains RED, grants no campaign authority and is ready for
 its signed/pushed correction checkpoint before GREEN.
+
+The D.108e4ac GREEN implementation remains test-only. It removes the
+campaign-wide single-owner rejection and classifies incoming replacement at
+each endpoint: the named endpoint must have local delta zero and its peer must
+have exactly one local drop whose reason is `replacement`. Both endpoints are
+therefore local—not incoming—when the counts are `1/1`. The endpoint-local
+integer `0..1` guard remains the sole count-ambiguity owner. The frozen truth
+table is:
+
+| Creator/receiver local replacement counts | Expected result                                                                                     |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `0/0`                                     | pass only with stable identities; zero-owner RTC advancement throws `D108E4H_IDENTITY_JOIN_INVALID` |
+| `1/0`                                     | pass; receiver is the peer-dependent incoming endpoint                                              |
+| `0/1`                                     | pass; creator is the peer-dependent incoming endpoint                                               |
+| `1/1`                                     | pass as two endpoint-local replacements; neither endpoint is incoming                               |
+| `2/0`                                     | throw `D108E4H_DROP_COUNT_AMBIGUOUS`                                                                |
+| `0/2`                                     | throw `D108E4H_DROP_COUNT_AMBIGUOUS`                                                                |
+
+The stale `ambiguousDoubleReplacementDrop` expectation was corrected to a
+true creator-local `2/0` mutation; the retained receiver-local
+`ambiguousDrop` supplies `0/2`. The singular `replacementOwner` symbol is
+absent. A complete read-only inventory of `replacementOwners`,
+`isIncomingReplacement`, `linkDrops`, `lastLinkDrop`, the shared count code
+and every helper/mutant that changes a deadline counter is preserved under
+`.logs/d108e4ac-green/`. Its empty singular-symbol result and refreshed symbol
+and deadline inventories have SHA-256
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`,
+`8242d1fb0d27955aff4617fb95a001675d01177ad769d39d88d4f6ad6951d774`
+and
+`cbd0d26567c02962719add3d11c01c8e76471e72e5fc6018eabe16118b55e258`.
+
+The lifecycle half admits the captured creator ordering only when the exact
+selected-new-identity observer handler reports `readyState=open` before the
+old product-owned close and the new product message handler also precedes
+that close. The exact later open event remains mandatory and still gates all
+new-identity traffic; new-identity close records may not precede old close.
+No production source, API, counter, workload, timeout or campaign rule
+changed.
+
+The bounded expectation sweep was implemented as the requested two related
+batches without intervening review. Ownership classification hard-covers all
+six truth-table rows. Lifecycle/identity safeguards freeze 14 exact-code
+mutants: authenticated non-advancement; zero-owner RTC advancement;
+unsupported reason; missing/duplicate selected identity; missing/duplicate
+open event; missing product handler; wrong old-close identity; readiness not
+open; close before readiness; failed-replacement displacement; boundary peer
+mismatch; and lifecycle trial mismatch. The eight retained D.108e4aa mutants
+also preserve their exact codes: `incomingRtcWithoutProductHandler`,
+`incomingRtcWithoutOpen`, `nonInitiatorProductOldCloseCall`,
+`initiatorOldCloseBeforeReplacementOpen` and
+`failedIncomingReplacementDisplacesUsableOldChannel` remain
+`D108E4H_LIFECYCLE_ORDER_INVALID`; `missingInitiatorReplacementDrop` and
+`nonInitiatorAuthenticatedIdentityDrift` remain
+`D108E4H_IDENTITY_JOIN_INVALID`; and `ambiguousDoubleReplacementDrop`
+remains `D108E4H_DROP_COUNT_AMBIGUOUS`.
+
+Each mandated focused batch ran exactly once after the consistency-sweep
+request. The ownership reporter returned status zero in 6.834 seconds with
+one expected test and zero skipped, unexpected, flaky, top-level or soft
+errors. The lifecycle/identity reporter returned status zero in 6.784 seconds
+with the same buckets. The retained seven-title suite then ran exactly once,
+returned status zero in 13.626 seconds, and reported seven expected tests with
+zero skipped, unexpected, flaky, top-level or soft errors. The complete soft
+failure set is empty. Command/reporter/status SHA-256 values are respectively
+`f2ee9f2a54a2143d3f06790f0bbad2732d48159f34ffe4a602635dd0a81808e5` /
+`9b5b27f530ca2e00d3fb19b36470e87b69dbaf7eab9fdebc46468ba66c3badfe` /
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`,
+`807b8d81c0511692ba78fb31e33d5bdd262497c1b45b6f5e4095c9347769563d` /
+`7e7ab8dd76b05fe181d2ab6701b92f3782d807aa26fb4b5fcde66f88c293326d` /
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`
+and
+`2cbee7a819d47918e48693e9fb22a3bfbfdbe410f39a423da8d76937a3a0a1cb` /
+`ea7b58389dd25ac9d57b99b23c0da5fcf8f761fd64108028fd956be9d66b2160` /
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+No reviewer, Fable run or long campaign ran during the sweep.
+
+Affected `@ts-drp/network` build/typecheck and `./examples/grid`
+build/typecheck all returned zero. The ledger's original grid filter
+`@ts-drp/grid` matched no project and was corrected to the actual workspace
+path. Root `pnpm typecheck` remains nonzero only in the inherited Phase-1i-b
+RED fixture `packages/object/tests/compact-history-observer-1i-b-red.test.ts`
+and its helper; both working hashes equal signed HEAD, so that result is not
+attributed to D.108e4ac. Exact-owner TypeScript, ESLint, Prettier and
+`git diff --check` returned zero after the final mutant roster. The corrected
+package command/status and owner command/status SHA-256 values are
+`5523029b4de3b80e52fe1e4b9b706fd9b57d9ae2a76f8885f35beb24f1b6f9c9` /
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`
+and
+`c6737d4a87bbfa2bbae06ff4ef585f484c533d853fcacf1b3a1855fe14d8d86f` /
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+The final test-owner SHA-256 is
+`37928bda3b96d043a5be55342becf7f9e6941c1faac89734e55f888bdd6c3af7`;
+its diff from signed RED-review checkpoint
+`7abcf9dda91222b7260499dd4169d251c93b7118` is
+`0f6e56472b2d79ff19df1700c77af8d5f2ac86be0fff147edcb002be32e6e4b1`.
+The complete GREEN `SHA256SUMS` excludes itself and has SHA-256
+`3843c3c2547119fedc3661f542fe27f7691f3e766c00dd936041140ec3b48549`.
+This GREEN evidence authorizes only the formal read-only Grok/Kimi/Opus GREEN
+review after the signed/pushed checkpoint; it grants no campaign authority.
 
 D.108e4b's separate GREEN review, aggregate D.108e4 closure and D.108e5 remain
 blocked until D.108e4ac and a replacement six-pass campaign close.
