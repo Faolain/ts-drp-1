@@ -73406,7 +73406,8 @@ SHA-256 values are respectively
 and
 `087eba9acd40302f69876972072fe38b513f0ba47b13ec083ed1f5c79586642f`.
 The standalone changed Playwright-owner TypeScript check, exact-two-owner
-ESLint, Prettier and `git diff --check` also returned zero. The broad workspace
+ESLint, exact three-path Prettier (the two test owners plus this plan record)
+and `git diff --check` also returned zero. The broad workspace
 typecheck returned one only in the already-recorded unchanged Phase-1i-b
 object RED/helper owners: rejected `history_storage: "archive"` and its broad
 helper union, last changed by
@@ -73415,11 +73416,139 @@ helper union, last changed by
 It is outside this exact diff and affected packages, was not rerun and does
 not invalidate this GREEN.
 
-The complete self-excluding 51-file GREEN manifest validates and has SHA-256
-`95f1948d8f22a23ab53a8c1e4254df09f9c4fd2534d9afc6764697349a09da30`.
+The focused network reporter contains one passed and 48 pending of 49
+discovered tests, so the selected title is explicitly 1/1 rather than 49/49.
+Grid build stderr contains only Vite's known-benign mixed static/dynamic import
+notice for `packages/ephemeral`. Review copies verify the manifest by rebasing
+its fixed `.logs/d108e4am-green/` prefix to
+`.review-evidence/d108e4am-green/` while preserving each relative basename.
+The corrected complete self-excluding 51-file GREEN manifest validates and has
+SHA-256
+`99ea639a166b43bc56d21f3dcc537eedaed974e8f43c6c37bcbf92ceb8320a21`.
 Protected untracked paths and 26 stashes remain unchanged. No production,
 example, configuration, dependency, public API, counter, threshold or
 campaign-acceptance byte changed; no campaign, Fable invocation or
 collaboration subagent ran. The GREEN is ready for its separate signed/pushed
 checkpoint and normal Grok/exact-Kimi/Opus review. Until that review is
 accepted, D.108e4/D.108e5 and all campaign execution remain blocked.
+
+The formal GREEN review authenticated signed/pushed commit
+`a9e25ad433f9d59d828eeab738db35a5ba1d8166`, tree
+`958c601cc79905a834e81675f1aa9aedfb1728ea` and parent
+`f76186284121cfa12a8df405e8b93e5868b5f112` in three isolated read-only
+worktrees. Each remained tracked-clean with only its copied
+`.review-evidence/` input untracked. No reviewer ran a test, campaign or
+profiler, wrote tracked content, invoked Fable or used a subagent.
+
+Grok 4.6/high session `01a04ee3-3dd6-7b71-9dfb-924898707b54`
+completed after 375.198 seconds. Progress prose before its valid object caused
+the runner's honest initial `NO_VERDICT`; its same-session tool-free/schema
+formatting continuation returned unchanged `APPROVED`, P0=0/P1=0/P2=0.
+Exact structured-output SHA-256 is
+`80ca893c0d970dfb0b2220ed03fc2e9f0257f352426493070907c54a9ba9c4ba`.
+
+Exact Kimi K3 session `1b8e3fda-e364-40dd-8450-3e83aff857f2`
+returned exactly 101 nonempty lines on its first terminal message: ordered
+unique `CHECK001` through `CHECK100`, then one RESULT. It returned `APPROVED`,
+P0=0/P1=0/P2=3. Exact checklist and RESULT SHA-256 values are
+`1be1e7a5c980dd89369a2288f843bc910d03748153067f41a80a3324cb04507b`
+and
+`a7e5ff6fa734a4a8d42e00f12a0936163c6f97f8ac5a60ffd4f3a29d0f43aa13`.
+
+Opus 5/xhigh session `096e5efd-147f-4211-b600-1baa3f153dd7`
+returned `APPROVED`, P0=0/P1=0/P2=3, with zero subagents. Its one disclosed
+permission denial was a read-only attempt to inspect Git worktree metadata
+outside the isolated checkout; source/evidence inspection and the verdict
+completed normally. Exact structured-output SHA-256 is
+`0de91cc44d0facb22d2f9469bdfeb7fbb9e20ddd8cd51b9d5d065099e9314031`.
+The complete self-excluding 27-file review manifest validates and has SHA-256
+`97af1837a9feb880ff26150a939a016149112f5b140669d6c3a254fc85cf6ea7`;
+review-validation SHA-256 is
+`962553eb26ad4e5e6ff958605ef903491e1a4a1dfe329ee674a49955e1c36d59`.
+
+The same-round record corrections above close Kimi's three P2 notes and Opus's
+static-scope wording note. Opus's remaining two P2s do not invalidate this
+GREEN: the standalone root Playwright owner used the inherited non-strict
+file-list `tsc` shape, while type-aware ESLint evaluated it through the strict
+root project; and the new lower precedence boundary lacks a combined
+nonzero-backpressure/earlier-invalid-delta regression mutant. D.108e4an owns
+both corrections before any further browser discriminator, with deadline
+2026-08-31: add `--strict` to the standalone owner command and pin that a
+detached nonzero-backpressure delta still throws `D108E4H_DELTA_MISMATCH`
+before `D108E4H_RAW_BACKPRESSURE`. Neither correction changes accepted input,
+product code or this reviewed GREEN. All three reviewers agree D.108e4am may
+close and explicitly do not authorize or recommend a campaign.
+
+###### D.108e4an — raw-only browser-drain discriminator freeze
+
+The demonstrated state after D.108e4am is narrower than a product bug and
+narrower than permission to relax the campaign. Product admission correctly
+implements the fixed 65,536-byte bounded-drop contract, the validator now
+attributes that condition exactly, and the failed full trial proves a 45-call
+local refusal under mixed raw/reliable execution. It still does not establish
+whether a fresh raw-only lane under the frozen Chromium/CDP profile drains
+normally or reaches the same ceiling. The smallest next action is therefore
+one new, test-only, non-campaign browser discriminator; no long campaign,
+product optimization or expectation change is authorized.
+
+D.108e4an owns only `tests/e3-03-loss-and-hol-proof.pw.ts` plus this plan
+record. Production, examples, Playwright configuration, dependencies, browser
+pin, 65,536-byte ceiling, 600-sample/33 ms workload, 30% loss, 40 ms latency,
+packet queue/reordering, reliable-lane behavior, campaign acceptance and
+public APIs are closed. If the discriminator requires any such change, stop
+and reslice. It uses the existing grid surface, RTC observer, two isolated
+browser contexts, CDP profile and `sendMovement`; it creates no new product or
+example seam.
+
+Before its browser RED, add the two accepted review controls in the same test
+owner: a combined detached creator raw-transport delta plus positive
+backpressure must preserve `D108E4H_DELTA_MISMATCH`, and the standalone
+file-list TypeScript command must include `--strict`. These are passing
+regression/static controls, not another behavior slice and receive no separate
+review ceremony.
+
+The new title is gated by `D108E4AN_DRAIN=1`, must list as exactly one test and
+must omit the retained three-trial title. It pins Chromium
+`151.0.7922.34`, opens two isolated contexts with the existing RTC observer,
+enables CDP with `NO_LOSS` before signaling, creates one zone, waits for the
+existing raw/network pair, resets the observer to one discriminator trial id,
+captures prepare transport/channel identity, applies the exact 30%/40 ms/queue
+10/reordering profile, then invokes raw-only `sendMovement` exactly 600 times
+at 33 ms. It invokes neither `fabric.runTrial` nor reliable publish and has no
+trial loop or 15-second reliable tail. After the send loop and the retained
+500 ms drain observation, it captures deadline transport and RTC custody.
+
+The evidence envelope must be attached even on failure and must include the
+exact CDP rule/profile, before/after raw counters and identity, fixed input
+count, native send-attempt/success/failure lifecycle, per-success
+`bufferedAmount`, peak buffered ownership, deadline channel state, elapsed
+schedule, and classification. Accounting is closed:
+`sentDelta + backpressuredDropsDelta === 600`; every native attempt has exactly
+one terminal; native successes equal `sentDelta`; one raw connection/channel
+identity owns every success; and handshake/link/authenticated-loss deltas are
+zero. A missing join or identity/counter mutation is an error, not a drain
+classification.
+
+The single RED invocation classifies without retry:
+
+- `RAW_ONLY_DRAINS`: sent delta 600, backpressure delta zero, all 600 native
+  successes and stable open raw identity. This assigns the retained blocker to
+  mixed/cumulative browser-test execution; the next reviewed slice may isolate
+  one mixed raw/reliable run but may not yet rerun the campaign or change
+  acceptance.
+- `RAW_ONLY_BACKPRESSURES`: positive backpressure with exact 600-call
+  accounting, stable identity and no link/handshake/authenticated loss. This
+  demonstrates the zero-local-refusal expectation is unreliable even for the
+  raw-only frozen browser profile; stop and reslice the test/evidence contract
+  for formal review without changing it in D.108e4an.
+- Any other shape is `OWNERSHIP_UNRESOLVED`; stop and diagnose the exact
+  accounting/identity failure without another browser invocation.
+
+Run only the list guard and one exact-title browser invocation after the
+normal Grok 4.6/high, exact Kimi 100-step and Opus 5/xhigh plan review. The
+browser invocation is the sole D.108e4an runtime authority and is not one of
+the six long retained-campaign invocations. Run no retained browser suite or
+campaign. Record command, status, reporter, attachment, classification,
+elapsed time and hashes, then checkpoint the diagnostic result before deciding
+another implementation slice. Fable and collaboration subagents remain
+prohibited.
