@@ -67084,11 +67084,16 @@ pnpm exec tsc --noEmit --strict --skipLibCheck --target ES2023 \
   --lib ES2023,DOM,DOM.Iterable --types node,@playwright/test \
   tests/e3-03-loss-and-hol-proof.pw.ts
 
-pnpm exec eslint --max-warnings=0 \
+pnpm exec eslint --quiet \
   examples/grid/src/v3-zone.ts \
+  packages/network/src/node.ts \
   packages/network/src/unreliable-webrtc.ts \
+  packages/network/tests/host-factory.test.ts \
   packages/network/tests/unreliable-webrtc-e3-01-red.test.ts \
+  packages/node/src/ephemeral.ts \
+  packages/node/tests/ephemeral-webrtc-e3-02-red.test.ts \
   packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts \
+  packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts \
   packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts \
   packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs \
   packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts \
@@ -67109,9 +67114,14 @@ pnpm exec eslint --max-warnings=0 \
 pnpm exec prettier --check \
   docs/production-hardening/production-hardening-tdd-plan-v2.md \
   examples/grid/src/v3-zone.ts \
+  packages/network/src/node.ts \
   packages/network/src/unreliable-webrtc.ts \
+  packages/network/tests/host-factory.test.ts \
   packages/network/tests/unreliable-webrtc-e3-01-red.test.ts \
+  packages/node/src/ephemeral.ts \
+  packages/node/tests/ephemeral-webrtc-e3-02-red.test.ts \
   packages/storage-browser/tests/assets/phase-6a-creator-successor-activation-entry.ts \
+  packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts \
   packages/storage-browser/tests/phase-6a-creator-successor-activation.pw.ts \
   packages/storage-node/tests/fixtures/phase-6a-creator-successor-local-author-child.mjs \
   packages/storage-node/tests/phase-6a-creator-successor-local-author-death-red.test.ts \
@@ -67134,13 +67144,13 @@ git diff --check 50fd6fd578d3d219649157e45462397eb19dde7f^..HEAD
 
 The expected ordinary and isolated results are respectively 17/17 for the
 focused root/infrastructure command, 5/5 for the unloaded native timing file,
-24/24 for the full Phase-3 owner, 58/58 for network plus E3-02, 1/1 for the
+24/24 for the full Phase-3 owner, 61/61 for network plus E3-02, 1/1 for the
 focused observer, 5/8/7 listed E3-03 inventories and 7/7 for the positive
 non-campaign execution, 61/61 for the five Phase-3h plus four frozen Phase-5e
 unit owners, 15 files/122 tests for the Phase-4c/Phase-6a semantic selection,
 and 3/3 for each standalone subprocess-resolution control. The browser
 expectations are D.93.36 5/5; each D.93.46 repeat invocation 3/3; Phase-4c-b/c
-18/18 and 6/6; Phase-5e actor/relearn/live-close 12/12, 6/6 and 6/6; and
+18/18 and 6/6; Phase-5e actor/relearn/live-close 12/12, 6/6 and 9/9; and
 Phase-6a adoption-commit/activation/product/epoch 6/6, 24/24, 21/21 and 3/3.
 
 The exact D.93.46 command runs in three consecutive invocations; any failure
@@ -67168,12 +67178,17 @@ change product behavior inside D.108e4k.
 
 The broad `pnpm --filter @ts-drp/node typecheck` and
 `pnpm --filter @ts-drp/storage-node typecheck` commands also run separately and
-retain their recorded nonzero inherited baselines; both must show zero
-diagnostics in the D.108e4 owner roster and are not relabeled green. ESLint and
-Prettier run over the exact tracked D.108e4 behavior roster above, excluding
-this plan from ESLint and including it in Prettier. The exact roster comparison
-against `git diff --name-only 50fd6fd^ cc112d22`, stash-count, protected-path
-and tracked-status checks complete the static gate.
+retain their recorded nonzero inherited baselines. The exact inherited node
+baseline includes
+`packages/node/tests/ephemeral-webrtc-e3-02-red.test.ts(523,12) TS2339`; that
+diagnostic predates D.108e4x adding the file to this roster and is not relabeled
+green. Every other D.108e4 owner-roster diagnostic remains forbidden. ESLint's
+acceptance is the exact 25-file error-only `--quiet` roster above; the existing
+20 `packages/network/src/node.ts` JSDoc warnings are a separately recorded
+nonzero warning-count baseline rather than a green gate. Prettier covers those
+25 files plus this plan. The exact roster comparison against
+`git diff --name-only 50fd6fd^ 900778ff`, stash-count, protected-path and
+tracked-status checks complete the static gate.
 
 The isolated proof starts from a new detached checkout of the exact signed
 same-round D.108e4k correction commit recorded below before execution. Before
@@ -69774,7 +69789,7 @@ stdout/stderr/status SHA-256 values are respectively
 `01f86d455aacc302e23fedb6d2a4712680dbbc0ae507d50cc1048fedd76fce83`,
 `7215a17d28812d891e0106b3ecf9609b2ee7e70950d56478f69140efe0c2f36e`,
 `61e73426ee4cbedb5bd199d24bc3eb8783aaa40b4d8312974c10490fcabf70dc`
-and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3ab86aa`.
+and `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
 
 The remaining nonblocking review union is assigned to the plan owner with
 deadline 2026-09-04: expose a dropped-record count when a telemetry category
@@ -69810,7 +69825,10 @@ adoption/activation/product/epoch 6/6, 24/24, 21/21 and 3/3.
 The ordinary affected build, eight green package typechecks, strict proof-file
 TypeScript, error-only ESLint, Prettier and diff checks passed. Broad node and
 storage-node typechecks and the warning-count ESLint form reproduced only
-their recorded inherited nonzero baselines. Native stdout, non-campaign JSON,
+their recorded inherited nonzero baselines. The node baseline's exact
+`ephemeral-webrtc-e3-02-red.test.ts(523,12) TS2339` overlap predates that file's
+D.108e4x roster addition and is carved out above rather than silently called
+owner-roster green. Native stdout, non-campaign JSON,
 Phase-4c/Phase-6a stdout and corrected live-close stdout SHA-256 values are
 `6a674294b75eb29bd61cc772cebc9e7f210e8110e731cdd2b98f75d3607ccea4`,
 `66ede165f38106d64f418bf52a267bee44626993cbebdc0473474ecbaff0efc2`,
@@ -69819,9 +69837,14 @@ and `9a9986f22fd42f741bf7d08b203de39bbf45f90d12223ca2cb58f93d12e2444c`.
 
 The isolated proof used new detached checkout
 `/private/tmp/ts-drp-d108e4k-900778ff.nxIeoK` at exact `900778ff`. It started
-tracked-clean with no package/example `dist` or root shim; offline frozen
-installation created no `dist`; native preparation and the fresh affected
-build passed. It repeated the complete authorized ledger successfully:
+tracked-clean with no package/example `dist`; the retained install output shows
+resolution skipped, zero downloads and no created `dist`, though the exact
+install command line was not separately captured. Native preparation and the
+fresh affected build passed. The canonical built export resolved to
+`/private/tmp/ts-drp-d108e4k-900778ff.nxIeoK/packages/canonical/dist/src/index.js`,
+was 21,858 bytes and had post-build timestamp
+`2026-08-28T20:26:10-0400`. The checkout repeated the complete authorized
+ledger successfully:
 focused 17/17; native 5/5 with one valid record, empty `memberCountErrors`,
 zero profile records and `wallTimeMs=54_711.127375`; transport 24/24; network
 61/61; observer 1/1; exact 5/8/7 inventories; selected 7/7; unit owners 61/61
@@ -69830,8 +69853,14 @@ controls 3/3; D.93.36 5/5; three consecutive D.93.46 invocations 3/3 in 1.3,
 1.3 and 1.3 minutes; all retained browsers at 18/18, 6/6, 12/12, 6/6, 9/9,
 6/6, 24/24, 21/21 and 3/3; eight green typechecks; strict TypeScript;
 error-only ESLint; Prettier; and diff check. The two broad package typechecks
-again reproduced only their inherited nonzero baselines. The checkout finished
-tracked-clean with no root shim.
+again reproduced the same inherited diagnostics while their wrapper statuses
+differed from ordinary (`2` isolated versus `1` ordinary), so diagnostic
+identity—not exit-code identity—defines that baseline. The checkout finished
+tracked-clean. Root-shim absence was not separately captured during the
+isolated root lists or D.93 runs; the preserved exact detached checkout and
+main checkout both returned the explicit absent predicate during this review,
+so the earlier temporal custody claim is downgraded to this exact evidence gap
+rather than inferred.
 
 Isolated native stdout, non-campaign JSON, Phase-4c/Phase-6a stdout and
 corrected live-close stdout SHA-256 values are
@@ -69840,10 +69869,72 @@ corrected live-close stdout SHA-256 values are
 `c3ee05601c8fba29a3d4d41424f258daee6902eb654471c34b324425cc7dcb29`
 and `8bfc5e313fb1d46036446ceb7ca23fbe58712d942a4fab032c2a5b300eabead2`.
 All 26 stashes and protected untracked paths remain present; the main root
-shim is absent. The complete E3-03 config and retained three-trial campaign did
-not run.
+shim is absent. The three identical isolated D.93.46 stdout hashes are paired
+with distinct stderr hashes
+`b7288370e4a27db044e296465fde56aaffe001229479534164cd17b874eb9dff`,
+`b940c57e465035d8064b0d297f8f11fff0195a24d5ac76233153c58938d1ab1d`
+and `32928af1cd85beb2461d90a751b38b86201f9d2959fefa55b06401b5b1fde3ee`,
+proving three separate invocations. The ordinary and isolated artifact
+manifests now also include the recorded non-campaign JSON hashes. The complete
+E3-03 config and retained three-trial campaign did not run.
 
 The combined ordinary/isolated non-campaign behavior proof is complete at the
 same exact tree. D.108e4k remains open only for the required Grok/Kimi/Opus
 read-only evidence review of this signed/pushed evidence checkpoint and any
 same-round corrections. No Fable or collaboration subagent is authorized.
+
+The D.108e4k evidence review inspected exact signed/pushed plan-only checkpoint
+`9e4188fc88dd3e2c8f503cbd043e9f5a74bca190`, whose parent is exact behavior
+tree `900778ff540c1b1b4fb2b3e29f095b7b66ef8f9f`. Grok 4.6/high completed after
+540.125 seconds with exit zero, `end_turn` and no timeout. Its wrapper retained
+`NO_VERDICT`, but its terminal substantive object was PASS with zero P0/P1 and
+four P2. Event/public/status/stderr SHA-256 values are
+`1d22681161ac37fb4d44c82cbe3ba7a3447b444ac94979e04dd1c07859ce8768`,
+`16990810fe85c13c41d18e550c5b175bd5156a376bc0d4e55ce7e122e50c7663`,
+`f78084a50bdaf1dde06ec8880724beb1dc0cb96c8fe08fe440e97eb9cb329667`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+Kimi exact K3 session `session_a2aa00dd-0e71-4ccf-ae35-ba845b2050ab`
+emitted exactly 100 unique ordered `CHECK001` through `CHECK100` lines and one
+RESULT: APPROVED with zero P0/P1 and six P2. Stream/status/stderr SHA-256 values
+are `b28f5379856f13763de353f3784671cf3a3471659f68730c2d475ebebad10bc5`,
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`
+and `a852fc4bf41d9c173842188d398972549128ab11741c7c5885b94579258daf68`.
+Opus 5/xhigh session `0fccc206-5f7f-44fb-be21-3177c29aeaeb` completed 100
+turns in 737.044 seconds without error. It returned CHANGES_REQUIRED with zero
+P0, six P1 and seven P2. JSON/status/stderr SHA-256 values are
+`53cfd0a65daef56c4033ebc22644175c4eb747d0c7170bf40a088458b2f818b6`,
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+The same-round correction resolves the full P1 union without a semantic rerun.
+The stale 58/58 and live-close 6/6 expectations are corrected to 61/61 and
+9/9. The frozen static contract now names the exact 25-file error-only ESLint
+roster, its separate 20-warning inherited baseline and Prettier's same roster
+plus this plan. The read-only
+`git diff --name-only 50fd6fd578d3d219649157e45462397eb19dde7f^ 900778ff`
+comparison returned exactly those 25 source/test files plus this plan. The
+error-only ESLint and source/test Prettier rosters passed once in both the main
+checkout and preserved detached checkout at exact `900778ff`; the previously
+unproven D.108e4y live-close file also passed each check independently in both
+environments. The inherited node TS2339 overlap is explicitly carved out, the
+isolated export path/size/timestamp and broad-typecheck exit mapping are now
+recorded, and the unsupported temporal root-shim claim is downgraded. Explicit
+post-review checks found the root shim absent in both preserved environments.
+The two JSON custody hashes were added to their manifests, distinct D.93.46
+stderr hashes establish the three isolated invocations, and the truncated
+D.108e4y zero-status hash is corrected.
+
+The remaining P2 evidence-process debt is assigned to the plan/evidence owner
+with deadline 2026-09-04: future isolated ledgers record the exact invoked
+command for every gate, a status and wall-clock timestamp for every command,
+the offline/frozen install command rather than only its output signature,
+inventory/JSON guards matching the ordinary ledger and predicate-named root-
+shim checks at every required boundary. Those prospective custody improvements
+do not alter or invalidate the corroborated D.108e4k behavior results. With all
+P1s corrected, no product/test/configuration/build-input change, both complete
+authorized ledgers green at one exact tree and zero complete E3-03 campaign
+execution, D.108e4k is closed. D.108e4a/b/c/d and aggregate D.108e4 remain open;
+the complete five-test E3-03 config, retained three-trial behavior and both
+campaign ledgers still require fresh express authorization. No Fable or
+collaboration subagent ran.
