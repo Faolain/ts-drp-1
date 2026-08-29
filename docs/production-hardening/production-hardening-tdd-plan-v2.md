@@ -70818,3 +70818,228 @@ D.108e4aa is therefore GREEN as a test-validator correction, with no product
 defect or product change demonstrated. The fresh signed/pushed campaign freeze,
 its review and express authorization remain the smallest next gate; this
 checkpoint does not authorize or count a long campaign invocation.
+
+###### D.108e4ab — post-validator retained-campaign reauthorization freeze
+
+D.108e4ab supersedes D.108e4z only as the executable freeze for the six
+unearned retained-campaign invocations. D.108e4z's failed ordinary invocation
+one remains immutable failure custody and is never counted as a pass. Its
+authorization was consumed when that invocation started; ordinary invocations
+two and three and all three isolated invocations never started. D.108e4ab
+therefore begins with zero ordinary and zero isolated consecutive passes and
+requires exactly three new ordinary plus three new isolated passes. No prior
+complete-config, failed D.108e4z or focused/non-campaign invocation may be
+substituted or double-counted.
+
+This is a plan/evidence-only execution slice. Product, example, test, fixture,
+Playwright/build/workspace configuration, script, dependency, package
+manifest, lockfile, browser pin, workload, loss profile, timing limit and
+performance threshold changes are forbidden. The exact signed/pushed behavior
+commit is `8c9afe55df7de6ffbfcc352e405e1faacfcf899c`, with tree
+`048edbdbb0960569c04f6284ab58057d602e3f78`. Its only behavior delta from the
+previous campaign tree is the reviewed D.108e4aa test-validator correction;
+production bytes remain unchanged. Plan-only descendants preserve this
+behavior identity only when the following guard exits zero:
+
+```sh
+git diff --quiet 8c9afe55df7de6ffbfcc352e405e1faacfcf899c..HEAD -- . \
+  ':(exclude)docs/production-hardening/production-hardening-tdd-plan-v2.md'
+```
+
+The fresh isolated checkout is
+`/private/tmp/ts-drp-d108e4ab-clean.dwW7kw/repo`. It is detached at exact
+commit `8c9afe55df7de6ffbfcc352e405e1faacfcf899c`, resolves to tree
+`048edbdbb0960569c04f6284ab58057d602e3f78`, and had empty tracked status
+before and after exact setup command `pnpm install --offline
+--frozen-lockfile`. That setup exited zero and completed the package build
+closure without changing the lockfile or tracked source. Both ordinary and
+isolated predicates `test ! -e node_modules/@ts-drp/canonical` pass. Both
+canonical exports are 21,858 bytes with SHA-256
+`cbc7746c51a5cd1da446865026a3e555b3aa5c69ebc9a8fa4f1f4552299aaa83`.
+
+Seven execution identities are pairwise byte-identical between checkouts:
+`playwright.e3-03-loss-and-hol.config.ts`, both
+`configs/network-spike-relay*.json` files, the exact test owner,
+`packages/network/src/unreliable-webrtc.ts`, `packages/network/src/node.ts`
+and `packages/node/src/ephemeral.ts`. The fresh isolated build contains 334
+runtime `dist` files after excluding `*.d.ts`, source maps and
+`*.tsbuildinfo`; every one exists in the ordinary checkout and all 334 hashes
+are pairwise identical. D.108e4ab setup custody is under
+`.logs/d108e4ab-freeze/`. The ordinary and isolated suffix-only `--list`
+probes both exited zero with byte-identical output, exactly one retained title
+and `Total: 1 test in 1 file`:
+
+```text
+three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss
+```
+
+No long invocation may start until this exact plan freeze is signed, pushed
+and reviewed by normal read-only Grok 4.6/high, exact Kimi K3 `CHECK001`
+through `CHECK100` plus RESULT and Opus 5/xhigh, and the user then expressly
+authorizes all six D.108e4ab long retained-campaign invocations. Neither this
+text, the readiness probes, the reviewer verdicts, the resumed thread goal nor
+any earlier authorization supplies that authority. Fable and collaboration
+subagents remain prohibited. A review P0/P1 is corrected in the same round
+without confirmation review; each P2 must name the plan/evidence owner and a
+deadline no later than 2026-09-04.
+
+Immediately before every invocation, re-record exact main and isolated commit
+and tree, remote main-branch head, signature, ordinary protected-untracked
+status, empty isolated tracked status, 26 stashes, both root-shim predicates,
+the seven identity manifests, the 334-file runtime manifest, ambient process
+inventory and fixed-port inventory. Under the user's narrowed ambient rule,
+unrelated processes may coexist, but no reviewer, test or profiler rooted in
+either ts-drp checkout may be active and ports 4174, 4175, 51000 and 51002
+must have no listener. A failed preflight consumes no invocation. It must be
+corrected before execution without stopping unrelated work.
+
+The exact evidence root is
+`/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/`.
+Create it only after express authorization. Run the six blocks below as six
+separate shell processes, in order, never with `--repeat-each` and never in a
+combined loop. Each unified process session has an external 360-second
+process-group watchdog over Playwright's unchanged 180-second test timeout;
+watchdog expiry is a terminal failure and does not authorize a retry or limit
+change. After each process, validate its artifact completely before starting
+the next. Any nonzero status, invalid JSON, missing attachment, unexpected,
+skipped or flaky result, retry, top-level error, failure telemetry attachment,
+title mismatch or retained semantic assertion failure stops the slice
+immediately. No rerun is authorized.
+
+```sh
+cd /Users/aristotle/Documents/Projects/ts-drp-1
+date -u +%Y-%m-%dT%H:%M:%SZ > .logs/d108e4ab-campaign/ordinary-1.time
+printf '%s\n' "pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' --reporter=json --fail-on-flaky-tests" > .logs/d108e4ab-campaign/ordinary-1.command
+set +e
+PLAYWRIGHT_JSON_OUTPUT_NAME=.logs/d108e4ab-campaign/ordinary-1.json \
+  pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
+  --reporter=json --fail-on-flaky-tests \
+  > .logs/d108e4ab-campaign/ordinary-1.stdout.log \
+  2> .logs/d108e4ab-campaign/ordinary-1.stderr.log
+d108e4ab_status=$?
+set -e
+printf '%s\n' "$d108e4ab_status" > .logs/d108e4ab-campaign/ordinary-1.status
+date -u +%Y-%m-%dT%H:%M:%SZ >> .logs/d108e4ab-campaign/ordinary-1.time
+test "$d108e4ab_status" -eq 0
+```
+
+```sh
+cd /Users/aristotle/Documents/Projects/ts-drp-1
+date -u +%Y-%m-%dT%H:%M:%SZ > .logs/d108e4ab-campaign/ordinary-2.time
+printf '%s\n' "pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' --reporter=json --fail-on-flaky-tests" > .logs/d108e4ab-campaign/ordinary-2.command
+set +e
+PLAYWRIGHT_JSON_OUTPUT_NAME=.logs/d108e4ab-campaign/ordinary-2.json \
+  pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
+  --reporter=json --fail-on-flaky-tests \
+  > .logs/d108e4ab-campaign/ordinary-2.stdout.log \
+  2> .logs/d108e4ab-campaign/ordinary-2.stderr.log
+d108e4ab_status=$?
+set -e
+printf '%s\n' "$d108e4ab_status" > .logs/d108e4ab-campaign/ordinary-2.status
+date -u +%Y-%m-%dT%H:%M:%SZ >> .logs/d108e4ab-campaign/ordinary-2.time
+test "$d108e4ab_status" -eq 0
+```
+
+```sh
+cd /Users/aristotle/Documents/Projects/ts-drp-1
+date -u +%Y-%m-%dT%H:%M:%SZ > .logs/d108e4ab-campaign/ordinary-3.time
+printf '%s\n' "pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' --reporter=json --fail-on-flaky-tests" > .logs/d108e4ab-campaign/ordinary-3.command
+set +e
+PLAYWRIGHT_JSON_OUTPUT_NAME=.logs/d108e4ab-campaign/ordinary-3.json \
+  pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
+  --reporter=json --fail-on-flaky-tests \
+  > .logs/d108e4ab-campaign/ordinary-3.stdout.log \
+  2> .logs/d108e4ab-campaign/ordinary-3.stderr.log
+d108e4ab_status=$?
+set -e
+printf '%s\n' "$d108e4ab_status" > .logs/d108e4ab-campaign/ordinary-3.status
+date -u +%Y-%m-%dT%H:%M:%SZ >> .logs/d108e4ab-campaign/ordinary-3.time
+test "$d108e4ab_status" -eq 0
+```
+
+```sh
+cd /private/tmp/ts-drp-d108e4ab-clean.dwW7kw/repo
+date -u +%Y-%m-%dT%H:%M:%SZ > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-1.time
+printf '%s\n' "pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' --reporter=json --fail-on-flaky-tests" > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-1.command
+set +e
+PLAYWRIGHT_JSON_OUTPUT_NAME=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-1.json \
+  pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
+  --reporter=json --fail-on-flaky-tests \
+  > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-1.stdout.log \
+  2> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-1.stderr.log
+d108e4ab_status=$?
+set -e
+printf '%s\n' "$d108e4ab_status" > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-1.status
+date -u +%Y-%m-%dT%H:%M:%SZ >> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-1.time
+test "$d108e4ab_status" -eq 0
+```
+
+```sh
+cd /private/tmp/ts-drp-d108e4ab-clean.dwW7kw/repo
+date -u +%Y-%m-%dT%H:%M:%SZ > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-2.time
+printf '%s\n' "pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' --reporter=json --fail-on-flaky-tests" > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-2.command
+set +e
+PLAYWRIGHT_JSON_OUTPUT_NAME=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-2.json \
+  pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
+  --reporter=json --fail-on-flaky-tests \
+  > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-2.stdout.log \
+  2> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-2.stderr.log
+d108e4ab_status=$?
+set -e
+printf '%s\n' "$d108e4ab_status" > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-2.status
+date -u +%Y-%m-%dT%H:%M:%SZ >> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-2.time
+test "$d108e4ab_status" -eq 0
+```
+
+```sh
+cd /private/tmp/ts-drp-d108e4ab-clean.dwW7kw/repo
+date -u +%Y-%m-%dT%H:%M:%SZ > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-3.time
+printf '%s\n' "pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' --reporter=json --fail-on-flaky-tests" > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-3.command
+set +e
+PLAYWRIGHT_JSON_OUTPUT_NAME=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-3.json \
+  pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
+  --reporter=json --fail-on-flaky-tests \
+  > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-3.stdout.log \
+  2> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-3.stderr.log
+d108e4ab_status=$?
+set -e
+printf '%s\n' "$d108e4ab_status" > /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-3.status
+date -u +%Y-%m-%dT%H:%M:%SZ >> /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/isolated-3.time
+test "$d108e4ab_status" -eq 0
+```
+
+Every successful result must contain exactly one expected test, zero skipped,
+unexpected and flaky tests, retry zero, no top-level error and the exact
+retained title. The decoded `e3-03-fixed-loss-campaign.json` attachment must
+pin Chromium `151.0.7922.34`, `trialCount: 3`, three metric records and three
+observation envelopes. Every trial must contain prepare, deadline, reset and
+run-returned stages; signed `rawMaxStallMs <= 500`, `rawGap > 1`, raw AoI P95
+at most 80% of reliable AoI P95 and at least ten raw deliveries after reliable
+start remain unchanged. Passing status must follow all aggregate delivery and
+connection assertions, rendered metrics, final durable-control round trip and
+terminal stage `complete`. Require the completed campaign attachment, exact
+`e3-03-preliminary-calibration.json`, absence of
+`e3-03-failure-telemetry.json`, reporter status `expected`, process status zero
+and `stats.unexpected == 0`; attachment presence alone is insufficient.
+
+Hash the reporter, stdout, stderr, status, command, timestamps, calibration,
+campaign attachment, all before/after preflight records and the complete
+artifact manifest for every invocation. After all six consecutive passes,
+record one signed/pushed D.108e4ab evidence checkpoint and run a separate
+read-only Grok 4.6/high, exact Kimi K3 100-step and Opus 5/xhigh evidence
+review. D.108e4b then receives its still-separate GREEN review against the
+exact product candidate and composed final behavior/evidence tree. Only after
+both review rounds close with all P0/P1 corrected and P2 owned may aggregate
+D.108e4 closure be audited. D.108e5 remains blocked until that audit.
