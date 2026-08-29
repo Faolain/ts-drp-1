@@ -73472,12 +73472,14 @@ GREEN: the standalone root Playwright owner used the inherited non-strict
 file-list `tsc` shape, while type-aware ESLint evaluated it through the strict
 root project; and the new lower precedence boundary lacks a combined
 nonzero-backpressure/earlier-invalid-delta regression mutant. D.108e4an owns
-both corrections before any further browser discriminator, with deadline
+both corrections as its only deterministic controls, with deadline
 2026-08-31: add `--strict` to the standalone owner command and pin that a
 detached nonzero-backpressure delta still throws `D108E4H_DELTA_MISMATCH`
-before `D108E4H_RAW_BACKPRESSURE`. Neither correction changes accepted input,
-product code or this reviewed GREEN. All three reviewers agree D.108e4am may
-close and explicitly do not authorize or recommend a campaign.
+before `D108E4H_RAW_BACKPRESSURE`. Its proposed browser discriminator was
+rejected before implementation and creates no later drain/browser follow-on.
+Neither correction changes accepted input, product code or this reviewed
+GREEN. All three reviewers agree D.108e4am may close and explicitly do not
+authorize or recommend a campaign.
 
 ###### D.108e4an — rejected browser discriminator and deterministic-control closure
 
@@ -73497,12 +73499,11 @@ and returned `CHANGES_REQUIRED`, P0=1/P1=3/P2=1 with `end_turn`. Exact public
 structured-output SHA-256 is
 `f7929fb743ed657b69a8c7e5516d44ecae8f6ea2317c6a65f0220404aef0718a`.
 
-Exact Kimi K3 session `e9fc6108-b7da-4fdc-a9f8-97b3d2e6c0e0` completed the
-substantive review and returned two progress lines before its complete
-checklist. A same-session, tool-free formatting continuation emitted exactly
-101 nonempty lines: ordered unique `CHECK001` through `CHECK100`, then one
-RESULT. It returned `CHANGES_REQUIRED`, P0=1/P1=2/P2=4. Exact formatted
-checklist and RESULT SHA-256 values are
+Exact Kimi K3 session `e9fc6108-b7da-4fdc-a9f8-97b3d2e6c0e0` emitted two
+interim progress messages during its substantive review. Its terminal message
+then emitted exactly 101 nonempty lines: ordered unique `CHECK001` through
+`CHECK100`, then one RESULT. It returned `CHANGES_REQUIRED`, P0=1/P1=2/P2=4.
+Exact checklist and RESULT SHA-256 values are
 `5afc18697678bb37a76a99910ba17a9961ffb0bca56065f25f8b06b17f62445a`
 and
 `92a0357e478be20e76e919977734e6dc843b542ddcbed21a2dd2a0ae8b915887`.
@@ -73532,6 +73533,48 @@ publishes, the known post-send authenticated-loss delta, the retained
 mid-trial loss-application point and a peer-id-dependent raw envelope size add
 further false-unresolved paths but do not change that causal rejection.
 
+The narrow confirmation review then inspected exact signed/pushed correction
+`90708e90d66c1f4e374f5bad458d7d3ef0b26796`, tree
+`a791a8045858c5ac6caf7e9be02ed65ba5c139c4` and parent
+`e191176c8f95a006d9c590208728eb77f84f3f93`. All three reviewers approved
+with zero P0/P1 and ran no test, browser, campaign or profiler.
+
+Grok 4.6/high session `01a04f0d-81e6-75e1-839f-13191eaf6644` completed after
+420.075 seconds with `end_turn`. Progress prose before its valid terminal
+object caused the runner's honest `NO_VERDICT`; a same-session, tool-free
+formatting continuation returned unchanged `APPROVED`, P0=0/P1=0/P2=3.
+Exact structured-output SHA-256 is
+`425e08bb5764872be226745ab77ee976ff75a1cc936c2b343c202a49f19c70c9`.
+
+Exact Kimi K3 session `7abe7813-720b-45fb-8e9e-0497d8a2af63` returned six
+progress lines before its complete checklist. A same-session, tool-free
+formatting continuation emitted exactly 101 nonempty lines: ordered unique
+`CHECK001` through `CHECK100`, then one RESULT. It returned `APPROVED`,
+P0=0/P1=0/P2=2. Exact formatted checklist and RESULT SHA-256 values are
+`2d20958c18916b92c1e043d2005dfd0c4e0d857eb2155a212dee60ce6c629904`
+and
+`7209ce5cb1329f3986733086ed7133eef297681dd070329cf7040efc57c4425f`.
+
+Opus 5/xhigh session `ea382ff7-ef35-4da3-beb9-fdaaddfe120a` returned
+`APPROVED`, P0=0/P1=0/P2=5, with zero permission denials and zero subagents.
+Exact canonical structured-output SHA-256 is
+`034bac308056c5d4d73f222c3078dd3fb326fd0bc1187415439fb9bd94bc5b4d`.
+The complete self-excluding 20-file confirmation manifest validates and has
+SHA-256
+`8131ad2fdeaceb46955629c5efc9d545894b78dd58928e22db544caae7b80e5d`;
+review-validation SHA-256 is
+`673b3f46027feafa0bb8609932c54ac8d4810fdfecfe26dcc6c3e3c523e8c6a9`.
+
+The confirmation P2 union is closed in this same-round plan record. The
+earlier Kimi provenance now describes the preserved stream rather than an
+unpreserved continuation. Command reporter/redirection, exact owner paths and
+the list expectation are pinned below. The rejected review's remaining
+P1/P2s lapse with the deleted probe except the two named controls and fixed
+evidence root; both remain owned by D.108e4an through 2026-08-31. D.108e4ao's
+own plan review, owner, deadline and provisional diagnosis are explicit below.
+The standing aggregate/campaign block is also carried forward. These record
+corrections change no reviewed executable and require no confirmation review.
+
 Accordingly D.108e4an consumes no browser authority. The proposed
 `D108E4AN_DRAIN=1` title, wrapper and classifications are deleted before
 implementation. No example/product/configuration/dependency/API/threshold,
@@ -73541,10 +73584,14 @@ D.108e4aj launch blocks remain unconsumed and prohibited by that evidence
 root's frozen stop rule. This correction does not authorize another long
 invocation.
 
-D.108e4an now closes only the two deterministic D.108e4am review controls in
-`tests/e3-03-loss-and-hol-proof.pw.ts`. Inside the existing
-`D108E4H_TELEMETRY=1` schema-validator title, add one combined mutant whose
-creator has both an invalid detached raw-transport delta and positive
+D.108e4an owns only `tests/e3-03-loss-and-hol-proof.pw.ts` plus this plan
+record, through 2026-08-31. Production, examples, Playwright configuration,
+dependencies, public APIs, the browser pin, 30% loss, 40 ms latency, packet
+queue/reordering, the 65,536-byte ceiling, 600/33/256 workload, reliable-lane
+behavior, campaign acceptance and evidence bytes are closed. It closes only
+the two deterministic D.108e4am review controls in the test owner. Inside the
+existing `D108E4H_TELEMETRY=1` schema-validator title, add one combined mutant
+whose creator has both an invalid detached raw-transport delta and positive
 backpressure; it must preserve the earlier exact
 `D108E4H_DELTA_MISMATCH` code rather than falling through to
 `D108E4H_RAW_BACKPRESSURE`. Add `--strict` to the existing standalone
@@ -73555,40 +73602,59 @@ After the signed/pushed corrected freeze and its accepted plan confirmation,
 run one exact schema-validator list guard and one exact focused invocation:
 
 ```sh
-D108E4H_TELEMETRY=1 pnpm exec playwright test \
-  --config playwright.e3-03-loss-and-hol.config.ts \
-  --grep 'validates schema-v3 replacement custody without cross-peer clocks$' \
-  --list
+mkdir -p .logs/d108e4an-controls
 
 D108E4H_TELEMETRY=1 pnpm exec playwright test \
   --config playwright.e3-03-loss-and-hol.config.ts \
   --grep 'validates schema-v3 replacement custody without cross-peer clocks$' \
-  --fail-on-flaky-tests
+  --list \
+  > .logs/d108e4an-controls/validator-list.txt \
+  2> .logs/d108e4an-controls/validator-list.stderr.log
+
+D108E4H_TELEMETRY=1 pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'validates schema-v3 replacement custody without cross-peer clocks$' \
+  --reporter=json --fail-on-flaky-tests \
+  > .logs/d108e4an-controls/validator-focused.json \
+  2> .logs/d108e4an-controls/validator-focused.stderr.log
 
 pnpm exec tsc --noEmit --target ES2022 --module ESNext \
   --moduleResolution bundler --allowImportingTsExtensions --skipLibCheck \
   --strict tests/e3-03-loss-and-hol-proof.pw.ts
+
+pnpm exec eslint tests/e3-03-loss-and-hol-proof.pw.ts
+NODE_OPTIONS=--max-old-space-size=8192 pnpm exec prettier --check \
+  tests/e3-03-loss-and-hol-proof.pw.ts \
+  docs/production-hardening/production-hardening-tdd-plan-v2.md
+git diff --check
 ```
 
-Then run exact-owner ESLint, Prettier and `git diff --check`, preserving command,
-status, reporter, complete soft-failure set and hashes under the fixed
-`.logs/d108e4an-controls/` root with a validating self-excluding manifest.
-Any failure outside the new mutant's expected exact-code matrix stops the
-slice. The test-only implementation receives one signed/pushed checkpoint and
-the normal Grok 4.6/high, exact Kimi 100-step and Opus 5/xhigh implementation
-review; no separate RED/GREEN behavior cycle is created for already-passing
-controls.
+The list guard must show exactly one test and no retained campaign title.
+Preserve every command, status, reporter, complete soft-failure set and hash
+under the fixed `.logs/d108e4an-controls/` root with a validating
+self-excluding manifest. Any failure outside the new mutant's expected
+exact-code matrix stops the slice. The test-only implementation receives one
+signed/pushed checkpoint and the normal Grok 4.6/high, exact Kimi 100-step and
+Opus 5/xhigh implementation review; no separate RED/GREEN behavior cycle is
+created for already-passing controls.
 
-Only after those controls close may D.108e4ao freeze the next causal step. Its
-input is the immutable failed `e3-03-2` attachment, not another browser run.
-The smallest justified action is a pure offline replay that reconstructs the
-post-custody application evidence already present in that attachment and
-evaluates the remaining sender schedule, receiver-domain, AoI, HOL,
-ready-state, partition and counter assertions without bypassing or changing
-the retained positive-backpressure failure. If the replay exposes another
-semantic failure, that exact owner is resliced. If every later semantic
-assertion passes, the evidence demonstrates only a cumulative/scheduling
-capacity-gate reliability failure, not a product defect; a separately reviewed
+Only after those controls close may D.108e4ao freeze the next causal step in a
+signed/pushed plan checkpoint that receives its own Grok 4.6/high, exact Kimi
+100-step and Opus 5/xhigh review before replay implementation. Its prospective
+implementation owner is only `tests/e3-03-loss-and-hol-proof.pw.ts` plus this
+plan record, and its freeze deadline is 2026-09-01. Its input is the immutable
+failed `e3-03-2` attachment, not another browser run. The smallest justified
+action is a pure offline replay that reconstructs the post-custody application
+evidence already present in that attachment and evaluates the remaining sender
+schedule, receiver-domain, AoI, HOL, ready-state, partition and counter
+assertions without bypassing or changing the retained positive-backpressure
+failure. If the replay exposes another semantic failure, that exact owner is
+resliced. If every later semantic assertion passes, the evidence supports only
+a proposal to classify the blocker as a cumulative/scheduling capacity-gate
+reliability issue; the replay does not itself establish that no product defect
+exists or authorize an expectation change. A separately reviewed
 test-infrastructure expectation/variance slice may then be proposed. Missing
 replay inputs are `OWNERSHIP_UNRESOLVED` and stop without instrumentation or a
-runtime retry. Fable and collaboration subagents remain prohibited.
+runtime retry. D.108e4, D.108e5 and all campaign execution remain blocked; no
+retained campaign is authorized or recommended. Fable and collaboration
+subagents remain prohibited.
