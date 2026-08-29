@@ -74194,9 +74194,10 @@ A failure among those expectations can therefore still produce an incomplete
 attachment. The statement that timestamp custody was complete for every future
 failure was false.
 
-Accordingly D.108e4aq decides **not to re-freeze or run a campaign yet**. Every
-paragraph above that describes future readiness, runner edits, root creation or
-six-run execution is rejected design evidence only and grants no authority.
+Accordingly D.108e4aq decides **not to re-freeze or run a campaign yet**. The
+entire readiness/campaign design above is void and grants no authority. Its
+prohibitions remain live: all D.108e4ad/D.108e4aj and D.108e4an/D.108e4ao/
+D.108e4ap evidence roots remain immutable and may not be overwritten or reused.
 `.logs/d108e4aq-freeze/` and `.logs/d108e4aq-campaign/` must remain absent. The
 durable six-run authorization remains recorded and must not be requested again,
 but no invocation is executable. Two replay checks were true only vacuously:
@@ -74205,12 +74206,17 @@ rejected-ready-state and sentinel-shape both had retained count zero.
 D.108e4ar owns the smallest prerequisite: a tests-only final-evidence custody
 slice in `tests/e3-03-loss-and-hol-proof.pw.ts` plus this plan, due before any
 campaign and no later than 2026-09-02. It must preserve the exact creator-page
-`runTrialReturnedAtMs` in the final `CampaignEvidence` record before
-`currentTrialEvidence = trialEvidence`, without changing production, product
+`runTrialReturnedAtMs` and the exact run-return `senderWire` under distinct,
+unambiguous final `CampaignEvidence` keys before
+`currentTrialEvidence = trialEvidence`. The retained deadline capture must keep
+its separate provenance; neither capture may silently replace the other. This
+discharges both halves of the D.108e4ap post-replacement residual. It changes no production, product
 APIs, clocks, wire formats, workload, thresholds or any of the twenty-one
 expectations. Its causal RED must prove a simulated post-replacement failure
-attachment lacks the field; GREEN must change only the final evidence builder/
-record seam and prove both the timestamp and existing final evidence survive.
+attachment lacks both run-return operands; GREEN must change only the final
+evidence builder/record seam and prove the timestamp, run-return sender wire,
+deadline sender wire and existing final evidence all survive with distinct
+provenance.
 Plan, RED and GREEN each require their normal signed/pushed Grok 4.6/high, exact
 Kimi K3 100-check and Opus 5/xhigh gates; Fable and collaboration subagents are
 prohibited. No long campaign may run in D.108e4ar.
@@ -74228,6 +74234,12 @@ launching runner's own process tree but rejects reviewer/test/profiler processes
 rooted in any ts-drp checkout. It must also disposition session-scoped tool
 paths, pre-trap residue, in-runner predecessor enforcement and checkout command/
 status custody rather than silently carrying them forward.
+The existing D.108e4ak evidence-hygiene owner remains responsible through
+2026-09-05; a future freeze may discharge but must not create parallel ownership.
+It must also bind or explicitly retain the filesystem-mode limitation because
+SHA-256 manifests do not bind mode bits. D.108e4aq's own 2026-09-05 decision
+deadline is satisfied by this stop; downstream D.108e5 timing must be rescheduled
+rather than used to skip any review or campaign gate.
 
 A second identical raw-backpressure recurrence would establish only that the
 same retained workload/ceiling can reproduce under unchanged product bytes; it
