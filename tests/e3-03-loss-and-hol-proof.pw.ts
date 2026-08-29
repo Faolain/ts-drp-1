@@ -3437,6 +3437,33 @@ function validateD108e4hCampaignCustody(input: D108e4hValidationInput): void {
 	);
 }
 
+const D108E4AP_RUN_RETURN_BOUND_MS = (SAMPLE_COUNT - 1) * SAMPLE_INTERVAL_MS - 1_000;
+
+function d108e4apBuildRunReturnProgress(
+	progress: Readonly<Record<string, unknown>>,
+	runTrialReturnedAtMs: number
+): Readonly<Record<string, unknown>> {
+	void runTrialReturnedAtMs;
+	return Object.freeze({ ...progress });
+}
+
+function d108e4apRunReturnTimestamp(progress: Readonly<Record<string, unknown>>): number {
+	const present = Object.hasOwn(progress, "runTrialReturnedAtMs");
+	const value = progress["runTrialReturnedAtMs"];
+	if (!present || value === undefined) throw new Error("D108E4AP_RUN_RETURN_CUSTODY_ABSENT");
+	if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0)
+		throw new Error("D108E4AP_RUN_RETURN_CUSTODY_INVALID");
+	return value;
+}
+
+function d108e4apAssertRunReturnJoin(
+	progress: Readonly<Record<string, unknown>>,
+	campaignStartedAtMs: number
+): void {
+	if (d108e4apRunReturnTimestamp(progress) - campaignStartedAtMs < D108E4AP_RUN_RETURN_BOUND_MS)
+		throw new Error("D108E4AP_RUN_RETURN_JOIN_INVALID");
+}
+
 if (process.env["D108E4H_TELEMETRY"] === "1") {
 	test("validates schema-v3 replacement custody without cross-peer clocks", () => {
 		const noReplacement = d108e4hFixture("none");
@@ -5872,6 +5899,40 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 		expect(() => validateD108e4hCampaignCustody(nonDrainedChannelClose)).toThrowError(
 			"D108E4H_CHANNEL_CLOSE_DRAIN_INVALID"
 		);
+
+		expect(D108E4AP_RUN_RETURN_BOUND_MS).toBe(18_767);
+		const d108e4apCampaignStartedAtMs = 1_000_000;
+		const d108e4apExactRunReturnAtMs = d108e4apCampaignStartedAtMs + D108E4AP_RUN_RETURN_BOUND_MS;
+		const d108e4apMissing = Object.freeze({ trialId: "d108e4ap-missing" });
+		expect(() => d108e4apRunReturnTimestamp(d108e4apMissing)).toThrowError(
+			"D108E4AP_RUN_RETURN_CUSTODY_ABSENT"
+		);
+		const d108e4apNonSafe = Object.freeze({ runTrialReturnedAtMs: Number.NaN });
+		expect(() => d108e4apRunReturnTimestamp(d108e4apNonSafe)).toThrowError(
+			"D108E4AP_RUN_RETURN_CUSTODY_INVALID"
+		);
+		const d108e4apNegative = Object.freeze({ runTrialReturnedAtMs: -1 });
+		expect(() => d108e4apRunReturnTimestamp(d108e4apNegative)).toThrowError(
+			"D108E4AP_RUN_RETURN_CUSTODY_INVALID"
+		);
+		expect(() => d108e4apAssertRunReturnJoin(d108e4apNegative, d108e4apCampaignStartedAtMs)).toThrowError(
+			"D108E4AP_RUN_RETURN_CUSTODY_INVALID"
+		);
+		const d108e4apBelowBoundary = Object.freeze({
+			runTrialReturnedAtMs: d108e4apExactRunReturnAtMs - 1,
+		});
+		expect(() => d108e4apAssertRunReturnJoin(d108e4apBelowBoundary, d108e4apCampaignStartedAtMs)).toThrowError(
+			"D108E4AP_RUN_RETURN_JOIN_INVALID"
+		);
+		const d108e4apExactBoundary = Object.freeze({ runTrialReturnedAtMs: d108e4apExactRunReturnAtMs });
+		expect(() => d108e4apAssertRunReturnJoin(d108e4apExactBoundary, d108e4apCampaignStartedAtMs)).not.toThrow();
+		const d108e4apLiveProgress = d108e4apBuildRunReturnProgress(
+			Object.freeze({ trialId: "d108e4ap-live" }),
+			d108e4apExactRunReturnAtMs
+		);
+		d108e4apRunReturnTimestamp(d108e4apLiveProgress);
+		expect(d108e4apLiveProgress["runTrialReturnedAtMs"]).toBe(d108e4apExactRunReturnAtMs);
+		d108e4apAssertRunReturnJoin(d108e4apLiveProgress, d108e4apCampaignStartedAtMs);
 	});
 }
 
@@ -7028,6 +7089,8 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			await trialOperation;
 			stage = trialId + "-sender-evidence";
 			const runTrialReturnedAtMs = await creator.evaluate(() => Date.now());
+			trialProgress = d108e4apBuildRunReturnProgress(trialProgress, runTrialReturnedAtMs);
+			currentTrialEvidence = trialProgress;
 			const [senderRawTransportAtRunReturn, receiverRawTransportAtRunReturn] = await Promise.all([
 				zone(creator).then(({ rawTransport }) => rawTransport),
 				zone(receiver).then(({ rawTransport }) => rawTransport),

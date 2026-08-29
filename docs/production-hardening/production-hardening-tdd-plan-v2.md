@@ -73973,6 +73973,25 @@ failure set and only `D108E4AP_RUN_RETURN_CUSTODY_ABSENT`; GREEN focused status
 must be zero with expected 1, unexpected/skipped/flaky 0 and an empty soft-
 failure set.
 
+The causal RED executed exactly once after the corrected plan gate closed. The
+list guard returned status zero and selected exactly one test in one file with
+the campaign title absent. The focused JSON run returned status one with
+expected 0, skipped 0, unexpected 1 and flaky 0; top-level errors were empty,
+result `softErrors` was absent/null, and the sole unexpected error was the final
+unwrapped `D108E4AP_RUN_RETURN_CUSTODY_ABSENT`. List stdout and focused JSON
+SHA-256 values are
+`d2ce7bbba3e02ab88ab9446e64e4fadb5af25164beeb2ff25be6e3d25dc33320`
+and
+`000d08b72b043568109ce5dc417d94f36593706e598345b9cc5fb4ad8e1214ae`.
+The self-excluding twelve-file `.logs/d108e4ap-red/` manifest validates and has
+SHA-256
+`3d8ad8b921b79af750ec02d2208d72a62692e20a63d92a6fe17ad424fbd00c5f`;
+validation SHA-256 is
+`2cc1f04355674ed5f6fa524fadb3c31f3ff3a8a9bd1d1fe6a0ccfd29b9476532`.
+No TypeScript, ESLint, Prettier, browser, campaign, profiler or unrelated suite
+ran at RED; the pre-run read-only overlap/port check and `git diff --check`
+reported no blocker.
+
 GREEN then runs only the four static commands recorded for D.108e4an—strict
 standalone TypeScript, exact-owner ESLint, 8 GiB Prettier and
 `git diff --check`—with every output redirected to the new GREEN root; it does
