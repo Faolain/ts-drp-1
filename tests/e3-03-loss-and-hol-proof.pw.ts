@@ -3443,8 +3443,9 @@ function d108e4apBuildRunReturnProgress(
 	progress: Readonly<Record<string, unknown>>,
 	runTrialReturnedAtMs: number
 ): Readonly<Record<string, unknown>> {
-	void runTrialReturnedAtMs;
-	return Object.freeze({ ...progress });
+	if (!Number.isSafeInteger(runTrialReturnedAtMs) || runTrialReturnedAtMs < 0)
+		throw new Error("D108E4AP_RUN_RETURN_CUSTODY_INVALID");
+	return Object.freeze({ ...progress, runTrialReturnedAtMs });
 }
 
 function d108e4apRunReturnTimestamp(progress: Readonly<Record<string, unknown>>): number {

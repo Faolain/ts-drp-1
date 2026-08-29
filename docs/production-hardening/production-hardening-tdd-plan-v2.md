@@ -74047,6 +74047,30 @@ Opus 5/xhigh read-only review, with same-round P0/P1 correction and explicit P2
 ownership, before any GREEN edit. GREEN receives a separate equivalent review
 only after it is focused-green. Neither review may authorize a campaign.
 
+GREEN changed only the shared builder body. It rejects a timestamp that is not
+a non-negative safe integer and returns the frozen accumulated progress plus the
+exact creator-page `runTrialReturnedAtMs`; every RED control and live adoption
+line is byte-identical. The exact list guard returned status zero, selected one
+test in one file and excluded the retained campaign title. Its stdout SHA-256 is
+`d77e68dc821ec6e1e4409e629cfcc93c039dda44963ce69f1508eba8e47b4704`.
+The one focused GREEN run returned status zero after 7.605 seconds with expected
+1, skipped 0, unexpected 0 and flaky 0; top-level errors were empty and result
+`softErrors` was absent/null. JSON reporter SHA-256 is
+`a785f1c19b117ee54cb9b4992674a9013ea439db18b84246ae03dcab0f0bd637`.
+Strict standalone TypeScript, exact-owner ESLint, 8 GiB exact-owner Prettier and
+`git diff --check` all returned status zero. TypeScript, ESLint and diff-check
+stdout/stderr are empty; Prettier stdout SHA-256 is
+`17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20`
+and stderr is empty. The retained twenty-one post-custody expectations are
+byte-identical at post-edit lines 7332-7394, and the retained run-return span
+expression is byte-identical at line 7381. The GREEN `owner-hashes.txt` pins
+post-GREEN test bytes plus inherited plan bytes from signed RED-review closure
+`d705a6d29a4d627abae68c16107754aea35c45b9`. The self-excluding twenty-eight-
+file GREEN manifest validates and has SHA-256
+`c2b709ae4ab326044121dbbb02cd82e231cd2eb62a9a1aa674e92a0a2d924843`;
+validation SHA-256 is
+`f7c04db2a7c6c397fe81c05610965a0ddd0ca6ab41fc2c23f5b34d6ba1a7ccdb`.
+
 Acceptance is deterministic: the focused controls prove missing, invalid,
 precedence, below-boundary, exact-boundary and exact-preservation behavior; the
 live progress writer stores the exact creator-page `runTrialReturnedAtMs`
