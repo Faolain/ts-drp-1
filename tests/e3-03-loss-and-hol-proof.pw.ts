@@ -2786,7 +2786,8 @@ function d108e4hAssertDelta(actual: RawTransportDelta, expected: RawTransportDel
 function d108e4hAssertBoundaryIdentity(
 	endpoint: D108e4hEndpointCustody,
 	remotePeerId: string,
-	replaced: boolean
+	replaced: boolean,
+	incomingReplacement = false
 ): Readonly<{ readonly after: D108e4hRtcIdentity; readonly before: D108e4hRtcIdentity }> {
 	const beforeAuthenticated = d108e4hOnly(endpoint.prepare.authenticated);
 	const afterAuthenticated = d108e4hOnly(endpoint.deadline.authenticated);
@@ -2804,17 +2805,17 @@ function d108e4hAssertBoundaryIdentity(
 	const authenticatedChanged =
 		beforeAuthenticated.connectionId !== afterAuthenticated.connectionId &&
 		beforeAuthenticated.generation < afterAuthenticated.generation;
+	const authenticatedStable =
+		beforeAuthenticated.connectionId === afterAuthenticated.connectionId &&
+		beforeAuthenticated.generation === afterAuthenticated.generation;
 	const rtcChanged = beforeRtc.connectionId !== afterRtc.connectionId && beforeRtc.channelId !== afterRtc.channelId;
+	const rtcStable = beforeRtc.connectionId === afterRtc.connectionId && beforeRtc.channelId === afterRtc.channelId;
 	if (replaced) {
 		d108e4hAssert(authenticatedChanged && rtcChanged, "D108E4H_IDENTITY_JOIN_INVALID");
+	} else if (incomingReplacement) {
+		d108e4hAssert(authenticatedStable && (rtcStable || rtcChanged), "D108E4H_IDENTITY_JOIN_INVALID");
 	} else {
-		d108e4hAssert(
-			beforeAuthenticated.connectionId === afterAuthenticated.connectionId &&
-				beforeAuthenticated.generation === afterAuthenticated.generation &&
-				beforeRtc.connectionId === afterRtc.connectionId &&
-				beforeRtc.channelId === afterRtc.channelId,
-			"D108E4H_IDENTITY_JOIN_INVALID"
-		);
+		d108e4hAssert(authenticatedStable && rtcStable, "D108E4H_IDENTITY_JOIN_INVALID");
 	}
 	return Object.freeze({ after: afterRtc, before: beforeRtc });
 }
@@ -2860,7 +2861,8 @@ function d108e4hAssertAttemptCustody(
 	before: D108e4hRtcIdentity,
 	after: D108e4hRtcIdentity,
 	replaced: boolean,
-	sampleCount: number
+	sampleCount: number,
+	incomingReplacement = false
 ): void {
 	const attempts = endpoint.lifecycle.filter(
 		({ event, label }) => event === "channel-send-attempt" && label === "ts-drp-ephemeral/1"
@@ -2913,7 +2915,8 @@ function d108e4hAssertAttemptCustody(
 			terminals.every(({ attemptId }) => attemptId !== undefined && attemptIds.has(attemptId)),
 		"D108E4H_IDENTITY_JOIN_INVALID"
 	);
-	if (replaced) {
+	const rtcChanged = before.connectionId !== after.connectionId && before.channelId !== after.channelId;
+	if (replaced || (incomingReplacement && rtcChanged)) {
 		const replacementOpens = endpoint.lifecycle.filter(
 			({ channelId, connectionId, event, label, owner }) =>
 				connectionId === after.connectionId &&
@@ -2959,7 +2962,8 @@ function d108e4hAssertOverlapCustody(
 	before: D108e4hRtcIdentity,
 	after: D108e4hRtcIdentity,
 	replaced: boolean,
-	transitionReason: "channel-close" | "replacement" | undefined
+	transitionReason: "channel-close" | "replacement" | undefined,
+	incomingReplacement = false
 ): void {
 	const messages = endpoint.lifecycle.filter(
 		({ event, label }) => event === "channel-message" && label === "ts-drp-ephemeral/1"
@@ -2983,7 +2987,8 @@ function d108e4hAssertOverlapCustody(
 		messages.length === ledger.length && messages.every(({ sequence }) => joined.has(sequence)),
 		"D108E4H_OVERLAP_LEDGER_INVALID"
 	);
-	if (!replaced) return;
+	const rtcChanged = before.connectionId !== after.connectionId && before.channelId !== after.channelId;
+	if (!replaced && (!incomingReplacement || !rtcChanged)) return;
 	const replacementOpens = endpoint.lifecycle.filter(
 		({ channelId, connectionId, event, label, owner }) =>
 			connectionId === after.connectionId &&
@@ -3019,6 +3024,22 @@ function d108e4hAssertOverlapCustody(
 	d108e4hAssert(replacementOpens.length === 1 && replacementHandlers.length === 1, "D108E4H_LIFECYCLE_ORDER_INVALID");
 	const replacementOpen = replacementOpens[0] as D108e4hLifecycleObservation;
 	const replacementHandler = replacementHandlers[0] as D108e4hLifecycleObservation;
+	if (incomingReplacement) {
+		d108e4hAssert(oldCloseCalls.length === 0, "D108E4H_LIFECYCLE_ORDER_INVALID");
+		const replacementReady = Math.max(replacementOpen.sequence, replacementHandler.sequence);
+		const replacementStarted = Math.min(replacementOpen.sequence, replacementHandler.sequence);
+		for (const record of ledger) {
+			const onBefore = record.connectionId === before.connectionId && record.channelId === before.channelId;
+			const onAfter = record.connectionId === after.connectionId && record.channelId === after.channelId;
+			d108e4hAssert(onBefore || onAfter, "D108E4H_OVERLAP_LEDGER_INVALID");
+			d108e4hAssert(
+				(onBefore && record.lifecycleSequence < replacementStarted) ||
+					(onAfter && replacementReady < record.lifecycleSequence),
+				"D108E4H_LIFECYCLE_ORDER_INVALID"
+			);
+		}
+		return;
+	}
 	let acceptedBefore: D108e4hLifecycleObservation;
 	if (transitionReason === "channel-close") {
 		d108e4hAssert(
@@ -3087,7 +3108,8 @@ function d108e4hValidateEndpoint(
 	remotePeerId: string,
 	delta: RawTransportDelta,
 	sampleCount: number,
-	trialId: string
+	trialId: string,
+	incomingReplacement: boolean
 ): void {
 	d108e4hAssert(endpoint.lifecycle.length > 0, "D108E4H_LIFECYCLE_CUSTODY_ABSENT");
 	for (const record of endpoint.lifecycle) {
@@ -3112,9 +3134,9 @@ function d108e4hValidateEndpoint(
 		);
 		transitionReason = recordedReason;
 	}
-	const { after, before } = d108e4hAssertBoundaryIdentity(endpoint, remotePeerId, replaced);
-	d108e4hAssertAttemptCustody(endpoint, before, after, replaced, sampleCount);
-	d108e4hAssertOverlapCustody(endpoint, before, after, replaced, transitionReason);
+	const { after, before } = d108e4hAssertBoundaryIdentity(endpoint, remotePeerId, replaced, incomingReplacement);
+	d108e4hAssertAttemptCustody(endpoint, before, after, replaced, sampleCount, incomingReplacement);
+	d108e4hAssertOverlapCustody(endpoint, before, after, replaced, transitionReason, incomingReplacement);
 	d108e4hAssert(delta.backpressuredDrops === 0, "D108E4H_RAW_BACKPRESSURE");
 	d108e4hAssert(
 		endpoint.deadline.rawTransport.sent - endpoint.prepare.rawTransport.sent === endpoint.rawSends.length &&
@@ -3138,19 +3160,30 @@ function validateD108e4hCampaignCustody(input: D108e4hValidationInput): void {
 		Number.isSafeInteger(input.sampleCount) && input.sampleCount > 0 && input.trialId.length > 0,
 		"D108E4H_SCHEMA_INVALID"
 	);
+	const endpointNames = ["creator", "receiver"] as const;
+	const replacementOwners = endpointNames.filter((name) => {
+		const delta = input.rawTransportDeltas[name];
+		return delta.linkDrops === 1 && delta.lastLinkDrop.after === "replacement";
+	});
+	d108e4hAssert(replacementOwners.length <= 1, "D108E4H_DROP_COUNT_AMBIGUOUS");
+	const replacementOwner = replacementOwners[0];
+	const isIncomingReplacement = (name: (typeof endpointNames)[number]): boolean =>
+		replacementOwner !== undefined && name !== replacementOwner && input.rawTransportDeltas[name].linkDrops === 0;
 	d108e4hValidateEndpoint(
 		input.endpoints.creator,
 		input.endpoints.receiver.peerId,
 		input.rawTransportDeltas.creator,
 		input.sampleCount,
-		input.trialId
+		input.trialId,
+		isIncomingReplacement("creator")
 	);
 	d108e4hValidateEndpoint(
 		input.endpoints.receiver,
 		input.endpoints.creator.peerId,
 		input.rawTransportDeltas.receiver,
 		input.sampleCount,
-		input.trialId
+		input.trialId,
+		isIncomingReplacement("receiver")
 	);
 }
 
@@ -3513,6 +3546,343 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 					creator: rawTransportDelta(fixture.endpoints.creator.prepare.rawTransport, rawTransport),
 				}),
 			});
+
+		const incomingMutationBase = d108e4aaRetainedAsymmetricReplay(false, "handler-open");
+		const incomingBefore = incomingMutationBase.endpoints.receiver.prepare.rtc[0] as D108e4hRtcIdentity;
+		const incomingAfter = incomingMutationBase.endpoints.receiver.deadline.rtc[0] as D108e4hRtcIdentity;
+		const incomingAcceptedAt = (sequence: number): D108e4hValidationInput => {
+			const withAcceptedMessage = Object.freeze({
+				...incomingMutationBase,
+				endpoints: Object.freeze({
+					...incomingMutationBase.endpoints,
+					receiver: Object.freeze({
+						...incomingMutationBase.endpoints.receiver,
+						acceptedRaw: Object.freeze([
+							...incomingMutationBase.endpoints.receiver.acceptedRaw,
+							d108e4hAcceptedRaw(incomingAfter, 422, sequence),
+						]),
+						lifecycle: Object.freeze(
+							[
+								...incomingMutationBase.endpoints.receiver.lifecycle,
+								d108e4hLifecycle(
+									incomingMutationBase.trialId,
+									sequence,
+									"channel-message",
+									incomingAfter,
+									"rtc-datachannel-message-event"
+								),
+							].sort((a, b) => a.sequence - b.sequence)
+						),
+					}),
+				}),
+			});
+			return withReceiverDeadlineTransport(
+				withAcceptedMessage,
+				Object.freeze({
+					...withAcceptedMessage.endpoints.receiver.deadline.rawTransport,
+					received: withAcceptedMessage.endpoints.receiver.deadline.rawTransport.received + 1,
+				})
+			);
+		};
+		const incomingAcceptedAfterReadiness = incomingAcceptedAt(1_251);
+		expect(() => validateD108e4hCampaignCustody(incomingAcceptedAfterReadiness)).not.toThrow();
+		const incomingAcceptedBeforeReadiness = incomingAcceptedAt(1_246);
+		expect
+			.soft(() => validateD108e4hCampaignCustody(incomingAcceptedBeforeReadiness), "incomingAcceptedBeforeReadiness")
+			.toThrowError("D108E4H_LIFECYCLE_ORDER_INVALID");
+
+		const incomingTransmitterCreatorBefore = incomingMutationBase.endpoints.creator.prepare
+			.rtc[0] as D108e4hRtcIdentity;
+		const incomingTransmitterCreatorAfter = incomingMutationBase.endpoints.creator.deadline
+			.rtc[0] as D108e4hRtcIdentity;
+		const incomingTransmitterReceiverBefore = incomingMutationBase.endpoints.receiver.prepare
+			.rtc[0] as D108e4hRtcIdentity;
+		const incomingTransmitterReceiverAuthenticated = incomingMutationBase.endpoints.receiver.deadline
+			.authenticated[0] as D108e4hAuthenticatedIdentity;
+		const finalIncomingTransmitterSend = incomingMutationBase.endpoints.creator.rawSends.find(
+			({ sequence }) => sequence === SAMPLE_COUNT - 1
+		);
+		if (finalIncomingTransmitterSend === undefined) throw new Error("D108E4AA_FINAL_TRANSMITTER_SEND_ABSENT");
+		const incomingTransmitterCreatorTransport = Object.freeze({
+			...incomingMutationBase.endpoints.creator.deadline.rawTransport,
+			authenticatedConnectionLosses:
+				incomingMutationBase.endpoints.creator.prepare.rawTransport.authenticatedConnectionLosses,
+			lastLinkDrop: incomingMutationBase.endpoints.creator.prepare.rawTransport.lastLinkDrop,
+			linkDrops: incomingMutationBase.endpoints.creator.prepare.rawTransport.linkDrops,
+		});
+		const incomingTransmitterReceiverTransport = Object.freeze({
+			...incomingMutationBase.endpoints.receiver.deadline.rawTransport,
+			lastLinkDrop: "replacement" as const,
+			linkDrops: incomingMutationBase.endpoints.receiver.prepare.rawTransport.linkDrops + 1,
+		});
+		const incomingTransmitterCreatorLifecycle = Object.freeze(
+			incomingMutationBase.endpoints.creator.lifecycle
+				.filter(
+					({ channelId, connectionId, event }) =>
+						!(
+							(event === "channel-close-call" || event === "channel-close-event") &&
+							connectionId === incomingTransmitterCreatorBefore.connectionId &&
+							channelId === incomingTransmitterCreatorBefore.channelId
+						)
+				)
+				.map((record) => {
+					if (record.attemptId !== finalIncomingTransmitterSend.attemptId) return record;
+					return d108e4hLifecycle(
+						incomingMutationBase.trialId,
+						record.event === "channel-send-attempt" ? 2_034 : 2_035,
+						record.event,
+						incomingTransmitterCreatorAfter,
+						record.owner,
+						{ attemptId: record.attemptId }
+					);
+				})
+				.sort((a, b) => a.sequence - b.sequence)
+		);
+		const incomingTransmitter = Object.freeze({
+			...incomingMutationBase,
+			endpoints: Object.freeze({
+				creator: Object.freeze({
+					...incomingMutationBase.endpoints.creator,
+					deadline: Object.freeze({
+						...incomingMutationBase.endpoints.creator.deadline,
+						authenticated: incomingMutationBase.endpoints.creator.prepare.authenticated,
+						rawTransport: incomingTransmitterCreatorTransport,
+					}),
+					lifecycle: incomingTransmitterCreatorLifecycle,
+					rawSends: Object.freeze(
+						incomingMutationBase.endpoints.creator.rawSends.map((send) =>
+							send === finalIncomingTransmitterSend
+								? Object.freeze({
+										...send,
+										channelId: incomingTransmitterCreatorAfter.channelId,
+										connectionId: incomingTransmitterCreatorAfter.connectionId,
+									})
+								: send
+						)
+					),
+				}),
+				receiver: Object.freeze({
+					...incomingMutationBase.endpoints.receiver,
+					deadline: Object.freeze({
+						...incomingMutationBase.endpoints.receiver.deadline,
+						authenticated: Object.freeze([
+							Object.freeze({
+								...incomingTransmitterReceiverAuthenticated,
+								connectionId: "d108e4aa-receiver-replacement",
+								generation: (incomingMutationBase.endpoints.receiver.prepare.authenticated[0]?.generation ?? 0) + 1,
+							}),
+						]),
+						rawTransport: incomingTransmitterReceiverTransport,
+					}),
+					lifecycle: Object.freeze([
+						...incomingMutationBase.endpoints.receiver.lifecycle,
+						d108e4hLifecycle(
+							incomingMutationBase.trialId,
+							1_251,
+							"channel-close-call",
+							incomingTransmitterReceiverBefore,
+							"product-unreliable-webrtc"
+						),
+					]),
+				}),
+			}),
+			rawTransportDeltas: Object.freeze({
+				creator: rawTransportDelta(
+					incomingMutationBase.endpoints.creator.prepare.rawTransport,
+					incomingTransmitterCreatorTransport
+				),
+				receiver: rawTransportDelta(
+					incomingMutationBase.endpoints.receiver.prepare.rawTransport,
+					incomingTransmitterReceiverTransport
+				),
+			}),
+		});
+		expect(() => validateD108e4hCampaignCustody(incomingTransmitter)).not.toThrow();
+		const incomingTransmitterAttemptBeforeReadiness = Object.freeze({
+			...incomingTransmitter,
+			endpoints: Object.freeze({
+				...incomingTransmitter.endpoints,
+				creator: Object.freeze({
+					...incomingTransmitter.endpoints.creator,
+					lifecycle: Object.freeze(
+						incomingTransmitter.endpoints.creator.lifecycle
+							.map((record) =>
+								record.attemptId === finalIncomingTransmitterSend.attemptId && record.event === "channel-send-attempt"
+									? Object.freeze({ ...record, sequence: 2_031 })
+									: record
+							)
+							.sort((a, b) => a.sequence - b.sequence)
+					),
+				}),
+			}),
+		});
+		expect
+			.soft(
+				() => validateD108e4hCampaignCustody(incomingTransmitterAttemptBeforeReadiness),
+				"incomingTransmitterAttemptBeforeReadiness"
+			)
+			.toThrowError("D108E4H_LIFECYCLE_ORDER_INVALID");
+		const incomingRtcWithoutProductHandler = withReceiverLifecycle(
+			incomingMutationBase,
+			incomingMutationBase.endpoints.receiver.lifecycle.filter(
+				({ channelId, connectionId, event, owner }) =>
+					!(
+						connectionId === incomingAfter.connectionId &&
+						channelId === incomingAfter.channelId &&
+						event === "channel-message-handler-installed" &&
+						owner === "product-unreliable-webrtc"
+					)
+			)
+		);
+		const incomingRtcWithoutOpen = withReceiverLifecycle(
+			incomingMutationBase,
+			incomingMutationBase.endpoints.receiver.lifecycle.filter(
+				({ channelId, connectionId, event, owner }) =>
+					!(
+						connectionId === incomingAfter.connectionId &&
+						channelId === incomingAfter.channelId &&
+						event === "channel-open-event" &&
+						owner === "rtc-datachannel-open-event"
+					)
+			)
+		);
+		for (const [name, fixture] of [
+			["incomingRtcWithoutProductHandler", incomingRtcWithoutProductHandler],
+			["incomingRtcWithoutOpen", incomingRtcWithoutOpen],
+		] as const) {
+			expect.soft(() => validateD108e4hCampaignCustody(fixture), name).toThrowError("D108E4H_LIFECYCLE_ORDER_INVALID");
+		}
+		const missingInitiatorReplacementDrop = withCreatorDeadlineTransport(
+			incomingMutationBase,
+			Object.freeze({
+				...incomingMutationBase.endpoints.creator.deadline.rawTransport,
+				lastLinkDrop: incomingMutationBase.endpoints.creator.prepare.rawTransport.lastLinkDrop,
+				linkDrops: incomingMutationBase.endpoints.creator.prepare.rawTransport.linkDrops,
+			})
+		);
+		expect
+			.soft(() => validateD108e4hCampaignCustody(missingInitiatorReplacementDrop), "missingInitiatorReplacementDrop")
+			.toThrowError("D108E4H_IDENTITY_JOIN_INVALID");
+		const ambiguousDoubleReplacementDrop = withReceiverDeadlineTransport(
+			incomingMutationBase,
+			Object.freeze({
+				...incomingMutationBase.endpoints.receiver.deadline.rawTransport,
+				lastLinkDrop: "replacement",
+				linkDrops: incomingMutationBase.endpoints.receiver.prepare.rawTransport.linkDrops + 1,
+			})
+		);
+		expect
+			.soft(() => validateD108e4hCampaignCustody(ambiguousDoubleReplacementDrop), "ambiguousDoubleReplacementDrop")
+			.toThrowError("D108E4H_DROP_COUNT_AMBIGUOUS");
+		const incomingAuthenticated = incomingMutationBase.endpoints.receiver.deadline
+			.authenticated[0] as D108e4hAuthenticatedIdentity;
+		const nonInitiatorAuthenticatedIdentityDrift = Object.freeze({
+			...incomingMutationBase,
+			endpoints: Object.freeze({
+				...incomingMutationBase.endpoints,
+				receiver: Object.freeze({
+					...incomingMutationBase.endpoints.receiver,
+					deadline: Object.freeze({
+						...incomingMutationBase.endpoints.receiver.deadline,
+						authenticated: Object.freeze([
+							Object.freeze({
+								...incomingAuthenticated,
+								connectionId: `${incomingAuthenticated.connectionId}:drift`,
+								generation: incomingAuthenticated.generation + 1,
+							}),
+						]),
+					}),
+				}),
+			}),
+		});
+		expect
+			.soft(
+				() => validateD108e4hCampaignCustody(nonInitiatorAuthenticatedIdentityDrift),
+				"nonInitiatorAuthenticatedIdentityDrift"
+			)
+			.toThrowError("D108E4H_IDENTITY_JOIN_INVALID");
+		const nonInitiatorProductOldCloseCall = withReceiverLifecycle(
+			incomingMutationBase,
+			Object.freeze([
+				...incomingMutationBase.endpoints.receiver.lifecycle,
+				d108e4hLifecycle(
+					incomingMutationBase.trialId,
+					1_251,
+					"channel-close-call",
+					incomingBefore,
+					"product-unreliable-webrtc"
+				),
+			])
+		);
+		expect
+			.soft(() => validateD108e4hCampaignCustody(nonInitiatorProductOldCloseCall), "nonInitiatorProductOldCloseCall")
+			.toThrowError("D108E4H_LIFECYCLE_ORDER_INVALID");
+		const initiatingOpen = incomingMutationBase.endpoints.creator.lifecycle.find(
+			({ channelId, connectionId, event }) => connectionId === 5 && channelId === 367 && event === "channel-open-event"
+		);
+		const initiatingCloseCall = incomingMutationBase.endpoints.creator.lifecycle.find(
+			({ channelId, connectionId, event, owner }) =>
+				connectionId === 3 &&
+				channelId === 346 &&
+				event === "channel-close-call" &&
+				owner === "product-unreliable-webrtc"
+		);
+		if (initiatingOpen === undefined || initiatingCloseCall === undefined) {
+			throw new Error("D108E4AA_INITIATING_ANCHOR_ABSENT");
+		}
+		const initiatorOldCloseBeforeReplacementOpen = withCreatorLifecycle(
+			incomingMutationBase,
+			Object.freeze(
+				incomingMutationBase.endpoints.creator.lifecycle
+					.map((record) =>
+						record === initiatingOpen
+							? Object.freeze({ ...record, sequence: initiatingCloseCall.sequence })
+							: record === initiatingCloseCall
+								? Object.freeze({ ...record, sequence: initiatingOpen.sequence })
+								: record
+					)
+					.sort((a, b) => a.sequence - b.sequence)
+			)
+		);
+		expect
+			.soft(
+				() => validateD108e4hCampaignCustody(initiatorOldCloseBeforeReplacementOpen),
+				"initiatorOldCloseBeforeReplacementOpen"
+			)
+			.toThrowError("D108E4H_LIFECYCLE_ORDER_INVALID");
+		const finalIncomingMessage = incomingMutationBase.endpoints.receiver.lifecycle.find(
+			({ event, sequence }) => event === "channel-message" && sequence === 421
+		);
+		if (finalIncomingMessage === undefined) throw new Error("D108E4AA_FINAL_INCOMING_MESSAGE_ABSENT");
+		const failedIncomingReplacementDisplacesUsableOldChannel = Object.freeze({
+			...incomingMutationBase,
+			endpoints: Object.freeze({
+				...incomingMutationBase.endpoints,
+				receiver: Object.freeze({
+					...incomingMutationBase.endpoints.receiver,
+					acceptedRaw: Object.freeze(
+						incomingMutationBase.endpoints.receiver.acceptedRaw.map((record) =>
+							record.lifecycleSequence === finalIncomingMessage.sequence
+								? Object.freeze({ ...record, lifecycleSequence: 1_252 })
+								: record
+						)
+					),
+					lifecycle: Object.freeze(
+						incomingMutationBase.endpoints.receiver.lifecycle
+							.map((record) =>
+								record === finalIncomingMessage ? Object.freeze({ ...record, sequence: 1_252 }) : record
+							)
+							.sort((a, b) => a.sequence - b.sequence)
+					),
+				}),
+			}),
+		});
+		expect
+			.soft(
+				() => validateD108e4hCampaignCustody(failedIncomingReplacementDisplacesUsableOldChannel),
+				"failedIncomingReplacementDisplacesUsableOldChannel"
+			)
+			.toThrowError("D108E4H_LIFECYCLE_ORDER_INVALID");
 
 		const creatorReplacementWithoutCloseEvent = withCreatorLifecycle(
 			creatorReplacement,

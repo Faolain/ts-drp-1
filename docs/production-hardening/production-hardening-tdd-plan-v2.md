@@ -70720,3 +70720,101 @@ ordinary and isolated three-consecutive ledgers require a new signed/pushed
 campaign freeze, its review round and fresh express user authorization. The
 failed invocation is never reclassified or counted. D.108e4b's separate GREEN
 review, aggregate D.108e4 closure and D.108e5 remain blocked.
+
+The D.108e4aa GREEN was reviewed against signed/pushed RED base
+`d2ea0a0986961ae3637e026d4c994b7aacb20f63`. The frozen pre-review owner
+SHA-256 was
+`ac4e68164ac6fc1d7d812c83c9342069bf25fd3da42835fe3081a44b86d4b4f4`
+and its exact review-diff SHA-256 was
+`19c6c1a0e6b2619bdd200dd8b498da965d7589cb9cbc737edd6bc6d0c3509e2d`.
+The pre-review focused validator passed 1/1, the retained lifecycle pair
+passed 2/2 and the exact seven-test non-campaign allowlist passed 7/7. Network
+and grid build/typecheck statuses were all zero. The exact owner `tsc`, ESLint,
+Prettier and diff checks were zero. Root `pnpm typecheck` returned one only for
+the inherited `packages/storage-node` workspace/rootDir/module-resolution
+debt; its stdout SHA-256 is
+`51f8c701d4d04d114288d322a4278f38c719fe6b574fe9e475fd47b223c5ffb2`
+and no diagnostic names the test owner.
+
+The required GREEN implementation-review round completed read-only without
+Fable or a collaboration subagent:
+
+- Grok 4.6/high inspected for 540.307 seconds and ended normally with
+  `end_turn`. Its substantive response was CHANGES_REQUIRED, P0=0/P1=1/P2=0,
+  but the primary runner honestly recorded `NO_VERDICT` because the response
+  was fenced extended JSON rather than the required terminal schema. Primary
+  events/public/status SHA-256 values are
+  `9c4190b22f022f004d59f906433bff1b98898b4bfd6ab7c6af27109eb32596b2`,
+  `fb0f707864e026f699d677033f973ab0738ea11be7711e6286a00131773340f3`
+  and
+  `9238e7927c6d242197590293057898e90bb048e8317ad32261ec442b527e07e1`.
+  A tool-free same-session formatting continuation
+  `01a04b8f-a0af-7d62-b218-6d2cc24f1b37` preserved the finding and emitted
+  valid CHANGES_REQUIRED P0=0/P1=1/P2=0 structured output. Its JSON/status
+  SHA-256 values are
+  `8bda482c1831d0869925e1c1ab4b04751454227cdab57634975dd7fdee67d704`
+  and
+  `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+- Exact Kimi K3 session `1f9ee538-071f-4440-b9cf-b3b6a871e924` was run with
+  legacy `kimi-cli`, because that CLI works while the newer `kimi` wrapper
+  fails in its own lifecycle context. The substantive turn returned APPROVED,
+  P0/P1/P2 all zero, but contained two progress lines before its 100 checks.
+  A tool-free same-session `kimi-cli --resume` formatting continuation exited
+  zero and produced exactly 101 nonempty lines: unique ordered `CHECK001`
+  through `CHECK100`, then the byte-identical RESULT and nothing else. Final
+  stream/text/stderr/status SHA-256 values are
+  `20163147f0382d5f3d28383d4b1f9481a43e0a38aaa18589cfa31bc40b45406c`,
+  `190a74e212ebd32206d55a28bdeb2ccfbf82acabe082093242dfcd601b796b97`,
+  `d4a8fd5d7f365e148ae662df52b474640568e09698e55183220ae935680df089`
+  and
+  `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+- Opus 5/xhigh session `5a6e0a7b-c7aa-4582-bbcb-5e587f9e7125`
+  completed 36 turns in 486.908 seconds without error, permission denial or
+  subagent and returned CHANGES_REQUIRED, P0=0/P1=2/P2=2. JSON/status
+  SHA-256 values are
+  `963e696f67ddfa5a106d77ecc49f40317f21411a32427684b9122318d7573752`
+  and
+  `9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+
+The same-round Grok/Opus union was corrected without a confirmation review.
+The duplicate displacement mutant no longer adds the already-covered product
+old-channel close; it now isolates only a late old-identity delivery. The
+incoming-replacement classification is threaded into raw-send attempt custody
+so a transmitting incoming endpoint may use the deadline identity only after
+both local replacement-readiness anchors. A live-shape positive makes the
+creator the incoming transmitter while the receiver owns the replacement
+drop, and a paired mutant moves its deadline-identity attempt before
+readiness. A second positive accepts one deadline-identity raw record after
+readiness, with a paired before-readiness mutant. The unreachable
+`replaced && incomingReplacement` assertion was removed. These corrections
+remain entirely inside `tests/e3-03-loss-and-hol-proof.pw.ts`; no product
+source, API, timing, workload or campaign behavior changed.
+
+The corrected GREEN owner SHA-256 is
+`24f9ba6a28a5df2a18d1fae9b65f5549b80ec09c1e87510b47da4f8edee09c1c`
+and its exact diff from RED has SHA-256
+`1b333648088e42cd2a18ef6f0835f41b5277cbd2b8ffee0b504584e78588dde7`.
+One focused corrected invocation passed 1/1 in 7.739 seconds with zero
+unexpected/skipped/flaky tests; JSON/stdout/stderr/status SHA-256 values are
+`05843d0eaad4d84bc7a869f9a11cff2acd60b4da887dffc2e4a90ff5775bd31c`,
+`ebacb6ac75213ab729588998b844cfc5f48fbd33549366964dff3bb5e0eb89c8`,
+`5563aec57a5c87720f59e02911d1523a2a5279334ca656af243de6b31b16765c`
+and
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+The positive allowlist again listed exactly seven tests and omitted the long
+campaign; list-output SHA-256 is
+`0d84b0da0aaf24e52891b01574d821e30e7b46a5e59699159b09c08c1de02a3f`.
+Its single retained invocation passed 7/7 in 12.896 seconds with zero
+unexpected/skipped/flaky tests; JSON/stdout/status SHA-256 values are
+`dbac5571637de6cb5b57f73a15ab493622fa27dc26523811398e7e62f09f91df`,
+`3816212d03168038e8cd329a88e6fb2d4b29008a9e990c86ef61cb8ee4aaa7b6`
+and
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+Corrected exact-owner `tsc`, ESLint, Prettier and `git diff --check` all
+returned zero. The stash count remains 26 and the protected untracked roster
+is unchanged.
+
+D.108e4aa is therefore GREEN as a test-validator correction, with no product
+defect or product change demonstrated. The fresh signed/pushed campaign freeze,
+its review and express authorization remain the smallest next gate; this
+checkpoint does not authorize or count a long campaign invocation.
