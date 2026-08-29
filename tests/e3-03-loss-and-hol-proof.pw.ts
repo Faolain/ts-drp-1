@@ -2634,6 +2634,165 @@ function d108e4aaRetainedAsymmetricReplay(
 	});
 }
 
+function d108e4acDualLocalReplacementReplay(swapPageOrder: boolean): D108e4hValidationInput {
+	const trialId = "e3-03-0";
+	const creatorPeerId = "16Uiu2HAmDmbpqXW4sui8F9r1JjViSCVkSuKcL6mBnqCGUb3jNUTc";
+	const receiverPeerId = "16Uiu2HAkvi5DUFivZdjNxyLAxR9sATAKBCLSmKN3qoHHzxKwUttJ";
+	const creatorBefore = Object.freeze({
+		channelId: 373,
+		connectionId: 5,
+		label: "ts-drp-ephemeral/1" as const,
+		readyState: "open" as const,
+	});
+	const creatorAfter = Object.freeze({ ...creatorBefore, channelId: 399, connectionId: 7 });
+	const receiverBefore = Object.freeze({ ...creatorBefore, channelId: 369 });
+	const receiverAfter = Object.freeze({ ...creatorAfter, channelId: 382 });
+	const creatorPrepareTransport = d108e4hRawTransport(receiverPeerId, {
+		authenticatedConnectionLosses: 1,
+		lastLinkDrop: "restart",
+		linkDrops: 2,
+		sent: 933,
+	});
+	const creatorDeadlineTransport = d108e4hRawTransport(receiverPeerId, {
+		authenticatedConnectionLosses: 2,
+		lastLinkDrop: "replacement",
+		linkDrops: 3,
+		sent: 1_533,
+	});
+	const receiverPrepareTransport = d108e4hRawTransport(creatorPeerId, {
+		authenticatedConnectionLosses: 1,
+		lastLinkDrop: "restart",
+		linkDrops: 2,
+		received: 683,
+	});
+	const receiverDeadlineTransport = d108e4hRawTransport(creatorPeerId, {
+		authenticatedConnectionLosses: 2,
+		lastLinkDrop: "replacement",
+		linkDrops: 3,
+		received: 1_083,
+	});
+	const boundary = (
+		peerId: string,
+		connectionId: string,
+		generation: number,
+		rtc: D108e4hRtcIdentity,
+		rawTransport: ZoneSnapshot["rawTransport"]
+	): D108e4hBoundaryCustody =>
+		Object.freeze({
+			authenticated: Object.freeze([Object.freeze({ connectionId, generation, peerId })]),
+			rawTransport,
+			rtc: Object.freeze([rtc]),
+		});
+	const creatorOldSends = d108e4hSendSlice(trialId, creatorBefore, 0, 507, 0);
+	const creatorNewSends = d108e4hSendSlice(trialId, creatorAfter, 507, 93, 1_658);
+	const receiverOldMessages = Object.freeze(
+		Array.from({ length: 336 }, (_, sequence) =>
+			d108e4hLifecycle(trialId, sequence, "channel-message", receiverBefore, "rtc-datachannel-message-event")
+		)
+	);
+	const receiverNewMessages = Object.freeze(
+		Array.from({ length: 64 }, (_, index) =>
+			d108e4hLifecycle(trialId, 977 + index, "channel-message", receiverAfter, "rtc-datachannel-message-event")
+		)
+	);
+	const receiverAccepted = Object.freeze([
+		...receiverOldMessages.map(({ sequence }, payloadSequence) =>
+			d108e4hAcceptedRaw(receiverBefore, payloadSequence, sequence)
+		),
+		...receiverNewMessages.map(({ sequence }, index) => d108e4hAcceptedRaw(receiverAfter, 336 + index, sequence)),
+	]);
+	const captured = Object.freeze({
+		endpoints: Object.freeze({
+			creator: Object.freeze({
+				acceptedRaw: Object.freeze([]),
+				deadline: boundary(receiverPeerId, "67j4of1787980800178", 6, creatorAfter, creatorDeadlineTransport),
+				lifecycle: Object.freeze([
+					...creatorOldSends.lifecycle,
+					d108e4hLifecycle(
+						trialId,
+						1_653,
+						"channel-handler-installed",
+						creatorAfter,
+						"rtc-observer-datachannel-handler"
+					),
+					d108e4hLifecycle(
+						trialId,
+						1_654,
+						"channel-message-handler-installed",
+						creatorAfter,
+						"rtc-observer-or-harness"
+					),
+					d108e4hLifecycle(
+						trialId,
+						1_655,
+						"channel-message-handler-installed",
+						creatorAfter,
+						"product-unreliable-webrtc"
+					),
+					d108e4hLifecycle(trialId, 1_656, "channel-close-call", creatorBefore, "product-unreliable-webrtc", {
+						readyState: "closing",
+					}),
+					d108e4hLifecycle(trialId, 1_657, "channel-open-event", creatorAfter, "rtc-datachannel-open-event"),
+					...creatorNewSends.lifecycle,
+				]),
+				monitor: d108e4hMonitor(trialId, receiverPeerId),
+				peerId: creatorPeerId,
+				prepare: boundary(receiverPeerId, "2f4n8z1787980768199", 5, creatorBefore, creatorPrepareTransport),
+				rawSends: Object.freeze([...creatorOldSends.rawSends, ...creatorNewSends.rawSends]),
+				rejectedRaw: Object.freeze([]),
+				transmitsRawTrial: true,
+			}),
+			receiver: Object.freeze({
+				acceptedRaw: receiverAccepted,
+				deadline: boundary(creatorPeerId, "6rktlz1787980796505", 6, receiverAfter, receiverDeadlineTransport),
+				lifecycle: Object.freeze([
+					...receiverOldMessages,
+					d108e4hLifecycle(
+						trialId,
+						429,
+						"channel-message-handler-installed",
+						receiverAfter,
+						"rtc-observer-or-harness",
+						{ readyState: "connecting" }
+					),
+					d108e4hLifecycle(trialId, 961, "channel-open-event", receiverAfter, "rtc-datachannel-open-event"),
+					d108e4hLifecycle(
+						trialId,
+						962,
+						"channel-message-handler-installed",
+						receiverAfter,
+						"product-unreliable-webrtc"
+					),
+					d108e4hLifecycle(trialId, 963, "channel-close-call", receiverBefore, "product-unreliable-webrtc"),
+					...receiverNewMessages,
+				]),
+				monitor: d108e4hMonitor(trialId, creatorPeerId),
+				peerId: receiverPeerId,
+				prepare: boundary(creatorPeerId, "9i8v0y1787980768201", 5, receiverBefore, receiverPrepareTransport),
+				rawSends: Object.freeze([]),
+				rejectedRaw: Object.freeze([]),
+				transmitsRawTrial: false,
+			}),
+		}),
+		rawTransportDeltas: Object.freeze({
+			creator: rawTransportDelta(creatorPrepareTransport, creatorDeadlineTransport),
+			receiver: rawTransportDelta(receiverPrepareTransport, receiverDeadlineTransport),
+		}),
+		sampleCount: SAMPLE_COUNT,
+		schemaVersion: 3 as const,
+		trialId,
+	}) satisfies D108e4hValidationInput;
+	if (!swapPageOrder) return captured;
+	return Object.freeze({
+		...captured,
+		endpoints: Object.freeze({ creator: captured.endpoints.receiver, receiver: captured.endpoints.creator }),
+		rawTransportDeltas: Object.freeze({
+			creator: captured.rawTransportDeltas.receiver,
+			receiver: captured.rawTransportDeltas.creator,
+		}),
+	});
+}
+
 function d108e4aaRetainedOldRtcBoundaryReplay(): D108e4hValidationInput {
 	const trialId = "e3-03-2";
 	const creatorPeerId = "16Uiu2HAm5SQJx1zQbk4bdMf6tsrm3CT399qmYnqmJFTJ5cS5K56X";
@@ -3428,6 +3587,102 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 				.soft(
 					() => validateD108e4hCampaignCustody(retainedReplay),
 					`D108E4AA_RED ${name} accepts stable authenticated identity with an incoming RTC advance`
+				)
+				.not.toThrow();
+		}
+		const exactOneOwnerControl = d108e4aaRetainedAsymmetricReplay(false, "handler-open");
+		expect(() => validateD108e4hCampaignCustody(exactOneOwnerControl)).not.toThrow();
+		for (const [name, swapPageOrder] of [
+			["creator page retains physical creator", false],
+			["receiver page retains physical creator", true],
+		] as const) {
+			const dualLocalReplacement = d108e4acDualLocalReplacementReplay(swapPageOrder);
+			const endpointValues = Object.values(dualLocalReplacement.endpoints);
+			const creatorLocal = endpointValues.find(
+				({ peerId }) => peerId === "16Uiu2HAmDmbpqXW4sui8F9r1JjViSCVkSuKcL6mBnqCGUb3jNUTc"
+			);
+			const receiverLocal = endpointValues.find(
+				({ peerId }) => peerId === "16Uiu2HAkvi5DUFivZdjNxyLAxR9sATAKBCLSmKN3qoHHzxKwUttJ"
+			);
+			if (creatorLocal === undefined || receiverLocal === undefined) {
+				throw new Error("D108E4AC_DUAL_LOCAL_ENDPOINT_ABSENT");
+			}
+			expect(Object.values(dualLocalReplacement.rawTransportDeltas)).toEqual([
+				{
+					authenticatedConnectionLosses: 1,
+					backpressuredDrops: 0,
+					handshakeFailures: 0,
+					lastLinkDrop: { after: "replacement", before: "restart", changed: true },
+					linkDrops: 1,
+				},
+				{
+					authenticatedConnectionLosses: 1,
+					backpressuredDrops: 0,
+					handshakeFailures: 0,
+					lastLinkDrop: { after: "replacement", before: "restart", changed: true },
+					linkDrops: 1,
+				},
+			]);
+			expect({
+				creatorAccepted: creatorLocal.acceptedRaw.length,
+				creatorAuthenticated: creatorLocal.prepare.authenticated.map(({ connectionId, generation }) => [
+					connectionId,
+					generation,
+				]),
+				creatorDeadlineAuthenticated: creatorLocal.deadline.authenticated.map(({ connectionId, generation }) => [
+					connectionId,
+					generation,
+				]),
+				creatorRtc: [creatorLocal.prepare.rtc, creatorLocal.deadline.rtc].map((identities) =>
+					identities.map(({ channelId, connectionId }) => [connectionId, channelId])
+				),
+				creatorSends: creatorLocal.rawSends.length,
+				receiverAccepted: receiverLocal.acceptedRaw.length,
+				receiverAuthenticated: receiverLocal.prepare.authenticated.map(({ connectionId, generation }) => [
+					connectionId,
+					generation,
+				]),
+				receiverDeadlineAuthenticated: receiverLocal.deadline.authenticated.map(({ connectionId, generation }) => [
+					connectionId,
+					generation,
+				]),
+				receiverRtc: [receiverLocal.prepare.rtc, receiverLocal.deadline.rtc].map((identities) =>
+					identities.map(({ channelId, connectionId }) => [connectionId, channelId])
+				),
+			}).toEqual({
+				creatorAccepted: 0,
+				creatorAuthenticated: [["2f4n8z1787980768199", 5]],
+				creatorDeadlineAuthenticated: [["67j4of1787980800178", 6]],
+				creatorRtc: [[[5, 373]], [[7, 399]]],
+				creatorSends: SAMPLE_COUNT,
+				receiverAccepted: 400,
+				receiverAuthenticated: [["9i8v0y1787980768201", 5]],
+				receiverDeadlineAuthenticated: [["6rktlz1787980796505", 6]],
+				receiverRtc: [[[5, 369]], [[7, 382]]],
+			});
+			expect(
+				creatorLocal.lifecycle
+					.filter(({ sequence }) => sequence >= 1_653 && sequence <= 1_657)
+					.map(({ event, owner, readyState, sequence }) => [sequence, event, owner, readyState])
+			).toEqual([
+				[1_653, "channel-handler-installed", "rtc-observer-datachannel-handler", "open"],
+				[1_654, "channel-message-handler-installed", "rtc-observer-or-harness", "open"],
+				[1_655, "channel-message-handler-installed", "product-unreliable-webrtc", "open"],
+				[1_656, "channel-close-call", "product-unreliable-webrtc", "closing"],
+				[1_657, "channel-open-event", "rtc-datachannel-open-event", "open"],
+			]);
+			let branchError: unknown;
+			try {
+				validateD108e4hCampaignCustody(dualLocalReplacement);
+			} catch (error) {
+				branchError = error;
+			}
+			expect(branchError).toBeInstanceOf(Error);
+			expect((branchError as Error).message).toBe("D108E4H_DROP_COUNT_AMBIGUOUS");
+			expect
+				.soft(
+					() => validateD108e4hCampaignCustody(dualLocalReplacement),
+					`D108E4AC_RED ${name} accepts exact dual-local replacement ownership`
 				)
 				.not.toThrow();
 		}

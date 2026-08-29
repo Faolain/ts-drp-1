@@ -71549,5 +71549,38 @@ remain owned by the D.108e4ac test/plan owner for 2026-09-04.
 The complete review-evidence `SHA256SUMS` excludes itself and has SHA-256
 `03e39097dc34cd05108cce26ded3576dc8d3b70d54ef464bb0f964727f8eb97e`.
 
+The D.108e4ac RED was then implemented against exact signed/pushed corrected
+plan base `c4eeb342af6677d3071f1a0c7541aa63c9240c0e`. It changes only
+`tests/e3-03-loss-and-hol-proof.pw.ts`. The deterministic helper freezes both
+endpoint-local deltas at exact one/replacement, authenticated boundaries
+`2f4n8z...`/generation 5 to `67j4of...`/6 and
+`9i8v0y...`/5 to `6rktlz...`/6, raw RTC `5/373` to `7/399` and `5/369` to
+`7/382`, 507+93 raw sends, 336+64 accepted raw messages, and creator lifecycle
+1653 through 1657. Both page-label orderings hard-assert those values and the
+shared error owner before expressing the desired `.not.toThrow()` behavior.
+The existing exact-one-owner control passes first.
+
+The one focused invocation returned one as intended in 7.830 seconds with
+exactly one unexpected test, zero expected/skipped/flaky tests, retry zero and
+no top-level error. Its only two soft failures are the two named D.108e4ac
+page orderings; both carry `D108E4H_DROP_COUNT_AMBIGUOUS` from the
+campaign-wide assertion before endpoint validation. No long campaign ran.
+Exact-owner `tsc`, ESLint, Prettier and `git diff --check` all returned zero.
+The RED owner SHA-256 is
+`bde586f95865e22849d44e114c99c4281d3d750fa9b396401019f6e7756e5802`;
+its pre-freeze diff SHA-256 is
+`33949a36af1d1df7cc28048b81fbec7ce60a068fd93448d585d9d9b3ad52e441`.
+Focused command/reporter/stdout/stderr/status/time SHA-256 values are
+`917a96646720f7a5baae9e9a88763ee0edf1677936be83323092359ae819cade`,
+`e75cc3182168c0021379f22c9968a330798815df7690fac1be86d0c88cdaab87`,
+`b867e7b3796b1f9f6481ac69db20376b00b5b7cdbd843eee679c7050d2f226ee`,
+`653993ba0aef375065d406f839efe456c3096d2076fc0d2fa513377175cde68f`,
+`4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`
+and
+`4eea772f993b9e8e687068854d43407e06450270aea12c8a560549d687cb3147`.
+The complete RED `SHA256SUMS` excludes itself and has SHA-256
+`fc9cf3b91d401d8d9301080998b0b043b04ec45696ad9acc1b4ecb7b012e5e69`.
+RED is not GREEN and authorizes no campaign execution.
+
 D.108e4b's separate GREEN review, aggregate D.108e4 closure and D.108e5 remain
 blocked until D.108e4ac and a replacement six-pass campaign close.
