@@ -73071,3 +73071,99 @@ accepted repeated-open behavior.
 Once this correction is signed and pushed and all three reviewer processes
 have exited, the already-recorded user authorization permits root setup and
 the exact six D.108e4aj launch blocks without another authorization request.
+
+###### D.108e4al — retained campaign backpressure stop and reslice
+
+The authorized post-fix campaign created the fresh D.108e4aj evidence root
+only after signed/pushed review closure `cb51990168446a4cda1f9eddcce7e6a7385f39e5`.
+All three reviewers had exited, no ts-drp reviewer/test/profiler was active in
+any worktree, ports 4174, 4175, 51000 and 51002 were clear, the ordinary HEAD
+equaled its signed remote, the isolated checkout remained clean at accepted
+behavior `f92f0b05`, both root shims were absent, all 26 stashes and protected
+paths were unchanged, and the signed freeze manifest validated.
+
+`ordinary-1` began at `2026-08-29T17:43:01Z`, passed the consuming preflight
+and ended at `2026-08-29T17:45:46Z` with Playwright status one and terminal
+runner status one. The reporter records one unexpected retry-zero result,
+zero expected/skipped/flaky results, no top-level error, 164.277 seconds total
+and a 154.830-second failed test. Preliminary calibration completed. Trials
+`e3-03-0` and `e3-03-1` each completed their full semantic validation and
+performance evidence with all 600 raw native sends and zero backpressured
+drops. Trial `e3-03-2` reached its assertion stage and failed
+`D108E4H_RAW_SEND_DOMAIN_INVALID`. Under the frozen stop rule,
+`ordinary-2`, `ordinary-3` and all three isolated invocations did not start
+and may not start from this evidence root. The new ledger remains at zero
+consecutive ordinary and zero isolated passes; no rerun is permitted.
+
+The failure telemetry makes the actual failed invariant unambiguous. The
+workbench attempted all 600 raw and 600 reliable samples. The creator's first
+555 raw sequences, exactly `0..554`, reached one native RTC send success; the
+remaining contiguous `555..599` did not cross the RTC send boundary. On the
+same open raw identity `(connectionId 8, channelId 429)`, observed
+`bufferedAmount` was 431 bytes at raw send 0 and still 431 near send 399, then
+rose to 42,238 near send 499, 63,788 near send 549 and 65,943 after send 554.
+Production's unchanged 65,536-byte ceiling admitted send 554 because its
+pre-send amount was 65,512, then returned false for the final 45 calls and
+incremented `backpressuredDrops` by exactly 45. The prepare/deadline raw RTC
+identity stayed open and unchanged, `linkDrops` stayed zero and neither
+endpoint had a handshake failure. This is not the repeated-open or
+replacement-ownership defect that D.108e4ah corrected.
+
+Validator order explains the surface code but not the failure. Attempt custody
+checks for the complete 600-success domain before the later explicit
+`delta.backpressuredDrops === 0` assertion, so 555 successes report
+`D108E4H_RAW_SEND_DOMAIN_INVALID`; the later intended code would be
+`D108E4H_RAW_BACKPRESSURE`. The attached endpoint-local classifier itself
+validated all three trials as `zero-local`; in trial two it preserved the
+creator's exact 45-drop delta. Renaming or reordering this test-only error
+would not make the campaign pass and is not sufficient reason for another
+execution.
+
+This proves a retained capacity-contract breach, but it does not by itself
+prove a production implementation bug. The route's public behavior and
+retained unit test deliberately reject a send once the browser-owned RTC
+buffer exceeds the fixed ceiling; that bounded drop is working as designed.
+The unresolved contract question is whether the stochastic 30% loss workload
+must guarantee all 600 native send successes with zero local backpressure, as
+D.108e4h currently mandates, or whether bounded, explicitly accounted local
+drops are legitimate for an unreliable freshness lane. Raising the ceiling,
+waiting on `bufferedamountlow`, changing SCTP options, pacing or shrinking the
+fixture, or accepting backpressured drops would each change a frozen product
+or test contract. None is authorized by this failed campaign and none is made
+silently.
+
+Exact campaign custody remains immutable at `.logs/d108e4aj-campaign/`.
+Reporter, failure telemetry, calibration, endpoint-local classification,
+stdout, stderr, Playwright status, runner status, timestamps, command and
+cumulative-manifest SHA-256 values are respectively
+`83422063aae5e867812fc096f03f6653387645e66eb6c01d8ada281d8041acb8`,
+`52412126796093a382f23c5795f66b923657ba8aa442bf14d365bca66cb02bc7`,
+`3692fe629a9a617f9787e2c11f91530d593b20b565998313096aa3763212247e`,
+`c048fa02d496cd9657a104e2d6761535b5ba8f243925da8f6b6ebb49fdcb639d`,
+`f15095e14919f92ea010d711ebc7c092251a08edef943e164a1a2d0fd6ed17dd`,
+`c72b0cb1a7711f1380c9b31fe561a08b09f1475959d3781885644c0905d49a5b`,
+`4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`,
+the same status-one hash,
+`92f0ce688d909e3e4c5deefcd2b8bd275c656daab45fb981862b745d2fc2b5ec`,
+`089b2ee5e8be8e45dd437c3ffa1414dbdcf9a73e28ea5af6f1de1c56e8f1a3d5`
+and
+`a4307791084132e7df46a88c2a6a6fe501861cd658667993116a2fe862c24f70`.
+The cumulative manifest validates but retains its frozen depth limit. The
+separately disclosed nested `trace.zip` and `error-context.md` SHA-256 values
+are
+`a27c73c64655f000ed3f32ff03bf1c44ee6b6fc50efd19cdd436983b62e67737`
+and
+`b981a44b0316f66759fc02e0f7379d477cdfd58dfcbfb2e172cac9080c34eec5`.
+
+The smallest justified next action is a narrow plan-only capacity-contract
+reslice before any RED, GREEN or long campaign. It must use this single
+failure's existing telemetry and the retained backpressure unit contract; it
+may not rerun the campaign, change production, weaken the 65,536-byte ceiling,
+alter the workload/loss/timing profile or recategorize the failure merely to
+obtain a pass. The normal Grok/exact-Kimi/Opus plan review must decide whether
+the golden path truly requires zero local backpressure and therefore needs a
+separately scoped product-capacity design, or whether the retained campaign
+gate is an unrealistic stochastic test expectation and needs an explicitly
+reviewed evidence-domain change. Mixed or unsupported ownership stops at that
+decision boundary. D.108e4, D.108e5 and all further campaign execution remain
+blocked; Fable and collaboration subagents remain prohibited.
