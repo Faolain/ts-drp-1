@@ -72194,20 +72194,30 @@ Trial `e3-03-2`, rendered campaign thresholds, final durable control and
 terminal completion did not execute, so this is not a semantic pass.
 
 The preserved lifecycle distinguishes repeated observer callbacks from
-duplicate product ownership. The receiver installed exactly one observer
-channel handler at sequence 866 and exactly one
-`product-unreliable-webrtc` message handler at sequence 868. Both were already
-`readyState=open`. The first open callback followed at sequence 869; the
-second followed 2.808 seconds later at sequence 946. There was no close call
-or close event on selected identity `10/420`, and 109 subsequent
+duplicate product ownership. The remotely announced receiver channel
+`10/420` entered the observer through the `datachannel` path and installed
+exactly one observer channel handler at sequence 866 with
+`readyState=open`, one observer/harness message handler at 867 and exactly one
+`product-unreliable-webrtc` message handler at 868. The first open callback
+followed at sequence 869; the second followed 2.808 seconds later at sequence 946. No third message handler followed the repeat. There was no close call or
+close event on selected identity `10/420`, and 109 subsequent
 `channel-message` records used that identity. The observer source installs
 one `open` listener once per channel and does not synthesize an open event.
-The initiating creator replacement identity `10/416` independently had one
-observer handler, one open event and one product handler. Thus the capture
-does not demonstrate two product handlers, two selected identities,
-break-before-make retirement or a product failure. It demonstrates that the
-test's exact-one raw open-callback expectation is narrower than the observed
-runtime lifecycle.
+Its `WeakMap<RTCDataChannel, identity>` watch guard and monotonically
+increasing channel IDs, neither cleared by trial reset, prove that both
+serialized `10/420` callbacks came from the same object rather than a reused
+numeric identity.
+
+The initiating creator replacement `10/416` entered through
+`createDataChannel`, installed its observer handler at sequence 1218 with
+`readyState=connecting`, then had one open event and one product handler. The
+product's only setup open listener is one-shot: `waitForOpen` returns
+immediately for an already-open channel and otherwise removes its open/close
+listeners on the first terminal event. Thus the second observer callback
+cannot re-enter product setup, and the capture does not demonstrate two
+product handlers, two selected identities, break-before-make retirement or a
+product failure. It demonstrates that the test's exact-one raw open-callback
+expectation is narrower than the observed runtime lifecycle.
 
 Exact evidence remains immutable at
 `/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ad-campaign/`.
@@ -72222,9 +72232,16 @@ SHA-256 values are respectively
 `588cff62394132e798bb208ede938ad669613fd080e2eaaecbb5814a83d8e244`
 and
 `ca98647f9a58f66adb566d0bc5b4f72492f48be7aa691ea50d88a5990dcbf7fc`.
-The cumulative artifact manifest excludes itself, validates every retained
-file and has SHA-256
+The cumulative artifact manifest excludes itself, validates every file it
+lists and has SHA-256
 `194f16e37363fa1f1ce33336f2e4ab146b3ae35b25e7d622ce5cf128afd508bb`.
+The preserved but unlisted Playwright `error-context.md` and `trace.zip` have
+SHA-256
+`21e9649a205090042303205d8c8c80e420f6f432d400102c0c7072d1e9d5213b`
+and
+`e20adf2321f2acec7986982db9e52b9729b7e593faa053a0fccf9d60f62d3821`;
+the campaign root remains immutable rather than retroactively regenerating
+its terminal manifest.
 Before/after checkout identities, protected status, all 26 stashes, absent
 root shims and fixed-port/process gates remained exact.
 
@@ -72238,46 +72255,188 @@ performance thresholds, product counters, wire behavior or public APIs. If
 the deterministic work requires any production-source change, stop and
 reslice instead of widening this owner.
 
-RED must replay the exact receiver `10/420` lifecycle above and prove the
-current exact-one `replacementOpens` predicate throws
-`D108E4H_LIFECYCLE_ORDER_INVALID` despite one observer handler, one product
-handler, no selected-identity close and usable post-callback ingress. It must
-also make the observer self-check dispatch two open callbacks on one watched
-channel and prove that current telemetry represents both as independent
-semantic `channel-open-event` records. No browser campaign is part of RED.
+The reviewed plan/evidence baseline is signed/pushed commit
+`217865acac51d7fa7dbbb1ccacffb95bf936fff9`, tree
+`461b3043348b2e680d24bbfb28909bab8c5bf193`; accepted behavior remains commit
+`3d9e6fe59114851c2fcd9835bed909b9bbf3e881`, tree
+`4a29b7087af6ac626e5f468312074afd9f8c8289`. The pre-RED sole-owner hash is
+`6ef1b53c744d3be795cd53daf82359e2deac3f4d21b0fc382250f468cb5fc9d5`.
+Every RED/GREEN owner check must keep this guard zero:
+
+```sh
+git diff --quiet 217865acac51d7fa7dbbb1ccacffb95bf936fff9 -- . \
+  ':(exclude)tests/e3-03-loss-and-hol-proof.pw.ts' \
+  ':(exclude)docs/production-hardening/production-hardening-tdd-plan-v2.md'
+```
+
+The exact raw receiver `10/420` replay with two literal semantic
+`channel-open-event` records is a permanent negative, not a RED that GREEN
+turns positive. It must throw `D108E4H_LIFECYCLE_ORDER_INVALID` before and
+after GREEN and remains paired with the existing `dualLocalDuplicateOpen`
+mutant. A separate GREEN-shaped positive replaces sequence 946's event/owner
+with `channel-open-repeat-event` / `rtc-datachannel-open-repeat-event`; it
+retains one observer handler, one product handler, no `10/420` close and
+post-repeat ingress. That positive currently passes only because the unknown
+repeat kind is ignored, so it is an acceptance control rather than causal
+RED evidence.
+
+The observer-level RED makes the existing self-check dispatch two open events
+on the same watched `RTCDataChannel` object. It must hard-pin that the current
+observer emits two semantic open anchors. GREEN inverts that exact assertion
+to one semantic anchor followed by one repeat kind; the existing
+non-exhaustive `arrayContaining` assertion is insufficient. Validator RED
+adds exact-code mutants which the current validator ignores: repeat before
+the trial-local anchor, wrong repeat owner, non-open repeat state, unmatched
+connection/channel identity, wrong trial, repeat after a close call/event on
+that same identity, missing anchor in the current trial window and more than
+one repeat on one identity in one trial. No browser campaign is part of RED.
 
 GREEN separates semantic readiness from repeated raw callback observation.
-For each watched channel, the first open-listener callback remains the sole
+For each watched channel and observer generation, the first open-listener
+callback remains the sole
 `channel-open-event` / `rtc-datachannel-open-event` readiness anchor. A later
 callback on that same object is preserved, not discarded, as
 `channel-open-repeat-event` / `rtc-datachannel-open-repeat-event`. The
-observer must still install only once per channel. Endpoint validation
-continues to require exactly one semantic open anchor and exactly one product
-handler on the selected replacement identity. Repeat telemetry is admissible
-only after that anchor, on the exact same peer/trial/connection/channel and
-label, with the exact repeat owner and `readyState=open`, and with no prior
-close call or close event on that identity. It cannot satisfy missing
-readiness, product-handler, identity, ordering, ingress or replacement
-custody. All joins remain endpoint-local and sequence-based; no cross-peer
-clock comparison is introduced.
+observer must still install only once per object. Its first/repeat latch is a
+`WeakMap<RTCDataChannel, generation>` keyed by object, never a numeric-ID set.
+`reset(trialId)` already increments generation and clears lifecycle records;
+therefore an object's first callback in each trial window is a new semantic
+anchor, while channel identities and monotonically increasing IDs remain
+observer-lifetime stable and non-reusable. Already-open handler installation
+does not consume the callback anchor.
 
-The existing duplicate semantic-open mutant remains unchanged and must still
-throw exact `D108E4H_LIFECYCLE_ORDER_INVALID`; converting a real repeat into a
-separate event kind must not weaken forged duplicate readiness rejection.
-Add focused mutants for repeat-before-first-open, wrong repeat owner,
-non-open repeat state, wrong selected identity or trial and repeat after
-selected-identity close. Preserve every D.108e4aa and D.108e4ac mutant and
-its exact error code, including endpoint-local `1/1` acceptance, `2/0` and
-`0/2` count ambiguity, asymmetric incoming behavior, zero-owner RTC
-stability, readiness ordering and failed-replacement retention.
+`RtcLifecycleKind` extends under unchanged internal `schemaVersion: 3`; this
+test-only kind addition is not a wire schema. A new central
+`d108e4hAssertOpenRepeats`-equivalent runs from `d108e4hValidateEndpoint` for
+both endpoints in every trial before transmitting, replacement or incoming
+early returns. It validates every repeat record in the complete endpoint
+lifecycle, including non-selected identities. Each repeat requires exactly
+one earlier semantic open anchor on the exact same trial, connection/channel
+and label, exact owner `rtc-datachannel-open-repeat-event`,
+`readyState=open`, no earlier close call/event on that same identity and at
+most one repeat for that identity in the trial. Retiring the old/before
+identity does not invalidate a repeat on the selected after identity.
+
+Both existing exact-one semantic-open/product-handler predicates remain in
+`d108e4hAssertAttemptCustody` and `d108e4hAssertOverlapCustody`; custody and
+raw-send ordering use only the first semantic anchor. Add a transmitting
+endpoint positive carrying one anchor plus one valid repeat so the attempt
+path is exercised, and retain the nontransmitting incoming `10/420` positive
+so overlap's pre-return path is exercised. Repeat telemetry cannot satisfy
+missing readiness, product-handler, identity, ordering, ingress or
+replacement custody. All joins remain endpoint-local and sequence-based; no
+cross-peer clock comparison is introduced.
+
+The existing duplicate semantic-open mutant remains unchanged and throws
+exact `D108E4H_LIFECYCLE_ORDER_INVALID`. Repeat-before-anchor, wrong owner,
+non-open state, repeat after same-identity close, missing current-trial anchor
+and repeat cardinality greater than one each throw exact
+`D108E4H_LIFECYCLE_ORDER_INVALID`. Unmatched connection/channel identity
+throws exact `D108E4H_IDENTITY_JOIN_INVALID`; wrong trial throws exact
+`D108E4H_TRIAL_MISMATCH`. Identity and trial are separate mutants. Preserve
+every D.108e4aa and D.108e4ac mutant and exact code, including endpoint-local
+`1/1` acceptance, `2/0` and `0/2` count ambiguity, asymmetric incoming
+behavior, zero-owner RTC stability, readiness ordering and
+failed-replacement retention.
 
 Freeze this plan/evidence checkpoint in a signed push, then run the normal
 read-only Grok 4.6/high, exact Kimi K3 `CHECK001` through `CHECK100` plus
 RESULT and Opus 5/xhigh plan review before RED. Do not invoke Fable or a
 collaboration subagent. RED and GREEN keep separate signed/pushed checkpoints
-and the same three-model review protocol. GREEN runs its focused
-non-campaign test once, then the retained seven-title non-campaign suite once,
-plus exact-owner lint/format/diff and affected typecheck/build checks. No long
-campaign may run in D.108e4ae. A later fresh campaign freeze must use new
-evidence paths and reviewed bytes; it cannot reuse or overwrite D.108e4ad
-artifacts or count its five unstarted commands.
+and the same three-model review protocol. Exact RED/GREEN evidence custody is
+`.logs/d108e4ae-red/` and `.logs/d108e4ae-green/`; each self-excluding manifest
+binds command, stdout, stderr, terminal status, elapsed time, reporter and
+focused-summary bytes before its signed push. GREEN runs one focused
+non-campaign invocation selecting the schema validator and observer lifecycle
+titles, then the retained seven-title non-campaign suite once, plus exact-owner
+lint/format/diff and affected typecheck/build checks.
+
+The exact focused non-campaign selection is:
+
+```sh
+set -u
+readonly D108E4AE_FOCUSED_PATTERN='(validates schema-v3 replacement custody without cross-peer clocks|records a versioned and causally joined RTC lifecycle without changing delivery)$'
+
+D108E4G_TELEMETRY=1 D108E4H_TELEMETRY=1 \
+  pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep "$D108E4AE_FOCUSED_PATTERN" --list
+
+D108E4G_TELEMETRY=1 D108E4H_TELEMETRY=1 \
+  pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep "$D108E4AE_FOCUSED_PATTERN" --fail-on-flaky-tests
+```
+
+Its list gate must return exactly those two titles. RED and GREEN each consume
+one focused execution only after its respective list guard passes.
+
+The exact retained non-campaign allowlist remains:
+
+```sh
+set -u
+readonly D108E4AE_NON_CAMPAIGN_PATTERN='(validates schema-v3 replacement custody without cross-peer clocks|raw sequence evidence includes the fixed sample-domain boundaries|partitions receiver evidence by exact product roster without losing observations|separates rendered product-roster metrics from boundary-aware application evidence|freezes RTC metadata at the event boundary before async payload conversion|records a versioned and causally joined RTC lifecycle without changing delivery|proves replacement open before retiring the stale authenticated raw owner)$'
+
+D108E4G_TELEMETRY=1 D108E4H_TELEMETRY=1 \
+  pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep "$D108E4AE_NON_CAMPAIGN_PATTERN" --list
+
+D108E4G_TELEMETRY=1 D108E4H_TELEMETRY=1 \
+  pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep "$D108E4AE_NON_CAMPAIGN_PATTERN" --fail-on-flaky-tests
+```
+
+The list gate must return exactly seven titles and must omit the retained
+three-trial title. Invoking `playwright.e3-03-loss-and-hol.config.ts` without
+this exact anchored positive allowlist is prohibited: a plain or empty grep
+would start an unauthorized long campaign. No long campaign may run in
+D.108e4ae. A later fresh campaign freeze must use new evidence paths and
+reviewed bytes; it cannot reuse or overwrite D.108e4ad artifacts or count its
+five unstarted commands.
+
+The required plan review inspected exact signed/pushed checkpoint
+`217865acac51d7fa7dbbb1ccacffb95bf936fff9` and ran no test, campaign,
+Fable or collaboration subagent. Grok 4.6/high's initial read-only session
+`01a04ded-1e2c-7c80-9fbd-c5589e057b11` exhausted the locally supplied
+20-turn cap after 360.173 seconds while still inspecting. It is retained
+honestly as `NO_VERDICT`, not an approval or service cancellation. A one-turn,
+tool-free terminal continuation in that same session returned valid
+`CHANGES_REQUIRED`, P0=0/P1=5/P2=2. Initial events/status and continuation
+JSON SHA-256 values are
+`b170eec24eade648a4b8fe10b6c2c5b5be73ffc141a1d7269bb245e40286bc96`,
+`87e7fc6358a24482136dcbaabd0b045eb14a0f234ea894e4fe95fe4c2533806f`
+and
+`de0763e01a1ca0b1d87176529dbf6cf581837fe368eaf848c3862fc55b6e645c`.
+
+Exact Kimi CLI 1.49.0 / `kimi-code/k3` session
+`56beeee1-51e3-4365-83c4-3660300bd58c` returned substantive
+`CHANGES_REQUIRED`, P0=0/P1=1/P2=3, but prefixed its required output with one
+progress line. Its stream is retained at SHA-256
+`29927620bfabc34077e30a332b30a34c4ba17366940956b915d93673e82d94e7`.
+A one-step, tool-free formatting continuation in the same session re-emitted
+the unchanged review as exactly 101 nonempty lines: ordered unique
+`CHECK001` through `CHECK100`, then one valid RESULT. Its SHA-256 is
+`fd4c8f02bf57b68d30e1ec3af65a815f5db33ed3738fd6f013563ffd7b2e2125`.
+Opus 5/xhigh session `0ba2b882-42a4-4e7c-801e-4db6f70f190a` completed 51
+turns without error and returned `CHANGES_REQUIRED`, P0=0/P1=5/P2=5; JSON
+SHA-256 is
+`6cb46e67fd9c68dddf36f84b40c09ee8d06dae6972d50f099b3661824d0bac06`.
+
+The same-round correction above closes the complete P1 union without changing
+source. It makes the raw two-anchor capture a permanent negative rather than
+a contradictory RED; moves actual RED ownership to the observer split and
+ignored malformed repeats; validates repeats centrally before every endpoint
+early return; binds latching to object identity plus trial generation; keeps
+both exact-one custody predicates; pins the observed already-open and
+selected-identity close semantics; caps repeats at one; retains schema version
+3; splits identity/trial mutants and pins every exact code; restores the exact
+seven-title executable guard; and binds baseline, owner hash and RED/GREEN
+evidence roots. It also corrects the old campaign-manifest overclaim while
+preserving the immutable unlisted trace hashes. Review validation SHA-256 is
+`c489d9da98f9cf9b54cb5ff89f12594a755808d65ade1b0452699387ee827ff5`;
+the complete self-excluding review manifest validates and has SHA-256
+`a9aa3c2c5e5faab6088414a3760a73c2ad46b26bd141d01c8a1999d5bacd1fef`.
+This correction grants no long-campaign authority and receives no redundant
+confirmation review; the next checkpoint is deterministic RED only.
