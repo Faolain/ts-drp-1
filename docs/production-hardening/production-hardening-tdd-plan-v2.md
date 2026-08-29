@@ -71248,7 +71248,7 @@ The authorization-time ordinary-one preflight first stopped on an invalid
 character class in its read-only `awk` process filter. Playwright had not
 started, so that mechanical evidence-command fault consumed no invocation.
 The error is preserved in
-`.logs/d108e4ab-campaign/ordinary-1.before/preflight-attempt-1-error.txt`.
+`/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/ordinary-1.before/preflight-attempt-1-error.txt`.
 Correcting only that filter produced a complete passing preflight at
 `2026-08-29T05:18:26Z`: exact signed/pushed ordinary HEAD
 `a6477b019eb93df49373d52a50b0a9a46003f048` and tree
@@ -71293,33 +71293,44 @@ product defect. Both endpoint-local deltas are exactly
 from connection/channel `5/373` to `7/399`. The receiver advanced from
 `9i8v0y1787980768201`/generation 5 to
 `6rktlz1787980796505`/generation 6 and from raw RTC `5/369` to `7/382`.
-Although the signed lexicographic initiator was the receiver, both peers
-legitimately owned one local authenticated replacement. The validator rejects
-before endpoint validation because `replacementOwners.length <= 1` encodes
-the narrower D.108e4aa asymmetric schedule as a campaign-wide invariant.
+Although the lexicographic initiator was the receiver, both endpoint-local
+counters observed one authenticated replacement. This does not prove one
+shared cross-peer replacement: the new connection-ID timestamps differ by
+about 3.673 seconds (`...796505` versus `...800178`), and the contract forbids
+joining peers by sequence, `atWallMs` or `atMonotonicMs`. Admitting this
+dual-local shape is therefore a test-validator coverage decision, not proof
+that the two local transitions have one underlying connection owner. The
+validator rejects before endpoint validation because
+`replacementOwners.length <= 1` encodes the narrower D.108e4aa asymmetric
+schedule as a campaign-wide invariant.
 
 The captured endpoint-local lifecycle also demonstrates usable replacement
-before old-channel retirement. Creator sequence 1654 installs the observer
-handler on new `7/399` with `readyState=open`, 1655 installs the product
-handler, 1656 is the product-owned close call on old `5/373`, and 1657 is the
-observer's open-event record for new `7/399`. The close occurs inside the
-product open callback before the later observer listener records that same
-open event; the already-open ready state and installed product handler are the
+before old-channel retirement. Creator sequence 1653 is the exact
+`channel-handler-installed` / `rtc-observer-datachannel-handler` record on new
+`7/399` with `readyState=open`; 1654 is its observer/harness message handler,
+1655 is the `product-unreliable-webrtc` message handler, 1656 is the
+product-owned close call on old `5/373`, and 1657 is the observer's required
+open-event record for new `7/399`. The close occurs inside the product open
+callback before a later observer listener records that same open event; the
+sequenced already-open handler record and installed product handler are the
 causal readiness evidence. Receiver sequence 961 records new `7/382` open,
-962 installs its product handler and 963 closes old `5/369`. Creator traffic
-contains 507 old-RTC and 93 new-RTC send attempts; receiver traffic contains
-336 old-RTC and 64 new-RTC messages. Trial zero reached prepare,
-`runReturned`, deadline and reset, restored open transports, partitioned 413
-accepted/observed/rostered and zero rejected observations, and captured all
-600 sender raw candidates before the validator stopped it. Later application
-thresholds and the final durable-control assertion did not run, so this is
-neither a semantic pass nor evidence that every product assertion would have
-passed.
+962 installs its product handler and 963 closes old `5/369`. Creator raw-send
+custody contains exactly 507 old-RTC and 93 new-RTC attempts, matching its
+600 sent-counter delta. Receiver D.108e4h `acceptedRaw` contains exactly 400
+records—336 old RTC plus 64 new RTC—matching its received-counter delta of 400. The separate application partition contains 413
+accepted/observed/rostered records, comprising 400 raw and 13 reliable, with
+zero rejected. Trial zero reached prepare, `runReturned`, deadline and reset,
+restored open transports and captured all 600 sender raw candidates before
+the validator stopped it. Later application thresholds and the final
+durable-control assertion did not run, so this is neither a semantic pass nor
+evidence that every product assertion would have passed.
 
-Exact custody is `.logs/d108e4ab-campaign/`. Reporter, stdout, stderr,
-status, timestamps, command, calibration, failure telemetry, error context,
-trace, focused lifecycle, current-trial classification, result summary,
-terminal result and complete artifact-manifest SHA-256 values are
+Exact custody is
+`/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ab-campaign/`.
+Reporter, stdout, stderr, status, timestamps, command, calibration, failure
+telemetry, error context, trace, focused lifecycle, current-trial
+classification, result summary, terminal result and complete
+artifact-manifest SHA-256 values are
 `726ed5dc345b7ecffb994aded5d37fcef5cfea193d32cd33426d32e6960b6ade`,
 `14fc34c811388ff4cea7ae4148167096b41ea7a1b18fc2abb1c73adb370b21ba`,
 `44ac0fc13bfb4cdf0580823c74bded08a56228f761dea7eb035d6e170e009b4c`,
@@ -71347,34 +71358,73 @@ retention, stop and reslice; do not weaken the validator to admit it.
 
 RED adds a deterministic fixture replaying the exact dual-local capture above
 and proves it currently fails specifically at the campaign-wide
-`replacementOwners.length <= 1` assertion after exact cardinality and delta
-shape checks. It also replays the creator listener interleaving—new channel
-already open plus product handler installed, product closes old, then the
-observer open-event callback records—and both page-label orderings. Existing
+`replacementOwners.length <= 1` assertion before endpoint validation. Before
+calling the validator, RED hard-asserts that both declared deltas are exactly
+`linkDrops === 1`, `lastLinkDrop.after === replacement` and
+`lastLinkDrop.changed === true`; therefore the later per-endpoint
+`linkDrops <= 1` site sharing `D108E4H_DROP_COUNT_AMBIGUOUS` cannot be the
+throw owner. A paired exact-one-owner control reaches endpoint validation and
+passes, while the exact dual-local fixture throws the shared code before any
+`d108e4hValidateEndpoint` call. RED does not require creator overlap custody
+to pass yet: after the owner-count assertion is removed, the captured
+handler/close/open-event interleaving must still fail the current strict
+open-event-before-close rule. It replays both page-label orderings. Existing
 zero-replacement and asymmetric one-local-replacement positives remain green.
 
 GREEN replaces the campaign-wide single-owner assumption with an
 endpoint-local classification. Each endpoint may own zero or exactly one
-local replacement. A local replacement still requires delta one, reason
-`replacement`, authenticated identity advancement, exactly one selected new
-open RTC identity, exactly one new product handler and exactly one
-product-owned old-channel close. The close may follow either the observer
-open-event record or an already-open new channel plus installed product
-handler, because listener callback order is not product causality. It may not
-precede a usable new identity. The asymmetric incoming-only rules from
-D.108e4aa remain unchanged for an endpoint with delta zero. Peer/trial joins,
+local replacement. `incomingReplacement(name)` is true only when that
+endpoint has delta zero and the peer owns exactly one local `replacement`;
+it is false for both endpoints when both own a replacement and for both when
+neither does. Thus a delta-zero RTC advance with zero replacement owners still
+throws `D108E4H_IDENTITY_JOIN_INVALID`, while D.108e4aa asymmetric incoming
+rules remain unchanged only on the peer-dependent predicate.
+
+A local replacement still requires delta one, reason `replacement`,
+authenticated identity advancement, exactly one selected new open RTC
+identity at the boundary, exactly one `channel-open-event` /
+`rtc-datachannel-open-event` record on that identity, exactly one
+`channel-message-handler-installed` / `product-unreliable-webrtc` record and
+exactly one product-owned old-channel close. The open-event remains mandatory
+and continues to gate new-identity traffic, but need not precede old close
+when an exact endpoint-local `channel-handler-installed` /
+`rtc-observer-datachannel-handler` record on the selected new identity carries
+`readyState === open` at a sequence strictly before close. The product handler
+must also precede close. No close call or close event on the new identity may
+precede old close. When no such already-open handler record exists, the
+required open-event itself must precede close. This rule uses sequenced
+lifecycle evidence, never the later deadline snapshot. Peer/trial joins,
 accepted/send identity joins, backpressure, failed-replacement retention and
 endpoint-local sequence ownership remain fail closed.
 
-Named mutants must reject: a dual-local endpoint without authenticated
-advancement; delta greater than one; unsupported drop reason; missing or
-duplicate selected new identity; missing product handler; product close while
-the new channel is not open; old close before both causal readiness facts;
-wrong old identity; cross-peer/trial mismatch; and failed replacement
-displacing a usable old channel. The former
-`ambiguousDoubleReplacementDrop` mutant is not silently deleted: it is split
-into a valid exact dual-local replay and mutants that isolate genuinely
-ambiguous count, identity and readiness defects.
+Named mutants must reject with exact existing codes. All eight D.108e4aa
+mutants remain:
+`incomingRtcWithoutProductHandler` and `incomingRtcWithoutOpen` throw
+`D108E4H_LIFECYCLE_ORDER_INVALID`;
+`missingInitiatorReplacementDrop` and
+`nonInitiatorAuthenticatedIdentityDrift` throw
+`D108E4H_IDENTITY_JOIN_INVALID`;
+`nonInitiatorProductOldCloseCall`,
+`initiatorOldCloseBeforeReplacementOpen` and
+`failedIncomingReplacementDisplacesUsableOldChannel` throw
+`D108E4H_LIFECYCLE_ORDER_INVALID`. The exact live delta-one/delta-one shape is
+renamed `dualLocalReplacement`; `ambiguousDoubleReplacementDrop` remains the
+greppable count-ambiguity mutant by setting one endpoint's local delta greater
+than one and still throws `D108E4H_DROP_COUNT_AMBIGUOUS`.
+
+New dual-local mutants cover authenticated non-advancement and zero-owner RTC
+advance (`D108E4H_IDENTITY_JOIN_INVALID`); unsupported reason
+(`D108E4H_DROP_REASON_UNSUPPORTED`); missing/duplicate selected identity
+(`D108E4H_IDENTITY_JOIN_INVALID`); missing/duplicate local open event, missing
+product handler, wrong old close identity and failed-replacement displacement
+(`D108E4H_LIFECYCLE_ORDER_INVALID`); boundary peer mismatch
+(`D108E4H_IDENTITY_JOIN_INVALID`); and lifecycle trial mismatch
+(`D108E4H_TRIAL_MISMATCH`). The not-open mutant changes sequence 1653's exact
+lifecycle `readyState` rather than the deadline snapshot. A separate
+close-before-readiness mutant leaves the product handler before close but
+moves the exact open-readiness anchor after it, isolating that branch.
+Missing/duplicate open-event mutants preserve open-event cardinality and
+new-traffic custody despite the creator listener interleaving.
 
 No long campaign may run in D.108e4ac. Freeze this plan-only reslice in a
 signed/pushed checkpoint and run the normal read-only Grok 4.6/high, exact
@@ -71386,13 +71436,43 @@ a fresh signed/pushed campaign freeze, full review and new express user
 authorization for six new invocations are required; neither the five
 unstarted D.108e4ab blocks nor their old authorization carry forward.
 
-The executable non-campaign acceptance ledger is unchanged in scope:
+Each RED/GREEN checkpoint records exact command, stdout, stderr, terminal
+status, elapsed time and SHA-256 under `.logs/d108e4ac-red/` or
+`.logs/d108e4ac-green/` before its signed/pushed checkpoint. The later fresh
+campaign freeze must also replace D.108e4ab's singular
+`replacement-classification.json` schema. Per trial, the new evidence
+observable records each endpoint's zero/one local replacement ownership, the
+campaign-wide zero/one/two-owner count, each authenticated boundary identity
+and advancement/stability result, and each deadline RTC selection. It is
+hashed with the remaining artifacts as disclosure evidence, not made a new
+pass condition.
+
+The executable non-campaign ledger preserves D.108e4aa's exact seven-title
+allowlist/list guard and lifecycle pair, then adds the affected-package and
+exact-owner checks below. The positive list must contain exactly seven tests
+and omit the retained three-trial title. Invoking
+`playwright.e3-03-loss-and-hol.config.ts` without the shown positive allowlist
+is prohibited; a plain or empty-grep invocation would start an unauthorized
+long campaign.
 
 ```sh
+set -u
+readonly D108E4AA_NON_CAMPAIGN_PATTERN='(validates schema-v3 replacement custody without cross-peer clocks|raw sequence evidence includes the fixed sample-domain boundaries|partitions receiver evidence by exact product roster without losing observations|separates rendered product-roster metrics from boundary-aware application evidence|freezes RTC metadata at the event boundary before async payload conversion|records a versioned and causally joined RTC lifecycle without changing delivery|proves replacement open before retiring the stale authenticated raw owner)$'
+
 D108E4H_TELEMETRY=1 pnpm exec playwright test \
   --config playwright.e3-03-loss-and-hol.config.ts \
   --grep 'validates schema-v3 replacement custody without cross-peer clocks$' \
   --fail-on-flaky-tests
+
+D108E4G_TELEMETRY=1 pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'records a versioned and causally joined RTC lifecycle without changing delivery$|proves replacement open before retiring the stale authenticated raw owner$' \
+  --fail-on-flaky-tests
+
+D108E4G_TELEMETRY=1 D108E4H_TELEMETRY=1 \
+  pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep "$D108E4AA_NON_CAMPAIGN_PATTERN" --list
 
 D108E4G_TELEMETRY=1 D108E4H_TELEMETRY=1 \
   pnpm exec playwright test \
@@ -71403,6 +71483,7 @@ pnpm --filter @ts-drp/network build
 pnpm --filter @ts-drp/network typecheck
 pnpm --filter @ts-drp/grid build
 pnpm --filter @ts-drp/grid typecheck
+pnpm typecheck
 pnpm exec tsc --noEmit --target ES2022 --module ESNext \
   --moduleResolution bundler --allowImportingTsExtensions --skipLibCheck \
   tests/e3-03-loss-and-hol-proof.pw.ts
@@ -71413,6 +71494,60 @@ git status --porcelain=v1
 git diff --stat -- tests/e3-03-loss-and-hol-proof.pw.ts
 git diff -- tests/e3-03-loss-and-hol-proof.pw.ts
 ```
+
+The two `git diff` owner gates run before each RED/GREEN freeze commit. After
+the signed checkpoint, custody uses `git show --stat --oneline HEAD --
+tests/e3-03-loss-and-hol-proof.pw.ts` and `git show --format= --
+tests/e3-03-loss-and-hol-proof.pw.ts`; a clean-tree `git diff` is never treated
+as proof of the committed owner change.
+
+The required plan review inspected exact signed/pushed plan-only commit
+`a79194410dc26b983dfe9631dfda4c0007961fa5`, parent
+`a6477b019eb93df49373d52a50b0a9a46003f048`, without Fable, collaboration
+subagents, tests or writes to the shared checkout.
+
+- Grok 4.6/high ended normally with `end_turn` after 495.234 seconds and a
+  terminal CHANGES_REQUIRED verdict, P0=0/P1=3/P2=2. Events/public/status/
+  stderr SHA-256 values are
+  `606fb771d7a1b4e8cc0cf1e3d3645c91133288ebe950fa4714fac5abb9a17570`,
+  `1f3436990f571ffd21236aa7472a9c5b5117a76e0cf6ce35a0243194d76d3c5b`,
+  `d9354f45b708d4c19c1ad081f2602d0080d1b375bd5250164b28b43f399b1a07`
+  and
+  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+- Exact `kimi-cli` 1.49.0 / `kimi-code/k3` session
+  `3ed0c9d1-1c73-4a51-87b4-8cada37a27ec` completed one substantive review in
+  its detached checkout and emitted exactly 101 nonempty lines: ordered unique
+  `CHECK001` through `CHECK100`, then RESULT. It returned CHANGES_REQUIRED,
+  P0=0/P1=2/P2=3. The model stream/text/stderr SHA-256 values are
+  `184237ce63bcd5469d9430a03723027059ebc0a55410af6d28388c0e596876af`,
+  `4a69a7b2dbb17e76ac78d81a702b4e3385e141e2f8d2a832a200d224a2cb955a`
+  and
+  `63bbe8a7b49b627414d8ed87fcf33e28591ee501de67d02e950e7ef3517acdb1`.
+  After the model output was durable, the evidence wrapper tried to assign
+  zsh's reserved read-only variable `status` and returned one. That
+  post-model wrapper fault is preserved without rerunning Kimi; its error-file
+  SHA-256 is
+  `4fb1985616bbeda7d47a8054894dfcf91644826eeafa3860b3b4bd5d707b2ac9`.
+- Opus 5/xhigh session `67e6b3d1-d03d-4be7-95ed-e3e81384e7b8`
+  completed 23 turns in 528.148 seconds with `is_error=false`, no permission
+  denial and valid structured CHANGES_REQUIRED, P0=2/P1=2/P2=5. JSON/stderr
+  SHA-256 values are
+  `b568729a2f83f21ff44f694b6e48edc3f33bdd7dfc4bfe30079f9739bc3609ee`
+  and
+  `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+  Its completed output hit the same post-model wrapper-variable fault and was
+  not rerun; the preserved error-file SHA-256 is
+  `96056e4477c9ec741901d5b134dc5a9093618a36fd7843d6d9cb66a007e3e6a8`.
+
+The same-round union is corrected above without confirmation review. It pins
+peer-dependent incoming classification, sequenced open readiness, mandatory
+open-event cardinality, exact RED branch attribution, all retained mutant
+codes, the dual-local classification observable, absolute custody, raw versus
+application populations, pre/post-freeze diff custody, checkpoint evidence
+directories and the locally defined seven-test allowlist/list gate. All P2s
+remain owned by the D.108e4ac test/plan owner for 2026-09-04.
+The complete review-evidence `SHA256SUMS` excludes itself and has SHA-256
+`03e39097dc34cd05108cce26ded3576dc8d3b70d54ef464bb0f964727f8eb97e`.
 
 D.108e4b's separate GREEN review, aggregate D.108e4 closure and D.108e5 remain
 blocked until D.108e4ac and a replacement six-pass campaign close.
