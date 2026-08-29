@@ -74181,3 +74181,58 @@ atomic preflight move and EXIT-trap arm, any nonzero terminal status consumes
 that invocation and stops all remaining runs. Six passes require a signed/pushed
 campaign-evidence checkpoint and separate Grok/Kimi/Opus evidence review before
 D.108e4 or D.108e5 may resume.
+
+The plan review rejects and supersedes the executable-readiness design above
+before any D.108e4aq root or clean checkout was created. Grok 4.6/high returned
+APPROVED with zero findings. Exact Kimi K3 returned exactly 100 checks plus
+RESULT, APPROVED with zero P0/P1 and four P2s. Opus 5/xhigh returned
+CHANGES_REQUIRED with one P0, six P1s and ten P2s. The governing P0 is causal:
+D.108e4ap preserves `runTrialReturnedAtMs` only through
+`validateD108e4hCampaignCustody`; `currentTrialEvidence = trialEvidence` then
+replaces that record before the twenty-one retained post-custody expectations.
+A failure among those expectations can therefore still produce an incomplete
+attachment. The statement that timestamp custody was complete for every future
+failure was false.
+
+Accordingly D.108e4aq decides **not to re-freeze or run a campaign yet**. Every
+paragraph above that describes future readiness, runner edits, root creation or
+six-run execution is rejected design evidence only and grants no authority.
+`.logs/d108e4aq-freeze/` and `.logs/d108e4aq-campaign/` must remain absent. The
+durable six-run authorization remains recorded and must not be requested again,
+but no invocation is executable. Two replay checks were true only vacuously:
+rejected-ready-state and sentinel-shape both had retained count zero.
+
+D.108e4ar owns the smallest prerequisite: a tests-only final-evidence custody
+slice in `tests/e3-03-loss-and-hol-proof.pw.ts` plus this plan, due before any
+campaign and no later than 2026-09-02. It must preserve the exact creator-page
+`runTrialReturnedAtMs` in the final `CampaignEvidence` record before
+`currentTrialEvidence = trialEvidence`, without changing production, product
+APIs, clocks, wire formats, workload, thresholds or any of the twenty-one
+expectations. Its causal RED must prove a simulated post-replacement failure
+attachment lacks the field; GREEN must change only the final evidence builder/
+record seam and prove both the timestamp and existing final evidence survive.
+Plan, RED and GREEN each require their normal signed/pushed Grok 4.6/high, exact
+Kimi K3 100-check and Opus 5/xhigh gates; Fable and collaboration subagents are
+prohibited. No long campaign may run in D.108e4ar.
+
+Only after D.108e4ar closes may a new plan-only freeze slice be proposed. That
+future plan must pin an exact UTC expiry, isolated-checkout path and no-hardlink
+creation recipe, retained campaign title, same-file-list/new-identity hash,
+unchanged D.108e4aj runtime-closure hash, repository-root diff/status guard,
+complete immutable-root set, literal root-setup and six launcher blocks, freeze
+verification before state creation, expiry and signed-copy authentication before
+every launch, `zsh -n`, exact runner diff, all four classifier prototypes,
+deterministic self-excluding recursive manifests, and an explicit correction/
+confirmation rule. It must freeze a global process predicate that excludes the
+launching runner's own process tree but rejects reviewer/test/profiler processes
+rooted in any ts-drp checkout. It must also disposition session-scoped tool
+paths, pre-trap residue, in-runner predecessor enforcement and checkout command/
+status custody rather than silently carrying them forward.
+
+A second identical raw-backpressure recurrence would establish only that the
+same retained workload/ceiling can reproduce under unchanged product bytes; it
+would not authorize a threshold change, product optimization, retry or upstream
+attribution. Its complete post-D.108e4ar attachment would be reviewed and
+resliced from evidence. The cumulative long-run ledger is D.108e4ad one consumed
+failed ordinary invocation, D.108e4aj one consumed failed ordinary invocation,
+and D.108e4aq zero invocations.
