@@ -5773,6 +5773,19 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 			})
 		);
 		expect(() => validateD108e4hCampaignCustody(creatorBackpressure)).toThrowError("D108E4H_RAW_BACKPRESSURE");
+		const detachedCreatorDeltaWithBackpressure = Object.freeze({
+			...creatorBackpressure,
+			rawTransportDeltas: Object.freeze({
+				...creatorBackpressure.rawTransportDeltas,
+				creator: Object.freeze({
+					...creatorBackpressure.rawTransportDeltas.creator,
+					linkDrops: creatorBackpressure.rawTransportDeltas.creator.linkDrops + 1,
+				}),
+			}),
+		});
+		expect(() => validateD108e4hCampaignCustody(detachedCreatorDeltaWithBackpressure)).toThrowError(
+			"D108E4H_DELTA_MISMATCH"
+		);
 		const admittedRawSends = Object.freeze(creatorReplacement.endpoints.creator.rawSends.slice(0, 555));
 		expect([admittedRawSends.length, admittedRawSends.at(-1)?.sequence]).toEqual([555, 554]);
 		const admittedAttemptIds = new Set(admittedRawSends.map(({ attemptId }) => attemptId));

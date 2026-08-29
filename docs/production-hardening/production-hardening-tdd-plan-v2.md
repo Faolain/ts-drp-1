@@ -73638,6 +73638,36 @@ signed/pushed checkpoint and the normal Grok 4.6/high, exact Kimi 100-step and
 Opus 5/xhigh implementation review; no separate RED/GREEN behavior cycle is
 created for already-passing controls.
 
+The D.108e4an implementation changes only the exact test owner plus this plan
+record. The new combined creator mutant starts from the existing positive
+backpressure fixture, detaches only its creator `linkDrops` delta and proves
+the unchanged validator throws `D108E4H_DELTA_MISMATCH` before
+`D108E4H_RAW_BACKPRESSURE`. No production/example/configuration/dependency/API,
+threshold, workload, expectation or campaign byte changed.
+
+The exact list guard returned status zero and listed exactly one test in one
+file with no campaign title. Its stdout SHA-256 is
+`6f1d55088eeb612fb05a724491fde841950d22af9f8d671c3c27511abe055eb6`.
+The one focused schema-validator invocation returned status zero after
+7.589 seconds with one expected, zero skipped, zero unexpected and zero flaky;
+its complete soft-failure set and top-level error set are empty. JSON reporter
+SHA-256 is
+`6ae810af805f6d4982196f03dcbccd609a8086fd87acd730fcaceef1a712ee1d`.
+
+The strict standalone owner TypeScript check, exact-owner ESLint and
+`git diff --check` all returned zero with empty stdout/stderr. Exact test/plan
+Prettier returned zero and its stdout SHA-256 is
+`17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20`.
+Every empty output has SHA-256
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+The complete self-excluding 25-file control manifest validates and has SHA-256
+`ca3786b4f813c9beaf470752de1b7b589c2f547b1cdf27552a32bbc47b1031f0`;
+validation SHA-256 is
+`314e98c95ce2137b96c250f65c7d788a4828740303636ad3253f1c3b135f2131`.
+No retained suite, browser discriminator, long campaign, Fable invocation or
+collaboration subagent ran. The controls are ready for their one signed/pushed
+implementation checkpoint and required review.
+
 Only after those controls close may D.108e4ao freeze the next causal step in a
 signed/pushed plan checkpoint that receives its own Grok 4.6/high, exact Kimi
 100-step and Opus 5/xhigh review before replay implementation. Its prospective
