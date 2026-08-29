@@ -73710,23 +73710,64 @@ D.108e4ao evidence owner must preserve exact changed-path output and SHA-256
 for both owner files in its new evidence root by 2026-09-01. These three P2s
 do not change or rerun this accepted checkpoint. D.108e4an is closed.
 
-Only after those controls close may D.108e4ao freeze the next causal step in a
-signed/pushed plan checkpoint that receives its own Grok 4.6/high, exact Kimi
-100-step and Opus 5/xhigh review before replay implementation. Its prospective
-implementation owner is only `tests/e3-03-loss-and-hol-proof.pw.ts` plus this
-plan record, and its freeze deadline is 2026-09-01. Its input is the immutable
-failed `e3-03-2` attachment, not another browser run. The smallest justified
-action is a pure offline replay that reconstructs the post-custody application
-evidence already present in that attachment and evaluates the remaining sender
-schedule, receiver-domain, AoI, HOL, ready-state, partition and counter
-assertions without bypassing or changing the retained positive-backpressure
-failure. If the replay exposes another semantic failure, that exact owner is
-resliced. If every later semantic assertion passes, the evidence supports only
-a proposal to classify the blocker as a cumulative/scheduling capacity-gate
-reliability issue; the replay does not itself establish that no product defect
-exists or authorize an expectation change. A separately reviewed
-test-infrastructure expectation/variance slice may then be proposed. Missing
-replay inputs are `OWNERSHIP_UNRESOLVED` and stop without instrumentation or a
-runtime retry. D.108e4, D.108e5 and all campaign execution remain blocked; no
-retained campaign is authorized or recommended. Fable and collaboration
+###### D.108e4ao — immutable replay completeness stop and timestamp-custody reslice
+
+D.108e4an's accepted controls close the prerequisite for this plan-only
+evidence audit. D.108e4ao changes only this plan record, runs no test, browser,
+campaign or profiler and has no implementation/RED/GREEN owner. Its sole input
+is immutable failed attachment
+`.logs/d108e4aj-campaign/ordinary-1.failure-telemetry.json`, SHA-256
+`52412126796093a382f23c5795f66b923657ba8aa442bf14d365bca66cb02bc7`.
+Production, examples, tests, configuration, dependencies, public APIs,
+thresholds, workload, campaign acceptance and evidence bytes are closed.
+
+The bounded read-only replay audit reconstructs only values already present in
+`currentTrialEvidence` with the retained pure helper algorithms. It returned
+status zero with empty stderr. Sixteen post-custody assertions evaluate true:
+raw/product counter and partition joins, raw/reliable physical shape,
+ready-state custody, connection presence, sender timestamp/schedule/stall,
+reliable deadline, receiver loss domain, AoI ratio and raw delivery after the
+reliable start. Exact retained values are 555 creator raw sends, 45 creator
+backpressured drops, 384 accepted raw observations, receiver gap 49, sender
+maximum stall 38 ms, raw/reliable AoI P95 14,849/32,732 ms and 383 raw
+deliveries after reliable start. This does not bypass the retained
+`D108E4H_RAW_BACKPRESSURE` failure; it proves only that no second failure is
+visible among the replayable later assertions.
+
+Exactly one retained assertion is not replayable. The live test compares
+creator-page `runTrialReturnedAtMs - campaignStartedAtMs` with the 18,767 ms
+lower bound, but the failure attachment preserves neither absolute value.
+`stages.runReturned.atMs=19,787` is relative to the Node-side
+`trialEvidenceStartedAtMs`, whose epoch is also absent. The recorded zero
+inter-page clock skew does not join that relative Node stage to the creator
+page clock. Proximity to the lower bound is not proof, so the audit returns
+`D108E4AO_RUN_RETURN_JOIN_UNAVAILABLE` rather than inferring a pass.
+
+Audit script, JSON, command, status, stderr and result SHA-256 values are
+`7e08e6601dc66cb7decf03c84aafbe2e7038fd5632dba0c1dde76fb764b1b51f`,
+`b52ced7b5ed27798adca1292e283918f18f3db9232a1bc7db7445104c011d654`,
+`4fcddd0e3e1346c2f0a40889467ee4d30502e650a6230878e01c384afd212b53`,
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+and
+`6e2aa06c2d68313eeb252049fb0dfbdb2f6d6cd10c3f95d24e22a6952abca134`.
+The self-excluding six-file manifest validates and has SHA-256
+`ef8ffc6bcabb097d464a9296c3bb0e7c991a6118fbcde935658391043953b088`;
+validation SHA-256 is
+`db08598ff9c29f75cedbcf2ce7e03153a97430025cc2d3ee6d1c37658824349b`.
+
+The originally proposed complete offline replay is therefore not executable
+from immutable evidence and D.108e4ao stops before source implementation. It
+does not establish absence of a product defect, authorize an expectation
+change or authorize a runtime retry. The smallest justified next proposal is
+a separately frozen tests-only timestamp-custody slice: preserve the two
+already-computed creator-page timestamps in `currentTrialEvidence` before the
+existing custody validator can throw, add deterministic missing/present/exact
+join controls, and leave every retained assertion unchanged. That proposal
+must define a causal RED/GREEN, exact owner, deadline and evidence schema in a
+new signed/pushed plan checkpoint and receive Grok 4.6/high, exact Kimi
+100-step and Opus 5/xhigh review before any source edit. It cannot run or
+authorize a long campaign; future telemetry is not retroactive proof for this
+immutable failure. D.108e4, D.108e5 and all campaign execution remain blocked;
+no retained campaign is authorized or recommended. Fable and collaboration
 subagents remain prohibited.
