@@ -80225,3 +80225,20 @@ and self-excluding review-manifest SHA-256 values are respectively
 and `c4dac962aa640fe7c27db752e06af2069a66c19697889c0ddb768cc1bd70a7ce`.
 The blocking union is empty. These P2 execution clarifications receive
 deterministic RED/GREEN validation and no recursive model review.
+
+The D.108e4bi RED was implemented without production changes and consumed
+exactly once after exact one-test/one-file collection plus formatting, lint,
+network typecheck and diff gates passed. The selected test established A,
+held the acceptor's old-A local close event and peer-close propagation before
+opening B, and proved acceptor B active while initiator A remained selected
+and initiator B had sent READY and COMMIT after receiving ACK. The acceptor's
+valid registered-route byte `81` then produced the frozen causal failure:
+initiator delivery was `[]` rather than `[Uint8Array.of(81)]`. The reporter
+records one failed execution, 84 skipped tests and no top-level error; no
+other assertion failed and no browser or campaign run occurred. Reporter and
+self-excluding evidence-index SHA-256 values are respectively
+`56d87fee716b84e9e45739d99d42490cef4f037366acd1b790df7cabf9207165`
+and `35302ef1f3ae0f285ee86f6dc1865ceeaf1a9a855b1a50a3615c2dc537d449e6`.
+Evidence is immutable under
+`.logs/d108e4bi-red/`. This matches the frozen causal matrix and authorizes
+the reviewed narrow GREEN receive-path change.

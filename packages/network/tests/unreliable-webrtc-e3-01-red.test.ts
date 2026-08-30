@@ -2088,6 +2088,89 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		}
 	);
 
+	it("D.108e4bi promotes a handshake-qualified pending initiator from peer application proof", async () => {
+		const module = await loadOwnerModule();
+		const bus = new FakeSignalingBus();
+		const low = owner(module, bus, "peer-a");
+		const high = owner(module, bus, "peer-b");
+		let openBarrier: FakeRemoteInboundOpenBarrier | undefined;
+		let closeEventBarrier: FakeInboundOpenBarrier | undefined;
+		let peerCloseBarrier: FakeInboundOpenBarrier | undefined;
+		let replacementPending: Promise<void> | undefined;
+		try {
+			const routeId = "zone:d108e4bi-application-proof";
+			const original = bus.connect("peer-a", "peer-b");
+			const lowRoute = low.owner.openUnreliableWebRtcRoute(routeId);
+			const highRoute = high.owner.openUnreliableWebRtcRoute(routeId);
+			const lowReceived: Uint8Array[] = [];
+			const highReceived: Uint8Array[] = [];
+			lowRoute.onMessage(({ bytes }) => lowReceived.push(bytes.slice()));
+			highRoute.onMessage(({ bytes }) => highReceived.push(bytes.slice()));
+			await Promise.all([lowRoute.reconcile(["peer-b"]), highRoute.reconcile(["peer-a"])]);
+
+			bus.disconnect(original);
+			const replacement = bus.connect("peer-a", "peer-b");
+			openBarrier = FakePeerConnection.pauseNextRemoteInboundOpen();
+			replacementPending = lowRoute.reconcile(["peer-b"]);
+			await openBarrier.waitUntilPending();
+			await replacementPending;
+
+			const oldHigh = high.peerConnections[0]?.channels[0];
+			const replacementLow = low.peerConnections[1]?.channels[0];
+			const replacementHigh = high.peerConnections[1]?.channels[0];
+			if (oldHigh === undefined || replacementLow === undefined || replacementHigh === undefined) {
+				throw new Error("D108E4BI_OWNER_ABSENT");
+			}
+			closeEventBarrier = oldHigh.pauseCloseEvent();
+			peerCloseBarrier = oldHigh.pausePeerClose();
+
+			openBarrier.release();
+			await openBarrier.waitUntilComplete();
+			await Promise.all([closeEventBarrier.waitUntilPending(), peerCloseBarrier.waitUntilPending()]);
+			await tick();
+
+			expect(controlFrames(replacementLow).filter((bytes) => bytes[3] === 1).length).toBeGreaterThanOrEqual(1);
+			expect(controlFrames(replacementLow).filter((bytes) => bytes[3] === 3).length).toBeGreaterThanOrEqual(1);
+			expect(controlFrames(replacementHigh).filter((bytes) => bytes[3] === 2).length).toBeGreaterThanOrEqual(1);
+			expect(lowRoute.snapshot()).toMatchObject({
+				activeLinks: 1,
+				lastLinkDrop: undefined,
+				linkDrops: 0,
+				links: [{ connectionId: original.left.id, generation: original.left.generation }],
+			});
+			expect(highRoute.snapshot()).toMatchObject({
+				activeLinks: 1,
+				lastLinkDrop: "replacement",
+				linkDrops: 1,
+				links: [{ connectionId: replacement.right.id, generation: replacement.right.generation }],
+			});
+
+			expect(await highRoute.send(["peer-a"], Uint8Array.of(81))).toBe(true);
+			await tick();
+			await tick();
+
+			expect(lowReceived).toEqual([Uint8Array.of(81)]);
+			expect(lowRoute.snapshot()).toMatchObject({
+				activeLinks: 1,
+				lastLinkDrop: "replacement",
+				linkDrops: 1,
+				received: 1,
+				routedBytesReceived: ROUTE_HEADER_BYTES + 1,
+				links: [{ connectionId: replacement.left.id, generation: replacement.left.generation }],
+			});
+			expect(await lowRoute.send(["peer-b"], Uint8Array.of(82))).toBe(true);
+			await tick();
+			expect(highReceived).toEqual([Uint8Array.of(82)]);
+		} finally {
+			closeEventBarrier?.release();
+			peerCloseBarrier?.release();
+			FakePeerConnection.releaseRemoteInboundOpenBarrier(openBarrier);
+			await replacementPending?.catch(() => undefined);
+			low.owner.close();
+			high.owner.close();
+		}
+	});
+
 	it.each(["initiator", "non-initiator"] as const)(
 		"D.108e4at keeps A until remote B is ready with the %s application sender",
 		async (senderRole) => {
