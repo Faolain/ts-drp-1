@@ -79377,3 +79377,114 @@ change. Aggregate D.108e4 campaign acceptance and D.108e5 therefore remain
 unmet even though deterministic product attribution is closed. Resolving that
 acceptance gap requires a separately authorized high-risk campaign/timing
 reliability disposition, not another product change or silent campaign rerun.
+
+###### D.108e4bd — fresh-name retained-campaign disposition
+
+The user explicitly authorized one new D.108e4 campaign-disposition slice:
+freeze fresh invocation names, preserve the existing workload and thresholds,
+complete the required high-risk review, and execute the newly authorized
+retained campaign under immutable evidence and first-failure rules. This is
+new authority, not a reinterpretation of the consumed D.108e4as/D.108e4aw
+ledger. `ordinary-1`, `ordinary-2` and `ordinary-3` remain immutable failures;
+`isolated-1`, `isolated-2` and `isolated-3` remain absent. Nothing in this slice
+may overwrite, delete, retry, reclassify or count any of those six names.
+
+The fresh closed ledger is, in exact order, `renewal-ordinary-1`,
+`renewal-ordinary-2`, `renewal-ordinary-3`, `renewal-isolated-1`,
+`renewal-isolated-2` and `renewal-isolated-3`. It starts at zero invocations.
+Every name after the first requires both the immediate predecessor's Playwright
+status and terminal runner status to exist and equal zero. Every launch rejects
+artifacts for any later fresh name. The first consuming nonzero status freezes
+all later names. There is no failure exception, retry, loop, overwrite,
+`--repeat-each`, substitution or continuation after nonzero.
+
+This high-risk exception changes campaign invocation accounting and authorizes
+scarce long browser execution, so it receives one formal Grok/Codex
+`gpt-5.6-sol` high/Opus xhigh freeze review before execution. Only a material
+P0/P1 affecting execution, workload semantics or evidence integrity blocks.
+No Kimi, Fable or collaboration subagent is used. The review is not permission
+to add fixtures, instrumentation, lifecycle behavior, product code,
+dependencies, thresholds or timing changes. After a zero blocking union, the
+six blocks below execute sequentially. A first failure stops immediately and
+is preserved; six passes authorize one signed/pushed campaign-evidence
+checkpoint and the single final evidence review before D.108e5.
+
+The immutable behavior anchor is signed/pushed commit
+`1860a2d763f2d654a701cd1f42290c390da78d0e`, tree
+`7e92672cea8d81320da49b29df63325861b72a81`. The campaign plan commit may
+change only this plan path. The ordinary checkout may differ from the behavior
+anchor only by that committed plan change; the detached isolated checkout at
+`/private/tmp/ts-drp-d108e4bd-clean/repo` remains exactly at the behavior
+anchor and tree. Offline frozen install completed there under the existing
+Node `v22.15.0` and pnpm `10.24.0` workload bindings. The seven campaign source
+identities and all 334 built nondeclaration runtime files are byte-identical
+between ordinary and isolated checkouts. Their inventory-file hashes are
+`b96c5da5d27e2bee87b31d184a523bb26cb73a612a03970b770d5e506923075b`
+and `0740401740e1f509463f5e14f59d8a05609bb02e1aa97d07e4c18c2bf07fc298`.
+Production `packages/network/src/unreliable-webrtc.ts` remains
+`969c68c54d7fa9b20e35aeea005a9abedc67b4277bbfb24242469f01323886b6`.
+
+The reviewed freeze root is `.logs/d108e4bd-freeze/`; its self-excluding
+`SHA256SUMS` hash is
+`e8a051299c50d2582021dfbc0d1f361cc6cf7fda357c57278ceb8e9c4570e2af`.
+Its mode-manifest, outer-launcher, runner and fresh-guard hashes are
+`fe7ace7637f98da3df2923b2c721fd92ffeeb66f855d83259e40b493b3d9dbd7`,
+`0527709c2ead87d0025f773df13b55d26b306a9304f4bc013b8c935cbfe1a93b`,
+`e6c75f276e03822dd940867fc055723538b6f08b098fc2b773c42e0be36ca435`
+and `11ca8b8b035dd316a8ec28aed6576ef9f23399a3e94748a54b564f5f6fb90910`.
+The classifier and validation hashes remain the previously accepted
+`99d7d65caaad75ae34370d93c230c91e16d6459ccc23594672bb2557254cced9`
+and `9508e84117c225c1432ffc6c0ec9b4d7eaeb7fdbc0cc55cb52b05ad63229b245`.
+
+The new evidence root is `.logs/d108e4bd-campaign/`. Its authorization file is
+the exact user authorization normalized to one newline-terminated line and has
+SHA-256
+`8b9f52ec217aa7e041b67f2b265b479ca34d5d9ec0ca5e1b9011e5e054784eca`.
+Its zero-invocation initial manifest has hash
+`890db34cdf2db5787dec52c3adcf27adcbbf7652456ab60ae381217b61c78e32`.
+Git and ripgrep physical paths and complete versions are captured in this new
+root. Their live path must remain the campaign-selected path, but no vendor,
+patch or revision string is an acceptance predicate. The direct Git
+`rev-parse`, `status --porcelain=v1` and `verify-commit` operations and the
+ripgrep `-F -c` smoke check pass.
+
+Mechanical freeze validation passes shell syntax, exact fresh-name acceptance
+and nonzero/future-artifact rejection, inherited classifier accept/accept/
+reject/reject probes, mode and manifest validation, byte-identical source and
+runtime inventories, exact one-test/one-file listing in both checkouts, 26
+stashes, eight protected untracked paths, no relevant ts-drp process and clear
+ports 4174, 4175, 51000 and 51002. One initial process-audit wrapper omitted its
+required sourced Git variable. A corrected snapshot then observed two unrelated
+Heimdall Vitest PIDs while they exited; immediate read-only inspection proved
+both absent. The final unchanged process audit passes. One `rg -c` diagnostic
+also emitted no numeric line for the desired zero-match result; the corrected
+check records numeric zero. Neither wrapper mistake is a source failure.
+
+Each exact launch is a separate fresh shell block. The reviewed outer launcher
+binds the campaign-selected tools, signed/pushed plan-only commit, immutable
+behavior parent, freeze manifest, zero-invocation initial campaign manifest and
+the inherited runner before Playwright starts:
+
+```sh
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = e8a051299c50d2582021dfbc0d1f361cc6cf7fda357c57278ceb8e9c4570e2af && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/launch-one.zsh renewal-ordinary-1 /Users/aristotle/Documents/Projects/ts-drp-1
+```
+
+```sh
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = e8a051299c50d2582021dfbc0d1f361cc6cf7fda357c57278ceb8e9c4570e2af && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/launch-one.zsh renewal-ordinary-2 /Users/aristotle/Documents/Projects/ts-drp-1
+```
+
+```sh
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = e8a051299c50d2582021dfbc0d1f361cc6cf7fda357c57278ceb8e9c4570e2af && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/launch-one.zsh renewal-ordinary-3 /Users/aristotle/Documents/Projects/ts-drp-1
+```
+
+```sh
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = e8a051299c50d2582021dfbc0d1f361cc6cf7fda357c57278ceb8e9c4570e2af && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/launch-one.zsh renewal-isolated-1 /private/tmp/ts-drp-d108e4bd-clean/repo
+```
+
+```sh
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = e8a051299c50d2582021dfbc0d1f361cc6cf7fda357c57278ceb8e9c4570e2af && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/launch-one.zsh renewal-isolated-2 /private/tmp/ts-drp-d108e4bd-clean/repo
+```
+
+```sh
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = e8a051299c50d2582021dfbc0d1f361cc6cf7fda357c57278ceb8e9c4570e2af && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/launch-one.zsh renewal-isolated-3 /private/tmp/ts-drp-d108e4bd-clean/repo
+```
