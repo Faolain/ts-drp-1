@@ -74987,3 +74987,32 @@ workspace custody belong to `.logs/d108e4ar-red-superseding/`. After its
 self-excluding manifest validates and this checkpoint is signed/pushed, restore
 the exact reviewed GREEN owner bytes from `535d6a52`; no separate RED model round
 runs.
+
+D.108e4ar superseding GREEN starts from signed/pushed typed-fixture RED
+`3a5f4e3694fd7a6c6b9d70e7d158c28dc45ac696`. The test owner was restored
+byte-for-byte to reviewed GREEN `535d6a52`; both hash to
+`22b0b618a094e0b125a4436cc97a5ef6fa535249ad349b30d505b7b3f70ae9af`.
+Pre-execution Prettier write/check, `git diff --check`, exact-byte comparison and
+the list guard returned zero. The list selected exactly one schema-v3 focused
+test in one file and excluded the retained campaign.
+
+The sole focused GREEN invocation returned status zero after 8.701 seconds with
+expected 1, skipped 0, unexpected 0 and flaky 0. Top-level errors were empty and
+result `softErrors` was absent/null. On unchanged test bytes, strict standalone
+TypeScript, exact-owner ESLint, 8 GiB Prettier, `git diff --check`, exact reviewed
+GREEN comparison, deterministic reporter parsing and the AST/source audit all
+returned zero. A malformed ad hoc `jq` inspection with one unmatched bracket
+returned status three and was corrected; it was not an acceptance gate or a
+source/reporter failure.
+
+The source audit proves exact reviewed-GREEN bytes, 22 final fields, a typed
+20-field base, two distinct frozen empty `readonly PlatformObservation[]`
+fixtures, sender-before-timestamp order, one live computed writer, one live
+finalizer, no old aggregate binding and the retained reviewed seams. Raw command,
+status, stdout, stderr, reporter, exact RED-to-GREEN diff, audits and custody
+belong to `.logs/d108e4ar-green-superseding/`. No retained campaign, Fable, Kimi,
+collaboration subagent, product source, dependency, configuration, threshold,
+timing, identity, wire-format or API change ran or occurred. After the
+self-excluding manifest validates and GREEN is signed/pushed, run only the one
+permitted Grok/Codex/Opus confirmation round over the complete original and
+superseding history.
