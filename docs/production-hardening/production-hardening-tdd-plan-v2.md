@@ -77449,19 +77449,21 @@ immutable evidence. A need for any such change stops and reslices rather than
 widening this owner. No retained campaign runs in D.108e4av.
 
 The evidence extension is additive within the existing schema-v3 envelope.
-`D108e4hEndpointCustody` gains optional `controlSends`; absence means an empty
-ledger, so immutable prior schema-v3 fixtures and attachments remain valid and
-are not edited or reclassified. Optionality is only a hand-built fixture
-affordance: the live `d108e4hEndpointFromCapture` path must always emit
-`controlSends`, including an explicit frozen empty array. Each new control row freezes only the facts
-already owned by `RtcObservation`: `attemptId`, `channelId`, `connectionId`,
-the send-attempt `lifecycleSequence`, and an exact read-only four-number byte
-tuple. A row is emitted only for direction `send`, label
-`ts-drp-ephemeral/1`, exact `byteLength === 4`, and a UTF-8 re-encoding exactly
-equal to one of the three tuples above. The exact length plus byte-for-byte
-re-encoding rejects malformed UTF-8, a magic/version/kind mutation, prefixes,
-suffixes and arbitrary four-byte application data. Nothing is inferred from
-buffered amount, channel timing, role or the old failed attachment.
+`D108e4hEndpointCustody` gains optional `controlSends` and `controlReceives`;
+absence means an empty ledger, so immutable prior schema-v3 fixtures and
+attachments remain valid and are not edited or reclassified. Optionality is
+only a hand-built fixture affordance: the live `d108e4hEndpointFromCapture`
+path must always emit both properties, including explicit frozen empty arrays.
+Each control row freezes only the facts already owned by `RtcObservation`:
+`channelId`, `connectionId`, the exact observation `lifecycleSequence`, and an
+exact read-only four-number byte tuple; a send row additionally owns its
+`attemptId`. A row is emitted only for direction `send` or `message` matching
+its ledger, label `ts-drp-ephemeral/1`, exact `byteLength === 4`, and a UTF-8
+re-encoding exactly equal to one of the three tuples above. The exact length
+plus byte-for-byte re-encoding rejects malformed UTF-8, a magic/version/kind
+mutation, prefixes, suffixes and arbitrary four-byte application data. Nothing
+is inferred for classification from buffered amount, channel timing, role or
+the old failed attachment.
 
 The validator first validates and joins the control ledger fail closed. Control
 attempt IDs must be safe, unique, disjoint from every application `rawSends`
@@ -77486,6 +77488,18 @@ observation. Control proof rests only on exact bytes and the independent
 attempt/terminal identity join above; application sends retain their existing
 boundary and open/handler ordering rules.
 
+The receive ledger is independently fail closed. Each receive lifecycle
+sequence must be safe and unique, and must select exactly one raw-channel
+`channel-message` with the same sequence, connection and channel. Only those
+proved message sequences are removed before
+`d108e4hAssertOverlapCustody` performs its existing application
+accepted/rejected reverse join and replacement-message ordering. A proved
+control receive is not counted in application `acceptedRaw` or the product raw
+received counter, and is not constrained to a boundary identity or to the
+application replacement-open ordering. An absent, malformed, duplicate,
+wrong-direction, wrong-label, unjoined or identity-mismatched receive remains
+fail closed as `D108E4H_OVERLAP_LEDGER_INVALID`.
+
 Only after that proof may the validator partition the complete raw-channel
 lifecycle by the proven control attempt-ID set. All remaining attempts and
 terminals are the application domain and retain the current exact contract:
@@ -77507,19 +77521,24 @@ their exact codes, including unmatched attempt
 `D108E4H_LIFECYCLE_ORDER_INVALID`. No D.108e4aa ownership, identity, close,
 readiness or failed-replacement mutant changes outcome or error code.
 
-The deterministic RED is two causal rows added to the existing telemetry-only
-test `validates schema-v3 replacement custody without cross-peer clocks`. Both
-start from the accepted `creator-replacement` fixture and add exactly one
-well-formed control ledger row plus its matching raw-channel lifecycle
+The deterministic RED is three causal rows added to the existing
+telemetry-only test
+`validates schema-v3 replacement custody without cross-peer clocks`. All start
+from the accepted `creator-replacement` fixture. Two add exactly one
+well-formed send-control ledger row plus its matching raw-channel lifecycle
 attempt/success pair: READY on the transmitting creator's B identity and ACK on
-the nontransmitting receiver's B identity. The pre-GREEN validator ignores the
-new ledger and respectively rejects the extra lifecycle pair through its
-reverse application join and nontransmitting role assertion. Two soft
+the nontransmitting receiver's B identity. The third adds one exact COMMIT
+receive-control row plus its matching receiver raw-channel `channel-message`.
+The pre-GREEN validator ignores the new ledgers and respectively rejects the
+extra send pairs through its reverse application join and nontransmitting role
+assertion, and the extra receive through its overlap reverse join. Three soft
 expectations translate only those known rejections to exact complete RED tokens
-`D108E4AV_TRANSMITTER_CONTROL_REJECTED` and
-`D108E4AV_NONTRANSMITTER_CONTROL_REJECTED`. Any construction failure, missing
-token, additional soft failure, top-level error or different causal result
-invalidates RED.
+`D108E4AV_TRANSMITTER_CONTROL_REJECTED`,
+`D108E4AV_NONTRANSMITTER_CONTROL_REJECTED` and
+`D108E4AV_RECEIVED_CONTROL_REJECTED`, the last translating exact underlying
+`D108E4H_OVERLAP_LEDGER_INVALID`. Any construction failure, missing token,
+additional soft failure, top-level error or different causal result invalidates
+RED.
 
 Run the RED focused command exactly once:
 
@@ -77535,7 +77554,7 @@ pnpm exec playwright test \
 
 Automated RED validation requires exactly one selected test in one file, no
 retained campaign title, expected/skipped/unexpected/flaky `0/0/1/0`, zero
-top-level errors, exactly the two frozen tokens as the complete soft-failure
+top-level errors, exactly the three frozen tokens as the complete soft-failure
 set, nonzero command status, unchanged production/config/package/lock hashes,
 clear fixed ports `4174`, `4175`, `51000` and `51002`, and no path outside the
 test and plan owners. Record command, status, stdout,
@@ -77544,7 +77563,7 @@ self-excluding manifest; validate it, sign and push RED. Under the prospective
 review cadence there is no separate full model RED review. If the observed
 matrix differs, stop and diagnose before GREEN.
 
-GREEN makes the two causal rows pass and adds the complete mutant roster in the
+GREEN makes the three causal rows pass and adds the complete mutant roster in the
 same telemetry-only test: READY, ACK and COMMIT on both endpoint roles; wrong
 magic; wrong version; kinds zero and four; three- and five-byte values;
 transmitting unledgered extra raw send
@@ -77554,7 +77573,12 @@ control attempt ID; application/control ID collision; missing and duplicate
 matching lifecycle attempts; connection, channel and lifecycle-sequence
 mismatch; missing terminal; duplicate terminal; terminal identity mismatch
 (`D108E4H_IDENTITY_JOIN_INVALID`); terminal-before-attempt; wrong-label control;
-direction-`message` control; and a proved control send with a failure terminal.
+direction-`message` row forged into the send ledger; and a proved control send
+with a failure terminal. Receive mutants cover unledgered exact control,
+malformed bytes, duplicate lifecycle sequence, missing matching message,
+wrong-direction row, wrong-label row, wrong connection/channel identity and a
+duplicate matching lifecycle message; all retain
+`D108E4H_OVERLAP_LEDGER_INVALID`.
 Malformed/unproven controls and joins use the exact errors frozen above. The
 existing unmatched-application, duplicate/missing-application-terminal,
 failed-application-send and D.108e4aa mutant assertions are rerun unchanged to
@@ -77565,9 +77589,11 @@ without claiming that the old attachment retained bytes: creator and receiver
 each receive one exact control row on their observed transient non-boundary
 connection/channel identity, both identities later close, the creator control
 attempt precedes its same-identity `channel-open-event`, and the receiver open
-precedes its control. The four control bytes in this deterministic fixture are
-explicitly reconstructed from the authenticated product send site. This row
-must pass while every application boundary/open-order assertion remains intact.
+precedes its control. It also contains at least one exact successfully received
+control and matching `channel-message` on a transient identity. The four
+control bytes in this deterministic fixture are explicitly reconstructed from
+the authenticated product send site. This row must pass while every application
+boundary/open-order and overlap assertion remains intact.
 
 Run the focused GREEN command once, then the retained seven-title owner once:
 
@@ -77646,3 +77672,48 @@ retained-shape row and exact-code matrix materially sharpen executable GREEN
 acceptance, one same-session Codex/Opus confirmation is permitted after this
 corrected plan is signed and pushed. Grok is not relaunched, and no further plan
 review or confirmation follows if both confirmations have zero P0/P1.
+
+The one permitted same-session confirmation inspected signed/pushed correction
+`f5bd9a06219183d7eafcd35befe333b0f64f5f24`. Opus returned `APPROVED`,
+P0=0/P1=0/P2=2, confirming that every original P1/P2 was closed; its two P2s
+are optional wording/no-action and expressly forbid another confirmation.
+Codex returned `CHANGES_REQUIRED`, P0=0/P1=1/P2=0. It confirmed every original
+finding closed, then demonstrated the adjacent receive-side omission: the
+observer records exact incoming controls as raw-channel `channel-message`
+lifecycle rows, while `d108e4hAssertOverlapCustody` currently reverse-joins
+every such row to the application accepted/rejected ledger. A send-only GREEN
+would therefore move the valid-product rejection from attempt custody to
+`D108E4H_OVERLAP_LEDGER_INVALID`. The validating confirmation manifest has
+SHA-256
+`8170cec6fb69eec193285b029bcb6eb7b8738c5538edef6369226c7e137381f7`.
+
+The final plan correction above closes that demonstrated omission within the
+same test/evidence owner. It adds an exact `controlReceives` ledger derived from
+direction `message`, independent sequence/identity joins, partitioning before
+only the application overlap checks, a third causal RED token
+`D108E4AV_RECEIVED_CONTROL_REJECTED`, a successful received-control positive
+and complete receive-specific mutants. It does not alter product source,
+schema version, application counters, accepted/rejected evidence, workload,
+thresholds, launcher or campaign custody. The original two RED tokens remain
+unchanged. The confirmation allowance is exhausted: there is no further model
+plan round. A deterministic local source audit must prove the three current
+validator paths and exact frozen matrix before RED begins.
+
+That corrected local audit passes. It authenticates the current transmitter
+reverse join, nontransmitting role assertion and receive overlap reverse join;
+the two product send sites, 33-byte application header and exact control magic;
+all frozen source/config/package/lock/campaign hashes; the validating immutable
+campaign manifest; exact ledger `2 failed / 0 pass / 4 unrun`; the plan-only
+changed-path set; all 26 stashes; clear fixed ports; and clean diff syntax. Its
+SHA-256 is
+`a1bfab962b1b07d287fcbd5ec3115a89b1e10f7e1b7a0744e9aabc3bd187bd5e`.
+The first wrapper record
+`074d34747c7df4724636fe3c5fa376367539d96861155e08b60cc8d65d455589`
+is a discarded diagnostic: it required two textual occurrences of each
+original RED token and piped through `tee` without `pipefail`, so it truncated
+after the first valid single occurrence while reporting the downstream status.
+The corrected audit enables `pipefail`, requires each token at least once and
+returns zero with `LOCAL_AUDIT=PASS`; the regex mistake is not a plan or code
+failure. The D.108e4av plan gate is closed after this final signed/pushed
+correction; proceed directly to the frozen three-token RED without another
+model review.
