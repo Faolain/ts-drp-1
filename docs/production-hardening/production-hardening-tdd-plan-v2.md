@@ -79521,3 +79521,59 @@ Codex, Opus, Grok-status and Grok-public SHA-256 values are respectively
 `e7d9dd0095ce5ede7bddd8ab174a2a5f596104648fc2b4c004199d5eb071dc48`,
 `86d6aa52e87021ebad123bfeb4af6313e79a86902214a214c3960370bcd368e5`
 and `d7d29ab3891adcd9f6cb3199b5303a1e60c42e08f4a38258c512c4fbcdb050b5`.
+
+Execution stopped at the frozen first-failure boundary. The sole consumed
+invocation, `renewal-ordinary-1`, ran from `2026-08-30T16:07:11Z` through
+`2026-08-30T16:08:04Z` and returned Playwright status one and terminal runner
+status one. The reporter records one selected test in one file, 0 expected, 0
+skipped, 1 unexpected, 0 flaky and no top-level errors. The preliminary
+calibration passed: 600 raw samples were sent, 420 were delivered against the
+frozen floor of 100, and the total-loss count remained exactly one before and
+during the 100% loss interval. Browser identity was `151.0.7922.34`.
+
+The initiating failure is the trial-zero readiness predicate at
+`tests/e3-03-loss-and-hol-proof.pw.ts:8216`: after the frozen 5,000 ms poll it
+observed `{ raw: true, reliable: false }` instead of both observers ready. The
+failure telemetry records stage `e3-03-0-run`, exact trial id `e3-03-0` and the
+same assertion. Prepare custody had one authenticated connection and one open
+unordered `maxRetransmits: 0` raw channel at each peer, zero authenticated
+connection losses and zero handshake failures at both endpoints, plus exact
+`linkDrops: 2` and `lastLinkDrop: restart`. No trial completed, so the
+endpoint-local classifier correctly contains an empty `trials` array rather
+than fabricating an ownership verdict.
+
+The reporter also surfaces `page.evaluate: Target page, context or browser has
+been closed` at the still-pending `runTrial` call. The retained stdout and trace
+order the events: repeated observer polls remained raw-ready/reliable-not-ready,
+the readiness assertion timed out, and only then did test cleanup close the
+page. The target-closed message is therefore secondary cleanup fallout, not the
+initiating failure. This evidence demonstrates a reliable-lane readiness gap
+within the fixed poll; it does not distinguish fixture/reset cost, scheduling
+variance or product behavior and does not demonstrate a raw-owner product
+defect or an upstream js-libp2p defect.
+
+The reporter, failure telemetry, endpoint-local classification, preliminary
+calibration, retained stdout and trace SHA-256 values are respectively
+`7dc40814685ee32b73db5c505071ca3def726d84d3f7c4816508ecfa3706fe25`,
+`5bc0d4bca23176f3152ea0f0b403ffd0ecdff033223010e82ad87467cd355ef6`,
+`af4a50b9f3b5ac8d9211a6fd7951d2b3b258658a5531adce217546424dcdcd4a`,
+`6e1a8d50aa87bf4368f51d125c609777dfb0c3a61815d0328d881246eeb1fc66`,
+`474362c4d831c20961e245a8d45f0cd85c71afd20bb885eadbd35388e7e2a516`
+and `407e9e75275973db972bec89283f6e5cd8d87a28801cbf3ecf25809773f28c70`.
+The before/after custody-manifest hashes are
+`5a88fac835e8e2892c2332196680d514b5fa59b9305520bccd528284bb622ad5`
+and `a6afdfc50783ce3f1d671bd71bd137d914596d5835871abf3b6ab6b853fa87ed`.
+The self-excluding campaign artifact manifest validates and has SHA-256
+`a81194bf198bcfdb569c60b02b1d6fb796fe9c5a3688672889ecd4bca04e0a33`.
+
+`renewal-ordinary-2`, `renewal-ordinary-3`, `renewal-isolated-1`,
+`renewal-isolated-2` and `renewal-isolated-3` remain absent. They are not
+authorized after the consumed failure, and no retry or substitution occurred.
+Post-stop validation passes the artifact and before/after custody manifests,
+signed commit and tag identities, pushed-ref equality, 26 stashes, all eight
+protected untracked paths, no relevant ts-drp process and clear ports 4174,
+4175, 51000 and 51002. The six-pass acceptance condition is unmet, so no final
+campaign-evidence review or D.108e5 transition is permitted. Further execution
+requires a separately scoped and authorized disposition of the reliable-lane
+readiness attribution; this checkpoint authorizes no product, workload,
+threshold, dependency, retry or timing change.
