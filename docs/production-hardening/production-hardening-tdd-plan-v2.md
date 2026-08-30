@@ -81437,3 +81437,60 @@ and
 The tracked implementation changes exactly those two paths; protected
 untracked paths and all 26 stashes remain untouched. No browser, retained-seven
 or campaign invocation ran during RED/GREEN.
+
+The single final implementation review inspected signed/pushed GREEN
+`541a18ec1a186390e19aa1c258ad147e8c630f02`. Codex `gpt-5.6-sol` high
+returned `CHANGES_REQUIRED`, P0=0/P1=1/P2=0: stale-B reclamation preceded
+offer decoding and current-authenticated-connection validation, so malformed
+or superseded-connection input could mutate pending ownership before request
+validity. Opus xhigh returned `APPROVED`, P0/P1 empty and P2=3; it independently
+observed the pre-decode ordering as nonblocking, recorded the intentionally
+wider expiry reclamation of an open but readiness-incomplete B, and noted that
+the stale-admission row proves C admission rather than later convergence.
+Grok emitted substantive `APPROVED`, P0/P1/P2 empty after progress prose; its
+strict runner therefore records honest `NO_VERDICT`. The Codex P1 is accepted
+because the frozen contract explicitly requires request validity before
+reclamation. Review prompt, Codex result, Opus raw result, Grok public text,
+Grok status and Grok event-stream SHA-256 values are respectively
+`77977ad3d301f80320b634e25feb80ca38f4a226b40ba134e587e70eff8c45b8`,
+`d0112509b3bea0b78aa1215556a0c5387bce5c5150c2a4336f12fa4444f05edf`,
+`5e2a2009433bc8e20d9aa76e84e7101fcea5f0bd162389679b658fdac29928b3`,
+`274c69d0f663b04e0e35b43434f3d21c577ff00dde7ed53ed437f1bf506e8337`,
+`0186fe0fac8bdca783709b2da3c39f23718e2dd92e2bb0a573f00eb1bea717ab`
+and
+`fdf82171f6774ef05dc0e45b7f87eb4c9168bb6c6b814545bb95d08d1d4c8b55`.
+
+The one blocking review correction now rejects a non-current authenticated
+connection and decodes a valid offer before stale-B reclamation. The already
+decoded offer is passed into the existing private accept owner; no public API
+or signaling format changes. Two deterministic controls prove that neither a
+malformed offer nor a valid offer on a superseded authenticated connection
+reclaims non-open pending B. Historical accounting remains exact: malformed
+offer decoding increments `handshakeFailures` without invoking pending cleanup,
+while a superseded-connection request is rejected without that increment.
+
+One read-only focused command over-escaped the title regex and selected zero
+rows; it is recorded only as a launcher diagnostic and not as a pass. The
+corrected focused command passed all six D.108e4bn rows. The first complete
+owner correction run passed 107/110 and exposed three retained malformed-offer
+counter expectations; the implementation then restored that existing counter
+contract without weakening either new ownership control. Final focused and
+complete-owner runs pass 6/6 and 110/110 with reporter SHA-256 values
+`9ffcf00993d0ec13cf79cd60ee418f62dd6c9478cbc2299867f794eda971a7c8`
+and
+`6afa0eccebd67f8d80e4ee1f8f9ac6af8f9fd5a92f7a18c7183daf17960c239f`.
+The diagnostic 107/110 reporter SHA-256 is
+`d1fdfb60a3e658007bfe7cb9d557f3fed239fa426fe420f3587589bdcf58a93f`.
+
+Network build/typecheck, exact source/test lint and format, diff check and the
+corrected handler-local source-shape audit pass. The audit records ordered
+offsets `119,386,536,604,785,924,970`: decision dispatch, current-connection
+validation, offer decoding, malformed-offer accounting, non-open stale-B
+reclamation, generic pruning and ordinary admission. It also proves accept no
+longer decodes the offer again and expiry still returns only after successful
+promotion. Final source and test SHA-256 values are respectively
+`17e61229a184f213691b54e8ca09f76941cee451865de7779e44c019aa73935d`
+and
+`76b367c20bfaaad5645c6f605974fc16d163be48819af0e399e2970a395a95da`.
+No retained browser, retained-seven or campaign invocation ran during this
+review correction.

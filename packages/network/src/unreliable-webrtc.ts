@@ -926,8 +926,20 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 	async #handleSignalingRequest(connection: AuthenticatedWebRtcConnection, request: Uint8Array): Promise<Uint8Array> {
 		const decision = decodeDecisionRequest(request);
 		if (decision !== undefined) return this.#handleDecisionRequest(connection, decision);
-		if (this.#closed || connection.transport !== "webrtc" || connection.remotePeerId >= this.#signaling.localPeerId) {
+		if (
+			this.#closed ||
+			connection.transport !== "webrtc" ||
+			connection.remotePeerId >= this.#signaling.localPeerId ||
+			!this.#isCurrent(connection)
+		) {
 			throw new Error("unreliable WebRTC signaling request rejected");
+		}
+		let offer: SignalDescription;
+		try {
+			offer = decodeDescription(request, "offer");
+		} catch (error) {
+			this.#handshakeFailures += 1;
+			throw error;
 		}
 		const pendingReplacement = this.#pendingReplacementLinks.get(connection.remotePeerId);
 		if (pendingReplacement !== undefined && pendingReplacement.channel.readyState !== "open") {
@@ -944,7 +956,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		}
 		const deadlineAt = Date.now() + SETUP_TIMEOUT_MS;
 		try {
-			return await withDeadline((_signal) => this.#accept(connection, request, deadlineAt));
+			return await withDeadline((_signal) => this.#accept(connection, request, offer, deadlineAt));
 		} catch (error) {
 			this.#closePendingForPeer(connection.remotePeerId);
 			this.#handshakeFailures += 1;
@@ -1005,9 +1017,9 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 	async #accept(
 		connection: AuthenticatedWebRtcConnection,
 		request: Uint8Array,
+		offer: SignalDescription,
 		deadlineAt: number
 	): Promise<Uint8Array> {
-		const offer = decodeDescription(request, "offer");
 		const pc = this.#createPeerConnection();
 		let authenticatedClosed = false;
 		let established = false;

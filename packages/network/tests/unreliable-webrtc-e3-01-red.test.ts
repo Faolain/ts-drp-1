@@ -3250,6 +3250,65 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		}
 	);
 
+	it.each(["malformed offer", "superseded authenticated connection"] as const)(
+		"D.108e4bn does not reclaim non-open pending B for a %s",
+		async (invalidRequest) => {
+			const module = await loadOwnerModule();
+			let fixture: CommittedPendingReplacementFixture | undefined;
+			const offerSource = new FakePeerConnection();
+			try {
+				fixture = await committedPendingReplacementFixture(module);
+				const pendingHighPc = fixture.high.peerConnections[1];
+				const pendingHigh = pendingHighPc?.channels[0];
+				if (pendingHighPc === undefined || pendingHigh === undefined) {
+					throw new Error("D108E4BN_INVALID_REQUEST_CONTROL_ABSENT");
+				}
+				pendingHigh.readyState = "closing";
+				offerSource.createDataChannel(RAW_LABEL, { maxRetransmits: 0, ordered: false });
+				const offer = await offerSource.createOffer();
+				const validOffer = new TextEncoder().encode(JSON.stringify({ candidates: [], sdp: offer.sdp, type: "offer" }));
+				const request = invalidRequest === "malformed offer" ? Uint8Array.of(255, 0, 255) : validOffer;
+				const expectedError =
+					invalidRequest === "malformed offer"
+						? "RTC signaling frame is malformed"
+						: "unreliable WebRTC signaling request rejected";
+				const expectedHandshakeFailures = invalidRequest === "malformed offer" ? 1 : 0;
+				if (invalidRequest === "superseded authenticated connection") {
+					fixture.bus.forgetWithoutClose(fixture.replacement);
+					fixture.bus.connect("peer-a", "peer-b");
+				}
+				const allocationCount = fixture.high.peerConnections.length;
+
+				await expect(fixture.replacement.left.exchange(request, new AbortController().signal)).rejects.toThrow(
+					expectedError
+				);
+				expect(fixture.high.peerConnections).toHaveLength(allocationCount);
+				expect(pendingHighPc.connectionState).toBe("connected");
+				expect(pendingHigh.readyState).toBe("closing");
+				expect(fixture.highRoute.snapshot()).toMatchObject({
+					activeLinks: 1,
+					handshakeFailures: expectedHandshakeFailures,
+					lastLinkDrop: undefined,
+					linkDrops: 0,
+					links: [
+						{
+							connectionId: fixture.original.right.id,
+							generation: fixture.original.right.generation,
+						},
+					],
+				});
+			} finally {
+				offerSource.close();
+				fixture?.oldCloseEventBarrier.release();
+				fixture?.oldPeerCloseBarrier.release();
+				fixture?.low.owner.close();
+				fixture?.high.owner.close();
+				vi.clearAllTimers();
+				vi.useRealTimers();
+			}
+		}
+	);
+
 	it("D.108e4bn expiry reclaims non-open committed B without another offer", async () => {
 		const module = await loadOwnerModule();
 		let fixture: CommittedPendingReplacementFixture | undefined;
