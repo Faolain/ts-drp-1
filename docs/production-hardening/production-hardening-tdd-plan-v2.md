@@ -78446,3 +78446,69 @@ review-wrapper's attempted use of zsh's read-only `status` variable occurred
 only after both Codex and Opus had written complete structured results; their
 model verdicts are intact and no reviewer is relaunched. A deterministic local
 audit closes this correction without another model round.
+
+D.108e4ay closed as a one-shot non-reproduction, not as product GREEN or
+campaign authority. The sole focused invocation ran from
+`2026-08-30T11:14:32Z` through `11:15:24Z`, returned status zero, and reported
+one expected, zero skipped, zero unexpected and zero flaky results, zero
+top-level errors, no retry, 43.510 seconds of test time and 50.908864 seconds
+of reporter time. Chromium remained exactly `151.0.7922.34`. The preliminary
+30-percent-loss leg delivered 413 of 600 samples against floor 100, while the
+100-percent-loss observation remained exactly 1 before and during the send.
+The final attachment contains the five ordered CDP labels, `stage=complete`
+and `error=null`.
+
+Both endpoint custody joins validate. The creator retained authenticated
+libp2p connection `2l9c3o1788088483601` while its unique open raw RTC channel
+changed from connection/channel 2/14 to 3/52. The receiver retained
+authenticated libp2p connection `93n95w1788088483597` while its raw RTC
+channel changed from 2/11 to 3/50. Each selected connection remains present in
+its pre/post libp2p roster. Both endpoints remain at zero authenticated
+connection losses and zero handshake failures, record exactly one explicit
+`restart` link drop, and exchange one raw message in each direction after the
+replacement. The creator's old product-owned close call is lifecycle sequence
+2731, replacement product handler 2788, first replacement send success 2790
+and open event 2791. The receiver's corresponding sequences are 1865, 1928,
+1930 and 1927, preserving the expected peer-dependent open/handler ordering.
+Both continuous monitor intervals add six successful ping reads and contain
+zero new connection aborts or closes after their pre-reset fences. Earlier
+observer-install abort/close records precede those fences and are not evidence
+about the reset.
+
+This invocation therefore proves that the literal browser prefix can retire
+and replace both raw RTC sides, preserve authenticated signaling connections,
+and complete bidirectional delivery within the unchanged 10-second gate. It
+does not reproduce ordinary-3's authenticated connection loss, 27/1 handshake
+failures or zero-link timeout. A single passing replay cannot assign the prior
+failure to scheduling or browser variance, cannot erase any consumed campaign
+failure, and cannot establish a product or js-libp2p defect. No production
+change, upstream reproduction, threshold change, campaign retry or isolated
+campaign authority follows. The three consumed campaign failures remain
+immutable; all three isolated names remain unrun and unauthorized.
+
+The focused reporter SHA-256 is
+`7ba23a1f37c91f89aad3941b6ad1771789aa4f0c10416bea49ed864211ade2de`,
+its empty stderr SHA-256 is
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`,
+and the deterministic attachment validator SHA-256 is
+`8a3239c67b5abf6f1f0a203d729792d54f32c807ecd7d1edd9ca98383461d0d3`.
+The test owner SHA-256 is
+`0b3648f5046240991056a07e3b818271675ce78045237de8f944f2079ec70444`;
+production `packages/network/src/unreliable-webrtc.ts` remains byte-identical
+at SHA-256
+`969c68c54d7fa9b20e35aeea005a9abedc67b4277bbfb24242469f01323886b6`.
+The commands, results, custody, validator and raw reporter are covered by the
+nine-file self-excluding manifest under `.logs/d108e4ay-replay/`; its SHA-256
+is `97cee88493df23603a9735eaebd165d2e38d4df2f48be67de4b062d764246494`
+and its exact validation record SHA-256 is
+`b1a65cbb561d692e44e5d5f870b2b7b431540d946aa9d3ef6e7a7ebd6197a34d`.
+No further Playwright runtime is executed.
+
+Final Prettier, standalone strict TypeScript, exact-owner ESLint,
+`git diff --check`, source-shape, evidence-validator and custody gates return
+zero. The default list selects exactly five tests in one file and omits the
+replay; the opt-in list selects exactly one test in one file and omits the
+retained campaign title. The first combined read-only list/shape shell used
+`set -e` with a zero-match `rg -c` and overcounted direct helper calls, so the
+expected absence returned shell status one. The corrected explicit-count
+diagnostics return zero; that regex/status mistake is not a code failure.

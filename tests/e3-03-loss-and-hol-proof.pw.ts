@@ -100,6 +100,7 @@ interface GridNetworkSnapshot {
 
 interface GridNetworkTestSession {
 	readonly node: Readonly<{
+		ephemeralUnreliableWebRtcSnapshot(objectId: string): RawOwnerSnapshot | undefined;
 		readonly networkNode: Readonly<{
 			connect(addresses: readonly unknown[]): Promise<void>;
 			disconnect(peerId: string): Promise<void>;
@@ -107,6 +108,23 @@ interface GridNetworkTestSession {
 		}>;
 	}>;
 	snapshot(): GridNetworkSnapshot;
+}
+
+interface RawOwnerSnapshot {
+	readonly activeLinks: number;
+	readonly authenticatedConnectionLosses: number;
+	readonly handshakeFailures: number;
+	readonly lastLinkDrop: string | undefined;
+	readonly linkDrops: number;
+	readonly links: readonly Readonly<{
+		readonly connectionId: string;
+		readonly generation: number;
+		readonly label: string;
+		readonly peerId: string;
+		readonly remoteAddr: string;
+	}>[];
+	readonly received: number;
+	readonly sent: number;
 }
 
 type Libp2pMonitorEventKind =
@@ -250,6 +268,16 @@ interface RtcObserver {
 	lifecycleSnapshot(): Promise<readonly RtcLifecycleObservation[]>;
 	reset(trialId: string): void;
 	snapshot(): Promise<readonly RtcObservation[]>;
+}
+
+interface ResetReplayEndpointCustody {
+	readonly libp2pConnections: readonly Readonly<{ readonly connectionId: string; readonly peerId: string }>[];
+	readonly monitor: readonly Libp2pMonitorObservation[];
+	readonly monitorSequenceFence: number;
+	readonly network: NetworkSnapshot;
+	readonly raw: RawOwnerSnapshot | undefined;
+	readonly rtc: RtcCustodySnapshot;
+	readonly zone: ZoneSnapshot;
 }
 
 interface PlatformObservation extends FabricObservation {
@@ -2066,15 +2094,77 @@ async function diagnosticAttempt<T>(
 	}
 }
 
+async function resetReplayEndpointCustody(page: Page, objectId: string): Promise<ResetReplayEndpointCustody> {
+	const [networkSnapshot, zoneSnapshot, rtc, monitor, owner] = await Promise.all([
+		network(page),
+		zone(page),
+		page.evaluate(async () => {
+			const observer = window.__E303_RTC_OBSERVER__;
+			if (observer === undefined) throw new Error("E303_RTC_OBSERVER_ABSENT");
+			return observer.custodySnapshot();
+		}),
+		libp2pMonitorObservations(page),
+		page.evaluate((selectedObjectId) => {
+			type ConnectionLike = Readonly<{
+				readonly id: string;
+				readonly remotePeer: Readonly<{ toString(): string }>;
+			}>;
+			type HostLike = Readonly<{ getConnections(): readonly ConnectionLike[] }>;
+			const session = window.__TS_DRP_GRID_SESSION__ as
+				| (GridNetworkTestSession & {
+						readonly node: {
+							ephemeralUnreliableWebRtcSnapshot(objectId: string): RawOwnerSnapshot | undefined;
+							readonly networkNode: { readonly _node?: HostLike };
+						};
+				  })
+				| undefined;
+			const host = session?.node.networkNode._node;
+			if (session === undefined || host === undefined) throw new Error("D108E4AY_OWNER_CUSTODY_ABSENT");
+			return Object.freeze({
+				libp2pConnections: Object.freeze(
+					host
+						.getConnections()
+						.map((connection) =>
+							Object.freeze({ connectionId: connection.id, peerId: connection.remotePeer.toString() })
+						)
+						.sort((left, right) => left.connectionId.localeCompare(right.connectionId))
+				),
+				raw: session.node.ephemeralUnreliableWebRtcSnapshot(selectedObjectId),
+			});
+		}, objectId),
+	]);
+	return Object.freeze({
+		libp2pConnections: owner.libp2pConnections,
+		monitor,
+		monitorSequenceFence: monitor.at(-1)?.sequence ?? -1,
+		network: networkSnapshot,
+		raw: owner.raw,
+		rtc,
+		zone: zoneSnapshot,
+	});
+}
+
 async function pageFailureEvidence(page: Page, trialId: string | null): Promise<unknown> {
 	if (page.isClosed()) return Object.freeze({ pageClosed: true });
-	const [networkResult, rtcResult, zoneResult] = await Promise.all([
-		diagnosticAttempt(() => network(page)),
-		diagnosticAttempt(() => rtcObservations(page)),
-		diagnosticAttempt(() => zone(page)),
-	]);
+	const [libp2pMonitorResult, networkResult, rtcChannelStatesResult, rtcLifecycleResult, rtcResult, zoneResult] =
+		await Promise.all([
+			diagnosticAttempt(() => libp2pMonitorObservations(page)),
+			diagnosticAttempt(() => network(page)),
+			diagnosticAttempt(() => rtcChannelStates(page)),
+			diagnosticAttempt(() => rtcLifecycleObservations(page)),
+			diagnosticAttempt(() => rtcObservations(page)),
+			diagnosticAttempt(() => zone(page)),
+		]);
 	if (!rtcResult.ok)
-		return Object.freeze({ network: networkResult, pageClosed: false, rtc: rtcResult, zone: zoneResult });
+		return Object.freeze({
+			libp2pMonitor: libp2pMonitorResult,
+			network: networkResult,
+			pageClosed: false,
+			rtc: rtcResult,
+			rtcChannelStates: rtcChannelStatesResult,
+			rtcLifecycle: rtcLifecycleResult,
+			zone: zoneResult,
+		});
 	const records = rtcResult.value;
 	let wire: unknown = null;
 	if (trialId !== null) {
@@ -2088,6 +2178,7 @@ async function pageFailureEvidence(page: Page, trialId: string | null): Promise<
 		}
 	}
 	return Object.freeze({
+		libp2pMonitor: libp2pMonitorResult,
 		network: networkResult,
 		pageClosed: false,
 		rtc: Object.freeze({
@@ -2100,6 +2191,8 @@ async function pageFailureEvidence(page: Page, trialId: string | null): Promise<
 				),
 			wire,
 		}),
+		rtcChannelStates: rtcChannelStatesResult,
+		rtcLifecycle: rtcLifecycleResult,
 		zone: zoneResult,
 	});
 }
@@ -7677,6 +7770,190 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 			).toBe(true);
 		} finally {
 			await Promise.all([creatorContext.close(), receiverContext.close()]);
+		}
+	});
+}
+
+if (process.env["D108E4AY_RESET_REPLAY"] === "1") {
+	test("D.108e4ay attributes the post-loss bilateral fabric reset", async ({ browser }, testInfo) => {
+		test.setTimeout(180_000);
+		expect(browser.browserType().name()).toBe("chromium");
+		expect(browser.version()).toBe(BROWSER_VERSION);
+		const creatorContext = await browser.newContext();
+		const receiverContext = await browser.newContext();
+		await Promise.all([
+			creatorContext.addInitScript(installRtcObserver),
+			receiverContext.addInitScript(installRtcObserver),
+		]);
+		const creator = await creatorContext.newPage();
+		const receiver = await receiverContext.newPage();
+		const cdp = await creatorContext.newCDPSession(creator);
+		const cdpEvidence: Array<
+			Readonly<{
+				readonly label: string;
+				readonly profile: NetworkProfile;
+				readonly ruleIds: readonly string[];
+			}>
+		> = [];
+		const applyProfile = async (label: string, profile: NetworkProfile): Promise<void> => {
+			const ruleIds = await emulate(cdp, profile);
+			cdpEvidence.push(Object.freeze({ label, profile, ruleIds: Object.freeze([...ruleIds]) }));
+		};
+		const replayId = "e3-03-total-loss-calibration";
+		let objectId: string | undefined;
+		let peers:
+			| Readonly<{ readonly creatorPeerId: string; readonly durableBaseline: number; readonly receiverPeerId: string }>
+			| undefined;
+		let preCustody: readonly [ResetReplayEndpointCustody, ResetReplayEndpointCustody] | undefined;
+		let stage = "network-enable";
+		try {
+			await cdp.send("Network.enable");
+			stage = "pre-signaling-profile";
+			await applyProfile("pre-signaling-capability", NO_LOSS);
+			expect(cdpEvidence[0]?.ruleIds).toHaveLength(1);
+			stage = "grid-open";
+			await Promise.all([openGrid(creator), openGrid(receiver)]);
+			stage = "zone-create";
+			peers = await createZone(creator, receiver);
+			objectId = (await zone(creator)).zoneId;
+			expect((await zone(receiver)).zoneId).toBe(objectId);
+			await Promise.all([installLibp2pMonitorObserver(creator), installLibp2pMonitorObserver(receiver)]);
+			const initialCreatorNetwork = await network(creator);
+			const initialReceiverNetwork = await network(receiver);
+			const initialCreatorLinks = (await zone(creator)).rawTransport.links;
+			const initialReceiverLinks = (await zone(receiver)).rawTransport.links;
+
+			stage = "raw-total-loss-calibration";
+			const beforeTotalLoss = (await zone(receiver)).rawTransport.received;
+			await applyProfile("raw-total-loss-calibration", lossProfile(CALIBRATION_LOSS_PERCENT));
+			const totalLossSend = sendMovement(creator, 30, 20);
+			await new Promise((resolve) => setTimeout(resolve, 500));
+			const receivedDuringTotalLoss = (await zone(receiver)).rawTransport.received;
+			await totalLossSend;
+			expect(receivedDuringTotalLoss).toBe(beforeTotalLoss);
+			expect((await zone(creator)).rawTransport.links).toEqual(initialCreatorLinks);
+			expect((await zone(receiver)).rawTransport.links).toEqual(initialReceiverLinks);
+			expect(await network(creator)).toEqual(initialCreatorNetwork);
+			expect(await network(receiver)).toEqual(initialReceiverNetwork);
+
+			stage = "preliminary-loss-campaign";
+			await applyProfile("raw-total-loss-reset", NO_LOSS);
+			await new Promise((resolve) => setTimeout(resolve, 250));
+			const beforePreliminary = (await zone(receiver)).rawTransport.received;
+			await applyProfile("preliminary-thirty-percent", lossProfile(CAMPAIGN_LOSS_PERCENT));
+			await sendMovement(creator, SAMPLE_COUNT, SAMPLE_INTERVAL_MS);
+			await new Promise((resolve) => setTimeout(resolve, 500));
+			const preliminaryDelivered = (await zone(receiver)).rawTransport.received - beforePreliminary;
+			expect(preliminaryDelivered).toBeGreaterThanOrEqual(PRELIMINARY_RAW_DELIVERY_FLOOR);
+			expect(preliminaryDelivered).toBeLessThan(SAMPLE_COUNT);
+			await attachJson(testInfo, "e3-03-preliminary-calibration.json", {
+				browserVersion: browser.version(),
+				cdpEvidence,
+				creatorPeerId: peers.creatorPeerId,
+				delivered: preliminaryDelivered,
+				floor: PRELIMINARY_RAW_DELIVERY_FLOOR,
+				profile: lossProfile(CAMPAIGN_LOSS_PERCENT),
+				receiverPeerId: peers.receiverPeerId,
+				sent: SAMPLE_COUNT,
+				totalLoss: { before: beforeTotalLoss, during: receivedDuringTotalLoss },
+			});
+
+			stage = "preliminary-reset";
+			await applyProfile("preliminary-reset", NO_LOSS);
+			await waitForOpenTransportPair(creator, receiver);
+			await waitForNetworkPair(creator, receiver, initialCreatorNetwork, initialReceiverNetwork);
+			await waitForRawDelivery(creator, receiver);
+			expect((await zone(creator)).durableVertexCount).toBe(peers.durableBaseline);
+			expect((await zone(receiver)).durableVertexCount).toBe(peers.durableBaseline);
+			const readiness = await Promise.all(
+				[creator, receiver].map((page) =>
+					page.evaluate(() => {
+						const fabric = window.__TS_DRP_V3_ZONE__?.fabric;
+						return {
+							reset: typeof fabric?.reset,
+							runTrial: typeof fabric?.runTrial,
+							snapshot: typeof fabric?.snapshot,
+						};
+					})
+				)
+			);
+			expect(readiness, "the focused replay requires the exact public fabric workbench").toEqual([
+				{ reset: "function", runTrial: "function", snapshot: "function" },
+				{ reset: "function", runTrial: "function", snapshot: "function" },
+			]);
+
+			stage = "pre-reset-custody";
+			preCustody = await Promise.all([
+				resetReplayEndpointCustody(creator, objectId),
+				resetReplayEndpointCustody(receiver, objectId),
+			]);
+			for (const custody of preCustody) {
+				expect(custody.raw?.links).toHaveLength(1);
+				const selected = custody.raw?.links[0];
+				if (selected === undefined) throw new Error("D108E4AY_PRE_RESET_RAW_OWNER_ABSENT");
+				expect(custody.libp2pConnections).toContainEqual(
+					expect.objectContaining({ connectionId: selected.connectionId, peerId: selected.peerId })
+				);
+				expect(
+					custody.rtc.channelStates.filter(
+						({ label, readyState }) => label === "ts-drp-ephemeral/1" && readyState === "open"
+					)
+				).toHaveLength(1);
+			}
+
+			stage = "workbench-total-loss-calibration";
+			await Promise.all(
+				[creator, receiver].map((page) =>
+					page.evaluate((selectedTrialId) => window.__TS_DRP_V3_ZONE__?.fabric?.reset(selectedTrialId), replayId)
+				)
+			);
+			await waitForOpenTransportPair(creator, receiver);
+			await waitForNetworkPair(creator, receiver, initialCreatorNetwork, initialReceiverNetwork);
+			await waitForRawDelivery(creator, receiver);
+			await waitForRawDelivery(receiver, creator);
+			stage = "post-reset-custody";
+			const postCustody = await Promise.all([
+				resetReplayEndpointCustody(creator, objectId),
+				resetReplayEndpointCustody(receiver, objectId),
+			]);
+			await attachJson(testInfo, "d108e4ay-reset-replay.json", {
+				browserVersion: browser.version(),
+				cdpEvidence,
+				error: null,
+				peers,
+				post: { creator: postCustody[0], receiver: postCustody[1] },
+				pre: { creator: preCustody[0], receiver: preCustody[1] },
+				replayId,
+				stage: "complete",
+			});
+			stage = "complete";
+		} catch (error) {
+			const selectedObjectId = objectId;
+			const postCustody =
+				selectedObjectId === undefined
+					? undefined
+					: await Promise.all([
+							diagnosticAttempt(() => resetReplayEndpointCustody(creator, selectedObjectId)),
+							diagnosticAttempt(() => resetReplayEndpointCustody(receiver, selectedObjectId)),
+						]);
+			await attachJson(testInfo, "d108e4ay-reset-replay.json", {
+				browserVersion: browser.version(),
+				cdpEvidence,
+				error: diagnosticError(error),
+				peers,
+				post: postCustody === undefined ? undefined : { creator: postCustody[0], receiver: postCustody[1] },
+				pre: preCustody === undefined ? undefined : { creator: preCustody[0], receiver: preCustody[1] },
+				replayId,
+				stage,
+			}).catch(() => undefined);
+			throw error;
+		} finally {
+			await emulate(cdp, NO_LOSS).catch(() => undefined);
+			await Promise.allSettled([
+				creator.evaluate(() => window.__TS_DRP_V3_ZONE__?.close()),
+				receiver.evaluate(() => window.__TS_DRP_V3_ZONE__?.close()),
+			]);
+			await Promise.allSettled([creatorContext.close(), receiverContext.close()]);
 		}
 	});
 }
