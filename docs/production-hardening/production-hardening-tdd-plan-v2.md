@@ -80846,3 +80846,29 @@ stop after causal RED and freeze the smallest explicit GREEN state-machine
 change before editing production source. The four unconsumed D.108e4bk names
 remain permanently unrun; a later reviewed fresh ledger is required after
 GREEN rather than attempting to continue this failed ledger.
+
+D.108e4bl RED is now deterministic and consumes exactly one test execution.
+The corrected Vitest `list` command selected exactly the new title in one
+file. Two earlier collection diagnostics used an unsupported Playwright-style
+`--listTests` flag and a nonexistent package-local Vitest config, and one
+anchored pattern omitted Vitest's suite prefix; none executed a test, and they
+are recorded as diagnostic mistakes rather than source failures. Prettier,
+network typecheck, exact-test-owner ESLint and `git diff --check` passed before
+the one execution.
+
+The single RED execution selected one failed assertion and skipped the other
+87 owner tests. Its exact failure is
+`D108E4BL_QUALIFIED_B_EXPIRED`: after 10 seconds the initiator still retained
+usable A with zero drops but had incremented `handshakeFailures` to one and
+closed B; the acceptor had lost B, had zero active links, and recorded exact
+`lastLinkDrop=channel-close`, `linkDrops=2`. Both replacement channels were
+closed. This matches the frozen causal matrix byte-for-byte and confirms that
+the browser campaign failure is reproducible without a browser, loss profile,
+connection monitor, scheduler or timing variance. Test and reporter SHA-256
+values are respectively
+`f544b33fffe7ac8d2ce9f42ece798a3c6015a41d455fe85d6e94b4b81d9ce358`
+and
+`318001e6cd7a77beee3a2966f80568e4aaaf24024a5a127ab62186706dee66dd`.
+The validating evidence manifest is `.logs/d108e4bl-red/SHA256SUMS`. No
+production source, campaign fixture, threshold, workload or consumed evidence
+changed, and no retained browser or campaign invocation ran.

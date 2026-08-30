@@ -2197,6 +2197,105 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		}
 	});
 
+	it("D.108e4bl retains handshake-qualified B while old-A close is delayed and application traffic is idle", async () => {
+		const module = await loadOwnerModule();
+		const bus = new FakeSignalingBus();
+		const low = owner(module, bus, "peer-a");
+		const high = owner(module, bus, "peer-b");
+		let openBarrier: FakeRemoteInboundOpenBarrier | undefined;
+		let closeEventBarrier: FakeInboundOpenBarrier | undefined;
+		let peerCloseBarrier: FakeInboundOpenBarrier | undefined;
+		let replacementPending: Promise<void> | undefined;
+		try {
+			const original = bus.connect("peer-a", "peer-b");
+			const lowRoute = low.owner.openUnreliableWebRtcRoute("zone:d108e4bl-idle-qualified-replacement");
+			const highRoute = high.owner.openUnreliableWebRtcRoute("zone:d108e4bl-idle-qualified-replacement");
+			await Promise.all([lowRoute.reconcile(["peer-b"]), highRoute.reconcile(["peer-a"])]);
+
+			bus.disconnect(original);
+			const replacement = bus.connect("peer-a", "peer-b");
+			openBarrier = FakePeerConnection.pauseNextRemoteInboundOpen();
+			vi.useFakeTimers();
+			replacementPending = lowRoute.reconcile(["peer-b"]);
+			await openBarrier.waitUntilPending();
+			await replacementPending;
+
+			const oldHigh = high.peerConnections[0]?.channels[0];
+			const replacementLow = low.peerConnections[1]?.channels[0];
+			const replacementHigh = high.peerConnections[1]?.channels[0];
+			if (oldHigh === undefined || replacementLow === undefined || replacementHigh === undefined) {
+				throw new Error("D108E4BL_OWNER_ABSENT");
+			}
+			closeEventBarrier = oldHigh.pauseCloseEvent();
+			peerCloseBarrier = oldHigh.pausePeerClose();
+
+			openBarrier.release();
+			await openBarrier.waitUntilComplete();
+			await Promise.all([closeEventBarrier.waitUntilPending(), peerCloseBarrier.waitUntilPending()]);
+			await tick();
+
+			expect(lowRoute.snapshot()).toMatchObject({
+				activeLinks: 1,
+				lastLinkDrop: undefined,
+				linkDrops: 0,
+				links: [{ connectionId: original.left.id, generation: original.left.generation }],
+			});
+			expect(highRoute.snapshot()).toMatchObject({
+				activeLinks: 1,
+				lastLinkDrop: "replacement",
+				linkDrops: 1,
+				links: [{ connectionId: replacement.right.id, generation: replacement.right.generation }],
+			});
+			expect(replacementLow.readyState).toBe("open");
+			expect(replacementHigh.readyState).toBe("open");
+
+			await vi.advanceTimersByTimeAsync(9_999);
+			expect(replacementLow.readyState).toBe("open");
+			expect(replacementHigh.readyState).toBe("open");
+			await vi.advanceTimersByTimeAsync(1);
+			await tick();
+
+			const lowAfterDeadline = lowRoute.snapshot();
+			const highAfterDeadline = highRoute.snapshot();
+			if (
+				replacementLow.readyState !== "open" ||
+				replacementHigh.readyState !== "open" ||
+				lowAfterDeadline.linkDrops !== 0 ||
+				highAfterDeadline.linkDrops !== 1
+			) {
+				throw new Error(
+					`D108E4BL_QUALIFIED_B_EXPIRED:${JSON.stringify({
+						high: highAfterDeadline,
+						low: lowAfterDeadline,
+						replacementHigh: replacementHigh.readyState,
+						replacementLow: replacementLow.readyState,
+					})}`
+				);
+			}
+			expect(lowAfterDeadline).toMatchObject({
+				activeLinks: 1,
+				lastLinkDrop: undefined,
+				linkDrops: 0,
+				links: [{ connectionId: original.left.id, generation: original.left.generation }],
+			});
+			expect(highAfterDeadline).toMatchObject({
+				activeLinks: 1,
+				lastLinkDrop: "replacement",
+				linkDrops: 1,
+				links: [{ connectionId: replacement.right.id, generation: replacement.right.generation }],
+			});
+		} finally {
+			closeEventBarrier?.release();
+			peerCloseBarrier?.release();
+			FakePeerConnection.releaseRemoteInboundOpenBarrier(openBarrier);
+			await replacementPending?.catch(() => undefined);
+			low.owner.close();
+			high.owner.close();
+			vi.clearAllTimers();
+			vi.useRealTimers();
+		}
+	});
+
 	it("D.108e4bi rejects application ingress before pending replacement qualification", async () => {
 		const module = await loadOwnerModule();
 		const bus = new FakeSignalingBus();
