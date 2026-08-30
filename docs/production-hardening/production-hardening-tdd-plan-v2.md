@@ -75430,3 +75430,63 @@ substantive review, not a reinterpretation of the original wrapper
 `NO_VERDICT`. Do not recursively review documentation-only result recording.
 No freeze root, isolated checkout or campaign may be created until confirmation
 closes and the corrected deterministic local audit passes.
+
+The one permitted confirmation round closes the D.108e4as plan gate. Codex
+`gpt-5.6-sol` / high resumed thread
+`01a050b3-2c0e-7750-b6dd-654c29a84b02` and returned schema-valid `APPROVED`,
+P0=0/P1=0/P2=0. Grok 4.6/high resumed the same
+`01a050b3-311f-76e3-91e2-888e750bc14b` session; its first confirmation turn
+hit the exact eight-turn cap before a verdict, then one tool-free
+schema-constrained continuation returned `APPROVED`, P0=0/P1=0/P2=0. This is a
+resumed terminal continuation, not a duplicate review or reinterpretation of
+the initial wrapper `NO_VERDICT`. Opus 5/xhigh resumed session
+`e2885143-a22c-4000-bb1b-8e40cf0cb01a` and returned normal `end_turn`,
+substantive `claude-opus-5`, no permission denial/subagent and `APPROVED`,
+P0=0/P1=0/P2=3. The blocking union is empty.
+
+Opus's three confirmation P2s belong to the existing D.108e4as freeze owner and
+must close in the placeholder-free freeze checkpoint. First, its literal root
+setup and six launch blocks explicitly supersede the earlier placeholder shape,
+and the signed Node-plus-Corepack pnpm invocation prefix is an authorized runner
+diff even though the inherited Playwright arguments/watchdog semantics remain
+frozen. Second, preflight process/port conflicts remain non-consuming, while
+the retained after-workload `assert_state` process/port checks remain consuming
+acceptance gates and may not be moved or weakened. Third, freeze the resolved
+Corepack cache artifact for pnpm 10.24.0 with path and SHA-256 and set
+`COREPACK_ENABLE_NETWORK=0` plus disabled download prompt in readiness and every
+launcher; a cache miss is a non-consuming refusal, never a fetch. These P2s do
+not change product behavior, campaign acceptance or a hard gate and require no
+further plan confirmation.
+
+The corrected deterministic local audit passed at signed/pushed correction
+`0c7433fb52c3f12c576dfb64ab50dc6edb76f3a1`: HEAD equaled upstream and had a
+good signature; both accepted-behavior staged/unstaged diff guards and tracked
+workspace checks passed; the protected eight-path status hash and 26 stashes
+matched; accepted tree, seven-path/identity and 334-file runtime identities
+matched; all four fixed ports were clear; the isolated parent and freeze,
+freeze-review and campaign roots were absent. One active Playwright server was
+rooted at `/Users/aristotle/Documents/Projects/f/freq-ticketing-clean-env-ef1ee12f`
+whose package name is `my-vue-app`; it is unrelated, is not a ts-drp process and
+is permitted by the user's process rule. The corrected root-aware audit found
+zero ts-drp reviewer/test/profiler processes. The earlier unqualified regex that
+printed this unrelated process was a faulty read-only diagnostic, not a plan or
+code failure.
+
+The 19-file recursive self-excluding `.logs/d108e4as-plan-review/` manifest
+validates and has SHA-256
+`0c19852652e917aee8c58b06e3d493a6251877c21b56e6b47de3b63f556e9388`;
+validation-record SHA-256 is
+`ba48de34c00e918f8c648e5e97d1ac2b4f0c933001bb60d3acc997054bed1a44`.
+External closed-session hashes for Grok, Codex and Opus are recorded inside that
+root. The initial 4 GiB Prettier OOM and shell-interpreted backtick search were
+corrected diagnostics; the authoritative 8 GiB Prettier check and literal
+search passed.
+
+This bookkeeping-only closure is signed and pushed without recursive model
+review. It authorizes only D.108e4as readiness construction: creation of the
+fixed isolated parent/checkout and `.logs/d108e4as-freeze/` under the accepted
+plan. It does not authorize `.logs/d108e4as-campaign/`, any retained invocation,
+product/test-semantic change, or reuse of old evidence. Campaign root setup and
+all six durable-authorized launches remain frozen until the exact
+placeholder-free freeze checkpoint is signed/pushed and its separate
+Grok/Codex/Opus freeze review closes with zero P0/P1.
