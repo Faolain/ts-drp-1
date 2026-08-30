@@ -80439,3 +80439,23 @@ and validating self-excluding review-index SHA-256 values are respectively
 `f825bd25ac08107e911df6219b8c7adeed75b2493d40d9e9d63297df4a79349c`
 and `582a5dee3d5e4e7c51ee10981f07eb1dd5ae65c49ad66293cd8f7a113ea81132`.
 Evidence is immutable under `.logs/d108e4bj-plan-review/`.
+
+D.108e4bj deterministic RED changed only the existing positive acceptor
+deadline-candidate fixture to the captured handler, eager-ACK, observer-open,
+READY and post-READY-ACK sequence, with distinct joined ACK attempts. The
+corrected literal-title selector listed exactly one test in one file. Its sole
+consuming run produced expected=0, skipped=0, unexpected=1 and flaky=0, with
+no top-level errors; the unchanged positive assertion failed only with exact
+`D108E4H_LIFECYCLE_ORDER_INVALID` at
+`d108e4hAssertDeadlinePendingCandidate`. No retained browser title or campaign
+ran. An earlier anchored-regex launcher attempt selected zero tests and is
+preserved honestly as non-consuming diagnostic evidence rather than claimed
+as RED.
+
+RED source, reporter, zero-test diagnostic reporter and validating
+self-excluding evidence-index SHA-256 values are respectively
+`9709e6ccb1790f84e640323b54a6eacd8783727e87016c28e967e418a7efee57`,
+`df357ba47c43c9e73825bfc968baea61c779d1f85d0fa18a658a923bea31c779`,
+`4782c79292d0d279a27dfe440ae018d21329c3a0a3492aa71eb04899a2e737ce`
+and `57dd7faaff1f69546c9d184c9f16f7ac5c346551f8b0c7977d9cfb168251667c`.
+Evidence is immutable under `.logs/d108e4bj-red/`. Sign/push RED before GREEN.

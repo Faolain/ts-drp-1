@@ -5103,20 +5103,6 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 			d108e4hLifecycle(
 				noReplacement.trialId,
 				2,
-				"channel-open-event",
-				d108e4bhDeadlineCandidate,
-				"rtc-datachannel-open-event"
-			),
-			d108e4hLifecycle(
-				noReplacement.trialId,
-				3,
-				"channel-message",
-				d108e4bhDeadlineCandidate,
-				"rtc-datachannel-message-event"
-			),
-			d108e4hLifecycle(
-				noReplacement.trialId,
-				4,
 				"channel-send-attempt",
 				d108e4bhDeadlineCandidate,
 				"rtc-datachannel-send",
@@ -5124,11 +5110,41 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 			),
 			d108e4hLifecycle(
 				noReplacement.trialId,
-				5,
+				3,
 				"channel-send-success",
 				d108e4bhDeadlineCandidate,
 				"rtc-datachannel-send",
 				{ attemptId: 930_001 }
+			),
+			d108e4hLifecycle(
+				noReplacement.trialId,
+				4,
+				"channel-open-event",
+				d108e4bhDeadlineCandidate,
+				"rtc-datachannel-open-event"
+			),
+			d108e4hLifecycle(
+				noReplacement.trialId,
+				5,
+				"channel-message",
+				d108e4bhDeadlineCandidate,
+				"rtc-datachannel-message-event"
+			),
+			d108e4hLifecycle(
+				noReplacement.trialId,
+				6,
+				"channel-send-attempt",
+				d108e4bhDeadlineCandidate,
+				"rtc-datachannel-send",
+				{ attemptId: 930_004 }
+			),
+			d108e4hLifecycle(
+				noReplacement.trialId,
+				7,
+				"channel-send-success",
+				d108e4bhDeadlineCandidate,
+				"rtc-datachannel-send",
+				{ attemptId: 930_004 }
 			),
 		]);
 		const d108e4bhDeadlinePending = withReceiverEndpoint(
@@ -5140,7 +5156,7 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 						bytes: d108e4avControlBytes(1),
 						channelId: d108e4bhDeadlineCandidate.channelId,
 						connectionId: d108e4bhDeadlineCandidate.connectionId,
-						lifecycleSequence: 3,
+						lifecycleSequence: 5,
 					}),
 				]),
 				controlSends: Object.freeze([
@@ -5149,7 +5165,14 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 						bytes: d108e4avControlBytes(2),
 						channelId: d108e4bhDeadlineCandidate.channelId,
 						connectionId: d108e4bhDeadlineCandidate.connectionId,
-						lifecycleSequence: 4,
+						lifecycleSequence: 2,
+					}),
+					Object.freeze({
+						attemptId: 930_004,
+						bytes: d108e4avControlBytes(2),
+						channelId: d108e4bhDeadlineCandidate.channelId,
+						connectionId: d108e4bhDeadlineCandidate.connectionId,
+						lifecycleSequence: 6,
 					}),
 				]),
 				deadline: Object.freeze({
