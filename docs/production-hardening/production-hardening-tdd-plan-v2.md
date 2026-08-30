@@ -77308,3 +77308,44 @@ semantic changed. Stop on the first nonzero consuming invocation. Five zero
 statuses complete the originally authorized six-name ledger as one preserved
 failed diagnostic plus five post-fix retained passes; they do not rewrite the
 failure into a pass.
+
+The first restored `ordinary-2` command made a non-consuming environmental
+refusal before the atomic preflight move. It created no command, time, reporter,
+status, runner-status, stdout, stderr, before/after, classification or
+attachment artifact, so the campaign ledger remains one consumed failure,
+zero passes and five unrun names. The complete partial preflight is preserved
+under
+`.logs/d108e4au-campaign-restoration-v2/non-consuming-ordinary-2-refusal-1/`.
+Its process snapshot caught an unrelated short-lived Vitest PID, which vanished
+between the `ps` snapshot and its cwd `lsof` probe. Inherited `set -e -o
+pipefail` exited on that pipeline before the audit's intended attribution
+branch; `ts-drp-conflicts.txt` is empty and every completed identity/runtime,
+status and stash record matches.
+
+This is the already-authorized non-consuming-refusal correction, not another
+readiness or review slice. The signed v1 restoration root remains immutable.
+V2 copies it once, preserves the refusal, changes the runner's root literal and
+temporarily disables errexit only around the cwd probe. A nonzero probe plus a
+failed `kill -0` records `vanished-before-cwd-probe` and continues; an active
+unprobeable process still enters the existing fail-closed conflict path. No
+process matcher, ownership rule, launcher command, workload, product source,
+timeout, threshold, evidence result or campaign count changed.
+
+The corrected process audit SHA-256 is
+`eb89062a38c87f35a4cd1f38d064a68dcdc420ff4fef9620f0e049a84fb5d92e`;
+the v2 runner is
+`c18796ff043eb22b27d5b563e391ee429d214b77b1edc67fd20990a9fce3c735`;
+the v2 mode manifest is
+`bc61ff813aef0727ec112a909066a842e512965ca61c1ece832cd32bcb329aab`;
+and the validating self-excluding 333-file v2 manifest is
+`2c74d0310a52ed9f95950189c6f7d53e708f387d2de19b9ded6fcb9a740c8e03`.
+Corrected shell syntax, modes, portable tool gate, exact failed-predecessor
+custody, ordinary-2 admission, ordinary-3 pre-admission refusal, source shape,
+live process audit and absence of campaign-root `.preflight-*` all return zero.
+
+The prior five literal blocks are superseded only in their runner-root path:
+replace `.logs/d108e4au-campaign-restoration/run-one.zsh` with
+`.logs/d108e4au-campaign-restoration-v2/run-one.zsh`. All arguments, order,
+environment and stop rules remain exact. This signed/pushed correction retains
+the explicit authority for the same five unrun invocations and does not request
+authorization again.
