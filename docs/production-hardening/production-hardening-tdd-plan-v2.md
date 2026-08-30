@@ -78882,3 +78882,49 @@ and capturing both reporter files. These corrections change causal accounting
 and evidence capture only; they do not change product code, workload or test
 semantics and receive deterministic local audit rather than another review
 round.
+
+D.108e4ba closed as a bounded test-only non-reproduction. The implementation
+changed only
+`packages/network/tests/unreliable-webrtc-e3-01-red.test.ts` and added the two
+frozen caller-order rows. In each passing row the first malformed replacement
+request produced handshake-failure counters 1/1; 26 product-owned 250 ms retry
+cycles each produced exactly one additional lower-id exchange and reached the
+required 27/1 split after 27 failed attempts; clean attempt 28 used the same
+replacement connection id and generation, retained counters 27/1 plus one
+authenticated loss and one `restart` drop at each endpoint, selected the exact
+replacement links, restored bidirectional ingress and drained to zero timers.
+Two additional 250 ms cycles produced no exchange, allocation, counter or
+snapshot growth.
+
+The pre-runtime gates passed: exact-owner Prettier, corrected ESLint, network
+package typecheck and build, `git diff --check`, the frozen source-shape and
+changed-path predicates, and exact collection of two titles in one file. The
+first ESLint invocation correctly caught two unused table fields before any
+runtime; removing those unused test parameters was the only correction, and
+the final ESLint gate passed. The sole focused command returned status zero;
+its complete JSON reports the two selected rows passed, zero failed and 74
+unselected pending assertions. The one complete retained E3-01 command then
+returned status zero with 76/76 passed, zero failed and zero pending. No
+focused or retained runtime was repeated.
+
+The focused and retained reporter SHA-256 values are
+`bb8c9fc084c77b2ec5e2dc649f7c8aac08c6db94b4b839a2e85df9d18c71a4c5`
+and `72eaaabc1eb768fda4e34d7d0b34a0c2d524ed5c6855312265a7bfe7520197c1`.
+The test-owner SHA-256 is
+`1a0a1f75b1b67171ca05f940e22d5da6dbea4b6c677151518f3519d30cfca4e9`;
+production `packages/network/src/unreliable-webrtc.ts` remains byte-identical
+at `969c68c54d7fa9b20e35aeea005a9abedc67b4277bbfb24242469f01323886b6`.
+The three-entry self-excluding manifest under
+`.logs/d108e4ba-discriminator/` validates and has SHA-256
+`e2d9244b5d8d22c05c4fe67f3d5c93701dd37d9a81d856ae5c778de12ddd17c0`.
+All eight protected untracked paths and 26 stashes remain present; relevant
+test, browser, campaign and profiler processes are absent and ports 4174,
+4175, 51000 and 51002 are clear.
+
+This pass proves recovery only for the frozen synthetic initiator-side 27/1
+realization. Held-replacement counter owners remain untested, and immutable
+`ordinary-3` remains unattributed. No product GREEN, final implementation
+review, browser replay or retained-campaign retry is justified. The result
+closes this deterministic raw-owner hypothesis without changing product code,
+APIs, dependencies, configuration, workload, timing, thresholds, immutable
+evidence or invocation accounting.
