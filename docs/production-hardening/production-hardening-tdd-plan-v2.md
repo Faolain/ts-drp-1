@@ -79160,12 +79160,13 @@ acceptor remains held and refuses subsequent offers.
 The slice changes only
 `packages/network/tests/unreliable-webrtc-e3-01-red.test.ts` and adds no fixture
 API. Two rows reverse only the synchronous bilateral restart caller order. They
-reuse `pauseNextInitiatorOutboundOpen()` to stop after the initiator replacement
-channel exists but before its open event, then arm that exact channel's existing
-`pausePeerClose()` barrier. One existing `throwNextControl(READY, 1)` fault is
-armed before releasing the open barrier. Current production must then close
-the failed initiator side while the barrier keeps the acceptor's paired channel
-open and held.
+reuse `FakeSignalingBus.pauseResponses()` to stop after the receiver handler has
+produced the answer and paired/opened both replacement channels but before that
+answer returns to the initiator. At that actual awaited seam, arm the exact
+initiator channel's existing `pausePeerClose()` barrier and one existing
+`throwNextControl(READY, 1)` fault, then release the signaling response. Current
+production must close the failed initiator side while the peer-close barrier
+keeps the acceptor's paired channel open and held.
 
 Each row:
 
@@ -79175,24 +79176,29 @@ Each row:
 - leaves signaling absent, synchronously calls both `restart()` owners with the
   first caller's old-channel peer-close barrier, awaits both and proves closed
   A, one `restart` drop, no active links and no exchange growth at either side;
-- connects one exact replacement authenticated pair, arms the initiator-open
-  barrier, starts and captures both connection-arrival reconciles, waits until
-  the initiator channel is paired but still connecting, arms its peer-close
-  barrier, consumes exactly one throwing READY send, releases/awaits the open
-  barrier and awaits both reconciles;
+- installs fake timers and a signaling-response barrier before connecting one
+  exact replacement authenticated pair, starts and captures both
+  connection-arrival reconciles, waits until the answer is genuinely pending,
+  proves both replacement channels are paired/open with zero initiator control
+  frames, arms the initiator channel's peer-close barrier and one throwing READY
+  fault, releases the response, awaits both reconciles, then proves the READY
+  throw was consumed;
 - proves the first exchange used the current replacement id/generation, the
   initiator counter is one, the receiver counter is zero, the failed initiator
   PC/channel closed locally, the acceptor paired channel remains open behind
   the barrier, the receiver retains exactly one pending physical PC, no active
-  link exists and one lower-id retry timer is owned;
+  link exists and total fake timers are exactly two: the receiver's live
+  deferred-finish deadline plus one lower-id retry;
 - advances 26 exact 250 ms retry cycles, boundedly settling each cycle until
   one new exchange record and one new initiator failure appear. Every retry
   must use the same replacement identity, be rejected by the receiver's held
   pending-PC admission gate before its counted handler catch, leave the
-  receiver counter zero and re-arm exactly one retry;
+  receiver counter zero, re-arm exactly one retry and retain total timer count
+  two;
 - at exact exchange/counter state 27/0, releases the delayed peer close and
   boundedly settles the receiver's deferred finish catch to exact 27/1 without
-  exchange growth, active links or identity mutation;
+  exchange growth, active links or identity mutation, proving the receiver
+  deadline cleared and exactly one retry timer remains;
 - advances the next 250 ms cycle and requires clean attempt 28 on the same
   replacement id/generation, exact final counters 27/1, one retained
   authenticated loss and one `restart` drop at each endpoint, both replacement
@@ -79200,18 +79206,28 @@ Each row:
   29/3 after recovery;
   and
 - advances two more 250 ms cycles with no exchange, allocation, counter or
-  snapshot growth and zero timers, then releases all barriers and clears static
-  control faults in `finally`.
+  snapshot growth and zero timers. `finally` releases the response/peer-close
+  barriers, clears static control faults, closes both owners, awaits
+  `Promise.allSettled` over every captured restart/reconcile promise, clears
+  fake timers and restores real timers.
+
+The 27 retry/failure advances plus attempt 28 and two quiet cycles consume
+7,250 ms of fake time, leaving 2,750 ms below the frozen 10-second acceptor
+deadline. The receiver deadline therefore cannot fire independently while the
+peer-close barrier is held.
 
 The causal matrix is fail-closed. Failure before initial traffic/loss/restart,
-failure to reach the initiator-open barrier, failure to arm the peer-close
-barrier on the exact paired replacement channel, failure to consume the one
-READY throw or receiver closure before explicit barrier release is fixture
-error. Once the initial exchange has produced exact 1/0 with the current held
-acceptor, fewer or more than one exchange/failure per retry cycle, any receiver
-counter growth before release, failure to re-arm the retry or replacement
-identity drift is product-owned causal evidence. Once exact 27/0 is proven,
-failure of barrier release to settle exactly 27/1 without exchange growth is
+failure to construct/pair/identify the exact replacement channels, or failure
+to arm the exact response/peer-close barriers and READY fault is fixture error.
+After those inputs are proven, absence of the first replacement offer is
+recorded from its exact `#linkFor` ordering/admission/current-connection gate;
+missing READY/fault consumption, premature receiver retirement, admission-gate
+deviation, wrong cleanup or wrong counter state is product-owned causal
+evidence. Once the initial exchange has produced exact 1/0 with the current
+held acceptor, fewer or more than one exchange/failure per retry cycle, any
+receiver counter growth before release, failure to re-arm the retry or
+replacement identity drift is product-owned. Once exact 27/0 is proven,
+failure of peer-close release to settle exactly 27/1 without exchange growth is
 classified from the exact close/catch owner. Once 27/1 is proven, missing or
 failed clean attempt 28, wrong link ids, failed ingress or residual growth is
 causal RED. A causal RED stops for a separately planned narrow product GREEN;
@@ -79262,3 +79278,28 @@ corrected once; P2 receives disposition without confirmation. Deterministic
 RED receives local evidence validation. A passing test-only discriminator has
 no additional model review; any later product GREEN receives the single formal
 three-model implementation review.
+
+The single plan review ran against signed/pushed commit
+`a7b4efbaf487d4201fddea3f33ecca0013c52680`. Codex
+`gpt-5.6-sol` high returned `CHANGES_REQUIRED` with three P1s: the named open
+barrier does not gate the unconditional `outbound.link()` open, the causal
+boundary hid product-owned first-offer/READY/cleanup failures, and `finally`
+did not explicitly settle captured work. Its terminal JSON SHA-256 is
+`81c8e3211ab84d61ddd6dc112820c804019bc7d845048bca99c0204c52100b66`.
+Grok ended normally after 690.508 seconds but fenced its terminal object, so
+the runner honestly records `NO_VERDICT`; its public analysis agreed on the
+27/1 arithmetic but incorrectly treated the initiator-open helper as a real
+open gate despite the unconditional `outbound.link()`. Its status/public
+SHA-256 values are
+`79e3e6f7c0f45550f26f1b13ea5b3fdf6771d36e7bd8348dfcb8566076c85aa9`
+and `f973a196323ec3ab21b5574a19e499ba5dfc32224e94b937bea7f142b4b81d16`.
+Opus xhigh returned `CHANGES_REQUIRED` with the same barrier defect and one P1
+for the omitted receiver-deadline timer. Its structured envelope SHA-256 is
+`2e32219a6524017e8e6ae808b77fc8de4e827668a8450ad6befde9a9bcf04238`.
+
+The batched correction above closes the blocking union with the executable
+signaling-response seam, exact timer matrix two/one/zero, 7,250 ms deadline
+margin, product-owned first-offer/READY/cleanup classification and complete
+promise/barrier/static/timer teardown. It disposes the P2 cleanup findings at
+the same time. No fixture API, product behavior, timing contract, workload or
+scope changes; deterministic audit closes the plan gate without confirmation.
