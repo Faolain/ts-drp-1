@@ -76603,3 +76603,54 @@ reviewed GREEN with zero P0/P1 and an explicit signed restoration of campaign
 authority. Preserve protected untracked paths, all 26 stashes, signed/pushed
 history, immutable evidence and the first-failure rule. Do not invoke Kimi,
 Fable or collaboration subagents.
+
+D.108e4au RED is frozen as one test-only owner change to
+`packages/network/tests/unreliable-webrtc-e3-01-red.test.ts`; production source,
+the browser validator, packages, configuration and every immutable evidence
+root remain byte-identical. Add one four-row parameterized control crossing
+failure mode `direct-close` / `send-discovers-unusable` with application sender
+`initiator` / `non-initiator`. The application-sender dimension must first
+prove A traffic in both directions so it is not mistaken for a physical-role
+dimension: the lexicographically lower peer remains the replacement initiator
+in all four rows.
+
+Each row establishes current A, advances authenticated identity, arms the
+existing distinct remote-inbound-open barrier and awaits the settled lower-peer
+reconcile so lower B is locally open, prepared and held while upper B remains
+connecting with zero message handlers and zero open events. Before injecting
+failure require exactly two allocated peer connections per endpoint, current A
+on both endpoints, zero link drops, successful A traffic and no C. For
+`direct-close`, close lower A independently and prove rejected GREEN selects
+lower B while upper B is still unready; the sole terminal RED token is exact
+`D108E4AU_PREMATURE_PENDING_PROMOTION`. For
+`send-discovers-unusable`, set only lower A's fake ready state to `closing`,
+send once, await the existing asynchronous recovery owner and prove lower B is
+prematurely selected plus exactly one lower C is allocated (three total lower
+peer connections, two total upper); the sole terminal RED token is exact
+`D108E4AU_THIRD_CONNECTION_ALLOCATION`. No timer, retry advance, answer
+rejection transform or additional lifecycle hook may manufacture either result.
+
+Release the one-shot barrier and close both owners in `finally`; require no
+alternate error, top-level error, flaky result, leaked barrier or fourth
+connection. The collection guard must select exactly four rows from one file
+and exclude every retained campaign title. Run the focused RED exactly once.
+Then run once, with coverage disabled, the named retained unit roster covering
+the two D.108e4at continuity rows, exact-old-link continuity in both roles,
+failed replacement rejection/timeout in all four cases, failed-send recovery
+in both roles, send-only replacement discovery, handler-before-selection and
+current-identity overlap. Require every retained row to pass with its existing
+drop reason and error behavior. Run network typecheck, exact test-owner ESLint
+and Prettier, `git diff --check`, one-path custody, production/browser byte
+custody, exact title/token/source-shape counts and a validating self-excluding
+RED manifest. Sign and push causal RED; do not run a browser, campaign,
+profiler or separate full RED model review.
+
+This signed plan receives one bounded Grok, read-only Codex `gpt-5.6-sol` /
+high and Opus 5/xhigh review before RED. Only P0/P1 blocks; correct material
+findings once, and permit one confirmation only if the correction changes the
+four-row causal matrix, scope or executable acceptance. P2 prose/bookkeeping
+gets a disposition without another round. Grok service failure is recorded
+honestly without relaunch. After causal RED, freeze the smallest sound GREEN
+before any production edit; because an explicit readiness control would change
+wire/lifecycle behavior, that GREEN design receives its own high-risk plan
+review rather than inheriting authority from this test-only RED plan.
