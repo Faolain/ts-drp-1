@@ -81276,3 +81276,73 @@ The next action is exactly one retained browser title under the unchanged
 600-second process-group watchdog. Only its pass releases the exact retained
 seven-title non-campaign allowlist; no campaign invocation is authorized by
 this confirmation closure.
+
+#### D.108e4bn stale pending-replacement admission recovery
+
+The single authorized retained-browser title ran once from signed/pushed
+`2fcd0f2680eb79a9aef9990294604994f5dc8b47` and failed before any retained-
+seven or campaign execution. Playwright selected exactly one title in one
+file, returned `expected=0`, `unexpected=1`, `skipped=0`, `flaky=0`, and
+failed after 38.208 seconds of test time (46.196 seconds reporter duration) at
+`resetFabricPairSerially` while waiting ten seconds for both raw endpoints to
+recover from `0/0` to `1/1`. The preliminary 600-send calibration had passed.
+The invocation is consumed and must not be retried, overwritten or represented
+as a campaign invocation.
+
+The captured failure telemetry establishes a narrow owner defect rather than
+scheduling variance. A reliable-connection replacement B opened and completed
+its raw readiness exchange. The creator then performed the fixture's required
+raw-route restart and closed B. The receiver retained its B as a pending
+replacement while that data channel remained `closing` without a close event
+and its PeerConnection was `disconnected`. The elected initiator created 24
+subsequent replacement attempts in the observation window; the receiver's
+generic pending-PC admission guard rejected them, producing 24 creator
+handshake failures while authenticated network connections remained present.
+The receiver is not the retry owner, so both raw owners stayed empty.
+
+Reporter, error-context and trace SHA-256 values are respectively
+`353bce93965b5203e4bf88a991e1894e750f1f37d3e105a434325105f0860479`,
+`fc8a608b63836116bf206975ed5081544290ac275960861956561edcf5b0ee86`
+and
+`c64052bb4f0f46f5d9eae2abdbc74c009b444b8b471b1edc6adf4dbee7a76411`.
+The evidence remains under the protected `.logs/` and Playwright result paths;
+no prior evidence root, manifest, invocation ledger or acceptance result is
+altered.
+
+Freeze D.108e4bn as one causal repair:
+
+1. Add one deterministic fake-RTC RED. Establish A, replace it with qualified
+   B after authenticated identity change, hold B's peer-close propagation,
+   restart the elected initiator's raw route, and leave the receiver's exact
+   pending-B channel in `closing` without a close event. A fresh C offer must
+   be admitted and restore `1/1`; current GREEN must instead fail with exact
+   token `D108E4BN_STALE_PENDING_ADMISSION_BLOCKED`.
+2. Before applying ordinary incoming-offer admission gates, prune only the
+   exact peer's already-established pending replacement when its data channel
+   is no longer `open`. Reuse the existing pending-replacement discard owner.
+   Do not add a cleanup, activation, retry or signaling owner.
+3. Do not classify PeerConnection `disconnected` alone as terminal. Do not
+   alter active or retiring links, pre-open pending PCs, current open pending
+   replacements, reliable connection selection, decision dispatch, readiness
+   controls, deadlines, retry interval, workload, thresholds or product API.
+4. Prove the stale B PC closes, C uses the current authenticated connection,
+   the elected endpoint and receiver each expose one active raw link, A/B/C
+   ownership remains bounded, counters and timers remain exact, and the
+   complete 104-test owner contract retains every prior error/behavior row.
+5. Run the exact new focused RED once. After the causal matrix matches, run
+   focused GREEN once, complete owner once, network build/typecheck, exact
+   source/test lint and format, source-shape/refactor-clean audit and diff
+   checks. Do not run the browser title, retained seven or campaign inside
+   RED/GREEN.
+
+This is a bounded high-risk exception only because it changes incoming
+production offer admission. Sign and push this plan, then run one
+Grok/Codex-`gpt-5.6-sol`-high/Opus-xhigh plan review. Only P0/P1 findings
+affecting the causal predicate, active/retiring continuity, bounded ownership,
+or retained semantics block. Correct one material union at most; do not review
+bookkeeping prose recursively. After signed GREEN, run one final three-model
+implementation review over the plan, causal RED, GREEN and retained evidence.
+No Kimi, Fable or collaboration subagent is authorized. An empty final P0/P1
+union releases one fresh retained-browser invocation name under the unchanged
+600-second watchdog; its pass alone releases retained seven. The six-run
+campaign and D.108e5 remain blocked until those gates pass.
