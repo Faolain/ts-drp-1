@@ -74232,11 +74232,13 @@ attachment lacks both run-return operands; GREEN must change only the final
 evidence custody seam and prove the timestamp, run-return sender wire, deadline
 sender wire and existing final evidence all survive with distinct provenance.
 That tests-only seam expressly includes the local `CampaignEvidence` interface,
-the progress writer and the final evidence builder/record; it does not include a
-product type or API. The progress and final records must call the run-return
+the progress writer, the final evidence builder/record and the single post-loop
+raw-connection aggregate that reads the deadline capture; it does not include a
+product type or API. The progress and final record keys must call the run-return
 capture `runReturnSenderWire`, the final record must call the deadline capture
 `deadlineSenderWire`, and the final record must add `runTrialReturnedAtMs`.
-The old cross-record `senderWire` homonym is prohibited.
+The old cross-record `senderWire` key homonym is prohibited; local variable names
+are not record keys.
 Plan, RED and GREEN each require their normal signed/pushed Grok 4.6/high, exact
 Kimi K3 100-check and Opus 5/xhigh gates; Fable and collaboration subagents are
 prohibited. No long campaign may run in D.108e4ar.
@@ -74302,7 +74304,9 @@ dependencies, browser pin, clocks, wire formats, workload, loss profile,
 watchdogs, budgets, thresholds, product APIs, the twenty-one post-custody
 expectations and every prior evidence root remain closed. The slice may not run
 the retained campaign, create a campaign/freeze root or consume any of the six
-authorized invocations.
+authorized invocations. Per D.108e4aq it is due no later than 2026-09-02; any
+overrun must become an explicit dated stop with the D.108e4ar plan/evidence owner
+rather than being absorbed silently.
 
 The defect is evidence replacement, not snapshot transfer or transport
 behavior. Before the final assignment, progress custody contains the exact
@@ -74311,38 +74315,77 @@ but the final `CampaignEvidence` object replaces that progress record with only
 the deadline sender wire under the ambiguous key `senderWire`. A failure in any
 of the twenty-one subsequent expectations can therefore lose both operands
 needed to replay the run-return join. D.108e4ar changes no assertion outcome; it
-only makes those already-captured values survive the replacement.
+only makes those already-captured values survive the replacement. Because each
+final record is also pushed into `campaignEvidence`, the success attachment gains
+one run-return sender wire per trial, at most 1,201 observations times three
+trials. That explicit test-evidence growth is authorized and changes no runtime
+budget, workload or threshold.
 
 The frozen final contract is:
 
-- progress custody stores the exact run-return capture as
-  `runReturnSenderWire` and never calls either capture `senderWire`;
+- the module-level constant
+  `D108E4AR_RUN_RETURN_SENDER_WIRE_KEY = "runReturnSenderWire" as const` is the
+  sole progress-writer key and helper lookup for the exact run-return capture;
+  no progress or final record key is named `senderWire`, while the local
+  variables `senderWire` and `senderWireAtDeadline` remain unchanged;
 - final `CampaignEvidence` contains exact `runTrialReturnedAtMs`, exact
   `runReturnSenderWire` and exact `deadlineSenderWire` keys;
+- `runTrialReturnedAtMs` remains the absolute creator-page capture used by the
+  replay join, while `stages.runReturned.atMs` remains the existing
+  runner-relative offset and may never substitute for it;
 - the run-return array and deadline array retain their original object
   identities, remain distinct even when their contents happen to match and
   neither may be recomputed from the other;
-- finalization preserves every existing final-evidence field and produces a
-  frozen record before `currentTrialEvidence = trialEvidence`;
+- finalization preserves all nineteen existing final-evidence fields other than
+  `senderWire`, renames that field in place to `deadlineSenderWire` with its
+  exact value, adds the two run-return fields and produces a frozen twenty-two-
+  field record before `currentTrialEvidence = trialEvidence`;
 - `campaignStartedAtMs` remains derived only by filtering non-sentinel raw and
   reliable run-return samples, sorting each lane by `sequence`, taking each
   lane's element-zero `receivedAtMs`, then applying `Math.min` to those two
-  values; and
+  values, with `Number.POSITIVE_INFINITY` substituted for an empty lane exactly
+  as in the retained source; the sender-sample checks make that fallback
+  unreachable in the twenty-one post-custody expectations; and
 - failure attachment continues to consume `currentTrialEvidence` without a new
   attachment API or fallback lookup.
 
 The permitted test-local GREEN surface is exactly the local `CampaignEvidence`
-interface, a small final-custody helper beside the retained D.108e4ap helpers,
-the deterministic focused controls, the progress writer key and the final
-evidence builder/record. The interface removes `senderWire` and adds the three
-frozen keys above. The helper reads the timestamp through the retained
-`d108e4apRunReturnTimestamp` validator, requires an own array-valued
-`runReturnSenderWire`, adds both exact run-return operands to a base record that
-already owns `deadlineSenderWire`, and freezes the merged result. Missing or
-`undefined` run-return sender custody throws
+interface, the shared key constant, a small final-custody helper beside the
+retained D.108e4ap helpers, the deterministic focused controls, the progress
+writer key, the final evidence builder/record and the single post-loop
+raw-connection aggregate that reads the deadline capture. The interface removes
+`senderWire` and adds the three frozen keys above. The aggregate changes only
+its destructuring binding from `senderWire` to `deadlineSenderWire`; its
+assertion outcome is unchanged. The helper first requires an own array-valued
+run-return sender value under the shared constant, then reads the timestamp
+through the retained `d108e4apRunReturnTimestamp` validator, adds both exact
+run-return operands to a base record that already owns `deadlineSenderWire`, and
+freezes the merged result. Missing or `undefined` run-return sender custody throws
 `D108E4AR_FINAL_RUN_RETURN_CUSTODY_ABSENT`; any other non-array value throws
 `D108E4AR_FINAL_RUN_RETURN_CUSTODY_INVALID`. It does not inspect, copy, sort or
 derive observation contents.
+
+The helper types and signature are frozen as:
+
+```ts
+type D108e4arFinalRunReturnCustody = {
+	readonly runTrialReturnedAtMs: number;
+	readonly runReturnSenderWire: readonly PlatformObservation[];
+};
+type D108e4arFinalizeRunReturnCustody = <TBase extends { readonly deadlineSenderWire: readonly PlatformObservation[] }>(
+	base: TBase,
+	custody: Readonly<Record<string, unknown>>
+) => Readonly<TBase & D108e4arFinalRunReturnCustody>;
+```
+
+After `Array.isArray`, the value is asserted to
+`readonly PlatformObservation[]`; no runtime element validation is introduced.
+The live base literal retains an explicit
+`Omit<CampaignEvidence, "runTrialReturnedAtMs" | "runReturnSenderWire">`
+annotation so required and excess-property checking survives, and the helper
+result retains `satisfies CampaignEvidence`. The focused round-trip control uses
+the same constant first to write progress custody and then to finalize it, so a
+writer/reader spelling mismatch cannot survive GREEN.
 
 First sign and push this plan-only checkpoint. Then obtain one read-only plan
 review from Grok 4.6/high, exact Kimi K3 with exactly `CHECK001` through
@@ -74353,19 +74396,29 @@ owner surface, one-run bounds and absence of campaign authority. Correct any
 P0/P1 in the same round, name an owner and deadline for every P2, record a
 self-excluding SHA-256 manifest, then sign and push review closure before RED.
 
-RED adds the helper/validator and one final unwrapped deterministic control to
-`validates schema-v3 replacement custody without cross-peer clocks`; it does
-not adopt the helper in the live campaign body or change `CampaignEvidence`.
-The control constructs the current post-replacement shape with a distinct
-deadline wire but without `runTrialReturnedAtMs` or `runReturnSenderWire`, first
-asserts that the missing-key set is exactly those two names, then makes the sole
-unwrapped final-custody call. After a suffix-anchored list guard proves exactly
+RED adds the constant, helper/validator and one final unwrapped deterministic
+control to `validates schema-v3 replacement custody without cross-peer clocks`;
+it does not adopt the helper in the live campaign body or change
+`CampaignEvidence`. One frozen current-key-shape replica is typed as
+`Pick<CampaignEvidence, "senderWire" | "trialId">`, owns the exact distinct
+deadline array under the old `senderWire` key and asserts that the frozen pair
+`runTrialReturnedAtMs` and `runReturnSenderWire` are exactly the two missing own
+properties. A separate causal replica owns the same deadline array
+under the deliberate post-adoption `deadlineSenderWire` key and supplies a valid
+`runTrialReturnedAtMs` but no run-return sender key, then makes the sole
+unwrapped final-custody call. Thus the old-shape gap proves both operands absent,
+while the terminal call uniquely reaches the new sender-custody guard; using the
+post-adoption base in that second replica does not change `CampaignEvidence` at
+RED. After a suffix-anchored list guard proves exactly
 one selected test in one file and the retained campaign title absent, run the
 focused test exactly once with `D108E4H_TELEMETRY=1`, JSON reporter and
 `--fail-on-flaky-tests`. Accepted RED is status one, expected 0, skipped 0,
 unexpected 1, flaky 0, empty top-level errors, absent/null result `softErrors`
-and sole unexpected error
-`D108E4AR_FINAL_RUN_RETURN_CUSTODY_ABSENT`. Any other result stops the slice.
+and sole unexpected error whose JSON-reporter `error.message` equals the complete
+string `Error: D108E4AR_FINAL_RUN_RETURN_CUSTODY_ABSENT`. Suffix or substring
+matching against `RUN_RETURN_CUSTODY_ABSENT` is prohibited because the retained
+`D108E4AP_RUN_RETURN_CUSTODY_ABSENT` shares that suffix. Any other result stops
+the slice.
 Run exact-owner ESLint, 8 GiB exact-owner Prettier and `git diff --check`; do not
 run TypeScript at RED because the intentional failing control, not compilation,
 owns causality. Record commands, statuses, reporter sets, changed paths and
@@ -74374,36 +74427,79 @@ then sign and push RED.
 
 The signed/pushed RED receives the same Grok/Kimi/Opus review before GREEN.
 Review must prove that the failure is the intended old final-record shape, both
-missing keys are demonstrated before the terminal call, all earlier focused
-controls execute, live adoption remains absent, and no campaign or product path
-changed. Correct P0/P1 in-round without adding another focused invocation unless
-the causal output itself is invalid; record all P2 ownership, validate the
-fixed RED-review root, and sign/push closure.
+missing keys are demonstrated on the current-shape replica before the separate
+terminal call, the second replica deliberately uses the post-adoption deadline
+key, all earlier focused controls execute, live adoption remains absent, and no
+campaign or product path changed. Correct P0/P1 in-round without adding another
+focused invocation unless the causal output itself is invalid; record all P2
+ownership, validate the fixed RED-review root, and sign/push closure.
 
-GREEN performs the frozen five-site adoption as one tests-only change: update
-the local interface, preserve the progress run-return wire under its new key,
-construct the final base record with `deadlineSenderWire`, finalize it with the
-shared helper so both run-return operands survive, and replace the RED terminal
-control with exact-value, array-identity, deadline-identity, accumulated-field
-and frozen-record assertions plus missing/invalid sender-custody controls. It
+GREEN performs the frozen bounded adoption as one tests-only change: update the
+local interface, use the shared constant as the computed progress run-return
+wire key, construct the explicitly typed final base record with
+`deadlineSenderWire`, finalize it with the shared helper so both run-return
+operands survive, rename the one post-loop aggregate binding to
+`deadlineSenderWire`, and replace the RED terminal control with exact-value,
+array-identity, deadline-identity, accumulated-field, relative-stage-field and
+frozen-record assertions plus missing/invalid sender-custody controls. It
 must not move either browser capture or the final assignment. Run the same
 suffix-anchored list guard once and the focused JSON test exactly once. Accepted
 GREEN is status zero, expected 1, skipped 0, unexpected 0, flaky 0, empty
 top-level errors and absent/null result `softErrors`. Then run strict standalone
 TypeScript for the test owner, exact-owner ESLint, 8 GiB exact-owner Prettier and
 `git diff --check` exactly once each. Source evidence must prove the old
-interface/progress/final `senderWire` keys absent, the exact campaign-start
-derivation and twenty-one post-custody expectations byte-identical, and the
-three custody keys assigned before the unchanged final-evidence replacement.
+interface/progress/final/post-loop `senderWire` keys absent by checking only key
+positions—no `readonly senderWire` member, `senderWire:` property,
+`{ senderWire }` shorthand or `({ senderWire })` binding remains. It must not use
+a substring absence check because unchanged local `senderWire`,
+`senderWireAtDeadline` and the new keys legitimately contain that substring.
+The exact campaign-start derivation and twenty-one post-custody expectations
+remain byte-identical; the post-loop aggregate remains semantically identical
+apart from its binding name; and the three custody keys are assigned before the
+unchanged final-evidence replacement.
 Record all outputs/hashes in `.logs/d108e4ar-green/`, validate a self-excluding
 manifest, then sign and push GREEN.
 
 Formal GREEN review repeats the bounded Grok/Kimi/Opus protocol and verifies
-that the focused pass exercises the shared helper adopted by the live final
-record, the three exact values remain non-homonymous, the existing final fields
-and error codes are preserved, all static gates pass and the diff contains only
-the two owner files. After zero P0/P1 and explicit P2 disposition, record and
-validate `.logs/d108e4ar-green-review/` and sign/push closure. D.108e4ar then
+that the focused pass exercises the shared helper and key constant in isolation;
+source evidence, not focused execution, must prove the live final record uses
+that same helper/constant pair. It also verifies that the three exact values
+remain non-homonymous, the nineteen retained final fields plus renamed deadline
+field and two additions are preserved, all error codes and static gates pass and
+the diff contains only the two owner files. After zero P0/P1 and explicit P2
+disposition, record and validate `.logs/d108e4ar-green-review/` and sign/push closure. D.108e4ar then
 closes only the post-replacement evidence-custody residual. It neither proves a
 product defect nor authorizes a retained campaign; the next action is the
 separate plan-only freeze reassessment required by D.108e4aq.
+
+Initial plan review of signed/pushed `f70cd74c3544f7d8c2c9ad7afe2cd342e591369d`
+does not close the gate. Grok 4.6/high session
+`01a04fe9-da36-7ea3-916f-f5fefa568ed4` returned CHANGES_REQUIRED with zero P0,
+two P1s and one P2. Exact Kimi K3 session
+`777a098c-3a06-4b3b-8661-eff59659d7e1` emitted exactly `CHECK001` through
+`CHECK100` plus terminal `RESULT`, CHANGES_REQUIRED with zero P0, one P1 and two
+P2s. Opus 5/xhigh session `2f4620e8-618c-4061-b01b-61e0d1a32599` returned
+CHANGES_REQUIRED with two P0s, four P1s and six P2s. No reviewer edited the
+tracked tree, ran a test, build, browser, profiler or campaign, invoked Fable or
+used a subagent.
+
+The same-round correction above accepts the complete union. It adds the omitted
+post-loop deadline-wire consumer; makes the sender guard precede timestamp
+delegation; separates the old-shape two-operand proof from the sender-only
+terminal fixture; requires exact full-message acceptance; freezes the generic
+helper/base/result types; couples writer and reader through one constant;
+narrows homonym and absence claims to record-key positions; preserves local
+bindings and the exact derivation bytes; records the `Infinity` fallbacks,
+relative-versus-absolute timestamp domains, twenty-two-field accounting,
+success-attachment growth and due date; and qualifies focused execution versus
+source-only live adoption. D.108e4ar's plan/evidence owner closes every P2 in
+this correction before RED and no later than 2026-09-02. The correction changes
+only this plan and creates no execution authority.
+
+Sign and push the correction, then run one read-only Grok 4.6/high, exact Kimi
+K3 100-check and Opus 5/xhigh confirmation against the corrected commit. The
+confirmation must explicitly verify each initial P0/P1 closure and the P2
+dispositions above. RED remains prohibited until all three return zero P0/P1,
+the complete `.logs/d108e4ar-plan-review/` evidence root has a validating
+self-excluding manifest, and a separate signed/pushed plan-review closure records
+the exact results.
