@@ -75604,3 +75604,245 @@ subject of the formal freeze review. This two-commit construction supersedes
 only the impossible self-referential hash equality; all manifest, mode, copy,
 expiry, predecessor, signed-HEAD and fail-closed gates remain mandatory. Neither
 commit authorizes campaign-root setup before the formal freeze review closes.
+
+Signed/pushed D.108e4as readiness-evidence anchor
+`53141bbf193379843d8183fa3e8b9b72cfc5dbec` makes the preceding evidence and
+hashes immutable. The following root-setup and six launch blocks supersede the
+earlier placeholder examples in full. They contain no placeholder, mutable hash
+variable, per-session shim or production-relative executable. The freeze anchor
+is hardcoded; the live signed HEAD must equal upstream, descend from that anchor
+and have exactly this plan as its changed-path union since the anchor. The
+signed Node-plus-Corepack prefix is an explicitly authorized runner diff while
+the inherited watchdog and Playwright arguments remain frozen.
+
+Campaign-root setup is forbidden until the formal freeze review over the second
+signed/pushed checkpoint containing these blocks closes with zero P0/P1. Once
+that review closes, execute this block once in a fresh shell:
+
+```sh
+set -eu
+ordinary_repo=/Users/aristotle/Documents/Projects/ts-drp-1
+freeze_anchor=53141bbf193379843d8183fa3e8b9b72cfc5dbec
+freeze_root="$ordinary_repo/.logs/d108e4as-freeze"
+campaign_root="$ordinary_repo/.logs/d108e4as-campaign"
+plan_path=docs/production-hardening/production-hardening-tdd-plan-v2.md
+test "$(/bin/date -u +%Y%m%d%H%M%S)" -le 20260905235959
+test ! -e "$campaign_root"
+/usr/bin/git -C "$ordinary_repo" verify-commit "$freeze_anchor"
+/usr/bin/git -C "$ordinary_repo" merge-base --is-ancestor "$freeze_anchor" HEAD
+test "$(/usr/bin/git -C "$ordinary_repo" rev-parse HEAD)" = "$(/usr/bin/git -C "$ordinary_repo" rev-parse origin/codex/phase3a1b-p6-golden-path)"
+/usr/bin/git -C "$ordinary_repo" verify-commit HEAD
+test "$(/usr/bin/git -C "$ordinary_repo" diff --name-only "$freeze_anchor"..HEAD | /usr/bin/sort -u)" = "$plan_path"
+/usr/bin/git -C "$ordinary_repo" diff --quiet 1642b17111a1330b5af0eea9e62d24469f1693e4 -- . \
+  ':(exclude)docs/production-hardening/production-hardening-tdd-plan-v2.md'
+/usr/bin/git -C "$ordinary_repo" diff --cached --quiet 1642b17111a1330b5af0eea9e62d24469f1693e4 -- . \
+  ':(exclude)docs/production-hardening/production-hardening-tdd-plan-v2.md'
+test "$(/usr/bin/shasum -a 256 "$freeze_root/SHA256SUMS" | /usr/bin/awk '{print $1}')" = c577dbdab0a7e78cdd57b99b0d4d1f85f56c8e5b4df03e6fa214d3db5e6c266d
+(cd "$freeze_root" && /usr/bin/shasum -a 256 -c SHA256SUMS >/dev/null)
+test "$(/usr/bin/shasum -a 256 "$freeze_root/MODE-SHA256SUMS" | /usr/bin/awk '{print $1}')" = 9e5307bfe32d9998ed53f2d521bda4283cd6ed4b9c4cc4da27480f967897eadc
+/bin/zsh "$freeze_root/verify-modes.zsh"
+/bin/mkdir "$campaign_root"
+printf '%s\n' 'I expressly authorize all six D.108e4ad long retained-campaign invocations under the frozen fail-closed rules.' > "$campaign_root/authorization.txt"
+/bin/cp -n "$freeze_root/run-one.zsh" "$campaign_root/run-one.zsh"
+/bin/cp -n "$freeze_root/endpoint-local-classification.jq" "$campaign_root/endpoint-local-classification.jq"
+/bin/cp -n "$freeze_root/classification-validation.jq" "$campaign_root/classification-validation.jq"
+test "$(/usr/bin/shasum -a 256 "$campaign_root/authorization.txt" | /usr/bin/awk '{print $1}')" = 03fdd987ba7d141645826769edc9c78376568483ca543a3183645ad510d03747
+test "$(/usr/bin/shasum -a 256 "$campaign_root/run-one.zsh" | /usr/bin/awk '{print $1}')" = b8dca51e0015323cdeb48e519917a9a8facbf369fe7909435aa2c7356a4ec3b1
+test "$(/usr/bin/shasum -a 256 "$campaign_root/endpoint-local-classification.jq" | /usr/bin/awk '{print $1}')" = 99d7d65caaad75ae34370d93c230c91e16d6459ccc23594672bb2557254cced9
+test "$(/usr/bin/shasum -a 256 "$campaign_root/classification-validation.jq" | /usr/bin/awk '{print $1}')" = 9508e84117c225c1432ffc6c0ec9b4d7eaeb7fdbc0cc55cb52b05ad63229b245
+test "$(/usr/bin/stat -f %Lp "$campaign_root/authorization.txt")" = 644
+test "$(/usr/bin/stat -f %Lp "$campaign_root/run-one.zsh")" = 644
+test "$(/usr/bin/stat -f %Lp "$campaign_root/endpoint-local-classification.jq")" = 644
+test "$(/usr/bin/stat -f %Lp "$campaign_root/classification-validation.jq")" = 644
+```
+
+After setup, execute exactly the following six blocks in order, each as a
+separate fresh shell. Each block repeats the complete signed guard. Blocks two
+through six additionally require the immediate predecessor's terminal status
+to be exactly zero. `COREPACK_ENABLE_NETWORK=0` and
+`COREPACK_ENABLE_DOWNLOAD_PROMPT=0` are explicit at the launcher and again
+inside the signed runner. No loop, retry, overwrite, substitution,
+`--repeat-each` or continuation after nonzero is authorized.
+
+```sh
+set -eu
+ordinary_repo=/Users/aristotle/Documents/Projects/ts-drp-1
+freeze_anchor=53141bbf193379843d8183fa3e8b9b72cfc5dbec
+freeze_root="$ordinary_repo/.logs/d108e4as-freeze"
+campaign_root="$ordinary_repo/.logs/d108e4as-campaign"
+plan_path=docs/production-hardening/production-hardening-tdd-plan-v2.md
+test "$(/bin/date -u +%Y%m%d%H%M%S)" -le 20260905235959
+/usr/bin/git -C "$ordinary_repo" verify-commit "$freeze_anchor"
+/usr/bin/git -C "$ordinary_repo" merge-base --is-ancestor "$freeze_anchor" HEAD
+test "$(/usr/bin/git -C "$ordinary_repo" rev-parse HEAD)" = "$(/usr/bin/git -C "$ordinary_repo" rev-parse origin/codex/phase3a1b-p6-golden-path)"
+/usr/bin/git -C "$ordinary_repo" verify-commit HEAD
+test "$(/usr/bin/git -C "$ordinary_repo" diff --name-only "$freeze_anchor"..HEAD | /usr/bin/sort -u)" = "$plan_path"
+test "$(/usr/bin/shasum -a 256 "$freeze_root/SHA256SUMS" | /usr/bin/awk '{print $1}')" = c577dbdab0a7e78cdd57b99b0d4d1f85f56c8e5b4df03e6fa214d3db5e6c266d
+(cd "$freeze_root" && /usr/bin/shasum -a 256 -c SHA256SUMS >/dev/null)
+test "$(/usr/bin/shasum -a 256 "$freeze_root/MODE-SHA256SUMS" | /usr/bin/awk '{print $1}')" = 9e5307bfe32d9998ed53f2d521bda4283cd6ed4b9c4cc4da27480f967897eadc
+/bin/zsh "$freeze_root/verify-modes.zsh"
+test "$(/usr/bin/shasum -a 256 "$campaign_root/authorization.txt" | /usr/bin/awk '{print $1}')" = 03fdd987ba7d141645826769edc9c78376568483ca543a3183645ad510d03747
+test "$(/usr/bin/shasum -a 256 "$campaign_root/run-one.zsh" | /usr/bin/awk '{print $1}')" = b8dca51e0015323cdeb48e519917a9a8facbf369fe7909435aa2c7356a4ec3b1
+test "$(/usr/bin/shasum -a 256 "$campaign_root/endpoint-local-classification.jq" | /usr/bin/awk '{print $1}')" = 99d7d65caaad75ae34370d93c230c91e16d6459ccc23594672bb2557254cced9
+test "$(/usr/bin/shasum -a 256 "$campaign_root/classification-validation.jq" | /usr/bin/awk '{print $1}')" = 9508e84117c225c1432ffc6c0ec9b4d7eaeb7fdbc0cc55cb52b05ad63229b245
+test "$(/usr/bin/stat -f %Lp "$campaign_root/run-one.zsh")" = 644
+test "$(/usr/bin/stat -f %Lp "$campaign_root/endpoint-local-classification.jq")" = 644
+test "$(/usr/bin/stat -f %Lp "$campaign_root/classification-validation.jq")" = 644
+export COREPACK_ENABLE_NETWORK=0 COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+/bin/zsh "$campaign_root/run-one.zsh" ordinary-1 "$ordinary_repo" || exit 1
+```
+
+```sh
+set -eu
+ordinary_repo=/Users/aristotle/Documents/Projects/ts-drp-1
+freeze_anchor=53141bbf193379843d8183fa3e8b9b72cfc5dbec
+freeze_root="$ordinary_repo/.logs/d108e4as-freeze"
+campaign_root="$ordinary_repo/.logs/d108e4as-campaign"
+plan_path=docs/production-hardening/production-hardening-tdd-plan-v2.md
+test "$(/bin/date -u +%Y%m%d%H%M%S)" -le 20260905235959
+/usr/bin/git -C "$ordinary_repo" verify-commit "$freeze_anchor"
+/usr/bin/git -C "$ordinary_repo" merge-base --is-ancestor "$freeze_anchor" HEAD
+test "$(/usr/bin/git -C "$ordinary_repo" rev-parse HEAD)" = "$(/usr/bin/git -C "$ordinary_repo" rev-parse origin/codex/phase3a1b-p6-golden-path)"
+/usr/bin/git -C "$ordinary_repo" verify-commit HEAD
+test "$(/usr/bin/git -C "$ordinary_repo" diff --name-only "$freeze_anchor"..HEAD | /usr/bin/sort -u)" = "$plan_path"
+test "$(/usr/bin/shasum -a 256 "$freeze_root/SHA256SUMS" | /usr/bin/awk '{print $1}')" = c577dbdab0a7e78cdd57b99b0d4d1f85f56c8e5b4df03e6fa214d3db5e6c266d
+(cd "$freeze_root" && /usr/bin/shasum -a 256 -c SHA256SUMS >/dev/null)
+test "$(/usr/bin/shasum -a 256 "$freeze_root/MODE-SHA256SUMS" | /usr/bin/awk '{print $1}')" = 9e5307bfe32d9998ed53f2d521bda4283cd6ed4b9c4cc4da27480f967897eadc
+/bin/zsh "$freeze_root/verify-modes.zsh"
+test "$(/usr/bin/shasum -a 256 "$campaign_root/authorization.txt" | /usr/bin/awk '{print $1}')" = 03fdd987ba7d141645826769edc9c78376568483ca543a3183645ad510d03747
+test "$(/usr/bin/shasum -a 256 "$campaign_root/run-one.zsh" | /usr/bin/awk '{print $1}')" = b8dca51e0015323cdeb48e519917a9a8facbf369fe7909435aa2c7356a4ec3b1
+test "$(/usr/bin/shasum -a 256 "$campaign_root/endpoint-local-classification.jq" | /usr/bin/awk '{print $1}')" = 99d7d65caaad75ae34370d93c230c91e16d6459ccc23594672bb2557254cced9
+test "$(/usr/bin/shasum -a 256 "$campaign_root/classification-validation.jq" | /usr/bin/awk '{print $1}')" = 9508e84117c225c1432ffc6c0ec9b4d7eaeb7fdbc0cc55cb52b05ad63229b245
+test "$(/usr/bin/stat -f %Lp "$campaign_root/run-one.zsh")" = 644
+test "$(/usr/bin/stat -f %Lp "$campaign_root/endpoint-local-classification.jq")" = 644
+test "$(/usr/bin/stat -f %Lp "$campaign_root/classification-validation.jq")" = 644
+test "$(/bin/cat "$campaign_root/ordinary-1.runner-status")" = 0
+export COREPACK_ENABLE_NETWORK=0 COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+/bin/zsh "$campaign_root/run-one.zsh" ordinary-2 "$ordinary_repo" || exit 1
+```
+
+```sh
+set -eu
+ordinary_repo=/Users/aristotle/Documents/Projects/ts-drp-1
+freeze_anchor=53141bbf193379843d8183fa3e8b9b72cfc5dbec
+freeze_root="$ordinary_repo/.logs/d108e4as-freeze"
+campaign_root="$ordinary_repo/.logs/d108e4as-campaign"
+plan_path=docs/production-hardening/production-hardening-tdd-plan-v2.md
+test "$(/bin/date -u +%Y%m%d%H%M%S)" -le 20260905235959
+/usr/bin/git -C "$ordinary_repo" verify-commit "$freeze_anchor"
+/usr/bin/git -C "$ordinary_repo" merge-base --is-ancestor "$freeze_anchor" HEAD
+test "$(/usr/bin/git -C "$ordinary_repo" rev-parse HEAD)" = "$(/usr/bin/git -C "$ordinary_repo" rev-parse origin/codex/phase3a1b-p6-golden-path)"
+/usr/bin/git -C "$ordinary_repo" verify-commit HEAD
+test "$(/usr/bin/git -C "$ordinary_repo" diff --name-only "$freeze_anchor"..HEAD | /usr/bin/sort -u)" = "$plan_path"
+test "$(/usr/bin/shasum -a 256 "$freeze_root/SHA256SUMS" | /usr/bin/awk '{print $1}')" = c577dbdab0a7e78cdd57b99b0d4d1f85f56c8e5b4df03e6fa214d3db5e6c266d
+(cd "$freeze_root" && /usr/bin/shasum -a 256 -c SHA256SUMS >/dev/null)
+test "$(/usr/bin/shasum -a 256 "$freeze_root/MODE-SHA256SUMS" | /usr/bin/awk '{print $1}')" = 9e5307bfe32d9998ed53f2d521bda4283cd6ed4b9c4cc4da27480f967897eadc
+/bin/zsh "$freeze_root/verify-modes.zsh"
+test "$(/usr/bin/shasum -a 256 "$campaign_root/authorization.txt" | /usr/bin/awk '{print $1}')" = 03fdd987ba7d141645826769edc9c78376568483ca543a3183645ad510d03747
+test "$(/usr/bin/shasum -a 256 "$campaign_root/run-one.zsh" | /usr/bin/awk '{print $1}')" = b8dca51e0015323cdeb48e519917a9a8facbf369fe7909435aa2c7356a4ec3b1
+test "$(/usr/bin/shasum -a 256 "$campaign_root/endpoint-local-classification.jq" | /usr/bin/awk '{print $1}')" = 99d7d65caaad75ae34370d93c230c91e16d6459ccc23594672bb2557254cced9
+test "$(/usr/bin/shasum -a 256 "$campaign_root/classification-validation.jq" | /usr/bin/awk '{print $1}')" = 9508e84117c225c1432ffc6c0ec9b4d7eaeb7fdbc0cc55cb52b05ad63229b245
+test "$(/usr/bin/stat -f %Lp "$campaign_root/run-one.zsh")" = 644
+test "$(/usr/bin/stat -f %Lp "$campaign_root/endpoint-local-classification.jq")" = 644
+test "$(/usr/bin/stat -f %Lp "$campaign_root/classification-validation.jq")" = 644
+test "$(/bin/cat "$campaign_root/ordinary-2.runner-status")" = 0
+export COREPACK_ENABLE_NETWORK=0 COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+/bin/zsh "$campaign_root/run-one.zsh" ordinary-3 "$ordinary_repo" || exit 1
+```
+
+```sh
+set -eu
+ordinary_repo=/Users/aristotle/Documents/Projects/ts-drp-1
+isolated_repo=/private/tmp/ts-drp-d108e4as-clean/repo
+freeze_anchor=53141bbf193379843d8183fa3e8b9b72cfc5dbec
+freeze_root="$ordinary_repo/.logs/d108e4as-freeze"
+campaign_root="$ordinary_repo/.logs/d108e4as-campaign"
+plan_path=docs/production-hardening/production-hardening-tdd-plan-v2.md
+test "$(/bin/date -u +%Y%m%d%H%M%S)" -le 20260905235959
+/usr/bin/git -C "$ordinary_repo" verify-commit "$freeze_anchor"
+/usr/bin/git -C "$ordinary_repo" merge-base --is-ancestor "$freeze_anchor" HEAD
+test "$(/usr/bin/git -C "$ordinary_repo" rev-parse HEAD)" = "$(/usr/bin/git -C "$ordinary_repo" rev-parse origin/codex/phase3a1b-p6-golden-path)"
+/usr/bin/git -C "$ordinary_repo" verify-commit HEAD
+test "$(/usr/bin/git -C "$ordinary_repo" diff --name-only "$freeze_anchor"..HEAD | /usr/bin/sort -u)" = "$plan_path"
+test "$(/usr/bin/shasum -a 256 "$freeze_root/SHA256SUMS" | /usr/bin/awk '{print $1}')" = c577dbdab0a7e78cdd57b99b0d4d1f85f56c8e5b4df03e6fa214d3db5e6c266d
+(cd "$freeze_root" && /usr/bin/shasum -a 256 -c SHA256SUMS >/dev/null)
+test "$(/usr/bin/shasum -a 256 "$freeze_root/MODE-SHA256SUMS" | /usr/bin/awk '{print $1}')" = 9e5307bfe32d9998ed53f2d521bda4283cd6ed4b9c4cc4da27480f967897eadc
+/bin/zsh "$freeze_root/verify-modes.zsh"
+test "$(/usr/bin/shasum -a 256 "$campaign_root/authorization.txt" | /usr/bin/awk '{print $1}')" = 03fdd987ba7d141645826769edc9c78376568483ca543a3183645ad510d03747
+test "$(/usr/bin/shasum -a 256 "$campaign_root/run-one.zsh" | /usr/bin/awk '{print $1}')" = b8dca51e0015323cdeb48e519917a9a8facbf369fe7909435aa2c7356a4ec3b1
+test "$(/usr/bin/shasum -a 256 "$campaign_root/endpoint-local-classification.jq" | /usr/bin/awk '{print $1}')" = 99d7d65caaad75ae34370d93c230c91e16d6459ccc23594672bb2557254cced9
+test "$(/usr/bin/shasum -a 256 "$campaign_root/classification-validation.jq" | /usr/bin/awk '{print $1}')" = 9508e84117c225c1432ffc6c0ec9b4d7eaeb7fdbc0cc55cb52b05ad63229b245
+test "$(/usr/bin/stat -f %Lp "$campaign_root/run-one.zsh")" = 644
+test "$(/usr/bin/stat -f %Lp "$campaign_root/endpoint-local-classification.jq")" = 644
+test "$(/usr/bin/stat -f %Lp "$campaign_root/classification-validation.jq")" = 644
+test "$(/bin/cat "$campaign_root/ordinary-3.runner-status")" = 0
+export COREPACK_ENABLE_NETWORK=0 COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+/bin/zsh "$campaign_root/run-one.zsh" isolated-1 "$isolated_repo" || exit 1
+```
+
+```sh
+set -eu
+ordinary_repo=/Users/aristotle/Documents/Projects/ts-drp-1
+isolated_repo=/private/tmp/ts-drp-d108e4as-clean/repo
+freeze_anchor=53141bbf193379843d8183fa3e8b9b72cfc5dbec
+freeze_root="$ordinary_repo/.logs/d108e4as-freeze"
+campaign_root="$ordinary_repo/.logs/d108e4as-campaign"
+plan_path=docs/production-hardening/production-hardening-tdd-plan-v2.md
+test "$(/bin/date -u +%Y%m%d%H%M%S)" -le 20260905235959
+/usr/bin/git -C "$ordinary_repo" verify-commit "$freeze_anchor"
+/usr/bin/git -C "$ordinary_repo" merge-base --is-ancestor "$freeze_anchor" HEAD
+test "$(/usr/bin/git -C "$ordinary_repo" rev-parse HEAD)" = "$(/usr/bin/git -C "$ordinary_repo" rev-parse origin/codex/phase3a1b-p6-golden-path)"
+/usr/bin/git -C "$ordinary_repo" verify-commit HEAD
+test "$(/usr/bin/git -C "$ordinary_repo" diff --name-only "$freeze_anchor"..HEAD | /usr/bin/sort -u)" = "$plan_path"
+test "$(/usr/bin/shasum -a 256 "$freeze_root/SHA256SUMS" | /usr/bin/awk '{print $1}')" = c577dbdab0a7e78cdd57b99b0d4d1f85f56c8e5b4df03e6fa214d3db5e6c266d
+(cd "$freeze_root" && /usr/bin/shasum -a 256 -c SHA256SUMS >/dev/null)
+test "$(/usr/bin/shasum -a 256 "$freeze_root/MODE-SHA256SUMS" | /usr/bin/awk '{print $1}')" = 9e5307bfe32d9998ed53f2d521bda4283cd6ed4b9c4cc4da27480f967897eadc
+/bin/zsh "$freeze_root/verify-modes.zsh"
+test "$(/usr/bin/shasum -a 256 "$campaign_root/authorization.txt" | /usr/bin/awk '{print $1}')" = 03fdd987ba7d141645826769edc9c78376568483ca543a3183645ad510d03747
+test "$(/usr/bin/shasum -a 256 "$campaign_root/run-one.zsh" | /usr/bin/awk '{print $1}')" = b8dca51e0015323cdeb48e519917a9a8facbf369fe7909435aa2c7356a4ec3b1
+test "$(/usr/bin/shasum -a 256 "$campaign_root/endpoint-local-classification.jq" | /usr/bin/awk '{print $1}')" = 99d7d65caaad75ae34370d93c230c91e16d6459ccc23594672bb2557254cced9
+test "$(/usr/bin/shasum -a 256 "$campaign_root/classification-validation.jq" | /usr/bin/awk '{print $1}')" = 9508e84117c225c1432ffc6c0ec9b4d7eaeb7fdbc0cc55cb52b05ad63229b245
+test "$(/usr/bin/stat -f %Lp "$campaign_root/run-one.zsh")" = 644
+test "$(/usr/bin/stat -f %Lp "$campaign_root/endpoint-local-classification.jq")" = 644
+test "$(/usr/bin/stat -f %Lp "$campaign_root/classification-validation.jq")" = 644
+test "$(/bin/cat "$campaign_root/isolated-1.runner-status")" = 0
+export COREPACK_ENABLE_NETWORK=0 COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+/bin/zsh "$campaign_root/run-one.zsh" isolated-2 "$isolated_repo" || exit 1
+```
+
+```sh
+set -eu
+ordinary_repo=/Users/aristotle/Documents/Projects/ts-drp-1
+isolated_repo=/private/tmp/ts-drp-d108e4as-clean/repo
+freeze_anchor=53141bbf193379843d8183fa3e8b9b72cfc5dbec
+freeze_root="$ordinary_repo/.logs/d108e4as-freeze"
+campaign_root="$ordinary_repo/.logs/d108e4as-campaign"
+plan_path=docs/production-hardening/production-hardening-tdd-plan-v2.md
+test "$(/bin/date -u +%Y%m%d%H%M%S)" -le 20260905235959
+/usr/bin/git -C "$ordinary_repo" verify-commit "$freeze_anchor"
+/usr/bin/git -C "$ordinary_repo" merge-base --is-ancestor "$freeze_anchor" HEAD
+test "$(/usr/bin/git -C "$ordinary_repo" rev-parse HEAD)" = "$(/usr/bin/git -C "$ordinary_repo" rev-parse origin/codex/phase3a1b-p6-golden-path)"
+/usr/bin/git -C "$ordinary_repo" verify-commit HEAD
+test "$(/usr/bin/git -C "$ordinary_repo" diff --name-only "$freeze_anchor"..HEAD | /usr/bin/sort -u)" = "$plan_path"
+test "$(/usr/bin/shasum -a 256 "$freeze_root/SHA256SUMS" | /usr/bin/awk '{print $1}')" = c577dbdab0a7e78cdd57b99b0d4d1f85f56c8e5b4df03e6fa214d3db5e6c266d
+(cd "$freeze_root" && /usr/bin/shasum -a 256 -c SHA256SUMS >/dev/null)
+test "$(/usr/bin/shasum -a 256 "$freeze_root/MODE-SHA256SUMS" | /usr/bin/awk '{print $1}')" = 9e5307bfe32d9998ed53f2d521bda4283cd6ed4b9c4cc4da27480f967897eadc
+/bin/zsh "$freeze_root/verify-modes.zsh"
+test "$(/usr/bin/shasum -a 256 "$campaign_root/authorization.txt" | /usr/bin/awk '{print $1}')" = 03fdd987ba7d141645826769edc9c78376568483ca543a3183645ad510d03747
+test "$(/usr/bin/shasum -a 256 "$campaign_root/run-one.zsh" | /usr/bin/awk '{print $1}')" = b8dca51e0015323cdeb48e519917a9a8facbf369fe7909435aa2c7356a4ec3b1
+test "$(/usr/bin/shasum -a 256 "$campaign_root/endpoint-local-classification.jq" | /usr/bin/awk '{print $1}')" = 99d7d65caaad75ae34370d93c230c91e16d6459ccc23594672bb2557254cced9
+test "$(/usr/bin/shasum -a 256 "$campaign_root/classification-validation.jq" | /usr/bin/awk '{print $1}')" = 9508e84117c225c1432ffc6c0ec9b4d7eaeb7fdbc0cc55cb52b05ad63229b245
+test "$(/usr/bin/stat -f %Lp "$campaign_root/run-one.zsh")" = 644
+test "$(/usr/bin/stat -f %Lp "$campaign_root/endpoint-local-classification.jq")" = 644
+test "$(/usr/bin/stat -f %Lp "$campaign_root/classification-validation.jq")" = 644
+test "$(/bin/cat "$campaign_root/isolated-2.runner-status")" = 0
+export COREPACK_ENABLE_NETWORK=0 COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+/bin/zsh "$campaign_root/run-one.zsh" isolated-3 "$isolated_repo" || exit 1
+```
+
+The D.108e4as ledger remains zero until the first runner crosses its atomic
+preflight move. A non-consuming environmental refusal remains evidence and may
+be corrected only without deletion or overwrite. The first consumed nonzero
+status stops all later blocks. Six zero terminal statuses remain subject to a
+separate signed/pushed campaign-evidence checkpoint and formal
+Grok/Codex/Opus evidence review before D.108e4 or D.108e5 may resume.
