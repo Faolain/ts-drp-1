@@ -80775,3 +80775,74 @@ reporters, attachments, classifiers, manifests, status custody and the
 plan-to-execution binding. A consuming failure stops immediately for narrow
 evidence-led diagnosis. D.108e5 remains blocked until all six pass and that
 final evidence review closes with no P0/P1.
+
+The first confidence invocation, `confidence-ordinary-1`, passed without a
+retry: Playwright status and terminal runner status are both zero, and its
+reporter is expected=1, skipped=0, unexpected=0 and flaky=0. The second fresh
+name, `confidence-ordinary-2`, is a consuming failure: both statuses are one,
+its reporter is expected=0, skipped=0, unexpected=1 and flaky=0 with no
+top-level error, and the sole test failed after 76.332 seconds with exact
+`D108E4H_DROP_COUNT_AMBIGUOUS` at `e3-03-0-assertions`. The reporter duration
+is 84.899015 seconds. Its reporter, failure telemetry and endpoint-local
+classification SHA-256 values are respectively
+`81a11579e75b5bf27f86bacf3f242eb2121ab1c178604d589f2db48868d8727d`,
+`d807aabd4955692b0a912923ab8502e70a1c6872a175bb31dfda5d1bb5e41c79`
+and
+`528291cad9a29a9ee96277fffc4e520a8d3507008e8a7877ef3d202a50c5be65`.
+The first-failure rule therefore leaves `confidence-ordinary-3` and all three
+`confidence-isolated-*` names unrun and artifact-free. They are not resumed,
+renamed or reused.
+
+This failure is not stale classification or duplicated accounting. The exact
+endpoint-local result is creator/receiver `2/0`, which the frozen truth table
+correctly rejects. The creator acceptor installed the product handler on open
+replacement RTC `10/394`, received READY and COMMIT, promoted it, and retired
+old selected RTC `8/367` with the first local `replacement` drop. The receiver
+initiator had open pending RTC `10/383`, had received both ACKs and sent both
+COMMITs, but kept selected RTC `8/366` because neither the old-channel close nor
+an application frame on pending B arrived. The fixed 600-sample raw workload
+had completed on A before B promoted. At the inherited absolute setup deadline
+the receiver discarded handshake-qualified B; 44 ms later its peer close
+closed creator B and caused the second creator-local `channel-close` drop.
+Receiver A remained selected and open. This is the accepted D.108e4au/bi
+one-way transition failing to converge when close propagation is delayed and
+application traffic is idle, not a libp2p false-positive finding: the earlier
+monitor TimeoutError is only the trigger that made replacement necessary.
+
+###### D.108e4bl — idle handshake-qualified replacement retention
+
+D.108e4bl owns only the concrete post-campaign lifecycle gap above in
+`packages/network/src/unreliable-webrtc.ts`, one deterministic fake-RTC owner
+row in `packages/network/tests/unreliable-webrtc-e3-01-red.test.ts`, and this
+plan/evidence record. Preserve public APIs, dependencies, route/snapshot wire
+formats, authenticated identity authority, raw payload semantics, the fixed
+campaign workload and thresholds, ports, browser configuration, memory and
+resource ceilings, and every consumed campaign artifact. Do not weaken or
+reclassify endpoint-local `2/0`, patch js-libp2p, change connection-monitor
+policy, or launch another retained campaign during RED.
+
+Freeze one deterministic RED from the existing D.108e4bi causal fixture.
+Establish old authenticated pair A, disconnect its authenticated owner without
+closing raw A, and establish replacement B. Before B can promote, hold the
+initiator's old-A local close event and peer-close propagation. Release B open,
+prove the acceptor selected B after exact READY/ACK/COMMIT qualification while
+the initiator retained selected A and handshake-qualified pending B, and send
+no application traffic on B. Advance the existing absolute setup deadline.
+The frozen expectation is that delayed A close alone must not destroy the
+qualified B pair or produce a second local drop: acceptor B remains active,
+initiator A remains usable while B is pending, both B channels remain open,
+and the drop counts remain exact acceptor/initiator `1/0`. Current code must
+instead expire initiator B, close acceptor B and produce the deterministic
+acceptor/initiator `2/0` causal RED.
+
+Run only that exact test title once for RED. If the result differs from this
+matrix, stop and diagnose it. A GREEN design must preserve the retained lost-
+READY/ACK/COMMIT behavior: an unqualified or unconfirmed replacement still
+expires and leaves usable A intact. It may not merely remove the deadline,
+extend a timeout, add post-workload fixture traffic, accept `2/0`, or rely on
+probabilistic close delivery. Because satisfying both qualified-idle retention
+and lost-control cleanup may require an internal readiness protocol change,
+stop after causal RED and freeze the smallest explicit GREEN state-machine
+change before editing production source. The four unconsumed D.108e4bk names
+remain permanently unrun; a later reviewed fresh ledger is required after
+GREEN rather than attempting to continue this failed ledger.
