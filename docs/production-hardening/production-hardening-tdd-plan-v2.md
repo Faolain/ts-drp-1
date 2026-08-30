@@ -81540,3 +81540,78 @@ equal the pushed branch, the protected roster and 26 stashes unchanged, no
 ts-drp reviewer/test/profiler, and ports 4174/4175/51000/51002 clear. An
 unrelated Playwright server rooted in another project and the two previously
 documented evidence-watcher shells are not conflicts.
+
+#### D.108e4bo late canceled-offer pre-open supersession
+
+The single fresh D.108e4bn retained-browser invocation consumed
+`.logs/d108e4bn-retained-browser-1/` from signed/pushed plan-only descendant
+`f5e88fbe86f47a5a85e57092fee917ee6d7f2934` and failed without retry. It
+selected exactly one title in one file, retries=0, and returned
+expected/skipped/unexpected/flaky `0/0/1/0`. Test duration was 42.413 seconds
+and reporter duration was 51.342 seconds; the 600-second watchdog was not
+reached. Preliminary 30% calibration and its no-loss reset passed. The failure
+occurred at the subsequent `workbench-total-loss-calibration` creator reset:
+the receiver exposed one active raw A while the creator remained at zero raw
+links for the full ten-second open-pair predicate. No retained-seven or
+campaign invocation ran.
+
+Captured telemetry proves a different owner defect from D.108e4bn's
+established-pending-B leak. Creator A closed on restart. Its first B offer was
+already in flight but the creator abandoned and closed B before the receiver
+processed the delayed request. The receiver then accepted that late offer,
+created acceptor PC 3 at wall time `1788130598261`, and held it pre-open in
+`connecting` until test teardown at `1788130608261`; it never produced a raw
+data-channel open event. During that interval the elected creator made 26
+further attempts. Every fresh initiator PC was closed after signaling
+rejection, creator `handshakeFailures` reached 26, and the final attempt was
+still connecting when evidence was captured. The receiver's old A remained
+open but its PC was disconnected, and the receiver's pre-open B occupied the
+generic per-peer pending-PC guard. D.108e4bn intentionally excluded pre-open
+pending PCs, so its established non-open replacement prune could not release
+this slot.
+
+Reporter, preliminary calibration, failure telemetry, error context, trace and
+validating self-excluding evidence-index SHA-256 values are respectively
+`a01e1d5575dfa298623f88200bccff612515730473efcd1a58ad8f4bbfeab184`,
+`f7744ff2fd2831ebd9f35c9d40fce720e33ce5597266a59c415b38d833c426bc`,
+`677a28d923f6d873d191bd0b83ad4c614a78770f9dd7d2699f28e9a53124e85b`,
+`67604669a019c6310e3bff17bc5a2980cd4956d190c44e6cd74dd2eb92166f7b`,
+`e2fb16f6ae500552415991df8c4d91cb320a7ebabde755e41e7e1f1f35fddc9a`
+and
+`21f470825516c79c9d66490929ac45bfbfdb2de7fa8ffd719d28f5713a05349e`.
+The consumed root is immutable. Fixed ports are clear, protected paths and all
+26 stashes remain preserved.
+
+Freeze D.108e4bo as one narrow authenticated-offer supersession repair:
+
+1. Add one deterministic fake-RTC RED. Establish A, start B from the elected
+   initiator, hold B before the acceptor receives an open data channel, and
+   cancel B locally without delivering peer-close before its delayed valid
+   offer leaves a pre-open acceptor PC. A subsequent valid C offer on the same
+   current authenticated connection must supersede and close only that peer's
+   pre-open B, admit C and restore one active raw link at both endpoints.
+   Current GREEN must fail with exact token
+   `D108E4BO_LATE_OFFER_ADMISSION_BLOCKED`.
+2. Reuse the existing pending-PC cleanup owner after current-connection and
+   offer validity checks. When there is no established open pending
+   replacement, a fresh valid offer may close the same peer's older pre-open
+   pending PC before ordinary admission. An established open pending B,
+   including open/disconnected B, must still reject another offer unchanged.
+3. Do not add sequence fields, signaling APIs, timers, thresholds, retries,
+   dependencies or product configuration. Do not change reliable connection
+   selection, the 10-second setup deadline, channel readiness, activation,
+   wire identity, workload or campaign contracts. Malformed and superseded-
+   connection requests must remain non-mutating as proved by D.108e4bn.
+4. Focused RED must select the new causal row plus all six D.108e4bn controls.
+   GREEN must pass that focused set, the complete owner file, network
+   build/typecheck, exact source/test lint and format, source-shape/refactor-
+   clean audit and diff checks. No browser, retained-seven or campaign run is
+   permitted inside RED/GREEN.
+
+Because this changes incoming production offer admission for pre-open PCs,
+sign and push the bounded plan and run one Grok/Codex-`gpt-5.6-sol`-high/Opus-
+xhigh plan review. Only P0/P1 blocks; correct one material union at most. RED
+causality is deterministic and receives no separate model round. After signed
+GREEN, run the one final three-model implementation review. An empty blocking
+union releases one new retained-browser name; the consumed D.108e4bn name must
+never be retried. No Kimi, Fable or collaboration subagent is authorized.
