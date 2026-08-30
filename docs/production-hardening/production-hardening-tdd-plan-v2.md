@@ -78512,3 +78512,108 @@ retained campaign title. The first combined read-only list/shape shell used
 `set -e` with a zero-match `rg -c` and overcounted direct helper calls, so the
 expected absence returned shell status one. The corrected explicit-count
 diagnostics return zero; that regex/status mistake is not a code failure.
+
+###### D.108e4az — authenticated-loss bilateral-restart discriminator
+
+D.108e4az owns the last deterministic product question left by D.108e4ax and
+D.108e4ay. D.108e4ax proved bilateral raw restart in both synchronous caller
+orders while authenticated signaling identity stayed stable. The sole browser
+replay in D.108e4ay likewise converged with zero authenticated connection
+losses and zero handshake failures. Consumed `ordinary-3` instead ended with
+one authenticated connection loss at each endpoint, asymmetric 27/1 handshake
+failures and no raw link. The browser evidence discarded the continuous
+pre-reset monitor/lifecycle history, so it cannot establish whether signaling
+loss caused raw recovery failure, merely overlapped it, or followed a prior
+unusable connection. Another browser replay is forbidden and unnecessary for
+this deterministic product discriminator.
+
+The existing network-owner harness already models authenticated connection
+closure, replacement connection identity/generation, exact exchange records,
+both raw roles, synchronous bilateral restart, peer-close barriers, fake time,
+route ingress and retry quiescence. D.108e4az changes only
+`packages/network/tests/unreliable-webrtc-e3-01-red.test.ts`. It adds one
+four-row test matrix crossing:
+
+- lower-id-first and higher-id-first synchronous `restart()` call order; and
+- replacement signaling availability before restart versus after restart.
+
+Every row first connects `peer-a` and `peer-b`, reconciles one shared route,
+proves one active raw link per endpoint and sends one application payload in
+each direction. It then captures both old raw channels, disconnects the exact
+authenticated signaling pair and proves both raw snapshots still have one
+usable old link plus exactly one authenticated connection loss, zero handshake
+failures and zero link drops. This is the distinguishing precondition absent
+from both passing prior discriminators.
+
+For `replacement-before-restart`, connect the new authenticated pair before
+calling either restart. For `replacement-after-restart`, leave signaling
+absent through both restart calls, prove no exchange was fabricated, then
+connect the replacement pair and explicitly call both route `reconcile()`
+methods. That explicit reconcile models the existing DRPNode connection-event
+owner; the raw owner is not required to discover a newly arrived libp2p
+connection without its caller. Neither row invents a product callback or new
+API.
+
+Both local restart drops must occur in one synchronous turn. Pause propagation
+of the first caller's old peer-channel close, invoke the first and second
+`restart()` without awaiting between them, then release the peer-close barrier.
+The row is invalid if either endpoint records a peer-induced `channel-close`
+instead of its own `restart`, if an exchange occurs against a missing or stale
+authenticated connection, or if the after-restart row omits the explicit
+connection-arrival reconcile. Reversing the rows changes only which route's
+restart is invoked first.
+
+The causal acceptance matrix is exact. After replacement availability and any
+required reconcile, exactly one new signaling exchange must use the lower
+endpoint's replacement connection id/generation. Both endpoints must select
+their corresponding replacement connection id/generation, retain exactly one
+authenticated connection loss, retain zero handshake failures, record exactly
+one `restart` link drop, restore one active raw link, deliver a new payload in
+both directions and remain quiescent across two 250 ms retry cycles with no
+new peer connection or counter change. Old channels must be closed and the
+replacement channels must be the only active raw pair.
+
+If all four rows pass, current product does not reproduce `ordinary-3` under
+authenticated loss immediately before bilateral restart, whether replacement
+signaling is already present or arrives afterward. Close D.108e4az without a
+causal RED; product GREEN, upstream attribution, another browser invocation,
+threshold changes and campaign authority remain forbidden. If a row fails
+before initial bidirectional traffic, before both owned restart drops, because
+the peer-close barrier was attached to the wrong old channel, or because the
+after-restart fixture fails to announce the new connection with reconcile,
+that is fixture error and cannot be called causal. If it fails only after the
+frozen precondition and observes the required replacement exchange but cannot
+restore the replacement ids and bidirectional delivery, that is a causal RED.
+Stop and plan the narrow product GREEN; do not alter production in this slice.
+
+The focused collection command must select exactly four tests in one file and
+no browser/campaign title. After the plan gate, implement the complete matrix
+in one batch, run static gates, then execute the focused unit test exactly
+once:
+
+```sh
+pnpm exec vitest run packages/network/tests/unreliable-webrtc-e3-01-red.test.ts \
+  -t 'D.108e4az converges after authenticated loss with replacement (before|after) restart and the (lower|higher)-id caller first' \
+  --reporter=json
+```
+
+The reporter must contain exactly four passed or causal failed rows in one
+file, zero skipped selected rows, zero top-level errors and no retry. Record
+the complete result set, exchange ids/generations, snapshot counters, changed
+paths, source hashes and a validating self-excluding evidence manifest.
+Required non-browser gates are the focused collection audit, complete
+`unreliable-webrtc-e3-01-red.test.ts`, network package typecheck/build,
+exact-owner ESLint/Prettier, `git diff --check`, source-shape custody and the
+protected path/stash/process/port predicates. No Playwright, retained browser
+test, long campaign, dependency, configuration, example, product source,
+threshold, workload, immutable evidence or invocation ledger may change.
+
+This bounded plan is signed and pushed before one Grok/Codex-high/Opus-xhigh
+plan review. Kimi remains replaced by the user-authorized Codex
+`gpt-5.6-sol` high reviewer; Fable and collaboration subagents remain
+prohibited. Only P0/P1 blocks. Correct a material union once and use a
+deterministic local audit; P2 receives a disposition without another fixture,
+confirmation round or review-policy slice. RED receives deterministic evidence
+validation rather than a separate model round. A final three-model review is
+required only if a later GREEN changes product behavior; a passing
+discriminator receives no extra review ceremony.
