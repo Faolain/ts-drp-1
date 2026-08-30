@@ -81615,3 +81615,57 @@ causality is deterministic and receives no separate model round. After signed
 GREEN, run the one final three-model implementation review. An empty blocking
 union releases one new retained-browser name; the consumed D.108e4bn name must
 never be retried. No Kimi, Fable or collaboration subagent is authorized.
+
+The bounded D.108e4bo plan review rejects this supersession design before RED
+or production implementation. Codex `gpt-5.6-sol` high returned
+`CHANGES_REQUIRED`, P0=0/P1=3/P2=0. It proves that peer-wide cleanup by a stale
+B handler can later close successor C; the receiver has no discriminator that
+separates abandoned delayed B from a legitimate slow concurrent offer; and
+structurally valid but RTC-invalid C would destroy B before RTC admission was
+proved. Opus xhigh returned `CHANGES_REQUIRED`, P0=1/P1=1/P2=4. Its P0 proves
+that even successful C admission is insufficient in the captured state:
+receiver A remains channel-open on a disconnected PC, so C is held as an
+acceptor pending replacement, cannot be promoted while A is considered usable,
+drops application ingress, and is discarded at its readiness deadline. Its P1
+independently rejects arrival-order supersession without an attempt/cancellation
+owner. Grok remained actively inspecting but reached its 900-second bound
+without a terminal object; it is honestly `NO_VERDICT_TIMEOUT` and is not
+relaunched.
+
+Review prompt, Codex result, Opus raw result, Grok public text, Grok status and
+Grok event-stream SHA-256 values are respectively
+`2d5147ea9adc9a66c85e92c0d357c236e281d736e4d2b466d0d9e609adad5d49`,
+`173626cde53fa7ff322ddcac7ff41ee56cd885588d60e18d57f13847086c8f89`,
+`b96a947732518232b55fff8b06cab71df28e99a9ff6ce0ab727a876a153a21fd`,
+`262a2db1daff1437dd22443049a4a5004eb4b321a645f2bd6a63de7cc1e12165`,
+`03cec2b653b113b081037372174147c010131a1303b5a85584eead07731f6b81`
+and
+`c556c0cd22a27b04143aecb62d65d3bc06a5eede31f1b8f91ed9324e427f124e`.
+Opus's P2 corrections are accepted as evidence wording: the receiver slot is a
+bounded stall equal to `SETUP_TIMEOUT_MS`, not an unbounded leak; guard
+attribution is inferred from PC-3 occupancy rather than the shared rejection
+string; an orphaned accept finish would defer one handshake-failure increment;
+and the existing pre-open lifetime row belongs in any future focused set.
+
+D.108e4bo is stopped before RED. A viable repair requires a separately frozen
+high-risk slice with two explicit behavior owners:
+
+1. Request-scoped signaling cancellation/delivery ownership so failure to
+   deliver an answer aborts and cleans only that request's exact acceptor PC.
+   The current exported `AuthenticatedWebRtcSignalingPort.onRequest` callback
+   carries no request signal or completion owner, so adding this discriminator
+   changes an exported product interface unless an equivalent existing seam is
+   found.
+2. Qualified-replacement promotion when selected A's data channel remains open
+   but A's PeerConnection is disconnected, proving bidirectional application
+   ingress and survival beyond the acceptor deadline. This changes the selected-
+   link usability/promotion contract and must not be folded silently into a
+   pre-open admission edit.
+
+Any authorized reslice must deterministically pin exact-PC cleanup, stale-B
+completion after C, the retained concurrent-valid-offer rejection, a
+structurally valid but RTC-invalid offer, reverse delivery order, the captured
+open-channel/disconnected-A state, bilateral application ingress, and survival
+past the original deadline. It must retain all D.108e4bn controls and the
+existing pre-open lifetime row. No further retained or campaign invocation is
+authorized by this rejected plan.
