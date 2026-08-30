@@ -437,12 +437,27 @@ interface D108e4hRawSend {
 	readonly sequence: number;
 }
 
+type D108e4avControlBytes = readonly [0x44, 0x52, 0x01, 1 | 2 | 3];
+
+interface D108e4avControlReceive {
+	readonly bytes: D108e4avControlBytes;
+	readonly channelId: number;
+	readonly connectionId: number;
+	readonly lifecycleSequence: number;
+}
+
+interface D108e4avControlSend extends D108e4avControlReceive {
+	readonly attemptId: number;
+}
+
 interface D108e4hOverlapObservation extends AcceptedObservationIdentity {
 	readonly lifecycleSequence: number;
 }
 
 interface D108e4hEndpointCustody {
 	readonly acceptedRaw: readonly D108e4hOverlapObservation[];
+	readonly controlReceives?: readonly D108e4avControlReceive[];
+	readonly controlSends?: readonly D108e4avControlSend[];
 	readonly deadline: D108e4hBoundaryCustody;
 	readonly lifecycle: readonly D108e4hLifecycleObservation[];
 	readonly monitor: readonly D108e4hMonitorObservation[];
@@ -1487,6 +1502,55 @@ function d108e4hOverlapFromWire(records: readonly PlatformObservation[]): readon
 	);
 }
 
+function d108e4avControlBytes(record: RtcObservation): D108e4avControlBytes | undefined {
+	if (record.label !== "ts-drp-ephemeral/1" || record.byteLength !== 4) return undefined;
+	const bytes = new TextEncoder().encode(record.text);
+	if (
+		bytes.byteLength !== 4 ||
+		bytes[0] !== 0x44 ||
+		bytes[1] !== 0x52 ||
+		bytes[2] !== 0x01 ||
+		(bytes[3] !== 1 && bytes[3] !== 2 && bytes[3] !== 3)
+	) {
+		return undefined;
+	}
+	return Object.freeze([0x44, 0x52, 0x01, bytes[3]]);
+}
+
+function d108e4avControlsFromCapture(
+	records: readonly RtcObservation[],
+	direction: "message"
+): readonly D108e4avControlReceive[];
+function d108e4avControlsFromCapture(
+	records: readonly RtcObservation[],
+	direction: "send"
+): readonly D108e4avControlSend[];
+function d108e4avControlsFromCapture(
+	records: readonly RtcObservation[],
+	direction: "message" | "send"
+): readonly (D108e4avControlReceive | D108e4avControlSend)[] {
+	const controls: (D108e4avControlReceive | D108e4avControlSend)[] = [];
+	for (const record of records) {
+		if (record.direction !== direction) continue;
+		const bytes = d108e4avControlBytes(record);
+		if (bytes === undefined) continue;
+		if (record.lifecycleSequence === undefined) throw new Error("D108E4H_IDENTITY_JOIN_INVALID");
+		const identity = Object.freeze({
+			bytes,
+			channelId: record.channelId,
+			connectionId: record.connectionId,
+			lifecycleSequence: record.lifecycleSequence,
+		});
+		if (direction === "message") {
+			controls.push(identity);
+			continue;
+		}
+		if (record.attemptId === undefined) throw new Error("D108E4H_IDENTITY_JOIN_INVALID");
+		controls.push(Object.freeze({ ...identity, attemptId: record.attemptId }));
+	}
+	return Object.freeze(controls);
+}
+
 function d108e4hEndpointFromCapture(
 	capture: D108e4hPageCapture,
 	input: Readonly<{
@@ -1502,6 +1566,8 @@ function d108e4hEndpointFromCapture(
 ): D108e4hEndpointCustody {
 	return Object.freeze({
 		acceptedRaw: d108e4hOverlapFromWire(input.acceptedRaw),
+		controlReceives: d108e4avControlsFromCapture(capture.rtc.records, "message"),
+		controlSends: d108e4avControlsFromCapture(capture.rtc.records, "send"),
 		deadline: d108e4hBoundaryFromCapture(capture, input.remotePeerId),
 		lifecycle: d108e4hLifecycleFromCapture(capture.rtc.lifecycle, input.trialId),
 		monitor: Object.freeze(capture.monitor.filter(({ peerId }) => peerId === input.remotePeerId)),
@@ -3088,6 +3154,17 @@ function d108e4hAssertOpenRepeats(lifecycle: readonly D108e4hLifecycleObservatio
 	}
 }
 
+function d108e4avAssertControlBytes(bytes: readonly number[], code: string): void {
+	d108e4hAssert(
+		bytes.length === 4 &&
+			bytes[0] === 0x44 &&
+			bytes[1] === 0x52 &&
+			bytes[2] === 0x01 &&
+			(bytes[3] === 1 || bytes[3] === 2 || bytes[3] === 3),
+		code
+	);
+}
+
 function d108e4hAssertAttemptCustody(
 	endpoint: D108e4hEndpointCustody,
 	before: D108e4hRtcIdentity,
@@ -3096,12 +3173,47 @@ function d108e4hAssertAttemptCustody(
 	sampleCount: number,
 	incomingReplacement = false
 ): void {
-	const attempts = endpoint.lifecycle.filter(
+	const allAttempts = endpoint.lifecycle.filter(
 		({ event, label }) => event === "channel-send-attempt" && label === "ts-drp-ephemeral/1"
 	);
-	const terminals = endpoint.lifecycle.filter(
+	const allTerminals = endpoint.lifecycle.filter(
 		({ event, label }) =>
 			label === "ts-drp-ephemeral/1" && (event === "channel-send-success" || event === "channel-send-failure")
+	);
+	const controlAttemptIds = new Set<number>();
+	for (const control of endpoint.controlSends ?? []) {
+		d108e4avAssertControlBytes(control.bytes, "D108E4H_IDENTITY_JOIN_INVALID");
+		d108e4hAssert(
+			Number.isSafeInteger(control.attemptId) &&
+				control.attemptId >= 0 &&
+				Number.isSafeInteger(control.lifecycleSequence) &&
+				control.lifecycleSequence >= 0 &&
+				!controlAttemptIds.has(control.attemptId) &&
+				!endpoint.rawSends.some(({ attemptId }) => attemptId === control.attemptId),
+			"D108E4H_IDENTITY_JOIN_INVALID"
+		);
+		controlAttemptIds.add(control.attemptId);
+		const joinedAttempts = allAttempts.filter(({ attemptId }) => attemptId === control.attemptId);
+		d108e4hAssert(joinedAttempts.length === 1, "D108E4H_IDENTITY_JOIN_INVALID");
+		const attempt = joinedAttempts[0] as D108e4hLifecycleObservation;
+		d108e4hAssert(
+			attempt.channelId === control.channelId &&
+				attempt.connectionId === control.connectionId &&
+				attempt.sequence === control.lifecycleSequence,
+			"D108E4H_IDENTITY_JOIN_INVALID"
+		);
+		const joinedTerminals = allTerminals.filter(({ attemptId }) => attemptId === control.attemptId);
+		d108e4hAssert(joinedTerminals.length === 1, "D108E4H_ATTEMPT_TERMINAL_CARDINALITY");
+		const terminal = joinedTerminals[0] as D108e4hLifecycleObservation;
+		d108e4hAssert(
+			terminal.channelId === control.channelId && terminal.connectionId === control.connectionId,
+			"D108E4H_IDENTITY_JOIN_INVALID"
+		);
+		d108e4hAssert(attempt.sequence < terminal.sequence, "D108E4H_LIFECYCLE_ORDER_INVALID");
+	}
+	const attempts = allAttempts.filter(({ attemptId }) => attemptId === undefined || !controlAttemptIds.has(attemptId));
+	const terminals = allTerminals.filter(
+		({ attemptId }) => attemptId === undefined || !controlAttemptIds.has(attemptId)
 	);
 	if (!endpoint.transmitsRawTrial) {
 		d108e4hAssert(
@@ -3197,9 +3309,28 @@ function d108e4hAssertOverlapCustody(
 	transitionReason: "channel-close" | "replacement" | undefined,
 	incomingReplacement = false
 ): void {
-	const messages = endpoint.lifecycle.filter(
+	const allMessages = endpoint.lifecycle.filter(
 		({ event, label }) => event === "channel-message" && label === "ts-drp-ephemeral/1"
 	);
+	const controlMessageSequences = new Set<number>();
+	for (const control of endpoint.controlReceives ?? []) {
+		d108e4avAssertControlBytes(control.bytes, "D108E4H_OVERLAP_LEDGER_INVALID");
+		d108e4hAssert(
+			Number.isSafeInteger(control.lifecycleSequence) &&
+				control.lifecycleSequence >= 0 &&
+				!controlMessageSequences.has(control.lifecycleSequence),
+			"D108E4H_OVERLAP_LEDGER_INVALID"
+		);
+		controlMessageSequences.add(control.lifecycleSequence);
+		const joinedMessages = allMessages.filter(({ sequence }) => sequence === control.lifecycleSequence);
+		d108e4hAssert(joinedMessages.length === 1, "D108E4H_OVERLAP_LEDGER_INVALID");
+		const message = joinedMessages[0] as D108e4hLifecycleObservation;
+		d108e4hAssert(
+			message.connectionId === control.connectionId && message.channelId === control.channelId,
+			"D108E4H_OVERLAP_LEDGER_INVALID"
+		);
+	}
+	const messages = allMessages.filter(({ sequence }) => !controlMessageSequences.has(sequence));
 	const ledger = [...endpoint.acceptedRaw, ...endpoint.rejectedRaw];
 	const joined = new Set<number>();
 	for (const record of ledger) {
@@ -3619,6 +3750,516 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 			"D108E4AV_NONTRANSMITTER_CONTROL_REJECTED"
 		);
 		d108e4avCausalRed(receivedControlRed, "D108E4H_OVERLAP_LEDGER_INVALID", "D108E4AV_RECEIVED_CONTROL_REJECTED");
+		const d108e4avWithEndpoint = (
+			fixture: D108e4hValidationInput,
+			name: "creator" | "receiver",
+			patch: Partial<D108e4hEndpointCustody>
+		): D108e4hValidationInput =>
+			Object.freeze({
+				...fixture,
+				endpoints: Object.freeze({
+					...fixture.endpoints,
+					[name]: Object.freeze({ ...fixture.endpoints[name], ...patch }),
+				}),
+			});
+		const d108e4avExpectCode = (fixture: D108e4hValidationInput, code: string, label: string): void => {
+			expect.soft(() => validateD108e4hCampaignCustody(fixture), label).toThrowError(code);
+		};
+		const d108e4avInvalidBytes = (...bytes: number[]): D108e4avControlBytes =>
+			Object.freeze(bytes) as unknown as D108e4avControlBytes;
+		const transmitterControl = d108e4hOnly(transmitterControlRed.endpoints.creator.controlSends ?? []);
+		const transmitterAttempt = d108e4hOnly(
+			transmitterControlRed.endpoints.creator.lifecycle.filter(
+				({ attemptId, event }) => attemptId === transmitterControl.attemptId && event === "channel-send-attempt"
+			)
+		);
+		const transmitterTerminal = d108e4hOnly(
+			transmitterControlRed.endpoints.creator.lifecycle.filter(
+				({ attemptId, event }) =>
+					attemptId === transmitterControl.attemptId &&
+					(event === "channel-send-success" || event === "channel-send-failure")
+			)
+		);
+		const nontransmitterControl = d108e4hOnly(nontransmitterControlRed.endpoints.receiver.controlSends ?? []);
+		const receivedControl = d108e4hOnly(receivedControlRed.endpoints.receiver.controlReceives ?? []);
+		for (const kind of [1, 2, 3] as const) {
+			expect
+				.soft(
+					() =>
+						validateD108e4hCampaignCustody(
+							d108e4avWithEndpoint(transmitterControlRed, "creator", {
+								controlSends: Object.freeze([
+									Object.freeze({ ...transmitterControl, bytes: d108e4avControlBytes(kind) }),
+								]),
+							})
+						),
+					`transmitting endpoint accepts control kind ${kind}`
+				)
+				.not.toThrow();
+			expect
+				.soft(
+					() =>
+						validateD108e4hCampaignCustody(
+							d108e4avWithEndpoint(nontransmitterControlRed, "receiver", {
+								controlSends: Object.freeze([
+									Object.freeze({ ...nontransmitterControl, bytes: d108e4avControlBytes(kind) }),
+								]),
+							})
+						),
+					`nontransmitting endpoint accepts control kind ${kind}`
+				)
+				.not.toThrow();
+			expect
+				.soft(
+					() =>
+						validateD108e4hCampaignCustody(
+							d108e4avWithEndpoint(receivedControlRed, "receiver", {
+								controlReceives: Object.freeze([
+									Object.freeze({ ...receivedControl, bytes: d108e4avControlBytes(kind) }),
+								]),
+							})
+						),
+					`receive ledger accepts control kind ${kind}`
+				)
+				.not.toThrow();
+		}
+		for (const [label, bytes] of [
+			["wrong control magic", d108e4avInvalidBytes(0x45, 0x52, 0x01, 1)],
+			["wrong control version", d108e4avInvalidBytes(0x44, 0x52, 0x02, 1)],
+			["control kind zero", d108e4avInvalidBytes(0x44, 0x52, 0x01, 0)],
+			["control kind four", d108e4avInvalidBytes(0x44, 0x52, 0x01, 4)],
+			["three-byte control", d108e4avInvalidBytes(0x44, 0x52, 0x01)],
+			["five-byte control", d108e4avInvalidBytes(0x44, 0x52, 0x01, 1, 0)],
+		] as const) {
+			d108e4avExpectCode(
+				d108e4avWithEndpoint(transmitterControlRed, "creator", {
+					controlSends: Object.freeze([Object.freeze({ ...transmitterControl, bytes })]),
+				}),
+				"D108E4H_IDENTITY_JOIN_INVALID",
+				label
+			);
+		}
+		d108e4avExpectCode(
+			d108e4avWithEndpoint(transmitterControlRed, "creator", { controlSends: Object.freeze([]) }),
+			"D108E4H_IDENTITY_JOIN_INVALID",
+			"transmitting unledgered control remains an application reverse-join failure"
+		);
+		d108e4avExpectCode(
+			d108e4avWithEndpoint(nontransmitterControlRed, "receiver", { controlSends: Object.freeze([]) }),
+			"D108E4H_RAW_SEND_ROLE_INVALID",
+			"nontransmitting unledgered control remains a role failure"
+		);
+		d108e4avExpectCode(
+			d108e4avWithEndpoint(transmitterControlRed, "creator", {
+				controlSends: Object.freeze([Object.freeze({ ...transmitterControl, attemptId: Number.MAX_SAFE_INTEGER + 1 })]),
+			}),
+			"D108E4H_IDENTITY_JOIN_INVALID",
+			"unsafe control attempt id"
+		);
+		d108e4avExpectCode(
+			d108e4avWithEndpoint(transmitterControlRed, "creator", {
+				controlSends: Object.freeze([transmitterControl, Object.freeze({ ...transmitterControl })]),
+			}),
+			"D108E4H_IDENTITY_JOIN_INVALID",
+			"duplicate control attempt id"
+		);
+		d108e4avExpectCode(
+			d108e4avWithEndpoint(transmitterControlRed, "creator", {
+				controlSends: Object.freeze([
+					Object.freeze({
+						...transmitterControl,
+						attemptId: (transmitterControlRed.endpoints.creator.rawSends[0] as D108e4hRawSend).attemptId,
+					}),
+				]),
+			}),
+			"D108E4H_IDENTITY_JOIN_INVALID",
+			"application and control attempt ids are disjoint"
+		);
+		d108e4avExpectCode(
+			d108e4avWithEndpoint(transmitterControlRed, "creator", {
+				lifecycle: Object.freeze(
+					transmitterControlRed.endpoints.creator.lifecycle.filter((record) => record !== transmitterAttempt)
+				),
+			}),
+			"D108E4H_IDENTITY_JOIN_INVALID",
+			"missing control attempt"
+		);
+		d108e4avExpectCode(
+			d108e4avWithEndpoint(transmitterControlRed, "creator", {
+				lifecycle: Object.freeze([
+					...transmitterControlRed.endpoints.creator.lifecycle,
+					d108e4hLifecycle(
+						transmitterControlRed.trialId,
+						transmitterTerminal.sequence + 1,
+						"channel-send-attempt",
+						D108E4H_RTC_B,
+						"rtc-datachannel-send",
+						{ attemptId: transmitterControl.attemptId }
+					),
+				]),
+			}),
+			"D108E4H_IDENTITY_JOIN_INVALID",
+			"duplicate matching control attempts"
+		);
+		for (const [label, control] of [
+			["control connection mismatch", Object.freeze({ ...transmitterControl, connectionId: 999_001 })],
+			["control channel mismatch", Object.freeze({ ...transmitterControl, channelId: 999_002 })],
+			[
+				"control lifecycle sequence mismatch",
+				Object.freeze({ ...transmitterControl, lifecycleSequence: transmitterControl.lifecycleSequence + 1 }),
+			],
+		] as const) {
+			d108e4avExpectCode(
+				d108e4avWithEndpoint(transmitterControlRed, "creator", {
+					controlSends: Object.freeze([control]),
+				}),
+				"D108E4H_IDENTITY_JOIN_INVALID",
+				label
+			);
+		}
+		d108e4avExpectCode(
+			d108e4avWithEndpoint(transmitterControlRed, "creator", {
+				lifecycle: Object.freeze(
+					transmitterControlRed.endpoints.creator.lifecycle.filter((record) => record !== transmitterTerminal)
+				),
+			}),
+			"D108E4H_ATTEMPT_TERMINAL_CARDINALITY",
+			"missing control terminal"
+		);
+		d108e4avExpectCode(
+			d108e4avWithEndpoint(transmitterControlRed, "creator", {
+				lifecycle: Object.freeze([
+					...transmitterControlRed.endpoints.creator.lifecycle,
+					d108e4hLifecycle(
+						transmitterControlRed.trialId,
+						transmitterTerminal.sequence + 1,
+						"channel-send-success",
+						D108E4H_RTC_B,
+						"rtc-datachannel-send",
+						{ attemptId: transmitterControl.attemptId }
+					),
+				]),
+			}),
+			"D108E4H_ATTEMPT_TERMINAL_CARDINALITY",
+			"duplicate control terminal"
+		);
+		d108e4avExpectCode(
+			d108e4avWithEndpoint(transmitterControlRed, "creator", {
+				lifecycle: Object.freeze(
+					transmitterControlRed.endpoints.creator.lifecycle.map((record) =>
+						record === transmitterTerminal
+							? Object.freeze({ ...record, channelId: (record.channelId ?? transmitterControl.channelId) + 1 })
+							: record
+					)
+				),
+			}),
+			"D108E4H_IDENTITY_JOIN_INVALID",
+			"control terminal identity mismatch"
+		);
+		const invertedControlLifecycle = Object.freeze(
+			transmitterControlRed.endpoints.creator.lifecycle.map((record) => {
+				if (record === transmitterAttempt) return Object.freeze({ ...record, event: "channel-send-success" as const });
+				if (record === transmitterTerminal) return Object.freeze({ ...record, event: "channel-send-attempt" as const });
+				return record;
+			})
+		);
+		d108e4avExpectCode(
+			d108e4avWithEndpoint(transmitterControlRed, "creator", {
+				controlSends: Object.freeze([
+					Object.freeze({ ...transmitterControl, lifecycleSequence: transmitterTerminal.sequence }),
+				]),
+				lifecycle: invertedControlLifecycle,
+			}),
+			"D108E4H_LIFECYCLE_ORDER_INVALID",
+			"control terminal precedes attempt"
+		);
+		for (const [label, eventPatch] of [
+			["wrong-label control attempt", Object.freeze({ label: "not-ts-drp" })],
+			["message direction forged into send ledger", Object.freeze({ event: "channel-message" as const })],
+		] as const) {
+			d108e4avExpectCode(
+				d108e4avWithEndpoint(transmitterControlRed, "creator", {
+					lifecycle: Object.freeze(
+						transmitterControlRed.endpoints.creator.lifecycle.map((record) =>
+							record === transmitterAttempt ? Object.freeze({ ...record, ...eventPatch }) : record
+						)
+					),
+				}),
+				"D108E4H_IDENTITY_JOIN_INVALID",
+				label
+			);
+		}
+		expect
+			.soft(
+				() =>
+					validateD108e4hCampaignCustody(
+						d108e4avWithEndpoint(transmitterControlRed, "creator", {
+							lifecycle: Object.freeze(
+								transmitterControlRed.endpoints.creator.lifecycle.map((record) =>
+									record === transmitterTerminal
+										? Object.freeze({ ...record, event: "channel-send-failure" as const })
+										: record
+								)
+							),
+						})
+					),
+				"proved failed control remains outside the application domain"
+			)
+			.not.toThrow();
+		d108e4avExpectCode(
+			d108e4avWithEndpoint(receivedControlRed, "receiver", { controlReceives: Object.freeze([]) }),
+			"D108E4H_OVERLAP_LEDGER_INVALID",
+			"unledgered exact control receive"
+		);
+		d108e4avExpectCode(
+			d108e4avWithEndpoint(receivedControlRed, "receiver", {
+				controlReceives: Object.freeze([
+					Object.freeze({ ...receivedControl, bytes: d108e4avInvalidBytes(0x44, 0x52, 0x02, 3) }),
+				]),
+			}),
+			"D108E4H_OVERLAP_LEDGER_INVALID",
+			"malformed receive control"
+		);
+		d108e4avExpectCode(
+			d108e4avWithEndpoint(receivedControlRed, "receiver", {
+				controlReceives: Object.freeze([receivedControl, Object.freeze({ ...receivedControl })]),
+			}),
+			"D108E4H_OVERLAP_LEDGER_INVALID",
+			"duplicate receive control lifecycle sequence"
+		);
+		const receivedControlMessage = d108e4hOnly(
+			receivedControlRed.endpoints.receiver.lifecycle.filter(
+				({ event, sequence }) => event === "channel-message" && sequence === receivedControl.lifecycleSequence
+			)
+		);
+		d108e4avExpectCode(
+			d108e4avWithEndpoint(receivedControlRed, "receiver", {
+				lifecycle: Object.freeze(
+					receivedControlRed.endpoints.receiver.lifecycle.filter((record) => record !== receivedControlMessage)
+				),
+			}),
+			"D108E4H_OVERLAP_LEDGER_INVALID",
+			"missing matching control message"
+		);
+		for (const [label, messagePatch] of [
+			["wrong-direction control message", Object.freeze({ event: "channel-open-event" as const })],
+			["wrong-label control message", Object.freeze({ label: "not-ts-drp" })],
+			["control message connection mismatch", Object.freeze({ connectionId: receivedControl.connectionId + 1 })],
+			["control message channel mismatch", Object.freeze({ channelId: receivedControl.channelId + 1 })],
+		] as const) {
+			d108e4avExpectCode(
+				d108e4avWithEndpoint(receivedControlRed, "receiver", {
+					lifecycle: Object.freeze(
+						receivedControlRed.endpoints.receiver.lifecycle.map((record) =>
+							record === receivedControlMessage ? Object.freeze({ ...record, ...messagePatch }) : record
+						)
+					),
+				}),
+				"D108E4H_OVERLAP_LEDGER_INVALID",
+				label
+			);
+		}
+		const duplicateControlLifecycleMessage = d108e4avWithEndpoint(receivedControlRed, "receiver", {
+			lifecycle: Object.freeze([
+				...receivedControlRed.endpoints.receiver.lifecycle,
+				Object.freeze({ ...receivedControlMessage }),
+			]),
+		});
+		d108e4avExpectCode(
+			duplicateControlLifecycleMessage,
+			"D108E4H_SEQUENCE_INVALID",
+			"global lifecycle sequence gate precedes duplicate control-message join"
+		);
+		const d108e4avRtcRecord = (
+			direction: "message" | "send",
+			label: string,
+			kind: 1 | 2 | 3,
+			ordinal: number
+		): RtcObservation =>
+			Object.freeze({
+				attemptId: direction === "send" ? 910_000 + ordinal : undefined,
+				atMs: ordinal,
+				byteLength: 4,
+				channelId: 310 + ordinal,
+				connectionId: 410 + ordinal,
+				direction,
+				insertionReadyState: "open",
+				label,
+				lifecycleSequence: 510 + ordinal,
+				maxRetransmits: 0,
+				ordinal,
+				ordered: false,
+				readyState: "open",
+				text: String.fromCharCode(0x44, 0x52, 0x01, kind),
+			});
+		const captureSend = d108e4avRtcRecord("send", "ts-drp-ephemeral/1", 1, 1);
+		const captureMessage = d108e4avRtcRecord("message", "ts-drp-ephemeral/1", 2, 2);
+		const captureWrongLabel = d108e4avRtcRecord("send", "not-ts-drp", 3, 3);
+		expect(d108e4avControlsFromCapture([captureSend, captureMessage, captureWrongLabel], "send")).toEqual([
+			{
+				attemptId: captureSend.attemptId,
+				bytes: [0x44, 0x52, 0x01, 1],
+				channelId: captureSend.channelId,
+				connectionId: captureSend.connectionId,
+				lifecycleSequence: captureSend.lifecycleSequence,
+			},
+		]);
+		expect(d108e4avControlsFromCapture([captureSend, captureMessage, captureWrongLabel], "message")).toEqual([
+			{
+				bytes: [0x44, 0x52, 0x01, 2],
+				channelId: captureMessage.channelId,
+				connectionId: captureMessage.connectionId,
+				lifecycleSequence: captureMessage.lifecycleSequence,
+			},
+		]);
+		const retainedCreatorTransient = Object.freeze({ ...D108E4H_RTC_B, channelId: 390, connectionId: 8 });
+		const retainedReceiverTransient = Object.freeze({ ...D108E4H_RTC_B, channelId: 382, connectionId: 10 });
+		const reconstructedOrdinaryTwo = d108e4avWithEndpoint(
+			d108e4avWithEndpoint(noReplacement, "creator", {
+				controlReceives: Object.freeze([
+					Object.freeze({
+						bytes: d108e4avControlBytes(2),
+						channelId: retainedCreatorTransient.channelId,
+						connectionId: retainedCreatorTransient.connectionId,
+						lifecycleSequence: 1_908,
+					}),
+				]),
+				controlSends: Object.freeze([
+					Object.freeze({
+						attemptId: 778,
+						bytes: d108e4avControlBytes(1),
+						channelId: retainedCreatorTransient.channelId,
+						connectionId: retainedCreatorTransient.connectionId,
+						lifecycleSequence: 1_909,
+					}),
+				]),
+				lifecycle: Object.freeze([
+					...noReplacement.endpoints.creator.lifecycle,
+					d108e4hLifecycle(
+						noReplacement.trialId,
+						1_908,
+						"channel-message",
+						retainedCreatorTransient,
+						"rtc-datachannel-message-event"
+					),
+					d108e4hLifecycle(
+						noReplacement.trialId,
+						1_909,
+						"channel-send-attempt",
+						retainedCreatorTransient,
+						"rtc-datachannel-send",
+						{
+							attemptId: 778,
+						}
+					),
+					d108e4hLifecycle(
+						noReplacement.trialId,
+						1_910,
+						"channel-send-success",
+						retainedCreatorTransient,
+						"rtc-datachannel-send",
+						{
+							attemptId: 778,
+						}
+					),
+					d108e4hLifecycle(
+						noReplacement.trialId,
+						1_911,
+						"channel-open-event",
+						retainedCreatorTransient,
+						"rtc-datachannel-open-event"
+					),
+					d108e4hLifecycle(
+						noReplacement.trialId,
+						1_912,
+						"channel-close-call",
+						retainedCreatorTransient,
+						"product-unreliable-webrtc"
+					),
+					d108e4hLifecycle(
+						noReplacement.trialId,
+						1_913,
+						"channel-close-event",
+						retainedCreatorTransient,
+						"rtc-datachannel-close-event",
+						{ readyState: "closed" }
+					),
+				]),
+			}),
+			"receiver",
+			{
+				controlReceives: Object.freeze([
+					Object.freeze({
+						bytes: d108e4avControlBytes(1),
+						channelId: retainedReceiverTransient.channelId,
+						connectionId: retainedReceiverTransient.connectionId,
+						lifecycleSequence: 1_169,
+					}),
+				]),
+				controlSends: Object.freeze([
+					Object.freeze({
+						attemptId: 196,
+						bytes: d108e4avControlBytes(3),
+						channelId: retainedReceiverTransient.channelId,
+						connectionId: retainedReceiverTransient.connectionId,
+						lifecycleSequence: 1_170,
+					}),
+				]),
+				lifecycle: Object.freeze([
+					...noReplacement.endpoints.receiver.lifecycle,
+					d108e4hLifecycle(
+						noReplacement.trialId,
+						1_168,
+						"channel-open-event",
+						retainedReceiverTransient,
+						"rtc-datachannel-open-event"
+					),
+					d108e4hLifecycle(
+						noReplacement.trialId,
+						1_169,
+						"channel-message",
+						retainedReceiverTransient,
+						"rtc-datachannel-message-event"
+					),
+					d108e4hLifecycle(
+						noReplacement.trialId,
+						1_170,
+						"channel-send-attempt",
+						retainedReceiverTransient,
+						"rtc-datachannel-send",
+						{
+							attemptId: 196,
+						}
+					),
+					d108e4hLifecycle(
+						noReplacement.trialId,
+						1_171,
+						"channel-send-success",
+						retainedReceiverTransient,
+						"rtc-datachannel-send",
+						{
+							attemptId: 196,
+						}
+					),
+					d108e4hLifecycle(
+						noReplacement.trialId,
+						1_172,
+						"channel-close-call",
+						retainedReceiverTransient,
+						"product-unreliable-webrtc"
+					),
+					d108e4hLifecycle(
+						noReplacement.trialId,
+						1_173,
+						"channel-close-event",
+						retainedReceiverTransient,
+						"rtc-datachannel-close-event",
+						{ readyState: "closed" }
+					),
+				]),
+			}
+		);
+		expect(() => validateD108e4hCampaignCustody(reconstructedOrdinaryTwo)).not.toThrow();
 		const preservedCampaignReplay = d108e4iPreservedCampaignReplay();
 		const replayCreator = preservedCampaignReplay.endpoints.creator;
 		const replayReceiver = preservedCampaignReplay.endpoints.receiver;
@@ -6842,7 +7483,11 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 					{ timeout: 20_000 }
 				)
 				.toBe(true);
-			const responderBeforeSend = await rtcLifecycleObservations(responder);
+			const [responderBeforeSend, initiatorBeforeSend, initiatorRecordsBeforeSend] = await Promise.all([
+				rtcLifecycleObservations(responder),
+				rtcLifecycleObservations(initiator),
+				rtcObservations(initiator),
+			]);
 			const responderHandlerAtGate = responderBeforeSend.find(
 				({ channelId, connectionId, event, owner }) =>
 					event === "channel-message-handler-installed" &&
@@ -6850,18 +7495,30 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 					connectionId === preSendResponder.connectionId &&
 					channelId === preSendResponder.channelId
 			);
-			const initiatorBeforeSend = await rtcLifecycleObservations(initiator);
 			const replacementAttemptsBeforeGate = initiatorBeforeSend.filter(
 				({ channelId, connectionId, event }) =>
 					event === "channel-send-attempt" &&
 					connectionId === preSendInitiator.connectionId &&
 					channelId === preSendInitiator.channelId
 			);
+			const replacementControlAttemptIdsBeforeGate = new Set(
+				d108e4avControlsFromCapture(initiatorRecordsBeforeSend, "send")
+					.filter(
+						({ channelId, connectionId }) =>
+							connectionId === preSendInitiator.connectionId && channelId === preSendInitiator.channelId
+					)
+					.map(({ attemptId }) => attemptId)
+			);
+			const replacementApplicationAttemptsBeforeGate = replacementAttemptsBeforeGate.filter(
+				({ attemptId }) => attemptId === undefined || !replacementControlAttemptIdsBeforeGate.has(attemptId)
+			);
 			expect(responderHandlerAtGate).toBeDefined();
-			expect(replacementAttemptsBeforeGate).toHaveLength(0);
+			expect(replacementControlAttemptIdsBeforeGate.size).toBe(replacementAttemptsBeforeGate.length);
+			expect(replacementApplicationAttemptsBeforeGate).toHaveLength(0);
 			const causalHandlerBeforeSendGate = Object.freeze({
 				initiatorReplacement: preSendInitiator,
-				initiatorReplacementAttemptsBeforeGate: replacementAttemptsBeforeGate.length,
+				initiatorReplacementApplicationAttemptsBeforeGate: replacementApplicationAttemptsBeforeGate.length,
+				initiatorReplacementControlAttemptsBeforeGate: replacementControlAttemptIdsBeforeGate.size,
 				owner: "playwright-serial-command-gate",
 				responderHandler: responderHandlerAtGate,
 				responderReplacement: preSendResponder,
@@ -6877,6 +7534,8 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 				responderChannels,
 				initiatorRtc,
 				responderRtc,
+				initiatorRtcRecords,
+				responderRtcRecords,
 				initiatorMonitor,
 				responderMonitor,
 			] = await Promise.all([
@@ -6887,6 +7546,8 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 				rtcChannelStates(responder),
 				rtcLifecycleObservations(initiator),
 				rtcLifecycleObservations(responder),
+				rtcObservations(initiator),
+				rtcObservations(responder),
 				libp2pMonitorObservations(initiator),
 				libp2pMonitorObservations(responder),
 			]);
@@ -6911,19 +7572,28 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 			const newResponderRtc = newResponderRtcChannels[0];
 			if (newResponderRtc === undefined) throw new Error("D108E4G_NEW_RESPONDER_RTC_OWNER_ABSENT");
 			const openRawClose = initiatorRtc.find(
-				({ channelId, connectionId, event, readyState }) =>
+				({ channelId, connectionId, event, owner }) =>
 					event === "channel-close-call" &&
+					owner === "product-unreliable-webrtc" &&
 					connectionId === oldRtc.connectionId &&
-					channelId === oldRtc.channelId &&
-					readyState === "open"
+					channelId === oldRtc.channelId
 			);
 			const newRawOpen = initiatorRtc.find(
 				({ channelId, connectionId, event }) =>
 					event === "channel-open-event" && connectionId === newRtc.connectionId && channelId === newRtc.channelId
 			);
+			const initiatorControlAttemptIds = new Set(
+				d108e4avControlsFromCapture(initiatorRtcRecords, "send").map(({ attemptId }) => attemptId)
+			);
+			const responderControlMessageSequences = new Set(
+				d108e4avControlsFromCapture(responderRtcRecords, "message").map(({ lifecycleSequence }) => lifecycleSequence)
+			);
 			const newRawSendAttempt = initiatorRtc.find(
-				({ channelId, connectionId, event }) =>
-					event === "channel-send-attempt" && connectionId === newRtc.connectionId && channelId === newRtc.channelId
+				({ attemptId, channelId, connectionId, event }) =>
+					event === "channel-send-attempt" &&
+					connectionId === newRtc.connectionId &&
+					channelId === newRtc.channelId &&
+					(attemptId === undefined || !initiatorControlAttemptIds.has(attemptId))
 			);
 			const newRawSendSuccess = initiatorRtc.find(
 				({ attemptId, channelId, connectionId, event }) =>
@@ -6940,10 +7610,11 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 					channelId === newResponderRtc.channelId
 			);
 			const responderFirstMessage = responderRtc.find(
-				({ channelId, connectionId, event }) =>
+				({ channelId, connectionId, event, sequence }) =>
 					event === "channel-message" &&
 					connectionId === newResponderRtc.connectionId &&
-					channelId === newResponderRtc.channelId
+					channelId === newResponderRtc.channelId &&
+					!responderControlMessageSequences.has(sequence)
 			);
 			const evidence = Object.freeze({
 				causalHandlerBeforeSendGate,
@@ -6990,7 +7661,8 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 			expect(newRtc.channelId).toBe(causalHandlerBeforeSendGate.initiatorReplacement.channelId);
 			expect(newResponderRtc.connectionId).toBe(causalHandlerBeforeSendGate.responderReplacement.connectionId);
 			expect(newResponderRtc.channelId).toBe(causalHandlerBeforeSendGate.responderReplacement.channelId);
-			expect(initiatorZone.rawTransport.lastLinkDrop).toBe("replacement");
+			expect(["channel-close", "replacement"]).toContain(initiatorZone.rawTransport.lastLinkDrop);
+			expect(initiatorZone.rawTransport.linkDrops - initialInitiatorZone.rawTransport.linkDrops).toBe(1);
 			expect(newRaw.connectionId).not.toBe(oldRaw.connectionId);
 			expect(newRaw.generation).toBeGreaterThan(oldRaw.generation);
 			expect(

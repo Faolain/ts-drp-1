@@ -77745,3 +77745,115 @@ The validating self-excluding RED manifest has SHA-256
 `7ea7aceaef40d2525bbd346b360936ba2b3b075f6cc5e21277d97736ccddfcb2`.
 This is the required causal failure, so sign and push RED without a separate
 model round, then implement only the frozen send/receive custody GREEN.
+
+D.108e4av GREEN remains test/evidence-only. The final executable owner adds
+exact READY/ACK/COMMIT byte capture for both send roles and exact received
+controls, fail-closed attempt/terminal/message joins, control/application
+partitioning before the inherited reverse joins, explicit live empty ledgers,
+the complete send/receive mutant matrix and a reconstructed ordinary-2
+transient-channel positive. Product source, APIs, protocol bytes, dependencies,
+configuration, workload, thresholds, campaign launchers and immutable campaign
+evidence are unchanged. Final test-owner SHA-256 is
+`54f3061eb9d4d7cf00d3d5172194c71261b960a5d004c610438bba891de3a292`.
+
+One frozen mutant expectation required a deterministic precedence correction.
+A literal duplicate lifecycle row cannot reach the receive overlap join because
+the existing global monotonic sequence gate runs first; it therefore retains
+the established exact `D108E4H_SEQUENCE_INVALID`. A duplicate receive-ledger
+row with the same owned sequence independently proves
+`D108E4H_OVERLAP_LEDGER_INVALID`. This preserves, rather than weakens, the
+existing D.108e4aa sequence contract. All other frozen send/receive mutants
+retain the planned exact codes, including terminal cardinality, identity,
+ordering, role and overlap failures. The proved failed-control terminal remains
+a positive and every inherited application mutant still executes unchanged.
+
+The first focused GREEN command ran from `2026-08-30T09:22:15Z` through
+`09:22:32Z`, returned zero and reported exactly one expected test in one file,
+zero skipped/unexpected/flaky tests, zero top-level errors and no soft failure.
+After the retained-only expectation corrections below, the same focused test
+ran again on the corrected module and reported the same `1/0/0/0` matrix with
+reporter SHA-256
+`23f796c4e747ff66a3a417b90d1f7883ffdfd7207967004f5a8d473fcfc71338`.
+Its wrapper then attempted to assign zsh's reserved read-only variable
+`status` after Playwright had completed, so the bookkeeping wrapper returned
+one before writing its status/end-time files. The reporter, stdout and zero
+result-error set prove the underlying Playwright pass; the faulty wrapper is
+preserved and was not treated as a code failure or rerun. The later final-source
+seven-title run includes and passes this focused test again.
+
+The originally frozen retained command was mechanically incomplete: it enabled
+`D108E4H_TELEMETRY=1` but omitted the existing
+`D108E4G_TELEMETRY=1` registration guard on two of its seven named titles. It
+therefore returned zero with five passes, not the required seven; this is
+preserved as partial evidence, not represented as the retained gate. A corrected
+`--list` with both guards selected exactly seven tests in one file. The corrected
+retained command is:
+
+```sh
+D108E4H_TELEMETRY=1 D108E4G_TELEMETRY=1 \
+PLAYWRIGHT_JSON_OUTPUT_NAME=.logs/d108e4av-green/retained-seven-green.json \
+pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep '(validates schema-v3 replacement custody without cross-peer clocks|raw sequence evidence includes the fixed sample-domain boundaries|partitions receiver evidence by exact product roster without losing observations|separates rendered product-roster metrics from boundary-aware application evidence|freezes RTC metadata at the event boundary before async payload conversion|records a versioned and causally joined RTC lifecycle without changing delivery|proves replacement open before retiring the stale authenticated raw owner)$' \
+  --reporter=json \
+  --fail-on-flaky-tests
+```
+
+That exact selection exposed three stale retained expectations sequentially;
+each full result remains immutable and each correction was made only after its
+complete attachment was inspected. First, the current-owner test counted four
+exact authenticated readiness-control attempts as application sends before the
+causal gate. It now joins those attempts to the exact-byte control ledger and
+continues to require zero application attempts before the gate; its later first
+send/message searches similarly exclude only proved controls. Second, the exact
+old owner had a product close call, but after the native close event its
+decision-time state was `closed`; the test now joins the product-owned call by
+the independently captured previously-open connection/channel identity rather
+than requiring call-time `readyState=open`. Third, endpoint-local handoff
+ownership produced the already-supported peer-dependent `channel-close` reason
+in one run instead of `replacement`; the test now accepts only those two frozen
+reasons and separately requires exactly one link-drop increment. No product
+behavior or semantic gate changed.
+
+The final retained command ran from `2026-08-30T09:32:25Z` through
+`09:32:50Z`, returned zero and reported expected/skipped/unexpected/flaky
+`7/0/0/0`, zero top-level errors, no retries and all seven exact titles in one
+file. Reporter SHA-256 is
+`1f9a16944f63dcd125d9005140e33cf4fe82eba334c90a788a434c837db8ddc5`.
+The prior corrected-selection results are preserved honestly: one
+`6/0/1/0` control-attempt expectation failure, one `6/0/1/0` obsolete
+close-state failure and one `6/0/1/0` peer-dependent reason failure. No long
+campaign, retry of a consuming name, reviewer, profiler, Fable, Kimi or
+collaboration subagent ran.
+
+The final static/build gates are zero: strict standalone TypeScript for the
+test owner, `@ts-drp/network` typecheck and build, exact-owner ESLint, test
+Prettier, plan Prettier and `git diff --check`. The initial combined
+test-plus-plan Prettier command exhausted Node's default 4 GiB heap while
+formatting the 77k-line plan; split exact-owner commands passed, with only the
+plan formatter receiving `NODE_OPTIONS=--max-old-space-size=8192`. This is a
+formatter-process resource correction, not a source or product threshold
+change. Product/config/package/lock hashes remain respectively
+`969c68c54d7fa9b20e35aeea005a9abedc67b4277bbfb24242469f01323886b6`,
+`1826318a19d5676631f6350fa21d2eb1125dbc1d83ecce69d7f776885bdd7978`,
+`91f8580615221ffa864302936ec8bb34661331c711955b08f3d7da83a6d43293`
+and
+`73c7c0660fa32c7380d0fe5a026897a7ad85a40edf1f169730c2d8e44e613a99`.
+The immutable campaign manifest remains
+`8b54ff2be8d1a27e2072365fb3db9f8f78847ea229da8c4c16898797c7f14c24`;
+custody remains two consumed failures, zero passes and four unrun names.
+
+The deterministic final audit returns zero with exact summary
+`FOCUSED_FINAL=1/0/0/0`, `RETAINED_FINAL=7/0/0/0`, the two tracked owners,
+eight protected untracked paths, 26 stashes and unchanged campaign custody.
+Audit script and stdout SHA-256 values are
+`d7363b87d950167dd15cf0c144606c70d6d359a05730faa0c28539882ad14fe2`
+and
+`15aa16e16c5e984b5c2aafec7fc1f7c8198afdf912183ed34a5217a2e0598639`.
+The validating self-excluding GREEN manifest covers 96 files; its SHA-256 is
+`e269906151def094a259e0e02f4d42d57a205b676baf7ad4cb3f42c35399e73b`
+and its 96-line validation record SHA-256 is
+`cad86775c44ceaef40535338c976c6d88e42edfda27094fc1d04922143657cc7`.
+Every listed artifact reports OK. This GREEN checkpoint is ready for a signed
+push and the sole formal Grok/Codex-high/Opus-xhigh implementation review; it
+does not restore campaign authority.
