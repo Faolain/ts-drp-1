@@ -78732,3 +78732,116 @@ cannot assign them to product, browser scheduling, js-libp2p or upstream
 behavior. No product GREEN or final implementation review is justified by this
 passing discriminator. D.108e4az therefore closes at test-only non-reproduction
 and leaves the existing campaign failures immutable and unattributed.
+
+###### D.108e4ba — transient 27/1 handshake-failure recovery discriminator
+
+D.108e4ba owns the one bounded deterministic product question explicitly left
+open by D.108e4az. Consumed `ordinary-3` reached a valid bilateral `restart`
+drop with one authenticated connection loss at each endpoint, then ended with
+no raw link and asymmetric handshake-failure counters 27 at the initiating
+endpoint and 1 at the receiving endpoint. D.108e4az proved that the same
+authenticated-loss/bilateral-restart sequence converges when the replacement
+handshake is clean. Existing retained unit rows prove that one rejected or
+timed-out replacement retains usable A and that a retry allocation begins, but
+they stop before a later clean retry converges. They therefore neither prove
+nor disprove recovery from the observed asymmetric transient-failure state.
+
+This slice changes only
+`packages/network/tests/unreliable-webrtc-e3-01-red.test.ts`. It reuses
+`FakeSignalingBus.requestTransform`, the synchronous bilateral-restart
+peer-close barrier, fake timers and existing snapshot/ingress oracles; it adds
+no fixture API. Two rows reverse only which route calls `restart()` first:
+lower-id first and higher-id first. Each row:
+
+- establishes the `peer-a`/`peer-b` raw route and proves bidirectional traffic;
+- disconnects the exact authenticated pair and proves one retained usable raw
+  link, one authenticated connection loss, zero handshake failures and zero
+  drops at each endpoint;
+- leaves signaling absent, pauses propagation of the first caller's local raw
+  close, invokes both restarts in one synchronous turn, releases the barrier,
+  awaits both promises and proves two local `restart` drops, closed old
+  channels, no exchange growth and no active raw link;
+- connects exactly one replacement authenticated pair and keeps that exact
+  pair current for the rest of the row;
+- uses one local request-transform closure whose first replacement offer
+  becomes a malformed request delivered to the receiver's counted handshake
+  path, whose next 26 offers throw before receiver-handler entry, and whose
+  28th and later offers pass through byte-identically;
+- captures and awaits both explicit connection-arrival reconcile promises,
+  then advances exactly 26 250 ms retry cycles to prove exactly 27 replacement
+  exchange attempts, initiator/receiver handshake-failure counters 27/1, no
+  active link and one still-owned retry timer; and
+- advances the next 250 ms cycle, requires attempt 28 to use the same current
+  replacement connection id/generation and valid bytes, settles on the exact
+  replacement ids, proves one active link at both endpoints and bidirectional
+  route ingress, then advances two more 250 ms cycles with no exchange,
+  allocation or counter growth and `vi.getTimerCount() === 0`.
+
+The first malformed request must reach the receiver's counted
+`#handleSignalingRequest`/`#accept` catch, so it increments both sides exactly
+once. Attempts 2 through 27 throw in the fake exchange before receiver-handler
+entry, so only the initiating `#linkFor` catch increments. This test-only
+classification intentionally reconstructs the retained 27/1 counter shape; it
+does not claim the browser used the same synthetic errors and does not change
+any production threshold. The exact 250 ms retry cadence and 10-second setup
+deadline remain product contracts rather than fixture-tunable values.
+
+The causal matrix is fail-closed. Failure before initial bidirectional traffic,
+before the exact connection-loss/restart snapshot, from a wrong peer-close
+barrier, from any counter split other than 27/1 after 27 recorded replacement
+attempts, or because the request transform fails to pass attempt 28 unchanged
+is fixture error. Once that complete precondition is proven and the exact
+replacement connection remains current, absence of attempt 28, failure of its
+clean exchange, failure to select both replacement ids or failure of
+bidirectional delivery is causal RED. Record the exact exchange list,
+connection ids/generations, allocations, snapshots, promise settlement and
+timer ownership, then stop for a separately planned narrow product GREEN. Do
+not edit production in D.108e4ba.
+
+If both rows pass, current production demonstrably recovers from the observed
+27/1 counter state on the next clean retry in both synchronous restart caller
+orders. Close D.108e4ba as non-reproduction. That result still cannot assign
+ordinary-3 to browser scheduling, js-libp2p or an upstream defect, but it closes
+the remaining deterministic raw-owner recovery hypothesis. No browser replay,
+retained campaign retry, threshold change, upstream attribution or product
+GREEN follows from a pass.
+
+Before runtime, the non-consuming collection command must select exactly two
+tests in one file:
+
+```sh
+pnpm exec vitest list \
+  packages/network/tests/unreliable-webrtc-e3-01-red.test.ts \
+  -t 'D.108e4ba recovers after the observed 27/1 handshake split with the (lower|higher)-id restart caller first' \
+  --json
+```
+
+After static and collection gates, run the focused discriminator exactly once
+with root coverage explicitly disabled:
+
+```sh
+pnpm exec vitest run --coverage.enabled=false \
+  packages/network/tests/unreliable-webrtc-e3-01-red.test.ts \
+  -t 'D.108e4ba recovers after the observed 27/1 handshake split with the (lower|higher)-id restart caller first' \
+  --reporter=json
+```
+
+If it passes, run the complete E3-01 owner file once with coverage disabled.
+Required gates are network package typecheck/build, exact test-owner
+ESLint/Prettier, `git diff --check`, source-shape custody, the exact two-title
+collection, the retained owner file, a validating self-excluding evidence
+manifest and protected-path/stash/process/port predicates. Record complete
+selected and retained result sets, exact exchange/counter matrices, source
+hashes and command statuses. No Playwright, browser, campaign, dependency,
+config, example, product source, workload, timing, threshold, immutable
+evidence or invocation-ledger change is authorized.
+
+This bounded plan is signed and pushed before one
+Grok/Codex-`gpt-5.6-sol`-high/Opus-xhigh plan review. Kimi remains replaced by
+the user-authorized Codex reviewer; Fable and collaboration subagents remain
+prohibited. Only P0/P1 blocks and receives one batched correction followed by
+deterministic local audit; P2 receives an owner/disposition without another
+fixture or confirmation round. A causal RED receives deterministic evidence
+validation. A later production GREEN would require the single formal
+three-model implementation review; a passing test-only discriminator receives
+no additional model ceremony.
