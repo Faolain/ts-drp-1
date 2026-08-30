@@ -76711,3 +76711,130 @@ The blocking union after correction is empty. The self-excluding
 Proceed once with the frozen four-row focused RED and once with its named
 retained roster. Do not run production edits, browser tests, retained campaigns,
 Kimi, Fable, collaboration subagents or another plan review.
+
+D.108e4au's causal RED is signed and pushed at
+`96a207dbb89c2d2866993ac1232336ffbd888112`. Collection selected exactly the
+four frozen rows from one file and no retained-campaign title. The sole focused
+execution returned nonzero with four expected failures, zero passes, 51 skipped,
+zero flaky or top-level errors, two exact
+`D108E4AU_PREMATURE_PENDING_PROMOTION` tokens and two exact
+`D108E4AU_THIRD_CONNECTION_ALLOCATION` tokens. The direct-close rows exposed
+one local B selected against a peer B with no handler/open event; the
+send-discovered rows exposed that same selection followed by exact lower/upper
+physical counts three/two. Drop reasons and counts matched the frozen matrix.
+The named retained roster then passed all 13 selected tests with 42 skipped.
+Network typecheck, exact test-owner lint/format/diff, one-path custody and
+production/browser byte custody passed. The self-excluding RED manifest
+validates with SHA-256
+`97bc96cb6ebe1b313b0f8d4f3f9a6d8f34580c05aacd0cc5bec6144e720afea6`.
+No browser, campaign, profiler or reviewer ran; campaign custody remains one
+consumed failure, zero passes and five unrun invocations.
+
+The required post-RED lifecycle audit finds no sound existing no-wire
+discriminator. Local channel open, peer-connection/ICE/SCTP state and current
+authenticated identity prove transport or identity facts, not installation of
+the remote product message handler. Successful traffic on A says nothing about
+B. An A close is the ambiguous event the four-row RED isolates. Allowing
+application traffic on held B as the discriminator would expose B before the
+proof and has no bounded liveness. D.108e4au therefore freezes the explicit
+control branch; this conclusion is limited to the inspected implementation and
+does not claim a general impossibility theorem.
+
+###### D.108e4au-GREEN — reciprocal replacement-channel readiness
+
+The GREEN changes only `packages/network/src/unreliable-webrtc.ts` and its
+existing `packages/network/tests/unreliable-webrtc-e3-01-red.test.ts` owner. It
+adds no public API, dependency, configuration, package, browser fixture or
+campaign change. Initial raw-link setup remains unchanged. Only replacement B
+created while usable or failed A ownership exists enters the reciprocal
+readiness state.
+
+The internal control namespace is exact and versioned: four bytes
+`44 52 01 01` mean replacement READY and `44 52 01 02` mean replacement ACK.
+The first two bytes are ASCII `DR`, byte three is control version 1 and byte four
+is the kind. No other length, magic, version or kind is a control frame. Routed
+application envelopes remain version 1 with their existing 33-byte header and
+1,200-byte ceiling, so the exact four-byte namespace is disjoint without a wire
+format or payload-limit change. Control frames never increment product
+sent/received/routed-byte/unknown-route counters and are never delivered to a
+route subscriber. A pending replacement accepts only an exact control frame;
+ordinary routed data on pending, stale or retiring B is not exposed before
+activation.
+
+Both replacement endpoints install the B message and close handlers before
+participating. The lexicographically lower signaling peer remains the sole RTC
+replacement initiator. After its local B is open and prepared, it sends one
+READY and awaits exact ACK within the already-existing absolute 10,000 ms setup
+deadline. The acceptor holds A and B, accepts READY only from its exact held B
+whose authenticated connection identity is still current, records reciprocal
+readiness, sends one ACK and continues to hold both links. Exact ACK on the
+initiator's same current held B records reciprocal readiness and promotes B;
+normal replacement retirement then closes initiator A. The acceptor may promote
+held B on exact A loss only after READY proved the initiator B handler ready.
+Thus every endpoint has direct B evidence before it can expose B, while the
+existing replacement/channel-close drop ownership and one active link per peer
+remain unchanged.
+
+Control loss or failure does not invent a new retry or timing contract. A
+missing READY/ACK, rejected send, closed B, expired setup or identity change
+discards that B through the existing failure owner, increments the existing
+handshake-failure counter once where setup owns the failure, retains usable A,
+and leaves the existing 250 ms whole-link retry owner to attempt a fresh
+replacement. The 10,000 ms setup deadline, 250 ms link retry, capacity limits,
+buffer ceiling, route envelope, payload ceiling and all campaign thresholds are
+unchanged. A failed or unrelated A may leave no active link temporarily, but it
+cannot promote an unproved B or allocate C while the exact B setup promise still
+owns recovery.
+
+Held-generation currency is fail closed. READY/ACK is accepted only when the
+pending link is the exact map owner, its authenticated connection identity is
+current and its channel is open. Duplicate controls are idempotent; controls on
+the wrong role, active/retiring/stale link, wrong generation, wrong connection,
+wrong version or wrong shape cannot change selection. A newly authenticated
+generation discards an older held replacement before it can block or satisfy
+the current generation. Cleanup cancels the one absolute setup owner, removes
+all pending readiness state and keeps physical/logical admission accounting
+bounded.
+
+The focused GREEN matrix is one batch. Convert the four D.108e4au RED rows into
+positive assertions: before remote B open, direct-close and send-discovered A
+failure select neither B nor C; exact owner counts remain two/two; then releasing
+the barrier completes the reciprocal control, activates the current B on both
+ends and restores bidirectional application traffic in both sender rows. Retain
+the two D.108e4at normal-handoff rows and require their existing connection
+identity, drop-reason/count and traffic assertions.
+
+Add bounded mutants for: READY held before peer delivery; ACK held after READY;
+wrong magic/version/kind/length; READY delivered on the wrong endpoint role;
+ACK delivered on the wrong endpoint role; a routed application envelope on
+pending B; duplicate READY and ACK; B close and control-send failure before ACK;
+the absolute handshake deadline; authenticated identity advancement while B is
+held; stale-generation control after C exists; and owner close during each held
+state. Each negative requires exact A retention or zero-active recovery as
+appropriate, no premature B/C, unchanged product counters, exact
+handshake-failure ownership and bounded peer-connection/timer cleanup. No new
+clock, lifecycle or production telemetry fixture is authorized; extend only the
+existing fake channel/barrier seams needed to inject and hold these exact
+frames.
+
+Run the focused test once after implementation. A result outside the frozen
+matrix stops. Then run once the complete retained unreliable-WebRTC unit file
+and the existing seven-test D.108e4 retained browser-independent roster, plus
+network build/typecheck, exact two-owner ESLint and Prettier, `git diff --check`,
+source-shape checks for the two exact control frames and a single readiness
+owner, changed-path custody, production API/export/config/dependency custody,
+and a validating self-excluding GREEN manifest. The manifest records complete
+reporter results, commands, statuses, hashes, protected paths, all 26 stashes,
+clear process/port predicates and the still-frozen campaign ledger. Do not run
+a browser or retained campaign.
+
+Because this GREEN changes internal wire/lifecycle behavior, this signed/pushed
+freeze receives one high-risk Grok, read-only Codex `gpt-5.6-sol` / high and
+Opus 5/xhigh plan review before production edits. Only P0/P1 blocks. One
+correction batch and at most one material confirmation are permitted under the
+prospective review policy; P2 bookkeeping/prose receives a disposition without
+more ceremony. Grok service failure is recorded honestly without relaunch. Do
+not invoke Kimi, Fable or collaboration subagents. After GREEN is signed and
+pushed, the one formal final review inspects this freeze, causal RED and full
+GREEN evidence. Campaign authority remains frozen until that blocking union is
+empty and a signed closure explicitly restores the five remaining invocations.
