@@ -915,6 +915,83 @@ function tick(): Promise<void> {
 	return new Promise<void>((resolve) => queueMicrotask(resolve));
 }
 
+interface CommittedPendingReplacementFixture {
+	readonly bus: FakeSignalingBus;
+	readonly high: ReturnType<typeof owner>;
+	readonly highRoute: UnreliableWebRtcRoute;
+	readonly low: ReturnType<typeof owner>;
+	readonly lowRoute: UnreliableWebRtcRoute;
+	readonly oldCloseEventBarrier: FakeInboundOpenBarrier;
+	readonly oldPeerCloseBarrier: FakeInboundOpenBarrier;
+	readonly original: ReturnType<FakeSignalingBus["connect"]>;
+	readonly replacement: ReturnType<FakeSignalingBus["connect"]>;
+}
+
+async function committedPendingReplacementFixture(
+	module: OwnerModule,
+	lowPeerId = "peer-a",
+	highPeerId = "peer-b"
+): Promise<CommittedPendingReplacementFixture> {
+	const bus = new FakeSignalingBus();
+	const low = owner(module, bus, lowPeerId);
+	const high = owner(module, bus, highPeerId);
+	const lowRoute = low.owner.openUnreliableWebRtcRoute("zone:d108e4bn-stale-pending-admission");
+	const highRoute = high.owner.openUnreliableWebRtcRoute("zone:d108e4bn-stale-pending-admission");
+	const original = bus.connect(lowPeerId, highPeerId);
+	await Promise.all([lowRoute.reconcile([highPeerId]), highRoute.reconcile([lowPeerId])]);
+
+	bus.disconnect(original);
+	const replacement = bus.connect(lowPeerId, highPeerId);
+	const openBarrier = FakePeerConnection.pauseNextRemoteInboundOpen();
+	vi.useFakeTimers();
+	const replacementPending = lowRoute.reconcile([highPeerId]);
+	await openBarrier.waitUntilPending();
+	await replacementPending;
+
+	const oldLow = low.peerConnections[0]?.channels[0];
+	if (oldLow === undefined) throw new Error("D108E4BN_OLD_A_ABSENT");
+	const oldCloseEventBarrier = oldLow.pauseCloseEvent();
+	const oldPeerCloseBarrier = oldLow.pausePeerClose();
+	openBarrier.release();
+	await openBarrier.waitUntilComplete();
+	await vi.advanceTimersByTimeAsync(0);
+	await tick();
+	await tick();
+	await Promise.all([oldCloseEventBarrier.waitUntilPending(), oldPeerCloseBarrier.waitUntilPending()]);
+
+	const replacementLow = low.peerConnections[1]?.channels[0];
+	const replacementHigh = high.peerConnections[1]?.channels[0];
+	if (replacementLow === undefined || replacementHigh === undefined) {
+		throw new Error("D108E4BN_PENDING_B_ABSENT");
+	}
+	expect(replacementLow.readyState).toBe("open");
+	expect(replacementHigh.readyState).toBe("open");
+	expect(lowRoute.snapshot()).toMatchObject({
+		activeLinks: 1,
+		lastLinkDrop: "replacement",
+		linkDrops: 1,
+		links: [{ connectionId: replacement.left.id, generation: replacement.left.generation }],
+	});
+	expect(highRoute.snapshot()).toMatchObject({
+		activeLinks: 1,
+		lastLinkDrop: undefined,
+		linkDrops: 0,
+		links: [{ connectionId: original.right.id, generation: original.right.generation }],
+	});
+
+	return {
+		bus,
+		high,
+		highRoute,
+		low,
+		lowRoute,
+		oldCloseEventBarrier,
+		oldPeerCloseBarrier,
+		original,
+		replacement,
+	};
+}
+
 interface InboundCapacityFixture {
 	readonly admittedPeers: readonly string[];
 	readonly bus: FakeSignalingBus;
@@ -3028,6 +3105,214 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 			vi.useRealTimers();
 			low.owner.close();
 			high.owner.close();
+		}
+	});
+
+	it("D.108e4bn admits fresh C after pending B becomes closing without a close event", async () => {
+		const module = await loadOwnerModule();
+		let fixture: CommittedPendingReplacementFixture | undefined;
+		let selectedPeerCloseBarrier: FakeInboundOpenBarrier | undefined;
+		try {
+			fixture = await committedPendingReplacementFixture(module);
+			const replacementLow = fixture.low.peerConnections[1]?.channels[0];
+			const replacementHigh = fixture.high.peerConnections[1]?.channels[0];
+			if (replacementLow === undefined || replacementHigh === undefined) {
+				throw new Error("D108E4BN_PENDING_B_ABSENT");
+			}
+			replacementHigh.readyState = "closing";
+			selectedPeerCloseBarrier = replacementLow.pausePeerClose();
+			const exchangeCountBeforeRestart = fixture.bus.exchangeRecords.length;
+
+			await fixture.lowRoute.restart();
+			await tick();
+			await tick();
+
+			const lowAfter = fixture.lowRoute.snapshot();
+			const highAfter = fixture.highRoute.snapshot();
+			if (
+				lowAfter.activeLinks !== 1 ||
+				highAfter.activeLinks !== 1 ||
+				fixture.high.peerConnections[1]?.connectionState !== "closed" ||
+				fixture.low.peerConnections[2]?.connectionState !== "connected" ||
+				fixture.high.peerConnections[2]?.connectionState !== "connected"
+			) {
+				throw new Error(
+					`D108E4BN_STALE_PENDING_ADMISSION_BLOCKED:${JSON.stringify({
+						exchanges: fixture.bus.exchangeRecords.length - exchangeCountBeforeRestart,
+						high: highAfter,
+						highPcStates: fixture.high.peerConnections.map(({ connectionState }) => connectionState),
+						low: lowAfter,
+						lowPcStates: fixture.low.peerConnections.map(({ connectionState }) => connectionState),
+					})}`
+				);
+			}
+			expect(fixture.bus.exchangeRecords).toHaveLength(exchangeCountBeforeRestart + 1);
+			expect(lowAfter).toMatchObject({
+				activeLinks: 1,
+				handshakeFailures: 0,
+				lastLinkDrop: "restart",
+				linkDrops: 2,
+				links: [
+					{
+						connectionId: fixture.replacement.left.id,
+						generation: fixture.replacement.left.generation,
+					},
+				],
+			});
+			expect(highAfter).toMatchObject({
+				activeLinks: 1,
+				handshakeFailures: 1,
+				lastLinkDrop: undefined,
+				linkDrops: 0,
+				links: [
+					{
+						connectionId: fixture.original.right.id,
+						generation: fixture.original.right.generation,
+					},
+				],
+			});
+		} finally {
+			selectedPeerCloseBarrier?.release();
+			fixture?.oldCloseEventBarrier.release();
+			fixture?.oldPeerCloseBarrier.release();
+			fixture?.low.owner.close();
+			fixture?.high.owner.close();
+			vi.clearAllTimers();
+			vi.useRealTimers();
+		}
+	});
+
+	it.each(["connected", "disconnected"] as const)(
+		"D.108e4bn retains open pending B when its PeerConnection is %s",
+		async (connectionState) => {
+			const module = await loadOwnerModule();
+			let fixture: CommittedPendingReplacementFixture | undefined;
+			const offerSource = new FakePeerConnection();
+			try {
+				fixture = await committedPendingReplacementFixture(module);
+				const pendingHighPc = fixture.high.peerConnections[1];
+				const pendingHigh = pendingHighPc?.channels[0];
+				if (pendingHighPc === undefined || pendingHigh === undefined) {
+					throw new Error("D108E4BN_OPEN_PENDING_CONTROL_ABSENT");
+				}
+				pendingHighPc.connectionState = connectionState;
+				offerSource.createDataChannel(RAW_LABEL, { maxRetransmits: 0, ordered: false });
+				const offer = await offerSource.createOffer();
+				const offerBytes = new TextEncoder().encode(JSON.stringify({ candidates: [], sdp: offer.sdp, type: "offer" }));
+				const allocationCount = fixture.high.peerConnections.length;
+
+				await expect(fixture.replacement.left.exchange(offerBytes, new AbortController().signal)).rejects.toThrow(
+					"unreliable WebRTC signaling request rejected"
+				);
+				const replacementOffer = fixture.bus.exchangeRequests.find(
+					({ connectionId, request }) =>
+						connectionId === fixture?.replacement.left.id && !replacementDecisionRequest(request)
+				);
+				if (replacementOffer === undefined) throw new Error("D108E4BN_REPLACEMENT_OFFER_ABSENT");
+				const decisionId = createHash("sha256")
+					.update(REPLACEMENT_DECISION_DOMAIN, "utf8")
+					.update(replacementOffer.request)
+					.digest("hex");
+				const decision = decodedRecord(
+					await fixture.replacement.left.exchange(decisionRequestBytes(decisionId), new AbortController().signal)
+				);
+
+				expect(decision).toEqual({
+					decisionId,
+					status: "committed",
+					type: "replacement-decision-result",
+					version: 1,
+				});
+				expect(fixture.high.peerConnections).toHaveLength(allocationCount);
+				expect(pendingHigh.readyState).toBe("open");
+				expect(pendingHighPc.connectionState).toBe(connectionState);
+				expect(fixture.highRoute.snapshot()).toMatchObject({
+					activeLinks: 1,
+					handshakeFailures: 0,
+					lastLinkDrop: undefined,
+					linkDrops: 0,
+					links: [
+						{
+							connectionId: fixture.original.right.id,
+							generation: fixture.original.right.generation,
+						},
+					],
+				});
+			} finally {
+				offerSource.close();
+				fixture?.oldCloseEventBarrier.release();
+				fixture?.oldPeerCloseBarrier.release();
+				fixture?.low.owner.close();
+				fixture?.high.owner.close();
+				vi.clearAllTimers();
+				vi.useRealTimers();
+			}
+		}
+	);
+
+	it("D.108e4bn expiry reclaims non-open committed B without another offer", async () => {
+		const module = await loadOwnerModule();
+		let fixture: CommittedPendingReplacementFixture | undefined;
+		let stalePeerCloseBarrier: FakeInboundOpenBarrier | undefined;
+		const remotes: ReturnType<typeof owner>[] = [];
+		try {
+			fixture = await committedPendingReplacementFixture(module, "peer-a", "peer-z");
+			const replacementHighPc = fixture.high.peerConnections[1];
+			const replacementHigh = replacementHighPc?.channels[0];
+			if (replacementHighPc === undefined || replacementHigh === undefined) {
+				throw new Error("D108E4BN_EXPIRY_PENDING_B_ABSENT");
+			}
+			replacementHigh.readyState = "closing";
+			stalePeerCloseBarrier = replacementHigh.pausePeerClose();
+			fixture.oldCloseEventBarrier.release();
+			fixture.oldPeerCloseBarrier.release();
+			await tick();
+			await tick();
+			expect(fixture.highRoute.snapshot()).toMatchObject({ activeLinks: 0, linkDrops: 1, links: [] });
+			const exchangesBeforeExpiry = fixture.bus.exchangeRecords.length;
+
+			await vi.advanceTimersByTimeAsync(10_000);
+			await tick();
+			await fixture.highRoute.reconcile([]);
+			const admissions: boolean[] = [];
+			for (let index = 0; index < 8; index += 1) {
+				const peerId = `peer-${String(index).padStart(2, "0")}`;
+				const remote = owner(module, fixture.bus, peerId);
+				remotes.push(remote);
+				const route = remote.owner.openUnreliableWebRtcRoute("zone:d108e4bn-expiry-capacity");
+				fixture.bus.connect(peerId, "peer-z");
+				admissions.push(await route.send(["peer-z"], Uint8Array.of(index)));
+			}
+
+			const highAfter = fixture.highRoute.snapshot();
+			if (
+				replacementHighPc.connectionState !== "closed" ||
+				admissions.some((admitted) => !admitted) ||
+				highAfter.activeLinks !== 8
+			) {
+				throw new Error(
+					`D108E4BN_EXPIRY_RECLAMATION_ABSENT:${JSON.stringify({
+						admissions,
+						exchangesAfterExpiry: fixture.bus.exchangeRecords.length - exchangesBeforeExpiry,
+						high: highAfter,
+						pendingPcState: replacementHighPc.connectionState,
+					})}`
+				);
+			}
+			expect(fixture.bus.exchangeRecords).toHaveLength(exchangesBeforeExpiry + 8);
+			expect(admissions).toEqual(Array.from({ length: 8 }, () => true));
+			expect(fixture.high.peerConnections.filter(({ connectionState }) => connectionState !== "closed")).toHaveLength(
+				8
+			);
+		} finally {
+			stalePeerCloseBarrier?.release();
+			fixture?.oldCloseEventBarrier.release();
+			fixture?.oldPeerCloseBarrier.release();
+			for (const remote of remotes) remote.owner.close();
+			fixture?.low.owner.close();
+			fixture?.high.owner.close();
+			vi.clearAllTimers();
+			vi.useRealTimers();
 		}
 	});
 

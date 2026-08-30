@@ -929,6 +929,10 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		if (this.#closed || connection.transport !== "webrtc" || connection.remotePeerId >= this.#signaling.localPeerId) {
 			throw new Error("unreliable WebRTC signaling request rejected");
 		}
+		const pendingReplacement = this.#pendingReplacementLinks.get(connection.remotePeerId);
+		if (pendingReplacement !== undefined && pendingReplacement.channel.readyState !== "open") {
+			this.#discardPendingReplacement(connection.remotePeerId, pendingReplacement);
+		}
 		this.#pruneReplacementAdmissions();
 		if (
 			this.#hasPendingPeerConnection(connection.remotePeerId) ||
@@ -1415,8 +1419,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		if (link.role === "acceptor" && readiness.reliableDecision) {
 			const record = this.#replacementDecisions.get(link.decisionId);
 			if (record?.link === link && record.status === "committed" && !this.#hasUsableSelectedLink(peerId, link)) {
-				this.#promotePendingReplacement(peerId);
-				return;
+				if (this.#promotePendingReplacement(peerId)) return;
 			}
 		}
 		this.#failReplacementReadiness(peerId, link, readiness);

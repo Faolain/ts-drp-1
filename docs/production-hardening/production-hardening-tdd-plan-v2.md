@@ -81390,3 +81390,50 @@ status and Grok event-stream SHA-256 values are respectively
 `46fcef81278533c534daef55c3ca96228a173c99052a777e2197a88ae435ae64`
 and
 `ff040cb4a24dcf21fc0fcc5164a34b5c546d6cfacb07a5ea7fd9c4847da1b805`.
+
+The frozen D.108e4bn RED/GREEN implementation is complete. The focused RED
+command selected exactly the four D.108e4bn rows in the single owner test
+file. It returned the frozen matrix: the connected and disconnected open-B
+negative controls passed, while the stale-offer and no-further-offer expiry
+rows failed only with exact tokens
+`D108E4BN_STALE_PENDING_ADMISSION_BLOCKED` and
+`D108E4BN_EXPIRY_RECLAMATION_ABSENT`. The RED reporter SHA-256 is
+`f4b88055f743cfb49cf48c8c9ad8cedbe71b362fcff6aa55c189fd45702ffd8c`.
+
+GREEN changes only the existing admission and expiry owners. After request
+validity checks and before ordinary admission guards, the receiver discards
+that peer's established pending replacement only when its data channel is no
+longer `open`. At readiness expiry, a successful promotion still returns;
+failed promotion now falls through to the existing failure/discard owner. No
+API, workload, threshold, deadline, retry, identity, signaling, activation or
+dependency contract changes.
+
+The first focused GREEN diagnostic returned three passes and one assertion
+failure because the new stale-offer row expected two signaling exchanges for
+C. Existing initiator behavior correctly performs only the offer when no A is
+selected locally, so this was a stale test expectation rather than a product
+failure. The test expectation was corrected to one exchange; that diagnostic
+reporter SHA-256 is
+`80a082af93e8d056f6f170b010e2a53396eac563547114eb60feb8c2f967dfcc`.
+The focused acceptance then passed all four rows, and the complete owner file
+passed all 108 rows, including all 104 retained contracts. Their reporter
+SHA-256 values are respectively
+`3131da29429e153433f5695e408f05cdc7a781d190aff5ee86754c173b5114c7`
+and
+`9b3e4863e853e678c2dc155d7c37ae2144b096b9a5165fd3ed9ef667cea76c1a`.
+
+`@ts-drp/network` build and typecheck, exact changed-source/test ESLint with
+zero warnings, exact Prettier checks, `git diff --check`, and exact one-file
+collection all pass. The refactor-clean audit finds one centralized fixture
+helper and no new production owner, adapter or wrapper. A first read-only
+source-shape command incorrectly selected the first file-wide prune call; its
+regex/selector error was not treated as a code failure. The corrected
+handler-local audit records ordered offsets `119,258,576,715,761`, confirms
+the expiry fall-through, and passes. Final source and test SHA-256 values are
+respectively
+`394bb7ab07837fd6a3b17721c8995adb60c5eb5df27ab4ed7f8ee5bb5d743cd7`
+and
+`2bb1d96ad291cb48cf935e62a672ae9bc6330b5e5da650cbf3dde9e97f56ec51`.
+The tracked implementation changes exactly those two paths; protected
+untracked paths and all 26 stashes remain untouched. No browser, retained-seven
+or campaign invocation ran during RED/GREEN.
