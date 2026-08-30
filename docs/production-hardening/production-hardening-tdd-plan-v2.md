@@ -79144,3 +79144,121 @@ capable of combining a held acceptor with repeated initiator-side refusals.
 Immutable `ordinary-3` does not reveal whether that ordering occurred. No
 product GREEN, browser replay, retained-campaign retry, upstream attribution or
 D.108e5 transition follows from D.108e4bb alone.
+
+###### D.108e4bc — held-acceptor exact 27/1 recovery discriminator
+
+D.108e4bc owns only the opposite close ordering left by D.108e4bb. The
+immutable `ordinary-3` failure ended at 27 initiator and one receiver handshake
+failure with no raw link after bilateral restart. D.108e4ba proved the exact
+counter shape and clean attempt 28 when failures occur before receiver-handler
+entry but did not retain an acceptor peer connection. D.108e4bb proved
+natural-order held-control expiry, where the acceptor deadline retires both
+pending sides first and recovery begins from 0/1. Neither covers an
+initiator-side readiness-send failure whose peer close is delayed while the
+acceptor remains held and refuses subsequent offers.
+
+The slice changes only
+`packages/network/tests/unreliable-webrtc-e3-01-red.test.ts` and adds no fixture
+API. Two rows reverse only the synchronous bilateral restart caller order. They
+reuse `pauseNextInitiatorOutboundOpen()` to stop after the initiator replacement
+channel exists but before its open event, then arm that exact channel's existing
+`pausePeerClose()` barrier. One existing `throwNextControl(READY, 1)` fault is
+armed before releasing the open barrier. Current production must then close
+the failed initiator side while the barrier keeps the acceptor's paired channel
+open and held.
+
+Each row:
+
+- establishes one authenticated raw route and proves bidirectional traffic;
+- disconnects that pair and proves usable A plus one authenticated loss and
+  zero handshake failures/drops at both endpoints;
+- leaves signaling absent, synchronously calls both `restart()` owners with the
+  first caller's old-channel peer-close barrier, awaits both and proves closed
+  A, one `restart` drop, no active links and no exchange growth at either side;
+- connects one exact replacement authenticated pair, arms the initiator-open
+  barrier, starts and captures both connection-arrival reconciles, waits until
+  the initiator channel is paired but still connecting, arms its peer-close
+  barrier, consumes exactly one throwing READY send, releases/awaits the open
+  barrier and awaits both reconciles;
+- proves the first exchange used the current replacement id/generation, the
+  initiator counter is one, the receiver counter is zero, the failed initiator
+  PC/channel closed locally, the acceptor paired channel remains open behind
+  the barrier, the receiver retains exactly one pending physical PC, no active
+  link exists and one lower-id retry timer is owned;
+- advances 26 exact 250 ms retry cycles, boundedly settling each cycle until
+  one new exchange record and one new initiator failure appear. Every retry
+  must use the same replacement identity, be rejected by the receiver's held
+  pending-PC admission gate before its counted handler catch, leave the
+  receiver counter zero and re-arm exactly one retry;
+- at exact exchange/counter state 27/0, releases the delayed peer close and
+  boundedly settles the receiver's deferred finish catch to exact 27/1 without
+  exchange growth, active links or identity mutation;
+- advances the next 250 ms cycle and requires clean attempt 28 on the same
+  replacement id/generation, exact final counters 27/1, one retained
+  authenticated loss and one `restart` drop at each endpoint, both replacement
+  link ids, bidirectional ingress and exact initiator/acceptor allocation counts
+  29/3 after recovery;
+  and
+- advances two more 250 ms cycles with no exchange, allocation, counter or
+  snapshot growth and zero timers, then releases all barriers and clears static
+  control faults in `finally`.
+
+The causal matrix is fail-closed. Failure before initial traffic/loss/restart,
+failure to reach the initiator-open barrier, failure to arm the peer-close
+barrier on the exact paired replacement channel, failure to consume the one
+READY throw or receiver closure before explicit barrier release is fixture
+error. Once the initial exchange has produced exact 1/0 with the current held
+acceptor, fewer or more than one exchange/failure per retry cycle, any receiver
+counter growth before release, failure to re-arm the retry or replacement
+identity drift is product-owned causal evidence. Once exact 27/0 is proven,
+failure of barrier release to settle exactly 27/1 without exchange growth is
+classified from the exact close/catch owner. Once 27/1 is proven, missing or
+failed clean attempt 28, wrong link ids, failed ingress or residual growth is
+causal RED. A causal RED stops for a separately planned narrow product GREEN;
+D.108e4bc must not edit production.
+
+If both rows pass, current product recovers from the one remaining deterministic
+held-acceptor realization of exact 27/1. That closes owner-local deterministic
+recovery attribution for immutable `ordinary-3` without claiming the synthetic
+barrier occurred in Chrome. No browser replay, campaign retry, dependency,
+threshold, timing-contract, upstream attribution or D.108e5 transition follows
+from a pass.
+
+Before runtime, exact-owner Prettier/ESLint, network typecheck/build,
+`git diff --check`, source-shape custody and non-consuming collection must pass.
+Collection selects exactly two rows in one file:
+
+```sh
+pnpm exec vitest list \
+  packages/network/tests/unreliable-webrtc-e3-01-red.test.ts \
+  -t 'D.108e4bc recovers from held-acceptor 27/1 after the (lower|higher)-id restart caller goes first' \
+  --json
+```
+
+Run the focused discriminator exactly once with coverage disabled:
+
+```sh
+pnpm exec vitest run --coverage.enabled=false \
+  packages/network/tests/unreliable-webrtc-e3-01-red.test.ts \
+  -t 'D.108e4bc recovers from held-acceptor 27/1 after the (lower|higher)-id restart caller goes first' \
+  --reporter=json \
+  --outputFile=.logs/d108e4bc-discriminator/focused.json
+```
+
+If focused passes, run the complete E3-01 owner file once with coverage
+disabled and reporter
+`.logs/d108e4bc-discriminator/retained-e3-01.json`. Record complete result sets,
+per-cycle exchange/counter matrices, connection/channel/barrier ownership,
+owner hashes, command statuses and a validating self-excluding manifest.
+Preserve the eight protected paths, 26 stashes, clear process/port predicates,
+signed commits and pushed refs. No Playwright, browser, campaign, product,
+dependency, config, workload, timeout, retry cadence, threshold, immutable
+evidence or invocation-ledger change is authorized.
+
+The signed/pushed plan receives one bounded
+Grok/Codex-`gpt-5.6-sol`-high/Opus-xhigh review. Kimi remains replaced by Codex;
+Fable and collaboration subagents remain prohibited. Only P0/P1 blocks and is
+corrected once; P2 receives disposition without confirmation. Deterministic
+RED receives local evidence validation. A passing test-only discriminator has
+no additional model review; any later product GREEN receives the single formal
+three-model implementation review.
