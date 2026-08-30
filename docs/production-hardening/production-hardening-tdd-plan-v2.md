@@ -80922,16 +80922,28 @@ wire formats, workload, thresholds, ports, browser configuration, setup
 deadline, resource ceilings, or endpoint-local `2/0` rejection. Consumed
 D.108e4bk evidence and its four permanently unrun names remain immutable.
 
-The reliable message observes rather than creates the acceptor decision. The
-acceptor may report `committed` only after its existing READY/ACK/COMMIT owner
-has received the raw COMMIT and promoted the exact replacement B. A reliable
-query cannot promote an acceptor, substitute for lost raw COMMIT, or weaken
+The reliable message observes rather than creates the acceptor's raw-COMMIT
+decision. When a usable selected A still exists, receiving raw COMMIT marks
+the exact acceptor B `committed` but does not promote B or retire A. A reliable
+query cannot promote the acceptor, substitute for lost raw COMMIT, or weaken
 the retained lost-READY/ACK/COMMIT behavior. The initiator may begin querying
-only after receiving ACK and successfully sending at least one raw COMMIT; it
-may promote only the exact still-pending B after a valid `committed` response
-on B's still-current authenticated connection. `aborted`, malformed, unknown,
-stale, mismatched or exhausted decisions leave usable A selected and clean B
-up through the existing failure owner.
+only after receiving ACK and successfully sending at least one raw COMMIT. A
+valid `committed` response may promote only the exact still-pending initiator
+B on B's still-current authenticated connection. Retiring initiator A then
+lets the acceptor's existing A-close owner promote its committed pending B. If
+the A close callback is delayed but the selected A channel is already
+physically non-open at the common deadline, that same readiness owner promotes
+B before cleanup. If A remains open, the acceptor discards pending B and
+retains A. Thus failed observations do not leave an already-promoted acceptor
+B: both endpoints retain A and clean B boundedly.
+
+This delayed acceptor activation applies only when a selected usable A exists.
+The existing no-selected-A promotion owner remains unchanged, including the
+exact D.108e4bb bilateral-restart/lost-COMMIT exchange, counter and drop
+matrices. The existing A-drop and qualified application-frame promotion
+triggers also remain. Only transient assertions that assumed acceptor B was
+selected immediately on raw COMMIT may be re-frozen; their final route,
+identity, counter and exactly-once behavior must remain unchanged.
 
 For each offer, both endpoints derive the lowercase 64-hex decision ID as
 SHA-256 over the fixed UTF-8 domain
@@ -80944,57 +80956,92 @@ authenticated connection, replacement C, peer or generation is rejected even
 if the original B record still exists.
 
 The new request and response are bounded canonical JSON objects carried on the
-existing signaling protocol. The request has exactly
+existing signaling protocol. Decision classification occurs at the top of
+`#handleSignalingRequest`, before and outside offer peer-order, pending-PC,
+physical/logical capacity and `#accept` failure gates. A decision allocates no
+PC, never calls `#accept` or `#closePendingForPeer`, and never increments
+`handshakeFailures`; existing offer/answer dispatch and decoding remain
+byte-identical. The request has exactly
 `decisionId,type,version`, with type `replacement-decision`, version `1` and
-the decision ID above. The response has exactly
+the decision ID above. Version is the JSON number `1`; all other values are
+strings. The response has exactly
 `decisionId,status,type,version`, with type `replacement-decision-result`,
 version `1`, the identical ID and status `committed` or `aborted`. Existing
 offer/answer objects and their exact decoder remain unchanged. Any other key,
 type, version, status, ID syntax or byte excess fails closed.
 
-The acceptor retains one bounded idempotent decision record per live pending
-or newly committed replacement until the original absolute setup deadline.
-Pending queries wait only within that deadline. Existing acceptor promotion
-marks the exact record committed and resolves all same-ID waiters; discard,
-connection identity change or owner close marks it aborted. Duplicate queries
-return the same terminal result. The deadline removes the record and every
-waiter/timer; no record, stream attempt, pending PC or physical slot survives
-that boundary. Owner close synchronously clears the same state. A stale result
-may not act after B was discarded, replaced by C, ceased to be current, or
-left pending ownership.
+The acceptor retains one bounded decision record per live selected-A
+replacement until the original absolute setup deadline. Pending queries wait
+only within that deadline. Raw COMMIT makes the exact record `committed` and
+resolves all same-ID waiters; before commit, discard, connection identity
+change or owner close makes it `aborted`. A committed record is write-once
+while its exact B and authenticated connection remain valid; invalidation
+removes it rather than rewriting its result. Duplicate live queries return the
+same terminal result. The deadline removes the decision record, waiters,
+streams and decision timers, and it removes any still-pending B/PC/slot. It
+does not remove a successfully selected active B or its ordinary active-link
+ownership. Owner close synchronously clears the same state. A stale result may
+not act after B was discarded, replaced by C, ceased to be current, or left
+pending ownership.
 
 The initiator performs at most two sequential reliable exchanges for the same
-decision ID, both inside the original absolute setup deadline. An immediate
-request/stream/response/decode failure may resume once against the same exact
-current connection and decision ID. A valid committed result is idempotent;
-the continuation rechecks the readiness object, pending-link identity,
-decision ID, channel state and authenticated connection before calling the
-single existing `#promotePendingReplacement` owner. A valid aborted result,
-two failures, connection change, owner close or deadline exhaustion uses the
-existing failure/cleanup path. The retry adds no deadline extension, grace
-period, background dial or second activation owner.
+decision ID, both inside the original absolute setup deadline. Attempt one is
+bounded at the midpoint of the time remaining when observation starts;
+attempt two is bounded by the original deadline. Both use abort signals; a
+held first response therefore leaves a deterministic second-attempt window.
+An immediate or timed-out request/stream/response/decode failure may resume
+once against the same exact current connection and decision ID. A valid
+committed result is idempotent; the continuation rechecks the readiness object,
+pending-link identity, decision ID, channel state and authenticated connection
+before calling the single existing `#promotePendingReplacement` owner. Every
+non-committed continuation performs the same recheck and reaches cleanup only
+through `#failReplacementReadiness`; it never calls
+`#discardPendingReplacement` or `#closePendingForPeer` directly. If B is no
+longer the pending owner, a late result is a no-op on active B or replacement
+C. The retry adds no deadline extension, grace period, background dial or
+second activation owner.
 
 Before production editing, extend the deterministic roster and freeze causal
 RED expectations. The original D.108e4bl idle case must remain the causal RED
 on the pre-GREEN production image. The complete GREEN matrix must prove:
 
-1. acceptor raw-COMMIT promotion plus idle initiator B converges before the
-   original deadline, leaves one B per endpoint and exact local drops `1/1`;
-2. lost raw COMMIT never becomes committed through the reliable query, expires
-   B, retains usable initiator A and preserves its exact existing error/drop
-   behavior;
-3. one failed request and, separately, one lost/malformed final response resume
-   through the second exchange and converge without duplicate promotion/drop;
-4. duplicate committed queries are idempotent and do not allocate another PC,
-   activate twice or alter counters;
-5. a B decision replayed on a changed connection or against replacement C is
-   rejected and cannot promote either stale candidate;
-6. connection change, B close and owner close while a query is pending abort
-   it, release timers/waiters/records and preserve bounded physical ownership;
-7. malformed request/response key, type, version, ID and status mutants fail
-   closed without changing offer/answer parsing; and
-8. the retained D.108e4at/au/ax/bb/bi/bl lifecycle, control-loss, application-
-   proof and both-peer-ordering rows preserve their exact non-mutated results.
+1. Re-freeze the existing D.108e4bl title for GREEN: pre-GREEN it retains its
+   exact `D108E4BL_QUALIFIED_B_EXPIRED` causal failure; post-GREEN both
+   endpoints select B before the original deadline with exact local drops
+   `1/1`, zero handshake failures and no extra PC. D.108e4bl is therefore not
+   in the non-mutated roster.
+2. When both reliable observations fail or hang but the authenticated
+   connection and A remain current, neither endpoint retires A; the original
+   deadline discards both pending B sides with no link drop, no leaked timer,
+   waiter, record, stream or PC, and the existing retry owner remains bounded.
+3. Lost raw COMMIT never becomes committed through the reliable query. With a
+   selected A it retains A and cleans B; with no selected A, every exact
+   D.108e4bb pre-deadline, retry, exchange-count, counter and drop assertion is
+   byte-for-byte unchanged because no decision query runs.
+4. One immediate failed request and, separately, one genuinely held response
+   through the first-attempt midpoint resume through attempt two and converge.
+   Releasing the stale first response after deadline is a no-op without leak or
+   duplicate promotion/drop.
+5. Duplicate live committed queries are idempotent and do not allocate another
+   PC, activate twice or alter counters. A late aborted or malformed result
+   after A-close/application-proof promotion is also a no-op.
+6. Capture the exact offer bytes and independently prove the lowercase
+   SHA-256 known answer. A same-connection syntactically valid wrong digest,
+   changed connection/generation, stale B or replacement-C replay is rejected
+   and cannot promote or discard C.
+7. Valid, malformed and rejected decision requests bypass offer-admission
+   side effects: pending B, PC counts and handshake counters remain exact.
+   Malformed request/response key, JSON value type, token, version, ID and
+   status mutants fail closed without changing offer/answer parsing.
+8. Connection change, B close, deadline and owner close while a query is
+   pending abort its exact stream/waiter/record and preserve bounded physical
+   ownership. A successfully promoted active B survives decision-record expiry.
+9. Retained D.108e4at/au/ax/bi lifecycle, application-proof, stale-generation
+   and both-peer-ordering semantics retain their final identities, counters,
+   drop bounds, routing and exactly-once delivery. Transient selected-A/raw-
+   COMMIT snapshots and decision exchange counts may change only where this
+   protocol necessarily changes them; enumerate every such expectation before
+   GREEN and correct them in the same test batch.
 
 Run static collection/source-shape gates before the exact new focused RED
 execution. GREEN then runs the new decision matrix, the complete unreliable-
@@ -81015,3 +81062,35 @@ releases one retained browser title and then the retained seven-test allowlist.
 A pass permits a separately frozen fresh six-name campaign; no D.108e4bk name
 is reused. D.108e5 remains blocked until the fresh campaign and final evidence
 review pass.
+
+The single high-risk plan review inspected signed/pushed checkpoint
+`665d74f53fe50fcf3e87779c7af54a1ef9a25bd9`. Codex
+`gpt-5.6-sol` high returned `BLOCKED`, P0=0/P1=4/P2=1. Opus xhigh returned
+`CHANGES_REQUIRED`, P0=1/P1=4/P2=3. Grok completed with
+`stop_reason=end_turn` and emitted a substantive `CHANGES_REQUIRED` object
+after progress prose; the strict runner correctly classifies it `NO_VERDICT`,
+so it is not represented as a formal verdict or relaunched.
+
+The complete material union is corrected above once. The decisive correction
+is delayed acceptor activation: raw COMMIT records B as committed but, while A
+is selected, cannot retire A. This makes one or two failed reliable
+observations bounded and symmetric rather than recreating `2/0`. The same
+batch separates decision dispatch from offer admission and failure side
+effects, gives attempt one a midpoint cutoff, scopes the protocol away from
+the no-selected-A D.108e4bb owner, makes non-committed continuations exact-B
+guarded, preserves active B at record expiry, re-freezes D.108e4bl's GREEN
+expectations, and adds known-answer/type/race mutants. Grok's overlapping
+dispatch, schedule, contradiction, cleanup and common-deadline findings are
+therefore dispositioned by the same executable corrections despite its formal
+NO_VERDICT. No confirmation review or recursive prose review is run; the
+deterministic RED/GREEN matrix and final implementation review own validation.
+
+Prompt, Codex final, Opus envelope, Grok public text, Grok status and Grok
+event-stream SHA-256 values are respectively
+`e24a8217ea0a4d54c298166825d6479894c4547f846869f9ec6eeeac6f14494f`,
+`f93803d0192f4ac5c6c59db1d5065b424cf5774159e7ad0bfc121129bc3230d0`,
+`97d54a37cf569a19de72f3682221ed6b9b7caa74a14a6e99c79be8293f0c2c3c`,
+`41fc80f6494a52adb52a9b8aecab140ad0725d16bf46eb6b2544a872a44ec31d`,
+`a232271cc2c0a06d565b4dabb4f7e5cc18f2086fe38770f952f90eb1a7befd58`
+and
+`078520506bb32caef1cbe3fcddfe6479b32e9f0326565f83b9669c4c58edf804`.
