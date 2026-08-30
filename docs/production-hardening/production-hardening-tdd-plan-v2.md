@@ -81494,3 +81494,32 @@ and
 `76b367c20bfaaad5645c6f605974fc16d163be48819af0e399e2970a395a95da`.
 No retained browser, retained-seven or campaign invocation ran during this
 review correction.
+
+The single permitted confirmation round inspected signed/pushed correction
+`2b7c1245d56e6dc40d282332b56c7b6a6d5d24a9`. Codex
+`gpt-5.6-sol` high returned `APPROVED`, P0/P1/P2 empty and explicitly confirms
+the prior P1 closed. Opus xhigh returned `APPROVED`, P0/P1 empty and P2=1;
+the nonblocking observation is that malformed input which would previously
+have met a full-capacity/pending gate first now reaches offer validation and
+increments the existing malformed-handshake counter. This is accepted as the
+direct accounting consequence of the frozen validate-before-reclaim order: it
+does not reclaim ownership, allocate a PC, change wire behavior or weaken an
+acceptance gate. Grok again emitted progress prose before a substantive
+`APPROVED`, P0/P1/P2 empty with `prior_p1_closed=true`; its strict runner
+therefore records honest `NO_VERDICT`, not a formal approval. It ended normally,
+was not timed out and is not relaunched. The confirmation blocking union is
+empty and no further review round is authorized.
+
+Confirmation prompt, Codex result, Opus raw result, Grok public text, Grok
+status and Grok event-stream SHA-256 values are respectively
+`1c32a02f970dce4f4f97d1ff48b9b85670b47b7e7fb49133ca11c7ec9a1f7f96`,
+`55a094c449f105fbb6850244c0e21d74846bcb1a5ab4e667093aa4bb573b45b8`,
+`c77b7a52764eefcc937988b991bf7a3c9c0e2756d2aff0b6374eb8bece4d14e4`,
+`b67f5b9fb0a4c0ed39b1ce4283a97d2108c096aed043daf62296da2858888a93`,
+`f2f7375fe603cc121ea17494e7fb52d2140e22359e71331fa46b569cde5fe193`
+and
+`a72cbaaa5428e367beff86c7fdfa0ce573f90f075b20228b85db616dde5b7a53`.
+D.108e4bn RED/GREEN and its sole confirmation are closed. The next gate is one
+fresh retained-browser invocation name under the unchanged 600-second
+process-group watchdog; only its pass releases the exact retained seven-title
+non-campaign allowlist.
