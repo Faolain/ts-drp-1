@@ -80561,3 +80561,35 @@ respectively
 `a4d758eb71995c03c78299eefdd8b47bc90a420bcb0c04edd3dec579543a0f86`
 and `01f6bd9a76927527e3a6dd677d724d4e57d5447b4ac24c2e308f225db76ac4b3`.
 Evidence is immutable under `.logs/d108e4bj-green-confirmation/`.
+
+The released D.108e4bj retained browser title ran once under the unchanged
+600-second process-group watchdog and passed without retry in 157.734 seconds.
+Its reporter is expected=1, skipped=0, unexpected=0 and flaky=0 with no
+top-level or soft failures. Preliminary 30% calibration delivered 397 of 600
+against the unchanged floor 100. All three fixed-loss trials completed: raw
+delivery was 403/404/410, maximum raw gap 8/6/10, maximum raw stall
+44/44/49 ms, reliable delivery 11/13/10 and clock skew 1/1/1 ms. This closes
+the prior D.108e4bh classifier failure and releases the retained-seven
+allowlist.
+
+The retained-seven selector listed exactly seven tests in one file. Its sole
+run then returned expected=7, skipped=0, unexpected=0 and flaky=0, with no
+top-level errors, soft failures or retries. No long campaign ran during
+D.108e4bj.
+
+Retained-browser reporter, preliminary calibration, complete three-trial
+evidence and validating self-excluding evidence-index SHA-256 values are
+respectively
+`61ad057755e7812ea40900de0fa70501b2809e89e06bf017600888b6c618a511`,
+`cf7b7358fea7afe576ea61b3433402a4ccfe388e13eea27498e3e0a9946f1427`,
+`8f9b84aa4c50552a3c4c5017f42f3ea26e6a6902d2c05f3ce68b8dfd90dd51f9`
+and `5e79eb4ab37930a1bd1147b569c7208e1039998d78ae5375f2c9a92306df32a7`.
+Evidence is immutable under `.logs/d108e4bj-retained-browser/`.
+
+Retained-seven reporter and validating self-excluding evidence-index SHA-256
+values are respectively
+`79173f2196122e5f3519f9e31c945d8ac2af20b49cb6c2d84ee3a01e032d7f04`
+and `72144ef04cc2be960dc1df0d35890095a4ff3d6cea44208bb7bd5ffeb5c1f6c7`.
+Evidence is immutable under `.logs/d108e4bj-retained-seven/`. D.108e4bj is
+closed; the next action is the separately authorized fresh-name
+D.108e4 campaign-disposition slice, not another D.108e4bj run.
