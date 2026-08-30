@@ -81801,3 +81801,50 @@ This is the one permitted correction after confirmation; no reviewer is
 relaunched. A deterministic local audit must confirm the frozen source seams
 and exact RED roster before execution. No retained or campaign invocation is
 released.
+
+The deterministic D.108e4bo RED is implemented without production changes.
+Collection selected exactly ten rows in the single owner file: three new
+D.108e4bo rows, all six D.108e4bn controls and the retained D.108e4bm acceptor
+pre-open deadline row. The first full RED returned the intended adapter and
+qualified-promotion tokens plus seven retained passes, but the exact-cancellation
+row reached Vitest's 10-second timeout. Source diagnosis found a RED teardown
+mistake: after the already-fired close event, current GREEN leaves
+`waitForOpen` pending until the unchanged setup deadline, while the test awaited
+that promise under an equal test timeout. This is not classified as a product
+finding and the reporter remains immutable with SHA-256
+`1d6bbb2f140368a30dc18a5ea1027c5fe17966d9c8f22a5bce3639e88e42ccff`.
+
+The correction changes only deterministic teardown: when producer abort is
+absent, fake time advances the existing 10-second setup deadline before the
+test emits its frozen predicate. The bounded one-row diagnostic then completed
+with exact token `D108E4BO_EXACT_ACCEPT_CLEANUP_ABSENT`; its reporter SHA-256 is
+`e8e5430dc1a8b5fa6122ef0c14609a3ad62cb23248a1ca1ef1133184c7efc3d5`.
+The corrected focused RED command was:
+
+```sh
+pnpm exec vitest run packages/network/tests/unreliable-webrtc-e3-01-red.test.ts \
+  -t 'D\.108e4bo|D\.108e4bn|D\.108e4bm bounds acceptor pre-open setup' \
+  --reporter=json \
+  --outputFile="$PWD/.logs/d108e4bo-red-corrected/reporter.json"
+```
+
+It returned exactly seven passes and three failures, 103 unselected rows, zero
+top-level errors and the complete frozen failure set:
+`D108E4BO_REQUEST_FAILURE_ATTRIBUTION_ABSENT`,
+`D108E4BO_EXACT_ACCEPT_CLEANUP_ABSENT` and
+`D108E4BO_QUALIFIED_DISCONNECTED_PROMOTION_ABSENT`. The adapter controls prove
+that genuine authenticated-connection close remains observable and successful
+graceful response close remains silent; only remote request reset and response-
+write failure attribution are absent. The exact-owner test, corrected reporter,
+ten-row collection and validating self-excluding evidence-index SHA-256 values
+are respectively
+`ff2b9db057045ea598a47e86b0784e7f78238a9cecc8d394582d96fb83ece8ad`,
+`5b8133c6f2c5fa6f971cef8459dc8ffebbe303fb8c1257f3291a3c9d1b224cd9`,
+`8ab700e405622beb1a48983ce87c31d231bfdc4143b43528bfd798a049dcfa68`
+and
+`30cab8c5a56e859b52f4a92a5ccdfc539a6f868a8b73a7bd75ba9f0c387c7a8a`.
+Exact-test ESLint and Prettier, `git diff --check`, manifest validation,
+protected-path custody, 26-stash custody and all four fixed-port predicates
+passed. No browser, retained-seven, campaign, production source, public API,
+wire, dependency, timer, threshold or workload changed. This signed RED
+releases only the frozen narrow GREEN.

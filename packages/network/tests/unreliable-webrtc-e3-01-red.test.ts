@@ -46,6 +46,27 @@ interface IncomingSignalingStream {
 	readonly stream: unknown;
 }
 
+class LinkedSignalingStream extends EventTarget {
+	status: "aborted" | "closed" | "open" | "reset" = "open";
+	peer?: LinkedSignalingStream;
+	readonly abort = vi.fn((error: Error): void => {
+		if (this.status !== "open") return;
+		this.status = "aborted";
+		this.dispatchEvent(Object.assign(new Event("close"), { error, local: true }));
+		this.peer?.reset(error);
+	});
+	readonly close = vi.fn((): Promise<void> => {
+		if (this.status === "open") this.status = "closed";
+		return Promise.resolve();
+	});
+
+	reset(error: Error): void {
+		if (this.status !== "open") return;
+		this.status = "reset";
+		this.dispatchEvent(Object.assign(new Event("close"), { error, local: false }));
+	}
+}
+
 interface UnreliableWebRtcSnapshot {
 	readonly activeLinks: number;
 	readonly authenticatedConnectionLosses: number;
@@ -631,6 +652,7 @@ interface ExchangeRecord {
 
 interface ExchangeRequestRecord extends ExchangeRecord {
 	readonly request: Uint8Array;
+	readonly signal: AbortSignal;
 }
 
 interface FakeResponseBarrier {
@@ -751,13 +773,34 @@ class FakeSignalingBus {
 						remotePeerId,
 					};
 					this.exchangeRecords.push(record);
-					this.exchangeRequests.push({ ...record, request: request.slice() });
+					this.exchangeRequests.push({ ...record, request: request.slice(), signal });
 					const decision = replacementDecisionRequest(request);
 					if (decision && this.#decisionRequestFailures > 0) {
 						this.#decisionRequestFailures -= 1;
 						throw new Error("fake replacement decision request failed");
 					}
-					const response = await remote.handler(reverse(), this.requestTransform(request.slice()));
+					const requestCloseListeners = new Set<() => void>();
+					const reverseConnection = reverse();
+					const requestConnection: AuthenticatedConnection = Object.freeze({
+						...reverseConnection,
+						onClose(listener: () => void): () => void {
+							requestCloseListeners.add(listener);
+							const unsubscribeConnection = reverseConnection.onClose(listener);
+							return (): void => {
+								requestCloseListeners.delete(listener);
+								unsubscribeConnection();
+							};
+						},
+					});
+					const onRequestAbort = (): void => {
+						for (const listener of requestCloseListeners) listener();
+					};
+					if (signal.aborted) onRequestAbort();
+					else signal.addEventListener("abort", onRequestAbort, { once: true });
+					const response = await this.#waitForHandler(
+						signal,
+						remote.handler(requestConnection, this.requestTransform(request.slice()))
+					).finally(() => signal.removeEventListener("abort", onRequestAbort));
 					const decisionResponse = decision ? this.#nextDecisionResponse : undefined;
 					if (decisionResponse !== undefined) {
 						this.#nextDecisionResponse = undefined;
@@ -837,6 +880,28 @@ class FakeSignalingBus {
 			else signal.addEventListener("abort", onAbort, { once: true });
 			void pending.then(
 				() => finish(resolve),
+				(error: unknown) => finish(() => reject(error))
+			);
+		});
+	}
+
+	async #waitForHandler<T>(signal: AbortSignal, handler: Promise<T>): Promise<T> {
+		return new Promise<T>((resolve, reject) => {
+			let settled = false;
+			const finish = (complete: () => void): void => {
+				if (settled) return;
+				settled = true;
+				signal.removeEventListener("abort", onAbort);
+				complete();
+			};
+			const onAbort = (): void =>
+				finish(() =>
+					reject(signal.reason instanceof Error ? signal.reason : new Error("fake signaling exchange aborted"))
+				);
+			if (signal.aborted) onAbort();
+			else signal.addEventListener("abort", onAbort, { once: true });
+			void handler.then(
+				(value) => finish(() => resolve(value)),
 				(error: unknown) => finish(() => reject(error))
 			);
 		});
@@ -1245,6 +1310,128 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 			expect(await inboundResult).toMatchObject({ message: "RTC setup deadline exceeded" });
 		} finally {
 			vi.useRealTimers();
+		}
+	});
+
+	it("D.108e4bo attributes exact request reset and response delivery failure", async () => {
+		const module = await loadOwnerModule();
+		const outboundStream = new LinkedSignalingStream();
+		const inboundResetStream = new LinkedSignalingStream();
+		outboundStream.peer = inboundResetStream;
+		inboundResetStream.peer = outboundStream;
+		const writeFailureStream = new LinkedSignalingStream();
+		const gracefulStream = new LinkedSignalingStream();
+		const genuineCloseStream = new LinkedSignalingStream();
+		let incoming: ((input: IncomingSignalingStream) => Promise<void>) | undefined;
+		let genuineConnectionClose: (() => void) | undefined;
+		const requestCloseCounts = new Map<number, number>();
+		const requestUnsubscribes = new Map<number, () => void>();
+		let releaseResetHandler: (() => void) | undefined;
+		let markResetHandlerReady: (() => void) | undefined;
+		const resetHandlerReady = new Promise<void>((resolve) => {
+			markResetHandlerReady = resolve;
+		});
+		const resetHandlerRelease = new Promise<void>((resolve) => {
+			releaseResetHandler = resolve;
+		});
+		const lowConnection: Libp2pConnectionFixture = {
+			addEventListener(): void {},
+			id: "libp2p-d108e4bo-low",
+			newStream: (): Promise<unknown> => Promise.resolve(outboundStream),
+			remoteAddr: { toString: (): string => "/webrtc" },
+			remotePeer: { toString: (): string => "peer-b" },
+		};
+		const highConnection: Libp2pConnectionFixture = {
+			addEventListener: (_type, listener): void => {
+				genuineConnectionClose = listener;
+			},
+			id: "libp2p-d108e4bo-high",
+			newStream: (): Promise<unknown> => Promise.reject(new Error("unexpected high outbound stream")),
+			remoteAddr: { toString: (): string => "/webrtc" },
+			remotePeer: { toString: (): string => "peer-a" },
+		};
+		const lowPort = module.createLibp2pWebRtcSignalingPort({
+			connections: (): readonly Libp2pConnectionFixture[] => [lowConnection],
+			localPeerId: "peer-a",
+			onIncoming: (): (() => void) => (): void => undefined,
+			read: (stream): Promise<Uint8Array> =>
+				new Promise<Uint8Array>((_resolve, reject) => {
+					(stream as LinkedSignalingStream).addEventListener(
+						"close",
+						(event) => reject((event as Event & { error?: Error }).error ?? new Error("stream closed")),
+						{ once: true }
+					);
+				}),
+			write: (): Promise<void> => Promise.resolve(),
+		});
+		const highPort = module.createLibp2pWebRtcSignalingPort({
+			connections: (): readonly Libp2pConnectionFixture[] => [highConnection],
+			localPeerId: "peer-b",
+			onIncoming: (listener): (() => void) => {
+				incoming = listener;
+				return (): void => {
+					if (incoming === listener) incoming = undefined;
+				};
+			},
+			read: (stream): Promise<Uint8Array> => {
+				if (stream === inboundResetStream) return Promise.resolve(Uint8Array.of(1));
+				if (stream === writeFailureStream) return Promise.resolve(Uint8Array.of(2));
+				if (stream === gracefulStream) return Promise.resolve(Uint8Array.of(3));
+				return Promise.resolve(Uint8Array.of(4));
+			},
+			write: (stream): Promise<void> =>
+				stream === writeFailureStream
+					? Promise.reject(new Error("controlled response write failure"))
+					: Promise.resolve(),
+		});
+		highPort.onRequest(async (authenticated, request): Promise<Uint8Array> => {
+			const requestId = request[0] ?? 0;
+			requestUnsubscribes.set(
+				requestId,
+				authenticated.onClose(() => requestCloseCounts.set(requestId, (requestCloseCounts.get(requestId) ?? 0) + 1))
+			);
+			if (requestId === 1) {
+				markResetHandlerReady?.();
+				await resetHandlerRelease;
+			}
+			return Uint8Array.of(requestId);
+		});
+		const adaptedLow = lowPort.connections()[0];
+		if (adaptedLow === undefined || incoming === undefined) throw new Error("D108E4BO_ADAPTER_FIXTURE_ABSENT");
+
+		const controller = new AbortController();
+		const outbound = adaptedLow.exchange(Uint8Array.of(1), controller.signal).catch((error: unknown) => error);
+		const resetInbound = incoming({ connection: highConnection, stream: inboundResetStream });
+		await resetHandlerReady;
+		controller.abort(new Error("controlled producer cancellation"));
+		await tick();
+		const resetNotified = requestCloseCounts.get(1) === 1;
+		releaseResetHandler?.();
+		await Promise.allSettled([outbound, resetInbound]);
+		requestUnsubscribes.get(1)?.();
+
+		await expect(incoming({ connection: highConnection, stream: writeFailureStream })).rejects.toThrow(
+			"controlled response write failure"
+		);
+		const writeFailureNotified = requestCloseCounts.get(2) === 1;
+		requestUnsubscribes.get(2)?.();
+		await incoming({ connection: highConnection, stream: gracefulStream });
+		const gracefulNotified = requestCloseCounts.get(3) ?? 0;
+		requestUnsubscribes.get(3)?.();
+		await incoming({ connection: highConnection, stream: genuineCloseStream });
+		genuineConnectionClose?.();
+		const genuineCloseNotified = requestCloseCounts.get(4) === 1;
+		requestUnsubscribes.get(4)?.();
+
+		if (!resetNotified || !writeFailureNotified || gracefulNotified !== 0 || !genuineCloseNotified) {
+			throw new Error(
+				`D108E4BO_REQUEST_FAILURE_ATTRIBUTION_ABSENT:${JSON.stringify({
+					genuineCloseNotified,
+					gracefulNotified,
+					resetNotified,
+					writeFailureNotified,
+				})}`
+			);
 		}
 	});
 
@@ -3105,6 +3292,175 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 			vi.useRealTimers();
 			low.owner.close();
 			high.owner.close();
+		}
+	});
+
+	it("D.108e4bo cancels exact pre-datachannel B and preserves successor C", async () => {
+		const module = await loadOwnerModule();
+		const bus = new FakeSignalingBus();
+		const low = owner(module, bus, "peer-a");
+		const high = owner(module, bus, "peer-b");
+		const validOfferSource = new FakePeerConnection();
+		const invalidOfferSource = new FakePeerConnection({ inboundChannel: { label: "wrong" } });
+		let barrier: FakeInboundOpenBarrier | undefined;
+		let pendingB: Promise<void> | undefined;
+		try {
+			const original = bus.connect("peer-a", "peer-b");
+			const lowRoute = low.owner.openUnreliableWebRtcRoute("zone:d108e4bo-exact-cancellation");
+			const highRoute = high.owner.openUnreliableWebRtcRoute("zone:d108e4bo-exact-cancellation");
+			await Promise.all([lowRoute.reconcile(["peer-b"]), highRoute.reconcile(["peer-a"])]);
+			vi.useFakeTimers();
+			bus.disconnect(original);
+			const replacement = bus.connect("peer-a", "peer-b");
+			barrier = FakePeerConnection.pauseNextInboundHandler();
+			pendingB = lowRoute.reconcile(["peer-b"]);
+			await barrier.waitUntilPending();
+			const acceptorB = high.peerConnections[1];
+			if (acceptorB === undefined) throw new Error("D108E4BO_ACCEPTOR_B_ABSENT");
+
+			validOfferSource.createDataChannel(RAW_LABEL, { maxRetransmits: 0, ordered: false });
+			const validOffer = await validOfferSource.createOffer();
+			const validOfferBytes = new TextEncoder().encode(
+				JSON.stringify({ candidates: [], sdp: validOffer.sdp, type: "offer" })
+			);
+			invalidOfferSource.createDataChannel("wrong", { maxRetransmits: 0, ordered: false });
+			const invalidOffer = await invalidOfferSource.createOffer();
+			const invalidOfferBytes = new TextEncoder().encode(
+				JSON.stringify({ candidates: [], sdp: invalidOffer.sdp, type: "offer" })
+			);
+			await expect(replacement.left.exchange(validOfferBytes, new AbortController().signal)).rejects.toThrow(
+				"unreliable WebRTC signaling request rejected"
+			);
+			await expect(replacement.left.exchange(invalidOfferBytes, new AbortController().signal)).rejects.toThrow(
+				"unreliable WebRTC signaling request rejected"
+			);
+			expect(acceptorB.connectionState).toBe("connected");
+
+			const producerRequest = bus.exchangeRequests.find(
+				({ connectionId, request }) => connectionId === replacement.left.id && !replacementDecisionRequest(request)
+			);
+			if (producerRequest === undefined) throw new Error("D108E4BO_PRODUCER_REQUEST_ABSENT");
+			low.owner.close();
+			await tick();
+			await tick();
+			const producerAborted = producerRequest.signal.aborted;
+			const exactBCleaned = acceptorB.connectionState === "closed";
+			const successorResult = await replacement.left.exchange(validOfferBytes, new AbortController().signal).then(
+				() => "accepted" as const,
+				(error: unknown) => (error instanceof Error ? error.message : String(error))
+			);
+			const successorC = high.peerConnections[2];
+			const successorOpen = successorResult === "accepted" && successorC?.connectionState !== "closed";
+
+			barrier.release();
+			if (!producerAborted) await vi.advanceTimersByTimeAsync(10_000);
+			await pendingB.catch(() => undefined);
+			await tick();
+			await tick();
+			const deferredBPreservedC = successorC === undefined || successorC.connectionState !== "closed";
+			if (!producerAborted || !exactBCleaned || !successorOpen || !deferredBPreservedC) {
+				throw new Error(
+					`D108E4BO_EXACT_ACCEPT_CLEANUP_ABSENT:${JSON.stringify({
+						acceptorB: acceptorB.connectionState,
+						deferredBPreservedC,
+						producerAborted,
+						successor: successorC?.connectionState,
+						successorResult,
+					})}`
+				);
+			}
+			expect(highRoute.snapshot().authenticatedConnectionLosses).toBe(1);
+		} finally {
+			FakePeerConnection.releaseInboundHandlerBarrier(barrier);
+			await pendingB?.catch(() => undefined);
+			validOfferSource.close();
+			invalidOfferSource.close();
+			low.owner.close();
+			high.owner.close();
+			vi.clearAllTimers();
+			vi.useRealTimers();
+		}
+	});
+
+	it("D.108e4bo promotes qualified C over selected disconnected A", async () => {
+		const module = await loadOwnerModule();
+		let fixture: CommittedPendingReplacementFixture | undefined;
+		let stalePeerCloseBarrier: FakeInboundOpenBarrier | undefined;
+		try {
+			fixture = await committedPendingReplacementFixture(module);
+			const selectedHighPc = fixture.high.peerConnections[0];
+			const selectedHigh = selectedHighPc?.channels[0];
+			const staleLow = fixture.low.peerConnections[1]?.channels[0];
+			const staleHigh = fixture.high.peerConnections[1]?.channels[0];
+			if (
+				selectedHighPc === undefined ||
+				selectedHigh === undefined ||
+				staleLow === undefined ||
+				staleHigh === undefined
+			) {
+				throw new Error("D108E4BO_DISCONNECTED_A_FIXTURE_ABSENT");
+			}
+			selectedHighPc.connectionState = "disconnected";
+			staleHigh.readyState = "closing";
+			stalePeerCloseBarrier = staleLow.pausePeerClose();
+			const lowReceived: Uint8Array[] = [];
+			const highReceived: Uint8Array[] = [];
+			fixture.lowRoute.onMessage(({ bytes }) => lowReceived.push(bytes.slice()));
+			fixture.highRoute.onMessage(({ bytes }) => highReceived.push(bytes.slice()));
+
+			await fixture.lowRoute.restart();
+			await vi.advanceTimersByTimeAsync(0);
+			await tick();
+			await tick();
+			const replacementLowPc = fixture.low.peerConnections[2];
+			const replacementHighPc = fixture.high.peerConnections[2];
+			const replacementLow = replacementLowPc?.channels[0];
+			const replacementHigh = replacementHighPc?.channels[0];
+			const promotedBeforeDeadline =
+				fixture.highRoute.snapshot().links[0]?.connectionId === fixture.replacement.right.id;
+			const lowSent = await fixture.lowRoute.send(["peer-b"], Uint8Array.of(71));
+			const highSent = await fixture.highRoute.send(["peer-a"], Uint8Array.of(72));
+			await tick();
+			await tick();
+			await vi.advanceTimersByTimeAsync(10_001);
+			await tick();
+			const survivedDeadline =
+				replacementLowPc?.connectionState !== "closed" &&
+				replacementHighPc?.connectionState !== "closed" &&
+				fixture.highRoute.snapshot().links[0]?.connectionId === fixture.replacement.right.id;
+
+			if (
+				!promotedBeforeDeadline ||
+				!lowSent ||
+				!highSent ||
+				lowReceived.length !== 1 ||
+				highReceived.length !== 1 ||
+				!survivedDeadline
+			) {
+				throw new Error(
+					`D108E4BO_QUALIFIED_DISCONNECTED_PROMOTION_ABSENT:${JSON.stringify({
+						high: fixture.highRoute.snapshot(),
+						highReceived: highReceived.map((bytes) => [...bytes]),
+						highSent,
+						low: fixture.lowRoute.snapshot(),
+						lowReceived: lowReceived.map((bytes) => [...bytes]),
+						lowSent,
+						promotedBeforeDeadline,
+						replacementHigh: replacementHigh?.readyState,
+						replacementLow: replacementLow?.readyState,
+						survivedDeadline,
+					})}`
+				);
+			}
+			expect(selectedHigh.readyState).toBe("closed");
+		} finally {
+			stalePeerCloseBarrier?.release();
+			fixture?.oldCloseEventBarrier.release();
+			fixture?.oldPeerCloseBarrier.release();
+			fixture?.low.owner.close();
+			fixture?.high.owner.close();
+			vi.clearAllTimers();
+			vi.useRealTimers();
 		}
 	});
 
