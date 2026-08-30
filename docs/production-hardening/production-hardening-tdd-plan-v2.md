@@ -76838,3 +76838,115 @@ not invoke Kimi, Fable or collaboration subagents. After GREEN is signed and
 pushed, the one formal final review inspects this freeze, causal RED and full
 GREEN evidence. Campaign authority remains frozen until that blocking union is
 empty and a signed closure explicitly restores the five remaining invocations.
+
+The high-risk review of signed/pushed freeze `cfb3fe4889055cc7500ed63be39e4bb9eed09347`
+found one material control-order defect and one contradictory retained
+expectation. Opus 5/xhigh session `d23985fa-eb20-45ab-aab3-165351c1f34e`
+returned `BLOCKED` with one P0, one P1 and four P2s. The P0 showed that the
+initiator's one-shot READY is emitted while the RED barrier deliberately leaves
+acceptor B without a handler, so the fake and production lifecycle may discard
+the sole frame before barrier release. The P1 showed that initiator promotion
+would invert the existing initiator `channel-close` / acceptor `replacement`
+drop ownership while the freeze also required those exact expectations to
+remain unchanged.
+
+Read-only Codex `gpt-5.6-sol` / high thread
+`01a0516c-4aab-74a1-bb58-0dab6891e290` returned `APPROVED` with zero P0/P1 and
+two P2s, but its approval does not cancel Opus's independently reproducible
+blocking trace. Grok's wrapper remains honest `NO_VERDICT` after 630.108 seconds
+with `stopReason=end_turn`, `timed_out=false`: its public stream ended with the
+same P0/P1 analysis, but progress prose preceded the schema, so that text is
+preserved without being promoted to a verdict. Grok is not relaunched.
+
+The following correction supersedes only the control order and related
+acceptance clauses in the `cfb3fe48` GREEN freeze. The four-byte namespace,
+causal RED, owners, scope, deadlines, retry cadence, limits and every other
+constraint remain unchanged. Kind `44 52 01 01` is initiator READY and kind
+`44 52 01 02` is acceptor ACK; despite the historical name, ACK is also an
+explicit acceptor-readiness statement rather than proof that READY was already
+received.
+
+Each endpoint installs its message/close handler and observes its own B open
+before emitting its role's frame. A replacement participant emits that frame
+once at own readiness. On the first exact peer-role frame, it records remote
+readiness and may emit its own frame once more as an idempotent response. Per
+held link, each role therefore sends at most twice—once at own readiness and
+once on first peer readiness—with no interval, new timer, third kind or
+ping-pong. Later duplicates are accepted idempotently but do not cause another
+send. If either initial frame reached a handler-less peer, the response after
+that peer's own readiness supplies the bounded second opportunity. If both
+opportunities are lost, the existing absolute setup deadline discards B and the
+existing whole-link retry creates a fresh attempt while retaining usable A.
+
+The acceptor remains the designated normal retirement owner. It may promote B
+and retire A with reason `replacement` only after it has received exact READY
+on the exact current B and has successfully emitted ACK from that B. The
+initiator records ACK as remote readiness, emits its bounded READY response if
+needed, but keeps usable A selected. It promotes B when acceptor-owned A close
+arrives, recording `channel-close`, and only if ACK has already proved acceptor
+B readiness. Thus the two retained D.108e4at rows keep their existing exact
+initiator `channel-close` / acceptor `replacement` reasons and one drop each.
+
+A loss and remote readiness are commutative state predicates. When exact A was
+already removed, first valid peer readiness plus successful emission of the
+local role frame promotes the proved B immediately; when readiness arrives
+first, promotion waits for the designated retirement/A-loss event above. This
+closes all four D.108e4au rows after barrier release without interpreting the
+earlier unrelated A loss as readiness. Until that release, both direct-close
+and send-discovered rows have zero active links after A loss, exact two/two
+physical owners, one unsettled B setup per endpoint and no C. The still-owned
+setup promise prevents the existing retry callback from allocating C.
+
+Replacement mode is the durable local `#activatedPeers` fact, not the
+time-sensitive presence of `#links`. It remains set after any endpoint has
+activated its first link and is cleared only by existing all-link/owner cleanup.
+An endpoint with no prior activation keeps existing immediate initial-link
+registration. To make asymmetric owner history converge, an exact peer-role
+frame received on the exact current active initial link may elicit that link's
+single role response without changing selection or counters. A replacement
+endpoint can therefore complete against a freshly created peer owner; ordinary
+first setup where neither endpoint has prior activation sends no control and is
+unchanged. Add the asymmetric-history cases to the focused matrix.
+
+The acceptor's missing-READY/ACK, send failure, identity change and expiry remain
+inside the same remaining `finish`/setup deadline. Their exact failure owner is
+`#discardPendingReplacement`, which removes the readiness record,
+`#pendingReplacementLinks` and `#pendingPeerConnections`, unsubscribes and
+closes B, and increments `handshakeFailures` exactly once through the existing
+setup catch. Initiator failure uses the same pending-discard path through the
+existing `#closePendingForPeer` owner. No closed B may retain a capacity slot or
+block retry.
+
+Payload suppression applies only to a not-yet-activated replacement B. Routed
+delivery on selected A and on an already-retiring A is unchanged. Exact controls
+on stale/retiring/wrong-generation/wrong-connection links remain unable to
+change readiness or selection. A valid peer-role frame on an exact active
+initial link has only the bounded asymmetric-history response effect described
+above; it is never delivered to routes or counted as product traffic.
+
+The accepted unreliable lane still has a short one-way transition in which the
+acceptor has selected B after reciprocal handler proof while the initiator is
+waiting to observe A close and select its already-prepared B. This correction
+removes the demonstrated handler/open continuity defect but does not promise
+lossless application delivery during that sub-event window; unreliable sends
+may fail or be dropped there just as elsewhere. The focused tests must prove
+post-handoff bidirectional traffic and that no application payload is delivered
+from unproved pending B. No new continuity guarantee or follow-on slice is
+created by this disposition; a later concrete failure may be sliced on its own
+evidence.
+
+The corrected focused roster adds bounded send-count/no-ping-pong assertions,
+both initial control-loss orderings, A-loss-before-readiness and readiness-before-
+A-loss, asymmetric prior activation in both physical roles, acceptor deadline
+cleanup and retiring-A delivery. The previously listed wrong-role, malformed,
+duplicate, stale/generation, pending-payload, send-failure and owner-close
+mutants remain. Existing D.108e4at drop expectations remain byte-for-byte
+controlling. This one batch resolves every Opus P0/P1 and disposes all review
+P2s without changing APIs, dependencies, workload, limits, timeouts, retry
+cadence or campaign authority.
+
+Because the correction materially changes executable control order, resume the
+same Codex and Opus review threads for the one permitted confirmation. Do not
+start a new review, relaunch Grok or invoke Kimi, Fable or collaboration
+subagents. Zero P0/P1 across the latest available Codex and Opus results plus a
+deterministic local source/acceptance audit closes the GREEN plan gate.
