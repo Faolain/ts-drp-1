@@ -74688,3 +74688,41 @@ threshold change or scope expansion. Prior immutable roots and invocation
 ledgers remain unchanged; protected untracked paths and all stashes remain in
 custody; signed commits, pushed-ref identity and fail-closed evidence remain
 mandatory.
+
+D.108e4ar's plan gate closes under the prospective policy after signed/pushed
+policy checkpoint `24fee2d4f1bb26773cc8f401b18f489f7305d044`, tree
+`6b92a729e51d47c0c39855f201f2c232a0623e7e`. Latest Grok 4.6/high session
+`01a05042-fa9e-7700-88d8-f80d9c3c6b4a` is APPROVED with zero findings. Latest
+Opus 5/xhigh session `75a67705-ad04-4f13-a6cc-93ca36f9d0ab` is APPROVED with
+zero P0/P1; its four P2s are disposed in signed/pushed descendant `6ad8d19f`.
+Kimi session `3f54edd4-79d9-45b7-b328-8f7395e887ad` remains honest NO_VERDICT
+after an immediate weekly-quota 403 before any check; it was not retried and no
+earlier verdict is attributed to later bytes. Under the prospective policy that
+temporary service limitation does not block deterministic RED.
+
+The deterministic `.logs/d108e4ar-plan-audit/` passed on its third read-only
+execution. Its first two status-one attempts were faulty audit diagnostics—a
+missing escaped dot in the policy-heading regex and a line-oriented phrase match
+against Kimi's wrapped 403—not source, plan or review failures. The corrected
+audit proves: signed/pushed identity; plan-only tracked descendants; executable
+test bytes unchanged from accepted GREEN `1a296702`; 20 current
+`CampaignEvidence` fields; four exact legacy key positions; final replacement
+at line 7331 before exactly 21 expectations and push at line 7412; retained
+per-lane sequence-first derivation with two `Infinity` fallbacks; zero-P0/P1
+review results; protected paths; 26 stashes; clear ports; no active ts-drp
+reviewer/test/profiler; and absent campaign/RED/GREEN execution roots. No test,
+build, browser, profiler or campaign ran.
+
+The self-excluding fifty-five-file `.logs/d108e4ar-plan-review/` manifest
+validates and has SHA-256
+`38e05808d0fc014144a63d8159b123828ecf579b98b5c3aa85ad55149d3a52f6`;
+validation SHA-256 is
+`c42b3fc42dd1ebcfa3ca2d2e06cd0330b51316385cf1b01c3515d73ed9060ffa`.
+The self-excluding thirty-eight-file `.logs/d108e4ar-plan-audit/` manifest
+validates and has SHA-256
+`a212c787722461f93d315f8aa21fc0ab05344421b194302c4348dda22df59743`;
+validation SHA-256 is
+`b1d62b0293760e2816fbb35be2f9844c16049e914d4e6406cf7709b3b84d64ec`.
+This closure is bookkeeping-only and receives no new formal review. After it is
+signed and pushed, D.108e4ar proceeds directly to its frozen deterministic RED;
+no retained campaign is authorized or executable.
