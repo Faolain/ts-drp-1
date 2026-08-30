@@ -79303,3 +79303,26 @@ margin, product-owned first-offer/READY/cleanup classification and complete
 promise/barrier/static/timer teardown. It disposes the P2 cleanup findings at
 the same time. No fixture API, product behavior, timing contract, workload or
 scope changes; deterministic audit closes the plan gate without confirmation.
+
+The sole D.108e4bc focused command returned status one with both selected rows
+failing at the same first assertion after the READY fault was consumed. The
+reporter SHA-256 is
+`46bbb33e955c6ef5deb1b1f88625ed21624700542b9f05e096bfb2780032318f`.
+The assertion required one READY in `controlFrames(firstReplacementLow)`, but
+`FakeDataChannel.send()` consults and consumes `controlThrows` and throws before
+executing `this.sent.push(bytes)`. A thrown control is therefore intentionally
+absent from the sent-frame ledger. The test already proves the actual scripted
+precondition with an empty `controlThrows` entry, the exact signaling exchange,
+the low handshake counter and closed low channel plus open held high channel.
+This is a structurally impossible fixture assertion, not a product failure and
+not evidence that READY was unattempted.
+
+Remove only that one sent-frame assertion. Do not rerun the focused selection.
+After exact-owner formatting/lint/typecheck/build/source-shape gates, run the
+complete retained E3-01 owner file once; its two D.108e4bc rows are the sole
+post-correction runtime and must prove the complete 27/0, 27/1 and attempt-28
+matrix alongside all retained assertions. Preserve the failed focused reporter
+in the final evidence manifest and record the correction explicitly. This
+narrow test-oracle correction changes no causal scope, product behavior,
+fixture API, timing, workload or threshold and receives deterministic audit,
+not another model review or focused rerun.
