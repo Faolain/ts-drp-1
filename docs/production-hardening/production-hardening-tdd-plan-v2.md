@@ -80966,19 +80966,18 @@ byte-identical. The request has exactly
 the decision ID above. Version is the JSON number `1`; all other values are
 strings. The response has exactly
 `decisionId,status,type,version`, with type `replacement-decision-result`,
-version `1`, the identical ID and status `committed`, `aborted` or `pending`.
-`pending` is a bounded nonterminal observation result emitted only when that
-request's cutoff arrives while the exact decision record remains undecided; it
-can cause only the already-bounded second observation and cannot promote or
-discard a link. Existing
+version `1`, the identical ID and status `committed` or `aborted`. An
+undecided first observation fails its transport-local exchange at the midpoint
+cutoff; that failure can cause only the already-bounded second observation and
+is not a third cross-node response status. Existing
 offer/answer objects and their exact decoder remain unchanged. Any other key,
 type, version, status, ID syntax or byte excess fails closed.
 
 The acceptor retains one bounded decision record per live selected-A
 replacement until the original absolute setup deadline. Pending queries wait
-only within that deadline. A first pending query may return the nonterminal
-`pending` status at its midpoint cutoff so its stream cannot consume the
-second-attempt window. Raw COMMIT makes the exact record `committed` and
+only within that deadline. A first pending query fails its local exchange at
+the midpoint cutoff so its stream cannot consume the second-attempt window.
+Raw COMMIT makes the exact record `committed` and
 resolves all same-ID waiters; before commit, discard, connection identity
 change or owner close makes it `aborted`. A committed record is write-once
 while its exact B and authenticated connection remain valid; invalidation
@@ -81162,3 +81161,91 @@ No browser, retained-seven or campaign invocation ran during GREEN. The next
 gate is the single formal Grok/Codex-high/Opus-xhigh implementation review over
 the signed plan, RED and GREEN history; an empty P0/P1 union is required before
 the separately authorized retained browser gates.
+
+The single formal implementation review then completed against signed/pushed
+GREEN `07a86e26846b85d9d0406ac21957e37bc98b7af8`. Codex
+`gpt-5.6-sol` high returned `CHANGES_REQUIRED`, P0=0/P1=4/P2=0: restore the
+acceptor's pre-hold absolute setup bound, invalidate exact pending B/decision
+state on authenticated connection loss, complete the frozen deterministic
+matrix, and remove the unreviewed third `pending` wire-result status. Opus
+xhigh returned `CHANGES_REQUIRED`, P0=1/P1=1/P2=5: the same pre-hold deadline
+was its P0 and the deleted retiring-link ingress proof was its P1. Its rollout,
+bounded-waiter, unreliable transient-ingress, asymmetric-retry and diagnostic
+drop-reason observations remain P2 with explicit acceptance under the existing
+scope. Grok ended normally after substantive inspection, but emitted progress
+prose before its JSON object; the strict runner therefore records
+`NO_VERDICT`, not a formal verdict, and it was not relaunched. Its public text
+identified one independently reproducible race: acceptor A can disappear
+after B is held but before raw COMMIT, leaving the hold-time decision flag to
+discard committed B at expiry.
+
+The blocking material union was corrected once. Only inbound channel
+acquisition/opening is deadline-wrapped before ownership transfers to the
+existing replacement-readiness deadline. Authenticated connection close now
+discards only the exact still-pending B through the existing cleanup owner;
+active A/B behavior remains unchanged. The response wire returns only
+`committed|aborted`; an undecided midpoint fails that local exchange so the
+initiator's already-bounded second attempt runs without a third response
+status. COMMIT and expiry re-read whether selected A is currently usable and
+call the sole existing promotion owner when A is absent or physically
+non-open. No new activation or cleanup owner was added.
+
+The deterministic correction matrix adds a fixed external SHA-256 known
+answer plus the captured-offer binding, request key/type/version/ID mutations,
+response key/type/version/ID/status mutations, a held first response, two
+observations reaching the original deadline after lost COMMIT, pending-B
+close, authenticated-connection close, owner close, replay on replacement C,
+acceptor A loss before COMMIT, and acceptor pre-open timeout followed by a
+successfully admitted new offer. The retiring-A application-ingress and
+retiring-PC proof is mirrored to the initiator, which is now the endpoint that
+retires first. Two retained expectations were re-frozen without semantic
+widening: application-proof promotion now records the existing `replacement`
+owner, and a stale-generation B is asserted closed after exact connection
+invalidation instead of sending on that closed channel.
+
+The first correction-focused diagnostic selected 16 titles: 13 passed and
+three test-owner assertions failed. They were an exact-request lookup that
+selected its own wrong-version mutant, an initiator counter asserted at the
+acceptor-only pre-open cleanup point, and a retry timer counted before
+asynchronous owner-close cleanup. The corrected diagnostic then passed all 16
+assertions but the repository-wide coverage threshold rejected the deliberately
+focused one-file selection; this was a command-policy failure, not a test
+failure. The acceptance command explicitly used `--coverage.enabled=false`,
+as intended for this focused gate, and returned 16 passed, 88 skipped, zero
+failed and `success=true`. The first complete-owner diagnostic returned
+102/104 and exposed the two stale retained expectations above; after their
+bounded correction the complete owner returned 104/104 passed.
+
+`pnpm --filter @ts-drp/network build`, package typecheck, exact source/test
+ESLint with zero warnings, exact source/test Prettier, and `git diff --check`
+all returned zero. The deterministic source audit confirms one decision
+decoder, one decision map, one observer, one promotion owner, two wire-result
+statuses, decision dispatch before offer admission, exact pending-B cleanup on
+both connection-close callbacks, and the pre-hold-only deadline. A mistaken
+read-only `rg -E` process diagnostic was rejected by ripgrep, and an initial
+source-count regex counted promotion call sites instead of only its definition;
+the corrected plain alternation and definition-position checks passed. Neither
+diagnostic mistake is treated as a code failure. No ts-drp test, reviewer or
+profiler process remains active. Ports 4174, 4175, 51000 and 51002 are clear.
+The protected untracked roster and all 26 stashes remain preserved; no browser,
+retained-seven or campaign invocation has run.
+
+Corrected production-owner, test-owner, focused-reporter and complete-owner
+reporter SHA-256 values are respectively
+`0dc36a385b0db62a61c4ffe26e179f2a1052fd51648c22fb4dd687dd641f05fb`,
+`8161dde06490c5d9c85eb613682e9c7a2d3bfd9cb74a92b64ec2beb76944592f`,
+`99cc50a8e2eb55058d077e858b31c28c163bb824281a6371a87831e9b88c022e`
+and
+`532b40a08e14d4a4944c8b88a96a3b289567fbe77672b9c3eca2b53ec52f4d3b`.
+Implementation-review prompt, Codex result, Grok public text, Grok status and
+Grok event-stream SHA-256 values are respectively
+`d431746448306261f9b5230ca390e3f19df3c20f02698a1732cd03b0e75f5d07`,
+`0b7922e2709063d3f423d46a15125e54aefc9f2d221f72f5ac36230c165ebec5`,
+`72e47b0fc65e3952314927957d054e68fb3c56ddfda555d3d8dbdd23c7c6ac8f`,
+`258de1b44a6d41a6142b327aefc327429895ea381ac9a37e6c5396a5d55d4c39`
+and
+`8f016bc9dfdaeada3d32a4fd47f67647db9f4f3bf3d52ff9bc08ae4d3f7c20c8`.
+Because the blocking correction changes executable code, the prospective
+review policy permits one confirmation over this signed correction. No
+recursive prose review is authorized. An empty confirmation P0/P1 union
+releases the already-planned retained browser gates.
