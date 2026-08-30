@@ -78515,8 +78515,10 @@ diagnostics return zero; that regex/status mistake is not a code failure.
 
 ###### D.108e4az — authenticated-loss bilateral-restart discriminator
 
-D.108e4az owns the last deterministic product question left by D.108e4ax and
-D.108e4ay. D.108e4ax proved bilateral raw restart in both synchronous caller
+D.108e4az owns one bounded deterministic product question left by D.108e4ax
+and D.108e4ay: authenticated signaling loss strictly before both synchronous
+raw restarts, followed by a clean replacement with zero handshake failures.
+D.108e4ax proved bilateral raw restart in both synchronous caller
 orders while authenticated signaling identity stayed stable. The sole browser
 replay in D.108e4ay likewise converged with zero authenticated connection
 losses and zero handshake failures. Consumed `ordinary-3` instead ended with
@@ -78546,50 +78548,78 @@ failures and zero link drops. This is the distinguishing precondition absent
 from both passing prior discriminators.
 
 For `replacement-before-restart`, connect the new authenticated pair before
-calling either restart. For `replacement-after-restart`, leave signaling
-absent through both restart calls, prove no exchange was fabricated, then
-connect the replacement pair and explicitly call both route `reconcile()`
-methods. That explicit reconcile models the existing DRPNode connection-event
-owner; the raw owner is not required to discover a newly arrived libp2p
-connection without its caller. Neither row invents a product callback or new
-API.
+calling either restart, but do not send or reconcile between `connect()` and
+the synchronous restart pair; the two restart-owned reconciles are the only
+setup owners. For `replacement-after-restart`, leave signaling absent through
+both restart calls, capture both restart promises, release the close barrier,
+await both restarts and prove zero exchange growth before connecting the
+replacement pair. Then connect the replacement pair, capture both route
+`reconcile()` promises and await them together. That explicit reconcile models
+`NodeEphemeralAdapter.reconcileRaw`, reached from the network-node
+`notifyPeerConnection`/`subscribeToPeerConnections` notification seam; the
+test's awaited calls are intentionally stronger than the product adapter's
+fire-and-report `void rawRoute.reconcile(...).catch(...)` call. The raw owner is
+not required to discover a newly arrived libp2p connection without its caller.
+Neither row invents a product callback or new API.
 
 Both local restart drops must occur in one synchronous turn. Pause propagation
 of the first caller's old peer-channel close, invoke the first and second
-`restart()` without awaiting between them, then release the peer-close barrier.
-The row is invalid if either endpoint records a peer-induced `channel-close`
-instead of its own `restart`, if an exchange occurs against a missing or stale
-authenticated connection, or if the after-restart row omits the explicit
-connection-arrival reconcile. Reversing the rows changes only which route's
-restart is invoked first.
+`restart()` without awaiting between them, capture both promises, then release
+the peer-close barrier and await both promises together. The row is invalid if
+either endpoint records a peer-induced `channel-close` instead of its own
+`restart`, if the barrier is attached to the wrong old channel, if an exchange
+occurs against a missing or stale authenticated connection, or if the
+after-restart row omits either explicit connection-arrival reconcile. Reversing
+the rows changes only which route's restart is invoked first.
 
-The causal acceptance matrix is exact. After replacement availability and any
-required reconcile, exactly one new signaling exchange must use the lower
-endpoint's replacement connection id/generation. Both endpoints must select
-their corresponding replacement connection id/generation, retain exactly one
-authenticated connection loss, retain zero handshake failures, record exactly
-one `restart` link drop, restore one active raw link, deliver a new payload in
-both directions and remain quiescent across two 250 ms retry cycles with no
-new peer connection or counter change. Old channels must be closed and the
-replacement channels must be the only active raw pair.
+The causal acceptance matrix is exact. Score it only after both restart
+promises and, where applicable, both connection-arrival reconcile promises
+settle, then use a bounded settle on the expected replacement connection ids.
+After the frozen precondition, both owned restart drops and valid replacement
+announcement, exactly one new signaling exchange must use the lower endpoint's
+replacement connection id/generation. Any other exchange count, any handshake
+failure growth, or failure to restore one active raw link is causal RED. Both
+endpoints must select their corresponding replacement connection id/generation,
+retain exactly one authenticated connection loss, retain zero handshake
+failures, record exactly one `restart` link drop, restore one active raw link,
+deliver a new payload in both directions and remain quiescent across two 250 ms
+retry cycles with no new peer connection or counter change and
+`vi.getTimerCount() === 0`. Old channels must be closed and the replacement
+channels must be the only active raw pair.
 
-If all four rows pass, current product does not reproduce `ordinary-3` under
-authenticated loss immediately before bilateral restart, whether replacement
-signaling is already present or arrives afterward. Close D.108e4az without a
-causal RED; product GREEN, upstream attribution, another browser invocation,
-threshold changes and campaign authority remain forbidden. If a row fails
-before initial bidirectional traffic, before both owned restart drops, because
-the peer-close barrier was attached to the wrong old channel, or because the
-after-restart fixture fails to announce the new connection with reconcile,
-that is fixture error and cannot be called causal. If it fails only after the
-frozen precondition and observes the required replacement exchange but cannot
-restore the replacement ids and bidirectional delivery, that is a causal RED.
-Stop and plan the narrow product GREEN; do not alter production in this slice.
+If all four rows pass, current product does not reproduce `ordinary-3` only
+under the bounded clean-replacement condition above. Consumed `ordinary-3`'s
+27/1 handshake-failure signature remains deterministically untested and
+unattributed after this slice. Close D.108e4az without a causal RED; product
+GREEN, upstream attribution, another browser invocation, threshold changes and
+campaign authority remain forbidden. Fixture error is limited to failure
+before initial bidirectional traffic or the frozen loss snapshot, a barrier on
+the wrong old channel, a peer-induced drop instead of both owned restart drops,
+an omitted replacement announcement/reconcile call, or an unsettled control
+promise that prevents the completed replacement-exchange checkpoint from being
+observed. A product-owned promise rejection after the frozen precondition is
+recorded separately with its exact owner and cannot be disguised as fixture
+error. Once the prerequisites complete and replacement is announced, any
+non-one replacement exchange count, handshake-failure growth, unrestored
+replacement id, missing active link or failed bidirectional delivery is causal
+RED. Stop and plan the narrow product GREEN; do not alter production in this
+slice.
 
-The focused collection command must select exactly four tests in one file and
-no browser/campaign title. After the plan gate, implement the complete matrix
-in one batch, run static gates, then execute the focused unit test exactly
-once:
+The authenticated-loss-but-old-raw-still-usable precondition is already covered
+by the retained unit around the existing authenticated replacement case; the
+novel coverage is its combination with synchronous bilateral restart. The
+focused collection command is non-consuming and must select exactly four tests
+in one file and no browser/campaign title:
+
+```sh
+pnpm exec vitest list \
+  packages/network/tests/unreliable-webrtc-e3-01-red.test.ts \
+  -t 'D.108e4az converges after authenticated loss with replacement (before|after) restart and the (lower|higher)-id caller first' \
+  --json
+```
+
+After the plan gate, implement the complete matrix in one batch, run static
+gates, then execute the focused unit test exactly once:
 
 ```sh
 pnpm exec vitest run packages/network/tests/unreliable-webrtc-e3-01-red.test.ts \
@@ -78617,3 +78647,27 @@ confirmation round or review-policy slice. RED receives deterministic evidence
 validation rather than a separate model round. A final three-model review is
 required only if a later GREEN changes product behavior; a passing
 discriminator receives no extra review ceremony.
+
+The one plan review returned Codex `CHANGES_REQUIRED` with one P1, Opus
+`CHANGES_REQUIRED` with two P1s, and Grok `NO_VERDICT`: Grok completed a normal
+end turn after 690.567 seconds and wrote useful prose plus a fenced JSON object,
+but did not emit the runner's required schema-valid terminal result. It is not
+relaunched. The blocking Codex/Opus union is corrected above in one batch:
+promise settlement and bounded identity convergence are explicit, retry timers
+must drain to zero, the causal matrix owns exchange/count/link failures after a
+valid announcement, and the conclusion is bounded away from ordinary-3's
+unmodeled 27/1 handshake-failure signature. Nonblocking observations are also
+dispositioned without widening the fixture: replacement-before cannot
+pre-reconcile, the adapter owns connection-arrival reconcile, collection is
+literal and non-consuming, and the existing loss snapshot is distinguished
+from the new combined restart coverage. Deterministic local audit closes the
+plan gate without another model round.
+
+The Codex result SHA-256 is
+`34daf52aac5f58fb14774b509efe83d4d7595fe852dbfd6fcfbfebc7332e5015`,
+the Opus envelope SHA-256 is
+`a634987397f2779bc416b6c20f1ab2710f88c49ad83d101d23104172b838b6d1`,
+and Grok's terminal status/public-output SHA-256 values are respectively
+`79790786c33a319cabcc0092038f8d85d4a00f23eb6bae6457d555fb9c57dcfc`
+and
+`c7b553fca3562ea765c3e02f5c74ce9628adb629a8c2fc6f6a1716c1a22611ae`.
