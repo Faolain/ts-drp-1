@@ -80966,13 +80966,19 @@ byte-identical. The request has exactly
 the decision ID above. Version is the JSON number `1`; all other values are
 strings. The response has exactly
 `decisionId,status,type,version`, with type `replacement-decision-result`,
-version `1`, the identical ID and status `committed` or `aborted`. Existing
+version `1`, the identical ID and status `committed`, `aborted` or `pending`.
+`pending` is a bounded nonterminal observation result emitted only when that
+request's cutoff arrives while the exact decision record remains undecided; it
+can cause only the already-bounded second observation and cannot promote or
+discard a link. Existing
 offer/answer objects and their exact decoder remain unchanged. Any other key,
 type, version, status, ID syntax or byte excess fails closed.
 
 The acceptor retains one bounded decision record per live selected-A
 replacement until the original absolute setup deadline. Pending queries wait
-only within that deadline. Raw COMMIT makes the exact record `committed` and
+only within that deadline. A first pending query may return the nonterminal
+`pending` status at its midpoint cutoff so its stream cannot consume the
+second-attempt window. Raw COMMIT makes the exact record `committed` and
 resolves all same-ID waiters; before commit, discard, connection identity
 change or owner close makes it `aborted`. A committed record is write-once
 while its exact B and authenticated connection remain valid; invalidation
@@ -81115,3 +81121,44 @@ No production, browser, retained-seven or campaign execution occurred. This
 RED plus signed D.108e4bl freezes both necessary causal transitions: defer
 acceptor A retirement until reliable observation, then prevent qualified idle
 B from expiring after that observation.
+
+The D.108e4bm GREEN implementation changes only the internal owner and its
+existing deterministic fake-signaling/RTC test owner. It derives the decision
+ID from the exact encoded offer, classifies decision requests before every
+offer-admission gate, binds records through the existing exact authenticated
+connection predicate, delays acceptor activation while selected A is usable,
+and lets only the existing `#promotePendingReplacement` method select B. The
+initiator starts observation on the next task after ACK and a successful raw
+COMMIT send; attempt one is abort-bounded at the midpoint of its then-remaining
+window and attempt two retains the original absolute deadline. One failed
+request, one held response, duplicate committed queries, wrong digest,
+malformed request/response, cross-connection replay, two failed observations,
+owner close and committed-record expiry are deterministic mutants. The
+refactor-clean audit found and removed an unused cleanup switch; there is one
+decision decoder, one decision map, one observer and one promotion owner, with
+no compatibility wrapper or decision-side `#closePendingForPeer` path.
+
+The final focused JSON execution selected seven D.108e4bm titles in one owner
+file and returned 7 passed, 88 skipped, zero failed and `success=true`. The
+complete owner execution returned 95/95 passed in the same file, including the
+six retained no-selected-A D.108e4bb rows and every retained lifecycle row.
+`pnpm --filter @ts-drp/network build`, package typecheck, exact-owner ESLint
+with zero warnings, exact-owner Prettier check and `git diff --check` all
+returned zero. The deterministic source audit returned one decision decoder,
+one decision map, one decision observer and one promotion definition; decision
+dispatch precedes offer gates, the observer contains no
+`#closePendingForPeer`, and the exact domain/status predicates are present.
+Only the production owner, test owner and this plan are tracked changes; the
+eight protected untracked paths and all 26 stashes remain preserved.
+
+Production-owner, test-owner, focused-reporter and complete-owner-reporter
+SHA-256 values are respectively
+`a9af11780ba9003030eaf061731955b386550153dab99241c63bde7531d21b6d`,
+`1106a215b15eee13a7f87f553bbb8e0c406dd301f257b8004e87782b477befbe`,
+`6ad88d1c5f322f788a7c2432d88e0854afdbf05f08d58f9afcdbe5129ab589fe`
+and
+`6084e8ead3cdd61120f1e3168090abde1462c1b9001def0460adc58bf4c19322`.
+No browser, retained-seven or campaign invocation ran during GREEN. The next
+gate is the single formal Grok/Codex-high/Opus-xhigh implementation review over
+the signed plan, RED and GREEN history; an empty P0/P1 union is required before
+the separately authorized retained browser gates.

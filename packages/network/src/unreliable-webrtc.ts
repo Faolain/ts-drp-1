@@ -8,6 +8,7 @@ export const DRP_UNRELIABLE_WEBRTC_SIGNALING_PROTOCOL = "/ts-drp/unreliable-webr
 
 const RAW_CHANNEL_LABEL = "ts-drp-ephemeral/1";
 const ROUTE_DOMAIN = new TextEncoder().encode("ts-drp-ephemeral-route-v1\0");
+const REPLACEMENT_DECISION_DOMAIN = new TextEncoder().encode("ts-drp-unreliable-webrtc-replacement-decision-v1\0");
 const ROUTE_VERSION = 1;
 const ROUTE_HEADER_BYTES = 33;
 const REPLACEMENT_CONTROL_MAGIC_0 = 0x44;
@@ -138,6 +139,7 @@ interface ActiveLink {
 	readonly channel: RTCDataChannel;
 	readonly connection: AuthenticatedWebRtcConnection;
 	closing: boolean;
+	readonly decisionId: string;
 	readonly pc: RTCPeerConnection;
 	readonly role: "acceptor" | "initiator";
 	unsubscribeConnection(): void;
@@ -148,14 +150,50 @@ interface LinkReadiness {
 	commitSends: number;
 	complete: boolean;
 	readonly commit: Promise<void> | undefined;
+	decisionAbort: AbortController | undefined;
+	decisionObservation: ReturnType<typeof setTimeout> | undefined;
+	readonly deadlineAt: number | undefined;
 	expiry: ReturnType<typeof setTimeout> | undefined;
 	receivedAck: boolean;
 	receivedCommit: boolean;
 	receivedReady: boolean;
 	readySends: number;
+	readonly reliableDecision: boolean;
 	readonly replacement: boolean;
 	rejectCommit(error: Error): void;
 	resolveCommit(): void;
+}
+
+type ReplacementDecisionStatus = "aborted" | "committed" | "pending";
+
+interface ReplacementDecisionWaiter {
+	resolve(status: ReplacementDecisionStatus): void;
+	readonly timer: ReturnType<typeof setTimeout>;
+}
+
+interface ReplacementDecisionRecord {
+	cleanup: ReturnType<typeof setTimeout> | undefined;
+	readonly connection: AuthenticatedWebRtcConnection;
+	readonly deadlineAt: number;
+	readonly decisionId: string;
+	readonly link: ActiveLink;
+	observations: number;
+	readonly readiness: LinkReadiness;
+	status: ReplacementDecisionStatus;
+	readonly waiters: Set<ReplacementDecisionWaiter>;
+}
+
+interface ReplacementDecisionRequest {
+	readonly decisionId: string;
+	readonly type: "replacement-decision";
+	readonly version: 1;
+}
+
+interface ReplacementDecisionResponse {
+	readonly decisionId: string;
+	readonly status: ReplacementDecisionStatus;
+	readonly type: "replacement-decision-result";
+	readonly version: 1;
 }
 
 interface PendingPeerConnection {
@@ -407,6 +445,82 @@ function encodeDescription(description: SignalDescription): Uint8Array {
 	return bytes;
 }
 
+function replacementDecisionId(offerBytes: Uint8Array): string {
+	return bytesToHex(sha256(concatBytes(REPLACEMENT_DECISION_DOMAIN, offerBytes)));
+}
+
+function decodedJson(bytes: Uint8Array): unknown {
+	if (bytes.byteLength > MAX_SIGNALING_FRAME_BYTES) throw new Error("RTC signaling frame exceeds its byte bound");
+	try {
+		return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+	} catch {
+		throw new Error("RTC signaling frame is malformed");
+	}
+}
+
+function decodeDecisionRequest(bytes: Uint8Array): ReplacementDecisionRequest | undefined {
+	let decoded: unknown;
+	try {
+		decoded = decodedJson(bytes);
+	} catch {
+		return undefined;
+	}
+	if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) return undefined;
+	const value = decoded as Record<string, unknown>;
+	if (!("decisionId" in value) && value.type !== "replacement-decision") return undefined;
+	if (
+		Object.keys(value).sort().join(",") !== "decisionId,type,version" ||
+		value.type !== "replacement-decision" ||
+		value.version !== 1 ||
+		typeof value.decisionId !== "string" ||
+		!/^[0-9a-f]{64}$/u.test(value.decisionId)
+	) {
+		throw new Error("RTC replacement decision request is outside its contract");
+	}
+	return Object.freeze({ decisionId: value.decisionId, type: "replacement-decision", version: 1 });
+}
+
+function encodeDecisionRequest(decisionId: string): Uint8Array {
+	const request: ReplacementDecisionRequest = Object.freeze({
+		decisionId,
+		type: "replacement-decision",
+		version: 1,
+	});
+	const bytes = new TextEncoder().encode(JSON.stringify(request));
+	if (bytes.byteLength > MAX_SIGNALING_FRAME_BYTES) throw new Error("RTC signaling frame exceeds its byte bound");
+	return bytes;
+}
+
+function encodeDecisionResponse(decisionId: string, status: ReplacementDecisionStatus): Uint8Array {
+	const response: ReplacementDecisionResponse = Object.freeze({
+		decisionId,
+		status,
+		type: "replacement-decision-result",
+		version: 1,
+	});
+	const bytes = new TextEncoder().encode(JSON.stringify(response));
+	if (bytes.byteLength > MAX_SIGNALING_FRAME_BYTES) throw new Error("RTC signaling frame exceeds its byte bound");
+	return bytes;
+}
+
+function decodeDecisionResponse(bytes: Uint8Array, decisionId: string): ReplacementDecisionStatus {
+	const decoded = decodedJson(bytes);
+	if (typeof decoded !== "object" || decoded === null || Array.isArray(decoded)) {
+		throw new Error("RTC replacement decision response is malformed");
+	}
+	const value = decoded as Record<string, unknown>;
+	if (
+		Object.keys(value).sort().join(",") !== "decisionId,status,type,version" ||
+		value.decisionId !== decisionId ||
+		(value.status !== "aborted" && value.status !== "committed" && value.status !== "pending") ||
+		value.type !== "replacement-decision-result" ||
+		value.version !== 1
+	) {
+		throw new Error("RTC replacement decision response is outside its contract");
+	}
+	return value.status;
+}
+
 async function addRemoteCandidates(pc: RTCPeerConnection, candidates: readonly RTCIceCandidateInit[]): Promise<void> {
 	for (const candidate of candidates) await pc.addIceCandidate(candidate);
 }
@@ -470,6 +584,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 	readonly #pendingLinks = new Map<string, Promise<ActiveLink | undefined>>();
 	readonly #pendingPeerConnections = new Map<RTCPeerConnection, PendingPeerConnection>();
 	readonly #readiness = new Map<ActiveLink, LinkReadiness>();
+	readonly #replacementDecisions = new Map<string, ReplacementDecisionRecord>();
 	readonly #retiringLinks = new Map<string, ActiveLink>();
 	readonly #replacementAdmissions = new Map<
 		string,
@@ -768,7 +883,8 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			channel.binaryType = "arraybuffer";
 			validateChannel(channel);
 			const offer = await localDescription(pc, await pc.createOffer());
-			const answer = decodeDescription(await connection.exchange(encodeDescription(offer), signal), "answer");
+			const offerBytes = encodeDescription(offer);
+			const answer = decodeDescription(await connection.exchange(offerBytes, signal), "answer");
 			if (authenticatedClosed || !this.#isCurrent(connection)) throw new Error("authenticated connection changed");
 			await pc.setRemoteDescription({ sdp: answer.sdp, type: "answer" });
 			await addRemoteCandidates(pc, answer.candidates);
@@ -776,7 +892,15 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			await waitForOpen(channel);
 			if (authenticatedClosed || !this.#isCurrent(connection)) throw new Error("authenticated connection changed");
 			established = true;
-			const link = { channel, closing: false, connection, pc, role: "initiator" as const, unsubscribeConnection };
+			const link = {
+				channel,
+				closing: false,
+				connection,
+				decisionId: replacementDecisionId(offerBytes),
+				pc,
+				role: "initiator" as const,
+				unsubscribeConnection,
+			};
 			const existing = this.#links.get(connection.remotePeerId);
 			if (
 				this.#activatedPeers.has(connection.remotePeerId) &&
@@ -796,6 +920,8 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 	}
 
 	async #handleSignalingRequest(connection: AuthenticatedWebRtcConnection, request: Uint8Array): Promise<Uint8Array> {
+		const decision = decodeDecisionRequest(request);
+		if (decision !== undefined) return this.#handleDecisionRequest(connection, decision);
 		if (this.#closed || connection.transport !== "webrtc" || connection.remotePeerId >= this.#signaling.localPeerId) {
 			throw new Error("unreliable WebRTC signaling request rejected");
 		}
@@ -816,6 +942,52 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			this.#handshakeFailures += 1;
 			throw error;
 		}
+	}
+
+	async #handleDecisionRequest(
+		connection: AuthenticatedWebRtcConnection,
+		request: ReplacementDecisionRequest
+	): Promise<Uint8Array> {
+		if (
+			this.#closed ||
+			connection.transport !== "webrtc" ||
+			connection.remotePeerId >= this.#signaling.localPeerId ||
+			!this.#isCurrent(connection)
+		) {
+			return encodeDecisionResponse(request.decisionId, "aborted");
+		}
+		const record = this.#replacementDecisions.get(request.decisionId);
+		if (
+			record === undefined ||
+			!this.#sameConnection(record.connection, connection) ||
+			record.link.decisionId !== request.decisionId
+		) {
+			return encodeDecisionResponse(request.decisionId, "aborted");
+		}
+		if (record.status !== "pending") return encodeDecisionResponse(request.decisionId, record.status);
+		record.observations += 1;
+		const now = Date.now();
+		const remaining = Math.max(0, record.deadlineAt - now);
+		const cutoffAt = record.observations === 1 ? now + Math.floor(remaining / 2) : record.deadlineAt;
+		const status = await this.#waitForDecision(record, cutoffAt);
+		return encodeDecisionResponse(request.decisionId, status);
+	}
+
+	#waitForDecision(record: ReplacementDecisionRecord, cutoffAt: number): Promise<ReplacementDecisionStatus> {
+		if (record.status !== "pending") return Promise.resolve(record.status);
+		return new Promise<ReplacementDecisionStatus>((resolve) => {
+			const waiter: ReplacementDecisionWaiter = Object.freeze({
+				resolve,
+				timer: setTimeout(
+					() => {
+						record.waiters.delete(waiter);
+						resolve("pending");
+					},
+					Math.max(0, cutoffAt - Date.now())
+				),
+			});
+			record.waiters.add(waiter);
+		});
 	}
 
 	async #accept(
@@ -871,9 +1043,17 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 					throw new Error("authenticated connection changed");
 				}
 				established = true;
-				const link = { channel, closing: false, connection, pc, role: "acceptor" as const, unsubscribeConnection };
+				const link = {
+					channel,
+					closing: false,
+					connection,
+					decisionId: replacementDecisionId(request),
+					pc,
+					role: "acceptor" as const,
+					unsubscribeConnection,
+				};
 				if (this.#activatedPeers.has(connection.remotePeerId)) {
-					const readiness = this.#holdReplacementLink(link);
+					const readiness = this.#holdReplacementLink(link, deadlineAt);
 					if (readiness.commit === undefined) throw new Error("replacement commit owner is absent");
 					await readiness.commit;
 				} else {
@@ -881,7 +1061,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 					this.#registerLink(link);
 				}
 			};
-			void withDeadline((_signal) => finish(), deadlineAt - Date.now()).catch(() => {
+			void finish().catch(() => {
 				const pending = this.#pendingReplacementLinks.get(connection.remotePeerId);
 				if (pending?.pc === pc) this.#discardPendingReplacement(connection.remotePeerId, pending);
 				else this.#pendingPeerConnections.delete(pc);
@@ -947,21 +1127,29 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 				};
 			});
 		}
+		const selected = this.#links.get(peerId);
+		const reliableDecision =
+			replacement && selected !== undefined && selected !== link && selected.channel.readyState === "open";
 		const readiness: LinkReadiness = {
 			ackSends: 0,
 			commit,
 			commitSends: 0,
 			complete: false,
+			deadlineAt,
+			decisionAbort: undefined,
+			decisionObservation: undefined,
 			expiry: undefined,
 			receivedAck: false,
 			receivedCommit: false,
 			receivedReady: false,
 			readySends: 0,
 			rejectCommit,
+			reliableDecision,
 			replacement,
 			resolveCommit,
 		};
 		this.#readiness.set(link, readiness);
+		if (reliableDecision && link.role === "acceptor") this.#createDecisionRecord(link, readiness);
 		link.channel.addEventListener("message", (event) => this.#receive(peerId, link, event));
 		link.channel.addEventListener(
 			"close",
@@ -984,11 +1172,11 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 				? this.#sendReplacementControl(link, readiness, 1)
 				: this.#sendReplacementControl(link, readiness, 2);
 		if (!sent && replacement) throw new Error("replacement readiness send failed");
-		if (replacement && link.role === "initiator" && !readiness.complete) {
+		if (replacement && !readiness.complete) {
 			if (deadlineAt === undefined) throw new Error("replacement readiness deadline is absent");
 			const remaining = Math.max(0, deadlineAt - Date.now());
 			readiness.expiry = setTimeout(() => {
-				if (this.#readiness.get(link) === readiness) this.#failReplacementReadiness(peerId, link, readiness);
+				if (this.#readiness.get(link) === readiness) this.#expireReplacementReadiness(peerId, link, readiness);
 			}, remaining);
 		}
 		return readiness;
@@ -1007,12 +1195,79 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		}
 	}
 
+	#createDecisionRecord(link: ActiveLink, readiness: LinkReadiness): void {
+		if (readiness.deadlineAt === undefined) throw new Error("replacement decision deadline is absent");
+		if (this.#replacementDecisions.has(link.decisionId)) {
+			throw new Error("replacement decision identity is already active");
+		}
+		this.#replacementDecisions.set(link.decisionId, {
+			cleanup: undefined,
+			connection: link.connection,
+			deadlineAt: readiness.deadlineAt,
+			decisionId: link.decisionId,
+			link,
+			observations: 0,
+			readiness,
+			status: "pending",
+			waiters: new Set(),
+		});
+	}
+
+	#settleDecision(record: ReplacementDecisionRecord, status: "aborted" | "committed"): void {
+		if (record.status !== "pending") return;
+		record.status = status;
+		for (const waiter of record.waiters) {
+			clearTimeout(waiter.timer);
+			waiter.resolve(status);
+		}
+		record.waiters.clear();
+	}
+
+	#removeDecisionRecord(link: ActiveLink): void {
+		const record = this.#replacementDecisions.get(link.decisionId);
+		if (record === undefined || record.link !== link) return;
+		this.#settleDecision(record, "aborted");
+		if (record.cleanup !== undefined) clearTimeout(record.cleanup);
+		for (const waiter of record.waiters) {
+			clearTimeout(waiter.timer);
+			waiter.resolve("aborted");
+		}
+		record.waiters.clear();
+		this.#replacementDecisions.delete(record.decisionId);
+	}
+
+	#retainCommittedDecision(link: ActiveLink): void {
+		const record = this.#replacementDecisions.get(link.decisionId);
+		if (record === undefined || record.link !== link || record.status !== "committed") return;
+		if (record.cleanup !== undefined) clearTimeout(record.cleanup);
+		record.cleanup = setTimeout(
+			() => {
+				if (this.#replacementDecisions.get(record.decisionId) === record) {
+					this.#replacementDecisions.delete(record.decisionId);
+				}
+			},
+			Math.max(0, record.deadlineAt - Date.now())
+		);
+	}
+
+	#clearReadinessTimers(readiness: LinkReadiness | undefined): void {
+		if (readiness?.expiry !== undefined) clearTimeout(readiness.expiry);
+		if (readiness?.decisionObservation !== undefined) clearTimeout(readiness.decisionObservation);
+		readiness?.decisionAbort?.abort(new Error("replacement decision observation ended"));
+		if (readiness !== undefined) {
+			readiness.expiry = undefined;
+			readiness.decisionObservation = undefined;
+			readiness.decisionAbort = undefined;
+		}
+	}
+
 	#discardPendingReplacement(peerId: string, link: ActiveLink): void {
 		if (link.closing) return;
 		link.closing = true;
 		const readiness = this.#readiness.get(link);
 		this.#readiness.delete(link);
-		if (readiness?.expiry !== undefined) clearTimeout(readiness.expiry);
+		this.#clearReadinessTimers(readiness);
+		this.#removeDecisionRecord(link);
 		readiness?.rejectCommit(new Error("replacement readiness ended before commit"));
 		if (this.#pendingReplacementLinks.get(peerId) === link) this.#pendingReplacementLinks.delete(peerId);
 		this.#pendingPeerConnections.delete(link.pc);
@@ -1042,10 +1297,10 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		}
 		this.#pendingReplacementLinks.delete(peerId);
 		this.#pendingPeerConnections.delete(pending.pc);
-		if (readiness.expiry !== undefined) clearTimeout(readiness.expiry);
-		readiness.expiry = undefined;
+		this.#clearReadinessTimers(readiness);
 		readiness.complete = true;
 		this.#registerLink(pending, true);
+		this.#retainCommittedDecision(pending);
 		readiness.resolveCommit();
 		return true;
 	}
@@ -1070,6 +1325,93 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		}
 	}
 
+	async #observeReplacementDecision(peerId: string, link: ActiveLink, readiness: LinkReadiness): Promise<void> {
+		for (let attempt = 0; attempt < 2; attempt += 1) {
+			if (
+				this.#closed ||
+				this.#pendingReplacementLinks.get(peerId) !== link ||
+				this.#readiness.get(link) !== readiness ||
+				!readiness.reliableDecision ||
+				link.role !== "initiator" ||
+				link.closing ||
+				link.channel.readyState !== "open" ||
+				!readiness.receivedAck ||
+				readiness.commitSends === 0 ||
+				readiness.deadlineAt === undefined ||
+				!this.#isCurrent(link.connection)
+			) {
+				return;
+			}
+			const now = Date.now();
+			const remaining = readiness.deadlineAt - now;
+			if (remaining <= 0) break;
+			const cutoffAt = attempt === 0 ? now + Math.floor(remaining / 2) : readiness.deadlineAt;
+			const controller = new AbortController();
+			readiness.decisionAbort = controller;
+			const cutoff = setTimeout(
+				() => controller.abort(new Error("replacement decision attempt deadline exceeded")),
+				Math.max(0, cutoffAt - Date.now())
+			);
+			try {
+				const response = await link.connection.exchange(encodeDecisionRequest(link.decisionId), controller.signal);
+				const status = decodeDecisionResponse(response, link.decisionId);
+				if (status === "pending") continue;
+				if (
+					this.#pendingReplacementLinks.get(peerId) !== link ||
+					this.#readiness.get(link) !== readiness ||
+					link.closing ||
+					link.channel.readyState !== "open" ||
+					!this.#isCurrent(link.connection)
+				) {
+					return;
+				}
+				if (status === "committed") this.#promotePendingReplacement(peerId);
+				else this.#failReplacementReadiness(peerId, link, readiness);
+				return;
+			} catch {
+				// One failed authenticated stream may resume inside the original absolute deadline.
+			} finally {
+				clearTimeout(cutoff);
+				if (readiness.decisionAbort === controller) readiness.decisionAbort = undefined;
+			}
+		}
+		if (this.#readiness.get(link) === readiness) this.#failReplacementReadiness(peerId, link, readiness);
+	}
+
+	#scheduleReplacementDecisionObservation(peerId: string, link: ActiveLink, readiness: LinkReadiness): void {
+		if (
+			!readiness.reliableDecision ||
+			readiness.deadlineAt === undefined ||
+			readiness.decisionObservation !== undefined ||
+			readiness.decisionAbort !== undefined
+		) {
+			return;
+		}
+		readiness.decisionObservation = setTimeout(() => {
+			readiness.decisionObservation = undefined;
+			void this.#observeReplacementDecision(peerId, link, readiness);
+		}, 0);
+	}
+
+	#expireReplacementReadiness(peerId: string, link: ActiveLink, readiness: LinkReadiness): void {
+		if (this.#pendingReplacementLinks.get(peerId) !== link || this.#readiness.get(link) !== readiness) return;
+		if (link.role === "acceptor" && readiness.reliableDecision) {
+			const record = this.#replacementDecisions.get(link.decisionId);
+			const selected = this.#links.get(peerId);
+			if (
+				record?.link === link &&
+				record.status === "committed" &&
+				selected !== undefined &&
+				selected !== link &&
+				selected.channel.readyState !== "open"
+			) {
+				this.#promotePendingReplacement(peerId);
+				return;
+			}
+		}
+		this.#failReplacementReadiness(peerId, link, readiness);
+	}
+
 	#failReplacementReadiness(peerId: string, link: ActiveLink, readiness: LinkReadiness): void {
 		if (!readiness.replacement || this.#pendingReplacementLinks.get(peerId) !== link) return;
 		if (link.role === "initiator") this.#handshakeFailures += 1;
@@ -1090,6 +1432,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 				this.#failReplacementReadiness(peerId, link, readiness);
 				return;
 			}
+			this.#scheduleReplacementDecisionObservation(peerId, link, readiness);
 			if (!this.#links.has(peerId)) this.#promotePendingReplacement(peerId);
 			return;
 		}
@@ -1103,8 +1446,11 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		}
 		if (kind !== 3 || !readiness.receivedReady || readiness.ackSends === 0) return;
 		readiness.receivedCommit = true;
-		if (readiness.replacement) this.#promotePendingReplacement(peerId);
-		else {
+		if (readiness.replacement) {
+			const record = this.#replacementDecisions.get(link.decisionId);
+			if (readiness.reliableDecision && record?.link === link) this.#settleDecision(record, "committed");
+			else this.#promotePendingReplacement(peerId);
+		} else {
 			readiness.complete = true;
 			readiness.resolveCommit();
 		}
@@ -1169,7 +1515,8 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		link.closing = true;
 		const readiness = this.#readiness.get(link);
 		this.#readiness.delete(link);
-		if (readiness?.expiry !== undefined) clearTimeout(readiness.expiry);
+		this.#clearReadinessTimers(readiness);
+		this.#removeDecisionRecord(link);
 		readiness?.rejectCommit(new Error("active link ended before replacement commit"));
 		this.#lastLinkDrop = reason;
 		this.#linkDrops += 1;
@@ -1185,7 +1532,8 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		this.#retiringLinks.delete(peerId);
 		const readiness = this.#readiness.get(link);
 		this.#readiness.delete(link);
-		if (readiness?.expiry !== undefined) clearTimeout(readiness.expiry);
+		this.#clearReadinessTimers(readiness);
+		this.#removeDecisionRecord(link);
 		link.pc.close();
 	}
 
@@ -1203,6 +1551,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		this.#pendingPeerConnections.clear();
 		for (const [peerId, link] of [...this.#retiringLinks]) this.#finishRetiringLink(peerId, link);
 		for (const [peerId, link] of [...this.#links]) this.#dropLink(peerId, link, "owner-close");
+		for (const record of [...this.#replacementDecisions.values()]) this.#removeDecisionRecord(record.link);
 		this.#readiness.clear();
 	}
 
