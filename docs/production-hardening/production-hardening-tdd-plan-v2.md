@@ -80593,3 +80593,137 @@ and `72144ef04cc2be960dc1df0d35890095a4ff3d6cea44208bb7bd5ffeb5c1f6c7`.
 Evidence is immutable under `.logs/d108e4bj-retained-seven/`. D.108e4bj is
 closed; the next action is the separately authorized fresh-name
 D.108e4 campaign-disposition slice, not another D.108e4bj run.
+
+###### D.108e4bk — fresh confidence campaign disposition
+
+The user explicitly authorizes continued narrow and whole-run debugging until
+the retained campaign is trustworthy enough to transition to D.108e5. This
+fresh high-risk disposition does not reopen D.108e4bj or any consumed
+D.108e4as/D.108e4aw/D.108e4bd name. Their evidence and ledgers remain
+immutable. The new closed ledger starts at zero and contains, in exact order,
+`confidence-ordinary-1`, `confidence-ordinary-2`,
+`confidence-ordinary-3`, `confidence-isolated-1`,
+`confidence-isolated-2` and `confidence-isolated-3`.
+
+Every name after the first requires both the immediate predecessor's
+Playwright status and terminal runner status to exist and equal zero. Every
+launch rejects artifacts for any later fresh name. The first consuming nonzero
+status freezes all later names. There is no retry, loop, overwrite,
+`--repeat-each`, substitution or continuation after a consuming failure.
+Narrow diagnostics remain authorized only before a consuming launch or after a
+failure has frozen the ledger; they may not reuse a name or mutate immutable
+evidence.
+
+The executable anchor is signed/pushed commit
+`eb2272c9b8e7e819f83b0c499f3fa966807d21ef`, tree
+`c0cbf126de6d13d11be901082829e150622676f0`. Every later tracked change is
+confined to this plan. The ordinary checkout must differ from that anchor only
+at this plan path. The clean detached checkout is
+`/private/tmp/ts-drp-d108e4bk-clean/repo` at the exact anchor/tree with empty
+tracked status. It began without package/example `dist`, completed
+`pnpm install --offline --frozen-lockfile` under Node `v22.15.0` and pnpm
+`10.24.0`, and freshly built the package graph through the existing
+postinstall. It has no root `node_modules/@ts-drp/canonical` shim.
+
+The seven campaign source/config identities and all 334 built nondeclaration
+runtime files are byte-identical between ordinary and isolated workspaces.
+Their inventory hashes are
+`60a873fb8bd5683e0f9a67fccb14f7c813cd033b3f197a495f769b4f2ac85e51`
+and
+`3f5b697d6bed154752e53353179464b384fb221d5b1255f223b7f5abdec74e41`.
+Production `packages/network/src/unreliable-webrtc.ts` remains
+`091848dce0450917e7c47fece246fd10e8bc2c604823e3839dc26cb6f8d95acc`;
+the corrected retained owner is
+`ec3c9cb4ae8a1e0fa6d08f2a5a4e5ec9f8a57b0f772c95109c62cd1904558f8b`.
+
+The freeze root is `.logs/d108e4bk-freeze/`. Its validating self-excluding
+50-file manifest hash is
+`53f50e0ff52aea5bdad8f31c206cd81260308a43ff59893137368d30c3c7eb9f`.
+The mode manifest, outer launcher, runner and predecessor/future-artifact guard
+hashes are respectively
+`77ccd48d9f004a6e014de4951efd00ea5510153e1f22c2f126f5f5f6f9ded228`,
+`f593f3c84c866754b491c750f5183239815d102a758b981bcec4f86a8bcf3b28`,
+`0e522a372f548baa6438be5dfb782e99508c4951ab3ac49a05dcc44d65752ce3`
+and
+`cba856a29dc4dcd26e2fb25787cc1d867b09ff0734bf5a2f53d25ee45572368f`.
+The inherited endpoint-local classifier and validation hashes remain
+`99d7d65caaad75ae34370d93c230c91e16d6459ccc23594672bb2557254cced9`
+and
+`9508e84117c225c1432ffc6c0ec9b4d7eaeb7fdbc0cc55cb52b05ad63229b245`.
+
+The fresh zero-invocation evidence root is `.logs/d108e4bk-campaign/`.
+Its authorization hash is
+`8b9f52ec217aa7e041b67f2b265b479ca34d5d9ec0ca5e1b9011e5e054784eca`
+and its initial manifest hash is
+`c5c1e66dd6abe104864331b8a2c4bd2ca82e617b4f38ae8affb8eb98cedf28e4`.
+Campaign setup resolves Git and ripgrep with `command -v`, records their
+physical paths and complete version output, and uses those selected binaries
+throughout this campaign. Git is accepted by the exact `rev-parse`,
+`status --porcelain=v1` and `verify-commit` operations used by the launcher;
+ripgrep is accepted by a deterministic `-F -c` smoke check. No vendor string,
+patch version, build suffix, revision or prior host path is a portable
+acceptance predicate; a missing or changed selected binary within this
+campaign remains fail closed.
+
+Mechanical construction passes shell syntax, direct tool capabilities, exact
+fresh-name admission/predecessor/future-artifact rejection, mode and manifest
+validation, source/runtime identity, exact one-test/one-file listing in both
+workspaces, eight protected untracked paths, 26 stashes, no conflicting ts-drp
+reviewer/test/profiler, clear ports 4174/4175/51000/51002 and zero fresh
+invocations. Three non-consuming wrapper diagnostics are preserved: a wrong
+`/bin/cmp` path, an omitted process-audit destination directory, and an
+`rg -c` line-count assumption. Their corrected gates pass and none is a source
+or campaign failure.
+
+The workload remains exact: one Playwright title, `three fixed browser trials
+prove raw freshness and no head-of-line blocking under 30% loss`; three fixed
+trials; the existing loss schedule, metrics and thresholds; Chromium
+`151.0.7922.34`; the existing ports and config; a 600-second process-group
+watchdog; JSON reporter classification; no retries; and first-failure stop.
+No product/API, dependency, wire, identity, activation, workload, timing,
+threshold, memory/resource or test-semantic change is authorized.
+
+Sign and push this plan-only freeze checkpoint, then run exactly one high-risk
+freeze review using Grok, Codex `gpt-5.6-sol` high and Opus xhigh. This extra
+checkpoint is required because it authorizes scarce long execution and freezes
+launcher/accounting/evidence custody. Only P0/P1 blocks. P2 receives a recorded
+disposition without new fixtures or ceremony. Kimi, Fable and collaboration
+subagents are prohibited. When the blocking union is empty, create signed
+annotated tag `d108e4bk-freeze-reviewed` at the exact reviewed plan commit and
+push it. The outer launcher requires the tag to verify and peel to local HEAD,
+local HEAD to equal the pushed branch, a valid commit signature, and the
+aggregate executable-anchor-to-HEAD diff to contain only this plan path.
+
+Then execute these six blocks sequentially as separate fresh shells. The user
+has already authorized all six and must not be asked again:
+
+```sh
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 53f50e0ff52aea5bdad8f31c206cd81260308a43ff59893137368d30c3c7eb9f && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = f593f3c84c866754b491c750f5183239815d102a758b981bcec4f86a8bcf3b28 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh confidence-ordinary-1 /Users/aristotle/Documents/Projects/ts-drp-1
+```
+
+```sh
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 53f50e0ff52aea5bdad8f31c206cd81260308a43ff59893137368d30c3c7eb9f && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = f593f3c84c866754b491c750f5183239815d102a758b981bcec4f86a8bcf3b28 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh confidence-ordinary-2 /Users/aristotle/Documents/Projects/ts-drp-1
+```
+
+```sh
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 53f50e0ff52aea5bdad8f31c206cd81260308a43ff59893137368d30c3c7eb9f && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = f593f3c84c866754b491c750f5183239815d102a758b981bcec4f86a8bcf3b28 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh confidence-ordinary-3 /Users/aristotle/Documents/Projects/ts-drp-1
+```
+
+```sh
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 53f50e0ff52aea5bdad8f31c206cd81260308a43ff59893137368d30c3c7eb9f && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = f593f3c84c866754b491c750f5183239815d102a758b981bcec4f86a8bcf3b28 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh confidence-isolated-1 /private/tmp/ts-drp-d108e4bk-clean/repo
+```
+
+```sh
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 53f50e0ff52aea5bdad8f31c206cd81260308a43ff59893137368d30c3c7eb9f && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = f593f3c84c866754b491c750f5183239815d102a758b981bcec4f86a8bcf3b28 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh confidence-isolated-2 /private/tmp/ts-drp-d108e4bk-clean/repo
+```
+
+```sh
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 53f50e0ff52aea5bdad8f31c206cd81260308a43ff59893137368d30c3c7eb9f && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = f593f3c84c866754b491c750f5183239815d102a758b981bcec4f86a8bcf3b28 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh confidence-isolated-3 /private/tmp/ts-drp-d108e4bk-clean/repo
+```
+
+Six zero Playwright statuses and six zero terminal runner statuses release a
+signed/pushed campaign-evidence checkpoint and one final evidence review over
+reporters, attachments, classifiers, manifests, status custody and the
+plan-to-execution binding. A consuming failure stops immediately for narrow
+evidence-led diagnosis. D.108e5 remains blocked until all six pass and that
+final evidence review closes with no P0/P1.
