@@ -76624,11 +76624,26 @@ on both endpoints, zero link drops, successful A traffic and no C. For
 lower B while upper B is still unready; the sole terminal RED token is exact
 `D108E4AU_PREMATURE_PENDING_PROMOTION`. For
 `send-discovers-unusable`, set only lower A's fake ready state to `closing`,
-send once, await the existing asynchronous recovery owner and prove lower B is
+issue the failure-triggering send through `lowRoute` in both application-sender
+rows, await the existing asynchronous recovery owner and prove lower B is
 prematurely selected plus exactly one lower C is allocated (three total lower
 peer connections, two total upper); the sole terminal RED token is exact
 `D108E4AU_THIRD_CONNECTION_ALLOCATION`. No timer, retry advance, answer
 rejection transform or additional lifecycle hook may manufacture either result.
+The application-sender dimension governs only the successful pre-failure A
+traffic. In send-mode rows, capture premature B selection as a non-terminal
+witness and throw the exact C-allocation token only after the exact three/two
+owner count is observed; do not let assertion order substitute the direct-close
+token.
+
+Pin post-injection ownership in every new row. `direct-close` requires lower
+and upper `lastLinkDrop=channel-close`, one drop each, lower active B, upper zero
+active links and exactly two allocated peer connections per endpoint while
+upper B still has no handler/open event. `send-discovers-unusable` requires
+lower `lastLinkDrop=replacement`, upper `lastLinkDrop=channel-close`, one drop
+each, lower active B, upper zero active links, and exact lower/upper allocation
+counts three/two. These facts, together with the unready upper B observations,
+distinguish premature selection from the accepted readiness-owned handoff.
 
 Release the one-shot barrier and close both owners in `finally`; require no
 alternate error, top-level error, flaky result, leaked barrier or fourth
@@ -76654,3 +76669,8 @@ honestly without relaunch. After causal RED, freeze the smallest sound GREEN
 before any production edit; because an explicit readiness control would change
 wire/lifecycle behavior, that GREEN design receives its own high-risk plan
 review rather than inheriting authority from this test-only RED plan.
+The RED establishes only that current lifecycle ownership is insufficient.
+After RED, the GREEN freeze must inspect the complete production lifecycle
+state to decide whether a sound existing no-wire discriminator exists; the RED
+alone cannot prove the negative. The explicit readiness-control branch is not
+preselected by this test-only checkpoint.
