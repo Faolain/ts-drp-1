@@ -80143,19 +80143,31 @@ roster empty and retain A. This is the exact causal failure. Do not model it
 with clocks, browser scheduling, connection-monitor aborts or a forced old-A
 close.
 
+The deterministic arming order is load-bearing: pause the acceptor's old-A
+local close event and its peer-close propagation before releasing B's inbound
+open barrier, then keep both holds through acceptor promotion and the
+acceptor-B application send. This preserves initiator A and pending B during
+the causal assertion; arming either hold after COMMIT would allow current code
+to promote B on A's close and would invalidate RED.
+
 GREEN may change only pending application handling. Control frames retain the
 existing state machine. For a non-control frame on a pending initiator link,
 first require the exact current authenticated connection, open channel,
 received ACK and at least one successful COMMIT send. Then validate the normal
 route header, byte ceiling and live registered route. A valid routed frame is
 peer-observed activation proof: promote that exact pending link through the
-existing `#promotePendingReplacement` owner before delivering the frame. The
-promotion must retire A through the existing path, preserve the exact receive
-and routed-byte counters, and make subsequent outbound application traffic use
-B. Any pending acceptor frame, pre-ACK/pre-COMMIT frame, malformed/oversize
-frame, unknown or closed route, stale authenticated connection, closed channel
-or failed replacement remains non-promoting and non-delivering with A intact.
-Do not create a second activation path or directly mutate link maps.
+existing `#promotePendingReplacement` owner before delivering the frame.
+Deliver only when that owner returns true; a false return drops the frame and
+leaves A intact. The promotion must retire A through the existing path,
+preserve the exact receive and routed-byte counters, and make subsequent
+outbound application traffic use B. Any pending acceptor frame,
+pre-ACK/pre-COMMIT frame, malformed/oversize frame, unknown or closed route,
+stale authenticated connection, closed channel or failed replacement remains
+non-promoting and non-delivering with A intact. A qualified, correctly shaped
+pending-initiator frame for an unknown or closed route follows the existing
+normal route-accounting path and increments `unknownRouteDrops` exactly once;
+prequalification and malformed/oversize rows do not. Do not create a second
+activation path or directly mutate link maps.
 
 The deterministic matrix must cover the causal acceptor-B to pending-initiator
 B frame, subsequent initiator-B reply, exactly-once delivery/counters and old-A
@@ -80178,3 +80190,38 @@ watchdog, followed only on pass by the retained seven-test allowlist. A pass
 then permits the already-authorized fresh six-name campaign freeze/review and
 sequential whole runs. The first failing consuming run still stops later
 runs. No Kimi, Fable or collaboration subagent is authorized.
+
+The prospective high-risk review inspected exact signed/pushed commit
+`e6bdf28921161679cd4c18df980a55d6b1e60817`. Codex
+`gpt-5.6-sol` high returned `APPROVED`, P0=0/P1=0/P2=0. Opus xhigh returned
+`APPROVED`, P0=0/P1=0/P2=4. Its P2 clarification union is applied above
+without widening the slice: arm the two old-A holds before B can promote,
+bind delivery to a true existing-owner promotion result, pin one
+`unknownRouteDrops` increment for a qualified unknown/closed route, and record
+the foreseeable transition-reason effect below. Grok completed its sole
+read-only run with `stop_reason=end_turn` and an otherwise useful
+APPROVED/P2=1 object, but prefixed that object with prose contrary to the exact
+terminal schema. The runner therefore correctly classifies it as
+`NO_VERDICT`; it is not relaunched, and its overlapping pre-activation hold
+finding is included in the Opus disposition.
+
+Successful application-proof promotion retires initiator A through
+`#registerLink`/`#dropLink` with exact reason `replacement`, producing one
+earlier peer-local drop rather than a later `channel-close`; A then closes as a
+retiring link without a second drop. The retained validator already accepts
+that exact single replacement transition. A mirror acceptor-pending gap after
+a lost COMMIT remains diagnosis-only and already has bounded recovery custody
+in D.108e4bb; it is not evidence from this browser failure and receives no new
+path, row or behavior in D.108e4bi.
+
+Codex-final, Opus-final, Opus-envelope, Grok-public, Grok-status, Grok-events
+and self-excluding review-manifest SHA-256 values are respectively
+`19204178d2e2ec9a6edf02b58ff57cdd646f5deaf8c5c510c350d2265374d0c8`,
+`8ded3db5dccd2404e59957be7467cfef21f86f397186c433d6f9c081295ad433`,
+`86fa7a571a9ddf33c9e961c72af4db702ca5e4a4d6a83be38ddf3ac9f8c5033f`,
+`c52a35f0c5f18841bbd5257fd0c7e1a052cab66f93732a9e53f6eecd3cc2e92b`,
+`d34a5fa76cb5c4f56a6e06c1026bf95dcf7e1184b3dd971f65e516ae4b9cb984`,
+`79998b6198e76a039b42e235bb46f46c437cf82dba05b7f294d85650bca6e14d`
+and `c4dac962aa640fe7c27db752e06af2069a66c19697889c0ddb768cc1bd70a7ce`.
+The blocking union is empty. These P2 execution clarifications receive
+deterministic RED/GREEN validation and no recursive model review.
