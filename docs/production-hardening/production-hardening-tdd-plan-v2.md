@@ -79787,26 +79787,33 @@ For the transmitting endpoint, define admitted attempts as the unique native
 raw-send custody records and refused attempts as its non-negative
 `delta.backpressuredDrops`. Preserve the existing per-send sequence range,
 uniqueness, RTC attempt/terminal, ready-state, identity and sent-counter joins.
-When neither endpoint owns a local replacement and the transmitting endpoint
-is not the peer-dependent incoming-replacement side, require exactly:
+Only when both endpoints' `delta.linkDrops` values are exactly zero, independent
+of `lastLinkDrop` reason and the reason-filtered `replacementOwners` helper,
+require exactly for the transmitting endpoint:
 
 ```text
 admitted native raw sends + explicit backpressured refusals = sampleCount
 deadline sent counter - prepare sent counter = admitted native raw sends
 ```
 
-The workbench itself still attempts each sequence `0..599` exactly once, so
-the unique admitted sequence subset plus the refusal counter closes the full
-attempt cardinality without inventing a native RTC event for a call that
-production intentionally rejected before `channel.send`. Zero backpressure
-continues to require all 600 native sends. A non-transmitting endpoint may not
-own a positive refusal delta.
+The workbench itself still attempts each sequence `0..599` exactly once and
+the retained title pins `senderSnapshot.attempted` to exactly
+`{ raw: SAMPLE_COUNT, reliable: SAMPLE_COUNT }` before custody validation. The
+unique admitted sequence subset plus the refusal counter therefore closes the
+full attempt cardinality. Production increments `backpressuredDrops` and
+returns before `channel.send`, so an explicit bounded refusal creates no native
+RTC attempt/terminal event and none is invented by this test. A negative or
+non-safe refusal delta, or a sum mismatch, reports
+`D108E4H_RAW_SEND_DOMAIN_INVALID`. Zero backpressure continues to require all
+600 native sends. A non-transmitting endpoint may not own a positive refusal
+delta.
 
 Positive backpressure remains fatal with exact code
-`D108E4H_RAW_BACKPRESSURE` whenever the same trial has a local replacement or
-the endpoint is the peer-dependent incoming-replacement side. That preserves
-the stronger complete native identity/overlap proof for every `1/0`, `0/1` or
-`1/1` replacement topology. `2/0` and `0/2` retain
+`D108E4H_RAW_BACKPRESSURE` whenever either endpoint owns any local link drop,
+whether its reason is `replacement` or `channel-close`. That preserves the
+stronger complete native identity/overlap proof for every `1/0`, `0/1` or
+`1/1` replacement topology without relying on peer-side reason propagation.
+`2/0` and `0/2` retain
 `D108E4H_DROP_COUNT_AMBIGUOUS`; zero-owner RTC identity advancement retains
 `D108E4H_IDENTITY_JOIN_INVALID`. A success/refusal cardinality that is not
 exactly `sampleCount`, an invalid/duplicate/out-of-range admitted sequence or a
@@ -79818,12 +79825,16 @@ The deterministic roster adds one zero-local positive control matching the
 new evidence shape—527 admitted unique sequences plus 73 refusals—which must
 pass. Add count-underflow and count-overflow siblings that retain
 `D108E4H_RAW_SEND_DOMAIN_INVALID`, a non-transmitter positive-refusal mutant
-that throws `D108E4H_RAW_BACKPRESSURE`, and positive-refusal local- and
-incoming-replacement controls that throw the same backpressure code. Preserve
-the existing 600-success/one-refusal and 555-success/45-refusal replacement
-mutants as failing `D108E4H_RAW_BACKPRESSURE` controls. Run the exact focused
-schema-validator title once after the batch; if its complete soft-failure set
-differs from the frozen matrix, stop and diagnose before any browser run.
+that throws `D108E4H_RAW_BACKPRESSURE`, and positive-refusal `replacement`
+local/incoming controls that throw the same code. Add two reason-independent
+guards: positive creator refusals derived from the retained
+`creator-channel-close` fixture and from the retained
+`receiver-channel-close` fixture must both throw
+`D108E4H_RAW_BACKPRESSURE`. Preserve the existing 600-success/one-refusal and
+555-success/45-refusal replacement mutants as failing
+`D108E4H_RAW_BACKPRESSURE` controls. Run the exact focused schema-validator
+title once after the batch; if its complete soft-failure set differs from the
+frozen matrix, stop and diagnose before any browser run.
 
 After deterministic GREEN and exact-owner strict typecheck, lint, formatting,
 source-shape and diff gates pass, run the retained campaign title once as the
@@ -79848,3 +79859,40 @@ authorization covers the necessary narrow and whole runs and must not be
 requested again. Prior roots and consumed names remain immutable; whole runs
 remain sequential under the existing first-failure rule. D.108e5 remains
 blocked until all six fresh invocations and their final evidence review pass.
+
+The single high-risk plan review found one shared P1 and no product owner.
+Codex `gpt-5.6-sol` high and Opus xhigh independently observed that
+`replacementOwners` includes only reason `replacement`, while the local
+validator treats both `replacement` and `channel-close` as link-drop
+transitions. The initial wording could therefore have admitted bounded
+refusals in a channel-close replacement topology despite promising native-send
+custody for every `1/0`, `0/1` and `1/1` case. The correction above uses the
+strict trial-wide `0/0` count predicate and adds both channel-close directions,
+which is narrower than either reason-filtered interpretation and changes no
+product, evidence schema or numeric contract.
+
+Opus's two P2s are dispositioned without widening the slice. Its proposal to
+allow a peer-owned channel-close while the transmitter remains stable is sound
+under endpoint-local reasoning but is deliberately not adopted: literal
+trial-wide `0/0` is simpler and preserves the plan's stronger no-backpressure
+rule for every replacement topology. Its requested accounting premises are
+now explicit above, including the retained attempted-count assertion, the
+pre-`channel.send` refusal seam and the exact domain code for a negative or
+inconsistent refusal delta.
+
+Codex returned `CHANGES_REQUIRED`, P0=0/P1=1/P2=0. Opus session
+`27d8222e-fcf5-4bf6-9578-2c552b3d40f7` returned `CHANGES_REQUIRED`,
+P0=0/P1=1/P2=2, with zero permission denials and zero subagents. Grok's sole
+read-only run made active inspection progress but its service canceled after
+465.202 seconds before a terminal schema, so its honest classification remains
+`NO_VERDICT` and it is not relaunched. The shared P1 is corrected in one
+batch; because the correction directly applies both reviewers' demonstrated
+count-based guard and only narrows eligibility to the already-promised `0/0`
+case, no confirmation round is required before deterministic RED/GREEN.
+Codex-final, Opus-envelope, Grok-status, Grok-public and self-excluding
+fourteen-file review-manifest SHA-256 values are respectively
+`c0a4e2c0a4d49211fa22d4e66f7d7f8b4240381413308fddf05adcbbec61343e`,
+`ff6fd0eecc87096f946caae41d3196d83a4ec17858167a760cd4a2ee4ea515ae`,
+`cdc37a1ec980fe58e80541259fb011814acb6d05f83f4eb4426d9953801b36ff`,
+`9774003dce4cbaba0369a4f5c2d1eb3508b585088f190484eecc1ffed5394a09`
+and `6aa21b8c8d247c5fca3181d4c22a500b3703e18bd12488f79f3e2faaaf193562`.
