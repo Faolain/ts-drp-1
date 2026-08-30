@@ -74872,3 +74872,87 @@ review, receives no new formal review of its own prose, and changes no product
 source, test source, acceptance rule, immutable evidence, campaign freeze or
 long-campaign authority. Fable and collaboration subagents remain prohibited;
 protected untracked paths and all stashes remain preserved.
+
+Codex `gpt-5.6-sol` / high thread
+`01a05087-a04e-7512-9517-b282081a870e` reviewed signed policy checkpoint
+`17b6536272ebf8a8cf919882c68204f840a2c0be` once in read-only mode and returned
+normal terminal `CHANGES_REQUIRED`, P0=0/P1=1/P2=4. The P1 is accepted. In RED
+`718adc4e`, `d108e4arDeadlineSenderWire` was inferred from
+`replayCreator.rawSends` as `readonly D108e4hRawSend[]`, not the required
+`readonly PlatformObservation[]`. Playwright's transpile-only execution erased
+that mismatch and reached the expected AR exception, while GREEN's later strict
+TypeScript status two exposed that the supposedly valid RED deadline fixture
+already violated its declared contract. The historical RED therefore does not
+prove absent run-return custody was the sole defect for valid typed deadline and
+timestamp inputs. GREEN implementation behavior itself was accepted, but the
+formal gate remains open.
+
+The first two Codex P2s are absorbed by the corrective evidence rules below:
+future roots preserve raw command/status/stdout/stderr and exact correction
+diffs, and formatting must precede execution. The other two retain the existing
+test-maintainer dispositions: add erased `senderWire satisfies readonly
+PlatformObservation[]` before a future computed-writer edit, and add a
+both-keys-missing precedence mutant before a future helper/error-partition edit.
+Neither is part of this causal P1 correction because neither current seam must
+change. `.logs/d108e4ar-green-review-codex/` is a separate immutable,
+self-excluding eleven-file root; its manifest SHA-256 is
+`7e2f847db1b935bc86a4461c5e2bfa130321fe642da46818b4b9858cd54f1eb7`
+and validation-record SHA-256 is
+`7c8c632abbf1d5db24dabc844f6c67debd3ab4cd7f5541f4867e4e47245b3dab`.
+The original Kimi NO_VERDICT, Grok/Opus opinions, signed RED/GREEN commits and
+all prior evidence remain immutable.
+
+###### D.108e4ar — superseding typed-fixture causal replay
+
+The accepted P1 receives one bounded test-only corrective replay, not a product
+reslice. This plan append is signed and pushed without recursive review. No
+campaign, product source, dependency, configuration, timing, threshold, wire
+format, identity authority or API may change. If any such change appears
+necessary, stop. The only tracked owners are this plan and
+`tests/e3-03-loss-and-hol-proof.pw.ts`.
+
+Superseding RED starts from the reviewed current owner, retains the frozen AR
+helper/key surface, and restores only the pre-adoption source shape from
+`718adc4e`: the 20-field `CampaignEvidence` with deadline field `senderWire`, the
+plain live `updateTrialProgress({ senderRawCandidateCount, senderWire })`, the
+direct frozen final evidence record, and the original post-loop binding. Its
+focused terminal control is corrected before execution: use a distinct frozen
+empty array explicitly typed `readonly PlatformObservation[]` for the deadline
+base, a valid safe-integer run-return timestamp, and omit only
+`runReturnSenderWire`. Do not reuse `D108e4hRawSend[]` and do not add another
+behavioral mutant.
+
+Before the sole focused RED invocation, run Prettier write/check and
+`git diff --check`, then strict standalone TypeScript and exact-owner ESLint;
+all must return zero. Preserve every command, status, stdout and stderr plus the
+exact current-to-RED diff under `.logs/d108e4ar-red-superseding/`. The list guard
+must select exactly the one schema-v3 focused title in one file and exclude the
+retained three-trial campaign. The one focused RED must return status one with
+exact counts `0/0/1/0`, empty top-level errors, absent/null result
+`softErrors`, and sole first line
+`Error: D108E4AR_FINAL_RUN_RETURN_CUSTODY_ABSENT`. A deterministic source audit
+must prove the typed base, sender-before-timestamp order, absent live adoption,
+unchanged retained suffix and no prohibited path. Any other result stops. After
+self-excluding manifest validation, record the result, sign and push the
+superseding RED without a separate model round.
+
+Superseding GREEN restores the exact reviewed GREEN owner bytes from
+`535d6a52f35c8d67d3f9ad5db3bdc31df5cd5aad`; those bytes already contain the
+two distinct frozen empty arrays explicitly typed `readonly
+PlatformObservation[]`. Do not add the two future-maintenance P2 guards or alter
+any other source. Preserve raw commands/status/stdout/stderr and the exact
+RED-to-GREEN diff under `.logs/d108e4ar-green-superseding/`. Prettier and diff
+checks precede execution. The list guard again selects exactly one non-campaign
+test. Invoke focused GREEN exactly once; require status zero, counts `1/0/0/0`,
+empty top-level errors and absent/null `softErrors`. Then require strict
+standalone TypeScript, exact-owner ESLint, Prettier, `git diff --check` and the
+same AST/source-preservation audit all at status zero. Validate the
+self-excluding manifest, record the complete result, sign and push GREEN.
+
+Because the accepted P1 correction changes executable test bytes and creates a
+new causal history, use the one permitted confirmation round after signed GREEN:
+normal Grok 4.6/high, read-only Codex `gpt-5.6-sol` / high and Opus 5/xhigh each
+inspect the original plan/history, rejected Codex review, superseding typed RED,
+superseding GREEN, raw gate evidence, manifests and causal closure. Only P0/P1
+blocks closure. Bookkeeping-only closure prose receives no recursive review.
+No retained campaign or campaign-readiness action may begin within this replay.
