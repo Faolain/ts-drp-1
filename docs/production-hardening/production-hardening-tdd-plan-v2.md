@@ -80907,3 +80907,111 @@ protocol scope boundary. D.108e5 and all fresh retained campaign execution
 remain blocked pending explicit authority for the reliable identity-bound
 commit reslice or an explicit contract relaxation. No reviewer, unit test,
 browser title or campaign is relaunched from this finding.
+
+###### D.108e4bm — reliable identity-bound replacement-decision observation
+
+The user expressly authorizes the narrow reliable commit-protocol reslice
+identified by D.108e4bl. D.108e4bm owns only the internal replacement-decision
+message on the existing authenticated
+`AuthenticatedWebRtcConnection.exchange` seam, its state owner in
+`packages/network/src/unreliable-webrtc.ts`, deterministic fake-signaling/RTC
+tests in `packages/network/tests/unreliable-webrtc-e3-01-red.test.ts`, and this
+plan/evidence record. It does not add a public API or dependency, change the
+raw channel label/properties, READY/ACK/COMMIT bytes or counts, route/snapshot
+wire formats, workload, thresholds, ports, browser configuration, setup
+deadline, resource ceilings, or endpoint-local `2/0` rejection. Consumed
+D.108e4bk evidence and its four permanently unrun names remain immutable.
+
+The reliable message observes rather than creates the acceptor decision. The
+acceptor may report `committed` only after its existing READY/ACK/COMMIT owner
+has received the raw COMMIT and promoted the exact replacement B. A reliable
+query cannot promote an acceptor, substitute for lost raw COMMIT, or weaken
+the retained lost-READY/ACK/COMMIT behavior. The initiator may begin querying
+only after receiving ACK and successfully sending at least one raw COMMIT; it
+may promote only the exact still-pending B after a valid `committed` response
+on B's still-current authenticated connection. `aborted`, malformed, unknown,
+stale, mismatched or exhausted decisions leave usable A selected and clean B
+up through the existing failure owner.
+
+For each offer, both endpoints derive the lowercase 64-hex decision ID as
+SHA-256 over the fixed UTF-8 domain
+`ts-drp-unreliable-webrtc-replacement-decision-v1\0` followed by the exact
+encoded offer bytes already exchanged. Decision records are additionally
+bound locally to the exact authenticated remote peer, connection ID,
+generation, address and WebRTC transport through the existing
+`#sameConnection` predicate. Thus a replayed decision ID on a different
+authenticated connection, replacement C, peer or generation is rejected even
+if the original B record still exists.
+
+The new request and response are bounded canonical JSON objects carried on the
+existing signaling protocol. The request has exactly
+`decisionId,type,version`, with type `replacement-decision`, version `1` and
+the decision ID above. The response has exactly
+`decisionId,status,type,version`, with type `replacement-decision-result`,
+version `1`, the identical ID and status `committed` or `aborted`. Existing
+offer/answer objects and their exact decoder remain unchanged. Any other key,
+type, version, status, ID syntax or byte excess fails closed.
+
+The acceptor retains one bounded idempotent decision record per live pending
+or newly committed replacement until the original absolute setup deadline.
+Pending queries wait only within that deadline. Existing acceptor promotion
+marks the exact record committed and resolves all same-ID waiters; discard,
+connection identity change or owner close marks it aborted. Duplicate queries
+return the same terminal result. The deadline removes the record and every
+waiter/timer; no record, stream attempt, pending PC or physical slot survives
+that boundary. Owner close synchronously clears the same state. A stale result
+may not act after B was discarded, replaced by C, ceased to be current, or
+left pending ownership.
+
+The initiator performs at most two sequential reliable exchanges for the same
+decision ID, both inside the original absolute setup deadline. An immediate
+request/stream/response/decode failure may resume once against the same exact
+current connection and decision ID. A valid committed result is idempotent;
+the continuation rechecks the readiness object, pending-link identity,
+decision ID, channel state and authenticated connection before calling the
+single existing `#promotePendingReplacement` owner. A valid aborted result,
+two failures, connection change, owner close or deadline exhaustion uses the
+existing failure/cleanup path. The retry adds no deadline extension, grace
+period, background dial or second activation owner.
+
+Before production editing, extend the deterministic roster and freeze causal
+RED expectations. The original D.108e4bl idle case must remain the causal RED
+on the pre-GREEN production image. The complete GREEN matrix must prove:
+
+1. acceptor raw-COMMIT promotion plus idle initiator B converges before the
+   original deadline, leaves one B per endpoint and exact local drops `1/1`;
+2. lost raw COMMIT never becomes committed through the reliable query, expires
+   B, retains usable initiator A and preserves its exact existing error/drop
+   behavior;
+3. one failed request and, separately, one lost/malformed final response resume
+   through the second exchange and converge without duplicate promotion/drop;
+4. duplicate committed queries are idempotent and do not allocate another PC,
+   activate twice or alter counters;
+5. a B decision replayed on a changed connection or against replacement C is
+   rejected and cannot promote either stale candidate;
+6. connection change, B close and owner close while a query is pending abort
+   it, release timers/waiters/records and preserve bounded physical ownership;
+7. malformed request/response key, type, version, ID and status mutants fail
+   closed without changing offer/answer parsing; and
+8. the retained D.108e4at/au/ax/bb/bi/bl lifecycle, control-loss, application-
+   proof and both-peer-ordering rows preserve their exact non-mutated results.
+
+Run static collection/source-shape gates before the exact new focused RED
+execution. GREEN then runs the new decision matrix, the complete unreliable-
+WebRTC owner, network typecheck/build, exact-owner strict TypeScript, ESLint,
+Prettier and `git diff --check`. A refactor-clean audit must confirm one
+decision decoder, one state owner, one promotion owner and no compatibility
+wrapper or parallel activation path.
+
+This is a high-risk exception because it adds an internal signaling message
+and changes the initiator's activation evidence. Sign and push this bounded
+plan checkpoint, then run one Grok/Codex-`gpt-5.6-sol`-high/Opus-xhigh plan
+review over the signed D.108e4bl RED and this frozen D.108e4bm contract. Only
+P0/P1 findings block; apply a material union once without recursive prose
+review. No Kimi, Fable or collaboration subagent is authorized. After GREEN,
+sign/push and run the single formal three-model implementation review across
+plan, RED, GREEN, retained behavior and evidence. Only an empty P0/P1 union
+releases one retained browser title and then the retained seven-test allowlist.
+A pass permits a separately frozen fresh six-name campaign; no D.108e4bk name
+is reused. D.108e5 remains blocked until the fresh campaign and final evidence
+review pass.
