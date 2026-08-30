@@ -75306,3 +75306,127 @@ enforcement and checkout command/status custody. The historical D.108e4aj
 limitations and artifacts remain unchanged. If readiness requires product,
 test-semantic, configuration, dependency, threshold or workload changes, stop
 and reslice rather than widening D.108e4as.
+
+D.108e4as plan review inspected signed/pushed plan checkpoint
+`f64d172e1447c119217f9f4a7811b304509e85d3`. Codex
+`gpt-5.6-sol` / high thread `01a050b3-2c0e-7750-b6dd-654c29a84b02`
+returned schema-valid `CHANGES_REQUIRED`, P0=0/P1=1/P2=1. Opus 5/xhigh
+session `e2885143-a22c-4000-bb1b-8e40cf0cb01a` returned normal `end_turn`,
+substantive `claude-opus-5`, no permission denial or subagent, and
+`CHANGES_REQUIRED`, P0=0/P1=2/P2=5. Grok 4.6/high session
+`01a050b3-311f-76e3-91e2-888e750bc14b` ended normally after 870.226 seconds
+and emitted a complete substantive `CHANGES_REQUIRED`, P0=0/P1=1/P2=5 object,
+but progress prose preceded it; the wrapper therefore correctly retained
+`NO_VERDICT`. Its findings remain useful but are not represented as an approval.
+No reviewer edited tracked files or ran a test, build, browser, profiler,
+campaign, Fable, Kimi or subagent.
+
+The complete deduplicated blocking union is accepted and corrected here in one
+batch. First, the inherited finalizer can write a zero `.runner-status` before
+recursive-manifest work changes its final exit to nonzero. The D.108e4as runner
+diff is therefore also permitted and required to change terminal-status
+publication. It must complete every copy, recursive-manifest generation and
+manifest-validation operation before publishing `.runner-status` atomically as
+its final fallible operation. The live recursive artifact manifest explicitly
+excludes itself, its validation record, `.runner-status` and the status temporary
+file to avoid circular custody; the later signed campaign-evidence checkpoint
+hashes all four. If status publication itself fails, the status remains absent,
+never falsely zero. After successful publication, the only operation is the
+matching shell `exit`. A deterministic non-campaign fault fixture forces
+manifest generation and validation failure separately and requires a nonzero or
+absent status; each of the five later in-runner predecessor cases must reject
+that fixture. A success fixture requires atomic zero publication and matching
+zero exit. These runner-finalizer fixtures run only during readiness and do not
+consume authorization.
+
+Second, the process predicate excludes the launching runner's complete PID
+lineage: its ancestor chain through the exact launcher plus its recursively
+computed descendants. It does not merely exclude descendants, and it does not
+exclude a same-name process outside that lineage. The deterministic auditor
+fixtures now prove an excluded launcher ancestor, an excluded runner descendant
+and a rejected foreign-root owner. For every other owner-matching PID, `lsof`
+cwd or Git-root resolution failure is itself a rejection. The cwd arm remains
+the authoritative global test: its Git toplevel must contain root
+`package.json` name `ts-drp`. The command arm resolves every argv path that
+exists through its Git toplevel and applies the same package-name test; it may
+not use only a pre-enumerated ordinary/isolated root list. Exact case-insensitive
+owner tokens include `run_grok.py`, `grok`, `codex review`, `codex exec`,
+`claude -p`, `kimi-cli`, `playwright`, `vitest`, `xctrace` and `instruments`.
+
+Third, raw `command -v` values are diagnostic inventory only. The signed binding
+and every pre-use/pre-launch comparison use `/bin/realpath` of the resolved
+binary. A live session shim is accepted only when its realpath equals the signed
+physical path; the historical
+`/Users/aristotle/Library/Caches/fnm_multishells/7946_1787712388203/bin/pnpm`
+is never an equality operand. Freeze both the stable Node realpath and the
+realpath of Corepack's `pnpm.js`; every pnpm use invokes those two signed
+physical paths together, not a per-shell fnm shim or an unverified
+`/usr/bin/env node` shebang. Continue to require the labeled D.108e4aj versions:
+Perl 5.34.1, jq 1.6, ripgrep 15.2.0, pnpm 10.24.0 and Git 2.50.1.
+
+The nonblocking findings are all owned and closed by the D.108e4as freeze
+implementation and freeze review, before campaign authority and no later than
+the fixed expiry. `verify-modes.zsh` is an enumerated freeze artifact included
+in both `SHA256SUMS` and the numeric mode manifest and is invoked as
+`/bin/zsh "$freeze_root/verify-modes.zsh"`. Root setup and all six launch blocks
+are explicitly `/bin/zsh` programs and use only signed absolute physical tool
+paths. Each launch compares the numeric modes of the three campaign copies to
+their signed expected values in addition to their hashes. The freeze copy mode
+manifest and campaign-copy mode checks use the signed physical `/usr/bin/stat`;
+`realpath` and `stat` join the required-tool inventory.
+
+The isolated install command is executed with cwd exactly
+`/private/tmp/ts-drp-d108e4as-clean/repo`, and that cwd is recorded beside its
+raw command/status/stdout/stderr/times. It remains exactly one
+`pnpm install --offline --frozen-lockfile`; the existing package postinstall and
+`build:packages` remain nested in that command's output and are not invoked a
+second time or replaced by `--ignore-scripts`. Its nonzero status is the offline
+network-fallback stop. The no-hardlink requirement applies to Git clone/object
+provenance relative to the ordinary repository; pnpm-store hardlinks or clones
+created by the offline installer are permitted and are not misclassified.
+
+Every new runner refusal—expiry, physical-tool mismatch, mode mismatch,
+predecessor failure, future-artifact detection, residue, process conflict or
+port conflict—runs before `capture_state`, the atomic `<name>.before` move and
+the EXIT trap. It is therefore non-consuming by construction. No such refusal
+may be moved after the consumption boundary. Checkout gets its own literal
+command/status/stdout/stderr/time custody; the nested postinstall remains under
+the install custody above.
+
+The seven ordered identity paths are explicitly
+`playwright.e3-03-loss-and-hol.config.ts`,
+`configs/network-spike-relay.json`,
+`configs/network-spike-relay-replacement.json`,
+`tests/e3-03-loss-and-hol-proof.pw.ts`,
+`packages/network/src/unreliable-webrtc.ts`, `packages/network/src/node.ts` and
+`packages/node/src/ephemeral.ts`. The four classifier payloads are copied
+byte-for-byte from D.108e4aj and pinned respectively as legal dual-local
+`classification-prototype.json`
+`276c8f1811d5e46015bfb84c7ded88f7b6cb0cfa6db0bdcfc7530f1a0561b992`,
+legal channel-close `channel-close-classification-prototype.json`
+`477d3aa4ad28cb18887f0263d0798154f9dd39f826137fe044cef8721966b426`,
+creator/receiver `2/1` inherited filename
+`ambiguous-2-0-classification.json`
+`c5817a0a4ca29190177a782af604671a5747044578cb733449ca3f8d03043b8c`,
+and creator/receiver `1/2` inherited filename
+`ambiguous-0-2-classification.json`
+`42187bdb2cd0e805b5b9b3aec2b53c95aec000c980ac1b30fe4c31d0550fe436`.
+The last two filenames are historical and do not describe their actual peer
+counts or replace the focused `2/0` and `0/2` error contract.
+
+Codex's external-guard P2, all five Opus P2s and all five Grok P2s are thereby
+disposed without widening product/test semantics: stable physical paths and
+campaign modes cover root/launcher custody; the mode verifier is explicit;
+isolated cwd and one nested postinstall are fixed; all refusals are pre-capture;
+hardlink/network scope is exact; prototype bytes/names/counts are pinned; the
+global predicate and failures are exact; and both relay paths are named.
+
+Because these corrections alter executable runner acceptance, sign and push
+this same-round plan correction, then use the one permitted confirmation round:
+normal Grok 4.6/high, read-only Codex `gpt-5.6-sol` / high and Opus 5/xhigh must
+inspect the original checkpoint, all three original terminal records and this
+correction. Only zero P0/P1 closes plan review. The Grok confirmation is a new
+substantive review, not a reinterpretation of the original wrapper
+`NO_VERDICT`. Do not recursively review documentation-only result recording.
+No freeze root, isolated checkout or campaign may be created until confirmation
+closes and the corrected deterministic local audit passes.
