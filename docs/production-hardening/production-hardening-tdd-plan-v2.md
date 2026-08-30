@@ -80057,3 +80057,124 @@ self-excluding review-index SHA-256 values are respectively
 `dc6a635f1c13863d6fe0b845661f521215076ce9efd19a42d45a8f5113a9fe0f`,
 `78f5c2dc22f1fdd50147394eb549e2784fc6019b59b9ff73bd4622e1f61232e1`
 and `5a96eae80d84b06665aef350f8ee6b5c797108b675134bf27341e5d5a961aff1`.
+
+The D.108e4bh implementation changes only
+`tests/e3-03-loss-and-hol-proof.pw.ts`. It selects the unique RTC identity
+common to both zero-local boundaries, keeps at most one application-idle
+candidate at either boundary, validates a deadline candidate's exact
+handler/open anchors and role-valid control prefix, and keeps all application
+ownership on the selected identity. The deterministic roster covers the
+positive prepare-only candidate, acceptor READY/ACK candidate and initiator
+READY/ACK/COMMIT candidate plus the frozen missing/duplicate common identity,
+second candidate, missing anchor, missing role prefix, terminal candidate,
+acceptor-received COMMIT and candidate-application-owner exact-code mutants.
+
+The first static pass correctly found one union-typing error and one missing
+explicit callback return type in the new test owner. After correcting those
+local implementation defects, the strict standalone `tsc`, exact-owner
+ESLint, 8 GiB exact-owner Prettier and `git diff --check` commands all returned
+zero. The first non-consuming `--list` wrapper then used zsh's read-only
+`status` parameter after Playwright had collected; the corrected wrapper uses
+`command_exit`, records that diagnostic without treating it as a test failure,
+and proves exactly one selected test in one file. The focused validator ran
+exactly once after the static gates and passed in 8.029424 seconds with
+expected/skipped/unexpected/flaky `1/0/0/0`, zero top-level errors and no soft
+failures. Its reporter SHA-256 is
+`02ed12737343ff0a624a13c553555b7ef5613d52bc8f6ab721ba37d33f02b907`.
+
+The required retained browser title then ran once under the unchanged
+600-second process-group watchdog and stopped before any retained-seven run.
+It did not reach D.108e4bh boundary validation. Preliminary 30% calibration
+passed with 600 sends and 303 deliveries, but after returning to no loss the
+unchanged 10-second `waitForRawDelivery` predicate saw zero newly accepted raw
+frames. The reporter started `2026-08-30T17:48:59.610Z`, ran 46.500493
+seconds, and records expected/skipped/unexpected/flaky `0/0/1/0` with no
+top-level errors. The exact stage is `preliminary-reset` and no fixed campaign
+trial or campaign evidence was created.
+
+This failure is not timing-only and is independent of the D.108e4bh evidence
+classifier. Complete wire/lifecycle evidence shows creator replacement B
+`(connectionId=5, channelId=52)` open and selected after its acceptor-side
+READY/ACK/COMMIT exchange. It sent a 193-byte application frame at wall time
+`1788112184480`. Receiver B `(5,51)` was also open and physically received
+that same-size frame at the same wall time, but remained the initiator-side
+pending replacement because receiver A `(2,11)` was still open while creator
+A `(2,14)` was already closing. Product ingress therefore discarded the
+frame under the existing unconditional pending-link return and receiver
+`rawTransport.received` remained 304. The peer lists and one logical raw link
+at each endpoint remained present. This demonstrates a product-owned
+make-before-break promotion gap rather than an unavailable route, absent
+physical frame, saturated CPU, slow scheduler or classifier error.
+
+Reporter, failure telemetry, causal summary, reporter summary, trace, error
+context and validating self-excluding manifest SHA-256 values are respectively
+`a1e18c1459addfe3356fc968170350e5ac954ac50558c616906db98913a9cc58`,
+`d4f841363c76241006a3c008d3f312d7e2711e659179cf7e6f10d316a4e7cc26`,
+`3146df4cf92f5259da36ab6d3f2390a2179782426f13aef08ae19552135dcacf`,
+`4e364c87189f69a4b1eb805c6d6de3fc6f743db27a8eec31cc2d18a56845f9b8`,
+`a1c929c4f2b9529c1102664e3717ee43fd7975fe17b78881eb20d66eb324bf85`,
+`84f7d19f248859b5ffd2924da9c3d7baee99e76f37e1d27114f3ee41448e989c`
+and `bbde7499712a7fcfb8bee859e090645947e12712e57d3c32f71e49e0f88bbbc3`.
+Evidence is immutable under `.logs/d108e4bh-green/`. D.108e4bh remains
+implemented and focused-green but cannot receive its retained/final review
+closure until the separately owned product continuity blocker below is green.
+
+###### D.108e4bi — pending-initiator application proof promotion
+
+D.108e4bi owns only the demonstrated asymmetric promotion gap in
+`packages/network/src/unreliable-webrtc.ts`, its deterministic owner test in
+`packages/network/tests/unreliable-webrtc-e3-01-red.test.ts`, and this
+plan/evidence record. Preserve public APIs, dependencies, signaling and wire
+formats, READY/ACK/COMMIT bytes and counts, authenticated-connection authority,
+route digests, workload, timing, thresholds, ports and campaign evidence. Do
+not patch js-libp2p, change connection-monitor policy, relax readiness, accept
+unqualified pending ingress or run a retained campaign in this slice.
+
+Freeze one deterministic RED using the existing fake signaling/RTC owners.
+Establish old authenticated raw pair A, disconnect its authenticated owner
+without closing A, establish replacement B, and hold the initiator's old-A
+remote close event after the acceptor has received COMMIT and promoted B.
+Prove the acceptor's B is active while the initiator retains A as its selected
+outbound link and B as its handshake-qualified pending link. Send one valid
+registered-route application frame from the acceptor over active B. The
+frozen RED expects the initiator to accept that exact frame and select B; the
+current unconditional `if (pending) return` must instead leave the receive
+roster empty and retain A. This is the exact causal failure. Do not model it
+with clocks, browser scheduling, connection-monitor aborts or a forced old-A
+close.
+
+GREEN may change only pending application handling. Control frames retain the
+existing state machine. For a non-control frame on a pending initiator link,
+first require the exact current authenticated connection, open channel,
+received ACK and at least one successful COMMIT send. Then validate the normal
+route header, byte ceiling and live registered route. A valid routed frame is
+peer-observed activation proof: promote that exact pending link through the
+existing `#promotePendingReplacement` owner before delivering the frame. The
+promotion must retire A through the existing path, preserve the exact receive
+and routed-byte counters, and make subsequent outbound application traffic use
+B. Any pending acceptor frame, pre-ACK/pre-COMMIT frame, malformed/oversize
+frame, unknown or closed route, stale authenticated connection, closed channel
+or failed replacement remains non-promoting and non-delivering with A intact.
+Do not create a second activation path or directly mutate link maps.
+
+The deterministic matrix must cover the causal acceptor-B to pending-initiator
+B frame, subsequent initiator-B reply, exactly-once delivery/counters and old-A
+retirement. It must also prove that unqualified, malformed, unknown-route and
+stale pending frames cannot promote or retire A, and preserve the existing
+D.108e4at/D.108e4au/D.108e4ax/D.108e4bb replacement, control-loss,
+failed-replacement and both peer-ordering rows. RED runs only the exact new
+test title once. GREEN runs that title once, the focused unreliable-WebRTC
+owner suite, network package typecheck/build, exact-owner strict TypeScript,
+ESLint, Prettier, source-shape and `git diff --check` gates.
+
+Because this changes production activation timing and identity ownership,
+sign and push this plan checkpoint and run one high-risk
+Grok/Codex-`gpt-5.6-sol`-high/Opus-xhigh plan review before RED. Only P0/P1
+blocks; apply one material union if needed and do not recurse on P2 or prose.
+After deterministic GREEN, sign/push and run the single formal three-model
+review across the D.108e4bh evidence, D.108e4bi RED and GREEN. An empty
+blocking union authorizes one new retained browser title under the unchanged
+watchdog, followed only on pass by the retained seven-test allowlist. A pass
+then permits the already-authorized fresh six-name campaign freeze/review and
+sequential whole runs. The first failing consuming run still stops later
+runs. No Kimi, Fable or collaboration subagent is authorized.
