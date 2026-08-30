@@ -74836,3 +74836,39 @@ the distinct internal times, bytes, hashes and manifest remain authentic. None
 of these P2 dispositions changes executable code, acceptance, scope or a hard
 gate, so none triggers confirmation. `.logs/d108e4ar-green-review/` preserves
 all three terminal outcomes and dispositions under a self-excluding manifest.
+
+###### D.108e4 prospective Codex-for-Kimi reviewer substitution
+
+On 2026-08-29 the user expressly authorized continuing without Kimi reviews and
+using one Codex `gpt-5.6-sol` / high review in place of each otherwise-required
+Kimi leg. This prospectively supersedes only the Kimi-availability and
+no-substitute clauses for remaining unclosed D.108e4 work. The governing review
+set is therefore normal Grok, read-only Codex `gpt-5.6-sol` / high and Opus
+5/xhigh wherever the prospective cadence requires a three-model gate. No Kimi
+retry is permitted unless the user later changes this instruction.
+
+Completed checkpoints and immutable evidence are unchanged. In particular,
+Kimi session `7afd81fa-20e5-4f78-9bed-e29ff7fc24f5` remains an honest
+NO_VERDICT caused by its immediate weekly-quota 403; it is neither rewritten as
+approval nor attributed to later bytes. Existing Grok and Opus review results,
+signed RED/GREEN commits, manifests, hashes, P2 dispositions and the dated stop
+record remain authoritative. The Codex review is a new read-only opinion over
+the already signed plan-to-RED-to-GREEN history, not a mutation of
+`.logs/d108e4ar-green-review/`; its evidence belongs in the separate
+`.logs/d108e4ar-green-review-codex/` root.
+
+For D.108e4ar, one Codex `gpt-5.6-sol` / high review now supplies the unavailable
+third leg. It must independently inspect signed plan gate `2d0654ac`, RED
+`718adc4e`, GREEN `535d6a52`, their immutable evidence, the current stop record
+and the existing nonblocking P2 dispositions. It must verify causal RED-to-GREEN
+closure, exact scope and source preservation, runtime/static results, manifest
+custody, and absence of campaign authority. Only P0/P1 blocks closure. A
+zero-P0/P1 result combined with the retained Grok and Opus approvals closes the
+formal D.108e4ar GREEN review; any P0/P1 stops for diagnosis under the existing
+confirmation limit.
+
+This bookkeeping-only policy correction is signed and pushed before that
+review, receives no new formal review of its own prose, and changes no product
+source, test source, acceptance rule, immutable evidence, campaign freeze or
+long-campaign authority. Fable and collaboration subagents remain prohibited;
+protected untracked paths and all stashes remain preserved.
