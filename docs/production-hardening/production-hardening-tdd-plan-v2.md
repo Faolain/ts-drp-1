@@ -78768,14 +78768,17 @@ lower-id first and higher-id first. Each row:
   path, whose next 26 offers throw before receiver-handler entry, and whose
   28th and later offers pass through byte-identically;
 - captures and awaits both explicit connection-arrival reconcile promises,
-  then advances exactly 26 250 ms retry cycles to prove exactly 27 replacement
+  then advances exactly 26 250 ms retry cycles, boundedly settling each cycle
+  until the exchange list grows by exactly one, to prove exactly 27 replacement
   exchange attempts, initiator/receiver handshake-failure counters 27/1, no
   active link and one still-owned retry timer; and
 - advances the next 250 ms cycle, requires attempt 28 to use the same current
   replacement connection id/generation and valid bytes, settles on the exact
   replacement ids, proves one active link at both endpoints and bidirectional
-  route ingress, then advances two more 250 ms cycles with no exchange,
-  allocation or counter growth and `vi.getTimerCount() === 0`.
+  route ingress, retains handshake-failure counters 27/1 plus one authenticated
+  connection loss and one `restart` drop at each endpoint, then advances two
+  more 250 ms cycles with no exchange, allocation or counter growth and
+  `vi.getTimerCount() === 0`.
 
 The first malformed request must reach the receiver's counted
 `#handleSignalingRequest`/`#accept` catch, so it increments both sides exactly
@@ -78788,21 +78791,30 @@ deadline remain product contracts rather than fixture-tunable values.
 
 The causal matrix is fail-closed. Failure before initial bidirectional traffic,
 before the exact connection-loss/restart snapshot, from a wrong peer-close
-barrier, from any counter split other than 27/1 after 27 recorded replacement
-attempts, or because the request transform fails to pass attempt 28 unchanged
-is fixture error. Once that complete precondition is proven and the exact
-replacement connection remains current, absence of attempt 28, failure of its
-clean exchange, failure to select both replacement ids or failure of
-bidirectional delivery is causal RED. Record the exact exchange list,
-connection ids/generations, allocations, snapshots, promise settlement and
-timer ownership, then stop for a separately planned narrow product GREEN. Do
-not edit production in D.108e4ba.
+barrier, from a request-transform script that does not produce the frozen
+first-malformed/next-26-throw/28th-clean sequence, or because that transform
+fails to pass attempt 28 unchanged is fixture error. While the exact
+replacement pair remains current and the transform script behaves as frozen,
+fewer than 27 recorded replacement attempts across the 26 cycles, or any cycle
+that produces no exchange record, is instead a product-owned observation. It
+must be recorded with its exact `#scheduleLinkRetry` re-arm or `#linkFor`
+ordering/ceiling/admission-gate owner and must not be hidden as fixture error or
+repaired by fixture tuning. A counter split other than 27/1 after all 27
+recorded scripted attempts is classified from the exact counter owner rather
+than assumed to be a fixture defect. Once the 27/1 precondition is proven and
+the exact replacement connection remains current, absence of attempt 28,
+failure of its clean exchange, failure to select both replacement ids or
+failure of bidirectional delivery is causal RED. Record the exact exchange
+list, connection ids/generations, allocations, snapshots, promise settlement
+and timer ownership, then stop for a separately planned narrow product GREEN.
+Do not edit production in D.108e4ba.
 
-If both rows pass, current production demonstrably recovers from the observed
-27/1 counter state on the next clean retry in both synchronous restart caller
-orders. Close D.108e4ba as non-reproduction. That result still cannot assign
-ordinary-3 to browser scheduling, js-libp2p or an upstream defect, but it closes
-the remaining deterministic raw-owner recovery hypothesis. No browser replay,
+If both rows pass, current production demonstrably recovers from one synthetic
+reconstruction of the 27/1 counter shape produced by initiator-side setup
+failures on the next clean retry in both synchronous restart caller orders.
+Close D.108e4ba as non-reproduction for that realization. Held-replacement
+counter owners remain untested, and the result cannot assign ordinary-3 to
+browser scheduling, js-libp2p or an upstream defect. No browser replay,
 retained campaign retry, threshold change, upstream attribution or product
 GREEN follows from a pass.
 
@@ -78823,10 +78835,13 @@ with root coverage explicitly disabled:
 pnpm exec vitest run --coverage.enabled=false \
   packages/network/tests/unreliable-webrtc-e3-01-red.test.ts \
   -t 'D.108e4ba recovers after the observed 27/1 handshake split with the (lower|higher)-id restart caller first' \
-  --reporter=json
+  --reporter=json \
+  --outputFile=.logs/d108e4ba-discriminator/focused.json
 ```
 
-If it passes, run the complete E3-01 owner file once with coverage disabled.
+If it passes, run the complete E3-01 owner file once with coverage disabled and
+write its JSON reporter to
+`.logs/d108e4ba-discriminator/retained-e3-01.json`.
 Required gates are network package typecheck/build, exact test-owner
 ESLint/Prettier, `git diff --check`, source-shape custody, the exact two-title
 collection, the retained owner file, a validating self-excluding evidence
@@ -78845,3 +78860,25 @@ fixture or confirmation round. A causal RED receives deterministic evidence
 validation. A later production GREEN would require the single formal
 three-model implementation review; a passing test-only discriminator receives
 no additional model ceremony.
+
+The bounded plan review ran once against signed commit
+`339fe1f0f3b80946d9079f4ba4c702a3658745f5`. Codex
+`gpt-5.6-sol` high approved with zero findings; its terminal JSON SHA-256 is
+`5faf3b6d1b450e40df02cd54e50c9f9dce6dc66168e8b98ff844fa1fea3ccb5b`.
+Grok inspected the cited seams and wrote a public approval plus one P2 about
+explicitly settling the voided retry, but fenced its response rather than
+emitting the required terminal schema, so the runner honestly records
+`NO_VERDICT`; its events/public SHA-256 values are
+`58bf6ddf1819f85133c8e2c1edc39ab99de4cdc2145f7dbac5920a26c4719e74`
+and `284862837c05f4aca1799c1521b78e7b4d3ae169c6f8114e7cbd3e1be179ea9c`.
+Opus xhigh returned one P1: retry-chain persistence before attempt 27 is
+product-owned and could not be classified as fixture error. Its structured
+result SHA-256 is
+`fdcbf8e40b44812749b61c2500c703b4b02fe0b06d98137f92c31988a154d9a9`.
+The batched correction above closes that P1 and disposes the P2 union by
+requiring bounded per-cycle settling, retaining the exact counters/loss/drop
+state through recovery, bounding the conclusion to the synthetic realization
+and capturing both reporter files. These corrections change causal accounting
+and evidence capture only; they do not change product code, workload or test
+semantics and receive deterministic local audit rather than another review
+round.
