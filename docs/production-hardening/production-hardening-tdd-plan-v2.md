@@ -78176,3 +78176,62 @@ ad832d56936c4229cd790c3686cd0bbbc7cfd9b6a1d1e159587cc0599c1a9b0e;
 its validation record SHA-256 is
 e12f76cdcc5466b7ef1f5166b58e578c1dfd3e5443a8dba739f07a8061ddd278.
 No further retained invocation is authorized by this evidence.
+
+###### D.108e4ax — deterministic bilateral restart ownership discriminator
+
+D.108e4ax owns only causal attribution for the consumed ordinary-3 failure.
+The concrete question is whether two authenticated peers that concurrently
+restart an established raw route converge after their signaling responses are
+released. The retained failure proves that both browser peers intentionally
+called restart through fabric.reset, both raw links retired, reliable
+connections remained present and no replacement opened within 10 seconds.
+Existing network-owner unit coverage proves unilateral restart only.
+
+RED changes only
+packages/network/tests/unreliable-webrtc-e3-01-red.test.ts. It reuses the
+existing FakeSignalingBus, FakePeerConnection and pauseResponses barrier. For
+each physical peer ordering it:
+
+- creates two owners and the same raw route on both;
+- establishes one authenticated signaling connection and proves initial
+  bidirectional raw send with activeLinks=1 at both endpoints;
+- pauses signaling responses, invokes both route.restart() calls concurrently,
+  and waits until a replacement exchange is genuinely pending;
+- proves the old raw pair retired with exact restart drop ownership;
+- releases the single deterministic response barrier, awaits both restart
+  promises and drains microtasks/timers; and
+- requires exactly one active raw link at both endpoints plus successful
+  bidirectional post-restart delivery without adding a signaling connection,
+  retry cadence, timeout or product API.
+
+The focused RED command selects exactly this two-row test and runs once. If
+current production fails after the barrier is released, the exact snapshots,
+peer ordering, exchange records, connection/channel states and unresolved
+promise ownership must be recorded; that is causal product ownership for a
+narrow GREEN in packages/network/src/unreliable-webrtc.ts. If both rows pass,
+the browser failure is not reproduced by simultaneous owner restart: stop
+product attribution and reslice as browser reset/fixture/timing diagnosis. A
+passing unit discriminator may not authorize a product change.
+
+Any RED failure before initial bilateral send, before the response barrier is
+pending, or because the fixture itself deadlocks is a fixture error and must be
+corrected without calling it causal. RED must not change production source,
+examples/grid reset behavior, browser tests, timing gates, campaign launchers,
+workload, thresholds or immutable campaign evidence. No browser or campaign
+runs during D.108e4ax RED.
+
+Before any production behavior change, sign and push this bounded plan and run
+one Grok/Codex-high/Opus-xhigh plan review. Only P0/P1 blocks; P2 receives a
+disposition without recursive prose review. After a causal RED, the sole GREEN
+may change only the demonstrated bilateral restart owner, preserve make-before-
+break replacement, readiness controls, admission bounds, 250 ms retry cadence,
+10-second setup deadline, drop counters/reasons, link cap and public APIs, and
+add exact retained unilateral/bilateral tests. Focused RED/GREEN, complete
+network-owner tests, network typecheck/build, exact-owner lint/format/diff and
+the retained seven non-campaign Playwright tests are required before the single
+formal GREEN review. Kimi, Fable and collaboration subagents remain prohibited.
+
+D.108e4ax cannot restore campaign authority. A future authority owner is
+permitted only after a causal GREEN is signed, pushed and approved with empty
+P0/P1, and it may bind only isolated-1 through isolated-3 while preserving all
+three consumed failures and the first-new-failure rule.
