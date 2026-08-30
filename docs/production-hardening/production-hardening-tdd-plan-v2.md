@@ -75016,3 +75016,56 @@ timing, identity, wire-format or API change ran or occurred. After the
 self-excluding manifest validates and GREEN is signed/pushed, run only the one
 permitted Grok/Codex/Opus confirmation round over the complete original and
 superseding history.
+
+D.108e4ar's one permitted confirmation round reviewed signed corrective plan
+`a29e8673b4fcd8687958bd751b3ad43720dc4728`, typed superseding RED
+`3a5f4e3694fd7a6c6b9d70e7d158c28dc45ac696` and exact superseding GREEN
+`1642b17111a1330b5af0eea9e62d24469f1693e4` together with the original history
+and rejected Codex review. Grok 4.6/high returned a normal terminal response
+after 390.114 seconds with APPROVED and zero P0/P1/P2. Codex
+`gpt-5.6-sol` / high thread `01a050a0-0ebb-73f2-8209-7efaa491e70d`
+returned normal schema-valid APPROVED with zero P0/P1 and two P2s. Opus 5/xhigh
+session `d5428a1e-2b43-46df-b5d3-f01122d4444b` returned normal `end_turn`,
+substantive `claude-opus-5`, no error, permission denial or subagent, APPROVED
+with zero P0/P1 and two P2s. The blocking union is empty.
+
+The two Codex P2s retain their existing future test-maintainer ownership: add an
+erased `senderWire satisfies readonly PlatformObservation[]` guard before a
+future computed-writer edit, and add a both-keys-missing AR-precedence mutant
+before a future helper/error-partition edit. Opus adds two future evidence-
+infrastructure rules: closure audits must enumerate both staged and unstaged
+tracked paths, and every nonzero ad hoc diagnostic must preserve its exact
+command/status even when it is not an acceptance gate. Neither identifies a
+current defect or changes executable code, acceptance, scope or a hard gate, so
+none triggers another confirmation.
+
+The first closure workspace audit returned status one because it treated the net
+substitution-to-GREEN diff as the union of corrective paths. RED and GREEN test
+changes cancel in that net diff, leaving only the plan. The corrected audit
+unions each corrective commit's `diff-tree` paths and separately records the
+plan-only net diff; it passed with exact plan/test per-commit custody, clean
+tracked state, HEAD=upstream, 26 stashes, protected paths present, clear ports,
+no active ts-drp reviewer/test/profiler and zero review P0/P1. All eight history
+commits verify with good signatures from the same RSA key. This audit-model
+mistake is not a source, signature or custody failure.
+
+Immutable evidence validates as follows: replacement-Codex-review manifest
+`7e2f847db1b935bc86a4461c5e2bfa130321fe642da46818b4b9858cd54f1eb7`
+over 11 files; superseding-RED manifest
+`91ea4a3d153be979d86a650ed70903821f6413cfa2d4d352e8cb9b0fd85d7eb5`
+over 64 files; superseding-GREEN manifest
+`1eb2c64b3512abeccde7034fd123ebee44ae2bfc1284a3c7685f8dd89fbc5c1c`
+over 68 files; and confirmation manifest
+`c6ca0a4017f201dc3d29d391f92495e5cca82b0724a3d3f6f8faef3aa01e7bdc`
+over 45 files. Confirmation validation-record SHA-256 is
+`7f6a321642507d62a72744b707c8a72f5beb5c16edb374762351b0544bf1de99`.
+Each manifest is self-excluding and every listed artifact reports OK.
+
+D.108e4ar is closed. The historical invalid fixture and Kimi NO_VERDICT remain
+honest immutable records; the superseding typed RED now proves the intended
+cause, and exact reviewed GREEN closes it with all frozen gates green. Closure
+authorizes no retained campaign, campaign freeze root, campaign-readiness
+claim, product change or invocation. The durable six-invocation D.108e4ad user
+authorization remains recorded and need not be requested again, but execution
+remains frozen until a separately planned and reviewed freeze/readiness slice
+grants authority.
