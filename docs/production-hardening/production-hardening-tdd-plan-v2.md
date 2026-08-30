@@ -75069,3 +75069,240 @@ claim, product change or invocation. The durable six-invocation D.108e4ad user
 authorization remains recorded and need not be requested again, but execution
 remains frozen until a separately planned and reviewed freeze/readiness slice
 grants authority.
+
+###### D.108e4as — post-custody campaign freeze/readiness reassessment
+
+D.108e4ar is closed at signed/pushed plan-only descendant
+`a034e869c214be61becd9e0a7799407c67773c8d`, but it grants no campaign
+authority. D.108e4as owns the separate high-risk freeze/readiness decision
+required by D.108e4aq. This is plan, test/build infrastructure and evidence
+infrastructure only. It changes no production source, product API, dependency,
+browser/build/workspace configuration, test semantic, campaign title, workload,
+30% loss profile, 600-second process-group watchdog, effective 300-second test
+budget, threshold, memory ceiling, wire format, digest/identity/activation
+authority or immutable prior evidence. No retained campaign may run during
+D.108e4as planning, readiness construction or freeze review.
+
+The accepted executable behavior is superseding GREEN
+`1642b17111a1330b5af0eea9e62d24469f1693e4`, tree
+`3290c235e1e52e1f0f833debbb1cd389ef01c1b1`. Later commits are admissible only
+as plan-only descendants while both
+`git diff --quiet 1642b171 -- . ':(exclude)docs/production-hardening/production-hardening-tdd-plan-v2.md'`
+and
+`git diff --cached --quiet 1642b171 -- . ':(exclude)docs/production-hardening/production-hardening-tdd-plan-v2.md'`
+return zero and the union of tracked changed paths contains only this plan.
+The ordinary HEAD must equal its upstream, verify with a good signature and
+retain exactly the protected eight-path untracked roster whose newline-terminated
+`git status --porcelain=v1` SHA-256 is
+`6059409902c4f17404bed9cc033bd839a5e78193c4ce7731458ba9201f013970`.
+All 26 existing stashes and protected paths are preserved.
+
+The exact UTC expiry is `2026-09-05T23:59:59Z`; every readiness/root-setup/
+launch command must require the numeric UTC stamp to be at most
+`20260905235959`. Expiry is fail-closed and grants no cleanup, retry or
+extension. The fixed isolated checkout is
+`/private/tmp/ts-drp-d108e4as-clean/repo`; its parent and repo must be absent
+through plan review. Readiness creates the parent once, then records the raw
+command, status, stdout, stderr and UTC start/end for each of these separate
+commands: `mkdir /private/tmp/ts-drp-d108e4as-clean`,
+`git clone --no-hardlinks --no-checkout /Users/aristotle/Documents/Projects/ts-drp-1 /private/tmp/ts-drp-d108e4as-clean/repo`,
+`git -C /private/tmp/ts-drp-d108e4as-clean/repo checkout --detach 1642b17111a1330b5af0eea9e62d24469f1693e4`,
+`pnpm install --offline --frozen-lockfile`, and the existing fresh package
+build invoked by that install. Any pre-existing target, nonzero status, network
+fallback, hardlink, dirty isolated status, wrong HEAD/tree or missing raw
+custody stops without deletion or reuse.
+
+The new fixed roots are `.logs/d108e4as-plan-review/`,
+`.logs/d108e4as-freeze/`, `.logs/d108e4as-freeze-review/` and
+`.logs/d108e4as-campaign/`. They must be absent before their owning checkpoint;
+an existing root stops for custody inspection and may not be deleted,
+overwritten or treated as success. Every prior `.logs/d108e4ad-*`,
+`.logs/d108e4aj-*`, `.logs/d108e4aq-*`, `.logs/d108e4ar-*` and all other
+signed D.108e4 evidence remain immutable. Plan review may create only the
+plan-review root. Freeze/readiness may create only the fixed isolated parent
+and freeze root after plan-review closure. Campaign/root setup remains forbidden
+until the signed freeze checkpoint and freeze review both close.
+
+Readiness freezes the same seven ordered execution-identity files:
+`playwright.e3-03-loss-and-hol.config.ts`, both relay JSON configurations,
+`tests/e3-03-loss-and-hol-proof.pw.ts`,
+`packages/network/src/unreliable-webrtc.ts`, `packages/network/src/node.ts`
+and `packages/node/src/ephemeral.ts`. The newline-terminated ordered path-list
+SHA-256 is `7600ad72b4b717808769e0592861b4be65c87557d472a3aa8be2f2e184ce565d`.
+The current ordinary identity manifest has the intentionally new SHA-256
+`158044b2d1e8b1a79a768546dae8985c96a0462f9d38e9734b7fbf2eb254095c`;
+the isolated manifest must be byte-identical after checkout/build. This replaces,
+and does not rewrite, D.108e4aj's old identity hash because the retained test
+owner changed in D.108e4ar.
+
+The runtime closure must retain exactly the same ordered 334
+non-declaration/non-map/non-`tsbuildinfo` `dist` paths and bytes as D.108e4aj.
+Its complete manifest SHA-256 remains
+`c1947b7d49b8029d12250ab137aa8081dd3aabcfe4998e8e698e7c6168f6fc08`;
+its ordered path-list SHA-256 is
+`e073cfc64a3405ce77f28878c3f06a53dfd5b2b6c4b91ca2f6ae8b54235d5dae`.
+Generate both ordinary and isolated manifests afresh and require each to equal
+that frozen manifest byte-for-byte. Both root canonical shims must be absent.
+Run the unchanged suffix-anchored `--list` command once in each checkout and
+require byte-identical output selecting exactly one test in one file with title
+`three fixed browser trials prove raw freshness and no head-of-line blocking
+under 30% loss`; listing is not a campaign invocation.
+
+Copy the immutable D.108e4aj runner and two jq filters into the new freeze as
+inputs, then create one exact reviewed runner patch. The jq filters are
+byte-identical unless a frozen four-prototype test proves a required evidence-
+only correction; any semantic change stops for reslicing. The runner diff may
+change only: D.108e4as paths; accepted head/tree; exact expiry; frozen tool-path
+verification; complete recursive manifests; the global process predicate;
+filesystem-mode custody; pre-trap residue refusal; in-runner predecessor
+enforcement; and checkout-command custody references. It may not change the
+watchdog, Playwright command, reporter predicates, attachment decoding,
+classification, browser/version/trial requirements or pass/fail semantics.
+Preserve `runner.diff`, both pre/post SHA-256 values and `zsh -n` status.
+
+Freeze `command -v` and physical/real paths for every required tool and the
+versions already recorded by D.108e4aj. The runner must verify the live path
+equals the signed frozen path before every use/launch; `/bin/zsh`,
+`/usr/bin/perl` and `/usr/bin/base64` remain absolute. A mismatch is a
+non-consuming preflight refusal. Freeze a mode manifest using numeric modes for
+the runner, both jq filters and every executable/helper used from the freeze;
+authenticate both mode and SHA-256 manifests before state creation and every
+launch. This discharges the D.108e4ak filesystem-mode limitation for the new
+root without amending old evidence.
+
+The global conflict predicate records `ps` PID/PPID/PGID/command state and each
+candidate's `lsof` cwd. It computes the runner PID's complete descendant set and
+excludes only that set. Every other process matching reviewer/test/profiler
+owners (`run_grok`, Grok launcher, `codex review`/`codex exec`, `claude -p`,
+Playwright, Vitest, xctrace or Instruments) is rejected when either its cwd
+resolves through `git rev-parse --show-toplevel` to a checkout whose root
+`package.json` names `ts-drp`, or its command contains an identified ts-drp
+checkout root. This scan is global, not limited to the ordinary and isolated
+paths. The process auditor has deterministic self-tree fixtures proving one
+excluded descendant and one rejected foreign-root candidate. Ports 4174, 4175,
+51000 and 51002 must all be clear.
+
+Before any capture, the runner refuses if any `.preflight-*` path exists
+anywhere below the campaign root. It records the path roster and exits
+non-consuming; it never deletes residue. The unique new preflight directory is
+then created, captured and asserted before the atomic move to `<name>.before`
+arms the EXIT trap. After that move, any nonzero terminal status consumes the
+invocation and stops the batch. Inside the runner, not merely in launch prose,
+the six-name case table enforces `ordinary-1` has no predecessor and each later
+name requires the immediately preceding `.runner-status` to exist and contain
+exactly zero; it also rejects any artifact for a later name. Every cumulative
+manifest uses recursive `find` without `-maxdepth`, includes all nested failure
+files and modes, excludes only its own manifest/validation record, sorts
+deterministically and validates before return.
+
+Freeze all four endpoint-local classifier prototypes: legal dual-local `1/1`
+returns zero; legal peer-dependent `channel-close` returns zero; ambiguous
+creator-two/receiver-one `2/1` returns one; ambiguous creator-one/receiver-two
+`1/2` returns one. These campaign prototypes do not replace the focused
+validator's retained `2/0` and `0/2` `D108E4H_DROP_COUNT_AMBIGUOUS` contract.
+Record prototype inputs, outputs, raw statuses and independent-validator
+statuses. Any other result stops before freeze closure.
+
+The readiness evidence record must preserve: every literal command; raw status,
+stdout, stderr and UTC times; ordinary/upstream/signature/staged/unstaged/status/
+stash custody; isolated creation/checkout/install/build/list custody; exact
+HEAD/tree; root-shim checks; identity/runtime path lists and manifests; tool
+paths/versions; mode manifest; runner diff/hash/syntax; four classifier
+prototypes; process-auditor fixtures; ports; and a deterministic recursive
+self-excluding manifest plus validation record. Append the resulting exact
+hashes and the literal campaign-root setup and six launch blocks to this plan,
+then sign and push the freeze checkpoint before freeze review. SHA-256, mode and
+signed-commit authentication must all precede state creation and every launch.
+
+The literal root-setup shape to be instantiated only with hashes from the
+signed freeze checkpoint is:
+
+```sh
+set -eu
+ordinary_repo=/Users/aristotle/Documents/Projects/ts-drp-1
+freeze_root="$ordinary_repo/.logs/d108e4as-freeze"
+campaign_root="$ordinary_repo/.logs/d108e4as-campaign"
+test "$(date -u +%Y%m%d%H%M%S)" -le 20260905235959
+test ! -e "$campaign_root"
+git -C "$ordinary_repo" verify-commit <SIGNED_FREEZE_COMMIT>
+test "$(git -C "$ordinary_repo" rev-parse HEAD)" = <SIGNED_FREEZE_COMMIT>
+test "$(git -C "$ordinary_repo" rev-parse origin/codex/phase3a1b-p6-golden-path)" = <SIGNED_FREEZE_COMMIT>
+test "$(shasum -a 256 "$freeze_root/SHA256SUMS" | awk '{print $1}')" = <FREEZE_MANIFEST_HASH>
+(cd "$freeze_root" && shasum -a 256 -c SHA256SUMS)
+"$freeze_root/verify-modes.zsh"
+mkdir "$campaign_root"
+printf '%s\n' 'I expressly authorize all six D.108e4ad long retained-campaign invocations under the frozen fail-closed rules.' > "$campaign_root/authorization.txt"
+cp -n "$freeze_root/run-one.zsh" "$campaign_root/run-one.zsh"
+cp -n "$freeze_root/endpoint-local-classification.jq" "$campaign_root/endpoint-local-classification.jq"
+cp -n "$freeze_root/classification-validation.jq" "$campaign_root/classification-validation.jq"
+test "$(shasum -a 256 "$campaign_root/authorization.txt" | awk '{print $1}')" = 03fdd987ba7d141645826769edc9c78376568483ca543a3183645ad510d03747
+test "$(shasum -a 256 "$campaign_root/run-one.zsh" | awk '{print $1}')" = <RUNNER_HASH>
+test "$(shasum -a 256 "$campaign_root/endpoint-local-classification.jq" | awk '{print $1}')" = <CLASSIFIER_HASH>
+test "$(shasum -a 256 "$campaign_root/classification-validation.jq" | awk '{print $1}')" = <VALIDATOR_HASH>
+```
+
+The six literal launcher blocks use the same signed guard and are instantiated
+with the freeze hashes before freeze review. Each is a separate shell process;
+no loop, retry, `--repeat-each`, overwrite or substitution is permitted:
+
+```sh
+<SIGNED_FREEZE_AND_COPY_GUARD> && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4as-campaign/run-one.zsh ordinary-1 /Users/aristotle/Documents/Projects/ts-drp-1 || exit 1
+```
+
+```sh
+<SIGNED_FREEZE_AND_COPY_GUARD> && test "$(</Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4as-campaign/ordinary-1.runner-status)" = 0 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4as-campaign/run-one.zsh ordinary-2 /Users/aristotle/Documents/Projects/ts-drp-1 || exit 1
+```
+
+```sh
+<SIGNED_FREEZE_AND_COPY_GUARD> && test "$(</Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4as-campaign/ordinary-2.runner-status)" = 0 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4as-campaign/run-one.zsh ordinary-3 /Users/aristotle/Documents/Projects/ts-drp-1 || exit 1
+```
+
+```sh
+<SIGNED_FREEZE_AND_COPY_GUARD> && test "$(</Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4as-campaign/ordinary-3.runner-status)" = 0 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4as-campaign/run-one.zsh isolated-1 /private/tmp/ts-drp-d108e4as-clean/repo || exit 1
+```
+
+```sh
+<SIGNED_FREEZE_AND_COPY_GUARD> && test "$(</Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4as-campaign/isolated-1.runner-status)" = 0 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4as-campaign/run-one.zsh isolated-2 /private/tmp/ts-drp-d108e4as-clean/repo || exit 1
+```
+
+```sh
+<SIGNED_FREEZE_AND_COPY_GUARD> && test "$(</Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4as-campaign/isolated-2.runner-status)" = 0 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4as-campaign/run-one.zsh isolated-3 /private/tmp/ts-drp-d108e4as-clean/repo || exit 1
+```
+
+`<SIGNED_FREEZE_AND_COPY_GUARD>` is not executable authority: the freeze
+checkpoint must replace it in each block with the literal expiry, signed
+freeze-commit/upstream, freeze-manifest, mode-manifest, authorization and three
+campaign-copy hash checks. Placeholders or environment-supplied hashes are
+prohibited at freeze-review closure.
+
+First sign and push this bounded plan. Run one read-only plan review using Grok
+4.6/high, Codex `gpt-5.6-sol` / high and Opus 5/xhigh. This is the high-risk
+campaign-freeze exception: the extra plan and later freeze reviews uniquely
+cover expensive six-run authority, launcher/classifier/invocation accounting,
+failure custody and immutable evidence. Fable and collaboration subagents are
+prohibited. Correct material P0/P1 findings in one batch and allow at most one
+confirmation only if scope, causal acceptance or executable behavior changes;
+P2 receives an owner/disposition and bookkeeping prose is not recursively
+reviewed. After zero P0/P1 and a deterministic local audit, create readiness,
+append exact evidence/hashes/blocks, sign and push, and run one equivalent
+Grok/Codex/Opus freeze review. No campaign runs during either review.
+
+Only a zero-P0/P1 freeze review over a complete placeholder-free signed
+checkpoint may authorize root setup and the six already-authorized invocations.
+The user's durable authorization remains bound to newline-terminated SHA-256
+`03fdd987ba7d141645826769edc9c78376568483ca543a3183645ad510d03747`
+and must not be requested again. The ledger remains D.108e4ad one consumed
+failed ordinary, D.108e4aj one consumed failed ordinary, D.108e4aq zero and
+D.108e4as zero. A non-consuming environmental refusal may be corrected only
+without deleting evidence; the first consumed nonzero result stops all later
+launches and receives a new evidence/diagnosis slice. Six passes require a
+signed/pushed campaign-evidence checkpoint and formal Grok/Codex/Opus evidence
+review before D.108e4 or D.108e5 resumes.
+
+This slice discharges, rather than duplicates, the existing D.108e4ak hygiene
+owner for the new freeze only: recursive failure-tree custody, global conflict
+scope, mode binding, stable tool paths, pre-trap residue, in-runner predecessor
+enforcement and checkout command/status custody. The historical D.108e4aj
+limitations and artifacts remain unchanged. If readiness requires product,
+test-semantic, configuration, dependency, threshold or workload changes, stop
+and reslice rather than widening D.108e4as.
