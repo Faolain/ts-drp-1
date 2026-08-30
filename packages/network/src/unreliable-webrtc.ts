@@ -10,6 +10,27 @@ const RAW_CHANNEL_LABEL = "ts-drp-ephemeral/1";
 const ROUTE_DOMAIN = new TextEncoder().encode("ts-drp-ephemeral-route-v1\0");
 const ROUTE_VERSION = 1;
 const ROUTE_HEADER_BYTES = 33;
+const REPLACEMENT_CONTROL_MAGIC_0 = 0x44;
+const REPLACEMENT_CONTROL_MAGIC_1 = 0x52;
+const REPLACEMENT_CONTROL_VERSION = 1;
+const REPLACEMENT_READY = Uint8Array.of(
+	REPLACEMENT_CONTROL_MAGIC_0,
+	REPLACEMENT_CONTROL_MAGIC_1,
+	REPLACEMENT_CONTROL_VERSION,
+	1
+);
+const REPLACEMENT_ACK = Uint8Array.of(
+	REPLACEMENT_CONTROL_MAGIC_0,
+	REPLACEMENT_CONTROL_MAGIC_1,
+	REPLACEMENT_CONTROL_VERSION,
+	2
+);
+const REPLACEMENT_COMMIT = Uint8Array.of(
+	REPLACEMENT_CONTROL_MAGIC_0,
+	REPLACEMENT_CONTROL_MAGIC_1,
+	REPLACEMENT_CONTROL_VERSION,
+	3
+);
 const MAX_ROUTED_ENVELOPE_BYTES = 1_200;
 const MAX_PAYLOAD_BYTES = MAX_ROUTED_ENVELOPE_BYTES - ROUTE_HEADER_BYTES;
 export const DRP_UNRELIABLE_WEBRTC_MAX_PAYLOAD_BYTES = MAX_PAYLOAD_BYTES;
@@ -118,7 +139,22 @@ interface ActiveLink {
 	readonly connection: AuthenticatedWebRtcConnection;
 	closing: boolean;
 	readonly pc: RTCPeerConnection;
+	readonly role: "acceptor" | "initiator";
 	unsubscribeConnection(): void;
+}
+
+interface LinkReadiness {
+	ackSends: number;
+	commitSends: number;
+	complete: boolean;
+	readonly commit: Promise<void> | undefined;
+	receivedAck: boolean;
+	receivedCommit: boolean;
+	receivedReady: boolean;
+	readySends: number;
+	readonly replacement: boolean;
+	rejectCommit(error: Error): void;
+	resolveCommit(): void;
 }
 
 interface PendingPeerConnection {
@@ -412,6 +448,19 @@ function messageBytes(data: unknown): Uint8Array | undefined {
 	return undefined;
 }
 
+function replacementControl(bytes: Uint8Array): 1 | 2 | 3 | undefined {
+	if (
+		bytes.byteLength !== 4 ||
+		bytes[0] !== REPLACEMENT_CONTROL_MAGIC_0 ||
+		bytes[1] !== REPLACEMENT_CONTROL_MAGIC_1 ||
+		bytes[2] !== REPLACEMENT_CONTROL_VERSION
+	) {
+		return undefined;
+	}
+	const kind = bytes[3];
+	return kind === 1 || kind === 2 || kind === 3 ? kind : undefined;
+}
+
 class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 	readonly #activatedPeers = new Set<string>();
 	readonly #createPeerConnection: () => RTCPeerConnection;
@@ -419,6 +468,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 	readonly #pendingReplacementLinks = new Map<string, ActiveLink>();
 	readonly #pendingLinks = new Map<string, Promise<ActiveLink | undefined>>();
 	readonly #pendingPeerConnections = new Map<RTCPeerConnection, PendingPeerConnection>();
+	readonly #readiness = new Map<ActiveLink, LinkReadiness>();
 	readonly #retiringLinks = new Map<string, ActiveLink>();
 	readonly #replacementAdmissions = new Map<
 		string,
@@ -640,9 +690,16 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			this.#reserveReplacementAdmission(peerId);
 			this.#dropLink(peerId, existing, "replacement");
 		}
+		const heldReplacement = this.#pendingReplacementLinks.get(peerId);
+		if (heldReplacement !== undefined) {
+			if (!this.#isCurrent(heldReplacement.connection)) {
+				this.#discardPendingReplacement(peerId, heldReplacement);
+			} else {
+				return this.#links.get(peerId);
+			}
+		}
 		const pending = this.#pendingLinks.get(peerId);
 		if (pending !== undefined) return staleOpen ? existing : pending;
-		if (staleOpen && this.#pendingReplacementLinks.has(peerId)) return existing;
 		if (staleOpen && this.#retiringLinks.has(peerId)) return existing;
 		this.#pruneReplacementAdmissions();
 		if (
@@ -681,7 +738,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			.sort((left, right) => left.id.localeCompare(right.id))[0];
 	}
 
-	async #initiate(connection: AuthenticatedWebRtcConnection, signal: AbortSignal): Promise<ActiveLink> {
+	async #initiate(connection: AuthenticatedWebRtcConnection, signal: AbortSignal): Promise<ActiveLink | undefined> {
 		const pc = this.#createPeerConnection();
 		let authenticatedClosed = false;
 		let established = false;
@@ -710,9 +767,12 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			await waitForOpen(channel);
 			if (authenticatedClosed || !this.#isCurrent(connection)) throw new Error("authenticated connection changed");
 			established = true;
-			const link = { channel, closing: false, connection, pc, unsubscribeConnection };
+			const link = { channel, closing: false, connection, pc, role: "initiator" as const, unsubscribeConnection };
 			const existing = this.#links.get(connection.remotePeerId);
-			if (existing?.channel.readyState === "open" && !this.#sameConnection(existing.connection, connection)) {
+			if (
+				this.#activatedPeers.has(connection.remotePeerId) &&
+				(existing === undefined || !this.#sameConnection(existing.connection, connection))
+			) {
 				this.#holdReplacementLink(link);
 				return existing;
 			}
@@ -802,12 +862,20 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 					throw new Error("authenticated connection changed");
 				}
 				established = true;
-				const link = { channel, closing: false, connection, pc, unsubscribeConnection };
-				this.#pendingPeerConnections.delete(pc);
-				this.#registerLink(link);
+				const link = { channel, closing: false, connection, pc, role: "acceptor" as const, unsubscribeConnection };
+				if (this.#activatedPeers.has(connection.remotePeerId)) {
+					const readiness = this.#holdReplacementLink(link);
+					if (readiness.commit === undefined) throw new Error("replacement commit owner is absent");
+					await readiness.commit;
+				} else {
+					this.#pendingPeerConnections.delete(pc);
+					this.#registerLink(link);
+				}
 			};
 			void withDeadline((_signal) => finish(), deadlineAt - Date.now()).catch(() => {
-				this.#pendingPeerConnections.delete(pc);
+				const pending = this.#pendingReplacementLinks.get(connection.remotePeerId);
+				if (pending?.pc === pc) this.#discardPendingReplacement(connection.remotePeerId, pending);
+				else this.#pendingPeerConnections.delete(pc);
 				this.#handshakeFailures += 1;
 				unsubscribeConnection();
 				pc.close();
@@ -844,14 +912,46 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		if (previous !== undefined && previous !== link) this.#retiringLinks.set(peerId, previous);
 		this.#links.set(peerId, link);
 		this.#activatedPeers.add(peerId);
-		if (!prepared) this.#prepareLink(peerId, link);
+		if (!prepared) this.#prepareLink(peerId, link, false);
 		if (previous !== undefined && previous !== link) {
 			this.#dropLink(peerId, previous, "replacement");
 		}
 		return link;
 	}
 
-	#prepareLink(peerId: string, link: ActiveLink): void {
+	#prepareLink(peerId: string, link: ActiveLink, replacement: boolean): LinkReadiness {
+		let commit: Promise<void> | undefined;
+		let rejectCommit = (_error: Error): void => undefined;
+		let resolveCommit = (): void => undefined;
+		if (replacement && link.role === "acceptor") {
+			commit = new Promise<void>((resolve, reject) => {
+				let settled = false;
+				resolveCommit = (): void => {
+					if (settled) return;
+					settled = true;
+					resolve();
+				};
+				rejectCommit = (error: Error): void => {
+					if (settled) return;
+					settled = true;
+					reject(error);
+				};
+			});
+		}
+		const readiness: LinkReadiness = {
+			ackSends: 0,
+			commit,
+			commitSends: 0,
+			complete: false,
+			receivedAck: false,
+			receivedCommit: false,
+			receivedReady: false,
+			readySends: 0,
+			rejectCommit,
+			replacement,
+			resolveCommit,
+		};
+		this.#readiness.set(link, readiness);
 		link.channel.addEventListener("message", (event) => this.#receive(peerId, link, event));
 		link.channel.addEventListener(
 			"close",
@@ -869,50 +969,143 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			else
 				this.#dropLink(peerId, link, link.pc.connectionState === "closed" ? "connection-close" : "connection-failed");
 		});
+		const sent =
+			link.role === "initiator"
+				? this.#sendReplacementControl(link, readiness, 1)
+				: this.#sendReplacementControl(link, readiness, 2);
+		if (!sent && replacement) throw new Error("replacement readiness send failed");
+		return readiness;
 	}
 
-	#holdReplacementLink(link: ActiveLink): void {
+	#holdReplacementLink(link: ActiveLink): LinkReadiness {
 		const peerId = link.connection.remotePeerId;
 		const previous = this.#pendingReplacementLinks.get(peerId);
 		if (previous !== undefined) this.#discardPendingReplacement(peerId, previous);
 		this.#pendingReplacementLinks.set(peerId, link);
-		this.#prepareLink(peerId, link);
+		try {
+			return this.#prepareLink(peerId, link, true);
+		} catch (error) {
+			if (this.#pendingReplacementLinks.get(peerId) === link) this.#pendingReplacementLinks.delete(peerId);
+			this.#readiness.delete(link);
+			throw error;
+		}
 	}
 
 	#discardPendingReplacement(peerId: string, link: ActiveLink): void {
 		if (link.closing) return;
 		link.closing = true;
+		const readiness = this.#readiness.get(link);
+		this.#readiness.delete(link);
+		readiness?.rejectCommit(new Error("replacement readiness ended before commit"));
 		if (this.#pendingReplacementLinks.get(peerId) === link) this.#pendingReplacementLinks.delete(peerId);
 		this.#pendingPeerConnections.delete(link.pc);
 		link.unsubscribeConnection();
 		link.channel.close();
 		link.pc.close();
+		if (!this.#links.has(peerId)) this.#scheduleLinkRetry(peerId);
 	}
 
 	#promotePendingReplacement(peerId: string): boolean {
 		const pending = this.#pendingReplacementLinks.get(peerId);
 		if (pending === undefined || pending.closing || pending.channel.readyState !== "open") return false;
+		const readiness = this.#readiness.get(pending);
+		if (
+			readiness === undefined ||
+			!readiness.replacement ||
+			(pending.role === "initiator"
+				? !readiness.receivedAck || readiness.commitSends === 0
+				: !readiness.receivedReady || !readiness.receivedCommit || readiness.ackSends === 0)
+		) {
+			return false;
+		}
 		if (!this.#isCurrent(pending.connection)) {
 			this.#discardPendingReplacement(peerId, pending);
 			return false;
 		}
 		this.#pendingReplacementLinks.delete(peerId);
 		this.#pendingPeerConnections.delete(pending.pc);
+		readiness.complete = true;
 		this.#registerLink(pending, true);
+		readiness.resolveCommit();
 		return true;
 	}
 
-	#receive(peerId: string, link: ActiveLink, event: MessageEvent): void {
-		if (
-			this.#links.get(peerId) !== link &&
-			this.#pendingReplacementLinks.get(peerId) !== link &&
-			this.#retiringLinks.get(peerId) !== link
-		) {
+	#sendReplacementControl(link: ActiveLink, readiness: LinkReadiness, kind: 1 | 2 | 3): boolean {
+		if (link.channel.readyState !== "open" || !this.#isCurrent(link.connection)) return false;
+		if (kind === 1) {
+			if (readiness.readySends >= 2) return true;
+			readiness.readySends += 1;
+		} else if (kind === 2) {
+			if (readiness.ackSends >= 2) return true;
+			readiness.ackSends += 1;
+		} else {
+			if (readiness.commitSends >= 2) return true;
+			readiness.commitSends += 1;
+		}
+		try {
+			link.channel.send(kind === 1 ? REPLACEMENT_READY : kind === 2 ? REPLACEMENT_ACK : REPLACEMENT_COMMIT);
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
+	#failReplacementReadiness(peerId: string, link: ActiveLink, readiness: LinkReadiness): void {
+		if (!readiness.replacement || this.#pendingReplacementLinks.get(peerId) !== link) return;
+		if (link.role === "initiator") this.#handshakeFailures += 1;
+		this.#discardPendingReplacement(peerId, link);
+	}
+
+	#receiveReplacementControl(peerId: string, link: ActiveLink, readiness: LinkReadiness, kind: 1 | 2 | 3): void {
+		if (readiness.complete || link.channel.readyState !== "open" || !this.#isCurrent(link.connection)) return;
+		if (link.role === "initiator") {
+			if (kind !== 2) return;
+			const firstAck = !readiness.receivedAck;
+			readiness.receivedAck = true;
+			if (firstAck && !this.#sendReplacementControl(link, readiness, 1)) {
+				this.#failReplacementReadiness(peerId, link, readiness);
+				return;
+			}
+			if (!this.#sendReplacementControl(link, readiness, 3)) {
+				this.#failReplacementReadiness(peerId, link, readiness);
+				return;
+			}
+			if (!this.#links.has(peerId)) this.#promotePendingReplacement(peerId);
 			return;
 		}
+		if (kind === 1) {
+			const firstReady = !readiness.receivedReady;
+			readiness.receivedReady = true;
+			if (firstReady && !this.#sendReplacementControl(link, readiness, 2)) {
+				this.#failReplacementReadiness(peerId, link, readiness);
+			}
+			return;
+		}
+		if (kind !== 3 || !readiness.receivedReady || readiness.ackSends === 0) return;
+		readiness.receivedCommit = true;
+		if (readiness.replacement) this.#promotePendingReplacement(peerId);
+		else {
+			readiness.complete = true;
+			readiness.resolveCommit();
+		}
+	}
+
+	#receive(peerId: string, link: ActiveLink, event: MessageEvent): void {
+		const active = this.#links.get(peerId) === link;
+		const pending = this.#pendingReplacementLinks.get(peerId) === link;
+		const retiring = this.#retiringLinks.get(peerId) === link;
+		if (!active && !pending && !retiring) return;
 		const bytes = messageBytes(event.data);
+		if (bytes === undefined) return;
+		const control = replacementControl(bytes);
+		if (control !== undefined) {
+			if (retiring) return;
+			const readiness = this.#readiness.get(link);
+			if (readiness !== undefined) this.#receiveReplacementControl(peerId, link, readiness, control);
+			return;
+		}
+		if (pending) return;
 		if (
-			bytes === undefined ||
 			bytes.byteLength < ROUTE_HEADER_BYTES ||
 			bytes.byteLength > MAX_ROUTED_ENVELOPE_BYTES ||
 			bytes[0] !== ROUTE_VERSION
@@ -939,6 +1132,9 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 	#dropLink(peerId: string, link: ActiveLink, reason: NonNullable<DRPUnreliableWebRtcSnapshot["lastLinkDrop"]>): void {
 		if (link.closing) return;
 		link.closing = true;
+		const readiness = this.#readiness.get(link);
+		this.#readiness.delete(link);
+		readiness?.rejectCommit(new Error("active link ended before replacement commit"));
 		this.#lastLinkDrop = reason;
 		this.#linkDrops += 1;
 		if (this.#links.get(peerId) === link) this.#links.delete(peerId);
@@ -951,6 +1147,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 	#finishRetiringLink(peerId: string, link: ActiveLink): void {
 		if (this.#retiringLinks.get(peerId) !== link) return;
 		this.#retiringLinks.delete(peerId);
+		this.#readiness.delete(link);
 		link.pc.close();
 	}
 
@@ -968,6 +1165,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		this.#pendingPeerConnections.clear();
 		for (const [peerId, link] of [...this.#retiringLinks]) this.#finishRetiringLink(peerId, link);
 		for (const [peerId, link] of [...this.#links]) this.#dropLink(peerId, link, "owner-close");
+		this.#readiness.clear();
 	}
 
 	#clearLinkRetry(peerId: string): void {

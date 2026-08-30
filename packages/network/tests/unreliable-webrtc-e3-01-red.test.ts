@@ -12,6 +12,9 @@ const MAX_ROUTED_ENVELOPE_BYTES = 1_200;
 const ROUTE_HEADER_BYTES = 33;
 const MAX_PAYLOAD_BYTES = MAX_ROUTED_ENVELOPE_BYTES - ROUTE_HEADER_BYTES;
 const MAX_SDP_BYTES = 16_384;
+const REPLACEMENT_READY = Uint8Array.of(0x44, 0x52, 0x01, 0x01);
+const REPLACEMENT_ACK = Uint8Array.of(0x44, 0x52, 0x01, 0x02);
+const REPLACEMENT_COMMIT = Uint8Array.of(0x44, 0x52, 0x01, 0x03);
 
 interface AuthenticatedConnection {
 	readonly generation: number;
@@ -58,6 +61,8 @@ interface UnreliableWebRtcSnapshot {
 		| undefined;
 	readonly linkDrops: number;
 	readonly received: number;
+	readonly routedBytesReceived: number;
+	readonly routedBytesSent: number;
 	readonly sent: number;
 	readonly unknownRouteDrops: number;
 	readonly links: readonly Readonly<{
@@ -121,6 +126,16 @@ async function loadOwnerModule(): Promise<OwnerModule> {
 type Listener = (event: unknown) => void;
 
 class FakeDataChannel {
+	static readonly controlDrops = new Map<number, number>();
+
+	static clearControlDrops(): void {
+		FakeDataChannel.controlDrops.clear();
+	}
+
+	static dropNextControl(kind: number, count: number): void {
+		FakeDataChannel.controlDrops.set(kind, count);
+	}
+
 	binaryType: BinaryType = "blob";
 	bufferedAmount = 0;
 	closeEvents = 0;
@@ -228,6 +243,16 @@ class FakeDataChannel {
 				? new Uint8Array(data.slice(0))
 				: new Uint8Array(data.buffer, data.byteOffset, data.byteLength).slice();
 		this.sent.push(bytes);
+		const controlKind =
+			bytes.byteLength === 4 && bytes[0] === 0x44 && bytes[1] === 0x52 && bytes[2] === 0x01 ? bytes[3] : undefined;
+		if (controlKind !== undefined) {
+			const drops = FakeDataChannel.controlDrops.get(controlKind) ?? 0;
+			if (drops > 0) {
+				if (drops === 1) FakeDataChannel.controlDrops.delete(controlKind);
+				else FakeDataChannel.controlDrops.set(controlKind, drops - 1);
+				return;
+			}
+		}
 		const peer = this.#peer;
 		const messageBarrier = this.#messageBarrier;
 		this.#messageBarrier = undefined;
@@ -738,6 +763,16 @@ function routeDigest(routeId: string): Uint8Array {
 	);
 }
 
+function routedFrames(channel: FakeDataChannel): readonly Uint8Array[] {
+	return channel.sent.filter((bytes) => bytes.byteLength >= ROUTE_HEADER_BYTES && bytes[0] === 1);
+}
+
+function controlFrames(channel: FakeDataChannel): readonly Uint8Array[] {
+	return channel.sent.filter(
+		(bytes) => bytes.byteLength === 4 && bytes[0] === 0x44 && bytes[1] === 0x52 && bytes[2] === 0x01
+	);
+}
+
 function tick(): Promise<void> {
 	return new Promise<void>((resolve) => queueMicrotask(resolve));
 }
@@ -1076,7 +1111,8 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 			},
 		]);
 		expect(leftRoute.maxPayloadBytes).toBe(MAX_PAYLOAD_BYTES);
-		const wire = left.peerConnections[0]?.channels[0]?.sent[0];
+		const rawChannel = left.peerConnections[0]?.channels[0];
+		const wire = rawChannel === undefined ? undefined : routedFrames(rawChannel)[0];
 		if (wire === undefined) throw new Error("routed wire envelope missing");
 		expect(wire[0]).toBe(1);
 		expect(wire.slice(1, ROUTE_HEADER_BYTES)).toEqual(routeDigest("zone:alpha"));
@@ -1687,7 +1723,7 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		for (let sequence = 555; sequence < 600; sequence += 1) {
 			expect(await replayRoute.send(["peer-b"], new Uint8Array(398)), `refused ${sequence}`).toBe(false);
 		}
-		expect(replayChannel.sent).toHaveLength(555);
+		expect(routedFrames(replayChannel)).toHaveLength(555);
 		expect(replayRoute.snapshot()).toMatchObject({
 			activeLinks: 1,
 			backpressuredDrops: 45,
@@ -1817,6 +1853,67 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 				left.owner.close();
 				right.owner.close();
 			}
+		}
+	});
+
+	it("D.108e4au separates pending controls from routed application ingress", async () => {
+		const module = await loadOwnerModule();
+		const bus = new FakeSignalingBus();
+		const low = owner(module, bus, "peer-a");
+		const high = owner(module, bus, "peer-b");
+		try {
+			const original = bus.connect("peer-a", "peer-b");
+			const lowRoute = low.owner.openUnreliableWebRtcRoute("zone:d108e4au-control-separation");
+			const highRoute = high.owner.openUnreliableWebRtcRoute("zone:d108e4au-control-separation");
+			const lowReceived: Uint8Array[] = [];
+			const highReceived: Uint8Array[] = [];
+			lowRoute.onMessage(({ bytes }) => lowReceived.push(bytes.slice()));
+			highRoute.onMessage(({ bytes }) => highReceived.push(bytes.slice()));
+			await Promise.all([lowRoute.reconcile(["peer-b"]), highRoute.reconcile(["peer-a"])]);
+			await tick();
+
+			FakeDataChannel.dropNextControl(2, 2);
+			bus.disconnect(original);
+			bus.connect("peer-a", "peer-b");
+			await lowRoute.reconcile(["peer-b"]);
+			await tick();
+			await tick();
+			const replacementLow = low.peerConnections[1]?.channels[0];
+			const replacementHigh = high.peerConnections[1]?.channels[0];
+			if (replacementLow === undefined || replacementHigh === undefined) {
+				throw new Error("control-separation replacement missing");
+			}
+
+			const routed = new Uint8Array(ROUTE_HEADER_BYTES + 1);
+			routed[0] = 1;
+			routed.set(routeDigest("zone:d108e4au-control-separation"), 1);
+			routed[ROUTE_HEADER_BYTES] = 91;
+			replacementHigh.send(Uint8Array.of(0x44, 0x52, 0x02, 0x02));
+			replacementHigh.send(REPLACEMENT_COMMIT);
+			replacementHigh.send(routed);
+			await tick();
+			await tick();
+
+			expect(lowReceived).toEqual([]);
+			expect(highReceived).toEqual([]);
+			expect(lowRoute.snapshot()).toMatchObject({
+				activeLinks: 1,
+				received: 0,
+				routedBytesReceived: 0,
+				unknownRouteDrops: 0,
+				links: [{ connectionId: original.left.id, generation: original.left.generation }],
+			});
+			expect(highRoute.snapshot()).toMatchObject({
+				activeLinks: 1,
+				received: 0,
+				routedBytesReceived: 0,
+				unknownRouteDrops: 0,
+				links: [{ connectionId: original.right.id, generation: original.right.generation }],
+			});
+		} finally {
+			FakeDataChannel.clearControlDrops();
+			low.owner.close();
+			high.owner.close();
 		}
 	});
 
@@ -2057,13 +2154,132 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		}
 	);
 
+	it("D.108e4au tolerates COMMIT racing ahead of the bounded READY response", async () => {
+		const module = await loadOwnerModule();
+		const bus = new FakeSignalingBus();
+		const low = owner(module, bus, "peer-a");
+		const high = owner(module, bus, "peer-b");
+		let openBarrier: FakeRemoteInboundOpenBarrier | undefined;
+		let readyBarrier: FakeInboundOpenBarrier | undefined;
+		try {
+			const original = bus.connect("peer-a", "peer-b");
+			const lowRoute = low.owner.openUnreliableWebRtcRoute("zone:d108e4au-control-reorder");
+			const highRoute = high.owner.openUnreliableWebRtcRoute("zone:d108e4au-control-reorder");
+			await Promise.all([lowRoute.reconcile(["peer-b"]), highRoute.reconcile(["peer-a"])]);
+			await tick();
+			bus.disconnect(original);
+			const replacement = bus.connect("peer-a", "peer-b");
+			openBarrier = FakePeerConnection.pauseNextRemoteInboundOpen();
+			const pending = lowRoute.reconcile(["peer-b"]);
+			await openBarrier.waitUntilPending();
+			await pending;
+			const replacementLow = low.peerConnections[1]?.channels[0];
+			if (replacementLow === undefined) throw new Error("reordered control replacement missing");
+			readyBarrier = replacementLow.pauseNextMessage();
+
+			openBarrier.release();
+			await readyBarrier.waitUntilPending();
+			await tick();
+			expect(lowRoute.snapshot().links[0]).toMatchObject({ connectionId: original.left.id });
+			expect(highRoute.snapshot().links[0]).toMatchObject({ connectionId: original.right.id });
+
+			readyBarrier.release();
+			await vi.waitFor(() => {
+				expect(lowRoute.snapshot().links[0]).toMatchObject({ connectionId: replacement.left.id });
+				expect(highRoute.snapshot().links[0]).toMatchObject({ connectionId: replacement.right.id });
+			});
+			const replacementHigh = high.peerConnections[1]?.channels[0];
+			if (replacementHigh === undefined) throw new Error("reordered control peer replacement missing");
+			expect(controlFrames(replacementLow).filter((bytes) => bytes[3] === 1).length).toBeLessThanOrEqual(2);
+			expect(controlFrames(replacementLow).filter((bytes) => bytes[3] === 3)).toHaveLength(2);
+			expect(controlFrames(replacementHigh).filter((bytes) => bytes[3] === 2).length).toBeLessThanOrEqual(2);
+		} finally {
+			readyBarrier?.release();
+			FakePeerConnection.releaseRemoteInboundOpenBarrier(openBarrier);
+			low.owner.close();
+			high.owner.close();
+		}
+	});
+
+	it.each([
+		[2, "ACK"],
+		[3, "COMMIT"],
+	] as const)("D.108e4au retains usable A when both bounded %s controls are lost", async (controlKind, name) => {
+		const module = await loadOwnerModule();
+		const bus = new FakeSignalingBus();
+		const low = owner(module, bus, "peer-a");
+		const high = owner(module, bus, "peer-b");
+		try {
+			const original = bus.connect("peer-a", "peer-b");
+			const lowRoute = low.owner.openUnreliableWebRtcRoute("zone:d108e4au-control-loss");
+			const highRoute = high.owner.openUnreliableWebRtcRoute("zone:d108e4au-control-loss");
+			await Promise.all([lowRoute.reconcile(["peer-b"]), highRoute.reconcile(["peer-a"])]);
+			await tick();
+			await tick();
+
+			vi.useFakeTimers();
+			FakeDataChannel.dropNextControl(controlKind, 2);
+			bus.disconnect(original);
+			bus.connect("peer-a", "peer-b");
+			await lowRoute.reconcile(["peer-b"]);
+			await tick();
+			await tick();
+			await tick();
+
+			expect(lowRoute.snapshot(), name).toMatchObject({
+				activeLinks: 1,
+				handshakeFailures: 0,
+				lastLinkDrop: undefined,
+				linkDrops: 0,
+				links: [{ connectionId: original.left.id, generation: original.left.generation }],
+			});
+			expect(highRoute.snapshot(), name).toMatchObject({
+				activeLinks: 1,
+				handshakeFailures: 0,
+				lastLinkDrop: undefined,
+				linkDrops: 0,
+				links: [{ connectionId: original.right.id, generation: original.right.generation }],
+			});
+			expect(low.peerConnections, name).toHaveLength(2);
+			expect(high.peerConnections, name).toHaveLength(2);
+
+			await vi.advanceTimersByTimeAsync(9_999);
+			expect(lowRoute.snapshot().links[0], name).toMatchObject({ connectionId: original.left.id });
+			expect(highRoute.snapshot().links[0], name).toMatchObject({ connectionId: original.right.id });
+			await vi.advanceTimersByTimeAsync(1);
+			await tick();
+			expect(lowRoute.snapshot(), name).toMatchObject({
+				activeLinks: 1,
+				lastLinkDrop: undefined,
+				linkDrops: 0,
+				links: [{ connectionId: original.left.id, generation: original.left.generation }],
+			});
+			expect(highRoute.snapshot(), name).toMatchObject({
+				activeLinks: 1,
+				handshakeFailures: 1,
+				lastLinkDrop: undefined,
+				linkDrops: 0,
+				links: [{ connectionId: original.right.id, generation: original.right.generation }],
+			});
+			expect(low.peerConnections, name).toHaveLength(2);
+			expect(high.peerConnections, name).toHaveLength(2);
+			expect(low.peerConnections[1]?.connectionState, name).toBe("closed");
+			expect(high.peerConnections[1]?.connectionState, name).toBe("closed");
+		} finally {
+			FakeDataChannel.clearControlDrops();
+			vi.useRealTimers();
+			low.owner.close();
+			high.owner.close();
+		}
+	});
+
 	it.each([
 		["direct-close", "initiator"],
 		["direct-close", "non-initiator"],
 		["send-discovers-unusable", "initiator"],
 		["send-discovers-unusable", "non-initiator"],
 	] as const)(
-		"D.108e4au RED exposes %s while B is remotely unready after %s pre-failure traffic",
+		"D.108e4au keeps unready B pending after %s with %s pre-failure traffic",
 		async (failureMode, senderRole) => {
 			const module = await loadOwnerModule();
 			const bus = new FakeSignalingBus();
@@ -2127,10 +2343,10 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 					oldLow.close();
 					await tick();
 					expect(lowRoute.snapshot(), senderRole).toMatchObject({
-						activeLinks: 1,
+						activeLinks: 0,
 						lastLinkDrop: "channel-close",
 						linkDrops: 1,
-						links: [{ connectionId: replacement.left.id, generation: replacement.left.generation }],
+						links: [],
 					});
 					expect(highRoute.snapshot(), senderRole).toMatchObject({
 						activeLinks: 0,
@@ -2143,30 +2359,47 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 					expect(replacementHigh.readyState, senderRole).toBe("connecting");
 					expect(replacementHigh.listenerCount("message"), senderRole).toBe(0);
 					expect(replacementHigh.openEvents, senderRole).toBe(0);
-					throw new Error("D108E4AU_PREMATURE_PENDING_PROMOTION");
+				} else {
+					oldLow.readyState = "closing";
+					expect(await lowRoute.send(["peer-b"], Uint8Array.of(82)), senderRole).toBe(false);
+					expect(low.peerConnections, senderRole).toHaveLength(2);
+					expect(high.peerConnections, senderRole).toHaveLength(2);
+					expect(lowRoute.snapshot(), senderRole).toMatchObject({
+						activeLinks: 0,
+						lastLinkDrop: "replacement",
+						linkDrops: 1,
+						links: [],
+					});
+					expect(highRoute.snapshot(), senderRole).toMatchObject({
+						activeLinks: 0,
+						lastLinkDrop: "channel-close",
+						linkDrops: 1,
+						links: [],
+					});
+					expect(replacementHigh.readyState, senderRole).toBe("connecting");
+					expect(replacementHigh.listenerCount("message"), senderRole).toBe(0);
+					expect(replacementHigh.openEvents, senderRole).toBe(0);
 				}
 
-				oldLow.readyState = "closing";
-				expect(await lowRoute.send(["peer-b"], Uint8Array.of(82)), senderRole).toBe(false);
-				expect(low.peerConnections, senderRole).toHaveLength(3);
+				barrier.release();
+				await barrier.waitUntilComplete();
+				await vi.waitFor(() => {
+					expect(lowRoute.snapshot().links[0], senderRole).toMatchObject({
+						connectionId: replacement.left.id,
+						generation: replacement.left.generation,
+					});
+					expect(highRoute.snapshot().links[0], senderRole).toMatchObject({
+						connectionId: replacement.right.id,
+						generation: replacement.right.generation,
+					});
+				});
+				expect(low.peerConnections, senderRole).toHaveLength(2);
 				expect(high.peerConnections, senderRole).toHaveLength(2);
-				expect(lowRoute.snapshot(), senderRole).toMatchObject({
-					activeLinks: 1,
-					lastLinkDrop: "replacement",
-					linkDrops: 1,
-					links: [{ connectionId: replacement.left.id, generation: replacement.left.generation }],
-				});
-				expect(highRoute.snapshot(), senderRole).toMatchObject({
-					activeLinks: 0,
-					lastLinkDrop: "channel-close",
-					linkDrops: 1,
-					links: [],
-				});
-				expect(replacementHigh.readyState, senderRole).toBe("connecting");
-				expect(replacementHigh.listenerCount("message"), senderRole).toBe(0);
-				expect(replacementHigh.openEvents, senderRole).toBe(0);
-				expect(low.peerConnections.length, senderRole).toBeLessThan(4);
-				throw new Error("D108E4AU_THIRD_CONNECTION_ALLOCATION");
+				expect(await lowRoute.send(["peer-b"], Uint8Array.of(83)), senderRole).toBe(true);
+				expect(await highRoute.send(["peer-a"], Uint8Array.of(84)), senderRole).toBe(true);
+				await tick();
+				expect(lowReceived.at(-1), senderRole).toEqual(Uint8Array.of(84));
+				expect(highReceived.at(-1), senderRole).toEqual(Uint8Array.of(83));
 			} finally {
 				FakePeerConnection.releaseRemoteInboundOpenBarrier(barrier);
 				await replacementPending?.catch(() => undefined);

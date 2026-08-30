@@ -77037,3 +77037,75 @@ both peers. It must also confirm the three exact control constants, unchanged
 route envelope/API/dependency/configuration/timeout/retry/limit owners, corrected
 retained sent/drop expectations and the two-path GREEN custody. If any predicate
 cannot be realized without widening those owners, stop before production edits.
+
+D.108e4au GREEN is implemented from definitive signed/pushed freeze
+`2a559101e68c64f0c879d1119d3dd7cadf5ebdcd` with exactly the frozen production
+and test owners before this plan record. The production owner adds the exact
+READY `44 52 01 01`, ACK/readiness `44 52 01 02` and COMMIT `44 52 01 03`
+internal frames and one `#readiness` map. Each kind is capped at two sends per
+link. Initial links still select immediately but exchange the same internal
+frames for asymmetric owner history. Replacement initiators settle at held B,
+and the independent current pending-replacement guard prevents C after A loss.
+Only ACK plus a sent COMMIT admits initiator B; only READY, a sent ACK and a
+received COMMIT admit acceptor B. Pending B application ingress is suppressed,
+retiring A ingress remains routable, and controls do not enter product route or
+byte counters. No public API, dependency, package/configuration owner, timeout,
+retry, capacity, payload, workload or campaign threshold changed.
+
+The one focused GREEN invocation selected exactly eight D.108e4au rows from one
+unit file and excluded every campaign title. It passed 8/8 with zero failures,
+51 unselected rows and reporter SHA-256
+`3317c355c4bc4c9a91af3cc03d15f839d8ad8553caf74a7e53d27d28c24f61e8`.
+The four causal RED rows now prove no B or C before peer readiness, exact two/two
+physical ownership after either independent A failure, exact current B on both
+endpoints after barrier release and restored bidirectional traffic. The same
+focused batch proves pending control/application separation, COMMIT-before-READY
+reordering, bounded control counts and usable-A retention when both ACK or both
+COMMIT opportunities are lost through the unchanged absolute deadline.
+
+The first complete retained-owner invocation passed 58/59. Its sole failure was
+the handler-installation fixture expecting initiator READY even though its
+one-shot barrier intentionally stops before initiator preparation; actual
+`pendingB.sent=[]` was therefore the controlling order. This was a stale test
+expectation from the earlier superseded control-order draft, not a production
+failure. Production source remained byte-identical. Correcting only that
+expectation to `[]` passed its exact title 1/1 and then the complete owner 59/59
+with zero failed or skipped rows. The immutable first, corrected-title and final
+reporter SHA-256 values are respectively
+`7f312f4405fffa5de71d495bcdaaa4818842078e8e949af7d98369f5ce9119f1`,
+`cad1b8ab25bb2bb1d15ad9a18fc7d9434d0d1adbf28145c8911be00a0d8818c4`
+and `8e3325b19070ea2c812c8e08d2ca70a9011d3079d003e746ffdb477e50d99120`.
+
+Network build and typecheck, exact-two-owner ESLint, exact source/test/plan
+Prettier and `git diff --check` all returned zero. Mechanical source audit finds
+three exact control constants, one readiness owner, COMMIT in the acceptor
+retirement predicate, the pending-owner allocation guard and pending payload
+suppression; both causal RED tokens and its RED title are absent. Final source
+and test SHA-256 values are
+`b6f928fd15561b57fa590924cfe88cb224149221bfd7d1cfc62e661317ce0dd5`
+and `eb1e797c654dc933f3c348c4aadb9562791d575ae0410294979e4248787f4a61`.
+The unchanged network export, package and lockfile SHA-256 values remain
+`793b58655f575f4dea958c9764ca849a723f40f87a5a126732a3cadf789c4678`,
+`91f8580615221ffa864302936ec8bb34661331c711955b08f3d7da83a6d43293`
+and `73c7c0660fa32c7380d0fe5a026897a7ad85a40edf1f169730c2d8e44e613a99`.
+
+The phrase "seven-test retained browser-independent roster" in the original
+GREEN command paragraph refers to the seven-title non-campaign Playwright
+allowlist, not a browser-independent unit owner. The same paragraph expressly
+prohibits a browser during D.108e4au. The prohibition controls: the complete
+59-row unit owner is the retained browser-independent proof, while the
+seven-title Playwright allowlist remains campaign/readiness evidence and was not
+run before final GREEN review. This resolves the command-description conflict
+without weakening or reclassifying either roster and without consuming a
+campaign invocation.
+
+The self-excluding `.logs/d108e4au-green/SHA256SUMS` validates and has SHA-256
+`dc183202aff145a4e49d3fdba27bf7936f1d2f074763cc5dc060b16ec5c5d6bb`.
+Its custody records the unchanged protected untracked roster, all 26 stashes,
+signed/pushed baseline identity, clear ts-drp process and fixed-port predicates,
+and a validating D.108e4as campaign manifest. No browser, campaign, profiler or
+reviewer ran during implementation. The campaign remains frozen at one consumed
+failure, zero passes and five unrun names pending this signed/pushed GREEN and
+its sole formal Grok/Codex/Opus review. Only an empty P0/P1 union followed by an
+explicit signed restoration may authorize those five invocations; the durable
+six-run authorization is preserved and must not be requested again.
