@@ -78928,3 +78928,124 @@ review, browser replay or retained-campaign retry is justified. The result
 closes this deterministic raw-owner hypothesis without changing product code,
 APIs, dependencies, configuration, workload, timing, thresholds, immutable
 evidence or invocation accounting.
+
+###### D.108e4bb — held replacement-control expiry recovery discriminator
+
+D.108e4bb owns the one deterministic raw-owner recovery path left explicit by
+D.108e4ba. The immutable `ordinary-3` artifact records one authenticated loss
+and one `restart` drop at each endpoint, no raw link and handshake-failure
+counters 27/1. D.108e4ba proves exact 27/1 initiator-side setup failures recover
+on the next clean retry. It does not exercise the two held-replacement counter
+owners: initiator `#failReplacementReadiness` and the acceptor's deferred
+`finish()` deadline catch. The retained D.108e4au lost-control and asymmetric
+expiry rows exercise those owners while usable A remains, then stop immediately
+after proving that the next allocation begins. They do not prove eventual
+convergence after bilateral restart has already removed A.
+
+This is a test-only discriminator changing only
+`packages/network/tests/unreliable-webrtc-e3-01-red.test.ts`. It reuses the
+existing bounded control-drop map, bilateral-restart peer-close barrier, fake
+timers, exact connection identities, snapshots and ingress oracles; it adds no
+fixture API. The six-row matrix crosses lost `READY`, `ACK` and `COMMIT`
+controls with lower-id-first and higher-id-first synchronous restart calls.
+Every row:
+
+- establishes the exact `peer-a`/`peer-b` raw route and proves bidirectional
+  application traffic;
+- disconnects the authenticated pair and proves one retained usable raw link,
+  one authenticated loss and zero handshake failures/drops at each endpoint;
+- leaves signaling absent, pauses propagation of the first caller's peer
+  close, invokes both `restart()` calls in one synchronous turn, releases the
+  barrier, awaits both calls and proves the old channels closed with one local
+  `restart` drop, no active link and no exchange growth at either endpoint;
+- connects one exact replacement authenticated pair, drops exactly the two
+  bounded sends of the selected readiness control, and awaits both explicit
+  connection-arrival reconciles;
+- proves one and only one initial replacement exchange on that pair, the
+  control-specific held state through 9,999 ms, and no third authenticated
+  connection or fixture-owned identity mutation;
+- advances the final deadline millisecond and, where the active initiator must
+  first observe the acceptor close, exactly one further 250 ms retry cycle;
+- requires one clean second exchange on the same replacement connection id and
+  generation, exact control-specific retained counters/drop ownership, one
+  active replacement link at both endpoints and bidirectional route ingress;
+  and
+- advances two more 250 ms cycles with no exchange, allocation, counter or
+  snapshot growth and zero remaining fake timers.
+
+The frozen pre-timeout and recovery matrices follow the current product owners,
+not browser timing. With both `READY` sends lost, the initiator has received
+the acceptor's eager `ACK`, sends `COMMIT` and promotes locally while the
+acceptor remains held because it never received `READY`. With both `COMMIT`
+sends lost, the initiator likewise promotes after receiving `ACK`, while the
+acceptor remains held without commit. At 9,999 ms both rows therefore require
+initiator/acceptor active links 1/0, counters 0/0 and only the first exchange.
+At 10,000 ms the acceptor deadline increments only the acceptor counter to one,
+closes its held channel, and the initiator records one additional
+`channel-close` drop; the next 250 ms cycle must perform the clean second
+exchange and converge with counters 0/1, initiator drops 2 ending in
+`channel-close`, and acceptor drops 1 ending in `restart`.
+
+With both `ACK` sends lost, neither side can promote before the common setup
+deadline. At 9,999 ms the row requires active links 0/0, counters 0/0 and only
+the first exchange. At 10,000 ms the initiator expiry increments
+`#failReplacementReadiness`, the acceptor deferred finish catch increments its
+counter, and the already-owned lower-id 250 ms retry chain may execute its clean
+second exchange in that same fake-clock turn. After bounded microtask settling
+the required state is one active link at each endpoint, counters 1/1 and only
+the original `restart` drop at each endpoint. The test records exact control
+frames so a wrong drop script cannot masquerade as product behavior.
+
+The causal matrix is fail-closed. Failure before initial traffic, before the
+authenticated-loss/restart snapshot, from a wrong peer-close barrier, from
+failure to consume exactly two selected control sends, or from replacement
+identity mutation is fixture error. Once the exact pre-timeout matrix is
+proven, an incorrect expiry counter/drop owner, a missing or extra exchange,
+failure of the product-owned retry chain, failure to select both replacement
+ids, failed bidirectional ingress or residual retry growth is causal RED. A
+causal RED stops for a separately planned narrow product GREEN; production must
+not change in D.108e4bb. If all six rows pass, close the held-control recovery
+hypothesis as non-reproduction. That pass still cannot prove which browser
+event produced immutable `ordinary-3` or authorize a campaign retry, upstream
+attribution, threshold change or D.108e5.
+
+Before runtime, exact-owner Prettier/ESLint, network typecheck/build,
+`git diff --check`, source-shape custody and the non-consuming collection must
+pass. Collection must select exactly six titles in one file:
+
+```sh
+pnpm exec vitest list \
+  packages/network/tests/unreliable-webrtc-e3-01-red.test.ts \
+  -t 'D.108e4bb recovers after bilateral restart and lost (READY|ACK|COMMIT) controls with the (lower|higher)-id caller first' \
+  --json
+```
+
+Run the focused discriminator exactly once with coverage disabled and a
+complete JSON reporter:
+
+```sh
+pnpm exec vitest run --coverage.enabled=false \
+  packages/network/tests/unreliable-webrtc-e3-01-red.test.ts \
+  -t 'D.108e4bb recovers after bilateral restart and lost (READY|ACK|COMMIT) controls with the (lower|higher)-id caller first' \
+  --reporter=json \
+  --outputFile=.logs/d108e4bb-discriminator/focused.json
+```
+
+If focused passes, run the complete E3-01 owner file once with coverage
+disabled and reporter
+`.logs/d108e4bb-discriminator/retained-e3-01.json`. Record the complete result
+sets, per-row exchange/control/counter/drop matrices, exact owner hashes,
+command statuses and a validating self-excluding manifest. Preserve all eight
+protected untracked paths, 26 stashes, clear process/port predicates and the
+signed/pushed workflow. No browser, Playwright, campaign, product, dependency,
+configuration, workload, timeout, retry cadence, threshold, immutable evidence
+or invocation-ledger change is authorized.
+
+The bounded plan is signed and pushed before one
+Grok/Codex-`gpt-5.6-sol`-high/Opus-xhigh plan review. Kimi remains replaced by
+the user-authorized Codex reviewer; Fable and collaboration subagents remain
+prohibited. Only P0/P1 blocks and receives one batched correction plus
+deterministic audit; P2 receives disposition without another review round.
+Deterministic RED receives local causal validation. A passing test-only
+discriminator receives no additional model ceremony; a later product GREEN
+would receive the one formal three-model implementation review.
