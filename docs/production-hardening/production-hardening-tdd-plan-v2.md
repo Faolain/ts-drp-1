@@ -76674,3 +76674,40 @@ After RED, the GREEN freeze must inspect the complete production lifecycle
 state to decide whether a sound existing no-wire discriminator exists; the RED
 alone cannot prove the negative. The explicit readiness-control branch is not
 preselected by this test-only checkpoint.
+
+D.108e4au's sole bounded plan review inspected signed/pushed checkpoint
+`6743aa1a35564a946ebb82ae9a653fd220d46168`. Read-only Codex
+`gpt-5.6-sol` / high returned `APPROVED` with zero P0/P1 and two P2s: keep the
+failure-triggering send lower-owned in both send rows, and attribute RED only
+to current-state insufficiency rather than exhaustive no-wire impossibility.
+Both dispositions are now explicit.
+
+Opus 5/xhigh session `efd99855-01a5-4a89-ba93-0f4844e7900e` returned
+`BLOCKED` with one P1 and three P2s. Its P1 identified the same lower-send
+ambiguity as material because a role-dependent upper send would inspect open
+upper A and never allocate lower C. Signed/pushed correction
+`86290a94d33aadc29e091c7bfa4557efcdabfc2f` states that `lowRoute` owns both
+failure sends while application sender controls only pre-failure traffic. The
+same batch pins the C-allocation token after non-terminal promotion evidence,
+exact per-mode drop reasons and two/two versus three/two allocation counts, and
+post-RED ownership of the no-wire semantic audit. This resolves every Opus
+P1/P2 without changing the four-row matrix, scope, tokens or intended
+executable acceptance, so no confirmation round is required.
+
+Grok's sole run produced a terminal-looking approved payload after progress
+prose, but its wrapper correctly classified the run `NO_VERDICT` after 450.321
+seconds with `stopReason=end_turn`, `timed_out=false`. It is not reinterpreted
+or relaunched. A deterministic local audit confirms the correction is plan-only,
+both production/test owners and the browser validator are byte-identical to the
+reviewed checkpoint, and all corrected owner/token/count/attribution predicates
+are present. One double-quoted `rg` diagnostic mistakenly executed the Markdown
+backticks around `lowRoute` and returned `command not found`; the corrected
+single-quoted check returned zero and this is recorded as a diagnostic quoting
+error, not a plan failure.
+
+The blocking union after correction is empty. The self-excluding
+`.logs/d108e4au-plan-review/SHA256SUMS` validates and has SHA-256
+`1481db7a863a528cdff26a3b44573a92ace306efcea801417d244faef3fb9676`.
+Proceed once with the frozen four-row focused RED and once with its named
+retained roster. Do not run production edits, browser tests, retained campaigns,
+Kimi, Fable, collaboration subagents or another plan review.
