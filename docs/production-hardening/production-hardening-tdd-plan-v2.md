@@ -76950,3 +76950,90 @@ same Codex and Opus review threads for the one permitted confirmation. Do not
 start a new review, relaunch Grok or invoke Kimi, Fable or collaboration
 subagents. Zero P0/P1 across the latest available Codex and Opus results plus a
 deterministic local source/acceptance audit closes the GREEN plan gate.
+
+The one permitted confirmation is complete and is not repeated. Codex thread
+`01a0516c-4aab-74a1-bb58-0dab6891e290` and Opus session
+`d23985fa-eb20-45ab-aab3-165351c1f34e` both returned `BLOCKED`. They confirmed
+that `89d03f24` closes the earlier handler-less first-frame and drop-owner
+findings, then exposed three remaining executable contradictions. Codex's P1
+showed that successful-but-undelivered ACK still allowed acceptor A retirement,
+contradicting failed-handshake A retention. Opus's two P1s showed that keeping
+the initiator setup promise unsettled would deadlock the existing `#reconcile`
+and barrier ordering, and that exempting an initial link from own-readiness
+emission breaks one asymmetric prior-activation role. Opus also identified the
+retained pending-B `sent=[]` assertion as a P2 stale expectation once internal
+controls exist.
+
+The final correction below supersedes the corresponding `89d03f24` clauses and
+is closed by deterministic state-machine/source audit, not another model round.
+The confirmation limit is exhausted. The exact internal namespace gains one
+kind: `44 52 01 01` is initiator READY, `44 52 01 02` is acceptor ACK/readiness
+and `44 52 01 03` is initiator COMMIT. COMMIT is the proof that ACK reached the
+initiator; the acceptor cannot retire A merely because its unreliable ACK send
+returned successfully.
+
+Every link installs its handler, observes local open and emits its physical
+role's readiness frame once. On a replacement link, initiator READY and acceptor
+ACK may each be emitted once more on first valid peer readiness. The initiator
+emits COMMIT on the first and, if present, second valid ACK, capped at two. The
+acceptor never responds to COMMIT. These per-kind caps make reordering and one
+lost initial role frame converge without ping-pong: if COMMIT races ahead of
+READY on the unordered channel it is ignored, the acceptor's bounded ACK
+response to READY gives the initiator its bounded second COMMIT opportunity.
+Loss of every bounded READY, ACK or COMMIT opportunity expires the same setup
+attempt; it never authorizes A retirement.
+
+The acceptor is the sole normal retirement owner and waits inside its existing
+remaining `finish`/setup deadline for the exact current-link sequence: READY
+received, ACK successfully emitted, then COMMIT received. Only exact COMMIT
+after those predicates promotes acceptor B and retires acceptor A with
+`replacement`. The initiator records ACK as remote readiness, emits COMMIT, and
+keeps usable A selected; exact acceptor-owned A close then promotes B with
+`channel-close`. If A was already lost, initiator ACK plus successful COMMIT
+send and acceptor valid COMMIT each promote their proved local B without using A
+loss as readiness. Missing/failed control before COMMIT retains usable A and
+discards B at the existing deadline. This preserves the retained failed-
+handshake contract as well as the normal drop reasons.
+
+`#initiate` still settles at the existing locally-open/prepared/held B point, so
+`#reconcile` and all six barrier rows retain their current synchronization
+order. C prevention does not depend on an unsettled `#pendingLinks` promise.
+Instead, `#linkFor` treats any exact current `#pendingReplacementLinks` owner as
+the in-flight setup for both stale-open and unusable/no-A paths and returns
+without allocation. The existing 250 ms retry may re-enter that guard but cannot
+allocate C until B promotes or the existing acceptor deadline discards it.
+`#discardPendingReplacement` remains the sole held-B cleanup owner; peer B close
+cleans the initiator side.
+
+Initial link selection remains immediate and is not readiness-gated, but initial
+links now exchange the same bounded internal role frames after open. Those
+frames change no public counter, route delivery, snapshot, API or activation
+decision. Their purpose is symmetric interoperability: an initial active link
+may complete the control state for a peer that classifies the same physical link
+as a replacement after asymmetric owner history. Initial-active handling may
+record peer readiness and emit the bounded READY/ACK/COMMIT response, but cannot
+replace, drop or reselect that already-active link. Ordinary initial setup
+therefore keeps its existing activation timing while gaining auditable internal
+control traffic.
+
+The definitive focused matrix covers both local open orderings; loss of each
+initial READY and ACK; loss of both bounded ACKs; loss and reordering of both
+bounded COMMITs; no-ping-pong send caps; normal A retention until COMMIT;
+A-loss-before-readiness and readiness-before-A-loss; asymmetric prior activation
+in both physical roles; deadline/control-send cleanup; pending B payload
+suppression; retiring A payload preservation; malformed/wrong-role/duplicate/
+stale/generation controls; and owner close in every held phase. The handler-
+order row replaces `pendingB.sent=[]` with exact bounded internal-control bytes
+and separately proves no routed application envelope was sent. Any other
+retained raw `sent[index]` assertion selects its routed envelope by the existing
+33-byte/version-1 shape rather than assuming controls are absent.
+
+The deterministic audit before production work must trace the complete finite
+state table for both roles and both link modes, verify all per-kind send caps,
+prove that only COMMIT can authorize acceptor retirement, prove `#reconcile`
+settles at held B, prove the independent pending-owner guard covers the exact
+unusable-A path from causal RED, and prove acceptor deadline cleanup reaches
+both peers. It must also confirm the three exact control constants, unchanged
+route envelope/API/dependency/configuration/timeout/retry/limit owners, corrected
+retained sent/drop expectations and the two-path GREEN custody. If any predicate
+cannot be realized without widening those owners, stop before production edits.
