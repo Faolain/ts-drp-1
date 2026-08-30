@@ -79326,3 +79326,54 @@ in the final evidence manifest and record the correction explicitly. This
 narrow test-oracle correction changes no causal scope, product behavior,
 fixture API, timing, workload or threshold and receives deterministic audit,
 not another model review or focused rerun.
+
+D.108e4bc closed as a bounded test-only non-reproduction after that one
+test-oracle correction. The immutable focused reporter remains a 0/2 fixture
+failure. The sole post-correction runtime was the complete retained E3-01 owner
+file, which returned status zero with 84/84 passed, zero failed and zero
+pending; both D.108e4bc caller-order rows passed inside that run. The focused
+selection was not rerun.
+
+In both passing rows the signaling-response barrier exposed paired/open
+replacement channels with zero initiator control frames before response
+release. The throwing READY fault was consumed, the initiator closed locally
+and reached exact counters 1/0 while the acceptor remained open/held. Each of
+26 250 ms cycles then produced exactly one same-identity exchange and one
+initiator failure with no receiver allocation/counter growth, reaching 27/0,
+allocations 28/2 and total timer count two. Releasing the delayed peer close
+closed the held acceptor, settled its deferred finish catch to exact 27/1 with
+no exchange or drop growth, and left exactly one retry timer. Clean attempt 28
+used the same authenticated replacement id/generation, produced allocations
+29/3, selected both replacement ids, retained one authenticated loss and one
+`restart` drop at each endpoint, restored bidirectional ingress and drained to
+zero timers across two quiet cycles.
+
+Post-correction exact-owner Prettier/ESLint, network typecheck/build,
+`git diff --check`, source-shape/diff/product custody, evidence validation and
+protected-path/stash/process/port predicates all return zero. The failed
+focused and passing retained reporter SHA-256 values are
+`46bbb33e955c6ef5deb1b1f88625ed21624700542b9f05e096bfb2780032318f`
+and `2894c7d943b714352ce1fd8aed11e6e81ace39b6d37bd9dc465cbbf623c20f32`.
+The final test-owner SHA-256 is
+`8e8fdcdaee1a4af3cb51268d492ae35e1c871bc28e0c2f11b04b6ca7a85c2366`;
+production `packages/network/src/unreliable-webrtc.ts` remains byte-identical
+at `969c68c54d7fa9b20e35aeea005a9abedc67b4277bbfb24242469f01323886b6`.
+The three-entry self-excluding evidence manifest under
+`.logs/d108e4bc-discriminator/` validates and has SHA-256
+`a469aa47cf04e450b982e245b9d3e3b7c7e19a338aceea207985bdf58a44d33f`.
+All eight protected untracked paths and 26 stashes remain present; relevant
+reviewer, test, browser, campaign and profiler processes are absent and ports
+4174, 4175, 51000 and 51002 are clear.
+
+D.108e4az, D.108e4ba, D.108e4bb and D.108e4bc now prove clean replacement,
+initiator-only exact 27/1 recovery, natural held-control expiry recovery and
+held-acceptor exact 27/1 recovery in both restart caller orders. Together with
+the passing one-shot browser replay in D.108e4ay, current evidence does not
+demonstrate a product raw-owner recovery defect or an upstream js-libp2p fault.
+Immutable `ordinary-3` remains a real but unreproduced browser campaign
+failure. The three consumed ordinary failures remain immutable and the three
+isolated names remain absent; no current authority permits a retry or threshold
+change. Aggregate D.108e4 campaign acceptance and D.108e5 therefore remain
+unmet even though deterministic product attribution is closed. Resolving that
+acceptance gap requires a separately authorized high-risk campaign/timing
+reliability disposition, not another product change or silent campaign rerun.
