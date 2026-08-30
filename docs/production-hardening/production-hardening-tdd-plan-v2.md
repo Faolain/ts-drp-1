@@ -79091,3 +79091,56 @@ teardown. It also disposes the P2 union by pinning title argument order and
 narrowing the novelty statement. No scope, production behavior, timeout,
 retry cadence or workload changes; deterministic local audit closes the plan
 gate without another review round.
+
+D.108e4bb closed as a bounded test-only non-reproduction. The implementation
+changed only
+`packages/network/tests/unreliable-webrtc-e3-01-red.test.ts` and added the six
+frozen READY/ACK/COMMIT-by-restart-caller rows. Each row first proved
+bidirectional traffic, one authenticated loss at both endpoints, usable A and
+then synchronous bilateral restart with one `restart` drop and no active link.
+The selected replacement control budget was armed only afterward and was fully
+exhausted during the first replacement exchange.
+
+Both READY rows recorded exactly one READY, one eager ACK and zero COMMIT
+frames, remained held at active links 0/0 through 9,999 ms and recovered at
+counters 0/1 with one `restart` drop per endpoint. Both ACK rows recorded one
+READY, two ACKs and zero COMMITs and reached the same pre-timeout and recovered
+matrix. Both COMMIT rows recorded two READYs, two ACKs and one COMMIT, reached
+the frozen 9,999 ms active-links matrix 1/0, then recovered at counters 0/1
+with initiator/acceptor drops 2/1 ending `channel-close`/`restart`. All six used
+exactly two signaling exchanges on the same authenticated replacement id and
+generation, allocated three peer connections per endpoint, restored both
+replacement link ids and bidirectional ingress, and drained two quiet 250 ms
+cycles with no growth and zero timers. Every `finally` cleared the static
+control-drop map.
+
+The pre-runtime gates passed: exact-owner Prettier/ESLint, network package
+typecheck and build, `git diff --check`, source-shape/diff/product custody and
+exact non-consuming collection of six titles in one file. The sole focused
+command returned status zero; its complete JSON reports 6/6 selected passes,
+zero failures and 76 unselected pending assertions. The single complete
+retained E3-01 command then returned status zero with 82/82 passed, zero failed
+and zero pending. Neither runtime was repeated.
+
+The focused and retained reporter SHA-256 values are
+`576ebf9052c66999d50900a7a54a1ed2b4f3221fdbba46e1cb507b0ed5376268`
+and `ab6910b500be206ba57d293d597e8a47c634625ba98a1dcf84f43e8afe85e003`.
+The test-owner SHA-256 is
+`059d01cc826342ed6f736ce22efb6e69e4c5a1a7191f960e332cb4fb607fce03`;
+production `packages/network/src/unreliable-webrtc.ts` remains byte-identical
+at `969c68c54d7fa9b20e35aeea005a9abedc67b4277bbfb24242469f01323886b6`.
+The three-entry self-excluding evidence manifest under
+`.logs/d108e4bb-discriminator/` validates and has SHA-256
+`02dc6f01ece335af810cd26dc6da71d806125c60b7b4f9a3ade5d4f986e2a7ef`.
+All eight protected untracked paths and 26 stashes remain present; relevant
+test, browser, campaign, reviewer and profiler processes are absent and ports
+4174, 4175, 51000 and 51002 are clear.
+
+This pass proves natural-order held-control expiry and clean retry convergence
+after bilateral restart. It does not force the opposite close ordering in
+which initiator readiness expiry occurs before the acceptor's held channel is
+retired; that ordering remains the only deterministic owner-local realization
+capable of combining a held acceptor with repeated initiator-side refusals.
+Immutable `ordinary-3` does not reveal whether that ordering occurred. No
+product GREEN, browser replay, retained-campaign retry, upstream attribution or
+D.108e5 transition follows from D.108e4bb alone.

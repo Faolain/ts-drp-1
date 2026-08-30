@@ -3557,6 +3557,248 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		}
 	);
 
+	it.each([
+		["READY", "lower", 1, 1],
+		["READY", "higher", 1, 1],
+		["ACK", "lower", 2, 2],
+		["ACK", "higher", 2, 2],
+		["COMMIT", "lower", 3, 1],
+		["COMMIT", "higher", 3, 1],
+	] as const)(
+		"D.108e4bb recovers after bilateral restart and lost %s controls with the %s-id caller first",
+		async (controlName, firstRole, controlKind, dropCount) => {
+			const module = await loadOwnerModule();
+			const bus = new FakeSignalingBus();
+			const low = owner(module, bus, "peer-a");
+			const high = owner(module, bus, "peer-b");
+			const lowRoute = low.owner.openUnreliableWebRtcRoute("zone:d108e4bb-held-control-recovery");
+			const highRoute = high.owner.openUnreliableWebRtcRoute("zone:d108e4bb-held-control-recovery");
+			const lowReceived: Uint8Array[] = [];
+			const highReceived: Uint8Array[] = [];
+			lowRoute.onMessage(({ bytes }) => lowReceived.push(bytes.slice()));
+			highRoute.onMessage(({ bytes }) => highReceived.push(bytes.slice()));
+			let peerCloseBarrier: FakeInboundOpenBarrier | undefined;
+			let restarts: readonly [Promise<void>, Promise<void>] | undefined;
+			let reconciles: readonly [Promise<void>, Promise<void>] | undefined;
+			try {
+				const original = bus.connect("peer-a", "peer-b");
+				await Promise.all([lowRoute.reconcile(["peer-b"]), highRoute.reconcile(["peer-a"])]);
+				expect(lowRoute.snapshot()).toMatchObject({ activeLinks: 1, handshakeFailures: 0, linkDrops: 0 });
+				expect(highRoute.snapshot()).toMatchObject({ activeLinks: 1, handshakeFailures: 0, linkDrops: 0 });
+				expect(await lowRoute.send(["peer-b"], Uint8Array.of(121)), controlName).toBe(true);
+				expect(await highRoute.send(["peer-a"], Uint8Array.of(122)), controlName).toBe(true);
+				await tick();
+				expect(lowReceived, controlName).toEqual([Uint8Array.of(122)]);
+				expect(highReceived, controlName).toEqual([Uint8Array.of(121)]);
+
+				const oldLowChannel = low.peerConnections[0]?.channels[0];
+				const oldHighChannel = high.peerConnections[0]?.channels[0];
+				if (oldLowChannel === undefined || oldHighChannel === undefined) {
+					throw new Error("held-control old raw pair missing");
+				}
+
+				bus.disconnect(original);
+				expect(lowRoute.snapshot(), controlName).toMatchObject({
+					activeLinks: 1,
+					authenticatedConnectionLosses: 1,
+					handshakeFailures: 0,
+					lastLinkDrop: undefined,
+					linkDrops: 0,
+				});
+				expect(highRoute.snapshot(), controlName).toMatchObject({
+					activeLinks: 1,
+					authenticatedConnectionLosses: 1,
+					handshakeFailures: 0,
+					lastLinkDrop: undefined,
+					linkDrops: 0,
+				});
+				expect(await lowRoute.send(["peer-b"], Uint8Array.of(123)), controlName).toBe(true);
+				expect(await highRoute.send(["peer-a"], Uint8Array.of(124)), controlName).toBe(true);
+				await tick();
+				expect(lowReceived, controlName).toEqual([Uint8Array.of(122), Uint8Array.of(124)]);
+				expect(highReceived, controlName).toEqual([Uint8Array.of(121), Uint8Array.of(123)]);
+
+				const firstRoute = firstRole === "lower" ? lowRoute : highRoute;
+				const secondRoute = firstRole === "lower" ? highRoute : lowRoute;
+				const firstOldChannel = firstRole === "lower" ? oldLowChannel : oldHighChannel;
+				peerCloseBarrier = firstOldChannel.pausePeerClose();
+				vi.useFakeTimers();
+				const exchangeCountBeforeRestart = bus.exchangeRecords.length;
+
+				restarts = [firstRoute.restart(), secondRoute.restart()];
+				peerCloseBarrier.release();
+				peerCloseBarrier = undefined;
+				await Promise.all(restarts);
+
+				expect(bus.exchangeRecords, controlName).toHaveLength(exchangeCountBeforeRestart);
+				expect(oldLowChannel.readyState, controlName).toBe("closed");
+				expect(oldHighChannel.readyState, controlName).toBe("closed");
+				expect(lowRoute.snapshot(), controlName).toMatchObject({
+					activeLinks: 0,
+					authenticatedConnectionLosses: 1,
+					handshakeFailures: 0,
+					lastLinkDrop: "restart",
+					linkDrops: 1,
+					links: [],
+				});
+				expect(highRoute.snapshot(), controlName).toMatchObject({
+					activeLinks: 0,
+					authenticatedConnectionLosses: 1,
+					handshakeFailures: 0,
+					lastLinkDrop: "restart",
+					linkDrops: 1,
+					links: [],
+				});
+
+				FakeDataChannel.dropNextControl(controlKind, dropCount);
+				const replacement = bus.connect("peer-a", "peer-b");
+				reconciles = [lowRoute.reconcile(["peer-b"]), highRoute.reconcile(["peer-a"])];
+				await Promise.all(reconciles);
+				for (
+					let microtask = 0;
+					microtask < 30 &&
+					(FakeDataChannel.controlDrops.has(controlKind) || low.peerConnections[1]?.channels[0] === undefined);
+					microtask += 1
+				) {
+					await tick();
+				}
+
+				const firstReplacementLow = low.peerConnections[1]?.channels[0];
+				const firstReplacementHigh = high.peerConnections[1]?.channels[0];
+				if (firstReplacementLow === undefined || firstReplacementHigh === undefined) {
+					throw new Error("held-control first replacement raw pair missing");
+				}
+				expect(FakeDataChannel.controlDrops.has(controlKind), controlName).toBe(false);
+				expect(bus.exchangeRecords.slice(exchangeCountBeforeRestart), controlName).toEqual([
+					{
+						connectionId: replacement.left.id,
+						generation: replacement.left.generation,
+						remoteAddr: "/webrtc/peer-b",
+						remotePeerId: "peer-b",
+					},
+				]);
+
+				const expectedFrames =
+					controlKind === 1
+						? { acknowledgements: 1, commits: 0, ready: 1 }
+						: controlKind === 2
+							? { acknowledgements: 2, commits: 0, ready: 1 }
+							: { acknowledgements: 2, commits: 1, ready: 2 };
+				expect(
+					controlFrames(firstReplacementLow).filter((bytes) => bytes[3] === 1),
+					controlName
+				).toHaveLength(expectedFrames.ready);
+				expect(
+					controlFrames(firstReplacementLow).filter((bytes) => bytes[3] === 3),
+					controlName
+				).toHaveLength(expectedFrames.commits);
+				expect(
+					controlFrames(firstReplacementHigh).filter((bytes) => bytes[3] === 2),
+					controlName
+				).toHaveLength(expectedFrames.acknowledgements);
+				expect(low.peerConnections, controlName).toHaveLength(2);
+				expect(high.peerConnections, controlName).toHaveLength(2);
+
+				await vi.advanceTimersByTimeAsync(9_999);
+				expect(bus.exchangeRecords, controlName).toHaveLength(exchangeCountBeforeRestart + 1);
+				expect(lowRoute.snapshot(), controlName).toMatchObject({
+					activeLinks: controlKind === 3 ? 1 : 0,
+					authenticatedConnectionLosses: 1,
+					handshakeFailures: 0,
+					lastLinkDrop: "restart",
+					linkDrops: 1,
+					links:
+						controlKind === 3 ? [{ connectionId: replacement.left.id, generation: replacement.left.generation }] : [],
+				});
+				expect(highRoute.snapshot(), controlName).toMatchObject({
+					activeLinks: 0,
+					authenticatedConnectionLosses: 1,
+					handshakeFailures: 0,
+					lastLinkDrop: "restart",
+					linkDrops: 1,
+					links: [],
+				});
+				expect(low.peerConnections, controlName).toHaveLength(2);
+				expect(high.peerConnections, controlName).toHaveLength(2);
+
+				await vi.advanceTimersByTimeAsync(1);
+				await vi.advanceTimersByTimeAsync(250);
+				for (
+					let microtask = 0;
+					microtask < 40 &&
+					(bus.exchangeRecords.length !== exchangeCountBeforeRestart + 2 ||
+						lowRoute.snapshot().activeLinks !== 1 ||
+						highRoute.snapshot().activeLinks !== 1);
+					microtask += 1
+				) {
+					await tick();
+				}
+
+				expect(bus.exchangeRecords.slice(exchangeCountBeforeRestart), controlName).toEqual([
+					{
+						connectionId: replacement.left.id,
+						generation: replacement.left.generation,
+						remoteAddr: "/webrtc/peer-b",
+						remotePeerId: "peer-b",
+					},
+					{
+						connectionId: replacement.left.id,
+						generation: replacement.left.generation,
+						remoteAddr: "/webrtc/peer-b",
+						remotePeerId: "peer-b",
+					},
+				]);
+				expect(lowRoute.snapshot(), controlName).toMatchObject({
+					activeLinks: 1,
+					authenticatedConnectionLosses: 1,
+					handshakeFailures: 0,
+					lastLinkDrop: controlKind === 3 ? "channel-close" : "restart",
+					linkDrops: controlKind === 3 ? 2 : 1,
+					links: [{ connectionId: replacement.left.id, generation: replacement.left.generation }],
+				});
+				expect(highRoute.snapshot(), controlName).toMatchObject({
+					activeLinks: 1,
+					authenticatedConnectionLosses: 1,
+					handshakeFailures: 1,
+					lastLinkDrop: "restart",
+					linkDrops: 1,
+					links: [{ connectionId: replacement.right.id, generation: replacement.right.generation }],
+				});
+				expect(firstReplacementLow.readyState, controlName).toBe("closed");
+				expect(firstReplacementHigh.readyState, controlName).toBe("closed");
+				expect(low.peerConnections, controlName).toHaveLength(3);
+				expect(high.peerConnections, controlName).toHaveLength(3);
+
+				expect(await lowRoute.send(["peer-b"], Uint8Array.of(125)), controlName).toBe(true);
+				expect(await highRoute.send(["peer-a"], Uint8Array.of(126)), controlName).toBe(true);
+				await tick();
+				expect(lowReceived, controlName).toEqual([Uint8Array.of(122), Uint8Array.of(124), Uint8Array.of(126)]);
+				expect(highReceived, controlName).toEqual([Uint8Array.of(121), Uint8Array.of(123), Uint8Array.of(125)]);
+
+				const settledLow = lowRoute.snapshot();
+				const settledHigh = highRoute.snapshot();
+				const settledExchangeCount = bus.exchangeRecords.length;
+				for (let quietCycle = 0; quietCycle < 2; quietCycle += 1) {
+					await vi.advanceTimersByTimeAsync(250);
+					expect(bus.exchangeRecords, controlName).toHaveLength(settledExchangeCount);
+					expect(low.peerConnections, controlName).toHaveLength(3);
+					expect(high.peerConnections, controlName).toHaveLength(3);
+					expect(lowRoute.snapshot(), controlName).toEqual(settledLow);
+					expect(highRoute.snapshot(), controlName).toEqual(settledHigh);
+				}
+				expect(vi.getTimerCount(), controlName).toBe(0);
+			} finally {
+				peerCloseBarrier?.release();
+				FakeDataChannel.clearControlDrops();
+				low.owner.close();
+				high.owner.close();
+				await Promise.allSettled([...(restarts ?? []), ...(reconciles ?? [])]);
+				vi.clearAllTimers();
+				vi.useRealTimers();
+			}
+		}
+	);
+
 	it("keeps the first absolute recovery deadline across repeated failed sends", async () => {
 		const module = await loadOwnerModule();
 		const bus = new FakeSignalingBus();
