@@ -78185,7 +78185,10 @@ restart an established raw route converge after their signaling responses are
 released. The retained failure proves that both browser peers intentionally
 called restart through fabric.reset, both raw links retired, reliable
 connections remained present and no replacement opened within 10 seconds.
-Existing network-owner unit coverage proves unilateral restart only.
+Existing network-owner unit coverage proves unilateral restart only. The
+discriminated variable relative to the retained bilateral failed-send recovery
+row near line 2958 is restart-specific state clearing plus the `restart` drop
+reason, not bilateral replacement generally.
 
 RED changes only
 packages/network/tests/unreliable-webrtc-e3-01-red.test.ts. It reuses the
@@ -78195,14 +78198,24 @@ each physical peer ordering it:
 - creates two owners and the same raw route on both;
 - establishes one authenticated signaling connection and proves initial
   bidirectional raw send with activeLinks=1 at both endpoints;
-- pauses signaling responses, invokes both route.restart() calls concurrently,
-  and waits until a replacement exchange is genuinely pending;
-- proves the old raw pair retired with exact restart drop ownership;
+- pauses signaling responses and issues both route.restart() calls in one
+  synchronous turn with no intervening await (for example,
+  `const restarts = [first.restart(), second.restart()]`); the two rows reverse
+  only synchronous call order and which physical owner holds the lower peer id,
+  never the causal order of the two drops;
+- records the pre-restart exchange count, requires exactly one new exchange
+  attempt, and then waits until that response is genuinely pending;
+- proves the old raw pair retired with `linkDrops=1` and
+  `lastLinkDrop="restart"` on each owner, both old channels closed, and exact
+  exchange/peer-connection counts; it deliberately does not constrain
+  mid-barrier activeLinks, handshakeFailures or pending-replacement internals;
 - releases the single deterministic response barrier, awaits both restart
   promises and drains microtasks/timers; and
-- requires exactly one active raw link at both endpoints plus successful
-  bidirectional post-restart delivery without adding a signaling connection,
-  retry cadence, timeout or product API.
+- requires exactly one active raw link at both endpoints plus observed route
+  ingress in both directions, matching sent/received counters, and two 250 ms
+  retry cycles with no handshake-failure or peer-connection growth and no
+  remaining fake timer, without adding a signaling connection, retry cadence,
+  timeout or product API.
 
 The focused RED command selects exactly this two-row test and runs once. If
 current production fails after the barrier is released, the exact snapshots,
@@ -78213,9 +78226,13 @@ the browser failure is not reproduced by simultaneous owner restart: stop
 product attribution and reslice as browser reset/fixture/timing diagnosis. A
 passing unit discriminator may not authorize a product change.
 
-Any RED failure before initial bilateral send, before the response barrier is
-pending, or because the fixture itself deadlocks is a fixture error and must be
-corrected without calling it causal. RED must not change production source,
+Any RED failure before initial bilateral send, before a new exchange attempt,
+because the fixture itself deadlocks without a recorded exchange attempt, or
+because the second restart was issued after the peer's replacement exchange
+began is a fixture error and must be corrected without calling it causal. If
+the exchange record grows but the response barrier cannot become pending
+because the handler rejected the attempted replacement, that rejection is
+causal evidence rather than a fixture deadlock. RED must not change production source,
 examples/grid reset behavior, browser tests, timing gates, campaign launchers,
 workload, thresholds or immutable campaign evidence. No browser or campaign
 runs during D.108e4ax RED.
@@ -78230,6 +78247,16 @@ add exact retained unilateral/bilateral tests. Focused RED/GREEN, complete
 network-owner tests, network typecheck/build, exact-owner lint/format/diff and
 the retained seven non-campaign Playwright tests are required before the single
 formal GREEN review. Kimi, Fable and collaboration subagents remain prohibited.
+
+The plan review closed with Codex approval, Grok `NO_VERDICT` after its service
+cancelled without a terminal schema, and one Opus P1 requiring the synchronous-
+turn rule above. Opus's P2 observations were dispositioned in the same bounded
+correction: attempt-level exchange evidence distinguishes handler rejection
+from fixture deadlock; mid-barrier assertions exclude lifecycle internals; and
+post-release proof uses observed ingress plus retry quiescence. These changes
+make the causal matrix explicit without changing scope, adding a fixture or
+authorizing a confirmation round. A deterministic local audit, not another
+model round, closes the corrected plan gate.
 
 D.108e4ax cannot restore campaign authority. A future authority owner is
 permitted only after a causal GREEN is signed, pushed and approved with empty
