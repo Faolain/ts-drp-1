@@ -79896,3 +79896,116 @@ fourteen-file review-manifest SHA-256 values are respectively
 `cdc37a1ec980fe58e80541259fb011814acb6d05f83f4eb4426d9953801b36ff`,
 `9774003dce4cbaba0369a4f5c2d1eb3508b585088f190484eecc1ffed5394a09`
 and `6aa21b8c8d247c5fca3181d4c22a500b3703e18bd12488f79f3e2faaaf193562`.
+
+The D.108e4bg implementation then passed its deterministic and static gates.
+Exact-owner Prettier, strict standalone TypeScript, ESLint and `git diff
+--check` all returned zero. The focused validator selected exactly one test in
+one file and returned expected/skipped/unexpected/flaky counts `1/0/0/0`, no
+top-level errors and no soft failures after 7.979 seconds. Its reporter SHA-256
+is `de69bbec50e1d020ca36614f160e490e004daf74f65d94a7c861f906fd4524f4`.
+The first combined plan/test Prettier diagnostic exhausted Node's default
+4 GiB heap without emitting a format finding. The corrected established
+`NODE_OPTIONS=--max-old-space-size=8192` write/check invocation returned zero
+and reported both exact files formatted; the resource failure is not treated
+as a code failure.
+
+The authorized one-title retained browser GREEN did not pass, so no retained
+seven-test run, formal GREEN review or campaign invocation followed. It
+selected exactly one test in one file, started at
+`2026-08-30T17:15:27.216Z`, and returned counts `0/0/1/0`, no top-level
+reporter error and terminal `D108E4H_IDENTITY_JOIN_INVALID` after 94.021
+seconds. The failure occurred in trial `e3-03-0` after the complete workload
+and before campaign evidence acceptance. It is outside D.108e4bg's bounded
+refusal matrix: both endpoint-local link-drop deltas and both backpressure
+deltas were zero.
+
+The complete telemetry identifies a test census defect rather than an active
+owner transition. The creator selected RTC identity remained `(11,376)` and
+owned all 600 native raw sends. The receiver's authenticated identity remained
+generation 5 on the same connection, its selected RTC identity `(9,372)`
+remained open, and that identity owned all 407 accepted raw observations. Its
+deadline RTC census additionally contained open candidate `(12,406)`. That
+candidate had the existing product handler, open event and HELLO/ACK control
+exchange, but owned no application raw observation and had not displaced the
+selected product link. The validator nevertheless applied `d108e4hOnly` to the
+complete open-channel census and rejected the two entries before it could
+prove the unchanged selected owner. This is a legitimate in-flight
+make-before-break candidate, not zero-owner RTC advancement and not evidence
+of a product lifecycle leak.
+
+The retained reporter, failure telemetry, compact summary, trace, error
+context and validating evidence-index SHA-256 values are respectively
+`003568c821e5327bdd5b8b9503d1be4b02fc6cc2320c50c9b224b55a20fc6218`,
+`d77e79b5d29457f32d1a87fc87dc318a962b45c3c90efea70e7ff95a3e84b381`,
+`f6187b109388fa2810f1e5043ca02a7fa3e0780f3cede9eab3f8dfcb6f020fa8`,
+`89b2e23544444840d9661bb397d29ec84b6a0054698db54f400df9b4b797ab6b`,
+`579492d4eb6508de0058d145b8de9306fe79f8e1f45ae955315bd8deb6b7bfff`
+and `0c27f4889e8803cd1209f7877658d0cb1cef5f267cf8c02f8a709a0029c0b886`.
+Evidence is immutable under `.logs/d108e4bg-green/`.
+
+###### D.108e4bh — selected-owner identity join with pending candidates
+
+D.108e4bh owns only the demonstrated deadline-census mismatch. Change
+`tests/e3-03-loss-and-hol-proof.pw.ts` plus this plan/evidence record. Do not
+change product source, APIs, dependencies, browser/build configuration,
+workload, timing, thresholds, ports, evidence schema, link-drop ownership,
+activation semantics or any prior immutable evidence.
+
+Preserve the complete open raw-RTC census. For a zero-local endpoint that is
+not the peer-dependent incoming-replacement side, identify the selected
+deadline RTC owner by requiring exactly one deadline entry equal to the sole
+prepare RTC identity. The authenticated identity must remain exactly stable.
+Additional deadline-open RTC identities are pending candidates, not selected
+owners, and are admissible only when all of the following hold:
+
+- every complete deadline RTC identity is unique;
+- each pending candidate has exactly one product message-handler installation
+  and exactly one RTC open event in the trial lifecycle;
+- no pending candidate owns an application `rawSends`, `acceptedRaw` or
+  `rejectedRaw` record; and
+- all existing control-attempt, control-terminal and control-message joins
+  remain valid.
+
+Continue passing the selected prepare/deadline identity—not a pending
+candidate—to attempt, overlap and lifecycle ownership validation. Do not
+discard pending-candidate evidence and do not invent a link drop. A missing or
+duplicate selected identity, duplicate deadline RTC identity, a pending
+candidate without its lifecycle anchors, or application traffic attributed to
+a pending candidate remains fail-closed with the existing identity/lifecycle
+error family.
+
+Do not alter the local-replacement or peer-dependent incoming-replacement
+paths: their selected deadline identity remains the existing exact singleton,
+with the existing authenticated advance/stability rules and exact lifecycle
+contract. Therefore `1/0`, `0/1`, `1/1`, `2/0`, `0/2`, asymmetric incoming
+behavior and all D.108e4aa/D.108e4ac mutants retain their exact results. A
+zero-owner boundary containing only an advanced RTC identity still throws
+`D108E4H_IDENTITY_JOIN_INVALID`; the retained failed-replacement displacement
+mutant keeps the same code.
+
+Add the deterministic roster in one batch: a `0/0` receiver boundary with the
+unchanged selected identity plus one lifecycle-anchored, application-idle
+pending candidate must pass; duplicate selected identity, missing selected
+identity, missing pending open/handler anchor, and any pending-candidate
+application ownership must fail with their frozen exact codes. Preserve every
+existing mutant and the D.108e4bg bounded-refusal matrix. Run the exact focused
+validator once after static gates. If its complete soft-failure set differs,
+stop and diagnose.
+
+Because this slice changes retained campaign evidence interpretation, sign and
+push this plan checkpoint and run one bounded high-risk Grok/Codex
+`gpt-5.6-sol`-high/Opus-xhigh plan review. Only P0/P1 blocks; correct a
+material union once and do not create confirmation ceremony for P2 or prose.
+After deterministic GREEN, run exact-owner strict typecheck, lint, formatting,
+diff and source-shape gates, then the retained browser title once under its
+600-second process-group watchdog. Only after that passes run the frozen
+retained seven-test allowlist once. Sign and push GREEN and run the single
+formal three-model review over D.108e4bg and D.108e4bh together, including the
+failed browser evidence and causal closure. No Kimi, Fable or collaboration
+subagent is authorized.
+
+An accepted empty P0/P1 GREEN union may proceed directly to a fresh isolated
+checkout, fresh invocation names, the required high-risk freeze review and the
+six already-authorized sequential whole campaigns under immutable evidence and
+first-failure rules. Do not request authorization again. D.108e5 remains
+blocked until those six invocations and their final evidence review pass.

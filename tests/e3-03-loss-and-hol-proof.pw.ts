@@ -3277,6 +3277,7 @@ function d108e4hAssertAttemptCustody(
 	after: D108e4hRtcIdentity,
 	replaced: boolean,
 	sampleCount: number,
+	admittedSampleCount: number,
 	incomingReplacement = false
 ): void {
 	const allAttempts = endpoint.lifecycle.filter(
@@ -3359,7 +3360,7 @@ function d108e4hAssertAttemptCustody(
 		d108e4hAssert(terminal.event === "channel-send-success", "D108E4H_RAW_SEND_NOT_SUCCESSFUL");
 		d108e4hAssert(attempt.sequence < terminal.sequence, "D108E4H_LIFECYCLE_ORDER_INVALID");
 	}
-	d108e4hAssert(sequences.size === sampleCount, "D108E4H_RAW_SEND_DOMAIN_INVALID");
+	d108e4hAssert(sequences.size === admittedSampleCount, "D108E4H_RAW_SEND_DOMAIN_INVALID");
 	d108e4hAssert(
 		attempts.every(({ attemptId }) => attemptId !== undefined && attemptIds.has(attemptId)) &&
 			terminals.every(({ attemptId }) => attemptId !== undefined && attemptIds.has(attemptId)),
@@ -3597,7 +3598,8 @@ function d108e4hValidateEndpoint(
 	delta: RawTransportDelta,
 	sampleCount: number,
 	trialId: string,
-	incomingReplacement: boolean
+	incomingReplacement: boolean,
+	trialWideZeroLocal: boolean
 ): void {
 	d108e4hAssert(endpoint.lifecycle.length > 0, "D108E4H_LIFECYCLE_CUSTODY_ABSENT");
 	for (const record of endpoint.lifecycle) {
@@ -3624,8 +3626,20 @@ function d108e4hValidateEndpoint(
 		transitionReason = recordedReason;
 	}
 	const { after, before } = d108e4hAssertBoundaryIdentity(endpoint, remotePeerId, replaced, incomingReplacement);
-	d108e4hAssert(delta.backpressuredDrops === 0, "D108E4H_RAW_BACKPRESSURE");
-	d108e4hAssertAttemptCustody(endpoint, before, after, replaced, sampleCount, incomingReplacement);
+	d108e4hAssert(
+		Number.isSafeInteger(delta.backpressuredDrops) && delta.backpressuredDrops >= 0,
+		"D108E4H_RAW_SEND_DOMAIN_INVALID"
+	);
+	d108e4hAssert(
+		delta.backpressuredDrops === 0 || (endpoint.transmitsRawTrial && trialWideZeroLocal),
+		"D108E4H_RAW_BACKPRESSURE"
+	);
+	const admittedSampleCount = sampleCount - delta.backpressuredDrops;
+	d108e4hAssert(
+		Number.isSafeInteger(admittedSampleCount) && admittedSampleCount >= 0,
+		"D108E4H_RAW_SEND_DOMAIN_INVALID"
+	);
+	d108e4hAssertAttemptCustody(endpoint, before, after, replaced, sampleCount, admittedSampleCount, incomingReplacement);
 	d108e4hAssertOverlapCustody(endpoint, before, after, replaced, transitionReason, incomingReplacement);
 	d108e4hAssert(
 		endpoint.deadline.rawTransport.sent - endpoint.prepare.rawTransport.sent === endpoint.rawSends.length &&
@@ -3658,13 +3672,15 @@ function validateD108e4hCampaignCustody(input: D108e4hValidationInput): void {
 		const peerName = name === "creator" ? "receiver" : "creator";
 		return input.rawTransportDeltas[name].linkDrops === 0 && replacementOwners.includes(peerName);
 	};
+	const trialWideZeroLocal = endpointNames.every((name) => input.rawTransportDeltas[name].linkDrops === 0);
 	d108e4hValidateEndpoint(
 		input.endpoints.creator,
 		input.endpoints.receiver.peerId,
 		input.rawTransportDeltas.creator,
 		input.sampleCount,
 		input.trialId,
-		isIncomingReplacement("creator")
+		isIncomingReplacement("creator"),
+		trialWideZeroLocal
 	);
 	d108e4hValidateEndpoint(
 		input.endpoints.receiver,
@@ -3672,7 +3688,8 @@ function validateD108e4hCampaignCustody(input: D108e4hValidationInput): void {
 		input.rawTransportDeltas.receiver,
 		input.sampleCount,
 		input.trialId,
-		isIncomingReplacement("receiver")
+		isIncomingReplacement("receiver"),
+		trialWideZeroLocal
 	);
 }
 
@@ -4586,10 +4603,18 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 				initiatingIdentity.before,
 				initiatingIdentity.after,
 				true,
+				retainedReplay.sampleCount,
 				retainedReplay.sampleCount
 			);
 			d108e4hAssertOverlapCustody(initiating, initiatingIdentity.before, initiatingIdentity.after, true, "replacement");
-			d108e4hAssertAttemptCustody(incoming, incomingBefore, incomingAfter, false, retainedReplay.sampleCount);
+			d108e4hAssertAttemptCustody(
+				incoming,
+				incomingBefore,
+				incomingAfter,
+				false,
+				retainedReplay.sampleCount,
+				retainedReplay.sampleCount
+			);
 			d108e4hAssertOverlapCustody(incoming, incomingBefore, incomingAfter, false, undefined);
 			expect(() => d108e4hAssertBoundaryIdentity(incoming, initiating.peerId, false)).toThrowError(
 				"D108E4H_IDENTITY_JOIN_INVALID"
@@ -4867,6 +4892,37 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 					creator: rawTransportDelta(fixture.endpoints.creator.prepare.rawTransport, rawTransport),
 				}),
 			});
+		const withCreatorBoundedRefusals = (
+			fixture: D108e4hValidationInput,
+			admittedCount: number,
+			refusedCount: number
+		): D108e4hValidationInput => {
+			const admittedRawSends = Object.freeze(fixture.endpoints.creator.rawSends.slice(0, admittedCount));
+			const admittedAttemptIds = new Set(admittedRawSends.map(({ attemptId }) => attemptId));
+			const admittedFixture = Object.freeze({
+				...fixture,
+				endpoints: Object.freeze({
+					...fixture.endpoints,
+					creator: Object.freeze({
+						...fixture.endpoints.creator,
+						lifecycle: Object.freeze(
+							fixture.endpoints.creator.lifecycle.filter(
+								({ attemptId }) => attemptId === undefined || admittedAttemptIds.has(attemptId)
+							)
+						),
+						rawSends: admittedRawSends,
+					}),
+				}),
+			});
+			return withCreatorDeadlineTransport(
+				admittedFixture,
+				Object.freeze({
+					...admittedFixture.endpoints.creator.deadline.rawTransport,
+					backpressuredDrops: admittedFixture.endpoints.creator.prepare.rawTransport.backpressuredDrops + refusedCount,
+					sent: admittedFixture.endpoints.creator.prepare.rawTransport.sent + admittedRawSends.length,
+				})
+			);
+		};
 
 		const incomingMutationBase = d108e4aaRetainedAsymmetricReplay(false, "handler-open");
 		const incomingBefore = incomingMutationBase.endpoints.receiver.prepare.rtc[0] as D108e4hRtcIdentity;
@@ -6685,6 +6741,32 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 			}),
 		});
 		expect(() => validateD108e4hCampaignCustody(duplicateRawSequence)).toThrowError("D108E4H_RAW_SEND_DOMAIN_INVALID");
+		const zeroLocalBoundedRefusal = withCreatorBoundedRefusals(noReplacement, 527, 73);
+		expect(() => validateD108e4hCampaignCustody(zeroLocalBoundedRefusal)).not.toThrow();
+		const zeroLocalRefusalUnderflow = withCreatorBoundedRefusals(noReplacement, 527, 72);
+		expect(() => validateD108e4hCampaignCustody(zeroLocalRefusalUnderflow)).toThrowError(
+			"D108E4H_RAW_SEND_DOMAIN_INVALID"
+		);
+		const zeroLocalRefusalOverflow = withCreatorBoundedRefusals(noReplacement, 527, 74);
+		expect(() => validateD108e4hCampaignCustody(zeroLocalRefusalOverflow)).toThrowError(
+			"D108E4H_RAW_SEND_DOMAIN_INVALID"
+		);
+		const nonTransmitterBackpressure = withReceiverDeadlineTransport(
+			noReplacement,
+			Object.freeze({
+				...noReplacement.endpoints.receiver.deadline.rawTransport,
+				backpressuredDrops: noReplacement.endpoints.receiver.prepare.rawTransport.backpressuredDrops + 1,
+			})
+		);
+		expect(() => validateD108e4hCampaignCustody(nonTransmitterBackpressure)).toThrowError("D108E4H_RAW_BACKPRESSURE");
+		for (const replacementBackpressure of [
+			withCreatorBoundedRefusals(creatorReplacement, 527, 73),
+			withCreatorBoundedRefusals(receiverReplacement, 527, 73),
+			withCreatorBoundedRefusals(creatorChannelClose, 527, 73),
+			withCreatorBoundedRefusals(receiverChannelClose, 527, 73),
+		]) {
+			expect(() => validateD108e4hCampaignCustody(replacementBackpressure)).toThrowError("D108E4H_RAW_BACKPRESSURE");
+		}
 		const creatorBackpressure = withCreatorDeadlineTransport(
 			creatorReplacement,
 			Object.freeze({
