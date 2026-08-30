@@ -80459,3 +80459,34 @@ self-excluding evidence-index SHA-256 values are respectively
 `4782c79292d0d279a27dfe440ae018d21329c3a0a3492aa71eb04899a2e737ce`
 and `57dd7faaff1f69546c9d184c9f16f7ac5c346551f8b0c7977d9cfb168251667c`.
 Evidence is immutable under `.logs/d108e4bj-red/`. Sign/push RED before GREEN.
+
+D.108e4bj GREEN changes only the closed test validator and its deterministic
+roster. Initiators retain the strict maximum handler/open anchor. Acceptors
+retain all handler, open, terminal, application-idle, identity and kind
+constraints while permitting at most one eager ACK before READY when the
+product handler observed an already-open channel; a post-READY ACK remains
+mandatory. The inherited terminal and received-COMMIT mutants now derive their
+sequence from the candidate tail, and the no-role-prefix mutant filters
+semantic control records rather than a positional prefix. The nine frozen
+acceptor lifecycle-order negatives, existing received-COMMIT identity negative
+and new initiator-order negative all retain their exact codes.
+
+The sole focused GREEN invocation returned zero with expected=1, skipped=0,
+unexpected=0 and flaky=0, no top-level errors and no result soft failures.
+Strict standalone owner TypeScript, exact-owner ESLint and Prettier,
+`git diff --check`, network typecheck, network build, and the deterministic
+source-custody/predicate audit all returned zero. No production, package,
+lockfile, Playwright configuration, workload, timing, threshold, port or
+evidence-schema byte changed. No retained browser title or campaign ran.
+
+GREEN owner, unchanged production owner, unchanged Playwright config,
+reporter, static-gate record and validating self-excluding evidence-index
+SHA-256 values are respectively
+`99cc0d1ecea04b08df506db7ad6598f121db03bdbcf377b1957a8c06e76ddb7c`,
+`091848dce0450917e7c47fece246fd10e8bc2c604823e3839dc26cb6f8d95acc`,
+`1826318a19d5676631f6350fa21d2eb1125dbc1d83ecce69d7f776885bdd7978`,
+`ccedb9b0e19f84aae36c7a4c5858731d851ba546c220f26e07fadb001a177837`,
+`f851e4cacf7b70d24327066cd6e910e0ba26e96556cf6d37525a813e54156d1b`
+and `c9f46090476a7f7cd2cc5c9c1af7072321c63a3bb792e87c9c480149ddbdae06`.
+Evidence is immutable under `.logs/d108e4bj-green/`. Sign/push GREEN before
+the single formal implementation review.
