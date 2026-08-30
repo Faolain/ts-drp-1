@@ -74803,3 +74803,36 @@ diagnosis, custody, hashes and a self-excluding manifest. After its validation,
 sign and push GREEN, then run the sole formal Grok/Kimi/Opus review over the
 complete signed plan-to-RED-to-GREEN history. No retained campaign is
 authorized or executable.
+
+D.108e4ar's sole formal GREEN review inspected signed plan gate
+`2d0654ac86bebf4193d2cfc4f3f4d16c85919995`, causal RED
+`718adc4e7eeb1f10fc5bd145878e0baaa8f5ac9c` and GREEN
+`535d6a52f35c8d67d3f9ad5db3bdc31df5cd5aad`. Grok 4.6/high session
+`01a0506c-c3f2-7e53-a22d-76f12679fd23` returned a normal terminal APPROVED
+after 360.097 seconds with zero P0/P1/P2. Opus 5/xhigh session
+`1a98b184-8d8a-434c-95bd-93a7de41955c` returned APPROVED with zero P0/P1 and
+five P2s. Both independently confirmed genuine RED causality, exact GREEN
+closure, the narrow TypeScript-fixture correction, source preservation,
+manifest integrity, tests-only scope and no campaign authority.
+
+Exact Kimi K3 session `7afd81fa-20e5-4f78-9bed-e29ff7fc24f5` returned immediate
+exit one / weekly-quota 403 before `CHECK001`. It is therefore honest
+NO_VERDICT, was not retried and no earlier Kimi result is attributed to signed
+GREEN. Under the prospective policy, D.108e4ar stops open at the final
+three-model gate; Grok and Opus approval cannot substitute for Kimi. No
+campaign-readiness reassessment, freeze root or retained campaign is authorized.
+
+Opus's five P2s do not dispute current correctness. Two record future evidence-
+infrastructure requirements: preserve raw command/status/stdout/stderr and any
+fixture-correction diff, and format before execution or rerun after every
+executable-byte change. The signed RED/GREEN roots remain immutable and are not
+retroactively reconstructed. Two are future-maintenance guards owned by the
+test maintainer: add erased element typing before any later computed-writer edit,
+and add a both-keys-missing precedence mutant before any later helper/error-
+partition edit. The fifth is closed by an explicit erratum: the initial GREEN
+run wrote `validator-focused.json`, which was copied to
+`validator-focused-initial.json` before the corrected run rewrote the former;
+the distinct internal times, bytes, hashes and manifest remain authentic. None
+of these P2 dispositions changes executable code, acceptance, scope or a hard
+gate, so none triggers confirmation. `.logs/d108e4ar-green-review/` preserves
+all three terminal outcomes and dispositions under a self-excluding manifest.
