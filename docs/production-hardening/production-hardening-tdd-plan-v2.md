@@ -80279,3 +80279,37 @@ and `28da3e4bf7943a711e647ebddc8a7bbea04a4755fb55fd126212918dc8ea33b7`.
 Evidence is immutable under `.logs/d108e4bi-green/`. No browser or campaign
 run occurred. Sign/push this GREEN before the single formal implementation
 review; only an empty P0/P1 union may release the retained browser title.
+
+The single formal D.108e4bi implementation review inspected signed/pushed
+GREEN `1b53481e7f64b71db508775cac341593936e8011` and the complete accepted
+plan, RED and GREEN history. Codex `gpt-5.6-sol` high returned `APPROVED`,
+P0=0/P1=0/P2=0. Opus xhigh returned `APPROVED`, P0=0/P1=0/P2=4. Grok's sole
+read-only run reached `stop_reason=end_turn` and emitted an otherwise valid
+`APPROVED`, P0=0/P1=0/P2=0 object after progress prose; because the prose
+violated the exact terminal schema, its honest runner classification is
+`NO_VERDICT` and it is not relaunched. The blocking union is empty and the
+single retained browser title is authorized under its unchanged watchdog.
+
+Opus's P2s receive disposition without code, fixture or review recursion. The
+explicit initiator role check is intentional defense in depth even though the
+current `receivedAck` owner also excludes acceptors. `commitSends` increments
+before the channel call, but a throwing call synchronously fails readiness and
+removes that link from pending ownership; therefore a link that is still the
+pending owner has a COMMIT attempt that did not fail readiness. Oversize and
+closed-route frames remain covered by the unchanged shared byte and live-route
+gates and are not claimed as separately pinned D.108e4bi rows. Finally, the
+malformed/unknown accounting assertions were introduced in GREEN and are
+GREEN coverage, not frozen RED evidence; RED causality rests on the unchanged
+byte-81 delivery assertion that failed before the one-line unconditional
+pending return was removed.
+
+Codex-final, Opus-final, Opus-envelope, Grok-public, Grok-status, Grok-events
+and self-excluding review-index SHA-256 values are respectively
+`87fddf81434c4329bef7f3c79fc987cede2987ad7477fcf117f2bdefd87465ce`,
+`485a365aed76c724e843e140977f95fad085c038b70ff6800dfb892ffc2f26f7`,
+`d1550b2044a3adf2dce02f4ce7dcee0870f66532187f17ea74b8260457fb9ec3`,
+`4394416706e1d84001e0134f333b6a372f4df42e271a22291c9ffdbc2e1196a6`,
+`1e8379153b1707cc87357de280fd22af162d4dd13a3f091946d4e78d507e4332`,
+`a82a29b4c5b72be23100606a4b5d632fa2166084bc7ccd873ee8f83368afe8cb`
+and `26c23a3b1dd41e66d45044a5739b86be0a423c1372e395a7662d3046735af7a1`.
+Evidence is immutable under `.logs/d108e4bi-green-review/`.
