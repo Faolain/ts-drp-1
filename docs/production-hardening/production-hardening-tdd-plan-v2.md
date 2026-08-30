@@ -81669,3 +81669,62 @@ open-channel/disconnected-A state, bilateral application ingress, and survival
 past the original deadline. It must retain all D.108e4bn controls and the
 existing pre-open lifetime row. No further retained or campaign invocation is
 authorized by this rejected plan.
+
+The bounded local seam audit resolves the apparent exported-API blocker without
+reopening the rejected arrival-order design. `AuthenticatedWebRtcSignalingPort`
+is exported from the package root and therefore remains unchanged. The exact
+installed `@libp2p/interface@3.2.5` `Stream` already exposes `status`, a typed
+`close` event, `StreamResetEvent.local=false`, and its attached error. The
+libp2p adapter can therefore create a request-scoped connection wrapper with
+the same immutable authenticated identity and existing interface, delegating
+real connection-close listeners while additionally notifying only that
+request's listeners when its incoming stream resets remotely or response
+read/handler/write delivery fails. Graceful stream close and successful
+response delivery do not notify request failure. No dependency, wire or public
+type changes.
+
+Correct D.108e4bo once as the following two-owner GREEN; this supersedes only
+the rejected implementation bullets above and preserves their review evidence:
+
+1. **Exact request cancellation.** Add a private opaque setup token to each
+   `PendingPeerConnection`. `#handleSignalingRequest` creates one token for the
+   accepted offer and `#accept` records it with its PC. Deadline or synchronous
+   accept failure closes only that token's PC; remove peer-wide cleanup from
+   the handler catch. The request-scoped connection wrapper causes remote
+   stream reset or response-delivery failure to trigger the existing acceptor
+   connection-loss callback while `established=false`, closing only B. B's
+   floating finish then rejects through its existing exact-PC check and cannot
+   remove, close or increment ownership for C. Ordinary authenticated
+   connection close retains its existing behavior.
+2. **Qualified C promotion over zombie A.** Do not globally classify
+   `disconnected` as terminal and do not drop A merely for that state. Only
+   after C is open, identity-current and readiness-qualified, the existing
+   acceptor commit/promotion path may prefer C when selected A's channel is
+   open but A's PC is `disconnected`. Reuse the existing promotion/retirement
+   owner and absolute deadline. Open/disconnected _pending B_ remains protected
+   exactly as D.108e4bn requires; the new rule concerns selected A only after a
+   qualified replacement exists.
+3. No newer-arrival supersession is implemented. A second valid offer while B
+   remains live pre-open is still rejected, preserving the existing one-pending-
+   physical-sidecar contract. A structurally valid but RTC-invalid offer cannot
+   mutate another setup. There is no offer sequence, cancellation frame,
+   public API, threshold, retry, timer, dependency, workload or campaign change.
+4. Freeze deterministic REDs for: remote reset/response-delivery failure
+   canceling exact B while graceful response close does not; late canceled B
+   releasing its slot before C; B's deferred completion after C leaving C
+   intact; same-peer concurrent valid offer still rejected; structurally valid
+   RTC-invalid input leaving the current pending owner intact; and the captured
+   receiver selected-A channel-open/PC-disconnected state promoting qualified C,
+   delivering application ingress in both directions and surviving beyond the
+   original acceptor deadline. Include all six D.108e4bn rows and the retained
+   pre-open lifetime row in the focused set.
+5. RED must fail only the new exact cancellation and selected-A promotion
+   predicates on the accepted source. GREEN runs that focused set, complete
+   owner/adapter tests, network build/typecheck, exact lint/format/diff and
+   source-shape/refactor-clean gates. No browser, retained-seven or campaign
+   invocation occurs before signed GREEN and final review.
+
+This correction materially changes causal acceptance, so use the plan policy's
+single confirmation round with Grok, Codex `gpt-5.6-sol` high and Opus xhigh.
+Only an empty P0/P1 confirmation union releases RED. This is not authorization
+for a public API, wire, threshold or dependency change.
