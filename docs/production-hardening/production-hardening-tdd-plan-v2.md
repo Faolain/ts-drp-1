@@ -74956,3 +74956,34 @@ inspect the original plan/history, rejected Codex review, superseding typed RED,
 superseding GREEN, raw gate evidence, manifests and causal closure. Only P0/P1
 blocks closure. Bookkeeping-only closure prose receives no recursive review.
 No retained campaign or campaign-readiness action may begin within this replay.
+
+The D.108e4ar superseding RED starts from signed/pushed corrective plan
+`a29e8673b4fcd8687958bd751b3ad43720dc4728`. The first pre-gate wrapper stopped
+with status one after only its planned Prettier write because it used zsh's
+read-only special parameter `status`; renaming that local to `exit_code` fixed
+the evidence runner. No focused test or static gate had run, and this diagnostic
+is not a source failure. The corrected wrapper returned zero: Prettier
+write/check, `git diff --check`, strict standalone TypeScript, exact-owner
+ESLint and the list guard all passed. The list selected exactly the schema-v3
+focused title in one file and excluded the retained campaign.
+
+The deterministic source audit passed before execution. The complete test owner
+is byte-identical to historical RED `718adc4e` except for exactly one replacement:
+the invalid inferred `D108e4hRawSend[]` deadline fixture is now a frozen empty
+array explicitly typed `readonly PlatformObservation[]`. `CampaignEvidence` has
+the same 20 pre-adoption fields, the helper's sender guard precedes timestamp
+delegation, live computed-key adoption count is zero, the terminal control count
+is one, and the complete retained campaign is byte-identical to signed RED.
+
+The sole focused RED invocation returned status one after 8.730 seconds with
+expected 0, skipped 0, unexpected 1 and flaky 0. Top-level errors were empty;
+result `softErrors` was absent/null; and the sole error first line was exact
+`Error: D108E4AR_FINAL_RUN_RETURN_CUSTODY_ABSENT`. The typed deadline base and
+safe-integer timestamp were valid and only the run-return sender key was absent,
+so this supersedes the rejected causal proof. No product, dependency,
+configuration, threshold, campaign or unrelated test changed. Raw command,
+status, stdout, stderr, reporter, exact diff, source audit, diagnostic and
+workspace custody belong to `.logs/d108e4ar-red-superseding/`. After its
+self-excluding manifest validates and this checkpoint is signed/pushed, restore
+the exact reviewed GREEN owner bytes from `535d6a52`; no separate RED model round
+runs.
