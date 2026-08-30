@@ -79577,3 +79577,45 @@ campaign-evidence review or D.108e5 transition is permitted. Further execution
 requires a separately scoped and authorized disposition of the reliable-lane
 readiness attribution; this checkpoint authorizes no product, workload,
 threshold, dependency, retry or timing change.
+
+###### D.108e4be — reliable-lane post-calibration attribution
+
+The user now authorizes continued debugging plus narrow and whole runs needed
+to reach a confident D.108e5 transition. Prior campaign roots and consumed
+names remain immutable. This slice first attributes the D.108e4bd readiness
+failure without retrying `renewal-ordinary-1`, changing product behavior or
+silently weakening the retained acceptance gate.
+
+The retained D.108e4bd evidence narrows the boundary. Trial-zero prepare
+custody had one authenticated connection and one open raw channel at each
+endpoint. Raw E3-03 sends then remained live, while a new reliable stream on
+the authenticated PeerConnection remained `connecting`; that PeerConnection
+subsequently transitioned to `disconnected`. The preceding 100% loss
+workbench calibration deliberately exercised both raw and reliable traffic.
+After loss reset, peer-list equality and the empty reliable drain proved only
+listed topology and local send acceptance, not a delivered reliable E3-03
+sample. The current evidence is therefore consistent with a doomed-but-listed
+reliable connection after the total-loss fixture, but does not yet distinguish
+eventual recovery outside 5 seconds from permanent loss of the lane.
+
+Run one non-campaign attribution only. Temporarily change only the trial-loop
+readiness observation window from 5,000 ms to 25,000 ms, retain the exact
+600-sample/32 ms trial operation and all transport behavior, and preserve a
+complete reporter, stdout/stderr, failure telemetry and trace under
+`.logs/d108e4be-attribution/`. Restore the 5,000 ms source immediately after
+the run. This temporary observation window is diagnostic evidence, not a new
+acceptance threshold. No additional rerun is permitted before interpreting
+whether and when the first reliable send appears and correlating it with the
+authenticated connection, ping and RTC lifecycle records.
+
+If the reliable send appears only after the retained gate, treat the defect as
+timing/readiness attribution and propose the smallest reviewed fixture gate.
+If it never appears and the authenticated connection is lost following the
+intentional total-loss calibration, propose a narrow reviewed calibration or
+post-calibration liveness repair that preserves all three 600-sample 30% loss
+trials and their thresholds. If telemetry instead proves a product-owned
+failure under a usable authenticated connection, stop and reslice product
+behavior. Any change to the retained timing gate, calibration workload,
+campaign launcher or whole-run authority is a high-risk exception and must be
+frozen and reviewed before execution. No Fable, Kimi or collaboration subagent
+is authorized; Codex `gpt-5.6-sol` high continues to substitute for Kimi.
