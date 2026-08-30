@@ -636,6 +636,7 @@ class FakeSignalingBus {
 	#pendingResponse?: Promise<void>;
 	#releaseResponse?: () => void;
 	#pendingObserved?: Promise<void>;
+	#pendingObservedState = false;
 	#resolvePendingObserved?: () => void;
 	requestTransform: (request: Uint8Array) => Uint8Array = (request) => request;
 	responseTransform: (response: Uint8Array) => Uint8Array = (response) => response;
@@ -691,6 +692,7 @@ class FakeSignalingBus {
 						remotePeerId,
 					});
 					const response = await remote.handler(reverse(), this.requestTransform(request.slice()));
+					this.#pendingObservedState = true;
 					this.#resolvePendingObserved?.();
 					await this.#waitForResponse(signal);
 					return this.responseTransform(response.slice());
@@ -720,14 +722,16 @@ class FakeSignalingBus {
 		pair.right.close();
 	}
 
-	pauseResponses(): Readonly<{ release(): void; waitUntilPending(): Promise<void> }> {
+	pauseResponses(): Readonly<{ isPending(): boolean; release(): void; waitUntilPending(): Promise<void> }> {
 		this.#pendingResponse = new Promise<void>((resolve) => {
 			this.#releaseResponse = resolve;
 		});
+		this.#pendingObservedState = false;
 		this.#pendingObserved = new Promise<void>((resolve) => {
 			this.#resolvePendingObserved = resolve;
 		});
 		return {
+			isPending: (): boolean => this.#pendingObservedState,
 			release: (): void => {
 				this.#releaseResponse?.();
 				this.#pendingResponse = undefined;
@@ -3074,6 +3078,111 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 				vi.useRealTimers();
 				low.owner.close();
 				high.owner.close();
+			}
+		}
+	);
+
+	it.each([
+		["lower", "peer-a", "peer-b"],
+		["higher", "peer-b", "peer-a"],
+	] as const)(
+		"D.108e4ax converges after bilateral restart with the %s-id caller first",
+		async (_firstRole, firstPeerId, secondPeerId) => {
+			const module = await loadOwnerModule();
+			const bus = new FakeSignalingBus();
+			const first = owner(module, bus, firstPeerId);
+			const second = owner(module, bus, secondPeerId);
+			const firstRoute = first.owner.openUnreliableWebRtcRoute("zone:d108e4ax-bilateral-restart");
+			const secondRoute = second.owner.openUnreliableWebRtcRoute("zone:d108e4ax-bilateral-restart");
+			const firstReceived: Uint8Array[] = [];
+			const secondReceived: Uint8Array[] = [];
+			firstRoute.onMessage(({ bytes }) => firstReceived.push(bytes.slice()));
+			secondRoute.onMessage(({ bytes }) => secondReceived.push(bytes.slice()));
+			let recoveryBarrier: ReturnType<FakeSignalingBus["pauseResponses"]> | undefined;
+			let peerCloseBarrier: FakeInboundOpenBarrier | undefined;
+			let restarts: readonly [Promise<void>, Promise<void>] | undefined;
+			try {
+				bus.connect(firstPeerId, secondPeerId);
+				await Promise.all([firstRoute.reconcile([secondPeerId]), secondRoute.reconcile([firstPeerId])]);
+				expect(firstRoute.snapshot().activeLinks).toBe(1);
+				expect(secondRoute.snapshot().activeLinks).toBe(1);
+				expect(await firstRoute.send([secondPeerId], Uint8Array.of(91))).toBe(true);
+				expect(await secondRoute.send([firstPeerId], Uint8Array.of(92))).toBe(true);
+				await tick();
+				expect(firstReceived).toEqual([Uint8Array.of(92)]);
+				expect(secondReceived).toEqual([Uint8Array.of(91)]);
+
+				const oldFirstChannel = first.peerConnections[0]?.channels[0];
+				const oldSecondChannel = second.peerConnections[0]?.channels[0];
+				if (oldFirstChannel === undefined || oldSecondChannel === undefined) {
+					throw new Error("bilateral restart old raw pair missing");
+				}
+				peerCloseBarrier = oldFirstChannel.pausePeerClose();
+				vi.useFakeTimers();
+				recoveryBarrier = bus.pauseResponses();
+				const exchangeCountBeforeRestart = bus.exchangeRecords.length;
+
+				// Both local drops happen in one synchronous turn. The rows reverse only this call order.
+				restarts = [firstRoute.restart(), secondRoute.restart()];
+				peerCloseBarrier.release();
+				peerCloseBarrier = undefined;
+
+				for (
+					let microtask = 0;
+					microtask < 20 && bus.exchangeRecords.length === exchangeCountBeforeRestart;
+					microtask += 1
+				) {
+					await tick();
+				}
+				expect(bus.exchangeRecords).toHaveLength(exchangeCountBeforeRestart + 1);
+				for (let microtask = 0; microtask < 20 && !recoveryBarrier.isPending(); microtask += 1) await tick();
+				expect(recoveryBarrier.isPending()).toBe(true);
+				await recoveryBarrier.waitUntilPending();
+
+				expect(firstRoute.snapshot()).toMatchObject({ lastLinkDrop: "restart", linkDrops: 1 });
+				expect(secondRoute.snapshot()).toMatchObject({ lastLinkDrop: "restart", linkDrops: 1 });
+				expect(oldFirstChannel.readyState).toBe("closed");
+				expect(oldSecondChannel.readyState).toBe("closed");
+				expect(first.peerConnections).toHaveLength(2);
+				expect(second.peerConnections).toHaveLength(2);
+
+				recoveryBarrier.release();
+				await vi.advanceTimersByTimeAsync(10_000);
+				await Promise.all(restarts);
+				await tick();
+				expect(firstRoute.snapshot().activeLinks).toBe(1);
+				expect(secondRoute.snapshot().activeLinks).toBe(1);
+				expect(first.peerConnections).toHaveLength(2);
+				expect(second.peerConnections).toHaveLength(2);
+
+				expect(await firstRoute.send([secondPeerId], Uint8Array.of(93))).toBe(true);
+				expect(await secondRoute.send([firstPeerId], Uint8Array.of(94))).toBe(true);
+				await tick();
+				expect(firstReceived).toEqual([Uint8Array.of(92), Uint8Array.of(94)]);
+				expect(secondReceived).toEqual([Uint8Array.of(91), Uint8Array.of(93)]);
+				expect(firstRoute.snapshot()).toMatchObject({ activeLinks: 1, received: 2, sent: 2 });
+				expect(secondRoute.snapshot()).toMatchObject({ activeLinks: 1, received: 2, sent: 2 });
+
+				const settledFirst = firstRoute.snapshot();
+				const settledSecond = secondRoute.snapshot();
+				const firstPeerConnectionCount = first.peerConnections.length;
+				const secondPeerConnectionCount = second.peerConnections.length;
+				for (let retryCycle = 0; retryCycle < 2; retryCycle += 1) {
+					await vi.advanceTimersByTimeAsync(250);
+					expect(first.peerConnections).toHaveLength(firstPeerConnectionCount);
+					expect(second.peerConnections).toHaveLength(secondPeerConnectionCount);
+					expect(firstRoute.snapshot().handshakeFailures).toBe(settledFirst.handshakeFailures);
+					expect(secondRoute.snapshot().handshakeFailures).toBe(settledSecond.handshakeFailures);
+				}
+				expect(vi.getTimerCount()).toBe(0);
+			} finally {
+				peerCloseBarrier?.release();
+				recoveryBarrier?.release();
+				first.owner.close();
+				second.owner.close();
+				await Promise.allSettled(restarts ?? []);
+				vi.clearAllTimers();
+				vi.useRealTimers();
 			}
 		}
 	);

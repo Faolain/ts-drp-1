@@ -78262,3 +78262,23 @@ D.108e4ax cannot restore campaign authority. A future authority owner is
 permitted only after a causal GREEN is signed, pushed and approved with empty
 P0/P1, and it may bind only isolated-1 through isolated-3 while preserving all
 three consumed failures and the first-new-failure rule.
+
+D.108e4ax closed without a causal RED. The signed plan correction is
+`cdd7a13507fc1da7115a93c9ab0086778beae459`. The collection guard selected
+exactly the lower-id-first and higher-id-first rows in one file. The sole
+focused invocation started at `2026-08-30T10:48:08.599Z`, returned status 0 in
+1.1349785 seconds and reported two passed, zero failed and 68 skipped
+assertions. Both rows proved per-owner `restart` drops, closed old channels,
+one replacement exchange, bilateral route ingress after release, stable sent
+and received counters, and two quiescent 250 ms retry cycles. The focused JSON
+SHA-256 is
+`2f093426be3c97a81e75f797477a5424e0a6bd0e4b70ee4839cadd7e682b3843`;
+the validating evidence-manifest SHA-256 is
+`54c5f5b3686a965dc973f0a5b38d8d63954663e2cb36b71154b7cd0528e2acaf`.
+`packages/network/src/unreliable-webrtc.ts` remained byte-identical to the
+plan anchor at Git blob `a5a39e3880f5bf27f8027e50bec46c4af7fcef46`, and no
+browser or campaign invocation ran. Current production therefore has no
+demonstrated simultaneous-bilateral-restart defect. Product GREEN is forbidden;
+ordinary-3 remains a real but unattributed browser reset/fixture/timing failure.
+The three consumed failures remain immutable and isolated-1 through isolated-3
+remain unrun and unauthorized.
