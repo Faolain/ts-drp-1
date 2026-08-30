@@ -74469,10 +74469,13 @@ computed `["senderWire"]:` key, `({ senderWire })` binding or
 `({ deadlineSenderWire: senderWire })` alias remains. Positive source evidence
 must show the exact live writer
 `updateTrialProgress({ senderRawCandidateCount, [D108E4AR_RUN_RETURN_SENDER_WIRE_KEY]: senderWire })`.
+It must also prove that the live fresh final-base declaration retains the exact
+type `Omit<CampaignEvidence, "runTrialReturnedAtMs" | "runReturnSenderWire">`;
+helper use without that annotation is not accepted.
 It must not use a substring absence check because unchanged local `senderWire`,
 and `senderWireAtDeadline` legitimately contain that exact case-sensitive
-substring; the new keys contain `SenderWire` with an uppercase `S` and are
-separately authorized.
+substring; the two new sender-wire keys contain `SenderWire` with an uppercase
+`S` and are separately authorized.
 The exact campaign-start derivation and twenty-one post-custody expectations
 remain byte-identical; the post-loop aggregate remains semantically identical
 apart from its binding name; and the three custody keys are assigned before the
@@ -74562,13 +74565,16 @@ authority.
 Sign and push this confirmation correction. Then obtain a new read-only Grok
 and Opus confirmation. Once the service permits a Kimi reviewer turn, resume
 session `3f54edd4-79d9-45b7-b328-8f7395e887ad` with a complete new follow-up
-prompt that binds the full signed/pushed correction hash against
+prompt that binds the hash of the signed/pushed commit carrying this paragraph
+against
 `a1886860961caa84d2928a085efbdd7a0e6456b2`, enumerates the dispositions in the
 latest correction and requires a fresh read of the corrected plan and test
 source. A verdict bound to `a1a52ac26f1044083a5c7176c1328bbf02772870` or any
 earlier prompt does not count. Kimi must still emit exactly `CHECK001` through
 `CHECK100` plus terminal `RESULT`. Do not retry Kimi against the known quota
-wall. If the quota does not permit a Kimi turn before 2026-09-02, the
+wall. Exactly one quota-reset probe is authorized on or after 2026-09-01; if it
+returns 403, record that refusal and make no further probe in this slice. If the
+quota does not permit a Kimi turn before 2026-09-02, the
 D.108e4ar plan/evidence owner must record the explicit dated stop required above
 rather than waiting silently. RED remains prohibited until all three reviewers
 return zero P0/P1 and the review root and signed/pushed closure requirements
@@ -74588,3 +74594,16 @@ same-round correction is plan-only and creates no RED or campaign authority.
 After signing and pushing, run one final read-only Grok and Opus confirmation of
 these five dispositions. Prepare the exact rebased Kimi follow-up prompt from
 that signed commit, but do not send it while the service returns the known 403.
+
+Final confirmation of signed/pushed `4dbf10e23c7203fcd4b27c414a583b255bf00eae`
+closes the technical review union but not the three-reviewer gate. Grok 4.6/high
+session `01a05042-fa9e-7700-88d8-f80d9c3c6b4a` returned APPROVED with zero
+findings. Opus 5/xhigh session `75a67705-ad04-4f13-a6cc-93ca36f9d0ab` returned
+APPROVED with zero P0, zero P1 and four P2s. The P2s are closed above by the
+self-identifying Kimi commit wording, one dated quota probe, exact live-base
+`Omit` source evidence and two-key case qualification. These documentation-only
+P2 dispositions require no additional Grok/Opus confirmation and create no RED
+or campaign authority. No reviewer edited the tracked tree, ran a test, build,
+browser, profiler or campaign, invoked Fable or used a subagent. The sole open
+plan-review gate is the exact Kimi K3 confirmation bound to the next signed
+plan-only descendant; until it returns zero P0/P1, RED is prohibited.
