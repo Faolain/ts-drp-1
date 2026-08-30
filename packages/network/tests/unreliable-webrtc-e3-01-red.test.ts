@@ -3187,6 +3187,156 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		}
 	);
 
+	it.each([
+		["before", "lower"],
+		["before", "higher"],
+		["after", "lower"],
+		["after", "higher"],
+	] as const)(
+		"D.108e4az converges after authenticated loss with replacement %s restart and the %s-id caller first",
+		async (replacementTiming, firstRole) => {
+			const module = await loadOwnerModule();
+			const bus = new FakeSignalingBus();
+			const low = owner(module, bus, "peer-a");
+			const high = owner(module, bus, "peer-b");
+			const lowRoute = low.owner.openUnreliableWebRtcRoute("zone:d108e4az-authenticated-loss-restart");
+			const highRoute = high.owner.openUnreliableWebRtcRoute("zone:d108e4az-authenticated-loss-restart");
+			const lowReceived: Uint8Array[] = [];
+			const highReceived: Uint8Array[] = [];
+			lowRoute.onMessage(({ bytes }) => lowReceived.push(bytes.slice()));
+			highRoute.onMessage(({ bytes }) => highReceived.push(bytes.slice()));
+			let peerCloseBarrier: FakeInboundOpenBarrier | undefined;
+			let restarts: readonly [Promise<void>, Promise<void>] | undefined;
+			let reconciles: readonly [Promise<void>, Promise<void>] | undefined;
+			try {
+				const original = bus.connect("peer-a", "peer-b");
+				await Promise.all([lowRoute.reconcile(["peer-b"]), highRoute.reconcile(["peer-a"])]);
+				expect(lowRoute.snapshot()).toMatchObject({ activeLinks: 1, handshakeFailures: 0, linkDrops: 0 });
+				expect(highRoute.snapshot()).toMatchObject({ activeLinks: 1, handshakeFailures: 0, linkDrops: 0 });
+				expect(await lowRoute.send(["peer-b"], Uint8Array.of(101))).toBe(true);
+				expect(await highRoute.send(["peer-a"], Uint8Array.of(102))).toBe(true);
+				await tick();
+				expect(lowReceived).toEqual([Uint8Array.of(102)]);
+				expect(highReceived).toEqual([Uint8Array.of(101)]);
+
+				const oldLowChannel = low.peerConnections[0]?.channels[0];
+				const oldHighChannel = high.peerConnections[0]?.channels[0];
+				if (oldLowChannel === undefined || oldHighChannel === undefined) {
+					throw new Error("authenticated-loss restart old raw pair missing");
+				}
+
+				bus.disconnect(original);
+				expect(lowRoute.snapshot()).toMatchObject({
+					activeLinks: 1,
+					authenticatedConnectionLosses: 1,
+					handshakeFailures: 0,
+					lastLinkDrop: undefined,
+					linkDrops: 0,
+				});
+				expect(highRoute.snapshot()).toMatchObject({
+					activeLinks: 1,
+					authenticatedConnectionLosses: 1,
+					handshakeFailures: 0,
+					lastLinkDrop: undefined,
+					linkDrops: 0,
+				});
+				expect(await lowRoute.send(["peer-b"], Uint8Array.of(103))).toBe(true);
+				expect(await highRoute.send(["peer-a"], Uint8Array.of(104))).toBe(true);
+				await tick();
+				expect(lowReceived).toEqual([Uint8Array.of(102), Uint8Array.of(104)]);
+				expect(highReceived).toEqual([Uint8Array.of(101), Uint8Array.of(103)]);
+
+				let replacement = replacementTiming === "before" ? bus.connect("peer-a", "peer-b") : undefined;
+				const firstRoute = firstRole === "lower" ? lowRoute : highRoute;
+				const secondRoute = firstRole === "lower" ? highRoute : lowRoute;
+				const firstOldChannel = firstRole === "lower" ? oldLowChannel : oldHighChannel;
+				peerCloseBarrier = firstOldChannel.pausePeerClose();
+				vi.useFakeTimers();
+				const exchangeCountBeforeRestart = bus.exchangeRecords.length;
+
+				// Both local owners drop in one synchronous turn; only the caller order changes.
+				restarts = [firstRoute.restart(), secondRoute.restart()];
+				peerCloseBarrier.release();
+				peerCloseBarrier = undefined;
+				await Promise.all(restarts);
+
+				expect(lowRoute.snapshot()).toMatchObject({ lastLinkDrop: "restart", linkDrops: 1 });
+				expect(highRoute.snapshot()).toMatchObject({ lastLinkDrop: "restart", linkDrops: 1 });
+				expect(oldLowChannel.readyState).toBe("closed");
+				expect(oldHighChannel.readyState).toBe("closed");
+
+				if (replacementTiming === "after") {
+					expect(bus.exchangeRecords).toHaveLength(exchangeCountBeforeRestart);
+					replacement = bus.connect("peer-a", "peer-b");
+					reconciles = [lowRoute.reconcile(["peer-b"]), highRoute.reconcile(["peer-a"])];
+					await Promise.all(reconciles);
+				}
+				if (replacement === undefined) throw new Error("authenticated replacement pair missing");
+
+				for (
+					let microtask = 0;
+					microtask < 20 &&
+					(lowRoute.snapshot().links[0]?.connectionId !== replacement.left.id ||
+						highRoute.snapshot().links[0]?.connectionId !== replacement.right.id);
+					microtask += 1
+				) {
+					await tick();
+				}
+
+				expect(bus.exchangeRecords.slice(exchangeCountBeforeRestart)).toEqual([
+					{
+						connectionId: replacement.left.id,
+						generation: replacement.left.generation,
+						remoteAddr: "/webrtc/peer-b",
+						remotePeerId: "peer-b",
+					},
+				]);
+				expect(lowRoute.snapshot()).toMatchObject({
+					activeLinks: 1,
+					authenticatedConnectionLosses: 1,
+					handshakeFailures: 0,
+					lastLinkDrop: "restart",
+					linkDrops: 1,
+					links: [{ connectionId: replacement.left.id, generation: replacement.left.generation }],
+				});
+				expect(highRoute.snapshot()).toMatchObject({
+					activeLinks: 1,
+					authenticatedConnectionLosses: 1,
+					handshakeFailures: 0,
+					lastLinkDrop: "restart",
+					linkDrops: 1,
+					links: [{ connectionId: replacement.right.id, generation: replacement.right.generation }],
+				});
+				expect(low.peerConnections).toHaveLength(2);
+				expect(high.peerConnections).toHaveLength(2);
+
+				expect(await lowRoute.send(["peer-b"], Uint8Array.of(105))).toBe(true);
+				expect(await highRoute.send(["peer-a"], Uint8Array.of(106))).toBe(true);
+				await tick();
+				expect(lowReceived).toEqual([Uint8Array.of(102), Uint8Array.of(104), Uint8Array.of(106)]);
+				expect(highReceived).toEqual([Uint8Array.of(101), Uint8Array.of(103), Uint8Array.of(105)]);
+
+				const settledLow = lowRoute.snapshot();
+				const settledHigh = highRoute.snapshot();
+				for (let retryCycle = 0; retryCycle < 2; retryCycle += 1) {
+					await vi.advanceTimersByTimeAsync(250);
+					expect(low.peerConnections).toHaveLength(2);
+					expect(high.peerConnections).toHaveLength(2);
+					expect(lowRoute.snapshot()).toEqual(settledLow);
+					expect(highRoute.snapshot()).toEqual(settledHigh);
+				}
+				expect(vi.getTimerCount()).toBe(0);
+			} finally {
+				peerCloseBarrier?.release();
+				low.owner.close();
+				high.owner.close();
+				await Promise.allSettled([...(restarts ?? []), ...(reconciles ?? [])]);
+				vi.clearAllTimers();
+				vi.useRealTimers();
+			}
+		}
+	);
+
 	it("keeps the first absolute recovery deadline across repeated failed sends", async () => {
 		const module = await loadOwnerModule();
 		const bus = new FakeSignalingBus();

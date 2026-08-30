@@ -78671,3 +78671,64 @@ and Grok's terminal status/public-output SHA-256 values are respectively
 `79790786c33a319cabcc0092038f8d85d4a00f23eb6bae6457d555fb9c57dcfc`
 and
 `c7b553fca3562ea765c3e02f5c74ce9628adb629a8c2fc6f6a1716c1a22611ae`.
+
+D.108e4az closed without a causal RED. The four deterministic rows all pass:
+replacement available before restart with lower-id first, before with higher-id
+first, after restart with lower-id first, and after with higher-id first. In
+every row the old raw pair first carried bidirectional traffic, the exact
+authenticated pair closed, both endpoints retained one usable old raw link
+with one authenticated connection loss and zero handshake failures, and both
+local owners then recorded exactly one `restart` drop. The clean replacement
+used one lower-id signaling exchange on `conn-2-left` generation 2, selected
+`conn-2-left`/`conn-2-right` generation 2 at the respective endpoints,
+restored one active link and bidirectional traffic, retained the one connection
+loss and zero handshake failures, and drained to zero timers across two 250 ms
+cycles. Each endpoint allocated exactly the old and replacement peer
+connections; the old channels are closed and no third allocation occurs.
+
+The sole focused command selected the intended four rows and its JSON terminal
+summary reported four passed, zero failed selected tests and `success: true`.
+The shell nevertheless returned one after the reporter because the frozen
+command omitted the repository's established `--coverage.enabled=false`
+bounded-test control: root `vite.config.mts` enables repository-wide coverage
+and applies a 70% line threshold, which a four-title selection cannot satisfy.
+This is retained as a command-shape error, not a product/test assertion failure
+and not authority to rerun the focused selection. The command did not request
+an output file and its coverage-heavy terminal stream exceeded the executor's
+raw capture limit, so the evidence records that limitation honestly instead of
+claiming a raw reporter artifact.
+
+The separately required complete retained E3-01 owner-file gate then ran once
+with coverage disabled and passed 74/74, including all four D.108e4az rows,
+with zero failed, zero pending and status zero. It did not repeat the focused
+selection as another focused command. Network package typecheck and build,
+exact test-owner ESLint/Prettier, corrected source-shape checks, collection of
+exactly four titles in one file, `git diff --check`, protected-path/stash
+custody, process and port predicates all return zero. The initial whole-file
+source-shape diagnostic forgot that D.108e4ax already contains
+`await Promise.all(restarts)`; the corrected D.108e4az-scoped count passed and
+the count mistake is not a code failure. Plan Prettier likewise passed with an
+8 GiB formatter-process heap after its first default-heap process exhausted 4
+GiB on the 78k-line plan without reporting a formatting defect.
+
+The retained reporter SHA-256 is
+`e50ba4ba9e26184b8e7d0ce74aaf1d8d58df7468934335abadb717697365c0bc`,
+the test-owner SHA-256 is
+`4a5c07d059cf780c4aa68c72b89853157b29a33bf8740960ff763400582368c2`,
+and production `packages/network/src/unreliable-webrtc.ts` remains
+byte-identical at
+`969c68c54d7fa9b20e35aeea005a9abedc67b4277bbfb24242469f01323886b6`.
+The five-file self-excluding evidence manifest under
+`.logs/d108e4az-discriminator/` validates and has SHA-256
+`af3665cc6b103085957e48581b7d340f7371d8612081575c66ee1b66d2cf701d`.
+All eight protected untracked paths and 26 stashes remain present; relevant
+processes are absent and ports 4174, 4175, 51000 and 51002 are clear. No
+browser, retained campaign, dependency, config, threshold, workload, product
+or invocation-ledger change occurred.
+
+The bounded result excludes one clean-replacement product hypothesis; it does
+not reproduce or explain consumed `ordinary-3`'s 27/1 handshake failures and
+cannot assign them to product, browser scheduling, js-libp2p or upstream
+behavior. No product GREEN or final implementation review is justified by this
+passing discriminator. D.108e4az therefore closes at test-only non-reproduction
+and leaves the existing campaign failures immutable and unattributed.
