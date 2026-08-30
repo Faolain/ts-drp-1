@@ -77349,3 +77349,56 @@ replace `.logs/d108e4au-campaign-restoration/run-one.zsh` with
 environment and stop rules remain exact. This signed/pushed correction retains
 the explicit authority for the same five unrun invocations and does not request
 authorization again.
+
+The restored `ordinary-2` invocation is a consumed failure and freezes the
+campaign again. It ran once from `2026-08-30T08:23:01Z` through
+`2026-08-30T08:24:25Z`; the reporter records 83.822826 seconds and
+expected/skipped/unexpected/flaky `0/0/1/0`, zero top-level errors and exact
+`D108E4H_IDENTITY_JOIN_INVALID` in trial `e3-03-0`. Both
+`ordinary-2.status` and `ordinary-2.runner-status` are one. No trial completed.
+`ordinary-3`, `isolated-1`, `isolated-2` and `isolated-3` remain absent and
+must not run.
+
+This is not the prior continuity failure. Endpoint classification is
+`zero-local`: both authenticated boundaries and selected RTC identities remain
+stable, both local replacement counts are zero and both `linkDrops` deltas are
+zero. The exact failing predicate is the reverse attempt join at
+`d108e4hAssertAttemptCustody`: the transmitting endpoint has all 600 distinct
+application raw samples and 600 joined attempt IDs, but the raw-channel
+lifecycle contains 601 attempt/terminal pairs. The unmatched successful pair
+has attempt ID 778, new RTC connection/channel `8/390`, lifecycle sequences
+1909/1910 and buffered amount `0 -> 4`.
+
+That four-byte send on the newly created raw channel is consistent with the
+reviewed exact four-byte readiness controls, while the retained campaign
+validator predates those controls and assumes every send on a
+`ts-drp-ephemeral/1` channel is an application sample. The current failure
+attachment retains attempt identity and buffer size but not the exact payload
+bytes for non-marker sends, so this evidence does not prove which control kind
+was sent. It therefore demonstrates an evidence-classification mismatch, not a
+product defect and not authority to weaken the join. The smallest future owner
+is test/evidence-only: retain enough exact non-application send custody to
+classify only the three frozen four-byte controls, exclude those proven control
+attempts from the application-domain reverse join, and preserve mutants proving
+that every application attempt still joins exactly once. If that cannot be
+done without product, workload, threshold or semantic changes, stop and
+reslice. No campaign retry is authorized by this diagnosis.
+
+The reporter, failure telemetry, endpoint classification and preliminary
+calibration SHA-256 values are respectively
+`c58b654556066428f63da136db1333f28cf1c26c74fd6d17417e3e5a83caa561`,
+`86192b8e4fdd509872369a30a49bad4f209081eba64fc3a3df277277dcd3dd42`,
+`74214076f6aba4c9b71e990c46179e4a62e76ed75f4ed9929066826296e0b428`
+and `d57116d388768c1e05981ec24a0a2e63419603fac17d573000791756029ab8c0`.
+Before/after manifests validate with SHA-256
+`30ca23666850552bef1deed9cbaa04114038238a2193a25c1ba4459197ea16d2`
+and `9efaf4abdf652eaa58efe403ca0919bbfac80bf9b8574be325f588d4861fb105`.
+Both process-conflict records are empty, all four fixed ports are clear, all 26
+stashes and protected paths match, and workspace identity/runtime custody is
+unchanged. The complete self-excluding campaign manifest validates with
+SHA-256
+`8b54ff2be8d1a27e2072365fb3db9f8f78847ea229da8c4c16898797c7f14c24`.
+Campaign custody is now two consumed failures, zero passes and four unrun
+names. First-new-failure custody controls; D.108e4as cannot resume until this
+exact validator mismatch has a separately accepted resolution and authority is
+explicitly restored.
