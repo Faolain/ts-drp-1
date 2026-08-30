@@ -77921,3 +77921,97 @@ reviewer, test or profiler is active. D.108e4av itself restores no campaign
 authority. The next narrow owner must bind its reviewed GREEN bytes and restore
 authority only for the four unrun names while preserving both failures and the
 first-new-failure rule; it must not request the durable authorization again.
+
+###### D.108e4aw — bind reviewed control-custody GREEN to four unrun campaigns
+
+D.108e4aw is the narrow campaign-authority owner required by the preceding
+closure. It does not reopen D.108e4as readiness, either consumed failure,
+D.108e4au production behavior or D.108e4av's test/evidence repair. Reviewed
+GREEN is signed/pushed commit
+`549b0e0a35c5cc13f351713d7ffb7fac6ba67aa7`, tree
+`0f2b5266ed39360fd7697f49f1b8fa4fa9bc6184`, with final test-owner SHA-256
+`54f3061eb9d4d7cf00d3d5172194c71261b960a5d004c610438bba891de3a292`.
+The documentation-only review closure is signed/pushed commit
+`5c9a2f978da24e692ac4a0f0ffbd6704e358694e`. The only changes between the
+prior campaign behavior anchor `136b1ebd84d7dfbe1b359aea4287750cbe9f7a89`
+and reviewed GREEN are this plan and the test owner; production and runtime
+bytes are unchanged.
+
+The immutable campaign root remains `.logs/d108e4as-campaign/`. Its validating
+manifest SHA-256 is
+`8b54ff2be8d1a27e2072365fb3db9f8f78847ea229da8c4c16898797c7f14c24`;
+it proves exact terminal statuses `ordinary-1=1` and `ordinary-2=1`, zero
+passes, and no artifact for `ordinary-3`, `isolated-1`, `isolated-2` or
+`isolated-3`. Neither failure may be retried, overwritten, deleted,
+reclassified or represented as a pass. The durable authorization for all six
+names is inherited and must not be requested again.
+
+The new restoration root is
+`.logs/d108e4aw-campaign-restoration/`. Construction copies accepted immutable
+root `.logs/d108e4au-campaign-restoration-v2/` once, then changes only:
+
+- `run-one.zsh` behavior head/tree to reviewed GREEN, and its restoration-root
+  literal to the new root;
+- `runner-guards.zsh` so `ordinary-3` is the sole failed-predecessor exception:
+  it requires exact `ordinary-2.status=1`, exact
+  `ordinary-2.runner-status=1`, exact campaign-manifest hash `8b54ff2b...`,
+  and complete validation of that manifest; and
+- the dependent protected-state, source/runtime identity, mode, diff and
+  self-excluding restoration manifests.
+
+The exception cannot admit `ordinary-1` or `ordinary-2`. `isolated-1` still
+requires `ordinary-3.runner-status=0`; `isolated-2` and `isolated-3` likewise
+require their immediate predecessor's exact zero status. Every invocation must
+still reject existing current/future artifacts, any `.preflight-*` residue,
+changed campaign-selected Git/ripgrep identity, invalid signatures or upstream
+identity, changed protected paths/stashes, ordinary/isolated source or runtime
+skew, conflicting ts-drp processes, a busy fixed port, classifier failure,
+wrong reporter counts, retry/flaky output or evidence-finalization failure.
+
+The isolated checkout is moved from the prior behavior anchor to detached
+reviewed GREEN only after proving it is clean and the commit is signed. Since
+the intervening executable diff is test-only, no runtime build may change; the
+complete frozen runtime inventory must compare byte-for-byte before authority
+can close. Both workspaces must list exactly the retained title
+`three fixed browser trials prove raw freshness and no head-of-line blocking
+under 30% loss` as one test in one file. No browser test or campaign runs during
+construction.
+
+Mechanical acceptance is: shell syntax for every affected script; mode and
+self-excluding manifest validation; exact three-field runner diff and exact
+failed-predecessor guard diff; direct campaign-selected Git/ripgrep capability
+execution; complete immutable campaign-manifest validation; exact reviewed
+commit/tree/test/product/config/package/lock identities; byte-identical ordinary
+and isolated runtime inventories; `ordinary-3` admission; pre-`ordinary-3`
+refusal for `isolated-1`; refusal of any overwrite/future-artifact state; exact
+one-test/one-file listing in each workspace; eight protected untracked paths;
+26 stashes; clear ports 4174, 4175, 51000 and 51002; no ts-drp reviewer, test or
+profiler; and zero campaign invocation count during the slice. A faulty grep or
+wrapper is diagnostic debt, not a source failure; correct it once and preserve
+the diagnosis.
+
+After construction and deterministic acceptance, append exact changed-path
+hashes, commands and results here, sign and push the plan-only authority
+checkpoint, and run one bounded high-risk freeze review using Grok,
+Codex `gpt-5.6-sol` / high and Opus xhigh. This extra checkpoint is required
+only because the slice changes campaign admission and authorizes scarce long
+execution. It must review the signed authority commit, exact runner/guard diff,
+immutable old-failure custody, runtime/source binding, literal four launch
+commands and first-new-failure behavior. Only P0/P1 blocks. P2 receives a
+disposition without new fixtures or recursive confirmation. Kimi, Fable and
+collaboration subagents remain prohibited.
+
+An empty blocking union restores authority for exactly four fresh shells in
+this order: `ordinary-3`, `isolated-1`, `isolated-2`, `isolated-3`. Each uses
+the reviewed restoration runner, existing arguments, network-disabled Corepack
+environment and unset finalizer fault hook. Stop immediately on the first
+nonzero consuming result. No retry, loop, overwrite, substitution or request
+for authorization is permitted. Four zero statuses complete the preserved
+six-name ledger as two immutable diagnostics plus four post-fix passes; a
+nonzero status freezes every later name for a new causal diagnosis.
+
+No product/API, dependency, protocol byte, workload, three-trial count,
+Playwright configuration, browser pin, watchdog, timeout, threshold, port,
+classifier, resource ceiling or test semantic changes are in scope. If the
+restoration cannot execute without one, stop and reslice rather than widening
+D.108e4aw.
