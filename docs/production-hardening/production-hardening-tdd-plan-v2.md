@@ -77857,3 +77857,67 @@ and its 96-line validation record SHA-256 is
 Every listed artifact reports OK. This GREEN checkpoint is ready for a signed
 push and the sole formal Grok/Codex-high/Opus-xhigh implementation review; it
 does not restore campaign authority.
+
+The sole D.108e4av formal GREEN review closes with an empty blocking union.
+Codex `gpt-5.6-sol` / high returned `APPROVED`, P0=0/P1=0/P2=0, after
+independently checking the signed plan, RED and GREEN chain, causal failure,
+classifier and join ordering, complete mutant roster, final reporters, hashes,
+changed-path custody and immutable campaign ledger. Its result SHA-256 is
+`538c291ea0902db553faf14e52ed756524fb538efa44e6f1542b8fa4ad4f34fc`.
+Opus 5/xhigh session `9c93389e-f8ba-4325-be9b-b40e243852ac` returned
+`APPROVED`, P0=0/P1=0/P2=3; its result SHA-256 is
+`45f3e1b63efa4672cdaccbb89366fd6e839f2739b10cbd154d8bf2749805ea60`.
+
+Opus's three P2 observations are recorded without executable follow-up. The
+focused-result chronology is narrative precision only because the final-source
+seven-title run includes and passes that exact focused title after every
+correction. The two independent pre-gate page snapshots can only under-count
+controls and fail closed; they cannot create a false pass, so they remain owned
+only if a future flake demonstrates a need for an atomic snapshot. Direct
+classifier negatives for non-four-byte and non-round-tripping payloads are not
+added: live `byteLength` and text originate from the same buffer and the frozen
+validator mutant matrix already rejects malformed byte shapes. None changes
+scope, causal acceptance, product behavior or a hard gate.
+
+Grok 4.6/high ended normally after 390.604 seconds with service status zero,
+`stop_reason=end_turn` and `timed_out=false`, but concatenated progress prose
+and its terminal object on one line. The wrapper therefore remains honestly
+`NO_VERDICT` and was not relaunched. The deterministically extracted trailing
+substantive payload is `APPROVED`, P0=0/P1=0/P2=0, with SHA-256
+`dd4a698960607808f29543a00fa0ed85127591b6dcb4d490fff829ff1e70108c`.
+It is preserved as supporting evidence, not misrepresented as a wrapper
+verdict. Kimi, Fable and collaboration subagents were not invoked.
+
+The self-excluding 25-file final-review manifest validates completely. Its
+SHA-256 is
+`ac9e7b43580889af001e9c9d8874b09863768b72d11213555747bc3b5943391b`;
+the 25-line validation record SHA-256 is
+`52b6a522e57d925a033fca6faf45053d17696f280f6488a5d5dabe877655f024`.
+This documentation-only closure receives no recursive review. D.108e4av is
+closed after this plan correction is signed and pushed.
+
+The D.108e4as-v2 host-utility correction remains the active launcher contract
+and was revalidated mechanically at this closure. Active runner/tool-gate
+sources contain zero `GIT_EXPECTED` or `RIPGREP_EXPECTED` predicates. The gate
+resolves Git and ripgrep with `command -v`, binds each only to the physical path
+selected and recorded in the existing campaign root, records complete version
+output, executes Git `rev-parse --verify`, `status --porcelain=v1` and
+`verify-commit`, and executes the deterministic ripgrep `-F -c` smoke with
+count two. Shell syntax, the direct shared gate, both immutable manifests and
+the exact Playwright `--list` all return zero; the latter selects one test in
+one file without launching a browser test. Exact Git/ripgrep vendor strings
+occur only in recorded version evidence and are not cross-host acceptance
+predicates. No hash changes because the already-accepted v2 gate and immutable
+campaign evidence were not modified. The revalidation record SHA-256 is
+`fc8669583897fb60506ad9587231b5d516960dcf075cd922e7d5e5d4ba449c8e`.
+
+That portability gate cannot recreate or restart the campaign: the immutable
+root already records `ordinary-1=1` and `ordinary-2=1`, with zero passes and
+`ordinary-3`, `isolated-1`, `isolated-2`, `isolated-3` unrun. This is the
+existing failed-consuming-invocation stop condition, not an artificial host
+identity refusal. Ports 4174, 4175, 51000 and 51002 are clear; the eight
+protected untracked paths and all 26 stashes remain unchanged; no ts-drp
+reviewer, test or profiler is active. D.108e4av itself restores no campaign
+authority. The next narrow owner must bind its reviewed GREEN bytes and restore
+authority only for the four unrun names while preserving both failures and the
+first-new-failure rule; it must not request the durable authorization again.
