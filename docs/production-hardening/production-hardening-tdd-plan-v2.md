@@ -80537,3 +80537,27 @@ and `1836d0f36a117662104b656bafa65bcfef764d6150ffb7aee097ba169415b254`.
 Evidence is immutable under `.logs/d108e4bj-green-correction/`. Sign/push the
 correction before the single bounded confirmation round; an empty confirmed
 P0/P1 union releases the one retained browser title.
+
+The single bounded confirmation inspected signed/pushed correction
+`eb2272c9b8e7e819f83b0c499f3fa966807d21ef`. Codex
+`gpt-5.6-sol` high and Opus xhigh each returned `APPROVED`, P0=0/P1=0/P2=0.
+Grok's sole read-only run emitted a substantive `APPROVED`, P0=0/P1=0/P2=0
+object after progress prose, so its honest runner classification is
+`NO_VERDICT`; it was not relaunched. All three substantive reviews confirm the
+prior P1 is causally closed, the captured handler-open ordering remains
+accepted, the new connecting-handler mutant fails at the intended predicate,
+the cumulative diff remains plan/test-only and no regression was introduced.
+The blocking union is empty and the one retained browser title is released.
+This closure prose receives no recursive review.
+
+Confirmation Codex-final, Opus-final, Opus-envelope, Grok-public, Grok-status,
+Grok-events and validating self-excluding confirmation-index SHA-256 values are
+respectively
+`0c3f5b5e6470415fc110a40dd6fd2553d52927b5cb0d574633daadf815c5b6e7`,
+`a46ca2dc1099dc98d4e66e15c6cd4c28ccbcfc6ef7a7c7c3071ed6f93032f7da`,
+`19113b574a1c791fcf53ae71fb9af2d635a126cb681e79c02682026e99f8d37e`,
+`c4a30db7ec48ed5d05f3610a1c9c5c561942593448623b9faf0168dc22b759e1`,
+`e0111177fd0613d0bce26436b61b5bcce98f2a384d25b462ca990d4a3c73cf91`,
+`a4d758eb71995c03c78299eefdd8b47bc90a420bcb0c04edd3dec579543a0f86`
+and `01f6bd9a76927527e3a6dd677d724d4e57d5447b4ac24c2e308f225db76ac4b3`.
+Evidence is immutable under `.logs/d108e4bj-green-confirmation/`.
