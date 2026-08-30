@@ -80620,10 +80620,11 @@ The executable anchor is signed/pushed commit
 confined to this plan. The ordinary checkout must differ from that anchor only
 at this plan path. The clean detached checkout is
 `/private/tmp/ts-drp-d108e4bk-clean/repo` at the exact anchor/tree with empty
-tracked status. It began without package/example `dist`, completed
-`pnpm install --offline --frozen-lockfile` under Node `v22.15.0` and pnpm
-`10.24.0`, and freshly built the package graph through the existing
-postinstall. It has no root `node_modules/@ts-drp/canonical` shim.
+tracked status. Construction used `pnpm install --offline --frozen-lockfile`
+under Node `v22.15.0` and pnpm `10.24.0`; the retained freeze directly proves
+the resulting detached head/tree, clean status, source/runtime identities and
+one-test/one-file listing rather than claiming an immutable install transcript.
+It has no root `node_modules/@ts-drp/canonical` shim.
 
 The seven campaign source/config identities and all 334 built nondeclaration
 runtime files are byte-identical between ordinary and isolated workspaces.
@@ -80638,14 +80639,16 @@ the corrected retained owner is
 
 The freeze root is `.logs/d108e4bk-freeze/`. Its validating self-excluding
 50-file manifest hash is
-`53f50e0ff52aea5bdad8f31c206cd81260308a43ff59893137368d30c3c7eb9f`.
+`921eec5c02f076beea53e31d584b8b243da14008ab7ed50355a58f1161ae1839`.
 The mode manifest, outer launcher, runner and predecessor/future-artifact guard
 hashes are respectively
-`77ccd48d9f004a6e014de4951efd00ea5510153e1f22c2f126f5f5f6f9ded228`,
-`f593f3c84c866754b491c750f5183239815d102a758b981bcec4f86a8bcf3b28`,
-`0e522a372f548baa6438be5dfb782e99508c4951ab3ac49a05dcc44d65752ce3`
+`b1ef4448443b89c5a3311fc02e549faa0a0eb799c2959f5146b5e0118c038c5d`,
+`002b9245ba462f3f2c7621d8266284d80bfc92d621220e34f49130d89535eb92`,
+`018930242bd66267568d449abe8c711f3809d71bfa264599399e44b27b62648a`
 and
-`cba856a29dc4dcd26e2fb25787cc1d867b09ff0734bf5a2f53d25ee45572368f`.
+`0f18e48245f946131ebac7b737d9cb4cb60ffe1378b49a260518985df5de21c6`.
+The inherited finalizer remains byte-identical at
+`55a5fd21b9ef8438d8683cb3d34919fb8839de6588efc898f325deebbd303ff7`.
 The inherited endpoint-local classifier and validation hashes remain
 `99d7d65caaad75ae34370d93c230c91e16d6459ccc23594672bb2557254cced9`
 and
@@ -80655,15 +80658,16 @@ The fresh zero-invocation evidence root is `.logs/d108e4bk-campaign/`.
 Its authorization hash is
 `8b9f52ec217aa7e041b67f2b265b479ca34d5d9ec0ca5e1b9011e5e054784eca`
 and its initial manifest hash is
-`c5c1e66dd6abe104864331b8a2c4bd2ca82e617b4f38ae8affb8eb98cedf28e4`.
+`4504670cb16f8ac2e5d512815b0c54f1ec47368154b90920b9b0370e265a5ed8`.
 Campaign setup resolves Git and ripgrep with `command -v`, records their
 physical paths and complete version output, and uses those selected binaries
 throughout this campaign. Git is accepted by the exact `rev-parse`,
 `status --porcelain=v1` and `verify-commit` operations used by the launcher;
 ripgrep is accepted by a deterministic `-F -c` smoke check. No vendor string,
 patch version, build suffix, revision or prior host path is a portable
-acceptance predicate; a missing or changed selected binary within this
-campaign remains fail closed.
+acceptance predicate. After setup, a missing selected tool, changed selected
+path/version output, or failed required capability within this campaign
+remains fail closed; arbitrary binary-byte identity is not claimed.
 
 Mechanical construction passes shell syntax, direct tool capabilities, exact
 fresh-name admission/predecessor/future-artifact rejection, mode and manifest
@@ -80688,8 +80692,52 @@ freeze review using Grok, Codex `gpt-5.6-sol` high and Opus xhigh. This extra
 checkpoint is required because it authorizes scarce long execution and freezes
 launcher/accounting/evidence custody. Only P0/P1 blocks. P2 receives a recorded
 disposition without new fixtures or ceremony. Kimi, Fable and collaboration
-subagents are prohibited. When the blocking union is empty, create signed
-annotated tag `d108e4bk-freeze-reviewed` at the exact reviewed plan commit and
+subagents are prohibited.
+
+The campaign threat model is explicit. The workspace, host and single operator
+are trusted. These controls protect against accidental contamination, stale
+state, retries, overwrites, name reuse and unnoticed test failure. Local hashes
+provide reproducibility and accidental-drift detection; they do not claim
+security against a malicious local actor able to rewrite `.logs`, helpers,
+manifests, statuses or the operating environment, and they do not claim WORM or
+external-signing custody.
+
+The initial review inspected signed/pushed checkpoint
+`9d5800e90d0a9e6558c2aba4e2c815961e807d8e`. Codex `gpt-5.6-sol` high
+returned `CHANGES_REQUIRED`, P0=0/P1=3/P2=2. Its P1 union is corrected in one
+infrastructure-only batch where it matches that threat model. The authenticated
+outer launcher now performs both full manifest validations before sourcing the
+selected-tool gate. Current-name freshness rejects any top-level
+`$invocation_name.*` collision, not merely the known artifact roster, and a
+deterministic probe proves that rejection.
+
+Codex's original cross-invocation cryptographic-custody P1 is preserved
+honestly but dispositioned nonblocking under the clarified trusted-local model.
+Fresh write-once names, immediate two-status predecessor checks, sequential
+execution, per-run reporter/stdout/stderr/attachment/time capture, cumulative
+artifact manifests, first-failure stop and the final evidence audit are
+sufficient for accidental-drift protection. Mutable hashes beside mutable
+evidence cannot provide hostile-local-operator security; that would require an
+external signing or immutable-storage boundary outside this campaign. No new
+custody-chain redesign is added.
+
+Opus xhigh returned `APPROVED`, P0=0/P1=0/P2=4. Its bootstrap-order P2 is
+superseded by the direct correction. Its procedural cross-invocation P2 has the
+same trusted-local disposition above.
+Its shell-context tool-path P2 remains a fail-closed operational fact: use the
+same non-login command environment captured at setup. Its stale-preflight P2
+remains deliberate fail-closed behavior requiring evidence-led adjudication
+after a non-consuming abort. Codex's tool-byte and install-chronology P2s are
+resolved by the narrower claims above. Grok's one read-only run made active
+inspection progress but its service canceled after 585.223 seconds before a
+terminal schema; it remains honestly `NO_VERDICT` and is not relaunched.
+
+No reviewer is relaunched or duplicated and no confirmation round is run. The
+corrected syntax, manifest order, exact wildcard freshness, predecessor logic,
+source/runtime identities, one-test/one-file selection, process/port state,
+protected paths, stashes and zero-invocation state are validated mechanically.
+Sign/push this corrected plan-only checkpoint, then create signed annotated tag
+`d108e4bk-freeze-reviewed` at that exact commit and
 push it. The outer launcher requires the tag to verify and peel to local HEAD,
 local HEAD to equal the pushed branch, a valid commit signature, and the
 aggregate executable-anchor-to-HEAD diff to contain only this plan path.
@@ -80698,27 +80746,27 @@ Then execute these six blocks sequentially as separate fresh shells. The user
 has already authorized all six and must not be asked again:
 
 ```sh
-test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 53f50e0ff52aea5bdad8f31c206cd81260308a43ff59893137368d30c3c7eb9f && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = f593f3c84c866754b491c750f5183239815d102a758b981bcec4f86a8bcf3b28 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh confidence-ordinary-1 /Users/aristotle/Documents/Projects/ts-drp-1
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 921eec5c02f076beea53e31d584b8b243da14008ab7ed50355a58f1161ae1839 && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = 002b9245ba462f3f2c7621d8266284d80bfc92d621220e34f49130d89535eb92 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh confidence-ordinary-1 /Users/aristotle/Documents/Projects/ts-drp-1
 ```
 
 ```sh
-test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 53f50e0ff52aea5bdad8f31c206cd81260308a43ff59893137368d30c3c7eb9f && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = f593f3c84c866754b491c750f5183239815d102a758b981bcec4f86a8bcf3b28 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh confidence-ordinary-2 /Users/aristotle/Documents/Projects/ts-drp-1
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 921eec5c02f076beea53e31d584b8b243da14008ab7ed50355a58f1161ae1839 && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = 002b9245ba462f3f2c7621d8266284d80bfc92d621220e34f49130d89535eb92 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh confidence-ordinary-2 /Users/aristotle/Documents/Projects/ts-drp-1
 ```
 
 ```sh
-test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 53f50e0ff52aea5bdad8f31c206cd81260308a43ff59893137368d30c3c7eb9f && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = f593f3c84c866754b491c750f5183239815d102a758b981bcec4f86a8bcf3b28 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh confidence-ordinary-3 /Users/aristotle/Documents/Projects/ts-drp-1
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 921eec5c02f076beea53e31d584b8b243da14008ab7ed50355a58f1161ae1839 && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = 002b9245ba462f3f2c7621d8266284d80bfc92d621220e34f49130d89535eb92 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh confidence-ordinary-3 /Users/aristotle/Documents/Projects/ts-drp-1
 ```
 
 ```sh
-test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 53f50e0ff52aea5bdad8f31c206cd81260308a43ff59893137368d30c3c7eb9f && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = f593f3c84c866754b491c750f5183239815d102a758b981bcec4f86a8bcf3b28 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh confidence-isolated-1 /private/tmp/ts-drp-d108e4bk-clean/repo
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 921eec5c02f076beea53e31d584b8b243da14008ab7ed50355a58f1161ae1839 && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = 002b9245ba462f3f2c7621d8266284d80bfc92d621220e34f49130d89535eb92 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh confidence-isolated-1 /private/tmp/ts-drp-d108e4bk-clean/repo
 ```
 
 ```sh
-test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 53f50e0ff52aea5bdad8f31c206cd81260308a43ff59893137368d30c3c7eb9f && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = f593f3c84c866754b491c750f5183239815d102a758b981bcec4f86a8bcf3b28 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh confidence-isolated-2 /private/tmp/ts-drp-d108e4bk-clean/repo
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 921eec5c02f076beea53e31d584b8b243da14008ab7ed50355a58f1161ae1839 && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = 002b9245ba462f3f2c7621d8266284d80bfc92d621220e34f49130d89535eb92 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh confidence-isolated-2 /private/tmp/ts-drp-d108e4bk-clean/repo
 ```
 
 ```sh
-test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 53f50e0ff52aea5bdad8f31c206cd81260308a43ff59893137368d30c3c7eb9f && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = f593f3c84c866754b491c750f5183239815d102a758b981bcec4f86a8bcf3b28 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh confidence-isolated-3 /private/tmp/ts-drp-d108e4bk-clean/repo
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 921eec5c02f076beea53e31d584b8b243da14008ab7ed50355a58f1161ae1839 && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = 002b9245ba462f3f2c7621d8266284d80bfc92d621220e34f49130d89535eb92 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bk-freeze/launch-one.zsh confidence-isolated-3 /private/tmp/ts-drp-d108e4bk-clean/repo
 ```
 
 Six zero Playwright statuses and six zero terminal runner statuses release a
