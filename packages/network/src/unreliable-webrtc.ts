@@ -1124,7 +1124,21 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			if (readiness !== undefined) this.#receiveReplacementControl(peerId, link, readiness, control);
 			return;
 		}
-		if (pending) return;
+		if (pending) {
+			const readiness = this.#readiness.get(link);
+			if (
+				link.role !== "initiator" ||
+				link.closing ||
+				link.channel.readyState !== "open" ||
+				readiness === undefined ||
+				!readiness.replacement ||
+				!readiness.receivedAck ||
+				readiness.commitSends === 0 ||
+				!this.#isCurrent(link.connection)
+			) {
+				return;
+			}
+		}
 		if (
 			bytes.byteLength < ROUTE_HEADER_BYTES ||
 			bytes.byteLength > MAX_ROUTED_ENVELOPE_BYTES ||
@@ -1137,6 +1151,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			this.#unknownRouteDrops += 1;
 			return;
 		}
+		if (pending && !this.#promotePendingReplacement(peerId)) return;
 		const ingress = Object.freeze({ bytes: bytes.slice(ROUTE_HEADER_BYTES), sender: peerId });
 		this.#received += 1;
 		this.#routedBytesReceived += bytes.byteLength;

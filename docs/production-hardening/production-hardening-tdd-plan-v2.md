@@ -80242,3 +80242,40 @@ and `35302ef1f3ae0f285ee86f6dc1865ceeaf1a9a855b1a50a3615c2dc537d449e6`.
 Evidence is immutable under
 `.logs/d108e4bi-red/`. This matches the frozen causal matrix and authorizes
 the reviewed narrow GREEN receive-path change.
+
+D.108e4bi GREEN changes only the reviewed receive owner and its deterministic
+fake RTC/signaling tests. A non-control pending frame must now come from the
+current open initiator replacement, with replacement readiness, ACK receipt
+and at least one successful COMMIT send. Normal envelope and live-route
+validation remains ahead of activation; only a valid known-route frame calls
+the existing `#promotePendingReplacement`, and delivery occurs only when that
+owner returns true. The receive path performs no direct active, pending or
+retiring link-map mutation.
+
+The focused D.108e4bi matrix passes 3/3. It proves the exact causal frame is
+delivered once, promotes B, retires A exactly once with reason `replacement`,
+and routes the reply on B. It also proves malformed and unknown-route
+qualified frames, prequalification traffic in both directions, acceptor-
+pending ingress and a no-longer-current authenticated B do not promote or
+deliver. The qualified unknown-route row increments `unknownRouteDrops`
+exactly once while the malformed and unqualified rows do not. The complete
+unreliable-WebRTC owner file passes 87/87, preserving the D.108e4at,
+D.108e4au, D.108e4ax and D.108e4bb rows.
+
+The first focused shell command omitted the repository-standard
+`--coverage.enabled=false`. All three selected assertions passed, but Vitest
+returned one for the unrelated global 70% coverage threshold. The corrected
+command ran on unchanged source and returned zero; this launcher mistake is
+preserved rather than classified as a code failure. Network package typecheck
+and build, exact-owner ESLint and Prettier, `git diff --check`, and a read-only
+source-shape audit all returned zero. Product, test, corrected focused
+reporter, complete owner reporter and self-excluding evidence-index SHA-256
+values are respectively
+`091848dce0450917e7c47fece246fd10e8bc2c604823e3839dc26cb6f8d95acc`,
+`87b894ffb7b33d2013a31a8c85af1ec8a58e5bfd5ba0974084ba978a0bd416d8`,
+`80b4ba5cc8ef3918d6320e5475e0495b74bc8a3b1acd1ba0cb9b3574bf5b40ac`,
+`117fa8df13722c457a59fdc8debf20ee9395a3e1e701ae51e8ae8c7974594418`
+and `28da3e4bf7943a711e647ebddc8a7bbea04a4755fb55fd126212918dc8ea33b7`.
+Evidence is immutable under `.logs/d108e4bi-green/`. No browser or campaign
+run occurred. Sign/push this GREEN before the single formal implementation
+review; only an empty P0/P1 union may release the retained browser title.
