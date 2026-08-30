@@ -74389,7 +74389,7 @@ The live, unfrozen fresh base literal receives an explicit
 annotation before it is passed to the helper, so required and excess-property
 checking demonstrably applies; the helper itself freezes the merged result, and
 that result retains `satisfies CampaignEvidence`. The focused round-trip control
-uses the same constant first to write a module-scope progress fixture and then
+uses the same constant first to write a focused-test-local progress fixture and then
 to finalize it. This proves constant/helper agreement only; separate positive
 source evidence below owns the trial-loop-local live progress writer.
 
@@ -74464,12 +74464,15 @@ TypeScript for the test owner, exact-owner ESLint, 8 GiB exact-owner Prettier an
 interface/progress/final/post-loop `senderWire` keys absent by checking only key
 positions—no `readonly senderWire` member, `senderWire:` property,
 shorthand `senderWire` property in any object literal (including the current
-`{ senderRawCandidateCount, senderWire }` form), `({ senderWire })` binding or
+`{ senderRawCandidateCount, senderWire }` form), quoted `"senderWire":` key,
+computed `["senderWire"]:` key, `({ senderWire })` binding or
 `({ deadlineSenderWire: senderWire })` alias remains. Positive source evidence
 must show the exact live writer
 `updateTrialProgress({ senderRawCandidateCount, [D108E4AR_RUN_RETURN_SENDER_WIRE_KEY]: senderWire })`.
 It must not use a substring absence check because unchanged local `senderWire`,
-`senderWireAtDeadline` and the new keys legitimately contain that substring.
+and `senderWireAtDeadline` legitimately contain that exact case-sensitive
+substring; the new keys contain `SenderWire` with an uppercase `S` and are
+separately authorized.
 The exact campaign-start derivation and twenty-one post-custody expectations
 remain byte-identical; the post-loop aggregate remains semantically identical
 apart from its binding name; and the three custody keys are assigned before the
@@ -74557,8 +74560,31 @@ progress writer. These changes are plan-only and create no RED or campaign
 authority.
 
 Sign and push this confirmation correction. Then obtain a new read-only Grok
-and Opus confirmation and resume the exact Kimi session once its service permits
-a reviewer turn; Kimi must still emit exactly `CHECK001` through `CHECK100` plus
-terminal `RESULT`. Do not retry Kimi against the known quota wall. RED remains
-prohibited until all three reviewers return zero P0/P1 and the review root and
-signed/pushed closure requirements above are satisfied.
+and Opus confirmation. Once the service permits a Kimi reviewer turn, resume
+session `3f54edd4-79d9-45b7-b328-8f7395e887ad` with a complete new follow-up
+prompt that binds the full signed/pushed correction hash against
+`a1886860961caa84d2928a085efbdd7a0e6456b2`, enumerates the dispositions in the
+latest correction and requires a fresh read of the corrected plan and test
+source. A verdict bound to `a1a52ac26f1044083a5c7176c1328bbf02772870` or any
+earlier prompt does not count. Kimi must still emit exactly `CHECK001` through
+`CHECK100` plus terminal `RESULT`. Do not retry Kimi against the known quota
+wall. If the quota does not permit a Kimi turn before 2026-09-02, the
+D.108e4ar plan/evidence owner must record the explicit dated stop required above
+rather than waiting silently. RED remains prohibited until all three reviewers
+return zero P0/P1 and the review root and signed/pushed closure requirements
+above are satisfied.
+
+The second confirmation still does not close the gate. Grok 4.6/high session
+`01a0502e-976c-7293-a34e-32e8f93e31b5` returned APPROVED with zero findings.
+Opus 5/xhigh session `e1db0ee3-fe88-4aa6-9cf4-c57f110516a2` returned
+CHANGES_REQUIRED with zero P0, one P1 and four P2s. The P1 is closed by the
+explicit new-turn Kimi commit/base binding above. The P2s are closed by naming
+the focused-test-local fixture, covering quoted and computed old keys, correcting
+the case-sensitive substring explanation and binding the quota wall to the
+2026-09-02 dated-stop rule. No reviewer edited the tracked tree, ran a test,
+build, browser, profiler or campaign, invoked Fable or used a subagent. This
+same-round correction is plan-only and creates no RED or campaign authority.
+
+After signing and pushing, run one final read-only Grok and Opus confirmation of
+these five dispositions. Prepare the exact rebased Kimi follow-up prompt from
+that signed commit, but do not send it while the service returns the known 403.
