@@ -81728,3 +81728,76 @@ This correction materially changes causal acceptance, so use the plan policy's
 single confirmation round with Grok, Codex `gpt-5.6-sol` high and Opus xhigh.
 Only an empty P0/P1 confirmation union releases RED. This is not authorization
 for a public API, wire, threshold or dependency change.
+
+The sole confirmation round found one common blocking causal gap and is now
+closed without another model round. Codex returned `CHANGES_REQUIRED`,
+P0=0/P1=1/P2=0: local restart closes the initiator PC but does not abort the
+still-running signaling exchange, so the receiver can successfully write B's
+late answer and observe no reset. Opus returned `CHANGES_REQUIRED`, P0=2/P1=2/
+P2=3, and Grok's strict runner records `NO_VERDICT` after progress prose plus a
+substantive `CHANGES_REQUIRED`, P0=2/P1=0/P2=1. Their shared second blocker is
+that the acceptor's established-false callback only closes the PC; when no
+`datachannel` event has occurred, the channel promise remains unresolved and
+the exact PC stays mapped, so C is still rejected until the original deadline.
+Opus additionally requires a pre-datachannel fake and direct adapter RED;
+Grok pins qualified-C promotion after preparation so `reliableDecision` remains
+unchanged.
+
+Confirmation prompt, Codex result, Opus raw result, Grok public text, Grok
+status and Grok event-stream SHA-256 values are respectively
+`0b6091efcf7fabe790afb59e45950a7d85f1af65fe1fb331f158109411041170`,
+`5b1a7339deeca9292bb7338d8d055ed9b4cbb8427cefd1e5b245156d1006996a`,
+`acc7e325ba88194435bfdb461470e3d88d2d43b66b3ed14f80ce2599ccc1f089`,
+`602bd96baea89ce0cb7a8fe7f51498f64eb66ec5b420a7c9203331ef5911d0dc`,
+`ba82f4abde0182256487eac73ca851c363d100b035aa4d045b869ae4bbf667c8`
+and
+`3efe8b20fc38d21d3f0b5a3539b6fb05bff76854dc7af0ff1e82c0bedaa9c175`.
+
+Apply the confirmation union as the final executable freeze:
+
+1. Give the single initiator setup per peer a private abort controller owned by
+   `#linkFor`. `restart`, owner close and existing pending cleanup abort that
+   controller before closing its PC. Compose it with the unchanged absolute
+   setup-deadline signal passed to `#initiate`; aborting it must abort
+   `connection.exchange`, which already resets the outbound libp2p stream.
+   This producer-side step is the causal event that makes the receiver's stream
+   reset observable. No new retry or timeout.
+2. Give each accept setup a private opaque token and pass the handler deadline
+   signal into `#accept`. A request reset, real connection close before
+   establishment, handler timeout or accept failure calls one idempotent exact-
+   token cleanup that immediately deletes its own pending-map entry,
+   unsubscribes and closes its PC. Every post-await registration/establishment
+   path checks the same signal/token ownership. The handler never invokes peer-
+   wide cleanup for an accept failure. A later B continuation cannot register
+   after cancellation or touch C.
+3. The request-scoped incoming connection wrapper delegates genuine connection
+   close for the link lifetime. It separately reports remote stream reset or
+   response-delivery failure only while that request owns its accept setup.
+   Graceful successful response close does not report failure. Request delivery
+   failure is handshake failure evidence, not an authenticated connection loss;
+   keep the exported counter semantics pinned.
+4. Direct adapter RED uses the real `createLibp2pWebRtcSignalingPort` with an
+   installed-shape fake Stream to prove outbound local abort produces a remote
+   reset notification, response-write failure notifies once, successful
+   graceful close notifies zero times, and genuine connection close continues
+   after request completion. Owner RED uses
+   `FakePeerConnection.pauseNextInboundHandler()` so B is canceled before the
+   fake emits `datachannel`; it proves immediate map/slot release rather than
+   fake-only `waitForOpen` rejection.
+5. The selected-A rule is evaluated only in the existing acceptor commit and
+   expiry promotion decisions after C is open/current/readiness-qualified.
+   `#prepareLink`, `#hasUsableSelectedLink` and `reliableDecision` retain their
+   current meaning. A qualified C may promote over selected A with channel open
+   and PC `disconnected`; pending open/disconnected B remains unchanged.
+6. The complete focused RED roster is: producer abort propagation; direct
+   adapter reset/write/graceful/connection-close controls; exact pre-datachannel
+   B cleanup; deferred B after C; concurrent-valid rejection; structurally
+   valid RTC-invalid non-mutation; captured disconnected selected A with
+   bilateral ingress and post-deadline survival; all six D.108e4bn rows; and the
+   existing pre-open lifetime row. RED may fail only new producer cancellation,
+   exact accept cleanup and qualified-C promotion predicates.
+
+This is the one permitted correction after confirmation; no reviewer is
+relaunched. A deterministic local audit must confirm the frozen source seams
+and exact RED roster before execution. No retained or campaign invocation is
+released.
