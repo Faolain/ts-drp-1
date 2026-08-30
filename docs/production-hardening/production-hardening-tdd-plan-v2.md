@@ -77415,7 +77415,7 @@ The reviewed product owner remains
 Playwright configuration, network package metadata and lockfile remain
 `1826318a19d5676631f6350fa21d2eb1125dbc1d83ecce69d7f776885bdd7978`,
 `91f8580615221ffa864302936ec8bb34661331c711955b08f3d7da83a6d43293`
-and `73c7c0660fa32c738e0fe5a026897a7ad85a40edf1f169730c2d8e44e613a99`.
+and `73c7c0660fa32c7380d0fe5a026897a7ad85a40edf1f169730c2d8e44e613a99`.
 The immutable campaign manifest remains
 `8b54ff2be8d1a27e2072365fb3db9f8f78847ea229da8c4c16898797c7f14c24`.
 Its two consumed failures, zero passes and four unrun names are evidence, not
@@ -77432,6 +77432,12 @@ controls: READY `[0x44,0x52,0x01,0x01]`, ACK
 `[0x44,0x52,0x01,0x02]` and COMMIT `[0x44,0x52,0x01,0x03]`. Therefore a
 successful readiness control becomes an unmatched 601st lifecycle attempt even
 though all 600 application samples retain exact one-attempt/one-success custody.
+The retained attachment proves that unmatched attempt and its four-byte buffer
+delta, but not its payload bytes. Classification is a source-grounded inference:
+the product has only the routed-envelope send site, whose header alone is 33
+bytes, and the exact four-byte readiness-control send site; the unmatched sends
+have no application marker and occur on pending replacement channels where the
+ordinary application `#send` path never transmits.
 
 This is tests-only. The sole executable owner is
 `tests/e3-03-loss-and-hol-proof.pw.ts`; the plan is the only documentation
@@ -77445,7 +77451,9 @@ widening this owner. No retained campaign runs in D.108e4av.
 The evidence extension is additive within the existing schema-v3 envelope.
 `D108e4hEndpointCustody` gains optional `controlSends`; absence means an empty
 ledger, so immutable prior schema-v3 fixtures and attachments remain valid and
-are not edited or reclassified. Each new control row freezes only the facts
+are not edited or reclassified. Optionality is only a hand-built fixture
+affordance: the live `d108e4hEndpointFromCapture` path must always emit
+`controlSends`, including an explicit frozen empty array. Each new control row freezes only the facts
 already owned by `RtcObservation`: `attemptId`, `channelId`, `connectionId`,
 the send-attempt `lifecycleSequence`, and an exact read-only four-number byte
 tuple. A row is emitted only for direction `send`, label
@@ -77458,8 +77466,10 @@ buffered amount, channel timing, role or the old failed attachment.
 The validator first validates and joins the control ledger fail closed. Control
 attempt IDs must be safe, unique, disjoint from every application `rawSends`
 attempt ID, and each must join exactly one raw-channel send attempt with matching
-connection/channel and exact attempt lifecycle sequence. It must join exactly
-one later terminal on the same identity. A terminal may be success or failure:
+connection/channel and exact attempt lifecycle sequence. Terminals are first
+selected by `attemptId` alone and must have cardinality one; only then must the
+terminal connection/channel match, followed by the strict
+`attempt.sequence < terminal.sequence` order check. A terminal may be success or failure:
 the observer captures before native send, and a proven failed readiness-control
 attempt remains a control rather than an application sample. Missing or
 duplicate control terminals retain
@@ -77468,6 +77478,14 @@ attempts and identity/sequence mismatches retain
 `D108E4H_IDENTITY_JOIN_INVALID`; lifecycle inversion retains
 `D108E4H_LIFECYCLE_ORDER_INVALID`.
 
+A proven control identity is not constrained to either prepare/deadline boundary
+identity and its attempt is not required to follow a `channel-open-event`.
+Readiness controls can belong to a transient pending replacement channel, and
+the observer can record native send before its separate asynchronous open-event
+observation. Control proof rests only on exact bytes and the independent
+attempt/terminal identity join above; application sends retain their existing
+boundary and open/handler ordering rules.
+
 Only after that proof may the validator partition the complete raw-channel
 lifecycle by the proven control attempt-ID set. All remaining attempts and
 terminals are the application domain and retain the current exact contract:
@@ -77475,8 +77493,11 @@ the transmitting endpoint has `sampleCount` unique sequences, unique attempt
 IDs, one matching attempt, one matching success terminal and no reverse-join
 extras; the nontransmitting endpoint has no application `rawSends`, attempts or
 terminals. Proven controls are permitted on either physical endpoint because
-both readiness roles send them. An unlisted or unproven extra raw-channel send
-still fails `D108E4H_IDENTITY_JOIN_INVALID`. Existing application mutants keep
+both readiness roles send them. On the transmitting endpoint an unlisted or
+unproven extra raw-channel send still fails
+`D108E4H_IDENTITY_JOIN_INVALID`; on the nontransmitting endpoint an unlisted or
+unproven raw-channel attempt or terminal retains
+`D108E4H_RAW_SEND_ROLE_INVALID`. Existing application mutants keep
 their exact codes, including unmatched attempt
 `D108E4H_IDENTITY_JOIN_INVALID`, duplicate/missing terminal
 `D108E4H_ATTEMPT_TERMINAL_CARDINALITY`, failed application send
@@ -77516,7 +77537,8 @@ Automated RED validation requires exactly one selected test in one file, no
 retained campaign title, expected/skipped/unexpected/flaky `0/0/1/0`, zero
 top-level errors, exactly the two frozen tokens as the complete soft-failure
 set, nonzero command status, unchanged production/config/package/lock hashes,
-and no path outside the test and plan owners. Record command, status, stdout,
+clear fixed ports `4174`, `4175`, `51000` and `51002`, and no path outside the
+test and plan owners. Record command, status, stdout,
 stderr, reporter, source-shape results, changed-path roster and hashes in a
 self-excluding manifest; validate it, sign and push RED. Under the prospective
 review cadence there is no separate full model RED review. If the observed
@@ -77525,14 +77547,27 @@ matrix differs, stop and diagnose before GREEN.
 GREEN makes the two causal rows pass and adds the complete mutant roster in the
 same telemetry-only test: READY, ACK and COMMIT on both endpoint roles; wrong
 magic; wrong version; kinds zero and four; three- and five-byte values;
-unledgered extra raw send; duplicate control attempt ID; application/control ID
-collision; missing matching attempt; connection, channel and lifecycle-sequence
-mismatch; missing terminal; duplicate terminal; terminal identity mismatch;
-terminal-before-attempt; and a proved control send with a failure terminal.
+transmitting unledgered extra raw send
+(`D108E4H_IDENTITY_JOIN_INVALID`); nontransmitting unledgered attempt and
+terminal (`D108E4H_RAW_SEND_ROLE_INVALID`); unsafe control attempt ID; duplicate
+control attempt ID; application/control ID collision; missing and duplicate
+matching lifecycle attempts; connection, channel and lifecycle-sequence
+mismatch; missing terminal; duplicate terminal; terminal identity mismatch
+(`D108E4H_IDENTITY_JOIN_INVALID`); terminal-before-attempt; wrong-label control;
+direction-`message` control; and a proved control send with a failure terminal.
 Malformed/unproven controls and joins use the exact errors frozen above. The
 existing unmatched-application, duplicate/missing-application-terminal,
 failed-application-send and D.108e4aa mutant assertions are rerun unchanged to
 prove their exact codes.
+
+The positive roster additionally reconstructs the retained `ordinary-2` shape
+without claiming that the old attachment retained bytes: creator and receiver
+each receive one exact control row on their observed transient non-boundary
+connection/channel identity, both identities later close, the creator control
+attempt precedes its same-identity `channel-open-event`, and the receiver open
+precedes its control. The four control bytes in this deterministic fixture are
+explicitly reconstructed from the authenticated product send site. This row
+must pass while every application boundary/open-order assertion remains intact.
 
 Run the focused GREEN command once, then the retained seven-title owner once:
 
@@ -77580,3 +77615,34 @@ D.108e4av closure grants no campaign execution by itself. The four remaining
 names stay frozen after two consumed failures. Only a later explicit
 signed/pushed authority restoration may bind reviewed GREEN runtime bytes and
 authorize the next unrun name without retrying or rewriting either failure.
+
+D.108e4av plan review inspected signed/pushed checkpoint
+`bdc4e710ed4de8c98f73919d2ff2f099257c6ef9`. Grok 4.6/high performed 16
+read-only turns and substantial source/evidence inspection, then its service
+canceled the run at 300.091 seconds before a terminal finding object; it is
+honestly `NO_VERDICT` and is not relaunched. Codex `gpt-5.6-sol`/high returned
+`APPROVED`, P0=0/P1=0/P2=2. It confirmed both RED paths and the classifier's
+injectivity, and found the lock-hash transcription plus missing unsafe-ID and
+duplicate-attempt mutants. Opus 5/xhigh returned `CHANGES_REQUIRED`,
+P0=0/P1=4/P2=4. It independently confirmed the diagnosis and RED causality,
+then found the same lock typo, endpoint-dependent unledgered-send code,
+terminal-join ordering ambiguity and absence of a retained-shape positive
+fixture. Its P2s require explicit live empty-ledger emission, clear RED ports,
+honest inferred-payload wording and wrong-label/direction mutants. No reviewer
+edited files, invoked a subagent, ran a test/browser/build/campaign, or changed
+custody. The validating self-excluding review manifest has SHA-256
+`be93e725f69c9264f69b56e41c4a6b58fa5cea229f511f53e93c6540af90dbe7`.
+
+The preceding text is the single-batch correction. It restores the exact
+64-character lock hash; freezes transmitting and nontransmitting unledgered
+codes separately; orders terminal cardinality, identity and lifecycle checks;
+requires explicit live empty ledgers; records payload attribution as inference;
+adds fixed-port preconditions and the unsafe-ID, duplicate-attempt,
+wrong-label/direction mutants; and adds the reconstructed ordinary-2 transient
+non-boundary/open-order positive. These corrections remain inside the same
+test/plan owners and do not change RED's two tokens, product behavior, workload,
+thresholds, launcher, immutable evidence or campaign custody. Because the
+retained-shape row and exact-code matrix materially sharpen executable GREEN
+acceptance, one same-session Codex/Opus confirmation is permitted after this
+corrected plan is signed and pushed. Grok is not relaunched, and no further plan
+review or confirmation follows if both confirmations have zero P0/P1.
