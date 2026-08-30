@@ -75490,3 +75490,117 @@ product/test-semantic change, or reuse of old evidence. Campaign root setup and
 all six durable-authorized launches remain frozen until the exact
 placeholder-free freeze checkpoint is signed/pushed and its separate
 Grok/Codex/Opus freeze review closes with zero P0/P1.
+
+D.108e4as readiness construction is complete without creating
+`.logs/d108e4as-campaign/` or running the retained title. The fixed isolated
+parent/repository were each created exactly once. The separately captured
+`mkdir`, `git clone --no-hardlinks --no-checkout`, detached checkout and
+network-disabled Corepack `pnpm install --offline --frozen-lockfile` commands
+all returned zero. The install ran from the isolated repository, used Node
+`v22.15.0` and pnpm `10.24.0`, and ran the existing postinstall/package build
+exactly once as nested install work. The checkout remains clean at
+`1642b17111a1330b5af0eea9e62d24469f1693e4`, tree
+`3290c235e1e52e1f0f833debbb1cd389ef01c1b1`; it has no Git alternates and its
+pack inode differs from the ordinary source pack inode.
+
+Fresh ordinary and isolated seven-file identity manifests are byte-identical
+at SHA-256
+`158044b2d1e8b1a79a768546dae8985c96a0462f9d38e9734b7fbf2eb254095c`.
+Fresh ordinary and isolated 334-file runtime manifests are byte-identical to
+the inherited expected manifest at SHA-256
+`c1947b7d49b8029d12250ab137aa8081dd3aabcfe4998e8e698e7c6168f6fc08`.
+Both root canonical shims are absent. The one authorized non-executing
+suffix-anchored list command in each checkout returned zero; both outputs are
+byte-identical at
+`a59a2f4486c3365716e1a93e3adf6640f3c0a23e06e5a37ae5c100374b6b8fc2`
+and select exactly one test in one file with the retained title. No browser
+trial or campaign invocation ran.
+
+The immutable inherited runner input remains
+`855e62050d61515ca849fe974a94f1f280e6515025f4e2da68d0687bd79022b9`.
+The repaired D.108e4as runner is
+`b8dca51e0015323cdeb48e519917a9a8facbf369fe7909435aa2c7356a4ec3b1`;
+its exact diff is
+`2f5f3a158f7c221d020da6202023bf7ceb05f73749da6642a332fa81189ad163`.
+The approved Node-plus-Corepack prefix is the only Playwright-launch prefix
+change. A deterministic static audit proves unchanged title, watchdog program,
+reporter acceptance predicate, Playwright arguments, classifier bytes and
+334-file runtime closure; it also proves no `--repeat-each`, network-disabled
+Corepack use and valid syntax. The runner completes result copying, recursive
+manifest generation and manifest validation before atomically publishing its
+terminal status. It authenticates modes/helpers, expiry, stable tool realpaths,
+the pinned Corepack cache, predecessor/future-artifact state and preflight
+residue before the consumption boundary. Its pre- and post-workload state
+captures are both retained; a post-workload process or port failure remains a
+consuming acceptance failure.
+
+The numeric mode manifest has SHA-256
+`9e5307bfe32d9998ed53f2d521bda4283cd6ed4b9c4cc4da27480f967897eadc`.
+The physical tool-path record is
+`73f57ba8415654fd37398126f0f68f211d719f1a433d55aa55fff3982997d38f`;
+the actual version record is
+`3e2f2e6cc1caaabb77be82e48caa3576584180b129adb86b5ee5c3ad1b1890b1`.
+The Corepack pnpm-10.24.0 cache record is
+`8d610df082359d58a8643a50dbae040e7751d5bfd1fcca9e8a398467e21c5f4f`;
+its marker, executable payload and package metadata are individually pinned,
+and every readiness/runner pnpm call sets `COREPACK_ENABLE_NETWORK=0` and
+`COREPACK_ENABLE_DOWNLOAD_PROMPT=0`.
+
+The complete runner-readiness fixture returned zero and proved finalizer
+generation failure, finalizer validation failure, atomic success, the full
+predecessor matrix, launcher-ancestor exclusion, runner-descendant exclusion
+and foreign ts-drp-root rejection. That first passing fixture emitted zsh
+loop-local and expected missing-predecessor diagnostics. The declaration and
+explicit-return correction changed no predicate; the bounded post-correction
+audit returned zero with empty stdout/stderr. After the later process-owner
+correction, a final-code fixture also returned zero with empty stdout/stderr
+and simultaneously proved foreign ts-drp rejection, argv-proven unrelated-root
+acceptance and complete launcher-lineage exclusion.
+
+The remaining capture needed three bounded non-campaign attempts, all retained.
+Attempt one returned one before either list command because the diagnostic
+inventory passed zsh's builtin token `kill` to `realpath`; the corrected check
+binds the actual absolute `/bin/kill` used by the fixture. Attempt two returned
+one before either list command because PID 62652's cwd is the non-repository
+parent `/Users/aristotle/Documents/Projects/f`, although its existing argv path
+resolves to separate repository
+`/Users/aristotle/Documents/Projects/f/freq-ticketing-clean-env-ef1ee12f`
+whose root package name is `freq`. The final auditor remains fail-closed when
+`lsof` cannot supply a cwd, when neither cwd nor argv resolves a Git root, or
+when either resolved root package is `ts-drp`; it accepts only a positively
+identified non-ts-drp owner. This is the concrete implementation of the user's
+permission to proceed while unrelated processes run. Attempt three returned
+zero, performed the two one-time list commands and found no ts-drp conflict and
+all four fixed ports clear. These two readiness refusals consumed no campaign
+authority and changed no product/test behavior.
+
+The copied classifier and independent validator remain byte-identical at
+`99d7d65caaad75ae34370d93c230c91e16d6459ccc23594672bb2557254cced9`
+and `9508e84117c225c1432ffc6c0ec9b4d7eaeb7fdbc0cc55cb52b05ad63229b245`.
+The frozen dual-local and channel-close payloads returned zero; the frozen
+actual `2/1` and `1/2` ambiguous payloads returned one. The ordinary tracked
+workspace is clean, HEAD equals upstream with a good signature, the protected
+status hash is still
+`6059409902c4f17404bed9cc033bd839a5e78193c4ce7731458ba9201f013970`,
+all 26 stashes remain, and protected untracked paths remain present.
+
+The complete `.logs/d108e4as-freeze/` evidence root has a recursive
+self-excluding 217-file manifest whose SHA-256 is
+`c577dbdab0a7e78cdd57b99b0d4d1f85f56c8e5b4df03e6fa214d3db5e6c266d`.
+It validates with status zero; the validation-record SHA-256 is
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+No artifact may be changed after this evidence-anchor commit.
+
+The plan's earlier literal `<SIGNED_FREEZE_COMMIT>` self-equality shape is
+non-executable because a signed Git commit cannot contain its own future hash.
+This correction does not weaken signed custody. Readiness is first anchored by
+one signed/pushed plan-only evidence commit. A second signed/pushed plan-only
+freeze checkpoint then hardcodes that already-known anchor in every root/setup
+and launch guard, requires the live HEAD to equal upstream and verify with a
+good signature, requires the anchor to be an ancestor, and requires every
+tracked path changed since the anchor to be exactly this plan. That second
+checkpoint contains the complete placeholder-free blocks and is the sole
+subject of the formal freeze review. This two-commit construction supersedes
+only the impossible self-referential hash equality; all manifest, mode, copy,
+expiry, predecessor, signed-HEAD and fail-closed gates remain mandatory. Neither
+commit authorizes campaign-root setup before the formal freeze review closes.
