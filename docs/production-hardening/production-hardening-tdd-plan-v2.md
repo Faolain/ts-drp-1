@@ -78313,33 +78313,51 @@ D.108e4ay changes only
 `pageFailureEvidence()` adds independently bounded diagnostic results for the
 existing `rtcLifecycleObservations()`, `rtcChannelStates()` and
 `libp2pMonitorObservations()` calls. A failed diagnostic remains explicit and
-cannot suppress the other owners. Existing `network`, `rtc`, `zone` and
-`pageClosed` fields remain unchanged. The default five-test inventory, retained
-campaign title, reporter, workload and campaign attachment names remain
-unchanged.
+cannot suppress the other owners. The current `!rtcResult.ok` early return must
+include all three new diagnostic results rather than dropping them. Existing
+`network`, `rtc`, `zone` and `pageClosed` fields remain unchanged. The default
+five-test inventory, retained campaign title, reporter, workload and campaign
+attachment names remain unchanged.
 
 Second, an opt-in test available only under
 `D108E4AY_RESET_REPLAY=1` is titled exactly
 `D.108e4ay attributes the post-loss bilateral fabric reset`. It reuses the
 existing real-browser helpers and performs the frozen pre-trial prefix only:
 
-- enable the same CDP network emulation before either peer socket exists;
-- open the two grid pages, create the same zone and install the existing
-  monitor observers;
-- prove the same 30-at-20-ms total-loss observation under 100-percent loss;
-- restore no loss for 250 ms, then run the same 600-at-20-ms preliminary
-  stream under 30-percent loss and the existing delivery-floor assertions;
-- restore no loss and pass the existing open-transport, network-pair,
-  raw-delivery and durable-baseline gates;
-- reset both existing observers to one replay id immediately before the
-  concurrent two-page `fabric.reset()` so carry-in monitor activity is
-  retained under that id;
-- call both resets in the same `Promise.all`, run the unchanged 10-second
-  `waitForOpenTransportPair()` and `waitForNetworkPair()` gates, and require a
+- install the RTC observer with `addInitScript` before creating either page,
+  enable the same CDP network emulation before either peer socket exists, open
+  both pages, create the same zone and install the libp2p monitor observers;
+- start `sendMovement(creator, 30, 20)` under 100-percent loss, wait 500 ms,
+  sample the total-loss observation before awaiting the send, then preserve the
+  exact link/network assertions;
+- restore no loss for 250 ms, apply 30-percent loss, run
+  `sendMovement(creator, SAMPLE_COUNT, SAMPLE_INTERVAL_MS)` with the retained
+  600-sample/33-ms constants, wait 500 ms, preserve both delivery-floor
+  assertions and attach the same preliminary-calibration fields before
+  restoring no loss;
+- pass the existing open-transport, network-pair, raw-delivery and
+  durable-baseline gates, followed by the exact public fabric-method readiness
+  check;
+- keep both observers continuous, exactly as ordinary-3 did before its failing
+  checkpoint. Immediately before concurrent reset, capture each endpoint's
+  full RTC wire/lifecycle/channel and monitor snapshots plus sequence/count
+  fences; do not call either observer's destructive `reset()`;
+- capture a pre-reset custody envelope for each endpoint containing the exact
+  raw authenticated connection id/generation from the existing test-accessible
+  `DRPNode.ephemeralUnreliableWebRtcSnapshot(objectId)`, the unique open raw RTC
+  connection/channel identity, zone counters, and the libp2p connection roster
+  including connection id and remote peer;
+- pass the legal lowercase-hyphen trial id
+  `e3-03-total-loss-calibration` to both `fabric.reset()` calls in the same
+  `Promise.all`, then run the unchanged 10-second
+  `waitForOpenTransportPair()` and `waitForNetworkPair()` gates and require a
   bidirectional raw delivery; and
-- on either pass or failure, attach both endpoints' network, zone, full RTC
-  lifecycle, channel states, monitor records and the CDP profile ledger. The
-  failure path rethrows the original error after attachment.
+- on either pass or failure, capture the corresponding post-reset custody,
+  successors and full continuous observer records, attach pre/fence/post
+  evidence for both endpoints with the CDP ledger, stage and original error,
+  then rethrow the original failure. Interpretation uses the union of pre-reset
+  records, the fenced interval and post-reset records; it never infers absence
+  from a destructive observer reset.
 
 The opt-in title is absent from the default inventory and is never added to the
 retained seven-test allowlist or any campaign launcher. Its list probe must
@@ -78350,6 +78368,9 @@ campaign invocation is authorized by D.108e4ay.
 The executable list and sole runtime commands are frozen as:
 
 ```sh
+env -u D108E4AY_RESET_REPLAY pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts --list
+
 D108E4AY_RESET_REPLAY=1 pnpm exec playwright test \
   --config playwright.e3-03-loss-and-hol.config.ts \
   --grep 'D\.108e4ay attributes the post-loss bilateral fabric reset$' --list
@@ -78360,23 +78381,33 @@ D108E4AY_RESET_REPLAY=1 pnpm exec playwright test \
   --workers=1 --retries=0 --fail-on-flaky-tests --reporter=json
 ```
 
-The list command is non-consuming. The second block is exactly one focused
-non-campaign invocation and must not be repeated merely to seek a pass.
+Both list commands are non-consuming. The environment-unset listing must
+contain exactly five default titles and omit the D.108e4ay replay. The opt-in
+grep listing must contain exactly one test in one file and omit the retained
+campaign title. The final block is exactly one focused non-campaign invocation
+and must not be repeated merely to seek a pass.
 
 Interpretation is fail-closed. A replay failure is product-owned only if the
-captured peer-local lifecycle proves a raw owner transition failed while the
-selected authenticated connection remained current and usable under the
-already-frozen D.108e4g predicate. A monitor false positive is not established
-by connected state or a recent ping: the same connection must have no
-product-owned close, nonterminal signaling/ICE/connection states, a
-monitor-owned abort, and a successful reliable signaling or ping round trip at
-or after the abort decision and before physical close. If that complete
-predicate is proven, stop and create the separately reviewed minimal upstream
-reproduction; do not patch or upgrade js-libp2p here. If the reliable
+captured pre/fence/post peer-local custody proves a raw owner transition failed
+while the exact selected authenticated connection remained current and usable
+under the already-frozen D.108e4g predicate. A monitor false positive is not
+established by connected state, peer-id presence or a recent ping. The abort
+decision means the joined monitor `ping-failure` or other recorded
+monitor-abort-triggering event, not the later synchronous `abort()` call. The
+same libp2p connection must have no product-owned close, nonterminal
+signaling/ICE/connection states, a monitor-owned abort and a successful joined
+round trip at or after that decision and before physical close. Existing
+non-ping `newStream` telemetry cannot by itself prove this conjunction, and
+wall-clock proximity between numeric RTC ids and string libp2p connection ids
+is not an identity join. Unless the complete existing evidence proves every
+operand, the abort remains contextual and cannot authorize an upstream claim.
+If the conjunction is proven, stop and create the separately reviewed minimal
+upstream reproduction; do not patch or upgrade js-libp2p here. If the reliable
 connection was unusable, its monitor abort may be correct and cannot authorize
-an upstream or raw-owner change. If the focused replay passes, stop product
-attribution and assign a narrow browser timing/variance owner; one pass may not
-rewrite ordinary-3 or restore campaign authority. Mixed or incomplete evidence
+an upstream or raw-owner change. If the focused replay passes, it proves only
+non-reproduction in that invocation: ordinary-3 remains unattributed,
+browser timing/variance remains a hypothesis rather than an owner, and no
+campaign, product or upstream authority follows. Mixed or incomplete evidence
 also stops without a product change.
 
 The slice must not change production source, `examples/grid`, dependencies,
@@ -78389,9 +78420,29 @@ reslice. Static gates are exact-owner ESLint/Prettier, standalone TypeScript,
 the default and opt-in list probes, and protected path/stash/process/port
 predicates. The focused replay is the sole runtime invocation.
 
+Changing the test owner necessarily changes the frozen D.108e4as
+`ordinary-identity.sha256` and behavior-head predicates. It does not mutate the
+immutable campaign root or its three consumed failures, but any future
+authority owner must build and review a fresh runner/source-identity freeze
+before isolated-1 through isolated-3 can execute.
+
 The signed/pushed plan receives one Grok/Codex-high/Opus-xhigh review. Kimi is
 replaced by the user-authorized Codex `gpt-5.6-sol` high reviewer; Fable and
 collaboration subagents remain prohibited. Only P0/P1 findings block. P2
 findings receive a disposition without another fixture, confirmation round or
 review-policy slice. If the blocking union is empty after one batched
 correction, implement the test-only evidence owner and focused replay directly.
+
+The one review round returned Codex `CHANGES_REQUIRED` with four P1s and one
+P2, Opus `CHANGES_REQUIRED` with two overlapping P1s and four P2s, and Grok
+`NO_VERDICT` after a normal end turn without a schema-valid terminal result.
+The P1 union is corrected above: literal retained cadence/order, continuous
+observer history, exact pre/post owner custody and non-attribution on a pass.
+The P2 union is dispositioned in the same batch: the RTC-error path retains all
+diagnostics, one legal fabric id is pinned, default and opt-in inventories have
+frozen list commands, the unreachable signaling leg cannot establish a false
+positive, and future campaign authority must re-freeze source identity. The
+review-wrapper's attempted use of zsh's read-only `status` variable occurred
+only after both Codex and Opus had written complete structured results; their
+model verdicts are intact and no reviewer is relaunched. A deterministic local
+audit closes this correction without another model round.
