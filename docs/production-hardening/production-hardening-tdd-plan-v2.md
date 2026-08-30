@@ -78935,12 +78935,12 @@ D.108e4bb owns the one deterministic raw-owner recovery path left explicit by
 D.108e4ba. The immutable `ordinary-3` artifact records one authenticated loss
 and one `restart` drop at each endpoint, no raw link and handshake-failure
 counters 27/1. D.108e4ba proves exact 27/1 initiator-side setup failures recover
-on the next clean retry. It does not exercise the two held-replacement counter
-owners: initiator `#failReplacementReadiness` and the acceptor's deferred
-`finish()` deadline catch. The retained D.108e4au lost-control and asymmetric
-expiry rows exercise those owners while usable A remains, then stop immediately
-after proving that the next allocation begins. They do not prove eventual
-convergence after bilateral restart has already removed A.
+on the next clean retry. It does not exercise eventual recovery after a held
+replacement-control exchange expires. The retained D.108e4au lost-control and
+asymmetric-expiry rows exercise the relevant expiry owners before bilateral
+restart has removed A at both endpoints, then stop immediately after proving
+that the next allocation begins. They do not prove eventual convergence after
+bilateral restart has already removed A.
 
 This is a test-only discriminator changing only
 `packages/network/tests/unreliable-webrtc-e3-01-red.test.ts`. It reuses the
@@ -78958,48 +78958,62 @@ Every row:
   close, invokes both `restart()` calls in one synchronous turn, releases the
   barrier, awaits both calls and proves the old channels closed with one local
   `restart` drop, no active link and no exchange growth at either endpoint;
-- connects one exact replacement authenticated pair, drops exactly the two
-  bounded sends of the selected readiness control, and awaits both explicit
+- arms the selected control budget only after that snapshot, connects one exact
+  replacement authenticated pair, drops the natural-order first-exchange
+  budget of one `READY`, two `ACK`s or one `COMMIT`, and awaits both explicit
   connection-arrival reconciles;
 - proves one and only one initial replacement exchange on that pair, the
-  control-specific held state through 9,999 ms, and no third authenticated
-  connection or fixture-owned identity mutation;
-- advances the final deadline millisecond and, where the active initiator must
-  first observe the acceptor close, exactly one further 250 ms retry cycle;
+  exact first-exchange control-frame matrix, exhaustion of the selected static
+  drop budget, the control-specific held state through 9,999 ms, and no third
+  authenticated connection or fixture-owned identity mutation;
+- advances the final deadline millisecond and exactly one further 250 ms cycle,
+  which either executes the already-owned retry or proves the same-turn retry
+  already converged without further growth;
 - requires one clean second exchange on the same replacement connection id and
   generation, exact control-specific retained counters/drop ownership, one
   active replacement link at both endpoints and bidirectional route ingress;
   and
 - advances two more 250 ms cycles with no exchange, allocation, counter or
-  snapshot growth and zero remaining fake timers.
+  snapshot growth and zero remaining fake timers, then clears the static
+  control-drop map in `finally` so no row can contaminate another.
 
 The frozen pre-timeout and recovery matrices follow the current product owners,
-not browser timing. With both `READY` sends lost, the initiator has received
-the acceptor's eager `ACK`, sends `COMMIT` and promotes locally while the
-acceptor remains held because it never received `READY`. With both `COMMIT`
-sends lost, the initiator likewise promotes after receiving `ACK`, while the
-acceptor remains held without commit. At 9,999 ms both rows therefore require
-initiator/acceptor active links 1/0, counters 0/0 and only the first exchange.
-At 10,000 ms the acceptor deadline increments only the acceptor counter to one,
-closes its held channel, and the initiator records one additional
-`channel-close` drop; the next 250 ms cycle must perform the clean second
-exchange and converge with counters 0/1, initiator drops 2 ending in
-`channel-close`, and acceptor drops 1 ending in `restart`.
+not browser timing. The fake's natural FIFO ordering emits the acceptor's eager
+`ACK` before the initiator installs its message listener, so that role frame is
+sent but not received. The exact first-exchange frame matrices are therefore:
 
-With both `ACK` sends lost, neither side can promote before the common setup
-deadline. At 9,999 ms the row requires active links 0/0, counters 0/0 and only
-the first exchange. At 10,000 ms the initiator expiry increments
-`#failReplacementReadiness`, the acceptor deferred finish catch increments its
-counter, and the already-owned lower-id 250 ms retry chain may execute its clean
-second exchange in that same fake-clock turn. After bounded microtask settling
-the required state is one active link at each endpoint, counters 1/1 and only
-the original `restart` drop at each endpoint. The test records exact control
-frames so a wrong drop script cannot masquerade as product behavior.
+- one dropped `READY`, one eager `ACK` send and zero `COMMIT`s for the READY
+  row;
+- one `READY`, two dropped `ACK`s and zero `COMMIT`s for the ACK row; and
+- two `READY`s, two `ACK`s and one dropped `COMMIT` for the COMMIT row.
+
+The selected `FakeDataChannel.controlDrops` entry must be exhausted immediately
+after that first exchange. With READY or ACK loss, neither side promotes before
+the common setup deadline; at 9,999 ms the rows require active links 0/0,
+counters 0/0 and only the first exchange. With COMMIT loss, the initiator
+receives the one delivered response ACK, records one COMMIT send and promotes,
+while the acceptor remains held without commit; its 9,999 ms matrix is active
+links 1/0, counters 0/0 and only the first exchange.
+
+For every control kind the acceptor's deferred `finish()` deadline was created
+before the initiator readiness expiry. At 10,000 ms its catch therefore runs
+first, increments only the acceptor handshake counter, discards the held link
+and synchronously closes the fake peer channel. That peer close discards any
+initiator-held replacement and clears its later expiry without invoking
+`#failReplacementReadiness`. All recovered counter matrices are consequently
+0/1. READY and ACK retain one `restart` drop at each endpoint. COMMIT had
+promoted the initiator, so the peer close records its additional
+`channel-close` drop: initiator drops 2 ending `channel-close`, acceptor drops 1
+ending `restart`. By the end of the uniform additional 250 ms cycle the exact
+second exchange must have converged on both replacement ids. The test records
+the full frame matrix and drop-map exhaustion so a wrong script cannot
+masquerade as product behavior.
 
 The causal matrix is fail-closed. Failure before initial traffic, before the
 authenticated-loss/restart snapshot, from a wrong peer-close barrier, from
-failure to consume exactly two selected control sends, or from replacement
-identity mutation is fixture error. Once the exact pre-timeout matrix is
+failure to consume the exact selected one/two/one control budget, from a
+non-exhausted drop map, or from replacement identity mutation is fixture error.
+Once the exact pre-timeout matrix is
 proven, an incorrect expiry counter/drop owner, a missing or extra exchange,
 failure of the product-owned retry chain, failure to select both replacement
 ids, failed bidirectional ingress or residual retry growth is causal RED. A
@@ -79011,7 +79025,9 @@ attribution, threshold change or D.108e5.
 
 Before runtime, exact-owner Prettier/ESLint, network typecheck/build,
 `git diff --check`, source-shape custody and the non-consuming collection must
-pass. Collection must select exactly six titles in one file:
+pass. The `it.each` tuple places the control name before its numeric kind so the
+title renders `READY`, `ACK` or `COMMIT`. Collection must select exactly six
+titles in one file:
 
 ```sh
 pnpm exec vitest list \
@@ -79049,3 +79065,29 @@ deterministic audit; P2 receives disposition without another review round.
 Deterministic RED receives local causal validation. A passing test-only
 discriminator receives no additional model ceremony; a later product GREEN
 would receive the one formal three-model implementation review.
+
+The single plan review ran against signed/pushed commit
+`0608ba9e35e655ca03a3cda6e6b13dd14f85d3a8`. Codex
+`gpt-5.6-sol` high returned `CHANGES_REQUIRED` with two P1s: READY loss has one
+COMMIT rather than two, and acceptor-first same-deadline cleanup makes ACK loss
+recover at 0/1 rather than 1/1. Its terminal JSON SHA-256 is
+`27852dac034fd33d190e448616ffffe639abfe56e8617e8cc70faad187a0a4a0`.
+Grok ended normally after 615.479 seconds but fenced its terminal object, so
+the runner honestly records `NO_VERDICT`; its public analysis independently
+identified the ACK ownership error and requested exact frame/drop exhaustion.
+Its status/public SHA-256 values are
+`331a3810547ac6f9e2a3b139fb17e573d7b481f70c803a12a53af75299afb5da`
+and `84e60ca53751b764f8c6914b496c225345dbbd36a5708bd177e723b4f879e518`.
+Opus xhigh returned `CHANGES_REQUIRED` and grounded three P0s in natural fake
+channel ordering: the eager ACK is emitted before listener installation,
+READY/COMMIT therefore have one selected send each, and acceptor expiry
+preempts every later initiator expiry. Its structured envelope SHA-256 is
+`164a7b50e7379047d3e9c4d98c8688ef24f02aa42111a9a2199cbc6f533657e0`.
+
+The batched correction above closes the complete blocking union by freezing
+the executable one/two/one drop budgets, exact natural-order frame matrices,
+0/1 recovery counters, uniform deadline-plus-250 ms observation and drop-map
+teardown. It also disposes the P2 union by pinning title argument order and
+narrowing the novelty statement. No scope, production behavior, timeout,
+retry cadence or workload changes; deterministic local audit closes the plan
+gate without another review round.
