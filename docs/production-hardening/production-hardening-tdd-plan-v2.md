@@ -79619,3 +79619,79 @@ behavior. Any change to the retained timing gate, calibration workload,
 campaign launcher or whole-run authority is a high-risk exception and must be
 frozen and reviewed before execution. No Fable, Kimi or collaboration subagent
 is authorized; Codex `gpt-5.6-sol` high continues to substitute for Kimi.
+
+The sole D.108e4be attribution ran against the exact retained title with only
+the trial-loop observer window temporarily changed from 5,000 ms to 25,000 ms.
+The source was restored immediately afterward to SHA-256
+`0b3648f5046240991056a07e3b818271675ce78045237de8f944f2079ec70444`;
+production `packages/network/src/unreliable-webrtc.ts` remained byte-identical
+at `969c68c54d7fa9b20e35aeea005a9abedc67b4277bbfb24242469f01323886b6`.
+The diagnostic was not a campaign invocation and consumed no ledger name.
+
+The result disproves one fixed slow-reliable explanation. Trial zero observed
+its first raw and reliable sends at the same wall millisecond, completed all
+600 samples under the unchanged 30% loss profile and passed its complete
+semantic matrix. The next failure moved to `e3-03-1-prepare`: after both pages
+again called `fabric.reset()` concurrently, the unchanged 10-second
+`waitForOpenTransportPair()` gate observed zero raw links at both endpoints.
+Peer lists still contained the counterpart and relay, but the creator recorded
+2 authenticated losses/4 handshake failures and the receiver 3 authenticated
+losses/31 handshake failures. Thus the same product tree can complete a full
+retained trial and then fail a later concurrent fixture reset, while the prior
+campaign failed earlier on reliable readiness. This is mixed browser
+lifecycle/reset scheduling evidence, not a deterministic product-owner RED.
+
+The reporter records start `2026-08-30T16:22:34.241Z`, 107.012172 seconds,
+0/0/1/0 expected/skipped/unexpected/flaky and zero top-level errors. Reporter,
+failure attachment, compact summary, trace and validating self-excluding
+manifest SHA-256 values are respectively
+`1e45982890ffd2695e4b054e4cffac3a4a71ffc0ea70591588ce02835f23d49e`,
+`7b62f4b8d289a30a4e78cb69c351931dadf8bfb3af800c924c0da933238dab73`,
+`ca68f8ddeca57007de5776dddac603676fd12c329bb68c3a4ddf969701b5825c`,
+`db889cdced4895bf63be603cf9e7d8bf0211d3fa2432df1a3d62ed199d222a4b`
+and `bade0d508ae5081cc7044c0edc8ba351ccbeb63a570021b540f03eac9b1cd312`.
+An initial read-only `jq` projection indexed its slurped attachment as an
+object instead of a one-element array. The corrected projection and manifest
+validate; that diagnostic error is not a source or runtime failure.
+
+###### D.108e4bf — deterministic serial fixture reset GREEN
+
+D.108e4bf is the smallest test-infrastructure repair justified by D.108e4be.
+The retained campaign's purpose is three fixed 600-sample 30% loss trials, not
+to make every test-state reset a simultaneous bilateral restart stressor.
+Simultaneous restart behavior already remains covered in both peer orderings by
+the retained deterministic network-owner tests, while the opt-in D.108e4ay
+real-browser replay retains the literal concurrent reset prefix and has passed
+with complete lifecycle custody. The campaign may therefore serialize its
+test-state reset without weakening product coverage.
+
+Change only `tests/e3-03-loss-and-hol-proof.pw.ts`. Add one test-local helper
+that awaits the creator's existing `fabric.reset(trialId)`, then the unchanged
+10-second open-transport and 15-second network-pair predicates, then awaits the
+receiver's same reset. Replace only the retained campaign title's three
+concurrent reset sites—workbench calibration, each trial prepare and durable
+control—with that helper; retain the existing post-helper open/network gates
+for the second endpoint. Do not change the D.108e4ay opt-in replay, production
+or example source, product APIs, RTC/signaling behavior, reset implementation,
+network profiles, 5/10/15-second gates, 600/32 ms trial workload, 300/20 ms
+calibration workload, three-trial count, delivery/AoI/HOL thresholds, browser
+identity, total test timeout or evidence/classifier semantics.
+
+GREEN must first pass exact-owner formatting, lint, standalone typecheck,
+source-shape and `git diff --check`. Run the retained campaign title once as a
+focused non-campaign GREEN with retries disabled and complete JSON/lifecycle
+evidence. If it fails outside the expected reset/readiness boundary, stop and
+diagnose rather than adding another change. If it passes, run the retained
+seven-test non-campaign suite once. Because reset ordering affects campaign
+readiness design, the signed/pushed GREEN receives the single formal
+Grok/Codex-`gpt-5.6-sol`-high/Opus-xhigh implementation review over plan,
+D.108e4be evidence and GREEN. Only P0/P1 blocks; one batched correction is
+permitted if executable scope changes.
+
+After a green retained suite and empty blocking review union, freeze a new
+isolated checkout and six fresh whole-run names in a separate plan-only
+campaign checkpoint. The user's present authorization covers those narrow and
+whole runs, so authorization must not be requested again. That freeze retains
+immutable prior roots and first-failure custody, receives the required
+high-risk launcher review, and then executes sequentially. D.108e5 is reached
+only after all six fresh invocations and their final evidence review pass.
