@@ -80313,3 +80313,79 @@ and self-excluding review-index SHA-256 values are respectively
 `a82a29b4c5b72be23100606a4b5d632fa2166084bc7ccd873ee8f83368afe8cb`
 and `26c23a3b1dd41e66d45044a5739b86be0a423c1372e395a7662d3046735af7a1`.
 Evidence is immutable under `.logs/d108e4bi-green-review/`.
+
+The authorized retained browser title then ran once under the unchanged
+600-second process-group watchdog. It passed preliminary 30% calibration with
+600 sends and 360 deliveries, passed the no-loss reset that D.108e4bi repaired,
+and completed the first real 30% trial with 590 creator raw sends and 358
+receiver accepts. It failed after 88.564 seconds at `e3-03-0-assertions` with
+`D108E4H_LIFECYCLE_ORDER_INVALID`; campaign evidence count remained zero and
+the retained-seven allowlist did not run.
+
+This is not a product-liveness regression. Both zero-local endpoints retained
+one stable selected RTC identity plus one open, application-idle candidate.
+The receiver's acceptor candidate `(connectionId=10, channelId=398)` installed
+the product handler at lifecycle sequence 1202 with `readyState=open`, emitted
+the product's eager initial ACK at 1203, recorded the observer open event at
+1205, received READY at 1206, and emitted the post-READY ACK at 1207. The
+D.108e4bh classifier rejected that legitimate ordering because it requires all
+controls after the observer open event and all acceptor ACKs after READY. The
+product intentionally sends the first acceptor ACK from `#prepareLink`, and an
+already-open inbound channel can reach the product handler before the queued
+observer open event is recorded.
+
+Reporter, failure telemetry, compact endpoint custody, trace and validating
+self-excluding evidence-index SHA-256 values are respectively
+`14f92998637e11e79ff594fbf6a131410bc6520f2ecbdb88ca11433f8f96f60a`,
+`eb81bf57b66c30748f58533595be2c1870238a6f47538ba3bec4671b61be9a38`,
+`63a1f8188256162eb5ee7b2a58f849015e8511c1dd195db9dc0b31341f710474`,
+`5d0f7a6a0978e63528346e83d7b90b16f9e3f43469dcb212b706ed098502c9f4`
+and `636ad926fd42e98da0cbc3f95855dbc8ecc8ebafbd0c2a1c86e65d6901a04336`.
+Evidence is immutable under `.logs/d108e4bi-retained-browser/`.
+
+###### D.108e4bj — already-open acceptor candidate ordering
+
+D.108e4bj owns only the demonstrated D.108e4bh lifecycle-order classifier
+defect in `tests/e3-03-loss-and-hol-proof.pw.ts` and this plan/evidence record.
+Do not change production source, APIs, dependencies, browser/build
+configuration, workload, timing, thresholds, ports, evidence schema,
+activation semantics, or prior immutable evidence.
+
+Preserve the exact one product-handler, one observer-open, zero-terminal,
+application-idle, stable-authenticated and unique selected/candidate identity
+requirements. For an initiator deadline candidate, preserve the current
+strict rule that all readiness controls follow both the product handler and
+observer open event, READY precedes received ACK, and received ACK precedes
+COMMIT. For an acceptor deadline candidate, recognize the existing protocol's
+bounded eager ACK ordering:
+
+- every control must follow the product message-handler installation;
+- any control before the observer open event is permitted only when the
+  product handler itself recorded `readyState=open`, and every such control is
+  a sent ACK (`kind=2`);
+- all received controls must follow the observer open event;
+- at least one received READY must be followed by at least one sent ACK, while
+  at most the single eager sent ACK may precede READY; and
+- received COMMIT remains forbidden and retains
+  `D108E4H_IDENTITY_JOIN_INVALID`.
+
+Freeze deterministic RED by changing the existing positive acceptor deadline
+candidate to the observed sequence: product handler/open state, eager ACK
+attempt+success, observer open, received READY, post-READY ACK
+attempt+success. The pre-GREEN classifier must fail the unchanged positive
+expectation with exact `D108E4H_LIFECYCLE_ORDER_INVALID`. GREEN changes only
+the closed validator and adds exact-code mutants for pre-handler control,
+pre-open received control, pre-open non-ACK send, handler `readyState` other
+than open, a second eager ACK, and no post-READY ACK. Preserve every existing
+D.108e4aa/D.108e4ac/D.108e4av/D.108e4bg/D.108e4bh result and error code.
+
+Run the exact focused schema-validator title once for RED and once after GREEN,
+with no retained title during deterministic work. GREEN also requires strict
+standalone TypeScript, exact-owner ESLint/Prettier/diff/source-shape gates and
+the network package typecheck. This changes retained campaign evidence
+interpretation, so sign/push this bounded plan and run one high-risk
+Grok/Codex-`gpt-5.6-sol`-high/Opus-xhigh plan review. Only P0/P1 blocks; P2 is
+dispositioned without new ceremony. After signed GREEN, run the one formal
+implementation review, then one fresh retained browser title; only a pass may
+release the retained-seven allowlist. No campaign runs during D.108e4bj. The
+existing authorization covers all narrow runs and must not be requested again.
