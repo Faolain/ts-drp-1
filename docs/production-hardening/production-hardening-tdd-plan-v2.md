@@ -76406,3 +76406,83 @@ so they receive no new review.
 The D.108e4at plan gate is closed. Proceed once with the frozen focused RED and
 once with its named retained unit roster; do not run a browser, long campaign,
 Kimi, Fable, collaboration subagent or separate RED model review.
+
+D.108e4at deterministic RED is signed/pushed as
+`22b738087f9c987dd5498ab698d7f908ccd5cdb2`, with sole tracked owner
+`packages/network/tests/unreliable-webrtc-e3-01-red.test.ts`. Its distinctly
+named remote-inbound-open barrier lets answer delivery and the initiator's local
+B open complete while the peer B remains connecting without product message
+handler or semantic open. The one focused invocation returned status one with
+exactly two selected parameter rows, both failing only with
+`D108E4AT_REMOTE_REPLACEMENT_READINESS_GAP`; 49 unrelated rows were skipped,
+there was no alternate error and the retained campaign title was absent.
+Focused reporter SHA-256 is
+`06e03d29602cb8880f4707d251ce872bc703d49efa5e485d0df8790aa27d3939`.
+
+The first retained-roster command selected the exact twelve expected rows and
+all twelve passed with zero failed assertions, but the shell returned one only
+after Vitest applied the root repository's unrelated global coverage gate to
+the narrow selection (`0.92% < 70%`). Reporter `success=true` and its SHA-256 is
+`264ef39d19bab97549f14a1c21a8b535557e97eb346e8d27ae1576c05f382cce`.
+This is preserved as a faulty gate invocation, not a code/test failure. With no
+source change, one corrected invocation added only
+`--coverage.enabled=false`; it returned status zero with the same exact twelve
+passes, zero failures and 39 unselected rows. Corrected reporter SHA-256 is
+`693c95a110955df0a7abf3e64586a817ef31057be53060f2b11a21ab788b4544`.
+This single transparent diagnostic correction is the only deviation from the
+planned one retained command; it does not authorize another RED invocation.
+
+Network package typecheck, exact-owner ESLint and Prettier, `git diff --check`,
+one-path tracked custody and production/browser-validator byte custody all
+returned zero. The RED test-owner SHA-256 is
+`6a597b74daf29f25adea275e94ed128156d0fd04cd37503ee6421450500fe447`;
+unchanged production owner SHA-256 is
+`61936ea396ebf76e1a5359d7cb67252fafdfdab09f48a7824d8f555ea68fb1ce`;
+unchanged browser validator SHA-256 is
+`22b0b618a094e0b125a4436cc97a5ef6fa535249ad349b30d505b7b3f70ae9af`.
+The self-excluding `.logs/d108e4at-red/SHA256SUMS` validates and has SHA-256
+`2c0be97862ad5146ae0e99e32a177b9abac99e236b3108afb3c289b4d83f5bc7`.
+No browser, profiler, long campaign or reviewer ran; the D.108e4as ledger
+remains one consumed failure, zero passes and five unrun names.
+
+The causal RED admits one narrow internal GREEN without a new wire, API,
+timer, threshold, dependency or workload contract. The single pending-
+replacement concept becomes role-neutral: rename `#pendingInboundLinks` to
+`#pendingReplacementLinks`, `#holdInboundLink` to `#holdReplacementLink`,
+`#discardPendingInbound` to `#discardPendingReplacement`,
+`#promotePendingInbound` to `#promotePendingReplacement`, and
+`#retiringInboundLinks` to `#retiringLinks` in the same production pass. No
+compatibility alias or parallel map remains.
+
+Behavior changes only at the two existing setup completions. When `#initiate`
+has an open B but A is still open on an older authenticated identity, it prepares
+and holds B as the sole pending replacement, returns/keeps A as the current send
+owner and does not close A. When `#accept` reaches open B on the current
+authenticated identity, it registers B directly instead of holding it. That
+registration installs B's product handlers before dropping the acceptor's A.
+The paired A close then reaches the initiator, whose channel-close path removes
+A and promotes its already-open pending B. Failed setup continues to retain A;
+an externally unusable A keeps the existing failed-send recovery path; admission,
+capacity and cleanup ownership are unchanged.
+
+The focused GREEN matrix is frozen. While remote B is held, both endpoints keep
+exactly one active A, zero link drops, one pending physical B each, successful
+A traffic and no peer B product handler/open. After release, both endpoints
+select the exact authenticated B with two physical peer connections and no
+additional allocation; the lexicographic initiator records one
+`channel-close`, the acceptor records one `replacement`, and post-promotion
+traffic succeeds. Thus asymmetric peer-dependent ownership is preserved but
+the owner direction correctly follows the endpoint that became remotely ready;
+no zero-owner or ambiguous count is introduced. Rename the RED control to a
+positive continuity title and remove only its intentional terminal throw.
+
+GREEN may change only `packages/network/src/unreliable-webrtc.ts` and
+`packages/network/tests/unreliable-webrtc-e3-01-red.test.ts`. Update the two
+retained role-dependent drop-reason expectations whose direction is deliberately
+reversed; every other retained expectation remains unchanged. Run the focused
+GREEN once, then the complete `unreliable-webrtc-e3-01-red.test.ts` file once
+with coverage disabled, network typecheck/build, exact-owner lint/Prettier/diff,
+source-shape/name-removal checks and a self-excluding GREEN manifest. Do not run
+a browser or long campaign. Sign and push GREEN, then run the sole formal Grok,
+Codex `gpt-5.6-sol` / high and Opus 5/xhigh review over signed plan, RED and
+GREEN. Only P0/P1 blocks. No Kimi, Fable or collaboration subagent is permitted.
