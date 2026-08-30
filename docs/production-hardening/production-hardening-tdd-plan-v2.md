@@ -79951,28 +79951,44 @@ change product source, APIs, dependencies, browser/build configuration,
 workload, timing, thresholds, ports, evidence schema, link-drop ownership,
 activation semantics or any prior immutable evidence.
 
-Preserve the complete open raw-RTC census. For a zero-local endpoint that is
-not the peer-dependent incoming-replacement side, identify the selected
-deadline RTC owner by requiring exactly one deadline entry equal to the sole
-prepare RTC identity. The authenticated identity must remain exactly stable.
-Additional deadline-open RTC identities are pending candidates, not selected
-owners, and are admissible only when all of the following hold:
+Preserve both complete open raw-RTC censuses. For a zero-local endpoint that is
+not the peer-dependent incoming-replacement side, identify the selected RTC
+owner as the unique identity present in both the prepare and deadline
+censuses. Require both complete censuses to contain unique identities, no more
+than one non-selected identity apiece, and the authenticated identity to remain
+exactly stable. Require every application `rawSends`, `acceptedRaw` and
+`rejectedRaw` record in the trial to belong to that selected common identity.
+This selects the unchanged active owner from evidence rather than assuming the
+complete physical census is a singleton.
 
-- every complete deadline RTC identity is unique;
-- each pending candidate has exactly one product message-handler installation
-  and exactly one RTC open event in the trial lifecycle;
-- no pending candidate owns an application `rawSends`, `acceptedRaw` or
-  `rejectedRaw` record; and
-- all existing control-attempt, control-terminal and control-message joins
-  remain valid.
+A non-selected identity present at prepare but absent at deadline is a
+pre-trial pending or retiring candidate. Its handler/open/control anchors may
+precede the per-trial observer reset, so do not invent missing in-trial
+records. It must be absent at deadline and must own no trial application
+traffic. A non-selected identity appearing at deadline but absent at prepare
+is a deadline-open pending candidate and is admissible only when all of the
+following hold:
 
-Continue passing the selected prepare/deadline identity—not a pending
+- it has exactly one product message-handler installation and exactly one RTC
+  open event in the in-trial lifecycle;
+- it owns no application `rawSends`, `acceptedRaw` or `rejectedRaw` record;
+- it owns a joined role-valid nonterminal control prefix: an initiator has at
+  least one sent READY (`kind=1`), while an acceptor has at least one received
+  READY and one sent ACK (`kind=2`);
+- a sent COMMIT (`kind=3`) remains admissible for an initiator waiting for old
+  retirement, but an acceptor-side received COMMIT is forbidden because the
+  product promotes immediately on that event; and
+- it has no product/RTC close-call or close-event record and all existing
+  control-attempt, control-terminal and control-message joins remain valid.
+
+Continue passing only the selected common identity—not either boundary
 candidate—to attempt, overlap and lifecycle ownership validation. Do not
-discard pending-candidate evidence and do not invent a link drop. A missing or
-duplicate selected identity, duplicate deadline RTC identity, a pending
-candidate without its lifecycle anchors, or application traffic attributed to
-a pending candidate remains fail-closed with the existing identity/lifecycle
-error family.
+discard candidate evidence and do not invent a link drop. No common selected
+identity, multiple common identities, a duplicate census identity, more than
+one boundary candidate, candidate application traffic or acceptor-side
+received COMMIT throws `D108E4H_IDENTITY_JOIN_INVALID`. A deadline candidate
+without the exact anchors/role prefix or with terminal close evidence throws
+`D108E4H_LIFECYCLE_ORDER_INVALID`.
 
 Do not alter the local-replacement or peer-dependent incoming-replacement
 paths: their selected deadline identity remains the existing exact singleton,
@@ -79983,11 +79999,16 @@ zero-owner boundary containing only an advanced RTC identity still throws
 `D108E4H_IDENTITY_JOIN_INVALID`; the retained failed-replacement displacement
 mutant keeps the same code.
 
-Add the deterministic roster in one batch: a `0/0` receiver boundary with the
-unchanged selected identity plus one lifecycle-anchored, application-idle
-pending candidate must pass; duplicate selected identity, missing selected
-identity, missing pending open/handler anchor, and any pending-candidate
-application ownership must fail with their frozen exact codes. Preserve every
+Add the deterministic roster in one batch. A `0/0` receiver deadline with the
+unchanged common selected identity plus one lifecycle-anchored,
+application-idle acceptor candidate carrying received READY plus sent ACK must
+pass. A prepare census with the common selected identity plus one pre-trial
+candidate that disappears by deadline and owns no application traffic must
+also pass without fabricated in-trial anchors. Duplicate or missing common
+selected identity, a second unique boundary candidate, missing deadline
+open/handler or role-valid initial control, terminal deadline-candidate close
+evidence, received COMMIT on an acceptor candidate, and any candidate
+application ownership must fail with the exact codes above. Preserve every
 existing mutant and the D.108e4bg bounded-refusal matrix. Run the exact focused
 validator once after static gates. If its complete soft-failure set differs,
 stop and diagnose.
@@ -80009,3 +80030,30 @@ checkout, fresh invocation names, the required high-risk freeze review and the
 six already-authorized sequential whole campaigns under immutable evidence and
 first-failure rules. Do not request authorization again. D.108e5 remains
 blocked until those six invocations and their final evidence review pass.
+
+The one D.108e4bh high-risk plan review inspected exact signed/pushed commit
+`85356ceae6c359b3736f6ead4098fde3d5c39a59`. Codex `gpt-5.6-sol` high returned
+`CHANGES_REQUIRED`, P0=0/P1=1/P2=0: bound the product's single pending slot and
+require a nonterminal role-valid handshake rather than accepting arbitrary
+open idle identities. Opus xhigh returned `CHANGES_REQUIRED`, P0=0/P1=2/P2=2:
+reject acceptor-side received COMMIT as activation evidence and classify both
+prepare and deadline censuses so the same in-flight condition cannot consume a
+later retained run at the earlier boundary. Its P2s remain diagnosis-only: a
+future demonstrated stable-authenticated local replacement or the separate
+post-loss reset-replay singleton could require its own owner, but neither is
+changed or preemptively widened here. Grok's sole read-only run reached its
+fixed 16-turn budget during active inspection before emitting a terminal
+object and is honestly recorded as `NO_VERDICT`; it is not relaunched.
+
+The corrected rule above applies the complete P1 union once. It is narrower
+than the initial plan, uses only existing schema-v3 records, and changes no
+product or numeric contract. No confirmation model round is required; the
+focused exact-code matrix and final GREEN review must verify the correction.
+Codex-final, Opus-final, Opus-envelope, Grok-terminal, Grok-events and
+self-excluding review-index SHA-256 values are respectively
+`b3b41b7697037257dbcd5b7534d7f97dee153e2e53de53c913431afc5e798112`,
+`e1183ce66cc39f5d5a215c4cde3a684751a200ccec5ba2eee44bf98832ec2361`,
+`c9246652350701be203fb67b110109a851e136824d94a99fe73bba1df0732955`,
+`dc6a635f1c13863d6fe0b845661f521215076ce9efd19a42d45a8f5113a9fe0f`,
+`78f5c2dc22f1fdd50147394eb549e2784fc6019b59b9ff73bd4622e1f61232e1`
+and `5a96eae80d84b06665aef350f8ee6b5c797108b675134bf27341e5d5a961aff1`.
