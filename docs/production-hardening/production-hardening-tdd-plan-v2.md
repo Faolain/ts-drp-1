@@ -74607,3 +74607,84 @@ or campaign authority. No reviewer edited the tracked tree, ran a test, build,
 browser, profiler or campaign, invoked Fable or used a subagent. The sole open
 plan-review gate is the exact Kimi K3 confirmation bound to the next signed
 plan-only descendant; until it returns zero P0/P1, RED is prohibited.
+
+###### D.108e4 prospective review-cadence correction
+
+The user prospectively supersedes only the review cadence for all remaining
+unclosed D.108e4 work. This policy does not reopen, reinterpret, amend or rerun
+any completed checkpoint. Every existing signed commit, finding, command,
+result, manifest, evidence root, invocation ledger and debt owner remains
+authoritative and immutable. The useful D.108e4ar findings and their corrections
+remain accepted. Fable and collaboration subagents remain prohibited; the six
+D.108e4ad long-invocation authorization remains durable and must not be
+requested again; and the campaign remains frozen until a separately reviewed
+freeze/readiness slice authorizes execution.
+
+For an ordinary narrow test, evidence, build-infrastructure or tightly scoped
+implementation slice, the governing flow is now one bounded plan review,
+deterministic RED with automated evidence validation, focused/static/retained
+GREEN gates, and one formal Grok/Kimi/Opus review after signed/pushed GREEN over
+the complete plan-to-RED-to-GREEN history. That final GREEN review is the sole
+mandatory three-model implementation review. Only P0/P1 blocks closure. At most
+one confirmation may follow a material correction to executable code,
+acceptance behavior or scope. Bookkeeping, review summaries, manifests, closure
+wording and review-policy prose do not receive recursive formal review. P2s get
+an owner and disposition but trigger confirmation only when their correction
+changes executable scope, causal acceptance, product behavior or a hard gate.
+
+RED must deterministically validate the exact selected test/file count,
+retained-campaign-title exclusion, expected/skipped/unexpected/flaky counts,
+top-level errors, result soft-failure state, exact complete error token,
+source-shape and owner-path custody, command statuses, evidence hashes and a
+self-excluding manifest. A matrix mismatch stops for diagnosis. A matching RED
+is recorded, manifest-validated, signed and pushed without a separate full
+Grok/Kimi/Opus RED review. The final GREEN review must inspect the signed RED
+commit and evidence and prove that it was genuinely causal. If deterministic
+causal attribution is unavailable, one targeted reviewer may answer that one
+question; the full ceremony is reserved for the high-risk exceptions below.
+
+GREEN changes only the frozen repair, runs every specified focused, TypeScript,
+lint, formatting, diff, retained-test and source-shape gate, records complete
+results/commands/hashes/paths and validates a self-excluding manifest before its
+signed push. Its sole formal Grok/Kimi/Opus review covers the accepted plan,
+signed RED diff/evidence, signed GREEN diff/evidence, causal closure, scope,
+retained behavior, gates, remaining debt and campaign authority. If Kimi is
+unavailable then, the slice stops with honest NO_VERDICT; no substitute,
+weakening or stale verdict may close the final three-model gate.
+
+Extra formal review remains mandatory only when a slice changes or authorizes
+production behavior or APIs; wire formats, digest ownership, activation,
+security or identity authority; dependencies, upstream patches or runtime
+policy; timing, workload, memory, watchdog, threshold or resource ceilings;
+production-affecting browser/build/workspace configuration; campaign
+freeze/readiness design or evidence; campaign launchers, classifiers,
+invocation accounting, failure custody or immutable-evidence policy; or scarce,
+irreversible, expensive or long retained-campaign execution. Such a slice must
+name the unique risk covered by each extra checkpoint; it does not reinstate a
+three-model review at every intermediate color automatically.
+
+Deterministic local commands—not new model rounds—own field/assertion counts,
+source-shape predicates, key-position checks, reporter parsing, exact error
+tokens, selected-test counts, type/lint/format/diff status, changed paths,
+signed/pushed identity, evidence/manifest hashes, protected untracked paths,
+stashes, ports and process predicates. A faulty grep or regex is corrected and
+recorded as a diagnostic defect, never reclassified as a code failure.
+
+For D.108e4ar specifically, all completed plan-review evidence remains intact.
+The latest Grok and Opus confirmations have zero P0/P1; Kimi's immediate quota
+403 remains honestly NO_VERDICT and no earlier Kimi result is claimed to cover
+later plan bytes. The preceding Kimi-resume/probe requirement and statement that
+its absence blocks RED are superseded prospectively before RED; do not retry
+Kimi against the known quota wall. The temporary service limitation does not
+block RED under this policy. Sign and push this policy correction without a new
+formal review, then create `.logs/d108e4ar-plan-audit/` and run one deterministic
+local audit of the corrected seams, types, key positions, counts, acceptance
+predicates, owner scope, signed/pushed identity and protected workspace. After
+that audit validates, record and sign/push plan-gate closure and proceed directly
+to the frozen D.108e4ar RED. Do not run a retained campaign.
+
+This correction authorizes no long campaign, product change, dependency change,
+threshold change or scope expansion. Prior immutable roots and invocation
+ledgers remain unchanged; protected untracked paths and all stashes remain in
+custody; signed commits, pushed-ref identity and fail-closed evidence remain
+mandatory.
