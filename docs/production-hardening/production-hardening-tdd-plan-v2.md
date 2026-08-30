@@ -79600,7 +79600,7 @@ eventual recovery outside 5 seconds from permanent loss of the lane.
 
 Run one non-campaign attribution only. Temporarily change only the trial-loop
 readiness observation window from 5,000 ms to 25,000 ms, retain the exact
-600-sample/32 ms trial operation and all transport behavior, and preserve a
+600-sample/33 ms trial operation and all transport behavior, and preserve a
 complete reporter, stdout/stderr, failure telemetry and trace under
 `.logs/d108e4be-attribution/`. Restore the 5,000 ms source immediately after
 the run. This temporary observation window is diagnostic evidence, not a new
@@ -79673,7 +79673,7 @@ concurrent reset sites—workbench calibration, each trial prepare and durable
 control—with that helper; retain the existing post-helper open/network gates
 for the second endpoint. Do not change the D.108e4ay opt-in replay, production
 or example source, product APIs, RTC/signaling behavior, reset implementation,
-network profiles, 5/10/15-second gates, 600/32 ms trial workload, 300/20 ms
+network profiles, 5/10/15-second gates, 600/33 ms trial workload, 300/20 ms
 calibration workload, three-trial count, delivery/AoI/HOL thresholds, browser
 identity, total test timeout or evidence/classifier semantics.
 
@@ -79695,3 +79695,34 @@ whole runs, so authorization must not be requested again. That freeze retains
 immutable prior roots and first-failure custody, receives the required
 high-risk launcher review, and then executes sequentially. D.108e5 is reached
 only after all six fresh invocations and their final evidence review pass.
+
+The single high-risk plan review closes after one mechanical P1 correction.
+Codex `gpt-5.6-sol` high found that the plan twice misstated the immutable
+`SAMPLE_INTERVAL_MS = 33` value as 32 ms; both literals are corrected above
+without an executable change. Codex otherwise confirmed complete/exclusive
+call sites, aligned peer-local trial state, retained post-reset gates,
+concurrent coverage and a separately owned future campaign freeze. Opus xhigh
+returned `APPROVED` with zero P0/P1. Grok's service canceled its sole run after
+270.059 seconds, so its formal classification remains `NO_VERDICT` and it is
+not relaunched.
+
+Opus's three P2 findings are nonblocking and explicitly dispositioned. The
+D.108e4ay browser replay covers only the concurrent calibration-prefix reset,
+not the later trial-prepare state; deterministic network-owner rows remain the
+load-bearing concurrent-restart coverage for the observed failure shapes. None
+of D.108e4be's three forecast branches fired literally; serial fixture reset is
+chosen as the smallest change consistent with the mixed runtime evidence and
+the deterministic product non-reproductions. If sequential replacement timing
+causes the focused GREEN's exact calibration connection-cardinality assertion
+to observe two connections instead of one, that is diagnosed inside this same
+reset/readiness boundary rather than classified as a new product defect.
+
+Codex-final, Opus-envelope, Grok-status and Grok-public SHA-256 values are
+respectively
+`f81c851f8206e6ad9a386f45df4fd44f959898f249b4b68cd123964935c0f43a`,
+`26fcee3c15b2b1a1165ae539a33b2a5a2f81091e522b77a4d289bc12b874dfd8`,
+`c6bcc8e7fb5583c390e24f19408452d23f4bed2f25ff568012d811ed211187ab`
+and `e72c00d9278127f93505b65c29ceba1f1b8a389a26b544bd389b2c4f1147ee36`.
+The self-excluding review manifest validates at SHA-256
+`a9d3f9338747bd2696594106cb475d8fd0366587038d807dae0463f4ae5379a0`.
+The corrected blocking union is empty; no confirmation review is required.
