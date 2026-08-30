@@ -81294,9 +81294,11 @@ scheduling variance. A reliable-connection replacement B opened and completed
 its raw readiness exchange. The creator then performed the fixture's required
 raw-route restart and closed B. The receiver retained its B as a pending
 replacement while that data channel remained `closing` without a close event
-and its PeerConnection was `disconnected`. The elected initiator created 24
-subsequent replacement attempts in the observation window; the receiver's
-generic pending-PC admission guard rejected them, producing 24 creator
+and its PeerConnection was `disconnected`. The readiness-expiry owner consumed
+its one-shot timer after its attempted promotion returned false, without
+discarding B. The elected initiator then created 24 subsequent replacement
+attempts in the observation window; the receiver's generic pending-PC
+admission guard was the proximate rejector for each, producing 24 creator
 handshake failures while authenticated network connections remained present.
 The receiver is not the retry owner, so both raw owners stayed empty.
 
@@ -81313,24 +81315,40 @@ Freeze D.108e4bn as one causal repair:
 
 1. Add one deterministic fake-RTC RED. Establish A, replace it with qualified
    B after authenticated identity change, hold B's peer-close propagation,
-   restart the elected initiator's raw route, and leave the receiver's exact
-   pending-B channel in `closing` without a close event. A fresh C offer must
-   be admitted and restore `1/1`; current GREEN must instead fail with exact
-   token `D108E4BN_STALE_PENDING_ADMISSION_BLOCKED`.
-2. Before applying ordinary incoming-offer admission gates, prune only the
-   exact peer's already-established pending replacement when its data channel
-   is no longer `open`. Reuse the existing pending-replacement discard owner.
-   Do not add a cleanup, activation, retry or signaling owner.
-3. Do not classify PeerConnection `disconnected` alone as terminal. Do not
-   alter active or retiring links, pre-open pending PCs, current open pending
-   replacements, reliable connection selection, decision dispatch, readiness
-   controls, deadlines, retry interval, workload, thresholds or product API.
-4. Prove the stale B PC closes, C uses the current authenticated connection,
-   the elected endpoint and receiver each expose one active raw link, A/B/C
-   ownership remains bounded, counters and timers remain exact, and the
-   complete 104-test owner contract retains every prior error/behavior row.
-5. Run the exact new focused RED once. After the causal matrix matches, run
-   focused GREEN once, complete owner once, network build/typecheck, exact
+   set the receiver's still-pending B channel to `closing` without a close
+   event before initiator restart can drop its selected B, then restart the
+   elected initiator's raw route. A fresh C offer must be admitted and restore
+   `1/1`; current GREEN must instead fail with exact token
+   `D108E4BN_STALE_PENDING_ADMISSION_BLOCKED`.
+2. Add one no-further-offer expiry RED. When committed acceptor B is non-open,
+   selected A is no longer usable and `#promotePendingReplacement` returns
+   false at the original readiness deadline, the existing expiry owner must
+   fall through to existing `#failReplacementReadiness`/discard ownership.
+   Current GREEN must fail with exact token
+   `D108E4BN_EXPIRY_RECLAMATION_ABSENT`. Prove the pending maps, timer and PC
+   slot are released even when that peer never offers again, including
+   admission of an unrelated peer at the physical ceiling.
+3. After the existing closed/transport/peer-order precondition and before the
+   ordinary incoming-offer capacity/pending gates, prune only the exact peer's
+   already-established pending replacement when its data channel is no longer
+   `open`. Reuse the existing pending-replacement discard owner. Do not add a
+   cleanup, activation, retry or signaling owner.
+4. Add two negative rows. An established pending replacement whose channel is
+   `open` must continue to reject another offer from the same peer while its
+   pending link, decision record and selected A remain intact. The same must
+   hold when only that pending B PeerConnection is `disconnected`. These rows
+   pin that `disconnected` alone is nonterminal and prevent a widened prune
+   predicate.
+5. Do not alter active or retiring links, pre-open pending PCs, current open
+   pending replacements, reliable connection selection, decision dispatch,
+   readiness controls, absolute deadlines, retry interval, workload,
+   thresholds or product API. Prove stale B closes, C uses the current
+   authenticated connection, each endpoint exposes one active raw link, A/B/C
+   ownership remains bounded, counters/timers remain exact, and the complete
+   104-test owner contract retains every prior error/behavior row.
+6. Run the exact four-row focused RED once: two causal failures with the exact
+   tokens above and two passing negative controls. After that matrix matches,
+   run focused GREEN once, complete owner once, network build/typecheck, exact
    source/test lint and format, source-shape/refactor-clean audit and diff
    checks. Do not run the browser title, retained seven or campaign inside
    RED/GREEN.
@@ -81346,3 +81364,29 @@ No Kimi, Fable or collaboration subagent is authorized. An empty final P0/P1
 union releases one fresh retained-browser invocation name under the unchanged
 600-second watchdog; its pass alone releases retained seven. The six-run
 campaign and D.108e5 remain blocked until those gates pass.
+
+The one bounded plan review inspected signed/pushed checkpoint
+`68dfca21c6af0305b71bc0669e1a4b123843b46d`. Codex
+`gpt-5.6-sol` high returned `APPROVED`, P0/P1/P2 all empty. Opus xhigh returned
+`CHANGES_REQUIRED`, P0=0/P1=2/P2=3. Its material union is corrected above in
+one batch: the plan now assigns expiry no-further-offer reclamation after
+failed promotion,
+and two negative controls pin open pending B plus open/disconnected pending B.
+Its placement note is made exact after request preconditions and before offer
+admission; its initiator asymmetry and open-channel/disconnected residual are
+accepted as nonblocking scope explanations. Grok completed with substantive
+`APPROVED`, P0/P1 empty and P2=2 after progress prose; the strict runner
+therefore records `NO_VERDICT`. Its RED-ordering note is applied by making B
+`closing` before initiator restart; its request to leave expiry unchanged is
+superseded by the independently grounded Opus P1 physical-slot leak. No
+reviewer is relaunched and this correction receives no recursive prose review.
+
+Plan-review prompt, Codex result, Opus raw session, Grok public text, Grok
+status and Grok event-stream SHA-256 values are respectively
+`63c5ca7447fd0315cc293e9a40084d6916a05b3c0871caaaa81413f9764ffd61`,
+`f6f5b64ab4ea3f57b9b783cf9957aebad3d4e9fd5d4916da214f95cb24f5620c`,
+`109e7d0c7ad9dbdef914443128034c31bf2a00d9485a684f5f92a926e5a53339`,
+`e0b74e2558a522f46330e01aeb2b96fda33771ed67269d03659641156899da8c`,
+`46fcef81278533c534daef55c3ca96228a173c99052a777e2197a88ae435ae64`
+and
+`ff040cb4a24dcf21fc0fcc5164a34b5c546d6cfacb07a5ea7fd9c4847da1b805`.
