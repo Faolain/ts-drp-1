@@ -80364,6 +80364,9 @@ bounded eager ACK ordering:
   product handler itself recorded `readyState=open`, and every such control is
   a sent ACK (`kind=2`);
 - all received controls must follow the observer open event;
+- every acceptor send remains ACK (`kind=2`) and every non-COMMIT acceptor
+  receive remains READY (`kind=1`) at every sequence; post-open sent READY or
+  COMMIT and post-open received ACK remain lifecycle-order failures;
 - at least one received READY must be followed by at least one sent ACK, while
   at most the single eager sent ACK may precede READY; and
 - received COMMIT remains forbidden and retains
@@ -80372,11 +80375,29 @@ bounded eager ACK ordering:
 Freeze deterministic RED by changing the existing positive acceptor deadline
 candidate to the observed sequence: product handler/open state, eager ACK
 attempt+success, observer open, received READY, post-READY ACK
-attempt+success. The pre-GREEN classifier must fail the unchanged positive
+attempt+success. Both ACK attempts use distinct attempt IDs and are joined to
+matching `kind=2` `controlSends`; READY is joined to its `kind=1`
+`controlReceive`. The pre-GREEN classifier must fail the unchanged positive
 expectation with exact `D108E4H_LIFECYCLE_ORDER_INVALID`. GREEN changes only
 the closed validator and adds exact-code mutants for pre-handler control,
 pre-open received control, pre-open non-ACK send, handler `readyState` other
-than open, a second eager ACK, and no post-READY ACK. Preserve every existing
+than open, a second eager ACK, no post-READY ACK, post-open sent READY,
+post-open sent COMMIT, post-open received ACK, and initiator sent READY before
+observer open. The first nine acceptor lifecycle-order mutants retain exact
+`D108E4H_LIFECYCLE_ORDER_INVALID`; the existing received-COMMIT mutant retains
+exact `D108E4H_IDENTITY_JOIN_INVALID`, and the initiator-order mutant retains
+exact `D108E4H_LIFECYCLE_ORDER_INVALID`.
+
+Evaluate the acceptor ordering rules instead of the shared
+`controlsFollowAnchors` predicate for the acceptor role; retain that strict
+maximum-open/handler anchor for the initiator role and retain the exclusive
+initiator/acceptor partition. Derive the existing terminal-candidate and
+acceptor-received-COMMIT appended sequence (including its control-ledger
+sequence) from the new candidate lifecycle tail rather than the former
+literal `6`. Rebuild `d108e4bhWithoutRolePrefix` by filtering its
+control-bearing send-attempt, send-success and READY-message records while
+retaining its product handler and observer open; do not use positional
+`slice(0, 3)`. Preserve every existing
 D.108e4aa/D.108e4ac/D.108e4av/D.108e4bg/D.108e4bh result and error code.
 
 Run the exact focused schema-validator title once for RED and once after GREEN,
@@ -80389,3 +80410,32 @@ dispositioned without new ceremony. After signed GREEN, run the one formal
 implementation review, then one fresh retained browser title; only a pass may
 release the retained-seven allowlist. No campaign runs during D.108e4bj. The
 existing authorization covers all narrow runs and must not be requested again.
+
+The single D.108e4bj plan review inspected signed/pushed plan anchor
+`0c2dc6481bfb9b8049972c8059ca36f743a27372`. Codex
+`gpt-5.6-sol` high returned `CHANGES_REQUIRED`, P0=0/P1=1/P2=0; Opus xhigh
+returned `CHANGES_REQUIRED`, P0=0/P1=3/P2=1. Grok's sole read-only run emitted
+a substantive `APPROVED`, P0=0/P1=0/P2=2 object after progress prose, so its
+honest runner classification is `NO_VERDICT`; it is not relaunched. The four
+P1 corrections are applied above in one non-production batch: global
+acceptor kind restrictions plus mutants, tail-derived appended sequences, a
+semantic rather than positional no-role-prefix fixture, and an explicit
+initiator pre-open negative. Grok's two P2 execution clarifications are also
+captured above by role-specific anchor evaluation and exact control-ledger
+joins. Opus's P2 initiator mirror is not demonstrated by the retained run and
+does not open product debt: the initiator remains deliberately strict and the
+new negative pins that contract. These corrections do not change scope,
+causal acceptance or product behavior, so the prospective bounded-review
+policy requires no confirmation round. A deterministic local audit of these
+frozen seams closes the plan gate and releases RED.
+
+Codex-final, Opus-final, Opus-envelope, Grok-public, Grok-status, Grok-events
+and validating self-excluding review-index SHA-256 values are respectively
+`6729318f3f9b3af52507d2e2b344e4aef75f32d310fe4b7e6b576f849dcde67e`,
+`53ce834ea937b757e653149f2cadbf759d2faaf0ac4d9fa22c746d946cadeb72`,
+`cf7cc74bf3085a7e908a38fbe047dbabd634916873812f30260744d0e7b4d79b`,
+`6b49799d8bb5b08c734a5ede4d6fe6c4823733c3ca861025223997dd3ecf19c6`,
+`f08de2d382df054aa4694d9f520e0ba1fe9e51736b4a75c2102ed910ddb971bf`,
+`f825bd25ac08107e911df6219b8c7adeed75b2493d40d9e9d63297df4a79349c`
+and `582a5dee3d5e4e7c51ee10981f07eb1dd5ae65c49ad66293cd8f7a113ea81132`.
+Evidence is immutable under `.logs/d108e4bj-plan-review/`.
