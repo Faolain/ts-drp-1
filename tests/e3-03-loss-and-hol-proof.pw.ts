@@ -3493,6 +3493,132 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 		const receiverReplacement = d108e4hFixture("receiver-replacement");
 		const repeatedReplacement = d108e4hFixture("receiver-repeated-replacement");
 		const receiverChannelClose = d108e4hFixture("receiver-channel-close");
+		const d108e4avControlBytes = (kind: 1 | 2 | 3): readonly [0x44, 0x52, 0x01, 1 | 2 | 3] =>
+			Object.freeze([0x44, 0x52, 0x01, kind]);
+		const creatorControlSequence =
+			Math.max(...creatorReplacement.endpoints.creator.lifecycle.map(({ sequence }) => sequence)) + 1;
+		const transmitterControlRed = Object.freeze({
+			...creatorReplacement,
+			endpoints: Object.freeze({
+				...creatorReplacement.endpoints,
+				creator: Object.freeze({
+					...creatorReplacement.endpoints.creator,
+					controlSends: Object.freeze([
+						Object.freeze({
+							attemptId: 900_001,
+							bytes: d108e4avControlBytes(1),
+							channelId: D108E4H_RTC_B.channelId,
+							connectionId: D108E4H_RTC_B.connectionId,
+							lifecycleSequence: creatorControlSequence,
+						}),
+					]),
+					lifecycle: Object.freeze([
+						...creatorReplacement.endpoints.creator.lifecycle,
+						d108e4hLifecycle(
+							creatorReplacement.trialId,
+							creatorControlSequence,
+							"channel-send-attempt",
+							D108E4H_RTC_B,
+							"rtc-datachannel-send",
+							{ attemptId: 900_001 }
+						),
+						d108e4hLifecycle(
+							creatorReplacement.trialId,
+							creatorControlSequence + 1,
+							"channel-send-success",
+							D108E4H_RTC_B,
+							"rtc-datachannel-send",
+							{ attemptId: 900_001 }
+						),
+					]),
+				}),
+			}),
+		});
+		const receiverControlSequence =
+			Math.max(...creatorReplacement.endpoints.receiver.lifecycle.map(({ sequence }) => sequence)) + 1;
+		const nontransmitterControlRed = Object.freeze({
+			...creatorReplacement,
+			endpoints: Object.freeze({
+				...creatorReplacement.endpoints,
+				receiver: Object.freeze({
+					...creatorReplacement.endpoints.receiver,
+					controlSends: Object.freeze([
+						Object.freeze({
+							attemptId: 900_002,
+							bytes: d108e4avControlBytes(2),
+							channelId: D108E4H_RTC_B.channelId,
+							connectionId: D108E4H_RTC_B.connectionId,
+							lifecycleSequence: receiverControlSequence,
+						}),
+					]),
+					lifecycle: Object.freeze([
+						...creatorReplacement.endpoints.receiver.lifecycle,
+						d108e4hLifecycle(
+							creatorReplacement.trialId,
+							receiverControlSequence,
+							"channel-send-attempt",
+							D108E4H_RTC_B,
+							"rtc-datachannel-send",
+							{ attemptId: 900_002 }
+						),
+						d108e4hLifecycle(
+							creatorReplacement.trialId,
+							receiverControlSequence + 1,
+							"channel-send-success",
+							D108E4H_RTC_B,
+							"rtc-datachannel-send",
+							{ attemptId: 900_002 }
+						),
+					]),
+				}),
+			}),
+		});
+		const receivedControlRed = Object.freeze({
+			...creatorReplacement,
+			endpoints: Object.freeze({
+				...creatorReplacement.endpoints,
+				receiver: Object.freeze({
+					...creatorReplacement.endpoints.receiver,
+					controlReceives: Object.freeze([
+						Object.freeze({
+							bytes: d108e4avControlBytes(3),
+							channelId: D108E4H_RTC_B.channelId,
+							connectionId: D108E4H_RTC_B.connectionId,
+							lifecycleSequence: receiverControlSequence,
+						}),
+					]),
+					lifecycle: Object.freeze([
+						...creatorReplacement.endpoints.receiver.lifecycle,
+						d108e4hLifecycle(
+							creatorReplacement.trialId,
+							receiverControlSequence,
+							"channel-message",
+							D108E4H_RTC_B,
+							"rtc-datachannel-message-event"
+						),
+					]),
+				}),
+			}),
+		});
+		const d108e4avCausalRed = (fixture: D108e4hValidationInput, expectedCode: string, token: string): void => {
+			let observedCode: string | undefined;
+			try {
+				validateD108e4hCampaignCustody(fixture);
+			} catch (error) {
+				observedCode = error instanceof Error ? error.message : String(error);
+			}
+			if (observedCode !== undefined && observedCode !== expectedCode) {
+				throw new Error(`D108E4AV_CAUSE_MISMATCH:${token}:${observedCode}`);
+			}
+			expect.soft(observedCode, token).toBeUndefined();
+		};
+		d108e4avCausalRed(transmitterControlRed, "D108E4H_IDENTITY_JOIN_INVALID", "D108E4AV_TRANSMITTER_CONTROL_REJECTED");
+		d108e4avCausalRed(
+			nontransmitterControlRed,
+			"D108E4H_RAW_SEND_ROLE_INVALID",
+			"D108E4AV_NONTRANSMITTER_CONTROL_REJECTED"
+		);
+		d108e4avCausalRed(receivedControlRed, "D108E4H_OVERLAP_LEDGER_INVALID", "D108E4AV_RECEIVED_CONTROL_REJECTED");
 		const preservedCampaignReplay = d108e4iPreservedCampaignReplay();
 		const replayCreator = preservedCampaignReplay.endpoints.creator;
 		const replayReceiver = preservedCampaignReplay.endpoints.receiver;

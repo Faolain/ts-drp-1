@@ -77717,3 +77717,31 @@ returns zero with `LOCAL_AUDIT=PASS`; the regex mistake is not a plan or code
 failure. The D.108e4av plan gate is closed after this final signed/pushed
 correction; proceed directly to the frozen three-token RED without another
 model review.
+
+D.108e4av deterministic RED starts from signed/pushed plan-gate closure
+`0f3af52c2444673c56f6551784fb83662400df4f`. The sole executable diff adds
+three fixtures and one soft causal adapter inside the existing telemetry-only
+test; no validator or production behavior changes. The focused command ran
+exactly once from `2026-08-30T09:06:37Z` through `09:06:46Z` and returned one.
+Its reporter selects exactly one test in one file, no campaign title, records
+expected/skipped/unexpected/flaky `0/0/1/0`, zero top-level errors and exactly
+three soft failures in frozen order:
+
+- `D108E4AV_TRANSMITTER_CONTROL_REJECTED`, carrying exact current
+  `D108E4H_IDENTITY_JOIN_INVALID`;
+- `D108E4AV_NONTRANSMITTER_CONTROL_REJECTED`, carrying exact current
+  `D108E4H_RAW_SEND_ROLE_INVALID`; and
+- `D108E4AV_RECEIVED_CONTROL_REJECTED`, carrying exact current
+  `D108E4H_OVERLAP_LEDGER_INVALID`.
+
+No construction/cause-mismatch error, additional soft failure, retry, browser
+campaign or retained invocation occurred. The four fixed ports were clear, the
+protected untracked roster and all 26 stashes match, Prettier and diff checks
+pass, and the only RED-time changed path was the test owner. Product,
+Playwright configuration, package metadata and lockfile retain their frozen
+hashes. RED test-owner SHA-256 is
+`fd1deb02cd14f985312f973c17181acd774d5ae7d7c11c01f965a84a2a966513`.
+The validating self-excluding RED manifest has SHA-256
+`7ea7aceaef40d2525bbd346b360936ba2b3b075f6cc5e21277d97736ccddfcb2`.
+This is the required causal failure, so sign and push RED without a separate
+model round, then implement only the frozen send/receive custody GREEN.
