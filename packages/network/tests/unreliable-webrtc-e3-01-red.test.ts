@@ -123,8 +123,11 @@ type Listener = (event: unknown) => void;
 class FakeDataChannel {
 	binaryType: BinaryType = "blob";
 	bufferedAmount = 0;
+	closeEvents = 0;
+	closeTransitions = 0;
 	readonly label: string;
 	readonly maxRetransmits: number | null;
+	openEvents = 0;
 	readonly ordered: boolean;
 	onclose: ((event: Event) => void) | null = null;
 	onmessage: ((event: MessageEvent) => void) | null = null;
@@ -157,6 +160,7 @@ class FakeDataChannel {
 
 	close(): void {
 		if (this.readyState === "closed") return;
+		this.closeTransitions += 1;
 		this.readyState = "closed";
 		const closeEventBarrier = this.#closeEventBarrier;
 		this.#closeEventBarrier = undefined;
@@ -198,9 +202,23 @@ class FakeDataChannel {
 	}
 
 	link(peer: FakeDataChannel): void {
-		this.#peer = peer;
+		this.pair(peer);
+		this.open();
+	}
+
+	open(): void {
+		if (this.readyState === "open") return;
+		if (this.readyState === "closed") throw new Error("fake data channel cannot reopen");
 		this.readyState = "open";
 		queueMicrotask(() => this.#emit("open", new Event("open")));
+	}
+
+	pair(peer: FakeDataChannel): void {
+		this.#peer = peer;
+	}
+
+	listenerCount(type: string): number {
+		return this.#listeners.get(type)?.size ?? 0;
 	}
 
 	send(data: ArrayBuffer | ArrayBufferView): void {
@@ -225,6 +243,8 @@ class FakeDataChannel {
 	}
 
 	#emit(type: string, event: Event): void {
+		if (type === "close") this.closeEvents += 1;
+		if (type === "open") this.openEvents += 1;
 		for (const listener of this.#listeners.get(type) ?? []) listener(event);
 		if (type === "close") this.onclose?.(event);
 		if (type === "message") this.onmessage?.(event as MessageEvent);
@@ -274,10 +294,53 @@ class FakeInboundOpenBarrier {
 	}
 }
 
+class FakeRemoteInboundOpenBarrier {
+	readonly #complete: Promise<void>;
+	readonly #pending: Promise<void>;
+	readonly #release: Promise<void>;
+	#resolveComplete: (() => void) | undefined;
+	#resolvePending: (() => void) | undefined;
+	#resolveRelease: (() => void) | undefined;
+
+	constructor() {
+		this.#complete = new Promise<void>((resolve) => {
+			this.#resolveComplete = resolve;
+		});
+		this.#pending = new Promise<void>((resolve) => {
+			this.#resolvePending = resolve;
+		});
+		this.#release = new Promise<void>((resolve) => {
+			this.#resolveRelease = resolve;
+		});
+	}
+
+	async defer(open: () => void): Promise<void> {
+		this.#resolvePending?.();
+		await this.#release;
+		open();
+		await new Promise<void>((resolve) => queueMicrotask(resolve));
+		await new Promise<void>((resolve) => queueMicrotask(resolve));
+		this.#resolveComplete?.();
+	}
+
+	release(): void {
+		this.#resolveRelease?.();
+	}
+
+	waitUntilComplete(): Promise<void> {
+		return this.#complete;
+	}
+
+	waitUntilPending(): Promise<void> {
+		return this.#pending;
+	}
+}
+
 class FakePeerConnection {
 	static nextId = 1;
 	static nextInboundHandlerBarrier: FakeInboundOpenBarrier | undefined;
 	static nextInboundOpenBarrier: FakeInboundOpenBarrier | undefined;
+	static nextRemoteInboundOpenBarrier: FakeRemoteInboundOpenBarrier | undefined;
 	static readonly registry = new Map<string, FakePeerConnection>();
 
 	static pauseNextInboundOpen(): FakeInboundOpenBarrier {
@@ -298,10 +361,26 @@ class FakePeerConnection {
 		return barrier;
 	}
 
+	static pauseNextRemoteInboundOpen(): FakeRemoteInboundOpenBarrier {
+		if (FakePeerConnection.nextRemoteInboundOpenBarrier !== undefined) {
+			throw new Error("fake remote-inbound-open barrier is already armed");
+		}
+		const barrier = new FakeRemoteInboundOpenBarrier();
+		FakePeerConnection.nextRemoteInboundOpenBarrier = barrier;
+		return barrier;
+	}
+
 	static releaseInboundOpenBarrier(barrier: FakeInboundOpenBarrier | undefined): void {
 		barrier?.release();
 		if (FakePeerConnection.nextInboundOpenBarrier === barrier) {
 			FakePeerConnection.nextInboundOpenBarrier = undefined;
+		}
+	}
+
+	static releaseRemoteInboundOpenBarrier(barrier: FakeRemoteInboundOpenBarrier | undefined): void {
+		barrier?.release();
+		if (FakePeerConnection.nextRemoteInboundOpenBarrier === barrier) {
+			FakePeerConnection.nextRemoteInboundOpenBarrier = undefined;
 		}
 	}
 
@@ -429,13 +508,20 @@ class FakePeerConnection {
 			FakePeerConnection.nextInboundHandlerBarrier = undefined;
 			const barrier = FakePeerConnection.nextInboundOpenBarrier;
 			FakePeerConnection.nextInboundOpenBarrier = undefined;
+			const remoteOpenBarrier = FakePeerConnection.nextRemoteInboundOpenBarrier;
+			FakePeerConnection.nextRemoteInboundOpenBarrier = undefined;
 			for (const outbound of remote.channels) {
 				const inbound = new FakeDataChannel(this.#options.inboundChannel?.label ?? outbound.label, {
 					maxRetransmits: this.#options.inboundChannel?.maxRetransmits ?? outbound.maxRetransmits ?? undefined,
 					ordered: this.#options.inboundChannel?.ordered ?? outbound.ordered,
 				});
 				outbound.link(inbound);
-				inbound.link(outbound);
+				if (remoteOpenBarrier === undefined) {
+					inbound.link(outbound);
+				} else {
+					inbound.pair(outbound);
+					void remoteOpenBarrier.defer(() => inbound.open());
+				}
 				this.channels.push(inbound);
 				if (handlerBarrier !== undefined) await handlerBarrier.hold();
 				this.#emit(
@@ -1850,6 +1936,92 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 				await pending?.catch(() => undefined);
 				low.owner.close();
 				high.owner.close();
+			}
+		}
+	);
+
+	it.each(["initiator", "non-initiator"] as const)(
+		"D.108e4at RED exposes the remote replacement readiness gap with the %s application sender",
+		async (senderRole) => {
+			const module = await loadOwnerModule();
+			const bus = new FakeSignalingBus();
+			const low = owner(module, bus, "peer-a");
+			const high = owner(module, bus, "peer-b");
+			let barrier: FakeRemoteInboundOpenBarrier | undefined;
+			let ownersClosed = false;
+			let replacementPending: Promise<void> | undefined;
+			try {
+				const original = bus.connect("peer-a", "peer-b");
+				const lowRoute = low.owner.openUnreliableWebRtcRoute("zone:d108e4at-remote-readiness");
+				const highRoute = high.owner.openUnreliableWebRtcRoute("zone:d108e4at-remote-readiness");
+				const lowReceived: Uint8Array[] = [];
+				const highReceived: Uint8Array[] = [];
+				lowRoute.onMessage(({ bytes }) => lowReceived.push(bytes.slice()));
+				highRoute.onMessage(({ bytes }) => highReceived.push(bytes.slice()));
+				await Promise.all([lowRoute.reconcile(["peer-b"]), highRoute.reconcile(["peer-a"])]);
+
+				const oldLow = low.peerConnections[0]?.channels[0];
+				const oldHigh = high.peerConnections[0]?.channels[0];
+				if (oldLow === undefined || oldHigh === undefined) throw new Error("D108E4AT_OLD_OWNER_ABSENT");
+				const applicationSender = senderRole === "initiator" ? lowRoute : highRoute;
+				const remotePeerId = senderRole === "initiator" ? "peer-b" : "peer-a";
+				expect(await applicationSender.send([remotePeerId], Uint8Array.of(71)), senderRole).toBe(true);
+				await tick();
+				expect(lowReceived, senderRole).toEqual(senderRole === "non-initiator" ? [Uint8Array.of(71)] : []);
+				expect(highReceived, senderRole).toEqual(senderRole === "initiator" ? [Uint8Array.of(71)] : []);
+
+				bus.disconnect(original);
+				const replacement = bus.connect("peer-a", "peer-b");
+				barrier = FakePeerConnection.pauseNextRemoteInboundOpen();
+				replacementPending = lowRoute.reconcile(["peer-b"]);
+				await barrier.waitUntilPending();
+				await replacementPending;
+				await tick();
+
+				const replacementLow = low.peerConnections[1]?.channels[0];
+				const replacementHigh = high.peerConnections[1]?.channels[0];
+				if (replacementLow === undefined || replacementHigh === undefined) {
+					throw new Error("D108E4AT_REPLACEMENT_OWNER_ABSENT");
+				}
+				expect(replacementLow.readyState, senderRole).toBe("open");
+				expect(replacementHigh.readyState, senderRole).toBe("connecting");
+				expect(replacementHigh.listenerCount("message"), senderRole).toBe(0);
+				expect(replacementHigh.openEvents, senderRole).toBe(0);
+				expect(lowRoute.snapshot(), senderRole).toMatchObject({
+					activeLinks: 1,
+					lastLinkDrop: "replacement",
+					linkDrops: 1,
+					links: [{ connectionId: replacement.left.id, generation: replacement.left.generation }],
+				});
+				expect(highRoute.snapshot(), senderRole).toMatchObject({
+					activeLinks: 0,
+					lastLinkDrop: "channel-close",
+					linkDrops: 1,
+					links: [],
+				});
+				expect(oldLow.closeTransitions, senderRole).toBe(1);
+				expect(oldHigh.closeTransitions, senderRole).toBe(1);
+				expect(oldLow.closeEvents, senderRole).toBe(1);
+				expect(oldHigh.closeEvents, senderRole).toBe(1);
+				expect(low.peerConnections, senderRole).toHaveLength(2);
+				expect(high.peerConnections, senderRole).toHaveLength(2);
+
+				// This models delayed peer readiness generically; it does not claim Chrome kept B in "connecting".
+				barrier.release();
+				await barrier.waitUntilComplete();
+				expect(low.peerConnections, senderRole).toHaveLength(2);
+				expect(high.peerConnections, senderRole).toHaveLength(2);
+				low.owner.close();
+				high.owner.close();
+				ownersClosed = true;
+				throw new Error("D108E4AT_REMOTE_REPLACEMENT_READINESS_GAP");
+			} finally {
+				FakePeerConnection.releaseRemoteInboundOpenBarrier(barrier);
+				await replacementPending?.catch(() => undefined);
+				if (!ownersClosed) {
+					low.owner.close();
+					high.owner.close();
+				}
 			}
 		}
 	);
