@@ -2024,6 +2024,19 @@ async function waitForNetworkPair(
 		.toEqual([creatorExpected, receiverExpected]);
 }
 
+async function resetFabricPairSerially(
+	creator: Page,
+	receiver: Page,
+	trialId: string,
+	creatorExpected: NetworkSnapshot,
+	receiverExpected: NetworkSnapshot
+): Promise<void> {
+	await creator.evaluate((selectedTrialId) => window.__TS_DRP_V3_ZONE__?.fabric?.reset(selectedTrialId), trialId);
+	await waitForOpenTransportPair(creator, receiver);
+	await waitForNetworkPair(creator, receiver, creatorExpected, receiverExpected);
+	await receiver.evaluate((selectedTrialId) => window.__TS_DRP_V3_ZONE__?.fabric?.reset(selectedTrialId), trialId);
+}
+
 async function waitForRawDelivery(sender: Page, receiver: Page): Promise<void> {
 	const before = (await zone(receiver)).rawTransport.received;
 	await expect
@@ -8068,14 +8081,7 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 		stage = "workbench-total-loss-calibration";
 		const calibrationTrialId = "e3-03-total-loss-calibration";
 		activeTrialId = calibrationTrialId;
-		await Promise.all(
-			[creator, receiver].map((page) =>
-				page.evaluate(
-					(selectedTrialId) => window.__TS_DRP_V3_ZONE__?.fabric?.reset(selectedTrialId),
-					calibrationTrialId
-				)
-			)
-		);
+		await resetFabricPairSerially(creator, receiver, calibrationTrialId, initialCreatorNetwork, initialReceiverNetwork);
 		await waitForOpenTransportPair(creator, receiver);
 		await waitForNetworkPair(creator, receiver, initialCreatorNetwork, initialReceiverNetwork);
 		await Promise.all([
@@ -8160,11 +8166,7 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			activeTrialId = trialId;
 			currentTrialEvidence = trialProgress;
 			stage = trialId + "-prepare";
-			await Promise.all(
-				[creator, receiver].map((page) =>
-					page.evaluate((selectedTrialId) => window.__TS_DRP_V3_ZONE__?.fabric?.reset(selectedTrialId), trialId)
-				)
-			);
+			await resetFabricPairSerially(creator, receiver, trialId, initialCreatorNetwork, initialReceiverNetwork);
 			await waitForOpenTransportPair(creator, receiver);
 			await waitForNetworkPair(creator, receiver, initialCreatorNetwork, initialReceiverNetwork);
 			const clock = await clockEvidence(creator, receiver);
@@ -8585,10 +8587,12 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 		stage = "durable-control";
 		expect((await zone(creator)).durableVertexCount).toBe(peers.durableBaseline);
 		expect((await zone(receiver)).durableVertexCount).toBe(peers.durableBaseline);
-		await Promise.all(
-			[creator, receiver].map((page) =>
-				page.evaluate(() => window.__TS_DRP_V3_ZONE__?.fabric?.reset("e3-03-durable-control"))
-			)
+		await resetFabricPairSerially(
+			creator,
+			receiver,
+			"e3-03-durable-control",
+			initialCreatorNetwork,
+			initialReceiverNetwork
 		);
 		await waitForOpenTransportPair(creator, receiver);
 		await waitForNetworkPair(creator, receiver, initialCreatorNetwork, initialReceiverNetwork);

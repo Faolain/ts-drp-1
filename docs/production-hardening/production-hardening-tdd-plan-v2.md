@@ -79726,3 +79726,125 @@ and `e72c00d9278127f93505b65c29ceba1f1b8a389a26b544bd389b2c4f1147ee36`.
 The self-excluding review manifest validates at SHA-256
 `a9d3f9338747bd2696594106cb475d8fd0366587038d807dae0463f4ae5379a0`.
 The corrected blocking union is empty; no confirmation review is required.
+
+The one focused non-campaign GREEN invocation then proved that the serial
+reset repair reaches the intended workload but did not close the complete
+retained title. It selected exactly one test in one file with retries disabled,
+started at `2026-08-30T16:43:40.715Z` and ended after 174.925223 seconds with
+expected/skipped/unexpected/flaky counts `0/0/1/0`, no top-level reporter
+error and the sole terminal code `D108E4H_RAW_BACKPRESSURE`. Workbench
+calibration and trials `e3-03-0` and `e3-03-1` completed their full 600-sample
+semantic matrices. Trial `e3-03-2` also passed serial prepare and executed all
+600 workbench attempts before its custody validator rejected 73 explicit
+pre-native backpressure refusals. Thus D.108e4bf closes the demonstrated
+reset/readiness owner but stops before its retained-suite and formal GREEN
+review gates; it is not represented as a complete GREEN.
+
+The failure is a second recurrence of the D.108e4al capacity event under
+unchanged production bytes, now with complete D.108e4ar failure custody. The
+creator recorded 527 native raw sends and 73 `backpressuredDrops`; their sum is
+exactly the 600 workbench attempts. The receiver accepted 334 raw samples.
+Both endpoint-local `linkDrops` deltas were zero, both raw identities remained
+open and unchanged, and both handshake-failure deltas were zero. The creator's
+buffer reached 65,512 bytes before the final admitted send and 65,943 bytes
+after it; production then correctly refused the remaining calls above its
+unchanged 65,536-byte ceiling. The first two trials recorded 600 native sends
+and zero backpressure. This reproduces the bounded browser-drain variance; it
+does not demonstrate a broken production admission check, justify a higher
+ceiling or authorize a retry of this focused invocation.
+
+The reporter, extracted failure telemetry, compact summary, trace, error
+context and validating self-excluding manifest SHA-256 values are respectively
+`05bff1e5a21b95d5fd386a3e6906c1a6f47c9b72b56c54c32069730a11afbb4e`,
+`e8c68398daad3e8628f737ae69d6cdf9dfca0652a50c364d5b6390d992b9d4c8`,
+`d139a3771bd66ebadd1ac050308c3d4182e2e068581b472dde8f52ea8e9de9a0`,
+`60ede842a1d166742b6379e76bd6335565bf854c3504284d99e88a460bdf536d`,
+`d20fc7becea522d887221d1c139b5009043cf5a0c08e7948f503e6027eacb068`
+and `285499d33ca6c0fe7ae8ea9ea2b7156f190e6f863a5999d860a2202fed65ced4`.
+Evidence is immutable under `.logs/d108e4bf-green/`. No retained seven-test
+run, campaign invocation, product edit, Fable, Kimi or collaboration subagent
+occurred.
+
+###### D.108e4bg — zero-local bounded-refusal attempt accounting
+
+D.108e4bg owns the smallest expectation-consistency correction justified by
+the two retained backpressure recurrences. The product contract deliberately
+returns `false` and increments `backpressuredDrops` before native RTC send when
+the browser-owned buffer exceeds 65,536 bytes. The campaign currently treats
+that documented bounded refusal as a fatal replacement-custody signal even
+when neither endpoint replaced a raw link. That conflates two concerns: a
+complete accounting of the 600 fixed workbench attempts and the stronger
+native-send identity proof required when a replacement actually occurs.
+
+Change only `tests/e3-03-loss-and-hol-proof.pw.ts` plus this plan/evidence
+record. Retain the D.108e4bf serial reset implementation. Production, examples,
+configuration, dependencies, public APIs, browser identity, network profiles,
+the 65,536-byte ceiling, 600/33 ms workload, three-trial count, calibration,
+5/10/15-second readiness gates, delivery floor, AoI/HOL thresholds, watchdog,
+test budget and evidence fields remain byte-closed.
+
+For the transmitting endpoint, define admitted attempts as the unique native
+raw-send custody records and refused attempts as its non-negative
+`delta.backpressuredDrops`. Preserve the existing per-send sequence range,
+uniqueness, RTC attempt/terminal, ready-state, identity and sent-counter joins.
+When neither endpoint owns a local replacement and the transmitting endpoint
+is not the peer-dependent incoming-replacement side, require exactly:
+
+```text
+admitted native raw sends + explicit backpressured refusals = sampleCount
+deadline sent counter - prepare sent counter = admitted native raw sends
+```
+
+The workbench itself still attempts each sequence `0..599` exactly once, so
+the unique admitted sequence subset plus the refusal counter closes the full
+attempt cardinality without inventing a native RTC event for a call that
+production intentionally rejected before `channel.send`. Zero backpressure
+continues to require all 600 native sends. A non-transmitting endpoint may not
+own a positive refusal delta.
+
+Positive backpressure remains fatal with exact code
+`D108E4H_RAW_BACKPRESSURE` whenever the same trial has a local replacement or
+the endpoint is the peer-dependent incoming-replacement side. That preserves
+the stronger complete native identity/overlap proof for every `1/0`, `0/1` or
+`1/1` replacement topology. `2/0` and `0/2` retain
+`D108E4H_DROP_COUNT_AMBIGUOUS`; zero-owner RTC identity advancement retains
+`D108E4H_IDENTITY_JOIN_INVALID`. A success/refusal cardinality that is not
+exactly `sampleCount`, an invalid/duplicate/out-of-range admitted sequence or a
+zero-backpressure incomplete domain retains
+`D108E4H_RAW_SEND_DOMAIN_INVALID`. Existing detached-delta precedence and all
+retained D.108e4aa/D.108e4am mutants keep their exact codes.
+
+The deterministic roster adds one zero-local positive control matching the
+new evidence shape—527 admitted unique sequences plus 73 refusals—which must
+pass. Add count-underflow and count-overflow siblings that retain
+`D108E4H_RAW_SEND_DOMAIN_INVALID`, a non-transmitter positive-refusal mutant
+that throws `D108E4H_RAW_BACKPRESSURE`, and positive-refusal local- and
+incoming-replacement controls that throw the same backpressure code. Preserve
+the existing 600-success/one-refusal and 555-success/45-refusal replacement
+mutants as failing `D108E4H_RAW_BACKPRESSURE` controls. Run the exact focused
+schema-validator title once after the batch; if its complete soft-failure set
+differs from the frozen matrix, stop and diagnose before any browser run.
+
+After deterministic GREEN and exact-owner strict typecheck, lint, formatting,
+source-shape and diff gates pass, run the retained campaign title once as the
+next focused non-campaign GREEN. This is a fresh diagnostic name and is not a
+retry or campaign invocation. If it passes, run the retained seven-test
+non-campaign allowlist once. If it fails, preserve the complete attachment and
+stop on the first different semantic code rather than adding another change or
+rerunning it.
+
+Because this slice changes retained campaign acceptance even though it changes
+no product or numeric contract, sign and push this bounded plan before source
+implementation and run one high-risk Grok/Codex-`gpt-5.6-sol`-high/Opus-xhigh
+plan review. Only P0/P1 blocks. Correct a material union once; do not relaunch
+for P2, bookkeeping or prose. After GREEN is signed and pushed, run the single
+formal three-model implementation review over the D.108e4bf failure, frozen
+matrix, test diff and complete focused/retained evidence. No Kimi, Fable or
+collaboration subagent is authorized.
+
+Only accepted GREEN with an empty P0/P1 union may proceed to a separately
+frozen isolated checkout and six fresh whole-run names. The user's current
+authorization covers the necessary narrow and whole runs and must not be
+requested again. Prior roots and consumed names remain immutable; whole runs
+remain sequential under the existing first-failure rule. D.108e5 remains
+blocked until all six fresh invocations and their final evidence review pass.
