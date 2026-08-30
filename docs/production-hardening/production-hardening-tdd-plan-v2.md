@@ -80490,3 +80490,50 @@ SHA-256 values are respectively
 and `c9f46090476a7f7cd2cc5c9c1af7072321c63a3bb792e87c9c480149ddbdae06`.
 Evidence is immutable under `.logs/d108e4bj-green/`. Sign/push GREEN before
 the single formal implementation review.
+
+The single formal D.108e4bj implementation review inspected signed/pushed
+GREEN `85d50f52356fd0cc5a4c8fa2585018fe04449cba`. Codex
+`gpt-5.6-sol` high returned `APPROVED`, P0=0/P1=0/P2=0. Grok's sole
+read-only run emitted a substantive `APPROVED`, P0=0/P1=0/P2=0 object after
+progress prose, so its honest runner classification is `NO_VERDICT`; it was
+not relaunched. Opus xhigh returned `CHANGES_REQUIRED`, P0=0/P1=1/P2=1.
+
+Opus's P1 identified one undemonstrated fail-open edge: the initial ACK could
+fall after observer open but before READY while bypassing the product
+handler's `readyState=open` justification. The one permitted executable
+correction changes that guard from pre-open sends to every pre-READY send and
+adds an exact `D108E4H_LIFECYCLE_ORDER_INVALID` mutant with handler
+`readyState=connecting`, observer open, one post-open/pre-READY ACK, READY and
+a post-READY ACK. The demonstrated retained ordering remains green because
+its product handler recorded `readyState=open`. Opus's P2 notes two redundant
+explicit conjuncts; they remain plan-shaped defense in depth and receive no
+code or fixture expansion.
+
+The corrected focused title ran once and returned expected=1, skipped=0,
+unexpected=0 and flaky=0, with no top-level errors or soft failures. Strict
+owner TypeScript, ESLint, Prettier, `git diff --check`, network typecheck,
+network build and correction source-custody gates all returned zero. No
+production/configuration/package/lockfile/workload/threshold/schema byte, no
+retained browser title and no campaign changed or ran.
+
+Initial-review Codex-final, Opus-final, Opus-envelope, Grok-public,
+Grok-status, Grok-events and validating self-excluding review-index SHA-256
+values are respectively
+`44f51589e4b0e55ee0e7be45fca250541d013c438bff8471664fd8d56358d2f0`,
+`469fc78154742498319f7dffd43141d0cc00953e285d9793f8c435b230d9a2dc`,
+`22c47888c7f3a40f4bd282a8278f8163432293806597b11871fcff4d643a9e9f`,
+`2c5991381780ec1f6f78eab7493a27e2e0aa98e31e601ec511e8679b22a44834`,
+`85cbd63755a3b26c176e07d4ee58632ced24cb1acc40cd1129ba5df0683a76d4`,
+`fe1477a0eb6d42ce9fdc60a1e4b14e77c365ab6353c6d277a281fcfec2ba2465`
+and `9fc251db458aecd320fce2e7fd3a733bab7b22aa6302963774cb042f4398312d`.
+Evidence is immutable under `.logs/d108e4bj-green-review/`.
+
+Corrected owner, focused reporter, static-gate record and validating
+self-excluding correction-index SHA-256 values are respectively
+`ec3c9cb4ae8a1e0fa6d08f2a5a4e5ec9f8a57b0f772c95109c62cd1904558f8b`,
+`95078dc740818d73dd63480e76cba30fa2120cebd7aae094c49cfd9fa0cfd843`,
+`73cf3d47993f4db8be9024abc388a5e46c735898f337381fdf296cb4f360316a`
+and `1836d0f36a117662104b656bafa65bcfef764d6150ffb7aee097ba169415b254`.
+Evidence is immutable under `.logs/d108e4bj-green-correction/`. Sign/push the
+correction before the single bounded confirmation round; an empty confirmed
+P0/P1 union releases the one retained browser title.

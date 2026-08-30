@@ -3251,7 +3251,7 @@ function d108e4hAssertDeadlinePendingCandidate(endpoint: D108e4hEndpointCustody,
 		sentKinds.every(({ kind }) => kind === 2) &&
 		receivedKinds.every(({ kind }) => kind === 1 || kind === 3) &&
 		receivedKinds.every(({ lifecycleSequence }) => open.sequence < lifecycleSequence) &&
-		(preOpenSends.length === 0 || handler.readyState === "open") &&
+		(preReadySends.length === 0 || handler.readyState === "open") &&
 		preOpenSends.every(({ kind }) => kind === 2) &&
 		preReadySends.length <= 1 &&
 		postReadyAck;
@@ -5406,6 +5406,45 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 			),
 			"D108E4H_LIFECYCLE_ORDER_INVALID",
 			"D.108e4bj pre-open control without open handler state"
+		);
+		const d108e4bjPostOpenPreReadyLifecycle = Object.freeze(
+			d108e4bhDeadlineCandidateLifecycle
+				.map((record) => {
+					if (
+						record.connectionId === d108e4bhDeadlineCandidate.connectionId &&
+						record.channelId === d108e4bhDeadlineCandidate.channelId &&
+						record.event === "channel-message-handler-installed"
+					)
+						return Object.freeze({ ...record, readyState: "connecting" as const });
+					if (
+						record.connectionId === d108e4bhDeadlineCandidate.connectionId &&
+						record.channelId === d108e4bhDeadlineCandidate.channelId &&
+						record.event === "channel-open-event"
+					)
+						return Object.freeze({ ...record, sequence: 2 });
+					if (record.attemptId === 930_001 && record.event === "channel-send-attempt")
+						return Object.freeze({ ...record, sequence: 3 });
+					if (record.attemptId === 930_001 && record.event === "channel-send-success")
+						return Object.freeze({ ...record, sequence: 4 });
+					return record;
+				})
+				.sort((left, right) => left.sequence - right.sequence)
+		);
+		d108e4avExpectCode(
+			withReceiverEndpoint(
+				d108e4bhDeadlinePending,
+				Object.freeze({
+					...d108e4bhDeadlinePending.endpoints.receiver,
+					controlSends: Object.freeze(
+						(d108e4bhDeadlinePending.endpoints.receiver.controlSends ?? []).map((record) =>
+							record.attemptId === 930_001 ? Object.freeze({ ...record, lifecycleSequence: 3 }) : record
+						)
+					),
+					lifecycle: d108e4bjPostOpenPreReadyLifecycle,
+				})
+			),
+			"D108E4H_LIFECYCLE_ORDER_INVALID",
+			"D.108e4bj post-open pre-READY ACK without open handler state"
 		);
 		const d108e4bjSecondEagerLifecycle = Object.freeze(
 			[
