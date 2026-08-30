@@ -76486,3 +76486,120 @@ source-shape/name-removal checks and a self-excluding GREEN manifest. Do not run
 a browser or long campaign. Sign and push GREEN, then run the sole formal Grok,
 Codex `gpt-5.6-sol` / high and Opus 5/xhigh review over signed plan, RED and
 GREEN. Only P0/P1 blocks. No Kimi, Fable or collaboration subagent is permitted.
+
+D.108e4at GREEN is signed/pushed as
+`1378f3deee67150bdf6dad9390f629b9ac910429`, parented by signed/pushed GREEN
+freeze `25d33bb664cd008deb53f7e1d242e7d72414ad2d`, with exactly the frozen
+production and test owners. The first focused GREEN invocation returned one
+pass and one failure: only the initiator-sender row allocated a third physical
+connection after successful A traffic because the settled setup promise no
+longer represented the already-held B. The narrow owner correction made
+`#linkFor` return A when `#pendingReplacementLinks` already owns B. One
+corrected focused invocation then passed both rows with 49 unselected rows and
+no third allocation. Both reports remain immutable evidence; their SHA-256
+values are respectively
+`da86b495f4969730d31f000771d5449a63bf3bef4aceff4d2cf33bfbdf8e1ab8`
+and
+`00628347623aec2b72647aff3c8881dd69c279e85f174b829c236d78d0557da0`.
+
+The one complete retained-file invocation passed 49 of 51 rows. Its only two
+failures were timeouts in the parameterized exact-old-link fixture: after the
+ownership flip, that fixture still armed the initiator-side A close barrier
+after the acceptor-side A retirement had already happened, so its wait could
+never become pending. No production source changed. The fixture was corrected
+to hold remote B readiness, arm the acceptor-owned A close before release and
+exercise the same retiring ingress in the opposite direction. One targeted
+two-row invocation passed both corrections. The other 49 rows and all shared
+fake owners are byte-identical to the complete-file run, so its 49 passes plus
+the corrected two passes cover all 51 retained rows without repeating the
+unchanged rows. The reports' SHA-256 values are
+`a4dd46b6580ed581214512260575b17095827bb1798aa305f2f0533d1808ef12`
+and
+`10e31d4629575889a692e94387c3360cf39821f31bbde33f3ff2342b813f1434`.
+This records the actual fixture delta and supersedes the freeze's narrower
+expectation-only description without altering immutable results.
+
+Network typecheck/build, exact-owner ESLint/Prettier, diff and changed-path
+custody, source-shape/name-removal and browser-validator byte custody all
+returned zero. Production owner SHA-256 is
+`117316fcf088d47d141cc5c7089cffa672f8c00c929d753814103710349c9283`,
+test owner SHA-256 is
+`2a225d1b91228de266bcea70bb0b89872f3a5ec715c450ac76249291d7ed54a0`,
+and the unchanged browser validator remains
+`22b0b618a094e0b125a4436cc97a5ef6fa535249ad349b30d505b7b3f70ae9af`.
+The self-excluding `.logs/d108e4at-green/SHA256SUMS` validates and has SHA-256
+`c152e4b82c17d70390a4f658b77895690f1054c51b3b6986abc93dae310fdac6`;
+its baseline is `25d33bb664cd008deb53f7e1d242e7d72414ad2d`. No browser, profiler or
+campaign ran; campaign custody remains one consumed failure, zero passes and
+five unrun names.
+
+The sole final implementation review does not close GREEN. Read-only Codex
+`gpt-5.6-sol` / high returned `BLOCKED` with one material P1. If A becomes
+unusable after initiator B is locally open and held but before peer B has its
+handler/open readiness, `#dropLink` promotes B solely because it is locally
+open/current. The same unusable-A `#linkFor` call then continues with its
+pre-drop `unusable`/`staleOpen` classification, no pending map owner remains,
+and it can allocate C. An independent A close reaches the same premature B
+promotion even when it does not itself allocate C. Thus A close is being used
+as an implicit readiness signal even though an unrelated A failure is
+observationally identical. The focused GREEN proves successful A traffic while
+B is held, but has no intersection row for A becoming unusable during that
+hold. This violates preserved failed-send recovery, remote readiness and
+no-third-allocation acceptance, so it blocks campaign authority.
+
+Opus 5/xhigh session `cfed0bbc-ab8d-4297-b980-d62654100815` returned
+`APPROVED` with zero P0/P1 and four P2s. Its useful nonblocking dispositions are
+retained: this closure records the full fixture delta and anchors the GREEN
+manifest; the unreliable lane may still lose an A send during the short
+acceptor-retired/initiator-not-yet-promoted window; and generation advancement
+while B is held lacks a currency check and can delay convergence until B
+closes. The forthcoming readiness slice owns the held-generation case and must
+state whether its explicit handshake also removes the residual one-way loss
+window. Opus did not exercise the blocking unusable-A/held-B intersection, so
+its approval does not cancel the demonstrated Codex P1.
+
+The one Grok review remains honest `NO_VERDICT`: its service stopped the sole
+run after 450.174 seconds with `stopReason=cancelled`, `timed_out=false` and no
+terminal schema. It is not relaunched. The blocking union is nevertheless
+nonempty because the Codex P1 is independently reproducible from the owner
+paths. The self-excluding final-review manifest validates and has SHA-256
+`9dc0763ef36d5d4ec24f4a57b3812f7a9e79ae63cb54cb33b6a59303b9f29b16`.
+Signed GREEN and all evidence are preserved as rejected, non-authorizing
+history; nothing is amended or discarded.
+
+###### D.108e4au — distinguish remote B readiness from unrelated A loss
+
+D.108e4au is the smallest justified next slice. It starts test-only and may not
+silently change production behavior. Add one deterministic intersection RED
+using the existing remote-inbound-open barrier: establish A, advance identity,
+let initiator B become locally open and settle into the pending-replacement
+owner while peer B remains without handler/open, then independently make A
+unusable. Cover both the direct A-close path and a send discovering unusable A.
+Require that current rejected GREEN exposes premature B selection in the first
+case and premature selection plus C allocation in the second, with exact error
+tokens, exact physical-owner counts, both peer orderings, cleanup and unchanged
+failure-retention/capacity/identity controls. A causal mismatch stops before
+production work. Do not run a browser or retained campaign.
+
+The RED must answer whether any existing authenticated RTC lifecycle state can
+distinguish the acceptor's readiness-owned A retirement from unrelated A loss.
+If it cannot, freeze a separate GREEN that explicitly authorizes a bounded,
+versioned internal B readiness handshake/control frame before either endpoint
+retires A. That is a wire/lifecycle behavior change and therefore receives the
+high-risk plan review required by the prospective policy before production
+source changes. Its acceptance matrix must include ready/ack ordering,
+duplicate/stale/wrong-generation control rejection, user-payload separation,
+failed-handshake A retention, unusable-A recovery without premature B or C,
+held-generation currency, capacity/cleanup, both peer orderings and the
+unchanged product API, workload, thresholds, timeouts and dependencies. If a
+sound no-wire discriminator is demonstrated instead, record it and freeze that
+narrower owner before GREEN; do not infer one from A close alone.
+
+D.108e4at does not restore campaign authority. D.108e4as remains frozen at one
+consumed failure, zero passes and five unrun invocations. The durable six-run
+authorization remains recorded and must not be requested again, but no
+remaining invocation may run until D.108e4au has a reviewed causal RED, a
+reviewed GREEN with zero P0/P1 and an explicit signed restoration of campaign
+authority. Preserve protected untracked paths, all 26 stashes, signed/pushed
+history, immutable evidence and the first-failure rule. Do not invoke Kimi,
+Fable or collaboration subagents.
