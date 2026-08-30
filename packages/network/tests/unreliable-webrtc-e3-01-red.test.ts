@@ -2296,6 +2296,79 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		}
 	});
 
+	it("D.108e4bm retains acceptor A until the initiator reliably observes committed B", async () => {
+		const module = await loadOwnerModule();
+		const bus = new FakeSignalingBus();
+		const low = owner(module, bus, "peer-a");
+		const high = owner(module, bus, "peer-b");
+		let openBarrier: FakeRemoteInboundOpenBarrier | undefined;
+		let closeEventBarrier: FakeInboundOpenBarrier | undefined;
+		let peerCloseBarrier: FakeInboundOpenBarrier | undefined;
+		let replacementPending: Promise<void> | undefined;
+		try {
+			const original = bus.connect("peer-a", "peer-b");
+			const lowRoute = low.owner.openUnreliableWebRtcRoute("zone:d108e4bm-delayed-acceptor-activation");
+			const highRoute = high.owner.openUnreliableWebRtcRoute("zone:d108e4bm-delayed-acceptor-activation");
+			await Promise.all([lowRoute.reconcile(["peer-b"]), highRoute.reconcile(["peer-a"])]);
+
+			bus.disconnect(original);
+			const replacement = bus.connect("peer-a", "peer-b");
+			openBarrier = FakePeerConnection.pauseNextRemoteInboundOpen();
+			replacementPending = lowRoute.reconcile(["peer-b"]);
+			await openBarrier.waitUntilPending();
+			await replacementPending;
+
+			const oldHigh = high.peerConnections[0]?.channels[0];
+			if (oldHigh === undefined) throw new Error("D108E4BM_OLD_ACCEPTOR_A_ABSENT");
+			closeEventBarrier = oldHigh.pauseCloseEvent();
+			peerCloseBarrier = oldHigh.pausePeerClose();
+
+			openBarrier.release();
+			await openBarrier.waitUntilComplete();
+			await tick();
+			await tick();
+
+			const lowBeforeObservation = lowRoute.snapshot();
+			const highBeforeObservation = highRoute.snapshot();
+			if (
+				lowBeforeObservation.linkDrops !== 0 ||
+				highBeforeObservation.linkDrops !== 0 ||
+				lowBeforeObservation.links[0]?.connectionId !== original.left.id ||
+				highBeforeObservation.links[0]?.connectionId !== original.right.id
+			) {
+				throw new Error(
+					`D108E4BM_ACCEPTOR_RETIRED_A_BEFORE_OBSERVATION:${JSON.stringify({
+						high: highBeforeObservation,
+						low: lowBeforeObservation,
+						replacement: {
+							left: replacement.left.id,
+							right: replacement.right.id,
+						},
+					})}`
+				);
+			}
+			expect(lowBeforeObservation).toMatchObject({
+				activeLinks: 1,
+				lastLinkDrop: undefined,
+				linkDrops: 0,
+				links: [{ connectionId: original.left.id, generation: original.left.generation }],
+			});
+			expect(highBeforeObservation).toMatchObject({
+				activeLinks: 1,
+				lastLinkDrop: undefined,
+				linkDrops: 0,
+				links: [{ connectionId: original.right.id, generation: original.right.generation }],
+			});
+		} finally {
+			closeEventBarrier?.release();
+			peerCloseBarrier?.release();
+			FakePeerConnection.releaseRemoteInboundOpenBarrier(openBarrier);
+			await replacementPending?.catch(() => undefined);
+			low.owner.close();
+			high.owner.close();
+		}
+	});
+
 	it("D.108e4bi rejects application ingress before pending replacement qualification", async () => {
 		const module = await loadOwnerModule();
 		const bus = new FakeSignalingBus();

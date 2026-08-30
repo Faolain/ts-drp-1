@@ -81094,3 +81094,24 @@ event-stream SHA-256 values are respectively
 `a232271cc2c0a06d565b4dabb4f7e5cc18f2086fe38770f952f90eb1a7befd58`
 and
 `078520506bb32caef1cbe3fcddfe6479b32e9f0326565f83b9669c4c58edf804`.
+
+The corrected D.108e4bm activation-order RED then changed only the existing
+fake-signaling/RTC test owner. Pre-execution network typecheck, exact-owner
+ESLint/Prettier, `git diff --check` and exact collection passed; collection
+selected one title in one file. The title establishes A, opens qualified B
+with acceptor A's close event and peer-close propagation held, and requires
+both endpoints still to select A before any reliable decision observation.
+
+The sole execution failed exactly as intended with one failed assertion and
+88 skipped owner tests. Its exact causal token is
+`D108E4BM_ACCEPTOR_RETIRED_A_BEFORE_OBSERVATION`: the current acceptor had
+already selected replacement B and recorded one `replacement` drop while the
+initiator still selected A with zero drops. Test-owner and reporter SHA-256
+values are respectively
+`f8d4ae540c49a24b63c08d9b628f466b8c9d25ef0b8091630fdfa4eb20a1fc8f`
+and
+`7c6fe9e2cc795a946d1db6f8c52bb9ca113cd4cae18b774e313c577a787b25cf`.
+No production, browser, retained-seven or campaign execution occurred. This
+RED plus signed D.108e4bl freezes both necessary causal transitions: defer
+acceptor A retirement until reliable observation, then prevent qualified idle
+B from expiring after that observation.
