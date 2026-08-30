@@ -76245,3 +76245,119 @@ The D.108e4as-v2 ledger is zero before these blocks. The first consumed nonzero
 runner status stops all later launches. Six zero terminal statuses authorize
 only the existing signed/pushed campaign-evidence checkpoint and its one final
 Grok/Codex/Opus evidence review before resuming D.108e5.
+
+###### D.108e4at — first-campaign lifecycle failure custody and deterministic causal RED
+
+The portable D.108e4as-v2 freeze completed at signed/pushed plan checkpoint
+`19b26bfae7afb32bd6afa10ad615edcb6ee7d496`, tagged by signed annotated tag
+`d108e4as-freeze-v2-reviewed`. Its final freeze review had an empty blocking
+union: Codex `gpt-5.6-sol` / high and Opus 5/xhigh returned `APPROVED` with zero
+P0/P1, while Grok's wrapper remained honest `NO_VERDICT` because progress prose
+preceded its terminal JSON even though that terminal payload was `APPROVED` with
+zero P0/P1. No reviewer is relaunched. The accepted readiness anchor
+`53141bbf193379843d8183fa3e8b9b72cfc5dbec`, 217-file manifest
+`c577dbdab0a7e78cdd57b99b0d4d1f85f56c8e5b4df03e6fa214d3db5e6c266d`,
+v2 270-file manifest
+`101fb09489184c78155bd855c2478f3652d541ade34f1b1eab1d20cf1b24a9f8`,
+completed gates, tool-capability correction and zero-invocation fact before the
+launcher remain closed and are not reopened.
+
+The first authorized consuming invocation, `ordinary-1`, ran once from
+`2026-08-30T05:19:25Z` through `2026-08-30T05:20:49Z`. Its Playwright reporter
+records 84.150811 seconds, expected/skipped/unexpected/flaky `0/0/1/0`, zero
+top-level errors and exact failure `D108E4H_LIFECYCLE_ORDER_INVALID` in the
+first trial `e3-03-0`; `ordinary-1.status` and
+`ordinary-1.runner-status` are both one. No trial reached completed campaign
+evidence. Failure telemetry SHA-256 is
+`0b01679ee2a8a885a144953a0c3165894072d9db87cef7a522ce4e2e72402d09`,
+endpoint-local classification SHA-256 is
+`f2bc3277d7cab12e2bf6890d5a1345fae26fb0847e913ef459628ce9bbefab9a`,
+reporter SHA-256 is
+`fef69ec9d143a03f5f26061581182b458ea57dfa87965125d15352ad23a765d2`,
+and the validating self-excluding campaign manifest SHA-256 is
+`5e326a54969a3e44dbbc875ff44a52cc7e78889d66fe388f7c60194a7a26b239`.
+The before/after process and fixed-port predicates are clear, the tracked tree
+is clean, and `ordinary-2`, `ordinary-3`, `isolated-1`, `isolated-2` and
+`isolated-3` have no status or result artifacts because they were not launched.
+This is one consumed failure, zero passes and five unrun invocations. The
+D.108e4as first-failure rule therefore prohibits every remaining block and
+requires this new evidence/diagnosis slice. The existing durable six-invocation
+authorization is preserved but supplies no retry or continuation authority.
+
+The failure is a demonstrated endpoint-local break-before-make ordering defect,
+not a launcher, classifier or host-utility defect. Endpoint classification is
+`receiver-local`: each endpoint advanced authenticated identity and recorded
+one local raw-link drop; the receiver owned `replacement`, while the creator
+observed `channel-close`. On the creator the selected old raw identity was RTC
+connection/channel `4/354` and the replacement was `7/393`. The old
+`rtc-datachannel-close-event` occurred at lifecycle sequence 2393, followed by
+the product-owned close call at 2394 and product-owned peer-connection close at 2395. The replacement product message handler was not installed until sequence
+2431 and its semantic open was sequence 2432. That exact order violates the
+retained contract requiring replacement handler and open before the old close
+event, then the product close call after that event. The old link had carried
+traffic before closing and the replacement became usable afterward; the
+failure is the continuity gap between those owners.
+
+Connection-monitor evidence is trigger context only. It includes timed-out and
+aborted authenticated connections, but does not prove a false-positive abort
+on an otherwise usable authenticated connection. D.108e4at must not upgrade or
+patch js-libp2p, disable its connection monitor, change ping thresholds, alter
+dependencies, or attribute the defect upstream. If later evidence proves such
+a false positive, stop and create a separate minimal upstream reproduction and
+report slice. The demonstrated local acceptance failure remains the raw
+sidecar's inability to prove remote replacement readiness before retiring the
+paired old sidecar.
+
+D.108e4at is a bounded test-only causal-RED slice. It changes only
+`packages/network/tests/unreliable-webrtc-e3-01-red.test.ts` after this plan is
+reviewed and signed. Extend the existing fake RTC owner with one deterministic,
+one-shot remote-open delivery barrier: the replacement initiator may receive
+its answer and observe its outbound channel open, while the peer's replacement
+inbound channel remains connecting and has not emitted open. This models the
+captured browser ordering without timers, scheduler assumptions, browser
+retries or a long campaign. Add one parameterized control covering both
+application peer orderings. Establish A, advance authenticated identity, arm
+the barrier for B, begin the replacement, and prove that current production
+retires the peer's A before B has a product message handler and semantic open.
+The sole intended RED error is exact
+`D108E4AT_REMOTE_REPLACEMENT_READINESS_GAP`; the test must also prove one old
+owner, one replacement owner, zero duplicate close ownership, unchanged route
+and identity semantics, and successful traffic on A before the gap. Release the
+barrier in `finally` and prove fixture cleanup has no pending timer or setup.
+
+The RED roster includes the new two-ordering control plus the existing orderly
+stale-authenticated replacement, failed-replacement rejection/timeout retention,
+send-only discovery, inbound-before-reconcile, handler-order and failed-send
+recovery controls. Their existing expectations and exact error behavior remain
+unchanged. RED may add test-local lifecycle observations needed to assert order,
+but may not edit production source, browser campaign source, workload,
+thresholds, timeout values, package state, APIs, wire formats, connection
+monitor behavior, launcher/evidence code or immutable campaign artifacts. Run
+the exact focused unit title once. Deterministically require the selected title
+count, both parameter rows, exact error token, no unexpected alternate error,
+production-source byte identity and retained-title exclusion; then run the
+listed retained unit controls once, exact-owner lint/Prettier/diff checks and a
+self-excluding evidence manifest. A mismatch stops for diagnosis and is not
+folded into a repair.
+
+D.108e4at does not pre-authorize GREEN product behavior. After a causal RED is
+signed and pushed, inspect whether the smallest repair can establish remote
+handler/open readiness using existing internal lifecycle ownership without a
+wire-format, product-API, timing, dependency, threshold or workload change. If
+yes, freeze that exact owner and acceptance matrix as the narrow GREEN
+continuation. If the only sound repair needs a new readiness handshake/control
+frame or another presently excluded contract change, stop and reslice that
+high-risk change explicitly rather than weakening the retained lifecycle
+assertion. No D.108e4as campaign invocation may run during D.108e4at, and the
+five unrun names remain unrun until a later reviewed GREEN closes the exact RED
+and separately restores campaign authority.
+
+The prospective review cadence applies: sign and push this bounded plan, then
+run one Grok, read-only Codex `gpt-5.6-sol` / high and Opus 5/xhigh plan review.
+Only P0/P1 blocks. Correct material findings in one batch; P2/bookkeeping/prose
+gets an owner and disposition without another round. A matching deterministic
+RED is signed and pushed without a separate full model review. Any eventual
+GREEN receives the one formal three-model review over the complete signed
+plan-to-RED-to-GREEN history. Kimi, Fable and collaboration subagents remain
+prohibited. Protected untracked paths, all 26 stashes, signed commits, pushed
+identity, immutable campaign evidence and first-failure custody remain intact.
