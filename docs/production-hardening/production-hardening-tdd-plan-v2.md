@@ -81523,3 +81523,20 @@ D.108e4bn RED/GREEN and its sole confirmation are closed. The next gate is one
 fresh retained-browser invocation name under the unchanged 600-second
 process-group watchdog; only its pass releases the exact retained seven-title
 non-campaign allowlist.
+
+Freeze that one fresh name as `.logs/d108e4bn-retained-browser-1/`. It must be
+absent before launch and is write-once whether the consuming invocation passes
+or fails. The literal launcher is the unchanged telemetry-enabled retained
+title under the 600-second process-group watchdog, with reporter, stdout,
+stderr, status and Playwright attachments rooted under that fresh name:
+
+```sh
+D108E4H_TELEMETRY=1 D108E4G_TELEMETRY=1 PLAYWRIGHT_JSON_OUTPUT_NAME="$PWD/.logs/d108e4bn-retained-browser-1/reporter.json" /usr/bin/perl -MPOSIX=setpgid -e 'my $limit=shift @ARGV; my $pid=fork(); die "fork failed" unless defined $pid; if($pid==0){setpgid(0,0); exec @ARGV; exit 127} $SIG{ALRM}=sub { kill "TERM", -$pid; select undef,undef,undef,5; kill "KILL", -$pid; waitpid($pid,0); exit 124 }; alarm $limit; waitpid($pid,0); alarm 0; exit($? == -1 ? 125 : ($? & 127) ? 128 + ($? & 127) : $? >> 8)' 600 pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' --reporter=json --fail-on-flaky-tests --output="$PWD/.logs/d108e4bn-retained-browser-1/test-results"
+```
+
+The output-path option changes evidence custody only, not selection, workload,
+browser, retries, timeout or test semantics. Preflight requires signed HEAD to
+equal the pushed branch, the protected roster and 26 stashes unchanged, no
+ts-drp reviewer/test/profiler, and ports 4174/4175/51000/51002 clear. An
+unrelated Playwright server rooted in another project and the two previously
+documented evidence-watcher shells are not conflicts.
