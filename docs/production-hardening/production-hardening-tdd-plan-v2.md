@@ -78015,3 +78015,92 @@ Playwright configuration, browser pin, watchdog, timeout, threshold, port,
 classifier, resource ceiling or test semantic changes are in scope. If the
 restoration cannot execute without one, stop and reslice rather than widening
 D.108e4aw.
+
+D.108e4aw construction is complete without consuming a campaign name. The
+first clean-isolated-object probe stopped before restoration-root creation
+because the temporary repository had not fetched reviewed GREEN. The exact
+signed commit was fetched from its configured origin, verified, and checked out
+detached with clean tree 0f2b5266...; no campaign preflight artifact exists.
+The source restoration root remains immutable at manifest SHA-256
+2c74d0310a52ed9f95950189c6f7d53e708f387d2de19b9ded6fcb9a740c8e03.
+
+The final D.108e4aw runner SHA-256 is
+c6adde1fefed95cd4c8389e26ee7ce535fa7943994f116f4d9650a690f45acd6.
+Its diff from the accepted predecessor changes exactly the behavior head,
+behavior tree and restoration-root literal; diff-evidence SHA-256 is
+6308c14289065d118f95f8bfe543aac623f915d5ffcd825947ba0d852edad942.
+The final predecessor guard SHA-256 is
+4f5d985b10521efd92a6c03e43130bb663938803fb19d8404031bf6d13644585;
+its ten changed diff lines move the sole failed-predecessor exception from the
+already-consumed ordinary-2 name to ordinary-3, bind exact ordinary-2=1/1, and
+replace the old campaign-manifest hash with 8b54ff2b.... Guard-diff evidence
+SHA-256 is
+dfbd99dd86c6d42ec77a6669daa2623535ef0ffeadbea0edeb933b3a3c69565e.
+
+The portable tool gate and corrected process audit remain byte-identical at
+SHA-256
+aa346cd11296c8efc5b3d0eebab219f8586d8df9272d8945f2093d523715b8a7
+and
+eb89062a38c87f35a4cd1f38d064a68dcdc420ff4fef9620f0e049a84fb5d92e.
+Ordinary and isolated seven-path source identities are byte-identical at
+SHA-256
+305aa60d4944b2e906ca82b9f7b527c2fb61079063f23d8e3a6cf3bd240c8a3a.
+Their complete 334-file runtime inventories and the expected-runtime manifest
+are byte-identical at
+0740401740e1f509463f5e14f59d8a05609bb02e1aa97d07e4c18c2bf07fc298.
+Thus the D.108e4av test/evidence repair changes no runtime byte.
+
+The deterministic construction audit and inherited static audit both return
+zero. The former records exact summary SYNTAX=PASS,
+RUNNER_DIFF=EXACT_THREE_FIELDS,
+FAILED_PREDECESSOR_DIFF=EXACT_ORDINARY_3, TOOL_GATE=PASS,
+CAMPAIGN_CUSTODY=2_FAILED_0_PASS_4_UNRUN,
+ORDINARY_3_ADMISSION=PASS, ISOLATED_1_PREDECESSOR_REFUSAL=PASS,
+SOURCE_RUNTIME_IDENTITY=PASS, PROCESS_PORT_CUSTODY=PASS,
+LISTING=1_TEST_1_FILE_BOTH_WORKSPACES and CAMPAIGN_INVOCATIONS=0;
+its stdout SHA-256 is
+ae61e40fbe688a6e9b0d1e786a7df9a518f89f8e96479054956033f197b32e40.
+Both list outputs are byte-identical at
+2b7598033bb16d472bee4bb00c6263ab3292e2d68640e555d1a4204ee29d3fec.
+Modes validate under manifest SHA-256
+6da6d6550e519de0fd04211322f3c62796a5e42396f8a47163da9ce8a167a26a.
+
+The self-excluding 359-file restoration manifest validates completely. Its
+SHA-256 is
+6f84973498bab7421a80cde481a56d584d747bc5b7bbd4742d899ed5e20a2e1a;
+the 359-line validation record SHA-256 is
+2cf635a46b99fee8d618f5a3fd5afe1fdad5965334b2cbefb80a6d622eae0f1e.
+The frozen literal-launch record SHA-256 is
+4d47af6ea7edfe0c73e36de38a635bc17ec1c34a4a11c4025e741bc0c7266ec4.
+Protected-state SHA-256 is
+6059409902c4f17404bed9cc033bd839a5e78193c4ce7731458ba9201f013970;
+all 26 stashes remain byte-recorded at
+35c57939738d237e53ac81b4b7c471b904b21e83d7b1b19ad8f54c9604ba1e2a.
+All fixed ports were clear and no ts-drp reviewer, test or profiler conflicted.
+
+After this plan-only authority checkpoint is signed and pushed and its one
+formal freeze review has an empty P0/P1 union, run these blocks as four separate
+fresh shells in exact order:
+
+    set -eu
+    export COREPACK_ENABLE_NETWORK=0 COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+    unset D108E4AS_FINALIZER_FAULT
+    /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aw-campaign-restoration/run-one.zsh ordinary-3 /Users/aristotle/Documents/Projects/ts-drp-1
+
+    set -eu
+    export COREPACK_ENABLE_NETWORK=0 COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+    unset D108E4AS_FINALIZER_FAULT
+    /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aw-campaign-restoration/run-one.zsh isolated-1 /private/tmp/ts-drp-d108e4as-clean/repo
+
+    set -eu
+    export COREPACK_ENABLE_NETWORK=0 COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+    unset D108E4AS_FINALIZER_FAULT
+    /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aw-campaign-restoration/run-one.zsh isolated-2 /private/tmp/ts-drp-d108e4as-clean/repo
+
+    set -eu
+    export COREPACK_ENABLE_NETWORK=0 COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+    unset D108E4AS_FINALIZER_FAULT
+    /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4aw-campaign-restoration/run-one.zsh isolated-3 /private/tmp/ts-drp-d108e4as-clean/repo
+
+The first nonzero consuming result stops the sequence. This authority checkpoint
+does not itself claim or consume a pass.
