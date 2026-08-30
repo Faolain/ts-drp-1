@@ -148,6 +148,7 @@ interface LinkReadiness {
 	commitSends: number;
 	complete: boolean;
 	readonly commit: Promise<void> | undefined;
+	expiry: ReturnType<typeof setTimeout> | undefined;
 	receivedAck: boolean;
 	receivedCommit: boolean;
 	receivedReady: boolean;
@@ -711,7 +712,11 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		}
 		if (connection === undefined) return staleOpen ? existing : undefined;
 		if (staleOpen && this.#retryLinks.has(peerId)) return existing;
-		const setup = withDeadline((signal) => this.#initiate(connection, signal)).catch(() => {
+		const deadlineAt = Date.now() + SETUP_TIMEOUT_MS;
+		const setup = withDeadline(
+			(signal) => this.#initiate(connection, signal, deadlineAt),
+			deadlineAt - Date.now()
+		).catch(() => {
 			this.#closePendingForPeer(peerId);
 			this.#handshakeFailures += 1;
 			if (staleOpen) this.#scheduleLinkRetry(peerId);
@@ -738,7 +743,11 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			.sort((left, right) => left.id.localeCompare(right.id))[0];
 	}
 
-	async #initiate(connection: AuthenticatedWebRtcConnection, signal: AbortSignal): Promise<ActiveLink | undefined> {
+	async #initiate(
+		connection: AuthenticatedWebRtcConnection,
+		signal: AbortSignal,
+		deadlineAt: number
+	): Promise<ActiveLink | undefined> {
 		const pc = this.#createPeerConnection();
 		let authenticatedClosed = false;
 		let established = false;
@@ -773,7 +782,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 				this.#activatedPeers.has(connection.remotePeerId) &&
 				(existing === undefined || !this.#sameConnection(existing.connection, connection))
 			) {
-				this.#holdReplacementLink(link);
+				this.#holdReplacementLink(link, deadlineAt);
 				return existing;
 			}
 			this.#pendingPeerConnections.delete(pc);
@@ -919,7 +928,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		return link;
 	}
 
-	#prepareLink(peerId: string, link: ActiveLink, replacement: boolean): LinkReadiness {
+	#prepareLink(peerId: string, link: ActiveLink, replacement: boolean, deadlineAt?: number): LinkReadiness {
 		let commit: Promise<void> | undefined;
 		let rejectCommit = (_error: Error): void => undefined;
 		let resolveCommit = (): void => undefined;
@@ -943,6 +952,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			commit,
 			commitSends: 0,
 			complete: false,
+			expiry: undefined,
 			receivedAck: false,
 			receivedCommit: false,
 			receivedReady: false,
@@ -974,19 +984,25 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 				? this.#sendReplacementControl(link, readiness, 1)
 				: this.#sendReplacementControl(link, readiness, 2);
 		if (!sent && replacement) throw new Error("replacement readiness send failed");
+		if (replacement && link.role === "initiator" && !readiness.complete) {
+			if (deadlineAt === undefined) throw new Error("replacement readiness deadline is absent");
+			const remaining = Math.max(0, deadlineAt - Date.now());
+			readiness.expiry = setTimeout(() => {
+				if (this.#readiness.get(link) === readiness) this.#failReplacementReadiness(peerId, link, readiness);
+			}, remaining);
+		}
 		return readiness;
 	}
 
-	#holdReplacementLink(link: ActiveLink): LinkReadiness {
+	#holdReplacementLink(link: ActiveLink, deadlineAt?: number): LinkReadiness {
 		const peerId = link.connection.remotePeerId;
 		const previous = this.#pendingReplacementLinks.get(peerId);
 		if (previous !== undefined) this.#discardPendingReplacement(peerId, previous);
 		this.#pendingReplacementLinks.set(peerId, link);
 		try {
-			return this.#prepareLink(peerId, link, true);
+			return this.#prepareLink(peerId, link, true, deadlineAt);
 		} catch (error) {
-			if (this.#pendingReplacementLinks.get(peerId) === link) this.#pendingReplacementLinks.delete(peerId);
-			this.#readiness.delete(link);
+			this.#discardPendingReplacement(peerId, link);
 			throw error;
 		}
 	}
@@ -996,13 +1012,15 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		link.closing = true;
 		const readiness = this.#readiness.get(link);
 		this.#readiness.delete(link);
+		if (readiness?.expiry !== undefined) clearTimeout(readiness.expiry);
 		readiness?.rejectCommit(new Error("replacement readiness ended before commit"));
 		if (this.#pendingReplacementLinks.get(peerId) === link) this.#pendingReplacementLinks.delete(peerId);
 		this.#pendingPeerConnections.delete(link.pc);
 		link.unsubscribeConnection();
 		link.channel.close();
 		link.pc.close();
-		if (!this.#links.has(peerId)) this.#scheduleLinkRetry(peerId);
+		const selected = this.#links.get(peerId);
+		if (selected === undefined || !this.#isCurrent(selected.connection)) this.#scheduleLinkRetry(peerId);
 	}
 
 	#promotePendingReplacement(peerId: string): boolean {
@@ -1024,6 +1042,8 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		}
 		this.#pendingReplacementLinks.delete(peerId);
 		this.#pendingPeerConnections.delete(pending.pc);
+		if (readiness.expiry !== undefined) clearTimeout(readiness.expiry);
+		readiness.expiry = undefined;
 		readiness.complete = true;
 		this.#registerLink(pending, true);
 		readiness.resolveCommit();
@@ -1134,6 +1154,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		link.closing = true;
 		const readiness = this.#readiness.get(link);
 		this.#readiness.delete(link);
+		if (readiness?.expiry !== undefined) clearTimeout(readiness.expiry);
 		readiness?.rejectCommit(new Error("active link ended before replacement commit"));
 		this.#lastLinkDrop = reason;
 		this.#linkDrops += 1;
@@ -1147,7 +1168,9 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 	#finishRetiringLink(peerId: string, link: ActiveLink): void {
 		if (this.#retiringLinks.get(peerId) !== link) return;
 		this.#retiringLinks.delete(peerId);
+		const readiness = this.#readiness.get(link);
 		this.#readiness.delete(link);
+		if (readiness?.expiry !== undefined) clearTimeout(readiness.expiry);
 		link.pc.close();
 	}
 

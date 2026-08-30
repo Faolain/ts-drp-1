@@ -77109,3 +77109,84 @@ failure, zero passes and five unrun names pending this signed/pushed GREEN and
 its sole formal Grok/Codex/Opus review. Only an empty P0/P1 union followed by an
 explicit signed restoration may authorize those five invocations; the durable
 six-run authorization is preserved and must not be requested again.
+
+The sole formal GREEN review of signed/pushed checkpoint
+`2713150ec013198c5751f8bbe6af69443d4f61a6` produced a nonempty blocking union.
+Read-only Codex `gpt-5.6-sol` / high session
+`01a05199-1da6-7450-a911-179ef447547d` returned `BLOCKED`, P0=0/P1=2/P2=0.
+Opus 5/xhigh session `c5371259-3464-48bd-8340-f237c4d7f9c8` independently
+returned `BLOCKED`, P0=0/P1=2/P2=4. Grok's sole run remains honest
+`NO_VERDICT` after 555.286 seconds with `stop_reason=end_turn` and
+`timed_out=false`; its terminal response did not satisfy the requested schema,
+so it is neither reinterpreted nor relaunched. Codex and Opus result SHA-256
+values are
+`3dc60fe180de6bb5e69a099a6f1dbbd66cdc23a4c94532c34feceba3feee3231`
+and `8a34ed69e0225a75a210dc94050a2c10e460d3c7f5df09758b1e85c009269f43`.
+The self-excluding final-review manifest validates with SHA-256
+`58ad67c2d611e4ec04546a2b6c31a511cd3b252aef33e2b193e9e9d3a9c6d415`.
+
+Both reviewers found the same material defects. First, an initiator-held B had
+no deadline after `#initiate` settled. Symmetric replacement happened to inherit
+the acceptor's outstanding `finish` deadline, but asymmetric prior activation
+allowed the fresh peer to register B as an initial link and resolve its setup;
+loss of both ACKs then left initiator B held forever, consumed one physical slot
+and made the pending-owner guard reject every fresh attempt. Terminal control
+loss in the symmetric case also retained stale A without scheduling the promised
+250 ms fresh attempt. Second, the eight executed focused rows were a strict
+subset of the definitive matrix and omitted the asymmetric case that exposed
+that wedge, plus READY loss, the second open ordering, control-send custody,
+stale generation and held-owner cleanup.
+
+One permitted executable correction batch closes that union without reslicing.
+The lower peer now computes the same absolute `deadlineAt` used by its existing
+`withDeadline` owner and passes it into initiator-held readiness. That readiness
+arms only the remaining portion of the existing 10,000 ms setup deadline; it
+adds no duration or retry cadence. Promotion, discard, active drop, retiring
+cleanup and owner cleanup clear the timer. Expiry enters the existing
+`#failReplacementReadiness` / `#discardPendingReplacement` owner and increments
+the initiator handshake failure exactly once. Terminal discard schedules the
+unchanged 250 ms retry only when there is no selected link or selected A is no
+longer current. Thus usable current A remains untouched, stale A is retained
+during the failed attempt, no C appears before expiry, the held slot is released
+at expiry and a fresh attempt begins only at the existing 250 ms boundary.
+
+The same source correction routes a readiness send that throws through
+`#discardPendingReplacement` while the link is still the pending map owner.
+Close callbacks therefore see `link.closing` and cannot book a false
+`channel-close` product drop for a link that was never selected. This closes
+Opus's related P2 within the already-required control-send mutant. The
+handler-order `sent=[]` expectation remains: its barrier precedes initiator
+preparation, so no internal frame can truthfully exist there; positive exact
+control bytes and caps are asserted after preparation in the reorder/open-order
+rows. The final focused reporter is derived from the corrected test-owner bytes.
+Version-skew remains intentionally fail closed, with the restored deadline and
+retry bounding the degraded attempt rather than inventing a compatibility
+fallback.
+
+The corrected focused matrix now selects exactly 17 D.108e4au rows from one
+file and no campaign title. It adds both initiator-first and acceptor-first open
+orderings; loss of both bounded READY, ACK and COMMIT opportunities; asymmetric
+prior activation in both physical roles; initial control-send failure; malformed
+magic/version/kind/length and wrong-role controls; duplicate completed controls;
+stale-generation controls followed by exact current C; and owner close on both
+held roles. The asymmetric rows prove one held slot through 9,999 ms, exact
+discard and one handshake failure at 10,000 ms, no allocation for another 249
+ms, and one fresh allocation per endpoint at 250 ms. Focused result is 17/17
+with 51 unselected and SHA-256
+`732fb65e487bc01e2b982af688495c8579213a7ceb390297e2ff0d8e7fc33db8`.
+The complete retained owner then passed 68/68 with zero skipped or failed; its
+reporter SHA-256 is
+`fd197c80f5dd7845cd6624aa3ef23a7ead1a7be78c38ef02fa28716f2b6d0648`.
+
+Network build/typecheck, exact-two-owner ESLint, exact source/test/plan
+Prettier and `git diff --check` again returned zero. Corrected production and
+test SHA-256 values are
+`969c68c54d7fa9b20e35aeea005a9abedc67b4277bbfb24242469f01323886b6`
+and `b37e470430b864f0e98d3a188e86bc7d00266103ada3beea4c67ec86458005bd`.
+The corrected self-excluding GREEN manifest validates with SHA-256
+`00260e34d760792c52f729468d43504f619313d1433569489291e6414d66722b`.
+No browser, campaign or profiler ran. Campaign custody remains one consumed
+failure, zero passes and five unrun names. Because this P1 correction changes
+executable code, the prospective policy permits one same-session Codex/Opus
+confirmation after the correction is signed and pushed. Grok is not relaunched;
+no new review round is created.
