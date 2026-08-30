@@ -79426,10 +79426,10 @@ Production `packages/network/src/unreliable-webrtc.ts` remains
 
 The reviewed freeze root is `.logs/d108e4bd-freeze/`; its self-excluding
 `SHA256SUMS` hash is
-`e8a051299c50d2582021dfbc0d1f361cc6cf7fda357c57278ceb8e9c4570e2af`.
+`33b0488fbe9d2e032c3fa1e5ea7422277d4e67e8804b73f19576bf33e6d880e8`.
 Its mode-manifest, outer-launcher, runner and fresh-guard hashes are
-`fe7ace7637f98da3df2923b2c721fd92ffeeb66f855d83259e40b493b3d9dbd7`,
-`0527709c2ead87d0025f773df13b55d26b306a9304f4bc013b8c935cbfe1a93b`,
+`844f153d15f52c076e3a0fd91bbd800dbe52e18fa8b71116b6b02d00816e8641`,
+`bc4b4cec41a8b4450722d54dd2b7a4d81d903eca07bb171df59c10560b32097e`,
 `e6c75f276e03822dd940867fc055723538b6f08b098fc2b773c42e0be36ca435`
 and `11ca8b8b035dd316a8ec28aed6576ef9f23399a3e94748a54b564f5f6fb90910`.
 The classifier and validation hashes remain the previously accepted
@@ -79443,8 +79443,9 @@ SHA-256
 Its zero-invocation initial manifest has hash
 `890db34cdf2db5787dec52c3adcf27adcbbf7652456ab60ae381217b61c78e32`.
 Git and ripgrep physical paths and complete versions are captured in this new
-root. Their live path must remain the campaign-selected path, but no vendor,
-patch or revision string is an acceptance predicate. The direct Git
+root. Their live path and captured output must remain continuous within this
+campaign, but no prior host's vendor, patch or revision string is a portable
+acceptance predicate. The direct Git
 `rev-parse`, `status --porcelain=v1` and `verify-commit` operations and the
 ripgrep `-F -c` smoke check pass.
 
@@ -79466,25 +79467,57 @@ behavior parent, freeze manifest, zero-invocation initial campaign manifest and
 the inherited runner before Playwright starts:
 
 ```sh
-test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = e8a051299c50d2582021dfbc0d1f361cc6cf7fda357c57278ceb8e9c4570e2af && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/launch-one.zsh renewal-ordinary-1 /Users/aristotle/Documents/Projects/ts-drp-1
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 33b0488fbe9d2e032c3fa1e5ea7422277d4e67e8804b73f19576bf33e6d880e8 && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = bc4b4cec41a8b4450722d54dd2b7a4d81d903eca07bb171df59c10560b32097e && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/launch-one.zsh renewal-ordinary-1 /Users/aristotle/Documents/Projects/ts-drp-1
 ```
 
 ```sh
-test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = e8a051299c50d2582021dfbc0d1f361cc6cf7fda357c57278ceb8e9c4570e2af && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/launch-one.zsh renewal-ordinary-2 /Users/aristotle/Documents/Projects/ts-drp-1
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 33b0488fbe9d2e032c3fa1e5ea7422277d4e67e8804b73f19576bf33e6d880e8 && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = bc4b4cec41a8b4450722d54dd2b7a4d81d903eca07bb171df59c10560b32097e && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/launch-one.zsh renewal-ordinary-2 /Users/aristotle/Documents/Projects/ts-drp-1
 ```
 
 ```sh
-test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = e8a051299c50d2582021dfbc0d1f361cc6cf7fda357c57278ceb8e9c4570e2af && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/launch-one.zsh renewal-ordinary-3 /Users/aristotle/Documents/Projects/ts-drp-1
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 33b0488fbe9d2e032c3fa1e5ea7422277d4e67e8804b73f19576bf33e6d880e8 && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = bc4b4cec41a8b4450722d54dd2b7a4d81d903eca07bb171df59c10560b32097e && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/launch-one.zsh renewal-ordinary-3 /Users/aristotle/Documents/Projects/ts-drp-1
 ```
 
 ```sh
-test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = e8a051299c50d2582021dfbc0d1f361cc6cf7fda357c57278ceb8e9c4570e2af && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/launch-one.zsh renewal-isolated-1 /private/tmp/ts-drp-d108e4bd-clean/repo
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 33b0488fbe9d2e032c3fa1e5ea7422277d4e67e8804b73f19576bf33e6d880e8 && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = bc4b4cec41a8b4450722d54dd2b7a4d81d903eca07bb171df59c10560b32097e && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/launch-one.zsh renewal-isolated-1 /private/tmp/ts-drp-d108e4bd-clean/repo
 ```
 
 ```sh
-test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = e8a051299c50d2582021dfbc0d1f361cc6cf7fda357c57278ceb8e9c4570e2af && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/launch-one.zsh renewal-isolated-2 /private/tmp/ts-drp-d108e4bd-clean/repo
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 33b0488fbe9d2e032c3fa1e5ea7422277d4e67e8804b73f19576bf33e6d880e8 && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = bc4b4cec41a8b4450722d54dd2b7a4d81d903eca07bb171df59c10560b32097e && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/launch-one.zsh renewal-isolated-2 /private/tmp/ts-drp-d108e4bd-clean/repo
 ```
 
 ```sh
-test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = e8a051299c50d2582021dfbc0d1f361cc6cf7fda357c57278ceb8e9c4570e2af && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/launch-one.zsh renewal-isolated-3 /private/tmp/ts-drp-d108e4bd-clean/repo
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 33b0488fbe9d2e032c3fa1e5ea7422277d4e67e8804b73f19576bf33e6d880e8 && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = bc4b4cec41a8b4450722d54dd2b7a4d81d903eca07bb171df59c10560b32097e && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4bd-freeze/launch-one.zsh renewal-isolated-3 /private/tmp/ts-drp-d108e4bd-clean/repo
 ```
+
+The single freeze review is complete. Codex `gpt-5.6-sol` high returned
+`CHANGES_REQUIRED` with two P1s: authenticate `launch-one.zsh` before entering
+it, and bind execution to the exact final reviewed/corrected plan object rather
+than any signed plan-only sibling. Both are corrected above: every literal block
+checks the outer-launcher hash before `/bin/zsh`, and the launcher requires the
+signed annotated tag `d108e4bd-freeze-reviewed`, its peeled target equal to
+HEAD, exact parent `6fc5fb8c7306b26a395880c7edea5ed62d85e9f6`, exact grandparent behavior
+anchor, pushed-ref equality, valid commit signature and the plan-only aggregate
+diff. This strengthening changes no workload or acceptance semantics and is
+closed by deterministic hash/tag audit without another model round.
+
+Opus xhigh returned `APPROVED` with zero P0/P1. Grok's runner formally recorded
+`NO_VERDICT` after 720.279 seconds despite a schema-shaped public approval; the
+formal classification remains authoritative. Grok's useful process-snapshot P2
+is accepted with the passing final attempt explicitly named. Its claimed
+335-file runtime count is rejected: both `wc -l` and `awk END{print NR}` return
+exactly 334 for all three inventory files. Opus's remaining P2s are disposed as
+nonblocking inherited/fail-closed facts: campaign-local version-output
+continuity is not a portable vendor contract; derived isolated identity proves
+the clean checkout despite no retained install transcript; preflight residue
+intentionally freezes execution; the inherited cumulative artifact manifest is
+re-attested while per-invocation custody remains self-hashed; and unrelated
+non-ts-drp browser work is permitted when the four fixed ports are clear.
+
+The review evidence manifest under `.logs/d108e4bd-freeze-review/` validates at
+`a5442a10d3c1f6de3b79cd2e83a7fb5a23b6430e952a581005a49b51fce3ca44`.
+Codex, Opus, Grok-status and Grok-public SHA-256 values are respectively
+`cbf3c450409503411eed1c6c8ac930f083fcfb604f5e93e26a53e15948a65fa2`,
+`e7d9dd0095ce5ede7bddd8ab174a2a5f596104648fc2b4c004199d5eb071dc48`,
+`86d6aa52e87021ebad123bfeb4af6313e79a86902214a214c3960370bcd368e5`
+and `d7d29ab3891adcd9f6cb3199b5303a1e60c42e08f4a38258c512c4fbcdb050b5`.
