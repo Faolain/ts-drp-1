@@ -77190,3 +77190,121 @@ failure, zero passes and five unrun names. Because this P1 correction changes
 executable code, the prospective policy permits one same-session Codex/Opus
 confirmation after the correction is signed and pushed. Grok is not relaunched;
 no new review round is created.
+
+The one permitted same-session confirmation closes the D.108e4au GREEN
+blocking union. Read-only Codex `gpt-5.6-sol` / high resumed session
+`01a05199-1da6-7450-a911-179ef447547d` and Opus 5/xhigh resumed session
+`c5371259-3464-48bd-8340-f237c4d7f9c8`; both returned `APPROVED` with zero
+P0/P1/P2. They independently confirmed the absolute-deadline expiry/retry,
+the 17/17 focused matrix, the complete 68/68 retained owner, timer and
+control-send cleanup, unchanged contracts and exact campaign custody. Grok
+remains the prior honest `NO_VERDICT` and was not relaunched. Codex and Opus
+confirmation SHA-256 values are
+`6dfbd99516e6d35b0c66cf790ede67576420c956ce48c9204a5f4a2825b32004`
+and `029d797818d7ec630fcbc4d55914d8048eb384bb3e8c214af6697a96c53c9928`.
+The corrected self-excluding final-review manifest validates with SHA-256
+`eb462b8e7cfb29055dfe327a88e69ef791af0bc9a1d8cf3e9f3546784466eab8`.
+The final blocking union is empty.
+
+Campaign restoration cannot reuse the immutable original runner literally:
+that runner correctly pins pre-fix behavior `1642b171...` and requires
+`ordinary-1.runner-status=0`. It would either reject the reviewed GREEN tree or
+falsify the consumed failure. D.108e4au therefore binds the five unrun names
+without reopening readiness or changing campaign semantics. The inherited
+`.logs/d108e4as-freeze-v2/`, the original campaign root and its complete
+`ordinary-1` evidence remain byte-immutable. The narrow restoration root is
+`.logs/d108e4au-campaign-restoration/`. It is copied from the accepted v2 root
+and changes only the behavior identity/runtime binding, the runner's freeze-root
+owner and immutable-old-runner check, and the predecessor guard for
+`ordinary-2`.
+
+The one exception requires exact original `ordinary-1.status=1`, exact
+`ordinary-1.runner-status=1`, original campaign manifest SHA-256
+`5e326a54969a3e44dbbc875ff44a52cc7e78889d66fe388f7c60194a7a26b239`
+and successful validation of that complete manifest. It neither retries nor
+reclassifies `ordinary-1`. `ordinary-3` through `isolated-3` still require an
+immediate zero predecessor, so the first new consumed failure still stops every
+later launch. The campaign root retains its original runner at exact SHA-256
+`98d1b7ed029c1b6bbe3a59af7d1bf7dfffbb4d866133a1b7af657381397fc90f`;
+it is not overwritten.
+
+Both ordinary and isolated workspaces are bound to signed reviewed GREEN
+`136b1ebd84d7dfbe1b359aea4287750cbe9f7a89`, tree
+`c44d220a4566cfa77e32ad864524d07045940fe2`. Only the affected network
+package was freshly built in each workspace; source and runtime inventories
+then compare byte-for-byte. Exact restoration hashes are:
+
+- runner:
+  `40bf829cfc5b98ae24b179f6e360a3f0fc9cb397e9ccb9e735c43ba7c5610992`;
+- predecessor guard:
+  `d44d4920f1673fe1c91bb25c5f80e10db10c0864bbdb5ae6c7e5f09f93ee5e78`;
+- mode manifest:
+  `c2d602e777f711f31ccfdac57a46c671fe82d0e99fe7edac505ebc658f21fde2`;
+- identity manifest:
+  `435aad3002ec0bad0a26472576f51b55da0968a1cf8940cbf81d792963aa34af`;
+- runtime/expected-runtime manifest:
+  `0740401740e1f509463f5e14f59d8a05609bb02e1aa97d07e4c18c2bf07fc298`;
+- validating self-excluding 300-file restoration manifest:
+  `492c3313e2c860c165d3655d25f1a1c7d6692e2cb407695da4192fbbf0fee1ea`.
+
+Mechanical restoration validation returned zero for `zsh -n`, mode
+verification, direct campaign-selected Git/ripgrep capability execution,
+original-failure manifest validation, ordinary-2 admission, ordinary-3 refusal
+before ordinary-2 exists, both-root identity/runtime comparison and exact
+one-test/one-file Playwright listing. Process custody found no ts-drp conflict;
+ports 4174, 4175, 51000 and 51002 were clear; all 26 stashes and the protected
+untracked roster match. A first wrapper used zsh's read-only `status` variable,
+and two source-shape diagnostics respectively expanded variables and then
+over-escaped quotes. Those diagnostic mistakes are preserved with diagnoses;
+the corrected commands returned the exact expected counts and are not code
+failures. No Git/ripgrep path/version equality against another host was
+reintroduced: the restoration reuses the campaign-selected physical paths,
+full recorded versions and capability gate already accepted by D.108e4as-v2.
+
+This signed/pushed plan closure explicitly restores authority for exactly the
+five unrun invocations. The durable six-run authorization is not requested
+again. Run the following as five separate fresh shells in order; each runner
+performs the frozen tool, signature/upstream, protected-state, process, port,
+runtime, classifier, accounting and first-new-failure checks:
+
+```sh
+set -eu
+export COREPACK_ENABLE_NETWORK=0 COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+unset D108E4AS_FINALIZER_FAULT
+/bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4au-campaign-restoration/run-one.zsh ordinary-2 /Users/aristotle/Documents/Projects/ts-drp-1
+```
+
+```sh
+set -eu
+export COREPACK_ENABLE_NETWORK=0 COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+unset D108E4AS_FINALIZER_FAULT
+/bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4au-campaign-restoration/run-one.zsh ordinary-3 /Users/aristotle/Documents/Projects/ts-drp-1
+```
+
+```sh
+set -eu
+export COREPACK_ENABLE_NETWORK=0 COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+unset D108E4AS_FINALIZER_FAULT
+/bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4au-campaign-restoration/run-one.zsh isolated-1 /private/tmp/ts-drp-d108e4as-clean/repo
+```
+
+```sh
+set -eu
+export COREPACK_ENABLE_NETWORK=0 COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+unset D108E4AS_FINALIZER_FAULT
+/bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4au-campaign-restoration/run-one.zsh isolated-2 /private/tmp/ts-drp-d108e4as-clean/repo
+```
+
+```sh
+set -eu
+export COREPACK_ENABLE_NETWORK=0 COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+unset D108E4AS_FINALIZER_FAULT
+/bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4au-campaign-restoration/run-one.zsh isolated-3 /private/tmp/ts-drp-d108e4as-clean/repo
+```
+
+No workload, title, three-trial count, Playwright configuration, browser pin,
+watchdog, timeout, threshold, port, classifier, product API, dependency or test
+semantic changed. Stop on the first nonzero consuming invocation. Five zero
+statuses complete the originally authorized six-name ledger as one preserved
+failed diagnostic plus five post-fix retained passes; they do not rewrite the
+failure into a pass.
