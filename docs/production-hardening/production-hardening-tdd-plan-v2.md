@@ -76361,3 +76361,48 @@ GREEN receives the one formal three-model review over the complete signed
 plan-to-RED-to-GREEN history. Kimi, Fable and collaboration subagents remain
 prohibited. Protected untracked paths, all 26 stashes, signed commits, pushed
 identity, immutable campaign evidence and first-failure custody remain intact.
+
+D.108e4at's one bounded plan review inspected signed/pushed checkpoint
+`e5042649c1bd5992d350e0d4e1b6988b2526cd55`. Codex `gpt-5.6-sol` / high
+thread `01a05127-e6fb-79b1-b07e-19b05d9f906e` returned `APPROVED` with zero
+P0/P1/P2. Opus 5/xhigh session `20a24004-3516-4801-8faf-696be1fe52e1`
+returned `APPROVED` with zero P0/P1 and five P2s. Both independently traced the
+same production seam: the responder returns its answer while inbound finish is
+detached at `waitForOpen`, then the initiator can observe local B open,
+register it and close A without proof that the peer has announced, opened or
+installed the product handler for its B. Both concluded that splitting those
+two fake open transitions is a faithful deterministic RED for the campaign
+failure, not a manufactured impossible state.
+
+The one permitted Grok 4.6/high run, session
+`01a05127-bb6d-79d1-83da-210c780d72c5c03d`, remains honest `NO_VERDICT`:
+its service ended at max turns after 540.222 seconds with `stopReason=cancelled`,
+`timed_out=false`, no terminal schema and no finding. Its public trace reached
+the correct validator branch and began extracting sequences 2393 through 2432
+but did not conclude. It is not relaunched or reinterpreted. Under the
+prospective plan-review policy only a demonstrated P0/P1 blocks; the available
+blocking union is empty, so this service failure does not create a second
+review round or prohibit deterministic RED.
+
+Opus's five P2s are accepted as implementation guidance without confirmation.
+The new hook is distinctly named and defers only the peer inbound channel's
+open transition/event; it must not reuse the existing barrier that blocks
+`setRemoteDescription` and therefore answer delivery. The control explicitly
+proves the initiating exchange has resolved and local outbound B is open while
+peer inbound B is not open. Its connecting state models delayed readiness
+generically and does not claim Chrome's captured channel remained connecting;
+the acceptance fact is absence of peer product handler and semantic open.
+Cleanup is proved by releasing the barrier, observing no additional peer-
+connection allocation or alternate error and closing both owners, not by a
+`vi.getTimerCount()` assertion. The hash-covered `ordinary-1.status=1` is the
+authoritative consumed-failure status; the unmanifested finalizer-owned
+`ordinary-1.runner-status=1` corroborates it and is not retroactively added to
+immutable evidence. Finally, the receiver's handshake-failure delta of two is
+recorded as corroboration: A survived two failed replacement attempts and the
+successful replacement alone exposed the continuity break. These dispositions
+change no executable scope, causal acceptance, product behavior or hard gate,
+so they receive no new review.
+
+The D.108e4at plan gate is closed. Proceed once with the frozen focused RED and
+once with its named retained unit roster; do not run a browser, long campaign,
+Kimi, Fable, collaboration subagent or separate RED model review.
