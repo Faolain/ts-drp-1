@@ -81249,3 +81249,30 @@ Because the blocking correction changes executable code, the prospective
 review policy permits one confirmation over this signed correction. No
 recursive prose review is authorized. An empty confirmation P0/P1 union
 releases the already-planned retained browser gates.
+
+The single bounded confirmation inspected signed/pushed correction
+`08818b3a739ea6734d3f3a8c8e70072e0c6dd1e6`. Codex
+`gpt-5.6-sol` high returned `APPROVED`, P0=0/P1=0/P2=0. Opus xhigh returned
+`APPROVED`, P0=0/P1=0/P2=3; its three nonblocking observations accept the
+frozen unreliable pending-B ingress window, the original-deadline fallback for
+a silent identity swap without a close callback, and the repository's absence
+of the prompt-listed `AGENTS.md`. Grok ended normally and emitted a substantive
+`APPROVED`, P0=0/P1=0/P2=0 object after progress prose; the strict runner
+therefore records `NO_VERDICT`, not a formal approval, and it was not
+relaunched. All three substantive results found no blocking defect. The
+confirmation P0/P1 union is empty and this one permitted confirmation round is
+closed. This closure prose receives no recursive review.
+
+Confirmation prompt, Codex final, normalized Opus terminal result, Grok public
+text, Grok status and Grok event-stream SHA-256 values are respectively
+`9d6d34978ad449e0895ff57e42afc3dc062397847a95d9a934f45d08334d5568`,
+`111b09866f360128cf9d21679ce8bdab57287322766f77bd1eb2503db8edb0a6`,
+`037b221f534961fdc377a8dbcb2830fb22a552132d508360caf5f3be987a6f7d`,
+`844db00d05f787f92bdcaa84661acbbee3dce149d678f145222bc8a9bb0939d2`,
+`d32029558fd55b767172f25ed657f8c884ab4922a3cfd31ad17f2a70dfe9055f`
+and
+`bbc9559b265f29c654ba2a039b767025d41c24f3015925e99cdde1e900314eea`.
+The next action is exactly one retained browser title under the unchanged
+600-second process-group watchdog. Only its pass releases the exact retained
+seven-title non-campaign allowlist; no campaign invocation is authorized by
+this confirmation closure.
