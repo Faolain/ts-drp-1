@@ -78282,3 +78282,116 @@ demonstrated simultaneous-bilateral-restart defect. Product GREEN is forbidden;
 ordinary-3 remains a real but unattributed browser reset/fixture/timing failure.
 The three consumed failures remain immutable and isolated-1 through isolated-3
 remain unrun and unauthorized.
+
+###### D.108e4ay — pre-trial browser reset attribution replay
+
+D.108e4ay owns only the browser-only attribution left open by D.108e4ax. The
+passing two-ordering unit discriminator proves that simultaneous bilateral raw
+route restart converges while authenticated signaling identity remains stable.
+It does not reproduce ordinary-3's endpoint-local
+`authenticatedConnectionLosses=1` or its 27/1 handshake-failure split.
+`resetReliable()` only aborts and drains the ephemeral reliable-send queue; it
+does not intentionally disconnect or rotate a libp2p connection. The
+authenticated loss is therefore an overlapping runtime event, not a specified
+part of `fabric.reset()`.
+
+The necessary attribution instrumentation already exists. Both pages install
+the schema-v3 RTC lifecycle observer and libp2p monitor observer before the
+loss prelude. The monitor records ping start/success/failure, abort owner and
+connection close; the RTC observer records connection/channel lifecycle,
+close-call ownership and signaling phases. However,
+`pageFailureEvidence()` currently gathers only `network()`, wire-oriented
+`rtcObservations()` and `zone()`. Ordinary-3 failed at the first
+`waitForOpenTransportPair()` after concurrent `fabric.reset()`, before the
+later `resetRtcObserver()` and `resetLibp2pMonitorObserver()` calls, so its
+failure attachment discarded the already-live lifecycle, channel-state and
+monitor records. D.108e4ay corrects that evidence-custody omission; it does not
+add a new product observer or debug API.
+
+D.108e4ay changes only
+`tests/e3-03-loss-and-hol-proof.pw.ts`. First,
+`pageFailureEvidence()` adds independently bounded diagnostic results for the
+existing `rtcLifecycleObservations()`, `rtcChannelStates()` and
+`libp2pMonitorObservations()` calls. A failed diagnostic remains explicit and
+cannot suppress the other owners. Existing `network`, `rtc`, `zone` and
+`pageClosed` fields remain unchanged. The default five-test inventory, retained
+campaign title, reporter, workload and campaign attachment names remain
+unchanged.
+
+Second, an opt-in test available only under
+`D108E4AY_RESET_REPLAY=1` is titled exactly
+`D.108e4ay attributes the post-loss bilateral fabric reset`. It reuses the
+existing real-browser helpers and performs the frozen pre-trial prefix only:
+
+- enable the same CDP network emulation before either peer socket exists;
+- open the two grid pages, create the same zone and install the existing
+  monitor observers;
+- prove the same 30-at-20-ms total-loss observation under 100-percent loss;
+- restore no loss for 250 ms, then run the same 600-at-20-ms preliminary
+  stream under 30-percent loss and the existing delivery-floor assertions;
+- restore no loss and pass the existing open-transport, network-pair,
+  raw-delivery and durable-baseline gates;
+- reset both existing observers to one replay id immediately before the
+  concurrent two-page `fabric.reset()` so carry-in monitor activity is
+  retained under that id;
+- call both resets in the same `Promise.all`, run the unchanged 10-second
+  `waitForOpenTransportPair()` and `waitForNetworkPair()` gates, and require a
+  bidirectional raw delivery; and
+- on either pass or failure, attach both endpoints' network, zone, full RTC
+  lifecycle, channel states, monitor records and the CDP profile ledger. The
+  failure path rethrows the original error after attachment.
+
+The opt-in title is absent from the default inventory and is never added to the
+retained seven-test allowlist or any campaign launcher. Its list probe must
+select exactly one test in one file and omit the retained three-trial campaign
+title. The focused replay runs exactly once after static gates. No retained
+campaign invocation is authorized by D.108e4ay.
+
+The executable list and sole runtime commands are frozen as:
+
+```sh
+D108E4AY_RESET_REPLAY=1 pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'D\.108e4ay attributes the post-loss bilateral fabric reset$' --list
+
+D108E4AY_RESET_REPLAY=1 pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'D\.108e4ay attributes the post-loss bilateral fabric reset$' \
+  --workers=1 --retries=0 --fail-on-flaky-tests --reporter=json
+```
+
+The list command is non-consuming. The second block is exactly one focused
+non-campaign invocation and must not be repeated merely to seek a pass.
+
+Interpretation is fail-closed. A replay failure is product-owned only if the
+captured peer-local lifecycle proves a raw owner transition failed while the
+selected authenticated connection remained current and usable under the
+already-frozen D.108e4g predicate. A monitor false positive is not established
+by connected state or a recent ping: the same connection must have no
+product-owned close, nonterminal signaling/ICE/connection states, a
+monitor-owned abort, and a successful reliable signaling or ping round trip at
+or after the abort decision and before physical close. If that complete
+predicate is proven, stop and create the separately reviewed minimal upstream
+reproduction; do not patch or upgrade js-libp2p here. If the reliable
+connection was unusable, its monitor abort may be correct and cannot authorize
+an upstream or raw-owner change. If the focused replay passes, stop product
+attribution and assign a narrow browser timing/variance owner; one pass may not
+rewrite ordinary-3 or restore campaign authority. Mixed or incomplete evidence
+also stops without a product change.
+
+The slice must not change production source, `examples/grid`, dependencies,
+Playwright configuration, network profiles, sample counts, intervals,
+thresholds, 10-second readiness/setup gates, connection-monitor policy,
+product APIs, wire formats, campaign launchers, immutable evidence or
+invocation accounting. If the replay requires any such change, stop and
+reslice. Static gates are exact-owner ESLint/Prettier, standalone TypeScript,
+`git diff --check`, source-shape checks for the three added diagnostic owners,
+the default and opt-in list probes, and protected path/stash/process/port
+predicates. The focused replay is the sole runtime invocation.
+
+The signed/pushed plan receives one Grok/Codex-high/Opus-xhigh review. Kimi is
+replaced by the user-authorized Codex `gpt-5.6-sol` high reviewer; Fable and
+collaboration subagents remain prohibited. Only P0/P1 findings block. P2
+findings receive a disposition without another fixture, confirmation round or
+review-policy slice. If the blocking union is empty after one batched
+correction, implement the test-only evidence owner and focused replay directly.
