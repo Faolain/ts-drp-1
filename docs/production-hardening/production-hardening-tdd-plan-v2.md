@@ -78104,3 +78104,75 @@ fresh shells in exact order:
 
 The first nonzero consuming result stops the sequence. This authority checkpoint
 does not itself claim or consume a pass.
+
+The sole D.108e4aw high-risk freeze review closed with an empty P0/P1 union.
+Codex gpt-5.6-sol/high returned APPROVED, P0=0/P1=0/P2=0, with result
+SHA-256
+68ea78fe12d41a768b925f9d061e78d2f2629a9741836f63f896ac640d58a197.
+Opus 5/xhigh session 99edb324-8af2-43a3-9db7-47e38a78be0a returned
+APPROVED, P0=0/P1=0/P2=3, with result SHA-256
+f458e100e7eeb69e6f870164d1c19d16c07b48067f0e737546076e64648a5987.
+Grok 4.6/high ended normally after 645.397 seconds with service status zero,
+stop_reason=end_turn and no timeout, but prefixed its terminal object with
+progress prose. Its wrapper remains honestly NO_VERDICT and was not relaunched;
+the extracted trailing substantive schema is APPROVED, P0=0/P1=0/P2=1, with
+SHA-256
+9d96d2ce358459e49944b63488c90c6a3ad02d672ac454e0d8b8456b6528b483.
+Kimi, Fable and collaboration subagents were not invoked.
+
+Opus's P2 findings are owned without pre-campaign mutation. The post-campaign
+audit must cross-check every runner-status against its manifest-covered status
+and reporter result. The four names were launched inside the existing expiry
+window. The restoration-root manifest's exact three excluded self-manifest
+paths are SHA256SUMS, SHA256SUMS.validation and
+restoration-preflight/SHA256SUMS; the nested manifest's eleven payload files
+are individually covered. Grok's runtime-count P2 is rejected by deterministic
+evidence: both wc and awk report exactly 334 records and the final byte is
+newline. The 22-file self-excluding review manifest validates at SHA-256
+236c7ba0071833cd3aa222e54f13a88a1749778827e74499316f58badc2f73d8;
+its 22-line validation record SHA-256 is
+ed3ae0da9eca107474a31e049264e7dd461cc80c46fd50aa5cc6b7b831a378d6.
+
+The first authorized invocation, ordinary-3, is a consumed failure and freezes
+all three isolated names. It ran once from 2026-08-30T10:22:59Z through
+10:23:47Z. The reporter records 47.645250 seconds and
+expected/skipped/unexpected/flaky 0/0/1/0 with zero top-level errors, no retry,
+ordinary-3.status=1 and ordinary-3.runner-status=1. isolated-1, isolated-2 and
+isolated-3 remain absent and must not run.
+
+The failure occurred after meaningful successful calibration, not during
+launcher setup. The total-loss observation delivered no raw sample, and the
+preliminary 30-percent loss campaign delivered 398 of 600 raw samples under
+the frozen browser 151.0.7922.34. The test then reset the profile to no loss
+and both pages concurrently called
+fabric.reset(e3-03-total-loss-calibration). That reset intentionally awaits
+resetReliable() and restartUnreliable() together. The subsequent
+waitForOpenTransportPair poll expired after 10 seconds with both senderRaw and
+remoteRaw still zero.
+
+At failure both reliable network snapshots still contained the authenticated
+counterpart plus relay connection. Both raw snapshots had links=[], one
+authenticated connection loss, one link drop and lastLinkDrop=restart. The
+creator had 27 handshake failures; the receiver had one. Stage was
+workbench-total-loss-calibration, active trial id was
+e3-03-total-loss-calibration, and no retained trial, campaign metric or
+endpoint-classification trial completed. Existing unit restart coverage is
+unilateral, while this campaign performs concurrent bilateral restart.
+Therefore the evidence demonstrates a bilateral restart/reopen failure after a
+successful loss run, but does not yet prove whether ownership is product
+convergence, reset-fixture sequencing or the 10-second readiness gate.
+
+Reporter, failure attachment, preliminary calibration and endpoint
+classification SHA-256 values are respectively
+5a71de123647c99da277043e9ce174f9ee12ebebe3fd0cfbf5e707ccf5cd5da5,
+01f0255a9dc24eca48089738694bfe1452e1b63f8dca52a8aa2779131299bb65,
+e93a460fee4f6137d4e1224cfe53360c797650b1ad3d6adb05dafcd231d39636
+and
+a0a8e17df1a4d4c10ea892696af54968f9afd9993548ac05069340f4c546a31e.
+The updated validating campaign manifest SHA-256 is
+deded5f9ded19b9512f1c04ce7346a9a81098f168475b49e39e0683e519c6be6.
+The four-file failure-summary manifest validates at
+ad832d56936c4229cd790c3686cd0bbbc7cfd9b6a1d1e159587cc0599c1a9b0e;
+its validation record SHA-256 is
+e12f76cdcc5466b7ef1f5166b58e578c1dfd3e5443a8dba739f07a8061ddd278.
+No further retained invocation is authorized by this evidence.
