@@ -80872,3 +80872,38 @@ and
 The validating evidence manifest is `.logs/d108e4bl-red/SHA256SUMS`. No
 production source, campaign fixture, threshold, workload or consumed evidence
 changed, and no retained browser or campaign invocation ran.
+
+One bounded read-only Codex `gpt-5.6-sol` high state-machine review, session
+`01a0544e-a1b8-7fa3-ba14-b32c67460d5a`, inspected signed/pushed RED
+`be6122917726221c4d4d995653601d43464fcdcd` and returned `BLOCKED`. Its
+finding matches the deterministic audit. At the initiator's deadline these two
+remote states are locally indistinguishable: acceptor received COMMIT and
+selected B, or every COMMIT was lost and acceptor retained A. Both appear as
+current open A and B, received ACK, and successful local COMMIT sends.
+
+Consequently no admissible local-only GREEN exists under the frozen
+constraints. Discarding B recreates the causal `2/0`; promoting B violates the
+retained lost-COMMIT usable-A contract; retaining B indefinitely consumes a
+physical slot and timer owner; another finite grace period only moves the same
+race. Another bounded control on the same `maxRetransmits=0` channel remains
+probabilistic because its final receipt can also be lost. Production remains
+byte-identical.
+
+The smallest sound reslice requires an identity-bound, resumable commit
+decision outside the unreliable raw lane, most narrowly through the existing
+authenticated `AuthenticatedWebRtcConnection.exchange` seam. That is not an
+implementation detail authorized by D.108e4bk or the present D.108e4bl freeze:
+it adds an internal signaling-wire phase and changes activation authority.
+Before implementation it must freeze a replacement decision identifier bound
+to exact peer/connection/generation, idempotent committed/aborted responses,
+the original absolute deadline and cleanup, response-loss resumption, stale-B
+and replacement-C rejection, and deterministic lost-decision/final-response/
+identity-change/owner-close mutants. The alternative is to relax at least one
+of bounded cleanup, usable-A retention after lost COMMIT, idle convergence, or
+the `2/0` rejection; none is silently relaxed here.
+
+D.108e4bl therefore stops before a production edit at a demonstrated product-
+protocol scope boundary. D.108e5 and all fresh retained campaign execution
+remain blocked pending explicit authority for the reliable identity-bound
+commit reslice or an explicit contract relaxation. No reviewer, unit test,
+browser title or campaign is relaunched from this finding.
