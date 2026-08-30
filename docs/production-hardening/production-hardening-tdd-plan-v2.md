@@ -74757,3 +74757,49 @@ Fable or collaboration subagent ran. `.logs/d108e4ar-red/` records commands,
 complete results, custody and hashes under a self-excluding manifest. After
 manifest validation and signed push, GREEN may begin directly under the
 prospective review cadence; there is no separate RED model round.
+
+D.108e4ar GREEN starts from signed/pushed causal RED
+`718adc4e7eeb1f10fc5bd145878e0baaa8f5ac9c`. Only the frozen test-local
+custody seam changed: the 22-field interface names the distinct run-return and
+deadline arrays; the shared computed key writes the exact run-return capture;
+the explicitly typed fresh 20-field base owns the deadline capture; and the
+helper freezes both run-return operands into the final record before the
+unchanged assignment. The post-loop aggregate changes only its binding/use to
+`deadlineSenderWire`. Both browser captures, the sequence-first campaign-start
+derivation and all 21 post-custody assertions remain byte-identical.
+
+The one list guard returned status zero with exactly one test in one file and
+the retained campaign title absent. The initial focused GREEN returned status
+zero after 7.756 seconds with expected 1, skipped 0, unexpected 0, flaky 0,
+empty top-level errors and absent/null result `softErrors`. Its subsequent
+strict TypeScript gate returned status two because the new focused control had
+selected normalized `D108e4hRawSend[]` replay values rather than the helper's
+full `PlatformObservation[]` type. This was a test-control fixture defect, not a
+live-adoption or product failure; the simultaneously run ESLint, Prettier and
+diff gates passed.
+
+The smallest correction replaced only those focused values with two distinct
+frozen empty arrays explicitly typed `readonly PlatformObservation[]`, which is
+consistent with the helper's frozen element-agnostic array-custody contract.
+Because executable focused-control bytes changed, the focused test was rerun
+rather than treating its earlier runtime pass as coverage of later bytes. The
+corrected run passed after 8.028 seconds with the same exact `1/0/0/0` counts,
+empty top-level errors and absent/null `softErrors`. Corrected strict TypeScript,
+exact-owner ESLint, 8 GiB Prettier and `git diff --check` all returned status
+zero. The deviation from the planned single focused/static pass is preserved
+honestly for final review; no further focused invocation is authorized.
+
+The AST source audit returned status zero: 22 final fields, 20 base fields, zero
+old `senderWire` record-key or object-binding positions across identifier,
+quoted, computed, shorthand and alias forms, one exact computed live writer,
+sender-before-timestamp helper order, unchanged capture/final-assignment seams,
+21 byte-identical post-custody expectations, byte-identical campaign-start
+derivation and aggregate rename only. Reporter SHA-256 values are
+`776ddbbe812602671b5fef539ece30962c47ed8df74fe8a2ab24cd77523eba8e`
+for the initial pass and
+`1fac62ebf89b78c15bac5e440b9c6068fdf0bbb8077ee89e5f97f722490b8949`
+for the corrected pass. `.logs/d108e4ar-green/` records both reports, commands,
+diagnosis, custody, hashes and a self-excluding manifest. After its validation,
+sign and push GREEN, then run the sole formal Grok/Kimi/Opus review over the
+complete signed plan-to-RED-to-GREEN history. No retained campaign is
+authorized or executable.

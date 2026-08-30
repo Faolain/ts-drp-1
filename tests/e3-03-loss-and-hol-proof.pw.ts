@@ -316,6 +316,7 @@ interface CampaignEvidence {
 		readonly reliableAoIP95Ms: number;
 		readonly reliableDelivered: number;
 	}>;
+	readonly deadlineSenderWire: readonly PlatformObservation[];
 	readonly perChannelMonotonicity: readonly ChannelSequenceEvidence[];
 	readonly rawArrivalInversionCount: number;
 	readonly clockSamples: readonly number[];
@@ -351,13 +352,14 @@ interface CampaignEvidence {
 	readonly rendered: RenderedFabricEvidence;
 	readonly receiverWire: readonly PlatformObservation[];
 	readonly replacementCustody: D108e4hValidationInput;
+	readonly runReturnSenderWire: readonly PlatformObservation[];
+	readonly runTrialReturnedAtMs: number;
 	readonly stages: Readonly<{
 		readonly deadline: TransportStageEvidence;
 		readonly prepare: TransportStageEvidence;
 		readonly reset: TransportStageEvidence;
 		readonly runReturned: TransportStageEvidence;
 	}>;
-	readonly senderWire: readonly PlatformObservation[];
 	readonly trialId: string;
 }
 
@@ -5947,18 +5949,44 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 		expect(d108e4apLiveProgress["trialId"]).toBe("d108e4ap-live");
 		d108e4apAssertRunReturnJoin(d108e4apLiveProgress, d108e4apCampaignStartedAtMs);
 
-		const d108e4arDeadlineSenderWire = Object.freeze(replayCreator.rawSends.slice(0, 1));
-		const d108e4arCurrentKeyShape: Pick<CampaignEvidence, "senderWire" | "trialId"> = Object.freeze({
-			senderWire: d108e4arDeadlineSenderWire,
-			trialId: "d108e4ar-current-key-shape",
+		const d108e4arDeadlineSenderWire: readonly PlatformObservation[] = Object.freeze([]);
+		const d108e4arRunReturnSenderWire: readonly PlatformObservation[] = Object.freeze([]);
+		const d108e4arRelativeStage = Object.freeze({ atMs: 321 });
+		const d108e4arFinalBase = {
+			deadlineSenderWire: d108e4arDeadlineSenderWire,
+			stages: Object.freeze({ runReturned: d108e4arRelativeStage }),
+			trialId: "d108e4ar-round-trip",
+		};
+		const d108e4arProgress = Object.freeze({
+			[D108E4AR_RUN_RETURN_SENDER_WIRE_KEY]: d108e4arRunReturnSenderWire,
+			runTrialReturnedAtMs: d108e4apExactRunReturnAtMs,
 		});
-		const d108e4arRunReturnKeys = Object.freeze(["runTrialReturnedAtMs", D108E4AR_RUN_RETURN_SENDER_WIRE_KEY] as const);
-		expect(Object.freeze(d108e4arRunReturnKeys.filter((key) => !Object.hasOwn(d108e4arCurrentKeyShape, key)))).toEqual(
-			d108e4arRunReturnKeys
+		const d108e4arFinalEvidence = d108e4arFinalizeRunReturnCustody(d108e4arFinalBase, d108e4arProgress);
+		expect(d108e4arRunReturnSenderWire).not.toBe(d108e4arDeadlineSenderWire);
+		expect(d108e4arFinalEvidence.runTrialReturnedAtMs).toBe(d108e4apExactRunReturnAtMs);
+		expect(d108e4arFinalEvidence.runReturnSenderWire).toBe(d108e4arRunReturnSenderWire);
+		expect(d108e4arFinalEvidence.deadlineSenderWire).toBe(d108e4arDeadlineSenderWire);
+		expect(d108e4arFinalEvidence.trialId).toBe("d108e4ar-round-trip");
+		expect(d108e4arFinalEvidence.stages.runReturned.atMs).toBe(d108e4arRelativeStage.atMs);
+		expect(Object.isFrozen(d108e4arFinalEvidence)).toBe(true);
+		const d108e4arTimestampOnly = Object.freeze({ runTrialReturnedAtMs: d108e4apExactRunReturnAtMs });
+		expect(() => d108e4arFinalizeRunReturnCustody(d108e4arFinalBase, d108e4arTimestampOnly)).toThrowError(
+			"D108E4AR_FINAL_RUN_RETURN_CUSTODY_ABSENT"
 		);
-		const d108e4arPostAdoptionBase = Object.freeze({ deadlineSenderWire: d108e4arDeadlineSenderWire });
-		const d108e4arPostAdoptionProgress = Object.freeze({ runTrialReturnedAtMs: d108e4apExactRunReturnAtMs });
-		d108e4arFinalizeRunReturnCustody(d108e4arPostAdoptionBase, d108e4arPostAdoptionProgress);
+		const d108e4arUndefinedSender = Object.freeze({
+			[D108E4AR_RUN_RETURN_SENDER_WIRE_KEY]: undefined,
+			runTrialReturnedAtMs: d108e4apExactRunReturnAtMs,
+		});
+		expect(() => d108e4arFinalizeRunReturnCustody(d108e4arFinalBase, d108e4arUndefinedSender)).toThrowError(
+			"D108E4AR_FINAL_RUN_RETURN_CUSTODY_ABSENT"
+		);
+		const d108e4arInvalidSender = Object.freeze({
+			[D108E4AR_RUN_RETURN_SENDER_WIRE_KEY]: Object.freeze({}),
+			runTrialReturnedAtMs: d108e4apExactRunReturnAtMs,
+		});
+		expect(() => d108e4arFinalizeRunReturnCustody(d108e4arFinalBase, d108e4arInvalidSender)).toThrowError(
+			"D108E4AR_FINAL_RUN_RETURN_CUSTODY_INVALID"
+		);
 	});
 }
 
@@ -7133,7 +7161,7 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			const senderRtc = await rtcObservations(creator);
 			const senderWire = platformObservations(senderRtc, "send", trialId);
 			const senderRawCandidateCount = senderWire.filter(({ lane, sentinel }) => lane === "raw" && !sentinel).length;
-			updateTrialProgress({ senderRawCandidateCount, senderWire });
+			updateTrialProgress({ senderRawCandidateCount, [D108E4AR_RUN_RETURN_SENDER_WIRE_KEY]: senderWire });
 			if (senderRawCandidateCount < PRELIMINARY_RAW_DELIVERY_FLOOR) {
 				throw new Error(
 					`E303_RAW_SENDER_FLOOR:${JSON.stringify({
@@ -7305,7 +7333,7 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			}) satisfies D108e4hValidationInput;
 			updateTrialProgress({ replacementCustody });
 			validateD108e4hCampaignCustody(replacementCustody);
-			const trialEvidence = Object.freeze({
+			const trialEvidenceBase: Omit<CampaignEvidence, "runTrialReturnedAtMs" | "runReturnSenderWire"> = {
 				acceptedObservationIdentities,
 				application: Object.freeze({
 					rawAoIP50Ms,
@@ -7358,9 +7386,13 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 					reset: resetStage,
 					runReturned: runReturnedStage,
 				}),
-				senderWire: senderWireAtDeadline,
+				deadlineSenderWire: senderWireAtDeadline,
 				trialId,
-			}) satisfies CampaignEvidence;
+			};
+			const trialEvidence = d108e4arFinalizeRunReturnCustody(
+				trialEvidenceBase,
+				trialProgress
+			) satisfies CampaignEvidence;
 			currentTrialEvidence = trialEvidence;
 			expect(receiverRawCounterDelta).toBe(acceptedRawWire.length);
 			expect(productRosterRawCount).toBe(acceptedRawWire.length);
@@ -7454,8 +7486,8 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 		).toBeGreaterThanOrEqual(PRELIMINARY_RAW_DELIVERY_FLOOR * TRIAL_COUNT);
 		expect(
 			new Set(
-				campaignEvidence.flatMap(({ senderWire }) =>
-					senderWire.filter(({ lane }) => lane === "raw").map(({ connectionId }) => connectionId)
+				campaignEvidence.flatMap(({ deadlineSenderWire }) =>
+					deadlineSenderWire.filter(({ lane }) => lane === "raw").map(({ connectionId }) => connectionId)
 				)
 			).size
 		).toBeGreaterThanOrEqual(calibrationRawConnections.size);
