@@ -74726,3 +74726,34 @@ validation SHA-256 is
 This closure is bookkeeping-only and receives no new formal review. After it is
 signed and pushed, D.108e4ar proceeds directly to its frozen deterministic RED;
 no retained campaign is authorized or executable.
+
+D.108e4ar deterministic RED starts from signed/pushed plan-gate closure
+`2d0654ac86bebf4193d2cfc4f3f4d16c85919995`. The test owner adds only the
+shared key, frozen helper/type surface, separate old-key-shape proof and sole
+post-adoption terminal control; `CampaignEvidence` and the complete retained
+campaign suffix remain byte-identical to that baseline, so the live progress
+writer, final record and aggregate are deliberately unadopted. The suffix-
+anchored list guard returned status zero with exactly one test in one file and
+the retained campaign title absent.
+
+The single focused RED invocation returned status one after 7.642 seconds with
+expected 0, skipped 0, unexpected 1 and flaky 0; top-level errors were empty and
+result `softErrors` was absent/null. The sole error's first line was exact
+`Error: D108E4AR_FINAL_RUN_RETURN_CUSTODY_ABSENT`. Its fixture supplied the
+valid creator-page timestamp and the same distinct deadline array but omitted
+only the run-return sender key, while the helper's sender guard precedes AP
+timestamp delegation. This matches the frozen causal matrix. Reporter SHA-256
+is `cfb5b0d9dae3b6a6b0a207f48a6c6c4f4e29d50fd8d2174466b5f3821880472a`;
+the formatted RED test-owner SHA-256 is
+`c89b99a0f9b27cb16d3ac7e0d19329a1bee3b14834f1c380ec8e9558ac5b283f`.
+
+The initial exact-owner ESLint and 8 GiB Prettier checks returned status one for
+two Prettier-only layouts in the new generic type and key tuple; `git diff
+--check` already passed. A single mechanical Prettier write corrected those
+diagnostics. Corrected ESLint, exact-owner Prettier and `git diff --check` all
+returned status zero, and the focused RED was not rerun. The deterministic
+reporter and source audits passed. No TypeScript, retained campaign, reviewer,
+Fable or collaboration subagent ran. `.logs/d108e4ar-red/` records commands,
+complete results, custody and hashes under a self-excluding manifest. After
+manifest validation and signed push, GREEN may begin directly under the
+prospective review cadence; there is no separate RED model round.

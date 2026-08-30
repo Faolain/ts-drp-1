@@ -3438,6 +3438,16 @@ function validateD108e4hCampaignCustody(input: D108e4hValidationInput): void {
 }
 
 const D108E4AP_RUN_RETURN_BOUND_MS = (SAMPLE_COUNT - 1) * SAMPLE_INTERVAL_MS - 1_000;
+const D108E4AR_RUN_RETURN_SENDER_WIRE_KEY = "runReturnSenderWire" as const;
+
+type D108e4arFinalRunReturnCustody = {
+	readonly runTrialReturnedAtMs: number;
+	readonly runReturnSenderWire: readonly PlatformObservation[];
+};
+type D108e4arFinalizeRunReturnCustody = <TBase extends { readonly deadlineSenderWire: readonly PlatformObservation[] }>(
+	base: TBase,
+	custody: Readonly<Record<string, unknown>>
+) => Readonly<TBase & D108e4arFinalRunReturnCustody>;
 
 function d108e4apBuildRunReturnProgress(
 	progress: Readonly<Record<string, unknown>>,
@@ -3461,6 +3471,16 @@ function d108e4apAssertRunReturnJoin(progress: Readonly<Record<string, unknown>>
 	if (d108e4apRunReturnTimestamp(progress) - campaignStartedAtMs < D108E4AP_RUN_RETURN_BOUND_MS)
 		throw new Error("D108E4AP_RUN_RETURN_JOIN_INVALID");
 }
+
+const d108e4arFinalizeRunReturnCustody: D108e4arFinalizeRunReturnCustody = (base, custody) => {
+	const present = Object.hasOwn(custody, D108E4AR_RUN_RETURN_SENDER_WIRE_KEY);
+	const value = custody[D108E4AR_RUN_RETURN_SENDER_WIRE_KEY];
+	if (!present || value === undefined) throw new Error("D108E4AR_FINAL_RUN_RETURN_CUSTODY_ABSENT");
+	if (!Array.isArray(value)) throw new Error("D108E4AR_FINAL_RUN_RETURN_CUSTODY_INVALID");
+	const runReturnSenderWire = value as readonly PlatformObservation[];
+	const runTrialReturnedAtMs = d108e4apRunReturnTimestamp(custody);
+	return Object.freeze({ ...base, runReturnSenderWire, runTrialReturnedAtMs });
+};
 
 if (process.env["D108E4H_TELEMETRY"] === "1") {
 	test("validates schema-v3 replacement custody without cross-peer clocks", () => {
@@ -5926,6 +5946,19 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 		expect(d108e4apLiveProgress["runTrialReturnedAtMs"]).toBe(d108e4apExactRunReturnAtMs);
 		expect(d108e4apLiveProgress["trialId"]).toBe("d108e4ap-live");
 		d108e4apAssertRunReturnJoin(d108e4apLiveProgress, d108e4apCampaignStartedAtMs);
+
+		const d108e4arDeadlineSenderWire = Object.freeze(replayCreator.rawSends.slice(0, 1));
+		const d108e4arCurrentKeyShape: Pick<CampaignEvidence, "senderWire" | "trialId"> = Object.freeze({
+			senderWire: d108e4arDeadlineSenderWire,
+			trialId: "d108e4ar-current-key-shape",
+		});
+		const d108e4arRunReturnKeys = Object.freeze(["runTrialReturnedAtMs", D108E4AR_RUN_RETURN_SENDER_WIRE_KEY] as const);
+		expect(Object.freeze(d108e4arRunReturnKeys.filter((key) => !Object.hasOwn(d108e4arCurrentKeyShape, key)))).toEqual(
+			d108e4arRunReturnKeys
+		);
+		const d108e4arPostAdoptionBase = Object.freeze({ deadlineSenderWire: d108e4arDeadlineSenderWire });
+		const d108e4arPostAdoptionProgress = Object.freeze({ runTrialReturnedAtMs: d108e4apExactRunReturnAtMs });
+		d108e4arFinalizeRunReturnCustody(d108e4arPostAdoptionBase, d108e4arPostAdoptionProgress);
 	});
 }
 
