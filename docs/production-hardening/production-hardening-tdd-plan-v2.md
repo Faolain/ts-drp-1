@@ -77402,3 +77402,181 @@ Campaign custody is now two consumed failures, zero passes and four unrun
 names. First-new-failure custody controls; D.108e4as cannot resume until this
 exact validator mismatch has a separately accepted resolution and authority is
 explicitly restored.
+
+###### D.108e4av — exact readiness-control custody in retained campaign evidence
+
+D.108e4av owns only the deterministic test/evidence-classification mismatch
+demonstrated by consumed `ordinary-2`. It starts from signed/pushed diagnosis
+`eb05917b0e3705142cb7e02372e0299f2265608c`, tree
+`d012f61b8e667c51b1cbba23357420f63839d365`, with test owner
+`22b0b618a094e0b125a4436cc97a5ef6fa535249ad349b30d505b7b3f70ae9af`.
+The reviewed product owner remains
+`969c68c54d7fa9b20e35aeea005a9abedc67b4277bbfb24242469f01323886b6`;
+Playwright configuration, network package metadata and lockfile remain
+`1826318a19d5676631f6350fa21d2eb1125dbc1d83ecce69d7f776885bdd7978`,
+`91f8580615221ffa864302936ec8bb34661331c711955b08f3d7da83a6d43293`
+and `73c7c0660fa32c738e0fe5a026897a7ad85a40edf1f169730c2d8e44e613a99`.
+The immutable campaign manifest remains
+`8b54ff2be8d1a27e2072365fb3db9f8f78847ea229da8c4c16898797c7f14c24`.
+Its two consumed failures, zero passes and four unrun names are evidence, not
+inputs to rewrite or retry.
+
+The concrete defect is narrower than product transport behavior. The browser
+observer already captures every `RTCDataChannel.send` payload asynchronously,
+after freezing the send-attempt identity and lifecycle sequence. It retains
+the exact byte length and UTF-8 decoding. The validator subsequently selects
+every lifecycle attempt and terminal on label `ts-drp-ephemeral/1` and requires
+all of them to join the 600 application-marker sends. Reviewed production now
+uses that same raw channel for exactly three four-byte replacement-readiness
+controls: READY `[0x44,0x52,0x01,0x01]`, ACK
+`[0x44,0x52,0x01,0x02]` and COMMIT `[0x44,0x52,0x01,0x03]`. Therefore a
+successful readiness control becomes an unmatched 601st lifecycle attempt even
+though all 600 application samples retain exact one-attempt/one-success custody.
+
+This is tests-only. The sole executable owner is
+`tests/e3-03-loss-and-hol-proof.pw.ts`; the plan is the only documentation
+owner. D.108e4av must not change production source, product APIs, wire formats,
+readiness bytes or behavior, digest/activation/identity authority,
+dependencies, Playwright/build configuration, workload, sample count, loss
+profile, watchdog, timeout, threshold, ports, classifier, campaign launcher or
+immutable evidence. A need for any such change stops and reslices rather than
+widening this owner. No retained campaign runs in D.108e4av.
+
+The evidence extension is additive within the existing schema-v3 envelope.
+`D108e4hEndpointCustody` gains optional `controlSends`; absence means an empty
+ledger, so immutable prior schema-v3 fixtures and attachments remain valid and
+are not edited or reclassified. Each new control row freezes only the facts
+already owned by `RtcObservation`: `attemptId`, `channelId`, `connectionId`,
+the send-attempt `lifecycleSequence`, and an exact read-only four-number byte
+tuple. A row is emitted only for direction `send`, label
+`ts-drp-ephemeral/1`, exact `byteLength === 4`, and a UTF-8 re-encoding exactly
+equal to one of the three tuples above. The exact length plus byte-for-byte
+re-encoding rejects malformed UTF-8, a magic/version/kind mutation, prefixes,
+suffixes and arbitrary four-byte application data. Nothing is inferred from
+buffered amount, channel timing, role or the old failed attachment.
+
+The validator first validates and joins the control ledger fail closed. Control
+attempt IDs must be safe, unique, disjoint from every application `rawSends`
+attempt ID, and each must join exactly one raw-channel send attempt with matching
+connection/channel and exact attempt lifecycle sequence. It must join exactly
+one later terminal on the same identity. A terminal may be success or failure:
+the observer captures before native send, and a proven failed readiness-control
+attempt remains a control rather than an application sample. Missing or
+duplicate control terminals retain
+`D108E4H_ATTEMPT_TERMINAL_CARDINALITY`; malformed bytes, collisions, missing
+attempts and identity/sequence mismatches retain
+`D108E4H_IDENTITY_JOIN_INVALID`; lifecycle inversion retains
+`D108E4H_LIFECYCLE_ORDER_INVALID`.
+
+Only after that proof may the validator partition the complete raw-channel
+lifecycle by the proven control attempt-ID set. All remaining attempts and
+terminals are the application domain and retain the current exact contract:
+the transmitting endpoint has `sampleCount` unique sequences, unique attempt
+IDs, one matching attempt, one matching success terminal and no reverse-join
+extras; the nontransmitting endpoint has no application `rawSends`, attempts or
+terminals. Proven controls are permitted on either physical endpoint because
+both readiness roles send them. An unlisted or unproven extra raw-channel send
+still fails `D108E4H_IDENTITY_JOIN_INVALID`. Existing application mutants keep
+their exact codes, including unmatched attempt
+`D108E4H_IDENTITY_JOIN_INVALID`, duplicate/missing terminal
+`D108E4H_ATTEMPT_TERMINAL_CARDINALITY`, failed application send
+`D108E4H_RAW_SEND_NOT_SUCCESSFUL`, wrong transmitting role
+`D108E4H_RAW_SEND_ROLE_INVALID`, application-domain mutation
+`D108E4H_RAW_SEND_DOMAIN_INVALID`, and lifecycle inversion
+`D108E4H_LIFECYCLE_ORDER_INVALID`. No D.108e4aa ownership, identity, close,
+readiness or failed-replacement mutant changes outcome or error code.
+
+The deterministic RED is two causal rows added to the existing telemetry-only
+test `validates schema-v3 replacement custody without cross-peer clocks`. Both
+start from the accepted `creator-replacement` fixture and add exactly one
+well-formed control ledger row plus its matching raw-channel lifecycle
+attempt/success pair: READY on the transmitting creator's B identity and ACK on
+the nontransmitting receiver's B identity. The pre-GREEN validator ignores the
+new ledger and respectively rejects the extra lifecycle pair through its
+reverse application join and nontransmitting role assertion. Two soft
+expectations translate only those known rejections to exact complete RED tokens
+`D108E4AV_TRANSMITTER_CONTROL_REJECTED` and
+`D108E4AV_NONTRANSMITTER_CONTROL_REJECTED`. Any construction failure, missing
+token, additional soft failure, top-level error or different causal result
+invalidates RED.
+
+Run the RED focused command exactly once:
+
+```sh
+D108E4H_TELEMETRY=1 \
+PLAYWRIGHT_JSON_OUTPUT_NAME=.logs/d108e4av-red/focused.json \
+pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'validates schema-v3 replacement custody without cross-peer clocks$' \
+  --reporter=json \
+  --fail-on-flaky-tests
+```
+
+Automated RED validation requires exactly one selected test in one file, no
+retained campaign title, expected/skipped/unexpected/flaky `0/0/1/0`, zero
+top-level errors, exactly the two frozen tokens as the complete soft-failure
+set, nonzero command status, unchanged production/config/package/lock hashes,
+and no path outside the test and plan owners. Record command, status, stdout,
+stderr, reporter, source-shape results, changed-path roster and hashes in a
+self-excluding manifest; validate it, sign and push RED. Under the prospective
+review cadence there is no separate full model RED review. If the observed
+matrix differs, stop and diagnose before GREEN.
+
+GREEN makes the two causal rows pass and adds the complete mutant roster in the
+same telemetry-only test: READY, ACK and COMMIT on both endpoint roles; wrong
+magic; wrong version; kinds zero and four; three- and five-byte values;
+unledgered extra raw send; duplicate control attempt ID; application/control ID
+collision; missing matching attempt; connection, channel and lifecycle-sequence
+mismatch; missing terminal; duplicate terminal; terminal identity mismatch;
+terminal-before-attempt; and a proved control send with a failure terminal.
+Malformed/unproven controls and joins use the exact errors frozen above. The
+existing unmatched-application, duplicate/missing-application-terminal,
+failed-application-send and D.108e4aa mutant assertions are rerun unchanged to
+prove their exact codes.
+
+Run the focused GREEN command once, then the retained seven-title owner once:
+
+```sh
+D108E4H_TELEMETRY=1 \
+PLAYWRIGHT_JSON_OUTPUT_NAME=.logs/d108e4av-green/focused.json \
+pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'validates schema-v3 replacement custody without cross-peer clocks$' \
+  --reporter=json \
+  --fail-on-flaky-tests
+```
+
+```sh
+D108E4H_TELEMETRY=1 \
+PLAYWRIGHT_JSON_OUTPUT_NAME=.logs/d108e4av-green/retained-seven.json \
+pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep '(validates schema-v3 replacement custody without cross-peer clocks|raw sequence evidence includes the fixed sample-domain boundaries|partitions receiver evidence by exact product roster without losing observations|separates rendered product-roster metrics from boundary-aware application evidence|freezes RTC metadata at the event boundary before async payload conversion|records a versioned and causally joined RTC lifecycle without changing delivery|proves replacement open before retiring the stale authenticated raw owner)$' \
+  --reporter=json \
+  --fail-on-flaky-tests
+```
+
+GREEN also requires the affected typecheck, exact-owner ESLint, exact test/plan
+Prettier, `git diff --check`, source-shape predicates for exact control bytes and
+partition ordering, unchanged production/config/package/lock hashes, complete
+reporter result sets, protected untracked roster, all 26 stashes, clear fixed
+ports, no ts-drp reviewer/test/profiler conflict, and a validating
+self-excluding evidence manifest. Sign and push GREEN before its sole formal
+review.
+
+Review follows the accepted prospective policy and Codex-for-Kimi
+substitution. Sign and push this bounded plan, then run one Grok, Codex
+`gpt-5.6-sol`/high and Opus/xhigh plan review. Correct material P0/P1 findings
+in one batch; at most one confirmation is permitted only if the correction
+changes executable scope, causal acceptance or behavior. P2 receives an owner
+and disposition without review recursion. After signed causal RED and signed
+GREEN, run the sole formal Grok/Codex/Opus GREEN review over the complete
+plan-to-RED-to-GREEN history. It must verify genuine RED causality, exact-byte
+classification, application-domain preservation, retained error codes, scope
+and all gates. Only P0/P1 blocks closure. Kimi, Fable and collaboration
+subagents are prohibited.
+
+D.108e4av closure grants no campaign execution by itself. The four remaining
+names stay frozen after two consumed failures. Only a later explicit
+signed/pushed authority restoration may bind reviewed GREEN runtime bytes and
+authorize the next unrun name without retrying or rewriting either failure.
