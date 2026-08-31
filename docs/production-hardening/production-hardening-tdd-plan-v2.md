@@ -86731,7 +86731,11 @@ D.108e2 or D.108e3 title changes.
 
 Batch one owns redirected lifetime ordering. Extend the existing browser
 instrumentation with a deterministic gate on the redirect session's target
-preparation, not a timer or production hook. In each of two fresh real-room
+preparation, not a timer or production hook. The test-only direct-room facade
+may expose the already-public `V3RoomSession.activateMigration()` member and
+the existing `recoverV3LiveReplica()` esbuild seam may gate only the
+`displacedSource.activationVertexDigest` redirect recovery; neither is a new
+product API or production hook. In each of two fresh real-room
 scenarios, publish a genuine migration activation until `ensureRedirect()` is
 creating the replacement and hold that creation. From one synchronous browser
 task, invoke `adoptCreatorSuccessor()` first and then either
@@ -86746,8 +86750,13 @@ order and perform pending-redirect wait/forwarding inside that one queue. It
 must not add a second queue, global owner, compatibility branch or parallel
 activation path. Concurrent adoption still shares
 `creatorSuccessorAdoptionTask`; independent sessions remain independent;
-failed redirect or operation releases the tail; close retains its existing
-join and failure ordering.
+failed redirect or operation releases the tail. The existing
+`migrationRehearsalReserved` fast-fail fence remains reserved synchronously at
+entry for source-owned work. If the queued dispatch instead discovers a
+redirect, it starts the forwarded call in the reserved queue position, then
+releases both that source fence and the source tail before awaiting the target
+result. Thus a source `close()` does not newly join arbitrary redirected-target
+work and retains its existing join and primary/cleanup failure ordering.
 
 Batch two owns bounded call-time capture. Freeze the unchanged limits as
 private implementation facts: migration activation record bytes are nonempty
@@ -86761,28 +86770,63 @@ reject exact oversized input with
 `v3 room migration activation record is unbounded` before constructing or
 copying any byte owner; a bounded valid view is copied at call time and later
 caller mutation cannot affect execution. Invite-string length is rejected
-before hex decoding. Object invite capture must compute the exact canonical
-envelope length from fixed fields, intrinsic byte-field lengths and canonical
-byte-string header widths before `encodeCanonical` can copy any caller body;
-only a bounded object is encoded into the existing call-time string snapshot.
+before hex decoding with `v3 room migration target invite is unbounded`.
+Object invite capture must first require the exact seven material fields,
+require the six byte fields to be intrinsic fixed `Uint8Array` views, and
+require the digest to be an exact 64-character lowercase hexadecimal
+primitive. Without copying or UTF-8 encoding a caller value, it then computes
+the exact nine-field canonical envelope length from the fixed
+object/key/kind/version encodings, the fixed digest encoding, intrinsic
+byte-field lengths and exact canonical byte-string header widths. The same
+bounded encoder owns both call-time snapshotting and the receiver-side object
+paths that currently call `encodeCreatorInvite()` in rehearsal and activation;
+no invalid object may fall through to an unbounded receiver-side encode. Only
+a bounded object is encoded into the existing call-time string snapshot.
 The post-encode and decode ceilings remain defense in depth at the same
 `65_536` limit. An oversized object invite rejects with
-`v3 room migration target invite is unbounded`; other invalid inputs preserve
-their existing receiver-owned classifications. Bounded object and string
-invites retain call-time identity under immediate caller mutation.
+`v3 room migration target invite is unbounded`; an invalid digest or non-byte
+field is rejected before encoding with its existing receiver-owned invalid
+classification. Exact canonical sizes `65_536` and `65_537` are respectively
+accepted by the bound and rejected as unbounded, proving that the oracle is
+inclusive and does not tighten the existing contract. Bounded object and
+string invites retain call-time identity under immediate caller mutation.
+For activation bytes, the resource metadata check and oversize classification
+precede closed, authority and redirect classification intentionally: that
+narrow precedence is the cost of guaranteeing that an over-limit caller view
+is never copied. It does not alter any authority decision for bounded input.
 
 The RED contract contains no product edit. The focused Vitest owner uses the
 TypeScript AST, not regex, to prove that current activation capture allocates
 before the `49_152` guard and current invite object/string capture lacks the
 required pre-copy ceiling. The focused browser title then proves both pending-
-redirect order inversions while retaining controls for boundary-size
-classification, over-limit error strings and bounded valid call-time mutation
-capture. RED acceptance is the frozen matrix only: the existing
-six focused Vitest cases stay green; the new AST ownership cases fail for the
-two intended missing pre-copy owners; and the new Chromium browser title fails
-only its two desired adoption-first order assertions. Any module-load, boot,
-timeout, top-level reporter error, unrelated semantic mismatch or different
-error string stops and is diagnosed before GREEN.
+redirect order inversions and the missing migration-invite bound while
+retaining controls for activation and invite boundary classification,
+over-limit error strings and bounded valid call-time mutation capture. RED
+acceptance is the frozen matrix only: the existing six focused Vitest cases
+stay green; the new AST ownership cases fail for the two intended missing
+pre-copy owners; and the new Chromium browser title reports exactly these six
+intended soft assertion mismatches and no others:
+
+1. adoption loses to the later redirect-pending rehearsal;
+2. adoption loses to the later redirect-pending activation;
+3. an over-limit hexadecimal invite reports current
+   `canonical value exceeds byte limit`, not required
+   `v3 room migration target invite is unbounded`;
+4. an otherwise shaped object at exact canonical size `65_537` reports that
+   same current canonical decoder error, not the required unbounded error;
+5. an oversized digest string reaches canonical encoding/decoding and reports
+   the current canonical decoder error, not its existing anchor-invalid
+   classification before encoding; and
+6. an oversized non-`Uint8Array` byte field reaches canonical
+   encoding/decoding and reports the current canonical decoder error, not its
+   existing field-invalid classification before encoding.
+
+The `65_536` object boundary remains a non-unbounded control; exact
+`49_152`/`49_153` activation cases retain the current inclusive bound and exact
+error; bounded object/string mutation remains captured at call time. Any
+module-load, boot, timeout, top-level reporter error, additional soft failure,
+missing named mismatch or different current error string stops and is
+diagnosed before GREEN.
 
 Run RED once per focused surface after exact listing:
 
@@ -86840,3 +86884,34 @@ authorized. No campaign, wire, receipt, digest, activation authority, public
 API, dependency, limit, timeout or workload change is permitted. An accepted
 empty final P0/P1 union closes D.108e5 and releases the remaining Phase-6a exit
 ledger.
+
+The first bounded plan review ran against immutable plan commit
+`21fe74d0dae294af7f9c7f12267a908d005d6a2b`. Grok session
+`01a05821-5521-7bc3-b7e3-f8f5604f0df9` reached its turn boundary before a
+terminal verdict, so the exact session was resumed rather than replaced and
+then returned `APPROVED` with an empty finding set; normalized result SHA-256
+is `11f3f04461a42b2b89af0ad7f27cebb2c8500858946e4dc1303a64728cb59002`.
+Codex session `01a05821-5146-73f1-ae21-41c345309f64` returned
+`CHANGES_REQUIRED` with one P1: the frozen RED matrix omitted the causal
+oversized-invite classification mismatch; normalized result SHA-256 is
+`91c6bb2fc8809b8909d28598649a48f51dc18814fee9c757b74a0232f5689df1`.
+Opus session `27f7cf51-4d72-412f-95f6-70563e9905bd` returned
+`CHANGES_REQUIRED` with two P1 findings covering that same RED omission and
+the oracle's missing digest/type/receiver bounds, plus three P2 findings about
+activation-error precedence, redirected close joining and rehearsal-fence
+placement; normalized result SHA-256 is
+`0b05a0b136f442c06976795b1c458d6707f0286f88e73df35a9fe477f6449cc5`.
+
+The one permitted material correction batch above resolves the blocking union
+by making all invite paths bounded before encoding, pinning exact inclusive
+boundaries and invalid-shape classifications, and expanding RED to the exact
+six-mismatch causal matrix. It also dispositions the P2 union without widening
+the slice: oversize activation precedence is explicitly accepted as the
+pre-copy resource rule; redirected dispatch releases the source tail before
+awaiting target completion, preserving close behavior; and the rehearsal
+fast-fail fence now has an explicit entry/release position. The direct-room
+activation facade and selected redirect-recovery gate are test-only uses of
+existing seams. Because these corrections materially change causal RED
+acceptance and executable behavior, one bounded confirmation round over the
+signed corrected commit is required; it is the sole plan confirmation and may
+only block on P0/P1.
