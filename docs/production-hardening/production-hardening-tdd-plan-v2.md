@@ -83183,82 +83183,113 @@ and
 `0c772fd26236ddab77110b633f31b5ddc3c85d8692686d9d9c2096c218ce482e`.
 No further continuation is implied. Preserve this implementation and failed
 retained evidence in a signed/pushed checkpoint, then proceed through a narrow
-TDD slice that makes post-reset durable readiness causal before another fresh
-retained-browser name is authorized.
+TDD slice that preserves the first durable outcome and adds only post-failure
+diagnosis before another fresh retained-browser name is authorized.
 
-###### D.108e4bt — post-reset reliable readiness before durable control
+###### D.108e4bt — preserve the first durable outcome and diagnose only after failure
 
 D.108e4bt owns only the distinct retained-browser failure preserved under
 `.logs/d108e4bs-retained-browser-1/`. It does not reopen the supported
-D.108e4bs sender-continuity calculation. The demonstrated problem is narrower:
+D.108e4bs sender-continuity calculation. The demonstrated problem is narrow:
 after the final 30% profile had been reset to no loss, both endpoint fabric
-resets, both raw-link predicates and both original peer rosters passed, but the
-fixture inferred durable readiness without proving that a reliable application
-payload crossed from creator to receiver. The subsequent creator `placeBlock`
-committed locally and the receiver did not apply it within the unchanged
-20-second durable poll. One sample does not yet prove a product defect.
+resets, both raw-link predicates and both original peer rosters passed. The
+creator's first `placeBlock` then committed locally while the receiver did not
+apply it within the unchanged 20-second durable poll. One sample does not prove
+a product defect, but the captured failure lacks a post-outcome discriminator
+between ephemeral reliable-lane reachability and a durable room/DRP liveness
+failure.
 
 This is a test/evidence-infrastructure slice limited to
 `examples/grid/src/v3-zone.ts`, `tests/e3-03-loss-and-hol-proof.pw.ts` and this
 plan/evidence record. It changes no package product source, public product API,
-dependency, browser/configuration, loss profile, campaign trial, sample count,
-sample interval, payload size, backpressure ceiling, sender-stall bound,
-durable poll bound, AoI/HOL threshold, port or launcher. The existing exported
-fabric workbench API remains exactly `reset`, `runTrial` and `snapshot`. If
-GREEN requires a package/product-source change, a new public method, a timing
-relaxation or a retry of a durable operation, stop and reslice.
+dependency, browser/configuration, loss profile, campaign trial, campaign
+sample count, campaign sample interval, campaign payload size, backpressure
+ceiling, sender-stall bound, durable poll bound, AoI/HOL threshold, port or
+launcher. The existing exported fabric workbench API remains exactly `reset`,
+`runTrial` and `snapshot`. If GREEN requires a package/product-source change, a
+new public method, a timing relaxation, a retry of a durable operation or any
+pre-durable probe/reset/wait, stop and reslice.
 
-RED extends the existing fixed sample-domain pure title with a readiness
-classifier over a `FabricTrialSnapshot`. It accepts only the exact probe trial
-identity, attempted counts `{ raw: 1, reliable: 1 }`, one in-range non-sentinel
-reliable sequence zero observation, one reliable sentinel, and the existing
-single open raw transport. It rejects a raw-only observation, sentinel-only
-observation, wrong trial, wrong sequence, duplicate non-sentinel reliable row,
-wrong attempted counts and missing/open-count-divergent transport. Current
-source has no such classified readiness and must fail only the positive exact
-equality. The same RED adds one fixed `runTrial` input named
-`e3-03-durable-readiness` with interval 1 ms, sample count 1, the existing
-ASCII-v1 payload format, existing 256-byte sample payload and existing
-12,000-byte reliable sentinel. Current fixture validation must reject it with
-the exact existing `fabric trial profile differs` error; no long title runs in
-RED.
+The bounded plan review completed once. Grok emitted no terminal finding and
+is preserved honestly as `NO_VERDICT` after service cancellation at 450.424
+seconds. Codex high and Opus xhigh found that the original plan's receiver
+attempt counts were impossible, its probe identity was never reset, its exact
+observation set omitted the normal raw row, its RED overclaimed a nonexistent
+current classifier owner, and—most importantly—its pre-durable probe could
+warm a different path and mask the first-write defect. This corrected plan
+keeps the useful role/observation findings but removes the unsafe precondition
+workload entirely. No reviewer is relaunched for this single material union.
 
-GREEN admits only that one exact test-workbench input in
-`validateFabricRunInput`; all other input validation remains unchanged. It adds
-no API. After the final bilateral `resetFabricPairSerially` and the existing
-post-receiver-reset raw/network gates, the retained title runs that one-sample
-probe once from creator, polls the receiver's existing `snapshot` for the exact
-classified reliable receipt under a 10-second readiness gate, and records the
-probe evidence before calling the unchanged `placeBlock`. The probe is a
-precondition measurement, not a retry of the durable operation. The original
-durable block is still issued exactly once and must still replicate within 20
-seconds.
+RED adds a pure post-failure classifier over an explicit creator/receiver pair
+of `FabricTrialSnapshot` values. The creator must have the exact diagnostic
+trial identity and attempted counts `{ raw: 1, reliable: 1 }`. The receiver
+must have that identity and endpoint-local attempted counts
+`{ raw: 0, reliable: 0 }`. After projecting receiver observations to
+`lane === "reliable"`, it must contain exactly one in-range non-sentinel
+sequence-zero sample and exactly one sequence-one sentinel. An incidental raw
+sequence-zero row is accepted. Both snapshots must retain exactly one open raw
+transport to the expected opposite peer. The frozen negative matrix rejects
+crossed roles, wrong trial or peer, wrong endpoint-local attempted counts,
+raw-only, sentinel-only, wrong sequence, duplicate reliable sample or sentinel,
+and missing or divergent open transport. This classifier is test-owned frozen
+specification support; it is not represented as a current-source RED.
 
-The helper must preserve causality: local `runTrial` completion or sender
-attempt counts alone cannot pass; raw receipt cannot substitute for reliable
-receipt; a reliable sentinel cannot substitute for the non-sentinel sample;
-rows from another trial cannot pass; and a later durable pass cannot backfill a
-missing readiness observation. The attachment records the exact probe
-snapshot, its start/receipt times and the durable issue/apply times. If the
-probe passes but durable replication fails, preserve that result and reslice a
-product reliable/durable liveness RED. If the probe itself cannot pass under
-no loss without product changes, preserve it and reslice rather than loop or
-weaken the gate.
+The sole current-source RED owner is a short fixture-validation title. It calls
+the existing workbench `runTrial` before a room is open with the exact fixed
+diagnostic input `trialId=e3-03-durable-readiness`, interval 1 ms, sample count
+1, existing ASCII-v1 payload format, existing 256-byte sample payload and
+existing 12,000-byte reliable sentinel. The RED expects validation to admit
+that exact tuple and execution then to fail with the existing later
+`fabric trial is not ready` error. Current source instead fails earlier with
+the exact `fabric trial profile differs` error. The classifier matrix passes;
+the validation mismatch is the only expected RED failure. No retained title or
+campaign runs in RED.
 
-Run one bounded Grok/Codex-`gpt-5.6-sol`-high/Opus-xhigh plan review because
-this adds a fixed precondition workload to the retained title. Only P0/P1
-findings block; apply one material union once, with no recursive prose or P2
-confirmation. No Kimi, Fable or collaboration subagent is authorized. RED then
-runs the one pure title plus a deterministic fixture-validation owner only; no
-retained browser or campaign runs. GREEN runs the pure/fixture focused gate,
-exact standalone strict TypeScript, exact-owner ESLint/Prettier/diff, grid
-build/typecheck, then one fresh write-once retained-browser title under the
-unchanged 600-second watchdog. Only that pass releases the exact retained
-seven-title allowlist once.
+GREEN admits only that one exact diagnostic input in
+`validateFabricRunInput`; all other validation remains unchanged and no API is
+added. In the retained title, the final bilateral reset remains exactly the
+existing `e3-03-durable-control` reset. The existing raw/network gates are
+followed immediately by the same single `placeBlock`; there is no second
+fabric reset, probe payload, added wait or other application workload before
+it. The unchanged 20-second receiver poll is allowed to complete and its exact
+outcome is captured. A pass follows the existing assertions and never executes
+the diagnostic path.
+
+Only after that original durable poll has already failed does the catch path
+freeze the creator/receiver durable snapshots, timestamp and original error.
+It then performs one bilateral reset under the distinct
+`e3-03-durable-readiness` identity, re-establishes the existing raw/network
+gates, runs the one-sample diagnostic exactly once from creator, and captures
+the creator attempt snapshot plus the receiver receipt snapshot under a
+bounded 10-second diagnostic poll. It records whether the exact pair classifier
+passed and attaches all diagnostic data. Diagnostic success or failure cannot
+alter the test verdict: the fixture always rethrows the preserved original
+durable-poll error. It never retries `placeBlock`.
+
+The diagnostic is a necessary-but-not-sufficient check of the ephemeral
+reliable direct-stream lane, not proof of durable room/DRP readiness. If a
+fresh retained failure has a passing diagnostic, preserve it and reslice a
+product durable-liveness RED. If both durable and diagnostic paths fail,
+preserve it and reslice the narrower transport/fixture owner shown by the
+captured error. If the diagnostic cannot be implemented without product
+changes, preserve the inherited failure and stop. A fresh retained pass proves
+only that the unchanged retained semantics passed that invocation; stability
+is then judged by the already-required retained seven and six fresh campaigns,
+not by a warmed precondition.
+
+RED runs the pure classifier matrix plus the deterministic validation owner
+exactly once. GREEN runs that focused gate, exact standalone strict TypeScript,
+exact-owner ESLint/Prettier/diff and grid build/typecheck, then one fresh
+write-once retained title under the unchanged 600-second watchdog. On that
+pass, run the exact retained seven once and require all seven to pass. Any
+semantic result outside the reviewed matrix stops without rerun or added
+instrumentation. Preserve complete reporter, stdout, stderr, attachments,
+statuses and hashes for both gates.
 
 Sign/push GREEN before the single formal Grok/Codex-high/Opus-xhigh review over
 plan, RED, GREEN, the inherited failed result and new evidence. An empty P0/P1
-union closes D.108e4bt and D.108e4bs together. Then freeze six genuinely fresh
-campaign names with the already reviewed launcher machinery and execute them
-sequentially under first-failure rules; no consumed D.108e4br or D.108e4bs name
-is reused. Six passes plus the final evidence review release D.108e5.
+union closes D.108e4bt and D.108e4bs together. Only then freeze six genuinely
+fresh campaign names with the already reviewed launcher machinery and execute
+them sequentially under first-failure rules; no consumed D.108e4br or
+D.108e4bs name is reused. Six passes plus the final evidence review release
+D.108e5. No Kimi, Fable or collaboration subagent is authorized.
