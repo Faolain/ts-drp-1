@@ -85739,6 +85739,85 @@ its validation SHA-256 is
 `ab28e597972605c07660a3468a3b96c1cbdc622ad5810a72ff822880032e67cc`,
 and all entries validate. The one fresh retained proof is released.
 
+###### D.108e4ck — give post-reset preparation one setup-expiry margin
+
+The released D.108e4cj retained root was consumed once and failed, so it is
+immutable and is never retried, overwritten, renamed or reused. It ran from
+`2026-08-31T11:55:48Z` through `11:58:03Z`; runner status was one. Reporter
+duration was `134536.817` ms with expected/skipped/unexpected/flaky
+`0/0/1/0`, zero top-level errors, retry zero and one selected title in one
+file. The first two 600-sample trials passed their complete semantic matrices.
+The only failure was trial `e3-03-2` stage `e3-03-2-prepare`: the fixed
+10-second `waitForOpenTransportPair` observed zero selected raw links on both
+endpoints when its predicate expired.
+
+The captured lifecycle establishes a test-infrastructure timing collision,
+not a new product failure. The existing high-id-then-low-id bilateral reset
+schedule first dropped receiver selected A at `1788177469039`. An already
+in-flight creator offer then created receiver acceptor PC 16 at
+`1788177469043`; eight milliseconds later the creator reset closed its paired
+pending initiator PC 20. Receiver PC 16 correctly remained pending under the
+unchanged product `SETUP_TIMEOUT_MS=10_000`, so its existing admission gate
+rejected the following creator offers. Creator handshake failures rose by 26
+while its unchanged 250-ms retry owner continued. At `1788177479044`, after
+`10001` ms, the existing product setup expiry closed PC 16. The next retry
+created creator PC 46 at `1788177479071`, created receiver PC 17 at
+`1788177479244`, and opened the raw pair at `1788177479280/9283`: product
+recovery completed without a change, `10241/10244` ms after the reset drop,
+only about 0.24 seconds beyond the fixture gate.
+
+Thus the fixture's 10-second prepare gate cannot observe one complete
+10-second product expiry plus the next 250-ms retry and RTC handshake. This
+does not justify changing pending ownership, signaling, retry policy, the
+product setup timeout, or any product source. The immutable failure is the
+causal D.108e4ck RED and is not duplicated. Its reporter, decoded telemetry,
+stdout, stderr, status and trace SHA-256 values are respectively
+`0a602e20d86dd59e0fe3c9c51df3ceb2d7a199810e418ef34b96b1aa3f2d9a46`,
+`1fabce2a4555e4f18928405224feb4b457ed13d1352ca45a8639ccd07dc142d2`,
+`af59fec45aac6d38d9aa874ca68643dc02bd98eead6d0e2933881682deec9c67`,
+`4fc54a90073565568d21437cbff9a8db9533e42d53b93b7cdfa42d4222a91250`,
+`4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`
+and
+`0bfef31dc0f6db80d8611fa9fdde780de6f0373eddf9d6ff1228210b3f0032a7`.
+The compact diagnosis, one-entry manifest and validation SHA-256 values are
+`a6b4da0e6ccc06decc8642dabc13385837841e3f8b5431bf9c99c0370dcb6c81`,
+`a551642cafacc98c5e16120705a8967767da02fda8472569645c709a1f1432ab`
+and
+`64b6a54e2fb907d5525d81151f31c54c73a910113a3e5e78bc2443619e0e0191`;
+all entries validate.
+
+GREEN changes only `tests/e3-03-loss-and-hol-proof.pw.ts`. Add the explicit
+test-only constant `D108E4CK_TRIAL_PREPARE_OPEN_TIMEOUT_MS = 15_000`, permit
+`waitForOpenTransportPair` to receive an optional timeout while preserving its
+10-second default, and pass 15 seconds only at the immediate post-
+`resetFabricPairSerially` trial-prepare call. The extra five seconds is a
+fixture scheduling margin over the demonstrated 10.244-second self-recovery,
+not a product availability SLA. Every other open-pair gate remains 10 seconds.
+Do not change the 15-second network-roster gate, 300-second Playwright test
+timeout, 600-second watchdog, three trials, workload, browser, ports, loss,
+sample count/interval/payload, delivery/AoI/HOL thresholds, evidence
+classifier, product setup/retry timers, dependencies, example source, product
+source or APIs. If the repair needs any such change, stop and reslice.
+
+Because this changes one retained readiness timeout, treat it as the timing-
+contract high-risk exception. Sign/push this bounded plan and run one
+Grok-high/Codex-`gpt-5.6-sol`-high/Opus-xhigh plan review. If Grok cancels,
+resume that exact session. Only a P0/P1 showing an unfixed product owner, a
+noncausal RED, or a semantic/workload weakening blocks; disposition P2 without
+confirmation. Do not use Kimi, Fable or collaboration subagents.
+
+After an empty plan-review blocking union, implement the exact test-only GREEN
+and run standalone strict TypeScript, exact-owner ESLint/Prettier/diff, grid
+typecheck/build, the D.108e4bv reset-schedule title, both D.108e4ax bilateral
+restart rows, the complete network-owner suite, the retained-seven allowlist,
+and exact one-test/one-file retained listing. Sign/push GREEN with complete
+statuses, hashes and a validating self-excluding manifest, then run the sole
+formal Grok/Codex/Opus implementation review over the consumed causal RED and
+GREEN. Only an empty P0/P1 union releases one wholly fresh write-once retained
+proof under unchanged workload and first-failure rules. No six-name campaign
+runs inside D.108e4ck; a passing retained proof releases the already-authorized
+fresh six-name campaign freeze.
+
 ###### D.108e4ce — post-census six-name campaign freeze
 
 D.108e4ce is the high-risk campaign disposition released by the passing
