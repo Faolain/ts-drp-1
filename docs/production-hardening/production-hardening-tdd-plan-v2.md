@@ -85818,6 +85818,26 @@ proof under unchanged workload and first-failure rules. No six-name campaign
 runs inside D.108e4ck; a passing retained proof releases the already-authorized
 fresh six-name campaign freeze.
 
+The sole D.108e4ck plan review is closed with an empty P0/P1 union. Codex
+`gpt-5.6-sol` high APPROVED with no findings. Opus xhigh APPROVED with three
+P2s. Grok high completed normally with APPROVED/no findings but prefixed
+progress prose, so the strict wrapper honestly recorded NO_VERDICT; the exact
+same session `01a057b4-f0f6-7851-a336-415f2aa80098` was resumed for one
+tool-free turn and emitted the same APPROVED verdict as valid terminal JSON.
+No replacement session or confirmation review ran.
+
+The P2 union is nonblocking. Three sibling post-reset gates remain at their
+accepted 10-second value because only trial-prepare failed; a future exact
+failure at those sites is owned as the same fixture-collision candidate, not
+silently attributed to product. The `10241/10244` figures measure from the
+receiver reset drop; the actual gate begins after the creator reset and
+therefore overshoots by about 0.23 seconds, a smaller conservative difference
+that does not change the repair. GREEN must comment that 15 seconds derives
+from one 10-second product setup expiry plus the 250-ms retry interval, the
+observed roughly 209-ms handshake and polling/scheduling margin, without
+importing private product constants. No executable plan correction or review
+confirmation is required; GREEN is authorized.
+
 ###### D.108e4ce — post-census six-name campaign freeze
 
 D.108e4ce is the high-risk campaign disposition released by the passing
