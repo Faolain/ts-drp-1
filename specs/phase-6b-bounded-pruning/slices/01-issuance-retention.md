@@ -11,18 +11,23 @@ closed-epoch boundary, and delete only paired `published` issued/outbox rows. A
 non-monotone, or newly changed row aborts with zero writes. Node, browser, and
 conformance-memory implementations must agree.
 
-The same transaction advances one durable per-scope pruning watermark through
-the exact deleted prefix while retaining the lineage CAS row. Browser upgrades
-its existing `--drp-issuance-v1` database in place; Node upgrades its existing
-`.drp-issuance-v1.sqlite` catalog in place. Neither changes the derived storage
-identity or creates an empty replacement database. Terminal classification,
-`readIssued`, and publication acknowledgement distinguish an address at or
-below the watermark as `pruned`, not `ISSUANCE_RECOVERY_CORRUPT`. Reads return
-absence. A late or raced acknowledgement returns the new exact closed error
-`ISSUANCE_RECORD_PRUNED`; because the deleted digest is no longer available,
-it must not claim exact-digest CAS success. This error carries only the
-caller-known scope and sequence, never a digest or deleted candidate. Above-
-watermark consumed absence retains the existing corruption classification.
+The same transaction advances one durable per-scope pruning watermark equal to
+the inclusive last deleted `authorSequence` while retaining the lineage CAS
+row. Browser stores the additive watermark on that existing lineage row in the
+existing `--drp-issuance-v1` object store without an IDB version bump; Node
+upgrades its existing `.drp-issuance-v1.sqlite` catalog in place. Neither
+changes the derived storage identity or creates an empty replacement database.
+Terminal classification reads the issued/outbox row and watermark in one owner
+read transaction. `readIssued` and publication acknowledgement distinguish an
+address at or below the watermark as `pruned`, not
+`ISSUANCE_RECOVERY_CORRUPT`. The public terminal observation requires that
+watermark member as part of this same demonstrated D.109b contract exception;
+it is not optional backend metadata. Reads return absence. A late or raced
+acknowledgement returns the new exact closed error `ISSUANCE_RECORD_PRUNED`;
+because the deleted digest is no longer available, it must not claim exact-
+digest CAS success. This error carries only the caller-known scope and sequence,
+never a digest or deleted candidate. Above-watermark consumed absence retains
+the existing corruption classification.
 
 RED covers every row classification, page boundaries, prefix gaps and epoch
 regression, stale expected lineage/watermark, late duplicate and wrong-digest

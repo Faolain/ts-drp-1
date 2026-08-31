@@ -17,7 +17,8 @@ The plan identifies, by exact value rather than ordering inference:
 - object and closed epoch;
 - verified commit-QC and adopted-head bindings;
 - expected current head/revision;
-- active generation and the exact usable rollback generations to retain;
+- active generation and exactly the two complete rollback generations reached
+  by following `baseExpectedHead` twice from that active adopted generation;
 - adopted local snapshot plus the adopted CutValue’s exact
   `availabilityPolicyDigest`;
 - the issuance scope and upper epoch boundary to classify; and
@@ -28,11 +29,13 @@ The plan identifies, by exact value rather than ordering inference:
 One tests-only owner drives the genuine Phase-6a close/adoption material into
 the missing module and requires:
 
-- a complete local-only positive control with active + two rollback generations;
+- a complete local-only positive control with the active generation plus both
+  immediate `baseExpectedHead` rollback ancestors and all three closures;
 - refusal for missing/unverified QC, non-adopted or mismatched head, fewer than
-  two distinct usable rollbacks, missing local snapshot, mismatched policy,
-  incomplete outbox classification, malformed/duplicate identities, and stale
-  expected revision;
+  two distinct usable rollbacks, a wrong-but-countable pair of non-ancestor
+  superseded generations, either missing ancestor row or incomplete ancestor
+  closure, missing local snapshot, mismatched policy, incomplete outbox
+  classification, malformed/duplicate identities, and stale expected revision;
 - permutation invariance of unordered facts;
 - detached immutable output;
 - exact refusal precedence; and

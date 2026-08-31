@@ -87479,10 +87479,11 @@ The ordered implementation is:
 3. **D.109c AHE reclamation:** a separate identity-gated maintenance capability
    performs store-local exact-head/closure/reference recheck, deletion of
    selected superseded generations/promotions, and GC of only newly
-   unreferenced blobs while the active generation plus at least two exact usable
-   rollback generations remain complete. Global blobs require a transactional
-   decode-scan of every remaining cross-object closure and promotion row; no
-   nonexistent reverse index is assumed.
+   unreferenced blobs while the active generation plus exactly the two complete
+   rollback ancestors reached by following `baseExpectedHead` twice remain
+   complete. Two other countable superseded generations cannot substitute.
+   Global blobs require a transactional decode-scan of every remaining cross-
+   object closure and promotion row; no nonexistent reverse index is assumed.
 4. **D.109d runtime reclamation:** after matching durable receipts, reclaim the
    enumerated graph, state, checkpoint, pending and sync structures while
    preserving root, active tail, canonical state, truthful known-hash
@@ -87496,9 +87497,10 @@ The ordered implementation is:
    census of every Phase-6b structure before Phase 6c memory work.
 
 Random generation IDs are never treated as chronological order. The verified
-lineage names the active and rollback identities. The local-only availability
-case requires the adopted local snapshot and exact equality between the adopted
-CutValue’s `availabilityPolicyDigest` and frozen digest
+lineage names the active generation and its two immediate `baseExpectedHead`
+ancestors; both ancestor rows and every blob in their closures must be present.
+The local-only availability case requires the adopted local snapshot and exact
+equality between the adopted CutValue’s `availabilityPolicyDigest` and frozen digest
 `53775c5c1ee01e346f588966d6e7acb876df2bd8b2abcbe2b2591f216f7d4d9b`,
 derived from canonical bytes
 `080405046d6f6465050a6c6f63616c2d6f6e6c79050e6d696e4c6f63616c436f70696573030205116d696e4d6972726f725265636569707473030005166d696e526f6c6c6261636b47656e65726174696f6e730304`.
@@ -87517,21 +87519,24 @@ D.109a adds one package-internal planner under `packages/node/src/internal/`
 and one tests-only RED owner. Its input consists only of detached facts already
 authenticated by the Phase-5/Phase-6a owners: object/closed epoch, commit-QC
 binding, adopted head and expected revision, exact active and rollback
-generation identities, adopted local snapshot and the adopted CutValue’s exact
-availability-policy digest, and a complete issuance-classification observation.
-Its immutable positive
+generation identities obtained by following `baseExpectedHead` twice from the
+active adopted generation, adopted local snapshot and the adopted CutValue’s
+exact availability-policy digest, and a complete issuance-classification
+observation. Its immutable positive
 result carries exact identities for later store-local rechecks; its negative
 result uses a closed refusal union. It does not reverify signatures, open a
 store, schedule work, mutate state, or export a package API.
 
 The tests-only RED must establish one complete local-only positive control and
 mutants for missing or mismatched QC, non-adopted/mismatched head, stale
-revision, fewer than two distinct usable rollbacks, missing local snapshot,
-policy mismatch, incomplete outbox classification, duplicate/malformed
-identities, permutation variance, aliased/mutable output, and refusal
-precedence. Source guards require zero delete/clear/discard calls and no public
-export. RED is accepted only when the focused test fails for the missing
-planner/closed result contract while retained Phase-6a semantics remain green.
+revision, fewer than two distinct usable rollbacks, either missing immediate
+ancestor or incomplete ancestor closure, a wrong-but-countable pair of non-
+ancestor superseded generations, missing local snapshot, policy mismatch,
+incomplete outbox classification, duplicate/malformed identities, permutation
+variance, aliased/mutable output, and refusal precedence. Source guards require
+zero delete/clear/discard calls and no public export. RED is accepted only when
+the focused test fails for the missing planner/closed result contract while
+retained Phase-6a semantics remain green.
 
 GREEN implements validation, copying, canonical ordering and freezing only.
 Its affected Node/object/storage typechecks, exact-owner lint/format/diff,
@@ -87545,13 +87550,28 @@ capabilities resolved by identity only from genuine Node/browser store
 instances; structural fakes and ordinary product consumers cannot mint them.
 The issuance schemas upgrade in place without changing their existing derived
 database/file identities. The per-scope pruning watermark is owner-local
-monotone state, not a second eligibility oracle. A consumed missing address
-above the watermark remains corrupt. At or below it, reads return absence and
-acknowledgement returns exact `ISSUANCE_RECORD_PRUNED` rather than false success
-for a digest whose row no longer exists. The code carries only caller-known
-scope and sequence, never a digest or deleted candidate. Adding that code to
-the closed issuance error union is the one demonstrated D.109b API exception;
-both success and corruption would be false after authorized deletion.
+monotone state equal to the inclusive last deleted `authorSequence`, not a
+second eligibility oracle. Terminal classification reads the watermark and row
+in one owner read transaction. Browser stores the additive watermark on the
+existing lineage row without an IDB version bump; Node migrates its existing
+catalog in place. A consumed missing address above the watermark remains
+corrupt. At or below it, reads return absence and acknowledgement returns exact
+`ISSUANCE_RECORD_PRUNED` rather than false success for a digest whose row no
+longer exists. The code carries only caller-known scope and sequence, never a
+digest or deleted candidate. Adding that code to the closed issuance error
+union and requiring the watermark member in the public terminal observation
+are one demonstrated D.109b API exception; both success and corruption would
+be false after authorized deletion.
+
+Until 7b-r supplies an authenticated committed rollback release, neither of the
+two generations counted toward the committed minimum is eligible for deletion.
+The release member of the deletion conjunction is vacuous only for older
+superseded generations beyond that protected pair. The installed v3 runtime
+orchestrates the `@ts-drp/object` graph/state owner and `@ts-drp/node`
+pending/sync owner after matching durable receipts; neither owner nor the
+orchestrator may infer eligibility. Phase 6b preserves both the Discord and
+MMORPG golden paths and enables neither. D.109f's complete equivalence list is
+the proof obligation.
 
 The one expressly authorized Fable 5/high advisory review inspected this
 working-tree plan read-only in session
@@ -87574,3 +87594,38 @@ recurse. If Grok cancels, resume the exact session rather than launching a
 replacement. The one expressly authorized Phase-6b Fable review is advisory
 and may not be relaunched; further Fable and collaboration subagents are
 prohibited. Codex `gpt-5.6-sol` does not substitute for Kimi in this review.
+
+The sole initial high-risk plan review inspected signed/pushed commit
+`a1812b0ef3f03cc733ca44e7ac9b59702d074c2e`. Grok 4.6/high exact session
+`01a058f5-27e8-7bd1-91f1-6cdc92a56d48` reached its 16-turn service cancellation
+boundary before a verdict, then resumed as that exact session and returned
+`APPROVED`, no P0/P1, and `D109A_RED_READY: yes`; initial event/status and
+resumed event/result SHA-256 values are respectively
+`3187057b0193ac07214c4e4a4ede10b524a8d298676a13d9aa403b0275b41802`,
+`9a1420b168ec4eb427db2ce28d3fcadcf2e9a8cfce25b699495ddef116a81864`,
+`cb1698ac91792a7ed9e449be89730ccaa24c986557f443c28e0064ff39415dea`
+and `b7cd343072818b7e9acc92e5e741ffb1c6fa606c8cef3eab306abf612256462a`.
+Exact Kimi K3/thinking/high/max-100 session
+`b368026c-3fe2-4ebe-a510-51b8ff4e8da2` returned `APPROVED`, no P0/P1, and
+`D109A_RED_READY: yes`; raw/result SHA-256 values are
+`b08191dbe70b8fecec6b0763f1cc9c805e5fa11fc1ed5dbabeb8a1d9aaaeb43e`
+and `b5c9036c3fa5e3ed2b8280905f6c6bf9d9df0a8dd423cce4ac36a57322871615`.
+Opus 5/xhigh session `3d85f717-13a1-4c92-a6bd-e5034143a6a3` returned
+`CHANGES_REQUIRED`, P0=0/P1=1/P2=4, and `D109A_RED_READY: no`; raw/result
+SHA-256 values are
+`37383cd1a88767f58f3d8ea12aa6d1a3eec98056d560962d1d74e95b2c90d74f`
+and `00df594e877a4e26f8ad591d3872acfc278322a9b6084b272519b8b82aecf63c`.
+
+The one blocking union item is accepted: cardinality alone did not prove that
+the retained rollback pair was the two immediate `baseExpectedHead` ancestors
+required by cold reopen and adoption commit. The correction above pins that
+pair, both complete closures, and the wrong-but-countable RED mutant. The P2
+set receives bounded disposition in the same batch: terminal watermark/row
+reads are explicitly one transaction; the watermark is inclusive-last-deleted;
+the browser v1 lineage row receives the additive member without a version bump;
+the public terminal observation member is part of the demonstrated D.109b
+exception; the installed runtime owns cross-package orchestration; the 7b-r
+release boundary and both golden paths are explicit. The literal policy digest
+is already a mandatory D.109a test vector. These corrections change causal RED
+acceptance, so exactly one Grok/Kimi/Opus confirmation of the corrected signed
+checkpoint is required; no further confirmation or prose review may recurse.

@@ -19,9 +19,10 @@ it.
 
 Bound closed-epoch durable and live structures without weakening recovery,
 availability, publication, or activation authority. Cleanup becomes possible
-only after verified commit QC, durable successor adoption, at least two usable
-rollback generations, satisfied availability policy, and a completely valid
-outbox classification.
+only after verified commit QC, durable successor adoption, the two complete
+rollback generations reached by following `baseExpectedHead` twice from the
+active adopted generation, satisfied availability policy, and a completely
+valid outbox classification.
 
 ## Non-goals
 
@@ -36,14 +37,14 @@ outbox classification.
 
 ## Existing owners and gaps
 
-| Concern                                                | Existing sole owner                                       | Phase-6b rule                                                                                               |
-| ------------------------------------------------------ | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| AHE head, generations, promotions, blobs               | `@ts-drp/storage` plus Node/IDB adapters                  | Add one bounded physical-reclamation command; never infer QC or availability in the adapter.                |
-| Issued rows and issuance outbox                        | `@ts-drp/issuance-store` plus dedicated Node/IDB adapters | Classify canonical preimages in the owning transaction; pending or malformed old-epoch rows block deletion. |
-| Verified close and successor adoption                  | `@ts-drp/node` creator close/adoption owners              | Supply authenticated facts to the cleanup planner; do not duplicate verification.                           |
-| Runtime graph, state snapshots, checkpoints and caches | `@ts-drp/object`                                          | Reclaim only after durable cleanup receipts; the runtime cannot mint deletion authority.                    |
-| Browser primary dispatch                               | Phase-5c internal vote dispatcher                         | Extract/reuse its one advisory lock runner; do not add a second election protocol.                          |
-| Legacy finality                                        | `FinalityStore`                                           | Preserved until Phase 6d defines post-expiry behavior.                                                      |
+| Concern                                                | Existing sole owner                                             | Phase-6b rule                                                                                                                |
+| ------------------------------------------------------ | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| AHE head, generations, promotions, blobs               | `@ts-drp/storage` plus Node/IDB adapters                        | Add one bounded physical-reclamation command; never infer QC or availability in the adapter.                                 |
+| Issued rows and issuance outbox                        | `@ts-drp/issuance-store` plus dedicated Node/IDB adapters       | Classify canonical preimages in the owning transaction; pending or malformed old-epoch rows block deletion.                  |
+| Verified close and successor adoption                  | `@ts-drp/node` creator close/adoption owners                    | Supply authenticated facts to the cleanup planner; do not duplicate verification.                                            |
+| Runtime graph, state snapshots, checkpoints and caches | `@ts-drp/object`; v3 pending/sync inventories in `@ts-drp/node` | The installed v3 runtime orchestrates both owners after durable cleanup receipts; neither owner can mint deletion authority. |
+| Browser primary dispatch                               | Phase-5c internal vote dispatcher                               | Extract/reuse its one advisory lock runner; do not add a second election protocol.                                           |
+| Legacy finality                                        | `FinalityStore`                                                 | Preserved until Phase 6d defines post-expiry behavior.                                                                       |
 
 The current AHE database, issuance database, snapshot quarantine, and runtime
 memory are distinct owners. Safety therefore comes from monotone epoch closure,
@@ -86,7 +87,8 @@ owner lifecycle failure deletes nothing in that owner.
    classify and remove only eligible published closed-epoch issued/outbox pairs.
 3. [D.109c AHE reclamation](slices/02-ahe-reclamation.md): atomically remove
    selected superseded generations, their promotions, and newly unreferenced
-   blobs while retaining the active generation plus two usable rollbacks.
+   blobs while retaining the active generation plus its two immediate complete
+   `baseExpectedHead` rollback ancestors.
 4. [D.109d runtime reclamation](slices/03-runtime-reclamation.md): after both
    durable receipts, compact graph payload/index history, state snapshots,
    checkpoints, and v3 pending/sync inventories; preserve legacy finality.
@@ -99,15 +101,20 @@ owner lifecycle failure deletes nothing in that owner.
 ## Sacred contracts
 
 - The active AHE head and every referenced byte remain complete and recoverable.
-- At least two distinct, usable rollback generations remain after every AHE
-  reclamation. Random generation identifiers never imply chronological order;
+- Exactly the two immediate rollback ancestors reached by following
+  `baseExpectedHead` twice from the active adopted generation remain complete
+  after every AHE reclamation. Both generation rows and every blob in both
+  closures must exist. Two other countable superseded generations never satisfy
+  this rule. Random generation identifiers never imply chronological order;
   the verified lineage supplies exact identities.
 - An old-epoch issuance row is deletable only when its canonical preimage is
   valid, epoch-bound, paired, and `published`. A `pending`, malformed,
   one-sided, foreign-digest, or unreadable row blocks that owner with no writes.
-- The issuance owner retains one monotone per-scope pruning watermark in the
-  same transaction that removes a complete published prefix. Consumed-but-
-  absent addresses at or below that watermark are `pruned`, never corruption;
+- The issuance owner retains one monotone per-scope pruning watermark equal to
+  the inclusive last deleted `authorSequence`, in the same transaction that
+  removes a complete published prefix. Terminal classification reads the row
+  and watermark in one owner transaction. Consumed-but-absent addresses at or
+  below that watermark are `pruned`, never corruption;
   a late acknowledgement receives exact non-poisoning
   `ISSUANCE_RECORD_PRUNED` rather than an unverified exact-digest success.
 - Local-only availability requires the adopted local snapshot and exact
@@ -123,6 +130,13 @@ owner lifecycle failure deletes nothing in that owner.
   the same eventual eligible deletion set.
 - A cleanup stage may fail by retaining too much; it must never fail by deleting
   too much.
+- Until 7b-r supplies authenticated rollback release, neither of the two
+  generations counted toward the committed minimum is deletable. The release
+  conjunction member is vacuous only for older superseded generations beyond
+  that protected pair.
+- Phase 6b preserves both the Discord and MMORPG golden paths and enables
+  neither; D.109f's archival-versus-compacted equivalence list is the proof
+  obligation.
 
 ## Review and evidence
 
@@ -150,8 +164,9 @@ signed commits, pushed refs, protected paths, stashes, ports, and processes.
 - Public product APIs remain unchanged unless a later slice explicitly proves
   an unavoidable package contract change and reviews it before RED.
   D.109b’s addition of `ISSUANCE_RECORD_PRUNED` to the closed issuance error
-  union is the one already-demonstrated exception: deleted digest evidence
-  makes both success and corruption false.
+  union and its required pruning-watermark member in the public terminal
+  observation are one demonstrated exception: deleted digest evidence makes
+  both success and corruption false.
 
 ## One-off advisory review
 
