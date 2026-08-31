@@ -84947,6 +84947,27 @@ expose only the named row with exact
 for diagnosis. Preserve a self-excluding RED manifest, sign and push it, and
 never rerun RED.
 
+RED executed once from plan-gate base
+`e650cb83de36c10459d6c01e738f766f7f5daa1d`. Focused listing selected exactly
+one test in one file and excluded the retained three-trial title. Execution
+returned status one with expected/skipped/unexpected/flaky `0/0/1/0`, zero
+top-level errors and one retry-zero failed result. Its sole soft failure is
+`incomingPendingCandidateAlongsidePeerReplacement`, exact
+`D108E4H_IDENTITY_JOIN_INVALID`, owned by
+`d108e4hOnly(endpoint.deadline.rtc)` through the boundary validator;
+`D108E4H_TRIAL_MISMATCH` is absent. Two read-only audit commands were corrected
+without rerunning RED: the first jq expression traversed nested errors
+incorrectly, and the second used zsh's reserved `path` variable. The corrected
+mechanical validation passes. Fourteen-entry RED manifest, validation and
+summary SHA-256 values are respectively
+`31201bfcad006fa09c4675cfc32dd2754a52a4871b19dc96530c11a7ba39ae59`,
+`e62359e0fbaba1afe76b69105ed59f0187d68491c79fee14863579599ad0d758`
+and
+`de61f03572f39b8b55be53f3cab754497e753ce2fcfb0bc4adc82080f721e5be`.
+All entries, including reporter, streams, statuses, source diff, error context
+and trace, validate from `.logs/d108e4cc-red/`. RED is causal and will not be
+rerun.
+
 **GREEN.** Change only boundary selection in the same validator. For a
 non-local endpoint, use `d108e4hAssertZeroLocalBoundaryIdentity` only when
 prepare is a singleton, deadline contains that exact identity and deadline has

@@ -5520,98 +5520,103 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 			channelId: 5_003,
 			connectionId: 503,
 		});
+		const d108e4ccDeadlinePending = (fixture: D108e4hValidationInput): D108e4hValidationInput => {
+			const receiver = fixture.endpoints.receiver;
+			const lifecycle = Object.freeze([
+				...receiver.lifecycle,
+				d108e4hLifecycle(
+					fixture.trialId,
+					1,
+					"channel-message-handler-installed",
+					d108e4bhDeadlineCandidate,
+					"product-unreliable-webrtc"
+				),
+				d108e4hLifecycle(
+					fixture.trialId,
+					2,
+					"channel-send-attempt",
+					d108e4bhDeadlineCandidate,
+					"rtc-datachannel-send",
+					{ attemptId: 930_001 }
+				),
+				d108e4hLifecycle(
+					fixture.trialId,
+					3,
+					"channel-send-success",
+					d108e4bhDeadlineCandidate,
+					"rtc-datachannel-send",
+					{ attemptId: 930_001 }
+				),
+				d108e4hLifecycle(
+					fixture.trialId,
+					4,
+					"channel-open-event",
+					d108e4bhDeadlineCandidate,
+					"rtc-datachannel-open-event"
+				),
+				d108e4hLifecycle(
+					fixture.trialId,
+					5,
+					"channel-message",
+					d108e4bhDeadlineCandidate,
+					"rtc-datachannel-message-event"
+				),
+				d108e4hLifecycle(
+					fixture.trialId,
+					6,
+					"channel-send-attempt",
+					d108e4bhDeadlineCandidate,
+					"rtc-datachannel-send",
+					{ attemptId: 930_004 }
+				),
+				d108e4hLifecycle(
+					fixture.trialId,
+					7,
+					"channel-send-success",
+					d108e4bhDeadlineCandidate,
+					"rtc-datachannel-send",
+					{ attemptId: 930_004 }
+				),
+			]);
+			return withReceiverEndpoint(
+				fixture,
+				Object.freeze({
+					...receiver,
+					controlReceives: Object.freeze([
+						Object.freeze({
+							bytes: d108e4avControlBytes(1),
+							channelId: d108e4bhDeadlineCandidate.channelId,
+							connectionId: d108e4bhDeadlineCandidate.connectionId,
+							lifecycleSequence: 5,
+						}),
+					]),
+					controlSends: Object.freeze([
+						Object.freeze({
+							attemptId: 930_001,
+							bytes: d108e4avControlBytes(2),
+							channelId: d108e4bhDeadlineCandidate.channelId,
+							connectionId: d108e4bhDeadlineCandidate.connectionId,
+							lifecycleSequence: 2,
+						}),
+						Object.freeze({
+							attemptId: 930_004,
+							bytes: d108e4avControlBytes(2),
+							channelId: d108e4bhDeadlineCandidate.channelId,
+							connectionId: d108e4bhDeadlineCandidate.connectionId,
+							lifecycleSequence: 6,
+						}),
+					]),
+					deadline: Object.freeze({
+						...receiver.deadline,
+						rtc: Object.freeze([D108E4H_RTC_A, d108e4bhDeadlineCandidate]),
+					}),
+					lifecycle,
+				})
+			);
+		};
 		const d108e4bhReceiver = noReplacement.endpoints.receiver;
-		const d108e4bhDeadlineCandidateLifecycle = Object.freeze([
-			...d108e4bhReceiver.lifecycle,
-			d108e4hLifecycle(
-				noReplacement.trialId,
-				1,
-				"channel-message-handler-installed",
-				d108e4bhDeadlineCandidate,
-				"product-unreliable-webrtc"
-			),
-			d108e4hLifecycle(
-				noReplacement.trialId,
-				2,
-				"channel-send-attempt",
-				d108e4bhDeadlineCandidate,
-				"rtc-datachannel-send",
-				{ attemptId: 930_001 }
-			),
-			d108e4hLifecycle(
-				noReplacement.trialId,
-				3,
-				"channel-send-success",
-				d108e4bhDeadlineCandidate,
-				"rtc-datachannel-send",
-				{ attemptId: 930_001 }
-			),
-			d108e4hLifecycle(
-				noReplacement.trialId,
-				4,
-				"channel-open-event",
-				d108e4bhDeadlineCandidate,
-				"rtc-datachannel-open-event"
-			),
-			d108e4hLifecycle(
-				noReplacement.trialId,
-				5,
-				"channel-message",
-				d108e4bhDeadlineCandidate,
-				"rtc-datachannel-message-event"
-			),
-			d108e4hLifecycle(
-				noReplacement.trialId,
-				6,
-				"channel-send-attempt",
-				d108e4bhDeadlineCandidate,
-				"rtc-datachannel-send",
-				{ attemptId: 930_004 }
-			),
-			d108e4hLifecycle(
-				noReplacement.trialId,
-				7,
-				"channel-send-success",
-				d108e4bhDeadlineCandidate,
-				"rtc-datachannel-send",
-				{ attemptId: 930_004 }
-			),
-		]);
-		const d108e4bhDeadlinePending = withReceiverEndpoint(
-			noReplacement,
-			Object.freeze({
-				...d108e4bhReceiver,
-				controlReceives: Object.freeze([
-					Object.freeze({
-						bytes: d108e4avControlBytes(1),
-						channelId: d108e4bhDeadlineCandidate.channelId,
-						connectionId: d108e4bhDeadlineCandidate.connectionId,
-						lifecycleSequence: 5,
-					}),
-				]),
-				controlSends: Object.freeze([
-					Object.freeze({
-						attemptId: 930_001,
-						bytes: d108e4avControlBytes(2),
-						channelId: d108e4bhDeadlineCandidate.channelId,
-						connectionId: d108e4bhDeadlineCandidate.connectionId,
-						lifecycleSequence: 2,
-					}),
-					Object.freeze({
-						attemptId: 930_004,
-						bytes: d108e4avControlBytes(2),
-						channelId: d108e4bhDeadlineCandidate.channelId,
-						connectionId: d108e4bhDeadlineCandidate.connectionId,
-						lifecycleSequence: 6,
-					}),
-				]),
-				deadline: Object.freeze({
-					...d108e4bhReceiver.deadline,
-					rtc: Object.freeze([D108E4H_RTC_A, d108e4bhDeadlineCandidate]),
-				}),
-				lifecycle: d108e4bhDeadlineCandidateLifecycle,
-			})
-		);
+		const d108e4bhDeadlinePending = d108e4ccDeadlinePending(noReplacement);
+		const d108e4bhDeadlineCandidateLifecycle = d108e4bhDeadlinePending.endpoints.receiver.lifecycle;
 		const d108e4bhPreparePending = withReceiverEndpoint(
 			noReplacement,
 			Object.freeze({
@@ -5718,9 +5723,30 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 				]),
 			})
 		);
+		const incomingPendingCandidateAlongsidePeerReplacement = d108e4ccDeadlinePending(creatorReplacement);
+		const d108e4ccTrialRecords = Object.freeze([
+			...incomingPendingCandidateAlongsidePeerReplacement.endpoints.creator.lifecycle,
+			...incomingPendingCandidateAlongsidePeerReplacement.endpoints.receiver.lifecycle,
+			...incomingPendingCandidateAlongsidePeerReplacement.endpoints.creator.monitor,
+			...incomingPendingCandidateAlongsidePeerReplacement.endpoints.receiver.monitor,
+		]);
+		expect(incomingPendingCandidateAlongsidePeerReplacement.trialId).toBe(creatorReplacement.trialId);
+		expect(incomingPendingCandidateAlongsidePeerReplacement.endpoints.creator).toBe(
+			creatorReplacement.endpoints.creator
+		);
+		expect(incomingPendingCandidateAlongsidePeerReplacement.rawTransportDeltas).toBe(
+			creatorReplacement.rawTransportDeltas
+		);
+		expect(d108e4ccTrialRecords.every(({ trialId }) => trialId === creatorReplacement.trialId)).toBe(true);
 		expect(() => validateD108e4hCampaignCustody(d108e4bhDeadlinePending)).not.toThrow();
 		expect(() => validateD108e4hCampaignCustody(d108e4bhPreparePending)).not.toThrow();
 		expect(() => validateD108e4hCampaignCustody(d108e4bhInitiatorPending)).not.toThrow();
+		expect
+			.soft(
+				() => validateD108e4hCampaignCustody(incomingPendingCandidateAlongsidePeerReplacement),
+				"incomingPendingCandidateAlongsidePeerReplacement"
+			)
+			.not.toThrow();
 
 		const d108e4bjPreHandlerLifecycle = Object.freeze(
 			d108e4bhDeadlineCandidateLifecycle
