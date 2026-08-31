@@ -84329,29 +84329,29 @@ reslices.
 
 The accepted validator identity is the observable
 `(connectionId, generation, peerId)` projection of product connection
-equality; schema-v3 does not carry product `remoteAddr` or `transport`. Libp2p
-defines `Connection.id` as the unique identifier for a connection, while the
-adapter assigns one positive safe-integer generation to that connection object
-when it is first adapted. An authenticated identity is stable only when both
-`connectionId` and `generation` are equal. It has changed only when the unique
-connection ID differs; its generation may increase, decrease or equal the
-prior connection's generation. Equal ID with a different generation is an
-invalid residue, not a replacement. Both boundary generations must be
-positive safe integers before classification. Generation remains a required
-validated identity component, but its numeric direction is not activation
-chronology. No `<`, `>`, increment or adjacency predicate may decide
-authenticated replacement. Peer ID must still equal the exact remote peer. A
-locally owned replacement still requires changed authenticated and RTC
-identities. An incoming-only or zero-owner endpoint still requires a stable
-authenticated tuple under its existing peer-dependent rule. RTC identity,
-local ownership, lifecycle readiness, close ownership, raw custody and every
-existing error token remain unchanged.
+equality. `d108e4hBoundaryFromCapture` drops the carried product `remoteAddr`,
+and schema-v3 carries no product `transport`. Libp2p defines `Connection.id` as
+the unique identifier for a connection, while the adapter assigns one positive
+safe-integer generation to that connection object when it is first adapted. An
+authenticated identity is stable only when both `connectionId` and
+`generation` are equal. It has changed only when the unique connection ID
+differs; its generation may increase, decrease or equal the prior connection's
+generation. Equal ID with a different generation is an invalid residue, not a
+replacement. Both boundary generations must be positive safe integers before
+classification. Generation remains a required validated identity component,
+but its numeric direction is not activation chronology. No `<`, `>`, increment
+or adjacency predicate may decide authenticated replacement. Peer ID must
+still equal the exact remote peer. A locally owned replacement still requires
+changed authenticated and RTC identities. An incoming-only or zero-owner
+endpoint still requires a stable authenticated tuple under its existing
+peer-dependent rule. RTC identity, local ownership, lifecycle readiness, close
+ownership, raw custody and every existing error token remain unchanged.
 
 **Causal RED.** Add one bilateral fixture row to the existing telemetry-only
 test `validates schema-v3 replacement custody without cross-peer clocks`. It
 starts from the passing D.108e4ac `1/1` dual-local replacement replay and
-changes only each deadline authenticated generation from its frozen prepare
-value 5 to exact value 4, while retaining distinct connection IDs, changed open
+changes only each deadline authenticated generation from 6 to exact value 4,
+below its frozen prepare value 5, while retaining distinct connection IDs, changed open
 RTC identities, exact one-local-drop ownership, lifecycle evidence and all
 other accepted fields. A soft `not.toThrow` expectation expresses the frozen
 contract. Before GREEN the one exact focused execution must select one test in
@@ -84375,16 +84375,14 @@ classification. In the same focused matrix:
 - reject a local replacement with equal connection ID and distinct generation
   as `D108E4H_IDENTITY_JOIN_INVALID`;
 - reject non-safe, non-integer and non-positive authenticated generations as
-  `D108E4H_IDENTITY_JOIN_INVALID` with one representative negative mutant;
+  `D108E4H_IDENTITY_JOIN_INVALID` with exact zero, fractional `1.5` and
+  `Number.MAX_SAFE_INTEGER + 1` mutants;
 - retain rejection of a locally owned RTC replacement with a completely stable
   authenticated tuple and rejection of an authenticated replacement with a
   stable RTC tuple, both as `D108E4H_IDENTITY_JOIN_INVALID`;
 - split incoming-endpoint identity drift into ID-only, generation-only and
   both-field retained-coverage mutants, each keeping
   `D108E4H_IDENTITY_JOIN_INVALID`; and
-- replace the D.108e4g live lifecycle title's stale
-  `newRaw.generation > oldRaw.generation` assertion with positive-safe-integer
-  generation shape plus its already-required distinct connection ID; and
 - preserve all D.108e4aa/D.108e4ac ownership, asymmetric incoming, zero-owner,
   lifecycle, readiness, failed-replacement, trial/peer join, control-custody
   and exact-error-code mutants without reclassification.
@@ -84396,16 +84394,23 @@ classification owner, no relational comparison of before/after authenticated
 generations in either the validator or D.108e4g live replacement assertion,
 and no production diff. Incoming drift rows retain branch coverage but are not
 claimed as causal constraints on the changed-classifier implementation.
+Separately in the same executable owner, replace the stale
+`newRaw.generation > oldRaw.generation` assertion inside exact title
+`proves replacement open before retiring the stale authenticated raw owner`
+with positive-safe-integer generation shape plus its already-required distinct
+connection ID.
 
 Run the focused GREEN title exactly once after implementation. Then run
 standalone strict TypeScript, exact-owner ESLint, 8 GiB formatter-only
-Prettier, `git diff --check`, affected grid typecheck/build, the D.108e4g
-lifecycle title, both D.108e4ax bilateral-restart rows, the complete network
-unit owner, and the frozen retained-seven listing/execution exactly once. The
-retained-seven selector must remain seven tests in one file and exclude the
-three-trial campaign title. Record complete reporters, streams, statuses,
-source hashes and a validating self-excluding manifest, then sign and push
-GREEN.
+Prettier, `git diff --check`, affected grid typecheck/build, exact
+D108E4G-telemetry titles `records a versioned and causally joined RTC lifecycle
+without changing delivery` and `proves replacement open before retiring the
+stale authenticated raw owner` separately at `1/1` each, both D.108e4ax
+bilateral-restart rows, the complete network unit owner, and the frozen
+retained-seven listing/execution exactly once. The retained-seven selector must
+remain seven tests in one file and exclude the three-trial campaign title.
+Record complete reporters, streams, statuses, source hashes and a validating
+self-excluding manifest, then sign and push GREEN.
 
 Use the governing prospective protocol: one bounded plan review by Grok
 4.6/high, Codex `gpt-5.6-sol` high in place of Kimi, and Opus xhigh; one final
@@ -84448,6 +84453,45 @@ Because this correction changes one proposed acceptance row and adds shape
 validation plus the already-in-scope live assertion, use the protocol's single
 permitted confirmation round on this corrected plan. Do not add another round:
 an empty corrected P0/P1 union plus the deterministic local audit releases RED.
+
+The sole confirmation reviewed signed/pushed correction
+`37a6aa905be1a3757c0b83e1b7e0a3821b6f29b3`, tree
+`5e8643c0bb7774b7f1079ef300d041003e0bf666`. Grok completed normally in
+`420.105` seconds with `TERMINAL_RESPONSE`, `end_turn`, exit zero, approval and
+no findings; it did not cancel, so no resume or replacement session ran. Codex
+high approved without findings. Opus xhigh confirmed the substantive identity
+contract and returned one P1 gate-list finding plus four P2 precision findings.
+The exact live replacement title is now named and added as its own `1/1` GREEN
+gate; the projection wording names the actual remote-address drop owner; RED
+states deadline 6 to 4 below prepare 5; the separate live assertion sits
+outside the focused-matrix list; and zero/fractional/unsafe generation mutants
+pin every shape branch. This is the one final correction batch; no further
+plan review is permitted or required. Deterministic local source/gate audit now
+owns closure.
+
+Grok-status, Grok-events, Codex-result, Codex-events, Opus-result,
+fifteen-entry self-excluding confirmation manifest and manifest-validation
+SHA-256 values are respectively
+`d7cf55129b2f1ba4d0dd2b99b9513b83c0b405dc19304e6bde00a05475c1c84b`,
+`a5875a65241c8f2311f5d4f8a02cf6c5548d6f1178b41cd925cca2990f5e372b`,
+`2a45c6947a1e4c79bedbbddd575f862b104bd1ea946071b92302873b7d7c9139`,
+`ae00ead7a10e38a5b0f7ad7ed324288de6d85409ae48ecc9d2ced792d34e1a18`,
+`6d53212d0aece7af3e1cc3069414ca611a59fd81849935dc4d9539e832cf3cfa`,
+`2132bcecf626d412b909a810bd71c3827874c3f0460225c6c891225ef6666698`
+and
+`65a5dcdc816df97e46d554576ee862785a31ad3ca5f5a4765852bd5c9bef8b66`.
+All fifteen entries validate from `.logs/d108e4bz-plan-confirmation/`.
+
+The post-confirmation deterministic audit passes. Before RED, the only two
+stale relational source seams are exactly the intended validator line and the
+intended live replacement assertion; both exact D108E4G titles exist and the
+suffix-anchored listing selects `2 tests in 1 file`; the dual-local fixture is
+exactly prepare 5/deadline 6 on both endpoints; installed libp2p documents
+connection ID uniqueness; and the only tracked post-correction path is this
+plan. Diff check and 8 GiB formatter-only plan check pass. HEAD equals the
+pushed branch and verifies with a good signature; all 26 stashes, the exact
+protected untracked roster and clear fixed ports are preserved. The plan gate
+is closed without another reviewer invocation; causal RED may proceed.
 
 The D.108e4by root stays consumed and immutable. No retained three-trial or
 campaign invocation runs in D.108e4bz. An empty final P0/P1 union releases one
