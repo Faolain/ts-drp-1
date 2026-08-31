@@ -85329,6 +85329,86 @@ test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.log
 Six passes release one signed/pushed campaign-evidence checkpoint and the
 single final evidence review, then D.108e5 and Phase-6a closure resume.
 
+The D.108e4ch campaign stopped fail-closed at its first consuming failure.
+`eagergate-ordinary-1` and `eagergate-ordinary-2` each passed with reporter
+counts `1/0/0/0`, retry zero, empty top-level errors and direct/runner statuses
+zero. `eagergate-ordinary-3` then failed with reporter counts `0/0/1/0`,
+direct/runner statuses one and exact error
+`D108E4H_DROP_COUNT_AMBIGUOUS`; it is consumed and is never retried.
+`eagergate-isolated-1` through `eagergate-isolated-3` remain unconsumed and
+must not run under the stopped D.108e4ch ledger. The 185-entry cumulative
+manifest and its validation SHA-256 values are
+`dd043d1f3fc9e5461f04001df24325ca9a4da00307747dec1fd07401621dfc0c`
+and
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`;
+all entries validate. The failed reporter and failure-telemetry SHA-256 values
+are
+`7f8721977a64041484c969f4d39fa124d2d53732a73c2f707693936fb3e699f1`
+and
+`988a33ed4cac90b3b1903c1a2adf6e45c0250765a585cef46aac6478bbdb590f`.
+
+###### D.108e4ci — retain an observed committed acceptor replacement
+
+D.108e4ci is the narrow product-lifecycle TDD slice released by the genuine
+D.108e4ch failure. It does not weaken `D108E4H_DROP_COUNT_AMBIGUOUS`, reuse a
+campaign name, relaunch a consumed invocation, change the fixed workload or
+thresholds, or attribute the failure to js-libp2p. The captured third trial
+shows creator/receiver local raw-link deltas `2/0`. The creator began on raw
+channel `469`/PeerConnection `12`; replacement channel `488`/PeerConnection
+`15` opened before channel `469` was retired. READY, ACK and COMMIT were sent
+and received, and the initiator reliably observed the exact committed
+decision. The creator promoted replacement B and retired A. The acceptor kept
+its committed B pending because its local A still appeared usable. When the
+original setup deadline expired, `#discardPendingReplacement` closed the
+acceptor's open B; 41 ms later the creator observed B close and counted the
+second local drop. At the assertion deadline the creator had no authenticated
+raw RTC channel while the receiver retained A. This establishes a local
+`unreliable-webrtc.ts` committed-replacement expiry defect.
+
+The deterministic RED belongs in
+`packages/network/tests/unreliable-webrtc-e3-01-red.test.ts` and reuses the
+existing fake signaling/RTC seams. Establish A, establish B through exact
+READY/ACK/COMMIT and authenticated decision observation, let the initiator
+promote B, and hold the acceptor's old-A peer-close delivery so its local A
+remains open. Advance fake time through the existing setup deadline. RED must
+show that current code discards the acceptor's open committed B and closes the
+initiator's active B. Its frozen GREEN acceptance instead requires:
+
+1. the initiator remains on B with exactly one local A retirement;
+2. the acceptor retains open committed B while its selected A remains usable;
+3. the first valid application ingress on retained B atomically promotes B
+   and is delivered exactly once;
+4. both peers then select the same authenticated B identity and old A can be
+   released without another B drop; and
+5. the existing lost-COMMIT, failed/malformed decision, authenticated-
+   connection-close, pending-B-close, superseding-offer and owner-close cases
+   retain their exact fail-closed behavior and error/counter contracts.
+
+GREEN is limited to the acceptor/reliable-decision/committed branch of
+`#expireReplacementReadiness`. When the exact current pending B has a matching
+committed decision and selected A is still locally usable, expiry must retain
+B rather than discard or prematurely promote it. Existing old-A close,
+disconnected-A and first qualified B-ingress paths remain the only promotion
+owners; unauthenticated, uncommitted, stale, closed or superseded B is still
+discarded. Do not change setup timeouts, retry counts, resource ceilings,
+public APIs, dependencies, signaling decision schemas or raw control bytes.
+If that source-only seam cannot satisfy RED, stop and reslice rather than add
+protocol messages or widen authority.
+
+Run the focused network file once for RED and preserve the exact causal
+failure. After GREEN run the focused title, the full retained network file,
+the affected network/grid builds and typechecks, exact-owner lint/format/diff
+checks, D.108e4ax, the retained browser support titles and the retained
+seven-test suite. No long browser campaign runs during D.108e4ci. Because
+this changes production replacement lifecycle behavior, sign/push the plan
+and run one Grok high, Codex `gpt-5.6-sol` high and Opus xhigh plan review;
+correct only material P0/P1 in one batch. RED receives deterministic evidence
+validation rather than another three-model round. The sole formal
+implementation review occurs after signed/pushed GREEN and covers plan,
+causal RED, GREEN and retained gates. If Grok cancels, resume its exact
+session; do not replace it. Do not invoke Kimi, Fable or collaboration
+subagents.
+
 ###### D.108e4ce — post-census six-name campaign freeze
 
 D.108e4ce is the high-risk campaign disposition released by the passing
