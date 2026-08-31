@@ -87038,3 +87038,28 @@ Protected untracked paths and all 26 stashes remain untouched. This ordinary
 GREEN evidence releases the signed implementation checkpoint; the detached
 artifact-clean proof and sole final Grok/Codex/Opus review still gate D.108e5
 closure.
+
+The GREEN implementation was signed and pushed as
+`13016cf84b4d578be5e0ebafa7b0e0a11d2bae16`, tree
+`17c1a3dcdb200936a84eba1cf67b280f98cef827`; its signature verifies `G`, and
+the remote branch resolved to that exact commit before review. The isolated
+proof used detached checkout
+`/private/tmp/ts-drp-d108e5-green.lc8WJS/repo` at that commit. Before
+installation, `find packages examples -type d -name dist -print -quit`
+returned no path. `pnpm install --offline --ignore-scripts
+--frozen-lockfile` passed, and the same check again found no `dist`, proving
+the install did not build or inherit workspace artifacts. Only then did
+`node scripts/ensure-native-deps.mjs` and `pnpm build:packages` freshly build
+the package workspace.
+
+In that checkout the exact focused Vitest command passed 8/8 and the complete
+creator-successor product configuration passed 24/24 across Chromium,
+Firefox and WebKit with `skipped=0`, `unexpected=0`, `flaky=0` and no reporter
+error. Fresh v3-room and storage-browser build/typecheck pairs passed, as did
+exact-five ESLint, exact-five Prettier, `git diff --check` and tracked-clean
+status. Thus neither an ordinary-checkout `dist`, Vite alias nor stale package
+artifact can mask this GREEN. The 22-entry self-excluding clean-proof
+manifest at `.logs/d108e5-green-clean/ARTIFACT-SHA256SUMS` validates every
+entry and has SHA-256
+`bcd7e84a5acf5f81e6b3e18752a7b3112f3723a0ce9c939cb48c88b5b1395351`.
+No retained campaign ran.
