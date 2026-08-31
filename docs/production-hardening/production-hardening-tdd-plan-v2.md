@@ -87063,3 +87063,64 @@ manifest at `.logs/d108e5-green-clean/ARTIFACT-SHA256SUMS` validates every
 entry and has SHA-256
 `bcd7e84a5acf5f81e6b3e18752a7b3112f3723a0ce9c939cb48c88b5b1395351`.
 No retained campaign ran.
+
+The sole final implementation review inspected signed plan closure
+`116e149e`, RED `60bd07aa`, GREEN `13016cf8` and clean-proof record
+`3b2a4785`. Grok 4.6/high session
+`01a05865-ee2a-7673-915e-6d9deeb3152e` completed its full inspection and
+emitted an `APPROVED` JSON with no findings, but the wrapper initially marked
+the mixed progress-plus-result turn `NO_VERDICT/end_turn`. The exact session
+was resumed once, not replaced, and returned the same schema-constrained
+`APPROVED` result with an empty finding set; resumed-result SHA-256 is
+`02b9e2d84e9ac541c878c0d125c007540308b5f36839522cbd9d0c1a4b6b3aaa`.
+Codex `gpt-5.6-sol` high session
+`01a0586e-ec76-76f3-841b-3b56b4ad7de4` returned `CHANGES_REQUIRED` with one
+P1: the two resource-ownership facts parsed declarations but then used text
+offsets/includes and a global call count, so comments, dead branches or dummy
+calls could satisfy the static gate without proving control-flow dominance.
+Its result SHA-256 is
+`7c14051eb571e11100d9af3265c3733a996d211787b48ac997b2e740a25618da`.
+Opus 5/xhigh session `3cf3bc57-a51b-470c-81a4-35d1b2279083`
+returned `APPROVED` with no P0/P1 and three P2 findings; raw-result SHA-256 is
+`c2f5b6d1423bdf41cd0554ad6602e1d0a2a22af473e0422d43b4d8ffd4ab5602`.
+The first Opus CLI attempt was an immediate no-input argument-parsing error
+and performed no review; the named session is the sole substantive Opus run.
+
+The blocking union adopts Codex's higher severity for the shared ownership-
+oracle observation. Its one bounded correction changes only
+`tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts`. The helper
+now reasons on TypeScript nodes with parent links, not initializer text. For
+activation it requires the unique exact `byteLength > 49_152` TypeError guard
+and proves that all three intrinsic allocation/copy nodes are later direct
+statements in the same block, so the guard control-dominates each. For invites
+it requires the unique exact `exactCanonicalByteLength > 65_536` TypeError
+guard to precede and dominate the sole bounded encoder return; structurally
+requires `exactRecord` and the intrinsic byte-length getter; and assigns the
+exact three bounded calls to snapshot, rehearsal receiver and activation
+receiver. It forbids direct snapshot/rehearsal encoding and proves the sole
+activation re-encode consumes the value decoded through that bounded owner.
+Comments, string literals, dead helper declarations, unrelated calls and
+mere source position can no longer satisfy either fact.
+
+The corrected fixture SHA-256 is
+`1cfd5b41ff768762194d4a1886aeaa36a80f68c0e02658ed494636ef87943cba`.
+Exact-owner ESLint, Prettier and `git diff --check` passed, and the focused
+Vitest command passed 8/8 with stdout/stderr SHA-256 values
+`03e8d0ce0e26ca67e4c717a2551d38d389399d5f58c4a1fcaa37e56d1174c698`
+and
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+There is no production, API, limit, classification, dependency or browser
+fixture change.
+
+Opus's two remaining P2 observations are nonblocking and explicitly
+dispositioned. Exact-prototype activation byte views are accepted as
+intentional hardening consistent with the existing strict canonical-byte and
+rehearsal-nonce policy; retained browser/native matrices already prove the
+ordinary fixed-view path. Invalid/oversized invite classification moving to
+call entry is the necessary pre-copy resource/shape rule and preserves the
+same exact receiver vocabulary; the retained close/failure/order matrices
+remain green. Neither P2 creates a new owner or review. Because the P1
+correction changes executable test acceptance, the prospective policy permits
+one confirmation round over the signed correction; that is the sole remaining
+review gate and may only block on a P0/P1 introduced or left unresolved by
+this test-only structural correction.
