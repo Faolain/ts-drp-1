@@ -2202,7 +2202,9 @@ type D108e4bvResetScheduleStep = "creator-reset" | "open-pair-gate" | "network-p
 
 function d108e4bvResetSchedule(creatorPeerId: string, receiverPeerId: string): readonly D108e4bvResetScheduleStep[] {
 	if (creatorPeerId === receiverPeerId) throw new Error("D108E4BV_RESET_IDENTITY_INVALID");
-	return Object.freeze(["creator-reset", "open-pair-gate", "network-pair-gate", "receiver-reset"]);
+	return creatorPeerId < receiverPeerId
+		? Object.freeze(["receiver-reset", "creator-reset"])
+		: Object.freeze(["creator-reset", "receiver-reset"]);
 }
 
 async function resetFabricPairSerially(

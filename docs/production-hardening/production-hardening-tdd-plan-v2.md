@@ -83713,6 +83713,98 @@ and
 All 13 manifest entries validate from the RED evidence root. GREEN is now
 authorized to change only the pure schedule owner.
 
+D.108e4bv GREEN changed only the schedule owner to direct relational peer-id
+ordering and two existing reset operations. The single focused execution
+passed with expected/skipped/unexpected/flaky `1/0/0/0` and zero top-level
+errors. Standalone strict TypeScript, exact-test ESLint, high-heap exact-owner
+Prettier, `git diff --check`, and grid typecheck/build all returned zero. Both
+D.108e4ax bilateral caller-order rows passed, with 112 unrelated rows skipped;
+the complete network-owner file then passed 114/114. Focused, D.108e4ax,
+complete network-owner, 31-entry self-excluding manifest, and manifest-
+validation SHA-256 values are respectively
+`d0964ff71d29ec9c5a475752746924c3691c8d470613d8735dec6fd19e387862`,
+`62c77036a3bd15ebc771b8317dde63c8f724990fec452c2700643f25ebac2687`,
+`d9025c3d242d14df7fe22ce62aff76a29359520964b64208a6a38dcc521a7d0c`,
+`8aa223a407bf04774e36e6f5323538b57c548b38987a652957820f486bc8f2db`,
+and
+`2eea6b0e2e18f942a77dcd3aa1c8fa96af2c6f8ed603f6bd010700f5ebd2149f`.
+
+The required fresh retained gate
+`.logs/d108e4bv-retained-browser-1/` was consumed once from
+`2026-08-31T04:46:08Z` through `04:48:10Z` and failed, so the retained seven
+did not run and D.108e4bv is not yet accepted. The original reset-order
+failure did not recur: calibration completed, trial 0 passed its full semantic
+matrix, and trial 1 reached assertion validation. The sole failure was exact
+test-instrumentation token `D108E4H_MONITOR_PING_CUSTODY_INVALID`, with
+expected/skipped/unexpected/flaky `0/0/1/0`, zero top-level errors, and runner
+status 1.
+
+The captured trial-1 monitor evidence demonstrates a separate exact-custody
+defect. `installLibp2pMonitorObserver` keys both `pingInFlight` and
+`failedPingAwaitingAbort` by connection id even though the monitor can overlap
+multiple pings on one connection. On connection `cmltoe1788151629831`, ping
+22 was replayed into the new epoch with `carryIn=true`, but overwritten older
+ping 18 later emitted `ping-failure` in that epoch with `carryIn=false` and no
+replayed start. Connection `44csj41788151635668` showed the same ping-23 versus
+ping-19 split. The schema validator correctly rejected the incomplete join at
+its exact start-required assertion. This is not evidence of a product,
+connection-monitor, reset-order, workload, threshold, or timing defect.
+Reporter, decoded failure telemetry, 11-entry self-excluding manifest,
+manifest validation, and trace SHA-256 values are respectively
+`d10c02099b9c1a46bfe7caf6671e7d69b22860cd82172f3958bb33d064fb8469`,
+`e51c4cd12048440f9cbc395db46ff5fb380b2f17cc6d9019f8c4b283b74e182f`,
+`b15364a5dc5abdaefe4e74424b8b67552be146536c0d85b92eac324f40398981`,
+`ecc74605505e3bef4143c8654d79fa1a4830235e4ce87fbe69e2c05d0dc8739c`,
+and
+`41fbe72e7a41bf0460c024cb9b1e18067ad8c34e8fa2a726517b5be330fa3942`.
+
+###### D.108e4bw — concurrent carry-in ping custody
+
+D.108e4bw is a narrow test-instrumentation continuation. It changes only
+`tests/e3-03-loss-and-hol-proof.pw.ts` and this evidence record. Production
+source, dependencies, monitor policy, product telemetry, APIs, workload,
+thresholds, browser, timers, ports, campaign semantics, and the accepted
+D.108e4bv reset schedule remain frozen.
+
+RED adds one opt-in browser-fixture test, registered only under
+`D108E4BW_MONITOR_CONCURRENCY_RED=1`, titled exactly `D.108e4bw retains every
+concurrent carry-in ping identity`. A blank page installs one fake
+authenticated connection and the real test observer. It starts two unresolved
+ping streams on that same connection in the prior epoch, resets the observer
+to a new epoch, then rejects both starts. The frozen expectation is two unique
+ping groups, each containing exactly one replayed `ping-start` followed by one
+`ping-failure`, with a single `carryIn=true` value and the new trial id. Current
+connection-keyed storage must fail only this expectation with reporter matrix
+`0/0/1/0`, zero top-level errors, one test in one file, and no retained title.
+Any different RED result stops.
+
+GREEN keys live and failed ping custody by exact `pingId`, not connection id,
+and makes every move/delete identity-specific. Reset replays every exact live
+or failed attempt once; failed attempts also replay their already-observed
+failure once. Connection abort lookup preserves the existing priority—newest
+in-flight attempt on that connection, otherwise newest failed attempt—without
+collapsing other exact attempts before their terminal callbacks. The new test
+must pass without weakening `d108e4hAssertMonitor`, `carryIn` requirements,
+trial joins, unique event cardinality, or abort ordering.
+
+Run the exact one-test/one-file RED once and the same GREEN once. Then repeat
+standalone strict TypeScript, exact-owner ESLint/Prettier/diff, grid
+typecheck/build, the D.108e4h schema-validator title, both D.108e4ax rows, and
+the complete network-owner suite. One wholly fresh non-campaign retained title
+then runs under the unchanged 600-second watchdog; a failure stops without
+retry. Only a pass releases one retained-seven run. Preserve complete
+reporters, streams, statuses, attachments, hashes, and validating
+self-excluding manifests.
+
+Because this owner affects retained campaign evidence attribution, sign and
+push this bounded plan and run one fresh Grok/Codex-`gpt-5.6-sol`-high/Opus-
+xhigh plan review. Only P0/P1 blocks; disposition P2 without recursive prose
+review. After signed GREEN and retained gates, the single final implementation
+review inspects D.108e4bv/bw together. Do not use Kimi, Fable, continued prior
+sessions, or collaboration subagents. An empty final blocking union releases
+six wholly fresh campaign names; all D.108e4bu names and
+`d108e4bv-retained-browser-1` remain permanently consumed or frozen.
+
 An empty final blocking union releases a new plan-only freeze with six wholly
 fresh names and a freshly built isolated checkout at the accepted GREEN.
 Execute those six sequentially under the existing immutable evidence,
