@@ -85387,16 +85387,23 @@ replacement custody without cross-peer clocks`, derive one
 `eagerAcceptorPending` fixture from the accepted deadline-pending fixture.
 Retain the common selected RTC and one deadline candidate, the exact open
 product handler with `readyState: "open"`, the single open event and the first
-ACK send; remove the READY receive and later ACK send. Keep all other endpoint,
-trial, identity, application and transport custody unchanged. Add one named
-soft `not.toThrow` expectation. Under `D108E4H_TELEMETRY=1`, list and execute
-that exact focused title once. RED must select one test in one file, exclude
-the retained three-trial title, return `0/0/1/0`, contain zero top-level errors
-and one failed result, and expose only the named expectation with exact
+ACK send. Remove the READY receive and its joined candidate `channel-message`
+lifecycle row at that receive's `lifecycleSequence`; remove the later ACK send
+and its joined `channel-send-attempt`/`channel-send-success` rows carrying that
+send's `attemptId`, mirroring the retained D.108e4bj no-post-READY-ACK
+construction. Keep all other endpoint, trial, identity, application and
+transport custody unchanged. Add one named soft `not.toThrow` expectation and
+a mechanical fixture-shape assertion before validation: the candidate has
+exactly one control send, that send has one joined attempt/success pair, and
+there are zero unjoined candidate `channel-message` rows and zero unjoined
+receiver send attempts. Under `D108E4H_TELEMETRY=1`, list and execute that exact
+focused title once. RED must select one test in one file, exclude the retained
+three-trial title, return `0/0/1/0`, contain zero top-level errors and one
+failed result, and expose only the named expectation with exact
 `D108E4H_LIFECYCLE_ORDER_INVALID` from the final role assertion in
-`d108e4hAssertDeadlinePendingCandidate`. A different token, owner or matrix
-stops for diagnosis. Preserve a self-excluding RED manifest, sign and push it,
-and never rerun RED.
+`d108e4hAssertDeadlinePendingCandidate`. A different fixture shape, token,
+owner or matrix stops for diagnosis. Preserve a self-excluding RED manifest,
+sign and push it, and never rerun RED.
 
 **GREEN.** Extend only the pending-candidate role classifier with an exact
 `eagerAcceptor` prefix. It requires all candidate controls after the open
@@ -85422,7 +85429,7 @@ Prettier, `git diff --check`, affected grid typecheck/build, the two D.108e4ax
 rows, complete network owner, both exact D.108e4g titles and the exact retained
 seven once. If any result falls outside its expected matrix, stop rather than
 folding more changes into GREEN. Preserve commands, complete results, hashes
-and a validating self-excluding manifest.
+changed-path custody and a validating self-excluding manifest.
 
 This tests-only slice changes campaign-readiness acceptance and therefore uses
 the high-risk exception. Sign and push this bounded plan, then run one
@@ -85435,6 +85442,23 @@ three-model review over plan, RED, GREEN and the consumed campaign evidence.
 Do not use Kimi, Fable or collaboration subagents. An empty final P0/P1 union
 releases one fresh write-once retained title; only its pass may freeze six
 wholly fresh campaign names.
+
+The bounded plan review used the signed plan commit above. Codex
+`gpt-5.6-sol` high approved with no findings. Grok's original service run
+canceled after active inspection; the exact session
+`01a056fd-c172-7410-aafa-c595ad721cbe` was resumed as required and approved.
+Its two P2 findings are disposed without widening the slice: retain the shared
+exactly-one-open guard instead of inventing a duplicate-open pending fixture,
+and implement eager sent-kind exclusivity literally as
+`sentKinds.length === 1 && sentKinds[0].kind === 2`. Opus xhigh confirmed the
+product ordering, causal state, role exclusivity and retained-mutant behavior,
+but found one P1 ambiguity in RED construction: removed controls also require
+removing their joined lifecycle rows, and the fixture needs a mechanical join
+audit before its one-shot expectation. The corrected RED paragraph above
+closes that P1. Opus's changed-path P2 is accepted in the GREEN evidence gate.
+Its no-open/no-handler micro-prefix P2 remains an explicit evidence-triggered
+future boundary: neither state was captured, so this slice does not weaken the
+retained cardinality guards without a causal observation.
 
 Consumed D.108e4bu reporter, stdout, stderr, failure telemetry,
 endpoint-classifier, trace, cumulative manifest, and manifest-validation
