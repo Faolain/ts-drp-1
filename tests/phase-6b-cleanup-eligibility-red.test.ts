@@ -15,7 +15,6 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { deriveD108cCandidateClosure } from "./fixtures/phase-6a-v3/creator-adoption-commit-contract.js";
 import { bytesForRef, openGenuineCreatorAdoptionFixture } from "./fixtures/phase-6a-v3/creator-adoption-contract.js";
 
 const REPOSITORY_ROOT = resolve(import.meta.dirname, "..");
@@ -152,7 +151,7 @@ function syntheticInput(): D109aInput {
 		availabilityPolicyDigest: D109A_POLICY_DIGEST,
 		close: Object.freeze({
 			closedEpoch: 0,
-			commitQcRef: generationRef(8),
+			commitQcRef: generationRef(5),
 			objectId: OBJECT_ID,
 			verified: true,
 		}),
@@ -477,19 +476,11 @@ describe("D.109a closed-epoch cleanup eligibility RED", () => {
 				});
 				expect(committed).toMatchObject({ lifecycle: "successor-prepared", ok: true });
 				const activeHead = committed.head as PresentHead;
-				const predecessor = fixture.evidence.current.candidates.filter(({ bytes }) => {
-					try {
-						return (decodeCanonical(bytes) as Readonly<Record<string, unknown>>).kind === "v3-live-generation-1";
-					} catch {
-						return false;
-					}
-				});
-				expect(predecessor).toHaveLength(1);
-				const activeClosure = deriveD108cCandidateClosure(
-					fixture.evidence.proposed.references,
-					predecessor[0]?.ref as GenerationRef,
-					fixture.evidence.exactCanonicalProjectionBytes
-				).closure;
+				const committedInspection = await fixture.handle.inspectDurableHead();
+				expect(committedInspection.head).toEqual(activeHead);
+				const activeClosure = Object.freeze(
+					committedInspection.references.map((ref) => Object.freeze({ byteLength: ref.byteLength, digest: ref.digest }))
+				);
 				const generations = Object.freeze([
 					...fixture.evidence.generations.map((record) =>
 						Object.freeze({
@@ -512,6 +503,23 @@ describe("D.109a closed-epoch cleanup eligibility RED", () => {
 				const cut = decodeCanonical(
 					bytesForRef(fixture.evidence.proposed, fixture.evidence.closeResult.cutValueRef)
 				) as Readonly<Record<string, unknown>>;
+				const outbox = await fixture.evidence.issuanceStore.readOutboxPage({
+					scope: fixture.evidence.issuanceScope,
+				});
+				expect(outbox.map(({ commit }) => commit.authorSequence)).toEqual(
+					Array.from({ length: fixture.evidence.localIssued.authorSequence + 1 }, (_, index) => index)
+				);
+				for (const { commit } of outbox) {
+					await fixture.evidence.issuanceStore.compareAndMarkOutboxPublished({
+						authorSequence: commit.authorSequence,
+						digest: new Uint8Array(commit.envelope.digest),
+						scope: fixture.evidence.issuanceScope,
+					});
+				}
+				const publishedOutbox = await fixture.evidence.issuanceStore.readOutboxPage({
+					scope: fixture.evidence.issuanceScope,
+				});
+				expect(publishedOutbox.every(({ publishState }) => publishState === "published")).toBe(true);
 				const input = replaceInput(syntheticInput(), {
 					adoption: Object.freeze({ activeHead, adopted: true }),
 					availabilityPolicyDigest: String(cut.availabilityPolicyDigest),
@@ -525,15 +533,17 @@ describe("D.109a closed-epoch cleanup eligibility RED", () => {
 					generations,
 					issuance: Object.freeze({
 						complete: true,
-						rows: Object.freeze([
-							Object.freeze({
-								authorSequence: fixture.evidence.localIssued.authorSequence,
-								epoch: fixture.evidence.closeResult.epoch,
-								issued: true,
-								outbox: true,
-								publishState: "published" as const,
-							}),
-						]),
+						rows: Object.freeze(
+							publishedOutbox.map(({ commit, publishState }) =>
+								Object.freeze({
+									authorSequence: commit.authorSequence,
+									epoch: fixture.evidence.closeResult.epoch,
+									issued: true,
+									outbox: true,
+									publishState,
+								})
+							)
+						),
 						scope: fixture.evidence.issuanceScope,
 						throughAuthorSequence: fixture.evidence.localIssued.authorSequence,
 					}),
@@ -542,7 +552,23 @@ describe("D.109a closed-epoch cleanup eligibility RED", () => {
 						manifestDigest: fixture.evidence.declaration.scope.manifestDigest,
 					}),
 				});
-				expect((await candidate()).planClosedEpochCleanup(input)).toMatchObject({ ok: true });
+				const result = (await candidate()).planClosedEpochCleanup(input);
+				expect(
+					result,
+					JSON.stringify({
+						activeHead,
+						generations: generations.map(({ baseExpectedHead, closure, closureDigest, generationId, state }) => ({
+							baseExpectedHead,
+							closure,
+							closureDigest,
+							generationId,
+							recomputedClosureDigest: digestClosure(closure),
+							state,
+						})),
+						issuance: input.issuance,
+						result,
+					})
+				).toMatchObject({ ok: true });
 			} finally {
 				await fixture.close();
 			}

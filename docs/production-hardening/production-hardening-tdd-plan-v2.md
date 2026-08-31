@@ -87742,3 +87742,86 @@ two live `!byId.has(baseExpectedHead.generationId)` lineage predicates, no-
 delete/no-package-export/no-root-export source shape, the signed plan anchor,
 pushed-ref equality, 26 stashes, and protected untracked paths pass. RED is
 causal and authorizes only the narrow D.109a no-I/O planner GREEN.
+
+#### D.109a GREEN checkpoint
+
+GREEN adds only the package-internal deterministic planner
+`packages/node/src/internal/closed-epoch-cleanup.ts`. It parses and copies the
+closed detached input, validates the active head and its two immediate complete
+rollback ancestors, walks the complete older linear prefix, freezes the exact
+floor rewrite/deletion intent, accepts only the frozen local-only policy digest,
+and requires a complete published issuance prefix. It opens no store, performs
+no delete/clear/discard call, schedules no work, changes no package export, and
+adds no product API.
+
+The first complete GREEN run exposed two defects in the already-signed RED
+fixture rather than reasons to weaken production validation. First,
+`generationRef(8)` generated the invalid 128-hex value `"12".repeat(64)` for
+the synthetic commit-QC reference; it was replaced with the existing valid
+64-hex `generationRef(5)`. Second, the genuine control reconstructed the new
+active closure with an older candidate helper, omitting one reference present
+in the committed durable head, and labeled only author sequence 1 as a complete
+`0..1` issuance prefix. The corrected control reads the committed head and
+references through `inspectDurableHead()`, reads the genuine durable outbox,
+asserts its exact contiguous `0..through` sequence set, publishes those exact
+rows through the existing issuance-store operation, rereads their published
+state, and only then supplies the detached classification. Failure-only
+diagnostics preserve the returned refusal, lineage graph, closure recomputation
+and issuance observation. The immutable RED commit and evidence were not
+rewritten.
+
+The execution record is intentionally honest rather than relabeling those
+fixture failures as a product GREEN. The first full attempt was 5/10 because
+the malformed QC ref forced `D109A_QC_INVALID`; after that correction it was
+9/10 with only the genuine control failing. Bounded single-test diagnostics
+then identified `D109A_LINEAGE_INVALID`, proved the durable closure mismatch,
+and finally identified `D109A_OUTBOX_INCOMPLETE` with the missing sequence 0.
+After both fixture corrections, the genuine diagnostic passed and the final
+focused command passed one file and 10/10 assertions with no failure, skip,
+top-level error or snapshot change:
+
+```text
+pnpm exec vitest run tests/phase-6b-cleanup-eligibility-red.test.ts --coverage.enabled=false --reporter=json --outputFile=.logs/phase-6b-d109a-green/focused-final.json
+```
+
+Its JSON SHA-256 is
+`69e86914c86ec5f3d6abbca91abb655d94ef0ea89bb650757172deb8d14f2864`.
+The retained Phase-6a eight-file command, using the same files enumerated at
+RED and `--coverage.enabled=false`, passed 77/77 assertions with no failure,
+skip or top-level error; its JSON SHA-256 is
+`7d483f04e73477da46a4d080bc66c28633df0f98b101b710dba949469b82db0f`.
+
+Source-only Node, object and storage typechecks passed with:
+
+```text
+pnpm exec tsc -p packages/node/tsconfig.build.json --noEmit
+pnpm exec tsc -p packages/object/tsconfig.build.json --noEmit
+pnpm exec tsc -p packages/storage/tsconfig.build.json --noEmit
+```
+
+The ordinary Node package typecheck was also run. It reports no error in the
+new planner but remains nonzero on inherited unrelated browser worker-host
+rootDir/file-list, ephemeral-WebRTC test typing and compact-history fixture
+typing debt; that complete disposition is retained in the command ledger.
+Exact-owner ESLint and Prettier, `git diff --check`, refusal vocabulary,
+no-delete/no-package-export/no-root-export source shape, changed-path custody,
+26 stashes and every protected untracked path pass. Planner and corrected-test
+SHA-256 values are respectively
+`c3068f428573f67ae411fc7864939e786b471e5c6f14e842ec7f1e63760557a6`
+and `58b7a87499e8f0ea6bb9a6293f5418fdf52cf458efb4b3d6010b12bdfd69d4b4`.
+The complete command/result ledger and every intermediate/final JSON are
+covered by the validating self-excluding manifest
+`.logs/phase-6b-d109a-green/manifest.sha256`, whose SHA-256 is
+`d5dbdfe5198023c75572c5369c3931e8797485ebf9786b5b001c5998b4ffb62a`.
+One combined code/test/large-plan Prettier process exhausted its default 4 GiB
+heap before a verdict. The corrected bounded diagnostic checked the two exact
+code/test owners separately and the plan alone with an 8 GiB Node heap; both
+passed. This resource failure is not treated as a formatting defect.
+
+This GREEN checkpoint must be signed and pushed before the sole formal review.
+That review uses Grok 4.6/high, exact Kimi K3 thinking/high with both 100-step
+controls, and Opus xhigh over the accepted plan, immutable causal RED, complete
+GREEN diff and evidence. Kimi replaces the formerly used Codex
+`gpt-5.6-sol` reviewer for Phase 6b. No collaboration subagent or further
+Fable run is authorized. Only P0/P1 findings block D.109a closure; no retained
+campaign is authorized by this slice.
