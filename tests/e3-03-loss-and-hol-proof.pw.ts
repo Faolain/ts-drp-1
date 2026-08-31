@@ -5622,6 +5622,71 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 		const d108e4bhReceiver = noReplacement.endpoints.receiver;
 		const d108e4bhDeadlinePending = d108e4ccDeadlinePending(noReplacement);
 		const d108e4bhDeadlineCandidateLifecycle = d108e4bhDeadlinePending.endpoints.receiver.lifecycle;
+		const eagerAcceptorPending = withReceiverEndpoint(
+			d108e4bhDeadlinePending,
+			Object.freeze({
+				...d108e4bhDeadlinePending.endpoints.receiver,
+				controlReceives: Object.freeze([]),
+				controlSends: Object.freeze(
+					(d108e4bhDeadlinePending.endpoints.receiver.controlSends ?? []).filter(
+						({ attemptId }) => attemptId !== 930_004
+					)
+				),
+				lifecycle: Object.freeze(
+					d108e4bhDeadlineCandidateLifecycle.filter(
+						(record) =>
+							record.attemptId !== 930_004 &&
+							!(
+								record.connectionId === d108e4bhDeadlineCandidate.connectionId &&
+								record.channelId === d108e4bhDeadlineCandidate.channelId &&
+								record.event === "channel-message" &&
+								record.sequence === 5
+							)
+					)
+				),
+			})
+		);
+		const eagerAcceptorReceiver = eagerAcceptorPending.endpoints.receiver;
+		const eagerAcceptorControlSends = eagerAcceptorReceiver.controlSends ?? [];
+		expect(eagerAcceptorControlSends).toHaveLength(1);
+		const eagerAcceptorControlSend = d108e4hOnly(eagerAcceptorControlSends);
+		expect(
+			eagerAcceptorReceiver.lifecycle.filter(
+				({ attemptId, event }) =>
+					attemptId === eagerAcceptorControlSend.attemptId && event === "channel-send-attempt"
+			)
+		).toHaveLength(1);
+		expect(
+			eagerAcceptorReceiver.lifecycle.filter(
+				({ attemptId, event }) =>
+					attemptId === eagerAcceptorControlSend.attemptId && event === "channel-send-success"
+			)
+		).toHaveLength(1);
+		const eagerAcceptorReceiveSequences = new Set(
+			(eagerAcceptorReceiver.controlReceives ?? []).map(({ lifecycleSequence }) => lifecycleSequence)
+		);
+		expect(
+			eagerAcceptorReceiver.lifecycle.filter(
+				({ channelId, connectionId, event, sequence }) =>
+					connectionId === d108e4bhDeadlineCandidate.connectionId &&
+					channelId === d108e4bhDeadlineCandidate.channelId &&
+					event === "channel-message" &&
+					!eagerAcceptorReceiveSequences.has(sequence)
+			)
+		).toHaveLength(0);
+		const eagerAcceptorSendAttemptIds = new Set(
+			eagerAcceptorControlSends.map(({ attemptId }) => attemptId)
+		);
+		expect(
+			eagerAcceptorReceiver.lifecycle.filter(
+				({ attemptId, event }) =>
+					event === "channel-send-attempt" &&
+					(attemptId === undefined || !eagerAcceptorSendAttemptIds.has(attemptId))
+			)
+		).toHaveLength(0);
+		expect
+			.soft(() => validateD108e4hCampaignCustody(eagerAcceptorPending), "eagerAcceptorPending")
+			.not.toThrow();
 		const d108e4bhPreparePending = withReceiverEndpoint(
 			noReplacement,
 			Object.freeze({

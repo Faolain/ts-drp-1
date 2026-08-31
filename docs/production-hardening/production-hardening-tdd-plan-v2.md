@@ -85478,6 +85478,25 @@ and
 `ab40cb442de38767a8a784d2b20a1a6589719f1dd3d67474061203a113638368`;
 all entries validate. The plan gate is closed and receives no further review.
 
+RED ran exactly once from signed/pushed plan-gate commit
+`04d24e4840d839a5ed12e3e0300958eda87975df`, tree
+`dfbd75b003dc1cf23249927c74f53b2b0f1666b4`. Preflight found no active
+ts-drp reviewer/test/profiler, all four fixed ports clear, all eight protected
+paths present and 26 stashes. Listing selected one Chromium test in one file
+and excluded the retained title. The sole focused execution returned status
+one with expected/skipped/unexpected/flaky `0/0/1/0`, zero top-level errors
+and one retry-zero result. Its only soft failure is named
+`eagerAcceptorPending` with exact `D108E4H_LIFECYCLE_ORDER_INVALID` at the
+final role assertion in `d108e4hAssertDeadlinePendingCandidate` line 3667.
+All mechanical fixture-shape assertions passed. A first read-only jq audit had
+an operator-precedence mistake and tried to apply `contains` to a boolean; the
+corrected parenthesized audit passes and RED was not rerun. The 11-entry RED
+manifest and validation SHA-256 values under `.logs/d108e4cf-red/` are
+`a4c65ed5eadb465642ebda3013f306e5a0becca0b45c6e8b590828b501548edd`
+and
+`692714a369dc9bb24ee2704e0e8bfdf0902ec9d3de4793877d3122d0d6d0cd2d`;
+all entries validate. Only the telemetry test owner and this plan changed.
+
 Consumed D.108e4bu reporter, stdout, stderr, failure telemetry,
 endpoint-classifier, trace, cumulative manifest, and manifest-validation
 SHA-256 values are respectively
