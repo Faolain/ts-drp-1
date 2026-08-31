@@ -167,6 +167,25 @@ interface Libp2pMonitorObserver {
 	snapshot(): readonly Libp2pMonitorObservation[];
 }
 
+interface D108e4bwMonitorStream extends EventTarget {
+	close(options?: unknown): Promise<void>;
+	send(data: Uint8Array): boolean;
+}
+
+interface D108e4bwMonitorConnection extends EventTarget {
+	abort(error?: Error): void;
+	readonly id: string;
+	newStream(protocol: string | readonly string[], options?: unknown): Promise<D108e4bwMonitorStream>;
+	readonly remotePeer: Readonly<{ toString(): string }>;
+}
+
+interface D108e4bwMonitorFixture {
+	readonly connection: D108e4bwMonitorConnection;
+	readonly pending: Promise<D108e4bwMonitorStream>[];
+	readonly rejectors: Array<(reason?: unknown) => void>;
+	readonly stream?: D108e4bwMonitorStream;
+}
+
 interface NetworkSnapshot {
 	readonly connections: readonly string[];
 	readonly peerId: string;
@@ -174,6 +193,7 @@ interface NetworkSnapshot {
 
 declare global {
 	interface Window {
+		readonly __D108E4BW_MONITOR_FIXTURE__?: D108e4bwMonitorFixture;
 		readonly __E303_RTC_OBSERVER__?: RtcObserver;
 		readonly __E303_LIBP2P_MONITOR_OBSERVER__?: Libp2pMonitorObserver;
 		readonly __TS_DRP_GRID_SESSION__?: GridNetworkTestSession;
@@ -1393,6 +1413,37 @@ async function installLibp2pMonitorObserver(page: Page): Promise<void> {
 			writable: false,
 		});
 	});
+}
+
+async function d108e4bwInstallMonitorFixture(page: Page, mode: "pending" | "stream"): Promise<void> {
+	await page.goto("about:blank");
+	await page.evaluate((selectedMode) => {
+		const stream = new EventTarget() as D108e4bwMonitorStream;
+		stream.close = (): Promise<void> => Promise.resolve();
+		stream.send = (): boolean => true;
+		const rejectors: Array<(reason?: unknown) => void> = [];
+		const connection = new EventTarget() as D108e4bwMonitorConnection;
+		connection.abort = (): void => undefined;
+		Object.defineProperty(connection, "id", { value: "d108e4bw-monitor-connection" });
+		connection.newStream = (): Promise<D108e4bwMonitorStream> =>
+			selectedMode === "stream"
+				? Promise.resolve(stream)
+				: new Promise<D108e4bwMonitorStream>((_resolve, reject) => rejectors.push(reject));
+		Object.defineProperty(connection, "remotePeer", {
+			value: Object.freeze({ toString: (): string => "d108e4bw-monitor-peer" }),
+		});
+		const host = new EventTarget() as EventTarget & { getConnections(): readonly [D108e4bwMonitorConnection] };
+		host.getConnections = (): readonly [D108e4bwMonitorConnection] => [connection];
+		Object.defineProperty(window, "__TS_DRP_GRID_SESSION__", {
+			configurable: true,
+			value: Object.freeze({ node: Object.freeze({ networkNode: Object.freeze({ _node: host }) }) }),
+		});
+		Object.defineProperty(window, "__D108E4BW_MONITOR_FIXTURE__", {
+			configurable: true,
+			value: Object.freeze({ connection, pending: [], rejectors, stream }),
+		});
+	}, mode);
+	await installLibp2pMonitorObserver(page);
 }
 
 async function resetRtcObserver(page: Page, trialId: string): Promise<void> {
@@ -8752,6 +8803,156 @@ test("freezes RTC metadata at the event boundary before async payload conversion
 		await context.close();
 	}
 });
+
+if (process.env["D108E4BW_MONITOR_CONCURRENCY_RED"] === "1") {
+	test("D.108e4bw retains every concurrent carry-in ping identity", async ({ browser }) => {
+		const onFixture = async <T>(mode: "pending" | "stream", run: (page: Page) => Promise<T>): Promise<T> => {
+			const context = await browser.newContext();
+			const page = await context.newPage();
+			try {
+				await d108e4bwInstallMonitorFixture(page, mode);
+				return await run(page);
+			} finally {
+				await context.close();
+			}
+		};
+		const groups = (records: readonly Libp2pMonitorObservation[]) => {
+			const byPing = new Map<string, Libp2pMonitorObservation[]>();
+			for (const record of records) {
+				if (record.event === "monitor-epoch-start" || record.event === "connection-close") continue;
+				const selected = byPing.get(record.pingId) ?? [];
+				selected.push(record);
+				byPing.set(record.pingId, selected);
+			}
+			return [...byPing.entries()]
+				.sort(([left], [right]) => left.localeCompare(right))
+				.map(([pingId, selected]) => ({
+					carryIn: [...new Set(selected.map(({ carryIn }) => carryIn))],
+					events: selected.map(({ event }) => event),
+					pingId,
+					trialIds: [...new Set(selected.map(({ trialId }) => trialId))],
+				}));
+		};
+
+		const carryIn = await onFixture("pending", async (page) => {
+			await page.evaluate(() => {
+				const fixture = window.__D108E4BW_MONITOR_FIXTURE__;
+				if (fixture === undefined) throw new Error("D108E4BW_MONITOR_FIXTURE_ABSENT");
+				fixture.pending.push(
+					fixture.connection.newStream("/ipfs/ping/1.0.0"),
+					fixture.connection.newStream("/ipfs/ping/1.0.0")
+				);
+			});
+			await resetLibp2pMonitorObserver(page, "d108e4bw-carry-in");
+			return page.evaluate(async () => {
+				const fixture = window.__D108E4BW_MONITOR_FIXTURE__;
+				const observer = window.__E303_LIBP2P_MONITOR_OBSERVER__;
+				if (fixture === undefined || observer === undefined || fixture.rejectors.length !== 2) {
+					throw new Error("D108E4BW_MONITOR_FIXTURE_INVALID");
+				}
+				const settled = Promise.allSettled(fixture.pending);
+				for (const reject of fixture.rejectors) reject(new Error("D108E4BW_SYNTHETIC_START_FAILURE"));
+				await settled;
+				return observer.snapshot();
+			});
+		});
+		expect.soft(groups(carryIn), "every exact concurrent ping crosses the epoch boundary").toEqual([
+			{
+				carryIn: [true],
+				events: ["ping-start", "ping-failure"],
+				pingId: "observer-install:ping:0",
+				trialIds: ["d108e4bw-carry-in"],
+			},
+			{
+				carryIn: [true],
+				events: ["ping-start", "ping-failure"],
+				pingId: "observer-install:ping:1",
+				trialIds: ["d108e4bw-carry-in"],
+			},
+		]);
+
+		const pendingFailure = await onFixture("stream", async (page) => {
+			await page.evaluate(async () => {
+				const fixture = window.__D108E4BW_MONITOR_FIXTURE__;
+				if (fixture === undefined || fixture.stream === undefined) {
+					throw new Error("D108E4BW_MONITOR_FIXTURE_INVALID");
+				}
+				await fixture.connection.newStream("/ipfs/ping/1.0.0");
+				fixture.stream.dispatchEvent(new Event("close"));
+			});
+			await resetLibp2pMonitorObserver(page, "d108e4bw-pending-failure");
+			return page.evaluate(() => {
+				const fixture = window.__D108E4BW_MONITOR_FIXTURE__;
+				const observer = window.__E303_LIBP2P_MONITOR_OBSERVER__;
+				if (fixture === undefined || observer === undefined) {
+					throw new Error("D108E4BW_MONITOR_FIXTURE_ABSENT");
+				}
+				const monitorOwner = {
+					"connection-monitor"(connection: D108e4bwMonitorConnection): void {
+						connection.abort(new Error("D108E4BW_SYNTHETIC_PING_TIMEOUT"));
+					},
+				};
+				monitorOwner["connection-monitor"](fixture.connection);
+				return observer.snapshot();
+			});
+		});
+		expect.soft(groups(pendingFailure), "reset does not invent a duplicate pending failure").toEqual([
+			{
+				carryIn: [true],
+				events: ["ping-start", "ping-failure", "connection-abort"],
+				pingId: "observer-install:ping:0",
+				trialIds: ["d108e4bw-pending-failure"],
+			},
+		]);
+
+		const postAbort = await onFixture("pending", async (page) => {
+			await resetLibp2pMonitorObserver(page, "d108e4bw-before-abort");
+			await page.evaluate(() => {
+				const fixture = window.__D108E4BW_MONITOR_FIXTURE__;
+				if (fixture === undefined) throw new Error("D108E4BW_MONITOR_FIXTURE_ABSENT");
+				fixture.pending.push(
+					fixture.connection.newStream("/ipfs/ping/1.0.0"),
+					fixture.connection.newStream("/ipfs/ping/1.0.0")
+				);
+				const monitorOwner = {
+					"connection-monitor"(connection: D108e4bwMonitorConnection): void {
+						connection.abort(new Error("D108E4BW_SYNTHETIC_PING_TIMEOUT"));
+					},
+				};
+				monitorOwner["connection-monitor"](fixture.connection);
+			});
+			const beforeReset = await page.evaluate(async () => {
+				const fixture = window.__D108E4BW_MONITOR_FIXTURE__;
+				const observer = window.__E303_LIBP2P_MONITOR_OBSERVER__;
+				if (fixture === undefined || observer === undefined || fixture.rejectors.length !== 2) {
+					throw new Error("D108E4BW_MONITOR_FIXTURE_INVALID");
+				}
+				const settled = Promise.allSettled(fixture.pending);
+				for (const reject of fixture.rejectors) reject(new Error("D108E4BW_SYNTHETIC_POST_ABORT_FAILURE"));
+				await settled;
+				return observer.snapshot();
+			});
+			await resetLibp2pMonitorObserver(page, "d108e4bw-after-abort");
+			const afterReset = await page.evaluate(() => window.__E303_LIBP2P_MONITOR_OBSERVER__?.snapshot() ?? []);
+			return { afterReset, beforeReset };
+		});
+		expect.soft(groups(postAbort.beforeReset), "abort and callbacks preserve one terminal per exact ping").toEqual([
+			{
+				carryIn: [false],
+				events: ["ping-start", "ping-failure"],
+				pingId: "d108e4bw-before-abort:ping:0",
+				trialIds: ["d108e4bw-before-abort"],
+			},
+			{
+				carryIn: [false],
+				events: ["ping-start", "ping-failure", "connection-abort"],
+				pingId: "d108e4bw-before-abort:ping:1",
+				trialIds: ["d108e4bw-before-abort"],
+			},
+		]);
+		expect.soft(groups(postAbort.afterReset), "retired abort custody never re-enters a later epoch").toEqual([]);
+	});
+}
 
 if (process.env["D108E4G_TELEMETRY"] === "1") {
 	test("records a versioned and causally joined RTC lifecycle without changing delivery", async ({ browser }) => {

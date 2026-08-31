@@ -83863,6 +83863,36 @@ The blocking findings are corrected in the executable RED/GREEN matrix. A
 deterministic local source/predicate audit closes the plan without a recursive
 confirmation round.
 
+D.108e4bw RED is accepted. The exact listing command
+`D108E4BW_MONITOR_CONCURRENCY_RED=1 pnpm exec playwright test --config
+playwright.e3-03-loss-and-hol.config.ts --grep 'D\.108e4bw retains every
+concurrent carry-in ping identity$' --list` returned zero and selected exactly
+one test in one file. The sole focused execution used the same environment,
+config, and grep with `--workers=1 --retries=0 --reporter=json
+--fail-on-flaky-tests`; it returned one with
+expected/skipped/unexpected/flaky `0/0/1/0`, zero top-level errors, one result,
+and exactly four soft failures. Their complete causal labels were `every exact
+concurrent ping crosses the epoch boundary`, `reset does not invent a duplicate
+pending failure`, `abort and callbacks preserve one terminal per exact ping`,
+and `retired abort custody never re-enters a later epoch`. Thus the old
+connection-keyed owner dropped one overlapping carry-in identity, duplicated a
+pending failure at reset/abort, duplicated a post-abort terminal callback, and
+replayed retired custody after the next reset. No retained title was selected
+or executed.
+
+The deterministic validator confirmed the exact count matrix, zero top-level
+errors, complete four-label soft-failure set, one-test/one-file selection,
+list/focused statuses `0/1`, opt-in source shape, retained-title exclusion, and
+the sole changed path `tests/e3-03-loss-and-hol-proof.pw.ts`. The reporter,
+listing, and ten-entry self-excluding manifest SHA-256 values are respectively
+`8ce74ca3600d61e125046a8f68e9901d113e85557d4bec5624873d33c4f5996f`,
+`88509e723892b961dbe53f339551f391a99054d30daa974cb9480871d8d681e7`,
+and
+`79a8c993bece54beb22d0716dcb7f0a47e872ea3d11a4ee95a8163b58d018aba`.
+All ten entries validate from `.logs/d108e4bw-red`. RED is not rerun; GREEN may
+now change only the frozen test observer and add the exact missing-start
+validator mutant.
+
 An empty final blocking union releases a new plan-only freeze with six wholly
 fresh names and a freshly built isolated checkout at the accepted GREEN.
 Execute those six sequentially under the existing immutable evidence,
