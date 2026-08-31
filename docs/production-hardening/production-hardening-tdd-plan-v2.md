@@ -84032,10 +84032,11 @@ logical selection, product metrics and all D.108e4h error tokens remain
 unchanged. No new product identifier, deduplication behavior, transport
 acknowledgement or retry policy is added. The separate retained sentinel check
 `senderSentinels.length <= 1` knowingly remains a physical exactly-once
-expectation on an at-least-once lane; its reachability is low because sentinel
-observation follows successful write completion, and any exact future retained
-failure owns a separate evidence-driven slice rather than speculative widening
-here.
+expectation on an at-least-once lane. Its retry reachability is unquantified and
+has not been demonstrated by retained evidence; the observer records a send
+attempt before the native send returns, so successful completion is not the
+reason for retaining this expectation. Any exact future retained failure owns
+a separate evidence-driven slice rather than speculative widening here.
 
 Because this corrects a retained campaign acceptance predicate, it is a
 high-risk evidence exception despite its tests-only owner. Sign and push this
@@ -84140,6 +84141,48 @@ and
 `cab49c9ac0911ead2e44ded38e8aa7f6ee0962bc3b1f11b197aaad896902dda6`.
 All 43 manifest entries validate from `.logs/d108e4bx-green`; protected
 untracked paths and all 26 stashes remain untouched.
+
+The signed/pushed GREEN checkpoint is commit
+`0a99ce7ec073693fd93c4d80dd35567cde973985`, tree
+`3ffe5f270ec7a13781d319ce06c08be4a8c68088`. Its single final implementation
+review closed with an empty P0/P1 union: Grok and Codex high approved without
+findings, while Opus xhigh approved with four P2 findings. Grok emitted
+read-only progress prose before its exact `RESULT:` object, but its service did
+not cancel: the runner recorded `TERMINAL_RESPONSE`, `end_turn`, exit zero and
+`375.176` seconds, so no resume was required. Grok-terminal, Codex-terminal,
+Opus-terminal, Grok-status, Grok-events, Codex-events and complete Opus-result
+SHA-256 values are respectively
+`24a506372cf46d30d5629dd1f7145d41fdfdf22e0ace563bdba2fe75ef6edcd2`,
+`1bb416e23958a6a1fd5799f9c269d74ace29df89711e40f85f03bfcb8cad7c6b`,
+`3b010b4e7f5dc83d0521d95044f97642ef7bf5c2fffa8a6185c9f66b47264d67`,
+`9e09382cf937af2dbbf86af80653dc16b19d9f11a9a5c916b92300ecff43531b`,
+`b9e73d08f2828704a6c60d8ecac9039e7505db17543a820dddc20d857982d2db`,
+`7e326a6104966a9aa1ae9426690d51e70e86e52af4c5c87769325170148928bf`
+and
+`50dec4beec4a6dd4035a5eb08ed58fa8fa25d743d0e4ec9d6fb2c98d66c4071c`.
+The nineteen-entry self-excluding review manifest, manifest-validation and
+mechanical-validation SHA-256 values are respectively
+`553492743e07e104d832c701a54f777dabd1dc59a51be51c7b830f28d6fe5ef6`,
+`6a951f906d118ac92df8f278b6ba6d8972d8c5d1e625d2071062e4936cc6d04f`
+and
+`a8afdbc3b1beab7b092a75a89e6e2c30b4e4003f994394686ca9c24934b858dd`;
+all nineteen entries validate from `.logs/d108e4bx-final-review`.
+
+Opus's P2 union is dispositioned without changing executable code or rerunning
+GREEN. First, `bySequence.size <= SAMPLE_COUNT` is implied by the preceding
+integer range gate and is retained as a declarative workload invariant, not
+counted as independent mutant coverage. Second, the matrix proves rejection at
+nine attempts but not acceptance at exactly eight; the next slice that changes
+`expectReliableSenderSamples` owns an exact-eight positive fixture, with a
+deadline before that helper or the product attempt ceiling may change. The
+current inclusive `<= 8` implementation, source-grounded product value and
+nine-attempt mutant make this nonblocking for the present retained gate. Third,
+the inaccurate sentinel-success explanation is corrected above without
+widening sentinel behavior. Fourth, the test-local value eight mirrors the
+unexported `packages/ephemeral/src/index.ts` `RELIABLE_ATTEMPTS`; any future
+change to that product constant owns the mirrored test value in the same slice
+before execution. These are explicit maintenance debts, not grounds for a new
+fixture, review round, or campaign-policy change now.
 
 After signed/pushed GREEN, the single final Grok/Codex-high/Opus-xhigh review
 must inspect plan, causal RED, GREEN, exact retry classification, unchanged raw
