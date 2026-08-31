@@ -1,0 +1,14 @@
+23ff8a6f52bbfb58b5d33de839e54f5db4d68d9edbffd23d38127917a4d0d982  .logs/phase-6b-d109b-green-review/README.md
+cf42dc26654b89cabe92a014d5a8491910e6fffdb51b55abef2e308a5f97ea84  .logs/phase-6b-d109b-green-review/grok/command.json
+a292b5e1652b39c51898856886f093f74bc3623bf71ca9ef153310d04e7611ac  .logs/phase-6b-d109b-green-review/grok/events.jsonl
+56dd062bdc7d74988c17aaba49a8282eaccaf7a2213c342de2da86798efd7fc5  .logs/phase-6b-d109b-green-review/grok/input-packet.md
+8e68e74f3778b98bd969cf77d04b35926548c145a433b0b1512cb793562b39ae  .logs/phase-6b-d109b-green-review/grok/public.txt
+de63509b534a632aa86802c6eda241640ad211b550aecb94d96f8a23b892729e  .logs/phase-6b-d109b-green-review/grok/review.diff
+25446dcdf46c5bb4c343f8efe4eab0bb43a42c7cadf443bfaa83eb90e44fd512  .logs/phase-6b-d109b-green-review/grok/status.json
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/phase-6b-d109b-green-review/grok/stderr.log
+940e92ab984a2691e62fe2e46a34daee5610299abed2b57775ecb57325c5d468  .logs/phase-6b-d109b-green-review/kimi-agent.yaml
+b3972950ed18532edea373dcff7be7bb9bf93da7f5fac816eb1b5a17bc2fccb5  .logs/phase-6b-d109b-green-review/kimi.jsonl
+2de848dcc0fb30d63f4b8c2152431ebdc15642d9981d7f58cff2767bb2a12a0a  .logs/phase-6b-d109b-green-review/kimi.stderr
+5630406cc51e5b7d37ea73b8e1471729ee1f8261c98cb504d1ddb4030bffc283  .logs/phase-6b-d109b-green-review/opus.json
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/phase-6b-d109b-green-review/opus.stderr
+e56dfd1ea786b03a0b3dbc2725e689d78be015590c04be51f3e3615c9969306d  .logs/phase-6b-d109b-green-review/review-prompt.md

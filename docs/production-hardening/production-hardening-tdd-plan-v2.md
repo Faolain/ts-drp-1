@@ -88177,3 +88177,38 @@ Grok 4.6/high, exact Kimi K3 thinking/high with both 100-step controls, and
 Opus xhigh plan-to-RED-to-GREEN review. Kimi occupies the middle external-CLI
 review slot; Codex `gpt-5.6-sol` is not a substitute. Only a P0/P1 finding
 blocks D.109b closure. D.109c remains closed until that review is complete.
+
+#### D.109b final review and closure
+
+The sole final formal review inspected signed/pushed GREEN
+`529367b154ffd3fb66bf31a6cfedb4a0d9b73746`. Grok 4.6/high exact session
+`01a05a06-e050-78c3-88ec-203d6cc45e6c`, exact Kimi K3 thinking/high/dual-100
+session `855a66da-2e60-4912-afea-87055f7d84bc`, and Opus xhigh session
+`63785529-bdca-473c-a540-220e91d90715` independently returned `APPROVED`,
+`P0_P1_UNION: none`, and `D109B_MAY_CLOSE: yes`. Kimi occupied the middle
+external-CLI review slot; no Codex `gpt-5.6-sol`, Fable, collaboration
+subagent, test, build, product mutation, or campaign ran during review. Grok
+completed normally in 13 turns and required no resume.
+
+Public/raw result SHA-256 values for Grok, Kimi, and Opus are respectively
+`8e68e74f3778b98bd969cf77d04b35926548c145a433b0b1512cb793562b39ae`,
+`b3972950ed18532edea373dcff7be7bb9bf93da7f5fac816eb1b5a17bc2fccb5`, and
+`5630406cc51e5b7d37ea73b8e1471729ee1f8261c98cb504d1ddb4030bffc283`.
+The validating self-excluding review manifest is
+`.logs/phase-6b-d109b-green-review/manifest.sha256`; its SHA-256 is
+`41930b963c5384e2bca14ee2797d38ae9c943ca968fca442307c8aae4d0ecdd3`.
+
+The reconciled P2 set is retained without changing the reviewed GREEN commit:
+Node inspection has a synchronous-throw versus Promise-rejection parity
+wrinkle; the ephemeral control lacks an explicit corruption branch for the
+otherwise unreachable state where a row survives at/below its watermark; the
+frozen pruned error holds a detached but not nested-frozen scope; and Vitest's
+suite count is distinct from its authoritative three-file result array. D.109f
+owns the first three as explicit cross-backend/deep-freeze census items before
+Phase-6b exit. None can authorize deletion, mutate durable state, reveal a
+deleted digest, falsify RED-to-GREEN causality, or widen D.109b scope. Only
+P0/P1 blocks under the accepted prospective policy, so no confirmation or
+recursive prose review runs.
+
+D.109b is closed on this signed record. D.109c may begin next. No retained
+campaign was authorized or executed by D.109b.

@@ -460,3 +460,28 @@ Grok 4.6/high, exact Kimi K3 thinking/high with both 100-step controls, and
 Opus xhigh plan-to-RED-to-GREEN review. Kimi occupies the middle external-CLI
 review slot; Codex `gpt-5.6-sol` is not a substitute. Only a P0/P1 finding
 blocks D.109b closure. D.109c remains closed until that review is complete.
+
+## Final review and closure
+
+The sole final formal review inspected signed/pushed GREEN
+`529367b154ffd3fb66bf31a6cfedb4a0d9b73746`. Grok 4.6/high, exact Kimi K3
+thinking/high with both 100-step controls, and Opus xhigh independently
+returned `APPROVED`, `P0_P1_UNION: none`, and `D109B_MAY_CLOSE: yes`. Kimi
+occupied the middle external-CLI review slot; no Codex `gpt-5.6-sol`, Fable,
+collaboration subagent, test, build, mutation, or campaign ran during review.
+Grok completed normally in its original session, so no resume was needed.
+
+The complete immutable review record and self-excluding manifest are under
+`.logs/phase-6b-d109b-green-review/`; the manifest SHA-256 is
+`41930b963c5384e2bca14ee2797d38ae9c943ca968fca442307c8aae4d0ecdd3`.
+The reconciled P2s are nonblocking:
+Node inspection has a synchronous-rejection parity wrinkle; the ephemeral
+control omits an unreachable present-below-watermark corruption branch; the
+pruned error's detached nested scope is not itself frozen; and Vitest's suite
+counter differs from its authoritative three-file array. D.109f owns the three
+cross-backend/freeze census items before Phase-6b exit. None can authorize
+deletion, mutate durable state, expose a digest, falsify RED causality, or
+widen D.109b scope, so the accepted policy forbids another review round.
+
+D.109b is closed. D.109c may begin from this signed closure record. No retained
+campaign is authorized or executed by D.109b.
