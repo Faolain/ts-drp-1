@@ -87825,3 +87825,56 @@ GREEN diff and evidence. Kimi replaces the formerly used Codex
 `gpt-5.6-sol` reviewer for Phase 6b. No collaboration subagent or further
 Fable run is authorized. Only P0/P1 findings block D.109a closure; no retained
 campaign is authorized by this slice.
+
+The sole formal GREEN review inspected signed/pushed commit
+`f70a294b815830742f31bb6ecca5488d8e316260` and unanimously returned
+`APPROVED`, `P0_P1_UNION: none`, and `D109A_MAY_CLOSE: yes`:
+
+- Grok 4.6/high exact session `01a0594a-061c-7b42-8a9d-a5c34ce0ec27`
+  completed normally in 15 turns without cancellation or resume. Public result,
+  event-stream and terminal-status SHA-256 values are respectively
+  `f122a1bd1f38082931c64726bd7b18981ea23af32bad9e74ad3a22c5f0acda85`,
+  `3e29f25ad126b165a19a24a1d737c8e41834efa131ea1f4d8e0ea54adbcbd53a`
+  and `999d4c6a7a6807487cacc7c9ba8ed9921544bd81b2005454487f6dee14425db1`.
+- Exact Kimi K3 session `3d20daca-e5a0-4ea7-be75-0cb550aaa7c3`
+  used native CLI 1.49.0, thinking/high instructions, and both
+  `KIMI_LOOP_MAX_STEPS_PER_TURN=100` and `--max-steps-per-turn 100`. Its raw
+  stream SHA-256 is
+  `a43dbbd6d203ae375728d656733b31ba19f7e967358a93eeb488af2b18955576`.
+  Kimi, rather than Codex `gpt-5.6-sol`, occupied the middle review slot.
+- Opus 5/xhigh session `5eab389f-d699-4810-a563-47cba1bc0121`
+  completed with `is_error:false` and `stop_reason:end_turn`; result JSON
+  SHA-256 is
+  `2da980755a18c812add357d2c6711cce4dc5d9abb9895aa03daa8181ca25dd55`.
+  A repo-wide grep exposed only other-review file paths/tool metadata; Opus
+  opened no other verdict and derived its findings independently.
+
+All three reviewers confirmed causal RED, the fixture repairs, exact lineage
+floor semantics, fail-closed refusal behavior, package internality, evidence
+consistency and D.109a-only scope. The validating self-excluding review
+manifest is `.logs/phase-6b-d109a-green-review/manifest.sha256`, SHA-256
+`d1de053369d393eda8230ae51f9c2f718053ac61fdf8a9a5e6cca228bf158afd`.
+
+The nonblocking P2 set receives prospective owners without reopening D.109a:
+
+1. The D.109a result intentionally omits the already-verified commit-QC ref and
+   adopted snapshot digest frozen out of its exact RED result shape. D.109b and
+   D.109c own those values as explicit transaction inputs when they recheck
+   their own physical facts; neither may infer them from the D.109a plan.
+2. The published refusal list is precedence among evaluable closed facts.
+   Malformed envelopes/identities must be parsed before that ordering can
+   apply, and every such divergence still refuses and retains. D.109a code and
+   exact frozen codes remain unchanged.
+3. A leftover `Staged` or `Discarded` lineage row conservatively blocks the
+   planner. D.109c owns its explicit owner-transaction refusal matrix and
+   D.109f owns the structure census; neither may silently delete or ignore such
+   a row.
+4. Kimi's bounded observations about one combined precedence mutant, no
+   explicit cycle mutant and no standalone already-no-head positive require no
+   D.109a rerun: the inspected paths fail closed, the genuine control exercises
+   a real nonempty prefix, and D.109c must retain the empty-prefix idempotence,
+   cycle and post-state cases in its execution RED.
+
+No P2 changes D.109a executable scope or justifies recursive review. D.109a is
+closed on this signed record. D.109b is next; no physical deletion or retained
+campaign has been authorized or executed by D.109a.
