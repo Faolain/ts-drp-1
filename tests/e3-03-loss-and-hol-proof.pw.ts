@@ -6528,6 +6528,35 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 		const dualLocalMutationBase = d108e4acDualLocalReplacementReplay(false);
 		const dualCreator = dualLocalMutationBase.endpoints.creator;
 		const dualReceiver = dualLocalMutationBase.endpoints.receiver;
+		const bilateralDescendingAuthenticatedGeneration = Object.freeze({
+			...dualLocalMutationBase,
+			endpoints: Object.freeze({
+				creator: Object.freeze({
+					...dualCreator,
+					deadline: Object.freeze({
+						...dualCreator.deadline,
+						authenticated: Object.freeze([
+							Object.freeze({ ...d108e4hOnly(dualCreator.deadline.authenticated), generation: 4 }),
+						]),
+					}),
+				}),
+				receiver: Object.freeze({
+					...dualReceiver,
+					deadline: Object.freeze({
+						...dualReceiver.deadline,
+						authenticated: Object.freeze([
+							Object.freeze({ ...d108e4hOnly(dualReceiver.deadline.authenticated), generation: 4 }),
+						]),
+					}),
+				}),
+			}),
+		});
+		expect
+			.soft(
+				() => validateD108e4hCampaignCustody(bilateralDescendingAuthenticatedGeneration),
+				"bilateralDescendingAuthenticatedGeneration"
+			)
+			.not.toThrow();
 		const dualCreatorAfter = d108e4hOnly(dualCreator.deadline.rtc);
 		const dualReceiverAfter = d108e4hOnly(dualReceiver.deadline.rtc);
 		const withDualCreatorDeadline = (

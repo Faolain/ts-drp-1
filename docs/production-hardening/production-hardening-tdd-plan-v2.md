@@ -84493,6 +84493,32 @@ pushed branch and verifies with a good signature; all 26 stashes, the exact
 protected untracked roster and clear fixed ports are preserved. The plan gate
 is closed without another reviewer invocation; causal RED may proceed.
 
+D.108e4bz RED is accepted and is never rerun. The exact listing selected one
+test in one file and excluded the retained three-trial title. The sole focused
+execution returned status one with expected/skipped/unexpected/flaky
+`0/0/1/0`, zero top-level errors and one failed result. Its complete soft-
+failure set contains only `bilateralDescendingAuthenticatedGeneration`, which
+throws exact `D108E4H_IDENTITY_JOIN_INVALID` from
+`d108e4hAssertBoundaryIdentity` at the old relational generation conjunct.
+Every later expectation completed without another soft failure. The RED diff
+changes only `tests/e3-03-loss-and-hol-proof.pw.ts`; production remains
+unchanged. Diff check, exact-owner ESLint and 8 GiB formatter-only Prettier
+pass.
+
+RED reporter, causal summary, causal validation, eighteen-entry
+self-excluding manifest, manifest validation and test-owner SHA-256 values are
+respectively
+`21f5019c66ca7415f4e901159e2b49ebbd72d6a13b4cd145e911a9d81d08d588`,
+`2691f731ec5d91b3385fbd4b6c3990225dca6b63cee5c060f24517d0de61eeb6`,
+`85458e4620c117379d4d6d6e118d011bff3dae06d5ff54773156c4dbfc1e23fc`,
+`ef28a4ba4b0043dfbc599a836a383902b3fb95dda8b4cea27449993342c6f719`,
+`d3ce51c9daeb3791aaa8ab7e4ee909c8392bcbe43447bfa13780b34519631e1e`
+and
+`09228bedce73ec785922d098edd61cd239cfa7e114a0461a3f54f5560ee12e65`.
+All eighteen entries validate from `.logs/d108e4bz-red/`. GREEN may now change
+only the frozen classifier, shape guard, identity matrix and exact D108E4G live
+replacement assertion in the same test owner.
+
 The D.108e4by root stays consumed and immutable. No retained three-trial or
 campaign invocation runs in D.108e4bz. An empty final P0/P1 union releases one
 new plan-only, wholly fresh retained-browser name. Only that fresh one-shot
