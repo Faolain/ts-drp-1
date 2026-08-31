@@ -82677,3 +82677,180 @@ must freeze placeholder-free setup and six literal launcher blocks, receive
 the required single high-risk Grok/Codex-high/Opus-xhigh review, and close an
 empty P0/P1 union. The user's standing authorization covers all six and must
 not be requested again.
+
+###### D.108e4br — fresh six-name resolution campaign freeze
+
+D.108e4br is the narrow campaign-disposition slice released by the passing
+D.108e4bq retained validation. It does not reopen D.108e4bq or any earlier
+checkpoint. All consumed names and immutable evidence remain unchanged. The
+fresh closed ledger begins at zero and contains, in exact order,
+`resolution-ordinary-1`, `resolution-ordinary-2`,
+`resolution-ordinary-3`, `resolution-isolated-1`,
+`resolution-isolated-2` and `resolution-isolated-3`.
+
+The executable behavior anchor is signed/pushed GREEN
+`0f0518cb4a0c724253ab01dd5fa4830fb60cb6fe`, tree
+`0d309ce423fbb3390482cc3860f5230c4484bec8`. The ordinary workspace is on the
+signed/pushed plan-only descendant `464255e4e0e7e703caa101f60dd60bce987401a8`
+before this record; every tracked difference from the behavior anchor is
+confined to this plan. The clean detached workspace is
+`/private/tmp/ts-drp-d108e4br-clean/repo` at the exact behavior anchor/tree
+with empty tracked status. Its offline frozen-lockfile install and affected
+builds passed before this freeze.
+
+The fixed product, retained test, Playwright config, lockfile, root package,
+relay config and replacement-relay config SHA-256 values are respectively
+`b4a3f61ae439a85bfe9236f0b02257cce014056eb633e57acf689107008358df`,
+`5a15e82127e1cd59d3368fd38f0a1c6fcf3bbe7b85958a0397434c208cf74229`,
+`1826318a19d5676631f6350fa21d2eb1125dbc1d83ecce69d7f776885bdd7978`,
+`73c7c0660fa32c7380d0fe5a026897a7ad85a40edf1f169730c2d8e44e613a99`,
+`6ca5cc4a47f6e807cb653fa29a43839d497613f2ba363608c894392c6ccb084d`,
+`2a2b8e5c8a642fff7c60de5921834da20627513abe16219e80b011464d41269c`
+and
+`2609d0bb60b4d1411c8f54d714738768a9bed6fb2d784dcb8edd54b2ef25be84`.
+The seven source/config inventory and 334-file built-runtime inventory hashes
+are
+`1c53c4b1739a468b4520f9f12c022d98c5f37623d267bbd46f02dd099faafb34`
+and
+`e8170b88a0c1a203ab3f9c7b8a95a2a878ec227ae78b132961b28b90aa2ee7f3`.
+They are byte-identical in ordinary and isolated workspaces. Runtime identity
+remains Node `v22.15.0`, pnpm `10.24.0`, Playwright `1.62.1` and Chromium
+`151.0.7922.34`.
+
+The freeze root is `.logs/d108e4br-freeze/`. Its validating self-excluding
+50-file manifest hash is
+`f69c42eadc9d85343d5d6c68049bb6fb4bccec3209317acfe42c16ba0586bdfc`.
+The mode manifest, outer launcher, runner and guard SHA-256 values are
+respectively
+`de9491acaaf61d30b5c55fe2caeaee4aa16419ae5b23cfa8ee17eb6575170cea`,
+`2994fb2b0d88f7674e4886a6119236ea4922a42256d296f9a5679338f69c6950`,
+`4cf6afac0781023dcfbda513ed365e5ed9af66f7f28a7a9d555b7b18c84c92d8`
+and
+`66b3bc50f06a0a147832e2ddfafa40c3df487c1fd84c9c1f14cc9b1223fde233`.
+The outer launcher validates both complete manifests before sourcing the tool
+gate. Current-name freshness rejects every top-level
+`$invocation_name.*` collision. Mechanical source-shape evidence proves both
+conditions.
+
+The fresh campaign root is `.logs/d108e4br-campaign/`. Its authorization,
+tool-manifest and initial-manifest SHA-256 values are respectively
+`8b9f52ec217aa7e041b67f2b265b479ca34d5d9ec0ca5e1b9011e5e054784eca`,
+`f76bb47f01247350f331d5c673f980f0e0c813641b63c199706576294e03a983`
+and
+`22c708088cb514473944434a5f03d78aacb41a94eba3b0f2289808d90cab7931`.
+It contains zero `resolution-*` artifacts. The following placeholder-free
+block is the exact one-time construction that produced the frozen root. It
+has already been executed once and must not be rerun or used to replace it:
+
+```sh
+ordinary_repo=/Users/aristotle/Documents/Projects/ts-drp-1
+freeze_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4br-freeze
+campaign_root=/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4br-campaign
+test ! -e "$campaign_root"
+/bin/mkdir -m 700 "$campaign_root"
+/usr/bin/printf '%s\n' 'I authorize a new D.108e4 campaign-disposition slice to freeze fresh invocation names, preserve the existing workload and thresholds, undergo the required high-risk review, and execute the newly authorized retained campaign under immutable evidence and first-failure rules.' >"$campaign_root/authorization.txt"
+/bin/cp "$freeze_root/run-one.zsh" "$campaign_root/run-one.zsh"
+/bin/cp "$freeze_root/endpoint-local-classification.jq" "$campaign_root/endpoint-local-classification.jq"
+/bin/cp "$freeze_root/classification-validation.jq" "$campaign_root/classification-validation.jq"
+git_selected="$(command -v git)"
+rg_selected="$(command -v rg)"
+test -n "$git_selected"
+test -n "$rg_selected"
+git_physical="$(/bin/realpath "$git_selected")"
+rg_physical="$(/bin/realpath "$rg_selected")"
+/usr/bin/printf 'git\t%s\nrg\t%s\n' "$git_physical" "$rg_physical" >"$campaign_root/CAMPAIGN-TOOL-PATHS.tsv"
+"$git_physical" --version >"$campaign_root/git.version.txt"
+"$rg_physical" --version >"$campaign_root/ripgrep.version.txt"
+test "$(/usr/bin/printf '%s\n' 'fixed[needle]' 'fixed-needle' 'fixed[needle]' | "$rg_physical" -F -c 'fixed[needle]')" = 2
+"$git_physical" -C "$ordinary_repo" rev-parse --verify HEAD >/dev/null
+"$git_physical" -C "$ordinary_repo" status --porcelain=v1 >/dev/null
+"$git_physical" -C "$ordinary_repo" verify-commit HEAD >/dev/null
+(
+  cd "$campaign_root"
+  /usr/bin/shasum -a 256 CAMPAIGN-TOOL-PATHS.tsv git.version.txt ripgrep.version.txt >CAMPAIGN-TOOL-SHA256SUMS
+  /usr/bin/shasum -a 256 CAMPAIGN-TOOL-PATHS.tsv CAMPAIGN-TOOL-SHA256SUMS authorization.txt classification-validation.jq endpoint-local-classification.jq git.version.txt ripgrep.version.txt run-one.zsh | /usr/bin/sed 's#  #  ./#' >INITIAL-SHA256SUMS
+  /usr/bin/shasum -a 256 -c INITIAL-SHA256SUMS >/dev/null
+  /usr/bin/printf '0\n' >INITIAL-SHA256SUMS.validation
+)
+test "$(/usr/bin/shasum -a 256 "$campaign_root/authorization.txt" | /usr/bin/awk '{print $1}')" = 8b9f52ec217aa7e041b67f2b265b479ca34d5d9ec0ca5e1b9011e5e054784eca
+test "$(/usr/bin/shasum -a 256 "$campaign_root/CAMPAIGN-TOOL-SHA256SUMS" | /usr/bin/awk '{print $1}')" = f76bb47f01247350f331d5c673f980f0e0c813641b63c199706576294e03a983
+test "$(/usr/bin/shasum -a 256 "$campaign_root/INITIAL-SHA256SUMS" | /usr/bin/awk '{print $1}')" = 22c708088cb514473944434a5f03d78aacb41a94eba3b0f2289808d90cab7931
+```
+
+Git and ripgrep are evidence/launcher utilities, not workload contracts. Their
+resolved paths and complete version output are recorded and kept stable inside
+this campaign. No prior-host path, vendor suffix, patch release or ripgrep
+revision is a portable acceptance gate. Git must perform the exact
+`rev-parse`, `status --porcelain=v1`, signature and diff operations used by
+the launcher; ripgrep must pass the deterministic `-F -c` smoke. A missing or
+changed selected tool during this campaign fails closed.
+
+The trusted-local threat model remains unchanged. The workspace, host and
+single operator are trusted. The campaign protects against accidental
+contamination, stale state, retry, overwrite, substitution, name reuse and
+unnoticed failure. Local hashes provide reproducibility and accidental-drift
+detection; they do not claim hostile-local protection, WORM storage or an
+external-signing boundary.
+
+The workload remains exact: the single retained title, one Chromium project,
+three fixed in-test trials, existing loss schedule, ports, configuration,
+reporter classification, workload and thresholds, retries zero, and the
+600-second process-group watchdog. Every invocation requires its immediate
+predecessor's Playwright and terminal statuses to exist and equal zero,
+rejects current and future-name artifacts, captures complete
+reporter/stdout/stderr/attachments/timestamps/statuses, and finalizes a
+validating cumulative manifest. The first consuming nonzero result stops the
+ledger. No name may be retried, overwritten, substituted or reused.
+
+Mechanical validation passes shell syntax, both manifests, modes, selected
+Git operations, ripgrep `-F -c`, bootstrap order, wildcard freshness,
+predecessor/future rejection, source/runtime identity, exact one-test/one-file
+listing in both workspaces, eight protected paths, 26 stashes, process custody
+and clear ports 4174/4175/51000/51002. There are zero fresh invocations. An
+initial read-only shell diagnostic assigned zsh's special `status` variable;
+the corrected diagnostic used `tool_status` and the tool gate returned zero.
+That was a command error, not a launcher or product failure.
+
+Sign and push this plan-only freeze, then run exactly one high-risk review
+using Grok, Codex `gpt-5.6-sol` high and Opus xhigh. This checkpoint is
+required because it authorizes scarce long execution and freezes the launcher,
+classifier, accounting and evidence custody. Only P0/P1 blocks. P2 receives a
+disposition without fixtures, evidence redesign or confirmation ceremony.
+Kimi, Fable and collaboration subagents remain prohibited. If Grok completes
+substantive inspection but violates only the terminal format, continue that
+exact session for schema-only completion rather than relaunching it.
+
+After the blocking union is empty, create and push signed annotated tag
+`d108e4br-freeze-reviewed` at the exact signed/pushed freeze commit, then run
+the six already-authorized commands below sequentially as separate fresh
+shells. Do not ask for authorization again.
+
+```sh
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4br-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = f69c42eadc9d85343d5d6c68049bb6fb4bccec3209317acfe42c16ba0586bdfc && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4br-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = 2994fb2b0d88f7674e4886a6119236ea4922a42256d296f9a5679338f69c6950 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4br-freeze/launch-one.zsh resolution-ordinary-1 /Users/aristotle/Documents/Projects/ts-drp-1
+```
+
+```sh
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4br-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = f69c42eadc9d85343d5d6c68049bb6fb4bccec3209317acfe42c16ba0586bdfc && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4br-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = 2994fb2b0d88f7674e4886a6119236ea4922a42256d296f9a5679338f69c6950 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4br-freeze/launch-one.zsh resolution-ordinary-2 /Users/aristotle/Documents/Projects/ts-drp-1
+```
+
+```sh
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4br-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = f69c42eadc9d85343d5d6c68049bb6fb4bccec3209317acfe42c16ba0586bdfc && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4br-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = 2994fb2b0d88f7674e4886a6119236ea4922a42256d296f9a5679338f69c6950 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4br-freeze/launch-one.zsh resolution-ordinary-3 /Users/aristotle/Documents/Projects/ts-drp-1
+```
+
+```sh
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4br-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = f69c42eadc9d85343d5d6c68049bb6fb4bccec3209317acfe42c16ba0586bdfc && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4br-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = 2994fb2b0d88f7674e4886a6119236ea4922a42256d296f9a5679338f69c6950 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4br-freeze/launch-one.zsh resolution-isolated-1 /private/tmp/ts-drp-d108e4br-clean/repo
+```
+
+```sh
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4br-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = f69c42eadc9d85343d5d6c68049bb6fb4bccec3209317acfe42c16ba0586bdfc && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4br-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = 2994fb2b0d88f7674e4886a6119236ea4922a42256d296f9a5679338f69c6950 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4br-freeze/launch-one.zsh resolution-isolated-2 /private/tmp/ts-drp-d108e4br-clean/repo
+```
+
+```sh
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4br-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = f69c42eadc9d85343d5d6c68049bb6fb4bccec3209317acfe42c16ba0586bdfc && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4br-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = 2994fb2b0d88f7674e4886a6119236ea4922a42256d296f9a5679338f69c6950 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4br-freeze/launch-one.zsh resolution-isolated-3 /private/tmp/ts-drp-d108e4br-clean/repo
+```
+
+Stop only on a material P0/P1 freeze-review finding, a consuming invocation
+failure, or proof that execution requires changing product behavior, workload,
+thresholds, dependencies or test semantics. Six passes release a signed/pushed
+campaign-evidence checkpoint and one final evidence review, after which work
+resumes at D.108e5 and the Phase-6a closure path.
