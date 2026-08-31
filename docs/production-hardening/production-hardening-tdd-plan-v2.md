@@ -82204,3 +82204,58 @@ The validating self-excluding RED evidence-index SHA-256 is
 This proves the intended stale local reference after synchronous qualified-C
 promotion without a production diff. Sign and push this causal RED, then make
 only the frozen `#send` re-read repair.
+
+D.108e4bp GREEN changes only `UnreliableWebRtcOwner.#send`. The per-peer
+selected link is mutable; after the existing non-awaited recovery kick for a
+present non-open selected link, the same call re-reads `#links.get(peerId)` and
+continues only when the entry changed to an open selected link. The rebound
+then traverses the unchanged current-connection, 65,536-byte backpressure and
+native-send gates. There is no await, retry, setup change, new helper, adapter,
+API or counter.
+
+The frozen focused command passed 11/11 with 103 unrelated rows skipped. The
+complete network owner passed 114/114, and retained E3-02 passed 12/12. Their
+reporter SHA-256 values are respectively
+`8ef988c74deeacb78b6ed96c7b44de660ac5833ca694fc0d5eeea496be8f5f7a`,
+`7148ed9a5d1c58f2d21634c9158c90144f36d927eaf655bf92f2fb3835f2fe99`
+and
+`39cc4133dc6c561aba5882e2519b7a699ecae165d13a9310234c9718caee789a`;
+all three stderr files are empty. The new row proves the same call returns
+true, C owns exactly one routed write and the remote receives that payload
+exactly once, A closes once with one `replacement` link drop, PC/timer counts
+remain at the promotion baseline, and handshake/backpressure counters do not
+change.
+
+The following static commands returned zero:
+
+```sh
+pnpm --filter @ts-drp/network typecheck
+pnpm --filter @ts-drp/network build
+pnpm exec eslint packages/network/src/unreliable-webrtc.ts \
+  packages/network/tests/unreliable-webrtc-e3-01-red.test.ts
+pnpm exec prettier --check packages/network/src/unreliable-webrtc.ts \
+  packages/network/tests/unreliable-webrtc-e3-01-red.test.ts
+git diff --check
+```
+
+The first read-only source-shape diagnostic incorrectly assumed `rg -c` would
+return status zero for an expected zero matches; the corrected zero-safe check
+then exposed that `--unified=0` legitimately renders the adjacent `const` to
+`let` change and branch change as two hunks. The final audit pins their exact
+starts at 801 and 804, one `rebound` binding, two pre-existing/new non-awaited
+`#linkFor` calls in the complete `#send` slice and zero awaited calls. Relative
+to signed RED, the only changed path is the production owner. The
+`refactor-clean` audit found no duplicated owner, compatibility layer, parallel
+abstraction or stale path to remove.
+
+Final source, unchanged test and validating self-excluding GREEN evidence-index
+SHA-256 values are respectively
+`b4a3f61ae439a85bfe9236f0b02257cce014056eb633e57acf689107008358df`,
+`5b34878f500ea8deeb5d8f523f5bc76a6aa5f8fd706c2d4f6615dd7bcb26792e`
+and
+`23aa4a32d1f6a66072b06bb3b015aad3444bf3bda97084dfe28586a572d3620f`.
+Protected paths, 26 stashes, fixed ports and ts-drp
+reviewer/test/profiler predicates remain preserved. No browser or campaign was
+run. Sign and push GREEN before the single formal Grok/Codex-high/Opus-xhigh
+review; only an empty final P0/P1 union may release one different fresh
+retained-browser name.

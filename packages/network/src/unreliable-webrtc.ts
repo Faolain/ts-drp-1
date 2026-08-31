@@ -798,11 +798,14 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		}
 		const targets: { readonly link: ActiveLink; readonly peerId: string }[] = [];
 		for (const peerId of peers) {
-			const link = this.#links.get(peerId);
+			let link = this.#links.get(peerId);
 			const connection = this.#connectionFor(peerId);
 			if (link === undefined || link.channel.readyState !== "open") {
-				if (link !== undefined && this.#desiredPeers().includes(peerId)) void this.#linkFor(peerId);
-				return false;
+				if (link === undefined || !this.#desiredPeers().includes(peerId)) return false;
+				void this.#linkFor(peerId);
+				const rebound = this.#links.get(peerId);
+				if (rebound === undefined || rebound === link || rebound.channel.readyState !== "open") return false;
+				link = rebound;
 			}
 			if (connection !== undefined && !this.#isCurrent(link.connection) && this.#desiredPeers().includes(peerId)) {
 				void this.#linkFor(peerId);
