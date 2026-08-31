@@ -19,6 +19,9 @@ The plan identifies, by exact value rather than ordering inference:
 - expected current head/revision;
 - active generation and exactly the two complete rollback generations reached
   by following `baseExpectedHead` twice from that active adopted generation;
+- the exact oldest-retained lineage floor, its expected present parent, and the
+  complete connected older prefix eligible for atomic floor normalization and
+  deletion;
 - adopted local snapshot plus the adopted CutValue’s exact
   `availabilityPolicyDigest`;
 - the issuance scope and upper epoch boundary to classify; and
@@ -36,6 +39,12 @@ the missing module and requires:
   superseded generations, either missing ancestor row or incomplete ancestor
   closure, missing local snapshot, mismatched policy, incomplete outbox
   classification, malformed/duplicate identities, and stale expected revision;
+- refusal when the proposed older deletion set is gapped, when any surviving
+  generation other than the exact floor points into it, or when simulating the
+  floor's sole `baseExpectedHead` normalization still leaves a dangling parent;
+- a causal mutant proving that deleting the parent of the oldest retained
+  ancestor without that exact normalization makes subsequent creator adoption
+  return `chain-invalid`;
 - permutation invariance of unordered facts;
 - detached immutable output;
 - exact refusal precedence; and
@@ -57,6 +66,11 @@ over canonical bytes
 The planner never accepts or decodes policy bytes; any other digest receives a
 closed refusal and retains data for Phase 7b. Do not verify signatures again,
 open a store, add schema, schedule work, or reclaim memory.
+
+The immutable positive result carries an exact lineage-floor rewrite intent:
+the floor generation identity, its expected original present parent, the
+existing no-head replacement scoped to the same object, and the complete older
+prefix. D.109a only simulates the post-state graph and never mutates a record.
 
 ## Acceptance
 

@@ -11,6 +11,17 @@ not satisfy the contract. In one owner transaction it rechecks the expected
 head/revision, active generation, that exact ancestor pair, selected superseded
 generations, closures, and promotion/reference graph.
 
+Current creator adoption requires every generation row with a `present`
+`baseExpectedHead` to retain its parent row. Therefore row reclamation also
+rechecks the complete generation graph. When an older connected ancestry prefix
+is selected, the same transaction rewrites only the oldest retained rollback
+ancestor's `baseExpectedHead` from the exact expected present parent to the
+already-supported `{ kind: "none", objectId }` form, then deletes that complete
+prefix. It changes no generation identity, head, revision, closure digest,
+closure, state, blob, wire byte, or public API. Any gap, alternate surviving
+child of a selected row, unexpected prior root, changed floor parent, or
+dangling post-state edge aborts with zero writes.
+
 Only then may it delete selected superseded generation rows and promotions and
 garbage-collect blobs with no remaining generation reference. Because blobs
 are globally content-addressed across objects and neither backend has a reverse
@@ -21,6 +32,10 @@ metadata); no reverse-index schema is implied, and measured need is required
 before adding one. The active generation and its two immediate rollback
 ancestors remain complete. RED covers changed head, changed closure, shared
 blobs, duplicate identities, insufficient rollbacks, a wrong-but-countable
-non-ancestor pair, every crash edge, reopen, idempotence, and unrelated objects.
-Node, browser, memory conformance, request inventory, schema authority, and
-recovery tests remain aligned. GREEN returns an immutable AHE receipt.
+non-ancestor pair, deleting the floor parent without normalization, normalizing
+the wrong row or wrong parent, a surviving branch into the deleted prefix,
+every crash edge, reopen, idempotence, subsequent creator adoption commit, and
+unrelated objects. Node, browser, memory conformance, request inventory, schema
+authority, and recovery tests remain aligned. GREEN returns an immutable AHE
+receipt containing the exact normalized floor, former parent, and deleted
+prefix.

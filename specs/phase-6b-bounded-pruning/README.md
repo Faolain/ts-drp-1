@@ -107,6 +107,16 @@ owner lifecycle failure deletes nothing in that owner.
   closures must exist. Two other countable superseded generations never satisfy
   this rule. Random generation identifiers never imply chronological order;
   the verified lineage supplies exact identities.
+- Generation-row reclamation preserves the current parent-presence invariant.
+  In the same owner transaction that deletes a complete older ancestry prefix,
+  rewrite only the oldest retained rollback ancestor's `baseExpectedHead` to
+  the existing `{ kind: "none", objectId }` form. Its generation identity,
+  revision-bearing descendants, closure digest, closure, state, and bytes are
+  otherwise unchanged. The transaction refuses if any surviving row other than
+  that exact floor points into the deletion set, if the deletion set is not the
+  complete connected prefix below the floor, or if post-state lineage has a
+  dangling parent. This is local metadata compaction, not a wire or digest
+  change.
 - An old-epoch issuance row is deletable only when its canonical preimage is
   valid, epoch-bound, paired, and `published`. A `pending`, malformed,
   one-sided, foreign-digest, or unreadable row blocks that owner with no writes.
@@ -161,6 +171,9 @@ signed commits, pushed refs, protected paths, stashes, ports, and processes.
   to it before cleanup uses it; no compatibility wrapper remains.
 - Durable receipts are stage results, not a second truth store or permanent
   shadow metadata model.
+- The AHE receipt records the exact lineage floor, its former parent, and the
+  deleted prefix. It does not authorize a later rewrite; every run rechecks the
+  current complete graph transactionally.
 - Public product APIs remain unchanged unless a later slice explicitly proves
   an unavoidable package contract change and reviews it before RED.
   D.109b’s addition of `ISSUANCE_RECORD_PRUNED` to the closed issuance error

@@ -87482,8 +87482,12 @@ The ordered implementation is:
    unreferenced blobs while the active generation plus exactly the two complete
    rollback ancestors reached by following `baseExpectedHead` twice remain
    complete. Two other countable superseded generations cannot substitute.
-   Global blobs require a transactional decode-scan of every remaining cross-
-   object closure and promotion row; no nonexistent reverse index is assumed.
+   The same transaction preserves parent connectivity by normalizing only the
+   oldest retained ancestor's exact expected `baseExpectedHead` to the existing
+   no-head form before deleting the complete older connected prefix; any other
+   surviving edge into that prefix aborts. Global blobs require a transactional
+   decode-scan of every remaining cross-object closure and promotion row; no
+   nonexistent reverse index is assumed.
 4. **D.109d runtime reclamation:** after matching durable receipts, reclaim the
    enumerated graph, state, checkpoint, pending and sync structures while
    preserving root, active tail, canonical state, truthful known-hash
@@ -87499,6 +87503,11 @@ The ordered implementation is:
 Random generation IDs are never treated as chronological order. The verified
 lineage names the active generation and its two immediate `baseExpectedHead`
 ancestors; both ancestor rows and every blob in their closures must be present.
+Because current adoption validates that every present parent has a row, a D.109c
+transaction may delete older generation rows only while it rewrites the oldest
+retained ancestor's exact expected parent to `{ kind: "none", objectId }` and
+proves that every other surviving parent remains present. Generation identity,
+head, revisions, closure digest, closure, state, and payload bytes do not change.
 The local-only availability case requires the adopted local snapshot and exact
 equality between the adopted CutValue’s `availabilityPolicyDigest` and frozen digest
 `53775c5c1ee01e346f588966d6e7acb876df2bd8b2abcbe2b2591f216f7d4d9b`,
@@ -87522,10 +87531,12 @@ binding, adopted head and expected revision, exact active and rollback
 generation identities obtained by following `baseExpectedHead` twice from the
 active adopted generation, adopted local snapshot and the adopted CutValue’s
 exact availability-policy digest, and a complete issuance-classification
-observation. Its immutable positive
-result carries exact identities for later store-local rechecks; its negative
-result uses a closed refusal union. It does not reverify signatures, open a
-store, schedule work, mutate state, or export a package API.
+observation. It also includes the exact oldest-retained lineage floor, that
+floor's expected present parent, and the complete connected older prefix whose
+simulated removal plus sole floor normalization leaves no dangling parent. Its
+immutable positive result carries exact identities for later store-local
+rechecks; its negative result uses a closed refusal union. It does not reverify
+signatures, open a store, schedule work, mutate state, or export a package API.
 
 The tests-only RED must establish one complete local-only positive control and
 mutants for missing or mismatched QC, non-adopted/mismatched head, stale
@@ -87533,10 +87544,13 @@ revision, fewer than two distinct usable rollbacks, either missing immediate
 ancestor or incomplete ancestor closure, a wrong-but-countable pair of non-
 ancestor superseded generations, missing local snapshot, policy mismatch,
 incomplete outbox classification, duplicate/malformed identities, permutation
-variance, aliased/mutable output, and refusal precedence. Source guards require
-zero delete/clear/discard calls and no public export. RED is accepted only when
-the focused test fails for the missing planner/closed result contract while
-retained Phase-6a semantics remain green.
+variance, aliased/mutable output, gapped older prefix, a surviving non-floor
+edge into the prefix, wrong floor parent, dangling simulated post-state, and
+refusal precedence. One causal mutant deletes the floor parent without
+normalizing that exact floor and proves the next creator adoption returns
+`chain-invalid`. Source guards require zero delete/clear/discard calls and no
+public export. RED is accepted only when the focused test fails for the missing
+planner/closed result contract while retained Phase-6a semantics remain green.
 
 GREEN implements validation, copying, canonical ordering and freezing only.
 Its affected Node/object/storage typechecks, exact-owner lint/format/diff,
@@ -87629,3 +87643,45 @@ release boundary and both golden paths are explicit. The literal policy digest
 is already a mandatory D.109a test vector. These corrections change causal RED
 acceptance, so exactly one Grok/Kimi/Opus confirmation of the corrected signed
 checkpoint is required; no further confirmation or prose review may recurse.
+
+That sole confirmation inspected signed/pushed commit
+`c02956403d7288f972d5e9b27d110437062d38b7`. Grok 4.6/high exact session
+`01a0590d-f96d-71d0-9f80-f0fc35b59583` reached its max-turn cancellation
+boundary, resumed as that same session, and returned `APPROVED`, no P0/P1, and
+`D109A_RED_READY: yes`; initial event/status and resumed event/result SHA-256
+values are respectively
+`e960c6017fc7efc8b22a0757812af71a02f4a229924f5913ea54d39cb6ad22c2`,
+`e5f3d6d1febd814e539a6e1c934c67e6c10c572702b97b22656638f98e561c9d`,
+`81419f3eb0738cde5e42f2d5f9dff8e1ae71313c4bb7ca4ffa7b1479f9823b65`
+and `323812f49471d702fc5e5da995323247e1c5516662168240ac76f4c3f4f64cf5`.
+Exact Kimi K3/thinking/high/max-100 session
+`bdbe581a-499e-496f-8abb-a1de6691f5b6` returned `APPROVED`, no P0/P1, and
+`D109A_RED_READY: yes`; raw/result SHA-256 values are
+`a89b6fd8e92ed8ba70627b3f68afef74295125c0dcdbd2a7a6dce3941f2e23f4`
+and `f2905204401b7cb6a7bf454f0fb697b524caa78c280afc57de0c3f53f13d3ce2`.
+Opus 5/xhigh session `fc89e69a-b344-4c51-8f20-f46aff7b41d5` returned
+`CHANGES_REQUIRED`, P0=0/P1=1/P2=1, and `D109A_RED_READY: no`; raw/result
+SHA-256 values are
+`6436e27c7ef1c9c7c37e8dc09a7c457ae184093d63d53d600cd4e4c7151c787d`
+and `bddff9266c67385cc501bc350c7ed75b3b05959b6e6970c0e48f75b02247c133`.
+
+The controller's direct source audit accepts Opus's P1 despite the two approvals.
+Both `validGenerationLineage` and `validLineage` enumerate every generation row
+and reject a `present` `baseExpectedHead` whose parent row is absent. Deleting an
+older ancestor while leaving the oldest retained rollback's original parent
+therefore makes later recovery or adoption `chain-invalid`. The correction above
+uses the existing no-head generation-record variant as an atomic local lineage
+floor: D.109a simulates and identifies the exact floor/former-parent/prefix;
+D.109c rechecks the complete graph, normalizes only that floor, deletes the
+complete connected older prefix, and proves the post-state has no dangling
+parent. This changes no format, digest, head, closure, revision, state, product
+API, or retained rollback bytes. Its RED includes unnormalized deletion,
+wrong-floor, wrong-parent, surviving-branch, abort, reopen, and subsequent-
+adoption mutants. Grok's and Kimi's browser-v1 compatibility note is retained
+for D.109b's old-reader/new-reader RED matrix.
+
+This is the one confirmation permitted by the frozen review policy. The
+source-proven P1 is corrected once without a second model round or recursive
+review prose. A deterministic audit of the exact lineage predicate, corrected
+source seams, formatting, changed paths, signature, pushed ref, protected paths,
+and stashes closes the plan gate before D.109a RED.
