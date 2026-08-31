@@ -82518,3 +82518,54 @@ The self-excluding evidence manifest
 No product source, browser campaign, retained name, workload, threshold,
 timing, dependency, port or evidence schema changed. Proceed directly to the
 test-only GREEN; no separate RED model review is permitted.
+
+D.108e4bq GREEN changes only the schema-v3 campaign validator and its
+deterministic fixtures. `d108e4hAssertDeadlinePendingCandidate` now accepts a
+committed acceptor candidate only when every COMMIT follows the first
+post-READY ACK. The exact captured two READY/two ACK/two COMMIT pending-C shape
+passes while the new READY -> COMMIT -> qualifying ACK mutant throws exact
+`D108E4H_LIFECYCLE_ORDER_INVALID`. Common selected A, application ownership,
+candidate cardinality, lifecycle terminal ownership, endpoint-local
+replacement classification, D.108e4aa exact errors and the `2/0`/`0/2`
+ambiguity rules are unchanged. Production source remains byte-identical at
+SHA-256
+`b4a3f61ae439a85bfe9236f0b02257cce014056eb633e57acf689107008358df`.
+
+The one focused GREEN invocation ran from `2026-08-31T01:51:29Z` through
+`2026-08-31T01:51:38Z` and reported expected/skipped/unexpected/flaky
+`1/0/0/0`, zero top-level errors and status zero. Reporter SHA-256 is
+`b99050783c050d986d33b5448a8d70e4faeac586e4dc6edcdebf449104cdb1e9`.
+The exact retained non-campaign list selected seven tests in one file and
+excluded the long three-trial title. Its single execution ran from
+`2026-08-31T01:52:04Z` through `2026-08-31T01:52:20Z` and reported
+`7/0/0/0`, zero top-level errors and status zero. Reporter SHA-256 is
+`36585404ae1dd4653f30232f8df42bceb3d46a7fed73337148b404bb28c523ef`.
+
+Strict standalone TypeScript, `@ts-drp/network` typecheck/build, exact-owner
+ESLint, `git diff --check`, exact source-shape and environment audits all
+returned zero. One combined Prettier diagnostic exhausted Node's default 4 GiB
+heap while parsing this 82k-line plan; it emitted no formatting verdict and is
+not a code failure. The corrected checks ran the test normally and the plan
+with `NODE_OPTIONS=--max-old-space-size=8192`; both returned zero. An initial
+source-shape diagnostic also used `rg -c` for an absent pattern and received an
+empty string rather than numeric zero; the corrected `rg | wc -l` check proves
+zero obsolete blanket prohibitions. These diagnostic corrections did not
+execute a test.
+
+Only `tests/e3-03-loss-and-hol-proof.pw.ts` changed before this evidence record.
+The test SHA-256 is
+`5a15e82127e1cd59d3368fd38f0a1c6fcf3bbe7b85958a0397434c208cf74229`;
+Playwright config and lockfile hashes remain
+`1826318a19d5676631f6350fa21d2eb1125dbc1d83ecce69d7f776885bdd7978`
+and
+`73c7c0660fa32c7380d0fe5a026897a7ad85a40edf1f169730c2d8e44e613a99`.
+All protected untracked paths and 26 stashes remain, fixed ports are clear, and
+no ts-drp reviewer/test/profiler conflicts. The validating self-excluding
+GREEN evidence manifest `.logs/d108e4bq-green/SHA256SUMS` has SHA-256
+`2bcff53bd536cb682133b81c6666d0d9411368b034095ea86bc4ebc751e33c14`.
+No retained browser or campaign name was consumed.
+
+Sign and push this GREEN, then run the single formal Grok/Codex
+`gpt-5.6-sol` high/Opus xhigh final review over signed plan, causal RED, GREEN
+diff, evidence hashes, retained errors and scope. Only P0/P1 blocks. Do not run
+a new browser or campaign before that blocking union is empty.

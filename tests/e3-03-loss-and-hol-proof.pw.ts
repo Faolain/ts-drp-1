@@ -3241,9 +3241,17 @@ function d108e4hAssertDeadlinePendingCandidate(endpoint: D108e4hEndpointCustody,
 		firstReceivedReady === undefined
 			? []
 			: sentKinds.filter(({ lifecycleSequence }) => lifecycleSequence < firstReceivedReady);
-	const postReadyAck =
-		firstReceivedReady !== undefined &&
-		sentKinds.some(({ kind, lifecycleSequence }) => kind === 2 && firstReceivedReady < lifecycleSequence);
+	const firstPostReadyAck =
+		firstReceivedReady === undefined
+			? undefined
+			: firstSequence(
+					sentKinds.filter(({ kind, lifecycleSequence }) => kind === 2 && firstReceivedReady < lifecycleSequence),
+					2
+				);
+	const commitsFollowPostReadyAck = receivedKinds.every(
+		({ kind, lifecycleSequence }) =>
+			kind !== 3 || (firstPostReadyAck !== undefined && firstPostReadyAck < lifecycleSequence)
+	);
 	const acceptor =
 		controlsFollowHandler &&
 		firstReceivedReady !== undefined &&
@@ -3254,9 +3262,9 @@ function d108e4hAssertDeadlinePendingCandidate(endpoint: D108e4hEndpointCustody,
 		(preReadySends.length === 0 || handler.readyState === "open") &&
 		preOpenSends.every(({ kind }) => kind === 2) &&
 		preReadySends.length <= 1 &&
-		postReadyAck;
+		firstPostReadyAck !== undefined &&
+		commitsFollowPostReadyAck;
 	d108e4hAssert(initiator !== acceptor, "D108E4H_LIFECYCLE_ORDER_INVALID");
-	d108e4hAssert(!acceptor || !receivedKinds.some(({ kind }) => kind === 3), "D108E4H_IDENTITY_JOIN_INVALID");
 }
 
 function d108e4hAssertZeroLocalBoundaryIdentity(
@@ -5738,6 +5746,31 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 			})
 		);
 		expect(() => validateD108e4hCampaignCustody(d108e4bhAcceptorReceivedCommit)).not.toThrow();
+		const d108e4bqCommitBeforeQualifyingAck = withReceiverEndpoint(
+			d108e4bhAcceptorReceivedCommit,
+			Object.freeze({
+				...d108e4bhAcceptorReceivedCommit.endpoints.receiver,
+				controlSends: Object.freeze(
+					(d108e4bhAcceptorReceivedCommit.endpoints.receiver.controlSends ?? []).map((record) =>
+						record.attemptId === 930_004 ? Object.freeze({ ...record, lifecycleSequence: 11 }) : record
+					)
+				),
+				lifecycle: Object.freeze(
+					d108e4bhAcceptorReceivedCommit.endpoints.receiver.lifecycle
+						.map((record) => {
+							if (record.attemptId !== 930_004) return record;
+							return Object.freeze({
+								...record,
+								sequence: record.event === "channel-send-attempt" ? 11 : 12,
+							});
+						})
+						.sort((left, right) => left.sequence - right.sequence)
+				),
+			})
+		);
+		expect(() => validateD108e4hCampaignCustody(d108e4bqCommitBeforeQualifyingAck)).toThrowError(
+			"D108E4H_LIFECYCLE_ORDER_INVALID"
+		);
 		const d108e4bhCandidateApplicationOwner = withReceiverEndpoint(
 			d108e4bhDeadlinePending,
 			Object.freeze({
