@@ -85460,6 +85460,24 @@ Its no-open/no-handler micro-prefix P2 remains an explicit evidence-triggered
 future boundary: neither state was captured, so this slice does not weaken the
 retained cardinality guards without a causal observation.
 
+The sole permitted confirmation inspected signed/pushed correction
+`dc44b89fc9ee9b149c993ecd12369360e899ba3e`, tree
+`744c0288d1f9e69dea0fb670eeff4de0e38f6579`. Grok, Codex and Opus all approved
+with an empty P0/P1 union. Grok's first confirmation terminal emitted the
+requested bare JSON but omitted the runner-specific `RESULT:` transport
+prefix; its runner therefore recorded `NO_VERDICT`. Exact session
+`01a0570b-7171-78c2-abf0-b25bf2b8cd7f` continued only to emit the same
+completed approval under the required prefix, without repeated inspection.
+Opus's sole confirmation P2 notes that the fixture-shape audit does not repeat
+the explicit zero-control-receive construction as a separate count assertion;
+no change is required because RED explicitly removes it and GREEN requires
+zero receives, so a contradiction cannot pass GREEN. The 47-entry review
+manifest and validation SHA-256 values under `.logs/d108e4cf-plan-review/` are
+`0c9bfb652a79764d10941d5c70b064f3d52c5e6cca348b7d6516ce5d8e1abc60`
+and
+`ab40cb442de38767a8a784d2b20a1a6589719f1dd3d67474061203a113638368`;
+all entries validate. The plan gate is closed and receives no further review.
+
 Consumed D.108e4bu reporter, stdout, stderr, failure telemetry,
 endpoint-classifier, trace, cumulative manifest, and manifest-validation
 SHA-256 values are respectively
