@@ -87442,3 +87442,135 @@ ledger observations without changing product behavior, and D.108e1 through
 D.108e6 are complete. Phase 6a exits on this signed record; no retained
 campaign, threshold change, dependency change or product/API widening is
 authorized or required.
+
+### D.109 — Phase-6b bounded-pruning slice freeze
+
+Phase 6b begins after signed Phase-6a closure
+`67833426279112e79aebaa16846ef4f7af6cfaf9`; that closure and all earlier
+immutable evidence remain accepted and are not reopened. The executable slice
+specification is `specs/phase-6b-bounded-pruning/README.md` with D.109a through
+D.109f under its `slices/` directory. The specification is subordinate to this
+plan’s frozen wire, digest, QC, adoption, availability, rollback, outbox,
+browser-dispatch and legacy-finality contracts.
+
+The source audit found three distinct physical domains rather than one atomic
+database: AHE generations/blobs in the primary storage adapter, issued/outbox
+rows in the dedicated issuance adapter, and graph/state/checkpoint/cache data
+in runtime memory. Phase 6b therefore makes no false cross-database atomicity
+claim. One package-internal cleanup planner owns eligibility. Each physical
+owner transactionally rechecks its own exact head/revision, row, closure,
+reference and lifecycle facts immediately before deletion. Stages are
+idempotent and return immutable receipts. Runtime reclamation requires the
+matching durable receipts. A crash may retain extra data; no partial stage may
+delete data whose owner-local precondition changed.
+
+The ordered implementation is:
+
+1. **D.109a eligibility:** deterministic immutable planning and closed refusal
+   taxonomy only; no I/O, deletion, schema, scheduling or public export.
+2. **D.109b issuance retention:** a separate identity-gated maintenance
+   capability performs store-local atomic classification and deletion of only
+   a complete valid paired `published` closed-epoch prefix, advancing one
+   durable per-scope pruning watermark in the same transaction. Pending,
+   malformed, one-sided, foreign, gapped, non-monotone or changed rows cause
+   zero writes. At/below-watermark consumed absence is pruned rather than
+   corruption; late acknowledgement returns exact non-poisoning
+   `ISSUANCE_RECORD_PRUNED` and cannot claim unprovable exact-digest success.
+3. **D.109c AHE reclamation:** a separate identity-gated maintenance capability
+   performs store-local exact-head/closure/reference recheck, deletion of
+   selected superseded generations/promotions, and GC of only newly
+   unreferenced blobs while the active generation plus at least two exact usable
+   rollback generations remain complete. Global blobs require a transactional
+   decode-scan of every remaining cross-object closure and promotion row; no
+   nonexistent reverse index is assumed.
+4. **D.109d runtime reclamation:** after matching durable receipts, reclaim the
+   enumerated graph, state, checkpoint, pending and sync structures while
+   preserving root, active tail, canonical state, truthful known-hash
+   inventory, and all legacy finality until Phase 6d.
+5. **D.109e browser scheduling:** extract and reuse the exact Phase-5c advisory
+   primary-dispatch runner, migrate the vote dispatcher to that sole owner, and
+   prove lock-mode/takeover equivalence. A lease never grants deletion
+   authority.
+6. **D.109f exit:** ≥100-epoch archival-versus-compacted differential,
+   raw-dependency audit, crash/reopen and browser takeover matrices, and exact
+   census of every Phase-6b structure before Phase 6c memory work.
+
+Random generation IDs are never treated as chronological order. The verified
+lineage names the active and rollback identities. The local-only availability
+case requires the adopted local snapshot and exact equality between the adopted
+CutValue’s `availabilityPolicyDigest` and frozen digest
+`53775c5c1ee01e346f588966d6e7acb876df2bd8b2abcbe2b2591f216f7d4d9b`,
+derived from canonical bytes
+`080405046d6f6465050a6c6f63616c2d6f6e6c79050e6d696e4c6f63616c436f70696573030205116d696e4d6972726f725265636569707473030005166d696e526f6c6c6261636b47656e65726174696f6e730304`.
+Phase 6b does not decode policy bytes; every other digest retains data for
+Phase 7b. Phase 6b does not invent mirror receipts;
+receipt-authenticated rollback release remains blocked on 7b-r. An old-epoch
+issuance pair is deletable only after canonical preimage validation binds it to
+the selected object/epoch and its publish state is `published`; any old pending
+row blocks that issuance stage rather than being silently dropped. Phase 6d
+remains the sole owner of legacy-finality retention, and Phase 6c remains the
+sole owner of memory thresholds.
+
+#### D.109a first checkpoint
+
+D.109a adds one package-internal planner under `packages/node/src/internal/`
+and one tests-only RED owner. Its input consists only of detached facts already
+authenticated by the Phase-5/Phase-6a owners: object/closed epoch, commit-QC
+binding, adopted head and expected revision, exact active and rollback
+generation identities, adopted local snapshot and the adopted CutValue’s exact
+availability-policy digest, and a complete issuance-classification observation.
+Its immutable positive
+result carries exact identities for later store-local rechecks; its negative
+result uses a closed refusal union. It does not reverify signatures, open a
+store, schedule work, mutate state, or export a package API.
+
+The tests-only RED must establish one complete local-only positive control and
+mutants for missing or mismatched QC, non-adopted/mismatched head, stale
+revision, fewer than two distinct usable rollbacks, missing local snapshot,
+policy mismatch, incomplete outbox classification, duplicate/malformed
+identities, permutation variance, aliased/mutable output, and refusal
+precedence. Source guards require zero delete/clear/discard calls and no public
+export. RED is accepted only when the focused test fails for the missing
+planner/closed result contract while retained Phase-6a semantics remain green.
+
+GREEN implements validation, copying, canonical ordering and freezing only.
+Its affected Node/object/storage typechecks, exact-owner lint/format/diff,
+retained Phase-6a semantic tests, changed-path set, source-shape checks and
+self-excluding evidence manifest must pass. D.109a authorizes no physical
+deletion and no retained campaign.
+
+The existing mandatory `AheDurableStore` and `DurableIssuanceStore` contracts
+are not widened. D.109b and D.109c use separate package maintenance
+capabilities resolved by identity only from genuine Node/browser store
+instances; structural fakes and ordinary product consumers cannot mint them.
+The issuance schemas upgrade in place without changing their existing derived
+database/file identities. The per-scope pruning watermark is owner-local
+monotone state, not a second eligibility oracle. A consumed missing address
+above the watermark remains corrupt. At or below it, reads return absence and
+acknowledgement returns exact `ISSUANCE_RECORD_PRUNED` rather than false success
+for a digest whose row no longer exists. The code carries only caller-known
+scope and sequence, never a digest or deleted candidate. Adding that code to
+the closed issuance error union is the one demonstrated D.109b API exception;
+both success and corruption would be false after authorized deletion.
+
+The one expressly authorized Fable 5/high advisory review inspected this
+working-tree plan read-only in session
+`69ab32d6-9d07-4f38-953a-600d457b5320`. Its result text SHA-256 is
+`10dd88c2633239de76abb69158ba21899408dcf797d0425efe6d3a288becaefc`.
+It approved the three-owner staged architecture, D.109a’s causal value, slice
+order, runtime reuse and Phase-5c advisory scheduling reuse, but returned
+`CHANGES_REQUIRED` for the false-poisoning issuance state and unavailable
+policy-value producer. This correction adopts both P1 findings and its two P2
+refinements: identity-gated maintenance interfaces and the explicit
+cross-object blob reference scan. The advisory session is complete and will
+not be relaunched.
+
+Because the overall Phase-6b track establishes deletion authority, the D.109
+plan checkpoint receives one high-risk Grok 4.6/high, exact Kimi high/100-step
+and Opus xhigh review before RED. Only P0/P1 findings block. One correction
+batch and at most one confirmation are allowed only if a correction changes
+scope, causal acceptance or executable behavior; bookkeeping/prose does not
+recurse. If Grok cancels, resume the exact session rather than launching a
+replacement. The one expressly authorized Phase-6b Fable review is advisory
+and may not be relaunched; further Fable and collaboration subagents are
+prohibited. Codex `gpt-5.6-sol` does not substitute for Kimi in this review.
