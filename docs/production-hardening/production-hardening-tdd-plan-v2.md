@@ -83769,41 +83769,99 @@ D.108e4bv reset schedule remain frozen.
 RED adds one opt-in browser-fixture test, registered only under
 `D108E4BW_MONITOR_CONCURRENCY_RED=1`, titled exactly `D.108e4bw retains every
 concurrent carry-in ping identity`. A blank page installs one fake
-authenticated connection and the real test observer. It starts two unresolved
-ping streams on that same connection in the prior epoch, resets the observer
-to a new epoch, then rejects both starts. The frozen expectation is two unique
-ping groups, each containing exactly one replayed `ping-start` followed by one
-`ping-failure`, with a single `carryIn=true` value and the new trial id. Current
-connection-keyed storage must fail only this expectation with reporter matrix
+authenticated connection and the real test observer using the existing
+non-frozen EventTarget fake-host shape. Its single body has three deterministic
+phases. First it starts two unresolved ping streams on that same connection in
+the prior epoch, resets the observer to a new epoch, then rejects and consumes
+both rethrown starts. The frozen expectation is two unique ping groups, each
+containing exactly one replayed `ping-start` followed by one `ping-failure`,
+with a single `carryIn=true` value and the new trial id. Second it drives a
+stream-close pending-failure attempt through reset and a monitor-owned abort;
+that group must contain exactly one start, one first failure, and one abort.
+Third it overlaps attempts across a monitor-owned abort, lets post-abort
+callbacks settle, resets again, and requires zero replay of every retired
+attempt. Current connection-keyed storage must fail the first frozen
+expectation; all phases remain inside one registered test with reporter matrix
 `0/0/1/0`, zero top-level errors, one test in one file, and no retained title.
 Any different RED result stops.
 
 GREEN keys live and failed ping custody by exact `pingId`, not connection id,
-and makes every move/delete identity-specific. Reset replays every exact live
-or failed attempt once; failed attempts also replay their already-observed
-failure once. Connection abort lookup preserves the existing priority—newest
-in-flight attempt on that connection, otherwise newest failed attempt—without
-collapsing other exact attempts before their terminal callbacks. The new test
-must pass without weakening `d108e4hAssertMonitor`, `carryIn` requirements,
-trial joins, unique event cardinality, or abort ordering.
+and makes every ordinary move/delete identity-specific. Reset uses one
+pingId-deduplicated pass to replay every exact live or failed attempt once. It
+replays `ping-failure` only when that attempt's `failureRecorded` is already
+true; a stream-close pending-failure entry replays only its start, so a later
+monitor-owned abort emits its first and only failure. The catch path also
+honors `failureRecorded`, preventing a post-abort callback from duplicating a
+synthetic failure.
+
+Connection abort lookup preserves the existing heuristic priority—newest
+in-flight attempt on that connection, otherwise newest failed attempt—where
+"newest" is last Map insertion/highest numeric ordinal, never lexical ping-id
+sort. Abort retires all exact custody already terminal on that connection and
+marks the connection so later callbacks cannot reinsert retired custody; a
+subsequent reset replays none of it. Connection-close alone does not erase
+pending custody because a later monitor-owned abort still needs its joined
+failure; residue is bounded by this three-trial test workload. This newest-
+first attribution remains a heuristic, not proof of which concurrent ping
+caused the abort. The new test must pass without weakening
+`d108e4hAssertMonitor`, `carryIn` requirements, trial joins, unique event
+cardinality, or abort ordering. Add one exact schema-validator mutant with a
+`ping-failure` but no `ping-start`; it must preserve
+`D108E4H_MONITOR_PING_CUSTODY_INVALID`.
 
 Run the exact one-test/one-file RED once and the same GREEN once. Then repeat
 standalone strict TypeScript, exact-owner ESLint/Prettier/diff, grid
-typecheck/build, the D.108e4h schema-validator title, both D.108e4ax rows, and
-the complete network-owner suite. One wholly fresh non-campaign retained title
-then runs under the unchanged 600-second watchdog; a failure stops without
-retry. Only a pass releases one retained-seven run. Preserve complete
-reporters, streams, statuses, attachments, hashes, and validating
-self-excluding manifests.
+typecheck/build, the D.108e4h schema-validator title, the existing
+`D108E4G_TELEMETRY=1` `records a versioned and causally joined RTC lifecycle
+without changing delivery` title, both D.108e4ax rows, and the complete
+network-owner suite. The existing telemetry title is a required deterministic
+abort/close/identity-delete gate, not optional retained coverage. One wholly
+fresh non-campaign retained title then runs under the unchanged 600-second
+watchdog; a failure stops without retry. Only a pass releases one
+retained-seven run. Preserve complete reporters, streams, statuses,
+attachments, hashes, and validating self-excluding manifests.
 
 Because this owner affects retained campaign evidence attribution, sign and
 push this bounded plan and run one fresh Grok/Codex-`gpt-5.6-sol`-high/Opus-
 xhigh plan review. Only P0/P1 blocks; disposition P2 without recursive prose
 review. After signed GREEN and retained gates, the single final implementation
-review inspects D.108e4bv/bw together. Do not use Kimi, Fable, continued prior
+review inspects D.108e4bv/bw together. Do not use Kimi, Fable, unrelated prior
 sessions, or collaboration subagents. An empty final blocking union releases
 six wholly fresh campaign names; all D.108e4bu names and
 `d108e4bv-retained-browser-1` remain permanently consumed or frozen.
+
+The plan review is closed after applying its complete material union above.
+Codex `gpt-5.6-sol` high returned `CHANGES_REQUIRED` with one P1: abort must
+retire terminal same-connection custody, guard post-abort reinsertion and
+duplicate failure, and prove the subsequent reset is empty. Opus xhigh session
+`15e56892-d1ff-4f3e-b95f-cccda4715de2` returned `CHANGES_REQUIRED` with two
+P1s: execute the existing deterministic abort/close title and replay a failure
+only when `failureRecorded` is true. Its P2s are dispositioned by bounded
+close-only retention, explicit newest-first heuristic status, a single
+deduplicated reset pass, and the proven fake-host/rejection-consumption shape.
+The fresh Grok run reached its 16-turn limit before a verdict; under the
+operator's explicit instruction it resumed the exact same session
+`01a05629-3f90-7102-bf7c-49600df9b902` once and returned `APPROVED` with two
+P2s, now frozen as the missing-start mutant and insertion-order rather than
+lexical newest selection. No reviewer requested a product, workload,
+threshold, timing, dependency, or validator weakening.
+
+Prompt, schema, Codex result, Opus result, initial Grok status, initial Grok
+events, Grok-resume prompt, Grok-resume events, and extracted Grok terminal
+JSON SHA-256 values are respectively
+`de5d699f7d2d7abef946389e353898edb6977a83f15932c9ba0cfadae6a0a0b6`,
+`5aaec951a7b5c27ea30909c77128ce564a05c2b43f610b4e5e48b4b4ce509681`,
+`832c00d0a07280cb679a08fabbd1ed8899ceefa2814c6f85eec3b5884d48bf41`,
+`44bbb3f67382dbe4925d69d97c6aef7b17ba23106266c2485250ed86e1688ebc`,
+`364943c6bf7318ebbba723c94e6cde298d598551c61ecdbe903241693f97d7f5`,
+`1303cdbb89c1a801c12977c3405e2a9432de13e65c967b370308fb27501f345e`,
+`620a943480fe5b061eb78cdcb30644d74bd3ebecd3078481bc43d0b5e48a3661`,
+`b63050d8e6a95c143660d4363d67edb64a9d86f1091d31dd9f383fe25be5485f`,
+and
+`caca75b98dd0ae4881ce04cda1bc6111d3f0208a69784f489e5abb9eeebb1930`.
+The blocking findings are corrected in the executable RED/GREEN matrix. A
+deterministic local source/predicate audit closes the plan without a recursive
+confirmation round.
 
 An empty final blocking union releases a new plan-only freeze with six wholly
 fresh names and a freshly built isolated checkout at the accepted GREEN.
