@@ -16,6 +16,19 @@ import {
 	isValidDurableAuthorSequence as validOrdinal,
 	isValidDurableScopeField as validScopeField,
 } from "./contract.js";
+import {
+	captureDurableIssuancePruningInput,
+	createDurableIssuancePruningReceipt,
+	createDurableIssuancePruningState,
+	createDurableIssuanceRecordPrunedError,
+	decodeDurableIssuancePreimage,
+	durableIssuanceAddressIsPruned,
+	durableIssuanceLineageConsumed,
+	durableIssuanceLineagesEqual,
+	type DurableIssuancePruningMaintenance,
+	type DurableIssuancePruningReceipt,
+	type DurableIssuancePruningState,
+} from "./maintenance.js";
 import { DEFAULT_DURABLE_ISSUANCE_PAGE_LIMIT, MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT } from "./types.js";
 import type {
 	DurableBuildAndSign,
@@ -59,10 +72,6 @@ function scopeKey(scope: DurableIssueScope): string {
 
 function recordKey(scope: DurableIssueScope, authorSequence: number): string {
 	return `${scopeKey(scope)}:${authorSequence}`;
-}
-
-function sameLineage(left: DurableLineage, right: DurableLineage): boolean {
-	return left.next === right.next && left.exhausted === right.exhausted;
 }
 
 function cloneLineage(lineage: DurableLineage): DurableLineage {
@@ -126,6 +135,7 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 	readonly #issued = new Map<string, DurableIssueCommit>();
 	readonly #lineages = new Map<string, DurableLineage>();
 	readonly #outbox = new Map<string, DurableIssuanceOutboxRecord>();
+	readonly #watermarks = new Map<string, number>();
 	#closed = false;
 	#poison?: IssuanceFailure;
 
@@ -164,8 +174,17 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 		const outbox = this.#outbox.get(key);
 		const lineage = this.#lineages.get(scopeKey(scope)) ?? { exhausted: false, next: 0 };
 		const consumed = lineage.next > authorSequence || (lineage.exhausted && lineage.next === authorSequence);
+		const watermark = this.#watermarks.get(scopeKey(scope)) ?? null;
 		if (issued === undefined && outbox === undefined && !consumed) {
 			throw new InvalidArgumentFailure("publication address has never been issued");
+		}
+		if (
+			issued === undefined &&
+			outbox === undefined &&
+			consumed &&
+			durableIssuanceAddressIsPruned(watermark, authorSequence)
+		) {
+			throw createDurableIssuanceRecordPrunedError(scope, authorSequence);
 		}
 		if (issued === undefined || outbox === undefined || !consumed) throw this.#latchCorruption();
 		const commit = outbox.commit;
@@ -194,8 +213,19 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 		this.#assertAvailable();
 		validateScope(scope);
 		if (!validOrdinal(authorSequence)) throw new InvalidArgumentFailure("authorSequence must be a safe ordinal");
-		const record = this.#issued.get(recordKey(scope, authorSequence));
-		return record === undefined ? null : cloneCommit(record);
+		const key = recordKey(scope, authorSequence);
+		const record = this.#issued.get(key);
+		const outbox = this.#outbox.get(key);
+		const lineage = this.#lineages.get(scopeKey(scope)) ?? { exhausted: false, next: 0 };
+		const watermark = this.#watermarks.get(scopeKey(scope)) ?? null;
+		const consumed = durableIssuanceLineageConsumed(lineage, authorSequence);
+		const pruned = durableIssuanceAddressIsPruned(watermark, authorSequence);
+		if (record === undefined && outbox === undefined) {
+			if (consumed && !pruned) throw this.#latchCorruption();
+			return null;
+		}
+		if (record === undefined || outbox === undefined || !consumed || pruned) throw this.#latchCorruption();
+		return cloneCommit(record);
 	}
 
 	async readLineage(scope: DurableIssueScope): Promise<DurableLineage> {
@@ -251,7 +281,7 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 		const candidate = copyAndValidateCommit(await buildAndSign(prior.next), detachedScope, prior.next);
 		this.#assertAvailable();
 		const current = this.#lineages.get(key) ?? { exhausted: false, next: 0 };
-		if (!sameLineage(current, prior)) {
+		if (!durableIssuanceLineagesEqual(current, prior)) {
 			throw failure("ISSUANCE_RETRY_REQUIRED", "author sequence lineage changed during signing");
 		}
 		const durableKey = recordKey(detachedScope, prior.next);
@@ -268,6 +298,87 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 		return cloneCommit(durable);
 	}
 
+	async inspectPruningState(scope: DurableIssueScope): Promise<DurableIssuancePruningState> {
+		await Promise.resolve();
+		this.#assertAvailable();
+		validateScope(scope);
+		const detached = cloneScope(scope);
+		return createDurableIssuancePruningState(
+			detached,
+			this.#lineages.get(scopeKey(detached)) ?? { exhausted: false, next: 0 },
+			this.#watermarks.get(scopeKey(detached)) ?? null
+		);
+	}
+
+	async prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt> {
+		const captured = captureDurableIssuancePruningInput(input);
+		await Promise.resolve();
+		this.#assertAvailable();
+		const key = scopeKey(captured.scope);
+		const lineage = cloneLineage(this.#lineages.get(key) ?? { exhausted: false, next: 0 });
+		const watermark = this.#watermarks.get(key) ?? null;
+		if (
+			captured.expectedPrunedThroughAuthorSequence !== null &&
+			(captured.expectedPrunedThroughAuthorSequence > captured.throughAuthorSequence ||
+				!durableIssuanceLineageConsumed(captured.expectedLineage, captured.expectedPrunedThroughAuthorSequence))
+		) {
+			throw new InvalidArgumentFailure("expected pruning state is internally impossible");
+		}
+		if (
+			watermark === captured.throughAuthorSequence &&
+			durableIssuanceLineagesEqual(lineage, captured.expectedLineage)
+		) {
+			return createDurableIssuancePruningReceipt(captured, lineage, null);
+		}
+		if (
+			watermark !== captured.expectedPrunedThroughAuthorSequence ||
+			!durableIssuanceLineagesEqual(lineage, captured.expectedLineage)
+		) {
+			throw failure("ISSUANCE_RETRY_REQUIRED", "issuance pruning state changed");
+		}
+		if (
+			(watermark !== null && captured.throughAuthorSequence <= watermark) ||
+			!durableIssuanceLineageConsumed(lineage, captured.throughAuthorSequence)
+		) {
+			throw new InvalidArgumentFailure("selected pruning boundary is invalid");
+		}
+		const from = watermark === null ? 0 : watermark + 1;
+		for (let authorSequence = from; authorSequence <= captured.throughAuthorSequence; authorSequence += 1) {
+			const recordAddress = recordKey(captured.scope, authorSequence);
+			const issued = this.#issued.get(recordAddress);
+			const outbox = this.#outbox.get(recordAddress);
+			if (issued === undefined || outbox === undefined) throw this.#latchCorruption();
+			const decoded = decodeDurableIssuancePreimage(
+				issued.envelope.canonicalPreimageBytes,
+				captured.scope,
+				authorSequence
+			);
+			if (
+				decoded === undefined ||
+				issued.authorSequence !== authorSequence ||
+				outbox.commit.authorSequence !== authorSequence ||
+				!sameScope(issued.issuedRecord.scope, captured.scope) ||
+				!sameScope(outbox.commit.outboxEntry.scope, captured.scope) ||
+				!sameBytes(issued.envelope.digest, outbox.commit.envelope.digest)
+			) {
+				throw this.#latchCorruption();
+			}
+			if (decoded.epoch !== captured.closedEpoch) {
+				throw new InvalidArgumentFailure("selected issuance row belongs to another epoch");
+			}
+			if (outbox.publishState === "pending") {
+				throw failure("ISSUANCE_RETRY_REQUIRED", "selected issuance prefix is not published");
+			}
+		}
+		for (let authorSequence = from; authorSequence <= captured.throughAuthorSequence; authorSequence += 1) {
+			const recordAddress = recordKey(captured.scope, authorSequence);
+			this.#issued.delete(recordAddress);
+			this.#outbox.delete(recordAddress);
+		}
+		this.#watermarks.set(key, captured.throughAuthorSequence);
+		return createDurableIssuancePruningReceipt(captured, lineage, from);
+	}
+
 	#assertAvailable(): void {
 		if (this.#poison !== undefined) throw this.#poison;
 		if (this.#closed) throw failure("ISSUANCE_STORE_CLOSED", "durable issuance store is closed");
@@ -279,6 +390,8 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 	}
 }
 
+const implementationByStore = new WeakMap<DurableIssuanceStore, EphemeralDurableIssuanceStore>();
+
 /**
  * Creates the explicitly non-durable conformance control used by backend-independent tests.
  * @param options - Optional initial lineage and corruption state.
@@ -288,7 +401,7 @@ export function createEphemeralDurableIssuanceStore(
 	options: EphemeralDurableIssuanceStoreOptions = {}
 ): DurableIssuanceStore {
 	const implementation = new EphemeralDurableIssuanceStore(options);
-	return {
+	const store: DurableIssuanceStore = {
 		close: () => implementation.close(),
 		compareAndMarkOutboxPublished: (input) => implementation.compareAndMarkOutboxPublished(input),
 		readIssued: (scope, authorSequence) => implementation.readIssued(scope, authorSequence),
@@ -296,4 +409,22 @@ export function createEphemeralDurableIssuanceStore(
 		readOutboxPage: (input) => implementation.readOutboxPage(input),
 		transactIssue: (scope, buildAndSign) => implementation.transactIssue(scope, buildAndSign),
 	};
+	implementationByStore.set(store, implementation);
+	return store;
+}
+
+/**
+ * Resolves maintenance only for a genuine facade created by this module.
+ * @param store - Candidate ordinary issuance facade.
+ * @returns Its identity-bound maintenance capability, when owned here.
+ */
+export function resolveEphemeralDurableIssuancePruningMaintenance(
+	store: DurableIssuanceStore
+): DurableIssuancePruningMaintenance | undefined {
+	const implementation = implementationByStore.get(store);
+	if (implementation === undefined) return undefined;
+	return Object.freeze({
+		inspectPruningState: (scope: DurableIssueScope) => implementation.inspectPruningState(scope),
+		prunePublishedPrefix: (input: unknown) => implementation.prunePublishedPrefix(input),
+	});
 }

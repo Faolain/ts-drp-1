@@ -1,8 +1,8 @@
 import { encodeCanonical } from "@ts-drp/canonical";
 import type {
+	DurableIssuanceStore,
 	DurableIssueCommit,
 	DurableIssueScope,
-	DurableIssuanceStore,
 	DurableLineage,
 } from "@ts-drp/issuance-store";
 
@@ -125,7 +125,13 @@ export interface D109bPruningMaintenance {
 }
 
 export interface D109bConformanceModule {
-	createEphemeralDurableIssuanceStore(): DurableIssuanceStore;
+	createEphemeralDurableIssuanceStore(options?: {
+		readonly initialLineages?: readonly {
+			readonly exhausted: boolean;
+			readonly next: number;
+			readonly scope: DurableIssueScope;
+		}[];
+	}): DurableIssuanceStore;
 	resolveEphemeralDurableIssuancePruningMaintenance(store: DurableIssuanceStore): D109bPruningMaintenance | undefined;
 }
 
@@ -151,6 +157,14 @@ function bytes(seed: number, length: number): Uint8Array {
 	return Uint8Array.from({ length }, (_, index) => (seed + index) & 0xff);
 }
 
+/**
+ * Creates one structurally valid v3 issuance closure.
+ * @param scope - Issuance scope to bind.
+ * @param authorSequence - Selected author ordinal.
+ * @param epoch - Vertex epoch encoded in the canonical preimage.
+ * @param seed - Deterministic byte seed.
+ * @returns A complete detached commit.
+ */
 export function d109bCommit(
 	scope: DurableIssueScope,
 	authorSequence: number,
@@ -177,6 +191,14 @@ export function d109bCommit(
 	};
 }
 
+/**
+ * Issues one fixture commit and optionally marks its outbox row published.
+ * @param store - Issuance store under test.
+ * @param scope - Scope to issue against.
+ * @param epoch - Vertex epoch to encode.
+ * @param published - Whether to acknowledge publication.
+ * @returns The committed closure.
+ */
 export async function d109bIssue(
 	store: DurableIssuanceStore,
 	scope: DurableIssueScope,
@@ -196,6 +218,13 @@ export async function d109bIssue(
 	return commit;
 }
 
+/**
+ * Builds one exact pruning request from an observed state.
+ * @param state - Detached pruning-state observation.
+ * @param closedEpoch - Closed epoch being removed.
+ * @param throughAuthorSequence - Inclusive deletion boundary.
+ * @returns A frozen exact pruning request.
+ */
 export function d109bPruningInput(
 	state: D109bPruningState,
 	closedEpoch: number,
@@ -212,12 +241,23 @@ export function d109bPruningInput(
 	});
 }
 
+/**
+ * Reads only the public code from an unknown failure.
+ * @param error - Unknown thrown value.
+ * @returns Its string code, when present.
+ */
 export function d109bErrorCode(error: unknown): string | undefined {
 	return typeof error === "object" && error !== null && typeof Reflect.get(error, "code") === "string"
 		? String(Reflect.get(error, "code"))
 		: undefined;
 }
 
+/**
+ * Tests recursive immutability without revisiting cycles.
+ * @param value - Candidate object graph.
+ * @param seen - Already visited objects.
+ * @returns Whether every reachable object is frozen.
+ */
 export function d109bDeepFrozen(value: unknown, seen = new Set<object>()): boolean {
 	if (value === null || typeof value !== "object" || seen.has(value)) return true;
 	seen.add(value);

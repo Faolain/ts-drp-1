@@ -88107,3 +88107,73 @@ native mutants, 10 migration cases, six crash edges, page boundaries
 The self-excluding evidence manifest is
 `.logs/phase-6b-d109b-red/manifest.sha256`; RED is causal and authorizes only
 the frozen D.109b GREEN implementation.
+
+#### D.109b GREEN implementation and evidence checkpoint
+
+D.109b GREEN implements only the frozen issuance owners, explicit maintenance
+subpaths, prospective D.109a planner continuation, and directly affected test
+expectations. The ordinary issuance facade remains exactly six methods; the
+existing Node/browser issuance factory modules remain exactly one factory
+each; package roots do not re-export maintenance. No dependency, protocol,
+snapshot, digest, activation, scheduler, threshold, timeout, workload,
+campaign, node-handle, or runtime-wiring change occurred.
+
+The shared maintenance owner validates and copies the closed request, owns the
+structural canonical v3 decoder and common lineage/watermark predicates, and
+creates detached frozen state, receipt, and pruned-address evidence. Each
+backend binds its two-method capability to the exact genuine ordinary facade
+through a module-private `WeakMap`. Copies, proxies, structural lookalikes, and
+cross-backend facades resolve to `undefined`.
+
+Node now admits exact schema v2 in the unchanged
+`.drp-issuance-v1.sqlite` file. Exact v1 migration rereads version and catalog
+under `BEGIN IMMEDIATE`, rebuilds only `lineages`, preserves both issuance
+tables, verifies v2, and rolls back on failure. The executable matrix proves
+fresh v2, in-place v1 row preservation and inode continuity, failed-migration
+rollback, two racing v1 openers, exact-v2 reopen, unknown version/catalog
+refusal, unchanged derived filename, and numeric-watermark reopen. Its
+genuine-row mutants cover malformed canonical bytes, wrong kind/protocol/
+scope/ordinal/epoch, one-sided rows, digest mismatch, gaps and epoch
+regression; injected delete/watermark count mismatches roll back; two live
+handles serialize; and all six hard-kill edges reopen old XOR complete-new
+state.
+
+Browser keeps IndexedDB version 1, the unchanged derived name and exact stores/
+key paths. It reads legacy four-member lineages as null-watermark state,
+introduces the fifth member only at pruning, and preserves it on later
+issuance. Chromium proves identity gating, legacy/current rows, late exact and
+wrong-digest pruned acknowledgement, unrelated-scope retention, stale lineage/
+watermark, pending and wrong-epoch refusal, later-epoch continuation, and the
+same eleven genuine native-row mutants with zero pruning writes.
+
+The immutable RED remains
+`db84a1addf28e655f7b5850fd540c4b9b6f5ca48`. GREEN added executable
+acceptance assertions for migration and native-mutant labels already frozen in
+the RED roster; those additions do not retroactively claim they executed at
+RED. The final focused result is three files and 45/45 Vitest assertions plus
+4/4 Chromium assertions, all with no skip, failure, flaky result or top-level
+error. The final retained result is 22 Vitest files and 183/183 assertions,
+8/8 Phase-2l browser lifecycle/death assertions, and 3/3 browser parity
+assertions. The additionally exercised retained p2 browser death suite passed
+2/2.
+
+All four affected package builds and source-only typechecks pass. Exact-owner
+ESLint, Prettier, `git diff --check`, runtime/package surface census, Node v2
+and browser v1 source-shape checks, protected paths, 26 stashes, clear fixed
+ports, and process custody pass. The clean-refactor audit collapsed duplicated
+lineage equality/consumption into the shared maintenance owner and removed two
+unused wrappers. The first retained sweeps' two stale schema expectations and
+one stale terminal hash are preserved and dispositioned as expectation
+corrections. A faulty read-only zsh loop used special variable `path`; its
+corrected `protected_entry` diagnostic passed and no code verdict relied on
+the failed command.
+
+Complete commands and results are in
+`.logs/phase-6b-d109b-green/commands.txt`. The self-excluding manifest
+validates and has SHA-256
+`1ced94f236482b08583b490fbadc04c0601f5b612b88180fcd575e80016d429b`.
+No campaign ran. Sign and push this GREEN checkpoint before the sole final
+Grok 4.6/high, exact Kimi K3 thinking/high with both 100-step controls, and
+Opus xhigh plan-to-RED-to-GREEN review. Kimi occupies the middle external-CLI
+review slot; Codex `gpt-5.6-sol` is not a substitute. Only a P0/P1 finding
+blocks D.109b closure. D.109c remains closed until that review is complete.

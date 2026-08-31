@@ -14,6 +14,12 @@ import {
 	assertDurableIssueScope as validateScope,
 	isValidDurableAuthorSequence as validOrdinal,
 } from "./contract.js";
+import {
+	createDurableIssuanceRecordPrunedError,
+	durableIssuanceAddressIsPruned,
+	durableIssuanceLineageConsumed,
+	durableIssuanceLineagesEqual,
+} from "./maintenance.js";
 import type {
 	DurableIssuancePublishState,
 	DurableIssueCommit,
@@ -33,6 +39,7 @@ export interface DurableIssuanceTerminalObservation {
 	readonly issuedRecord: DurableIssuedRecord | null;
 	readonly lineage: DurableLineage;
 	readonly outboxRecord: DurableIssuanceNativeOutboxRecord | null;
+	readonly prunedThroughAuthorSequence: number | null;
 }
 
 export interface DurableIssuanceTerminalClassificationInput {
@@ -40,10 +47,6 @@ export interface DurableIssuanceTerminalClassificationInput {
 	readonly observation: DurableIssuanceTerminalObservation | { readonly unreadable: true };
 	readonly priorLineage: DurableLineage;
 	readonly scope: DurableIssueScope;
-}
-
-function sameLineage(left: DurableLineage, right: DurableLineage): boolean {
-	return left.next === right.next && left.exhausted === right.exhausted;
 }
 
 function copyExactLineage(value: unknown, source: "caller" | "durable-observation"): DurableLineage {
@@ -56,10 +59,6 @@ function copyExactLineage(value: unknown, source: "caller" | "durable-observatio
 		throw failure("ISSUANCE_RECOVERY_CORRUPT", "durable observation contains a malformed lineage");
 	}
 	return exact;
-}
-
-function consumed(lineage: DurableLineage, ordinal: number): boolean {
-	return lineage.next > ordinal || (lineage.exhausted && lineage.next === ordinal);
 }
 
 function recordMatches(record: DurableIssuedRecord, expected: DurableIssuedRecord, requireEnvelope: boolean): boolean {
@@ -125,11 +124,25 @@ export function classifyDurableIssuanceTerminalSuppression(
 		throw new InvalidArgumentFailure("candidate must close the exact prior-lineage ordinal");
 	}
 	if ("unreadable" in input.observation) throw new UnknownOutcomeFailure(scope);
-	const { issuedRecord, lineage, outboxRecord } = input.observation;
+	if (!isRecord(input.observation, ["issuedRecord", "lineage", "outboxRecord", "prunedThroughAuthorSequence"])) {
+		throw failure("ISSUANCE_RECOVERY_CORRUPT", "durable observation has an invalid closed shape");
+	}
+	const { issuedRecord, lineage, outboxRecord, prunedThroughAuthorSequence } = input.observation;
 	const observedLineage = copyExactLineage(lineage, "durable-observation");
-	const isConsumed = consumed(observedLineage, candidate.authorSequence);
+	if (
+		prunedThroughAuthorSequence !== null &&
+		(!validOrdinal(prunedThroughAuthorSequence) ||
+			!durableIssuanceLineageConsumed(observedLineage, prunedThroughAuthorSequence))
+	) {
+		throw failure("ISSUANCE_RECOVERY_CORRUPT", "durable observation contains an invalid pruning watermark");
+	}
+	const isConsumed = durableIssuanceLineageConsumed(observedLineage, candidate.authorSequence);
+	const isPruned = durableIssuanceAddressIsPruned(prunedThroughAuthorSequence, candidate.authorSequence);
 	const observedIssued = issuedRecord === null ? null : copyIssuedRecord(issuedRecord);
 	const observedOutbox = outboxRecord === null ? null : copyNativeOutboxRecord(outboxRecord);
+	if (isPruned && (issuedRecord !== null || outboxRecord !== null)) {
+		throw failure("ISSUANCE_RECOVERY_CORRUPT", "pruned durable address still contains issuance rows");
+	}
 	if (
 		(issuedRecord !== null && observedIssued === undefined) ||
 		(outboxRecord !== null && observedOutbox === undefined)
@@ -148,7 +161,10 @@ export function classifyDurableIssuanceTerminalSuppression(
 	) {
 		return cloneCommit(candidate);
 	}
-	if (issuedRecord === null && outboxRecord === null && sameLineage(observedLineage, priorLineage)) {
+	if (issuedRecord === null && outboxRecord === null && isConsumed && isPruned) {
+		throw createDurableIssuanceRecordPrunedError(scope, candidate.authorSequence);
+	}
+	if (issuedRecord === null && outboxRecord === null && durableIssuanceLineagesEqual(observedLineage, priorLineage)) {
 		throw failure("ISSUANCE_SUBSTRATE_FAILURE", "commit was definitively not applied", "transient");
 	}
 	if (

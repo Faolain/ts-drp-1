@@ -27,15 +27,30 @@ import {
 	isValidDurableScopeField,
 	MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT,
 } from "@ts-drp/issuance-store";
+import {
+	captureDurableIssuancePruningInput,
+	createDurableIssuancePruningReceipt,
+	createDurableIssuancePruningState,
+	createDurableIssuanceRecordPrunedError,
+	decodeDurableIssuancePreimage,
+	durableIssuanceAddressIsPruned,
+	durableIssuanceLineageConsumed,
+	durableIssuanceLineagesEqual,
+	type DurableIssuancePruningReceipt,
+	type DurableIssuancePruningState,
+	DurableIssuanceRecordPrunedError,
+} from "@ts-drp/issuance-store/maintenance";
 import { DatabaseSync, type StatementSync } from "node:sqlite";
 
 const DATABASE_SUFFIX = ".drp-issuance-v1.sqlite";
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 const PAGE_SIZE = 4096;
 const BUSY_TIMEOUT = 1000;
 
-const LINEAGES_DDL =
+const LINEAGES_V1_DDL =
 	"CREATE TABLE lineages (\n  object_id TEXT NOT NULL,\n  author TEXT NOT NULL,\n  next INTEGER NOT NULL CHECK(next BETWEEN 0 AND 9007199254740991),\n  exhausted INTEGER NOT NULL CHECK(exhausted IN (0,1)),\n  PRIMARY KEY (object_id,author)\n) WITHOUT ROWID";
+const LINEAGES_DDL =
+	"CREATE TABLE lineages (\n  object_id TEXT NOT NULL,\n  author TEXT NOT NULL,\n  next INTEGER NOT NULL CHECK(next BETWEEN 0 AND 9007199254740991),\n  exhausted INTEGER NOT NULL CHECK(exhausted IN (0,1)),\n  pruned_through_author_sequence INTEGER CHECK(pruned_through_author_sequence IS NULL OR pruned_through_author_sequence BETWEEN 0 AND 9007199254740991),\n  PRIMARY KEY (object_id,author)\n) WITHOUT ROWID";
 const ISSUED_RECORDS_DDL =
 	"CREATE TABLE issued_records (\n  object_id TEXT NOT NULL,\n  author TEXT NOT NULL,\n  author_sequence INTEGER NOT NULL CHECK(author_sequence BETWEEN 0 AND 9007199254740991),\n  canonical_preimage BLOB NOT NULL CHECK(typeof(canonical_preimage) = 'blob' AND length(canonical_preimage) > 0),\n  digest BLOB NOT NULL CHECK(typeof(digest) = 'blob' AND length(digest) > 0),\n  signature BLOB NOT NULL CHECK(typeof(signature) = 'blob' AND length(signature) > 0),\n  PRIMARY KEY (object_id,author,author_sequence)\n) WITHOUT ROWID";
 const ISSUANCE_OUTBOX_DDL =
@@ -47,9 +62,15 @@ const EXPECTED_CATALOG = Object.freeze([
 	Object.freeze({ name: "issued_records", sql: ISSUED_RECORDS_DDL, type: "table" }),
 	Object.freeze({ name: "lineages", sql: LINEAGES_DDL, type: "table" }),
 ] as const);
+const V1_EXPECTED_CATALOG = Object.freeze([
+	Object.freeze({ name: "issuance_outbox", sql: ISSUANCE_OUTBOX_DDL, type: "table" }),
+	Object.freeze({ name: "issued_records", sql: ISSUED_RECORDS_DDL, type: "table" }),
+	Object.freeze({ name: "lineages", sql: LINEAGES_V1_DDL, type: "table" }),
+] as const);
 
 interface NativeLineage extends DurableLineage {
 	readonly present: boolean;
+	readonly prunedThroughAuthorSequence: number | null;
 }
 
 interface NativeLineageRow extends DurableIssueScope, NativeLineage {}
@@ -71,6 +92,7 @@ interface TerminalReadback {
 	readonly issuedRecord: DurableIssuedRecord | null;
 	readonly lineage: DurableLineage;
 	readonly outboxRecord: DurableIssuanceNativeOutboxRecord | null;
+	readonly prunedThroughAuthorSequence: number | null;
 }
 
 function invalid(message: string): DurableIssuanceInvalidArgumentError {
@@ -96,7 +118,11 @@ function errorText(error: unknown): string {
 }
 
 function mapSubstrate(error: unknown, message: string, fallback: "permanent" | "transient" = "transient"): Error {
-	if (error instanceof DurableIssuanceContractError || error instanceof DurableIssuanceInvalidArgumentError) {
+	if (
+		error instanceof DurableIssuanceContractError ||
+		error instanceof DurableIssuanceInvalidArgumentError ||
+		error instanceof DurableIssuanceRecordPrunedError
+	) {
 		return error;
 	}
 	const number = errorNumber(error);
@@ -148,11 +174,14 @@ function catalog(database: DatabaseSync): readonly Record<string, unknown>[] {
 	return statement(database, "SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY type,name").all();
 }
 
-function catalogMatches(rows: readonly Record<string, unknown>[]): boolean {
+function catalogMatches(
+	rows: readonly Record<string, unknown>[],
+	expectedCatalog: typeof EXPECTED_CATALOG | typeof V1_EXPECTED_CATALOG = EXPECTED_CATALOG
+): boolean {
 	return (
-		rows.length === EXPECTED_CATALOG.length &&
+		rows.length === expectedCatalog.length &&
 		rows.every((row, index) => {
-			const expected = EXPECTED_CATALOG[index];
+			const expected = expectedCatalog[index];
 			return (
 				expected !== undefined &&
 				row.type === expected.type &&
@@ -193,36 +222,42 @@ function admit(database: DatabaseSync): void {
 
 	const initialCatalog = catalog(database);
 	const initialVersion = scalar(database, "PRAGMA user_version");
-	const initialPageSize = scalar(database, "PRAGMA page_size");
-	const initialJournal = String(scalar(database, "PRAGMA journal_mode")).toLowerCase();
-	const fresh = initialCatalog.length === 0 && initialVersion === 0;
-	if (!fresh) {
-		if (
-			initialVersion !== SCHEMA_VERSION ||
-			initialPageSize !== PAGE_SIZE ||
-			initialJournal !== "wal" ||
-			!catalogMatches(initialCatalog)
-		) {
-			throw unsupported("existing issuance SQLite authority is unsupported");
+	const initiallyFresh = initialCatalog.length === 0 && initialVersion === 0;
+	if (initiallyFresh) {
+		database.exec(`PRAGMA page_size=${PAGE_SIZE}`);
+		if (scalar(database, "PRAGMA page_size") !== PAGE_SIZE) {
+			throw failure("ISSUANCE_DURABILITY_UNAVAILABLE", "SQLite page size could not be established");
 		}
-		verifyAuthority(database);
-		return;
-	}
-
-	database.exec(`PRAGMA page_size=${PAGE_SIZE}`);
-	if (scalar(database, "PRAGMA page_size") !== PAGE_SIZE) {
-		throw failure("ISSUANCE_DURABILITY_UNAVAILABLE", "SQLite page size could not be established");
-	}
-	const journalResult = scalar(database, "PRAGMA journal_mode=WAL");
-	if (String(journalResult).toLowerCase() !== "wal") {
-		throw failure("ISSUANCE_DURABILITY_UNAVAILABLE", "SQLite WAL mode could not be established");
+		const journalResult = scalar(database, "PRAGMA journal_mode=WAL");
+		if (String(journalResult).toLowerCase() !== "wal") {
+			throw failure("ISSUANCE_DURABILITY_UNAVAILABLE", "SQLite WAL mode could not be established");
+		}
+	} else if (
+		scalar(database, "PRAGMA page_size") !== PAGE_SIZE ||
+		String(scalar(database, "PRAGMA journal_mode")).toLowerCase() !== "wal"
+	) {
+		throw unsupported("existing issuance SQLite authority is unsupported");
 	}
 	database.exec("BEGIN IMMEDIATE");
 	try {
-		for (const sql of DDL) database.exec(sql);
-		database.exec(`PRAGMA user_version=${SCHEMA_VERSION}`);
+		const lockedCatalog = catalog(database);
+		const lockedVersion = scalar(database, "PRAGMA user_version");
+		if (lockedCatalog.length === 0 && lockedVersion === 0) {
+			for (const sql of DDL) database.exec(sql);
+			database.exec(`PRAGMA user_version=${SCHEMA_VERSION}`);
+		} else if (lockedVersion === 1 && catalogMatches(lockedCatalog, V1_EXPECTED_CATALOG)) {
+			database.exec("ALTER TABLE lineages RENAME TO lineages_v1");
+			database.exec(LINEAGES_DDL);
+			database.exec(
+				"INSERT INTO lineages (object_id,author,next,exhausted,pruned_through_author_sequence) SELECT object_id,author,next,exhausted,NULL FROM lineages_v1"
+			);
+			database.exec("DROP TABLE lineages_v1");
+			database.exec(`PRAGMA user_version=${SCHEMA_VERSION}`);
+		} else if (lockedVersion !== SCHEMA_VERSION || !catalogMatches(lockedCatalog)) {
+			throw unsupported("existing issuance SQLite authority is unsupported");
+		}
 		if (!catalogMatches(catalog(database)) || scalar(database, "PRAGMA user_version") !== SCHEMA_VERSION) {
-			throw unsupported("fresh issuance SQLite authority did not match its exact schema");
+			throw unsupported("issuance SQLite authority did not match its exact v2 schema");
 		}
 		database.exec("COMMIT");
 	} catch (error) {
@@ -237,18 +272,21 @@ function admit(database: DatabaseSync): void {
 }
 
 function rawLineage(value: unknown, present: boolean): NativeLineage | undefined {
-	if (!present) return { exhausted: false, next: 0, present: false };
+	if (!present) return { exhausted: false, next: 0, present: false, prunedThroughAuthorSequence: null };
 	if (typeof value !== "object" || value === null) return undefined;
 	const next = Reflect.get(value, "next");
 	const exhausted = Reflect.get(value, "exhausted");
+	const watermark = Reflect.get(value, "pruned_through_author_sequence");
 	if (
 		!isValidDurableAuthorSequence(next) ||
 		(exhausted !== 0 && exhausted !== 1) ||
-		(exhausted === 1 && next !== Number.MAX_SAFE_INTEGER)
+		(exhausted === 1 && next !== Number.MAX_SAFE_INTEGER) ||
+		(watermark !== null && !isValidDurableAuthorSequence(watermark)) ||
+		(watermark !== null && !durableIssuanceLineageConsumed({ exhausted: exhausted === 1, next }, watermark))
 	) {
 		return undefined;
 	}
-	return { exhausted: exhausted === 1, next, present: true };
+	return { exhausted: exhausted === 1, next, present: true, prunedThroughAuthorSequence: watermark };
 }
 
 function copyLineageRow(value: unknown): NativeLineageRow | undefined {
@@ -268,10 +306,10 @@ function readNativeLineage(
 	authority: "snapshot" | "writer" = "snapshot"
 ): NativeLineage | undefined {
 	const table = authority === "writer" ? "lineages" : "main.lineages";
-	const row = statement(database, `SELECT next,exhausted FROM ${table} WHERE object_id=? AND author=?`).get(
-		scope.objectId,
-		scope.author
-	);
+	const row = statement(
+		database,
+		`SELECT next,exhausted,pruned_through_author_sequence FROM ${table} WHERE object_id=? AND author=?`
+	).get(scope.objectId, scope.author);
 	return rawLineage(row, row !== undefined);
 }
 
@@ -339,10 +377,6 @@ function sameLineage(left: NativeLineage, right: NativeLineage): boolean {
 	return left.present === right.present && left.next === right.next && left.exhausted === right.exhausted;
 }
 
-function lineageConsumed(lineage: DurableLineage, authorSequence: number): boolean {
-	return lineage.next > authorSequence || (lineage.exhausted && lineage.next === authorSequence);
-}
-
 class NodeIssuanceImplementation {
 	readonly #database: DatabaseSync;
 	#closed = false;
@@ -381,6 +415,11 @@ class NodeIssuanceImplementation {
 				this.#database.exec("ROLLBACK");
 				began = false;
 				throw invalid("publication address has never been issued");
+			}
+			if (status === "pruned") {
+				this.#database.exec("ROLLBACK");
+				began = false;
+				throw createDurableIssuanceRecordPrunedError(captured.scope, captured.authorSequence);
 			}
 			if (status === "foreign-digest") {
 				this.#database.exec("ROLLBACK");
@@ -443,14 +482,23 @@ class NodeIssuanceImplementation {
 		} catch (error) {
 			throw this.#mapOperationError(error, "issued-record read failed");
 		}
-		if (observation.issuedRecord === null && observation.outboxRecord === null) return null;
+		if (observation.issuedRecord === null && observation.outboxRecord === null) {
+			if (
+				durableIssuanceLineageConsumed(observation.lineage, authorSequence) &&
+				!durableIssuanceAddressIsPruned(observation.prunedThroughAuthorSequence, authorSequence)
+			) {
+				throw this.#latchCorruption("consumed issued closure is absent above the pruning watermark");
+			}
+			return null;
+		}
 		if (
 			observation.issuedRecord === null ||
 			observation.outboxRecord === null ||
 			observation.issuedRecord.authorSequence !== authorSequence ||
 			observation.outboxRecord.authorSequence !== authorSequence ||
 			!bytesEqual(observation.issuedRecord.envelope.digest, observation.outboxRecord.digest) ||
-			!lineageConsumed(observation.lineage, authorSequence)
+			!durableIssuanceLineageConsumed(observation.lineage, authorSequence) ||
+			durableIssuanceAddressIsPruned(observation.prunedThroughAuthorSequence, authorSequence)
 		) {
 			throw this.#latchCorruption("stored issued closure is incomplete or malformed");
 		}
@@ -469,7 +517,10 @@ class NodeIssuanceImplementation {
 		const parsed = this.#parsePageInput(input);
 		try {
 			this.#database.exec("BEGIN");
-			const lineageRows = statement(this.#database, "SELECT object_id,author,next,exhausted FROM lineages").all();
+			const lineageRows = statement(
+				this.#database,
+				"SELECT object_id,author,next,exhausted,pruned_through_author_sequence FROM lineages"
+			).all();
 			const issuedRows = statement(
 				this.#database,
 				"SELECT object_id,author,author_sequence,canonical_preimage,digest,signature FROM issued_records"
@@ -500,7 +551,11 @@ class NodeIssuanceImplementation {
 					throw this.#latchCorruption("outbox has no matching issued record");
 				}
 				const lineage = lineageByScope.get(this.#scopeKey(row));
-				if (lineage === undefined || !lineageConsumed(lineage, row.authorSequence)) {
+				if (
+					lineage === undefined ||
+					!durableIssuanceLineageConsumed(lineage, row.authorSequence) ||
+					durableIssuanceAddressIsPruned(lineage.prunedThroughAuthorSequence, row.authorSequence)
+				) {
 					throw this.#latchCorruption("stored outbox closure was not consumed by lineage");
 				}
 				issuedByKey.delete(this.#key(row, row.authorSequence));
@@ -546,6 +601,157 @@ class NodeIssuanceImplementation {
 		const candidate = copyAndValidateDurableIssueCommit(built, detached, prior.next);
 		this.#assertAvailable();
 		return this.#commitCandidate(detached, prior, candidate);
+	}
+
+	inspectPruningState(scope: DurableIssueScope): Promise<DurableIssuancePruningState> {
+		this.#assertAvailable();
+		assertDurableIssueScope(scope);
+		const detached = copyDurableIssueScope(scope);
+		try {
+			this.#database.exec("BEGIN");
+			const lineage = readNativeLineage(this.#database, detached, "writer");
+			if (lineage === undefined) throw this.#latchCorruption("stored lineage is malformed");
+			this.#database.exec("COMMIT");
+			return Promise.resolve(
+				createDurableIssuancePruningState(
+					detached,
+					{ exhausted: lineage.exhausted, next: lineage.next },
+					lineage.prunedThroughAuthorSequence
+				)
+			);
+		} catch (error) {
+			try {
+				this.#database.exec("ROLLBACK");
+			} catch {
+				// Preserve the inspection failure.
+			}
+			return Promise.reject(this.#mapOperationError(error, "pruning-state inspection failed"));
+		}
+	}
+
+	prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt> {
+		let captured: ReturnType<typeof captureDurableIssuancePruningInput>;
+		try {
+			captured = captureDurableIssuancePruningInput(input);
+			this.#assertAvailable();
+		} catch (error) {
+			return Promise.reject(error);
+		}
+		let began = false;
+		try {
+			this.#database.exec("BEGIN IMMEDIATE");
+			began = true;
+			const current = readNativeLineage(this.#database, captured.scope, "writer");
+			if (current === undefined) throw this.#latchCorruption("stored lineage is malformed");
+			const lineage = { exhausted: current.exhausted, next: current.next };
+			if (
+				captured.expectedPrunedThroughAuthorSequence !== null &&
+				(captured.expectedPrunedThroughAuthorSequence > captured.throughAuthorSequence ||
+					!durableIssuanceLineageConsumed(captured.expectedLineage, captured.expectedPrunedThroughAuthorSequence))
+			) {
+				throw invalid("expected pruning state is internally impossible");
+			}
+			if (
+				current.prunedThroughAuthorSequence === captured.throughAuthorSequence &&
+				durableIssuanceLineagesEqual(lineage, captured.expectedLineage)
+			) {
+				this.#database.exec("COMMIT");
+				began = false;
+				return Promise.resolve(createDurableIssuancePruningReceipt(captured, lineage, null));
+			}
+			if (
+				current.prunedThroughAuthorSequence !== captured.expectedPrunedThroughAuthorSequence ||
+				!durableIssuanceLineagesEqual(lineage, captured.expectedLineage)
+			) {
+				throw failure("ISSUANCE_RETRY_REQUIRED", "issuance pruning state changed");
+			}
+			if (
+				(current.prunedThroughAuthorSequence !== null &&
+					captured.throughAuthorSequence <= current.prunedThroughAuthorSequence) ||
+				!durableIssuanceLineageConsumed(lineage, captured.throughAuthorSequence)
+			) {
+				throw invalid("selected pruning boundary is invalid");
+			}
+			const from = current.prunedThroughAuthorSequence === null ? 0 : current.prunedThroughAuthorSequence + 1;
+			for (let pageFrom = from; pageFrom <= captured.throughAuthorSequence; pageFrom += 64) {
+				const pageThrough = Math.min(captured.throughAuthorSequence, pageFrom + 63);
+				const issuedRows = statement(
+					this.#database,
+					"SELECT object_id,author,author_sequence,canonical_preimage,digest,signature FROM issued_records WHERE object_id=? AND author=? AND author_sequence BETWEEN ? AND ? ORDER BY author_sequence"
+				).all(captured.scope.objectId, captured.scope.author, pageFrom, pageThrough);
+				const outboxRows = statement(
+					this.#database,
+					"SELECT object_id,author,author_sequence,digest,publish_state FROM issuance_outbox WHERE object_id=? AND author=? AND author_sequence BETWEEN ? AND ? ORDER BY author_sequence"
+				).all(captured.scope.objectId, captured.scope.author, pageFrom, pageThrough);
+				const expectedCount = pageThrough - pageFrom + 1;
+				if (issuedRows.length !== expectedCount || outboxRows.length !== expectedCount) {
+					throw this.#latchCorruption("selected issuance prefix is incomplete");
+				}
+				for (let index = 0; index < expectedCount; index += 1) {
+					const authorSequence = pageFrom + index;
+					const issued = copyIssuedRow(issuedRows[index]);
+					const outbox = copyOutboxRow(outboxRows[index]);
+					if (
+						issued === undefined ||
+						outbox === undefined ||
+						issued.authorSequence !== authorSequence ||
+						outbox.authorSequence !== authorSequence ||
+						!bytesEqual(issued.digest, outbox.digest)
+					) {
+						throw this.#latchCorruption("selected issuance prefix is malformed");
+					}
+					const decoded = decodeDurableIssuancePreimage(issued.canonicalPreimageBytes, captured.scope, authorSequence);
+					if (decoded === undefined) throw this.#latchCorruption("selected issuance preimage is malformed");
+					if (decoded.epoch !== captured.closedEpoch) {
+						throw invalid("selected issuance row belongs to another epoch");
+					}
+					if (outbox.publishState === "pending") {
+						throw failure("ISSUANCE_RETRY_REQUIRED", "selected issuance prefix is not published");
+					}
+				}
+			}
+			const issuedChanges = statement(
+				this.#database,
+				"DELETE FROM issued_records WHERE object_id=? AND author=? AND author_sequence BETWEEN ? AND ?"
+			).run(captured.scope.objectId, captured.scope.author, from, captured.throughAuthorSequence).changes;
+			if (issuedChanges !== captured.throughAuthorSequence - from + 1) {
+				throw this.#latchCorruption("issued deletion changed an impossible row count");
+			}
+			const outboxChanges = statement(
+				this.#database,
+				"DELETE FROM issuance_outbox WHERE object_id=? AND author=? AND author_sequence BETWEEN ? AND ?"
+			).run(captured.scope.objectId, captured.scope.author, from, captured.throughAuthorSequence).changes;
+			if (outboxChanges !== captured.throughAuthorSequence - from + 1) {
+				throw this.#latchCorruption("outbox deletion changed an impossible row count");
+			}
+			const watermarkChanges = statement(
+				this.#database,
+				"UPDATE lineages SET pruned_through_author_sequence=? WHERE object_id=? AND author=? AND next=? AND exhausted=? AND ((pruned_through_author_sequence IS NULL AND ? IS NULL) OR pruned_through_author_sequence=?)"
+			).run(
+				captured.throughAuthorSequence,
+				captured.scope.objectId,
+				captured.scope.author,
+				lineage.next,
+				lineage.exhausted ? 1 : 0,
+				current.prunedThroughAuthorSequence,
+				current.prunedThroughAuthorSequence
+			).changes;
+			if (watermarkChanges !== 1) {
+				throw this.#latchCorruption("watermark update changed an impossible row count");
+			}
+			this.#database.exec("COMMIT");
+			began = false;
+			return Promise.resolve(createDurableIssuancePruningReceipt(captured, lineage, from));
+		} catch (error) {
+			if (began) {
+				try {
+					this.#database.exec("ROLLBACK");
+				} catch {
+					// Preserve the pruning failure.
+				}
+			}
+			return Promise.reject(this.#mapOperationError(error, "issuance pruning failed"));
+		}
 	}
 
 	#commitCandidate(scope: DurableIssueScope, prior: NativeLineage, candidate: DurableIssueCommit): DurableIssueCommit {
@@ -701,6 +907,7 @@ class NodeIssuanceImplementation {
 							publishState: outbox.publishState,
 							scope: { author: outbox.author, objectId: outbox.objectId },
 						},
+			prunedThroughAuthorSequence: lineage.prunedThroughAuthorSequence,
 		};
 	}
 
@@ -726,11 +933,20 @@ class NodeIssuanceImplementation {
 	#publicationStatus(
 		observation: TerminalReadback,
 		input: DurableOutboxPublicationTransitionInput
-	): "corrupt" | "foreign-digest" | "never-issued" | "pending" | "published" {
-		const { issuedRecord, lineage, outboxRecord } = observation;
-		const consumed = lineageConsumed(lineage, input.authorSequence);
+	): "corrupt" | "foreign-digest" | "never-issued" | "pending" | "pruned" | "published" {
+		const { issuedRecord, lineage, outboxRecord, prunedThroughAuthorSequence } = observation;
+		const consumed = durableIssuanceLineageConsumed(lineage, input.authorSequence);
 		if (issuedRecord === null && outboxRecord === null && !consumed) return "never-issued";
+		if (
+			issuedRecord === null &&
+			outboxRecord === null &&
+			consumed &&
+			durableIssuanceAddressIsPruned(prunedThroughAuthorSequence, input.authorSequence)
+		) {
+			return "pruned";
+		}
 		if (issuedRecord === null || outboxRecord === null || !consumed) return "corrupt";
+		if (durableIssuanceAddressIsPruned(prunedThroughAuthorSequence, input.authorSequence)) return "corrupt";
 		if (
 			issuedRecord.authorSequence !== input.authorSequence ||
 			outboxRecord.authorSequence !== input.authorSequence ||
@@ -761,6 +977,7 @@ class NodeIssuanceImplementation {
 		this.#assertAvailable();
 		const status = this.#publicationStatus(observation, input);
 		if (status === "published") return;
+		if (status === "pruned") throw createDurableIssuanceRecordPrunedError(input.scope, input.authorSequence);
 		if (status === "pending" && commit === "ambiguous") {
 			throw createDurableIssuanceFailure(
 				"ISSUANCE_SUBSTRATE_FAILURE",
@@ -784,6 +1001,7 @@ class NodeIssuanceImplementation {
 	#mapOperationError(error: unknown, message: string): Error {
 		if (error === this.#poison && this.#poison !== undefined) return this.#poison;
 		if (error instanceof DurableIssuanceInvalidArgumentError) return error;
+		if (error instanceof DurableIssuanceRecordPrunedError) return error;
 		if (error instanceof DurableIssuanceContractError) return error;
 		return mapSubstrate(error, message);
 	}
@@ -854,6 +1072,14 @@ class NodeIssuanceImplementation {
 	}
 }
 
+const maintenanceByStore = new WeakMap<
+	DurableIssuanceStore,
+	Readonly<{
+		inspectPruningState(scope: DurableIssueScope): Promise<DurableIssuancePruningState>;
+		prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+	}>
+>();
+
 /**
  * Creates one exact Node SQLite issuance capability.
  * @param options - Untrusted exact Node factory options.
@@ -875,7 +1101,7 @@ export function createNodeDurableIssuanceStoreImplementation(options: unknown): 
 	try {
 		admit(database);
 		const implementation = new NodeIssuanceImplementation(database);
-		return Object.freeze({
+		const store = Object.freeze({
 			close: (): Promise<void> => implementation.close(),
 			compareAndMarkOutboxPublished: (input: DurableOutboxPublicationTransitionInput) =>
 				implementation.compareAndMarkOutboxPublished(input),
@@ -886,6 +1112,14 @@ export function createNodeDurableIssuanceStoreImplementation(options: unknown): 
 			transactIssue: (scope: DurableIssueScope, buildAndSign: DurableBuildAndSign) =>
 				implementation.transactIssue(scope, buildAndSign),
 		});
+		maintenanceByStore.set(
+			store,
+			Object.freeze({
+				inspectPruningState: (scope: DurableIssueScope) => implementation.inspectPruningState(scope),
+				prunePublishedPrefix: (input: unknown) => implementation.prunePublishedPrefix(input),
+			})
+		);
+		return store;
 	} catch (error) {
 		try {
 			database.exec("ROLLBACK");
@@ -900,4 +1134,18 @@ export function createNodeDurableIssuanceStoreImplementation(options: unknown): 
 		if (error instanceof DurableIssuanceContractError) throw error;
 		throw mapSubstrate(error, "issuance SQLite admission failed", "permanent");
 	}
+}
+
+/**
+ * Resolves the private pruning implementation for one exact Node facade.
+ * @param store - Candidate ordinary issuance facade.
+ * @returns Its private maintenance capability, when identity matches.
+ */
+export function nodeIssuancePruningMaintenanceForStore(store: DurableIssuanceStore):
+	| Readonly<{
+			inspectPruningState(scope: DurableIssueScope): Promise<DurableIssuancePruningState>;
+			prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+	  }>
+	| undefined {
+	return maintenanceByStore.get(store);
 }

@@ -1,6 +1,6 @@
 import "fake-indexeddb/auto";
 
-import type { DurableIssueCommit, DurableIssuanceStore } from "@ts-drp/issuance-store";
+import type { DurableIssuanceStore, DurableIssueCommit } from "@ts-drp/issuance-store";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -16,11 +16,11 @@ import {
 	D109B_RED_PATHS,
 	D109B_SCOPE,
 	D109B_SEMANTIC_CASES,
+	type D109bConformanceModule,
 	d109bDeepFrozen,
 	d109bErrorCode,
 	d109bIssue,
 	d109bPruningInput,
-	type D109bConformanceModule,
 } from "./fixtures/phase-6b/issuance-retention-contract.js";
 
 const REPOSITORY_ROOT = resolve(import.meta.dirname, "..");
@@ -179,13 +179,13 @@ describe("D.109b issuance-retention causal RED", () => {
 		async () => {
 			const { maintenance, store } = await opened();
 			try {
-				const published = await d109bIssue(store, D109B_SCOPE, 7);
+				const published = await d109bIssue(store, D109B_SCOPE, 8);
 				await d109bIssue(store, D109B_SCOPE, 8, false);
 				const stateBefore = await maintenance.inspectPruningState(D109B_SCOPE);
 				const pendingError = await capture(maintenance.prunePublishedPrefix(d109bPruningInput(stateBefore, 8, 1)));
 				expect(d109bErrorCode(pendingError)).toBe("ISSUANCE_RETRY_REQUIRED");
 				expect(await store.readLineage(D109B_SCOPE)).toEqual({ exhausted: false, next: 2 });
-				const wrongEpoch = await capture(maintenance.prunePublishedPrefix(d109bPruningInput(stateBefore, 8, 0)));
+				const wrongEpoch = await capture(maintenance.prunePublishedPrefix(d109bPruningInput(stateBefore, 7, 0)));
 				expect(d109bErrorCode(wrongEpoch)).toBe("ISSUANCE_INVALID_ARGUMENT");
 				expect(await store.readIssued(D109B_SCOPE, 0)).toEqual(published);
 			} finally {
@@ -193,6 +193,138 @@ describe("D.109b issuance-retention causal RED", () => {
 			}
 		}
 	);
+
+	it.skipIf(!state.ready)("rejects accessor input before mutation and captures mutable input by value", async () => {
+		const { maintenance, store } = await opened();
+		try {
+			await d109bIssue(store, D109B_SCOPE, 9);
+			const before = await maintenance.inspectPruningState(D109B_SCOPE);
+			let getterCalls = 0;
+			const accessorInput = { ...d109bPruningInput(before, 9, 0) };
+			Object.defineProperty(accessorInput, "throughAuthorSequence", {
+				enumerable: true,
+				get: () => {
+					getterCalls += 1;
+					return 0;
+				},
+			});
+			expect(d109bErrorCode(await capture(maintenance.prunePublishedPrefix(accessorInput)))).toBe(
+				"ISSUANCE_INVALID_ARGUMENT"
+			);
+			expect(getterCalls).toBe(0);
+			expect(await store.readIssued(D109B_SCOPE, 0)).not.toBeNull();
+
+			const frozenInput = d109bPruningInput(before, 9, 0);
+			const mutableInput = {
+				...frozenInput,
+				commitQcRef: { ...(frozenInput.commitQcRef as object) } as { byteLength: number; digest: string },
+				expectedLineage: { ...(frozenInput.expectedLineage as object) } as {
+					exhausted: boolean;
+					next: number;
+				},
+				scope: { ...(frozenInput.scope as object) } as { author: string; objectId: string },
+			};
+			const pruning = maintenance.prunePublishedPrefix(mutableInput);
+			mutableInput.closedEpoch = 10;
+			mutableInput.commitQcRef.digest = "0".repeat(64);
+			mutableInput.expectedLineage.next = 99;
+			mutableInput.scope.author = "z".repeat(64);
+			mutableInput.snapshotManifestDigest = "1".repeat(64);
+			mutableInput.throughAuthorSequence = 99;
+			const receipt = await pruning;
+			expect(receipt).toMatchObject({
+				closedEpoch: 9,
+				commitQcRef: { digest: "e".repeat(64) },
+				prunedThroughAuthorSequence: 0,
+				scope: D109B_SCOPE,
+				snapshotManifestDigest: "f".repeat(64),
+			});
+		} finally {
+			await store.close();
+		}
+	});
+
+	it.skipIf(!state.ready)("refuses stale lineage and stale watermark without poisoning the store", async () => {
+		const first = await opened();
+		try {
+			await d109bIssue(first.store, D109B_SCOPE, 12);
+			const staleLineage = await first.maintenance.inspectPruningState(D109B_SCOPE);
+			await d109bIssue(first.store, D109B_SCOPE, 12);
+			expect(
+				d109bErrorCode(await capture(first.maintenance.prunePublishedPrefix(d109bPruningInput(staleLineage, 12, 0))))
+			).toBe("ISSUANCE_RETRY_REQUIRED");
+			expect(await first.store.readIssued(D109B_SCOPE, 0)).not.toBeNull();
+		} finally {
+			await first.store.close();
+		}
+
+		const second = await opened();
+		try {
+			await d109bIssue(second.store, D109B_SCOPE, 13);
+			await d109bIssue(second.store, D109B_SCOPE, 13);
+			const staleWatermark = await second.maintenance.inspectPruningState(D109B_SCOPE);
+			await second.maintenance.prunePublishedPrefix(d109bPruningInput(staleWatermark, 13, 0));
+			expect(
+				d109bErrorCode(await capture(second.maintenance.prunePublishedPrefix(d109bPruningInput(staleWatermark, 13, 1))))
+			).toBe("ISSUANCE_RETRY_REQUIRED");
+			expect(await second.store.readIssued(D109B_SCOPE, 1)).not.toBeNull();
+		} finally {
+			await second.store.close();
+		}
+	});
+
+	it.skipIf(!state.ready)("supports a later closed epoch after a prior prefix was pruned", async () => {
+		const { maintenance, store } = await opened();
+		try {
+			await d109bIssue(store, D109B_SCOPE, 14);
+			await d109bIssue(store, D109B_SCOPE, 14);
+			const first = await maintenance.inspectPruningState(D109B_SCOPE);
+			await maintenance.prunePublishedPrefix(d109bPruningInput(first, 14, 1));
+			await d109bIssue(store, D109B_SCOPE, 15);
+			await d109bIssue(store, D109B_SCOPE, 15);
+			const second = await maintenance.inspectPruningState(D109B_SCOPE);
+			expect(second.prunedThroughAuthorSequence).toBe(1);
+			const receipt = await maintenance.prunePublishedPrefix(d109bPruningInput(second, 15, 3));
+			expect(receipt.deletedAuthorSequenceRange).toEqual({ from: 2, through: 3 });
+			expect(await store.readOutboxPage({ scope: D109B_SCOPE })).toEqual([]);
+		} finally {
+			await store.close();
+		}
+	});
+
+	it.skipIf(!state.ready)("preserves null-watermark polarity across the complete absence matrix", async () => {
+		const module = await candidate();
+		const neverIssued = module.createEphemeralDurableIssuanceStore();
+		try {
+			expect(await neverIssued.readIssued(D109B_SCOPE, 0)).toBeNull();
+			expect(
+				d109bErrorCode(
+					await capture(
+						neverIssued.compareAndMarkOutboxPublished({
+							authorSequence: 0,
+							digest: Uint8Array.of(1),
+							scope: D109B_SCOPE,
+						})
+					)
+				)
+			).toBe("ISSUANCE_INVALID_ARGUMENT");
+		} finally {
+			await neverIssued.close();
+		}
+
+		for (const authorSequence of [0, 1]) {
+			const consumed = module.createEphemeralDurableIssuanceStore({
+				initialLineages: [{ exhausted: false, next: 2, scope: D109B_SCOPE }],
+			});
+			try {
+				expect(d109bErrorCode(await capture(consumed.readIssued(D109B_SCOPE, authorSequence)))).toBe(
+					"ISSUANCE_RECOVERY_CORRUPT"
+				);
+			} finally {
+				await consumed.close();
+			}
+		}
+	});
 
 	it.skipIf(!state.ready).each(D109B_PAGE_BOUNDARIES)(
 		"walks the exact bounded-page edge %i without retaining the selected prefix",

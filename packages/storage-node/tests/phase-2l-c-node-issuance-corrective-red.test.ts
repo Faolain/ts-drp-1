@@ -185,6 +185,7 @@ describe("Phase 2l-c independent SQLite structure oracles", () => {
 					["author", "TEXT", 2],
 					["next", "INTEGER", 0],
 					["exhausted", "INTEGER", 0],
+					["pruned_through_author_sequence", "INTEGER", 0, 0],
 				],
 			} as const;
 
@@ -192,12 +193,12 @@ describe("Phase 2l-c independent SQLite structure oracles", () => {
 				const tableInfo = database.prepare(`PRAGMA table_xinfo(${tableName})`);
 				tableInfo.setReadBigInts(false);
 				expect(plainRows(tableInfo.all() as Record<string, unknown>[])).toEqual(
-					columns.map(([name, type, pk], cid) => ({
+					columns.map(([name, type, pk, nullable], cid) => ({
 						cid,
 						dflt_value: null,
 						hidden: 0,
 						name,
-						notnull: 1,
+						notnull: nullable ?? 1,
 						pk,
 						type,
 					}))

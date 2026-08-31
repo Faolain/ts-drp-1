@@ -37,6 +37,8 @@ export type ClosedEpochCleanupPlan = Readonly<{
 	readonly closedEpoch: number;
 	readonly expectedHead: PresentHead;
 	readonly issuance: Readonly<{
+		readonly lineage: Readonly<{ readonly exhausted: boolean; readonly next: number }>;
+		readonly prunedThroughAuthorSequence: number | null;
 		readonly scope: Readonly<{ readonly author: string; readonly objectId: StorageObjectId }>;
 		readonly throughAuthorSequence: number;
 	}>;
@@ -354,8 +356,23 @@ function copiedIssuance(
 	closedEpoch: number
 ): ClosedEpochCleanupPlan["issuance"] | undefined {
 	if (
-		!exactKeys(value, ["complete", "rows", "scope", "throughAuthorSequence"]) ||
+		!exactKeys(value, [
+			"complete",
+			"lineage",
+			"prunedThroughAuthorSequence",
+			"rows",
+			"scope",
+			"throughAuthorSequence",
+		]) ||
 		value.complete !== true ||
+		!record(value.lineage) ||
+		!exactKeys(value.lineage, ["exhausted", "next"]) ||
+		typeof value.lineage.exhausted !== "boolean" ||
+		!Number.isSafeInteger(value.lineage.next) ||
+		Number(value.lineage.next) < 0 ||
+		(value.lineage.exhausted === true && Number(value.lineage.next) !== Number.MAX_SAFE_INTEGER) ||
+		(value.prunedThroughAuthorSequence !== null &&
+			(!Number.isSafeInteger(value.prunedThroughAuthorSequence) || Number(value.prunedThroughAuthorSequence) < 0)) ||
 		!record(value.scope) ||
 		!exactKeys(value.scope, ["author", "objectId"]) ||
 		copiedObjectId(value.scope.objectId) !== objectId ||
@@ -368,14 +385,32 @@ function copiedIssuance(
 		return undefined;
 	}
 	const throughAuthorSequence = Number(value.throughAuthorSequence);
-	if (value.rows.length !== throughAuthorSequence + 1) return undefined;
+	const lineage = Object.freeze({ exhausted: value.lineage.exhausted, next: Number(value.lineage.next) });
+	const prunedThroughAuthorSequence =
+		value.prunedThroughAuthorSequence === null ? null : Number(value.prunedThroughAuthorSequence);
+	const consumed =
+		lineage.next > throughAuthorSequence || (lineage.exhausted && lineage.next === throughAuthorSequence);
+	if (
+		!consumed ||
+		(prunedThroughAuthorSequence !== null &&
+			(prunedThroughAuthorSequence > throughAuthorSequence ||
+				!(
+					lineage.next > prunedThroughAuthorSequence ||
+					(lineage.exhausted && lineage.next === prunedThroughAuthorSequence)
+				)))
+	) {
+		return undefined;
+	}
+	const first = prunedThroughAuthorSequence === null ? 0 : prunedThroughAuthorSequence + 1;
+	const expectedRows = throughAuthorSequence - first + 1;
+	if (value.rows.length !== Math.max(0, expectedRows)) return undefined;
 	const seen = new Set<number>();
 	for (const candidate of value.rows) {
 		if (
 			!record(candidate) ||
 			!exactKeys(candidate, ["authorSequence", "epoch", "issued", "outbox", "publishState"]) ||
 			!Number.isSafeInteger(candidate.authorSequence) ||
-			Number(candidate.authorSequence) < 0 ||
+			Number(candidate.authorSequence) < first ||
 			Number(candidate.authorSequence) > throughAuthorSequence ||
 			!Number.isSafeInteger(candidate.epoch) ||
 			Number(candidate.epoch) !== closedEpoch ||
@@ -388,10 +423,12 @@ function copiedIssuance(
 		}
 		seen.add(Number(candidate.authorSequence));
 	}
-	for (let sequence = 0; sequence <= throughAuthorSequence; sequence += 1) {
+	for (let sequence = first; sequence <= throughAuthorSequence; sequence += 1) {
 		if (!seen.has(sequence)) return undefined;
 	}
 	return Object.freeze({
+		lineage,
+		prunedThroughAuthorSequence,
 		scope: Object.freeze({ author: value.scope.author, objectId }),
 		throughAuthorSequence,
 	});

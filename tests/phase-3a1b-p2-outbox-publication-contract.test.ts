@@ -580,7 +580,7 @@ describe("D.93.29 Seam 2 shared durable publication contract", () => {
 			"67a7520e324677d3cf9786956ec565e54eda32b2a60c56f344dd921e56613928"
 		);
 		expect(sha256(source("packages/issuance-store/src/terminal.ts"))).toBe(
-			"9f85c5d3405e16edb3502e37b2739583cce25431543708f21df6145e8f43ed60"
+			"a71b32967ca152c12b10adad4f3303696fb42d4379892cc27c4937af19d42a4a"
 		);
 		expect(sha256(source("packages/issuance-store/src/index.ts"))).toBe(
 			"62b3b2c62e7cc230820ba56e8867be76f17861dde3b45d645c2855a11b6afa93"

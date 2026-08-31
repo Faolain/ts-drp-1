@@ -610,6 +610,8 @@ describe("D.109a closed-epoch cleanup eligibility RED", () => {
 					generations,
 					issuance: Object.freeze({
 						complete: true,
+						lineage: await fixture.evidence.issuanceStore.readLineage(fixture.evidence.issuanceScope),
+						prunedThroughAuthorSequence: null,
 						rows: Object.freeze(
 							publishedOutbox.map(({ commit, publishState }) =>
 								Object.freeze({

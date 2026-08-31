@@ -296,7 +296,7 @@ describe("Phase 2l-c synchronous factory and exact SQLite admission", () => {
 		expect(fs.existsSync(derivedFilename(whitespace.trim()))).toBe(false);
 	});
 
-	it("creates, byte-verifies and reopens exactly one SQLite-v1 authority", async () => {
+	it("creates, byte-verifies and reopens exactly one authority at schema v2 in the stable v1-derived file", async () => {
 		const primaryFilename = primary("schema");
 		const { createNodeDurableIssuanceStore } = await loadPhase2lCNodeModule();
 		const first = createNodeDurableIssuanceStore({ primaryFilename });
@@ -308,7 +308,7 @@ describe("Phase 2l-c synchronous factory and exact SQLite admission", () => {
 			rows: Record<string, unknown>[];
 			userVersion: number;
 		};
-		expect(observed).toMatchObject({ journalMode: "wal", pageSize: 4096, userVersion: 1 });
+		expect(observed).toMatchObject({ journalMode: "wal", pageSize: 4096, userVersion: 2 });
 		expect(observed.rows).toEqual([
 			expect.objectContaining({ name: "issuance_outbox", sql: PHASE_2L_C_DDL.issuance_outbox, type: "table" }),
 			expect.objectContaining({ name: "issued_records", sql: PHASE_2L_C_DDL.issued_records, type: "table" }),
@@ -377,7 +377,7 @@ describe("Phase 2l-c synchronous factory and exact SQLite admission", () => {
 		empty.close();
 		const recovered = createNodeDurableIssuanceStore({ primaryFilename: retryPrimary });
 		await recovered.close();
-		expect(schema(retryFilename)).toMatchObject({ journalMode: "wal", pageSize: 4096, userVersion: 1 });
+		expect(schema(retryFilename)).toMatchObject({ journalMode: "wal", pageSize: 4096, userVersion: 2 });
 
 		for (const [label, statements] of [
 			["partial", [PHASE_2L_C_DDL.lineages]],
@@ -403,7 +403,7 @@ describe("Phase 2l-c synchronous factory and exact SQLite admission", () => {
 				],
 				{},
 			],
-			["wrong-version", Object.values(PHASE_2L_C_DDL), { userVersion: 2 }],
+			["wrong-version", Object.values(PHASE_2L_C_DDL), { userVersion: 3 }],
 			["wrong-page", Object.values(PHASE_2L_C_DDL), { pageSize: 8192 }],
 			["wrong-journal", Object.values(PHASE_2L_C_DDL), { journalMode: "DELETE" }],
 		] as const) {

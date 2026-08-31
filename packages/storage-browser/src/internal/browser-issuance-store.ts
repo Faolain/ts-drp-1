@@ -27,14 +27,25 @@ import {
 	isValidDurableScopeField,
 	MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT,
 } from "@ts-drp/issuance-store";
+import {
+	captureDurableIssuancePruningInput,
+	createDurableIssuancePruningReceipt,
+	createDurableIssuancePruningState,
+	createDurableIssuanceRecordPrunedError,
+	decodeDurableIssuancePreimage,
+	durableIssuanceAddressIsPruned,
+	durableIssuanceLineageConsumed,
+	durableIssuanceLineagesEqual,
+	type DurableIssuancePruningReceipt,
+	type DurableIssuancePruningState,
+	DurableIssuanceRecordPrunedError,
+} from "@ts-drp/issuance-store/maintenance";
 
 const DATABASE_SUFFIX = "--drp-issuance-v1";
 const DATABASE_VERSION = 1;
 const STORE_NAMES = ["lineages", "issuedRecords", "issuanceOutbox"] as const;
 const LINEAGE_KEY_PATH = ["objectId", "author"] as const;
 const RECORD_KEY_PATH = ["objectId", "author", "authorSequence"] as const;
-
-interface NativeLineage extends DurableLineage, DurableIssueScope {}
 
 interface NativeIssuedRecord extends DurableIssueScope {
 	readonly authorSequence: number;
@@ -53,6 +64,7 @@ interface TerminalReadback {
 	readonly issuedRecord: DurableIssuedRecord | null;
 	readonly lineage: DurableLineage;
 	readonly outboxRecord: DurableIssuanceNativeOutboxRecord | null;
+	readonly prunedThroughAuthorSequence: number | null;
 }
 
 function invalid(message: string): DurableIssuanceInvalidArgumentError {
@@ -176,9 +188,20 @@ function strictTransaction(database: IDBDatabase, mode: IDBTransactionMode): IDB
 	return transaction;
 }
 
-function copyNativeLineage(value: unknown, scope: DurableIssueScope): DurableLineage | undefined {
+function copyNativeLineage(
+	value: unknown,
+	scope: DurableIssueScope
+): (DurableLineage & { readonly prunedThroughAuthorSequence: number | null }) | undefined {
+	const legacy = isClosedDurableIssuanceRecord(value, ["author", "exhausted", "next", "objectId"]);
+	const current = isClosedDurableIssuanceRecord(value, [
+		"author",
+		"exhausted",
+		"next",
+		"objectId",
+		"prunedThroughAuthorSequence",
+	]);
 	if (
-		!isClosedDurableIssuanceRecord(value, ["author", "exhausted", "next", "objectId"]) ||
+		(!legacy && !current) ||
 		value.author !== scope.author ||
 		value.objectId !== scope.objectId ||
 		typeof value.exhausted !== "boolean" ||
@@ -187,7 +210,15 @@ function copyNativeLineage(value: unknown, scope: DurableIssueScope): DurableLin
 	) {
 		return undefined;
 	}
-	return { exhausted: value.exhausted, next: value.next };
+	const watermark = current ? value.prunedThroughAuthorSequence : null;
+	if (
+		watermark !== null &&
+		(!isValidDurableAuthorSequence(watermark) ||
+			!durableIssuanceLineageConsumed({ exhausted: value.exhausted, next: value.next }, watermark))
+	) {
+		return undefined;
+	}
+	return { exhausted: value.exhausted, next: value.next, prunedThroughAuthorSequence: watermark };
 }
 
 function copyNativeIssued(value: unknown): NativeIssuedRecord | undefined {
@@ -275,14 +306,6 @@ function nativeOutbox(candidate: DurableIssueCommit): NativeOutboxRecord {
 	};
 }
 
-function sameLineage(left: DurableLineage, right: DurableLineage): boolean {
-	return left.next === right.next && left.exhausted === right.exhausted;
-}
-
-function lineageConsumed(lineage: DurableLineage, authorSequence: number): boolean {
-	return lineage.next > authorSequence || (lineage.exhausted && lineage.next === authorSequence);
-}
-
 class BrowserIssuanceImplementation {
 	readonly #database: IDBDatabase;
 	readonly #transactions = new Set<IDBTransaction>();
@@ -343,7 +366,9 @@ class BrowserIssuanceImplementation {
 			}
 			const status = this.#publicationStatus(observation, captured);
 			if (status === "never-issued") reason = invalid("publication address has never been issued");
-			else if (status === "foreign-digest") {
+			else if (status === "pruned") {
+				reason = createDurableIssuanceRecordPrunedError(captured.scope, captured.authorSequence);
+			} else if (status === "foreign-digest") {
 				reason = invalid("publication digest does not identify the issued closure");
 			} else if (status === "corrupt") {
 				reason = this.#latchCorruption("publication closure is incomplete or malformed");
@@ -388,7 +413,7 @@ class BrowserIssuanceImplementation {
 			if (raw === undefined) return { exhausted: false, next: 0 };
 			const lineage = copyNativeLineage(raw, detached);
 			if (lineage === undefined) throw this.#latchCorruption("stored lineage is malformed");
-			return lineage;
+			return { exhausted: lineage.exhausted, next: lineage.next };
 		} catch (error) {
 			if (this.#isClosedFailure(error)) throw error;
 			throw mapSubstrateError(error, "lineage read failed");
@@ -409,11 +434,22 @@ class BrowserIssuanceImplementation {
 				requestResult(transaction.objectStore("lineages").get([detached.objectId, detached.author])),
 			]);
 			await transactionResult(transaction);
-			if (rawIssued === undefined && rawOutbox === undefined) return null;
+			const lineage =
+				rawLineage === undefined
+					? { exhausted: false, next: 0, prunedThroughAuthorSequence: null }
+					: copyNativeLineage(rawLineage, detached);
+			if (lineage === undefined) throw this.#latchCorruption("stored lineage is malformed");
+			if (rawIssued === undefined && rawOutbox === undefined) {
+				if (
+					durableIssuanceLineageConsumed(lineage, authorSequence) &&
+					!durableIssuanceAddressIsPruned(lineage.prunedThroughAuthorSequence, authorSequence)
+				) {
+					throw this.#latchCorruption("consumed issued closure is absent above the pruning watermark");
+				}
+				return null;
+			}
 			const row = rawIssued === undefined ? undefined : copyNativeIssued(rawIssued);
 			const outbox = rawOutbox === undefined ? undefined : copyNativeOutbox(rawOutbox);
-			const lineage =
-				rawLineage === undefined ? { exhausted: false, next: 0 } : copyNativeLineage(rawLineage, detached);
 			if (
 				row === undefined ||
 				outbox === undefined ||
@@ -425,7 +461,8 @@ class BrowserIssuanceImplementation {
 				outbox.author !== detached.author ||
 				outbox.authorSequence !== authorSequence ||
 				!this.#bytesEqual(row.digest, outbox.digest) ||
-				!(lineage.next > authorSequence || (lineage.exhausted && lineage.next === authorSequence))
+				!durableIssuanceLineageConsumed(lineage, authorSequence) ||
+				durableIssuanceAddressIsPruned(lineage.prunedThroughAuthorSequence, authorSequence)
 			) {
 				throw this.#latchCorruption("stored issued closure is incomplete or malformed");
 			}
@@ -447,10 +484,14 @@ class BrowserIssuanceImplementation {
 				requestResult(transaction.objectStore("lineages").getAll()),
 			]);
 			await transactionResult(transaction);
-			const lineageByScope = new Map<string, DurableLineage>();
+			const lineageByScope = new Map<
+				string,
+				DurableLineage & { readonly prunedThroughAuthorSequence: number | null }
+			>();
 			for (const raw of lineageRows) {
 				if (
-					!isClosedDurableIssuanceRecord(raw, ["author", "exhausted", "next", "objectId"]) ||
+					typeof raw !== "object" ||
+					raw === null ||
 					!isValidDurableScopeField(raw.author) ||
 					!isValidDurableScopeField(raw.objectId)
 				) {
@@ -479,7 +520,11 @@ class BrowserIssuanceImplementation {
 					throw this.#latchCorruption("outbox has no matching issued record");
 				}
 				const lineage = lineageByScope.get(this.#scopeKey(outbox));
-				if (lineage === undefined || !lineageConsumed(lineage, outbox.authorSequence)) {
+				if (
+					lineage === undefined ||
+					!durableIssuanceLineageConsumed(lineage, outbox.authorSequence) ||
+					durableIssuanceAddressIsPruned(lineage.prunedThroughAuthorSequence, outbox.authorSequence)
+				) {
 					throw this.#latchCorruption("stored outbox closure was not consumed by lineage");
 				}
 				issuedByKey.delete(this.#recordKey(outbox, outbox.authorSequence));
@@ -517,6 +562,143 @@ class BrowserIssuanceImplementation {
 		return this.#commitCandidate(detached, prior, candidate);
 	}
 
+	async inspectPruningState(scope: DurableIssueScope): Promise<DurableIssuancePruningState> {
+		this.#assertAvailable();
+		assertDurableIssueScope(scope);
+		const detached = copyDurableIssueScope(scope);
+		const transaction = this.#startTransaction("readonly");
+		try {
+			const raw = await requestResult(transaction.objectStore("lineages").get([detached.objectId, detached.author]));
+			await transactionResult(transaction);
+			const lineage =
+				raw === undefined
+					? { exhausted: false, next: 0, prunedThroughAuthorSequence: null }
+					: copyNativeLineage(raw, detached);
+			if (lineage === undefined) throw this.#latchCorruption("stored lineage is malformed");
+			return createDurableIssuancePruningState(
+				detached,
+				{ exhausted: lineage.exhausted, next: lineage.next },
+				lineage.prunedThroughAuthorSequence
+			);
+		} catch (error) {
+			if (this.#isClosedFailure(error)) throw error;
+			throw mapSubstrateError(error, "pruning-state inspection failed");
+		}
+	}
+
+	async prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt> {
+		const captured = captureDurableIssuancePruningInput(input);
+		this.#assertAvailable();
+		const transaction = this.#startTransaction("readwrite");
+		const terminal = transactionResult(transaction);
+		try {
+			const lineages = transaction.objectStore("lineages");
+			const issuedRecords = transaction.objectStore("issuedRecords");
+			const issuanceOutbox = transaction.objectStore("issuanceOutbox");
+			const lineageKey = [captured.scope.objectId, captured.scope.author];
+			const rawLineage = await requestResult(lineages.get(lineageKey));
+			const current =
+				rawLineage === undefined
+					? { exhausted: false, next: 0, prunedThroughAuthorSequence: null }
+					: copyNativeLineage(rawLineage, captured.scope);
+			if (current === undefined) throw this.#latchCorruption("stored lineage is malformed");
+			const lineage = { exhausted: current.exhausted, next: current.next };
+			if (
+				captured.expectedPrunedThroughAuthorSequence !== null &&
+				(captured.expectedPrunedThroughAuthorSequence > captured.throughAuthorSequence ||
+					!durableIssuanceLineageConsumed(captured.expectedLineage, captured.expectedPrunedThroughAuthorSequence))
+			) {
+				throw invalid("expected pruning state is internally impossible");
+			}
+			if (
+				current.prunedThroughAuthorSequence === captured.throughAuthorSequence &&
+				durableIssuanceLineagesEqual(lineage, captured.expectedLineage)
+			) {
+				await terminal;
+				return createDurableIssuancePruningReceipt(captured, lineage, null);
+			}
+			if (
+				current.prunedThroughAuthorSequence !== captured.expectedPrunedThroughAuthorSequence ||
+				!durableIssuanceLineagesEqual(lineage, captured.expectedLineage)
+			) {
+				throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "issuance pruning state changed");
+			}
+			if (
+				(current.prunedThroughAuthorSequence !== null &&
+					captured.throughAuthorSequence <= current.prunedThroughAuthorSequence) ||
+				!durableIssuanceLineageConsumed(lineage, captured.throughAuthorSequence)
+			) {
+				throw invalid("selected pruning boundary is invalid");
+			}
+			const from = current.prunedThroughAuthorSequence === null ? 0 : current.prunedThroughAuthorSequence + 1;
+			for (let pageFrom = from; pageFrom <= captured.throughAuthorSequence; pageFrom += 64) {
+				const pageThrough = Math.min(captured.throughAuthorSequence, pageFrom + 63);
+				for (let authorSequence = pageFrom; authorSequence <= pageThrough; authorSequence += 1) {
+					const key = [captured.scope.objectId, captured.scope.author, authorSequence];
+					const rawIssued = await requestResult(issuedRecords.get(key));
+					const rawOutbox = await requestResult(issuanceOutbox.get(key));
+					const issued = rawIssued === undefined ? undefined : copyNativeIssued(rawIssued);
+					const outbox = rawOutbox === undefined ? undefined : copyNativeOutbox(rawOutbox);
+					if (
+						issued === undefined ||
+						outbox === undefined ||
+						issued.authorSequence !== authorSequence ||
+						outbox.authorSequence !== authorSequence ||
+						!this.#bytesEqual(issued.digest, outbox.digest)
+					) {
+						throw this.#latchCorruption("selected issuance prefix is incomplete or malformed");
+					}
+					const decoded = decodeDurableIssuancePreimage(issued.canonicalPreimageBytes, captured.scope, authorSequence);
+					if (decoded === undefined) throw this.#latchCorruption("selected issuance preimage is malformed");
+					if (decoded.epoch !== captured.closedEpoch) {
+						throw invalid("selected issuance row belongs to another epoch");
+					}
+					if (outbox.publishState === "pending") {
+						throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "selected issuance prefix is not published");
+					}
+				}
+			}
+			for (let authorSequence = from; authorSequence <= captured.throughAuthorSequence; authorSequence += 1) {
+				const key = [captured.scope.objectId, captured.scope.author, authorSequence];
+				await requestResult(issuedRecords.delete(key));
+				await requestResult(issuanceOutbox.delete(key));
+			}
+			const writtenKey = await requestResult(
+				lineages.put({
+					...captured.scope,
+					exhausted: lineage.exhausted,
+					next: lineage.next,
+					prunedThroughAuthorSequence: captured.throughAuthorSequence,
+				})
+			);
+			if (
+				!Array.isArray(writtenKey) ||
+				writtenKey[0] !== captured.scope.objectId ||
+				writtenKey[1] !== captured.scope.author
+			) {
+				throw this.#latchCorruption("watermark put returned an impossible key");
+			}
+			await terminal;
+			return createDurableIssuancePruningReceipt(captured, lineage, from);
+		} catch (error) {
+			try {
+				transaction.abort();
+			} catch {
+				// The transaction may already be terminal.
+			}
+			await terminal.catch(() => undefined);
+			if (
+				error instanceof DurableIssuanceContractError ||
+				error instanceof DurableIssuanceInvalidArgumentError ||
+				error instanceof DurableIssuanceRecordPrunedError
+			) {
+				throw error;
+			}
+			if (this.#closed || this.#poison !== undefined) this.#assertAvailable();
+			throw mapSubstrateError(error, "issuance pruning failed");
+		}
+	}
+
 	async terminalObservationForTest(scope: DurableIssueScope, authorSequence: number): Promise<TerminalReadback> {
 		return this.#readTerminal(scope, authorSequence);
 	}
@@ -540,18 +722,24 @@ class BrowserIssuanceImplementation {
 			const issued = transaction.objectStore("issuedRecords");
 			const outbox = transaction.objectStore("issuanceOutbox");
 			const rawPrior = await requestResult(lineages.get([scope.objectId, scope.author]));
-			const current = rawPrior === undefined ? { exhausted: false, next: 0 } : copyNativeLineage(rawPrior, scope);
+			const current =
+				rawPrior === undefined
+					? { exhausted: false, next: 0, prunedThroughAuthorSequence: null }
+					: copyNativeLineage(rawPrior, scope);
 			if (current === undefined) {
 				reason = this.#latchCorruption("stored lineage is malformed");
 				transaction.abort();
-			} else if (!sameLineage(current, prior)) {
+			} else if (!durableIssuanceLineagesEqual(current, prior)) {
 				reason = createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "author sequence changed while signing");
 				transaction.abort();
 			} else {
-				const next: NativeLineage = {
+				const next = {
 					...scope,
 					exhausted: prior.next === Number.MAX_SAFE_INTEGER,
 					next: prior.next === Number.MAX_SAFE_INTEGER ? prior.next : prior.next + 1,
+					...(current.prunedThroughAuthorSequence === null
+						? {}
+						: { prunedThroughAuthorSequence: current.prunedThroughAuthorSequence }),
 				};
 				await requestResult(rawPrior === undefined ? lineages.add(next) : lineages.put(next));
 				await requestResult(issued.add(nativeIssued(candidate)));
@@ -606,7 +794,10 @@ class BrowserIssuanceImplementation {
 		rawIssued: unknown,
 		rawOutbox: unknown
 	): TerminalReadback {
-		const lineage = rawLineage === undefined ? { exhausted: false, next: 0 } : copyNativeLineage(rawLineage, scope);
+		const lineage =
+			rawLineage === undefined
+				? { exhausted: false, next: 0, prunedThroughAuthorSequence: null }
+				: copyNativeLineage(rawLineage, scope);
 		const issued = rawIssued === undefined ? null : copyNativeIssued(rawIssued);
 		const outbox = rawOutbox === undefined ? null : copyNativeOutbox(rawOutbox);
 		if (lineage === undefined || issued === undefined || outbox === undefined) {
@@ -625,7 +816,7 @@ class BrowserIssuanceImplementation {
 							},
 							scope: { author: issued.author, objectId: issued.objectId },
 						},
-			lineage,
+			lineage: { exhausted: lineage.exhausted, next: lineage.next },
 			outboxRecord:
 				outbox === null
 					? null
@@ -635,6 +826,7 @@ class BrowserIssuanceImplementation {
 							publishState: outbox.publishState,
 							scope: { author: outbox.author, objectId: outbox.objectId },
 						},
+			prunedThroughAuthorSequence: lineage.prunedThroughAuthorSequence,
 		};
 	}
 
@@ -670,11 +862,20 @@ class BrowserIssuanceImplementation {
 	#publicationStatus(
 		observation: TerminalReadback,
 		input: DurableOutboxPublicationTransitionInput
-	): "corrupt" | "foreign-digest" | "never-issued" | "pending" | "published" {
-		const { issuedRecord, lineage, outboxRecord } = observation;
-		const consumed = lineageConsumed(lineage, input.authorSequence);
+	): "corrupt" | "foreign-digest" | "never-issued" | "pending" | "pruned" | "published" {
+		const { issuedRecord, lineage, outboxRecord, prunedThroughAuthorSequence } = observation;
+		const consumed = durableIssuanceLineageConsumed(lineage, input.authorSequence);
 		if (issuedRecord === null && outboxRecord === null && !consumed) return "never-issued";
+		if (
+			issuedRecord === null &&
+			outboxRecord === null &&
+			consumed &&
+			durableIssuanceAddressIsPruned(prunedThroughAuthorSequence, input.authorSequence)
+		) {
+			return "pruned";
+		}
 		if (issuedRecord === null || outboxRecord === null || !consumed) return "corrupt";
+		if (durableIssuanceAddressIsPruned(prunedThroughAuthorSequence, input.authorSequence)) return "corrupt";
 		if (
 			issuedRecord.authorSequence !== input.authorSequence ||
 			outboxRecord.authorSequence !== input.authorSequence ||
@@ -709,6 +910,7 @@ class BrowserIssuanceImplementation {
 		this.#assertAvailable();
 		const status = this.#publicationStatus(observation, input);
 		if (status === "published") return;
+		if (status === "pruned") throw createDurableIssuanceRecordPrunedError(input.scope, input.authorSequence);
 		if (status === "pending" && commit === "ambiguous") {
 			throw substrate("publication commit did not become durable", "transient");
 		}
@@ -932,4 +1134,23 @@ export function browserIssuanceImplementationForTest(
 	store: DurableIssuanceStore
 ): BrowserIssuanceImplementation | undefined {
 	return implementationByStore.get(store);
+}
+
+/**
+ * Resolves the private pruning implementation for one exact browser facade.
+ * @param store - Candidate ordinary issuance facade.
+ * @returns Its private maintenance capability, when identity matches.
+ */
+export function browserIssuancePruningMaintenanceForStore(store: DurableIssuanceStore):
+	| Readonly<{
+			inspectPruningState(scope: DurableIssueScope): Promise<DurableIssuancePruningState>;
+			prunePublishedPrefix(input: unknown): Promise<DurableIssuancePruningReceipt>;
+	  }>
+	| undefined {
+	const implementation = implementationByStore.get(store);
+	if (implementation === undefined) return undefined;
+	return Object.freeze({
+		inspectPruningState: (scope: DurableIssueScope) => implementation.inspectPruningState(scope),
+		prunePublishedPrefix: (input: unknown) => implementation.prunePublishedPrefix(input),
+	});
 }
