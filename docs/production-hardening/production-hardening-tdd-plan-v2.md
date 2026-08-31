@@ -85104,6 +85104,59 @@ closed and releases exactly one fresh retained proof name,
 `d108e4cd-retained-browser-1`; only its pass may freeze six wholly fresh
 campaign names.
 
+###### D.108e4cd — post-census fresh retained-browser disposition
+
+D.108e4cd is the one plan-only fresh retained-browser proof released by the
+accepted D.108e4cc final review. Its behavior anchor is signed/pushed GREEN
+`041167ff831dbe6d59fd82f3c18f3ec5cd01c244`, tree
+`1449fffa01f3f5a41597a6e89631597adb7a0c18`; its final-review closure anchor is
+signed/pushed `0c5fcd4d941b5fd1a54936e7e1a776dbf2317fb9`, tree
+`0407ed6ef5b7c163faf27cf31f2b7393018e4fc6`. It changes no source, fixture,
+configuration, dependency, workload, threshold, timeout, browser, port,
+review policy or launcher. Every earlier retained/campaign root remains
+immutable.
+
+Freeze wholly fresh write-once root `.logs/d108e4cd-retained-browser-1/`. It
+must be absent before consumption and is never retried, overwritten or reused
+whether the invocation passes or fails. Before launch, require signed HEAD to
+equal the pushed branch, every tracked path since behavior GREEN to be this
+plan only, the protected untracked roster and all 26 stashes unchanged, no
+reviewer/test/profiler rooted in a ts-drp checkout, and ports 4174, 4175,
+51000 and 51002 clear. Exact suffix listing must select one test in one file.
+
+The one consuming invocation preserves the telemetry-enabled title, Chromium
+configuration, zero retries, effective 300-second test timeout and 600-second
+process-group watchdog:
+
+```sh
+set -u
+retained_root="$PWD/.logs/d108e4cd-retained-browser-1"
+test ! -e "$retained_root"
+mkdir -m 700 "$retained_root"
+date -u +%Y-%m-%dT%H:%M:%SZ > "$retained_root/started-at.txt"
+D108E4H_TELEMETRY=1 D108E4G_TELEMETRY=1 \
+  PLAYWRIGHT_JSON_OUTPUT_NAME="$retained_root/reporter.json" \
+  /usr/bin/perl -MPOSIX=setpgid -e 'my $limit=shift @ARGV; my $pid=fork(); die "fork failed" unless defined $pid; if($pid==0){setpgid(0,0); exec @ARGV; exit 127} $SIG{ALRM}=sub { kill "TERM", -$pid; select undef,undef,undef,5; kill "KILL", -$pid; waitpid($pid,0); exit 124 }; alarm $limit; waitpid($pid,0); alarm 0; exit($? == -1 ? 125 : ($? & 127) ? 128 + ($? & 127) : $? >> 8)' \
+  600 pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
+  --reporter=json --fail-on-flaky-tests \
+  --output="$retained_root/test-results" \
+  > "$retained_root/stdout.log" 2> "$retained_root/stderr.log"
+runner_status=$?
+print -r -- "$runner_status" > "$retained_root/runner.status"
+date -u +%Y-%m-%dT%H:%M:%SZ > "$retained_root/finished-at.txt"
+exit "$runner_status"
+```
+
+Preserve reporter, streams, timestamps, attachments, direct status, decoded
+campaign attachment, hashes and a validating self-excluding manifest. A
+consuming failure stops and owns the next evidence-driven disposition; it is
+never retried. Only one retry-zero pass with `1/0/0/0`, zero top-level/result
+errors, all three completed fixed trials and unchanged durable control may
+release six wholly fresh campaign names. No review, retained-seven repeat or
+campaign runs in D.108e4cd.
+
 Consumed D.108e4bu reporter, stdout, stderr, failure telemetry,
 endpoint-classifier, trace, cumulative manifest, and manifest-validation
 SHA-256 values are respectively
