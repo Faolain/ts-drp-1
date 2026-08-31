@@ -3710,8 +3710,13 @@ function d108e4hAssertBoundaryIdentity(
 ): Readonly<{ readonly after: D108e4hRtcIdentity; readonly before: D108e4hRtcIdentity }> {
 	const beforeAuthenticated = d108e4hOnly(endpoint.prepare.authenticated);
 	const afterAuthenticated = d108e4hOnly(endpoint.deadline.authenticated);
+	const incomingDeadlinePending =
+		incomingReplacement &&
+		endpoint.prepare.rtc.length === 1 &&
+		endpoint.deadline.rtc.length > 1 &&
+		endpoint.prepare.rtc.some((before) => endpoint.deadline.rtc.some((after) => d108e4hSameRtcIdentity(before, after)));
 	const selectedBoundary =
-		!replaced && !incomingReplacement
+		!replaced && (!incomingReplacement || incomingDeadlinePending)
 			? d108e4hAssertZeroLocalBoundaryIdentity(endpoint)
 			: Object.freeze({ before: d108e4hOnly(endpoint.prepare.rtc), after: d108e4hOnly(endpoint.deadline.rtc) });
 	const { after: afterRtc, before: beforeRtc } = selectedBoundary;
@@ -5747,6 +5752,63 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 				"incomingPendingCandidateAlongsidePeerReplacement"
 			)
 			.not.toThrow();
+		const incomingCandidateApplicationOwner = withReceiverEndpoint(
+			incomingPendingCandidateAlongsidePeerReplacement,
+			Object.freeze({
+				...incomingPendingCandidateAlongsidePeerReplacement.endpoints.receiver,
+				acceptedRaw: Object.freeze([
+					Object.freeze({
+						...(incomingPendingCandidateAlongsidePeerReplacement.endpoints.receiver
+							.acceptedRaw[0] as D108e4hOverlapObservation),
+						channelId: d108e4bhDeadlineCandidate.channelId,
+						connectionId: d108e4bhDeadlineCandidate.connectionId,
+					}),
+				]),
+			})
+		);
+		d108e4avExpectCode(
+			incomingCandidateApplicationOwner,
+			"D108E4H_IDENTITY_JOIN_INVALID",
+			"D.108e4cc incoming candidate application owner"
+		);
+		const incomingPrepareCandidate = withReceiverEndpoint(
+			incomingPendingCandidateAlongsidePeerReplacement,
+			Object.freeze({
+				...incomingPendingCandidateAlongsidePeerReplacement.endpoints.receiver,
+				acceptedRaw: Object.freeze([
+					Object.freeze({
+						...(incomingPendingCandidateAlongsidePeerReplacement.endpoints.receiver
+							.acceptedRaw[0] as D108e4hOverlapObservation),
+						channelId: d108e4bhDeadlineCandidate.channelId,
+						connectionId: d108e4bhDeadlineCandidate.connectionId,
+					}),
+				]),
+				deadline: Object.freeze({
+					...incomingPendingCandidateAlongsidePeerReplacement.endpoints.receiver.deadline,
+					rtc: Object.freeze([d108e4bhDeadlineCandidate]),
+				}),
+				lifecycle: Object.freeze(
+					incomingPendingCandidateAlongsidePeerReplacement.endpoints.receiver.lifecycle.map((record) =>
+						record.sequence === 0 && record.event === "channel-message"
+							? Object.freeze({
+									...record,
+									channelId: d108e4bhDeadlineCandidate.channelId,
+									connectionId: d108e4bhDeadlineCandidate.connectionId,
+								})
+							: record
+					)
+				),
+				prepare: Object.freeze({
+					...incomingPendingCandidateAlongsidePeerReplacement.endpoints.receiver.prepare,
+					rtc: Object.freeze([D108E4H_RTC_A, d108e4bhDeadlineCandidate]),
+				}),
+			})
+		);
+		d108e4avExpectCode(
+			incomingPrepareCandidate,
+			"D108E4H_IDENTITY_JOIN_INVALID",
+			"D.108e4cc incoming prepare candidate"
+		);
 
 		const d108e4bjPreHandlerLifecycle = Object.freeze(
 			d108e4bhDeadlineCandidateLifecycle

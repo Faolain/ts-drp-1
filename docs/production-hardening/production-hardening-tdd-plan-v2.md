@@ -85004,6 +85004,32 @@ execution once. Record complete reporters/streams/statuses, source-shape and
 changed-path custody, source hashes and a validating self-excluding manifest;
 sign and push GREEN.
 
+GREEN changes only test-validator boundary selection and the two frozen
+negative fixtures. The sole focused execution passes `1/1` with
+expected/skipped/unexpected/flaky `1/0/0/0` and zero top-level errors.
+Standalone strict TypeScript, exact-owner ESLint, 8 GiB Prettier,
+`git diff --check`, grid typecheck and grid build all return zero. Both
+D.108e4ax rows pass `2/2`; the complete network owner passes `114/114`; the
+two exact D108E4G browser titles pass `1/1` separately. Frozen retained-seven
+listing selects exactly seven tests in one file with no campaign title, and
+its sole execution passes `7/7` with `7/0/0/0` and zero top-level errors. One
+read-only reporter inspection used the wrong focused filename and one
+source-shape audit overquoted two labels; corrected diagnostics pass without
+rerunning any executable gate. Only the test owner changed before this plan
+closure; product source remains untouched. Test-owner and RED-to-GREEN diff
+SHA-256 values are respectively
+`445d07ce13902fb8707571aa1afa16c0eb69628c531e1abc7e65c98e0094d3a0`
+and
+`6e485fb0fc5b026baeef67cbd33f39d4fb9f63c14bd210106133811e940368c4`.
+The 51-entry GREEN manifest, validation and summary SHA-256 values are
+respectively
+`0e4b924cb85308e400f69591f95611e1d5add8b35c9182840a113f76a59d96d3`,
+`538c6298a3b1e52fc976378c6d643b1970c46d29ccc946d5ec8a0aa8fffd60ef`
+and
+`9747951b27495ab792f31b0950b2ddd5cfadb87e4ca6aca9123d23c8369ea378`.
+All entries validate from `.logs/d108e4cc-green/`; protected paths, 26 stashes,
+clear ports and process predicates remain intact.
+
 Use the governing narrow-slice protocol: one bounded plan review by Grok
 4.6/high, Codex `gpt-5.6-sol` high and Opus xhigh; no separate RED review; one
 final three-model review after signed/pushed GREEN over plan, causal RED and
