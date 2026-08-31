@@ -83602,11 +83602,13 @@ RED changes only `tests/e3-03-loss-and-hol-proof.pw.ts` and this plan/evidence
 record. Extract the current helper's four-step orchestration into one pure,
 test-local schedule owner without changing runtime behavior: creator reset,
 open-pair gate, network-pair gate, receiver reset. Add one opt-in pure test,
-selected only under `D108E4BV_RESET_ORDER_RED=1`, with both peer-id
-orderings. Its frozen expectation is exactly two reset operations with no
-interposed readiness operation: the higher-id endpoint resets first and the
-lower-id elected initiator resets last. Duplicate peer ids fail with exact
-token `D108E4BV_RESET_IDENTITY_INVALID`. Current behavior must fail the
+selected only under `D108E4BV_RESET_ORDER_RED=1`. Register exactly one
+`test(...)`, not parameterized `test.each`/`it.each` rows; its body covers both
+peer-id orderings and the duplicate-id case so the frozen reporter matrix
+remains one selected title. Its expectation is exactly two reset operations
+with no interposed readiness operation: the higher-id endpoint resets first
+and the lower-id elected initiator resets last. Duplicate peer ids fail with
+exact token `D108E4BV_RESET_IDENTITY_INVALID`. Current behavior must fail the
 ordering test with reporter counts `0/0/1/0`, zero top-level errors, and no
 browser or retained title selected. If RED differs from that matrix, stop and
 correct the fixture rather than changing product code.
@@ -83623,6 +83625,19 @@ three-trial count, 600/33 ms workload, 300/20 ms calibration, payloads,
 delivery/AoI/HOL requirements, memory/resource contracts, 300-second test
 timeout, outer 600-second watchdog, evidence/classifier semantics, and durable
 operation remain unchanged.
+
+The schedule owner obtains both identities from the already-passed
+`creatorExpected.peerId` and `receiverExpected.peerId` values. It uses the
+same direct ECMAScript relational string comparison (`<`/`>=`) as product
+election and the existing fixture role calculation, explicitly not
+`localeCompare`; the pure test uses a comparator-discriminating id pair. The
+D.108e4ax rows are substantive rather than byte-for-byte scheduling
+precedent: their drops occur in one synchronous turn, while this helper
+awaits each reset. The reached state is equivalent because the high-id reset
+is link-inert—it cannot initiate or schedule a retry—so the following low-id
+reset reaches the retained both-dropped convergence and lets the elected
+initiator drive replacement. No new deterministic network-owner row is
+required for this test-infrastructure slice.
 
 Run the exact one-test/one-file RED once and the same focused GREEN once. Then
 run standalone strict TypeScript, exact-owner ESLint/Prettier,
@@ -83643,6 +83658,26 @@ workload, or retained acceptance block. After signed GREEN, run the single
 formal three-model implementation review over plan, RED, GREEN, the consumed
 D.108e4bu failure, and retained gates. Do not run Kimi, Fable, or
 collaboration subagents.
+
+The bounded plan review is closed. Codex `gpt-5.6-sol` high and Opus xhigh
+both returned `APPROVED` with zero P0/P1. Their P2 union is dispositioned in
+the frozen implementation constraints above: exact identity source and
+relational comparator, one registered RED test, and the substantive
+D.108e4ax equivalence. The new independent Grok run was canceled by its
+service at 450.144 seconds before emitting a terminal schema or finding and
+is preserved honestly as `NO_VERDICT`; it is not a continuation of the prior
+one-off session and is not relaunched. The review prompt, schema, Codex
+result, Opus result, Grok status, Grok public progress, and Grok event stream
+SHA-256 values are respectively
+`f5dbf381ceee9cb070228e552baa691580c1672e0a33335e0978fc2bb668630e`,
+`5aaec951a7b5c27ea30909c77128ce564a05c2b43f610b4e5e48b4b4ce509681`,
+`779076973a1f0f009786b02f072dc21fed5c18785ffa3696f5b0a727387a7f62`,
+`351f99821d2d3c7a40d734169ae2c5e03f639ae8632a310074b0abe5ae220ddf`,
+`3bcf3506434606c5fb00fb7c09bc2d9821c1e163cba2ec024c094887805df0b3`,
+`475ccbdb13ca201912b3c71f2f00ef395b5fa3bca4ac4695e63c782b796fee2f`,
+and
+`93d93e5f8baabee55a45e8f9b3c1a5e7a434149a3aa07da9e359b8728f2cb26b`.
+The blocking union is empty, so RED may proceed without a confirmation round.
 
 An empty final blocking union releases a new plan-only freeze with six wholly
 fresh names and a freshly built isolated checkout at the accepted GREEN.
