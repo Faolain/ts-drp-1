@@ -85497,6 +85497,40 @@ and
 `692714a369dc9bb24ee2704e0e8bfdf0902ec9d3de4793877d3122d0d6d0cd2d`;
 all entries validate. Only the telemetry test owner and this plan changed.
 
+GREEN extends only the tests-only pending-role classifier with the exact
+eager-acceptor predicate and six frozen mutants. The sole focused execution
+passes expected/skipped/unexpected/flaky `1/0/0/0`, retry zero and zero
+top-level errors. Standalone strict TypeScript, exact-owner ESLint, 8 GiB
+Prettier, `git diff --check`, grid typecheck and grid build all return zero.
+The first two unit commands omitted the established
+`--coverage.enabled=false` option: both reporters show their test bodies passed
+`2/2` and `114/114`, but Vitest returned one on the unrelated global coverage
+threshold and concurrent coverage writers collided on `coverage/.tmp`. No
+source changed. Those bad commands are preserved, and the corrected sequential
+commands with coverage disabled return zero: the exact D.108e4ax rows pass
+`2/2` and the complete network owner passes `114/114`. This is a launcher
+mistake, not a code/test failure.
+
+Both exact D.108e4g browser titles pass separately at `1/0/0/0` with zero
+top-level errors. The frozen retained-seven listing selected seven tests in
+one file and excluded the campaign title; its sole execution passed `7/7`,
+`7/0/0/0`, retry zero and zero top-level errors. Mechanical checks prove the
+single eager-role owner, literal one-ACK-only predicate, exactly-one-of-three
+role assertion, all six mutants, test-only changed-path custody, clean
+product/config/lockfile paths, signed/pushed RED parent, protected paths, 26
+stashes and clear fixed ports. Test-owner and RED-to-GREEN diff SHA-256 values
+are respectively
+`4643ca72bbd2f2a8af4c04688c9e2409a076af12d161b73ad036e75a26d9baf3`
+and
+`cbff2daed5d9b88fdfa9decbbf276b169d9ed194343b97a796f14a142ff05c3e`.
+The 58-entry GREEN manifest, validation and summary SHA-256 values under
+`.logs/d108e4cf-green/` are respectively
+`e0e8d5d8827e14923add1a6224bb40f436ed515d8749aca05ded7de976ef6d55`,
+`03282443b1d2194059e66220bf38ab318ff6fd107c3aa0d1909b4308d41762c1`
+and
+`dd7beac78409544fabd97f2adf826cd38670452d1dd31bbf7217a2a68bb0abfa`;
+all entries validate.
+
 Consumed D.108e4bu reporter, stdout, stderr, failure telemetry,
 endpoint-classifier, trace, cumulative manifest, and manifest-validation
 SHA-256 values are respectively
