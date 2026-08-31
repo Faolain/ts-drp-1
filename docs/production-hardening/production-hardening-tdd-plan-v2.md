@@ -87124,3 +87124,65 @@ correction changes executable test acceptance, the prospective policy permits
 one confirmation round over the signed correction; that is the sole remaining
 review gate and may only block on a P0/P1 introduced or left unresolved by
 this test-only structural correction.
+
+The sole final confirmation round inspected signed correction `f43a43b4`.
+Grok 4.6/high session `01a0588c-d6fc-7d01-b197-f9a9316ddaf3` again emitted
+progress before its terminal payload, so the exact session was resumed rather
+than replaced; the resumed schema result is `APPROVED` with no findings and
+has SHA-256
+`acb5f6a9f5594237a68122a9a4c4c77391ba172369debe31d135c36d5f13e410`.
+Codex `gpt-5.6-sol` high session
+`01a05893-cdf1-76f2-99c4-c22914e5634e` returned `CHANGES_REQUIRED` with one
+P1: executable-node searches still crossed nested function boundaries, and
+the snapshot/rehearsal/activation invite facts were not bound to their live
+return or decoder operands. Its result SHA-256 is
+`0e2acf84076639b5e756ed11b9f9fd8ee7b1bbc9c21362f6cd0d70c0a8400e40`.
+Opus 5/xhigh session `9d3335e5-f245-4bc4-80d2-6f7c6abb71b9` returned
+`APPROVED` with no P0/P1 and three P2 observations: `.some()` admitted an
+alternate unbounded decode, lexical activation scanning crossed a possible
+nested function, and the exact three-copy count is intentionally
+refactor-sensitive. Its raw-result SHA-256 is
+`f4f4452a860e5aa17d0c9f2d286a9b55d756916f0e00cec7f0c63626e5e685b0`.
+
+The blocking Codex finding and the first two Opus observations are closed in
+one test-only correction at signed/pushed commit
+`f10f0b3b98994b2c788e9e542457d078d7d6f6dc`, tree
+`7ab5a0b678d76f73d8c14f902d8c73fafaa53665`. Executable AST traversal now
+stops at every nested function-like boundary. The activation guard and all
+three intrinsic copies must therefore belong to the same live activation
+function and guarded block. Invite metadata is bound from the direct
+`exactRecord(value, CREATOR_INVITE_MATERIAL_KEYS)` result through the live
+byte-field loop, intrinsic byte-length getter, `byteLengths.push`, exact-size
+reduction, bound and returned encoder argument. The exact three owner calls
+must be the direct snapshot return and the sole rehearsal and activation
+decoder operands; the activation re-encode must consume that exact decoded
+identifier. The three-copy count is retained and dispositioned as an
+intentional exact-shape safety pin: a future equivalent refactor must update
+production and this fixture together.
+
+The same eight-test focused owner now contains fail-closed source mutants for
+a dead nested activation owner, a dead snapshot owner, a dead rehearsal
+owner, an alternate unbounded activation decode and detached exact-record and
+byte-length metadata owners. The single post-correction focused command
+`pnpm exec vitest run --coverage.enabled=false
+tests/phase-6a-creator-successor-product-red.test.ts --maxWorkers=1
+--minWorkers=1` passed one file and 8/8 tests. Exact-two ESLint with zero
+warnings, exact-two Prettier, and `git diff --check` passed. The fixture, test,
+focused stdout and empty stderr SHA-256 values are respectively
+`1f0ca36988d1aef5f0f4a716ed29dfedadebb3427eb9ce22be6ccb53f375448d`,
+`154ec8edf8585738145969e625f0990fa2c995ab2c7bb38ec6016b101f1c960a`,
+`ee94a3bf1f0079ca7b90c5f70fb469dc03503962a86b71998ba0448c1df610a0`
+and
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+The ten-entry self-excluding manifest at
+`.logs/d108e5-final-correction/ARTIFACT-SHA256SUMS` validates completely and
+has SHA-256
+`42db2afbde142011abe3e51a2babda9095c1d9fad7979c373466556a3ef857c2`.
+
+The prospective policy's sole confirmation allowance is consumed; the
+confirmation-generated P1 is resolved by executable negative mutants and
+mechanical gates rather than a recursive model round. No production source,
+API, limit, classification, dependency, browser fixture, workload or prior
+evidence changed, and no campaign ran. Protected untracked paths and all 26
+stashes remain untouched. The corrected final P0/P1 union is empty, D.108e5
+is closed, and the remaining Phase-6a exit ledger is released.
