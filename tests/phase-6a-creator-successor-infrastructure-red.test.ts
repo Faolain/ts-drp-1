@@ -3,9 +3,11 @@ import {
 	mkdirSync,
 	mkdtempSync,
 	readFileSync,
+	readlinkSync,
 	realpathSync,
 	rmdirSync,
 	rmSync,
+	symlinkSync,
 	writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -31,6 +33,21 @@ const GLOBAL_SETUP = resolve(
 const SHIM_ROOT = resolve(REPOSITORY_ROOT, "tests/fixtures/node_modules/@ts-drp");
 const SHIM_SIBLING_SENTINEL = resolve(REPOSITORY_ROOT, "tests/fixtures/node_modules/d108e1-caller-owned.txt");
 const SHIM_PARENT = dirname(SHIM_SIBLING_SENTINEL);
+
+interface ActivationShimSetupHooks {
+	afterRootCreated?(): void;
+}
+
+interface ActivationShimSetupModule {
+	default(): Promise<() => void>;
+	setupActivationWorkspaceShims?(hooks?: Readonly<ActivationShimSetupHooks>): Promise<() => void>;
+}
+
+async function activationShimSetupModule(): Promise<ActivationShimSetupModule> {
+	return (await import(
+		`${pathToFileURL(GLOBAL_SETUP).href}?d108e6=${crypto.randomUUID()}`
+	)) as ActivationShimSetupModule;
+}
 
 describe("D.108e1 activation test-infrastructure RED", () => {
 	it(D108E4_INFRASTRUCTURE_BEHAVIORS[0], async () => {
@@ -166,6 +183,114 @@ describe("D.108e1 activation test-infrastructure RED", () => {
 				expectedReads
 			)
 		).toBe(false);
+	});
+
+	it("removes its setup-created empty parent and preserves the live owner on refusal", async () => {
+		expect(existsSync(SHIM_ROOT)).toBe(false);
+		expect(existsSync(SHIM_PARENT)).toBe(false);
+		const setup = await activationShimSetupModule();
+		let cleanup: (() => void) | undefined;
+		try {
+			cleanup = await setup.default();
+			expect(existsSync(SHIM_ROOT)).toBe(true);
+			expect(existsSync(SHIM_PARENT)).toBe(true);
+			const canonicalManifest = resolve(SHIM_ROOT, "canonical/package.json");
+			const manifestBytes = readFileSync(canonicalManifest);
+			const refusal = await setup.default().then(
+				() => undefined,
+				(error: unknown) => error
+			);
+			expect.soft(refusal).toBeInstanceOf(Error);
+			expect.soft(refusal instanceof Error ? refusal.message : String(refusal)).toContain(SHIM_ROOT);
+			expect.soft(readFileSync(canonicalManifest)).toEqual(manifestBytes);
+			cleanup();
+			cleanup = undefined;
+			expect.soft(existsSync(SHIM_ROOT)).toBe(false);
+			expect.soft(existsSync(SHIM_PARENT)).toBe(false);
+		} finally {
+			cleanup?.();
+			rmSync(SHIM_ROOT, { force: true, recursive: true });
+			if (existsSync(SHIM_PARENT)) rmdirSync(SHIM_PARENT);
+		}
+	});
+
+	it("preserves a pre-existing empty shim parent", async () => {
+		expect(existsSync(SHIM_ROOT)).toBe(false);
+		expect(existsSync(SHIM_PARENT)).toBe(false);
+		mkdirSync(SHIM_PARENT, { recursive: true });
+		try {
+			const setup = await activationShimSetupModule();
+			const cleanup = await setup.default();
+			cleanup();
+			expect(existsSync(SHIM_ROOT)).toBe(false);
+			expect(existsSync(SHIM_PARENT)).toBe(true);
+		} finally {
+			rmSync(SHIM_ROOT, { force: true, recursive: true });
+			if (existsSync(SHIM_PARENT)) rmdirSync(SHIM_PARENT);
+		}
+	});
+
+	it("refuses populated and dangling exact roots without deleting caller ownership", async () => {
+		expect(existsSync(SHIM_ROOT)).toBe(false);
+		expect(existsSync(SHIM_PARENT)).toBe(false);
+		const setup = await activationShimSetupModule();
+		mkdirSync(SHIM_ROOT, { recursive: true });
+		const sentinel = resolve(SHIM_ROOT, "preexisting.txt");
+		writeFileSync(sentinel, "caller-owned", "utf8");
+		try {
+			const populatedRefusal = await setup.default().then(
+				() => undefined,
+				(error: unknown) => error
+			);
+			expect.soft(populatedRefusal).toBeInstanceOf(Error);
+			expect
+				.soft(populatedRefusal instanceof Error ? populatedRefusal.message : String(populatedRefusal))
+				.toContain(SHIM_ROOT);
+			expect.soft(readFileSync(sentinel, "utf8")).toBe("caller-owned");
+		} finally {
+			rmSync(SHIM_ROOT, { force: true, recursive: true });
+		}
+
+		const danglingTarget = "d108e6-caller-owned-missing-target";
+		symlinkSync(danglingTarget, SHIM_ROOT);
+		try {
+			const danglingRefusal = await setup.default().then(
+				() => undefined,
+				(error: unknown) => error
+			);
+			expect.soft(danglingRefusal).toBeInstanceOf(Error);
+			expect
+				.soft(danglingRefusal instanceof Error ? danglingRefusal.message : String(danglingRefusal))
+				.toContain(SHIM_ROOT);
+			let observedTarget: string | undefined;
+			try {
+				observedTarget = readlinkSync(SHIM_ROOT);
+			} catch {
+				observedTarget = undefined;
+			}
+			expect.soft(observedTarget).toBe(danglingTarget);
+		} finally {
+			rmSync(SHIM_ROOT, { force: true, recursive: true });
+			if (existsSync(SHIM_PARENT)) rmdirSync(SHIM_PARENT);
+		}
+	});
+
+	it("cleans its root and setup-created parent after a deterministic setup failure", async () => {
+		expect(existsSync(SHIM_ROOT)).toBe(false);
+		expect(existsSync(SHIM_PARENT)).toBe(false);
+		const setup = await activationShimSetupModule();
+		if (setup.setupActivationWorkspaceShims === undefined) {
+			throw new Error("D108E6_AFTER_ROOT_CREATED_SEAM_ABSENT");
+		}
+		await expect(
+			setup.setupActivationWorkspaceShims({
+				afterRootCreated() {
+					throw new Error("D108E6_AFTER_ROOT_CREATED_FAILURE");
+				},
+			})
+		).rejects.toThrow("D108E6_AFTER_ROOT_CREATED_FAILURE");
+		expect(existsSync(SHIM_ROOT)).toBe(false);
+		expect(existsSync(SHIM_PARENT)).toBe(false);
 	});
 
 	it("moves package shims behind one bounded Playwright global-setup owner", async () => {
