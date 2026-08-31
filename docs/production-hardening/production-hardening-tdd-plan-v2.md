@@ -82854,3 +82854,43 @@ failure, or proof that execution requires changing product behavior, workload,
 thresholds, dependencies or test semantics. Six passes release a signed/pushed
 campaign-evidence checkpoint and one final evidence review, after which work
 resumes at D.108e5 and the Phase-6a closure path.
+
+The single D.108e4br high-risk freeze review is closed with an empty blocking
+union. Grok and Codex `gpt-5.6-sol` high returned `APPROVED 0/0/0`; Opus xhigh
+returned `APPROVED 0/0/4`. All three report scope preserved and the campaign
+safe to launch. Grok's substantive run prepended progress prose to a valid
+terminal object, so the runner honestly classified that first envelope as
+`NO_VERDICT`; exact session `01a055aa-670d-7d62-8bdf-ce273b6fc3c9` was
+continued once for formatting-only completion and returned the clean object.
+No substantive review was relaunched.
+
+Opus's four P2 findings are accepted as fail-closed operating dispositions,
+not reasons to alter the frozen launcher. First,
+`D108E4AS_FINALIZER_FAULT` must be unset in each fresh launch shell; its two
+test hooks can only force nonzero runner status and cannot fabricate a pass.
+Second, cumulative manifests exclude `*.runner-status` because the current
+runner status is written after finalization; each predecessor additionally
+requires the manifest-covered Playwright `.status` twin to equal zero, while
+runner-status integrity remains within the trusted-local model. Third, a
+preflight abort before the EXIT trap may leave `.preflight-*`; such a directory
+contains no `resolution-*` ledger artifact or browser result and may be removed
+only after diagnosing the non-consuming environment fault. It is not a retry;
+any name with status artifacts remains consumed. Fourth, the isolated mode is
+now deliberately exercised for the first time in this launcher lineage. Any
+new isolated-worktree path or failed after-capture assertion is genuine
+first-failure contamination evidence and stops later names for diagnosis.
+No dry run, fixture, instrumentation, product, dependency, workload,
+threshold, timing, script or evidence redesign follows from these P2s.
+
+The review prompt, clean continued Grok envelope, Codex result and Opus
+envelope SHA-256 values are respectively
+`825ceebbffee988a380ec29f01ef8a3ea9a3b3e8e7c194c473962d2231713ad8`,
+`badcd76a46c4cf477826c57c4634e7ad1f7cd5db4a2d5fc0f5971be2c92371d5`,
+`1176b8bad5c978617f79dbeaabd741735c54136fcfbbc47ed019ecf358c9381e`
+and
+`4fc0d50f76c04747f131be4b2503e9afa6e83eff8798b7cacac4942533ebfe2e`.
+Codex session `01a055aa-5ff8-72d0-bc25-deffe3bef578` and Opus session
+`cb164401-5511-412e-a0e7-0d5277ca632d` are preserved. The finalizer fault
+variable is currently unset, the campaign root has no `.preflight-*` or
+`resolution-*` artifact, and the launch gate is released after this
+review-closure commit is signed/pushed and the reviewed tag is signed/pushed.
