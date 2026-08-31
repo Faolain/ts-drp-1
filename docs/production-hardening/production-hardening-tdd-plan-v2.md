@@ -87222,27 +87222,46 @@ repository-global fail-closed guard. D.108e6 does not authorize two activation
 configs to share that root concurrently; any future parallelization requires
 a separately reviewed per-run ownership design. Within the serialized policy,
 stale-root refusal must name the exact physical root and state that
-caller-owned contents will not be removed.
+caller-owned contents will not be removed. The guard uses non-following
+filesystem identity, so an exact-root dangling symlink is present rather than
+mistaken for absence, and refusal returns before any cleanup path.
 
 RED extends the existing global-setup unit behavior without a new fixture. It
-starts with both the exact shim root and its ignored parent absent, invokes the
-real setup, proves the root and parent exist, invokes a second setup while the
-first owns the root, and requires an exact-path refusal while the first
-owner's package shims remain intact. After the first cleanup, both its exact
-root and the parent it created must be absent. The retained caller-owned
-sibling control must still prove that setup cleanup removes only `@ts-drp`
-and preserves a pre-existing parent and sibling. The retained pre-existing
-root control must preserve that root byte-for-byte. A pre-run command may
-remove `tests/fixtures/node_modules` only after proving it is empty; it may not
-remove any nonempty or protected path.
+has a fail-closed first assertion that both the exact shim root and its ignored
+parent are absent; it may not adapt, skip or branch on a pre-existing parent.
+The only sanctioned pre-run cleanup is
+`rmdir tests/fixtures/node_modules`, whose own `ENOTEMPTY` failure makes the
+empty proof and removal atomic; no recursive removal is permitted. The test
+then invokes real setup, proves root and parent exist, invokes a second setup
+while the first owns the root, and requires an exact-path refusal while the
+first owner's package shims remain intact. After the first cleanup, both its
+exact root and the parent it created must be absent.
 
-GREEN tracks whether the shim parent existed before setup. Its returned and
-error-path cleanup removes the setup-owned root and removes the parent only
-when setup created it and it is still empty. `ENOTEMPTY` preserves
-caller-owned siblings; any other unexpected cleanup error fails. The stale
-root diagnostic includes the resolved root and the serialized ownership rule.
-No production source, product API, package/dependency/configuration, workload,
-timeout, limit, wire/store/digest/authority rule or campaign changes.
+Three independent controls prevent that success case from overclaiming
+ownership. First, create an empty parent before setup, run returned cleanup,
+and prove that caller-owned empty parent remains. Second, retain the existing
+caller-owned sibling control and prove cleanup removes only `@ts-drp` while
+preserving both parent and sibling. Third, retain the existing populated-root
+control and add a dangling-symlink exact-root control; each refusal must name
+the exact root and preserve the directory bytes or link text unchanged. A
+test-only named setup core may accept one synchronous `afterRootCreated`
+throw seam while the unchanged default export remains the Playwright global
+setup. That seam produces a deterministic post-root-creation failure and RED
+requires error cleanup to remove both the setup-owned root and its newly
+created empty parent. Test teardown is idempotent when GREEN has already
+removed either setup-owned path.
+
+GREEN uses `lstat`-equivalent non-following existence checks and records
+separate `rootCreated` and `parentExisted` facts. Stale-root refusal occurs
+before ownership or cleanup is armed. Returned and error-path cleanup removes
+the root only after this invocation successfully created it, then attempts
+`rmdir` on the parent only when it did not exist at entry. `ENOTEMPTY`
+preserves a sibling added during setup; any other unexpected cleanup error
+fails. The stale-root diagnostic includes the resolved root and serialized
+ownership rule. The named failure seam is test-only and the default Playwright
+entry has unchanged behavior and signature. No production source, product
+API, package/dependency/configuration, workload, timeout, limit,
+wire/store/digest/authority rule or campaign changes.
 
 The deterministic focused RED/GREEN command is:
 
@@ -87255,8 +87274,11 @@ unchanged activation Playwright configuration across Chromium, Firefox and
 WebKit, and before/after absence checks for both shim root and a
 setup-created empty parent. Protected untracked paths, all 26 stashes and the
 fixed-port/process predicates remain unchanged. RED and GREEN record complete
-stdout/stderr, statuses, owner hashes and self-excluding manifests. No retained
-campaign runs.
+stdout/stderr, statuses, owner hashes and self-excluding manifests. A captured
+set-equality gate requires the RED commit range to change only the one RED
+owner and the GREEN commit range to change only the one GREEN owner; every
+additional tracked product, configuration, dependency, campaign, prior-
+evidence or other path fails. No retained campaign runs.
 
 Under the prospective review policy this ordinary narrow test-infrastructure
 slice receives one bounded Grok 4.6/high, Codex `gpt-5.6-sol` high and Opus
@@ -87266,3 +87288,36 @@ session rather than launching a replacement. Only P0/P1 findings block; P2
 bookkeeping or hostile-local-operator custody requests receive a disposition
 without another round. Kimi, Fable and collaboration subagents are not
 authorized.
+
+The bounded plan review inspected signed/pushed freeze
+`aaf9f7e2df450403e585153a1cbb0f2acf2e32ae`, tree
+`17310390ff0ab0d81c4b648a31619375b47cf3e7`. Grok 4.6/high session
+`01a058a6-e266-7a71-be6a-34ef593fc575` was canceled at its 12-turn boundary
+after active inspection and therefore classified `NO_VERDICT`. The exact
+session was resumed rather than replaced; after its completed interactive
+turn the same session emitted a schema-constrained `APPROVED` with no findings.
+The resumed result SHA-256 is
+`7b03f0c40a72637b6030765e9e6a49ac5356fa692d65249dd3f751cdfccb1b50`.
+Codex `gpt-5.6-sol` high session
+`01a058a6-da8a-75d1-b568-a854e730f7d7` returned `CHANGES_REQUIRED` with three
+P1 findings: no pre-existing-empty-parent or deterministic error-cleanup
+control, destructive dangling-symlink ambiguity under `existsSync`, and no
+exact changed-path set gate. Its result SHA-256 is
+`f6e1bfecc2777a837275595e000940c4717110de251284231296e5d3e5ceb2d9`.
+Opus 5/xhigh session `de082cd8-cd8f-4ba8-a08e-120b9e545315` returned
+`CHANGES_REQUIRED` with two overlapping P1 findings and three P2 refinements:
+the absent-parent precondition must fail closed, a pre-existing empty parent
+must be distinct from the sibling control, refusal must remain outside cleanup,
+pre-run cleanup must use `rmdir`, and teardown must tolerate GREEN's earlier
+cleanup. Its raw-result SHA-256 is
+`ccf1249cf64ec10d70324270a6fa69477bfdb474dd2e02306d09581f3b02f6df`.
+
+The single correction batch above adopts the complete blocking union and all
+three bounded P2 refinements without adding an owner or widening product
+scope. It freezes non-following root identity, explicit creation ownership,
+all four success/refusal/error parent states, a deterministic test-only
+post-root failure seam, fail-closed absent-state entry, `rmdir` pre-cleanup,
+idempotent test teardown and exact RED/GREEN changed-path custody. Because the
+correction materially changes causal RED acceptance, the prospective policy
+permits one confirmation over the signed corrected plan. That confirmation is
+the only remaining plan gate and only P0/P1 may block deterministic RED.
