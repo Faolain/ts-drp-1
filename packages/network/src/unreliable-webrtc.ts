@@ -198,10 +198,12 @@ interface ReplacementDecisionResponse {
 
 interface PendingPeerConnection {
 	readonly peerId: string;
+	readonly token: object;
 	unsubscribeConnection(): void;
 }
 
 const abortedStreams = new WeakSet<object>();
+const requestFailedConnections = new WeakSet<object>();
 
 function isWebRtcAddress(address: string): boolean {
 	try {
@@ -313,27 +315,64 @@ export function createLibp2pWebRtcSignalingPort(input: Libp2pSignalingPortInput)
 	};
 
 	const unsubscribeIncoming = input.onIncoming(async ({ connection, stream }) => {
+		const authenticated = adapt(connection);
+		const requestCloseListeners = new Set<() => void>();
+		const requestUnsubscribes = new Map<() => void, () => void>();
+		let requestComplete = false;
+		let requestFailed = false;
+		const notifyRequestFailure = (): void => {
+			if (requestComplete || requestFailed) return;
+			requestFailed = true;
+			requestFailedConnections.add(requestConnection);
+			for (const listener of requestCloseListeners) listener();
+		};
+		const requestConnection: AuthenticatedWebRtcConnection = Object.freeze({
+			...authenticated,
+			onClose(listener: () => void): () => void {
+				requestCloseListeners.add(listener);
+				const unsubscribeConnection = authenticated.onClose(listener);
+				requestUnsubscribes.set(listener, unsubscribeConnection);
+				if (requestFailed) {
+					queueMicrotask(() => {
+						if (requestCloseListeners.has(listener)) listener();
+					});
+				}
+				return (): void => {
+					requestCloseListeners.delete(listener);
+					requestUnsubscribes.get(listener)?.();
+					requestUnsubscribes.delete(listener);
+				};
+			},
+		});
+		const onStreamClose = (event: Event): void => {
+			const close = event as Event & { readonly error?: Error; readonly local?: boolean };
+			if (close.error !== undefined && close.local === false) notifyRequestFailure();
+		};
+		stream.addEventListener("close", onStreamClose);
+		if (stream.status === "reset") notifyRequestFailure();
 		try {
 			await withDeadline(async (signal) => {
 				const onAbort = (): void => abortStream(stream, errorFrom(signal.reason, "RTC signaling request aborted"));
 				signal.addEventListener("abort", onAbort, { once: true });
 				try {
 					if (requestListener === undefined) throw new Error("unreliable WebRTC signaling owner is unavailable");
-					const authenticated = adapt(connection);
 					if (authenticated.transport !== "webrtc") {
 						throw new Error("unreliable WebRTC signaling transport rejected");
 					}
 					const request = (await input.read(stream, MAX_SIGNALING_FRAME_BYTES)).slice();
-					const response = await requestListener(authenticated, request);
+					const response = await requestListener(requestConnection, request);
 					await input.write(stream, response.slice());
+					requestComplete = true;
 				} finally {
 					signal.removeEventListener("abort", onAbort);
 				}
 			});
 		} catch (error) {
+			notifyRequestFailure();
 			abortStream(stream, errorFrom(error, "RTC signaling request failed"));
 			throw error;
 		} finally {
+			stream.removeEventListener("close", onStreamClose);
 			await closeStream(stream).catch(() => undefined);
 		}
 	});
@@ -581,6 +620,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 	readonly #createPeerConnection: () => RTCPeerConnection;
 	readonly #links = new Map<string, ActiveLink>();
 	readonly #pendingReplacementLinks = new Map<string, ActiveLink>();
+	readonly #pendingLinkAborts = new Map<string, AbortController>();
 	readonly #pendingLinks = new Map<string, Promise<ActiveLink | undefined>>();
 	readonly #pendingPeerConnections = new Map<RTCPeerConnection, PendingPeerConnection>();
 	readonly #readiness = new Map<ActiveLink, LinkReadiness>();
@@ -828,15 +868,21 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		if (connection === undefined) return staleOpen ? existing : undefined;
 		if (staleOpen && this.#retryLinks.has(peerId)) return existing;
 		const deadlineAt = Date.now() + SETUP_TIMEOUT_MS;
+		const setupAbort = new AbortController();
+		this.#pendingLinkAborts.set(peerId, setupAbort);
 		const setup = withDeadline(
-			(signal) => this.#initiate(connection, signal, deadlineAt),
+			(signal) => this.#initiate(connection, AbortSignal.any([signal, setupAbort.signal]), deadlineAt),
 			deadlineAt - Date.now()
-		).catch(() => {
-			this.#closePendingForPeer(peerId);
-			this.#handshakeFailures += 1;
-			if (staleOpen) this.#scheduleLinkRetry(peerId);
-			return undefined;
-		});
+		)
+			.catch(() => {
+				this.#closePendingForPeer(peerId);
+				this.#handshakeFailures += 1;
+				if (staleOpen) this.#scheduleLinkRetry(peerId);
+				return undefined;
+			})
+			.finally(() => {
+				if (this.#pendingLinkAborts.get(peerId) === setupAbort) this.#pendingLinkAborts.delete(peerId);
+			});
 		this.#pendingLinks.set(peerId, setup);
 		if (staleOpen) {
 			void setup.finally(() => {
@@ -880,6 +926,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		});
 		this.#pendingPeerConnections.set(pc, {
 			peerId: connection.remotePeerId,
+			token: Object.freeze({}),
 			unsubscribeConnection,
 		});
 		try {
@@ -955,10 +1002,10 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			throw new Error("unreliable WebRTC signaling request rejected");
 		}
 		const deadlineAt = Date.now() + SETUP_TIMEOUT_MS;
+		const setupToken = Object.freeze({});
 		try {
-			return await withDeadline((_signal) => this.#accept(connection, request, offer, deadlineAt));
+			return await withDeadline((signal) => this.#accept(connection, request, offer, deadlineAt, signal, setupToken));
 		} catch (error) {
-			this.#closePendingForPeer(connection.remotePeerId);
 			this.#handshakeFailures += 1;
 			throw error;
 		}
@@ -1018,17 +1065,31 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		connection: AuthenticatedWebRtcConnection,
 		request: Uint8Array,
 		offer: SignalDescription,
-		deadlineAt: number
+		deadlineAt: number,
+		signal: AbortSignal,
+		setupToken: object
 	): Promise<Uint8Array> {
 		const pc = this.#createPeerConnection();
 		let authenticatedClosed = false;
 		let established = false;
 		let inboundChannelError: Error | undefined;
 		let link: ActiveLink | undefined;
+		const ownsSetup = (): boolean => !signal.aborted && this.#pendingPeerConnections.get(pc)?.token === setupToken;
+		const closeSetup = (): boolean => this.#closePendingPeerConnection(pc, setupToken);
 		const unsubscribeConnection = connection.onClose(() => {
+			if (requestFailedConnections.has(connection)) {
+				authenticatedClosed = true;
+				if (link !== undefined && this.#pendingReplacementLinks.get(connection.remotePeerId) === link) {
+					this.#discardPendingReplacement(connection.remotePeerId, link);
+				} else if (link !== undefined && this.#links.get(connection.remotePeerId) === link) {
+					this.#handshakeFailures += 1;
+					this.#dropLink(connection.remotePeerId, link, "connection-close");
+				} else closeSetup();
+				return;
+			}
 			if (!established) {
 				authenticatedClosed = true;
-				pc.close();
+				closeSetup();
 				return;
 			}
 			this.#authenticatedConnectionLosses += 1;
@@ -1038,9 +1099,17 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		});
 		this.#pendingPeerConnections.set(pc, {
 			peerId: connection.remotePeerId,
+			token: setupToken,
 			unsubscribeConnection,
 		});
+		const onAbort = (): void => {
+			authenticatedClosed = true;
+			closeSetup();
+		};
+		if (signal.aborted) onAbort();
+		else signal.addEventListener("abort", onAbort, { once: true });
 		try {
+			if (!ownsSetup()) throw errorFrom(signal.reason, "RTC accept setup ended");
 			const channelPromise = new Promise<RTCDataChannel>((resolve) => {
 				pc.addEventListener(
 					"datachannel",
@@ -1058,9 +1127,12 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 				);
 			});
 			await pc.setRemoteDescription({ sdp: offer.sdp, type: "offer" });
+			if (!ownsSetup()) throw errorFrom(signal.reason, "RTC accept setup ended");
 			if (inboundChannelError !== undefined) throw inboundChannelError;
 			await addRemoteCandidates(pc, offer.candidates);
+			if (!ownsSetup()) throw errorFrom(signal.reason, "RTC accept setup ended");
 			const answer = await localDescription(pc, await pc.createAnswer());
+			if (!ownsSetup()) throw errorFrom(signal.reason, "RTC accept setup ended");
 			validateSctp(pc);
 			const finish = async (): Promise<void> => {
 				const channel = await withDeadline(async () => {
@@ -1070,7 +1142,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 					await waitForOpen(pendingChannel);
 					return pendingChannel;
 				}, deadlineAt - Date.now());
-				if (authenticatedClosed || !this.#isCurrent(connection)) {
+				if (!ownsSetup() || authenticatedClosed || !this.#isCurrent(connection)) {
 					throw new Error("authenticated connection changed");
 				}
 				established = true;
@@ -1088,6 +1160,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 					if (readiness.commit === undefined) throw new Error("replacement commit owner is absent");
 					await readiness.commit;
 				} else {
+					if (!ownsSetup()) throw new Error("RTC accept setup ownership changed");
 					this.#pendingPeerConnections.delete(pc);
 					this.#registerLink(link);
 				}
@@ -1095,17 +1168,15 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			void finish().catch(() => {
 				const pending = this.#pendingReplacementLinks.get(connection.remotePeerId);
 				if (pending?.pc === pc) this.#discardPendingReplacement(connection.remotePeerId, pending);
-				else this.#pendingPeerConnections.delete(pc);
+				else closeSetup();
 				this.#handshakeFailures += 1;
-				unsubscribeConnection();
-				pc.close();
 			});
 			return encodeDescription(answer);
 		} catch (error) {
-			this.#pendingPeerConnections.delete(pc);
-			unsubscribeConnection();
-			pc.close();
+			closeSetup();
 			throw error;
+		} finally {
+			signal.removeEventListener("abort", onAbort);
 		}
 	}
 
@@ -1339,6 +1410,16 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		return selected !== undefined && selected !== replacement && selected.channel.readyState === "open";
 	}
 
+	#hasDisconnectedSelectedLink(peerId: string, replacement: ActiveLink): boolean {
+		const selected = this.#links.get(peerId);
+		return (
+			selected !== undefined &&
+			selected !== replacement &&
+			selected.channel.readyState === "open" &&
+			selected.pc.connectionState === "disconnected"
+		);
+	}
+
 	#sendReplacementControl(link: ActiveLink, readiness: LinkReadiness, kind: 1 | 2 | 3): boolean {
 		if (link.channel.readyState !== "open" || !this.#isCurrent(link.connection)) return false;
 		if (kind === 1) {
@@ -1430,7 +1511,11 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		if (this.#pendingReplacementLinks.get(peerId) !== link || this.#readiness.get(link) !== readiness) return;
 		if (link.role === "acceptor" && readiness.reliableDecision) {
 			const record = this.#replacementDecisions.get(link.decisionId);
-			if (record?.link === link && record.status === "committed" && !this.#hasUsableSelectedLink(peerId, link)) {
+			if (
+				record?.link === link &&
+				record.status === "committed" &&
+				(!this.#hasUsableSelectedLink(peerId, link) || this.#hasDisconnectedSelectedLink(peerId, link))
+			) {
 				if (this.#promotePendingReplacement(peerId)) return;
 			}
 		}
@@ -1475,7 +1560,9 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			const record = this.#replacementDecisions.get(link.decisionId);
 			if (readiness.reliableDecision && record?.link === link) {
 				this.#settleDecision(record, "committed");
-				if (!this.#hasUsableSelectedLink(peerId, link)) this.#promotePendingReplacement(peerId);
+				if (!this.#hasUsableSelectedLink(peerId, link) || this.#hasDisconnectedSelectedLink(peerId, link)) {
+					this.#promotePendingReplacement(peerId);
+				}
 			} else this.#promotePendingReplacement(peerId);
 		} else {
 			readiness.complete = true;
@@ -1568,14 +1655,15 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		this.#activatedPeers.clear();
 		this.#clearAllReplacementAdmissions();
 		for (const peerId of [...this.#retryLinks.keys()]) this.#clearLinkRetry(peerId);
+		for (const peerId of [...this.#pendingLinkAborts.keys()]) {
+			this.#abortPendingLink(peerId, new Error("unreliable WebRTC owner closed"));
+		}
 		for (const [peerId, link] of [...this.#pendingReplacementLinks]) {
 			this.#discardPendingReplacement(peerId, link);
 		}
 		for (const [pc, pending] of this.#pendingPeerConnections) {
-			pending.unsubscribeConnection();
-			pc.close();
+			this.#closePendingPeerConnection(pc, pending.token);
 		}
-		this.#pendingPeerConnections.clear();
 		for (const [peerId, link] of [...this.#retiringLinks]) this.#finishRetiringLink(peerId, link);
 		for (const [peerId, link] of [...this.#links]) this.#dropLink(peerId, link, "owner-close");
 		for (const record of [...this.#replacementDecisions.values()]) this.#removeDecisionRecord(record.link);
@@ -1663,14 +1751,28 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		this.#retryLinks.set(peerId, retry);
 	}
 
+	#abortPendingLink(peerId: string, error: Error): void {
+		const controller = this.#pendingLinkAborts.get(peerId);
+		if (controller === undefined || controller.signal.aborted) return;
+		controller.abort(error);
+	}
+
+	#closePendingPeerConnection(pc: RTCPeerConnection, token: object): boolean {
+		const pending = this.#pendingPeerConnections.get(pc);
+		if (pending?.token !== token) return false;
+		this.#pendingPeerConnections.delete(pc);
+		pending.unsubscribeConnection();
+		pc.close();
+		return true;
+	}
+
 	#closePendingForPeer(peerId: string): void {
+		this.#abortPendingLink(peerId, new Error("unreliable WebRTC pending setup ended"));
 		const pendingReplacement = this.#pendingReplacementLinks.get(peerId);
 		if (pendingReplacement !== undefined) this.#discardPendingReplacement(peerId, pendingReplacement);
 		for (const [pc, pending] of this.#pendingPeerConnections) {
 			if (pending.peerId !== peerId) continue;
-			this.#pendingPeerConnections.delete(pc);
-			pending.unsubscribeConnection();
-			pc.close();
+			this.#closePendingPeerConnection(pc, pending.token);
 		}
 	}
 

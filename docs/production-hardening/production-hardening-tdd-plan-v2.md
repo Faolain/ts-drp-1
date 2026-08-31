@@ -81848,3 +81848,79 @@ protected-path custody, 26-stash custody and all four fixed-port predicates
 passed. No browser, retained-seven, campaign, production source, public API,
 wire, dependency, timer, threshold or workload changed. This signed RED
 releases only the frozen narrow GREEN.
+
+D.108e4bo GREEN changes only the frozen internal owners. Each initiator setup
+has an exact per-peer abort controller composed with the unchanged absolute
+deadline signal; owner close, restart and pending cleanup abort it before PC
+close, so the existing outbound adapter resets its stream. The inbound adapter
+wraps each request with the same authenticated identity and public interface,
+delegates genuine connection close, and separately notifies only that request's
+listeners for remote reset or request/response delivery failure. Successful
+graceful response close remains silent. A private marker keeps request-delivery
+failure on the handshake path rather than incrementing
+`authenticatedConnectionLosses`.
+
+Each accept setup now owns an opaque token. Signal, pre-establishment
+connection close, request failure, timeout and accept failure delete,
+unsubscribe and close only the matching token/PC. Every post-await path checks
+the same ownership, and the handler no longer performs peer-wide catch cleanup;
+therefore deferred B cannot touch C. The only promotion exception is in the
+existing acceptor commit/expiry owners after replacement readiness: a current,
+qualified C may promote when selected A's channel remains open but A's PC is
+`disconnected`. `#prepareLink`, `#hasUsableSelectedLink`, `reliableDecision`,
+the 10-second deadline and open/disconnected pending-B protection are unchanged.
+
+The first focused GREEN command passed all ten assertions in its reporter but
+returned shell status 1 because it accidentally omitted the repository's
+established `--coverage.enabled=false`; the filtered file produced only 1.83%
+repository-wide coverage against the unrelated global 70% threshold. This is
+an invocation soft failure, not a product/test failure, and its immutable
+reporter SHA-256 is
+`22aee31143759e1759f5cf27a4389f49aeb3d03b3c059e61bf113d51a631e9d6`.
+The accepted focused command added only that established flag and ultimately
+passed 10/10 with status zero.
+
+The first complete owner run then passed 111/113. Its two failures were both
+retained fixture-shape errors: the old adapter fakes were plain objects without
+the `EventTarget` and `status` members guaranteed by the installed
+`@libp2p/interface@3.2.5` `Stream`; one failed at `addEventListener`, and the
+other consequently observed no deadline abort. No product branch failed. The
+two old fakes were corrected to the installed shape in one batch. The immutable
+111/113 reporter SHA-256 is
+`faf87781a8c738c46a867981601a17121516ffd8b65d092f059aca468fbc5d40`.
+
+Final acceptance used:
+
+```sh
+pnpm exec vitest run --coverage.enabled=false \
+  packages/network/tests/unreliable-webrtc-e3-01-red.test.ts \
+  -t 'D\.108e4bo|D\.108e4bn|D\.108e4bm bounds acceptor pre-open setup' \
+  --reporter=json
+pnpm exec vitest run --coverage.enabled=false \
+  packages/network/tests/unreliable-webrtc-e3-01-red.test.ts \
+  --reporter=json
+pnpm exec vitest run --coverage.enabled=false \
+  packages/node/tests/ephemeral-webrtc-e3-02-red.test.ts \
+  --reporter=json
+```
+
+They passed respectively 10/10, 113/113 and 12/12 with status zero. Reporter
+SHA-256 values are respectively
+`d8ae51e1ffc75bcd7b5989a2481416d77b1f4e3c8775b3633e7d7c2b842f904c`,
+`d900b29ac81c6bde60292805f7ae34c08688e19cfede9fc6507e0ccc96626e1f`
+and
+`c47c51a9e99c1dcda51a3b62ddb83c43adf4c074137218936291d57478c16447`.
+Network typecheck/build, exact source/test ESLint, high-heap documentation plus
+exact-owner Prettier, `git diff --check`, process/port/protected-path/26-stash
+custody and the validating evidence manifest passed. Deterministic base-vs-
+GREEN hashes prove the exported signaling interfaces, `#prepareLink`,
+`#hasUsableSelectedLink`, frozen limits/deadline and package/lock state are
+unchanged. Final source, test and self-excluding evidence-index SHA-256 values
+are respectively
+`c0973adb89346b3c8523cfb6834850b4200213b267434dcaca6e5464585efe71`,
+`c36b268ad84221042a182505f021bad05bfdef7299b34e853a32c71469653040`
+and
+`a2a377fd3c72f8b7d3097f1015c19d018fbeb406d2488e54acc6262b66e69ab1`.
+No browser, retained campaign, public API, wire, dependency, threshold,
+deadline, retry, workload or campaign contract changed. Sign and push this
+GREEN before the single final Grok/Codex-high/Opus-xhigh implementation review.

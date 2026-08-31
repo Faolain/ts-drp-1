@@ -1154,8 +1154,8 @@ it("E3-01 RED exposes the missing authenticated unreliable WebRTC owner", () => 
 describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 	it("adapts the exact authenticated libp2p connection and signaling stream", async () => {
 		const module = await loadOwnerModule();
-		const outboundStream = Object.freeze({ id: "outbound-stream" });
-		const inboundStream = Object.freeze({ id: "inbound-stream" });
+		const outboundStream = Object.freeze(Object.assign(new EventTarget(), { id: "outbound-stream", status: "open" }));
+		const inboundStream = Object.freeze(Object.assign(new EventTarget(), { id: "inbound-stream", status: "open" }));
 		let closeListener: (() => void) | undefined;
 		let incoming: ((input: IncomingSignalingStream) => Promise<void>) | undefined;
 		const newStream = vi.fn<(protocol: string, options?: Readonly<{ signal?: AbortSignal }>) => Promise<unknown>>(() =>
@@ -1244,14 +1244,16 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		const outboundReadStarted = new Promise<void>((resolve) => {
 			markOutboundReadStarted = resolve;
 		});
-		const outboundStream = {
+		const outboundStream = Object.assign(new EventTarget(), {
 			abort: vi.fn((error: Error): void => rejectOutbound?.(error)),
 			close: vi.fn((): Promise<void> => Promise.resolve()),
-		};
-		const inboundStream = {
+			status: "open",
+		});
+		const inboundStream = Object.assign(new EventTarget(), {
 			abort: vi.fn((error: Error): void => rejectInbound?.(error)),
 			close: vi.fn((): Promise<void> => Promise.resolve()),
-		};
+			status: "open",
+		});
 		const connection: Libp2pConnectionFixture = {
 			addEventListener(): void {},
 			id: "libp2p-connection-cancellable",
