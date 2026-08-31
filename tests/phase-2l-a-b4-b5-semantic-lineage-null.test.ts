@@ -66,6 +66,7 @@ function exactPairInput(lineage: DurableLineage, priorLineage: DurableLineage): 
 		observation: {
 			issuedRecord: candidate.issuedRecord,
 			lineage,
+			prunedThroughAuthorSequence: null,
 			outboxRecord: nativeOutboxRow(candidate),
 		},
 		priorLineage,

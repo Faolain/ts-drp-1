@@ -48,6 +48,8 @@ type D109aPlanningResult =
 				readonly closedEpoch: number;
 				readonly expectedHead: PresentHead;
 				readonly issuance: Readonly<{
+					readonly lineage: Readonly<{ readonly exhausted: boolean; readonly next: number }>;
+					readonly prunedThroughAuthorSequence: number | null;
 					readonly scope: Readonly<{ readonly author: string; readonly objectId: StorageObjectId }>;
 					readonly throughAuthorSequence: number;
 				}>;
@@ -82,6 +84,8 @@ interface D109aInput {
 	readonly generations: readonly GenerationRecord[];
 	readonly issuance: Readonly<{
 		readonly complete: boolean;
+		readonly lineage: Readonly<{ readonly exhausted: boolean; readonly next: number }>;
+		readonly prunedThroughAuthorSequence: number | null;
 		readonly rows: readonly Readonly<{
 			readonly authorSequence: number;
 			readonly epoch: number;
@@ -159,6 +163,8 @@ function syntheticInput(): D109aInput {
 		generations,
 		issuance: Object.freeze({
 			complete: true,
+			lineage: Object.freeze({ exhausted: false, next: 1 }),
+			prunedThroughAuthorSequence: null,
 			rows: Object.freeze([
 				Object.freeze({
 					authorSequence: 0,
@@ -299,7 +305,8 @@ describe("D.109a closed-epoch cleanup eligibility RED", () => {
 	});
 
 	it.skipIf(!state.ready)("returns the exact immutable active/two-ancestor/floor plan", async () => {
-		const result = (await candidate()).planClosedEpochCleanup(syntheticInput());
+		const input = syntheticInput();
+		const result = (await candidate()).planClosedEpochCleanup(input);
 		expect(result).toMatchObject({ ok: true });
 		if (!result.ok) throw new TypeError(`D.109a positive control refused: ${result.reason}`);
 		expect(Object.keys(result).sort()).toEqual(["ok", "plan"]);
@@ -317,6 +324,12 @@ describe("D.109a closed-epoch cleanup eligibility RED", () => {
 			activeGenerationId: generationId(4),
 			availabilityPolicyDigest: D109A_POLICY_DIGEST,
 			closedEpoch: 0,
+			issuance: {
+				lineage: { exhausted: false, next: 1 },
+				prunedThroughAuthorSequence: null,
+				scope: input.issuance.scope,
+				throughAuthorSequence: 0,
+			},
 			lineageFloor: {
 				deleteGenerationIds: [generationId(0), generationId(1)],
 				expectedBaseExpectedHead: head(1),
@@ -328,6 +341,70 @@ describe("D.109a closed-epoch cleanup eligibility RED", () => {
 		});
 		expect(deepFrozen(result)).toBe(true);
 	});
+
+	it.skipIf(!state.ready)(
+		"continues planning from a numeric pruning watermark across restart and a later epoch",
+		async () => {
+			const planner = (await candidate()).planClosedEpochCleanup;
+			const base = syntheticInput();
+			const scope = base.issuance.scope;
+			const continued = replaceInput(base, {
+				issuance: Object.freeze({
+					...base.issuance,
+					lineage: Object.freeze({ exhausted: false, next: 2 }),
+					prunedThroughAuthorSequence: 0,
+					rows: Object.freeze([
+						Object.freeze({
+							authorSequence: 1,
+							epoch: 0,
+							issued: true,
+							outbox: true,
+							publishState: "published" as const,
+						}),
+					]),
+					throughAuthorSequence: 1,
+				}),
+			});
+			expect(planner(continued)).toMatchObject({
+				ok: true,
+				plan: {
+					issuance: {
+						lineage: { exhausted: false, next: 2 },
+						prunedThroughAuthorSequence: 0,
+						scope,
+						throughAuthorSequence: 1,
+					},
+				},
+			});
+
+			const idempotent = replaceInput(continued, {
+				issuance: Object.freeze({ ...continued.issuance, prunedThroughAuthorSequence: 1, rows: Object.freeze([]) }),
+			});
+			expect(planner(idempotent)).toMatchObject({ ok: true, plan: { issuance: { prunedThroughAuthorSequence: 1 } } });
+
+			const laterEpoch = replaceInput(continued, {
+				close: Object.freeze({ ...continued.close, closedEpoch: 1 }),
+				issuance: Object.freeze({
+					...continued.issuance,
+					rows: Object.freeze([Object.freeze({ ...(continued.issuance.rows[0] ?? {}), epoch: 1 })]),
+				}),
+			});
+			expect(planner(laterEpoch)).toMatchObject({ ok: true, plan: { closedEpoch: 1 } });
+
+			for (const issuance of [
+				{ ...continued.issuance, prunedThroughAuthorSequence: 2 },
+				{
+					...continued.issuance,
+					rows: Object.freeze([Object.freeze({ ...(continued.issuance.rows[0] ?? {}), authorSequence: 0 })]),
+				},
+			]) {
+				expect(planner(replaceInput(continued, { issuance: Object.freeze(issuance) }))).toEqual({
+					ok: false,
+					reason: "D109A_OUTBOX_INCOMPLETE",
+				});
+			}
+		}
+	);
 
 	it.skipIf(!state.ready)("rejects every causal mutant with the exact closed reason", async () => {
 		const planner = (await candidate()).planClosedEpochCleanup;

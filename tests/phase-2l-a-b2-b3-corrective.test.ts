@@ -90,6 +90,7 @@ function exactPairInput(
 		observation: {
 			issuedRecord: candidate.issuedRecord,
 			lineage,
+			prunedThroughAuthorSequence: null,
 			outboxRecord: nativeOutboxRow(candidate, publishState),
 		},
 		priorLineage: { exhausted: false, next: 3 },
@@ -145,6 +146,7 @@ describe("Phase 2l-a B2 closed lineage classification", () => {
 						observation: {
 							issuedRecord: null,
 							lineage: lineage as unknown as DurableLineage,
+							prunedThroughAuthorSequence: null,
 							outboxRecord: null,
 						},
 						priorLineage: { exhausted: false, next: 3 },
@@ -181,6 +183,7 @@ describe("Phase 2l-a B2 closed lineage classification", () => {
 						observation: {
 							issuedRecord: null,
 							lineage: { exhausted: false, next: 3 },
+							prunedThroughAuthorSequence: null,
 							outboxRecord: null,
 						},
 						priorLineage: priorLineage as DurableLineage,
@@ -207,6 +210,7 @@ describe("Phase 2l-a B2 closed lineage classification", () => {
 				observation: {
 					issuedRecord: candidate.issuedRecord,
 					lineage: { exhausted: true, next: Number.MAX_SAFE_INTEGER },
+					prunedThroughAuthorSequence: null,
 					outboxRecord: nativeOutboxRow(candidate, "pending"),
 				},
 				priorLineage: { exhausted: false, next: Number.MAX_SAFE_INTEGER },

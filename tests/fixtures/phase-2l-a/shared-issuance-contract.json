@@ -10,6 +10,7 @@
 		"ISSUANCE_DURABILITY_UNAVAILABLE",
 		"ISSUANCE_SUBSTRATE_FAILURE",
 		"ISSUANCE_RECOVERY_CORRUPT",
+		"ISSUANCE_RECORD_PRUNED",
 		"ISSUANCE_OUTCOME_UNKNOWN"
 	],
 	"retryClasses": ["transient", "resource-exhausted", "permanent"],

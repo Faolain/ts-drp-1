@@ -89,6 +89,7 @@ describe("Phase 2l-a B6 private terminal-transition binding", () => {
 			observation: {
 				issuedRecord: candidate.issuedRecord,
 				lineage: { exhausted: false, next: 4 },
+				prunedThroughAuthorSequence: null,
 				outboxRecord: nativeOutboxRow(candidate),
 			},
 		},
@@ -97,6 +98,7 @@ describe("Phase 2l-a B6 private terminal-transition binding", () => {
 			observation: {
 				issuedRecord: foreign.issuedRecord,
 				lineage: { exhausted: false, next: 4 },
+				prunedThroughAuthorSequence: null,
 				outboxRecord: nativeOutboxRow(foreign),
 			},
 		},
@@ -105,6 +107,7 @@ describe("Phase 2l-a B6 private terminal-transition binding", () => {
 			observation: {
 				issuedRecord: null,
 				lineage: priorLineage,
+				prunedThroughAuthorSequence: null,
 				outboxRecord: null,
 			},
 		},
@@ -135,6 +138,7 @@ describe("Phase 2l-a B6 private terminal-transition binding", () => {
 				observation: {
 					issuedRecord: ordinary.issuedRecord,
 					lineage: { exhausted: false, next: 4 },
+					prunedThroughAuthorSequence: null,
 					outboxRecord: nativeOutboxRow(ordinary),
 				},
 				priorLineage: { exhausted: false, next: 3 },
@@ -149,6 +153,7 @@ describe("Phase 2l-a B6 private terminal-transition binding", () => {
 				observation: {
 					issuedRecord: finalCandidate.issuedRecord,
 					lineage: { exhausted: true, next: Number.MAX_SAFE_INTEGER },
+					prunedThroughAuthorSequence: null,
 					outboxRecord: nativeOutboxRow(finalCandidate),
 				},
 				priorLineage: { exhausted: false, next: Number.MAX_SAFE_INTEGER },

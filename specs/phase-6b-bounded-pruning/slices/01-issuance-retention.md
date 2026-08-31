@@ -372,3 +372,21 @@ Kimi/Opus's overlapping P2 observations are recorded without more ceremony;
 they either describe non-mandatory historical pins, wording already resolved
 by the executable clauses, or later receipt-consumption ownership. The
 blocking union is empty and D.109b RED may proceed.
+
+## Deterministic RED result
+
+The tests-only RED is complete against signed/pushed parent
+`5bd4fe84cc3d2279afeb590700ad1c7a63cdccd1`. Focused Vitest recorded 10
+passed controls, 12 causal failures and 71 skips. Every failure is a frozen
+missing D.109b owner or semantic: the new error, maintenance exports/resolver,
+planner lineage/watermark continuation, shared maintenance capability, or Node
+v2 schema. The authoritative Chromium result has one exact
+`D109B_BROWSER_MAINTENANCE_MISSING` failure, one semantic skip, no flaky result
+and no top-level error. Three preceding Chromium harness attempts are retained
+but excluded with explicit dispositions in
+`.logs/phase-6b-d109b-red/README.md`.
+
+Production remained byte-identical. The self-excluding evidence manifest is
+`.logs/phase-6b-d109b-red/manifest.sha256`. No campaign ran. GREEN may now
+implement only the nine frozen owners plus directly affected manifests and
+retained expectations.

@@ -132,8 +132,22 @@ describe("Phase 2l-d parity inventory and public binding", () => {
 		const nodeManifest = JSON.parse(
 			readFileSync(resolve(REPOSITORY_ROOT, "packages/storage-node/package.json"), "utf8")
 		) as { exports: Record<string, unknown> };
-		expect(Object.keys(browserManifest.exports).sort()).toEqual([".", "./issuance", "./live-journal"]);
-		expect(Object.keys(nodeManifest.exports).sort()).toEqual([".", "./issuance", "./live-journal"]);
+		expect(Object.keys(browserManifest.exports).sort()).toEqual([
+			".",
+			"./issuance",
+			"./issuance-maintenance",
+			"./live-journal",
+			"./seal-evidence",
+			"./seal-vote",
+			"./snapshot-transfer",
+		]);
+		expect(Object.keys(nodeManifest.exports).sort()).toEqual([
+			".",
+			"./issuance",
+			"./issuance-maintenance",
+			"./live-journal",
+			"./snapshot-transfer",
+		]);
 		expect(contract.backends.map(({ factorySubpath }) => factorySubpath)).toEqual([
 			"@ts-drp/storage-browser/issuance",
 			"@ts-drp/storage-node/issuance",

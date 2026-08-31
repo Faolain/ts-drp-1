@@ -517,16 +517,23 @@ describe("D.93.29 Seam 2 shared durable publication contract", () => {
 		expect(issuanceManifest.exports).toEqual({
 			".": { import: "./dist/src/index.js", types: "./dist/src/index.d.ts" },
 			"./conformance": { import: "./dist/src/conformance.js", types: "./dist/src/conformance.d.ts" },
+			"./maintenance": { import: "./dist/src/maintenance.js", types: "./dist/src/maintenance.d.ts" },
 		});
 		expect(Object.keys((nodeManifest.exports as Record<string, unknown>) ?? {}).sort()).toEqual([
 			".",
 			"./issuance",
+			"./issuance-maintenance",
 			"./live-journal",
+			"./snapshot-transfer",
 		]);
 		expect(Object.keys((browserManifest.exports as Record<string, unknown>) ?? {}).sort()).toEqual([
 			".",
 			"./issuance",
+			"./issuance-maintenance",
 			"./live-journal",
+			"./seal-evidence",
+			"./seal-vote",
+			"./snapshot-transfer",
 		]);
 		expect(
 			(protocolManifest.dependencies as Record<string, unknown> | undefined)?.["@ts-drp/issuance-store"]
@@ -540,6 +547,7 @@ describe("D.93.29 Seam 2 shared durable publication contract", () => {
 			"TERMINAL_SUPPRESSION_AMBIGUITY_CASES",
 			"classifyTerminalSuppression",
 			"createEphemeralDurableIssuanceStore",
+			"resolveEphemeralDurableIssuancePruningMaintenance",
 		]);
 		expect(await runtimeNames("packages/issuance-store/dist/src/index.js")).toEqual([
 			"DEFAULT_DURABLE_ISSUANCE_PAGE_LIMIT",

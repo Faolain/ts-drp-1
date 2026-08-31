@@ -71,6 +71,7 @@ interface IssuanceError extends Error {
 interface TerminalObservation {
 	readonly issuedRecord: DurableIssuedRecord | null;
 	readonly lineage: DurableLineage;
+	readonly prunedThroughAuthorSequence: number | null;
 	readonly outboxRecord: {
 		readonly authorSequence: number;
 		readonly digest: Uint8Array;
@@ -236,7 +237,7 @@ describe("Phase 2l-a package and closed contract", () => {
 		};
 		expect(packageJson.dependencies).toEqual({ "@ts-drp/canonical": "0.11.0" });
 		expect(packageJson.devDependencies).toEqual({ "@ts-drp/protocol-v3": "0.11.0" });
-		expect(Object.keys(packageJson.exports ?? {}).sort()).toEqual([".", "./conformance"]);
+		expect(Object.keys(packageJson.exports ?? {}).sort()).toEqual([".", "./conformance", "./maintenance"]);
 
 		const inspect = async (directory: string): Promise<string> => {
 			const files = (await readdir(directory, { recursive: true, withFileTypes: true }))
@@ -634,6 +635,7 @@ describe("Phase 2l-a paging, terminal readback and poisoning", () => {
 				observation: {
 					issuedRecord: candidate.issuedRecord,
 					lineage: { exhausted: false, next: 9 },
+					prunedThroughAuthorSequence: null,
 					outboxRecord: nativeOutboxRow(candidate, publishState),
 				},
 				priorLineage: { exhausted: false, next: 3 },
@@ -655,6 +657,7 @@ describe("Phase 2l-a paging, terminal readback and poisoning", () => {
 				observation: {
 					issuedRecord: null,
 					lineage: { exhausted: false, next: 3 },
+					prunedThroughAuthorSequence: null,
 					outboxRecord: null,
 				},
 			});
@@ -671,6 +674,7 @@ describe("Phase 2l-a paging, terminal readback and poisoning", () => {
 				observation: {
 					issuedRecord: foreign.issuedRecord,
 					lineage: { exhausted: false, next: 4 },
+					prunedThroughAuthorSequence: null,
 					outboxRecord: nativeOutboxRow(foreign, "pending"),
 				},
 			})
@@ -680,21 +684,25 @@ describe("Phase 2l-a paging, terminal readback and poisoning", () => {
 			{
 				issuedRecord: candidate.issuedRecord,
 				lineage: { exhausted: false, next: 4 },
+				prunedThroughAuthorSequence: null,
 				outboxRecord: null,
 			},
 			{
 				issuedRecord: candidate.issuedRecord,
 				lineage: { exhausted: false, next: 4 },
+				prunedThroughAuthorSequence: null,
 				outboxRecord: { ...nativeOutboxRow(candidate, "pending"), digest: bytes(0xff) },
 			},
 			{
 				issuedRecord: null,
 				lineage: { exhausted: false, next: 4 },
+				prunedThroughAuthorSequence: null,
 				outboxRecord: null,
 			},
 			{
 				issuedRecord: candidate.issuedRecord,
 				lineage: { exhausted: false, next: 3 },
+				prunedThroughAuthorSequence: null,
 				outboxRecord: nativeOutboxRow(candidate, "pending"),
 			},
 		];
@@ -728,6 +736,7 @@ describe("Phase 2l-a paging, terminal readback and poisoning", () => {
 					observation: {
 						issuedRecord: candidate.issuedRecord,
 						lineage: { exhausted, next: Number.MAX_SAFE_INTEGER },
+						prunedThroughAuthorSequence: null,
 						outboxRecord: nativeOutboxRow(candidate, "pending"),
 					},
 					priorLineage: { exhausted: false, next: Number.MAX_SAFE_INTEGER },

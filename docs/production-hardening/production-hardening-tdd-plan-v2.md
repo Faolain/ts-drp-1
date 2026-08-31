@@ -88068,3 +88068,42 @@ subpaths. The explicit five-site census above closes the bookkeeping omission.
 It changes no scope, causal outcome, acceptance predicate, or product behavior,
 so the prospective policy forbids another model round. The blocking union is
 empty and D.109b RED is authorized.
+
+#### D.109b deterministic RED checkpoint
+
+The deterministic tests-only RED is based on signed/pushed plan/review anchor
+`5bd4fe84cc3d2279afeb590700ad1c7a63cdccd1`. It adds exactly the eight frozen
+new RED paths, prospectively extends the existing D.109a test owner for the
+lineage/watermark continuation, and corrects only the directly affected
+retained error, terminal-observation and five-site package-export/runtime
+expectations. No production source, package manifest, dependency, protocol,
+threshold, runtime, scheduler or campaign file changed.
+
+The one focused Vitest command selected the three D.109 files plus the exact
+retained census titles. Its JSON evidence records 93 selected-or-skipped
+assertions: 10 passed controls, 12 expected causal failures and 71 skips. The
+complete failure set is precisely the absent `ISSUANCE_RECORD_PRUNED`, shared
+`./maintenance` export and resolver, Node/browser `./issuance-maintenance`
+exports, D.109a lineage/watermark continuation, shared maintenance owner and
+Node maintenance/v2 schema owner. There was no top-level, fixture, build or
+module-resolution failure. Evidence SHA-256 is
+`425f3310df4aa3e875bef64ab592a3f56d4eb905305258523ff86454a87bfaa3`.
+
+The first three Chromium attempts are preserved as invalid harness evidence,
+not product verdicts: unsupported esbuild regex flags, an accidentally
+file-wide skip, and use of a shared asset allowlist outside this slice's
+custody. Those defects were corrected only inside the frozen RED owners. The
+authoritative Chromium RED then produced exactly one readiness failure with
+`D109B_BROWSER_MAINTENANCE_MISSING`, one semantic skip, zero flaky results and
+zero top-level errors; result SHA-256 is
+`e936c46ba1ee3237b67ac8c16bc22ee86d2b1b32a4e9036776d96428bb6b72b5`.
+The excluded-attempt hashes and dispositions are in
+`.logs/phase-6b-d109b-red/README.md`.
+
+Mechanical validation confirmed the 8/9 owner counts, 27 semantic labels, 17
+native mutants, 10 migration cases, six crash edges, page boundaries
+64/65/128/129, Node child syntax, exact Chromium two-test/one-file listing,
+26 preserved stashes and clear fixed ports. No retained campaign title ran.
+The self-excluding evidence manifest is
+`.logs/phase-6b-d109b-red/manifest.sha256`; RED is causal and authorizes only
+the frozen D.109b GREEN implementation.

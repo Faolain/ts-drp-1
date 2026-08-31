@@ -964,8 +964,15 @@ describe("D.93.34 p4-b Node strict live-journal RED", () => {
 			types: "./dist/src/live-journal.d.ts",
 		});
 		expect(manifest.dependencies?.["@ts-drp/live-journal"]).toBe("0.11.0");
-		expect(Object.keys(manifest.exports ?? {}).sort()).toEqual([".", "./issuance", "./live-journal"]);
+		expect(Object.keys(manifest.exports ?? {}).sort()).toEqual([
+			".",
+			"./issuance",
+			"./issuance-maintenance",
+			"./live-journal",
+			"./snapshot-transfer",
+		]);
 		expect(Object.keys(manifest.dependencies ?? {}).sort()).toEqual([
+			"@ts-drp/compaction",
 			"@ts-drp/issuance-store",
 			"@ts-drp/live-journal",
 			"@ts-drp/storage",
