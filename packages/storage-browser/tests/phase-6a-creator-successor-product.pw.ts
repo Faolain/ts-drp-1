@@ -26,6 +26,7 @@ const contractLoad = import(
 			string,
 			string,
 		];
+		readonly D108E5_BROWSER_BEHAVIORS: readonly [string, string, string, string];
 		isD108d2Authority(value: unknown): boolean;
 	}>
 >;
@@ -35,6 +36,7 @@ const D108D2_BROWSER_BEHAVIORS = contract.D108D2_BROWSER_BEHAVIORS;
 const D108E2B_BROWSER_BEHAVIORS = contract.D108E2B_BROWSER_BEHAVIORS;
 const D108E2C_PRODUCT_BROWSER_BEHAVIORS = contract.D108E2C_PRODUCT_BROWSER_BEHAVIORS;
 const D108E3_BROWSER_BEHAVIORS = contract.D108E3_BROWSER_BEHAVIORS;
+const D108E5_BROWSER_BEHAVIORS = contract.D108E5_BROWSER_BEHAVIORS;
 let isD108d2Authority: (value: unknown) => boolean = () => false;
 const DATABASES = Object.freeze({ creator: "d108d2-creator", established: "d108d2-established", late: "d108d2-late" });
 const CHANNEL_NAME = "d108d2-successor-product";
@@ -70,6 +72,7 @@ function createState() {
     pauseActivationFailure: false,
     pauseAfterPredecessorDeactivation: false,
     pauseMigrationRecord: false,
+    pauseRedirectRecovery: false,
     pauseTerminalTransition: false,
     pauseVerification: false,
     postActivationGate: Promise.resolve(),
@@ -82,6 +85,7 @@ function createState() {
     releaseAcceptedVertexFailure: undefined,
     releaseActivationFailure: undefined,
     releaseMigrationRecord: undefined,
+    releaseRedirectRecovery: undefined,
     releasePostActivation: undefined,
     releasePostPredecessorDeactivation: undefined,
     releaseTerminalTransition: undefined,
@@ -89,11 +93,15 @@ function createState() {
     replacementDeactivateCount: 0,
     replacementDeactivateCompletedCount: 0,
     replacementPlanes: new Set(),
+    redirectRecoveryCount: 0,
+    redirectRecoveryGate: Promise.resolve(),
     targetPlaneId: 0,
     terminalTransitionCount: 0,
     terminalTransitionGate: Promise.resolve(),
     throwIssueLocal: false,
     verificationCount: 0,
+    d108e5VerificationCount: 0,
+    d108e5Mode: false,
     verificationGate: Promise.resolve(),
   };
   const configure = (input) => {
@@ -110,6 +118,8 @@ function createState() {
     state.pauseActivationFailure = input.pauseActivationFailure === true;
     state.pauseAfterPredecessorDeactivation = input.pauseAfterPredecessorDeactivation === true;
     state.pauseMigrationRecord = input.pauseMigrationRecord === true;
+    state.pauseRedirectRecovery = input.pauseRedirectRecovery === true;
+    state.d108e5Mode = input.pauseRedirectRecovery === true;
     state.pauseTerminalTransition = input.pauseTerminalTransition === true;
     state.pauseVerification = input.pauseVerification === true;
     state.postActivationPauseCount = 0;
@@ -119,10 +129,12 @@ function createState() {
     state.rejectReplacementDeactivate = input.rejectReplacementDeactivate === true;
     state.replacementDeactivateCount = 0;
     state.replacementDeactivateCompletedCount = 0;
+    state.redirectRecoveryCount = 0;
     if (input.retainTarget !== true) state.targetPlaneId = state.latestPredecessorPlaneId;
     state.terminalTransitionCount = 0;
     state.throwIssueLocal = input.throwIssueLocal === true;
     state.verificationCount = 0;
+    state.d108e5VerificationCount = 0;
     state.acceptedVertexFailureGate = state.pauseAcceptedVertexFailure
       ? new Promise((resolve) => { state.releaseAcceptedVertexFailure = resolve; })
       : Promise.resolve();
@@ -131,6 +143,9 @@ function createState() {
       : Promise.resolve();
     state.migrationRecordGate = state.pauseMigrationRecord
       ? new Promise((resolve) => { state.releaseMigrationRecord = resolve; })
+      : Promise.resolve();
+    state.redirectRecoveryGate = state.pauseRedirectRecovery
+      ? new Promise((resolve) => { state.releaseRedirectRecovery = resolve; })
       : Promise.resolve();
     state.postActivationGate = state.pauseAfterActivation
       ? new Promise((resolve) => { state.releasePostActivation = resolve; })
@@ -147,6 +162,7 @@ function createState() {
     if (!state.pauseActivationFailure) state.releaseActivationFailure = undefined;
     if (!state.pauseAcceptedVertexFailure) state.releaseAcceptedVertexFailure = undefined;
     if (!state.pauseMigrationRecord) state.releaseMigrationRecord = undefined;
+    if (!state.pauseRedirectRecovery) state.releaseRedirectRecovery = undefined;
     if (!state.pauseAfterActivation) state.releasePostActivation = undefined;
     if (!state.pauseAfterPredecessorDeactivation) state.releasePostPredecessorDeactivation = undefined;
     if (!state.pauseVerification) state.releaseVerification = undefined;
@@ -165,6 +181,10 @@ function createState() {
         await Promise.allSettled(Array.from(state.replacementPlanes, (plane) => plane.deactivate()));
       },
       configure,
+      d108e5Snapshot: () => Object.freeze({
+        redirectRecoveryCount: state.redirectRecoveryCount,
+        verificationCount: state.d108e5VerificationCount,
+      }),
       releaseAcceptedVertexFailure: () => {
         state.pauseAcceptedVertexFailure = false;
         state.releaseAcceptedVertexFailure?.();
@@ -179,6 +199,11 @@ function createState() {
         state.pauseMigrationRecord = false;
         state.releaseMigrationRecord?.();
         state.releaseMigrationRecord = undefined;
+      },
+      releaseRedirectRecovery: () => {
+        state.pauseRedirectRecovery = false;
+        state.releaseRedirectRecovery?.();
+        state.releaseRedirectRecovery = undefined;
       },
       releasePostActivation: () => {
         state.pauseAfterActivation = false;
@@ -335,7 +360,13 @@ const instrumentPlane = (plane, kind, ownerPlaneId) => {
 					`${shared}
 import * as actual from ${JSON.stringify(v3Live)};
 export const prepareV3LiveGeneration = actual.prepareV3LiveGeneration;
-export const recoverV3LiveReplica = actual.recoverV3LiveReplica;
+export const recoverV3LiveReplica = async (input) => {
+  if (input?.displacedSource?.activationVertexDigest !== undefined) {
+    state.redirectRecoveryCount += 1;
+    if (state.pauseRedirectRecovery) await state.redirectRecoveryGate;
+  }
+  return actual.recoverV3LiveReplica(input);
+};
 export const routeV3Ingress = actual.routeV3Ingress;
 export const activateV3LivePlane = (input) => {
   const result = actual.activateV3LivePlane(input);
@@ -366,9 +397,10 @@ export const bindCreatorLiveClose = async (input) => {
 import * as actual from ${JSON.stringify(creatorAdoption)};
 export const verifyCreatorSuccessorAdoption = async (input) => {
   const targeted = closeHandlePlaneIds.get(input.handle) === state.targetPlaneId;
+  if (state.d108e5Mode) state.d108e5VerificationCount += 1;
   if (targeted) state.verificationCount += 1;
   else state.independentVerificationCount += 1;
-  if (targeted && state.pauseVerification) await state.verificationGate;
+  if ((targeted || state.d108e5Mode) && state.pauseVerification) await state.verificationGate;
   return actual.verifyCreatorSuccessorAdoption(input);
 };`,
 				],
@@ -1833,4 +1865,107 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 			retry: { settled: ["rejected", "fulfilled"], verificationCount: 2 },
 		},
 	});
+});
+
+test(D108E5_BROWSER_BEHAVIORS.join("; "), async () => {
+	const runRedirectOrdering = async (
+		kind: "activation" | "rehearsal"
+	): Promise<Readonly<{ readonly laterSettledAtVerification: boolean }>> => {
+		const context = await openD108e3Creator(false);
+		const name = `d108e5-${kind}-${lifetimeScenario}`;
+		const redirectObservation = `${name}-redirect`;
+		const laterObservation = `${name}-later`;
+		await context.page.evaluate((selected) => window.phase6aCreatorSuccessorProduct.openDirectCreator(selected), name);
+		await context.page.evaluate(
+			(selected) => window.phase6aCreatorSuccessorProduct.prepareDirectRehearsal(selected),
+			name
+		);
+		await context.page.evaluate(() =>
+			window.phase6aCreatorSuccessorProduct.configureLifetime({
+				pauseRedirectRecovery: true,
+				pauseVerification: true,
+			})
+		);
+		await context.page.evaluate(
+			({ observation, selected }) =>
+				window.phase6aCreatorSuccessorProduct.beginD108e5DirectOperation(selected, observation, "activation"),
+			{ observation: redirectObservation, selected: name }
+		);
+		await expect
+			.poll(async () => {
+				const state = await context.page.evaluate(
+					(observation) =>
+						Object.freeze({
+							redirectRecoveryCount: window.phase6aCreatorSuccessorProduct.d108e5Snapshot().redirectRecoveryCount,
+							settled: window.phase6aCreatorSuccessorProduct.d108e5OperationSettled(observation),
+						}),
+					redirectObservation
+				);
+				if (state.settled) {
+					const settlement = await context.page.evaluate(
+						(observation) => window.phase6aCreatorSuccessorProduct.waitForD108e5DirectOperation(observation),
+						redirectObservation
+					);
+					throw new TypeError(`D.108e5 redirect activation settled before recovery: ${JSON.stringify(settlement)}`);
+				}
+				return state.redirectRecoveryCount;
+			})
+			.toBe(1);
+		await context.page.evaluate(
+			({ observation, operation, selected }) => {
+				window.phase6aCreatorSuccessorProduct.beginDirectAdoption(selected);
+				window.phase6aCreatorSuccessorProduct.beginD108e5DirectOperation(selected, observation, operation);
+			},
+			{ observation: laterObservation, operation: kind, selected: name }
+		);
+		await context.page.evaluate(() => window.phase6aCreatorSuccessorProduct.releaseRedirectRecovery());
+		await expect
+			.poll(() => context.page.evaluate(() => window.phase6aCreatorSuccessorProduct.d108e5Snapshot().verificationCount))
+			.toBe(1);
+		await settleBrowserTurns(context.page);
+		const laterSettledAtVerification = await context.page.evaluate(
+			(observation) => window.phase6aCreatorSuccessorProduct.d108e5OperationSettled(observation),
+			laterObservation
+		);
+		await context.page.evaluate(() => window.phase6aCreatorSuccessorProduct.releaseVerification());
+		await Promise.all([
+			context.page.evaluate(
+				(observation) => window.phase6aCreatorSuccessorProduct.waitForD108e5DirectOperation(observation),
+				redirectObservation
+			),
+			context.page.evaluate(
+				(observation) => window.phase6aCreatorSuccessorProduct.waitForD108e5DirectOperation(observation),
+				laterObservation
+			),
+			context.page.evaluate((selected) => window.phase6aCreatorSuccessorProduct.waitForDirectAdoption(selected), name),
+		]);
+		await context.page.evaluate((selected) => window.phase6aCreatorSuccessorProduct.closeDirectCreator(selected), name);
+		await context.page.close();
+		return Object.freeze({ laterSettledAtVerification });
+	};
+
+	const rehearsalOrdering = await runRedirectOrdering("rehearsal");
+	const activationOrdering = await runRedirectOrdering("activation");
+
+	const bounds = await openD108e3Creator(false);
+	const boundsName = `d108e5-bounds-${lifetimeScenario}`;
+	await bounds.page.evaluate((name) => window.phase6aCreatorSuccessorProduct.openDirectCreator(name), boundsName);
+	const observations = await bounds.page.evaluate(
+		(name) => window.phase6aCreatorSuccessorProduct.migrationBoundObservations(name),
+		boundsName
+	);
+	await bounds.page.evaluate((name) => window.phase6aCreatorSuccessorProduct.closeDirectCreator(name), boundsName);
+	await bounds.page.close();
+
+	expect.soft(rehearsalOrdering.laterSettledAtVerification).toBe(false);
+	expect.soft(activationOrdering.laterSettledAtVerification).toBe(false);
+	expect.soft(observations.overLimitHex).toBe("v3 room migration target invite is unbounded");
+	expect.soft(observations.exact65537).toBe("v3 room migration target invite is unbounded");
+	expect.soft(observations.oversizedDigest).toBe("v3 room creator invite anchor is invalid");
+	expect.soft(observations.nonByteField).toBe("v3 room creator invite exactCanonicalParametersCarrierBytes is invalid");
+
+	expect(observations.activation49152).not.toBe("v3 room migration activation record is unbounded");
+	expect(observations.activation49153).toBe("v3 room migration activation record is unbounded");
+	expect(observations.exact65536).not.toBe("v3 room migration target invite is unbounded");
+	expect(observations.boundedMutation).toBe("fulfilled");
 });

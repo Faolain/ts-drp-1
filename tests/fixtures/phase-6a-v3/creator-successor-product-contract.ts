@@ -68,6 +68,13 @@ export const D108E3_BROWSER_BEHAVIORS = Object.freeze([
 	"accepted-vertex failure cannot deadlock queued adoption and shutdown",
 ] as const);
 
+export const D108E5_BROWSER_BEHAVIORS = Object.freeze([
+	"redirect-pending adoption stays ahead of rehearsal",
+	"redirect-pending adoption stays ahead of activation",
+	"activation bytes are bounded before call-time copy",
+	"migration invites are bounded before call-time encoding",
+] as const);
+
 const D108D2_ROOM_INPUT_KEYS = Object.freeze([
 	"application",
 	"author",
@@ -131,6 +138,25 @@ function interfaceKeys(source: string, name: string): readonly string[] {
 	);
 }
 
+function variableInitializer(source: string, name: string): string | undefined {
+	const parsed = ts.createSourceFile("d108e5-source.ts", source, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
+	let selected: string | undefined;
+	const visit = (node: ts.Node): void => {
+		if (
+			selected === undefined &&
+			ts.isVariableDeclaration(node) &&
+			ts.isIdentifier(node.name) &&
+			node.name.text === name
+		) {
+			selected = node.initializer?.getText(parsed);
+			return;
+		}
+		ts.forEachChild(node, visit);
+	};
+	visit(parsed);
+	return selected;
+}
+
 function sameStrings(left: readonly string[], right: readonly string[]): boolean {
 	return left.length === right.length && left.every((value, index) => value === right[index]);
 }
@@ -167,6 +193,45 @@ export function d108d2SourceGovernance(): Readonly<Record<string, boolean>> {
 		roomIsSoleConsumerWhenProductExists:
 			!productExists ||
 			(roomConsumesAll && consumers.length === 1 && consumers[0]?.path === "examples/v3-room/src/index.ts"),
+	});
+}
+
+/**
+ * Pins D.108e5's two pre-copy owners through parsed TypeScript structure.
+ * @returns Whether activation and migration-invite bounds dominate allocation.
+ */
+export function d108e5SourceOwnership(): Readonly<{
+	readonly activationBoundPrecedesCopy: boolean;
+	readonly migrationInviteBoundOwnsEveryEncode: boolean;
+}> {
+	const room = read(D108E3_GREEN_PATHS[0]);
+	const activation = variableInitializer(room, "snapshotMigrationActivationInput");
+	const boundedInvite = variableInitializer(room, "boundedMigrationCreatorInvite");
+	const activationText = activation ?? "";
+	const boundedInviteText = boundedInvite ?? "";
+	const parsed = ts.createSourceFile("d108e5-room.ts", room, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
+	let boundedInviteCalls = 0;
+	const visit = (node: ts.Node): void => {
+		if (
+			ts.isCallExpression(node) &&
+			ts.isIdentifier(node.expression) &&
+			node.expression.text === "boundedMigrationCreatorInvite"
+		) {
+			boundedInviteCalls += 1;
+		}
+		ts.forEachChild(node, visit);
+	};
+	visit(parsed);
+	const activationBound = activationText.indexOf("49_152");
+	const activationCopy = activationText.search(/new\s+INTRINSIC_UINT8_ARRAY/u);
+	return Object.freeze({
+		activationBoundPrecedesCopy: activationBound >= 0 && activationCopy >= 0 && activationBound < activationCopy,
+		migrationInviteBoundOwnsEveryEncode:
+			boundedInvite !== undefined &&
+			boundedInviteText.includes("65_536") &&
+			boundedInviteText.includes("exactRecord") &&
+			boundedInviteText.includes("INTRINSIC_TYPED_ARRAY_BYTE_LENGTH_GETTER") &&
+			boundedInviteCalls >= 3,
 	});
 }
 

@@ -3,6 +3,7 @@ import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical"
 type PlainRecord = Readonly<Record<string, unknown>>;
 
 interface DirectRoomSession {
+	activateMigration(input: Readonly<Record<string, unknown>>): Promise<unknown>;
 	adoptCreatorSuccessor(): Promise<void>;
 	close(): Promise<void>;
 	issue(operation: Readonly<Record<string, unknown>>): Promise<void>;
@@ -125,6 +126,7 @@ interface LifetimeInstrumentation {
 			readonly pauseActivationFailure?: boolean;
 			readonly pauseAfterPredecessorDeactivation?: boolean;
 			readonly pauseMigrationRecord?: boolean;
+			readonly pauseRedirectRecovery?: boolean;
 			readonly pauseTerminalTransition?: boolean;
 			readonly pauseVerification?: boolean;
 			readonly rejectPredecessorDeactivate?: boolean;
@@ -136,12 +138,17 @@ interface LifetimeInstrumentation {
 	releaseAcceptedVertexFailure(): void;
 	releaseActivationFailure(): void;
 	releaseMigrationRecord(): void;
+	releaseRedirectRecovery(): void;
 	releasePostActivation(): void;
 	releasePostPredecessorDeactivation(): void;
 	releaseTerminalTransition(): void;
 	releaseVerification(): void;
 	snapshot(): LifetimeInstrumentationSnapshot;
 	transitionSnapshot(): TransitionInstrumentationSnapshot;
+	d108e5Snapshot(): Readonly<{
+		readonly redirectRecoveryCount: number;
+		readonly verificationCount: number;
+	}>;
 }
 
 interface ObservedSettlement {
@@ -174,6 +181,7 @@ declare global {
 					readonly pauseActivationFailure?: boolean;
 					readonly pauseAfterPredecessorDeactivation?: boolean;
 					readonly pauseMigrationRecord?: boolean;
+					readonly pauseRedirectRecovery?: boolean;
 					readonly pauseTerminalTransition?: boolean;
 					readonly pauseVerification?: boolean;
 					readonly rejectPredecessorDeactivate?: boolean;
@@ -184,6 +192,7 @@ declare global {
 			): void;
 			concurrentAdoption(): Promise<readonly [ObservedSettlement, ObservedSettlement]>;
 			beginDirectAdoption(name: string): void;
+			beginD108e5DirectOperation(name: string, observation: string, kind: "activation" | "rehearsal"): void;
 			beginDirectClose(name: string): void;
 			beginDirectRehearsal(name: string): void;
 			beginDirectSend(name: string, text: string): void;
@@ -191,6 +200,8 @@ declare global {
 			create(input: unknown): Promise<string>;
 			deleteDatabases(prefix: string): Promise<readonly string[]>;
 			directAdoptionSettled(name: string): boolean;
+			d108e5OperationSettled(observation: string): boolean;
+			d108e5Snapshot(): Readonly<{ readonly redirectRecoveryCount: number; readonly verificationCount: number }>;
 			deliver(packet: RelayPacket): void;
 			exportSuccessor(databaseName: string): Promise<SuccessorCarrier>;
 			importSuccessor(carrier: SuccessorCarrier, sourceDatabaseName: string, targetDatabaseName: string): Promise<void>;
@@ -200,9 +211,12 @@ declare global {
 			openDirectCreator(name: string): Promise<void>;
 			relayAudit(): RelayAudit;
 			prepareRehearsal(): Promise<void>;
+			prepareDirectRehearsal(name: string): Promise<void>;
+			migrationBoundObservations(name: string): Promise<Readonly<Record<string, unknown>>>;
 			releaseAcceptedVertexFailure(): void;
 			releaseActivationFailure(): void;
 			releaseMigrationRecord(): void;
+			releaseRedirectRecovery(): void;
 			releasePostActivation(): void;
 			releasePostPredecessorDeactivation(): void;
 			releaseTerminalTransition(): void;
@@ -223,6 +237,7 @@ declare global {
 			waitForActivation(): Promise<ObservedSettlement>;
 			waitForClose(): Promise<ObservedSettlement>;
 			waitForDirectAdoption(name: string): Promise<ObservedSettlement>;
+			waitForD108e5DirectOperation(observation: string): Promise<ObservedSettlement>;
 			waitForDirectClose(name: string): Promise<ObservedSettlement>;
 			waitForDirectRehearsal(name: string): Promise<ObservedSettlement>;
 			waitForOverlappingRehearsal(): Promise<ObservedSettlement>;
@@ -255,11 +270,14 @@ let pendingRehearsal: Promise<ObservedSettlement> | undefined;
 let pendingSend: Promise<ObservedSettlement> | undefined;
 let migrationReceipt: unknown;
 const directRooms = new Map<string, DirectRoomSession>();
+const d108e5OperationSettlements = new Map<string, boolean>();
+const pendingD108e5Operations = new Map<string, Promise<ObservedSettlement>>();
 const pendingDirectAdoptions = new Map<string, Promise<ObservedSettlement>>();
 const pendingDirectCloses = new Map<string, Promise<ObservedSettlement>>();
 const pendingDirectRehearsals = new Map<string, Promise<ObservedSettlement>>();
 const directAdoptionSettlements = new Map<string, boolean>();
 const directRehearsalInputs = new Map<string, Readonly<Record<string, unknown>>>();
+const directMigrationReceipts = new Map<string, Readonly<Record<string, unknown>>>();
 
 function instrumentation(): LifetimeInstrumentation {
 	const selected = Reflect.get(globalThis, "__d108e2bLifetimeInstrumentation");
@@ -866,6 +884,49 @@ async function createDirectRoom(name: string): Promise<DirectRoomSession> {
 	});
 }
 
+function creatorInviteEnvelope(material: Readonly<Record<string, unknown>>): Uint8Array {
+	return encodeCanonical({
+		detachedGenesisSignature: material.detachedGenesisSignature,
+		exactCanonicalLatchedAclBytes: material.exactCanonicalLatchedAclBytes,
+		exactCanonicalGenesisAnchorPreimageBytes: material.exactCanonicalGenesisAnchorPreimageBytes,
+		exactCanonicalParametersCarrierBytes: material.exactCanonicalParametersCarrierBytes,
+		exactCanonicalProfileBytes: material.exactCanonicalProfileBytes,
+		exactCanonicalSignerSetBytes: material.exactCanonicalSignerSetBytes,
+		kind: "ts-drp-example-v3-room-creator-invite",
+		pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
+		version: 1,
+	});
+}
+
+function creatorInviteAtExactSize(
+	material: Readonly<Record<string, unknown>>,
+	targetSize: number
+): Readonly<Record<string, unknown>> {
+	const selectedField = material.exactCanonicalParametersCarrierBytes;
+	if (!(selectedField instanceof Uint8Array)) throw new TypeError("D.108e5 invite fixture is invalid");
+	let selectedLength = selectedField.byteLength + targetSize - creatorInviteEnvelope(material).byteLength;
+	for (let attempt = 0; attempt < 4; attempt += 1) {
+		if (selectedLength < 1) throw new TypeError("D.108e5 invite fixture size is invalid");
+		const candidate = Object.freeze({
+			...material,
+			exactCanonicalParametersCarrierBytes: new Uint8Array(selectedLength),
+		});
+		const difference = targetSize - creatorInviteEnvelope(candidate).byteLength;
+		if (difference === 0) return candidate;
+		selectedLength += difference;
+	}
+	throw new TypeError("D.108e5 invite fixture size differs");
+}
+
+async function settlementDetail(task: Promise<unknown>): Promise<string> {
+	try {
+		await task;
+		return "fulfilled";
+	} catch (error) {
+		return error instanceof Error ? error.message : String(error);
+	}
+}
+
 async function removeDirectDatabases(name: string): Promise<void> {
 	const prefix = `d108e3-direct-${name}`;
 	for (const { name: databaseName } of await indexedDB.databases()) {
@@ -933,6 +994,30 @@ const api = Object.freeze({
 				room.adoptCreatorSuccessor(),
 				() => {
 					directAdoptionSettlements.set(name, true);
+				},
+				true
+			)
+		);
+	},
+	beginD108e5DirectOperation(name: string, observation: string, kind: "activation" | "rehearsal"): void {
+		const room = directRooms.get(name);
+		const input = kind === "activation" ? directMigrationReceipts.get(name) : directRehearsalInputs.get(name);
+		if (
+			room === undefined ||
+			input === undefined ||
+			observation.length === 0 ||
+			pendingD108e5Operations.has(observation)
+		) {
+			throw new TypeError("D.108e5 direct operation observation is invalid");
+		}
+		d108e5OperationSettlements.set(observation, false);
+		const task = kind === "activation" ? room.activateMigration(input) : room.rehearseMigration(input);
+		pendingD108e5Operations.set(
+			observation,
+			observe(
+				task.then(() => undefined),
+				() => {
+					d108e5OperationSettlements.set(observation, true);
 				},
 				true
 			)
@@ -1056,6 +1141,7 @@ const api = Object.freeze({
 		pendingDirectRehearsals.delete(name);
 		directAdoptionSettlements.delete(name);
 		directRehearsalInputs.delete(name);
+		directMigrationReceipts.delete(name);
 		await removeDirectDatabases(name);
 	},
 	cleanupLifetimeReplacements(): Promise<void> {
@@ -1115,6 +1201,15 @@ const api = Object.freeze({
 		}
 		return directAdoptionSettlements.get(name) === true;
 	},
+	d108e5OperationSettled(observation: string): boolean {
+		if (!d108e5OperationSettlements.has(observation)) {
+			throw new TypeError("D.108e5 direct operation observation is absent");
+		}
+		return d108e5OperationSettlements.get(observation) === true;
+	},
+	d108e5Snapshot(): Readonly<{ readonly redirectRecoveryCount: number; readonly verificationCount: number }> {
+		return instrumentation().d108e5Snapshot();
+	},
 	deliver(packet: RelayPacket): void {
 		if (packet.realmId === realmId) return;
 		for (const channel of relayChannels.get(packet.channelName) ?? []) channel.deliver(packet);
@@ -1159,6 +1254,67 @@ const api = Object.freeze({
 	async prepareRehearsal(): Promise<void> {
 		migrationReceipt = await productApi().rehearseMigration();
 	},
+	async prepareDirectRehearsal(name: string): Promise<void> {
+		const room = directRooms.get(name);
+		const input = directRehearsalInputs.get(name);
+		if (room === undefined || input === undefined) {
+			throw new TypeError("D.108e5 direct rehearsal preparation is invalid");
+		}
+		const receipt = await room.rehearseMigration(input);
+		if (receipt === null || typeof receipt !== "object") {
+			throw new TypeError("D.108e5 direct migration receipt is invalid");
+		}
+		directMigrationReceipts.set(
+			name,
+			Object.freeze({
+				exactCanonicalRecordBytes: Reflect.get(receipt, "exactCanonicalRecordBytes"),
+				recordVertexDigest: Reflect.get(receipt, "recordVertexDigest"),
+				targetCreatorInvite: input.targetCreatorInvite,
+			})
+		);
+	},
+	async migrationBoundObservations(name: string): Promise<Readonly<Record<string, unknown>>> {
+		const room = directRooms.get(name);
+		const rehearsalInput = directRehearsalInputs.get(name);
+		const material = rehearsalInput?.targetCreatorInvite;
+		const rehearsalNonce = rehearsalInput?.rehearsalNonce;
+		if (
+			room === undefined ||
+			material === null ||
+			typeof material !== "object" ||
+			!(rehearsalNonce instanceof Uint8Array)
+		) {
+			throw new TypeError("D.108e5 migration-bound fixture is invalid");
+		}
+		const inviteMaterial = material as Readonly<Record<string, unknown>>;
+		const exact65536 = creatorInviteAtExactSize(inviteMaterial, 65_536);
+		const exact65537 = creatorInviteAtExactSize(inviteMaterial, 65_537);
+		const activationInput = (byteLength: number): Readonly<Record<string, unknown>> =>
+			Object.freeze({
+				exactCanonicalRecordBytes: new Uint8Array(byteLength),
+				recordVertexDigest: "0".repeat(64),
+				targetCreatorInvite: inviteMaterial,
+			});
+		const rehearse = (targetCreatorInvite: unknown): Promise<unknown> =>
+			room.rehearseMigration(Object.freeze({ rehearsalNonce, targetCreatorInvite }));
+		const mutableInvite = { ...inviteMaterial };
+		const boundedMutationTask = rehearse(mutableInvite);
+		mutableInvite["pinnedGenesisAnchorDigest"] = "mutated-after-call";
+		return Object.freeze({
+			activation49152: await settlementDetail(room.activateMigration(activationInput(49_152))),
+			activation49153: await settlementDetail(room.activateMigration(activationInput(49_153))),
+			exact65536: await settlementDetail(rehearse(exact65536)),
+			exact65537: await settlementDetail(rehearse(exact65537)),
+			nonByteField: await settlementDetail(
+				rehearse({ ...inviteMaterial, exactCanonicalParametersCarrierBytes: Array.from({ length: 65_537 }, () => 0) })
+			),
+			oversizedDigest: await settlementDetail(
+				rehearse({ ...inviteMaterial, pinnedGenesisAnchorDigest: "0".repeat(65_537) })
+			),
+			overLimitHex: await settlementDetail(rehearse("00".repeat(65_537))),
+			boundedMutation: await settlementDetail(boundedMutationTask),
+		});
+	},
 	relayAudit(): RelayAudit {
 		const copy = (observation: RelayMessageObservation): RelayMessageObservation =>
 			Object.freeze({ ...observation, data: Uint8Array.from(observation.data) });
@@ -1179,6 +1335,9 @@ const api = Object.freeze({
 	},
 	releaseMigrationRecord(): void {
 		instrumentation().releaseMigrationRecord();
+	},
+	releaseRedirectRecovery(): void {
+		instrumentation().releaseRedirectRecovery();
 	},
 	releasePostActivation(): void {
 		instrumentation().releasePostActivation();
@@ -1246,6 +1405,13 @@ const api = Object.freeze({
 		if (pending === undefined) throw new TypeError("D.108e3 direct adoption observation is absent");
 		const selected = await pending;
 		pendingDirectAdoptions.delete(name);
+		return selected;
+	},
+	async waitForD108e5DirectOperation(observation: string): Promise<ObservedSettlement> {
+		const pending = pendingD108e5Operations.get(observation);
+		if (pending === undefined) throw new TypeError("D.108e5 direct operation observation is absent");
+		const selected = await pending;
+		pendingD108e5Operations.delete(observation);
 		return selected;
 	},
 	async waitForDirectClose(name: string): Promise<ObservedSettlement> {

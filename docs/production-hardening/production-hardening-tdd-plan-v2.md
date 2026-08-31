@@ -86936,3 +86936,47 @@ pair plus the retained encoder/decoder ceilings pins drift. No P2 requests a
 new owner, test or review. The corrected plan therefore has an empty blocking
 union, its one confirmation allowance is consumed, and deterministic D.108e5
 RED is released.
+
+The deterministic D.108e5 RED is accepted against signed plan-review closure
+`116e149ea70471002e51256b0379c42661772d21`. Exact listing selected eight
+Vitest cases in one file and one Chromium Playwright test in one file with
+retries zero. The focused Vitest command above exited `1` with exactly six
+retained passes and the two frozen D.108e5 AST failures: activation capture
+still allocated before its `49_152` guard, and no shared migration-invite
+pre-encode owner existed. Its complete stdout/stderr SHA-256 values are
+`c0151a77d5c8a63d71fb8206404118a642114cbbda7ac19b77f984e4e25c182f`
+and
+`29aec369f4bae98fee280cb329427a0d789844bc1d1ca0dceee4e4379fa56f2a`.
+
+The exact focused Playwright command above exited `1`; its JSON reporter has
+`expected=0`, `skipped=0`, `unexpected=1`, `flaky=0`, one selected test and
+one selected file. The sole test contains exactly six soft failures and no
+top-level error: both redirect-order observations were `true` instead of
+required `false`; over-limit hexadecimal and exact-`65_537` object invites
+both returned `canonical value exceeds byte limit` instead of the migration
+unbounded classification; the oversized digest returned that canonical
+error instead of anchor-invalid; and the non-`Uint8Array` field returned that
+canonical error instead of its exact field-invalid classification. Exact
+`49_152`/`49_153`, exact `65_536`, and bounded mutation controls emitted no
+failure. The complete JSON/stderr SHA-256 values are
+`4ad0f8df8cd46434e127c26bc9b8848167264226d8eaef55f42b8e6728791b04`
+and the empty-file hash
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+The eight-entry self-excluding manifest is
+`.logs/d108e5-red/ARTIFACT-SHA256SUMS`; it binds those accepted results and
+the four RED owners. `shasum -a 256 -c` reports all eight entries `OK`; the
+manifest SHA-256 is
+`6df06361f77a6ae3cd87487fee74cf75b1e5c530cdba3f17572de4f52acea86f`.
+
+Three pre-acceptance executions remain diagnostic evidence rather than
+product results. The first Vitest attempt exposed a test-only AST diagnostic
+mistake (`Node.getText()` lacked its parsed source file); correcting that
+read-only helper produced the exact causal RED above. The first browser
+attempt proved the redirect gate had not selected displaced-source recovery;
+the diagnostic attempt then proved the direct facade supplied the seven-field
+rehearsal receipt where the existing three-field activation input was
+required. After adapting that test-only facade, one further attempt showed
+the fixture had sealed the epoch before activation. Removing that fixture
+ordering mistake produced the accepted six-mismatch reporter. These
+corrections changed only the four frozen RED owners, did not touch production,
+and did not relax or reinterpret the frozen acceptance matrix.

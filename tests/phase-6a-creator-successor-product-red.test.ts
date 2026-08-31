@@ -14,6 +14,8 @@ import {
 	D108E3_BROWSER_BEHAVIORS,
 	D108E3_GREEN_PATHS,
 	D108E3_RED_PATHS,
+	D108E5_BROWSER_BEHAVIORS,
+	d108e5SourceOwnership,
 	isD108d2Authority,
 } from "./fixtures/phase-6a-v3/creator-successor-product-contract.js";
 import { createV3RoomSession } from "../examples/v3-room/src/index.js";
@@ -181,8 +183,24 @@ describe("D.108e3 room lifetime transition RED", () => {
 			"accepted-vertex failure cannot deadlock queued adoption and shutdown",
 		]);
 		expect(D108E2C_PRODUCT_BROWSER_BEHAVIORS).toHaveLength(2);
+		expect(D108E5_BROWSER_BEHAVIORS).toEqual([
+			"redirect-pending adoption stays ahead of rehearsal",
+			"redirect-pending adoption stays ahead of activation",
+			"activation bytes are bounded before call-time copy",
+			"migration invites are bounded before call-time encoding",
+		]);
 		expect(D108E3_RED_PATHS.some((path) => /examples\/v3-chat|packages\/node|playwright.*config/u.test(path))).toBe(
 			false
 		);
+	});
+});
+
+describe("D.108e5 bounded redirected lifetime RED", () => {
+	it("bounds migration activation bytes before constructing the call-time owner", () => {
+		expect(d108e5SourceOwnership().activationBoundPrecedesCopy).toBe(true);
+	});
+
+	it("bounds every migration invite encode before copying caller-controlled bodies", () => {
+		expect(d108e5SourceOwnership().migrationInviteBoundOwnsEveryEncode).toBe(true);
 	});
 });
