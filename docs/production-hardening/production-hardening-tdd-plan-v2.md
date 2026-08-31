@@ -84259,6 +84259,60 @@ durable control releases a six-wholly-fresh-name campaign freeze. D.108e4by
 runs no model review, retained-seven repeat or campaign; D.108e4bx's signed
 final review already owns the changed predicate and its retained-seven gate.
 
+The one D.108e4by invocation consumed
+`.logs/d108e4bx-retained-browser-1/` exactly once and failed, so that name is
+permanently unavailable and no campaign is released. It started at
+`2026-08-31T05:59:11Z`, finished at `2026-08-31T06:02:06Z`, returned runner
+status one and recorded one unexpected result, zero expected/skipped/flaky
+results, zero top-level errors and exact terminal
+`D108E4H_IDENTITY_JOIN_INVALID` after `163204` ms of test time. Trials
+`e3-03-0` and `e3-03-1` completed; trial `e3-03-2` reached its assertions.
+The complete reporter, streams, timestamps, trace, error context, failure
+telemetry and derived read-only diagnosis are preserved without retry or
+overwrite.
+
+The failed trial demonstrates live replacement behavior rather than the
+D.108e4bx reliable-retry mismatch. The creator sent all 600 native raw
+samples, the receiver accepted 398 and rejected zero, both endpoints selected
+new open RTC connection/channel identities, both authenticated connection IDs
+changed, and each endpoint recorded exactly one local `replacement` link drop.
+Creator authenticated identity changed from
+`dhlqn21788156043324`/generation 9 to
+`4yeuzr1788156037329`/generation 8 while RTC changed from `12/449` to
+`15/482`. Receiver authenticated identity changed from
+`91jauq1788156043326`/generation 8 to
+`dwove61788156037324`/generation 7 while RTC changed from `13/445` to
+`17/473`. The validator rejected only because
+`d108e4hAssertBoundaryIdentity` defines replacement identity change as a new
+connection ID **and a numerically greater generation**.
+
+That numeric direction is not a product activation-order contract.
+`createLibp2pWebRtcSignalingPort` assigns each `generation` when a libp2p
+`Connection` object is first adapted and caches that value in a `WeakMap`;
+an already-adapted lower-generation connection may legitimately become the
+active replacement later. Product equality in `#sameConnection` compares the
+complete ID/generation tuple and does not order generations. The retained
+failure therefore demonstrates a stale test-validator predicate, not a product
+defect and not authority for product, workload, threshold, dependency or
+timing changes. Its next owner must be a narrow tests-only TDD slice before
+another retained invocation.
+
+Reporter, failure-telemetry, preliminary-calibration,
+generation-direction-diagnosis, twelve-entry self-excluding manifest and
+manifest-validation SHA-256 values are respectively
+`d44af6e5e08ed7d7f929bf3ff8dc51d0ddcaddc2692bcfe9b32658117af992ab`,
+`5450eb46310307c81a63ec56462e2e87d513b4d2bc22c79cef6b510a71668083`,
+`451877b3077c956665711b2f3099a6f2cebee8dfb4cb95c90c7192b11abfad51`,
+`c57205bf275dbf884a0e3fc05f43c9010bda00a1c0522d7bd7861794f2ec7eb5`,
+`0ba753ab9738915289c2b3865d95a2123faa72e21c867c9257d9ef7cb6bcb899`
+and
+`e6b123912a0c3771c18211b6554f3aa0febd253ce08e7ef6cf552d222a68c0cb`.
+All twelve entries validate from the consumed root. The test and read-only
+product-source owner SHA-256 values at failure are
+`cab49c9ac0911ead2e44ded38e8aa7f6ee0962bc3b1f11b197aaad896902dda6`
+and
+`b4a3f61ae439a85bfe9236f0b02257cce014056eb633e57acf689107008358df`.
+
 Consumed D.108e4bu reporter, stdout, stderr, failure telemetry,
 endpoint-classifier, trace, cumulative manifest, and manifest-validation
 SHA-256 values are respectively
