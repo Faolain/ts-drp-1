@@ -84779,6 +84779,45 @@ behavior or evidence integrity block. P2/prose/bookkeeping receives a
 disposition without confirmation or more ceremony. Kimi, Fable and
 collaboration subagents remain prohibited.
 
+The sole high-risk review inspected signed/pushed freeze
+`f410388bd4c0b4bae5226f8563fb3b19eb3be12d`, tree
+`ee35ed1178c91c2ebc51fc505937ae8e55d934f6`, and closed with an empty P0/P1
+union. Grok 4.6/high completed normally after `600.179` seconds with
+`TERMINAL_RESPONSE`, `end_turn`, exit zero, approval and no findings. It
+crossed 570 seconds without canceling, so no resume or replacement ran. Codex
+`gpt-5.6-sol` high approved with no findings. Opus xhigh approved with no
+P0/P1, three P2 dispositions and no subagents.
+
+First, the frozen evidence-only classifier's `advanced`/`invalid`
+authentication-state vocabulary predates direction-neutral GREEN. A legitimate
+non-increasing replacement generation can therefore receive the stale
+`invalid` label, but the enum is expressly accepted and gates neither reporter
+acceptance nor runner status. Preserve the frozen classifier and interpret the
+label as evidence vocabulary, not a failure. Second, the new freeze root does
+not retain install/build/typecheck or literal listing-command transcripts; the
+checks ran, listing streams/status are retained, and ordinary/isolated eight-
+owner plus 334-runtime identities are manifest-bound and rechecked before and
+after every invocation. No rerun is warranted. Third, freeze-root custody
+files were necessarily captured at predecessor `9d76df11` before this plan
+could quote their hashes. Review covers the executable freeze at `f410388b`;
+the final documentation-only closure commit is bound live by HEAD/tag/branch/
+signature and plan-only-diff checks. None changes artifacts, acceptance or
+campaign semantics, and no confirmation runs.
+
+Grok-status, Grok-events, Codex-result, Codex-events, Opus-result, mechanical
+union, 22-entry self-excluding review manifest and validation SHA-256 values
+are respectively
+`723fbcc5666b119faff9f66d2a8b798d011f2ad2c7456dad5e811223e720f60f`,
+`052f31e3553a41ffb06eeaa4ed548968d071354674f5a00b29746d74d8a39fe9`,
+`1f4bd476ba640c61430a396714f1b8d42f99ad7be5ee55fd3dc2ff975433d853`,
+`f3192948abcaff00a3fa5b5a130d17244ef49c5fe6db547f0ed9ca1a88445309`,
+`176cefdc20d223807bb36c11750917740fa05456cd802c808d2ff89f41b631c9`,
+`af2d16fc8bdd94efdabbc6b72c14d4e1ae289d68080bef28217466ea8bc9b549`,
+`b713f255af7af2c0a3ada7fe3fab9486299bdbe34ee3c4a7d64e298b6301f559`
+and
+`2a302a95cf2b40c2f9e507123891ba3c9f2005dd88c696d9a7f0ba0cb8fbc3ec`.
+All 22 entries validate from `.logs/d108e4cb-freeze-review/`.
+
 If the blocking union is empty, create and push signed annotated tag
 `d108e4cb-freeze-reviewed` at this exact plan-only commit and immediately run
 the following six commands sequentially in separate shells. Never retry,
