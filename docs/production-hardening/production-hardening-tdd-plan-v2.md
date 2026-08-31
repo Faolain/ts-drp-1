@@ -87878,3 +87878,105 @@ The nonblocking P2 set receives prospective owners without reopening D.109a:
 No P2 changes D.109a executable scope or justifies recursive review. D.109a is
 closed on this signed record. D.109b is next; no physical deletion or retained
 campaign has been authorized or executed by D.109a.
+
+#### D.109b issuance-retention checkpoint
+
+D.109b is frozen in
+`specs/phase-6b-bounded-pruning/slices/01-issuance-retention.md`. The source
+audit confirms that `DurableIssuanceStore` still has exactly six methods;
+browser and Node issuance use the distinct derived identities
+`--drp-issuance-v1` and `.drp-issuance-v1.sqlite`; browser stores lineage,
+issued records and outbox records in one strict three-store transaction; Node
+uses one WAL/FULL SQLite authority with the same three logical tables; and the
+shared terminal classifier currently has no pruning observation. The existing
+browser implementation already demonstrates the required private `WeakMap`
+identity pattern. Node and conformance memory must add the same pattern rather
+than accepting a structural facade.
+
+Maintenance does not become a seventh store method. Shared pruning types are
+isolated at `@ts-drp/issuance-store/maintenance`; genuine Node and browser
+resolvers are isolated at their new `./issuance-maintenance` subpaths; the
+existing package roots and `./issuance` factory-module key sets remain exact.
+Each resolver returns the one-method `prunePublishedPrefix` capability only
+for the exact facade its module created. The new subpaths are explicit
+package-maintenance surfaces and are never attached to a v3 product handle.
+This resolves the capability by object identity while preserving the ordinary
+mandatory contract and preventing structural stubs from minting it.
+
+The exact input carries scope, closed epoch, inclusive selected end, expected
+`{ exhausted, next }` lineage, expected inclusive nullable pruning watermark,
+and the separately authenticated commit-QC ref and adopted snapshot-manifest
+digest omitted from the D.109a result. The issuance owner validates and copies
+the external binding values but does not claim to reauthenticate another
+database. In one native write transaction it rereads lineage plus watermark,
+requires both expected values, scans the selected sequence range in bounded
+pages, decodes every canonical v3 vertex, proves exact scope/ordinal, a
+non-regressing epoch sequence ending exactly at the selected closed epoch,
+paired equal digests, complete ordinals, consumed lineage and `published`
+state, then deletes only that paired range and advances the watermark to the
+inclusive last deleted ordinal. Any malformed, pending, one-sided,
+foreign-digest, gapped, regressing, stale, unreadable, count-mismatched or
+newly changed selected fact aborts with zero writes. A newer-epoch pending
+suffix and unrelated scopes remain untouched.
+
+The receipt is detached and deeply frozen. It records the copied binding,
+scope/epoch, exact deleted inclusive range or an idempotent `null`, resulting
+watermark and observed lineage pair. The existing `{ exhausted, next }` pair
+is the lineage CAS revision; no redundant revision column or receipt shadow
+store is added. Repeating the exact state at the resulting watermark is a
+no-op. A stale expected lineage/watermark is `ISSUANCE_RETRY_REQUIRED`; durable
+malformation is `ISSUANCE_RECOVERY_CORRUPT`; invalid caller state remains
+`ISSUANCE_INVALID_ARGUMENT`.
+
+The inclusive nullable `prunedThroughAuthorSequence` becomes a required member
+of the public terminal observation and is read with lineage/issued/outbox in
+one owner transaction. Both rows absent at a consumed address at or below the
+watermark is pruned: `readIssued` returns `null`, while acknowledgement and
+shared terminal classification return the new non-poisoning
+`ISSUANCE_RECORD_PRUNED`. That error exposes only its code, detached caller-
+known scope and caller-known author sequence, never a digest, candidate or
+deleted bytes; a wrong-digest late acknowledgement receives the same result
+because no durable digest remains. Consumed absence above the watermark and
+all one-sided/malformed states remain poisoning corruption. A row that exists
+at or below the watermark is likewise corruption. Never-issued publication
+acknowledgement keeps the existing invalid-address behavior, while transaction
+terminal classification keeps its existing definite-not-applied substrate
+result when durable lineage still equals the caller's prior lineage.
+
+Browser retains database version 1, store names/key paths and derived name.
+Its new reader accepts legacy four-member lineage rows as a null watermark and
+five-member rows with one valid nullable/numeric watermark. Ordinary issuance
+preserves the legacy representation until pruning writes the watermark, then
+preserves it on later lineage CAS updates. There is no versionchange or
+replacement database and no post-pruning downgrade claim. Node retains the
+same file, page size, WAL and FULL synchronous policy. It creates exact schema
+v2 with one checked nullable lineage watermark column and migrates only an
+exact v1 catalog inside one `BEGIN IMMEDIATE` transaction in that file,
+preserving every row. Unknown catalogs/versions remain unsupported.
+
+The tests-only RED path set and full semantic/native matrix are frozen in the
+slice. It includes identity denial, immutable copying/receipts, 64/65 and
+128/129 page boundaries, every row classification, stale state, idempotence,
+late exact/wrong-digest acknowledgement, complete absence polarity, two-handle
+races, browser legacy/new lineage rows without an IDB bump, Node in-place v1
+migration, transaction abort, hard-kill old-XOR-new recovery, reopen and
+unrelated-scope preservation. Directly affected retained expectations may be
+corrected only for the new code, terminal member, maintenance subpaths and Node
+v2 lineage catalog; the six-method facade and existing factory-module surfaces
+remain unchanged. RED is causal only if production is byte-identical and its
+failures are the missing frozen D.109b owners/semantics, not a fixture or build
+failure.
+
+This is a high-risk slice because it authorizes physical deletion, an in-place
+schema migration, new package-maintenance subpaths, and the already accepted
+closed error/terminal-observation exception. Sign and push this plan-only
+checkpoint, then run one Grok 4.6/high, exact Kimi K3 thinking/high with both
+100-step controls, and Opus xhigh plan review. Kimi occupies the middle slot;
+Codex `gpt-5.6-sol` does not substitute for it. These are external CLI review
+sessions, not collaboration subagents. If Grok cancels, resume that exact
+session. Only P0/P1 findings block and only one material correction batch is
+permitted. Deterministic RED receives no model round. GREEN is signed and
+pushed before the sole final Grok/Kimi/Opus plan-to-RED-to-GREEN review. No
+Fable, collaboration subagent, retained campaign, scheduler, protocol/runtime
+change, threshold change, dependency change or recursive prose review is
+authorized.

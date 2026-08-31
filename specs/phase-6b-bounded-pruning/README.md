@@ -2,18 +2,19 @@
 
 ## Next Agent Prompt
 
-Status: plan formation begins after signed Phase-6a closure
-`67833426279112e79aebaa16846ef4f7af6cfaf9`. Phase 6a is accepted inherited
-evidence and must not be reopened. Implement [Slice 00](slices/00-eligibility.md)
-first with a tests-only RED. It creates no deletion path. Do not start a later
-slice until the current slice has its signed RED, narrow GREEN, retained gates,
-and required review.
+Status: D.109a eligibility is closed at signed/pushed commit
+`717b15ac0a8c7369fd18a0a1c08b8a88dfbb0056`; its plan, RED, GREEN, review,
+and evidence are accepted and must not be reopened. Freeze and review
+[D.109b issuance retention](slices/01-issuance-retention.md), then execute its
+tests-only causal RED before any production deletion path. Do not start D.109c
+until D.109b has its signed RED, narrow GREEN, retained gates, and final review.
 
 The user has prohibited further Fable and collaboration subagents after the
 one expressly authorized Phase-6b Fable review. Phase-6b formal reviews use
 Grok, exact Kimi high/100-step, and Opus xhigh; Codex `gpt-5.6-sol` does not
 substitute for Kimi. If Grok cancels, resume that exact session; do not replace
-it.
+it. These reviews run through their external CLIs; they are not collaboration
+subagents.
 
 ## Goal
 
