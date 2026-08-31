@@ -85605,6 +85605,30 @@ errors, all three completed fixed trials and unchanged durable control may
 release six wholly fresh campaign names. No review, retained-seven repeat or
 campaign run occurs in D.108e4cg.
 
+The one D.108e4cg invocation consumed
+`.logs/d108e4cg-retained-browser-1/` exactly once and passed. It started
+`2026-08-31T09:31:28Z`, finished `2026-08-31T09:34:24Z`, and directly captured
+status zero. The reporter records expected/skipped/unexpected/flaky
+`1/0/0/0`, zero top-level/result errors and one retry-zero pass after `167720`
+ms. The decoded campaign contains exactly `e3-03-0`, `e3-03-1`, `e3-03-2`,
+durable baseline 2 and Chromium `151.0.7922.34`. Raw delivered counts are 415,
+382 and 419; reliable delivered counts are 11, 13 and 15. The unchanged title
+enforced retained freshness, head-of-line, fixed-loss and durable-control
+contracts. One read-only jq audit had an operator-precedence mistake; the
+corrected parenthesized result-error audit passes without rerunning the proof.
+
+Reporter, decoded campaign, normalized campaign summary, 22-entry manifest
+and manifest-validation SHA-256 values are respectively
+`4d2b2f418bcb0910d9b087c41b57aa6d5953cc242e7c86a633545fa6249a309e`,
+`0a0b94fa6384b7807aec85efa90b48e8e21089a55ffc8979a396c2dcaf0febbf`,
+`f476d5df10986e27b2103783541944d8d100bf3adac23803c0c89eadccbae681`,
+`a19fdb334978f6ec4a53827838605cd927781a8bc4d1e785d5401b1afacb12e9`
+and
+`c8dc8070ef99038d77858878501b6d3e8257758ac46a9410d6ab4ea6d2c023ab`.
+All entries validate from `.logs/d108e4cg-retained-browser-1/`. No retry,
+overwrite, retained-seven repeat, review or campaign occurred. This pass
+releases one plan-only freeze of six wholly fresh campaign names.
+
 Consumed D.108e4bu reporter, stdout, stderr, failure telemetry,
 endpoint-classifier, trace, cumulative manifest, and manifest-validation
 SHA-256 values are respectively
