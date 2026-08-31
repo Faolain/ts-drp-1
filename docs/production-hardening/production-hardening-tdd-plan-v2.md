@@ -84103,6 +84103,44 @@ All ten manifest entries validate from `.logs/d108e4bx-red`; the sole changed
 source path is `tests/e3-03-loss-and-hol-proof.pw.ts`. GREEN may now change
 only that frozen test helper and focused fixture matrix.
 
+The signed/pushed RED anchor is commit
+`b4610f1c883c171dba2d19d04e9dcace562bb9d2`, tree
+`7a94410559631a88720168c7f35be1b624c49f0d`. D.108e4bx GREEN changes only
+the frozen test owner: unique logical sequences retain the `SAMPLE_COUNT`
+workload ceiling, each logical reliable sequence retains the product's exact
+eight-attempt ceiling, duplicates require identical `sentAtMs`, `byteLength`
+and `carrierByteLength` plus distinct `(connectionId, channelId)`, and the
+helper returns every filtered physical row in unchanged observer order. The
+focused matrix accepts the captured cross-connection retry,
+same-connection/different-channel retry, and 601 physical rows containing 600
+logical sequences. It rejects marker-time, payload-length, carrier-length,
+physical-identity, ninth-attempt, descending-order and out-of-range mutants.
+
+The sole focused GREEN execution passed `1/1` with no top-level or result
+errors. Standalone strict TypeScript, exact-owner ESLint, high-heap Prettier,
+`git diff --check`, grid typecheck and grid build all returned zero. The
+D.108e4h schema and D.108e4g lifecycle titles each passed `1/1`; both
+D.108e4ax bilateral restart rows passed with 112 unrelated rows skipped; the
+complete network-owner file passed `114/114`; and the exact retained-seven
+allowlist listed seven tests in one file and passed `7/7`. No retained
+three-trial or campaign title was listed or executed. The focused, D.108e4h,
+D.108e4g, D.108e4ax, complete-network, retained-seven, forty-three-entry
+self-excluding manifest, manifest-validation, mechanical-validation and final
+test-owner SHA-256 values are respectively
+`727a2732dedc47cad0822bcc0f3c5609e1622659caa1805a6677d4c8742131e3`,
+`3b9e4b4854a158f1c78877e93979ce65cb5a1af2a655634e5f031488af1b9b7d`,
+`1bf458f9e99a82a21ac45cf5e1b29ef08b0f5217491e6671d193e9df5d020797`,
+`d5d65ac92ca8f2a55e4356209902cc511ca1133c69cbdbbb394ef612a6206eb7`,
+`3ddcfe1b295c80d1b7cf0e9cdec5467b254596aa25d37a84b34a51da242b9e6d`,
+`a0301ec34591deffa7c94f4e3c1f209a7eae90563db808f906ff9b525c7536e5`,
+`28df10241abc9d5abe68c5588479a68143b8597827cc3759ff43fd47b222cd97`,
+`c120f7a81594223ab030f6a3c1701ebc5bb3f24690531f4dbe0a96c5233fe294`,
+`904b8605e2c5dd6f924af4bbee1f956ce06eb4289f68317cf86c3ad429f55ada`
+and
+`cab49c9ac0911ead2e44ded38e8aa7f6ee0962bc3b1f11b197aaad896902dda6`.
+All 43 manifest entries validate from `.logs/d108e4bx-green`; protected
+untracked paths and all 26 stashes remain untouched.
+
 After signed/pushed GREEN, the single final Grok/Codex-high/Opus-xhigh review
 must inspect plan, causal RED, GREEN, exact retry classification, unchanged raw
 and logical-dedup contracts, static/retained gates and scope. Only an empty

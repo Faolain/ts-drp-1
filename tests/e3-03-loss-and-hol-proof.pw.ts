@@ -13,6 +13,7 @@ const SAMPLE_PAYLOAD_BYTES = 256;
 const RELIABLE_SENTINEL_BYTES = 12_000;
 const RELIABLE_OBSERVATION_TAIL_MS = 15_000;
 const TRIAL_COUNT = 3;
+const D108E4BX_RELIABLE_ATTEMPTS = 8;
 const D108E4BT_DIAGNOSTIC_TRIAL_ID = "e3-03-durable-readiness";
 const D108E4BT_DIAGNOSTIC_INPUT = Object.freeze({
 	intervalMs: 1,
@@ -1810,27 +1811,48 @@ function firstReliableBySequence(observations: readonly PlatformObservation[]): 
 function expectReliableSenderSamples(observations: readonly PlatformObservation[]): readonly PlatformObservation[] {
 	const samples = observations.filter(({ lane, sentinel }) => lane === "reliable" && !sentinel);
 	expect(samples.length).toBeGreaterThan(0);
-	expect(samples.length).toBeLessThanOrEqual(SAMPLE_COUNT);
-	expect(new Set(samples.map(({ sequence }) => sequence)).size).toBe(samples.length);
 	expect(samples.map(({ sequence }) => sequence)).toEqual(
 		[...samples].map(({ sequence }) => sequence).sort((a, b) => a - b)
 	);
 	expect(samples.every(({ sequence }) => sequence >= 0 && sequence < SAMPLE_COUNT)).toBe(true);
+	const bySequence = new Map<number, PlatformObservation[]>();
+	for (const sample of samples) {
+		const selected = bySequence.get(sample.sequence) ?? [];
+		selected.push(sample);
+		bySequence.set(sample.sequence, selected);
+	}
+	expect(bySequence.size).toBeLessThanOrEqual(SAMPLE_COUNT);
+	for (const group of bySequence.values()) {
+		const first = group[0];
+		if (first === undefined) throw new Error("D108E4BX_RELIABLE_GROUP_EMPTY");
+		expect(group.length).toBeLessThanOrEqual(D108E4BX_RELIABLE_ATTEMPTS);
+		expect(
+			group.every(
+				({ byteLength, carrierByteLength, sentAtMs }) =>
+					byteLength === first.byteLength &&
+					carrierByteLength === first.carrierByteLength &&
+					sentAtMs === first.sentAtMs
+			)
+		).toBe(true);
+		expect(new Set(group.map(({ channelId, connectionId }) => `${connectionId}|${channelId}`)).size).toBe(group.length);
+	}
 	return samples;
 }
 
 if (process.env["D108E4BX_RELIABLE_RETRY_RED"] === "1") {
 	test("D.108e4bx accepts one exact reliable retry across physical stream identity", () => {
-		const sequences = [0, 1, 2, 3, 4, 4, 5, 6] as const;
-		const observations = sequences.map((sequence, ordinal): PlatformObservation => {
-			const duplicate = sequence === 4 && ordinal === 5;
-			return Object.freeze({
+		const observation = (
+			sequence: number,
+			ordinal: number,
+			overrides: Partial<PlatformObservation> = {}
+		): PlatformObservation =>
+			Object.freeze({
 				attemptId: ordinal,
 				byteLength: 256,
 				carrierByteLength: 496,
-				channelId: sequence === 4 ? (duplicate ? 506 : 495) : 100 + ordinal,
+				channelId: 100 + ordinal,
 				channelLabel: "reliable",
-				connectionId: sequence === 4 ? (duplicate ? 13 : 9) : 1,
+				connectionId: 1,
 				insertionReadyState: "open",
 				lane: "reliable",
 				lifecycleSequence: ordinal,
@@ -1842,10 +1864,64 @@ if (process.env["D108E4BX_RELIABLE_RETRY_RED"] === "1") {
 				sentAtMs: 1_000 + sequence,
 				sequence,
 				sentinel: false,
+				...overrides,
 			});
-		});
+		const replace = (
+			observations: readonly PlatformObservation[],
+			index: number,
+			overrides: Partial<PlatformObservation>
+		): readonly PlatformObservation[] =>
+			observations.map((selected, selectedIndex) =>
+				selectedIndex === index ? Object.freeze({ ...selected, ...overrides }) : selected
+			);
+		const captured = [0, 1, 2, 3, 4, 4, 5, 6].map((sequence, ordinal) =>
+			observation(sequence, ordinal, {
+				channelId: sequence === 4 ? (ordinal === 5 ? 506 : 495) : 100 + ordinal,
+				connectionId: sequence === 4 ? (ordinal === 5 ? 13 : 9) : 1,
+			})
+		);
+		const capturedResult = expectReliableSenderSamples(captured);
+		expect.soft(capturedResult).toHaveLength(captured.length);
+		for (const [index, selected] of captured.entries()) {
+			expect.soft(capturedResult[index], `captured observer order ${index}`).toBe(selected);
+		}
 
-		expect(expectReliableSenderSamples(observations)).toEqual(observations);
+		const sameConnection = replace(captured, 5, { connectionId: 9 });
+		const sameConnectionResult = expectReliableSenderSamples(sameConnection);
+		for (const [index, selected] of sameConnection.entries()) {
+			expect.soft(sameConnectionResult[index], `same-connection observer order ${index}`).toBe(selected);
+		}
+
+		const maxWorkload = Array.from({ length: SAMPLE_COUNT }, (_, sequence) => observation(sequence, sequence));
+		maxWorkload.splice(
+			301,
+			0,
+			observation(300, SAMPLE_COUNT, {
+				channelId: SAMPLE_COUNT + 100,
+				connectionId: 2,
+			})
+		);
+		const maxWorkloadResult = expectReliableSenderSamples(maxWorkload);
+		expect.soft(maxWorkloadResult).toHaveLength(SAMPLE_COUNT + 1);
+		for (const [index, selected] of maxWorkload.entries()) {
+			expect.soft(maxWorkloadResult[index], `max-workload observer order ${index}`).toBe(selected);
+		}
+
+		expect.soft(() => expectReliableSenderSamples(replace(captured, 5, { sentAtMs: 9_999 }))).toThrow();
+		expect.soft(() => expectReliableSenderSamples(replace(captured, 5, { byteLength: 255 }))).toThrow();
+		expect.soft(() => expectReliableSenderSamples(replace(captured, 5, { carrierByteLength: 495 }))).toThrow();
+		expect.soft(() => expectReliableSenderSamples(replace(captured, 5, { channelId: 495, connectionId: 9 }))).toThrow();
+		expect
+			.soft(() =>
+				expectReliableSenderSamples(
+					Array.from({ length: D108E4BX_RELIABLE_ATTEMPTS + 1 }, (_, ordinal) =>
+						observation(4, ordinal, { channelId: 400 + ordinal, connectionId: 9 + ordinal })
+					)
+				)
+			)
+			.toThrow();
+		expect.soft(() => expectReliableSenderSamples([observation(1, 0), observation(0, 1)])).toThrow();
+		expect.soft(() => expectReliableSenderSamples([observation(SAMPLE_COUNT, 0)])).toThrow();
 	});
 }
 
