@@ -85998,6 +85998,116 @@ with full physical paths preserved. All four ports cleared after execution;
 plan-only high-risk freeze of six wholly fresh retained campaign names; no
 campaign invocation has yet run under the new ledger.
 
+###### D.108e4cm — prepare-gate six-name campaign disposition
+
+D.108e4cm is the high-risk campaign freeze released by the passing D.108e4cl
+proof. It accepts signed/pushed behavior GREEN
+`b98631afb3eb91b68226649113fb53d69d8ee56b`, tree
+`c4f8371f725baaf2dc9787a9f2c19add411c55f9`, and passing retained-evidence
+anchor `b06d064d5510941f16838d5f037d697009140ab1`. It does not reopen readiness,
+product behavior, workload, thresholds, browser, dependencies, launcher
+design or immutable prior evidence. The host, workspace and single operator
+are trusted. Evidence protects against accidental contamination, stale state,
+retry, overwrite, name reuse, source/runtime drift and unnoticed test failure;
+local hashes are reproducibility and accidental-drift controls, not hostile-
+local tamper resistance.
+
+The fresh closed ledger contains, in exact order,
+`preparegate-ordinary-1`, `preparegate-ordinary-2`,
+`preparegate-ordinary-3`, `preparegate-isolated-1`,
+`preparegate-isolated-2` and `preparegate-isolated-3`. All six names and the
+freeze/campaign roots were absent at construction. The user's durable
+campaign authorization covers all six and is not requested again. Never
+retry, overwrite, rename, substitute or reuse a consumed name; require both
+direct and finalizer status zero from the immediate predecessor and stop on
+the first consuming failure.
+
+The ordinary workspace is a signed/pushed plan-only descendant of GREEN. The
+fresh detached checkout `/private/tmp/ts-drp-d108e4cm-clean/repo` is at exact
+GREEN/tree with clean tracked status. Offline frozen-lockfile installation
+reused 1,525 packages with zero downloads and built the package closure;
+ordinary and isolated grid build/typecheck pass. Their eight-file source/
+configuration identity manifest SHA-256 is
+`cd1496997dfe757a0b8db46171990622457344dad38f05df9c409f2d6006123d`;
+their 334-file built-runtime manifest SHA-256 is
+`0c39e9aa5c64e2361b562881996782abe176c37d066eb5d99437e6b9e5533ea6`,
+and both modes match byte-for-byte.
+
+The freeze root is `.logs/d108e4cm-freeze/`; campaign root is
+`.logs/d108e4cm-campaign/`. The 68-entry validating self-excluding freeze
+manifest, validation, outer launcher, runner, guard and eight-entry initial
+campaign manifest SHA-256 values are respectively
+`6f0facedd93314e973bc022f74609e544771304b536eeb50a81a9f26384354f3`,
+`8ecd21c74a2db29afbb547ae04afc6b12b950db04d5df962621b1d9c7bc93236`,
+`74f8498c41d338cc55f24ac4336d04e02e3519a0ffa7df4f0f3942b15e05d6da`,
+`df422e1f0cc0dc43c3b7d7a61bddbb91e7f3940cef9ccab2dc03830e9e935525`,
+`4a732c394b13640265502139b31f64228f8c278bee2e53b777c140cfa64c1022`
+and
+`8991d4aae8f7042c3775f83f531c0fa1c51b171c9e8082c1872557f85bad5942`.
+All entries validate. Normalizing only anchors, roots, reviewed tag, initial
+manifest, slice prefix and fresh names makes launcher, runner and guards
+byte-identical to D.108e4ce; tool gate, process audit, finalizer, mode verifier
+and classifier programs are byte-identical without normalization.
+
+Mechanical gates pass shell syntax, script modes/hashes, initial/freeze
+manifests, capability-based host tool selection, Git operations, ripgrep
+`-F`/`-c` smoke behavior, authorization-before-freshness order, wildcard
+current-name freshness, predecessor/future-name refusal, exact ordinary and
+isolated one-test/one-file lists, classifier smoke/validation, protected paths,
+26 stashes, absent root canonical shims, source/ref/signature custody, process
+audit and clear ports 4174/4175/51000/51002. Full selected Git/ripgrep paths
+and versions are captured and held stable within this campaign; exact vendor
+strings, revisions and another host's absolute paths are not portable
+acceptance contracts.
+
+The fixed workload remains the exact retained title, Chromium
+`151.0.7922.34`, one worker, retry zero, three trials, 30% campaign and 100%
+calibration loss, 600 samples per trial, unchanged payload, delivery/AoI/gap/
+stall/HOL/durability/identity/lifecycle thresholds, endpoint-local classifier,
+300-second test timeout and 600-second process-group watchdog. Per-run
+reporter, stdout, stderr, timestamps, attachments, direct/finalizer status,
+before/after custody, classification and cumulative manifest remain mandatory.
+
+Sign/push this plan-only freeze and run one final high-risk freeze review with
+Grok high, Codex `gpt-5.6-sol` high and Opus xhigh over the literal commands,
+freeze evidence and unchanged workload. If Grok cancels, resume that exact
+session. Only P0/P1 findings that can change workload, fabricate an accidental
+pass, bypass predecessor/first-failure behavior, consume the wrong name, or
+break evidence integrity block. Disposition P2 without more infrastructure or
+confirmation ceremony. An empty union permits a signed/pushed review closure
+and signed reviewed tag `d108e4cm-freeze-reviewed` at that exact closure. Then
+execute these six already-authorized invocations sequentially:
+
+```sh
+test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 6f0facedd93314e973bc022f74609e544771304b536eeb50a81a9f26384354f3 && (cd /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-freeze && /usr/bin/shasum -a 256 -c SHA256SUMS >/dev/null) && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = 74f8498c41d338cc55f24ac4336d04e02e3519a0ffa7df4f0f3942b15e05d6da && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-freeze/launch-one.zsh preparegate-ordinary-1 /Users/aristotle/Documents/Projects/ts-drp-1
+```
+
+```sh
+test "$(</Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-campaign/preparegate-ordinary-1.status)" = 0 && test "$(</Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-campaign/preparegate-ordinary-1.runner-status)" = 0 && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 6f0facedd93314e973bc022f74609e544771304b536eeb50a81a9f26384354f3 && (cd /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-freeze && /usr/bin/shasum -a 256 -c SHA256SUMS >/dev/null) && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = 74f8498c41d338cc55f24ac4336d04e02e3519a0ffa7df4f0f3942b15e05d6da && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-freeze/launch-one.zsh preparegate-ordinary-2 /Users/aristotle/Documents/Projects/ts-drp-1
+```
+
+```sh
+test "$(</Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-campaign/preparegate-ordinary-2.status)" = 0 && test "$(</Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-campaign/preparegate-ordinary-2.runner-status)" = 0 && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 6f0facedd93314e973bc022f74609e544771304b536eeb50a81a9f26384354f3 && (cd /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-freeze && /usr/bin/shasum -a 256 -c SHA256SUMS >/dev/null) && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = 74f8498c41d338cc55f24ac4336d04e02e3519a0ffa7df4f0f3942b15e05d6da && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-freeze/launch-one.zsh preparegate-ordinary-3 /Users/aristotle/Documents/Projects/ts-drp-1
+```
+
+```sh
+test "$(</Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-campaign/preparegate-ordinary-3.status)" = 0 && test "$(</Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-campaign/preparegate-ordinary-3.runner-status)" = 0 && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 6f0facedd93314e973bc022f74609e544771304b536eeb50a81a9f26384354f3 && (cd /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-freeze && /usr/bin/shasum -a 256 -c SHA256SUMS >/dev/null) && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = 74f8498c41d338cc55f24ac4336d04e02e3519a0ffa7df4f0f3942b15e05d6da && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-freeze/launch-one.zsh preparegate-isolated-1 /private/tmp/ts-drp-d108e4cm-clean/repo
+```
+
+```sh
+test "$(</Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-campaign/preparegate-isolated-1.status)" = 0 && test "$(</Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-campaign/preparegate-isolated-1.runner-status)" = 0 && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 6f0facedd93314e973bc022f74609e544771304b536eeb50a81a9f26384354f3 && (cd /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-freeze && /usr/bin/shasum -a 256 -c SHA256SUMS >/dev/null) && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = 74f8498c41d338cc55f24ac4336d04e02e3519a0ffa7df4f0f3942b15e05d6da && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-freeze/launch-one.zsh preparegate-isolated-2 /private/tmp/ts-drp-d108e4cm-clean/repo
+```
+
+```sh
+test "$(</Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-campaign/preparegate-isolated-2.status)" = 0 && test "$(</Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-campaign/preparegate-isolated-2.runner-status)" = 0 && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = 6f0facedd93314e973bc022f74609e544771304b536eeb50a81a9f26384354f3 && (cd /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-freeze && /usr/bin/shasum -a 256 -c SHA256SUMS >/dev/null) && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = 74f8498c41d338cc55f24ac4336d04e02e3519a0ffa7df4f0f3942b15e05d6da && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4cm-freeze/launch-one.zsh preparegate-isolated-3 /private/tmp/ts-drp-d108e4cm-clean/repo
+```
+
+After six passes, validate the cumulative manifest, direct/finalizer statuses,
+six reporters, eighteen completed trial summaries, source/runtime custody and
+zero failure attachments; sign/push the evidence checkpoint and run the one
+required final Grok/Codex/Opus evidence review before D.108e5. A consuming
+failure stops this ledger and owns the next evidence-driven disposition.
+
 ###### D.108e4ce — post-census six-name campaign freeze
 
 D.108e4ce is the high-risk campaign disposition released by the passing
