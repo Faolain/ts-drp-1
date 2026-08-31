@@ -84851,6 +84851,118 @@ test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.log
 Six passes release one signed/pushed campaign-evidence checkpoint and the
 single final evidence review, then D.108e5 and Phase-6a closure resume.
 
+The first D.108e4cb invocation, `identitygate-ordinary-1`, is a consuming
+failure and stops this ledger. It ran once from `2026-08-31T07:18:16Z` through
+`2026-08-31T07:19:42Z`; direct Playwright and finalizer statuses are both one.
+The reporter records expected/skipped/unexpected/flaky `0/0/1/0`, zero top-
+level errors and one failed retry-zero result after `77192` ms with exact
+`D108E4H_IDENTITY_JOIN_INVALID`. The other five names remain absent and are
+permanently predecessor-blocked; none may be run, reused or substituted.
+
+This is a new test-validator census gap, not recurrence of direction-neutral
+generation custody and not evidence of a product defect. Trial `e3-03-0` had
+one creator-local replacement. The incoming receiver had zero local link
+drops, an exactly stable authenticated tuple, and a common selected old RTC
+owner `5/359` in prepare and deadline. All 416 accepted raw records remained on
+that owner. Its deadline RTC census also contained one open candidate `7/390`
+with one product handler, one open event, five control records, no application
+record and no terminal close event. That is the existing qualified pending-
+candidate contract. `incomingReplacement` nevertheless bypassed
+`d108e4hAssertZeroLocalBoundaryIdentity` and called
+`d108e4hOnly(endpoint.deadline.rtc)`, rejecting the legitimate two-entry
+census before applying incoming semantics.
+
+Reporter, failure telemetry, evidence-only endpoint classifier, immutable
+70-entry campaign manifest and campaign-manifest validation SHA-256 values are
+respectively
+`fe2255fc98cef546ba90b59200d5fd60163a1ab5b87c3e48c99e523fcff32633`,
+`a6abb2e2185aabac806f464a39b1a49110f8f026ed9fcc72feb473488046740e`,
+`c0396ae9ac5f63b12d6c656636cedf0a3436547b4702526410c331e9f4c690ad`,
+`aaefa56e2ce052d34e89921cf98e1933906b3e58ce490f833d28c9c6337e32a4`
+and
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+The campaign manifest validates without mutation. Compact failure summary,
+detailed incoming census, four-entry diagnosis manifest and its validation
+SHA-256 values are respectively
+`750910366dce82b70128868f549d9b2eec73951ae3a2d9c202edcfd2d56b0f43`,
+`17a9f2d787dd021370cafc49da5227d5af73a7417504b07a7c7c1fd0bb4d91ec`,
+`5ae2eba947a818e0491d4b1a94037aeed854b8861293b41727ea42a40f4ef0c5`
+and
+`d736db496c6a5c0a5d5de14b3c57d5c3e948c8295fdd477a48bedc255a78f877`.
+All four diagnosis entries validate from `.logs/d108e4cc-diagnosis/`.
+
+###### D.108e4cc — incoming pending-candidate census selection
+
+D.108e4cc is the narrow tests-only TDD owner for the consumed D.108e4cb
+failure. Its sole executable owner is
+`tests/e3-03-loss-and-hol-proof.pw.ts`; this plan is the sole documentation
+owner. `packages/network/src/unreliable-webrtc.ts`, campaign artifacts and all
+product/example sources are read-only. Do not change product behavior/APIs,
+wire or identity semantics, dependencies, configuration, browser, workload,
+loss, thresholds, timeouts, watchdog, ports or campaign machinery. Any need
+for such a change stops and reslices.
+
+The frozen boundary contract distinguishes two incoming states. A completed
+incoming transition has no RTC identity common to prepare/deadline and retains
+the existing singleton old/new path. An incoming endpoint that still has one
+RTC identity common to both boundaries has not selected its qualified
+candidate for application traffic: select that common old owner and apply the
+existing zero-local census helper. That helper already proves unique census
+identities, exactly one common owner, at most one prepare/deadline candidate,
+all application records on the common owner, and for a deadline candidate one
+product handler, one open event and no terminal close. Control custody on the
+candidate remains separately validated. Stable authenticated identity and
+zero local drop remain required. No new acceptance is created for two
+selected owners, candidate application traffic, missing readiness, terminal
+candidates, multiple candidates or an incoming transition without a common
+owner.
+
+**Causal RED.** In the existing telemetry-only title `validates schema-v3
+replacement custody without cross-peer clocks`, compose one
+`incomingPendingCandidateAlongsidePeerReplacement` fixture from the already-
+passing creator endpoint/delta of `creatorReplacement` and the already-passing
+receiver endpoint/delta of `d108e4bhDeadlinePending`. These fixtures share the
+same trial, peer, workload and base identities. The composition changes only
+campaign-wide peer classification: creator owns one replacement, so receiver
+becomes incoming while retaining its common selected RTC plus one qualified
+control-only pending candidate. Add one soft `not.toThrow` expectation. Before
+GREEN, the exact focused execution must select one test in one file, exclude
+the three-trial title, return `0/0/1/0`, contain zero top-level errors and one
+failed result, and expose only the named row with exact
+`D108E4H_IDENTITY_JOIN_INVALID` from
+`d108e4hOnly(endpoint.deadline.rtc)`. Any different matrix/token/owner stops
+for diagnosis. Preserve a self-excluding RED manifest, sign and push it, and
+never rerun RED.
+
+**GREEN.** Change only boundary selection in the same validator. For a
+non-local endpoint whose prepare/deadline RTC censuses share an exact identity,
+use `d108e4hAssertZeroLocalBoundaryIdentity`; otherwise preserve the existing
+incoming singleton transition. Keep the local-replacement path unchanged. Add
+one incoming-specific negative composition using the existing
+`d108e4bhCandidateApplicationOwner`; it must retain exact
+`D108E4H_IDENTITY_JOIN_INVALID`. Preserve the existing incoming-transition
+fixtures, zero-local deadline/prepare/initiator pending candidates, second-
+candidate rejection, missing-open/handler, terminal-candidate, control-custody,
+application-owner, ownership truth table, asymmetric behavior, identity shape,
+lifecycle and every exact error token.
+
+Run focused GREEN exactly once. Then run standalone strict TypeScript,
+exact-owner ESLint, 8 GiB formatter-only Prettier, `git diff --check`, affected
+grid typecheck/build, both exact D108E4G lifecycle titles, both D.108e4ax rows,
+the complete network unit owner, and the frozen retained-seven exact listing/
+execution once. Record complete reporters/streams/statuses, source-shape and
+changed-path custody, source hashes and a validating self-excluding manifest;
+sign and push GREEN.
+
+Use the governing narrow-slice protocol: one bounded plan review by Grok
+4.6/high, Codex `gpt-5.6-sol` high and Opus xhigh; no separate RED review; one
+final three-model review after signed/pushed GREEN over plan, causal RED and
+all gates. If Grok cancels, resume that exact session. Only P0/P1 blocks; P2
+gets a disposition without recursive prose review. Kimi, Fable and
+collaboration subagents remain prohibited. An empty final union releases one
+wholly fresh retained proof name. Only its pass may freeze six wholly fresh
+campaign names; no D.108e4cb name is available.
+
 Consumed D.108e4bu reporter, stdout, stderr, failure telemetry,
 endpoint-classifier, trace, cumulative manifest, and manifest-validation
 SHA-256 values are respectively
