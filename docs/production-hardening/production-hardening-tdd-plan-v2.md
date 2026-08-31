@@ -84313,6 +84313,98 @@ product-source owner SHA-256 values at failure are
 and
 `b4a3f61ae439a85bfe9236f0b02257cce014056eb633e57acf689107008358df`.
 
+###### D.108e4bz — direction-neutral authenticated-identity custody
+
+D.108e4bz is the narrow tests-only TDD owner for the D.108e4by failure. Its
+signed/pushed diagnosis anchor is
+`8c3545f0194e3ab5e7668e13d81d3ef8a8e74d2b`, tree
+`5d6a7b469d396b2f773cd1ec7b8dd2e8a54a3220`. The sole executable owner is
+`tests/e3-03-loss-and-hol-proof.pw.ts`; this plan is the sole documentation
+owner. `packages/network/src/unreliable-webrtc.ts` is read-only evidence.
+D.108e4bz must not change production/example source, product APIs, wire
+formats, connection or activation authority, replacement behavior,
+dependencies, configuration, workload, three-trial count, loss profile,
+ports, timing, watchdog or thresholds. Any need for such a change stops and
+reslices.
+
+The accepted identity contract is the exact tuple already used by product
+connection equality. An authenticated identity is stable only when both
+`connectionId` and `generation` are equal. It has changed when that tuple is
+not equal: the ID differs, the generation differs, or both differ. Generation
+remains a required validated identity component, but its numeric direction is
+not activation chronology. No `<`, `>`, increment or adjacency predicate may
+decide authenticated replacement. Peer ID must still equal the exact remote
+peer. A locally owned replacement still requires changed authenticated and
+RTC identities. An incoming-only or zero-owner endpoint still requires a
+stable authenticated tuple under its existing peer-dependent rule. RTC
+identity, local ownership, lifecycle readiness, close ownership, raw custody
+and every existing error token remain unchanged.
+
+**Causal RED.** Add one bilateral fixture row to the existing telemetry-only
+test `validates schema-v3 replacement custody without cross-peer clocks`. It
+starts from the passing D.108e4ac `1/1` dual-local replacement replay and
+changes only each deadline authenticated generation to a positive value below
+its prepare generation, while retaining distinct connection IDs, changed open
+RTC identities, exact one-local-drop ownership, lifecycle evidence and all
+other accepted fields. A soft `not.toThrow` expectation expresses the frozen
+contract. Before GREEN the one exact focused execution must select one test in
+one file, exclude the retained three-trial title, return
+expected/skipped/unexpected/flaky `0/0/1/0`, contain zero top-level errors and
+one failed result, and expose exactly
+`D108E4H_IDENTITY_JOIN_INVALID` from the relational generation predicate. Any
+other soft failure, token, stack owner, selected title or count invalidates RED
+and stops for diagnosis. Preserve a self-excluding evidence manifest, sign and
+push RED; do not run a full RED model review or any retained campaign.
+
+**GREEN.** Replace only the validator's relational authenticated-change
+predicate with exact tuple inequality. Retain exact tuple equality as the
+stable predicate. In the same focused matrix:
+
+- accept the bilateral descending-generation RED replay;
+- accept a local replacement with distinct connection ID and equal generation;
+- accept a local replacement with equal connection ID and distinct generation;
+- retain acceptance of the existing distinct-ID/increasing-generation rows;
+- retain rejection of a locally owned RTC replacement with a completely stable
+  authenticated tuple and rejection of an authenticated replacement with a
+  stable RTC tuple, both as `D108E4H_IDENTITY_JOIN_INVALID`;
+- split incoming-endpoint identity drift into ID-only, generation-only and
+  both-field mutants, each retaining `D108E4H_IDENTITY_JOIN_INVALID`; and
+- preserve all D.108e4aa/D.108e4ac ownership, asymmetric incoming, zero-owner,
+  lifecycle, readiness, failed-replacement, trial/peer join, control-custody
+  and exact-error-code mutants without reclassification.
+
+The stale `nonIncreasingGeneration` rejection becomes a named positive
+same-generation/distinct-ID row; it is not retained as a false mutant. A
+source-shape audit must prove there is exactly one changed/stable authenticated
+tuple classification owner, no relational comparison of before/after
+authenticated generations in that owner, and no production diff.
+
+Run the focused GREEN title exactly once after implementation. Then run
+standalone strict TypeScript, exact-owner ESLint, 8 GiB formatter-only
+Prettier, `git diff --check`, affected grid typecheck/build, the D.108e4g
+lifecycle title, both D.108e4ax bilateral-restart rows, the complete network
+unit owner, and the frozen retained-seven listing/execution exactly once. The
+retained-seven selector must remain seven tests in one file and exclude the
+three-trial campaign title. Record complete reporters, streams, statuses,
+source hashes and a validating self-excluding manifest, then sign and push
+GREEN.
+
+Use the governing prospective protocol: one bounded plan review by Grok
+4.6/high, Codex `gpt-5.6-sol` high in place of Kimi, and Opus xhigh; one final
+three-model review only after signed/pushed GREEN over plan, causal RED, GREEN
+and retained gates. Correct any material plan P0/P1 union in one batch with at
+most one confirmation only if executable scope or acceptance materially
+changes. If Grok cancels, resume that exact session rather than launching a
+replacement. Only P0/P1 findings block; P2 findings receive a disposition and
+do not cause recursive prose or bookkeeping review. Kimi, Fable and
+collaboration subagents remain prohibited.
+
+The D.108e4by root stays consumed and immutable. No retained three-trial or
+campaign invocation runs in D.108e4bz. An empty final P0/P1 union releases one
+new plan-only, wholly fresh retained-browser name. Only that fresh one-shot
+retained pass may release six wholly fresh campaign names; no old name is
+retried, reused or substituted.
+
 Consumed D.108e4bu reporter, stdout, stderr, failure telemetry,
 endpoint-classifier, trace, cumulative manifest, and manifest-validation
 SHA-256 values are respectively
