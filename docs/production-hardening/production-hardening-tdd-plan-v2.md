@@ -85265,9 +85265,37 @@ first-failure behavior or evidence integrity block. Record P2 findings with a
 disposition without confirmation or new ceremony. Do not use Kimi, Fable or
 collaboration subagents.
 
+The sole high-risk freeze review inspected signed/pushed commit
+`71398073751bd5df7c5004210e7d763855edc503`, tree
+`b2d30964b246ca02b38bc1f47ea153827c7abf13`, and closed with an empty P0/P1
+union. Grok 4.6/high completed normally after `435.277` seconds with
+`TERMINAL_RESPONSE`, `end_turn`, exit zero, approval and no findings. It did
+not cancel, so no resume or replacement ran. Codex `gpt-5.6-sol` high approved
+with no findings. Opus xhigh completed normally after `565.675` seconds,
+approved with no P0/P1, returned three P2 dispositions, had no permission
+denial and used no subagent.
+
+The P2s require no executable change or confirmation. Freeze-root ordinary
+head/tree snapshots necessarily identify predecessor `698427e9`; live
+HEAD/tag/branch/signature and plan-only-diff gates bind the closure commit.
+The cumulative manifest necessarily excludes the runner status written after
+finalization; the manifest-bound direct status and both predecessor status
+checks preserve first-failure behavior under the accepted trusted-local threat
+model. Finally, the reviewed tag must identify the live pushed documentation-
+only closure HEAD, rather than its reviewed plan-only parent, because the
+launcher requires `HEAD == tag^{}`. Review manifest, validation and mechanical
+union SHA-256 values are respectively
+`4c84c9eca3f7b61d1b7965bac2e8d0447d8ae14ebeb5a8769732bd986de6c40a`,
+`8b5dbc55ff1fab86abe351a78504b20fc83eda49019d3fe40f6c68b2afcef13a`
+and
+`dfc697717c4f2b05ec1ca8f50d56bb3515b411339f47eaddfb77d5f801340403`.
+All 21 entries validate from `.logs/d108e4ce-freeze-review/`. No confirmation
+round is permitted.
+
 If the blocking union is empty, create and push signed annotated tag
-`d108e4ce-freeze-reviewed` at the reviewed plan-only commit and immediately
-run the following six commands sequentially in separate shells:
+`d108e4ce-freeze-reviewed` at the signed/pushed documentation-only review-
+closure HEAD and immediately run the following six commands sequentially in
+separate shells:
 
 ```sh
 test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ce-freeze/SHA256SUMS | /usr/bin/awk '{print $1}')" = f93bf6af9bd8d81239db4eb822fae16d023fcc497e8f8ac02105394ff833a5ba && test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ce-freeze/launch-one.zsh | /usr/bin/awk '{print $1}')" = 23c2ac97d310c01dec855fa701e738c960b050ffd59daf52b602040528b50837 && /bin/zsh /Users/aristotle/Documents/Projects/ts-drp-1/.logs/d108e4ce-freeze/launch-one.zsh censusgate-ordinary-1 /Users/aristotle/Documents/Projects/ts-drp-1
