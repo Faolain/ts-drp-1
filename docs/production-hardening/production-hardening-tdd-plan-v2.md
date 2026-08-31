@@ -85498,6 +85498,23 @@ state. This is the one permitted material correction after confirmation; no
 reviewer is relaunched. Deterministic source and RED audits own the corrected
 ordering and exact mutant roster.
 
+The deterministic D.108e4ci RED changes only the existing fake-signaling/RTC
+test owner. Network typecheck, exact-test ESLint, Prettier, `git diff --check`
+and exact collection passed; collection selected the one D.108e4ci title in
+one file. Its sole execution returned one failed and 114 skipped assertions,
+`success=false`, with exact causal token
+`D108E4CI_OBSERVED_COMMITTED_B_EXPIRED`. At the unchanged 10-second expiry the
+acceptor's B channel and PC were closed while it retained A with zero local
+drops; the initiator then had zero active links, `lastLinkDrop=channel-close`
+and `linkDrops=2`. Test-owner and reporter SHA-256 values are respectively
+`3ac0b2431db27180fc7b545a13c05143e709074c41408852e443c64fb424ce1a`
+and
+`dd8895e2602f7f293bfe54e6826464482ff878f7da2ff8713b5a2fcd717f6d25`.
+No production, retained browser or campaign execution occurred. RED therefore
+reproduces the captured COMMIT-before-query expiry defect and freezes its
+pre-proof A/B identities, endpoint-local `1/0` state and post-discard `2/0`
+failure before GREEN.
+
 ###### D.108e4ce — post-census six-name campaign freeze
 
 D.108e4ce is the high-risk campaign disposition released by the passing

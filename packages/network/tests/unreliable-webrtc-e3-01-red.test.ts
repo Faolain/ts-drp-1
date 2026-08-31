@@ -3297,6 +3297,111 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		}
 	});
 
+	it("D.108e4ci retains observed committed acceptor B through expiry and converges on routed proof", async () => {
+		const module = await loadOwnerModule();
+		let fixture: CommittedPendingReplacementFixture | undefined;
+		try {
+			fixture = await committedPendingReplacementFixture(module);
+			const replacementLowPc = fixture.low.peerConnections[1];
+			const replacementHighPc = fixture.high.peerConnections[1];
+			const replacementLow = replacementLowPc?.channels[0];
+			const replacementHigh = replacementHighPc?.channels[0];
+			if (
+				replacementLowPc === undefined ||
+				replacementHighPc === undefined ||
+				replacementLow === undefined ||
+				replacementHigh === undefined
+			) {
+				throw new Error("D108E4CI_COMMITTED_B_FIXTURE_ABSENT");
+			}
+			const decisions = fixture.bus.exchangeRequests.filter(({ request }) => replacementDecisionRequest(request));
+			if (decisions.length !== 1) {
+				throw new Error(`D108E4CI_COMMIT_BEFORE_QUERY_ABSENT:${decisions.length}`);
+			}
+			const receivedByHigh: Uint8Array[] = [];
+			const receivedByLow: Uint8Array[] = [];
+			fixture.highRoute.onMessage(({ bytes }) => receivedByHigh.push(bytes.slice()));
+			fixture.lowRoute.onMessage(({ bytes }) => receivedByLow.push(bytes.slice()));
+
+			await vi.advanceTimersByTimeAsync(10_000);
+			await tick();
+			await tick();
+
+			const lowAtExpiry = fixture.lowRoute.snapshot();
+			const highAtExpiry = fixture.highRoute.snapshot();
+			const retainedAtExpiry =
+				replacementLow.readyState === "open" &&
+				replacementHigh.readyState === "open" &&
+				replacementLowPc.connectionState === "connected" &&
+				replacementHighPc.connectionState === "connected" &&
+				lowAtExpiry.activeLinks === 1 &&
+				lowAtExpiry.linkDrops === 1 &&
+				lowAtExpiry.links[0]?.connectionId === fixture.replacement.left.id &&
+				highAtExpiry.activeLinks === 1 &&
+				highAtExpiry.linkDrops === 0 &&
+				highAtExpiry.links[0]?.connectionId === fixture.original.right.id;
+			if (!retainedAtExpiry) {
+				throw new Error(
+					`D108E4CI_OBSERVED_COMMITTED_B_EXPIRED:${JSON.stringify({
+						high: highAtExpiry,
+						replacementHighPc: replacementHighPc.connectionState,
+						replacementHighState: replacementHigh.readyState,
+						replacementLowPc: replacementLowPc.connectionState,
+						replacementLowState: replacementLow.readyState,
+						low: lowAtExpiry,
+					})}`
+				);
+			}
+
+			const lowPayload = Uint8Array.of(108, 111, 119);
+			const lowSent = await fixture.lowRoute.send([fixture.high.signaling.localPeerId], lowPayload);
+			await tick();
+			await tick();
+			const highAfterProof = fixture.highRoute.snapshot();
+			if (
+				!lowSent ||
+				highAfterProof.linkDrops !== 1 ||
+				highAfterProof.lastLinkDrop !== "replacement" ||
+				highAfterProof.links[0]?.connectionId !== fixture.replacement.right.id ||
+				receivedByHigh.length !== 1 ||
+				receivedByHigh[0]?.length !== lowPayload.length ||
+				!receivedByHigh[0]?.every((byte, index) => byte === lowPayload[index])
+			) {
+				throw new Error(
+					`D108E4CI_ROUTED_PROOF_CONVERGENCE_ABSENT:${JSON.stringify({
+						high: highAfterProof,
+						lowSent,
+						receivedByHigh: receivedByHigh.map((bytes) => [...bytes]),
+					})}`
+				);
+			}
+
+			const highPayload = Uint8Array.of(104, 105, 103, 104);
+			expect(await fixture.highRoute.send([fixture.low.signaling.localPeerId], highPayload)).toBe(true);
+			await tick();
+			expect(receivedByLow).toEqual([highPayload]);
+			expect(fixture.lowRoute.snapshot()).toMatchObject({
+				activeLinks: 1,
+				lastLinkDrop: "replacement",
+				linkDrops: 1,
+				links: [{ connectionId: fixture.replacement.left.id, generation: fixture.replacement.left.generation }],
+			});
+			expect(fixture.highRoute.snapshot()).toMatchObject({
+				activeLinks: 1,
+				lastLinkDrop: "replacement",
+				linkDrops: 1,
+				links: [{ connectionId: fixture.replacement.right.id, generation: fixture.replacement.right.generation }],
+			});
+		} finally {
+			fixture?.oldCloseEventBarrier.release();
+			fixture?.oldPeerCloseBarrier.release();
+			fixture?.low.owner.close();
+			fixture?.high.owner.close();
+			vi.clearAllTimers();
+			vi.useRealTimers();
+		}
+	});
+
 	it("D.108e4bo cancels exact pre-datachannel B and preserves successor C", async () => {
 		const module = await loadOwnerModule();
 		const bus = new FakeSignalingBus();
