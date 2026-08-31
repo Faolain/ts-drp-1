@@ -3466,6 +3466,61 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 		}
 	});
 
+	it("D.108e4bp rebinds one send to the same-call qualified replacement", async () => {
+		const module = await loadOwnerModule();
+		let fixture: CommittedPendingReplacementFixture | undefined;
+		try {
+			fixture = await committedPendingReplacementFixture(module);
+			const selectedHigh = fixture.high.peerConnections[0]?.channels[0];
+			const replacementHigh = fixture.high.peerConnections[1]?.channels[0];
+			if (selectedHigh === undefined || replacementHigh === undefined) {
+				throw new Error("D108E4BP_REBIND_FIXTURE_ABSENT");
+			}
+			const payload = Uint8Array.of(73, 108, 112);
+			const received: Uint8Array[] = [];
+			fixture.lowRoute.onMessage(({ bytes }) => received.push(bytes.slice()));
+			const highBefore = fixture.highRoute.snapshot();
+			const peerConnectionsBefore = fixture.high.peerConnections.length;
+			const replacementRoutedBefore = routedFrames(replacementHigh).length;
+			const selectedRoutedBefore = routedFrames(selectedHigh).length;
+			const selectedCloseTransitionsBefore = selectedHigh.closeTransitions;
+			const timersBefore = vi.getTimerCount();
+
+			selectedHigh.readyState = "closing";
+			const sent = await fixture.highRoute.send(["peer-a"], payload);
+			await tick();
+			await tick();
+
+			const highAfter = fixture.highRoute.snapshot();
+			const receivedPayload = received[0];
+			const sameCallRebound =
+				sent &&
+				highAfter.links[0]?.connectionId === fixture.replacement.right.id &&
+				highAfter.linkDrops === highBefore.linkDrops + 1 &&
+				highAfter.lastLinkDrop === "replacement" &&
+				highAfter.sent === highBefore.sent + 1 &&
+				highAfter.handshakeFailures === highBefore.handshakeFailures &&
+				highAfter.backpressuredDrops === highBefore.backpressuredDrops &&
+				fixture.high.peerConnections.length === peerConnectionsBefore &&
+				vi.getTimerCount() === timersBefore &&
+				selectedHigh.closeTransitions === selectedCloseTransitionsBefore + 1 &&
+				routedFrames(selectedHigh).length === selectedRoutedBefore &&
+				routedFrames(replacementHigh).length === replacementRoutedBefore + 1 &&
+				received.length === 1 &&
+				receivedPayload !== undefined &&
+				receivedPayload.length === payload.length &&
+				receivedPayload.every((byte, index) => byte === payload[index]);
+			if (!sameCallRebound) throw new Error("D108E4BP_SAME_CALL_PROMOTION_REBIND_ABSENT");
+		} finally {
+			fixture?.oldCloseEventBarrier.release();
+			fixture?.oldPeerCloseBarrier.release();
+			fixture?.low.owner.close();
+			fixture?.high.owner.close();
+			vi.clearAllTimers();
+			vi.useRealTimers();
+		}
+	});
+
 	it("D.108e4bn admits fresh C after pending B becomes closing without a close event", async () => {
 		const module = await loadOwnerModule();
 		let fixture: CommittedPendingReplacementFixture | undefined;

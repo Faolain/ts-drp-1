@@ -82184,3 +82184,23 @@ SHA-256 values are respectively
 and
 `fcde8d0d2eff44f8a65c0c5b9d4760df48eebc7b70dc60e254fb4d5d76c4f037`.
 The blocking union is empty; proceed directly to deterministic RED.
+
+D.108e4bp RED is accepted. The exact selector listed 11 tests in one file:
+the new bp row, all three bo rows, all six bn rows and the bm acceptor
+pre-open bound. Its single execution returned status one with 10 passed, one
+failed and 103 unrelated rows skipped. The ten retained controls passed; the
+new row alone failed, and its complete failure set contains exactly one
+`D108E4BP_SAME_CALL_PROMOTION_REBIND_ABSENT` token. Stderr is empty. The test
+and unchanged production-source SHA-256 values are respectively
+`5b34878f500ea8deeb5d8f523f5bc76a6aa5f8fd706c2d4f6615dd7bcb26792e`
+and
+`c0973adb89346b3c8523cfb6834850b4200213b267434dcaca6e5464585efe71`;
+the reporter and empty-stderr hashes are respectively
+`e1da8a4db91daa259c55310089294028402fe813eb547652e860d78dcd0af7c1`
+and
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+The validating self-excluding RED evidence-index SHA-256 is
+`e7f8244495ce0eab7fee26dbffa93a2025e1789a83522a5909f1a2f72397a1bd`.
+This proves the intended stale local reference after synchronous qualified-C
+promotion without a production diff. Sign and push this causal RED, then make
+only the frozen `#send` re-read repair.
