@@ -87404,3 +87404,41 @@ The 18-entry self-excluding manifest at
 Protected untracked paths and all 26 stashes remain untouched; no retained
 campaign ran. The single final plan-to-RED-to-GREEN review is the only
 remaining D.108e6 and Phase-6a exit gate.
+
+The single final review inspected plan closure `20d2ba09`, RED `9443c922`,
+GREEN `4e4548b0` and evidence record `6e51852d`. Grok 4.6/high session
+`01a058ca-5aef-7113-972a-70135e399242` was canceled during its initial
+inspection and the exact session was resumed rather than replaced. Its first
+resume completed inspection but exhausted turns while emitting invalid
+non-schema prose, so it remained `NO_VERDICT`; the same session resumed only
+to emit its completed verdict and returned schema-valid `APPROVED` with no
+findings. The terminal resumed-result SHA-256 is
+`69cc693791796caebe3032a772001196a88e05190e29ede7906c2e8f5511693f`.
+Codex `gpt-5.6-sol` high session
+`01a058ca-58d0-7300-89c5-f88f90539523` returned `APPROVED` with no findings;
+result SHA-256 is
+`226d4f0d27bab4e9a5d843201e70c3e2947dcba569dbb1899478595efaf725a9`.
+Opus 5/xhigh session `5f524924-203c-4b6c-8771-56bab7b8fd30` returned
+`APPROVED` with no P0/P1 and four P2 observations; raw-result SHA-256 is
+`f2775d11650a67255c7fad0cff54271a760a60ca3c6cb74a79f985c64bdbe920`.
+
+The P2 set is recorded as nonblocking with no new slice. The exact pre-lint
+RED preimage was not separately artifacted, but rule identity, erased
+interfaces, unchanged imports and byte-identical executed assertion excerpts
+under a uniform two-line offset independently corroborate the recorded
+type-only correction. A partial recursive-`mkdir` failure before root creation
+could leave one empty parent, but the next run fails closed on that artifact.
+Non-`ENOENT` `lstat` errors may throw synchronously rather than reject, but
+Playwright awaits setup and these exotic/hostile-local states are outside the
+trusted serialized slice. No named control reaches `ENOTEMPTY` on a
+setup-created parent and exact command strings are not separate artifacts;
+`rmdir` is intrinsically non-destructive for nonempty parents, parallel
+authority is explicitly declined, and result/status/path/hash evidence is
+complete. None is a product defect, pass-fabrication path under the stated
+model, or reason for more review ceremony.
+
+The final P0/P1 union is empty. D.108e6 closes all remaining D.108e1 exit
+ledger observations without changing product behavior, and D.108e1 through
+D.108e6 are complete. Phase 6a exits on this signed record; no retained
+campaign, threshold change, dependency change or product/API widening is
+authorized or required.
