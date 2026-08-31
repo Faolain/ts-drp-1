@@ -10101,10 +10101,92 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 		);
 		await waitForOpenTransportPair(creator, receiver);
 		await waitForNetworkPair(creator, receiver, initialCreatorNetwork, initialReceiverNetwork);
+		const durableIssuedAtMs = Date.now();
 		await creator.evaluate(() =>
 			window.__TS_DRP_V3_ZONE__?.placeBlock({ id: "e3-03-durable-control", kind: "stone", x: 89, y: 144 })
 		);
-		await expect.poll(async () => (await zone(receiver)).durableVertexCount).toBe(peers.durableBaseline + 1);
+		try {
+			await expect.poll(async () => (await zone(receiver)).durableVertexCount).toBe(peers.durableBaseline + 1);
+		} catch (durableError) {
+			const durableFailedAtMs = Date.now();
+			const beforeDiagnostic = await Promise.all([
+				diagnosticAttempt(() => zone(creator)),
+				diagnosticAttempt(() => zone(receiver)),
+				diagnosticAttempt(() => network(creator)),
+				diagnosticAttempt(() => network(receiver)),
+			]);
+			stage = "durable-control-post-failure-diagnostic";
+			const diagnosticStartedAtMs = Date.now();
+			let diagnostic: unknown;
+			try {
+				await resetFabricPairSerially(
+					creator,
+					receiver,
+					D108E4BT_DIAGNOSTIC_TRIAL_ID,
+					initialCreatorNetwork,
+					initialReceiverNetwork
+				);
+				await waitForOpenTransportPair(creator, receiver);
+				await waitForNetworkPair(creator, receiver, initialCreatorNetwork, initialReceiverNetwork);
+				const runStartedAtMs = Date.now();
+				await creator.evaluate(
+					(input) => window.__TS_DRP_V3_ZONE__?.fabric?.runTrial(input),
+					D108E4BT_DIAGNOSTIC_INPUT
+				);
+				const runReturnedAtMs = Date.now();
+				await expect
+					.poll(
+						async () => {
+							const [creatorSnapshot, receiverSnapshot] = await Promise.all([
+								fabricSnapshot(creator, D108E4BT_DIAGNOSTIC_TRIAL_ID),
+								fabricSnapshot(receiver, D108E4BT_DIAGNOSTIC_TRIAL_ID),
+							]);
+							return d108e4btDiagnosticPairReady(
+								creatorSnapshot,
+								receiverSnapshot,
+								peers.creatorPeerId,
+								peers.receiverPeerId
+							);
+						},
+						{ timeout: 10_000 }
+					)
+					.toBe(true);
+				const [creatorSnapshot, receiverSnapshot] = await Promise.all([
+					fabricSnapshot(creator, D108E4BT_DIAGNOSTIC_TRIAL_ID),
+					fabricSnapshot(receiver, D108E4BT_DIAGNOSTIC_TRIAL_ID),
+				]);
+				diagnostic = Object.freeze({
+					completedAtMs: Date.now(),
+					creatorSnapshot,
+					ok: true,
+					receiverSnapshot,
+					runReturnedAtMs,
+					runStartedAtMs,
+				});
+			} catch (diagnosticErrorValue) {
+				const afterDiagnostic = await Promise.all([
+					diagnosticAttempt(() => fabricSnapshot(creator, D108E4BT_DIAGNOSTIC_TRIAL_ID)),
+					diagnosticAttempt(() => fabricSnapshot(receiver, D108E4BT_DIAGNOSTIC_TRIAL_ID)),
+					diagnosticAttempt(() => zone(creator)),
+					diagnosticAttempt(() => zone(receiver)),
+				]);
+				diagnostic = Object.freeze({
+					afterDiagnostic,
+					completedAtMs: Date.now(),
+					error: diagnosticError(diagnosticErrorValue),
+					ok: false,
+				});
+			}
+			await attachJson(testInfo, "d108e4bt-post-failure-diagnostic.json", {
+				beforeDiagnostic,
+				diagnostic,
+				diagnosticStartedAtMs,
+				durableError: diagnosticError(durableError),
+				durableFailedAtMs,
+				durableIssuedAtMs,
+			}).catch(() => undefined);
+			throw durableError;
+		}
 		expect((await zone(creator)).durableVertexCount).toBe(peers.durableBaseline + 1);
 		expect((await zone(creator)).rawTransport.fallbackCount).toBe(0);
 		expect((await zone(receiver)).rawTransport.fallbackCount).toBe(0);

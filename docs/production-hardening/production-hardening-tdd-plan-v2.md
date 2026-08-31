@@ -83335,3 +83335,61 @@ fresh successor. It runs once under the same 600-second watchdog and all other
 frozen retained semantics. This is not a retry or reuse of the consumed name;
 any test-executing failure stops and is dispositioned from its immutable
 evidence.
+
+D.108e4bt GREEN admits only the exact diagnostic tuple in the existing example
+workbench validator and adds only the frozen classifier plus post-failure catch
+path to the retained fixture. The pass path remains final bilateral durable
+reset, existing raw/network gates, one `placeBlock` and the unchanged
+20-second poll. The diagnostic reset/probe is lexically inside that poll's
+catch, never retries the durable operation, attaches its result and rethrows
+the preserved original error. Package product source, public APIs,
+dependencies, configuration, workload and thresholds remain unchanged.
+
+The focused GREEN selection remained exactly two tests in one file and ran
+once. It reported expected/skipped/unexpected/flaky `2/0/0/0`, zero top-level
+errors and status zero. Reporter, empty stderr and status SHA-256 values are
+respectively
+`9d919fa0526724d989cc13664fafaf88e4a9f38f49ad26bb41220ce305ef5c2a`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+and
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+Standalone strict TypeScript, exact-owner ESLint and Prettier, `git diff
+--check`, grid typecheck and grid production build all returned zero. The
+tracked implementation diff is limited to `examples/grid/src/v3-zone.ts` and
+`tests/e3-03-loss-and-hol-proof.pw.ts`; protected paths and all 26 stashes are
+unchanged.
+
+The corrected fresh retained invocation
+`.logs/d108e4bt-retained-browser-2/` ran once from `2026-08-31T03:56:19Z`
+through `03:59:32Z` and passed without retry. Reporter results are
+`1/0/0/0`, with zero top-level errors, zero result errors and status zero. The
+real test duration was 183.271 seconds. Preliminary delivery was 411/600
+against floor 100. The three fixed trials delivered 402/417/403 raw samples,
+had maximum raw gaps 8/7/7, maximum factual and unexplained stalls 38/41/49 ms,
+zero qualified backpressure windows, reliable delivery 9/15/16 and clock skew
+1/6/1 ms. The unchanged durable control passed. Attachments were exactly the
+preliminary calibration and fixed campaign records; the failure-only
+D.108e4bt diagnostic did not execute. Reporter/stdout, empty stderr and status
+SHA-256 values are respectively
+`dd4c23706eb95524afdf1ad8fd35e690e478787d600d64c0f247fd59ff4b1ea2`,
+`dd4c23706eb95524afdf1ad8fd35e690e478787d600d64c0f247fd59ff4b1ea2`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+and
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+
+The exact retained-seven listing selected seven tests in one file and excluded
+the long title. Its sole execution reported `7/0/0/0`, zero top-level or result
+errors and status zero. Reporter/stdout, empty stderr and status SHA-256 values
+are respectively
+`4594521f3c47233365afd9dfbdd7f15d6d81c73c76b8900ef321db0843c93729`,
+`4594521f3c47233365afd9dfbdd7f15d6d81c73c76b8900ef321db0843c93729`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+and
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+The self-excluding 46-file evidence manifest and its complete successful
+validation have SHA-256
+`a341f9b9bdac1067aa87edd897b5f7a3f9df07f345d31b7e17560547331da41f`
+and
+`23717545f4cd1f03c291bd2c17943e31ee36e9cf854d1de55c44bf3bc3f6a8a9`.
+No campaign invocation ran. Sign and push this GREEN, then run the sole formal
+Grok/Codex-high/Opus-xhigh review before freezing the six fresh campaign names.

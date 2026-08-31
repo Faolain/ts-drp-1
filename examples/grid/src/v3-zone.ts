@@ -1516,7 +1516,15 @@ function validateFabricRunInput(input: FabricRunInput): void {
 	const fixedCampaign = /^e3-03-[0-2]$/u.test(input.trialId) && input.intervalMs === 33 && input.sampleCount === 600;
 	const fixedCalibration =
 		input.trialId === "e3-03-total-loss-calibration" && input.intervalMs === 20 && input.sampleCount === 300;
-	if (!fixedCampaign && !fixedCalibration) throw new TypeError("fabric trial profile differs");
+	const fixedDurableReadinessDiagnostic =
+		input.trialId === "e3-03-durable-readiness" &&
+		input.intervalMs === 1 &&
+		input.sampleCount === 1 &&
+		input.payloadBytes === 256 &&
+		input.reliableSentinelBytes === 12_000;
+	if (!fixedCampaign && !fixedCalibration && !fixedDurableReadinessDiagnostic) {
+		throw new TypeError("fabric trial profile differs");
+	}
 }
 
 function encodeFabricPayload(
