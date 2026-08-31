@@ -160,6 +160,7 @@ interface LinkReadiness {
 	readySends: number;
 	readonly reliableDecision: boolean;
 	readonly replacement: boolean;
+	retainedAfterExpiry: boolean;
 	rejectCommit(error: Error): void;
 	resolveCommit(): void;
 }
@@ -1034,8 +1035,8 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		) {
 			return encodeDecisionResponse(request.decisionId, "aborted");
 		}
-		if (record.status !== "pending") return encodeDecisionResponse(request.decisionId, record.status);
 		record.observations += 1;
+		if (record.status !== "pending") return encodeDecisionResponse(request.decisionId, record.status);
 		const now = Date.now();
 		const remaining = Math.max(0, record.deadlineAt - now);
 		const cutoffAt = record.observations === 1 ? now + Math.floor(remaining / 2) : record.deadlineAt;
@@ -1249,6 +1250,7 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			rejectCommit,
 			reliableDecision,
 			replacement,
+			retainedAfterExpiry: false,
 			resolveCommit,
 		};
 		this.#readiness.set(link, readiness);
@@ -1264,6 +1266,19 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 			{ once: true }
 		);
 		link.pc.addEventListener("connectionstatechange", () => {
+			if (link.pc.connectionState === "disconnected") {
+				const pending = this.#pendingReplacementLinks.get(peerId);
+				const pendingReadiness = pending === undefined ? undefined : this.#readiness.get(pending);
+				if (
+					this.#links.get(peerId) === link &&
+					pending !== undefined &&
+					pendingReadiness !== undefined &&
+					this.#isObservedCommittedAcceptorReplacement(peerId, pending, pendingReadiness)
+				) {
+					this.#promotePendingReplacement(peerId);
+				}
+				return;
+			}
 			if (link.pc.connectionState !== "closed" && link.pc.connectionState !== "failed") return;
 			if (this.#pendingReplacementLinks.get(peerId) === link) this.#discardPendingReplacement(peerId, link);
 			else if (this.#retiringLinks.get(peerId) === link) this.#finishRetiringLink(peerId, link);
@@ -1423,6 +1438,28 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		);
 	}
 
+	#isObservedCommittedAcceptorReplacement(peerId: string, link: ActiveLink, readiness: LinkReadiness): boolean {
+		const record = this.#replacementDecisions.get(link.decisionId);
+		return (
+			this.#pendingReplacementLinks.get(peerId) === link &&
+			this.#readiness.get(link) === readiness &&
+			link.role === "acceptor" &&
+			!link.closing &&
+			link.channel.readyState === "open" &&
+			readiness.replacement &&
+			readiness.reliableDecision &&
+			readiness.receivedReady &&
+			readiness.receivedCommit &&
+			readiness.ackSends > 0 &&
+			record?.link === link &&
+			record.readiness === readiness &&
+			record.status === "committed" &&
+			record.observations > 0 &&
+			this.#sameConnection(record.connection, link.connection) &&
+			this.#isCurrent(link.connection)
+		);
+	}
+
 	#sendReplacementControl(link: ActiveLink, readiness: LinkReadiness, kind: 1 | 2 | 3): boolean {
 		if (link.channel.readyState !== "open" || !this.#isCurrent(link.connection)) return false;
 		if (kind === 1) {
@@ -1512,15 +1549,13 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 
 	#expireReplacementReadiness(peerId: string, link: ActiveLink, readiness: LinkReadiness): void {
 		if (this.#pendingReplacementLinks.get(peerId) !== link || this.#readiness.get(link) !== readiness) return;
-		if (link.role === "acceptor" && readiness.reliableDecision) {
-			const record = this.#replacementDecisions.get(link.decisionId);
-			if (
-				record?.link === link &&
-				record.status === "committed" &&
-				(!this.#hasUsableSelectedLink(peerId, link) || this.#hasDisconnectedSelectedLink(peerId, link))
-			) {
+		readiness.expiry = undefined;
+		if (this.#isObservedCommittedAcceptorReplacement(peerId, link, readiness)) {
+			if (!this.#hasUsableSelectedLink(peerId, link) || this.#hasDisconnectedSelectedLink(peerId, link)) {
 				if (this.#promotePendingReplacement(peerId)) return;
 			}
+			readiness.retainedAfterExpiry = true;
+			return;
 		}
 		this.#failReplacementReadiness(peerId, link, readiness);
 	}
@@ -1589,18 +1624,18 @@ class UnreliableWebRtcOwner implements DRPUnreliableWebRtcOwner {
 		}
 		if (pending) {
 			const readiness = this.#readiness.get(link);
-			if (
-				link.role !== "initiator" ||
-				link.closing ||
-				link.channel.readyState !== "open" ||
-				readiness === undefined ||
-				!readiness.replacement ||
-				!readiness.receivedAck ||
-				readiness.commitSends === 0 ||
-				!this.#isCurrent(link.connection)
-			) {
-				return;
-			}
+			if (readiness === undefined) return;
+			const qualifiedInitiator =
+				link.role === "initiator" &&
+				!link.closing &&
+				link.channel.readyState === "open" &&
+				readiness.replacement &&
+				readiness.receivedAck &&
+				readiness.commitSends > 0 &&
+				this.#isCurrent(link.connection);
+			const qualifiedRetainedAcceptor =
+				readiness.retainedAfterExpiry && this.#isObservedCommittedAcceptorReplacement(peerId, link, readiness);
+			if (!qualifiedInitiator && !qualifiedRetainedAcceptor) return;
 		}
 		if (
 			bytes.byteLength < ROUTE_HEADER_BYTES ||

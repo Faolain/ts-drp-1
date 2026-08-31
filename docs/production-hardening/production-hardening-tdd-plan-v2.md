@@ -85515,6 +85515,65 @@ reproduces the captured COMMIT-before-query expiry defect and freezes its
 pre-proof A/B identities, endpoint-local `1/0` state and post-discard `2/0`
 failure before GREEN.
 
+GREEN changes only the frozen private lifecycle source owner and its existing
+fake-signaling/RTC test owner. Exact authenticated decision observations are
+now counted before the already-settled terminal return. One private predicate
+owns the acceptor/replacement/reliable-decision/READY/ACK/COMMIT/current-
+connection/committed-record/positive-observation qualification. At setup
+expiry an exact qualified B is retained while usable A remains selected; a
+valid known-route application frame or selected-A `disconnected` transition
+promotes through the existing single owner. Malformed and unknown-route
+frames do not promote, and the latter preserves its exact counter owner. The
+silent row proves two live PCs remain the existing bounded same-peer maximum,
+a third offer is rejected without allocation, and closing both owners releases
+all PCs and timers. No public API, protocol byte, dependency, ceiling, timeout
+or campaign contract changed.
+
+The first three-title focused GREEN run exposed only a stale test expectation:
+it asserted a globally empty fake-timer queue after closing the acceptor while
+the still-live initiator correctly owned one retry timer. The correction closes
+both owners before the global zero-timer assertion and changes no production
+source. That corrected test body passed `3/3`, but its command omitted the
+repository's established `--coverage.enabled=false` option and therefore
+exited on the unrelated global coverage threshold. Both diagnostic reporters
+remain immutable. The final corrected focused command with coverage disabled
+passes `3/3` with 114 unselected tests. The complete owner passes `117/117`,
+and the exact two D.108e4ax rows pass `2/2`.
+
+Network and grid build/typecheck, standalone strict test TypeScript,
+exact-owner ESLint and Prettier, and `git diff --check` all return zero. Both
+exact D.108e4g browser support titles pass separately at `1/0/0/0`, retry zero
+and zero errors. The frozen retained-seven listing selects exactly seven tests
+in one file, excludes the campaign title, and its sole execution passes
+`7/0/0/0`, retry zero and zero errors. No long retained or campaign invocation
+ran. All protected paths remain present, all 26 stashes remain untouched, and
+ports 4174, 4175, 51000 and 51002 were clear.
+
+Source, test-owner and RED-to-GREEN diff SHA-256 values are respectively
+`ec894295605729a6ae1ab2489ef6a9d2db79ce30f0cc728d511639070c10dc87`,
+`220160fb19fcf9a497798a19c35f48219eff96edb667021fa895d328bde7ec6f`
+and
+`34a8a26138afa4b4089a7d8236703fdcfc40ee34d04236a895adddb1e037e5e8`.
+Final focused, full-owner, D.108e4ax, lifecycle, live-replacement and retained-
+seven reporter hashes are respectively
+`d22a779b77d58b7df2c7229252eafda758b9e94906777f5b5cb9c07bc9c60129`,
+`47ce3dba6e562fb3f2ff5034af9a6d1fb23ac9f8fa72b1c89e46f9574a1995c9`,
+`26214574361f629cc1a8db71d036aded0b1fe29c47d572fb3ba287577f80f553`,
+`424cdb8fecdc9076c2c96284bf4b8d8aef77b309ec0533af2a8095c6b29f908f`,
+`e67c3b3f85fa0b35aeb29e14173d5670b913846d51a6b16f33f5c98cbb56c5c8`
+and
+`929f81ea7e6c15a3e244882480276354e2fdc78661b5228fc1080ef51e9fa9fc`.
+The 53-entry self-excluding GREEN manifest, validation and summary hashes
+under `.logs/d108e4ci-green/` are respectively
+`e05ae83a0926cd364f5c3e0c2dd76861c95b7c55754e8c47ebcb07f4406e101e`,
+`bb27192d524dcda2a8e7cede1e3a59d567e0bd94a5ca6fa6a8279e49fc4639f4`
+and
+`1d100a72b974feb6064c50b349945c80e9e56318a88bb9720c092a482d6397c6`;
+all manifest entries validate. Sign and push this GREEN before the sole formal
+implementation review. D.108e4cj remains the explicit owner of the separate
+captured empty-authenticated-boundary diagnosis; D.108e4ci does not claim to
+release a campaign by itself.
+
 ###### D.108e4ce — post-census six-name campaign freeze
 
 D.108e4ce is the high-risk campaign disposition released by the passing

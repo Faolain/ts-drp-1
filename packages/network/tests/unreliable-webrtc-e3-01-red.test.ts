@@ -574,6 +574,11 @@ class FakePeerConnection {
 		return Promise.resolve();
 	}
 
+	transitionConnectionState(state: RTCPeerConnectionState): void {
+		this.connectionState = state;
+		this.#emit("connectionstatechange", new Event("connectionstatechange"));
+	}
+
 	async setRemoteDescription(description: RTCSessionDescriptionInit): Promise<void> {
 		this.remoteDescription = description as RTCSessionDescription;
 		const remoteId = /a=mid:(pc-\d+)/u.exec(description.sdp ?? "")?.[1];
@@ -3393,6 +3398,112 @@ describe.skipIf(!ownerExists)("E3-01 authenticated unreliable WebRTC", () => {
 				links: [{ connectionId: fixture.replacement.right.id, generation: fixture.replacement.right.generation }],
 			});
 		} finally {
+			fixture?.oldCloseEventBarrier.release();
+			fixture?.oldPeerCloseBarrier.release();
+			fixture?.low.owner.close();
+			fixture?.high.owner.close();
+			vi.clearAllTimers();
+			vi.useRealTimers();
+		}
+	});
+
+	it("D.108e4ci promotes retained committed B when selected A becomes disconnected", async () => {
+		const module = await loadOwnerModule();
+		let fixture: CommittedPendingReplacementFixture | undefined;
+		try {
+			fixture = await committedPendingReplacementFixture(module);
+			const selectedHighPc = fixture.high.peerConnections[0];
+			const replacementHigh = fixture.high.peerConnections[1]?.channels[0];
+			if (selectedHighPc === undefined || replacementHigh === undefined) {
+				throw new Error("D108E4CI_DISCONNECTED_FIXTURE_ABSENT");
+			}
+
+			await vi.advanceTimersByTimeAsync(10_000);
+			await tick();
+			if (
+				replacementHigh.readyState !== "open" ||
+				fixture.highRoute.snapshot().links[0]?.connectionId !== fixture.original.right.id
+			) {
+				throw new Error("D108E4CI_DISCONNECTED_RETAINED_B_ABSENT");
+			}
+
+			selectedHighPc.transitionConnectionState("disconnected");
+			await tick();
+			expect(fixture.lowRoute.snapshot()).toMatchObject({
+				activeLinks: 1,
+				lastLinkDrop: "replacement",
+				linkDrops: 1,
+				links: [{ connectionId: fixture.replacement.left.id, generation: fixture.replacement.left.generation }],
+			});
+			expect(fixture.highRoute.snapshot()).toMatchObject({
+				activeLinks: 1,
+				lastLinkDrop: "replacement",
+				linkDrops: 1,
+				links: [{ connectionId: fixture.replacement.right.id, generation: fixture.replacement.right.generation }],
+			});
+		} finally {
+			fixture?.oldCloseEventBarrier.release();
+			fixture?.oldPeerCloseBarrier.release();
+			fixture?.low.owner.close();
+			fixture?.high.owner.close();
+			vi.clearAllTimers();
+			vi.useRealTimers();
+		}
+	});
+
+	it("D.108e4ci retains one silent committed B without accepting an unknown route or third offer", async () => {
+		const module = await loadOwnerModule();
+		let fixture: CommittedPendingReplacementFixture | undefined;
+		const offerSource = new FakePeerConnection();
+		try {
+			fixture = await committedPendingReplacementFixture(module);
+			const replacementLow = fixture.low.peerConnections[1]?.channels[0];
+			const replacementHighPc = fixture.high.peerConnections[1];
+			const replacementHigh = replacementHighPc?.channels[0];
+			if (replacementLow === undefined || replacementHighPc === undefined || replacementHigh === undefined) {
+				throw new Error("D108E4CI_SILENT_FIXTURE_ABSENT");
+			}
+
+			await vi.advanceTimersByTimeAsync(10_000);
+			await tick();
+			const beforeUnknown = fixture.highRoute.snapshot();
+			replacementLow.send(routedFrame("zone:d108e4ci-unknown", Uint8Array.of(99)));
+			await tick();
+			await tick();
+			const afterUnknown = fixture.highRoute.snapshot();
+			expect(afterUnknown).toMatchObject({
+				activeLinks: 1,
+				lastLinkDrop: undefined,
+				linkDrops: 0,
+				links: [{ connectionId: fixture.original.right.id, generation: fixture.original.right.generation }],
+				received: beforeUnknown.received,
+				unknownRouteDrops: beforeUnknown.unknownRouteDrops + 1,
+			});
+			expect(replacementHigh.readyState).toBe("open");
+			expect(replacementHighPc.connectionState).toBe("connected");
+			expect(fixture.high.peerConnections.filter(({ connectionState }) => connectionState !== "closed")).toHaveLength(
+				2
+			);
+
+			offerSource.createDataChannel(RAW_LABEL, { maxRetransmits: 0, ordered: false });
+			const offer = await offerSource.createOffer();
+			const offerBytes = new TextEncoder().encode(JSON.stringify({ candidates: [], sdp: offer.sdp, type: "offer" }));
+			const allocationCount = fixture.high.peerConnections.length;
+			await expect(fixture.replacement.left.exchange(offerBytes, new AbortController().signal)).rejects.toThrow(
+				"unreliable WebRTC signaling request rejected"
+			);
+			expect(fixture.high.peerConnections).toHaveLength(allocationCount);
+			expect(replacementHigh.readyState).toBe("open");
+
+			fixture.high.owner.close();
+			await tick();
+			expect(fixture.high.peerConnections.every(({ connectionState }) => connectionState === "closed")).toBe(true);
+			fixture.low.owner.close();
+			await tick();
+			expect(fixture.low.peerConnections.every(({ connectionState }) => connectionState === "closed")).toBe(true);
+			expect(vi.getTimerCount()).toBe(0);
+		} finally {
+			offerSource.close();
 			fixture?.oldCloseEventBarrier.release();
 			fixture?.oldPeerCloseBarrier.release();
 			fixture?.low.owner.close();
