@@ -85968,6 +85968,36 @@ three completed trial summaries and unchanged workload/semantic contracts
 releases a plan-only freeze of six wholly fresh campaign names. D.108e4cl
 runs no six-name campaign.
 
+D.108e4cl passed on its sole consuming invocation and is never rerun. The
+write-once root `.logs/d108e4ck-retained-browser-1/` ran from
+`2026-08-31T12:40:33Z` through `12:43:30Z`; direct runner status was zero.
+Reporter duration was `175161.582` ms with expected/skipped/unexpected/flaky
+`1/0/0/0`, zero top-level errors, retry zero and one selected title in one
+file. The decoded campaign contains exactly three metric rows and three
+observation rows for `e3-03-0`, `e3-03-1` and `e3-03-2`; the formerly failing
+third prepare boundary completed. The campaign retained 30% packet loss,
+40-ms latency, queue length 10 and packet reordering, while calibration
+retained 100% loss. All workload, delivery, AoI, gap, stall, HOL, durability,
+identity and lifecycle assertions passed.
+
+The reporter, decoded campaign, decoded preliminary calibration and
+mechanical-validation SHA-256 values are respectively
+`b8e78ece9840f244b42bb9c6f5a0790e293be5451caf7edae2960dcd77d740c2`,
+`480bc202314497802a6b4d4b4ff29479423770e35a898e5b54a1af1aeee9eb6a`,
+`568262439f78289f98cf8ff71ebd8977d6b2d4f3176212b04d0f0671227c581e`
+and
+`9217853aaae54fa691a50bfa396d372642fe131af4f044a03c9a8089a41b48f1`.
+The 14-entry self-excluding proof manifest SHA-256 is
+`7e976d2aa76520b780ad16b223bc47a3b20cb565d8647261ab3a84b175663c40`;
+its validation SHA-256 is
+`43cd5e52bcb4c8a0ce5487ef64b25ef58f84cfeb34c5060f369d93fd36f6cdde`,
+and every entry validates. Runtime identities are Node `22.15.0`, pnpm
+`10.24.0`, Playwright `1.62.1` and Google Chrome for Testing `151.0.7922.34`
+with full physical paths preserved. All four ports cleared after execution;
+26 stashes and protected paths remain intact. This pass releases only a
+plan-only high-risk freeze of six wholly fresh retained campaign names; no
+campaign invocation has yet run under the new ledger.
+
 ###### D.108e4ce — post-census six-name campaign freeze
 
 D.108e4ce is the high-risk campaign disposition released by the passing
