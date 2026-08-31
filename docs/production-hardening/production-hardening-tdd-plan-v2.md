@@ -83945,13 +83945,17 @@ physical identities `(connectionId=9, channelId=495)` and
 `(connectionId=13, channelId=506)`. The exact current assertion required eight
 unique sequences and received seven.
 
-That evidence demonstrates a reliable retry crossing physical stream identity,
-not duplicate application acceptance and not a recurrence of D.108e4bv/bw.
-The production reliable owner deliberately permits up to eight transport
-attempts; receiver wire validation already permits nondecreasing duplicate
-reliable markers, while `firstReliableBySequence`, product fabric metrics and
-rendered metrics all select one logical reliable observation per sequence.
-Only `expectReliableSenderSamples` imposes physical exactly-once uniqueness.
+That evidence demonstrates a reliable retry crossing physical stream identity
+and not a recurrence of D.108e4bv/bw. Trial `e3-03-2` stopped at sender
+evidence before receiver/product acceptance, so the executed trial does not by
+itself prove whether a duplicate reached application acceptance. The
+classification is instead source-grounded: `runTrial` publishes each logical
+sequence once, the reliable queue enqueues it once, `drain` is the sole retry
+owner, receiver wire validation permits nondecreasing duplicate reliable
+markers, and `firstReliableBySequence`, product fabric metrics and rendered
+metrics all select one logical reliable observation per sequence. The
+production reliable owner deliberately permits up to eight transport attempts;
+only `expectReliableSenderSamples` imposes physical exactly-once uniqueness.
 No product defect is established by this retained failure. Reporter, decoded
 failure telemetry, compact duplicate diagnosis, twelve-entry self-excluding
 manifest and manifest-validation SHA-256 values are respectively
@@ -83999,23 +84003,39 @@ select exactly one test in one file and exclude the retained browser title. Any
 different RED matrix stops.
 
 GREEN changes only `expectReliableSenderSamples` and the deterministic focused
-fixture. The helper retains the existing nonempty and physical
-`samples.length <= SAMPLE_COUNT` bounds, in-range sequence check, nondecreasing
-logical sequence order and return of every physical observation. It groups by
-sequence and permits more than one row only when every member has the exact same
-logical marker `sentAtMs` and byte/carrier lengths and every member owns a
-distinct `(connectionId, channelId)` physical stream identity. Thus the
-captured retry remains visible to downstream ready-state, transport-shape,
-connection-roster and deadline checks; it is not collapsed or hidden.
+fixture. The helper retains the existing nonempty bound, in-range sequence
+check, nondecreasing logical sequence order and return of every filtered
+physical observation in exact unchanged observer order. The workload ceiling
+applies to unique logical sequences, which must not exceed `SAMPLE_COUNT`; the
+physical row count may exceed it because a logical reliable publication may be
+retried. A local test-only `D108E4BX_RELIABLE_ATTEMPTS = 8` mirrors the existing
+product attempt ceiling for one authorized remote peer. Each sequence group is
+therefore capped at eight rows and permits more than one row only when every
+member has the exact same logical marker `sentAtMs`, `byteLength` and
+`carrierByteLength`, and every member owns a distinct `(connectionId,
+channelId)` physical stream identity. Thus the captured retry remains visible
+to downstream ready-state, transport-shape, connection-roster and deadline
+checks; it is not collapsed, sorted or hidden.
 
-The GREEN focused matrix accepts the exact cross-connection retry and a
-same-connection/different-channel retry while preserving both input object
-identities in the returned array. It rejects same-sequence/different-`sentAtMs`,
-same-marker/same-physical-identity, descending sequence and out-of-range
-mutants. The existing raw duplicate rejection, reliable sentinel rules,
-receiver partition, first-by-sequence logical selection, product metrics and
-all D.108e4h error tokens remain unchanged. No new product identifier,
-deduplication behavior, transport acknowledgement or retry policy is added.
+The GREEN focused matrix accepts the exact cross-connection retry, a
+same-connection/different-channel retry, and `SAMPLE_COUNT` unique logical
+sequences plus one exact retry (`601` physical rows). It proves exact returned
+observer order and object identity. It rejects same-sequence/different-
+`sentAtMs`, `byteLength` mismatch, `carrierByteLength` mismatch,
+same-marker/same-physical-identity, nine attempts for one sequence, descending
+sequence and out-of-range mutants. The authorization remains deliberately
+scoped to distinct `(connectionId, channelId)` stream identity; a same-stream
+retry distinguished only by `attemptId` remains rejected and must be resliced
+if retained evidence ever demonstrates it. The existing raw duplicate
+rejection, reliable sentinel rules, receiver partition, first-by-sequence
+logical selection, product metrics and all D.108e4h error tokens remain
+unchanged. No new product identifier, deduplication behavior, transport
+acknowledgement or retry policy is added. The separate retained sentinel check
+`senderSentinels.length <= 1` knowingly remains a physical exactly-once
+expectation on an at-least-once lane; its reachability is low because sentinel
+observation follows successful write completion, and any exact future retained
+failure owns a separate evidence-driven slice rather than speculative widening
+here.
 
 Because this corrects a retained campaign acceptance predicate, it is a
 high-risk evidence exception despite its tests-only owner. Sign and push this
@@ -84031,6 +84051,34 @@ network owner with coverage disabled and the existing retained seven-test
 allowlist. Preserve complete reporters, streams, statuses, source hashes and
 self-excluding manifests.
 
+The plan-only checkpoint is signed/pushed commit
+`488742f17202fa5c8ea991c86d11aa0b23ea7672`, tree
+`71ba948ae1141fb7fcd2bc9471e3ec108458c413`. Codex high approved with no
+findings; result SHA-256 is
+`dde7759b3505c7e8ef5826e96b75127459aadc617528b56cd4f4cb551c82f485`.
+Opus xhigh returned one P1 and three P2 findings; terminal-result SHA-256 is
+`4344a69e241a57c5e970fc8d7bf21dd352de15263b7c39c652e207d788fe70a0`.
+Grok's initial exact session emitted progress prose before a valid terminal
+finding object, so the strict wrapper honestly recorded `NO_VERDICT` even
+though the service completed rather than canceled. The same session
+`01a05645-bc75-7be2-9217-c62008ac19d5` was resumed once, as required, solely
+to re-emit the terminal schema; resumed result and terminal-result SHA-256
+values are
+`bb86f6b919c3df943da3dd7e55556eba304d95648a20ac9772be101f9dbb573f`
+and
+`4dd1e097196b8714828eaf3d1e68a3839296e2f8dab8ec19f4d85c70baf638d8`.
+Its structured verdict contained one P1 and three P2 findings. The material
+union is corrected above in one batch: the false physical `SAMPLE_COUNT`
+ceiling is replaced by the unique-logical ceiling plus the existing eight-
+attempt multiplicity bound; exact payload/carrier equality, distinct physical
+stream identity, unchanged observer order, and their deterministic mutants are
+frozen; the retained failure claim and post-GREEN release order are narrowed.
+The sentinel and same-stream/`attemptId` observations are explicitly disposed
+without widening this slice. These corrections change executable acceptance,
+so the deterministic local audit below must verify them before RED; the
+governing prospective protocol does not require a recursive model confirmation
+round.
+
 After signed/pushed GREEN, the single final Grok/Codex-high/Opus-xhigh review
 must inspect plan, causal RED, GREEN, exact retry classification, unchanged raw
 and logical-dedup contracts, static/retained gates and scope. Only an empty
@@ -84040,13 +84088,14 @@ campaign run is authorized by D.108e4bx. Six fresh campaign names are frozen
 only after that retained title passes and the final implementation review is
 closed. Kimi, Fable and collaboration subagents remain prohibited.
 
-An empty final blocking union releases a new plan-only freeze with six wholly
-fresh names and a freshly built isolated checkout at the accepted GREEN.
-Execute those six sequentially under the existing immutable evidence,
-predecessor, write-once, first-failure, fixed-port, fixed-workload, and
-watchdog rules. The five unused D.108e4bu successors stay permanently frozen;
-they are not a partial campaign. Six fresh passes plus the final evidence
-review release D.108e5.
+Only an accepted D.108e4bx final implementation review followed by one passing
+fresh retained-browser disposition releases a new plan-only freeze with six
+wholly fresh names and a freshly built isolated checkout at the accepted
+GREEN. Execute those six sequentially under the existing immutable evidence,
+predecessor, write-once, first-failure, fixed-port, fixed-workload, and watchdog
+rules. The five unused D.108e4bu successors stay permanently frozen; they are
+not a partial campaign. Six fresh passes plus the final evidence review release
+D.108e5.
 
 Consumed D.108e4bu reporter, stdout, stderr, failure telemetry,
 endpoint-classifier, trace, cumulative manifest, and manifest-validation
