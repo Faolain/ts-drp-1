@@ -82914,7 +82914,7 @@ respectively
 `eb39dfef92a88d300eb600ccb6a9944c535749db7a5f09efb656e79b2b36bf0e`,
 `824a97a4d21a15c1fa8d962ecabf706b11845f75be29222607827c9ac7fb9453`
 and
-`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3ab86aa`.
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
 The validating campaign manifest remains rooted at
 `.logs/d108e4br-campaign/`; no later name has an artifact.
 
@@ -82935,7 +82935,11 @@ context only: the receiver AggregateError abort occurred about 2.4 seconds
 after the gap began, while the same raw channel subsequently resumed, so no
 upstream or replacement cause is established.
 
-The event loop and fixed attempt schedule did not stall. The product executed
+The complete loop and custody account for all 600 attempts, but refusals have
+no individual native-observer timestamp. That fact alone cannot exclude an
+event-loop pause followed by the workbench's absolute-deadline catch-up. The
+qualified-window cadence predicate below closes that ambiguity from existing
+boundary timestamps and the exact absent-sequence count. The product executed
 its unchanged bounded refusal contract while the browser-owned channel was
 over ceiling. The receiver-side semantic gates otherwise passed: raw/reliable
 AoI p95 was `13,264/32,765` ms, raw delivered after reliable start was 268 and
@@ -82967,38 +82971,62 @@ requires any such change, stop and reslice.
 RED extends the existing pure raw-sequence-evidence title with one exact
 zero-local refusal-window matrix. The positive row has native sender sequences
 `0..393` and `560..599`, the captured 5,506 ms boundary, one unchanged open
-`(8,377)` identity, a matching sequence-393 send-success lifecycle record with
-buffered amount 65,943, a matching sequence-560 send-attempt record at or below
-65,536, exact refusal count 166 and endpoint-local link-drop counts `0/0`.
-Current source must report a 5,506 ms unexplained stall and fail the new expected
-qualified result. Negative rows preserve that 5,506 ms as unexplained when the
-refusal count is absent or inconsistent, either endpoint owns a link drop, the
-boundary channel/connection changes, the preceding success did not cross the
-ceiling, the resume attempt remains over ceiling, or a close-call/close-event
-for the selected identity lies inside the interval. A complete 600-send row and
-a loss-free internal cadence row retain their current results. The focused RED
-must select exactly one test in one file and fail only the positive row's exact
-deep equality; source/static gates must otherwise pass. RED is signed and
-pushed without a separate model review.
+`(8,377)` identity, a sequence-393 native observation joined by `attemptId` to
+one unique send-attempt at buffered amount 65,512 and its same-attempt later
+send-success at 65,943, a sequence-560 native observation joined by `attemptId`
+to one unique send-attempt at or below 65,536, exact prepare-to-deadline refusal
+delta 166 and endpoint-local link-drop counts `0/0`. Its boundary interval is
+5,506 ms, below the exact cadence bound
+`(166 + 1) * SAMPLE_INTERVAL_MS + 500 = 6,011` ms. Current source must report a
+5,506 ms unexplained stall and fail the new expected qualified result.
+
+Negative rows preserve the full interval as unexplained when the refusal delta
+is absent or inconsistent, either endpoint owns a link drop, the boundary
+channel/connection changes, the preceding attempt is already above 65,536, the
+preceding same-attempt success does not cross above 65,536, the resume attempt
+remains above 65,536, or a close-call/close-event for the selected identity lies
+inside the interval. Add three structural killers: one otherwise-qualified
+window at 6,012 ms that exceeds its 6,011 ms cadence bound; one 5,506 ms pair of
+consecutive native domain sequences with no absent sequence between them while
+the globally exact refusal delta belongs to another window; and two
+nonconsecutive gaps where only the first owns complete crossing lifecycle, so
+the second remains in `rawMaxStallMs`. Predicates concerning boundary identity,
+attempt/success records, buffer values, lifecycle and cadence are evaluated
+independently for every nonconsecutive interval.
+
+The existing four-row deep equality remains verbatim:
+`{ complete: 1, internal: 2, leading: 2, trailing: 2 }`. The new
+refusal-window matrix is added beside it. The focused RED must select exactly
+one test in one file and fail only the positive row's exact deep equality;
+source/static gates must otherwise pass. RED is signed and pushed without a
+separate model review.
 
 GREEN replaces only the pure sender continuity calculation and its call site.
-It first preserves factual `nativeGapMaxMs`, the maximum wall interval between
+It first preserves factual `rawNativeGapMaxMs`, the maximum wall interval between
 all successful sender native sends. It computes the retained
 `rawMaxStallMs <= 500` value over consecutive native sequences and every
 unqualified sequence gap. A nonconsecutive interval may be excluded from that
-unexplained-stall maximum only when all of these predicates hold together:
+unexplained-stall maximum only when all of these predicates hold together for
+that interval:
 
-1. the already-validated endpoint-local link-drop counts are exactly `0/0`;
-2. the transmitter's exact unique in-range native sequence complement equals
-   its non-negative `backpressuredDrops` count, so every absent attempt is
+1. the domain sequence difference is greater than one, producing a positive
+   exact absent-sequence count for this interval;
+2. the already-validated endpoint-local link-drop counts are exactly `0/0`;
+3. the transmitter's exact unique in-range native sequence complement equals
+   the already-validated prepare-to-deadline
+   `rawTransportDeltas.sender.backpressuredDrops`, so every absent attempt is
    already closed by D.108e4bg custody;
-3. both native boundary observations use the same open connection/channel;
-4. the preceding matching send-success lifecycle record is on that identity
-   and records buffered amount greater than 65,536;
-5. the next matching send-attempt is on that identity and records buffered
-   amount at or below 65,536; and
-6. no close call or close event for that identity occurs between the boundary
-   lifecycle records.
+4. both native boundary observations use the same open connection/channel;
+5. the preceding native observation joins by `attemptId` to exactly one
+   send-attempt on that identity at buffered amount at or below 65,536 and one
+   same-attempt later send-success above 65,536;
+6. the next native observation joins by `attemptId` to exactly one send-attempt
+   on that identity at buffered amount at or below 65,536;
+7. no close call or close event for that identity occurs between the boundary
+   lifecycle records; and
+8. the boundary wall interval is no greater than
+   `(intervalAbsentCount + 1) * SAMPLE_INTERVAL_MS + 500`, binding the excluded
+   time to the fixed cadence plus the unchanged stall allowance.
 
 Qualified intervals remain visible as `rawBackpressureWindowMaxMs`; factual
 `rawNativeGapMaxMs` also remains visible. Neither field is called a pass, a
@@ -83009,6 +83037,44 @@ unaccounted missing attempt, any positive refusal in a replacement topology,
 counter mismatch, identity mutation or lifecycle defect before the performance
 assertion. Receiver loss, AoI, delivery and rendered-product assertions remain
 unchanged.
+
+The single high-risk plan review found no P0 and a material four-P1 union.
+Codex `gpt-5.6-sol` high returned `CHANGES_REQUIRED`, P0/P1/P2 `0/1/0`:
+the predecessor boundary named only the post-send over-ceiling value and did
+not prove the same attempt crossed from an admitted value. Opus xhigh session
+`804b59d5-613a-4b5e-a224-53e38cdb2db0` returned
+`CHANGES_REQUIRED`, `0/3/3`: add a cadence/absent-count time bound, kill a
+consecutive-sequence false qualification and correct the mistyped immutable
+manifest-validation digest. Grok's continued exact session returned
+`APPROVED`, `0/0/3`, with P2s for the factual field name, explicit `attemptId`
+joins and a second-window per-interval mutant.
+
+The correction above applies the complete union in one batch. It requires the
+same-attempt below-to-above ceiling crossing; uses `rawNativeGapMaxMs`
+consistently; keys native/lifecycle joins by `attemptId`; binds every qualified
+window to its own absent count and fixed cadence; adds over-bound,
+consecutive-sequence and second-window killers; preserves the exact existing
+four-row deep equality; pins the refusal count to the prepare-to-deadline
+sender delta; and restores the mechanically recomputed 64-hex digest
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+No product, example, threshold, workload, timing constant or campaign artifact
+changed. These are the reviewers' exact fail-closed predicates, so deterministic
+source/number/hash audit closes the corrected plan without a recursive
+confirmation round.
+
+Review prompt, schema, Codex terminal result, compact Opus result, complete
+Opus session stream and complete continued Grok session SHA-256 values are
+respectively
+`ce886a94c9a806c5ddb152c95f68ff8125b10a223cb537e47af807202717c4a8`,
+`d5460dbe0e8349b72c5062c6e321132ba94ec93882caf59373cfc3b1ff3af657`,
+`eadc6b74d1efade05fef1a50334f70c6831bb8de0579892ac9f1561078212dfb`,
+`201fe23b8abf66d97a40cb8bb807935535dc9c93403448d96da90202fea7bd38`,
+`807cdd59a400441bfa5a5b117cc8ae8418c1950bd8f3c71b4ced09315b70003f`
+and
+`7f92a49b783871dacd99e2768fba580f5e821e458c92197bb2c714ef7137f45c`.
+The Codex session is `01a055c6-0071-79f3-8afe-d29e47e185b2`; Grok remains
+`01a055aa-670d-7d62-8bdf-ce273b6fc3c9`. Opus's two denied Bash probes were
+nonblocking because the exact digest and length checks were rerun locally.
 
 Because this slice corrects a retained timing oracle and evidence schema even
 without changing its numeric bound, it is a high-risk exception. Sign and push
