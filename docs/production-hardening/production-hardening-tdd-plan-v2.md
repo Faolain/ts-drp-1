@@ -82038,3 +82038,102 @@ capture shell; it does not change executable product code, selection,
 workload, thresholds, dependencies, browser configuration or test semantics.
 No additional reviewer round is authorized. Only a pass may be dispositioned
 toward the separately authorized six-name retained campaign and D.108e5.
+
+##### D.108e4bp same-call qualified-replacement send rebind
+
+The one authorized D.108e4bo retained-browser invocation consumed
+`.logs/d108e4bo-retained-browser-1/` from signed/pushed plan-only freeze
+`2196ce73554630515d0105f5d2abf8bf1d3fb7c0` and failed without retry. It
+selected exactly one title in one file with retries=0 and returned
+expected/skipped/unexpected/flaky `0/0/1/0`, no top-level reporter error,
+Playwright status one and runner status one. Test and reporter durations were
+174.257 and 184.541 seconds; the 600-second process-group watchdog did not
+fire. Trials `e3-03-0` and `e3-03-1` completed their semantic matrices. Trial
+`e3-03-2` reached its assertion stage and failed only
+`D108E4H_RAW_SEND_DOMAIN_INVALID`. No retained suite or campaign invocation
+started after the failure.
+
+The complete attachment identifies one exact unaccounted local refusal rather
+than timing, capacity or classifier ambiguity. Trial `e3-03-2` attempted 600
+raw samples, recorded zero backpressured drops, and joined 599 unique native
+raw sends to 599 successful RTC terminals and a sent-counter delta of 599.
+Sequence 502 is the sole missing domain member. Both endpoints own one local
+replacement with `lastLinkDrop=replacement`; neither owns a handshake-failure
+or backpressure delta. Creator sequence 501 succeeded on selected A
+`(connectionId 18, channelId 471)` at wall time `1788136045356`. Qualified C
+`(21,492)` had installed the product handler and opened at
+`1788136043384`, sent both ACK controls and received READY plus COMMIT by
+`1788136043466`. Thus C was open and control-qualified for about 1.922 seconds
+before the refusal. At `1788136045388`, exactly when sequence 502 was due,
+product replacement retired A; its close-call record already observed
+`readyState=closing`. Sequence 503 then succeeded on C at
+`1788136045417`, 29 ms later.
+
+The source path closes the causal join. `#send` captures selected A in a local
+constant. When A is non-open it calls `#linkFor(peerId)` and immediately
+returns `false`. `#linkFor` executes synchronously through its unusable-link
+branch before its first possible suspension: it reserves admission, drops A,
+and `#dropLink` promotes the already-qualified pending C. The original send
+nevertheless retains its stale local A reference and refuses the current
+sample even though C has become selected during the same call. This exactly
+matches the captured A-close/C-next-send boundary. It is a narrow local
+continuity defect, not evidence for changing js-libp2p, connection-monitor
+policy, workload, timing, thresholds or campaign acceptance.
+
+Reporter, stdout, stderr, Playwright/runner status, trace and error-context
+SHA-256 values are respectively
+`fa2f1af407ab7ab4ca8c75fad726e51842a0c45ad9414b7dca9311360d7149fb`,
+`ae945b586a3b50b84ed7d6580fdb504e0f78cba9ca3d301958d04a6216915793`,
+`d838db253c6a906c4df4d71d11843a5f3fed142ad7409a3e8c9365c6a02b6535`,
+`4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`,
+the same status hash,
+`c2127f8c95faf41223729f21d40e55cd19edb227decfc186014601f0d5092a9f`
+and
+`25bf805b7de4ea74e3f21a0d7d7b4829317ca836e53f5d675632e3cb451fea32`.
+The consumed root remains immutable; ports are clear, protected paths and all
+26 stashes remain preserved.
+
+Freeze D.108e4bp as one same-call rebind repair:
+
+1. Add one deterministic fake-RTC RED beside the existing D.108e4bo controls.
+   Start from the committed-pending-replacement fixture where acceptor C is
+   open, has sent ACK and received READY plus COMMIT, while selected A remains
+   usable. Change only fake A's `readyState` to `closing` without delivering a
+   close event, then issue exactly one route send. Current source must
+   synchronously promote C but return false and create no routed C write; emit
+   exact token `D108E4BP_SAME_CALL_PROMOTION_REBIND_ABSENT`. The required GREEN
+   result is that the same call returns true, C owns the routed write, the
+   remote receives it exactly once, A is retired once as `replacement`, and no
+   extra PC, retry, timer, counter or handshake mutation occurs.
+2. Change only `UnreliableWebRtcOwner.#send`. Use a mutable per-peer selected
+   link. When the captured link exists but is non-open, invoke the existing
+   `#linkFor(peerId)` exactly as today, then re-read `#links.get(peerId)` in the
+   same call. Continue only if that re-read is a different open link; otherwise
+   preserve the existing `false` result. Do not await setup, add a retry, send
+   on a pending/unqualified link, or directly weaken replacement readiness.
+   The existing current-connection and buffer-ceiling checks still govern the
+   rebound link before native send.
+3. Preserve absent-link behavior, stale-but-open old-link behavior, failed or
+   unqualified replacement retention, send-error cleanup, exact 65,536-byte
+   backpressure accounting, route/digest ownership, channel parameters,
+   activation authority, public APIs, wire bytes, dependencies, timers,
+   thresholds, workload and browser configuration. No js-libp2p policy or
+   connection-monitor change is in scope.
+4. RED selects the new row plus D.108e4bo, all six D.108e4bn controls and the
+   D.108e4bm acceptor pre-open bound exactly once. Current RED may fail only the
+   new exact token. After signed RED, GREEN runs that focused set once, the
+   complete network owner once, retained E3-02 once, network build/typecheck,
+   exact source/test lint and format, source-shape/refactor-clean and diff
+   checks. No browser, retained suite or campaign runs before signed GREEN and
+   final review.
+
+Because this changes production send behavior at a replacement boundary, the
+signed/pushed bounded plan receives one Grok/Codex-`gpt-5.6-sol`-high/Opus-
+xhigh plan review before RED. Only P0/P1 blocks and one material correction
+batch is permitted. Deterministic RED receives no separate model round. After
+signed GREEN, the single formal three-model implementation review covers the
+consumed browser evidence, causal RED, production diff and complete gates.
+No Kimi, Fable or collaboration subagent is authorized. An empty final P0/P1
+union may freeze one different fresh retained-browser name; the consumed
+D.108e4bo name is never retried. The six-name campaign and D.108e5 remain
+blocked until that fresh retained validation passes.
