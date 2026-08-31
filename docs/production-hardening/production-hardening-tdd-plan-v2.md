@@ -85712,6 +85712,33 @@ retry-zero pass with `1/0/0/0`, zero errors, exactly three completed trials and
 unchanged durable/workload contracts may release a plan-only freeze of six
 wholly fresh campaign names. D.108e4cj itself runs no six-name campaign.
 
+The sole D.108e4cj plan review inspected signed/pushed `79674f75`. Codex
+`gpt-5.6-sol` high APPROVED with no findings. Opus xhigh APPROVED with no
+P0/P1 and three P2 dispositions. Grok high's original read-only leg reached
+its 16-turn service boundary after 330.188 seconds and returned honest
+NO_VERDICT/cancelled; the same session
+`01a05797-2d66-7260-bf10-809d36bd91e7` was resumed, reached a further
+eight-turn boundary after completing the remaining reads, and was resumed
+again for one tool-free terminal turn. It then returned `end_turn`, APPROVED
+with no findings. No replacement Grok session ran.
+
+The blocking union is empty. Opus's first P2 correctly clarifies that the
+captured boundary `authenticated` set enumerates the owner's selected raw
+links, not the live libp2p connection roster; D.108e4cj's evidence-based
+diagnosis supersedes D.108e4ci's earlier sentence treating that empty set as
+independent continuity evidence. Opus's second P2 notes that the inherited
+`set -u` script relies on the mandatory operator preflight to establish the
+fresh root; retain the frozen command and require the immediately preceding
+`test ! -e` audit to pass before launch. Its third P2 corrects the narrative
+meaning of `local replacement delta two`: the captured field is the creator's
+local raw `linkDrops` delta two, not classifier replacement ownership. These
+are recorded nonblocking dispositions; no executable change or confirmation
+round is justified. The 27-entry self-excluding review manifest SHA-256 is
+`25d3c9a0bad14f2e9a14c327558220c39a878764a209389b22d65ca944ae67fe`;
+its validation SHA-256 is
+`ab28e597972605c07660a3468a3b96c1cbdc622ad5810a72ff822880032e67cc`,
+and all entries validate. The one fresh retained proof is released.
+
 ###### D.108e4ce — post-census six-name campaign freeze
 
 D.108e4ce is the high-risk campaign disposition released by the passing
