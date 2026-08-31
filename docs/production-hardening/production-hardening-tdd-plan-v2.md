@@ -85347,7 +85347,7 @@ are
 and
 `988a33ed4cac90b3b1903c1a2adf6e45c0250765a585cef46aac6478bbdb590f`.
 
-###### D.108e4ci — retain an observed committed acceptor replacement
+###### D.108e4ci — retain an observed committed acceptor replacement safely
 
 D.108e4ci is the narrow product-lifecycle TDD slice released by the genuine
 D.108e4ch failure. It does not weaken `D108E4H_DROP_COUNT_AMBIGUOUS`, reuse a
@@ -85355,15 +85355,16 @@ campaign name, relaunch a consumed invocation, change the fixed workload or
 thresholds, or attribute the failure to js-libp2p. The captured third trial
 shows creator/receiver local raw-link deltas `2/0`. The creator began on raw
 channel `469`/PeerConnection `12`; replacement channel `488`/PeerConnection
-`15` opened before channel `469` was retired. READY, ACK and COMMIT were sent
-and received, and the initiator reliably observed the exact committed
-decision. The creator promoted replacement B and retired A. The acceptor kept
-its committed B pending because its local A still appeared usable. When the
-original setup deadline expired, `#discardPendingReplacement` closed the
-acceptor's open B; 41 ms later the creator observed B close and counted the
-second local drop. At the assertion deadline the creator had no authenticated
-raw RTC channel while the receiver retained A. This establishes a local
-`unreliable-webrtc.ts` committed-replacement expiry defect.
+`15` opened before channel `469` was retired. Numeric control-frame telemetry
+captures READY, ACK and COMMIT in both directions. The initiator's sole
+promotion owner in this state additionally establishes that it received the
+authenticated committed-decision response for the exact offer digest. The
+creator promoted replacement B and retired A. The acceptor kept its committed
+B pending because its local A still appeared usable. When the original setup
+deadline expired, `#discardPendingReplacement` closed the acceptor's open B;
+41 ms later the creator observed B close and counted the second local drop.
+This establishes a local `unreliable-webrtc.ts` committed-replacement expiry
+defect.
 
 The deterministic RED belongs in
 `packages/network/tests/unreliable-webrtc-e3-01-red.test.ts` and reuses the
@@ -85375,25 +85376,77 @@ show that current code discards the acceptor's open committed B and closes the
 initiator's active B. Its frozen GREEN acceptance instead requires:
 
 1. the initiator remains on B with exactly one local A retirement;
-2. the acceptor retains open committed B while its selected A remains usable;
-3. the first valid application ingress on retained B atomically promotes B
-   and is delivered exactly once;
-4. both peers then select the same authenticated B identity and old A can be
-   released without another B drop; and
-5. the existing lost-COMMIT, failed/malformed decision, authenticated-
+2. the acceptor has observed at least one authenticated decision request for
+   the exact B decision identity and retains that exact open committed B when
+   the already-existing setup expiry fires while its selected A still appears
+   locally usable;
+3. the first valid routed application ingress on that exact retained acceptor
+   B is definitive proof that the initiator selected B, atomically promotes B
+   through the existing owner and is delivered exactly once; a later selected-
+   A `disconnected` transition provides the same convergence trigger without
+   application traffic;
+4. this lifecycle has the retained validator's accepted endpoint-local `1/1`
+   replacement profile; `2/0` and `0/2` remain
+   `D108E4H_DROP_COUNT_AMBIGUOUS`; and
+5. the existing lost-COMMIT, zero-observation/two-failed-decision-request,
+   malformed or wrong decision, authenticated-
    connection-close, pending-B-close, superseding-offer and owner-close cases
-   retain their exact fail-closed behavior and error/counter contracts.
+   retain their exact fail-closed behavior and error/counter contracts. A
+   request observed by the acceptor whose response is lost is not
+   misclassified as proof that the initiator promoted: A remains selected and
+   B remains pending until a definitive convergence or cleanup owner acts.
 
-GREEN is limited to the acceptor/reliable-decision/committed branch of
-`#expireReplacementReadiness`. When the exact current pending B has a matching
-committed decision and selected A is still locally usable, expiry must retain
-B rather than discard or prematurely promote it. Existing old-A close,
-disconnected-A and first qualified B-ingress paths remain the only promotion
-owners; unauthenticated, uncommitted, stale, closed or superseded B is still
-discarded. Do not change setup timeouts, retry counts, resource ceilings,
-public APIs, dependencies, signaling decision schemas or raw control bytes.
-If that source-only seam cannot satisfy RED, stop and reslice rather than add
-protocol messages or widen authority.
+GREEN is limited to three existing private lifecycle seams in
+`packages/network/src/unreliable-webrtc.ts`: the acceptor/reliable-decision/
+committed branch of `#expireReplacementReadiness`, the pending-link guard in
+`#receive`, and the selected-link PeerConnection state listener installed by
+`#prepareLink`. At expiry, only the exact current open acceptor B with matching
+current authenticated connection, complete READY/ACK/COMMIT qualification, a
+matching committed decision record and positive existing
+`ReplacementDecisionRecord.observations` is retained. This observation means
+the initiator may already have selected B, but does not by itself authorize
+acceptor promotion because response delivery is not locally proven. If
+neither decision request reached the acceptor, `observations` remains zero and
+existing expiry discard/retain-A behavior is unchanged.
+
+After that bounded decision point, application ingress may promote an
+acceptor pending B only when all of those exact predicates still hold, the
+frame passes the existing route envelope/digest/size validation, and the
+existing `#promotePendingReplacement` owner succeeds; only then is the payload
+delivered once through the unchanged route listener owner. This is causal
+proof because product send targets come only from selected `#links`, never a
+pending replacement. A selected A transition to `disconnected` may likewise
+promote only that exact qualified committed B. There is no second activation
+owner, new timer, protocol message, public surface or additional physical
+connection.
+
+The retained state is bounded structurally to the existing single pending
+replacement for that peer and the unchanged physical `MAX_LINKS` ceiling, but
+is intentionally no longer discarded by elapsed setup time alone once the
+acceptor has committed and observed a decision request. That is the minimum
+safety tradeoff: after such an observation the remote may already have
+retired A, and no local fact can distinguish a delivered response from a lost
+response. Its exit owners are exact-B application proof, selected-A close or
+disconnection, B/channel/PC close, authenticated-connection identity change,
+owner close, or an existing stale/superseding cleanup path. Tests must prove
+timer/waiter cleanup, one pending PC at most, unchanged global ceiling, no
+offer substitution, and complete cleanup by every terminal owner. An idle
+current A plus open current B may remain dual-live; it preserves connectivity
+and cannot admit a third same-peer offer. Unauthenticated, uncommitted, zero-
+observation, stale, non-open or superseded B is still discarded. Do not change
+setup timeout values, retry counts, resource ceilings, public APIs,
+dependencies, signaling decision schemas or raw control bytes. If these three
+source-only seams cannot satisfy RED and the response-loss/resource mutants,
+stop and reslice rather than add protocol messages or widen authority.
+
+The captured trial also ended with creator `deadline.authenticated: []` and
+`cardinality-invalid`. That second authenticated-connection continuity
+failure is real captured evidence but is not caused or concealed by the
+acceptor expiry predicate. D.108e4ci does not claim that its isolated repair
+alone makes the long trial pass. D.108e4cj owns deterministic diagnosis and,
+only if demonstrated, a separately reviewed narrow repair before any fresh
+campaign disposition. No js-libp2p attribution or change is authorized
+without telemetry proving an upstream false-positive abort.
 
 Run the focused network file once for RED and preserve the exact causal
 failure. After GREEN run the focused title, the full retained network file,
@@ -85402,10 +85455,18 @@ checks, D.108e4ax, the retained browser support titles and the retained
 seven-test suite. No long browser campaign runs during D.108e4ci. Because
 this changes production replacement lifecycle behavior, sign/push the plan
 and run one Grok high, Codex `gpt-5.6-sol` high and Opus xhigh plan review;
-correct only material P0/P1 in one batch. RED receives deterministic evidence
-validation rather than another three-model round. The sole formal
-implementation review occurs after signed/pushed GREEN and covers plan,
-causal RED, GREEN and retained gates. If Grok cancels, resume its exact
+correct only material P0/P1 in one batch. The first plan review returned no
+P0 and a material P1 union: the proposed acceptor application-ingress owner
+was unreachable through `#receive`, retained pending B needed explicit
+lifetime/re-evaluation/cleanup ownership, and the captured empty authenticated
+boundary was a separate masked failure. Those findings are accepted by the
+three explicit private seams, structural bound and terminal-owner matrix above
+plus D.108e4cj ownership. Because this batch
+materially changes executable acceptance, run at most one confirmation round;
+do not recursively review bookkeeping or closure prose. RED receives
+deterministic evidence validation rather than another three-model round. The
+sole formal implementation review occurs after signed/pushed GREEN and covers
+plan, causal RED, GREEN and retained gates. If Grok cancels, resume its exact
 session; do not replace it. Do not invoke Kimi, Fable or collaboration
 subagents.
 
