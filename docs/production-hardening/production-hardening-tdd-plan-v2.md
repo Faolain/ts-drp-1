@@ -87321,3 +87321,24 @@ idempotent test teardown and exact RED/GREEN changed-path custody. Because the
 correction materially changes causal RED acceptance, the prospective policy
 permits one confirmation over the signed corrected plan. That confirmation is
 the only remaining plan gate and only P0/P1 may block deterministic RED.
+
+The sole corrected-plan confirmation inspected signed/pushed `f95499a9`.
+Grok 4.6/high session `01a058bb-aee6-7981-9d72-427b2451fac7` reached its
+turn-boundary cancellation before a terminal schema, so the exact session was
+resumed rather than replaced and returned `APPROVED` with no findings;
+resumed-result SHA-256 is
+`8d9ad8278264d3e111ea94f20cb4f14ec96e5733e564b30943c01e2c0c5a3605`.
+Codex `gpt-5.6-sol` high session
+`01a058bb-acb5-7981-a008-eaeac65714ab` returned `APPROVED` with no findings;
+result SHA-256 is
+`e15a7737b318e24ecd73fe20c5faba96dad0f8a444ec1258e5c651268245ccc2`.
+Opus 5/xhigh session `fa179ce9-db9f-429c-99fa-68521a8ae199` returned
+`APPROVED` with no P0/P1 and one P2 noting that no named control reaches an
+`ENOTEMPTY` parent created during setup. That observation explicitly requests
+no action: serialized authority prevents a concurrent caller owner, `rmdir`
+cannot delete a nonempty parent, and the slice makes no parallel-safety claim.
+Its raw-result SHA-256 is
+`1b2139512e7ea37578844e5abb5b8a46f5984a0d4e18fbed5b43b9981cf9f29e`.
+The confirmation allowance is consumed, the corrected plan has an empty
+blocking union, and deterministic D.108e6 RED is released without another
+review round.
