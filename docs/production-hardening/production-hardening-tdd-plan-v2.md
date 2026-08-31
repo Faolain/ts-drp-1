@@ -83310,3 +83310,28 @@ SHA-256 values are respectively
 and
 `4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`.
 This is the frozen causal RED. It consumed no retained or campaign invocation.
+
+The first GREEN retained launcher artifact
+`.logs/d108e4bt-retained-browser-1/` is permanently consumed but executed no
+test workload. Its literal selector incorrectly anchored the beginning of the
+unqualified title even though Playwright applies `--grep` to the fully
+qualified title. The reporter therefore exited 1 after 10.670 seconds with
+expected/skipped/unexpected/flaky `0/0/0/0`, one top-level `No tests found`
+error and no spec. This is a launcher-selection failure, not a semantic result,
+and the name is never retried, overwritten or represented as evidence about
+the product. Reporter/stdout, empty stderr, status, start and finish SHA-256
+values are respectively
+`c7aea96fe9824a08131306f64a8b915b41ba81f9e1b8f04dc6e0eeb6241620ac`,
+`c7aea96fe9824a08131306f64a8b915b41ba81f9e1b8f04dc6e0eeb6241620ac`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`,
+`4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`,
+`e78e06942677b443f3cba21d9a67fabb079e0bfbcab0d4033ba08d30ef42ab46`
+and
+`ac55f9bf9669c8bcebc35af59a58e74b37a7cbd8fb0fa8d3d797da9436e7ab65`.
+The corrected suffix-anchored selector lists exactly one test in one file.
+Under the operator's existing authorization to continue narrow and whole
+debugging runs, `.logs/d108e4bt-retained-browser-2/` is the single distinct
+fresh successor. It runs once under the same 600-second watchdog and all other
+frozen retained semantics. This is not a retry or reuse of the consumed name;
+any test-executing failure stops and is dispositioned from its immutable
+evidence.
