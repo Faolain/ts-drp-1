@@ -1224,15 +1224,36 @@ async function installLibp2pMonitorObserver(page: Page): Promise<void> {
 		let sequence = 0;
 		const records: Libp2pMonitorObservation[] = [];
 		const wrapped = new WeakSet<object>();
+		const abortedConnections = new WeakSet<object>();
 		type PingEvidence = {
 			carryIn: boolean;
 			readonly connection: ConnectionLike;
 			failureRecorded: boolean;
 			readonly pingId: string;
+			retired: boolean;
 			successObserved: boolean;
 		};
 		const pingInFlight = new Map<string, PingEvidence>();
 		const failedPingAwaitingAbort = new Map<string, PingEvidence>();
+		const newestForConnection = (
+			custody: ReadonlyMap<string, PingEvidence>,
+			connection: ConnectionLike
+		): PingEvidence | undefined => {
+			let newest: PingEvidence | undefined;
+			for (const ping of custody.values()) {
+				if (ping.connection === connection) newest = ping;
+			}
+			return newest;
+		};
+		const retireConnectionCustody = (connection: ConnectionLike): void => {
+			for (const custody of [pingInFlight, failedPingAwaitingAbort]) {
+				for (const [pingId, ping] of custody) {
+					if (ping.connection !== connection) continue;
+					ping.retired = true;
+					custody.delete(pingId);
+				}
+			}
+		};
 		const record = (
 			connection: ConnectionLike,
 			event: Libp2pMonitorEventKind,
@@ -1267,7 +1288,8 @@ async function installLibp2pMonitorObserver(page: Page): Promise<void> {
 				value(error?: Error): void {
 					const stack = new Error().stack ?? "";
 					const monitorOwned = stack.includes("connection-monitor");
-					const ping = pingInFlight.get(connection.id) ?? failedPingAwaitingAbort.get(connection.id);
+					const ping =
+						newestForConnection(pingInFlight, connection) ?? newestForConnection(failedPingAwaitingAbort, connection);
 					if (monitorOwned && ping !== undefined && !ping.failureRecorded) {
 						record(connection, "ping-failure", "libp2p-connection-monitor", {
 							carryIn: ping.carryIn,
@@ -1276,8 +1298,8 @@ async function installLibp2pMonitorObserver(page: Page): Promise<void> {
 						});
 						ping.failureRecorded = true;
 					}
-					pingInFlight.delete(connection.id);
-					failedPingAwaitingAbort.delete(connection.id);
+					retireConnectionCustody(connection);
+					abortedConnections.add(connection);
 					record(connection, "connection-abort", monitorOwned ? "libp2p-connection-monitor" : "other-owner", {
 						carryIn: ping?.carryIn,
 						pingId: ping?.pingId,
@@ -1298,6 +1320,7 @@ async function installLibp2pMonitorObserver(page: Page): Promise<void> {
 								connection,
 								failureRecorded: false,
 								pingId: `${activeTrialId}:ping:${nextPingOrdinal}`,
+								retired: false,
 								successObserved: false,
 							}
 						: undefined;
@@ -1306,7 +1329,7 @@ async function installLibp2pMonitorObserver(page: Page): Promise<void> {
 						record(connection, "ping-start", "libp2p-connection-monitor", {
 							pingId: pingEvidence?.pingId,
 						});
-						if (pingEvidence !== undefined) pingInFlight.set(connection.id, pingEvidence);
+						if (pingEvidence !== undefined) pingInFlight.set(pingEvidence.pingId, pingEvidence);
 					}
 					try {
 						const stream = await nativeNewStream(protocol, options);
@@ -1323,11 +1346,13 @@ async function installLibp2pMonitorObserver(page: Page): Promise<void> {
 							});
 						});
 						stream.addEventListener("close", () => {
-							pingInFlight.delete(connection.id);
-							if (pingEvidence === undefined || pingEvidence.successObserved) {
-								failedPingAwaitingAbort.delete(connection.id);
-							} else {
-								failedPingAwaitingAbort.set(connection.id, pingEvidence);
+							if (pingEvidence === undefined) return;
+							pingInFlight.delete(pingEvidence.pingId);
+							if (pingEvidence.successObserved) {
+								pingEvidence.retired = true;
+								failedPingAwaitingAbort.delete(pingEvidence.pingId);
+							} else if (!pingEvidence.retired && !abortedConnections.has(connection)) {
+								failedPingAwaitingAbort.set(pingEvidence.pingId, pingEvidence);
 							}
 						});
 						return new Proxy(stream, {
@@ -1345,8 +1370,11 @@ async function installLibp2pMonitorObserver(page: Page): Promise<void> {
 								if (property === "close") {
 									return async (closeOptions?: unknown): Promise<void> => {
 										await target.close(closeOptions);
-										pingInFlight.delete(connection.id);
-										failedPingAwaitingAbort.delete(connection.id);
+										if (pingEvidence !== undefined) {
+											pingEvidence.retired = true;
+											pingInFlight.delete(pingEvidence.pingId);
+											failedPingAwaitingAbort.delete(pingEvidence.pingId);
+										}
 									};
 								}
 								const value = Reflect.get(target, property, receiver) as unknown;
@@ -1354,17 +1382,19 @@ async function installLibp2pMonitorObserver(page: Page): Promise<void> {
 							},
 						});
 					} catch (error) {
-						if (ping) {
-							record(connection, "ping-failure", "libp2p-connection-monitor", {
-								carryIn: pingEvidence?.carryIn,
-								pingId: pingEvidence?.pingId,
-								reason: error instanceof Error ? error.name : String(error),
-							});
-							if (pingEvidence !== undefined) {
+						if (pingEvidence !== undefined) {
+							if (!pingEvidence.failureRecorded) {
+								record(connection, "ping-failure", "libp2p-connection-monitor", {
+									carryIn: pingEvidence.carryIn,
+									pingId: pingEvidence.pingId,
+									reason: error instanceof Error ? error.name : String(error),
+								});
 								pingEvidence.failureRecorded = true;
-								failedPingAwaitingAbort.set(connection.id, pingEvidence);
 							}
-							pingInFlight.delete(connection.id);
+							pingInFlight.delete(pingEvidence.pingId);
+							if (!pingEvidence.retired && !abortedConnections.has(connection)) {
+								failedPingAwaitingAbort.set(pingEvidence.pingId, pingEvidence);
+							}
 						}
 						throw error;
 					}
@@ -1387,23 +1417,22 @@ async function installLibp2pMonitorObserver(page: Page): Promise<void> {
 							pingId: `${trialId}:epoch:${connection.id}`,
 						});
 					}
-					for (const ping of pingInFlight.values()) {
-						ping.carryIn = true;
-						record(ping.connection, "ping-start", "libp2p-connection-monitor", {
-							carryIn: true,
-							pingId: ping.pingId,
-						});
+					const carryInPings = new Map<string, PingEvidence>();
+					for (const custody of [pingInFlight, failedPingAwaitingAbort]) {
+						for (const [pingId, ping] of custody) carryInPings.set(pingId, ping);
 					}
-					for (const ping of failedPingAwaitingAbort.values()) {
+					for (const ping of carryInPings.values()) {
 						ping.carryIn = true;
 						record(ping.connection, "ping-start", "libp2p-connection-monitor", {
 							carryIn: true,
 							pingId: ping.pingId,
 						});
-						record(ping.connection, "ping-failure", "libp2p-connection-monitor", {
-							carryIn: true,
-							pingId: ping.pingId,
-						});
+						if (ping.failureRecorded) {
+							record(ping.connection, "ping-failure", "libp2p-connection-monitor", {
+								carryIn: true,
+								pingId: ping.pingId,
+							});
+						}
 					}
 				},
 				snapshot(): readonly Libp2pMonitorObservation[] {
@@ -7211,6 +7240,21 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 		expect(() => validateD108e4hCampaignCustody(carryInAttributedCurrent)).toThrowError(
 			"D108E4H_MONITOR_PING_CUSTODY_INVALID"
 		);
+		const missingCarryInStart = Object.freeze({
+			...carryInMonitor,
+			endpoints: Object.freeze({
+				...carryInMonitor.endpoints,
+				receiver: Object.freeze({
+					...carryInMonitor.endpoints.receiver,
+					monitor: Object.freeze(
+						carryInMonitor.endpoints.receiver.monitor.filter(({ event }) => event !== "ping-start")
+					),
+				}),
+			}),
+		});
+		expect(() => validateD108e4hCampaignCustody(missingCarryInStart)).toThrowError(
+			"D108E4H_MONITOR_PING_CUSTODY_INVALID"
+		);
 		const duplicatePingEpoch = Object.freeze({
 			...carryInMonitor,
 			endpoints: Object.freeze({
@@ -8816,7 +8860,14 @@ if (process.env["D108E4BW_MONITOR_CONCURRENCY_RED"] === "1") {
 				await context.close();
 			}
 		};
-		const groups = (records: readonly Libp2pMonitorObservation[]) => {
+		const groups = (
+			records: readonly Libp2pMonitorObservation[]
+		): Array<{
+			readonly carryIn: boolean[];
+			readonly events: Libp2pMonitorEventKind[];
+			readonly pingId: string;
+			readonly trialIds: string[];
+		}> => {
 			const byPing = new Map<string, Libp2pMonitorObservation[]>();
 			for (const record of records) {
 				if (record.event === "monitor-epoch-start" || record.event === "connection-close") continue;

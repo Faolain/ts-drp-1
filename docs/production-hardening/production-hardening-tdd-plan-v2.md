@@ -83893,6 +83893,76 @@ All ten entries validate from `.logs/d108e4bw-red`. RED is not rerun; GREEN may
 now change only the frozen test observer and add the exact missing-start
 validator mutant.
 
+D.108e4bw GREEN keys both custody maps by exact `pingId`, uses identity-specific
+moves/deletes, chooses abort attribution by last Map insertion, retires all
+same-connection custody at abort, and prevents late callbacks from recording a
+second terminal or re-inserting retired custody. Reset builds one exact-ping
+union and replays a failure only when `failureRecorded` was already true. The
+schema title also gained the exact missing-start mutant, preserving
+`D108E4H_MONITOR_PING_CUSTODY_INVALID`.
+
+The sole focused GREEN execution passed with expected/skipped/unexpected/flaky
+`1/0/0/0`, zero top-level errors and zero result errors. Standalone strict
+TypeScript passed. The first ESLint pass then found only a missing explicit
+return type on RED's local grouping helper; adding that type annotation was a
+source-shape correction, so the focused test was not rerun. Corrected strict
+TypeScript, ESLint, high-heap Prettier, `git diff --check`, grid typecheck and
+grid build all returned zero. The D.108e4h schema title and existing D.108e4g
+abort/close/identity lifecycle title each passed `1/1`. The first two Vitest
+commands omitted the established `--coverage.enabled=false`: both semantic
+reporters were green (`2/2` and `114/114`) but the processes returned one on
+the unrelated repository-wide coverage threshold. Those outputs are preserved
+as command-diagnostic evidence. The corrected commands used new filenames and
+returned zero with the exact same semantic counts: both D.108e4ax caller-order
+rows passed with 112 skipped, then the complete network owner passed `114/114`.
+
+Focused, D.108e4h, D.108e4g, corrected D.108e4ax, corrected complete-network,
+forty-eight-entry self-excluding manifest and manifest-validation SHA-256
+values are respectively
+`344fe111f2a963a77263913b0a2c7fae5373bd2aef231e63bf14d65b367df126`,
+`80d7840891ad667cae144b7838a425e3d413dd265d051388fdeb5315f9952ef6`,
+`5de6d65e550a16ed156eafd29897e83b544ad6ee50ca414e0ada77809cb090ba`,
+`70e6be34aa5e6b7d8b9f17a71a14ecd9f94c3c7f93d7f525bd73710483632b8a`,
+`76fbff787d46af356954ec630dbd128e599155e92fb905ee8b427654982771f8`,
+`811a7b21c1d0cbae271e7585b86a10f75cec485acb02652d29c56b82ad919291`
+and
+`52a972e1aa69098ccd95feb8780ff622f10099157feb8e6c38f662ad75177def`.
+All manifest entries validate from `.logs/d108e4bw-green`; final test-owner
+SHA-256 is
+`6a7a5db112792425f859d4e78dbd2126c97c0185e285b4291861d86bc235036b`.
+
+The fresh write-once retained root
+`.logs/d108e4bw-retained-browser-1/` was consumed exactly once from
+`2026-08-31T05:14:25Z` through `05:17:04Z` and failed, so no retained-seven or
+campaign run followed. Runner status was one; reporter duration was
+`157688.28` ms with expected/skipped/unexpected/flaky `0/0/1/0`, zero top-level
+errors and one failed result. This was not the repaired monitor-custody token.
+Trials `e3-03-0` and `e3-03-1` completed, and trial `e3-03-2` reached exact stage
+`e3-03-2-sender-evidence`. Its reliable sender wire contained eight physical
+observations but seven unique sequences: logical sequence 4 appeared twice with
+the same `sentAtMs=1788153399139`, byte/carrier lengths `256/496`, and distinct
+physical identities `(connectionId=9, channelId=495)` and
+`(connectionId=13, channelId=506)`. The exact current assertion required eight
+unique sequences and received seven.
+
+That evidence demonstrates a reliable retry crossing physical stream identity,
+not duplicate application acceptance and not a recurrence of D.108e4bv/bw.
+The production reliable owner deliberately permits up to eight transport
+attempts; receiver wire validation already permits nondecreasing duplicate
+reliable markers, while `firstReliableBySequence`, product fabric metrics and
+rendered metrics all select one logical reliable observation per sequence.
+Only `expectReliableSenderSamples` imposes physical exactly-once uniqueness.
+No product defect is established by this retained failure. Reporter, decoded
+failure telemetry, compact duplicate diagnosis, twelve-entry self-excluding
+manifest and manifest-validation SHA-256 values are respectively
+`a28e6980bcf8f3736cfdfd0ad45db3c623e45479e59051dfb68802daf5a6323a`,
+`78828528956a15fbc1d99284f7bc8b932d7ebb9038f6fe6471cfa23f45264f96`,
+`8efdbc86e34aa056104446a58357c8feb0eda60991eb1dc570aa5bf3a1ccec62`,
+`cb95e06e646504f266a74de63939034454bd5610b10bcbb6f5fc18e6064a6391`
+and
+`81ac8e6d0616c967b3932e44dbb9db3d35827f7c6d7e8387c80638f78799437b`.
+The consumed root is immutable and is never retried, overwritten or reused.
+
 An empty final blocking union releases a new plan-only freeze with six wholly
 fresh names and a freshly built isolated checkout at the accepted GREEN.
 Execute those six sequentially under the existing immutable evidence,
