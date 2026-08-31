@@ -82435,3 +82435,36 @@ authorized by this plan paragraph itself. Preserve the durable authorization
 for all six future campaign invocations, but keep the campaign frozen until
 the new retained validation passes. Do not invoke Kimi, Fable, or collaboration
 subagents.
+
+D.108e4bq plan-review correction: the initial Grok/Codex/Opus review returned
+P0 union `0` and P1 union `1`. Codex correctly identified that deleting the
+blanket received-COMMIT prohibition alone would admit an impossible
+READY -> COMMIT -> qualifying ACK order: the existing acceptor predicate proves
+that some ACK follows the first READY but does not prove that each COMMIT
+follows that qualifying ACK. This is a material but still test-only acceptance
+gap. GREEN must therefore compute the first post-READY ACK sequence and require
+every received COMMIT to follow it, with an early-COMMIT mutant preserving exact
+`D108E4H_LIFECYCLE_ORDER_INVALID`. RED remains the single causal assertion that
+the demonstrated committed-pending acceptor shape is wrongly rejected; the
+new order mutant is added with GREEN because current source already rejects it
+under the broader, wrong `D108E4H_IDENTITY_JOIN_INVALID` classification.
+
+The positive committed-pending fixture should carry the demonstrated two
+READY, two ACK and two COMMIT controls while preserving their captured order.
+This adopts Opus's first P2 as useful exact-shape coverage. Opus's second P2 is
+also adopted as documentation clarification: this correction explicitly
+supersedes only the stale D.108e4bh sentence that an acceptor must promote
+immediately upon COMMIT; later reliable-decision custody intentionally retains
+C while selected A remains usable. Opus's selected-A PeerConnection-state P2
+is recorded but deferred: actual promotion has endpoint-local replacement
+custody, pending readiness remains deadline-owned by product code, and no
+captured zombie-A non-promotion has been demonstrated. Do not add that state,
+wall-clock fields or timing clauses here.
+
+Grok's P2 recommended the one-line deletion and no order clause. Its timing
+disposition is retained, but its order disposition is superseded by Codex's
+specific counterexample. This correction changes executable acceptance and
+therefore receives the one permitted confirmation round. The confirmation is
+limited to the corrected committed-pending acceptance, early-COMMIT exact
+error, and unchanged scope; no further confirmation or prose review follows if
+the P0/P1 union is empty.
