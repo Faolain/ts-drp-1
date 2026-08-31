@@ -82894,3 +82894,138 @@ Codex session `01a055aa-5ff8-72d0-bc25-deffe3bef578` and Opus session
 variable is currently unset, the campaign root has no `.preflight-*` or
 `resolution-*` artifact, and the launch gate is released after this
 review-closure commit is signed/pushed and the reviewed tag is signed/pushed.
+
+###### D.108e4bs — zero-local backpressure-window sender continuity
+
+The reviewed D.108e4br campaign consumed exactly one fresh name,
+`resolution-ordinary-1`, and stopped on its nonzero Playwright and runner
+statuses. The other five names remain unused but blocked by the failed
+predecessor and must not run. This is immutable first-failure evidence, not a
+retry candidate. Reporter counts are expected/skipped/unexpected/flaky
+`0/0/1/0`, with no top-level error. Trial `e3-03-0` reached its assertion
+stage and failed only the retained sender `maxStallMs <= 500` oracle at
+`5,506` ms. Reporter, stdout, stderr, failure-telemetry, endpoint-local
+classification, cumulative-manifest and manifest-validation SHA-256 values are
+respectively
+`cc0f9c788a12e7681709c5e4c9c9486463f1596dcbeca887593a5c92a878bfbe`,
+`048568e3e051e2483725e5cc0014d0ad4acf48a38046f4cf34185f32e9eee718`,
+`500995c73c677a310ac72532bbfcfa5dbf9316444ddc60263ceb7a22b52d67da`,
+`04a4b849e2bbf1a2c659b46b8cb3f956a930fa3a0f4b71d056b7f51beda7d5ac`,
+`eb39dfef92a88d300eb600ccb6a9944c535749db7a5f09efb656e79b2b36bf0e`,
+`824a97a4d21a15c1fa8d962ecabf706b11845f75be29222607827c9ac7fb9453`
+and
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3ab86aa`.
+The validating campaign manifest remains rooted at
+`.logs/d108e4br-campaign/`; no later name has an artifact.
+
+The attachment deterministically accounts for the gap. The workbench made all
+600 fixed raw attempts. Exactly 434 crossed native RTC send and exactly 166
+incremented the product's documented `backpressuredDrops` counter before
+native send; the missing domain is exactly sequences `394..559`. Sequence 393
+succeeded on open selected raw identity `(connectionId 8, channelId 377)` at
+wall time `1788144649557`: its matching native attempt observed buffered amount
+65,512 and the success observed 65,943, across the unchanged 65,536-byte
+ceiling. Sequence 560 resumed on that same still-open identity at
+`1788144655063` with buffered amount zero. Both endpoint-local link-drop deltas
+are zero, both handshake-failure deltas are zero and the existing classifier
+accepts literal zero-local `0/0`. The raw channel did not close or change across
+the refusal interval. Later replacement channels opened only after the gap and
+after the 20-second send workload. Authenticated-connection-loss deltas are
+context only: the receiver AggregateError abort occurred about 2.4 seconds
+after the gap began, while the same raw channel subsequently resumed, so no
+upstream or replacement cause is established.
+
+The event loop and fixed attempt schedule did not stall. The product executed
+its unchanged bounded refusal contract while the browser-owned channel was
+over ceiling. The receiver-side semantic gates otherwise passed: raw/reliable
+AoI p95 was `13,264/32,765` ms, raw delivered after reliable start was 268 and
+the raw loss gap was greater than one. The evidence therefore does not justify
+a product, dependency, ceiling, workload, timing or API change. It exposes an
+expectation inconsistency introduced when D.108e4bg accepted exact bounded
+refusals in literal `0/0` topology but retained a sender-stall helper that treats
+every gap between successful native sends as unexplained. A prompt refusal is
+not relabeled a native send; the native-byte roster remains exact.
+
+Exact Grok session `01a055aa-670d-7d62-8bdf-ce273b6fc3c9` was continued once
+for this targeted causal question rather than relaunched. It returned
+`TEST_EXPECTATION_DEFECT`, confidence `HIGH`, and independently reached the
+same bounded correction. Prompt and exported complete-session SHA-256 values
+are
+`587489cdf7d0af6cc8c2d6b53f724c10bed81d32da29e5f3f143f6fecdd034fd`
+and
+`82924f516cbdf4e3d79c71f965ec40417e6cdeb8a6360185c1b4a45d28d65c76`.
+This targeted disposition is advisory causal evidence, not a second freeze
+review or authority to implement before the plan gate below.
+
+D.108e4bs changes only
+`tests/e3-03-loss-and-hol-proof.pw.ts` plus this plan/evidence record. It changes
+no product or example source, public API, dependency, browser/configuration,
+65,536-byte ceiling, 600/33 ms workload, loss profile, trial count, 500 ms
+bound, AoI/HOL ratio, readiness gate, timeout or campaign launcher. If GREEN
+requires any such change, stop and reslice.
+
+RED extends the existing pure raw-sequence-evidence title with one exact
+zero-local refusal-window matrix. The positive row has native sender sequences
+`0..393` and `560..599`, the captured 5,506 ms boundary, one unchanged open
+`(8,377)` identity, a matching sequence-393 send-success lifecycle record with
+buffered amount 65,943, a matching sequence-560 send-attempt record at or below
+65,536, exact refusal count 166 and endpoint-local link-drop counts `0/0`.
+Current source must report a 5,506 ms unexplained stall and fail the new expected
+qualified result. Negative rows preserve that 5,506 ms as unexplained when the
+refusal count is absent or inconsistent, either endpoint owns a link drop, the
+boundary channel/connection changes, the preceding success did not cross the
+ceiling, the resume attempt remains over ceiling, or a close-call/close-event
+for the selected identity lies inside the interval. A complete 600-send row and
+a loss-free internal cadence row retain their current results. The focused RED
+must select exactly one test in one file and fail only the positive row's exact
+deep equality; source/static gates must otherwise pass. RED is signed and
+pushed without a separate model review.
+
+GREEN replaces only the pure sender continuity calculation and its call site.
+It first preserves factual `nativeGapMaxMs`, the maximum wall interval between
+all successful sender native sends. It computes the retained
+`rawMaxStallMs <= 500` value over consecutive native sequences and every
+unqualified sequence gap. A nonconsecutive interval may be excluded from that
+unexplained-stall maximum only when all of these predicates hold together:
+
+1. the already-validated endpoint-local link-drop counts are exactly `0/0`;
+2. the transmitter's exact unique in-range native sequence complement equals
+   its non-negative `backpressuredDrops` count, so every absent attempt is
+   already closed by D.108e4bg custody;
+3. both native boundary observations use the same open connection/channel;
+4. the preceding matching send-success lifecycle record is on that identity
+   and records buffered amount greater than 65,536;
+5. the next matching send-attempt is on that identity and records buffered
+   amount at or below 65,536; and
+6. no close call or close event for that identity occurs between the boundary
+   lifecycle records.
+
+Qualified intervals remain visible as `rawBackpressureWindowMaxMs`; factual
+`rawNativeGapMaxMs` also remains visible. Neither field is called a pass, a
+native send or continuity. The attachment therefore records this run's 5,506
+ms native/backpressure window while `rawMaxStallMs` continues to fail any
+unexplained sender silence above 500 ms. Existing custody still rejects an
+unaccounted missing attempt, any positive refusal in a replacement topology,
+counter mismatch, identity mutation or lifecycle defect before the performance
+assertion. Receiver loss, AoI, delivery and rendered-product assertions remain
+unchanged.
+
+Because this slice corrects a retained timing oracle and evidence schema even
+without changing its numeric bound, it is a high-risk exception. Sign and push
+this bounded plan, then run one Grok/Codex-`gpt-5.6-sol`-high/Opus-xhigh plan
+review. Only P0/P1 blocks; correct one material union once and do not recurse on
+P2 or prose. Kimi, Fable and collaboration subagents remain prohibited. After
+accepted RED/GREEN, run exact-owner standalone strict TypeScript, ESLint,
+Prettier, `git diff --check`, affected grid build/typecheck, the focused pure
+test once, then one fresh-name non-campaign retained title and the retained
+seven-test allowlist once. A semantic result outside the reviewed matrix stops
+without rerun or added instrumentation.
+
+Sign and push GREEN before the single formal Grok/Codex-high/Opus-xhigh review
+of the complete plan, RED, GREEN and evidence history. Only an empty P0/P1
+union accepts D.108e4bs. The consumed `resolution-ordinary-1` and its root stay
+immutable, the five predecessor-blocked D.108e4br names never run, and no
+campaign retry is authorized by this slice. Accepted GREEN releases a new
+fresh-name campaign-disposition freeze; it does not itself authorize or execute
+that campaign. D.108e5 remains blocked until a separately frozen fresh six-run
+campaign passes and receives its final evidence review.
