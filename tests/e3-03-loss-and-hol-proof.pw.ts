@@ -6,6 +6,7 @@ const CAMPAIGN_LOSS_PERCENT = 30;
 const LATENCY_MS = 40;
 const PACKET_QUEUE_LENGTH = 10;
 const PRELIMINARY_RAW_DELIVERY_FLOOR = 100;
+const RAW_BACKPRESSURE_CEILING_BYTES = 65_536;
 const SAMPLE_COUNT = 600;
 const SAMPLE_INTERVAL_MS = 33;
 const SAMPLE_PAYLOAD_BYTES = 256;
@@ -174,11 +175,13 @@ declare global {
 interface CampaignMetric {
 	readonly clockSkewMs: number;
 	readonly clockSamples: readonly number[];
+	readonly rawBackpressureWindowMaxMs: number;
 	readonly rawAoIP50Ms: number;
 	readonly rawAoIP95Ms: number;
 	readonly rawDelivered: number;
 	readonly rawGap: number;
 	readonly rawMaxStallMs: number;
+	readonly rawNativeGapMaxMs: number;
 	readonly rawDeliveredAfterReliableStart: number;
 	readonly reliableAoIP50Ms: number;
 	readonly reliableAoIP95Ms: number;
@@ -334,12 +337,14 @@ interface ChannelSequenceEvidence {
 interface CampaignEvidence {
 	readonly acceptedObservationIdentities: readonly AcceptedObservationIdentity[];
 	readonly application: Readonly<{
+		readonly rawBackpressureWindowMaxMs: number;
 		readonly rawAoIP50Ms: number;
 		readonly rawAoIP95Ms: number;
 		readonly rawDelivered: number;
 		readonly rawDeliveredAfterReliableStart: number;
 		readonly rawGap: number;
 		readonly rawMaxStallMs: number;
+		readonly rawNativeGapMaxMs: number;
 		readonly reliableAoIP50Ms: number;
 		readonly reliableAoIP95Ms: number;
 		readonly reliableDelivered: number;
@@ -1976,10 +1981,92 @@ interface RawSenderContinuityEvidence {
 
 function rawSenderContinuityEvidence(input: RawSenderContinuityInput): RawSenderContinuityEvidence {
 	const current = rawSequenceEvidence(input.observations);
+	const received = input.observations
+		.filter(({ lane, sentinel }) => lane === "raw" && !sentinel)
+		.sort((left, right) => left.receivedAtMs - right.receivedAtMs);
+	const observedSequences = new Set(received.map(({ sequence }) => sequence));
+	const exactComplement =
+		Number.isSafeInteger(input.backpressuredDrops) &&
+		input.backpressuredDrops >= 0 &&
+		received.length === observedSequences.size &&
+		received.every(({ sequence }) => Number.isSafeInteger(sequence) && sequence >= 0 && sequence < input.sampleCount) &&
+		input.sampleCount - observedSequences.size === input.backpressuredDrops;
+	const matchingLifecycle = (
+		event: "channel-send-attempt" | "channel-send-success",
+		observation: PlatformObservation
+	): readonly D108e4hLifecycleObservation[] =>
+		input.lifecycle.filter(
+			(record) =>
+				record.event === event &&
+				record.attemptId === observation.attemptId &&
+				record.connectionId === observation.connectionId &&
+				record.channelId === observation.channelId
+		);
+	let rawBackpressureWindowMaxMs = 0;
+	let rawMaxStallMs = 0;
+	for (let index = 1; index < received.length; index += 1) {
+		const previous = received[index - 1];
+		const next = received[index];
+		if (previous === undefined || next === undefined) continue;
+		const windowMs = next.receivedAtMs - previous.receivedAtMs;
+		const absentCount = next.sequence - previous.sequence - 1;
+		const previousAttempts = matchingLifecycle("channel-send-attempt", previous);
+		const previousSuccesses = matchingLifecycle("channel-send-success", previous);
+		const nextAttempts = matchingLifecycle("channel-send-attempt", next);
+		const previousAttempt = previousAttempts[0];
+		const previousSuccess = previousSuccesses[0];
+		const nextAttempt = nextAttempts[0];
+		const sameOpenIdentity =
+			previous.connectionId === next.connectionId &&
+			previous.channelId === next.channelId &&
+			previous.readyState === "open" &&
+			previous.insertionReadyState === "open" &&
+			next.readyState === "open" &&
+			next.insertionReadyState === "open";
+		const lifecycleCrossing =
+			previousAttempts.length === 1 &&
+			previousSuccesses.length === 1 &&
+			nextAttempts.length === 1 &&
+			previousAttempt !== undefined &&
+			previousSuccess !== undefined &&
+			nextAttempt !== undefined &&
+			previousAttempt.readyState === "open" &&
+			previousSuccess.readyState === "open" &&
+			nextAttempt.readyState === "open" &&
+			previousAttempt.bufferedAmount !== undefined &&
+			previousAttempt.bufferedAmount <= RAW_BACKPRESSURE_CEILING_BYTES &&
+			previousSuccess.bufferedAmount !== undefined &&
+			previousSuccess.bufferedAmount > RAW_BACKPRESSURE_CEILING_BYTES &&
+			nextAttempt.bufferedAmount !== undefined &&
+			nextAttempt.bufferedAmount <= RAW_BACKPRESSURE_CEILING_BYTES &&
+			previousSuccess.sequence > previousAttempt.sequence &&
+			nextAttempt.sequence > previousSuccess.sequence;
+		const closedInsideWindow =
+			lifecycleCrossing &&
+			input.lifecycle.some(
+				(record) =>
+					(record.event === "channel-close-call" || record.event === "channel-close-event") &&
+					record.connectionId === previous.connectionId &&
+					record.channelId === previous.channelId &&
+					record.sequence > previousAttempt.sequence &&
+					record.sequence < nextAttempt.sequence
+			);
+		const qualified =
+			absentCount > 0 &&
+			input.senderLinkDrops === 0 &&
+			input.receiverLinkDrops === 0 &&
+			exactComplement &&
+			sameOpenIdentity &&
+			lifecycleCrossing &&
+			!closedInsideWindow &&
+			windowMs <= (absentCount + 1) * input.intervalMs + 500;
+		if (qualified) rawBackpressureWindowMaxMs = Math.max(rawBackpressureWindowMaxMs, windowMs);
+		else rawMaxStallMs = Math.max(rawMaxStallMs, windowMs);
+	}
 	return Object.freeze({
 		gap: current.gap,
-		rawBackpressureWindowMaxMs: 0,
-		rawMaxStallMs: current.maxStallMs,
+		rawBackpressureWindowMaxMs,
+		rawMaxStallMs,
 		rawNativeGapMaxMs: current.maxStallMs,
 	});
 }
@@ -9547,7 +9634,6 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			const receiverRawCounterDelta = receiverAtDeadline.zone.rawTransport.received - receiverRawBefore;
 			const productRosterRawCount = productRoster.filter(({ lane, sentinel }) => lane === "raw" && !sentinel).length;
 			const receiverSequence = rawSequenceEvidence(raw);
-			const senderSequence = rawSequenceEvidence(senderRaw);
 			const rawAoI = ageOfInformation(raw, campaignStartedAtMs, deadlineMs, SAMPLE_INTERVAL_MS);
 			const reliableAoI = ageOfInformation(reliable, campaignStartedAtMs, deadlineMs, SAMPLE_INTERVAL_MS);
 			const rawAoIP50Ms = percentile(rawAoI, 0.5);
@@ -9593,15 +9679,26 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			}) satisfies D108e4hValidationInput;
 			updateTrialProgress({ replacementCustody });
 			validateD108e4hCampaignCustody(replacementCustody);
+			const senderContinuity = rawSenderContinuityEvidence({
+				backpressuredDrops: replacementCustody.rawTransportDeltas.creator.backpressuredDrops,
+				intervalMs: SAMPLE_INTERVAL_MS,
+				lifecycle: replacementCustody.endpoints.creator.lifecycle,
+				observations: senderRaw,
+				receiverLinkDrops: replacementCustody.rawTransportDeltas.receiver.linkDrops,
+				sampleCount: SAMPLE_COUNT,
+				senderLinkDrops: replacementCustody.rawTransportDeltas.creator.linkDrops,
+			});
 			const trialEvidenceBase: Omit<CampaignEvidence, "runTrialReturnedAtMs" | "runReturnSenderWire"> = {
 				acceptedObservationIdentities,
 				application: Object.freeze({
+					rawBackpressureWindowMaxMs: senderContinuity.rawBackpressureWindowMaxMs,
 					rawAoIP50Ms,
 					rawAoIP95Ms,
 					rawDelivered: raw.length,
 					rawDeliveredAfterReliableStart,
 					rawGap: receiverSequence.gap,
-					rawMaxStallMs: senderSequence.maxStallMs,
+					rawMaxStallMs: senderContinuity.rawMaxStallMs,
+					rawNativeGapMaxMs: senderContinuity.rawNativeGapMaxMs,
 					reliableAoIP50Ms,
 					reliableAoIP95Ms,
 					reliableDelivered: reliable.length,
@@ -9714,18 +9811,20 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 				scheduledReliable.every(({ receivedAtMs, sentAtMs }) => receivedAtMs >= sentAtMs && receivedAtMs <= deadlineMs)
 			).toBe(true);
 			expect(receiverSequence.gap).toBeGreaterThan(1);
-			expect(senderSequence.maxStallMs).toBeLessThanOrEqual(500);
+			expect(senderContinuity.rawMaxStallMs).toBeLessThanOrEqual(500);
 			expect(rawAoIP95Ms).toBeLessThanOrEqual(reliableAoIP95Ms * 0.8);
 			expect(rawDeliveredAfterReliableStart).toBeGreaterThanOrEqual(10);
 			metrics.push(
 				Object.freeze({
 					clockSamples: clock.samples,
 					clockSkewMs: clock.maximumSkewMs,
+					rawBackpressureWindowMaxMs: senderContinuity.rawBackpressureWindowMaxMs,
 					rawAoIP50Ms,
 					rawAoIP95Ms,
 					rawDelivered: raw.length,
 					rawGap: receiverSequence.gap,
-					rawMaxStallMs: senderSequence.maxStallMs,
+					rawMaxStallMs: senderContinuity.rawMaxStallMs,
+					rawNativeGapMaxMs: senderContinuity.rawNativeGapMaxMs,
 					rawDeliveredAfterReliableStart,
 					reliableAoIP50Ms,
 					reliableAoIP95Ms,

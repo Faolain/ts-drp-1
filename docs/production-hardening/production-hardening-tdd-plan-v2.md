@@ -83123,3 +83123,65 @@ deterministically proves the nonzero test-failure result; the test was not
 rerun. The evidence root preserves a wrapper note and the original complete
 reporter and streams. This bookkeeping defect does not affect RED causality and
 will be avoided in later wrappers by using `runner_rc`.
+
+D.108e4bs GREEN implements only the reviewed test-side sender continuity
+calculation and evidence fields. The single focused execution passed 1/1 with
+expected/skipped/unexpected/flaky `1/0/0/0` and zero top-level errors. Exact
+standalone strict TypeScript, ESLint, Prettier and `git diff --check` passed;
+the affected grid build and typecheck both returned zero. Focused reporter,
+stdout and stderr SHA-256 values are respectively
+`e6fa67df91fd29af4802529e9aebf6f677909370b0417d432db15cd3ada00062`,
+`06102f528374072ad76a471e608c690e0b1e6e2103b9d790471b7b296f09a4b5`
+and
+`260361deee174f20809d4558ff9a866b509f70631cb43bbb87ff9dddd830c491`.
+Grid build stdout/stderr and typecheck stdout/stderr SHA-256 values are
+`bd34bcf966d433a6da97fac4bd466c0df1a546025bf0e680480fb322d2a42d60`,
+`5ede836919696ec04a96900a7fa8c651cf4160f93f56090d9205f624de123c79`,
+`087eba9acd40302f69876972072fe38b513f0ba47b13ec083ed1f5c79586642f`
+and
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+The required fresh write-once retained-browser gate
+`.logs/d108e4bs-retained-browser-1/` then consumed exactly one invocation and
+failed, so the retained seven did not run and D.108e4bs is not closed. The
+reporter recorded expected/skipped/unexpected/flaky `0/0/1/0`, zero top-level
+errors and a single failure after all three fixed loss trials had completed
+their assertions. Those trials reported unexplained/factual sender gaps
+`39/39`, `39/39` and `78/78` ms, no qualified backpressure window, passing raw
+loss/AoI/delivery/custody/timing gates and no D.108e4bs mismatch. The failure
+was the later durable-control poll: creator committed local block
+`e3-03-durable-control` and reached durable count 3, while receiver remained at
+baseline 2 for the full 20-second poll.
+
+Reporter, stdout, stderr and trace SHA-256 values for that retained result are
+respectively
+`a5c01bb8ad4d2943060885903e5674c8b468eb56c6efb58e3e5046764aa2c72a`,
+`24f3d8d9c1641ad637e22f44280580882e854ec013f4b261ed8c043f2d24f102`,
+`d9afe7d62f0415e2290a4472e364cb4c8032a30b7762c2ecc1bf2595a89b3f3d`
+and
+`bc3b528fd427f123119f4b7ff669d1781a1d2a35e6c5345cb27bb851c7337b48`.
+The name is permanently consumed and is never retried or overwritten.
+
+The captured trace proves the final CDP profile changed from 30% loss to exact
+no-loss before the durable check. Both raw links and both original peer rosters
+then recovered; creator reset completed, receiver reset completed, and the
+same open-raw/network predicates passed after each endpoint reset. The helper
+nonetheless inferred durable readiness solely from peer-list and raw-sidecar
+state. The creator issue returned after about 2.06 seconds but receiver never
+applied it. Existing evidence therefore supports the D.108e4bs sender repair
+but does not distinguish a reliable/durable product liveness defect from an
+insufficient post-reset durable-readiness fixture.
+
+As a one-off advisory disposition requested by the operator, exact Grok
+session `01a055aa-670d-7d62-8bdf-ce273b6fc3c9` was continued one final time,
+not relaunched. It classified the durable miss `INSUFFICIENT_EVIDENCE` at high
+confidence and the sender repair `SUPPORTED`. Its response prepended one
+progress sentence to the requested JSON, so it is not represented as a strict
+formal verdict. Prompt and raw-result SHA-256 values are
+`eba1b41851a9fc4dcfc8e33135d900966cf8abdba3c3f83ccfc56ead3e75d518`
+and
+`0c772fd26236ddab77110b633f31b5ddc3c85d8692686d9d9c2096c218ce482e`.
+No further continuation is implied. Preserve this implementation and failed
+retained evidence in a signed/pushed checkpoint, then proceed through a narrow
+TDD slice that makes post-reset durable readiness causal before another fresh
+retained-browser name is authorized.
