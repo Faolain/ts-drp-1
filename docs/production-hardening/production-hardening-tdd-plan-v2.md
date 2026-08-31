@@ -85324,6 +85324,118 @@ test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.log
 Six passes release one signed/pushed campaign-evidence checkpoint and the
 single final evidence review, then D.108e5 and Phase-6a closure resume.
 
+The D.108e4ce ledger stopped at its first consuming failure. The first name,
+`censusgate-ordinary-1`, ran once and passed: direct/finalizer statuses are
+zero, reporter expected/skipped/unexpected/flaky is `1/0/0/0`, retry is zero,
+there are no errors, Chromium is `151.0.7922.34`, and all three trials
+completed with raw delivery 396/411/425 and reliable delivery 9/7/13. The
+second name, `censusgate-ordinary-2`, ran once from `2026-08-31T08:37:22Z`
+through `08:38:49Z` and failed with direct/finalizer statuses one. Its reporter
+is `0/0/1/0`, has no top-level error, and contains one retry-zero failed result
+after 76.879 seconds with exact `D108E4H_LIFECYCLE_ORDER_INVALID` from
+`d108e4hAssertDeadlinePendingCandidate`. `censusgate-ordinary-3` and all three
+`censusgate-isolated-*` names remain absent and permanently predecessor-
+blocked; none may run, be reused or be represented as campaign confidence.
+
+The immutable campaign reporter, failure telemetry, endpoint classifier,
+trace, 128-entry cumulative manifest and validation SHA-256 values are
+respectively
+`1251ae0ec110bb28cf696fc1c1760a890f49b5896a3fe61a1c3dc4d4f7c29cc2`,
+`40b3a8654b4cf03549eb64b8068b5762a2fa57b6d2e4f145a7106b0ca99df390`,
+`dc1bd44a50847168d6001b9dcd580e41cd37682f6945d80605ef4b951f3c0c36`,
+`b3f8f81797b4fd9427e239a1df3340e0ab1a4a41823fe44475cdd721f2d99fcb`,
+`00256fce3cec098ff3ee08d483c957b918fa133839d6dc5fad113b0daf6de24d`
+and
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+All entries validate from `.logs/d108e4ce-campaign/`. The seven-entry derived
+diagnosis manifest and validation hashes are
+`12494404bcdb68da29b94e71de40d2d05ee81b10e828d4e815a58d87795ff06d`
+and
+`38401bb9398da049b9bf7d6edec01b28bbf91536544386f06f5515c012c56fac`;
+all entries validate from `.logs/d108e4cf-diagnosis/`.
+
+###### D.108e4cf — eager acceptor pending-prefix custody
+
+D.108e4cf is the narrow tests-only TDD owner for the consumed D.108e4ce
+failure. Its executable owner is only
+`tests/e3-03-loss-and-hol-proof.pw.ts`; this plan is the documentation owner.
+`packages/network/src/unreliable-webrtc.ts`, all configuration, launcher,
+classifier and product/example sources are read-only. Do not change product
+behavior/APIs, wire or identity semantics, dependencies, browser, workload,
+loss, thresholds, timeout, watchdog, ports or campaign machinery. Any need for
+such a change stops and reslices.
+
+The captured trial `e3-03-0` is a campaign-wide zero-local state: both endpoint
+`linkDrops` deltas are zero, both authenticated identities are stable, and
+each endpoint retains its selected RTC owner plus one open, control-only,
+nonterminal deadline candidate. The creator candidate is an initiator prefix:
+one open event, one open product handler, READY after both, no received
+control. The receiver candidate is the earlier acceptor prefix: one open
+product handler at lifecycle 1287, one ACK at 1288, no received control yet,
+and the observer open event at 1290. Neither candidate owns application data.
+The product behavior is intentional and already visible in read-only source:
+`#prepareLink` installs its message handler and immediately sends READY for an
+initiator or ACK for an acceptor. Therefore an acceptor can be captured after
+its eager ACK but before READY and the second ACK; observer installation on an
+already-open channel can place the open event after that send. The validator
+currently requires the completed READY-plus-post-READY-ACK prefix and
+misclassifies this legitimate earlier prefix as neither initiator nor
+acceptor. This is a validator coverage gap, not a product defect.
+
+**Causal RED.** In the existing telemetry-only title `validates schema-v3
+replacement custody without cross-peer clocks`, derive one
+`eagerAcceptorPending` fixture from the accepted deadline-pending fixture.
+Retain the common selected RTC and one deadline candidate, the exact open
+product handler with `readyState: "open"`, the single open event and the first
+ACK send; remove the READY receive and later ACK send. Keep all other endpoint,
+trial, identity, application and transport custody unchanged. Add one named
+soft `not.toThrow` expectation. Under `D108E4H_TELEMETRY=1`, list and execute
+that exact focused title once. RED must select one test in one file, exclude
+the retained three-trial title, return `0/0/1/0`, contain zero top-level errors
+and one failed result, and expose only the named expectation with exact
+`D108E4H_LIFECYCLE_ORDER_INVALID` from the final role assertion in
+`d108e4hAssertDeadlinePendingCandidate`. A different token, owner or matrix
+stops for diagnosis. Preserve a self-excluding RED manifest, sign and push it,
+and never rerun RED.
+
+**GREEN.** Extend only the pending-candidate role classifier with an exact
+`eagerAcceptor` prefix. It requires all candidate controls after the open
+product handler, handler `readyState: "open"`, exactly one sent control of kind
+ACK, and zero received controls. It does not order that ACK against the
+observer open event because the captured already-open path legitimately
+records the observer event later. Keep the existing exactly-one open, exactly-
+one product handler, no terminal event, control-byte validation and control-
+only candidate ownership. Require exactly one of initiator, completed acceptor
+or eager acceptor to match.
+
+Add the frozen eager-prefix mutant batch in the same focused owner: missing
+ACK, duplicate ACK, non-ACK kind, control before the product handler, non-open
+product handler and any received control without the completed acceptor
+sequence all retain exact `D108E4H_LIFECYCLE_ORDER_INVALID`. Preserve the
+existing no-role, missing/duplicate open, missing handler, terminal,
+pre-open-receive, second-eager-ACK, no-post-READY-ACK, wrong-control-kind and
+candidate-application-owner mutants with their current exact codes. Do not
+widen completed acceptor or initiator ordering.
+
+Run focused GREEN once, standalone strict TypeScript, exact-owner ESLint and
+Prettier, `git diff --check`, affected grid typecheck/build, the two D.108e4ax
+rows, complete network owner, both exact D.108e4g titles and the exact retained
+seven once. If any result falls outside its expected matrix, stop rather than
+folding more changes into GREEN. Preserve commands, complete results, hashes
+and a validating self-excluding manifest.
+
+This tests-only slice changes campaign-readiness acceptance and therefore uses
+the high-risk exception. Sign and push this bounded plan, then run one
+Grok-high/Codex-`gpt-5.6-sol`-high/Opus-xhigh plan review. If Grok cancels,
+resume that exact session. Only P0/P1 findings affecting causal attribution,
+role-prefix exclusivity, retained acceptance or scope block; correct them once
+only if required. RED receives deterministic local validation, not another
+three-model round. After signed GREEN and all gates, run the single formal
+three-model review over plan, RED, GREEN and the consumed campaign evidence.
+Do not use Kimi, Fable or collaboration subagents. An empty final P0/P1 union
+releases one fresh write-once retained title; only its pass may freeze six
+wholly fresh campaign names.
+
 Consumed D.108e4bu reporter, stdout, stderr, failure telemetry,
 endpoint-classifier, trace, cumulative manifest, and manifest-validation
 SHA-256 values are respectively
