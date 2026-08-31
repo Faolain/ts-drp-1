@@ -1819,6 +1819,36 @@ function expectReliableSenderSamples(observations: readonly PlatformObservation[
 	return samples;
 }
 
+if (process.env["D108E4BX_RELIABLE_RETRY_RED"] === "1") {
+	test("D.108e4bx accepts one exact reliable retry across physical stream identity", () => {
+		const sequences = [0, 1, 2, 3, 4, 4, 5, 6] as const;
+		const observations = sequences.map((sequence, ordinal): PlatformObservation => {
+			const duplicate = sequence === 4 && ordinal === 5;
+			return Object.freeze({
+				attemptId: ordinal,
+				byteLength: 256,
+				carrierByteLength: 496,
+				channelId: sequence === 4 ? (duplicate ? 506 : 495) : 100 + ordinal,
+				channelLabel: "reliable",
+				connectionId: sequence === 4 ? (duplicate ? 13 : 9) : 1,
+				insertionReadyState: "open",
+				lane: "reliable",
+				lifecycleSequence: ordinal,
+				maxRetransmits: null,
+				ordered: true,
+				ordinal,
+				receivedAtMs: 2_000 + ordinal,
+				readyState: "open",
+				sentAtMs: 1_000 + sequence,
+				sequence,
+				sentinel: false,
+			});
+		});
+
+		expect(expectReliableSenderSamples(observations)).toEqual(observations);
+	});
+}
+
 function partitionReceiverEvidence(
 	observations: readonly PlatformObservation[],
 	productRoster: readonly FabricObservation[]

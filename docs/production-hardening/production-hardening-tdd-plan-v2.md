@@ -84079,6 +84079,30 @@ so the deterministic local audit below must verify them before RED; the
 governing prospective protocol does not require a recursive model confirmation
 round.
 
+The corrected plan checkpoint is signed/pushed commit
+`8dff6ceff47ac1528ec070d0ee398e7e80e368a0`, tree
+`b71a3deefbdfe7152836fa45279904cbba0557a1`. D.108e4bx RED is accepted and
+is never rerun. The exact listing selected one test in one file and excluded
+the retained browser title. The sole focused execution returned one with
+expected/skipped/unexpected/flaky `0/0/1/0`, zero top-level errors and one
+failed result. Its only error is the current
+`expectReliableSenderSamples` physical unique-sequence assertion: expected
+eight and received seven at the intended helper line. All earlier bounds
+passed, so this is the frozen causal RED and not an unrelated fixture failure.
+The reporter, listing, ten-entry self-excluding manifest,
+manifest-validation, causal-validation, and RED test-owner SHA-256 values are
+respectively
+`8fd7f720467f6dc8ff3399c99374b759d8ed12d0efbb7922438f4c9e834975af`,
+`3de22619c94cef12d8db86df422e758f26a5922d5a998d1140b53eb44bb516c0`,
+`0915de00593958f55bdbc8e8c3f162dde8052da47adce500d3c6246700a83b8c`,
+`53f5fe29a9a10e26a8cfc45de824e00a5f42b98d502a4e5ab29a2ef7f1ab5e26`,
+`ea0cc25fcaa60a0408f93ece9b26bf4d87ab9156ee4bd391d21d734ba97f077b`
+and
+`3041abbee952c4810e109bfa9ef2d137d3dbb08aeb77f66025402b1d86e5a65f`.
+All ten manifest entries validate from `.logs/d108e4bx-red`; the sole changed
+source path is `tests/e3-03-loss-and-hol-proof.pw.ts`. GREEN may now change
+only that frozen test helper and focused fixture matrix.
+
 After signed/pushed GREEN, the single final Grok/Codex-high/Opus-xhigh review
 must inspect plan, causal RED, GREEN, exact retry classification, unchanged raw
 and logical-dedup contracts, static/retained gates and scope. Only an empty
