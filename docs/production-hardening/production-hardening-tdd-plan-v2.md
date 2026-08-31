@@ -86679,3 +86679,164 @@ the wrong relative-path base and reported missing files; the corrected
 read-only command `(cd .logs/d108e4bu-campaign && shasum -a 256 -c
 ARTIFACT-SHA256SUMS)` passes all entries. That diagnostic mistake is not
 evidence corruption and does not mutate the existing manifest.
+
+##### D.108e5 — redirected lifetime order and bounded migration capture
+
+D.108e5 is the final narrow production RED/GREEN owner assigned by the
+D.108e3 GREEN review and released by the signed D.108e4 closure at
+`fd394cc606ae021484368485edb37917af14c46f`, tree
+`a1ab86dd29da9cc21495d495d7124567d0440050`. It closes two residual contracts
+in the same room owner without reopening D.108e3 or D.108e4: calls made on a
+redirecting source must retain call order, and migration byte/invite inputs
+must be bounded before allocation while preserving call-time capture. This is
+one checkpoint because both contracts are private call-entry custody in
+`examples/v3-room/src/index.ts` and share the existing four D.108e3 test
+owners. They are implemented as two diagnostic batches without separate
+review ceremony.
+
+The exact RED roster is:
+
+- `tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts`;
+- `tests/phase-6a-creator-successor-product-red.test.ts`;
+- `packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts`;
+  and
+- `packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts`.
+
+The sole GREEN owner is `examples/v3-room/src/index.ts`. Their starting
+SHA-256 values in that order are
+`b45b91ede0b7cf30b646d8a2f9ae62a716146dd550de4c0c4cf14c5f356e4aa7`,
+`2e91c499d0f99368c5256be788aa8da7738d8b2738d64bcc60838ff7402aa674`,
+`7bbd58d48032aa3c98b197719e8522f3184c0cb89b0da4fed0bea6cdbb2d9842`,
+`3ccf045231dd5aff029576ce6ebc42f33a0022534beff62332d4546129b27d8b`
+and
+`6e9aff001f1b327ebe1684aa9c4269a08a6f7b45c7d3093739fe29c1514c1d30`.
+The existing Playwright configuration remains an unchanged retained owner at
+SHA-256
+`c516cf631da3070da662170224b46202d58788e19daadba8f3371e004b0f7567`.
+No package manifest, lockfile, dependency, build configuration or additional
+production path may change. The lockfile and root-manifest SHA-256 values stay
+`73c7c0660fa32c7380d0fe5a026897a7ad85a40edf1f169730c2d8e44e613a99`
+and
+`6ca5cc4a47f6e807cb653fa29a43839d497613f2ba363608c894392c6ccb084d`.
+
+The test contract adds exactly four D.108e5 behavior labels:
+
+- `redirect-pending adoption stays ahead of rehearsal`;
+- `redirect-pending adoption stays ahead of activation`;
+- `activation bytes are bounded before call-time copy`; and
+- `migration invites are bounded before call-time encoding`.
+
+They form one browser title by joining them with `; `; no existing D.108d2,
+D.108e2 or D.108e3 title changes.
+
+Batch one owns redirected lifetime ordering. Extend the existing browser
+instrumentation with a deterministic gate on the redirect session's target
+preparation, not a timer or production hook. In each of two fresh real-room
+scenarios, publish a genuine migration activation until `ensureRedirect()` is
+creating the replacement and hold that creation. From one synchronous browser
+task, invoke `adoptCreatorSuccessor()` first and then either
+`rehearseMigration()` or `activateMigration()`. Release redirect creation and
+use the existing verification, migration-record, terminal-transition and
+settlement observations to prove the first call owns the target before the
+second can enter. The RED must demonstrate the current bypass: the later
+rehearsal/activation registers directly on the pending redirect before the
+earlier adoption's queued transition begins. GREEN must make all three public
+entry calls reserve the existing per-session `lifetimeTransitionTail` in call
+order and perform pending-redirect wait/forwarding inside that one queue. It
+must not add a second queue, global owner, compatibility branch or parallel
+activation path. Concurrent adoption still shares
+`creatorSuccessorAdoptionTask`; independent sessions remain independent;
+failed redirect or operation releases the tail; close retains its existing
+join and failure ordering.
+
+Batch two owns bounded call-time capture. Freeze the unchanged limits as
+private implementation facts: migration activation record bytes are nonempty
+and at most `49_152`; the decoded/encoded creator invite is at most `65_536`
+bytes, so a hexadecimal string invite is at most `131_072` characters. Add a
+single no-allocation byte-view metadata owner based on the already-captured
+intrinsic buffer, byte-length and byte-offset getters. Callers apply their
+existing validation policy to that metadata.
+`snapshotMigrationActivationInput` must inspect the supplied view length and
+reject exact oversized input with
+`v3 room migration activation record is unbounded` before constructing or
+copying any byte owner; a bounded valid view is copied at call time and later
+caller mutation cannot affect execution. Invite-string length is rejected
+before hex decoding. Object invite capture must compute the exact canonical
+envelope length from fixed fields, intrinsic byte-field lengths and canonical
+byte-string header widths before `encodeCanonical` can copy any caller body;
+only a bounded object is encoded into the existing call-time string snapshot.
+The post-encode and decode ceilings remain defense in depth at the same
+`65_536` limit. An oversized object invite rejects with
+`v3 room migration target invite is unbounded`; other invalid inputs preserve
+their existing receiver-owned classifications. Bounded object and string
+invites retain call-time identity under immediate caller mutation.
+
+The RED contract contains no product edit. The focused Vitest owner uses the
+TypeScript AST, not regex, to prove that current activation capture allocates
+before the `49_152` guard and current invite object/string capture lacks the
+required pre-copy ceiling. The focused browser title then proves both pending-
+redirect order inversions while retaining controls for boundary-size
+classification, over-limit error strings and bounded valid call-time mutation
+capture. RED acceptance is the frozen matrix only: the existing
+six focused Vitest cases stay green; the new AST ownership cases fail for the
+two intended missing pre-copy owners; and the new Chromium browser title fails
+only its two desired adoption-first order assertions. Any module-load, boot,
+timeout, top-level reporter error, unrelated semantic mismatch or different
+error string stops and is diagnosed before GREEN.
+
+Run RED once per focused surface after exact listing:
+
+```sh
+pnpm exec vitest run --coverage.enabled=false tests/phase-6a-creator-successor-product-red.test.ts --maxWorkers=1 --minWorkers=1
+```
+
+```sh
+pnpm exec playwright test --config packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts --project=chromium --grep 'redirect-pending adoption stays ahead of rehearsal; redirect-pending adoption stays ahead of activation; activation bytes are bounded before call-time copy; migration invites are bounded before call-time encoding$' --reporter=json --fail-on-flaky-tests
+```
+
+Record complete reporters, selected-test/file counts, exact assertion and
+error sets, stdout/stderr, runner statuses, source hashes and a validating
+self-excluding manifest. The browser RED must select exactly one test in one
+file with retries zero. Do not run a retained campaign or add telemetry to
+production.
+
+GREEN implements batch one first and runs the focused Chromium title once. If
+its only remaining mismatches are the frozen batch-two ownership cases,
+implement batch two and run the focused Vitest and Chromium title once. A
+result outside the reviewed matrix stops without folding in more changes.
+After focused GREEN, require:
+
+- the full creator-successor product browser configuration across Chromium,
+  Firefox and WebKit with zero retries and no flaky result;
+- the retained D.108e3 composite title across all three engines;
+- the Phase-6a activation, creator-adoption-commit and successor-epoch browser
+  matrices;
+- the complete focused/root Phase-6a creator-successor selections affected by
+  the four test owners;
+- v3-room and storage-browser builds and passing typechecks;
+- exact-five ESLint and Prettier checks, `git diff --check`, AST/source-shape
+  checks and an exact changed-path audit; and
+- protected untracked paths, all 26 stashes, clear fixed ports and no active
+  ts-drp test/reviewer/profiler conflict.
+
+The final proof uses a fresh detached checkout of the accepted GREEN with no
+package/example `dist`, performs the frozen offline ignore-scripts install and
+fresh affected dependency builds, and reruns the focused Vitest, full three-
+engine product matrix and affected build/typecheck/static gates. The checkout
+must end tracked-clean and resolve only its freshly built workspace packages;
+the ordinary checkout cannot mask it.
+
+This is a high-risk exception because it changes production call ordering and
+the point at which resource ceilings reject input. It does not change the
+ceilings themselves. Sign and push this bounded plan, then run one read-only
+Grok 4.6 high, Codex `gpt-5.6-sol` high and Opus xhigh plan review over the
+exact immutable commit. If Grok cancels, resume that exact session; do not
+start a replacement. Only P0/P1 findings affecting causal RED, the one-queue
+invariant, pre-copy proof, current limits or retained semantics block. Correct
+one material union at most. Deterministic RED receives no separate model
+round. Sign and push GREEN before the single final three-model review of plan,
+RED, GREEN and evidence. Kimi, Fable and collaboration subagents are not
+authorized. No campaign, wire, receipt, digest, activation authority, public
+API, dependency, limit, timeout or workload change is permitted. An accepted
+empty final P0/P1 union closes D.108e5 and releases the remaining Phase-6a exit
+ledger.
