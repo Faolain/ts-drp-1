@@ -87342,3 +87342,65 @@ Its raw-result SHA-256 is
 The confirmation allowance is consumed, the corrected plan has an empty
 blocking union, and deterministic D.108e6 RED is released without another
 review round.
+
+Deterministic RED is signed/pushed commit
+`9443c922cb957113b7b65248ff777b13049f2a36`, tree
+`44f0080a9c8af4ccef621081b8740e6f029c9391`, parent plan closure
+`20d2ba09559b18169c69e42534f6a80101f76db1`. Its commit-range changed-path
+set is exactly the one frozen RED owner. The focused command selected ten
+tests in one file: seven retained tests passed and exactly three D.108e6 tests
+failed with the frozen five assertions. Current setup omitted the exact root
+from both live-owner and populated-root refusals, left its setup-created empty
+parent, deleted the caller-owned dangling symlink, and omitted the exact
+`D108E6_AFTER_ROOT_CREATED_SEAM_ABSENT` test core. The pre-existing-empty-
+parent and retained sibling/populated-byte controls otherwise passed. Both
+shim paths were absent after test teardown. Focused stdout/stderr SHA-256
+values are
+`ac84960456cb01a88fe6f4d1528c6e88644415a5ce06d7a733f31fa87b00003f`
+and
+`273b3d6d7ff29574e751477774ee0341133001b12b5a027263d85a4188d50edb`.
+
+The first RED static capture found only four type-surface style diagnostics:
+one import-order rule and three required method shorthands. Correcting those
+changed no assertion or runtime expression—the interface declarations erase
+and the same imports remain—so the frozen exactly-once RED runtime was not
+repeated. Final exact-owner ESLint with zero warnings, Prettier,
+`git diff --check` and the one-path set gate passed. The signed RED test hash
+is `cdcbaa6a759ea7f1e0572f07a4eb43dc3d34c98af402d86e503d9038801b532e`.
+The ten-entry self-excluding manifest at
+`.logs/d108e6-red/ARTIFACT-SHA256SUMS` validates completely and has SHA-256
+`0fdd4c514f99dbfd34824abfeda3c8ff2889cffe652c7ef36f05b8628f9eae60`.
+
+GREEN is signed/pushed commit
+`4e4548b01cf4808660c60e3deee37329f1bca19a`, tree
+`74bce656ce42773f87c10e983d8b74d820b3ca69`, parent RED `9443c922`; its
+commit-range changed-path set is exactly the one frozen GREEN owner. The setup
+core now uses non-following `lstatSync`, refuses the exact root before cleanup,
+tracks root creation separately from parent entry state, removes only its
+created root, and uses non-recursive `rmdirSync` only for a parent absent at
+entry. The named synchronous post-root hook is test-only; the default
+Playwright export still invokes the core with no hook. Returned cleanup is
+idempotent, caller-owned empty parents and siblings remain, dangling links and
+populated roots are refused without mutation, and error cleanup removes both
+setup-owned paths. No product, configuration, dependency or campaign path
+changed.
+
+The single focused GREEN command passed 10/10; stdout/stderr SHA-256 values are
+`e033b65ae1e5f1a3f7fdffeb3c814db0f5962ef980453691be7623915b19ca1c`
+and
+`3a55ac3bd579caf46316b3e6b2559f06be5ecf571fa2df1789b264920ec7bf1f`.
+The unchanged activation Playwright configuration passed 24/24 across
+Chromium, Firefox and WebKit with `skipped=0`, `unexpected=0`, `flaky=0` and
+no top-level or stderr error; JSON SHA-256 is
+`6c70639b124aa192891bc688bc5e7adef4b6cbf42068ae3405d298cfc1497c03`.
+Both exact shim paths were absent before and after. Storage-browser typecheck,
+exact-two ESLint with zero warnings, exact-two Prettier, `git diff --check`,
+frozen config/lockfile/root-manifest hashes and exact GREEN-path set equality
+passed. The GREEN owner hash is
+`1afb2c4feb8cbdf305213930c7d60ce8466fa2f7d37ad0d46e907dca5628a5da`.
+The 18-entry self-excluding manifest at
+`.logs/d108e6-green/ARTIFACT-SHA256SUMS` validates completely and has SHA-256
+`4f214f64b90de303e44a2fb4ea06602c0f334ae40b1df396877d87d3b5dce31d`.
+Protected untracked paths and all 26 stashes remain untouched; no retained
+campaign ran. The single final plan-to-RED-to-GREEN review is the only
+remaining D.108e6 and Phase-6a exit gate.
