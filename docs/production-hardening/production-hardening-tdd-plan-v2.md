@@ -83963,6 +83963,83 @@ and
 `81ac8e6d0616c967b3932e44dbb9db3d35827f7c6d7e8387c80638f78799437b`.
 The consumed root is immutable and is never retried, overwritten or reused.
 
+###### D.108e4bx — reliable retry sender-evidence consistency
+
+D.108e4bx starts from signed/pushed D.108e4bw checkpoint
+`e91104eb996f039bcf1c4ab4a4cee462e01894b0`, tree
+`424ec79be9a35768e48af873b1cd44b309107635`. It owns only
+`tests/e3-03-loss-and-hol-proof.pw.ts`, this plan and ignored evidence under
+fixed D.108e4bx roots. Product/example source, dependencies, browser and build
+configuration, wire formats, delivery classes, retry count, loss profile,
+workload, three-trial count, sample count/interval/bytes, timing and performance
+thresholds, watchdog, ports, campaign launcher and all consumed evidence remain
+frozen. If GREEN requires production or example source, stop and reslice.
+
+The concrete defect is a stale sender-evidence expectation. `reliable-unordered`
+has bounded at-least-once physical transport attempts: one logical publication
+can be written on one stream, return an ambiguous failure after delivery, and
+be attempted on another stream. Receiver wire validation already permits
+nondecreasing duplicate reliable markers, and the product roster plus both
+metric owners select the first observation per logical sequence. The sender
+helper alone requires physical count to equal unique sequence count. The
+retained failure captured the exact same logical marker `(sequence=4,
+sentAtMs=1788153399139)` twice with equal payload/carrier lengths and distinct
+physical `(connectionId, channelId)` identities. This slice does not claim
+network exactly-once and does not weaken raw-lane uniqueness.
+
+RED adds one opt-in deterministic test under
+`D108E4BX_RELIABLE_RETRY_RED=1`, titled exactly `D.108e4bx accepts one exact
+reliable retry across physical stream identity`. Its sole positive fixture has
+eight reliable non-sentinel physical observations with logical sequences
+`0,1,2,3,4,4,5,6`; both sequence-4 rows have the same `sentAtMs`, byte length,
+carrier length and marker metadata but distinct connection/channel identities.
+The current `expectReliableSenderSamples` must fail only at its physical
+unique-sequence assertion with expected eight and received seven. Listing must
+select exactly one test in one file and exclude the retained browser title. Any
+different RED matrix stops.
+
+GREEN changes only `expectReliableSenderSamples` and the deterministic focused
+fixture. The helper retains the existing nonempty and physical
+`samples.length <= SAMPLE_COUNT` bounds, in-range sequence check, nondecreasing
+logical sequence order and return of every physical observation. It groups by
+sequence and permits more than one row only when every member has the exact same
+logical marker `sentAtMs` and byte/carrier lengths and every member owns a
+distinct `(connectionId, channelId)` physical stream identity. Thus the
+captured retry remains visible to downstream ready-state, transport-shape,
+connection-roster and deadline checks; it is not collapsed or hidden.
+
+The GREEN focused matrix accepts the exact cross-connection retry and a
+same-connection/different-channel retry while preserving both input object
+identities in the returned array. It rejects same-sequence/different-`sentAtMs`,
+same-marker/same-physical-identity, descending sequence and out-of-range
+mutants. The existing raw duplicate rejection, reliable sentinel rules,
+receiver partition, first-by-sequence logical selection, product metrics and
+all D.108e4h error tokens remain unchanged. No new product identifier,
+deduplication behavior, transport acknowledgement or retry policy is added.
+
+Because this corrects a retained campaign acceptance predicate, it is a
+high-risk evidence exception despite its tests-only owner. Sign and push this
+bounded plan, then run one Grok/Codex-`gpt-5.6-sol`-high/Opus-xhigh plan review.
+Only P0/P1 blocks; correct one material union once, do not recurse on P2/prose,
+and if Grok is canceled resume that exact session instead of relaunching.
+After an empty blocking union, run the exact focused RED once, validate and
+sign/push it, then implement GREEN and run the focused test once. Follow with
+standalone strict TypeScript, exact-owner ESLint/Prettier/diff, grid
+typecheck/build, the D.108e4h schema title, the existing D.108e4g lifecycle
+title, both D.108e4ax rows with coverage disabled, the complete 114-test
+network owner with coverage disabled and the existing retained seven-test
+allowlist. Preserve complete reporters, streams, statuses, source hashes and
+self-excluding manifests.
+
+After signed/pushed GREEN, the single final Grok/Codex-high/Opus-xhigh review
+must inspect plan, causal RED, GREEN, exact retry classification, unchanged raw
+and logical-dedup contracts, static/retained gates and scope. Only an empty
+P0/P1 union releases one new plan-only fresh retained-browser disposition; that
+fresh name runs once under the unchanged watchdog and first-failure rules. No
+campaign run is authorized by D.108e4bx. Six fresh campaign names are frozen
+only after that retained title passes and the final implementation review is
+closed. Kimi, Fable and collaboration subagents remain prohibited.
+
 An empty final blocking union releases a new plan-only freeze with six wholly
 fresh names and a freshly built isolated checkout at the accepted GREEN.
 Execute those six sequentially under the existing immutable evidence,
