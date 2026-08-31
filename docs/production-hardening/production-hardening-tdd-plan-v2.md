@@ -86108,6 +86108,39 @@ zero failure attachments; sign/push the evidence checkpoint and run the one
 required final Grok/Codex/Opus evidence review before D.108e5. A consuming
 failure stops this ledger and owns the next evidence-driven disposition.
 
+The sole D.108e4cm high-risk freeze review is closed with an empty P0/P1
+union. Grok 4.6 high APPROVED with no findings. Its substantive `end_turn`
+response included progress prose, so the wrapper honestly recorded
+NO_VERDICT; the exact same session
+`01a057e3-16d1-7543-a6e5-8cca3af2dc5e` was resumed for one tool-free schema
+turn and emitted valid APPROVED JSON with no findings. No replacement session
+ran. Codex `gpt-5.6-sol` high APPROVED with no findings. Opus xhigh APPROVED
+with no P0/P1 and three P2s.
+
+The P2s do not extend this freeze. Isolated install/build/typecheck transcripts
+are less symmetric than ordinary evidence, but the exact clean checkout,
+one-test listing, eight source identities, and 334 runtime files are captured
+and revalidated before every invocation. Guard transcript files are smaller
+than D.108e4ce, but executable guards normalize exactly to the reviewed owner
+and deterministic refusal fixtures passed. The inherited version-embedded jq
+physical path is fail-closed host fragility covered by the pre-test tool gate,
+not a path to an accidental pass. Any future freeze may retain more symmetric
+transcripts; no new infrastructure is added before this campaign.
+
+The Grok, Codex, Opus and union result SHA-256 values are respectively
+`f50765911ba5bee0ec3706dea7c70880d29e907c54c8422315e24906591b5aac`,
+`ab24132b16ece22ac02dbfb47311bd6ea54c71625a9e31cfdf5cfd0246f286dc`,
+`1f26b7a6c48b25b4a8bfb226b64adbf0e24cf3d1d009cc30c9b32f436ee42fe3`
+and
+`ab3a6ca5704497e33b9fbbe78ce8915082e3c2cb3f57d31c00330ee0dcddad2c`.
+The 23-entry self-excluding review manifest SHA-256 is
+`b5246c48e655f07be46fd6944045baadef8052a2ba73a58f54a5d7403cab9444`;
+its validation SHA-256 is
+`ce4df2912ff693b40b30ca7c660c558c99aefcf548550567e8c9903c87c21173`,
+and every entry validates. No campaign name was consumed during review. A
+signed/pushed closure and reviewed tag now release the six literal commands
+above under the already-granted durable authorization and first-failure rule.
+
 ###### D.108e4ce — post-census six-name campaign freeze
 
 D.108e4ce is the high-risk campaign disposition released by the passing
