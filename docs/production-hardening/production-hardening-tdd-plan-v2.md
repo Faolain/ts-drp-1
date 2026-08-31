@@ -84519,6 +84519,68 @@ All eighteen entries validate from `.logs/d108e4bz-red/`. GREEN may now change
 only the frozen classifier, shape guard, identity matrix and exact D108E4G live
 replacement assertion in the same test owner.
 
+D.108e4bz GREEN implements exactly that frozen tests-only change. The
+classifier validates both boundary generations as positive safe integers,
+uses unique connection-ID inequality as the changed predicate, retains exact
+ID/generation equality as stable and rejects equal-ID/different-generation
+residue. The focused matrix now accepts bilateral descending generations and
+distinct-ID/equal-generation replacement, rejects equal-ID/different-
+generation plus zero, fractional and unsafe generations with exact
+`D108E4H_IDENTITY_JOIN_INVALID`, and splits incoming ID-only, generation-only
+and both-field drift coverage without changing their token. The exact
+D108E4G live assertion retains distinct connection IDs and validates both
+generations' positive-safe-integer shape without ordering them. The sole
+executable diff remains `tests/e3-03-loss-and-hol-proof.pw.ts`; there is no
+production or example-source diff.
+
+The corrected focused listing selected exactly one test in one file and the
+sole focused execution completed `1 passed (8.3s)`. Its complete reporter
+records expected/skipped/unexpected/flaky `1/0/0/0`, zero top-level errors and
+one expected passed result. The evidence wrapper then returned one only after
+Playwright completed because it assigned the prior result to zsh's reserved
+read-only variable `status`; the test was not rerun. The reporter and stdout
+preserve the terminal Playwright result, and the evidence root distinguishes
+the reconstructed Playwright status zero from wrapper status one. A first
+read-only listing without `D108E4H_TELEMETRY=1`, an over-escaped Vitest
+selector, a leading-anchored Playwright retained selector and a closure shell
+that reused zsh's special `path` array were each corrected as diagnostic
+mistakes; none executed an omitted focused/retained row or represented a code
+failure.
+
+Standalone strict TypeScript, exact-owner ESLint, 8 GiB formatter-only
+Prettier, `git diff --check`, affected grid typecheck and grid build all pass.
+The corrected D.108e4ax selector executes both bilateral restart rows at
+`2/2`; the complete network unit owner passes `114/114`; the exact D108E4G
+lifecycle and live-replacement titles pass separately at `1/1` each. The
+corrected retained listing selects exactly seven tests in one file, excludes
+the three-trial campaign title, and its sole execution returns
+expected/skipped/unexpected/flaky `7/0/0/0` with zero top-level errors. The
+source-shape audit finds the sole changed/stable classifier owner, both shape
+guards and neither forbidden relational seam. All 26 stashes, protected
+untracked paths, clear fixed ports and absence of matching ts-drp
+reviewer/test/profiler processes are preserved.
+
+Focused, exact lifecycle, exact live-replacement, retained-seven, D.108e4ax,
+complete network-unit, source-shape, executable-diff, test-owner-record,
+57-entry self-excluding manifest and manifest-validation SHA-256 values are
+respectively
+`9610109e87c83a40a58d36b9cba6cabf99ec548a73aa8aaac2128c347ef68206`,
+`4a7afe79737935e06ff9d9ab154713a7475df9fbeca5c079a5a45a7a08d4334d`,
+`19d2e0e32dbdf19306a8dfc6f30bcc98a1448aa525ddd922129558ebef221066`,
+`14864aca0b11d9c7dd0cd8871412439c71c27883f74058f07f3ecf541e9baaeb`,
+`9497f6eacaa5f7fe7c2226cbc052869772658614f5d0634f91d7f204ba8f72e5`,
+`405b2b965c779534135fabd3062d391be273cce9d1c93f92f5774ac76a40f272`,
+`781cb404801aba61a5e54ed3c029533aa85fb906e42e8c8ae6c87041a14c09b1`,
+`7f85a51d086e73a9c56a6a4b7cbc45ad5d67b6da25bb626949b5a53f6e9dead6`,
+`e2f5d13fdff42c91e06d96ceaef6c38dabdfd16969835474f82b7d3ab9d2c8b1`,
+`53b539620eae7a21d8708403cec21898a03b7683ff414f8d7733663601dc5b0c`
+and
+`7a57054cbc28d65dce0910d6b27646ae15485d2d0493ccf0258d68d73f104fa9`.
+The test owner itself hashes to
+`67065ae2e10c5eb2b3852147a0e38630b18e5c7cf3b3116d82d0b422607bb372`.
+All 57 manifest entries validate from `.logs/d108e4bz-green/`. GREEN is ready
+for its sole final Grok/Codex-high/Opus-xhigh plan-to-RED-to-GREEN review.
+
 The D.108e4by root stays consumed and immutable. No retained three-trial or
 campaign invocation runs in D.108e4bz. An empty final P0/P1 union releases one
 new plan-only, wholly fresh retained-browser name. Only that fresh one-shot

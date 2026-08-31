@@ -3724,12 +3724,18 @@ function d108e4hAssertBoundaryIdentity(
 			afterRtc.readyState === "open",
 		"D108E4H_IDENTITY_JOIN_INVALID"
 	);
-	const authenticatedChanged =
-		beforeAuthenticated.connectionId !== afterAuthenticated.connectionId &&
-		beforeAuthenticated.generation < afterAuthenticated.generation;
+	d108e4hAssert(
+		Number.isSafeInteger(beforeAuthenticated.generation) &&
+			beforeAuthenticated.generation > 0 &&
+			Number.isSafeInteger(afterAuthenticated.generation) &&
+			afterAuthenticated.generation > 0,
+		"D108E4H_IDENTITY_JOIN_INVALID"
+	);
+	const authenticatedChanged = beforeAuthenticated.connectionId !== afterAuthenticated.connectionId;
 	const authenticatedStable =
 		beforeAuthenticated.connectionId === afterAuthenticated.connectionId &&
 		beforeAuthenticated.generation === afterAuthenticated.generation;
+	d108e4hAssert(authenticatedChanged || authenticatedStable, "D108E4H_IDENTITY_JOIN_INVALID");
 	const rtcChanged = beforeRtc.connectionId !== afterRtc.connectionId && beforeRtc.channelId !== afterRtc.channelId;
 	const rtcStable = beforeRtc.connectionId === afterRtc.connectionId && beforeRtc.channelId === afterRtc.channelId;
 	if (replaced) {
@@ -6417,31 +6423,42 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 			.toThrowError("D108E4H_DROP_COUNT_AMBIGUOUS");
 		const incomingAuthenticated = incomingMutationBase.endpoints.receiver.deadline
 			.authenticated[0] as D108e4hAuthenticatedIdentity;
-		const nonInitiatorAuthenticatedIdentityDrift = Object.freeze({
-			...incomingMutationBase,
-			endpoints: Object.freeze({
-				...incomingMutationBase.endpoints,
-				receiver: Object.freeze({
-					...incomingMutationBase.endpoints.receiver,
-					deadline: Object.freeze({
-						...incomingMutationBase.endpoints.receiver.deadline,
-						authenticated: Object.freeze([
-							Object.freeze({
-								...incomingAuthenticated,
-								connectionId: `${incomingAuthenticated.connectionId}:drift`,
-								generation: incomingAuthenticated.generation + 1,
-							}),
-						]),
+		const withIncomingAuthenticatedDrift = (
+			overrides: Partial<Pick<D108e4hAuthenticatedIdentity, "connectionId" | "generation">>
+		): D108e4hValidationInput =>
+			Object.freeze({
+				...incomingMutationBase,
+				endpoints: Object.freeze({
+					...incomingMutationBase.endpoints,
+					receiver: Object.freeze({
+						...incomingMutationBase.endpoints.receiver,
+						deadline: Object.freeze({
+							...incomingMutationBase.endpoints.receiver.deadline,
+							authenticated: Object.freeze([Object.freeze({ ...incomingAuthenticated, ...overrides })]),
+						}),
 					}),
 				}),
-			}),
-		});
-		expect
-			.soft(
-				() => validateD108e4hCampaignCustody(nonInitiatorAuthenticatedIdentityDrift),
-				"nonInitiatorAuthenticatedIdentityDrift"
-			)
-			.toThrowError("D108E4H_IDENTITY_JOIN_INVALID");
+			});
+		const incomingAuthenticatedDriftMutants = Object.freeze([
+			[
+				"nonInitiatorAuthenticatedConnectionIdDrift",
+				withIncomingAuthenticatedDrift({ connectionId: `${incomingAuthenticated.connectionId}:drift` }),
+			],
+			[
+				"nonInitiatorAuthenticatedGenerationDrift",
+				withIncomingAuthenticatedDrift({ generation: incomingAuthenticated.generation + 1 }),
+			],
+			[
+				"nonInitiatorAuthenticatedIdentityDrift",
+				withIncomingAuthenticatedDrift({
+					connectionId: `${incomingAuthenticated.connectionId}:drift`,
+					generation: incomingAuthenticated.generation + 1,
+				}),
+			],
+		] as const);
+		for (const [name, fixture] of incomingAuthenticatedDriftMutants) {
+			expect.soft(() => validateD108e4hCampaignCustody(fixture), name).toThrowError("D108E4H_IDENTITY_JOIN_INVALID");
+		}
 		const nonInitiatorProductOldCloseCall = withReceiverLifecycle(
 			incomingMutationBase,
 			Object.freeze([
@@ -7514,25 +7531,44 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 			}),
 		});
 		expect(() => validateD108e4hCampaignCustody(repeatedRtcIdentity)).toThrowError("D108E4H_IDENTITY_JOIN_INVALID");
-		const nonIncreasingGeneration = Object.freeze({
-			...receiverReplacement,
-			endpoints: Object.freeze({
-				...receiverReplacement.endpoints,
-				receiver: Object.freeze({
-					...receiverReplacement.endpoints.receiver,
-					deadline: Object.freeze({
-						...receiverReplacement.endpoints.receiver.deadline,
-						authenticated: Object.freeze([
-							Object.freeze({
-								...(receiverReplacement.endpoints.receiver.deadline.authenticated[0] as D108e4hAuthenticatedIdentity),
-								generation: D108E4H_RTC_A.generation,
-							}),
-						]),
+		const receiverPrepareAuthenticated = d108e4hOnly(receiverReplacement.endpoints.receiver.prepare.authenticated);
+		const receiverDeadlineAuthenticated = d108e4hOnly(receiverReplacement.endpoints.receiver.deadline.authenticated);
+		const withReceiverDeadlineAuthenticated = (
+			overrides: Partial<Pick<D108e4hAuthenticatedIdentity, "connectionId" | "generation">>
+		): D108e4hValidationInput =>
+			Object.freeze({
+				...receiverReplacement,
+				endpoints: Object.freeze({
+					...receiverReplacement.endpoints,
+					receiver: Object.freeze({
+						...receiverReplacement.endpoints.receiver,
+						deadline: Object.freeze({
+							...receiverReplacement.endpoints.receiver.deadline,
+							authenticated: Object.freeze([Object.freeze({ ...receiverDeadlineAuthenticated, ...overrides })]),
+						}),
 					}),
 				}),
-			}),
+			});
+		const sameGenerationDistinctConnectionId = withReceiverDeadlineAuthenticated({
+			generation: receiverPrepareAuthenticated.generation,
 		});
-		expect(() => validateD108e4hCampaignCustody(nonIncreasingGeneration)).toThrowError("D108E4H_IDENTITY_JOIN_INVALID");
+		expect(() => validateD108e4hCampaignCustody(sameGenerationDistinctConnectionId)).not.toThrow();
+		const sameConnectionIdDistinctGeneration = withReceiverDeadlineAuthenticated({
+			connectionId: receiverPrepareAuthenticated.connectionId,
+		});
+		expect(() => validateD108e4hCampaignCustody(sameConnectionIdDistinctGeneration)).toThrowError(
+			"D108E4H_IDENTITY_JOIN_INVALID"
+		);
+		for (const [name, generation] of [
+			["zeroAuthenticatedGeneration", 0],
+			["fractionalAuthenticatedGeneration", 1.5],
+			["unsafeAuthenticatedGeneration", Number.MAX_SAFE_INTEGER + 1],
+		] as const) {
+			expect(
+				() => validateD108e4hCampaignCustody(withReceiverDeadlineAuthenticated({ generation })),
+				name
+			).toThrowError("D108E4H_IDENTITY_JOIN_INVALID");
+		}
 		const duplicateBoundaryIdentities = Object.freeze({
 			...receiverReplacement,
 			endpoints: Object.freeze({
@@ -9690,7 +9726,8 @@ if (process.env["D108E4G_TELEMETRY"] === "1") {
 			expect(["channel-close", "replacement"]).toContain(initiatorZone.rawTransport.lastLinkDrop);
 			expect(initiatorZone.rawTransport.linkDrops - initialInitiatorZone.rawTransport.linkDrops).toBe(1);
 			expect(newRaw.connectionId).not.toBe(oldRaw.connectionId);
-			expect(newRaw.generation).toBeGreaterThan(oldRaw.generation);
+			expect(Number.isSafeInteger(oldRaw.generation) && oldRaw.generation > 0).toBe(true);
+			expect(Number.isSafeInteger(newRaw.generation) && newRaw.generation > 0).toBe(true);
 			expect(
 				initiatorMonitor.every(
 					({ schemaVersion, trialId: recordTrialId }) => schemaVersion === 3 && recordTrialId === trialId
