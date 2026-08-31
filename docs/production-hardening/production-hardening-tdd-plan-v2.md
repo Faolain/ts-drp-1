@@ -87897,8 +87897,10 @@ Maintenance does not become a seventh store method. Shared pruning types are
 isolated at `@ts-drp/issuance-store/maintenance`; genuine Node and browser
 resolvers are isolated at their new `./issuance-maintenance` subpaths; the
 existing package roots and `./issuance` factory-module key sets remain exact.
-Each resolver returns the one-method `prunePublishedPrefix` capability only
-for the exact facade its module created. The new subpaths are explicit
+Each resolver returns the exact two-method `inspectPruningState` plus
+`prunePublishedPrefix` capability only for the exact facade its module created.
+Inspection reads and detaches scope, lineage, and nullable watermark in one
+owner transaction without exposing rows or native handles. The new subpaths are explicit
 package-maintenance surfaces and are never attached to a v3 product handle.
 This resolves the capability by object identity while preserving the ordinary
 mandatory contract and preventing structural stubs from minting it.
@@ -87910,21 +87912,36 @@ digest omitted from the D.109a result. The issuance owner validates and copies
 the external binding values but does not claim to reauthenticate another
 database. In one native write transaction it rereads lineage plus watermark,
 requires both expected values, scans the selected sequence range in bounded
-pages, decodes every canonical v3 vertex, proves exact scope/ordinal, a
-non-regressing epoch sequence ending exactly at the selected closed epoch,
+pages, decodes every canonical v3 vertex, proves exact scope/ordinal, every
+selected row exactly in the selected closed epoch,
 paired equal digests, complete ordinals, consumed lineage and `published`
 state, then deletes only that paired range and advances the watermark to the
 inclusive last deleted ordinal. Any malformed, pending, one-sided,
 foreign-digest, gapped, regressing, stale, unreadable, count-mismatched or
-newly changed selected fact aborts with zero writes. A newer-epoch pending
+newly changed selected fact aborts with zero writes. Durable malformation
+latches `ISSUANCE_RECOVERY_CORRUPT`; a valid selected pending row is
+non-latching `ISSUANCE_RETRY_REQUIRED`; a valid wrong-epoch row is non-latching
+`ISSUANCE_INVALID_ARGUMENT`. A newer-epoch pending
 suffix and unrelated scopes remain untouched.
+
+D.109b prospectively extends the same pure D.109a planner, without altering
+its historical evidence, to copy the owner-observed lineage and nullable
+watermark. Null still requires complete rows `0..through`; numeric `W`
+requires complete rows `W+1..through`; `W === through` accepts empty rows for
+idempotent recovery. Every supplied row remains exactly in `closedEpoch`.
+This makes cold restart and later closed epochs reachable after pruning while
+the D.109b owner still revalidates every fact transactionally.
 
 The receipt is detached and deeply frozen. It records the copied binding,
 scope/epoch, exact deleted inclusive range or an idempotent `null`, resulting
-watermark and observed lineage pair. The existing `{ exhausted, next }` pair
+watermark and observed lineage pair. Its exact keys are `scope`, `closedEpoch`,
+`commitQcRef`, `snapshotManifestDigest`, `deletedAuthorSequenceRange`,
+`prunedThroughAuthorSequence`, and `observedLineage`. The existing `{ exhausted, next }` pair
 is the lineage CAS revision; no redundant revision column or receipt shadow
-store is added. Repeating the exact state at the resulting watermark is a
-no-op. A stale expected lineage/watermark is `ISSUANCE_RETRY_REQUIRED`; durable
+store is added. When observed lineage still matches and the current watermark
+already equals the requested end, even the original stale/null-watermark input
+returns a fresh no-op receipt; this closes lost-receipt retry. Other stale
+expected lineage/watermark is `ISSUANCE_RETRY_REQUIRED`; durable
 malformation is `ISSUANCE_RECOVERY_CORRUPT`; invalid caller state remains
 `ISSUANCE_INVALID_ARGUMENT`.
 
@@ -87942,30 +87959,50 @@ at or below the watermark is likewise corruption. Never-issued publication
 acknowledgement keeps the existing invalid-address behavior, while transaction
 terminal classification keeps its existing definite-not-applied substrate
 result when durable lineage still equals the caller's prior lineage.
+The at-or-below predicate is always explicit:
+`watermark !== null && authorSequence <= watermark`. Missing or invalid
+watermark state in a readable terminal observation is corruption.
 
 Browser retains database version 1, store names/key paths and derived name.
-Its new reader accepts legacy four-member lineage rows as a null watermark and
+Every lineage reader, including `readLineage`, `readOutboxPage`, terminal
+readback, and maintenance, accepts legacy four-member lineage rows as a null watermark and
 five-member rows with one valid nullable/numeric watermark. Ordinary issuance
 preserves the legacy representation until pruning writes the watermark, then
 preserves it on later lineage CAS updates. There is no versionchange or
 replacement database and no post-pruning downgrade claim. Node retains the
 same file, page size, WAL and FULL synchronous policy. It creates exact schema
-v2 with one checked nullable lineage watermark column and migrates only an
-exact v1 catalog inside one `BEGIN IMMEDIATE` transaction in that file,
-preserving every row. Unknown catalogs/versions remain unsupported.
+v2 with one checked nullable lineage watermark column. Migration begins
+`BEGIN IMMEDIATE`, rereads version/catalog under that lock, rebuilds only the
+exact v1 `lineages` table from a literal v2 DDL while preserving both issuance
+tables, sets version 2 and verifies before commit; exact v2 no-ops and every
+other catalog/version is unsupported. A crossed two-handle v1-open RED proves
+the loser cannot rerun migration or reset a watermark.
 
 The tests-only RED path set and full semantic/native matrix are frozen in the
 slice. It includes identity denial, immutable copying/receipts, 64/65 and
 128/129 page boundaries, every row classification, stale state, idempotence,
 late exact/wrong-digest acknowledgement, complete absence polarity, two-handle
-races, browser legacy/new lineage rows without an IDB bump, Node in-place v1
-migration, transaction abort, hard-kill old-XOR-new recovery, reopen and
-unrelated-scope preservation. Directly affected retained expectations may be
-corrected only for the new code, terminal member, maintenance subpaths and Node
-v2 lineage catalog; the six-method facade and existing factory-module surfaces
-remain unchanged. RED is causal only if production is byte-identical and its
-failures are the missing frozen D.109b owners/semantics, not a fixture or build
-failure.
+races, browser legacy/new lineage rows without an IDB bump, every browser
+lineage-read path, later browser issuance preserving a numeric watermark, Node
+in-place v1 migration, crossed concurrent admission, transaction abort,
+hard-kill old-XOR-new recovery, reopen, lost-receipt/cold-restart/later-epoch
+replanning and unrelated-scope preservation. The existing D.109a planner test
+is extended prospectively. Directly affected retained expectations enumerate
+the new code, terminal member/literals/hashes, maintenance subpaths, conformance
+runtime names and Node v2 lineage catalog. They also correct the demonstrated
+stale current-package pins in the Phase-2l-c Node issuance registry and
+Phase-3a1b-p4 Node live-journal suites to include existing
+`./snapshot-transfer` and `@ts-drp/compaction` before adding only the new
+maintenance subpath. The six-method facade and existing factory-module
+surfaces remain unchanged. RED is causal only if other production is
+byte-identical and failures are the missing frozen D.109b owners/semantics,
+not a fixture or build failure.
+
+The shared structural v3 check stays in issuance-store maintenance and uses
+the existing canonical dependency plus literal kind/protocol/epoch fields; no
+protocol-v3 dependency is added. The selected prefix is scanned in bounded
+64-row pages but is not artificially capped by this slice. Browser awaits only
+requests belonging to the live native transaction before its terminal event.
 
 This is a high-risk slice because it authorizes physical deletion, an in-place
 schema migration, new package-maintenance subpaths, and the already accepted
@@ -87980,3 +88017,25 @@ pushed before the sole final Grok/Kimi/Opus plan-to-RED-to-GREEN review. No
 Fable, collaboration subagent, retained campaign, scheduler, protocol/runtime
 change, threshold change, dependency change or recursive prose review is
 authorized.
+
+The initial plan review inspected signed/pushed commit
+`fe934eae3a781b70ef666e5827317cf231e5d078`. Grok 4.6/high returned four
+P1/two P2 findings (public SHA-256
+`713cb28f53423699ee7c4551ebf41cc9e4472f81c612943262da0a1315c8bf6c`);
+exact Kimi K3 thinking/high with both 100-step controls approved with three P2
+observations (raw SHA-256
+`53d90eaee7bff295abc7446cba01d2550635c8e2d57e691229bb95944e8bb321`);
+Opus xhigh returned four P1/five P2 findings (result SHA-256
+`753a2453f8550fa87deeec1e5df2841f42615fbde1aa329c33bae25d93e8c953`).
+The corrected exact-title Vitest audit selected exactly two tests/two files;
+both failed only because the live Node manifest already contains
+`@ts-drp/compaction` and `./snapshot-transfer`. The preceding incomplete title
+filter supplies no code verdict.
+The correction batch adopts the full blocking union and freezes the P2 details:
+exact eligibility codes, lost-receipt retry, null polarity, all browser lineage
+read/write paths, migration under-lock reread, the crossed two-handle case,
+prospective planner continuation, exact receipt/DDL/decoder ownership, terminal
+malformation, native-transaction await discipline, and both proven stale
+retained pins. Because these corrections change causal RED acceptance, exactly
+one signed-checkpoint Grok/Kimi/Opus confirmation is required; no further plan
+confirmation or prose-review recursion is permitted.

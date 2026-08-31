@@ -85,7 +85,11 @@ owner lifecycle failure deletes nothing in that owner.
 1. [D.109a eligibility](slices/00-eligibility.md): one deterministic planner,
    exact refusal taxonomy, and no deletion.
 2. [D.109b issuance retention](slices/01-issuance-retention.md): atomically
-   classify and remove only eligible published closed-epoch issued/outbox pairs.
+   classify and remove only eligible published closed-epoch issued/outbox
+   pairs. Its prospective extension of the same pure D.109a planner carries
+   the owner-observed lineage/watermark so restart and later-epoch planning
+   remain reachable after an earlier prefix was physically pruned; historical
+   D.109a evidence remains immutable.
 3. [D.109c AHE reclamation](slices/02-ahe-reclamation.md): atomically remove
    selected superseded generations, their promotions, and newly unreferenced
    blobs while retaining the active generation plus its two immediate complete
