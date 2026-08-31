@@ -83548,3 +83548,125 @@ test "$(/usr/bin/shasum -a 256 /Users/aristotle/Documents/Projects/ts-drp-1/.log
 
 Six passes release one signed/pushed campaign-evidence checkpoint and the
 single final evidence review, then D.108e5 and the Phase-6a closure path resume.
+
+###### D.108e4bv — elected-initiator-last serial reset orchestration
+
+The first D.108e4bu campaign invocation is a consumed semantic failure and
+stops that ledger. `e5gate-ordinary-1` ran once from
+`2026-08-31T04:18:22Z` through `04:20:38Z`; Playwright and runner statuses
+were both 1. The reporter records expected/skipped/unexpected/flaky
+`0/0/1/0`, zero top-level errors, no retry, and one selected title in one
+file. `e5gate-ordinary-2`, `e5gate-ordinary-3`, and all three
+`e5gate-isolated-*` names remain absent and must not run because their
+immediate predecessor failed. Neither the consumed name nor the five frozen
+successors may be retried, substituted, or represented as the future six-pass
+campaign.
+
+The first two fixed 600-sample trials completed their semantic matrices. The
+failure occurred at `e3-03-2-prepare` inside the first
+`waitForOpenTransportPair()` owned by `resetFabricPairSerially`: after the
+creator reset, the creator exposed zero raw links while the receiver exposed
+one. Both reliable network rosters still contained the counterpart and relay.
+The creator and receiver each recorded two authenticated-connection losses;
+their raw `linkDrops` values were eight and seven, and both retained
+`lastLinkDrop="restart"`. The creator had zero handshake failures and the
+receiver one.
+
+The lifecycle evidence is more specific than a marginal ten-second timing
+breach. The creator peer id sorted higher than the receiver peer id, so the
+receiver was the elected raw initiator. At wall time `1788150024690` the
+product raw owner executed its existing `dropLink` path and closed the
+creator's open `ts-drp-ephemeral/1` channel with owner
+`product-unreliable-webrtc`. The creator subsequently had no open raw channel;
+the receiver still reported its prior half open, and neither endpoint
+recorded a successor raw channel before failure. Meanwhile the authenticated
+connection monitor recorded successful ping stream open/write/read events on
+both endpoints through wall time `1788150031506`; the corresponding reliable
+connection-close observations arrived later at `1788150033047`. This is not
+evidence of CPU delay or a false-positive monitor abort.
+
+The demonstrated test-infrastructure defect is that the helper demands full
+pair readiness after its first endpoint reset and before invoking the second
+endpoint reset. In this ordering the first reset was the higher-id,
+non-initiating owner. The interposed gate therefore prevented the lower-id
+elected initiator's reset from ever running. That adds a unilateral
+higher-owner recovery requirement to a fixture whose accepted purpose is a
+bilateral serial state reset before each retained workload. It does not prove
+a product defect. Deterministic D.108e4ax already retains synchronous
+bilateral restart coverage in both caller orderings, and the complete network
+owner suite retains unilateral and authenticated-replacement behavior. Do not
+change production source, signaling, replacement policy, dependencies,
+timeouts, or product APIs in D.108e4bv.
+
+RED changes only `tests/e3-03-loss-and-hol-proof.pw.ts` and this plan/evidence
+record. Extract the current helper's four-step orchestration into one pure,
+test-local schedule owner without changing runtime behavior: creator reset,
+open-pair gate, network-pair gate, receiver reset. Add one opt-in pure test,
+selected only under `D108E4BV_RESET_ORDER_RED=1`, with both peer-id
+orderings. Its frozen expectation is exactly two reset operations with no
+interposed readiness operation: the higher-id endpoint resets first and the
+lower-id elected initiator resets last. Duplicate peer ids fail with exact
+token `D108E4BV_RESET_IDENTITY_INVALID`. Current behavior must fail the
+ordering test with reporter counts `0/0/1/0`, zero top-level errors, and no
+browser or retained title selected. If RED differs from that matrix, stop and
+correct the fixture rather than changing product code.
+
+GREEN changes only that schedule owner and the same helper. It executes the
+two existing `fabric.reset(trialId)` calls sequentially in high-id then low-id
+order, with no open/network assertion between them. Every existing caller's
+immediate post-helper 10-second open-pair and 15-second exact-network gates
+remain unchanged and continue to validate the completed bilateral reset. The
+same helper still owns workbench calibration, all three trial prepares,
+durable control, and the failure-only durable diagnostic. No reset is added,
+removed, made concurrent, or retried. The fixed loss profiles, Chromium,
+three-trial count, 600/33 ms workload, 300/20 ms calibration, payloads,
+delivery/AoI/HOL requirements, memory/resource contracts, 300-second test
+timeout, outer 600-second watchdog, evidence/classifier semantics, and durable
+operation remain unchanged.
+
+Run the exact one-test/one-file RED once and the same focused GREEN once. Then
+run standalone strict TypeScript, exact-owner ESLint/Prettier,
+`git diff --check`, grid typecheck/build, the two D.108e4ax bilateral restart
+rows, and the complete network-owner suite. After those deterministic gates
+pass, run one fresh write-once non-campaign retained title. A failure stops
+and is dispositioned from its immutable reporter, telemetry, trace, streams,
+and statuses; it is not retried. Only that pass releases one retained-seven
+execution. Preserve hashes and a validating self-excluding manifest for RED
+and GREEN.
+
+Because this test-only change alters retained campaign readiness sequencing,
+it is a high-risk review exception. Sign and push this bounded plan, then run
+one new Grok/Codex-`gpt-5.6-sol`-high/Opus-xhigh plan review; the earlier
+one-session Grok continuation is closed and is neither reused nor continued.
+Only P0/P1 findings affecting causal attribution, bilateral reset semantics,
+workload, or retained acceptance block. After signed GREEN, run the single
+formal three-model implementation review over plan, RED, GREEN, the consumed
+D.108e4bu failure, and retained gates. Do not run Kimi, Fable, or
+collaboration subagents.
+
+An empty final blocking union releases a new plan-only freeze with six wholly
+fresh names and a freshly built isolated checkout at the accepted GREEN.
+Execute those six sequentially under the existing immutable evidence,
+predecessor, write-once, first-failure, fixed-port, fixed-workload, and
+watchdog rules. The five unused D.108e4bu successors stay permanently frozen;
+they are not a partial campaign. Six fresh passes plus the final evidence
+review release D.108e5.
+
+Consumed D.108e4bu reporter, stdout, stderr, failure telemetry,
+endpoint-classifier, trace, cumulative manifest, and manifest-validation
+SHA-256 values are respectively
+`48e5def4e56032b21935f6c39805ce27865516b044450439e52e8be927d0c4d2`,
+`dc5062252ef0efaadee1064e7c239312e2ee513c4917eb560b8308a3901bfd38`,
+`a5213a9f3d05addc694379a35e275f57e40e43e20bc4ec8db55becdf044bb7b6`,
+`a8f4449ead7566ae93a67eb9cefccc628e80d9c5a6037ea1bbc106afc4da30bd`,
+`821470f9d8f57a59c70e1286be02d3ad47315590046f67de3ef53f7a466178c6`,
+`ad53e6982eaa394c3235795b64d2e116c3b1cbe2c507b6c761c0a035028685ee`,
+`4f9b04ea40f01fd6be1dc09cddcc77830a32f6ab35ff1f5875df219e82eee2ac`,
+and
+`9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa`.
+The immutable 106-entry campaign manifest validates completely when checked
+from its campaign root. An initial manual check from the repository root used
+the wrong relative-path base and reported missing files; the corrected
+read-only command `(cd .logs/d108e4bu-campaign && shasum -a 256 -c
+ARTIFACT-SHA256SUMS)` passes all entries. That diagnostic mistake is not
+evidence corruption and does not mutate the existing manifest.
