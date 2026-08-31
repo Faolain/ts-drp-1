@@ -84581,6 +84581,43 @@ The test owner itself hashes to
 All 57 manifest entries validate from `.logs/d108e4bz-green/`. GREEN is ready
 for its sole final Grok/Codex-high/Opus-xhigh plan-to-RED-to-GREEN review.
 
+The signed/pushed GREEN reviewed is
+`be0f200890f42250d8b8fcb8f951aeaeedfcd585`, tree
+`5cdc74ccb72b8d334a7355090a14f02b501d60fb`. Its sole final review is closed
+with an empty blocking union. Grok 4.6/high completed normally after `360.073`
+seconds with `TERMINAL_RESPONSE`, `end_turn`, exit zero, approval and no
+findings. It did not cancel, so no resume or replacement session ran. Codex
+`gpt-5.6-sol` high approved with no findings. Opus xhigh approved with no
+P0/P1 and two nonblocking P2 observations; it spawned no subagents.
+
+The first Opus P2 notes that the explicit changed-or-stable assertion is
+behaviorally redundant with the branch-specific assertions. Retain it as a
+local defensive invariant: the existing equal-ID/different-generation row
+already proves the required rejection and exact token, so no new mutant or
+code change is warranted. The second notes that
+`focused.playwright.status` is a reconstructed bare zero rather than a directly
+captured status. Its provenance is explicit above and the primary hashed
+reporter/stdout are conclusive, so immutable GREEN evidence is not regenerated.
+Future evidence roots must label a derived status directly and retain literal
+command blocks. Neither P2 changes executable scope, acceptance or campaign
+authority, and neither triggers confirmation.
+
+Grok-status, Grok-events, Codex-result, Codex-events, Opus-result, mechanical
+review union, 22-entry self-excluding review manifest and manifest-validation
+SHA-256 values are respectively
+`8dcc36f1fb1f21fc6f8d04ac995fe85e747151e216084633c6a8c7a00a04b67c`,
+`633afa5fc80fd576465b9af4d425c01dfe189c53d0055c00d8973bea53c8c30b`,
+`9ae047924e1328642061470666853cdcf31c4a0eb46deeec892a9e27735bbd7a`,
+`444a6ecb5a78c65199262d4c50835999fd5e93646375312bcdaca49833d5cad7`,
+`daaab10bd610ac1cee0cc4f8362ac53058892c911b415357956d7d36e0447ee0`,
+`8b966d1d928cb5cb8236c0ce7027e8b51b5464271fa8ce2013246f9968b78c76`,
+`21f827950d2ebaf02d1782d4dfa2631f3c577acd975ee1941b1e964f52e65a52`
+and
+`2a302a95cf2b40c2f9e507123891ba3c9f2005dd88c696d9a7f0ba0cb8fbc3ec`.
+All 22 entries validate from `.logs/d108e4bz-final-review/`. The final review
+gate is closed and releases one new plan-only, wholly fresh retained-browser
+name under the unchanged D.108e4by execution contract.
+
 The D.108e4by root stays consumed and immutable. No retained three-trial or
 campaign invocation runs in D.108e4bz. An empty final P0/P1 union releases one
 new plan-only, wholly fresh retained-browser name. Only that fresh one-shot
