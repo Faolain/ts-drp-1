@@ -82353,3 +82353,85 @@ review is authorized for this plan-only name/capture freeze. A pass may be
 dispositioned toward the already authorized six-name retained campaign; a
 failure remains first-failure evidence and must be diagnosed before any other
 browser or campaign run.
+
+##### D.108e4bq committed pending-candidate validator correction
+
+The write-once D.108e4bp retained root was consumed exactly once and failed, so
+the first-failure stop remains active. `.logs/d108e4bp-retained-browser-1/`
+started at `2026-08-31T01:12:07Z`, finished at `2026-08-31T01:14:20Z`, and
+records runner/Playwright status `1/1`. Reporter duration was
+`131462.31399999998` ms with expected/skipped/unexpected/flaky counts
+`0/0/1/0`, one selected suite, and zero top-level reporter errors. The exact
+terminal token was `D108E4H_IDENTITY_JOIN_INVALID` during trial `e3-03-1`,
+stage `e3-03-1-assertions`. Trial `e3-03-0` had already completed. The failed
+root is immutable and must never be retried, overwritten, substituted or
+reused. Its sorted per-file SHA-256 ledger has SHA-256
+`83619a446d342e71622a2cf789a16bebf66748d883b261eb8e54c43a46341440`;
+the individual reporter, stdout, stderr, trace and status hashes remain
+recoverable directly from that root without adding a manifest to it.
+
+The failure is not a recurrence of D.108e4bp. In the failing trial the creator
+accounted for all 600 raw attempts as 559 successful raw sends plus 41 bounded
+backpressure drops. Both endpoint-local `linkDrops` deltas were zero and all
+application records remained on the common selected A identities. The
+validator instead rejected the receiver's additional open candidate C solely
+because the acceptor had received replacement COMMIT. C had exactly one
+product handler and open event, no terminal event, no application traffic, two
+received READYs, two sent ACKs and two received COMMITs. Its product handler
+was installed at wall time `1788138853927`; the final COMMIT was received at
+`1788138854017`; capture followed at approximately `1788138855974`. The paired
+creator candidate sent the corresponding READY/COMMIT controls and received
+ACK. The selected A identities remained open and common at prepare and
+deadline.
+
+This topology is expressly permitted by the product's existing
+make-before-break protocol: an acceptor using reliable replacement decision
+custody settles COMMIT but retains pending C while selected A remains usable,
+and promotes C only if A is absent or disconnected. The evidence therefore
+demonstrates a stale test-validator expectation, not a product defect and not
+an upstream libp2p defect. The connection-monitor aborts remain contextual
+triggers only; do not patch, upgrade, disable or retune them in this slice.
+
+Freeze D.108e4bq as a narrow high-risk campaign-validator correction in
+`tests/e3-03-loss-and-hol-proof.pw.ts` only. Product source, APIs,
+dependencies, workload, three-trial count, loss profile, thresholds, timeouts,
+ports and campaign semantics are immutable. If GREEN requires production
+source, stop and reslice.
+
+RED must change the stale committed-acceptor fixture to the demonstrated
+expectation: a zero-local candidate with common selected A, no candidate
+application traffic, exact acceptor READY/ACK/COMMIT ordering, one product
+handler/open pair and no terminal event is valid pending make-before-break
+custody. Run the focused D.108e4h validator test once and require the current
+owner to fail exactly because `d108e4hAssertDeadlinePendingCandidate` still
+throws `D108E4H_IDENTITY_JOIN_INVALID` for received COMMIT. Do not run a
+browser or campaign at RED.
+
+GREEN may remove only that obsolete COMMIT prohibition. It must not weaken the
+existing lifecycle-role ordering or zero-owner identity rules. Deterministic
+mutants must continue to throw their exact existing codes when selected A is
+missing or duplicated, more than one pending candidate exists, the candidate
+owns any application record, open/handler/terminal lifecycle is invalid,
+control-role ordering is invalid, or RTC advancement occurs without an
+endpoint-local replacement owner. The retained D.108e4aa exact-error roster
+and the `2/0` and `0/2` `D108E4H_DROP_COUNT_AMBIGUOUS` cases remain unchanged.
+Do not add a timing threshold or capture-time field: the product's live pending
+ownership and lifecycle, not wall-clock proximity, is the causal distinction.
+
+Use the prospective review policy: sign and push this bounded plan, then run
+one Grok/Codex `gpt-5.6-sol` high/Opus xhigh plan review. Only P0/P1 findings
+block. After accepted RED, implement GREEN and run the focused validator test,
+the complete retained seven-test D.108e4 suite, exact one-test/one-file listing,
+affected typecheck/build, lint, Prettier, diff/source-shape, protected-path,
+stash, process and port gates. Sign and push RED and GREEN evidence. Run one
+formal three-model final implementation review over plan -> RED -> GREEN;
+resume the same Grok session for schema-only completion if its substantive run
+again emits prose before the terminal object. No separate RED review and no
+recursive prose review are permitted.
+
+Only after the final blocking union is empty may a different fresh retained
+name be frozen and consumed once. No browser or campaign invocation is
+authorized by this plan paragraph itself. Preserve the durable authorization
+for all six future campaign invocations, but keep the campaign frozen until
+the new retained validation passes. Do not invoke Kimi, Fable, or collaboration
+subagents.
