@@ -85396,18 +85396,24 @@ initiator's active B. Its frozen GREEN acceptance instead requires:
    misclassified as proof that the initiator promoted: A remains selected and
    B remains pending until a definitive convergence or cleanup owner acts.
 
-GREEN is limited to three existing private lifecycle seams in
+GREEN is limited to four existing private lifecycle seams in
 `packages/network/src/unreliable-webrtc.ts`: the acceptor/reliable-decision/
 committed branch of `#expireReplacementReadiness`, the pending-link guard in
 `#receive`, and the selected-link PeerConnection state listener installed by
-`#prepareLink`. At expiry, only the exact current open acceptor B with matching
-current authenticated connection, complete READY/ACK/COMMIT qualification, a
-matching committed decision record and positive existing
-`ReplacementDecisionRecord.observations` is retained. This observation means
-the initiator may already have selected B, but does not by itself authorize
-acceptor promotion because response delivery is not locally proven. If
-neither decision request reached the acceptor, `observations` remains zero and
-existing expiry discard/retain-A behavior is unchanged.
+`#prepareLink`, plus the matching-record branch of `#handleDecisionRequest`.
+That request handler increments `ReplacementDecisionRecord.observations` only
+after exact decision/link/authenticated-connection validation but before its
+existing already-settled-status return, so normal COMMIT-before-query ordering
+and request-before-COMMIT ordering both record the authenticated observation.
+It does not change any returned status, wait rule, retry, message or decoder.
+At expiry, only the exact current open acceptor B with matching current
+authenticated connection, complete READY/ACK/COMMIT qualification, a matching
+committed decision record and positive existing observations is retained.
+This observation means the initiator may already have selected B, but does not
+by itself authorize acceptor promotion because response delivery is not
+locally proven. If no valid matching decision request reached the acceptor,
+observations remains zero and existing expiry discard/retain-A behavior is
+unchanged.
 
 After that bounded decision point, application ingress may promote an
 acceptor pending B only when all of those exact predicates still hold, the
@@ -85430,13 +85436,19 @@ response. Its exit owners are exact-B application proof, selected-A close or
 disconnection, B/channel/PC close, authenticated-connection identity change,
 owner close, or an existing stale/superseding cleanup path. Tests must prove
 timer/waiter cleanup, one pending PC at most, unchanged global ceiling, no
-offer substitution, and complete cleanup by every terminal owner. An idle
-current A plus open current B may remain dual-live; it preserves connectivity
-and cannot admit a third same-peer offer. Unauthenticated, uncommitted, zero-
+offer substitution, and complete cleanup by every terminal owner. The
+explicit silent-remote row keeps the authenticated connection current and A
+and B open past expiry, proves exactly one pending PC, unchanged global
+ceiling accounting and same-peer third-offer rejection, then proves owner
+close releases all state. The acceptor-pending unknown-route row proves one
+`unknownRouteDrops` increment with no promotion or delivery. An idle current A
+plus open current B may remain dual-live; it preserves connectivity and cannot
+admit a third same-peer offer. Unauthenticated, uncommitted, zero-
 observation, stale, non-open or superseded B is still discarded. Do not change
 setup timeout values, retry counts, resource ceilings, public APIs,
-dependencies, signaling decision schemas or raw control bytes. If these three
-source-only seams cannot satisfy RED and the response-loss/resource mutants,
+dependencies, signaling decision schemas or raw control bytes. If these four
+source-only lifecycle changes cannot satisfy RED and the response-loss/
+resource mutants,
 stop and reslice rather than add protocol messages or widen authority.
 
 The captured trial also ended with creator `deadline.authenticated: []` and
@@ -85460,7 +85472,7 @@ P0 and a material P1 union: the proposed acceptor application-ingress owner
 was unreachable through `#receive`, retained pending B needed explicit
 lifetime/re-evaluation/cleanup ownership, and the captured empty authenticated
 boundary was a separate masked failure. Those findings are accepted by the
-three explicit private seams, structural bound and terminal-owner matrix above
+four explicit private seams, structural bound and terminal-owner matrix above
 plus D.108e4cj ownership. Because this batch
 materially changes executable acceptance, run at most one confirmation round;
 do not recursively review bookkeeping or closure prose. RED receives
@@ -85469,6 +85481,22 @@ sole formal implementation review occurs after signed/pushed GREEN and covers
 plan, causal RED, GREEN and retained gates. If Grok cancels, resume its exact
 session; do not replace it. Do not invoke Kimi, Fable or collaboration
 subagents.
+
+The single confirmation inspected corrected signed/pushed commit
+`129996320534ffddbab036019e7a9b9db424676f`, tree
+`0aab36f939e000ca25413259bb89c682884fcd6f`. Grok high completed normally after
+`510.315` seconds with `TERMINAL_RESPONSE`, exit zero and approval; it did not
+cancel, so no resume ran. Codex `gpt-5.6-sol` high approved with no findings.
+Opus xhigh completed normally with one P1 and two P2 findings, no permission
+denial and no subagent. The P1 is accepted: current
+`#handleDecisionRequest` returns an already committed status before incrementing
+`observations`, so COMMIT-before-query could make the frozen gate unreachable.
+The fourth seam above records the exact valid request in both orderings. Both
+P2s are also accepted as deterministic mutants: acceptor-pending unknown-route
+counter custody and the explicitly accepted silent-remote dual-live resource
+state. This is the one permitted material correction after confirmation; no
+reviewer is relaunched. Deterministic source and RED audits own the corrected
+ordering and exact mutant roster.
 
 ###### D.108e4ce — post-census six-name campaign freeze
 
