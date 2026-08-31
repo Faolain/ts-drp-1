@@ -148,6 +148,17 @@ function descendants(root: ts.Node): readonly ts.Node[] {
 	return selected;
 }
 
+function executableDescendants(root: ts.Node): readonly ts.Node[] {
+	const selected: ts.Node[] = [];
+	const visit = (node: ts.Node): void => {
+		selected.push(node);
+		if (node !== root && ts.isFunctionLike(node)) return;
+		ts.forEachChild(node, visit);
+	};
+	visit(root);
+	return selected;
+}
+
 function uniqueVariableInitializer(root: ts.Node, name: string): ts.Expression | undefined {
 	const matches = descendants(root).filter(
 		(node): node is ts.VariableDeclaration =>
@@ -161,12 +172,67 @@ function functionBlock(value: ts.Expression | undefined): ts.Block | undefined {
 	return ts.isBlock(value.body) ? value.body : undefined;
 }
 
+function executableVariableInitializer(root: ts.Node | undefined, name: string): ts.Expression | undefined {
+	if (root === undefined) return undefined;
+	const matches = executableDescendants(root).filter(
+		(node): node is ts.VariableDeclaration =>
+			ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === name
+	);
+	return matches.length === 1 ? matches[0]?.initializer : undefined;
+}
+
+function directVariableInitializer(block: ts.Block | undefined, name: string): ts.Expression | undefined {
+	if (block === undefined) return undefined;
+	const matches = block.statements.flatMap((statement) =>
+		ts.isVariableStatement(statement)
+			? statement.declarationList.declarations.filter(
+					(declaration) => ts.isIdentifier(declaration.name) && declaration.name.text === name
+				)
+			: []
+	);
+	return matches.length === 1 ? matches[0]?.initializer : undefined;
+}
+
 function identifierCall(root: ts.Node | undefined, name: string): readonly ts.CallExpression[] {
 	if (root === undefined) return Object.freeze([]);
 	return descendants(root).filter(
 		(node): node is ts.CallExpression =>
 			ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === name
 	);
+}
+
+function executableIdentifierCall(root: ts.Node | undefined, name: string): readonly ts.CallExpression[] {
+	if (root === undefined) return Object.freeze([]);
+	return executableDescendants(root).filter(
+		(node): node is ts.CallExpression =>
+			ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === name
+	);
+}
+
+function identifierCallExpression(value: ts.Expression | undefined, name: string): ts.CallExpression | undefined {
+	return value !== undefined &&
+		ts.isCallExpression(value) &&
+		ts.isIdentifier(value.expression) &&
+		value.expression.text === name
+		? value
+		: undefined;
+}
+
+function unwrapExpression(value: ts.Expression): ts.Expression {
+	let selected = value;
+	while (
+		ts.isAsExpression(selected) ||
+		ts.isTypeAssertionExpression(selected) ||
+		ts.isParenthesizedExpression(selected) ||
+		ts.isNonNullExpression(selected)
+	) {
+		selected = selected.expression;
+	}
+	return selected;
+}
+
+function isIdentifierExpression(value: ts.Expression | undefined, name: string): boolean {
+	return value !== undefined && ts.isIdentifier(unwrapExpression(value)) && unwrapExpression(value).text === name;
 }
 
 function isBoundGuard(
@@ -231,9 +297,9 @@ function isIntrinsicCopy(node: ts.Node): boolean {
 	);
 }
 
-function intrinsicReflectApply(root: ts.Node | undefined, name: string): readonly ts.CallExpression[] {
+function executableIntrinsicReflectApply(root: ts.Node | undefined, name: string): readonly ts.CallExpression[] {
 	if (root === undefined) return Object.freeze([]);
-	return descendants(root).filter((node): node is ts.CallExpression => {
+	return executableDescendants(root).filter((node): node is ts.CallExpression => {
 		if (
 			!ts.isCallExpression(node) ||
 			!ts.isPropertyAccessExpression(node.expression) ||
@@ -248,16 +314,18 @@ function intrinsicReflectApply(root: ts.Node | undefined, name: string): readonl
 	});
 }
 
-function decodesBoundedInvite(root: ts.Node | undefined): boolean {
-	return identifierCall(root, "decodeCreatorInvite").some((call) => {
-		const argument = call.arguments[0];
-		return (
-			argument !== undefined &&
-			ts.isCallExpression(argument) &&
-			ts.isIdentifier(argument.expression) &&
-			argument.expression.text === "boundedMigrationCreatorInvite"
-		);
-	});
+function boundedDecodeExpression(value: ts.Expression | undefined):
+	| Readonly<{
+			readonly boundedCall: ts.CallExpression;
+			readonly decodeCall: ts.CallExpression;
+	  }>
+	| undefined {
+	const decodeCall = identifierCallExpression(value, "decodeCreatorInvite");
+	if (decodeCall === undefined || decodeCall.arguments.length !== 1) return undefined;
+	const boundedCall = identifierCallExpression(decodeCall.arguments[0], "boundedMigrationCreatorInvite");
+	return boundedCall !== undefined && boundedCall.arguments.length === 1
+		? Object.freeze({ boundedCall, decodeCall })
+		: undefined;
 }
 
 function sameStrings(left: readonly string[], right: readonly string[]): boolean {
@@ -301,17 +369,18 @@ export function d108d2SourceGovernance(): Readonly<Record<string, boolean>> {
 
 /**
  * Pins D.108e5's two pre-copy owners through parsed TypeScript structure.
+ * @param room - Room source, injectable only for fail-closed source-shape mutants.
  * @returns Whether activation and migration-invite bounds dominate allocation.
  */
-export function d108e5SourceOwnership(): Readonly<{
+export function d108e5SourceOwnership(room = read(D108E3_GREEN_PATHS[0])): Readonly<{
 	readonly activationBoundPrecedesCopy: boolean;
 	readonly migrationInviteBoundOwnsEveryEncode: boolean;
 }> {
-	const room = read(D108E3_GREEN_PATHS[0]);
 	const parsed = ts.createSourceFile("d108e5-room.ts", room, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
 	const activation = uniqueVariableInitializer(parsed, "snapshotMigrationActivationInput");
 	const activationBody = functionBlock(activation);
-	const nestedActivationGuards = descendants(activationBody ?? parsed).filter(
+	const activationNodes = activationBody === undefined ? [] : executableDescendants(activationBody);
+	const nestedActivationGuards = activationNodes.filter(
 		(node): node is ts.IfStatement =>
 			ts.isIfStatement(node) &&
 			isBoundGuard(node, "byteLength", 49_152, "v3 room migration activation record is unbounded")
@@ -323,7 +392,7 @@ export function d108e5SourceOwnership(): Readonly<{
 		activationGuard !== undefined && activationGuardBlock !== undefined
 			? activationGuardBlock.statements.indexOf(activationGuard)
 			: -1;
-	const activationCopies = activation === undefined ? [] : descendants(activation).filter(isIntrinsicCopy);
+	const activationCopies = activationNodes.filter(isIntrinsicCopy);
 	const activationCopiesDominated =
 		activationGuardBlock !== undefined &&
 		activationGuardIndex >= 0 &&
@@ -340,7 +409,7 @@ export function d108e5SourceOwnership(): Readonly<{
 			isBoundGuard(statement, "exactCanonicalByteLength", 65_536, "v3 room migration target invite is unbounded")
 		) ?? [];
 	const inviteGuard = inviteGuards.length === 1 ? inviteGuards[0] : undefined;
-	const boundedEncodes = identifierCall(boundedInvite, "encodeCreatorInvite");
+	const boundedEncodes = executableIdentifierCall(boundedInviteBody, "encodeCreatorInvite");
 	const boundedEncode = boundedEncodes[0];
 	const boundedEncodeStatement =
 		boundedInviteBody !== undefined && boundedEncodes.length === 1 && boundedEncode !== undefined
@@ -352,40 +421,130 @@ export function d108e5SourceOwnership(): Readonly<{
 		boundedEncodeStatement !== undefined &&
 		ts.isReturnStatement(boundedEncodeStatement) &&
 		boundedInviteBody.statements.indexOf(boundedEncodeStatement) > boundedInviteBody.statements.indexOf(inviteGuard);
+	const fieldsInitializer = directVariableInitializer(boundedInviteBody, "fields");
+	const fieldsCall = identifierCallExpression(fieldsInitializer, "exactRecord");
+	const byteFieldLoops =
+		boundedInviteBody?.statements.filter(
+			(statement): statement is ts.ForOfStatement =>
+				ts.isForOfStatement(statement) &&
+				ts.isIdentifier(statement.expression) &&
+				statement.expression.text === "CREATOR_INVITE_BYTE_FIELDS" &&
+				statement.initializer.declarations.length === 1 &&
+				statement.initializer.declarations[0] !== undefined &&
+				ts.isIdentifier(statement.initializer.declarations[0].name) &&
+				statement.initializer.declarations[0].name.text === "field"
+		) ?? [];
+	const byteFieldLoop = byteFieldLoops.length === 1 ? byteFieldLoops[0] : undefined;
+	const fieldValueInitializer = executableVariableInitializer(byteFieldLoop, "fieldValue");
+	const byteLengthGetters = executableIntrinsicReflectApply(
+		boundedInviteBody,
+		"INTRINSIC_TYPED_ARRAY_BYTE_LENGTH_GETTER"
+	);
+	const byteLengthGetter = byteLengthGetters[0];
+	const byteLengthAssignments =
+		byteFieldLoop === undefined
+			? []
+			: executableDescendants(byteFieldLoop).filter(
+					(node): node is ts.BinaryExpression =>
+						ts.isBinaryExpression(node) &&
+						node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+						ts.isIdentifier(node.left) &&
+						node.left.text === "byteLength" &&
+						node.right === byteLengthGetter
+				);
+	const byteLengthPushes =
+		byteFieldLoop === undefined
+			? []
+			: executableDescendants(byteFieldLoop).filter(
+					(node): node is ts.CallExpression =>
+						ts.isCallExpression(node) &&
+						ts.isPropertyAccessExpression(node.expression) &&
+						ts.isIdentifier(node.expression.expression) &&
+						node.expression.expression.text === "byteLengths" &&
+						node.expression.name.text === "push" &&
+						node.arguments.length === 1 &&
+						isIdentifierExpression(node.arguments[0], "byteLength")
+				);
+	const exactLengthInitializer = directVariableInitializer(boundedInviteBody, "exactCanonicalByteLength");
+	const exactLengthCall =
+		exactLengthInitializer !== undefined && ts.isCallExpression(exactLengthInitializer)
+			? exactLengthInitializer
+			: undefined;
+	const boundedMetadataIsLive =
+		fieldsCall !== undefined &&
+		fieldsCall.arguments.length === 2 &&
+		isIdentifierExpression(fieldsCall.arguments[0], "value") &&
+		isIdentifierExpression(fieldsCall.arguments[1], "CREATOR_INVITE_MATERIAL_KEYS") &&
+		executableIdentifierCall(boundedInviteBody, "exactRecord").length === 1 &&
+		byteFieldLoop !== undefined &&
+		fieldValueInitializer !== undefined &&
+		ts.isElementAccessExpression(fieldValueInitializer) &&
+		isIdentifierExpression(fieldValueInitializer.expression, "fields") &&
+		isIdentifierExpression(fieldValueInitializer.argumentExpression, "field") &&
+		byteLengthGetters.length === 1 &&
+		byteLengthGetter !== undefined &&
+		byteLengthGetter.arguments.length === 3 &&
+		isIdentifierExpression(byteLengthGetter.arguments[1], "fieldValue") &&
+		byteLengthAssignments.length === 1 &&
+		byteLengthPushes.length === 1 &&
+		exactLengthCall !== undefined &&
+		ts.isPropertyAccessExpression(exactLengthCall.expression) &&
+		isIdentifierExpression(exactLengthCall.expression.expression, "byteLengths") &&
+		exactLengthCall.expression.name.text === "reduce" &&
+		boundedEncode !== undefined &&
+		boundedEncode.arguments.length === 1 &&
+		isIdentifierExpression(boundedEncode.arguments[0], "fields");
 	const snapshotInvite = uniqueVariableInitializer(parsed, "snapshotMigrationInvite");
+	const snapshotInviteBody = functionBlock(snapshotInvite);
 	const rehearsal = uniqueVariableInitializer(parsed, "performMigrationRehearsal");
+	const rehearsalBody = functionBlock(rehearsal);
 	const migrationActivation = uniqueVariableInitializer(parsed, "performMigrationActivation");
+	const migrationActivationBody = functionBlock(migrationActivation);
 	const boundedInviteCalls = identifierCall(parsed, "boundedMigrationCreatorInvite");
-	const snapshotBoundedCalls = identifierCall(snapshotInvite, "boundedMigrationCreatorInvite");
-	const rehearsalBoundedCalls = identifierCall(rehearsal, "boundedMigrationCreatorInvite");
-	const activationBoundedCalls = identifierCall(migrationActivation, "boundedMigrationCreatorInvite");
-	const activationInvite = uniqueVariableInitializer(migrationActivation ?? parsed, "targetCreatorInvite");
-	const activationInviteEncodes = identifierCall(migrationActivation, "encodeCreatorInvite");
+	const snapshotBoundedReturns =
+		snapshotInviteBody?.statements.filter(
+			(statement): statement is ts.ReturnStatement =>
+				ts.isReturnStatement(statement) &&
+				identifierCallExpression(statement.expression, "boundedMigrationCreatorInvite") !== undefined
+		) ?? [];
+	const snapshotBoundedCall =
+		snapshotBoundedReturns.length === 1
+			? identifierCallExpression(snapshotBoundedReturns[0]?.expression, "boundedMigrationCreatorInvite")
+			: undefined;
+	const rehearsalInvite = executableVariableInitializer(rehearsalBody, "targetMaterial");
+	const rehearsalDecode = boundedDecodeExpression(rehearsalInvite);
+	const activationInvite = executableVariableInitializer(migrationActivationBody, "targetCreatorInvite");
+	const activationDecode = boundedDecodeExpression(activationInvite);
+	const activationInviteEncodes = executableIdentifierCall(migrationActivationBody, "encodeCreatorInvite");
 	const activationInviteEncode = activationInviteEncodes[0];
 	const activationInviteEncodeArgument = activationInviteEncode?.arguments[0];
 	const activationReencodeIsBounded =
-		activationInvite !== undefined &&
-		decodesBoundedInvite(activationInvite) &&
+		activationDecode !== undefined &&
+		executableIdentifierCall(migrationActivationBody, "decodeCreatorInvite").length === 1 &&
 		activationInviteEncodes.length === 1 &&
 		activationInviteEncode?.arguments.length === 1 &&
 		activationInviteEncodeArgument !== undefined &&
 		ts.isIdentifier(activationInviteEncodeArgument) &&
 		activationInviteEncodeArgument.text === "targetCreatorInvite";
+	const expectedBoundedInviteCalls = [
+		snapshotBoundedCall,
+		rehearsalDecode?.boundedCall,
+		activationDecode?.boundedCall,
+	].filter((call): call is ts.CallExpression => call !== undefined);
 	return Object.freeze({
 		activationBoundPrecedesCopy:
 			activationBody !== undefined && activationGuard !== undefined && activationCopiesDominated,
 		migrationInviteBoundOwnsEveryEncode:
 			boundedInvite !== undefined &&
 			boundedEncodeDominated &&
-			identifierCall(boundedInvite, "exactRecord").length === 1 &&
-			intrinsicReflectApply(boundedInvite, "INTRINSIC_TYPED_ARRAY_BYTE_LENGTH_GETTER").length === 1 &&
+			boundedMetadataIsLive &&
 			boundedInviteCalls.length === 3 &&
-			snapshotBoundedCalls.length === 1 &&
-			identifierCall(snapshotInvite, "encodeCreatorInvite").length === 0 &&
-			rehearsalBoundedCalls.length === 1 &&
-			decodesBoundedInvite(rehearsal) &&
-			identifierCall(rehearsal, "encodeCreatorInvite").length === 0 &&
-			activationBoundedCalls.length === 1 &&
+			expectedBoundedInviteCalls.length === 3 &&
+			boundedInviteCalls.every((call) => expectedBoundedInviteCalls.includes(call)) &&
+			executableIdentifierCall(snapshotInviteBody, "encodeCreatorInvite").length === 0 &&
+			rehearsalDecode !== undefined &&
+			executableIdentifierCall(rehearsalBody, "decodeCreatorInvite").length === 1 &&
+			executableIdentifierCall(rehearsalBody, "encodeCreatorInvite").length === 0 &&
 			activationReencodeIsBounded,
 	});
 }

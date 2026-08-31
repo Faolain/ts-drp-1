@@ -20,6 +20,14 @@ import {
 } from "./fixtures/phase-6a-v3/creator-successor-product-contract.js";
 import { createV3RoomSession } from "../examples/v3-room/src/index.js";
 
+function replaceExactlyOnce(source: string, before: string, after: string): string {
+	const index = source.indexOf(before);
+	if (index < 0 || source.indexOf(before, index + before.length) >= 0) {
+		throw new TypeError("D.108e5 source mutant seam is not unique");
+	}
+	return `${source.slice(0, index)}${after}${source.slice(index + before.length)}`;
+}
+
 describe("D.108e2b creator successor room lifetime RED", () => {
 	it("freezes exactly five RED owners, one GREEN owner and seven browser behaviors", () => {
 		expect(D108E2B_RED_PATHS).toHaveLength(5);
@@ -198,9 +206,83 @@ describe("D.108e3 room lifetime transition RED", () => {
 describe("D.108e5 bounded redirected lifetime RED", () => {
 	it("bounds migration activation bytes before constructing the call-time owner", () => {
 		expect(d108e5SourceOwnership().activationBoundPrecedesCopy).toBe(true);
+		const room = readFileSync(resolve(REPOSITORY_ROOT, "examples/v3-room/src/index.ts"), "utf8");
+		const liveOwner = [
+			'\t\t\tif (byteLength > 49_152) throw new TypeError("v3 room migration activation record is unbounded");',
+			"\t\t\tconst copiedRecordBytes = new INTRINSIC_UINT8_ARRAY(byteLength);",
+			"\t\t\tReflect.apply(INTRINSIC_UINT8_ARRAY_SET, copiedRecordBytes, [",
+			"\t\t\t\tnew INTRINSIC_UINT8_ARRAY(backing, byteOffset, byteLength),",
+			"\t\t\t]);",
+			"\t\t\tcapturedRecordBytes = copiedRecordBytes;",
+		].join("\n");
+		const deadNestedOwner = replaceExactlyOnce(
+			room,
+			liveOwner,
+			[
+				"\t\t\tconst ignoredActivationOwner = (): void => {",
+				liveOwner,
+				"\t\t\t};",
+				"\t\t\tvoid ignoredActivationOwner;",
+			].join("\n")
+		);
+		expect(d108e5SourceOwnership(deadNestedOwner).activationBoundPrecedesCopy).toBe(false);
 	});
 
 	it("bounds every migration invite encode before copying caller-controlled bodies", () => {
 		expect(d108e5SourceOwnership().migrationInviteBoundOwnsEveryEncode).toBe(true);
+		const room = readFileSync(resolve(REPOSITORY_ROOT, "examples/v3-room/src/index.ts"), "utf8");
+		const deadSnapshotOwner = replaceExactlyOnce(
+			room,
+			"\t\treturn boundedMigrationCreatorInvite(value);",
+			[
+				"\t\tconst ignoredBoundedInvite = (): unknown => boundedMigrationCreatorInvite(value);",
+				"\t\tvoid ignoredBoundedInvite;",
+				"\t\treturn value;",
+			].join("\n")
+		);
+		expect(d108e5SourceOwnership(deadSnapshotOwner).migrationInviteBoundOwnsEveryEncode).toBe(false);
+
+		const deadRehearsalOwner = replaceExactlyOnce(
+			room,
+			"\t\tconst targetMaterial = decodeCreatorInvite(boundedMigrationCreatorInvite(targetInviteValue));",
+			[
+				"\t\tconst ignoredBoundedInvite = (): unknown =>",
+				"\t\t\tdecodeCreatorInvite(boundedMigrationCreatorInvite(targetInviteValue));",
+				"\t\tvoid ignoredBoundedInvite;",
+				"\t\tconst targetMaterial = decodeCreatorInvite(targetInviteValue);",
+			].join("\n")
+		);
+		expect(d108e5SourceOwnership(deadRehearsalOwner).migrationInviteBoundOwnsEveryEncode).toBe(false);
+
+		const alternateActivationOwner = replaceExactlyOnce(
+			room,
+			"\t\tconst targetCreatorInvite = decodeCreatorInvite(boundedMigrationCreatorInvite(targetInviteValue));",
+			[
+				"\t\tconst targetCreatorInvite = true",
+				"\t\t\t? decodeCreatorInvite(boundedMigrationCreatorInvite(targetInviteValue))",
+				"\t\t\t: decodeCreatorInvite(targetInviteValue);",
+			].join("\n")
+		);
+		expect(d108e5SourceOwnership(alternateActivationOwner).migrationInviteBoundOwnsEveryEncode).toBe(false);
+
+		const deadMetadataOwners = replaceExactlyOnce(
+			replaceExactlyOnce(
+				room,
+				"\t\tconst fields = exactRecord(value, CREATOR_INVITE_MATERIAL_KEYS);",
+				[
+					"\t\tconst ignoredExactRecord = (): unknown => exactRecord(value, CREATOR_INVITE_MATERIAL_KEYS);",
+					"\t\tvoid ignoredExactRecord;",
+					"\t\tconst fields = value as Readonly<Record<string, unknown>>;",
+				].join("\n")
+			),
+			"\t\t\t\tbyteLength = Reflect.apply(INTRINSIC_TYPED_ARRAY_BYTE_LENGTH_GETTER, fieldValue, []);",
+			[
+				"\t\t\t\tconst ignoredByteLength = (): unknown =>",
+				"\t\t\t\t\tReflect.apply(INTRINSIC_TYPED_ARRAY_BYTE_LENGTH_GETTER, fieldValue, []);",
+				"\t\t\t\tvoid ignoredByteLength;",
+				"\t\t\t\tbyteLength = 1;",
+			].join("\n")
+		);
+		expect(d108e5SourceOwnership(deadMetadataOwners).migrationInviteBoundOwnsEveryEncode).toBe(false);
 	});
 });
