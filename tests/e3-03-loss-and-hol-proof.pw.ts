@@ -1957,6 +1957,33 @@ function rawSequenceEvidence(
 	return Object.freeze({ gap, maxStallMs });
 }
 
+interface RawSenderContinuityInput {
+	readonly backpressuredDrops: number;
+	readonly intervalMs: number;
+	readonly lifecycle: readonly D108e4hLifecycleObservation[];
+	readonly observations: readonly PlatformObservation[];
+	readonly receiverLinkDrops: number;
+	readonly sampleCount: number;
+	readonly senderLinkDrops: number;
+}
+
+interface RawSenderContinuityEvidence {
+	readonly gap: number;
+	readonly rawBackpressureWindowMaxMs: number;
+	readonly rawMaxStallMs: number;
+	readonly rawNativeGapMaxMs: number;
+}
+
+function rawSenderContinuityEvidence(input: RawSenderContinuityInput): RawSenderContinuityEvidence {
+	const current = rawSequenceEvidence(input.observations);
+	return Object.freeze({
+		gap: current.gap,
+		rawBackpressureWindowMaxMs: 0,
+		rawMaxStallMs: current.maxStallMs,
+		rawNativeGapMaxMs: current.maxStallMs,
+	});
+}
+
 function expectOpenTransport(snapshot: FabricTrialSnapshot, remotePeerId: string): void {
 	expect(snapshot.transport.fallbackCount).toBe(0);
 	expect(snapshot.transport.raw).toEqual([
@@ -7826,6 +7853,216 @@ test("raw sequence evidence includes the fixed sample-domain boundaries", () => 
 		leading: rawSequenceEvidence(observations.slice(1)).gap,
 		trailing: rawSequenceEvidence(observations.slice(0, -1)).gap,
 	}).toEqual({ complete: 1, internal: 2, leading: 2, trailing: 2 });
+
+	const senderObservation = (
+		sequence: number,
+		receivedAtMs: number,
+		connectionId = 8,
+		channelId = 377
+	): PlatformObservation =>
+		Object.freeze({
+			attemptId: sequence,
+			byteLength: SAMPLE_PAYLOAD_BYTES,
+			carrierByteLength: 431,
+			channelId,
+			channelLabel: "ts-drp-ephemeral/1",
+			connectionId,
+			insertionReadyState: "open",
+			lane: "raw",
+			lifecycleSequence: sequence + 1_000,
+			maxRetransmits: 0,
+			ordered: false,
+			ordinal: sequence,
+			receivedAtMs,
+			readyState: "open",
+			sentAtMs: receivedAtMs,
+			sequence,
+			sentinel: false,
+		});
+	const lifecycleRecord = (
+		sequence: number,
+		event: "channel-send-attempt" | "channel-send-success",
+		attemptId: number,
+		bufferedAmount: number,
+		atWallMs: number,
+		connectionId = 8,
+		channelId = 377
+	): D108e4hLifecycleObservation =>
+		Object.freeze({
+			attemptId,
+			atMonotonicMs: atWallMs,
+			atWallMs,
+			bufferedAmount,
+			channelId,
+			connectionId,
+			event,
+			label: "ts-drp-ephemeral/1",
+			owner: "rtc-datachannel-send",
+			readyState: "open",
+			schemaVersion: 3,
+			sequence,
+			trialId: "d108e4bs-refusal-window",
+		});
+	const firstBoundaryAtMs = 393 * SAMPLE_INTERVAL_MS;
+	const secondBoundaryAtMs = firstBoundaryAtMs + 5_506;
+	const qualifiedObservations = Object.freeze(
+		Array.from({ length: SAMPLE_COUNT }, (_, sequence) => sequence)
+			.filter((sequence) => sequence <= 393 || sequence >= 560)
+			.map((sequence) =>
+				senderObservation(
+					sequence,
+					sequence <= 393 ? sequence * SAMPLE_INTERVAL_MS : secondBoundaryAtMs + (sequence - 560) * SAMPLE_INTERVAL_MS
+				)
+			)
+	);
+	const qualifiedLifecycle = Object.freeze([
+		lifecycleRecord(100, "channel-send-attempt", 393, 65_512, firstBoundaryAtMs),
+		lifecycleRecord(101, "channel-send-success", 393, 65_943, firstBoundaryAtMs),
+		lifecycleRecord(102, "channel-send-attempt", 560, 0, secondBoundaryAtMs),
+		lifecycleRecord(103, "channel-send-success", 560, 431, secondBoundaryAtMs),
+	]);
+	const qualifiedInput: RawSenderContinuityInput = Object.freeze({
+		backpressuredDrops: 166,
+		intervalMs: SAMPLE_INTERVAL_MS,
+		lifecycle: qualifiedLifecycle,
+		observations: qualifiedObservations,
+		receiverLinkDrops: 0,
+		sampleCount: SAMPLE_COUNT,
+		senderLinkDrops: 0,
+	});
+	const withLifecycle = (lifecycle: readonly D108e4hLifecycleObservation[]): RawSenderContinuityInput =>
+		Object.freeze({ ...qualifiedInput, lifecycle: Object.freeze(lifecycle) });
+	const mutateLifecycle = (
+		selectedEvent: D108e4hLifecycleObservation["event"],
+		selectedAttemptId: number,
+		mutation: Readonly<Partial<D108e4hLifecycleObservation>>
+	): readonly D108e4hLifecycleObservation[] =>
+		qualifiedLifecycle.map((record) =>
+			record.event === selectedEvent && record.attemptId === selectedAttemptId
+				? Object.freeze({ ...record, ...mutation })
+				: record
+		);
+
+	expect(rawSenderContinuityEvidence(qualifiedInput)).toEqual({
+		gap: 167,
+		rawBackpressureWindowMaxMs: 5_506,
+		rawMaxStallMs: SAMPLE_INTERVAL_MS,
+		rawNativeGapMaxMs: 5_506,
+	});
+
+	const changedIdentityObservations = qualifiedObservations.map((record) =>
+		record.sequence >= 560 ? Object.freeze({ ...record, channelId: 378 }) : record
+	);
+	const overBoundObservations = qualifiedObservations.map((record) =>
+		record.sequence >= 560
+			? Object.freeze({ ...record, receivedAtMs: record.receivedAtMs + 506, sentAtMs: record.sentAtMs + 506 })
+			: record
+	);
+	const consecutiveStallObservations = qualifiedObservations.map((record) =>
+		record.sequence >= 101
+			? Object.freeze({ ...record, receivedAtMs: record.receivedAtMs + 5_473, sentAtMs: record.sentAtMs + 5_473 })
+			: record
+	);
+	const splitGapSequences = Array.from({ length: SAMPLE_COUNT }, (_, sequence) => sequence).filter(
+		(sequence) => sequence < 100 || (sequence >= 200 && sequence < 400) || sequence >= 466
+	);
+	const splitGapObservations = Object.freeze(
+		splitGapSequences.map((sequence) => {
+			if (sequence < 400) return senderObservation(sequence, sequence * SAMPLE_INTERVAL_MS);
+			const secondSplitBoundaryAtMs = 399 * SAMPLE_INTERVAL_MS + 5_506;
+			return senderObservation(sequence, secondSplitBoundaryAtMs + (sequence - 466) * SAMPLE_INTERVAL_MS);
+		})
+	);
+	const firstSplitBoundaryAtMs = 99 * SAMPLE_INTERVAL_MS;
+	const splitGapLifecycle = Object.freeze([
+		lifecycleRecord(200, "channel-send-attempt", 99, 65_512, firstSplitBoundaryAtMs),
+		lifecycleRecord(201, "channel-send-success", 99, 65_943, firstSplitBoundaryAtMs),
+		lifecycleRecord(202, "channel-send-attempt", 200, 0, 200 * SAMPLE_INTERVAL_MS),
+		lifecycleRecord(203, "channel-send-success", 200, 431, 200 * SAMPLE_INTERVAL_MS),
+	]);
+	const negativeRows: readonly Readonly<{
+		readonly expected: number;
+		readonly input: RawSenderContinuityInput;
+		readonly name: string;
+	}>[] = Object.freeze([
+		Object.freeze({
+			expected: 5_506,
+			input: Object.freeze({ ...qualifiedInput, backpressuredDrops: 0 }),
+			name: "absent refusal delta",
+		}),
+		Object.freeze({
+			expected: 5_506,
+			input: Object.freeze({ ...qualifiedInput, backpressuredDrops: 165 }),
+			name: "inconsistent refusal delta",
+		}),
+		Object.freeze({
+			expected: 5_506,
+			input: Object.freeze({ ...qualifiedInput, senderLinkDrops: 1 }),
+			name: "local replacement",
+		}),
+		Object.freeze({
+			expected: 5_506,
+			input: Object.freeze({ ...qualifiedInput, receiverLinkDrops: 1 }),
+			name: "peer replacement",
+		}),
+		Object.freeze({
+			expected: 5_506,
+			input: Object.freeze({ ...qualifiedInput, observations: changedIdentityObservations }),
+			name: "changed RTC identity",
+		}),
+		Object.freeze({
+			expected: 5_506,
+			input: withLifecycle(mutateLifecycle("channel-send-attempt", 393, { bufferedAmount: 65_537 })),
+			name: "preceding attempt already over ceiling",
+		}),
+		Object.freeze({
+			expected: 5_506,
+			input: withLifecycle(mutateLifecycle("channel-send-success", 393, { bufferedAmount: 65_536 })),
+			name: "preceding success did not cross ceiling",
+		}),
+		Object.freeze({
+			expected: 5_506,
+			input: withLifecycle(mutateLifecycle("channel-send-attempt", 560, { bufferedAmount: 65_537 })),
+			name: "resume remained over ceiling",
+		}),
+		Object.freeze({
+			expected: 5_506,
+			input: withLifecycle([
+				...qualifiedLifecycle.slice(0, 2),
+				Object.freeze({
+					...qualifiedLifecycle[1],
+					attemptId: undefined,
+					event: "channel-close-call" as const,
+					owner: "rtc-observer-or-harness",
+					sequence: 102,
+				}),
+				...qualifiedLifecycle.slice(2).map((record) => Object.freeze({ ...record, sequence: record.sequence + 1 })),
+			]),
+			name: "close inside refusal window",
+		}),
+		Object.freeze({
+			expected: 6_012,
+			input: Object.freeze({ ...qualifiedInput, observations: overBoundObservations }),
+			name: "cadence bound exceeded",
+		}),
+		Object.freeze({
+			expected: 5_506,
+			input: Object.freeze({ ...qualifiedInput, observations: consecutiveStallObservations }),
+			name: "consecutive sequence stall",
+		}),
+		Object.freeze({
+			expected: 5_506,
+			input: Object.freeze({
+				...qualifiedInput,
+				lifecycle: splitGapLifecycle,
+				observations: splitGapObservations,
+			}),
+			name: "second nonconsecutive window lacks lifecycle",
+		}),
+	]);
+	for (const { expected, input, name } of negativeRows) {
+		expect.soft(rawSenderContinuityEvidence(input).rawMaxStallMs, name).toBe(expected);
+	}
 });
 
 test("partitions receiver evidence by exact product roster without losing observations", () => {

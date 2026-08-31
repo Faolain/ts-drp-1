@@ -83095,3 +83095,31 @@ campaign retry is authorized by this slice. Accepted GREEN releases a new
 fresh-name campaign-disposition freeze; it does not itself authorize or execute
 that campaign. D.108e5 remains blocked until a separately frozen fresh six-run
 campaign passes and receives its final evidence review.
+
+D.108e4bs RED is accepted and causal. The corrected suffix-only Playwright
+listing selected exactly one test in one file; the earlier read-only listing
+with a leading `^` selected zero because Playwright's full grep title includes
+suite context, so that diagnostic was corrected and was not counted as an
+execution. The single focused execution then reported
+expected/skipped/unexpected/flaky `0/0/1/0`, zero top-level errors and one
+failed result. Its sole mismatch was the frozen positive equality:
+`rawBackpressureWindowMaxMs` remained `0` instead of `5,506` and
+`rawMaxStallMs` remained `5,506` instead of `33`; `gap: 167` and factual
+`rawNativeGapMaxMs: 5,506` already matched. All twelve preceding soft negative
+rows completed without a soft failure. This is exactly the reviewed RED causal
+matrix, with no product source, dependency, configuration, workload, threshold
+or campaign change.
+
+The reporter, stdout and stderr SHA-256 values are respectively
+`da33364f3d2227b8ff0420f35efa2ed460b227a79d991bfb4e1134590ec4a7ea`,
+`c3a7ef3c1e0bb168568f6342690a9ef9a25e9270157a23280ae036ffc2eeef60`
+and
+`d69ecb875d01c43aeeef3ab0080d0934a95235f6d517ba9160fe527da9571130`.
+The command ran once at reporter start `2026-08-31T03:21:17.274Z` for
+`9,222.933` ms. Its capture wrapper then attempted to assign the Playwright
+exit code to zsh's read-only `status` parameter, so the post-command status and
+timestamp sidecars were not written. The complete reporter independently and
+deterministically proves the nonzero test-failure result; the test was not
+rerun. The evidence root preserves a wrapper note and the original complete
+reporter and streams. This bookkeeping defect does not affect RED causality and
+will be avoided in later wrappers by using `runner_rc`.
