@@ -85907,6 +85907,67 @@ and every entry validates. D.108e4ck is closed and one wholly fresh write-once
 retained proof is released under the unchanged workload and first-failure
 rules; no campaign invocation is released by this review closure alone.
 
+###### D.108e4cl — one fresh retained proof of the closed prepare gate
+
+D.108e4cl consumes the single retained proof released by the closed
+D.108e4ck implementation review. It adds no review, source, fixture,
+instrumentation, dependency, workload, threshold, timeout, browser, port,
+classifier or product change. The signed/pushed behavior GREEN is
+`b98631afb3eb91b68226649113fb53d69d8ee56b`, tree
+`c4f8371f725baaf2dc9787a9f2c19add411c55f9`; its signed/pushed review closure
+is `15055bdd39d7d535d681f619b481047495b9ba6a`. Product source, test owner,
+Playwright config and lockfile SHA-256 values are respectively
+`ec894295605729a6ae1ab2489ef6a9d2db79ce30f0cc728d511639070c10dc87`,
+`a0eacef8085d20289e0d48eb4bc626debd279fbead899a51cb66e4377d8e6a27`,
+`1826318a19d5676631f6350fa21d2eb1125dbc1d83ecce69d7f776885bdd7978`
+and
+`73c7c0660fa32c7380d0fe5a026897a7ad85a40edf1f169730c2d8e44e613a99`.
+The selected runtime is Playwright `1.62.1` with Google Chrome for Testing
+`151.0.7922.34`; full resolved identity is captured in the new root.
+
+The sole fresh root is `.logs/d108e4ck-retained-browser-1/`. It is absent at
+freeze and is never retried, overwritten, renamed, substituted or reused.
+Before launch require signed HEAD equal the pushed branch; the only tracked
+path changed since behavior GREEN is this plan; the four frozen hashes match;
+the root remains absent; the suffix selector lists exactly one test in one
+file; all protected untracked paths and 26 stashes remain intact; no
+ts-drp-rooted reviewer, test or profiler is active; and ports 4174, 4175,
+51000 and 51002 are clear. Record physical Node, pnpm, Playwright and Chromium
+paths and complete version output. The one consuming invocation preserves
+both telemetry flags, Chromium, one worker, retry zero, three trials, 30%
+loss, 600 samples per trial, payload and all semantic thresholds, the
+effective 300-second test timeout, and the 600-second process-group watchdog:
+
+```sh
+set -u
+retained_root="$PWD/.logs/d108e4ck-retained-browser-1"
+test ! -e "$retained_root"
+mkdir -m 700 "$retained_root"
+date -u +%Y-%m-%dT%H:%M:%SZ > "$retained_root/started-at.txt"
+D108E4H_TELEMETRY=1 D108E4G_TELEMETRY=1 \
+  PLAYWRIGHT_JSON_OUTPUT_NAME="$retained_root/reporter.json" \
+  /usr/bin/perl -MPOSIX=setpgid -e 'my $limit=shift @ARGV; my $pid=fork(); die "fork failed" unless defined $pid; if($pid==0){setpgid(0,0); exec @ARGV; exit 127} $SIG{ALRM}=sub { kill "TERM", -$pid; select undef,undef,undef,5; kill "KILL", -$pid; waitpid($pid,0); exit 124 }; alarm $limit; waitpid($pid,0); alarm 0; exit($? == -1 ? 125 : ($? & 127) ? 128 + ($? & 127) : $? >> 8)' \
+  600 pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
+  --reporter=json --fail-on-flaky-tests \
+  --output="$retained_root/test-results" \
+  > "$retained_root/stdout.log" 2> "$retained_root/stderr.log"
+runner_status=$?
+print -r -- "$runner_status" > "$retained_root/runner.status"
+date -u +%Y-%m-%dT%H:%M:%SZ > "$retained_root/finished-at.txt"
+exit "$runner_status"
+```
+
+Preserve reporter, streams, timestamps, attachments, direct status, decoded
+campaign telemetry, runtime identities, hashes and a validating
+self-excluding manifest. A consuming failure stops, is never retried and owns
+the next evidence-driven disposition. One retry-zero pass with
+expected/skipped/unexpected/flaky `1/0/0/0`, zero top-level errors, exactly
+three completed trial summaries and unchanged workload/semantic contracts
+releases a plan-only freeze of six wholly fresh campaign names. D.108e4cl
+runs no six-name campaign.
+
 ###### D.108e4ce — post-census six-name campaign freeze
 
 D.108e4ce is the high-risk campaign disposition released by the passing
