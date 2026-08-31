@@ -82643,3 +82643,37 @@ review is authorized for this plan-only name/capture freeze. A pass may release
 the separately authorized six-name campaign disposition; a failure remains
 immutable first-failure evidence and must be diagnosed before any other
 browser or campaign run.
+
+The one D.108e4bq retained-browser validation passed without retry. The
+write-once root `.logs/d108e4bq-retained-browser-1/` ran from
+`2026-08-31T02:14:45Z` through `2026-08-31T02:17:37Z`; runner and Playwright
+statuses are both zero. Its reporter selected the exact retained title once in
+one Chromium project and reports expected/skipped/unexpected/flaky
+`1/0/0/0`, zero top-level errors, one passed result of `162201` ms and total
+reporter duration `170741.021` ms. All three fixed in-test trials completed.
+There was no retry, watchdog, substitution or campaign invocation.
+
+Reporter, stdout and stderr SHA-256 values are respectively
+`50f1ae96262c526215dc641af0b5c365704d9220b24ef17d30ed276bb32ebc46`,
+`7ac00056338016ab3740d9a87a843a828362d72e69716fe5983b12f1d68f6722`
+and
+`06a836bd938a761fd10fcdf39d5bc97a48a2ba9a04ddb50db7869f92388624f8`.
+The sorted eight-file ledger was computed outside the now-immutable root and
+has SHA-256
+`e621c09a87e758f66a55754aa91f09e61b98418176ab970436ed3b99e939d7fc`.
+Protected untracked paths and 26 stashes remain; fixed ports are clear.
+D.108e4bq is closed and releases the separately authorized new six-name
+campaign-disposition slice. No consumed `ordinary-*`, `renewal-*`,
+`confidence-*`, bp or bq name may be reused.
+
+The next slice is D.108e4br, with fresh ordered names
+`resolution-ordinary-1`, `resolution-ordinary-2`,
+`resolution-ordinary-3`, `resolution-isolated-1`,
+`resolution-isolated-2` and `resolution-isolated-3`. It must preserve the
+trusted-local threat model, current signed source, exact workload/thresholds,
+three ordinary plus three clean-isolated modes, write-once sequential
+predecessor custody and first-failure stop. Before any consuming invocation it
+must freeze placeholder-free setup and six literal launcher blocks, receive
+the required single high-risk Grok/Codex-high/Opus-xhigh review, and close an
+empty P0/P1 union. The user's standing authorization covers all six and must
+not be requested again.
