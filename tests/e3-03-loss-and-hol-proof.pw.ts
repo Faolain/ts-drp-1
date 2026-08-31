@@ -5693,10 +5693,22 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 				controlReceives: Object.freeze([
 					...(d108e4bhDeadlinePending.endpoints.receiver.controlReceives ?? []),
 					Object.freeze({
-						bytes: d108e4avControlBytes(3),
+						bytes: d108e4avControlBytes(1),
 						channelId: d108e4bhDeadlineCandidate.channelId,
 						connectionId: d108e4bhDeadlineCandidate.connectionId,
 						lifecycleSequence: d108e4bhDeadlineCandidateTail + 1,
+					}),
+					Object.freeze({
+						bytes: d108e4avControlBytes(3),
+						channelId: d108e4bhDeadlineCandidate.channelId,
+						connectionId: d108e4bhDeadlineCandidate.connectionId,
+						lifecycleSequence: d108e4bhDeadlineCandidateTail + 2,
+					}),
+					Object.freeze({
+						bytes: d108e4avControlBytes(3),
+						channelId: d108e4bhDeadlineCandidate.channelId,
+						connectionId: d108e4bhDeadlineCandidate.connectionId,
+						lifecycleSequence: d108e4bhDeadlineCandidateTail + 3,
 					}),
 				]),
 				lifecycle: Object.freeze([
@@ -5708,12 +5720,24 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 						d108e4bhDeadlineCandidate,
 						"rtc-datachannel-message-event"
 					),
+					d108e4hLifecycle(
+						noReplacement.trialId,
+						d108e4bhDeadlineCandidateTail + 2,
+						"channel-message",
+						d108e4bhDeadlineCandidate,
+						"rtc-datachannel-message-event"
+					),
+					d108e4hLifecycle(
+						noReplacement.trialId,
+						d108e4bhDeadlineCandidateTail + 3,
+						"channel-message",
+						d108e4bhDeadlineCandidate,
+						"rtc-datachannel-message-event"
+					),
 				]),
 			})
 		);
-		expect(() => validateD108e4hCampaignCustody(d108e4bhAcceptorReceivedCommit)).toThrowError(
-			"D108E4H_IDENTITY_JOIN_INVALID"
-		);
+		expect(() => validateD108e4hCampaignCustody(d108e4bhAcceptorReceivedCommit)).not.toThrow();
 		const d108e4bhCandidateApplicationOwner = withReceiverEndpoint(
 			d108e4bhDeadlinePending,
 			Object.freeze({

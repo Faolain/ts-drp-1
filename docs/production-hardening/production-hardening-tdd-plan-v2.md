@@ -82496,3 +82496,25 @@ Grok session `01a0556a-483d-7152-b8fa-42d2f6f8e0d2`, Codex session
 `01a0556f-f845-79f0-88cf-7bbf2867a1b3` and Opus session
 `16fc3a9e-b451-4e67-9408-7e8818f4f92e` were continued rather than relaunched.
 The D.108e4bq plan gate is closed; proceed directly to deterministic RED.
+
+D.108e4bq RED is accepted. The positive fixture now reproduces the captured
+two READY, two ACK and two COMMIT acceptor control multiplicity while common A
+owns all application records and pending C has valid open/handler custody with
+no terminal. One initial read-only list diagnostic omitted
+`D108E4H_TELEMETRY=1` and therefore found zero tests; this was a command error,
+not a code failure or test execution. The corrected list selected exactly the
+schema validator in one file.
+
+The single focused execution ran from `2026-08-31T01:49:12Z` through
+`2026-08-31T01:49:20Z` and produced expected/skipped/unexpected/flaky counts
+`0/0/1/0`, one selected test in one file, zero top-level reporter errors and
+exact `D108E4H_IDENTITY_JOIN_INVALID`. The stack terminates at the frozen
+received-COMMIT prohibition in `d108e4hAssertDeadlinePendingCandidate`, so the
+RED is causal and matches the signed plan. Test SHA-256 is
+`35da20c1703ffcaae7d361f6128f65f7a1f981fe81f4b3713a1e535f4cc16f2e`.
+The self-excluding evidence manifest
+`.logs/d108e4bq-red/SHA256SUMS` validates and has SHA-256
+`c088c41d0df82f0745a4d7ac47cb4148a6f31cb5db27496e6174fec6bb90eb7d`.
+No product source, browser campaign, retained name, workload, threshold,
+timing, dependency, port or evidence schema changed. Proceed directly to the
+test-only GREEN; no separate RED model review is permitted.
