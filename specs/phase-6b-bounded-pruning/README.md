@@ -2,12 +2,26 @@
 
 ## Next Agent Prompt
 
-Status: D.109a eligibility is closed at signed/pushed commit
-`717b15ac0a8c7369fd18a0a1c08b8a88dfbb0056`; its plan, RED, GREEN, review,
-and evidence are accepted and must not be reopened. Freeze and review
-[D.109b issuance retention](slices/01-issuance-retention.md), then execute its
-tests-only causal RED before any production deletion path. Do not start D.109c
-until D.109b has its signed RED, narrow GREEN, retained gates, and final review.
+Status (2026-08-31): D.109a eligibility and D.109b issuance retention are
+closed. D.109b's signed/pushed GREEN and final-review anchors are respectively
+`529367b154ffd3fb66bf31a6cfedb4a0d9b73746` and
+`2afadbe682261bdb311a5cb64f6f42d86ed7330b`; their plan, RED, GREEN, reviews,
+and evidence are accepted and must not be reopened. Freeze, sign, push, and
+review [D.109c AHE reclamation](slices/02-ahe-reclamation.md), then execute its
+tests-only causal RED before adding any AHE deletion path.
+
+Global TODO:
+
+- [x] D.109a eligibility planner and causal closure.
+- [x] D.109b issuance retention and causal closure.
+- [ ] D.109c AHE reclamation plan → RED → GREEN → final review.
+- [ ] D.109d receipt-gated runtime reclamation.
+- [ ] D.109e browser primary scheduling reuse.
+- [ ] D.109f differential/census exit, including D.109b's three assigned P2
+      parity/deep-freeze checks.
+
+Before ending a pass, update this handoff with the exact signed/pushed anchor,
+current gate, and next executable command.
 
 The user has prohibited further Fable and collaboration subagents after the
 one expressly authorized Phase-6b Fable review. Phase-6b formal reviews use

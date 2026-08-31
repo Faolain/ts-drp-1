@@ -1,41 +1,337 @@
 # D.109c — AHE Generation and Blob Reclamation
 
-Keep the mandatory `AheDurableStore` contract unchanged. Node/browser adapters
-add a separate package maintenance capability resolved by object identity only
-for their genuine concrete stores. The verified plan supplies exact generation
-identities; the store must not sort random generation IDs as chronology. The
-retained rollback set is exactly the two rows reached by following
-`baseExpectedHead` twice from the active adopted generation, and both complete
-closures must remain readable. Two other countable superseded generations do
-not satisfy the contract. In one owner transaction it rechecks the expected
-head/revision, active generation, that exact ancestor pair, selected superseded
-generations, closures, and promotion/reference graph.
+## Status and inherited anchors
 
-Current creator adoption requires every generation row with a `present`
-`baseExpectedHead` to retain its parent row. Therefore row reclamation also
-rechecks the complete generation graph. When an older connected ancestry prefix
-is selected, the same transaction rewrites only the oldest retained rollback
-ancestor's `baseExpectedHead` from the exact expected present parent to the
-already-supported `{ kind: "none", objectId }` form, then deletes that complete
-prefix. It changes no generation identity, head, revision, closure digest,
-closure, state, blob, wire byte, or public API. Any gap, alternate surviving
-child of a selected row, unexpected prior root, changed floor parent, or
-dangling post-state edge aborts with zero writes.
+D.109c starts only after signed/pushed D.109b closure
+`2afadbe682261bdb311a5cb64f6f42d86ed7330b`. D.109a's planner and D.109b's
+issuance deletion remain accepted, immutable prerequisites. This slice changes
+only AHE physical ownership. It authorizes no runtime reclamation, scheduler,
+campaign, threshold, dependency, protocol, wire, digest, QC, adoption,
+availability, issuance, snapshot, or product-handle change.
 
-Only then may it delete selected superseded generation rows and promotions and
-garbage-collect blobs with no remaining generation reference. Because blobs
-are globally content-addressed across objects and neither backend has a reverse
-index, the transaction decodes and scans every remaining generation closure
-across every object plus remaining promotion rows before deleting any candidate
-blob. This first implementation is explicitly O(total retained generation
-metadata); no reverse-index schema is implied, and measured need is required
-before adding one. The active generation and its two immediate rollback
-ancestors remain complete. RED covers changed head, changed closure, shared
-blobs, duplicate identities, insufficient rollbacks, a wrong-but-countable
-non-ancestor pair, deleting the floor parent without normalization, normalizing
-the wrong row or wrong parent, a surviving branch into the deleted prefix,
-every crash edge, reopen, idempotence, subsequent creator adoption commit, and
-unrelated objects. Node, browser, memory conformance, request inventory, schema
-authority, and recovery tests remain aligned. GREEN returns an immutable AHE
-receipt containing the exact normalized floor, former parent, and deleted
-prefix.
+The active formal-review trio is Grok 4.6/high, exact Kimi K3 thinking/high
+with both `KIMI_LOOP_MAX_STEPS_PER_TURN=100` and
+`--max-steps-per-turn 100`, and Opus xhigh. Kimi occupies the middle
+external-CLI slot; Codex `gpt-5.6-sol` is not a substitute. If Grok cancels,
+resume that exact session. Fable and collaboration subagents are not
+authorized.
+
+## Source audit and one-owner seam
+
+The mandatory `AheDurableStore` remains the exact existing 12-key facade:
+`capabilities` plus `readHead`, `readGenerationPage`,
+`recoverActiveGeneration`, `getBlob`, `beginGeneration`, `putCachedBlob`,
+`promoteReference`, `completeGeneration`, `swapHead`, `discardGeneration`, and
+`close`. D.109c does not add a thirteenth key.
+
+Current physical facts are:
+
+- memory owns objects, generation rows, global blobs, and promotion evidence in
+  one synchronous `TransitionOwner`;
+- Node owns exact `objects`, `generations`, `blobs`, and `promotions` SQLite
+  tables in the caller-selected file under WAL/FULL and foreign keys;
+- browser owns the same four AHE stores inside the existing Phase-5e IndexedDB
+  version-3 database. D.109c changes neither database name, schema version,
+  store/table/key path, nor unrelated vote/evidence stores;
+- blob identity is global by digest, not object-local, and neither persisted
+  backend has a reverse index;
+- creator adoption rejects every surviving generation whose `present`
+  `baseExpectedHead` parent row is missing. Deleting an older prefix without
+  rewriting the retained floor is therefore a demonstrated recovery defect.
+
+There is one shared `@ts-drp/storage/maintenance` owner for the closed request,
+receipt/error types, copying, canonical-generation validation, lineage graph
+classification, and remaining-reference calculation. Memory registers its
+capability through a package-private identity registry. Node and browser each
+add only `./maintenance`, backed by a module-private `WeakMap` keyed by the
+exact facade their existing factory returned. Copies, proxies, structural
+lookalikes, and cross-backend facades resolve to `undefined`. Package roots and
+ordinary factory modules do not re-export maintenance.
+
+Backend transactions remain the only physical mutation owners. No generic
+adapter command, `AheDurableStore` method, public runtime handle, reverse-index
+schema, receipt shadow table, or cross-database transaction is added.
+
+## Closed maintenance contract
+
+The one method is:
+
+```text
+reclaimClosedEpoch(input: unknown): Promise<AheReclamationReceipt>
+```
+
+The captured exact input has only:
+
+```text
+{
+  activeGenerationId,
+  availabilityPolicyDigest,
+  closedEpoch,
+  expectedHead,
+  lineageFloor: {
+    deleteGenerationIds,
+    expectedBaseExpectedHead,
+    generationId,
+    replacementBaseExpectedHead
+  },
+  objectId,
+  rollbackGenerationIds
+}
+```
+
+It is the detached AHE subset of one successful D.109a plan. The availability
+digest must be the frozen local-only digest
+`53775c5c1ee01e346f588966d6e7acb876df2bd8b2abcbe2b2591f216f7d4d9b`;
+D.109c compares it but never decodes policy bytes. The expected head is
+`present`; active, both rollback, floor, and deletion identities are valid,
+distinct where required, exact closed records; rollback order is immediate
+parent then grandparent; deletion identities have no duplicates; replacement
+is exactly `{ kind: "none", objectId }`; and an empty deletion list is valid
+only when the expected floor parent is already that same no-head value.
+Accessors, inherited fields, symbols, sparse arrays, shared buffers, aliases,
+extra fields, and impossible relationships fail before transaction work.
+
+Success returns a detached deeply frozen receipt with exact keys:
+
+```text
+{
+  activeGenerationId,
+  availabilityPolicyDigest,
+  closedEpoch,
+  deletedBlobDigests,
+  deletedGenerationIds,
+  deletedPromotionCount,
+  expectedHead,
+  floor: {
+    expectedFormerBaseExpectedHead,
+    generationId,
+    normalizedThisCall,
+    replacementBaseExpectedHead
+  },
+  objectId,
+  reclaimedGenerationIds,
+  rollbackGenerationIds
+}
+```
+
+`reclaimedGenerationIds` is the exact requested older prefix proven absent at
+commit. `deletedGenerationIds`, `deletedPromotionCount`, and
+`deletedBlobDigests` describe writes performed by this call. A lost-receipt
+replay has the same reclaimed prefix, `normalizedThisCall: false`, and empty
+actual-deletion fields. No receipt contains blob bytes, closure bytes, QC,
+signatures, snapshot bytes, runtime authority, or a future-deletion grant.
+
+Failures are frozen errors with one of exactly:
+
+- `AHE_RECLAMATION_INVALID_ARGUMENT`: malformed or internally impossible
+  caller input; never poisons;
+- `AHE_RECLAMATION_RETRY_REQUIRED`: a well-formed head, revision, generation,
+  floor, branch, or selected-set observation changed since planning; zero
+  writes and no poison;
+- `AHE_RECLAMATION_CORRUPT`: malformed/unreadable native bytes, key/record
+  mismatch, broken retained closure/promotion/blob evidence, impossible partial
+  replay, or a malformed global remaining-reference row; zero committed writes
+  and the ordinary store latches poison;
+- `AHE_RECLAMATION_STORE_CLOSED` and `AHE_RECLAMATION_STORE_POISONED`: exact
+  lifecycle precedence;
+- `AHE_RECLAMATION_SUBSTRATE_FAILURE`: a contained native failure with cause;
+  no false success.
+
+No error exposes persisted bytes. Every backend returns asynchronous rejection,
+never a backend-specific synchronous throw.
+
+## Transactional algorithm
+
+One memory critical section, SQLite `BEGIN IMMEDIATE`, or strict IndexedDB
+`readwrite` transaction over the four AHE stores performs this exact order:
+
+1. Recheck lifecycle and decode the target object's head. A different valid
+   head/revision is retry; malformed persisted head is corruption.
+2. Enumerate and canonically decode every target generation row. Rebuild the
+   chain from expected head → active → immediate rollback → second rollback →
+   complete older prefix. Generation IDs are never sorted as chronology.
+3. Require active `Adopted`; both rollback rows and every selected prefix row
+   `Superseded`; exact head/closure-digest/revision links; canonical nonempty
+   digest-sorted closures; and exact equality with the requested active,
+   rollback, floor, former-parent, and deletion identities. Any additional
+   target generation row makes the plan stale rather than silently deleting it.
+4. Verify active and both rollback closures remain complete: every referenced
+   blob exists with exact byte length/digest and every promotion exists. Verify
+   selected superseded rows' complete promotion/blob evidence before treating
+   their references as newly reclaimable candidates.
+5. Enumerate every generation record across every object and every promotion
+   row in the database. Decode/bind each generation to its physical key. Every
+   promotion must bind to an existing generation and a digest in that
+   generation's closure. Any malformed remaining row aborts; omission cannot
+   be interpreted as “unreferenced.” `Staged` and `Discarded` rows may have a
+   promotion subset because discard is legal before completion; only
+   `Complete`, `Adopted`, and `Superseded` rows require complete promotion
+   sets.
+6. Reject cycles, gaps, wrong floor/parent, any surviving non-floor edge into
+   the selected prefix, any selected row outside the complete connected prefix,
+   or any simulated post-state dangling `present` parent.
+7. For a nonempty fresh prefix, rewrite only the second rollback/floor record's
+   `baseExpectedHead` from the exact expected parent to the existing no-head
+   form. Preserve every other generation field and re-encode canonical storage
+   v1 bytes. Exact one-row update is required.
+8. Delete exactly all promotions owned by the selected prefix, then exactly the
+   selected generation rows. Count mismatch aborts.
+9. From the selected closures, delete a candidate global blob only when no
+   remaining generation closure across any object and no remaining promotion
+   references its digest. Shared and unrelated-object blobs remain. Exact
+   delete counts are checked.
+10. Reread/simulate the resulting target graph: expected head, active, both
+    rollback closures, normalized floor, no selected rows/promotions, and no
+    dangling parent must all hold before commit. Then return the frozen receipt.
+
+No await or externally supplied callback may split the memory critical section.
+Node executes no callback inside the transaction except the package-owned
+test-only crash observer. Browser issues every cursor/request from the one live
+transaction and performs no unrelated asynchronous work that could auto-commit
+it.
+
+## Idempotence and concurrency
+
+- An initially empty prefix with a no-head floor is a no-write success.
+- A lost-receipt replay is accepted only when every requested prefix row and
+  promotion is absent, the exact floor is already no-head, the head/active/two
+  rollback graph still matches, and retained closure evidence is complete.
+- All-present plus expected former parent is the only fresh mutable state.
+  Any mixed present/absent prefix, already-normalized floor with a surviving
+  selected row, or absent selected row with the old floor still present is
+  corruption, never a guessed replay.
+- A second live handle that changes any selected fact before lock acquisition
+  receives retry or observes the committed idempotent state; it cannot combine
+  old classification with new writes.
+- Closing or poisoning during admission cannot publish a receipt. A failed
+  transaction retains the prior recovery certificate and bytes; a committed
+  floor rewrite does not change the head fingerprint or active closure.
+
+## Deterministic RED
+
+RED adds tests/fixtures/config only. Production source, package manifests,
+schemas, lockfile, dependencies, thresholds, and runtime code remain
+byte-identical to D.109b closure.
+
+The exact new RED path roster is:
+
+1. `tests/fixtures/phase-6b/ahe-reclamation-contract.ts`
+2. `tests/phase-6b-ahe-reclamation-red.test.ts`
+3. `packages/storage-node/tests/fixtures/phase-6b-ahe-reclamation-child.mjs`
+4. `packages/storage-node/tests/phase-6b-ahe-reclamation-red.test.ts`
+5. `packages/storage-browser/playwright.phase-6b-ahe-reclamation.config.ts`
+6. `packages/storage-browser/tests/phase-6b-ahe-reclamation-global-setup.ts`
+7. `packages/storage-browser/tests/assets/phase-6b-ahe-reclamation-entry.ts`
+8. `packages/storage-browser/tests/assets/phase-6b-ahe-reclamation-worker.ts`
+9. `packages/storage-browser/tests/phase-6b-ahe-reclamation-red.pw.ts`
+
+The focused Vitest selection covers the shared/memory and genuine Node owners;
+the focused Playwright selection is exactly one file and the frozen Chromium
+tests. Before GREEN, controls pass and semantic bodies skip behind exact
+readiness predicates; failures are only
+`D109C_SHARED_MAINTENANCE_MISSING`, `D109C_NODE_MAINTENANCE_MISSING`, and
+`D109C_BROWSER_MAINTENANCE_MISSING`. Any module-resolution, build, server,
+fixture, selected-count, top-level, or different-token failure invalidates RED.
+
+The frozen semantic roster covers:
+
+- exact facade/export census and identity denial for copy/proxy/fake/
+  cross-backend values;
+- detached closed input, frozen receipt/error, exact error-key/code registry,
+  and lifecycle precedence;
+- genuine five-generation positive control retaining active plus its two
+  immediate ancestors, normalizing only the second rollback, deleting the two
+  older connected rows/promotions, and preserving active/rollback bytes;
+- empty-prefix success, lost-receipt replay, two-live-handle serialization,
+  reopen, and a subsequent genuine creator-adoption commit;
+- stale/different head or revision, active mismatch, insufficient rollback,
+  wrong-but-countable rollback pair, duplicate identity, changed closure/state,
+  wrong floor, wrong former parent, gap, cycle, alternate surviving branch,
+  extra target row, and simulated dangling post-state;
+- missing/corrupt retained blob, missing/extra/wrong promotion, malformed
+  target or unrelated generation bytes, key/record mismatch, and partial
+  replay; every corrupt case performs zero committed writes and poisons;
+- shared blobs within the retained set and across an unrelated object,
+  candidate-only blob deletion, unrelated orphan retention, and full global
+  remaining-generation plus promotion scanning;
+- injected floor-update, promotion-delete, generation-delete, and blob-delete
+  count mismatches, each rolling back the complete transaction;
+- Node hard `SIGKILL` at `after-floor-rewrite`,
+  `after-promotion-delete`, `after-generation-delete`, `after-blob-delete`,
+  `before-commit`, and `after-commit`; reopen must be old XOR complete-new;
+- Chromium worker termination/transaction abort at the corresponding live-IDB
+  stages, with reopen old XOR complete-new and no partial floor/prefix/blob
+  combination.
+
+RED also retains the D.109a planner positive/refusal matrix and its dangling-
+parent oracle. It does not claim production behavior for skipped semantics and
+does not run a retained campaign.
+
+## GREEN implementation batches
+
+One D.109c GREEN checkpoint uses two diagnostic batches without an intermediate
+commit or model review:
+
+1. **Shared contract and memory owner.** Add the maintenance types, classifier,
+   private registry, `TransitionOwner` mutation, memory test control, exact
+   package subpath, and run the focused shared/memory file once.
+2. **Native owners.** Add Node and browser identity registries, transactions,
+   test-only fault edges, package subpaths, and run the focused Node and browser
+   commands once before the retained suites.
+
+If either focused run reports a code/token outside its frozen matrix, stop and
+diagnose rather than folding another concept into the batch. Before final
+review, apply `refactor-clean`: one shared graph classifier, one backend
+transaction per physical owner, no duplicate lineage walker, no compatibility
+wrapper, and no temporary export left behind.
+
+## GREEN and retained gates
+
+GREEN must prove all focused assertions with no skip, failure, flaky result,
+or top-level error, then run:
+
+- affected `@ts-drp/storage`, `storage-node`, `storage-browser`, and `node`
+  builds plus source-only typechecks;
+- exact-owner ESLint, Prettier, `git diff --check`, package/root/factory export
+  census, schema/version/name source shape, no generic adapter-command growth,
+  and changed-path custody;
+- retained storage codecs, memory/state-machine, adapter facade, bounded reads,
+  taxonomy/poison, recovery authority/memory-bound, Node SQLite contract/
+  SIGKILL/lifecycle, browser schema/adapter/recovery/process-death, D.109a
+  planner, and Phase-6a creator adoption/reopen tests;
+- a self-excluding evidence manifest covering complete reporter JSON, stdout,
+  stderr, child/worker observations, commands, hashes, and dispositions;
+- signature, pushed-ref equality, protected paths, 26 stashes, fixed ports,
+  and no conflicting ts-drp reviewer/test/profiler process.
+
+The Node file path, four-table DDL, WAL/FULL/foreign-key policy, browser
+database name and version 3, nine-store authority, four AHE key paths, storage
+v1 codecs, D.109a planner result, and both creator parent-presence predicates
+are source pins. Directly affected hashes may change only for the frozen owner
+paths; unrelated source drift stops the slice.
+
+## Review and stop conditions
+
+This is high-risk because it authorizes physical generation/blob deletion and
+changes crash behavior. Sign and push this bounded plan, then run one
+Grok/Kimi/Opus plan review. Only P0/P1 blocks; disposition P2 without recursive
+prose review. Permit at most one confirmation if a P0/P1 correction changes
+scope, causal RED behavior, or a hard acceptance gate. Deterministic RED gets
+no separate full model round. Sign/push GREEN, then run the sole final
+Grok/Kimi/Opus review over plan → RED → GREEN history. Only P0/P1 blocks
+closure.
+
+Stop and reslice rather than widen scope if safe implementation requires a
+schema/reverse index, mandatory facade change, product/runtime API, dependency,
+threshold, workload, protocol/wire/digest/QC/adoption/availability change, or
+cross-database authority. D.109c runs no retained campaign. D.109d remains
+unopened until D.109c's signed GREEN evidence and final review are complete.
+
+## Human-verifiable outcome
+
+The focused evidence must show, in plain data, the head and three retained
+generation records before/after, the exact floor-parent rewrite, exact removed
+prefix/promotions, shared-versus-deleted blob digests, replay receipt, and old
+XOR complete-new crash observations for Node and Chromium. A reviewer can
+therefore decide deletion safety without inferring it from implementation
+prose.

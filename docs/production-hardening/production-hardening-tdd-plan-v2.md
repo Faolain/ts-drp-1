@@ -88212,3 +88212,104 @@ recursive prose review runs.
 
 D.109b is closed on this signed record. D.109c may begin next. No retained
 campaign was authorized or executed by D.109b.
+
+#### D.109c AHE-reclamation plan checkpoint
+
+D.109c is frozen in
+`specs/phase-6b-bounded-pruning/slices/02-ahe-reclamation.md` from signed/pushed
+D.109b closure `2afadbe682261bdb311a5cb64f6f42d86ed7330b`. The source audit
+confirms that the ordinary `AheDurableStore` is still the exact 12-key facade;
+memory owns one synchronous `TransitionOwner`; Node owns the unchanged four-
+table SQLite authority under WAL/FULL/foreign keys; and browser owns the same
+four AHE stores inside its unchanged Phase-5e version-3, nine-store IndexedDB
+authority. Blobs are globally keyed by digest and neither native backend has a
+reverse index. D.109c therefore adds no schema, index, database identity,
+generic adapter command, mandatory facade member, dependency, or product
+handle.
+
+The only new package surfaces are `@ts-drp/storage/maintenance`,
+`@ts-drp/storage-node/maintenance`, and
+`@ts-drp/storage-browser/maintenance`. Package roots and ordinary factory
+modules remain exact. Module-private identity registries resolve one
+`reclaimClosedEpoch` capability only for the exact memory/Node/browser facade
+created by its owner; copies, proxies, structural fakes, and cross-backend
+facades cannot mint it. One shared storage owner captures the closed D.109a AHE
+subset and classifies the complete lineage/reference graph; each backend alone
+owns its atomic floor rewrite and physical deletion.
+
+The exact input carries object/closed epoch, frozen local-only availability
+digest, expected present head, active identity, ordered immediate two-rollback
+tuple, and exact lineage-floor generation/former parent/no-head replacement/
+complete older prefix. It carries no issuance row, QC verification authority,
+snapshot bytes, runtime authority, or future deletion grant. The receipt is
+deeply detached/frozen and records the expected head, active/rollback
+identities, exact reclaimed prefix, actual generation/promotion/blob deletions,
+and whether this call performed the one floor normalization. Lost-receipt
+replay proves the requested prefix absent and the exact floor already no-head,
+but reports no actual writes for that call.
+
+The closed failure taxonomy is
+`AHE_RECLAMATION_INVALID_ARGUMENT`, `AHE_RECLAMATION_RETRY_REQUIRED`,
+`AHE_RECLAMATION_CORRUPT`, `AHE_RECLAMATION_STORE_CLOSED`,
+`AHE_RECLAMATION_STORE_POISONED`, and
+`AHE_RECLAMATION_SUBSTRATE_FAILURE`. Invalid/stale input never poisons;
+malformed native state or impossible partial replay aborts and latches the
+ordinary owner as poisoned; substrate/lifecycle failure cannot publish a
+receipt. All backends reject asynchronously.
+
+In one memory critical section, SQLite `BEGIN IMMEDIATE`, or strict IndexedDB
+transaction over the four AHE stores, the owner rechecks exact head/revision,
+decodes every target generation, follows ancestry rather than random ID order,
+requires active `Adopted` plus its two immediate complete `Superseded`
+ancestors, proves the selected set is the complete connected older prefix,
+verifies retained and selected closure/promotion/blob evidence, and rejects
+cycles, gaps, branches, extras, wrong floor/parent, or dangling simulated post-
+state. Global classification permits partial promotion sets for `Staged` and
+`Discarded` rows because discard is legal before completion; only `Complete`,
+`Adopted`, and `Superseded` require complete promotion sets. It then rewrites
+only the second rollback's `baseExpectedHead` to the
+existing no-head encoding, deletes selected promotions then generations,
+globally decodes every remaining generation and promotion across every object,
+deletes only candidate blobs with no remaining reference, verifies exact row
+counts/post-state, and commits. Shared or unrelated-object blobs remain; an
+unreadable remaining row aborts because omission cannot prove unreferenced
+state.
+
+Fresh empty-prefix state and exact lost-receipt replay are no-write successes.
+Mixed present/absent prefix, old floor with absent rows, or normalized floor
+with surviving selected rows is corruption. Two live handles serialize at the
+native owner. Hard-kill/abort evidence covers floor rewrite, promotion delete,
+generation delete, blob delete, before commit, and after commit; reopen must be
+old XOR complete-new. A subsequent genuine creator-adoption commit must accept
+the normalized graph, closing the demonstrated parent-presence defect rather
+than merely inspecting raw rows.
+
+RED adds only the exact nine test/fixture/config paths frozen in the slice.
+Controls pass and semantic bodies skip until the three causal readiness tokens
+`D109C_SHARED_MAINTENANCE_MISSING`, `D109C_NODE_MAINTENANCE_MISSING`, and
+`D109C_BROWSER_MAINTENANCE_MISSING`; any other failure invalidates RED.
+The matrix includes identity/surface denial, exact error/receipt shape,
+five-generation positive control, empty/replay/concurrency/reopen/subsequent-
+adoption cases, stale/invalid lineage variants, retained corruption, global
+shared-blob/reference scanning, exact count rollback, Node SIGKILL, and
+Chromium worker-termination/IDB-abort cases. D.109a's planner and dangling-
+parent oracle remain green. No campaign runs.
+
+GREEN uses one checkpoint with a shared/memory batch followed by a Node/browser
+batch and no intermediate model ceremony. Focused/static/retained gates cover
+storage codecs/state machine/adapter/recovery, native schema/lifecycle/crash,
+D.109a, and Phase-6a creator adoption/reopen behavior. Before final review,
+`refactor-clean` must confirm one graph classifier, one physical transaction
+per backend, no duplicate lineage walker, no compatibility wrapper, and no
+temporary export.
+
+This physical-deletion/crash slice receives one signed/pushed plan review and
+one signed/pushed final plan-to-RED-to-GREEN review using Grok 4.6/high, exact
+Kimi K3 thinking/high with both 100-step controls, and Opus xhigh. Kimi
+occupies the middle external-CLI slot; Codex `gpt-5.6-sol` does not substitute.
+If Grok cancels, resume the same session. Only P0/P1 blocks; no recursive P2/
+prose round. Fable and collaboration subagents are prohibited. Stop and
+reslice if safety requires schema/reverse-index, mandatory facade, runtime/
+product API, dependency, threshold, workload, protocol/wire/digest/QC/
+adoption/availability, or cross-database authority changes. D.109d remains
+unopened and D.109c authorizes no retained campaign.
