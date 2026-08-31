@@ -84202,6 +84202,63 @@ rules. The five unused D.108e4bu successors stay permanently frozen; they are
 not a partial campaign. Six fresh passes plus the final evidence review release
 D.108e5.
 
+###### D.108e4by — post-retry fresh retained-browser disposition
+
+D.108e4by is the one plan-only fresh retained-browser disposition released by
+the accepted D.108e4bx final implementation review. Its behavior anchor is
+signed/pushed GREEN `0a99ce7ec073693fd93c4d80dd35567cde973985`, tree
+`3ffe5f270ec7a13781d319ce06c08be4a8c68088`; its final-review closure anchor
+is signed/pushed commit `81199860802218ceef4c31cc1669c4c85e7af3d1`, tree
+`f08111f4128920ade2b7077ca8102ffa387f3b38`. It changes no source, fixture,
+configuration, dependency, workload, threshold, timeout, browser, port,
+review policy or campaign launcher. All earlier retained roots remain
+immutable.
+
+Freeze the wholly fresh write-once root
+`.logs/d108e4bx-retained-browser-1/`. It must be absent before consumption and
+is never retried, overwritten or reused whether the consuming invocation
+passes or fails. Before launch, require signed HEAD to equal the pushed branch,
+all tracked changes since behavior GREEN to be this plan only, the protected
+untracked roster and all 26 stashes unchanged, no reviewer/test/profiler rooted
+in a ts-drp checkout, and ports 4174, 4175, 51000 and 51002 clear. The exact
+suffix-anchored listing must select one test in one file. An unrelated process
+outside ts-drp is not a conflict.
+
+The one consuming invocation uses the unchanged telemetry-enabled retained
+title, Chromium/config, retries, effective 300-second test timeout and
+600-second process-group watchdog. Its literal write-once shell block is:
+
+```sh
+set -u
+retained_root="$PWD/.logs/d108e4bx-retained-browser-1"
+test ! -e "$retained_root"
+mkdir -m 700 "$retained_root"
+date -u +%Y-%m-%dT%H:%M:%SZ > "$retained_root/started-at.txt"
+D108E4H_TELEMETRY=1 D108E4G_TELEMETRY=1 \
+  PLAYWRIGHT_JSON_OUTPUT_NAME="$retained_root/reporter.json" \
+  /usr/bin/perl -MPOSIX=setpgid -e 'my $limit=shift @ARGV; my $pid=fork(); die "fork failed" unless defined $pid; if($pid==0){setpgid(0,0); exec @ARGV; exit 127} $SIG{ALRM}=sub { kill "TERM", -$pid; select undef,undef,undef,5; kill "KILL", -$pid; waitpid($pid,0); exit 124 }; alarm $limit; waitpid($pid,0); alarm 0; exit($? == -1 ? 125 : ($? & 127) ? 128 + ($? & 127) : $? >> 8)' \
+  600 pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
+  --reporter=json --fail-on-flaky-tests \
+  --output="$retained_root/test-results" \
+  > "$retained_root/stdout.log" 2> "$retained_root/stderr.log"
+runner_status=$?
+print -r -- "$runner_status" > "$retained_root/runner.status"
+date -u +%Y-%m-%dT%H:%M:%SZ > "$retained_root/finished-at.txt"
+exit "$runner_status"
+```
+
+Preserve the complete reporter, streams, timestamps, attachments, runner
+status, telemetry/classification on failure, hashes and a validating
+self-excluding manifest. A test-executing failure stops and owns the next
+narrow evidence-driven disposition; it does not authorize a retry or campaign.
+Only one retry-zero pass with expected/skipped/unexpected/flaky `1/0/0/0`, zero
+top-level/result errors, all three completed fixed trials and the unchanged
+durable control releases a six-wholly-fresh-name campaign freeze. D.108e4by
+runs no model review, retained-seven repeat or campaign; D.108e4bx's signed
+final review already owns the changed predicate and its retained-seven gate.
+
 Consumed D.108e4bu reporter, stdout, stderr, failure telemetry,
 endpoint-classifier, trace, cumulative manifest, and manifest-validation
 SHA-256 values are respectively
