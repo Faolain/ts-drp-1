@@ -86915,3 +86915,24 @@ existing seams. Because these corrections materially change causal RED
 acceptance and executable behavior, one bounded confirmation round over the
 signed corrected commit is required; it is the sole plan confirmation and may
 only block on P0/P1.
+
+That sole confirmation reviewed signed/pushed correction
+`b8d15d6a570afcbe0961a128685837e365a72273`. Grok session
+`01a05833-bd89-7961-9c8c-2d663a152162` reached its max-turn cancellation
+boundary before a verdict, was resumed as that exact session, and returned
+`APPROVED` with no findings; normalized result SHA-256 is
+`fac78aa46f06a39225f5f44545be5ca5bf303adddfd39ce4cb77abe6a69b4e33`.
+Codex session `01a05833-ba97-7741-ac74-3e2e8665b80b` returned `APPROVED`
+with no findings; normalized result SHA-256 is
+`9565ed1882848e48a14cc17a2d4099ae87d1825f9b35f47cf1aa87f6d759ed0a`.
+Opus session `2e21b601-9325-49ed-9826-a5708d17554d` returned `APPROVED`
+with no P0/P1 and three P2 observations; normalized result SHA-256 is
+`de4b435bbbb88519b237b41d43b771b29cb155890c4a99f9112d5ea022770c4c`.
+The P2 dispositions are frozen as nonblocking: session-creation invite
+encoding is pre-existing and outside this migration-only slice; redirected
+duplicate rehearsal may move the same fast-fail message from target to source;
+and the local exact-size arithmetic is accepted because the inclusive boundary
+pair plus the retained encoder/decoder ceilings pins drift. No P2 requests a
+new owner, test or review. The corrected plan therefore has an empty blocking
+union, its one confirmation allowance is consumed, and deterministic D.108e5
+RED is released.
