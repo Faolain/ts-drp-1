@@ -85613,6 +85613,105 @@ all entries validate. D.108e4ci is closed. It authorizes no retained campaign
 and transfers only the separately captured authenticated-boundary diagnosis
 to D.108e4cj.
 
+###### D.108e4cj — close the captured empty-authenticated boundary causally
+
+D.108e4cj is a bounded diagnosis and fresh retained-proof disposition. It
+changes no product, fixture, validator, dependency, configuration, workload,
+threshold, timeout, browser, port or campaign machinery. Its behavior anchor
+is signed/pushed D.108e4ci GREEN
+`092a9ac9a5d75ff47e226a3cabee1df9db702b8e`, tree
+`4fbfc3f60faa512921d035e927c171fa9a8c0cb2`; its review closure is
+signed/pushed `f1dc9c41`. The source/test hashes remain respectively
+`ec894295605729a6ae1ab2489ef6a9d2db79ce30f0cc728d511639070c10dc87`
+and
+`220160fb19fcf9a497798a19c35f48219eff96edb667021fa895d328bde7ec6f`.
+
+The immutable D.108e4ch third invocation does not demonstrate a second
+product defect. At `1788171442926` the creator's prepare-boundary authenticated
+connection `aduj5v1788171384660` completed a monitor ping. The reverse
+receiver ping on paired connection `7pwpbv1788171382891` timed out at
+`1788171445998`; creator observed the paired connection abort/close at
+`1788171446004/6005`. This asymmetric liveness evidence does not prove a
+js-libp2p false-positive abort, so no monitor, threshold, dependency or
+upstream change is justified.
+
+Product continuity then succeeded far enough to isolate the later owner.
+Creator replacement B, RTC `15`/channel `488`, opened at `1788171449434` and
+creator retired selected A at `1788171451552`, proving B promotion after the
+authenticated-A close. The receiver kept paired B, RTC `15`/channel `503`,
+open until the unchanged 10-second setup expiry. At `1788171457603`
+`#discardPendingReplacement` closed receiver B; at `1788171457644` creator
+observed promoted B close. Only afterward, at product deadline
+`1788171462099`, creator custody was `authenticated: []`, `rtc: []`, with
+local replacement delta two. The reset boundary 35 ms later again had one raw
+link. The deadline's empty identity is therefore downstream of the exact
+acceptor-expiry/creator-B-close defect frozen by D.108e4ci RED and repaired by
+GREEN, not independent evidence for another behavior change.
+
+The deterministic closure is already executable: the D.108e4ci fake-
+signaling fixture disconnects authenticated A, creates the fresh authenticated
+replacement connection, establishes B while delaying A's peer-close delivery,
+advances through expiry, and proves current B survives and converges with
+endpoint-local `1/1`. Its exact three-title and complete 117-test owner runs,
+D.108e4ax, browser support and retained-seven gates passed under the signed
+GREEN review. Do not duplicate RED or change production merely to rename this
+same causal chain. The extracted causal-chain, one-entry manifest and
+validation SHA-256 values under `.logs/d108e4cj-diagnosis/` are respectively
+`dce999aa8deadf5118b52ec1d42dacadce63dde2952121ab8243234a8f5d6bc0`,
+`a467cb4465ad582ad0e1651db75feb53167f06224ccebb4e909fdc49762c2525`
+and
+`06a638706fb455b182b1883267c1627014c223115fd6e19966d866c1e8771d89`;
+all entries validate.
+
+Because the next step consumes scarce retained-browser work, sign/push this
+plan-only diagnosis and run one Grok-high/Codex-`gpt-5.6-sol`-high/Opus-xhigh
+plan review. If Grok cancels, resume that exact session. Only a P0/P1 finding
+that disproves the causal ordering, identifies an unfixed product owner, or
+shows the frozen retained command changes semantics blocks. P2 and prose
+findings receive disposition without confirmation. Do not use Kimi, Fable or
+collaboration subagents.
+
+An empty blocking union releases exactly one wholly fresh write-once retained
+root `.logs/d108e4cj-retained-browser-1/`. It must be absent before use and is
+never retried, overwritten, renamed or reused. Before launch require signed
+HEAD equal the pushed branch; every tracked path since behavior GREEN be this
+plan only; both frozen source/test hashes match; the protected untracked roster
+and all 26 stashes remain unchanged; no reviewer/test/profiler rooted in a
+ts-drp checkout is active; and ports 4174, 4175, 51000 and 51002 are clear.
+Exact suffix listing must select one test in one file.
+
+The one consuming invocation preserves both telemetry flags, Chromium
+configuration/version, three trials, fixed workload/loss/thresholds, retry
+zero, 300-second Playwright timeout and 600-second process-group watchdog:
+
+```sh
+set -u
+retained_root="$PWD/.logs/d108e4cj-retained-browser-1"
+test ! -e "$retained_root"
+mkdir -m 700 "$retained_root"
+date -u +%Y-%m-%dT%H:%M:%SZ > "$retained_root/started-at.txt"
+D108E4H_TELEMETRY=1 D108E4G_TELEMETRY=1 \
+  PLAYWRIGHT_JSON_OUTPUT_NAME="$retained_root/reporter.json" \
+  /usr/bin/perl -MPOSIX=setpgid -e 'my $limit=shift @ARGV; my $pid=fork(); die "fork failed" unless defined $pid; if($pid==0){setpgid(0,0); exec @ARGV; exit 127} $SIG{ALRM}=sub { kill "TERM", -$pid; select undef,undef,undef,5; kill "KILL", -$pid; waitpid($pid,0); exit 124 }; alarm $limit; waitpid($pid,0); alarm 0; exit($? == -1 ? 125 : ($? & 127) ? 128 + ($? & 127) : $? >> 8)' \
+  600 pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$' \
+  --reporter=json --fail-on-flaky-tests \
+  --output="$retained_root/test-results" \
+  > "$retained_root/stdout.log" 2> "$retained_root/stderr.log"
+runner_status=$?
+print -r -- "$runner_status" > "$retained_root/runner.status"
+date -u +%Y-%m-%dT%H:%M:%SZ > "$retained_root/finished-at.txt"
+exit "$runner_status"
+```
+
+Preserve reporter, streams, timestamps, attachments, direct status, decoded
+campaign, hashes and a validating self-excluding manifest. A consuming failure
+stops and owns the next evidence-driven disposition; it is never retried. One
+retry-zero pass with `1/0/0/0`, zero errors, exactly three completed trials and
+unchanged durable/workload contracts may release a plan-only freeze of six
+wholly fresh campaign names. D.108e4cj itself runs no six-name campaign.
+
 ###### D.108e4ce — post-census six-name campaign freeze
 
 D.108e4ce is the high-risk campaign disposition released by the passing
