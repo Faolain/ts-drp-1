@@ -87990,13 +87990,19 @@ replanning and unrelated-scope preservation. The existing D.109a planner test
 is extended prospectively. Directly affected retained expectations enumerate
 the new code, terminal member/literals/hashes, maintenance subpaths, conformance
 runtime names and Node v2 lineage catalog. They also correct the demonstrated
-stale current-package pins in the Phase-2l-c Node issuance registry and
-Phase-3a1b-p4 Node live-journal suites to include existing
-`./snapshot-transfer` and `@ts-drp/compaction` before adding only the new
-maintenance subpath. The six-method facade and existing factory-module
-surfaces remain unchanged. RED is causal only if other production is
+stale current-package pins in Phase-2l-a shared issuance, Phase-2l-d parity,
+Phase-3a1b-p2 publication, the Phase-2l-c Node issuance registry, and the
+Phase-3a1b-p4 Node live-journal suite. Those exact assertions first recognize
+the full current Node/browser surfaces—including Node `./snapshot-transfer`
+and `@ts-drp/compaction`, and browser `./seal-evidence`, `./seal-vote`, and
+`./snapshot-transfer`—then add only the owning maintenance subpath. The
+six-method facade and existing factory-module surfaces remain unchanged. RED
+is causal only if other production is
 byte-identical and failures are the missing frozen D.109b owners/semantics,
 not a fixture or build failure.
+Other historical complete-export pins remain explicit D.109f retained-suite
+census debt and must be closed before Phase-6b exit, not folded into this
+deletion slice.
 
 The shared structural v3 check stays in issuance-store maintenance and uses
 the existing canonical dependency plus literal kind/protocol/epoch fields; no
@@ -88039,3 +88045,26 @@ malformation, native-transaction await discipline, and both proven stale
 retained pins. Because these corrections change causal RED acceptance, exactly
 one signed-checkpoint Grok/Kimi/Opus confirmation is required; no further plan
 confirmation or prose-review recursion is permitted.
+
+The single confirmation inspected signed/pushed commit
+`433f11afe22b2357563d0953c6634829ff344ab1`. Grok session
+`01a05997-e41b-74e3-b8eb-ebb67a958976` first reached its turn ceiling and is
+retained as `NO_VERDICT` (event SHA-256
+`0d6c0d2014dfa238bb603d3ce3c34bccd5dc3113e245d0bbfe6ab0347944a8e2`),
+then the exact resumed session completed with one P1/six P2 (resumed-event
+SHA-256
+`23aa2022e42912ef8d56750899fbff10e93e6e8f16ccfc0417f15df6b894a0c4`).
+Exact Kimi K3 thinking/high with both 100-step controls approved with P0/P1/P2
+`0/0/2` (raw SHA-256
+`a51672afb7c3b50cca079bcae6a3c9c28fcb97823df8eb18a5dc067086b5047e`).
+Opus xhigh session `5e372c80-3297-4cf3-bf55-fdbd6271f7e1` completed with
+`is_error:false`, `stop_reason:end_turn`, approval, and P0/P1/P2 `0/0/3`
+(result SHA-256
+`93d6473d217399d4d09f6ad46d39d083009b123d629af507ae329a4fa190ca6d`).
+Grok's sole P1 identified the same stale complete-export pattern in the
+mandatory p2 and Phase-2l-d gates. A corrected exact-title Vitest invocation
+selected exactly two tests/two files and both failed only on those omitted live
+subpaths. The explicit five-site census above closes the bookkeeping omission.
+It changes no scope, causal outcome, acceptance predicate, or product behavior,
+so the prospective policy forbids another model round. The blocking union is
+empty and D.109b RED is authorized.

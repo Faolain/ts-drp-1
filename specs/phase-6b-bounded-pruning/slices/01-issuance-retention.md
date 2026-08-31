@@ -231,15 +231,27 @@ subpaths, Node v2 lineage DDL, and compatible browser lineage row. The ledger
 must enumerate `packages/issuance-store/src/types.ts`, the new shared
 maintenance module, p2 contract/terminal/index hashes and conformance runtime
 names, every terminal-observation literal, the Phase-2l exact error registry,
-and the current Node/browser export lists. Two pre-existing stale Node pins are
-also explicitly owned:
-`packages/storage-node/tests/phase-2l-c-node-issuance-registry-red.test.ts`
-lines 33–38 and
-`packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts`
-lines 967–972. They must first recognize the current `./snapshot-transfer`
-export and `@ts-drp/compaction` dependency, then add only
-`./issuance-maintenance`; they may not delete or invent package surface. The
-six-method facade and existing factory-module key sets remain exact.
+and the current Node/browser export lists. The complete exact-export census for
+the mandatory retained gates explicitly owns:
+
+- `tests/phase-2l-a-shared-issuance-contract.test.ts` line 239;
+- `tests/phase-2l-d-parity-governance-red.test.ts` lines 135–136;
+- `tests/phase-3a1b-p2-outbox-publication-contract.test.ts` lines 517–530;
+- `packages/storage-node/tests/phase-2l-c-node-issuance-registry-red.test.ts`
+  lines 33–38; and
+- `packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts`
+  lines 967–972.
+
+Each assertion must first recognize the complete current package surface,
+including existing Node `./snapshot-transfer` and `@ts-drp/compaction` plus
+existing browser `./seal-evidence`, `./seal-vote`, and
+`./snapshot-transfer`, then add only `./maintenance` or
+`./issuance-maintenance` for its owning package. It may not delete or invent
+package surface. The six-method facade and existing factory-module key sets
+remain exact. Historical complete-export pins outside the mandatory D.109b
+gate are recorded as pre-existing retained debt, owned by D.109f's complete
+retained-suite/source-shape census before Phase-6b exit, and are not silently
+widened into this deletion slice.
 
 The shared/conformance test freezes exact input copying, identity-gated
 resolution, immutable receipts, page boundaries at 64/65 and 128/129 rows,
@@ -329,3 +341,34 @@ and the two demonstrated stale retained pins. It also freezes every P2 detail
 listed above. The source/causal contract materially changed, so the policy
 permits exactly one confirmation of this corrected signed checkpoint by Grok,
 Kimi, and Opus. No further plan confirmation or prose review may recurse.
+
+## Confirmation disposition
+
+The single confirmation inspected signed/pushed commit
+`433f11afe22b2357563d0953c6634829ff344ab1`. The original Grok session
+`01a05997-e41b-74e3-b8eb-ebb67a958976` reached its turn ceiling and was
+honestly retained as `NO_VERDICT`; its event SHA-256 is
+`0d6c0d2014dfa238bb603d3ce3c34bccd5dc3113e245d0bbfe6ab0347944a8e2`.
+The exact session was resumed, completed normally, and returned one P1/six P2;
+resumed-event SHA-256 is
+`23aa2022e42912ef8d56750899fbff10e93e6e8f16ccfc0417f15df6b894a0c4`.
+Exact Kimi K3 thinking/high with both 100-step controls returned `APPROVED`,
+P0/P1/P2 `0/0/2`; raw SHA-256 is
+`a51672afb7c3b50cca079bcae6a3c9c28fcb97823df8eb18a5dc067086b5047e`.
+Opus xhigh session `5e372c80-3297-4cf3-bf55-fdbd6271f7e1` completed with
+`is_error:false`, `stop_reason:end_turn`, `APPROVED`, and P0/P1/P2 `0/0/3`;
+result SHA-256 is
+`93d6473d217399d4d09f6ad46d39d083009b123d629af507ae329a4fa190ca6d`.
+
+Grok's sole P1 demonstrated that the p2 and Phase-2l-d mandatory gates contain
+the same stale complete-export assertion as the two already owned Node sites.
+One corrected exact-title Vitest invocation selected exactly two tests/two
+files and both failed only on those pre-existing omitted live subpaths. The
+explicit five-site census above closes that ledger omission. This is a
+bookkeeping-only correction to the retained-test owner list: it changes no
+scope, causal RED outcome, acceptance predicate, or product behavior, so the
+governing policy forbids another model confirmation. Grok's other P2 notes and
+Kimi/Opus's overlapping P2 observations are recorded without more ceremony;
+they either describe non-mandatory historical pins, wording already resolved
+by the executable clauses, or later receipt-consumption ownership. The
+blocking union is empty and D.109b RED may proceed.
