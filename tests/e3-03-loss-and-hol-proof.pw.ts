@@ -2198,6 +2198,13 @@ async function waitForNetworkPair(
 		.toEqual([creatorExpected, receiverExpected]);
 }
 
+type D108e4bvResetScheduleStep = "creator-reset" | "open-pair-gate" | "network-pair-gate" | "receiver-reset";
+
+function d108e4bvResetSchedule(creatorPeerId: string, receiverPeerId: string): readonly D108e4bvResetScheduleStep[] {
+	if (creatorPeerId === receiverPeerId) throw new Error("D108E4BV_RESET_IDENTITY_INVALID");
+	return Object.freeze(["creator-reset", "open-pair-gate", "network-pair-gate", "receiver-reset"]);
+}
+
 async function resetFabricPairSerially(
 	creator: Page,
 	receiver: Page,
@@ -2205,10 +2212,41 @@ async function resetFabricPairSerially(
 	creatorExpected: NetworkSnapshot,
 	receiverExpected: NetworkSnapshot
 ): Promise<void> {
-	await creator.evaluate((selectedTrialId) => window.__TS_DRP_V3_ZONE__?.fabric?.reset(selectedTrialId), trialId);
-	await waitForOpenTransportPair(creator, receiver);
-	await waitForNetworkPair(creator, receiver, creatorExpected, receiverExpected);
-	await receiver.evaluate((selectedTrialId) => window.__TS_DRP_V3_ZONE__?.fabric?.reset(selectedTrialId), trialId);
+	for (const step of d108e4bvResetSchedule(creatorExpected.peerId, receiverExpected.peerId)) {
+		switch (step) {
+			case "creator-reset":
+				await creator.evaluate((selectedTrialId) => window.__TS_DRP_V3_ZONE__?.fabric?.reset(selectedTrialId), trialId);
+				break;
+			case "open-pair-gate":
+				await waitForOpenTransportPair(creator, receiver);
+				break;
+			case "network-pair-gate":
+				await waitForNetworkPair(creator, receiver, creatorExpected, receiverExpected);
+				break;
+			case "receiver-reset":
+				await receiver.evaluate(
+					(selectedTrialId) => window.__TS_DRP_V3_ZONE__?.fabric?.reset(selectedTrialId),
+					trialId
+				);
+				break;
+		}
+	}
+}
+
+if (process.env["D108E4BV_RESET_ORDER_RED"] === "1") {
+	test("D.108e4bv orders serial reset through the elected initiator", () => {
+		const creatorLower = "peer-A";
+		const receiverHigher = "peer-a";
+		expect(creatorLower < receiverHigher).toBe(true);
+		expect(creatorLower.localeCompare(receiverHigher)).toBeGreaterThan(0);
+		expect(() => d108e4bvResetSchedule(creatorLower, creatorLower)).toThrow("D108E4BV_RESET_IDENTITY_INVALID");
+		expect
+			.soft(d108e4bvResetSchedule(creatorLower, receiverHigher), "creator is elected")
+			.toEqual(["receiver-reset", "creator-reset"]);
+		expect
+			.soft(d108e4bvResetSchedule(receiverHigher, creatorLower), "receiver is elected")
+			.toEqual(["creator-reset", "receiver-reset"]);
+	});
 }
 
 async function waitForRawDelivery(sender: Page, receiver: Page): Promise<void> {

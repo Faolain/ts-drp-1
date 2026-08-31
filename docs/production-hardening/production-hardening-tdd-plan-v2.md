@@ -83679,6 +83679,40 @@ and
 `93d93e5f8baabee55a45e8f9b3c1a5e7a434149a3aa07da9e359b8728f2cb26b`.
 The blocking union is empty, so RED may proceed without a confirmation round.
 
+D.108e4bv RED is accepted. The test file now exposes the current runtime
+orchestration through one pure schedule owner while preserving the exact
+creator-reset, open-pair gate, network-pair gate, receiver-reset execution.
+The opt-in source registers one test whose body covers both comparator-
+discriminating peer orderings and the duplicate-id token. The exact listing
+
+```sh
+D108E4BV_RESET_ORDER_RED=1 pnpm exec playwright test \
+  --config playwright.e3-03-loss-and-hol.config.ts \
+  --grep 'D\.108e4bv orders serial reset through the elected initiator$' \
+  --list
+```
+
+selected one test in one file. Its sole focused execution used the same env,
+config, and grep with `--workers=1 --retries=0 --reporter=json
+--fail-on-flaky-tests`. It exited 1 with expected/skipped/unexpected/flaky
+`0/0/1/0`, zero top-level errors, one failed result, and exactly two soft
+assertion errors. Both errors contained the interposed `open-pair-gate` and
+`network-pair-gate`, while the duplicate identity assertion preserved exact
+token `D108E4BV_RESET_IDENTITY_INVALID`. No retained title was selected and
+the pure test did not request a browser fixture. The deterministic validator
+exited zero and confirmed the selection, matrix, complete causal error set,
+source shape, exact changed path, and statuses. The reporter, 13-entry
+self-excluding manifest, corrected manifest validation, validation output,
+and exact listing SHA-256 values are respectively
+`b8cbc849d78f246fde23dfad2113d2e5405453959896211ee4655db2571b01b9`,
+`5a39e70c276a55fe924660250946d0fac0a7a554594f968b924d25942c988309`,
+`764332b89d74917d1a60a5bb2a6e02c3f007a152418b53945705bc3537b97c60`,
+`a17fcf0a2f50e2d495e4f90ce263410edc183add6c62699a2facbccf60410f74`,
+and
+`b910d5ddf55e4f6dfe1dcf1cc4157d1b1d4d34943fdc90c8034c69b63e0d5eb9`.
+All 13 manifest entries validate from the RED evidence root. GREEN is now
+authorized to change only the pure schedule owner.
+
 An empty final blocking union releases a new plan-only freeze with six wholly
 fresh names and a freshly built isolated checkout at the accepted GREEN.
 Execute those six sequentially under the existing immutable evidence,
