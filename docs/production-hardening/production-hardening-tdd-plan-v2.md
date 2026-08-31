@@ -87532,8 +87532,9 @@ generation identities obtained by following `baseExpectedHead` twice from the
 active adopted generation, adopted local snapshot and the adopted CutValue’s
 exact availability-policy digest, and a complete issuance-classification
 observation. It also includes the exact oldest-retained lineage floor, that
-floor's expected present parent, and the complete connected older prefix whose
-simulated removal plus sole floor normalization leaves no dangling parent. Its
+floor's expected original base (present only when an older prefix exists), and
+the complete connected older prefix whose simulated removal plus sole floor
+normalization leaves no dangling parent. Its
 immutable positive result carries exact identities for later store-local
 rechecks; its negative result uses a closed refusal union. It does not reverify
 signatures, open a store, schedule work, mutate state, or export a package API.
@@ -87685,3 +87686,59 @@ source-proven P1 is corrected once without a second model round or recursive
 review prose. A deterministic audit of the exact lineage predicate, corrected
 source seams, formatting, changed paths, signature, pushed ref, protected paths,
 and stashes closes the plan gate before D.109a RED.
+
+#### D.109a deterministic RED checkpoint
+
+The plan gate closed at signed/pushed commit
+`28b23304bb070507b4d10833a5985c4ca9ce5911`. D.109a RED adds exactly one
+tests-only owner, `tests/phase-6b-cleanup-eligibility-red.test.ts`; the sole
+missing GREEN owner is
+`packages/node/src/internal/closed-epoch-cleanup.ts`. No production source,
+package export, schema, deletion path, scheduler, dependency, threshold, or
+product API changes in RED.
+
+The exact focused command ran once:
+
+```text
+pnpm exec vitest run tests/phase-6b-cleanup-eligibility-red.test.ts --reporter=json --outputFile=.logs/phase-6b-d109a-red/focused.json
+```
+
+It selected one reported file and ten assertions: three controls passed, six
+GREEN behaviors skipped behind the missing-owner readiness predicate, and one
+readiness assertion failed with exact token
+`D109A_CLEANUP_PLANNER_MISSING`. There were no other assertion failures,
+top-level errors, snapshot changes, or flaky results. The JSON reporter's
+top-level suite counters report `2/0/2` despite one `testResults` entry; the
+file and assertion arrays are the authoritative deterministic selection proof,
+and no suite-count claim relies on that reporter defect. Focused JSON and exact
+test-source SHA-256 values are respectively
+`d5197f8feab4d0e9d8c528586043209d5fe3efd08f489b42ce12de293632533a`
+and `80709ad22a43a4171644988a69f2d7daa6901f38c3b02d77233ab09b6c5248e7`.
+
+The test freezes the ten-code refusal precedence, exact local-only policy
+preimage/digest, active plus two immediate ancestors, connected-prefix floor
+normalization, unnormalized dangling-parent causal mutant, wrong-but-countable
+rollback pair, missing row/closure, gapped prefix, surviving branch, wrong
+floor/parent, permutation invariance, detached deep-frozen output, source shape,
+and genuine Phase-6a close/adoption positive control. The independent
+dangling-parent oracle passes before GREEN and exactly reproduces why deletion
+without floor normalization is unsafe.
+
+The first retained eight-file Phase-6a command executed all 77 assertions
+successfully, but inherited whole-repository coverage and exited 1 only because
+the focused subset's 18.76% line coverage is below the unrelated 70% global
+threshold. Its JSON says `success: true`, 77/77 assertions and eight passing
+files; SHA-256 is
+`60143464fc67ac4c797012b675461e224ac6c99b7fbf3522bbef9bfaf1d5551a`.
+The corrected retained command added only `--coverage.enabled=false` and exited
+0 with the same eight files and 77/77 assertions; JSON SHA-256 is
+`8202df7e13260d2ffb6dc18df9c4c0137e5cc8a8d911c8885e0092f8560309bb`.
+This is an invocation correction, not a code failure or a second focused RED.
+The self-excluding three-entry evidence manifest validates with SHA-256
+`916681f8df97876e578df00e844218e670c3ac195feb3a466e7639ca91737ce9`.
+
+Exact-owner ESLint, Prettier, `git diff --check`, changed-path inspection, the
+two live `!byId.has(baseExpectedHead.generationId)` lineage predicates, no-
+delete/no-package-export/no-root-export source shape, the signed plan anchor,
+pushed-ref equality, 26 stashes, and protected untracked paths pass. RED is
+causal and authorizes only the narrow D.109a no-I/O planner GREEN.

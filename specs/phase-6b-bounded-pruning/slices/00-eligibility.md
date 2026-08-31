@@ -19,9 +19,9 @@ The plan identifies, by exact value rather than ordering inference:
 - expected current head/revision;
 - active generation and exactly the two complete rollback generations reached
   by following `baseExpectedHead` twice from that active adopted generation;
-- the exact oldest-retained lineage floor, its expected present parent, and the
-  complete connected older prefix eligible for atomic floor normalization and
-  deletion;
+- the exact oldest-retained lineage floor, its expected original base (present
+  when an older prefix exists), and the complete connected older prefix eligible
+  for atomic floor normalization and deletion;
 - adopted local snapshot plus the adopted CutValue’s exact
   `availabilityPolicyDigest`;
 - the issuance scope and upper epoch boundary to classify; and
@@ -68,9 +68,12 @@ closed refusal and retains data for Phase 7b. Do not verify signatures again,
 open a store, add schema, schedule work, or reclaim memory.
 
 The immutable positive result carries an exact lineage-floor rewrite intent:
-the floor generation identity, its expected original present parent, the
-existing no-head replacement scoped to the same object, and the complete older
-prefix. D.109a only simulates the post-state graph and never mutates a record.
+the floor generation identity, its expected original base, the existing no-head
+replacement scoped to the same object, and the complete older prefix. D.109a
+only simulates the post-state graph and never mutates a record.
+When the floor is already the original no-head generation, the expected base is
+that existing no-head value, the deletion prefix is empty, and the later stage
+is an idempotent no-op rather than a fabricated rewrite.
 
 ## Acceptance
 
@@ -81,6 +84,15 @@ prefix. D.109a only simulates the post-state graph and never mutates a record.
 - The changed production path set is the one internal planner only; the tests
   and plan/evidence paths are enumerated separately.
 - A source-shape check proves no delete-like operation and no package export.
+
+The frozen owner is
+`tests/phase-6b-cleanup-eligibility-red.test.ts`; its sole GREEN source is
+`packages/node/src/internal/closed-epoch-cleanup.ts`. The closed refusal
+precedence is `D109A_QC_INVALID`, `D109A_ADOPTION_INVALID`,
+`D109A_HEAD_MISMATCH`, `D109A_REVISION_STALE`, `D109A_IDENTITY_INVALID`,
+`D109A_LINEAGE_INVALID`, `D109A_ROLLBACK_INSUFFICIENT`,
+`D109A_SNAPSHOT_MISSING`, `D109A_POLICY_UNSUPPORTED`, then
+`D109A_OUTBOX_INCOMPLETE`.
 
 ## Handoff
 
