@@ -84902,49 +84902,78 @@ wire or identity semantics, dependencies, configuration, browser, workload,
 loss, thresholds, timeouts, watchdog, ports or campaign machinery. Any need
 for such a change stops and reslices.
 
-The frozen boundary contract distinguishes two incoming states. A completed
-incoming transition has no RTC identity common to prepare/deadline and retains
-the existing singleton old/new path. An incoming endpoint that still has one
-RTC identity common to both boundaries has not selected its qualified
-candidate for application traffic: select that common old owner and apply the
-existing zero-local census helper. That helper already proves unique census
-identities, exactly one common owner, at most one prepare/deadline candidate,
-all application records on the common owner, and for a deadline candidate one
-product handler, one open event and no terminal close. Control custody on the
-candidate remains separately validated. Stable authenticated identity and
-zero local drop remain required. No new acceptance is created for two
-selected owners, candidate application traffic, missing readiness, terminal
-candidates, multiple candidates or an incoming transition without a common
-owner.
+The frozen boundary contract distinguishes three incoming census states. A
+completed incoming transition has no RTC identity common to prepare/deadline
+and retains the existing singleton old/new path. An RTC-stable incoming
+endpoint has singleton prepare/deadline censuses with one common identity and
+also retains the existing singleton path. The only new accepted shape is the
+observed pending-deadline state: prepare has exactly one RTC identity, deadline
+has that same selected identity plus at least one additional census entry, and therefore
+the selected old owner remains common while a candidate has not been selected
+for application traffic. Only that shape uses the existing zero-local census
+helper. The helper proves unique census identities, exactly one common owner,
+at most one prepare/deadline candidate, all application records on the common
+owner, and for a deadline candidate one product handler, one open event and no
+terminal close. Control custody on the candidate remains separately
+validated. Stable authenticated identity and zero local drop remain required.
+An incoming prepare candidate does not enter the new branch. No new acceptance
+is created for two selected owners, candidate application traffic, missing
+readiness, terminal candidates, multiple candidates or an incoming transition
+without a common owner.
 
 **Causal RED.** In the existing telemetry-only title `validates schema-v3
 replacement custody without cross-peer clocks`, compose one
-`incomingPendingCandidateAlongsidePeerReplacement` fixture from the already-
-passing creator endpoint/delta of `creatorReplacement` and the already-passing
-receiver endpoint/delta of `d108e4bhDeadlinePending`. These fixtures share the
-same trial, peer, workload and base identities. The composition changes only
-campaign-wide peer classification: creator owns one replacement, so receiver
-becomes incoming while retaining its common selected RTC plus one qualified
-control-only pending candidate. Add one soft `not.toThrow` expectation. Before
-GREEN, the exact focused execution must select one test in one file, exclude
-the three-trial title, return `0/0/1/0`, contain zero top-level errors and one
-failed result, and expose only the named row with exact
+`incomingPendingCandidateAlongsidePeerReplacement` fixture by parameterizing
+the existing deadline-pending candidate construction over a base fixture and
+building it directly on `creatorReplacement`. Use
+`creatorReplacement.endpoints.receiver`,
+`creatorReplacement.rawTransportDeltas.receiver` and
+`creatorReplacement.trialId` for the receiver, its monitor and every added
+lifecycle record. Rebuild the same two-entry deadline census, one READY
+receive and two ACK sends; do not transplant the `noReplacement` endpoint or
+rewrite mixed-trial records after composition. Assert mechanically that the
+outer trial, both endpoint monitors and every lifecycle record have the exact
+`creatorReplacement.trialId`. This keeps peer, workload, base RTC identity and
+receiver delta compatible while changing only campaign-wide peer
+classification: creator owns one replacement, so receiver becomes incoming
+while retaining its common selected RTC plus one qualified control-only
+pending candidate. Add one soft `not.toThrow` expectation. Run focused listing
+and execution with `D108E4H_TELEMETRY=1`. Before GREEN, the exact focused
+execution must select one test in one file, exclude the three-trial title,
+return `0/0/1/0`, contain zero top-level errors and one failed result, and
+expose only the named row with exact
 `D108E4H_IDENTITY_JOIN_INVALID` from
 `d108e4hOnly(endpoint.deadline.rtc)`. Any different matrix/token/owner stops
 for diagnosis. Preserve a self-excluding RED manifest, sign and push it, and
 never rerun RED.
 
 **GREEN.** Change only boundary selection in the same validator. For a
-non-local endpoint whose prepare/deadline RTC censuses share an exact identity,
-use `d108e4hAssertZeroLocalBoundaryIdentity`; otherwise preserve the existing
-incoming singleton transition. Keep the local-replacement path unchanged. Add
-one incoming-specific negative composition using the existing
-`d108e4bhCandidateApplicationOwner`; it must retain exact
-`D108E4H_IDENTITY_JOIN_INVALID`. Preserve the existing incoming-transition
-fixtures, zero-local deadline/prepare/initiator pending candidates, second-
-candidate rejection, missing-open/handler, terminal-candidate, control-custody,
-application-owner, ownership truth table, asymmetric behavior, identity shape,
-lifecycle and every exact error token.
+non-local endpoint, use `d108e4hAssertZeroLocalBoundaryIdentity` only when
+prepare is a singleton, deadline contains that exact identity and deadline has
+more than one census entry. Otherwise preserve the existing incoming singleton
+transition. Keep the local-replacement and ordinary zero-local paths unchanged.
+Derive one incoming-specific candidate-application-owner negative from the
+same trial-compatible positive composition; it must retain exact
+`D108E4H_IDENTITY_JOIN_INVALID`. Add one incoming prepare-candidate negative:
+prepare contains old plus candidate, deadline selects the candidate, and
+application custody follows the candidate; it must remain rejected with exact
+`D108E4H_IDENTITY_JOIN_INVALID` rather than entering the new deadline-pending
+branch. Preserve the existing incoming-transition fixtures, zero-local
+deadline/prepare/initiator pending candidates, second-candidate rejection,
+missing-open/handler, terminal-candidate, control-custody, application-owner,
+ownership truth table, asymmetric behavior, identity shape, lifecycle and
+every exact error token.
+
+The pending fixture deliberately uses the existing three-control minimal
+qualified-candidate shape rather than reproducing all five campaign control
+records. Boundary selection is independent of the extra COMMIT-bearing shape,
+which remains pinned by `d108e4bhAcceptorReceivedCommit` and
+`d108e4bqCommitBeforeQualifyingAck`. The immutable campaign telemetry proves
+the actual acceptor ordering: handler `1230`, ACK `1231`, open `1233`, READY
+`1234`, ACK `1235`, READY `1237`, COMMIT `1238`, with no candidate terminal
+event. The common-owner branch preserves the existing before-equals-after
+overlap behavior; the broader question of selected-owner close-call policy is
+unchanged and outside this tests-only boundary-selection slice.
 
 Run focused GREEN exactly once. Then run standalone strict TypeScript,
 exact-owner ESLint, 8 GiB formatter-only Prettier, `git diff --check`, affected
@@ -84962,6 +84991,26 @@ gets a disposition without recursive prose review. Kimi, Fable and
 collaboration subagents remain prohibited. An empty final union releases one
 wholly fresh retained proof name. Only its pass may freeze six wholly fresh
 campaign names; no D.108e4cb name is available.
+
+The initial plan review inspected signed/pushed commit
+`febbc4c99835351abfae84aa26fa70bb416fa3d1`. Grok completed normally after
+`420.151` seconds with one P0 trial-mismatch finding and one P2 focused-env
+finding; no cancellation or resume occurred. Codex `gpt-5.6-sol` high returned
+the same material trial-mismatch finding as P1. Opus xhigh completed normally
+after `573.861` API seconds, spawned no subagents, confirmed the diagnosis and
+GREEN sufficiency for the consumed census, and returned the same P0 plus one
+P1 prepare-candidate widening finding and four P2s. The material union is
+corrected above in one batch: construct the receiver on the creator-
+replacement trial itself, constrain the new branch to singleton-prepare plus
+multi-entry-deadline, and pin the forbidden prepare-candidate case. The
+focused environment is now explicit. The remaining P2s are dispositioned
+without more fixture scope: preserve existing RTC-stable routing, preserve the
+existing selected-owner close-call policy, rely on the already-pinned full
+COMMIT lifecycle while using the minimal qualified-candidate RED shape, and
+cite the immutable campaign control sequence above. Because these corrections
+change causal RED construction and executable branch acceptance, one and only
+one confirmation round is required before RED; bookkeeping or prose does not
+permit another round.
 
 Consumed D.108e4bu reporter, stdout, stderr, failure telemetry,
 endpoint-classifier, trace, cumulative manifest, and manifest-validation
