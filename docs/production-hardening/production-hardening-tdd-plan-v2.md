@@ -86980,3 +86980,61 @@ the fixture had sealed the epoch before activation. Removing that fixture
 ordering mistake produced the accepted six-mismatch reporter. These
 corrections changed only the four frozen RED owners, did not touch production,
 and did not relax or reinterpret the frozen acceptance matrix.
+
+GREEN batch one changed only `examples/v3-room/src/index.ts`. The source's
+existing `lifetimeTransitionTail` now reserves redirect wait and dispatch in
+call order for adoption, rehearsal and activation. A redirected target call
+is started while that source slot is held, but is returned inside a
+non-thenable dispatch result so the source tail releases before the target
+settles; rehearsal releases its synchronously reserved fast-fail fence at the
+same point. Local work continues to hold the same queue through completion,
+and concurrent adoption continues to share `creatorSuccessorAdoptionTask`.
+The sole batch-one Chromium invocation produced exactly the reviewed partial
+GREEN matrix: both ordering mismatches closed, and only the four frozen
+batch-two invite mismatches remained.
+
+GREEN batch two added the one migration-only bounded invite encoder and
+pre-copy activation checks in that same production owner. An invite string is
+length-checked before hexadecimal decoding. Object input is reduced to the
+exact seven material fields, validates the six genuine fixed `Uint8Array`
+views and exact lowercase digest without copying any body, and computes the
+exact nine-field canonical envelope length from fixed framing plus canonical
+varuint widths before calling `encodeCreatorInvite()`. That owner is used at
+call-time capture and both rehearsal/activation receiver paths. Exact
+`65_536` remains accepted and `65_537` rejects as unbounded; invalid digest
+and byte-field classifications are preserved. Activation obtains intrinsic
+view metadata and applies `49_152` before constructing its call-time copy;
+the receiver repeats the bound before its defensive copy. No public API,
+limit, wire value, dependency, package metadata or second queue changed.
+
+The final focused commands passed 8/8 Vitest assertions and one Chromium test
+with `expected=1`, `skipped=0`, `unexpected=0`, `flaky=0` and no reporter or
+soft error. The full product configuration passed 24/24 across Chromium,
+Firefox and WebKit; the independently selected retained D.108e3 composite
+passed 3/3. The unchanged activation, adoption-commit and successor-epoch
+configurations passed 24/24, 6/6 and 3/3 respectively across all three
+engines. The exact eleven-file Phase-6a native selection passed 85/85,
+including all three fresh-process/death owners; stderr contained only Node's
+known experimental SQLite warning. Final v3-room and storage-browser builds
+and typechecks passed. Exact-five ESLint with zero warnings, exact-five
+Prettier, source-shape/AST assertions and `git diff --check` passed.
+
+One first static pass found only three style defects in the initial dispatch
+expression: two forbidden non-null assertions and one required `return
+await`. Replacing those shortcuts with the explicit non-thenable dispatch
+result above preserved the reviewed queue semantics. A subsequent missing
+IIFE return annotation was also a lint-only diagnostic. The corrected source
+then passed lint, build/typecheck, focused Vitest, focused Chromium and the
+complete three-engine product matrix again; the failed static diagnostics are
+not test failures and did not trigger a product reslice.
+
+The final ordinary-checkout production SHA-256 is
+`be0fae5e22476ebfcf2602c34213df60df954b51f1f2e945807c04a3e7fbb612`.
+The 29-entry self-excluding evidence manifest at
+`.logs/d108e5-green/ARTIFACT-SHA256SUMS` validates every entry and has
+SHA-256
+`893783b2008140702a90acc45d4faa275a36775dd45e931631f8d69da69722cc`.
+Protected untracked paths and all 26 stashes remain untouched. This ordinary
+GREEN evidence releases the signed implementation checkpoint; the detached
+artifact-clean proof and sole final Grok/Codex/Opus review still gate D.108e5
+closure.

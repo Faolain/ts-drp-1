@@ -56,6 +56,18 @@ const CREATOR_INVITE_KEYS = Object.freeze([
 	"pinnedGenesisAnchorDigest",
 	"version",
 ]);
+const CREATOR_INVITE_BYTE_FIELDS = Object.freeze([
+	"detachedGenesisSignature",
+	"exactCanonicalLatchedAclBytes",
+	"exactCanonicalGenesisAnchorPreimageBytes",
+	"exactCanonicalParametersCarrierBytes",
+	"exactCanonicalProfileBytes",
+	"exactCanonicalSignerSetBytes",
+] as const);
+const CREATOR_INVITE_MATERIAL_KEYS = Object.freeze([...CREATOR_INVITE_BYTE_FIELDS, "pinnedGenesisAnchorDigest"]);
+// Object framing plus the nine encoded keys and the fixed kind, digest and version values.
+// The retained exact 65_536/65_537 boundary pair pins this codec-specific arithmetic.
+const CREATOR_INVITE_FIXED_CANONICAL_BYTE_LENGTH = 346;
 const MIGRATION_RECORD_KEYS = Object.freeze([
 	"applicationStateDigest",
 	"archivePolicy",
@@ -165,6 +177,16 @@ const INTRINSIC_TYPED_ARRAY_PROTOTYPE = INTRINSIC_GET_PROTOTYPE_OF(INTRINSIC_UIN
 const INTRINSIC_TYPED_ARRAY_BUFFER_GETTER = requiredIntrinsicGetter(INTRINSIC_TYPED_ARRAY_PROTOTYPE, "buffer");
 const INTRINSIC_TYPED_ARRAY_BYTE_LENGTH_GETTER = requiredIntrinsicGetter(INTRINSIC_TYPED_ARRAY_PROTOTYPE, "byteLength");
 const INTRINSIC_TYPED_ARRAY_BYTE_OFFSET_GETTER = requiredIntrinsicGetter(INTRINSIC_TYPED_ARRAY_PROTOTYPE, "byteOffset");
+
+function canonicalVarUintByteLength(value: number): number {
+	let width = 1;
+	let remaining = value;
+	while (remaining >= 128) {
+		width += 1;
+		remaining = Math.floor(remaining / 128);
+	}
+	return width;
+}
 
 export interface V3RoomCreatorInviteMaterial {
 	readonly detachedGenesisSignature: Uint8Array;
@@ -1964,6 +1986,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	let migrationAcceptingFollowers = false;
 	let migrationRehearsalReserved = false;
 	let lifetimeTransitionTail: Promise<void> = Promise.resolve();
+	type LifetimeDispatchResult<Result> = Readonly<{ readonly result: Result | Promise<Result> }>;
 	const enqueueLifetimeTransition = <Result>(transition: () => Promise<Result>): Promise<Result> => {
 		const selected = lifetimeTransitionTail.then(transition);
 		lifetimeTransitionTail = selected.then(
@@ -1972,13 +1995,67 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		);
 		return selected;
 	};
-	const snapshotMigrationInvite = (value: unknown): unknown => {
-		if (value === null || typeof value !== "object") return value;
-		try {
-			return encodeCreatorInvite(value as V3RoomCreatorInviteMaterial);
-		} catch {
+	const boundedMigrationCreatorInvite = (value: unknown): string => {
+		if (typeof value === "string") {
+			if (value.length > 131_072) throw new TypeError("v3 room migration target invite is unbounded");
 			return value;
 		}
+		const fields = exactRecord(value, CREATOR_INVITE_MATERIAL_KEYS);
+		if (fields === undefined) throw new TypeError("v3 room creator invite fields are invalid");
+		const pinnedGenesisAnchorDigest = fields.pinnedGenesisAnchorDigest;
+		if (typeof pinnedGenesisAnchorDigest !== "string" || !/^[0-9a-f]{64}$/u.test(pinnedGenesisAnchorDigest)) {
+			throw new TypeError("v3 room creator invite anchor is invalid");
+		}
+		const byteLengths: number[] = [];
+		for (const field of CREATOR_INVITE_BYTE_FIELDS) {
+			const fieldValue = fields[field];
+			let backing: unknown;
+			let backingByteLength: unknown;
+			let byteLength: unknown;
+			let byteOffset: unknown;
+			let resizable = false;
+			try {
+				backing = Reflect.apply(INTRINSIC_TYPED_ARRAY_BUFFER_GETTER, fieldValue, []);
+				backingByteLength = Reflect.apply(INTRINSIC_ARRAY_BUFFER_BYTE_LENGTH_GETTER, backing, []);
+				byteLength = Reflect.apply(INTRINSIC_TYPED_ARRAY_BYTE_LENGTH_GETTER, fieldValue, []);
+				byteOffset = Reflect.apply(INTRINSIC_TYPED_ARRAY_BYTE_OFFSET_GETTER, fieldValue, []);
+				if (INTRINSIC_ARRAY_BUFFER_RESIZABLE_GETTER !== undefined) {
+					resizable = Reflect.apply(INTRINSIC_ARRAY_BUFFER_RESIZABLE_GETTER, backing, []) === true;
+				}
+			} catch {
+				throw new TypeError(`v3 room creator invite ${field} is invalid`);
+			}
+			if (
+				INTRINSIC_GET_PROTOTYPE_OF(fieldValue) !== INTRINSIC_UINT8_ARRAY_PROTOTYPE ||
+				!(backing instanceof INTRINSIC_ARRAY_BUFFER) ||
+				INTRINSIC_GET_PROTOTYPE_OF(backing) !== INTRINSIC_ARRAY_BUFFER_PROTOTYPE ||
+				resizable ||
+				typeof backingByteLength !== "number" ||
+				typeof byteLength !== "number" ||
+				typeof byteOffset !== "number" ||
+				byteLength === 0 ||
+				byteOffset < 0 ||
+				byteOffset + byteLength > backingByteLength
+			) {
+				throw new TypeError(`v3 room creator invite ${field} is invalid`);
+			}
+			if (field === "detachedGenesisSignature" && byteLength !== 64) {
+				throw new TypeError("v3 room creator invite signature is invalid");
+			}
+			byteLengths.push(byteLength);
+		}
+		const exactCanonicalByteLength = byteLengths.reduce(
+			(total, byteLength) => total + 1 + canonicalVarUintByteLength(byteLength) + byteLength,
+			CREATOR_INVITE_FIXED_CANONICAL_BYTE_LENGTH
+		);
+		if (exactCanonicalByteLength > 65_536) {
+			throw new TypeError("v3 room migration target invite is unbounded");
+		}
+		return encodeCreatorInvite(fields as unknown as V3RoomCreatorInviteMaterial);
+	};
+	const snapshotMigrationInvite = (value: unknown): unknown => {
+		if (typeof value !== "string" && (value === null || typeof value !== "object")) return value;
+		return boundedMigrationCreatorInvite(value);
 	};
 	const snapshotMigrationRehearsalInput = (
 		rehearsalInput: V3RoomMigrationRehearsalInput
@@ -2023,11 +2100,44 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			"targetCreatorInvite",
 		]);
 		if (fields === undefined) return activationInput;
+		const suppliedRecordBytes = fields.exactCanonicalRecordBytes;
+		let capturedRecordBytes = suppliedRecordBytes;
+		let backing: unknown;
+		let backingByteLength: unknown;
+		let byteLength: unknown;
+		let byteOffset: unknown;
+		let resizable = false;
+		try {
+			backing = Reflect.apply(INTRINSIC_TYPED_ARRAY_BUFFER_GETTER, suppliedRecordBytes, []);
+			backingByteLength = Reflect.apply(INTRINSIC_ARRAY_BUFFER_BYTE_LENGTH_GETTER, backing, []);
+			byteLength = Reflect.apply(INTRINSIC_TYPED_ARRAY_BYTE_LENGTH_GETTER, suppliedRecordBytes, []);
+			byteOffset = Reflect.apply(INTRINSIC_TYPED_ARRAY_BYTE_OFFSET_GETTER, suppliedRecordBytes, []);
+			if (INTRINSIC_ARRAY_BUFFER_RESIZABLE_GETTER !== undefined) {
+				resizable = Reflect.apply(INTRINSIC_ARRAY_BUFFER_RESIZABLE_GETTER, backing, []) === true;
+			}
+		} catch {
+			// The queued owner preserves the existing invalid-input classification.
+		}
+		if (
+			INTRINSIC_GET_PROTOTYPE_OF(suppliedRecordBytes) === INTRINSIC_UINT8_ARRAY_PROTOTYPE &&
+			backing instanceof INTRINSIC_ARRAY_BUFFER &&
+			INTRINSIC_GET_PROTOTYPE_OF(backing) === INTRINSIC_ARRAY_BUFFER_PROTOTYPE &&
+			!resizable &&
+			typeof backingByteLength === "number" &&
+			typeof byteLength === "number" &&
+			typeof byteOffset === "number" &&
+			byteOffset >= 0 &&
+			byteOffset + byteLength <= backingByteLength
+		) {
+			if (byteLength > 49_152) throw new TypeError("v3 room migration activation record is unbounded");
+			const copiedRecordBytes = new INTRINSIC_UINT8_ARRAY(byteLength);
+			Reflect.apply(INTRINSIC_UINT8_ARRAY_SET, copiedRecordBytes, [
+				new INTRINSIC_UINT8_ARRAY(backing, byteOffset, byteLength),
+			]);
+			capturedRecordBytes = copiedRecordBytes;
+		}
 		return Object.freeze({
-			exactCanonicalRecordBytes:
-				fields.exactCanonicalRecordBytes instanceof Uint8Array
-					? new Uint8Array(fields.exactCanonicalRecordBytes)
-					: fields.exactCanonicalRecordBytes,
+			exactCanonicalRecordBytes: capturedRecordBytes,
 			recordVertexDigest: fields.recordVertexDigest,
 			targetCreatorInvite: snapshotMigrationInvite(fields.targetCreatorInvite),
 		}) as V3RoomMigrationActivationInput;
@@ -2467,8 +2577,6 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	const performMigrationRehearsal = async (
 		rehearsalInput: V3RoomMigrationRehearsalInput
 	): Promise<V3RoomMigrationRehearsalReceipt> => {
-		if (redirectPromise !== undefined) await redirectPromise;
-		if (redirectedSession !== undefined) return redirectedSession.rehearseMigration(rehearsalInput);
 		if (terminalFailure !== undefined) throw terminalFailure;
 		if (closed) throw new TypeError("v3 room session is closed");
 		const fields = exactRecord(rehearsalInput, ["rehearsalNonce", "targetCreatorInvite"]);
@@ -2523,11 +2631,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		) {
 			throw new TypeError("v3 room migration target invite is invalid");
 		}
-		const targetMaterial = decodeCreatorInvite(
-			typeof targetInviteValue === "string"
-				? targetInviteValue
-				: encodeCreatorInvite(targetInviteValue as V3RoomCreatorInviteMaterial)
-		);
+		const targetMaterial = decodeCreatorInvite(boundedMigrationCreatorInvite(targetInviteValue));
 		const sourceAuthority = migrationInviteAuthority(material);
 		const targetAuthority = migrationInviteAuthority(targetMaterial);
 		if (
@@ -2778,21 +2882,30 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		rehearsalInput: V3RoomMigrationRehearsalInput
 	): Promise<V3RoomMigrationRehearsalReceipt> => {
 		const capturedInput = snapshotMigrationRehearsalInput(rehearsalInput);
-		if (redirectPromise !== undefined) await redirectPromise;
-		if (redirectedSession !== undefined) return redirectedSession.rehearseMigration(capturedInput);
 		if (migrationRehearsalReserved) throw new TypeError("v3 room migration rehearsal is already active");
 		migrationRehearsalReserved = true;
-		try {
-			return await enqueueLifetimeTransition(() => performMigrationRehearsal(capturedInput));
-		} finally {
-			migrationRehearsalReserved = false;
-		}
+		const selected = await (async (): Promise<LifetimeDispatchResult<V3RoomMigrationRehearsalReceipt>> => {
+			try {
+				return await enqueueLifetimeTransition(async () => {
+					if (redirectPromise !== undefined) await redirectPromise;
+					if (redirectedSession !== undefined) {
+						return Object.freeze({
+							result: redirectedSession.rehearseMigration(capturedInput),
+						});
+					}
+					return Object.freeze({
+						result: await performMigrationRehearsal(capturedInput),
+					});
+				});
+			} finally {
+				migrationRehearsalReserved = false;
+			}
+		})();
+		return selected.result;
 	};
 	const performMigrationActivation = async (
 		activationInput: V3RoomMigrationActivationInput
 	): Promise<V3RoomMigrationActivationReceipt> => {
-		if (redirectPromise !== undefined) await redirectPromise;
-		if (redirectedSession !== undefined) return redirectedSession.activateMigration(activationInput);
 		if (terminalFailure !== undefined) throw terminalFailure;
 		if (closed) throw new TypeError("v3 room session is closed");
 		if (migrationActivationAuthority === undefined || input.application.migration === undefined) {
@@ -2808,13 +2921,43 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		]);
 		if (fields === undefined) throw new TypeError("v3 room migration activation input is invalid");
 		const suppliedRecordBytes = fields.exactCanonicalRecordBytes;
-		if (!(suppliedRecordBytes instanceof Uint8Array) || suppliedRecordBytes.byteLength === 0) {
+		let recordBacking: unknown;
+		let recordBackingByteLength: unknown;
+		let recordByteLength: unknown;
+		let recordByteOffset: unknown;
+		let recordResizable = false;
+		try {
+			recordBacking = Reflect.apply(INTRINSIC_TYPED_ARRAY_BUFFER_GETTER, suppliedRecordBytes, []);
+			recordBackingByteLength = Reflect.apply(INTRINSIC_ARRAY_BUFFER_BYTE_LENGTH_GETTER, recordBacking, []);
+			recordByteLength = Reflect.apply(INTRINSIC_TYPED_ARRAY_BYTE_LENGTH_GETTER, suppliedRecordBytes, []);
+			recordByteOffset = Reflect.apply(INTRINSIC_TYPED_ARRAY_BYTE_OFFSET_GETTER, suppliedRecordBytes, []);
+			if (INTRINSIC_ARRAY_BUFFER_RESIZABLE_GETTER !== undefined) {
+				recordResizable = Reflect.apply(INTRINSIC_ARRAY_BUFFER_RESIZABLE_GETTER, recordBacking, []) === true;
+			}
+		} catch {
 			throw new TypeError("v3 room migration activation input is invalid");
 		}
-		const exactCanonicalRecordBytes = new Uint8Array(suppliedRecordBytes);
-		if (exactCanonicalRecordBytes.byteLength > 49_152) {
+		if (
+			INTRINSIC_GET_PROTOTYPE_OF(suppliedRecordBytes) !== INTRINSIC_UINT8_ARRAY_PROTOTYPE ||
+			!(recordBacking instanceof INTRINSIC_ARRAY_BUFFER) ||
+			INTRINSIC_GET_PROTOTYPE_OF(recordBacking) !== INTRINSIC_ARRAY_BUFFER_PROTOTYPE ||
+			recordResizable ||
+			typeof recordBackingByteLength !== "number" ||
+			typeof recordByteLength !== "number" ||
+			typeof recordByteOffset !== "number" ||
+			recordByteLength === 0 ||
+			recordByteOffset < 0 ||
+			recordByteOffset + recordByteLength > recordBackingByteLength
+		) {
+			throw new TypeError("v3 room migration activation input is invalid");
+		}
+		if (recordByteLength > 49_152) {
 			throw new TypeError("v3 room migration activation record is unbounded");
 		}
+		const exactCanonicalRecordBytes = new INTRINSIC_UINT8_ARRAY(recordByteLength);
+		Reflect.apply(INTRINSIC_UINT8_ARRAY_SET, exactCanonicalRecordBytes, [
+			new INTRINSIC_UINT8_ARRAY(recordBacking, recordByteOffset, recordByteLength),
+		]);
 		let decodedRecord: unknown;
 		try {
 			decodedRecord = decodeCanonical(exactCanonicalRecordBytes, { maxBytes: 49_152, maxDepth: 16, maxItems: 16_384 });
@@ -2836,11 +2979,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		) {
 			throw new TypeError("v3 room migration activation target invite is invalid");
 		}
-		const targetCreatorInvite = decodeCreatorInvite(
-			typeof targetInviteValue === "string"
-				? targetInviteValue
-				: encodeCreatorInvite(targetInviteValue as V3RoomCreatorInviteMaterial)
-		);
+		const targetCreatorInvite = decodeCreatorInvite(boundedMigrationCreatorInvite(targetInviteValue));
 		const targetAuthority = migrationInviteAuthority(targetCreatorInvite);
 		const targetRecordAuthority = Object.freeze({
 			anchorDigest: targetCreatorInvite.pinnedGenesisAnchorDigest,
@@ -2995,9 +3134,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		activationInput: V3RoomMigrationActivationInput
 	): Promise<V3RoomMigrationActivationReceipt> => {
 		const capturedInput = snapshotMigrationActivationInput(activationInput);
-		if (redirectPromise !== undefined) await redirectPromise;
-		if (redirectedSession !== undefined) return redirectedSession.activateMigration(capturedInput);
-		return enqueueLifetimeTransition(() => performMigrationActivation(capturedInput));
+		const selected = await enqueueLifetimeTransition(async () => {
+			if (redirectPromise !== undefined) await redirectPromise;
+			if (redirectedSession !== undefined) {
+				return Object.freeze({
+					result: redirectedSession.activateMigration(capturedInput),
+				});
+			}
+			return Object.freeze({
+				result: await performMigrationActivation(capturedInput),
+			});
+		});
+		return selected.result;
 	};
 	if (redirectSource !== undefined) {
 		try {
@@ -3013,9 +3161,6 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		if (closed) throw new TypeError("v3 room session is closed");
 	};
 	const performCreatorSuccessorAdoption = async (): Promise<void> => {
-		if (redirectPromise !== undefined) await redirectPromise;
-		assertSessionOpen();
-		if (redirectedSession !== undefined) return redirectedSession.adoptCreatorSuccessor();
 		if (terminalFailure !== undefined) throw terminalFailure;
 		if (successorProjectionAuthority !== null) return;
 		if (creatorCloseHandle === undefined) throw new TypeError("creator close authority is unavailable");
@@ -3084,7 +3229,17 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	};
 	const adoptCreatorSuccessor = (): Promise<void> => {
 		if (creatorSuccessorAdoptionTask !== undefined) return creatorSuccessorAdoptionTask;
-		const attempt = enqueueLifetimeTransition(performCreatorSuccessorAdoption);
+		const forwarded: { result?: Promise<void> } = {};
+		const dispatch = enqueueLifetimeTransition(async () => {
+			if (redirectPromise !== undefined) await redirectPromise;
+			assertSessionOpen();
+			if (redirectedSession !== undefined) {
+				forwarded.result = redirectedSession.adoptCreatorSuccessor();
+				return;
+			}
+			return performCreatorSuccessorAdoption();
+		});
+		const attempt = dispatch.then(() => forwarded.result);
 		const shared = attempt.finally(() => {
 			if (creatorSuccessorAdoptionTask === shared) creatorSuccessorAdoptionTask = undefined;
 		});
