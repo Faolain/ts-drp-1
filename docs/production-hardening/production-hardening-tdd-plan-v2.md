@@ -87186,3 +87186,83 @@ API, limit, classification, dependency, browser fixture, workload or prior
 evidence changed, and no campaign ran. Protected untracked paths and all 26
 stashes remain untouched. The corrected final P0/P1 union is empty, D.108e5
 is closed, and the remaining Phase-6a exit ledger is released.
+
+##### D.108e6 — Phase-6a exit evidence and shim-lifetime audit
+
+D.108e6 closes only the four exit-ledger observations assigned by D.108e1.
+It is a test-infrastructure/evidence slice after signed D.108e5 closure
+`d34bdb6867feb0eb1a7cbe5ac2a193efa39a0db5`, tree
+`cc4245ef7074595b408e80ee250aab7890466971`. The exact RED owner is
+`tests/phase-6a-creator-successor-infrastructure-red.test.ts`; the exact GREEN
+owner is
+`packages/storage-browser/tests/phase-6a-creator-successor-activation-global-setup.ts`.
+Their starting SHA-256 values are
+`6376456bd59dc899b7ec4f173cb46e88724787b0beecb0543b9d249f71de6e0d`
+and
+`0b0f95817d15ae2ad386f5533969cc5d13830f62b30a4996b2f02897efea6994`.
+The retained activation Playwright configuration remains unchanged at
+`ec57c6bfc0453ad2bf154b3c2da7a2359be721e04e5f0c038f8b54e2e0ae35bf`.
+The lockfile and root manifest remain unchanged at
+`73c7c0660fa32c7380d0fe5a026897a7ad85a40edf1f169730c2d8e44e613a99`
+and
+`6ca5cc4a47f6e807cb653fa29a43839d497613f2ba363608c894392c6ccb084d`.
+
+The relay observation is closed by an explicit non-claim. The retained
+product oracle proves conservation and literal byte/scalar equality only for
+accepted message-shaped relay observations. Its independently incremented
+accepted-message counters are not an all-frame denominator, and Phase 6a does
+not claim conservation of non-message control packets. Adding such a
+denominator would widen the frozen browser contract without closing a product
+defect, so no product or browser-fixture change is authorized here.
+
+The concurrency observation is also closed without inventing parallel
+authority. Activation Playwright remains `fullyParallel: false`, `workers: 1`
+and is invoked serially. The exact shared shim-root refusal remains the
+repository-global fail-closed guard. D.108e6 does not authorize two activation
+configs to share that root concurrently; any future parallelization requires
+a separately reviewed per-run ownership design. Within the serialized policy,
+stale-root refusal must name the exact physical root and state that
+caller-owned contents will not be removed.
+
+RED extends the existing global-setup unit behavior without a new fixture. It
+starts with both the exact shim root and its ignored parent absent, invokes the
+real setup, proves the root and parent exist, invokes a second setup while the
+first owns the root, and requires an exact-path refusal while the first
+owner's package shims remain intact. After the first cleanup, both its exact
+root and the parent it created must be absent. The retained caller-owned
+sibling control must still prove that setup cleanup removes only `@ts-drp`
+and preserves a pre-existing parent and sibling. The retained pre-existing
+root control must preserve that root byte-for-byte. A pre-run command may
+remove `tests/fixtures/node_modules` only after proving it is empty; it may not
+remove any nonempty or protected path.
+
+GREEN tracks whether the shim parent existed before setup. Its returned and
+error-path cleanup removes the setup-owned root and removes the parent only
+when setup created it and it is still empty. `ENOTEMPTY` preserves
+caller-owned siblings; any other unexpected cleanup error fails. The stale
+root diagnostic includes the resolved root and the serialized ownership rule.
+No production source, product API, package/dependency/configuration, workload,
+timeout, limit, wire/store/digest/authority rule or campaign changes.
+
+The deterministic focused RED/GREEN command is:
+
+```sh
+pnpm exec vitest run --coverage.enabled=false tests/phase-6a-creator-successor-infrastructure-red.test.ts --maxWorkers=1 --minWorkers=1
+```
+
+GREEN additionally runs exact-two ESLint and Prettier, `git diff --check`, the
+unchanged activation Playwright configuration across Chromium, Firefox and
+WebKit, and before/after absence checks for both shim root and a
+setup-created empty parent. Protected untracked paths, all 26 stashes and the
+fixed-port/process predicates remain unchanged. RED and GREEN record complete
+stdout/stderr, statuses, owner hashes and self-excluding manifests. No retained
+campaign runs.
+
+Under the prospective review policy this ordinary narrow test-infrastructure
+slice receives one bounded Grok 4.6/high, Codex `gpt-5.6-sol` high and Opus
+xhigh plan review, deterministic RED without a model round, and one final
+three-model review over plan, RED and GREEN. If Grok cancels, resume the exact
+session rather than launching a replacement. Only P0/P1 findings block; P2
+bookkeeping or hostile-local-operator custody requests receive a disposition
+without another round. Kimi, Fable and collaboration subagents are not
+authorized.
