@@ -84681,6 +84681,31 @@ durable control releases a plan-only freeze of six wholly fresh campaign names.
 D.108e4ca runs no model review, retained-seven repeat or campaign; D.108e4bz's
 signed final review already owns the changed validator and retained gates.
 
+The one D.108e4ca invocation consumed
+`.logs/d108e4ca-retained-browser-1/` exactly once and passed. It started at
+`2026-08-31T06:54:39Z`, finished at `2026-08-31T06:57:43Z`, and directly
+captured runner status zero. Its complete reporter records
+expected/skipped/unexpected/flaky `1/0/0/0`, zero top-level and result errors,
+and one passed result after `175008` ms of test time. The decoded fixed-loss
+attachment contains exactly three completed trials `e3-03-0`, `e3-03-1` and
+`e3-03-2`, durable baseline 2 and Chromium `151.0.7922.34`. Raw delivery is
+416, 420 and 421; reliable delivery is 11, 9 and 10. The passing test preserves
+the unchanged raw-freshness, head-of-line, loss and durable-control contracts.
+No retry, overwrite, retained-seven repeat, review or campaign occurred.
+
+Reporter, decoded fixed-loss campaign, normalized campaign summary, 16-entry
+self-excluding manifest and manifest-validation SHA-256 values are respectively
+`e4f7072ce7351084b1c359bceb241b6e4edd9ababc07feaada3966e5bf457dcc`,
+`75903579edcc8f57f14cd715d3a44dc2e82975f8cac3dccd668e493289a2a3ac`,
+`5372b15e84f13f5325d4beb0c1fcb2362146f2cafea4a987a37cd8ffab047134`,
+`2e977d8bf716b6e9b23e59d1c2e3040ea33c7661b0ce12c71b037deb88718a01`
+and
+`d614770211f2dbe418e0fd61c373350d257e1f4e75769f5419f1632f00e673e3`.
+All 16 entries validate from `.logs/d108e4ca-retained-browser-1/`. This sole
+fresh retained pass releases one plan-only freeze of six wholly fresh campaign
+names against the same behavior, workload, browser configuration, thresholds,
+watchdog, ports and first-failure contract.
+
 Consumed D.108e4bu reporter, stdout, stderr, failure telemetry,
 endpoint-classifier, trace, cumulative manifest, and manifest-validation
 SHA-256 values are respectively
