@@ -82137,3 +82137,50 @@ No Kimi, Fable or collaboration subagent is authorized. An empty final P0/P1
 union may freeze one different fresh retained-browser name; the consumed
 D.108e4bo name is never retried. The six-name campaign and D.108e5 remain
 blocked until that fresh retained validation passes.
+
+The bounded D.108e4bp plan review is closed with an empty P0/P1 union. Codex
+`gpt-5.6-sol` high returned `APPROVED`, P0=0/P1=0/P2=0, and marked causal
+attribution, RED design, scope preservation and blocking-union emptiness true.
+Opus xhigh returned `APPROVED`, P0=0/P1=0/P2=4 with the same four predicates
+true. Grok 4.6 high completed its source inspection and emitted an approved
+object with P0=0/P1=0/P2=2, but progress prose before that object caused the
+strict wrapper to classify the envelope as `NO_VERDICT`. The raw Grok CLI does
+support `--resume`; continuing the same saved session
+`01a05542-6734-7c92-b965-248b1a032fef` for one formatting-only turn produced
+the same two findings as a strict structured `APPROVED` result without another
+inspection. This corrects the operational understanding of the CLI while
+leaving the already closed D.108e4bo checkpoint and its immutable evidence
+unchanged.
+
+The six P2 findings are dispositioned without another plan round:
+
+1. The RED must mutate `high.peerConnections[0]` and call
+   `highRoute.send([lowPeerId], ...)`; the low route already selected C and
+   would not exercise the stale A reference. This makes the existing frozen
+   causal owner explicit without changing scope.
+2. The repair must re-read `#links.get(peerId)` after the existing non-awaited
+   `#linkFor` kick. It must not use or await `#linkFor`'s return, because the
+   acceptor path promotes C synchronously and then returns `undefined`.
+3. Timer and PC acceptance is parity with the fixture's existing promotion
+   baseline, not a bare zero-timer assertion: promotion legitimately retains
+   the committed-decision cleanup timer while clearing replacement admission.
+4. No additional unqualified-pending fixture is added. Promotion already
+   requires an open, current, role-qualified ACK/READY/COMMIT replacement, and
+   the retained failed/unqualified controls remain mandatory.
+5. If the newly selected C is above the unchanged 65,536-byte ceiling, the
+   existing backpressure branch may now own the refusal and counter increment.
+   That is correct accounting for the genuinely selected open target, not a
+   threshold or workload change.
+6. Keep the re-read before the existing open/current/ceiling checks and add no
+   third `#linkFor` call. Promotion itself requires a current connection, so a
+   non-current rebound cannot arise in the frozen row; no `#linkFor` or setup
+   behavior is widened.
+
+Plan-review prompt, Codex result, Opus envelope and resumed Grok envelope
+SHA-256 values are respectively
+`8bb377ad7fc0446c63e42601c94f7bc1e235a46f71febfaa8e78e8bf83263bc1`,
+`47bad9a57a8b19c6a067da2d7852f281d8e92527eb91635a68e3751b2e7de400`,
+`8dd6b86b8f65d6692434b41647854d137964361f6b64514f041a67cb7327269d`
+and
+`fcde8d0d2eff44f8a65c0c5b9d4760df48eebc7b70dc60e254fb4d5d76c4f037`.
+The blocking union is empty; proceed directly to deterministic RED.
