@@ -84975,7 +84975,7 @@ event. The common-owner branch preserves the existing before-equals-after
 overlap behavior; the broader question of selected-owner close-call policy is
 unchanged and outside this tests-only boundary-selection slice.
 
-Run focused GREEN exactly once. Then run standalone strict TypeScript,
+Run focused GREEN exactly once with `D108E4H_TELEMETRY=1`. Then run standalone strict TypeScript,
 exact-owner ESLint, 8 GiB formatter-only Prettier, `git diff --check`, affected
 grid typecheck/build, both exact D108E4G lifecycle titles, both D.108e4ax rows,
 the complete network unit owner, and the frozen retained-seven exact listing/
@@ -85011,6 +85011,30 @@ cite the immutable campaign control sequence above. Because these corrections
 change causal RED construction and executable branch acceptance, one and only
 one confirmation round is required before RED; bookkeeping or prose does not
 permit another round.
+
+The sole confirmation inspected signed/pushed correction
+`d616d41804145aa3b61428e20d128cb64d785402`, tree
+`9778a04b13ca252a75afe1da8ad90687efe4327d`. Grok completed normally after
+`360.121` seconds with approval and no findings; it did not cancel, so no Grok
+resume occurred. Codex encountered a transient capacity failure after
+inspection, resumed exact thread `01a056bf-2b5c-7530-a123-64553977b70e` once,
+and approved with no findings. Opus approved with no P0/P1, two P2
+dispositions and zero subagents. The P2s require no new fixture: GREEN evidence
+retains the explicit telemetry environment, and existing COMMIT-bearing
+candidate coverage composes with the common helper. The blocking union is
+empty and no further plan confirmation is permitted. Initial-review manifest,
+validation and union SHA-256 values are respectively
+`69800b5583648017f83f0216a2c2cdcc2eb26640f41552c9ce4291e7ca64c968`,
+`c6883a147baf000c2fdd846fbe138c9e5c94111c94d54fd81a6aeaa286c22657`
+and
+`c472521420372c7b1a9eb103bdab10dc0202db7f68bf8e763e6cfe9d52622785`.
+Confirmation manifest, validation and union SHA-256 values are respectively
+`d35b30b9e4ef0eb436d3586f6913fc92373bfc91897695a1761daa5c409bb01b`,
+`57bc8e2081ebc39891db7018dab9c36ac071eba655b3d4d02d482e1c4342b04a`
+and
+`5e0b4df6fdbdb623640da7bb4b9f12246b707168442c1d1ea6d71d6bb36f914e`.
+All 17 initial and 18 confirmation entries validate from their respective
+roots. RED is released.
 
 Consumed D.108e4bu reporter, stdout, stderr, failure telemetry,
 endpoint-classifier, trace, cumulative manifest, and manifest-validation
