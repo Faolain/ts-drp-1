@@ -14,6 +14,9 @@ const RELIABLE_SENTINEL_BYTES = 12_000;
 const RELIABLE_OBSERVATION_TAIL_MS = 15_000;
 const TRIAL_COUNT = 3;
 const D108E4BX_RELIABLE_ATTEMPTS = 8;
+// One 10 s product setup expiry + 250 ms retry + observed ~209 ms RTC handshake,
+// with polling and runtime scheduling margin. This is test readiness, not a product SLA.
+const D108E4CK_TRIAL_PREPARE_OPEN_TIMEOUT_MS = 15_000;
 const D108E4BT_DIAGNOSTIC_TRIAL_ID = "e3-03-durable-readiness";
 const D108E4BT_DIAGNOSTIC_INPUT = Object.freeze({
 	intervalMs: 1,
@@ -2330,7 +2333,7 @@ function d108e4btDiagnosticPairReady(
 	);
 }
 
-async function waitForOpenTransportPair(creator: Page, receiver: Page): Promise<void> {
+async function waitForOpenTransportPair(creator: Page, receiver: Page, timeoutMs = 10_000): Promise<void> {
 	await expect
 		.poll(
 			async () => {
@@ -2355,7 +2358,7 @@ async function waitForOpenTransportPair(creator: Page, receiver: Page): Promise<
 					senderRaw: sender.rawTransport.links.length,
 				};
 			},
-			{ timeout: 10_000 }
+			{ timeout: timeoutMs }
 		)
 		.toEqual({
 			remoteAuthenticatedLosses: expect.any(Number),
@@ -10409,7 +10412,7 @@ test("three fixed browser trials prove raw freshness and no head-of-line blockin
 			currentTrialEvidence = trialProgress;
 			stage = trialId + "-prepare";
 			await resetFabricPairSerially(creator, receiver, trialId, initialCreatorNetwork, initialReceiverNetwork);
-			await waitForOpenTransportPair(creator, receiver);
+			await waitForOpenTransportPair(creator, receiver, D108E4CK_TRIAL_PREPARE_OPEN_TIMEOUT_MS);
 			await waitForNetworkPair(creator, receiver, initialCreatorNetwork, initialReceiverNetwork);
 			const clock = await clockEvidence(creator, receiver);
 			updateTrialProgress({ clockSamples: clock.samples, clockSkewMs: clock.maximumSkewMs });

@@ -85838,6 +85838,46 @@ observed roughly 209-ms handshake and polling/scheduling margin, without
 importing private product constants. No executable plan correction or review
 confirmation is required; GREEN is authorized.
 
+D.108e4ck GREEN is complete and remains test-only. The helper retains its
+10-second default; only the immediate post-`resetFabricPairSerially`
+trial-prepare call receives
+`D108E4CK_TRIAL_PREPARE_OPEN_TIMEOUT_MS = 15_000`. The comment derives that
+margin from one unchanged 10-second product setup expiry, the unchanged
+250-ms retry interval, the observed roughly 209-ms RTC handshake, and
+polling/runtime scheduling margin. The product owner is unchanged at SHA-256
+`ec894295605729a6ae1ab2489ef6a9d2db79ce30f0cc728d511639070c10dc87`;
+the GREEN test owner is
+`a0eacef8085d20289e0d48eb4bc626debd279fbead899a51cb66e4377d8e6a27`.
+
+The D.108e4bv reset-schedule title ran once and passed expected/skipped/
+unexpected/flaky `1/0/0/0`, retry zero and zero top-level errors. Its wrapper
+then attempted to assign zsh's read-only `status` parameter after Playwright
+had completed, so no wrapper status is claimed; the reporter and terminal
+stdout independently prove `1 passed (6.5s)`, and the test was not rerun. Both
+D.108e4ax rows passed with 115 unselected tests; the complete network owner
+passed `117/117`. The frozen retained-seven selector listed seven tests in one
+file, excluded the three-trial title, and its sole execution passed
+expected/skipped/unexpected/flaky `7/0/0/0`, retry zero and zero top-level
+errors. The corrected three-trial suffix selector lists exactly one test in
+one file. Two over-anchored read-only listing attempts found zero tests before
+the corrected check; neither executed or consumed an invocation.
+
+Standalone strict TypeScript, exact-owner ESLint and Prettier, grid typecheck
+and build, and `git diff --check` all returned zero. The D.108e4bv, D.108e4ax,
+complete-network and retained-seven reporter SHA-256 values are respectively
+`8adde9b933f5d51b7f44dd9164a578015b08bb50505825a0af379e88332b68be`,
+`f0fcfe78e32ac6850b666319f9b2d44d10e7db067dcd3c4466b7f251146fda5f`,
+`0bf43d75a40b529c8a1ae435a6c9ef5f77c87c3e87046c4ec7b126fe2add287d`
+and
+`f0c160d2d9cc6dcd14935d3d22d0eed8f335ea369ac0508767219d334dbf6850`.
+The 41-entry self-excluding GREEN manifest SHA-256 is
+`a89ffa70f105f3b1b797832c4457e77094db22f68235ee41c457489f39ef90cd`;
+its validation SHA-256 is
+`8ab0c2b17f5c06bd8f7aecc23fc38cb79fda4471cbb210dcbfa1a50799cb5aa9`,
+and every entry validates. All 26 stashes and protected untracked paths remain
+intact. No retained three-trial proof or six-name campaign invocation ran.
+GREEN now proceeds to the sole formal Grok/Codex/Opus implementation review.
+
 ###### D.108e4ce — post-census six-name campaign freeze
 
 D.108e4ce is the high-risk campaign disposition released by the passing
