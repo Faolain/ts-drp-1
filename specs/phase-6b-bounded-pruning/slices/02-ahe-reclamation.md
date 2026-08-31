@@ -26,8 +26,11 @@ The mandatory `AheDurableStore` remains the exact existing 12-key facade:
 
 Current physical facts are:
 
-- memory owns objects, generation rows, global blobs, and promotion evidence in
-  one synchronous `TransitionOwner`;
+- the exported memory facade owns one `TransitionOwner("ephemeral")` and can
+  never promote, complete, adopt, or supersede a generation through its public
+  operations. It is not a D.109c physical-reclamation owner; its behavior and
+  `TransitionOwner` remain byte-identical, while D.109d separately owns live
+  runtime-memory reclamation;
 - Node owns exact `objects`, `generations`, `blobs`, and `promotions` SQLite
   tables in the caller-selected file under WAL/FULL and foreign keys;
 - browser owns the same four AHE stores inside the existing Phase-5e IndexedDB
@@ -41,14 +44,16 @@ Current physical facts are:
 
 There is one shared `@ts-drp/storage/maintenance` owner for the closed request,
 receipt/error types, copying, canonical-generation validation, lineage graph
-classification, and remaining-reference calculation. Memory registers its
-capability through a package-private identity registry. Node and browser each
-add only `./maintenance`, backed by a module-private `WeakMap` keyed by the
-exact facade their existing factory returned. Copies, proxies, structural
-lookalikes, and cross-backend facades resolve to `undefined`. Package roots and
-ordinary factory modules do not re-export maintenance.
+classification, and remaining-reference calculation. It grants no physical
+authority and does not register the honest ephemeral memory facade. Node and
+browser each add only `./maintenance`, backed by a module-private `WeakMap`
+keyed by the exact strict facade their existing factory returned. Copies,
+proxies, structural lookalikes, cross-backend facades, and the memory facade
+resolve to `undefined`. Package roots and ordinary factory modules do not re-
+export maintenance.
 
-Backend transactions remain the only physical mutation owners. No generic
+The two native backend transactions remain the only physical mutation owners.
+No generic
 adapter command, `AheDurableStore` method, public runtime handle, reverse-index
 schema, receipt shadow table, or cross-database transaction is added.
 
@@ -137,19 +142,24 @@ Failures are frozen errors with one of exactly:
 - `AHE_RECLAMATION_SUBSTRATE_FAILURE`: a contained native failure with cause;
   no false success.
 
-No error exposes persisted bytes. Every backend returns asynchronous rejection,
-never a backend-specific synchronous throw.
+No error exposes persisted bytes. Both native backends return asynchronous
+rejection, never a backend-specific synchronous throw. Closed and poisoned
+state precede transaction work, while invalid-argument validation follows the
+existing backend convention and occurs before lifecycle classification; RED
+pins that exact parity on both owners.
 
 ## Transactional algorithm
 
-One memory critical section, SQLite `BEGIN IMMEDIATE`, or strict IndexedDB
-`readwrite` transaction over the four AHE stores performs this exact order:
+One SQLite `BEGIN IMMEDIATE` or strict IndexedDB `readwrite` transaction over
+the four AHE stores performs this exact order:
 
 1. Recheck lifecycle and decode the target object's head. A different valid
    head/revision is retry; malformed persisted head is corruption.
 2. Enumerate and canonically decode every target generation row. Rebuild the
    chain from expected head → active → immediate rollback → second rollback →
-   complete older prefix. Generation IDs are never sorted as chronology.
+   complete older prefix. Generation IDs are never sorted as chronology. Every
+   `present` parent link must also decrement revision by exactly one, matching
+   D.109a's live `cursor.revision === expectedRevision - 1` predicate.
 3. Require active `Adopted`; both rollback rows and every selected prefix row
    `Superseded`; exact head/closure-digest/revision links; canonical nonempty
    digest-sorted closures; and exact equality with the requested active,
@@ -184,11 +194,11 @@ One memory critical section, SQLite `BEGIN IMMEDIATE`, or strict IndexedDB
     rollback closures, normalized floor, no selected rows/promotions, and no
     dangling parent must all hold before commit. Then return the frozen receipt.
 
-No await or externally supplied callback may split the memory critical section.
-Node executes no callback inside the transaction except the package-owned
-test-only crash observer. Browser issues every cursor/request from the one live
-transaction and performs no unrelated asynchronous work that could auto-commit
-it.
+Node executes no callback inside the transaction except a new maintenance-
+scoped package-owned test-only crash observer; it does not widen the existing
+adapter-command checkpoint union. Browser issues every cursor/request from the
+one live transaction and performs no unrelated asynchronous work that could
+auto-commit it.
 
 ## Idempotence and concurrency
 
@@ -200,7 +210,7 @@ it.
   Any mixed present/absent prefix, already-normalized floor with a surviving
   selected row, or absent selected row with the old floor still present is
   corruption, never a guessed replay.
-- A second live handle that changes any selected fact before lock acquisition
+- A second native live handle that changes any selected fact before lock acquisition
   receives retry or observes the committed idempotent state; it cannot combine
   old classification with new writes.
 - Closing or poisoning during admission cannot publish a receipt. A failed
@@ -225,7 +235,26 @@ The exact new RED path roster is:
 8. `packages/storage-browser/tests/assets/phase-6b-ahe-reclamation-worker.ts`
 9. `packages/storage-browser/tests/phase-6b-ahe-reclamation-red.pw.ts`
 
-The focused Vitest selection covers the shared/memory and genuine Node owners;
+The same tests-only RED batch may amend exactly four current live export-census
+owners whose assertions will otherwise be invalidated by the three additive
+`./maintenance` subpaths:
+
+1. `tests/phase-2l-d-parity-governance-red.test.ts`
+2. `tests/phase-3a1b-p2-outbox-publication-contract.test.ts`
+3. `packages/storage-node/tests/phase-2l-c-node-issuance-registry-red.test.ts`
+4. `packages/storage-node/tests/phase-3a1b-p4-node-live-journal-red.test.ts`
+
+Each amended assertion must first recognize the exact D.109b Node/browser
+package surface, then add only `./maintenance` for its owning package. The new
+shared RED owner separately freezes the current `@ts-drp/storage` export map
+before adding its own `./maintenance`. RED controls prove all three current
+surfaces before GREEN; semantic expectations are gated on the corresponding
+missing subpath. Historical already-stale complete-export assertions—including
+storage adapter/capacity, Node SQLite-contract, and browser Phase-2d structural/
+schema files—remain explicit D.109f census debt. They are not silently edited
+or run as D.109c blocking retained gates.
+
+The focused Vitest selection covers the shared contract and genuine Node owner;
 the focused Playwright selection is exactly one file and the frozen Chromium
 tests. Before GREEN, controls pass and semantic bodies skip behind exact
 readiness predicates; failures are only
@@ -236,12 +265,15 @@ fixture, selected-count, top-level, or different-token failure invalidates RED.
 The frozen semantic roster covers:
 
 - exact facade/export census and identity denial for copy/proxy/fake/
-  cross-backend values;
+  cross-backend values, plus proof that the honest ephemeral memory facade has
+  no reclamation capability and its production owner is unchanged;
 - detached closed input, frozen receipt/error, exact error-key/code registry,
-  and lifecycle precedence;
-- genuine five-generation positive control retaining active plus its two
-  immediate ancestors, normalizing only the second rollback, deleting the two
-  older connected rows/promotions, and preserving active/rollback bytes;
+  invalid/lifecycle precedence, and asynchronous-rejection parity on Node and
+  browser;
+- genuine Node and browser five-generation positive controls retaining active
+  plus their two immediate ancestors, normalizing only the second rollback,
+  deleting the two older connected rows/promotions, and preserving active/
+  rollback bytes;
 - empty-prefix success, lost-receipt replay, two-live-handle serialization,
   reopen, and a subsequent genuine creator-adoption commit;
 - stale/different head or revision, active mismatch, insufficient rollback,
@@ -272,18 +304,20 @@ does not run a retained campaign.
 One D.109c GREEN checkpoint uses two diagnostic batches without an intermediate
 commit or model review:
 
-1. **Shared contract and memory owner.** Add the maintenance types, classifier,
-   private registry, `TransitionOwner` mutation, memory test control, exact
-   package subpath, and run the focused shared/memory file once.
+1. **Shared contract and classifier.** Add the maintenance types, copying,
+   classifier, remaining-reference calculation, and exact package subpath;
+   leave `MemoryAheDurableStore` and `TransitionOwner` unchanged, then run the
+   focused shared-contract file once.
 2. **Native owners.** Add Node and browser identity registries, transactions,
-   test-only fault edges, package subpaths, and run the focused Node and browser
-   commands once before the retained suites.
+   separate maintenance-scoped test-only fault edges, package subpaths, and run
+   the focused Node and browser commands once before the retained suites.
 
 If either focused run reports a code/token outside its frozen matrix, stop and
 diagnose rather than folding another concept into the batch. Before final
 review, apply `refactor-clean`: one shared graph classifier, one backend
 transaction per physical owner, no duplicate lineage walker, no compatibility
-wrapper, and no temporary export left behind.
+wrapper, no `TransitionOwner` reclamation mutation, and no temporary export
+left behind.
 
 ## GREEN and retained gates
 
@@ -295,20 +329,39 @@ or top-level error, then run:
 - exact-owner ESLint, Prettier, `git diff --check`, package/root/factory export
   census, schema/version/name source shape, no generic adapter-command growth,
   and changed-path custody;
-- retained storage codecs, memory/state-machine, adapter facade, bounded reads,
-  taxonomy/poison, recovery authority/memory-bound, Node SQLite contract/
-  SIGKILL/lifecycle, browser schema/adapter/recovery/process-death, D.109a
-  planner, and Phase-6a creator adoption/reopen tests;
+- explicitly named retained storage codecs and unchanged memory/state-machine,
+  bounded reads, taxonomy/poison, recovery authority/memory-bound, current Node
+  SQLite semantic/SIGKILL/lifecycle, current browser schema/adapter/recovery/
+  process-death, D.109a planner, and Phase-6a creator adoption/reopen tests;
+  the command ledger must list exact file paths and must not substitute the
+  already-stale complete-export census files deferred above;
 - a self-excluding evidence manifest covering complete reporter JSON, stdout,
   stderr, child/worker observations, commands, hashes, and dispositions;
 - signature, pushed-ref equality, protected paths, 26 stashes, fixed ports,
   and no conflicting ts-drp reviewer/test/profiler process.
 
-The Node file path, four-table DDL, WAL/FULL/foreign-key policy, browser
+The unchanged memory facade/`TransitionOwner`, Node file path, four-table DDL,
+WAL/FULL/foreign-key policy, browser
 database name and version 3, nine-store authority, four AHE key paths, storage
-v1 codecs, D.109a planner result, and both creator parent-presence predicates
-are source pins. Directly affected hashes may change only for the frozen owner
-paths; unrelated source drift stops the slice.
+v1 codecs, D.109a planner result and exact revision-decrement predicate, and
+both creator parent-presence predicates are source pins. Directly affected
+hashes may change only for the frozen owner paths and four authorized live
+export-census tests; unrelated source drift stops the slice.
+
+The initial plan review found and this correction accepts two P1s. First, the
+honest memory facade cannot reach the frozen durable lineage state, so it is no
+longer misrepresented as a positive reclamation owner and no `TransitionOwner`
+mutation is authorized. Second, the four currently-live exact package-export
+censuses above now have explicit tests-only RED/GREEN custody; inherited stale
+complete-export assertions remain D.109f debt rather than surprise D.109c
+gates. The same batch accepts four bounded P2 clarifications: a malformed row
+found by the global scan poisons the whole native owner and D.109d must not
+assume per-object isolation; the D.109a revision-decrement predicate is pinned;
+async rejection plus invalid/closed/poisoned precedence is executable; and Node
+uses a separate maintenance observer rather than widening adapter checkpoints.
+Kimi's digest-metadata observation is accepted as intended auditable receipt
+data, not persisted bytes. These corrections change causal RED acceptance and
+therefore receive the plan's sole permitted confirmation round.
 
 ## Review and stop conditions
 

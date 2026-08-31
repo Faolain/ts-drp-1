@@ -7,8 +7,12 @@ closed. D.109b's signed/pushed GREEN and final-review anchors are respectively
 `529367b154ffd3fb66bf31a6cfedb4a0d9b73746` and
 `2afadbe682261bdb311a5cb64f6f42d86ed7330b`; their plan, RED, GREEN, reviews,
 and evidence are accepted and must not be reopened. Freeze, sign, push, and
-review [D.109c AHE reclamation](slices/02-ahe-reclamation.md), then execute its
-tests-only causal RED before adding any AHE deletion path.
+review [D.109c AHE reclamation](slices/02-ahe-reclamation.md). Its initial plan
+review found two accepted P1 corrections: the ephemeral memory facade is not a
+reclamation owner, and four live export-census tests require explicit tests-
+only custody. Sign/push the corrected plan and run its one permitted
+Grok/Kimi/Opus confirmation, then execute tests-only causal RED before adding
+any AHE deletion path.
 
 Global TODO:
 

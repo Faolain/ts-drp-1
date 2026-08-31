@@ -88219,8 +88219,10 @@ D.109c is frozen in
 `specs/phase-6b-bounded-pruning/slices/02-ahe-reclamation.md` from signed/pushed
 D.109b closure `2afadbe682261bdb311a5cb64f6f42d86ed7330b`. The source audit
 confirms that the ordinary `AheDurableStore` is still the exact 12-key facade;
-memory owns one synchronous `TransitionOwner`; Node owns the unchanged four-
-table SQLite authority under WAL/FULL/foreign keys; and browser owns the same
+the exported memory facade owns an unchanged ephemeral `TransitionOwner` that
+cannot publicly promote, complete, adopt, or supersede and therefore is not a
+D.109c reclamation owner; Node owns the unchanged four-table SQLite authority
+under WAL/FULL/foreign keys; and browser owns the same
 four AHE stores inside its unchanged Phase-5e version-3, nine-store IndexedDB
 authority. Blobs are globally keyed by digest and neither native backend has a
 reverse index. D.109c therefore adds no schema, index, database identity,
@@ -88230,12 +88232,13 @@ handle.
 The only new package surfaces are `@ts-drp/storage/maintenance`,
 `@ts-drp/storage-node/maintenance`, and
 `@ts-drp/storage-browser/maintenance`. Package roots and ordinary factory
-modules remain exact. Module-private identity registries resolve one
-`reclaimClosedEpoch` capability only for the exact memory/Node/browser facade
-created by its owner; copies, proxies, structural fakes, and cross-backend
-facades cannot mint it. One shared storage owner captures the closed D.109a AHE
-subset and classifies the complete lineage/reference graph; each backend alone
-owns its atomic floor rewrite and physical deletion.
+modules remain exact. The shared subpath owns contract/copying/classification
+only and grants no physical authority. Module-private native identity
+registries resolve one `reclaimClosedEpoch` capability only for the exact
+strict Node/browser facade created by its owner; copies, proxies, structural
+fakes, cross-backend facades, and the honest ephemeral memory facade cannot
+mint it. Each native backend alone owns its atomic floor rewrite and physical
+deletion.
 
 The exact input carries object/closed epoch, frozen local-only availability
 digest, expected present head, active identity, ordered immediate two-rollback
@@ -88257,8 +88260,8 @@ malformed native state or impossible partial replay aborts and latches the
 ordinary owner as poisoned; substrate/lifecycle failure cannot publish a
 receipt. All backends reject asynchronously.
 
-In one memory critical section, SQLite `BEGIN IMMEDIATE`, or strict IndexedDB
-transaction over the four AHE stores, the owner rechecks exact head/revision,
+In one SQLite `BEGIN IMMEDIATE` or strict IndexedDB transaction over the four
+AHE stores, the owner rechecks exact head/revision,
 decodes every target generation, follows ancestry rather than random ID order,
 requires active `Adopted` plus its two immediate complete `Superseded`
 ancestors, proves the selected set is the complete connected older prefix,
@@ -88266,8 +88269,9 @@ verifies retained and selected closure/promotion/blob evidence, and rejects
 cycles, gaps, branches, extras, wrong floor/parent, or dangling simulated post-
 state. Global classification permits partial promotion sets for `Staged` and
 `Discarded` rows because discard is legal before completion; only `Complete`,
-`Adopted`, and `Superseded` require complete promotion sets. It then rewrites
-only the second rollback's `baseExpectedHead` to the
+`Adopted`, and `Superseded` require complete promotion sets. Every present link
+also decrements revision by exactly one, matching D.109a's live predicate. It
+then rewrites only the second rollback's `baseExpectedHead` to the
 existing no-head encoding, deletes selected promotions then generations,
 globally decodes every remaining generation and promotion across every object,
 deletes only candidate blobs with no remaining reference, verifies exact row
@@ -88284,21 +88288,29 @@ old XOR complete-new. A subsequent genuine creator-adoption commit must accept
 the normalized graph, closing the demonstrated parent-presence defect rather
 than merely inspecting raw rows.
 
-RED adds only the exact nine test/fixture/config paths frozen in the slice.
+RED adds only the exact nine new test/fixture/config paths frozen in the slice
+plus tests-only amendments to the four named currently-live package export-
+census owners whose exact lists intentionally gain `./maintenance`.
 Controls pass and semantic bodies skip until the three causal readiness tokens
 `D109C_SHARED_MAINTENANCE_MISSING`, `D109C_NODE_MAINTENANCE_MISSING`, and
 `D109C_BROWSER_MAINTENANCE_MISSING`; any other failure invalidates RED.
-The matrix includes identity/surface denial, exact error/receipt shape,
-five-generation positive control, empty/replay/concurrency/reopen/subsequent-
+The matrix includes identity/surface denial including honest-memory refusal,
+exact error/receipt shape and async parity, genuine Node/browser five-
+generation positive controls, empty/replay/concurrency/reopen/subsequent-
 adoption cases, stale/invalid lineage variants, retained corruption, global
 shared-blob/reference scanning, exact count rollback, Node SIGKILL, and
-Chromium worker-termination/IDB-abort cases. D.109a's planner and dangling-
-parent oracle remain green. No campaign runs.
+Chromium worker-termination/IDB-abort cases. Historical already-stale complete-
+export tests remain named D.109f debt and are not silently made D.109c blockers.
+D.109a's planner and dangling-parent oracle remain green. No campaign runs.
 
-GREEN uses one checkpoint with a shared/memory batch followed by a Node/browser
-batch and no intermediate model ceremony. Focused/static/retained gates cover
-storage codecs/state machine/adapter/recovery, native schema/lifecycle/crash,
-D.109a, and Phase-6a creator adoption/reopen behavior. Before final review,
+GREEN uses one checkpoint with a shared contract/classifier batch followed by a
+Node/browser batch and no intermediate model ceremony. The memory facade and
+`TransitionOwner` remain byte-identical. Focused/static/retained gates use
+exact named files covering storage codecs/state machine/recovery, current
+native schema/lifecycle/crash semantics, D.109a, and Phase-6a creator adoption/
+reopen behavior; already-stale broad export assertions are excluded rather than
+relabelled. Node adds a separate maintenance-scoped crash observer without
+widening the existing adapter-command checkpoint union. Before final review,
 `refactor-clean` must confirm one graph classifier, one physical transaction
 per backend, no duplicate lineage walker, no compatibility wrapper, and no
 temporary export.
@@ -88313,3 +88325,56 @@ reslice if safety requires schema/reverse-index, mandatory facade, runtime/
 product API, dependency, threshold, workload, protocol/wire/digest/QC/
 adoption/availability, or cross-database authority changes. D.109d remains
 unopened and D.109c authorizes no retained campaign.
+
+The initial bounded D.109c plan review inspected signed/pushed commit
+`e2c18898033744eb64723ea901a906af3845b112`. Grok 4.6/high exact session
+`01a05a22-53a6-76b2-898c-98c5b877dced` reached a service cancellation after
+540.21 seconds and was honestly classified `NO_VERDICT`, then resumed as that
+same session and returned `CHANGES_REQUIRED` with one P1. Initial event/status
+and resumed-event SHA-256 values are respectively
+`8910eadcad864250401eea23be5f857f48657018300d6e4fcae67559e5740e82`,
+`c31533008255ffb2d12d1482d9a4f0c52b7b3b0e1ee5f985b1bc22a2abd35958`,
+and `5de739e0e55fbe507e3dc6e45d533a91679e84c2d0bf9b55f6bc1255db5f4843`.
+Exact Kimi K3 thinking/high session
+`79e9e849-180f-44ff-905b-3f17f59542ff`, using both 100-step controls,
+returned `APPROVED`, no P0/P1, and `D109C_RED_MAY_START: yes`; raw-stream
+SHA-256 is
+`81b211f21cd263e7367ab24502e83f33e58514076550e9ccc6055983113c2701`.
+Opus xhigh session `c2c70c30-d493-45c9-8578-ba2df5ca9830` returned
+`CHANGES_REQUIRED`, P0=0/P1=1/P2=4, and
+`D109C_RED_MAY_START: no`; result JSON SHA-256 is
+`e1d4cb0b56462edeafceabd39d67e03170cd4dd84dbe651ded110d7054020f09`.
+Kimi, not Codex `gpt-5.6-sol`, occupied the middle external-CLI review slot.
+The 18-entry self-excluding review manifest validates with SHA-256
+`b49d97ec3c90478be7f6b902d6cf932c2759c7da933a0112bca4c2731827e2f6`.
+
+The blocking union has two accepted items. Opus proved that the exported
+memory facade's `TransitionOwner("ephemeral")` rejects promotion and therefore
+cannot publicly reach `Complete`, `Adopted`, or `Superseded`; the original
+memory-positive plan was unreachable. D.109c now leaves the memory facade and
+`TransitionOwner` unchanged, uses the shared package only for contract and pure
+classification, and proves genuine reclamation only through strict Node and
+browser owners. Grok proved that adding `./maintenance` would invalidate four
+currently-live exact Node/browser package-export assertions. The corrected RED
+explicitly owns tests-only updates to those four files while preserving each
+current surface before adding only the intended native subpath; the new shared
+RED owner freezes the current storage package map before its own additive
+subpath. Already-stale storage adapter/capacity, Node SQLite-contract, and
+browser Phase-2d complete-export assertions remain named D.109f debt and are
+not smuggled into this deletion slice.
+
+The nonblocking findings are dispositioned in the same batch. Global-scan
+corruption intentionally poisons the complete native owner; D.109d may not
+assume per-object poison isolation. The shared classifier is pinned to D.109a's
+exact one-step revision decrement as well as the two creator parent-presence
+predicates. RED now explicitly covers native asynchronous rejection and
+invalid/closed/poisoned precedence. Node uses a separate maintenance-scoped
+crash observer rather than widening the closed adapter-command checkpoint
+union. Receipt blob digests are intentional auditable metadata and never blob
+bytes. Memory's lack of a genuine positive is now an explicit unchanged-
+ephemeral control rather than seeded behavior represented as production.
+
+These corrections change causal RED acceptance. Sign/push this one correction
+batch and run exactly one Grok/Kimi/Opus confirmation of the corrected plan.
+Only the resulting P0/P1 union may block D.109c RED; no further confirmation or
+review of bookkeeping prose may recurse.
