@@ -83295,7 +83295,7 @@ D.108e4bs name is reused. Six passes plus the final evidence review release
 D.108e5. No Kimi, Fable or collaboration subagent is authorized.
 
 D.108e4bt plan correction was signed and pushed as
-`ee3a4ae897213703d87e241597449c702316a5cf`. The one deterministic RED listing
+`ee3a4ae89b34f1367f71e5793f421a8d9a505885`. The one deterministic RED listing
 selected exactly two tests in one file and no retained title. The one RED
 execution used `D108E4BT_READINESS_RED=1 pnpm exec playwright test
 --config=playwright.e3-03-loss-and-hol.config.ts --grep 'D\.108e4bt
@@ -83393,3 +83393,39 @@ and
 `23717545f4cd1f03c291bd2c17943e31ee36e9cf854d1de55c44bf3bc3f6a8a9`.
 No campaign invocation ran. Sign and push this GREEN, then run the sole formal
 Grok/Codex-high/Opus-xhigh review before freezing the six fresh campaign names.
+
+The sole formal D.108e4bt GREEN review is closed with an empty blocking union.
+The exact signed/pushed plan, RED, retained-selector disposition and GREEN
+commits are respectively
+`ee3a4ae89b34f1367f71e5793f421a8d9a505885`,
+`f08e5d028a7bfd3bd60c041cae7917051efd71fa`,
+`2de9765520eeb742579919141bff51a507910a20` and
+`49f1bbfdef7c6ea975c397a77ce18e83e1a22473`. Codex
+`gpt-5.6-sol` high and Opus xhigh both returned `APPROVED` with zero P0/P1.
+Grok performed read-only inspection but its service canceled the sole run at
+270.106 seconds before a terminal object; it is preserved honestly as
+`NO_VERDICT` and is not relaunched or continued. Codex result, Opus envelope,
+Grok status, Grok public progress and Grok event-stream SHA-256 values are
+respectively
+`8e081551dc14cd175f055d0b35d8488f7794314675e495a65b68da28e8308c69`,
+`162ce3bf81e5f1de627c389e08d94142b7219f40159130d9027921e322910313`,
+`34429309d64ee49614ecbac476a273501b1fee3c211428e44021c463d71e7a49`,
+`62691f236779cb9a853934533f4c66d240ca2af7f67472eab37d9b6cdcb997ca`
+and
+`400acda6207bc30caf2ff053c78fc57c170402a5f1284fbcb1273f040c02355d`.
+
+Codex's sole P2 corrected the clerical full-SHA suffixes above; the prefixes
+and reviewed commit identities were otherwise unambiguous. Opus's two P2s are
+accepted dispositions, not blockers or reasons for another review. First, the
+static/build commands returned zero but were recorded only in this plan, not
+as hashed stdout/stderr/status files; the fresh campaign freeze will preserve
+those mechanical gates as hashed artifacts. Second, the failure-only
+diagnostic shares the unchanged 300-second title timeout. If a future fresh
+campaign failure ends as a 300-second timeout in stage
+`durable-control-post-failure-diagnostic`, classify it from the reporter and
+retained trace as an infrastructure-bounded artifact, not proof of product
+durable liveness. Do not change the timeout or add instrumentation. The
+passing retained title and retained seven, unchanged first durable operation,
+causal RED, scoped GREEN and validated evidence close D.108e4bt and D.108e4bs.
+The six-fresh-name campaign freeze is released under the already-reviewed
+first-failure launcher machinery.
