@@ -86185,6 +86185,34 @@ was retried, overwritten, renamed, substituted or reused. This signed/pushed
 campaign-evidence checkpoint now proceeds to the one required final
 Grok/Codex/Opus evidence review before D.108e5.
 
+The one final D.108e4cm campaign-evidence review is closed with an empty
+P0/P1 union. Grok 4.6 high independently APPROVED with no findings. Its
+substantive `end_turn` response included progress prose, so the strict wrapper
+honestly recorded NO_VERDICT even though the service did not cancel; exact
+session `01a05806-f09b-7930-bb6a-ae5e569d91ad` was resumed for one tool-free
+schema turn and emitted the identical valid APPROVED object. No replacement
+review ran. Codex `gpt-5.6-sol` high APPROVED with no findings. Opus xhigh
+APPROVED with no P0/P1 and one record-only P2: the effective 300-second test
+timeout is owned by `test.setTimeout(300_000)` while the Playwright
+configuration default is 180 seconds. The frozen source identity and all six
+reporters prove the effective timeout was unchanged, so this provenance note
+does not justify another campaign, threshold change or infrastructure slice.
+
+The Grok, Codex, Opus and review-union SHA-256 values are respectively
+`518b0b59ceb2043be92ad5dca75c8b25486aa60f2402d84903e1267cf7e52c7e`,
+`f74846dcd881d8da964643c9383db63a2a2f061a6c3318bcbac1674da2137488`,
+`b47e02ea75137cc33da8a536b34a724091dff1785f69416f94d6145d46ca2ff8`
+and
+`4603a05f4a1d0712e36fd7124eba34eae7fdfe3390adfc9ddb1f18dae7e0a362`.
+The 21-entry self-excluding review manifest SHA-256 is
+`422ac1525ab72a463fb6dcf88374d6d9b369e87582a87cc37edfdec3e6a3bbf4`;
+its validation SHA-256 is
+`6f130002a43882df0c2c99181ccfe093e6fa00ebe39ca768e081d98f480495cd`,
+and every entry validates. The signed/pushed evidence commit remains
+`f15e1dd7e5707c92d13eaead86743ca72e0d10e5`; the reviewed freeze tag remains
+bound to `37bcf079c462a8980abc7973df80b5301824f415`. D.108e4 is closed. D.108e5 and
+the Phase-6a closure path are released without another D.108e4 invocation.
+
 ###### D.108e4ce — post-census six-name campaign freeze
 
 D.108e4ce is the high-risk campaign disposition released by the passing
