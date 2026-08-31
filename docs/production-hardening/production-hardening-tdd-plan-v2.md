@@ -88378,3 +88378,38 @@ These corrections change causal RED acceptance. Sign/push this one correction
 batch and run exactly one Grok/Kimi/Opus confirmation of the corrected plan.
 Only the resulting P0/P1 union may block D.109c RED; no further confirmation or
 review of bookkeeping prose may recurse.
+
+That sole confirmation inspected signed/pushed correction commit
+`dad2b20279d4d31f942da42691ffdb5745136cc8`. Grok 4.6/high exact session
+`01a05a35-cd51-7171-80e0-7bb017fbe0c0` reached a service cancellation after
+300.376 seconds and was honestly classified `NO_VERDICT`, then resumed as that
+same session and returned `APPROVED`, `P0_P1_UNION: none`, and
+`D109C_RED_MAY_START: yes`. Initial event/status and resumed-event SHA-256
+values are respectively
+`3eee2499c76a4504ca9018fe61e4d4a9d140856a351cc6832dd9dbe0b9b6bc3a`,
+`d0a043c14835b77fe46319b7a5e5172ddd7d3526c310ce8f8d3cc924fa5276e1`,
+and `116fae49fe6a9e366c16e1fda8f9201880c406c76e0011bfab2ca51eb5c650c6`.
+Exact Kimi K3 thinking/high/dual-100 session
+`10f81f3d-7af7-42fc-90da-11ce0c0dfd6b` returned the same approval; raw-stream
+SHA-256 is
+`5ae0687e76fcf6eca2fd820d5b2cabdbdabb1ded855e338fdac78619dfd7a304`.
+Opus xhigh session `689c53a7-150b-41c2-b4bc-18b9689be84e` also returned
+the same approval with `is_error:false` and `stop_reason:end_turn`; result JSON
+SHA-256 is
+`be40255a420c24be9e8c33d9078e6db329037fdf675c4ec49ecd92ecd5d3a31f`.
+Kimi occupied the middle external-CLI slot; no Sol, Fable, collaboration
+subagent, test, build, mutation, or campaign ran.
+The 17-entry self-excluding confirmation manifest validates with SHA-256
+`ae073123da61a52d5d0bd9921b1522627a1db3a7b449ba4c763da0502a4e0d84`.
+
+Opus's three P2s receive deterministic disposition without another review.
+The four live census amendments are explicitly green at RED and add the future
+native key only after its readiness subpath exists. The D.109f debt list now
+also names Phase-3a1b live-journal parity and Phase-4c snapshot-quarantine exact
+maps. The revision rule cites D.109a's positive equality and literal
+inequality/refusal form rather than presenting a nonliteral source quote. None
+changes executable scope beyond the already-confirmed P1 correction.
+
+The corrected-plan P0/P1 union is empty. The D.109c plan gate is closed; seal
+this confirmation evidence, sign/push the closure record, and proceed directly
+to the frozen tests-only RED. No further plan review is authorized.

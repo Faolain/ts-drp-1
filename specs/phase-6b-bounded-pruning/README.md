@@ -10,9 +10,9 @@ and evidence are accepted and must not be reopened. Freeze, sign, push, and
 review [D.109c AHE reclamation](slices/02-ahe-reclamation.md). Its initial plan
 review found two accepted P1 corrections: the ephemeral memory facade is not a
 reclamation owner, and four live export-census tests require explicit tests-
-only custody. Sign/push the corrected plan and run its one permitted
-Grok/Kimi/Opus confirmation, then execute tests-only causal RED before adding
-any AHE deletion path.
+only custody. Corrected-plan confirmation is unanimously approved with an
+empty P0/P1 union. Seal/sign/push that confirmation record, then execute the
+frozen tests-only causal RED before adding any AHE deletion path.
 
 Global TODO:
 

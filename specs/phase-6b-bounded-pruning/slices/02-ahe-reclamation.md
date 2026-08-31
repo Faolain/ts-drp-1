@@ -159,7 +159,8 @@ the four AHE stores performs this exact order:
    chain from expected head → active → immediate rollback → second rollback →
    complete older prefix. Generation IDs are never sorted as chronology. Every
    `present` parent link must also decrement revision by exactly one, matching
-   D.109a's live `cursor.revision === expectedRevision - 1` predicate.
+   D.109a's live positive `parentMatches` equality and its
+   `cursor.revision !== expectedRevision - 1` refusal branch.
 3. Require active `Adopted`; both rollback rows and every selected prefix row
    `Superseded`; exact head/closure-digest/revision links; canonical nonempty
    digest-sorted closures; and exact equality with the requested active,
@@ -249,10 +250,14 @@ package surface, then add only `./maintenance` for its owning package. The new
 shared RED owner separately freezes the current `@ts-drp/storage` export map
 before adding its own `./maintenance`. RED controls prove all three current
 surfaces before GREEN; semantic expectations are gated on the corresponding
-missing subpath. Historical already-stale complete-export assertions—including
-storage adapter/capacity, Node SQLite-contract, and browser Phase-2d structural/
-schema files—remain explicit D.109f census debt. They are not silently edited
-or run as D.109c blocking retained gates.
+missing subpath. Each of the four amendments therefore remains green at RED by
+expecting the exact current list until that package's maintenance subpath
+exists; it must not require the future key unconditionally. Historical already-
+stale complete-export assertions—including storage adapter/capacity, Node
+SQLite-contract, browser Phase-2d structural/schema,
+`tests/phase-3a1b-p4-live-journal-parity-governance-red.test.ts`, and
+`tests/phase-4c-snapshot-quarantine-red.test.ts`—remain explicit D.109f census
+debt. They are not silently edited or run as D.109c blocking retained gates.
 
 The focused Vitest selection covers the shared contract and genuine Node owner;
 the focused Playwright selection is exactly one file and the frozen Chromium
