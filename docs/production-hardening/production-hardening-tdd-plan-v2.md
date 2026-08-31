@@ -82468,3 +82468,31 @@ therefore receives the one permitted confirmation round. The confirmation is
 limited to the corrected committed-pending acceptance, early-COMMIT exact
 error, and unchanged scope; no further confirmation or prose review follows if
 the P0/P1 union is empty.
+
+The one confirmation round is complete with an empty blocking union. Grok and
+Codex returned APPROVED `0/0/0`; Opus returned APPROVED `0/0/1`. Opus's P2
+observes that the unordered RTC channel could physically deliver a COMMIT
+before READY, which product code ignores. The frozen strict ledger rule still
+rejects that ordering, consistently with other product-ignored control frames;
+do not pre-widen it. A future retained capture of pre-READY COMMIT followed by
+READY and its ACK would be the evidence required for a separate narrow
+relaxation. No such capture exists here.
+
+The initial review prompt, resumed Grok envelope, Codex result and Opus
+envelope SHA-256 values are respectively
+`932e48db45803ecb91fcb0986509fb083adf1afeb966550ca42a0e8c88bbc485`,
+`57bcbc85a7e90af223e1d3a1063fd6ffc99e295364f9f4de48aa2c8c08e1966f`,
+`e89f9540410a125b8803f3fd2c9272417fcfa71f4417ab84d8e50aa33272747e`
+and
+`91338b3fb7b196aa90dccddefaeac8a1f0eeb52173b6eae5445f7b562b067434`.
+The confirmation prompt, clean resumed Grok envelope, Codex result and Opus
+envelope SHA-256 values are respectively
+`4c6893392ba1aab294b9dfc7f1c949fc066757342a1f595013c8e3aee45584a3`,
+`f7e22de0ebba29b8f2b6f6cbc9fc1563532db9eaf7a9c4af6f877d7bc502a32e`,
+`47bad9a57a8b19c6a067da2d7852f281d8e92527eb91635a68e3751b2e7de400`
+and
+`e0685a8b8c8f2de9082ce1e1febb5d6cfc52bb4f9048b7ca4b505074b2638e6c`.
+Grok session `01a0556a-483d-7152-b8fa-42d2f6f8e0d2`, Codex session
+`01a0556f-f845-79f0-88cf-7bbf2867a1b3` and Opus session
+`16fc3a9e-b451-4e67-9408-7e8818f4f92e` were continued rather than relaunched.
+The D.108e4bq plan gate is closed; proceed directly to deterministic RED.
