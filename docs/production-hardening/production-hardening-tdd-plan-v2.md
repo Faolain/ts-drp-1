@@ -83293,3 +83293,20 @@ fresh campaign names with the already reviewed launcher machinery and execute
 them sequentially under first-failure rules; no consumed D.108e4br or
 D.108e4bs name is reused. Six passes plus the final evidence review release
 D.108e5. No Kimi, Fable or collaboration subagent is authorized.
+
+D.108e4bt plan correction was signed and pushed as
+`ee3a4ae897213703d87e241597449c702316a5cf`. The one deterministic RED listing
+selected exactly two tests in one file and no retained title. The one RED
+execution used `D108E4BT_READINESS_RED=1 pnpm exec playwright test
+--config=playwright.e3-03-loss-and-hol.config.ts --grep 'D\.108e4bt
+(classifies|admits)' --reporter=json`. It exited 1 with reporter
+expected/skipped/unexpected/flaky `1/0/1/0` and zero top-level errors. The pure
+pair classifier passed. The fixture-validation owner was the sole failure:
+expected `fabric trial is not ready`, received the exact current-source error
+`fabric trial profile differs`. Reporter, empty stderr and runner-status
+SHA-256 values are respectively
+`db7522c9c8bbc35951d103b514e4b363388e59c2c55e4d81f260cb3eaab158f9`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+and
+`4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865`.
+This is the frozen causal RED. It consumed no retained or campaign invocation.

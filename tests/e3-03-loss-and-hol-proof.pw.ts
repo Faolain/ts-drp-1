@@ -13,6 +13,15 @@ const SAMPLE_PAYLOAD_BYTES = 256;
 const RELIABLE_SENTINEL_BYTES = 12_000;
 const RELIABLE_OBSERVATION_TAIL_MS = 15_000;
 const TRIAL_COUNT = 3;
+const D108E4BT_DIAGNOSTIC_TRIAL_ID = "e3-03-durable-readiness";
+const D108E4BT_DIAGNOSTIC_INPUT = Object.freeze({
+	intervalMs: 1,
+	payloadBytes: SAMPLE_PAYLOAD_BYTES,
+	payloadFormat: "e3-03-ascii-v1" as const,
+	reliableSentinelBytes: RELIABLE_SENTINEL_BYTES,
+	sampleCount: 1,
+	trialId: D108E4BT_DIAGNOSTIC_TRIAL_ID,
+});
 
 interface FabricObservation {
 	readonly byteLength: number;
@@ -2082,6 +2091,57 @@ function expectOpenTransport(snapshot: FabricTrialSnapshot, remotePeerId: string
 			readyState: "open",
 		}),
 	]);
+}
+
+function d108e4btDiagnosticPairReady(
+	creator: FabricTrialSnapshot,
+	receiver: FabricTrialSnapshot,
+	creatorPeerId: string,
+	receiverPeerId: string
+): boolean {
+	const hasExactOpenTransport = (snapshot: FabricTrialSnapshot, remotePeerId: string): boolean => {
+		const [link] = snapshot.transport.raw;
+		return (
+			snapshot.transport.fallbackCount === 0 &&
+			snapshot.transport.raw.length === 1 &&
+			link !== undefined &&
+			link.iceRestarts === 0 &&
+			link.maxRetransmits === 0 &&
+			link.ordered === false &&
+			link.peerId === remotePeerId &&
+			link.readyState === "open"
+		);
+	};
+	if (
+		creator.trialId !== D108E4BT_DIAGNOSTIC_TRIAL_ID ||
+		receiver.trialId !== D108E4BT_DIAGNOSTIC_TRIAL_ID ||
+		creator.attempted.raw !== 1 ||
+		creator.attempted.reliable !== 1 ||
+		receiver.attempted.raw !== 0 ||
+		receiver.attempted.reliable !== 0 ||
+		!hasExactOpenTransport(creator, receiverPeerId) ||
+		!hasExactOpenTransport(receiver, creatorPeerId)
+	) {
+		return false;
+	}
+	const reliable = receiver.observations.filter(({ lane }) => lane === "reliable");
+	if (reliable.length !== 2) return false;
+	const sample = reliable.find(({ sentinel }) => !sentinel);
+	const sentinel = reliable.find(({ sentinel: selected }) => selected);
+	return (
+		sample !== undefined &&
+		sample.byteLength === SAMPLE_PAYLOAD_BYTES &&
+		sample.sequence === 0 &&
+		Number.isSafeInteger(sample.sentAtMs) &&
+		Number.isSafeInteger(sample.receivedAtMs) &&
+		sample.receivedAtMs >= sample.sentAtMs &&
+		sentinel !== undefined &&
+		sentinel.byteLength === RELIABLE_SENTINEL_BYTES &&
+		sentinel.sequence === 1 &&
+		Number.isSafeInteger(sentinel.sentAtMs) &&
+		Number.isSafeInteger(sentinel.receivedAtMs) &&
+		sentinel.receivedAtMs >= sentinel.sentAtMs
+	);
 }
 
 async function waitForOpenTransportPair(creator: Page, receiver: Page): Promise<void> {
@@ -7920,6 +7980,169 @@ if (process.env["D108E4H_TELEMETRY"] === "1") {
 		expect(() => d108e4arFinalizeRunReturnCustody(d108e4arFinalBase, d108e4arInvalidSender)).toThrowError(
 			"D108E4AR_FINAL_RUN_RETURN_CUSTODY_INVALID"
 		);
+	});
+}
+
+test("D.108e4bt classifies only the exact post-failure diagnostic pair", () => {
+	const creatorPeerId = "12D3KooWcreator";
+	const receiverPeerId = "12D3KooWreceiver";
+	const transport = (peerId: string): FabricTransportEvidence =>
+		Object.freeze({
+			fallbackCount: 0,
+			raw: Object.freeze([
+				Object.freeze({
+					connectionId: `connection-${peerId}`,
+					generation: 1,
+					iceRestarts: 0,
+					maxRetransmits: 0,
+					ordered: false,
+					peerId,
+					remoteAddr: "/ip4/127.0.0.1/udp/51000/webrtc-direct",
+					readyState: "open",
+				}),
+			]),
+		});
+	const observation = (
+		lane: FabricObservation["lane"],
+		sequence: number,
+		sentinel: boolean,
+		byteLength: number
+	): FabricObservation =>
+		Object.freeze({
+			byteLength,
+			lane,
+			receivedAtMs: 1_001 + sequence,
+			sentAtMs: 1_000 + sequence,
+			sequence,
+			sentinel,
+		});
+	const raw = observation("raw", 0, false, SAMPLE_PAYLOAD_BYTES);
+	const sample = observation("reliable", 0, false, SAMPLE_PAYLOAD_BYTES);
+	const sentinel = observation("reliable", 1, true, RELIABLE_SENTINEL_BYTES);
+	const creator: FabricTrialSnapshot = Object.freeze({
+		attempted: Object.freeze({ raw: 1, reliable: 1 }),
+		observations: Object.freeze([]),
+		transport: transport(receiverPeerId),
+		trialId: D108E4BT_DIAGNOSTIC_TRIAL_ID,
+	});
+	const receiver: FabricTrialSnapshot = Object.freeze({
+		attempted: Object.freeze({ raw: 0, reliable: 0 }),
+		observations: Object.freeze([raw, sample, sentinel]),
+		transport: transport(creatorPeerId),
+		trialId: D108E4BT_DIAGNOSTIC_TRIAL_ID,
+	});
+	const replace = (
+		snapshot: FabricTrialSnapshot,
+		change: Readonly<Partial<FabricTrialSnapshot>>
+	): FabricTrialSnapshot => Object.freeze({ ...snapshot, ...change });
+	const cases: readonly Readonly<{
+		readonly creator: FabricTrialSnapshot;
+		readonly expected: boolean;
+		readonly name: string;
+		readonly receiver: FabricTrialSnapshot;
+	}>[] = Object.freeze([
+		Object.freeze({ creator, expected: true, name: "exact pair with incidental raw row", receiver }),
+		Object.freeze({ creator: receiver, expected: false, name: "crossed endpoint roles", receiver: creator }),
+		Object.freeze({
+			creator: replace(creator, { trialId: "e3-03-wrong-trial" }),
+			expected: false,
+			name: "wrong trial",
+			receiver,
+		}),
+		Object.freeze({
+			creator,
+			expected: false,
+			name: "wrong peer",
+			receiver: replace(receiver, { transport: transport("12D3KooWthird") }),
+		}),
+		Object.freeze({
+			creator: replace(creator, { attempted: Object.freeze({ raw: 0, reliable: 1 }) }),
+			expected: false,
+			name: "wrong creator attempted counts",
+			receiver,
+		}),
+		Object.freeze({
+			creator,
+			expected: false,
+			name: "wrong receiver attempted counts",
+			receiver: replace(receiver, { attempted: Object.freeze({ raw: 1, reliable: 1 }) }),
+		}),
+		Object.freeze({
+			creator,
+			expected: false,
+			name: "raw only",
+			receiver: replace(receiver, { observations: Object.freeze([raw]) }),
+		}),
+		Object.freeze({
+			creator,
+			expected: false,
+			name: "sentinel only",
+			receiver: replace(receiver, { observations: Object.freeze([raw, sentinel]) }),
+		}),
+		Object.freeze({
+			creator,
+			expected: false,
+			name: "wrong sequence",
+			receiver: replace(receiver, {
+				observations: Object.freeze([raw, Object.freeze({ ...sample, sequence: 2 }), sentinel]),
+			}),
+		}),
+		Object.freeze({
+			creator,
+			expected: false,
+			name: "duplicate reliable sample",
+			receiver: replace(receiver, { observations: Object.freeze([raw, sample, sample, sentinel]) }),
+		}),
+		Object.freeze({
+			creator,
+			expected: false,
+			name: "duplicate reliable sentinel",
+			receiver: replace(receiver, { observations: Object.freeze([raw, sample, sentinel, sentinel]) }),
+		}),
+		Object.freeze({
+			creator,
+			expected: false,
+			name: "missing open transport",
+			receiver: replace(receiver, {
+				transport: Object.freeze({ fallbackCount: 0, raw: Object.freeze([]) }),
+			}),
+		}),
+		Object.freeze({
+			creator,
+			expected: false,
+			name: "divergent open transport",
+			receiver: replace(receiver, {
+				transport: Object.freeze({
+					fallbackCount: 0,
+					raw: Object.freeze([...transport(creatorPeerId).raw, ...transport(creatorPeerId).raw]),
+				}),
+			}),
+		}),
+	]);
+	for (const selected of cases) {
+		expect
+			.soft(
+				d108e4btDiagnosticPairReady(selected.creator, selected.receiver, creatorPeerId, receiverPeerId),
+				selected.name
+			)
+			.toBe(selected.expected);
+	}
+});
+
+if (process.env["D108E4BT_READINESS_RED"] === "1") {
+	test("D.108e4bt admits only the fixed post-failure diagnostic profile", async ({ page }) => {
+		await openGrid(page);
+		const message = await page.evaluate(async (input) => {
+			const fabric = window.__TS_DRP_V3_ZONE__?.fabric;
+			if (fabric === undefined) throw new Error("E303_FABRIC_WORKBENCH_ABSENT");
+			try {
+				await fabric.runTrial(input);
+				return "resolved";
+			} catch (error) {
+				return error instanceof Error ? error.message : String(error);
+			}
+		}, D108E4BT_DIAGNOSTIC_INPUT);
+		expect(message).toBe("fabric trial is not ready");
 	});
 }
 
