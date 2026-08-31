@@ -86141,6 +86141,50 @@ and every entry validates. No campaign name was consumed during review. A
 signed/pushed closure and reviewed tag now release the six literal commands
 above under the already-granted durable authorization and first-failure rule.
 
+All six D.108e4cm invocations ran exactly once in frozen order and passed.
+Their UTC intervals were `13:09:16Z–13:11:59Z`,
+`13:12:56Z–13:15:38Z`, `13:16:36Z–13:19:31Z`,
+`13:20:31Z–13:23:29Z`, `13:24:31Z–13:27:28Z` and
+`13:28:23Z–13:31:10Z` on 2026-08-31. Reporter durations were respectively
+`162095.796`, `162098.826`, `174283.412`, `176919.913`, `176106.224` and
+`166008.226` ms. Every invocation has direct/finalizer status `0/0`, reporter
+expected/skipped/unexpected/flaky `1/0/0/0`, one passed result, retry zero,
+zero result and top-level errors, one success attachment, one calibration
+attachment, zero failure attachments, exactly three metric and observation
+rows, exact trial IDs `e3-03-0/1/2`, and valid endpoint-local classification.
+
+Aggregate evidence is six expected results, eighteen completed trials,
+eighteen metric rows, eighteen observation rows, six success and six
+calibration attachments, and zero skipped/unexpected/flaky/errors/failure
+attachments. The six reporter SHA-256 values in order are
+`9931a9759b841f56b832e4cb408cc7d4969b402e07832493003888c9cf09559e`,
+`7a91c880d2fecb19bde7ee852bb9180d87130558ddd9a8dd5153b79ca9db62d3`,
+`c6426c3b8dc9db177ad2753f9413220b7bfb93e412c675ea3823f902eb93d9c3`,
+`707b456c32c5475bfe00923d8a038caac70acedd4631eaafc30f04307ec97a95`,
+`7540491155fa98a6888418b461cb5f28a75c28edf705ed52ef729683f62abc2d`
+and
+`2aa3eac3c650b8f31f263361d823d0196cd273dc7da9eab7e04fe3075eabaf23`.
+
+The finalizer's 357-entry cumulative manifest SHA-256 is
+`c07a1ec4911a6ef298d951024d8cdd4f9cbc5c53a4729a9e90ee68d8dd0bcac8`
+and validates with status zero. The outer 365-entry complete campaign
+manifest, including all final runner statuses, has SHA-256
+`d0a062b7bd0bc51b67f493ce9be135791181bc601fa5db91241ca601ae4d60e5`;
+its validation SHA-256 is
+`2b90d4ebf955765eda494bb8e78f9ef06918d0432df39e0f16766bc5f5535da3`.
+The exact aggregate audit SHA-256 is
+`f8cc156df27dd9cd9b498e2a32a30bcf64f27a9373af8cd5191cb3144199cb52`.
+The five-entry self-excluding audit manifest SHA-256 is
+`bd97e1d860bb9c806067aab5c63816701813c42d06db736edbaf4c96dcd2fdb7`;
+its validation SHA-256 is
+`49337b680984f001a56882d70fab943f1381baabd94c68e661f53163d78369aa`,
+and every entry validates. Signed HEAD, pushed ref and reviewed tag remained
+identical; the isolated checkout remained clean at exact GREEN/tree; all four
+ports cleared; 26 stashes and protected paths remain intact. No invocation
+was retried, overwritten, renamed, substituted or reused. This signed/pushed
+campaign-evidence checkpoint now proceeds to the one required final
+Grok/Codex/Opus evidence review before D.108e5.
+
 ###### D.108e4ce — post-census six-name campaign freeze
 
 D.108e4ce is the high-risk campaign disposition released by the passing
