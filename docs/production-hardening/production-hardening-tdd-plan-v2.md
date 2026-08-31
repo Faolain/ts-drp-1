@@ -82259,3 +82259,97 @@ reviewer/test/profiler predicates remain preserved. No browser or campaign was
 run. Sign and push GREEN before the single formal Grok/Codex-high/Opus-xhigh
 review; only an empty final P0/P1 union may release one different fresh
 retained-browser name.
+
+The single final D.108e4bp implementation review is closed with an empty
+P0/P1 union. Codex `gpt-5.6-sol` high returned `APPROVED`, P0=0/P1=0/P2=0.
+Opus xhigh returned `APPROVED`, P0=0/P1=0/P2=2. Grok 4.6 high completed its
+inspection and emitted `APPROVED`, P0=0/P1=0/P2=0 after progress prose; the
+strict wrapper classified that envelope as `NO_VERDICT`, so the same saved
+session `01a05554-77ae-7123-bf47-fbf2be310c76` was continued for one
+formatting-only turn and re-emitted the unchanged verdict as strict structured
+output. All three reviewers independently marked RED causal, GREEN as closing
+RED, scope preserved, gates supported, the blocking union empty and one fresh
+retained validation justified.
+
+Opus's two P2 observations are nonblocking and require no signed-test or source
+change:
+
+1. The bp row's bare exact error token does not carry the adjacent bo row's
+   JSON diagnostics. Preserve it because the frozen causal contract requires
+   that exact complete token and the signed RED/GREEN reporters already isolate
+   the row. Richer diagnostics may be added only if a future authorized slice
+   already changes this owner.
+2. The post-rebind current-connection kick uses the pre-branch `connection`
+   capture only as a presence guard while freshly evaluating
+   `#isCurrent(link.connection)`. The promotion path already requires C to be
+   current, and signaling identity cannot change synchronously inside this
+   rebind path. Re-reading it adds no correctness and is not part of this seam.
+
+Final-review prompt, Codex result, Opus envelope and resumed Grok envelope
+SHA-256 values are respectively
+`82b49e5335d7a059bf6d5269f12ba992850331102b58bb0a7c0aa7875907732b`,
+`18b10cee954278143643d37df49ad8cd90caf5f4119fe99aabe19f8573cf5774`,
+`3da9cf223c3adcc754f998cb670f9650c9c0db2b063f2690341965cc51ea04ba`
+and
+`0ae22c8189e9790ad8a9fad94b35d9b099d95fb084c791900629f8baa71fd2d4`.
+D.108e4bp GREEN is closed.
+
+##### D.108e4bp one-name retained-browser disposition
+
+The empty final blocking union and standing authorization for narrow retained
+validation release exactly one different fresh write-once root,
+`.logs/d108e4bp-retained-browser-1/`. Pin product source to signed/pushed GREEN
+`3f2bfa96fb829b71aa7242fb10d3c7de68397d31`; the plan-only disposition commit
+that contains this literal block must itself be signed, pushed and current
+before consumption. The GREEN tree is
+`59cc4032e971b8938fdc0d2caf88e132ede72345`. Source, retained test,
+Playwright configuration, lockfile, root manifest, relay configuration and
+replacement-relay configuration SHA-256 values are respectively
+`b4a3f61ae439a85bfe9236f0b02257cce014056eb633e57acf689107008358df`,
+`ec3c9cb4ae8a1e0fa6d08f2a5a4e5ec9f8a57b0f772c95109c62cd1904558f8b`,
+`1826318a19d5676631f6350fa21d2eb1125dbc1d83ecce69d7f776885bdd7978`,
+`73c7c0660fa32c7380d0fe5a026897a7ad85a40edf1f169730c2d8e44e613a99`,
+`6ca5cc4a47f6e807cb653fa29a43839d497613f2ba363608c894392c6ccb084d`,
+`2a2b8e5c8a642fff7c60de5921834da20627513abe16219e80b011464d41269c`
+and
+`2609d0bb60b4d1411c8f54d714738768a9bed6fb2d784dcb8edd54b2ef25be84`.
+Runtime identity remains Node `v22.15.0`, pnpm `10.24.0` and Playwright
+`1.62.1`.
+
+Preserve the exact retained title, one Chromium project, three in-test trials,
+retries=0, fixed ports, workload, thresholds and 600-second process-group
+watchdog. Before consumption, require the fresh root to be absent; signed HEAD
+to equal the pushed branch; the product/config/package hashes above to match;
+the selector to list exactly one test in one file; protected paths and 26
+stashes to remain; no ts-drp reviewer/test/profiler to be active; and ports
+4174/4175/51000/51002 to be clear. The root is consumed on pass, failure or
+watchdog and is never retried, overwritten, substituted or reused. Any nonzero
+runner status stops further retained or campaign execution for diagnosis.
+
+After signing and pushing this plan-only freeze, execute exactly this literal
+block once from the repository root:
+
+```sh
+run_root="$PWD/.logs/d108e4bp-retained-browser-1"
+test ! -e "$run_root"
+mkdir -m 700 "$run_root"
+date -u '+%Y-%m-%dT%H:%M:%SZ' >"$run_root/started-at.txt"
+set +e
+D108E4H_TELEMETRY=1 D108E4G_TELEMETRY=1 \
+  PLAYWRIGHT_JSON_OUTPUT_NAME="$run_root/reporter.json" \
+  /usr/bin/perl -MPOSIX=setpgid -e 'my $limit=shift @ARGV; my $pid=fork(); die "fork failed" unless defined $pid; if($pid==0){setpgid(0,0); exec @ARGV; exit 127} $SIG{ALRM}=sub { kill "TERM", -$pid; select undef,undef,undef,5; kill "KILL", -$pid; waitpid($pid,0); exit 124 }; alarm $limit; waitpid($pid,0); alarm 0; exit($? == -1 ? 125 : ($? & 127) ? 128 + ($? & 127) : $? >> 8)' \
+  600 /bin/zsh -c 'pnpm exec playwright test --config playwright.e3-03-loss-and-hol.config.ts --grep "three fixed browser trials prove raw freshness and no head-of-line blocking under 30% loss$" --reporter=json --fail-on-flaky-tests --output="$1/test-results"; playwright_status=$?; printf "%s\n" "$playwright_status" >"$1/playwright.status"; exit "$playwright_status"' \
+  _ "$run_root" >"$run_root/stdout.log" 2>"$run_root/stderr.log"
+runner_status=$?
+set -e
+printf '%s\n' "$runner_status" >"$run_root/runner.status"
+date -u '+%Y-%m-%dT%H:%M:%SZ' >"$run_root/finished-at.txt"
+exit "$runner_status"
+```
+
+This is the one fresh validation justified by the final implementation review,
+not a campaign invocation or retry of the consumed bo name. No additional
+review is authorized for this plan-only name/capture freeze. A pass may be
+dispositioned toward the already authorized six-name retained campaign; a
+failure remains first-failure evidence and must be diagnosed before any other
+browser or campaign run.
