@@ -12,8 +12,10 @@ evidence are accepted and must not be reopened. The bounded
 plan corrects the earlier false `@ts-drp/object` ownership assumption and is
 the active plan-review checkpoint. Its first review found material receipt
 coverage, replay, precedence, hot-link, and creator-close owner gaps. The one
-batched correction is awaiting its single permitted confirmation; do not begin
-the deterministic causal RED until that signed/pushed gate closes.
+confirmation found one additional narrow replay-latch omission: stable
+issuance `observedLineage` and AHE `reclaimedGenerationIds` prefix authority.
+That exact correction and its deterministic audit must be signed/pushed before
+the deterministic causal RED begins; no further plan-review round is opened.
 
 Global TODO:
 

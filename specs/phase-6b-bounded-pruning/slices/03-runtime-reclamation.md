@@ -119,13 +119,17 @@ authority.
 
 Before the first release write, the owner freezes one bounded replay latch from
 the authority-bearing fields: object/closed/successor epochs, issuance scope,
-exact closed-epoch ordinal boundary, snapshot-manifest digest, commit-QC ref,
-adopted head, active generation, rollback/floor identities, and availability
-policy. D.109b's `deletedAuthorSequenceRange` and D.109c's deletion lists,
-counts, and `normalizedThisCall` flag are outcome fields, so their genuine
-first-call versus lost-receipt-replay forms do not alter latch identity. After
-release, replay requires the same current successor plus an exact latch match;
-any changed authority field is `D109D_RECEIPT_MISMATCH`.
+exact closed-epoch ordinal boundary, issuance `observedLineage`,
+snapshot-manifest digest, commit-QC ref, adopted head, active generation,
+exact `reclaimedGenerationIds` prefix, rollback/floor identities, and
+availability policy. D.109b's `deletedAuthorSequenceRange` and only D.109c's
+physical deletion-result fields (`deletedBlobDigests`, `deletedGenerationIds`,
+`deletedPromotionCount`, and `floor.normalizedThisCall`) are outcome fields, so
+their genuine first-call versus lost-receipt-replay forms do not alter latch
+identity. `observedLineage` and `reclaimedGenerationIds` are never classified
+as outcome fields. After release, replay requires the same current successor
+plus an exact latch match; any changed authority field is
+`D109D_RECEIPT_MISMATCH`.
 
 ### Serialized make-then-release
 
@@ -200,7 +204,9 @@ Freeze these matrices before implementation:
   partial-prefix receipt below the authenticated displaced ordinal boundary;
 - fake, predecessor, inactive, foreign and snapshot-closed handles;
 - hot and cold positive controls, first-call/lost-receipt replay equivalence,
-  changed-authority post-success refusal, and replay without displaced payload;
+  post-success `observedLineage` and `reclaimedGenerationIds` authority
+  mutations, other changed-authority post-success refusal, and replay without
+  displaced payload;
 - a queued-operation ordering control proving reclamation waits behind existing
   successor work and the retired predecessor gate, and that later live work
   sees only the post-state;

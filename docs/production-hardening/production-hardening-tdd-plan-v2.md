@@ -88588,8 +88588,10 @@ The frozen refusal vocabulary is `D109D_INVALID_ARGUMENT`,
 every refusal. The exact RED owners are
 `tests/fixtures/phase-6b/runtime-reclamation-contract.ts` and
 `tests/phase-6b-runtime-reclamation-red.test.ts`; the prospective production
-owners are only `packages/node/src/internal/runtime-reclamation.ts` and
-`packages/node/src/v3-live.ts`. A required edit to creator activation,
+owners are exactly `packages/node/src/internal/runtime-reclamation.ts`,
+`packages/node/src/v3-live.ts`, and the narrowly demonstrated private
+creator-close release owner in `packages/node/src/creator-close.ts`. A
+required edit to creator activation,
 `@ts-drp/object`, a public surface, durable store/schema, live-journal deletion,
 dependency, threshold, or protocol authority stops this slice for a reviewed
 reslice rather than widening GREEN silently. The inherited stale
@@ -88663,3 +88665,45 @@ Confirmation must return an empty P0/P1 union before RED. It does not reopen
 D.109a/b/c or Phase 6a, authorize a campaign, or permit a public API,
 dependency, threshold, schema, journal-deletion, protocol/wire/digest/QC/
 adoption/availability, scheduler, legacy-object, or finality change.
+
+#### D.109d confirmation finding and bounded correction
+
+The single permitted confirmation inspected signed/pushed correction
+`627483163cfb8693f7a2ec9376d089d347577ae9`. Grok 4.6/high and Opus xhigh
+returned `APPROVED`, an empty P0/P1 union, and `D109D_RED_READY: yes`.
+Standard Kimi CLI 0.39.1 ran K3 thinking/high under the exact 100-step cap and
+returned `CHANGES_REQUIRED`: the replay latch omitted stable issuance-lineage
+and reclaimed-prefix authority. This is accepted as one material P1; the other
+reviewers' approvals are preserved honestly and are not claimed to cover this
+later correction.
+
+The correction is exact and does not widen the slice. The frozen replay latch
+now includes D.109b `observedLineage` and D.109c
+`reclaimedGenerationIds`. Only D.109b `deletedAuthorSequenceRange` and D.109c
+physical deletion-result fields (`deletedBlobDigests`,
+`deletedGenerationIds`, `deletedPromotionCount`, and
+`floor.normalizedThisCall`) may differ between a genuine first execution and a
+lost-receipt replay. RED adds explicit post-success mutations for
+`observedLineage` and `reclaimedGenerationIds`, each requiring
+`D109D_RECEIPT_MISMATCH`. The stale earlier two-owner summary is also corrected
+to name the already accepted private `creator-close.ts` release owner.
+
+No second confirmation round is opened: the one permitted confirmation is
+complete, and this field-classification correction is closed by deterministic
+source/text audit before RED. It changes no product path, API, durable receipt,
+wire/digest/QC/adoption/availability authority, dependency, threshold,
+scheduler, campaign, or prior immutable evidence.
+
+The complete confirmation evidence is rooted at
+`.logs/phase-6b-d109d-plan-confirmation/`; its validating self-excluding
+manifest SHA-256 is
+`e3007c668e69bf609e7c5ef22fb0e5b9f92e72036f560bf98a950688bc4d639e`.
+The deterministic audit passed after correcting two read-only diagnostic
+mistakes: the AHE receipt's enclosing `Readonly` makes a redundant property
+`readonly` literal false, and zsh reserves `path` as its command-search array,
+so the protected-path loop now uses `protected_entry`. Neither diagnostic
+failure was a source or plan failure. The corrected audit proved the two
+stable authority fields, exact outcome-field roster, three production owners,
+all three terminal review results, zero Kimi subagents, documentation-only
+tracked diff, formatting/diff status, 26 preserved stashes, and all protected
+untracked paths.
