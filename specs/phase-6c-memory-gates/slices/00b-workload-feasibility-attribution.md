@@ -133,6 +133,11 @@ percent of the reviewed six-hour watchdog. Otherwise D.110a remains paused
 even if the preflight exits zero. This is an invocation-safety predicate, not a
 new product or memory-performance contract.
 
+D.110a-w's sole later preflight exited zero with exact semantics at 585.233
+seconds, so it correctly stopped under that predicate. D.110a-x prospectively
+owns the resulting variance correction; this historical slice neither retries
+nor reinterprets the consumed invocation.
+
 ## Review and closure
 
 Because this slice handles timing feasibility adjacent to a scarce consuming

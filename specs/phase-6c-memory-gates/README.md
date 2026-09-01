@@ -43,15 +43,16 @@ no owner met the unchanged dominance rule; canonical was largest at about
 product or memory defect. The serial 4.4875-hour 64-object value is a
 projection, not a measured full run.
 
-The next executable work is
-[D.110a-w retained-heap watchdog feasibility correction](slices/00e-watchdog-feasibility-correction.md).
-The existing evidence rules out a narrow product optimization: creator-close
-alone would need a greater-than-5.14-times phase-wide speedup, while no owner
-reaches 50 percent. D.110a-w therefore reviews a tests-only preflight timeout
-of 15 minutes and full-worker watchdog of six hours, preserving every workload,
-memory, semantic, and measurement contract. No child or reserved execution is
-authorized until its reviewed GREEN releases it. Do not invoke Fable or
-collaboration subagents.
+D.110a-w is implemented and its sole two-object preflight is consumed. That
+preflight passed every semantic and accounting check with status zero but took
+585.233 seconds, exceeding the frozen 540-second release predicate. The full
+worker remains unspent. The next executable work is
+[D.110a-x retained-heap preflight variance correction](slices/00f-preflight-variance-correction.md).
+It prospectively raises only the tests-only full watchdog to seven hours and
+the matching 80-percent-headroom release bound to 630 seconds. It reuses the
+immutable successful preflight evidence without retry and preserves every
+workload, memory, semantic, and measurement contract. No product defect has
+been demonstrated. Do not invoke Fable or collaboration subagents.
 
 Global TODO:
 
@@ -59,7 +60,9 @@ Global TODO:
 - [x] D.110a-p paginate creator durable replay across the public 128-row page seam.
 - [x] D.110a-t/u produce and validate one exact one-object attribution profile.
 - [x] D.110a-v disposition the full lifecycle without another capture.
-- [ ] D.110a-w correct the tests-only watchdog feasibility contract.
+- [x] D.110a-w correct the tests-only watchdog feasibility contract and record
+      its consumed preflight result.
+- [ ] D.110a-x correct the demonstrated preflight variance bound without retry.
 - [ ] D.110a genuine million-operation retained-heap hard gate.
 - [ ] D.110b CI memory-trend fail-closed backstop.
 
@@ -175,16 +178,16 @@ motivation, not silently converted into a binary-megabyte contract. D.110a
 records the fresh-process baseline and every raw sample, but does not subtract
 baseline from the absolute ceiling.
 
-D.110a-w prospectively supersedes the original 45-minute parent watchdog with
-a six-hour local parent watchdog and the five-minute preflight timeout with 15
-minutes. Timeout remains a consuming failure, not permission to rerun or weaken
-the workload. A GitHub-hosted Actions job is capped at six hours, so D.110b must
-separately review a runner whose limit exceeds the child plus setup and evidence
-upload, such as a provisioned self-hosted runner; it may not silently shorten
-the D.110a contract to fit the current hosted workflow. One non-verdict
-two-object preflight validates the identical resolver, catalog, lifecycle, GC,
-schema, and teardown path before the sole consuming full worker; it cannot tune
-or reinterpret a threshold.
+D.110a-w superseded the original 45-minute parent watchdog with a six-hour
+local parent watchdog and the five-minute preflight timeout with 15 minutes.
+Its single successful 585.233-second preflight then demonstrated that the
+separate 540-second release predicate did not preserve its intended variance
+margin. D.110a-x prospectively uses the smallest whole-hour watchdog that
+retains 20-percent headroom over that immutable observation: seven hours, with
+a matching 630-second two-object release bound. Timeout remains a consuming
+failure, not permission to rerun or weaken the workload. D.110b must separately
+review a runner whose limit exceeds seven hours plus setup and evidence upload;
+it may not silently shorten D.110a to fit a hosted runner.
 
 ## Slice graph
 
@@ -201,11 +204,14 @@ or reinterpret a threshold.
 4. [D.110a-w watchdog feasibility correction](slices/00e-watchdog-feasibility-correction.md)
    raises only the tests-only preflight/full parent timers to evidence-backed
    15-minute/six-hour values under high-risk review.
-5. [D.110a retained-heap hard gate](slices/00-retained-heap-gate.md) adds the
+5. [D.110a-x preflight variance correction](slices/00f-preflight-variance-correction.md)
+   dispositions the one consumed semantic-pass/timing-release-fail preflight
+   and prospectively raises only the tests-only full timer and release bound.
+6. [D.110a retained-heap hard gate](slices/00-retained-heap-gate.md) adds the
    fresh-process worker, exact workload/digest assertions, slope arithmetic,
    hard limits, and mutation-sensitive focused test. Its own implementation
    remains tests/build infrastructure; it depends on D.110a-p.
-6. D.110b runs the accepted D.110a hard command from CI and changes the existing
+7. D.110b runs the accepted D.110a hard command from CI and changes the existing
    benchmark comparison to `fail-on-alert: true` as a separate trend backstop.
    It reviews timeout, cadence, cache-absence, and failure-reporting behavior
    without changing D.110a's workload or thresholds. Historical trend cache is

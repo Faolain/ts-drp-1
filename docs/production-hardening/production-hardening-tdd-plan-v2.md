@@ -90980,3 +90980,69 @@ preflight, then only on its complete normal pass with exact two-object/two-
 lifecycle accounting and total wrapper elapsed at most 540 seconds, the sole
 fresh 64-object full worker. Neither execution may be retried. Both roots
 remain absent at this review closure point.
+
+##### D.110a-w consumed preflight result and mandatory stop
+
+The sole write-once two-object preflight ran from signed/pushed source
+`fdc75dcc2ac689a04ecd12d0acd90e2d8de78dd4`, tree
+`6ae24c8971d893a1a97acac89e22a2a01ec7e89c`, from
+`2026-09-01T19:30:57Z` through `2026-09-01T19:40:43Z`. The child and wrapper
+exited zero, stderr is empty, and exact semantic/accounting validation passed:
+two object epochs, two successful lifecycles, 31,250 applied operations, two
+ordered `during-execution` samples with exact progress, complete authenticated
+built-package runtime identity, and no preflight memory verdict.
+
+Total wrapper elapsed was 585,233 ms. This exceeds the frozen at-most-540,000-
+ms release predicate by 45,233 ms, so the deterministic classification is
+`SEMANTIC_PASS_TIMING_RELEASE_FAIL`. The full-worker root remains absent and no
+64-object execution was started. The preflight is consumed and may not be
+retried. This is a release-arithmetic failure, not a product or retained-memory
+defect.
+
+The parent JSON, audit JSON, consumed sentinel, and validating self-excluding
+19-entry manifest SHA-256 values are respectively
+`12e96bce8b6b84b707cc83f439cce53f09ee0bb9e3aaec863bf1c64b4eb92341`,
+`cf61e2a89899a3bb9e815bee7d96991f45316fc51304d045a699cddb2215fa72`,
+`94c813d90575f8c9068dffa27565fa998508bc3db7a18fef2f69bdc0bbfc04b1`,
+and `61fab70acbce30842219f01ea18fe33a72d710e5332d5ad6f8ab01bbf955178d`.
+The post-run audit also records 26 stashes, all protected roots present, all
+four fixed ports clear, no relevant process, matching local/pushed source refs,
+and an unexported `NODE_OPTIONS`.
+
+##### D.110a-x retained-heap preflight variance correction plan
+
+D.110a-x is frozen in
+`specs/phase-6c-memory-gates/slices/00f-preflight-variance-correction.md`.
+The successful 585.233-second two-object wrapper projects linearly to
+18,727.456 seconds for 64 objects. Preserving the reviewed rule that this
+projection use no more than 80 percent of the full watchdog requires at least
+23,409.32 seconds. The smallest whole-hour correction is therefore a seven-
+hour (25,200,000-ms) full watchdog with a 630,000-ms two-object release bound:
+`630 * 32 = 20,160` seconds, exactly 80 percent of seven hours. The immutable
+preflight lies 44,767 ms inside that revised release bound, and the proposed
+full watchdog lies 6,472.544 seconds above its observed linear projection.
+
+This is a high-risk tests-only timing-contract slice, not a product-defect
+claim. RED adds `D110A_PREFLIGHT_RELEASE_MAX_MS = 630_000`, exact token
+`D110AX_PREFLIGHT_VARIANCE_MISSING`, and an isolated source/audit predicate
+while leaving the active six-hour constant unchanged, so only the new token
+fails and no child runs. GREEN changes only `D110A_FULL_TIMEOUT_MS` to
+25,200,000 and the corresponding focused arithmetic expectation. The child
+remains unchanged and continues to consume that one parent-owned constant.
+
+The focused RED and GREEN each run exactly once with coverage disabled. GREEN
+then runs the affected build/type/lint/format/diff/source-shape/listing gates
+and the exact retained 95-test suite. Because this changes a timing/resource
+contract beside a scarce invocation, the signed/pushed plan and final GREEN
+receive Grok 4.6/high, standard direct Kimi K3/100-step, and Opus xhigh review;
+only P0/P1 blocks. No Fable, collaboration subagent, profile, preflight retry,
+product change, dependency change, workload change, memory-threshold change,
+or child-launcher change is authorized.
+
+After an empty final-review blocking union, mechanically revalidate the
+immutable D.110a-w preflight hashes and exact semantic pass under the revised
+bound, plus absent fresh full root, matching signed/pushed source, unexported
+`NODE_OPTIONS`, protected paths, 26 stashes, clear fixed ports, and no relevant
+process. Those checks release the still-unspent sole 64-object worker exactly
+once. D.110b must separately select an outer runner budget greater than seven
+hours plus setup/evidence upload; D.110a-x changes no workflow.

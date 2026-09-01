@@ -13,10 +13,12 @@ Execution note (2026-09-01): the authoritative focused GREEN passes 20/20 and
 prerequisite. The corrected preflight then completed only one of two exact
 object lifecycles before its five-minute diagnostic watchdog. D.110a-t/u/v
 attributed the observed CPU cost without finding a narrow product owner.
+D.110a-w's sole preflight later passed semantics but missed its release bound.
 D.110a is now paused behind
-[D.110a-w](00e-watchdog-feasibility-correction.md), which prospectively
-supersedes only the preflight/full timers while preserving this slice's
-workload, thresholds, sample window, and single consuming full-worker rule.
+[D.110a-x](00f-preflight-variance-correction.md), which prospectively
+supersedes only the full timer and preflight release arithmetic while preserving
+this slice's workload, thresholds, sample window, consumed-preflight custody,
+and single consuming full-worker rule.
 
 ## Exact scope
 
@@ -55,7 +57,7 @@ the existing `tsx` import hook, `fake-indexeddb/auto`, and the workspace-package
 hook. The `.mjs` bootstrap imports the tests-only TypeScript worker; the worker
 reaches product code only through those authenticated built targets. This
 avoids Vite and its aliases while reusing the genuine IndexedDB-bound
-Phase-6a/6b fixture under Node. The parent owns the D.110a-w six-hour timer,
+Phase-6a/6b fixture under Node. The parent owns the prospective D.110a-x seven-hour timer,
 streamed stdout/stderr, last-progress custody, and `SIGKILL` on timeout.
 
 Do not add `NODE_PATH`, a root shim, a source-relative production import in the
@@ -154,7 +156,7 @@ The worker also tracks its current object-epoch and applied-operation count at
 every sample. This proves the samples were taken during execution, not
 reconstructed from memory remaining after the complete workload.
 
-The parent enforces the D.110a-w six-hour watchdog over the full child. A
+The parent enforces the prospective D.110a-x seven-hour watchdog over the full child. A
 timeout is a consuming GREEN failure with complete stdout/stderr and the last
 completed object-epoch retained as evidence; it is never interpreted as a heap
 verdict.
