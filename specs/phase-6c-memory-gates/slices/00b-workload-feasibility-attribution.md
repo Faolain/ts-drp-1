@@ -43,6 +43,32 @@ D.110a-t may change only:
   validation; and
 - the root test entry only if a named diagnostic command is necessary.
 
+Before D.110a-t RED, land one separately labelled signed/pushed pre-RED
+baseline commit for the already parked D.110a GREEN scaffold and the
+demonstrated D.109d helper correction. Its exact tracked roster is:
+
+- `package.json`;
+- `tests/fixtures/phase-3a1b-p3/live-fixture.ts`;
+- `tests/fixtures/phase-6a-v3/creator-adoption-contract.ts`;
+- `tests/fixtures/phase-6a-v3/creator-successor-activation-contract.ts`;
+- `tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts`;
+- `tests/fixtures/phase-6a-v3/creator-successor-oracle.ts`;
+- `tests/fixtures/phase-6b/runtime-reclamation-contract.ts`;
+- `tests/fixtures/phase-6c/retained-heap-contract.ts`;
+- `tests/fixtures/phase-6c/retained-heap-child.mjs`;
+- `tests/fixtures/phase-6c/retained-heap-worker.ts`; and
+- `tests/phase-6c-retained-heap-red.test.ts`.
+
+That baseline preserves the already accepted D.110a 20-case focused GREEN and
+records the later D.109d bounded-page correction, but it does not close D.110a,
+run the scarce worker, or contain D.110a-t profile behavior. No other parked or
+protected path may enter it. D.110a-t RED then changes only
+`retained-heap-contract.ts` and the existing focused test, so a clean checkout
+audits the same signed launcher bytes as the working tree. The activation/
+identity/oracle split is inherited tests-only import-graph plumbing: it keeps
+one pure oracle owner and prevents the fresh child from loading the broader
+TypeScript source-audit fixture graph.
+
 No product source, dependency, package export, Vite alias, wire format, digest
 owner, activation authority, store implementation, application operation,
 workload count, vertex count, object count, sample window, slope, memory
@@ -66,19 +92,46 @@ workload completion, close, receipt/reclamation, successor publication,
 sampling, and teardown. They are monotonic diagnostics and do not become
 performance thresholds.
 
+Profile capture uses a `node:inspector` `Profiler` session connected inside
+the profile-mode child main thread, never inherited parent `NODE_OPTIONS`.
+The child writes exactly one named profile with exclusive creation into a
+parent-created fresh empty directory and stops the session before normal exit.
+The fixed profile-mode outer timeout is 900,000 ms and is emitted in the parent
+result; the existing 300,000 ms preflight and 2,700,000 ms full-worker values
+remain byte-for-byte unchanged. A signal, exception, missing profile, extra
+profile file, or nonzero exit is invalid evidence and stops the slice without
+an implicit retry.
+
 Run the one-object diagnostic exactly once after focused/static gates pass.
 Authenticate the profile PID, executable, built-module hashes, result schema,
 exact operation/vertex/lifecycle counts, normal exit, phase timeline, and CPU
-profile hash. Determine the dominant JavaScript owner conservatively:
+profile hash. The profile must contain main-thread
+`retained-heap-worker.ts` frames whose sampled interval overlaps the recorded
+workload phase; parent-only, loader-only, sibling-thread, stale `CPU.*`, and
+duration-inconsistent artifacts are rejected. Determine the dominant
+JavaScript owner conservatively from self time inside that workload-phase
+window. One owner group is clearly dominant only when it accounts for at least
+50 percent of attributed self time and at least twice the next owner group;
+anything weaker is mixed or unavailable.
 
-- if a tests-only owner is clearly dominant, implement only that narrow
-  optimization and rerun focused gates plus one corrected two-object preflight;
+- if a tests-only owner within the D.110a-t file roster is clearly dominant,
+  implement only that narrow optimization and rerun focused gates plus one
+  corrected two-object preflight; a tests-only owner outside that roster stops
+  for a separately frozen follow-up;
 - if a product owner is clearly dominant, stop and freeze a separate product
   optimization slice before editing it;
 - if attribution remains mixed or unavailable, stop and report the feasibility
   blocker rather than changing workload or timing contracts.
 
 The 64-object worker does not run in D.110a-t.
+
+The corrected two-object preflight is only a readiness diagnostic. It may
+resume the sole D.110a worker only if its recorded mean lifecycle time projected
+across 64 objects is at most 80 percent of the unchanged 45-minute watchdog,
+reserving 20 percent headroom; equivalently its two lifecycle intervals total
+at most 67.5 seconds.
+Otherwise D.110a remains paused even if the preflight exits zero. This is an
+invocation-safety predicate, not a new product or memory-performance contract.
 
 ## Review and closure
 
@@ -90,3 +143,21 @@ deterministic local validation. After diagnostic GREEN, one final
 Grok/Kimi/Opus review covers plan, RED, GREEN, attribution, scope, and the next
 owner decision. Only P0/P1 blocks. If Grok cancels, resume the exact session.
 Do not use Codex Sol for Kimi, Fable, or collaboration subagents.
+
+## Initial plan-review disposition
+
+The signed plan anchor `fe675ce20d04b5130e24ce5e809a11dc78dd4527`
+received the one bounded Grok 4.6/high, standard direct Kimi K3/100-step, and
+Opus xhigh review. All three accepted the conservative full-worker hold, exact
+one-object lifecycle, no-memory-verdict rule, and D.109d page arithmetic. The
+blocking union was the missing signed baseline custody and insufficient
+main-thread profile discrimination. This corrected text closes both once by
+freezing the exact pre-RED baseline roster and in-child inspector capture.
+
+The nonblocking findings are also dispositioned here: the 900,000 ms diagnostic
+timeout is fixed and recorded; dominance has a prospective numeric rule; the
+two-object resume projection reserves 20 percent of the unchanged full-worker
+watchdog; the shared D.109d file receives the retained 95-case gate at final
+GREEN; and an owner outside the closed tests-only roster requires a new slice.
+No confirmation round, workload run, product edit, threshold edit, Fable, or
+collaboration subagent is authorized by this correction.

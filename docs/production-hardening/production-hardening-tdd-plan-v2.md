@@ -89840,3 +89840,71 @@ K3/100-step, and Opus xhigh review. Signed RED receives deterministic local
 validation; final diagnostic GREEN receives one plan-to-RED-to-GREEN review.
 Only P0/P1 blocks. If Grok cancels, resume the exact session. Do not invoke
 Codex Sol in place of Kimi, Fable, or collaboration subagents.
+
+##### D.110a-t initial plan review and bounded correction
+
+The one bounded plan review inspected signed/pushed anchor
+`fe675ce20d04b5130e24ce5e809a11dc78dd4527`. Grok 4.6/high completed normally
+in session `01a05d1a-69c9-7990-b7c0-ecb2f42a584b` and returned
+CHANGES_REQUIRED with P0=0, P1=2, and P2=1. The standard direct Kimi CLI ran
+K3 with `KIMI_LOOP_MAX_STEPS_PER_TURN=100` in session
+`session_23eba2be-5bbe-4083-a406-e53c5373bb1f` and returned CHANGES_REQUIRED
+with P0=0, P1=1, and P2=2. Opus xhigh completed normally in session
+`7a6ef802-e50f-4684-87cf-993529bea6b6` and returned CHANGES_REQUIRED with
+P0=0, P1=3, and P2=4. No reviewer edited files or ran the workload.
+
+The shared prompt SHA-256 is
+`a9b71645d71cdd2e7b0fe10a163b869b4fa330426706123a2101d40dc79e8154`.
+Grok public/event/status SHA-256 values are
+`5f9b6c606d2bffe652a13459fb4a3c118bd8c75c16db1d95e027e61af4695673`,
+`d8e448112a5be70d0a938a27a3d3f67f6101bfaf0460935f03e0e145d36489d2`,
+and `225e7ee8a959efb93887f39d505e22661dcd37fcafd30acd6a33df97514985d4`.
+Kimi raw/stderr SHA-256 values are
+`bf881c911f240d46e1af803c823e70ec848939f1c02aea3f449be3f5d09ce210`
+and `a9218cd6116ce73f1ba98a9251bbaa7597227e5d5b76d7ca87f0727e1017707d`.
+Opus raw/stderr SHA-256 values are
+`b8c35c9e5129f85f8b5194384144e8ea46689912167722d144896d276b55b392`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+
+The accepted blocking union has two owners. First, the D.110a GREEN scaffold
+and later D.109d page fix remained parked, so RED had no reproducible signed
+launcher baseline and could accidentally absorb prior work. Before RED, one
+separately labelled signed/pushed baseline commit must contain exactly
+`package.json`; `tests/fixtures/phase-3a1b-p3/live-fixture.ts`; the Phase-6a
+creator adoption, successor activation, successor handle-identity, and new
+pure successor-oracle fixture files; the Phase-6b runtime-reclamation fixture;
+the Phase-6c retained-heap contract, child, and worker; and the existing
+focused test. It is attributed to the already implemented D.110a/D.109d test
+infrastructure, does not close D.110a, and excludes every unrelated or
+protected path. D.110a-t RED may then edit only the contract and focused test.
+
+Second, PID and executable identity do not distinguish the child main thread
+from a same-PID tsx loader thread. GREEN therefore starts a `node:inspector`
+`Profiler` session inside the profile-mode child main thread, never through
+inherited parent `NODE_OPTIONS`; writes exactly one named file with exclusive
+creation in a parent-created fresh empty directory; stops and flushes it before
+normal exit; and rejects extra, stale `CPU.*`, parent-only, loader-only, or
+duration-inconsistent profiles. The accepted profile must contain
+`retained-heap-worker.ts` frames overlapping the recorded workload phase.
+
+The correction also closes the useful nonblocking findings without widening
+scope. Profile mode has a fixed and emitted 900,000 ms outer timeout; the
+300,000 ms preflight and 2,700,000 ms full watchdogs remain unchanged. A signal,
+exception, missing/extra profile, or nonzero exit stops without retry. Dominance
+means at least 50 percent of workload-window attributed self time and at least
+twice the next owner group; weaker evidence is mixed/unavailable. A tests-only
+owner outside the closed roster requires a separate follow-up slice. The
+corrected two-object preflight can authorize the sole full worker only when its
+mean lifecycle time projected across 64 objects is at most 80 percent of the
+45-minute watchdog, reserving 20 percent headroom; equivalently its two
+recorded lifecycle intervals total at most 67.5 seconds. This is a scarce-
+invocation readiness predicate, not a new
+product, memory, or performance contract. The D.109d shared-helper change must
+retain the inherited 95-case selection.
+
+This is the one permitted P0/P1 correction batch. Deterministic syntax,
+format, exact-roster, signed-baseline, pushed-ref, focused 20-case, retained,
+protected-path, stash, and source-shape checks replace a recursive plan review.
+No profile, preflight, full worker, product edit, dependency edit, threshold
+change, Fable, or collaboration subagent runs before the corrected plan and
+baseline are signed and pushed.
