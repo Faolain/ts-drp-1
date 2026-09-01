@@ -5,11 +5,14 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFil
 import { basename, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { validateD110auProfileAttribution } from "./retained-heap-contract.ts";
 import { workspacePackageImportHook } from "../shared/workspace-package-subprocess.mjs";
 
 const REPOSITORY_ROOT = resolve(import.meta.dirname, "../../..");
 const ROLE = process.argv[2] ?? "parent";
-const D110AT_PROFILE_FILENAME = "d110at-main.cpuprofile";
+const D110AU_PROFILE_FILENAME = "d110au-main.cpuprofile";
+const D110AU_CAPTURE_SENTINEL = "capture-consumed.json";
+const D110AU_CAPTURE_RECORDS = "capture-records.json";
 
 function sha256(path) {
 	return createHash("sha256").update(readFileSync(path)).digest("hex");
@@ -65,11 +68,18 @@ function internalModules() {
 
 function freshProfileTarget(mode) {
 	if (mode !== "profile") return undefined;
-	const evidenceRoot = resolve(REPOSITORY_ROOT, ".logs/phase-6c-d110at-green");
+	const evidenceRoot = resolve(REPOSITORY_ROOT, ".logs/phase-6c-d110au-green");
+	if (existsSync(evidenceRoot)) throw new TypeError("D110AU_PROFILE_ROOT_NOT_FRESH");
 	mkdirSync(evidenceRoot, { recursive: true });
 	const directory = mkdtempSync(join(evidenceRoot, "profile-"));
-	if (readdirSync(directory).length !== 0) throw new TypeError("D110AT_PROFILE_DIRECTORY_NOT_EMPTY");
-	return Object.freeze({ directory, path: join(directory, D110AT_PROFILE_FILENAME) });
+	if (readdirSync(directory).length !== 0) throw new TypeError("D110AU_PROFILE_DIRECTORY_NOT_EMPTY");
+	return Object.freeze({
+		directory,
+		evidenceRoot,
+		path: join(directory, D110AU_PROFILE_FILENAME),
+		recordsPath: join(evidenceRoot, D110AU_CAPTURE_RECORDS),
+		sentinelPath: join(evidenceRoot, D110AU_CAPTURE_SENTINEL),
+	});
 }
 
 function childEnvironment(mode) {
@@ -79,98 +89,19 @@ function childEnvironment(mode) {
 	return environment;
 }
 
-function profileAttribution(profile, result) {
-	if (
-		!Number.isFinite(profile?.startTime) ||
-		!Number.isFinite(profile?.endTime) ||
-		profile.endTime <= profile.startTime ||
-		profile.endTime - profile.startTime > 900_000 * 1_000 ||
-		!Array.isArray(profile.nodes) ||
-		!Array.isArray(profile.samples) ||
-		!Array.isArray(profile.timeDeltas) ||
-		profile.samples.length !== profile.timeDeltas.length
-	) {
-		throw new TypeError("D110AT_PROFILE_SCHEMA_INVALID");
-	}
-	const phase = (name) => result.phases.find((entry) => entry.phase === name)?.monotonicMicroseconds;
-	const workloadStart = phase("fixture-open");
-	const workloadEnd = phase("workload-complete");
-	if (
-		!Number.isFinite(workloadStart) ||
-		!Number.isFinite(workloadEnd) ||
-		profile.startTime > workloadStart ||
-		workloadStart >= workloadEnd ||
-		workloadEnd > profile.endTime
-	) {
-		throw new TypeError("D110AT_PROFILE_WINDOW_INVALID");
-	}
-	const nodes = new Map(profile.nodes.map((node) => [node.id, node]));
-	const parents = new Map();
-	for (const node of profile.nodes) {
-		for (const childId of node.children ?? []) parents.set(childId, node.id);
-	}
-	const hasWorkerFrame = (nodeId) => {
-		const visited = new Set();
-		for (let current = nodeId; current !== undefined && !visited.has(current); current = parents.get(current)) {
-			visited.add(current);
-			if (String(nodes.get(current)?.callFrame?.url ?? "").includes("retained-heap-worker.ts")) return true;
-		}
-		return false;
-	};
-	if (![...nodes.values()].some((node) => String(node.callFrame?.url ?? "").includes("retained-heap-worker.ts"))) {
-		throw new TypeError("D110AT_PROFILE_WORKER_FRAME_MISSING");
-	}
-	const owners = new Map();
-	let timestamp = profile.startTime;
-	let workloadSamples = 0;
-	let workerAncestrySamples = 0;
-	let attributedMicroseconds = 0;
-	for (const [index, nodeId] of profile.samples.entries()) {
-		const delta = profile.timeDeltas[index];
-		if (!Number.isFinite(delta) || delta < 0) throw new TypeError("D110AT_PROFILE_DELTA_INVALID");
-		timestamp += delta;
-		if (timestamp < workloadStart || timestamp > workloadEnd) continue;
-		workloadSamples += 1;
-		attributedMicroseconds += delta;
-		if (hasWorkerFrame(nodeId)) workerAncestrySamples += 1;
-		const frame = nodes.get(nodeId)?.callFrame;
-		const owner = String(frame?.url || `[runtime] ${frame?.functionName || "anonymous"}`);
-		owners.set(owner, (owners.get(owner) ?? 0) + delta);
-	}
-	if (workloadSamples === 0 || workerAncestrySamples === 0 || attributedMicroseconds <= 0) {
-		throw new TypeError("D110AT_PROFILE_WORKLOAD_SAMPLES_MISSING");
-	}
-	const rankedOwners = Object.freeze(
-		[...owners.entries()]
-			.map(([owner, selfMicroseconds]) =>
-				Object.freeze({ owner, selfMicroseconds, share: selfMicroseconds / attributedMicroseconds })
-			)
-			.sort((left, right) => right.selfMicroseconds - left.selfMicroseconds || left.owner.localeCompare(right.owner))
-	);
-	const first = rankedOwners[0];
-	const second = rankedOwners[1];
-	const clearlyDominant =
-		first !== undefined && first.share >= 0.5 && first.selfMicroseconds >= 2 * (second?.selfMicroseconds ?? 0);
-	return Object.freeze({
-		attributedMicroseconds,
-		clearlyDominant,
-		owners: rankedOwners,
-		workerAncestrySamples,
-		workloadEnd,
-		workloadSamples,
-		workloadStart,
-	});
-}
-
 async function inspectorPost(session, method) {
 	return new Promise((resolvePromise, reject) => {
 		session.post(method, {}, (error, result) => (error === null ? resolvePromise(result) : reject(error)));
 	});
 }
 
+function monotonicMicroseconds() {
+	return Number(process.hrtime.bigint() / 1_000n);
+}
+
 async function captureChildProfile(profilePath, executeProfile) {
-	if (basename(profilePath) !== D110AT_PROFILE_FILENAME || existsSync(profilePath)) {
-		throw new TypeError("D110AT_PROFILE_TARGET_INVALID");
+	if (basename(profilePath) !== D110AU_PROFILE_FILENAME || existsSync(profilePath)) {
+		throw new TypeError("D110AU_PROFILE_TARGET_INVALID");
 	}
 	const { Session } = await import("node:inspector");
 	const session = new Session();
@@ -178,14 +109,26 @@ async function captureChildProfile(profilePath, executeProfile) {
 	let started = false;
 	try {
 		await inspectorPost(session, "Profiler.enable");
+		const hrtimeBeforeStart = monotonicMicroseconds();
 		await inspectorPost(session, "Profiler.start");
+		const hrtimeAfterStart = monotonicMicroseconds();
 		started = true;
 		const result = await executeProfile();
+		const hrtimeBeforeStop = monotonicMicroseconds();
 		const stopped = await inspectorPost(session, "Profiler.stop");
+		const hrtimeAfterStop = monotonicMicroseconds();
 		started = false;
 		if (stopped?.profile === undefined) throw new TypeError("D110AT_PROFILE_MISSING");
 		writeFileSync(profilePath, JSON.stringify(stopped.profile), { encoding: "utf8", flag: "wx" });
-		return result;
+		return Object.freeze({
+			calibration: Object.freeze({
+				hrtimeAfterStart,
+				hrtimeAfterStop,
+				hrtimeBeforeStart,
+				hrtimeBeforeStop,
+			}),
+			result,
+		});
 	} catch (error) {
 		if (started) await inspectorPost(session, "Profiler.stop").catch(() => undefined);
 		throw error;
@@ -199,6 +142,13 @@ async function runWorker(mode) {
 	const modules = internalModules();
 	const importHook = workspacePackageImportHook({ expectedImports: imports });
 	const profileTarget = freshProfileTarget(mode);
+	if (profileTarget !== undefined) {
+		writeFileSync(
+			profileTarget.sentinelPath,
+			JSON.stringify(Object.freeze({ kind: "d110au-profile-capture-consumed-v1" })),
+			{ encoding: "utf8", flag: "wx" }
+		);
+	}
 	const child = spawn(
 		process.execPath,
 		[
@@ -217,6 +167,7 @@ async function runWorker(mode) {
 	let stderr = "";
 	let stdout = "";
 	let terminal;
+	let captureRecordError;
 	let lastProgress;
 	const progressMessages = [];
 	const timeoutMs = mode === "full" ? 45 * 60 * 1000 : mode === "profile" ? 900_000 : 5 * 60 * 1000;
@@ -229,13 +180,27 @@ async function runWorker(mode) {
 		if (message?.kind === "progress") {
 			lastProgress = message;
 			progressMessages.push(message);
-		} else terminal = message;
+		} else {
+			if (profileTarget !== undefined) {
+				try {
+					writeFileSync(profileTarget.recordsPath, JSON.stringify(message), { encoding: "utf8", flag: "wx" });
+				} catch (error) {
+					captureRecordError = error;
+				}
+			}
+			terminal = message;
+		}
 	});
 	const exit = await new Promise((resolvePromise, reject) => {
 		child.once("error", reject);
 		child.once("exit", (code, signal) => resolvePromise({ code, signal }));
 	});
 	clearTimeout(timer);
+	if (captureRecordError !== undefined) {
+		throw new TypeError(
+			`D110AU_CAPTURE_RECORD_WRITE_FAILED:${captureRecordError instanceof Error ? captureRecordError.message : String(captureRecordError)}`
+		);
+	}
 	if (exit.code !== 0 || terminal?.kind === "child-error" || terminal?.result === undefined) {
 		throw new TypeError(
 			`D110A_CHILD_FAILED:${String(exit.code)}:${String(exit.signal)}:${terminal?.message ?? stderr}:${JSON.stringify(lastProgress)}`
@@ -258,16 +223,24 @@ async function runWorker(mode) {
 		node: Object.freeze({ execPath: process.execPath, version: process.version }),
 	});
 	if (mode === "profile") {
+		if (profileTarget === undefined || !existsSync(profileTarget.recordsPath)) {
+			throw new TypeError("D110AU_CAPTURE_RECORD_MISSING");
+		}
+		const durableTerminal = JSON.parse(readFileSync(profileTarget.recordsPath, "utf8"));
+		if (JSON.stringify(durableTerminal) !== JSON.stringify(terminal)) {
+			throw new TypeError("D110AU_CAPTURE_RECORD_MISMATCH");
+		}
+		terminal = durableTerminal;
 		if (
 			terminal.pid !== child.pid ||
 			terminal.execPath !== process.execPath ||
-			profileTarget === undefined ||
 			terminal.result.kind !== "d110at-profile-v1" ||
 			terminal.result.objectEpochs !== 1 ||
 			terminal.result.successfulLifecycles !== 1 ||
 			terminal.result.appliedWorkloadOperations !== 15_625 ||
 			terminal.result.workloadBatchVertices !== 977 ||
-			terminal.result.memoryVerdict !== "not-evaluated"
+			terminal.result.memoryVerdict !== "not-evaluated" ||
+			terminal.profileCalibration === undefined
 		) {
 			throw new TypeError("D110AT_PROFILE_RESULT_INVALID");
 		}
@@ -293,16 +266,33 @@ async function runWorker(mode) {
 			throw new TypeError("D110AT_PROFILE_PROGRESS_INVALID");
 		}
 		const entries = readdirSync(profileTarget.directory);
-		if (entries.length !== 1 || entries[0] !== D110AT_PROFILE_FILENAME) {
+		if (entries.length !== 1 || entries[0] !== D110AU_PROFILE_FILENAME) {
 			throw new TypeError("D110AT_PROFILE_FILE_CUSTODY_INVALID");
 		}
+		const rootEntries = readdirSync(profileTarget.evidenceRoot).sort();
+		const expectedRootEntries = [
+			D110AU_CAPTURE_RECORDS,
+			D110AU_CAPTURE_SENTINEL,
+			basename(profileTarget.directory),
+		].sort();
+		if (JSON.stringify(rootEntries) !== JSON.stringify(expectedRootEntries)) {
+			throw new TypeError("D110AU_PROFILE_ROOT_CUSTODY_INVALID");
+		}
 		const profile = JSON.parse(readFileSync(profileTarget.path, "utf8"));
-		const attribution = profileAttribution(profile, terminal.result);
+		const attribution = validateD110auProfileAttribution({
+			calibration: terminal.profileCalibration,
+			phases,
+			profile,
+		});
 		return Object.freeze({
 			attribution,
+			captureRecords: Object.freeze({
+				path: profileTarget.recordsPath,
+				sha256: sha256(profileTarget.recordsPath),
+			}),
 			childIdentity: Object.freeze({ execPath: terminal.execPath, pid: terminal.pid }),
 			childIo: Object.freeze({ stderr, stdout }),
-			kind: "d110at-profile-parent-v1",
+			kind: "d110au-profile-parent-v1",
 			profile: Object.freeze({
 				endTime: profile.endTime,
 				path: profileTarget.path,
@@ -344,12 +334,20 @@ async function runChild() {
 	}
 	const worker = await import("./retained-heap-worker.ts");
 	const executeProfile = () => worker.runD110aProfile(modules);
-	const result =
-		mode === "full"
-			? await worker.runD110aFullWorker(modules)
-			: mode === "profile"
-				? await captureChildProfile(profilePath, executeProfile)
-				: await worker.runD110aPreflight(modules);
+	if (mode === "profile") {
+		const captured = await captureChildProfile(profilePath, executeProfile);
+		process.send?.(
+			Object.freeze({
+				execPath: process.execPath,
+				kind: "result",
+				pid: process.pid,
+				profileCalibration: captured.calibration,
+				result: captured.result,
+			})
+		);
+		return;
+	}
+	const result = mode === "full" ? await worker.runD110aFullWorker(modules) : await worker.runD110aPreflight(modules);
 	process.send?.(Object.freeze({ execPath: process.execPath, kind: "result", pid: process.pid, result }));
 }
 

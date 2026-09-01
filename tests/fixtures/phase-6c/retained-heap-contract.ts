@@ -490,11 +490,132 @@ export function d110auMutantProfileInput(mutant: D110auProfileMutant): D110auPro
 
 /**
  * Validates detached profile-clock custody and named-window attribution.
- * @param _input - Detached profile, phase and calibration data.
- * @throws While the D.110a-u implementation is absent.
+ * @param input - Detached profile, phase and calibration data.
+ * @returns Attribution derived without cross-clock absolute comparison.
  */
-export function validateD110auProfileAttribution(_input: D110auProfileInput): D110auProfileAttribution {
-	fail(D110AU_RED_TOKEN);
+export function validateD110auProfileAttribution(input: D110auProfileInput): D110auProfileAttribution {
+	const { calibration, phases, profile } = input;
+	const calibrationValues = [
+		calibration.hrtimeBeforeStart,
+		calibration.hrtimeAfterStart,
+		calibration.hrtimeBeforeStop,
+		calibration.hrtimeAfterStop,
+	];
+	if (
+		calibrationValues.some((value) => !Number.isSafeInteger(value) || value < 0) ||
+		calibration.hrtimeBeforeStart > calibration.hrtimeAfterStart ||
+		calibration.hrtimeAfterStart >= calibration.hrtimeBeforeStop ||
+		calibration.hrtimeBeforeStop > calibration.hrtimeAfterStop
+	) {
+		fail("D110AU_PROFILE_CLOCK_CALIBRATION_INVALID");
+	}
+	if (
+		!Number.isFinite(profile.startTime) ||
+		!Number.isFinite(profile.endTime) ||
+		profile.endTime <= profile.startTime ||
+		!Array.isArray(profile.nodes) ||
+		!Array.isArray(profile.samples) ||
+		!Array.isArray(profile.timeDeltas) ||
+		profile.samples.length !== profile.timeDeltas.length
+	) {
+		fail("D110AT_PROFILE_SCHEMA_INVALID");
+	}
+	const profileDuration = profile.endTime - profile.startTime;
+	if (profileDuration > 900_000_000 || profileDuration > calibration.hrtimeAfterStop - calibration.hrtimeBeforeStart) {
+		fail("D110AU_PROFILE_DURATION_INVALID");
+	}
+	if (
+		phases.length !== 7 ||
+		phases.some(
+			({ monotonicMicroseconds }) =>
+				!Number.isSafeInteger(monotonicMicroseconds) ||
+				monotonicMicroseconds < calibration.hrtimeAfterStart ||
+				monotonicMicroseconds > calibration.hrtimeBeforeStop
+		)
+	) {
+		fail("D110AU_PROFILE_PHASE_OUTSIDE_CAPTURE");
+	}
+
+	const nodes = new Map(profile.nodes.map((node) => [node.id, node]));
+	const parents = new Map<number, number>();
+	for (const node of profile.nodes) {
+		for (const childId of node.children ?? []) parents.set(childId, node.id);
+	}
+	const matchingNodeIds = new Set(
+		profile.nodes
+			.filter(
+				({ callFrame }) =>
+					callFrame.functionName === D110AU_WORKLOAD_FUNCTION && callFrame.url.endsWith("/retained-heap-worker.ts")
+			)
+			.map(({ id }) => id)
+	);
+	if (matchingNodeIds.size === 0) fail("D110AU_PROFILE_WORKLOAD_FRAME_MISSING");
+	const hasNamedWorkloadAncestry = (nodeId: number): boolean => {
+		const visited = new Set<number>();
+		for (let current: number | undefined = nodeId; current !== undefined && !visited.has(current); ) {
+			visited.add(current);
+			if (matchingNodeIds.has(current)) return true;
+			current = parents.get(current);
+		}
+		return false;
+	};
+
+	let timestamp = profile.startTime;
+	const sampleTimestamps: number[] = [];
+	const matchingSampleIndexes: number[] = [];
+	for (const [index, nodeId] of profile.samples.entries()) {
+		const delta = profile.timeDeltas[index];
+		if (delta === undefined || !Number.isFinite(delta) || delta < 0) fail("D110AT_PROFILE_DELTA_INVALID");
+		timestamp += delta;
+		sampleTimestamps.push(timestamp);
+		if (hasNamedWorkloadAncestry(nodeId)) matchingSampleIndexes.push(index);
+	}
+	const firstIndex = matchingSampleIndexes[0];
+	const lastIndex = matchingSampleIndexes.at(-1);
+	if (firstIndex === undefined || lastIndex === undefined) fail("D110AU_PROFILE_WORKLOAD_SAMPLES_MISSING");
+	const workloadStart = sampleTimestamps[firstIndex];
+	const workloadEnd = sampleTimestamps[lastIndex];
+	if (
+		firstIndex === lastIndex ||
+		workloadStart === undefined ||
+		workloadEnd === undefined ||
+		workloadStart >= workloadEnd
+	) {
+		fail("D110AU_PROFILE_WORKLOAD_WINDOW_DEGENERATE");
+	}
+
+	const owners = new Map<string, number>();
+	let attributedMicroseconds = 0;
+	for (let index = firstIndex; index <= lastIndex; index += 1) {
+		const delta = profile.timeDeltas[index];
+		const nodeId = profile.samples[index];
+		if (delta === undefined || nodeId === undefined) fail("D110AT_PROFILE_SCHEMA_INVALID");
+		attributedMicroseconds += delta;
+		const frame = nodes.get(nodeId)?.callFrame;
+		const owner = String(frame?.url || `[runtime] ${frame?.functionName || "anonymous"}`);
+		owners.set(owner, (owners.get(owner) ?? 0) + delta);
+	}
+	if (attributedMicroseconds <= 0) fail("D110AU_PROFILE_WORKLOAD_WINDOW_DEGENERATE");
+	const rankedOwners = Object.freeze(
+		[...owners.entries()]
+			.map(([owner, selfMicroseconds]) =>
+				Object.freeze({ owner, selfMicroseconds, share: selfMicroseconds / attributedMicroseconds })
+			)
+			.sort((left, right) => right.selfMicroseconds - left.selfMicroseconds || left.owner.localeCompare(right.owner))
+	);
+	const first = rankedOwners[0];
+	const second = rankedOwners[1];
+	const clearlyDominant =
+		first !== undefined && first.share >= 0.5 && first.selfMicroseconds >= 2 * (second?.selfMicroseconds ?? 0);
+	return Object.freeze({
+		attributedMicroseconds,
+		clearlyDominant,
+		owners: rankedOwners,
+		workerAncestrySamples: matchingSampleIndexes.length,
+		workloadEnd,
+		workloadSamples: lastIndex - firstIndex + 1,
+		workloadStart,
+	});
 }
 
 type D110aMutableProof = {

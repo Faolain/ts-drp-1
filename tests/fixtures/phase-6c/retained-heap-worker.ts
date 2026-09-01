@@ -34,6 +34,7 @@ import {
 	d110aSemanticDigest,
 	validateD110aProof,
 } from "./retained-heap-contract.js";
+import type { GenuineCreatorAdoptionFixtureOptions } from "../phase-6a-v3/creator-adoption-contract.js";
 import { createD109dReceipts, d109dCandidate, openD109dHotFixture } from "../phase-6b/runtime-reclamation-contract.js";
 
 const D110A_CREATOR_MODULES = Object.freeze({
@@ -105,6 +106,44 @@ interface RetainedSuccessor {
 }
 
 type D110aProfileRecorder = (phase: D110aProfilePhase, appliedWorkloadOperations: number) => void;
+type D110auApplicationWorkloadInput = Parameters<
+	NonNullable<GenuineCreatorAdoptionFixtureOptions["beforeCreatorClose"]>
+>[0];
+
+async function runD110auApplicationWorkload({
+	firstLogicalTime,
+	plane,
+	signRegisteredVertexDigest,
+}: D110auApplicationWorkloadInput): Promise<
+	Readonly<{
+		readonly appliedWorkloadOperations: number;
+		readonly latest: Readonly<{ readonly authorSequence: number; readonly digest: string }> | undefined;
+	}>
+> {
+	let appliedWorkloadOperations = 0;
+	let logicalTime = firstLogicalTime;
+	let latest: Readonly<{ readonly authorSequence: number; readonly digest: string }> | undefined;
+	for (let batchIndex = 0; batchIndex < D110A_BATCH_VERTICES_PER_OBJECT; batchIndex += 1) {
+		const count = batchIndex === D110A_BATCH_VERTICES_PER_OBJECT - 1 ? 9 : 16;
+		const operations = Object.freeze(
+			Array.from({ length: count }, () =>
+				Object.freeze({
+					logicalTime: logicalTime++,
+					operation: Object.freeze({ action: "add", value: 1 }),
+				})
+			)
+		);
+		const issued = await plane.issueLocal({ operations, signRegisteredVertexDigest });
+		if (!issued.ok) throw new TypeError(`D110A_WORKLOAD_ISSUE_FAILED:${issued.kind}:${issued.detail}`);
+		const published = await plane.publishPending();
+		if (!published.ok || published.kind !== "published") {
+			throw new TypeError(`D110A_WORKLOAD_PUBLISH_FAILED:${published.kind}`);
+		}
+		appliedWorkloadOperations += count;
+		latest = Object.freeze({ authorSequence: issued.authorSequence, digest: issued.digest });
+	}
+	return Object.freeze({ appliedWorkloadOperations, latest });
+}
 
 function progress(message: Readonly<Record<string, unknown>>): void {
 	process.send?.(Object.freeze({ kind: "progress", ...message }));
@@ -166,30 +205,15 @@ async function buildObjectEpoch(
 	const fixture = await openD109dHotFixture({
 		creator: {
 			applicationBatch: true,
-			beforeCreatorClose: async ({ firstLogicalTime, plane, signRegisteredVertexDigest }) => {
+			beforeCreatorClose: async (input) => {
 				recordProfilePhase?.("fixture-open", appliedWorkloadOperations);
-				let logicalTime = firstLogicalTime;
-				let latest: Readonly<{ readonly authorSequence: number; readonly digest: string }> | undefined;
-				for (let batchIndex = 0; batchIndex < D110A_BATCH_VERTICES_PER_OBJECT; batchIndex += 1) {
-					const count = batchIndex === D110A_BATCH_VERTICES_PER_OBJECT - 1 ? 9 : 16;
-					const operations = Object.freeze(
-						Array.from({ length: count }, () =>
-							Object.freeze({
-								logicalTime: logicalTime++,
-								operation: Object.freeze({ action: "add", value: 1 }),
-							})
-						)
-					);
-					const issued = await plane.issueLocal({ operations, signRegisteredVertexDigest });
-					if (!issued.ok) throw new TypeError(`D110A_WORKLOAD_ISSUE_FAILED:${issued.kind}:${issued.detail}`);
-					const published = await plane.publishPending();
-					if (!published.ok || published.kind !== "published") {
-						throw new TypeError(`D110A_WORKLOAD_PUBLISH_FAILED:${published.kind}`);
-					}
-					appliedWorkloadOperations += count;
-					latest = Object.freeze({ authorSequence: issued.authorSequence, digest: issued.digest });
-				}
-				if (logicalTime !== 15_628 || appliedWorkloadOperations !== D110A_OPERATIONS_PER_OBJECT) {
+				const workload = await runD110auApplicationWorkload(input);
+				appliedWorkloadOperations = workload.appliedWorkloadOperations;
+				const { latest } = workload;
+				if (
+					input.firstLogicalTime + appliedWorkloadOperations !== 15_628 ||
+					appliedWorkloadOperations !== D110A_OPERATIONS_PER_OBJECT
+				) {
 					throw new TypeError("D110A_WORKLOAD_COUNT_INVALID");
 				}
 				if (latest === undefined) throw new TypeError("D110A_WORKLOAD_LAST_ISSUE_MISSING");
