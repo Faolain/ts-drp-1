@@ -418,3 +418,23 @@ only that pre-existing rule waived. No campaign ran. Because executable scope
 changed, the review policy permits exactly one confirmation over this signed
 correction; D.109d remains open until that confirmation has an empty P0/P1
 union.
+
+## Closure
+
+The executable correction is signed and pushed at
+`40382c7bddadd4aa007bf9e2bc5bbab7b5a8b224`. The single permitted confirmation
+round is complete: Grok 4.6/high, standard Kimi CLI K3/high/100-step, and Opus
+xhigh each returned `APPROVED` with no P0/P1 finding and
+`D109D_GREEN_READY: yes`. The two original P1s are closed, so the blocking
+union is empty.
+
+Confirmation evidence is rooted at
+`.logs/phase-6b-d109d-green-confirmation/`. Its validating self-excluding
+manifest SHA-256 is
+`428248d8bed4ee823a50dc94f64271419caa645fa5ca80eeb2e58f8ba57d67b0`.
+Remaining P2 observations—post-release census observation, shared-fixture
+static census, receipt/store identity and raw dependency auditing, transitive
+snapshot dependency proof, and genuine fresh-process reopen—belong to D.109f
+and do not reopen this slice. No campaign ran.
+
+D.109d is closed. D.109e is the next executable Phase-6b slice.

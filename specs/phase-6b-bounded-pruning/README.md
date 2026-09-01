@@ -9,23 +9,19 @@ Grok 4.6/high, standard Kimi K3/high/100-step, and Opus xhigh unanimously
 approved it with an empty P0/P1 union. Its plan, RED, GREEN, review, and
 evidence are accepted and must not be reopened. The bounded
 [D.109d installed-v3 runtime reclamation](slices/03-runtime-reclamation.md) is
-at its one permitted final-review correction. Signed GREEN
-`f8f6367a1214486412873eb15dca55159c8a74b6` received empty P0/P1 unions from
-Grok and standard Kimi; Opus demonstrated independent-transport creator-close
-retention and a stale genuine issuance-store rebase failure. One narrow batch
-now carries only an internal weak source-handle reference, prunes the live
-fixture's exact issuance owner, and completes the post-release dependency
-gate. Focused 12/12, retained 142/142, all four retained browser groups, Node
-build, and affected static gates pass. Sign/push this correction, then run the
-single permitted Grok/Kimi/Opus confirmation; D.109e remains closed until its
-P0/P1 union is empty.
+also closed. Its signed/pushed correction is
+`40382c7bddadd4aa007bf9e2bc5bbab7b5a8b224`; the single Grok/Kimi/Opus
+confirmation unanimously approved it with an empty P0/P1 union. Focused 12/12,
+retained 142/142, all four retained browser groups, Node build, and affected
+static gates pass. D.109e browser primary scheduling reuse is the next active
+slice.
 
 Global TODO:
 
 - [x] D.109a eligibility planner and causal closure.
 - [x] D.109b issuance retention and causal closure.
 - [x] D.109c AHE reclamation plan → RED → GREEN → final review.
-- [ ] D.109d receipt-gated runtime reclamation.
+- [x] D.109d receipt-gated runtime reclamation.
 - [ ] D.109e browser primary scheduling reuse.
 - [ ] D.109f differential/census exit, including D.109b's three assigned P2
       parity/deep-freeze checks and D.109c's invalid-input-polarity,
@@ -241,10 +237,18 @@ pass. Known whole-package typecheck debt remains confined to its inherited
 test/configuration categories and emits no D.109d semantic diagnostic.
 
 Evidence is rooted at `.logs/phase-6b-d109d-green/`. The final signed
-Grok/Kimi/Opus implementation review is pending; D.109e and later slices remain
-closed until that blocking union is empty. No campaign ran.
+Grok/Kimi/Opus implementation review and its one permitted correction
+confirmation are complete. No campaign ran.
 
 The first final review is complete and preserved. Grok and standard Kimi
-approved; Opus's two P1s are corrected in the current working batch. Correction
-evidence is rooted at `.logs/phase-6b-d109d-green-correction/`; the exact next
-action is sign/push the correction and run the one permitted confirmation.
+approved; Opus's two P1s were corrected in the single permitted executable
+batch. Correction evidence is rooted at
+`.logs/phase-6b-d109d-green-correction/`; the signed and pushed correction
+anchor is `40382c7bddadd4aa007bf9e2bc5bbab7b5a8b224`.
+Grok 4.6/high, standard Kimi CLI K3/high/100-step, and Opus xhigh unanimously
+returned `APPROVED` with an empty P0/P1 union. Confirmation evidence is rooted
+at `.logs/phase-6b-d109d-green-confirmation/`; its validating self-excluding
+manifest SHA-256 is
+`428248d8bed4ee823a50dc94f64271419caa645fa5ca80eeb2e58f8ba57d67b0`.
+D.109d is closed. The exact next action is to plan D.109e browser primary
+scheduling reuse without reopening D.109a–D.109d.

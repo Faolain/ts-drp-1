@@ -88819,3 +88819,32 @@ only that rule waived. No campaign ran. Evidence is rooted at
 `.logs/phase-6b-d109d-green-correction/`. Sign/push this correction and run
 exactly one Grok/Kimi/Opus confirmation because executable scope changed; only
 a material P0/P1 may block D.109d closure and D.109e.
+
+#### D.109d final closure
+
+The correction is signed and pushed at
+`40382c7bddadd4aa007bf9e2bc5bbab7b5a8b224`. Its one permitted confirmation
+round is complete: Grok 4.6/high, the standard Kimi CLI K3/high/100-step, and
+Opus xhigh each returned `APPROVED`, `P0_P1_UNION: none`, and
+`D109D_GREEN_READY: yes`. The blocking union is empty. The complete review
+packet is rooted at `.logs/phase-6b-d109d-green-confirmation/`; its validating
+self-excluding manifest SHA-256 is
+`428248d8bed4ee823a50dc94f64271419caa645fa5ca80eeb2e58f8ba57d67b0`.
+
+The reviewers confirmed that both original P1s are closed without widening
+product behavior: independent-transport adoption carries only a private direct
+weak source-handle reference and releases the genuine creator-close owners,
+while complete/replay receipts prune the successor's actual issuance owner and
+the live post-release dependency probes pass. Snapshot export remains within
+its existing lifecycle contract; the bounded owner-local source proof is
+accepted instead of adding a new active-successor retrieval API.
+
+The remaining nonblocking P2 work is owned by D.109f: observe rather than
+constant-fill the post-release creator-close census, include the shared
+Phase-6a fixture in the changed-owner census, audit receipt/store identity and
+raw dependency structure, make the snapshot dependency proof transitive or
+lifecycle-live, and exercise genuine fresh-process reopen with no weak source
+handle. These dispositions do not reopen D.109d. No campaign ran.
+
+D.109d is closed on this signed record. D.109e browser primary scheduling reuse
+is the next active Phase-6b slice.
