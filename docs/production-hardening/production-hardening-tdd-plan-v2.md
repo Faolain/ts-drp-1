@@ -90583,3 +90583,89 @@ input already places all 35 mapped boundaries strictly inside the profile, so
 no clamping or new acceptance behavior is needed. These corrections materially
 change executable branch selection; one confirmation of the corrected
 signed/pushed plan is permitted. No further plan round is allowed afterward.
+
+##### D.110a-v corrected-plan confirmation and offline disposition
+
+The one permitted confirmation inspected signed/pushed correction anchor
+`cc6a72d9f197075930a7a4cf66b97c356d68f6cf`, tree
+`4ce2eef55e8675fa2523a297b0188f6719bdc9e5`. The prompt SHA-256 is
+`4fee7ed7bf1c678765f3b038583b97da8f9850a54a550e62c6bcee546f2674f8`.
+Grok 4.6/high session `01a05e18-d7f0-7132-8cfa-e6a593f10102` returned
+`APPROVED`, P0=0, P1=0, P2=2; standard direct Kimi K3/100-step session
+`session_1d2ea989-4c9f-45dc-9878-3d8e6407b34b` returned `APPROVED`, P0=0,
+P1=0, P2=0; and Opus xhigh session
+`400968be-3803-4a57-a2d2-0172d54f973a` returned `APPROVED`, P0=0, P1=0,
+P2=5. All three answered YES for mapping validity, conservation validity,
+decision-matrix closure, and scope preservation. Their terminal SHA-256 values
+are respectively
+`b805c7d925e61944b1a4977982a7624722c80df5245411d89bbec3a977cd75f4`,
+`ed14771b2239e38d22e419c73359247a19a81645dab7ef1d9cef9c5da123dda0`,
+and `772c8df9cc75e4ae6cc9e750b57a5674a8f15ef321a83e49da46bcdfa50f673a`.
+The self-excluding 13-entry confirmation manifest validates and has SHA-256
+`e015bed61ddfd26ee7a70bbb162d2d3dbc7520f247cce18462dfea8a2bc142df`.
+
+The confirmation P2 findings do not change the frozen computation. The
+repository/test/package URL guard is already total across branches 2 and 3;
+the spec is authoritative for the three evidence roots; mapped-boundary
+containment is already an input-validity predicate; `full attributed time` is
+fixed by time-delta conservation; the frozen result has one unique phase above
+50 percent, so no tie-break is reached; and the application phase is already
+distinguished from the named-function window. Per the review cap, none triggers
+another edit or plan round. The blocking union is empty.
+
+The fresh `.logs/phase-6c-d110av-disposition/` root was absent before
+execution. Local and pushed refs both named the confirmed anchor, all 26
+stashes and protected roots remained, and the three immutable input hashes plus
+the D.110a-u evidence/final-review manifest hashes matched exactly. The single
+offline command was `node
+.logs/phase-6c-d110av-disposition/analyze.mjs`; it created the exclusive
+`analysis-consumed.json` sentinel, ran from `2026-09-01T17:58:59Z` through
+`2026-09-01T17:59:00Z`, exited zero with empty stderr, and was not rerun. The
+analyzer and result SHA-256 values are
+`aebf29f6fb71e6c61583e2b4526cf8108b7a25e0a01ca0b0af1b40c8064a93fc`
+and
+`388d1f98d096493698734e717f5fe43ceb6fcbf8d3dad2508b5db79536a8c3c1`.
+
+All five mappings conserved exactly 167,687 samples and 252,421,458 attributed
+microseconds across eight intervals. Every phase boundary stayed inside the
+profile; the exact maximum spread was 44,960 microseconds. Every mapping chose
+`creator-close` as the sole dominant phase, ranging from
+85.9331986744 percent through 85.9429708230 percent of full attributed time.
+Every mapping classified the phase's owners as mixed. Canonical was largest
+but ranged only from 46.6071877514 percent through 46.6087051482 percent,
+below the unchanged 50-percent rule. The next material buckets were GC at
+about 8.33 percent, Node encoding at about 7.99 percent, live-journal at about
+5.79 percent, Node issuance storage at about 5.18 percent, runtime UTF-8 decode
+at about 4.99 percent, noble SHA-256 at about 4.57 percent, and runtime `all`
+at about 4.21 percent. The complete profile was likewise mixed, with canonical
+at 46.7024455583 percent. No single product, fixture, runtime, or dependency
+owner is dominant.
+
+The closed matrix therefore selected exactly branch 3:
+`stable-phase-mixed-owners`, stable phase `creator-close`, no stable dominant
+owner, next slice `phase-level feasibility slice`. The measured profile was
+252.422167 seconds and wall time was 255 seconds. A serial 64-object projection
+from the profile duration is 16,155.018688 seconds, or 4.4875051911 hours and
+5.9833402548 times the frozen 45-minute watchdog. This is explicitly a
+projection, not a measured full-run result. It demonstrates a feasibility gap,
+not a product correctness or memory defect.
+
+The independent audit returned all sixteen predicates true, including mapping
+roster, eight-interval/sample/time conservation, stable creator-close phase,
+mixed owner result, canonical below half, exact branch, bounded spread, and
+non-measurement projection. Its SHA-256 is
+`6c6ef7f1bbe1540de827f1dfce1f74fe7c64ee4e6134c4b2fa9c90e45230c1ef`.
+The self-excluding 41-entry D.110a-v evidence manifest validates and has
+SHA-256
+`1d6e60bc59603be8102890367f9d4134213169e991831d7414b1d38681dd353c`.
+No test, measured child, workload, profiler, profile, retry, preflight,
+full-worker, source, dependency, threshold, memory, or watchdog contract ran
+or changed.
+
+D.110a-v now awaits only its single final Grok/Kimi/Opus evidence review. If
+that review has an empty P0/P1 union, D.110a-v closes and the sole next action
+is a separately planned phase-level creator-close feasibility slice. That
+successor must decide whether the required genuine creator-close cost warrants
+a product performance investigation or a high-risk workload/watchdog contract
+correction; it may not claim a product bug, alter a contract, run another
+profile, or spend the preflight/full worker without its own reviewed authority.
