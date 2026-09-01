@@ -90775,3 +90775,29 @@ sentinel. These corrections change causal acceptance and future CI
 feasibility, so one confirmation round of this corrected signed/pushed plan is
 permitted. It must not broaden timing, product, workload, threshold, or
 execution authority.
+
+The sole corrected-plan confirmation inspected signed/pushed anchor
+`6180cd028ac8730512053239368d06e5d9c1d109`, tree
+`23eaac5e31168d1a7fd23175ab2de3ffc9ff86aa`. Grok 4.6/high and standard
+direct Kimi K3/100-step returned `APPROVED`, P0=0, P1=0, P2=0. Opus xhigh
+returned `APPROVED`, P0=0, P1=0, P2=3. All three answered YES for RED
+causality, profile-timeout preservation, stale-document closure, CI-feasibility
+deferral, and scope preservation. Their terminal SHA-256 values are
+respectively
+`8aa1b39a109b26b9aa6e511bb2e7a9daf1a2a3623c1f8ed3ef161c7992bb6cb3`,
+`d93598effc5fe7a32af7f785958078c9c025b0644bb2f0cea0a8d91c80164004`,
+and `1249f00334ea5a396fc7c24dd4490227202e69b9e68c83896c2e388cde90fb12`.
+The self-excluding 13-entry confirmation manifest validates and has SHA-256
+`c30dc799a1b03d65c62aa8b538ebc5edff8d1b78929c4258683b9bff8a4babe2`.
+The corrected plan's blocking union is empty and no further plan round is
+permitted.
+
+Opus's useful P2 release precision is adopted without another review round.
+The inherited 80-percent preflight release rule is now expressed against the
+six-hour watchdog: complete two-object wrapper elapsed time must be at most 540
+seconds, projecting to at most 17,280 seconds across 64 objects. The GREEN
+keeps the timer ternary on one line so the inherited contiguous profile-literal
+audit remains valid. Widening the documentation owner set only to update the
+superseded D.110a slices is accepted as bookkeeping. These points change no
+RED behavior, timeout value, product owner, workload, threshold, or reserved-
+run count. D.110a-w RED may proceed.

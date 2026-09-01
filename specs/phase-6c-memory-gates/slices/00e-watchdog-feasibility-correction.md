@@ -44,6 +44,7 @@ The only executable owners are:
 Planning and evidence may additionally update this specification,
 `specs/phase-6c-memory-gates/README.md`, and
 `specs/phase-6c-memory-gates/slices/00-retained-heap-gate.md`, and
+`specs/phase-6c-memory-gates/slices/00b-workload-feasibility-attribution.md`, and
 `docs/production-hardening/production-hardening-tdd-plan-v2.md`, and create new
 D.110a-w evidence roots under `.logs/`.
 
@@ -84,9 +85,11 @@ Make `retained-heap-child.mjs` import and use the two tests-only timeout
 constants in its existing parent timer expression. Keep profile mode exactly
 900,000 ms, including the literal `900_000` token in the profile branch. The
 GREEN source-shape check must require the two imported constant names and must
-not restore or accept the old 45-minute expression. Do not add retries,
-progress-resetting timers, adaptive deadlines, per-object timeouts, signal
-changes, or a second watchdog owner.
+not restore or accept the old 45-minute expression. Preserve the single-line
+ternary containing the contiguous `mode === "profile" ? 900_000` substring
+because the inherited profile audit pins that exact source shape. Do not add
+retries, progress-resetting timers, adaptive deadlines, per-object timeouts,
+signal changes, or a second watchdog owner.
 
 Run the focused test exactly once after the edit. Then run the affected package
 build/source typechecks, exact-owner ESLint, Prettier, child syntax, source-
@@ -108,8 +111,11 @@ in this order:
    signed/pushed GREEN using a fresh write-once
    `.logs/phase-6c-d110aw-preflight/` root;
 2. require normal exit, exact two-object/two-lifecycle accounting, complete
-   stdout/stderr/status/runtime identity, no memory verdict, and a validating
-   self-excluding manifest; then
+   stdout/stderr/status/runtime identity, no memory verdict, a validating
+   self-excluding manifest, and total wrapper elapsed time at most 540 seconds.
+   This conservatively preserves the inherited 20-percent headroom release
+   predicate because 540 seconds across two objects projects to 17,280 seconds
+   across 64, exactly 80 percent of the six-hour watchdog; then
 3. run the sole genuine 64-object full worker exactly once using a fresh
    write-once `.logs/phase-6c-d110a-full/` root.
 

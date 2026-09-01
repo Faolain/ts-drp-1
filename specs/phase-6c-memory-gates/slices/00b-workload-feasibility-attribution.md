@@ -125,13 +125,13 @@ anything weaker is mixed or unavailable.
 
 The 64-object worker does not run in D.110a-t.
 
-The corrected two-object preflight is only a readiness diagnostic. It may
-resume the sole D.110a worker only if its recorded mean lifecycle time projected
-across 64 objects is at most 80 percent of the unchanged 45-minute watchdog,
-reserving 20 percent headroom; equivalently its two lifecycle intervals total
-at most 67.5 seconds.
-Otherwise D.110a remains paused even if the preflight exits zero. This is an
-invocation-safety predicate, not a new product or memory-performance contract.
+The corrected two-object preflight is only a readiness diagnostic. D.110a-w
+prospectively supersedes the timer but preserves this 80-percent release rule:
+the complete wrapper elapsed time for two objects must be at most 540 seconds,
+which projects to at most 17,280 seconds across 64 objects and reserves 20
+percent of the reviewed six-hour watchdog. Otherwise D.110a remains paused
+even if the preflight exits zero. This is an invocation-safety predicate, not a
+new product or memory-performance contract.
 
 ## Review and closure
 
