@@ -91281,3 +91281,41 @@ the launcher's actually consumed exported configuration rather than only a
 regex; and the post-GC baseline is journaled and matched on success. No second
 confirmation or recursive prose review is authorized. Sign/push this bounded
 correction and proceed to the separate deterministic forensics RED.
+
+##### D.110a-x deterministic failure-forensics RED
+
+The separate forensics RED changed only the tests-only contract and new
+`tests/phase-6c-retained-heap-forensics-red.test.ts`. It added the exact
+`D110AX_FAILURE_FORENSICS_MISSING` token, completed the audit return type,
+added a false `failureForensics` source predicate against the still-absent
+recorder, and added one require/test owner. The child and worker remained
+unchanged, no child or workload ran, the completed timing-focused 23/23 result
+was not rerun, and the full root remained absent.
+
+The new focused command ran exactly once with coverage disabled. It selected
+only the new file and reported exactly one test, failed only `closes
+D110AX_FAILURE_FORENSICS_MISSING` with the complete exact token, had zero
+pending/todo tests or top-level errors, and emitted empty stderr. The reporter
+JSON SHA-256 is
+`67b9093d95ad37ccc09bc60f349b64cecf4c52d07b31d00b41f4b0143e35794b`.
+
+Exact-two-owner ESLint, Prettier, `git diff --check`, and the detached source
+audit exited zero. The source audit reports only `failureForensics=false` while
+every inherited field, including `preflightVariance`, remains true; its SHA-256
+is `c4cd3f5f72d84ca3feb88ef939fb24674685ac1a392c5a1729b46214f8bce81b`.
+The child remains exact at SHA-256
+`263012d82edeae639a80235011b8d00227b0b19ed52463af998f8734e458fff9`.
+
+The first read-only RED audit expected a leading Git-status space after it had
+already applied `.trim()`, so only `changedPathsExact` was false. Correcting
+that diagnostic expectation produced the final all-true audit without
+rerunning the focused test. Protected roots and all 26 stashes remain present,
+fixed ports are clear, no relevant process is active, `NODE_OPTIONS` is unset,
+the preflight manifest hash remains exact, and the full root is absent. The
+final RED diff and audit SHA-256 values are
+`1c1ed9d461ac26981a0cbe2d13c3de1255ac7428c69ad246ccd1f15f3654adb8`
+and `ecd71cb2104d3c7198ebf4e4ec64de9dbbe40b5f9635a72944d24d24caf126fc`.
+The validating self-excluding 30-entry evidence manifest has SHA-256
+`947dfa533e2698ba4e9eac96170365c7355f4db25664f576578652485e219714`.
+RED is causal and authorizes only the reviewed tests-only recorder, worker IPC,
+full-launcher wiring, synthetic child, and focused fault matrix in GREEN.

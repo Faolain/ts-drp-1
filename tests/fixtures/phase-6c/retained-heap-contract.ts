@@ -26,6 +26,7 @@ export const D110AT_RED_TOKEN = "D110AT_PROFILE_ATTRIBUTION_MISSING";
 export const D110AU_RED_TOKEN = "D110AU_PROFILE_CLOCK_CALIBRATION_MISSING";
 export const D110AW_RED_TOKEN = "D110AW_TIMEOUT_FEASIBILITY_MISSING";
 export const D110AX_RED_TOKEN = "D110AX_PREFLIGHT_VARIANCE_MISSING";
+export const D110AX_FORENSICS_RED_TOKEN = "D110AX_FAILURE_FORENSICS_MISSING";
 
 export const D110AU_PROFILE_MUTANTS = Object.freeze([
 	"phase-before-start",
@@ -719,12 +720,14 @@ export function d110aMutantProof(mutant: D110aMutant): D110aProof {
  */
 export function d110aCurrentInfrastructureAudit(): Readonly<{
 	readonly childProfileCustody: boolean;
+	readonly failureForensics: boolean;
 	readonly gracefulProfileMode: boolean;
 	readonly hardEntrypoint: boolean;
 	readonly pairedWorkloadGate: boolean;
 	readonly phaseProgressSchema: boolean;
 	readonly profileClockCalibration: boolean;
 	readonly postGcSlopeGate: boolean;
+	readonly preflightVariance: boolean;
 	readonly watchdogFeasibility: boolean;
 }> {
 	const read = (relative: string): string => {
@@ -733,6 +736,7 @@ export function d110aCurrentInfrastructureAudit(): Readonly<{
 	};
 	const rootPackage = readFileSync(resolve(REPOSITORY_ROOT, "package.json"), "utf8");
 	const child = read("tests/fixtures/phase-6c/retained-heap-child.mjs");
+	const forensics = read("tests/fixtures/phase-6c/retained-heap-forensics.mjs");
 	const worker = read("tests/fixtures/phase-6c/retained-heap-worker.ts");
 	return Object.freeze({
 		childProfileCustody:
@@ -742,6 +746,12 @@ export function d110aCurrentInfrastructureAudit(): Readonly<{
 			/Profiler\.stop/u.test(child) &&
 			/flag:\s*"wx"/u.test(child) &&
 			/retained-heap-worker\.ts/u.test(child),
+		failureForensics:
+			/createD110aFullForensicConfiguration/u.test(forensics) &&
+			/captureD110aForensicChild/u.test(forensics) &&
+			/validateD110aForensicJournal/u.test(forensics) &&
+			/terminal\.json/u.test(forensics) &&
+			/progress\.jsonl/u.test(forensics),
 		gracefulProfileMode:
 			/ROLE !== "full" && ROLE !== "preflight" && ROLE !== "profile"/u.test(child) &&
 			/mode === "profile" \? 900_000/u.test(child) &&
@@ -813,6 +823,11 @@ export function requireD110awTimeoutFeasibility(): void {
 /** Fails with the exact D.110a-x RED token while the variance reserve is infeasible. */
 export function requireD110axPreflightVariance(): void {
 	if (!d110aCurrentInfrastructureAudit().preflightVariance) fail(D110AX_RED_TOKEN);
+}
+
+/** Fails with the exact D.110a-x RED token while full-run failure evidence is incomplete. */
+export function requireD110axFailureForensics(): void {
+	if (!d110aCurrentInfrastructureAudit().failureForensics) fail(D110AX_FORENSICS_RED_TOKEN);
 }
 
 /** Fails with the exact RED token while the post-GC gate is absent. */
