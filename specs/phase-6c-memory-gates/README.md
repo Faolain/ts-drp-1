@@ -22,15 +22,27 @@ D.110a-p is closed through signed/pushed GREEN anchor
 128; focused GREEN passed 2/2 and the retained selection passed 95/95. Grok,
 the standard direct Kimi CLI, and Opus all approved with an empty P0/P1 union.
 
-The next executable work is the corrected D.110a two-object non-verdict
-preflight. Preserve both inherited failed diagnostics. If it passes, the full
-64-object worker remains a single consuming invocation. Do not invoke Fable or
+The corrected D.110a path then exposed two tests-only infrastructure limits.
+The inherited D.109d receipt helper read only the default 64-row issuance page;
+bounded pagination closes that mismatch. Afterward the two-object preflight
+completed one exact 15,625-operation lifecycle but hit its five-minute
+diagnostic watchdog during the second. A 55-second Time Profiler trace of the
+exact child showed CPU-active canonical/typed-array/BigInt/GC work, not an idle
+or SQLite-bound process. The 64-object full worker remains unspent because the
+observed throughput cannot credibly fit its frozen 45-minute watchdog.
+
+The next executable work is
+[D.110a-t workload feasibility attribution](slices/00b-workload-feasibility-attribution.md).
+It adds one graceful one-object diagnostic with exact phase timing and child
+JavaScript CPU-profile custody. It changes no workload, threshold, memory
+verdict, product source, or full-worker watchdog. Do not invoke Fable or
 collaboration subagents.
 
 Global TODO:
 
 - [x] Structure-census artifact inherited from D.109f and D.109d.
 - [x] D.110a-p paginate creator durable replay across the public 128-row page seam.
+- [ ] D.110a-t attribute and close the retained-workload feasibility blocker.
 - [ ] D.110a genuine million-operation retained-heap hard gate.
 - [ ] D.110b CI memory-trend fail-closed backstop.
 
@@ -160,11 +172,14 @@ the sole consuming full worker; it cannot tune or reinterpret a threshold.
 1. [D.110a-p durable-replay pagination prerequisite](slices/00a-durable-replay-pagination.md)
    closes the newly demonstrated `rowCount > 128` creator-close defect without
    changing journal limits, close semantics, or Phase-6c workload contracts.
-2. [D.110a retained-heap hard gate](slices/00-retained-heap-gate.md) adds the
+2. [D.110a-t workload feasibility attribution](slices/00b-workload-feasibility-attribution.md)
+   identifies the exact CPU owner behind the impossible preflight throughput
+   without changing the accepted workload or watchdog.
+3. [D.110a retained-heap hard gate](slices/00-retained-heap-gate.md) adds the
    fresh-process worker, exact workload/digest assertions, slope arithmetic,
    hard limits, and mutation-sensitive focused test. Its own implementation
    remains tests/build infrastructure; it depends on D.110a-p.
-3. D.110b runs the accepted D.110a hard command from CI and changes the existing
+4. D.110b runs the accepted D.110a hard command from CI and changes the existing
    benchmark comparison to `fail-on-alert: true` as a separate trend backstop.
    It reviews timeout, cadence, cache-absence, and failure-reporting behavior
    without changing D.110a's workload or thresholds. Historical trend cache is

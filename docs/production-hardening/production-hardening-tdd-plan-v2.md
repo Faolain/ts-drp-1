@@ -89768,3 +89768,75 @@ preserved authentication and replay checks, the accurate tests-only sequence
 correction, focused 2/2, retained 95/95, and unchanged public/workload/memory
 contracts. D.110a-p is closed. Resume D.110a at one corrected two-object
 non-verdict preflight; the consuming 64-object worker remains unspent.
+
+##### D.110a post-pagination preflight disposition and D.110a-t plan
+
+After D.110a-p closure, a fresh all-package build passed. The corrected
+two-object preflight passed creator close pagination but failed before any
+memory verdict at `D109D_GENUINE_DISPLACED_BOUNDARY_INVALID`. The D.109d
+tests-only receipt helper read the issuance outbox twice with its default
+64-row page and compared row 63 to the genuine final boundary 978. A bounded
+fixture correction now reads at most the public 128-row issuance maximum,
+advances an exact `(objectId, author, authorSequence)` cursor, requires
+contiguous sequence zero through the frozen boundary, rejects empty/overrun
+pages, and re-reads every row as published. No product source changed. The
+failing stderr SHA-256 is
+`debfbf766b5bb517e79f8e6f018766c39c4feb6417fee680a1d2d85b57895e77`.
+
+The corrected preflight then completed one exact object lifecycle and reported
+15,625 applied workload operations, but the unchanged five-minute diagnostic
+watchdog sent SIGKILL during object two. Its stdout was empty and its stderr
+SHA-256 is
+`6266fb195400e2bc8f35339ba186214f303987c373bc5d67ba7657d9cff10eb8`.
+No heap slope, ceiling, or other memory verdict ran. This is not a product
+correctness failure, but it demonstrates that the sole 64-object worker cannot
+credibly fit its frozen 45-minute watchdog at the observed throughput. The
+consuming worker remains unspent.
+
+One bounded attribution capture used macOS Time Profiler for 55 seconds against
+the exact worker PID and Node executable while the same preflight ran. The TOC
+and raw time-profile XML SHA-256 values are
+`4f30da5789eaff303803fe47af1a03b580c75c50011fb51d70a8a4b7063ce724`
+and `91e74a31ebd3ad73553114c471a988bbbd2d65daefc1e99e81e3411922c01aca`.
+It contained 60,282 running samples; contemporaneous process inspection showed
+about 115 percent CPU. Deterministic top-frame classification yielded 28.37
+percent typed-array/allocation, 18.13 percent unnamed JIT JavaScript, 9.65
+percent GC, 7.12 percent BigInt arithmetic, 6.13 percent string/codec, and only
+1.84 percent SQLite/I/O. The child was CPU-active in genuine cryptographic and
+canonical workload, not idle, wedged, or I/O dominated.
+
+A final `NODE_OPTIONS=--cpu-prof` diagnostic again completed one object before
+the five-minute SIGKILL, with stderr SHA-256
+`9150328bb354171def078d1d35cb455bafb74c01cb6544a0cb2e46a8b6705a1d`.
+Its two `.cpuprofile` files name only parent PID 81759 and the tsx loader thread;
+they do not contain `retained-heap-worker.ts` because the killed child could not
+flush a profile. They are preserved as invalid owner-attribution diagnostics,
+not used to claim a JavaScript owner. A separate 1,000-signature benchmark
+proved Node native Ed25519 signatures byte-identical and about 9.45 times faster
+than the fixture's noble signer, but the noble total was only about 321 ms per
+1,000 signatures; substituting it cannot explain or close a multi-minute
+per-object gap and is rejected as speculative optimization.
+
+D.110a therefore pauses behind D.110a-t, a narrow tests/build-infrastructure
+feasibility attribution slice. RED adds desired-state assertions to the
+existing focused file without changing its selected file/title count and runs
+no object workload. GREEN adds one graceful diagnostic-only `profile` mode to
+the existing child/worker owners. It executes exactly one genuine object with
+the same 15,625 operations, 977 batch vertices, built-package hook, stores,
+close/adopt/prune/reclaim/successor path, three GC turns, and teardown; records
+monotonic phase progress; emits no memory verdict; exits normally; and hashes a
+child-owned JavaScript CPU profile. The 64-object worker does not run.
+
+If the one profile proves a tests-only owner dominant, D.110a-t may optimize
+only that named owner and run one corrected two-object preflight. If it proves a
+product owner, stop and freeze a separate product optimization slice before
+editing production source. Mixed or unavailable attribution stops without
+changing the workload, thresholds, sample window, GC turns, memory ceiling,
+45-minute full watchdog, dependencies, or semantics.
+
+Because this diagnostic controls feasibility adjacent to a scarce consuming
+run, its signed/pushed plan receives one Grok 4.6/high, standard direct Kimi CLI
+K3/100-step, and Opus xhigh review. Signed RED receives deterministic local
+validation; final diagnostic GREEN receives one plan-to-RED-to-GREEN review.
+Only P0/P1 blocks. If Grok cancels, resume the exact session. Do not invoke
+Codex Sol in place of Kimi, Fable, or collaboration subagents.
