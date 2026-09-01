@@ -90848,3 +90848,84 @@ The validating self-excluding 34-entry RED manifest has SHA-256
 RED matches its frozen causal matrix and authorizes only the child timer import
 and expression change in GREEN. Sign and push this RED before that edit; no
 separate RED model review is required.
+
+##### D.110a-w GREEN implementation and deterministic gates
+
+GREEN changes only
+`tests/fixtures/phase-6c/retained-heap-child.mjs`. It imports the reviewed
+tests-only `D110A_PREFLIGHT_TIMEOUT_MS` and `D110A_FULL_TIMEOUT_MS` constants
+and uses them in the existing single parent timer. The profile branch remains
+the exact literal `mode === "profile" ? 900_000`; the stale five-minute and
+45-minute expressions are absent. No worker, product source, package manifest,
+lockfile, dependency, workload, memory threshold, semantic contract, retry,
+signal, or result schema changed. The final child and GREEN diff SHA-256 values
+are respectively
+`263012d82edeae639a80235011b8d00227b0b19ed52463af998f8734e458fff9`
+and
+`d09172a7f024f51b359a019fd62b2503e6b8e4d510a4b584e2053697a008e65a`.
+
+The focused test was executed exactly once from `2026-09-01T18:51:45Z`
+through `2026-09-01T18:51:51Z` using the frozen command recorded in
+`.logs/phase-6c-d110aw-green/command.txt`. Its reporter JSON is successful:
+exactly one selected file, 22/22 assertions passed, zero failed, pending or
+todo assertions, and no top-level test error. The wrapper nevertheless exited
+1 because that command accidentally omitted the lineage's established
+`--coverage.enabled=false`; the only stderr is exactly `ERROR: Coverage for
+lines (0%) does not meet global threshold (70%)`. This is a command-construction
+soft failure from applying the repository-wide coverage threshold to a
+source-shape-only focused selection, not a product or test-assertion failure.
+The invocation was not rerun. The deterministic classification preserves the
+nonzero status and all four raw hashes at
+`.logs/phase-6c-d110aw-green/focused-exit-classification.json`, SHA-256
+`f4e0d545f8089414819ade96eb70b217f1a50428567ff0030a741a7cf7cfac30`.
+Future focused invocations in this lineage must restore
+`--coverage.enabled=false`; the final review must inspect this disposition
+rather than silently treating the wrapper status as zero.
+
+`pnpm build:packages` and the Node, storage-node and storage-browser
+build-source `tsc --noEmit` commands all exited zero. Exact-three ESLint with
+zero warnings, exact-three Prettier, child `node --check`, `git diff --check`,
+and the detached source audit all exited zero. The audit returned all eight
+inherited/current fields true, including `watchdogFeasibility=true`. The
+listing gate selected exactly 22 titles from only the focused file. The frozen
+retained command, with `--coverage.enabled=false`, exited zero with 95/95
+assertions passed across the exact eleven retained files and zero failed,
+pending or todo assertions.
+
+The first combined post-ledger Prettier check exhausted Node's default 4 GiB
+heap while parsing this approximately 90,000-line plan and emitted no
+formatting mismatch. The preserved corrected read-only check raised only the
+Prettier process heap to 12 GiB, checked this plan alone, and exited zero with
+`All matched files use Prettier code style!`; it did not change or execute any
+Phase-6c workload, threshold, memory ceiling, or product owner. The exact
+classification SHA-256 is
+`df3eb8f3654d7ccadd675908248543217593dc58a2da23cba062fa5e47ebb2e8`.
+
+The final mechanical audit returned every one of its twenty checks true and
+no failure. It verifies the sole changed executable path, exact constants and
+timer source shape, focused assertion result and explicit non-test status
+classification, retained counts, static statuses, 26 stashes, all protected
+roots, four clear fixed ports, no active ts-drp reviewer/test/profiler, and
+absent preflight/full evidence roots. Two inherited shell waiters for old
+D.108e4 owner checks remain visible only in the broader process context; they
+run no reviewer, test, profiler, port listener, or D.110a owner and are
+nonblocking under the user's authorization to proceed alongside unrelated
+processes. The audit SHA-256 is
+`6188dce4511dd32c41f0224323b961d837c747673cf78c45c565721ac0b736cd`.
+The validating self-excluding 65-entry GREEN manifest has SHA-256
+`9658c88a57d25f29ddea5a8551f7b8641607db0627d63ca79b52c346a7885f84`.
+
+The user-authorized one-off Fable/high trajectory review used effective model
+`claude-fable-5`, session `da7fdcbd-a2c5-40e3-9c6a-9788068bc724`, spawned no
+subagent, and returned `ON_TRACK_WITH_CONDITIONS`, P0=0. It independently
+confirmed the Phase-6c goal, D.110a-u/v causal evidence, watchdog arithmetic,
+unchanged workload/memory/semantic contracts, single-use custody, and D.110b
+CI-risk quarantine. Its sole P1 was the focused coverage-command disposition
+recorded above. This advisory is not a substitute for or addition to the
+frozen final Grok/Kimi/Opus gate, and no further Fable run is authorized.
+
+Sign and push the GREEN implementation/evidence checkpoint, record its exact
+commit identity in one plan-only anchor, and then run the single final Grok,
+standard direct Kimi K3/100-step, and Opus xhigh review over the complete
+plan-to-RED-to-GREEN history. The two-object preflight and sole 64-object worker
+remain unspent and prohibited until that review's P0/P1 union is empty.

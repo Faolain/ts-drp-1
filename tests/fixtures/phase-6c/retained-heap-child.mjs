@@ -5,7 +5,11 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFil
 import { basename, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { validateD110auProfileAttribution } from "./retained-heap-contract.ts";
+import {
+	D110A_FULL_TIMEOUT_MS,
+	D110A_PREFLIGHT_TIMEOUT_MS,
+	validateD110auProfileAttribution,
+} from "./retained-heap-contract.ts";
 import { workspacePackageImportHook } from "../shared/workspace-package-subprocess.mjs";
 
 const REPOSITORY_ROOT = resolve(import.meta.dirname, "../../..");
@@ -170,7 +174,7 @@ async function runWorker(mode) {
 	let captureRecordError;
 	let lastProgress;
 	const progressMessages = [];
-	const timeoutMs = mode === "full" ? 45 * 60 * 1000 : mode === "profile" ? 900_000 : 5 * 60 * 1000;
+	const timeoutMs = mode === "full" ? D110A_FULL_TIMEOUT_MS : mode === "profile" ? 900_000 : D110A_PREFLIGHT_TIMEOUT_MS;
 	const timer = setTimeout(() => child.kill("SIGKILL"), timeoutMs);
 	child.stdout?.setEncoding("utf8");
 	child.stderr?.setEncoding("utf8");
