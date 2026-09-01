@@ -13,8 +13,10 @@ also closed. Its signed/pushed correction is
 `40382c7bddadd4aa007bf9e2bc5bbab7b5a8b224`; the single Grok/Kimi/Opus
 confirmation unanimously approved it with an empty P0/P1 union. Focused 12/12,
 retained 142/142, all four retained browser groups, Node build, and affected
-static gates pass. D.109e browser primary scheduling reuse is now at its
-tests-only RED checkpoint; no product change has run.
+static gates pass. D.109e browser primary scheduling reuse is also closed at
+signed/pushed correction `fd99b1ac567c6a559593916492cb9c2036109066`;
+its one Grok/Kimi/Opus confirmation unanimously approved with an empty P0/P1
+union. D.109f differential/census exit is now the next active slice.
 
 Global TODO:
 
@@ -22,7 +24,7 @@ Global TODO:
 - [x] D.109b issuance retention and causal closure.
 - [x] D.109c AHE reclamation plan → RED → GREEN → final review.
 - [x] D.109d receipt-gated runtime reclamation.
-- [ ] D.109e browser primary scheduling reuse.
+- [x] D.109e browser primary scheduling reuse.
 - [ ] D.109f differential/census exit, including D.109b's three assigned P2
       parity/deep-freeze checks and D.109c's invalid-input-polarity,
       second-process SQLite concurrency, and browser facade-census checks.
@@ -313,4 +315,12 @@ though `drain()` still rejected. The single correction restores the original
 `await result` tail behavior. All D.109e and retained browser/static gates pass
 again; correction evidence is rooted at
 `.logs/phase-6b-d109e-green-correction/`. One bounded confirmation of this exact
-correction is now pending; no other review P2 widens D.109e.
+correction followed; no other review P2 widened D.109e.
+
+The bounded correction confirmation is complete. Grok 4.6/high, standard Kimi
+CLI K3/high/100-step, and Opus xhigh unanimously returned `APPROVED`, P0 none,
+P1 none, and `D109E_GREEN_CLOSABLE: yes` for signed/pushed correction
+`fd99b1ac567c6a559593916492cb9c2036109066`. Its validating self-excluding
+manifest SHA-256 is
+`a78c72b15a660197ace16542af5b8b3491f3cb8a08a4a1ce2555c02f12ca6378`.
+D.109e is closed without a campaign. D.109f is next.

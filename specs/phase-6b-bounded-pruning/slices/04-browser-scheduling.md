@@ -283,9 +283,9 @@ After that one-line correction, every frozen executable gate was rerun: focused
 Chromium 6/6, all-engine D.109e 18/18, retained Phase-5c 25 plus the two expected
 skips, retained D.109c 4/4, build/static gates green, and the same tests-only
 typecheck file/class set. Correction evidence is rooted at
-`.logs/phase-6b-d109e-green-correction/`. The corrected signed/pushed commit now
-receives the one permitted bounded confirmation; no other P2 expands this
-slice.
+`.logs/phase-6b-d109e-green-correction/`. The corrected signed/pushed commit
+then received the one permitted bounded confirmation; no other P2 expanded
+this slice.
 
 ## Exit
 
@@ -305,3 +305,19 @@ and `D109E_RED_READY: yes`. Evidence is rooted at
 manifest SHA-256 is
 `c0f0dbd11bb0250edbbd98bff660f9786a9d240a6508b8cfe3559608532e531c`.
 The plan gate is closed and the one authorized Chromium RED may run.
+
+## Closure
+
+The single close-preservation correction is signed and pushed at
+`fd99b1ac567c6a559593916492cb9c2036109066`. Its post-correction evidence
+manifest SHA-256 is
+`fc032f145e1d9c993f1146870cb6e8ff02b69ac23b04e7fd30c6cd09ec910cfb`.
+The one permitted confirmation completed normally: Grok 4.6/high, standard
+Kimi CLI K3/high/100-step, and Opus xhigh each returned `APPROVED`, P0 none, P1
+none, and `D109E_GREEN_CLOSABLE: yes`. Confirmation evidence is rooted at
+`.logs/phase-6b-d109e-green-confirmation/`; its validating self-excluding
+manifest SHA-256 is
+`a78c72b15a660197ace16542af5b8b3491f3cb8a08a4a1ce2555c02f12ca6378`.
+
+D.109e is closed. No campaign ran, all P2s retain their recorded dispositions,
+and D.109f becomes the next active Phase-6b slice.

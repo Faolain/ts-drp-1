@@ -89071,3 +89071,24 @@ evidence-strength limitations; and pre-correction artifacts remain preserved.
 Correction evidence is rooted at `.logs/phase-6b-d109e-green-correction/`.
 Sign/push this one-line correction and run the one permitted bounded
 Grok/Kimi/Opus confirmation. No campaign runs.
+
+#### D.109e closure
+
+The close-preservation correction is signed and pushed at
+`fd99b1ac567c6a559593916492cb9c2036109066`. Its validated correction-evidence
+manifest SHA-256 is
+`fc032f145e1d9c993f1146870cb6e8ff02b69ac23b04e7fd30c6cd09ec910cfb`.
+
+The one permitted bounded confirmation completed normally. Grok 4.6/high,
+standard Kimi CLI K3/high/100-step, and Opus xhigh each returned `APPROVED`, P0
+none, P1 none, and `D109E_GREEN_CLOSABLE: yes`. They confirmed that restored
+`await result` makes failed publication reject both `drain()` and the tail
+awaited by `close()`, leaves success and later-drain recovery unchanged, and is
+the sole production-line delta. Confirmation evidence is rooted at
+`.logs/phase-6b-d109e-green-confirmation/`; its validating self-excluding
+manifest SHA-256 is
+`a78c72b15a660197ace16542af5b8b3491f3cb8a08a4a1ce2555c02f12ca6378`.
+
+D.109e is closed with the exact plan → causal RED → GREEN → single correction
+history preserved. No retained campaign ran. D.109f differential/census exit
+is the next active Phase-6b slice.
