@@ -90417,3 +90417,75 @@ with an actionable Phase-6c decision rather than another profiling loop. The
 single final Grok, standard direct Kimi K3/100-step, and Opus xhigh review now
 inspects the complete signed plan → RED → GREEN → artifact history and
 this conservative disposition.
+
+##### D.110a-u final review and closure
+
+The single final review inspected signed/pushed evidence anchor
+`c7682aa41be4979901ffe9e58eaddc3c0bdf44a7` and the complete accepted plan,
+causal RED, GREEN source, gate evidence, replacement artifact, and mixed
+disposition. The shared prompt SHA-256 is
+`84c32d463608e84f4c5150f9bb673cf60d3ff67261b88589f7833579ffba800e`.
+No reviewer wrote source, ran a test or workload, used the network, invoked
+another model, or spawned a helper.
+
+The initial Grok 4.6/high transport failed after nine inspection turns and
+after forming a draft approval, before emitting a terminal response. Its
+events/stderr hashes are
+`eac65292be9e997f4ef68bc2ae92675ddac6d27ed5f5fe44cb94eedb6e1ea163`
+and
+`2153a023865419fef532f7313f81c932f8837e08c1552aa7ff8f8b2bfd2746b8`.
+Per the standing rule, exact session
+`01a05d96-de5c-75a1-8504-d93d5157b1c8` was resumed rather than replaced. It
+then reached a normal terminal `APPROVED`, P0=0, P1=0, P2=0, and answered YES
+for RED causality, GREEN closure, and scope preservation and AGREE for the
+mixed disposition and D.110a-v next step. Its resumed events and terminal
+SHA-256 values are
+`70b184ab04fa258de1a2c67f75489f32c292664c4e49a610278f2f5f0affd1de`
+and
+`9eae0ec459f7dc7d0d63199df6af1be7f905328c81421fe61feb3aad45b7ac51`;
+resumed stderr is empty.
+
+The standard direct Kimi K3/100-step invocation used exactly
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100 /Users/aristotle/.kimi-code/bin/kimi
+--model kimi-code/k3 --prompt "$review_prompt" --output-format stream-json`.
+Its service exhausted built-in connection retries during inspection before a
+terminal verdict. Exact session
+`session_75af8dd7-59e5-4682-aa4d-330329527438` was resumed through the same
+standard CLI rather than replaced. It reached `APPROVED`, P0=0, P1=0, P2=0,
+with YES/YES/YES and AGREE/AGREE for the five causal fields. Its initial
+stream, resumed stream, and terminal SHA-256 values are
+`2416a6ce7541d9977865cae5879c63e8110e0c813292dc731d6b75be200916d4`,
+`a250003d388e827476b2ae35e5327a735f29694c11fc3662532d4dbdea2fb9ec`,
+and `178d4225fcaa403010ec63466c0eecca439bfd67f729227f186e4997f5ff0681`.
+
+Opus xhigh exact session `51e9bb1d-9249-4b7b-a20e-a321b1974ac0`
+returned an API timeout after extensive inspection and before a terminal
+verdict. The same session was resumed without tools and reached a normal
+terminal `APPROVED`, P0=0, P1=0, P2=2, with YES/YES/YES and AGREE/AGREE for
+the five causal fields. Its initial result, resumed result, and terminal
+SHA-256 values are
+`91d8ba8140d5daab8630586b1d04c63ebebd17f89d753cfb8c6a450aebbba9fc`,
+`42e986a9f5c4146cbb1af536bdec7a0a52d2fa9d5f15b160bb9d1465ddb26f02`,
+and `0124548cb178fe409fc2ca0eb5cf7ab3ee8ac958daf779b5feeb8eb1804e5db0`;
+stderr is empty for both calls.
+
+Both Opus P2 findings are nonblocking and receive explicit no-change
+dispositions. First, `endsWith("/retained-heap-worker.ts")` is sufficient for
+the current unique exact named-function owner; pinning an absolute host URL
+would add no protection to the durable result and is not portable. Second,
+inherited `D110AT_*` tokens and `d110at-profile-v1` preserve the accepted
+underlying profile/result schema, while every new D.110a-u custody predicate
+has a distinct `D110AU_*` token; renaming them would be churn, not a closure
+fix. Neither changes executable scope, acceptance, or evidence integrity, so
+no correction or confirmation round is permitted.
+
+The final blocking union is empty. The self-excluding 25-entry final-review
+manifest validates and has SHA-256
+`fa5f57f18378f9dc0348d328a5dc3806b85b3727568aaeda068ac508ef5b08ff`.
+D.110a-u is closed: it repaired the tests-only clock-custody defect, proved the
+replacement capture valid, and returned an honest mixed attribution without
+demonstrating a product defect. No further D.110a-u capture, retry, source
+change, or review is authorized. D.110a remains paused; D.110a-v may now be
+planned as the already-bounded read-only whole-lifecycle disposition over the
+existing immutable D.110a-u profile and terminal record. The two-object
+preflight and sole 64-object full worker remain unspent.
