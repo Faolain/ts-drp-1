@@ -751,7 +751,15 @@ export function d110aCurrentInfrastructureAudit(): Readonly<{
 			/captureD110aForensicChild/u.test(forensics) &&
 			/validateD110aForensicJournal/u.test(forensics) &&
 			/terminal\.json/u.test(forensics) &&
-			/progress\.jsonl/u.test(forensics),
+			/progress\.jsonl/u.test(forensics) &&
+			/fsyncSync/u.test(forensics) &&
+			/createD110aFullForensicConfiguration/u.test(child) &&
+			/captureD110aForensicChild/u.test(child) &&
+			/fullSourceRuntimeIdentity/u.test(child) &&
+			/validateD110aForensicJournal/u.test(child) &&
+			/execute\(D110A_OBJECT_EPOCHS, modules, true\)/u.test(worker) &&
+			/recordKind: "baseline"/u.test(worker) &&
+			/recordKind: "completed-sample"/u.test(worker),
 		gracefulProfileMode:
 			/ROLE !== "full" && ROLE !== "preflight" && ROLE !== "profile"/u.test(child) &&
 			/mode === "profile" \? 900_000/u.test(child) &&

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- Fresh-process test launcher. */
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
@@ -7,9 +7,18 @@ import { pathToFileURL } from "node:url";
 
 import {
 	D110A_FULL_TIMEOUT_MS,
+	D110A_OBJECT_EPOCHS,
 	D110A_PREFLIGHT_TIMEOUT_MS,
 	validateD110auProfileAttribution,
 } from "./retained-heap-contract.ts";
+import {
+	captureD110aForensicChild,
+	createD110aForensicRecorder,
+	createD110aFullForensicConfiguration,
+	readD110aForensicJournal,
+	requireSuccessfulD110aForensicCapture,
+	validateD110aForensicJournal,
+} from "./retained-heap-forensics.mjs";
 import { workspacePackageImportHook } from "../shared/workspace-package-subprocess.mjs";
 
 const REPOSITORY_ROOT = resolve(import.meta.dirname, "../../..");
@@ -67,6 +76,64 @@ function internalModules() {
 		aheMaintenance: pathToFileURL(built("packages/storage-node/dist/src/maintenance.js")).href,
 		closedEpochCleanup: pathToFileURL(built("packages/node/dist/src/internal/closed-epoch-cleanup.js")).href,
 		runtimeReclamation: pathToFileURL(built("packages/node/dist/src/internal/runtime-reclamation.js")).href,
+	});
+}
+
+function runtimeIdentity(imports, modules) {
+	return Object.freeze({
+		imports: Object.freeze(
+			Object.fromEntries(
+				Object.entries(imports).map(([specifier, path]) => [specifier, { path, sha256: sha256(path) }])
+			)
+		),
+		internals: Object.freeze(
+			Object.fromEntries(
+				Object.entries(modules).map(([name, url]) => {
+					const path = new URL(url);
+					return [name, { sha256: sha256(path), url }];
+				})
+			)
+		),
+		node: Object.freeze({ execPath: process.execPath, version: process.version }),
+	});
+}
+
+function checkedGit(args) {
+	const result = spawnSync("git", args, { cwd: REPOSITORY_ROOT, encoding: "utf8" });
+	if (result.error !== undefined || result.status !== 0 || result.signal !== null) {
+		throw new TypeError(
+			`D110AX_SOURCE_AUTHENTICATION_FAILED:${args.join(" ")}:${result.error?.message ?? result.stderr}`
+		);
+	}
+	return Object.freeze({ stderr: result.stderr, stdout: result.stdout.trim() });
+}
+
+function fullSourceRuntimeIdentity({ childArguments, imports, modules }) {
+	const sourceCommit = checkedGit(["rev-parse", "HEAD"]).stdout;
+	const sourceTree = checkedGit(["rev-parse", "HEAD^{tree}"]).stdout;
+	const signature = checkedGit(["verify-commit", "--raw", sourceCommit]);
+	checkedGit(["diff", "--quiet"]);
+	checkedGit(["diff", "--cached", "--quiet"]);
+	const ownerPaths = Object.freeze([
+		"tests/fixtures/phase-6c/retained-heap-child.mjs",
+		"tests/fixtures/phase-6c/retained-heap-contract.ts",
+		"tests/fixtures/phase-6c/retained-heap-forensics.mjs",
+		"tests/fixtures/phase-6c/retained-heap-worker.ts",
+	]);
+	return Object.freeze({
+		command: Object.freeze({ arguments: childArguments, cwd: REPOSITORY_ROOT, execPath: process.execPath }),
+		deadlineMs: D110A_FULL_TIMEOUT_MS,
+		kind: "d110ax-full-source-runtime-identity-v1",
+		owners: Object.freeze(
+			Object.fromEntries(
+				ownerPaths.map((relative) => [relative, { sha256: sha256(resolve(REPOSITORY_ROOT, relative)) }])
+			)
+		),
+		runtime: runtimeIdentity(imports, modules),
+		sourceCommit,
+		sourceSignature: Object.freeze({ stderr: signature.stderr, stdout: signature.stdout, verified: true }),
+		sourceTree,
+		trackedWorktreeClean: true,
 	});
 }
 
@@ -141,10 +208,91 @@ async function captureChildProfile(profilePath, executeProfile) {
 	}
 }
 
+async function runFullWorker(imports, modules, importHook) {
+	const childPath = resolve(import.meta.dirname, "retained-heap-child.mjs");
+	const configuration = createD110aFullForensicConfiguration({
+		childPath,
+		deadlineMs: D110A_FULL_TIMEOUT_MS,
+		repositoryRoot: REPOSITORY_ROOT,
+	});
+	const childArguments = Object.freeze([
+		"--expose-gc",
+		"--import=tsx",
+		"--import=fake-indexeddb/auto",
+		importHook,
+		configuration.childPath,
+		"worker",
+		"full",
+		JSON.stringify(modules),
+		"",
+	]);
+	const identity = fullSourceRuntimeIdentity({ childArguments, imports, modules });
+	const recorder = createD110aForensicRecorder({ configuration, identity });
+	let finalizing = false;
+	let capture = Object.freeze({
+		childPid: null,
+		exitCode: null,
+		exitSignal: null,
+		terminalResultReceived: false,
+		watchdogFired: false,
+	});
+	try {
+		const child = spawn(process.execPath, childArguments, {
+			cwd: REPOSITORY_ROOT,
+			env: process.env,
+			stdio: ["ignore", "pipe", "pipe", "ipc"],
+		});
+		capture = await captureD110aForensicChild({ child, recorder });
+		const terminal = requireSuccessfulD110aForensicCapture(capture);
+		const durableTerminal = JSON.parse(readFileSync(`${configuration.evidenceRoot}/terminal.json`, "utf8"));
+		if (
+			JSON.stringify(durableTerminal) !== JSON.stringify(terminal) ||
+			durableTerminal.pid !== child.pid ||
+			durableTerminal.execPath !== process.execPath
+		) {
+			throw new TypeError("D110AX_FORENSIC_TERMINAL_IDENTITY_INVALID");
+		}
+		const journalValidation = validateD110aForensicJournal({
+			expectedObjectEpochs: D110A_OBJECT_EPOCHS,
+			proof: durableTerminal.result,
+			records: readD110aForensicJournal(configuration.evidenceRoot),
+		});
+		const { validateD110aProof } = await import("./retained-heap-contract.ts");
+		const validation = validateD110aProof(durableTerminal.result);
+		const parentResult = Object.freeze({
+			failureForensics: Object.freeze({
+				evidenceRoot: configuration.evidenceRoot,
+				journal: journalValidation,
+			}),
+			kind: "d110a-full-parent-v1",
+			proof: durableTerminal.result,
+			runtimeIdentity: identity.runtime,
+			validation,
+		});
+		finalizing = true;
+		recorder.finish({ capture, parentResult, parentStatus: "success" });
+		return parentResult;
+	} catch (error) {
+		const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
+		const classification = error instanceof Error ? error.message.split(":", 1)[0] : "D110AX_FORENSIC_UNKNOWN_FAILURE";
+		if (!finalizing) {
+			finalizing = true;
+			recorder.finish({
+				capture,
+				failureClassification: classification,
+				failureMessage: message,
+				parentStatus: "failure",
+			});
+		}
+		throw error;
+	}
+}
+
 async function runWorker(mode) {
 	const imports = expectedImports();
 	const modules = internalModules();
 	const importHook = workspacePackageImportHook({ expectedImports: imports });
+	if (mode === "full") return runFullWorker(imports, modules, importHook);
 	const profileTarget = freshProfileTarget(mode);
 	if (profileTarget !== undefined) {
 		writeFileSync(
@@ -210,22 +358,7 @@ async function runWorker(mode) {
 			`D110A_CHILD_FAILED:${String(exit.code)}:${String(exit.signal)}:${terminal?.message ?? stderr}:${JSON.stringify(lastProgress)}`
 		);
 	}
-	const runtimeIdentity = Object.freeze({
-		imports: Object.freeze(
-			Object.fromEntries(
-				Object.entries(imports).map(([specifier, path]) => [specifier, { path, sha256: sha256(path) }])
-			)
-		),
-		internals: Object.freeze(
-			Object.fromEntries(
-				Object.entries(modules).map(([name, url]) => {
-					const path = new URL(url);
-					return [name, { sha256: sha256(path), url }];
-				})
-			)
-		),
-		node: Object.freeze({ execPath: process.execPath, version: process.version }),
-	});
+	const currentRuntimeIdentity = runtimeIdentity(imports, modules);
 	if (mode === "profile") {
 		if (profileTarget === undefined || !existsSync(profileTarget.recordsPath)) {
 			throw new TypeError("D110AU_CAPTURE_RECORD_MISSING");
@@ -305,13 +438,8 @@ async function runWorker(mode) {
 			}),
 			profileTimeoutMs: timeoutMs,
 			result: terminal.result,
-			runtimeIdentity: Object.freeze({ ...runtimeIdentity, nodeOptionsCleared: true }),
+			runtimeIdentity: Object.freeze({ ...currentRuntimeIdentity, nodeOptionsCleared: true }),
 		});
-	}
-	if (mode === "full") {
-		const { validateD110aProof } = await import("./retained-heap-contract.ts");
-		const validation = validateD110aProof(terminal.result);
-		return Object.freeze({ kind: "d110a-full-parent-v1", proof: terminal.result, runtimeIdentity, validation });
 	}
 	if (
 		terminal.result.kind !== "d110a-preflight-v1" ||
@@ -321,7 +449,11 @@ async function runWorker(mode) {
 	) {
 		throw new TypeError("D110A_PREFLIGHT_INVALID");
 	}
-	return Object.freeze({ kind: "d110a-preflight-parent-v1", preflight: terminal.result, runtimeIdentity });
+	return Object.freeze({
+		kind: "d110a-preflight-parent-v1",
+		preflight: terminal.result,
+		runtimeIdentity: currentRuntimeIdentity,
+	});
 }
 
 async function runChild() {
@@ -337,10 +469,15 @@ async function runChild() {
 		throw new TypeError("D110A_CHILD_ARGUMENTS_INVALID");
 	}
 	const worker = await import("./retained-heap-worker.ts");
+	const sendTerminal = async (message) =>
+		new Promise((resolvePromise, reject) => {
+			if (process.send === undefined) return reject(new TypeError("D110A_CHILD_IPC_MISSING"));
+			process.send(message, (error) => (error === undefined || error === null ? resolvePromise() : reject(error)));
+		});
 	const executeProfile = () => worker.runD110aProfile(modules);
 	if (mode === "profile") {
 		const captured = await captureChildProfile(profilePath, executeProfile);
-		process.send?.(
+		await sendTerminal(
 			Object.freeze({
 				execPath: process.execPath,
 				kind: "result",
@@ -352,7 +489,7 @@ async function runChild() {
 		return;
 	}
 	const result = mode === "full" ? await worker.runD110aFullWorker(modules) : await worker.runD110aPreflight(modules);
-	process.send?.(Object.freeze({ execPath: process.execPath, kind: "result", pid: process.pid, result }));
+	await sendTerminal(Object.freeze({ execPath: process.execPath, kind: "result", pid: process.pid, result }));
 }
 
 try {
@@ -366,12 +503,17 @@ try {
 	}
 } catch (error) {
 	if (ROLE === "worker") {
-		process.send?.(
-			Object.freeze({
-				kind: "child-error",
-				message: error instanceof Error ? (error.stack ?? error.message) : String(error),
-			})
-		);
+		if (process.send !== undefined && process.connected) {
+			await new Promise((resolvePromise) => {
+				process.send(
+					Object.freeze({
+						kind: "child-error",
+						message: error instanceof Error ? (error.stack ?? error.message) : String(error),
+					}),
+					() => resolvePromise()
+				);
+			});
+		}
 	}
 	throw error;
 }

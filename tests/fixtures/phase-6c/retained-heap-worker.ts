@@ -106,6 +106,12 @@ interface RetainedSuccessor {
 }
 
 type D110aProfileRecorder = (phase: D110aProfilePhase, appliedWorkloadOperations: number) => void;
+type D110aForensicPhase = Exclude<D110aProfilePhase, "sample-complete" | "teardown-complete">;
+type D110aForensicRecorder = (
+	phase: D110aForensicPhase,
+	appliedWorkloadOperations: number,
+	activeSuccessors: number
+) => void;
 type D110auApplicationWorkloadInput = Parameters<
 	NonNullable<GenuineCreatorAdoptionFixtureOptions["beforeCreatorClose"]>
 >[0];
@@ -198,7 +204,7 @@ function installBrowserStoreEnvironment(): void {
 async function buildObjectEpoch(
 	index: number,
 	modules: D110aWorkerModules,
-	recordProfilePhase?: D110aProfileRecorder
+	recordProfilePhase?: D110aForensicRecorder
 ): Promise<Readonly<{ readonly result: D110aObjectResult; readonly retained: RetainedSuccessor }>> {
 	let appliedWorkloadOperations = 0;
 	let preCloseState = -1;
@@ -340,7 +346,8 @@ async function closeWindow(window: readonly RetainedSuccessor[]): Promise<void> 
 
 async function execute(
 	objectEpochs: number,
-	modules: D110aWorkerModules
+	modules: D110aWorkerModules,
+	forensicProgress = false
 ): Promise<
 	Readonly<{
 		readonly baseline: D110aMemoryReading;
@@ -351,12 +358,53 @@ async function execute(
 > {
 	installBrowserStoreEnvironment();
 	const baseline = await postGcReading();
+	let lastForensicMonotonicMicroseconds = -1;
+	const forensicMonotonicMicroseconds = (): number => {
+		const observed = Number(process.hrtime.bigint() / 1_000n);
+		lastForensicMonotonicMicroseconds = Math.max(observed, lastForensicMonotonicMicroseconds + 1);
+		return lastForensicMonotonicMicroseconds;
+	};
+	if (forensicProgress) {
+		progress({
+			activeSuccessors: 0,
+			appliedWorkloadOperations: 0,
+			completedObjectEpochs: 0,
+			memory: baseline,
+			objectIndex: null,
+			recordKind: "baseline",
+			workerMonotonicMicroseconds: forensicMonotonicMicroseconds(),
+		});
+	}
 	const results: D110aObjectResult[] = [];
 	const samples: D110aSample[] = [];
 	const window: RetainedSuccessor[] = [];
 	try {
 		for (let index = 0; index < objectEpochs; index += 1) {
-			const completed = await buildObjectEpoch(index, modules);
+			const recordForensicPhase: D110aForensicRecorder | undefined = forensicProgress
+				? (phase, objectAppliedWorkloadOperations, activeSuccessors): void => {
+						progress({
+							activeSuccessors,
+							appliedWorkloadOperations: index * D110A_OPERATIONS_PER_OBJECT + objectAppliedWorkloadOperations,
+							completedObjectEpochs: index,
+							objectIndex: index,
+							phase,
+							recordKind: "lifecycle-phase",
+							workerMonotonicMicroseconds: forensicMonotonicMicroseconds(),
+						});
+					}
+				: undefined;
+			const completed = await buildObjectEpoch(
+				index,
+				modules,
+				recordForensicPhase === undefined
+					? undefined
+					: (phase, appliedWorkloadOperations): void =>
+							recordForensicPhase(
+								phase,
+								appliedWorkloadOperations,
+								phase === "successor-published" ? window.length + 1 : window.length
+							)
+			);
 			results.push(completed.result);
 			window.push(completed.retained);
 			if (window.length > D110A_ACTIVE_ROOMS) {
@@ -375,11 +423,23 @@ async function execute(
 				phase: "during-execution" as const,
 			});
 			samples.push(sample);
-			progress({
-				activeSuccessors: sample.activeSuccessors,
-				appliedWorkloadOperations: sample.appliedWorkloadOperations,
-				completedObjectEpochs: sample.completedObjectEpochs,
-			});
+			if (forensicProgress) {
+				progress({
+					activeSuccessors: sample.activeSuccessors,
+					appliedWorkloadOperations: sample.appliedWorkloadOperations,
+					completedObjectEpochs: sample.completedObjectEpochs,
+					memory: sample.memory,
+					objectIndex: index,
+					recordKind: "completed-sample",
+					workerMonotonicMicroseconds: forensicMonotonicMicroseconds(),
+				});
+			} else {
+				progress({
+					activeSuccessors: sample.activeSuccessors,
+					appliedWorkloadOperations: sample.appliedWorkloadOperations,
+					completedObjectEpochs: sample.completedObjectEpochs,
+				});
+			}
 		}
 		return Object.freeze({
 			baseline,
@@ -424,7 +484,7 @@ export async function runD110aPreflight(modules: D110aWorkerModules): Promise<D1
  * @returns Complete retained-heap proof.
  */
 export async function runD110aFullWorker(modules: D110aWorkerModules): Promise<D110aProof> {
-	const executed = await execute(D110A_OBJECT_EPOCHS, modules);
+	const executed = await execute(D110A_OBJECT_EPOCHS, modules, true);
 	const proof: D110aProof = Object.freeze({
 		accounting: Object.freeze({
 			admittedWorkloadOperations: D110A_TOTAL_OPERATIONS,

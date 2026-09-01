@@ -213,3 +213,29 @@ authorized.
 The seven-hour child remains local-only through D.110a. D.110b must separately
 select and prove an outer CI runner budget greater than seven hours plus setup
 and evidence upload; no current hosted-runner assumption is inherited.
+
+## Failure-forensics GREEN evidence
+
+The bounded GREEN implements the reviewed parent-only write-once recorder,
+full-mode lifecycle/sample IPC, durable raw terminal and stream custody, and a
+synthetic fault child. The focused command ran exactly once with coverage
+disabled and passed all 9 assertions from its one selected file. It exercised
+normal two-object reconciliation, controlled mid-lifecycle failure, explicit
+watchdog termination, child error, partial stdout/stderr, a 512 KiB trailing
+stderr burst, missing/duplicate/malformed/out-of-order journals, and terminal-
+proof/journal mismatch. The real `.logs/phase-6c-d110a-full/` root remained
+absent throughout.
+
+`pnpm build:packages` and the Node, storage-node, and storage-browser
+`tsconfig.build.json --noEmit` checks passed. Exact-six-owner ESLint, Prettier,
+three child syntax checks, source/configuration audit, listing, and
+`git diff --check` passed. The frozen eleven-file retained selection passed
+95/95 with no failed, pending, or todo assertions; stderr contained only the
+expected Node experimental-SQLite warnings. The earlier broad root `tsc`
+diagnostic remains non-authoritative because it includes the repository's
+known cross-package/test-program debt; it helped correct two local test type
+annotations before the sole focused execution and did not run a workload.
+
+The GREEN checkpoint still requires its signed/pushed evidence manifest and
+the existing final Grok/Kimi/Opus review. It does not release the 64-object
+worker until that blocking union is empty.

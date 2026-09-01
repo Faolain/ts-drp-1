@@ -58,6 +58,12 @@ journals, explicit watchdog/exit status, and bounded synthetic fault tests;
 partial evidence remains diagnostic only. Do not invoke Fable or collaboration
 subagents.
 
+The D.110a-x forensics GREEN is implemented: its one focused run passed 9/9,
+the frozen retained suite passed 95/95, and all affected build-source/static
+gates passed without creating the real full-run root. Signed evidence and the
+final three-model GREEN review remain the execution gate for the sole
+64-object run.
+
 Global TODO:
 
 - [x] Structure-census artifact inherited from D.109f and D.109d.

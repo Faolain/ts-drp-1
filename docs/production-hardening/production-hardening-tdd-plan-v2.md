@@ -91319,3 +91319,87 @@ The validating self-excluding 30-entry evidence manifest has SHA-256
 `947dfa533e2698ba4e9eac96170365c7355f4db25664f576578652485e219714`.
 RED is causal and authorizes only the reviewed tests-only recorder, worker IPC,
 full-launcher wiring, synthetic child, and focused fault matrix in GREEN.
+
+##### D.110a-x failure-forensics GREEN before final review
+
+The narrow GREEN adds only the reviewed six tests-only owners: the contract,
+real child launcher, real worker, parent-only recorder, bounded synthetic child,
+and focused fault matrix. Full mode now authenticates signed source/tree and
+all built import/internal identities in memory before consuming the fresh
+root; it then creates the write-once root/sentinel and persists identity before
+spawn. The parent exclusively owns fsynced progress, launcher events, raw
+stdout/stderr, raw terminal IPC, final parent JSON, and explicit execution
+status. The worker performs no evidence I/O and sends only one baseline, five
+bounded lifecycle records per object, and each already-created post-GC sample.
+Success first requires exact 64-sample journal/proof reconciliation and then the
+unchanged authoritative accounting/digest/slope/ceiling/during-execution
+validator. Partial evidence remains diagnostic and fail closed.
+
+The separate focused GREEN command was:
+
+```text
+pnpm exec vitest run tests/phase-6c-retained-heap-forensics-red.test.ts --coverage.enabled=false --reporter=json --outputFile=.logs/d110ax-forensics-green/focused.json
+```
+
+It ran exactly once, selected one result file, and passed all 9 assertions with
+zero failed, pending, or todo assertions, no top-level error, and empty stderr.
+The matrix proves normal two-object completion/reconciliation, retained
+completed-sample plus partial-lifecycle evidence after controlled failure,
+explicit watchdog-fired/SIGKILL custody, durable child-error terminal IPC,
+newline-free partial stdout/stderr, a drained 512 KiB trailing stderr burst,
+and fail-closed missing/duplicate/malformed/out-of-order journal and terminal-
+proof mismatch classifications. The genuine full root remained absent.
+
+The exact listing selected those same 9 titles from one file. The frozen
+eleven-file retained command ran once with coverage disabled and one worker;
+it passed 95/95 across exactly eleven result files, with zero failed, pending,
+or todo assertions. Its stderr contains only nine expected Node experimental-
+SQLite warnings. `pnpm build:packages` passed. These source-build checks all
+passed with empty stdout/stderr:
+
+```text
+pnpm exec tsc -p packages/node/tsconfig.build.json --noEmit
+pnpm exec tsc -p packages/storage-node/tsconfig.build.json --noEmit
+pnpm exec tsc -p packages/storage-browser/tsconfig.build.json --noEmit
+```
+
+Exact-six-owner ESLint, Prettier, the three `.mjs` syntax checks, corrected
+source/configuration audit, and `git diff --check` passed. One intermediate
+post-focused ESLint invocation found only Prettier whitespace introduced by a
+reverted read-only design experiment; formatting corrected that diagnostic and
+the final exact-owner ESLint passed without rerunning any test. An earlier
+broad root `tsc --noEmit` diagnostic selected the repository's known
+cross-package/test-program debt and two local test annotation issues; those
+annotations were corrected before the sole focused run. It is not an affected
+build-source gate and did not execute a worker.
+
+No product source/API/dependency, workload, sample window, memory threshold,
+watchdog, release arithmetic, retry, profile, preflight, or full invocation
+changed or ran. The consumed 585,233-ms preflight and all D.110a-w evidence
+remain immutable. This GREEN must now be signed/pushed with its mechanical
+audit and self-excluding manifest, then receive the already-required single
+final Grok 4.6/high, direct Kimi K3/100-step, and Opus xhigh review. Only an
+empty P0/P1 union releases the sole 64-object worker.
+
+The focused JSON/empty-stderr SHA-256 values are
+`0bd368962b7104a05bdf857da0041ca99b3c16d17722383e5157d6ed89c704a8`
+and `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`;
+the exact listing hash is
+`c68d28694532a9f504f1fe9454d83f2b5bf98067b2bb2e34ac546f8dde764346`.
+The retained JSON/stdout/stderr hashes are respectively
+`8146b54a997e756a4e0687ff0d93e2e963f2a351ece00f3082f8902521e2c38c`,
+`69a65dd03af7c0c52ca03a7a70fc26e8e82ca430af1f394e4820e11277b35241`,
+and `35608a58d6e313d78e13c14a3af208f27dc2621ea5a085ed86847c9dc3f451c7`.
+The package-build stdout/empty-stderr hashes are
+`85140a8bb92c1a7e1ec31036f263db990eb922094882f59b2b58ecddb2dee813`
+and the empty-file hash. The corrected source/configuration audit and all-true
+mechanical audit hashes are
+`1d95138f16c15030c42c973268284f33db2f64654010b00969ffaf5051f1b701`
+and `9fd31514409fe31ecbfa1acd872e5bbb8a8270187efac378668825a4907cc43e`.
+The latter proves the exact nine changed paths, 26 stashes, protected roots,
+clear ports, no relevant process, unset `NODE_OPTIONS`, immutable inherited
+preflight hashes, absent full root, exact listing/results, and every current
+source predicate true.
+
+The validating self-excluding 39-entry GREEN evidence manifest has SHA-256
+`f562509b1c25caffa3122db6997ec736338feaf02de5c50284e6c931ea06a41e`.
