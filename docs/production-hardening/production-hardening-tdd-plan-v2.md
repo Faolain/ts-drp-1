@@ -89282,3 +89282,72 @@ Phase 6b close without a retained campaign, Codex-Sol substitution, Fable, or
 collaboration subagents. The next unclosed work is a bounded Phase-6c memory-
 threshold source audit and plan; this record does not pre-authorize its RED,
 GREEN, threshold changes, or campaign.
+
+#### D.110 — Phase-6c enforceable-memory-gate source audit
+
+D.110 inherits signed/pushed Phase-6b closure
+`955e72f4d1a6cd70d07639708712f58b0808bb17` without reopening D.109 or its
+immutable evidence. The executable Phase-6c specification begins at
+`specs/phase-6c-memory-gates/README.md`; its first bounded slice is
+`slices/00-structure-census.md`.
+
+The audit confirms that the current memory workflow is only a trend report.
+`.github/workflows/benchmark-memory.yml` sets `fail-on-alert: false`, while the
+object and node memory benchmarks report `maxRSS` for small legacy/object or
+network workloads. They do not launch Node with `--expose-gc`, sample post-GC
+`heapUsed` per epoch, compute a least-squares slope, enforce an absolute heap
+budget, or pair memory success with an exact accepted/applied operation count
+and independent final digest.
+
+Phase 6b supplies two real but different evidence seams. D.109f runs 128
+same-object durable AHE maintenance steps and exact AHE/issuance censuses.
+D.109d observes all 22 installed-v3 and creator-close runtime owners across
+one genuine close, adoption, durable prune, and receipt-gated release. The
+current successor is intentionally `snapshot-closed`; no genuine repeated
+same-object close/adopt path exists after epoch 1. The 128 durable steps must
+therefore never be relabeled as 128 runtime transitions.
+
+The roadmap's `HashGraph.vertices`, `forwardEdges`, private
+`vertexDistances`, and `FinalityStore.states` wording is also reconciled with
+the completed ownership plan. Those structures belong to the legacy/general
+object plane. Phase 6b left them unchanged, and Phase 6d remains the sole owner
+of legacy-finality retention. Phase 6c retains them as controls and uses the
+installed-v3 application/causality/epoch-byte census for the v3 path; it does
+not silently widen a local-safe test slice into legacy product deletion.
+
+The exact heap thresholds are not yet frozen. The first-pass plan's
+approximately 100 MB after one million lifetime vertices is not an exact byte
+contract, the v2 profile table states a separate 512 MB budget for 20 open
+Profile-D rooms, and no governing slope epsilon exists. D.110a therefore owns
+only a deterministic tests-only structure-census foundation. D.110b must
+separately freeze an honest workload topology, exact operation count and
+digest, epoch/object interpretation, GC/sample window, slope epsilon, absolute
+bytes, watchdog, and environment. If the intended same-object lifetime proof
+requires repeatable successor close/adopt product behavior, that prerequisite
+must be resliced and reviewed under its product, activation, identity, and
+protocol risks rather than fabricated in a memory fixture.
+
+D.110a reuses the real 128-step D.109f durable path and the one genuine D.109d
+runtime lifecycle. It freezes exact AHE terminal counts of three generations,
+three blobs, three grouped generation promotions, three promotion references,
+and one present head; exact issuance terminal counts of zero issued rows, zero
+outbox rows, one lineage row, and watermark 129; the exact 22-key runtime
+before/after census; and live next-operation/digest reachability. Mutation
+controls kill archival substitution, skipped work, missing/extra census keys,
+wrong terminal counts, retained runtime owners, dropped accepted work,
+substituted digest, and conflation of durable steps with runtime transitions.
+
+D.110a RED and GREEN are confined to tests/test infrastructure. RED must run
+all inherited controls and fail only
+`D110A_STRUCTURE_CENSUS_OWNER_MISSING`; it may not use a readiness skip or
+module-load failure. GREEN adds the tests-only owner and no production file.
+Any need for a product-source change, new product inspection API, changed
+retention behavior, dependency, threshold, workflow, or long workload stops
+the slice for reslicing.
+
+This plan checkpoint receives one Grok 4.6/high, standard direct Kimi CLI
+K3/high/100-step, and Opus xhigh review before RED. If Grok cancels, resume the
+exact session. Codex Sol does not substitute for Kimi. No Fable,
+collaboration subagent, retained campaign, heap threshold, workflow change,
+or Phase-6c RED is authorized by this plan text until the review's blocking
+union is empty.
