@@ -90662,10 +90662,35 @@ No test, measured child, workload, profiler, profile, retry, preflight,
 full-worker, source, dependency, threshold, memory, or watchdog contract ran
 or changed.
 
-D.110a-v now awaits only its single final Grok/Kimi/Opus evidence review. If
-that review has an empty P0/P1 union, D.110a-v closes and the sole next action
-is a separately planned phase-level creator-close feasibility slice. That
-successor must decide whether the required genuine creator-close cost warrants
-a product performance investigation or a high-risk workload/watchdog contract
-correction; it may not claim a product bug, alter a contract, run another
-profile, or spend the preflight/full worker without its own reviewed authority.
+D.110a-v's single final evidence review inspected signed/pushed evidence anchor
+`5ce2e7957656b0092a1dbccbe1eaa492ee592279`. Grok 4.6/high and standard
+direct Kimi K3/100-step both returned `APPROVED`, P0=0, P1=0, P2=0. Opus
+xhigh session `7f3becca-d00e-4543-9f4b-01255dc5bce4` returned `APPROVED`,
+P0=0, P1=0, P2=4. All three answered YES for input validity, conservation,
+branch selection, and scope preservation, and AGREE for the next step. Their
+terminal SHA-256 values are respectively
+`5ec7a8bf1b8aeeda3bb3431ceb738b8cedcda8acd6138832e0f2904236eeda76`,
+`aa71d57bae4edfb8071de02e7b97deb8b7b0e8941b042ba6c0baddb5a4237645`,
+and `677bb66b4b5e920355545c8b5f1f00c97b68cf52f76db7878c4866d94cc31dbd`.
+The self-excluding 13-entry final-review manifest validates and has SHA-256
+`00bf56567391ae7142c3ad7a110f70c91bec12f408be8fb91fe29fafa46917a7`;
+its validation record has SHA-256
+`766be5ae8f24eeb6915f7eb9e2ecfa21d99f30b6810dee3feb321cc32568f116`.
+The final blocking union is empty.
+
+Opus's four P2 observations do not change the evidence or selected branch.
+The recorded sixteen-predicate audit was independently rechecked by the final
+review but has no separate producing script; conservation is structurally
+guaranteed by the exhaustive first-match partition and was also independently
+recomputed; invalid immutable inputs abort fail-closed rather than emitting a
+branch-1 result document; and the now-frozen analyzer has one unused
+`readdirSync` import. None affects a number, scope, or next action, and the
+review policy forbids rerunning or revising the completed offline analysis for
+such hygiene.
+
+D.110a-v is closed. The sole next action is a separately planned phase-level
+creator-close feasibility slice. That successor must decide whether the
+required genuine creator-close cost warrants a product performance
+investigation or a high-risk workload/watchdog contract correction; it may not
+claim a product bug, alter a contract, run another profile, or spend the
+preflight/full worker without its own reviewed authority.

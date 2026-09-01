@@ -145,3 +145,24 @@ result, and run the single final three-model evidence review. P2 prose or
 bookkeeping findings do not trigger recursion. Grok transport cancellation
 resumes the exact session. Kimi uses the direct local CLI, not a Codex model.
 Fable and collaboration subagents are not authorized.
+
+## Closure
+
+The single offline analysis ran once and selected branch 3,
+`stable-phase-mixed-owners`. Across all five mappings, `creator-close` accounts
+for 85.9331986744 through 85.9429708230 percent of attributed time. Canonical
+is the largest owner inside that phase at only 46.6071877514 through
+46.6087051482 percent, so no owner satisfies the unchanged at-least-50-percent
+and at-least-two-times rule. All mappings conserve exactly 167,687 samples and
+252,421,458 microseconds across the eight disjoint intervals.
+
+The measured one-object profile lasts 252.422167 seconds. Multiplying that
+duration by 64 gives a non-measured serial projection of 16,155.018688 seconds,
+or 4.4875051911 hours, about 5.9833 times the frozen watchdog. This establishes
+a feasibility gap, not a product correctness or memory defect.
+
+The final Grok/Kimi/Opus evidence review returned an empty P0/P1 union and
+agreed with branch 3 and the bounded next step. D.110a-v is closed. Its sole
+successor is one separately planned creator-close phase-level feasibility
+slice over the existing immutable evidence; no new profile, preflight, full
+worker, product edit, or acceptance-contract change is authorized here.

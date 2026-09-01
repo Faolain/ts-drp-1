@@ -34,20 +34,28 @@ below the unchanged 50-percent dominance threshold. No product defect has been
 demonstrated. The two-object preflight and 64-object full worker remain
 unspent.
 
-The next executable work is
-[D.110a-v whole-lifecycle profile disposition](slices/00d-whole-lifecycle-disposition.md).
-It performs one offline, read-only phase/owner analysis over the existing
-durable profile using a pre-reviewed five-mapping sensitivity method and must
-choose exactly one actionable successor. It grants no process, workload,
-profile, preflight, full-worker, product-edit, threshold-change, or watchdog-
-change authority. Do not invoke Fable or collaboration subagents.
+D.110a-v is closed through signed/pushed evidence anchor
+`5ce2e7957656b0092a1dbccbe1eaa492ee592279` and its final review. Its single
+offline analysis conserved every sample and microsecond under all five clock
+mappings. Every mapping selected `creator-close` at 85.93--85.94 percent, but
+no owner met the unchanged dominance rule; canonical was largest at about
+46.61 percent. The result is `stable-phase-mixed-owners`, not a demonstrated
+product or memory defect. The serial 4.4875-hour 64-object value is a
+projection, not a measured full run.
+
+The next executable work is one separately planned creator-close phase-level
+feasibility slice. It must use the existing immutable profile to decide between
+a bounded product-performance investigation and a high-risk workload/watchdog
+contract correction. Until that plan is reviewed, it grants no process,
+workload, profile, preflight, full-worker, product-edit, threshold-change, or
+watchdog-change authority. Do not invoke Fable or collaboration subagents.
 
 Global TODO:
 
 - [x] Structure-census artifact inherited from D.109f and D.109d.
 - [x] D.110a-p paginate creator durable replay across the public 128-row page seam.
 - [x] D.110a-t/u produce and validate one exact one-object attribution profile.
-- [ ] D.110a-v disposition the full lifecycle without another capture.
+- [x] D.110a-v disposition the full lifecycle without another capture.
 - [ ] D.110a genuine million-operation retained-heap hard gate.
 - [ ] D.110b CI memory-trend fail-closed backstop.
 
@@ -182,8 +190,8 @@ the sole consuming full worker; it cannot tune or reinterpret a threshold.
    without changing the accepted workload or watchdog.
 3. [D.110a-v whole-lifecycle profile disposition](slices/00d-whole-lifecycle-disposition.md)
    applies a deterministic five-mapping sensitivity analysis to the already
-   durable D.110a-u artifact and selects one closed next branch without another
-   capture.
+   durable D.110a-u artifact and selects branch 3, a creator-close phase-level
+   feasibility slice, without another capture.
 4. [D.110a retained-heap hard gate](slices/00-retained-heap-gate.md) adds the
    fresh-process worker, exact workload/digest assertions, slope arithmetic,
    hard limits, and mutation-sensitive focused test. Its own implementation
