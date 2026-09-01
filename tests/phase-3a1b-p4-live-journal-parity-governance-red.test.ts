@@ -82,7 +82,11 @@ function sha256(relativePath: string): string {
 		.digest("hex");
 }
 
-function adapterViolations(manifest: AdapterManifest, expectedDependencies: readonly string[]): readonly string[] {
+function adapterViolations(
+	manifest: AdapterManifest,
+	expectedDependencies: readonly string[],
+	expectedExports: readonly string[] = [".", "./issuance", "./live-journal"]
+): readonly string[] {
 	const violations: string[] = [];
 	const exportsMap = manifest.exports ?? {};
 	const dependencies = manifest.dependencies ?? {};
@@ -110,7 +114,7 @@ function adapterViolations(manifest: AdapterManifest, expectedDependencies: read
 	) {
 		violations.push("journal-export");
 	}
-	if (JSON.stringify(Object.keys(exportsMap).sort()) !== JSON.stringify([".", "./issuance", "./live-journal"])) {
+	if (JSON.stringify(Object.keys(exportsMap).sort()) !== JSON.stringify([...expectedExports].sort())) {
 		violations.push("export-inventory");
 	}
 	if (dependencies["@ts-drp/live-journal"] !== "0.11.0") violations.push("journal-version");
@@ -248,14 +252,35 @@ describe("D.93.34 p4-d parity and governance RED", () => {
 	it("transitions only the two adapter manifests to exact additive exports and dependencies", () => {
 		const node = json("packages/storage-node/package.json") as AdapterManifest;
 		const browser = json("packages/storage-browser/package.json") as AdapterManifest;
-		expect(adapterViolations(node, ["@ts-drp/issuance-store", "@ts-drp/live-journal", "@ts-drp/storage"])).toEqual([]);
 		expect(
-			adapterViolations(browser, [
-				"@ts-drp/canonical",
-				"@ts-drp/issuance-store",
-				"@ts-drp/live-journal",
-				"@ts-drp/storage",
-			])
+			adapterViolations(
+				node,
+				["@ts-drp/compaction", "@ts-drp/issuance-store", "@ts-drp/live-journal", "@ts-drp/storage"],
+				[".", "./issuance", "./issuance-maintenance", "./live-journal", "./maintenance", "./snapshot-transfer"]
+			)
+		).toEqual([]);
+		expect(
+			adapterViolations(
+				browser,
+				[
+					"@ts-drp/canonical",
+					"@ts-drp/compaction",
+					"@ts-drp/issuance-store",
+					"@ts-drp/live-journal",
+					"@ts-drp/seal",
+					"@ts-drp/storage",
+				],
+				[
+					".",
+					"./issuance",
+					"./issuance-maintenance",
+					"./live-journal",
+					"./maintenance",
+					"./seal-evidence",
+					"./seal-vote",
+					"./snapshot-transfer",
+				]
+			)
 		).toEqual([]);
 	});
 
@@ -668,8 +693,13 @@ describe("D.93.34 p4-d parity and governance RED", () => {
 			if (packageName === "storage-browser") {
 				expect(packedTestControls).toEqual([
 					"dist/src/internal/issuance-test-control.d.ts",
+					"dist/src/internal/issuance-test-control.d.ts.map",
 					"dist/src/internal/issuance-test-control.js",
+					"dist/src/internal/seal-vote-test-control.d.ts",
+					"dist/src/internal/seal-vote-test-control.d.ts.map",
+					"dist/src/internal/seal-vote-test-control.js",
 					"src/internal/issuance-test-control.ts",
+					"src/internal/seal-vote-test-control.ts",
 				]);
 			} else {
 				expect(packedTestControls).toEqual([

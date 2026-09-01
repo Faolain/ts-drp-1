@@ -264,6 +264,32 @@ changing a schema, dependency, threshold, workload, timeout, wire/digest/QC/
 activation/availability/identity contract, browser scheduler, snapshot format,
 or legacy object/finality behavior.
 
+## Corrected-plan confirmation and deterministic RED
+
+The corrected plan anchor is
+`9935d7102daedc240218979dd659c2cd223fde9f`. Grok 4.6/high session
+`01a05bed-dd8b-7f62-bb6c-679e3bc7f83c`, standard Kimi CLI K3/high/100
+session `session_26419202-7da4-4354-b3f0-f6b68e51207e`, and Opus xhigh
+session `9b2249c1-be2c-4347-a9c5-6cfc224ce148` each returned `APPROVED`,
+`P0_P1_UNION: none`, and `D109F_RED_READY: yes`.
+
+The accepted non-browser RED selected 9 tests in 2 files: 6 passed and exactly
+3 failed. The causal failures are empty-delete/present-parent returning
+`AHE_RECLAMATION_RETRY_REQUIRED` rather than
+`AHE_RECLAMATION_INVALID_ARGUMENT`, mutable detached pruned-error scope, and
+Node inspection throwing synchronously before returning a Promise. All 128
+planner steps, all 128 genuine Node AHE maintenance steps, two 65-row issuance
+epochs, numeric watermark 129, IPC release, fresh-process reopen/next-write,
+and source confinement passed. Chromium selected 1 test in 1 file and failed
+only the same AHE assertion, with zero skip, flaky, or top-level error.
+
+The retained Vitest selection passed 155/155 across 9 files, including the
+complete D.109c mutant matrix and corrected export rosters. Retained D.109c
+Chromium passed 4/4. Invalid preliminary diagnostics are preserved honestly:
+they exposed test-fixture exact-record mistakes and one final stale tarball
+roster, all corrected without production changes. Evidence is under
+`.logs/phase-6b-d109f-red/`; its manifest excludes itself. No campaign ran.
+
 ## Phase-6b completion condition
 
 Phase 6b closes only when all three defects reject/behave as frozen; the

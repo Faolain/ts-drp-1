@@ -247,12 +247,34 @@ describe("Phase 4c-b durable snapshot quarantine RED", () => {
 			expect(packageExports("packages/compaction/package.json")).toEqual(
 				SNAPSHOT_QUARANTINE_PACKAGE_EXPORT_MAPS.compaction
 			);
-			expect(packageExports("packages/storage/package.json")).toEqual(SNAPSHOT_QUARANTINE_PACKAGE_EXPORT_MAPS.common);
-			expect(packageExports("packages/storage-node/package.json")).toEqual(
-				SNAPSHOT_QUARANTINE_PACKAGE_EXPORT_MAPS.node
-			);
+			expect(packageExports("packages/storage/package.json")).toEqual({
+				...SNAPSHOT_QUARANTINE_PACKAGE_EXPORT_MAPS.common,
+				"./maintenance": {
+					import: "./dist/src/maintenance.js",
+					types: "./dist/src/maintenance.d.ts",
+				},
+			});
+			expect(packageExports("packages/storage-node/package.json")).toEqual({
+				...SNAPSHOT_QUARANTINE_PACKAGE_EXPORT_MAPS.node,
+				"./issuance-maintenance": {
+					import: "./dist/src/issuance-maintenance.js",
+					types: "./dist/src/issuance-maintenance.d.ts",
+				},
+				"./maintenance": {
+					import: "./dist/src/maintenance.js",
+					types: "./dist/src/maintenance.d.ts",
+				},
+			});
 			expect(packageExports("packages/storage-browser/package.json")).toEqual({
 				...SNAPSHOT_QUARANTINE_PACKAGE_EXPORT_MAPS.browser,
+				"./issuance-maintenance": {
+					import: "./dist/src/issuance-maintenance.js",
+					types: "./dist/src/issuance-maintenance.d.ts",
+				},
+				"./maintenance": {
+					import: "./dist/src/maintenance.js",
+					types: "./dist/src/maintenance.d.ts",
+				},
 				"./seal-evidence": {
 					import: "./dist/src/seal-evidence.js",
 					types: "./dist/src/seal-evidence.d.ts",

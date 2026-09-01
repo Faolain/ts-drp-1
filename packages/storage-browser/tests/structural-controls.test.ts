@@ -17,7 +17,16 @@ describe("storage-browser structural controls", () => {
 		expect(browser.exports).toEqual({
 			".": { import: "./dist/src/index.js", types: "./dist/src/index.d.ts" },
 			"./issuance": { import: "./dist/src/issuance.js", types: "./dist/src/issuance.d.ts" },
+			"./issuance-maintenance": {
+				import: "./dist/src/issuance-maintenance.js",
+				types: "./dist/src/issuance-maintenance.d.ts",
+			},
 			"./live-journal": { import: "./dist/src/live-journal.js", types: "./dist/src/live-journal.d.ts" },
+			"./maintenance": { import: "./dist/src/maintenance.js", types: "./dist/src/maintenance.d.ts" },
+			"./seal-evidence": {
+				import: "./dist/src/seal-evidence.js",
+				types: "./dist/src/seal-evidence.d.ts",
+			},
 			"./seal-vote": { import: "./dist/src/seal-vote.js", types: "./dist/src/seal-vote.d.ts" },
 			"./snapshot-transfer": {
 				import: "./dist/src/snapshot-transfer.js",

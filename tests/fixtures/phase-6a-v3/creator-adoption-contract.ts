@@ -8,6 +8,7 @@ import {
 import { createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
 import type { DurableIssuanceStore, DurableIssueCommit, DurableIssueScope } from "@ts-drp/issuance-store";
 import type { DurableIssuancePruningMaintenance } from "@ts-drp/issuance-store/maintenance";
+// eslint-disable-next-line import/no-unresolved -- Workspace subpath resolves after the required package build.
 import { createRecoverableFinalitySigner } from "@ts-drp/keychain/finality";
 import type {
 	DurableLiveJournalStore,
@@ -219,6 +220,7 @@ export interface CandidateCreatorAdoptionModule {
 export interface GenuineCreatorAdoptionFixture {
 	readonly catalog: TrustedBlueprintCatalog;
 	readonly evidence: Readonly<{
+		readonly aheBackend: AheDurableStore;
 		readonly chunks: readonly Uint8Array[];
 		readonly closeResult: CreatorLiveCloseResult;
 		readonly current: DetachedHeadEvidence;
@@ -1065,6 +1067,7 @@ export async function openGenuineCreatorAdoptionFixture(
 		},
 		controls,
 		evidence: Object.freeze({
+			aheBackend,
 			chunks: Object.freeze(chunks),
 			closeResult,
 			current,

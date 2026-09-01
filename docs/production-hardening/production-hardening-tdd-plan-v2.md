@@ -89166,3 +89166,30 @@ its exact session. Deterministic RED receives no full model review; signed
 GREEN receives the sole plan-to-RED-to-GREEN review. No Fable, Codex-Sol
 substitution, collaboration subagent, retained campaign, or recursive prose
 review runs.
+
+The corrected-plan confirmation is complete. Grok 4.6/high session
+`01a05bed-dd8b-7f62-bb6c-679e3bc7f83c`, standard Kimi CLI K3/high/100
+session `session_26419202-7da4-4354-b3f0-f6b68e51207e`, and Opus xhigh
+session `9b2249c1-be2c-4347-a9c5-6cfc224ce148` each returned `APPROVED`,
+`P0_P1_UNION: none`, and `D109F_RED_READY: yes`. The confirmation gate is
+closed without another plan-review round.
+
+Deterministic RED now matches its frozen causal matrix. The corrected focused
+non-browser selection ran 9 tests in 2 files: 6 passed and exactly 3 failed.
+The failures are empty-delete/present-parent returning
+`AHE_RECLAMATION_RETRY_REQUIRED` rather than
+`AHE_RECLAMATION_INVALID_ARGUMENT`, mutable detached pruned-error scope, and
+Node inspection throwing synchronously before returning a Promise. The 128
+planner steps, 128 genuine Node AHE maintenance steps, archival count 131,
+compacted count 3, two genuine 65-row issuance epochs, watermark 129, IPC-
+ordered release, fresh-process reopen/next-write, and owner confinement all
+passed. Chromium selected one test in one file and failed only the same AHE
+polarity, with zero skips, retries, flaky results, or top-level errors.
+
+The corrected retained Vitest selection passed 155/155 across 9 files,
+including all D.109c source/Node mutants and the seven stale-export owners.
+Retained D.109c Chromium passed 4/4. Preliminary invalid diagnostics are kept
+honestly in `.logs/phase-6b-d109f-red/`: they exposed only exact-record fixture
+mistakes and one stale tarball roster, which were corrected before the accepted
+RED. No production file changed and no campaign ran. GREEN is authorized only
+for the three named production owners.

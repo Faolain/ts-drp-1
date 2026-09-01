@@ -62,7 +62,13 @@ describe("Phase 2e3 durable adapter facade correction RED", () => {
 			(match) => match[1]
 		).sort();
 
-		expect(Object.keys(manifest.exports ?? {})).toEqual([".", "./contract", "./adapter"]);
+		expect(Object.keys(manifest.exports ?? {})).toEqual([
+			".",
+			"./contract",
+			"./maintenance",
+			"./adapter",
+			"./snapshot-transfer",
+		]);
 		expect(manifest.exports?.["./internal/transition"]).toBeUndefined();
 		expect(Object.keys(manifest.dependencies ?? {})).toEqual(["@ts-drp/canonical"]);
 		expect(Object.keys(adapter).sort()).toEqual([

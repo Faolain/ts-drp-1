@@ -362,7 +362,9 @@ describe("Phase 2g-a public neutral surface RED", () => {
 		const manifest = JSON.parse(fs.readFileSync(path.join(PACKAGE_DIRECTORY, "package.json"), "utf8")) as {
 			exports?: Record<string, unknown>;
 		};
-		expect.soft(Object.keys(manifest.exports ?? {})).toEqual([".", "./contract", "./adapter"]);
+		expect
+			.soft(Object.keys(manifest.exports ?? {}))
+			.toEqual([".", "./contract", "./maintenance", "./adapter", "./snapshot-transfer"]);
 		expect.soft(fs.existsSync(path.join(PACKAGE_DIRECTORY, "src/capacity.ts"))).toBe(true);
 		expect.soft(adapter).not.toHaveProperty("inspectStorageCapability");
 		expect.soft(adapter).not.toHaveProperty("requestPersistentStorage");

@@ -5,7 +5,7 @@ import type {
 	DurableIssuancePruningReceipt,
 } from "@ts-drp/issuance-store/maintenance";
 import { MessageQueueManager } from "@ts-drp/message-queue";
-import { type AheDurableStore, digestBlob, type GenerationRecord, type PresentHead } from "@ts-drp/storage";
+import { type AheDurableStore, type PresentHead } from "@ts-drp/storage";
 import type { AheReclamationMaintenance, AheReclamationReceipt } from "@ts-drp/storage/maintenance";
 import type { Message } from "@ts-drp/types";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -332,135 +332,34 @@ function d109dIssuancePruningInput(
 	});
 }
 
-function storeValue<T>(
-	result: Readonly<{ readonly ok: boolean; readonly reason?: string; readonly value?: T }>,
-	label: string
-): T {
-	if (result.ok !== true || !("value" in result)) throw new TypeError(`D109D_AHE_${label}:${String(result.reason)}`);
-	return result.value as T;
-}
-
 async function d109dAheReceipts(
 	fixture: D109dHotFixture,
-	plan: ClosedEpochCleanupPlan,
-	generations: readonly GenerationRecord[],
-	references: readonly Readonly<{ readonly byteLength: number; readonly digest: string }>[]
+	plan: ClosedEpochCleanupPlan
 ): Promise<Readonly<{ readonly first: AheReclamationReceipt; readonly replay: AheReclamationReceipt }>> {
-	const directory = mkdtempSync(join(tmpdir(), "d109d-ahe-"));
-	const storeModule = (await import(
-		pathToFileURL(resolve(REPOSITORY_ROOT, "packages/storage-node/src/index.ts")).href
-	)) as {
-		createSqliteAheDurableStore(options: { readonly filename: string }): AheDurableStore;
-	};
 	const maintenanceModule = (await import(
-		pathToFileURL(resolve(REPOSITORY_ROOT, "packages/storage-node/src/maintenance.ts")).href
+		pathToFileURL(resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/maintenance.js")).href
 	)) as {
 		resolveNodeAheReclamationMaintenance(store: AheDurableStore): AheReclamationMaintenance | undefined;
 	};
-	const store = storeModule.createSqliteAheDurableStore({ filename: join(directory, "ahe.sqlite") });
+	const maintenance = maintenanceModule.resolveNodeAheReclamationMaintenance(fixture.base.evidence.aheBackend);
+	if (maintenance === undefined) throw new TypeError("D109D_NODE_AHE_MAINTENANCE_MISSING");
+	const input = Object.freeze({
+		activeGenerationId: plan.activeGenerationId,
+		availabilityPolicyDigest: plan.availabilityPolicyDigest,
+		closedEpoch: plan.closedEpoch,
+		expectedHead: plan.expectedHead,
+		lineageFloor: plan.lineageFloor,
+		objectId: plan.objectId,
+		rollbackGenerationIds: plan.rollbackGenerationIds,
+	});
 	try {
-		const blobs = new Map<string, Uint8Array>();
-		for (const candidate of [
-			...fixture.base.evidence.current.candidates,
-			...fixture.base.evidence.proposed.candidates,
-		]) {
-			blobs.set(candidate.ref.digest, Uint8Array.from(candidate.bytes));
-		}
-		for (const bytes of [
-			fixture.base.evidence.exactCanonicalProjectionBytes,
-			fixture.base.evidence.predecessorExactCanonicalLatchedAclBytes,
-		]) {
-			const digest = storeValue(digestBlob(bytes), "DIGEST");
-			blobs.set(digest, Uint8Array.from(bytes));
-		}
-		for (const reference of references) {
-			const bytes = blobs.get(reference.digest);
-			if (bytes === undefined || bytes.byteLength !== reference.byteLength) {
-				throw new TypeError(`D109D_AHE_ACTIVE_BLOB_MISSING:${reference.digest}`);
-			}
-		}
-		const ordered = [...generations].sort((left, right) => {
-			const leftRevision = left.baseExpectedHead.kind === "none" ? 0 : left.baseExpectedHead.revision;
-			const rightRevision = right.baseExpectedHead.kind === "none" ? 0 : right.baseExpectedHead.revision;
-			return leftRevision - rightRevision;
-		});
-		for (const generation of ordered) {
-			storeValue(
-				await store.beginGeneration({
-					baseExpectedHead: generation.baseExpectedHead,
-					closure: generation.closure,
-					generationId: generation.generationId,
-					objectId: generation.objectId,
-				}),
-				"BEGIN"
-			);
-			for (const reference of generation.closure) {
-				const bytes = blobs.get(reference.digest);
-				if (bytes === undefined) throw new TypeError(`D109D_AHE_BLOB_MISSING:${reference.digest}`);
-				storeValue(
-					await store.putCachedBlob({
-						bytes,
-						digest: reference.digest,
-						generationId: generation.generationId,
-						objectId: generation.objectId,
-					}),
-					"PUT"
-				);
-				storeValue(
-					await store.promoteReference({
-						digest: reference.digest,
-						generationId: generation.generationId,
-						objectId: generation.objectId,
-					}),
-					"PROMOTE"
-				);
-			}
-			storeValue(
-				await store.completeGeneration({ generationId: generation.generationId, objectId: generation.objectId }),
-				"COMPLETE"
-			);
-			storeValue(
-				await store.swapHead({
-					expectedHead: generation.baseExpectedHead,
-					generationId: generation.generationId,
-					objectId: generation.objectId,
-				}),
-				"SWAP"
-			);
-		}
-		const head = storeValue(await store.readHead(plan.objectId), "READ_HEAD");
-		if (
-			head.kind !== "present" ||
-			head.closureDigest !== plan.expectedHead.closureDigest ||
-			head.generationId !== plan.expectedHead.generationId ||
-			head.objectId !== plan.expectedHead.objectId ||
-			head.revision !== plan.expectedHead.revision
-		) {
-			throw new TypeError("D109D_AHE_HEAD_MISMATCH");
-		}
-		const maintenance = maintenanceModule.resolveNodeAheReclamationMaintenance(store);
-		if (maintenance === undefined) throw new TypeError("D109D_NODE_AHE_MAINTENANCE_MISSING");
-		const input = Object.freeze({
-			activeGenerationId: plan.activeGenerationId,
-			availabilityPolicyDigest: plan.availabilityPolicyDigest,
-			closedEpoch: plan.closedEpoch,
-			expectedHead: plan.expectedHead,
-			lineageFloor: plan.lineageFloor,
-			objectId: plan.objectId,
-			rollbackGenerationIds: plan.rollbackGenerationIds,
-		});
-		try {
-			const first = await maintenance.reclaimClosedEpoch(input);
-			const replay = await maintenance.reclaimClosedEpoch(input);
-			return Object.freeze({ first, replay });
-		} catch (error) {
-			const code = error !== null && typeof error === "object" ? Reflect.get(error, "code") : undefined;
-			const message = error instanceof Error ? error.message : String(error);
-			throw new TypeError(`D109D_AHE_RECLAMATION_FAILED:${String(code)}:${message}`);
-		}
-	} finally {
-		await store.close();
-		rmSync(directory, { force: true, recursive: true });
+		const first = await maintenance.reclaimClosedEpoch(input);
+		const replay = await maintenance.reclaimClosedEpoch(input);
+		return Object.freeze({ first, replay });
+	} catch (error) {
+		const code = error !== null && typeof error === "object" ? Reflect.get(error, "code") : undefined;
+		const message = error instanceof Error ? error.message : String(error);
+		throw new TypeError(`D109D_AHE_RECLAMATION_FAILED:${String(code)}:${message}`);
 	}
 }
 
@@ -571,7 +470,7 @@ export async function createD109dReceipts(fixture: D109dHotFixture): Promise<D10
 		}),
 	});
 	if (!planned.ok) throw new TypeError(`D109D_GENUINE_CLEANUP_PLAN_REFUSED:${planned.reason}`);
-	const ahe = await d109dAheReceipts(fixture, planned.plan, generations, inspection.references);
+	const ahe = await d109dAheReceipts(fixture, planned.plan);
 	return Object.freeze({
 		aheReceipt: ahe.first,
 		aheReplayReceipt: ahe.replay,
