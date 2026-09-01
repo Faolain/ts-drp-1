@@ -49,6 +49,8 @@ import {
 	recoverV3LiveReplica,
 	routeV3Ingress,
 	type V3AdmittedVertexSink,
+	type V3LocalIssueInput,
+	type V3PlaneHandle,
 } from "../../../packages/node/src/v3-live.js";
 import type { CurrentAnchorTrust } from "../../../packages/protocol-v3/src/index.js";
 import { openBrowserSealEvidenceStore } from "../../../packages/storage-browser/src/seal-evidence.js";
@@ -860,6 +862,13 @@ function deleteDatabase(name: string): Promise<void> {
 export async function openGenuineCreatorAdoptionFixture(
 	options: Readonly<{
 		readonly authorizedPrivateKeySeedHexes?: readonly string[];
+		beforeCreatorClose?(
+			input: Readonly<{
+				readonly firstLogicalTime: number;
+				readonly plane: V3PlaneHandle;
+				readonly signRegisteredVertexDigest: V3LocalIssueInput["signRegisteredVertexDigest"];
+			}>
+		): Promise<Readonly<{ readonly authorSequence: number; readonly digest: string }>>;
 		readonly establishedPeerPrivateKeySeedHex?: string;
 		readonly objectId?: string;
 		readonly stageAclChange?: boolean;
@@ -933,6 +942,7 @@ export async function openGenuineCreatorAdoptionFixture(
 		signRegisteredVertexDigest: fixture.signRegisteredVertexDigest,
 	});
 	if (!localIssued.ok) throw new TypeError(`D.108b fixture local issue failed: ${localIssued.kind}`);
+	let latestLocalIssued = localIssued;
 	if (options.stageAclChange === true) {
 		const stagedAcl = await activation.handle.issueLocal({
 			operations: Object.freeze([
@@ -1025,6 +1035,33 @@ export async function openGenuineCreatorAdoptionFixture(
 			canonicalPreimageBytes: Uint8Array.from(carrier.canonicalPreimageBytes),
 			digest: Uint8Array.from(carrier.digest),
 			signature: Uint8Array.from(carrier.signature),
+		});
+	}
+	if (options.beforeCreatorClose !== undefined) {
+		if (
+			options.stageAclChange === true ||
+			options.successorAclGroups !== undefined ||
+			options.establishedPeerPrivateKeySeedHex !== undefined
+		) {
+			throw new TypeError("D.110a-p pre-close fixture option is incompatible with other staged operations");
+		}
+		const preCloseIssued = await options.beforeCreatorClose({
+			firstLogicalTime: 3,
+			plane: activation.handle,
+			signRegisteredVertexDigest: fixture.signRegisteredVertexDigest,
+		});
+		if (
+			!Number.isSafeInteger(preCloseIssued.authorSequence) ||
+			preCloseIssued.authorSequence <= localIssued.authorSequence ||
+			!/^[0-9a-f]{64}$/u.test(preCloseIssued.digest)
+		) {
+			throw new TypeError("D.110a-p pre-close fixture result is invalid");
+		}
+		latestLocalIssued = Object.freeze({
+			authorSequence: preCloseIssued.authorSequence,
+			digest: preCloseIssued.digest,
+			kind: "accepted" as const,
+			ok: true as const,
 		});
 	}
 	const signer = await createRecoverableFinalitySigner({ seed: hexBytes(contract.privateKeySeedHex) });
@@ -1134,7 +1171,10 @@ export async function openGenuineCreatorAdoptionFixture(
 			issuanceStore: recovered.issuanceStore,
 			journalRows: Object.freeze(journalRows),
 			journalSnapshot: journalReadiness.snapshot,
-			localIssued: Object.freeze({ authorSequence: localIssued.authorSequence, digest: localIssued.digest }),
+			localIssued: Object.freeze({
+				authorSequence: latestLocalIssued.authorSequence,
+				digest: latestLocalIssued.digest,
+			}),
 			predecessorExactCanonicalLatchedAclBytes: Uint8Array.from(fixture.exactCanonicalLatchedAclBytes as Uint8Array),
 			proposed,
 		}),
