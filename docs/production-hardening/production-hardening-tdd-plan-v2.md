@@ -88501,3 +88501,49 @@ the sole formal final review using Grok 4.6/high, exact Kimi K3 thinking/high wi
 `KIMI_LOOP_MAX_STEPS_PER_TURN=100` and `--max-steps-per-turn 100`, and Opus
 xhigh. Kimi occupies the middle external-CLI slot and Codex `gpt-5.6-sol` is
 not a substitute. Only P0/P1 blocks D.109c closure; D.109d remains unopened.
+
+#### D.109c final review and closure
+
+The complete GREEN was signed and pushed at
+`3d21264f4477fb5ff586047826ebd49e15d20bde`. The sole final review inspected
+the accepted plan, immutable RED, complete GREEN diff, and committed evidence.
+Grok 4.6/high session `01a05a8e-66d1-73e3-9403-69c3d07f5995`, the
+user-authorized standard Kimi CLI K3/high/100-step session
+`session_926cdc44-4a34-474e-b63d-bcf0a9ab6ab8`, and Opus 5/xhigh session
+`50126d08-0132-4491-9200-ae4a077455f5` independently returned `APPROVED`,
+`P0_P1_UNION: none`, and `D109C_MAY_CLOSE: yes`. Kimi, not Codex
+`gpt-5.6-sol`, occupied the middle external-CLI review slot. Grok completed
+normally without cancellation or resume. No reviewer ran tests/builds,
+changed product source, invoked Fable or collaboration subagents, or ran a
+campaign.
+
+The successful standard Kimi v0.39.1 invocation used model `kimi-code/k3`, its
+configured high thinking effort, and `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, as
+the user expressly authorized after the legacy `kimi-cli` OAuth store returned
+401 before any model turn. The failed legacy authentication and one local
+unsupported-`--auto` argument diagnostic are preserved honestly and are not
+counted as reviews or verdicts.
+
+The reconciled P2 set is nonblocking and explicitly owned. Kimi and Opus both
+found that an empty deletion list paired with a present expected floor parent
+can reach retry/replay instead of capture-time
+`AHE_RECLAMATION_INVALID_ARGUMENT`; it performs zero writes, does not poison,
+and cannot authorize unsafe deletion. D.109f owns the exact invalid-input
+mutant and polarity correction. Opus also found that Node's same-process
+two-handle control proves replay but cannot force a synchronous SQLite
+interleaving, and that the browser fixture's computed `facadeKeys` census is
+not asserted. D.109f owns a genuine second-process concurrency control and the
+browser facade census as part of its required crash/concurrency and complete
+enumerated-structure exit work. These P2s do not alter the reviewed GREEN or
+trigger recursive confirmation.
+
+Reviewer public/raw SHA-256 values for Grok, Kimi, and Opus are respectively
+`5686c634d2a91275e7aec517869bae70e8acfe0ec86bf83b72bba9ea1d8849c5`,
+`fdce906a23945aacc4318f57d192c561839650a6c0f8c340ae936d248075bd71`,
+and `80adcd5192cfb07c72aec77d2c09b0c2deae6505fc3156c72313c1095ac516b0`.
+The complete review evidence is rooted at
+`.logs/phase-6b-d109c-green-review/`; its validating self-excluding manifest
+SHA-256 is
+`44971c03dce649d0886b2bebf943044aa55178499ede15155cc363f7b4d2692b`.
+D.109c is closed on this signed record; D.109d may begin. No retained campaign
+was authorized or executed.

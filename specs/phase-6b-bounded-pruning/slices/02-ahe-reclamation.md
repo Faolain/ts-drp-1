@@ -463,3 +463,32 @@ prefix/promotions, shared-versus-deleted blob digests, replay receipt, and old
 XOR complete-new crash observations for Node and Chromium. A reviewer can
 therefore decide deletion safety without inferring it from implementation
 prose.
+
+## Final review and closure
+
+The complete GREEN was signed and pushed at
+`3d21264f4477fb5ff586047826ebd49e15d20bde`. The sole final review used Grok
+4.6/high session `01a05a8e-66d1-73e3-9403-69c3d07f5995`, the
+user-authorized standard Kimi CLI K3/high/100-step session
+`session_926cdc44-4a34-474e-b63d-bcf0a9ab6ab8`, and Opus 5/xhigh session
+`50126d08-0132-4491-9200-ae4a077455f5`. All three independently returned
+`APPROVED`, `P0_P1_UNION: none`, and `D109C_MAY_CLOSE: yes`. Kimi occupied the
+middle external-CLI slot; no Codex `gpt-5.6-sol`, Fable, collaboration
+subagent, test, build, product mutation, or campaign ran during review.
+
+The overlapping Kimi/Opus P2 identifies an exact invalid-input-polarity edge:
+an empty deletion list with a present expected floor parent can reach
+retry/replay rather than capture-time `AHE_RECLAMATION_INVALID_ARGUMENT`.
+There are zero writes and no poison, so it cannot authorize unsafe deletion;
+D.109f owns the exact mutant and correction. Opus's two further P2s assign a
+genuine second-process SQLite concurrency control and the already-computed
+browser `facadeKeys` assertion to D.109f's required crash/concurrency and
+complete-census work. No P2 changes this reviewed GREEN or triggers another
+review round.
+
+The complete review evidence is rooted at
+`.logs/phase-6b-d109c-green-review/`; its validating self-excluding manifest
+SHA-256 is
+`44971c03dce649d0886b2bebf943044aa55178499ede15155cc363f7b4d2692b`.
+D.109c is closed on this signed record; D.109d may begin. No retained campaign
+is authorized or executed by D.109c.

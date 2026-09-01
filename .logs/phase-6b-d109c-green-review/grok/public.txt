@@ -1,0 +1,60 @@
+I'll review D.109c GREEN at `3d21264` against the causal RED and accepted plan, using only read-only inspection of those commits, contracts, and evidence.The review skill would spawn another reviewer, so I'll inspect the plan, RED/GREEN commits, and evidence directly.I'll read the rest of the D.109c spec and locate the GREEN owners, RED tests, and evidence without looking at other reviewers' verdicts.I'll inspect the shared classifier, both native owners, and the GREEN/RED evidence next.I'll now inspect registration, exports, crash fixtures, and the classifier/test matrix for invariant gaps.D.109c GREEN at `3d21264f4477fb5ff586047826ebd49e15d20bde` closes the immutable RED `84cff9ceaa6620c2ed8d1baa3a358ad9b018bb94` for missing shared/Node/browser AHE reclamation owners. No P0/P1 invariant gap is demonstrated.
+
+## 1. Causal RED → GREEN
+
+RED focused Vitest is 38 tests: 6 passed, exactly `D109C_SHARED_MAINTENANCE_MISSING` and `D109C_NODE_MAINTENANCE_MISSING`, 30 skipped. Focused Chromium is 4 tests: exactly `D109C_BROWSER_MAINTENANCE_MISSING`, 3 skipped, 0 flaky, 0 top-level errors. The first Vitest diagnostic (38/5/3) is the documented public-facade shape false fail; the corrected run is the causal RED.
+
+GREEN is not a relabel: `packages/storage/src/maintenance.ts` owns capture/classify/receipt; Node `BEGIN IMMEDIATE` and browser strict four-store `readwrite` perform the physical work. Focused Vitest is 48/48 with 0 skip; Chromium is 4/4.
+
+## 2. Identity-scoped authority, no public-root leak
+
+Authority is a module-private `WeakMap<AheDurableStore, …>` registered only from `SqliteAheDurableStore` / `createBrowserAheDurableStore`. `resolveNodeAheReclamationMaintenance` / `resolveBrowserAheReclamationMaintenance` return `undefined` for `{...store}`, `Proxy`, `{}`, and the memory facade. Package roots still export the 12-key factory only; `reclaimClosedEpoch` is not a facade method. `./maintenance` is the sole additive export.
+
+## 3. Frozen contract
+
+`captureAheReclamationInput` uses `isClosedRecord` / `isClosedArray` (no accessors, extras, aliases, shared backing). Invalid runs before lifecycle. Node `await Promise.resolve()` then capture; both backends reject asynchronously. Codes are the frozen six. Receipts are detached `Object.freeze` trees. `CORRUPT` poisons with zero committed writes; `RETRY`/`INVALID` do not.
+
+## 4. Lineage / floor / generation / promotion / blob
+
+Classifier rebuilds head → active `Adopted` → two `Superseded` rollbacks → connected older prefix with D.109a `revision - 1` / `parentMatches`. Floor rewrite is only the second rollback’s `baseExpectedHead` → `{ kind: "none", objectId }`. Stale head/revision/rollback/floor/prefix → `RETRY`. Gap/cycle/partial replay/malformed/key mismatch/missing retained blob → `CORRUPT`. Staged/Discarded/Complete extras cannot be selected as closed (`state !== "Superseded"` or extra-row retry).
+
+## 5. Global remaining-reference scan
+
+Every generation and promotion is loaded. Remaining closures and remaining promotions both pin blob identity. Shared retained, cross-object shared, staged/discarded partial promotions keep referenced blobs. Candidates come only from the selected prefix; an unrelated orphan is not a reference and is retained.
+
+## 6. One native transaction, exact counts
+
+Node: one `BEGIN IMMEDIATE`, classify, floor UPDATE, promotion/generation/blob DELETEs, post-classify must be empty replay, then `COMMIT`. Count fault → `CORRUPT` → `ROLLBACK` + poison. Browser: one strict transaction over the four AHE stores; `expectKey` before/after each write; abort on fault. No partial durable writes.
+
+## 7. Lifecycle / replay / concurrency / identity
+
+Empty 3-generation prefix is no-write success. Lost-receipt replay: `reclaimedGenerationIds` preserved, `normalizedThisCall: false`, empty deletes. Two live handles serialize to `{0,2}` deleted counts. Reopen + successor `swapHead` to revision 6 succeeds. Closed valid input → `STORE_CLOSED`; `{}` after close → `INVALID_ARGUMENT`.
+
+## 8. Crash XOR
+
+Node child `fork` + real `SIGKILL` at the six edges; browser dedicated worker `terminate()` at the matching live-IDB edges (observer `postMessage` + `Atomics.wait`, not a post-completion mock). Reopen is old XOR complete-new, and complete-new is only `after-commit`.
+
+## 9. Evidence
+
+| Gate | Result |
+|---|---|
+| Focused Vitest | 48/48, 0 failed, 0 pending |
+| Focused Chromium | expected 4, skipped 0, unexpected 0, flaky 0 |
+| Retained Vitest initial | 197 passed, 1 failed (`reports the exact frozen strict capability pair`), 1 skipped campaign |
+| Retained Vitest corrected | 197 passed, 0 failed, 2 pending (D.109f export + campaign) |
+| Export/planner | 15 passed, 38 filtered |
+| Chromium retained | 12, 22, 1, 2 expected, 0 unexpected |
+
+The Unicode-regex source-shape miss is a diagnostic error, not a D.109c product failure. Manifests are self-excluding. No retained campaign ran.
+
+## 10. Scope
+
+GREEN paths are the 11 frozen owners plus authorized `./maintenance` maps. No runtime reclamation, scheduler, campaign, or D.109d work.
+
+No demonstrated P0/P1: no unsafe reclamation, lost live data, borrowed authority, non-atomic commit, inverted error polarity, or false RED-to-GREEN causality.
+
+VERDICT: APPROVED
+
+P0_P1_UNION: none
+
+D109C_MAY_CLOSE: yes

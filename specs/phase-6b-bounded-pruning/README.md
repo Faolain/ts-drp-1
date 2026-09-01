@@ -2,36 +2,35 @@
 
 ## Next Agent Prompt
 
-Status (2026-09-01): D.109a eligibility and D.109b issuance retention are
-closed. D.109b's signed/pushed GREEN and final-review anchors are respectively
-`529367b154ffd3fb66bf31a6cfedb4a0d9b73746` and
-`2afadbe682261bdb311a5cb64f6f42d86ed7330b`; their plan, RED, GREEN, reviews,
-and evidence are accepted and must not be reopened. The deterministic RED for
-[D.109c AHE reclamation](slices/02-ahe-reclamation.md) is signed/pushed at
-`84cff9ceaa6620c2ed8d1baa3a358ad9b018bb94`. D.109c GREEN implementation and
-its focused/static/retained gates now pass locally with no semantic exclusion;
-sign and push the GREEN/evidence checkpoint next, then run the sole final
-Grok/Kimi/Opus review before closing D.109c.
+Status (2026-09-01): D.109a eligibility, D.109b issuance retention, and
+[D.109c AHE reclamation](slices/02-ahe-reclamation.md) are closed. D.109c's
+signed/pushed GREEN is `3d21264f4477fb5ff586047826ebd49e15d20bde`;
+Grok 4.6/high, standard Kimi K3/high/100-step, and Opus xhigh unanimously
+approved it with an empty P0/P1 union. Its plan, RED, GREEN, review, and
+evidence are accepted and must not be reopened. Freeze and review
+[D.109d runtime reclamation](slices/03-runtime-reclamation.md), then execute
+its deterministic causal RED before production runtime reclamation work.
 
 Global TODO:
 
 - [x] D.109a eligibility planner and causal closure.
 - [x] D.109b issuance retention and causal closure.
-- [ ] D.109c AHE reclamation plan → RED → GREEN → final review.
+- [x] D.109c AHE reclamation plan → RED → GREEN → final review.
 - [ ] D.109d receipt-gated runtime reclamation.
 - [ ] D.109e browser primary scheduling reuse.
 - [ ] D.109f differential/census exit, including D.109b's three assigned P2
-      parity/deep-freeze checks.
+      parity/deep-freeze checks and D.109c's invalid-input-polarity,
+      second-process SQLite concurrency, and browser facade-census checks.
 
 Before ending a pass, update this handoff with the exact signed/pushed anchor,
 current gate, and next executable command.
 
 The user has prohibited further Fable and collaboration subagents after the
 one expressly authorized Phase-6b Fable review. Phase-6b formal reviews use
-Grok, exact Kimi high/100-step, and Opus xhigh; Codex `gpt-5.6-sol` does not
-substitute for Kimi. If Grok cancels, resume that exact session; do not replace
-it. These reviews run through their external CLIs; they are not collaboration
-subagents.
+Grok, the standard Kimi CLI with K3/high and a 100-step cap, and Opus xhigh;
+Codex `gpt-5.6-sol` does not substitute for Kimi. If Grok cancels, resume that
+exact session; do not replace it. These reviews run through their external
+CLIs; they are not collaboration subagents.
 
 ## Goal
 
