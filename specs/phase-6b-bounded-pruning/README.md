@@ -14,7 +14,7 @@ also closed. Its signed/pushed correction is
 confirmation unanimously approved it with an empty P0/P1 union. Focused 12/12,
 retained 142/142, all four retained browser groups, Node build, and affected
 static gates pass. D.109e browser primary scheduling reuse is now at its
-bounded plan checkpoint; no RED or product change has run.
+single plan-review correction; no RED or product change has run.
 
 Global TODO:
 
@@ -252,8 +252,9 @@ manifest SHA-256 is
 `428248d8bed4ee823a50dc94f64271419caa645fa5ca80eeb2e58f8ba57d67b0`.
 D.109d is closed. The D.109e browser primary-scheduling plan is now frozen in
 `slices/04-browser-scheduling.md` without reopening D.109a–D.109d; the exact
-next command is the single Grok/Kimi/Opus plan review after signing and pushing
-the plan-only checkpoint.
+initial Grok/Kimi/Opus review preserved two approvals and one Opus P1. The exact
+next command is the one permitted confirmation after signing and pushing the
+bounded source-shape/causal-proof correction.
 
 ## D.109e plan handoff
 
@@ -271,3 +272,13 @@ primary close/takeover, `versionchange`, and changed-precondition refusal. The
 lease carries no cleanup fact and cannot suppress the transaction's exact
 recheck. Production scope is exactly four storage-browser internal owners; no
 public API, schema, dependency, threshold, protocol, or campaign changes.
+
+The initial plan review found one blocking wording/acceptance defect: a global
+singleton scan would count legitimate LockManager users in other packages and
+a separate 250 ms blocked-open timeout. The corrected scan is package-internal,
+identifier-bound, and explicitly excludes tests-only injection and unrelated
+timeouts. The same batch adds runtime observation of the exact AHE lock name
+and requires the changed-precondition fixture to prove a genuine generation-6
+head swap before callback release. Sign/push this correction, then run the one
+permitted Grok/Kimi/Opus confirmation; RED remains unopened until its P0/P1
+union is empty.

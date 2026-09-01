@@ -120,7 +120,7 @@ is generations 1 and 2, freeze these cases:
 
 | Case                                           | Expected cleanup observation                                                         |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------ |
-| native granted                                 | exact two-generation deletion receipt                                                |
+| granted/native when available                  | exact AHE lock name and exact two-generation deletion receipt                        |
 | explicitly unelected/off                       | same exact deletion receipt                                                          |
 | Locks absent                                   | same exact deletion receipt                                                          |
 | `request` non-callable                         | same exact deletion receipt                                                          |
@@ -135,19 +135,39 @@ is generations 1 and 2, freeze these cases:
 | `versionchange` closes before delayed grant    | exact closed refusal, zero writes; reopened successor deletes the exact prefix       |
 | head/precondition changes before delayed grant | exact retry-required refusal and zero cleanup deletion                               |
 
-The changed-precondition case performs a genuine lawful successor head change
-through the ordinary store before releasing the delayed callback. It compares a
-raw database image before and after the refused cleanup so a lease cannot hide a
-partial delete. The stale-holder case releases the original callback after the
-timeout fallback has completed and proves the task-entry count remains one.
+Every injected callable LockManager records the complete name passed by the
+production runner. The positive cleanup path must observe exactly
+`ts-drp:ahe-reclamation:v1:<utf8-database-name-length>:<database-name>`; this
+behavioral check prevents unelected fallback from hiding a wrong or colliding
+cleanup identity. GREEN evidence also records whether each engine exposes a
+native LockManager; native absence is an expected capability observation, not a
+substitute for the deterministic injected-grant control.
+
+The changed-precondition case does not reuse the older request-only
+`head-different` mutant. While the production callback is delayed, it creates a
+lawful generation 6 and successfully swaps the genuine store head from
+generation 5/revision 5 to generation 6/revision 6. The fixture must read back
+and assert that new head before releasing the callback, capture the raw database
+image after that swap, then require exact `AHE_RECLAMATION_RETRY_REQUIRED` and a
+byte-identical image after the refused cleanup. This makes the head mismatch,
+not an unrelated extra-row rule, the causal refusal and proves the lease cannot
+hide a partial delete. The stale-holder case releases the original callback
+after the timeout fallback has completed and counts entries into the inner AHE
+transaction/observer path; the outer `reclaimClosedEpoch` call itself is not the
+entry counter.
 
 Source-shape controls require:
 
-- exactly one production owner of `navigator.locks`, the 250 ms constant,
-  `{ ifAvailable: true, mode: "exclusive" }`, and lock-name framing;
+- within `packages/storage-browser/src/internal/`, exactly one runtime owner of
+  `Reflect.get(navigator, "locks")`, `LOCK_TIMEOUT_MILLISECONDS = 250`,
+  `{ ifAvailable: true, mode: "exclusive" }`, exactly-once fallback, and lock-
+  name framing: `primary-dispatch.ts`;
 - the unchanged package-local `seal-vote-test-control.ts` and D.109e browser
   asset may still replace or inspect `navigator.locks` only to inject the
   frozen test modes; neither is counted as a runtime runner;
+- the timeout check is identifier- and owner-bound; it must not count the
+  separate `PHASE_5C_BLOCKED_OPEN_TIMEOUT_MILLISECONDS` in `schema-idb.ts`, a
+  bare `250`, or legitimate LockManager owners in other packages/examples;
 - both consumers invoke the same internal primitive;
 - the Phase-5c lock name remains exact;
 - the AHE callback still enters `classifyAheReclamation` inside its strict

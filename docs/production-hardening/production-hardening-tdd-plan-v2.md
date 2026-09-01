@@ -88927,3 +88927,41 @@ and Opus xhigh review before RED. The signed GREEN receives the single formal
 plan → RED → GREEN review. Only P0/P1 blocks; the governing one-correction and
 at-most-one-confirmation rule applies. No RED review, Fable, Codex Sol,
 collaboration subagent, retained campaign, or recursive prose review runs.
+
+#### D.109e first plan review and bounded correction
+
+The sole initial plan review inspected signed/pushed commit
+`0af156fccae44126cf46617c498fa9b1919c8095`. Grok 4.6/high completed normally
+and returned `APPROVED`, no P0/P1, and `D109E_RED_READY: yes`. The standard
+Kimi CLI ran K3 with high reasoning and the 100-step bound, returning the same
+terminal result. Opus xhigh returned `CHANGES_REQUIRED`, P0=0/P1=1, and
+`D109E_RED_READY: no`. Original results remain preserved under
+`.logs/phase-6b-d109e-plan-review/`.
+
+Opus's P1 is accepted. The phrase “exactly one production owner” did not bound
+the source-shape scan tightly enough: unrelated packages/examples legitimately
+own LockManager calls, and `schema-idb.ts` legitimately owns a different 250 ms
+blocked-open timeout. The corrected acceptance scans only
+`packages/storage-browser/src/internal/`, requires the exact
+`LOCK_TIMEOUT_MILLISECONDS = 250` identifier and acquisition path solely in
+`primary-dispatch.ts`, and explicitly excludes the unchanged Phase-5c test
+injector, the D.109e test asset, the separate blocked-open identifier, bare
+numeric matches, and other packages. This is an executable acceptance
+correction, not a product-scope expansion.
+
+Two proof-strength P2s are adopted in the same batch. Callable cleanup modes
+record and assert the exact runtime name
+`ts-drp:ahe-reclamation:v1:<utf8-database-name-length>:<database-name>` so an
+unelected fallback cannot mask a wrong identity. The changed-precondition case
+must lawfully create and adopt generation 6, read back revision 6 before
+releasing the delayed callback, baseline the raw image after that swap, and
+then prove exact retry-required plus an unchanged image; it may not reuse a
+request-only mutant or obtain the same error from an unrelated extra-row rule.
+The stale-holder counter is bound to inner transaction/observer entry, not the
+outer call. Per-engine native LockManager capability is recorded, while the
+deterministic injected grant remains the cross-engine semantic control.
+
+Because the P1 correction changes executable RED acceptance, sign and push this
+single correction and run at most one confirmation with the same
+Grok/Kimi/Opus trio. Only an empty P0/P1 union opens RED; do not add another
+review round for P2 or closure prose.
