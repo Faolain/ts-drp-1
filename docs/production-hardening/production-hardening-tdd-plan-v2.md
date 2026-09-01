@@ -89549,21 +89549,32 @@ The D.110a tests-only scope therefore stops as required and a narrow
 D.110a-p product prerequisite owns the defect. Its only production owner is
 the private `readCreatorReplayRows` function in
 `packages/node/src/v3-live.ts`. GREEN must read the fixed readiness snapshot in
-pages of at most 128, advance from the exact prior terminal sequence, reject
-empty/non-progress/overrun/early-terminal pages, validate global journal
-sequence and every existing authentication/issuance/digest/byte/graph
-predicate, and require terminal `nextSequence === null` exactly at the frozen
-row count. It does not change the public page limit, epoch limit, API, export,
-dependency, wire format, digest, creator-close/adoption authority, workload,
-or memory contract.
+a loop structurally bounded to at most `rowCount` iterations. Each request uses
+`Math.min(128, rowCount - consumed)`, advances from the exact prior nonterminal
+cursor, rejects empty/non-progress/overrun/early-terminal pages, validates a
+nonterminal cursor against the last row plus global journal sequence and every
+existing authentication/issuance/digest/byte/graph predicate, and requires
+terminal `nextSequence === null` exactly at the frozen row count. It does not
+change the public page limit, epoch limit, API, export, dependency, wire format,
+digest, creator-close/adoption authority, workload, or memory contract.
 
 D.110a-p RED adds one genuine 129-row creator-close regression and a
-deterministic source audit proving the current 128-row public bound plus the
-oversized `limit: readiness.rowCount` request. It must fail only at the
-demonstrated durable-replay seal. No D.110a preflight, memory worker, browser
-test, or retained campaign runs in its RED. GREEN runs that focus, retained
-creator close/adoption/activation and D.109d/D.109f reclamation suites, node
-build/source typecheck, and exact static/evidence gates.
+deterministic desired-state source audit whose polarity does not change between
+RED and GREEN. The public 128-row bound is a passing control; the genuine close
+and the owner's missing bounded-pagination predicate are the only RED failures,
+with the close ending at the demonstrated durable-replay seal. RED may commit
+only a minimal `beforeCreatorClose` callback seam exposing the live plane and
+registered-vertex signer. It must not absorb the uncommitted D.110a batch
+artifact, public-import migration, helper extraction, package script, memory
+worker, or other harness changes, and its proof runs from the clean tree of its
+signed commit. The remaining D.110a diff stays uncommitted and resumes on top.
+No D.110a preflight, memory worker, browser test, or retained campaign runs in
+RED. GREEN runs that focus, retained creator close/adoption/activation and
+D.109d/D.109f reclamation suites, node build/source typecheck, and exact
+static/evidence gates. The 129-row case executes continuation and final-page
+behavior; the structural bound, existing global sequence/map-size checks, and
+retained store conformance eliminate the need for a synthetic malformed-store
+fixture.
 
 Because D.110a-p changes production behavior, its signed/pushed plan receives
 one Grok 4.6/high, standard direct Kimi CLI K3/high/100-step, and Opus xhigh
@@ -89573,3 +89584,21 @@ review. If Grok cancels, resume the exact session. Do not use Codex Sol for
 Kimi, Fable, or collaboration subagents. After D.110a-p closes, resume D.110a
 at one corrected two-object preflight while preserving both failed attempts as
 diagnostic evidence. The single consuming full worker remains unspent.
+
+The bounded plan review used prompt SHA-256
+`45a2a8705c608a9826bc35e3f34a50890f987c5f81204380260e67bb6e9b6bc1`.
+Grok 4.6/high approved with zero P0/P1/P2; its public result SHA-256 is
+`14087f7427a51a0b7b994f59e9b2bdea2d7935cc5c0ba461eddd9896c3bd12d1`.
+The standard direct Kimi CLI K3/100-step review approved with zero P0/P1/P2;
+its raw stream SHA-256 is
+`4cbea6276fe4564a62fd5345478fe86c1f1813794f6d4e3c886d31ba62544f90`.
+Opus xhigh confirmed the cause and owner but returned two P1 and three P2 plan
+findings; its raw JSON SHA-256 is
+`41d8ddf2e3798800217f8c378576cbfcf0acea197cb77148e6bc0d5a1c06d283`.
+Both P1 findings are applied above by freezing desired-state audit polarity and
+explicit clean-commit custody for the minimal pre-close seam. All three P2
+dispositions are also applied: maximum 128-row pages clamped to remaining,
+structural loop bounding, and no unnecessary synthetic malformed-store owner.
+Because the corrections change causal RED acceptance and changed-path custody,
+one confirmation round is required; bookkeeping after that round is not
+reviewed recursively.
