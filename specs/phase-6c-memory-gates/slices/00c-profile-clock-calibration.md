@@ -41,16 +41,24 @@ The focused run must return exactly 20 passed and one failed, with the sole
 failure carrying that token. RED runs no object, preflight, profile, or full
 worker.
 
+RED also lands the detached validator's exported signature and synthetic input
+types as collection-safe scaffolding. The positive audit assertion executes
+first and remains the sole causal failure while the implementation is absent;
+missing imports or collection errors are not an accepted RED.
+
 The desired-state audit requires all of the following:
 
 - exact `process.hrtime` calibration fields `hrtimeBeforeStart`,
   `hrtimeAfterStart`, `hrtimeBeforeStop`, and `hrtimeAfterStop`, recorded
-  immediately before/after `Profiler.start` and before/after `Profiler.stop`;
+  immediately before/after `Profiler.start` and before/after `Profiler.stop` as
+  microseconds using the same `Number(process.hrtime.bigint() / 1_000n)`
+  derivation as the frozen `monotonicMicroseconds` phase schema;
 - no absolute equality or ordering comparison between profiler timestamps and
   `process.hrtime` timestamps;
 - the exact replacement root `.logs/phase-6c-d110au-green`, profile filename
   `d110au-main.cpuprofile`, fresh-directory prefix `profile-`, and root-level
-  exclusive sentinel `capture-consumed.json`, created before spawn;
+  exclusive sentinel `capture-consumed.json`, plus root-level durable terminal
+  record `capture-records.json`;
 - the stable named async function `runD110auApplicationWorkload`, whose body is
   the unchanged exact 977-batch/15,625-operation loop, returns both
   `{ appliedWorkloadOperations, latest }`, and is called only from the shared
@@ -88,16 +96,23 @@ GREEN extracts the existing callback body into the named tests-only async
 function `runD110auApplicationWorkload` without changing its operations,
 order, signing, issue/publish calls, or counts. The function returns both the
 final applied count and `latest`; the callback consumes both and evaluates the
-existing 15,628 logical-time and 15,625 applied-operation invariants from that
-returned object. No profile-only workload copy is allowed.
+existing 15,625 applied-operation invariant from that returned object and the
+15,628 logical-time invariant as
+`firstLogicalTime + appliedWorkloadOperations === 15_628`. The returned applied
+count is also assigned to the outer lifecycle counter before any later phase or
+result reads it. No profile-only workload copy is allowed.
 
 The child records and reports raw `process.hrtime` stamps immediately before
 and after `Profiler.start` and immediately before and after `Profiler.stop`,
 stops the profiler, writes the raw profile with exclusive creation, and only
-then sends its terminal IPC result. It does not adjudicate calibration,
-containment, sample windows, or dominance. The parent performs every such
-check from the already durable on-disk profile plus the terminal/phase IPC
-records, so a validator defect cannot discard the sole artifact.
+then sends its terminal IPC result containing those microsecond brackets. It
+does not adjudicate calibration, containment, sample windows, or dominance.
+On receipt and before any validation or adjudication, the parent writes the
+complete terminal envelope—including the four brackets, seven phases, PID,
+and executable path—to root-level `capture-records.json` with exclusive `wx`
+creation. The parent performs every subsequent check from the already durable
+profile and terminal record, so a validator defect cannot discard either
+input required to adjudicate the sole artifact.
 
 The parent calls the same exported detached contract validator exercised by
 the synthetic control and mutants. It proves every phase lies in the
@@ -114,9 +129,9 @@ matching frame, no matching sample, and a degenerate/single-sample window, and
 attributes every sample in the first-to-last closed interval by leaf self time.
 
 The exact D.110a-u root, filename, `profile-` directory prefix, and
-`capture-consumed.json` sentinel; exclusive `wx` profile write; exact one-file
-profile-directory custody; built-package hashes; PID/executable identity; and
-cleared inherited
+`capture-consumed.json` sentinel; root-level `capture-records.json`; exclusive
+`wx` profile and terminal-record writes; exact one-file profile-directory
+custody; built-package hashes; PID/executable identity; and cleared inherited
 `NODE_OPTIONS`, 900,000 ms diagnostic timeout, normal-exit, phase-order,
 operation/vertex/lifecycle counts, and no-memory-verdict checks remain. Static
 GREEN must pass exact-owner lint/format/diff, child syntax, the three package
@@ -137,7 +152,9 @@ unspent.
 A failed replacement capture closes D.110a-u as unavailable, keeps D.110a
 paused, and grants no further profile invocation authority. The write-once
 sentinel makes a second launcher invocation fail before spawn even if the first
-replacement fails.
+replacement fails. The parent creates that sentinel only after expected built
+imports, internal-module URLs, and the fresh target have validated, immediately
+before `spawn`, so a pre-spawn validation defect does not consume the capture.
 
 Apply the unchanged dominance rule to self time in the named workload sample
 window: at least 50% and at least twice the next owner group. D.110a-u only
@@ -147,6 +164,15 @@ clearly dominant tests-only owner must be inside the D.110a-t roster frozen in
 `00b-workload-feasibility-attribution.md`; otherwise stop for a new slice. A
 clearly dominant product owner requires a separately reviewed
 product-optimization slice before any product edit.
+
+A mixed or unavailable result also receives an explicit successor rather than
+an indefinite attribution loop: a separately planned/reviewed D.110a-v may
+perform read-only whole-lifecycle phase/owner disposition from the already
+durable D.110a-u profile and terminal record. It receives no process, profile,
+preflight, full-worker, product-edit, threshold-change, or retry authority.
+D.110a-u does not pre-authorize cross-clock phase mapping as an acceptance
+predicate; D.110a-v must state and review any diagnostic mapping method before
+using it.
 
 ## Review
 

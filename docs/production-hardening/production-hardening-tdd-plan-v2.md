@@ -90177,3 +90177,84 @@ Because these corrections materially pin causal acceptance and execution
 custody, the one permitted confirmation review will inspect the corrected
 signed/pushed plan. No further plan-review recursion is allowed after that
 confirmation.
+
+##### D.110a-u corrected-plan confirmation and final disposition
+
+The one permitted confirmation reviewed signed/pushed correction anchor
+`bde2a8e53f44a4d62c0e313494aa748282768a59`, tree
+`fbc85c66a31975c0e9603d8c518162a05c05a5b2`. The shared confirmation prompt
+SHA-256 is `9e32bebe74c25a4331b82f81ed523be9c7592aa9db5be1a210a327bb74f441e4`.
+
+Grok 4.6/high session `01a05d6c-a918-7f31-8a7e-cd9691247dc3` reached a normal
+terminal response after 690.143 seconds with `APPROVED`, P0=0, P1=0, P2=2.
+Its public/events/status SHA-256 values are
+`41cfaf57665d0a7685257c2d031c06ade8035a9c6bc5d1175142add148c039e5`,
+`70b21fd990f794b0e8bbe354c2df1e451f2e01a1ade80cdeff37e0a5998b0c5b`,
+and `dfb421afbc0d6e660bf1b76353e37b10987f8bfb9d52b9e8f977a6471f23ceb6`;
+stderr is empty. Standard direct Kimi K3/100-step session
+`session_f219668d-1b5e-4b67-86a3-3969fce5d09f` returned `APPROVED`, P0=0,
+P1=0, P2=1. Its stream/terminal/stderr SHA-256 values are
+`717d712ea18a80a792b0c06be1e3c3abae7eafffba1946d492f519a9a4e5fccb`,
+`3bda48eb6670aafbe8c479ea3f518de2748f53dd257489e5443beb47d5e39c46`,
+and `d394df9d8edccca8ba65560b4ebe8303b94e2e07bce81665ec9163f7ccc407b1`.
+Opus xhigh session `ace022e4-dbcc-4794-85bc-5eb4acece146` returned
+`CHANGES_REQUIRED`, P0=0, P1=2, P2=3. Its result/terminal SHA-256 values are
+`0f50e222b8aa3ea36b470268bdbc30fc4b1a10694857bbb4442d284e9140132f`
+and `a1f3f37b93aecb7c1b1df685e9034e4b81122b9eb989c214031e5b49b711ad05`;
+stderr is empty.
+
+The confirmation blocking union is accepted once, without another model
+round. First, all four start/stop brackets are explicitly microseconds using
+the same `Number(process.hrtime.bigint() / 1_000n)` derivation as the frozen
+phase schema. This prevents a nanosecond/microsecond recurrence of the same
+one-shot mismatch and keeps the one-sided profiler-duration predicate in the
+declared unit. Second, the terminal envelope is now a durable input rather
+than volatile launcher memory: after the child has exclusively written the
+raw profile and sends terminal IPC, the parent exclusively writes exact
+root-level `capture-records.json` containing the four brackets, seven phases,
+PID, and executable path before any validation or adjudication. A validator
+throw therefore cannot again preserve only half of the non-retryable evidence.
+
+The nonblocking confirmation findings are adopted in the same mechanical
+implementation contract. `capture-consumed.json` is created after built-import,
+internal-module, and fresh-target validation and immediately before spawn. The
+extracted workload returns and the callback consumes both
+`appliedWorkloadOperations` and `latest`, assigns the returned count to the
+outer lifecycle owner, and retains the 15,628 invariant as
+`firstLogicalTime + appliedWorkloadOperations === 15_628`. RED lands a
+collection-safe exported validator signature and synthetic types, while its
+positive audit assertion remains the sole causal exact-token failure. These
+changes remain inside the four tests-only owners and do not alter workload,
+product behavior, thresholds, watchdogs, dependencies, memory contracts, or
+preflight/full authority.
+
+Per the accepted review cap, this confirmation is the final plan model round.
+Deterministic local checks must now verify the signed/pushed source text,
+microsecond derivation, durable-record identity and ordering, collection-safe
+RED API, exact 21-title arithmetic, protected paths, stashes, and zero workload
+before D.110a-u RED.
+
+The user-authorized one-off advisory Fable/high trajectory review ran through
+the `claude-phel` profile as effective model `claude-fable-5`, session
+`ef689241-5af3-4aeb-9188-7d0f762bb956`. It spawned no helper/subagent and made
+no write, test, profile, preflight, full-worker, network, or workflow action.
+It returned `ON_TRACK_WITH_CONDITIONS`: D.110a-u is the smallest justified
+next step and preserves the genuine workload, but the current workload sample
+window covers only about 14 percent of the measured one-object lifecycle, so a
+likely mixed result must not become an indefinite profiling loop. Its
+prompt/raw/result SHA-256 values are
+`fae81b1cb02e93cee83b68c26b64da518c9dd3fffb8741c77864f504f540ec25`,
+`ef48ccd38f94432a6764eaf28b7c596b6c0d46ed29cd3fb1ab228b57220539de`,
+and `5803ffd986c52ec69f24bf1fb825420f4fe18a59c295eb8057c33d800b559390`;
+stderr is empty. This advisory result is not part of the Grok/Kimi/Opus gate
+and does not reopen the accepted D.110a-u plan.
+
+The useful trajectory condition receives an explicit future owner without
+widening current execution: if D.110a-u closes mixed or unavailable, a
+separately planned/reviewed D.110a-v may perform read-only whole-lifecycle
+phase/owner disposition over the already durable D.110a-u profile and terminal
+record. It receives no new capture, process, retry, preflight, full-worker,
+product-edit, threshold-change, or acceptance-mapping authority. Any diagnostic
+cross-clock phase mapping must be specified and reviewed in that future slice;
+D.110a-u itself still adjudicates only its frozen same-clock and profiler-clock
+predicates.
