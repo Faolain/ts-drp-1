@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 export const D110A_OBJECT_EPOCHS = 64;
@@ -312,7 +312,7 @@ export function d110aSyntheticProof(): D110aProof {
 	});
 }
 
-function mutableProof(): {
+type D110aMutableProof = {
 	accounting: Record<string, number>;
 	baseline: D110aMemoryReading;
 	finalWindowClosedAfterTerminalSample: boolean;
@@ -330,8 +330,10 @@ function mutableProof(): {
 		phase: "after-completion" | "during-execution";
 	}>;
 	semanticDigest: string;
-} {
-	return structuredClone(d110aSyntheticProof());
+};
+
+function mutableProof(): D110aMutableProof {
+	return structuredClone(d110aSyntheticProof()) as unknown as D110aMutableProof;
 }
 
 function mutableSample(proof: ReturnType<typeof mutableProof>, index: number): (typeof proof.samples)[number] {
@@ -397,27 +399,42 @@ export function d110aMutantProof(mutant: D110aMutant): D110aProof {
 			proof.repeatedSameObjectEpochs = true;
 			break;
 	}
-	return proof as D110aProof;
+	return proof as unknown as D110aProof;
 }
 
 /**
- * Audits only the pre-D.110a benchmark and root entry-point owners.
- * @returns Current missing hard-infrastructure facts.
+ * Audits the D.110a worker, launcher, validator, and root entry-point owners.
+ * @returns Current hard-infrastructure facts.
  */
 export function d110aCurrentInfrastructureAudit(): Readonly<{
 	readonly hardEntrypoint: boolean;
 	readonly pairedWorkloadGate: boolean;
 	readonly postGcSlopeGate: boolean;
 }> {
-	const nodeBench = readFileSync(resolve(REPOSITORY_ROOT, "packages/node/tests/node.memory.bench.ts"), "utf8");
-	const objectBench = readFileSync(resolve(REPOSITORY_ROOT, "packages/object/tests/drpobject.memory.bench.ts"), "utf8");
+	const read = (relative: string): string => {
+		const absolute = resolve(REPOSITORY_ROOT, relative);
+		return existsSync(absolute) ? readFileSync(absolute, "utf8") : "";
+	};
 	const rootPackage = readFileSync(resolve(REPOSITORY_ROOT, "package.json"), "utf8");
-	const benches = `${nodeBench}\n${objectBench}`;
+	const child = read("tests/fixtures/phase-6c/retained-heap-child.mjs");
+	const worker = read("tests/fixtures/phase-6c/retained-heap-worker.ts");
 	return Object.freeze({
-		hardEntrypoint: /"test:phase-6c-memory"\s*:/u.test(rootPackage),
+		hardEntrypoint:
+			/"test:phase-6c-memory"\s*:\s*"pnpm build:packages && node --import=tsx tests\/fixtures\/phase-6c\/retained-heap-child\.mjs full"/u.test(
+				rootPackage
+			) && /45 \* 60 \* 1000/u.test(child),
 		pairedWorkloadGate:
-			/admittedAndAppliedOps/u.test(benches) && /1_000_000/u.test(benches) && /semanticDigest/u.test(benches),
-		postGcSlopeGate: /--expose-gc/u.test(benches) && /heapUsed/u.test(benches) && /arrayBuffers/u.test(benches),
+			/D110A_TOTAL_OPERATIONS/u.test(worker) &&
+			/D110A_TOTAL_BATCH_VERTICES/u.test(worker) &&
+			/d110aSemanticDigest/u.test(worker) &&
+			/validateD110aProof/u.test(worker),
+		postGcSlopeGate:
+			/"--expose-gc"/u.test(child) &&
+			/globalThis\.gc\(\)/u.test(worker) &&
+			/heapUsed/u.test(worker) &&
+			/arrayBuffers/u.test(worker) &&
+			/ownedBytes/u.test(worker) &&
+			/phase: "during-execution"/u.test(worker),
 	});
 }
 

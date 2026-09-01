@@ -3,9 +3,11 @@ import { encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { Message, MessageType, V3Envelope } from "@ts-drp/types";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 
-import type { GenuineCreatorAdoptionFixture } from "./creator-adoption-contract.js";
+import {
+	commitGenuineCreatorAdoptionFixture,
+	type GenuineCreatorAdoptionFixture,
+} from "./creator-adoption-contract.js";
 import { REPOSITORY_ROOT } from "./creator-successor-activation-contract.js";
 import { hexBytes } from "../phase-3a0-v3/controlled-anchor-trust.js";
 
@@ -103,17 +105,7 @@ export function d108d1aSourceGovernance(): Readonly<{
 export async function commitD108d1aFixture(
 	fixture: GenuineCreatorAdoptionFixture
 ): Promise<Readonly<Record<string, unknown>>> {
-	const verifier = (await import(
-		pathToFileURL(resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption.ts")).href
-	)) as { verifyCreatorSuccessorAdoption(input: unknown): Promise<Readonly<Record<string, unknown>>> };
-	const committer = (await import(
-		pathToFileURL(resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption-commit.ts")).href
-	)) as { commitCreatorSuccessorAdoption(input: unknown): Promise<Readonly<Record<string, unknown>>> };
-	const verified = await verifier.verifyCreatorSuccessorAdoption({ catalog: fixture.catalog, handle: fixture.handle });
-	if (verified.ok !== true) throw new TypeError(`D.108d1a verification failed: ${String(verified.kind)}`);
-	const committed = await committer.commitCreatorSuccessorAdoption({ handle: fixture.handle, intent: verified.intent });
-	if (committed.ok !== true) throw new TypeError(`D.108d1a commit failed: ${String(committed.kind)}`);
-	return committed;
+	return commitGenuineCreatorAdoptionFixture(fixture);
 }
 
 /**

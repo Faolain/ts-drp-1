@@ -42,23 +42,23 @@ describe("D.110a retained-heap hard-gate RED", () => {
 		expect(() => validateD110aProof(d110aMutantProof(mutant))).toThrow(D110A_MUTANT_ERROR[mutant]);
 	});
 
-	it("audits the current benchmark and entry-point owners without readiness skips", () => {
+	it("audits the complete hard-gate infrastructure without readiness skips", () => {
 		expect(d110aCurrentInfrastructureAudit()).toEqual({
-			hardEntrypoint: false,
-			pairedWorkloadGate: false,
-			postGcSlopeGate: false,
+			hardEntrypoint: true,
+			pairedWorkloadGate: true,
+			postGcSlopeGate: true,
 		});
 	});
 
-	it(`fails only ${D110A_RED_TOKENS[0]}`, () => {
+	it(`closes ${D110A_RED_TOKENS[0]}`, () => {
 		requireD110aPostGcSlopeGate();
 	});
 
-	it(`fails only ${D110A_RED_TOKENS[1]}`, () => {
+	it(`closes ${D110A_RED_TOKENS[1]}`, () => {
 		requireD110aPairedWorkloadGate();
 	});
 
-	it(`fails only ${D110A_RED_TOKENS[2]}`, () => {
+	it(`closes ${D110A_RED_TOKENS[2]}`, () => {
 		requireD110aHardEntrypoint();
 	});
 });

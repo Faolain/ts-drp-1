@@ -1,11 +1,15 @@
 import { decodeCanonical } from "@ts-drp/canonical";
-import type { DurableIssuanceStore, DurableIssueCommit } from "@ts-drp/issuance-store";
+import {
+	type DurableIssuanceOutboxRecord,
+	type DurableIssueCommit,
+	MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT,
+} from "@ts-drp/issuance-store";
 import type {
 	DurableIssuancePruningMaintenance,
 	DurableIssuancePruningReceipt,
 } from "@ts-drp/issuance-store/maintenance";
 import { MessageQueueManager } from "@ts-drp/message-queue";
-import { type AheDurableStore, type PresentHead } from "@ts-drp/storage";
+import type { PresentHead } from "@ts-drp/storage";
 import type { AheReclamationMaintenance, AheReclamationReceipt } from "@ts-drp/storage/maintenance";
 import type { Message } from "@ts-drp/types";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -14,14 +18,15 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import type { ClosedEpochCleanupPlan } from "../../../packages/node/src/internal/closed-epoch-cleanup.js";
-import { fakeNetwork } from "../phase-4b-v3/live-snapshot.js";
 import {
 	bytesForRef,
+	commitGenuineCreatorAdoptionFixture,
+	fakeNetwork,
 	type GenuineCreatorAdoptionFixture,
+	type GenuineCreatorAdoptionFixtureOptions,
 	openGenuineCreatorAdoptionFixture,
 } from "../phase-6a-v3/creator-adoption-contract.js";
-import { type D108d1Oracle, deriveD108d1Oracle } from "../phase-6a-v3/creator-successor-activation-contract.js";
-import { commitD108d1aFixture } from "../phase-6a-v3/creator-successor-handle-identity-contract.js";
+import { type D108d1Oracle, deriveD108d1Oracle } from "../phase-6a-v3/creator-successor-oracle.js";
 
 export const REPOSITORY_ROOT = resolve(import.meta.dirname, "../../..");
 
@@ -187,18 +192,29 @@ export interface D109dReceiptFixture {
 	readonly issuanceReplayReceipt: DurableIssuancePruningReceipt;
 }
 
+export interface D109dModuleUrls {
+	readonly aheMaintenance?: string;
+	readonly closedEpochCleanup?: string;
+	readonly runtimeReclamation?: string;
+}
+
+export interface D109dOpenOptions {
+	readonly creator?: GenuineCreatorAdoptionFixtureOptions;
+}
+
 /**
  * Opens the inherited genuine close -> verify -> commit -> hot-activate path.
  * The future receipt builder consumes D.109b/D.109c maintenance owners without
  * changing this product path or synthesizing successful receipts.
  * @param mode - Same-transport hot handoff or independent-transport cold activation.
+ * @param options - Optional tests-only creator fixture extension.
  * @returns Genuine predecessor and current successor handles plus trusted oracle.
  */
-async function openD109dFixture(mode: "cold" | "hot"): Promise<D109dHotFixture> {
-	const base = await openGenuineCreatorAdoptionFixture();
+async function openD109dFixture(mode: "cold" | "hot", options: D109dOpenOptions = {}): Promise<D109dHotFixture> {
+	const base = await openGenuineCreatorAdoptionFixture(options.creator);
 	let successor: D109dHotFixture["successor"] | undefined;
 	try {
-		const prepared = await commitD108d1aFixture(base);
+		const prepared = await commitGenuineCreatorAdoptionFixture(base);
 		const selectedBindings =
 			mode === "hot"
 				? base.runtimeBindings
@@ -216,12 +232,7 @@ async function openD109dFixture(mode: "cold" | "hot"): Promise<D109dHotFixture> 
 				return selectedBindings.onAdmittedVertex(input);
 			},
 		});
-		const activationModule = (await import(
-			pathToFileURL(resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption-activate.ts")).href
-		)) as {
-			activateCreatorSuccessorAdoption(input: unknown): Promise<Readonly<Record<string, unknown>>>;
-		};
-		const activated = await activationModule.activateCreatorSuccessorAdoption({
+		const activated = await base.modules.activateCreatorSuccessorAdoption({
 			capability: prepared.capability,
 			handle: base.handle,
 			...runtimeBindings,
@@ -230,12 +241,13 @@ async function openD109dFixture(mode: "cold" | "hot"): Promise<D109dHotFixture> 
 			throw new TypeError(`D109D_HOT_ACTIVATION_FAILED:${String(activated.kind)}`);
 		}
 		successor = activated.handle as D109dHotFixture["successor"];
+		const closeBase = base.close;
 		return Object.freeze({
 			base,
 			committedHead: prepared.head as PresentHead,
 			close: async () => {
 				await Promise.resolve(successor?.deactivate());
-				await base.close();
+				await closeBase();
 			},
 			oracle: deriveD108d1Oracle(base),
 			predecessor: base.handle,
@@ -251,18 +263,20 @@ async function openD109dFixture(mode: "cold" | "hot"): Promise<D109dHotFixture> 
 
 /**
  * Opens the genuine same-transport handoff with a reachable retired registration.
+ * @param options - Optional tests-only creator fixture extension.
  * @returns Genuine hot successor fixture.
  */
-export function openD109dHotFixture(): Promise<D109dHotFixture> {
-	return openD109dFixture("hot");
+export function openD109dHotFixture(options: D109dOpenOptions = {}): Promise<D109dHotFixture> {
+	return openD109dFixture("hot", options);
 }
 
 /**
  * Opens genuine successor material on a separate transport without a retired registration.
+ * @param options - Optional tests-only creator fixture extension.
  * @returns Genuine cold successor fixture.
  */
-export function openD109dColdFixture(): Promise<D109dHotFixture> {
-	return openD109dFixture("cold");
+export function openD109dColdFixture(options: D109dOpenOptions = {}): Promise<D109dHotFixture> {
+	return openD109dFixture("cold", options);
 }
 
 function copiedCommit(commit: DurableIssueCommit): DurableIssueCommit {
@@ -289,19 +303,9 @@ async function d109dIssuanceReceipt(
 	Readonly<{ readonly first: DurableIssuancePruningReceipt; readonly replay: DurableIssuancePruningReceipt }>
 > {
 	const directory = mkdtempSync(join(tmpdir(), `d109d-${label}-`));
-	const issuanceModule = (await import(
-		pathToFileURL(resolve(REPOSITORY_ROOT, "packages/storage-node/src/issuance.ts")).href
-	)) as {
-		createNodeDurableIssuanceStore(options: { readonly primaryFilename: string }): DurableIssuanceStore;
-	};
-	const maintenanceModule = (await import(
-		pathToFileURL(resolve(REPOSITORY_ROOT, "packages/storage-node/src/issuance-maintenance.ts")).href
-	)) as {
-		resolveNodeDurableIssuancePruningMaintenance(
-			store: DurableIssuanceStore
-		): DurableIssuancePruningMaintenance | undefined;
-	};
-	const store = issuanceModule.createNodeDurableIssuanceStore({ primaryFilename: join(directory, "issuance.sqlite") });
+	const store = fixture.base.modules.createNodeDurableIssuanceStore({
+		primaryFilename: join(directory, "issuance.sqlite"),
+	});
 	try {
 		for (const source of commits) {
 			const committed = await store.transactIssue(source.issuedRecord.scope, (authorSequence) => {
@@ -314,7 +318,7 @@ async function d109dIssuanceReceipt(
 				scope: committed.issuedRecord.scope,
 			});
 		}
-		const maintenance = maintenanceModule.resolveNodeDurableIssuancePruningMaintenance(store);
+		const maintenance = fixture.base.modules.resolveNodeDurableIssuancePruningMaintenance(store);
 		if (maintenance === undefined) throw new TypeError("D109D_NODE_ISSUANCE_MAINTENANCE_MISSING");
 		const state = await maintenance.inspectPruningState(fixture.base.evidence.issuanceScope);
 		const input = d109dIssuancePruningInput(fixture, state, throughAuthorSequence);
@@ -345,12 +349,14 @@ function d109dIssuancePruningInput(
 
 async function d109dAheReceipts(
 	fixture: D109dHotFixture,
-	plan: ClosedEpochCleanupPlan
+	plan: ClosedEpochCleanupPlan,
+	modules: D109dModuleUrls
 ): Promise<Readonly<{ readonly first: AheReclamationReceipt; readonly replay: AheReclamationReceipt }>> {
 	const maintenanceModule = (await import(
-		pathToFileURL(resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/maintenance.js")).href
+		modules.aheMaintenance ??
+			pathToFileURL(resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/maintenance.js")).href
 	)) as {
-		resolveNodeAheReclamationMaintenance(store: AheDurableStore): AheReclamationMaintenance | undefined;
+		resolveNodeAheReclamationMaintenance(store: unknown): AheReclamationMaintenance | undefined;
 	};
 	const maintenance = maintenanceModule.resolveNodeAheReclamationMaintenance(fixture.base.evidence.aheBackend);
 	if (maintenance === undefined) throw new TypeError("D109D_NODE_AHE_MAINTENANCE_MISSING");
@@ -374,16 +380,59 @@ async function d109dAheReceipts(
 	}
 }
 
+async function d109dOutboxThroughBoundary(
+	fixture: D109dHotFixture,
+	boundary: number
+): Promise<readonly DurableIssuanceOutboxRecord[]> {
+	if (boundary < 1) throw new TypeError("D109D_GENUINE_DISPLACED_BOUNDARY_INVALID");
+	const scope = fixture.base.evidence.issuanceScope;
+	const records: DurableIssuanceOutboxRecord[] = [];
+	let afterKey: readonly [string, string, number] | undefined;
+	while (records.length <= boundary) {
+		const remaining = boundary + 1 - records.length;
+		const page = await fixture.base.evidence.issuanceStore.readOutboxPage({
+			...(afterKey === undefined ? {} : { afterKey }),
+			limit: Math.min(MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT, remaining),
+			scope,
+		});
+		if (page.length === 0 || page.length > remaining || page.length > MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT) {
+			throw new TypeError("D109D_GENUINE_DISPLACED_BOUNDARY_INVALID");
+		}
+		const pageStart = records.length;
+		for (const [pageIndex, record] of page.entries()) {
+			const expectedSequence = pageStart + pageIndex;
+			if (
+				record.commit.authorSequence !== expectedSequence ||
+				record.commit.issuedRecord.scope.author !== scope.author ||
+				record.commit.issuedRecord.scope.objectId !== scope.objectId
+			) {
+				throw new TypeError("D109D_GENUINE_DISPLACED_BOUNDARY_INVALID");
+			}
+			records.push(record);
+		}
+		const last = records.at(-1);
+		if (last === undefined) throw new TypeError("D109D_GENUINE_DISPLACED_BOUNDARY_INVALID");
+		afterKey = Object.freeze([scope.objectId, scope.author, last.commit.authorSequence]);
+	}
+	if (records.length !== boundary + 1 || records.at(-1)?.commit.authorSequence !== boundary) {
+		throw new TypeError("D109D_GENUINE_DISPLACED_BOUNDARY_INVALID");
+	}
+	return Object.freeze(records);
+}
+
 /**
  * Produces owner-issued D.109b and D.109c receipts for the exact genuine
  * successor registration.
  * @param fixture - Genuine committed and activated hot successor.
+ * @param modules - Optional authenticated built internal-module URLs.
  * @returns First-call, replay, and genuine partial-prefix receipt evidence.
  */
-export async function createD109dReceipts(fixture: D109dHotFixture): Promise<D109dReceiptFixture> {
-	const sourceOutbox = await fixture.base.evidence.issuanceStore.readOutboxPage({
-		scope: fixture.base.evidence.issuanceScope,
-	});
+export async function createD109dReceipts(
+	fixture: D109dHotFixture,
+	modules: D109dModuleUrls = {}
+): Promise<D109dReceiptFixture> {
+	const boundary = fixture.base.evidence.localIssued.authorSequence;
+	const sourceOutbox = await d109dOutboxThroughBoundary(fixture, boundary);
 	for (const { commit } of sourceOutbox) {
 		await fixture.base.evidence.issuanceStore.compareAndMarkOutboxPublished({
 			authorSequence: commit.authorSequence,
@@ -391,15 +440,12 @@ export async function createD109dReceipts(fixture: D109dHotFixture): Promise<D10
 			scope: fixture.base.evidence.issuanceScope,
 		});
 	}
-	const published = await fixture.base.evidence.issuanceStore.readOutboxPage({
-		scope: fixture.base.evidence.issuanceScope,
-	});
+	const published = await d109dOutboxThroughBoundary(fixture, boundary);
 	if (!published.every(({ publishState }) => publishState === "published")) {
 		throw new TypeError("D109D_GENUINE_OUTBOX_NOT_PUBLISHED");
 	}
 	const commits = Object.freeze(published.map(({ commit }) => copiedCommit(commit)));
-	const boundary = fixture.base.evidence.localIssued.authorSequence;
-	if (boundary < 1 || commits.at(-1)?.authorSequence !== boundary) {
+	if (commits.at(-1)?.authorSequence !== boundary) {
 		throw new TypeError("D109D_GENUINE_DISPLACED_BOUNDARY_INVALID");
 	}
 	const partial = await d109dIssuanceReceipt(fixture, commits, boundary - 1, "partial");
@@ -438,7 +484,8 @@ export async function createD109dReceipts(fixture: D109dHotFixture): Promise<D10
 		bytesForRef(fixture.base.evidence.proposed, fixture.base.evidence.closeResult.cutValueRef)
 	) as Readonly<Record<string, unknown>>;
 	const planner = (await import(
-		pathToFileURL(resolve(REPOSITORY_ROOT, "packages/node/src/internal/closed-epoch-cleanup.ts")).href
+		modules.closedEpochCleanup ??
+			pathToFileURL(resolve(REPOSITORY_ROOT, "packages/node/src/internal/closed-epoch-cleanup.ts")).href
 	)) as {
 		planClosedEpochCleanup(
 			input: unknown
@@ -481,7 +528,7 @@ export async function createD109dReceipts(fixture: D109dHotFixture): Promise<D10
 		}),
 	});
 	if (!planned.ok) throw new TypeError(`D109D_GENUINE_CLEANUP_PLAN_REFUSED:${planned.reason}`);
-	const ahe = await d109dAheReceipts(fixture, planned.plan);
+	const ahe = await d109dAheReceipts(fixture, planned.plan, modules);
 	return Object.freeze({
 		aheReceipt: ahe.first,
 		aheReplayReceipt: ahe.replay,
@@ -493,10 +540,13 @@ export async function createD109dReceipts(fixture: D109dHotFixture): Promise<D10
 
 /**
  * Returns the future internal owner when all three private seams exist.
+ * @param moduleUrl - Optional authenticated built runtime-reclamation URL.
  * @returns Dynamically imported package-internal candidate module.
  */
-export async function d109dCandidate(): Promise<D109dCandidateModule> {
-	return import(pathToFileURL(resolve(REPOSITORY_ROOT, D109D_GREEN_PATHS[0])).href) as Promise<D109dCandidateModule>;
+export async function d109dCandidate(moduleUrl?: string): Promise<D109dCandidateModule> {
+	return import(
+		moduleUrl ?? pathToFileURL(resolve(REPOSITORY_ROOT, D109D_GREEN_PATHS[0])).href
+	) as Promise<D109dCandidateModule>;
 }
 
 /**

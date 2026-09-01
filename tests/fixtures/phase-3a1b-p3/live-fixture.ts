@@ -5,14 +5,10 @@ import { type AheDurableStore, parseStorageObjectId, type StorageObjectId } from
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import type { TrustedBlueprintCatalog } from "../../../packages/blueprint-catalog/src/index.js";
-import {
-	prepareV3LiveGeneration as defaultPrepareV3LiveGeneration,
-	type PreparedV3Live,
-	type V3LiveDescriptor,
-} from "../../../packages/node/src/v3-live.js";
-import { createSqliteAheDurableStore as createBuiltSqliteAheDurableStore } from "../../../packages/storage-node/dist/src/index.js";
+import type { PreparedV3Live, prepareV3LiveGeneration, V3LiveDescriptor } from "../../../packages/node/src/v3-live.js";
 import {
 	bytesHex,
 	contract,
@@ -25,6 +21,7 @@ import packageGolden from "../track-p2-b/forward-counter-package.json" with { ty
 const ROOT = path.resolve(import.meta.dirname, "../../..");
 const ARTIFACT = path.join(ROOT, "tests/fixtures/track-p2-c/primary.mjs");
 const LATCHED_ACL_ARTIFACT_SOURCE = `function aclReducer(input){return {output:null,state:input.state}}function addReducer(input){const value=input.operation.value??1;const state=input.state+value;return {output:state,state}}function readReducer(input){return {output:input.state,state:input.state}}function setReducer(input){const state=input.operation.value??0;return {output:state,state}}export const blueprint={exportSchemaVersion:1,artifactId:"counter.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{acl:aclReducer,add:addReducer,"read-value":readReducer,set:setReducer}};`;
+const LATCHED_ACL_BATCH_ARTIFACT_SOURCE = `function aclReducer(input){return {output:null,state:input.state}}function addReducer(input){const value=input.operation.value??1;const state=input.state+value;return {output:state,state}}function applicationBatchReducer(input){let state=input.state;const output=[];for(const entry of input.operation.batch.entries){const operation=entry.operation;if(operation.action!=="add")throw new TypeError("unknown batch action");state+=operation.value??1;output.push(state)}return {output,state}}function readReducer(input){return {output:input.state,state:input.state}}function setReducer(input){const state=input.operation.value??0;return {output:state,state}}export const blueprint={exportSchemaVersion:1,artifactId:"counter.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{acl:aclReducer,add:addReducer,applicationBatch:applicationBatchReducer,"read-value":readReducer,set:setReducer}};`;
 const PARAMETERS = Object.freeze({
 	maxEpochVertices: 8192,
 	maxEpochBytes: 8_388_608,
@@ -95,6 +92,7 @@ export interface GenuinePreparedV3Fixture {
 }
 
 export interface GenuinePreparedV3FixtureOptions {
+	readonly applicationBatch?: boolean;
 	readonly anchorPrivateKeySeedHex?: string;
 	readonly authorizationMode?: "latched-acl" | "legacy-author-list";
 	readonly authorizedPrivateKeySeedHexes?: readonly string[];
@@ -104,15 +102,13 @@ export interface GenuinePreparedV3FixtureOptions {
 	readonly latchedAclGroups?: readonly ("admin" | "finality" | "referee" | "writer")[];
 	readonly latchedAclVersion?: 1 | 2;
 	readonly objectId?: string;
-	readonly prepareV3LiveGeneration?: typeof defaultPrepareV3LiveGeneration;
+	readonly createSqliteAheDurableStore?: CreateSqliteAheDurableStoreForFixture;
+	readonly prepareV3LiveGeneration?: PrepareV3LiveGenerationForFixture;
 	storeDecorator?(store: AheDurableStore): AheDurableStore;
 }
 
-export type PrepareV3LiveGenerationForFixture = typeof defaultPrepareV3LiveGeneration;
-
-const createSqliteAheDurableStore = createBuiltSqliteAheDurableStore as unknown as (input: {
-	readonly filename: string;
-}) => AheDurableStore;
+export type PrepareV3LiveGenerationForFixture = typeof prepareV3LiveGeneration;
+export type CreateSqliteAheDurableStoreForFixture = (input: { readonly filename: string }) => AheDurableStore;
 
 function must<T>(result: { readonly ok: true; readonly value: T } | { readonly ok: false }): T {
 	if (!result.ok) throw new TypeError("invalid deterministic Seam3 fixture");
@@ -123,9 +119,19 @@ function lowerHex(bytes: Uint8Array): string {
 	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function blueprintFixture(authorizationMode: "latched-acl" | "legacy-author-list"): BlueprintFixture {
+function blueprintFixture(
+	authorizationMode: "latched-acl" | "legacy-author-list",
+	applicationBatch: boolean
+): BlueprintFixture {
+	if (applicationBatch && authorizationMode !== "latched-acl") {
+		throw new TypeError("application batch fixture requires latched ACL");
+	}
 	const exactArtifactBytes = new TextEncoder().encode(
-		authorizationMode === "latched-acl" ? LATCHED_ACL_ARTIFACT_SOURCE : readFileSync(ARTIFACT, "utf8")
+		authorizationMode === "latched-acl"
+			? applicationBatch
+				? LATCHED_ACL_BATCH_ARTIFACT_SOURCE
+				: LATCHED_ACL_ARTIFACT_SOURCE
+			: readFileSync(ARTIFACT, "utf8")
 	);
 	const artifactDigest = lowerHex(hashDomain(packageGolden.artifactDigestDomain, exactArtifactBytes));
 	const packageRecord = Object.freeze({
@@ -147,7 +153,21 @@ function blueprintFixture(authorizationMode: "latched-acl" | "legacy-author-list
 								}),
 								name: "acl",
 							}),
-							...packageGolden.package.manifest.operations,
+							packageGolden.package.manifest.operations[0],
+							...(applicationBatch
+								? [
+										Object.freeze({
+											argumentSchema: Object.freeze({
+												fields: Object.freeze([
+													Object.freeze({ name: "batch", required: true, type: "canonical-object" }),
+												]),
+												kind: "closed-record",
+											}),
+											name: "applicationBatch",
+										}),
+									]
+								: []),
+							...packageGolden.package.manifest.operations.slice(1),
 						]),
 					})
 				: packageGolden.package.manifest,
@@ -202,13 +222,20 @@ function catalog(fixture: BlueprintFixture): TrustedBlueprintCatalog {
 export async function createGenuinePreparedV3Fixture(
 	options: GenuinePreparedV3FixtureOptions = {}
 ): Promise<GenuinePreparedV3Fixture> {
+	const prepareV3LiveGeneration =
+		options.prepareV3LiveGeneration ??
+		((await import(pathToFileURL(path.resolve(ROOT, "packages/node/src/v3-live.ts")).href))
+			.prepareV3LiveGeneration as PrepareV3LiveGenerationForFixture);
+	const createSqliteAheDurableStore =
+		options.createSqliteAheDurableStore ??
+		((await import(pathToFileURL(path.resolve(ROOT, "packages/storage-node/dist/src/index.js")).href))
+			.createSqliteAheDurableStore as unknown as CreateSqliteAheDurableStoreForFixture);
 	const directory = mkdtempSync(path.join(tmpdir(), "drp-seam3-token-"));
 	const backendStore = createSqliteAheDurableStore({ filename: path.join(directory, "store.sqlite") });
 	const store = options.storeDecorator?.(backendStore) ?? backendStore;
-	const prepareV3LiveGeneration = options.prepareV3LiveGeneration ?? defaultPrepareV3LiveGeneration;
 	try {
 		const authorizationMode = options.authorizationMode ?? "legacy-author-list";
-		const fixture = blueprintFixture(authorizationMode);
+		const fixture = blueprintFixture(authorizationMode, options.applicationBatch === true);
 		const anchorPrivateKeySeedHex = options.anchorPrivateKeySeedHex ?? contract.privateKeySeedHex;
 		const objectIdValue = options.objectId ?? `creator:${"a".repeat(32)}`;
 		const base = makeCreatorMaterial({ objectId: objectIdValue, privateKeySeedHex: anchorPrivateKeySeedHex });

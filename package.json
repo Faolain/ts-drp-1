@@ -46,6 +46,7 @@
 		"release": "release-it",
 		"shadow:soak": "tsx scripts/production-hardening/run-shadow-soak.ts",
 		"test": "vitest",
+		"test:phase-6c-memory": "pnpm build:packages && node --import=tsx tests/fixtures/phase-6c/retained-heap-child.mjs full",
 		"test:public-relay-live": "RUN_PUBLIC_LIVE=true pnpm exec vitest run packages/network-spike/tests/public-relay-live.test.ts",
 		"test:public-convergence": "RUN_PUBLIC_LIVE=true pnpm exec vitest run packages/network-spike/tests/public-convergence-live.test.ts",
 		"typecheck": "pnpm --parallel typecheck",

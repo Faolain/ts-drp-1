@@ -1,3 +1,4 @@
+import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import {
 	type CloseSetHistoryCommitment,
@@ -22,6 +23,7 @@ import {
 	digestBlob,
 	type GenerationRecord,
 	type GenerationRef,
+	parseStorageObjectId,
 	type PresentHead,
 } from "@ts-drp/storage";
 import type {
@@ -34,37 +36,149 @@ import { type DRPNetworkNode, Message, MessageType, V3Envelope } from "@ts-drp/t
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
-import type { TrustedBlueprintCatalog } from "../../../packages/blueprint-catalog/src/index.js";
-import {
+import type { activateCreatorSuccessorAdoption } from "../../../packages/node/src/creator-adoption-activate.js";
+import type { commitCreatorSuccessorAdoption } from "../../../packages/node/src/creator-adoption-commit.js";
+import type { verifyCreatorSuccessorAdoption } from "../../../packages/node/src/creator-adoption.js";
+import type {
 	bindCreatorLiveClose,
-	type CreatorLiveCloseHandle,
-	type CreatorLiveCloseResult,
+	CreatorLiveCloseHandle,
+	CreatorLiveCloseResult,
 } from "../../../packages/node/src/creator-close.js";
-import {
+import type {
 	activateV3LivePlane,
 	bindV3BlueprintLivePlane,
-	type PreparedV3Live,
-	type RecoveredV3Live,
+	PreparedV3Live,
+	RecoveredV3Live,
 	recoverV3LiveReplica,
 	routeV3Ingress,
-	type V3AdmittedVertexSink,
-	type V3LocalIssueInput,
-	type V3PlaneHandle,
+	V3AdmittedVertexSink,
+	V3LocalIssueInput,
+	V3PlaneHandle,
 } from "../../../packages/node/src/v3-live.js";
 import type { CurrentAnchorTrust } from "../../../packages/protocol-v3/src/index.js";
-import { openBrowserSealEvidenceStore } from "../../../packages/storage-browser/src/seal-evidence.js";
-import { openBrowserSealVoteStore } from "../../../packages/storage-browser/src/seal-vote.js";
-import { createBrowserSnapshotQuarantineStore } from "../../../packages/storage-browser/src/snapshot-transfer.js";
-import { resolveNodeDurableIssuancePruningMaintenance } from "../../../packages/storage-node/src/issuance-maintenance.js";
-import { createNodeDurableIssuanceStore } from "../../../packages/storage-node/src/issuance.js";
-import { createNodeDurableLiveJournalStore } from "../../../packages/storage-node/src/live-journal.js";
+import type { openBrowserSealEvidenceStore } from "../../../packages/storage-browser/src/seal-evidence.js";
+import type { openBrowserSealVoteStore } from "../../../packages/storage-browser/src/seal-vote.js";
+import type { createBrowserSnapshotQuarantineStore } from "../../../packages/storage-browser/src/snapshot-transfer.js";
+import type { resolveNodeDurableIssuancePruningMaintenance } from "../../../packages/storage-node/src/issuance-maintenance.js";
+import type { createNodeDurableIssuanceStore } from "../../../packages/storage-node/src/issuance.js";
+import type { createNodeDurableLiveJournalStore } from "../../../packages/storage-node/src/live-journal.js";
 import { contract, hexBytes } from "../phase-3a0-v3/controlled-anchor-trust.js";
-import { createGenuinePreparedV3Fixture } from "../phase-3a1b-p3/live-fixture.js";
+import {
+	createGenuinePreparedV3Fixture,
+	type CreateSqliteAheDurableStoreForFixture,
+	type PrepareV3LiveGenerationForFixture,
+} from "../phase-3a1b-p3/live-fixture.js";
 
 export const REPOSITORY_ROOT = resolve(import.meta.dirname, "../../..");
 
-function fakeNetwork(peerId: string): DRPNetworkNode {
+export interface GenuineCreatorAdoptionFixtureModules {
+	readonly activateCreatorSuccessorAdoption: typeof activateCreatorSuccessorAdoption;
+	readonly activateV3LivePlane: typeof activateV3LivePlane;
+	readonly bindCreatorLiveClose: typeof bindCreatorLiveClose;
+	readonly bindV3BlueprintLivePlane: typeof bindV3BlueprintLivePlane;
+	readonly commitCreatorSuccessorAdoption: typeof commitCreatorSuccessorAdoption;
+	readonly createBrowserSnapshotQuarantineStore: typeof createBrowserSnapshotQuarantineStore;
+	readonly createNodeDurableIssuanceStore: typeof createNodeDurableIssuanceStore;
+	readonly createNodeDurableLiveJournalStore: typeof createNodeDurableLiveJournalStore;
+	readonly createSqliteAheDurableStore: CreateSqliteAheDurableStoreForFixture;
+	readonly openBrowserSealEvidenceStore: typeof openBrowserSealEvidenceStore;
+	readonly openBrowserSealVoteStore: typeof openBrowserSealVoteStore;
+	readonly prepareV3LiveGeneration: PrepareV3LiveGenerationForFixture;
+	readonly recoverV3LiveReplica: typeof recoverV3LiveReplica;
+	readonly resolveNodeDurableIssuancePruningMaintenance: typeof resolveNodeDurableIssuancePruningMaintenance;
+	readonly routeV3Ingress: typeof routeV3Ingress;
+	readonly verifyCreatorSuccessorAdoption: typeof verifyCreatorSuccessorAdoption;
+}
+
+async function defaultCreatorAdoptionFixtureModules(): Promise<GenuineCreatorAdoptionFixtureModules> {
+	const source = (relative: string): string => pathToFileURL(resolve(REPOSITORY_ROOT, relative)).href;
+	const [
+		activation,
+		v3Live,
+		creatorClose,
+		commit,
+		adoption,
+		browserSnapshot,
+		browserEvidence,
+		browserVote,
+		storageNode,
+		issuance,
+		issuanceMaintenance,
+		liveJournal,
+	] = await Promise.all([
+		import(source("packages/node/src/creator-adoption-activate.ts")) as Promise<
+			Pick<GenuineCreatorAdoptionFixtureModules, "activateCreatorSuccessorAdoption">
+		>,
+		import(source("packages/node/src/v3-live.ts")) as Promise<
+			Pick<
+				GenuineCreatorAdoptionFixtureModules,
+				| "activateV3LivePlane"
+				| "bindV3BlueprintLivePlane"
+				| "prepareV3LiveGeneration"
+				| "recoverV3LiveReplica"
+				| "routeV3Ingress"
+			>
+		>,
+		import(source("packages/node/src/creator-close.ts")) as Promise<
+			Pick<GenuineCreatorAdoptionFixtureModules, "bindCreatorLiveClose">
+		>,
+		import(source("packages/node/src/creator-adoption-commit.ts")) as Promise<
+			Pick<GenuineCreatorAdoptionFixtureModules, "commitCreatorSuccessorAdoption">
+		>,
+		import(source("packages/node/src/creator-adoption.ts")) as Promise<
+			Pick<GenuineCreatorAdoptionFixtureModules, "verifyCreatorSuccessorAdoption">
+		>,
+		import(source("packages/storage-browser/src/snapshot-transfer.ts")) as Promise<
+			Pick<GenuineCreatorAdoptionFixtureModules, "createBrowserSnapshotQuarantineStore">
+		>,
+		import(source("packages/storage-browser/src/seal-evidence.ts")) as Promise<
+			Pick<GenuineCreatorAdoptionFixtureModules, "openBrowserSealEvidenceStore">
+		>,
+		import(source("packages/storage-browser/src/seal-vote.ts")) as Promise<
+			Pick<GenuineCreatorAdoptionFixtureModules, "openBrowserSealVoteStore">
+		>,
+		import(source("packages/storage-node/dist/src/index.js")) as Promise<
+			Pick<GenuineCreatorAdoptionFixtureModules, "createSqliteAheDurableStore">
+		>,
+		import(source("packages/storage-node/src/issuance.ts")) as Promise<
+			Pick<GenuineCreatorAdoptionFixtureModules, "createNodeDurableIssuanceStore">
+		>,
+		import(source("packages/storage-node/src/issuance-maintenance.ts")) as Promise<
+			Pick<GenuineCreatorAdoptionFixtureModules, "resolveNodeDurableIssuancePruningMaintenance">
+		>,
+		import(source("packages/storage-node/src/live-journal.ts")) as Promise<
+			Pick<GenuineCreatorAdoptionFixtureModules, "createNodeDurableLiveJournalStore">
+		>,
+	]);
+	return Object.freeze({
+		activateCreatorSuccessorAdoption: activation.activateCreatorSuccessorAdoption,
+		activateV3LivePlane: v3Live.activateV3LivePlane,
+		bindCreatorLiveClose: creatorClose.bindCreatorLiveClose,
+		bindV3BlueprintLivePlane: v3Live.bindV3BlueprintLivePlane,
+		commitCreatorSuccessorAdoption: commit.commitCreatorSuccessorAdoption,
+		createBrowserSnapshotQuarantineStore: browserSnapshot.createBrowserSnapshotQuarantineStore,
+		createNodeDurableIssuanceStore: issuance.createNodeDurableIssuanceStore,
+		createNodeDurableLiveJournalStore: liveJournal.createNodeDurableLiveJournalStore,
+		createSqliteAheDurableStore:
+			storageNode.createSqliteAheDurableStore as unknown as CreateSqliteAheDurableStoreForFixture,
+		openBrowserSealEvidenceStore: browserEvidence.openBrowserSealEvidenceStore,
+		openBrowserSealVoteStore: browserVote.openBrowserSealVoteStore,
+		prepareV3LiveGeneration: v3Live.prepareV3LiveGeneration,
+		recoverV3LiveReplica: v3Live.recoverV3LiveReplica,
+		resolveNodeDurableIssuancePruningMaintenance: issuanceMaintenance.resolveNodeDurableIssuancePruningMaintenance,
+		routeV3Ingress: v3Live.routeV3Ingress,
+		verifyCreatorSuccessorAdoption: adoption.verifyCreatorSuccessorAdoption,
+	});
+}
+
+/**
+ * Creates the deterministic in-memory network owner shared by lifecycle fixtures.
+ * @param peerId - Stable peer identity for the fixture instance.
+ * @returns Minimal DRP network surface used by the live-plane tests.
+ */
+export function fakeNetwork(peerId: string): DRPNetworkNode {
 	const topics = new Set<string>();
 	return {
 		peerId,
@@ -265,13 +379,53 @@ export interface GenuineCreatorAdoptionFixture {
 	};
 	readonly handle: CreatorLiveCloseHandle;
 	readonly journal: DurableLiveJournalStore;
+	readonly modules: GenuineCreatorAdoptionFixtureModules;
 	readonly runtimeBindings: Readonly<{
 		readonly messageQueueManager: MessageQueueManager<Message>;
 		readonly networkNode: DRPNetworkNode;
 		onAdmittedVertex(input: Readonly<Record<string, unknown>>): Promise<void> | void;
 	}>;
 	readonly scope: LiveJournalScope;
+	readonly signRegisteredVertexDigest: V3LocalIssueInput["signRegisteredVertexDigest"];
 	close(): Promise<void>;
+}
+
+export interface GenuineCreatorAdoptionFixtureOptions {
+	readonly applicationBatch?: boolean;
+	readonly authorizedPrivateKeySeedHexes?: readonly string[];
+	beforeCreatorClose?(
+		input: Readonly<{
+			readonly firstLogicalTime: number;
+			readonly plane: V3PlaneHandle;
+			readonly signRegisteredVertexDigest: V3LocalIssueInput["signRegisteredVertexDigest"];
+		}>
+	): Promise<Readonly<{ readonly authorSequence: number; readonly digest: string }>>;
+	readonly establishedPeerPrivateKeySeedHex?: string;
+	readonly modules?: GenuineCreatorAdoptionFixtureModules;
+	readonly objectId?: string;
+	readonly stageAclChange?: boolean;
+	readonly successorAclGroups?: Readonly<Record<string, readonly ("admin" | "finality" | "writer")[]>>;
+}
+
+/**
+ * Runs the public predecessor verification and durable adoption commit shared by lifecycle fixtures.
+ * @param fixture - Genuine sealed predecessor and successor evidence.
+ * @returns One-use committed activation capability.
+ */
+export async function commitGenuineCreatorAdoptionFixture(
+	fixture: GenuineCreatorAdoptionFixture
+): Promise<Readonly<Record<string, unknown>>> {
+	const verified = await fixture.modules.verifyCreatorSuccessorAdoption({
+		catalog: fixture.catalog,
+		handle: fixture.handle,
+	});
+	if (verified.ok !== true) throw new TypeError(`D.108d1a verification failed: ${String(verified.kind)}`);
+	const committed = await fixture.modules.commitCreatorSuccessorAdoption({
+		handle: fixture.handle,
+		intent: verified.intent,
+	});
+	if (committed.ok !== true) throw new TypeError(`D.108d1a commit failed: ${String(committed.kind)}`);
+	return committed;
 }
 
 export type CreatorAdoptionAheMutationOperation =
@@ -568,7 +722,8 @@ function hex(bytes: Uint8Array): string {
 async function recoverWithDurableStores(
 	fixture: Awaited<ReturnType<typeof createGenuinePreparedV3Fixture>>,
 	capability: PreparedV3Live,
-	controls: GenuineCreatorAdoptionFixture["controls"]
+	controls: GenuineCreatorAdoptionFixture["controls"],
+	modules: GenuineCreatorAdoptionFixtureModules
 ): Promise<
 	Readonly<{
 		readonly capability: RecoveredV3Live;
@@ -579,10 +734,12 @@ async function recoverWithDurableStores(
 	}>
 > {
 	const directory = mkdtempSync(join(tmpdir(), "drp-d108b-replay-"));
-	const rawIssuanceStore = createNodeDurableIssuanceStore({ primaryFilename: join(directory, "issuance.sqlite") });
-	const issuanceMaintenance = resolveNodeDurableIssuancePruningMaintenance(rawIssuanceStore);
+	const rawIssuanceStore = modules.createNodeDurableIssuanceStore({
+		primaryFilename: join(directory, "issuance.sqlite"),
+	});
+	const issuanceMaintenance = modules.resolveNodeDurableIssuancePruningMaintenance(rawIssuanceStore);
 	if (issuanceMaintenance === undefined) throw new TypeError("D.108b fixture issuance maintenance is unavailable");
-	const rawJournal = createNodeDurableLiveJournalStore({ primaryFilename: join(directory, "journal.sqlite") });
+	const rawJournal = modules.createNodeDurableLiveJournalStore({ primaryFilename: join(directory, "journal.sqlite") });
 	const issuanceStore: DurableIssuanceStore = Object.freeze({
 		close: () => rawIssuanceStore.close(),
 		compareAndMarkOutboxPublished: (input) => rawIssuanceStore.compareAndMarkOutboxPublished(input),
@@ -659,7 +816,7 @@ async function recoverWithDurableStores(
 		if (fixture.exactCanonicalLatchedAclBytes === undefined) {
 			throw new TypeError("D.108b fixture requires a latched ACL");
 		}
-		const recovered = await recoverV3LiveReplica({
+		const recovered = await modules.recoverV3LiveReplica({
 			capability,
 			exactCanonicalLatchedAclBytes: fixture.exactCanonicalLatchedAclBytes,
 			issuanceScope: scope,
@@ -860,21 +1017,18 @@ function deleteDatabase(name: string): Promise<void> {
  * @returns Genuine sealed handle, trusted catalog, mutation controls and cleanup owner.
  */
 export async function openGenuineCreatorAdoptionFixture(
-	options: Readonly<{
-		readonly authorizedPrivateKeySeedHexes?: readonly string[];
-		beforeCreatorClose?(
-			input: Readonly<{
-				readonly firstLogicalTime: number;
-				readonly plane: V3PlaneHandle;
-				readonly signRegisteredVertexDigest: V3LocalIssueInput["signRegisteredVertexDigest"];
-			}>
-		): Promise<Readonly<{ readonly authorSequence: number; readonly digest: string }>>;
-		readonly establishedPeerPrivateKeySeedHex?: string;
-		readonly objectId?: string;
-		readonly stageAclChange?: boolean;
-		readonly successorAclGroups?: Readonly<Record<string, readonly ("admin" | "finality" | "writer")[]>>;
-	}> = {}
+	options: GenuineCreatorAdoptionFixtureOptions = {}
 ): Promise<GenuineCreatorAdoptionFixture> {
+	const modules = options.modules ?? (await defaultCreatorAdoptionFixtureModules());
+	const {
+		activateV3LivePlane,
+		bindCreatorLiveClose,
+		bindV3BlueprintLivePlane,
+		createBrowserSnapshotQuarantineStore,
+		openBrowserSealEvidenceStore,
+		openBrowserSealVoteStore,
+		routeV3Ingress,
+	} = modules;
 	const controls: GenuineCreatorAdoptionFixture["controls"] = {
 		adoptionPhase: false,
 		aheMutationCount: 0,
@@ -891,6 +1045,7 @@ export async function openGenuineCreatorAdoptionFixture(
 	let aheBackend: AheDurableStore | undefined;
 	let declaration: SnapshotQuarantineDeclaration | undefined;
 	const fixture = await createGenuinePreparedV3Fixture({
+		applicationBatch: options.applicationBatch === true,
 		authorizationMode: "latched-acl",
 		...(options.authorizedPrivateKeySeedHexes === undefined
 			? {}
@@ -899,6 +1054,8 @@ export async function openGenuineCreatorAdoptionFixture(
 		historyRoot: emptyHistoryRoot,
 		historySize: 0,
 		...(options.objectId === undefined ? {} : { objectId: options.objectId }),
+		createSqliteAheDurableStore: modules.createSqliteAheDurableStore,
+		prepareV3LiveGeneration: modules.prepareV3LiveGeneration,
 		storeDecorator: (backend) => {
 			aheBackend = backend;
 			return decoratedAheStore(backend, controls);
@@ -912,7 +1069,7 @@ export async function openGenuineCreatorAdoptionFixture(
 	}).open();
 	if (!openedCurrentTrust.ok)
 		throw new TypeError(`D.108b fixture current trust open failed: ${openedCurrentTrust.reason}`);
-	const recovered = await recoverWithDurableStores(fixture, fixture.capability, controls);
+	const recovered = await recoverWithDurableStores(fixture, fixture.capability, controls, modules);
 	const messageQueueManager = new MessageQueueManager<Message>({ logConfig: { level: "silent" } });
 	const networkNode = fakeNetwork(`d108b-${crypto.randomUUID()}`);
 	let establishedPeerAuthor: string | undefined;
@@ -1043,7 +1200,7 @@ export async function openGenuineCreatorAdoptionFixture(
 			options.successorAclGroups !== undefined ||
 			options.establishedPeerPrivateKeySeedHex !== undefined
 		) {
-			throw new TypeError("D.110a-p pre-close fixture option is incompatible with other staged operations");
+			throw new TypeError("D.110a pre-close fixture option is incompatible with other staged operations");
 		}
 		const preCloseIssued = await options.beforeCreatorClose({
 			firstLogicalTime: 3,
@@ -1055,7 +1212,7 @@ export async function openGenuineCreatorAdoptionFixture(
 			preCloseIssued.authorSequence <= localIssued.authorSequence ||
 			!/^[0-9a-f]{64}$/u.test(preCloseIssued.digest)
 		) {
-			throw new TypeError("D.110a-p pre-close fixture result is invalid");
+			throw new TypeError("D.110a pre-close fixture result is invalid");
 		}
 		latestLocalIssued = Object.freeze({
 			authorSequence: preCloseIssued.authorSequence,
@@ -1096,11 +1253,13 @@ export async function openGenuineCreatorAdoptionFixture(
 	const closeResult = await bound.handle.close();
 	controls.adoptionPhase = true;
 	const proposed = await detachedHeadEvidence(aheBackend, await bound.handle.inspectDurableHead());
-	const generationPage = await aheBackend.readGenerationPage({ objectId: fixture.objectId, limit: 128 });
+	const parsedObjectId = parseStorageObjectId(fixture.objectId);
+	if (!parsedObjectId.ok) throw new TypeError("D.108b fixture object identity is invalid");
+	const generationPage = await aheBackend.readGenerationPage({ objectId: parsedObjectId.value, limit: 128 });
 	if (!generationPage.ok || generationPage.value.nextCursor !== null) {
 		throw new TypeError("D.108b fixture generation page is unavailable");
 	}
-	const journalScope = Object.freeze({ anchorDigest: fixture.anchorDigest, epoch: 0, objectId: fixture.objectId });
+	const journalScope = Object.freeze({ anchorDigest: fixture.anchorDigest, epoch: 0, objectId: parsedObjectId.value });
 	const journalReadiness = await recovered.journal.readiness({ scope: journalScope });
 	if (!journalReadiness.ok || !journalReadiness.ready) {
 		throw new TypeError("D.108b fixture journal snapshot is unavailable");
@@ -1180,8 +1339,10 @@ export async function openGenuineCreatorAdoptionFixture(
 		}),
 		handle: bound.handle,
 		journal: recovered.journal,
+		modules,
 		runtimeBindings: Object.freeze({ messageQueueManager, networkNode, onAdmittedVertex }),
 		scope: journalScope,
+		signRegisteredVertexDigest: fixture.signRegisteredVertexDigest,
 	});
 }
 
