@@ -90939,3 +90939,44 @@ refs both resolved to that exact commit before this plan-only identity anchor.
 This paragraph changes no GREEN source, evidence, acceptance, or execution
 authority. It exists only to give the final reviewers one immutable GREEN
 commit to inspect.
+
+##### D.110a-w final GREEN review and execution release
+
+The single final review inspected exact signed/pushed anchor
+`c2828ad0261148dd589933009f6e2cc046f82508`, its parent GREEN implementation
+`37f60d35c6b0d0f9adc40410e0d0b369a89cf774`, causal RED
+`01421b0b33effccb75903a868b9221d069a059c5`, both validated evidence roots,
+and the complete accepted plan-to-RED-to-GREEN history. The shared prompt
+SHA-256 is
+`89630eed01f0922dcab26969d7a8ac6f957bf8c7619dadbb8bb8e63cb9266e30`.
+
+Grok 4.6/high, standard direct Kimi K3 with the exact 100-step setting, and
+Opus xhigh all returned `APPROVED`, P0=0 and P1=0. Their P2 counts are two,
+three and four respectively. Every reviewer answered `YES` for causal RED,
+narrow GREEN, preserved contracts, timing arithmetic, sufficient gates,
+sufficient focused-status disposition, and safe reserved-execution release.
+Their terminal SHA-256 values are respectively
+`f9a38eb30dff37a32ebdc31bdad3544f0472b549784fba4ffab18d9056ba536e`,
+`6d6b07200617afcd262805d4514fa0b87a3ce56a49831565bcb1cbb65842965b`,
+and `364da0066e64be1b3d15f7be95ab07486cc65ba474c366b933fb17d1be40d38f`.
+The self-excluding 14-entry review manifest validates and has SHA-256
+`4f380a6bad68127b5b3d6812d3098aed565db519383a9346d0cb32320f35c53e`.
+
+The P2 union requires no source, evidence, acceptance or review correction.
+All reviewers accept the accurately preserved focused wrapper status and the
+trusted-local hash custody; Kimi confirms the timeout-shape ownership migration
+was explicitly reviewed; and Opus confirms the post-RED import sort was
+semantically inert and revalidated by the committed GREEN roster. Opus also
+notes that preflight/full inherit `NODE_OPTIONS` if the launching shell exports
+it. This is inherited behavior outside D.110a-w and does not change the memory
+decision, but the reserved executions will mechanically require an unexported
+`NODE_OPTIONS`; the 12-GiB Prettier check used an inline command-only prefix and
+did not persist it. The redundant stale-timeout negation is harmless and
+retained unchanged.
+
+The final blocking union is empty. D.110a-w GREEN is closed and releases the
+two reserved executions in their frozen order: exactly one fresh two-object
+preflight, then only on its complete normal pass with exact two-object/two-
+lifecycle accounting and total wrapper elapsed at most 540 seconds, the sole
+fresh 64-object full worker. Neither execution may be retried. Both roots
+remain absent at this review closure point.
