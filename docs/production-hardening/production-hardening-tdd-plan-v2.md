@@ -90489,3 +90489,46 @@ change, or review is authorized. D.110a remains paused; D.110a-v may now be
 planned as the already-bounded read-only whole-lifecycle disposition over the
 existing immutable D.110a-u profile and terminal record. The two-object
 preflight and sole 64-object full worker remain unspent.
+
+##### D.110a-v bounded whole-lifecycle disposition plan
+
+D.110a-v is frozen in
+`specs/phase-6c-memory-gates/slices/00d-whole-lifecycle-disposition.md` as the
+one read-only successor required by the accepted D.110a-u mixed result. Its
+only data inputs are the immutable D.110a-u raw profile, durable terminal
+record, parent JSON, validated manifests, and signed source/evidence anchors.
+It may write only a new `.logs/phase-6c-d110av-disposition/` evidence root and
+the two planning ledgers. It has no test/source edit, child process, test,
+profiler, profile, retry, preflight, full-worker, dependency, product,
+threshold, workload, memory, or watchdog authority.
+
+The offline analyzer reconstructs the original ordered profiler timestamps
+from `startTime + cumulative timeDeltas` and applies five predeclared mappings
+to every durable phase boundary: start aligned at each side of the start
+bracket, stop aligned at each side of the stop bracket, and one affine mapping
+between the inner start/stop brackets. Each mapping partitions every sample
+exactly once across startup, application workload, creator close, reclamation,
+successor publish, post-GC sample, teardown, and inspector tail. It emits full
+sample/microsecond conservation, boundary spread, phase shares, whole-profile
+owners, and per-phase leaf-self owner rankings using the same URL/runtime
+classification and unchanged at-least-50-percent plus at-least-two-times owner
+rule as D.110a-u.
+
+The decision matrix is closed before analysis. A phase/owner result is accepted
+only when the same phase is at least half of full attributed time under every
+mapping and the same owner is dominant inside it under every mapping. A stable
+tests-only owner yields a narrow fixture-optimization plan; a stable product
+owner yields a narrow product-optimization plan. A stable dominant phase with
+mixed owners yields one phase-level feasibility plan. No stable phase, input
+unavailability, or mapping sensitivity yields one high-risk workload/watchdog
+feasibility-contract plan. Every branch records the measured one-object time
+and non-measured serial 64-object projection, chooses exactly one successor,
+and forbids another profiling loop.
+
+This bounded plan is signed/pushed before one Grok, standard direct Kimi
+K3/100-step, and Opus xhigh plan review. Only material P0/P1 findings about
+mapping validity, conservation, or the closed decision matrix block. After an
+empty blocking union, the offline analysis runs exactly once, its deterministic
+JSON and self-excluding manifest are signed/pushed, and the one final
+three-model evidence review closes the slice. Fable and collaboration
+subagents remain prohibited.
