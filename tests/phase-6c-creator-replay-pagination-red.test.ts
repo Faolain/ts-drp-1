@@ -67,7 +67,7 @@ describe("D.110a-p creator durable-replay pagination RED", () => {
 				},
 			});
 			expect(opened.evidence.journalRows).toHaveLength(129);
-			expect(opened.evidence.localIssued.authorSequence).toBe(127);
+			expect(opened.evidence.localIssued.authorSequence).toBe(ADDITIONAL_ROWS + 1);
 		} finally {
 			await opened?.close();
 		}
