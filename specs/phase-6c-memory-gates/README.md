@@ -74,9 +74,10 @@ Two roadmap phrases cannot be copied literally into a new test:
 D.110a uses exactly 64 genuine object-epochs. Each object applies exactly
 15,625 application operations: 976 maximum 16-operation batches plus one
 9-operation batch, producing 977 workload batch vertices. Together with the
-fixture's existing anchor and two setup vertices, that stays below the existing
-4,096-vertex fixture ceiling and totals exactly 1,000,000 admitted and applied
-workload operations without changing product limits.
+fixture's existing anchor and two setup vertices, that stays below both the
+4,096-vertex close-set helper bound and the authenticated 8,192-vertex product
+limit, and totals exactly 1,000,000 admitted and applied workload operations
+without changing either limit.
 
 The default Phase-6a latched-ACL artifact cannot accept a multi-operation
 `issueLocal` call. D.110a therefore mints one opt-in tests-only catalog variant
@@ -107,7 +108,12 @@ with `--expose-gc`, the existing `tsx` loader, and `fake-indexeddb/auto`. The
 bootstrap imports a tests-only TypeScript worker, so the genuine
 IndexedDB-bound fixture runs in plain Node without Vite aliases. Internal built
 URLs are supplied by the parent; the child does not derive production paths or
-invent a second package resolver.
+invent a second package resolver. Every value import on that path uses the same
+built `v3-live` module instance. The Phase-6b fixture reuses the pure fake
+network exported by the owned Phase-6a fixture instead of importing the
+Phase-4b `vi.fn()` helper, so neither `vitest` nor a source `v3-live` copy enters
+the measured process. The worker also installs the retained Phase-6a
+`navigator.storage.estimate()` mock before browser-store construction.
 
 The worker launches fresh Node with `--expose-gc` and samples the complete raw
 `process.memoryUsage()` record during execution after each complete

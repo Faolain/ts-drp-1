@@ -89317,7 +89317,8 @@ objects as 64 runtime epochs of one object.
 Each object applies exactly 15,625 deterministic child operations through
 `issueLocal`: 976 16-operation batches plus one 9-operation batch. That is 977
 workload batch vertices; with the fixture's anchor and two setup vertices
-it remains below the existing 4,096-vertex ceiling. Across 64 objects the
+it remains below both the 4,096-vertex close-set helper bound and the
+authenticated 8,192-vertex product limit. Across 64 objects the
 workload is exactly 1,000,000 admitted and applied operations and 62,528 batch
 vertices. The inherited setup applies `add(1)` plus `add(2)`, so the worker
 verifies exact pre-close counter 15,628, post-successor-`add(1)` counter 15,629,
@@ -89360,7 +89361,12 @@ the `.mjs` bootstrap with `--expose-gc`, the existing `tsx` loader, and
 Vite aliases, child-derived production paths, stale `dist`, a second bare-
 package resolver, and new product exports remain forbidden. One bounded two-
 object non-verdict preflight proves that exact catalog/lifecycle/resolver/GC/
-schema/teardown path before the one consuming full worker. The single full
+schema/teardown path before the one consuming full worker. Every value import
+in that path uses the same built `v3-live` module. The Phase-6b fixture reuses
+the pure fake network exported by the Phase-6a fixture rather than importing
+the Phase-4b `vitest` helper, and the worker installs the retained
+`navigator.storage.estimate()` mock before browser-store construction. The
+single full
 worker has a 45-minute parent watchdog; timeout is a consuming failure with
 last-progress custody, not a heap verdict or retry permission.
 
@@ -89431,3 +89437,42 @@ one permitted confirmation round must inspect this signed/pushed correction.
 Only an empty combined P0/P1 union authorizes D.110a RED. No long worker,
 preflight, RED, product edit, workflow edit, Fable, or collaboration subagent
 ran during this correction.
+
+The one confirmation round reviewed signed/pushed correction
+`d36e2080bdb154aae21f1ea78d640e28068d3156`. The resumed exact Grok session
+completed APPROVED with zero P0/P1. The standard direct Kimi CLI completed
+APPROVED with zero P0/P1. Opus found one remaining P1 in the newly named child
+graph: `live-fixture.ts` still minted its capability through a source
+`v3-live`, while the adoption fixture would consume it through built
+`@ts-drp/node/v3-live`; the Phase-6b reclamation fixture also statically pulled
+in the Phase-4b `vitest` fake network and its second source `v3-live`. Those two
+module records own distinct module-scoped WeakMaps, so the uncorrected worker
+would fail `capability-consumed` before its first epoch.
+
+The final owner correction is mechanical and receives no recursive review.
+The already named `live-fixture.ts` owner now explicitly includes conversion
+of its product imports to public built package subpaths. The already named
+creator-adoption fixture exports its pure, non-Vitest fake network, and the
+already named Phase-6b reclamation fixture consumes that helper instead of
+Phase-4b `live-snapshot.ts`. All value imports in the worker graph therefore
+share the same authenticated built `v3-live` module; the only file-URL targets
+are the two authenticated built internal owners. The worker also installs the
+retained deterministic `navigator.storage.estimate()` mock before browser-
+store construction. The preflight verifies module identity, navigator setup,
+and Node's `arrayBuffers <= external` diagnostic before the consuming run; the
+diagnostic is not mislabeled as a heap-threshold result.
+
+Opus's other findings are dispositioned without widening the slice. Affected
+packages are freshly built and every selected target is authenticated, so bare
+imports do not rely on stale `dist`. `typescript`, `tsx`, and fake IndexedDB are
+fixed harness overhead included in the absolute gate by design. The 4,096
+close-set helper bound and 8,192 product limit are now named distinctly. The
+component and aggregate slopes are intentionally redundant fail-closed checks.
+The exact retained browser owner remains the one that imports the changed
+fixture graph.
+
+This closes the demonstrated confirmation P1 through the deterministic import-
+graph predicate; a third model round is forbidden by the bounded protocol. RED
+may start only after the signed/pushed final owner correction, exact changed-
+path audit, single-built-module source-shape checks, and review-evidence
+manifest all pass. No preflight or long worker is part of RED.

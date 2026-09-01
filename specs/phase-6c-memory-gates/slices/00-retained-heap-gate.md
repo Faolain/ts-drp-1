@@ -20,15 +20,19 @@ prospective owner set:
 - the existing tests-only `tests/fixtures/phase-3a1b-p3/live-fixture.ts` for
   one opt-in latched-ACL catalog variant that adds the already shipped
   `applicationBatch` reducer and manifest operation while leaving every
-  default fixture byte-for-byte unchanged;
+  default fixture byte-for-byte unchanged, and for conversion of its product
+  imports to the same public built package graph used by the child;
 - the existing tests-only
   `tests/fixtures/phase-6a-v3/creator-adoption-contract.ts` for one generic
-  bounded pre-close callback and public bare-package imports;
+  bounded pre-close callback, public bare-package imports, and one exported
+  pure fake-network helper with no Vitest dependency;
 - the existing tests-only
   `tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts`
   and `tests/fixtures/phase-6b/runtime-reclamation-contract.ts` for equivalent
   public-package loading plus a parent-authenticated built URL for each
-  package-internal owner that has no export-map entry; and
+  package-internal owner that has no export-map entry; the reclamation fixture
+  switches from the Phase-4b `vi.fn()` network to the pure Phase-6a helper so
+  the child never imports `vitest` or a source-relative second `v3-live`; and
 - the smallest root/package test-script entry needed to invoke exactly the
   hard gate.
 
@@ -113,6 +117,11 @@ diagnostic evidence. This prevents retained `Uint8Array`/`Buffer` backing
 stores from escaping a JS-heap-only gate without double-counting
 `arrayBuffers` through `external`.
 
+The worker installs the same deterministic `navigator.storage.estimate()`
+tests-only mock used by the retained Phase-6a tests before opening browser
+stores. The two-object preflight must prove that mock and the single built
+`v3-live` module identity before the consuming worker.
+
 The result contains exactly 64 samples. Ordinary least-squares uses sample
 indices 32 through 63 inclusive, all with 20 active rooms, and separately uses
 the raw `heapUsed`, `arrayBuffers`, and `ownedBytes` series; it must not sort,
@@ -122,7 +131,9 @@ fitted baseline. Require:
 - each of the three slopes `<= 165_161` bytes per object-epoch;
 - every raw `heapUsed` and `ownedBytes` sample, including the terminal sample,
   `< 512_000_000` bytes; and
-- `arrayBuffers <= external` in every sample as a Node accounting sanity check.
+- record whether `arrayBuffers <= external` in every sample as a Node
+  accounting diagnostic. The preflight rejects a false diagnostic, but this is
+  not misreported as a memory-threshold verdict.
 
 The epsilon limits predicted growth across the 31 last-half intervals to
 5,119,991 bytes, strictly less than one percent of the Profile-D 512,000,000-
