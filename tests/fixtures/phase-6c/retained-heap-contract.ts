@@ -20,6 +20,65 @@ export const D110A_RED_TOKENS = Object.freeze([
 ] as const);
 
 export const D110AT_RED_TOKEN = "D110AT_PROFILE_ATTRIBUTION_MISSING";
+export const D110AU_RED_TOKEN = "D110AU_PROFILE_CLOCK_CALIBRATION_MISSING";
+
+export const D110AU_PROFILE_MUTANTS = Object.freeze([
+	"phase-before-start",
+	"phase-after-stop",
+	"missing-named-frame",
+	"zero-matching-samples",
+	"single-sample-window",
+] as const);
+
+export type D110auProfileMutant = (typeof D110AU_PROFILE_MUTANTS)[number];
+
+export const D110AU_PROFILE_MUTANT_ERROR = Object.freeze({
+	"missing-named-frame": "D110AU_PROFILE_WORKLOAD_FRAME_MISSING",
+	"phase-after-stop": "D110AU_PROFILE_PHASE_OUTSIDE_CAPTURE",
+	"phase-before-start": "D110AU_PROFILE_PHASE_OUTSIDE_CAPTURE",
+	"single-sample-window": "D110AU_PROFILE_WORKLOAD_WINDOW_DEGENERATE",
+	"zero-matching-samples": "D110AU_PROFILE_WORKLOAD_SAMPLES_MISSING",
+} as const satisfies Readonly<Record<D110auProfileMutant, string>>);
+
+export interface D110auCpuProfileNode {
+	readonly callFrame: Readonly<{ readonly functionName: string; readonly url: string }>;
+	readonly children?: readonly number[];
+	readonly id: number;
+}
+
+export interface D110auProfileInput {
+	readonly calibration: Readonly<{
+		readonly hrtimeAfterStart: number;
+		readonly hrtimeAfterStop: number;
+		readonly hrtimeBeforeStart: number;
+		readonly hrtimeBeforeStop: number;
+	}>;
+	readonly phases: readonly Readonly<{
+		readonly monotonicMicroseconds: number;
+		readonly phase: string;
+	}>[];
+	readonly profile: Readonly<{
+		readonly endTime: number;
+		readonly nodes: readonly D110auCpuProfileNode[];
+		readonly samples: readonly number[];
+		readonly startTime: number;
+		readonly timeDeltas: readonly number[];
+	}>;
+}
+
+export interface D110auProfileAttribution {
+	readonly attributedMicroseconds: number;
+	readonly clearlyDominant: boolean;
+	readonly owners: readonly Readonly<{
+		readonly owner: string;
+		readonly selfMicroseconds: number;
+		readonly share: number;
+	}>[];
+	readonly workerAncestrySamples: number;
+	readonly workloadEnd: number;
+	readonly workloadSamples: number;
+	readonly workloadStart: number;
+}
 
 export const D110A_MUTANTS = Object.freeze([
 	"missing-gc",
@@ -314,6 +373,130 @@ export function d110aSyntheticProof(): D110aProof {
 	});
 }
 
+const D110AU_WORKLOAD_FUNCTION = "runD110auApplicationWorkload";
+const D110AU_WORKER_URL = "file:///repository/tests/fixtures/phase-6c/retained-heap-worker.ts";
+
+/**
+ * Builds the detached disjoint-clock control used to calibrate D.110a-u.
+ * @returns Synthetic CPU-profile and phase-clock input without running a workload.
+ */
+export function d110auSyntheticProfileInput(): D110auProfileInput {
+	const phaseNames = Object.freeze([
+		"fixture-open",
+		"workload-complete",
+		"creator-close-complete",
+		"reclamation-complete",
+		"successor-published",
+		"sample-complete",
+		"teardown-complete",
+	]);
+	return Object.freeze({
+		calibration: Object.freeze({
+			hrtimeAfterStart: 9_000_010,
+			hrtimeAfterStop: 9_000_400,
+			hrtimeBeforeStart: 9_000_000,
+			hrtimeBeforeStop: 9_000_300,
+		}),
+		phases: Object.freeze(
+			phaseNames.map((phase, index) => Object.freeze({ monotonicMicroseconds: 9_000_020 + index * 10, phase }))
+		),
+		profile: Object.freeze({
+			endTime: 1_000_200,
+			nodes: Object.freeze([
+				Object.freeze({
+					callFrame: Object.freeze({ functionName: "(root)", url: "" }),
+					children: Object.freeze([2, 4, 5, 6]),
+					id: 1,
+				}),
+				Object.freeze({
+					callFrame: Object.freeze({ functionName: D110AU_WORKLOAD_FUNCTION, url: D110AU_WORKER_URL }),
+					children: Object.freeze([3]),
+					id: 2,
+				}),
+				Object.freeze({
+					callFrame: Object.freeze({ functionName: "issueLocal", url: "file:///repository/packages/node.js" }),
+					id: 3,
+				}),
+				Object.freeze({
+					callFrame: Object.freeze({ functionName: D110AU_WORKLOAD_FUNCTION, url: D110AU_WORKER_URL }),
+					id: 4,
+				}),
+				Object.freeze({
+					callFrame: Object.freeze({ functionName: "(garbage collector)", url: "" }),
+					id: 5,
+				}),
+				Object.freeze({
+					callFrame: Object.freeze({ functionName: "outsideWorkload", url: D110AU_WORKER_URL }),
+					id: 6,
+				}),
+			]),
+			samples: Object.freeze([6, 2, 5, 4, 6]),
+			startTime: 1_000_000,
+			timeDeltas: Object.freeze([10, 20, 30, 40, 50]),
+		}),
+	});
+}
+
+/**
+ * Produces one precise D.110a-u attribution false gate.
+ * @param mutant - Frozen mutant name.
+ * @returns Invalid detached profile input.
+ */
+export function d110auMutantProfileInput(mutant: D110auProfileMutant): D110auProfileInput {
+	const input = structuredClone(d110auSyntheticProfileInput()) as {
+		calibration: {
+			hrtimeAfterStart: number;
+			hrtimeAfterStop: number;
+			hrtimeBeforeStart: number;
+			hrtimeBeforeStop: number;
+		};
+		phases: Array<{ monotonicMicroseconds: number; phase: string }>;
+		profile: {
+			endTime: number;
+			nodes: Array<{ callFrame: { functionName: string; url: string }; children?: number[]; id: number }>;
+			samples: number[];
+			startTime: number;
+			timeDeltas: number[];
+		};
+	};
+	switch (mutant) {
+		case "phase-before-start":
+			if (input.phases[0] !== undefined) {
+				input.phases[0].monotonicMicroseconds = input.calibration.hrtimeAfterStart - 1;
+			}
+			break;
+		case "phase-after-stop":
+			if (input.phases.at(-1) !== undefined) {
+				(input.phases.at(-1) as { monotonicMicroseconds: number }).monotonicMicroseconds =
+					input.calibration.hrtimeBeforeStop + 1;
+			}
+			break;
+		case "missing-named-frame":
+			for (const node of input.profile.nodes) {
+				if (node.callFrame.functionName === D110AU_WORKLOAD_FUNCTION) node.callFrame.functionName = "renamedWorkload";
+			}
+			break;
+		case "zero-matching-samples":
+			input.profile.samples = [6, 5, 6];
+			input.profile.timeDeltas = [10, 20, 30];
+			break;
+		case "single-sample-window":
+			input.profile.samples = [6, 2, 6];
+			input.profile.timeDeltas = [10, 20, 30];
+			break;
+	}
+	return input;
+}
+
+/**
+ * Validates detached profile-clock custody and named-window attribution.
+ * @param _input - Detached profile, phase and calibration data.
+ * @throws While the D.110a-u implementation is absent.
+ */
+export function validateD110auProfileAttribution(_input: D110auProfileInput): D110auProfileAttribution {
+	fail(D110AU_RED_TOKEN);
+}
+
 type D110aMutableProof = {
 	accounting: Record<string, number>;
 	baseline: D110aMemoryReading;
@@ -414,6 +597,7 @@ export function d110aCurrentInfrastructureAudit(): Readonly<{
 	readonly hardEntrypoint: boolean;
 	readonly pairedWorkloadGate: boolean;
 	readonly phaseProgressSchema: boolean;
+	readonly profileClockCalibration: boolean;
 	readonly postGcSlopeGate: boolean;
 }> {
 	const read = (relative: string): string => {
@@ -453,6 +637,19 @@ export function d110aCurrentInfrastructureAudit(): Readonly<{
 			/"successor-published"/u.test(worker) &&
 			/"sample-complete"/u.test(worker) &&
 			/"teardown-complete"/u.test(worker),
+		profileClockCalibration:
+			/\.logs\/phase-6c-d110au-green/u.test(child) &&
+			/d110au-main\.cpuprofile/u.test(child) &&
+			/capture-consumed\.json/u.test(child) &&
+			/capture-records\.json/u.test(child) &&
+			/hrtimeBeforeStart/u.test(child) &&
+			/hrtimeAfterStart/u.test(child) &&
+			/hrtimeBeforeStop/u.test(child) &&
+			/hrtimeAfterStop/u.test(child) &&
+			/process\.hrtime\.bigint\(\) \/ 1_000n/u.test(child) &&
+			/validateD110auProfileAttribution/u.test(child) &&
+			/runD110auApplicationWorkload/u.test(worker) &&
+			/appliedWorkloadOperations,\s*latest/u.test(worker),
 		postGcSlopeGate:
 			/"--expose-gc"/u.test(child) &&
 			/globalThis\.gc\(\)/u.test(worker) &&

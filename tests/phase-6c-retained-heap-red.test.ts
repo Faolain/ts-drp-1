@@ -14,11 +14,17 @@ import {
 	d110aMutantProof,
 	d110aSyntheticProof,
 	D110AT_RED_TOKEN,
+	D110AU_PROFILE_MUTANT_ERROR,
+	D110AU_PROFILE_MUTANTS,
+	D110AU_RED_TOKEN,
+	d110auMutantProfileInput,
+	d110auSyntheticProfileInput,
 	requireD110aHardEntrypoint,
 	requireD110aPairedWorkloadGate,
 	requireD110aPostGcSlopeGate,
 	requireD110atProfileAttribution,
 	validateD110aProof,
+	validateD110auProfileAttribution,
 } from "./fixtures/phase-6c/retained-heap-contract.js";
 
 describe("D.110a retained-heap hard-gate RED", () => {
@@ -51,6 +57,24 @@ describe("D.110a retained-heap hard-gate RED", () => {
 			postGcSlopeGate: true,
 		});
 		expect(() => requireD110atProfileAttribution()).not.toThrow(D110AT_RED_TOKEN);
+	});
+
+	it("calibrates profile clocks without cross-clock absolute comparison", () => {
+		const audit = d110aCurrentInfrastructureAudit();
+		expect(audit.profileClockCalibration, D110AU_RED_TOKEN).toBe(true);
+		expect(validateD110auProfileAttribution(d110auSyntheticProfileInput())).toMatchObject({
+			attributedMicroseconds: 90,
+			clearlyDominant: true,
+			workerAncestrySamples: 2,
+			workloadEnd: 1_000_100,
+			workloadSamples: 3,
+			workloadStart: 1_000_030,
+		});
+		for (const mutant of D110AU_PROFILE_MUTANTS) {
+			expect(() => validateD110auProfileAttribution(d110auMutantProfileInput(mutant))).toThrow(
+				D110AU_PROFILE_MUTANT_ERROR[mutant]
+			);
+		}
 	});
 
 	it(`closes ${D110A_RED_TOKENS[0]}`, () => {
