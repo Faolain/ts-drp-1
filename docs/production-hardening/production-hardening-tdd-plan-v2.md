@@ -90929,3 +90929,13 @@ commit identity in one plan-only anchor, and then run the single final Grok,
 standard direct Kimi K3/100-step, and Opus xhigh review over the complete
 plan-to-RED-to-GREEN history. The two-object preflight and sole 64-object worker
 remain unspent and prohibited until that review's P0/P1 union is empty.
+
+The signed/pushed GREEN implementation/evidence checkpoint is commit
+`37f60d35c6b0d0f9adc40410e0d0b369a89cf774`, tree
+`5ac0e4c45036165691c99910b087ae315092022c`, with parent RED
+`01421b0b33effccb75903a868b9221d069a059c5`. Its signature is good from
+`Faolain <Faolain@users.noreply.github.com>`, and the local and pushed branch
+refs both resolved to that exact commit before this plan-only identity anchor.
+This paragraph changes no GREEN source, evidence, acceptance, or execution
+authority. It exists only to give the final reviewers one immutable GREEN
+commit to inspect.
