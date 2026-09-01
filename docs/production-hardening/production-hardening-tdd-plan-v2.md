@@ -90258,3 +90258,57 @@ product-edit, threshold-change, or acceptance-mapping authority. Any diagnostic
 cross-clock phase mapping must be specified and reviewed in that future slice;
 D.110a-u itself still adjudicates only its frozen same-clock and profiler-clock
 predicates.
+
+##### D.110a-u deterministic RED
+
+The signed/pushed RED is commit
+`5aa62aa04b56e2800201a29b623bf0abbe7830ef`, tree
+`4c8337328f14c38b47a6e69d1ddfe8b99a06dafd`. Relative to the final reviewed
+plan anchor it changed exactly
+`tests/fixtures/phase-6c/retained-heap-contract.ts` and
+`tests/phase-6c-retained-heap-red.test.ts`. The child and worker stayed at blob
+IDs `412c6d06c0fa21df262cdd2b3970610d8aa696d2` and
+`d76b097391829028bd6011b01cbe5dc919bf836c`, exactly matching the plan anchor;
+therefore RED could not launch or alter any object/profile/preflight/full
+workload.
+
+RED added the exact token `D110AU_PROFILE_CLOCK_CALIBRATION_MISSING`, the five
+frozen mutant names/error codes, detached profile/calibration input and output
+types, a disjoint-clock synthetic control with two exact named-function node
+IDs, collection-safe synthetic/mutant builders, the unavailable validator
+signature, and the `profileClockCalibration` source audit. The one new title
+asserts that audit positively with the exact token before reaching the
+detached validator matrix. No collection failure can masquerade as the RED.
+
+The exact listing command selected one file and 21 titles. Its JSON/stderr
+SHA-256 values are
+`c337c91edbf483ad7a0e3e9ebf3bd769f570357214fe4d5b6a84430d7c6d6a18`
+and the empty-file hash. The focused command was `pnpm exec vitest run
+tests/phase-6c-retained-heap-red.test.ts --coverage.enabled=false
+--maxWorkers=1 --minWorkers=1 --reporter=json
+--outputFile=.logs/phase-6c-d110au-red/focused.json` and ran exactly once. It
+returned the frozen causal matrix: 21 total, 20 passed, one failed, zero
+pending, zero todo, one result file, and exactly one failed assertion. The sole
+failed title was `calibrates profile clocks without cross-clock absolute
+comparison`; its failure message contains only the intended audit mismatch and
+exact token. The JSON/stdout/stderr SHA-256 values are
+`70896e8cb580849c980ca58fb5dc0a141353fd043dbae72be5908f77e2159903`,
+`09212576de3efda8479869835f70d6641c42b4c4faac5928ea43da825d7765fb`,
+and the empty-file hash.
+
+Exact-owner ESLint with zero warnings, Prettier check, and diff check passed.
+The detached audit returned all six inherited hard-gate facts true and only
+`profileClockCalibration=false`; its JSON/stderr hashes are
+`342ae3af8fc39d863a50301b131450e13d71da5ed443995ede106a0380299452`
+and the empty-file hash. The mechanical audit verifies exact two-path custody,
+unchanged child/worker blobs, absent D.110a-u GREEN root, exact list/result
+counts, sole title/token, zero pending/todo, all inherited facts, 26 stashes,
+and protected roots. Its output and RED diff hashes are
+`b8b808ebc653c37dc95a5e46a3559868af2df591e391118f41f36cf717942ff6`
+and `7efc42840d89c00a91f7dd44121d6418b5ef80c9b72b9bc7cc17c841fbc70648`.
+The self-excluding evidence manifest validates and has SHA-256
+`5807666e1d8b38c0ceb60ac8a4502bc33ce9cf252747ecdeeac8a8ecc2aa49e6`.
+No object, profile, preflight, full worker, product code, dependency, workload,
+threshold, watchdog, or memory contract ran or changed. Deterministic local
+validation closes RED under the accepted simplified protocol; GREEN may now
+change only the frozen four tests-only owners.
