@@ -2,13 +2,20 @@ import "fake-indexeddb/auto";
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
 import { openGenuineCreatorAdoptionFixture } from "./fixtures/phase-6a-v3/creator-adoption-contract.js";
 
 const NODE_SOURCE_PATH = resolve(import.meta.dirname, "../packages/node/src/v3-live.ts");
 const JOURNAL_CONTRACT_PATH = resolve(import.meta.dirname, "../packages/live-journal/src/contract.ts");
 const ADDITIONAL_ROWS = 127;
+
+beforeAll(() => {
+	Object.defineProperty(navigator, "storage", {
+		configurable: true,
+		value: Object.freeze({ estimate: () => Promise.resolve({ quota: 1_000_000_000, usage: 0 }) }),
+	});
+});
 
 function d110apSourceAudit(): Readonly<{
 	readonly ownerUsesBoundedPagination: boolean;
