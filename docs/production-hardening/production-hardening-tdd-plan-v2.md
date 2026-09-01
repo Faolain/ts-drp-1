@@ -89602,3 +89602,14 @@ structural loop bounding, and no unnecessary synthetic malformed-store owner.
 Because the corrections change causal RED acceptance and changed-path custody,
 one confirmation round is required; bookkeeping after that round is not
 reviewed recursively.
+
+The single confirmation round closed with an empty blocking union: Grok
+4.6/high, the standard direct Kimi CLI K3/100-step, and Opus xhigh each returned
+APPROVE with zero P0/P1/P2. The confirmation prompt, Grok public result, Kimi
+raw stream, and Opus raw JSON SHA-256 values are respectively
+`c5a5ca931d88118b9289da0f30679cb1a141de52b3f357ede97579cb9097facc`,
+`b9547326ae204e44a5b8fe3e2ebc2957a6ef06101612372cf194da3e18306a65`,
+`17211068f3841ba4ed14f19b8baae709f9f03c6380bd8c54202921f60970b28f`,
+and `5c5d9c027684a8b6a2afb16a3897324436ff21334e488254c6710a7acd6ea3fe`.
+No further plan confirmation is authorized or required; D.110a-p RED is
+unblocked.
