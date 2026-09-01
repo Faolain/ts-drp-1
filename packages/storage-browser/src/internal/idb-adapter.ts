@@ -970,6 +970,6 @@ export async function createBrowserAheDurableStore(
 	});
 	lifecycle.attach(opaqueDatabase as IDBDatabase);
 	const store = new IdbAheDurableStore(lifecycle);
-	registerBrowserAheReclamationMaintenance(store, lifecycle);
+	registerBrowserAheReclamationMaintenance(store, lifecycle, options.databaseName);
 	return store;
 }

@@ -230,6 +230,41 @@ test-root alias and branded fixture values, including the unchanged companion
 worker; it found no production-source regression and is retained honestly for
 GREEN classification. No model review or retained campaign ran.
 
+## GREEN implementation checkpoint
+
+GREEN adds only the four frozen production owners. The new internal primitive
+owns the exact UTF-8-framed lock name, receiver-preserving request, exclusive
+`ifAvailable` acquisition, 250 ms fallback, and single task promise. The vote
+dispatcher delegates only that advisory step. AHE captures its request first,
+then invokes its unchanged lifecycle entry, recovery turn, classification,
+strict transaction, post-state check, and receipt inside the task. The adapter
+passes the exact database name it already owns. No package export, dependency,
+schema, threshold, or public option changed.
+
+The final executable gates passed:
+
+- focused Chromium D.109e: 6/6;
+- complete Chromium/Firefox/WebKit D.109e: 18/18;
+- retained Phase-5c across all engines: 25 passed and the two frozen
+  non-Chromium death-test skips, with no unexpected/flaky/top-level error;
+- retained D.109c Chromium: 4/4;
+- storage-browser build, exact-owner ESLint, Prettier, source/export checks, and
+  `git diff --check`: pass; and
+- whole-package typecheck: the same tests-root-only alias/branded-fixture debt,
+  with zero error in any frozen production owner.
+
+A supplemental, non-frozen default package Vitest sweep was also retained
+honestly. It remained nonzero on historical packed-consumer timing gates,
+pre-existing stale additive-export snapshots, and the tests-root raw-IDB/type
+audit already made nonzero by the D.109c browser assets; its nested clean-copy
+test repeated those same failures. No D.109e browser or production assertion
+failed. These unrelated results do not authorize timing, export, ownership-
+policy, or product changes in this slice.
+
+Evidence is rooted at `.logs/phase-6b-d109e-green/`. The signed/pushed GREEN
+head is the input to the sole formal Grok/Kimi/Opus plan → RED → GREEN review;
+D.109e remains open until that review has an empty P0/P1 union.
+
 ## Exit
 
 D.109e closes only when every lock/lifecycle mode attempts the same eligible

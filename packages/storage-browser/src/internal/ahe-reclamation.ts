@@ -19,6 +19,7 @@ import {
 	createAheReclamationReceipt,
 } from "@ts-drp/storage/maintenance";
 
+import { runInternalPrimaryDispatch } from "./primary-dispatch.js";
 import {
 	PHASE_2D_BLOBS_STORE,
 	PHASE_2D_GENERATIONS_STORE,
@@ -171,11 +172,22 @@ async function loadSnapshot(transaction: IDBTransaction, objectId: string): Prom
 class BrowserAheReclamationMaintenance implements AheReclamationMaintenance {
 	public constructor(
 		private readonly store: AheDurableStore,
-		private readonly lifecycle: BrowserAheReclamationLifecycle
+		private readonly lifecycle: BrowserAheReclamationLifecycle,
+		private readonly databaseName: string
 	) {}
 
 	public async reclaimClosedEpoch(input: unknown): Promise<AheReclamationReceipt> {
 		const captured = captureAheReclamationInput(input);
+		return runInternalPrimaryDispatch({
+			databaseName: this.databaseName,
+			identity: "ahe-reclamation:v1",
+			task: () => this.reclaimCaptured(captured),
+		});
+	}
+
+	private async reclaimCaptured(
+		captured: ReturnType<typeof captureAheReclamationInput>
+	): Promise<AheReclamationReceipt> {
 		const database = this.lifecycle.startOperation();
 		if (database === undefined) {
 			throw createAheReclamationError("AHE_RECLAMATION_STORE_CLOSED", "store is closed");
@@ -276,12 +288,14 @@ class BrowserAheReclamationMaintenance implements AheReclamationMaintenance {
  * Registers maintenance authority for one genuine IndexedDB facade.
  * @param store - Exact facade identity.
  * @param lifecycle - Owning facade lifecycle controls.
+ * @param databaseName - Exact adapter-owned database identity.
  */
 export function registerBrowserAheReclamationMaintenance(
 	store: AheDurableStore,
-	lifecycle: BrowserAheReclamationLifecycle
+	lifecycle: BrowserAheReclamationLifecycle,
+	databaseName: string
 ): void {
-	maintenanceByStore.set(store, new BrowserAheReclamationMaintenance(store, lifecycle));
+	maintenanceByStore.set(store, new BrowserAheReclamationMaintenance(store, lifecycle, databaseName));
 }
 
 /**

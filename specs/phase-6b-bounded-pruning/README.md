@@ -296,3 +296,12 @@ zero flaky results, and zero top-level errors. Evidence is rooted at
 `.logs/phase-6b-d109e-red/`. The checkpoint is tests-only; production remains
 unchanged, and D.109e GREEN is now open over exactly the four frozen internal
 owners.
+
+D.109e GREEN is now implemented over exactly those four internal owners. The
+final gates are green: focused Chromium 6/6, all-engine D.109e 18/18, retained
+Phase-5c 25 passed with its two expected non-Chromium death-test skips, retained
+D.109c Chromium 4/4, and all build/exact-owner static gates. Whole-package
+typecheck remains nonzero only on the inherited tests-root alias/branded-fixture
+set and contains no frozen production owner. Evidence is rooted at
+`.logs/phase-6b-d109e-green/`; sign/push this GREEN, then run the one formal
+Grok/Kimi/Opus history review before closure.

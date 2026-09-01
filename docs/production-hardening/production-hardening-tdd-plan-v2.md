@@ -89000,3 +89000,40 @@ reporter JSON, commands, hashes, and self-excluding manifest are rooted at
 `.logs/phase-6b-d109e-red/`. RED changes no production source. D.109e GREEN is
 open only for the four frozen internal owners; no separate RED model review is
 required.
+
+#### D.109e GREEN implementation checkpoint
+
+GREEN changes exactly the four frozen internal production owners. New
+`primary-dispatch.ts` is the sole package-runtime owner of the UTF-8-length-
+framed advisory name, receiver-preserving LockManager request, exact exclusive
+`ifAvailable` options, `LOCK_TIMEOUT_MILLISECONDS = 250`, and one shared task
+promise that prevents late grants or acquisition rejections from re-entering
+work. The Phase-5c dispatcher retains its queue, scan, publication, dispatched
+marking, overflow, and close behavior while delegating only this runner. AHE
+captures the detached request before dispatch; its lifecycle start/recovery
+turn, current snapshot classification, strict transaction, post-state check,
+and immutable receipt all remain inside the dispatched task. The adapter passes
+the exact database name it already owns.
+
+Final executable results are focused Chromium D.109e 6/6; complete D.109e
+Chromium/Firefox/WebKit 18/18; retained Phase-5c all engines 25 passed plus the
+two frozen non-Chromium death-test skips, unexpected=0/flaky=0/top-level
+errors=0; and retained D.109c Chromium 4/4. Storage-browser build, exact-owner
+ESLint, Prettier, source/export singleton checks, and `git diff --check` pass.
+Whole-package typecheck remains nonzero only in the inherited test-root
+maintenance aliases and branded D.109c/issuance fixture values; none of the
+four production owners appears in its error set.
+
+An additional default-package Vitest sweep was diagnostic rather than a frozen
+D.109e gate. It retained unrelated historical failures: packed-consumer timing
+assertions, stale snapshots that omit already-accepted additive exports, and
+the test-root raw-IDB/type audit already nonzero at the signed tests-only RED;
+its nested clean-copy test repeats the same set. No D.109e test or production
+owner failed. This evidence does not widen D.109e to change timing contracts,
+old export snapshots, raw-IDB governance, or product behavior.
+
+Complete reporter JSON, static outputs, source hashes, command results, and the
+self-excluding manifest are rooted at `.logs/phase-6b-d109e-green/`. Sign and
+push this GREEN checkpoint, then run the sole formal Grok 4.6/high, standard
+Kimi CLI K3/high/100-step, and Opus xhigh plan → RED → GREEN review. D.109e
+remains open until that review has an empty P0/P1 union. No campaign runs.

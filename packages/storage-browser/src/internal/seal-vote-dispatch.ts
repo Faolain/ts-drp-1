@@ -1,3 +1,4 @@
+import { runInternalPrimaryDispatch } from "./primary-dispatch.js";
 import { type InternalSealVoteStore, type PendingVoteRow, type StoredSealCarrier } from "./seal-vote-store.js";
 
 export interface VoteDispatchResult {
@@ -13,14 +14,9 @@ interface VoteDispatcherInput {
 }
 
 const DISPATCH_CONCURRENCY = 4;
-const LOCK_TIMEOUT_MILLISECONDS = 250;
 
 function encodedKey(row: PendingVoteRow): string {
 	return JSON.stringify([row.objectId, row.epoch, row.round, row.phase, row.signerId]);
-}
-
-function lockName(databaseName: string): string {
-	return `ts-drp:seal-vote:v2:${new TextEncoder().encode(databaseName).length}:${databaseName}`;
 }
 
 /**
@@ -80,49 +76,17 @@ export function createInternalVoteDispatcher(input: VoteDispatcherInput): Readon
 		tail = tail
 			.catch(() => undefined)
 			.then(async () => {
-				const locks = Reflect.get(navigator, "locks") as unknown;
-				const request =
-					locks !== null && typeof locks === "object" ? (Reflect.get(locks, "request") as unknown) : undefined;
-				const runPublish = async (): Promise<void> => {
-					try {
-						resolveResult(await publishRows());
-					} catch (error) {
-						rejectResult(error);
-					}
-				};
-				if (typeof request !== "function") {
-					await runPublish();
-					return;
-				}
-				let settled = false;
-				let timer: ReturnType<typeof setTimeout> | undefined;
-				const fallback = async (): Promise<void> => {
-					if (settled) return;
-					settled = true;
-					await runPublish();
-				};
 				try {
-					timer = setTimeout(() => void fallback().catch(rejectResult), LOCK_TIMEOUT_MILLISECONDS);
-					const requested = Reflect.apply(request, locks, [
-						lockName(input.databaseName),
-						{ ifAvailable: true, mode: "exclusive" },
-						async (lock: unknown): Promise<void> => {
-							if (settled) return;
-							if (lock === null || lock === undefined) {
-								await fallback();
-								return;
-							}
-							settled = true;
-							clearTimeout(timer);
-							await runPublish();
-						},
-					]);
-					void Promise.resolve(requested).catch(async () => fallback());
-				} catch {
-					await fallback();
+					resolveResult(
+						await runInternalPrimaryDispatch({
+							databaseName: input.databaseName,
+							identity: "seal-vote:v2",
+							task: publishRows,
+						})
+					);
+				} catch (error) {
+					rejectResult(error);
 				}
-				await result;
-				clearTimeout(timer);
 			});
 		return result;
 	};
