@@ -229,6 +229,27 @@ green and the sole readiness assertion fails with
 RED contains no production edit and is signed/pushed with a validating
 self-excluding evidence manifest.
 
+### RED evidence
+
+The corrected plan/confirmation gate is signed and pushed at
+`e2ef3fbdf66deb138eaefde72abe1e23e9e46fe1`. RED adds exactly the two frozen
+tests-only owners and no production edit. Its accepted focused reporter
+selected one file and twelve declared tests: four control assertions passed,
+seven GREEN-only semantic tests were skipped by the composite readiness gate,
+and the sole failure was the readiness assertion with exact token
+`D109D_RUNTIME_RECLAMATION_MISSING`. There were no top-level errors or other
+soft failures. The non-consuming listing selected the same one file and its
+five active RED assertions.
+
+One earlier collection attempt is preserved and rejected as noncausal evidence:
+an unescaped `}` in a test-only source-shape regex caused zero tests to collect.
+Only that diagnostic was corrected; it was not treated as a product or
+semantic failure. Exact-owner ESLint, Prettier, diff, changed-path, protected-
+path, 26-stash, and source-owner hash checks pass. No retained campaign ran.
+The complete RED evidence root is `.logs/phase-6b-d109d-red/`; its validating
+self-excluding manifest SHA-256 is
+`290c2cccbbdccc23ced7d91492e305d14ef82cf6380e006b4dea61201ee36874`.
+
 ## GREEN and gates
 
 The prospective GREEN path set is limited to:

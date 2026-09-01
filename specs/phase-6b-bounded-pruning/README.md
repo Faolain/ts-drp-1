@@ -14,8 +14,12 @@ the active plan-review checkpoint. Its first review found material receipt
 coverage, replay, precedence, hot-link, and creator-close owner gaps. The one
 confirmation found one additional narrow replay-latch omission: stable
 issuance `observedLineage` and AHE `reclaimedGenerationIds` prefix authority.
-That exact correction and its deterministic audit must be signed/pushed before
-the deterministic causal RED begins; no further plan-review round is opened.
+That exact correction and its deterministic audit are signed/pushed at
+`e2ef3fbdf66deb138eaefde72abe1e23e9e46fe1`. The deterministic RED now has
+exactly one causal failure, `D109D_RUNTIME_RECLAMATION_MISSING`, with all four
+controls passing and seven GREEN-only assertions readiness-skipped. Sign/push
+the RED checkpoint, then implement only the frozen three-owner GREEN; no
+further plan-review or separate RED-review round is opened.
 
 Global TODO:
 

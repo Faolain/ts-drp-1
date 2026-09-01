@@ -88707,3 +88707,32 @@ stable authority fields, exact outcome-field roster, three production owners,
 all three terminal review results, zero Kimi subagents, documentation-only
 tracked diff, formatting/diff status, 26 preserved stashes, and all protected
 untracked paths.
+
+#### D.109d deterministic causal RED
+
+The corrected plan and confirmation gate is signed and pushed at
+`e2ef3fbdf66deb138eaefde72abe1e23e9e46fe1`. RED adds exactly
+`tests/fixtures/phase-6b/runtime-reclamation-contract.ts` and
+`tests/phase-6b-runtime-reclamation-red.test.ts`; no production source changed.
+It freezes the exact input/result/error/precedence contracts, 27 receipt
+mutants, seven identity mutants, fourteen replay-authority mutants, the exact
+five replay-outcome fields, and 22 census keys. In particular,
+`issuance-observed-lineage` and `ahe-reclaimed-generation-ids` are authority
+mutants and are absent from the replay-outcome roster.
+
+The first focused command is preserved but rejected as causal evidence because
+a test-only source-shape regex used an unescaped `}`, causing collection to
+stop with zero tests. The corrected replacement command selected one file and
+twelve declared tests: four controls passed, seven GREEN-only semantic tests
+were readiness-skipped, and the sole failure was exactly
+`D109D_RUNTIME_RECLAMATION_MISSING`. No top-level or additional soft failure
+occurred. The non-consuming listing selected the same file and five active RED
+assertions. Exact-owner lint/format/diff, changed-path, source-hash, protected-
+path, and 26-stash checks pass; no retained campaign ran.
+
+The complete RED evidence is rooted at `.logs/phase-6b-d109d-red/`; its
+validating self-excluding manifest SHA-256 is
+`290c2cccbbdccc23ced7d91492e305d14ef82cf6380e006b4dea61201ee36874`.
+Under the prospective simplified review policy, no separate three-model RED
+review runs. The final GREEN review must inspect this signed RED diff and
+evidence and confirm its causal transition.
