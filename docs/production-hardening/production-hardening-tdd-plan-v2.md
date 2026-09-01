@@ -88547,3 +88547,57 @@ SHA-256 is
 `44971c03dce649d0886b2bebf943044aa55178499ede15155cc363f7b4d2692b`.
 D.109c is closed on this signed record; D.109d may begin. No retained campaign
 was authorized or executed.
+
+#### D.109d bounded plan and installed-runtime ownership correction
+
+D.109d inherits signed/pushed D.109c closure
+`f5e76815df5201678f69934a1fc53eb0bf51a1a6` without reopening any earlier
+plan, RED, GREEN, review, or evidence. The detailed executable plan is
+`specs/phase-6b-bounded-pruning/slices/03-runtime-reclamation.md`.
+
+The pre-plan source audit found that the earlier Phase-6b outline attributed
+the installed v3 graph/state owner incorrectly. `packages/node/src/v3-live.ts`
+imports no `@ts-drp/object` code: it directly owns the active and displaced
+v3 `CausalityIndex`, application maps, blueprint machine, pending ingress,
+quarantine, publication and rebase structures. The legacy/general
+`DRPObject`/`HashGraph.compactPayloadHistory()` machinery is a separate runtime
+with already-shipped compact-history behavior. D.109d therefore supersedes
+only the prospective false statement that installed v3 orchestrates that
+object owner; it does not alter historical evidence or any legacy object,
+known-hash, finality, snapshot, checkpoint, frontier, forward-edge, or
+vertex-distance behavior.
+
+The corrected slice consumes exact D.109b and D.109c receipts through one
+package-internal owner resolved only from a genuine current successor handle.
+It validates common object/closed-epoch identity, exact successor epoch,
+issuance scope, snapshot-manifest digest from the authenticated successor
+projection, commit-QC reference membership in the adopted closure, frozen
+availability policy, and exact adopted AHE head. It serializes behind the
+existing registration gate, then releases only the successor's displaced
+predecessor authentication/rebase retention and, for a hot same-topic handoff,
+compacts the retired predecessor registration to its authenticated anchor
+before severing that link. Cold reopen has no retired registration and releases
+only its reconstructed displaced source. The current successor's graph,
+canonical blueprint state, ACL, pending/quarantine/publication state, stores,
+transport, queue, topic and handle remain unchanged; durable journals and
+legacy finality remain untouched.
+
+The frozen refusal vocabulary is `D109D_INVALID_ARGUMENT`,
+`D109D_RECEIPT_MISMATCH`, `D109D_IDENTITY_MISMATCH`,
+`D109D_RUNTIME_NOT_READY`, and `D109D_INTERNAL_INVARIANT`, with zero writes on
+every refusal. The exact RED owners are
+`tests/fixtures/phase-6b/runtime-reclamation-contract.ts` and
+`tests/phase-6b-runtime-reclamation-red.test.ts`; the prospective production
+owners are only `packages/node/src/internal/runtime-reclamation.ts` and
+`packages/node/src/v3-live.ts`. A required edit to creator activation,
+`@ts-drp/object`, a public surface, durable store/schema, live-journal deletion,
+dependency, threshold, or protocol authority stops this slice for a reviewed
+reslice rather than widening GREEN silently. The inherited stale
+`activeOwners` repeated-rollover P2 remains outside D.109d and must be proved or
+causally resliced by D.109f.
+
+This runtime-release plan receives one signed/pushed Grok 4.6/high, standard
+Kimi CLI K3/high with `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review
+before RED. Kimi is not replaced by Codex/Sol; if Grok cancels, resume the exact
+session. Only P0/P1 blocks. D.109d runs no retained campaign, Fable, or
+collaboration subagent.

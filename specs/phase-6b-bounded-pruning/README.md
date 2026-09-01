@@ -7,9 +7,11 @@ Status (2026-09-01): D.109a eligibility, D.109b issuance retention, and
 signed/pushed GREEN is `3d21264f4477fb5ff586047826ebd49e15d20bde`;
 Grok 4.6/high, standard Kimi K3/high/100-step, and Opus xhigh unanimously
 approved it with an empty P0/P1 union. Its plan, RED, GREEN, review, and
-evidence are accepted and must not be reopened. Freeze and review
-[D.109d runtime reclamation](slices/03-runtime-reclamation.md), then execute
-its deterministic causal RED before production runtime reclamation work.
+evidence are accepted and must not be reopened. The bounded
+[D.109d installed-v3 runtime reclamation](slices/03-runtime-reclamation.md)
+plan corrects the earlier false `@ts-drp/object` ownership assumption and is
+the active plan-review checkpoint. Do not begin its deterministic causal RED
+until that signed/pushed review gate closes.
 
 Global TODO:
 
@@ -54,14 +56,15 @@ valid outbox classification.
 
 ## Existing owners and gaps
 
-| Concern                                                | Existing sole owner                                             | Phase-6b rule                                                                                                                |
-| ------------------------------------------------------ | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| AHE head, generations, promotions, blobs               | `@ts-drp/storage` plus Node/IDB adapters                        | Add one bounded physical-reclamation command; never infer QC or availability in the adapter.                                 |
-| Issued rows and issuance outbox                        | `@ts-drp/issuance-store` plus dedicated Node/IDB adapters       | Classify canonical preimages in the owning transaction; pending or malformed old-epoch rows block deletion.                  |
-| Verified close and successor adoption                  | `@ts-drp/node` creator close/adoption owners                    | Supply authenticated facts to the cleanup planner; do not duplicate verification.                                            |
-| Runtime graph, state snapshots, checkpoints and caches | `@ts-drp/object`; v3 pending/sync inventories in `@ts-drp/node` | The installed v3 runtime orchestrates both owners after durable cleanup receipts; neither owner can mint deletion authority. |
-| Browser primary dispatch                               | Phase-5c internal vote dispatcher                               | Extract/reuse its one advisory lock runner; do not add a second election protocol.                                           |
-| Legacy finality                                        | `FinalityStore`                                                 | Preserved until Phase 6d defines post-expiry behavior.                                                                       |
+| Concern                                              | Existing sole owner                                       | Phase-6b rule                                                                                                                                         |
+| ---------------------------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AHE head, generations, promotions, blobs             | `@ts-drp/storage` plus Node/IDB adapters                  | Add one bounded physical-reclamation command; never infer QC or availability in the adapter.                                                          |
+| Issued rows and issuance outbox                      | `@ts-drp/issuance-store` plus dedicated Node/IDB adapters | Classify canonical preimages in the owning transaction; pending or malformed old-epoch rows block deletion.                                           |
+| Verified close and successor adoption                | `@ts-drp/node` creator close/adoption owners              | Supply authenticated facts to the cleanup planner; do not duplicate verification.                                                                     |
+| Installed-v3 closed runtime retention                | retired/displaced registrations in `@ts-drp/node`         | After matching durable receipts, release only predecessor graph/state/classification retention; the live successor remains byte- and identity-stable. |
+| Legacy/general graph, snapshots, checkpoints, caches | `@ts-drp/object`                                          | It is not bound into the installed v3 plane and remains byte-identical in Phase 6b; do not invent a cross-runtime reclamation bridge.                 |
+| Browser primary dispatch                             | Phase-5c internal vote dispatcher                         | Extract/reuse its one advisory lock runner; do not add a second election protocol.                                                                    |
+| Legacy finality                                      | `FinalityStore`                                           | Preserved until Phase 6d defines post-expiry behavior.                                                                                                |
 
 The current AHE database, issuance database, snapshot quarantine, and runtime
 memory are distinct owners. Safety therefore comes from monotone epoch closure,
@@ -111,8 +114,9 @@ owner lifecycle failure deletes nothing in that owner.
    blobs while retaining the active generation plus its two immediate complete
    `baseExpectedHead` rollback ancestors.
 4. [D.109d runtime reclamation](slices/03-runtime-reclamation.md): after both
-   durable receipts, compact graph payload/index history, state snapshots,
-   checkpoints, and v3 pending/sync inventories; preserve legacy finality.
+   durable receipts, release the installed v3 successor's displaced-source
+   retention and compact any hot retired predecessor registration; preserve
+   the current successor and all legacy/general object/finality behavior.
 5. [D.109e browser scheduling](slices/04-browser-scheduling.md): reuse the exact
    Phase-5c advisory primary-dispatch runner and prove lock-mode equivalence.
 6. [D.109f differential exit](slices/05-differential-exit.md): ≥100-epoch
