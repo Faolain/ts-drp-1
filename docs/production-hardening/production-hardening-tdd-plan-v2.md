@@ -90514,16 +90514,17 @@ owners, and per-phase leaf-self owner rankings using the same URL/runtime
 classification and unchanged at-least-50-percent plus at-least-two-times owner
 rule as D.110a-u.
 
-The decision matrix is closed before analysis. A phase/owner result is accepted
-only when the same phase is at least half of full attributed time under every
-mapping and the same owner is dominant inside it under every mapping. A stable
-tests-only owner yields a narrow fixture-optimization plan; a stable product
-owner yields a narrow product-optimization plan. A stable dominant phase with
-mixed owners yields one phase-level feasibility plan. No stable phase, input
-unavailability, or mapping sensitivity yields one high-risk workload/watchdog
-feasibility-contract plan. Every branch records the measured one-object time
-and non-measured serial 64-object projection, chooses exactly one successor,
-and forbids another profiling loop.
+The decision matrix is closed before analysis as a first-match cascade. Input
+failure or any cross-mapping disagreement on phase identity/dominance or owner
+identity/dominance selects the high-risk feasibility-contract branch. With
+stable mapping results, the same at-least-half phase and same dominant owner
+select a narrow optimization only when the owner is a repository `tests/` or
+first-party `packages/` URL. Stable runtime, `node:`, third-party, other
+pathless, or mixed owners select phase-level feasibility; all-five agreement
+that no phase reaches half selects whole-lifecycle high-risk feasibility.
+Every branch records the measured one-object time and non-measured serial
+64-object projection, chooses exactly one successor, and forbids another
+profiling loop.
 
 This bounded plan is signed/pushed before one Grok, standard direct Kimi
 K3/100-step, and Opus xhigh plan review. Only material P0/P1 findings about
@@ -90532,3 +90533,53 @@ empty blocking union, the offline analysis runs exactly once, its deterministic
 JSON and self-excluding manifest are signed/pushed, and the one final
 three-model evidence review closes the slice. Fable and collaboration
 subagents remain prohibited.
+
+##### D.110a-v initial plan review and bounded correction
+
+The one plan review inspected signed/pushed anchor
+`c81d3f10651f3ec1d3be443daea4ec9d8b87d9c2`, tree
+`2753c7d69c7fa12a56cdf4b9742c33c33cd19e1b`. The shared prompt SHA-256 is
+`0fac998ac9937dfb9314552fd7a0dc11226590a14578d2be9edb21cbd6a8a204`.
+All three reviewers verified the exact immutable input hashes, coherent five-
+mapping clock method, exact-sample conservation design, D.110a-u owner
+grouping, and zero process/source authority. The only blocking union concerns
+the closed decision matrix.
+
+Grok 4.6/high session `01a05e0c-7c4b-72b1-9b89-e59082a06525` returned
+`CHANGES_REQUIRED`, P0=0, P1=2, P2=2. Its events/terminal SHA-256 values are
+`47cb7238e55ad22130de9d0cd14ecba596d38a52202cc7020bd30aa1a1331bd3`
+and
+`f727000e2b6cfdf76a961873da42b19c3430b7047b8592deb0bdce0c4fd06a16`;
+stderr is empty. Standard direct Kimi K3/100-step returned
+`CHANGES_REQUIRED`, P0=0, P1=1, P2=1. Its stream/terminal SHA-256 values are
+`d7202cc22a2b20bef9d2ba2b074caeae0cfe92f33a47f51bbc6bdbf57086f7bd`
+and
+`b3cc42552bad47c04c2d27f1cd1d98ffa99ecb9b5c1ec25098a8d2532b7c6860`.
+Opus xhigh session `dcff799c-448f-4b5d-89de-7161a20be480` returned
+`CHANGES_REQUIRED`, P0=0, P1=2, P2=3. Its result/terminal SHA-256 values are
+`0b17cf3d543daecf231772038fb2de504c12f4608d6db703fb6fe50ff7653719`
+and
+`8ebd96cfd7ab3f399749dc7a83629ca31765c4e15356a68f84a842168edc2d41`;
+stderr is empty. The self-excluding initial-review manifest validates with
+SHA-256
+`60c06e09204ab510c71f71add4b2f0513142cc91b537f95da2da2cab80363678`.
+
+The correction adopts the complete material union in one batch. The matrix is
+now an explicit first-match cascade: validation failure or any disagreement
+across mappings on phase identity, phase-dominance boolean, owner identity, or
+owner-dominance boolean selects unavailable/high-risk feasibility before any
+other branch. A stable dominant owner is actionable as an optimization owner
+only for repository `tests/` or first-party `packages/` file URLs. Stable
+`[runtime]`, `node:`, third-party `node_modules`, other pathless, or mixed
+owners route to phase-level feasibility and cannot be mislabeled as a product
+bug. All-five stable absence of a half-capture phase routes to whole-lifecycle
+high-risk feasibility. The branches are disjoint and total.
+
+The useful P2 precision is included without expanding scope: capture start/end
+are bound exactly to profile start/end, and the affine formula uses explicit
+`Math.round` to integer microseconds. The application phase remains explicitly
+distinct from D.110a-u's narrower named-function ancestry interval. The frozen
+input already places all 35 mapped boundaries strictly inside the profile, so
+no clamping or new acceptance behavior is needed. These corrections materially
+change executable branch selection; one confirmation of the corrected
+signed/pushed plan is permitted. No further plan round is allowed afterward.
