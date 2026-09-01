@@ -88413,3 +88413,27 @@ changes executable scope beyond the already-confirmed P1 correction.
 The corrected-plan P0/P1 union is empty. The D.109c plan gate is closed; seal
 this confirmation evidence, sign/push the closure record, and proceed directly
 to the frozen tests-only RED. No further plan review is authorized.
+
+The deterministic tests-only RED is closed at signed/pushed commit
+`84cff9ceaa6620c2ed8d1baa3a358ad9b018bb94`. The corrected focused Vitest
+selection covered two files and 38 tests: six controls passed, the exact
+`D109C_SHARED_MAINTENANCE_MISSING` and `D109C_NODE_MAINTENANCE_MISSING`
+readiness assertions failed, and 30 semantic bodies skipped. The focused
+Chromium selection covered one file and four tests: the exact
+`D109C_BROWSER_MAINTENANCE_MISSING` readiness assertion failed, three semantic
+bodies skipped, none was flaky, and no top-level error occurred. The retained
+five-file selection discovered 53 tests, selected and passed 15, filtered 38,
+and failed none. An initial 5-pass/3-fail/30-skip Vitest diagnostic is retained
+honestly: its extra failure was a faulty test-only prototype-key check, which
+was corrected to the frozen 12-key facade before the accepted RED run.
+
+The 20-entry self-excluding evidence manifest under
+`.logs/phase-6b-d109c-red/` validates with SHA-256
+`d0745b39302d2e17437aea78ff8622ebb6bbc277fc20360fd8e67f33f924ca2f`.
+It covers complete reporters, stdout/stderr, the browser attachment, command
+statuses, environment, production pins, and exact RED/census source hashes.
+ESLint, Prettier, child syntax, source diff, manifest, protected-path, 26-stash,
+process, and fixed-port checks passed. No product source, package manifest,
+lockfile, reviewer, collaboration subagent, retained campaign, or Fable run
+changed RED. Proceed to the two frozen GREEN batches; deterministic RED gets no
+separate model review.

@@ -6,13 +6,12 @@ Status (2026-08-31): D.109a eligibility and D.109b issuance retention are
 closed. D.109b's signed/pushed GREEN and final-review anchors are respectively
 `529367b154ffd3fb66bf31a6cfedb4a0d9b73746` and
 `2afadbe682261bdb311a5cb64f6f42d86ed7330b`; their plan, RED, GREEN, reviews,
-and evidence are accepted and must not be reopened. Freeze, sign, push, and
-review [D.109c AHE reclamation](slices/02-ahe-reclamation.md). Its initial plan
-review found two accepted P1 corrections: the ephemeral memory facade is not a
-reclamation owner, and four live export-census tests require explicit tests-
-only custody. Corrected-plan confirmation is unanimously approved with an
-empty P0/P1 union. Seal/sign/push that confirmation record, then execute the
-frozen tests-only causal RED before adding any AHE deletion path.
+and evidence are accepted and must not be reopened. The deterministic RED for
+[D.109c AHE reclamation](slices/02-ahe-reclamation.md) is signed/pushed at
+`84cff9ceaa6620c2ed8d1baa3a358ad9b018bb94`: only the three frozen missing-owner
+tokens failed and the retained selection passed. Implement the shared contract
+and classifier GREEN batch next; do not add native physical deletion until its
+focused shared gate passes.
 
 Global TODO:
 

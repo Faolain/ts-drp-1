@@ -304,6 +304,26 @@ RED also retains the D.109a planner positive/refusal matrix and its dangling-
 parent oracle. It does not claim production behavior for skipped semantics and
 does not run a retained campaign.
 
+## Deterministic RED checkpoint
+
+The signed/pushed RED anchor is
+`84cff9ceaa6620c2ed8d1baa3a358ad9b018bb94`. The accepted focused Vitest run
+selected two files and 38 tests: six controls passed, only the shared and Node
+missing-owner readiness assertions failed, and 30 semantic bodies skipped. The
+focused Chromium run selected one file and four tests: only the browser
+missing-owner readiness assertion failed, three semantic bodies skipped, none
+was flaky, and no top-level error occurred. The retained five-file selection
+passed all 15 selected tests. The first Vitest diagnostic's extra failure was a
+faulty public-facade shape check and is retained separately from the corrected
+causal result.
+
+The complete evidence is rooted at `.logs/phase-6b-d109c-red/`; its 20-entry
+self-excluding manifest SHA-256 is
+`d0745b39302d2e17437aea78ff8622ebb6bbc277fc20360fd8e67f33f924ca2f`.
+Product sources, package manifests, the lockfile, protected paths, and all 26
+stashes remained unchanged. No campaign or reviewer ran. RED therefore closes
+causally and releases only the frozen GREEN implementation below.
+
 ## GREEN implementation batches
 
 One D.109c GREEN checkpoint uses two diagnostic batches without an intermediate
