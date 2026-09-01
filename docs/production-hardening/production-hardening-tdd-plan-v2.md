@@ -89037,3 +89037,37 @@ self-excluding manifest are rooted at `.logs/phase-6b-d109e-green/`. Sign and
 push this GREEN checkpoint, then run the sole formal Grok 4.6/high, standard
 Kimi CLI K3/high/100-step, and Opus xhigh plan → RED → GREEN review. D.109e
 remains open until that review has an empty P0/P1 union. No campaign runs.
+
+#### D.109e final review and single GREEN correction
+
+The sole formal review of signed/pushed GREEN
+`c84d4589b4993850033c6dfa1d4f094a66debb78` completed normally. Grok
+4.6/high, standard Kimi CLI K3/high/100-step, and Opus xhigh all returned
+`APPROVED`, P0 none, P1 none, and `D109E_GREEN_CLOSABLE: yes`. Original outputs
+and the union remain preserved under `.logs/phase-6b-d109e-final-review/`.
+
+One Grok P2 is adopted because it directly preserves the frozen Phase-5c close
+contract. Before extraction, failed publication rejected the public `result`
+and `tail` then awaited that rejection; `close()` therefore observed the
+failure. GREEN still rejected `drain()`, but its catch settled the public promise
+without awaiting it, allowing the internal tail—and thus `close()`—to resolve.
+The single permitted correction restores only `await result` after the catch.
+No election, task, queue, durable row, timeout, name, AHE behavior, public API,
+or dependency changes.
+
+All frozen gates were rerun after the correction: focused Chromium D.109e 6/6;
+all-engine D.109e 18/18; retained Phase-5c 25 plus the two expected
+non-Chromium death-test skips; retained D.109c Chromium 4/4; and build,
+exact-owner lint/format/source/diff checks green. Whole-package typecheck has
+the same three tests-only files and inherited error classes, although the
+frozen D.109e fixture adds further test-only instances of those classes; no
+production owner appears.
+
+The other P2s are recorded without scope expansion: stale-late sampling is
+backed by structural task-promise memoization; the duplicate null/grant branch
+is cosmetic; Phase-5c identity shares the sole framing owner and passes its
+retained suite; literal source matching and native-capability surfacing are
+evidence-strength limitations; and pre-correction artifacts remain preserved.
+Correction evidence is rooted at `.logs/phase-6b-d109e-green-correction/`.
+Sign/push this one-line correction and run the one permitted bounded
+Grok/Kimi/Opus confirmation. No campaign runs.

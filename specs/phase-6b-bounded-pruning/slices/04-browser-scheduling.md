@@ -265,6 +265,28 @@ Evidence is rooted at `.logs/phase-6b-d109e-green/`. The signed/pushed GREEN
 head is the input to the sole formal Grok/Kimi/Opus plan → RED → GREEN review;
 D.109e remains open until that review has an empty P0/P1 union.
 
+## Final review and single correction
+
+Grok 4.6/high, standard Kimi CLI K3/high/100-step, and Opus xhigh each approved
+the signed/pushed GREEN with no P0/P1 and marked D.109e closable. The preserved
+union is `.logs/phase-6b-d109e-final-review/review-union.md`.
+
+One Grok P2 exposed a genuine close-preservation detail: the extracted vote
+runner still rejected `drain()` on publication failure, but the consumer's
+internal `tail` resolved because its catch settled the public promise without
+then awaiting it. Before extraction, `tail` awaited the rejected public result,
+so `close()` observed that rejection. The single permitted correction restores
+the exact `await result` after the catch. It changes no scheduling, work,
+threshold, API, or AHE behavior.
+
+After that one-line correction, every frozen executable gate was rerun: focused
+Chromium 6/6, all-engine D.109e 18/18, retained Phase-5c 25 plus the two expected
+skips, retained D.109c 4/4, build/static gates green, and the same tests-only
+typecheck file/class set. Correction evidence is rooted at
+`.logs/phase-6b-d109e-green-correction/`. The corrected signed/pushed commit now
+receives the one permitted bounded confirmation; no other P2 expands this
+slice.
+
 ## Exit
 
 D.109e closes only when every lock/lifecycle mode attempts the same eligible

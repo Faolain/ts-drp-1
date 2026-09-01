@@ -305,3 +305,12 @@ typecheck remains nonzero only on the inherited tests-root alias/branded-fixture
 set and contains no frozen production owner. Evidence is rooted at
 `.logs/phase-6b-d109e-green/`; sign/push this GREEN, then run the one formal
 Grok/Kimi/Opus history review before closure.
+
+That final review completed with three approvals and an empty P0/P1 union. A
+Grok P2 correctly observed that failed publication no longer rejected the
+consumer's internal tail, which could change Phase-5c `close()` behavior even
+though `drain()` still rejected. The single correction restores the original
+`await result` tail behavior. All D.109e and retained browser/static gates pass
+again; correction evidence is rooted at
+`.logs/phase-6b-d109e-green-correction/`. One bounded confirmation of this exact
+correction is now pending; no other review P2 widens D.109e.

@@ -87,6 +87,7 @@ export function createInternalVoteDispatcher(input: VoteDispatcherInput): Readon
 				} catch (error) {
 					rejectResult(error);
 				}
+				await result;
 			});
 		return result;
 	};
