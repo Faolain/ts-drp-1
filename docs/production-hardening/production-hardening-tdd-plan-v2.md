@@ -89100,37 +89100,69 @@ D.109f inherits signed/pushed D.109e closure
 Its executable specification is
 `specs/phase-6b-bounded-pruning/slices/05-differential-exit.md`.
 
-The slice runs one seeded 128-epoch archival-versus-compacted differential for
-both Discord-shaped and MMORPG-shaped histories. At every epoch and across
-fresh-process reopen it compares application digest, ACL, frontier, operation
-counts, anchor/head identity, restart result, publication/ingress, and the next
-live write. Test-owned raw-dependency classification makes any lookup of a
-deleted issued preimage, AHE blob, displaced source, creator-close duplicate,
-or old snapshot dependency fail immediately; final-state equality alone is not
-sufficient. Exact censuses cover every Phase-6b durable/runtime structure and
-all current package/root/facade/factory surfaces.
+The signed/pushed initial plan is
+`926bf4c6f185fadfb6ae361e81448210f9e7e5af`. Grok 4.6/high session
+`01a05bd1-c568-7db2-9c80-0230c01ab1c1`, standard Kimi CLI K3/high/100 session
+`session_5b19e331-2914-41ad-97b5-54ccda3b30e0`, and Opus xhigh session
+`350cea36-b25b-4bce-beed-ebd3cba8b114` each returned `CHANGES_REQUIRED` and
+`D109F_RED_READY: no`.
 
-The tests-only RED also closes the inherited D.109b cross-backend rejection and
-deep-freeze observations, D.109c browser-facade and genuine second-process
-SQLite observations, D.109d observed creator-close census, receipt/store
-identity, lifecycle-live transitive snapshot, fresh-process no-weak-source and
-repeated-rollover observations, plus the explicitly deferred stale export
-assertions. The sole expected causal failure is the demonstrated empty AHE
-delete-list paired with a present former floor parent: it must reject before I/O
-with `AHE_RECLAMATION_INVALID_ARGUMENT` but currently reaches replay/retry.
+The accepted blocking union proves that the initial 128-genuine-transition
+claim exceeded the current product seam: creator close is intentionally epoch
+0 to 1 and a snapshot-closed successor cannot be rebound as genesis-active.
+It also identifies two inherited behavioral debts outside the original sole
+GREEN owner, non-causal RED skip gating, unavailable genuine AHE backend
+identity in the shared fixture, a universal raw-reader claim that incorrectly
+included in-memory owners, an impossible archival runtime numeric census, and
+polarity wording that would change four retained D.109c retry mutants.
 
-GREEN may change only `packages/storage/src/maintenance.ts` to require empty
-deletion plus no-head or nonempty deletion plus present-parent polarity. Every
-other production owner, schema, dependency, threshold, workload, timeout,
-wire/digest/QC/activation/availability/identity contract, product API, browser
-scheduler, snapshot format, and legacy object/finality owner remains
-byte-identical. Any further product-source need or unexpected differential
-failure stops for a new narrow causal reslice.
+The corrected plan uses two complementary levels. A seeded 128-step
+archival-versus-compacted durable-history differential drives the real D.109a
+planner and genuine D.109b/D.109c maintenance owners over deterministic
+closed-epoch material. It compares head/floor/rollback closure, receipts,
+watermark/publication, durable dependencies, census, and Discord/MMORPG-shaped
+semantic projections at every step. It crosses the issuance 64-row boundary
+with at least 65 rows in each of two selected epochs and paginates beyond 128.
+It does not claim 128 application-runtime close/adopt cycles.
 
-Because the exit proof exercises deletion, cross-process recovery, and browser
-scheduling, sign/push this plan and run one Grok 4.6/high, standard Kimi CLI
-K3/high/100-step, and Opus xhigh plan review. If Grok cancels, resume its exact
-session. Only P0/P1 blocks. Deterministic RED receives no full model review;
-the signed GREEN receives the sole plan-to-RED-to-GREEN review. No Fable,
-Codex-Sol substitution, collaboration subagent, retained campaign, or recursive
-prose review runs.
+The second level uses the existing Phase-6a and D.109d fixtures for the one
+genuine close, verified commit, adoption, durable prune, receipt-gated runtime
+release, reopen, snapshot export/import, and next live issue/publish/ingress
+transition the product supports. Durable raw reads are instrumented in place on
+the exact backend identity; displaced source and creator-close structures use
+owner-observed before/release/second-prepare values plus live behavior. The
+census assigns exact counts/bytes to durable owners and observed presence/live
+reachability to runtime owners instead of inventing an archival inspection API.
+
+The corrected tests-only RED executes the long-horizon, census,
+raw-dependency, fresh-process, two-process, retained-mutant, and already-correct
+controls rather than skipping them. Its exact causal set has three classes:
+empty AHE deletion plus a present former parent does not yet return
+`AHE_RECLAMATION_INVALID_ARGUMENT` before I/O; the detached pruned-error scope
+is not frozen; and Node inspection can throw before returning a Promise rather
+than rejecting asynchronously. Nonempty deletion plus no former parent remains
+the retained classify-time `AHE_RECLAMATION_RETRY_REQUIRED` path.
+
+GREEN may change exactly `packages/storage/src/maintenance.ts`,
+`packages/issuance-store/src/maintenance.ts`, and
+`packages/storage-node/src/internal/node-issuance-store.ts`. It rejects only
+empty-delete/present-parent, freezes the nested pruned-error scope without
+changing shape, and establishes the Node Promise boundary without changing
+results. The shared genuine fixture may expose its already-owned undecorated
+AHE backend as tests-only data, with factory and maintenance loaded from one
+freshly built tree. No public API, schema, dependency, threshold, workload,
+timeout, wire/digest/QC/activation/availability/identity contract, browser
+scheduler, snapshot format, or legacy object/finality behavior changes.
+
+The correction also freezes the exact stale-export test roster, genuine
+IPC-ordered two-process control, browser `facadeKeys`, all-engine bounded
+D.109f backend controls, and retained D.109e scheduling matrix. It does not
+duplicate the 128-step differential in browsers or reopen D.109e.
+
+Because this correction materially changes executable scope and causal
+acceptance, it receives the single permitted Grok/Kimi/Opus confirmation after
+signed push. Only an empty P0/P1 union authorizes RED. If Grok cancels, resume
+its exact session. Deterministic RED receives no full model review; signed
+GREEN receives the sole plan-to-RED-to-GREEN review. No Fable, Codex-Sol
+substitution, collaboration subagent, retained campaign, or recursive prose
+review runs.

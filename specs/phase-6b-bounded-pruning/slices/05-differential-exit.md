@@ -7,160 +7,161 @@ D.109f inherits the signed/pushed D.109e closure
 immutable evidence, and their accepted findings are not reopened. No retained
 campaign ran in those slices, and none is authorized here.
 
-This final Phase-6b slice proves that bounded cleanup is observationally
-equivalent to archival retention over a deterministic history of at least 100
-closed epochs. It closes the finite census, cross-backend parity, raw-
-dependency, fresh-process, and inherited P2 obligations already assigned to
-D.109f. It changes no threshold, workload contract, wire format, digest,
-signature, QC, activation, availability, identity, dependency, public product
-API, browser schema, or Node schema.
+This final Phase-6b slice proves bounded cleanup over a deterministic history
+of 128 closed-epoch records and proves genuine creator-close/adoption/runtime
+behavior through the one transition the current product supports. It closes
+the finite census, cross-backend parity, raw-dependency, fresh-process, and
+inherited P2 obligations already assigned to D.109f. It changes no threshold,
+workload contract, wire format, digest, signature, QC, activation,
+availability, identity, dependency, public product API, browser schema, or
+Node schema.
 
-The only already-demonstrated product defect is narrow: shared AHE input
-capture currently accepts an empty `deleteGenerationIds` array paired with a
-present `expectedBaseExpectedHead`, allowing the request to reach replay/retry
-classification instead of rejecting it as
-`AHE_RECLAMATION_INVALID_ARGUMENT`. That request performs no writes and cannot
-authorize unsafe deletion, but its input polarity is stale. GREEN may correct
-only that shared capture predicate in `packages/storage/src/maintenance.ts`.
-If any other production owner must change, stop and reslice before editing it.
+Three narrow defects are already demonstrated by source inspection and receive
+causal RED assertions:
 
-## Frozen equivalence oracle
+1. shared AHE input capture accepts an empty `deleteGenerationIds` array with
+   a present `expectedBaseExpectedHead` rather than rejecting
+   `AHE_RECLAMATION_INVALID_ARGUMENT` before I/O;
+2. `DurableIssuanceRecordPrunedError.scope` is detached but not frozen; and
+3. Node `inspectPruningState` can throw before returning a Promise, unlike the
+   ephemeral and browser maintenance owners.
 
-One seeded fixture constructs 128 successive closed epochs for one object,
-with deterministic signed/canonical operations, ACL changes, causal
-dependencies, accepted and refused operations, snapshot/adoption material,
-issued rows, publication state, AHE generation closures, and subsequent live
-writes. The count is fixed at 128 so the `>=100` obligation is literal and the
-existing 64-row issuance page boundary is crossed twice. Random generation
-identifiers are never sorted as chronology; every retained/deleted identity is
-derived by walking the verified `baseExpectedHead` lineage.
+GREEN may change exactly `packages/storage/src/maintenance.ts`,
+`packages/issuance-store/src/maintenance.ts`, and
+`packages/storage-node/src/internal/node-issuance-store.ts`. If any other
+production owner must change, stop and reslice before editing it.
 
-The fixture drives two replicas from the same copied inputs:
+## Frozen two-level equivalence oracle
 
-- the archival replica performs every close/adoption transition and retains
-  all closed-epoch durable and runtime history; and
-- the compacted replica performs the same transition, obtains genuine
-  issuance and AHE receipts from the owning maintenance capabilities, then
-  invokes the private installed-v3 runtime reclamation owner.
+The initial plan overstated the available seam. The current creator-close
+owner is intentionally epoch-`0` to epoch-`1`, and a snapshot-closed successor
+cannot be rebound as a new genesis-active creator. D.109f therefore does not
+claim 128 genuine product close/adopt cycles and does not add multi-epoch close
+authority.
 
-After every epoch, and again after a close/reopen boundary, compare the exact
-application-state digest, ACL projection, frontier, accepted/refused operation
-counts, current anchor/head identity, live publication result, retained ingress
-result, and next local operation result. Expected differences are limited to
-the explicitly enumerated closed-history structures and the five already-
-frozen D.109d replay-outcome fields. Every comparison is performed from public
-or already-existing package/test inspection surfaces; D.109f adds no product
-inspection API.
+The long-horizon level is one seeded, 128-step archival-versus-compacted
+maintenance differential. It constructs deterministic closed-epoch durable
+material through existing test/private fixtures and drives the real D.109a
+planner plus genuine D.109b issuance and D.109c AHE maintenance owners. The
+archival store retains every generated epoch. The compacted store prunes each
+eligible prefix after the two-rollback warm-up. Generation order comes only
+from the verified `baseExpectedHead` walk, never identifier sorting. The
+fixture publishes at least 65 issued rows in each of two selected epochs so
+the existing 64-row page boundary is crossed twice; 128 one-row epochs alone
+would not prove that boundary. Generation and journal census walks paginate
+past 128 rather than assuming one page.
 
-The differential must prove both golden-path shapes without enabling either:
+After every step, compare the exact active head, retained floor and its
+normalized parent, planner outcome, receipt range/identity, publication and
+watermark state, generation/blob completeness, rollback-1/rollback-2 closure,
+and deterministic Discord-shaped and MMORPG-shaped semantic projections.
+Expected differences are limited to the enumerated pruned durable structures
+and receipt replay fields. The 128-step oracle does not claim to exercise the
+installed-v3 `activeOwners` map or application runtime 128 times.
 
-- a Discord-shaped history with membership/ACL churn, concurrent messages,
-  offline gaps, and later live writes; and
-- an MMORPG-shaped history with dense causally dependent state updates,
-  rejected stale inputs, and later live writes.
+The genuine lifecycle level uses the existing Phase-6a and D.109d fixtures for
+one real creator close, verified commit, adoption, durable pruning, receipt-
+gated runtime reclamation, reopen, snapshot export/import, and subsequent live
+issue/publish/ingress behavior. It compares application-state digest, ACL,
+frontier, accepted/refused operations, current anchor/head, publication,
+ingress, and the next local operation. It runs both Discord-shaped and MMORPG-
+shaped controls without enabling either. Repeated-rollover behavior remains a
+future product capability question, not a hidden D.109f acceptance claim.
 
-The oracle fails if either compacted execution or restart can fetch a deleted
-issued preimage, AHE blob, displaced runtime source, retired creator-close
-graph/snapshot, or old snapshot dependency. Merely comparing final digests is
-insufficient.
+## Dependency and identity proof
 
-## Raw-dependency and identity proof
+Durable dependency reads and in-memory release observations are separate
+proof classes.
 
-Tests wrap the existing test-owned durable stores and dependency readers before
-the 128-epoch run. Each read is classified as current-retained, rollback-1,
-rollback-2, intentionally retained metadata/finality, or deleted. A deleted
-class read is an immediate `D109F_RAW_DEPENDENCY_READ` failure, including a read
-that happens to succeed because the archival replica still owns the bytes.
-The compacted replica must complete with zero deleted-class reads.
+- Test-owned genuine issuance, AHE, snapshot, and live-journal owners are
+  instrumented in place, preserving the exact identity used by maintenance
+  `WeakMap` resolution. Reads are classified from the planner and genuine
+  receipt identities as current-retained, rollback-1, rollback-2,
+  intentionally retained, or deleted. Any deleted-class durable read fails
+  `D109F_RAW_DEPENDENCY_READ`.
+- The shared genuine adoption fixture may expose its already-owned undecorated
+  AHE backend as a tests-only field. Factory and maintenance resolution must
+  load from the same freshly built tree; proxies and source/dist mixing are
+  forbidden.
+- Displaced runtime source and creator-close graph/snapshot owners are not
+  durable readers. Their proof uses the genuine D.109d before/release/second-
+  prepare observations plus live rebase/issue/publish behavior. It does not
+  pretend that a wrapper intercepted every in-memory access.
 
-Receipt custody is identity-specific. The test records the exact genuine
-issuance and AHE store facades that minted each receipt and proves copies,
-proxies, cross-backend facades, stale receipts, and receipts from another
-epoch/object cannot authorize runtime reclamation. Snapshot dependency proof is
-live and transitive: after cleanup and after reopen, export a genuine successor
-snapshot, import it into a fresh successor, accept one dependency-bearing live
-operation, publish it, and read it from the durable live journal. A source-only
-substring assertion is only a supplementary control.
+Receipt custody remains identity-specific. Copies, proxies, cross-backend
+facades, stale receipts, and another object/epoch cannot authorize runtime
+reclamation. Snapshot dependency proof is live and transitive: after cleanup
+and reopen, export a genuine successor snapshot, import it into a fresh
+successor, accept a dependency-bearing operation, publish it, and read it from
+the durable live journal. Source-shape assertions are supplementary only.
 
 ## Complete census and inherited debt roster
 
-The test contract owns one sorted, duplicate-free registry of every Phase-6b
-enumerated structure. At each selected epoch it records exact archival and
-compacted counts/booleans/bytes and classifies every intentional difference.
-The registry includes:
+One sorted, duplicate-free registry maps every Phase-6b structure to its proof
+kind. Durable structures receive exact archival/compacted counts or bytes.
+Installed-v3 and creator-close structures receive owner-observed before/after
+presence plus live behavioral reachability; no nonexistent archival numeric
+inspection API is implied. Stable package surfaces receive exact key sets.
+The registry covers issuance/outbox/lineage/watermark state; AHE heads,
+generations, promotions, references and blobs; installed-v3 application,
+causality, blueprint, anchor, graph, ingress, publication, rebase, displaced-
+source, hot-predecessor and payload owners; creator-close graph/snapshot/
+commitment/replay owners; snapshot quarantine; live journal; unchanged legacy
+object/finality state; browser facade keys; and package/factory/module maps.
 
-- issuance rows, outbox rows by publish state, lineage rows and pruning
-  watermark;
-- AHE heads, generations by state, promotions, referenced/shared/unreferenced
-  blobs, and the active plus two rollback closures;
-- installed-v3 application authors/charges/vertices, causality index, blueprint
-  state, anchor bytes, graph version, latched operations, pending ingress and
-  bytes, quarantine, publication, rebase cursor/source, displaced source, hot
-  predecessor, and retained payload metadata;
-- creator-close graph, staged snapshot, persisted snapshot, derived commitment,
-  and durable replay owners;
-- snapshot-quarantine rows/chunks, live-journal rows, and intentionally
-  unchanged legacy object/finality state; and
-- browser facade keys, package export maps, package-root runtime rosters, and
-  maintenance factory/module key sets.
+D.109f closes the inherited findings as follows:
 
-This closes the following inherited findings without changing their original
-dispositions:
+1. Make Node inspection reject asynchronously like ephemeral/browser, exercise
+   the native present-below-watermark corruption polarity, and deeply freeze
+   the pruned error including its nested scope.
+2. Reject only empty-delete/present-parent as
+   `AHE_RECLAMATION_INVALID_ARGUMENT`; preserve all D.109c mutants and their
+   exact codes, including nonempty-delete/no-parent as classify-time
+   `AHE_RECLAMATION_RETRY_REQUIRED`. Run a genuine two-process SQLite case and
+   assert the browser fixture's existing `facadeKeys` value.
+3. Observe actual post-release creator-close values, include the shared
+   Phase-6a fixture in the changed-owner census, prove receipt/store identity,
+   split durable raw reads from in-memory observations, make snapshot proof
+   lifecycle-live, and run a genuine fresh-process reopen with no inherited JS
+   object or weak handle.
+4. Correct stale complete-export assertions without removing an accepted
+   subpath. The exact roster includes
+   `packages/storage/tests/adapter-facade-red.test.ts`,
+   `packages/storage/tests/phase-2g-a-capacity-red.test.ts`,
+   `packages/storage-node/tests/sqlite-contract-red.test.ts`,
+   `packages/storage-browser/tests/structural-controls.test.ts`,
+   `packages/storage-browser/tests/phase-2d1-decision-schema-red.test.ts`,
+   `tests/phase-3a1b-p4-live-journal-parity-governance-red.test.ts`, and the
+   package-map assertions in
+   `tests/phase-4c-snapshot-quarantine-red.test.ts`. Exact current maps
+   retain every already-accepted additive maintenance, issuance-maintenance,
+   snapshot-transfer, seal-evidence, and seal-vote subpath.
 
-1. D.109b Node inspection must match asynchronous-rejection behavior across
-   ephemeral, Node, and browser maintenance; the present-below-watermark
-   corruption polarity is exercised where a native owner can synthesize it;
-   and every reachable member of the pruned error, including nested scope, is
-   deeply frozen.
-2. D.109c rejects the exact empty-delete/present-parent mutant with
-   `AHE_RECLAMATION_INVALID_ARGUMENT`, runs a genuine second-process SQLite
-   race, and asserts the browser fixture's already-computed `facadeKeys`.
-3. D.109d observes actual post-release creator-close values rather than
-   constant-filling expected false values; includes the shared Phase-6a fixture
-   in changed-owner/source census; proves receipt/store identity; instruments
-   raw dependencies; makes snapshot dependency proof lifecycle-live; and runs
-   a genuine fresh-process reopen in which no weak predecessor/source handle
-   can survive.
-4. The stale `activeOwners` repeated-rollover concern is exercised across all
-   128 epochs. If it fails, the failure is a new demonstrated product defect
-   and D.109f stops for a narrow causal reslice.
-5. Historical complete-export assertions are corrected to the exact current
-   maps without removing any accepted subpath. The bounded batch owns the
-   stale assertions in storage adapter/capacity, Node SQLite contract, browser
-   Phase-2d structure/schema, Phase-3a1b live-journal parity, and Phase-4c
-   snapshot quarantine. Each test first compares its previous frozen surface
-   plus only the already-accepted additive `./maintenance`,
-   `./issuance-maintenance`, `./snapshot-transfer`, `./seal-evidence`, and
-   `./seal-vote` subpaths applicable to that package.
+No census may be satisfied by hard-coded post-state values where an owner can
+be observed. A stable contract registry is permitted only when compared with a
+separately observed value.
 
-No census may be satisfied by hard-coded post-state values where the fixture
-can inspect the owner. A constant is permitted only for a stable contract
-registry and must be compared to a separately observed value.
+## Fresh-process, process-contention, and browser matrix
 
-## Fresh-process and backend matrix
+Node children import freshly built workspace packages through explicit build-
+root-relative file URLs. The fresh-process lifecycle child performs the one
+genuine close/adopt/reclaim/reopen transition and next live write without an
+inherited object or `WeakRef`. The separate two-process SQLite case uses IPC to
+confirm transaction-held and release states; it never infers ordering from a
+sleep or the native 1000 ms busy timeout. Exactly one fresh delete and one
+replay/retry result are accepted, with old XOR complete-new database state and
+no mixed image.
 
-Node runs two fresh child processes against built workspace packages resolved
-through explicit build-root-relative file URLs, following the proven Phase-4c
-and D.109c child pattern. It never imports stale source aliases or relies on
-Vite. The first process creates and partially advances the fixed history; the
-second opens the same SQLite files with no inherited JS object or `WeakRef`,
-finishes cleanup, exports/imports the live snapshot, and performs the next live
-write. A separate two-process contention case holds one native SQLite cleanup
-transaction while the other process attempts the same request; exactly one
-fresh delete and one replay/retry outcome may occur, with an old XOR complete-
-new database image and no mixed state.
-
-Browser runs the same compacted owner matrix in Chromium, Firefox, and WebKit.
-It covers native granted ownership, explicit unelected fallback, absent/non-
-callable/throw/reject/abort/unavailable/timeout scheduling, takeover after
-close/versionchange, and a reopened origin. All modes produce the same eligible
-deletion set and final semantic projection. Browser facade keys are asserted,
-not merely returned in an attachment. Native capability presence is recorded;
-injected deterministic controls remain the cross-engine oracle.
+The 128-step durable differential is Node-only. Browser D.109f runs the genuine
+eligible-deletion-set equivalence, invalid-input polarity, `facadeKeys`, and
+reopened-origin controls in Chromium, Firefox, and WebKit. D.109e's retained
+all-engine scheduling matrix supplies granted, fallback, throw/reject/abort/
+unavailable/timeout, takeover, and versionchange coverage; D.109f does not
+duplicate that closed matrix or run another 128-step browser history.
 
 ## Deterministic RED
 
-RED is tests/evidence only. It may add exactly these new paths:
+RED is tests/evidence only. It may add:
 
 1. `tests/fixtures/phase-6b/differential-exit-contract.ts`;
 2. `tests/phase-6b-differential-exit-red.test.ts`;
@@ -171,96 +172,106 @@ RED is tests/evidence only. It may add exactly these new paths:
 7. `packages/storage-browser/tests/phase-6b-differential-exit-red.pw.ts`; and
 8. `packages/storage-browser/playwright.phase-6b-differential-exit.config.ts`.
 
-The same tests-only batch may amend the exact historical export-census owners
-enumerated above, the existing D.109c Node/browser fixtures for the second-
-process and `facadeKeys` assertions, and the D.109d contract/test plus shared
-Phase-6a creator-adoption fixture for observed-census and fresh-process hooks.
-The evidence ledger must record the exact changed-path roster before execution.
+The tests-only batch may amend the exact export-census roster, D.109c Node/
+browser fixtures for two-process/backend-identity/`facadeKeys` assertions, and
+the D.109d contract/test plus shared Phase-6a fixture for observed-census and
+fresh-process hooks. It adds no product API.
 
-Run one focused non-browser RED command and one Chromium RED command. Controls,
-the archival side, export census, and already-correct behavior pass. The exact
-complete intended failure set is the single empty-delete/present-parent mutant,
-whose expected code is `AHE_RECLAMATION_INVALID_ARGUMENT`; all dependent
-compacted differential bodies skip behind the frozen token
-`D109F_INVALID_INPUT_POLARITY_MISSING`. Any module-load failure, fixture error,
-different code, additional assertion failure, top-level error, flaky result,
-or retained title selected by the focused configuration invalidates RED and
-must be diagnosed before GREEN. Sign and push the validated RED evidence; do
-not run a separate full model RED review.
+Run the focused non-browser RED once and Chromium RED once. The 128-step
+differential, census, raw-dependency, process controls, retained D.109c mutants,
+and already-correct behavior execute at RED; none hides behind a missing-owner
+skip. The exact intended causal set is three assertion classes: empty-delete/
+present-parent does not yet return `AHE_RECLAMATION_INVALID_ARGUMENT`, the
+nested pruned scope is not frozen, and Node inspection does not yet return an
+asynchronously rejecting Promise. Evidence records the exact occurrence count
+per selected suite surface. Any other code, failure, top-level error, flaky
+result, module-load failure, or retained-title selection invalidates RED. Sign
+and push RED after deterministic evidence validation; there is no separate
+full model RED review.
 
 ## Narrow GREEN and gates
 
-GREEN may change only `packages/storage/src/maintenance.ts` to require the
-following exact polarity:
+GREEN changes exactly three owners:
 
-- empty deletion list requires an already-normalized no-head floor and remains
-  the existing no-write replay/empty success;
-- nonempty deletion list requires a present expected former parent; and
-- every other pairing throws the existing deeply frozen
-  `AHE_RECLAMATION_INVALID_ARGUMENT` before owner dispatch or I/O.
+- `packages/storage/src/maintenance.ts` rejects only empty deletion plus a
+  present former parent before owner dispatch or I/O. Empty plus no-head keeps
+  existing replay/empty success; nonempty plus present remains legal; nonempty
+  plus no-head retains D.109c classify-time retry semantics.
+- `packages/issuance-store/src/maintenance.ts` returns a deeply frozen pruned
+  error whose detached nested `scope` is also frozen, with unchanged public
+  shape and code.
+- `packages/storage-node/src/internal/node-issuance-store.ts` establishes the
+  Promise boundary before unavailable/invalid-input inspection checks, matching
+  ephemeral/browser rejection timing without changing results.
 
-The backend adapters, schemas, transactions, receipts, runtime, snapshot,
-browser scheduler, package exports, and public APIs remain byte-identical. If
-the 128-epoch differential, repeated rollover, raw-dependency, fresh-process,
-or two-process test exposes another product failure, preserve that evidence and
-stop for a separately reviewed causal reslice. Do not repair it opportunistically
-inside D.109f.
+Run in order: focused non-browser GREEN once; focused Chromium once and the
+same one-file selection in Firefox/WebKit; exact retained D.109a-e, Phase-6a,
+snapshot-quarantine, live-journal, storage schema/capacity, and Phase-5c files/
+titles; affected package builds and source typechecks; exact-owner ESLint and
+Prettier; `git diff --check`; child syntax; package/facade/factory census;
+source-shape and changed-path checks; protected-untracked, 26-stash, process/
+port, signature, pushed-ref, and self-excluding evidence-manifest checks.
 
-Run, in order:
+Evidence records selected counts, exact RED/GREEN outcomes, seed and all 128
+completed durable steps, zero deleted durable reads, full registry coverage,
+both golden-path projections, child chronology, transaction observations,
+owner hashes, environment, and dispositions. There is no campaign or retry
+loop.
 
-1. the focused non-browser GREEN command once;
-2. the focused Chromium GREEN command once, then the same one-file browser
-   selection in Firefox and WebKit;
-3. retained D.109a, D.109b, D.109c, D.109d, D.109e, Phase-6a creator close/
-   adoption/activation/product, snapshot quarantine, live journal, storage
-   schema/capacity, and Phase-5c scheduling tests using exact file/title lists;
-4. storage, issuance-store, storage-node, storage-browser, node, object, and
-   compaction builds plus source-only typechecks, and bounded whole-package
-   typecheck classification where inherited test-root debt remains;
-5. exact-owner ESLint, Prettier, `git diff --check`, child syntax, package/root/
-   facade/factory census, source-shape, changed-path, protected-untracked,
-   26-stash, process/port, signature, and pushed-ref checks; and
-6. a self-excluding evidence manifest covering commands, complete reporter
-   JSON/stdout/stderr/attachments, child messages and statuses, environment,
-   owner hashes, source/ref identity, results, and dispositions.
+## Initial review and correction disposition
 
-The focused evidence must state all selected file/test counts, pass/fail/skip/
-flaky/top-level counts, the 128-epoch seed and completed epoch count, zero
-deleted-class dependency reads, exact census registry coverage, both golden-
-path projections, child exit/status chronology, and old XOR complete-new
-transaction observations. There is no campaign and no retry loop.
+The signed/pushed initial plan is
+`926bf4c6f185fadfb6ae361e81448210f9e7e5af`. Grok 4.6/high session
+`01a05bd1-c568-7db2-9c80-0230c01ab1c1`, standard Kimi K3/high/100 session
+`session_5b19e331-2914-41ad-97b5-54ccda3b30e0`, and Opus xhigh session
+`350cea36-b25b-4bce-beed-ebd3cba8b114` all returned `CHANGES_REQUIRED` and
+`D109F_RED_READY: no`.
+
+The accepted blocking union is: the unsupported 128-genuine-transition claim;
+two inherited behavioral debts outside the original owner list; non-causal
+RED skip gating; unavailable genuine AHE backend identity in the shared
+fixture; the universal raw-reader claim over in-memory owners; impossible
+archival runtime numeric census; and polarity wording that would change four
+retained D.109c retry mutants. This correction adopts each item through the
+two-level oracle, three exact GREEN owners, fully executing RED controls,
+tests-only backend exposure with one build tree, split proof classes, proof-
+kind census, and empty/present-only predicate above.
+
+Nonblocking findings are also dispositioned: enumerate the complete export
+roster; paginate 129+ records; put 65+ issued rows in two epochs; use IPC for
+the two-process hold; await deterministic sinks rather than polling; treat
+D.109d replay fields as receipt comparisons rather than archival differences;
+and retain, rather than duplicate, D.109e's browser matrix. No recursive
+review is created for these corrections.
+
+Because the correction changes executable scope and causal acceptance, the
+single permitted Grok/Kimi/Opus confirmation reviews this signed/pushed text.
+Only an empty P0/P1 union authorizes RED. If Grok cancels, resume its exact
+session. The standard `kimi` CLI is authoritative; Codex Sol is not a
+substitute.
 
 ## Review and stop policy
 
-This exit proof covers physical deletion, cross-process recovery, and browser
-scheduling, so its plan gets one signed/pushed Grok 4.6/high, standard Kimi CLI
-K3/high with both 100-step controls, and Opus xhigh review before RED. The
-standard `kimi` invocation is authoritative; Codex Sol is not a substitute. If
-Grok cancels, resume the exact session. Only P0/P1 blocks, with one correction
-batch and at most one confirmation only if executable scope, causal acceptance,
-or a hard gate materially changes.
+After signed/pushed GREEN, one formal Grok/Kimi/Opus review inspects the
+accepted plan, causal RED, complete GREEN, retained behavior, and exit
+evidence. Only P0/P1 blocks. No Fable, collaboration subagent, separate RED
+model round, retained campaign, recursive prose review, or review substitution
+runs.
 
-After signed/pushed GREEN, the sole formal Grok/Kimi/Opus review inspects the
-accepted plan, causal RED, complete GREEN, retained behavior, and exit evidence.
-Only P0/P1 blocks Phase-6b closure. No Fable, collaboration subagent, separate
-RED model round, retained campaign, long campaign, recursive prose review, or
-review substitution runs.
-
-Stop before implementation if the plan review shows that the 128-epoch oracle
-cannot use existing private/test seams without a product API. Stop during RED
-or GREEN on any unexpected causal failure. Stop and reslice before changing any
-production file other than `packages/storage/src/maintenance.ts`, or before
+Stop during RED or GREEN on an unexpected causal failure. Stop and reslice
+before changing a production file outside the three named owners, or before
 changing a schema, dependency, threshold, workload, timeout, wire/digest/QC/
 activation/availability/identity contract, browser scheduler, snapshot format,
 or legacy object/finality behavior.
 
 ## Phase-6b completion condition
 
-Phase 6b closes only when the corrected invalid input rejects before I/O, both
-128-epoch archival/compacted golden-path differentials are identical on every
-non-pruned observation, the compacted path performs zero deleted-class raw
-reads, all owner censuses are complete and bounded, fresh-process and two-
-process recovery pass, all three browser engines agree, every named retained
-test and static gate is green or has an unchanged explicitly classified
-tests-only diagnostic, the evidence manifest validates, and the final
-Grok/Kimi/Opus P0/P1 union is empty.
+Phase 6b closes only when all three defects reject/behave as frozen; the
+128-step archival/compacted durable-history differentials match every non-
+pruned observation and perform zero deleted durable reads; the genuine one-
+transition lifecycle controls preserve both golden paths through reclaim,
+reopen, and next live work; all proof-kind censuses are complete and bounded;
+fresh-process and two-process recovery pass; all three browser engines agree;
+every named retained/static gate is green or has an unchanged explicitly
+classified tests-only diagnostic; the evidence manifest validates; and the
+final Grok/Kimi/Opus P0/P1 union is empty.

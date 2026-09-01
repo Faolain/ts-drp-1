@@ -18,8 +18,11 @@ signed/pushed correction `fd99b1ac567c6a559593916492cb9c2036109066`;
 its one Grok/Kimi/Opus confirmation unanimously approved with an empty P0/P1
 union. D.109e's documentation closure is signed/pushed at
 `bb7d4601ac951df28b066e22dba1c096abe287c0`. D.109f differential/census exit
-is the active slice. Its bounded plan is being frozen before RED; do not reopen
-D.109a-D.109e or run a campaign.
+is the active slice. Initial signed/pushed plan `926bf4c6` received material
+Grok/Kimi/Opus findings. The single correction batch is now frozen around a
+128-step durable-history differential plus the one genuine creator lifecycle
+transition the product supports, three causal defects, and three exact GREEN
+owners. Do not reopen D.109a-D.109e or run a campaign.
 
 Global TODO:
 
@@ -129,9 +132,11 @@ owner lifecycle failure deletes nothing in that owner.
    the current successor and all legacy/general object/finality behavior.
 5. [D.109e browser scheduling](slices/04-browser-scheduling.md): reuse the exact
    Phase-5c advisory primary-dispatch runner and prove lock-mode equivalence.
-6. [D.109f differential exit](slices/05-differential-exit.md): ≥100-epoch
-   archival-versus-compacted equivalence, raw-dependency audit, crash/reopen,
-   and complete enumerated-structure census.
+6. [D.109f differential exit](slices/05-differential-exit.md): ≥100-step
+   archival-versus-compacted durable-history equivalence, genuine one-
+   transition lifecycle controls, raw-dependency audit, crash/reopen, and a
+   complete proof-kind structure census. It does not invent unsupported
+   repeated creator-close authority.
 
 ## Sacred contracts
 
