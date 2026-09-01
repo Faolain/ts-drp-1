@@ -16,6 +16,7 @@ import type {
 	DurableOutboxPageInput,
 	DurableOutboxPublicationTransitionInput,
 } from "@ts-drp/issuance-store";
+import { durableIssuanceLineageConsumed, type DurableIssuancePruningReceipt } from "@ts-drp/issuance-store/maintenance";
 import type { DurableLiveJournalStore, LiveJournalScope } from "@ts-drp/live-journal";
 import type { MessageQueueManager } from "@ts-drp/message-queue";
 import {
@@ -61,6 +62,11 @@ import {
 	type PresentHead,
 	type StorageObjectId,
 } from "@ts-drp/storage";
+import {
+	AHE_RECLAMATION_LOCAL_ONLY_POLICY_DIGEST,
+	type AheReclamationReceipt,
+	captureAheReclamationInput,
+} from "@ts-drp/storage/maintenance";
 import { type DRPNetworkNode, Message, MessageType, V3Envelope } from "@ts-drp/types";
 
 import { bindCreatorLiveClose } from "./creator-close.js";
@@ -71,6 +77,15 @@ import {
 	installCreatorSuccessorHandleAlias,
 	installCreatorSuccessorLive,
 } from "./internal/creator-successor-live.js";
+import {
+	type CreatorCloseRuntimeReleaseCensus,
+	type D109dRuntimeCensus,
+	type D109dRuntimeReclamationErrorCode,
+	type D109dRuntimeReclamationInput,
+	type D109dRuntimeReclamationResult,
+	installV3RuntimeReclamationKernel,
+	prepareCreatorCloseRuntimeRelease,
+} from "./internal/runtime-reclamation.js";
 import { deriveV3StableTopic } from "./internal/v3-topic.js";
 import { classifyV3EnvelopeScope } from "./v3-envelope-scope.js";
 import { consumeRecoveredV3LiveAuthority, installRecoveredV3LiveAuthority } from "./v3-live-recovered-authority.js";
@@ -89,11 +104,13 @@ const ObjectPrototype = Object.prototype;
 const SharedArrayBufferConstructor = globalThis.SharedArrayBuffer;
 const StringConstructor = String;
 const Uint8ArrayConstructor = Uint8Array;
+const WeakRefConstructor = WeakRef;
 const ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const ObjectGetPrototypeOf = Object.getPrototypeOf;
 const IntrinsicMap = Map;
 const MapPrototype = Map.prototype;
 const MapPrototypeDelete = Map.prototype.delete;
+const MapPrototypeClear = Map.prototype.clear;
 const MapPrototypeEntries = Map.prototype.entries;
 const MapPrototypeGet = Map.prototype.get;
 const MapPrototypeHas = Map.prototype.has;
@@ -105,6 +122,7 @@ const MapIteratorNext = ObjectGetOwnPropertyDescriptor(MapIteratorPrototype, "ne
 const IntrinsicSet = Set;
 const SetPrototypeAdd = Set.prototype.add;
 const SetPrototypeHas = Set.prototype.has;
+const SetSizeGetter = ObjectGetOwnPropertyDescriptor(Set.prototype, "size")?.get;
 const DRP_ERROR_BRAND = Symbol.for("@ts-drp/errors/DRPError");
 const TypedArrayPrototype = ObjectGetPrototypeOf(Uint8Array.prototype) as object;
 const TypedArrayBufferGetter = ObjectGetOwnPropertyDescriptor(TypedArrayPrototype, "buffer")?.get;
@@ -2496,11 +2514,13 @@ interface V3PlaneRegistration {
 	blueprintMachine?: BlueprintStateMachine;
 	blueprintHandle?: V3BlueprintLiveHandle;
 	readonly classifyTerminalVertex?: V3TerminalVertexClassifier;
-	readonly displacedSource?: V3DisplacedSourceAuthority;
+	displacedIssuanceBoundary?: number;
+	displacedSource?: V3DisplacedSourceAuthority;
 	epochBytes: number;
 	graphVersion: number;
 	handle: V3PlaneHandle;
-	readonly index: CausalityIndex;
+	hotPredecessor?: WeakRef<V3PlaneRegistration>;
+	index: CausalityIndex;
 	readonly issuanceScope: DurableIssueScope;
 	readonly issuanceStore: DurableIssuanceStore;
 	readonly latchedOperations: Map<string, StagedLatchedAclOperation>;
@@ -2513,7 +2533,7 @@ interface V3PlaneRegistration {
 	readonly operationAdmissionPolicy?: V3OperationAdmissionPolicy;
 	readonly payload: PreparedV3LivePayload;
 	readonly pendingIngress: Map<string, PendingV3Ingress>;
-	readonly quarantinedDigests: ReadonlySet<string>;
+	quarantinedDigests: ReadonlySet<string>;
 	readonly queueId: string;
 	readonly topic: string;
 	drainingPendingIngress: boolean;
@@ -2523,6 +2543,8 @@ interface V3PlaneRegistration {
 	rebaseCursor: number | undefined;
 	rebaseSnapshot: readonly ClassifiedRebaseRow[] | undefined;
 	retainedBootstrapHold: boolean;
+	runtimeReclamationLatch?: Uint8Array;
+	runtimeReclamationResult?: Extract<D109dRuntimeReclamationResult, { readonly ok: true }>;
 	releaseTerminalBarrier: (() => void) | undefined;
 	terminalBarrier: Promise<void> | undefined;
 	terminalState: "active" | "transition" | "terminal";
@@ -2564,6 +2586,543 @@ if (
 	]) !== true
 ) {
 	throw new TypeError("v3 creator close registration resolver is unavailable");
+}
+
+const D109D_ISSUANCE_RECEIPT_KEYS = [
+	"closedEpoch",
+	"commitQcRef",
+	"deletedAuthorSequenceRange",
+	"observedLineage",
+	"prunedThroughAuthorSequence",
+	"scope",
+	"snapshotManifestDigest",
+] as const;
+const D109D_AHE_RECEIPT_KEYS = [
+	"activeGenerationId",
+	"availabilityPolicyDigest",
+	"closedEpoch",
+	"deletedBlobDigests",
+	"deletedGenerationIds",
+	"deletedPromotionCount",
+	"expectedHead",
+	"floor",
+	"objectId",
+	"reclaimedGenerationIds",
+	"rollbackGenerationIds",
+] as const;
+const D109D_AHE_FLOOR_KEYS = [
+	"expectedFormerBaseExpectedHead",
+	"generationId",
+	"normalizedThisCall",
+	"replacementBaseExpectedHead",
+] as const;
+
+type D109dReceiptSnapshot = Readonly<{
+	readonly ahe: AheReclamationReceipt;
+	readonly issuance: DurableIssuancePruningReceipt;
+}>;
+
+function d109dFailure(code: D109dRuntimeReclamationErrorCode): D109dRuntimeReclamationResult {
+	return ObjectFreeze({ code, ok: false as const });
+}
+
+function d109dDenseDigests(value: unknown): readonly string[] | undefined {
+	const values = denseStrings(value);
+	if (values === undefined || values.some((entry) => !isDigestHex(entry))) return undefined;
+	return values;
+}
+
+function d109dIssuanceReceipt(value: unknown): DurableIssuancePruningReceipt | undefined {
+	const receipt = snapshotClosedRecord(value, D109D_ISSUANCE_RECEIPT_KEYS);
+	const commitQcRef = snapshotClosedRecord(receipt?.commitQcRef, TRUST_REF_KEYS);
+	const observedLineage = snapshotClosedRecord(receipt?.observedLineage, ["exhausted", "next"]);
+	const scope = snapshotClosedRecord(receipt?.scope, ISSUANCE_SCOPE_KEYS);
+	const deletedRange =
+		receipt?.deletedAuthorSequenceRange === null
+			? null
+			: snapshotClosedRecord(receipt?.deletedAuthorSequenceRange, ["from", "through"]);
+	if (
+		receipt === undefined ||
+		commitQcRef === undefined ||
+		observedLineage === undefined ||
+		scope === undefined ||
+		deletedRange === undefined ||
+		!NumberIsSafeInteger(receipt.closedEpoch) ||
+		(receipt.closedEpoch as number) < 0 ||
+		!NumberIsSafeInteger(receipt.prunedThroughAuthorSequence) ||
+		(receipt.prunedThroughAuthorSequence as number) < 0 ||
+		!NumberIsSafeInteger(commitQcRef.byteLength) ||
+		(commitQcRef.byteLength as number) < 1 ||
+		!isDigestHex(commitQcRef.digest) ||
+		!isDigestHex(receipt.snapshotManifestDigest) ||
+		typeof observedLineage.exhausted !== "boolean" ||
+		!NumberIsSafeInteger(observedLineage.next) ||
+		(observedLineage.next as number) < 0 ||
+		typeof scope.author !== "string" ||
+		!isDigestHex(scope.author) ||
+		typeof scope.objectId !== "string"
+	) {
+		return undefined;
+	}
+	const parsedObjectId = parseStorageObjectId(scope.objectId);
+	if (!parsedObjectId.ok) return undefined;
+	if (
+		deletedRange !== null &&
+		(!NumberIsSafeInteger(deletedRange.from) ||
+			(deletedRange.from as number) < 0 ||
+			!NumberIsSafeInteger(deletedRange.through) ||
+			(deletedRange.through as number) < 0)
+	) {
+		return undefined;
+	}
+	return ObjectFreeze({
+		closedEpoch: receipt.closedEpoch as number,
+		commitQcRef: ObjectFreeze({ byteLength: commitQcRef.byteLength as number, digest: commitQcRef.digest as string }),
+		deletedAuthorSequenceRange:
+			deletedRange === null
+				? null
+				: ObjectFreeze({ from: deletedRange.from as number, through: deletedRange.through as number }),
+		observedLineage: ObjectFreeze({
+			exhausted: observedLineage.exhausted,
+			next: observedLineage.next as number,
+		}),
+		prunedThroughAuthorSequence: receipt.prunedThroughAuthorSequence as number,
+		scope: ObjectFreeze({ author: scope.author, objectId: parsedObjectId.value }),
+		snapshotManifestDigest: receipt.snapshotManifestDigest as string,
+	});
+}
+
+function d109dAheReceipt(value: unknown): AheReclamationReceipt | undefined {
+	const receipt = snapshotClosedRecord(value, D109D_AHE_RECEIPT_KEYS);
+	if (receipt === undefined || typeof receipt.objectId !== "string") return undefined;
+	const parsedObjectId = parseStorageObjectId(receipt.objectId);
+	if (!parsedObjectId.ok) return undefined;
+	const expectedHead = copiedPresentHead(receipt.expectedHead, parsedObjectId.value);
+	const floor = snapshotClosedRecord(receipt.floor, D109D_AHE_FLOOR_KEYS);
+	const expectedFormer = copiedExpectedHead(floor?.expectedFormerBaseExpectedHead, parsedObjectId.value);
+	const replacement = copiedExpectedHead(floor?.replacementBaseExpectedHead, parsedObjectId.value);
+	const deletedBlobDigests = d109dDenseDigests(receipt.deletedBlobDigests);
+	const deletedGenerationIds = d109dDenseDigests(receipt.deletedGenerationIds);
+	const reclaimedGenerationIds = d109dDenseDigests(receipt.reclaimedGenerationIds);
+	const rollback = snapshotDenseArray(receipt.rollbackGenerationIds, 2);
+	if (
+		expectedHead === undefined ||
+		floor === undefined ||
+		expectedFormer === undefined ||
+		replacement === undefined ||
+		deletedBlobDigests === undefined ||
+		deletedGenerationIds === undefined ||
+		reclaimedGenerationIds === undefined ||
+		rollback === undefined ||
+		!isDigestHex(receipt.activeGenerationId) ||
+		typeof receipt.availabilityPolicyDigest !== "string" ||
+		!isDigestHex(receipt.availabilityPolicyDigest) ||
+		!NumberIsSafeInteger(receipt.closedEpoch) ||
+		(receipt.closedEpoch as number) < 0 ||
+		!NumberIsSafeInteger(receipt.deletedPromotionCount) ||
+		(receipt.deletedPromotionCount as number) < 0 ||
+		!isDigestHex(floor.generationId) ||
+		typeof floor.normalizedThisCall !== "boolean" ||
+		!isDigestHex(rollback[0]) ||
+		!isDigestHex(rollback[1])
+	) {
+		return undefined;
+	}
+	return ObjectFreeze({
+		activeGenerationId: receipt.activeGenerationId as GenerationId,
+		availabilityPolicyDigest: receipt.availabilityPolicyDigest,
+		closedEpoch: receipt.closedEpoch as number,
+		deletedBlobDigests: deletedBlobDigests as readonly BlobDigest[],
+		deletedGenerationIds: deletedGenerationIds as readonly GenerationId[],
+		deletedPromotionCount: receipt.deletedPromotionCount as number,
+		expectedHead,
+		floor: ObjectFreeze({
+			expectedFormerBaseExpectedHead: expectedFormer,
+			generationId: floor.generationId as GenerationId,
+			normalizedThisCall: floor.normalizedThisCall,
+			replacementBaseExpectedHead: replacement as Readonly<{ kind: "none"; objectId: StorageObjectId }>,
+		}),
+		objectId: parsedObjectId.value,
+		reclaimedGenerationIds: reclaimedGenerationIds as readonly GenerationId[],
+		rollbackGenerationIds: ObjectFreeze([rollback[0], rollback[1]]) as readonly [GenerationId, GenerationId],
+	});
+}
+
+function d109dReceiptsInternallyConsistent(snapshot: D109dReceiptSnapshot): boolean {
+	const { ahe, issuance } = snapshot;
+	const range = issuance.deletedAuthorSequenceRange;
+	if (
+		issuance.scope.objectId !== ahe.objectId ||
+		issuance.closedEpoch !== ahe.closedEpoch ||
+		(issuance.observedLineage.exhausted && issuance.observedLineage.next !== Number.MAX_SAFE_INTEGER) ||
+		!durableIssuanceLineageConsumed(issuance.observedLineage, issuance.prunedThroughAuthorSequence) ||
+		(range !== null && (range.from > range.through || range.through !== issuance.prunedThroughAuthorSequence)) ||
+		new IntrinsicSet(ahe.deletedBlobDigests).size !== ahe.deletedBlobDigests.length ||
+		new IntrinsicSet(ahe.deletedGenerationIds).size !== ahe.deletedGenerationIds.length ||
+		new IntrinsicSet(ahe.reclaimedGenerationIds).size !== ahe.reclaimedGenerationIds.length ||
+		ahe.deletedGenerationIds.some((generationId) => !ahe.reclaimedGenerationIds.includes(generationId))
+	) {
+		return false;
+	}
+	try {
+		captureAheReclamationInput({
+			activeGenerationId: ahe.activeGenerationId,
+			availabilityPolicyDigest: ahe.availabilityPolicyDigest,
+			closedEpoch: ahe.closedEpoch,
+			expectedHead: ahe.expectedHead,
+			lineageFloor: {
+				deleteGenerationIds: ahe.reclaimedGenerationIds,
+				expectedBaseExpectedHead: ahe.floor.expectedFormerBaseExpectedHead,
+				generationId: ahe.floor.generationId,
+				replacementBaseExpectedHead: ahe.floor.replacementBaseExpectedHead,
+			},
+			objectId: ahe.objectId,
+			rollbackGenerationIds: ahe.rollbackGenerationIds,
+		});
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+function d109dReceiptSnapshot(
+	input: D109dRuntimeReclamationInput
+):
+	| Readonly<{ readonly ok: true; readonly value: D109dReceiptSnapshot }>
+	| Readonly<{ readonly code: "D109D_INVALID_ARGUMENT" | "D109D_RECEIPT_MISMATCH"; readonly ok: false }> {
+	const issuance = d109dIssuanceReceipt(input.issuanceReceipt);
+	const ahe = d109dAheReceipt(input.aheReceipt);
+	if (issuance === undefined || ahe === undefined) {
+		return ObjectFreeze({ code: "D109D_INVALID_ARGUMENT" as const, ok: false as const });
+	}
+	const value = ObjectFreeze({ ahe, issuance });
+	return d109dReceiptsInternallyConsistent(value)
+		? ObjectFreeze({ ok: true as const, value })
+		: ObjectFreeze({ code: "D109D_RECEIPT_MISMATCH" as const, ok: false as const });
+}
+
+function d109dProjectionManifestDigest(registration: V3PlaneRegistration): string | undefined {
+	try {
+		const projection = decodeCanonical(registration.payload.exactProjectionBytes);
+		if (!isObject(projection) || !sameBytes(encodeCanonical(projection), registration.payload.exactProjectionBytes)) {
+			return undefined;
+		}
+		const digest = Reflect.get(projection, "snapshotManifestDigest");
+		return isDigestHex(digest) ? digest : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+function d109dRegistrationBound(registration: V3PlaneRegistration, snapshot: D109dReceiptSnapshot): boolean {
+	const { ahe, issuance } = snapshot;
+	const displaced = registration.displacedSource;
+	const closedEpoch = displaced?.prepared.provenance.epoch;
+	const manifestDigest = d109dProjectionManifestDigest(registration);
+	let qcCount = 0;
+	for (const reference of registration.payload.proposedClosure) {
+		if (reference.digest === issuance.commitQcRef.digest && reference.byteLength === issuance.commitQcRef.byteLength) {
+			qcCount += 1;
+		}
+	}
+	return (
+		displaced !== undefined &&
+		registration.displacedIssuanceBoundary !== undefined &&
+		closedEpoch === issuance.closedEpoch &&
+		registration.payload.provenance.epoch === issuance.closedEpoch + 1 &&
+		NumberIsSafeInteger(registration.payload.provenance.epoch) &&
+		issuance.scope.author === registration.issuanceScope.author &&
+		issuance.scope.objectId === registration.issuanceScope.objectId &&
+		issuance.scope.objectId === displaced.prepared.provenance.objectId &&
+		issuance.prunedThroughAuthorSequence === registration.displacedIssuanceBoundary &&
+		manifestDigest === issuance.snapshotManifestDigest &&
+		qcCount === 1 &&
+		ahe.objectId === registration.payload.provenance.objectId &&
+		ahe.closedEpoch === closedEpoch &&
+		ahe.activeGenerationId === registration.payload.trust.head.generationId &&
+		sameHead(ahe.expectedHead, registration.payload.trust.head) &&
+		ahe.availabilityPolicyDigest === AHE_RECLAMATION_LOCAL_ONLY_POLICY_DIGEST
+	);
+}
+
+function d109dLatchBytes(registration: V3PlaneRegistration, snapshot: D109dReceiptSnapshot): Uint8Array | undefined {
+	try {
+		const { ahe, issuance } = snapshot;
+		return encodeCanonical({
+			ahe: {
+				activeGenerationId: ahe.activeGenerationId,
+				availabilityPolicyDigest: ahe.availabilityPolicyDigest,
+				expectedHead: ahe.expectedHead,
+				floor: {
+					expectedFormerBaseExpectedHead: ahe.floor.expectedFormerBaseExpectedHead,
+					generationId: ahe.floor.generationId,
+					replacementBaseExpectedHead: ahe.floor.replacementBaseExpectedHead,
+				},
+				reclaimedGenerationIds: ahe.reclaimedGenerationIds,
+				rollbackGenerationIds: ahe.rollbackGenerationIds,
+			},
+			closedEpoch: issuance.closedEpoch,
+			issuance: {
+				commitQcRef: issuance.commitQcRef,
+				observedLineage: issuance.observedLineage,
+				prunedThroughAuthorSequence: issuance.prunedThroughAuthorSequence,
+				scope: issuance.scope,
+				snapshotManifestDigest: issuance.snapshotManifestDigest,
+			},
+			objectId: issuance.scope.objectId,
+			successorEpoch: registration.payload.provenance.epoch,
+		});
+	} catch {
+		return undefined;
+	}
+}
+
+function d109dSetSize(value: ReadonlySet<unknown>): number | undefined {
+	try {
+		return SetSizeGetter === undefined ? undefined : (ReflectApply(SetSizeGetter, value, []) as number);
+	} catch {
+		return undefined;
+	}
+}
+
+function d109dCloseCensusAbsent(): CreatorCloseRuntimeReleaseCensus {
+	return ObjectFreeze({
+		derivedCommitment: false,
+		durableReplay: false,
+		graph: false,
+		persistedSnapshot: false,
+		stagedSnapshot: false,
+	});
+}
+
+function d109dCensus(
+	successor: V3PlaneRegistration,
+	predecessor: V3PlaneRegistration | undefined,
+	close: CreatorCloseRuntimeReleaseCensus
+): D109dRuntimeCensus | undefined {
+	const quarantine = predecessor === undefined ? 0 : d109dSetSize(predecessor.quarantinedDigests);
+	const applicationAuthors = predecessor === undefined ? 0 : intrinsicMapSize(predecessor.applicationAuthors);
+	const applicationCharges = predecessor === undefined ? 0 : intrinsicMapSize(predecessor.applicationCharges);
+	const applicationVertices = predecessor === undefined ? 0 : intrinsicMapSize(predecessor.applicationVertices);
+	const latchedOperations = predecessor === undefined ? 0 : intrinsicMapSize(predecessor.latchedOperations);
+	const pendingIngress = predecessor === undefined ? 0 : intrinsicMapSize(predecessor.pendingIngress);
+	if (
+		quarantine === undefined ||
+		applicationAuthors === undefined ||
+		applicationCharges === undefined ||
+		applicationVertices === undefined ||
+		latchedOperations === undefined ||
+		pendingIngress === undefined
+	) {
+		return undefined;
+	}
+	return ObjectFreeze({
+		applicationAuthors,
+		applicationCharges,
+		applicationVertices,
+		blueprintState: predecessor?.blueprintMachine !== undefined,
+		causalityIndex: predecessor?.index.size ?? 0,
+		creatorCloseDerivedCommitment: close.derivedCommitment,
+		creatorCloseDurableReplay: close.durableReplay,
+		creatorCloseGraph: close.graph,
+		creatorClosePersistedSnapshot: close.persistedSnapshot,
+		creatorCloseStagedSnapshot: close.stagedSnapshot,
+		displacedRebaseCursor: successor.rebaseCursor !== undefined,
+		displacedSource: successor.displacedSource !== undefined,
+		epochBytes: predecessor?.epochBytes ?? 0,
+		graphVersion: predecessor?.graphVersion ?? 0,
+		hotPredecessor: successor.hotPredecessor !== undefined,
+		latchedOperations,
+		pendingIngress,
+		pendingIngressBytes: predecessor?.pendingIngressBytes ?? 0,
+		publication: predecessor?.publicationCursor !== undefined,
+		quarantine,
+		rebase: predecessor?.rebaseSnapshot !== undefined || predecessor?.rebaseCursor !== undefined,
+		retainedPayloadMetadata: predecessor !== undefined,
+	});
+}
+
+function d109dAfterCensus(
+	anchorCharge: number | undefined,
+	latchedOperations: number,
+	hasPredecessor: boolean
+): D109dRuntimeCensus {
+	return ObjectFreeze({
+		applicationAuthors: 0,
+		applicationCharges: hasPredecessor ? 1 : 0,
+		applicationVertices: hasPredecessor ? 1 : 0,
+		blueprintState: false,
+		causalityIndex: hasPredecessor ? 1 : 0,
+		creatorCloseDerivedCommitment: false,
+		creatorCloseDurableReplay: false,
+		creatorCloseGraph: false,
+		creatorClosePersistedSnapshot: false,
+		creatorCloseStagedSnapshot: false,
+		displacedRebaseCursor: false,
+		displacedSource: false,
+		epochBytes: anchorCharge ?? 0,
+		graphVersion: hasPredecessor ? 1 : 0,
+		hotPredecessor: false,
+		latchedOperations,
+		pendingIngress: 0,
+		pendingIngressBytes: 0,
+		publication: false,
+		quarantine: 0,
+		rebase: false,
+		retainedPayloadMetadata: hasPredecessor,
+	});
+}
+
+async function reclaimV3RuntimeKernel(input: D109dRuntimeReclamationInput): Promise<D109dRuntimeReclamationResult> {
+	const receiptCapture = d109dReceiptSnapshot(input);
+	if (!receiptCapture.ok) return d109dFailure(receiptCapture.code);
+	const successor = input.successor as V3PlaneHandle;
+	const initial = v3HandleRegistrations.get(successor);
+	if (initial === undefined || initial.mode === "snapshot-closed" || !currentRegistration(initial)) {
+		return d109dFailure("D109D_IDENTITY_MISMATCH");
+	}
+	return enqueueRegistrationTask(initial, (): (() => Promise<D109dRuntimeReclamationResult>) => {
+		const receipts = receiptCapture.value;
+		return async (): Promise<D109dRuntimeReclamationResult> => {
+			if (
+				v3HandleRegistrations.get(successor) !== initial ||
+				initial.mode === "snapshot-closed" ||
+				!currentRegistration(initial)
+			) {
+				return d109dFailure("D109D_IDENTITY_MISMATCH");
+			}
+			const latchBytes = d109dLatchBytes(initial, receipts);
+			if (latchBytes === undefined) return d109dFailure("D109D_INTERNAL_INVARIANT");
+			if (initial.runtimeReclamationLatch !== undefined) {
+				if (!sameBytes(initial.runtimeReclamationLatch, latchBytes)) {
+					return d109dFailure("D109D_RECEIPT_MISMATCH");
+				}
+				const first = initial.runtimeReclamationResult;
+				return first === undefined
+					? d109dFailure("D109D_INTERNAL_INVARIANT")
+					: ObjectFreeze({ ...first, replay: true as const });
+			}
+			if (!d109dRegistrationBound(initial, receipts)) {
+				return d109dFailure("D109D_RECEIPT_MISMATCH");
+			}
+			if (
+				initial.terminalState !== "active" ||
+				initial.retainedBootstrapHold ||
+				initial.terminalBarrier !== undefined ||
+				initial.blueprintClosing
+			) {
+				return d109dFailure("D109D_RUNTIME_NOT_READY");
+			}
+
+			const predecessorReference = initial.hotPredecessor;
+			let predecessor = predecessorReference?.deref();
+			if (predecessor?.gate !== undefined) await predecessor.gate;
+			if (predecessorReference !== undefined) {
+				const rechecked = predecessorReference.deref();
+				if (predecessor !== undefined && rechecked !== predecessor) {
+					return d109dFailure("D109D_RUNTIME_NOT_READY");
+				}
+				predecessor = rechecked;
+			}
+			if (
+				predecessor !== undefined &&
+				(predecessor.active ||
+					predecessor.mode === "snapshot-closed" ||
+					predecessor.topic !== initial.topic ||
+					predecessor.networkNode !== initial.networkNode ||
+					v3HandleRegistrations.get(predecessor.handle) !== predecessor ||
+					(intrinsicMapSize(predecessor.pendingIngress) ?? -1) !== 0 ||
+					predecessor.pendingIngressBytes !== 0)
+			) {
+				return d109dFailure("D109D_RUNTIME_NOT_READY");
+			}
+
+			const closePlan = predecessor === undefined ? undefined : prepareCreatorCloseRuntimeRelease(predecessor.handle);
+			if (predecessor !== undefined && closePlan === undefined) {
+				return d109dFailure("D109D_RUNTIME_NOT_READY");
+			}
+			const absentClose = d109dCloseCensusAbsent();
+			const before = d109dCensus(initial, predecessor, closePlan?.before ?? absentClose);
+			if (before === undefined) return d109dFailure("D109D_INTERNAL_INVARIANT");
+
+			let anchorDigest: string | undefined;
+			let anchorVertex: EpochVertex | undefined;
+			let anchorCharge: number | undefined;
+			let replacementIndex: CausalityIndex | undefined;
+			let emptyQuarantine: ReadonlySet<string> | undefined;
+			if (predecessor !== undefined) {
+				anchorDigest = predecessor.payload.provenance.anchorDigest;
+				anchorVertex = ReflectApply(MapPrototypeGet, predecessor.applicationVertices, [anchorDigest]) as
+					| EpochVertex
+					| undefined;
+				anchorCharge = ReflectApply(MapPrototypeGet, predecessor.applicationCharges, [anchorDigest]) as
+					| number
+					| undefined;
+				if (anchorVertex === undefined || !NumberIsSafeInteger(anchorCharge) || (anchorCharge as number) < 1) {
+					return d109dFailure("D109D_INTERNAL_INVARIANT");
+				}
+				try {
+					const vertices = new IntrinsicMap<string, EpochVertex>([[anchorDigest, anchorVertex]]);
+					const charges = new IntrinsicMap<string, number>([[anchorDigest, anchorCharge as number]]);
+					replacementIndex = new CausalityIndex(vertices, ObjectFreeze([anchorDigest]), {
+						initialByteCharges: charges,
+						maxEpochBytes: predecessor.payload.parameters.maxEpochBytes,
+						maxEpochVertices: predecessor.payload.parameters.maxEpochVertices,
+					});
+					emptyQuarantine = new IntrinsicSet<string>();
+				} catch {
+					return d109dFailure("D109D_INTERNAL_INVARIANT");
+				}
+			}
+			const retainedLatchCount = predecessor === undefined ? 0 : intrinsicMapSize(predecessor.latchedOperations);
+			if (retainedLatchCount === undefined) return d109dFailure("D109D_INTERNAL_INVARIANT");
+			const after = d109dAfterCensus(anchorCharge, retainedLatchCount, predecessor !== undefined);
+			const result = ObjectFreeze({
+				after,
+				before,
+				closedEpoch: receipts.issuance.closedEpoch,
+				objectId: receipts.issuance.scope.objectId,
+				ok: true as const,
+				replay: false as const,
+				successorEpoch: initial.payload.provenance.epoch,
+			});
+
+			if (closePlan !== undefined && !closePlan.release()) {
+				return d109dFailure("D109D_INTERNAL_INVARIANT");
+			}
+			if (
+				predecessor !== undefined &&
+				anchorDigest !== undefined &&
+				anchorVertex !== undefined &&
+				anchorCharge !== undefined &&
+				replacementIndex !== undefined &&
+				emptyQuarantine !== undefined
+			) {
+				ReflectApply(MapPrototypeClear, predecessor.applicationAuthors, []);
+				ReflectApply(MapPrototypeClear, predecessor.applicationCharges, []);
+				ReflectApply(MapPrototypeSet, predecessor.applicationCharges, [anchorDigest, anchorCharge]);
+				ReflectApply(MapPrototypeClear, predecessor.applicationVertices, []);
+				ReflectApply(MapPrototypeSet, predecessor.applicationVertices, [anchorDigest, anchorVertex]);
+				predecessor.index = replacementIndex;
+				predecessor.epochBytes = anchorCharge;
+				predecessor.graphVersion = 1;
+				predecessor.blueprintMachine = undefined;
+				predecessor.blueprintHandle = undefined;
+				predecessor.quarantinedDigests = emptyQuarantine;
+				predecessor.publicationCursor = undefined;
+				predecessor.rebaseCursor = undefined;
+				predecessor.rebaseSnapshot = undefined;
+			}
+			initial.displacedSource = undefined;
+			initial.displacedIssuanceBoundary = undefined;
+			initial.rebaseCursor = undefined;
+			initial.rebaseSnapshot = undefined;
+			initial.hotPredecessor = undefined;
+			initial.runtimeReclamationLatch = latchBytes;
+			initial.runtimeReclamationResult = result;
+			return result;
+		};
+	});
 }
 
 function activationFailure(
@@ -3550,6 +4109,7 @@ interface RecoveredV3LivePayload {
 	readonly applicationVertices: Map<string, EpochVertex>;
 	readonly authorization: V3LiveAuthorization;
 	readonly classifyTerminalVertex?: V3TerminalVertexClassifier;
+	readonly displacedIssuanceBoundary?: number;
 	readonly displacedSource?: V3DisplacedSourceAuthority;
 	readonly epochBytes: number;
 	readonly index: CausalityIndex;
@@ -4392,6 +4952,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		let afterKey: readonly [string, string, number] | undefined;
 		let currentRecordCount = 0;
 		let displacedRecordCount = 0;
+		let displacedIssuanceBoundary: number | undefined;
 		for (;;) {
 			let rawPage: unknown;
 			try {
@@ -4439,6 +5000,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			}
 			if (classified?.kind === "displaced") {
 				displacedRecordCount += 1;
+				displacedIssuanceBoundary = row.authorSequence;
 				if (
 					displacedRecordCount > (displacedSource as V3DisplacedSourceAuthority).prepared.parameters.maxEpochVertices
 				) {
@@ -4693,6 +5255,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				classifyTerminalVertex:
 					typeof terminalClassifier === "function" ? (terminalClassifier as V3TerminalVertexClassifier) : undefined,
 				displacedSource,
+				displacedIssuanceBoundary,
 				epochBytes,
 				index,
 				issuanceScope: selectedScope,
@@ -6571,11 +7134,13 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				blueprintHandle: undefined,
 				blueprintMachine: snapshotMachine,
 				classifyTerminalVertex: recovered.classifyTerminalVertex,
+				displacedIssuanceBoundary: recovered.displacedIssuanceBoundary,
 				displacedSource: recovered.displacedSource,
 				drainingPendingIngress: false,
 				epochBytes: recovered.epochBytes,
 				graphVersion: intrinsicMapSize(recovered.applicationAuthors) ?? -1,
 				handle: undefined as unknown as V3PlaneHandle,
+				hotPredecessor: undefined,
 				index: recovered.index,
 				issuanceScope: selectedScope,
 				issuanceStore: boundIssuanceStore,
@@ -6595,6 +7160,8 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				rebaseSnapshot: undefined,
 				retainedBootstrapHold: recovered.retainedBootstrapHold,
 				releaseTerminalBarrier: undefined,
+				runtimeReclamationLatch: undefined,
+				runtimeReclamationResult: undefined,
 				quarantinedDigests: recovered.quarantinedDigests,
 				queueId: topic,
 				topic,
@@ -6610,6 +7177,7 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				existing.active = false;
 				existing.pendingIngress.clear();
 				existing.pendingIngressBytes = 0;
+				registration.hotPredecessor = new WeakRefConstructor(existing);
 			}
 			registrations.set(topic, registration);
 			v3PlaneRegistrations.set(boundNetworkNode, registrations);
@@ -6738,6 +7306,10 @@ if (!installCreatorSuccessorHandleAlias(aliasCreatorSuccessorHandle)) {
 
 if (!installCreatorSuccessorLive(activateCreatorSuccessorLive)) {
 	throw new TypeError("creator successor live owner was already installed");
+}
+
+if (!installV3RuntimeReclamationKernel(reclaimV3RuntimeKernel)) {
+	throw new TypeError("v3 runtime reclamation kernel was already installed");
 }
 
 /**

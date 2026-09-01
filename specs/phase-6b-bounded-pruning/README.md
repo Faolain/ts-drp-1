@@ -228,3 +228,19 @@ cross-object remaining-closure scan before global blob deletion. The reviewer
 approved the staged owner topology, D.109a’s causal value, slice order, runtime
 reuse, and Phase-5c advisory scheduling reuse. This one-off review is complete
 and must not be relaunched.
+
+## D.109d GREEN handoff
+
+D.109d GREEN is implemented within its five executable owners and three
+evidence documents. Receipt-gated reclamation now releases the authenticated
+displaced source, compacts a reachable hot predecessor to its single anchor,
+and clears the creator-close duplicate owner while leaving the current
+successor and every durable store untouched. The accepted focused result is
+12/12; retained D.109a/b/c and Phase-6a results are 142/142 Vitest plus 4/4,
+4/4, 2/2, and 8/8 Chromium. All affected builds and exact-owner static gates
+pass. Known whole-package typecheck debt remains confined to its inherited
+test/configuration categories and emits no D.109d semantic diagnostic.
+
+Evidence is rooted at `.logs/phase-6b-d109d-green/`. The final signed
+Grok/Kimi/Opus implementation review is pending; D.109e and later slices remain
+closed until that blocking union is empty. No campaign ran.

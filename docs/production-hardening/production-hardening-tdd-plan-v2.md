@@ -88736,3 +88736,39 @@ validating self-excluding manifest SHA-256 is
 Under the prospective simplified review policy, no separate three-model RED
 review runs. The final GREEN review must inspect this signed RED diff and
 evidence and confirm its causal transition.
+
+#### D.109d GREEN implementation checkpoint
+
+D.109d GREEN is complete within the frozen owners:
+`packages/node/src/internal/runtime-reclamation.ts`,
+`packages/node/src/v3-live.ts`, `packages/node/src/creator-close.ts`, and the
+two D.109d test owners. The internal API remains package-private. The genuine
+hot path records the exact displaced issuance boundary, holds only a direct
+non-owning predecessor reference, serializes and rechecks both registrations,
+preconstructs the immutable result and replacement index, clears the
+creator-close duplicate owner, compacts the retired registration to its anchor,
+and severs the displaced/rebase/predecessor references. Replay latches
+D.109b `observedLineage` and D.109c `reclaimedGenerationIds`; only the five
+frozen physical outcome fields may differ.
+
+The accepted focused reporter passes 12/12 with zero skips or soft failures.
+The fixture obtains genuine first/replay/partial D.109b receipts from a
+temporary Node issuance owner and genuine first/replay D.109c receipts from an
+exact temporary SQLite reconstruction of the adopted four-generation lineage.
+An earlier all-green result that used only the shared D.109c receipt constructor
+is preserved but rejected, rather than misrepresented as native-maintenance
+evidence. Later superseded reports preceding the asynchronous closed-union
+guard and genuine inactive-handle assertion are likewise preserved.
+
+Retained D.109a/b/c and Phase-6a execution passes 142/142 Vitest and 4/4, 4/4,
+2/2, and 8/8 Chromium. Every affected package build passes. Passing
+whole-package typechecks are compaction, issuance-store, and storage; the Node,
+object, storage-node, and storage-browser typechecks retain only their recorded
+pre-existing test/configuration debt, with no D.109d semantic diagnostic. Exact
+owner ESLint, Prettier, diff, source/export, protected-path, and stash gates
+pass. Evidence is rooted at `.logs/phase-6b-d109d-green/`.
+
+No retained campaign or scope-widening product/dependency/protocol/threshold
+change ran. GREEN is not closed until the signed/pushed checkpoint receives the
+single required Grok 4.6/high, standard Kimi CLI K3/high/100-step, and Opus
+xhigh final review with an empty P0/P1 union.

@@ -30,6 +30,11 @@ import {
 import type { SnapshotQuarantineDeclaration, SnapshotQuarantineStore } from "@ts-drp/storage/snapshot-transfer";
 
 import { installCreatorAdoptionFacts, revokeCreatorAdoptionFacts } from "./internal/creator-adoption-intent.js";
+import {
+	type CreatorCloseRuntimeReleaseCensus,
+	type CreatorCloseRuntimeReleasePlan,
+	installCreatorCloseRuntimeRelease,
+} from "./internal/runtime-reclamation.js";
 import type { V3PlaneHandle } from "./v3-live.js";
 
 const PROFILE: SnapshotTransferProfile = Object.freeze({
@@ -39,6 +44,7 @@ const PROFILE: SnapshotTransferProfile = Object.freeze({
 });
 const SCANNABLE_BYTES = 8192;
 const bindings = new WeakMap<V3PlaneHandle, CreatorLiveCloseHandle>();
+const runtimeReleaseOwners = new WeakMap<V3PlaneHandle, () => CreatorCloseRuntimeReleasePlan | undefined>();
 let creatorCloseRegistrationResolver: ((plane: V3PlaneHandle) => unknown) | undefined;
 
 type CreatorTrustProjection = Readonly<{
@@ -663,11 +669,52 @@ export async function bindCreatorLiveClose(
 			},
 			stop: () => actor.stop(),
 		});
+		runtimeReleaseOwners.set(input.plane, (): CreatorCloseRuntimeReleasePlan | undefined => {
+			if (lifecycle !== "successor-adopted") return undefined;
+			const before: CreatorCloseRuntimeReleaseCensus = Object.freeze({
+				derivedCommitment: derivedCommitment !== undefined,
+				durableReplay: durableReplay !== undefined,
+				graph: capturedGraph !== undefined,
+				persistedSnapshot: persistedSnapshot !== undefined,
+				stagedSnapshot: stagedSnapshot !== undefined,
+			});
+			const after: CreatorCloseRuntimeReleaseCensus = Object.freeze({
+				derivedCommitment: false,
+				durableReplay: false,
+				graph: false,
+				persistedSnapshot: false,
+				stagedSnapshot: false,
+			});
+			let used = false;
+			return Object.freeze({
+				after,
+				before,
+				release: (): boolean => {
+					if (used) return true;
+					if (lifecycle !== "successor-adopted") return false;
+					used = true;
+					capturedGraph = undefined;
+					stagedSnapshot = undefined;
+					persistedSnapshot = undefined;
+					derivedCommitment = undefined;
+					durableReplay = undefined;
+					return true;
+				},
+			});
+		});
 		bindings.set(input.plane, handle);
 		return Object.freeze({ handle, ok: true as const });
 	} catch {
 		return Object.freeze({ ok: false as const, reason: "CREATOR_CLOSE_BIND_FAILED" });
 	}
+}
+
+if (
+	!installCreatorCloseRuntimeRelease((plane): CreatorCloseRuntimeReleasePlan | undefined =>
+		runtimeReleaseOwners.get(plane as V3PlaneHandle)?.()
+	)
+) {
+	throw new TypeError("creator close runtime release owner was already installed");
 }
 
 Object.defineProperty(bindCreatorLiveClose, "installV3CreatorCloseRegistrationResolver", {

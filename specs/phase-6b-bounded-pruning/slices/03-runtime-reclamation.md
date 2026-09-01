@@ -308,3 +308,68 @@ demonstrated P0/P1 union in one batch. Because it changes receipt acceptance
 and adds the omitted creator-close production owner, exactly one confirmation
 round reviews this corrected executable plan before RED; no further plan round
 is permitted absent a newly demonstrated P0/P1.
+
+## GREEN implementation and evidence
+
+GREEN adds the frozen package-internal owner and no public surface. The
+internal entry snapshots the exact closed input, delegates only to the single
+installed v3 kernel, and converts both synchronous and asynchronous kernel
+failure to `D109D_INTERNAL_INVARIANT`. `v3-live.ts` records the maximum
+authenticated displaced issuance ordinal during its existing complete outbox
+classification, installs a direct `WeakRef` only for a genuine same-transport
+handoff, validates and latches every authority field, joins the successor gate,
+awaits and rechecks a reachable predecessor gate, constructs the complete
+post-state before mutation, and then releases the frozen owner set.
+`creator-close.ts` supplies the separately demonstrated no-throw release plan
+only after `successor-adopted`; it clears the captured graph, staged/persisted
+snapshot, derived commitment, and durable replay while preserving the close
+handle's status, durable-head inspection, and stop behavior.
+
+The corrected test fixture uses the genuine close → verify → commit path and
+the exact hot transport bindings. It copies the authenticated issuance commits
+into a temporary genuine Node issuance store and obtains first-call, replay,
+and partial-prefix receipts from
+`resolveNodeDurableIssuancePruningMaintenance`. It also reconstructs the exact
+four-generation adopted lineage and every referenced blob in a temporary
+SQLite AHE store, then obtains first-call and replay receipts from
+`resolveNodeAheReclamationMaintenance`. No synthetic successful receipt is
+accepted as evidence. An independent-transport activation covers the
+no-retired-registration branch; the same-transport path proves the actual hot
+predecessor and creator-close owners.
+
+The accepted focused reporter is
+`.logs/phase-6b-d109d-green/focused-accepted.json`: one selected file, twelve
+declared tests, twelve passed, zero failed/skipped/top-level errors. It covers
+all 27 receipt mutants, seven identity labels (including a genuine deactivated
+handle and proxy/copy identities), fourteen replay-authority mutations, the
+five permitted outcome differences, exact hot before/after census, cold
+absence, queued successor ordering plus predecessor-gate source custody, live
+successor issue/publication after release, close-handle preservation, and
+pre-write failure usability. Earlier all-green reporters remain immutable but
+are rejected as final evidence: one used the shared D.109c receipt constructor
+instead of native maintenance, one preceded the asynchronous closed-union
+guard, and one preceded the genuine inactive-handle assertion.
+
+Retained evidence is green:
+
+- D.109a/b/c plus Phase-6a Node/Vitest paths: 142/142;
+- D.109b Chromium retention: 4/4;
+- D.109c Chromium reclamation: 4/4;
+- Phase-6a Chromium adoption/death: 2/2; and
+- Phase-6a Chromium activation: 8/8.
+
+All seven affected package builds pass. Compaction, issuance-store, and storage
+whole-package typechecks pass. Node, object, storage-node, and storage-browser
+whole-package typechecks retain their pre-existing test/configuration failures:
+worker-host `rootDir`/file-list inclusion, the retained WebRTC `emit` typing,
+compact-history negative/config union fixtures, cross-package test-root
+inclusion and unresolved workspace aliases, and D.109c browser negative-fixture
+branding/import aliases. The Node production build and exact-owner ESLint,
+Prettier, and diff checks pass; no D.109d semantic type diagnostic appears.
+The complete commands, full reporter set, typecheck output, owner hashes, and
+self-excluding manifest are rooted at `.logs/phase-6b-d109d-green/`.
+
+No retained campaign, dependency, schema, threshold, timing, protocol,
+wire/digest/QC/adoption/availability, live-journal deletion, legacy-object, or
+product-API change ran. Final Grok/Kimi/Opus review remains the sole blocking
+GREEN closure gate.
