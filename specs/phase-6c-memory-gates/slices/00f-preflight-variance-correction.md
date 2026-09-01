@@ -98,13 +98,15 @@ success proof and memory-only failure context. This amendment does not reopen
 D.110a-w, rerun its consumed preflight, or change the seven-hour/630-second
 arithmetic. It adds no new long invocation.
 
-For full mode only, the parent must create fresh write-once root
-`.logs/phase-6c-d110a-full/` and `invocation-consumed.json` before spawning the
-worker. It then writes authenticated source identity (signed commit/tree and
-exact child/worker/contract hashes), Node identity, every resolved public import
-and internal URL/hash, command, and 25,200,000-ms deadline to a write-once
-identity record before spawn. The root must already be absent; no overwrite or
-reuse path is accepted.
+For full mode only, the parent first resolves and authenticates every required
+built target and computes source/Node/import/internal identity in memory. Only
+after those non-consuming checks pass does it create fresh write-once root
+`.logs/phase-6c-d110a-full/` and `invocation-consumed.json`; both still precede
+worker spawn. It then writes the authenticated signed commit/tree, exact child/
+worker/contract hashes, Node identity, every resolved public import and
+internal URL/hash, command, and 25,200,000-ms deadline to a write-once identity
+record before spawn. The root must already be absent; no overwrite or reuse
+path is accepted.
 
 The parent opens distinct raw child stdout, child stderr, progress JSONL, and
 launcher-event JSONL files with exclusive creation. Every received chunk or
@@ -117,6 +119,16 @@ result-received boolean, and parent success/failure status. On successful full
 completion the parent also writes the exact JSON it returns to `parent.json`;
 the public stdout remains the same complete parent result.
 
+On receipt of any non-progress terminal IPC message, the parent writes and
+fsyncs its complete raw content to exclusive `terminal.json` before parsing or
+validation. Thus a complete proof rejected for journal equality, accounting,
+digest, slope, or ceiling remains durable rather than collapsing to a received
+boolean. The final status record also contains the parent's exact failure
+classification and error text. The parent records the child's `exit` event but
+finalizes only after `close`, ended stdout/stderr, and IPC disconnect when
+present. The fault matrix includes a large final stderr burst immediately
+before exit.
+
 The measured worker performs no evidence I/O. It may send bounded IPC progress
 facts. Each lifecycle phase record contains a worker monotonic timestamp,
 object index, completed-object count, applied-operation count, active-successor
@@ -128,6 +140,9 @@ The parent assigns one contiguous journal sequence and flushes each record.
 These facts are diagnostic only and never become or substitute for a memory
 verdict.
 
+Immediately after the existing pre-loop post-GC baseline reading, the worker
+sends one bounded `baseline` record for parent journaling.
+
 Add exact token `D110AX_FAILURE_FORENSICS_MISSING` and a deterministic source-
 shape owner. The new focused RED runs once without the real worker and fails
 only that token while every timing assertion remains green. After signing and
@@ -135,18 +150,26 @@ pushing RED, GREEN adds the parent-only recorder, enriched bounded worker IPC,
 and a tiny synthetic child used only by the focused fault matrix. The matrix
 covers normal miniature completion; controlled failure after several phase/
 sample records; watchdog termination; child error; partial stdout/stderr;
-missing, duplicate, malformed, and out-of-order records; and terminal-proof/
-journal mismatch. It proves evidence survives process death and every
-non-success classification remains fail closed.
+missing, duplicate, malformed, and out-of-order records; terminal-proof/journal
+mismatch; and a large final stderr burst immediately before exit. It proves
+evidence survives process death and every non-success classification remains
+fail closed.
 
-The success validator requires exactly 64 `completed-sample` records with
-indices 0 through 63, operation counts `(index + 1) * 15,625`, completed counts
-`index + 1`, active counts `min(index + 1, 20)`, complete nonnegative memory
-readings equal to the terminal proof samples, contiguous journal ordering, and
-valid per-object lifecycle order. Only after that equality check does the
-existing `validateD110aProof` remain authoritative for accounting, digest,
-slopes, absolute ceiling, and during-execution sampling. A partial journal has
+The success validator requires exactly one baseline record followed by exactly
+64 `completed-sample` records with indices 0 through 63, operation counts
+`(index + 1) * 15,625`, completed counts `index + 1`, active counts
+`min(index + 1, 20)`, complete nonnegative memory readings equal to the terminal
+proof baseline/samples, contiguous journal ordering, and valid per-object
+lifecycle order. Only after that equality check does the existing
+`validateD110aProof` remain authoritative for accounting, digest, slopes,
+absolute ceiling, and during-execution sampling. A partial journal has
 diagnostic validity only and cannot satisfy full success.
+
+Add both `preflightVariance` and `failureForensics` to the audit's declared
+return type. The source-shape token alone is insufficient: the focused matrix
+must inspect the same exported full-mode configuration actually consumed by
+the launcher and prove its exact `.logs/phase-6c-d110a-full/` root,
+`D110A_FULL_TIMEOUT_MS` deadline, and real retained-heap child path.
 
 Because this materially amends launcher/evidence behavior adjacent to a sole
 consuming run, sign and push the amended plan and run exactly one confirmation

@@ -91178,18 +91178,19 @@ contract/test, child, and worker plus new parent-only
 API, dependency, package, lockfile, workflow, workload, threshold, adaptive
 deadline, retry, preflight, profile, or full execution in this amendment.
 
-For full mode, the parent creates fresh write-once
-`.logs/phase-6c-d110a-full/` and its consumed sentinel before worker spawn. It
-persists signed commit/tree, exact child/worker/contract hashes, Node identity,
-resolved public imports and internal URLs/hashes, command, and deadline in a
-write-once identity file before spawn. Distinct child stdout, child stderr,
+For full mode, the parent first resolves/authenticates every built target and
+computes source/runtime/import identity in memory. It then creates fresh write-
+once `.logs/phase-6c-d110a-full/` and its consumed sentinel before worker spawn
+and persists signed commit/tree, exact child/worker/contract hashes, Node
+identity, resolved public imports and internal URLs/hashes, command, and
+deadline in a write-once identity file. Distinct child stdout, child stderr,
 progress JSONL, and launcher-event JSONL files are exclusively created; each
 received chunk/record is synchronously appended and fsynced. The launcher
 journal and final write-once status explicitly retain start/finish wall and
 monotonic times, elapsed time, identity persistence, child PID/spawn, deadline,
-watchdog-fired boolean/event, terminal-result receipt, exit code/signal, and
-parent success/failure. On success `parent.json` contains the same complete
-parent result still printed to stdout.
+watchdog-fired boolean/event, terminal-result receipt, exit code/signal, parent
+success/failure, exact failure classification, and error text. On success
+`parent.json` contains the same complete parent result still printed to stdout.
 
 The worker performs no evidence I/O. It sends bounded IPC phase facts with a
 worker monotonic timestamp, object index, completed count, applied-operation
@@ -91199,11 +91200,21 @@ and the already-created full memory reading. The parent assigns contiguous
 journal sequence numbers and durably flushes each record. Partial records are
 diagnostic only and never create or substitute for a memory verdict.
 
-On success, an independent validator requires exactly 64 completed-sample
-records, indices 0--63, exact `(index + 1) * 15,625` operations, completed count
-`index + 1`, active count `min(index + 1, 20)`, nonnegative complete memory
-readings byte-for-byte equal to terminal proof samples, contiguous record
-sequence, and valid per-object phase ordering. The unchanged
+The worker also sends the already-created pre-loop post-GC baseline once. On
+receipt of any non-progress terminal IPC message, the parent writes and fsyncs
+its complete raw content to exclusive `terminal.json` before parsing or
+validation. Thus a complete proof rejected by journal, accounting, digest,
+slope, or ceiling checks remains durable. The parent records `exit` but
+finalizes only after child `close`, ended stdout/stderr, and IPC disconnect when
+present; the fault matrix includes a large trailing-stderr write immediately
+before exit.
+
+On success, an independent validator requires exactly one baseline plus 64
+completed-sample records, indices 0--63, exact `(index + 1) * 15,625`
+operations, completed count `index + 1`, active count `min(index + 1, 20)`,
+nonnegative complete memory readings byte-for-byte equal to terminal proof
+baseline/samples, contiguous record sequence, and valid per-object phase
+ordering. The unchanged
 `validateD110aProof` remains authoritative for the million-operation/62,528-
 vertex accounting, object results, semantic digest, three slope ceilings,
 absolute ceiling, and during-execution contract.
@@ -91213,10 +91224,16 @@ The amended deterministic RED adds exact token
 once without a real worker and must fail only that token. GREEN uses the same
 parent recorder with a tiny synthetic child to cover normal miniature
 completion, failure after several records, watchdog termination, child error,
-partial stdout/stderr, missing/duplicate/malformed/out-of-order records, and
-terminal-proof/journal mismatch. The bounded tests must prove prior evidence
-survives process death and every non-success classification remains fail
-closed.
+partial stdout/stderr, missing/duplicate/malformed/out-of-order records,
+terminal-proof/journal mismatch, and a large final stderr burst. The bounded
+tests must prove prior evidence survives process death and every non-success
+classification remains fail closed.
+
+The contract audit's declared return type gains `preflightVariance` and
+`failureForensics`. The focused matrix verifies the same exported full-mode
+configuration actually consumed by the launcher binds the real full evidence
+root, `D110A_FULL_TIMEOUT_MS`, and retained-heap child path; regex-only source
+shape cannot close GREEN.
 
 Because this materially changes launcher/evidence behavior adjacent to the
 sole consuming worker, sign and push this amendment and run exactly one
@@ -91233,3 +91250,34 @@ manifest gates. Only their complete pass plus signed/pushed evidence, this
 amended-plan confirmation, and the final GREEN review can release the one full
 worker. On either success or failure, the new durable evidence must support a
 defensible conclusion without rerun.
+
+##### D.110a-x failure-forensics amendment confirmation and correction
+
+The single material confirmation inspected signed/pushed anchor
+`fdc1440fec6e819ba8ebd06152a49c990e73c5c6`, tree
+`97c7e3fc2e38c02b983d3f0df0905d9ed459a820`. The shared prompt SHA-256 is
+`f4ca9b4318c207c7a96c33192aa3bb0373ec94acaecd5ba548faa2cc5f08e2c7`.
+Grok 4.6/high and standard direct Kimi K3/100-step returned `APPROVED`, P0=0,
+P1=0, P2=0. Opus xhigh returned `CHANGES_REQUIRED`, P0=0, P1=2, P2=4. Their
+terminal/public SHA-256 values are respectively
+`91a3ed5e53fbd84f59ce551071c7911237c53b95586d7ead90dab99c45b89f23`,
+`100b9ff1f95546ed7fa12438b70db8e9388f7bf3768d48305f384f03f3fd134a`,
+and `87be0d28a1f823ff0edf8a6f898b71d65e4e9a3e52ab0ab0d2bdf1f95c59a597`.
+The validating self-excluding 16-entry review manifest has SHA-256
+`c62747db3f19d75191ffb2d825c2b0476e066de48e4884186685706823398b2f`.
+
+Both P1s are adopted above. First, the complete raw terminal IPC is persisted
+and fsynced before validation, and final status retains the parent's exact
+classification/error; a complete-but-rejected proof can no longer disappear.
+Second, `exit` is recorded but evidence finalization waits for `close`, stream
+ends, and IPC drain, with a large trailing-stderr fault test. These close the
+blocking union without changing timing, workload, memory, product behavior, or
+scope.
+
+The four P2s are also dispositioned in the same batch: the audit return type is
+complete; built/source identity is authenticated in memory before the scarce
+root is consumed and then persisted before spawn; the focused test validates
+the launcher's actually consumed exported configuration rather than only a
+regex; and the post-GC baseline is journaled and matched on success. No second
+confirmation or recursive prose review is authorized. Sign/push this bounded
+correction and proceed to the separate deterministic forensics RED.
