@@ -91403,3 +91403,57 @@ source predicate true.
 
 The validating self-excluding 39-entry GREEN evidence manifest has SHA-256
 `f562509b1c25caffa3122db6997ec736338feaf02de5c50284e6c931ea06a41e`.
+
+##### D.110a-x final GREEN review closure
+
+The one required final implementation review inspected signed/pushed GREEN
+`be148e13eb6f9513189da4f13f2ff8f93a4040cb`, tree
+`5d3da3cf46ff8ea69688c278581702298b8c3c6c`, over the complete timing plan/RED/
+GREEN and forensics amendment/confirmation/RED/GREEN history. Grok 4.6/high,
+standard direct Kimi K3 with `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh
+all returned `APPROVED`. Their P0/P1/P2 counts were respectively 0/0/3, 0/0/5,
+and 0/0/7, so the blocking union is empty.
+
+Grok's runner status says `NO_VERDICT`, but this is a deterministic wrapper-
+marker defect rather than a canceled or incomplete service run: status records
+`timed_out=false`, `stop_reason=end_turn`, and exit zero, while `public.txt`
+contains the complete schema-valid terminal JSON after two progress sentences.
+The runner recognizes uppercase textual markers such as `VERDICT:` but not the
+requested lowercase JSON key `"verdict"`. The exact terminal object was
+extracted without altering it and validates as `APPROVED` with P0=0/P1=0.
+Because no cancellation occurred and a complete terminal verdict exists, the
+session was not relaunched or duplicated.
+
+All P2 findings are accepted as nonblocking under the frozen policy. The union
+concerns only fail-closed or bounded diagnostics: fire-and-forget worker IPC;
+strict parent timestamp equality; impossible cross-object interleaving from the
+sequential worker; bounded parent stdout/stderr accumulation; constants copied
+into the detached validator; recorder construction/finish filesystem failures;
+no containing-directory fsync against host power loss; no post-exit identity
+rehash; the already-correct runtime callback despite an overly broad TypeScript
+function annotation excluded from build-source programs; the corrected audit's
+targeted untracked query; the synthetic one-second watchdog margin; and an
+unreachable legacy full-timeout selection branch. Every failure direction is
+fail closed, the actual child-death threat model is covered, and none can
+fabricate a passing memory verdict or alter workload/product semantics. Changing
+these executable details for P2 would violate the prospective rule against
+extending this sole-run-adjacent checkpoint; any optional cleanup is deferred.
+
+The shared prompt SHA-256 is
+`a00bad96ce40c85b3b3dfb76f5e8057e5e7e0cf40ac471a689cc494e68333fcb`.
+Grok public/terminal hashes are
+`c5748e06148918ba838b3456280ccd4fe7b6d5c0e25849d749e1fe32db789075`
+and `72157afd8bc9d9208cb374286969d02fc817cc7d665c136e310cf4a6f9f7f38f`.
+Kimi stream/terminal hashes are
+`001d986edab768234809e75af5550b99e9630384bb2c06d559836cbd1ad1beb8`
+and `08336b5a8b8e70ca713699c1d8691f4f9724595d672c0ef87b25e1d3b32851f7`.
+Opus raw/terminal hashes are
+`b1343f7a85ffe84277184bb1a675f7d58ee060db18d43bb88cd98c410f8f7740`
+and `418ccae4799fdc17f5750db6b44bc2f91b010d8da0a97ef856c0892aa679c6e2`.
+The validating self-excluding 14-entry review manifest has SHA-256
+`b190c8543851fe0219fd6ab84a16bfbb4fd622be70261b2b630f52e33d104fda`.
+
+This closes the final GREEN review without another model round. After signing
+and pushing this documentation-only closure, run the already-frozen D.110a-x
+release revalidation and, if every predicate remains true, consume the sole
+64-object worker exactly once. A failure stops without retry.
