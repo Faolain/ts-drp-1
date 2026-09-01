@@ -2545,6 +2545,7 @@ interface V3PlaneRegistration {
 	retainedBootstrapHold: boolean;
 	runtimeReclamationLatch?: Uint8Array;
 	runtimeReclamationResult?: Extract<D109dRuntimeReclamationResult, { readonly ok: true }>;
+	sourceRuntimeHandle?: WeakRef<object>;
 	releaseTerminalBarrier: (() => void) | undefined;
 	terminalBarrier: Promise<void> | undefined;
 	terminalState: "active" | "transition" | "terminal";
@@ -3037,8 +3038,10 @@ async function reclaimV3RuntimeKernel(input: D109dRuntimeReclamationInput): Prom
 				return d109dFailure("D109D_RUNTIME_NOT_READY");
 			}
 
-			const closePlan = predecessor === undefined ? undefined : prepareCreatorCloseRuntimeRelease(predecessor.handle);
-			if (predecessor !== undefined && closePlan === undefined) {
+			const sourceRuntimeHandle = predecessor?.handle ?? initial.sourceRuntimeHandle?.deref();
+			const closePlan =
+				sourceRuntimeHandle === undefined ? undefined : prepareCreatorCloseRuntimeRelease(sourceRuntimeHandle);
+			if (sourceRuntimeHandle !== undefined && closePlan === undefined) {
 				return d109dFailure("D109D_RUNTIME_NOT_READY");
 			}
 			const absentClose = d109dCloseCensusAbsent();
@@ -3120,6 +3123,7 @@ async function reclaimV3RuntimeKernel(input: D109dRuntimeReclamationInput): Prom
 			initial.hotPredecessor = undefined;
 			initial.runtimeReclamationLatch = latchBytes;
 			initial.runtimeReclamationResult = result;
+			initial.sourceRuntimeHandle = undefined;
 			return result;
 		};
 	});
@@ -7162,6 +7166,7 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				releaseTerminalBarrier: undefined,
 				runtimeReclamationLatch: undefined,
 				runtimeReclamationResult: undefined,
+				sourceRuntimeHandle: undefined,
 				quarantinedDigests: recovered.quarantinedDigests,
 				queueId: topic,
 				topic,
@@ -7290,6 +7295,12 @@ async function activateCreatorSuccessorLive(
 		}
 		const activated = activateV3LivePlane({ capability: recovered.capability, ...bindings });
 		if (!activated.ok) return rejected("activation-rejected", `creator successor activation failed: ${activated.kind}`);
+		const activatedRegistration = v3HandleRegistrations.get(activated.handle);
+		if (activatedRegistration === undefined) {
+			activated.handle.deactivate();
+			return rejected("internal-invariant", "creator successor runtime registration is unavailable");
+		}
+		activatedRegistration.sourceRuntimeHandle = material.sourceRuntimeHandle;
 		if (!material.terminalizeSource()) {
 			activated.handle.deactivate();
 			return rejected("source-unavailable", "creator predecessor could not be terminalized");

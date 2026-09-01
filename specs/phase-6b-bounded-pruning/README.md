@@ -8,18 +8,17 @@ signed/pushed GREEN is `3d21264f4477fb5ff586047826ebd49e15d20bde`;
 Grok 4.6/high, standard Kimi K3/high/100-step, and Opus xhigh unanimously
 approved it with an empty P0/P1 union. Its plan, RED, GREEN, review, and
 evidence are accepted and must not be reopened. The bounded
-[D.109d installed-v3 runtime reclamation](slices/03-runtime-reclamation.md)
-plan corrects the earlier false `@ts-drp/object` ownership assumption and is
-the active plan-review checkpoint. Its first review found material receipt
-coverage, replay, precedence, hot-link, and creator-close owner gaps. The one
-confirmation found one additional narrow replay-latch omission: stable
-issuance `observedLineage` and AHE `reclaimedGenerationIds` prefix authority.
-That exact correction and its deterministic audit are signed/pushed at
-`e2ef3fbdf66deb138eaefde72abe1e23e9e46fe1`. The deterministic RED now has
-exactly one causal failure, `D109D_RUNTIME_RECLAMATION_MISSING`, with all four
-controls passing and seven GREEN-only assertions readiness-skipped. Sign/push
-the RED checkpoint, then implement only the frozen three-owner GREEN; no
-further plan-review or separate RED-review round is opened.
+[D.109d installed-v3 runtime reclamation](slices/03-runtime-reclamation.md) is
+at its one permitted final-review correction. Signed GREEN
+`f8f6367a1214486412873eb15dca55159c8a74b6` received empty P0/P1 unions from
+Grok and standard Kimi; Opus demonstrated independent-transport creator-close
+retention and a stale genuine issuance-store rebase failure. One narrow batch
+now carries only an internal weak source-handle reference, prunes the live
+fixture's exact issuance owner, and completes the post-release dependency
+gate. Focused 12/12, retained 142/142, all four retained browser groups, Node
+build, and affected static gates pass. Sign/push this correction, then run the
+single permitted Grok/Kimi/Opus confirmation; D.109e remains closed until its
+P0/P1 union is empty.
 
 Global TODO:
 
@@ -244,3 +243,8 @@ test/configuration categories and emits no D.109d semantic diagnostic.
 Evidence is rooted at `.logs/phase-6b-d109d-green/`. The final signed
 Grok/Kimi/Opus implementation review is pending; D.109e and later slices remain
 closed until that blocking union is empty. No campaign ran.
+
+The first final review is complete and preserved. Grok and standard Kimi
+approved; Opus's two P1s are corrected in the current working batch. Correction
+evidence is rooted at `.logs/phase-6b-d109d-green-correction/`; the exact next
+action is sign/push the correction and run the one permitted confirmation.

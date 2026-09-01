@@ -34,6 +34,7 @@ export interface CreatorSuccessorLiveMaterial {
 	readonly predecessor: CreatorSuccessorGenerationMaterial;
 	readonly predecessorExactCanonicalLatchedAclBytes: Uint8Array;
 	readonly snapshotPayloadDigest: string;
+	readonly sourceRuntimeHandle?: WeakRef<object>;
 	readonly stateDigest: string;
 	readonly store: AheDurableStore;
 	readonly successor: CreatorSuccessorGenerationMaterial;

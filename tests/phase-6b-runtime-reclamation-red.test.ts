@@ -4,7 +4,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { signD108d1aVertexDigest } from "./fixtures/phase-6a-v3/creator-successor-handle-identity-contract.js";
+import {
+	d108d1aRetainedMessage,
+	signD108d1aVertexDigest,
+} from "./fixtures/phase-6a-v3/creator-successor-handle-identity-contract.js";
 import {
 	createD109dReceipts,
 	D109D_CENSUS_KEYS,
@@ -51,6 +54,14 @@ function values(value: unknown): unknown[] {
 
 function changedDigest(value: unknown): string {
 	return value === "f".repeat(64) ? "e".repeat(64) : "f".repeat(64);
+}
+
+async function eventually(check: () => Promise<boolean>, attempts = 100): Promise<void> {
+	for (let attempt = 0; attempt < attempts; attempt += 1) {
+		if (await check()) return;
+		await new Promise<void>((resolvePromise) => setTimeout(resolvePromise, 10));
+	}
+	throw new TypeError("D109D_EVENTUALLY_TIMED_OUT");
 }
 
 async function reclaim(
@@ -196,7 +207,7 @@ function successorIssue(logicalTime: number): Readonly<Record<string, unknown>> 
 }
 
 describe("D.109d receipt-gated installed-v3 runtime reclamation RED", () => {
-	it("freezes exactly two RED and three GREEN owners", () => {
+	it("freezes the original RED owners and corrected GREEN owner set", () => {
 		expect(D109D_RED_PATHS).toEqual([
 			"tests/fixtures/phase-6b/runtime-reclamation-contract.ts",
 			"tests/phase-6b-runtime-reclamation-red.test.ts",
@@ -205,8 +216,10 @@ describe("D.109d receipt-gated installed-v3 runtime reclamation RED", () => {
 			"packages/node/src/internal/runtime-reclamation.ts",
 			"packages/node/src/v3-live.ts",
 			"packages/node/src/creator-close.ts",
+			"packages/node/src/creator-adoption.ts",
+			"packages/node/src/internal/creator-successor-live.ts",
 		]);
-		expect(new Set([...D109D_RED_PATHS, ...D109D_GREEN_PATHS]).size).toBe(5);
+		expect(new Set([...D109D_RED_PATHS, ...D109D_GREEN_PATHS]).size).toBe(7);
 		expect(D109D_RED_PATHS.every((entry) => readFileSync(resolve(REPOSITORY_ROOT, entry)).byteLength > 0)).toBe(true);
 	});
 
@@ -364,6 +377,20 @@ describe("D.109d receipt-gated installed-v3 runtime reclamation RED", () => {
 				const before = record(result.before);
 				expect(before.hotPredecessor).toBe(open === openD109dHotFixture);
 				expect(before.displacedSource).toBe(true);
+				expect(before.creatorCloseGraph).toBe(true);
+				expect(before.creatorCloseStagedSnapshot).toBe(true);
+				expect(before.creatorClosePersistedSnapshot).toBe(true);
+				expect(before.creatorCloseDerivedCommitment).toBe(true);
+				expect(before.creatorCloseDurableReplay).toBe(true);
+				expect(result.after).toMatchObject({
+					creatorCloseDerivedCommitment: false,
+					creatorCloseDurableReplay: false,
+					creatorCloseGraph: false,
+					creatorClosePersistedSnapshot: false,
+					creatorCloseStagedSnapshot: false,
+					displacedSource: false,
+					hotPredecessor: false,
+				});
 			} finally {
 				await fixture.close();
 			}
@@ -451,8 +478,48 @@ describe("D.109d receipt-gated installed-v3 runtime reclamation RED", () => {
 				rebase: false,
 				retainedPayloadMetadata: true,
 			});
-			expect(await fixture.successor.issueLocal(successorIssue(30))).toMatchObject({ kind: "accepted", ok: true });
+			expect(await fixture.successor.readRebaseOutbox()).toEqual({ kind: "empty", ok: true });
+			const issued = await fixture.successor.issueLocal(successorIssue(30));
+			expect(issued).toMatchObject({ kind: "accepted", ok: true });
 			expect(await fixture.successor.publishPending()).toMatchObject({ ok: true });
+			const live = (await import(new URL("../packages/node/src/v3-live.ts", import.meta.url).href)) as Readonly<{
+				routeV3RetainedIngress(handle: object, message: unknown): boolean;
+			}>;
+			const remote = d108d1aRetainedMessage({
+				anchorDigest: fixture.oracle.anchorDigest,
+				author: fixture.base.evidence.issuanceScope.author,
+				authorSequence: Number(issued.authorSequence) + 1,
+				dependency: String(issued.digest),
+				objectId: fixture.oracle.objectId,
+				sender: `d109d-remote-${crypto.randomUUID()}`,
+				topic: fixture.successor.topic,
+			});
+			expect(live.routeV3RetainedIngress(fixture.successor, remote.message)).toBe(true);
+			await eventually(async () => {
+				const readiness = await fixture.base.journal.readiness({
+					scope: {
+						anchorDigest: fixture.oracle.anchorDigest,
+						epoch: 1,
+						objectId: fixture.oracle.objectId,
+					},
+				});
+				if (!readiness.ok || !readiness.ready) return false;
+				const page = await fixture.base.journal.readPage({
+					afterSequence: null,
+					limit: 32,
+					scope: readiness.scope,
+					snapshot: readiness.snapshot,
+				});
+				return page.ok && page.rows.some((row) => row.vertexDigest === remote.digest);
+			});
+			const liveSource = readFileSync(resolve(REPOSITORY_ROOT, "packages/node/src/v3-live.ts"), "utf8");
+			const exportStart = liveSource.indexOf("function exportLiveSnapshotPayload(");
+			const exportEnd = liveSource.indexOf("\nfunction makeV3BlueprintLiveHandle(", exportStart);
+			const snapshotExportOwner = liveSource.slice(exportStart, exportEnd);
+			expect(exportStart).toBeGreaterThanOrEqual(0);
+			expect(exportEnd).toBeGreaterThan(exportStart);
+			expect(snapshotExportOwner).toMatch(/registration\.blueprintMachine/u);
+			expect(snapshotExportOwner).not.toMatch(/displacedSource|hotPredecessor/u);
 			const closeHandle = fixture.base.handle as Readonly<{
 				inspectDurableHead(): Promise<Readonly<Record<string, unknown>>>;
 				status(): Readonly<Record<string, unknown>>;
@@ -551,15 +618,18 @@ describe("D.109d receipt-gated installed-v3 runtime reclamation RED", () => {
 				expect(result).toMatchObject({ ok: true, replay: false });
 				expect(await fixture.successor.publishPending()).toMatchObject({ ok: true });
 				const source = readFileSync(resolve(REPOSITORY_ROOT, "packages/node/src/v3-live.ts"), "utf8");
-				const firstWrite = source.indexOf("closePlan.release()");
+				const kernelStart = source.indexOf("async function reclaimV3RuntimeKernel(");
+				const kernelEnd = source.indexOf("\nfunction activationFailure(", kernelStart);
+				const kernel = source.slice(kernelStart, kernelEnd);
+				const firstWrite = kernel.indexOf("closePlan.release()");
 				for (const marker of [
 					"d109dCensus(",
 					"new CausalityIndex(",
 					"d109dAfterCensus(",
 					"const result = ObjectFreeze(",
 				]) {
-					expect(source.indexOf(marker)).toBeGreaterThanOrEqual(0);
-					expect(source.indexOf(marker)).toBeLessThan(firstWrite);
+					expect(kernel.indexOf(marker)).toBeGreaterThanOrEqual(0);
+					expect(kernel.indexOf(marker)).toBeLessThan(firstWrite);
 				}
 			} finally {
 				await fixture.close();

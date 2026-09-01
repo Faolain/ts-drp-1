@@ -7,6 +7,7 @@ import {
 } from "@ts-drp/compaction";
 import { createCurrentAnchorTrustStore } from "@ts-drp/control-plane";
 import type { DurableIssuanceStore, DurableIssueCommit, DurableIssueScope } from "@ts-drp/issuance-store";
+import type { DurableIssuancePruningMaintenance } from "@ts-drp/issuance-store/maintenance";
 import { createRecoverableFinalitySigner } from "@ts-drp/keychain/finality";
 import type {
 	DurableLiveJournalStore,
@@ -52,6 +53,7 @@ import type { CurrentAnchorTrust } from "../../../packages/protocol-v3/src/index
 import { openBrowserSealEvidenceStore } from "../../../packages/storage-browser/src/seal-evidence.js";
 import { openBrowserSealVoteStore } from "../../../packages/storage-browser/src/seal-vote.js";
 import { createBrowserSnapshotQuarantineStore } from "../../../packages/storage-browser/src/snapshot-transfer.js";
+import { resolveNodeDurableIssuancePruningMaintenance } from "../../../packages/storage-node/src/issuance-maintenance.js";
 import { createNodeDurableIssuanceStore } from "../../../packages/storage-node/src/issuance.js";
 import { createNodeDurableLiveJournalStore } from "../../../packages/storage-node/src/live-journal.js";
 import { contract, hexBytes } from "../phase-3a0-v3/controlled-anchor-trust.js";
@@ -234,6 +236,7 @@ export interface GenuineCreatorAdoptionFixture {
 		readonly generations: readonly GenerationRecord[];
 		readonly history: CloseSetHistoryCommitment;
 		readonly issuanceScope: DurableIssueScope;
+		readonly issuanceMaintenance: DurableIssuancePruningMaintenance;
 		readonly issuanceStore: DurableIssuanceStore;
 		readonly journalRows: readonly LiveJournalAcceptedRow[];
 		readonly journalSnapshot: LiveJournalSnapshotToken;
@@ -534,11 +537,14 @@ async function recoverWithDurableStores(
 		readonly capability: RecoveredV3Live;
 		close(): Promise<void>;
 		readonly issuanceStore: DurableIssuanceStore;
+		readonly issuanceMaintenance: DurableIssuancePruningMaintenance;
 		readonly journal: DurableLiveJournalStore;
 	}>
 > {
 	const directory = mkdtempSync(join(tmpdir(), "drp-d108b-replay-"));
 	const rawIssuanceStore = createNodeDurableIssuanceStore({ primaryFilename: join(directory, "issuance.sqlite") });
+	const issuanceMaintenance = resolveNodeDurableIssuancePruningMaintenance(rawIssuanceStore);
+	if (issuanceMaintenance === undefined) throw new TypeError("D.108b fixture issuance maintenance is unavailable");
 	const rawJournal = createNodeDurableLiveJournalStore({ primaryFilename: join(directory, "journal.sqlite") });
 	const issuanceStore: DurableIssuanceStore = Object.freeze({
 		close: () => rawIssuanceStore.close(),
@@ -613,6 +619,7 @@ async function recoverWithDurableStores(
 				rmSync(directory, { force: true, recursive: true });
 			},
 			issuanceStore,
+			issuanceMaintenance,
 			journal,
 		});
 	} catch (error) {
@@ -1069,6 +1076,7 @@ export async function openGenuineCreatorAdoptionFixture(
 			generations: Object.freeze([...generationPage.value.generations]),
 			history,
 			issuanceScope: Object.freeze({ author: fixture.author, objectId: fixture.objectId }),
+			issuanceMaintenance: recovered.issuanceMaintenance,
 			issuanceStore: recovered.issuanceStore,
 			journalRows: Object.freeze(journalRows),
 			journalSnapshot: journalReadiness.snapshot,

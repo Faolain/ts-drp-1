@@ -373,3 +373,48 @@ No retained campaign, dependency, schema, threshold, timing, protocol,
 wire/digest/QC/adoption/availability, live-journal deletion, legacy-object, or
 product-API change ran. Final Grok/Kimi/Opus review remains the sole blocking
 GREEN closure gate.
+
+## Final-review correction
+
+The signed/pushed GREEN review ran once against `f8f6367a1214486412873eb15dca55159c8a74b6`.
+Grok 4.6/high and the standard Kimi CLI K3/high/100-step approved with empty
+P0/P1 unions. Opus xhigh demonstrated two P1s: independent-transport adoption
+left the live creator-close duplicate owner reachable while reporting it
+absent, and the fixture's temporary D.109b owner left the successor's genuine
+issuance store unpruned, so a post-release `readRebaseOutbox()` could return
+`record-rejected`. The complete original results remain immutable under
+`.logs/phase-6b-d109d-green-review/`.
+
+One permitted executable correction batch closes that union. The existing
+adoption custody now carries an optional `WeakRef` to the original runtime
+handle. It is installed only for in-process close/adoption, copied through the
+already-private adoption material, and cleared after reclamation; genuine
+fresh-process reopen has no such reference. This adds
+`packages/node/src/creator-adoption.ts` and
+`packages/node/src/internal/creator-successor-live.ts` to the corrected GREEN
+owner set without adding a package export, product-handle key, strong chain, or
+public API. The shared Phase-6a fixture exposes its already-owned Node pruning
+capability so D.109d prunes the exact issuance store used by the live successor;
+only the genuine partial-prefix control remains on a temporary owner.
+
+The corrected focused run is 12/12. Both hot and independent-transport controls
+now census creator-close duplicates present before and absent after. The
+post-release dependency gate proves rebase-empty, local issue, publication,
+authenticated retained ingress and durable journal admission, close status and
+durable-head capture; a bounded owner-local source check proves snapshot export
+reads the current blueprint machine and neither `displacedSource` nor
+`hotPredecessor`. A rejected diagnostic attempt tried to retrieve an active
+creator successor through the existing snapshot-closed-only blueprint retrieval
+contract; that attempt was removed rather than widening product behavior. The
+construction-order diagnostic is now sliced to `reclaimV3RuntimeKernel`, fixing
+the original file-global `indexOf` mistake.
+
+Correction evidence is rooted at `.logs/phase-6b-d109d-green-correction/`:
+focused 12/12, retained Vitest 142/142, D.109b/D.109c Chromium 4/4 and 4/4,
+Phase-6a Chromium 2/2 and 8/8, Node build, Prettier, diff, and exact changed-owner
+lint all pass. One inherited `@ts-drp/keychain/finality` alias-resolution lint
+diagnostic in the shared Phase-6a fixture is preserved; that file passes with
+only that pre-existing rule waived. No campaign ran. Because executable scope
+changed, the review policy permits exactly one confirmation over this signed
+correction; D.109d remains open until that confirmation has an empty P0/P1
+union.

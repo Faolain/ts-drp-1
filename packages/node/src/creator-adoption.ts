@@ -83,6 +83,7 @@ interface SealedAdoptionFacts {
 	readonly proposedReferences: readonly GenerationRef[];
 	readonly snapshotDeclaration: SnapshotQuarantineDeclaration;
 	readonly snapshotStore: SnapshotQuarantineStore<SnapshotVerificationReceipt>;
+	readonly sourceRuntimeHandle: WeakRef<object>;
 	readonly store: AheDurableStore;
 	terminalizeSource(): boolean;
 }
@@ -710,6 +711,7 @@ function creatorSuccessorLiveSeed(
 			}),
 			predecessorExactCanonicalLatchedAclBytes: Uint8Array.from(facts.exactCanonicalLatchedAclBytes),
 			snapshotPayloadDigest: snapshot.manifest.payloadDigest,
+			sourceRuntimeHandle: facts.sourceRuntimeHandle,
 			stateDigest: snapshot.manifest.stateDigest,
 			store: facts.store,
 			successor: Object.freeze({

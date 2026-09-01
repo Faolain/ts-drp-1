@@ -34,6 +34,8 @@ export const D109D_GREEN_PATHS = Object.freeze([
 	"packages/node/src/internal/runtime-reclamation.ts",
 	"packages/node/src/v3-live.ts",
 	"packages/node/src/creator-close.ts",
+	"packages/node/src/creator-adoption.ts",
+	"packages/node/src/internal/creator-successor-live.ts",
 ] as const);
 
 export const D109D_INPUT_KEYS = Object.freeze(["aheReceipt", "issuanceReceipt", "successor"] as const);
@@ -170,6 +172,7 @@ export interface D109dHotFixture {
 		deactivate(): void | Promise<void>;
 		issueLocal(input: unknown): Promise<Readonly<Record<string, unknown>>>;
 		publishPending(): Promise<Readonly<Record<string, unknown>>>;
+		readRebaseOutbox(): Promise<Readonly<Record<string, unknown>>>;
 		readonly topic: string;
 	}>;
 	close(): Promise<void>;
@@ -303,15 +306,7 @@ async function d109dIssuanceReceipt(
 		const maintenance = maintenanceModule.resolveNodeDurableIssuancePruningMaintenance(store);
 		if (maintenance === undefined) throw new TypeError("D109D_NODE_ISSUANCE_MAINTENANCE_MISSING");
 		const state = await maintenance.inspectPruningState(fixture.base.evidence.issuanceScope);
-		const input = Object.freeze({
-			closedEpoch: fixture.base.evidence.closeResult.epoch,
-			commitQcRef: fixture.base.evidence.closeResult.commitQcRef,
-			expectedLineage: state.lineage,
-			expectedPrunedThroughAuthorSequence: state.prunedThroughAuthorSequence,
-			scope: state.scope,
-			snapshotManifestDigest: fixture.base.evidence.declaration.scope.manifestDigest,
-			throughAuthorSequence,
-		});
+		const input = d109dIssuancePruningInput(fixture, state, throughAuthorSequence);
 		const first = await maintenance.prunePublishedPrefix(input);
 		const replay = await maintenance.prunePublishedPrefix(input);
 		return Object.freeze({ first, replay });
@@ -319,6 +314,22 @@ async function d109dIssuanceReceipt(
 		await store.close();
 		rmSync(directory, { force: true, recursive: true });
 	}
+}
+
+function d109dIssuancePruningInput(
+	fixture: D109dHotFixture,
+	state: Awaited<ReturnType<DurableIssuancePruningMaintenance["inspectPruningState"]>>,
+	throughAuthorSequence: number
+): Readonly<Record<string, unknown>> {
+	return Object.freeze({
+		closedEpoch: fixture.base.evidence.closeResult.epoch,
+		commitQcRef: fixture.base.evidence.closeResult.commitQcRef,
+		expectedLineage: state.lineage,
+		expectedPrunedThroughAuthorSequence: state.prunedThroughAuthorSequence,
+		scope: state.scope,
+		snapshotManifestDigest: fixture.base.evidence.declaration.scope.manifestDigest,
+		throughAuthorSequence,
+	});
 }
 
 function storeValue<T>(
@@ -481,8 +492,14 @@ export async function createD109dReceipts(fixture: D109dHotFixture): Promise<D10
 	if (boundary < 1 || commits.at(-1)?.authorSequence !== boundary) {
 		throw new TypeError("D109D_GENUINE_DISPLACED_BOUNDARY_INVALID");
 	}
-	const issuance = await d109dIssuanceReceipt(fixture, commits, boundary, "complete");
 	const partial = await d109dIssuanceReceipt(fixture, commits, boundary - 1, "partial");
+	const genuineMaintenance = fixture.base.evidence.issuanceMaintenance;
+	const genuineState = await genuineMaintenance.inspectPruningState(fixture.base.evidence.issuanceScope);
+	const genuineInput = d109dIssuancePruningInput(fixture, genuineState, boundary);
+	const issuance = Object.freeze({
+		first: await genuineMaintenance.prunePublishedPrefix(genuineInput),
+		replay: await genuineMaintenance.prunePublishedPrefix(genuineInput),
+	});
 
 	const inspection = await fixture.base.handle.inspectDurableHead();
 	if (inspection.head.generationId !== fixture.committedHead.generationId) {

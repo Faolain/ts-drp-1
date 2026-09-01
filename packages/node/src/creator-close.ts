@@ -153,6 +153,7 @@ interface CreatorAdoptionFacts {
 	readonly proposedReferences: readonly GenerationRef[];
 	readonly snapshotDeclaration: SnapshotQuarantineDeclaration;
 	readonly snapshotStore: SnapshotQuarantineStore<SnapshotVerificationReceipt>;
+	readonly sourceRuntimeHandle: WeakRef<object>;
 	readonly store: AheDurableStore;
 	terminalizeSource(): boolean;
 }
@@ -619,6 +620,7 @@ export async function bindCreatorLiveClose(
 								proposedReferences: Object.freeze(proposed.map(copiedRef)),
 								snapshotDeclaration: persistedSnapshot.declaration,
 								snapshotStore: input.snapshotStore,
+								sourceRuntimeHandle: new WeakRef(input.plane),
 								store: registration.store,
 								terminalizeSource: (): boolean => {
 									if (lifecycle !== "successor-pending-adoption") return false;

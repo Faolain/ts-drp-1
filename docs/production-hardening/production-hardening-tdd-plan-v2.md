@@ -88772,3 +88772,50 @@ No retained campaign or scope-widening product/dependency/protocol/threshold
 change ran. GREEN is not closed until the signed/pushed checkpoint receives the
 single required Grok 4.6/high, standard Kimi CLI K3/high/100-step, and Opus
 xhigh final review with an empty P0/P1 union.
+
+#### D.109d final-review correction checkpoint
+
+The final review of signed/pushed GREEN
+`f8f6367a1214486412873eb15dca55159c8a74b6` completed once. Grok 4.6/high and
+standard Kimi CLI K3/high/100-step returned `APPROVED` with empty P0/P1 unions.
+Opus xhigh returned `CHANGES_REQUIRED` with two P1s: independent-transport
+activation retained the creator-close duplicate owner while censusing it
+absent, and the temporary receipt owner did not prune the successor's actual
+issuance store, making post-release `readRebaseOutbox()` reject a stale
+predecessor row. Original review streams and terminal results are preserved at
+`.logs/phase-6b-d109d-green-review/`.
+
+The single permitted executable correction batch adds an optional internal
+`WeakRef` to the source runtime handle to existing creator-adoption custody.
+The reference is absent on genuine cold reopen and is cleared after release;
+no strong registration chain, package export, public handle key, product API,
+wire/schema/digest/threshold/dependency, or durable owner changes. This
+necessarily adds `packages/node/src/creator-adoption.ts` and
+`packages/node/src/internal/creator-successor-live.ts` to the corrected GREEN
+source set. The shared Phase-6a fixture now exposes the exact identity-bound
+Node issuance maintenance capability it already owns, and D.109d uses that
+capability for the complete/replay receipts. The partial-prefix receipt remains
+a genuine temporary-owner negative control.
+
+The first corrected focused command passed all 12 semantic assertions but
+returned nonzero only because a narrow run inherited the repository-wide 70%
+coverage threshold. The corrected accepted invocation uses the established
+`--coverage.enabled=false` focused form and passes 12/12. A diagnostic live
+snapshot-handle retrieval then showed the existing retrieval contract is
+snapshot-closed-only; it was not treated as a product failure or widened.
+Instead the post-release gate executes rebase-empty, issue, publication,
+authenticated ingress/journal admission, and close capture, while a bounded
+owner-local source predicate proves snapshot export reads the current blueprint
+machine and not released predecessor fields. The previously faulty file-global
+construction-order `indexOf` check is now scoped to
+`reclaimV3RuntimeKernel`.
+
+Correction gates pass: focused 12/12; retained D.109a/b/c and Phase-6a Vitest
+142/142; Chromium D.109b 4/4, D.109c 4/4, Phase-6a adoption 2/2, and Phase-6a
+activation 8/8; Node build; Prettier; `git diff --check`; and affected-owner
+ESLint. The shared fixture retains one pre-existing
+`@ts-drp/keychain/finality` alias-resolution lint diagnostic and passes with
+only that rule waived. No campaign ran. Evidence is rooted at
+`.logs/phase-6b-d109d-green-correction/`. Sign/push this correction and run
+exactly one Grok/Kimi/Opus confirmation because executable scope changed; only
+a material P0/P1 may block D.109d closure and D.109e.
