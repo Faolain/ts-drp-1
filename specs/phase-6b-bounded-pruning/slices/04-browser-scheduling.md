@@ -219,3 +219,14 @@ cleanup set or produces its frozen fail-closed refusal, Phase-5c dispatch is
 byte-for-byte behaviorally retained through the sole shared primitive, all
 gates pass, and the final review has an empty P0/P1 union. Then D.109f becomes
 the next active slice.
+
+## Plan review closure
+
+The corrected plan is signed and pushed at
+`ea96d97525e34ab907f504dcef9ed2cfa43075fd`. Grok 4.6/high, standard Kimi CLI
+K3/high/100-step, and Opus xhigh unanimously confirmed it with no P0/P1 finding
+and `D109E_RED_READY: yes`. Evidence is rooted at
+`.logs/phase-6b-d109e-plan-confirmation/`; its validating self-excluding
+manifest SHA-256 is
+`c0f0dbd11bb0250edbbd98bff660f9786a9d240a6508b8cfe3559608532e531c`.
+The plan gate is closed and the one authorized Chromium RED may run.

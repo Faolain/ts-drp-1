@@ -88965,3 +88965,17 @@ Because the P1 correction changes executable RED acceptance, sign and push this
 single correction and run at most one confirmation with the same
 Grok/Kimi/Opus trio. Only an empty P0/P1 union opens RED; do not add another
 review round for P2 or closure prose.
+
+#### D.109e corrected plan closure
+
+The corrected plan is signed and pushed at
+`ea96d97525e34ab907f504dcef9ed2cfa43075fd`. Its one permitted confirmation
+round is complete: Grok 4.6/high, standard Kimi CLI K3/high/100-step, and Opus
+xhigh each returned `APPROVED`, `P0_P1_UNION: none`, and
+`D109E_RED_READY: yes`. The blocking union is empty. Confirmation evidence is
+rooted at `.logs/phase-6b-d109e-plan-confirmation/`; its validating
+self-excluding manifest SHA-256 is
+`c0f0dbd11bb0250edbbd98bff660f9786a9d240a6508b8cfe3559608532e531c`.
+
+D.109e RED may now begin exactly once in Chromium under the corrected frozen
+matrix. No further plan review or confirmation is permitted or required.

@@ -14,7 +14,7 @@ also closed. Its signed/pushed correction is
 confirmation unanimously approved it with an empty P0/P1 union. Focused 12/12,
 retained 142/142, all four retained browser groups, Node build, and affected
 static gates pass. D.109e browser primary scheduling reuse is now at its
-single plan-review correction; no RED or product change has run.
+tests-only RED checkpoint; no product change has run.
 
 Global TODO:
 
@@ -253,8 +253,10 @@ manifest SHA-256 is
 D.109d is closed. The D.109e browser primary-scheduling plan is now frozen in
 `slices/04-browser-scheduling.md` without reopening D.109a–D.109d; the exact
 initial Grok/Kimi/Opus review preserved two approvals and one Opus P1. The exact
-next command is the one permitted confirmation after signing and pushing the
-bounded source-shape/causal-proof correction.
+source-shape/causal-proof correction is signed and pushed at
+`ea96d97525e34ab907f504dcef9ed2cfa43075fd`; its one confirmation unanimously
+approved with an empty P0/P1 union. The exact next command is the single
+authorized Chromium RED invocation after landing the frozen tests-only owners.
 
 ## D.109e plan handoff
 
@@ -281,4 +283,8 @@ timeouts. The same batch adds runtime observation of the exact AHE lock name
 and requires the changed-precondition fixture to prove a genuine generation-6
 head swap before callback release. Sign/push this correction, then run the one
 permitted Grok/Kimi/Opus confirmation; RED remains unopened until its P0/P1
-union is empty.
+union is empty. That confirmation is complete with an empty union. Evidence is
+rooted at `.logs/phase-6b-d109e-plan-confirmation/`; its validating
+self-excluding manifest SHA-256 is
+`c0f0dbd11bb0250edbbd98bff660f9786a9d240a6508b8cfe3559608532e531c`.
+D.109e RED is now open; no further plan review runs.
