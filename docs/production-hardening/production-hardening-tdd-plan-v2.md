@@ -89092,3 +89092,45 @@ manifest SHA-256 is
 D.109e is closed with the exact plan → causal RED → GREEN → single correction
 history preserved. No retained campaign ran. D.109f differential/census exit
 is the next active Phase-6b slice.
+
+#### D.109f bounded differential/census exit plan
+
+D.109f inherits signed/pushed D.109e closure
+`bb7d4601ac951df28b066e22dba1c096abe287c0` and does not reopen D.109a-D.109e.
+Its executable specification is
+`specs/phase-6b-bounded-pruning/slices/05-differential-exit.md`.
+
+The slice runs one seeded 128-epoch archival-versus-compacted differential for
+both Discord-shaped and MMORPG-shaped histories. At every epoch and across
+fresh-process reopen it compares application digest, ACL, frontier, operation
+counts, anchor/head identity, restart result, publication/ingress, and the next
+live write. Test-owned raw-dependency classification makes any lookup of a
+deleted issued preimage, AHE blob, displaced source, creator-close duplicate,
+or old snapshot dependency fail immediately; final-state equality alone is not
+sufficient. Exact censuses cover every Phase-6b durable/runtime structure and
+all current package/root/facade/factory surfaces.
+
+The tests-only RED also closes the inherited D.109b cross-backend rejection and
+deep-freeze observations, D.109c browser-facade and genuine second-process
+SQLite observations, D.109d observed creator-close census, receipt/store
+identity, lifecycle-live transitive snapshot, fresh-process no-weak-source and
+repeated-rollover observations, plus the explicitly deferred stale export
+assertions. The sole expected causal failure is the demonstrated empty AHE
+delete-list paired with a present former floor parent: it must reject before I/O
+with `AHE_RECLAMATION_INVALID_ARGUMENT` but currently reaches replay/retry.
+
+GREEN may change only `packages/storage/src/maintenance.ts` to require empty
+deletion plus no-head or nonempty deletion plus present-parent polarity. Every
+other production owner, schema, dependency, threshold, workload, timeout,
+wire/digest/QC/activation/availability/identity contract, product API, browser
+scheduler, snapshot format, and legacy object/finality owner remains
+byte-identical. Any further product-source need or unexpected differential
+failure stops for a new narrow causal reslice.
+
+Because the exit proof exercises deletion, cross-process recovery, and browser
+scheduling, sign/push this plan and run one Grok 4.6/high, standard Kimi CLI
+K3/high/100-step, and Opus xhigh plan review. If Grok cancels, resume its exact
+session. Only P0/P1 blocks. Deterministic RED receives no full model review;
+the signed GREEN receives the sole plan-to-RED-to-GREEN review. No Fable,
+Codex-Sol substitution, collaboration subagent, retained campaign, or recursive
+prose review runs.

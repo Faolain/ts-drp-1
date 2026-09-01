@@ -16,7 +16,10 @@ retained 142/142, all four retained browser groups, Node build, and affected
 static gates pass. D.109e browser primary scheduling reuse is also closed at
 signed/pushed correction `fd99b1ac567c6a559593916492cb9c2036109066`;
 its one Grok/Kimi/Opus confirmation unanimously approved with an empty P0/P1
-union. D.109f differential/census exit is now the next active slice.
+union. D.109e's documentation closure is signed/pushed at
+`bb7d4601ac951df28b066e22dba1c096abe287c0`. D.109f differential/census exit
+is the active slice. Its bounded plan is being frozen before RED; do not reopen
+D.109a-D.109e or run a campaign.
 
 Global TODO:
 
@@ -30,7 +33,9 @@ Global TODO:
       second-process SQLite concurrency, and browser facade-census checks.
 
 Before ending a pass, update this handoff with the exact signed/pushed anchor,
-current gate, and next executable command.
+current gate, and next executable command. D.109f's plan must be signed/pushed,
+then reviewed once by Grok 4.6/high, standard Kimi CLI K3/high/100-step, and
+Opus xhigh before its deterministic tests-only RED.
 
 The user has prohibited further Fable and collaboration subagents after the
 one expressly authorized Phase-6b Fable review. Phase-6b formal reviews use
