@@ -90735,3 +90735,43 @@ worker once under fresh write-once root `.logs/phase-6c-d110a-full/`. Neither
 may be retried. A failed preflight stops before full; any full failure is
 consuming and stops with complete evidence. This slice grants no product,
 dependency, workload, memory-threshold, profile, retry, campaign, or CI change.
+
+##### D.110a-w plan review and bounded correction
+
+The one high-risk plan review inspected signed/pushed anchor
+`b7fe7f0a295b3046bf1270be8cc9236d099e58e2`, tree
+`afe73a370b4d84f1bd4fcca78d77b3d3edc2c15f`. Grok 4.6/high returned
+`CHANGES_REQUIRED`, P0=0, P1=1, P2=1; standard direct Kimi K3/100-step
+returned `CHANGES_REQUIRED`, P0=0, P1=1, P2=1; and Opus xhigh session
+`11b02307-e340-462b-b993-80c1d30e7ab1` returned `CHANGES_REQUIRED`, P0=1,
+P1=1, P2=5 after one exact-session continuation recovered the omitted verdict
+block without re-review. Their terminal SHA-256 values are respectively
+`5f86a3cdb9aa6cad752d3c1aa0b9410045526ba8ed9cddb6df3e6182563a8425`,
+`485fef0acab54edd4e453c63642174282071b14268a5a3b9c8ce68d6d838b075`,
+and `43541f8875c35178e5e5b22d9df94314f2091c9b0fe4d38b43817d8adf849d6d`.
+The self-excluding 17-entry review manifest validates and has SHA-256
+`a90d0583d35b49f36b17f5d16a501159378f4d4f6f0c56da68f729e294c4185f`.
+
+All three reviewers independently confirmed the timing arithmetic, tests-only
+scope, frozen workload/memory contracts, reserved-run ordering, and absence of
+a product-defect claim. The material union has two corrections. First, RED now
+migrates the old `45 * 60 * 1000` check out of `hardEntrypoint` into the new
+watchdog-feasibility predicate. The inherited hard-entrypoint assertions remain
+green in RED, the new predicate alone fails
+`D110AW_TIMEOUT_FEASIBILITY_MISSING`, and GREEN requires the two new constants
+while preserving the literal `900_000` profile branch. Second, the six-hour
+child is explicitly local-only through D.110a: GitHub-hosted Actions currently
+limits a job to six hours, leaving no room for setup or evidence upload. D.110b
+must separately review and select a runner with a larger outer budget, such as
+a provisioned self-hosted runner; it cannot shorten this watchdog to fit the
+current hosted workflow.
+
+The P2 union is dispositioned in the same batch. The README and original
+D.110a slice now identify D.110a-w as the prospective timer override; the
+profile branch must retain the exact `900_000` literal and survive Prettier;
+linear scaling remains explicitly a projection; and preflight/full write-once
+custody remains an evidence-wrapper responsibility rather than a new child
+sentinel. These corrections change causal acceptance and future CI
+feasibility, so one confirmation round of this corrected signed/pushed plan is
+permitted. It must not broaden timing, product, workload, threshold, or
+execution authority.

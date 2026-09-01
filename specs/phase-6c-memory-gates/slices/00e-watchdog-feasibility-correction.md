@@ -43,8 +43,9 @@ The only executable owners are:
 
 Planning and evidence may additionally update this specification,
 `specs/phase-6c-memory-gates/README.md`, and
-`docs/production-hardening/production-hardening-tdd-plan-v2.md`, and create
-new D.110a-w evidence roots under `.logs/`.
+`specs/phase-6c-memory-gates/slices/00-retained-heap-gate.md`, and
+`docs/production-hardening/production-hardening-tdd-plan-v2.md`, and create new
+D.110a-w evidence roots under `.logs/`.
 
 No product source, package manifest, lockfile, dependency, workflow, public or
 internal product API, wire format, digest owner, activation authority,
@@ -63,6 +64,15 @@ test so the current child fails only that token while it still owns the stale
 assertions still pass and must not start a child, profiler, preflight, or full
 worker.
 
+As part of RED, migrate timeout-shape ownership out of the existing
+`hardEntrypoint` predicate and into the new watchdog-feasibility predicate.
+`hardEntrypoint` continues to validate the unchanged root command and child
+entry point without requiring the superseded `45 * 60 * 1000` literal. The new
+predicate alone requires the child to use `D110A_PREFLIGHT_TIMEOUT_MS` and
+`D110A_FULL_TIMEOUT_MS` while retaining the literal `900_000` profile branch.
+Consequently RED has one cause and the later child edit is the sole remaining
+GREEN flip; no decoy 45-minute literal is permitted.
+
 Run the focused test exactly once. Its complete result must contain exactly
 one expected failure with `D110AW_TIMEOUT_FEASIBILITY_MISSING`, no other failed
 or soft-failed assertion, no top-level error, and no selected test/file drift.
@@ -72,8 +82,11 @@ Record, manifest, sign, and push RED before GREEN.
 
 Make `retained-heap-child.mjs` import and use the two tests-only timeout
 constants in its existing parent timer expression. Keep profile mode exactly
-900,000 ms. Do not add retries, progress-resetting timers, adaptive deadlines,
-per-object timeouts, signal changes, or a second watchdog owner.
+900,000 ms, including the literal `900_000` token in the profile branch. The
+GREEN source-shape check must require the two imported constant names and must
+not restore or accept the old 45-minute expression. Do not add retries,
+progress-resetting timers, adaptive deadlines, per-object timeouts, signal
+changes, or a second watchdog owner.
 
 Run the focused test exactly once after the edit. Then run the affected package
 build/source typechecks, exact-owner ESLint, Prettier, child syntax, source-
@@ -110,3 +123,12 @@ accounting, semantic digest, three OLS slopes, absolute maxima, runtime
 identity, child I/O, timestamps, command statuses, hashes, and a validating
 self-excluding manifest. Then complete the remaining retained/static gates and
 the single final D.110a evidence review before D.110b.
+
+The six-hour D.110a watchdog is local-only until D.110b separately reviews CI
+runner feasibility. GitHub-hosted jobs currently have a six-hour execution
+limit, which cannot contain a six-hour child plus checkout, build, setup,
+classification, and evidence upload. D.110b must therefore select a runner
+whose job limit exceeds the complete outer budget, such as an explicitly
+provisioned self-hosted runner, and validate its failure/reporting behavior; it
+must not shorten the accepted child watchdog to fit a hosted runner. D.110a-w
+does not edit or authorize a workflow or runner.

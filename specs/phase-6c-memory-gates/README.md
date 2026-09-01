@@ -175,14 +175,16 @@ motivation, not silently converted into a binary-megabyte contract. D.110a
 records the fresh-process baseline and every raw sample, but does not subtract
 baseline from the absolute ceiling.
 
-The single full worker has a hard 45-minute parent watchdog, matching the
-existing 100,000-operation compact-history retained-heap gate and Phase-4d
-2,700,000 ms soak precedent. Timeout is a consuming failure, not permission to
-rerun or weaken the workload. D.110b must give its CI job enough outer time to
-preserve that child watchdog plus setup and evidence upload; it may not silently
-shorten the D.110a contract. One non-verdict two-object preflight validates the
-identical resolver, catalog, lifecycle, GC, schema, and teardown path before
-the sole consuming full worker; it cannot tune or reinterpret a threshold.
+D.110a-w prospectively supersedes the original 45-minute parent watchdog with
+a six-hour local parent watchdog and the five-minute preflight timeout with 15
+minutes. Timeout remains a consuming failure, not permission to rerun or weaken
+the workload. A GitHub-hosted Actions job is capped at six hours, so D.110b must
+separately review a runner whose limit exceeds the child plus setup and evidence
+upload, such as a provisioned self-hosted runner; it may not silently shorten
+the D.110a contract to fit the current hosted workflow. One non-verdict
+two-object preflight validates the identical resolver, catalog, lifecycle, GC,
+schema, and teardown path before the sole consuming full worker; it cannot tune
+or reinterpret a threshold.
 
 ## Slice graph
 
