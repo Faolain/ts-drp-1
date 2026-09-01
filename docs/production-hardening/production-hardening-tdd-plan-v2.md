@@ -88601,3 +88601,65 @@ Kimi CLI K3/high with `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review
 before RED. Kimi is not replaced by Codex/Sol; if Grok cancels, resume the exact
 session. Only P0/P1 blocks. D.109d runs no retained campaign, Fable, or
 collaboration subagent.
+
+#### D.109d first plan review and one-batch correction
+
+The first D.109d plan review inspected signed/pushed commit
+`8c7648c87f2faed2a22c9a4db263c9c76b98383e`. Grok 4.6/high reached its
+original turn limit and was resumed at exact session
+`01a05abb-f6d8-7cd0-8d46-2c5f3f119d47` to a terminal
+`CHANGES_REQUIRED`. Standard Kimi CLI 0.39.1 ran K3 thinking/high with the
+100-step cap and an enforced `Read`/`Grep`/`Glob`-only agent definition; it
+returned `CHANGES_REQUIRED`. Opus xhigh also returned
+`CHANGES_REQUIRED`. The validating self-excluding first-review manifest is
+`.logs/phase-6b-d109d-plan-review/manifest.sha256`; its SHA-256 is
+`5966e26b82c0e9d5b87421d56ba9fe1172db4db2ebc2e02880cf45014ba44f2a`.
+
+Two earlier Kimi commands failed before a model verdict because `-p` cannot be
+combined with `--yolo` and because Kimi CLI 0.39.1 no longer accepts the legacy
+YAML agent definition. A later unrestricted standard call was interrupted and
+rejected as evidence when it used Kimi's built-in `Agent` tool contrary to the
+no-subagent prompt. These remain honest launcher/tool-policy failures. The
+accepted Kimi review is the subsequent standard K3 invocation whose enforced
+allowlist removed shell, write, network, and subagent tools.
+
+The complete material union is accepted in one batch:
+
+1. a genuine D.109b partial-prefix receipt does not authorize release of
+   surviving displaced rows, so existing successor recovery records the exact
+   maximum authenticated displaced local-issuance ordinal while it already
+   verifies the predecessor outbox; D.109d requires the pruning watermark to
+   equal that boundary and adds a partial-prefix mutant;
+2. first success stores one bounded frozen authority-binding latch, allowing
+   only genuine first-call/lost-receipt outcome-field differences on replay and
+   refusing every changed authority field;
+3. precedence is shape, receipt-internal disagreement, genuine current-handle
+   identity, registration-bound receipt mismatch, readiness, then internal
+   invariant, so identity tests are reachable and causal;
+4. the hot successor holds only a direct non-owning `WeakRef` to a retired
+   registration. It cannot pin a strong multi-epoch registration chain; a
+   collected predecessor needs no manual compaction; and
+5. `packages/node/src/creator-close.ts` is added as the demonstrated third
+   production owner because a held close authority separately retains captured
+   graph, snapshot, commitment, and durable-replay copies. Its private
+   successor-adopted release owner clears only those duplicates after matching
+   receipts while preserving status, durable-head inspection, and stop.
+
+The corrected census runs wholly in the queued thunk, awaits and rechecks a
+reachable retired predecessor's own gate, replaces its append-only causality
+index, resets anchor byte/graph counters, and records pending ingress as already
+empty at handoff. It retains and reports the bounded authorization, prepared
+payload/trust/projection/catalog/runtime metadata, and `latchedOperations`
+needed by the still-callable inactive `previewLatchedAcl`; it no longer falsely
+claims those are cleared. Commit-QC validation is stated as exact adopted-
+closure membership, not semantic QC reverification.
+
+This correction changes receipt acceptance and the production-owner path set,
+so the one confirmation round permitted by the frozen policy is required. The
+corrected production paths are exactly
+`packages/node/src/internal/runtime-reclamation.ts`,
+`packages/node/src/v3-live.ts`, and `packages/node/src/creator-close.ts`.
+Confirmation must return an empty P0/P1 union before RED. It does not reopen
+D.109a/b/c or Phase 6a, authorize a campaign, or permit a public API,
+dependency, threshold, schema, journal-deletion, protocol/wire/digest/QC/
+adoption/availability, scheduler, legacy-object, or finality change.

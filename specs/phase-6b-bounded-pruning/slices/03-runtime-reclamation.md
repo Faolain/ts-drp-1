@@ -22,13 +22,14 @@ checkpoints, known hashes, finality state, or public surface.
 
 The installed v3 ownership boundary is instead:
 
-| Lifetime              | Genuine owner                                                               | Closed-epoch retention in scope                                                                                                                                        |
-| --------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| active successor      | current `V3PlaneRegistration` in `@ts-drp/node`                             | `displacedSource` authentication payload and any completed rebase snapshot/cursor that still retain the closed predecessor                                             |
-| hot predecessor       | retired `V3PlaneRegistration` displaced during same-topic transport handoff | application vertex/author/charge maps, `CausalityIndex`, latched operations, blueprint machine/handle, pending ingress, quarantine set, and publication/rebase cursors |
-| cold reopen           | no predecessor registration exists                                          | only the reconstructed `displacedSource` retained by the active successor                                                                                              |
-| durable replay        | `DurableLiveJournalStore`                                                   | out of scope: neither D.109b nor D.109c emits authority to delete journal rows                                                                                         |
-| legacy/general object | `@ts-drp/object`                                                            | out of scope and byte-identical in D.109d                                                                                                                              |
+| Lifetime                          | Genuine owner                                                               | Closed-epoch retention in scope                                                                                                                                 |
+| --------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| active successor                  | current `V3PlaneRegistration` in `@ts-drp/node`                             | `displacedSource`, authenticated displaced issuance boundary, completed rebase state, replay latch, and one non-owning hot-predecessor reference                |
+| hot predecessor                   | retired `V3PlaneRegistration` displaced during same-topic transport handoff | application vertex/author/charge maps, `CausalityIndex`, blueprint state, pending/quarantine/publication/rebase state; retained ACL preview metadata is bounded |
+| bound predecessor close authority | `packages/node/src/creator-close.ts`                                        | separately captured graph, staged/persisted snapshot, derived commitment, and sealed durable-replay rows                                                        |
+| cold reopen                       | no predecessor registration exists                                          | only the reconstructed `displacedSource`; no creator-close or hot-registration owner exists                                                                     |
+| durable live journal              | `DurableLiveJournalStore`                                                   | out of scope: neither D.109b nor D.109c emits authority to delete journal rows                                                                                  |
+| legacy/general object             | `@ts-drp/object`                                                            | out of scope and byte-identical in D.109d                                                                                                                       |
 
 The active successor already owns the new epoch anchor, imported canonical
 blueprint state, current causality index, current pending ingress, current
@@ -65,9 +66,15 @@ The internal result is a deeply frozen closed union:
   `D109D_IDENTITY_MISMATCH`, `D109D_RUNTIME_NOT_READY`, or
   `D109D_INTERNAL_INVARIANT`.
 
-Malformed exact-record shape has first precedence. Receipt disagreement is
-next, genuine runtime identity is next, lifecycle/readiness is next, and a
-closed internal construction failure is last. Every refusal performs zero
+Malformed exact-record shape has first precedence. Self-contained disagreement
+between the two well-shaped receipts is next. Genuine current-successor
+identity is then resolved before any receipt comparison that needs a
+registration. Registration-bound receipt disagreement follows, then
+lifecycle/readiness, then a closed internal construction failure. Thus a fake
+handle plus mutually inconsistent receipts yields `D109D_RECEIPT_MISMATCH`; a
+fake handle plus internally consistent receipts yields
+`D109D_IDENTITY_MISMATCH`; and no identity mutant is shadowed by a comparison
+against a registration that was never resolved. Every refusal performs zero
 runtime writes and does not poison the successor.
 
 ### Receipt match
@@ -89,21 +96,59 @@ then requires all of the following:
 6. the AHE `expectedHead`, `activeGenerationId`, object, and rollback/floor
    identities are internally valid and its expected head equals the
    successor registration's exact adopted head; and
-7. the AHE availability digest remains the frozen local-only digest.
+7. the AHE availability digest remains the frozen local-only digest; and
+8. the issuance `prunedThroughAuthorSequence` equals the exact maximum
+   authenticated displaced local-issuance ordinal recorded while the existing
+   successor-recovery path verifies the predecessor outbox. A genuine D.109b
+   partial-prefix receipt is insufficient even when every deleted row was
+   published.
+
+The eighth value is not inferred at cleanup time and does not add a store
+rescan. `v3-live.ts` records it while recovery already reads, authenticates, and
+classifies the complete displaced outbox before activation. A missing boundary,
+a surviving authenticated displaced row above the receipt watermark, or a
+watermark below/above that exact boundary is `D109D_RECEIPT_MISMATCH`.
+Successor-epoch rows above the boundary remain valid and untouched.
 
 The runtime never reconstructs either receipt from memory and never treats a
-missing receipt as success. It does not reverify QC, rescan a database, infer
-availability, or widen either durable owner's authority.
+missing receipt as success. The commit-QC comparison proves exact byte-length
+and digest membership in the adopted closure; it does not relabel an arbitrary
+closure member as a semantically reverified QC. The runtime does not reverify
+QC, rescan a database, infer availability, or widen either durable owner's
+authority.
+
+Before the first release write, the owner freezes one bounded replay latch from
+the authority-bearing fields: object/closed/successor epochs, issuance scope,
+exact closed-epoch ordinal boundary, snapshot-manifest digest, commit-QC ref,
+adopted head, active generation, rollback/floor identities, and availability
+policy. D.109b's `deletedAuthorSequenceRange` and D.109c's deletion lists,
+counts, and `normalizedThisCall` flag are outcome fields, so their genuine
+first-call versus lost-receipt-replay forms do not alter latch identity. After
+release, replay requires the same current successor plus an exact latch match;
+any changed authority field is `D109D_RECEIPT_MISMATCH`.
 
 ### Serialized make-then-release
 
 Reclamation joins the successor's existing `enqueueRegistrationTask` gate, so
 all earlier issue, ingress, publication, and rebase work settles first and all
-later work observes either the complete pre-state or complete post-state. The
-kernel rechecks current handle identity and every receipt predicate inside that
-turn. It constructs the complete retained predecessor root/index and immutable
-result census before mutation; no user callback, store call, decode, allocation,
-or other throwing work occurs after the first release write.
+later work observes either the complete pre-state or complete post-state.
+Receipt snapshots alone may be captured synchronously; every census, identity
+recheck, readiness predicate, predecessor-gate wait, and mutation runs in the
+queued thunk, never in `enqueueRegistrationTask`'s synchronous `capture()`
+phase. A live hot predecessor is reached only through a non-owning
+`WeakRef<V3PlaneRegistration>` installed at handoff. If it is still reachable,
+the thunk awaits its gate and rechecks that it is the exact inactive direct
+predecessor; if it has already been collected, its runtime state needs no
+manual compaction. No strong successor-to-retired-registration link or
+multi-epoch registration chain is permitted.
+
+For a genuine bound creator-close authority, `creator-close.ts` registers one
+package-internal no-throw release owner keyed by the predecessor handle. It is
+ready only after `terminalizeSource()` reached `successor-adopted`. The kernel
+constructs the complete retained predecessor root/index, close-owner release
+plan, replay latch, and immutable result census before mutation. No user
+callback, store call, decode, allocation, or other throwing work occurs after
+the first release write.
 
 On success it:
 
@@ -111,20 +156,28 @@ On success it:
   displaced rebase cursor;
 - in a hot handoff, compacts the retired predecessor to its authenticated epoch
   anchor, retaining exactly one vertex, one byte charge, a one-entry causality
-  index, the immutable object/epoch/topic handle identity, and no ordinary
-  author entry;
-- clears only the retired predecessor's latched-operation, pending-ingress,
-  quarantine, publication, rebase, and blueprint-state references; and
-- severs the successor-to-retired-registration link after the compacted census
-  is complete.
+  index, anchor byte total, graph version one, the immutable object/epoch/topic
+  handle identity, and no ordinary author entry;
+- preserves the retired registration's bounded authorization, prepared
+  anchor/projection/catalog/runtime metadata and `latchedOperations`, because
+  its still-callable `previewLatchedAcl` observes those operations; records
+  pending ingress as already empty at handoff; and clears its quarantine,
+  publication, rebase, and blueprint-state references;
+- clears a present creator-close owner's separately captured graph,
+  staged/persisted snapshot, derived commitment, and durable-replay rows while
+  preserving its already-unavailable `close()`, `status()`,
+  `inspectDurableHead()`, and `stop()` behavior; and
+- deletes the replayed non-owning predecessor reference after the complete
+  post-census is frozen.
 
 The current successor's anchor, application maps, causality index, blueprint
 machine, ACL, pending ingress, quarantine, publication cursor, stores, network,
 queue, topic, active handle, and canonical state remain referentially and
 observably unchanged. Legacy finality and both durable stores are untouched.
 Repeated invocation with the same receipts returns a frozen replay success and
-does not require the removed predecessor payload. Different receipts after
-success fail closed.
+does not require the removed predecessor payload. Genuine first-call and
+lost-receipt outcome differences are accepted only when their authority latch
+is identical. Different authority bindings after success fail closed.
 
 ## Deterministic RED
 
@@ -143,21 +196,26 @@ Freeze these matrices before implementation:
 - exact refusal precedence and unknown/accessor/proxy/aliased input rejection;
 - either missing receipt, every shared object/epoch mismatch, wrong issuance
   scope, snapshot manifest, commit-QC ref/digest/length, AHE head/revision/
-  generation, policy, rollback, and floor mismatch;
+  generation, policy, rollback, and floor mismatch, plus a genuine D.109b
+  partial-prefix receipt below the authenticated displaced ordinal boundary;
 - fake, predecessor, inactive, foreign and snapshot-closed handles;
-- hot and cold positive controls, lost-receipt replay, and different-receipt
-  post-success refusal;
+- hot and cold positive controls, first-call/lost-receipt replay equivalence,
+  changed-authority post-success refusal, and replay without displaced payload;
 - a queued-operation ordering control proving reclamation waits behind existing
-  work and a later live operation sees only the post-state;
-- before/after exact census of every listed predecessor-bearing structure;
+  successor work and the retired predecessor gate, and that later live work
+  sees only the post-state;
+- before/after exact census of every listed predecessor-bearing structure,
+  including creator-close duplicates, anchor byte total, graph version,
+  intentionally retained ACL/payload metadata, and an absent strong
+  registration chain;
 - a raw-dependency probe proving later successor issue, ingress, publication,
   rebase-empty, close capture, and snapshot export do not read a released
   predecessor vertex or payload;
 - a precommit construction-failure mutant proving byte-identical pre-state and
   subsequent live usability; and
-- source guards proving no `@ts-drp/object`, finality, durable-store mutation,
-  package export, product-handle key, dependency, threshold, or scheduler
-  change.
+- source guards proving the hot predecessor reference is non-owning and direct,
+  and proving no `@ts-drp/object`, finality, durable-store mutation, package
+  export, product-handle key, dependency, threshold, or scheduler change.
 
 RED is accepted only when the focused file reports the exact frozen controls
 green and the sole readiness assertion fails with
@@ -171,14 +229,18 @@ The prospective GREEN path set is limited to:
 
 - `packages/node/src/internal/runtime-reclamation.ts`;
 - `packages/node/src/v3-live.ts`;
+- `packages/node/src/creator-close.ts`;
 - the two D.109d tests-only owners; and
 - this slice, the Phase-6b handoff, and the main evidence ledger.
 
-If implementation proves that `creator-adoption-activate.ts`, an
+The third production owner is the smallest honest correction for the
+demonstrated creator-close duplicate retention; it does not change close,
+adoption, activation, or product authority. If implementation proves that
+`creator-adoption-activate.ts`, an
 `@ts-drp/object` owner, a public export/API, durable schema/store, live-journal
 deletion, dependency, threshold, protocol/wire/digest/QC/adoption/availability
-contract, or more than the installed successor/predecessor registrations must
-change, stop before editing it and reslice with a new reviewed plan. In
+contract, or another production owner must change, stop before editing it and
+reslice with a new reviewed plan. In
 particular, the inherited stale-`activeOwners` multi-rollover P2 is not silently
 folded into D.109d; D.109f must prove the repeated-epoch path or assign its own
 causal prerequisite.
@@ -210,3 +272,12 @@ After signed/pushed GREEN, one final Grok/Kimi/Opus review inspects the complete
 plan → RED → GREEN history and causal evidence. No separate full RED review,
 Fable, collaboration subagent, retained campaign, or recursive review of
 bookkeeping/closure prose runs.
+
+The first plan review of signed commit
+`8c7648c87f2faed2a22c9a4db263c9c76b98383e` completed with material findings
+from Grok, Kimi, and Opus. Their union is preserved under
+`.logs/phase-6b-d109d-plan-review/`. This correction accepts the complete
+demonstrated P0/P1 union in one batch. Because it changes receipt acceptance
+and adds the omitted creator-close production owner, exactly one confirmation
+round reviews this corrected executable plan before RED; no further plan round
+is permitted absent a newly demonstrated P0/P1.

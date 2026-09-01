@@ -10,8 +10,10 @@ approved it with an empty P0/P1 union. Its plan, RED, GREEN, review, and
 evidence are accepted and must not be reopened. The bounded
 [D.109d installed-v3 runtime reclamation](slices/03-runtime-reclamation.md)
 plan corrects the earlier false `@ts-drp/object` ownership assumption and is
-the active plan-review checkpoint. Do not begin its deterministic causal RED
-until that signed/pushed review gate closes.
+the active plan-review checkpoint. Its first review found material receipt
+coverage, replay, precedence, hot-link, and creator-close owner gaps. The one
+batched correction is awaiting its single permitted confirmation; do not begin
+the deterministic causal RED until that signed/pushed gate closes.
 
 Global TODO:
 
@@ -56,15 +58,15 @@ valid outbox classification.
 
 ## Existing owners and gaps
 
-| Concern                                              | Existing sole owner                                       | Phase-6b rule                                                                                                                                         |
-| ---------------------------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| AHE head, generations, promotions, blobs             | `@ts-drp/storage` plus Node/IDB adapters                  | Add one bounded physical-reclamation command; never infer QC or availability in the adapter.                                                          |
-| Issued rows and issuance outbox                      | `@ts-drp/issuance-store` plus dedicated Node/IDB adapters | Classify canonical preimages in the owning transaction; pending or malformed old-epoch rows block deletion.                                           |
-| Verified close and successor adoption                | `@ts-drp/node` creator close/adoption owners              | Supply authenticated facts to the cleanup planner; do not duplicate verification.                                                                     |
-| Installed-v3 closed runtime retention                | retired/displaced registrations in `@ts-drp/node`         | After matching durable receipts, release only predecessor graph/state/classification retention; the live successor remains byte- and identity-stable. |
-| Legacy/general graph, snapshots, checkpoints, caches | `@ts-drp/object`                                          | It is not bound into the installed v3 plane and remains byte-identical in Phase 6b; do not invent a cross-runtime reclamation bridge.                 |
-| Browser primary dispatch                             | Phase-5c internal vote dispatcher                         | Extract/reuse its one advisory lock runner; do not add a second election protocol.                                                                    |
-| Legacy finality                                      | `FinalityStore`                                           | Preserved until Phase 6d defines post-expiry behavior.                                                                                                |
+| Concern                                              | Existing sole owner                                                              | Phase-6b rule                                                                                                                                                             |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AHE head, generations, promotions, blobs             | `@ts-drp/storage` plus Node/IDB adapters                                         | Add one bounded physical-reclamation command; never infer QC or availability in the adapter.                                                                              |
+| Issued rows and issuance outbox                      | `@ts-drp/issuance-store` plus dedicated Node/IDB adapters                        | Classify canonical preimages in the owning transaction; pending or malformed old-epoch rows block deletion.                                                               |
+| Verified close and successor adoption                | `@ts-drp/node` creator close/adoption owners                                     | Supply authenticated facts to the cleanup planner; do not duplicate verification.                                                                                         |
+| Installed-v3 closed runtime retention                | displaced/current registrations plus bound creator-close state in `@ts-drp/node` | After receipts cover the authenticated closed-epoch end, release predecessor graph/state/classification duplicates; the live successor remains byte- and identity-stable. |
+| Legacy/general graph, snapshots, checkpoints, caches | `@ts-drp/object`                                                                 | It is not bound into the installed v3 plane and remains byte-identical in Phase 6b; do not invent a cross-runtime reclamation bridge.                                     |
+| Browser primary dispatch                             | Phase-5c internal vote dispatcher                                                | Extract/reuse its one advisory lock runner; do not add a second election protocol.                                                                                        |
+| Legacy finality                                      | `FinalityStore`                                                                  | Preserved until Phase 6d defines post-expiry behavior.                                                                                                                    |
 
 The current AHE database, issuance database, snapshot quarantine, and runtime
 memory are distinct owners. Safety therefore comes from monotone epoch closure,
