@@ -4340,62 +4340,73 @@ async function readCreatorReplayRows(
 				: undefined;
 		}
 		const rows: CreatorReplayRow[] = [];
-		const page = await registration.liveJournalStore.readPage({
-			afterSequence: null,
-			limit: readiness.rowCount,
-			scope,
-			snapshot: readiness.snapshot,
-		});
-		if (!page.ok || page.rows.length !== readiness.rowCount || page.nextSequence !== null) return undefined;
-		for (let expectedSequence = 0; expectedSequence < readiness.rowCount; expectedSequence += 1) {
-			const row = journalRowSnapshot(page.rows[expectedSequence], scope, expectedSequence);
-			if (row === undefined) return undefined;
+		let afterSequence: number | null = null;
+		while (rows.length < readiness.rowCount) {
+			const remaining = readiness.rowCount - rows.length;
+			const page = await registration.liveJournalStore.readPage({
+				afterSequence,
+				limit: Math.min(128, remaining),
+				scope,
+				snapshot: readiness.snapshot,
+			});
+			if (!page.ok || page.rows.length === 0 || page.rows.length > remaining || page.rows.length > 128) {
+				return undefined;
+			}
+			const pageStart = rows.length;
+			for (let pageIndex = 0; pageIndex < page.rows.length; pageIndex += 1) {
+				const expectedSequence = pageStart + pageIndex;
+				const row = journalRowSnapshot(page.rows[pageIndex], scope, expectedSequence);
+				if (row === undefined) return undefined;
 
-			let authenticated: AuthenticatedRecoveryVertex | undefined;
-			if (row.sourceKind === "received") {
-				authenticated = authenticateRecoveryVertex(
-					registration.payload,
-					registration.authorization,
-					row.exactCanonicalPreimageBytes,
-					row.detachedSignature
-				);
-			} else {
-				const localScope = ObjectFreeze({ author: row.author, objectId: scope.objectId });
-				const issued = await registration.issuanceStore.readIssued(localScope, row.authorSequence);
-				const issuedRow = outboxRowSnapshot(
-					ObjectFreeze({ commit: issued, publishState: "published" as const }),
-					localScope
-				);
-				if (issuedRow !== undefined && lowerHexDigest(issuedRow.digest) === row.vertexDigest) {
+				let authenticated: AuthenticatedRecoveryVertex | undefined;
+				if (row.sourceKind === "received") {
 					authenticated = authenticateRecoveryVertex(
 						registration.payload,
 						registration.authorization,
-						issuedRow.canonicalPreimageBytes,
-						issuedRow.signature
+						row.exactCanonicalPreimageBytes,
+						row.detachedSignature
 					);
-					if (authenticated?.author !== row.author || authenticated.authorSequence !== row.authorSequence) {
-						authenticated = undefined;
+				} else {
+					const localScope = ObjectFreeze({ author: row.author, objectId: scope.objectId });
+					const issued = await registration.issuanceStore.readIssued(localScope, row.authorSequence);
+					const issuedRow = outboxRowSnapshot(
+						ObjectFreeze({ commit: issued, publishState: "published" as const }),
+						localScope
+					);
+					if (issuedRow !== undefined && lowerHexDigest(issuedRow.digest) === row.vertexDigest) {
+						authenticated = authenticateRecoveryVertex(
+							registration.payload,
+							registration.authorization,
+							issuedRow.canonicalPreimageBytes,
+							issuedRow.signature
+						);
+						if (authenticated?.author !== row.author || authenticated.authorSequence !== row.authorSequence) {
+							authenticated = undefined;
+						}
 					}
 				}
+				if (authenticated === undefined || authenticated.digest !== row.vertexDigest) return undefined;
+				const retainedVertex = registration.applicationVertices.get(authenticated.digest);
+				const retainedCharge = registration.applicationCharges.get(authenticated.digest);
+				const exactCanonicalVertexBytes = encodeCanonical(authenticated.vertex);
+				if (
+					retainedVertex === undefined ||
+					retainedCharge !== authenticated.byteCharge ||
+					!sameBytes(encodeCanonical(retainedVertex), exactCanonicalVertexBytes)
+				) {
+					return undefined;
+				}
+				rows.push(
+					ObjectFreeze({
+						byteCharge: authenticated.byteCharge,
+						digest: authenticated.digest,
+						exactCanonicalVertexBytes,
+					})
+				);
 			}
-			if (authenticated === undefined || authenticated.digest !== row.vertexDigest) return undefined;
-			const retainedVertex = registration.applicationVertices.get(authenticated.digest);
-			const retainedCharge = registration.applicationCharges.get(authenticated.digest);
-			const exactCanonicalVertexBytes = encodeCanonical(authenticated.vertex);
-			if (
-				retainedVertex === undefined ||
-				retainedCharge !== authenticated.byteCharge ||
-				!sameBytes(encodeCanonical(retainedVertex), exactCanonicalVertexBytes)
-			) {
-				return undefined;
-			}
-			rows.push(
-				ObjectFreeze({
-					byteCharge: authenticated.byteCharge,
-					digest: authenticated.digest,
-					exactCanonicalVertexBytes,
-				})
-			);
+			const expectedNext = rows.length < readiness.rowCount ? rows.length - 1 : null;
+			if (page.nextSequence !== expectedNext) return undefined;
+			afterSequence = page.nextSequence;
 		}
 		return registration.applicationVertices.size === rows.length + 1 &&
 			registration.applicationCharges.size === rows.length + 1
