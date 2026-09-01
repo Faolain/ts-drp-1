@@ -366,3 +366,31 @@ fresh-process and two-process recovery pass; all three browser engines agree;
 every named retained/static gate is green or has an unchanged explicitly
 classified tests-only diagnostic; the evidence manifest validates; and the
 final Grok/Kimi/Opus P0/P1 union is empty.
+
+## Final correction confirmation and closure
+
+The tests-only proof correction is signed and pushed at
+`ca25ea23df36d571beef4d01afe533437520ed79`. Grok 4.6/high session
+`01a05c57-6ef8-7f32-aede-cca3117b5bf8`, standard Kimi CLI K3/high/100
+session `session_fcd6dd11-dbfd-49f4-bda0-c6e7e339bf72`, and Opus xhigh
+session `18b50593-19b7-4564-93bc-1e7ceb38787c` each returned `APPROVED`,
+`P0_P1_UNION: none`, and `PHASE6B_READY: yes`.
+
+The bounded P2 set does not reopen the correction. Redundant projection
+membership checks are not the proof; the independent accepted-operation,
+canonical-preimage, owner-sink, digest, and journal assertions are.
+`runtime.anchor` is intentionally discharged behaviorally rather than through
+a nonexistent census key. Paged reads classify extant returned rows while
+null-returning blob/issued-record point reads classify before lookup; receipt
+identities and native censuses prove deletion. No swallowed hook rejection is
+demonstrated, package-local and shared-lifecycle module pairs each stay within
+one tree, and Vitest suite accounting does not alter exact selected-file
+arrays. No executable debt or additional review round follows from these
+observations.
+
+The correction manifest SHA-256 is
+`338400724a38cca0cbaa7a589f0911e33399fb8dcd595ed91df85799a8ac6489`.
+The validating self-excluding confirmation manifest SHA-256 is
+`76a5cfa15dfdde2031dd793c10371bafe35838e236f931370ae006184ce5a1d9`.
+All completion predicates above are met. D.109f and Phase 6b close without a
+campaign.

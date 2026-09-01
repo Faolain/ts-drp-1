@@ -18,15 +18,13 @@ signed/pushed correction `fd99b1ac567c6a559593916492cb9c2036109066`;
 its one Grok/Kimi/Opus confirmation unanimously approved with an empty P0/P1
 union. D.109e's documentation closure is signed/pushed at
 `bb7d4601ac951df28b066e22dba1c096abe287c0`. D.109f differential/census exit
-is the active slice. Its corrected plan, causal RED, and first GREEN are
-signed/pushed at `9935d710`, `26193e9b`, and `a24d3b20`. The initial final
-review found three tests/evidence blockers: incomplete census/raw-read proof,
-tautological projections, and a fresh process without the genuine close/adopt
-lifecycle. Their tests-only correction now passes focused 11/11, affected
-retained 73/73, D.109f browser 3/3, retained Phase-6a browser 24/24, five
-build/typecheck groups, and exact static/protected-state gates. Sign/push the
-correction, then run one Grok/Kimi/Opus confirmation. Do not reopen D.109a-
-D.109e or run a campaign.
+is closed. Its corrected plan, causal RED, first GREEN, and tests-only proof
+correction are signed/pushed at `9935d710`, `26193e9b`, `a24d3b20`, and
+`ca25ea23`. The correction passes focused 11/11, affected retained 73/73,
+D.109f browser 3/3, retained Phase-6a browser 24/24, five build/typecheck
+groups, and exact static/protected-state gates. Its single Grok/Kimi/Opus
+confirmation unanimously approved with an empty P0/P1 union. D.109a-D.109f
+and Phase 6b are complete without a campaign.
 
 Global TODO:
 
@@ -35,14 +33,14 @@ Global TODO:
 - [x] D.109c AHE reclamation plan → RED → GREEN → final review.
 - [x] D.109d receipt-gated runtime reclamation.
 - [x] D.109e browser primary scheduling reuse.
-- [ ] D.109f differential/census exit, including D.109b's three assigned P2
+- [x] D.109f differential/census exit, including D.109b's three assigned P2
       parity/deep-freeze checks and D.109c's invalid-input-polarity,
       second-process SQLite concurrency, and browser facade-census checks.
 
 Before ending a pass, update this handoff with the exact signed/pushed anchor,
-current gate, and next executable command. The next command is to sign and push
-the D.109f tests-only final-review correction, then run its single Grok
-4.6/high, standard Kimi CLI K3/high/100-step, and Opus xhigh confirmation.
+current gate, and next executable command. The next unclosed work is a bounded
+Phase-6c memory-threshold source audit and plan. Phase 6b does not authorize a
+Phase-6c RED, product change, threshold change, or campaign.
 
 The user has prohibited further Fable and collaboration subagents after the
 one expressly authorized Phase-6b Fable review. Phase-6b formal reviews use
@@ -337,8 +335,11 @@ P1 none, and `D109E_GREEN_CLOSABLE: yes` for signed/pushed correction
 `fd99b1ac567c6a559593916492cb9c2036109066`. Its validating self-excluding
 manifest SHA-256 is
 `a78c72b15a660197ace16542af5b8b3491f3cb8a08a4a1ce2555c02f12ca6378`.
-D.109e is closed without a campaign. D.109f has completed corrected plan,
-causal RED, and first GREEN. Its initial final review exposed three tests-only
-proof defects; the bounded correction and all affected gates are green. The
-next action is the signed/pushed correction followed by its one formal
-Grok/Kimi/Opus confirmation.
+D.109e is closed without a campaign. D.109f correction
+`ca25ea23df36d571beef4d01afe533437520ed79` closed the initial final-review
+proof defects. Grok 4.6/high, standard Kimi CLI K3/high/100, and Opus xhigh
+unanimously approved it with an empty P0/P1 union. The correction and
+confirmation manifest SHA-256 values are
+`338400724a38cca0cbaa7a589f0911e33399fb8dcd595ed91df85799a8ac6489` and
+`76a5cfa15dfdde2031dd793c10371bafe35838e236f931370ae006184ce5a1d9`.
+D.109f and Phase 6b are closed without a campaign. Phase 6c planning is next.

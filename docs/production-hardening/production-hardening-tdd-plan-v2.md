@@ -89254,8 +89254,31 @@ is not treated as a code failure. Evidence is rooted at
 `.logs/phase-6b-d109f-green-correction/`. No production file or campaign
 changed.
 
-Sign and push this tests-only correction, then run exactly one Grok 4.6/high,
-standard Kimi CLI K3/high/100, and Opus xhigh confirmation over the complete
-plan → RED → GREEN → correction history. Only an empty P0/P1 union closes
-D.109f and Phase 6b. Do not substitute Codex Sol for Kimi, invoke Fable or a
-collaboration subagent, or run a retained campaign.
+The tests-only correction is signed and pushed at
+`ca25ea23df36d571beef4d01afe533437520ed79`. Its single confirmation is
+complete. Grok 4.6/high session `01a05c57-6ef8-7f32-aede-cca3117b5bf8`,
+standard Kimi CLI K3/high/100 session
+`session_fcd6dd11-dbfd-49f4-bda0-c6e7e339bf72`, and Opus xhigh session
+`18b50593-19b7-4564-93bc-1e7ceb38787c` each returned `APPROVED`,
+`P0_P1_UNION: none`, and `PHASE6B_READY: yes`.
+
+The bounded P2 observations require no executable correction or another
+review. Redundant projection membership assertions are supplementary to the
+independent accepted-operation, canonical-preimage, owner-sink, digest, and
+journal checks. `runtime.anchor` remains a behavioral proof rather than a
+fabricated census owner. Paged reads classify extant returned rows while the
+null-returning point-read evasion path classifies before lookup; native
+censuses and receipts independently prove deletion. No swallowed hook failure
+is demonstrated. Package-local source pairs and the genuine shared-lifecycle
+`dist` pair each remain in one identity realm. Vitest suite accounting does
+not change its exact two-file and eight-file result arrays.
+
+The correction manifest SHA-256 is
+`338400724a38cca0cbaa7a589f0911e33399fb8dcd595ed91df85799a8ac6489`;
+the self-excluding confirmation manifest SHA-256 is
+`76a5cfa15dfdde2031dd793c10371bafe35838e236f931370ae006184ce5a1d9`.
+All D.109f completion predicates are satisfied. D.109a through D.109f and
+Phase 6b close without a retained campaign, Codex-Sol substitution, Fable, or
+collaboration subagents. The next unclosed work is a bounded Phase-6c memory-
+threshold source audit and plan; this record does not pre-authorize its RED,
+GREEN, threshold changes, or campaign.
