@@ -90694,3 +90694,44 @@ required genuine creator-close cost warrants a product performance
 investigation or a high-risk workload/watchdog contract correction; it may not
 claim a product bug, alter a contract, run another profile, or spend the
 preflight/full worker without its own reviewed authority.
+
+##### D.110a-w retained-heap watchdog feasibility correction plan
+
+D.110a-w is frozen in
+`specs/phase-6c-memory-gates/slices/00e-watchdog-feasibility-correction.md`.
+It closes D.110a-v's branch-3 choice without another profiling or attribution
+loop. The minimum mapped creator-close duration is 216.913833 seconds per
+object, but the 2,700-second full watchdog permits only 42.1875 seconds per
+object across 64 objects even if every other phase were free. Closing that gap
+would require more than a 5.14-times improvement across a mixed-owner phase
+and about a 5.98-times improvement across the measured lifecycle. No narrow
+product optimization owner has been demonstrated, so the bounded resolution
+is a high-risk tests-only timing-contract correction, not a product edit or
+defect claim.
+
+The proposed preflight timeout is exactly 900,000 ms and the proposed full
+watchdog is exactly 21,600,000 ms. Six hours retains 20 percent headroom over
+both the 16,155.018688-second profile-duration projection and the
+16,320-second wall projection; fifteen minutes covers the two-object
+510-second wall projection and equals the accepted profile-mode timeout. Every
+workload, object/vertex/operation count, active-room and OLS window, GC turn,
+semantic assertion, memory slope/absolute ceiling, resolver, runtime identity,
+and result schema remains unchanged.
+
+RED adds tests-only constants and the exact
+`D110AW_TIMEOUT_FEASIBILITY_MISSING` source-shape gate, then runs the focused
+test once without a child. GREEN changes only the parent timer selection to use
+those constants, runs the focused test once, the retained 95-test selection,
+affected build/type/lint/format/diff/source-shape gates, and signs/pushes the
+evidence before one final Grok, standard direct Kimi K3/100-step, and Opus
+xhigh review. Because this changes a watchdog contract, the final review must
+verify the timing arithmetic, exact unchanged workload/memory contracts,
+single parent timer, and causal RED-to-GREEN closure. Only P0/P1 blocks.
+
+An empty final-review blocking union releases the still-unspent two-object
+preflight once under fresh write-once root
+`.logs/phase-6c-d110aw-preflight/`. Its pass alone releases the sole 64-object
+worker once under fresh write-once root `.logs/phase-6c-d110a-full/`. Neither
+may be retried. A failed preflight stops before full; any full failure is
+consuming and stops with complete evidence. This slice grants no product,
+dependency, workload, memory-threshold, profile, retry, campaign, or CI change.

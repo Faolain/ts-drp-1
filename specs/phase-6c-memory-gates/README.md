@@ -43,12 +43,15 @@ no owner met the unchanged dominance rule; canonical was largest at about
 product or memory defect. The serial 4.4875-hour 64-object value is a
 projection, not a measured full run.
 
-The next executable work is one separately planned creator-close phase-level
-feasibility slice. It must use the existing immutable profile to decide between
-a bounded product-performance investigation and a high-risk workload/watchdog
-contract correction. Until that plan is reviewed, it grants no process,
-workload, profile, preflight, full-worker, product-edit, threshold-change, or
-watchdog-change authority. Do not invoke Fable or collaboration subagents.
+The next executable work is
+[D.110a-w retained-heap watchdog feasibility correction](slices/00e-watchdog-feasibility-correction.md).
+The existing evidence rules out a narrow product optimization: creator-close
+alone would need a greater-than-5.14-times phase-wide speedup, while no owner
+reaches 50 percent. D.110a-w therefore reviews a tests-only preflight timeout
+of 15 minutes and full-worker watchdog of six hours, preserving every workload,
+memory, semantic, and measurement contract. No child or reserved execution is
+authorized until its reviewed GREEN releases it. Do not invoke Fable or
+collaboration subagents.
 
 Global TODO:
 
@@ -56,6 +59,7 @@ Global TODO:
 - [x] D.110a-p paginate creator durable replay across the public 128-row page seam.
 - [x] D.110a-t/u produce and validate one exact one-object attribution profile.
 - [x] D.110a-v disposition the full lifecycle without another capture.
+- [ ] D.110a-w correct the tests-only watchdog feasibility contract.
 - [ ] D.110a genuine million-operation retained-heap hard gate.
 - [ ] D.110b CI memory-trend fail-closed backstop.
 
@@ -192,11 +196,14 @@ the sole consuming full worker; it cannot tune or reinterpret a threshold.
    applies a deterministic five-mapping sensitivity analysis to the already
    durable D.110a-u artifact and selects branch 3, a creator-close phase-level
    feasibility slice, without another capture.
-4. [D.110a retained-heap hard gate](slices/00-retained-heap-gate.md) adds the
+4. [D.110a-w watchdog feasibility correction](slices/00e-watchdog-feasibility-correction.md)
+   raises only the tests-only preflight/full parent timers to evidence-backed
+   15-minute/six-hour values under high-risk review.
+5. [D.110a retained-heap hard gate](slices/00-retained-heap-gate.md) adds the
    fresh-process worker, exact workload/digest assertions, slope arithmetic,
    hard limits, and mutation-sensitive focused test. Its own implementation
    remains tests/build infrastructure; it depends on D.110a-p.
-5. D.110b runs the accepted D.110a hard command from CI and changes the existing
+6. D.110b runs the accepted D.110a hard command from CI and changes the existing
    benchmark comparison to `fail-on-alert: true` as a separate trend backstop.
    It reviews timeout, cadence, cache-absence, and failure-reporting behavior
    without changing D.110a's workload or thresholds. Historical trend cache is
