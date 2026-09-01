@@ -91091,3 +91091,43 @@ steady-state window. These corrections change no chosen timing, executable
 scope, causal acceptance, product behavior, or workload. Under the bounded
 review policy they do not warrant a confirmation round. Sign and push this
 correction, mechanically validate the plan, then proceed to deterministic RED.
+
+##### D.110a-x deterministic RED
+
+RED changed only `tests/fixtures/phase-6c/retained-heap-contract.ts` and
+`tests/phase-6c-retained-heap-red.test.ts`. It added the reviewed 630,000-ms
+release constant, exact `D110AX_PREFLIGHT_VARIANCE_MISSING` token, isolated
+direct-value/relation audit, require owner, and one focused assertion. The
+active full timeout remained 21,600,000 ms, the existing child remained
+byte-for-byte unchanged at SHA-256
+`263012d82edeae639a80235011b8d00227b0b19ed52463af998f8734e458fff9`,
+and no child, preflight, profiler, full worker, package build, workload, or
+product source ran or changed.
+
+The focused command ran exactly once with coverage disabled. It selected the
+one intended file and reported 23 tests: 22 passed and only `closes
+D110AX_PREFLIGHT_VARIANCE_MISSING` failed, with the complete exact token. There
+were zero pending/todo tests, no top-level error, and empty stderr. The focused
+JSON SHA-256 is
+`15ce47a03fffb39b39a7115d1855c74ed39195f36022978350f4bd40058b364f`.
+
+Exact-two-owner ESLint, Prettier, `git diff --check`, and the detached source
+audit all exited zero. The source audit preserves every inherited predicate as
+true, reports only `preflightVariance=false`, retains full timeout 21,600,000,
+and reports release bound 630,000. Its JSON and RED diff SHA-256 values are
+`e00d600b15ba503b0099fe9067af1aebcfe8513f688f7b273047bccea16de6f0`
+and `44e8e14985d0d3b116fbb1bfb773df252cb0ea5d99d658df5e05691a48b475fe`.
+
+The corrected process predicate excludes the Codex UI's own `turn-ended`
+notification after the initial broad grep matched repository text embedded in
+that payload; the corrected relevant-process result is empty. This was a
+read-only diagnostic false positive, not a test or code failure. All protected
+roots and 26 stashes remain present, all four fixed ports are clear,
+`NODE_OPTIONS` is unset, the full root remains absent, and the inherited
+preflight manifest hash remains exact. The deterministic RED audit returns all
+25 checks true and has SHA-256
+`37504381b4824bd8ecf1a5a7b9294f2e83d2040e2c0e75d2bf75233577b7aab5`.
+The validating self-excluding 29-entry evidence manifest has SHA-256
+`c4abce2288e3d4af9b956661559125208a067117087ad31ff24029400e3c90f5`.
+RED is causal and authorizes only the reviewed full-timeout and two adjacent
+focused-expectation changes in GREEN.

@@ -7,6 +7,7 @@ import {
 	D110A_MUTANTS,
 	D110A_OBJECT_EPOCHS,
 	D110A_OPERATIONS_PER_OBJECT,
+	D110A_PREFLIGHT_RELEASE_MAX_MS,
 	D110A_PREFLIGHT_TIMEOUT_MS,
 	D110A_RED_TOKENS,
 	D110A_SLOPE_LIMIT_BYTES,
@@ -22,11 +23,13 @@ import {
 	d110auMutantProfileInput,
 	d110auSyntheticProfileInput,
 	D110AW_RED_TOKEN,
+	D110AX_RED_TOKEN,
 	requireD110aHardEntrypoint,
 	requireD110aPairedWorkloadGate,
 	requireD110aPostGcSlopeGate,
 	requireD110atProfileAttribution,
 	requireD110awTimeoutFeasibility,
+	requireD110axPreflightVariance,
 	validateD110aProof,
 	validateD110auProfileAttribution,
 } from "./fixtures/phase-6c/retained-heap-contract.js";
@@ -38,6 +41,7 @@ describe("D.110a retained-heap hard-gate RED", () => {
 		expect(D110A_TOTAL_BATCH_VERTICES).toBe(D110A_BATCH_VERTICES_PER_OBJECT * D110A_OBJECT_EPOCHS);
 		expect(D110A_SLOPE_LIMIT_BYTES * 31).toBe(5_119_991);
 		expect(D110A_PREFLIGHT_TIMEOUT_MS).toBe(15 * 60 * 1000);
+		expect(D110A_PREFLIGHT_RELEASE_MAX_MS).toBe(10.5 * 60 * 1000);
 		expect(D110A_FULL_TIMEOUT_MS).toBe(6 * 60 * 60 * 1000);
 		expect(D110A_FULL_TIMEOUT_MS * 0.8).toBe(17_280_000);
 		expect(64 - 19).toBe(45);
@@ -98,5 +102,9 @@ describe("D.110a retained-heap hard-gate RED", () => {
 
 	it(`closes ${D110AW_RED_TOKEN}`, () => {
 		requireD110awTimeoutFeasibility();
+	});
+
+	it(`closes ${D110AX_RED_TOKEN}`, () => {
+		requireD110axPreflightVariance();
 	});
 });
