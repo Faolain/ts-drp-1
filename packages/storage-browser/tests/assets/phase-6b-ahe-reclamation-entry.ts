@@ -15,12 +15,17 @@ import {
 	resolveBrowserAheReclamationMaintenance,
 } from "#phase-6b-ahe-reclamation-maintenance";
 import { createBrowserAheDurableStore } from "../../src/index.js";
-import { installBrowserAheReclamationCountFault } from "../../src/internal/ahe-reclamation.js";
+import {
+	type BrowserAheReclamationCrashEdge,
+	installBrowserAheReclamationCountFault,
+	installBrowserAheReclamationCrashObserver,
+} from "../../src/internal/ahe-reclamation.js";
 import {
 	PHASE_2D_BLOBS_STORE,
 	PHASE_2D_GENERATIONS_STORE,
 	PHASE_2D_OBJECTS_STORE,
 	PHASE_2D_PROMOTIONS_STORE,
+	PHASE_5E_SCHEMA_VERSION,
 } from "../../src/internal/schema-idb.js";
 
 const OBJECT_ID = `creator:${"a".repeat(32)}`;
@@ -69,6 +74,30 @@ const REFERENCE_CASES = Object.freeze([
 	"discarded-partial-promotions",
 ] as const);
 
+type SchedulingMode =
+	| "abort"
+	| "absent"
+	| "delayed"
+	| "granted"
+	| "native"
+	| "non-callable"
+	| "off"
+	| "reject"
+	| "stale-late"
+	| "throw"
+	| "timeout"
+	| "unavailable";
+
+type LockCallback = (lock: unknown) => Promise<unknown> | unknown;
+
+type InstalledLockMode = Readonly<{
+	invokeDelayed(): Promise<void>;
+	readonly names: readonly string[];
+	readonly nativeAvailable: boolean;
+	restore(): void;
+	waitUntilRequested(): Promise<void>;
+}>;
+
 function generationId(index: number): string {
 	return index.toString(16).padStart(64, "0");
 }
@@ -91,6 +120,71 @@ async function failureCode(promise: Promise<unknown>): Promise<string | undefine
 			? String(Reflect.get(error, "code"))
 			: undefined;
 	}
+}
+
+function installSchedulingLockMode(mode: SchedulingMode): InstalledLockMode {
+	const ownDescriptor = Object.getOwnPropertyDescriptor(navigator, "locks");
+	const nativeLocks = Reflect.get(navigator, "locks") as unknown;
+	const nativeRequest =
+		nativeLocks !== null && typeof nativeLocks === "object" ? Reflect.get(nativeLocks, "request") : undefined;
+	const nativeAvailable = typeof nativeRequest === "function";
+	const names: string[] = [];
+	let delayedCallback: LockCallback | undefined;
+	let requested = false;
+	let resolveRequested!: () => void;
+	const requestedPromise = new Promise<void>((resolvePromise) => {
+		resolveRequested = resolvePromise;
+	});
+
+	const replaceLocks = (value: unknown): void => {
+		Object.defineProperty(navigator, "locks", { configurable: true, value });
+	};
+	if (mode === "absent") {
+		replaceLocks(undefined);
+	} else if (mode === "off") {
+		replaceLocks(Object.freeze({}));
+	} else if (mode === "non-callable") {
+		replaceLocks(Object.freeze({ request: 1 }));
+	} else if (mode !== "native") {
+		const locks = {
+			request(this: unknown, name: string, _options: unknown, callback: LockCallback): Promise<unknown> {
+				if (this !== locks) throw new TypeError("D109E_LOCK_RECEIVER_LOST");
+				names.push(name);
+				if (!requested) {
+					requested = true;
+					resolveRequested();
+				}
+				if (mode === "throw") throw new TypeError("D109E_INJECTED_LOCK_THROW");
+				if (mode === "reject") return Promise.reject(new TypeError("D109E_INJECTED_LOCK_REJECTION"));
+				if (mode === "abort") return Promise.reject(new DOMException("injected abort", "AbortError"));
+				if (mode === "unavailable") return Promise.resolve(callback(null));
+				if (mode === "granted") return Promise.resolve(callback(Object.freeze({ name })));
+				if (mode === "timeout") return new Promise(() => undefined);
+				delayedCallback = callback;
+				return new Promise(() => undefined);
+			},
+		};
+		replaceLocks(Object.freeze(locks));
+	}
+
+	return Object.freeze({
+		invokeDelayed: async () => {
+			if (delayedCallback === undefined) throw new TypeError(`D109E_DELAYED_CALLBACK_MISSING:${mode}`);
+			await delayedCallback(Object.freeze({ name: names[0] }));
+		},
+		names,
+		nativeAvailable,
+		restore: () => {
+			if (ownDescriptor === undefined) {
+				Reflect.deleteProperty(navigator, "locks");
+			} else {
+				Object.defineProperty(navigator, "locks", ownDescriptor);
+			}
+		},
+		waitUntilRequested: async () => {
+			if (mode === "delayed" || mode === "stale-late") await requestedPromise;
+		},
+	});
 }
 
 async function fiveGenerations(
@@ -248,6 +342,173 @@ async function runPositiveControls(prefix: string): Promise<Record<string, unkno
 		return Object.freeze({ concurrentDeletedCounts: Object.freeze(deleted), empty: true });
 	} finally {
 		await Promise.all([firstStore.close(), secondStore.close()]);
+	}
+}
+
+async function prepareSchedulingScenario(databaseName: string): Promise<Record<string, unknown>> {
+	const store = await createBrowserAheDurableStore({ databaseName });
+	try {
+		return structuredClone((await fiveGenerations(store)).input);
+	} finally {
+		await store.close();
+	}
+}
+
+async function runPreparedCleanup(
+	databaseName: string,
+	input: Record<string, unknown>,
+	mode: SchedulingMode
+): Promise<Record<string, unknown>> {
+	const store = await createBrowserAheDurableStore({ databaseName });
+	const maintenance = resolveBrowserAheReclamationMaintenance(store);
+	if (maintenance === undefined) throw new TypeError("D109C_BROWSER_MAINTENANCE_MISSING");
+	let transactionEntries = 0;
+	installBrowserAheReclamationCrashObserver(store, (edge: BrowserAheReclamationCrashEdge) => {
+		if (edge === "before-commit") transactionEntries += 1;
+	});
+	const locks = installSchedulingLockMode(mode);
+	try {
+		const receipt = await maintenance.reclaimClosedEpoch(input);
+		if (mode === "stale-late") {
+			await locks.invokeDelayed();
+			await Promise.resolve();
+		}
+		return Object.freeze({
+			names: Object.freeze([...locks.names]),
+			nativeAvailable: locks.nativeAvailable,
+			receipt,
+			transactionEntries,
+		});
+	} finally {
+		locks.restore();
+		await store.close();
+	}
+}
+
+async function runSchedulingMode(databaseName: string, mode: SchedulingMode): Promise<Record<string, unknown>> {
+	const input = await prepareSchedulingScenario(databaseName);
+	return runPreparedCleanup(databaseName, input, mode);
+}
+
+async function triggerVersionchange(databaseName: string): Promise<void> {
+	await new Promise<void>((resolvePromise, reject) => {
+		const request = indexedDB.open(databaseName, PHASE_5E_SCHEMA_VERSION + 1);
+		request.addEventListener(
+			"upgradeneeded",
+			() => {
+				request.transaction?.abort();
+			},
+			{ once: true }
+		);
+		request.addEventListener("error", () => resolvePromise(), { once: true });
+		request.addEventListener("blocked", () => reject(new TypeError("D109E_VERSIONCHANGE_BLOCKED")), { once: true });
+		request.addEventListener(
+			"success",
+			() => {
+				request.result.close();
+				reject(new TypeError("D109E_VERSIONCHANGE_UPGRADE_COMMITTED"));
+			},
+			{ once: true }
+		);
+	});
+}
+
+async function runLifecycleScenario(
+	databaseName: string,
+	event: "close" | "versionchange"
+): Promise<Record<string, unknown>> {
+	const input = await prepareSchedulingScenario(databaseName);
+	const before = await databaseImage(databaseName);
+	const store = await createBrowserAheDurableStore({ databaseName });
+	const maintenance = resolveBrowserAheReclamationMaintenance(store);
+	if (maintenance === undefined) throw new TypeError("D109C_BROWSER_MAINTENANCE_MISSING");
+	let transactionEntries = 0;
+	installBrowserAheReclamationCrashObserver(store, (edge: BrowserAheReclamationCrashEdge) => {
+		if (edge === "before-commit") transactionEntries += 1;
+	});
+	const delayed = installSchedulingLockMode("delayed");
+	let restored = false;
+	try {
+		const pending = maintenance.reclaimClosedEpoch(input);
+		await delayed.waitUntilRequested();
+		if (event === "close") await store.close();
+		else await triggerVersionchange(databaseName);
+		await delayed.invokeDelayed().catch(() => undefined);
+		const code = await failureCode(pending);
+		const unchangedBeforeTakeover = (await databaseImage(databaseName)) === before;
+		delayed.restore();
+		restored = true;
+		const granted = installSchedulingLockMode("granted");
+		try {
+			const successor = await createBrowserAheDurableStore({ databaseName });
+			try {
+				const successorMaintenance = resolveBrowserAheReclamationMaintenance(successor);
+				if (successorMaintenance === undefined) throw new TypeError("D109C_BROWSER_MAINTENANCE_MISSING");
+				const receipt = await successorMaintenance.reclaimClosedEpoch(input);
+				return Object.freeze({ code, receipt, transactionEntries, unchangedBeforeTakeover });
+			} finally {
+				await successor.close();
+			}
+		} finally {
+			granted.restore();
+		}
+	} finally {
+		if (!restored) delayed.restore();
+		await store.close();
+	}
+}
+
+async function advanceToGenerationSix(store: AheDurableStore): Promise<ExpectedHead> {
+	const head = successful(await store.readHead(OBJECT_ID), "SCHEDULING_HEAD");
+	const bytes = Uint8Array.of(6, 7, 8);
+	const digest = successful(digestBlob(bytes), "SCHEDULING_DIGEST");
+	const id = generationId(6);
+	successful(
+		await store.beginGeneration({
+			baseExpectedHead: head,
+			closure: [{ byteLength: bytes.byteLength, digest }],
+			generationId: id,
+			objectId: OBJECT_ID,
+		}),
+		"SCHEDULING_BEGIN"
+	);
+	successful(await store.putCachedBlob({ bytes, digest, generationId: id, objectId: OBJECT_ID }), "SCHEDULING_PUT");
+	successful(await store.promoteReference({ digest, generationId: id, objectId: OBJECT_ID }), "SCHEDULING_PROMOTE");
+	successful(await store.completeGeneration({ generationId: id, objectId: OBJECT_ID }), "SCHEDULING_COMPLETE");
+	return successful(
+		await store.swapHead({ expectedHead: head, generationId: id, objectId: OBJECT_ID }),
+		"SCHEDULING_SWAP"
+	).head;
+}
+
+async function runChangedPreconditionScenario(databaseName: string): Promise<Record<string, unknown>> {
+	const store = await createBrowserAheDurableStore({ databaseName });
+	const maintenance = resolveBrowserAheReclamationMaintenance(store);
+	if (maintenance === undefined) throw new TypeError("D109C_BROWSER_MAINTENANCE_MISSING");
+	const { input } = await fiveGenerations(store);
+	let transactionEntries = 0;
+	installBrowserAheReclamationCrashObserver(store, (edge: BrowserAheReclamationCrashEdge) => {
+		if (edge === "before-commit") transactionEntries += 1;
+	});
+	const delayed = installSchedulingLockMode("delayed");
+	try {
+		const pending = maintenance.reclaimClosedEpoch(input);
+		await delayed.waitUntilRequested();
+		const advanced = await advanceToGenerationSix(store);
+		const readBack = successful(await store.readHead(OBJECT_ID), "SCHEDULING_READ_BACK");
+		const baseline = await databaseImage(databaseName);
+		await delayed.invokeDelayed().catch(() => undefined);
+		const code = await failureCode(pending);
+		return Object.freeze({
+			advanced,
+			code,
+			imageUnchanged: (await databaseImage(databaseName)) === baseline,
+			readBack,
+			transactionEntries,
+		});
+	} finally {
+		delayed.restore();
+		await store.close();
 	}
 }
 
@@ -780,12 +1041,17 @@ Reflect.set(
 	globalThis,
 	"phase6bAheReclamation",
 	Object.freeze({
+		prepareSchedulingScenario,
 		ready: D109C_BROWSER_MAINTENANCE_READY,
 		run,
+		runChangedPreconditionScenario,
 		runCrashMatrix,
+		runLifecycleScenario,
 		runMutantMatrix,
 		runPositiveControls,
+		runPreparedCleanup,
 		runReferenceMatrix,
+		runSchedulingMode,
 		workerUrl,
 	})
 );

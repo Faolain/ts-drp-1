@@ -88979,3 +88979,24 @@ self-excluding manifest SHA-256 is
 
 D.109e RED may now begin exactly once in Chromium under the corrected frozen
 matrix. No further plan review or confirmation is permitted or required.
+
+#### D.109e RED acceptance
+
+The one authorized Chromium RED selected exactly six tests from only
+`phase-6b-browser-scheduling-red.pw.ts`. The independent frozen-owner and
+source-shape control passed; readiness failed with the complete and sole token
+`D109E_PRIMARY_DISPATCH_MISSING` because only
+`src/internal/primary-dispatch.ts` was absent; the remaining four behavioral
+tests skipped on that exact readiness condition. Reporter totals were
+expected=1, unexpected=1, skipped=4, flaky=0, with zero top-level errors. No
+Phase-5c or D.109c retained title was selected and no campaign ran.
+
+The tests-only owners passed exact ESLint, Prettier, bundle construction,
+`git diff --check`, and one-file listing controls. Whole-package
+`tsc --noEmit` remained nonzero on the inherited tests-root maintenance-alias
+and branded-fixture debt already present in the D.109c asset/worker; this is
+recorded rather than misclassified as the intended RED. The authoritative
+reporter JSON, commands, hashes, and self-excluding manifest are rooted at
+`.logs/phase-6b-d109e-red/`. RED changes no production source. D.109e GREEN is
+open only for the four frozen internal owners; no separate RED model review is
+required.

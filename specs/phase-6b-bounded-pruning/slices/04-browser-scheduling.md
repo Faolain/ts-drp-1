@@ -212,6 +212,24 @@ confirmation are permitted under the governing review policy; documentation-
 only closure prose does not recurse. Do not invoke Fable, Codex Sol, or
 collaboration subagents.
 
+## RED acceptance
+
+The tests-only RED is signed against the six-test, one-file Chromium listing.
+Its sole execution produced exactly one passing independent owner/source-shape
+control, one unexpected result carrying only
+`D109E_PRIMARY_DISPATCH_MISSING`, four readiness skips, zero flaky results, and
+zero top-level errors. The missing owner was exactly
+`src/internal/primary-dispatch.ts`; no retained Phase-5c or D.109c title was
+selected. The genuine behavioral fixtures remained unexecuted, so RED did not
+change or probe production behavior before the causal seam exists.
+
+Evidence is rooted at `.logs/phase-6b-d109e-red/`. Exact-owner ESLint,
+Prettier, bundle construction, `git diff --check`, and listing controls passed.
+The whole-package `tsc --noEmit` remained nonzero only on the already-recorded
+test-root alias and branded fixture values, including the unchanged companion
+worker; it found no production-source regression and is retained honestly for
+GREEN classification. No model review or retained campaign ran.
+
 ## Exit
 
 D.109e closes only when every lock/lifecycle mode attempts the same eligible

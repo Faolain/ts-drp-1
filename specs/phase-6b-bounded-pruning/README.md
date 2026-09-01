@@ -288,3 +288,11 @@ rooted at `.logs/phase-6b-d109e-plan-confirmation/`; its validating
 self-excluding manifest SHA-256 is
 `c0f0dbd11bb0250edbbd98bff660f9786a9d240a6508b8cfe3559608532e531c`.
 D.109e RED is now open; no further plan review runs.
+
+The one authorized D.109e Chromium RED has now run and matched the frozen
+matrix exactly: six tests in one file, one independent source/owner pass, one
+failure carrying only `D109E_PRIMARY_DISPATCH_MISSING`, four readiness skips,
+zero flaky results, and zero top-level errors. Evidence is rooted at
+`.logs/phase-6b-d109e-red/`. The checkpoint is tests-only; production remains
+unchanged, and D.109e GREEN is now open over exactly the four frozen internal
+owners.
