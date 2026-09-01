@@ -215,6 +215,9 @@ export function captureAheReclamationInput(value: unknown): AheReclamationInput 
 		}
 		const rollbackGenerationIds = copyRollbackIds(value.rollbackGenerationIds);
 		const deleteGenerationIds = copyGenerationIds(value.lineageFloor.deleteGenerationIds);
+		if (deleteGenerationIds.length === 0 && expectedBaseExpectedHead.kind === "present") {
+			invalid("an empty reclamation prefix cannot retain a former floor parent");
+		}
 		const retained = new Set<GenerationId>([
 			value.activeGenerationId,
 			rollbackGenerationIds[0],

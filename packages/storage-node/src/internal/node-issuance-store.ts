@@ -603,7 +603,8 @@ class NodeIssuanceImplementation {
 		return this.#commitCandidate(detached, prior, candidate);
 	}
 
-	inspectPruningState(scope: DurableIssueScope): Promise<DurableIssuancePruningState> {
+	async inspectPruningState(scope: DurableIssueScope): Promise<DurableIssuancePruningState> {
+		await Promise.resolve();
 		this.#assertAvailable();
 		assertDurableIssueScope(scope);
 		const detached = copyDurableIssueScope(scope);
@@ -612,12 +613,10 @@ class NodeIssuanceImplementation {
 			const lineage = readNativeLineage(this.#database, detached, "writer");
 			if (lineage === undefined) throw this.#latchCorruption("stored lineage is malformed");
 			this.#database.exec("COMMIT");
-			return Promise.resolve(
-				createDurableIssuancePruningState(
-					detached,
-					{ exhausted: lineage.exhausted, next: lineage.next },
-					lineage.prunedThroughAuthorSequence
-				)
+			return createDurableIssuancePruningState(
+				detached,
+				{ exhausted: lineage.exhausted, next: lineage.next },
+				lineage.prunedThroughAuthorSequence
 			);
 		} catch (error) {
 			try {
@@ -625,7 +624,7 @@ class NodeIssuanceImplementation {
 			} catch {
 				// Preserve the inspection failure.
 			}
-			return Promise.reject(this.#mapOperationError(error, "pruning-state inspection failed"));
+			throw this.#mapOperationError(error, "pruning-state inspection failed");
 		}
 	}
 

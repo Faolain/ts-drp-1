@@ -290,6 +290,27 @@ they exposed test-fixture exact-record mistakes and one final stale tarball
 roster, all corrected without production changes. Evidence is under
 `.logs/phase-6b-d109f-red/`; its manifest excludes itself. No campaign ran.
 
+GREEN changes only the three frozen production owners. Shared AHE capture now
+rejects only empty-delete/present-parent before dispatch; the pruned error
+freezes its detached scope; and Node inspection crosses an async boundary
+before availability/input checks. Focused non-browser GREEN passed 9/9. The
+corrected one-file browser gate passed 3/3 across Chromium, Firefox, and WebKit.
+
+Retained Vitest passed 301/301 across 24 D.109a-d, Phase-6a, snapshot, live-
+journal, schema, capacity, and export-roster files. Retained browser gates
+passed D.109b 4/4, D.109c 4/4, and D.109e 18/18, all with zero skip,
+unexpected, flaky, or top-level error. The first all-engine GREEN browser run
+is retained as an invalid tests-only diagnostic: all engines exposed the same
+31-key concrete backend `facadeKeys` roster after RED's causal assertion was
+removed. Correcting the stale 13-key expectation required no production edit;
+the complete corrected run passed.
+
+All four affected package builds and source-only build-config typechecks pass.
+Exact-owner lint/format, child syntax, source-shape, diff, protected-path,
+26-stash, process/port, and self-excluding manifest checks pass. GREEN evidence
+is under `.logs/phase-6b-d109f-green/`. No campaign ran. The signed/pushed GREEN
+checkpoint receives the sole formal Grok/Kimi/Opus plan-to-RED-to-GREEN review.
+
 ## Phase-6b completion condition
 
 Phase 6b closes only when all three defects reject/behave as frozen; the

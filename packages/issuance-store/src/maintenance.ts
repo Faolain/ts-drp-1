@@ -57,7 +57,7 @@ export class DurableIssuanceRecordPrunedError extends Error implements DurableIs
 		super("durable issuance record was pruned");
 		Object.defineProperty(this, "name", { configurable: true, value: "DurableIssuanceError" });
 		this.authorSequence = authorSequence;
-		this.scope = copyDurableIssueScope(scope);
+		this.scope = Object.freeze(copyDurableIssueScope(scope));
 	}
 }
 

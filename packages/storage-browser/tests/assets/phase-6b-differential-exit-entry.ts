@@ -6,19 +6,37 @@ import { resolveBrowserAheReclamationMaintenance } from "../../dist/src/maintena
 const OBJECT_ID = `creator:${"f".repeat(32)}`;
 const POLICY_DIGEST = "53775c5c1ee01e346f588966d6e7acb876df2bd8b2abcbe2b2591f216f7d4d9b";
 const FACADE_KEYS = Object.freeze([
+	"applyWrite",
+	"applyWrites",
 	"beginGeneration",
 	"capabilities",
 	"close",
 	"completeGeneration",
 	"discardGeneration",
+	"ensureCertificate",
+	"execute",
 	"getBlob",
+	"lifecycle",
+	"loadBlob",
+	"loadFacts",
+	"loadGeneration",
+	"loadPromotion",
+	"observeHead",
 	"probeBlobPresence",
 	"promoteReference",
 	"putCachedBlob",
 	"readGenerationPage",
 	"readHead",
 	"recoverActiveGeneration",
+	"recoverWithinTransaction",
+	"recoveryCertificates",
+	"request",
+	"requiredHeadObservation",
+	"run",
+	"runRecovery",
 	"swapHead",
+	"verifyCandidate",
+	"verifyClosure",
 ] as const);
 
 function generationId(index: number): string {

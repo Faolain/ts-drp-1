@@ -89193,3 +89193,25 @@ honestly in `.logs/phase-6b-d109f-red/`: they exposed only exact-record fixture
 mistakes and one stale tarball roster, which were corrected before the accepted
 RED. No production file changed and no campaign ran. GREEN is authorized only
 for the three named production owners.
+
+GREEN changes only those three owners. Shared AHE capture rejects only empty-
+delete/present-parent before dispatch, the pruned error freezes its detached
+scope, and Node inspection crosses an async boundary before availability/input
+checks. Focused non-browser GREEN passed 9/9. The corrected one-file browser
+gate passed 3/3 across Chromium, Firefox, and WebKit.
+
+Retained Vitest passed 301/301 across 24 D.109a-d, Phase-6a, snapshot, live-
+journal, schema, capacity, and export-roster files. Retained browser gates
+passed D.109b 4/4, D.109c 4/4, and D.109e 18/18, all without skip, unexpected,
+flaky, or top-level error. The first all-engine GREEN browser result is kept as
+an invalid tests-only diagnostic: all engines reported the same exact 31-key
+concrete backend `facadeKeys` roster after the former RED assertion became
+green. Correcting that stale 13-key expectation required no product change;
+the complete corrected run passed.
+
+Affected package builds and source-only build-config typechecks pass for
+storage, issuance-store, storage-node, and storage-browser. Exact-owner lint,
+format, child syntax, source-shape, diff, protected-path, 26-stash, process/
+port, and self-excluding manifest checks pass. GREEN evidence is under
+`.logs/phase-6b-d109f-green/`. No campaign ran. The signed/pushed GREEN receives
+the sole formal Grok/Kimi/Opus plan-to-RED-to-GREEN review.
