@@ -89476,3 +89476,43 @@ graph predicate; a third model round is forbidden by the bounded protocol. RED
 may start only after the signed/pushed final owner correction, exact changed-
 path audit, single-built-module source-shape checks, and review-evidence
 manifest all pass. No preflight or long worker is part of RED.
+
+##### D.110a deterministic RED
+
+The final plan-review/owner checkpoint is signed and pushed at
+`555bcb5ac14e234c5a2ddb10c1311e172c5fedca`. D.110a RED adds exactly
+`tests/fixtures/phase-6c/retained-heap-contract.ts` and
+`tests/phase-6c-retained-heap-red.test.ts`; no product, workflow, package
+manifest, worker, child, fixture-extension, or retained owner changed. The
+contract freezes the exact 64-object/1,000,000-operation/62,528-vertex
+arithmetic, 20-room window, samples 32 through 63 OLS window, 165,161-byte
+slope epsilon, 512,000,000-byte absolute ceiling, detached semantic digest,
+complete proof validator, and fourteen false-gate mutants. Its source audit is
+confined to the two preexisting memory benches and root entry point, so the RED
+contract cannot satisfy its own missing-infrastructure predicates.
+
+Exact command
+`pnpm exec vitest run tests/phase-6c-retained-heap-red.test.ts --reporter=json --outputFile=.logs/phase-6c-d110a-red/result.json`
+ran once and exited 1. It selected one test file and 20 tests: 17 passed, zero
+skipped/todo, and exactly three failed. The complete failure-token set is
+`D110A_HARD_ENTRYPOINT_MISSING`,
+`D110A_PAIRED_WORKLOAD_GATE_MISSING`, and
+`D110A_POST_GC_SLOPE_GATE_MISSING`; there was no additional assertion failure,
+top-level error, module-load error, timeout, readiness skip, flaky result, or
+soft-failure class. Exact listing command
+`pnpm exec vitest list tests/phase-6c-retained-heap-red.test.ts --json` selected
+the same one file and all 20 titles without executing the tests.
+
+Pre-execution static checks passed: exact-owner Prettier, exact-owner ESLint
+with zero warnings, root TypeScript no-emit, and `git diff --check`. After RED,
+ports 4174, 4175, 51000, and 51002 were clear; the only observed Vitest process
+belonged to an unrelated Heimdall checkout, not ts-drp; all 26 inherited
+stashes remained. The full worker, two-object preflight, retained tests,
+product builds, browser tests, reviewers, Fable, and collaboration subagents
+did not run. Raw result/stdout/stderr/list SHA-256 values are
+`d1f5a5b0f1cecab1a3500fb37971ee7b9ca1bd3d2e4a956f007690f48d461c92`,
+`3b30d29e492d81704ec65306e70942256eadeb98181d49add518bf2cbc938ba3`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`,
+and `dfcecc75dd16176b925047d251782375bda593a27f83f2cf1fc498aaff926755`.
+The RED matches its signed causal matrix and authorizes only the named
+tests/test-fixture/entry-point GREEN.
