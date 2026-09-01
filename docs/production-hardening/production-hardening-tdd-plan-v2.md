@@ -90099,3 +90099,81 @@ authorize a preflight, full worker, product edit, dependency/threshold change,
 Fable, Codex-Sol substitution, or collaboration subagent. Its signed/pushed
 plan receives one Grok, standard direct Kimi K3/100-step, and Opus xhigh review
 before RED.
+
+##### D.110a-u initial plan review and bounded correction
+
+The signed/pushed review anchor is
+`bae6c12fdcb1c043abc6fb598855cc25f26d50f7`, tree
+`e578846daa52ee8f8209f4bb658dbc71bfcea158`. All three reviewers inspected that
+same anchor and the existing D.110a-t source/evidence. The shared prompt SHA-256
+is `1ca5f3a7b0df67c3520310f80372def0d705b97bbcd4654b1b0e83cceb3ec468`.
+
+Grok 4.6/high session `01a05d5b-054d-7861-97c2-5e7073e363bf` reached a normal
+terminal response after 641.321 seconds with `CHANGES_REQUIRED`, P0=0, P1=2,
+P2=3. Its public/events/status SHA-256 values are
+`4abda7e2bc2bde548b01a612f369d8c10685859333f90fc2aa3373d7d2d754a8`,
+`d6a28ddbd0869b4346a7b94a05ce57e87a691a1735579d7e47ee2bfd583d9386`,
+and `c7473c5f3af79496d6018e97fee22f3006c64a01a7d11cd2aef76a8cd5558211`;
+stderr is empty. Standard direct Kimi CLI K3 session
+`session_0e41c206-7840-4060-bdc3-4f55cb67f0d1` reached a valid terminal
+`CHANGES_REQUIRED`, P0=0, P1=1, P2=2. Its stream/terminal/stderr SHA-256 values
+are `8face638502747b6ab92e109b7c1539209d922b94b6a6089eabb0bce110591a8`,
+`e4224eb2fb7f6294ec50432b1ac41a423aa49226aeac7e343361d7366fc2d729`,
+and `d99ab053b98e5523a8ff0781c3063962c159a35817eeb9cd6aaad75ee63bc614`.
+The working invocation is `KIMI_LOOP_MAX_STEPS_PER_TURN=100
+/Users/aristotle/.kimi-code/bin/kimi --model kimi-code/k3 --prompt
+"$review_prompt" --output-format stream-json`; two earlier commands with
+mutually exclusive mode flags exited before creating review sessions and are
+not verdicts. Opus xhigh session `1dbc2af6-7dc9-4f19-85be-4a2d291f9fc5`
+returned `CHANGES_REQUIRED`, P0=0, P1=5, P2=5. Its result/terminal SHA-256
+values are `c8aa6627dcbe066930f924f13a27b6e000d820db8e176854cd8906287c12f744`
+and `5ad64fc3b0afe54a2fd20a57e15782f000c2fd832b41ec22267464e917edb11e`;
+stderr is empty.
+
+The blocking union is accepted as one bounded tests-only correction. The exact
+named async owner is `runD110auApplicationWorkload`, called through the shared
+`buildObjectEpoch` path and returning both `{ appliedWorkloadOperations,
+latest }` so the existing 15,625-operation and 15,628-logical-time invariants
+remain outside the extracted loop. Profile-node selection requires exact
+function name plus `retained-heap-worker.ts` URL across all matching node ids.
+The profiler-time workload window is the closed interval from the first to the
+last sample whose ancestry contains any matching node; every sample in that
+interval, including GC/runtime leaves, contributes leaf self time. Zero frame,
+zero matching samples, and a one-sample/degenerate interval fail distinctly.
+
+The child records raw `hrtimeBeforeStart`, `hrtimeAfterStart`,
+`hrtimeBeforeStop`, and `hrtimeAfterStop`, stops the profiler, writes the raw
+profile exclusively, and only then reports terminal IPC. The parent calls the
+same exported detached validator used by the synthetic control and performs
+all calibration, phase-containment, sample-window, and dominance adjudication
+only after the file is durable. All seven phases must fall inside the
+same-clock `[hrtimeAfterStart, hrtimeBeforeStop]` interval. Profiler duration
+has only the one-sided custody predicate `0 < endTime - startTime <=
+hrtimeAfterStop - hrtimeBeforeStart` plus the inherited 900,000,000-microsecond
+ceiling. Grok's suggested lower elapsed bound is rejected because inspector
+stop/materialisation latency and clock-rate skew make it a false one-shot
+failure vector; no absolute cross-clock comparison is allowed.
+
+Before the replacement capture, the one new focused title must positively
+assert the complete audit with exact token
+`D110AU_PROFILE_CLOCK_CALIBRATION_MISSING` and execute the shared validator
+against a passing disjoint-clock control and exact mutants for phase before
+start, phase after stop, missing named frame, zero matching samples, and a
+single-sample window. This single-title matrix both detects reintroduced
+cross-clock comparison and preserves the exact 21-title roster. The replacement
+identity is frozen to `.logs/phase-6c-d110au-green`, fresh-directory prefix
+`profile-`, profile filename `d110au-main.cpuprofile`, and root-level exclusive
+sentinel `capture-consumed.json`, created before spawn. The preserved D.110a-t
+profile hash must pass immediately before and after the replacement capture.
+
+All P2 findings are dispositioned in that correction: the four bracket fields,
+shared owner path, report-only outcome, closed D.110a-t owner roster, exact
+replacement identity, write-once sentinel, failed-capture closure, positive
+audit assertion, and preserved-profile rehash are adopted. D.110a-u performs
+no optimization. A failed replacement closes the slice unavailable and grants
+no further invocation authority. No product source, dependency, workload,
+threshold, watchdog, preflight/full authority, or memory contract changes.
+Because these corrections materially pin causal acceptance and execution
+custody, the one permitted confirmation review will inspect the corrected
+signed/pushed plan. No further plan-review recursion is allowed after that
+confirmation.

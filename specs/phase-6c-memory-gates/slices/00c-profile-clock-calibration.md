@@ -43,34 +43,88 @@ worker.
 
 The desired-state audit requires all of the following:
 
-- explicit before/after `Profiler.start` and before/after `Profiler.stop`
-  `process.hrtime` calibration brackets;
+- exact `process.hrtime` calibration fields `hrtimeBeforeStart`,
+  `hrtimeAfterStart`, `hrtimeBeforeStop`, and `hrtimeAfterStop`, recorded
+  immediately before/after `Profiler.start` and before/after `Profiler.stop`;
 - no absolute equality or ordering comparison between profiler timestamps and
   `process.hrtime` timestamps;
-- one stable named workload callback frame whose body is the unchanged exact
-  977-batch/15,625-operation loop;
+- the exact replacement root `.logs/phase-6c-d110au-green`, profile filename
+  `d110au-main.cpuprofile`, fresh-directory prefix `profile-`, and root-level
+  exclusive sentinel `capture-consumed.json`, created before spawn;
+- the stable named async function `runD110auApplicationWorkload`, whose body is
+  the unchanged exact 977-batch/15,625-operation loop, returns both
+  `{ appliedWorkloadOperations, latest }`, and is called only from the shared
+  `buildObjectEpoch` path used by profile, preflight, and full modes;
 - same-clock proof that all seven progress timestamps occur after the profiler
   start bracket and before the profiler stop bracket; and
-- profiler-clock sample-window derivation from the named workload frame and
-  its sampled ancestry.
+- exact function-name plus `retained-heap-worker.ts` URL matching across every
+  CPU-profile node for the named workload function; and
+- a closed profiler-time interval from the first through last sample whose
+  ancestor chain contains any matching named-function node, attributing every
+  sample in that interval—including GC/runtime leaves—by leaf self time.
+
+The one added title positively asserts the complete audit field with
+`D110AU_PROFILE_CLOCK_CALIBRATION_MISSING` as its assertion message and then
+invokes the same exported detached validator that the real parent launcher
+uses. Its valid synthetic control deliberately uses disjoint profiler and
+`process.hrtime` absolute origins, includes multiple node ids for the same
+exact named function, and must pass. The same title executes these exact
+mutants and tokens:
+
+- `phase-before-start` and `phase-after-stop` each throw
+  `D110AU_PROFILE_PHASE_OUTSIDE_CAPTURE`;
+- `missing-named-frame` throws `D110AU_PROFILE_WORKLOAD_FRAME_MISSING`;
+- `zero-matching-samples` throws `D110AU_PROFILE_WORKLOAD_SAMPLES_MISSING`;
+  and
+- `single-sample-window` throws `D110AU_PROFILE_WORKLOAD_WINDOW_DEGENERATE`.
+
+This behavioural matrix must execute before the replacement capture; a
+negative grep or renamed-source predicate alone is insufficient. Keeping the
+control and mutants in this single title preserves the frozen 21-title roster.
 
 ## GREEN and replacement capture
 
-GREEN extracts the existing callback body into one named tests-only workload
-function without changing its operations, order, signing, issue/publish calls,
-or counts. The child records four calibration timestamps around inspector
-start/stop. It validates duration consistency using elapsed durations and
-brackets, never absolute cross-clock values. It proves the progress timeline
-was recorded while profiling using only `process.hrtime`, and derives the CPU
-sample window using only profiler timestamps from the named workload frame.
+GREEN extracts the existing callback body into the named tests-only async
+function `runD110auApplicationWorkload` without changing its operations,
+order, signing, issue/publish calls, or counts. The function returns both the
+final applied count and `latest`; the callback consumes both and evaluates the
+existing 15,628 logical-time and 15,625 applied-operation invariants from that
+returned object. No profile-only workload copy is allowed.
 
-The existing fresh-directory, exclusive `wx` write, exact one-file custody,
-built-package hashes, PID/executable identity, cleared inherited
+The child records and reports raw `process.hrtime` stamps immediately before
+and after `Profiler.start` and immediately before and after `Profiler.stop`,
+stops the profiler, writes the raw profile with exclusive creation, and only
+then sends its terminal IPC result. It does not adjudicate calibration,
+containment, sample windows, or dominance. The parent performs every such
+check from the already durable on-disk profile plus the terminal/phase IPC
+records, so a validator defect cannot discard the sole artifact.
+
+The parent calls the same exported detached contract validator exercised by
+the synthetic control and mutants. It proves every phase lies in the
+same-clock closed interval
+`[hrtimeAfterStart, hrtimeBeforeStop]`. It compares no profiler timestamp to an
+hrtime absolute value. Duration custody is one-sided only:
+`0 < profile.endTime - profile.startTime <= hrtimeAfterStop -
+hrtimeBeforeStart`, with the existing 900,000,000-microsecond ceiling; there is
+no lower-bound agreement requirement because inspector stop/materialisation
+latency and clock-rate skew need not be symmetric. The parent derives the
+workload window solely in profiler time using exact function-name plus URL
+matches across all matching node ids, fails with distinct exact tokens for no
+matching frame, no matching sample, and a degenerate/single-sample window, and
+attributes every sample in the first-to-last closed interval by leaf self time.
+
+The exact D.110a-u root, filename, `profile-` directory prefix, and
+`capture-consumed.json` sentinel; exclusive `wx` profile write; exact one-file
+profile-directory custody; built-package hashes; PID/executable identity; and
+cleared inherited
 `NODE_OPTIONS`, 900,000 ms diagnostic timeout, normal-exit, phase-order,
 operation/vertex/lifecycle counts, and no-memory-verdict checks remain. Static
 GREEN must pass exact-owner lint/format/diff, child syntax, the three package
 build-source typechecks, all-package build, focused 21/21, and the inherited
-retained 95/95 selection before any replacement capture.
+retained 95/95 selection before any replacement capture. The preserved
+D.110a-t profile hash
+`f7b0de49a5a364304acc9f8c5838d6ef6bdb8903ee92c7098c4b6cf3c9e25d99`
+must verify immediately before and after the replacement capture.
 
 After those gates, D.110a-u permits exactly one separately labelled replacement
 one-object profile under the user's existing express debugging authorization.
@@ -80,19 +134,29 @@ the first signal, exception, timeout, nonzero exit, missing/extra file, or
 semantic mismatch. The two-object preflight and 64-object worker remain
 unspent.
 
+A failed replacement capture closes D.110a-u as unavailable, keeps D.110a
+paused, and grants no further profile invocation authority. The write-once
+sentinel makes a second launcher invocation fail before spawn even if the first
+replacement fails.
+
 Apply the unchanged dominance rule to self time in the named workload sample
-window: at least 50% and at least twice the next owner group. If the result is
-mixed or unavailable, close the slice without optimization and keep D.110a
-paused. A clearly dominant tests-only owner must be inside this closed roster;
-otherwise stop for a new slice. A clearly dominant product owner requires a
-separately reviewed product-optimization slice before any product edit.
+window: at least 50% and at least twice the next owner group. D.110a-u only
+reports mixed, unavailable, or dominant; it performs no optimization. If the
+result is mixed or unavailable, close the slice and keep D.110a paused. A
+clearly dominant tests-only owner must be inside the D.110a-t roster frozen in
+`00b-workload-feasibility-attribution.md`; otherwise stop for a new slice. A
+clearly dominant product owner requires a separately reviewed
+product-optimization slice before any product edit.
 
 ## Review
 
 Because this authorizes one replacement capture adjacent to the scarce full
 worker, the signed/pushed plan receives one Grok 4.6/high, standard direct Kimi
 CLI K3 with `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review. Correct
-P0/P1 findings once. Signed RED receives deterministic local validation. One
-final Grok/Kimi/Opus review covers the accepted plan, causal RED, GREEN, raw
-profile, attribution, and disposition. No Fable, Codex-Sol substitution,
-collaboration subagent, recursive prose review, or long/full worker is allowed.
+P0/P1 findings once. Because the accepted correction materially pins
+executable causal acceptance, permit one confirmation review of the corrected
+plan and no further plan-review recursion. Signed RED receives deterministic
+local validation. One final Grok/Kimi/Opus review covers the accepted plan,
+causal RED, GREEN, raw profile, attribution, and disposition. No Fable,
+Codex-Sol substitution, collaboration subagent, recursive prose review, or
+long/full worker is allowed.
