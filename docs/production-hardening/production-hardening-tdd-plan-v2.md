@@ -89908,3 +89908,68 @@ protected-path, stash, and source-shape checks replace a recursive plan review.
 No profile, preflight, full worker, product edit, dependency edit, threshold
 change, Fable, or collaboration subagent runs before the corrected plan and
 baseline are signed and pushed.
+
+##### D.110a-t pre-RED baseline custody and evidence
+
+The separately labelled baseline is signed/pushed commit
+`c33034711a1786d0689a552ea7beabb93a4f45f8`, tree
+`09c66cbee7abd826008b4b5ea638c84cefda2885`. Its staged roster matched the
+eleven frozen paths exactly. It contains the already parked D.110a scaffold,
+the bounded D.109d issuance-outbox pagination correction, and the tests-only
+module-binding/oracle split needed for the fresh child to authenticate built
+workspace packages without making the ordinary retained suites load that
+built import graph. It contains no D.110a-t profile mode, product source,
+dependency, Vite configuration, memory/workload threshold, plan file,
+unrelated path, or protected path. The full and preflight watchdog expressions
+remain exactly `45 * 60 * 1000` and `5 * 60 * 1000`; the root hard entry remains
+`pnpm build:packages && node --import=tsx
+tests/fixtures/phase-6c/retained-heap-child.mjs full`.
+
+The final focused command was `pnpm exec vitest run
+tests/phase-6c-retained-heap-red.test.ts --coverage.enabled=false
+--maxWorkers=1 --minWorkers=1 --reporter=json
+--outputFile=.logs/phase-6c-d110at-baseline/focused-final.json`. It passed all
+20 titles in exactly one result file with no failed, pending, or todo result.
+The JSON/stdout/stderr SHA-256 values are
+`785b32fdbd03305d499504932213ad689a339c25c93493380a7e3fb0d2ae9b7a`,
+`2a41af05551c44480eab77c5709940cb7246bbbddbfcba850075a465d392e2c4`,
+and the empty-file hash. `vitest list` independently selected the same one
+file and exact 20 titles; its JSON hash is
+`6bd279f07082fc9be793f48bb57f23371b21717e1c1074581064764d43ecbe2d`.
+
+The inherited retained command selected the exact eleven Phase-5e, Phase-6a,
+D.109d, and D.109f files already recorded above. Its final result passed 95/95
+with zero failed, pending, or todo assertions and no failed result file. The
+JSON/stdout/stderr SHA-256 values are
+`15dd36d01fa137d07609b20f0c0b14400b7fffc9128f42869d0cad95a55b7796`,
+`8aad904dca87a17dc2f343f4605526bdabdff4c700beec560f26c303e71044d5`,
+and `eba0c89374086ff635571c4ceb17938d2b56d6489a0c36ba8da816fabef68c3e`;
+stderr contains only Node's expected experimental-SQLite warnings. The first
+retained attempt that failed while loading the broader source graph and the
+intermediate D.109f source-shape failure remain preserved as diagnostics; they
+are superseded by this complete final result and were not hidden or excluded.
+
+`pnpm build:packages` passed; its stdout/stderr hashes are
+`b156b1c25440163e89e15889e0f58fa697d81414306f5c7a25a3941712caa90c`
+and the empty-file hash. Authoritative source checks `pnpm exec tsc -p
+packages/node/tsconfig.build.json --noEmit`, the corresponding storage-node
+command, and the corresponding storage-browser command all passed with empty
+stdout/stderr. The broader root and package `typecheck` scripts remain
+nonzero on inherited test-program debt: unresolved root workspace imports,
+cross-package `rootDir`/file-list errors, historical branded browser-fixture
+values, and the existing test-only browser alias. Their complete outputs are
+preserved under `.logs/phase-6c-d110at-baseline/`; no changed product-source
+diagnostic was selected, and the passing build programs are authoritative for
+the freshly built packages used by this tests-only baseline.
+
+Exact-owner ESLint, Prettier check, child `node --check`, and `git diff
+--check` passed. The corrected mechanical audit verifies source constants,
+absence of profile behavior, exact focused/retained result counts, the bounded
+issuance page owner, built maintenance owner, 26 stashes, and all protected
+roots. Its output hash is
+`735acfefef41ab9e1e9ec80a3e5b45477128f82c31b7fede2d25ab597811d5f0`.
+The first read-only audit incorrectly expected `rg -c` to print `0` for a
+no-match; the corrected check uses an empty-output predicate and passes. This
+was a diagnostic correction, not a code failure. No profile, preflight, or
+full object workload ran while establishing this baseline. D.110a-t RED may
+now change only the retained-heap contract and its existing focused test.
