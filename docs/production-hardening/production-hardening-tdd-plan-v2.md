@@ -88848,3 +88848,82 @@ handle. These dispositions do not reopen D.109d. No campaign ran.
 
 D.109d is closed on this signed record. D.109e browser primary scheduling reuse
 is the next active Phase-6b slice.
+
+#### D.109e bounded browser-scheduling plan
+
+D.109e inherits signed/pushed D.109d closure
+`1661092621afd010c1729caf3f1de3772c80ff92` and does not reopen D.109a–D.109d.
+Its executable specification is
+`specs/phase-6b-bounded-pruning/slices/04-browser-scheduling.md`.
+
+The current Phase-5c vote dispatcher privately owns the complete advisory
+LockManager runner: the injective versioned database name, receiver-preserving
+request, exclusive `ifAvailable` acquisition, 250 ms timeout, and exactly-once
+fallback for absent, non-callable, throwing, rejecting, aborted, unavailable,
+or hanging Locks. D.109e extracts only that runner into
+`packages/storage-browser/src/internal/primary-dispatch.ts`. Vote queue
+serialization, concurrency four, durable scans, exact-byte publication,
+dispatched marking, overflow, and close remain in
+`internal/seal-vote-dispatch.ts`.
+
+The shared primitive preserves the exact Phase-5c lock name
+`ts-drp:seal-vote:v2:<utf8-database-name-length>:<database-name>` and gives
+browser AHE cleanup a disjoint `ahe-reclamation:v1` identity over its exact
+adapter-owned database name. It has no package/root export, caller alias,
+bucket token, epoch/room key, retry policy, queue, or deletion facts. The
+browser origin/default bucket remains native LockManager scope.
+
+The existing browser AHE maintenance captures the detached cleanup input before
+scheduling, then executes its unchanged lifecycle acquisition, raw snapshot,
+`classifyAheReclamation`, strict transaction, post-state validation, and
+immutable receipt inside the granted or unelected callback. A lease merely
+invokes that state machine. A changed head/precondition still returns exact
+`AHE_RECLAMATION_RETRY_REQUIRED` with zero cleanup writes; close or
+`versionchange` before callback entry still returns exact
+`AHE_RECLAMATION_STORE_CLOSED`; a successor facade may reopen and retry. When
+election is unavailable, concurrent callbacks remain safe through the existing
+owner-local recovery turn and transactional recheck, producing one deleting
+receipt and one replay rather than treating the lease as authority.
+
+The frozen production owner set is exactly the new primary-dispatch file plus
+`internal/seal-vote-dispatch.ts`, `internal/ahe-reclamation.ts`, and
+`internal/idb-adapter.ts`. The tests-only set is the existing Phase-6b browser
+AHE asset extended with scheduling controls, a new D.109e Playwright test, a
+new three-engine one-file config, and the three evidence documents. Product
+exports, durable schemas, cleanup eligibility/receipts, dependencies,
+thresholds, wire/digest/QC/adoption/availability, Node/runtime reclamation, and
+all campaign authority remain unchanged.
+
+The deterministic RED freezes native grant, explicit unelected/off, absent,
+non-callable, throwing, rejecting, aborted, unavailable-null, hanging timeout,
+and late stale-grant modes over isolated genuine five-generation browser
+lineages. Every ordinary mode deletes the same exact generations 1 and 2 once.
+It also freezes same-context dual-tab delete/replay, primary-close and
+`versionchange` refusal followed by successor takeover, and a lawful head
+change before delayed callback that returns retry-required with a byte-identical
+cleanup image. The stale callback must not enter the task twice. RED runs once
+in Chromium and is accepted only when the exact one-file listing excludes every
+retained title and the complete soft-failure set is solely
+`D109E_PRIMARY_DISPATCH_MISSING`.
+
+GREEN runs the D.109e matrix in Chromium, Firefox, and WebKit; retains the
+complete Phase-5c nine-test suite in all configured engines and D.109c 4/4 in
+Chromium; and passes storage-browser build, bounded whole-package typecheck
+classification, exact-owner lint/format/diff, source/export, changed-path,
+hash/manifest, protected-path, 26-stash, process/port, signed-commit, and
+pushed-ref gates. Source checks require one and only one owner of lock framing,
+`navigator.locks`, `{ ifAvailable: true, mode: "exclusive" }`, the 250 ms
+timeout, and fallback; both consumers call it, and the cleanup transaction
+still owns every eligibility recheck. The unchanged package-local Phase-5c
+test control and the D.109e browser asset may replace or inspect
+`navigator.locks` only to inject the frozen modes; they are tests-only controls,
+not alternate runtime runners.
+
+Because this slice relocates browser scheduling/timing around deletion work,
+its unique high-risk question is whether the lease accidentally becomes
+deletion authority or changes the retained Phase-5c dispatcher. The signed
+plan therefore receives one Grok 4.6/high, standard Kimi CLI K3/high/100-step,
+and Opus xhigh review before RED. The signed GREEN receives the single formal
+plan → RED → GREEN review. Only P0/P1 blocks; the governing one-correction and
+at-most-one-confirmation rule applies. No RED review, Fable, Codex Sol,
+collaboration subagent, retained campaign, or recursive prose review runs.

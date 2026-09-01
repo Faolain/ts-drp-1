@@ -13,8 +13,8 @@ also closed. Its signed/pushed correction is
 `40382c7bddadd4aa007bf9e2bc5bbab7b5a8b224`; the single Grok/Kimi/Opus
 confirmation unanimously approved it with an empty P0/P1 union. Focused 12/12,
 retained 142/142, all four retained browser groups, Node build, and affected
-static gates pass. D.109e browser primary scheduling reuse is the next active
-slice.
+static gates pass. D.109e browser primary scheduling reuse is now at its
+bounded plan checkpoint; no RED or product change has run.
 
 Global TODO:
 
@@ -250,5 +250,24 @@ returned `APPROVED` with an empty P0/P1 union. Confirmation evidence is rooted
 at `.logs/phase-6b-d109d-green-confirmation/`; its validating self-excluding
 manifest SHA-256 is
 `428248d8bed4ee823a50dc94f64271419caa645fa5ca80eeb2e58f8ba57d67b0`.
-D.109d is closed. The exact next action is to plan D.109e browser primary
-scheduling reuse without reopening D.109a–D.109d.
+D.109d is closed. The D.109e browser primary-scheduling plan is now frozen in
+`slices/04-browser-scheduling.md` without reopening D.109a–D.109d; the exact
+next command is the single Grok/Kimi/Opus plan review after signing and pushing
+the plan-only checkpoint.
+
+## D.109e plan handoff
+
+D.109e extracts the existing Phase-5c advisory LockManager name, 250 ms
+acquisition timeout, and exactly-once fallback into one package-private
+primitive. The vote dispatcher retains all queue, durable scan, publication,
+overflow, and close behavior. Browser AHE cleanup calls the same scheduling
+primitive but retains all authority in its existing captured request,
+owner-local recovery turn, current-state classification, strict transaction,
+post-state validation, and immutable receipt.
+
+The frozen RED covers grant, unelected/off, absent, non-callable, throw, reject,
+abort, unavailable, timeout, stale late grant, same-context dual-tab replay,
+primary close/takeover, `versionchange`, and changed-precondition refusal. The
+lease carries no cleanup fact and cannot suppress the transaction's exact
+recheck. Production scope is exactly four storage-browser internal owners; no
+public API, schema, dependency, threshold, protocol, or campaign changes.

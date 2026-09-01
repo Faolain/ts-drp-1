@@ -1,13 +1,201 @@
 # D.109e — Browser Cleanup Scheduling
 
-Extract the advisory Web-Lock runner currently owned by the Phase-5c vote
-dispatcher into one package-internal primary-dispatch primitive, migrate the
-vote dispatcher to it in the same slice, and schedule cleanup through that
-same primitive. Database/storage-key identity and failure fallback remain the
-Phase-5c contract. A lease merely invokes the cleanup state machine.
+## Entry and scope
 
-RED proves Locks on/off/absent/non-callable/throwing/rejecting/timed-out,
-unavailable lock, primary close/takeover, stale holder, `versionchange`, and
-changed cleanup precondition. Every mode eventually attempts the same eligible
-set; a changed precondition deletes nothing. GREEN leaves no duplicate lock
-name, timeout, or fallback implementation.
+D.109e begins only after signed/pushed D.109d closure
+`1661092621afd010c1729caf3f1de3772c80ff92`. D.109a–D.109d and their
+evidence remain accepted and are not reopened.
+
+This slice extracts the advisory Web-Lock runner currently embedded in the
+Phase-5c vote dispatcher into one package-internal primary-dispatch primitive,
+migrates the vote dispatcher to that exact primitive, and invokes the existing
+browser AHE reclamation state machine through it. It changes no cleanup
+eligibility rule, transaction, receipt, durable schema, public API, dependency,
+workload, threshold, wire/digest/QC/adoption/availability contract, or runtime
+reclamation behavior. No retained campaign runs.
+
+## Frozen ownership
+
+Production owners:
+
+1. `packages/storage-browser/src/internal/primary-dispatch.ts` — sole owner of
+   advisory lock-name encoding, LockManager capability detection, the existing
+   250 ms acquisition timeout, receiver-preserving `request` invocation, and
+   exactly-once unelected fallback;
+2. `packages/storage-browser/src/internal/seal-vote-dispatch.ts` — retains vote
+   queue serialization, concurrency four, durable pending-row scans, exact-byte
+   publication, dispatched marking, overflow, and close behavior, but delegates
+   only the advisory lease/fallback step;
+3. `packages/storage-browser/src/internal/ahe-reclamation.ts` — captures the
+   cleanup request before scheduling and runs the unchanged owner-local
+   reclamation transaction inside the shared primitive;
+4. `packages/storage-browser/src/internal/idb-adapter.ts` — passes the exact
+   database identity already captured by `createBrowserAheDurableStore` into
+   the identity-bound maintenance owner.
+
+Tests-only owners:
+
+1. `packages/storage-browser/tests/assets/phase-6b-ahe-reclamation-entry.ts` —
+   adds deterministic scheduling controls around the genuine browser store and
+   maintenance capability;
+2. `packages/storage-browser/tests/phase-6b-browser-scheduling-red.pw.ts` — owns
+   the closed mode, takeover, stale-holder, lifecycle, and changed-precondition
+   matrix;
+3. `packages/storage-browser/playwright.phase-6b-browser-scheduling.config.ts`
+   — selects exactly that test with one worker, no retries, and Chromium,
+   Firefox, and WebKit projects; and
+4. this slice, the Phase-6b README, and the production-hardening plan as
+   evidence documents.
+
+No package export or root export may expose the primitive, its identities, or a
+lease handle. No product caller can select a lock alias, timeout, or deletion
+decision.
+
+## Shared primitive contract
+
+The primitive accepts an owner-local storage identity and an asynchronous task.
+It returns that task's result or failure. It does not inspect, classify,
+authorize, retry, or transform the task.
+
+The lock name is one injective UTF-8-length-framed encoding owned only by the
+new primitive. The Phase-5c vote caller supplies its frozen `seal-vote:v2`
+identity, preserving byte-for-byte
+`ts-drp:seal-vote:v2:<utf8-database-name-length>:<database-name>`. Browser AHE
+reclamation supplies a disjoint versioned `ahe-reclamation:v1` identity over
+the exact database name already owned by the adapter. The browser origin and
+default storage bucket remain native LockManager scope. This slice invents no
+caller bucket token, epoch, room namespace, or public alias.
+
+The existing Phase-5c behavior remains exact:
+
+- a callable LockManager receives `{ ifAvailable: true, mode: "exclusive" }`
+  with its original receiver;
+- a granted lock invokes the task once;
+- disabled/absent Locks, a missing or non-callable `request`, synchronous
+  throw, rejected or aborted acquisition, an unavailable `null` lock, or an
+  acquisition that does not settle within 250 ms invokes the same task
+  unelected exactly once;
+- a grant or rejection arriving after fallback does not invoke the task again;
+- task failures remain task failures and are never converted into a successful
+  lease result; and
+- the timer is cleared on every terminal path.
+
+The primitive owns no volatile work queue. Vote-key deduplication, durable
+reread, concurrency and overflow remain in the vote dispatcher. Browser AHE
+reclamation remains serialized by its existing recovery-turn lifecycle and
+strict IndexedDB transaction.
+
+## Cleanup authority boundary
+
+`reclaimClosedEpoch(input)` captures and validates a detached request before
+the advisory scheduling boundary. The granted or unelected callback then
+starts the existing lifecycle operation, reacquires the existing recovery
+turn, loads the current raw database snapshot, re-runs
+`classifyAheReclamation`, performs the existing strict transaction, validates
+the post-state, and returns the existing immutable receipt.
+
+The lease carries no QC, adoption, head, lineage, availability, issuance,
+closure, row, or receipt fact. It cannot suppress the owner-local recheck. If
+the head or any cleanup precondition changes while the task is waiting, the
+existing exact `AHE_RECLAMATION_RETRY_REQUIRED` refusal commits zero cleanup
+writes. If close or `versionchange` retires the owner before callback entry,
+the existing exact `AHE_RECLAMATION_STORE_CLOSED` refusal commits zero cleanup
+writes. A successor facade may reopen and retry the original authenticated
+request normally.
+
+Concurrent eligible invocations may both reach the state machine when election
+is unavailable. Owner-local serialization and transactional recheck determine
+one deleting receipt and one replay receipt; election is never a safety fence.
+
+## Deterministic RED matrix
+
+The tests-only RED first proves its exact owner roster and that the new internal
+primitive is absent. All behavioral cases remain readiness-gated until that
+sole production seam exists; RED must fail only with
+`D109E_PRIMARY_DISPATCH_MISSING` after its independent fixture/source controls
+pass.
+
+For an isolated genuine five-generation browser lineage whose eligible prefix
+is generations 1 and 2, freeze these cases:
+
+| Case                                           | Expected cleanup observation                                                         |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------ |
+| native granted                                 | exact two-generation deletion receipt                                                |
+| explicitly unelected/off                       | same exact deletion receipt                                                          |
+| Locks absent                                   | same exact deletion receipt                                                          |
+| `request` non-callable                         | same exact deletion receipt                                                          |
+| synchronous throw                              | same exact deletion receipt                                                          |
+| rejected acquisition                           | same exact deletion receipt                                                          |
+| aborted acquisition                            | same exact deletion receipt                                                          |
+| callback receives no lock                      | same exact deletion receipt                                                          |
+| acquisition never settles                      | fallback after the frozen timeout, one exact deletion receipt                        |
+| stale late grant after fallback                | no second task entry; one deletion receipt only                                      |
+| two same-context tabs                          | combined receipts delete the same exact prefix once and replay once                  |
+| primary closes before delayed grant            | exact closed refusal, zero writes; successor takes over and deletes the exact prefix |
+| `versionchange` closes before delayed grant    | exact closed refusal, zero writes; reopened successor deletes the exact prefix       |
+| head/precondition changes before delayed grant | exact retry-required refusal and zero cleanup deletion                               |
+
+The changed-precondition case performs a genuine lawful successor head change
+through the ordinary store before releasing the delayed callback. It compares a
+raw database image before and after the refused cleanup so a lease cannot hide a
+partial delete. The stale-holder case releases the original callback after the
+timeout fallback has completed and proves the task-entry count remains one.
+
+Source-shape controls require:
+
+- exactly one production owner of `navigator.locks`, the 250 ms constant,
+  `{ ifAvailable: true, mode: "exclusive" }`, and lock-name framing;
+- the unchanged package-local `seal-vote-test-control.ts` and D.109e browser
+  asset may still replace or inspect `navigator.locks` only to inject the
+  frozen test modes; neither is counted as a runtime runner;
+- both consumers invoke the same internal primitive;
+- the Phase-5c lock name remains exact;
+- the AHE callback still enters `classifyAheReclamation` inside its strict
+  transaction after scheduling;
+- no duplicate fallback/timeout implementation remains in either consumer;
+- no new export, dependency, schema/version, or public option exists; and
+- no scheduling callback receives or returns deletion authority.
+
+Run the focused RED once in Chromium. Accept it only when the selected listing
+is exactly one file with no Phase-5c or D.109c retained title, all independent
+controls pass, and the complete soft-failure set is only the frozen missing-
+primitive readiness token. Sign and push RED evidence without a separate model
+review.
+
+## GREEN and retained gates
+
+GREEN implements only the four frozen production owners and wakes the exact RED
+without changing its matrix. Run:
+
+1. the focused D.109e Chromium test;
+2. the complete D.109e test in Chromium, Firefox, and WebKit;
+3. the retained Phase-5c nine-test suite in all configured engines;
+4. the retained D.109c four-test Chromium suite;
+5. the storage-browser build and whole-package typecheck, recording only exact
+   inherited configuration/test-root debt if the latter is nonzero;
+6. exact-owner ESLint, Prettier, `git diff --check`, package-export and source-
+   shape gates; and
+7. changed-path, source-hash, protected-untracked-path, 26-stash, process, port,
+   signed-commit, pushed-ref, and self-excluding evidence-manifest checks.
+
+If any mode yields a different eligible set, an unexpected error code, more
+than one stale-holder task entry, a late commit after close/versionchange, a
+Phase-5c lock-name change, or a product-source path outside the frozen four,
+stop and diagnose rather than folding in more behavior.
+
+After signed/pushed GREEN, run one formal Grok 4.6/high, standard Kimi CLI
+K3/high/100-step, and Opus xhigh review over plan → RED → GREEN. This slice
+receives the high-risk plan and final reviews because it moves a browser
+scheduling/timing owner around deletion work and must prove that the lease does
+not become authority. Only P0/P1 findings block. At most one correction and one
+confirmation are permitted under the governing review policy; documentation-
+only closure prose does not recurse. Do not invoke Fable, Codex Sol, or
+collaboration subagents.
+
+## Exit
+
+D.109e closes only when every lock/lifecycle mode attempts the same eligible
+cleanup set or produces its frozen fail-closed refusal, Phase-5c dispatch is
+byte-for-byte behaviorally retained through the sole shared primitive, all
+gates pass, and the final review has an empty P0/P1 union. Then D.109f becomes
+the next active slice.
