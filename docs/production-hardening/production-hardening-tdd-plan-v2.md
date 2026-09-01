@@ -89973,3 +89973,56 @@ no-match; the corrected check uses an empty-output predicate and passes. This
 was a diagnostic correction, not a code failure. No profile, preflight, or
 full object workload ran while establishing this baseline. D.110a-t RED may
 now change only the retained-heap contract and its existing focused test.
+
+##### D.110a-t deterministic RED
+
+The signed/pushed RED is commit
+`04e56ec1e300f98354a3c0b59ea5603d96cf46b6`, tree
+`b76279e49d030f9625bfe7e938720db32191ca47`. Relative to the signed baseline
+and its evidence ledger, it changed exactly
+`tests/fixtures/phase-6c/retained-heap-contract.ts` and
+`tests/phase-6c-retained-heap-red.test.ts`. It added one composite exact token,
+`D110AT_PROFILE_ATTRIBUTION_MISSING`, and desired-state source audits for a
+graceful 900,000 ms profile mode, the frozen phase-progress schema, and
+child-main-thread inspector/profile custody. It changed no selected title,
+child, worker, root entry, product source, dependency, workload, threshold, or
+watchdog.
+
+The exact focused command ran once after ESLint, Prettier, diff, and exact
+one-file/20-title listing gates passed. It returned the frozen causal matrix:
+20 total, 19 passed, one failed, zero pending, and zero todo. The only failed
+title was the existing `audits the complete hard-gate infrastructure without
+readiness skips`; its sole failure message contains the exact RED token. All
+fourteen retained false-gate mutants and all three inherited D.110a hard-gate
+closure assertions remained green. The result JSON/stdout/stderr SHA-256
+values are
+`28a94fc11a1509f11eeb6173f3574db8480412aa70482d9cff81dc4759e117b7`,
+`12304a448be681ed6702414e67d8ad0c4949971f7ba3d805e72ee2085110f944`,
+and the empty-file hash.
+
+An independent ESM read-only audit reports
+`childProfileCustody=false`, `gracefulProfileMode=false`, and
+`phaseProgressSchema=false`, while `hardEntrypoint`, `pairedWorkloadGate`, and
+`postGcSlopeGate` all remain true. Its JSON/stderr hashes are
+`07d7e4c2a90254886ae25666657f514ee3f094b2551e769013b05bebf3125983`
+and the empty-file hash. The first audit invocation used `tsx -e`, whose CJS
+evaluation lacks this fixture's `import.meta.dirname`; that diagnostic was
+corrected to `node --import=tsx --input-type=module --eval` before evidence was
+sealed. It did not execute a workload.
+
+The first mechanical no-workload predicate also searched the desired-state
+contract diff for future-profile strings and therefore selected its own audit
+regexes. The corrected predicate compares the actual child and worker owners
+to the signed baseline; both are unchanged. The corrected audit proves the
+exact result matrix, token, three false/new and three true/inherited facts,
+two-path custody, no child/worker change, 26 stashes, and protected roots. Its
+output and RED diff hashes are
+`63d445b29dab6329815af7668b618ec4fb66549c4dd87fe071c001dde273741a`
+and `541511630d2cfa76884b767509a9f2a68d7a3b04e09f0b4c83df6357aa38e922`.
+The self-excluding evidence manifest validates and has SHA-256
+`12a757a67874052ba9f73a55ba06ee9c71257ea5984be8f36f878563ff48afef`.
+Both read-only corrections are diagnostic fixes, not code failures or RED
+reruns. No object, profile, preflight, or full worker ran. Per the accepted
+D.110a-t review protocol, deterministic validation closes RED; the one final
+Grok/Kimi/Opus review will inspect this signed commit and its evidence after
+GREEN.
