@@ -90801,3 +90801,50 @@ audit remains valid. Widening the documentation owner set only to update the
 superseded D.110a slices is accepted as bookkeeping. These points change no
 RED behavior, timeout value, product owner, workload, threshold, or reserved-
 run count. D.110a-w RED may proceed.
+
+##### D.110a-w deterministic RED
+
+RED changed only
+`tests/fixtures/phase-6c/retained-heap-contract.ts` and
+`tests/phase-6c-retained-heap-red.test.ts`. It added the exact reviewed
+900,000-ms and 21,600,000-ms constants, moved the superseded full-timer literal
+out of `hardEntrypoint`, and added the isolated
+`watchdogFeasibility`/`D110AW_TIMEOUT_FEASIBILITY_MISSING` owner. The child
+remained byte-for-byte unchanged at SHA-256
+`5d34d706cbb015f5af33749de1e18c7233e16b970dfbb2e1342b79af34c96766`.
+No child, profiler, preflight, full worker, package build, workload, or product
+source ran or changed.
+
+The focused command was run exactly once from `2026-09-01T18:47:54Z` through
+`2026-09-01T18:48:00Z`:
+`pnpm exec vitest run tests/phase-6c-retained-heap-red.test.ts
+--reporter=json
+--outputFile=.logs/phase-6c-d110aw-red/focused.json`. It exited 1 with exactly
+22 assertions: 21 passed and only `closes
+D110AW_TIMEOUT_FEASIBILITY_MISSING` failed, with that complete exact token.
+There were zero pending/todo assertions, no top-level error, and the report
+contained exactly the intended test file. The inherited hard-entrypoint,
+profile-clock, workload, slope, and all mutant assertions passed. The focused
+JSON and normalized summary SHA-256 values are
+`22b49b0898bfaa8a505bd42a11436790124ab3d58628871b490dd08d45097ca3`
+and
+`22d84a26746e14981c2b4bd44e6397ab64d282292bb09657f838a1072950a4a6`.
+
+The detached source audit returned every inherited field true and only
+`watchdogFeasibility=false`, while reporting the exact new constants. Its
+SHA-256 is
+`4ea9052e515f3a6cd4230a3d6a204f6ec6214e1f28029f232ba2b708b95587f6`.
+The first ESLint check found only a new import-order error in the focused test.
+That mechanical ordering was corrected without rerunning the focused test;
+the preserved initial lint status remains 1 and the corrected ESLint,
+Prettier, and `git diff --check` statuses are all zero. The final RED diff
+SHA-256 is
+`a6203b0b6da0fb8013c384e40f71ec1a1729d298e57dabca1f8d7d9047475d7c`.
+All 26 stashes and protected roots remain present, and the relevant process
+audit is empty.
+
+The validating self-excluding 34-entry RED manifest has SHA-256
+`6157ca43b97a381423bcd12643f86d50a31aa94dd4511a93a9557f7cd565315e`.
+RED matches its frozen causal matrix and authorizes only the child timer import
+and expression change in GREEN. Sign and push this RED before that edit; no
+separate RED model review is required.

@@ -12,6 +12,8 @@ export const D110A_SLOPE_START_INDEX = 32;
 export const D110A_SLOPE_END_INDEX = 63;
 export const D110A_SLOPE_LIMIT_BYTES = 165_161;
 export const D110A_ABSOLUTE_LIMIT_BYTES = 512_000_000;
+export const D110A_PREFLIGHT_TIMEOUT_MS = 900_000;
+export const D110A_FULL_TIMEOUT_MS = 21_600_000;
 
 export const D110A_RED_TOKENS = Object.freeze([
 	"D110A_POST_GC_SLOPE_GATE_MISSING",
@@ -21,6 +23,7 @@ export const D110A_RED_TOKENS = Object.freeze([
 
 export const D110AT_RED_TOKEN = "D110AT_PROFILE_ATTRIBUTION_MISSING";
 export const D110AU_RED_TOKEN = "D110AU_PROFILE_CLOCK_CALIBRATION_MISSING";
+export const D110AW_RED_TOKEN = "D110AW_TIMEOUT_FEASIBILITY_MISSING";
 
 export const D110AU_PROFILE_MUTANTS = Object.freeze([
 	"phase-before-start",
@@ -720,6 +723,7 @@ export function d110aCurrentInfrastructureAudit(): Readonly<{
 	readonly phaseProgressSchema: boolean;
 	readonly profileClockCalibration: boolean;
 	readonly postGcSlopeGate: boolean;
+	readonly watchdogFeasibility: boolean;
 }> {
 	const read = (relative: string): string => {
 		const absolute = resolve(REPOSITORY_ROOT, relative);
@@ -743,7 +747,7 @@ export function d110aCurrentInfrastructureAudit(): Readonly<{
 		hardEntrypoint:
 			/"test:phase-6c-memory"\s*:\s*"pnpm build:packages && node --import=tsx tests\/fixtures\/phase-6c\/retained-heap-child\.mjs full"/u.test(
 				rootPackage
-			) && /45 \* 60 \* 1000/u.test(child),
+			),
 		pairedWorkloadGate:
 			/D110A_TOTAL_OPERATIONS/u.test(worker) &&
 			/D110A_TOTAL_BATCH_VERTICES/u.test(worker) &&
@@ -778,6 +782,12 @@ export function d110aCurrentInfrastructureAudit(): Readonly<{
 			/arrayBuffers/u.test(worker) &&
 			/ownedBytes/u.test(worker) &&
 			/phase: "during-execution"/u.test(worker),
+		watchdogFeasibility:
+			/D110A_PREFLIGHT_TIMEOUT_MS/u.test(child) &&
+			/D110A_FULL_TIMEOUT_MS/u.test(child) &&
+			/mode === "profile" \? 900_000/u.test(child) &&
+			!/45 \* 60 \* 1000/u.test(child) &&
+			!/5 \* 60 \* 1000/u.test(child),
 	});
 }
 
@@ -787,6 +797,11 @@ export function requireD110atProfileAttribution(): void {
 	if (!audit.gracefulProfileMode || !audit.phaseProgressSchema || !audit.childProfileCustody) {
 		fail(D110AT_RED_TOKEN);
 	}
+}
+
+/** Fails with the exact D.110a-w RED token while the parent watchdogs remain infeasible. */
+export function requireD110awTimeoutFeasibility(): void {
+	if (!d110aCurrentInfrastructureAudit().watchdogFeasibility) fail(D110AW_RED_TOKEN);
 }
 
 /** Fails with the exact RED token while the post-GC gate is absent. */
