@@ -137,6 +137,7 @@ describe("Phase 2l-d parity inventory and public binding", () => {
 			"./issuance",
 			"./issuance-maintenance",
 			"./live-journal",
+			...(Object.hasOwn(browserManifest.exports, "./maintenance") ? ["./maintenance"] : []),
 			"./seal-evidence",
 			"./seal-vote",
 			"./snapshot-transfer",
@@ -146,6 +147,7 @@ describe("Phase 2l-d parity inventory and public binding", () => {
 			"./issuance",
 			"./issuance-maintenance",
 			"./live-journal",
+			...(Object.hasOwn(nodeManifest.exports, "./maintenance") ? ["./maintenance"] : []),
 			"./snapshot-transfer",
 		]);
 		expect(contract.backends.map(({ factorySubpath }) => factorySubpath)).toEqual([

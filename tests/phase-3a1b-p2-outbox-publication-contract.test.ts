@@ -524,6 +524,9 @@ describe("D.93.29 Seam 2 shared durable publication contract", () => {
 			"./issuance",
 			"./issuance-maintenance",
 			"./live-journal",
+			...(Object.hasOwn((nodeManifest.exports as Record<string, unknown>) ?? {}, "./maintenance")
+				? ["./maintenance"]
+				: []),
 			"./snapshot-transfer",
 		]);
 		expect(Object.keys((browserManifest.exports as Record<string, unknown>) ?? {}).sort()).toEqual([
@@ -531,6 +534,9 @@ describe("D.93.29 Seam 2 shared durable publication contract", () => {
 			"./issuance",
 			"./issuance-maintenance",
 			"./live-journal",
+			...(Object.hasOwn((browserManifest.exports as Record<string, unknown>) ?? {}, "./maintenance")
+				? ["./maintenance"]
+				: []),
 			"./seal-evidence",
 			"./seal-vote",
 			"./snapshot-transfer",

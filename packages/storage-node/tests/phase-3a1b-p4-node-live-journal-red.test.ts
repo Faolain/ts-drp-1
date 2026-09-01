@@ -969,6 +969,7 @@ describe("D.93.34 p4-b Node strict live-journal RED", () => {
 			"./issuance",
 			"./issuance-maintenance",
 			"./live-journal",
+			...(Object.hasOwn(manifest.exports ?? {}, "./maintenance") ? ["./maintenance"] : []),
 			"./snapshot-transfer",
 		]);
 		expect(Object.keys(manifest.dependencies ?? {}).sort()).toEqual([

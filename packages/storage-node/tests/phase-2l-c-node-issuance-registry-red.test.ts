@@ -41,6 +41,7 @@ describe("Phase 2l-c literal Node issuance authorities", () => {
 			"./issuance",
 			"./issuance-maintenance",
 			"./live-journal",
+			...(Object.hasOwn(manifest.exports ?? {}, "./maintenance") ? ["./maintenance"] : []),
 			"./snapshot-transfer",
 		]);
 		const root = fs.readFileSync(path.join(packageDirectory, "src/index.ts"));
