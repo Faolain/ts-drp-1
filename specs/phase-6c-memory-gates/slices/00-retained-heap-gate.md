@@ -14,18 +14,41 @@ RED and GREEN are confined to tests and test/build infrastructure under this
 prospective owner set:
 
 - `tests/fixtures/phase-6c/retained-heap-contract.ts`;
+- `tests/fixtures/phase-6c/retained-heap-worker.ts`;
 - `tests/fixtures/phase-6c/retained-heap-child.mjs`;
 - `tests/phase-6c-retained-heap-red.test.ts`;
+- the existing tests-only `tests/fixtures/phase-3a1b-p3/live-fixture.ts` for
+  one opt-in latched-ACL catalog variant that adds the already shipped
+  `applicationBatch` reducer and manifest operation while leaving every
+  default fixture byte-for-byte unchanged;
 - the existing tests-only
-  `tests/fixtures/phase-6a-v3/creator-adoption-contract.ts` for one bounded
-  pre-close workload option; and
+  `tests/fixtures/phase-6a-v3/creator-adoption-contract.ts` for one generic
+  bounded pre-close callback and public bare-package imports;
+- the existing tests-only
+  `tests/fixtures/phase-6a-v3/creator-successor-handle-identity-contract.ts`
+  and `tests/fixtures/phase-6b/runtime-reclamation-contract.ts` for equivalent
+  public-package loading plus a parent-authenticated built URL for each
+  package-internal owner that has no export-map entry; and
 - the smallest root/package test-script entry needed to invoke exactly the
   hard gate.
 
-Reuse `tests/fixtures/shared/workspace-package-subprocess.mjs` to resolve exact
-freshly built workspace exports. Do not add a Vite alias, `NODE_PATH`, root
-shim, source-relative production import, stale-dist assumption, or a second
-subprocess resolver.
+Reuse `workspacePackageImportHook` from
+`tests/fixtures/shared/workspace-package-subprocess.mjs` with `spawn`; do not
+edit or wrap its synchronous `runWorkspacePackageSubprocess` owner. The parent
+builds the affected packages, authenticates every expected public export and
+the two non-exported built internal files, then starts Node with `--expose-gc`,
+the existing `tsx` import hook, `fake-indexeddb/auto`, and the workspace-package
+hook. The `.mjs` bootstrap imports the tests-only TypeScript worker; the worker
+reaches product code only through those authenticated built targets. This
+avoids Vite and its aliases while reusing the genuine IndexedDB-bound
+Phase-6a/6b fixture under Node. The parent owns the 45-minute timer, streamed
+stdout/stderr, last-progress custody, and `SIGKILL` on timeout.
+
+Do not add `NODE_PATH`, a root shim, a source-relative production import in the
+new worker, a stale-dist assumption, a second bare-package resolver, or a new
+product export. The existing tests-only fixtures may name the two internal
+built files only through exact file URLs authenticated and supplied by the
+parent; no child-computed production-relative path is accepted.
 
 No production file or workflow is authorized. If the worker needs a
 production-source change, public or internal product inspection API, changed
@@ -58,29 +81,48 @@ workload vertices or workload operations. The object identifiers are
 deterministic and distinct. No operation, vertex, object, or failed attempt may
 count twice.
 
+The opt-in catalog used only by this worker contains both `acl` and
+`applicationBatch`, and its manifest names both operations. The original
+latched-ACL artifact, package bytes, digests, and every default fixture path
+remain unchanged. Child logical times are strictly increasing from 3 through
+15,627; the successor operation uses 15,628. A missing reducer or manifest
+entry, split result, single-operation substitution, or default-fixture digest
+change is a hard failure.
+
 The sample records exactly `min(completedObjectEpochs, 20)` active successors;
-the last 44 samples therefore contain exactly 20 open rooms. Close the final
+samples 19 through 63 -- the last 45 samples -- therefore contain exactly 20
+open rooms. Close the final
 20-room window only after recording and validating the terminal sample.
 
 This is 64 genuine single-transition object-epochs, not 64 epochs of one
-object. The inherited D.109f 128-step same-object durable differential remains
-the long-lived durable-owner proof.
+object. Creator handoff activates the adopted successor as `genesis-active`;
+the repository nevertheless has no second creator-close/adopt entry for that
+same object. The inherited D.109f 128-step same-object durable differential
+remains the long-lived durable-owner proof.
 
 ## Frozen measurement
 
 The parent launches one fresh Node child with `--expose-gc` from freshly built
 workspace exports. The child rejects absent `global.gc`. After each
 object-epoch/window replacement, it performs exactly three `global.gc()` calls,
-each followed by one event-loop turn, then records raw
-`process.memoryUsage().heapUsed`.
+each followed by one event-loop turn, then records all raw
+`process.memoryUsage()` fields. The enforced fields are `heapUsed`,
+`arrayBuffers`, and `ownedBytes`, where
+`ownedBytes = heapUsed + arrayBuffers`; `external` and `rss` are retained as
+diagnostic evidence. This prevents retained `Uint8Array`/`Buffer` backing
+stores from escaping a JS-heap-only gate without double-counting
+`arrayBuffers` through `external`.
 
 The result contains exactly 64 samples. Ordinary least-squares uses sample
-indices 32 through 63 inclusive, all with 20 active rooms, and their raw heap
-bytes; it must not sort, trim, smooth, clamp, use endpoints only, or subtract a
+indices 32 through 63 inclusive, all with 20 active rooms, and separately uses
+the raw `heapUsed`, `arrayBuffers`, and `ownedBytes` series; it must not sort,
+trim, smooth, clamp, use endpoints only, use another window, or subtract a
 fitted baseline. Require:
 
-- slope `<= 165_161` bytes per object-epoch; and
-- every raw sample, including the terminal sample, `< 512_000_000` bytes.
+- each of the three slopes `<= 165_161` bytes per object-epoch;
+- every raw `heapUsed` and `ownedBytes` sample, including the terminal sample,
+  `< 512_000_000` bytes; and
+- `arrayBuffers <= external` in every sample as a Node accounting sanity check.
 
 The epsilon limits predicted growth across the 31 last-half intervals to
 5,119,991 bytes, strictly less than one percent of the Profile-D 512,000,000-
@@ -111,10 +153,12 @@ prove the current RSS benchmark and `fail-on-alert: false` trend workflow do
 not already satisfy these hard-gate contracts.
 
 The contract freezes lightweight validator mutants for missing GC, endpoint-
-only slope, sorted samples, baseline subtraction, retained 1 MiB per epoch,
-absolute-budget bypass, dropped operations, double-counted operations,
-substituted digest, after-completion-only sampling, and a false repeated-same-
-object claim. Every mutant must fail with its exact token in GREEN.
+only slope, sorted samples, baseline subtraction, the wrong OLS window, a
+window not held at 20 rooms, retained 1 MiB JS graphs per epoch, retained 1 MiB
+`Uint8Array`s per epoch, absolute-budget bypass, dropped operations, double-
+counted operations, substituted digest, after-completion-only sampling, and a
+false repeated-same-object claim. Every mutant must fail with its exact token
+in GREEN.
 
 Any other failed assertion, top-level error, flaky result, timeout, or retained
 test regression invalidates RED. Sign and push the causal RED evidence before
@@ -128,18 +172,24 @@ and hard test entry point. It does not edit the existing benchmark workflow.
 Run in order:
 
 1. focused validator and source-shape GREEN once;
-2. the genuine 64-object-epoch/1,000,000-operation fresh-process hard gate
+2. one bounded two-object fresh-process preflight using the identical catalog,
+   lifecycle, resolver, GC turns, result schema, and teardown path but emitting
+   no memory verdict and carrying no authority to alter the frozen full-worker
+   thresholds;
+3. the genuine 64-object-epoch/1,000,000-operation fresh-process hard gate
    exactly once;
-3. retained D.109f non-browser tests and the D.109d lifecycle tests;
-4. retained Phase-6a close/adoption/activation tests affected by the fixture
+4. retained D.109f non-browser tests and the D.109d lifecycle tests;
+5. retained Phase-6a close/adoption/activation tests affected by the fixture
    option;
-5. the unchanged Phase-4c 64 MiB fresh-process memory child;
-6. the Phase-0k legacy-finality and compact-history controls;
-7. affected package builds and source typechecks;
-8. exact-owner ESLint, Prettier, `git diff --check`, source-shape, result-key,
-   selected-file/title, child-syntax, and workspace-resolution checks; and
-9. protected-path, stash, process, port, signed-commit, pushed-ref, and
-   evidence-manifest checks.
+6. the Phase-6a creator-successor Playwright test that imports the affected
+   fixture graph;
+7. the unchanged Phase-4c 64 MiB fresh-process memory child;
+8. the Phase-0k legacy-finality and compact-history controls;
+9. affected package builds and source typechecks;
+10. exact-owner ESLint, Prettier, `git diff --check`, source-shape, result-key,
+    selected-file/title, child-syntax, and workspace-resolution checks; and
+11. protected-path, stash, process, port, signed-commit, pushed-ref, and
+    evidence-manifest checks.
 
 Do not repeatedly rerun the million-operation worker to tune the threshold. A
 failed consuming GREEN run stops for evidence-based diagnosis. If product CPU,
@@ -147,9 +197,10 @@ fixture cost, scheduling variance, or an impossible watchdog dominates rather
 than retained heap, preserve the result and reslice; do not weaken workload,
 GC, sample count, limits, or semantics in place.
 
-No browser matrix is added merely to repeat Node heap arithmetic. The retained
-Phase-6b browser results remain inherited unless the tests-only fixture option
-actually affects them.
+No browser matrix is added merely to repeat Node heap arithmetic. The one
+retained Phase-6a browser owner is rerun because it imports the fixture graph
+whose default-path byte identity must remain unchanged; the Phase-6b browser
+results remain inherited.
 
 ## Completion and next boundary
 

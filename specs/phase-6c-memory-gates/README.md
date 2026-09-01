@@ -56,13 +56,13 @@ The repository currently has three materially different memory surfaces:
 
 Two roadmap phrases cannot be copied literally into a new test:
 
-- The installed-v3 successor is currently `snapshot-closed`. The product does
-  not expose a genuine repeated same-object close/adopt path after epoch 1.
-  D.109f already proved and recorded this limitation. The heap worker therefore
-  uses 64 distinct object-epochs, each exercising the supported genuine epoch-0
-  to epoch-1 lifecycle once. It does not relabel them as 64 epochs of one
-  object. The inherited 128-step same-object durable differential covers the
-  long-lived durable-owner dimension.
+- Creator handoff activates the adopted successor as `genesis-active`, so it
+  accepts the retained successor operation. The repository still exposes no
+  second creator-close/adopt entry for that same object after epoch 1. The heap
+  worker therefore uses 64 distinct object-epochs, each exercising the
+  supported genuine epoch-0 to epoch-1 lifecycle once. It does not relabel them
+  as 64 epochs of one object. The inherited 128-step same-object durable
+  differential covers the long-lived durable-owner dimension.
 - `HashGraph.vertices`, `forwardEdges`, private `vertexDistances`, and legacy
   `FinalityStore.states` belong to the legacy/general object plane. Phase 6b
   deliberately left that plane unchanged, and Phase 6d owns legacy-finality
@@ -78,6 +78,13 @@ fixture's existing anchor and two setup vertices, that stays below the existing
 4,096-vertex fixture ceiling and totals exactly 1,000,000 admitted and applied
 workload operations without changing product limits.
 
+The default Phase-6a latched-ACL artifact cannot accept a multi-operation
+`issueLocal` call. D.110a therefore mints one opt-in tests-only catalog variant
+whose artifact and manifest contain both `acl` and the already shipped
+`applicationBatch` operation. The default artifact bytes, package bytes,
+digests, and callers remain byte-for-byte unchanged. A generic tests-only
+pre-close callback drives the batches; it does not add a product API.
+
 Each object's reducer is a deterministic additive counter. The inherited setup
 applies `add(1)` and `add(2)` before the workload, so the worker checks exact
 pre-close state 15,628 and post-successor-`add(1)` state 15,629. An independent
@@ -92,16 +99,30 @@ pre-close workload through
 the existing genuine Phase-6a fixture; it may not bypass `issueLocal`, signing,
 admission, journaling, blueprint folding, close, adoption, or reclamation.
 
-The worker launches fresh Node with `--expose-gc` and samples `heapUsed` during
-execution after each complete object-epoch/window replacement, using three
-explicit GC + event-loop turns per sample. It calculates ordinary least-squares
-slope over the last 32 of 64 samples, when the rolling window already contains
-20 active rooms. The exact absolute ceiling is 512,000,000 bytes,
-carried from the governing Profile-D `512 MB` heap contract. The exact slope
-epsilon is 165,161 bytes per object-epoch: across the 31 intervals represented
-by the last 32 samples, that permits at most 5,119,991 predicted bytes, strictly
-below one percent of the absolute budget. Both bounds must pass; negative slope
-does not excuse an absolute-budget breach.
+The parent uses `workspacePackageImportHook` with asynchronous `spawn`, not the
+synchronous subprocess convenience function. After affected package builds it
+authenticates exact public export targets and the two built internal owners
+that intentionally have no product export, then starts the `.mjs` bootstrap
+with `--expose-gc`, the existing `tsx` loader, and `fake-indexeddb/auto`. The
+bootstrap imports a tests-only TypeScript worker, so the genuine
+IndexedDB-bound fixture runs in plain Node without Vite aliases. Internal built
+URLs are supplied by the parent; the child does not derive production paths or
+invent a second package resolver.
+
+The worker launches fresh Node with `--expose-gc` and samples the complete raw
+`process.memoryUsage()` record during execution after each complete
+object-epoch/window replacement, using three explicit GC + event-loop turns per
+sample. It calculates ordinary least-squares slopes over the last 32 of 64
+samples, when the rolling window already contains 20 active rooms, for
+`heapUsed`, `arrayBuffers`, and `ownedBytes = heapUsed + arrayBuffers`.
+`external` and `rss` remain diagnostic evidence. Each slope must be at most
+165,161 bytes per object-epoch. Every `heapUsed` and `ownedBytes` sample must be
+below the exact 512,000,000-byte ceiling carried from the governing Profile-D
+`512 MB` contract. This keeps the original JS-heap contract and also prevents
+retained `Uint8Array`/`Buffer` storage from escaping it. Across the 31 intervals
+represented by the last 32 samples, epsilon permits at most 5,119,991 predicted
+bytes, strictly below one percent of the absolute budget. All bounds must pass;
+negative slope does not excuse an absolute-budget breach.
 
 The first-pass approximate 100 MB statement is retained as historical
 motivation, not silently converted into a binary-megabyte contract. D.110a
@@ -109,10 +130,13 @@ records the fresh-process baseline and every raw sample, but does not subtract
 baseline from the absolute ceiling.
 
 The single full worker has a hard 45-minute parent watchdog, matching the
-existing longest retained object-memory gate. Timeout is a consuming failure,
-not permission to rerun or weaken the workload. D.110b must give its CI job
-enough outer time to preserve that child watchdog plus setup and evidence
-upload; it may not silently shorten the D.110a contract.
+existing 100,000-operation compact-history retained-heap gate and Phase-4d
+2,700,000 ms soak precedent. Timeout is a consuming failure, not permission to
+rerun or weaken the workload. D.110b must give its CI job enough outer time to
+preserve that child watchdog plus setup and evidence upload; it may not silently
+shorten the D.110a contract. One non-verdict two-object preflight validates the
+identical resolver, catalog, lifecycle, GC, schema, and teardown path before
+the sole consuming full worker; it cannot tune or reinterpret a threshold.
 
 ## Slice graph
 

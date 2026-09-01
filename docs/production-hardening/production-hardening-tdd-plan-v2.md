@@ -89306,8 +89306,9 @@ proof-kind registry, and D.109d's exact 22-key runtime census already are the
 Phase-6c deterministic structure artifact. D.110a now owns the missing heap
 gate only.
 
-The current successor is intentionally `snapshot-closed`; no genuine repeated
-same-object close/adopt path exists after epoch 1. D.110a therefore uses 64
+Creator handoff activates the adopted successor as `genesis-active`, and the
+retained successor operation is therefore genuine. No second creator-close/
+adopt entry exists for that same object after epoch 1. D.110a therefore uses 64
 distinct genuine object-epochs, each exercising the supported epoch-0 to
 epoch-1 lifecycle once, while the inherited D.109f differential supplies the
 same-object long-lived durable-owner dimension. It never describes those 64
@@ -89326,19 +89327,42 @@ The worker retains a rolling window of exactly 20 active successor rooms after
 warm-up and fully tears down each displaced oldest fixture before sampling.
 Setup operations and vertices are observed but excluded from workload counters.
 
-One fresh Node `--expose-gc` child samples raw `heapUsed` during execution after
-each complete object-epoch/window replacement. Each sample follows exactly
-three GC plus event-loop turns. Ordinary least-squares over samples 32 through
-63, all with 20 active rooms, must be at most 165,161 bytes per object-epoch,
-and every raw sample must remain below
-512,000,000 bytes. The absolute budget is the governing Profile-D `512 MB`
-contract. The epsilon limits predicted growth over the 31 last-half intervals
-to 5,119,991 bytes, strictly below one percent of that budget. Baseline is
-recorded but not subtracted from the absolute gate; sorting, trimming,
-smoothing, endpoint-only arithmetic, and negative-slope absolute bypass are
-forbidden. The single full worker has a 45-minute parent watchdog; timeout is a
-consuming failure with last-progress custody, not a heap verdict or retry
-permission.
+The default Phase-6a latched-ACL blueprint cannot accept a multi-operation
+`issueLocal` input. The corrected tests-only owner therefore mints one opt-in
+catalog whose artifact and manifest contain both `acl` and the shipped
+`applicationBatch` operation. All default fixture bytes and digests remain
+unchanged. A generic pre-close callback drives logical times 3 through 15,627;
+the successor operation uses 15,628. Missing batch authority, a split result,
+single-operation substitution, or any default-artifact change fails closed.
+
+One fresh Node `--expose-gc` child samples the complete raw
+`process.memoryUsage()` record during execution after each complete object-
+epoch/window replacement. Each sample follows exactly three GC plus event-loop
+turns. Ordinary least-squares over samples 32 through 63, all with 20 active
+rooms, separately gates `heapUsed`, `arrayBuffers`, and
+`ownedBytes = heapUsed + arrayBuffers` at at most 165,161 bytes per object-
+epoch. Every raw `heapUsed` and `ownedBytes` sample remains below 512,000,000
+bytes; `external` and `rss` are recorded diagnostically. This closes the
+JS-heap-only blind spot for retained `Uint8Array`/`Buffer` storage without
+double-counting `arrayBuffers` through `external`. The absolute budget is the
+governing Profile-D `512 MB` contract. Epsilon limits predicted growth over the
+31 last-half intervals to 5,119,991 bytes, strictly below one percent of that
+budget. Baseline is recorded but not subtracted from the absolute gate;
+sorting, trimming, smoothing, a different window, endpoint-only arithmetic,
+and negative-slope absolute bypass are forbidden. Samples 19 through 63 are
+the exact 45 samples with 20 rooms.
+
+The parent uses `workspacePackageImportHook` with asynchronous `spawn`, builds
+and authenticates the affected public workspace exports plus the two package-
+internal built targets that intentionally have no export-map entry, and starts
+the `.mjs` bootstrap with `--expose-gc`, the existing `tsx` loader, and
+`fake-indexeddb/auto`. The bootstrap imports the tests-only TypeScript worker;
+Vite aliases, child-derived production paths, stale `dist`, a second bare-
+package resolver, and new product exports remain forbidden. One bounded two-
+object non-verdict preflight proves that exact catalog/lifecycle/resolver/GC/
+schema/teardown path before the one consuming full worker. The single full
+worker has a 45-minute parent watchdog; timeout is a consuming failure with
+last-progress custody, not a heap verdict or retry permission.
 
 The roadmap's legacy `HashGraph`/`FinalityStore` wording does not widen this
 slice. Phase 6d remains the sole owner of legacy-finality retention; the
@@ -89366,3 +89390,44 @@ K3/high/100-step, and Opus xhigh review before RED. If Grok cancels, resume the
 exact session. Codex Sol does not substitute for Kimi. No Fable,
 collaboration subagent, retained campaign, heap threshold, workflow change,
 or Phase-6c RED is authorized until the review's blocking union is empty.
+
+##### D.110a plan-review correction
+
+The signed/pushed plan anchor
+`5d0781e459a6736794a24fbac80a71416508a202` received the required bounded
+review. Grok's first service run canceled without a verdict; its exact session
+`01a05c79-fede-71e1-99c6-4b71c9b458f1` was resumed as required and completed
+APPROVED with zero P0/P1. The standard local Kimi CLI ran K3 with the exact
+100-step cap and completed APPROVED with zero P0/P1. Opus xhigh returned
+CHANGES_REQUIRED. The blocking union is therefore nonempty and RED has not
+started.
+
+Opus demonstrated three material defects in the frozen executable plan. First,
+the default latched-ACL artifact has no `applicationBatch` reducer or manifest
+operation, so every proposed 16-operation `issueLocal` call would be rejected.
+Second, a plain `.mjs` child cannot directly execute the TypeScript,
+fake-IndexedDB-bound Phase-6a/6b lifecycle through the synchronous workspace
+subprocess helper, which also cannot enforce the parent watchdog. Third,
+`heapUsed` alone omits retained `Uint8Array`/`Buffer` backing stores. It also
+identified the nonblocking 44-versus-45 room-window error, the inaccurate
+`snapshot-closed` successor wording, missing wrong-window and wrong-room-count
+mutants, the need for a bounded lifecycle preflight, and the affected retained
+browser owner.
+
+The correction above resolves the union in one batch without product changes:
+an opt-in tests-only latched-ACL plus batching catalog leaves the default
+artifact byte-identical; an authenticated built-package `spawn` path with the
+existing `tsx`, `fake-indexeddb`, and workspace hooks executes the genuine
+fixture and owns timeout custody; and the gate now records full process memory
+and separately enforces `heapUsed`, `arrayBuffers`, and their non-double-counted
+sum. It also freezes the exact last-45 room invariant, truthful successor mode,
+two missing mutants, two-object non-verdict preflight, and retained Phase-6a
+browser test. The numerical ceiling, slope epsilon, million-operation workload,
+64 object-epochs, 20-room window, three GC turns, and 45-minute full-worker
+watchdog are unchanged.
+
+Because these corrections change executable scope and causal acceptance, the
+one permitted confirmation round must inspect this signed/pushed correction.
+Only an empty combined P0/P1 union authorizes D.110a RED. No long worker,
+preflight, RED, product edit, workflow edit, Fable, or collaboration subagent
+ran during this correction.
