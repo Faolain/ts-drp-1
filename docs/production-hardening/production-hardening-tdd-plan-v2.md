@@ -88437,3 +88437,67 @@ process, and fixed-port checks passed. No product source, package manifest,
 lockfile, reviewer, collaboration subagent, retained campaign, or Fable run
 changed RED. Proceed to the two frozen GREEN batches; deterministic RED gets no
 separate model review.
+
+GREEN path custody includes three required existing internal integration
+owners omitted from the initial new-file roster: Node's scaffold registers the
+genuine facade plus live SQLite connection, Node's package-private test
+instrumentation exposes the maintenance-only crash observer, and the browser
+IDB adapter registers its genuine facade plus lifecycle. These seams implement
+the already-reviewed strict-identity and crash design; they add no root export,
+facade key, schema, dependency, ordinary adapter-command hook, or product API.
+The final Grok/Kimi/Opus review must inspect these exact integration diffs.
+
+#### D.109c GREEN implementation checkpoint
+
+The complete D.109c GREEN is locally implemented without widening the frozen
+scope. `@ts-drp/storage/maintenance` owns one closed input/error/receipt model
+and one pure global lineage/reference classifier. Strict weak-identity
+registries expose separate Node and browser maintenance subpaths only for the
+genuine native facades; the ordinary 12-key facade, package roots, memory
+`TransitionOwner`, schemas, database identity/version, dependencies, lockfile,
+protocol/wire/digest/QC/adoption/availability contracts and runtime scheduling
+remain unchanged. SQLite owns one `BEGIN IMMEDIATE`; IndexedDB owns one strict
+readwrite transaction over the four AHE stores.
+
+The final focused Vitest reporter at
+`.logs/phase-6b-d109c-green/focused-vitest.json` passes 48/48 with no failure or
+skip. The one-file Chromium reporter passes 4/4 with zero unexpected, flaky,
+skipped or top-level errors; its four bodies execute all 28 frozen native
+mutation/count cases, six global-reference cases, six live worker-termination
+edges, and genuine empty/replay/reopen/two-handle/successor/lifecycle controls.
+Node's six child processes receive hard `SIGKILL` at the six frozen transaction
+edges and reopen as exact old or complete-new; Chromium workers block at the
+same live edges and termination proves the same XOR.
+
+All four affected package builds and source-only typechecks pass. The corrected
+17-file retained Vitest selection passes 197 selected assertions with zero
+failure. Its two filtered titles are the explicitly predeclared D.109f stale
+Node complete-export assertion and the unrelated opt-in repeated-SIGKILL
+campaign. The initial diagnostic that selected the stale D.109f assertion is
+retained honestly in `retained-vitest.json`: 197 passed, that single assertion
+failed solely because it rejects the reviewed additive `./maintenance`
+subpath, and one unrelated long campaign was skipped. The conditional current
+export/D.109a selection passes 15 selected assertions. Retained Chromium
+schema, adapter/recovery/lifecycle, real process-death and Phase-6a creator-
+adoption/reopen reporters pass respectively 12/12, 22/22, 1/1 and 2/2 with no
+unexpected/flaky/skipped/top-level result.
+
+Exact-owner ESLint, Prettier, `git diff --check`, child syntax, source-only
+typechecks, source pins, package/root/factory export census, unchanged schema/
+version/name, unchanged generic adapter-command surface, exact 11-path GREEN
+custody, protected paths, 26 stashes, fixed ports and process predicates pass.
+The first read-only custody diagnostic used an invalid Unicode regex escape;
+the corrected check passes and the diagnostic mistake is not treated as a code
+failure. The required `refactor-clean` audit confirms one shared production
+classifier, one transaction per backend, no duplicate production lineage
+walker, compatibility wrapper, temporary export, or facade sediment.
+
+Complete reporters and the command/result ledger are rooted at
+`.logs/phase-6b-d109c-green/`. Its validating self-excluding manifest SHA-256
+is `6e21d87aae12c4b818d9d9676df987ebf034d4fe08bd0f4f544e38ef70c7cc28`.
+No retained campaign, Fable, collaboration subagent, Kimi, Sol, Grok or Opus
+ran during implementation. Sign and push this GREEN checkpoint next; then run
+the sole formal final review using Grok 4.6/high, exact Kimi K3 thinking/high with both
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100` and `--max-steps-per-turn 100`, and Opus
+xhigh. Kimi occupies the middle external-CLI slot and Codex `gpt-5.6-sol` is
+not a substitute. Only P0/P1 blocks D.109c closure; D.109d remains unopened.

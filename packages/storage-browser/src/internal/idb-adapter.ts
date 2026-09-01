@@ -30,6 +30,7 @@ import {
 	type StorageAdapterWrite,
 } from "@ts-drp/storage/adapter";
 
+import { registerBrowserAheReclamationMaintenance } from "./ahe-reclamation.js";
 import {
 	openPhase2dInternalDatabase,
 	PHASE_2D_BLOBS_STORE,
@@ -968,5 +969,7 @@ export async function createBrowserAheDurableStore(
 		void lifecycle.close();
 	});
 	lifecycle.attach(opaqueDatabase as IDBDatabase);
-	return new IdbAheDurableStore(lifecycle);
+	const store = new IdbAheDurableStore(lifecycle);
+	registerBrowserAheReclamationMaintenance(store, lifecycle);
+	return store;
 }

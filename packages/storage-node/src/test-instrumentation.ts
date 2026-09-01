@@ -2,6 +2,12 @@ import type { AheDurableStore } from "@ts-drp/storage";
 
 import type { SqliteAheDurableStoreOptions } from "./index.js";
 import {
+	installNodeAheReclamationCountFault,
+	installNodeAheReclamationCrashObserver,
+	type NodeAheReclamationCountFault,
+	type NodeAheReclamationCrashObserver,
+} from "./internal/ahe-reclamation.js";
+import {
 	createInstrumentedSqliteScaffold,
 	type SqliteCrashCheckpointObserver,
 	type SqliteMutationFault,
@@ -21,6 +27,10 @@ export type InstrumentedSqliteAheDurableStore = Readonly<{
 }>;
 
 export type ExpandedCrashInstrumentation = Readonly<{ crashCheckpoints: "expanded" }>;
+
+export { installNodeAheReclamationCrashObserver };
+export { installNodeAheReclamationCountFault };
+export type { NodeAheReclamationCountFault, NodeAheReclamationCrashObserver };
 
 /**
  * Creates a store with the bounded Phase 2c-a transaction fault hook.

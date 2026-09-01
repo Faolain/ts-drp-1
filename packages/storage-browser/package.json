@@ -33,6 +33,10 @@
 			"types": "./dist/src/live-journal.d.ts",
 			"import": "./dist/src/live-journal.js"
 		},
+		"./maintenance": {
+			"types": "./dist/src/maintenance.d.ts",
+			"import": "./dist/src/maintenance.js"
+		},
 		"./seal-vote": {
 			"types": "./dist/src/seal-vote.d.ts",
 			"import": "./dist/src/seal-vote.js"

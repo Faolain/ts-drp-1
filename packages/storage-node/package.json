@@ -35,6 +35,10 @@
 			"types": "./dist/src/live-journal.d.ts",
 			"import": "./dist/src/live-journal.js"
 		},
+		"./maintenance": {
+			"types": "./dist/src/maintenance.d.ts",
+			"import": "./dist/src/maintenance.js"
+		},
 		"./snapshot-transfer": {
 			"types": "./dist/src/snapshot-transfer.d.ts",
 			"import": "./dist/src/snapshot-transfer.js"

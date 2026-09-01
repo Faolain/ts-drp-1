@@ -31,6 +31,7 @@ import {
 import { DatabaseSync } from "node:sqlite";
 
 import type { SqliteAheDurableStoreOptions } from "../index.js";
+import { registerNodeAheReclamationMaintenance } from "./ahe-reclamation.js";
 
 export type SqliteMutationOperation = Exclude<
 	StorageAdapterCommand["kind"],
@@ -142,7 +143,16 @@ class SqliteAheDurableStore implements AheDurableStore {
 		private readonly connection: DatabaseSync,
 		private readonly fault?: SqliteMutationFault,
 		private readonly crashObserver?: SqliteCrashCheckpointObserver
-	) {}
+	) {
+		registerNodeAheReclamationMaintenance(this, connection, {
+			isClosed: () => this.closed,
+			isPoisoned: () => this.poisoned,
+			latchPoison: () => {
+				this.poisoned = true;
+				this.recoveryCertificates.clear();
+			},
+		});
+	}
 
 	public readHead(objectId: StorageObjectId): Promise<StoreResult<ExpectedHead>> {
 		return this.run(commandWithKind("readHead", { objectId })) as Promise<StoreResult<ExpectedHead>>;

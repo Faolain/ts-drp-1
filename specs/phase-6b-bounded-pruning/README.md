@@ -2,16 +2,16 @@
 
 ## Next Agent Prompt
 
-Status (2026-08-31): D.109a eligibility and D.109b issuance retention are
+Status (2026-09-01): D.109a eligibility and D.109b issuance retention are
 closed. D.109b's signed/pushed GREEN and final-review anchors are respectively
 `529367b154ffd3fb66bf31a6cfedb4a0d9b73746` and
 `2afadbe682261bdb311a5cb64f6f42d86ed7330b`; their plan, RED, GREEN, reviews,
 and evidence are accepted and must not be reopened. The deterministic RED for
 [D.109c AHE reclamation](slices/02-ahe-reclamation.md) is signed/pushed at
-`84cff9ceaa6620c2ed8d1baa3a358ad9b018bb94`: only the three frozen missing-owner
-tokens failed and the retained selection passed. Implement the shared contract
-and classifier GREEN batch next; do not add native physical deletion until its
-focused shared gate passes.
+`84cff9ceaa6620c2ed8d1baa3a358ad9b018bb94`. D.109c GREEN implementation and
+its focused/static/retained gates now pass locally with no semantic exclusion;
+sign and push the GREEN/evidence checkpoint next, then run the sole final
+Grok/Kimi/Opus review before closing D.109c.
 
 Global TODO:
 

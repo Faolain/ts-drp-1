@@ -337,12 +337,62 @@ commit or model review:
    separate maintenance-scoped test-only fault edges, package subpaths, and run
    the focused Node and browser commands once before the retained suites.
 
+The native batch necessarily touches three existing internal integration
+owners in addition to the new maintenance files: Node's scaffold registers the
+genuine facade and live SQLite connection, Node's package-private test
+instrumentation exposes only the maintenance crash observer, and the browser
+IDB adapter registers its genuine facade and lifecycle. This is changed-path
+custody for the already-frozen identity and crash design, not a new API or
+behavioral slice. No root export, facade key, schema, dependency, or ordinary
+adapter-command hook changes.
+
 If either focused run reports a code/token outside its frozen matrix, stop and
 diagnose rather than folding another concept into the batch. Before final
 review, apply `refactor-clean`: one shared graph classifier, one backend
 transaction per physical owner, no duplicate lineage walker, no compatibility
 wrapper, no `TransitionOwner` reclamation mutation, and no temporary export
 left behind.
+
+## GREEN implementation evidence
+
+The complete GREEN is locally implemented. The shared package owns the one
+closed contract/capture/classifier/receipt implementation; strict weak-identity
+registries expose separate Node and browser maintenance subpaths without
+changing the 12-key facade or package roots. SQLite uses one `BEGIN IMMEDIATE`
+and IndexedDB one strict four-store transaction. Both recheck the full global
+generation/promotion graph, normalize only the retained floor, enforce exact
+write counts, preserve shared/orphan references, replay idempotently, and
+latch corruption without committing partial deletion.
+
+The final focused Vitest reporter passes 48/48 with zero failure or skip. The
+one-file Chromium reporter passes 4/4 and internally executes all 28 frozen
+mutation/count cases, six reference cases, six worker-termination edges, and
+the empty/replay/reopen/two-handle/successor/lifecycle controls. Four affected
+package builds and source-only typechecks pass. The corrected retained Vitest
+selection passes all 197 selected assertions; its two filters are the exact
+predeclared D.109f stale complete-export assertion and unrelated opt-in long
+SIGKILL campaign. Retained Chromium schema, adapter/recovery/lifecycle, real
+process-death, and creator-adoption selections pass 12/12, 22/22, 1/1 and 2/2.
+The initial retained diagnostic that selected the D.109f assertion is preserved
+honestly rather than relabelled as a product failure.
+
+Exact-owner lint/format/diff, child syntax, source pins, export/schema/facade
+shape, 11-path custody, protected paths, 26 stashes, process and fixed-port
+checks pass. One initial read-only custody check used an invalid Unicode regex;
+the corrected diagnostic passes and the regex error is not a code failure.
+The `refactor-clean` audit confirms one production classifier and one physical
+transaction per backend with no wrapper, temporary export, duplicate lineage
+walker, or adapter-command growth. Complete reporter JSON and the command/
+result ledger are rooted at `.logs/phase-6b-d109c-green/`. Its validating
+self-excluding manifest SHA-256 is
+`6e21d87aae12c4b818d9d9676df987ebf034d4fe08bd0f4f544e38ef70c7cc28`;
+no campaign ran.
+
+GREEN must now be signed and pushed before the sole formal final review. That
+review uses Grok 4.6/high, exact Kimi K3 thinking/high with both 100-step
+controls, and Opus xhigh. Kimi occupies the middle external-CLI slot; Codex
+`gpt-5.6-sol` is not a substitute and no collaboration subagent or Fable run is
+authorized.
 
 ## GREEN and retained gates
 

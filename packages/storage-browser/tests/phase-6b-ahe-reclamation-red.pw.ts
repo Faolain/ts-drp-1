@@ -67,35 +67,79 @@ test("reclaims and replays a genuine five-generation IndexedDB lineage", async (
 	const issued = transition();
 	try {
 		await page.goto(issued.url, { waitUntil: "load" });
-		const value = await page.evaluate(() => {
+		const value = await page.evaluate(async () => {
 			const fixture = (
 				globalThis as unknown as {
-					phase6bAheReclamation: { run(databaseName: string): Promise<Record<string, unknown>> };
+					phase6bAheReclamation: {
+						run(databaseName: string): Promise<Record<string, unknown>>;
+						runPositiveControls(prefix: string): Promise<Record<string, unknown>>;
+					};
 				}
 			).phase6bAheReclamation;
-			return fixture.run(`d109c-${crypto.randomUUID()}`);
+			const prefix = `d109c-${crypto.randomUUID()}`;
+			return {
+				controls: await fixture.runPositiveControls(`${prefix}-controls`),
+				value: await fixture.run(`${prefix}-primary`),
+			};
 		});
-		expect(value).toMatchObject({ copiedDenied: true, memoryDenied: true, proxyDenied: true });
-		expect(value.receipt).toMatchObject({ deletedPromotionCount: 2, floor: { normalizedThisCall: true } });
-		expect(value.replay).toMatchObject({ deletedGenerationIds: [], floor: { normalizedThisCall: false } });
+		expect(value.controls).toEqual({ concurrentDeletedCounts: [0, 2], empty: true });
+		expect(value.value).toMatchObject({
+			asynchronousClosed: true,
+			closedCode: "AHE_RECLAMATION_STORE_CLOSED",
+			copiedDenied: true,
+			invalidCode: "AHE_RECLAMATION_INVALID_ARGUMENT",
+			memoryDenied: true,
+			proxyDenied: true,
+		});
+		expect(value.value.receipt).toMatchObject({ deletedPromotionCount: 2, floor: { normalizedThisCall: true } });
+		expect(value.value.replay).toMatchObject({ deletedGenerationIds: [], floor: { normalizedThisCall: false } });
+		expect(value.value.successor).toMatchObject({ head: { generationId: "6".padStart(64, "0"), revision: 6 } });
 	} finally {
 		tokens.delete(issued.token);
 	}
 });
 
-test("refuses the frozen native mutant matrix without partial deletion", () => {
+test("refuses the frozen native mutant matrix without partial deletion", async ({ page }) => {
 	test.skip(process.env.D109C_BROWSER_MAINTENANCE_READY !== "true", "D109C_BROWSER_MAINTENANCE_MISSING");
-	expect(true).toBe(true);
+	const issued = transition();
+	try {
+		await page.goto(issued.url, { waitUntil: "load" });
+		const result = await page.evaluate(async () => {
+			const fixture = (
+				globalThis as unknown as {
+					phase6bAheReclamation: {
+						runMutantMatrix(prefix: string): Promise<Record<string, unknown>>;
+						runReferenceMatrix(prefix: string): Promise<Record<string, unknown>>;
+					};
+				}
+			).phase6bAheReclamation;
+			const prefix = `d109c-${crypto.randomUUID()}`;
+			return {
+				mutants: await fixture.runMutantMatrix(`${prefix}-mutants`),
+				references: await fixture.runReferenceMatrix(`${prefix}-references`),
+			};
+		});
+		expect(result.mutants).toMatchObject({ total: 28 });
+		expect(result.references).toMatchObject({ total: 6 });
+	} finally {
+		tokens.delete(issued.token);
+	}
 });
 
-test("terminates at every live IndexedDB mutation edge and reopens old XOR complete-new", () => {
+test("terminates at every live IndexedDB mutation edge and reopens old XOR complete-new", async ({ page }) => {
 	test.skip(process.env.D109C_BROWSER_MAINTENANCE_READY !== "true", "D109C_BROWSER_MAINTENANCE_MISSING");
-	expect([
-		"after-floor-rewrite",
-		"after-promotion-delete",
-		"after-generation-delete",
-		"after-blob-delete",
-		"before-commit",
-		"after-commit",
-	]).toHaveLength(6);
+	const issued = transition();
+	try {
+		await page.goto(issued.url, { waitUntil: "load" });
+		const result = await page.evaluate(() =>
+			(
+				globalThis as unknown as {
+					phase6bAheReclamation: { runCrashMatrix(prefix: string): Promise<Record<string, unknown>> };
+				}
+			).phase6bAheReclamation.runCrashMatrix(`d109c-${crypto.randomUUID()}-crash`)
+		);
+		expect(result).toMatchObject({ total: 6 });
+	} finally {
+		tokens.delete(issued.token);
+	}
 });

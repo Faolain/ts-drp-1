@@ -1,4 +1,4 @@
-/* eslint-disable import/no-unresolved, @typescript-eslint/explicit-function-return-type -- Future built maintenance owner is the RED seam. */
+/* eslint-disable @typescript-eslint/explicit-function-return-type -- Future built maintenance owner is the RED seam. */
 const [databaseFilename, target] = process.argv.slice(2);
 if (databaseFilename === undefined || target === undefined) {
 	throw new TypeError("D109C_CHILD_ARGUMENTS_INVALID");
@@ -24,7 +24,7 @@ try {
 		import("../../dist/src/test-instrumentation.js"),
 	]);
 	const instrumented = instrumentation.createInstrumentedSqliteAheDurableStore({ filename: databaseFilename });
-	instrumentation.installAheReclamationCrashObserver?.(instrumented.store, checkpoint);
+	instrumentation.installNodeAheReclamationCrashObserver(instrumented.store, checkpoint);
 	const store = instrumented.store;
 	const maintenance = maintenanceModule.resolveNodeAheReclamationMaintenance(store);
 	if (maintenance === undefined) throw new TypeError("D109C_NODE_MAINTENANCE_MISSING");

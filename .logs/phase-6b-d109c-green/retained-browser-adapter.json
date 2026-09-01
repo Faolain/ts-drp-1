@@ -1,0 +1,871 @@
+{
+  "config": {
+    "argv": [
+      "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+      "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@playwright+test@1.62.1/node_modules/@playwright/test/cli.js",
+      "test",
+      "--config",
+      "packages/storage-browser/playwright.phase-2d2a-idb-adapter.config.ts",
+      "--project=chromium",
+      "--reporter=json"
+    ],
+    "configFile": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/playwright.phase-2d2a-idb-adapter.config.ts",
+    "rootDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 120000,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-2d2a-idb-adapter-red.pw.ts",
+          "phase-2e1-bounded-reads-red.pw.ts",
+          "phase-2e2-taxonomy-poison-red.pw.ts",
+          "phase-2e3-recovery-authority-red.pw.ts",
+          "phase-2e4-lifecycle-backend-red.pw.ts"
+        ],
+        "timeout": 15000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": {
+      "command": "pnpm exec tsx tests/phase-2d2a-idb-adapter-server.ts",
+      "url": "http://127.0.0.1:43876/",
+      "reuseExistingServer": false,
+      "timeout": 15000
+    }
+  },
+  "suites": [
+    {
+      "title": "phase-2d2a-idb-adapter-red.pw.ts",
+      "file": "phase-2d2a-idb-adapter-red.pw.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "real Chromium IndexedDB passes the shared strict AheDurableStore contract",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 159,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-01T01:07:52.197Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "15436ef8a7d2098fd537-1f3ada66f9db728849c9",
+          "file": "phase-2d2a-idb-adapter-red.pw.ts",
+          "line": 22,
+          "column": 1
+        },
+        {
+          "title": "whole canonical rows and exact blobs survive reopen with detached outputs",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 112,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-01T01:07:52.517Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "15436ef8a7d2098fd537-383dd9458aaca510b5fe",
+          "file": "phase-2d2a-idb-adapter-red.pw.ts",
+          "line": 29,
+          "column": 1
+        },
+        {
+          "title": "promoteReference owns missing and corrupt closure bytes without mutating journal state",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 109,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-01T01:07:52.636Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "15436ef8a7d2098fd537-092127511d26ee025c02",
+          "file": "phase-2d2a-idb-adapter-red.pw.ts",
+          "line": 40,
+          "column": 1
+        },
+        {
+          "title": "completion incrementally reverifies every promotion and blob in one strict bounded transaction",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 96,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-01T01:07:52.753Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "15436ef8a7d2098fd537-f164a3bab51149bf09c1",
+          "file": "phase-2d2a-idb-adapter-red.pw.ts",
+          "line": 48,
+          "column": 1
+        },
+        {
+          "title": "same-byte blob insertion and promotion are idempotent across global/object scopes",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 102,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-01T01:07:52.857Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "15436ef8a7d2098fd537-5ee28841b99a8a298fa7",
+          "file": "phase-2d2a-idb-adapter-red.pw.ts",
+          "line": 69,
+          "column": 1
+        },
+        {
+          "title": "same digest with different bytes has one insert winner and one immutable loser",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 100,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-01T01:07:52.967Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "15436ef8a7d2098fd537-85c75352334f0d60819f",
+          "file": "phase-2d2a-idb-adapter-red.pw.ts",
+          "line": 82,
+          "column": 1
+        },
+        {
+          "title": "concurrent expected-head swaps linearize to one adoption and one stable conflict",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 104,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-01T01:07:53.073Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "15436ef8a7d2098fd537-ef2308e45f4503419dd8",
+          "file": "phase-2d2a-idb-adapter-red.pw.ts",
+          "line": 90,
+          "column": 1
+        },
+        {
+          "title": "a second-write failure aborts the entire strict transaction and permits an exact retry",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 100,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-01T01:07:53.184Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "15436ef8a7d2098fd537-1361ded4213b196e36b6",
+          "file": "phase-2d2a-idb-adapter-red.pw.ts",
+          "line": 99,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "phase-2e1-bounded-reads-red.pw.ts",
+      "file": "phase-2e1-bounded-reads-red.pw.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "real Chromium exposes detached head and bounded exclusive pages with pre-I/O validation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 107,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-01T01:07:53.294Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "951018d45a6d473a9118-e8b0f78b379f674ed591",
+          "file": "phase-2e1-bounded-reads-red.pw.ts",
+          "line": 19,
+          "column": 1
+        },
+        {
+          "title": "real Chromium fails closed when an IndexedDB compound key disagrees with its canonical record",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 103,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-01T01:07:53.407Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "951018d45a6d473a9118-efa19a99114effac9bed",
+          "file": "phase-2e1-bounded-reads-red.pw.ts",
+          "line": 41,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "phase-2e2-taxonomy-poison-red.pw.ts",
+      "file": "phase-2e2-taxonomy-poison-red.pw.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "real Chromium classifies every persisted recovery contradiction and writes nothing",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 182,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-01T01:07:53.520Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "bb96841cf4f073355f51-ae03266e50f6aa64c240",
+          "file": "phase-2e2-taxonomy-poison-red.pw.ts",
+          "line": 15,
+          "column": 1
+        },
+        {
+          "title": "real Chromium latches poison before queued work and close then outranks it",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 106,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-01T01:07:53.706Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "bb96841cf4f073355f51-a60685fb227e7b25a1b7",
+          "file": "phase-2e2-taxonomy-poison-red.pw.ts",
+          "line": 31,
+          "column": 1
+        },
+        {
+          "title": "real Chromium rejects incompatible schema at open without returning a handle",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 81,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-01T01:07:53.818Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "bb96841cf4f073355f51-80edba4ac6a08207783b",
+          "file": "phase-2e2-taxonomy-poison-red.pw.ts",
+          "line": 41,
+          "column": 1
+        },
+        {
+          "title": "real Chromium preserves caller and substrate classifications with zero writes",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 89,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-01T01:07:53.904Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "bb96841cf4f073355f51-e382e808bc95c58e8641",
+          "file": "phase-2e2-taxonomy-poison-red.pw.ts",
+          "line": 48,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "phase-2e3-recovery-authority-red.pw.ts",
+      "file": "phase-2e3-recovery-authority-red.pw.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "real Chromium returns exact detached empty and active recovery metadata",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 103,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-01T01:07:54.002Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "22affd203eebdf1568d7-c3dbbc430eb35f67ff12",
+          "file": "phase-2e3-recovery-authority-red.pw.ts",
+          "line": 18,
+          "column": 1
+        },
+        {
+          "title": "real Chromium cursor-walks more than 128 rows in one strict bounded recovery transaction",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 120,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-01T01:07:54.111Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "22affd203eebdf1568d7-4df90b30d596e8175fd1",
+          "file": "phase-2e3-recovery-authority-red.pw.ts",
+          "line": 45,
+          "column": 1
+        },
+        {
+          "title": "real Chromium gates the G1-rev5 head-deletion swap before any write",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 106,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-01T01:07:54.236Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "22affd203eebdf1568d7-bdee04b3e943f8825c91",
+          "file": "phase-2e3-recovery-authority-red.pw.ts",
+          "line": 61,
+          "column": 1
+        },
+        {
+          "title": "real Chromium incrementally reverifies promoted candidate bytes without poisoning",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 173,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-01T01:07:54.349Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "22affd203eebdf1568d7-cad4d932753c43b98619",
+          "file": "phase-2e3-recovery-authority-red.pw.ts",
+          "line": 81,
+          "column": 1
+        },
+        {
+          "title": "positive control calibrates the peak-request probe against a batched mutant",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 210,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-01T01:07:54.527Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "22affd203eebdf1568d7-2e2928517bc6ac14af4b",
+          "file": "phase-2e3-recovery-authority-red.pw.ts",
+          "line": 124,
+          "column": 1
+        }
+      ]
+    },
+    {
+      "title": "phase-2e4-lifecycle-backend-red.pw.ts",
+      "file": "phase-2e4-lifecycle-backend-red.pw.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "real Chromium freezes explicit recovery, reopen, stale-certificate, completion, and substrate lifecycle",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 179,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-01T01:07:54.748Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "17c6c9f682d1c5ab2024-9097f360452635c092da",
+          "file": "phase-2e4-lifecycle-backend-red.pw.ts",
+          "line": 14,
+          "column": 1
+        },
+        {
+          "title": "real Chromium re-verifies physical swap evidence and keeps backend taxonomy aligned",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 156,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-01T01:07:54.935Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "17c6c9f682d1c5ab2024-614812ad42c7884c5b8a",
+          "file": "phase-2e4-lifecycle-backend-red.pw.ts",
+          "line": 48,
+          "column": 1
+        },
+        {
+          "title": "real Chromium closes behind active recovery and suppresses queued poison work before another scan",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 15000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 114,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-01T01:07:55.096Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "17c6c9f682d1c5ab2024-04acf0c42caf0aeb218f",
+          "file": "phase-2e4-lifecycle-backend-red.pw.ts",
+          "line": 77,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-01T01:07:50.819Z",
+    "duration": 4434.751,
+    "expected": 22,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

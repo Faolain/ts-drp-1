@@ -3,6 +3,7 @@ import type {
 	BlobDigest,
 	ExpectedHead,
 	GenerationId,
+	GenerationRecord,
 	PresentHead,
 	StorageObjectId,
 } from "@ts-drp/storage";
@@ -35,9 +36,12 @@ export const D109C_GREEN_PATHS = Object.freeze([
 	"packages/storage/package.json",
 	"packages/storage-node/src/maintenance.ts",
 	"packages/storage-node/src/internal/ahe-reclamation.ts",
+	"packages/storage-node/src/internal/create-scaffold.ts",
+	"packages/storage-node/src/test-instrumentation.ts",
 	"packages/storage-node/package.json",
 	"packages/storage-browser/src/maintenance.ts",
 	"packages/storage-browser/src/internal/ahe-reclamation.ts",
+	"packages/storage-browser/src/internal/idb-adapter.ts",
 	"packages/storage-browser/package.json",
 ] as const);
 
@@ -148,6 +152,32 @@ export interface D109cMaintenance {
 
 export interface D109cSharedMaintenanceModule {
 	readonly AHE_RECLAMATION_ERROR_CODES: readonly string[];
+	captureAheReclamationInput(input: unknown): D109cReclamationInput;
+	classifyAheReclamation(
+		input: unknown,
+		snapshot: Readonly<{
+			blobs: readonly Readonly<{ bytes: Uint8Array; digest: BlobDigest }>[];
+			generations: readonly GenerationRecord[];
+			head: ExpectedHead;
+			promotions: readonly Readonly<{
+				digest: BlobDigest;
+				generationId: GenerationId;
+				objectId: StorageObjectId;
+			}>[];
+		}>
+	): Readonly<{
+		deleteBlobDigests: readonly BlobDigest[];
+		deleteGenerationIds: readonly GenerationId[];
+		deletePromotions: readonly unknown[];
+		floor: Readonly<{
+			generation: GenerationRecord;
+			normalizedThisCall: boolean;
+			rewrittenGeneration: GenerationRecord;
+		}>;
+	}>;
+	createAheReclamationReceipt(
+		decision: ReturnType<D109cSharedMaintenanceModule["classifyAheReclamation"]>
+	): D109cReceipt;
 }
 
 export interface D109cNodeMaintenanceModule {
