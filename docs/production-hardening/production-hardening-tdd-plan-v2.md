@@ -89667,3 +89667,59 @@ The validating self-excluding eight-file manifest SHA-256 is
 No D.110a preflight/full worker, browser test, retained campaign, reviewer,
 Fable, or collaboration subagent ran in RED. Narrow GREEN at the sole private
 owner is authorized.
+
+##### D.110a-p GREEN implementation and evidence checkpoint
+
+GREEN changes only private
+`packages/node/src/v3-live.ts::readCreatorReplayRows`, signed and pushed in
+`a7a8f7fc7bccee1b5ebabcea843a7d92c95b27aa`. It replaces the oversized
+single-page read with one fixed-readiness-snapshot loop. Each request uses
+`Math.min(128, remaining)`; every nonempty page is limited to both remaining
+rows and 128; rows retain their global sequence plus all preexisting
+authentication, issuance, digest, byte-charge, retained-graph, and replay
+verification checks; a nonterminal cursor must equal the last consumed global
+sequence; and null is accepted only after exactly `rowCount` rows. The loop's
+nonempty-page guard bounds it to at most `rowCount` iterations.
+
+The first clean focused GREEN reached successful 129-row close and passed the
+desired-state source audit, then exposed one stale tests-only expectation: the
+final local author sequence is 128, not 127, because the inherited received row
+is author sequence 0 and the base local `add(2)` is sequence 1 before the 127
+additional rows. This is preserved as an invalid expectation diagnostic, not a
+product failure. Signed/pushed correction
+`e028ec6b335857d3e9415fc11309608f35985e5d` changes only that assertion to
+`ADDITIONAL_ROWS + 1`; no RED causal predicate or product behavior changed.
+
+The authoritative proof ran from the clean detached worktree at that exact
+commit and tree `ba506b473b53efa3752fe6c38e97efd06d9318ba`; its porcelain status was
+empty. The focused command passed 2/2 with zero failure, pending, todo, skip,
+top-level error, or soft failure. It proves genuine 129-row close and the
+unchanged desired-state source audit. The audit reports public page limit true,
+oversized owner call false, and bounded limit, bounded loop, empty guard,
+overrun guard, and cursor guard all true.
+
+The retained non-campaign selection passed 95/95 in exactly 11 files: Phase-5e
+creator close; Phase-6a creator adoption, commit, activation, handle identity,
+and the two fresh-process death tests; D.109a cleanup eligibility; D.109d
+runtime reclamation; and both D.109f differential owners. There were zero
+failure, pending, todo, skip, top-level error, or soft failure. `pnpm --filter
+@ts-drp/node build` and source-only `pnpm exec tsc -p
+packages/node/tsconfig.build.json --noEmit` passed. The package's broader
+`typecheck` script still reports its recorded unrelated test/configuration
+baseline; it is not used as a source-owner verdict. Exact-owner Prettier,
+ESLint with zero warnings, `git diff --check`, clean-tree identity, signed
+commit, pushed ref, 26-stash, and protected-state checks passed.
+
+Focused JSON/stdout/stderr SHA-256 values are
+`5e97d382a786cb6c84b86eec85c3140e69eddb350460b378941984a31041d946`,
+`9b4697f38449576e5a7a3e788316d55426334fc60d38690ad64572ad05f13b16`, and
+`749d50f46f92c8be0ad70e84b12431af932652cbfcdb495f790cadda58a0fa22`.
+Retained JSON/stdout/stderr SHA-256 values are
+`876fd6f6636e46dffd12c779c54e7d8d98256b87db936d57ea68dbffdc055137`,
+`7e892aecb9ee0a1596eabf7924b40a746d33a5e30693c33a42253c54feb3c1fd`, and
+`9cd708cd1a5a588d29d63bb7c8af644ec99b15ce1aab333b4010b5c61d6bc207`.
+The validating self-excluding 23-file manifest SHA-256 is
+`6c286d8165860d50b5b2d6d1e08a3d2277dc236e1c3b33eee3373677d940343f`.
+The D.110a preflight and consuming full worker remain unspent after D.110a-p;
+no browser test, campaign, Fable, or collaboration subagent ran. The single
+formal Grok/Kimi/Opus plan-to-RED-to-GREEN review is now authorized.
