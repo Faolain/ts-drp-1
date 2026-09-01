@@ -89613,3 +89613,57 @@ raw stream, and Opus raw JSON SHA-256 values are respectively
 and `5c5d9c027684a8b6a2afb16a3897324436ff21334e488254c6710a7acd6ea3fe`.
 No further plan confirmation is authorized or required; D.110a-p RED is
 unblocked.
+
+##### D.110a-p deterministic RED evidence
+
+The minimal RED owners were signed and pushed in
+`9cff68594357be33c0f4e7b30fd1119e9586300e`; the isolated browser-storage
+prerequisite correction was signed and pushed in
+`92d838d34b881fa9c487f9ee8ef6218164599af6`. The latter commit has tree
+`db90b38eee34724546f212f235a705c91fd8d63e`, a good GPG signature, and exactly
+two changed paths relative to the plan-review closure: the minimal
+`beforeCreatorClose` fixture seam and
+`tests/phase-6c-creator-replay-pagination-red.test.ts`. It contains none of the
+parked D.110a batch, import, helper, package-script, or memory-worker changes.
+
+The proof ran from detached clean worktree
+`/private/tmp/ts-drp-d110ap-red.PKlHX1/repo` at that exact commit. `git status
+--porcelain=v1 --untracked-files=all` was empty. `pnpm install
+--frozen-lockfile --offline` reused the local content-addressed store, resolved
+all 48 workspace projects without downloads, and its postinstall freshly built
+all workspace packages. Exact listing command `pnpm exec vitest list
+tests/phase-6c-creator-replay-pagination-red.test.ts --json` selected one file
+and the two frozen titles.
+
+The first clean focused invocation is retained as an invalid causal diagnostic:
+the isolated Vitest environment lacked `navigator.storage.estimate`, so the
+runtime assertion stopped in browser snapshot-quarantine setup before creator
+close. The source predicate failed as expected, but this was not accepted as
+RED. The correction added only a deterministic storage-estimate test stub; it
+changed no fixture workload or product source.
+
+The corrected authoritative command was `pnpm exec vitest run
+tests/phase-6c-creator-replay-pagination-red.test.ts --coverage.enabled=false
+--reporter=json --outputFile=<evidence-root>/focused.json`. It selected one file
+and two tests, exited 1, and reported exactly two failures with zero pass,
+pending, skip, todo, top-level error, or extra failure. The genuine 129-row
+case failed exactly at `creator close durable replay seal failed`. The source
+audit independently proved `publicPageLimitIs128: true`, the current oversized
+owner call present, and bounded owner pagination absent. Thus the corrected RED
+matches its frozen causal matrix: the passing public-bound control plus only
+the genuine close and desired owner predicate failing.
+
+Exact-owner Prettier, ESLint with zero warnings, `git diff --check`, clean-tree
+identity, and the signed/pushed-ref check passed. All 26 inherited stashes and
+protected untracked paths remain. The focused JSON/stdout/stderr SHA-256 values
+are `e06c18593f609e6a0aea58a2e2e471e22b6989957b2cdd5b065d5da331621350`,
+`5aaee9d77448631f9e0a2c492e5c42f21f3cac3c8905ca1df74b29cafe3c7b93`, and
+`ce738cd0b5117f27fe8729d1d9b09887def20fbf3f332efd60c8859c457eb3f1`.
+The listing JSON/stderr SHA-256 values are
+`8a5743c8b8b9bc7569b36b657ba13ed3f0ea4f5348bdd001e0c061d2435df506`
+and `b2b4d0251f47cc482f6a6a860e6d2bf92934f68350ae165b205ea1fb43050a04`.
+The validating self-excluding eight-file manifest SHA-256 is
+`d245b4a260fb3a777ea099688f5979823ef3d2ea7c89730ea7b7e3e82a446487`.
+No D.110a preflight/full worker, browser test, retained campaign, reviewer,
+Fable, or collaboration subagent ran in RED. Narrow GREEN at the sole private
+owner is authorized.
