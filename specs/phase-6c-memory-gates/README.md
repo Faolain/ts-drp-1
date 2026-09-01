@@ -9,17 +9,26 @@ close/adopt/reclaim lifecycle, fresh-process proof, and immutable evidence are
 the Phase-6c structure-census artifact. Do not reopen, duplicate, or wrap them
 in a second census owner.
 
-The next executable work is
-[D.110a retained-heap hard gate](slices/00-retained-heap-gate.md). It is a
-tests/build-infrastructure slice only. Its corrected plan must be signed,
-pushed, and reviewed by Grok 4.6/high, the standard Kimi CLI with K3/high and
-an exact 100-step cap, and Opus xhigh before RED. If Grok cancels, resume that
-exact session. Do not substitute Codex Sol for Kimi. Do not invoke Fable or
-collaboration subagents.
+The D.110a causal RED is signed/pushed at
+`b85875c3e0448b65a5d262cbc1ca7c38fdcb331a`. Its authoritative focused GREEN
+passes 20/20. The two-object preflight then demonstrated that creator durable
+replay requests one 979-row journal page even though the public journal
+contract accepts at most 128 rows per page. The million-operation worker has
+not run. Do not weaken or reinterpret D.110a.
+
+The next executable work is the narrow
+[D.110a-p durable-replay pagination prerequisite](slices/00a-durable-replay-pagination.md).
+Freeze, sign, push, and review that product slice with Grok 4.6/high, the
+standard Kimi CLI with K3/high and an exact 100-step cap, and Opus xhigh before
+its RED. If Grok cancels, resume that exact session. Do not substitute Codex Sol
+for Kimi. Do not invoke Fable or collaboration subagents. Once D.110a-p closes,
+resume the corrected D.110a preflight; the full worker remains a single
+consuming invocation.
 
 Global TODO:
 
 - [x] Structure-census artifact inherited from D.109f and D.109d.
+- [ ] D.110a-p paginate creator durable replay across the public 128-row page seam.
 - [ ] D.110a genuine million-operation retained-heap hard gate.
 - [ ] D.110b CI memory-trend fail-closed backstop.
 
@@ -146,11 +155,14 @@ the sole consuming full worker; it cannot tune or reinterpret a threshold.
 
 ## Slice graph
 
-1. [D.110a retained-heap hard gate](slices/00-retained-heap-gate.md) adds the
+1. [D.110a-p durable-replay pagination prerequisite](slices/00a-durable-replay-pagination.md)
+   closes the newly demonstrated `rowCount > 128` creator-close defect without
+   changing journal limits, close semantics, or Phase-6c workload contracts.
+2. [D.110a retained-heap hard gate](slices/00-retained-heap-gate.md) adds the
    fresh-process worker, exact workload/digest assertions, slope arithmetic,
-   hard limits, and mutation-sensitive focused test. It changes no production
-   source or existing benchmark workflow.
-2. D.110b runs the accepted D.110a hard command from CI and changes the existing
+   hard limits, and mutation-sensitive focused test. Its own implementation
+   remains tests/build infrastructure; it depends on D.110a-p.
+3. D.110b runs the accepted D.110a hard command from CI and changes the existing
    benchmark comparison to `fail-on-alert: true` as a separate trend backstop.
    It reviews timeout, cadence, cache-absence, and failure-reporting behavior
    without changing D.110a's workload or thresholds. Historical trend cache is

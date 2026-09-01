@@ -89516,3 +89516,60 @@ did not run. Raw result/stdout/stderr/list SHA-256 values are
 and `dfcecc75dd16176b925047d251782375bda593a27f83f2cf1fc498aaff926755`.
 The RED matches its signed causal matrix and authorizes only the named
 tests/test-fixture/entry-point GREEN.
+
+##### D.110a GREEN preflight disposition and D.110a-p prerequisite plan
+
+D.110a GREEN infrastructure is implemented but not accepted or committed.
+After a fresh all-package build, child syntax, source-shape, exact-owner lint,
+and diff checks passed. The first focused invocation selected the intended one
+file and all 20 tests; all 20 assertions passed, but the command exited 1 only
+because the repository-wide 70-percent coverage threshold was applied to the
+narrow selection. It is retained as an invalid launcher diagnostic. The
+authoritative `--coverage.enabled=false` invocation passed all 20 with zero
+skip, todo, assertion failure, top-level error, or soft failure.
+
+The first two-object non-verdict preflight completed its 977 workload batch
+vertices, then exposed a tests-only timing error: the callback inspected the
+blueprint machine before creator close performed its fold. The corrected
+fixture reads the exact authenticated snapshot payload after genuine close and
+requires application state 15,628. No product source changed for that
+correction.
+
+The corrected preflight then failed after the same workload at
+`creator close durable replay seal failed`. This is a demonstrated product
+defect, not a memory verdict. `readCreatorReplayRows` obtains a readiness
+snapshot with 979 rows and calls `readPage` once with
+`limit: readiness.rowCount`. `captureLiveJournalInput("page", ...)` accepts
+only limits 1 through 128, so the request is deterministically malformed and
+`sealCreatorDurableReplay` returns unavailable. The full 64-object worker has
+not run; no memory threshold, workload, window, watchdog, or package-resolution
+contract is implicated.
+
+The D.110a tests-only scope therefore stops as required and a narrow
+D.110a-p product prerequisite owns the defect. Its only production owner is
+the private `readCreatorReplayRows` function in
+`packages/node/src/v3-live.ts`. GREEN must read the fixed readiness snapshot in
+pages of at most 128, advance from the exact prior terminal sequence, reject
+empty/non-progress/overrun/early-terminal pages, validate global journal
+sequence and every existing authentication/issuance/digest/byte/graph
+predicate, and require terminal `nextSequence === null` exactly at the frozen
+row count. It does not change the public page limit, epoch limit, API, export,
+dependency, wire format, digest, creator-close/adoption authority, workload,
+or memory contract.
+
+D.110a-p RED adds one genuine 129-row creator-close regression and a
+deterministic source audit proving the current 128-row public bound plus the
+oversized `limit: readiness.rowCount` request. It must fail only at the
+demonstrated durable-replay seal. No D.110a preflight, memory worker, browser
+test, or retained campaign runs in its RED. GREEN runs that focus, retained
+creator close/adoption/activation and D.109d/D.109f reclamation suites, node
+build/source typecheck, and exact static/evidence gates.
+
+Because D.110a-p changes production behavior, its signed/pushed plan receives
+one Grok 4.6/high, standard direct Kimi CLI K3/high/100-step, and Opus xhigh
+review before RED. Its signed RED receives deterministic causal validation;
+its signed GREEN receives the one formal three-model plan-to-RED-to-GREEN
+review. If Grok cancels, resume the exact session. Do not use Codex Sol for
+Kimi, Fable, or collaboration subagents. After D.110a-p closes, resume D.110a
+at one corrected two-object preflight while preserving both failed attempts as
+diagnostic evidence. The single consuming full worker remains unspent.
