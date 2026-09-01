@@ -31,7 +31,132 @@ export const D109F_POLICY_DIGEST = "53775c5c1ee01e346f588966d6e7acb876df2bd8b2ab
 export const D109F_OBJECT_ID = `creator:${"f".repeat(32)}` as StorageObjectId;
 export const D109F_SCOPE = Object.freeze({ author: "e".repeat(64), objectId: D109F_OBJECT_ID });
 export const D109F_STEP_COUNT = 128;
-export const D109F_SELECTED_EPOCH_ROW_COUNTS = Object.freeze([65, 65] as const);
+export const D109F_PROOF_KIND_REGISTRY = Object.freeze([
+	Object.freeze({ name: "ahe.blobs", proofKind: "durable-count" }),
+	Object.freeze({ name: "ahe.generations", proofKind: "durable-count" }),
+	Object.freeze({ name: "ahe.heads", proofKind: "durable-count" }),
+	Object.freeze({ name: "ahe.promotions", proofKind: "durable-count" }),
+	Object.freeze({ name: "ahe.references", proofKind: "durable-count" }),
+	Object.freeze({ name: "browser.facade-keys", proofKind: "stable-key-set" }),
+	Object.freeze({
+		name: "creator-close.commitment",
+		ownerKey: "creatorCloseDerivedCommitment",
+		proofKind: "owner-observed-lifecycle",
+	}),
+	Object.freeze({
+		name: "creator-close.durable-replay",
+		ownerKey: "creatorCloseDurableReplay",
+		proofKind: "owner-observed-lifecycle",
+	}),
+	Object.freeze({
+		name: "creator-close.graph",
+		ownerKey: "creatorCloseGraph",
+		proofKind: "owner-observed-lifecycle",
+	}),
+	Object.freeze({
+		name: "creator-close.persisted-snapshot",
+		ownerKey: "creatorClosePersistedSnapshot",
+		proofKind: "owner-observed-lifecycle",
+	}),
+	Object.freeze({
+		name: "creator-close.staged-snapshot",
+		ownerKey: "creatorCloseStagedSnapshot",
+		proofKind: "owner-observed-lifecycle",
+	}),
+	Object.freeze({ name: "issuance.issued-records", proofKind: "durable-count" }),
+	Object.freeze({ name: "issuance.lineage", proofKind: "durable-count" }),
+	Object.freeze({ name: "issuance.outbox", proofKind: "durable-count" }),
+	Object.freeze({ name: "issuance.watermark", proofKind: "durable-count" }),
+	Object.freeze({ name: "legacy.finality", proofKind: "retained-unchanged" }),
+	Object.freeze({ name: "legacy.object", proofKind: "retained-unchanged" }),
+	Object.freeze({ name: "live-journal.rows", proofKind: "durable-count" }),
+	Object.freeze({ name: "package.export-maps", proofKind: "stable-key-set" }),
+	Object.freeze({ name: "package.factory-maps", proofKind: "stable-key-set" }),
+	Object.freeze({ name: "package.module-maps", proofKind: "stable-key-set" }),
+	Object.freeze({ name: "runtime.anchor", proofKind: "owner-observed-lifecycle" }),
+	Object.freeze({
+		name: "runtime.application-authors",
+		ownerKey: "applicationAuthors",
+		proofKind: "owner-observed-lifecycle",
+	}),
+	Object.freeze({
+		name: "runtime.application-charges",
+		ownerKey: "applicationCharges",
+		proofKind: "owner-observed-lifecycle",
+	}),
+	Object.freeze({
+		name: "runtime.application-vertices",
+		ownerKey: "applicationVertices",
+		proofKind: "owner-observed-lifecycle",
+	}),
+	Object.freeze({
+		name: "runtime.blueprint-state",
+		ownerKey: "blueprintState",
+		proofKind: "owner-observed-lifecycle",
+	}),
+	Object.freeze({
+		name: "runtime.causality-index",
+		ownerKey: "causalityIndex",
+		proofKind: "owner-observed-lifecycle",
+	}),
+	Object.freeze({
+		name: "runtime.displaced-rebase-cursor",
+		ownerKey: "displacedRebaseCursor",
+		proofKind: "owner-observed-lifecycle",
+	}),
+	Object.freeze({
+		name: "runtime.displaced-source",
+		ownerKey: "displacedSource",
+		proofKind: "owner-observed-lifecycle",
+	}),
+	Object.freeze({
+		name: "runtime.epoch-bytes",
+		ownerKey: "epochBytes",
+		proofKind: "owner-observed-lifecycle",
+	}),
+	Object.freeze({
+		name: "runtime.graph-version",
+		ownerKey: "graphVersion",
+		proofKind: "owner-observed-lifecycle",
+	}),
+	Object.freeze({
+		name: "runtime.hot-predecessor",
+		ownerKey: "hotPredecessor",
+		proofKind: "owner-observed-lifecycle",
+	}),
+	Object.freeze({
+		name: "runtime.latched-operations",
+		ownerKey: "latchedOperations",
+		proofKind: "owner-observed-lifecycle",
+	}),
+	Object.freeze({
+		name: "runtime.pending-ingress",
+		ownerKey: "pendingIngress",
+		proofKind: "owner-observed-lifecycle",
+	}),
+	Object.freeze({
+		name: "runtime.pending-ingress-bytes",
+		ownerKey: "pendingIngressBytes",
+		proofKind: "owner-observed-lifecycle",
+	}),
+	Object.freeze({
+		name: "runtime.publication",
+		ownerKey: "publication",
+		proofKind: "owner-observed-lifecycle",
+	}),
+	Object.freeze({
+		name: "runtime.quarantine",
+		ownerKey: "quarantine",
+		proofKind: "owner-observed-lifecycle",
+	}),
+	Object.freeze({ name: "runtime.rebase", ownerKey: "rebase", proofKind: "owner-observed-lifecycle" }),
+	Object.freeze({
+		name: "runtime.retained-payload-metadata",
+		ownerKey: "retainedPayloadMetadata",
+		proofKind: "owner-observed-lifecycle",
+	}),
+	Object.freeze({ name: "snapshot-quarantine.chunks", proofKind: "durable-count" }),
+] as const);
 
 export type D109fPlannerResult =
 	| Readonly<{ readonly ok: false; readonly reason: string }>
@@ -67,9 +192,6 @@ export interface D109fDifferentialStep {
 export interface D109fDifferentialResult {
 	readonly archivalGenerationCount: number;
 	readonly compactedGenerationCount: number;
-	readonly discordProjection: Readonly<Record<string, unknown>>;
-	readonly mmorpgProjection: Readonly<Record<string, unknown>>;
-	readonly selectedEpochRowCounts: readonly [number, number];
 	readonly steps: readonly D109fDifferentialStep[];
 }
 
@@ -252,19 +374,6 @@ export async function runD109fPlannerDifferential(): Promise<D109fDifferentialRe
 	return Object.freeze({
 		archivalGenerationCount: archival.length,
 		compactedGenerationCount: compacted.length,
-		discordProjection: Object.freeze({
-			activeGenerationId: active.activeGenerationId,
-			channelCount: 65,
-			messageCount: 65,
-			retainedGenerationCount: compacted.length,
-		}),
-		mmorpgProjection: Object.freeze({
-			activeGenerationId: active.activeGenerationId,
-			inventoryEntries: 65,
-			retainedGenerationCount: compacted.length,
-			worldEvents: 65,
-		}),
-		selectedEpochRowCounts: D109F_SELECTED_EPOCH_ROW_COUNTS,
 		steps: Object.freeze(steps),
 	});
 }

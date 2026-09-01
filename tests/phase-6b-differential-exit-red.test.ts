@@ -4,12 +4,14 @@ import { describe, expect, it } from "vitest";
 
 import {
 	D109F_GREEN_PATHS,
+	D109F_PROOF_KIND_REGISTRY,
 	D109F_RED_PATHS,
 	D109F_SCOPE,
 	D109F_STEP_COUNT,
 	d109fDeepFrozen,
 	runD109fPlannerDifferential,
 } from "./fixtures/phase-6b/differential-exit-contract.js";
+import { D109D_CENSUS_KEYS } from "./fixtures/phase-6b/runtime-reclamation-contract.js";
 import { createDurableIssuanceRecordPrunedError } from "../packages/issuance-store/src/maintenance.js";
 
 const REPOSITORY_ROOT = resolve(import.meta.dirname, "..");
@@ -37,9 +39,62 @@ describe("D.109f differential and Phase-6b exit RED", () => {
 		expect(result.compactedGenerationCount).toBe(3);
 		expect(result.steps.every(({ compactedDeleteCount }) => compactedDeleteCount === 1)).toBe(true);
 		expect(result.steps.at(-1)?.archivalDeleteCount).toBe(128);
-		expect(result.selectedEpochRowCounts).toEqual([65, 65]);
-		expect(result.discordProjection).toMatchObject({ channelCount: 65, messageCount: 65 });
-		expect(result.mmorpgProjection).toMatchObject({ inventoryEntries: 65, worldEvents: 65 });
+		expect(result.steps.at(-1)?.activeGenerationId).toBe("83".padStart(64, "0"));
+	});
+
+	it("freezes one sorted duplicate-free proof-kind registry", () => {
+		const names = D109F_PROOF_KIND_REGISTRY.map(({ name }) => name);
+		const lifecycleOwnerKeys = D109F_PROOF_KIND_REGISTRY.flatMap((entry) =>
+			"ownerKey" in entry ? [entry.ownerKey] : []
+		);
+		expect(names).toEqual([...names].sort());
+		expect(new Set(names).size).toBe(names.length);
+		expect(lifecycleOwnerKeys.sort()).toEqual([...D109D_CENSUS_KEYS].sort());
+		expect(new Set(D109F_PROOF_KIND_REGISTRY.map(({ proofKind }) => proofKind))).toEqual(
+			new Set(["durable-count", "owner-observed-lifecycle", "retained-unchanged", "stable-key-set"])
+		);
+		expect(names).toEqual([
+			"ahe.blobs",
+			"ahe.generations",
+			"ahe.heads",
+			"ahe.promotions",
+			"ahe.references",
+			"browser.facade-keys",
+			"creator-close.commitment",
+			"creator-close.durable-replay",
+			"creator-close.graph",
+			"creator-close.persisted-snapshot",
+			"creator-close.staged-snapshot",
+			"issuance.issued-records",
+			"issuance.lineage",
+			"issuance.outbox",
+			"issuance.watermark",
+			"legacy.finality",
+			"legacy.object",
+			"live-journal.rows",
+			"package.export-maps",
+			"package.factory-maps",
+			"package.module-maps",
+			"runtime.anchor",
+			"runtime.application-authors",
+			"runtime.application-charges",
+			"runtime.application-vertices",
+			"runtime.blueprint-state",
+			"runtime.causality-index",
+			"runtime.displaced-rebase-cursor",
+			"runtime.displaced-source",
+			"runtime.epoch-bytes",
+			"runtime.graph-version",
+			"runtime.hot-predecessor",
+			"runtime.latched-operations",
+			"runtime.pending-ingress",
+			"runtime.pending-ingress-bytes",
+			"runtime.publication",
+			"runtime.quarantine",
+			"runtime.rebase",
+			"runtime.retained-payload-metadata",
+			"snapshot-quarantine.chunks",
+		]);
 	});
 
 	it("deeply freezes the detached pruned-record error scope", () => {
@@ -57,5 +112,12 @@ describe("D.109f differential and Phase-6b exit RED", () => {
 		expect(ahe).toContain("captureAheReclamationInput");
 		expect(issuance).toContain("createDurableIssuanceRecordPrunedError");
 		expect(node).toContain("inspectPruningState");
+		const builtFactory = readFileSync(resolve(REPOSITORY_ROOT, "tests/fixtures/phase-3a1b-p3/live-fixture.ts"), "utf8");
+		const builtMaintenance = readFileSync(
+			resolve(REPOSITORY_ROOT, "tests/fixtures/phase-6b/runtime-reclamation-contract.ts"),
+			"utf8"
+		);
+		expect(builtFactory).toContain('packages/storage-node/dist/src/index.js"');
+		expect(builtMaintenance).toContain('packages/storage-node/dist/src/maintenance.js"');
 	});
 });

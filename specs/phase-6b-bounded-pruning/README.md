@@ -18,11 +18,15 @@ signed/pushed correction `fd99b1ac567c6a559593916492cb9c2036109066`;
 its one Grok/Kimi/Opus confirmation unanimously approved with an empty P0/P1
 union. D.109e's documentation closure is signed/pushed at
 `bb7d4601ac951df28b066e22dba1c096abe287c0`. D.109f differential/census exit
-is the active slice. Initial signed/pushed plan `926bf4c6` received material
-Grok/Kimi/Opus findings. The single correction batch is now frozen around a
-128-step durable-history differential plus the one genuine creator lifecycle
-transition the product supports, three causal defects, and three exact GREEN
-owners. Do not reopen D.109a-D.109e or run a campaign.
+is the active slice. Its corrected plan, causal RED, and first GREEN are
+signed/pushed at `9935d710`, `26193e9b`, and `a24d3b20`. The initial final
+review found three tests/evidence blockers: incomplete census/raw-read proof,
+tautological projections, and a fresh process without the genuine close/adopt
+lifecycle. Their tests-only correction now passes focused 11/11, affected
+retained 73/73, D.109f browser 3/3, retained Phase-6a browser 24/24, five
+build/typecheck groups, and exact static/protected-state gates. Sign/push the
+correction, then run one Grok/Kimi/Opus confirmation. Do not reopen D.109a-
+D.109e or run a campaign.
 
 Global TODO:
 
@@ -36,9 +40,9 @@ Global TODO:
       second-process SQLite concurrency, and browser facade-census checks.
 
 Before ending a pass, update this handoff with the exact signed/pushed anchor,
-current gate, and next executable command. D.109f's plan must be signed/pushed,
-then reviewed once by Grok 4.6/high, standard Kimi CLI K3/high/100-step, and
-Opus xhigh before its deterministic tests-only RED.
+current gate, and next executable command. The next command is to sign and push
+the D.109f tests-only final-review correction, then run its single Grok
+4.6/high, standard Kimi CLI K3/high/100-step, and Opus xhigh confirmation.
 
 The user has prohibited further Fable and collaboration subagents after the
 one expressly authorized Phase-6b Fable review. Phase-6b formal reviews use
@@ -333,4 +337,8 @@ P1 none, and `D109E_GREEN_CLOSABLE: yes` for signed/pushed correction
 `fd99b1ac567c6a559593916492cb9c2036109066`. Its validating self-excluding
 manifest SHA-256 is
 `a78c72b15a660197ace16542af5b8b3491f3cb8a08a4a1ce2555c02f12ca6378`.
-D.109e is closed without a campaign. D.109f is next.
+D.109e is closed without a campaign. D.109f has completed corrected plan,
+causal RED, and first GREEN. Its initial final review exposed three tests-only
+proof defects; the bounded correction and all affected gates are green. The
+next action is the signed/pushed correction followed by its one formal
+Grok/Kimi/Opus confirmation.

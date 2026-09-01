@@ -311,6 +311,50 @@ Exact-owner lint/format, child syntax, source-shape, diff, protected-path,
 is under `.logs/phase-6b-d109f-green/`. No campaign ran. The signed/pushed GREEN
 checkpoint receives the sole formal Grok/Kimi/Opus plan-to-RED-to-GREEN review.
 
+## Initial final review and tests-only correction
+
+The initial final review inspected corrected plan
+`9935d7102daedc240218979dd659c2cd223fde9f`, causal RED
+`26193e9b065b63d9931342008c283148c1c42a03`, and first GREEN
+`a24d3b204ad33617259e18fb1613a214fd3ad749`. Standard Kimi CLI
+K3/high/100 session `session_c7733691-f617-469c-9674-a30371f57197`
+approved with an empty union. Opus xhigh session
+`a5785b9f-9fb4-4ad8-8900-ed7769584cc2` required changes. Grok 4.6/high
+session `01a05c1f-aa67-7841-8f93-d9de8e4669c6` was resumed after its
+initial service cancellation and returned `CHANGES_REQUIRED`. Its exact
+blocking union was missing census/raw-dependency 128-step proof, tautological
+golden-path projections, and a fresh process that omitted the genuine
+close/adopt lifecycle. Phase 6b therefore did not close at the first GREEN.
+
+The single tests-only correction removes planner-owned projection constants,
+adds one sorted proof-kind registry tied exactly to the D.109d lifecycle
+census, asserts each genuine AHE receipt and native AHE/issuance durable
+census, and observes point-read identities before backend lookup so missing
+deleted data cannot bypass `D109F_RAW_DEPENDENCY_READ`. Both hot and cold
+controls now derive their semantic projections from the actual post-reclaim
+accepted vertex, canonical preimage, owner sink, issued digest, and durable
+live-journal digest set. A fresh Node/Vitest subprocess selects exactly that
+genuine close → adopt → reclaim → next-live test with no inherited fixture
+object or weak handle. Factory and maintenance identities are pinned to the
+same storage-node `dist` tree; no source/dist production mix exists.
+
+The corrected focused selection passes 11/11 in exactly two files. The eight-
+file affected retained selection passes 73/73. D.109f browser passes 3/3 and
+retained Phase-6a browser passes 24/24 across Chromium, Firefox, and WebKit,
+all without skip, unexpected, flaky, or top-level error. Five affected package
+builds and source-only build-config typechecks pass, as do exact changed-file
+lint/format/diff and protected-state gates. The first corrected focused command
+omitted `--coverage.enabled=false`; its 11 tests passed but the command exited
+on the unrelated global coverage threshold. The corrected launcher result is
+authoritative and the invalid diagnostic is recorded. Evidence is under
+`.logs/phase-6b-d109f-green-correction/`. No production source changed and no
+campaign ran.
+
+After this correction is signed and pushed, exactly one Grok/Kimi/Opus
+confirmation reviews the complete history. Only an empty P0/P1 union closes
+D.109f and Phase 6b; no additional RED, campaign, Fable, collaboration
+subagent, or Codex-Sol substitution is authorized.
+
 ## Phase-6b completion condition
 
 Phase 6b closes only when all three defects reject/behave as frozen; the

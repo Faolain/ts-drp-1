@@ -89215,3 +89215,47 @@ format, child syntax, source-shape, diff, protected-path, 26-stash, process/
 port, and self-excluding manifest checks pass. GREEN evidence is under
 `.logs/phase-6b-d109f-green/`. No campaign ran. The signed/pushed GREEN receives
 the sole formal Grok/Kimi/Opus plan-to-RED-to-GREEN review.
+
+That initial final review did not authorize Phase-6b closure. Standard Kimi
+CLI K3/high/100 session `session_c7733691-f617-469c-9674-a30371f57197`
+approved with an empty P0/P1 union. Opus xhigh session
+`a5785b9f-9fb4-4ad8-8900-ed7769584cc2` returned `CHANGES_REQUIRED`. Grok
+4.6/high session `01a05c1f-aa67-7841-8f93-d9de8e4669c6` initially suffered a
+service cancellation, then the exact session was resumed and returned
+`CHANGES_REQUIRED`, `PHASE6B_READY: no`. Its terminal blocking union was
+missing census/raw-dependency 128-step proof, tautological golden-path
+projections, and a fresh process that omitted close/adopt lifecycle. The
+accepted union is tests/evidence debt, not a newly demonstrated product defect.
+
+The bounded correction changes only six tests/fixtures. It replaces the
+planner's hard-coded projections with a sorted proof-kind registry tied to all
+22 D.109d lifecycle owners, exact AHE receipts, and native AHE/issuance census.
+Tests-only point-read hooks now classify requested identities before backend
+lookup, so an already-deleted blob or issuance record cannot evade
+`D109F_RAW_DEPENDENCY_READ` by returning missing. The genuine hot and cold
+lifecycle controls derive Discord-shaped and MMORPG-shaped observations from
+the accepted post-reclaim vertex, exact canonical preimage, owner sink,
+issuance digest, and durable live-journal rows. A fresh Node/Vitest process
+selects exactly that close → adopt → reclaim → next-live lifecycle test without
+an inherited fixture object or weak handle. Both exact storage-node imports use
+the same freshly built `dist` tree; the review's source/dist-mixing concern is
+not present.
+
+Post-correction focused tests pass 11/11 in two files; the affected retained
+selection passes 73/73 in eight files. D.109f browser passes 3/3 and retained
+Phase-6a browser passes 24/24 across Chromium, Firefox, and WebKit with zero
+skip, unexpected, flaky, or top-level error. Builds and source-only build-
+config typechecks pass for storage, issuance-store, storage-node, storage-
+browser, and node. Exact changed-file lint/format/diff and protected-state
+checks pass. The first corrected focused invocation omitted coverage disable:
+all 11 tests passed, but the launcher exited on the unrelated global coverage
+threshold. The corrected no-coverage result is authoritative; the diagnostic
+is not treated as a code failure. Evidence is rooted at
+`.logs/phase-6b-d109f-green-correction/`. No production file or campaign
+changed.
+
+Sign and push this tests-only correction, then run exactly one Grok 4.6/high,
+standard Kimi CLI K3/high/100, and Opus xhigh confirmation over the complete
+plan → RED → GREEN → correction history. Only an empty P0/P1 union closes
+D.109f and Phase 6b. Do not substitute Codex Sol for Kimi, invoke Fable or a
+collaboration subagent, or run a retained campaign.

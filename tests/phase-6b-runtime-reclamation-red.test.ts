@@ -1,5 +1,6 @@
 import "fake-indexeddb/auto";
 
+import { decodeCanonical } from "@ts-drp/canonical";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -8,6 +9,7 @@ import {
 	d108d1aRetainedMessage,
 	signD108d1aVertexDigest,
 } from "./fixtures/phase-6a-v3/creator-successor-handle-identity-contract.js";
+import { D109F_PROOF_KIND_REGISTRY } from "./fixtures/phase-6b/differential-exit-contract.js";
 import {
 	createD109dReceipts,
 	D109D_CENSUS_KEYS,
@@ -202,6 +204,13 @@ function successorIssue(logicalTime: number): Readonly<Record<string, unknown>> 
 		operations: Object.freeze([
 			Object.freeze({ logicalTime, operation: Object.freeze({ action: "add", value: logicalTime }) }),
 		]),
+		signRegisteredVertexDigest: signD108d1aVertexDigest,
+	});
+}
+
+function goldenIssue(logicalTime: number, value: number): Readonly<Record<string, unknown>> {
+	return Object.freeze({
+		operations: Object.freeze([Object.freeze({ logicalTime, operation: Object.freeze({ action: "add", value }) })]),
 		signRegisteredVertexDigest: signD108d1aVertexDigest,
 	});
 }
@@ -422,6 +431,111 @@ describe("D.109d receipt-gated installed-v3 runtime reclamation RED", () => {
 			await fixture.close();
 		}
 	});
+
+	it.skipIf(!readiness.ready)(
+		"D.109f preserves owner-observed Discord and MMORPG projections with zero deleted durable reads",
+		async () => {
+			const lifecycleOwnerKeys = D109F_PROOF_KIND_REGISTRY.flatMap((entry): string[] =>
+				"ownerKey" in entry ? [entry.ownerKey] : []
+			).sort();
+			for (const control of [
+				{ label: "discord", logicalTime: 41, open: openD109dHotFixture, value: 7 },
+				{ label: "mmorpg", logicalTime: 43, open: openD109dColdFixture, value: 11 },
+			] as const) {
+				const fixture = await control.open();
+				try {
+					const receipts = await createD109dReceipts(fixture);
+					const admittedBefore = fixture.readAdmittedVertices().length;
+					const deletedGenerationIds = new Set<string>(receipts.aheReceipt.deletedGenerationIds);
+					const deletedBlobDigests = new Set<string>(receipts.aheReceipt.deletedBlobDigests);
+					const deletedThrough = receipts.issuanceReceipt.prunedThroughAuthorSequence;
+					const observations: Readonly<{ readonly identity: number | string; readonly owner: string }>[] = [];
+					fixture.base.controls.durableReadHook = (observation): void => {
+						const deletedAhe =
+							(observation.owner === "ahe-generation" && deletedGenerationIds.has(String(observation.identity))) ||
+							(observation.owner === "ahe-blob" && deletedBlobDigests.has(String(observation.identity)));
+						const deletedIssuance =
+							(observation.owner === "issuance-record" || observation.owner === "issuance-outbox") &&
+							typeof observation.identity === "number" &&
+							observation.identity <= deletedThrough;
+						if (deletedAhe || deletedIssuance) {
+							throw new TypeError(`D109F_RAW_DEPENDENCY_READ:${observation.owner}:${String(observation.identity)}`);
+						}
+						observations.push(observation);
+					};
+
+					const reclaimed = await reclaim(fixture, receipts);
+					expect(reclaimed).toMatchObject({ ok: true, replay: false });
+					expect(Object.keys(record(reclaimed.before)).sort()).toEqual(lifecycleOwnerKeys);
+					expect(Object.keys(record(reclaimed.after)).sort()).toEqual(lifecycleOwnerKeys);
+					const scope = Object.freeze({
+						anchorDigest: fixture.oracle.anchorDigest,
+						epoch: 1,
+						objectId: fixture.oracle.objectId,
+					});
+					const beforeReadiness = await fixture.base.journal.readiness({ scope });
+					if (!beforeReadiness.ok || !beforeReadiness.ready) {
+						throw new TypeError(`D109F_${control.label.toUpperCase()}_JOURNAL_NOT_READY`);
+					}
+					const beforePage = await fixture.base.journal.readPage({
+						afterSequence: null,
+						limit: 64,
+						scope,
+						snapshot: beforeReadiness.snapshot,
+					});
+					if (!beforePage.ok) throw new TypeError(`D109F_${control.label.toUpperCase()}_JOURNAL_READ_FAILED`);
+					const issued = await fixture.successor.issueLocal(goldenIssue(control.logicalTime, control.value));
+					expect(issued).toMatchObject({ kind: "accepted", ok: true });
+					expect(await fixture.successor.publishPending()).toMatchObject({ ok: true });
+
+					const journalReadiness = await fixture.base.journal.readiness({ scope });
+					if (!journalReadiness.ok || !journalReadiness.ready) {
+						throw new TypeError(`D109F_${control.label.toUpperCase()}_JOURNAL_NOT_READY`);
+					}
+					const page = await fixture.base.journal.readPage({
+						afterSequence: null,
+						limit: 64,
+						scope,
+						snapshot: journalReadiness.snapshot,
+					});
+					if (!page.ok) throw new TypeError(`D109F_${control.label.toUpperCase()}_JOURNAL_READ_FAILED`);
+					const acceptedDigests = Object.freeze(page.rows.map(({ vertexDigest }) => vertexDigest));
+					expect(acceptedDigests).toContain(String(issued.digest));
+					expect(acceptedDigests).toHaveLength(beforePage.rows.length + 1);
+					const admitted = fixture.readAdmittedVertices();
+					expect(admitted).toHaveLength(admittedBefore + 1);
+					const delivery = record(admitted.at(-1));
+					const vertex = record(delivery.vertex);
+					const exactPreimage = decodeCanonical(delivery.exactReceivedCanonicalPreimageBytes as Uint8Array);
+					expect(record(exactPreimage).operation).toEqual(vertex.operation);
+					expect(Array.from(vertex.digest as Uint8Array, (byte) => byte.toString(16).padStart(2, "0")).join("")).toBe(
+						String(issued.digest)
+					);
+					expect(vertex.operation).toEqual({ action: "add", value: control.value });
+					const projection =
+						control.label === "discord"
+							? Object.freeze({
+									channelOperation: vertex.operation,
+									messageDigests: acceptedDigests,
+								})
+							: Object.freeze({
+									inventoryOperation: vertex.operation,
+									worldEventDigests: acceptedDigests,
+								});
+					expect(Object.values(projection)).toContain(vertex.operation);
+					expect(Object.values(projection)).toContain(acceptedDigests);
+					expect(await fixture.base.handle.inspectDurableHead()).toMatchObject({ head: fixture.committedHead });
+					expect(observations.some(({ owner }) => owner === "ahe-generation")).toBe(true);
+					expect(observations.some(({ owner }) => owner === "ahe-blob")).toBe(true);
+					expect(observations.some(({ owner }) => owner === "issuance-outbox")).toBe(true);
+					expect(observations.some(({ owner }) => owner === "live-journal-row")).toBe(true);
+				} finally {
+					fixture.base.controls.durableReadHook = undefined;
+					await fixture.close();
+				}
+			}
+		}
+	);
 
 	it.skipIf(!readiness.ready)("releases every predecessor owner while preserving the live successor", async () => {
 		const fixture = await openD109dHotFixture();

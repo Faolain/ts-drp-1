@@ -254,6 +254,7 @@ export interface GenuineCreatorAdoptionFixture {
 		readonly aheOperationCounts: Map<CreatorAdoptionAheMutationOperation, number>;
 		readonly blobOverrides: Map<string, Uint8Array>;
 		cutField?: (typeof CUT_VALUE_FIELDS)[number];
+		durableReadHook?(observation: CreatorAdoptionDurableReadObservation): void;
 		generationMutation?: "cycle" | "duplicate" | "missing" | "skipped";
 		issuanceMissing: boolean;
 		journalMutation?: "reverse";
@@ -283,6 +284,19 @@ export interface CreatorAdoptionAheMutationObservation {
 	readonly edge: "after-request" | "before-request";
 	readonly occurrence: number;
 	readonly operation: CreatorAdoptionAheMutationOperation;
+}
+
+export interface CreatorAdoptionDurableReadObservation {
+	readonly identity: number | string;
+	readonly owner:
+		| "ahe-blob"
+		| "ahe-generation"
+		| "ahe-head"
+		| "issuance-lineage"
+		| "issuance-outbox"
+		| "issuance-record"
+		| "live-journal-row"
+		| "snapshot-chunk";
 }
 
 export interface DetachedHeadEvidence {
@@ -379,6 +393,9 @@ function decoratedAheStore(
 	backend: AheDurableStore,
 	controls: GenuineCreatorAdoptionFixture["controls"]
 ): AheDurableStore {
+	const observe = (owner: CreatorAdoptionDurableReadObservation["owner"], identity: number | string): void =>
+		controls.durableReadHook?.(Object.freeze({ identity, owner }));
+
 	function mutate<T>(operation: CreatorAdoptionAheMutationOperation, request: () => Promise<T>): Promise<T> {
 		const occurrence = controls.aheOperationCounts.get(operation) ?? 0;
 		controls.aheOperationCounts.set(operation, occurrence + 1);
@@ -396,6 +413,7 @@ function decoratedAheStore(
 		completeGeneration: (input) => mutate("completeGeneration", () => backend.completeGeneration(input)),
 		discardGeneration: (input) => mutate("discardGeneration", () => backend.discardGeneration(input)),
 		getBlob: async (digest) => {
+			observe("ahe-blob", digest);
 			const result = await backend.getBlob(digest);
 			if (!result.ok || result.value === null) return result;
 			const override = controls.blobOverrides.get(digest);
@@ -406,6 +424,12 @@ function decoratedAheStore(
 		putCachedBlob: (input) => mutate("putCachedBlob", () => backend.putCachedBlob(input)),
 		readGenerationPage: async (input) => {
 			const result = await backend.readGenerationPage(input);
+			if (result.ok) {
+				for (const generation of result.value.generations) {
+					observe("ahe-generation", generation.generationId);
+					for (const reference of generation.closure) observe("ahe-blob", reference.digest);
+				}
+			}
 			if (!result.ok || controls.generationMutation === undefined || result.value.generations.length < 2) return result;
 			const generations = [...result.value.generations];
 			const last = generations.findLast(({ state }) => state === "Adopted") ?? generations.at(-1);
@@ -428,9 +452,17 @@ function decoratedAheStore(
 			}
 			return Object.freeze({ ok: true as const, value: Object.freeze({ ...result.value, generations }) });
 		},
-		readHead: (objectId) => backend.readHead(objectId),
+		readHead: async (objectId) => {
+			const result = await backend.readHead(objectId);
+			if (result.ok && result.value.kind === "present") observe("ahe-head", result.value.generationId);
+			return result;
+		},
 		recoverActiveGeneration: async (objectId) => {
 			const result = await backend.recoverActiveGeneration(objectId);
+			if (result.ok && result.value.kind === "active") {
+				observe("ahe-generation", result.value.adoptedGeneration.generationId);
+				for (const reference of result.value.references) observe("ahe-blob", reference.digest);
+			}
 			if (!result.ok || result.value.kind !== "active" || controls.activeRefMutation === undefined) return result;
 			const references = result.value.references.map((ref, index) =>
 				index !== 0
@@ -476,6 +508,7 @@ function decoratedSnapshotStore(
 						return Object.freeze({
 							discard: () => port.discard(),
 							read: async (descriptor) => {
+								controls.durableReadHook?.(Object.freeze({ identity: descriptor.digest, owner: "snapshot-chunk" }));
 								const bytes = await port.read(descriptor);
 								const override = controls.snapshotChunkOverride?.[descriptor.index];
 								if (override !== undefined) return Uint8Array.from(override);
@@ -551,10 +584,23 @@ async function recoverWithDurableStores(
 	const issuanceStore: DurableIssuanceStore = Object.freeze({
 		close: () => rawIssuanceStore.close(),
 		compareAndMarkOutboxPublished: (input) => rawIssuanceStore.compareAndMarkOutboxPublished(input),
-		readIssued: (scope, sequence) =>
-			controls.issuanceMissing ? Promise.resolve(null) : rawIssuanceStore.readIssued(scope, sequence),
-		readLineage: (scope) => rawIssuanceStore.readLineage(scope),
-		readOutboxPage: (input) => rawIssuanceStore.readOutboxPage(input),
+		readIssued: async (scope, sequence) => {
+			controls.durableReadHook?.(Object.freeze({ identity: sequence, owner: "issuance-record" }));
+			const result = controls.issuanceMissing ? null : await rawIssuanceStore.readIssued(scope, sequence);
+			return result;
+		},
+		readLineage: async (scope) => {
+			const result = await rawIssuanceStore.readLineage(scope);
+			controls.durableReadHook?.(Object.freeze({ identity: result.next, owner: "issuance-lineage" }));
+			return result;
+		},
+		readOutboxPage: async (input) => {
+			const result = await rawIssuanceStore.readOutboxPage(input);
+			for (const row of result) {
+				controls.durableReadHook?.(Object.freeze({ identity: row.commit.authorSequence, owner: "issuance-outbox" }));
+			}
+			return result;
+		},
 		transactIssue: (scope, buildAndSign) => rawIssuanceStore.transactIssue(scope, buildAndSign),
 	});
 	const journal: DurableLiveJournalStore = Object.freeze({
@@ -565,6 +611,11 @@ async function recoverWithDurableStores(
 		readiness: (input) => rawJournal.readiness(input),
 		readPage: async (input) => {
 			const result = await rawJournal.readPage(input);
+			if (result.ok) {
+				for (const row of result.rows) {
+					controls.durableReadHook?.(Object.freeze({ identity: row.vertexDigest, owner: "live-journal-row" }));
+				}
+			}
 			return result.ok && controls.journalMutation === "reverse"
 				? Object.freeze({ ...result, rows: Object.freeze([...result.rows].reverse()) })
 				: result;

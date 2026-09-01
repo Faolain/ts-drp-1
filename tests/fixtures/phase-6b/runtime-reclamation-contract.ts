@@ -175,6 +175,7 @@ export interface D109dHotFixture {
 		readRebaseOutbox(): Promise<Readonly<Record<string, unknown>>>;
 		readonly topic: string;
 	}>;
+	readAdmittedVertices(): readonly Readonly<Record<string, unknown>>[];
 	close(): Promise<void>;
 }
 
@@ -198,7 +199,7 @@ async function openD109dFixture(mode: "cold" | "hot"): Promise<D109dHotFixture> 
 	let successor: D109dHotFixture["successor"] | undefined;
 	try {
 		const prepared = await commitD108d1aFixture(base);
-		const runtimeBindings =
+		const selectedBindings =
 			mode === "hot"
 				? base.runtimeBindings
 				: Object.freeze({
@@ -206,6 +207,15 @@ async function openD109dFixture(mode: "cold" | "hot"): Promise<D109dHotFixture> 
 						networkNode: fakeNetwork(`d109d-cold-${crypto.randomUUID()}`),
 						onAdmittedVertex: () => undefined,
 					});
+		const admittedVertices: Readonly<Record<string, unknown>>[] = [];
+		const runtimeBindings = Object.freeze({
+			messageQueueManager: selectedBindings.messageQueueManager,
+			networkNode: selectedBindings.networkNode,
+			onAdmittedVertex: (input: Readonly<Record<string, unknown>>) => {
+				admittedVertices.push(input);
+				return selectedBindings.onAdmittedVertex(input);
+			},
+		});
 		const activationModule = (await import(
 			pathToFileURL(resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption-activate.ts")).href
 		)) as {
@@ -229,6 +239,7 @@ async function openD109dFixture(mode: "cold" | "hot"): Promise<D109dHotFixture> 
 			},
 			oracle: deriveD108d1Oracle(base),
 			predecessor: base.handle,
+			readAdmittedVertices: () => Object.freeze([...admittedVertices]),
 			successor,
 		});
 	} catch (error) {

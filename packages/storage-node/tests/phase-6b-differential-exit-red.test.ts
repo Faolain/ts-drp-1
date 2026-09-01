@@ -1,15 +1,17 @@
 import type { AheDurableStore, GenerationPageCursor, GenerationRecord, PresentHead } from "@ts-drp/storage";
 import { digestBlob } from "@ts-drp/storage";
-import { type ChildProcess, fork } from "node:child_process";
+import { type ChildProcess, fork, spawn } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
 	D109F_OBJECT_ID,
 	D109F_POLICY_DIGEST,
+	D109F_PROOF_KIND_REGISTRY,
 	D109F_SCOPE,
 	D109F_STEP_COUNT,
 	d109fErrorCode,
@@ -20,7 +22,11 @@ import {
 import { d109bIssue, d109bPruningInput } from "../../../tests/fixtures/phase-6b/issuance-retention-contract.js";
 
 const PACKAGE_DIRECTORY = resolve(import.meta.dirname, "..");
+const REPOSITORY_ROOT = resolve(PACKAGE_DIRECTORY, "../..");
 const CHILD_FIXTURE = resolve(import.meta.dirname, "fixtures/phase-6b-differential-exit-child.mjs");
+const ISSUANCE_DATABASE_SUFFIX = ".drp-issuance-v1.sqlite";
+const D109F_LIFECYCLE_TITLE =
+	"D.109f preserves owner-observed Discord and MMORPG projections with zero deleted durable reads";
 const directories: string[] = [];
 
 function temporary(label: string): string {
@@ -32,6 +38,57 @@ function temporary(label: string): string {
 function successful<T>(result: { ok: false; reason: string } | { ok: true; value: T }, label: string): T {
 	if (!result.ok) throw new TypeError(`D109F_${label}:${result.reason}`);
 	return result.value;
+}
+
+function sqliteCount(filename: string, query: string): number {
+	const database = new DatabaseSync(filename, { readOnly: true });
+	try {
+		const row = database.prepare(query).get() as { count: number };
+		return Number(row.count);
+	} finally {
+		database.close();
+	}
+}
+
+function runFreshLifecycle(): Promise<Readonly<Record<string, unknown>>> {
+	return new Promise((resolvePromise, reject) => {
+		const vitest = resolve(REPOSITORY_ROOT, "node_modules/vitest/vitest.mjs");
+		const child = spawn(
+			process.execPath,
+			[
+				vitest,
+				"run",
+				"tests/phase-6b-runtime-reclamation-red.test.ts",
+				"-t",
+				D109F_LIFECYCLE_TITLE,
+				"--reporter=json",
+				"--coverage.enabled=false",
+				"--pool=forks",
+				"--poolOptions.forks.singleFork=true",
+			],
+			{ cwd: REPOSITORY_ROOT, stdio: ["ignore", "pipe", "pipe"] }
+		);
+		let stdout = "";
+		let stderr = "";
+		child.stdout.setEncoding("utf8");
+		child.stderr.setEncoding("utf8");
+		child.stdout.on("data", (value: string) => (stdout += value));
+		child.stderr.on("data", (value: string) => (stderr += value));
+		const timeout = setTimeout(() => child.kill("SIGKILL"), 120_000);
+		child.once("error", reject);
+		child.once("exit", (code, signal) => {
+			clearTimeout(timeout);
+			if (code !== 0) {
+				reject(new Error(`D109F_FRESH_LIFECYCLE_EXIT:${String(code)}:${String(signal)}:${stderr}:${stdout}`));
+				return;
+			}
+			try {
+				resolvePromise(JSON.parse(stdout) as Readonly<Record<string, unknown>>);
+			} catch (error) {
+				reject(new Error(`D109F_FRESH_LIFECYCLE_JSON:${stderr}:${stdout}`, { cause: error }));
+			}
+		});
+	});
 }
 
 async function aheModules(): Promise<
@@ -243,8 +300,10 @@ describe("D.109f Node differential exit RED", () => {
 
 	it("executes 128 genuine compacted maintenance steps while the archival owner remains complete", async () => {
 		const modules = await aheModules();
-		const archival = modules.create({ filename: temporary("archival-ahe") });
-		const compacted = modules.create({ filename: temporary("compacted-ahe") });
+		const archivalFilename = temporary("archival-ahe");
+		const compactedFilename = temporary("compacted-ahe");
+		const archival = modules.create({ filename: archivalFilename });
+		const compacted = modules.create({ filename: compactedFilename });
 		try {
 			const owner = modules.resolve(compacted);
 			if (owner === undefined) throw new TypeError("D109F_AHE_OWNER_MISSING");
@@ -266,7 +325,14 @@ describe("D.109f Node differential exit RED", () => {
 				expect(compactedPlan.plan.lineageFloor.deleteGenerationIds).toHaveLength(1);
 				expect(compactedPlan.plan.activeGenerationId).toBe(archivalPlan.plan.activeGenerationId);
 				expect(compactedPlan.plan.rollbackGenerationIds).toEqual(archivalPlan.plan.rollbackGenerationIds);
-				receipts.push(await owner.reclaimClosedEpoch(aheInput(compactedPlan.plan)));
+				const receipt = await owner.reclaimClosedEpoch(aheInput(compactedPlan.plan));
+				expect(receipt).toMatchObject({
+					activeGenerationId: compactedPlan.plan.activeGenerationId,
+					closedEpoch: step,
+					deletedGenerationIds: compactedPlan.plan.lineageFloor.deleteGenerationIds,
+					rollbackGenerationIds: compactedPlan.plan.rollbackGenerationIds,
+				});
+				receipts.push(receipt);
 			}
 			expect(receipts).toHaveLength(D109F_STEP_COUNT);
 			expect(await allGenerations(archival)).toHaveLength(131);
@@ -274,6 +340,33 @@ describe("D.109f Node differential exit RED", () => {
 			expect(successful(await archival.readHead(D109F_OBJECT_ID), "ARCHIVE_HEAD")).toEqual(
 				successful(await compacted.readHead(D109F_OBJECT_ID), "COMPACT_HEAD")
 			);
+			const archivalCensus = {
+				blobs: sqliteCount(archivalFilename, "SELECT COUNT(*) AS count FROM blobs"),
+				generations: sqliteCount(archivalFilename, "SELECT COUNT(*) AS count FROM generations"),
+				heads: sqliteCount(archivalFilename, "SELECT COUNT(*) AS count FROM objects WHERE head_record IS NOT NULL"),
+				promotions: sqliteCount(
+					archivalFilename,
+					"SELECT COUNT(*) AS count FROM (SELECT object_id, generation_id FROM promotions GROUP BY object_id, generation_id)"
+				),
+				references: sqliteCount(archivalFilename, "SELECT COUNT(*) AS count FROM promotions"),
+			};
+			const compactedCensus = {
+				blobs: sqliteCount(compactedFilename, "SELECT COUNT(*) AS count FROM blobs"),
+				generations: sqliteCount(compactedFilename, "SELECT COUNT(*) AS count FROM generations"),
+				heads: sqliteCount(compactedFilename, "SELECT COUNT(*) AS count FROM objects WHERE head_record IS NOT NULL"),
+				promotions: sqliteCount(
+					compactedFilename,
+					"SELECT COUNT(*) AS count FROM (SELECT object_id, generation_id FROM promotions GROUP BY object_id, generation_id)"
+				),
+				references: sqliteCount(compactedFilename, "SELECT COUNT(*) AS count FROM promotions"),
+			};
+			expect(archivalCensus).toEqual({ blobs: 131, generations: 131, heads: 1, promotions: 131, references: 131 });
+			expect(compactedCensus).toEqual({ blobs: 3, generations: 3, heads: 1, promotions: 3, references: 3 });
+			expect(
+				Object.keys(archivalCensus)
+					.map((name) => `ahe.${name}`)
+					.sort()
+			).toEqual(D109F_PROOF_KIND_REGISTRY.filter(({ name }) => name.startsWith("ahe.")).map(({ name }) => name));
 		} finally {
 			await Promise.all([archival.close(), compacted.close()]);
 		}
@@ -281,7 +374,8 @@ describe("D.109f Node differential exit RED", () => {
 
 	it("crosses the 64-row issuance boundary twice and preserves a numeric watermark", async () => {
 		const modules = await issuanceModules();
-		const store = modules.create({ primaryFilename: temporary("issuance-pages") });
+		const filename = temporary("issuance-pages");
+		const store = modules.create({ primaryFilename: filename });
 		const owner = modules.resolve(store);
 		if (owner === undefined) throw new TypeError("D109F_ISSUANCE_OWNER_MISSING");
 		try {
@@ -297,6 +391,22 @@ describe("D.109f Node differential exit RED", () => {
 				lineage: { exhausted: false, next: 130 },
 				prunedThroughAuthorSequence: 129,
 			});
+			const issuanceCensus = {
+				issuedRecords: sqliteCount(
+					`${filename}${ISSUANCE_DATABASE_SUFFIX}`,
+					"SELECT COUNT(*) AS count FROM issued_records"
+				),
+				lineages: sqliteCount(`${filename}${ISSUANCE_DATABASE_SUFFIX}`, "SELECT COUNT(*) AS count FROM lineages"),
+				outbox: sqliteCount(`${filename}${ISSUANCE_DATABASE_SUFFIX}`, "SELECT COUNT(*) AS count FROM issuance_outbox"),
+				watermarks: sqliteCount(
+					`${filename}${ISSUANCE_DATABASE_SUFFIX}`,
+					"SELECT COUNT(*) AS count FROM lineages WHERE pruned_through_author_sequence = 129"
+				),
+			};
+			expect(issuanceCensus).toEqual({ issuedRecords: 0, lineages: 1, outbox: 0, watermarks: 1 });
+			expect(
+				D109F_PROOF_KIND_REGISTRY.filter(({ name }) => name.startsWith("issuance.")).map(({ name }) => name)
+			).toEqual(["issuance.issued-records", "issuance.lineage", "issuance.outbox", "issuance.watermark"]);
 		} finally {
 			await store.close();
 		}
@@ -351,5 +461,23 @@ describe("D.109f Node differential exit RED", () => {
 		}, "D109F_NODE_INSPECTION_THROWN_SYNCHRONOUSLY").not.toThrow();
 		expect(promise).toBeInstanceOf(Promise);
 		await expect(promise).rejects.toBeDefined();
+	});
+
+	it("runs the genuine close, adopt, reclaim and next-live golden paths in a fresh process", async () => {
+		const result = await runFreshLifecycle();
+		expect(result).toMatchObject({
+			numFailedTests: 0,
+			numPassedTests: 1,
+			success: true,
+		});
+		const testResults = result.testResults as readonly Readonly<Record<string, unknown>>[];
+		expect(testResults).toHaveLength(1);
+		expect(String(testResults[0]?.name)).toBe(
+			resolve(REPOSITORY_ROOT, "tests/phase-6b-runtime-reclamation-red.test.ts")
+		);
+		const assertionResults = testResults[0]?.assertionResults as readonly Readonly<Record<string, unknown>>[];
+		expect(assertionResults.filter(({ status }) => status === "passed")).toEqual([
+			expect.objectContaining({ status: "passed", title: D109F_LIFECYCLE_TITLE }),
+		]);
 	});
 });
