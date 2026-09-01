@@ -1,5 +1,11 @@
 # D.110a-w — Retained-Heap Watchdog Feasibility Correction
 
+> Historical closure note: D.110a-w's sole later preflight passed every
+> semantic predicate but exceeded this slice's 540-second release bound.
+> [D.110a-x](00f-preflight-variance-correction.md) prospectively supersedes only
+> the six-hour full watchdog and its matching release arithmetic; the values
+> below remain the immutable D.110a-w contract and result context.
+
 ## Demonstrated problem and disposition
 
 D.110a-v closed at signed/pushed commit

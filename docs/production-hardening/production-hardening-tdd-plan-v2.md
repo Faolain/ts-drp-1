@@ -91027,8 +91027,11 @@ claim. RED adds `D110A_PREFLIGHT_RELEASE_MAX_MS = 630_000`, exact token
 `D110AX_PREFLIGHT_VARIANCE_MISSING`, and an isolated source/audit predicate
 while leaving the active six-hour constant unchanged, so only the new token
 fails and no child runs. GREEN changes only `D110A_FULL_TIMEOUT_MS` to
-25,200,000 and the corresponding focused arithmetic expectation. The child
-remains unchanged and continues to consume that one parent-owned constant.
+25,200,000 and both corresponding focused arithmetic expectations: six hours
+to seven hours and derived 17,280,000 to 20,160,000. The audit uses direct
+value comparisons plus the exact release/full relation rather than a regex
+that could match its own expected literal. The child remains unchanged and
+continues to consume that one parent-owned constant.
 
 The focused RED and GREEN each run exactly once with coverage disabled. GREEN
 then runs the affected build/type/lint/format/diff/source-shape/listing gates
@@ -91041,8 +91044,50 @@ or child-launcher change is authorized.
 
 After an empty final-review blocking union, mechanically revalidate the
 immutable D.110a-w preflight hashes and exact semantic pass under the revised
-bound, plus absent fresh full root, matching signed/pushed source, unexported
-`NODE_OPTIONS`, protected paths, 26 stashes, clear fixed ports, and no relevant
-process. Those checks release the still-unspent sole 64-object worker exactly
-once. D.110b must separately select an outer runner budget greater than seven
-hours plus setup/evidence upload; D.110a-x changes no workflow.
+bound, reading that root without writes and placing all new output in fresh
+write-once `.logs/phase-6c-d110ax-release/`. Also require an absent fresh full
+root, matching signed/pushed source, unexported `NODE_OPTIONS`, protected paths,
+26 stashes, clear fixed ports, and no relevant process. Those checks release
+the still-unspent sole 64-object worker exactly once. D.110b must separately
+select an outer runner budget greater than seven hours plus setup/evidence
+upload; D.110a-x changes no workflow.
+
+The two-object evidence reaches only one and two active successors rather than
+the full worker's 20-room steady-state window, so the linear projection is not
+a steady-state proof. Fixed wrapper overhead is conservative, while possible
+superlinear steady-state behavior remains covered only by the reserve and the
+consuming full result; this does not change the arithmetic or acceptance.
+
+##### D.110a-x high-risk plan review and bounded correction
+
+The one plan review inspected signed/pushed anchor
+`3a2ffd5b73476a89166b114b5360d5f26e2e9c7c`, tree
+`f32908fffef1e196243ad49c9b966361dfcdb538`, and the immutable D.110a-w
+preflight evidence. The shared prompt SHA-256 is
+`b4e02fce551210b7dfa2762be26f96726bb5dd0a6304b6a451add3e938c7ef7f`.
+Grok 4.6/high returned `APPROVED`, P0=0, P1=0, P2=0. Standard direct Kimi
+K3/100-step returned `CHANGES_REQUIRED`, P0=0, P1=1, P2=1. Opus xhigh returned
+`CHANGES_REQUIRED`, P0=0, P1=1, P2=4. Their terminal/public SHA-256 values are
+respectively
+`2c41182cfd163f098e2e0080525e682360a230158d24f3fafc8b96af47aac4b5`,
+`8c28adfe66ba80f64ebd22c59e9042f35095c0c8e8a9e163012968f3f9c32996`,
+and `8cad9c1946a827ab208a2b16cdd22cd5931f4ede4bb89ee055b022da5e5cb50a`.
+The validating self-excluding 16-entry review manifest has SHA-256
+`851c7b1caac392a5262fd0b83f4c677eb36e2f48f89ce2dc7da2b85c31d3fc55`.
+
+Kimi and Opus independently found the same sole P1: the written GREEN named
+only the direct six-to-seven-hour assertion, but the focused test also owns the
+derived `17_280_000` expectation. The correction above explicitly authorizes
+both adjacent expectation changes, including `20_160_000`, while preserving
+the one-constant executable change and exact RED token. This closes the entire
+blocking union.
+
+The P2 union is dispositioned in the same batch. D.110a-x revalidation output
+gets its own fresh root and the consumed preflight is read-only; the audit uses
+direct values and the non-tautological release/full equality; D.110a-w gains a
+prospective supersession note without changing its historical contract; and
+the plan discloses that the two-object projection does not exercise the 20-room
+steady-state window. These corrections change no chosen timing, executable
+scope, causal acceptance, product behavior, or workload. Under the bounded
+review policy they do not warrant a confirmation round. Sign and push this
+correction, mechanically validate the plan, then proceed to deterministic RED.

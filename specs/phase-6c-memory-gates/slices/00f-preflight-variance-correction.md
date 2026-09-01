@@ -27,6 +27,12 @@ D.110a-x is a high-risk tests-only timing-contract correction. It does not
 claim linear scaling as a measured full result, and it does not weaken any
 workload, memory, semantic, sample, or evidence requirement.
 
+The two-object preflight observes only one and then two active successors; it
+does not reach the full worker's 20-room steady-state window. The projection
+therefore does not prove linear steady-state cost. Fixed wrapper overhead makes
+part of it conservative, while any superlinear steady-state behavior remains
+covered only by the preserved watchdog reserve and the consuming full result.
+
 ## Exact scope
 
 The only executable owners are:
@@ -67,9 +73,13 @@ then sign and push RED.
 ## Narrow GREEN
 
 Change only `D110A_FULL_TIMEOUT_MS` from 21,600,000 to 25,200,000 and update
-the inherited focused arithmetic expectation from six to seven hours. The
-existing child import makes that one constant the sole executable timer change.
-Do not edit the child or add a second timer owner.
+both inherited focused arithmetic expectations: six hours to seven hours and
+17,280,000 to 20,160,000 for the derived 80-percent value. The
+`preflightVariance` predicate uses direct value comparisons and also requires
+`D110A_PREFLIGHT_RELEASE_MAX_MS * 32 === D110A_FULL_TIMEOUT_MS * 0.8`; it must
+not use a source regex that can match its own expected literal. The existing
+child import makes that one constant the sole executable timer change. Do not
+edit the child or add a second timer owner.
 
 Run the focused test exactly once, then the affected package build/source
 typechecks, exact-owner ESLint and Prettier, child syntax, source-shape,
@@ -84,7 +94,9 @@ No Fable or collaboration subagent is authorized.
 ## Reserved execution after final review
 
 The completed D.110a-w preflight is immutable input, not a rerunnable gate.
-After an empty final-review P0/P1 union, revalidate its parent/audit/manifest
+After an empty final-review P0/P1 union, open the D.110a-w preflight root
+read-only and write all D.110a-x revalidation output to fresh write-once root
+`.logs/phase-6c-d110ax-release/`. Revalidate the inherited parent/audit/manifest
 hashes and require its exact semantic pass plus `585,233 <= 630,000`. Also
 require the full evidence root to remain absent, signed source and pushed ref
 to match, `NODE_OPTIONS` to be unset, protected paths and all 26 stashes to be
