@@ -42,8 +42,8 @@ describe("D.110a retained-heap hard-gate RED", () => {
 		expect(D110A_SLOPE_LIMIT_BYTES * 31).toBe(5_119_991);
 		expect(D110A_PREFLIGHT_TIMEOUT_MS).toBe(15 * 60 * 1000);
 		expect(D110A_PREFLIGHT_RELEASE_MAX_MS).toBe(10.5 * 60 * 1000);
-		expect(D110A_FULL_TIMEOUT_MS).toBe(6 * 60 * 60 * 1000);
-		expect(D110A_FULL_TIMEOUT_MS * 0.8).toBe(17_280_000);
+		expect(D110A_FULL_TIMEOUT_MS).toBe(7 * 60 * 60 * 1000);
+		expect(D110A_FULL_TIMEOUT_MS * 0.8).toBe(20_160_000);
 		expect(64 - 19).toBe(45);
 	});
 

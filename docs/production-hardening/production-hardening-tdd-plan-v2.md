@@ -91131,3 +91131,105 @@ The validating self-excluding 29-entry evidence manifest has SHA-256
 `c4abce2288e3d4af9b956661559125208a067117087ad31ff24029400e3c90f5`.
 RED is causal and authorizes only the reviewed full-timeout and two adjacent
 focused-expectation changes in GREEN.
+
+##### D.110a-x timing GREEN checkpoint before forensics amendment
+
+The timing GREEN changed only `D110A_FULL_TIMEOUT_MS` from 21,600,000 to
+25,200,000 and the two adjacent focused expectations from six to seven hours
+and 17,280,000 to 20,160,000. Its focused command ran exactly once with
+coverage disabled and passed 23/23 tests from the one selected file, with zero
+failed, pending, or todo tests and empty stderr. Preserve this result; the
+material forensics amendment below adds a separate focused owner and does not
+authorize rerunning the completed timing-focused invocation.
+
+`pnpm build:packages`, exact-two-owner ESLint/Prettier, child syntax, and
+`git diff --check` then exited zero. The direct source audit returned every
+predicate true and exact 25,200,000/630,000/20,160,000 arithmetic, but its
+capture ended with a literal `\n` because the shell command double-escaped the
+newline. The source result is valid and the malformed capture is a diagnostic
+command defect to correct later without rerunning the focused test.
+
+Three broad package-root `typecheck` commands exited nonzero because those
+scripts include known cross-package and test-source failures outside the
+D.110a-x owner set: Node reported 13 existing errors, storage-node 134, and
+storage-browser 74. The preceding complete 40-package build passed. These were
+the wrong commands for the planned build-source gates, not failures caused by
+the timeout change; preserve their raw outputs and later run the established
+`tsconfig.build.json`-scoped checks after the complete amended GREEN. No
+retained suite or full worker ran before the following user-directed pause.
+
+##### D.110a-x material failure-forensics amendment
+
+The user identified a real pre-run evidence asymmetry: success retains the
+complete terminal proof, while a timeout/crash currently leaves only in-memory
+progress, `lastProgress` without memory/phase history, non-durable child I/O,
+inferred `SIGKILL`, and potentially no durable source/runtime identity. A
+several-hour consuming failure could therefore be impossible to attribute.
+This amendment closes only that tests-only forensics gap. It preserves all
+D.110a-w evidence, the consumed 585,233-ms preflight, the seven-hour watchdog,
+the 630-second release arithmetic, workload, memory thresholds, sample window,
+terminal proof, and no-retry/sole-full rules.
+
+The prospective executable roster expands only to the existing D.110a
+contract/test, child, and worker plus new parent-only
+`retained-heap-forensics.mjs`, bounded synthetic
+`retained-heap-forensics-child.mjs`, and focused
+`phase-6c-retained-heap-forensics-red.test.ts`. There is no product source,
+API, dependency, package, lockfile, workflow, workload, threshold, adaptive
+deadline, retry, preflight, profile, or full execution in this amendment.
+
+For full mode, the parent creates fresh write-once
+`.logs/phase-6c-d110a-full/` and its consumed sentinel before worker spawn. It
+persists signed commit/tree, exact child/worker/contract hashes, Node identity,
+resolved public imports and internal URLs/hashes, command, and deadline in a
+write-once identity file before spawn. Distinct child stdout, child stderr,
+progress JSONL, and launcher-event JSONL files are exclusively created; each
+received chunk/record is synchronously appended and fsynced. The launcher
+journal and final write-once status explicitly retain start/finish wall and
+monotonic times, elapsed time, identity persistence, child PID/spawn, deadline,
+watchdog-fired boolean/event, terminal-result receipt, exit code/signal, and
+parent success/failure. On success `parent.json` contains the same complete
+parent result still printed to stdout.
+
+The worker performs no evidence I/O. It sends bounded IPC phase facts with a
+worker monotonic timestamp, object index, completed count, applied-operation
+count, active-successor count, and exact lifecycle phase. After each existing
+post-GC measurement it sends one `completed-sample` record with those counters
+and the already-created full memory reading. The parent assigns contiguous
+journal sequence numbers and durably flushes each record. Partial records are
+diagnostic only and never create or substitute for a memory verdict.
+
+On success, an independent validator requires exactly 64 completed-sample
+records, indices 0--63, exact `(index + 1) * 15,625` operations, completed count
+`index + 1`, active count `min(index + 1, 20)`, nonnegative complete memory
+readings byte-for-byte equal to terminal proof samples, contiguous record
+sequence, and valid per-object phase ordering. The unchanged
+`validateD110aProof` remains authoritative for the million-operation/62,528-
+vertex accounting, object results, semantic digest, three slope ceilings,
+absolute ceiling, and during-execution contract.
+
+The amended deterministic RED adds exact token
+`D110AX_FAILURE_FORENSICS_MISSING` and one source-shape/focused owner. It runs
+once without a real worker and must fail only that token. GREEN uses the same
+parent recorder with a tiny synthetic child to cover normal miniature
+completion, failure after several records, watchdog termination, child error,
+partial stdout/stderr, missing/duplicate/malformed/out-of-order records, and
+terminal-proof/journal mismatch. The bounded tests must prove prior evidence
+survives process death and every non-success classification remains fail
+closed.
+
+Because this materially changes launcher/evidence behavior adjacent to the
+sole consuming worker, sign and push this amendment and run exactly one
+confirmation with Grok 4.6/high, standard direct Kimi K3/100-step, and Opus
+xhigh before the new RED. Do not restart or reinterpret the completed review.
+Only P0/P1 blocks; disposition P2 once without recursive review. The existing
+final GREEN review remains and must inspect the complete timing RED/GREEN plus
+forensics RED/GREEN history. No Fable or collaboration subagent is authorized.
+
+After forensics focused GREEN, run correct build-source typechecks, exact-owner
+lint/format, child syntax, source shape, listing, retained 95-test selection,
+protected-path/stash/process/port, signed/pushed-ref, hash, and self-excluding-
+manifest gates. Only their complete pass plus signed/pushed evidence, this
+amended-plan confirmation, and the final GREEN review can release the one full
+worker. On either success or failure, the new durable evidence must support a
+defensible conclusion without rerun.

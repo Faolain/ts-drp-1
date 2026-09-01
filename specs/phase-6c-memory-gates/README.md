@@ -52,7 +52,11 @@ It prospectively raises only the tests-only full watchdog to seven hours and
 the matching 80-percent-headroom release bound to 630 seconds. It reuses the
 immutable successful preflight evidence without retry and preserves every
 workload, memory, semantic, and measurement contract. No product defect has
-been demonstrated. Do not invoke Fable or collaboration subagents.
+been demonstrated. Before the sole full run it also closes the narrow failure-
+forensics gap with parent-owned write-once identity, fsynced progress/raw-I/O
+journals, explicit watchdog/exit status, and bounded synthetic fault tests;
+partial evidence remains diagnostic only. Do not invoke Fable or collaboration
+subagents.
 
 Global TODO:
 

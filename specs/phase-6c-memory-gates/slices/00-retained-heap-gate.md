@@ -57,8 +57,8 @@ the existing `tsx` import hook, `fake-indexeddb/auto`, and the workspace-package
 hook. The `.mjs` bootstrap imports the tests-only TypeScript worker; the worker
 reaches product code only through those authenticated built targets. This
 avoids Vite and its aliases while reusing the genuine IndexedDB-bound
-Phase-6a/6b fixture under Node. The parent owns the prospective D.110a-x seven-hour timer,
-streamed stdout/stderr, last-progress custody, and `SIGKILL` on timeout.
+Phase-6a/6b fixture under Node. The parent owns the prospective D.110a-x seven-
+hour timer, write-once/fsynced failure evidence, and `SIGKILL` on timeout.
 
 Do not add `NODE_PATH`, a root shim, a source-relative production import in the
 new worker, a stale-dist assumption, a second bare-package resolver, or a new
@@ -156,10 +156,12 @@ The worker also tracks its current object-epoch and applied-operation count at
 every sample. This proves the samples were taken during execution, not
 reconstructed from memory remaining after the complete workload.
 
-The parent enforces the prospective D.110a-x seven-hour watchdog over the full child. A
-timeout is a consuming GREEN failure with complete stdout/stderr and the last
-completed object-epoch retained as evidence; it is never interpreted as a heap
-verdict.
+The parent enforces the prospective D.110a-x seven-hour watchdog over the full
+child. Before spawn it consumes the fresh full root and persists source/runtime
+identity. Parent-owned fsynced journals retain every received lifecycle/sample
+record, raw child stdout/stderr, explicit watchdog/exit/terminal/status facts,
+and timestamps. A timeout is a consuming GREEN failure; partial progress is
+diagnostic only and is never interpreted as a heap verdict.
 
 ## Deterministic causal RED
 
