@@ -8,12 +8,13 @@ remain immutable. D.109f/D.109d already satisfy the deterministic structure-
 census half of Phase 6c. This slice adds the missing genuine fresh-process heap
 gate without changing product behavior or the existing trend workflow.
 
-Execution note (2026-09-01): the authoritative focused GREEN passes 20/20, but
-the two-object preflight demonstrated a preexisting product defect before any
-memory verdict: creator durable replay requests `limit = rowCount`, while the
-live-journal contract rejects limits above 128. D.110a is paused behind
-[D.110a-p](00a-durable-replay-pagination.md). Its workload, thresholds, sample
-window, watchdog, and single consuming full-worker rule remain frozen.
+Execution note (2026-09-01): the authoritative focused GREEN passes 20/20. The
+two-object preflight demonstrated a preexisting durable-replay pagination
+defect before any memory verdict; [D.110a-p](00a-durable-replay-pagination.md)
+closed that prerequisite through signed/pushed GREEN and an empty final P0/P1
+review union. D.110a resumes at the corrected two-object non-verdict preflight.
+Its workload, thresholds, sample window, watchdog, and single consuming full-
+worker rule remain frozen.
 
 ## Exact scope
 

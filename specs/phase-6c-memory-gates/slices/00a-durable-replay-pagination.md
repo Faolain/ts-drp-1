@@ -77,3 +77,24 @@ After D.110a-p closes, rebuild affected packages and resume D.110a at its
 corrected two-object non-verdict preflight. Preserve both failed preflight
 attempts as causal diagnostics. The 64-object full worker is still unspent and
 may run exactly once only after the corrected preflight passes.
+
+## Closure
+
+D.110a-p is closed. RED owners are signed/pushed at `9cff6859` and `92d838d3`;
+RED evidence is recorded at `841b92b3`. GREEN product pagination is
+signed/pushed at `a7a8f7fc`, the tests-only author-sequence correction at
+`e028ec6b`, and GREEN evidence at `f03b97f6`. Focused GREEN passed 2/2, retained
+GREEN passed 95/95 in 11 files, and the node build, source-only typecheck,
+static gates, source audit, and evidence manifest passed.
+
+The final Grok/Kimi/Opus review returned APPROVE from all three with an empty
+P0/P1 union. Grok's initial tool-heavy session reached its turn cap before a
+verdict; the exact same session was resumed and approved with zero findings.
+Kimi reported one nonblocking P2: the preserved invalid author-sequence run's
+stdout names the shared authoritative JSON output path even though its distinct
+JSON captures the intended failure. This is recorded as an evidence-caption
+limitation; neither artifact is changed or rerun. Opus reported two
+nonblocking P2s: future RED roots should capture a standalone source-audit file,
+and future self-contained manifests should include the signed-ref, pushed-ref,
+stash, and protected-state command outputs. Both claims were recomputed and
+confirmed for this slice, so neither changes closure or immutable evidence.

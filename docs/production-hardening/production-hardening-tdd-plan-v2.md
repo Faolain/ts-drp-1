@@ -89723,3 +89723,48 @@ The validating self-excluding 23-file manifest SHA-256 is
 The D.110a preflight and consuming full worker remain unspent after D.110a-p;
 no browser test, campaign, Fable, or collaboration subagent ran. The single
 formal Grok/Kimi/Opus plan-to-RED-to-GREEN review is now authorized.
+
+##### D.110a-p final review and closure
+
+The sole formal plan-to-RED-to-GREEN review closed D.110a-p with an empty
+blocking union. The shared prompt SHA-256 was
+`22cd067ac37b7d85841793d6be937accd7113cddb1abfa2963938b6e902b8156`.
+Grok 4.6/high reached its 16-turn cap after active inspection and ended
+NO_VERDICT without a terminal schema; the initial event and status SHA-256
+values are `da7a7a8e3d854c1dfdc0f46f3754c9511b31a9a39c9e2848a5dd2e5846ad7835`
+and `59c4899b2f72425656285cfeea944ca5f798a97b30f3e8a4c4bd1a2a800d2cea`.
+The exact session `01a05ced-9876-7c63-9b44-c8fcbf191f7d` was resumed rather
+than replaced; it returned APPROVE with zero P0/P1/P2. Its resumed event stream
+SHA-256 is
+`3cef07ffd7a013e95ad2d5ad16efa4b45e7e2b5c546fde7b5861c566b73971cf`.
+
+The standard direct Kimi CLI used K3 with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100` and returned APPROVE with zero P0, zero P1,
+and one P2; its raw stream SHA-256 is
+`a0faac91b46f1cc77e2433325f85a3dc1c1a6aa556eb1cde43fe0b8ad188350d`.
+The P2 observes that the preserved invalid author-sequence diagnostic stdout
+names the shared authoritative JSON output path while its distinct JSON
+contains the intended `expected 128 to be 127` failure. It is dispositioned as
+a nonblocking evidence-caption limitation: the diagnostic JSON is distinct and
+hash-verified, causality is unaffected, and immutable evidence is not recaptured
+or rewritten.
+
+Opus xhigh completed read-only inspection, but its first headless result
+referred to a verdict “above” without emitting that schema; its raw SHA-256 is
+`3efdbcecf2c06699cb3c69e81d2bfbfb0ef3457a8f0ac94fcf26888ba6997103`.
+The same session `5c15b953-f2ae-474b-ad54-d9eba779cf5b` re-emitted its completed
+review and returned APPROVE with zero P0, zero P1, and two P2; that raw SHA-256
+is `4b48119cc1926508057d5e4971cf0c6adbb25350f02c320a3f1c6df8ea4b8744`.
+The first P2 asks future RED evidence roots to capture a standalone source-audit
+artifact; the current RED manifest values were independently recomputed against
+`92d838d3` and matched exactly. The second asks future self-contained manifests
+to capture signed-ref, pushed-ref, stash, and protected-state outputs; all nine
+slice commits have good signatures, the pushed branch contains `f03b97f6`, 26
+stashes remain, and the parked D.110a diff is intact. Both are nonblocking
+future evidence-capture improvements, not corrections to immutable evidence.
+
+All three reviewers confirmed genuine causal RED, private-owner GREEN,
+preserved authentication and replay checks, the accurate tests-only sequence
+correction, focused 2/2, retained 95/95, and unchanged public/workload/memory
+contracts. D.110a-p is closed. Resume D.110a at one corrected two-object
+non-verdict preflight; the consuming 64-object worker remains unspent.

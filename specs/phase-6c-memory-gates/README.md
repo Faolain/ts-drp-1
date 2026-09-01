@@ -16,19 +16,21 @@ replay requests one 979-row journal page even though the public journal
 contract accepts at most 128 rows per page. The million-operation worker has
 not run. Do not weaken or reinterpret D.110a.
 
-The next executable work is the narrow
-[D.110a-p durable-replay pagination prerequisite](slices/00a-durable-replay-pagination.md).
-Freeze, sign, push, and review that product slice with Grok 4.6/high, the
-standard Kimi CLI with K3/high and an exact 100-step cap, and Opus xhigh before
-its RED. If Grok cancels, resume that exact session. Do not substitute Codex Sol
-for Kimi. Do not invoke Fable or collaboration subagents. Once D.110a-p closes,
-resume the corrected D.110a preflight; the full worker remains a single
-consuming invocation.
+D.110a-p is closed through signed/pushed GREEN anchor
+`f03b97f6e3a06e7c1caae6aeb8bc3e0d2da33189` and its final review. The genuine
+129-row close now pages against one readiness snapshot in chunks no larger than
+128; focused GREEN passed 2/2 and the retained selection passed 95/95. Grok,
+the standard direct Kimi CLI, and Opus all approved with an empty P0/P1 union.
+
+The next executable work is the corrected D.110a two-object non-verdict
+preflight. Preserve both inherited failed diagnostics. If it passes, the full
+64-object worker remains a single consuming invocation. Do not invoke Fable or
+collaboration subagents.
 
 Global TODO:
 
 - [x] Structure-census artifact inherited from D.109f and D.109d.
-- [ ] D.110a-p paginate creator durable replay across the public 128-row page seam.
+- [x] D.110a-p paginate creator durable replay across the public 128-row page seam.
 - [ ] D.110a genuine million-operation retained-heap hard gate.
 - [ ] D.110b CI memory-trend fail-closed backstop.
 
