@@ -90026,3 +90026,76 @@ reruns. No object, profile, preflight, or full worker ran. Per the accepted
 D.110a-t review protocol, deterministic validation closes RED; the one final
 Grok/Kimi/Opus review will inspect this signed commit and its evidence after
 GREEN.
+
+##### D.110a-t failed diagnostic disposition and D.110a-u plan
+
+The tests-only diagnostic capture source is signed/pushed checkpoint
+`8024cb8dabed3deb95cb2cc79570263292c19db1`, tree
+`ae1eb75907a8337bcbca6823a1523aa899f5ccf8`. This is an explicitly failed
+attribution checkpoint, not D.110a-t GREEN. Before its sole profile invocation,
+`build:packages`, the Node/storage-node/storage-browser build-source
+typechecks, exact-owner ESLint/Prettier, child syntax, diff check, exact
+one-file/20-title listing, focused 20/20, and all six infrastructure audit facts
+passed. Fixed ports were clear, no ts-drp test/reviewer/profiler process was
+active, all 26 stashes remained, and protected roots were present. An initial
+process grep selected one unrelated `freq-ticketing` Playwright server; the
+corrected repository-qualified predicate was empty. This was a read-only
+diagnostic correction, not a blocker.
+
+The single authorized D.110a-t invocation ran
+`node --import=tsx tests/fixtures/phase-6c/retained-heap-child.mjs profile`.
+The child completed its exact one-object 15,625-operation/977-batch lifecycle,
+emitted and parent-validated all seven strictly ordered progress records,
+reported no memory verdict, stopped the in-child inspector, exited zero, and
+wrote exactly one exclusive file in the fresh directory
+`.logs/phase-6c-d110at-green/profile-FpJYj6/`. These facts follow from the
+launcher's fail-closed ordering: the parent reached `profileAttribution` only
+after validating terminal schema, PID/executable, operation/vertex/lifecycle
+counts, phase order and monotonicity, exact IPC/result equality, and one-file
+custody. The parent then exited nonzero at
+`D110AT_PROFILE_WINDOW_INVALID`; no retry ran.
+
+The raw 3,119,141-byte profile has SHA-256
+`f7b0de49a5a364304acc9f8c5838d6ef6bdb8903ee92c7098c4b6cf3c9e25d99`.
+It spans 235,324,959 profiler microseconds, contains 5,934 nodes, 157,647
+samples/time deltas, and four `retained-heap-worker.ts` nodes. Parent stderr
+has SHA-256
+`b3173adb25998cec99cb0228d04cbe2358f5aada5203ae978923caf060ee6cb8`;
+parent stdout is empty. The concrete defect is that V8 profiler timestamps and
+`process.hrtime` use different absolute clock origins on this macOS host. The
+validator compared those absolute values directly, so it rejected valid
+temporal custody. This is tests/build-infrastructure debt; it demonstrates no
+product or workload failure.
+
+A read-only same-profile approximation used the unique worker callback frame
+without rerunning anything. In its derived callback interval, canonical held
+46.9793% of self time, GC 8.9455%, runtime UTF-8 decoding 8.2142%, the node
+issuance store 7.7869%, and noble modular arithmetic 7.1939%. No owner met the
+unchanged at-least-50% rule, so even this non-authoritative approximation is
+mixed. Its JSON SHA-256 is
+`0175feced2f3f001216ab97e85f344094dc0725f7f3c9ee065df08c93997a89f`.
+Because the accepted clock-custody gate failed, this approximation is context,
+not an attribution verdict; no product or tests-only optimization is allowed
+from it.
+
+The focused JSON and failed-source diff hashes are
+`085894a4c426c7c8633c14f874f23f54210ddd1929cafb036534fee105e69f80`
+and `f9b323e279cc60f318598845938a7f304d6372585793682874068d798625caee`.
+The self-excluding failed-capture manifest validates and has SHA-256
+`52fd5ae1d1c644a6fc8a264f3c98d6d6696f9ec4f0985fafd3cd6487f1de0ae0`.
+The preserved profile and evidence root are immutable. The two-object
+preflight and 64-object worker remain unspent.
+
+D.110a-t therefore closes only as unavailable attribution and D.110a remains
+paused. D.110a-u is the narrow tests-only profile-clock calibration slice in
+`specs/phase-6c-memory-gates/slices/00c-profile-clock-calibration.md`. RED adds
+one no-workload exact token. GREEN brackets inspector start/stop in the phase
+clock, extracts one stable named workload frame without changing the workload,
+uses same-clock duration/containment checks, and derives the sample interval
+inside the profiler clock. After static, focused 21/21, retained 95/95, and
+build/typecheck gates, it permits exactly one new-name replacement one-object
+capture under the user's existing express debugging authorization. It does not
+authorize a preflight, full worker, product edit, dependency/threshold change,
+Fable, Codex-Sol substitution, or collaboration subagent. Its signed/pushed
+plan receives one Grok, standard direct Kimi K3/100-step, and Opus xhigh review
+before RED.
