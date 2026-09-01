@@ -90312,3 +90312,108 @@ No object, profile, preflight, full worker, product code, dependency, workload,
 threshold, watchdog, or memory contract ran or changed. Deterministic local
 validation closes RED under the accepted simplified protocol; GREEN may now
 change only the frozen four tests-only owners.
+
+##### D.110a-u GREEN and replacement-profile disposition
+
+The tests-only GREEN source is signed/pushed commit
+`330ccdb6361e5da2e3e86aef23d61bc992e71100`, tree
+`68a32486cd0ac00f7c4aed5d2bea0465d3a51e20`. Relative to RED it changed
+exactly `tests/fixtures/phase-6c/retained-heap-child.mjs`,
+`tests/fixtures/phase-6c/retained-heap-contract.ts`, and
+`tests/fixtures/phase-6c/retained-heap-worker.ts`; the 21-title test owner is
+byte-identical to RED. The worker now names the unchanged exact workload as
+`runD110auApplicationWorkload`, returns and consumes both the 15,625 applied
+operations and latest state, and preserves the exact 15,628 logical-time
+closure. The child derives all four inspector brackets in explicit
+microseconds, writes the sentinel immediately before spawn, writes the raw
+profile before terminal IPC, durably records the complete terminal envelope
+before adjudication, and reloads that record for the parent verdict. The
+shared detached validator enforces same-clock phase containment, the
+one-sided profiler-duration bound, exact named-frame URL/function selection,
+the first-to-last matching-ancestry interval including GC/runtime leaf time,
+and the unchanged at-least-50-percent plus at-least-two-times dominance rule.
+
+Before capture, `pnpm build:packages`; the Node, storage-node, and
+storage-browser build-source typechecks; exact-owner ESLint with zero
+warnings; Prettier; child syntax; diff check; and source-shape validation all
+passed. The focused command was `pnpm exec vitest run
+tests/phase-6c-retained-heap-red.test.ts --coverage.enabled=false
+--maxWorkers=1 --minWorkers=1 --reporter=json
+--outputFile=.logs/phase-6c-d110au-green-gates/focused.json`; it returned
+21/21 with zero failed, pending, or todo tests. The retained eleven-file
+Phase-5e/6a/6b suite returned 95/95 with zero failed, pending, or todo tests;
+its only stderr was Node's experimental SQLite warning. Exact listing
+selected one file and 21 titles. The detached audit and source-shape audit
+returned every field true. Their principal SHA-256 values are: listing
+`c337c91edbf483ad7a0e3e9ebf3bd769f570357214fe4d5b6a84430d7c6d6a18`,
+focused JSON
+`915aad020fbf1795e3ed21df963f4545b10f4fa54371951900645222a2e19e12`,
+retained JSON
+`c596babdb517575552796ef63940ad6d19eb6995106959555e00fca47cb3942e`,
+detached audit
+`cd21ce0d0c3416ffab1612b6b57f4ea7db50bbb5c55b08969803f161b934d4b0`,
+source-shape audit
+`5630532fe7da28b42e630e77c913030c6c2b8dc02dfb929c514fac94646ec450`,
+and GREEN diff
+`85ea9a6bf81ca257e4d95fce8ce8bed6dd1858c33eda9b486db0e54fba9b2e82`.
+An initial read-only mechanical audit attempted to assign zsh's reserved
+`status` variable and emitted no result. The corrected Bash audit passed with
+SHA-256
+`02b393611a4e7134bb98506cd3c980b9f26d8e1ac5adbbabf2ddd924aaa785f0`;
+this diagnostic correction was not a code or gate failure and no test was
+rerun for it.
+
+Immediately before the replacement capture, local and pushed refs both named
+the signed GREEN source, no repository-qualified ts-drp test, reviewer, or
+profiler process was active, fixed ports 4174, 4175, 51000, and 51002 were
+clear, all 26 stashes and protected roots remained, the reserved root was
+absent, and the D.110a-t raw profile still had exact SHA-256
+`f7b0de49a5a364304acc9f8c5838d6ef6bdb8903ee92c7098c4b6cf3c9e25d99`.
+The one authorized replacement command was then consumed exactly once:
+`node --import=tsx tests/fixtures/phase-6c/retained-heap-child.mjs profile`.
+It ran from `2026-09-01T15:18:57Z` through `2026-09-01T15:23:12Z`, exited
+zero, and produced empty parent stderr. There was no retry.
+
+The fresh root `.logs/phase-6c-d110au-green` contains exactly the exclusive
+sentinel, durable terminal envelope, and one
+`profile-ImBAT6/d110au-main.cpuprofile`. Their SHA-256 values are respectively
+`250fcf1aa5ffd34bbd2ff58425f08ad2e9afd7b1ed943eeff79120a73ddc6671`,
+`8561e43e59203219f329bb09ccef7828462ba61d3a794e8e4c3757a05b95307f`,
+and `394c1b2326fface0ee3e9f81d074a92c5c638112fedfe7046ae31ac10880b0c3`.
+The complete parent JSON has SHA-256
+`252a2fbeecc4da4720af6051c15a72726fc9fb5dc96fff8a1775da37e64af47c`.
+Independent validation proves exact durable/in-memory result, PID, executable,
+profile bounds and hashes; strict start/stop brackets; all seven ordered
+phases inside the same-clock capture interval; exact 977-batch,
+15,625-operation, 15,628/15,629 logical closure; one successful object
+lifecycle; and `memoryVerdict=not-evaluated`. The profiler duration was
+252,422,167 microseconds inside a 252,467,127-microsecond outer bracket. The
+named workload interval was nondegenerate at 32,331,750 microseconds, with
+22,127 samples and 128 matching-ancestry samples.
+
+The frozen attribution result is **mixed**, not unavailable and not a product
+owner verdict. Canonical was the largest leaf-self owner at 15,472,391 of
+32,332,959 attributed microseconds, or 47.8533096832 percent. The second owner,
+the Node issuance store, was 2,797,327 microseconds, or 8.6516269668 percent.
+Although the top-to-second ratio was 5.5311, canonical did not meet the
+unchanged at-least-50-percent half of the signed dominance rule, so
+`clearlyDominant=false`. The workload and semantic assertions passed; no
+product defect or narrow product optimization owner has been demonstrated.
+The independent audit SHA-256 is
+`f0ac112b7832b54d899e9043303a1a22bcc690f8e8bf4f31b72cb6ea7b1a2fbc`.
+The corrected self-excluding 53-entry evidence manifest validates and has
+SHA-256
+`4f85da4a66325891d0b79cdeb91c104cf1a2dbbb2c93f1588c2e4eb7a1c5c55a`.
+The preserved D.110a-t profile rehash passed after capture.
+
+D.110a-u therefore closes the clock-custody defect and its one-shot capture
+as a valid mixed result. It authorizes no optimization, retry, new capture,
+two-object preflight, 64-object worker, threshold change, product edit, or
+dependency change. Per the accepted trajectory condition, D.110a-v is the
+smallest justified next slice: a separately planned/reviewed, read-only
+whole-lifecycle phase/owner disposition over this already durable profile and
+terminal record. It must grant no process or workload authority and must end
+with an actionable Phase-6c decision rather than another profiling loop. The
+single final Grok, standard direct Kimi K3/100-step, and Opus xhigh review now
+inspects the complete signed plan → RED → GREEN → artifact history and
+this conservative disposition.
