@@ -13,9 +13,11 @@ import {
 	d110aCurrentInfrastructureAudit,
 	d110aMutantProof,
 	d110aSyntheticProof,
+	D110AT_RED_TOKEN,
 	requireD110aHardEntrypoint,
 	requireD110aPairedWorkloadGate,
 	requireD110aPostGcSlopeGate,
+	requireD110atProfileAttribution,
 	validateD110aProof,
 } from "./fixtures/phase-6c/retained-heap-contract.js";
 
@@ -43,11 +45,12 @@ describe("D.110a retained-heap hard-gate RED", () => {
 	});
 
 	it("audits the complete hard-gate infrastructure without readiness skips", () => {
-		expect(d110aCurrentInfrastructureAudit()).toEqual({
+		expect(d110aCurrentInfrastructureAudit()).toMatchObject({
 			hardEntrypoint: true,
 			pairedWorkloadGate: true,
 			postGcSlopeGate: true,
 		});
+		expect(() => requireD110atProfileAttribution()).not.toThrow(D110AT_RED_TOKEN);
 	});
 
 	it(`closes ${D110A_RED_TOKENS[0]}`, () => {

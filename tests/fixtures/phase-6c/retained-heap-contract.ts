@@ -19,6 +19,8 @@ export const D110A_RED_TOKENS = Object.freeze([
 	"D110A_HARD_ENTRYPOINT_MISSING",
 ] as const);
 
+export const D110AT_RED_TOKEN = "D110AT_PROFILE_ATTRIBUTION_MISSING";
+
 export const D110A_MUTANTS = Object.freeze([
 	"missing-gc",
 	"endpoint-only-slope",
@@ -407,8 +409,11 @@ export function d110aMutantProof(mutant: D110aMutant): D110aProof {
  * @returns Current hard-infrastructure facts.
  */
 export function d110aCurrentInfrastructureAudit(): Readonly<{
+	readonly childProfileCustody: boolean;
+	readonly gracefulProfileMode: boolean;
 	readonly hardEntrypoint: boolean;
 	readonly pairedWorkloadGate: boolean;
+	readonly phaseProgressSchema: boolean;
 	readonly postGcSlopeGate: boolean;
 }> {
 	const read = (relative: string): string => {
@@ -419,6 +424,17 @@ export function d110aCurrentInfrastructureAudit(): Readonly<{
 	const child = read("tests/fixtures/phase-6c/retained-heap-child.mjs");
 	const worker = read("tests/fixtures/phase-6c/retained-heap-worker.ts");
 	return Object.freeze({
+		childProfileCustody:
+			/node:inspector/u.test(child) &&
+			/Profiler\.enable/u.test(child) &&
+			/Profiler\.start/u.test(child) &&
+			/Profiler\.stop/u.test(child) &&
+			/flag:\s*"wx"/u.test(child) &&
+			/retained-heap-worker\.ts/u.test(child),
+		gracefulProfileMode:
+			/ROLE !== "full" && ROLE !== "preflight" && ROLE !== "profile"/u.test(child) &&
+			/mode === "profile" \? 900_000/u.test(child) &&
+			/runD110aProfile/u.test(worker),
 		hardEntrypoint:
 			/"test:phase-6c-memory"\s*:\s*"pnpm build:packages && node --import=tsx tests\/fixtures\/phase-6c\/retained-heap-child\.mjs full"/u.test(
 				rootPackage
@@ -428,6 +444,15 @@ export function d110aCurrentInfrastructureAudit(): Readonly<{
 			/D110A_TOTAL_BATCH_VERTICES/u.test(worker) &&
 			/d110aSemanticDigest/u.test(worker) &&
 			/validateD110aProof/u.test(worker),
+		phaseProgressSchema:
+			/D110aProfilePhase/u.test(worker) &&
+			/"fixture-open"/u.test(worker) &&
+			/"workload-complete"/u.test(worker) &&
+			/"creator-close-complete"/u.test(worker) &&
+			/"reclamation-complete"/u.test(worker) &&
+			/"successor-published"/u.test(worker) &&
+			/"sample-complete"/u.test(worker) &&
+			/"teardown-complete"/u.test(worker),
 		postGcSlopeGate:
 			/"--expose-gc"/u.test(child) &&
 			/globalThis\.gc\(\)/u.test(worker) &&
@@ -436,6 +461,14 @@ export function d110aCurrentInfrastructureAudit(): Readonly<{
 			/ownedBytes/u.test(worker) &&
 			/phase: "during-execution"/u.test(worker),
 	});
+}
+
+/** Fails with the exact D.110a-t RED token while profile attribution custody is absent. */
+export function requireD110atProfileAttribution(): void {
+	const audit = d110aCurrentInfrastructureAudit();
+	if (!audit.gracefulProfileMode || !audit.phaseProgressSchema || !audit.childProfileCustody) {
+		fail(D110AT_RED_TOKEN);
+	}
 }
 
 /** Fails with the exact RED token while the post-GC gate is absent. */
