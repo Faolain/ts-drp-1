@@ -92726,6 +92726,135 @@ the raw local session JSONL SHA-256 is
 `8d4c6cf06f435a814fe1b59cc9d7fec048006811edf37d573590668e1b19219d`.
 No further Fable run is authorized by this result.
 
+A second expressly authorized one-off Fable 5.1/high audit, session
+`924afa1f-908c-4590-95ba-ce5cfc94f8bc`, completed read-only against RED
+evidence HEAD `685611728ecfe37bbdb09369f245f9a909fcf776` and the in-progress uncommitted
+0b0 plumbing. It independently revalidated the same three upstream heads and
+again selects the existing creator-signed bounded checkpoint plus the 0b0
+external freshness floor; WRAPS is disproportionate for a fixed signer and
+does not establish latestness. It returned no P0. Its three P1 design cautions
+are accepted prospectively: D.110c-0b1 must declare the genuinely required
+epoch-N opener/Node-reopen public compatibility boundary before RED; bounded
+cold reopen authenticates the creator-signed current history root/size rather
+than replay-proving every retired historical extension; and retaining the
+immediate predecessor QC is an explicit fail-closed availability trade rather
+than an additional trust root. These cautions do not reopen 0b0, authorize an
+opener change, weaken archive accounting, or claim that a self-authenticating
+checkpoint is fresh. The durable report is
+`.logs/d110c-0b-hiero-fable-924afa1f/report.md`, SHA-256
+`f9342a7337c1769c4c37d17b7d063acf04cd852ef4abae4b6903affb7f166efd`;
+the raw local session JSONL SHA-256 is
+`9db8635826759afa527d1370cdfbd5df0da63a351c92463ad8a21250ff81be94`.
+No further Fable run is authorized by this second result.
+
+##### D.110c-0b0a staged adoption and pending-recovery prerequisite
+
+The first 0b0 GREEN composition audit found a narrower prerequisite that the
+accepted owner design did not make executable. At RED evidence HEAD
+`685611728ecfe37bbdb09369f245f9a909fcf776`, the exported
+`commitCreatorSuccessorAdoption()` consumes its one-use authenticated intent,
+stages/completes the candidate generation, and swaps the AHE head in the same
+call. It cannot expose the required durable-complete-but-not-published state in
+which the application installs the provider pending record. Conversely,
+`reopenCreatorSuccessorAdoption()` authenticates only the already-adopted
+three-generation epoch-1 shape and activates it in the same call. It cannot
+authenticate or finish a provider-selected pending candidate without live
+activation. Therefore expected-head plumbing alone cannot implement the frozen
+six-step protocol or its old-head/new-head crash rows. Reordering the existing
+calls is not a repair: committing the AHE first creates an unrecoverable
+floor-behind/head-ahead window, while installing pending first can leave no
+durably complete selected candidate after a crash.
+
+This is a demonstrated production composition/API seam, not permission to
+weaken crash acceptance or hide provider I/O in Node. **D.110c-0b0a** owns it,
+blocks resumption of 0b0 GREEN, and is due before any focused 0b0 GREEN run,
+D.110c-a production work, or multi-epoch execution. Its source owner is the
+creator adoption lifecycle across
+`packages/node/src/creator-adoption-commit.ts`,
+`packages/node/src/creator-adoption.ts`,
+`packages/node/src/creator-adoption-activate.ts`, their private opaque-capability
+registries under `packages/node/src/internal/`, and the sole product
+orchestrator in `examples/v3-room/src/index.ts`. Existing exploratory
+uncommitted 0b0 edits are non-evidence and receive no acceptance; no additional
+production edit or focused GREEN execution may occur until this prerequisite's
+plan gate is accepted.
+
+The selected compatibility direction is additive and phase-separated:
+
+1. A Node **stage** operation consumes the genuine verified adoption intent,
+   writes and authenticates the complete next generation, leaves the exact old
+   AHE head unchanged, and returns an owner-bound opaque staged capability plus
+   the copied exact successor descriptor. It performs no provider I/O and no
+   live activation.
+2. After the product installs the exact provider pending tuple, a Node
+   **publish** operation consumes that staged capability, performs the exact
+   old-head-to-next-head CAS, resolves ambiguous storage results only through
+   authenticated reopen/equality, and returns the existing opaque activation
+   capability. It performs no provider I/O and no live activation.
+3. A Node **pending-recovery** operation accepts copied exact previous/next
+   room-head tuples plus the existing durable carriers/stores. Without live
+   activation, it authenticates the pending-selected complete candidate from
+   pinned genesis and prior trust. If the AHE is old it completes the same exact
+   head CAS; if the AHE is already new it proves exact equality; missing,
+   malformed, foreign, incomplete, forked, or stale candidates fail closed. It
+   returns status only. The product then commits the provider pending tuple and
+   calls the existing cold reopen with the now-stable expected head, which
+   reauthenticates before activation.
+4. The existing one-call commit export remains as a compatibility wrapper for
+   lower-level callers that do not claim product freshness. The creator-owned
+   product path must use the new phase-separated operations; it may not bypass
+   the provider through the wrapper. Exact API names, input keys, result keys,
+   opaque-capability ownership, and compatibility behavior are frozen by the
+   0b0a plan review before RED.
+
+This additive Node lifecycle surface is a high-risk public-contract exception.
+One bounded Grok 4.6/high, direct Kimi K3 100-step, and Opus xhigh plan review
+must inspect the exact API/ownership design before RED. Only P0/P1 blocks; one
+confirmation is permitted only if a correction changes executable semantics,
+scope, or the public contract. Deterministic RED then replaces prose inference:
+one genuine first-transition fixture must prove that the current public API has
+no durable-complete/no-head-swap capability and no non-activating pending cold
+recovery owner, failing with exact token
+`D110C_0B0A_STAGED_HANDOFF_SEAM_MISSING`. RED must not alter product source or
+run a retained campaign.
+
+GREEN acceptance is exact:
+
+- after genuine stage, the candidate is complete and fully authenticated, the
+  AHE head remains the prior exact head, no provider call has occurred, and no
+  successor owner has activated;
+- publish refuses a missing, foreign, replayed, duplicated, already-consumed,
+  cross-handle, wrong-head, or mutated staged capability and preserves exact
+  existing failure custody;
+- publish performs one exact head CAS and resolves an ambiguous result by
+  authenticated equality, never by assuming success;
+- cold pending recovery covers both provider/AHE orderings, candidate absent,
+  candidate incomplete, wrong previous/next tuple, forked candidate, malformed
+  stores, and ambiguous CAS, without activation and without deriving the
+  expected tuple from room storage;
+- the product sequence is visibly stage → provider begin-CAS → Node publish →
+  provider commit-CAS → exact dual-owner reread → activation; every injected
+  crash boundary resumes that same transition or remains unavailable;
+- the old one-call API retains its previously proved semantics for direct
+  callers but is absent from the creator product publication owner;
+- no provider object crosses into Node or protocol-v3, and no wire record,
+  schema, digest, authority, dependency, threshold, rollback generation,
+  availability rule, or public product capability beyond the reviewed Node
+  lifecycle seam changes; and
+- exact-owner source-shape tests, Node/example builds and typechecks, focused
+  genuine runtime tests, all retained creator adoption/activation/reopen and
+  cleanup tests, browser product controls, lint/format/diff, protected paths,
+  stashes, signed commits, pushed refs, and self-excluding evidence manifests
+  pass.
+
+After signed/pushed GREEN, one formal Grok/Kimi/Opus review covers plan → RED →
+GREEN causality, the additive compatibility boundary, capability custody,
+non-activating recovery, and retained behavior. Only then may 0b0 resume and
+finish provider initialization, classification, crash orchestration, and the
+already frozen focused/retained gates. D.110c-0b0a does not implement the
+freshness provider, bounded checkpoint opener, repeated rollover, pruning,
+archive evolution, or any long campaign.
+
 This exact owner-selection design is signed and pushed before one bounded Grok
 4.6/high, standard direct Kimi K3 with
 `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review. Only P0/P1 blocks;
