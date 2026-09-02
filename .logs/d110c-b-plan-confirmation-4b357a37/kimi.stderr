@@ -1,0 +1,421 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+4b357a37 docs: correct d110c-b lifecycle plan
+aa002e78 docs: plan d110c-b hot rollover
+3118da76 docs: close d110c-a review
+cd665103 test: cover repeat-close carrier refusals
+a923c7d2 feat: carry authenticated repeat-close history
+---
+aa002e78463b3a56377fd26b7bdaa04ecc587396 docs: plan d110c-b hot rollover
+
+===
+4b357a37d13f809ed67f9ba7ad5f0f658188c89a docs: correct d110c-b lifecycle plan
+
+grok
+grok-resume-prompt.md
+grok-resume.events.jsonl
+grok-resume.stderr
+grok-resume.terminal.json
+kimi.stderr
+kimi.stream.jsonl
+kimi.terminal.json
+manifest.sha256
+opus.json
+opus.stderr
+opus.terminal.json
+prompt.md
+review-ledger.md
+ .logs/d110c-b-plan-audit-3118da76/audit.md         |   78 +
+ .logs/d110c-b-plan-audit-3118da76/manifest.sha256  |    2 +
+ .logs/d110c-b-plan-audit-3118da76/source-shape.txt |   46 +
+ .../grok-resume-prompt.md                          |    6 +
+ .../grok-resume.events.jsonl                       |  918 +++++
+ .../grok-resume.stderr                             |    0
+ .../grok-resume.terminal.json                      |   29 +
+ .../d110c-b-plan-review-aa002e78/grok/command.json |   26 +
+ .../d110c-b-plan-review-aa002e78/grok/events.jsonl | 1711 ++++++++
+ .../grok/input-packet.md                           |  114 +
+ .logs/d110c-b-plan-review-aa002e78/grok/public.txt |    1 +
+ .../d110c-b-plan-review-aa002e78/grok/review.diff  |  237 ++
+ .../d110c-b-plan-review-aa002e78/grok/status.json  |    9 +
+ .logs/d110c-b-plan-review-aa002e78/grok/stderr.log |    1 +
+ .logs/d110c-b-plan-review-aa002e78/kimi.stderr     | 4225 ++++++++++++++++++++
+ .../d110c-b-plan-review-aa002e78/kimi.stream.jsonl |  151 +
+ .../kimi.terminal.json                             |   35 +
+ .logs/d110c-b-plan-review-aa002e78/manifest.sha256 |   19 +
+ .logs/d110c-b-plan-review-aa002e78/opus.json       |    1 +
+ .logs/d110c-b-plan-review-aa002e78/opus.stderr     |    0
+ .../opus.terminal.json                             |   45 +
+ .logs/d110c-b-plan-review-aa002e78/prompt.md       |  101 +
+ .../d110c-b-plan-review-aa002e78/review-ledger.md  |   83 +
+ .../production-hardening-tdd-plan-v2.md            |  205 +-
+ 24 files changed, 7986 insertions(+), 57 deletions(-)
+===
+A	.logs/d110c-b-plan-audit-3118da76/audit.md
+A	.logs/d110c-b-plan-audit-3118da76/manifest.sha256
+A	.logs/d110c-b-plan-audit-3118da76/source-shape.txt
+A	.logs/d110c-b-plan-review-aa002e78/grok-resume-prompt.md
+A	.logs/d110c-b-plan-review-aa002e78/grok-resume.events.jsonl
+A	.logs/d110c-b-plan-review-aa002e78/grok-resume.stderr
+A	.logs/d110c-b-plan-review-aa002e78/grok-resume.terminal.json
+A	.logs/d110c-b-plan-review-aa002e78/grok/command.json
+A	.logs/d110c-b-plan-review-aa002e78/grok/events.jsonl
+A	.logs/d110c-b-plan-review-aa002e78/grok/input-packet.md
+A	.logs/d110c-b-plan-review-aa002e78/grok/public.txt
+A	.logs/d110c-b-plan-review-aa002e78/grok/review.diff
+A	.logs/d110c-b-plan-review-aa002e78/grok/status.json
+A	.logs/d110c-b-plan-review-aa002e78/grok/stderr.log
+A	.logs/d110c-b-plan-review-aa002e78/kimi.stderr
+A	.logs/d110c-b-plan-review-aa002e78/kimi.stream.jsonl
+A	.logs/d110c-b-plan-review-aa002e78/kimi.terminal.json
+A	.logs/d110c-b-plan-review-aa002e78/manifest.sha256
+A	.logs/d110c-b-plan-review-aa002e78/opus.json
+A	.logs/d110c-b-plan-review-aa002e78/opus.stderr
+A	.logs/d110c-b-plan-review-aa002e78/opus.terminal.json
+A	.logs/d110c-b-plan-review-aa002e78/prompt.md
+A	.logs/d110c-b-plan-review-aa002e78/review-ledger.md
+M	docs/production-hardening/production-hardening-tdd-plan-v2.md
+commit aa002e78463b3a56377fd26b7bdaa04ecc587396
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 11:44:20 2026 -0400
+
+    docs: plan d110c-b hot rollover
+
+ .../production-hardening-tdd-plan-v2.md            | 218 +++++++++++++++++++++
+ 1 file changed, 218 insertions(+)
+     268 /tmp/d110c-diff.txt
+{
+  "verdict": "CHANGES_REQUIRED",
+  "blocking_union_empty": false,
+  "p0": [],
+  "p1": [
+    {
+      "title": "Same-lock replacement swap is not specified to be atomic against a mid-flight deactivation of the current owner",
+      "evidence": "In packages/node/src/creator-adoption-activate.ts:194-230 the entry is read at :194, then two awaits (lock at :200, consumeCreatorSuccessorLive at :203, which internally runs activateV3LivePlane and only afterwards material.terminalizeSource at packages/node/src/v3-live.ts:7371-7390) precede the map write at :229. The plan's token rule ('deletes the map entry and releases the stable-topic lock only if its token is still current') covers only post-swap stale cleanup. Before the swap the current token is still valid, so a concurrent deactivate of the existing wrapper passes the token check, deletes the entry, and releases the `ts-drp:${topic}` Web Lock (creator-adoption-activate.ts:143). This race is reachable from the product today: examples/v3-room/src/index.ts:1920-1963 shutdown() runs outside the lifetime-transition queue (enqueueLifetimeTransition at :2322-2330 serializes adoption only) and calls activeHandle.deactivate() mid-adoption. The in-flight replacement then re-installs an owner at :229 holding no browser lock, silently breaking the cross-tab single-writer guarantee the lock exists for; the plan names 'close/shutdown races' as a GREEN fault case but gives no rule that makes it pass.",
+      "required_fix": "Amend Batch 1 to state that the replacement re-validates the map entry and ownership token (compare-and-swap) after the last await and immediately before activeOwners.set; on mismatch the newly activated plane is torn down and the request fails closed, and a deactivation arriving during an in-flight replacement is either deferred until the swap settles or forces the replacement to fail. The failed-replacement retention guarantee should also state it preserves lock/identity custody, not old-plane usability, since terminalizeSource runs after the transport-reuse swap (v3-live.ts:7383-7390) and a post-reuse failure leaves the old registration already retired (v3-live.ts:7255-7260) with retry only via the existing pending-recovery/reopen path."
+    },
+    {
+      "title": "The plan's pinned audit evidence is absent from the signed checkpoint commit",
+      "evidence": "The plan (docs/production-hardening/production-hardening-tdd-plan-v2.md, D.110c-b section) pins .logs/d110c-b-plan-audit-3118da76/audit.md and source-shape.txt with SHA-256 61d34473…/49bb0fc6… plus a 'validating self-excluding manifest SHA-256' 1ea2c137…, but commit aa002e78 contains exactly one file (+218 lines, the plan markdown only) and `git ls-tree -r HEAD` shows no .logs/d110c-b-* path, while every prior slice's review/audit ledger under .logs/ is committed (e.g. .logs/d110c-0b0-confirmation-43290dab). The pinned hashes are therefore unverifiable by any reviewer, violating the plan's own changed-path/hash/manifest custody discipline at the checkpoint that anchors the whole slice. The audit's technical claims themselves check out against source (creator-adoption.ts:373/545/565/610/666, creator-adoption-commit.ts:434/491, creator-adoption-activate.ts:52-57/189-230, examples/v3-room/src/index.ts:235-242/453-488/2265-2287/3500-3586 all confirmed), so this is an evidence-custody defect, not an audit-correctness one.",
+      "required_fix": "Commit the referenced audit ledger, source-shape record, and self-excluding manifest under .logs/d110c-b-plan-audit-3118da76/ with hashes matching the plan's pins (or amend the plan to drop the unverifiable pins) before any RED begins."
+    }
+  ],
+  "p2": [
+    {
+      "title": "Compatibility boundary omits the epoch-pinned authority guard in the product contract fixture",
+      "evidence": "tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts:560-580 exports isD108d2Authority, documented as 'the exact epoch-one creator projection', which hard-requires record.epoch === 1; tests/phase-6a-creator-successor-product-red.test.ts:79-82 pins its epoch rejection. After widening V3RoomSuccessorAuthority.epoch (examples/v3-room/src/index.ts:237) to a validated positive number, a genuine epoch-2 authority fails this guard, so the new Batch 2 Chromium test cannot validate its epoch-2 authority through the existing contract without generalizing it. The plan names only the phase-5e declaration as a tests-only widening.",
+      "disposition": "Amend the boundary paragraph to enumerate isD108d2Authority/D108D2_AUTHORITY_KEYS and its red test as tests-only generalizations (positive safe integer; epoch 0 must remain rejected). No public change; caught anyway by the mandatory changed-path/source-shape gates."
+    },
+    {
+      "title": "The phase-5e 'CreatorLiveCloseResult declaration' reference is misnamed",
+      "evidence": "No identifier named CreatorLiveCloseResult exists in packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts; the literal-pinned pair epoch: 0 / successorEpoch: 1 lives in the inline anonymous sealEpoch() return type at lines 249-262 (the production CreatorLiveCloseResult in packages/node/src/creator-close.ts:65-77 already ships number fields from D.110c-a).",
+      "disposition": "Correct the reference to the inline sealEpoch declaration when the plan text is next amended; the intended widening is unambiguous and needs no re-review."
+    },
+    {
+      "title": "Batch 1's Node GREEN lists a 'one browser lock' proof that is vacuous in the Node runner",
+      "evidence": "The root Vitest project (vite.config.mts:87-112) uses the default node environment with no window/navigator.locks, so browserLockRealm() (creator-adoption-activate.ts:106-114) is false and acquireBrowserLock returns undefined — no lock exists to count in the Node test; the genuine lock proof exists only in the Batch 2 Chromium gate, which already lists 'exactly one active owner/lock'.",
+      "disposition": "Reword the Batch 1 gate as map-custody-only (one active topic owner) and leave the exact lock proof to the Chromium gate; no design change."
+    }
+  ],
+  "summary": "The plan's diagnosis is accurate and its core design is sound: RED is genuinely causal (the frozen chain-invalid is exactly the creator-adoption.ts:371-374 gen-1-only projection filter rejecting the genuine D.110c-a epoch-1 close, and the browser RED rides the real stale close handle whose close() rejects once lifecycle is successor-adopted, creator-close.ts:468-475); epoch/kind derivation from authenticated trust is sufficient because openCreatorSuccessorTrust already enforces successor == current+1 (protocol-v3/creator-close.ts:615-619), and 0->1 stays byte-identical; v3-live.ts:1928 already implements the epoch-general kind rule so no new authority is needed; store reuse across epochs is feasible since seal vote/evidence rows are epoch-keyed (seal-vote-store.ts:164/281, seal-evidence.ts:50-74, packages/seal/src/creator.ts:438-447); GREEN gates honestly prove 0->1->2 plus a genuine 2->3 close without cold-reopen or long-horizon claims, and no silent public/wire/dependency widening is required beyond the declared epoch-field change. Two blockers remain: the same-lock replacement design lacks swap-atomicity against a mid-flight deactivation/shutdown that can release the browser lock under an in-flight replacement, and the signed plan commit omits the very audit-ledger evidence it pins by hash. Both are correctable without changing the design's shape."
+}
+{
+  "verdict": "CHANGES_REQUIRED",
+  "blocking_union_empty": false,
+  "p0": [],
+  "p1": [
+    {
+      "title": "\"Failed consume/alias retains the old owner and lock\" is unachievable after live consumption begins; the predecessor and the shared transport are already gone",
+      "evidence": "plan docs/production-hardening/production-hardening-tdd-plan-v2.md:94169-94172 and :94224-94226 promise that any failed consume/alias retains the old owner and lock and that GREEN proves \"failed replacement retention\". In the real owner, consumeCreatorSuccessorLive -> activateV3LivePlane retires the predecessor first: packages/node/src/v3-live.ts:7114 computes reusesTransport for the same stable topic, :7261 sets existing.active = false and :7266 installs the successor as the topic owner — all before packages/node/src/v3-live.ts:7383 material.terminalizeSource(). On the two post-consumption failure paths (v3-live.ts:7384 terminalize-failure, and packages/node/src/creator-adoption-activate.ts:220-227 alias-failure) rawHandle.deactivate() runs deactivateRegistration (v3-live.ts:3465-3486), which unsubscribes the shared stable topic (:3475) and closes the shared queue (:3480). The retained predecessor wrapper then wraps a registration with active === false, so its own deactivate is a no-op (v3-live.ts:7049-7051): the room would hold a lock and a map entry over a plane that can neither ingest nor publish, while the close handle has already moved to \"successor-adopted\" (packages/node/src/creator-close.ts:638-643).",
+      "required_fix": "Restate retention as stable-topic entry plus lock custody only, and pin the boundary: every genuinely reversible refusal must occur strictly before consumeCreatorSuccessorLive; after it returns, the predecessor is retired and terminal and (on failure) the shared topic/queue are torn down. Require the failed-live-consumption and failed-alias/cleanup mutants to assert those observed facts (predecessor registration inactive, topic unsubscribed, queue closed, close handle terminal) and to surface an explicit unavailable/stalled room state with an exact code, rather than asserting a usable retained predecessor."
+    },
+    {
+      "title": "Duplicate-adoption no-op predicate is under-specified in a way that would refuse the legitimate epoch 1 -> 2 adoption",
+      "evidence": "plan :94198-94201 replaces the latch with \"once the current authority already equals the durable authenticated head, an additional call is an idempotent no-op\". In the room, the floor's stable head only advances inside the adoption itself (examples/v3-room/src/index.ts:3524-3534 beginRoomHeadAdvance -> publish -> commitRoomHeadAdvance) and the authority is only set at :3586. Immediately after a genuine sealEpoch() at epoch 1 the authority is epoch 1 and openedRoomHeadState.stable is still epoch 1, so a floor/authority equality reading no-ops exactly the adoption this slice must enable; the alternative reading (compare against the live plane's current ephemeral authority) never no-ops. The current latch it replaces is examples/v3-room/src/index.ts:3502.",
+      "required_fix": "Name the exact authenticated predicate and its evaluation point — e.g. no-op only when the currently bound close handle reports status().lifecycle !== \"successor-pending-adoption\" (packages/node/src/creator-close.ts:666-684) and the authority/floor already equal the active plane's authenticated currentEphemeralAuthority tuple — and add a GREEN case proving that a fresh seal at epoch 1 admits adoption while the floor stable is still 1, and that a duplicate call with no pending successor no-ops instead of throwing sealed-live-unavailable."
+    },
+    {
+      "title": "Compatibility boundary omits the two retained epoch-1 authority oracles the epoch-2 assertions must not silently relax",
+      "evidence": "plan :94086-94097 declares the boundary \"exact\" and names only the tests-only CreatorLiveCloseResult declaration in packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts. Two retained Phase-6a owners hard-pin epoch 1 and are consumed by gates this slice must keep: tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts:574 (record.epoch === 1 inside isD108d2Authority), used by the retained assertion at packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:740; and the harness's independent raw-authority derivation at packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts:682 (selects only the trust record with currentEpoch === 1) and :702 (emits literal epoch: 1), consumed by exportSuccessor/carrier.authority at :735-742 of the same test. An epoch-2 authority assertion has no producer today, so the cheapest path is to loosen both to a numeric check, which silently weakens the retained D.108d2 oracle equality.",
+      "required_fix": "Name both owners in the compatibility section; require isD108d2Authority's epoch === 1 pin and the retained D.108d2 oracle comparison to stay byte-exact; add a separate epoch-parameterized predicate and raw-authority derivation used only by the new D.110c-b title, and forbid replacing either epoch pin with a typeof/number check."
+    }
+  ],
+  "p2": [
+    {
+      "title": "Deferred cold-reopen literal creator-adoption.ts:1030 is missing from the debt enumeration",
+      "evidence": "plan :94244-94247 lists cold-reopen literals at creator-adoption.ts:840,943-944,1052,1229-1230 but omits packages/node/src/creator-adoption.ts:1030 (successorProjection.record.epoch !== 1), which sits in the same reopenCreatorSuccessorMaterial function and is the only remaining hot-emitted-value dependency there once Batch 1 emits the authenticated successor epoch at :545/:565.",
+      "disposition": "Add :1030 to the D.110c-0b1/D.110c-c debt list and add one Batch-1 GREEN assertion that reopenCreatorSuccessorAdoption of an epoch>=2 successor still fails closed with the existing chain-invalid classification rather than activating."
+    },
+    {
+      "title": "Batch-1 Node gate requires \"one browser lock\", which the Node realm cannot produce",
+      "evidence": "plan :94176-94177 requires the focused Node test to prove \"one active topic owner and one browser lock\". packages/node/src/creator-adoption-activate.ts:106-114 browserLockRealm() requires window === globalThis or an object globalThis.location; the root suite runs in the default node environment (vite.config.mts:86-108 sets no test.environment), so acquireBrowserLock returns undefined and no lock exists. Satisfying the clause in Node would require synthesizing location/navigator.locks, i.e. a fake lock manager.",
+      "disposition": "Move the lock-custody clause to the Chromium Batch-2 gate (which already requires \"exactly one active owner/lock\") and restate the Node gate as one active topic owner with the no-lock realm path exercised and no synthetic LockManager installed."
+    },
+    {
+      "title": "The new Chromium title's \"independent genuine room\" has no pinned realm, database, or channel in a serial retained file",
+      "evidence": "plan :94116-94123 adds one test to packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts, which is test.describe.configure({ mode: \"serial\" }) at :662 with exactly three servers/pages and fixed DATABASES/CHANNEL_NAME (:41-42, :664-686) whose state the retained D.108d2/D.108e tests carry across titles.",
+      "disposition": "Pin the new realm explicitly in RED (fourth server/page or an added tests-only direct-room entry with distinct database and channel names) and assert in the same run that the three retained realms' snapshots and authority are unchanged."
+    },
+    {
+      "title": "The \"idempotent same-head activation\" gate has exactly one genuine producer, unnamed by the plan",
+      "evidence": "activateCreatorSuccessorAdoption consumes a one-use capability (packages/node/src/creator-adoption-activate.ts:245-248), so a second same-head activation cannot come from replaying the published capability; the only non-synthetic producer is the retained one-call API returning a fresh capability for an already-published head at packages/node/src/creator-adoption-commit.ts:684 (terminal.kind === \"active-new\" -> success(...)).",
+      "disposition": "Name that producer in the Batch-1 GREEN matrix so the idempotence case is minted from authenticated durable state rather than by re-minting activation material in the fixture."
+    }
+  ],
+  "summary": "The bounded audit is accurate at every cited line and the RED is executable and causal: after a genuine 1->2 close the current closure holds a v3-live-generation-2 projection, so packages/node/src/creator-adoption.ts:371-374 finds no candidate and verifyCreatorSuccessorAdoption returns exact chain-invalid at :766, ahead of the journal and snapshot owners; the browser observation is equally causal because the room never rebinds close (examples/v3-room/src/index.ts:2265-2287, :3502) and sealEpoch reaches a handle already at lifecycle successor-adopted (packages/node/src/creator-close.ts:469-476, :638-643). Deriving kind/epoch from authenticated trust is sufficient and byte-identical at epoch 0: openCreatorSuccessorTrust already enforces successor == current + 1 (packages/protocol-v3/src/creator-close.ts:619), v3-live.ts:1928 and :4598 are already epoch-relative, and the floor (examples/v3-room/src/index.ts:936-981) and bindCreatorLiveClose (packages/node/src/creator-close.ts:424-428) plus epoch-filtered evidence rows (packages/seal/src/creator.ts:438-452) make product rebinding to the existing singular stores feasible with no new store, method, wire field, threshold, or cold-reopen change. Three P1s block: the plan's post-consumption \"retain the old owner and lock\" is impossible because activateV3LivePlane retires the predecessor at v3-live.ts:7261 before terminalizeSource at :7383 and the failure paths tear down the shared topic/queue; the duplicate-adoption predicate as worded would refuse the legitimate 1->2 adoption because the floor only advances inside the adoption; and the compatibility boundary omits the two retained epoch-1 authority oracles whose cheapest accommodation silently weakens the retained D.108d2 gate."
+}
+{
+  "verdict": "APPROVED",
+  "blocking_union_empty": true,
+  "p0": [],
+  "p1": [],
+  "p2": [
+    {
+      "title": "Post-consume alias/cleanup cannot retain a live predecessor owner",
+      "evidence": "consumeCreatorSuccessorLive already transfers the stable topic before alias: v3-live.ts:7260-7266 sets existing.active=false on transport reuse, 7383-7386 terminalizes the close source after activateV3LivePlane, and 7049-7052/3465-3483 make a later raw deactivate either a no-op or an unsubscribe. creator-adoption-activate.ts:203-228 aliases and map-sets only after that transfer; alias failure currently deactivates the new plane and releases the lock.",
+      "disposition": "Keep retain-old-owner only for refusals that return before activateV3LivePlane. Recast failed alias/cleanup as fail-closed post-custody: do not map-swap, do not release the predecessor lock token, deactivate the unaliased raw successor once, and do not claim the predecessor remains the live topic owner. No v3-live restore owner in this slice."
+    },
+    {
+      "title": "Node GREEN cannot observe a browser lock",
+      "evidence": "creator-adoption-activate.ts:132-168 acquireBrowserLock returns undefined outside browserLockRealm(); Node Vitest has no navigator.locks. The Batch 1 gate still requires 'one browser lock'.",
+      "disposition": "Node focused GREEN asserts exactly one activeOwners topic entry and wrapper identity. Lock uniqueness stays a Chromium/product assertion."
+    },
+    {
+      "title": "New Chromium test can clobber the serial Phase-6a room",
+      "evidence": "packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts uses fullyParallel:false and workers:1 on one shared creator page; phase-6a-creator-successor-product.pw.ts plus product-entry.ts expose a singleton create() over DATABASES.creator and the D108d2 invite/carrier chain.",
+      "disposition": "Append the D.110c-b title after the retained serial chain and give it distinct databaseName/channelName so create() cannot replace D108d2 state."
+    },
+    {
+      "title": "Close-rebind must not regress D108E2B replacement cleanup",
+      "evidence": "examples/v3-room/src/index.ts:3539-3586 activates, then predecessor.deactivate() at 3574-3578; failure still throwAfterReplacementCleanup. Retained D108E2B requires that 0->1 cleanup. Floor is already committed at 3534.",
+      "disposition": "Bind the fresh close handle only after predecessor.deactivate() succeeds. Keep D108E2B replacement cleanup on that injected failure. Close-rebind failure uses D110C_B_CLOSE_REBIND_FAILED / stalled unavailable and must not call throwAfterReplacementCleanup."
+    }
+  ],
+  "summary": "RED is genuinely causal: D.110c-a already produces a pending epoch-2 close that dies at the generation-1 predecessor filter with chain-invalid, and post-0->1 sealEpoch fails through the successor-adopted terminal close handle without minted epoch-2 control state. Deriving projection kind/epoch from authenticated current/successor trust plus exact-next safe-integer checks is sufficient and 0->1 byte-identical. Same-lock replacement is safe on the consume-then-alias-then-token-swap path; product vote/evidence/snapshot reuse and stalled close-rebind are implementable without a new store/API; widening only V3RoomSuccessorAuthority.epoch to number is the smallest compatible public change. GREEN 0->1->2 issue/publish plus genuine 2->3 close stays inside the hot loop. Recast post-consume alias retention rather than adding a v3-live restore owner."
+}
+61d34473cb5eb6590e8c8b41b5aa26fa27ff03276577f28090b3aded7ea268b7  audit.md
+49bb0fc62e96ce9054cafac195cd68b4fa9f46385ef8ca7a2ef271d26997e1bb  source-shape.txt
+1ea2c137269835b94ffb9995e88031e7ed7c31aac366fb6364f0289ff3fe5d43  manifest.sha256
+---
+081229e4a60f0c29a401e1941bd3d078e87d9d4609a662f84b1e2ad77924c934  review-ledger.md
+f2a5bb67eeba98c487012aee1284f8f9e90d5f0f07838c4ff75b5a49d489e8c8  manifest.sha256
+94081:`61d34473cb5eb6590e8c8b41b5aa26fa27ff03276577f28090b3aded7ea268b7` and
+94082:`49bb0fc62e96ce9054cafac195cd68b4fa9f46385ef8ca7a2ef271d26997e1bb`.
+94084:`1ea2c137269835b94ffb9995e88031e7ed7c31aac366fb6364f0289ff3fe5d43`.
+94355:`081229e4a60f0c29a401e1941bd3d078e87d9d4609a662f84b1e2ad77924c934`.
+94357:`f2a5bb67eeba98c487012aee1284f8f9e90d5f0f07838c4ff75b5a49d489e8c8`.
+61d34473cb5eb6590e8c8b41b5aa26fa27ff03276577f28090b3aded7ea268b7  .logs/d110c-b-plan-audit-3118da76/audit.md
+49bb0fc62e96ce9054cafac195cd68b4fa9f46385ef8ca7a2ef271d26997e1bb  .logs/d110c-b-plan-audit-3118da76/source-shape.txt
+---
+shasum: .logs/d110c-b-plan-audit-3118da76/audit.md: No such file or directory
+.logs/d110c-b-plan-audit-3118da76/audit.md: FAILED open or read
+shasum: .logs/d110c-b-plan-audit-3118da76/source-shape.txt: No such file or directory
+.logs/d110c-b-plan-audit-3118da76/source-shape.txt: FAILED open or read
+shasum: WARNING: 2 listed files could not be read
+---
+66006edf1de2a58596ff5528598fe2581a1e9da1a3d0c5e1c4bd060759cdf04c  .logs/d110c-b-plan-review-aa002e78/grok-resume-prompt.md
+d549d90bb1bff60dd0599039f619ad176b075b7e3007bcc24c032182eca700f2  .logs/d110c-b-plan-review-aa002e78/grok-resume.events.jsonl
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/d110c-b-plan-review-aa002e78/grok-resume.stderr
+05ac0d768be39fc7d9010ccfbe88d8f5dcb3d488bf2335631b3f09eae6b9cc6f  .logs/d110c-b-plan-review-aa002e78/grok-resume.terminal.json
+16c621a277e978030f2e0d9f493099abda0b8e3ecfbfa2627b2bac0445f5ad2c  .logs/d110c-b-plan-review-aa002e78/grok/command.json
+df52b817c15bfcb8d130e5bc783370a65d3148fa6ce93851ff3fe407fb87307b  .logs/d110c-b-plan-review-aa002e78/grok/events.jsonl
+9692072519cb3ad020e337af242d818f3b4251ca6f97d210919444c9c4612ba3  .logs/d110c-b-plan-review-aa002e78/grok/input-packet.md
+4e6f7726316fb74dc51d1574f9be01cd11c6a172eeab5af46b31674050dbe896  .logs/d110c-b-plan-review-aa002e78/grok/public.txt
+e6b2b7d7c265a31ec7582c5414e4a983d2cceb99eddc2c89fb35247aec3981b7  .logs/d110c-b-plan-review-aa002e78/grok/review.diff
+43aa5d21767777a70b265b890d3399b71f29f86c13284b393d66de50ef379577  .logs/d110c-b-plan-review-aa002e78/grok/status.json
+b3e62995cdc9d267dd575413b26c5eb3c56eb3f54d816fc4ace8f7b91c7d1b1f  .logs/d110c-b-plan-review-aa002e78/grok/stderr.log
+18d4703c1acc83ccfc16b641bca33e7422b349166ea30737283c6452c5b4e3a9  .logs/d110c-b-plan-review-aa002e78/kimi.stderr
+5fd660c78b0809649a17dfd4fa1b1138bb0d9e640d9261ca5d05c48566a712b5  .logs/d110c-b-plan-review-aa002e78/kimi.stream.jsonl
+51fef22ea3988b04f4f519f70e8a31ff63c53f4b94d0f4a84bca41dbc3645bb1  .logs/d110c-b-plan-review-aa002e78/kimi.terminal.json
+106c0d7b0b3141ef128db9beded50cad7a8d2aa67cabccee24d7c1d9304d9aac  .logs/d110c-b-plan-review-aa002e78/opus.json
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/d110c-b-plan-review-aa002e78/opus.stderr
+7fef21fa6be320e18f75fe8d1169cc64c127fe0ca487d1713498c907e41f56f3  .logs/d110c-b-plan-review-aa002e78/opus.terminal.json
+5fc29cc0335756084c200f06c837600dd6cd86455483a529c68b53b0a65bda19  .logs/d110c-b-plan-review-aa002e78/prompt.md
+081229e4a60f0c29a401e1941bd3d078e87d9d4609a662f84b1e2ad77924c934  .logs/d110c-b-plan-review-aa002e78/review-ledger.md
+.logs/d110c-b-plan-review-aa002e78/grok/status.json: FAILED open or read
+shasum: .logs/d110c-b-plan-review-aa002e78/grok/stderr.log: No such file or directory
+.logs/d110c-b-plan-review-aa002e78/grok/stderr.log: FAILED open or read
+shasum: .logs/d110c-b-plan-review-aa002e78/kimi.stderr: No such file or directory
+.logs/d110c-b-plan-review-aa002e78/kimi.stderr: FAILED open or read
+shasum: .logs/d110c-b-plan-review-aa002e78/kimi.stream.jsonl: No such file or directory
+.logs/d110c-b-plan-review-aa002e78/kimi.stream.jsonl: FAILED open or read
+shasum: .logs/d110c-b-plan-review-aa002e78/kimi.terminal.json: No such file or directory
+.logs/d110c-b-plan-review-aa002e78/kimi.terminal.json: FAILED open or read
+shasum: .logs/d110c-b-plan-review-aa002e78/opus.json: No such file or directory
+.logs/d110c-b-plan-review-aa002e78/opus.json: FAILED open or read
+shasum: .logs/d110c-b-plan-review-aa002e78/opus.stderr: No such file or directory
+.logs/d110c-b-plan-review-aa002e78/opus.stderr: FAILED open or read
+shasum: .logs/d110c-b-plan-review-aa002e78/opus.terminal.json: No such file or directory
+.logs/d110c-b-plan-review-aa002e78/opus.terminal.json: FAILED open or read
+shasum: .logs/d110c-b-plan-review-aa002e78/prompt.md: No such file or directory
+.logs/d110c-b-plan-review-aa002e78/prompt.md: FAILED open or read
+shasum: .logs/d110c-b-plan-review-aa002e78/review-ledger.md: No such file or directory
+.logs/d110c-b-plan-review-aa002e78/review-ledger.md: FAILED open or read
+shasum: WARNING: 19 listed files could not be read
+			successorTrust: openedSuccessor.trust,
+			successorTrustRecord,
+		});
+		const snapshot = await verifySnapshot(input, chain);
+		if (snapshot === undefined) return coldFailure("snapshot-unavailable", "creator successor snapshot is unavailable");
+		const resolved = verifiedCatalog(input.catalog, snapshot.payload.blueprintDigest, chain.currentCatalog);
+		const manifestDigest = input.snapshotDeclaration.scope.manifestDigest;
+		if (
+			resolved === undefined ||
+			successorProjection.record.anchorDigest !== openedSuccessor.trust.currentAnchorDigest ||
+			successorProjection.record.epoch !== 1 ||
+			successorProjection.record.objectId !== objectId ||
+			successorProjection.record.blueprintDigest !== successorAnchor.blueprintDigest ||
+			successorProjection.record.parametersDigest !== successorAnchor.parametersDigest ||
+			successorProjection.record.snapshotManifestDigest !== manifestDigest ||
+			successorProjection.record.snapshotPayloadDigest !== snapshot.manifest.payloadDigest ||
+			successorProjection.record.stateDigest !== snapshot.manifest.stateDigest ||
+			hex(hashDomain("ts-drp/parameters/v3", input.exactCanonicalParametersCarrierBytes)) !==
+				successorAnchor.parametersDigest
+		) {
+			return coldFailure("chain-invalid", "creator successor projection is invalid");
+===
+	if (captured === undefined) return failure("malformed-input", "creator adoption commit input is invalid");
+	const facts = resolveCreatorAdoptionFacts<SealedAdoptionFacts>(captured.handle);
+	const material = consumeCreatorAdoptionIntent(captured.intent, captured.handle);
+	if (facts === undefined || material === undefined) {
+		return failure("intent-unavailable", "creator adoption intent is unavailable");
+	}
+	const descriptor = validProjection(material);
+	if (descriptor === undefined) return failure("internal-invariant", "creator successor projection is invalid");
+	let terminal = await authenticatedTerminal(facts, material);
+	if (terminal.kind === "active-new") return success(captured.handle, material, descriptor, terminal.head);
+	if (terminal.kind === "stale-head") return failure("stale-head", "creator successor head is stale");
+	if (terminal.kind === "recovery-failed") return failure("recovery-failed", "creator successor recovery failed");
+	if (terminal.kind === "chain-invalid") return failure("chain-invalid", "creator successor chain is invalid");
+	let stageRequestFailed = false;
+	try {
+		await stageCandidate(facts, material);
+	} catch {
+		stageRequestFailed = true;
+		// A fresh authenticated reopen below is the only authority after an ambiguous write.
+	}
+	const staged = stageRequestFailed ? undefined : await authenticatedStaged(facts, material);
+.logs/d110c-b-plan-audit-3118da76/audit.md: OK
+.logs/d110c-b-plan-audit-3118da76/source-shape.txt: OK
+.logs/d110c-b-plan-review-aa002e78/grok-resume-prompt.md: OK
+.logs/d110c-b-plan-review-aa002e78/grok-resume.events.jsonl: OK
+.logs/d110c-b-plan-review-aa002e78/grok-resume.stderr: OK
+.logs/d110c-b-plan-review-aa002e78/grok-resume.terminal.json: OK
+.logs/d110c-b-plan-review-aa002e78/grok/command.json: OK
+.logs/d110c-b-plan-review-aa002e78/grok/events.jsonl: OK
+.logs/d110c-b-plan-review-aa002e78/grok/input-packet.md: OK
+.logs/d110c-b-plan-review-aa002e78/grok/public.txt: OK
+.logs/d110c-b-plan-review-aa002e78/grok/review.diff: OK
+.logs/d110c-b-plan-review-aa002e78/grok/status.json: OK
+.logs/d110c-b-plan-review-aa002e78/grok/stderr.log: OK
+.logs/d110c-b-plan-review-aa002e78/kimi.stderr: OK
+.logs/d110c-b-plan-review-aa002e78/kimi.stream.jsonl: OK
+.logs/d110c-b-plan-review-aa002e78/kimi.terminal.json: OK
+.logs/d110c-b-plan-review-aa002e78/opus.json: OK
+.logs/d110c-b-plan-review-aa002e78/opus.stderr: OK
+.logs/d110c-b-plan-review-aa002e78/opus.terminal.json: OK
+.logs/d110c-b-plan-review-aa002e78/prompt.md: OK
+.logs/d110c-b-plan-review-aa002e78/review-ledger.md: OK
+17:export const D108D2_AUTHORITY_KEYS = Object.freeze([
+560:export function isD108d2Authority(value: unknown): boolean {
+564:		Reflect.ownKeys(record).length !== D108D2_AUTHORITY_KEYS.length ||
+565:		!D108D2_AUTHORITY_KEYS.every((key) => Object.hasOwn(record, key))
+574:		record.epoch === 1 &&
+===
+			}
+			return exactRecord(decodeCanonical(bytes));
+		});
+		const projections = decoded.filter((value) => value.kind === "v3-live-generation-2");
+		const trusts = decoded.filter((value) => value.kind === "drp-anchor-trust-state" && value.currentEpoch === 1);
+		if (projections.length !== 1 || trusts.length !== 1) {
+			throw new TypeError("D.108d2 successor projection is ambiguous");
+		}
+		const projection = projections[0] as PlainRecord;
+		const trust = trusts[0] as PlainRecord;
+		const anchorBytes = trust.exactCanonicalCurrentAnchorPreimageBytes as Uint8Array;
+		const anchor = exactRecord(decodeCanonical(anchorBytes));
+		const anchorDigest = hex(hashDomain("ts-drp/epoch-anchor/v3", anchorBytes));
+		if (
+			anchorDigest !== trust.currentAnchorDigest ||
+			anchorDigest !== projection.anchorDigest ||
+			anchor.aclDigest !== projection.aclDigest ||
+			anchor.objectId !== projection.objectId
+		) {
+			throw new TypeError("D.108d2 raw authority differs");
+		}
+		return Object.freeze({
+			aclDigest: anchor.aclDigest,
+			anchorDigest,
+			epoch: 1,
+			genesisAnchorDigest: trust.genesisAnchorDigest,
+			lifecycle: "active",
+			objectId: trust.objectId,
+			profileId: "creator-trusted-v1",
+===
+		}>
+	>;
+	join(
+		input: Readonly<{ channelName: string; clientId: "bob" | "carol"; databaseName: string; invite: string }>
+	): Promise<void>;
+	sealEpoch(): Promise<
+		Readonly<{
+			closedVertexCount: number;
+			commitQcRef: Readonly<{ byteLength: number; digest: string }>;
+			currentTrustRef: Readonly<{ byteLength: number; digest: string }>;
+			cutValueRef: Readonly<{ byteLength: number; digest: string }>;
+			epoch: 0;
+			lifecycle: "successor-pending-adoption";
+			ok: true;
+			successorAnchorDigest: string;
+			successorEpoch: 1;
+			successorTrustRef: Readonly<{ byteLength: number; digest: string }>;
+		}>
+	>;
+	send(text: string): Promise<void>;
+	snapshot(): Readonly<{ readonly accepted: readonly Readonly<{ readonly text: string }>[] }>;
+1937:				await Promise.resolve(activeHandle?.deactivate());
+3554:			await Promise.resolve(replacement.deactivate());
+3557:		const throwAfterReplacementCleanup = async (primary: unknown): Promise<never> => {
+3566:			return throwAfterReplacementCleanup(new TypeError("v3 room session is closed"));
+3572:			return throwAfterReplacementCleanup(error);
+3576:			await Promise.resolve(predecessor.deactivate());
+3578:			return throwAfterReplacementCleanup(error);
+3582:			return throwAfterReplacementCleanup(new TypeError("v3 room session is closed"));
+===
+			};
+			registration.handle = makeV3PlaneHandle(registration);
+			if (snapshotMachine !== undefined) registration.blueprintHandle = makeV3BlueprintLiveHandle(registration);
+			v3HandleRegistrations.set(registration.handle, registration);
+			registrations ??= new IntrinsicMap<string, V3PlaneRegistration>();
+			if (reusesTransport) {
+				existing.active = false;
+				existing.pendingIngress.clear();
+				existing.pendingIngressBytes = 0;
+				registration.hotPredecessor = new WeakRefConstructor(existing);
+			}
+			registrations.set(topic, registration);
+			v3PlaneRegistrations.set(boundNetworkNode, registrations);
+			return ObjectFreeze({ handle: registration.handle, ok: true as const });
+			return rejected("internal-invariant", "creator successor runtime registration is unavailable");
+		}
+		activatedRegistration.sourceRuntimeHandle = material.sourceRuntimeHandle;
+		if (!material.terminalizeSource()) {
+			activated.handle.deactivate();
+			return rejected("source-unavailable", "creator predecessor could not be terminalized");
+		}
+		return ObjectFreeze({ handle: activated.handle, ok: true as const });
+	} catch {
+		return rejected("internal-invariant", "creator successor activation failed unexpectedly");
+	}
+}
+
+===
+41:const DATABASES = Object.freeze({ creator: "d108d2-creator", established: "d108d2-established", late: "d108d2-late" });
+42:const CHANNEL_NAME = "d108d2-successor-product";
+662:test.describe.configure({ mode: "serial" });
+718:		channelName: CHANNEL_NAME,
+720:		databaseName: DATABASES.creator,
+723:		channelName: CHANNEL_NAME,
+725:		databaseName: DATABASES.established,
+737:		DATABASES.creator
+755:		{ carrier, source: DATABASES.creator, target: DATABASES.established }
+758:		channelName: CHANNEL_NAME,

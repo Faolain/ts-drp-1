@@ -94209,8 +94209,9 @@ After Batch 1, the exact focused Node test runs once. GREEN must prove real
 the old plane terminal, one active topic owner in the genuine no-browser-lock
 realm, idempotent same-head activation, and post-epoch-2 issue/publish. The
 idempotence input is a fresh authenticated capability returned by the existing
-`publishStagedCreatorSuccessorAdoption()` `active-new` terminal owner; the
-fixture may not replay or mint a consumed capability. Mutants cover same-epoch
+`commitCreatorSuccessorAdoption()` `active-new` terminal owner before the first
+activation; the fixture may not replay or mint a consumed capability. Mutants
+cover same-epoch
 different anchor, stale, skipped, cross-object, cross-genesis, missing hot
 input, malformed floor, lagging/ahead/substituted floor, different bindings,
 pre-transfer refusal, post-transfer consume/terminalize/alias cleanup, and
@@ -94355,6 +94356,29 @@ correction before RED. The first-review ledger is
 `081229e4a60f0c29a401e1941bd3d078e87d9d4609a662f84b1e2ad77924c934`.
 The validating self-excluding review manifest SHA-256 is
 `f2a5bb67eeba98c487012aee1284f8f9e90d5f0f07838c4ff75b5a49d489e8c8`.
+
+The one permitted material confirmation inspected signed/pushed correction
+`4b357a37d13f809ed67f9ba7ad5f0f658188c89a` from the same clean detached
+checkout. Grok 4.6/high completed normally after 600.103 seconds with
+`stop_reason=end_turn`; its wrapper's `NO_VERDICT` reflects leading inspection
+prose before the fenced terminal JSON, not cancellation, and the extracted
+terminal is `APPROVED`, P0=0/P1=0/P2=2. Standard direct Kimi K3 session
+`session_08de3c58-417d-4914-a7fb-aa4a771ecd96`, with the exact 100-step
+control, returned `APPROVED`, P0=0/P1=0/P2=0. Opus xhigh session
+`4e589f16-a28f-447b-a5c6-91296cd55e41` returned `APPROVED`,
+P0=0/P1=0/P2=2. The blocking union is empty and D.110c-b RED may proceed.
+
+The shared P2 dispositions require no confirmation or scope change. The
+immutable base audit's old alias-retention sentence remains preserved as
+historical evidence but is superseded by the reviewed plan's pre-transfer-
+retain/post-transfer-stall rule. The genuine same-head idempotence capability
+comes from `commitCreatorSuccessorAdoption()`'s authenticated `active-new` path
+before first activation; replay and fixture minting remain forbidden. The
+confirmation ledger is
+`.logs/d110c-b-plan-confirmation-4b357a37/confirmation-ledger.md`; its SHA-256
+is `48f2f9fc5c494dfd535ad3a9a94406188d6962ffc283e32aa2da941f85683704`.
+The validating self-excluding confirmation manifest SHA-256 is
+`b80b4b8742eecd8a2fec307921dc3a553508ace8f3f5fbc8faa6730690eeafdf`.
 
 The four prerequisite decisions, including the newly demonstrated 0b0
 freshness-floor authority question, are reviewed before their production edits;
