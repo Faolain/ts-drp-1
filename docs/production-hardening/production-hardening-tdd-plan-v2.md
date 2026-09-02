@@ -91769,26 +91769,39 @@ genesis-only trust opener, `inspectTrustClosure` permits exactly one trust
 record, and the closure law accumulates old cut/QC proof refs. A new or extended
 authenticated opener/closure contract and atomic bounded-closure transition are
 therefore **D.110c-0b1**, a named high-risk prerequisite; it must prefer a
-private/package-internal composition and preserve the v1 record/wire schema. If
-the RED demonstrates that a new exported public API, record version, wire field,
-authority carrier, dependency, or migration protocol is genuinely required,
-0b1 stops and is resliced again rather than implementing it. D.110c-0b1 is
+private/package-internal composition and preserve the v1 record/wire schema.
+The existing exported `inspectTrustClosure`, `assertTrustPreserved`, and install
+paths keep their exactly-one-trust-record contract. The first 0b1 stop-check is
+whether the Node owner can validate two actual closure members through a scoped
+private dual-record inspector without globally relaxing those exports. If the
+RED demonstrates that a changed exported predicate/result, new public API,
+record version, wire field, authority carrier, dependency, or migration
+protocol is genuinely required, 0b1 stops and is resliced again rather than
+implementing it. D.110c-0b1 is
 limited to stable `creator-trusted-v1`; rotating creator/seal authority,
 delegated/BFT repeated rollover, external pins, and recursive proofs are
 excluded. Brand-new-client freshness is not created by a root signature: a
 valid earlier creator checkpoint is authentic but may be stale. Reopen must
-compare against a caller-held authenticated expected head/floor; Phase 7 must
+compare against a caller-held authenticated expected head/floor. That room
+tuple is distinct from storage's AHE `PresentHead`/`ExpectedHead` revision and
+closure-digest tuple and may not be derived from the same hostile generation
+being opened. The first 0b1 stop-check must prove an existing caller-owned
+authenticated input can supply it; otherwise a new durable freshness carrier
+is required and triggers the same explicit reslice. Phase 7 must
 name how a new client obtains that input or reslice a freshness/availability
 authority. Until then, D.110c may claim bounded authentic recovery with an
 authenticated expected head, not discovery of latestness from hostile storage
 using genesis alone.
 
-D.110c-0b1 RED must use the real current trust opener and closure against at
-least three genuine sequential creator transitions. It must prove the current
-epoch>0 trust cannot open without replaying retained predecessors, exact active
-closure grows with each cut/QC, a stale but valid earlier checkpoint is rejected
-when a newer authenticated expected floor exists, and no tests-only trust record or private
-fixture shortcut can satisfy the path. GREEN must prove:
+D.110c-0b1 executable RED is deliberately sequenced **after D.110c-0a,
+D.110c-a, and D.110c-b GREEN and before D.110c-c RED**. It consumes their real
+epoch-relative seal, repeat-close, and hot-adoption path to create at least
+three genuine sequential creator transitions; the plan-level 0b design decision
+does not pretend those transitions exist earlier. The RED must prove the
+current epoch>0 trust cannot open without replaying retained predecessors, exact
+active closure grows with each cut/QC, a stale but valid earlier checkpoint is
+rejected when a newer authenticated expected floor exists, and no tests-only
+trust record or private fixture shortcut can satisfy the path. GREEN must prove:
 
 - the pinned genesis digest, creator key/profile/signer set, current epoch,
   current anchor signature, cut/QC, ACL digest, state/snapshot/manifest,
@@ -91824,8 +91837,13 @@ recovery storage.
 
 ##### Explicit implementation reslice
 
-The umbrella closes through three reviewed prerequisite decisions followed by
-four causally ordered executable sub-slices. No sub-slice may
+The umbrella closes through named decision and implementation owners. Numeric
+labels preserve audit identity; they are not execution order. The exact causal
+order is: current 0b architecture decision; D.110c-0a GREEN; D.110c-a GREEN;
+D.110c-b GREEN; executable D.110c-0b1 RED/GREEN; D.110c-0c; D.110c-c; then
+D.110c-d. The hot 0a/a/b path may retain its small, genuinely produced linear
+closure only long enough to expose 0b1's causal RED; it cannot claim bounded
+reopen or proceed to cleanup/long-horizon acceptance. No sub-slice may
 manufacture an epoch-N capability, anchor, projection, history snapshot, QC,
 receipt, archive record, or active registration in test code.
 
@@ -91860,7 +91878,9 @@ receipt, archive record, or active registration in test code.
    authority solution. D.110c-0b1 owns its reviewed opener/closure contract,
    exact authenticated-head input, compatibility transition, RED/GREEN, and
    stop boundary; it adds no new record/wire schema unless another high-risk
-   reslice is first accepted. It closes before D.110c-c RED and D.110c-d freeze.
+   reslice is first accepted. Its executable RED waits for 0a/a/b GREEN and
+   consumes their real transition loop; it closes before D.110c-c RED and
+   D.110c-d freeze.
 3. **D.110c-0c — durable pending-adoption resume decision.** Owner: creator
    close/adoption durable orchestration and existing AHE/snapshot/evidence
    owners. RED must create a real closed durable head, terminate the process
@@ -92009,6 +92029,28 @@ P1 and disposition Grok's P2 findings by qualifying the 6c-r compatibility
 claim, naming browser seal adapters/migration, assigning snapshot substitution
 to D.110c-a, and adding hot close/verify/commit consumers to D.110c-0b. No prior
 verdict is relabelled as having reviewed this later amendment.
+
+The first formal comparative-design review inspected signed/pushed commit
+`871c7782fcfcc0abbc8acaed81bef92fa7c00b50` from evidence root
+`.logs/d110c-0b-hiero-plan-review-871c7782`; prompt SHA-256 is
+`c4b684e40fac1fefee9f8ca89fb5f67c0223c2f586642d6f05c653e5e9086f14`.
+Grok 4.6/high session `01a05feb-255e-77e3-bd6a-b15f673e3e71` completed
+normally with P0=0/P1=1/P2=2: the blocking finding correctly identified that
+the original 0b1 RED demanded three genuine transitions before 0a/a/b could
+produce them. Opus xhigh session `cdf1629a-cfc3-4479-9539-c8dca17fbcf2`
+returned P0=0/P1=0/P2=3 and independently identified the same ordering
+ambiguity, the exported exactly-one inspector boundary, and the difference
+between the room expected-head tuple and AHE storage head. Direct Kimi K3
+session `6b472f97-58bf-4957-b4ac-3e527067a374`, invoked with both 100-step
+controls, failed immediately with provider 401
+`invalid_authentication_error` and is honestly `NO_VERDICT`; it did not inspect
+the plan. The correction above sequences executable 0b1 after 0a/a/b GREEN,
+preserves the exported exactly-one predicates behind a first stop-check, and
+requires a caller-authenticated room head distinct from hostile storage/AHE
+head. Because the ordering correction changes executable causality, one bounded
+Grok/Opus confirmation inspects the signed correction. No production RED begins
+until a standard direct Kimi K3 verdict on the corrected design also exists;
+the known credential failure is not retried or replaced here.
 
 The one expressly authorized Fable 5.1/high read-only advisory run used session
 `eefd0856-c660-4cc6-aa98-3c41eb863316`, spawned no subagents, and returned
