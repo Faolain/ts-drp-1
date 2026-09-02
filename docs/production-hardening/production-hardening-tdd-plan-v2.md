@@ -95200,8 +95200,8 @@ third transition or campaign, or reopen its immutable RED/GREEN evidence.
 
 ##### D.110c-0c durable pending-adoption resume plan
 
-**Status: bounded source audit complete; initial plan review found one P1;
-single material correction confirmation pending.** Owner:
+**Status: bounded source audit and single material plan confirmation complete;
+blocking union empty; deterministic RED authorized.** Owner:
 `packages/node/src/creator-adoption.ts` pending-candidate authentication and
 recovery kernel, the already exported
 `@ts-drp/node/creator-adoption-recover` capture boundary, the existing private
@@ -95380,6 +95380,33 @@ retained under `.logs/d110c-0c-plan-review-f1e021f2/` and
 `.logs/d110c-0c-plan-correction-f1e021f2/`; their joint self-excluding manifest
 SHA-256 is
 `2742853c1897e9ba164a9b058271171596d2cf09a13187bd3b4b7e2e6e9fb96c`.
+
+The one material confirmation at signed/pushed correction `cb5b3437` closed
+with Grok APPROVED (P0=0, P1=0, P2=1), Kimi APPROVED (P0=0, P1=0, P2=0), and
+Opus APPROVED (P0=0, P1=0, P2=3). Grok exact session
+`01a0642c-d006-7963-871a-6f66b7bd9f39` re-emitted its structured verdict on
+the same session after the runner classified its already complete public JSON
+as `NO_VERDICT`; Kimi exact session
+`session_39586ca5-3b3c-42d3-84a4-e0acf8444bcc` and Opus exact session
+`50d4644a-2a5a-4b53-921c-33b59cb18c13` completed normally with zero subagents.
+The blocking union is empty and no further plan round is allowed.
+
+The confirmation P2s are frozen RED implementation details, not new scope. The
+new process must pass `initialization: {kind: "reopen"}` and must not call
+create/migrate; it serializes the exact durable head, lineage, candidate
+closure inventory, and zero recovery-CAS count so the collapsed room error
+cannot hide `storage-failed` or `pending-old`; snapshot-declaration discovery
+selects the exact epoch-3 verified scope rather than assuming only one scope;
+and the new-AHE commit fault is configured and consumed before process death,
+without carrying an in-memory one-shot reset into the new process. These checks
+join the existing exact room error and source-pin audit to establish
+`pending-missing` causally. They require test assets only and are resolved in
+the one authorized RED execution.
+
+The complete confirmation evidence is retained under
+`.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry
+self-excluding manifest SHA-256 is
+`5f932353bbd41bffc697424adfbe2c9a2835ac79de6f2dc9e51e6c455ae6a9e7`.
 
 The four prerequisite decisions, including the newly demonstrated 0b0
 freshness-floor authority question, are reviewed before their production edits;
