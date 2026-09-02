@@ -91639,9 +91639,13 @@ authorization. The audit pinned `hiero-improvement-proposals` at commit
 [`54ccb06659592ab201e7adea632f1019e9faa00e`](https://github.com/hiero-ledger/hiero-improvement-proposals/tree/54ccb06659592ab201e7adea632f1019e9faa00e)
 (tree `42ff7d2c1ff68ef662b405cb167838849d1b49f1`) and HIP-1200 blob
 `088088185786375a1478166bbd61c4021eedc85c`; it pinned
-`hiero-consensus-node` at commit
-[`1aa1d6c153907750cfbba6935b7a21867053968e`](https://github.com/hiero-ledger/hiero-consensus-node/tree/1aa1d6c153907750cfbba6935b7a21867053968e)
-(tree `7c7adb3015c782e4131cc2ad1ca7ec5f97cb8cc5`). The inspected
+`hiero-consensus-node` at refreshed current-main commit
+[`92ea3b0caff4e8106f87e7f5f4a84c0361634299`](https://github.com/hiero-ledger/hiero-consensus-node/tree/92ea3b0caff4e8106f87e7f5f4a84c0361634299)
+(tree `3c4337aa328fccf5ea31bd9a6d6f3c321cf646af`). The exact inspected
+History/WRAPS/roster-handoff/protobuf/test paths have no byte diff from the
+original audit pin `1aa1d6c153907750cfbba6935b7a21867053968e`; the refresh command
+returned status zero, so the recorded implementation/proposal distinction and
+decision matrix remain current without reopening the accepted audit. The inspected
 exact-weight design blob is `c35cb34e6e797719fdb02f8541cb067f64e3972a`;
 the implementation blobs for `HistoryLibrary`, `HistoryLibraryImpl`,
 `WrapsHistoryProver`, `WritableHistoryStoreImpl`, `V071HistorySchema`,
@@ -93958,7 +93962,8 @@ close binder. Every one returns exact `CREATOR_CLOSE_UNAVAILABLE` before
 room-head or durable-head mutation. A fresh isolated child also proves the
 `Number.MAX_SAFE_INTEGER` epoch guard returns that exact reason before seal,
 snapshot, or generation staging. The retained Phase-5e trust mutants continue
-to prove skipped/substituted successor epochs return exact `EPOCH_GAP`, while
+to prove skipped successor epochs return exact `EPOCH_GAP` and substituted
+same-epoch successor trust returns exact `EPOCH_EQUIVOCATION`, while
 the D.110c-a owner retains its post-open successor epoch/object/genesis identity
 check before staging. Canonical decoding cannot carry JavaScript reference
 aliases; copied-snapshot assertions here and retained accumulator alias/hostile
@@ -93996,6 +94001,39 @@ the durable advisory summary is
 `.logs/d110c-0b-hiero-fable51-parallel/summary.md`. This result is not a formal
 D.110c-a or D.110c-0b gate, does not reopen completed evidence, and consumes
 the one-off authorization; no further Fable invocation is authorized.
+
+The single permitted executable confirmation then inspected signed/pushed
+correction `cd665103dc178d4b6428eebd405f7b7d000285de`. Grok 4.6/high's initial
+runner cancelled after 360.266 seconds; exact session
+`01a0628d-80f1-7463-9ce6-0c3108f010c5` was resumed as required and returned
+`APPROVED`, P0=0/P1=0/P2=2. Standard direct Kimi K3/high session
+`session_95ab9cd1-6226-4607-8c83-76a2bd562d25`, with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, completed normally and returned
+`APPROVED`, P0=0/P1=0/P2=2. Opus xhigh session
+`8191d762-1501-4a0c-ac76-f31163dbdad1` returned `APPROVED`,
+P0=0/P1=0/P2=4. The blocking union is empty and D.110c-a is closed as
+`D110C_A_GREEN_ACCEPTED`.
+
+The terminal P2 dispositions require no executable correction or recursive
+review. At epoch 1, reset, earlier-epoch, and the only same-room cross-anchor
+prefix collapse to the empty epoch-0 accumulator; cross-room already exercises
+the foreign authenticated root/size mismatch. Canonical bytes cannot preserve
+a JavaScript alias, so copied-snapshot and retained accumulator alias tests
+remain authoritative. A construction-identical unmutated control may be added
+only when that fixture is next edited. The retained trust codes are recorded
+accurately above. Finally, `openCreatorSuccessorTrust` already enforces genesis
+digest, object identity, and exact-next epoch before the Node post-open check,
+so that later branch is redundant defense and must not be made reachable with
+an upstream mock. The confirmation ledger is
+`.logs/d110c-a-green-confirmation-cd665103/confirmation-ledger.md`; Grok,
+Kimi-export, and Opus evidence SHA-256 values are respectively
+`c22e43872d53817f500dc40e90b2f45b9a54f90d7483e26cb40df193f9c0811c`,
+`2288724d4900517a1d87a2be06ba286a0f43899213ffa20b7a7c771db2bc72cb`,
+and `121a4bd951c3ee9c1bc655349057fe04085f2f00000d3e7cee7ba4d74038e687`.
+The refreshed Hiero primary-source ledger is
+`.logs/d110c-0b-hiero-refresh-92ea3b0c/audit-ledger.md`. It confirms no byte
+change in the inspected consensus paths and leaves the accepted bounded
+dual-anchor creator-checkpoint selection unchanged.
 
 This is a high-risk production authority/public-contract slice. The plan-only
 checkpoint is signed and pushed, then one Grok 4.6/high, standard direct Kimi K3
