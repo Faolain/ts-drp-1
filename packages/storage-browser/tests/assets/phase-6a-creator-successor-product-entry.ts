@@ -803,6 +803,54 @@ function directDependencies(): DirectRoomDependencies {
 	return selected as DirectRoomDependencies;
 }
 
+function directRoomHeadAuthority(): PlainRecord {
+	let state: PlainRecord | null = null;
+	const same = (left: unknown, right: unknown): boolean => {
+		const leftBytes = encodeCanonical(left);
+		const rightBytes = encodeCanonical(right);
+		return (
+			leftBytes.byteLength === rightBytes.byteLength && leftBytes.every((byte, index) => byte === rightBytes[index])
+		);
+	};
+	const success = (): PlainRecord => Object.freeze({ ok: true, state });
+	return Object.freeze({
+		initialization: Object.freeze({ kind: "create" }),
+		begin: (input: PlainRecord): Promise<PlainRecord> => {
+			if (state === null || !same(state, input.expected)) {
+				return Promise.resolve(Object.freeze({ ok: false, reason: "conflict" }));
+			}
+			const expected = input.expected as PlainRecord;
+			state = Object.freeze({
+				pending: Object.freeze({ next: input.next, previous: expected.stable }),
+				stable: expected.stable,
+			});
+			return Promise.resolve(success());
+		},
+		commit: (input: PlainRecord): Promise<PlainRecord> => {
+			if (state === null || state.pending === null || !same(state, input.expected)) {
+				return Promise.resolve(Object.freeze({ ok: false, reason: "conflict" }));
+			}
+			state = Object.freeze({ pending: null, stable: (state.pending as PlainRecord).next });
+			return Promise.resolve(success());
+		},
+		create: (input: PlainRecord): Promise<PlainRecord> => {
+			const desired = Object.freeze({ pending: null, stable: input.stable });
+			if (state === null) state = desired;
+			else if (!same(state, desired)) return Promise.resolve(Object.freeze({ ok: false, reason: "conflict" }));
+			return Promise.resolve(success());
+		},
+		migrate: (input: PlainRecord): Promise<PlainRecord> => {
+			const desired = Object.freeze({ pending: null, stable: input.stable });
+			if (state !== null && !same(state, desired)) {
+				return Promise.resolve(Object.freeze({ ok: false, reason: "conflict" }));
+			}
+			state = desired;
+			return Promise.resolve(success());
+		},
+		read: (): Promise<PlainRecord> => Promise.resolve(success()),
+	});
+}
+
 async function createDirectRoom(name: string): Promise<DirectRoomSession> {
 	if (name.length === 0 || directRooms.has(name)) throw new TypeError("D.108e3 direct room identity is invalid");
 	const databaseName = `d108e3-direct-${name}`;
@@ -880,6 +928,7 @@ async function createDirectRoom(name: string): Promise<DirectRoomSession> {
 		onProjection: () => undefined,
 		openTransport: () => directTransport(authorKeychain.localAuthorId),
 		publicKeyBytes: bytesFromHex(authorKeychain.localAuthorId),
+		roomHeadAuthority: directRoomHeadAuthority(),
 		signRegisteredVertexDigest: (registeredDigest: Uint8Array) => authorKeychain.signWithLocalAuthor(registeredDigest),
 	});
 }

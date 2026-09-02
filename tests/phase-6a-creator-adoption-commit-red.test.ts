@@ -205,7 +205,8 @@ describe("D.108c one-CAS creator adoption RED", () => {
 			noDirectChatCommitConsumer: true,
 			noRootExport: true,
 			privateCapabilityConsumer: readiness.ready,
-			roomOwnsCommitWhenProductExists: true,
+			retainedCommitHasNoProductConsumer: true,
+			roomOwnsStagedPublicationWhenProductExists: true,
 		});
 		expect(D108C_GREEN_PATHS).not.toContain("packages/node/src/index.ts");
 		expect(D108C_GREEN_PATHS.every((path) => !/(?:transport|issuance|v3-live|examples)/u.test(path))).toBe(true);

@@ -61,6 +61,7 @@ export const CREATOR_SUCCESSOR_ACTIVATION_EXPORTS = Object.freeze([
 ] as const);
 export const CREATOR_SUCCESSOR_ACTIVATION_INPUT_KEYS = Object.freeze([
 	"capability",
+	"expectedRoomHead",
 	"handle",
 	"messageQueueManager",
 	"networkNode",
@@ -72,6 +73,7 @@ export const CREATOR_SUCCESSOR_REOPEN_INPUT_KEYS = Object.freeze([
 	"detachedSignature",
 	"exactCanonicalAnchorPreimageBytes",
 	"exactCanonicalParametersCarrierBytes",
+	"expectedRoomHead",
 	"issuanceStore",
 	"liveJournalStore",
 	"messageQueueManager",
@@ -89,6 +91,7 @@ export const CREATOR_SUCCESSOR_LOCAL_AUTHOR_REOPEN_INPUT_KEYS = Object.freeze([
 	"detachedSignature",
 	"exactCanonicalAnchorPreimageBytes",
 	"exactCanonicalParametersCarrierBytes",
+	"expectedRoomHead",
 	"issuanceStore",
 	"liveJournalStore",
 	"messageQueueManager",
@@ -108,6 +111,9 @@ export const CREATOR_SUCCESSOR_ACTIVATION_SUCCESS_KEYS = Object.freeze([
 	"trust",
 ] as const);
 export const CREATOR_SUCCESSOR_ACTIVATION_FAILURE_KINDS = Object.freeze([
+	"D110C_FLOOR_INVALID",
+	"D110C_FLOOR_MIGRATION_REQUIRED",
+	"D110C_FLOOR_MISMATCH",
 	"malformed-input",
 	"capability-unavailable",
 	"source-unavailable",
@@ -152,6 +158,8 @@ export interface D108d1CandidateModule {
 
 export type D108d1ChildMode =
 	| "cold"
+	| "d110c-no-floor"
+	| "d110c-wrong-floor"
 	| "declaration-loop-mutant"
 	| "divergent-genesis"
 	| "extra-epoch"

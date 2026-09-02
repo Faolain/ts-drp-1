@@ -234,6 +234,11 @@ async function openD109dFixture(mode: "cold" | "hot", options: D109dOpenOptions 
 		});
 		const activated = await base.modules.activateCreatorSuccessorAdoption({
 			capability: prepared.capability,
+			expectedRoomHead: Object.freeze({
+				currentAnchorDigest: (prepared.descriptor as Readonly<Record<string, unknown>>).anchorDigest,
+				epoch: (prepared.descriptor as Readonly<Record<string, unknown>>).epoch,
+				objectId: (prepared.descriptor as Readonly<Record<string, unknown>>).objectId,
+			}),
 			handle: base.handle,
 			...runtimeBindings,
 		});

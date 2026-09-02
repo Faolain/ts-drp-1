@@ -11,6 +11,8 @@ import type {
 } from "@ts-drp/storage/snapshot-transfer";
 import type { DRPNetworkNode, Message } from "@ts-drp/types";
 
+import type { CreatorExpectedRoomHead } from "./creator-room-head.js";
+
 export interface CreatorSuccessorGenerationMaterial {
 	readonly candidates: readonly Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }>[];
 	readonly detachedAnchorSignature: Uint8Array;
@@ -87,6 +89,7 @@ export interface CreatorSuccessorReopenInput {
 	readonly detachedSignature: Uint8Array;
 	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
 	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
+	readonly expectedRoomHead: CreatorExpectedRoomHead;
 	readonly issuanceStore: DurableIssuanceStore;
 	readonly liveJournalStore: DurableLiveJournalStore;
 	readonly pinnedGenesisAnchorDigest: string;

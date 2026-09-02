@@ -442,6 +442,11 @@ export async function openContender(
 					? String(((material.issuance as PlainRecord).scope as PlainRecord).author)
 					: "",
 				catalog: trustedCatalog(material),
+				expectedRoomHead: {
+					currentAnchorDigest: String((material.oracle as PlainRecord).anchorDigest),
+					epoch: Number((material.oracle as PlainRecord).epoch),
+					objectId: String((material.oracle as PlainRecord).objectId),
+				},
 				issuanceStore: stores.issuanceStore,
 				liveJournalStore: stores.liveJournalStore,
 				messageQueueManager: new BrowserTestMessageQueueManager(),

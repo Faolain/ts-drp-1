@@ -186,7 +186,8 @@ export function d108cSourceGovernance(): Readonly<{
 	readonly noDirectChatCommitConsumer: boolean;
 	readonly noRootExport: boolean;
 	readonly privateCapabilityConsumer: boolean;
-	readonly roomOwnsCommitWhenProductExists: boolean;
+	readonly retainedCommitHasNoProductConsumer: boolean;
+	readonly roomOwnsStagedPublicationWhenProductExists: boolean;
 }> {
 	const read = (path: string): string => {
 		const absolute = resolve(REPOSITORY_ROOT, path);
@@ -198,8 +199,10 @@ export function d108cSourceGovernance(): Readonly<{
 	const room = read("examples/v3-room/src/index.ts");
 	const chat = read("examples/v3-chat/src/index.ts");
 	const productExists = /adoptCreatorSuccessor\s*\(/u.test(room);
-	const roomConsumesCommit =
-		/@ts-drp\/node\/creator-adoption-commit/u.test(room) && /commitCreatorSuccessorAdoption/u.test(room);
+	const roomConsumesStagedPublication =
+		/@ts-drp\/node\/creator-adoption-stage/u.test(room) &&
+		/stageCreatorSuccessorAdoption/u.test(room) &&
+		/publishStagedCreatorSuccessorAdoption/u.test(room);
 	const manifest = JSON.parse(read("packages/node/package.json")) as {
 		readonly exports?: Readonly<Record<string, unknown>>;
 	};
@@ -213,6 +216,9 @@ export function d108cSourceGovernance(): Readonly<{
 		noDirectChatCommitConsumer: !/commitCreatorSuccessorAdoption|creator-adoption-commit/u.test(chat),
 		noRootExport: !/commitCreatorSuccessorAdoption|creator-adoption-commit/u.test(root),
 		privateCapabilityConsumer: /function\s+consumePreparedCreatorSuccessorAdoption\s*\(/u.test(internal),
-		roomOwnsCommitWhenProductExists: !productExists || roomConsumesCommit,
+		retainedCommitHasNoProductConsumer: !/commitCreatorSuccessorAdoption|@ts-drp\/node\/creator-adoption-commit/u.test(
+			room
+		),
+		roomOwnsStagedPublicationWhenProductExists: !productExists || roomConsumesStagedPublication,
 	});
 }

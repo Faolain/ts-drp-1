@@ -4,6 +4,7 @@ import {
 	consumePreparedCreatorSuccessorAdoption,
 	type PreparedCreatorSuccessorAdoptionMaterial,
 } from "./internal/creator-adoption-intent.js";
+import { captureCreatorExpectedRoomHead, sameCreatorRoomHead } from "./internal/creator-room-head.js";
 import {
 	consumeCreatorSuccessorHandleAlias,
 	consumeCreatorSuccessorLive,
@@ -13,7 +14,14 @@ import {
 } from "./internal/creator-successor-live.js";
 import { deriveV3StableTopic } from "./internal/v3-topic.js";
 
-const HOT_KEYS = Object.freeze(["capability", "handle", "messageQueueManager", "networkNode", "onAdmittedVertex"]);
+const HOT_KEYS = Object.freeze([
+	"capability",
+	"expectedRoomHead",
+	"handle",
+	"messageQueueManager",
+	"networkNode",
+	"onAdmittedVertex",
+]);
 const COLD_KEYS = Object.freeze([
 	"authenticationProfile",
 	"author",
@@ -21,6 +29,7 @@ const COLD_KEYS = Object.freeze([
 	"detachedSignature",
 	"exactCanonicalAnchorPreimageBytes",
 	"exactCanonicalParametersCarrierBytes",
+	"expectedRoomHead",
 	"issuanceStore",
 	"liveJournalStore",
 	"messageQueueManager",
@@ -229,12 +238,17 @@ async function activateMaterial(
 export async function activateCreatorSuccessorAdoption(input: unknown): Promise<Readonly<Record<string, unknown>>> {
 	const captured = capture(input, HOT_KEYS);
 	if (captured === undefined) return failure("malformed-input", "creator successor activation input is invalid");
+	const expectedRoomHead = captureCreatorExpectedRoomHead(captured.expectedRoomHead);
+	if (expectedRoomHead === undefined) return failure("D110C_FLOOR_INVALID", "creator room-head floor is invalid");
 	const bindings = runtimeBindings(captured);
 	if (bindings === undefined) return failure("malformed-input", "creator successor runtime bindings are invalid");
 	const prepared = consumePreparedCreatorSuccessorAdoption(captured.capability, captured.handle) as
 		| PreparedCreatorSuccessorAdoptionMaterial
 		| undefined;
 	if (prepared === undefined) return failure("capability-unavailable", "creator successor capability is unavailable");
+	if (!sameCreatorRoomHead(expectedRoomHead, prepared.activation.successor.trust)) {
+		return failure("D110C_FLOOR_MISMATCH", "creator successor differs from the authenticated room-head floor");
+	}
 	return activateMaterial(prepared.activation, bindings);
 }
 
@@ -244,8 +258,21 @@ export async function activateCreatorSuccessorAdoption(input: unknown): Promise<
  * @returns Active successor custody or a typed fail-closed result.
  */
 export async function reopenCreatorSuccessorAdoption(input: unknown): Promise<Readonly<Record<string, unknown>>> {
+	if (
+		input !== null &&
+		typeof input === "object" &&
+		Object.getPrototypeOf(input) === Object.prototype &&
+		!("expectedRoomHead" in input)
+	) {
+		return failure(
+			"D110C_FLOOR_MIGRATION_REQUIRED",
+			"creator successor reopen requires an authenticated room-head floor"
+		);
+	}
 	const captured = capture(input, COLD_KEYS);
 	if (captured === undefined) return failure("malformed-input", "creator successor reopen input is invalid");
+	const expectedRoomHead = captureCreatorExpectedRoomHead(captured.expectedRoomHead);
+	if (expectedRoomHead === undefined) return failure("D110C_FLOOR_INVALID", "creator room-head floor is invalid");
 	if (captured.authenticationProfile !== "creator-only") {
 		return failure("malformed-input", "creator successor authentication profile is invalid");
 	}
@@ -256,5 +283,8 @@ export async function reopenCreatorSuccessorAdoption(input: unknown): Promise<Re
 	if (bindings === undefined) return failure("malformed-input", "creator successor runtime bindings are invalid");
 	const reopened = await consumeCreatorSuccessorReopen(captured as never);
 	if (!reopened.ok) return failure(reopened.kind, reopened.detail);
+	if (!sameCreatorRoomHead(expectedRoomHead, reopened.material.successor.trust)) {
+		return failure("D110C_FLOOR_MISMATCH", "creator successor differs from the authenticated room-head floor");
+	}
 	return activateMaterial(reopened.material, bindings);
 }

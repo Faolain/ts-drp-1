@@ -93397,6 +93397,88 @@ may accept an absent floor in ordinary reopen regardless of local epoch. The
 blocking confirmation union is empty, the exact design is accepted, and the
 next state is `D110C_0A_PLAN_READY`.
 
+The D.110c-0b0 GREEN implementation now supplies the reviewed first-transition
+freshness owner without changing protocol records or cryptography. The product
+room requires an application-held `V3RoomHeadAuthority` with exact
+create/migrate/read/begin/commit operations over one stable and at most one
+pending `(objectId, epoch, currentAnchorDigest)` tuple. Hot adoption uses the
+0b0a make-before-publish seam in the frozen order: verify, stage the complete
+successor, begin the provider pending CAS, publish the AHE head, commit and
+reread the provider, then activate only after exact dual-owner equality. Cold
+reopen refuses a missing provider with `D110C_FLOOR_MIGRATION_REQUIRED`, checks
+an exact copied head in Node before activation, and completes an exact pending
+transition only through the existing authenticated non-activating 0b0a recovery
+owner. Explicit migration is caller-selected; ordinary reopen never derives or
+creates a floor from room bytes. The retained one-call commit remains available
+but has no product consumer, and the original cold reopen owner retains its
+no-AHE-mutation law. The browser model provider demonstrates capability
+composition only and is not evidence that same-origin IndexedDB is anti-rollback.
+
+The frozen focused command ran once. Its one test passed semantically with JSON
+`success:true`, zero failures, and zero pending, while the shell returned 1
+solely because that exact command inherited the repository-wide coverage
+percentage gate; it was not rerun. The first retained selection then passed
+95/97 and exposed two obsolete source-governance expectations for the removed
+direct-commit product consumer and old byte-identical chat owner. After one
+test-only correction batch, the exact retained nine-file selection passed
+97/97 across 20 suites. The first browser integration attempt exposed a genuine
+test-harness module-realm mismatch: verification was instrumented from source
+while new stage/recovery subpaths resolved built artifacts, so their process-
+local WeakMap custody differed. The harness was corrected to resolve those
+subpaths through the same fresh source realm. A second run found one stale
+creator epoch-1 fixture rejoin missing the mandatory head. After that fixture-
+only correction, the complete product browser gate passed 24/24 in Chromium,
+Firefox, and WebKit with zero skipped, unexpected, or flaky results.
+
+Affected Node, v3-room, and v3-chat builds passed. Exact Node production-source,
+room, chat, and private-fixture typechecks passed, as did exact-owner ESLint,
+Prettier, diff-check, the corrected six-step/key-roster/source-custody audit,
+and frozen root-manifest/lockfile identity checks. A first read-only diagnostic
+incorrectly counted the literal `expectedRoomHead:` syntax rather than the two
+actual hot/cold capture and equality checks; the corrected V2 check passed and
+the regex mistake is not a code failure. No protocol-v3, registry, wire, schema,
+dependency, threshold, workload, campaign, D.110a, or long multi-epoch path
+changed or ran. Protected roots remain present and all 27 current stashes are
+preserved. The first whole-plan Prettier check exhausted Node's default heap on
+this 93,000-line file; the identical read-only check passed with an 8 GiB
+formatter-process heap, without changing a product or test memory contract.
+
+The complete GREEN ledger is
+`.logs/d110c-0b0-green-798489fd/green-ledger.md`, SHA-256
+`fa150846b600f8549a88e9476cba85ae5e469fb8773a61da91b4103c969d4c25`.
+Focused, final retained, final browser, and corrected source-audit SHA-256
+values are
+`3d8f2391d4ba1059bca42eb86a0dfc330b92563fcdede49415935a6c5320386d`,
+`65b6c35141885ecc5e8ab0fe6b7c7dc944325a8249ffdccdc850e422ee7abb8f`,
+`56a53de0ee5c5c051b245f201ee97d031e64cea295189cb57bc7835cd7308b18`,
+and `b338d1b840e0086f2500a3dbf6b48e9f17f1d9d3ce0ca0b0e2c394b7b52c443e`.
+The validated 45-entry self-excluding evidence/source manifest SHA-256 is
+`9746dec91515f81219cc063bbb62dde77b478da91cbca35d390d6447a9a5bc21`;
+the plan is excluded to avoid circular identity.
+
+The latest expressly authorized one-off Fable 5.1/high parallel audit used
+session `a07b9681-5de2-4cb2-a106-ba421f2738c8`, completed normally, spawned no
+subagents, and changed no repository file. It returned no P0 and independently
+confirmed the selected fixed-creator checkpoint, immediate-predecessor rollback
+pair, and external 0b0 freshness floor. Its two P1s are accepted prospectively
+for a/b/0b1 rather than widening 0b0: a/b tests must assert closure membership
+through the inspect/advance predicates instead of freezing exact ref arrays,
+and 0b1 must prove D.109 cannot reclaim the floor member while an active cold
+open still requires it. The predecessor QC remains a fail-closed availability
+trade, not another trust root. Transcript and report SHA-256 values are
+`65aadcf527dfe334aab9dd9de85489ae2b6690d2def010d24b75f8581b96a6e4`
+and `66c8b3a091cd846c11cf46365928322d15832ae007b6347b0cb9fc3250217849`.
+This express authorization is consumed; no further Fable run is authorized.
+
+The implementation/evidence checkpoint is signed and pushed before the one
+governing Grok 4.6/high, standard direct Kimi K3 100-step, and Opus xhigh final
+plan-to-RED-to-GREEN review. That review must inspect the causal RED, 0b0a/0b0b
+prerequisites, complete provider/public boundary, six-step ordering, pending
+recovery, exact negative classifications, retained behavior, and evidence
+custody. Only P0/P1 blocks; any executable correction receives at most the one
+permitted confirmation. D.110c-0b0 is not closed and D.110c-a/b do not begin
+until that blocking union is empty.
+
 The four prerequisite decisions, including the newly demonstrated 0b0
 freshness-floor authority question, are reviewed before their production edits;
 each executable sub-slice receives its own bounded causal RED and GREEN. The

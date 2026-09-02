@@ -52,6 +52,7 @@ interface ExpectedInput {
 	onProjection(projection: Projection): void;
 	openTransport(): Readonly<Record<string, unknown>>;
 	readonly publicKeyBytes: Uint8Array;
+	readonly roomHeadAuthority: never;
 	signRegisteredVertexDigest(): Promise<Uint8Array>;
 }
 
@@ -354,6 +355,7 @@ function input(application: ExpectedApplication, onProjection: (projection: Proj
 			setRetainedPublisher: () => undefined,
 		}),
 		publicKeyBytes: Uint8Array.of(1),
+		roomHeadAuthority: undefined as never,
 		signRegisteredVertexDigest: () => Promise.resolve(new Uint8Array(64)),
 	};
 }

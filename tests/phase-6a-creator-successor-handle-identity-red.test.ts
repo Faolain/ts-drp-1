@@ -112,6 +112,11 @@ describe("D.108d1a successor handle registration identity RED", () => {
 			}
 			active = await candidate.activateCreatorSuccessorAdoption({
 				capability: prepared.capability,
+				expectedRoomHead: Object.freeze({
+					currentAnchorDigest: (prepared.descriptor as Readonly<Record<string, unknown>>).anchorDigest,
+					epoch: (prepared.descriptor as Readonly<Record<string, unknown>>).epoch,
+					objectId: (prepared.descriptor as Readonly<Record<string, unknown>>).objectId,
+				}),
 				handle: fixture.handle,
 				messageQueueManager: new MessageQueueManager<Message>({ logConfig: { level: "silent" } }),
 				networkNode,

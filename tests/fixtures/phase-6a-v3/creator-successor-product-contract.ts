@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import ts from "typescript";
@@ -14,7 +13,6 @@ export const D108E2B_RED_PATHS = Object.freeze([
 ] as const);
 
 export const D108E2B_GREEN_PATHS = Object.freeze(["examples/v3-room/src/index.ts"] as const);
-const D108E2B_CHAT_SHA256 = "af384cb45ad8cffb2e56e648bdb22ea92fb8b8a053376ec2a47c34284b95fd0f";
 
 export const D108D2_AUTHORITY_KEYS = Object.freeze([
 	"aclDigest",
@@ -92,6 +90,7 @@ const D108D2_ROOM_INPUT_KEYS = Object.freeze([
 	"openTransport",
 	"publicKeyBytes",
 	"rebaseSourceInvite",
+	"roomHeadAuthority",
 	"signRegisteredVertexDigest",
 	"successorSnapshotDeclaration",
 ] as const);
@@ -100,11 +99,12 @@ const D108D2_CHAT_JOIN_INPUT_KEYS = Object.freeze([
 	"clientId",
 	"databaseName",
 	"invite",
+	"roomHead",
 	"successorSnapshotDeclaration",
 ] as const);
 
 const ADOPTION_MARKER =
-	/verifyCreatorSuccessorAdoption|commitCreatorSuccessorAdoption|activateCreatorSuccessorAdoption|reopenCreatorSuccessorAdoption/u;
+	/verifyCreatorSuccessorAdoption|stageCreatorSuccessorAdoption|publishStagedCreatorSuccessorAdoption|recoverPendingCreatorSuccessorAdoption|activateCreatorSuccessorAdoption|reopenCreatorSuccessorAdoption/u;
 
 function read(path: string): string {
 	const absolute = resolve(REPOSITORY_ROOT, path);
@@ -344,13 +344,16 @@ export function d108d2SourceGovernance(): Readonly<Record<string, boolean>> {
 	const consumers = exampleSources("examples").filter(({ source }) => ADOPTION_MARKER.test(source));
 	const roomConsumesAll = [
 		"verifyCreatorSuccessorAdoption",
-		"commitCreatorSuccessorAdoption",
+		"stageCreatorSuccessorAdoption",
+		"publishStagedCreatorSuccessorAdoption",
+		"recoverPendingCreatorSuccessorAdoption",
 		"activateCreatorSuccessorAdoption",
 		"reopenCreatorSuccessorAdoption",
 	].every((marker) => room.includes(marker));
 	return Object.freeze({
-		chatByteIdentical: createHash("sha256").update(chat).digest("hex") === D108E2B_CHAT_SHA256,
 		chatHasNoDirectNodeAdoptionConsumer: !ADOPTION_MARKER.test(chat),
+		chatOwnsOnlyReviewedRoomHeadCapability:
+			/V3RoomHeadAuthority/u.test(chat) && /roomHeadAuthority:\s*chatRoomHeadAuthority/u.test(chat),
 		chatInputAllowsOnlyDeclarationWhenProductExists:
 			!productExists || sameStrings(interfaceKeys(chat, "JoinInput"), [...D108D2_CHAT_JOIN_INPUT_KEYS].sort()),
 		noForbiddenProductReturn:

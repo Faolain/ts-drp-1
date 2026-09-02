@@ -8,7 +8,11 @@ import {
 	activateCreatorSuccessorAdoption,
 	reopenCreatorSuccessorAdoption,
 } from "@ts-drp/node/creator-adoption-activate";
-import { commitCreatorSuccessorAdoption } from "@ts-drp/node/creator-adoption-commit";
+import { recoverPendingCreatorSuccessorAdoption } from "@ts-drp/node/creator-adoption-recover";
+import {
+	publishStagedCreatorSuccessorAdoption,
+	stageCreatorSuccessorAdoption,
+} from "@ts-drp/node/creator-adoption-stage";
 import {
 	bindCreatorLiveClose,
 	type BindCreatorLiveCloseInput,
@@ -238,6 +242,48 @@ export interface V3RoomSuccessorAuthority {
 	readonly profileId: "creator-trusted-v1";
 }
 
+export interface V3RoomHead {
+	readonly currentAnchorDigest: string;
+	readonly epoch: number;
+	readonly objectId: string;
+}
+
+export interface V3RoomHeadScope {
+	readonly objectId: string;
+	readonly pinnedGenesisAnchorDigest: string;
+}
+
+export interface V3RoomHeadState {
+	readonly pending: null | Readonly<{ readonly next: V3RoomHead; readonly previous: V3RoomHead }>;
+	readonly stable: V3RoomHead;
+}
+
+export type V3RoomHeadAuthorityResult =
+	| Readonly<{ readonly ok: false; readonly reason: "conflict" | "unavailable" }>
+	| Readonly<{ readonly ok: true; readonly state: V3RoomHeadState | null }>;
+
+export type V3RoomHeadInitialization =
+	| Readonly<{ readonly kind: "create" }>
+	| Readonly<{ readonly head: V3RoomHead; readonly kind: "migrate" }>
+	| Readonly<{ readonly kind: "reopen" }>;
+
+export interface V3RoomHeadAuthority {
+	readonly initialization: V3RoomHeadInitialization;
+	begin(
+		input: Readonly<{ readonly expected: V3RoomHeadState; readonly next: V3RoomHead; readonly scope: V3RoomHeadScope }>
+	): Promise<V3RoomHeadAuthorityResult>;
+	commit(
+		input: Readonly<{ readonly expected: V3RoomHeadState; readonly scope: V3RoomHeadScope }>
+	): Promise<V3RoomHeadAuthorityResult>;
+	create(
+		input: Readonly<{ readonly scope: V3RoomHeadScope; readonly stable: V3RoomHead }>
+	): Promise<V3RoomHeadAuthorityResult>;
+	migrate(
+		input: Readonly<{ readonly scope: V3RoomHeadScope; readonly stable: V3RoomHead }>
+	): Promise<V3RoomHeadAuthorityResult>;
+	read(input: Readonly<{ readonly scope: V3RoomHeadScope }>): Promise<V3RoomHeadAuthorityResult>;
+}
+
 export interface V3RoomMigrationProjection {
 	readonly exactCanonicalApplicationStateBytes: Uint8Array;
 	readonly importOperations: readonly Readonly<Record<string, unknown>>[];
@@ -339,6 +385,7 @@ export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAut
 	onProjection(projection: Projection): void;
 	readonly publicKeyBytes: Uint8Array;
 	readonly rebaseSourceInvite?: string | V3RoomCreatorInviteMaterial;
+	readonly roomHeadAuthority: V3RoomHeadAuthority;
 	readonly signRegisteredVertexDigest: SignRegisteredVertexDigest;
 	readonly successorSnapshotDeclaration?: SnapshotQuarantineDeclaration;
 }
@@ -741,6 +788,199 @@ function exactRecord(value: unknown, expectedKeys: readonly string[]): Readonly<
 		output[key] = descriptor.value;
 	}
 	return Object.freeze(output);
+}
+
+const ROOM_HEAD_KEYS = Object.freeze(["currentAnchorDigest", "epoch", "objectId"]);
+const ROOM_HEAD_STATE_KEYS = Object.freeze(["pending", "stable"]);
+const ROOM_HEAD_PENDING_KEYS = Object.freeze(["next", "previous"]);
+const ROOM_HEAD_INITIALIZATION_KEYS = Object.freeze(["kind"]);
+const ROOM_HEAD_MIGRATION_KEYS = Object.freeze(["head", "kind"]);
+const ROOM_HEAD_RESULT_FAILURE_KEYS = Object.freeze(["ok", "reason"]);
+const ROOM_HEAD_RESULT_SUCCESS_KEYS = Object.freeze(["ok", "state"]);
+const LOWER_HEX_256 = /^[0-9a-f]{64}$/u;
+
+function roomHeadFailure(code: string): never {
+	throw new TypeError(code);
+}
+
+function captureRoomHead(value: unknown): V3RoomHead | undefined {
+	const record = exactRecord(value, ROOM_HEAD_KEYS);
+	return record !== undefined &&
+		typeof record.currentAnchorDigest === "string" &&
+		LOWER_HEX_256.test(record.currentAnchorDigest) &&
+		Number.isSafeInteger(record.epoch) &&
+		(record.epoch as number) >= 0 &&
+		typeof record.objectId === "string" &&
+		record.objectId.length > 0
+		? Object.freeze({
+				currentAnchorDigest: record.currentAnchorDigest,
+				epoch: record.epoch as number,
+				objectId: record.objectId,
+			})
+		: undefined;
+}
+
+function sameRoomHead(left: V3RoomHead, right: V3RoomHead): boolean {
+	return (
+		left.currentAnchorDigest === right.currentAnchorDigest &&
+		left.epoch === right.epoch &&
+		left.objectId === right.objectId
+	);
+}
+
+function captureRoomHeadState(value: unknown, scope: V3RoomHeadScope): V3RoomHeadState | undefined {
+	const record = exactRecord(value, ROOM_HEAD_STATE_KEYS);
+	const stable = captureRoomHead(record?.stable);
+	if (record === undefined || stable === undefined || stable.objectId !== scope.objectId) return undefined;
+	if (record.pending === null) return Object.freeze({ pending: null, stable });
+	const pending = exactRecord(record.pending, ROOM_HEAD_PENDING_KEYS);
+	const previous = captureRoomHead(pending?.previous);
+	const next = captureRoomHead(pending?.next);
+	return pending !== undefined &&
+		previous !== undefined &&
+		next !== undefined &&
+		sameRoomHead(previous, stable) &&
+		next.objectId === scope.objectId &&
+		next.epoch === stable.epoch + 1 &&
+		next.currentAnchorDigest !== stable.currentAnchorDigest
+		? Object.freeze({ pending: Object.freeze({ next, previous }), stable })
+		: undefined;
+}
+
+function sameRoomHeadState(left: V3RoomHeadState, right: V3RoomHeadState): boolean {
+	return (
+		sameRoomHead(left.stable, right.stable) &&
+		(left.pending === null
+			? right.pending === null
+			: right.pending !== null &&
+				sameRoomHead(left.pending.previous, right.pending.previous) &&
+				sameRoomHead(left.pending.next, right.pending.next))
+	);
+}
+
+function captureRoomHeadInitialization(value: unknown): V3RoomHeadInitialization | undefined {
+	const createOrReopen = exactRecord(value, ROOM_HEAD_INITIALIZATION_KEYS);
+	if (createOrReopen?.kind === "create" || createOrReopen?.kind === "reopen") {
+		return Object.freeze({ kind: createOrReopen.kind });
+	}
+	const migration = exactRecord(value, ROOM_HEAD_MIGRATION_KEYS);
+	const head = captureRoomHead(migration?.head);
+	return migration?.kind === "migrate" && head !== undefined
+		? Object.freeze({ head, kind: "migrate" as const })
+		: undefined;
+}
+
+async function callRoomHeadAuthority(
+	operation: () => Promise<V3RoomHeadAuthorityResult>,
+	scope: V3RoomHeadScope
+): Promise<V3RoomHeadState | null> {
+	let result: unknown;
+	try {
+		result = await operation();
+	} catch {
+		return roomHeadFailure("D110C_FLOOR_UNAVAILABLE");
+	}
+	const failure = exactRecord(result, ROOM_HEAD_RESULT_FAILURE_KEYS);
+	if (failure?.ok === false) {
+		if (failure.reason === "conflict") return roomHeadFailure("D110C_FLOOR_CONFLICT");
+		if (failure.reason === "unavailable") return roomHeadFailure("D110C_FLOOR_UNAVAILABLE");
+		return roomHeadFailure("D110C_FLOOR_INVALID");
+	}
+	const success = exactRecord(result, ROOM_HEAD_RESULT_SUCCESS_KEYS);
+	if (success?.ok !== true) return roomHeadFailure("D110C_FLOOR_INVALID");
+	if (success.state === null) return null;
+	return captureRoomHeadState(success.state, scope) ?? roomHeadFailure("D110C_FLOOR_INVALID");
+}
+
+async function initializeRoomHeadAuthority(
+	authority: V3RoomHeadAuthority,
+	scope: V3RoomHeadScope,
+	genesis: V3RoomHead
+): Promise<V3RoomHeadState> {
+	const initialization = captureRoomHeadInitialization(Reflect.get(authority, "initialization"));
+	if (initialization === undefined) return roomHeadFailure("D110C_FLOOR_INVALID");
+	let state: V3RoomHeadState | null;
+	if (initialization.kind === "create") {
+		state = await callRoomHeadAuthority(() => authority.create(Object.freeze({ scope, stable: genesis })), scope);
+	} else if (initialization.kind === "migrate") {
+		if (initialization.head.objectId !== scope.objectId) return roomHeadFailure("D110C_FLOOR_INVALID");
+		state = await callRoomHeadAuthority(
+			() => authority.migrate(Object.freeze({ scope, stable: initialization.head })),
+			scope
+		);
+	} else {
+		state = await callRoomHeadAuthority(() => authority.read(Object.freeze({ scope })), scope);
+	}
+	if (state === null) {
+		return roomHeadFailure(
+			initialization.kind === "reopen" ? "D110C_FLOOR_MIGRATION_REQUIRED" : "D110C_FLOOR_CONFLICT"
+		);
+	}
+	return state;
+}
+
+async function readRoomHeadAuthority(authority: V3RoomHeadAuthority, scope: V3RoomHeadScope): Promise<V3RoomHeadState> {
+	return (
+		(await callRoomHeadAuthority(() => authority.read(Object.freeze({ scope })), scope)) ??
+		roomHeadFailure("D110C_FLOOR_MIGRATION_REQUIRED")
+	);
+}
+
+async function beginRoomHeadAdvance(
+	authority: V3RoomHeadAuthority,
+	scope: V3RoomHeadScope,
+	current: V3RoomHead,
+	next: V3RoomHead
+): Promise<V3RoomHeadState> {
+	if (
+		current.objectId !== scope.objectId ||
+		next.objectId !== scope.objectId ||
+		next.epoch !== current.epoch + 1 ||
+		next.currentAnchorDigest === current.currentAnchorDigest
+	) {
+		return roomHeadFailure("D110C_FLOOR_REGRESSION");
+	}
+	const observed = await readRoomHeadAuthority(authority, scope);
+	if (observed.pending !== null) {
+		if (sameRoomHead(observed.pending.previous, current) && sameRoomHead(observed.pending.next, next)) return observed;
+		return roomHeadFailure("D110C_FLOOR_PENDING_INVALID");
+	}
+	if (!sameRoomHead(observed.stable, current)) {
+		return roomHeadFailure(observed.stable.epoch > current.epoch ? "D110C_FLOOR_HEAD_AHEAD" : "D110C_FLOOR_MISMATCH");
+	}
+	const expected = Object.freeze({ pending: null, stable: current });
+	const selected = await callRoomHeadAuthority(() => authority.begin(Object.freeze({ expected, next, scope })), scope);
+	const pending = Object.freeze({ next, previous: current });
+	const desired = Object.freeze({ pending, stable: current });
+	if (selected === null || !sameRoomHeadState(selected, desired)) return roomHeadFailure("D110C_FLOOR_CONFLICT");
+	return selected;
+}
+
+async function commitRoomHeadAdvance(
+	authority: V3RoomHeadAuthority,
+	scope: V3RoomHeadScope,
+	pending: V3RoomHeadState
+): Promise<V3RoomHeadState> {
+	if (pending.pending === null) return roomHeadFailure("D110C_FLOOR_PENDING_INVALID");
+	const selected = await callRoomHeadAuthority(
+		() => authority.commit(Object.freeze({ expected: pending, scope })),
+		scope
+	);
+	const desired = Object.freeze({ pending: null, stable: pending.pending.next });
+	if (selected === null || !sameRoomHeadState(selected, desired)) return roomHeadFailure("D110C_FLOOR_CONFLICT");
+	const reopened = await readRoomHeadAuthority(authority, scope);
+	if (!sameRoomHeadState(reopened, desired)) return roomHeadFailure("D110C_FLOOR_MISMATCH");
+	return reopened;
+}
+
+function expectedRoomHeadFromDescriptor(descriptor: Readonly<Record<string, unknown>>): V3RoomHead {
+	return (
+		captureRoomHead({
+			currentAnchorDigest: descriptor.anchorDigest,
+			epoch: descriptor.epoch,
+			objectId: descriptor.objectId,
+		}) ?? roomHeadFailure("D110C_FLOOR_INVALID")
+	);
 }
 
 function exactDenseArray(value: unknown): readonly unknown[] | undefined {
@@ -1222,7 +1462,8 @@ export async function createV3RoomSession<Projection extends V3RoomProjectionAut
 async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAuthority>(
 	input: CreateV3RoomSessionInput<Projection>,
 	requireFreshTrust: boolean,
-	redirectSource?: RedirectSourceRecovery
+	redirectSource?: RedirectSourceRecovery,
+	skipRoomHeadAuthority = false
 ): Promise<V3RoomSession<Projection>> {
 	if (
 		input.successorSnapshotDeclaration !== undefined &&
@@ -1283,6 +1524,51 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	} = input;
 	const objectIdResult = parseStorageObjectId(input.objectId);
 	if (!objectIdResult.ok) throw new TypeError("v3 room object id is invalid");
+	const roomHeadScope = Object.freeze({
+		objectId: input.objectId,
+		pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
+	});
+	const genesisRoomHead = Object.freeze({
+		currentAnchorDigest: material.pinnedGenesisAnchorDigest,
+		epoch: 0,
+		objectId: input.objectId,
+	});
+	let roomHeadAuthority: V3RoomHeadAuthority | undefined;
+	let openedRoomHeadState: V3RoomHeadState | undefined;
+	if (redirectSource === undefined && !requireFreshTrust && !skipRoomHeadAuthority) {
+		const candidate = input.roomHeadAuthority;
+		if (
+			candidate === undefined ||
+			candidate === null ||
+			typeof candidate !== "object" ||
+			!["begin", "commit", "create", "migrate", "read"].every(
+				(method) => typeof Reflect.get(candidate, method) === "function"
+			)
+		) {
+			if (input.creatorFinalitySigner !== undefined || input.successorSnapshotDeclaration !== undefined) {
+				return roomHeadFailure("D110C_FLOOR_MIGRATION_REQUIRED");
+			}
+		} else {
+			roomHeadAuthority = candidate;
+			openedRoomHeadState = await initializeRoomHeadAuthority(candidate, roomHeadScope, genesisRoomHead);
+			if (
+				openedRoomHeadState.pending === null &&
+				input.successorSnapshotDeclaration === undefined &&
+				!sameRoomHead(openedRoomHeadState.stable, genesisRoomHead)
+			) {
+				return roomHeadFailure(
+					openedRoomHeadState.stable.epoch > genesisRoomHead.epoch ? "D110C_FLOOR_HEAD_AHEAD" : "D110C_FLOOR_MISMATCH"
+				);
+			}
+			if (
+				openedRoomHeadState.pending === null &&
+				input.successorSnapshotDeclaration !== undefined &&
+				(openedRoomHeadState.stable.objectId !== input.objectId || openedRoomHeadState.stable.epoch !== 1)
+			) {
+				return roomHeadFailure("D110C_FLOOR_MISMATCH");
+			}
+		}
+	}
 	const inviteAuthority = migrationInviteAuthority(material);
 	const roomInviteAuthority = input.application.migration === undefined ? undefined : inviteAuthority;
 	if (inviteAuthority.objectId !== input.objectId) {
@@ -1870,10 +2156,40 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (!activated.ok) throw new TypeError(`v3 room activation failed: ${activated.kind}`);
 			activeHandle = activated.handle as RoomPlaneHandle;
 		} else {
+			if (roomHeadAuthority === undefined || openedRoomHeadState === undefined) {
+				return roomHeadFailure("D110C_FLOOR_MIGRATION_REQUIRED");
+			}
 			const snapshotStore = await createBrowserSnapshotQuarantineStore({
 				primaryDatabaseName: input.databaseName,
 			});
 			creatorCloseStoreClosers.push(snapshotStore.close);
+			const selectedPending = openedRoomHeadState.pending;
+			if (selectedPending !== null) {
+				const pending = Object.freeze({ pending: selectedPending, stable: openedRoomHeadState.stable });
+				const recoveredPending = await recoverPendingCreatorSuccessorAdoption({
+					authenticationProfile: "creator-only",
+					catalog: input.application.catalog,
+					detachedSignature: material.detachedGenesisSignature,
+					exactCanonicalAnchorPreimageBytes: material.exactCanonicalGenesisAnchorPreimageBytes,
+					exactCanonicalParametersCarrierBytes: material.exactCanonicalParametersCarrierBytes,
+					expectedNextRoomHead: selectedPending.next,
+					expectedPreviousRoomHead: selectedPending.previous,
+					pinnedGenesisAnchorDigest: material.pinnedGenesisAnchorDigest,
+					snapshotDeclaration: input.successorSnapshotDeclaration,
+					snapshotStore,
+					store: aheStores[0],
+				});
+				const recoveredHead = captureRoomHead(recoveredPending.head);
+				if (
+					recoveredPending.ok !== true ||
+					recoveredHead === undefined ||
+					!sameRoomHead(recoveredHead, selectedPending.next)
+				) {
+					return roomHeadFailure("D110C_FLOOR_RECOVERY_UNAVAILABLE");
+				}
+				openedRoomHeadState = await commitRoomHeadAdvance(roomHeadAuthority, roomHeadScope, pending);
+			}
+			const expectedRoomHead = openedRoomHeadState.stable;
 			const reopened = await reopenCreatorSuccessorAdoption({
 				authenticationProfile: "creator-only",
 				author: input.author,
@@ -1881,6 +2197,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				detachedSignature: material.detachedGenesisSignature,
 				exactCanonicalAnchorPreimageBytes: material.exactCanonicalGenesisAnchorPreimageBytes,
 				exactCanonicalParametersCarrierBytes: material.exactCanonicalParametersCarrierBytes,
+				expectedRoomHead,
 				issuanceStore,
 				liveJournalStore: journalStore,
 				messageQueueManager,
@@ -2745,12 +3062,13 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				onProjection: (): void => undefined,
 				openTransport: migrationTransport,
 				publicKeyBytes: new Uint8Array(input.publicKeyBytes),
+				roomHeadAuthority: input.roomHeadAuthority,
 				signRegisteredVertexDigest: input.signRegisteredVertexDigest,
 			});
 			let target: V3RoomSession<Projection> | undefined;
 			let reopenedTarget: V3RoomSession<Projection> | undefined;
 			try {
-				const openedTarget = await createV3RoomSessionOwned(targetInput, true);
+				const openedTarget = await createV3RoomSessionOwned(targetInput, true, undefined, true);
 				target = openedTarget;
 				const bootstrapAcceptedCount = targetAccepted.length;
 				if (bootstrapAcceptedCount < 1) throw new TypeError("v3 room migration target bootstrap was not accepted");
@@ -2821,7 +3139,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 							}
 						},
 					}),
-					false
+					false,
+					undefined,
+					true
 				);
 				reopenedTarget = reopened;
 				const reopenedProjection = reopened.projection();
@@ -3052,7 +3372,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					onMigrationTarget: () => undefined,
 					onProjection: (): void => undefined,
 				}),
-				false
+				false,
+				undefined,
+				true
 			);
 			try {
 				const recoveredRecord = recoveredRecords[0];
@@ -3172,15 +3494,36 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			handle: creatorCloseHandle,
 		});
 		if (!verified.ok) throw new TypeError(`v3 room successor verification failed: ${verified.kind}`);
+		if (roomHeadAuthority === undefined || openedRoomHeadState === undefined) {
+			return roomHeadFailure("D110C_FLOOR_MIGRATION_REQUIRED");
+		}
 		assertSessionOpen();
-		const committed = await commitCreatorSuccessorAdoption({
+		const staged = await stageCreatorSuccessorAdoption({
 			handle: creatorCloseHandle,
 			intent: verified.intent,
 		});
-		if (!committed.ok) throw new TypeError(`v3 room successor commit failed: ${committed.kind}`);
+		if (!staged.ok) throw new TypeError(`v3 room successor stage failed: ${String(staged.kind)}`);
+		const nextRoomHead = expectedRoomHeadFromDescriptor(staged.descriptor as Readonly<Record<string, unknown>>);
+		const pendingRoomHead = await beginRoomHeadAdvance(
+			roomHeadAuthority,
+			roomHeadScope,
+			openedRoomHeadState.stable,
+			nextRoomHead
+		);
+		assertSessionOpen();
+		const published = await publishStagedCreatorSuccessorAdoption({
+			capability: staged.capability,
+			handle: creatorCloseHandle,
+		});
+		if (!published.ok) throw new TypeError(`v3 room successor publication failed: ${String(published.kind)}`);
+		openedRoomHeadState = await commitRoomHeadAdvance(roomHeadAuthority, roomHeadScope, pendingRoomHead);
+		if (openedRoomHeadState.pending !== null || !sameRoomHead(openedRoomHeadState.stable, nextRoomHead)) {
+			return roomHeadFailure("D110C_FLOOR_MISMATCH");
+		}
 		assertSessionOpen();
 		const activated = await activateCreatorSuccessorAdoption({
-			capability: committed.capability,
+			capability: published.capability,
+			expectedRoomHead: openedRoomHeadState.stable,
 			handle: creatorCloseHandle,
 			messageQueueManager,
 			networkNode: transport.networkNode,

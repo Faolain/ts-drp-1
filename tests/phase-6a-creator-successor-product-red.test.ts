@@ -84,8 +84,8 @@ describe("D.108e2b creator successor room lifetime RED", () => {
 
 	it("keeps node-root and chat authority closed while assigning the room as sole node consumer", () => {
 		expect(d108d2SourceGovernance()).toEqual({
-			chatByteIdentical: true,
 			chatHasNoDirectNodeAdoptionConsumer: true,
+			chatOwnsOnlyReviewedRoomHeadCapability: true,
 			chatInputAllowsOnlyDeclarationWhenProductExists: true,
 			noForbiddenProductReturn: true,
 			noNodeRootWidening: true,

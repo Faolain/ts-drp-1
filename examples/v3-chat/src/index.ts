@@ -6,6 +6,10 @@ import {
 	type V3RoomAcceptedOperation,
 	type V3RoomApplication,
 	type V3RoomCreatorInviteMaterial,
+	type V3RoomHead,
+	type V3RoomHeadAuthority,
+	type V3RoomHeadAuthorityResult,
+	type V3RoomHeadState,
 	type V3RoomMigrationActivationReceipt,
 	type V3RoomMigrationProjection,
 	type V3RoomMigrationRehearsalReceipt,
@@ -50,6 +54,7 @@ interface JoinInput {
 	readonly clientId: ClientId;
 	readonly databaseName: string;
 	readonly invite: string;
+	readonly roomHead?: V3RoomHead;
 	readonly successorSnapshotDeclaration?: SuccessorSnapshotDeclaration;
 }
 
@@ -732,6 +737,52 @@ function projectChat(operations: readonly V3RoomAcceptedOperation[]): ChatProjec
 	});
 }
 
+function chatRoomHeadAuthority(migrationHead?: V3RoomHead): V3RoomHeadAuthority {
+	let state: V3RoomHeadState | null = null;
+	const same = (left: unknown, right: unknown): boolean => sameBytes(encodeCanonical(left), encodeCanonical(right));
+	const success = (): V3RoomHeadAuthorityResult => Object.freeze({ ok: true as const, state });
+	return Object.freeze({
+		initialization:
+			migrationHead === undefined
+				? Object.freeze({ kind: "create" as const })
+				: Object.freeze({ head: migrationHead, kind: "migrate" as const }),
+		begin: (input: Parameters<V3RoomHeadAuthority["begin"]>[0]) => {
+			if (state === null || !same(state, input.expected)) {
+				return Promise.resolve(Object.freeze({ ok: false as const, reason: "conflict" as const }));
+			}
+			state = Object.freeze({
+				pending: Object.freeze({ next: input.next, previous: input.expected.stable }),
+				stable: input.expected.stable,
+			});
+			return Promise.resolve(success());
+		},
+		commit: (input: Parameters<V3RoomHeadAuthority["commit"]>[0]) => {
+			if (state === null || state.pending === null || !same(state, input.expected)) {
+				return Promise.resolve(Object.freeze({ ok: false as const, reason: "conflict" as const }));
+			}
+			state = Object.freeze({ pending: null, stable: state.pending.next });
+			return Promise.resolve(success());
+		},
+		create: (input: Parameters<V3RoomHeadAuthority["create"]>[0]) => {
+			const desired = Object.freeze({ pending: null, stable: input.stable });
+			if (state === null) state = desired;
+			else if (!same(state, desired)) {
+				return Promise.resolve(Object.freeze({ ok: false as const, reason: "conflict" as const }));
+			}
+			return Promise.resolve(success());
+		},
+		migrate: (input: Parameters<V3RoomHeadAuthority["migrate"]>[0]) => {
+			const desired = Object.freeze({ pending: null, stable: input.stable });
+			if (state !== null && !same(state, desired)) {
+				return Promise.resolve(Object.freeze({ ok: false as const, reason: "conflict" as const }));
+			}
+			state = desired;
+			return Promise.resolve(success());
+		},
+		read: () => Promise.resolve(success()),
+	});
+}
+
 async function joinRoom(input: RoomJoinInput): Promise<ActiveChat> {
 	const application = createV3ChatApplication(input.clientId);
 	const selected = CLIENTS[input.clientId];
@@ -774,6 +825,7 @@ async function joinRoom(input: RoomJoinInput): Promise<ActiveChat> {
 			}
 		},
 		publicKeyBytes: bytes(author),
+		roomHeadAuthority: chatRoomHeadAuthority(input.roomHead),
 		signRegisteredVertexDigest: (registeredDigest) => keychain.signWithLocalAuthor(registeredDigest),
 		...(input.successorSnapshotDeclaration === undefined
 			? {}
@@ -817,6 +869,7 @@ const api = Object.freeze({
 			clientId: input.clientId,
 			creatorInvite: input.invite,
 			databaseName: input.databaseName,
+			...(input.roomHead === undefined ? {} : { roomHead: input.roomHead }),
 			...(input.successorSnapshotDeclaration === undefined
 				? {}
 				: { successorSnapshotDeclaration: input.successorSnapshotDeclaration }),

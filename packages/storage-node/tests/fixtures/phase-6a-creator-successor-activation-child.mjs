@@ -437,6 +437,16 @@ async function cold(material, selectedMode) {
 				...(selectedMode === "divergent-genesis" ? { pinnedGenesisAnchorDigest: "f".repeat(64) } : {}),
 				...(selectedMode === "extra-epoch" ? { epoch: 1 } : {}),
 				catalog,
+				...(selectedMode === "d110c-no-floor"
+					? {}
+					: {
+							expectedRoomHead: {
+								currentAnchorDigest:
+									selectedMode === "d110c-wrong-floor" ? "f".repeat(64) : material.oracle.anchorDigest,
+								epoch: material.oracle.epoch,
+								objectId: material.oracle.objectId,
+							},
+						}),
 				issuanceStore: stores.issuanceStore,
 				liveJournalStore: stores.liveJournal.store,
 				messageQueueManager: new MessageQueueManager({ logConfig: { level: "silent" } }),

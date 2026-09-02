@@ -46,6 +46,8 @@ function lifetimeInstrumentationPlugin(): Plugin {
 	const creatorClose = resolve(REPOSITORY_ROOT, "packages/node/src/creator-close.ts");
 	const creatorAdoption = resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption.ts");
 	const creatorAdoptionCommit = resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption-commit.ts");
+	const creatorAdoptionStage = resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption-stage.ts");
+	const creatorAdoptionRecover = resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption-recover.ts");
 	const creatorAdoptionActivate = resolve(REPOSITORY_ROOT, "packages/node/src/creator-adoption-activate.ts");
 	const shared = `
 const stateSymbol = Symbol.for("ts-drp/d108e2b/lifetime-state");
@@ -414,6 +416,21 @@ export const commitCreatorSuccessorAdoption = async (input) => {
 };`,
 				],
 				[
+					"@ts-drp/node/creator-adoption-stage",
+					`${shared}
+import * as actual from ${JSON.stringify(creatorAdoptionStage)};
+export const stageCreatorSuccessorAdoption = async (input) => {
+  if (closeHandlePlaneIds.get(input.handle) === state.targetPlaneId) state.commitCount += 1;
+  return actual.stageCreatorSuccessorAdoption(input);
+};
+export const publishStagedCreatorSuccessorAdoption = actual.publishStagedCreatorSuccessorAdoption;`,
+				],
+				[
+					"@ts-drp/node/creator-adoption-recover",
+					`import * as actual from ${JSON.stringify(creatorAdoptionRecover)};
+export const recoverPendingCreatorSuccessorAdoption = actual.recoverPendingCreatorSuccessorAdoption;`,
+				],
+				[
 					"@ts-drp/node/creator-adoption-activate",
 					`${shared}
 import * as actual from ${JSON.stringify(creatorAdoptionActivate)};
@@ -500,6 +517,8 @@ async function startProductBrowserServer(entryPoint: string): Promise<ProductBro
 						"@ts-drp/node/creator-adoption",
 						"@ts-drp/node/creator-adoption-activate",
 						"@ts-drp/node/creator-adoption-commit",
+						"@ts-drp/node/creator-adoption-recover",
+						"@ts-drp/node/creator-adoption-stage",
 						"@ts-drp/node/creator-close",
 						"@ts-drp/node/v3-live",
 					]).has(specifier)
@@ -716,6 +735,11 @@ test(D108D2_BROWSER_BEHAVIORS[1], async () => {
 		clientId: "bob",
 		databaseName: DATABASES.established,
 		invite,
+		roomHead: {
+			currentAnchorDigest: carrier.authority.anchorDigest,
+			epoch: carrier.authority.epoch,
+			objectId: carrier.authority.objectId,
+		},
 		successorSnapshotDeclaration: carrier.snapshotDeclaration,
 	});
 	const reopened = await snapshot(established);
@@ -753,6 +777,11 @@ test(D108D2_BROWSER_BEHAVIORS[2], async () => {
 		clientId: "carol",
 		databaseName: DATABASES.late,
 		invite,
+		roomHead: {
+			currentAnchorDigest: carrier.authority.anchorDigest,
+			epoch: carrier.authority.epoch,
+			objectId: carrier.authority.objectId,
+		},
 		successorSnapshotDeclaration: carrier.snapshotDeclaration,
 	});
 	await waitForText(late, "successor-live");
@@ -766,6 +795,11 @@ test(D108D2_BROWSER_BEHAVIORS[2], async () => {
 		clientId: "alice",
 		databaseName: DATABASES.creator,
 		invite,
+		roomHead: {
+			currentAnchorDigest: carrier.authority.anchorDigest,
+			epoch: carrier.authority.epoch,
+			objectId: carrier.authority.objectId,
+		},
 		successorSnapshotDeclaration: carrier.snapshotDeclaration,
 	});
 	expect((await snapshot(creator)).authority).toEqual(carrier.authority);

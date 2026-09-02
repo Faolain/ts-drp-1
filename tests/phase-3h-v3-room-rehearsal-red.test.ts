@@ -453,6 +453,7 @@ async function openRoom(
 			return inertTransport(input.databaseName, openedObjectId);
 		},
 		publicKeyBytes: bytes(author),
+		roomHeadAuthority: undefined as never,
 		signRegisteredVertexDigest:
 			input.signer ?? ((registeredDigest) => Promise.resolve(ed25519.sign(registeredDigest, input.material.seed))),
 	})) as MigrationSession;

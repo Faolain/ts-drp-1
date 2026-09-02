@@ -62,6 +62,15 @@ async function candidate(): Promise<D108d1CandidateModule> {
 	return import(pathToFileURL(resolve(REPOSITORY_ROOT, D108D1_GREEN_PATHS[0])).href) as Promise<D108d1CandidateModule>;
 }
 
+function preparedRoomHead(prepared: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> {
+	const descriptor = prepared.descriptor as Readonly<Record<string, unknown>>;
+	return Object.freeze({
+		currentAnchorDigest: descriptor.anchorDigest,
+		epoch: descriptor.epoch,
+		objectId: descriptor.objectId,
+	});
+}
+
 function runtimeBindings(peerId: string): Readonly<Record<string, unknown>> {
 	return Object.freeze({
 		messageQueueManager: new MessageQueueManager<Message>({ logConfig: { level: "silent" } }),
@@ -180,6 +189,11 @@ describe("D.108d1 creator successor activation RED", () => {
 				detachedSignature: new Uint8Array(),
 				exactCanonicalAnchorPreimageBytes: new Uint8Array(),
 				exactCanonicalParametersCarrierBytes: new Uint8Array(),
+				expectedRoomHead: Object.freeze({
+					currentAnchorDigest: "0".repeat(64),
+					epoch: 1,
+					objectId: "creator:00000000000000000000000000000000",
+				}),
 				issuanceStore: downstream,
 				liveJournalStore: downstream,
 				messageQueueManager: downstream,
@@ -240,6 +254,7 @@ describe("D.108d1 creator successor activation RED", () => {
 		]);
 		expect(CREATOR_SUCCESSOR_ACTIVATION_INPUT_KEYS).toEqual([
 			"capability",
+			"expectedRoomHead",
 			"handle",
 			"messageQueueManager",
 			"networkNode",
@@ -252,6 +267,7 @@ describe("D.108d1 creator successor activation RED", () => {
 			"detachedSignature",
 			"exactCanonicalAnchorPreimageBytes",
 			"exactCanonicalParametersCarrierBytes",
+			"expectedRoomHead",
 			"issuanceStore",
 			"liveJournalStore",
 			"messageQueueManager",
@@ -269,6 +285,7 @@ describe("D.108d1 creator successor activation RED", () => {
 			"detachedSignature",
 			"exactCanonicalAnchorPreimageBytes",
 			"exactCanonicalParametersCarrierBytes",
+			"expectedRoomHead",
 			"issuanceStore",
 			"liveJournalStore",
 			"messageQueueManager",
@@ -281,6 +298,9 @@ describe("D.108d1 creator successor activation RED", () => {
 			"store",
 		]);
 		expect(CREATOR_SUCCESSOR_ACTIVATION_FAILURE_KINDS).toEqual([
+			"D110C_FLOOR_INVALID",
+			"D110C_FLOOR_MIGRATION_REQUIRED",
+			"D110C_FLOOR_MISMATCH",
 			"malformed-input",
 			"capability-unavailable",
 			"source-unavailable",
@@ -370,6 +390,7 @@ describe("D.108d1 creator successor activation RED", () => {
 			if (activate === undefined) throw new TypeError("D.108d1 activation export missing");
 			result = await activate({
 				capability: prepared.capability,
+				expectedRoomHead: preparedRoomHead(prepared),
 				handle: fixture.handle,
 				...fixture.runtimeBindings,
 			});
@@ -400,6 +421,7 @@ describe("D.108d1 creator successor activation RED", () => {
 			}
 			const malformedHot = Object.freeze({
 				capability: prepared.capability,
+				expectedRoomHead: preparedRoomHead(prepared),
 				epoch: 1,
 				handle: fixture.handle,
 				...runtimeBindings(`d108d1-forged-hot-${crypto.randomUUID()}`),
@@ -476,7 +498,12 @@ describe("D.108d1 creator successor activation RED", () => {
 			const recording = recordingRuntimeBindings(`d108d1-displaced-${crypto.randomUUID()}`);
 			const activate = (await candidate()).activateCreatorSuccessorAdoption;
 			if (activate === undefined) throw new TypeError("D.108d1 activation export missing");
-			result = await activate({ capability: prepared.capability, handle: fixture.handle, ...recording.input });
+			result = await activate({
+				capability: prepared.capability,
+				expectedRoomHead: preparedRoomHead(prepared),
+				handle: fixture.handle,
+				...recording.input,
+			});
 			expect(result.ok).toBe(true);
 			const handle = result.handle as Readonly<{
 				publishPending(): Promise<Readonly<Record<string, unknown>>>;
@@ -507,6 +534,7 @@ describe("D.108d1 creator successor activation RED", () => {
 			if (activate === undefined) throw new TypeError("D.108d1 activation export missing");
 			const input = {
 				capability: prepared.capability,
+				expectedRoomHead: preparedRoomHead(prepared),
 				handle: fixture.handle,
 				...runtimeBindings(`d108d1-terminal-${crypto.randomUUID()}`),
 			};
@@ -537,8 +565,18 @@ describe("D.108d1 creator successor activation RED", () => {
 			if (activate === undefined) throw new TypeError("D.108d1 activation export missing");
 			const firstPrepared = await committed(fixture);
 			const secondPrepared = await committed(fixture);
-			first = await activate({ capability: firstPrepared.capability, handle: fixture.handle, ...bindings });
-			const second = await activate({ capability: secondPrepared.capability, handle: fixture.handle, ...bindings });
+			first = await activate({
+				capability: firstPrepared.capability,
+				expectedRoomHead: preparedRoomHead(firstPrepared),
+				handle: fixture.handle,
+				...bindings,
+			});
+			const second = await activate({
+				capability: secondPrepared.capability,
+				expectedRoomHead: preparedRoomHead(secondPrepared),
+				handle: fixture.handle,
+				...bindings,
+			});
 			expect(first).toMatchObject({ ok: true });
 			expect(second).toMatchObject({ ok: true });
 			expect(second.handle).toBe(first.handle);
@@ -558,6 +596,7 @@ describe("D.108d1 creator successor activation RED", () => {
 			const secondPrepared = await committed(fixture);
 			first = await activate({
 				capability: firstPrepared.capability,
+				expectedRoomHead: preparedRoomHead(firstPrepared),
 				handle: fixture.handle,
 				...runtimeBindings(`d108d1-binding-a-${crypto.randomUUID()}`),
 			});
@@ -565,6 +604,7 @@ describe("D.108d1 creator successor activation RED", () => {
 			expect(
 				await activate({
 					capability: secondPrepared.capability,
+					expectedRoomHead: preparedRoomHead(secondPrepared),
 					handle: fixture.handle,
 					...runtimeBindings(`d108d1-binding-b-${crypto.randomUUID()}`),
 				})
@@ -590,6 +630,7 @@ describe("D.108d1 creator successor activation RED", () => {
 			expect(
 				await activate({
 					capability: failedPrepared.capability,
+					expectedRoomHead: preparedRoomHead(failedPrepared),
 					handle: fixture.handle,
 					messageQueueManager: new MessageQueueManager<Message>({ logConfig: { level: "silent" } }),
 					networkNode: broken,
@@ -600,6 +641,7 @@ describe("D.108d1 creator successor activation RED", () => {
 			expect(replay).toMatchObject({ ok: true, recovery: "active-new" });
 			recovered = await activate({
 				capability: replay.capability,
+				expectedRoomHead: preparedRoomHead(replay),
 				handle: fixture.handle,
 				...runtimeBindings(`d108d1-retry-${crypto.randomUUID()}`),
 			});

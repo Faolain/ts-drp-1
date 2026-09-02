@@ -195,6 +195,11 @@ describe("D.110c-0b0a staged adoption and pending recovery GREEN", () => {
 			expect(
 				await activateCreatorSuccessorAdoption({
 					capability: staged.capability,
+					expectedRoomHead: Object.freeze({
+						currentAnchorDigest: (staged.descriptor as Readonly<Record<string, unknown>>).anchorDigest,
+						epoch: (staged.descriptor as Readonly<Record<string, unknown>>).epoch,
+						objectId: (staged.descriptor as Readonly<Record<string, unknown>>).objectId,
+					}),
 					handle: fixture.handle,
 					...fixture.runtimeBindings,
 				})
