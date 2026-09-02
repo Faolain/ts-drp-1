@@ -92148,10 +92148,14 @@ GREEN batch 2 generalizes the mechanical browser owners:
   migration is manufactured; existing epoch-0 rows reopen unchanged; and
 - creator evidence open/resume selects only the exact current-trust
   `(objectId, epoch, signerId)` record before enforcing the one-record
-  invariant. A retained record from another epoch is ignored for actor resume,
-  cannot occupy or terminalize the current actor, and cannot satisfy the
-  current close. Same-epoch duplicates remain fail closed. The epoch-0-retained
-  plus epoch-1-open case is a required mutant;
+  invariant. Without adding a public actor input, the actor authenticates each
+  candidate signer public key against `currentTrust` through
+  `openSealAuthority`, resolves that opaque authority's registered identity,
+  and retains only a record whose stored object/epoch/signer tuple equals that
+  identity before applying the count/resume law. A retained record from another
+  epoch is ignored for actor resume, cannot occupy or terminalize the current
+  actor, and cannot satisfy the current close. Same-epoch duplicates remain
+  fail closed. The epoch-0-retained plus epoch-1-open case is a required mutant;
 - public `evidenceCount` and `pendingCount` remain observation-only totals over
   all durable epochs, preserving their existing epoch-0 value while making the
   retained-row census explicit; they do not select authority or resume state;
