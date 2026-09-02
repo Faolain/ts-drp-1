@@ -2,7 +2,6 @@ import type { ResolvedBlueprintBytes, TrustedBlueprintCatalog } from "@ts-drp/bl
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import type { CloseSetHistoryCommitment } from "@ts-drp/compaction";
 import { verifySnapshotStreamWithReceipt } from "@ts-drp/compaction/snapshot-quarantine-receipt";
-import { inspectCreatorTrustAdvance } from "@ts-drp/control-plane/creator-trust-advance";
 import type { DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-store";
 import type { DurableLiveJournalStore } from "@ts-drp/live-journal";
 import { type CurrentAnchorTrust, openCurrentAnchorTrust } from "@ts-drp/protocol-v3";
@@ -1302,7 +1301,10 @@ async function authenticatePendingCandidate(
 		if (currentCandidates === undefined || proposedCandidates === undefined || candidateCandidates === undefined) {
 			return undefined;
 		}
-		const currentProjection = uniqueCandidateByKind(currentCandidates, "v3-live-generation-1");
+		const currentEpoch = expectedPrevious.epoch;
+		const successorEpoch = expectedNext.epoch;
+		const expectedCurrentProjectionKind = currentProjectionKind(currentEpoch);
+		const currentProjection = uniqueCandidateByKind(currentCandidates, expectedCurrentProjectionKind);
 		const successorProjection = uniqueCandidateByKind(candidateCandidates, "v3-live-generation-2");
 		const currentTrustCandidate = uniqueCandidateByKind(currentCandidates, "drp-anchor-trust-state");
 		const successorTrustCandidate = uniqueCandidateByKind(proposedCandidates, "drp-anchor-trust-state");
@@ -1316,58 +1318,99 @@ async function authenticatePendingCandidate(
 		) {
 			return undefined;
 		}
-		const openedCurrent = openCurrentAnchorTrust({
-			exactCanonicalTrustStateRecordBytes: currentTrustCandidate.bytes,
-			expectedObjectId: objectId,
-			pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
-		});
-		if (!openedCurrent.ok || !sameRoomHead(roomHeadFromTrust(openedCurrent.trust), expectedPrevious)) {
-			return undefined;
-		}
 		const qcs = proposedCandidates.flatMap((entry) =>
 			canonicalRecord(entry.bytes)?.kind === "drp-seal-qc" ? [entry] : []
 		);
-		const openedSuccessors = qcs.flatMap((entry) => {
-			const opened = openCreatorSuccessorTrust({
-				currentTrust: openedCurrent.trust,
-				exactCanonicalCommitQcBytes: entry.bytes,
-				exactCanonicalCutValueBytes: cutCandidate.bytes,
-				exactCanonicalTrustStateRecordBytes: successorTrustCandidate.bytes,
-			});
-			return opened.ok ? [Object.freeze({ qc: entry, trust: opened.trust })] : [];
-		});
-		if (openedSuccessors.length !== 1) return undefined;
-		const openedSuccessor = openedSuccessors[0] as (typeof openedSuccessors)[number];
-		if (
-			!sameRoomHead(roomHeadFromTrust(openedSuccessor.trust), expectedNext) ||
-			!inspectCreatorTrustAdvance({
-				current: { candidates: currentCandidates, closure: currentGeneration.closure },
-				proofRefs: [cutCandidate.ref, openedSuccessor.qc.ref],
-				proposed: { candidates: proposedCandidates, closure: proposedGeneration.closure },
-			}).ok
-		) {
-			return undefined;
-		}
 		const currentTrustRecord = currentTrustCandidate.record;
 		const successorTrustRecord = successorTrustCandidate.record;
 		if (
 			!(currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array) ||
 			!(currentTrustRecord.detachedCurrentAnchorSignature instanceof Uint8Array) ||
-			!(successorTrustRecord.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array) ||
-			!sameBytes(
-				input.exactCanonicalAnchorPreimageBytes,
-				currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes
-			) ||
-			!sameBytes(input.detachedSignature, currentTrustRecord.detachedCurrentAnchorSignature)
+			!(successorTrustRecord.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array)
+		) {
+			return undefined;
+		}
+		let predecessorTrust: CurrentAnchorTrust;
+		let successorTrust: CurrentAnchorTrust;
+		let selectedQc: (typeof qcs)[number];
+		if (currentEpoch === 0) {
+			if (
+				!sameBytes(
+					input.exactCanonicalAnchorPreimageBytes,
+					currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes
+				) ||
+				!sameBytes(input.detachedSignature, currentTrustRecord.detachedCurrentAnchorSignature)
+			) {
+				return undefined;
+			}
+			const openedCurrent = openCurrentAnchorTrust({
+				exactCanonicalTrustStateRecordBytes: currentTrustCandidate.bytes,
+				expectedObjectId: objectId,
+				pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
+			});
+			if (!openedCurrent.ok) return undefined;
+			const openedSuccessors = qcs.flatMap((entry) => {
+				const opened = openCreatorSuccessorTrust({
+					currentTrust: openedCurrent.trust,
+					exactCanonicalCommitQcBytes: entry.bytes,
+					exactCanonicalCutValueBytes: cutCandidate.bytes,
+					exactCanonicalTrustStateRecordBytes: successorTrustCandidate.bytes,
+				});
+				return opened.ok ? [Object.freeze({ qc: entry, trust: opened.trust })] : [];
+			});
+			if (openedSuccessors.length !== 1) return undefined;
+			const openedSuccessor = openedSuccessors[0] as (typeof openedSuccessors)[number];
+			predecessorTrust = openedCurrent.trust;
+			successorTrust = openedSuccessor.trust;
+			selectedQc = openedSuccessor.qc;
+		} else {
+			const openedCheckpoints = qcs.flatMap((entry) => {
+				const opened = openCreatorCheckpointTrust({
+					detachedGenesisSignature: input.detachedSignature,
+					exactCanonicalCommitQcBytes: entry.bytes,
+					exactCanonicalCurrentTrustStateRecordBytes: successorTrustCandidate.bytes,
+					exactCanonicalCutValueBytes: cutCandidate.bytes,
+					exactCanonicalGenesisAnchorPreimageBytes: input.exactCanonicalAnchorPreimageBytes,
+					exactCanonicalPredecessorTrustStateRecordBytes: currentTrustCandidate.bytes,
+					expectedCurrentHead: expectedNext,
+					expectedObjectId: objectId,
+					pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
+				});
+				return opened.ok ? [Object.freeze({ opened, qc: entry })] : [];
+			});
+			if (openedCheckpoints.length !== 1) return undefined;
+			const selected = openedCheckpoints[0] as (typeof openedCheckpoints)[number];
+			predecessorTrust = selected.opened.predecessorTrust;
+			successorTrust = selected.opened.currentTrust;
+			selectedQc = selected.qc;
+		}
+		if (
+			!sameRoomHead(roomHeadFromTrust(predecessorTrust), expectedPrevious) ||
+			!sameRoomHead(roomHeadFromTrust(successorTrust), expectedNext) ||
+			!inspectCreatorTransitionAdvance({
+				current: { candidates: currentCandidates, closure: currentGeneration.closure },
+				mode: "verify",
+				proofRefs: [cutCandidate.ref, selectedQc.ref],
+				proposed: { candidates: proposedCandidates, closure: proposedGeneration.closure },
+			}).ok
 		) {
 			return undefined;
 		}
 		const currentAnchor = canonicalRecord(currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes);
 		const successorAnchor = canonicalRecord(successorTrustRecord.exactCanonicalCurrentAnchorPreimageBytes);
-		if (currentAnchor === undefined || successorAnchor === undefined) return undefined;
+		if (
+			currentAnchor === undefined ||
+			successorAnchor === undefined ||
+			currentProjection.record.epoch !== currentEpoch ||
+			currentProjection.record.objectId !== objectId ||
+			currentProjection.record.blueprintDigest !== currentAnchor.blueprintDigest ||
+			currentProjection.record.blueprintDigest !== successorAnchor.blueprintDigest
+		) {
+			return undefined;
+		}
 		const chain: VerifiedChain = Object.freeze({
 			currentAnchor,
-			currentEpoch: 0,
+			currentEpoch,
 			currentCatalog: Object.freeze({
 				artifactDigest: String(currentProjection.record.artifactDigest),
 				artifactId: String(currentProjection.record.artifactId),
@@ -1375,13 +1418,13 @@ async function authenticatePendingCandidate(
 				catalogDigest: String(currentProjection.record.catalogDigest),
 				runtimeProfile: String(currentProjection.record.runtimeProfile),
 			}),
-			currentProjectionKind: "v3-live-generation-1",
+			currentProjectionKind: expectedCurrentProjectionKind,
 			currentTrustRecord,
 			cut: cutCandidate.record,
 			successorAnchor,
 			successorAnchorBytes: Uint8Array.from(successorTrustRecord.exactCanonicalCurrentAnchorPreimageBytes),
-			successorEpoch: 1,
-			successorTrust: openedSuccessor.trust,
+			successorEpoch,
+			successorTrust,
 			successorTrustRecord,
 		});
 		const snapshot = await verifySnapshot(input, chain);
@@ -1390,7 +1433,7 @@ async function authenticatePendingCandidate(
 		const manifestDigest = input.snapshotDeclaration.scope.manifestDigest;
 		if (
 			resolved === undefined ||
-			successorProjection.record.anchorDigest !== openedSuccessor.trust.currentAnchorDigest ||
+			successorProjection.record.anchorDigest !== successorTrust.currentAnchorDigest ||
 			successorProjection.record.epoch !== expectedNext.epoch ||
 			successorProjection.record.objectId !== objectId ||
 			successorProjection.record.blueprintDigest !== successorAnchor.blueprintDigest ||

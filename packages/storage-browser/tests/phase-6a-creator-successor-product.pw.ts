@@ -2438,8 +2438,15 @@ function runD110c0cRecovery(
 		let observed: Readonly<Record<string, unknown>> | undefined;
 		let stderr = "";
 		let stdout = "";
+		const terminate = (): void => {
+			if (child.pid === undefined) return;
+			const owned = processClosure(captureProcessForest(), child.pid);
+			const groups = [...new Set(owned.map(({ pgid }) => pgid))].filter((pgid) => pgid > 0);
+			for (const pgid of groups) d110c0cKillGroup(pgid);
+			d110c0cKillGroup(child.pid);
+		};
 		const timeout = setTimeout(() => {
-			if (child.pid !== undefined) d110c0cKillGroup(child.pid);
+			terminate();
 			reject(new Error(`D110C_0C recovery timeout: ${stdout}\n${stderr}`));
 		}, 120_000);
 		child.stdout?.setEncoding("utf8");
@@ -2448,7 +2455,10 @@ function runD110c0cRecovery(
 		child.stderr?.on("data", (value: string) => (stderr += value));
 		child.on("message", (message: D110c0cChildMessage) => {
 			if (message.kind === "recovery") observed = message.result;
-			if (message.kind === "child-error") reject(new TypeError(message.message ?? "D110C_0C child failed"));
+			if (message.kind === "child-error") {
+				terminate();
+				reject(new TypeError(message.message ?? "D110C_0C child failed"));
+			}
 		});
 		child.once("error", reject);
 		child.once("exit", (code, signal) => {
@@ -2466,6 +2476,7 @@ test("D.110c-0c resumes a genuine epoch-3 pending adoption after both process-de
 	browserName: _browserName,
 }, testInfo) => {
 	const token = "D110C_0C_PENDING_EPOCH3_RESUME_MISSING";
+	const postCommitToken = "D110C_0C_EPOCH3_COLD_REOPEN_BLOCKED";
 	const server = await startProductBrowserServer(
 		new URL("./assets/phase-6a-creator-successor-product-entry.ts", import.meta.url).pathname
 	);
@@ -2529,8 +2540,38 @@ test("D.110c-0c resumes a genuine epoch-3 pending adoption after both process-de
 			expect(d110c0cRecord(recovered.snapshotScope).epoch).toBe(2);
 			const recovery = d110c0cRecord(recovered.recovery);
 			expect(recovery.callCount).toBe(1);
-			causalEvidence.push(Object.freeze({ ordering, recovered, staged }));
+			const evidenceRow = Object.freeze({ ordering, recovered, staged });
+			causalEvidence.push(evidenceRow);
+			await testInfo.attach(`d110c-0c-causal-evidence-${ordering}`, {
+				body: Buffer.from(JSON.stringify(evidenceRow)),
+				contentType: "application/json",
+			});
 			if (recovered.detail !== "fulfilled") {
+				if (recovery.resultKind === "active-new") {
+					const committed = d110c0cRecord(d110c0cRecord(recovered.floorAfter).state);
+					expect(committed.pending).toBeNull();
+					expect(d110c0cRecord(committed.stable).epoch).toBe(3);
+					if (ordering === "old-ahe") {
+						const beforeAhe = d110c0cRecord(recovered.aheBefore);
+						const afterAhe = d110c0cRecord(recovered.aheAfter);
+						const beforeHead = d110c0cRecord(beforeAhe.activeHead);
+						const afterHead = d110c0cRecord(afterAhe.activeHead);
+						expect(afterHead.revision).toBe(Number(beforeHead.revision) + 1);
+						const expectedGenerations = d110c0cArray(beforeAhe.generations).map((entry) => {
+							const generation = d110c0cRecord(entry);
+							return generation.generationId === beforeHead.generationId
+								? { ...generation, state: "Superseded" }
+								: generation.generationId === afterHead.generationId
+									? { ...generation, state: "Adopted" }
+									: generation;
+						});
+						expect(afterAhe).toEqual({ ...beforeAhe, activeHead: afterHead, generations: expectedGenerations });
+					} else {
+						expect(recovered.aheAfter).toEqual(recovered.aheBefore);
+					}
+					expect.soft(recovered.detail, postCommitToken).toBe("fulfilled");
+					continue;
+				}
 				expect(recovered.detail).toBe("D110C_FLOOR_RECOVERY_UNAVAILABLE");
 				expect(recovery).toEqual({ callCount: 1, resultKind: "pending-missing", swapHeadCount: 0 });
 				expect(recovered.floorAfter).toEqual(recovered.floorBefore);

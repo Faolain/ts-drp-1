@@ -95280,9 +95280,13 @@ provider is test evidence for process-death causality only and neither selects
 nor pre-empts D.110c-0b0's production floor owner.
 
 GREEN changes only the internal pending authenticator. For expected predecessor
-epoch 0 it preserves the present projection selection, genesis opener,
-one-step successor opener, input-carrier equality, additive transition
-predicate, and chain fields. For expected predecessor epoch N≥1 it:
+epoch 0 it preserves the existing authentication semantics through the genesis
+opener, one-step successor opener, input-carrier equality, and shared
+transition-classifier delegation, while adding the same explicit
+current-projection bindings required by cold reopen. The retained 0→1 pending
+matrix, not a false literal byte-preservation claim, proves that this
+strengthening preserves accepted epoch-0 behavior. For expected predecessor
+epoch N≥1 it:
 
 1. selects the current projection with the existing epoch-relative projection
    helper and the successor projection at N+1;
@@ -95350,8 +95354,11 @@ one-test/file listing, source/export/runtime shape, protected paths, all 27
 stashes, process/port predicates, hashes, and a self-excluding manifest are
 mandatory. The RED/GREEN source audit must first slice the exact
 `authenticatePendingCandidate()` function body, rather than use file-global
-substrings, and must prove both removal of the N≥1 pins and byte-preservation of
-the epoch-0 branch within that slice. Generated JSON evidence retains the raw
+substrings, and must prove removal of the N≥1 pins plus the epoch-0 branch's
+genesis opener, one-step successor opener, input-carrier equality, shared
+transition-classifier delegation, and additive projection bindings. The
+retained 0→1 pending matrix supplies the behavioral preservation proof.
+Generated JSON evidence retains the raw
 byte-exact command output or records its formatting command explicitly. The RED
 evidence root also records the plan/correction commits' post-commit signature
 status and exact pushed-ref identity, closing the retained 0b1 custody item.
@@ -95495,20 +95502,24 @@ RED-to-GREEN closure and is prohibited.
 **Status: bounded decision/RED plan required before any `v3-live.ts` or
 issuance-store production edit.** Owner: the predecessor and successor issuance
 views created by `packages/node/src/v3-live.ts::activateCreatorSuccessorLive()`,
-`creatorFilteredIssuanceStore()`, and their exact outbox classification inside
-`recoverV3LiveReplica()`. The durable issuance/outbox contract and browser/Node
+`creatorFilteredIssuanceStore()`, their exact outbox classification inside
+`recoverV3LiveReplica()`, and the registered view's `publishPending` and
+`readRebaseOutbox` scans. The durable issuance/outbox contract and browser/Node
 store implementations join the owner set only if the reviewed design requires
 an authenticated retirement boundary or physical deletion; that outcome is an
 explicit high-risk compatibility/schema prerequisite, not an implicit 0c
-change. Deadline: GREEN before D.110c-0c may claim cold reopen, before D.110c-c
-RED, and before any D.110c-d/Phase-7 long-lived-room gate.
+change. Deadline: GREEN before D.110c-0c may claim its same-process post-commit
+reopen, before D.110c-c RED, and before any D.110c-d/Phase-7 long-lived-room
+gate.
 
 The threat model remains untrusted durable store bytes under a trusted pinned
 genesis and current room floor. It is not sufficient to decode a claimed epoch
 and skip the row. A solution must prove that no current/unpublished row can be
 hidden or substituted; authenticate object, author, sequence, signature,
 anchor/epoch relation, and the exact retained authority needed for any row it
-discards; preserve pending publication and offline/rebase custody; fail closed
+discards; preserve pending publication and offline/rebase custody; never copy
+the current genesis filter's publish-state-blind treatment of an unpublished
+old row; fail closed or explicitly resolve every such pending row; fail closed
 on malformed, duplicate, reordered, forked, stale, cross-object, cross-author,
 or ambiguous rows; and keep hidden-row accounting per scan under one combined
 `maxEpochVertices` ceiling. It may not retain an O(N) authority/projection
@@ -95534,22 +95545,62 @@ row to be classified obsolete; a signed claimed epoch alone is not proof.
 
 RED remains tests-only. First, one corrected diagnostic invocation must retain
 both old-AHE and new-AHE orderings after `active-new`, proving exact floor/AHE
-effects and the identical post-commit cold-reopen classification without
-aborting after the first ordering. Then a deterministic real-store
-differential creates genuine 0→1→2 product state with one local issued/published
-row per epoch and attempts epoch-3 reopen. Its control uses the same product
-path and fixed inputs but omits only the epoch-1 issued row. The evidence must
-enumerate and signature-check the actual stored rows read by the recovery path,
-prove the epoch-1 row is the sole differential, obtain the exact predecessor
-`admission-rejected` without widening production error strings, and emit one
-frozen causal token. Any different row, filter call, or failure class stops the
-slice. The existing two process-death orderings remain retained consumption
-gates; no test may construct epoch-3 state or delete a row privately.
+effects and the identical post-commit reopen classification without aborting
+after the first ordering. Then a deterministic real-store prefix differential
+uses the same product path, room, and message inputs. Its control performs the
+genuine 0→1 transition with local issued/published rows r0 and r1, crashes in
+the pending 1→2 state, recovers, and reopens at epoch 2. Its treatment adds the
+next genuine transition, with r2, and attempts the same-process post-commit
+epoch-3 reopen. A test-owned read-only store-boundary trace records every
+`readOutboxPage` and `readIssued` call, returned row key and digest, and the
+pre-crash issue result for each epoch. It must prove byte-identical r1 is
+accepted as current in the control, the treatment reaches r1 through the real
+recovery scan, and the treatment fails there with exact predecessor
+`admission-rejected` without widening production error strings. Any control
+failure before epoch-2 reopen, treatment trace not ending at r1, different row,
+filter call, or failure class stops the slice. An empty-epoch/omitted-row control
+is prohibited unless a separate bounded tests-only probe first proves the
+product supports that lifecycle. The existing two process-death orderings
+remain retained consumption gates; no test may construct epoch-3 state, delete
+a row privately, or mutate store bytes to manufacture the differential.
+
+The one authorized corrected diagnostic ran from signed/pushed plan anchor
+`907a0499cfe03a858f682a2066faf3bbd210a59d`. Its read-only listing selected
+exactly the one D.110c-0c Chromium test in one file. Playwright exited `1` with
+expected/skipped/unexpected/flaky `0/0/1/0`, zero top-level errors, and exactly
+two soft failures carrying `D110C_0C_EPOCH3_COLD_REOPEN_BLOCKED`. Both
+`old-ahe` and `new-ahe` completed pending recovery as `active-new`, advanced
+the room floor from stable epoch 2/pending epoch 3 to stable epoch 3/no pending,
+then failed immediate cold reopen with the identical exact detail
+`v3 room successor reopen failed: recovery-rejected: creator predecessor
+recovery failed: admission-rejected`. Old-AHE performed exactly one head swap
+with revision `7→8`, former active `Adopted→Superseded`, replacement
+`Complete→Adopted`, and every other generation unchanged. New-AHE performed
+zero swaps and retained its complete AHE value exactly. The aggregate inline
+attachment equals the two ordered per-case attachments.
+
+The deterministic validator first used an ANSI-sensitive regex. That faulty
+read-only diagnostic was corrected to strip terminal escape codes and is not a
+code or test failure; the corrected validator exits `0`. The complete evidence
+is `.logs/d110c-0c-green-two-order-diagnostic-907a0499/`; its validating
+nine-entry self-excluding manifest SHA-256 is
+`53c39e465c0c397602c0d0a2bf0336c6b13115d72bfb785fc8d480dfaf3d6270`.
+The two earlier non-GREEN executions remain preserved rather than overwritten:
+the masked floor-guard result manifest is
+`3b42a052723a3d01b12d78244a6c3d11050cf4c7e72be33a912f25ae1da340e0`,
+and the first one-order downstream diagnostic manifest is
+`4909002340b4d9c2316f262cabff8a8c1168e9e155d1066b07f56ba7ed30b128`.
+Node build, production-source no-emit typecheck, exact-owner ESLint/Prettier,
+and diff checks pass. These results prove the pending authenticator through
+durable commit and the separate post-commit seam; they are explicitly not a
+GREEN or permission to edit `v3-live.ts`.
 
 GREEN implements only the reviewed selected family. It must make the unchanged
 epoch-0/1/2 fixture cold reopen epoch 3 and issue/publish its fourth message in
 both crash orderings while preserving the exact first-transition pending matrix
-and the signed D.110c-0c RED. Adversarial gates cover a forged lower epoch,
+and the signed D.110c-0c RED. The N≥1 pending authenticator also applies the
+same commit-phase/current-epoch QC filtering used by the retained cold-reopen
+owner before its exactly-one opener. Adversarial gates cover a forged lower epoch,
 valid same-room old fork, duplicated author sequence, substituted issued/outbox
 pair, unpublished intermediate row, current row claiming an older sequence,
 stale retirement boundary, rollback, ambiguous write, and scan-counter reset.
@@ -95586,6 +95637,26 @@ self-excluding manifest SHA-256 is
 `d90b114e2c7b318a722006a8f0a473e1ff3ce34fe58a1e2a3cf2975c44a696df`.
 This was the only authorized Fable invocation; no further Fable review is
 permitted without new express authorization.
+
+A later separately authorized one-off `claude-fable-5-1`/high current-course
+review completed normally in session
+`6aaf4f98-77ca-42ab-a71e-721c11f781d1`, spawned zero subagents, and returned
+`ON_TRACK_WITH_CORRECTIONS`, P0=0/P1=2. Its first P1 is corrected above by
+replacing the false literal epoch-0 byte-preservation claim with exact semantic
+delegation/binding obligations and the retained 0→1 behavioral gate. Its second
+P1 is corrected above by replacing the invalid omitted-row control, which could
+fail earlier on an empty issued chain, with the prefix-control differential and
+exact store-boundary trace. Its nonblocking guidance names both registered
+view scans, keeps unpublished old rows fail closed, limits 0c to same-process
+post-commit reopen, aligns N≥1 QC filtering at GREEN, and prohibits reuse of the
+file-global diagnostic check. The review did not select between carrier-free
+authenticated discard and a creator-signed retirement boundary; that remains
+the explicit 0c1 architecture decision. Evidence is under
+`.logs/d110c-current-course-fable51-high-20260902/`; its validating
+self-excluding manifest SHA-256 is
+`7acd605e4973999cfdf935d7a4c5e89c00be11bcc9ab45fab8bc7e182023ddb6`.
+This authorization is consumed; no further Fable review is permitted without
+new express authorization.
 
 The complete confirmation evidence is retained under
 `.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry

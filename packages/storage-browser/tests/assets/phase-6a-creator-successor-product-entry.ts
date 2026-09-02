@@ -1657,10 +1657,14 @@ async function d110c0cRecover(name: string): Promise<PlainRecord> {
 	const floorAfter = await d110cRoomHeadEvidence(name);
 	const aheAfter = await d110cAheEvidence(databaseName);
 	const recovery = instrumentation().d110c0cRecoverySnapshot();
-	if (detail !== "fulfilled" && !sameCanonical(floorBefore, floorAfter)) {
+	if (detail !== "fulfilled" && recovery.resultKind !== "active-new" && !sameCanonical(floorBefore, floorAfter)) {
 		throw new TypeError("D110C_0C_FAILED_RECOVERY_FLOOR_MUTATED");
 	}
-	if (detail !== "fulfilled" && fingerprint(aheBefore) !== fingerprint(aheAfter)) {
+	if (
+		detail !== "fulfilled" &&
+		recovery.resultKind !== "active-new" &&
+		fingerprint(aheBefore) !== fingerprint(aheAfter)
+	) {
 		throw new TypeError("D110C_0C_FAILED_RECOVERY_AHE_MUTATED");
 	}
 	return Object.freeze({

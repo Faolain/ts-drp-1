@@ -1,0 +1,6 @@
+Running 1 test using 1 worker
+
+1 failed
+  [chromium] › tests/phase-6a-creator-successor-product.pw.ts:2475:1 › D.110c-0c resumes a genuine epoch-3 pending adoption after both process-death orderings
+
+The complete reporter JSON contains the two exact soft failures and all inline causal-evidence attachments. The terminal command exited 1 as required for this diagnostic checkpoint.
