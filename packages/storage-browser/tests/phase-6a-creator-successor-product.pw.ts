@@ -1,8 +1,13 @@
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 import { build, type Plugin } from "esbuild";
+import { spawn } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
 import { createServer, type Server } from "node:http";
-import { resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+
+import { captureProcessForest, processClosure } from "./fixtures/process-forest.js";
 
 const REPOSITORY_ROOT = resolve(import.meta.dirname, "../../..");
 const contractLoad = import(
@@ -66,6 +71,9 @@ function createState() {
     closeBindFailureCount: 0,
     commitCount: 0,
     coldReopenCount: 0,
+    d110c0cRecoveryCallCount: 0,
+    d110c0cRecoveryResultKind: null,
+    d110c0cRecoverySwapHeadCount: 0,
     failBeforePublication: false,
     injectActivationFailure: false,
     independentVerificationCount: 0,
@@ -121,6 +129,9 @@ function createState() {
     state.closeBindFailureCount = 0;
     state.commitCount = 0;
     state.coldReopenCount = 0;
+    state.d110c0cRecoveryCallCount = 0;
+    state.d110c0cRecoveryResultKind = null;
+    state.d110c0cRecoverySwapHeadCount = 0;
     state.failBeforePublication = input.failBeforePublication === true;
     state.injectActivationFailure = input.injectActivationFailure === true;
     state.independentVerificationCount = 0;
@@ -198,6 +209,11 @@ function createState() {
       },
       configure,
       d110cColdReopenCount: () => state.coldReopenCount,
+      d110c0cRecoverySnapshot: () => Object.freeze({
+        callCount: state.d110c0cRecoveryCallCount,
+        resultKind: state.d110c0cRecoveryResultKind,
+        swapHeadCount: state.d110c0cRecoverySwapHeadCount,
+      }),
       d108e5Snapshot: () => Object.freeze({
         redirectRecoveryCount: state.redirectRecoveryCount,
         verificationCount: state.d108e5VerificationCount,
@@ -470,8 +486,26 @@ export const publishStagedCreatorSuccessorAdoption = async (input) => {
 				],
 				[
 					"@ts-drp/node/creator-adoption-recover",
-					`import * as actual from ${JSON.stringify(creatorAdoptionRecover)};
-export const recoverPendingCreatorSuccessorAdoption = actual.recoverPendingCreatorSuccessorAdoption;`,
+					`${shared}
+import * as actual from ${JSON.stringify(creatorAdoptionRecover)};
+export const recoverPendingCreatorSuccessorAdoption = async (input) => {
+  state.d110c0cRecoveryCallCount += 1;
+  const store = new Proxy(input.store, {
+    get(target, key) {
+      if (key === "swapHead") {
+        return (...args) => {
+          state.d110c0cRecoverySwapHeadCount += 1;
+          return Reflect.apply(target.swapHead, target, args);
+        };
+      }
+      const selected = Reflect.get(target, key, target);
+      return typeof selected === "function" ? selected.bind(target) : selected;
+    },
+  });
+  const result = await actual.recoverPendingCreatorSuccessorAdoption({ ...input, store });
+  state.d110c0cRecoveryResultKind = result.ok === true ? result.recovery : result.kind;
+  return result;
+};`,
 				],
 				[
 					"@ts-drp/node/creator-adoption-activate",
@@ -2278,6 +2312,258 @@ test("D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebin
 			.evaluate((prefix) => window.phase6aCreatorSuccessorProduct.deleteDatabases(prefix), databaseName)
 			.catch(() => undefined);
 		await isolatedContext.close();
+		await server.close();
+	}
+});
+
+interface D110c0cChildMessage {
+	readonly kind: "checkpoint" | "child-error" | "recovery";
+	readonly message?: string;
+	readonly result?: Readonly<Record<string, unknown>>;
+}
+
+function d110c0cRecord(value: unknown): Readonly<Record<string, unknown>> {
+	if (value === null || typeof value !== "object" || Array.isArray(value)) {
+		throw new TypeError("D110C_0C fixture record is invalid");
+	}
+	return value as Readonly<Record<string, unknown>>;
+}
+
+function d110c0cArray(value: unknown): readonly unknown[] {
+	if (!Array.isArray(value)) throw new TypeError("D110C_0C fixture array is invalid");
+	return value;
+}
+
+function d110c0cKillGroup(pid: number): void {
+	try {
+		process.kill(-pid, "SIGKILL");
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+	}
+}
+
+async function buildD110c0cChild(): Promise<Readonly<{ readonly directory: string; readonly path: string }>> {
+	const directory = mkdtempSync(join(resolve(import.meta.dirname, ".."), ".d110c-0c-child-"));
+	const path = join(directory, "phase-6b-durable-pending-recovery-child.js");
+	await build({
+		bundle: true,
+		entryPoints: [resolve(import.meta.dirname, "process/phase-6b-durable-pending-recovery-child.ts")],
+		format: "esm",
+		outfile: path,
+		packages: "external",
+		platform: "node",
+		target: "node22",
+	});
+	return Object.freeze({ directory, path });
+}
+
+function runD110c0cStage(
+	childPath: string,
+	input: Readonly<{
+		readonly name: string;
+		readonly ordering: "new-ahe" | "old-ahe";
+		readonly profileDirectory: string;
+		readonly url: string;
+	}>
+): Promise<Readonly<Record<string, unknown>>> {
+	return new Promise((resolvePromise, reject) => {
+		const encoded = Buffer.from(JSON.stringify({ ...input, mode: "stage" })).toString("base64url");
+		const child = spawn(process.execPath, [childPath, encoded], {
+			detached: true,
+			stdio: ["ignore", "pipe", "pipe", "ipc"],
+		});
+		let checkpoint: Readonly<Record<string, unknown>> | undefined;
+		let killed = false;
+		let killedPids: readonly number[] = [];
+		let stderr = "";
+		let stdout = "";
+		const timeout = setTimeout(() => {
+			if (child.pid !== undefined) d110c0cKillGroup(child.pid);
+			reject(new Error(`D110C_0C stage timeout: ${stdout}\n${stderr}`));
+		}, 120_000);
+		child.stdout?.setEncoding("utf8");
+		child.stdout?.on("data", (value: string) => (stdout += value));
+		child.stderr?.setEncoding("utf8");
+		child.stderr?.on("data", (value: string) => (stderr += value));
+		child.on("message", (message: D110c0cChildMessage) => {
+			try {
+				if (message.kind === "child-error") throw new TypeError(message.message ?? "D110C_0C child failed");
+				if (message.kind !== "checkpoint" || message.result === undefined || child.pid === undefined) return;
+				checkpoint = message.result;
+				const owned = processClosure(captureProcessForest(), child.pid);
+				if (owned.length < 2) throw new TypeError("D110C_0C browser process forest is empty");
+				killed = true;
+				killedPids = Object.freeze(owned.map(({ pid }) => pid));
+				const groups = [...new Set(owned.map(({ pgid }) => pgid))].filter((pgid) => pgid > 0 && pgid !== child.pid);
+				for (const pgid of groups) d110c0cKillGroup(pgid);
+				d110c0cKillGroup(child.pid);
+			} catch (error) {
+				if (child.pid !== undefined) d110c0cKillGroup(child.pid);
+				reject(error);
+			}
+		});
+		child.once("error", reject);
+		child.once("exit", (code, signal) => {
+			clearTimeout(timeout);
+			if (!killed || checkpoint === undefined || code !== null || signal !== "SIGKILL") {
+				reject(
+					new Error(
+						`D110C_0C expected staged browser SIGKILL, got ${String(code)}/${String(signal)}: ${stdout}\n${stderr}`
+					)
+				);
+				return;
+			}
+			const deadline = Date.now() + 10_000;
+			const poll = (): void => {
+				const live = new Set(captureProcessForest().map(({ pid }) => pid));
+				if (killedPids.every((pid) => !live.has(pid))) resolvePromise(checkpoint as Readonly<Record<string, unknown>>);
+				else if (Date.now() >= deadline) reject(new Error("D110C_0C browser process forest survived SIGKILL"));
+				else setTimeout(poll, 25);
+			};
+			poll();
+		});
+	});
+}
+
+function runD110c0cRecovery(
+	childPath: string,
+	input: Readonly<{ readonly name: string; readonly profileDirectory: string; readonly url: string }>
+): Promise<Readonly<Record<string, unknown>>> {
+	return new Promise((resolvePromise, reject) => {
+		const encoded = Buffer.from(JSON.stringify({ ...input, mode: "recover" })).toString("base64url");
+		const child = spawn(process.execPath, [childPath, encoded], {
+			detached: true,
+			stdio: ["ignore", "pipe", "pipe", "ipc"],
+		});
+		let observed: Readonly<Record<string, unknown>> | undefined;
+		let stderr = "";
+		let stdout = "";
+		const timeout = setTimeout(() => {
+			if (child.pid !== undefined) d110c0cKillGroup(child.pid);
+			reject(new Error(`D110C_0C recovery timeout: ${stdout}\n${stderr}`));
+		}, 120_000);
+		child.stdout?.setEncoding("utf8");
+		child.stdout?.on("data", (value: string) => (stdout += value));
+		child.stderr?.setEncoding("utf8");
+		child.stderr?.on("data", (value: string) => (stderr += value));
+		child.on("message", (message: D110c0cChildMessage) => {
+			if (message.kind === "recovery") observed = message.result;
+			if (message.kind === "child-error") reject(new TypeError(message.message ?? "D110C_0C child failed"));
+		});
+		child.once("error", reject);
+		child.once("exit", (code, signal) => {
+			clearTimeout(timeout);
+			if (code !== 0 || signal !== null || observed === undefined) {
+				reject(new Error(`D110C_0C recovery child failed ${String(code)}/${String(signal)}: ${stdout}\n${stderr}`));
+			} else {
+				resolvePromise(observed);
+			}
+		});
+	});
+}
+
+test("D.110c-0c resumes a genuine epoch-3 pending adoption after both process-death orderings", async ({
+	browserName: _browserName,
+}, testInfo) => {
+	const token = "D110C_0C_PENDING_EPOCH3_RESUME_MISSING";
+	const server = await startProductBrowserServer(
+		new URL("./assets/phase-6a-creator-successor-product-entry.ts", import.meta.url).pathname
+	);
+	const child = await buildD110c0cChild();
+	const profiles: string[] = [];
+	const causalEvidence: Array<Readonly<Record<string, unknown>>> = [];
+	try {
+		for (const ordering of ["old-ahe", "new-ahe"] as const) {
+			const name = `d110c-0c-${ordering}`;
+			const profileDirectory = mkdtempSync(join(tmpdir(), `${name}-`));
+			profiles.push(profileDirectory);
+			const staged = await runD110c0cStage(child.path, {
+				name,
+				ordering,
+				profileDirectory,
+				url: server.origin,
+			});
+			const floor = d110c0cRecord(staged.floor);
+			const floorState = d110c0cRecord(floor.state);
+			const stableHead = d110c0cRecord(floorState.stable);
+			const pending = d110c0cRecord(floorState.pending);
+			const nextHead = d110c0cRecord(pending.next);
+			expect(stableHead.epoch).toBe(2);
+			expect(nextHead.epoch).toBe(3);
+			expect(pending.previous).toEqual(stableHead);
+			expect(floor.fault).toBe("none");
+			expect(d110c0cRecord(d110c0cRecord(staged.stable).authority).epoch).toBe(2);
+			expect(d110c0cRecord(d110c0cRecord(staged.after).authority).epoch).toBe(2);
+			expect(d110c0cRecord(staged.stable).projection).toEqual(d110c0cRecord(staged.after).projection);
+			expect(d110c0cRecord(staged.stable).acl).toEqual(d110c0cRecord(staged.after).acl);
+			expect(d110c0cRecord(staged.close)).toMatchObject({ epoch: 2, successorEpoch: 3 });
+			const operations = d110c0cArray(floor.events).map((event) => d110c0cRecord(event).operation);
+			expect(operations).toEqual([
+				"create",
+				"begin",
+				"commit",
+				"begin",
+				"commit",
+				"begin",
+				...(ordering === "new-ahe" ? ["commit-fault"] : []),
+			]);
+			const generations = d110c0cArray(d110c0cRecord(staged.ahe).generations).map(d110c0cRecord);
+			const closure = generations.flatMap((generation) => d110c0cArray(generation.closure).map(d110c0cRecord));
+			expect(closure).toEqual(
+				expect.arrayContaining([
+					expect.objectContaining({ currentEpoch: 2, kind: "drp-anchor-trust-state" }),
+					expect.objectContaining({ currentEpoch: 3, kind: "drp-anchor-trust-state" }),
+					expect.objectContaining({ epoch: 2, kind: "drp-hard-epoch-cut" }),
+					expect.objectContaining({ epoch: 2, kind: "drp-seal-qc" }),
+					expect.objectContaining({ epoch: 3, kind: "v3-live-generation-2" }),
+				])
+			);
+
+			const recovered = await runD110c0cRecovery(child.path, {
+				name,
+				profileDirectory,
+				url: server.origin,
+			});
+			expect(recovered.floorBefore).toEqual(staged.floor);
+			expect(recovered.aheBefore).toEqual(staged.ahe);
+			expect(d110c0cRecord(recovered.snapshotScope).epoch).toBe(2);
+			const recovery = d110c0cRecord(recovered.recovery);
+			expect(recovery.callCount).toBe(1);
+			causalEvidence.push(Object.freeze({ ordering, recovered, staged }));
+			if (recovered.detail !== "fulfilled") {
+				expect(recovered.detail).toBe("D110C_FLOOR_RECOVERY_UNAVAILABLE");
+				expect(recovery).toEqual({ callCount: 1, resultKind: "pending-missing", swapHeadCount: 0 });
+				expect(recovered.floorAfter).toEqual(recovered.floorBefore);
+				expect(recovered.aheAfter).toEqual(recovered.aheBefore);
+				expect(recovered.reopened).toBeNull();
+				expect.soft(recovered.detail, token).toBe("fulfilled");
+				continue;
+			}
+			const committed = d110c0cRecord(d110c0cRecord(recovered.floorAfter).state);
+			expect(committed.pending).toBeNull();
+			expect(d110c0cRecord(committed.stable).epoch).toBe(3);
+			expect(recovery).toEqual({
+				callCount: 1,
+				resultKind: "active-new",
+				swapHeadCount: ordering === "old-ahe" ? 1 : 0,
+			});
+			const reopened = d110c0cRecord(recovered.reopened);
+			expect(d110c0cRecord(reopened.authority).epoch).toBe(3);
+			const accepted = d110c0cArray(d110c0cRecord(reopened.projection).accepted).map(d110c0cRecord);
+			expect(accepted.map(({ text }) => text)).toEqual([
+				"d110c-0c-epoch-zero",
+				"d110c-0c-epoch-one",
+				"d110c-0c-epoch-two",
+				"d110c-0c-post-restart",
+			]);
+		}
+		await testInfo.attach("d110c-0c-causal-evidence", {
+			body: Buffer.from(JSON.stringify(causalEvidence)),
+			contentType: "application/json",
+		});
+	} finally {
+		for (const profile of profiles) rmSync(profile, { force: true, recursive: true });
+		rmSync(child.directory, { force: true, recursive: true });
 		await server.close();
 	}
 });

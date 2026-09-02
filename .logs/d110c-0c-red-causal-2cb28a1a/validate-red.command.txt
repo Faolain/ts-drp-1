@@ -1,0 +1,1 @@
+node .logs/d110c-0c-red-causal-2cb28a1a/validate-red.mjs

@@ -95200,8 +95200,8 @@ third transition or campaign, or reopen its immutable RED/GREEN evidence.
 
 ##### D.110c-0c durable pending-adoption resume plan
 
-**Status: bounded source audit and single material plan confirmation complete;
-blocking union empty; deterministic RED authorized.** Owner:
+**Status: bounded source audit, single material plan confirmation, and causal
+RED complete; blocking union empty; narrow GREEN authorized.** Owner:
 `packages/node/src/creator-adoption.ts` pending-candidate authentication and
 recovery kernel, the already exported
 `@ts-drp/node/creator-adoption-recover` capture boundary, the existing private
@@ -95434,6 +95434,31 @@ validating eight-entry self-excluding manifest SHA-256 is
 its deterministic comparison audit proves that the normalized diagnostic
 fingerprint is key-order stable and mutation-sensitive while the durable-floor
 predicate remains canonical.
+
+The accepted causal RED ran from signed/pushed diagnostic-correction anchor
+`2cb28a1a` under fresh write-once root
+`.logs/d110c-0c-red-causal-2cb28a1a/`. The exact Playwright command selected one
+Chromium test in one file and returned status 1 with expected 0, skipped 0,
+unexpected 1, flaky 0, and zero top-level errors. Its single failed test
+contains exactly two soft failures, one per old-AHE/new-AHE process-death
+ordering, and both have exact terminal token
+`D110C_0C_PENDING_EPOCH3_RESUME_MISSING`. The reporter attachment proves for
+both cases that stable epoch 2 and pending epoch 3 reread exactly across the
+fresh process; the old-AHE and new-AHE interruption/event sequences are exact;
+the epoch-2 snapshot scope and required Cut/QC/trust/projection closure are
+present; recovery was called exactly once and classified `pending-missing`
+with zero head swaps; room recovery failed closed with
+`D110C_FLOOR_RECOVERY_UNAVAILABLE`; no room reopened; and the durable floor and
+AHE inventory remained unchanged. Exact authored-file ESLint/Prettier,
+`git diff --check`, one-test/one-file listing, source-shape, clear-process/port,
+protected-path, and 27-stash gates passed with zero production-source diff.
+The validator's initial anchored-grep expectation did not match the exact
+unanchored literal grep in the config; that diagnostic was corrected before
+sealing and was not treated as a source failure. The validating eleven-entry
+self-excluding manifest SHA-256 is
+`ec7bfe57fdfec9e995881c497eed45b159c90c1975550861f49b3b057473c622`.
+This is the intended product-path failure and authorizes only the frozen
+internal pending-authenticator GREEN.
 
 The complete confirmation evidence is retained under
 `.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry

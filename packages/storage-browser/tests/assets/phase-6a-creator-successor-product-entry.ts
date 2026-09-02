@@ -7,8 +7,12 @@ interface DirectRoomSession {
 	adoptCreatorSuccessor(): Promise<void>;
 	authority(): PlainRecord | null;
 	close(): Promise<void>;
+	inspectDurableHead(): Promise<unknown>;
 	issue(operation: Readonly<Record<string, unknown>>): Promise<void>;
+	previewLatchedAcl(): PlainRecord;
+	projection(): unknown;
 	rehearseMigration(input: Readonly<Record<string, unknown>>): Promise<unknown>;
+	readonly roomId: string;
 	sealEpoch(): Promise<unknown>;
 	status(): PlainRecord;
 }
@@ -38,6 +42,7 @@ interface DirectRoomOpenOptions {
 	readonly control?: DirectRoomHeadControl;
 	readonly initialization?: PlainRecord;
 	onOpenTransport?(): void;
+	readonly roomHeadAuthority?: PlainRecord;
 	readonly successorSnapshotDeclaration?: unknown;
 	readonly withCreatorSigner?: boolean;
 }
@@ -150,6 +155,11 @@ interface LifetimeInstrumentation {
 	acceptedVertex(): Promise<void>;
 	cleanupReplacements(): Promise<void>;
 	d110cColdReopenCount(): number;
+	d110c0cRecoverySnapshot(): Readonly<{
+		readonly callCount: number;
+		readonly resultKind: string | null;
+		readonly swapHeadCount: number;
+	}>;
 	d110cBSnapshot(): Readonly<{
 		readonly activationCount: number;
 		readonly closeBindCount: number;
@@ -243,6 +253,8 @@ declare global {
 			closeDirectCreator(name: string): Promise<void>;
 			create(input: unknown): Promise<string>;
 			deleteDatabases(prefix: string): Promise<readonly string[]>;
+			d110c0cRecover(name: string): Promise<PlainRecord>;
+			d110c0cStage(name: string, ordering: "new-ahe" | "old-ahe"): Promise<PlainRecord>;
 			d110cBSnapshot(): Readonly<{
 				readonly activationCount: number;
 				readonly closeBindCount: number;
@@ -738,6 +750,10 @@ function rawAuthority(databaseName: string): Promise<PlainRecord> {
 }
 
 async function rawSnapshotDeclaration(databaseName: string): Promise<PlainRecord> {
+	return rawSnapshotDeclarationAtEpoch(databaseName);
+}
+
+async function rawSnapshotDeclarationAtEpoch(databaseName: string, expectedEpoch?: number): Promise<PlainRecord> {
 	const database = await openExistingDatabase(`${databaseName}--drp-snapshot-quarantine-v1`);
 	try {
 		const transaction = database.transaction(["chunks", "scopes"], "readonly");
@@ -746,7 +762,9 @@ async function rawSnapshotDeclaration(databaseName: string): Promise<PlainRecord
 			request(transaction.objectStore("chunks").getAll()),
 		]);
 		await transactionDone(transaction);
-		const scopes = scopeRows.map(exactRecord).filter((scope) => scope.state === "verified");
+		const scopes = scopeRows
+			.map(exactRecord)
+			.filter((scope) => scope.state === "verified" && (expectedEpoch === undefined || scope.epoch === expectedEpoch));
 		if (scopes.length !== 1) throw new TypeError("D.108d2 snapshot scope is ambiguous");
 		const scope = scopes[0] as PlainRecord;
 		const chunks = chunkRows
@@ -946,6 +964,265 @@ function directRoomHeadAuthority(control: DirectRoomHeadControl, initialization:
 	});
 }
 
+type D110cRoomHeadFault = "commit-unavailable-once" | "none";
+
+function d110cRoomHeadDatabaseName(name: string): string {
+	return `d108e3-direct-${name}--d110c-room-head-v1`;
+}
+
+function openD110cRoomHeadDatabase(name: string): Promise<IDBDatabase> {
+	return new Promise((resolvePromise, reject) => {
+		const selected = indexedDB.open(d110cRoomHeadDatabaseName(name), 1);
+		selected.addEventListener(
+			"upgradeneeded",
+			() => {
+				const database = selected.result;
+				if (!database.objectStoreNames.contains("floor")) database.createObjectStore("floor", { keyPath: "key" });
+				if (!database.objectStoreNames.contains("control")) database.createObjectStore("control", { keyPath: "key" });
+				if (!database.objectStoreNames.contains("events"))
+					database.createObjectStore("events", { autoIncrement: true });
+			},
+			{ once: true }
+		);
+		selected.addEventListener("success", () => resolvePromise(selected.result), { once: true });
+		selected.addEventListener(
+			"error",
+			() => reject(selected.error ?? new Error("D110C_0C room-head database open failed")),
+			{ once: true }
+		);
+	});
+}
+
+function sameCanonical(left: unknown, right: unknown): boolean {
+	const leftBytes = encodeCanonical(left);
+	const rightBytes = encodeCanonical(right);
+	return leftBytes.byteLength === rightBytes.byteLength && leftBytes.every((byte, index) => byte === rightBytes[index]);
+}
+
+function d110cRoomHeadResult(state: unknown): PlainRecord {
+	return Object.freeze({ ok: true, state: state === null ? null : structuredClone(state) });
+}
+
+function d110cRoomHeadAuthority(name: string, initialization: PlainRecord): PlainRecord {
+	const read = async (scope: unknown): Promise<PlainRecord> => {
+		const database = await openD110cRoomHeadDatabase(name);
+		try {
+			const transaction = database.transaction("floor", "readonly");
+			const store = transaction.objectStore("floor");
+			const [scopeRow, stateRow] = await Promise.all([request(store.get("scope")), request(store.get("state"))]);
+			await transactionDone(transaction);
+			if (scopeRow !== undefined && !sameCanonical(exactRecord(scopeRow).value, scope)) {
+				return Object.freeze({ ok: false, reason: "conflict" });
+			}
+			return d110cRoomHeadResult(stateRow === undefined ? null : exactRecord(stateRow).value);
+		} finally {
+			database.close();
+		}
+	};
+	return Object.freeze({
+		initialization,
+		begin: async (input: PlainRecord): Promise<PlainRecord> => {
+			const database = await openD110cRoomHeadDatabase(name);
+			try {
+				const transaction = database.transaction(["events", "floor"], "readwrite", { durability: "strict" });
+				const floor = transaction.objectStore("floor");
+				const [scopeRow, stateRow] = await Promise.all([request(floor.get("scope")), request(floor.get("state"))]);
+				const state = stateRow === undefined ? null : exactRecord(stateRow).value;
+				if (
+					scopeRow === undefined ||
+					!sameCanonical(exactRecord(scopeRow).value, input.scope) ||
+					state === null ||
+					!sameCanonical(state, input.expected)
+				) {
+					transaction.abort();
+					return Object.freeze({ ok: false, reason: "conflict" });
+				}
+				const expected = exactRecord(input.expected);
+				const desired = Object.freeze({
+					pending: Object.freeze({ next: input.next, previous: expected.stable }),
+					stable: expected.stable,
+				});
+				await Promise.all([
+					request(floor.put({ key: "state", value: desired })),
+					request(transaction.objectStore("events").add({ operation: "begin", state: desired })),
+				]);
+				await transactionDone(transaction);
+				return d110cRoomHeadResult(desired);
+			} finally {
+				database.close();
+			}
+		},
+		commit: async (input: PlainRecord): Promise<PlainRecord> => {
+			const database = await openD110cRoomHeadDatabase(name);
+			try {
+				const transaction = database.transaction(["control", "events", "floor"], "readwrite", {
+					durability: "strict",
+				});
+				const control = transaction.objectStore("control");
+				const floor = transaction.objectStore("floor");
+				const [faultRow, scopeRow, stateRow] = await Promise.all([
+					request(control.get("fault")),
+					request(floor.get("scope")),
+					request(floor.get("state")),
+				]);
+				const fault = faultRow === undefined ? "none" : exactRecord(faultRow).value;
+				if (fault === "commit-unavailable-once") {
+					await Promise.all([
+						request(control.put({ key: "fault", value: "none" })),
+						request(transaction.objectStore("events").add({ operation: "commit-fault" })),
+					]);
+					await transactionDone(transaction);
+					return Object.freeze({ ok: false, reason: "unavailable" });
+				}
+				const state = stateRow === undefined ? null : exactRecord(stateRow).value;
+				const captured = state === null ? undefined : exactRecord(state);
+				if (
+					scopeRow === undefined ||
+					!sameCanonical(exactRecord(scopeRow).value, input.scope) ||
+					captured === undefined ||
+					captured.pending === null ||
+					!sameCanonical(captured, input.expected)
+				) {
+					transaction.abort();
+					return Object.freeze({ ok: false, reason: "conflict" });
+				}
+				const desired = Object.freeze({ pending: null, stable: exactRecord(captured.pending).next });
+				await Promise.all([
+					request(floor.put({ key: "state", value: desired })),
+					request(transaction.objectStore("events").add({ operation: "commit", state: desired })),
+				]);
+				await transactionDone(transaction);
+				return d110cRoomHeadResult(desired);
+			} finally {
+				database.close();
+			}
+		},
+		create: async (input: PlainRecord): Promise<PlainRecord> => {
+			const database = await openD110cRoomHeadDatabase(name);
+			try {
+				const transaction = database.transaction(["events", "floor"], "readwrite", { durability: "strict" });
+				const floor = transaction.objectStore("floor");
+				const [scopeRow, stateRow] = await Promise.all([request(floor.get("scope")), request(floor.get("state"))]);
+				const desired = Object.freeze({ pending: null, stable: input.stable });
+				if (
+					(scopeRow !== undefined && !sameCanonical(exactRecord(scopeRow).value, input.scope)) ||
+					(stateRow !== undefined && !sameCanonical(exactRecord(stateRow).value, desired))
+				) {
+					transaction.abort();
+					return Object.freeze({ ok: false, reason: "conflict" });
+				}
+				if (stateRow === undefined) {
+					await Promise.all([
+						request(floor.put({ key: "scope", value: input.scope })),
+						request(floor.put({ key: "state", value: desired })),
+						request(transaction.objectStore("events").add({ operation: "create", state: desired })),
+					]);
+				}
+				await transactionDone(transaction);
+				return d110cRoomHeadResult(desired);
+			} finally {
+				database.close();
+			}
+		},
+		migrate: (): Promise<PlainRecord> => Promise.resolve(Object.freeze({ ok: false, reason: "conflict" })),
+		read: (input: PlainRecord): Promise<PlainRecord> => read(input.scope),
+	});
+}
+
+async function configureD110cRoomHeadFault(name: string, fault: D110cRoomHeadFault): Promise<void> {
+	const database = await openD110cRoomHeadDatabase(name);
+	try {
+		const transaction = database.transaction("control", "readwrite", { durability: "strict" });
+		await request(transaction.objectStore("control").put({ key: "fault", value: fault }));
+		await transactionDone(transaction);
+	} finally {
+		database.close();
+	}
+}
+
+async function d110cRoomHeadEvidence(name: string): Promise<PlainRecord> {
+	const database = await openD110cRoomHeadDatabase(name);
+	try {
+		const transaction = database.transaction(["control", "events", "floor"], "readonly");
+		const [faultRow, events, scopeRow, stateRow] = await Promise.all([
+			request(transaction.objectStore("control").get("fault")),
+			request(transaction.objectStore("events").getAll()),
+			request(transaction.objectStore("floor").get("scope")),
+			request(transaction.objectStore("floor").get("state")),
+		]);
+		await transactionDone(transaction);
+		const state = stateRow === undefined ? null : exactRecord(stateRow).value;
+		const canonicalStateBytes = encodeCanonical(state);
+		return Object.freeze({
+			canonicalStateHex: hex(canonicalStateBytes),
+			events: Object.freeze(events.map((event) => normalize(exactRecord(event)))),
+			fault: faultRow === undefined ? "none" : exactRecord(faultRow).value,
+			scope: scopeRow === undefined ? null : normalize(exactRecord(scopeRow).value),
+			state: normalize(state),
+			stateDigest: hex(hashDomain("ts-drp/d110c-0c-room-head-state/v1", canonicalStateBytes)),
+		});
+	} finally {
+		database.close();
+	}
+}
+
+async function d110cAheEvidence(databaseName: string): Promise<PlainRecord> {
+	const database = await openExistingDatabase(`${databaseName}--ahe`);
+	try {
+		const transaction = database.transaction(["blobs", "generations", "objects"], "readonly");
+		const [blobRows, generationRows, objectRows] = await Promise.all([
+			request(transaction.objectStore("blobs").getAll()),
+			request(transaction.objectStore("generations").getAll()),
+			request(transaction.objectStore("objects").getAll()),
+		]);
+		await transactionDone(transaction);
+		if (objectRows.length !== 1) throw new TypeError("D110C_0C AHE object inventory is ambiguous");
+		const objectRow = exactRecord(objectRows[0]);
+		const headEnvelope = exactRecord(decodeCanonical(objectRow.record as Uint8Array));
+		const head = exactRecord(headEnvelope.body);
+		const blobs = blobRows.map(exactRecord);
+		const generations = generationRows
+			.map(exactRecord)
+			.map((row) => {
+				const envelope = exactRecord(decodeCanonical(row.record as Uint8Array));
+				const generation = exactRecord(envelope.body);
+				const closure = (generation.closure as readonly PlainRecord[]).map((reference) => {
+					const blob = blobs.find((candidate) => candidate.digest === reference.digest);
+					if (blob === undefined) throw new TypeError("D110C_0C AHE closure blob is absent");
+					const bytes = blob.bytes as Uint8Array;
+					if (hex(hashDomain("ts-drp-storage/blob/v1", bytes)) !== reference.digest) {
+						throw new TypeError("D110C_0C AHE closure blob digest differs");
+					}
+					const record = exactRecord(decodeCanonical(bytes));
+					return Object.freeze({
+						anchorDigest: record.anchorDigest,
+						currentAnchorDigest: record.currentAnchorDigest,
+						currentEpoch: record.currentEpoch,
+						digest: reference.digest,
+						epoch: record.epoch,
+						kind: record.kind,
+						objectId: record.objectId,
+					});
+				});
+				return Object.freeze({
+					baseExpectedHead: normalize(generation.baseExpectedHead),
+					closure: Object.freeze(closure.map(normalize)),
+					closureDigest: generation.closureDigest,
+					generationId: generation.generationId,
+					state: generation.state,
+				});
+			})
+			.sort((left, right) => String(left.generationId).localeCompare(String(right.generationId)));
+		return Object.freeze({
+			activeHead: normalize(head),
+			generations: Object.freeze(generations),
+			objectId: objectRow.objectId,
+		});
+	} finally {
+		database.close();
+	}
+}
+
 async function createDirectRoom(name: string, options: DirectRoomOpenOptions = {}): Promise<DirectRoomSession> {
 	if (name.length === 0 || directRooms.has(name)) throw new TypeError("D.108e3 direct room identity is invalid");
 	const databaseName = `d108e3-direct-${name}`;
@@ -1013,8 +1290,15 @@ async function createDirectRoom(name: string, options: DirectRoomOpenOptions = {
 		name,
 		Object.freeze({ rehearsalNonce, targetCreatorInvite: await createInvite(targetObjectId) })
 	);
-	const control = options.control ?? createDirectRoomHeadControl();
-	directRoomHeadControls.set(name, control);
+	const control =
+		options.roomHeadAuthority === undefined ? (options.control ?? createDirectRoomHeadControl()) : undefined;
+	if (control !== undefined) directRoomHeadControls.set(name, control);
+	const roomHeadAuthority =
+		options.roomHeadAuthority ??
+		directRoomHeadAuthority(
+			control as DirectRoomHeadControl,
+			options.initialization ?? Object.freeze({ kind: "create" })
+		);
 	return dependencies.createV3RoomSession({
 		application,
 		author: authorKeychain.localAuthorId,
@@ -1032,7 +1316,7 @@ async function createDirectRoom(name: string, options: DirectRoomOpenOptions = {
 			return directTransport(authorKeychain.localAuthorId);
 		},
 		publicKeyBytes: bytesFromHex(authorKeychain.localAuthorId),
-		roomHeadAuthority: directRoomHeadAuthority(control, options.initialization ?? Object.freeze({ kind: "create" })),
+		roomHeadAuthority,
 		signRegisteredVertexDigest: (registeredDigest: Uint8Array) => authorKeychain.signWithLocalAuthor(registeredDigest),
 		...(options.successorSnapshotDeclaration === undefined
 			? {}
@@ -1280,6 +1564,115 @@ async function directHeadAhead(name: string): Promise<string> {
 	} finally {
 		await discardDirectRoom(name);
 	}
+}
+
+async function d110c0cRoomSnapshot(room: DirectRoomSession): Promise<PlainRecord> {
+	return Object.freeze({
+		acl: normalize(room.previewLatchedAcl()),
+		authority: normalize(room.authority()),
+		durableHead: normalize(await room.inspectDurableHead()),
+		projection: normalize(room.projection()),
+		roomId: room.roomId,
+		status: normalize(room.status()),
+	});
+}
+
+async function d110c0cStage(name: string, ordering: "new-ahe" | "old-ahe"): Promise<PlainRecord> {
+	const databaseName = `d108e3-direct-${name}`;
+	const roomHeadAuthority = d110cRoomHeadAuthority(name, Object.freeze({ kind: "create" }));
+	const room = await createDirectRoom(name, { roomHeadAuthority });
+	directRooms.set(name, room);
+	instrumentation().configure({});
+	const issue = (text: string): Promise<void> =>
+		room.issue(Object.freeze({ action: "message", clientOperationId: crypto.randomUUID(), text }));
+	await issue("d110c-0c-epoch-zero");
+	await room.sealEpoch();
+	await room.adoptCreatorSuccessor();
+	await issue("d110c-0c-epoch-one");
+	await room.sealEpoch();
+	await room.adoptCreatorSuccessor();
+	await issue("d110c-0c-epoch-two");
+	const stable = await d110c0cRoomSnapshot(room);
+	const close = normalize(await room.sealEpoch());
+	if (ordering === "old-ahe") {
+		instrumentation().configure({ failBeforePublication: true });
+	} else {
+		instrumentation().configure({});
+		await configureD110cRoomHeadFault(name, "commit-unavailable-once");
+	}
+	const interrupted = await settlementDetail(room.adoptCreatorSuccessor());
+	const expectedInterruption =
+		ordering === "old-ahe" ? "D110C controlled pre-publication process death" : "D110C_FLOOR_UNAVAILABLE";
+	if (interrupted !== expectedInterruption) {
+		throw new TypeError(`D110C_0C_STAGE_CLASSIFICATION_INVALID:${ordering}:${interrupted}`);
+	}
+	const after = await d110c0cRoomSnapshot(room);
+	const floor = await d110cRoomHeadEvidence(name);
+	const floorState = exactRecord(floor.state);
+	const pending = exactRecord(floorState.pending);
+	if (exactRecord(floorState.stable).epoch !== 2 || exactRecord(pending.next).epoch !== 3) {
+		throw new TypeError("D110C_0C_DURABLE_PENDING_INVALID");
+	}
+	if (!sameCanonical(stable.projection, after.projection) || !sameCanonical(stable.acl, after.acl)) {
+		throw new TypeError("D110C_0C_INTERRUPTED_STATE_CHANGED");
+	}
+	return Object.freeze({
+		ahe: await d110cAheEvidence(databaseName),
+		after,
+		close,
+		floor,
+		interrupted,
+		ordering,
+		stable,
+	});
+}
+
+async function d110c0cRecover(name: string): Promise<PlainRecord> {
+	const databaseName = `d108e3-direct-${name}`;
+	const floorBefore = await d110cRoomHeadEvidence(name);
+	const aheBefore = await d110cAheEvidence(databaseName);
+	const snapshotDeclaration = await rawSnapshotDeclarationAtEpoch(databaseName, 2);
+	instrumentation().configure({});
+	let detail = "fulfilled";
+	let reopened: DirectRoomSession | undefined;
+	let reopenedSnapshot: PlainRecord | null = null;
+	try {
+		reopened = await createDirectRoom(name, {
+			roomHeadAuthority: d110cRoomHeadAuthority(name, Object.freeze({ kind: "reopen" })),
+			successorSnapshotDeclaration: snapshotDeclaration,
+			withCreatorSigner: false,
+		});
+		directRooms.set(name, reopened);
+		await reopened.issue(
+			Object.freeze({
+				action: "message",
+				clientOperationId: crypto.randomUUID(),
+				text: "d110c-0c-post-restart",
+			})
+		);
+		reopenedSnapshot = await d110c0cRoomSnapshot(reopened);
+	} catch (error) {
+		detail = directFailureDetail(error);
+	}
+	const floorAfter = await d110cRoomHeadEvidence(name);
+	const aheAfter = await d110cAheEvidence(databaseName);
+	const recovery = instrumentation().d110c0cRecoverySnapshot();
+	if (detail !== "fulfilled" && !sameCanonical(floorBefore, floorAfter)) {
+		throw new TypeError("D110C_0C_FAILED_RECOVERY_FLOOR_MUTATED");
+	}
+	if (detail !== "fulfilled" && fingerprint(aheBefore) !== fingerprint(aheAfter)) {
+		throw new TypeError("D110C_0C_FAILED_RECOVERY_AHE_MUTATED");
+	}
+	return Object.freeze({
+		aheAfter,
+		aheBefore,
+		detail,
+		floorAfter,
+		floorBefore,
+		recovery,
+		reopened: reopenedSnapshot,
+		snapshotScope: normalize(snapshotDeclaration.scope),
+	});
 }
 
 async function d110cFloorMatrix(): Promise<Readonly<Record<string, unknown>>> {
@@ -1618,6 +2011,12 @@ const api = Object.freeze({
 			.sort();
 		for (const name of names) await deleteDatabase(name);
 		return Object.freeze(names);
+	},
+	d110c0cRecover(name: string): Promise<PlainRecord> {
+		return d110c0cRecover(name);
+	},
+	d110c0cStage(name: string, ordering: "new-ahe" | "old-ahe"): Promise<PlainRecord> {
+		return d110c0cStage(name, ordering);
 	},
 	d110cBSnapshot(): Readonly<{
 		readonly activationCount: number;
