@@ -1261,7 +1261,6 @@ async function d110cFloorMatrix(): Promise<Readonly<Record<string, unknown>>> {
 			return await operation();
 		} catch (error) {
 			return Object.freeze({
-				pendingRecovery: instrumentation().d110cLastPendingRecovery(),
 				unexpected: directFailureDetail(error),
 			});
 		}

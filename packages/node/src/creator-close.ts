@@ -1,5 +1,5 @@
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
-import { CompactMerkleAccumulator, deriveCloseSetHistoryCommitment, type EpochVertex } from "@ts-drp/compaction";
+import { type AccumulatorSnapshot, deriveCloseSetHistoryCommitment, type EpochVertex } from "@ts-drp/compaction";
 import {
 	type SnapshotVerificationReceipt,
 	verifySnapshotStreamWithReceipt,
@@ -67,11 +67,11 @@ export type CreatorLiveCloseResult = Readonly<{
 	commitQcRef: GenerationRef;
 	currentTrustRef: GenerationRef;
 	cutValueRef: GenerationRef;
-	epoch: 0;
+	epoch: number;
 	lifecycle: "successor-pending-adoption";
 	ok: true;
 	successorAnchorDigest: string;
-	successorEpoch: 1;
+	successorEpoch: number;
 	successorTrustRef: GenerationRef;
 }>;
 
@@ -113,6 +113,7 @@ interface V3CreatorCloseRegistration {
 	readonly maxEpochBytes: number;
 	readonly maxEpochVertices: number;
 	readonly objectId: Parameters<AheDurableStore["recoverActiveGeneration"]>[0];
+	readonly previousHistorySnapshot: AccumulatorSnapshot;
 	readonly store: AheDurableStore;
 	captureCloseGraph():
 		| Readonly<{
@@ -420,6 +421,11 @@ export async function bindCreatorLiveClose(
 		if (existing !== undefined) return Object.freeze({ handle: existing, ok: true as const });
 		const registration = claimCreatorCloseRegistration(input.plane);
 		if (registration === undefined) return Object.freeze({ ok: false as const, reason: "CREATOR_CLOSE_UNAVAILABLE" });
+		const epoch = registration.currentTrust.currentEpoch;
+		if (!Number.isSafeInteger(epoch) || epoch < 0 || epoch === Number.MAX_SAFE_INTEGER) {
+			return Object.freeze({ ok: false as const, reason: "CREATOR_CLOSE_UNAVAILABLE" });
+		}
+		const successorEpoch = epoch + 1;
 		const boundHead = await inspectHead(registration.store, registration.objectId);
 		const boundTrustCandidate = boundHead.candidates.find(({ ref }) => sameRef(ref, boundHead.trustRef));
 		if (
@@ -507,7 +513,7 @@ export async function bindCreatorLiveClose(
 						frontier: graph.frontier,
 						maxEpochBytes: registration.maxEpochBytes,
 						maxEpochVertices: registration.maxEpochVertices,
-						previousHistorySnapshot: new CompactMerkleAccumulator().snapshot(),
+						previousHistorySnapshot: registration.previousHistorySnapshot,
 						vertices: graph.vertices,
 					});
 					const commitment = derivedCommitment;
@@ -553,6 +559,13 @@ export async function bindCreatorLiveClose(
 						exactCanonicalTrustStateRecordBytes: finalized.exactCanonicalTrustStateRecordBytes,
 					});
 					if (!successor.ok) throw new TypeError(`creator successor reopen failed: ${successor.reason}`);
+					if (
+						successor.trust.currentEpoch !== successorEpoch ||
+						successor.trust.objectId !== registration.currentTrust.objectId ||
+						successor.trust.genesisAnchorDigest !== registration.currentTrust.genesisAnchorDigest
+					) {
+						throw new TypeError("creator successor epoch identity failed");
+					}
 					const successorTrustRef = refFor(finalized.exactCanonicalTrustStateRecordBytes);
 					const cutValueRef = refFor(prepared.exactCanonicalCutValueBytes);
 					const commitQcRef = refFor(finalized.exactCanonicalCommitQcBytes);
@@ -593,11 +606,11 @@ export async function bindCreatorLiveClose(
 						commitQcRef: copiedRef(commitQcRef),
 						currentTrustRef: copiedRef(current.trustRef),
 						cutValueRef: copiedRef(cutValueRef),
-						epoch: 0 as const,
+						epoch,
 						lifecycle: "successor-pending-adoption" as const,
 						ok: true as const,
 						successorAnchorDigest: successor.trust.currentAnchorDigest,
-						successorEpoch: 1 as const,
+						successorEpoch,
 						successorTrustRef: copiedRef(successorTrustRef),
 					});
 					if (

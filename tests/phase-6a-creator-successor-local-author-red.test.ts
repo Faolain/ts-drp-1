@@ -115,6 +115,7 @@ describe("D.108d1b authenticated peer-local cold issuance RED", () => {
 			"detachedSignature",
 			"exactCanonicalAnchorPreimageBytes",
 			"exactCanonicalParametersCarrierBytes",
+			"expectedRoomHead",
 			"issuanceStore",
 			"liveJournalStore",
 			"messageQueueManager",

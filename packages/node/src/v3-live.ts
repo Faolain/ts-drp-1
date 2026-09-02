@@ -1,6 +1,11 @@
 import type { TrustedBlueprintCatalog } from "@ts-drp/blueprint-catalog";
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
-import { CausalityIndex, type EpochVertex } from "@ts-drp/compaction";
+import {
+	type AccumulatorSnapshot,
+	CausalityIndex,
+	CompactMerkleAccumulator,
+	type EpochVertex,
+} from "@ts-drp/compaction";
 import {
 	BlueprintStateMachine,
 	type BlueprintStateSnapshot,
@@ -374,6 +379,7 @@ interface V3CreatorCloseRegistration {
 	readonly maxEpochBytes: number;
 	readonly maxEpochVertices: number;
 	readonly objectId: StorageObjectId;
+	readonly previousHistorySnapshot: AccumulatorSnapshot;
 	readonly store: AheDurableStore;
 	captureCloseGraph():
 		| Readonly<{
@@ -6850,6 +6856,65 @@ export function bindV3BlueprintLivePlane(rawInput: V3BlueprintLiveBindingInput):
 	}
 }
 
+function creatorClosePreviousHistorySnapshot(payload: PreparedV3LivePayload): AccumulatorSnapshot | undefined {
+	try {
+		const epoch = payload.provenance.epoch;
+		const trust = payload.trust.trust;
+		if (
+			!NumberIsSafeInteger(epoch) ||
+			epoch < 0 ||
+			trust.currentEpoch !== epoch ||
+			trust.currentAnchorDigest !== payload.provenance.anchorDigest ||
+			trust.objectId !== payload.provenance.objectId
+		) {
+			return undefined;
+		}
+		const anchor = decodeCanonical(payload.input.exactCanonicalAnchorPreimageBytes);
+		if (!isObject(anchor) || !sameBytes(encodeCanonical(anchor), payload.input.exactCanonicalAnchorPreimageBytes)) {
+			return undefined;
+		}
+		const anchorEpoch = ownDataValue(anchor, "epoch");
+		const anchorObjectId = ownDataValue(anchor, "objectId");
+		const historyRoot = ownDataValue(anchor, "historyRoot");
+		const historySize = ownDataValue(anchor, "historySize");
+		if (
+			anchorEpoch !== epoch ||
+			anchorObjectId !== payload.provenance.objectId ||
+			!isDigestHex(historyRoot) ||
+			typeof historySize !== "number" ||
+			!NumberIsSafeInteger(historySize) ||
+			historySize < 0
+		) {
+			return undefined;
+		}
+		let accumulator: CompactMerkleAccumulator;
+		if (epoch === 0) {
+			accumulator = new CompactMerkleAccumulator();
+		} else {
+			const projection = decodeCanonical(payload.exactProjectionBytes);
+			if (!isObject(projection) || !sameBytes(encodeCanonical(projection), payload.exactProjectionBytes)) {
+				return undefined;
+			}
+			if (
+				ownDataValue(projection, "epoch") !== epoch ||
+				ownDataValue(projection, "objectId") !== payload.provenance.objectId ||
+				ownDataValue(projection, "anchorDigest") !== payload.provenance.anchorDigest ||
+				ownDataValue(projection, "historyRoot") !== historyRoot ||
+				ownDataValue(projection, "historySize") !== historySize
+			) {
+				return undefined;
+			}
+			const compactHistory = ownDataValue(projection, "compactHistory");
+			if (!isObject(compactHistory)) return undefined;
+			accumulator = CompactMerkleAccumulator.fromSnapshot(compactHistory as unknown as AccumulatorSnapshot);
+		}
+		if (accumulator.size !== historySize || bytesToLowerHex(accumulator.root()) !== historyRoot) return undefined;
+		return accumulator.snapshot();
+	} catch {
+		return undefined;
+	}
+}
+
 /**
  * Claims the close-only state of one genuine active v3 registration.
  * @param registration - Private genuine live registration.
@@ -6866,6 +6931,8 @@ function creatorCloseRegistration(registration: V3PlaneRegistration): V3CreatorC
 		registration.payload.input.store.capabilities.signingEligibility !== "backend-capability-required"
 	)
 		return undefined;
+	const previousHistorySnapshot = creatorClosePreviousHistorySnapshot(registration.payload);
+	if (previousHistorySnapshot === undefined) return undefined;
 	return ObjectFreeze({
 		abortSnapshotStage: (): boolean => {
 			if (!currentRegistration(registration) || registration.blueprintFolded || registration.terminalState !== "active")
@@ -6901,6 +6968,7 @@ function creatorCloseRegistration(registration: V3PlaneRegistration): V3CreatorC
 		maxEpochBytes: registration.payload.parameters.maxEpochBytes,
 		maxEpochVertices: registration.payload.parameters.maxEpochVertices,
 		objectId: registration.payload.input.objectId,
+		previousHistorySnapshot,
 		stageSnapshot: async (): Promise<V3BlueprintSnapshotExportResult> => {
 			if (registration.blueprintFolded) return exportLiveSnapshotPayload(registration);
 			const staged = await stageBlueprintEpoch(registration);

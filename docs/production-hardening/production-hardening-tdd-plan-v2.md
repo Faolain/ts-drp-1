@@ -93875,6 +93875,65 @@ custody ledger, and self-excluding manifest SHA-256 values are respectively
 `e68b21acbe627d2e457c823903720b73549fe3d9b9c8677d5431468cd00b09cc`,
 and `223355a5e698c6327107c7d4da220dbf93d8ade55e60cce484c4dc0eea25484f`.
 
+The bounded GREEN starts from signed/pushed RED
+`29012528145e3f7ae2bf056ba351459b90cd8aa0`. `v3-live.ts` now restores the
+current authenticated projection's existing `compactHistory` through the
+unchanged `CompactMerkleAccumulator`, requires canonical projection/current
+trust/anchor epoch, object, root, and size agreement, and gives creator-close a
+copied private snapshot. Epoch 0 still accepts only the canonical empty
+accumulator. `creator-close.ts` passes that snapshot to the unchanged history
+verifier, widens only the two existing result-field types to `number`, refuses
+unsafe successor overflow at bind, and derives exact current/successor values
+from authenticated trust with `successorEpoch === epoch + 1` before generation
+staging. No wire/schema/record/dependency/public-key-roster/provider/threshold
+change occurred.
+
+The corrected focused result is 1/1 with one selected file and zero
+failed/pending/todo tests. It proves genuine 0→1 adoption/activation, real
+epoch-1 issue/publish, genuine 1→2 close, exact result 1/2, an independently
+reconstructed history root/size, unchanged copied prior snapshot, successor
+Cut/QC/trust closure membership, unchanged epoch-1 caller floor, no provider or
+replacement activation, same-plane rebind identity, and
+concurrent/sequential/stale-predecessor refusal. A final assertion-identical
+evidence capture records five→seven closure references and exact closure bytes
+5,776→7,729 (delta 1,953), plus history size 2→3 and the exact independent prior
+and result roots. The private exported-result type contract passes with the
+exact key roster, exact `number` fields, epoch-0 compatibility, genuine 1→2,
+and later epoch 3.
+
+The first focused GREEN failed only because the fixture made an out-of-scope
+epoch-2 call into the still epoch-pinned D.110c-b adoption verifier; every
+preceding close/history assertion passed. Removing that probe preserves the
+reviewed boundary that D.110c-a stops at a pending epoch-2 head. A plain root
+`tsx` evidence probe separately failed before module execution because that
+launcher cannot resolve the monorepo bare workspace import; the supported
+Vitest evidence capture closed the numeric-evidence gap. The first retained
+16-file run passed 127/128; its sole stale Phase-6a key-roster expectation
+omitted D.110c-0b0's already-shipped `expectedRoomHead`. The corrected retained
+run passes 128/128. Retained browser gates pass in Chromium, Firefox, and
+WebKit: live close 9/9, adoption commit/process-death reopen 6/6, successor
+activation 24/24, and product lifecycle 27/27.
+
+Node build and exact source typecheck, storage-browser build, root-test type
+project, v3-room typecheck/build, independent v3-chat typecheck, exact-owner
+ESLint/Prettier, and diff/source-shape gates pass. Broad Node and
+storage-browser typechecks remain unsuitable aggregate gates because they
+include inherited test/config debt outside every changed owner; the exact
+production builds/typechecks are green. The stale tests-only
+`d110cLastPendingRecovery()` call is removed. The GREEN ledger is
+`.logs/d110c-a-green-29012528/green-ledger.md`; exact-runtime evidence, final
+focused reporter, corrected retained reporter, browser summary, source-shape,
+custody, and self-excluding manifest SHA-256 values are respectively
+`2800bc3e62a3ce68d7da53673ca66f0a20921fba9c824bcd5a39b5415b626adc`,
+`648a1326fa9d045905c892789d8dad6f90ae0f60d376f7c3a11810ca8c3fd940`,
+`f85b996e572d85af4bf1f8f88b5f5d56c4a1855b778b1a20e6f39cf258d0ca5a`,
+`db093049309f8e9e69be741555d3883eacbdd8dffa9075365e667af1988a9413`,
+`63e133a9710799c2979fc8d319ac142aa4f65cc96fb8c7db2c5276d44936a49c`,
+`1fb6832e07de163d6e47ab438ea72cf6041843321a70e31cee1d08b54bf85709`,
+and `345cd891834cd44951e940733be1725f0934d395c242a4e37651c79071fdb9b9`.
+The final governing Grok/Kimi/Opus plan→RED→GREEN review remains pending and
+must inspect the signed GREEN checkpoint before closure.
+
 This is a high-risk production authority/public-contract slice. The plan-only
 checkpoint is signed and pushed, then one Grok 4.6/high, standard direct Kimi K3
 with `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review inspects the

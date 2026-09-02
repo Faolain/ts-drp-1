@@ -2,38 +2,78 @@ import "fake-indexeddb/auto";
 
 import { describe, expect, it } from "vitest";
 
-import { openD110cARepeatCloseRedFixture } from "./fixtures/phase-6b-d110c-a/repeat-close-contract.js";
+import { openD110cARepeatCloseFixture } from "./fixtures/phase-6b-d110c-a/repeat-close-contract.js";
 
 describe("D.110c-a authenticated repeat-close carrier RED", () => {
-	it("fails the genuine adopted epoch-one close only at the empty previous-history carrier", async () => {
+	it("extends authenticated compact history through one genuine adopted epoch-one close", async () => {
 		Object.defineProperty(navigator, "storage", {
 			configurable: true,
 			value: Object.freeze({ estimate: () => Promise.resolve({ quota: 1_000_000_000_000, usage: 0 }) }),
 		});
-		const fixture = await openD110cARepeatCloseRedFixture();
+		const fixture = await openD110cARepeatCloseFixture();
 		try {
 			const evidence = fixture.evidence;
+			if (process.env.D110C_A_RECORD_EVIDENCE === "1") {
+				process.stdout.write(
+					`D110C_A_GREEN_EVIDENCE=${JSON.stringify({
+						afterReferenceCount: evidence.afterHead.references.length,
+						beforeReferenceCount: evidence.beforeHead.references.length,
+						closeOrder: evidence.independentHistory.closeOrder,
+						closureBytes: evidence.closureBytes,
+						epoch: evidence.closeResult.epoch,
+						historyRoot: evidence.independentHistory.historyRoot,
+						historySize: evidence.independentHistory.historySize,
+						previousHistoryRoot: evidence.independentHistory.previousRoot,
+						previousHistorySize: evidence.independentHistory.previous.size,
+						successorEpoch: evidence.closeResult.successorEpoch,
+					})}\n`
+				);
+			}
 			expect(evidence.issued).toMatchObject({ kind: "accepted", ok: true });
 			expect(evidence.published).toEqual({ kind: "published", ok: true });
 			expect(evidence.closeAttempts).toBe(1);
-			expect(evidence.closeResult).toBeUndefined();
-			expect(evidence.closeError).toEqual({
-				code: "INVALID_ANCHOR",
-				message: "previous history snapshot does not match the authenticated anchor",
-				name: "LinearizationError",
+			expect(evidence.closeResult).toMatchObject({
+				closedVertexCount: evidence.independentHistory.closeOrder.length,
+				epoch: 1,
+				lifecycle: "successor-pending-adoption",
+				ok: true,
+				successorEpoch: 2,
 			});
-			expect(evidence.beforeHead).toEqual(evidence.afterHead);
+			expect(evidence.afterHead.head.revision).toBe(evidence.beforeHead.head.revision + 1);
+			expect(evidence.afterHead.head).not.toEqual(evidence.beforeHead.head);
+			for (const reference of [
+				evidence.closeResult.commitQcRef,
+				evidence.closeResult.cutValueRef,
+				evidence.closeResult.successorTrustRef,
+			]) {
+				expect(evidence.afterHead.references).toContainEqual(reference);
+			}
+			expect(evidence.cutValue).toMatchObject({
+				epoch: 1,
+				historyRoot: evidence.independentHistory.historyRoot,
+				historySize: evidence.independentHistory.historySize,
+				previousHistoryRoot: evidence.independentHistory.previousRoot,
+				previousHistorySize: evidence.independentHistory.previous.size,
+			});
+			expect(evidence.previousHistoryAfter).toEqual(evidence.independentHistory.previous);
+			expect(evidence.previousHistoryAfter).not.toBe(evidence.independentHistory.previous);
+			expect(evidence.closureBytes.delta).toBeGreaterThan(0);
+			expect(evidence.duplicateCloseErrors).toEqual({
+				concurrent: "creator close authority is unavailable",
+				sequential: "creator close authority is unavailable",
+			});
+			expect(evidence.rebindReturnedSameHandle).toBe(true);
+			expect(evidence.stalePredecessorError).toBe("creator close authority is unavailable");
 			expect(evidence.actorStatusBeforeClose).toMatchObject({
 				closeAuthority: "available",
 				continuity: "continuous",
 				lifecycle: "active",
 			});
-			expect(evidence.actorStatusAfterFailure).toMatchObject({
-				closeAuthority: "available",
+			expect(evidence.actorStatusAfterClose).toMatchObject({
+				closeAuthority: "unavailable",
 				continuity: "continuous",
-				lifecycle: "sealed",
+				lifecycle: "successor-pending-adoption",
 			});
-			expect(evidence.adoptionProbe).toMatchObject({ kind: "sealed-live-unavailable", ok: false });
 			expect(evidence.roomHeadBefore).toMatchObject({ epoch: 1 });
 			expect(evidence.roomHeadAfter).toEqual(evidence.roomHeadBefore);
 			expect(evidence.providerPresent).toBe(false);
