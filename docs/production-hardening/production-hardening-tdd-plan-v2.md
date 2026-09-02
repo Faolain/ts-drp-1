@@ -92027,6 +92027,189 @@ receipt, archive record, or active registration in test code.
    and the Node control owners. Deadline:
    before Phase-6 exit or Phase-7a execution.
 
+##### D.110c-0b0 owner-selection design
+
+The bounded owner audit rejects two superficially attractive shortcuts. The
+existing creator finality key authenticates checkpoint content but has no
+monotonic memory: it can sign two same-epoch forks, and every valid older
+signature remains valid. Storing a signed "latest" value in the room AHE,
+IndexedDB, invite, checkpoint, registration, journal, snapshot store, or another
+database on the same rollbackable storage boundary merely moves the replay
+problem. The current `@ts-drp/keychain` derives signing keys from caller seed
+material and exposes signing, not a platform monotonic counter or independently
+durable per-room state. Neither construction can be the floor.
+
+The selected owner is therefore an **application/account-held monotonic room
+head authority** supplied to the product room as an explicit capability. It is
+not a built-in checkpoint server, global ledger, consensus service, or new
+cryptographic proof. The provider may be backed by an authenticated account
+service or a platform credential store with real anti-rollback semantics, but
+that backing is application policy outside the room's untrusted storage. A
+plain IndexedDB/localStorage implementation on the same origin does not satisfy
+the hostile-storage acceptance. The capability is trusted only for latestness
+and availability; protocol-v3 remains responsible for authenticating genesis,
+creator/profile/signer-set, epoch/anchor lineage, cut/QC, ACL, history,
+archive/state/snapshot/manifest, and recovery bytes.
+
+The compared owner families and dispositions are:
+
+| Floor owner family                               | Freshness/root property                                                                                                       | Browser and operational property                                                                                             | Disposition                                                                                                                                          |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Creator signing custody alone                    | Authenticates bytes but remembers no maximum epoch; rollback and same-key forks remain valid.                                 | Existing browser-compatible Ed25519 path, but no monotonic durable cell.                                                     | Rejected as insufficient. The creator key remains the checkpoint signer, never the latestness oracle.                                                |
+| Application/account-held monotonic room-head pin | Caller-authenticated O(1) cell selects one exact current `(objectId, epoch, currentAnchorDigest)` independently of room data. | Async TypeScript capability is browser-feasible; a real account/platform backing is required for hostile-storage resistance. | **Selected.** This is an acknowledged public product/Node contract addition and must pass this high-risk design review before any production edit.   |
+| Library-selected external checkpoint service     | Could supply a monotonic authenticated pin and brand-new-client bootstrap.                                                    | Adds a service, availability policy, credential protocol, dependency, and migration chosen by ts-drp.                        | Rejected for D.110c-0b0. Phase 7 may bind the application capability to a separately reviewed service, but ts-drp does not silently choose one here. |
+| Merkle/recursive proof without an external floor | Authenticates lineage or consistency but cannot establish which valid prefix is latest.                                       | Adds proof machinery without closing rollback freshness.                                                                     | Rejected as a floor. It remains orthogonal to the already selected creator checkpoint design.                                                        |
+
+The new public contract is narrow and explicit. Product ownership begins at
+`CreateV3RoomSessionInput` in `examples/v3-room/src/index.ts`; Node integration
+touches creator adoption commit/reopen/activation and the later generalized
+close/adoption owners. Protocol-v3 receives a copied exact expected room-head
+value at its new bounded checkpoint opener, not the provider or its I/O. The
+provider exposes one per-room authenticated state:
+
+```text
+scope   = (pinnedGenesisAnchorDigest, objectId)
+stable  = (objectId, epoch, currentAnchorDigest)
+pending = null | {
+  previous: stable,
+  next: (objectId, epoch + 1, nextAnchorDigest),
+  transitionCommitment
+}
+```
+
+`transitionCommitment` is a domain-separated digest over the exact previous
+and next room-head tuples plus the immutable provider scope. It is provider metadata, not a protocol wire field,
+anchor field, QC field, or archive record. The capability supports exact
+read, begin-CAS from `{stable, pending:null}` to `{stable, pending}`, and
+commit-CAS from that exact pending value to `{stable:next, pending:null}`.
+All inputs and results are copied, exact-shaped, and fail closed. No method may
+select the greatest stored epoch, accept an absent floor for an advanced room,
+blindly overwrite a conflict, or expose a general arbitrary-value store. At
+most one stable tuple and one pending tuple exist per room, so provider state is
+O(1) with epoch count.
+
+The publication protocol supplies logical atomicity across the independent
+authority and room store without pretending that two physical stores share a
+transaction:
+
+1. Verify the current stable floor equals the genuine active room head and that
+   no pending value exists.
+2. Produce, verify, and durably complete the exact next checkpoint/generation,
+   while leaving the current room head and activation unchanged.
+3. Install the exact pending advance through provider CAS. From this point no
+   old or new room generation may activate until the transition resolves.
+4. CAS the room AHE head from the exact prior head to the already-complete next
+   generation. An ambiguous CAS is resolved by an authenticated reopen and
+   exact equality; it is never guessed.
+5. Commit the exact pending provider record to the new stable floor.
+6. Reopen both owners, require exact equality at the new tuple, and only then
+   activate/publish the new owner. Old control proof retirement remains subject
+   to adoption, rollback, availability, snapshot, and outbox gates.
+
+After pending installation there is no rollback-to-old abort path. Recovery
+either completes the same exact authenticated transition or remains unavailable
+and fail closed. This makes every crash state deterministic:
+
+| Crash observation                                                                                         | Required result                                                                                                            |
+| --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Old stable floor, no pending, old room head; next generation absent or merely staged/complete             | Old head may reopen; unselected next bytes have no authority.                                                              |
+| Old stable floor, exact pending next, old room head                                                       | No activation. Reverify the pending-selected complete next generation, then perform the exact head CAS and pending commit. |
+| Old stable floor, exact pending next, next room head                                                      | No activation until the provider commits that exact pending value; then exact dual-owner equality is required.             |
+| New stable floor, no pending, next room head                                                              | Reverify checkpoint contents and exact floor equality, then activate.                                                      |
+| Floor behind an authenticated room head with no matching pending                                          | `D110C_FLOOR_HEAD_AHEAD`; do not accept the floor-matching old generation and do not synthesize a pending value.           |
+| Floor ahead of room head, malformed/foreign pending, missing selected generation, or unavailable provider | Typed availability/authority failure; never fall back to the largest local epoch or an older matching generation.          |
+| Two concurrent next heads or a changed provider value                                                     | Exact CAS conflict `D110C_FLOOR_CONFLICT`; neither losing head activates.                                                  |
+
+The focused contract freezes the complete classification set rather than a
+prefix wildcard:
+
+| Condition                                                                 | Exact code                         |
+| ------------------------------------------------------------------------- | ---------------------------------- |
+| Provider read/begin/commit unavailable or throws                          | `D110C_FLOOR_UNAVAILABLE`          |
+| Provider value is malformed, cross-object, cross-genesis, or noncanonical | `D110C_FLOOR_INVALID`              |
+| Stable floor differs from the sole proposed current authenticated head    | `D110C_FLOOR_MISMATCH`             |
+| Proposed next epoch/anchor regresses, skips, or reuses the stable tuple   | `D110C_FLOOR_REGRESSION`           |
+| Exact begin/commit CAS loses or observes another value                    | `D110C_FLOOR_CONFLICT`             |
+| Pending previous/next/commitment is missing, duplicate, or inconsistent   | `D110C_FLOOR_PENDING_INVALID`      |
+| Authenticated room head is ahead while no exact pending advance exists    | `D110C_FLOOR_HEAD_AHEAD`           |
+| Exact pending-selected complete generation is absent or unavailable       | `D110C_FLOOR_RECOVERY_UNAVAILABLE` |
+| Existing epoch>0 room has no independently authenticated provider cell    | `D110C_FLOOR_MIGRATION_REQUIRED`   |
+
+Crash completion reads the next tuple from the independently authenticated
+pending provider record. It may load hostile room bytes only as candidates and
+must fully authenticate the candidate against that tuple and the prior trust;
+it may not derive, repair, or advance the provider value from a local AHE head,
+checkpoint, journal, snapshot, invite, or maximum epoch. A provider outage is
+an availability failure, not permission to weaken freshness. A provider that
+lies, rolls back, or equivocates is outside the selected trust assumption and
+can defeat latestness; this limitation is explicit.
+
+Initialization and compatibility are also exact. A genuinely unadvanced room
+may initialize an absent provider cell only to
+`(objectId, 0, pinnedGenesisAnchorDigest)` from the caller's authenticated
+genesis invite and an independently verified epoch-0 trust root. An existing
+epoch>0 room with no provider cell returns
+`D110C_FLOOR_MIGRATION_REQUIRED`; it may continue only after the application
+supplies an independently authenticated current pin. It must not bootstrap the
+floor from the local successor generation. A brand-new client with only genesis
+can authenticate a checkpoint but cannot establish freshness; Phase 7 must
+define how its application/account obtains the current pin. Replacing an old
+stable floor with the exact committed next floor retires the old value only
+after dual-owner equality. No transition history is retained. Permanent room
+deletion may not erase the last pin and permit replay; it requires an O(1)
+authenticated terminal tombstone or a separately reviewed account deletion
+policy.
+
+D.110c-0b0 RED/GREEN is frozen accordingly. RED uses the real first transition
+and production reopen path to demonstrate all of the following without a
+tests-only trust record: a valid old generation is accepted when no independent
+floor exists; a creator signature alone cannot distinguish latestness; and the
+current APIs have no provider/pending/CAS seam. GREEN adds only the reviewed
+capability/public-contract boundary and the first-transition orchestration. It
+must prove:
+
+- exact genesis initialization and exact current-head equality;
+- make-before-publish ordering and no activation during a pending transition;
+- every crash row above in both before/after orderings, including ambiguous
+  room-head CAS recovery;
+- stale, forked, skipped, duplicate, cross-object, cross-genesis, regressed,
+  malformed, missing, unavailable, and concurrent-provider mutants fail with
+  exact `D110C_FLOOR_*` codes before activation or deletion;
+- neither normal nor crash recovery derives the provider value from hostile
+  local data;
+- the provider contains exactly one stable and at most one pending fixed-size
+  record, old values retire only after authenticated dual-owner equality, and
+  the D.110c-c/d censuses count it;
+- epoch-0 compatibility succeeds, advanced legacy state without an external
+  pin returns `D110C_FLOOR_MIGRATION_REQUIRED`, and no silent migration occurs;
+  and
+- the existing wire records, anchor/QC semantics, creator key, thresholds,
+  dependencies, room workload, and storage schemas remain unchanged.
+
+Focused gates cover a deterministic in-memory hostile room store and a separate
+model provider, real browser room reopen with an injected account-authority
+test implementation, creator trust/close/adoption retained vectors, exact
+public source shape, package builds/typechecks, exact-owner lint/format/diff,
+protected paths/stashes, and signed/pushed evidence. The browser test provider
+is an implementation of the public authority contract, not evidence that
+IndexedDB itself is anti-rollback. If production implementation requires a new
+protocol wire/schema field, cryptographic dependency, built-in external
+service, keychain mutation/counter, changed genesis assumption, or any public
+surface broader than this exact capability and expected-head plumbing, stop
+and reslice before production edits. After reviewed 0b0 GREEN, D.110c-a/b must
+generalize the identical protocol to every genuine transition; 0b1 consumes the
+stable exact floor for bounded cold trust opening; D.110c-c/d prove retirement,
+restart, census, and at least 100 transitions; Phase 7 owns new-client pin
+distribution and archive/cold-join availability.
+
+This exact owner-selection design is signed and pushed before one bounded Grok
+4.6/high, standard direct Kimi K3 with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review. Only P0/P1 blocks;
+material findings are corrected in one batch with at most one confirmation if
+scope, causal acceptance, or the public authority contract changes. No
+production edit, RED, Fable, collaboration subagent, or long workload runs
+before that gate is accepted.
+
 The four prerequisite decisions, including the newly demonstrated 0b0
 freshness-floor authority question, are reviewed before their production edits;
 each executable sub-slice receives its own bounded causal RED and GREEN. The
