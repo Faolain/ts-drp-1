@@ -58,11 +58,22 @@ journals, explicit watchdog/exit status, and bounded synthetic fault tests;
 partial evidence remains diagnostic only. Do not invoke Fable or collaboration
 subagents.
 
-The D.110a-x forensics GREEN is implemented: its one focused run passed 9/9,
-the frozen retained suite passed 95/95, and all affected build-source/static
-gates passed without creating the real full-run root. Signed evidence and the
-final three-model GREEN review remain the execution gate for the sole
-64-object run.
+The D.110a-x forensics GREEN and final review closed, and the sole 64-object
+run completed successfully exactly once. Its signed/pushed closure is
+`08e49163140c892facac2bd0eb2ede08a9fae102`. It proved distinct-room churn,
+per-handoff reclamation, exact million-operation semantics, and bounded memory;
+it did not prove repeated epochs of one room and must never be rerun.
+
+The next blocking work is the audit/resliced D.110c repeated same-room
+authenticated epoch lifecycle in the governing production-hardening plan.
+Production currently supports one genuine epoch 0→1 handoff. Repetition is
+blocked by epoch-0-only creator seal custody, an empty prior-history accumulator,
+first-transition close/adoption/product constants, stale topic-owner reuse, no
+bounded authenticated current-trust/control-proof checkpoint after pruning,
+and no durable pending-adoption resume entry. The audit/reslice owns those
+high-risk boundaries before production edits. Phase 6 cannot close and Phase 7
+cannot consume a long-lived-room claim until D.110c is green. Do not begin
+D.110b as if it closes that capability gap.
 
 Global TODO:
 
@@ -72,8 +83,9 @@ Global TODO:
 - [x] D.110a-v disposition the full lifecycle without another capture.
 - [x] D.110a-w correct the tests-only watchdog feasibility contract and record
       its consumed preflight result.
-- [ ] D.110a-x correct the demonstrated preflight variance bound without retry.
-- [ ] D.110a genuine million-operation retained-heap hard gate.
+- [x] D.110a-x correct the demonstrated preflight variance bound without retry.
+- [x] D.110a genuine million-operation retained-heap hard gate.
+- [ ] D.110c genuine repeated same-room authenticated epoch lifecycle.
 - [ ] D.110b CI memory-trend fail-closed backstop.
 
 No Phase-6c RED, GREEN, workflow mutation, product change, or long workload is

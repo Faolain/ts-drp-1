@@ -18024,12 +18024,13 @@ its eviction matrix green. Only then may any profile leave observation mode.
 > optimization. It is the **acceptance boundary** — the moment untrusted bytes become authoritative — and it
 > is already built and crash-tested in Phase 2e. Phase 6 _enables_ it, it does not invent it.
 
-| Slice  | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Class        | RED test → GREEN                                                                                                                                                                                                                                                                                                                                                      |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **6a** | Enable verified adoption: full external verification (authority chain, `CutValue`, commit QC, proposal/value binding, close + history extension, snapshot payload/manifest, blueprint, archive root, next anchor) **outside** the transaction; then one strict transaction with exact CAS on `(expectedEpoch, expectedAnchor, expectedCutValueDigest)`                                                                                                                                                                                                                                                                                                                                                                                           | coordinated  | Unsigned cut, stale expected anchor, same-epoch different value, and every crash point leave the old anchor unchanged; a valid cut yields exactly one new complete closure                                                                                                                                                                                            |
-| **6b** | Enumerated-structure cleanup: closed-epoch `vertices`, `forwardEdges`, `frontier`, `vertexDistances`, causality caches, snapshots, checkpoints, finality state, pending indexes, sync inventories, rollback artifacts — **only after** verified commit QC + durable adoption + ≥2 rollback generations + availability policy satisfied + outbox fully categorized. Browser cleanup scheduling reuses the exact 5c primary-dispatch owner/port and introduces no second election mechanism; holding the advisory lease grants no deletion authority, and every cleanup precondition is transactionally rechecked immediately before deletion.                                                                                                     | consensus-v3 | Archival-vs-compacted differential over ≥100 epochs; raw-dependency audit instrumentation; Locks on/off/unavailable and takeover yield the same eligible deletion set, while a stale lease holder or changed precondition deletes nothing                                                                                                                             |
-| **6c** | **Memory gate, made able to fail.** Round 1 routed this through `benchmark-memory.yml`, which sets `fail-on-alert: false`. Two artifacts instead: (i) **structure-census assertions in vitest** — deterministic, non-flaky, exact integers: after E epochs with pruning enabled, `hashGraph.vertices.size ≤ maxEpochVertices + activeTail`, closed-epoch `FinalityState` count `=== 0`, `states` map ≤ checkpoint bound, `forwardEdges`/`vertexDistances` census ≤ bound; (ii) heap slope under `node --expose-gc`, post-GC `heapUsed` per epoch, least-squares slope over the last E/2 epochs ≤ ε bytes/epoch **and** absolute ≤ budget. Flip `fail-on-alert: true` on the memory bench as a trend backstop.                                    | local-safe   | **Paired assertion** (a heap bound alone passes if writes were silently dropped): `expect(admittedAndAppliedOps).toBe(1_000_000)` **and** final state digest correct **and** heap bounded                                                                                                                                                                             |
-| **6d** | **Deferred legacy-finality retention resolution (former 0k bound).** Enabled legacy finality may delete or compact a record only after the adopted close/cut policy deterministically grants deletion permission and the required durable evidence or certified replacement exists. This is a coordinated compatibility operation, not a Phase-0 `Map.size` trick: define post-expiry query, late-attestation, sync and restart behavior; plumb configuration; integrate journal/commit discipline; and run mandatory XVER. Phase-4/5/6 artifacts establish policy consistency and deletion permission — frozen legacy rooms do not literally inherit v3 QC machinery. The Phase-1c off-switch remains the only bound-zero mode before this row. | coordinated  | Same history under permuted delivery/access orders expires the same records only after verified adoption; ancient late attestations, old queries, sync and restart follow the specified post-expiry result; rollback restores the exact pre-prune census; no sibling map merely relocates Θ(V) state; paired admitted-operation/digest/census/heap gates remain green |
+| Slice    | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Class        | RED test → GREEN                                                                                                                                                                                                                                                                                                                                                      |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **6a**   | Enable verified adoption: full external verification (authority chain, `CutValue`, commit QC, proposal/value binding, close + history extension, snapshot payload/manifest, blueprint, archive root, next anchor) **outside** the transaction; then one strict transaction with exact CAS on `(expectedEpoch, expectedAnchor, expectedCutValueDigest)`                                                                                                                                                                                                                                                                                                                                                                                           | coordinated  | Unsigned cut, stale expected anchor, same-epoch different value, and every crash point leave the old anchor unchanged; a valid cut yields exactly one new complete closure                                                                                                                                                                                            |
+| **6b**   | Enumerated-structure cleanup: closed-epoch `vertices`, `forwardEdges`, `frontier`, `vertexDistances`, causality caches, snapshots, checkpoints, finality state, pending indexes, sync inventories, rollback artifacts — **only after** verified commit QC + durable adoption + ≥2 rollback generations + availability policy satisfied + outbox fully categorized. Browser cleanup scheduling reuses the exact 5c primary-dispatch owner/port and introduces no second election mechanism; holding the advisory lease grants no deletion authority, and every cleanup precondition is transactionally rechecked immediately before deletion.                                                                                                     | consensus-v3 | Archival-vs-compacted differential over ≥100 epochs; raw-dependency audit instrumentation; Locks on/off/unavailable and takeover yield the same eligible deletion set, while a stale lease holder or changed precondition deletes nothing                                                                                                                             |
+| **6c**   | **Memory gate, made able to fail.** Round 1 routed this through `benchmark-memory.yml`, which sets `fail-on-alert: false`. Two artifacts instead: (i) **structure-census assertions in vitest** — deterministic, non-flaky, exact integers: after E epochs with pruning enabled, `hashGraph.vertices.size ≤ maxEpochVertices + activeTail`, closed-epoch `FinalityState` count `=== 0`, `states` map ≤ checkpoint bound, `forwardEdges`/`vertexDistances` census ≤ bound; (ii) heap slope under `node --expose-gc`, post-GC `heapUsed` per epoch, least-squares slope over the last E/2 epochs ≤ ε bytes/epoch **and** absolute ≤ budget. Flip `fail-on-alert: true` on the memory bench as a trend backstop.                                    | local-safe   | **Paired assertion** (a heap bound alone passes if writes were silently dropped): `expect(admittedAndAppliedOps).toBe(1_000_000)` **and** final state digest correct **and** heap bounded                                                                                                                                                                             |
+| **6c-r** | **Blocking repeated-room authenticated epoch lifecycle.** Generalize the already verified creator close/adopt/reopen orchestration so one adopted active successor becomes the authenticated close-capable predecessor of the next epoch. Preserve the existing wire, authority, digest, workload, threshold, dependency, and public-API contracts. This row is a prerequisite for any long-lived-room, bounded-after-E-epochs, archive, or age-independent cold-join claim; D.109f's synthetic durable differential and D.110a's 64 distinct one-transition rooms do not satisfy it.                                                                                                                                                            | coordinated  | A genuine room executes epoch 0→1, restart/reopen, epoch 1→2, and continued issue/publish with exact state/ACL/authority/anchor/history/archive/operation accounting; then one room executes at least 100 authenticated transitions with restart/prune boundaries, bounded owner/durable censuses, and a fresh-process post-GC memory gate.                           |
+| **6d**   | **Deferred legacy-finality retention resolution (former 0k bound).** Enabled legacy finality may delete or compact a record only after the adopted close/cut policy deterministically grants deletion permission and the required durable evidence or certified replacement exists. This is a coordinated compatibility operation, not a Phase-0 `Map.size` trick: define post-expiry query, late-attestation, sync and restart behavior; plumb configuration; integrate journal/commit discipline; and run mandatory XVER. Phase-4/5/6 artifacts establish policy consistency and deletion permission — frozen legacy rooms do not literally inherit v3 QC machinery. The Phase-1c off-switch remains the only bound-zero mode before this row. | coordinated  | Same history under permuted delivery/access orders expires the same records only after verified adoption; ancient late attestations, old queries, sync and restart follow the specified post-expiry result; rollback restores the exact pre-prune census; no sibling map merely relocates Θ(V) state; paired admitted-operation/digest/census/heap gates remain green |
 
 ### Exit gate (Phase 6)
 
@@ -18038,6 +18039,11 @@ Phase 2) plus real Safari/macOS, Safari/iOS and Chrome/Android **from the releas
 SHA**; cold-join convergence from untrusted sources; rollback integrity after forced mid-adoption failures;
 kill-switch drill re-run; soak ledger thresholds met; formal model + trace conformance green; signer-profile
 eviction matrix green.
+
+Phase 6 cannot exit, and no long-lived-room golden path may be claimed, until
+6c-r proves a single production room can advance through repeated authenticated
+epochs. One genuine transition repeated across many distinct rooms is a separate
+churn/reclamation proof, not a substitute.
 
 > **On mobile gates.** Every workflow in this repo is `runs-on: ubuntu-latest`, and
 > `docs/cross-browser-testing.md:13-18` says explicitly that Playwright WebKit **is not** installed Safari.
@@ -18055,7 +18061,7 @@ The root **codecs** already landed in Phase 3e — this phase is segmentation, p
 
 | Slice    | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | RED test → GREEN                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **7a**   | Immutable content-addressed **archive segments** under the Merkle archive index; hot snapshot = recent window + edit/tombstone overlay + archive root; demand paging with inclusion proofs; attachment manifests                                                                                                                                                                                                                                                                                                                                    | Corrupt/missing/withheld/tampered segment → verification fails; cold-join of a 1M-message room downloads O(hot + window), verified by **network-byte accounting** in the chat e2e                                                                                                                                                                                                                                                                                                          |
+| **7a**   | Immutable content-addressed **archive segments** under the Merkle archive index; hot snapshot = recent window + edit/tombstone overlay + archive root; demand paging with inclusion proofs; attachment manifests. The source room must have completed the blocking 6c-r repeated authenticated lifecycle; one oversized epoch and synthetic archive records are forbidden substitutes.                                                                                                                                                              | Corrupt/missing/withheld/tampered segment → verification fails; cold-join of a genuinely multi-epoch 1M-message room after safely pruning early epochs downloads O(hot + window), verified by **network-byte accounting** in the chat e2e                                                                                                                                                                                                                                                  |
 | **7b**   | Availability policy as a **committed** value. `availabilityPolicyDigest` is a committed `CutValue` field from Phase 3 onward and binds to a successor anchor transitively through its certified `cutDigest`; the frozen sixteen-field `drp-epoch-anchor` never carries it (D.93.17). The initial no-mirror profile is a valid **explicit** policy: `mode:"local-only", minRollbackGenerations:2, minLocalCopies:1, minMirrorReceipts:0`. Receipts are signed artifact-bound local pruning evidence — **not consensus, and not a permanence claim**. | `availability-policy.test.ts`: a no-mirror room prunes only with a local snapshot and two rollback generations; a receipt for the wrong artifact/object/epoch never satisfies policy                                                                                                                                                                                                                                                                                                       |
 | **7b-r** | **Receipt-authenticated rollback release, after its prerequisites and a governed protocol-v3 registry bump.** Canonically verify artifact-bound availability receipts before retention arithmetic, derive a module-private release intent bound to observed revision, and atomically recheck head/generation/policy/storage revisions plus usable rollback facts before updating release state only. `releaseRollbackGeneration` never deletes; Phase 6b remains the sole physical deletion authority.                                              | Forged/malformed/wrongly bound/untrusted/replayed/bad-signature receipts return `RECEIPT_INVALID` before arithmetic or release mutation. Only an authenticated but policy-unsafe release returns `ROLLBACK_PINNED`. No receipt alone deletes bytes; 6b still requires verified QC, durable adoption, minimum usable rollbacks, satisfied availability and categorized outbox. This row is blocked on Phase 3, 5c, 6a, 7b and the receipt registry bump detailed in the Phase 2g amendment. |
 | **7c**   | Privacy/retention: per-segment encryption, certified key-erasure, honest deletion UX                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Certified key-erasure renders retained ciphertext unreadable to conforming clients; documented residual-risk statement                                                                                                                                                                                                                                                                                                                                                                     |
@@ -91558,3 +91564,251 @@ success/failure custody. No product/API/dependency, workload, sample-window,
 memory-threshold, watchdog, retry, or preflight behavior changed. The existing
 nonblocking P2 dispositions remain deferred; no further D.110a invocation or
 review ceremony is authorized or required by this closure.
+
+#### D.110c — blocking repeated same-room authenticated epoch lifecycle
+
+##### Inherited evidence, boundary, owner, and deadline
+
+D.110c preserves D.108, D.109, and D.110a exactly as accepted. D.108 proves the
+first genuine creator transition from epoch 0 to epoch 1. D.109f proves a
+128-step synthetic durable-maintenance differential plus one genuine lifecycle;
+it explicitly does not claim repeated installed-v3 rollover. D.110a proves
+distinct-room churn, per-handoff reclamation, exact million-operation accounting,
+and bounded retained memory across 64 rooms that each close only once. None is
+reopened, rerun, weakened, or relabelled as repeated epochs of one room.
+
+D.110c is a blocking coordinated production-lifecycle umbrella owned by the
+`@ts-drp/node` installed-v3 creator close/adoption/reopen orchestrators, with the
+existing `@ts-drp/protocol-v3`, compaction, storage, issuance, snapshot,
+availability, archive, and runtime-reclamation owners retained as verification
+boundaries. Its deadline is before Phase-6 exit, before D.110b or any later gate
+is used to claim bounded memory _after E epochs_, and before Phase 7a/7b or either
+golden path consumes a long-lived-room claim. D.110b's CI trend wiring may not
+erase or satisfy this blocker.
+
+This checkpoint is audit and plan only. It authorizes no production edit, RED,
+campaign, wire-format change, authority change, dependency change, threshold
+change, public API, or Phase-7 implementation. The bounded source audit below
+demonstrates that the gap is not merely test composition or one private Node
+orchestration bug. It crosses an exported result contract, creator seal
+authority/evidence custody, bounded authenticated trust recovery, product-room
+ownership, and durable transition recovery. Those owners are explicitly
+resliced before any production change.
+
+##### Bounded source and architecture audit
+
+Some close primitives are epoch-relative, but the complete production path is
+not. `prepareCreatorClose` derives the cut epoch from authenticated
+`currentTrust`, enforces exact history extension, and binds the successor
+anchor. By contrast, creator seal custody and several Node/product owners are
+still epoch-0/first-successor-only:
+
+| Lifecycle concern                                        | Current production path                                                                                                                                                                                                                                                                                                                                                                       | Exact repeated-epoch gap and required custody                                                                                                                                                                                                                                                                                                                                                   |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Live issue and publication                               | `v3-live.ts` activates the adopted successor as an ordinary non-`snapshot-closed` plane; `issueLocal`, pending/retained publication, ingress, and stable topic use the recovered epoch and anchor.                                                                                                                                                                                            | The live path already works at epoch 1. Preserve it and prove the first post-epoch-2 issue, publication, ingress, journal row, reducer state, and digest rather than adding another issuing API.                                                                                                                                                                                                |
+| Close set and compact history                            | `creatorCloseRegistration` captures the genuine graph and authenticated anchor; `creator-close.ts` calls `deriveCloseSetHistoryCommitment`.                                                                                                                                                                                                                                                   | The close owner always supplies a new empty accumulator. Epoch 1 commits nonzero prior history, so the genuine second close fails exact accumulator/root/size verification. The adopted projection retains `compactHistory`, but the live registration neither authenticates nor carries one shared continuity owner.                                                                           |
+| Creator seal and QC authority                            | `openSealAuthority` in protocol-v3 refuses any creator trust whose `currentEpoch !== 0`; protocol seal authority, proposal, vote, and QC identities bind literal epoch 0. `@ts-drp/seal` creator intent, vote intent, pacemaker, evidence, vote stores, and browser adapters also carry epoch-0 literals, and the singleton evidence actor cannot reuse an epoch-0 finalized row for epoch 1. | No genuine epoch-1 cut can be certified or verified today. Generalizing creator-only seal custody and selecting evidence/vote custody by authenticated `(objectId, closedEpoch)` is a security-authority and durable-record contract, not a Node-only fix. Certified/BFT epoch-zero behavior and all existing vectors remain unchanged.                                                         |
+| Exported close result                                    | `@ts-drp/node/creator-close` publicly exports `CreatorLiveCloseResult` with literal `epoch: 0` and `successorEpoch: 1`; the runtime returns the same constants.                                                                                                                                                                                                                               | Repeated close requires one reviewed public-contract generalization to safe integer epochs with exact `successorEpoch === epoch + 1`. Field names and result shape remain unchanged; this is still a public API change and is never hidden as private plumbing.                                                                                                                                 |
+| Snapshot and manifest                                    | Snapshot staging/export/quarantine bind the registration's current object, epoch, anchor, ACL, and state digest.                                                                                                                                                                                                                                                                              | The existing format appears epoch-relative. Prove epoch-N export and epoch-N+1 verification cannot substitute an earlier snapshot; stop if a format change is demonstrated.                                                                                                                                                                                                                     |
+| Next anchor, projection, and adoption                    | `creator-adoption.ts` verifies the first history advance and emits `v3-live-generation-2`, while hot verify/commit code requires predecessor kind `v3-live-generation-1` and constructs epoch 1.                                                                                                                                                                                              | Generalize existing epoch fields and choose predecessor kind from authenticated epoch. Do not add a new projection kind or fixture-authored capability.                                                                                                                                                                                                                                         |
+| Activation and product custody                           | Adoption uses one-use capabilities and strict CAS. `creator-adoption-activate.ts` keys `activeOwners` only by stable topic and returns the existing wrapper when bindings match. `examples/v3-room` binds close only for genesis, treats a set successor authority as permanently adopted, and does not bind close after cold reopen.                                                         | A second adoption can report success while returning the stale epoch-1 wrapper. The product owner must replace ownership only for the exact next authenticated anchor, rebind close to every adopted/reopened successor, and preserve the stale-handle refusal contract.                                                                                                                        |
+| Cold reopen and trust root                               | Reopen assumes the first three-generation shape, genesis projection, one cut/QC, epoch-1 successor, and the genesis-only trust opener. `inspectTrustClosure` permits exactly one trust record and every trust advance removes the prior record.                                                                                                                                               | After repeated D.109 pruning, no bounded authenticated carrier currently proves an arbitrary current trust from the pinned genesis. Replaying an ever-growing cut/QC chain or retaining every old trust record would violate age-independent recovery or bounded durable-control state. A reviewed trust-checkpoint/control-proof compaction design is required before implementation.          |
+| Durable control-plane census                             | `exactCombinedClosure` retains every old cut and commit-QC ref while replacing only the trust record; adoption also retains predecessor ACL material.                                                                                                                                                                                                                                         | The current active closure grows linearly with epochs. The user's bounded durable-structure gate may not be weakened to accept exact linear `f(N)`. The checkpoint design must bound hot/control closure and recovery state while accounting archive/history data separately. Any change to closure law, trust opening, or authenticated checkpoint bytes is high-risk and separately reviewed. |
+| Closed-but-unadopted restart                             | Verified adoption facts are attached to the in-process close handle; no genuine cross-process entry reconstructs and resumes a durable closed/pending-adoption state.                                                                                                                                                                                                                         | The required post-close and pre-adoption restart gates need a named durable resume capability. If it requires a new public API or authority carrier, that change is its own reviewed prerequisite; the gate is not dropped or relabelled as in-process recovery.                                                                                                                                |
+| Offline/rebase outbox                                    | Successor activation carries the issuance store/scope and live journal, reconstructs displaced-source authority, and exposes rebase completion.                                                                                                                                                                                                                                               | Prove no pending/published row is lost, duplicated, reassigned, or accepted under a stale epoch; preserve the issuance watermark and first valid post-reopen publication.                                                                                                                                                                                                                       |
+| Rollback, availability, pruning, and runtime reclamation | D.109 planning is epoch-numeric and deletes only after verified adoption, exact head, two rollback generations, policy, snapshot, and categorized outbox. D.109d binds `closedEpoch` to successor `closedEpoch + 1`.                                                                                                                                                                          | Reuse these owners only with authentic per-transition facts. Prove sequential prune/catch-up, distinct receipts, idempotent replay, two rollback generations, and bounded live predecessor/registration custody. A failure may retain too much but never delete too much.                                                                                                                       |
+| Archive and cold paging                                  | The current anchor/cut schemas carry `archiveIndexRoot`, but protocol-v3 creator close requires the next input root to equal the current anchor root. Phase 7 archive segmentation/paging is not implemented in the production packages.                                                                                                                                                      | D.110c can supply a genuine multi-epoch producer and preserve an existing root, but cannot silently evolve archive lineage or cold-page messages. Evolving the committed archive root is a separate Phase-7 wire/authority reslice. The Discord golden path stays blocked until that downstream slice consumes D.110c output.                                                                   |
+
+The genuine second close therefore has several ordered failures, not one: an
+epoch-1 seal actor cannot open or certify a QC; the close history owner has only
+an empty prior accumulator; the exported close result and adoption path encode
+0→1; activation can return the stale topic owner; and restart/pruning have no
+bounded authenticated current-trust checkpoint. D.110c is a coordinated
+product/security lifecycle program. It already demonstrates a need for a
+bounded public result-contract change and separate security-authority,
+durable-checkpoint, control-closure, and resume decisions. That is why this
+checkpoint stops at audit/reslice. Any registry kind/domain, wire field,
+dependency, workload, threshold, availability/deletion rule, or additional
+public surface beyond the explicitly reviewed owners below stops the affected
+sub-slice for another high-risk reslice.
+
+##### Explicit implementation reslice
+
+The umbrella closes through three reviewed prerequisite decisions followed by
+four causally ordered executable sub-slices. No sub-slice may
+manufacture an epoch-N capability, anchor, projection, history snapshot, QC,
+receipt, archive record, or active registration in test code.
+
+1. **D.110c-0a — epoch-relative creator seal custody.** Owner:
+   `packages/protocol-v3/src/seal.ts`, the creator-only owners in
+   `packages/seal`, and their genuine vote/evidence adapters. RED opens seal
+   authority and a genuine actor with authenticated epoch-1 creator trust and
+   proves today's exact epoch-0 refusal without synthesizing a QC. GREEN derives
+   every proposal/vote/QC/evidence epoch and anchor from opaque trust authority,
+   isolates write-once evidence/vote custody per authenticated
+   `(objectId, closedEpoch)`, rejects cross-epoch store reuse, and leaves the
+   certified/BFT branch plus epoch-0 vectors byte-identical. This is a high-risk
+   security-authority slice and closes before D.110c-a RED.
+2. **D.110c-0b — bounded authenticated trust checkpoint and control-proof
+   compaction decision.** Owner: protocol-v3/control-plane trust and closure
+   law, Node cold reopen, and existing durable owners as boundaries. The design
+   must permit age-independent cold reopen from the pinned genesis while
+   bounding the active control closure and without trusting storage bytes,
+   retaining an O(N) proof chain, weakening the genesis pin, or moving growth
+   into an uncounted store. Current trust records, live-journal anchor carriers,
+   and retained cut/QC evidence are inputs to the audit, not preselected fixes.
+   Because every obvious option changes authority, a package contract, or wire
+   custody, this prerequisite receives its own plan review and stops before RED
+   until one exact design, schema impact, proof, and migration/compatibility
+   boundary is approved. It closes before D.110c-c RED and D.110c-d freeze.
+3. **D.110c-0c — durable pending-adoption resume decision.** Owner: creator
+   close/adoption durable orchestration and existing AHE/snapshot/evidence
+   owners. RED must create a real closed durable head, terminate the process
+   before adoption, and prove no genuine reopen/resume entry exists. GREEN, if
+   separately approved, reconstructs only authenticated close/adoption facts
+   and resumes the existing verify/CAS/activate path; it never treats a pending
+   head as adopted. A new public entry or authority carrier is explicitly
+   reviewed, not smuggled into D.110c-c. It closes before the post-close and
+   pre-adoption restart gates.
+4. **D.110c-a — authenticated repeat-close state carrier.** Owner:
+   `packages/node/src/creator-close.ts` and the private installed-v3 close
+   registration in `v3-live.ts`, with compaction as unchanged verifier and 0a
+   as prerequisite. RED binds a real adopted epoch-1 plane and calls the genuine
+   close path; after isolating the 0a seal refusal, it fails because the exact
+   prior accumulator is unavailable/mismatched. GREEN creates one authenticated
+   epoch-continuity owner in prepared/live registration state, supplies it to
+   existing history derivation, and generalizes the exported close-result epoch
+   fields under a separately pinned public contract. Root/size mismatch, reset,
+   substitution, same-anchor double close, stale handle, and duplicate-close
+   mutants fail closed. Deadline: before D.110c-b RED.
+5. **D.110c-b — general hot adoption, activation, and product custody.** Owner:
+   creator adoption/commit/activate modules, `creator-successor-live`,
+   installed-v3 handoff, and `examples/v3-room`. RED executes real 0→1 and
+   attempts 1→2; it pins first-transition projection constants, the topic-keyed
+   stale-wrapper success, missing successor close rebinding, and the room's
+   one-transition adoption latch. GREEN uses authenticated epochs/kinds,
+   replaces active ownership only for the exact next anchor, rebinds close after
+   every adoption, and permits the room to request the next genuine adoption.
+   Existing first-transition APIs and epoch-1 governance controls remain valid;
+   new epoch-N controls are additive. Deadline: before D.110c-c RED.
+6. **D.110c-c — bounded cold reopen, repeated cleanup, restart, and custody.**
+   Owner: the existing D.109 cleanup/reclamation orchestrators and installed-v3
+   registration custody, consuming approved 0b/0c designs. RED/Green cover
+   fresh-process pre-close, post-close, pre-adoption, post-adoption, and
+   post-prune boundaries; age-independent trust reopen; offline/rebase outbox;
+   sequential prune plus one skipped-prune catch-up; two rollback generations;
+   availability refusal; receipt replay/staleness; active-owner uniqueness;
+   predecessor terminalization; bounded hot/control closure; and bounded live
+   registration/close ownership through at least three genuine transitions.
+   Physical store deletion authority remains unchanged unless a separate RED
+   demonstrates an owner defect. Deadline: before D.110c-d RED.
+7. **D.110c-d — retained long-horizon and golden-path prerequisite gate.**
+   Owner: tests and test/build infrastructure only after D.110c-a/b/c GREEN. One
+   room performs at least 100 genuine authenticated transitions. The exact bound
+   remains 100 unless this high-risk plan review approves another explicit value
+   before RED. It runs no adaptive retry and cannot replace real close/adopt
+   calls with synthetic maintenance. Deadline: before Phase-6 exit or Phase-7a
+   execution.
+
+The three prerequisite decisions are reviewed before their production edits;
+each executable sub-slice receives its own bounded causal RED and GREEN. The
+umbrella's minimum functional GREEN is not satisfied until
+D.110c-0a/0b/0c/a/b/c jointly prove one genuine room completes epoch 0→1,
+restart/reopen, epoch 1→2,
+continued issue/publish after epoch 2, and cold recovery with exact application
+state, ACL, writer authority, current anchor/trust, compact history,
+archive-index root, snapshots, journals, and operation accounting. A second
+close that only returns an epoch number is not acceptance.
+
+##### Retained long-horizon and golden-path acceptance
+
+D.110c-d must prove, in a fresh process where required, all of the following:
+
+- at least 100 genuine transitions on one production room, with strictly
+  increasing epochs and authenticated anchor/QC/cut lineage;
+- exact compact-history root and size extension at every step, with no skipped,
+  duplicated, reordered, or substituted epoch and no same-anchor double close;
+- real issue/admit/apply/publish work before and after selected transitions,
+  exact aggregate operation accounting, exact application state, and an
+  independently derived semantic digest;
+- restart/reopen at selected pre-close, post-close, pre-adoption,
+  post-adoption, and post-prune boundaries, including offline/rebase outbox and
+  first-successful-publication continuity;
+- pruning only after verified adoption, two complete rollback generations,
+  satisfied availability, complete outbox classification, and authenticated
+  archive/snapshot dependencies; refusal and crash may retain too much but may
+  not delete too much;
+- bounded active-owner, registration, close-handle, displaced-predecessor,
+  hot/control closure, snapshot/quarantine, issuance/outbox, AHE
+  generation/blob, rollback, and runtime structure census, without moving
+  unbounded control data into a journal or sibling owner. Intentionally archival
+  application/history bytes receive a separate exact segment/byte census and
+  are never counted as bounded hot state;
+- a fresh-process, during-execution, post-GC memory series over repeated
+  same-room rollovers, paired with exact work and digest assertions. Its exact
+  sample window, workload, watchdog, epsilon, and absolute ceiling require a
+  separately reviewed freeze before execution; D.110a's distinct-room values
+  are preserved as evidence but are not silently reused as this contract; and
+- two real semantic controls using the same production lifecycle: an
+  MMORPG-style world whose current state and authority continue across
+  rotations, and a Discord-shaped room whose messages span genuine epochs and
+  whose current work continues after safe pruning. D.110c must produce the
+  latter without synthetic archive rows; actual evolving archive roots and
+  cold paging remain a separately reviewed Phase-7 control because the current
+  creator-close wire requires the archive root to remain unchanged.
+
+Phase 7a's one-million-message cold-join gate is downstream acceptance, not a
+D.110c shortcut. Before implementation it must explicitly reslice the current
+archive-root equality contract if genuine segment production requires the root
+to advance. It then ingests the genuinely multi-epoch Discord control after
+early epochs have been safely pruned, authenticates its archive lineage, and
+proves O(hot + window) network bytes. One oversized epoch, prebuilt archive
+segments, or fixture-authored epoch records is invalid. Neither the Discord
+golden path nor age-independent cold join is claimed until that downstream gate
+is green.
+
+##### Retained gates, evidence, review, and debt disposition
+
+Every sub-slice retains the complete affected protocol-v3 seal vectors,
+Phase-5e creator seal/close, Phase-6a adoption/commit/activation/reopen,
+D.108d2/e v3-room governance, D.109a-f cleanup/reclamation,
+snapshot-quarantine, live-journal parity, issuance, storage Node/browser, and
+D.110a non-consuming validator suites; affected package builds and source
+typechecks; exact-owner lint/format/diff/source-shape checks; and protected-path,
+26-stash, process/port, signed-commit, pushed-ref, changed-path, hash, and
+self-excluding manifest custody. D.110a's full worker and preflight are
+permanently excluded: both identities are consumed and neither may run again.
+
+The current audit/plan checkpoint is signed and pushed before one bounded
+Grok 4.6/high, standard direct Kimi K3 with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review. If Grok cancels,
+resume that exact session. Only P0/P1 findings block; P2 receives an owner and
+disposition without recursive prose review. No Fable or collaboration
+subagent runs. Because this is a high-risk production lifecycle, each later
+production GREEN receives the governing final plan→RED→GREEN review, and the
+long-horizon workload receives a reviewed immutable freeze before its sole
+consuming execution.
+
+The one expressly authorized Fable 5.1/high read-only advisory run used session
+`eefd0856-c660-4cc6-aa98-3c41eb863316`, spawned no subagents, and returned
+`CHANGES_REQUIRED`. Its prompt and raw-result SHA-256 values are
+`7f21200678b0accc3ad6e77b1bc986202bf8be2f2c2eef33bb1e718e4545cd65`
+and `b42f7e453175119315437c6b614ea6f4f70f299c6484ba26682b13e7dc386935`.
+The corrected audit adopts its demonstrated epoch-0 seal, stale active owner,
+missing pending-resume/product owner, and cold-chain findings. It rejects only
+the suggested acceptance of exact linear active-closure growth: the user's
+bounded durable-structure requirement instead creates D.110c-0b. This one-off
+run is complete and does not authorize another Fable invocation.
+
+Debt disposition is explicit: D.110c owns repeated same-room rollover,
+epoch-relative creator seal custody, bounded authenticated current-trust
+recovery/control closure, durable pending-adoption resume, and the product room
+loop. None can be deferred to Phase 6d or hidden in Phase 7. Phase 6d still owns
+legacy-finality retention. Phase 7 owns the separately reviewed archive-root
+evolution/segmentation, availability receipts, cold paging, and deletion UX;
+its long-lived-room acceptance is blocked on D.110c's genuine producer. D.109f
+remains the synthetic durable-maintenance proof and D.110a remains the
+distinct-room churn/per-handoff memory proof. Until all D.110c acceptance is
+green, the repository may claim epoch awareness and one genuine handoff, but
+not a repeatable-epoch lifecycle or Phase-6 closure. Until Phase 7 consumes that
+producer, it may not claim the complete long-lived Discord/archive golden path.
