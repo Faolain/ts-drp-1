@@ -95418,6 +95418,23 @@ additional plan-review round is authorized. The rejected root's validating
 eight-entry self-excluding manifest SHA-256 is
 `229a19cd9d0a2c20c058e66dd5da5c8afbdd483ccf39ebe38d70408c6b64222e`.
 
+The first corrected-scope execution reached the pending-recovery call but is
+also rejected as non-causal evidence because the fixture then passed its
+diagnostic AHE summary, which contains absent optional fields represented as
+`undefined`, to the strict canonical encoder. The encoder correctly rejected
+that out-of-domain diagnostic value before the parent received the recovery
+classification. The immutable result is retained under
+`.logs/d110c-0c-red-corrected-7d5624aa/`. The repair changes only the diagnostic
+equality predicate to the asset's existing sorted normalized fingerprint; the
+floor and all production carriers continue to use exact canonical equality.
+No product behavior, recovery input, workload, ordering, or acceptance token
+changes, and this rejected fixture result is never accepted as RED. The root's
+validating eight-entry self-excluding manifest SHA-256 is
+`08eb99f01c422cfcf57f2a206a9b575401c66bb5fb79fb9bb85a38f25cdf646f`;
+its deterministic comparison audit proves that the normalized diagnostic
+fingerprint is key-order stable and mutation-sensitive while the durable-floor
+predicate remains canonical.
+
 The complete confirmation evidence is retained under
 `.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry
 self-excluding manifest SHA-256 is
