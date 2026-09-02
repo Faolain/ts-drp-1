@@ -93839,6 +93839,42 @@ prompt/events, Kimi stream, and Opus stream SHA-256 values are respectively
 `acf48fe25e6b156ce14ea5a45374c3d62f9a97b1b4a1082d9e714a9117008c1c`,
 and `5911bad1742df1616fe206763be924222d90ea375e334531fd967ec28d937d5f`.
 
+The deterministic tests-only RED executed from signed/pushed base
+`b784b3db724002f053d05d7c40024f21fb297126`. The genuine retained path
+created, used, closed, adopted, and activated epoch 0→1; issued and published
+real epoch-1 work; then invoked the real bound epoch-1 close exactly once. Its
+sole asserted terminal cause was `LinearizationError` / `INVALID_ANCHOR` /
+`previous history snapshot does not match the authenticated anchor`. The
+durable head and reference closure remained byte-identical, the caller-held
+room head remained epoch 1, the actor remained nonterminal with lifecycle
+`sealed`, no adoption facts or successor activation appeared, and no product
+floor provider existed in the Node-only process. The reporter selected one
+result file and one test and recorded one pass, zero failed/pending/todo tests,
+zero failed suites, and `success:true`. The shell status was nevertheless 1
+because the root Vitest configuration applied its global 70% coverage threshold
+to the one-file focused selection; the genuine path was not rerun merely to
+remove that unrelated coverage epilogue. The semantic reporter JSON remains
+the accepted once-only runtime RED.
+
+The private type RED rejects exact-`number`, genuine 1→2, and later-epoch 3
+assignments solely through the current literal result fields while its exact
+key roster and epoch-0 compatibility compile. An initial diagnostic command is
+preserved but excluded from acceptance because the new private config
+mistakenly enabled `exactOptionalPropertyTypes`, producing unrelated Node-source
+diagnostics; removing that tests-only option yielded the frozen causal set and
+is not a product correction. No production, example, dependency, wire/schema,
+threshold, or completed-evidence path changed. The RED ledger is
+`.logs/d110c-a-red-b784b3db/red-ledger.md`; its SHA-256 is
+`01d249d6e39d6218a66d6e4cec81b2cfc3a6bcefebcdb514c02de1ceb8e5e753`.
+Runtime JSON, accepted type output, invalid-config output, source-shape ledger,
+custody ledger, and self-excluding manifest SHA-256 values are respectively
+`8efa5e1c8b625b950b2972d97b801172c29410d0bd99147cafb99e4aca9806e4`,
+`66e91f6adf7608fefcf32117509013acd07f8daf2bc34b349a421acb1fe415d6`,
+`5fbbbcd85ba10ca61539c6a2f7006f26eb9887b538c12cc2ecccf1b20cad17ad`,
+`ac826f1b3e450a37f52595787f4914e4de9ac8e9b6e701e35bc6d25b045a3028`,
+`e68b21acbe627d2e457c823903720b73549fe3d9b9c8677d5431468cd00b09cc`,
+and `223355a5e698c6327107c7d4da220dbf93d8ade55e60cce484c4dc0eea25484f`.
+
 This is a high-risk production authority/public-contract slice. The plan-only
 checkpoint is signed and pushed, then one Grok 4.6/high, standard direct Kimi K3
 with `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review inspects the
