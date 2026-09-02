@@ -13,6 +13,8 @@
 			"@ts-drp/protocol-v3": ["packages/protocol-v3/src/public.ts"],
 			"@ts-drp/protocol-v3/registry/registry-v1.json": ["packages/protocol-v3/registry/registry-v1.json"],
 			"@ts-drp/storage": ["packages/storage/src/index.ts"],
+			"@ts-drp/storage/maintenance": ["packages/storage/src/maintenance.ts"],
+			"@ts-drp/storage/snapshot-transfer": ["packages/storage/src/snapshot-transfer.ts"],
 			"@ts-drp/types": ["packages/types/src/index.ts"]
 		},
 		"rootDir": "../../.."

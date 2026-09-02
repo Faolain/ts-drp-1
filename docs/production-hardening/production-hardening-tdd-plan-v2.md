@@ -92983,6 +92983,43 @@ The causal matrix matches the frozen RED exactly; no production file changed,
 no retained or long test ran, and GREEN may now implement only the accepted
 Node seam.
 
+The D.110c-0b0a GREEN implementation now closes that exact causal seam. The
+new non-root `creator-adoption-stage` owner stages and authenticates a complete
+successor without moving the AHE head, then publishes it through one
+owner-bound, one-use opaque capability and one exact head CAS. The separate
+non-activating `creator-adoption-recover` owner authenticates a provider-selected
+pending candidate from pinned genesis and the copied exact previous/next room
+head tuples, deterministically selects equivalent retry leftovers, rejects a
+different authenticated closure as a true fork, and resolves old-head,
+already-new-head, and ambiguous-CAS recovery without deriving freshness from
+room storage or activating a live successor. The retained one-call commit API,
+its public roster and fault semantics, product/provider orchestration, existing
+activation owners, protocol records, dependencies, thresholds, and root exports
+remain unchanged.
+
+The accepted focused command disabled only the repository-wide coverage
+percentage gate and passed 3/3. The exact retained eight-file selection passed
+86/86 with zero failures or pending tests. Node build, exact production-source
+typecheck, the affected private compile fixture, exact-owner ESLint and
+Prettier, diff-check, source-shape audit, and built package self-reference
+export probe all exited zero. The broad Node package `typecheck` remains an
+inherited unsuitable aggregate because it includes unrelated worker-host
+`rootDir`, retained WebRTC emit-typing, and compact-history-helper errors; the
+exact affected source and private compile owners pass and this slice does not
+widen to those debts. A first provider grep that matched documentation and a
+first export probe run from the unlinked repository root were corrected as
+diagnostic mistakes, not code failures.
+
+Final focused and retained JSON SHA-256 values are
+`dea13e05881f9563d051b9e024ae669f53204a8fe53b4f402e14b6e514243349`
+and `65cba8d8d13b1ded81b9e9506ef419f9313273b7b8d2646efcacd85f42892059`.
+The complete command/result, diagnostic, changed-path, source-hash, stash, and
+protected-path ledger is
+`.logs/d110c-0b0a-green-c1e443fc/green-ledger.md`. No D.110a identity or long
+campaign ran. GREEN is not closed until this signed/pushed implementation and
+evidence receive the one governing Grok/Kimi/Opus plan-to-RED-to-GREEN review;
+only P0/P1 blocks. No Fable result substitutes for that formal review.
+
 This exact owner-selection design is signed and pushed before one bounded Grok
 4.6/high, standard direct Kimi K3 with
 `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review. Only P0/P1 blocks;

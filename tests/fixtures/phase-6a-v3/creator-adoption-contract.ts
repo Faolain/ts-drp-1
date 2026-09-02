@@ -337,6 +337,7 @@ export interface GenuineCreatorAdoptionFixture {
 	readonly catalog: TrustedBlueprintCatalog;
 	readonly evidence: Readonly<{
 		readonly aheBackend: AheDurableStore;
+		readonly aheStore: AheDurableStore;
 		readonly chunks: readonly Uint8Array[];
 		readonly closeResult: CreatorLiveCloseResult;
 		readonly current: DetachedHeadEvidence;
@@ -361,6 +362,7 @@ export interface GenuineCreatorAdoptionFixture {
 		readonly localIssued: Readonly<{ readonly authorSequence: number; readonly digest: string }>;
 		readonly predecessorExactCanonicalLatchedAclBytes: Uint8Array;
 		readonly proposed: DetachedHeadEvidence;
+		readonly snapshotStore: SnapshotQuarantineStore<SnapshotVerificationReceipt>;
 	}>;
 	readonly controls: {
 		activeRefMutation?: "digest" | "length";
@@ -1043,6 +1045,7 @@ export async function openGenuineCreatorAdoptionFixture(
 	const primaryDatabaseName = `d108b-seal-${crypto.randomUUID()}`;
 	const snapshotDatabaseName = `d108b-snapshot-${crypto.randomUUID()}`;
 	let aheBackend: AheDurableStore | undefined;
+	let aheStore: AheDurableStore | undefined;
 	let declaration: SnapshotQuarantineDeclaration | undefined;
 	const fixture = await createGenuinePreparedV3Fixture({
 		applicationBatch: options.applicationBatch === true,
@@ -1058,10 +1061,12 @@ export async function openGenuineCreatorAdoptionFixture(
 		prepareV3LiveGeneration: modules.prepareV3LiveGeneration,
 		storeDecorator: (backend) => {
 			aheBackend = backend;
-			return decoratedAheStore(backend, controls);
+			aheStore = decoratedAheStore(backend, controls);
+			return aheStore;
 		},
 	});
-	if (aheBackend === undefined) throw new TypeError("D.108b fixture AHE backend capture failed");
+	if (aheBackend === undefined || aheStore === undefined)
+		throw new TypeError("D.108b fixture AHE store capture failed");
 	const openedCurrentTrust = await createCurrentAnchorTrustStore({
 		objectId: fixture.objectId as Parameters<typeof createCurrentAnchorTrustStore>[0]["objectId"],
 		pinnedGenesisAnchorDigest: fixture.anchorDigest,
@@ -1315,6 +1320,7 @@ export async function openGenuineCreatorAdoptionFixture(
 		controls,
 		evidence: Object.freeze({
 			aheBackend,
+			aheStore,
 			chunks: Object.freeze(chunks),
 			closeResult,
 			current,
@@ -1336,6 +1342,7 @@ export async function openGenuineCreatorAdoptionFixture(
 			}),
 			predecessorExactCanonicalLatchedAclBytes: Uint8Array.from(fixture.exactCanonicalLatchedAclBytes as Uint8Array),
 			proposed,
+			snapshotStore,
 		}),
 		handle: bound.handle,
 		journal: recovered.journal,
@@ -1409,11 +1416,15 @@ export function sourceGovernance(): Readonly<{
 	const productExists = /adoptCreatorSuccessor\s*\(/u.test(room);
 	const roomConsumesVerifier =
 		/@ts-drp\/node\/creator-adoption/u.test(room) && /verifyCreatorSuccessorAdoption/u.test(room);
+	const verifierStart = verifier.indexOf("export async function verifyCreatorSuccessorAdoption");
+	const verifierEnd = verifier.indexOf("\nfunction coldFailure", verifierStart);
+	const verifierOwner =
+		verifierStart >= 0 && verifierEnd > verifierStart ? verifier.slice(verifierStart, verifierEnd) : verifier;
 	return Object.freeze({
 		forbiddenRootExport: /creator-adoption|verifyCreatorSuccessorAdoption/u.test(root),
 		noAheMutationInVerifier:
 			!/\.(?:beginGeneration|putCachedBlob|promoteReference|completeGeneration|swapHead|discardGeneration)\s*\(/u.test(
-				verifier
+				verifierOwner
 			),
 		noDirectChatVerifierConsumer: !/verifyCreatorSuccessorAdoption|CreatorAdoptionIntent|creator-adoption/u.test(chat),
 		roomOwnsVerifierWhenProductExists: !productExists || roomConsumesVerifier,

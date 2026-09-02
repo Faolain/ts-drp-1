@@ -251,6 +251,14 @@ function nodeBoundaryViolations(manifestText: string, importerText: string): rea
 				types: "./dist/src/creator-adoption-commit.d.ts",
 				import: "./dist/src/creator-adoption-commit.js",
 			},
+			"./creator-adoption-stage": {
+				types: "./dist/src/creator-adoption-stage.d.ts",
+				import: "./dist/src/creator-adoption-stage.js",
+			},
+			"./creator-adoption-recover": {
+				types: "./dist/src/creator-adoption-recover.d.ts",
+				import: "./dist/src/creator-adoption-recover.js",
+			},
 			"./creator-adoption-activate": {
 				types: "./dist/src/creator-adoption-activate.d.ts",
 				import: "./dist/src/creator-adoption-activate.js",
@@ -2374,6 +2382,14 @@ describe("Phase 3a-1B Seam 3 private live-plane RED", () => {
 			"./creator-adoption-commit": {
 				types: "./dist/src/creator-adoption-commit.d.ts",
 				import: "./dist/src/creator-adoption-commit.js",
+			},
+			"./creator-adoption-stage": {
+				types: "./dist/src/creator-adoption-stage.d.ts",
+				import: "./dist/src/creator-adoption-stage.js",
+			},
+			"./creator-adoption-recover": {
+				types: "./dist/src/creator-adoption-recover.d.ts",
+				import: "./dist/src/creator-adoption-recover.js",
 			},
 			"./creator-adoption-activate": {
 				types: "./dist/src/creator-adoption-activate.d.ts",

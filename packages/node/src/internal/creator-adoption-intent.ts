@@ -5,6 +5,7 @@ import type { CreatorSuccessorLiveMaterial, CreatorSuccessorLiveSeed } from "./c
 
 export type CreatorAdoptionIntent = Readonly<Record<never, never>>;
 export type PreparedCreatorSuccessorAdoption = Readonly<Record<never, never>>;
+export type StagedCreatorSuccessorAdoption = Readonly<Record<never, never>>;
 
 export interface CreatorAdoptionIntentMaterial {
 	readonly activation: CreatorSuccessorLiveSeed;
@@ -25,6 +26,11 @@ export interface PreparedCreatorSuccessorAdoptionMaterial {
 
 export type PreparedCreatorSuccessorAdoptionInput = Omit<PreparedCreatorSuccessorAdoptionMaterial, "descriptor">;
 
+export interface StagedCreatorSuccessorAdoptionMaterial {
+	readonly descriptor: Readonly<Record<string, unknown>>;
+	readonly intent: CreatorAdoptionIntentMaterial;
+}
+
 const custody = new WeakMap<
 	object,
 	Readonly<{ readonly material: CreatorAdoptionIntentMaterial; readonly owner: object }>
@@ -33,6 +39,10 @@ const sealedFacts = new WeakMap<object, object>();
 const preparedCustody = new WeakMap<
 	object,
 	Readonly<{ readonly material: PreparedCreatorSuccessorAdoptionInput; readonly owner: object }>
+>();
+const stagedCustody = new WeakMap<
+	object,
+	Readonly<{ readonly material: StagedCreatorSuccessorAdoptionMaterial; readonly owner: object }>
 >();
 
 function copiedRef(ref: GenerationRef): GenerationRef {
@@ -182,5 +192,51 @@ export function consumePreparedCreatorSuccessorAdoption(
 		descriptor: decodedDescriptor(exactCanonicalProjectionBytes),
 		exactCanonicalProjectionBytes,
 		head: copiedHead(retained.material.head),
+	});
+}
+
+/**
+ * Creates one opaque owner-bound capability for a complete unpublished successor.
+ * @param owner - Genuine sealed close handle.
+ * @param material - Authenticated staged successor material.
+ * @returns Opaque process-local staged capability.
+ */
+export function createStagedCreatorSuccessorAdoption(
+	owner: object,
+	material: StagedCreatorSuccessorAdoptionMaterial
+): StagedCreatorSuccessorAdoption {
+	const capability = Object.freeze({}) as StagedCreatorSuccessorAdoption;
+	stagedCustody.set(
+		capability,
+		Object.freeze({
+			material: Object.freeze({
+				descriptor: Object.freeze({ ...material.descriptor }),
+				intent: material.intent,
+			}),
+			owner,
+		})
+	);
+	return capability;
+}
+
+/**
+ * Destructively consumes one genuine staged capability for its bound close handle.
+ * @param capability - Opaque staged capability candidate.
+ * @param owner - Expected genuine close handle.
+ * @returns Authenticated staged material, or undefined.
+ */
+export function consumeStagedCreatorSuccessorAdoption(
+	capability: unknown,
+	owner: unknown
+): StagedCreatorSuccessorAdoptionMaterial | undefined {
+	if (capability === null || typeof capability !== "object" || owner === null || typeof owner !== "object") {
+		return undefined;
+	}
+	const retained = stagedCustody.get(capability);
+	if (retained === undefined || retained.owner !== owner) return undefined;
+	stagedCustody.delete(capability);
+	return Object.freeze({
+		descriptor: Object.freeze({ ...retained.material.descriptor }),
+		intent: retained.material.intent,
 	});
 }

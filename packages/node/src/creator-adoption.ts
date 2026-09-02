@@ -35,6 +35,12 @@ import {
 	resolveCreatorAdoptionFacts,
 } from "./internal/creator-adoption-intent.js";
 import {
+	type CreatorAdoptionPendingRecoveryInput,
+	type CreatorAdoptionPendingRecoveryResult,
+	type CreatorAdoptionRoomHead,
+	installCreatorAdoptionPendingRecovery,
+} from "./internal/creator-adoption-recover.js";
+import {
 	type CreatorSuccessorLiveMaterial,
 	type CreatorSuccessorLiveSeed,
 	type CreatorSuccessorReopenInput,
@@ -1111,6 +1117,332 @@ async function reopenCreatorSuccessorMaterial(
 	}
 }
 
+interface AuthenticatedPendingCandidate {
+	readonly closureDigest: string;
+	readonly generation: GenerationRecord;
+	readonly head: PresentHead;
+}
+
+function exactRoomHead(value: unknown): CreatorAdoptionRoomHead | undefined {
+	try {
+		if (
+			value === null ||
+			typeof value !== "object" ||
+			Object.getPrototypeOf(value) !== Object.prototype ||
+			Reflect.ownKeys(value).sort().join(",") !== "currentAnchorDigest,epoch,objectId"
+		) {
+			return undefined;
+		}
+		const anchor = Object.getOwnPropertyDescriptor(value, "currentAnchorDigest");
+		const epoch = Object.getOwnPropertyDescriptor(value, "epoch");
+		const objectId = Object.getOwnPropertyDescriptor(value, "objectId");
+		return anchor !== undefined &&
+			"value" in anchor &&
+			anchor.enumerable === true &&
+			typeof anchor.value === "string" &&
+			/^[0-9a-f]{64}$/u.test(anchor.value) &&
+			epoch !== undefined &&
+			"value" in epoch &&
+			epoch.enumerable === true &&
+			typeof epoch.value === "number" &&
+			Number.isSafeInteger(epoch.value) &&
+			epoch.value >= 0 &&
+			objectId !== undefined &&
+			"value" in objectId &&
+			objectId.enumerable === true &&
+			typeof objectId.value === "string"
+			? Object.freeze({
+					currentAnchorDigest: anchor.value,
+					epoch: epoch.value,
+					objectId: objectId.value,
+				})
+			: undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+function sameRoomHead(left: CreatorAdoptionRoomHead, right: CreatorAdoptionRoomHead): boolean {
+	return (
+		left.currentAnchorDigest === right.currentAnchorDigest &&
+		left.epoch === right.epoch &&
+		left.objectId === right.objectId
+	);
+}
+
+function roomHeadFromTrust(trust: CurrentAnchorTrust): CreatorAdoptionRoomHead {
+	return Object.freeze({
+		currentAnchorDigest: trust.currentAnchorDigest,
+		epoch: trust.currentEpoch,
+		objectId: trust.objectId,
+	});
+}
+
+async function authenticatePendingCandidate(
+	input: CreatorAdoptionPendingRecoveryInput,
+	lineage: readonly GenerationRecord[],
+	candidate: GenerationRecord,
+	expectedPrevious: CreatorAdoptionRoomHead,
+	expectedNext: CreatorAdoptionRoomHead,
+	objectId: StorageObjectId
+): Promise<AuthenticatedPendingCandidate | undefined> {
+	try {
+		if (candidate.state !== "Complete" && candidate.state !== "Adopted") return undefined;
+		const proposedHead = presentBase(candidate);
+		const byId = new Map(lineage.map((generation) => [generation.generationId, generation]));
+		if (byId.size !== lineage.length || proposedHead === undefined) return undefined;
+		const proposedGeneration = byId.get(proposedHead.generationId);
+		const currentHead = proposedGeneration === undefined ? undefined : presentBase(proposedGeneration);
+		const currentGeneration = currentHead === undefined ? undefined : byId.get(currentHead.generationId);
+		if (
+			proposedGeneration === undefined ||
+			currentHead === undefined ||
+			currentGeneration === undefined ||
+			currentGeneration.state !== "Superseded" ||
+			(proposedGeneration.state !== "Adopted" && proposedGeneration.state !== "Superseded") ||
+			candidate.baseExpectedHead.kind !== "present" ||
+			proposedGeneration.baseExpectedHead.kind !== "present" ||
+			candidate.objectId !== objectId ||
+			proposedGeneration.objectId !== objectId ||
+			currentGeneration.objectId !== objectId ||
+			proposedHead.revision !== currentHead.revision + 1
+		) {
+			return undefined;
+		}
+		const closureDigest = digestClosure(candidate.closure);
+		if (!closureDigest.ok || candidate.closureDigest !== closureDigest.value) return undefined;
+		const candidateHead: PresentHead = Object.freeze({
+			closureDigest: closureDigest.value,
+			generationId: candidate.generationId,
+			kind: "present",
+			objectId,
+			revision: (proposedHead.revision + 1) as PresentHead["revision"],
+		});
+		const [currentCandidates, proposedCandidates, candidateCandidates] = await Promise.all([
+			loadClosure(input.store, currentGeneration.closure),
+			loadClosure(input.store, proposedGeneration.closure),
+			loadClosure(input.store, candidate.closure),
+		]);
+		if (currentCandidates === undefined || proposedCandidates === undefined || candidateCandidates === undefined) {
+			return undefined;
+		}
+		const currentProjection = uniqueCandidateByKind(currentCandidates, "v3-live-generation-1");
+		const successorProjection = uniqueCandidateByKind(candidateCandidates, "v3-live-generation-2");
+		const currentTrustCandidate = uniqueCandidateByKind(currentCandidates, "drp-anchor-trust-state");
+		const successorTrustCandidate = uniqueCandidateByKind(proposedCandidates, "drp-anchor-trust-state");
+		const cutCandidate = uniqueCandidateByKind(proposedCandidates, "drp-hard-epoch-cut");
+		if (
+			currentProjection === undefined ||
+			successorProjection === undefined ||
+			currentTrustCandidate === undefined ||
+			successorTrustCandidate === undefined ||
+			cutCandidate === undefined
+		) {
+			return undefined;
+		}
+		const openedCurrent = openCurrentAnchorTrust({
+			exactCanonicalTrustStateRecordBytes: currentTrustCandidate.bytes,
+			expectedObjectId: objectId,
+			pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
+		});
+		if (!openedCurrent.ok || !sameRoomHead(roomHeadFromTrust(openedCurrent.trust), expectedPrevious)) {
+			return undefined;
+		}
+		const qcs = proposedCandidates.flatMap((entry) =>
+			canonicalRecord(entry.bytes)?.kind === "drp-seal-qc" ? [entry] : []
+		);
+		const openedSuccessors = qcs.flatMap((entry) => {
+			const opened = openCreatorSuccessorTrust({
+				currentTrust: openedCurrent.trust,
+				exactCanonicalCommitQcBytes: entry.bytes,
+				exactCanonicalCutValueBytes: cutCandidate.bytes,
+				exactCanonicalTrustStateRecordBytes: successorTrustCandidate.bytes,
+			});
+			return opened.ok ? [Object.freeze({ qc: entry, trust: opened.trust })] : [];
+		});
+		if (openedSuccessors.length !== 1) return undefined;
+		const openedSuccessor = openedSuccessors[0] as (typeof openedSuccessors)[number];
+		if (
+			!sameRoomHead(roomHeadFromTrust(openedSuccessor.trust), expectedNext) ||
+			!inspectCreatorTrustAdvance({
+				current: { candidates: currentCandidates, closure: currentGeneration.closure },
+				proofRefs: [cutCandidate.ref, openedSuccessor.qc.ref],
+				proposed: { candidates: proposedCandidates, closure: proposedGeneration.closure },
+			}).ok
+		) {
+			return undefined;
+		}
+		const currentTrustRecord = currentTrustCandidate.record;
+		const successorTrustRecord = successorTrustCandidate.record;
+		if (
+			!(currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array) ||
+			!(currentTrustRecord.detachedCurrentAnchorSignature instanceof Uint8Array) ||
+			!(successorTrustRecord.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array) ||
+			!sameBytes(
+				input.exactCanonicalAnchorPreimageBytes,
+				currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes
+			) ||
+			!sameBytes(input.detachedSignature, currentTrustRecord.detachedCurrentAnchorSignature)
+		) {
+			return undefined;
+		}
+		const currentAnchor = canonicalRecord(currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes);
+		const successorAnchor = canonicalRecord(successorTrustRecord.exactCanonicalCurrentAnchorPreimageBytes);
+		if (currentAnchor === undefined || successorAnchor === undefined) return undefined;
+		const chain: VerifiedChain = Object.freeze({
+			currentAnchor,
+			currentCatalog: Object.freeze({
+				artifactDigest: String(currentProjection.record.artifactDigest),
+				artifactId: String(currentProjection.record.artifactId),
+				blueprintDigest: String(currentProjection.record.blueprintDigest),
+				catalogDigest: String(currentProjection.record.catalogDigest),
+				runtimeProfile: String(currentProjection.record.runtimeProfile),
+			}),
+			currentTrustRecord,
+			cut: cutCandidate.record,
+			successorAnchor,
+			successorAnchorBytes: Uint8Array.from(successorTrustRecord.exactCanonicalCurrentAnchorPreimageBytes),
+			successorTrust: openedSuccessor.trust,
+			successorTrustRecord,
+		});
+		const snapshot = await verifySnapshot(input, chain);
+		if (snapshot === undefined) return undefined;
+		const resolved = verifiedCatalog(input.catalog, snapshot.payload.blueprintDigest, chain.currentCatalog);
+		const manifestDigest = input.snapshotDeclaration.scope.manifestDigest;
+		if (
+			resolved === undefined ||
+			successorProjection.record.anchorDigest !== openedSuccessor.trust.currentAnchorDigest ||
+			successorProjection.record.epoch !== expectedNext.epoch ||
+			successorProjection.record.objectId !== objectId ||
+			successorProjection.record.blueprintDigest !== successorAnchor.blueprintDigest ||
+			successorProjection.record.parametersDigest !== successorAnchor.parametersDigest ||
+			successorProjection.record.snapshotManifestDigest !== manifestDigest ||
+			successorProjection.record.snapshotPayloadDigest !== snapshot.manifest.payloadDigest ||
+			successorProjection.record.stateDigest !== snapshot.manifest.stateDigest ||
+			hex(hashDomain("ts-drp/parameters/v3", input.exactCanonicalParametersCarrierBytes)) !==
+				successorAnchor.parametersDigest
+		) {
+			return undefined;
+		}
+		const predecessorAclCandidates = candidateCandidates.filter(
+			(entry) => hex(hashDomain("ts-drp/latched-acl/v3", entry.bytes)) === currentAnchor.aclDigest
+		);
+		if (predecessorAclCandidates.length !== 1) return undefined;
+		const openedPredecessorAcl = openCanonicalLatchedAclSnapshot({
+			exactCanonicalLatchedAclBytes: predecessorAclCandidates[0]?.bytes as Uint8Array,
+			expectedAclDigest: String(currentAnchor.aclDigest),
+			expectedEpoch: expectedPrevious.epoch,
+			expectedObjectId: objectId,
+		});
+		return openedPredecessorAcl.ok
+			? Object.freeze({ closureDigest: closureDigest.value, generation: candidate, head: candidateHead })
+			: undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+function pendingRecoveryFailure(kind: string, detail: string): CreatorAdoptionPendingRecoveryResult {
+	return Object.freeze({ detail, kind, ok: false as const });
+}
+
+async function recoverPendingCreatorSuccessorMaterial(
+	input: CreatorAdoptionPendingRecoveryInput
+): Promise<CreatorAdoptionPendingRecoveryResult> {
+	try {
+		const expectedPrevious = exactRoomHead(input.expectedPreviousRoomHead);
+		const expectedNext = exactRoomHead(input.expectedNextRoomHead);
+		const parsedObjectId = parseStorageObjectId(input.snapshotDeclaration.scope.objectId);
+		if (
+			input.authenticationProfile !== "creator-only" ||
+			expectedPrevious === undefined ||
+			expectedNext === undefined ||
+			!parsedObjectId.ok ||
+			expectedPrevious.objectId !== parsedObjectId.value ||
+			expectedNext.objectId !== parsedObjectId.value ||
+			expectedNext.epoch !== expectedPrevious.epoch + 1
+		) {
+			return pendingRecoveryFailure("chain-invalid", "creator pending room-head input is invalid");
+		}
+		const objectId = parsedObjectId.value;
+		const [headResult, lineage] = await Promise.all([
+			input.store.readHead(objectId),
+			readGenerationLineage(input.store, objectId),
+		]);
+		if (!headResult.ok || headResult.value.kind !== "present" || lineage === undefined) {
+			return pendingRecoveryFailure("storage-failed", "creator pending durable state is unavailable");
+		}
+		const durableHead = headResult.value;
+		const candidates: AuthenticatedPendingCandidate[] = [];
+		for (const generation of lineage) {
+			const candidate = await authenticatePendingCandidate(
+				input,
+				lineage,
+				generation,
+				expectedPrevious,
+				expectedNext,
+				objectId
+			);
+			if (candidate !== undefined) candidates.push(candidate);
+		}
+		if (candidates.length === 0) {
+			return pendingRecoveryFailure("pending-missing", "creator pending successor is unavailable");
+		}
+		const closureDigests = new Set(candidates.map(({ closureDigest }) => closureDigest));
+		if (closureDigests.size !== 1) {
+			return pendingRecoveryFailure("true-fork", "creator pending successors disagree");
+		}
+		const alreadyActive = candidates.find(({ head }) => sameHead(head, durableHead));
+		if (alreadyActive !== undefined) {
+			return Object.freeze({
+				head: Object.freeze({ ...expectedNext }),
+				lifecycle: "successor-published" as const,
+				ok: true as const,
+				recovery: "active-new" as const,
+			});
+		}
+		const selected = [...candidates].sort((left, right) =>
+			left.generation.generationId < right.generation.generationId
+				? -1
+				: left.generation.generationId > right.generation.generationId
+					? 1
+					: 0
+		)[0] as AuthenticatedPendingCandidate;
+		const previous = presentBase(selected.generation);
+		if (previous === undefined || !sameHead(previous, durableHead)) {
+			return pendingRecoveryFailure("stale-head", "creator pending head is stale");
+		}
+		try {
+			await input.store.swapHead({
+				expectedHead: previous,
+				generationId: selected.generation.generationId,
+				objectId,
+			});
+		} catch {
+			// The authenticated reread below is the only authority after an ambiguous CAS.
+		}
+		const recovered = await input.store.recoverActiveGeneration(objectId);
+		if (!recovered.ok || recovered.value.kind !== "active") {
+			return pendingRecoveryFailure("pending-old", "creator pending successor remains unpublished");
+		}
+		const recoveredHead = recovered.value.head;
+		if (!candidates.some(({ head }) => sameHead(head, recoveredHead))) {
+			return pendingRecoveryFailure("pending-old", "creator pending successor remains unpublished");
+		}
+		return Object.freeze({
+			head: Object.freeze({ ...expectedNext }),
+			lifecycle: "successor-published" as const,
+			ok: true as const,
+			recovery: "active-new" as const,
+		});
+	} catch {
+		return pendingRecoveryFailure("internal-invariant", "creator pending recovery failed unexpectedly");
+	}
+}
+
 if (!installCreatorSuccessorReopen(reopenCreatorSuccessorMaterial)) {
 	throw new TypeError("creator successor reopen owner was already installed");
+}
+if (!installCreatorAdoptionPendingRecovery(recoverPendingCreatorSuccessorMaterial)) {
+	throw new TypeError("creator adoption pending recovery owner was already installed");
 }
