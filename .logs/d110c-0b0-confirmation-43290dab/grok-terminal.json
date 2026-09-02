@@ -1,0 +1,14 @@
+{
+  "verdict": "APPROVED",
+  "blocking_union_empty": true,
+  "p0": [],
+  "p1": [],
+  "p2": [
+    {
+      "title": "capturedCase error path still calls unimplemented d110cLastPendingRecovery",
+      "evidence": "packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts:1263-1265 invokes instrumentation().d110cLastPendingRecovery(), but the lifetime plugin only exports d110cColdReopenCount (phase-6a-creator-successor-product.pw.ts:192). A future recovery throw would be rewritten as a missing-method TypeError instead of the original floor code. The passing 27/27 matrix never took this path.",
+      "disposition": "Test-only cleanup: delete that unimplemented call from capturedCase. No further 0b0 confirmation."
+    }
+  ],
+  "summary": "Pending now dominates before genesis prepare/transport/activation: no successor declaration fails D110C_FLOOR_RECOVERY_UNAVAILABLE at examples/v3-room/src/index.ts:1561-1563; with a declaration the existing non-activating recoverPending owner runs, commitRoomHeadAdvance rereads, then one cold reopen. Epoch-0 capture is genesis-bound; HEAD_AHEAD is room-ahead and MISMATCH is provider-ahead/other; true-fork/chain-invalid/stale-head/malformed-input map to PENDING_INVALID. The browser matrix proves both AHE crash orderings, the nine frozen codes, exact provider ops, transport/reopen counts, committed epoch 1, and post-recovery issue. Abandon-without-close plus retained 0b0a process/storage proof is a causally adequate bounded durable-recovery test and does not use graceful-close reclamation. D.93.46 changes are fixture-only; evidence is 27/27 and 112/112; SHA256SUMS excludes itself; no Node/protocol/control-plane/dependency/schema widening."
+}

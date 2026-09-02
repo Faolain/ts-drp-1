@@ -93546,6 +93546,51 @@ Protected roots and all 27 stashes remain intact. D.110c-0b0 remains open only
 for the single permitted confirmation of this signed/pushed executable
 correction; D.110c-a/b still do not begin.
 
+That single confirmation inspected signed/pushed correction
+`43290dabd06d796758e8da577a53e0c1bb8b303b` from a clean detached checkout.
+Grok 4.6/high completed normally after 1,516.153 seconds with exit code zero,
+`stop_reason=end_turn`, and no cancellation or timeout. Its runner recorded
+`NO_VERDICT` only because the response contained inspection prose and fenced
+JSON instead of a runner terminal marker; the exact extracted terminal object
+was `APPROVED`, P0=0/P1=0/P2=1. The cancellation-resume rule therefore did not
+apply. Standard direct Kimi K3 session
+`session_85497fdc-a3b6-46c6-acba-35bd9cb17fce`, with the exact 100-step
+control, returned `APPROVED`, P0=0/P1=0/P2=1. Opus xhigh session
+`0cd4ad56-3813-41c8-a421-ae3dc6b65ec8` completed normally after 523.590
+seconds and 56 turns and returned `APPROVED`, P0=0/P1=0/P2=2. The blocking
+union is empty: pending dominance, directional head classification, and the
+deterministic product/provider crash matrix are confirmed closed without
+product-scope widening. D.110c-0b0 is closed; its RED and consuming gates may
+not be rerun.
+
+The nonblocking P2 union is assigned prospectively without another review
+round. D.110c-a/b owns an exact TypeScript gate for the root D.93.46 test owner
+and deletion of the browser fixture's unreachable stale
+`d110cLastPendingRecovery` diagnostic call before extending that matrix.
+D.110c-0b1 owns classifying a generalized `ok:true` recovery whose returned
+head differs from the authenticated pending tuple as
+`D110C_FLOOR_PENDING_INVALID`; the current owner cannot produce that shape and
+the existing branch already fails closed before provider commit or activation.
+The complete confirmation ledger is
+`.logs/d110c-0b0-confirmation-43290dab/confirmation-ledger.md`; prompt, Grok
+events/terminal, Kimi stream/terminal, and Opus stream/terminal SHA-256 values
+are respectively
+`2767f9bf412c05bbc35dd7c91028002324e05c3c6a8a68aa4ef95a57136c9c12`,
+`475282e5a3352b7053182a95370c9d704ab3e2eff64efb7ef9c18eda10e52858`,
+`a126a73eaf85c5c472b060151ef5b61fcdd66cb6f8f775253b0b7a3f83144cf2`,
+`c46e212017409835bf14ba55a35a0a0863d190f8f43937d30206ad395ec7dd40`,
+`14d42298d89f684417c5213583c66e4b936b36207a83249b35cf0fecbe3379c1`,
+`f0b3ce8b2205a74f97e0782c1c93024194b009e5d3a662cd926cc2d7ac422956`,
+and `3ad90fb5f3a37a151968150ffa1915eb3786e9fb362b76eb6e8c01f044eaf55b`.
+The ledger SHA-256 is
+`8c950660a1957209e15c85ad56bbf06d4b1f3663a8630b89149b3dfce939610f`;
+the validating self-excluding manifest SHA-256 is
+`6b41538e57b33c82fba1ed5f8e84aba446b406341e6c88d168dee8ce396d947e`.
+No product/test source, campaign, preflight, or D.110a invocation changed or ran
+during confirmation. The next ordered executable production slice is D.110c-a;
+its bounded plan/RED begins from this closure and must consume the carried P2
+test-gate cleanup before GREEN review.
+
 The four prerequisite decisions, including the newly demonstrated 0b0
 freshness-floor authority question, are reviewed before their production edits;
 each executable sub-slice receives its own bounded causal RED and GREEN. The
