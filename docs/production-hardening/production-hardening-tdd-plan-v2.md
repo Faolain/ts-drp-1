@@ -92272,6 +92272,42 @@ Kimi export
 and Opus transcript
 `e8cc97f2777db0c3d500de83027833139a5beb58b2204a90539b13a87f89f75c`.
 
+The deterministic RED checkpoint against accepted plan anchor `5388f64d`
+closed without a production edit or campaign invocation. Batch 1 selected one
+test in one file and failed exactly once at
+`D110C_0A_EPOCH_ONE_AUTHORITY_REFUSED`: genuine epoch-0 authority and genuine
+successor-trust controls passed, the pinned source guard was present, and the
+genuine epoch-1 creator authority returned exact `untrusted-context`. Batch 2
+selected one test in one file and produced the complete frozen seven-item soft
+failure set: epoch-1 peer evidence returned `MALFORMED_EVIDENCE`; the epoch-1
+vote returned `MALFORMED_INPUT`; pending-read length was `0` rather than `1`;
+the explicit epoch-1 selector returned epoch `0`; invalid-epoch and extra-key
+selectors fulfilled with the epoch-0 row rather than throwing the exact public
+TypeError; and the dispatcher source used
+`markDispatched([row.objectId, 0, ...])`. The epoch-0 authority,
+prepare-QC/commit-vote, peer-evidence persistence, raw schema-v3 epoch-1 key,
+and legacy epoch-0 selector controls all passed.
+
+Four earlier reports remain preserved as noncausal harness evidence rather
+than being relabelled as RED: missing `navigator.storage.estimate`, missing
+fake IndexedDB initialization, a commit request before prepare-QC verification,
+and a prepare carrier supplied to commit-evidence custody. Each fault was
+diagnosed and corrected only in the new test fixture; no product owner changed.
+The accepted reports are
+`batch1-corrected2-vitest.json` SHA-256
+`d1b923aa7ca7f8efa86eec589796337528c1920fa1001b2bdf672d46c8a5befb`
+and `batch2-corrected2-vitest.json` SHA-256
+`2c52bbbecff841e0fd0efd834e0fdd1cb657a4651cf147de443f021cc15052e0`.
+The exact command/status, control, failure, changed-path, and protected-state
+matrix is `.logs/d110c-0a-red-5388f64d/red-ledger.json` SHA-256
+`4edbe4204204339ebb0f53008d95737ca32ab2363ff6d19d3f2a46ae6d3c038c`;
+the validated self-excluding manifest SHA-256 is
+`b98e06380678a8e458373b48f87cc69a8cf418705f4bda7772d77ee632a499c3`.
+Both new RED files passed Prettier and exact-owner ESLint, `git diff --check`
+passed, all manifest entries validated, the protected untracked paths remained
+untouched, and all 26 stashes remained present. This signed RED authorizes only
+the frozen D.110c-0a GREEN batches described above.
+
 ##### D.110c-0b0 owner-selection design
 
 The bounded owner audit rejects two superficially attractive shortcuts. The
