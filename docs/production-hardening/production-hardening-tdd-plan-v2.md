@@ -93619,7 +93619,11 @@ D.110c-0a seal actor. D.110c-a adds one copied private
 `previousHistorySnapshot` registration member. Epoch 0 accepts only the
 canonical empty snapshot matching the authenticated genesis anchor. Epoch N
 greater than zero requires the exact `compactHistory` member of the
-authenticated current projection, restores it through the existing
+authenticated current projection. The exact carrier is decoded from
+`PreparedV3LivePayload.exactProjectionBytes`; the branch discriminator is the
+already-authenticated `payload.provenance.epoch` and
+`payload.trust.trust.currentEpoch`, which must agree before registration.
+D.110c-a restores the carrier through the existing
 `CompactMerkleAccumulator`, requires its root and size to equal the current
 authenticated anchor, and copies its peaks before creator-close custody. The
 unchanged `deriveCloseSetHistoryCommitment()` remains the final verifier. No
@@ -93636,7 +93640,10 @@ or substituted epochs fail before generation staging, floor change,
 terminalization, or adoption-fact installation. No new result field, overload,
 generic façade, export, or compatibility alias is added. This intentional type
 widening is the sole D.110c-a public surface change and receives the high-risk
-plan review before RED or production edits.
+plan review before RED or production edits. The private type contract proves
+both fields are exactly `number`, including assignment of a later epoch such as
+3, rather than a finite `0 | 1` / `1 | 2` union; the epoch-0 compatibility value
+remains assignable with exact runtime values 0/1.
 
 The deterministic RED is tests-only and has two causal gates in one signed
 checkpoint:
@@ -93652,7 +93659,11 @@ checkpoint:
    `INVALID_ANCHOR`/`previous history snapshot does not match the authenticated
 anchor` result. The actor must not emit a successor QC, terminalize the
    plane, install adoption facts, advance the application floor, or activate a
-   replacement.
+   replacement. The evidence records the first failing owner verbatim. If
+   `stageSnapshot()`, `persistSnapshot()`, `sealDurableReplay()`, or another
+   pre-verifier owner fails first at epoch 1, RED stops and reslices from that
+   demonstrated owner; the fixture must not be adapted to force the expected
+   verifier failure.
 2. A closed TypeScript fixture assigns genuine epoch-1→2 result bytes to the
    existing exported `CreatorLiveCloseResult` shape and fails only because its
    two fields remain literal 0/1. It also freezes the exact existing result-key
@@ -93671,8 +93682,10 @@ production source is authorized by RED.
 
 GREEN changes only `packages/node/src/creator-close.ts`,
 `packages/node/src/v3-live.ts`, the focused fixture/test, and directly affected
-type fixtures unless a demonstrated owner requires a reviewed reslice. It must
-prove in one genuine process:
+type fixtures, plus the tests-only stale-helper owner
+`packages/storage-browser/tests/assets/phase-6a-creator-successor-product-entry.ts`,
+unless a demonstrated owner requires a reviewed reslice. It must prove in one
+genuine process:
 
 - epoch 0→1 remains byte- and behavior-identical, including exact result values
   0/1, trust/CutValue/QC verification, snapshot scope, AHE head, and adoption
@@ -93685,17 +93698,29 @@ prove in one genuine process:
   malformed, aliased, reset, cross-room, cross-anchor, and earlier-epoch
   substitution all fail before seal/QC, head/floor mutation,
   terminalization, adoption facts, state/ACL transfer, or recovery ownership;
+  those private registration refusals may retain the existing fail-closed
+  `CREATOR_CLOSE_UNAVAILABLE` reason rather than introduce a public error, but
+  the fixture must distinguish them by proving that the same plane binds and
+  closes with its genuine carrier and refuses every named mutation;
 - same-anchor double close, concurrent duplicate close, rebinding the same
   plane, a stale predecessor handle after adoption, skipped epoch, substituted
   successor trust, and unsafe successor overflow fail closed with exact existing
   or frozen D.110c-a errors;
-- the pending epoch-2 AHE head does not advance the 0b0 application/account
-  floor or activate a successor. Product close-handle rebinding and floor
-  advance remain D.110c-b, so D.110c-a does not edit `examples/v3-room` or claim
-  the complete 1→2 product loop; and
+- the pending epoch-2 AHE head does not activate a successor: the caller-held
+  authenticated room-head tuple remains exactly the epoch-1 trust tuple, no
+  `activateCreatorSuccessorAdoption()` or `reopenCreatorSuccessorAdoption()`
+  call occurs, and no application/account-floor provider exists in this
+  Node-only process. Provider `begin`/`commit`/reread floor advancement and
+  product close-handle rebinding remain D.110c-b, so D.110c-a does not edit
+  `examples/v3-room` or claim the complete 1→2 product loop; and
 - the existing binding/claimed-registration weak owners remain singular. No
   parallel registry, hidden O(N) accumulator chain, archive substitution, or
-  new active owner is introduced.
+  new active owner is introduced. GREEN records the exact closure-membership
+  and closure-blob byte delta across the genuine 1→2 close. Existing per-epoch
+  cut/QC closure growth is explicit debt owned by D.110c-0b1's bounded control
+  proof and D.110c-d's long-horizon census; if bounding it requires changing
+  close composition, that work is separately reviewed and cannot widen
+  D.110c-a.
 
 The focused GREEN gate runs once after the one bounded implementation batch,
 followed by the private type contract and the retained creator seal/close,
@@ -93703,10 +93728,42 @@ creator adoption/commit/activation/reopen, D.110c-0a authority/browser custody,
 D.110c-0b0 floor/provider, snapshot quarantine/substitution, history
 commitment, D.109 cleanup/runtime-reclamation/outbox, Node build and exact source
 typecheck, storage-browser build, exact-owner ESLint/Prettier/diff/source-shape,
-and root-test TypeScript gate carried from the 0b0 P2. The stale
+and root-test TypeScript gate carried from the 0b0 P2. Because the widened
+result is public and consumed by both examples, GREEN also records exact
+successful statuses for `pnpm --dir examples/v3-room typecheck`,
+`pnpm --dir examples/v3-room build`, and
+`pnpm --dir examples/v3-chat typecheck`. The stale
 `d110cLastPendingRecovery` diagnostic call is removed in the same tests-only
 batch before extending the browser fixture; it cannot change product behavior
 or trigger a separate review.
+
+The D.110c-b plan must name the still epoch-pinned adoption owners at
+`packages/node/src/creator-adoption.ts:546`, `:565`, `:840`, and `:1052` before
+its RED. They are inert in D.110c-a because this slice stops at a pending
+epoch-2 head and neither constructs nor activates an epoch-2 projection.
+
+The first high-risk plan review inspected signed/pushed commit
+`ec720f7d37cd7b32229cbe1c85557c3d73239cc7` from one clean detached checkout.
+Grok 4.6/high completed normally after 1,050.771 seconds with provider exit code
+zero and `stop_reason=end_turn`; its strict wrapper's `NO_VERDICT` reflects
+leading inspection prose/fenced JSON, not cancellation, and the extracted
+terminal was `APPROVED`, P0=0/P1=0/P2=3. Standard direct Kimi K3 session
+`session_2f17bb8a-d232-45ea-bbd3-398259ea2941`, with the exact 100-step control,
+returned `APPROVED`, P0=0/P1=0/P2=3. Opus xhigh session
+`ff9e4677-8637-49e0-9ccf-17aceaeaca38` returned `CHANGES_REQUIRED`,
+P0=0/P1=1/P2=5. Its sole P1 is accepted: the exported result-type widening
+requires explicit compilation of the real v3-room/v3-chat consumers. The exact
+example gates and all bounded P2 dispositions above are one plan-only
+correction. Because that P1 changes a hard public-compatibility gate, the one
+permitted confirmation will inspect the signed/pushed correction; no RED or
+production edit begins until its P0/P1 union is empty. The review ledger is
+`.logs/d110c-a-plan-review-ec720f7d/review-ledger.md`; raw prompt, Grok events,
+Grok public result, Kimi stream, and Opus stream SHA-256 values are respectively
+`89ff84edbbb96e5df608a097a2a91a2eebb9ecc29fe982a8f7a85d8622fe5145`,
+`2fe4a32acca2788712eb0695e7e1fd67767b4a48dae259e5f696a45562709a4b`,
+`e778ef351a9af96a57c502afbc40cb5268e1135ae2d3b4bb0880feb9b7268b26`,
+`65b3fb3b4a15412d0541e2e58d5adccb32c1442e01073493872ca5e2be8f5c34`,
+and `18b39a36afc2e01a34399553a28089244a251982b872e5ea42d6618dff543f87`.
 
 This is a high-risk production authority/public-contract slice. The plan-only
 checkpoint is signed and pushed, then one Grok 4.6/high, standard direct Kimi K3
