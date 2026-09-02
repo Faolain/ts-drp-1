@@ -92767,6 +92767,39 @@ the raw local session JSONL SHA-256 is
 `9db8635826759afa527d1370cdfbd5df0da63a351c92463ad8a21250ff81be94`.
 No further Fable run is authorized by this second result.
 
+A third expressly authorized one-off Fable 5.1/high parallel audit, session
+`dfd6ea8f-1d41-448a-866a-bf30279b5126`, independently inspected current
+primary Hiero sources and the existing D.110c decision without editing the
+workspace or running tests. It observed that `hiero-consensus-node` main had
+moved to `313c1647de0279b5b6092f1338dc206e7896069e` on 2026-09-02 while the
+previously pinned implementation blobs it rechecked remained byte-identical;
+the accepted immutable audit is not reopened. It again selects the bounded
+fixed-creator/genesis checkpoint plus the external 0b0 floor and rejects WRAPS
+as disproportionate: WRAPS folds changing roster/proof-key authority, whereas
+`creator-trusted-v1` fixes those carriers and can authenticate the current
+checkpoint with existing Ed25519/SHA-256 and one immediate predecessor. It also
+confirms that WRAPS does not by itself bind current-roster selection,
+transition count, or freshness, retains an uncompressed extension proof and
+proving artifacts, has no inspected browser/TypeScript verifier, and is not
+proven operationally enabled merely because source/tests exist.
+
+Its sole material prospective caution is accepted as a D.110c-0b1 gate: no
+D.109 cleanup/release path may discard the older/floor rollback generation
+while it is the only carrier of the immediate predecessor record required by
+the bounded opener. This tightens the existing two-generation stop-check; it
+does not change closure composition or authorize a new record, dependency,
+wire field, API, authority, or proof system. Hiero threshold claims continue to
+cite implementation code because HIP-1200, the exact-weight document, and the
+circuit describe distinct thresholds. The durable report is
+`.logs/d110c-0b-hedera-fable-audit/report.md`, SHA-256
+`60852ca9d8e49653b521ce340329165d4b039c21e2ccb6afa436e019436e434c`;
+the prompt SHA-256 is
+`d669f27492920edddc14dd8c49e459e5170e6644ff156acb8a990641a18c9ba4`;
+the raw local session JSONL SHA-256 is
+`5134f4f65aeb77f2224e72c8fa4d87ed9778ef5feea911f0985e4f66293e915d`.
+This advisory audit does not replace the governing Grok/Kimi/Opus gate, and no
+further Fable run is authorized by it.
+
 ##### D.110c-0b0a staged adoption and pending-recovery prerequisite
 
 The first 0b0 GREEN composition audit found a narrower prerequisite that the
@@ -93202,8 +93235,11 @@ earlier evidence:
   gates preserve recoverability. On the genuine 0→1→2 path it mechanically
   asserts exactly two head advances per transition, their exact revision deltas,
   and that the older/floor retained closure still contains the epoch-(N-1)
-  `drp-anchor-trust-state` immediately before reclamation. No current trust
-  capability exists before current QC and expected-head verification.
+  `drp-anchor-trust-state` immediately before reclamation. It enumerates every
+  D.109 cleanup/release owner and proves none can release that older/floor
+  generation while it is the sole immediate-predecessor carrier required by
+  the current bounded opener. No current trust capability exists before current
+  QC and expected-head verification.
 - Adversarial gates cover tampered or cross-room/cross-genesis carriers,
   signatures, object, epoch, current/predecessor anchors, previous-anchor link,
   CutValue, QC phase/value/signers, floor lag/ahead/conflict, skipped epoch,
