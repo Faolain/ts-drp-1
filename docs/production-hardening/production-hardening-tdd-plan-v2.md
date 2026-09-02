@@ -91889,7 +91889,7 @@ receipt, archive record, or active registration in test code.
    and resumes the existing verify/CAS/activate path; it never treats a pending
    head as adopted. A new public entry or authority carrier is explicitly
    reviewed, not smuggled into D.110c-c. It closes before the post-close and
-   pre-adoption restart gates.
+   pre-adoption restart gates and executes only after D.110c-0b1 GREEN.
 4. **D.110c-a — authenticated repeat-close state carrier.** Owner:
    `packages/node/src/creator-close.ts` and the private installed-v3 close
    registration in `v3-live.ts`, with compaction as unchanged verifier and 0a
@@ -91939,7 +91939,7 @@ receipt, archive record, or active registration in test code.
 The three prerequisite decisions are reviewed before their production edits;
 each executable sub-slice receives its own bounded causal RED and GREEN. The
 umbrella's minimum functional GREEN is not satisfied until
-D.110c-0a/0b/0c/a/b/c jointly prove one genuine room completes epoch 0→1,
+D.110c-0a/0b/0b1/0c/a/b/c jointly prove one genuine room completes epoch 0→1,
 restart/reopen, epoch 1→2,
 continued issue/publish after epoch 2, and cold recovery with exact application
 state, ACL, writer authority, current anchor/trust, compact history,
@@ -92051,6 +92051,21 @@ head. Because the ordering correction changes executable causality, one bounded
 Grok/Opus confirmation inspects the signed correction. No production RED begins
 until a standard direct Kimi K3 verdict on the corrected design also exists;
 the known credential failure is not retried or replaced here.
+
+The single permitted correction confirmation reviewed signed/pushed commit
+`d12f57e2191697c023369f22f09e6800447ea25a` at
+`.logs/d110c-0b-hiero-confirmation-d12f57e2`; prompt SHA-256 is
+`e14523e3d66a7d16929a0475ff9f1a7b1322ce5bc41916a2b7f341084dd3c7e5`.
+Grok session `01a05ffa-3c80-7143-9c1a-f47064e2e276` returned P0=0/P1=0/P2=0
+and `D110C_0B_CORRECTION_CONFIRMED`; its event SHA-256 is
+`1a33831ff758d939582fadeaeff2bab2a0029d2f9b2213ed77e823cec4ee1f20`.
+Opus session `b0e27487-e734-4f84-9626-da5dcf38b6c3` returned P0=0/P1=0/P2=2
+and the same confirmed next state; its result SHA-256 is
+`eed0eb9b1653cf7bddb0ad42e62dcc17523c798f94a309237566fdb03083d34f`.
+Its two bookkeeping P2s are dispositioned above by naming 0b1 in the
+minimum-functional-GREEN roster and making 0c's post-0b1 deadline explicit.
+These prose-only dispositions do not trigger another model round. Grok and Opus
+are closed; only the required direct Kimi K3 verdict remains before 0b1 RED.
 
 The one expressly authorized Fable 5.1/high read-only advisory run used session
 `eefd0856-c660-4cc6-aa98-3c41eb863316`, spawned no subagents, and returned
