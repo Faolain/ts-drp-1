@@ -92965,6 +92965,24 @@ predicates when it rewrites the product. No finding changes executable scope,
 authority, workload, or a hard acceptance gate. The D.110c-0b0a plan gate is
 accepted; deterministic RED is next.
 
+The deterministic D.110c-0b0a RED then ran exactly once from accepted plan HEAD
+`c47927f515f1182b6bc6a711e85fb696d3effe1b`. The sole selected test and file,
+`tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts`, opened a genuine
+first-transition fixture, authenticated its successor intent, observed the
+retained one-call commit perform exactly one old-to-new AHE head swap, and
+proved that neither reviewed stage nor recovery subpath exists. It then failed
+only with exact token `D110C_0B0A_STAGED_HANDOFF_SEAM_MISSING`: one selected,
+zero passed, one failed, zero pending, zero unexpected errors, and no campaign
+title. The JSON report is authoritative and has `success:false`; Vitest's JSON
+output-file invocation anomalously returned shell status 0, which is recorded
+separately and does not convert the failed report into a pass. Source and
+report SHA-256 values are
+`295515e5fc3dc980c0b40291632ff5c39e7d608acb73fec59cb7fa2152820ce9` and
+`db4dcd8218055f0d1ab323634faa74511bc977ac244de3c9a4265388db4d9ac9`.
+The causal matrix matches the frozen RED exactly; no production file changed,
+no retained or long test ran, and GREEN may now implement only the accepted
+Node seam.
+
 This exact owner-selection design is signed and pushed before one bounded Grok
 4.6/high, standard direct Kimi K3 with
 `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review. Only P0/P1 blocks;
