@@ -94678,7 +94678,7 @@ closure.
 
 ##### D.110c-0b1 bounded checkpoint opener and control-proof compaction plan
 
-**Status: GREEN implemented and locally verified; signed final review pending.**
+**Status: CLOSED at signed/pushed GREEN `420fd2403f69a5bc21e7bb5807597ff96d92a344`; final blocking union empty.**
 This is the next executable D.110c slice after the closed D.110c-b checkpoint. Its
 owner is the accepted non-root protocol-v3 creator-checkpoint boundary, the
 accepted non-root control-plane bounded-advance boundary, and their existing
@@ -95156,10 +95156,47 @@ from the non-package repository root correctly could not resolve bare workspace
 imports; a second read-only predicate mistakenly searched `kind:` instead of
 `currentProjectionKind:`. Both diagnostics are retained with exit 1 and are not
 code failures; the corrected consumer-context audit exits 0. No D.110a worker,
-preflight, long campaign, Fable, or collaboration subagent ran. D.110c-0b1 is
-ready for its signed/pushed GREEN checkpoint and the single governing
-Grok/Kimi/Opus plan→RED→GREEN review; it is not closed until that blocking
-union is empty.
+preflight, long campaign, Fable, or collaboration subagent ran. The signed
+GREEN commit is `420fd2403f69a5bc21e7bb5807597ff96d92a344`, tree
+`60cf892dff96fcb6b4fe2d181094bfd06872f5e9`, with signed RED parent
+`9457680d95eec15afe3a6a6d7d17655a1d21c2ee`; its GPG signature is good and
+`origin/codex/phase3a1b-p6-golden-path` resolves to that exact commit.
+
+The governing final plan→RED→GREEN review is retained under
+`.logs/d110c-0b1-final-review-420fd240/`; prompt SHA-256 is
+`a5f9e1620a37ceeb8f41d84973aa69b47ad21e79c3b307da0917e64f520c3894`.
+Grok 4.6/high session `01a063f9-7d8a-7172-988e-967bd7c1e69d` was canceled by
+the service before a terminal verdict after useful inspection, so the exact
+same session was resumed once as required. The resume ended normally with
+schema-clean `APPROVED`, P0=0/P1=0/P2=0; the initial event/status and resume
+result SHA-256 values are
+`cd8f995a3adc575da51ef5558c8532ac764596029986b8c636fa99fb81186c65`,
+`05cd47af438bed4c8a19416f40a93dc59777a4607ee0bebcb65713d1bbb1e426`,
+and `1c8a48448dec03194f83e375d6e1f6969866f30a0e8f783a961dd1ef4bd2bd8e`.
+Direct Kimi K3 session `session_f23945b8-43b1-404f-ada4-61263961ed28`, with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, returned schema-clean `APPROVED`,
+P0=0/P1=0/P2=3; stream/stderr SHA-256 values are
+`d9044cf9b8563781cf292186e131c464bae2e561d5206d2231f13cedbd3cc1c7`
+and `2ec69943c25f76f7ebe68f8ebfa3d8d0810988423fbbc035c0ad52365d5db56e`.
+Opus xhigh session `035bd935-cbe0-4706-89fb-8139927f80e1` ended normally,
+spawned zero subagents, and returned schema-clean `APPROVED`, P0=0/P1=0/P2=4;
+raw-result SHA-256 is
+`836bc9df006d4e30c07e31fdb0bbbdf001e8b7e0ab5bd31d57666c47e3070225`.
+All three reviewers set RED causal, GREEN closure, scope preservation, evidence
+sufficiency, and the empty blocking union true. D.110c-0b1 is therefore closed
+without another implementation or review round. The 25-entry self-excluding
+review-evidence manifest validates and has SHA-256
+`e92a22111cbe6f29401403a24956f68ff822ce5a935fb4d7055a7a70c4971a44`.
+
+The nonblocking P2 union is dispositioned prospectively. D.110c-0c/D.110c-d
+must add an independently derived post-reopen state/history/accounting oracle;
+scope issuance-filter counters per scan and freeze one combined hidden-row
+ceiling; and close the already recorded pending epoch-0/arbitrary-intermediate
+issuance durability consequence before the ≥100-transition gate. The next
+D.110c evidence checkpoint must retain literal inline audit scripts and record
+post-commit signature plus pushed-ref identity in its evidence root. These
+items do not weaken this slice's genuine two-transition acceptance, authorize a
+third transition or campaign, or reopen its immutable RED/GREEN evidence.
 
 The four prerequisite decisions, including the newly demonstrated 0b0
 freshness-floor authority question, are reviewed before their production edits;
