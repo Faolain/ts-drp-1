@@ -94764,7 +94764,7 @@ The public compatibility boundary is frozen as follows.
    returns only the bounded predecessor/current opaque trust pair described
    below. Its exact failure roster is
    `malformed-input`, `genesis-rejected`, `predecessor-rejected`,
-   `current-rejected`, `lineage-invalid`, `commit-qc-rejected`, and
+   `current-rejected`, `lineage-invalid`, `commit-qc-rejected`,
    `expected-head-mismatch`, and `custody-unavailable`. On success it returns
    exactly `{currentTrust,ok,predecessorTrust}`: the two opaque capabilities
    that the existing `CreatorSuccessorLiveMaterial` consumer must authenticate
@@ -94798,8 +94798,11 @@ ref]` tuple. The current candidates—not the caller's labels—must decode the
    `RETIRING_PREDECESSOR_ACL_INVALID` to the existing exact rejection roster.
    Missing, duplicate, wrong-kind, wrong-phase, wrong-epoch, cross-object,
    substituted, still-retained, or extra-deleted refs fail closed. This ACL
-   correction closes the reviewed linear-growth defect; it does not authorize
-   D.110c-c physical generation deletion.
+   correction closes the reviewed linear-growth defect. The five-key input
+   supersedes 0b0b's earlier four-key
+   `{current,proofRefs,proposed,retiringProofRefs}` sentence prospectively; it
+   does not edit completed 0b0b evidence or authorize D.110c-c physical
+   generation deletion.
 
 The deterministic tests-only RED is one signed/pushed checkpoint owned by
 `tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts` and
@@ -94965,6 +94968,50 @@ Because the accepted correction changes the public success output and bounded
 retirement contract, one confirmation of the signed/pushed correction is
 required. The completed first sessions are not relaunched or relabelled, and
 no closure prose receives recursive review.
+
+The single permitted correction confirmation inspected signed/pushed commit
+`627f98d118fa22e935f31023171d38c6075e3bc0`, tree
+`20f41aaf2adccd2029649aaece9d728ef2ff61e9`, from
+`.logs/d110c-0b1-plan-confirmation-627f98d1/`; prompt SHA-256 is
+`c56d6d3397b218544776700b66bca585794417eb1d3a3fc467bd1f6bae938eca`.
+Grok 4.6/high session `01a063aa-e998-72d2-a25f-ecc46110cc89` ended normally
+with `stop_reason=end_turn`, no timeout or cancellation, and embedded terminal
+`APPROVED`, P0=0/P1=0/P2=0. Its strict runner recorded `NO_VERDICT` only
+because inspection prose preceded that JSON. The exact same session was
+resumed once without another review and emitted the identical schema-clean
+object with no tools or changed verdict. Initial event/public/status SHA-256
+values are
+`adf2b6bf8cbaa75b5b627c3e52c69c6308616c6da47255d8bc0402212a3326e9`,
+`4b85ab2533bd9f32fa8f4684d861f1423f76bdca69b2dbe2b67bf21b466b8130`,
+and `bdace531f7e46138a74bf533e5145d2913c0a6513dfb9f3be2733175d28d8d35`;
+resume event/stderr/public-object SHA-256 values are
+`63b1cb3c8d156a41ef71c8f0b9ffec1d4d4f4700a24126e135d598909f675d2d`,
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`,
+and `fd669ea6c8e67fb6a135d03c48f8f1856099a212cc25b7d92eb00481e7032cc3`.
+Direct Kimi K3 session `session_dc7c1710-1504-4134-8d92-980a061aa416`, with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, returned schema-clean `APPROVED`,
+P0=0/P1=0/P2=0; stream/stderr SHA-256 values are
+`0a1f646588eb134dee629263ad146b09eb7ba0f6bb722cceeb8deb4f7fa1ff01`
+and `d706c8d7e11485fc37c89e3f063366d873cfb416fd6ce1a35fa41e5f146432f8`.
+Opus xhigh session `8cf547ac-e93f-4841-bf6f-d291740e415c` ended normally,
+spawned zero subagents, and returned `APPROVED`, P0=0/P1=0/P2=2; raw-result
+SHA-256 is
+`68d50e305bdfa5da77392135ac68cc9c5ef2e642c34f539cc12ab2d848ceac74`.
+Its two nonblocking P2s are dispositioned in the preceding contract without a
+new review: the five-key bounded input now explicitly supersedes 0b0b's
+four-key sentence prospectively, and the frozen opener failure roster has one
+unambiguous final conjunction. The confirmation blocking union is empty;
+D.110c-0b1 deterministic RED is authorized, while production GREEN, pruning,
+pending epoch≥2 recovery, third transition, and long campaigns remain
+unauthorized. The confirmation ledger is
+`.logs/d110c-0b1-plan-confirmation-627f98d1/confirmation-ledger.md`; the
+validating self-excluding manifest SHA-256 is
+`4612d8032ba24a5071ba0f5eecc480892792948251cb40e70d91601af902384b`.
+`git diff --check`, the established 12 GiB Prettier check, exact contract-token
+checks, protected-path/stash/process/port checks, and manifest validation pass.
+The first default-heap Prettier attempt exhausted its approximately 4 GiB Node
+heap and is recorded only as a corrected diagnostic-capacity failure, not a
+formatting or code failure.
 
 The four prerequisite decisions, including the newly demonstrated 0b0
 freshness-floor authority question, are reviewed before their production edits;
