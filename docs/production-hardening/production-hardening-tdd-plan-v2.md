@@ -92376,6 +92376,45 @@ the plan is excluded so it can record that manifest identity without a circular
 hash. The signed/pushed GREEN anchor is recorded with the checkpoint before the
 one required Grok/Kimi/Opus final review.
 
+The GREEN checkpoint is signed/pushed commit
+`93fe946abf33f052706343e2aa8c02a514f98627`. Its final review closed with Grok
+4.6/high `P0=0/P1=0/P2=1`, standard direct Kimi K3 100-step
+`P0=0/P1=0/P2=4`, and Opus xhigh `P0=0/P1=0/P2=4`; the blocking union is empty.
+Grok's first terminal turn contained progress prose followed by valid approval
+JSON, so the runner honestly classified that serialization as `NO_VERDICT`.
+Exact session `01a0609f-fa3b-7ec0-a4b6-638f25add775` was resumed only to
+re-emit the already reached verdict under a constrained schema; it returned
+`APPROVE` with no further inspection. The nonblocking union is accepted without
+reopening 0a: a direct batch-1 registered-identity epoch assertion is optional
+because the real actor matrix proves it end to end; the certified epoch-0 guard
+and inverted source check remain secondary to behavioral coverage; epoch-1
+dispatcher execution belongs to D.110c-a/b while the exact mechanical key
+correction is source-proven here; the plan-required foreign-scope expectation
+correction preserves current-scope duplicate refusal; the tests-only epoch-0
+helper remains inadmissible as success evidence; and the reviewers verified
+that two plan-named but unexecuted retained gates have no causal reach into the
+changed owner predicates. No additional test or review round is authorized by
+those P2s.
+
+Final-review artifact SHA-256 values are: prompt
+`aa09fb1ea9cc670d7ce00c25e220d0e3e5c4ab55bba4c2aa9cafdda3dce161bb`,
+initial Grok events/public/status
+`e357fe78bca4f3bc04c587f15a6efb95d5f2ebb55c19c652f3a707ded1ad944d` /
+`8d44e4c46dd8b0cf98b018db9b11c214e47f66567ffba382c0e3fd413e5b59ba` /
+`678ea0956613dd02cbb9e6f85713d48a514524c2e8b9fa1a814f3180beb35d51`,
+Grok schema re-emission
+`d7d6fcce9d35d8838fcc7b1dbbad125986057fd9adcecf6dcaca61c0eceb78ae`,
+Kimi stream
+`9e2fc5df7bcb0cbafc9f3cf4b043046d2a31754d37d68e28c2ac57d76c6a6c79`,
+Opus transcript
+`ab456b2c8e6de0e02e071425076eb6d6ce715fbf0e19ba2ee92ce0554fd0f9d2`,
+and normalized review summary
+`c165eeaad755b342fb3e479349e002a32efd01bc1f699615a5d0e6f51a6d76ca`.
+The validated self-excluding final-review manifest SHA-256 is
+`31f634caa02f08f1a4a57637a074934cbede65a0742f99e0d79d55b444766ba5`.
+D.110c-0a is closed; later slices may consume its genuine epoch-relative seal
+custody but may not relabel it as repeated rollover or freshness-floor proof.
+
 ##### D.110c-0b0 owner-selection design
 
 The bounded owner audit rejects two superficially attractive shortcuts. The
@@ -92572,6 +92611,21 @@ must prove:
 - the existing wire records, anchor/QC semantics, creator key, thresholds,
   dependencies, room workload, and storage schemas remain unchanged.
 
+The retained transition is explicit rather than contradictory. Creator-owned
+Phase-6a adoption/reopen cases receive the deterministic model implementation
+of the new account capability and must retain their existing semantic success.
+The established-peer and fresh-late-peer cold-reopen cases in
+`packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts`, and
+the cold activation/reopen cases in
+`tests/phase-6a-creator-successor-activation-red.test.ts`, become exact 0b0 RED
+when no independently authenticated pin is supplied: they fail before room
+authority or activation with `D110C_FLOOR_MIGRATION_REQUIRED` or the named
+availability owner. Their original success remains retained only in the paired
+case that supplies a separately authenticated application/account test pin.
+This changes no D.108 evidence retrospectively; it freezes how those same
+golden-path controls are interpreted after the new mandatory freshness owner
+exists.
+
 Focused gates cover a deterministic in-memory hostile room store and a separate
 model provider, real browser room reopen with an injected account-authority
 test implementation, creator trust/close/adoption retained vectors, exact
@@ -92587,6 +92641,24 @@ generalize the identical protocol to every genuine transition; 0b1 consumes the
 stable exact floor for bounded cold trust opening; D.110c-c/d prove retirement,
 restart, census, and at least 100 transitions; Phase 7 owns new-client pin
 distribution and archive/cold-join availability.
+
+The expressly authorized one-off Fable 5.1/high parallel audit, session
+`5d9b90ff-5bca-4284-92fa-a9f1018273ff`, independently re-fetched the three
+pinned Hiero heads, inspected the local trust/closure/reopen owners read-only,
+and returned `P0=0/P1=0`. It agrees that WRAPS is unnecessary for the fixed
+creator signer and cannot supply freshness, and that deterministic provider
+tests prove correctness assuming an honest external authority rather than
+browser-only rollback resistance. Therefore D.110c-c/d and Phase 7 may claim
+hostile-storage freshness only when a real application/account provider exists
+outside that storage boundary. Its preferred simpler caller-held-genesis-carrier
+variant and its QC/abort/census observations are P2 design guidance for the
+already required D.110c-0b1 private-opener stop-check; they do not reopen the
+accepted architecture or authorize a new record/API/dependency. The durable
+report SHA-256 is
+`a9ce81a546d04c282276629e927b04583a44d49d8986efca194f8d2a58fe9ba4`;
+the raw local session JSONL SHA-256 is
+`8d4c6cf06f435a814fe1b59cc9d7fec048006811edf37d573590668e1b19219d`.
+No further Fable run is authorized by this result.
 
 This exact owner-selection design is signed and pushed before one bounded Grok
 4.6/high, standard direct Kimi K3 with

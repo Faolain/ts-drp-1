@@ -1,0 +1,49 @@
+{
+  "schema": "d110c-0a-final-review-summary-v1",
+  "acceptedPlan": "5388f64d",
+  "signedRed": "0b7a1cf6e01f3554363c4138b14eec779c05bc33",
+  "signedGreen": "93fe946abf33f052706343e2aa8c02a514f98627",
+  "reviewers": {
+    "grok": {
+      "model": "grok-4.6",
+      "effort": "high",
+      "initialClassification": "NO_VERDICT",
+      "initialStopReason": "end_turn",
+      "initialDisposition": "The first terminal turn contained progress prose followed by schema-valid approval JSON, so the runner parser rejected it honestly. The exact session was resumed only to re-emit the already reached verdict as constrained JSON.",
+      "sessionId": "01a0609f-fa3b-7ec0-a4b6-638f25add775",
+      "verdict": "APPROVE",
+      "p0": 0,
+      "p1": 0,
+      "p2": 1
+    },
+    "kimi": {
+      "model": "Kimi K3",
+      "maxStepsPerTurn": 100,
+      "sessionId": "session_863ea168-f79e-411e-a8de-4f84dcd930c4",
+      "verdict": "APPROVE",
+      "p0": 0,
+      "p1": 0,
+      "p2": 4
+    },
+    "opus": {
+      "model": "opus",
+      "effort": "xhigh",
+      "sessionId": "59d69488-592c-4275-9c49-d08684fbabed",
+      "verdict": "APPROVE",
+      "p0": 0,
+      "p1": 0,
+      "p2": 4
+    }
+  },
+  "blockingUnion": {"p0": 0, "p1": 0},
+  "p2Disposition": [
+    "A direct batch-one assertion of the registered successor identity epoch is optional because the genuine actor matrix proves epoch-one custody end to end; do not reopen 0a.",
+    "The certified epoch-zero-only rule is directly retained in production and covered by retained vectors; no extra focused test is required.",
+    "The inverted source-string check is only a secondary discriminator; the genuine behavioral authority opening remains causal.",
+    "Epoch-one dispatch is mechanically source-proven by the exact row.epoch key substitution and existing key consistency; live epoch-one dispatcher coverage belongs naturally to D.110c-a/b.",
+    "The foreign-scope Phase-5e expectation correction is plan-required and disclosed; current-scope duplicate refusal remains green.",
+    "The tests-only epoch-zero carrier helper remains explicitly inadmissible as GREEN authority and did not supply the genuine actor success path.",
+    "Two plan-named but causally unrelated retained gates were not rerun; reviewers verified no reach into the changed owners and accepted closure without another test run."
+  ],
+  "closure": "APPROVED"
+}
