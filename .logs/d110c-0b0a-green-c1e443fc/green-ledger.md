@@ -15,7 +15,8 @@ pnpm exec vitest run tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts --cove
 
 Result: status 0; JSON `success:true`; 3/3 tests passed; 0 failed; 0 pending.
 
-The retained command selected these exact eight files:
+The retained command selected these exact seven files, separately from the
+focused file above:
 
 ```text
 tests/phase-3a1b-p3-live-transport-red.test.ts
@@ -25,10 +26,10 @@ tests/phase-6a-creator-adoption-red.test.ts
 tests/phase-6a-creator-successor-activation-red.test.ts
 tests/phase-6a-creator-successor-handle-identity-red.test.ts
 tests/phase-6b-cleanup-eligibility-red.test.ts
-tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts
 ```
 
-Result: status 0; JSON `success:true`; 86/86 tests passed; 0 failed; 0 pending. Vitest reports 14 suites for those eight result files.
+Result: status 0; JSON `success:true`; 86/86 tests passed; 0 failed; 0 pending.
+Vitest reports 14 suites for those seven result files.
 
 ## Accepted static and build results
 
@@ -60,6 +61,7 @@ The corrected source audit found no provider import, provider call, product sour
 - A first read-only provider source-shape regex searched every occurrence of the word `provider`, including documentation, and was corrected to inspect actual imports and calls. This was a faulty diagnostic, not a code failure.
 - A first built-export probe ran from the repository root, which does not link `@ts-drp/node`; rerunning from `packages/node` proved the intended package self-resolution. This was a wrong working directory, not an export failure.
 - The broad `pnpm --filter @ts-drp/node typecheck` command remains unsuitable as an exact slice gate because it includes inherited repository test/config errors (worker-host `rootDir`, retained WebRTC emit typing, and a compact-history helper). The exact production source typecheck and the affected private compile fixture both pass; this slice does not widen to those inherited owners.
+- Final review identified that the original ledger text called retained.json an eight-file report. The immutable JSON actually proves seven retained files/86 tests/14 suites, while focused.json separately proves the D.110c-0b0a file's 3 tests. The wording is corrected without rerunning or changing either report.
 
 ## Exact changed source/test roster and SHA-256
 

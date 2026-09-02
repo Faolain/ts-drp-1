@@ -91792,27 +91792,28 @@ permitted beyond the fixed rollback window.
 
 This selection has a hard compatibility boundary. Current protocol-v3 exposes a
 genesis-only trust opener, `inspectTrustClosure` permits exactly one trust
-record, and the closure law accumulates old cut/QC proof refs. A new or extended
-authenticated opener/closure contract and atomic bounded-closure transition are
-therefore **D.110c-0b1**, a named high-risk prerequisite; it must prefer a
-private/package-internal composition and preserve the v1 record/wire schema.
-The existing exported `inspectTrustClosure`, `assertTrustPreserved`, and install
-paths keep their exactly-one-trust-record contract. The first 0b1 stop-check is
-whether the Node owner can validate two actual closure members through a scoped
-private dual-record inspector without globally relaxing those exports. If the
-RED demonstrates that a changed exported predicate/result, new public API,
-record version, wire field, authority carrier, dependency, or migration
-protocol is genuinely required, 0b1 stops and is resliced again rather than
-implementing it. D.110c-0b1 is
-limited to stable `creator-trusted-v1`; rotating creator/seal authority,
-delegated/BFT repeated rollover, external pins, and recursive proofs are
-excluded. Brand-new-client freshness is not created by a root signature: a
+record, and the closure law accumulates old cut/QC proof refs. The completed
+source audit proves a private Node-only solution is impossible because
+`CurrentAnchorTrust` minting remains protocol-v3 custody. D.110c-0b0b therefore
+freezes one new non-root protocol-v3 checkpoint opener and one new non-root
+control-plane bounded-advance predicate before implementation; D.110c-0b1 owns
+their causal RED/GREEN after the genuine transition loop exists. Existing root
+exports, `openCurrentAnchorTrust`, `openCreatorSuccessorTrust`,
+`inspectTrustClosure`, `assertTrustPreserved`, and install paths keep their
+current contracts, and every active closure still contains exactly one trust
+record. The new boundaries preserve the v1 record/wire schema and add no
+authority carrier or dependency. If implementation nevertheless demonstrates
+that a record version, wire field, broader public API, authority carrier,
+dependency, or migration protocol is required, 0b1 stops and reslices again.
+D.110c-0b1 is limited to stable `creator-trusted-v1`; rotating creator/seal
+authority, delegated/BFT repeated rollover, external pins, and recursive proofs
+are excluded. Brand-new-client freshness is not created by a root signature: a
 valid earlier creator checkpoint is authentic but may be stale. Reopen must
 compare against a caller-held authenticated expected head/floor. That room
 tuple is distinct from storage's AHE `PresentHead`/`ExpectedHead` revision and
 closure-digest tuple and may not be derived from the same hostile generation
-being opened. The bounded source audit has now completed that stop-check: no
-existing production owner supplies this tuple across restart. Every
+being opened. The bounded source audit also proved that no existing production
+owner supplies this tuple across restart. Every
 `expectedHead` under `packages/node/src` is an AHE storage head, and the only
 genesis-side caller input is the pinned genesis anchor. A valid older
 creator-signed checkpoint is therefore authentic but indistinguishable from
@@ -91825,7 +91826,8 @@ authenticated expected head, not discovery of latestness from hostile storage
 using genesis alone.
 
 D.110c-0b1 executable RED is deliberately sequenced **after D.110c-0b0,
-D.110c-0a, D.110c-a, and D.110c-b GREEN and before D.110c-c RED**. It consumes their real
+D.110c-0a, D.110c-a, and D.110c-b GREEN, after D.110c-0b0b design acceptance,
+and before D.110c-c RED**. It consumes their real
 epoch-relative seal, repeat-close, and hot-adoption path to create at least
 three genuine sequential creator transitions; the plan-level 0b design decision
 does not pretend those transitions exist earlier. The RED must prove the
@@ -91876,8 +91878,9 @@ recovery storage.
 The umbrella closes through named decision and implementation owners. Numeric
 labels preserve audit identity; they are not execution order. The exact causal
 order is: current 0b architecture decision; D.110c-0b0 design acceptance;
-D.110c-0a GREEN; D.110c-0b0 RED/GREEN; D.110c-a GREEN; D.110c-b GREEN;
-executable D.110c-0b1 RED/GREEN; D.110c-0c; D.110c-c; then D.110c-d. The hot
+D.110c-0a GREEN; D.110c-0b0 RED/GREEN; D.110c-0b0b design acceptance;
+D.110c-a GREEN; D.110c-b GREEN; executable D.110c-0b1 RED/GREEN;
+D.110c-0c; D.110c-c; then D.110c-d. The hot
 0a/a/b path may retain its small, genuinely produced linear
 closure only long enough to expose 0b1's causal RED; it cannot claim bounded
 reopen or proceed to cleanup/long-horizon acceptance. No sub-slice may
@@ -91958,12 +91961,13 @@ receipt, archive record, or active registration in test code.
    selects the existing-v1 dual-anchor creator checkpoint plus two rollback
    generations and rejects WRAPS, an external pin, and a Merkle proof as the
    authority solution, conditional on D.110c-0b0 supplying the missing floor.
-   D.110c-0b1 owns its reviewed opener/closure contract, exact
-   authenticated-head input, compatibility transition, RED/GREEN, and
-   stop boundary; it adds no new record/wire schema unless another high-risk
-   reslice is first accepted. Its executable RED waits for 0b0/0a/a/b GREEN and
-   consumes their real transition loop; it closes before D.110c-c RED and
-   D.110c-d freeze.
+   D.110c-0b0b freezes the reviewed non-root epoch-N checkpoint opener and
+   bounded-advance public contracts before a/b production edits. D.110c-0b1
+   owns their implementation, exact authenticated-head input, compatibility
+   transition, and RED/GREEN; it adds no new record/wire schema unless another
+   high-risk reslice is first accepted. Its executable RED waits for
+   0b0/0a/a/b GREEN and consumes their real transition loop; it closes before
+   D.110c-c RED and D.110c-d freeze.
 4. **D.110c-0c — durable pending-adoption resume decision.** Owner: creator
    close/adoption durable orchestration and existing AHE/snapshot/evidence
    owners. RED must create a real closed durable head, terminate the process
@@ -92998,7 +93002,7 @@ activation owners, protocol records, dependencies, thresholds, and root exports
 remain unchanged.
 
 The accepted focused command disabled only the repository-wide coverage
-percentage gate and passed 3/3. The exact retained eight-file selection passed
+percentage gate and passed 3/3. The separate exact retained seven-file selection passed
 86/86 with zero failures or pending tests. Node build, exact production-source
 typecheck, the affected private compile fixture, exact-owner ESLint and
 Prettier, diff-check, source-shape audit, and built package self-reference
@@ -93020,13 +93024,210 @@ campaign ran. GREEN is not closed until this signed/pushed implementation and
 evidence receive the one governing Grok/Kimi/Opus plan-to-RED-to-GREEN review;
 only P0/P1 blocks. No Fable result substitutes for that formal review.
 
+That final implementation review inspected signed/pushed GREEN
+`2b3080d6562881ecd2a129dc3d896e9e9a86650d` in a clean detached checkout.
+Prompt SHA-256 is
+`891d559783217819352ed2ac62271e67eba531454550c2d47e1e490642baf669`.
+Grok 4.6/high completed normally after 885.749 seconds with
+`stop_reason=end_turn`, no cancellation or timeout, but placed inspection prose
+before its exact JSON, so the runner honestly classified it `NO_VERDICT`. Its
+public terminal object was `BLOCKED`, P0=0/P1=1/P2=1; event, public, status, and
+extracted-terminal SHA-256 values are
+`99400b41d3de58fc5c4ea292ece98640f5994b19d9537571ef564579a3f211f0`,
+`e2f2d5c91e4faacc891bef5cf0800671d69d8ea3d38a94727af5e60df1767e29`,
+`b0ee8db858485ace1b02e40e34b18683036ac94bfe53f4ddf96a323b6611d261`,
+and `1e3b33cfd71d1ea5780e5f3d9ec9604f2642a8bbe312d074d38658df3037f752`.
+Standard direct Kimi K3 session
+`session_8d50908e-4785-47a2-b68e-a370def74885` with the exact 100-step control
+returned `PASS`, P0=0/P1=0/P2=1; stream and terminal SHA-256 values are
+`466127c30936204bd812e1744277005dbd19c8f46f19d771f69989a4f56c44f7`
+and `ea0e4f06c6da88ab99a0d8c3e8517154f024598cb5f621c04212a8b3de3f45b7`.
+Opus xhigh session `de925e84-c258-4a43-9868-e15be6a5ca05` returned `PASS`,
+P0=0/P1=0/P2=3; stream and terminal SHA-256 values are
+`e30bda798ef91ec333178f66634081abc887a70964f47281c8db566b43ad2b84`
+and `13df504fc996da7f91fa8eb4559937033ba04058d321704cf3dad2cf0c79bdd7`.
+
+The only P1 was Grok's correct evidence inconsistency: retained JSON proves
+seven files/86 tests/14 suites, while the original ledger and plan called it an
+eight-file report. Kimi and Opus independently found the same issue as P2. The
+ledger and plan now state the exact truth: focused JSON separately proves the
+0b0a file's 3/3 and retained JSON proves the seven retained files' 86/86. No
+test, source byte, public contract, scope, or acceptance behavior changed, so
+the governing policy forbids a new confirmation for this documentation-only
+correction. Grok did not cancel, so its cancellation-resume rule does not
+apply. The remaining P2s are assigned to 0b0: its full product/provider crash
+matrix owns the modeled pending/stable six-step composition and missing/wrong/
+foreign rows, and its source-governance update preserves an explicit no-AHE-
+mutation predicate for the original reopen owner while allowing the distinct
+pending-recovery owner to publish. The corrected blocking union is empty and
+D.110c-0b0a is closed.
+
+##### D.110c-0b0b epoch-N checkpoint-opener and bounded-advance contract prerequisite
+
+The comparative audit's deferred public-boundary stop-check now has a
+deterministic answer. `openCurrentAnchorTrust()` accepts only an epoch-0 record
+whose current digest equals the pinned genesis digest. The exported
+`openCreatorSuccessorTrust()` can authenticate exactly one next epoch only when
+the caller already holds the immediate predecessor `CurrentAnchorTrust`.
+`CurrentAnchorTrust` minting remains private protocol-v3 custody. Therefore an
+epoch-N cold opener cannot authenticate a retained epoch-(N-1) creator record
+directly from pinned genesis material and then verify N-1→N without either
+replaying the older chain or adding a reviewed protocol-v3 boundary. Node
+cannot implement that mint safely in private application code. Separately,
+`inspectCreatorTrustAdvance()` computes the proposed closure as every current
+reference except the old trust plus the new trust, CutValue, and commit QC. It
+therefore retains every earlier CutValue/QC pair and is the demonstrated O(N)
+control-growth owner. The 0b0a stage/recovery seam correctly preserves that
+first-transition contract; it does not solve or claim bounded repeated closure.
+
+This is a public-contract prerequisite and stops implicit 0b1 production
+implementation. **D.110c-0b0b** is owned by the protocol-v3 creator-checkpoint
+trust boundary, the control-plane creator-trust advance boundary, and their
+Node consumers. Its design freezes before D.110c-a or D.110c-b production RED;
+its executable RED/GREEN remains D.110c-0b1 after 0b0, a, and b have produced
+the genuine repeated path. No 0b0b source edit occurs until this exact design is
+signed, pushed, and accepted by the governing high-risk Grok/Kimi/Opus plan
+review.
+
+The selected compatibility design adds two non-root package boundaries while
+preserving every existing root and first-transition export:
+
+1. `@ts-drp/protocol-v3/creator-checkpoint` exports exactly
+   `openCreatorCheckpointTrust`. Its exact closed input carries one already
+   pin-authenticated epoch-0 `genesisTrust`, the immediate predecessor and
+   current `creator-trusted-v1` trust-state record bytes, the exact current
+   transition CutValue and commit-QC bytes, and copied expected current
+   `(objectId, epoch, currentAnchorDigest)` values. It accepts no chain, store,
+   provider, AHE head, or activation owner. Internally it requires both records'
+   profile and signer-set carriers to be byte-identical to the genesis trust
+   material, verifies both creator signatures, requires the predecessor epoch
+   to equal current epoch minus one, requires the current anchor's
+   `previousAnchor` to equal the predecessor digest, verifies the exact current
+   CutValue/commit QC under the predecessor's creator seal authority, verifies
+   the successor anchor derivation and copied expected tuple, and only then
+   returns the current `CurrentAnchorTrust`. The transient predecessor trust is
+   never returned. Missing predecessor state is a fail-closed availability
+   result; its own older QC is deliberately not replayed. Epoch 0 continues to
+   use `openCurrentAnchorTrust`, and the existing `openCreatorSuccessorTrust`
+   remains byte- and behavior-compatible.
+2. `@ts-drp/control-plane/creator-trust-checkpoint-advance` exports exactly
+   `inspectBoundedCreatorTrustAdvance`. Its exact closed input is
+   `{current,proofRefs,proposed,retiringProofRefs}`. Each proof-ref tuple has
+   exactly one CutValue ref and one commit-QC ref, with no duplicate digest.
+   After the Node/protocol owner has authenticated the current checkpoint and
+   identified the current transition pair, the predicate accepts exactly the
+   current closure minus its one current trust ref and the exact two retiring
+   proof refs, plus one successor trust ref and the exact two new proof refs;
+   every other ref is byte-for-byte preserved. Missing, extra, duplicated,
+   substituted, non-current, or still-retained retiring refs fail closed. The
+   existing `inspectCreatorTrustAdvance` remains unchanged and owns epoch 0→1;
+   the bounded predicate owns epoch N→N+1 for N≥1.
+
+This is a new public package contract but not a wire-format or authority
+change. Both functions reuse the existing v1 trust-state record, anchor,
+CutValue, QC, Ed25519, SHA-256 domain separation, and opaque trust capability.
+No dependency, recursive proof, CRS, threshold, record kind/version/field,
+provider operation, product API, or migration format is added. The external
+0b0 floor remains the sole latestness owner: the protocol opener authenticates
+the copied expected tuple but neither fetches nor invents it. Its security
+assumptions are the authentic pinned genesis record, uncompromised fixed creator
+key, strict existing cryptography, an honest application/account floor for
+latestness, hostile room storage, and availability of the immediate predecessor
+rollback closure. It does not claim creator-key rotation, a dishonest-provider
+defense, brand-new-client freshness, lone-fork detection without a floor,
+archive-root evolution, or chain-verified historical application data.
+
+The retained-current versus rollback law is exact. Active epoch N retains one
+current trust record and only the CutValue/QC for N-1→N, plus the already
+required live projection, ACL, snapshot/manifest, recovery, and bounded hot
+refs. The immediate predecessor trust record needed by the opener resides in
+the newest of exactly two complete `Superseded` rollback generations. Older
+transition pairs remain recoverable only while inside that two-generation
+window; after authentic current-head installation, exact floor commit, two
+complete rollback generations, and every D.109 availability/snapshot/outbox
+gate, pairs outside the window become eligible for deletion. A crash or missing
+availability retains too much or fails closed; it never deletes too much.
+Archive/application bytes remain separately growing and cannot carry hidden
+ordinary-reopen control state.
+
+D.110c-0b1 RED/GREEN is amended prospectively, without rerunning or relabelling
+earlier evidence:
+
+- RED uses the genuine epoch 0→1→2 path produced by 0b0/a/b, never a fixture-
+  minted epoch-2 trust. It proves the existing genesis-only opener cannot cold
+  authenticate epoch 2 without replay, the existing advance predicate retains
+  the prior CutValue/QC, and exact active-control census grows. It also proves a
+  valid stale creator checkpoint is authentic but rejected by a newer copied
+  floor. The exact causal tokens distinguish missing checkpoint opener from
+  unbounded advance ownership.
+- GREEN implements only the two reviewed non-root boundaries and their Node
+  composition. It proves epoch 1→2 and later cold opens from pinned genesis,
+  one immediate predecessor, current trust/CutValue/QC, and the external floor;
+  no older transition chain is read. It proves the active closure retires
+  exactly the prior transition pair while both rollback generations and D.109
+  gates preserve recoverability. No current trust capability exists before
+  current QC and expected-head verification.
+- Adversarial gates cover tampered or cross-room/cross-genesis carriers,
+  signatures, object, epoch, current/predecessor anchors, previous-anchor link,
+  CutValue, QC phase/value/signers, floor lag/ahead/conflict, skipped epoch,
+  replay, same-epoch ambiguity, lone fork selected against another floor,
+  missing predecessor, two predecessor candidates, retiring-pair omission,
+  substitution, duplication, extra deletion, retained old pair, crash before
+  and after head/floor publication, and unavailable rollback state. Every
+  failure occurs before activation or deletion with an exact bounded code.
+- Retained gates preserve all epoch-0/first-successor vectors and the 0b0a
+  stage/publish/recovery behavior, then cover restart/reopen and continued
+  issue/publish after epoch 2, exact state/ACL/authority/history/archive and
+  operation accounting, Node/protocol/control-plane builds and exact source
+  typechecks, exact export rosters, lint/format/diff, protected paths, 27
+  stashes, signed commits, pushed refs, hashes, and a self-excluding manifest.
+  D.110c-d later proves the same bound for at least 100 genuine same-room
+  transitions; Phase 7 consumes that room but separately owns archive-root
+  evolution, archive availability/cold paging, and new-client floor delivery.
+
+The current upstream refresh was bounded and primary-source based. On
+2026-09-02, `hiero-improvement-proposals` remained at
+`54ccb06659592ab201e7adea632f1019e9faa00e` and `hiero-cryptography` remained at
+`39f28f39f609f80e52253d86169e2db5216a713e`. `hiero-consensus-node` advanced
+one unrelated throttle-snapshot commit from the audited
+`1aa1d6c153907750cfbba6935b7a21867053968e` to
+`a97f829a778023aeddd59d30562f0759799e8159`; zero History, Hints, TSS, roster,
+WRAPS, reconnect, signed-state, or handoff paths changed, and every previously
+recorded relevant blob remains identical. Additional inspected blobs at that
+head are `b3cb7271393aad72e666d5a192bcff51a51a8a35` for
+`V0730HistorySchema`, `505e9c588a9010fca4f4b095e5271c66eee7cf6f` for
+`WrapsMpcStateMachine`, `5f5ec0c6deced5e4a943dde896fd9677cebdcf8f` for
+`ProofControllerImpl`, `7491ac42304dea3a7c380f5dc8a9f14748f03714` for
+`RosterTransitionWeights`, `b74064314f39eefd1359269cbc6f68aa087ef652` for
+`TssConfig`, and `191d48739d0a60d95bbe8b02f58f2111e9b95862` for
+`DefaultSignedStateValidator`. They reinforce rather than change the existing
+decision: WRAPS binds genesis descent to the final verification-key hash but
+not latestness, and reconnect rejects an old signed state using the learner's
+separate prior round/timestamp floor.
+
+The expressly authorized one-off Fable 5.1/high parallel audit independently
+reached the same fixed-creator construction family, confirmed the public-boundary
+stop-check, and returned
+`D110C_0B0B_DESIGN_READY: YES` with two P1 declarations: make the new epoch-N
+protocol boundary explicit, and make the bounded six-step closure generalization
+explicit before a/b. Both are incorporated above. Its P2 implementation-status
+and upstream-ledger observations are recorded without treating Fable as a
+formal gate. Session `0b68b30f-133f-4078-a9a7-ee7aeeec8953` used
+`claude-fable-5-1` at high effort for 542,433 ms and 67 turns, with zero
+subagents, permission denials, or repository writes. Prompt, raw-stream, and
+report SHA-256 values are
+`375fbfea67bc3323dd05fb69e58297b543abee43228772d09793d4cb032c4af3`,
+`7ddf346a0bc260ba660eee0b2ae6e9ea62d2ae11ee9a4278aaa98387432662fc`,
+and `01ede583b5d0f1022305fa5025349241f6ac7971e56260d12c199daba0b1f979`.
+This express authorization is consumed; no further Fable run is authorized.
+
 This exact owner-selection design is signed and pushed before one bounded Grok
 4.6/high, standard direct Kimi K3 with
 `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review. Only P0/P1 blocks;
 material findings are corrected in one batch with at most one confirmation if
 scope, causal acceptance, or the public authority contract changes. No
-production edit, RED, Fable, collaboration subagent, or long workload runs
-before that gate is accepted.
+production edit, RED, further Fable invocation, collaboration subagent, or long
+workload runs before that gate is accepted.
 
 The owner-selection review inspected signed/pushed plan-only commit
 `65912fbc6fc128fb4cc648c7f028924bd36cb865` from
@@ -93148,7 +93349,7 @@ D.108d2/e v3-room governance, D.109a-f cleanup/reclamation,
 snapshot-quarantine, live-journal parity, issuance, storage Node/browser, and
 D.110a non-consuming validator suites; affected package builds and source
 typechecks; exact-owner lint/format/diff/source-shape checks; and protected-path,
-26-stash, process/port, signed-commit, pushed-ref, changed-path, hash, and
+27-stash, process/port, signed-commit, pushed-ref, changed-path, hash, and
 self-excluding manifest custody. D.110a's full worker and preflight are
 permanently excluded: both identities are consumed and neither may run again.
 

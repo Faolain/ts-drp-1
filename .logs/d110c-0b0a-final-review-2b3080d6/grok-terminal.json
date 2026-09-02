@@ -1,0 +1,20 @@
+{
+  "verdict": "BLOCKED",
+  "summary": "The Node seam itself closes the causal RED: stage completes without swapHead, publish does one old-to-new CAS with reread, recovery is non-activating and pin-bound, and commit/export/product surfaces stay compatible. Closure is blocked by a false retained-evidence conjunction: the 86/86 JSON is a 7-file, 14-suite report, not the claimed eight-file selection that includes the GREEN tests.",
+  "findings": [
+    {
+      "severity": "P1",
+      "title": "Retained 86/86 report does not include the claimed eighth GREEN file",
+      "evidence": ".logs/d110c-0b0a-green-c1e443fc/retained.json is numTotalTests=86, numTotalTestSuites=14, and contains phase-3h/activation/cleanup paths but not staged-handoff-red, successor-published, or true-fork. The seven historical files already contain 86 it() cases (24+9+9+13+17+3+11); focused.json shows the eighth file is 3 tests / 2 suites. green-ledger.md and the plan still call this an eight-file 86/86 with 14 suites.",
+      "required_action": "Either re-run the real eight-file retained selection and replace retained.json/hashes (expected 89 tests / 16 suites) or rewrite the ledger/plan to the actual seven-file 86/14 report plus the separate focused 3/3. Do not keep both 'eight files' and '86/86 / 14 suites'."
+    },
+    {
+      "severity": "P2",
+      "title": "No explicit six-step modeled pending/stable composition table",
+      "evidence": "tests/phase-6b-d110c-0b0a-staged-handoff-red.test.ts exercises genuine stage-then-publish, equivalent Completes, old/new recovery, commit-then-throw reread, and fail-closed rows, but never composes stage → modeled provider pending → publish → modeled stable → recovery as a tests-only decision model.",
+      "required_action": "Owner: D.110c-0b0 product composition. Disposition: optional tests-only table; do not treat it as a Node-seam defect. 0b0 owns the frozen six-step product/provider order."
+    }
+  ],
+  "counts": { "P0": 0, "P1": 1, "P2": 1 },
+  "next_state": "D110C_0B0A_GREEN_CORRECTION_REQUIRED"
+}
