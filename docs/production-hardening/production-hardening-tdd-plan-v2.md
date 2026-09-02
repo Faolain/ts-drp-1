@@ -93657,7 +93657,7 @@ checkpoint:
    records. After D.110c-0a has removed seal refusal as a confounder, the sole
    terminal runtime cause must be the compaction verifier's
    `INVALID_ANCHOR`/`previous history snapshot does not match the authenticated
-   anchor` result. The actor must not emit a successor QC, terminalize the
+anchor` result. The actor must not emit a successor QC, terminalize the
    plane, install adoption facts, advance the application floor, or activate a
    replacement. The evidence records the first failing owner verbatim. If
    `stageSnapshot()`, `persistSnapshot()`, or another actual pre-verifier owner
