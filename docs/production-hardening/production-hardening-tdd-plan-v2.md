@@ -92278,6 +92278,29 @@ Because the accepted P1 changes a hard security acceptance predicate, one
 bounded confirmation of this signed correction is required. It is the only
 confirmation; no bookkeeping or closure prose receives another review.
 
+That single confirmation inspected signed/pushed commit
+`340a66466768133aee20493186d46bf2c8e76512` from
+`.logs/d110c-0b0-confirmation-340a6646`; prompt SHA-256 is
+`69a23e6d5ec4e3e25938d833cc87b1d862af5d55234bbda6a5d10aef338d6336`.
+Grok 4.6/high completed normally with P0=0/P1=0/P2=0; its events and public
+result SHA-256 values are
+`2711e1c52eee96be707294fc518e0f7a01bf923ba4688f4d221800a91fa1fe08`
+and `bf054af72a2736c146719b19a577d3a6b93e1bc8310fea30148918af6d299041`.
+Standard direct Kimi K3 session
+`session_4452eabe-19de-490d-ae69-892da0b6f4f2`, with the exact 100-step
+control, returned P0=0/P1=0/P2=0; its exported session SHA-256 is
+`c37902733b1e21619785a9da734193cffa8f314cbae3c61c93785861c894d847`.
+Opus xhigh session `679bfe17-46ba-400b-82eb-6aba41076a4d` returned
+P0=0/P1=0/P2=1; its transcript SHA-256 is
+`893d7a1f5d2690018b99269f1713b3852a566dfee5b24495eb51dd1fd0dca378`.
+Its attempted shell-monitor call was denied as required by the read-only tool
+policy; it completed the review from the captured exact commit diff and local
+read-only sources. The sole P2 is assigned to the next 0b0 owner-selection
+design: crash completion of a pending floor advance may not derive the floor
+value from the hostile local head/checkpoint. It does not change this plan
+checkpoint or trigger another confirmation. The blocking confirmation union is
+empty and the exact next state is `D110C_0B0_OWNER_SELECTION_READY`.
+
 Debt disposition is explicit: D.110c owns repeated same-room rollover,
 epoch-relative creator seal custody, bounded authenticated current-trust
 recovery/control closure, durable pending-adoption resume, and the product room
