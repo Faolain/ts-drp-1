@@ -94090,14 +94090,22 @@ must equal the active live handle's ephemeral-authority epoch. Epoch-1 callers
 remain source- and behavior-compatible. The interface key roster, methods,
 trust profile, live-generation kinds, record/wire schemas, digest and cut/QC
 authority, room-floor API, dependencies, availability policy, thresholds,
-workload, and storage schemas do not change. The tests-only
-`CreatorLiveCloseResult` declaration in
+workload, and storage schemas do not change. The tests-only anonymous
+`sealEpoch()` result declaration in
 `packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts` is widened to
 the already-shipped D.110c-a `number` fields in the product batch; it does not
-create a second product contract. If RED or implementation requires a new
-public key/method, record or wire field, cryptographic/dependency change,
-authority carrier or assumption, threshold, or migration protocol, this slice
-stops and reslices rather than widening silently.
+create a second product contract. The retained
+`isD108d2Authority()`/`D108D2_AUTHORITY_KEYS` oracle and its RED remain
+byte-exact epoch-1 controls. They are not loosened to `typeof number` merely to
+accept epoch 2. The new D.110c-b browser title instead receives one separate
+tests-only `isD110cBSuccessorAuthority(value, expectedEpoch)` exact-key
+predicate and a separate raw-authority derivation that selects an explicitly
+supplied positive safe epoch. The existing raw epoch-1 `exportSuccessor()`
+owner and retained D.108d2 equality assertions remain unchanged. If RED or
+implementation requires a new public key/method, record or wire field,
+cryptographic/dependency change, authority carrier or assumption, threshold,
+or migration protocol, this slice stops and reslices rather than widening
+silently.
 
 The deterministic tests-only RED is one signed/pushed checkpoint with two
 causal observations and one source-shape gate:
@@ -94113,14 +94121,18 @@ causal observations and one source-shape gate:
    non-root predecessor. The fixture emits the diagnostic token
    `D110C_B_EPOCH_PINNED_PREDECESSOR`; any earlier or different owner stops RED
    and requires diagnosis rather than adapting the fixture.
-2. One exact Chromium test added to the retained Phase-6a product file, titled
+2. One exact Chromium test appended after the retained serial Phase-6a product
+   chain, titled
    `D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and
-   rebinds epoch 2 close custody`, creates an independent genuine room,
-   performs 0->1 adoption, and issues/publishes through epoch 1. Its first real
-   post-adoption `sealEpoch()` rejects through the stale terminal creator-close
-   handle, while the authority and room floor remain at the honestly adopted
-   epoch 1. The test records `D110C_B_CLOSE_NOT_REBOUND`. No synthetic epoch-2
-   state is introduced merely to reach the later adoption latch.
+rebinds epoch 2 close custody`, creates an independent fourth browser realm
+   and server with exact distinct database name `d110c-b-hot-creator` and
+   channel `d110c-b-hot-rollover`. It performs 0->1 adoption and
+   issues/publishes through epoch 1. Its first real post-adoption `sealEpoch()`
+   rejects through the stale terminal creator-close handle, while the authority
+   and room floor remain at the honestly adopted epoch 1. The test records
+   `D110C_B_CLOSE_NOT_REBOUND`. The three retained realms are snapshotted before
+   and after and remain unchanged. No synthetic epoch-2 state is introduced
+   merely to reach the later adoption latch.
 3. A corrected deterministic source-shape script pins the projection epochs,
    predecessor-kind checks, same-bindings stale-wrapper branch, unconditional
    topic deletion, literal public epoch, one-transition latch, and absence of a
@@ -94158,57 +94170,99 @@ existing `v3-live-generation-2`. Root 0->1 bytes and behavior remain unchanged.
 The stable-topic active owner retains the existing browser lock while an
 authenticated exact-next wrapper replaces its predecessor. Its private entry
 records bindings, the authenticated current object/genesis/epoch/anchor tuple,
-handle, lock custody, and a unique local ownership token. Same exact head and
-same bindings is idempotent and returns the same wrapper. A request is eligible
-for replacement only when its predecessor tuple exactly equals the current
-entry and its successor is the same object/genesis with a safe-integer epoch
-exactly one greater and the authenticated next anchor. Same-epoch substitution,
-stale or skipped predecessor, cross-room/object/genesis, conflicting bindings,
-or a non-exact successor fails before live-material consumption or owner swap
-with the existing fail-closed result family. Live consumption and handle alias
-must succeed before the map entry changes. Any failed consume/alias retains the
-old owner and lock. A wrapper deactivates its raw plane once, but deletes the
-map entry and releases the stable-topic lock only if its token is still current;
-delayed old-wrapper cleanup can never remove the replacement.
+handle, lock custody, a unique local ownership token, and replacement-in-flight
+state. Same exact head and same bindings is idempotent and returns the same
+wrapper. A request is eligible for replacement only when its predecessor tuple
+exactly equals the current entry and its successor is the same
+object/genesis with a safe-integer epoch exactly one greater and the
+authenticated next anchor. Same-epoch substitution, stale or skipped
+predecessor, cross-room/object/genesis, conflicting bindings, or a non-exact
+successor fails before live-material consumption or owner swap with the
+existing fail-closed result family.
+
+Replacement marks the captured owner/token in-flight synchronously before its
+first await. Owner deactivation requested while that marker is held cannot
+delete the map entry or release the Web Lock; it marks retirement requested and
+settles only after replacement finalization. After live consumption and handle
+aliasing, and immediately before `activeOwners.set`, replacement performs an
+exact compare-and-swap: the map entry and ownership token must still be the
+captured owner and must not have been revoked. A mismatch or retirement request
+deactivates the newly activated plane, removes only the still-matching entry,
+releases the lock exactly once after teardown, and fails closed. This prevents
+shutdown/deactivation from releasing the lock underneath an in-flight
+replacement or installing a successor without cross-tab writer custody.
+
+The failure boundary is explicit. Refusals strictly before transport/live
+transfer retain the usable old owner and lock. Once
+`activateCreatorSuccessorLive()` has reused the stable topic, the predecessor
+registration is already inactive; terminalization or alias/cleanup failure may
+not claim it remains usable. Such a post-transfer failure deactivates the raw
+successor once, leaves no false active map entry, releases the lock only after
+teardown, and reports exact fail-closed stalled/unavailable custody. It does not
+add a v3-live restore owner; restart/pending recovery remains D.110c-0c. A
+wrapper always deactivates its raw plane once, but deletes the map entry and
+releases the stable-topic lock only if its token is still current; delayed old
+wrapper cleanup can never remove the replacement.
 
 After Batch 1, the exact focused Node test runs once. GREEN must prove real
 1->2 verify, stage, publish, floor-checked activation, a new wrapper identity,
-the old plane terminal, one active topic owner and one browser lock, idempotent
-same-head activation, and post-epoch-2 issue/publish. Mutants cover same-epoch
+the old plane terminal, one active topic owner in the genuine no-browser-lock
+realm, idempotent same-head activation, and post-epoch-2 issue/publish. The
+idempotence input is a fresh authenticated capability returned by the existing
+`publishStagedCreatorSuccessorAdoption()` `active-new` terminal owner; the
+fixture may not replay or mint a consumed capability. Mutants cover same-epoch
 different anchor, stale, skipped, cross-object, cross-genesis, missing hot
 input, malformed floor, lagging/ahead/substituted floor, different bindings,
-failed live consumption, and failed alias/cleanup. They preserve exact existing
+pre-transfer refusal, post-transfer consume/terminalize/alias cleanup, and
+in-flight owner deactivation/CAS loss. They preserve exact existing
 `chain-invalid`, `stale-head`, `authority-unavailable`, `internal-invariant`,
 `malformed-input`, `D110C_FLOOR_INVALID`, and `D110C_FLOOR_MISMATCH`
 classifications at their current hot entry points. Every refusal occurs before
-replacement custody. Old-wrapper deactivation after a successful swap is
-separately proven unable to delete or unlock the new owner.
+replacement custody or is classified honestly as post-transfer failure. The
+Node gate installs no synthetic `navigator.locks`; exact lock uniqueness stays
+in Chromium. Old-wrapper deactivation after a successful swap is separately
+proven unable to delete or unlock the new owner.
 
 **Batch 2 — product authority, close rebinding, and repeat request custody.**
-The room replaces the permanent boolean-like first-adoption latch with an
-authenticated current-head comparison. `successorAuthority()` accepts any
-positive safe exact epoch whose object, genesis, anchor, ACL, and live
-ephemeral authority agree. The existing singular creator-close store owners
-opened at room creation are retained as private binding material and reused;
-no per-epoch store family is opened. After verified publication, atomic
-room-floor commit, and exact-floor activation, the room binds a fresh
-creator-close handle to the new live plane before returning success, installs
-the new active handle/authority/close handle coherently, stops the terminal old
-close handle exactly once, and deactivates the old live wrapper without
-affecting the new stable-topic owner. Concurrent duplicate adoption continues
-to share the one in-flight task; once the current authority already equals the
-durable authenticated head, an additional call is an idempotent no-op, not a
-permanent epoch-1 latch.
+The room replaces the permanent boolean-like first-adoption latch with an exact
+close-lifecycle predicate, not floor/authority equality alone.
+`successorAuthority()` accepts any positive safe exact epoch whose object,
+genesis, anchor, ACL, and live ephemeral authority agree. A current close handle
+at `successor-pending-adoption` always proceeds through verification even
+though current authority and stable floor still equal the predecessor; this is
+the genuine epoch-1->2 case. A current handle at `active` is an idempotent no-op
+only when the authority, stable floor, and active plane's authenticated
+ephemeral-authority tuple all agree and no pending successor exists. `sealed`
+or `successor-adopted` as the current handle is a fail-closed stale/stalled
+state, never a no-op. This proves a fresh epoch-1 seal is admitted while a
+duplicate call after complete adoption and new-close binding is harmless.
+
+The existing singular creator-close store owners opened at room creation are
+retained as private binding material and reused; no per-epoch store family is
+opened. After verified publication, atomic room-floor commit, and exact-floor
+activation, the room first preserves the retained D.108e2b predecessor-
+deactivation behavior. Only after predecessor deactivation succeeds does it
+bind a fresh creator-close handle to the replacement. It then installs the new
+active handle/authority/close handle coherently, stops the terminal old close
+handle exactly once, and returns success. Concurrent duplicate adoption
+continues to share the one in-flight task.
 
 Successful activation cannot be falsely rolled back: the predecessor is
-terminal and the authenticated floor has advanced. If close rebinding then
-fails, the room keeps the genuine new active handle, authority, and floor,
-clears the stale terminal close handle, reports close authority unavailable
-with stalled continuity, and rejects that adoption attempt with exact
-`D110C_B_CLOSE_REBIND_FAILED`. It may not reactivate the predecessor, regress
-the floor, expose the old close handle, or claim readiness for another close.
-Shutdown remains idempotent and releases the current close handle, live owner,
-stores, transport, and stable-topic lock exactly once.
+terminal and the authenticated floor has advanced. If activation fails after
+live transfer, the room preserves the committed floor, clears stale live/close
+handles, enters exact `D110C_B_ACTIVATION_STALLED`, and refuses issue, seal, or
+another hot adoption until the separately owned pending-recovery/reopen path.
+It never claims the predecessor survived. If close rebinding fails after a
+replacement was returned and predecessor deactivation succeeded, the room does
+not call the old `throwAfterReplacementCleanup` path: it keeps the genuine new
+active handle, authority, and floor, clears the stale terminal close handle,
+reports close authority unavailable with stalled continuity, and rejects that
+adoption attempt with exact `D110C_B_CLOSE_REBIND_FAILED`. It may not reactivate
+the predecessor, regress the floor, expose the old close handle, or claim
+readiness for another close. Shutdown during an in-flight replacement exercises
+the token/CAS rule above. Shutdown otherwise remains idempotent and releases
+the current close handle, live owner, stores, transport, and stable-topic lock
+exactly once.
 
 After Batch 2, the same exact Chromium title runs once. It must prove one
 genuine production room completes 0->1, real issue/publish at epoch 1, genuine
@@ -94220,10 +94274,12 @@ asserts exact result epochs 2/3, proving the adopted epoch-2 plane became the
 close-capable predecessor. Exact state, ACL, writer/ephemeral authority,
 history-root/size extension, archive root, snapshot/manifest, operation count,
 semantic digest, and retained publication are unchanged or advance exactly as
-specified. Fault cases prove concurrent duplicate coalescing, failed
-replacement retention, close-bind failure's honest unavailable state, delayed
-stale cleanup, close/shutdown races, and floor refusal without a second live
-owner or stale usable close handle.
+specified. Fault cases prove concurrent duplicate coalescing, pre-transfer
+refusal retention, post-transfer stalled classification, close-bind failure's
+honest unavailable state, delayed stale cleanup, in-flight CAS loss,
+close/shutdown races, and floor refusal without a second live owner, unlocked
+replacement, or stale usable close handle. Exact one-lock custody is proved in
+this real Chromium realm.
 
 The full GREEN then runs the focused Node and Chromium results already produced
 for the two batches only as recorded above, followed by the retained Node
@@ -94242,9 +94298,12 @@ diagnostics outside changed owners are recorded but cannot replace these exact
 gates.
 
 This slice owns only the hot loop and product close rebinding. The cold-reopen
-literals at `creator-adoption.ts:840,943-944,1052,1229-1230`, authenticated
+literals at `creator-adoption.ts:840,943-944,1030,1052,1229-1230`, authenticated
 non-root checkpoint opener, fixed rollback window, pruning, age-independent
 reopen, and bounded active control proof remain D.110c-0b1/D.110c-c. The
+Batch-1 retained matrix asserts that epoch-2 cold reopen still fails closed as
+`chain-invalid`; it does not generalize that deferred path.
+The
 multi-transition durable census and fresh-process post-GC memory proof remain
 D.110c-d; Phase 7 still owns archive delivery and genuinely multi-epoch cold
 join. D.110c-b neither reopens D.110c-a nor relabels a hot 0->1->2 proof as
@@ -94264,6 +94323,38 @@ authority, or public compatibility. The signed GREEN receives the one formal
 Grok/Kimi/Opus plan->RED->GREEN review; there is no separate full RED review or
 batch review. No Fable or collaboration subagent is authorized, and no long
 campaign or D.110a invocation may run.
+
+The first high-risk plan review inspected signed/pushed commit
+`aa002e78463b3a56377fd26b7bdaa04ecc587396` from one clean detached checkout.
+Grok 4.6/high reached its 32-turn runner bound after 720.224 seconds and ended
+`cancelled` immediately before its promised verdict; exact session
+`01a062cd-c811-7c31-a0ed-5ff24e31a304` was resumed rather than restarted and
+completed normally with `APPROVED`, P0=0/P1=0/P2=4. Standard direct Kimi K3
+session `session_a6727230-b5d4-4bfa-abe9-5083c4078160`, with the exact 100-step
+control, returned `CHANGES_REQUIRED`, P0=0/P1=2/P2=3. Opus xhigh session
+`4d183b83-9927-4431-a3ef-872c5bfe18d2` returned `CHANGES_REQUIRED`,
+P0=0/P1=3/P2=4. The initial Kimi shell command's incompatible prompt/plan flags
+failed before a session or model call and are launcher diagnostics, not a
+second review.
+
+The blocking union is accepted and corrected in one plan-only batch above:
+post-transfer failure no longer promises a usable predecessor; active-owner
+replacement has an in-flight token/CAS and deferred lock release; duplicate
+adoption has an exact close-lifecycle predicate; retained D.108d2 epoch-1
+authority oracles remain exact beside a separate expected-epoch D.110c-b
+oracle; and the audit evidence omitted from the first commit is included in the
+signed correction. The P2 union is dispositioned above without recursive prose
+review by moving lock proof to Chromium, pinning a fourth isolated browser
+realm/database/channel, naming the authenticated `active-new` idempotence
+producer, preserving predecessor-deactivation ordering, assigning the omitted
+cold literal, and accurately naming the Phase-5e anonymous type owner. Because
+these corrections change lifecycle acceptance and executable failure
+semantics, the one permitted confirmation must inspect the signed/pushed
+correction before RED. The first-review ledger is
+`.logs/d110c-b-plan-review-aa002e78/review-ledger.md`; its SHA-256 is
+`081229e4a60f0c29a401e1941bd3d078e87d9d4609a662f84b1e2ad77924c934`.
+The validating self-excluding review manifest SHA-256 is
+`f2a5bb67eeba98c487012aee1284f8f9e90d5f0f07838c4ff75b5a49d489e8c8`.
 
 The four prerequisite decisions, including the newly demonstrated 0b0
 freshness-floor authority question, are reviewed before their production edits;
