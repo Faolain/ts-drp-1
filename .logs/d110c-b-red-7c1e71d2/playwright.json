@@ -1,0 +1,156 @@
+{
+  "config": {
+    "argv": [
+      "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+      "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@playwright+test@1.62.1/node_modules/@playwright/test/cli.js",
+      "test",
+      "--config",
+      "packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts",
+      "--project=chromium",
+      "--grep",
+      "D\\.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebinds epoch 2 close custody",
+      "--reporter=json",
+      "--fail-on-flaky-tests",
+      "--output=.logs/d110c-b-red-7c1e71d2/playwright-artifacts"
+    ],
+    "configFile": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts",
+    "rootDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+    "failOnFlakyTests": true,
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 600000,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-b-red-7c1e71d2/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-6a-creator-successor-product.pw.ts"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-b-red-7c1e71d2/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-6a-creator-successor-product.pw.ts"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/.logs/d110c-b-red-7c1e71d2/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-6a-creator-successor-product.pw.ts"
+        ],
+        "timeout": 90000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "phase-6a-creator-successor-product.pw.ts",
+      "file": "phase-6a-creator-successor-product.pw.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebinds epoch 2 close custody",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 755,
+                  "errors": [],
+                  "stdout": [
+                    {
+                      "text": "D110C_B_CLOSE_NOT_REBOUND\n"
+                    }
+                  ],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T16:48:11.503Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-65b35a71ef81040e746e",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 2071,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-02T16:48:10.576Z",
+    "duration": 3157.2259999999997,
+    "expected": 1,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

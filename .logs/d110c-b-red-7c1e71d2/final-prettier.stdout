@@ -1,0 +1,3 @@
+Checking formatting...
+undefined
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command was killed with SIGABRT (Aborted): prettier --check docs/production-hardening/production-hardening-tdd-plan-v2.md tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts tests/fixtures/phase-6b-d110c-b/hot-adoption-contract.ts tests/fixtures/phase-6b-d110c-b/source-shape.mjs tests/phase-6b-d110c-b-hot-adoption.test.ts packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts

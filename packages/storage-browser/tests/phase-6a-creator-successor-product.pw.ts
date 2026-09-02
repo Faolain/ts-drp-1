@@ -2067,3 +2067,46 @@ test(D108E5_BROWSER_BEHAVIORS.join("; "), async () => {
 	expect(observations.exact65536).not.toBe("v3 room migration target invite is unbounded");
 	expect(observations.boundedMutation).toBe("fulfilled");
 });
+
+test("D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebinds epoch 2 close custody", async ({
+	browser,
+}) => {
+	const retainedPages = [creator, established, late].filter((page): page is Page => page !== undefined);
+	const retainedBefore = await Promise.all(retainedPages.map(snapshot));
+	const server = await startProductBrowserServer(
+		new URL("./assets/phase-6a-creator-successor-product-entry.ts", import.meta.url).pathname
+	);
+	const isolatedContext = await browser.newContext();
+	const page = await isolatedContext.newPage();
+	const databaseName = "d110c-b-hot-creator";
+	try {
+		await openRealm(page, server.origin, "d110c-b-hot", () => [page]);
+		await page.evaluate((input) => window.phase6aCreatorSuccessorProduct.create(input), {
+			channelName: "d110c-b-hot-rollover",
+			clientId: "alice",
+			databaseName,
+		});
+		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.send("d110c-b-epoch-zero"));
+		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.sealEpoch());
+		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.adoptSuccessor());
+		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.send("d110c-b-epoch-one"));
+		const beforeRejectedClose = await snapshot(page);
+		expect(beforeRejectedClose.authority).toMatchObject({ epoch: 1 });
+		await expect(page.evaluate(() => window.phase6aCreatorSuccessorProduct.sealEpoch())).rejects.toThrow(
+			"creator close authority is unavailable"
+		);
+		const afterRejectedClose = await snapshot(page);
+		expect(afterRejectedClose.authority).toEqual(beforeRejectedClose.authority);
+		expect(afterRejectedClose.roomId).toBe(beforeRejectedClose.roomId);
+		expect(afterRejectedClose.accepted).toEqual(beforeRejectedClose.accepted);
+		expect(await Promise.all(retainedPages.map(snapshot))).toEqual(retainedBefore);
+		process.stdout.write("D110C_B_CLOSE_NOT_REBOUND\n");
+	} finally {
+		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.close()).catch(() => undefined);
+		await page
+			.evaluate((prefix) => window.phase6aCreatorSuccessorProduct.deleteDatabases(prefix), databaseName)
+			.catch(() => undefined);
+		await isolatedContext.close();
+		await server.close();
+	}
+});

@@ -94380,6 +94380,48 @@ is `48f2f9fc5c494dfd535ad3a9a94406188d6962ffc283e32aa2da941f85683704`.
 The validating self-excluding confirmation manifest SHA-256 is
 `b80b4b8742eecd8a2fec307921dc3a553508ace8f3f5fbc8faa6730690eeafdf`.
 
+The deterministic D.110c-b RED executed from reviewed signed/pushed base
+`7c1e71d28180fa561f8730ac39dcf41277eccd31` without a product edit or a
+separate model review. Root Vitest selected one test in
+`tests/phase-6b-d110c-b-hot-adoption.test.ts` with coverage disabled and
+passed: the genuine retained D.110c-a room performed hot 0->1, real epoch-1
+issue/publish, and the genuine 1->2 close; the one-use call to the real
+verifier then returned exact `chain-invalid`, left its independently read
+durable head unchanged, and emitted `D110C_B_EPOCH_PINNED_PREDECESSOR`. The
+exact Chromium product title selected one test in one file and passed with
+expected=1, skipped=0, unexpected=0, flaky=0, and no top-level error. Its
+independent fourth server/realm used exact database
+`d110c-b-hot-creator` and channel `d110c-b-hot-rollover`; after real 0->1
+adoption and epoch-1 publication, the first post-adoption `sealEpoch()`
+rejected exact `creator close authority is unavailable`, while epoch-1
+authority, room id, accepted state, and all three retained realm snapshots
+remained unchanged. It emitted `D110C_B_CLOSE_NOT_REBOUND`. Neither focused
+executable was retried.
+
+The first anchored Playwright grep selected zero because Playwright matches a
+larger full-title representation; it was a read-only listing diagnostic. The
+corrected literal-title grep selected exactly one test in one file before the
+sole execution. The corrected source-shape script passed all fourteen frozen
+predicates. Exact-owner ESLint, Prettier, diff, the Node and storage-browser
+build-config no-emit checks, and the v3-room typecheck passed. The broad root,
+Node-package, and storage-browser-package typechecks continue to report only
+inherited compact-history, worker-host rootDir/E3-02, reclamation-alias, and
+branded fixture-ID debt outside every D.110c-b changed file; their complete
+outputs are retained rather than misreported as this RED's failure. Direct
+runtime identity loaded the verifier from `packages/node/src/creator-adoption.ts`
+and the fixture storage owner from `packages/storage-node/dist/src/index.js`
+under Node `v22.15.0`. The first identity probe guessed a nonexistent export
+after both imports loaded; the corrected probe used the fixture's actual
+`createSqliteAheDurableStore` export and passed. Protected paths and all 27
+stashes remained, the fixed ports were clear, and no ts-drp test, reviewer, or
+profiler process remained. The plan-inclusive formatter check exhausted its
+default 4 GiB tool heap before a verdict; the identical formatter-only check
+with a 12 GiB heap passed, without changing a product or test resource
+contract. The RED ledger SHA-256 is
+`3e6f3b7695d55353cf57a3683cb7712b4bcb6f50409ec8fd4962467996bcdcee`;
+the validating self-excluding evidence manifest SHA-256 is
+`44f4d03737162f99e3825c26c5445a0ce36e4200a5837d18669633851ee8ad04`.
+
 The four prerequisite decisions, including the newly demonstrated 0b0
 freshness-floor authority question, are reviewed before their production edits;
 each executable sub-slice receives its own bounded causal RED and GREEN. The

@@ -21,7 +21,10 @@ import {
 } from "../../../packages/node/src/internal/creator-adoption-intent.js";
 import type { V3PlaneHandle } from "../../../packages/node/src/v3-live.js";
 import { contract, hexBytes } from "../phase-3a0-v3/controlled-anchor-trust.js";
-import { openGenuineCreatorAdoptionFixture } from "../phase-6a-v3/creator-adoption-contract.js";
+import {
+	type GenuineCreatorAdoptionFixtureModules,
+	openGenuineCreatorAdoptionFixture,
+} from "../phase-6a-v3/creator-adoption-contract.js";
 import { type D109dHotFixture, openD109dHotFixture } from "../phase-6b/runtime-reclamation-contract.js";
 
 const REPOSITORY_ROOT = resolve(import.meta.dirname, "../../..");
@@ -86,6 +89,13 @@ export interface D110cARepeatCloseEvidence {
 export interface D110cARepeatCloseFixture {
 	readonly evidence: D110cARepeatCloseEvidence;
 	close(): Promise<void>;
+	verifyPendingSuccessor(): Promise<
+		Readonly<{
+			readonly afterHead: Awaited<ReturnType<CreatorLiveCloseHandle["inspectDurableHead"]>>;
+			readonly beforeHead: Awaited<ReturnType<CreatorLiveCloseHandle["inspectDurableHead"]>>;
+			readonly result: Awaited<ReturnType<GenuineCreatorAdoptionFixtureModules["verifyCreatorSuccessorAdoption"]>>;
+		}>
+	>;
 }
 
 function copiedRoomHead(plane: V3PlaneHandle): Readonly<Record<string, unknown>> | undefined {
@@ -389,6 +399,7 @@ export async function openD110cARepeatCloseFixture(): Promise<D110cARepeatCloseF
 	const closers: StoreCloser[] = [];
 	let closeHandle: CreatorLiveCloseHandle | undefined;
 	let closed = false;
+	let successorVerificationConsumed = false;
 	const cleanup = async (): Promise<void> => {
 		if (closed) return;
 		closed = true;
@@ -491,6 +502,21 @@ export async function openD110cARepeatCloseFixture(): Promise<D110cARepeatCloseF
 					storageNodeBuiltUrl: pathToFileURL(resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/index.js")).href,
 				}),
 			}),
+			verifyPendingSuccessor: async () => {
+				if (successorVerificationConsumed) throw new TypeError("D110C_B_VERIFICATION_ALREADY_CONSUMED");
+				successorVerificationConsumed = true;
+				if (closeHandle === undefined) throw new TypeError("D110C_B_CLOSE_HANDLE_UNAVAILABLE");
+				const beforeHead = await closeHandle.inspectDurableHead();
+				const result = await hot.base.modules.verifyCreatorSuccessorAdoption({
+					catalog: hot.base.catalog,
+					handle: closeHandle,
+				});
+				return Object.freeze({
+					afterHead: await closeHandle.inspectDurableHead(),
+					beforeHead,
+					result,
+				});
+			},
 		});
 	} catch (error) {
 		await cleanup();
