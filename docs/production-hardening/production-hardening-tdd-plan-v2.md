@@ -92642,6 +92642,44 @@ stable exact floor for bounded cold trust opening; D.110c-c/d prove retirement,
 restart, census, and at least 100 transitions; Phase 7 owns new-client pin
 distribution and archive/cold-join availability.
 
+The D.110c-0b0 executable RED is now frozen without reopening the accepted
+owner-selection design. Its sole new owner is
+`tests/phase-6b-d110c-0b0-floor-red.test.ts`, initial SHA-256
+`d9b41102189c0bf3e703d026ed050e08fc395f1dd815101ec9d6975c49258252`.
+The test creates the genuine D.108 first-transition fixture, durably commits the
+epoch-1 successor, transfers the resulting exact durable carriers to the
+existing fresh-process production cold-reopen child, and supplies no
+independent room-head authority. The current implementation activates that
+advanced room, so the exact expected RED failure token is
+`D110C_0B0_FRESHNESS_FLOOR_MISSING`. GREEN is causal only when the same path
+instead returns `{ ok:false, kind:"D110C_FLOOR_MIGRATION_REQUIRED" }` before
+activation and the exact reviewed public/provider plumbing is present. Partial,
+source-only, fixture-authored, or locally inferred floor evidence cannot satisfy
+the test.
+
+The focused RED command is exactly
+`pnpm exec vitest run tests/phase-6b-d110c-0b0-floor-red.test.ts
+--reporter=json --outputFile=.logs/d110c-0b0-red/vitest.json`; it selects one
+test in one file and may run once from the signed/pushed freeze checkpoint. Its
+fresh evidence root records command/stdout/stderr/status, selected/result/error
+counts, exact terminal token, source and built-import identities, changed paths,
+protected state, and a self-excluding manifest. Before RED, affected workspace
+packages are freshly built so the child cannot consume stale `dist` state.
+RED changes no production source. Starting production SHA-256 values are
+`be0fae5e22476ebfcf2602c34213df60df954b51f1f2e945807c04a3e7fbb612`
+for `examples/v3-room/src/index.ts`,
+`70dba504e7f71fd830b89f28cbfde0d58a9f51584ca256a6058045e693c6cf46`
+for `packages/node/src/creator-adoption-activate.ts`, and
+`a5fd0c18292e63a8c3f16a2517dff474e7f51c99bf122360a65b87f0c7516db9`
+for `packages/node/src/creator-adoption-commit.ts`; lockfile and root-manifest
+SHA-256 values are
+`73c7c0660fa32c7380d0fe5a026897a7ad85a40edf1f169730c2d8e44e613a99`
+and `1baa6c3967e63f1d8af5f1e70c6b6c62e032a90e770f18dd3d86f5cfc40e1a55`.
+The already accepted Grok/Kimi/Opus owner-selection plan and confirmation are
+the bounded plan review for this executable sub-slice; deterministic RED needs
+no additional model round. No browser campaign or D.110a invocation is
+authorized.
+
 The expressly authorized one-off Fable 5.1/high parallel audit, session
 `5d9b90ff-5bca-4284-92fa-a9f1018273ff`, independently re-fetched the three
 pinned Hiero heads, inspected the local trust/closure/reopen owners read-only,
