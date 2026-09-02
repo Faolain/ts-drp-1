@@ -92063,26 +92063,34 @@ The compared owner families and dispositions are:
 The new public contract is narrow and explicit. Product ownership begins at
 `CreateV3RoomSessionInput` in `examples/v3-room/src/index.ts`; Node integration
 touches creator adoption commit/reopen/activation and the later generalized
-close/adoption owners. Protocol-v3 receives a copied exact expected room-head
-value at its new bounded checkpoint opener, not the provider or its I/O. The
-provider exposes one per-room authenticated state:
+close/adoption owners. D.110c-0b0 first plumbs the provider and a copied exact
+expected room-head only through the existing first-transition product/Node
+commit, reopen, and activation path. Protocol-v3 receives that value at the new
+bounded checkpoint opener only when D.110c-0b1 implements that later consumer;
+it never receives the provider or its I/O. The 0b0 publishing capability is
+mandatory for the creator-owned room session that can close/adopt. Any
+non-creator session that cold-reopens an advanced room and claims latestness
+must also receive an authenticated current pin through the separately reviewed
+Phase-7 participant/bootstrap contract; absent that input it fails closed and
+cannot treat local advanced state as current. The provider exposes one
+per-room authenticated state:
 
 ```text
 scope   = (pinnedGenesisAnchorDigest, objectId)
 stable  = (objectId, epoch, currentAnchorDigest)
 pending = null | {
   previous: stable,
-  next: (objectId, epoch + 1, nextAnchorDigest),
-  transitionCommitment
+  next: (objectId, epoch + 1, nextAnchorDigest)
 }
 ```
 
-`transitionCommitment` is a domain-separated digest over the exact previous
-and next room-head tuples plus the immutable provider scope. It is provider metadata, not a protocol wire field,
-anchor field, QC field, or archive record. The capability supports exact
-read, begin-CAS from `{stable, pending:null}` to `{stable, pending}`, and
-commit-CAS from that exact pending value to `{stable:next, pending:null}`.
-All inputs and results are copied, exact-shaped, and fail closed. No method may
+The previous/next tuples plus immutable provider scope already bind the pending
+transition; no redundant commitment field exists. The capability supports an
+account-side create-scope-if-never-seen operation, one explicitly authorized
+legacy migrate-scope operation, exact read, begin-CAS from
+`{stable, pending:null}` to `{stable, pending}`, and commit-CAS from that exact
+pending value to `{stable:next, pending:null}`. All inputs and results are
+copied, exact-shaped, and fail closed. No method may
 select the greatest stored epoch, accept an absent floor for an advanced room,
 blindly overwrite a conflict, or expose a general arbitrary-value store. At
 most one stable tuple and one pending tuple exist per room, so provider state is
@@ -92100,40 +92108,50 @@ transaction:
    old or new room generation may activate until the transition resolves.
 4. CAS the room AHE head from the exact prior head to the already-complete next
    generation. An ambiguous CAS is resolved by an authenticated reopen and
-   exact equality; it is never guessed.
-5. Commit the exact pending provider record to the new stable floor.
+   exact equality before step 5; it is never guessed.
+5. Commit the exact pending provider record to the new stable floor. The
+   confirmed step-4 head equality plus this commit retire the old stable tuple.
 6. Reopen both owners, require exact equality at the new tuple, and only then
-   activate/publish the new owner. Old control proof retirement remains subject
-   to adoption, rollback, availability, snapshot, and outbox gates.
+   activate/publish the new owner. This is a fresh publication check, not the
+   first evidence for step-5 retirement. Old control proof retirement remains
+   separately subject to adoption, rollback, availability, snapshot, and
+   outbox gates.
 
 After pending installation there is no rollback-to-old abort path. Recovery
 either completes the same exact authenticated transition or remains unavailable
 and fail closed. This makes every crash state deterministic:
 
-| Crash observation                                                                                         | Required result                                                                                                            |
-| --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Old stable floor, no pending, old room head; next generation absent or merely staged/complete             | Old head may reopen; unselected next bytes have no authority.                                                              |
-| Old stable floor, exact pending next, old room head                                                       | No activation. Reverify the pending-selected complete next generation, then perform the exact head CAS and pending commit. |
-| Old stable floor, exact pending next, next room head                                                      | No activation until the provider commits that exact pending value; then exact dual-owner equality is required.             |
-| New stable floor, no pending, next room head                                                              | Reverify checkpoint contents and exact floor equality, then activate.                                                      |
-| Floor behind an authenticated room head with no matching pending                                          | `D110C_FLOOR_HEAD_AHEAD`; do not accept the floor-matching old generation and do not synthesize a pending value.           |
-| Floor ahead of room head, malformed/foreign pending, missing selected generation, or unavailable provider | Typed availability/authority failure; never fall back to the largest local epoch or an older matching generation.          |
-| Two concurrent next heads or a changed provider value                                                     | Exact CAS conflict `D110C_FLOOR_CONFLICT`; neither losing head activates.                                                  |
+| Crash observation                                                                             | Required result                                                                                                                                                                                               |
+| --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Old stable floor, no pending, old room head; next generation absent or merely staged/complete | Old head may reopen; unselected next bytes have no authority.                                                                                                                                                 |
+| Old stable floor, exact pending next, old room head                                           | No activation. Reverify the pending-selected complete next generation, then perform the exact head CAS and pending commit.                                                                                    |
+| Old stable floor, exact pending next, next room head                                          | No activation until the provider commits that exact pending value; then exact dual-owner equality is required.                                                                                                |
+| New stable floor, no pending, next room head                                                  | Reverify checkpoint contents and exact floor equality, then activate.                                                                                                                                         |
+| Floor behind an authenticated room head with no matching pending                              | `D110C_FLOOR_HEAD_AHEAD`; do not accept the floor-matching old generation and do not synthesize a pending value.                                                                                              |
+| Floor ahead of room head with no pending                                                      | `D110C_FLOOR_MISMATCH`; never fall back to the largest local epoch or an older matching generation.                                                                                                           |
+| Malformed/foreign pending, missing selected generation, or unavailable provider               | Typed availability/authority failure; never fall back to the largest local epoch or an older matching generation.                                                                                             |
+| Two concurrent next heads or a changed provider value                                         | Exact CAS conflict `D110C_FLOOR_CONFLICT`; the losing publication attempt cannot activate. A later reopen observing the exact winning `pending.next` follows pending recovery rather than retrying begin-CAS. |
 
 The focused contract freezes the complete classification set rather than a
 prefix wildcard:
 
 | Condition                                                                 | Exact code                         |
 | ------------------------------------------------------------------------- | ---------------------------------- |
-| Provider read/begin/commit unavailable or throws                          | `D110C_FLOOR_UNAVAILABLE`          |
+| Provider create/migrate/read/begin/commit unavailable or throws           | `D110C_FLOOR_UNAVAILABLE`          |
 | Provider value is malformed, cross-object, cross-genesis, or noncanonical | `D110C_FLOOR_INVALID`              |
 | Stable floor differs from the sole proposed current authenticated head    | `D110C_FLOOR_MISMATCH`             |
 | Proposed next epoch/anchor regresses, skips, or reuses the stable tuple   | `D110C_FLOOR_REGRESSION`           |
 | Exact begin/commit CAS loses or observes another value                    | `D110C_FLOOR_CONFLICT`             |
-| Pending previous/next/commitment is missing, duplicate, or inconsistent   | `D110C_FLOOR_PENDING_INVALID`      |
+| Pending previous/next tuple is missing, duplicate, or inconsistent        | `D110C_FLOOR_PENDING_INVALID`      |
 | Authenticated room head is ahead while no exact pending advance exists    | `D110C_FLOOR_HEAD_AHEAD`           |
 | Exact pending-selected complete generation is absent or unavailable       | `D110C_FLOOR_RECOVERY_UNAVAILABLE` |
-| Existing epoch>0 room has no independently authenticated provider cell    | `D110C_FLOOR_MIGRATION_REQUIRED`   |
+| Any ordinary reopen has no independently authenticated provider scope     | `D110C_FLOOR_MIGRATION_REQUIRED`   |
+
+When an exact pending value selects the observed old or next room head, the
+pending-recovery rows dominate ordinary mismatch classification.
+`D110C_FLOOR_MISMATCH` applies when the floor is ahead or otherwise differs
+without an exact pending selector; `D110C_FLOOR_HEAD_AHEAD` is reserved for an
+authenticated room head ahead of the stable floor with no exact pending.
 
 Crash completion reads the next tuple from the independently authenticated
 pending provider record. It may load hostile room bytes only as candidates and
@@ -92144,21 +92162,32 @@ an availability failure, not permission to weaken freshness. A provider that
 lies, rolls back, or equivocates is outside the selected trust assumption and
 can defeat latestness; this limitation is explicit.
 
-Initialization and compatibility are also exact. A genuinely unadvanced room
-may initialize an absent provider cell only to
-`(objectId, 0, pinnedGenesisAnchorDigest)` from the caller's authenticated
-genesis invite and an independently verified epoch-0 trust root. An existing
-epoch>0 room with no provider cell returns
-`D110C_FLOOR_MIGRATION_REQUIRED`; it may continue only after the application
-supplies an independently authenticated current pin. It must not bootstrap the
-floor from the local successor generation. A brand-new client with only genesis
-can authenticate a checkpoint but cannot establish freshness; Phase 7 must
-define how its application/account obtains the current pin. Replacing an old
-stable floor with the exact committed next floor retires the old value only
-after dual-owner equality. No transition history is retained. Permanent room
-deletion may not erase the last pin and permit replay; it requires an O(1)
-authenticated terminal tombstone or a separately reviewed account deletion
-policy.
+Initialization and compatibility are also exact. Only an explicit account-side
+**new-room creation act** may create a previously unseen provider scope, using
+create-if-never-seen CAS to install
+`(objectId, 0, pinnedGenesisAnchorDigest)`. It runs as part of new room creation,
+not ordinary reopen, and concurrent creators converge only on the identical
+deterministic genesis tuple. The provider must remember that the scope has ever
+existed; erasing the room store or provider value cannot make the scope new
+again. If new-room creation aborts after scope creation, the scope remains
+reserved and reopen fails unavailable until the exact genesis room data is
+restored.
+
+Ordinary reopen with an absent provider scope always returns
+`D110C_FLOOR_MIGRATION_REQUIRED`, even when hostile local bytes present an
+authentic epoch-0 trust root. No local epoch, invite, checkpoint, or signature
+may distinguish a legacy unadvanced room from an advanced room rolled back to
+genesis. A legacy room may continue only through the explicit one-time
+migrate-scope operation using an independently authenticated application/account
+pin; migration never derives the pin from local room storage. A brand-new client
+with only genesis can authenticate a checkpoint but cannot establish freshness;
+Phase 7 must define how its application/account obtains the current pin.
+Step-4 authenticated head equality authorizes the step-5 provider commit that
+retires the old stable tuple; step 6 reconfirms equality before publication. No
+transition history is retained. D.110c does not implement permanent provider
+scope deletion: the account authority must retain the last active pin or an
+O(1) terminal used-scope/tombstone marker. Any erasing deletion policy is a
+separate high-risk Phase-7 decision and may never enable create-scope reuse.
 
 D.110c-0b0 RED/GREEN is frozen accordingly. RED uses the real first transition
 and production reopen path to demonstrate all of the following without a
@@ -92168,7 +92197,8 @@ current APIs have no provider/pending/CAS seam. GREEN adds only the reviewed
 capability/public-contract boundary and the first-transition orchestration. It
 must prove:
 
-- exact genesis initialization and exact current-head equality;
+- exact account-side create-if-never-seen genesis initialization, exact
+  current-head equality, and refusal to initialize during ordinary reopen;
 - make-before-publish ordering and no activation during a pending transition;
 - every crash row above in both before/after orderings, including ambiguous
   room-head CAS recovery;
@@ -92177,11 +92207,18 @@ must prove:
   exact `D110C_FLOOR_*` codes before activation or deletion;
 - neither normal nor crash recovery derives the provider value from hostile
   local data;
+- creator-owned close/adopt sessions require the publishing capability;
+  participant advanced reopen without a separately authenticated Phase-7 pin
+  fails closed and is not silently treated as creator-floor custody;
 - the provider contains exactly one stable and at most one pending fixed-size
-  record, old values retire only after authenticated dual-owner equality, and
-  the D.110c-c/d censuses count it;
-- epoch-0 compatibility succeeds, advanced legacy state without an external
-  pin returns `D110C_FLOOR_MIGRATION_REQUIRED`, and no silent migration occurs;
+  record, old values retire only after step-4 authenticated head equality plus
+  the exact step-5 commit, step 6 gates publication, and the D.110c-c/d censuses
+  count it;
+- fresh account-side epoch-0 creation succeeds; every ordinary reopen with a
+  missing scope, including local epoch 0, returns
+  `D110C_FLOOR_MIGRATION_REQUIRED`; explicit migration requires an
+  independently authenticated pin; used scopes cannot be re-created; and no
+  silent migration occurs;
   and
 - the existing wire records, anchor/QC semantics, creator key, thresholds,
   dependencies, room workload, and storage schemas remain unchanged.
@@ -92209,6 +92246,39 @@ material findings are corrected in one batch with at most one confirmation if
 scope, causal acceptance, or the public authority contract changes. No
 production edit, RED, Fable, collaboration subagent, or long workload runs
 before that gate is accepted.
+
+The owner-selection review inspected signed/pushed plan-only commit
+`65912fbc6fc128fb4cc648c7f028924bd36cb865` from
+`.logs/d110c-0b0-owner-design-review-65912fbc`; prompt SHA-256 is
+`e56c1c4e9dcb8bf80d5dd050d967b22bc8601a4a67aebfb23b24d0fc5f413384`.
+Grok 4.6/high completed normally with P0=0/P1=0/P2=4; its event and public
+result SHA-256 values are
+`b959c4375e71bb144bb09499c0aeb9481d27568faf7e0ddad9a3ed675e93fe00`
+and `47de316cf28a041a6111c2a23532f1f91750af90314f5cbc1fb58898af058fdb`.
+Standard direct Kimi K3 session
+`session_a38e5a00-207c-41c2-9300-a075f4cc7105`, with the exact 100-step
+control, returned P0=0/P1=0/P2=2; its exported session SHA-256 is
+`7691f29dc5b6e7baca8b4cf870b364d93097ce441b52b794f1b25bf1098e0c04`.
+Opus xhigh session `713c2922-9d41-43fd-a804-7da32e937450` returned
+P0=0/P1=1/P2=3; its transcript SHA-256 is
+`cee5595e82c6627218b17246598514aa1a89466ff4c0584b8315924b97f9e7f9`.
+
+The blocking finding is accepted. Local genesis bytes cannot prove that a
+provider-less room was never advanced, so ordinary reopen may never create a
+floor—even when local storage presents authentic epoch 0. The correction
+requires an account-side create-if-never-seen act for new rooms, makes all
+provider-less reopen migration-required, forbids scope reuse, and requires an
+independent pin for explicit legacy migration. The P2 union is dispositioned in
+the same batch: step-4 equality authorizes step-5 retirement while step 6 gates
+publication; the redundant transition commitment is removed; pending recovery
+dominates mismatch classification; same-next reopen follows the winning pending
+rather than retrying begin-CAS; 0b0 uses the existing first-transition opener
+and leaves the dual-record protocol opener to 0b1; creator-publisher versus
+participant floor ownership is explicit; and erasing room deletion remains
+unsupported without a later tombstone policy. Because these changes alter the
+security initialization predicate and public capability operations, one
+bounded confirmation of the signed correction is required. No closure prose
+receives another review.
 
 The four prerequisite decisions, including the newly demonstrated 0b0
 freshness-floor authority question, are reviewed before their production edits;
