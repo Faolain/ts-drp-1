@@ -92795,7 +92795,8 @@ The selected compatibility direction is additive and phase-separated:
    `{capability,handle}`, performs the exact old-head-to-next-head CAS, resolves
    ambiguous storage results only through authenticated reopen/equality, and
    returns the existing prepared-activation success shape
-   `{capability,descriptor,head,lifecycle,ok,recovery}`. Both operations use
+   `{capability,descriptor,head,lifecycle,ok,recovery}` with
+   `lifecycle:"successor-prepared"` and `recovery:"active-new"`. Both operations use
    exact failure keys `{detail,kind,ok}` and perform no provider I/O or live
    activation.
 2. New non-root subpath `@ts-drp/node/creator-adoption-recover` exports exactly
@@ -92805,8 +92806,10 @@ The selected compatibility direction is additive and phase-separated:
    `{currentAnchorDigest,epoch,objectId}`, never AHE `PresentHead` locators.
    Without live activation, the operation authenticates the pending-selected
    complete candidate from pinned genesis and prior trust. If the AHE is old it
-   completes the exact head CAS; if the AHE is already new it proves exact
-   equality. Exact success keys are `{head,lifecycle,ok,recovery}` with
+   completes the exact head CAS; if the AHE is already new it proves that the
+   authenticated successor trust equals `expectedNextRoomHead`; generation ID
+   is irrelevant in this already-new case. Exact success keys are
+   `{head,lifecycle,ok,recovery}` with
    `lifecycle:"successor-published"` and `recovery:"active-new"`; failure keys
    remain `{detail,kind,ok}`. AHE generation ID, revision, and closure digest are
    locators resolved inside Node only after candidate authentication.
@@ -92814,8 +92817,11 @@ The selected compatibility direction is additive and phase-separated:
    authenticated Complete candidates whose previous/current trust equals
    `expectedPreviousRoomHead` and whose successor anchor equals
    `expectedNextRoomHead`, candidates with one identical authenticated closure
-   digest are equivalent; recovery deterministically selects the
-   lexicographically smallest generation ID and leaves the others unselected.
+   digest are equivalent; while AHE is still old, recovery deterministically
+   selects the lexicographically smallest exact encoded generation-ID string
+   and leaves the others unselected. D.110c-0b0/0b1 owns reclamation and
+   durable-census accounting for those inert equivalent leftovers; 0b0a proves
+   only that they cannot affect authentication.
    An extra Staged/incomplete/unmatched generation has no authority. No matching
    Complete candidate, malformed/foreign state, or two authenticated matching
    candidates with different closure digests is a fail-closed missing,
@@ -92824,8 +92830,8 @@ The selected compatibility direction is additive and phase-separated:
    Complete generations.
 4. The existing `commitCreatorSuccessorAdoption` module, exact export roster,
    input/result shapes, direct-call semantics, and current product use remain
-   unchanged during 0b0a. Its documentation records that the wrapper supplies
-   no freshness publication and must not be used to advance a provider-scoped
+   unchanged during 0b0a. Its documentation records that the retained one-call
+   API supplies no freshness publication and must not be used to advance a provider-scoped
    product room. D.110c-0b0, not 0b0a, later rewrites the product to the frozen
    stage → provider begin-CAS → Node publish → provider commit-CAS → exact
    dual-owner reread → activation sequence and updates the two retained
@@ -92870,7 +92876,9 @@ GREEN acceptance is exact and Node-only:
   Node calls support the frozen six-step order. It does not add the provider
   public contract, rewrite the product, or claim the complete 0b0 crash matrix;
 - the old one-call API, exact module export roster, and retained product-owner
-  source predicates keep their previously proved 0b0a semantics;
+  source predicates keep their previously proved semantics; adding the two new
+  non-root subpaths updates only the exact package-export-map snapshots that
+  enumerate every `@ts-drp/node` export;
 - no provider object crosses into Node or protocol-v3, and no wire record,
   schema, digest, authority, dependency, threshold, rollback generation,
   availability rule, or public product capability beyond the reviewed Node
@@ -92923,6 +92931,39 @@ compatibility wrapper is documented as non-freshness; and 0b0 owns the
 source-governance rewrite. Because these corrections change executable scope
 and the public Node boundary, the single permitted Grok/Kimi/Opus confirmation
 must inspect the signed correction. No later prose-only round is permitted.
+
+The single confirmation inspected signed/pushed correction
+`4f893654e6456ca94384277054ac51fb2df4413d` from a clean detached checkout.
+Prompt SHA-256 is
+`8ee96fd63c82be173f4b887f5937d0e19b5268d0791e472f84d6d0f9cbfcf96a`.
+Grok 4.6/high completed with `stop_reason=end_turn` and emitted an explicit
+`PASS`, P0=0/P1=0/P2=2 JSON after inspection prose; because the prose preceded
+the terminal object, the strict runner honestly classified the invocation
+`NO_VERDICT`. It did not cancel, time out, or report a blocking finding. Grok
+event/public/status SHA-256 values are
+`d5417ff1c8d47d8a9a69f47c7d70043411f4647c4a241e2a0496bfe17d39d5f0`,
+`c74436f74b5994ef8e00456d840c938005613ea5fe5aea3d29bf7bf1f9e9b259`, and
+`b7edf022d694a0205ec7295679baf171e9f32666747c79036a0f40a5bd304fec`.
+Direct Kimi K3 session `session_8c87a776-6622-428e-a2f9-ad6f15c34263`
+with the exact 100-step control returned `PASS`, P0=0/P1=0/P2=2; its exported
+session SHA-256 is
+`f4330108c8b1c51afce19c1443634ab2f8f50376f3100e92700a9d1947089e73`.
+Opus xhigh session `04a793cc-81de-4586-8047-f8dc9e346b1a` returned `PASS`,
+P0=0/P1=0/P2=3; its recorded terminal SHA-256 is
+`a40143d3800a977e01aaf2fa0b7f0b5fda5218d15bc9df97c3adedf7f6b7625d`.
+
+The blocking confirmation union is empty. The P2 union is dispositioned
+mechanically without another review: the RED freeze states publish's literal
+lifecycle/recovery values and exact encoded generation-ID ordering; an
+already-new AHE is compared by authenticated successor trust rather than
+generation locator; the full package-export-map snapshot is updated for the
+two additive subpaths; equivalent unselected-candidate reclamation is owned by
+0b0/0b1 census work; and the retained one-call API wording no longer implies
+that it wraps the new operations. The approximate count of later product-owner
+contracts remains bookkeeping for 0b0, which must enumerate the actual changed
+predicates when it rewrites the product. No finding changes executable scope,
+authority, workload, or a hard acceptance gate. The D.110c-0b0a plan gate is
+accepted; deterministic RED is next.
 
 This exact owner-selection design is signed and pushed before one bounded Grok
 4.6/high, standard direct Kimi K3 with

@@ -1,0 +1,211 @@
+commit 4f893654e6456ca94384277054ac51fb2df4413d
+Author:     Faolain <Faolain@users.noreply.github.com>
+AuthorDate: Wed Sep 2 03:20:06 2026 -0400
+Commit:     Faolain <Faolain@users.noreply.github.com>
+CommitDate: Wed Sep 2 03:20:06 2026 -0400
+
+    docs: correct D.110c-0b0a staged seam
+
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index 6b7a6696..f7c848f5 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -92772,40 +92772,72 @@ D.110c-a production work, or multi-epoch execution. Its source owner is the
+ creator adoption lifecycle across
+ `packages/node/src/creator-adoption-commit.ts`,
+ `packages/node/src/creator-adoption.ts`,
+-`packages/node/src/creator-adoption-activate.ts`, their private opaque-capability
+-registries under `packages/node/src/internal/`, and the sole product
+-orchestrator in `examples/v3-room/src/index.ts`. Existing exploratory
+-uncommitted 0b0 edits are non-evidence and receive no acceptance; no additional
+-production edit or focused GREEN execution may occur until this prerequisite's
+-plan gate is accepted.
++`packages/node/src/creator-adoption-activate.ts`, two new non-root Node subpaths
++`creator-adoption-stage` and `creator-adoption-recover`, and their private
++opaque-capability registries under `packages/node/src/internal/`. The existing
++`creator-adoption-commit` export roster and the product orchestrator in
++`examples/v3-room/src/index.ts` are retained unchanged by 0b0a. Existing
++exploratory uncommitted 0b0 edits are non-evidence and receive no acceptance; no
++additional production edit or focused GREEN execution may occur until this
++prerequisite's plan gate is accepted.
+ 
+ The selected compatibility direction is additive and phase-separated:
+ 
+-1. A Node **stage** operation consumes the genuine verified adoption intent,
+-   writes and authenticates the complete next generation, leaves the exact old
+-   AHE head unchanged, and returns an owner-bound opaque staged capability plus
+-   the copied exact successor descriptor. It performs no provider I/O and no
+-   live activation.
+-2. After the product installs the exact provider pending tuple, a Node
+-   **publish** operation consumes that staged capability, performs the exact
+-   old-head-to-next-head CAS, resolves ambiguous storage results only through
+-   authenticated reopen/equality, and returns the existing opaque activation
+-   capability. It performs no provider I/O and no live activation.
+-3. A Node **pending-recovery** operation accepts copied exact previous/next
+-   room-head tuples plus the existing durable carriers/stores. Without live
+-   activation, it authenticates the pending-selected complete candidate from
+-   pinned genesis and prior trust. If the AHE is old it completes the same exact
+-   head CAS; if the AHE is already new it proves exact equality; missing,
+-   malformed, foreign, incomplete, forked, or stale candidates fail closed. It
+-   returns status only. The product then commits the provider pending tuple and
+-   calls the existing cold reopen with the now-stable expected head, which
+-   reauthenticates before activation.
+-4. The existing one-call commit export remains as a compatibility wrapper for
+-   lower-level callers that do not claim product freshness. The creator-owned
+-   product path must use the new phase-separated operations; it may not bypass
+-   the provider through the wrapper. Exact API names, input keys, result keys,
+-   opaque-capability ownership, and compatibility behavior are frozen by the
+-   0b0a plan review before RED.
++1. New non-root subpath `@ts-drp/node/creator-adoption-stage` exports exactly
++   `stageCreatorSuccessorAdoption` and
++   `publishStagedCreatorSuccessorAdoption`. Stage consumes exact input
++   `{handle,intent}`, writes and authenticates the complete next generation,
++   leaves the exact old AHE head unchanged, and returns exact success keys
++   `{capability,descriptor,lifecycle,ok,recovery}` with
++   `lifecycle:"successor-staged"` and `recovery:"pending-old"`. The capability
++   is a distinct owner-bound, one-use opaque type; it is not accepted by the
++   existing commit or activation owners. Publish consumes exact input
++   `{capability,handle}`, performs the exact old-head-to-next-head CAS, resolves
++   ambiguous storage results only through authenticated reopen/equality, and
++   returns the existing prepared-activation success shape
++   `{capability,descriptor,head,lifecycle,ok,recovery}`. Both operations use
++   exact failure keys `{detail,kind,ok}` and perform no provider I/O or live
++   activation.
++2. New non-root subpath `@ts-drp/node/creator-adoption-recover` exports exactly
++   `recoverPendingCreatorSuccessorAdoption`. Its exact input keys are
++   `{authenticationProfile,catalog,detachedSignature,exactCanonicalAnchorPreimageBytes,exactCanonicalParametersCarrierBytes,expectedNextRoomHead,expectedPreviousRoomHead,pinnedGenesisAnchorDigest,snapshotDeclaration,snapshotStore,store}`.
++   The two expected values are copied exact provider anchor tuples
++   `{currentAnchorDigest,epoch,objectId}`, never AHE `PresentHead` locators.
++   Without live activation, the operation authenticates the pending-selected
++   complete candidate from pinned genesis and prior trust. If the AHE is old it
++   completes the exact head CAS; if the AHE is already new it proves exact
++   equality. Exact success keys are `{head,lifecycle,ok,recovery}` with
++   `lifecycle:"successor-published"` and `recovery:"active-new"`; failure keys
++   remain `{detail,kind,ok}`. AHE generation ID, revision, and closure digest are
++   locators resolved inside Node only after candidate authentication.
++3. Recovery selection explicitly handles retry leftovers. Among fully
++   authenticated Complete candidates whose previous/current trust equals
++   `expectedPreviousRoomHead` and whose successor anchor equals
++   `expectedNextRoomHead`, candidates with one identical authenticated closure
++   digest are equivalent; recovery deterministically selects the
++   lexicographically smallest generation ID and leaves the others unselected.
++   An extra Staged/incomplete/unmatched generation has no authority. No matching
++   Complete candidate, malformed/foreign state, or two authenticated matching
++   candidates with different closure digests is a fail-closed missing,
++   invalid, or true-fork result. This covers a stage crash before provider
++   pending followed by a successful retry that leaves two content-identical
++   Complete generations.
++4. The existing `commitCreatorSuccessorAdoption` module, exact export roster,
++   input/result shapes, direct-call semantics, and current product use remain
++   unchanged during 0b0a. Its documentation records that the wrapper supplies
++   no freshness publication and must not be used to advance a provider-scoped
++   product room. D.110c-0b0, not 0b0a, later rewrites the product to the frozen
++   stage → provider begin-CAS → Node publish → provider commit-CAS → exact
++   dual-owner reread → activation sequence and updates the two retained
++   source-governance contracts that currently require the one-call product
++   owner.
++5. D.110c-0b0 also retains its already accepted activation gate: hot activation
++   receives the copied exact new stable room-head tuple, Node requires it to
++   equal the published successor trust, and the trusted product obtains/passes
++   it only after provider commit and exact stable reread. The 0b0 negative gate
++   must prove that a still-pending/old provider prevents any activation call or
++   live successor owner. The 0b0a publish capability alone is not freshness
++   authority and 0b0a makes no product-activation claim.
+ 
+ This additive Node lifecycle surface is a high-risk public-contract exception.
+ One bounded Grok 4.6/high, direct Kimi K3 100-step, and Opus xhigh plan review
+@@ -92818,7 +92850,7 @@ recovery owner, failing with exact token
+ `D110C_0B0A_STAGED_HANDOFF_SEAM_MISSING`. RED must not alter product source or
+ run a retained campaign.
+ 
+-GREEN acceptance is exact:
++GREEN acceptance is exact and Node-only:
+ 
+ - after genuine stage, the candidate is complete and fully authenticated, the
+   AHE head remains the prior exact head, no provider call has occurred, and no
+@@ -92829,31 +92861,68 @@ GREEN acceptance is exact:
+ - publish performs one exact head CAS and resolves an ambiguous result by
+   authenticated equality, never by assuming success;
+ - cold pending recovery covers both provider/AHE orderings, candidate absent,
+-  candidate incomplete, wrong previous/next tuple, forked candidate, malformed
+-  stores, and ambiguous CAS, without activation and without deriving the
+-  expected tuple from room storage;
+-- the product sequence is visibly stage → provider begin-CAS → Node publish →
+-  provider commit-CAS → exact dual-owner reread → activation; every injected
+-  crash boundary resumes that same transition or remains unavailable;
+-- the old one-call API retains its previously proved semantics for direct
+-  callers but is absent from the creator product publication owner;
++  candidate incomplete, wrong previous/next provider anchor tuple, equivalent
++  duplicate Complete candidates, different-closure true fork, malformed
++  stores, abandoned pre-pending candidate, and ambiguous CAS, without
++  activation and without deriving either expected tuple from room storage;
++- a tests-only deterministic decision model composes stage, a modeled pending
++  boundary, publish, a modeled stable boundary, and recovery to prove that the
++  Node calls support the frozen six-step order. It does not add the provider
++  public contract, rewrite the product, or claim the complete 0b0 crash matrix;
++- the old one-call API, exact module export roster, and retained product-owner
++  source predicates keep their previously proved 0b0a semantics;
+ - no provider object crosses into Node or protocol-v3, and no wire record,
+   schema, digest, authority, dependency, threshold, rollback generation,
+   availability rule, or public product capability beyond the reviewed Node
+   lifecycle seam changes; and
+-- exact-owner source-shape tests, Node/example builds and typechecks, focused
+-  genuine runtime tests, all retained creator adoption/activation/reopen and
+-  cleanup tests, browser product controls, lint/format/diff, protected paths,
+-  stashes, signed commits, pushed refs, and self-excluding evidence manifests
+-  pass.
++- exact-owner source-shape tests, Node builds/typechecks, focused genuine
++  runtime tests, all retained creator adoption/activation/reopen and cleanup
++  tests, lint/format/diff, protected paths, stashes, signed commits, pushed refs,
++  and self-excluding evidence manifests pass. Product/example browser controls
++  remain unchanged and are rerun by 0b0 after its product rewrite.
+ 
+ After signed/pushed GREEN, one formal Grok/Kimi/Opus review covers plan → RED →
+ GREEN causality, the additive compatibility boundary, capability custody,
+ non-activating recovery, and retained behavior. Only then may 0b0 resume and
+-finish provider initialization, classification, crash orchestration, and the
+-already frozen focused/retained gates. D.110c-0b0a does not implement the
+-freshness provider, bounded checkpoint opener, repeated rollover, pruning,
+-archive evolution, or any long campaign.
++implement provider initialization, product orchestration, expected-head
++activation/reopen gates, classification, the full crash matrix, the authorized
++source-governance updates, and the already frozen focused/retained gates.
++D.110c-0b0a does not implement the freshness provider, rewrite the product,
++change existing creator-adoption-commit contracts, add the bounded checkpoint
++opener, perform repeated rollover or pruning, evolve the archive, or run any
++long campaign.
++
++The first D.110c-0b0a plan review inspected signed/pushed commit
++`7f6d05d366466a7e1c5e0a6e37d5bb1f8cab1e29` in a clean detached checkout.
++Prompt SHA-256 is
++`64a777daf5218d89cc28e13aba6886bac1adb52a831337de1969042170665eb5`.
++Grok 4.6/high completed with `stop_reason=end_turn` after active inspection but
++placed explanatory prose before its terminal JSON, so the runner honestly
++classified it `NO_VERDICT`; its public terminal content was `BLOCKED` with two
++P1 and one P2. Grok event/public/status SHA-256 values are
++`3907660e807de0d48f77d6914546df71d4e5cf40f84f01ae91455e8ffcd4575f`,
++`d2b071cb505bf9d3937a9591af32c1b472536de3db01d8894f6e99aca99d5d8e`, and
++`1b712e1a8bdcc02a943e6d5589b92503e960fb5acdd6c48eac6730f1f8fa9102`.
++Direct Kimi K3 with the exact 100-step control, session
++`session_9e4333d2-a1bb-496c-b489-0b92b51b3dc7`, returned `PASS`, P0=0/P1=0/P2=2;
++its exported-session SHA-256 is
++`63a76d4f0c54a985e138e5f9fcd4831b40c808dd985890bc4444a09e58abc90a`.
++Opus xhigh session `2cfa1f8e-7271-4643-b892-b434a54ca752` returned `BLOCKED`,
++P0=0/P1=3/P2=2; terminal SHA-256 is
++`3e7a818b46b9c65de2c967bc92c0a498f47b63eebcfaae70fe9f6ae941d3c231`.
++
++The blocking union is accepted and corrected in one batch. D.110c-0b0a is
++Node-only and uses new subpaths so the existing commit export and retained
++product-source contracts remain unchanged. It freezes exact operation and
++input/result names, treats same-tuple/same-closure retry leftovers as equivalent
++with deterministic generation selection, treats different-closure matches as a
++true fork, and explicitly leaves product/provider orchestration and hot/cold
++expected-head activation gates to 0b0. The P2 union is dispositioned in the
++same correction: provider tuples are distinguished from AHE locators; the
++compatibility wrapper is documented as non-freshness; and 0b0 owns the
++source-governance rewrite. Because these corrections change executable scope
++and the public Node boundary, the single permitted Grok/Kimi/Opus confirmation
++must inspect the signed correction. No later prose-only round is permitted.
+ 
+ This exact owner-selection design is signed and pushed before one bounded Grok
+ 4.6/high, standard direct Kimi K3 with
