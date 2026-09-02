@@ -1,0 +1,4 @@
+
+> @ts-drp/example-v3-room@0.11.0 build /Users/aristotle/Documents/Projects/ts-drp-1/examples/v3-room
+> tsc --noEmit -p tsconfig.build.json
+

@@ -94537,8 +94537,10 @@ ordering test then passed, proving both requests were pending before redirect
 release, the invalid adoption remained exact
 `D110C_B_ACTIVATION_STALLED` with zero verifier calls, and its settlement
 preceded the later rehearsal or activation. These failed reporters and the
-corrected focused reporter remain immutable diagnostic evidence under the
-working root; they are not presented as GREEN passes.
+corrected focused reporter used the working roots only as staging locations.
+Their retained copies live in the tracked consolidated GREEN evidence root;
+the untracked working roots are not described as immutable custody and are not
+presented as GREEN passes.
 
 The final retained gates are green. Root Vitest passed 62/62 suites and
 282/282 tests with zero failures or pending tests in `retained-node.json`.
@@ -94558,6 +94560,76 @@ The consolidated immutable GREEN evidence root is
 `5dadc749185265d332f1a5588133b230b23b8a616e8321ad67e4e2833448cc7c`;
 its validated 17-entry self-excluding manifest SHA-256 is
 `ce501e519d7bb726d896938ada4443540c9dfecfe9e1299ba9202a37be4dc469`.
+
+The first formal plan->RED->GREEN review inspected signed/pushed GREEN
+`f2066512f0311a56863be0d769531c6b783d9fef`. Grok 4.6/high completed normally
+after 660.123 seconds with `stop_reason=end_turn`; the runner conservatively
+classified the response `NO_VERDICT` because inspection prose preceded its
+terminal schema, while the retained terminal JSON itself says `APPROVED`,
+P0=0/P1=0/P2=2. It requested the exact expected-epoch authority oracle and
+terminal predecessor-close cleanup. Standard direct Kimi K3 exact session
+`session_45264236-ae29-4ee8-9692-d980b386192e`, resumed after its internal
+review branches stalled, returned `CHANGES_REQUIRED`, P0=0/P1=1/P2=5: the
+blocking finding was the absence of a behavioral close-bind-failure injection.
+Opus xhigh session `c68e57d2-9ca6-4801-992b-4e7bb5e81fc9` returned
+`CHANGES_REQUIRED`, P0=0/P1=4/P2=5. Its blocking findings were the missing
+explicit Chromium lock/fault proof, missing static/custody artifacts, an
+untracked GREEN evidence root, and the missing exact authority oracle. These
+verdicts are preserved without relabelling Grok's runner classification or
+claiming any reviewer inspected the later correction.
+
+One bounded correction closes that blocking union without changing the slice's
+wire, schema, public API, dependency, authority, threshold, workload, or cold-
+reopen boundary. The tests-only exact-key
+`isD110cBSuccessorAuthority(value, expectedEpoch)` reuses the unchanged seven-
+key epoch-1 roster, rejects a non-positive or unsafe expected epoch, and checks
+both visible and independently decoded raw AHE authority at epochs 1 and 2.
+The Chromium proof queries the native Web Lock inventory before activation and
+across both replacements, requiring zero successor-owner locks at genesis and
+one unchanged stable-topic lock thereafter. A dedicated tests-only
+`d110cBSnapshot()` isolates replacement and close-bind counters from retained
+D.108 instrumentation contracts. The same title injects one real
+`bindCreatorLiveClose()` refusal after genuine adoption, proves exact
+`D110C_B_CLOSE_REBIND_FAILED`, retained epoch-1 replacement authority, active
+but stalled/unavailable close custody, one predecessor deactivation, refusal
+of another close, two distinct room locks while the failed replacement remains
+active, and restoration to the sole main-room lock after shutdown.
+The production failure path best-effort stops its terminal predecessor close
+handle, and `deactivateOwner()` now deletes the owner and releases its shared
+lock only while its token is still current.
+
+The correction retains failed test reporters as diagnostics, not passes. The
+first complete retained run exposed only two new zero-valued counters in an
+old exact snapshot; the counters were consequently isolated behind the
+D.110c-b-specific inspection method rather than widening the retained
+snapshot. A focused run then established the real observed predecessor-
+deactivation count across the second hot replacement before the final focused
+Chromium result passed and emitted `D110C_B_PRODUCT_HOT_LOOP_COMPLETE`. The
+complete successor-product configuration subsequently passed 30/30 across
+Chromium, Firefox, and WebKit; successor activation passed 24/24; creator live
+close passed 9/9; and the affected retained Node pair passed. The corrected
+source-shape gate has seventeen predicates, adding exact current-owner lock
+release, behavioral close-bind injection, visible/raw authority, native lock,
+and exact-key-oracle checks.
+
+The correction checkpoint tracks both the original consolidated GREEN root
+and the new correction root. The latter retains separate stdout, stderr, and
+status artifacts for both affected package builds and build-source
+typechecks, v3-room typecheck/build, independent v3-chat typecheck, the private
+D.110c-a fixture typecheck, exact-owner ESLint, the 12-GiB formatter, diff and
+seventeen-predicate source-shape checks, reporter summaries, changed paths and
+source hashes, protected-path/stash/process/port state, commit/signature/ref
+custody, and a validating self-excluding manifest. The signed correction and
+its evidence receive the one already-permitted material confirmation; there is
+no new review slice.
+
+The nonblocking findings are dispositioned prospectively. The post-transfer
+alias-cleanup mutant, retained title/stall-token hygiene, and an exact durable-
+head tuple assertion are owned by D.110c-c before its retained gate. D.110c-c
+also pins the disclosed one-displaced-generation boundary and proves the third
+adoption only after authenticated pruning/catch-up exists. No D.110c-b result
+is reinterpreted as a third adoption, cold reopen, or bounded long-horizon
+proof.
 
 The four prerequisite decisions, including the newly demonstrated 0b0
 freshness-floor authority question, are reviewed before their production edits;

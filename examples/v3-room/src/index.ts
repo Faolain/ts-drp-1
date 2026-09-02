@@ -3616,25 +3616,19 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			activeHandle = undefined;
 			return throwAfterReplacementCleanup(new TypeError("v3 room session is closed"));
 		}
-		if (bindCurrentCreatorClose === undefined) {
+		const failCloseRebind = async (): Promise<never> => {
 			activeHandle = replacement;
 			replacementOwned = false;
 			successorProjectionAuthority = authority;
 			creatorCloseHandle = undefined;
 			creatorCloseUnavailableContinuity = "stalled";
 			terminalFailure = new TypeError("D110C_B_CLOSE_REBIND_FAILED");
+			await predecessorClose.stop().catch(() => undefined);
 			throw terminalFailure;
-		}
+		};
+		if (bindCurrentCreatorClose === undefined) return failCloseRebind();
 		const rebound = await bindCurrentCreatorClose(replacement);
-		if (!rebound.ok) {
-			activeHandle = replacement;
-			replacementOwned = false;
-			successorProjectionAuthority = authority;
-			creatorCloseHandle = undefined;
-			creatorCloseUnavailableContinuity = "stalled";
-			terminalFailure = new TypeError("D110C_B_CLOSE_REBIND_FAILED");
-			throw terminalFailure;
-		}
+		if (!rebound.ok) return failCloseRebind();
 		activeHandle = replacement;
 		replacementOwned = false;
 		successorProjectionAuthority = authority;

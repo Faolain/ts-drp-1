@@ -1,0 +1,1239 @@
+{
+  "config": {
+    "argv": [
+      "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+      "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@playwright+test@1.62.1/node_modules/@playwright/test/cli.js",
+      "test",
+      "--config",
+      "playwright.phase-6a-creator-successor-product.config.ts",
+      "--reporter=json",
+      "--fail-on-flaky-tests"
+    ],
+    "configFile": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts",
+    "rootDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+    "failOnFlakyTests": true,
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 600000,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-6a-creator-successor-product.pw.ts"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-6a-creator-successor-product.pw.ts"
+        ],
+        "timeout": 90000
+      },
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "phase-6a-creator-successor-product.pw.ts"
+        ],
+        "timeout": 90000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "phase-6a-creator-successor-product.pw.ts",
+      "file": "phase-6a-creator-successor-product.pw.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "pins the exact successor product browser inventory",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:26.485Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-bcbf67211ecdcae2eb77",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 733,
+          "column": 1
+        },
+        {
+          "title": "hot creator adoption exposes oracle authority and issues through the replacement handle",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 582,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:27.703Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-fd63c0351ae8178a6bfc",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 751,
+          "column": 1
+        },
+        {
+          "title": "established peer cold reopen accepts the genuine epoch-one live operation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 183,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:28.290Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-0842f3ce0df07c33f2b0",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 784,
+          "column": 1
+        },
+        {
+          "title": "fresh late peer cold reopen accepts the targeted retained epoch-one operation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 367,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:28.478Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-09be0c1adb493b71cf4c",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 812,
+          "column": 1
+        },
+        {
+          "title": "D.110c-0b0 provider crash and classification matrix fails closed",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 1735,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:28.850Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-2d01a2ea6eab0a63cc3a",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 901,
+          "column": 1
+        },
+        {
+          "title": "concurrent adoption shares one success and one underlying transition; concurrent adoption shares one real verification failure; close joins a paused adoption before releasing lifetime ownership; predecessor deactivation failure cleans the replacement before escaping",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 564,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:30.593Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-e0b772cb00263741868b",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 1007,
+          "column": 1
+        },
+        {
+          "title": "close at the post-activation gate cleans the successor exactly once; close at the post-predecessor-deactivation gate preserves causal cleanup",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 436,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 0\u001b[39m\n\u001b[31m+ Received  + 8\u001b[39m\n\n\u001b[33m@@ -1,9 +1,11 @@\u001b[39m\n\u001b[2m  Object {\u001b[22m\n\u001b[2m    \"afterRelease\": Object {\u001b[22m\n\u001b[2m      \"activationCount\": 1,\u001b[22m\n\u001b[2m      \"adoptionSettled\": true,\u001b[22m\n\u001b[31m+     \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+     \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m      \"closeSettled\": true,\u001b[22m\n\u001b[2m      \"commitCount\": 1,\u001b[22m\n\u001b[2m      \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m      \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m      \"predecessorDeactivateCount\": 1,\u001b[22m\n\u001b[33m@@ -13,10 +15,12 @@\u001b[39m\n\u001b[2m    },\u001b[22m\n\u001b[2m    \"authorityBeforeRelease\": null,\u001b[22m\n\u001b[2m    \"beforeRelease\": Object {\u001b[22m\n\u001b[2m      \"activationCount\": 1,\u001b[22m\n\u001b[2m      \"adoptionSettled\": false,\u001b[22m\n\u001b[31m+     \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+     \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m      \"closeSettled\": false,\u001b[22m\n\u001b[2m      \"commitCount\": 1,\u001b[22m\n\u001b[2m      \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m      \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m      \"predecessorDeactivateCount\": 0,\u001b[22m\n\u001b[33m@@ -27,10 +31,12 @@\u001b[39m\n\u001b[2m    \"settlements\": Object {\u001b[22m\n\u001b[2m      \"adoption\": Object {\u001b[22m\n\u001b[2m        \"detail\": \"v3 room session is closed\",\u001b[22m\n\u001b[2m        \"lifetime\": Object {\u001b[22m\n\u001b[2m          \"activationCount\": 1,\u001b[22m\n\u001b[31m+         \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+         \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m          \"commitCount\": 1,\u001b[22m\n\u001b[2m          \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m          \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m          \"predecessorDeactivateCount\": 0,\u001b[22m\n\u001b[2m          \"replacementDeactivateCompletedCount\": 1,\u001b[22m\n\u001b[33m@@ -41,10 +47,12 @@\u001b[39m\n\u001b[2m        \"status\": \"rejected\",\u001b[22m\n\u001b[2m      },\u001b[22m\n\u001b[2m      \"close\": Object {\u001b[22m\n\u001b[2m        \"lifetime\": Object {\u001b[22m\n\u001b[2m          \"activationCount\": 1,\u001b[22m\n\u001b[31m+         \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+         \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m          \"commitCount\": 1,\u001b[22m\n\u001b[2m          \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m          \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m          \"predecessorDeactivateCount\": 1,\u001b[22m\n\u001b[2m          \"replacementDeactivateCompletedCount\": 1,\u001b[22m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 0\u001b[39m\n\u001b[31m+ Received  + 8\u001b[39m\n\n\u001b[33m@@ -1,9 +1,11 @@\u001b[39m\n\u001b[2m  Object {\u001b[22m\n\u001b[2m    \"afterRelease\": Object {\u001b[22m\n\u001b[2m      \"activationCount\": 1,\u001b[22m\n\u001b[2m      \"adoptionSettled\": true,\u001b[22m\n\u001b[31m+     \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+     \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m      \"closeSettled\": true,\u001b[22m\n\u001b[2m      \"commitCount\": 1,\u001b[22m\n\u001b[2m      \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m      \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m      \"predecessorDeactivateCount\": 1,\u001b[22m\n\u001b[33m@@ -13,10 +15,12 @@\u001b[39m\n\u001b[2m    },\u001b[22m\n\u001b[2m    \"authorityBeforeRelease\": null,\u001b[22m\n\u001b[2m    \"beforeRelease\": Object {\u001b[22m\n\u001b[2m      \"activationCount\": 1,\u001b[22m\n\u001b[2m      \"adoptionSettled\": false,\u001b[22m\n\u001b[31m+     \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+     \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m      \"closeSettled\": false,\u001b[22m\n\u001b[2m      \"commitCount\": 1,\u001b[22m\n\u001b[2m      \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m      \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m      \"predecessorDeactivateCount\": 0,\u001b[22m\n\u001b[33m@@ -27,10 +31,12 @@\u001b[39m\n\u001b[2m    \"settlements\": Object {\u001b[22m\n\u001b[2m      \"adoption\": Object {\u001b[22m\n\u001b[2m        \"detail\": \"v3 room session is closed\",\u001b[22m\n\u001b[2m        \"lifetime\": Object {\u001b[22m\n\u001b[2m          \"activationCount\": 1,\u001b[22m\n\u001b[31m+         \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+         \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m          \"commitCount\": 1,\u001b[22m\n\u001b[2m          \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m          \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m          \"predecessorDeactivateCount\": 0,\u001b[22m\n\u001b[2m          \"replacementDeactivateCompletedCount\": 1,\u001b[22m\n\u001b[33m@@ -41,10 +47,12 @@\u001b[39m\n\u001b[2m        \"status\": \"rejected\",\u001b[22m\n\u001b[2m      },\u001b[22m\n\u001b[2m      \"close\": Object {\u001b[22m\n\u001b[2m        \"lifetime\": Object {\u001b[22m\n\u001b[2m          \"activationCount\": 1,\u001b[22m\n\u001b[31m+         \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+         \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m          \"commitCount\": 1,\u001b[22m\n\u001b[2m          \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m          \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m          \"predecessorDeactivateCount\": 1,\u001b[22m\n\u001b[2m          \"replacementDeactivateCompletedCount\": 1,\u001b[22m\n    at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:1225:25",
+                    "location": {
+                      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                      "column": 25,
+                      "line": 1225
+                    },
+                    "snippet": "  1223 | \t};\n  1224 | \tconst finalCounts = { ...finalInstrumentationCounts, adoptionSettled: true, closeSettled: true };\n> 1225 | \texpect(postActivation).toEqual({\n       | \t                       ^\n  1226 | \t\tafterRelease: { ...finalCounts, postActivationPauseCount: 1, postPredecessorDeactivationPauseCount: 0 },\n  1227 | \t\tauthorityBeforeRelease: null,\n  1228 | \t\tbeforeRelease: {"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                        "column": 25,
+                        "line": 1225
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 0\u001b[39m\n\u001b[31m+ Received  + 8\u001b[39m\n\n\u001b[33m@@ -1,9 +1,11 @@\u001b[39m\n\u001b[2m  Object {\u001b[22m\n\u001b[2m    \"afterRelease\": Object {\u001b[22m\n\u001b[2m      \"activationCount\": 1,\u001b[22m\n\u001b[2m      \"adoptionSettled\": true,\u001b[22m\n\u001b[31m+     \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+     \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m      \"closeSettled\": true,\u001b[22m\n\u001b[2m      \"commitCount\": 1,\u001b[22m\n\u001b[2m      \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m      \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m      \"predecessorDeactivateCount\": 1,\u001b[22m\n\u001b[33m@@ -13,10 +15,12 @@\u001b[39m\n\u001b[2m    },\u001b[22m\n\u001b[2m    \"authorityBeforeRelease\": null,\u001b[22m\n\u001b[2m    \"beforeRelease\": Object {\u001b[22m\n\u001b[2m      \"activationCount\": 1,\u001b[22m\n\u001b[2m      \"adoptionSettled\": false,\u001b[22m\n\u001b[31m+     \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+     \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m      \"closeSettled\": false,\u001b[22m\n\u001b[2m      \"commitCount\": 1,\u001b[22m\n\u001b[2m      \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m      \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m      \"predecessorDeactivateCount\": 0,\u001b[22m\n\u001b[33m@@ -27,10 +31,12 @@\u001b[39m\n\u001b[2m    \"settlements\": Object {\u001b[22m\n\u001b[2m      \"adoption\": Object {\u001b[22m\n\u001b[2m        \"detail\": \"v3 room session is closed\",\u001b[22m\n\u001b[2m        \"lifetime\": Object {\u001b[22m\n\u001b[2m          \"activationCount\": 1,\u001b[22m\n\u001b[31m+         \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+         \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m          \"commitCount\": 1,\u001b[22m\n\u001b[2m          \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m          \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m          \"predecessorDeactivateCount\": 0,\u001b[22m\n\u001b[2m          \"replacementDeactivateCompletedCount\": 1,\u001b[22m\n\u001b[33m@@ -41,10 +47,12 @@\u001b[39m\n\u001b[2m        \"status\": \"rejected\",\u001b[22m\n\u001b[2m      },\u001b[22m\n\u001b[2m      \"close\": Object {\u001b[22m\n\u001b[2m        \"lifetime\": Object {\u001b[22m\n\u001b[2m          \"activationCount\": 1,\u001b[22m\n\u001b[31m+         \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+         \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m          \"commitCount\": 1,\u001b[22m\n\u001b[2m          \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m          \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m          \"predecessorDeactivateCount\": 1,\u001b[22m\n\u001b[2m          \"replacementDeactivateCompletedCount\": 1,\u001b[22m\n\n  1223 | \t};\n  1224 | \tconst finalCounts = { ...finalInstrumentationCounts, adoptionSettled: true, closeSettled: true };\n> 1225 | \texpect(postActivation).toEqual({\n       | \t                       ^\n  1226 | \t\tafterRelease: { ...finalCounts, postActivationPauseCount: 1, postPredecessorDeactivationPauseCount: 0 },\n  1227 | \t\tauthorityBeforeRelease: null,\n  1228 | \t\tbeforeRelease: {\n    at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:1225:25"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:31.161Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results/phase-6a-creator-successor-2437d-te-preserves-causal-cleanup-chromium/error-context.md"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results/phase-6a-creator-successor-2437d-te-preserves-causal-cleanup-chromium/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                    "column": 25,
+                    "line": 1225
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-12113dd827941ad4bb97",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 1155,
+          "column": 1
+        },
+        {
+          "title": "cleanup failure preserves the predecessor failure in an ordered aggregate; activation failure remains primary while close joins adoption; drain failure still shuts down and releases browser ownership; drain and shutdown failure preserve ordered primary and cleanup errors; rehearsal blocks later adoption until its migration record releases; activation blocks later adoption until terminal transition releases; adoption blocks later rehearsal until verification releases; adoption blocks later activation until verification releases; overlapping rehearsal retains the existing fast-fail fence; independent room sessions do not share one lifetime queue; a failed adoption releases the lifetime queue for retry; accepted-vertex failure cannot deadlock queued adoption and shutdown",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:31.655Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-b0b403e0de960b7bae9d",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 1297,
+          "column": 1
+        },
+        {
+          "title": "redirect-pending adoption stays ahead of rehearsal; redirect-pending adoption stays ahead of activation; activation bytes are bounded before call-time copy; migration invites are bounded before call-time encoding",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:31.655Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-549b5865ba131d783198",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 2008,
+          "column": 1
+        },
+        {
+          "title": "D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebinds epoch 2 close custody",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "chromium",
+              "projectName": "chromium",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:31.655Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-65b35a71ef81040e746e",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 2143,
+          "column": 1
+        },
+        {
+          "title": "pins the exact successor product browser inventory",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:32.202Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-32a439432e3d27e20f3a",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 733,
+          "column": 1
+        },
+        {
+          "title": "hot creator adoption exposes oracle authority and issues through the replacement handle",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 755,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:34.547Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-db5b5cddd7d18d305471",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 751,
+          "column": 1
+        },
+        {
+          "title": "established peer cold reopen accepts the genuine epoch-one live operation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 149,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:35.307Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-7dfd248bf8ac55c9a555",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 784,
+          "column": 1
+        },
+        {
+          "title": "fresh late peer cold reopen accepts the targeted retained epoch-one operation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 429,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:35.461Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-668b2062b6425bafc6b5",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 812,
+          "column": 1
+        },
+        {
+          "title": "D.110c-0b0 provider crash and classification matrix fails closed",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3124,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:35.895Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-038da193a0b1f0b6779a",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 901,
+          "column": 1
+        },
+        {
+          "title": "concurrent adoption shares one success and one underlying transition; concurrent adoption shares one real verification failure; close joins a paused adoption before releasing lifetime ownership; predecessor deactivation failure cleans the replacement before escaping",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 892,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:39.025Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-503b42acf5fdb870d665",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 1007,
+          "column": 1
+        },
+        {
+          "title": "close at the post-activation gate cleans the successor exactly once; close at the post-predecessor-deactivation gate preserves causal cleanup",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": 1,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 1101,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 0\u001b[39m\n\u001b[31m+ Received  + 8\u001b[39m\n\n\u001b[33m@@ -1,9 +1,11 @@\u001b[39m\n\u001b[2m  Object {\u001b[22m\n\u001b[2m    \"afterRelease\": Object {\u001b[22m\n\u001b[2m      \"activationCount\": 1,\u001b[22m\n\u001b[2m      \"adoptionSettled\": true,\u001b[22m\n\u001b[31m+     \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+     \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m      \"closeSettled\": true,\u001b[22m\n\u001b[2m      \"commitCount\": 1,\u001b[22m\n\u001b[2m      \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m      \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m      \"predecessorDeactivateCount\": 1,\u001b[22m\n\u001b[33m@@ -13,10 +15,12 @@\u001b[39m\n\u001b[2m    },\u001b[22m\n\u001b[2m    \"authorityBeforeRelease\": null,\u001b[22m\n\u001b[2m    \"beforeRelease\": Object {\u001b[22m\n\u001b[2m      \"activationCount\": 1,\u001b[22m\n\u001b[2m      \"adoptionSettled\": false,\u001b[22m\n\u001b[31m+     \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+     \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m      \"closeSettled\": false,\u001b[22m\n\u001b[2m      \"commitCount\": 1,\u001b[22m\n\u001b[2m      \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m      \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m      \"predecessorDeactivateCount\": 0,\u001b[22m\n\u001b[33m@@ -27,10 +31,12 @@\u001b[39m\n\u001b[2m    \"settlements\": Object {\u001b[22m\n\u001b[2m      \"adoption\": Object {\u001b[22m\n\u001b[2m        \"detail\": \"v3 room session is closed\",\u001b[22m\n\u001b[2m        \"lifetime\": Object {\u001b[22m\n\u001b[2m          \"activationCount\": 1,\u001b[22m\n\u001b[31m+         \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+         \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m          \"commitCount\": 1,\u001b[22m\n\u001b[2m          \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m          \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m          \"predecessorDeactivateCount\": 0,\u001b[22m\n\u001b[2m          \"replacementDeactivateCompletedCount\": 1,\u001b[22m\n\u001b[33m@@ -41,10 +47,12 @@\u001b[39m\n\u001b[2m        \"status\": \"rejected\",\u001b[22m\n\u001b[2m      },\u001b[22m\n\u001b[2m      \"close\": Object {\u001b[22m\n\u001b[2m        \"lifetime\": Object {\u001b[22m\n\u001b[2m          \"activationCount\": 1,\u001b[22m\n\u001b[31m+         \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+         \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m          \"commitCount\": 1,\u001b[22m\n\u001b[2m          \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m          \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m          \"predecessorDeactivateCount\": 1,\u001b[22m\n\u001b[2m          \"replacementDeactivateCompletedCount\": 1,\u001b[22m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 0\u001b[39m\n\u001b[31m+ Received  + 8\u001b[39m\n\n\u001b[33m@@ -1,9 +1,11 @@\u001b[39m\n\u001b[2m  Object {\u001b[22m\n\u001b[2m    \"afterRelease\": Object {\u001b[22m\n\u001b[2m      \"activationCount\": 1,\u001b[22m\n\u001b[2m      \"adoptionSettled\": true,\u001b[22m\n\u001b[31m+     \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+     \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m      \"closeSettled\": true,\u001b[22m\n\u001b[2m      \"commitCount\": 1,\u001b[22m\n\u001b[2m      \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m      \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m      \"predecessorDeactivateCount\": 1,\u001b[22m\n\u001b[33m@@ -13,10 +15,12 @@\u001b[39m\n\u001b[2m    },\u001b[22m\n\u001b[2m    \"authorityBeforeRelease\": null,\u001b[22m\n\u001b[2m    \"beforeRelease\": Object {\u001b[22m\n\u001b[2m      \"activationCount\": 1,\u001b[22m\n\u001b[2m      \"adoptionSettled\": false,\u001b[22m\n\u001b[31m+     \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+     \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m      \"closeSettled\": false,\u001b[22m\n\u001b[2m      \"commitCount\": 1,\u001b[22m\n\u001b[2m      \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m      \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m      \"predecessorDeactivateCount\": 0,\u001b[22m\n\u001b[33m@@ -27,10 +31,12 @@\u001b[39m\n\u001b[2m    \"settlements\": Object {\u001b[22m\n\u001b[2m      \"adoption\": Object {\u001b[22m\n\u001b[2m        \"detail\": \"v3 room session is closed\",\u001b[22m\n\u001b[2m        \"lifetime\": Object {\u001b[22m\n\u001b[2m          \"activationCount\": 1,\u001b[22m\n\u001b[31m+         \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+         \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m          \"commitCount\": 1,\u001b[22m\n\u001b[2m          \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m          \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m          \"predecessorDeactivateCount\": 0,\u001b[22m\n\u001b[2m          \"replacementDeactivateCompletedCount\": 1,\u001b[22m\n\u001b[33m@@ -41,10 +47,12 @@\u001b[39m\n\u001b[2m        \"status\": \"rejected\",\u001b[22m\n\u001b[2m      },\u001b[22m\n\u001b[2m      \"close\": Object {\u001b[22m\n\u001b[2m        \"lifetime\": Object {\u001b[22m\n\u001b[2m          \"activationCount\": 1,\u001b[22m\n\u001b[31m+         \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+         \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m          \"commitCount\": 1,\u001b[22m\n\u001b[2m          \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m          \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m          \"predecessorDeactivateCount\": 1,\u001b[22m\n\u001b[2m          \"replacementDeactivateCompletedCount\": 1,\u001b[22m\n    at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:1225:25",
+                    "location": {
+                      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                      "column": 25,
+                      "line": 1225
+                    },
+                    "snippet": "  1223 | \t};\n  1224 | \tconst finalCounts = { ...finalInstrumentationCounts, adoptionSettled: true, closeSettled: true };\n> 1225 | \texpect(postActivation).toEqual({\n       | \t                       ^\n  1226 | \t\tafterRelease: { ...finalCounts, postActivationPauseCount: 1, postPredecessorDeactivationPauseCount: 0 },\n  1227 | \t\tauthorityBeforeRelease: null,\n  1228 | \t\tbeforeRelease: {"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                        "column": 25,
+                        "line": 1225
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 0\u001b[39m\n\u001b[31m+ Received  + 8\u001b[39m\n\n\u001b[33m@@ -1,9 +1,11 @@\u001b[39m\n\u001b[2m  Object {\u001b[22m\n\u001b[2m    \"afterRelease\": Object {\u001b[22m\n\u001b[2m      \"activationCount\": 1,\u001b[22m\n\u001b[2m      \"adoptionSettled\": true,\u001b[22m\n\u001b[31m+     \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+     \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m      \"closeSettled\": true,\u001b[22m\n\u001b[2m      \"commitCount\": 1,\u001b[22m\n\u001b[2m      \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m      \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m      \"predecessorDeactivateCount\": 1,\u001b[22m\n\u001b[33m@@ -13,10 +15,12 @@\u001b[39m\n\u001b[2m    },\u001b[22m\n\u001b[2m    \"authorityBeforeRelease\": null,\u001b[22m\n\u001b[2m    \"beforeRelease\": Object {\u001b[22m\n\u001b[2m      \"activationCount\": 1,\u001b[22m\n\u001b[2m      \"adoptionSettled\": false,\u001b[22m\n\u001b[31m+     \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+     \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m      \"closeSettled\": false,\u001b[22m\n\u001b[2m      \"commitCount\": 1,\u001b[22m\n\u001b[2m      \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m      \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m      \"predecessorDeactivateCount\": 0,\u001b[22m\n\u001b[33m@@ -27,10 +31,12 @@\u001b[39m\n\u001b[2m    \"settlements\": Object {\u001b[22m\n\u001b[2m      \"adoption\": Object {\u001b[22m\n\u001b[2m        \"detail\": \"v3 room session is closed\",\u001b[22m\n\u001b[2m        \"lifetime\": Object {\u001b[22m\n\u001b[2m          \"activationCount\": 1,\u001b[22m\n\u001b[31m+         \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+         \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m          \"commitCount\": 1,\u001b[22m\n\u001b[2m          \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m          \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m          \"predecessorDeactivateCount\": 0,\u001b[22m\n\u001b[2m          \"replacementDeactivateCompletedCount\": 1,\u001b[22m\n\u001b[33m@@ -41,10 +47,12 @@\u001b[39m\n\u001b[2m        \"status\": \"rejected\",\u001b[22m\n\u001b[2m      },\u001b[22m\n\u001b[2m      \"close\": Object {\u001b[22m\n\u001b[2m        \"lifetime\": Object {\u001b[22m\n\u001b[2m          \"activationCount\": 1,\u001b[22m\n\u001b[31m+         \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+         \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m          \"commitCount\": 1,\u001b[22m\n\u001b[2m          \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m          \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m          \"predecessorDeactivateCount\": 1,\u001b[22m\n\u001b[2m          \"replacementDeactivateCompletedCount\": 1,\u001b[22m\n\n  1223 | \t};\n  1224 | \tconst finalCounts = { ...finalInstrumentationCounts, adoptionSettled: true, closeSettled: true };\n> 1225 | \texpect(postActivation).toEqual({\n       | \t                       ^\n  1226 | \t\tafterRelease: { ...finalCounts, postActivationPauseCount: 1, postPredecessorDeactivationPauseCount: 0 },\n  1227 | \t\tauthorityBeforeRelease: null,\n  1228 | \t\tbeforeRelease: {\n    at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:1225:25"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:39.922Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results/phase-6a-creator-successor-2437d-te-preserves-causal-cleanup-firefox/error-context.md"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results/phase-6a-creator-successor-2437d-te-preserves-causal-cleanup-firefox/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                    "column": 25,
+                    "line": 1225
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-3ecf967c98c448cb7223",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 1155,
+          "column": 1
+        },
+        {
+          "title": "cleanup failure preserves the predecessor failure in an ordered aggregate; activation failure remains primary while close joins adoption; drain failure still shuts down and releases browser ownership; drain and shutdown failure preserve ordered primary and cleanup errors; rehearsal blocks later adoption until its migration record releases; activation blocks later adoption until terminal transition releases; adoption blocks later rehearsal until verification releases; adoption blocks later activation until verification releases; overlapping rehearsal retains the existing fast-fail fence; independent room sessions do not share one lifetime queue; a failed adoption releases the lifetime queue for retry; accepted-vertex failure cannot deadlock queued adoption and shutdown",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:41.314Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-15c215a977ac6c1c781d",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 1297,
+          "column": 1
+        },
+        {
+          "title": "redirect-pending adoption stays ahead of rehearsal; redirect-pending adoption stays ahead of activation; activation bytes are bounded before call-time copy; migration invites are bounded before call-time encoding",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:41.314Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-14e7476702251cef621a",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 2008,
+          "column": 1
+        },
+        {
+          "title": "D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebinds epoch 2 close custody",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "firefox",
+              "projectName": "firefox",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:41.314Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-bb3c185a49bae316d081",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 2143,
+          "column": 1
+        },
+        {
+          "title": "pins the exact successor product browser inventory",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 3,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:41.861Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-7445009cfb28cfeae0db",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 733,
+          "column": 1
+        },
+        {
+          "title": "hot creator adoption exposes oracle authority and issues through the replacement handle",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 701,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:44.003Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-3c5c04bbd883d472ecbb",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 751,
+          "column": 1
+        },
+        {
+          "title": "established peer cold reopen accepts the genuine epoch-one live operation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 205,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:44.709Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-4eff6a378c5deddb15a2",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 784,
+          "column": 1
+        },
+        {
+          "title": "fresh late peer cold reopen accepts the targeted retained epoch-one operation",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 406,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:44.919Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-ab6d52bf5012cecedc3a",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 812,
+          "column": 1
+        },
+        {
+          "title": "D.110c-0b0 provider crash and classification matrix fails closed",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 2310,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:45.330Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-d46b26d48387bacddab7",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 901,
+          "column": 1
+        },
+        {
+          "title": "concurrent adoption shares one success and one underlying transition; concurrent adoption shares one real verification failure; close joins a paused adoption before releasing lifetime ownership; predecessor deactivation failure cleans the replacement before escaping",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 653,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:47.647Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-da84d1cfaa8825adc099",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 1007,
+          "column": 1
+        },
+        {
+          "title": "close at the post-activation gate cleans the successor exactly once; close at the post-predecessor-deactivation gate preserves causal cleanup",
+          "ok": false,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": 2,
+                  "parallelIndex": 0,
+                  "status": "failed",
+                  "duration": 483,
+                  "error": {
+                    "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 0\u001b[39m\n\u001b[31m+ Received  + 8\u001b[39m\n\n\u001b[33m@@ -1,9 +1,11 @@\u001b[39m\n\u001b[2m  Object {\u001b[22m\n\u001b[2m    \"afterRelease\": Object {\u001b[22m\n\u001b[2m      \"activationCount\": 1,\u001b[22m\n\u001b[2m      \"adoptionSettled\": true,\u001b[22m\n\u001b[31m+     \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+     \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m      \"closeSettled\": true,\u001b[22m\n\u001b[2m      \"commitCount\": 1,\u001b[22m\n\u001b[2m      \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m      \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m      \"predecessorDeactivateCount\": 1,\u001b[22m\n\u001b[33m@@ -13,10 +15,12 @@\u001b[39m\n\u001b[2m    },\u001b[22m\n\u001b[2m    \"authorityBeforeRelease\": null,\u001b[22m\n\u001b[2m    \"beforeRelease\": Object {\u001b[22m\n\u001b[2m      \"activationCount\": 1,\u001b[22m\n\u001b[2m      \"adoptionSettled\": false,\u001b[22m\n\u001b[31m+     \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+     \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m      \"closeSettled\": false,\u001b[22m\n\u001b[2m      \"commitCount\": 1,\u001b[22m\n\u001b[2m      \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m      \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m      \"predecessorDeactivateCount\": 0,\u001b[22m\n\u001b[33m@@ -27,10 +31,12 @@\u001b[39m\n\u001b[2m    \"settlements\": Object {\u001b[22m\n\u001b[2m      \"adoption\": Object {\u001b[22m\n\u001b[2m        \"detail\": \"v3 room session is closed\",\u001b[22m\n\u001b[2m        \"lifetime\": Object {\u001b[22m\n\u001b[2m          \"activationCount\": 1,\u001b[22m\n\u001b[31m+         \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+         \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m          \"commitCount\": 1,\u001b[22m\n\u001b[2m          \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m          \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m          \"predecessorDeactivateCount\": 0,\u001b[22m\n\u001b[2m          \"replacementDeactivateCompletedCount\": 1,\u001b[22m\n\u001b[33m@@ -41,10 +47,12 @@\u001b[39m\n\u001b[2m        \"status\": \"rejected\",\u001b[22m\n\u001b[2m      },\u001b[22m\n\u001b[2m      \"close\": Object {\u001b[22m\n\u001b[2m        \"lifetime\": Object {\u001b[22m\n\u001b[2m          \"activationCount\": 1,\u001b[22m\n\u001b[31m+         \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+         \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m          \"commitCount\": 1,\u001b[22m\n\u001b[2m          \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m          \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m          \"predecessorDeactivateCount\": 1,\u001b[22m\n\u001b[2m          \"replacementDeactivateCompletedCount\": 1,\u001b[22m",
+                    "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 0\u001b[39m\n\u001b[31m+ Received  + 8\u001b[39m\n\n\u001b[33m@@ -1,9 +1,11 @@\u001b[39m\n\u001b[2m  Object {\u001b[22m\n\u001b[2m    \"afterRelease\": Object {\u001b[22m\n\u001b[2m      \"activationCount\": 1,\u001b[22m\n\u001b[2m      \"adoptionSettled\": true,\u001b[22m\n\u001b[31m+     \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+     \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m      \"closeSettled\": true,\u001b[22m\n\u001b[2m      \"commitCount\": 1,\u001b[22m\n\u001b[2m      \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m      \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m      \"predecessorDeactivateCount\": 1,\u001b[22m\n\u001b[33m@@ -13,10 +15,12 @@\u001b[39m\n\u001b[2m    },\u001b[22m\n\u001b[2m    \"authorityBeforeRelease\": null,\u001b[22m\n\u001b[2m    \"beforeRelease\": Object {\u001b[22m\n\u001b[2m      \"activationCount\": 1,\u001b[22m\n\u001b[2m      \"adoptionSettled\": false,\u001b[22m\n\u001b[31m+     \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+     \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m      \"closeSettled\": false,\u001b[22m\n\u001b[2m      \"commitCount\": 1,\u001b[22m\n\u001b[2m      \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m      \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m      \"predecessorDeactivateCount\": 0,\u001b[22m\n\u001b[33m@@ -27,10 +31,12 @@\u001b[39m\n\u001b[2m    \"settlements\": Object {\u001b[22m\n\u001b[2m      \"adoption\": Object {\u001b[22m\n\u001b[2m        \"detail\": \"v3 room session is closed\",\u001b[22m\n\u001b[2m        \"lifetime\": Object {\u001b[22m\n\u001b[2m          \"activationCount\": 1,\u001b[22m\n\u001b[31m+         \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+         \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m          \"commitCount\": 1,\u001b[22m\n\u001b[2m          \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m          \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m          \"predecessorDeactivateCount\": 0,\u001b[22m\n\u001b[2m          \"replacementDeactivateCompletedCount\": 1,\u001b[22m\n\u001b[33m@@ -41,10 +47,12 @@\u001b[39m\n\u001b[2m        \"status\": \"rejected\",\u001b[22m\n\u001b[2m      },\u001b[22m\n\u001b[2m      \"close\": Object {\u001b[22m\n\u001b[2m        \"lifetime\": Object {\u001b[22m\n\u001b[2m          \"activationCount\": 1,\u001b[22m\n\u001b[31m+         \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+         \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m          \"commitCount\": 1,\u001b[22m\n\u001b[2m          \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m          \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m          \"predecessorDeactivateCount\": 1,\u001b[22m\n\u001b[2m          \"replacementDeactivateCompletedCount\": 1,\u001b[22m\n    at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:1225:25",
+                    "location": {
+                      "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                      "column": 25,
+                      "line": 1225
+                    },
+                    "snippet": "  1223 | \t};\n  1224 | \tconst finalCounts = { ...finalInstrumentationCounts, adoptionSettled: true, closeSettled: true };\n> 1225 | \texpect(postActivation).toEqual({\n       | \t                       ^\n  1226 | \t\tafterRelease: { ...finalCounts, postActivationPauseCount: 1, postPredecessorDeactivationPauseCount: 0 },\n  1227 | \t\tauthorityBeforeRelease: null,\n  1228 | \t\tbeforeRelease: {"
+                  },
+                  "errors": [
+                    {
+                      "location": {
+                        "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                        "column": 25,
+                        "line": 1225
+                      },
+                      "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoEqual\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // deep equality\u001b[22m\n\n\u001b[32m- Expected  - 0\u001b[39m\n\u001b[31m+ Received  + 8\u001b[39m\n\n\u001b[33m@@ -1,9 +1,11 @@\u001b[39m\n\u001b[2m  Object {\u001b[22m\n\u001b[2m    \"afterRelease\": Object {\u001b[22m\n\u001b[2m      \"activationCount\": 1,\u001b[22m\n\u001b[2m      \"adoptionSettled\": true,\u001b[22m\n\u001b[31m+     \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+     \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m      \"closeSettled\": true,\u001b[22m\n\u001b[2m      \"commitCount\": 1,\u001b[22m\n\u001b[2m      \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m      \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m      \"predecessorDeactivateCount\": 1,\u001b[22m\n\u001b[33m@@ -13,10 +15,12 @@\u001b[39m\n\u001b[2m    },\u001b[22m\n\u001b[2m    \"authorityBeforeRelease\": null,\u001b[22m\n\u001b[2m    \"beforeRelease\": Object {\u001b[22m\n\u001b[2m      \"activationCount\": 1,\u001b[22m\n\u001b[2m      \"adoptionSettled\": false,\u001b[22m\n\u001b[31m+     \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+     \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m      \"closeSettled\": false,\u001b[22m\n\u001b[2m      \"commitCount\": 1,\u001b[22m\n\u001b[2m      \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m      \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m      \"predecessorDeactivateCount\": 0,\u001b[22m\n\u001b[33m@@ -27,10 +31,12 @@\u001b[39m\n\u001b[2m    \"settlements\": Object {\u001b[22m\n\u001b[2m      \"adoption\": Object {\u001b[22m\n\u001b[2m        \"detail\": \"v3 room session is closed\",\u001b[22m\n\u001b[2m        \"lifetime\": Object {\u001b[22m\n\u001b[2m          \"activationCount\": 1,\u001b[22m\n\u001b[31m+         \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+         \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m          \"commitCount\": 1,\u001b[22m\n\u001b[2m          \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m          \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m          \"predecessorDeactivateCount\": 0,\u001b[22m\n\u001b[2m          \"replacementDeactivateCompletedCount\": 1,\u001b[22m\n\u001b[33m@@ -41,10 +47,12 @@\u001b[39m\n\u001b[2m        \"status\": \"rejected\",\u001b[22m\n\u001b[2m      },\u001b[22m\n\u001b[2m      \"close\": Object {\u001b[22m\n\u001b[2m        \"lifetime\": Object {\u001b[22m\n\u001b[2m          \"activationCount\": 1,\u001b[22m\n\u001b[31m+         \"closeBindCount\": 0,\u001b[39m\n\u001b[31m+         \"closeBindFailureCount\": 0,\u001b[39m\n\u001b[2m          \"commitCount\": 1,\u001b[22m\n\u001b[2m          \"postActivationPauseCount\": 1,\u001b[22m\n\u001b[2m          \"postPredecessorDeactivationPauseCount\": 0,\u001b[22m\n\u001b[2m          \"predecessorDeactivateCount\": 1,\u001b[22m\n\u001b[2m          \"replacementDeactivateCompletedCount\": 1,\u001b[22m\n\n  1223 | \t};\n  1224 | \tconst finalCounts = { ...finalInstrumentationCounts, adoptionSettled: true, closeSettled: true };\n> 1225 | \texpect(postActivation).toEqual({\n       | \t                       ^\n  1226 | \t\tafterRelease: { ...finalCounts, postActivationPauseCount: 1, postPredecessorDeactivationPauseCount: 0 },\n  1227 | \t\tauthorityBeforeRelease: null,\n  1228 | \t\tbeforeRelease: {\n    at /Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts:1225:25"
+                    }
+                  ],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:48.305Z",
+                  "annotations": [],
+                  "attachments": [
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results/phase-6a-creator-successor-2437d-te-preserves-causal-cleanup-webkit/error-context.md"
+                    },
+                    {
+                      "name": "error-context",
+                      "contentType": "text/markdown",
+                      "path": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results/phase-6a-creator-successor-2437d-te-preserves-causal-cleanup-webkit/error-context.md"
+                    }
+                  ],
+                  "errorLocation": {
+                    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts",
+                    "column": 25,
+                    "line": 1225
+                  }
+                }
+              ],
+              "status": "unexpected"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-e2931f3c2f062f5b8be8",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 1155,
+          "column": 1
+        },
+        {
+          "title": "cleanup failure preserves the predecessor failure in an ordered aggregate; activation failure remains primary while close joins adoption; drain failure still shuts down and releases browser ownership; drain and shutdown failure preserve ordered primary and cleanup errors; rehearsal blocks later adoption until its migration record releases; activation blocks later adoption until terminal transition releases; adoption blocks later rehearsal until verification releases; adoption blocks later activation until verification releases; overlapping rehearsal retains the existing fast-fail fence; independent room sessions do not share one lifetime queue; a failed adoption releases the lifetime queue for retry; accepted-vertex failure cannot deadlock queued adoption and shutdown",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:48.848Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-e46ceb5420b971cd0fec",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 1297,
+          "column": 1
+        },
+        {
+          "title": "redirect-pending adoption stays ahead of rehearsal; redirect-pending adoption stays ahead of activation; activation bytes are bounded before call-time copy; migration invites are bounded before call-time encoding",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:48.848Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-f204ea405cdc4af4639b",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 2008,
+          "column": 1
+        },
+        {
+          "title": "D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebinds epoch 2 close custody",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 90000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "webkit",
+              "projectName": "webkit",
+              "results": [
+                {
+                  "workerIndex": -1,
+                  "parallelIndex": -1,
+                  "status": "skipped",
+                  "duration": 0,
+                  "errors": [],
+                  "stdout": [],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-09-02T18:41:48.848Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "skipped"
+            }
+          ],
+          "id": "a27ca8e8a7840963c3e5-16f3ebf634db74927251",
+          "file": "phase-6a-creator-successor-product.pw.ts",
+          "line": 2143,
+          "column": 1
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-02T18:41:25.608Z",
+    "duration": 23253.47,
+    "expected": 18,
+    "skipped": 9,
+    "unexpected": 3,
+    "flaky": 0
+  }
+}

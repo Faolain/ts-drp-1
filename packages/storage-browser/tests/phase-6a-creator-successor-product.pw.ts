@@ -28,6 +28,7 @@ const contractLoad = import(
 		];
 		readonly D108E5_BROWSER_BEHAVIORS: readonly [string, string, string, string];
 		isD108d2Authority(value: unknown): boolean;
+		isD110cBSuccessorAuthority(value: unknown, expectedEpoch: number): boolean;
 	}>
 >;
 // @ts-expect-error Playwright loads this ESM test before registration; the package typecheck uses an older module target.
@@ -38,6 +39,7 @@ const D108E2C_PRODUCT_BROWSER_BEHAVIORS = contract.D108E2C_PRODUCT_BROWSER_BEHAV
 const D108E3_BROWSER_BEHAVIORS = contract.D108E3_BROWSER_BEHAVIORS;
 const D108E5_BROWSER_BEHAVIORS = contract.D108E5_BROWSER_BEHAVIORS;
 let isD108d2Authority: (value: unknown) => boolean = () => false;
+let isD110cBSuccessorAuthority: (value: unknown, expectedEpoch: number) => boolean = () => false;
 const DATABASES = Object.freeze({ creator: "d108d2-creator", established: "d108d2-established", late: "d108d2-late" });
 const CHANNEL_NAME = "d108d2-successor-product";
 
@@ -60,6 +62,8 @@ function createState() {
     acceptedVertexFailureGate: Promise.resolve(),
     activationCount: 0,
     activationFailureGate: Promise.resolve(),
+    closeBindCount: 0,
+    closeBindFailureCount: 0,
     commitCount: 0,
     coldReopenCount: 0,
     failBeforePublication: false,
@@ -86,6 +90,7 @@ function createState() {
     postPredecessorDeactivationPauseCount: 0,
     predecessorDeactivateCount: 0,
     rejectPredecessorDeactivate: false,
+    rejectCloseBind: false,
     rejectReplacementDeactivate: false,
     releaseAcceptedVertexFailure: undefined,
     releaseActivationFailure: undefined,
@@ -112,6 +117,8 @@ function createState() {
   const configure = (input) => {
     state.acceptedVertexFailureCount = 0;
     state.activationCount = 0;
+    state.closeBindCount = 0;
+    state.closeBindFailureCount = 0;
     state.commitCount = 0;
     state.coldReopenCount = 0;
     state.failBeforePublication = input.failBeforePublication === true;
@@ -134,6 +141,7 @@ function createState() {
     state.postPredecessorDeactivationPauseCount = 0;
     state.predecessorDeactivateCount = 0;
     state.rejectPredecessorDeactivate = input.rejectPredecessorDeactivate === true;
+    state.rejectCloseBind = input.rejectCloseBind === true;
     state.rejectReplacementDeactivate = input.rejectReplacementDeactivate === true;
     state.replacementDeactivateCount = 0;
     state.replacementDeactivateCompletedCount = 0;
@@ -234,6 +242,12 @@ function createState() {
         state.releaseVerification?.();
         state.releaseVerification = undefined;
       },
+      d110cBSnapshot: () => Object.freeze({
+        activationCount: state.activationCount,
+        closeBindCount: state.closeBindCount,
+        closeBindFailureCount: state.closeBindFailureCount,
+        predecessorDeactivateCount: state.predecessorDeactivateCount,
+      }),
       snapshot: () => Object.freeze({
         activationCount: state.activationCount,
         commitCount: state.commitCount,
@@ -395,6 +409,14 @@ export const republishV3RetainedTo = (handle, targetPeerId) => actual.republishV
 import * as actual from ${JSON.stringify(creatorClose)};
 export const bindCreatorLiveClose = async (input) => {
   const planeId = planeIds.get(input.plane);
+  if (planeId === state.targetPlaneId) {
+    state.closeBindCount += 1;
+    if (state.rejectCloseBind) {
+      state.rejectCloseBind = false;
+      state.closeBindFailureCount += 1;
+      return Object.freeze({ ok: false, reason: "STORE_UNAVAILABLE" });
+    }
+  }
   const result = await actual.bindCreatorLiveClose({ ...input, plane: unwrapPlane(input.plane) });
   if (planeId !== undefined && result.ok === true) closeHandlePlaneIds.set(result.handle, planeId);
   return result;
@@ -646,6 +668,21 @@ async function snapshot(page: Page): Promise<Readonly<Record<string, unknown>>> 
 	return page.evaluate(() => window.phase6aCreatorSuccessorProduct.snapshot());
 }
 
+async function heldTsDrpLocks(page: Page): Promise<readonly string[]> {
+	return page.evaluate(async () => {
+		const query = Reflect.get(navigator.locks, "query");
+		if (typeof query !== "function") throw new TypeError("D110C_B_LOCK_QUERY_UNAVAILABLE");
+		const selected = (await Reflect.apply(query, navigator.locks, [])) as Readonly<{
+			readonly held?: readonly Readonly<{ readonly name?: string }>[];
+		}>;
+		return Object.freeze(
+			(selected.held ?? [])
+				.flatMap(({ name }) => (typeof name === "string" && name.startsWith("ts-drp:") ? [name] : []))
+				.sort()
+		);
+	});
+}
+
 async function waitForText(page: Page, text: string): Promise<void> {
 	await expect
 		.poll(
@@ -663,6 +700,7 @@ test.describe.configure({ mode: "serial" });
 
 test.beforeAll(async ({ browser }) => {
 	isD108d2Authority = contract.isD108d2Authority;
+	isD110cBSuccessorAuthority = contract.isD110cBSuccessorAuthority;
 	servers = Object.freeze(
 		await Promise.all(
 			["creator", "established", "late"].map(() =>
@@ -2104,6 +2142,7 @@ test(D108E5_BROWSER_BEHAVIORS.join("; "), async () => {
 
 test("D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebinds epoch 2 close custody", async ({
 	browser,
+	browserName,
 }) => {
 	const retainedPages = [creator, established, late].filter((page): page is Page => page !== undefined);
 	const retainedBefore = await Promise.all(retainedPages.map(snapshot));
@@ -2120,18 +2159,40 @@ test("D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebin
 			clientId: "alice",
 			databaseName,
 		});
+		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.configureLifetime({}));
+		const initialLocks = browserName === "chromium" ? await heldTsDrpLocks(page) : Object.freeze([]);
+		if (browserName === "chromium") expect(initialLocks).toHaveLength(0);
 		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.send("d110c-b-epoch-zero"));
 		const closeZero = await page.evaluate(() => window.phase6aCreatorSuccessorProduct.sealEpoch());
 		expect(closeZero).toMatchObject({ epoch: 0, successorEpoch: 1 });
 		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.adoptSuccessor());
 		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.send("d110c-b-epoch-one"));
 		const epochOne = await snapshot(page);
-		expect(epochOne.authority).toMatchObject({ epoch: 1 });
+		expect(isD110cBSuccessorAuthority(epochOne.authority, 1)).toBe(true);
+		expect(
+			isD110cBSuccessorAuthority(
+				await page.evaluate(
+					({ databaseName: selected, epoch }) =>
+						window.phase6aCreatorSuccessorProduct.rawAuthorityAtEpoch(selected, epoch),
+					{ databaseName, epoch: 1 }
+				),
+				1
+			)
+		).toBe(true);
+		expect(await page.evaluate(() => window.phase6aCreatorSuccessorProduct.d110cBSnapshot())).toEqual({
+			activationCount: 1,
+			closeBindCount: 1,
+			closeBindFailureCount: 0,
+			predecessorDeactivateCount: 1,
+		});
+		const epochOneLocks = browserName === "chromium" ? await heldTsDrpLocks(page) : Object.freeze([]);
+		if (browserName === "chromium") expect(epochOneLocks).toHaveLength(1);
 		const closeOne = await page.evaluate(() => window.phase6aCreatorSuccessorProduct.sealEpoch());
 		expect(closeOne).toMatchObject({ epoch: 1, successorEpoch: 2 });
 		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.adoptSuccessor());
 		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.send("d110c-b-epoch-two"));
 		const epochTwo = await snapshot(page);
+		expect(isD110cBSuccessorAuthority(epochTwo.authority, 2)).toBe(true);
 		expect(epochTwo.authority).toMatchObject({
 			epoch: 2,
 			genesisAnchorDigest: (epochOne.authority as Readonly<Record<string, unknown>>).genesisAnchorDigest,
@@ -2144,11 +2205,71 @@ test("D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebin
 			"d110c-b-epoch-two",
 		]);
 		expect(epochTwo.roomId).toBe((epochTwo.authority as Readonly<Record<string, unknown>>).anchorDigest);
+		expect(epochTwo.latchedAcl).toMatchObject({ currentEpoch: 2, nextEpoch: 3 });
+		expect(
+			isD110cBSuccessorAuthority(
+				await page.evaluate(
+					({ databaseName: selected, epoch }) =>
+						window.phase6aCreatorSuccessorProduct.rawAuthorityAtEpoch(selected, epoch),
+					{ databaseName, epoch: 2 }
+				),
+				2
+			)
+		).toBe(true);
+		expect(await page.evaluate(() => window.phase6aCreatorSuccessorProduct.d110cBSnapshot())).toEqual({
+			activationCount: 2,
+			closeBindCount: 2,
+			closeBindFailureCount: 0,
+			predecessorDeactivateCount: 1,
+		});
+		if (browserName === "chromium") expect(await heldTsDrpLocks(page)).toEqual(epochOneLocks);
 		const closeTwo = await page.evaluate(() => window.phase6aCreatorSuccessorProduct.sealEpoch());
 		expect(closeTwo).toMatchObject({ epoch: 2, successorEpoch: 3 });
 		const pendingEpochThree = await snapshot(page);
 		expect(pendingEpochThree.authority).toEqual(epochTwo.authority);
 		expect(pendingEpochThree.accepted).toEqual(epochTwo.accepted);
+		if (browserName === "chromium") expect(await heldTsDrpLocks(page)).toEqual(epochOneLocks);
+
+		const closeBindFailureName = "d110c-b-close-bind-failure";
+		await page.evaluate((name) => window.phase6aCreatorSuccessorProduct.openDirectCreator(name), closeBindFailureName);
+		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.configureLifetime({ rejectCloseBind: true }));
+		await page.evaluate((name) => window.phase6aCreatorSuccessorProduct.sealDirectCreator(name), closeBindFailureName);
+		await page.evaluate(
+			(name) => window.phase6aCreatorSuccessorProduct.beginDirectAdoption(name),
+			closeBindFailureName
+		);
+		const closeBindFailure = await page.evaluate(
+			(name) => window.phase6aCreatorSuccessorProduct.waitForDirectAdoption(name),
+			closeBindFailureName
+		);
+		const closeBindFailureState = await page.evaluate(
+			(name) => window.phase6aCreatorSuccessorProduct.directCreatorState(name),
+			closeBindFailureName
+		);
+		expect(closeBindFailure).toMatchObject({ detail: "D110C_B_CLOSE_REBIND_FAILED", status: "rejected" });
+		expect(isD110cBSuccessorAuthority(closeBindFailureState.authority, 1)).toBe(true);
+		expect(closeBindFailureState.status).toMatchObject({
+			closeAuthority: "unavailable",
+			continuity: "stalled",
+			lifecycle: "active",
+		});
+		expect(await page.evaluate(() => window.phase6aCreatorSuccessorProduct.d110cBSnapshot())).toEqual({
+			activationCount: 1,
+			closeBindCount: 1,
+			closeBindFailureCount: 1,
+			predecessorDeactivateCount: 1,
+		});
+		if (browserName === "chromium") {
+			const closeBindFailureLocks = await heldTsDrpLocks(page);
+			expect(closeBindFailureLocks).toHaveLength(2);
+			expect(closeBindFailureLocks).toContain(epochOneLocks[0]);
+			expect(closeBindFailureLocks.filter((name) => name !== epochOneLocks[0])).toHaveLength(1);
+		}
+		await expect(
+			page.evaluate((name) => window.phase6aCreatorSuccessorProduct.sealDirectCreator(name), closeBindFailureName)
+		).rejects.toThrow("D110C_B_CLOSE_REBIND_FAILED");
+		await page.evaluate((name) => window.phase6aCreatorSuccessorProduct.closeDirectCreator(name), closeBindFailureName);
+		if (browserName === "chromium") expect(await heldTsDrpLocks(page)).toEqual(epochOneLocks);
 		expect(await Promise.all(retainedPages.map(snapshot))).toEqual(retainedBefore);
 		process.stdout.write("D110C_B_PRODUCT_HOT_LOOP_COMPLETE\n");
 	} finally {

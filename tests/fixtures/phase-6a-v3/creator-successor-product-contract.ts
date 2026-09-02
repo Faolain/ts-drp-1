@@ -580,3 +580,34 @@ export function isD108d2Authority(value: unknown): boolean {
 		record.profileId === "creator-trusted-v1"
 	);
 }
+
+/**
+ * Validates one exact D.110c-b successor-authority projection at the supplied epoch.
+ * @param value - Candidate room/chat authority value.
+ * @param expectedEpoch - Positive safe authenticated epoch expected by the caller.
+ * @returns Whether the candidate has the unchanged authority key roster and exact epoch.
+ */
+export function isD110cBSuccessorAuthority(value: unknown, expectedEpoch: number): boolean {
+	if (!Number.isSafeInteger(expectedEpoch) || expectedEpoch < 1) return false;
+	if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+	const record = value as Readonly<Record<string, unknown>>;
+	if (
+		Reflect.ownKeys(record).length !== D108D2_AUTHORITY_KEYS.length ||
+		!D108D2_AUTHORITY_KEYS.every((key) => Object.hasOwn(record, key))
+	) {
+		return false;
+	}
+	return (
+		typeof record.aclDigest === "string" &&
+		/^[0-9a-f]{64}$/u.test(record.aclDigest) &&
+		typeof record.anchorDigest === "string" &&
+		/^[0-9a-f]{64}$/u.test(record.anchorDigest) &&
+		record.epoch === expectedEpoch &&
+		typeof record.genesisAnchorDigest === "string" &&
+		/^[0-9a-f]{64}$/u.test(record.genesisAnchorDigest) &&
+		record.lifecycle === "active" &&
+		typeof record.objectId === "string" &&
+		record.objectId.length > 0 &&
+		record.profileId === "creator-trusted-v1"
+	);
+}

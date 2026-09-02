@@ -188,8 +188,10 @@ async function deactivateOwner(owner: ActiveOwner): Promise<void> {
 	try {
 		if (typeof deactivate === "function") await Reflect.apply(deactivate, owner.handle, []);
 	} finally {
-		if (currentOwner(owner)) activeOwners.delete(owner.topic);
-		await owner.lock?.release();
+		if (currentOwner(owner)) {
+			activeOwners.delete(owner.topic);
+			await owner.lock?.release();
+		}
 	}
 }
 

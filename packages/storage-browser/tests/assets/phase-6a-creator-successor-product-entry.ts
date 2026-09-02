@@ -5,10 +5,12 @@ type PlainRecord = Readonly<Record<string, unknown>>;
 interface DirectRoomSession {
 	activateMigration(input: Readonly<Record<string, unknown>>): Promise<unknown>;
 	adoptCreatorSuccessor(): Promise<void>;
+	authority(): PlainRecord | null;
 	close(): Promise<void>;
 	issue(operation: Readonly<Record<string, unknown>>): Promise<void>;
 	rehearseMigration(input: Readonly<Record<string, unknown>>): Promise<unknown>;
 	sealEpoch(): Promise<unknown>;
+	status(): PlainRecord;
 }
 
 type DirectRoomHeadFault =
@@ -148,6 +150,12 @@ interface LifetimeInstrumentation {
 	acceptedVertex(): Promise<void>;
 	cleanupReplacements(): Promise<void>;
 	d110cColdReopenCount(): number;
+	d110cBSnapshot(): Readonly<{
+		readonly activationCount: number;
+		readonly closeBindCount: number;
+		readonly closeBindFailureCount: number;
+		readonly predecessorDeactivateCount: number;
+	}>;
 	configure(
 		input: Readonly<{
 			readonly failBeforePublication?: boolean;
@@ -162,6 +170,7 @@ interface LifetimeInstrumentation {
 			readonly pauseTerminalTransition?: boolean;
 			readonly pauseVerification?: boolean;
 			readonly rejectPredecessorDeactivate?: boolean;
+			readonly rejectCloseBind?: boolean;
 			readonly rejectReplacementDeactivate?: boolean;
 			readonly retainTarget?: boolean;
 			readonly throwIssueLocal?: boolean;
@@ -218,6 +227,7 @@ declare global {
 					readonly pauseRedirectRecovery?: boolean;
 					readonly pauseTerminalTransition?: boolean;
 					readonly pauseVerification?: boolean;
+					readonly rejectCloseBind?: boolean;
 					readonly rejectPredecessorDeactivate?: boolean;
 					readonly rejectReplacementDeactivate?: boolean;
 					readonly retainTarget?: boolean;
@@ -233,12 +243,20 @@ declare global {
 			closeDirectCreator(name: string): Promise<void>;
 			create(input: unknown): Promise<string>;
 			deleteDatabases(prefix: string): Promise<readonly string[]>;
+			d110cBSnapshot(): Readonly<{
+				readonly activationCount: number;
+				readonly closeBindCount: number;
+				readonly closeBindFailureCount: number;
+				readonly predecessorDeactivateCount: number;
+			}>;
 			d110cFloorMatrix(): Promise<PlainRecord>;
 			directAdoptionSettled(name: string): boolean;
+			directCreatorState(name: string): PlainRecord;
 			d108e5OperationSettled(observation: string): boolean;
 			d108e5Snapshot(): Readonly<{ readonly redirectRecoveryCount: number; readonly verificationCount: number }>;
 			deliver(packet: RelayPacket): void;
 			exportSuccessor(databaseName: string): Promise<SuccessorCarrier>;
+			rawAuthorityAtEpoch(databaseName: string, expectedEpoch: number): Promise<PlainRecord>;
 			importSuccessor(carrier: SuccessorCarrier, sourceDatabaseName: string, targetDatabaseName: string): Promise<void>;
 			join(input: unknown): Promise<void>;
 			lifetimeSnapshot(): LifetimeInstrumentationSnapshot &
@@ -642,7 +660,10 @@ function exactRecord(value: unknown): PlainRecord {
 	return value as PlainRecord;
 }
 
-async function rawAuthority(databaseName: string): Promise<PlainRecord> {
+async function rawAuthorityAtEpoch(databaseName: string, expectedEpoch: number): Promise<PlainRecord> {
+	if (!Number.isSafeInteger(expectedEpoch) || expectedEpoch < 1) {
+		throw new TypeError("D110C_B_EXPECTED_EPOCH_INVALID");
+	}
 	const database = await openExistingDatabase(`${databaseName}--ahe`);
 	try {
 		const transaction = database.transaction(["blobs", "generations", "objects"], "readonly");
@@ -679,7 +700,9 @@ async function rawAuthority(databaseName: string): Promise<PlainRecord> {
 			return exactRecord(decodeCanonical(bytes));
 		});
 		const projections = decoded.filter((value) => value.kind === "v3-live-generation-2");
-		const trusts = decoded.filter((value) => value.kind === "drp-anchor-trust-state" && value.currentEpoch === 1);
+		const trusts = decoded.filter(
+			(value) => value.kind === "drp-anchor-trust-state" && value.currentEpoch === expectedEpoch
+		);
 		if (projections.length !== 1 || trusts.length !== 1) {
 			throw new TypeError("D.108d2 successor projection is ambiguous");
 		}
@@ -699,7 +722,7 @@ async function rawAuthority(databaseName: string): Promise<PlainRecord> {
 		return Object.freeze({
 			aclDigest: anchor.aclDigest,
 			anchorDigest,
-			epoch: 1,
+			epoch: expectedEpoch,
 			genesisAnchorDigest: trust.genesisAnchorDigest,
 			lifecycle: "active",
 			objectId: trust.objectId,
@@ -708,6 +731,10 @@ async function rawAuthority(databaseName: string): Promise<PlainRecord> {
 	} finally {
 		database.close();
 	}
+}
+
+function rawAuthority(databaseName: string): Promise<PlainRecord> {
+	return rawAuthorityAtEpoch(databaseName, 1);
 }
 
 async function rawSnapshotDeclaration(databaseName: string): Promise<PlainRecord> {
@@ -1592,6 +1619,14 @@ const api = Object.freeze({
 		for (const name of names) await deleteDatabase(name);
 		return Object.freeze(names);
 	},
+	d110cBSnapshot(): Readonly<{
+		readonly activationCount: number;
+		readonly closeBindCount: number;
+		readonly closeBindFailureCount: number;
+		readonly predecessorDeactivateCount: number;
+	}> {
+		return instrumentation().d110cBSnapshot();
+	},
 	d110cFloorMatrix(): Promise<PlainRecord> {
 		return d110cFloorMatrix();
 	},
@@ -1600,6 +1635,11 @@ const api = Object.freeze({
 			throw new TypeError("D.108e3 direct adoption observation is absent");
 		}
 		return directAdoptionSettlements.get(name) === true;
+	},
+	directCreatorState(name: string): PlainRecord {
+		const room = directRooms.get(name);
+		if (room === undefined) throw new TypeError("D110C_B_DIRECT_ROOM_ABSENT");
+		return Object.freeze({ authority: room.authority(), status: room.status() });
 	},
 	d108e5OperationSettled(observation: string): boolean {
 		if (!d108e5OperationSettlements.has(observation)) {
@@ -1626,6 +1666,9 @@ const api = Object.freeze({
 			),
 			snapshotDeclaration: await rawSnapshotDeclaration(databaseName),
 		});
+	},
+	rawAuthorityAtEpoch(databaseName: string, expectedEpoch: number): Promise<PlainRecord> {
+		return rawAuthorityAtEpoch(databaseName, expectedEpoch);
 	},
 	async importSuccessor(
 		carrier: SuccessorCarrier,

@@ -4,13 +4,14 @@ import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "../../..");
 const read = (path) => readFile(resolve(root, path), "utf8");
-const [adoption, commit, activation, live, room, browser] = await Promise.all([
+const [adoption, commit, activation, live, room, browser, contract] = await Promise.all([
 	read("packages/node/src/creator-adoption.ts"),
 	read("packages/node/src/creator-adoption-commit.ts"),
 	read("packages/node/src/creator-adoption-activate.ts"),
 	read("packages/node/src/v3-live.ts"),
 	read("examples/v3-room/src/index.ts"),
 	read("packages/storage-browser/tests/phase-6a-creator-successor-product.pw.ts"),
+	read("tests/fixtures/phase-6a-v3/creator-successor-product-contract.ts"),
 ]);
 
 function section(source, start, end) {
@@ -27,6 +28,7 @@ const activateMaterial = section(
 	"/**\n * Activates one freshly committed"
 );
 const ownerWrapper = section(activation, "function wrapOwner(", "function browserLockRealm(");
+const deactivateOwner = section(activation, "async function deactivateOwner(", "async function abandonOwner(");
 const filteredIssuance = section(live, "function creatorFilteredIssuanceStore(", "function openRecoveryAuthorization(");
 const liveActivation = section(
 	live,
@@ -56,6 +58,10 @@ const predicates = Object.freeze({
 		activateMaterial.includes("activeOwners.set(topic, replacement)"),
 	activationRetainsAuthenticatedOwnerHeadAndToken:
 		activation.includes("readonly head: ActiveHead;") && activation.includes("readonly token: object;"),
+	activationReleasesOnlyTheCurrentOwnerLock:
+		deactivateOwner.includes("if (currentOwner(owner)) {") &&
+		deactivateOwner.includes("activeOwners.delete(owner.topic)") &&
+		deactivateOwner.includes("await owner.lock?.release()"),
 	commitRequiresExactNextEpoch:
 		commit.includes("successorEpoch === currentEpoch + 1") &&
 		commit.includes('currentEpoch === 0\n\t\t\t? "v3-live-generation-1"'),
@@ -83,6 +89,17 @@ const predicates = Object.freeze({
 		roomAdoption.includes('new TypeError("D110C_B_ACTIVATION_STALLED")') &&
 		roomAdoption.includes('new TypeError("D110C_B_CLOSE_REBIND_FAILED")') &&
 		roomAdoption.includes('creatorCloseUnavailableContinuity = "stalled"'),
+	productCloseRebindFailureIsBehaviorallyInjected:
+		browser.includes("rejectCloseBind: true") &&
+		browser.includes('return Object.freeze({ ok: false, reason: "STORE_UNAVAILABLE" })') &&
+		productProof.includes('detail: "D110C_B_CLOSE_REBIND_FAILED"') &&
+		productProof.includes('closeAuthority: "unavailable"') &&
+		productProof.includes('continuity: "stalled"'),
+	productProofAuthenticatesVisibleAndRawEpochHeads:
+		productProof.includes("rawAuthorityAtEpoch(selected, epoch)") &&
+		(productProof.match(/isD110cBSuccessorAuthority\(/gu)?.length ?? 0) >= 4 &&
+		productProof.includes("heldTsDrpLocks(page)") &&
+		productProof.includes("expect(closeBindFailureLocks).toHaveLength(2)"),
 	productProofClosesEpochTwoToThree:
 		productProof.includes("D110C_B_PRODUCT_HOT_LOOP_COMPLETE") &&
 		productProof.includes("{ epoch: 2, successorEpoch: 3 }"),
@@ -91,6 +108,11 @@ const predicates = Object.freeze({
 		successorAuthority.includes("Number.isSafeInteger(currentEpoch)") &&
 		successorAuthority.includes("currentEpoch < 1") &&
 		successorAuthority.includes("epoch: currentEpoch"),
+	testsOnlyAuthorityOracleIsExact:
+		contract.includes("export function isD110cBSuccessorAuthority(") &&
+		contract.includes("Reflect.ownKeys(record).length !== D108D2_AUTHORITY_KEYS.length") &&
+		contract.includes("D108D2_AUTHORITY_KEYS.every((key) => Object.hasOwn(record, key))") &&
+		contract.includes("record.epoch === expectedEpoch"),
 });
 
 const failed = Object.entries(predicates).filter(([, value]) => value !== true);
