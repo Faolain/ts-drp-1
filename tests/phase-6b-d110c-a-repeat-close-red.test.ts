@@ -2,7 +2,10 @@ import "fake-indexeddb/auto";
 
 import { describe, expect, it } from "vitest";
 
-import { openD110cARepeatCloseFixture } from "./fixtures/phase-6b-d110c-a/repeat-close-contract.js";
+import {
+	D110C_A_HOSTILE_CARRIERS,
+	openD110cARepeatCloseFixture,
+} from "./fixtures/phase-6b-d110c-a/repeat-close-contract.js";
 
 describe("D.110c-a authenticated repeat-close carrier RED", () => {
 	it("extends authenticated compact history through one genuine adopted epoch-one close", async () => {
@@ -31,6 +34,17 @@ describe("D.110c-a authenticated repeat-close carrier RED", () => {
 			}
 			expect(evidence.issued).toMatchObject({ kind: "accepted", ok: true });
 			expect(evidence.published).toEqual({ kind: "published", ok: true });
+			expect(evidence.hostileCarrierRefusals).toHaveLength(D110C_A_HOSTILE_CARRIERS.length);
+			expect(evidence.hostileCarrierRefusals.map(({ carrier }) => carrier)).toEqual(D110C_A_HOSTILE_CARRIERS);
+			for (const refusal of evidence.hostileCarrierRefusals) {
+				expect(refusal).toEqual({
+					carrier: refusal.carrier,
+					durableHeadUnchanged: true,
+					reason: "CREATOR_CLOSE_UNAVAILABLE",
+					roomHeadUnchanged: true,
+				});
+			}
+			expect(evidence.overflowRefusal).toBe("CREATOR_CLOSE_UNAVAILABLE");
 			expect(evidence.closeAttempts).toBe(1);
 			expect(evidence.closeResult).toMatchObject({
 				closedVertexCount: evidence.independentHistory.closeOrder.length,

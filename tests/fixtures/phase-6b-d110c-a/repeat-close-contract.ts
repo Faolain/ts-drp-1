@@ -3,20 +3,48 @@ import { type AccumulatorSnapshot, CompactMerkleAccumulator } from "@ts-drp/comp
 // eslint-disable-next-line import/no-unresolved -- Workspace subpath resolves after the required package build.
 import { createRecoverableFinalitySigner } from "@ts-drp/keychain/finality";
 import type { LiveJournalAcceptedRow } from "@ts-drp/live-journal";
-import type { GenerationRef } from "@ts-drp/storage";
+import { digestBlob, type GenerationRef } from "@ts-drp/storage";
+import { execFile } from "node:child_process";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { promisify } from "node:util";
 
 import type {
 	CreatorLiveCloseHandle,
 	CreatorLiveCloseResult,
 	CreatorLiveCloseStatus,
 } from "../../../packages/node/src/creator-close.js";
+import {
+	consumeCreatorAdoptionIntent,
+	createCreatorAdoptionIntent,
+	type CreatorAdoptionIntentMaterial,
+} from "../../../packages/node/src/internal/creator-adoption-intent.js";
 import type { V3PlaneHandle } from "../../../packages/node/src/v3-live.js";
 import { contract, hexBytes } from "../phase-3a0-v3/controlled-anchor-trust.js";
+import { openGenuineCreatorAdoptionFixture } from "../phase-6a-v3/creator-adoption-contract.js";
 import { type D109dHotFixture, openD109dHotFixture } from "../phase-6b/runtime-reclamation-contract.js";
 
 const REPOSITORY_ROOT = resolve(import.meta.dirname, "../../..");
+const execFileAsync = promisify(execFile);
+
+export const D110C_A_HOSTILE_CARRIERS = Object.freeze([
+	"root-inconsistent",
+	"size-inconsistent",
+	"missing",
+	"malformed",
+	"reset",
+	"cross-room",
+	"earlier-epoch",
+] as const);
+
+type D110cAHostileCarrier = (typeof D110C_A_HOSTILE_CARRIERS)[number];
+
+export interface D110cAHostileCarrierEvidence {
+	readonly carrier: D110cAHostileCarrier;
+	readonly durableHeadUnchanged: boolean;
+	readonly reason: string;
+	readonly roomHeadUnchanged: boolean;
+}
 
 type StoreCloser = Readonly<{ close(): Promise<void> }>;
 
@@ -38,6 +66,8 @@ export interface D110cARepeatCloseEvidence {
 		readonly previousRoot: string;
 	}>;
 	readonly issued: Readonly<Record<string, unknown>>;
+	readonly hostileCarrierRefusals: readonly D110cAHostileCarrierEvidence[];
+	readonly overflowRefusal: string;
 	readonly previousHistoryAfter: AccumulatorSnapshot;
 	readonly providerPresent: false;
 	readonly published: Readonly<Record<string, unknown>>;
@@ -88,6 +118,160 @@ function copiedCompactHistory(bytes: Uint8Array): AccumulatorSnapshot {
 
 function lowerHex(bytes: Uint8Array): string {
 	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function changedDigest(value: unknown): string {
+	return value === "f".repeat(64) ? "e".repeat(64) : "f".repeat(64);
+}
+
+function mutatedProjection(
+	bytes: Uint8Array,
+	carrier: D110cAHostileCarrier,
+	foreignHistory: AccumulatorSnapshot
+): Uint8Array {
+	const projection = { ...canonicalRecord(bytes) } as Record<string, unknown>;
+	if (carrier === "root-inconsistent") projection.historyRoot = changedDigest(projection.historyRoot);
+	else if (carrier === "size-inconsistent") projection.historySize = Number(projection.historySize) + 1;
+	else if (carrier === "missing") Reflect.deleteProperty(projection, "compactHistory");
+	else if (carrier === "malformed") projection.compactHistory = "not-an-accumulator";
+	else if (carrier === "reset" || carrier === "earlier-epoch") {
+		projection.compactHistory = new CompactMerkleAccumulator().snapshot();
+	} else projection.compactHistory = foreignHistory;
+	return encodeCanonical(projection);
+}
+
+function replacedProjectionMaterial(
+	material: CreatorAdoptionIntentMaterial,
+	mutantBytes: Uint8Array
+): CreatorAdoptionIntentMaterial {
+	const originalDigest = digestBlob(material.exactCanonicalProjectionBytes);
+	const mutantDigest = digestBlob(mutantBytes);
+	if (!originalDigest.ok || !mutantDigest.ok) throw new TypeError("D110C_A_PROJECTION_DIGEST_FAILED");
+	const mutantRef = Object.freeze({ byteLength: mutantBytes.byteLength, digest: mutantDigest.value });
+	const replaceRef = (ref: GenerationRef): GenerationRef =>
+		ref.digest === originalDigest.value ? mutantRef : Object.freeze({ ...ref });
+	const replaceCandidate = (
+		candidate: Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }>
+	): Readonly<{ readonly bytes: Uint8Array; readonly ref: GenerationRef }> =>
+		candidate.ref.digest === originalDigest.value
+			? Object.freeze({ bytes: Uint8Array.from(mutantBytes), ref: mutantRef })
+			: Object.freeze({ bytes: Uint8Array.from(candidate.bytes), ref: Object.freeze({ ...candidate.ref }) });
+	const successor = material.activation.successor;
+	return Object.freeze({
+		...material,
+		activation: Object.freeze({
+			...material.activation,
+			successor: Object.freeze({
+				...successor,
+				candidates: Object.freeze(successor.candidates.map(replaceCandidate)),
+				exactCanonicalProjectionBytes: Uint8Array.from(mutantBytes),
+				references: Object.freeze(successor.references.map(replaceRef).sort(compareRef)),
+			}),
+		}),
+		candidateReferences: Object.freeze(material.candidateReferences.map(replaceRef).sort(compareRef)),
+		exactCanonicalProjectionBytes: Uint8Array.from(mutantBytes),
+	});
+}
+
+function compareRef(left: GenerationRef, right: GenerationRef): number {
+	return left.digest < right.digest ? -1 : left.digest > right.digest ? 1 : 0;
+}
+
+async function hostileCarrierRefusal(
+	carrier: D110cAHostileCarrier,
+	foreignHistory: AccumulatorSnapshot
+): Promise<D110cAHostileCarrierEvidence> {
+	const base = await openGenuineCreatorAdoptionFixture();
+	const primaryDatabaseName = `d110c-a-hostile-seal-${crypto.randomUUID()}`;
+	const snapshotDatabaseName = `d110c-a-hostile-snapshot-${crypto.randomUUID()}`;
+	const closers: StoreCloser[] = [];
+	let successor: V3PlaneHandle | undefined;
+	try {
+		const verified = await base.modules.verifyCreatorSuccessorAdoption({ catalog: base.catalog, handle: base.handle });
+		if (!verified.ok) throw new TypeError(`D110C_A_HOSTILE_VERIFY_FAILED:${verified.kind}`);
+		const material = consumeCreatorAdoptionIntent(verified.intent, base.handle);
+		if (material === undefined) throw new TypeError("D110C_A_HOSTILE_INTENT_UNAVAILABLE");
+		const mutant = mutatedProjection(material.exactCanonicalProjectionBytes, carrier, foreignHistory);
+		const replacement = replacedProjectionMaterial(material, mutant);
+		const committed = await base.modules.commitCreatorSuccessorAdoption({
+			handle: base.handle,
+			intent: createCreatorAdoptionIntent(base.handle, replacement),
+		});
+		if (!committed.ok) throw new TypeError(`D110C_A_HOSTILE_COMMIT_FAILED:${committed.kind}`);
+		const activated = await base.modules.activateCreatorSuccessorAdoption({
+			capability: committed.capability,
+			expectedRoomHead: Object.freeze({
+				currentAnchorDigest: String(committed.descriptor.anchorDigest),
+				epoch: Number(committed.descriptor.epoch),
+				objectId: String(committed.descriptor.objectId),
+			}),
+			handle: base.handle,
+			...base.runtimeBindings,
+		});
+		if (!activated.ok || activated.handle === null || typeof activated.handle !== "object") {
+			throw new TypeError(`D110C_A_HOSTILE_ACTIVATION_FAILED:${String(activated.kind)}`);
+		}
+		successor = activated.handle as V3PlaneHandle;
+		const beforeRoomHead = copiedRoomHead(successor);
+		const beforeDurable = await base.evidence.aheBackend.recoverActiveGeneration(base.scope.objectId);
+		const signer = await createRecoverableFinalitySigner({ seed: hexBytes(contract.privateKeySeedHex) });
+		const [vote, evidenceStore, snapshotStore] = await Promise.all([
+			base.modules.openBrowserSealVoteStore({ databaseName: primaryDatabaseName }),
+			base.modules.openBrowserSealEvidenceStore({ databaseName: primaryDatabaseName }),
+			base.modules.createBrowserSnapshotQuarantineStore({ primaryDatabaseName: snapshotDatabaseName }),
+		]);
+		closers.push(vote, evidenceStore, snapshotStore);
+		const bound = await base.modules.bindCreatorLiveClose({
+			evidenceStore: evidenceStore.store,
+			exactCanonicalAvailabilityPolicyBytes: encodeCanonical({
+				minLocalCopies: 1,
+				minMirrorReceipts: 0,
+				minRollbackGenerations: 2,
+				mode: "local-only",
+			}),
+			onObservation: () => undefined,
+			plane: successor,
+			signer: signer.signer,
+			snapshotStore,
+			storageIncarnation: vote.observation.incarnation,
+			voteStore: vote.store,
+		});
+		const afterDurable = await base.evidence.aheBackend.recoverActiveGeneration(base.scope.objectId);
+		return Object.freeze({
+			carrier,
+			durableHeadUnchanged: JSON.stringify(afterDurable) === JSON.stringify(beforeDurable),
+			reason: bound.ok ? "UNEXPECTED_SUCCESS" : bound.reason,
+			roomHeadUnchanged: JSON.stringify(copiedRoomHead(successor)) === JSON.stringify(beforeRoomHead),
+		});
+	} finally {
+		await Promise.resolve(successor?.deactivate()).catch(() => undefined);
+		await Promise.all(closers.map((closer) => closer.close().catch(() => undefined)));
+		await base.close();
+		await Promise.all([deleteDatabase(primaryDatabaseName), deleteDatabase(snapshotDatabaseName)]);
+	}
+}
+
+async function hostileCarrierRefusals(): Promise<readonly D110cAHostileCarrierEvidence[]> {
+	const foreign = await openGenuineCreatorAdoptionFixture({ objectId: `creator:${"b".repeat(32)}` });
+	let foreignHistory: AccumulatorSnapshot;
+	try {
+		foreignHistory = CompactMerkleAccumulator.fromSnapshot(foreign.evidence.history.historySnapshot).snapshot();
+	} finally {
+		await foreign.close();
+	}
+	const output: D110cAHostileCarrierEvidence[] = [];
+	for (const carrier of D110C_A_HOSTILE_CARRIERS) output.push(await hostileCarrierRefusal(carrier, foreignHistory));
+	return Object.freeze(output);
+}
+
+async function overflowRefusal(): Promise<string> {
+	const child = resolve(import.meta.dirname, "overflow-bind-child.mjs");
+	const completed = await execFileAsync(process.execPath, ["--import", "tsx", child], {
+		cwd: REPOSITORY_ROOT,
+		encoding: "utf8",
+	});
+	const parsed = JSON.parse(completed.stdout.trim()) as Readonly<{ readonly reason?: unknown }>;
+	return typeof parsed.reason === "string" ? parsed.reason : "D110C_A_OVERFLOW_CHILD_INVALID";
 }
 
 async function rejectedMessage(task: Promise<unknown>, missing: string): Promise<string> {
@@ -198,6 +382,7 @@ async function blobForRef(hot: D109dHotFixture, ref: GenerationRef): Promise<Uin
  * @returns Retained GREEN evidence and a cooperative cleanup owner.
  */
 export async function openD110cARepeatCloseFixture(): Promise<D110cARepeatCloseFixture> {
+	const [carrierRefusals, overflow] = await Promise.all([hostileCarrierRefusals(), overflowRefusal()]);
 	const hot = await openD109dHotFixture();
 	const primaryDatabaseName = `d110c-a-seal-${crypto.randomUUID()}`;
 	const snapshotDatabaseName = `d110c-a-snapshot-${crypto.randomUUID()}`;
@@ -290,6 +475,8 @@ export async function openD110cARepeatCloseFixture(): Promise<D110cARepeatCloseF
 				}),
 				independentHistory: independentlyDerived,
 				issued,
+				hostileCarrierRefusals: carrierRefusals,
+				overflowRefusal: overflow,
 				previousHistoryAfter: copiedCompactHistory(hot.base.evidence.exactCanonicalProjectionBytes),
 				providerPresent: false as const,
 				published,

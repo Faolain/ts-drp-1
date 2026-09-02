@@ -1,0 +1,15 @@
+25ce58e1920deff0f2b8718915772dc023a0c50f76098fc3bdae27605d4cc9af  .logs/d110c-a-final-review-a923c7d2/prompt.md
+0fac12dcf012e94f0212cf429945cc3680f3de66b086c0ef4504da49b48c2589  .logs/d110c-a-final-review-a923c7d2/grok/events.jsonl
+d89e5c7a0355befb3d600b7f10c3598be655ddbb271fb238454bb6457921752f  .logs/d110c-a-final-review-a923c7d2/grok/public.txt
+54b14a6157f47077fb675f38ed7d3da3eab3672718ca6334d706a2660e804574  .logs/d110c-a-final-review-a923c7d2/grok/status.json
+df1e8e251f516a1ec689bcaa2e891329351e2c11441bb1d10b5ee42ef2013951  .logs/d110c-a-final-review-a923c7d2/grok/resumed-terminal.json
+e54bef2c4fd0319f953e34c972b11153ef6e7a527220d433acbca1b024ccc85e  .logs/d110c-a-final-review-a923c7d2/opus/raw.json
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  .logs/d110c-a-final-review-a923c7d2/opus/stderr.txt
+7bd5cd1a8a3960f1ebbf3a776eed446d46c281b17c7c2593b6c3e33d920c1ebc  .logs/d110c-a-final-review-a923c7d2/kimi/kimi-cli.stream.jsonl
+c8d393335aaa816f1e71d00078eb4ffff6630e378f5faa4cedf13b44c09b2ecf  .logs/d110c-a-final-review-a923c7d2/kimi/kimi-cli.stderr.txt
+4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865  .logs/d110c-a-final-review-a923c7d2/kimi/kimi-cli.exit.status
+13695b5b6fc310134fad6764b539e7f226e7da6509718abe8e1296de6496c3e4  .logs/d110c-a-final-review-a923c7d2/correction-focused.json
+8ca49f19450bc478820b80785723061e91204328e1bf79cd7c4e3a59c386f8c4  .logs/d110c-a-final-review-a923c7d2/correction-focused-final.json
+37d3f879245ea1776a3d39f89801af17c83ddc28c98cbb86223a8d265d1082d3  .logs/d110c-a-final-review-a923c7d2/correction-retained.json
+acf0940a1ec85dfc8807163ae328a5d4f3cb1f237adf4abec463fbf2652e30c5  .logs/d110c-a-final-review-a923c7d2/correction-status.json
+bcc0cd04d006fc8efe71641775927417f53cb1c8dc5d65feb1088b6020b325c9  .logs/d110c-a-final-review-a923c7d2/correction-ledger.md

@@ -93934,6 +93934,69 @@ and `345cd891834cd44951e940733be1725f0934d395c242a4e37651c79071fdb9b9`.
 The final governing Grok/Kimi/Opus plan→RED→GREEN review remains pending and
 must inspect the signed GREEN checkpoint before closure.
 
+The first final-review round inspected signed/pushed GREEN
+`a923c7d2b8d2d2a5c58725a467d8e33f43db7c73`. Grok 4.6/high's initial service
+run cancelled after 330.136 seconds; its exact session
+`01a06272-94a7-7f82-b385-f640f0c3f403` was resumed as required and returned
+`APPROVED`, P0=0/P1=0/P2=3. Opus xhigh session
+`f0480f5a-8a6a-4eb2-8f22-3cf86c1ac52e` returned
+`CHANGES_REQUIRED`, P0=0/P1=1/P2=3. Its sole P1 is accepted: the reviewed plan
+made the hostile-carrier and epoch-refusal matrix mandatory, while the signed
+GREEN exercised only the genuine carrier. Direct `kimi-cli` reached the
+provider but returned 401 `invalid_authentication_error`; that attempt is
+honestly `NO_VERDICT` and is not represented as a review. Grok event, Opus raw
+result, and Kimi stream SHA-256 values are respectively
+`0fac12dcf012e94f0212cf429945cc3680f3de66b086c0ef4504da49b48c2589`,
+`e54bef2c4fd0319f953e34c972b11153ef6e7a527220d433acbca1b024ccc85e`,
+and `7bd5cd1a8a3960f1ebbf3a776eed446d46c281b17c7c2593b6c3e33d920c1ebc`.
+
+The accepted correction is tests-only. Seven projection/history carrier
+mutants—root inconsistency, size inconsistency, missing, malformed, reset,
+cross-room, and earlier-epoch substitution—start from genuine creator-close
+evidence, traverse the real commit and activation owners, and reach the real
+close binder. Every one returns exact `CREATOR_CLOSE_UNAVAILABLE` before
+room-head or durable-head mutation. A fresh isolated child also proves the
+`Number.MAX_SAFE_INTEGER` epoch guard returns that exact reason before seal,
+snapshot, or generation staging. The retained Phase-5e trust mutants continue
+to prove skipped/substituted successor epochs return exact `EPOCH_GAP`, while
+the D.110c-a owner retains its post-open successor epoch/object/genesis identity
+check before staging. Canonical decoding cannot carry JavaScript reference
+aliases; copied-snapshot assertions here and retained accumulator alias/hostile
+input tests remain the executable ownership proof rather than inventing an
+on-wire alias identity.
+
+The first correction command reported the one selected test passed but exited
+one only because the command accidentally enabled the repository-wide coverage
+threshold. The corrected exact command with `--coverage.enabled=false` exits
+zero with one file/one test passed. The retained 16-file suite exits zero with
+128/128 tests passed; the exact fixture TypeScript project, exact-owner ESLint,
+Prettier, and diff checks also pass. Reporter SHA-256 values for the diagnostic
+focused run, final focused run, and retained run are recorded in
+`.logs/d110c-a-final-review-a923c7d2/correction-ledger.md`. No product source,
+API, dependency, wire/schema, threshold, workload, D.110a identity, or campaign
+behavior changed. This executable test correction receives the single
+permitted confirmation after its signed/pushed checkpoint; no documentation-
+only confirmation follows it.
+
+In parallel, the user's separately authorized one-off Fable 5.1/high advisory
+session `fc758ff4-ab4f-434c-9d0a-99d243f8fba0` completed normally after about
+12 minutes 46 seconds without a repository edit or test run. It refreshed the
+Hiero consensus-node pin to
+`92ea3b0caff4e8106f87e7f5f4a84c0361634299` and confirmed that intervening
+changes do not touch the inspected History/WRAPS/roster proof paths. It
+independently supports the already selected fixed-genesis creator checkpoint:
+under `creator-trusted-v1`, the predecessor record and N-1→N QC provide lineage
+and close-process evidence, not a second authority source. Its prospective
+0b1 guidance is to type predecessor absence as availability, keep rollback as a
+consistency/availability carrier, add a self-referential-floor mutant, assert no
+force-handoff equivalent, and make observed closure growth the later bounded-
+closure RED. The full report SHA-256 is
+`6783ed60ba38e0dace1ee9a6458d54bac55bd6bc8c21bb757fc3274e4ea50619`;
+the durable advisory summary is
+`.logs/d110c-0b-hiero-fable51-parallel/summary.md`. This result is not a formal
+D.110c-a or D.110c-0b gate, does not reopen completed evidence, and consumes
+the one-off authorization; no further Fable invocation is authorized.
+
 This is a high-risk production authority/public-contract slice. The plan-only
 checkpoint is signed and pushed, then one Grok 4.6/high, standard direct Kimi K3
 with `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review inspects the
