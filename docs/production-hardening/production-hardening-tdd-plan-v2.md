@@ -95201,7 +95201,9 @@ third transition or campaign, or reopen its immutable RED/GREEN evidence.
 ##### D.110c-0c durable pending-adoption resume plan
 
 **Status: bounded source audit, single material plan confirmation, and causal
-RED complete; blocking union empty; narrow GREEN authorized.** Owner:
+RED complete; the pending-authenticator repair reaches durable epoch-3 commit,
+but full GREEN is blocked on the newly demonstrated D.110c-0c1 predecessor-
+issuance prerequisite below.** Owner:
 `packages/node/src/creator-adoption.ts` pending-candidate authentication and
 recovery kernel, the already exported
 `@ts-drp/node/creator-adoption-recover` capture boundary, the existing private
@@ -95459,6 +95461,131 @@ self-excluding manifest SHA-256 is
 `ec7bfe57fdfec9e995881c497eed45b159c90c1975550861f49b3b057473c622`.
 This is the intended product-path failure and authorizes only the frozen
 internal pending-authenticator GREEN.
+
+The first GREEN execution does not close D.110c-0c. The reviewed
+`authenticatePendingCandidate()` repair made the old-AHE recovery return
+`active-new`, perform exactly one AHE head swap, and advance the room floor
+from stable epoch 2/pending epoch 3 to stable epoch 3/no pending. The immediate
+same-process cold reopen then failed with exact product detail
+`v3 room successor reopen failed: recovery-rejected: creator predecessor
+recovery failed: admission-rejected`. The initial fixture guard masked this
+downstream result as `D110C_0C_FAILED_RECOVERY_FLOOR_MUTATED`; that test-only
+guard is corrected so post-publication failure preserves and reports the
+committed floor rather than asserting pre-publication immutability. Neither
+execution is GREEN, and neither weakens the retained requirement to reopen and
+issue after epoch 3.
+
+The bounded follow-up source audit finds a real owner boundary, not another
+pending-authenticator defect. `activateCreatorSuccessorLive()` creates the
+epoch-2 predecessor issuance view with `creatorFilteredIssuanceStore()`.
+That view authenticates and hides the pinned epoch-0 row and successor-relative
+rows above epoch 2; the genuine epoch-1 row created by the retained fixture is
+neither classifiable by the epoch-2 predecessor nor hidden by an authenticated
+intermediate-epoch rule, so predecessor recovery fails closed at admission.
+The accepted 0b1 closure already assigned general intermediate-epoch issuance
+retirement/recovery to D.110c-c, while this plan simultaneously required 0c to
+cold reopen epoch 3 and prohibited an unreviewed `v3-live.ts` filter change.
+The result exposes that sequencing contradiction. Removing epoch-0/1/2 work,
+accepting the floor commit without cold reopen, passing a synthetic displaced
+authority, or deferring the same-process reopen would invalidate causal
+RED-to-GREEN closure and is prohibited.
+
+##### D.110c-0c1 authenticated intermediate-epoch issuance prerequisite
+
+**Status: bounded decision/RED plan required before any `v3-live.ts` or
+issuance-store production edit.** Owner: the predecessor and successor issuance
+views created by `packages/node/src/v3-live.ts::activateCreatorSuccessorLive()`,
+`creatorFilteredIssuanceStore()`, and their exact outbox classification inside
+`recoverV3LiveReplica()`. The durable issuance/outbox contract and browser/Node
+store implementations join the owner set only if the reviewed design requires
+an authenticated retirement boundary or physical deletion; that outcome is an
+explicit high-risk compatibility/schema prerequisite, not an implicit 0c
+change. Deadline: GREEN before D.110c-0c may claim cold reopen, before D.110c-c
+RED, and before any D.110c-d/Phase-7 long-lived-room gate.
+
+The threat model remains untrusted durable store bytes under a trusted pinned
+genesis and current room floor. It is not sufficient to decode a claimed epoch
+and skip the row. A solution must prove that no current/unpublished row can be
+hidden or substituted; authenticate object, author, sequence, signature,
+anchor/epoch relation, and the exact retained authority needed for any row it
+discards; preserve pending publication and offline/rebase custody; fail closed
+on malformed, duplicate, reordered, forked, stale, cross-object, cross-author,
+or ambiguous rows; and keep hidden-row accounting per scan under one combined
+`maxEpochVertices` ceiling. It may not retain an O(N) authority/projection
+chain, manufacture displaced authority, mark an unpublished row published,
+trust the issuance database as an authority, weaken the two-generation rollback
+window, or hide growth outside the D.110c-c/d durable census.
+
+Before production edits, the bounded architecture decision compares exactly:
+
+1. authenticated discard-only classification of signed obsolete rows against
+   the retained current/immediate-predecessor trust and ACL material;
+2. an authenticated durable per-author retirement boundary advanced only after
+   verified adoption, floor commit, availability, rollback, and outbox gates;
+3. physical row retirement under the existing D.109/D.110c-c cleanup owner; and
+4. retaining older authority/projection material, which is rejected unless it
+   can meet the existing O(1) control-state law.
+
+If options 2 or 3 require a new issuance-store method, browser schema/version,
+wire field, public API, or migration, the decision stops and freezes that exact
+high-risk prerequisite before implementation. Option 1 is acceptable only if
+the audit proves a hostile-store substitution cannot cause a current or pending
+row to be classified obsolete; a signed claimed epoch alone is not proof.
+
+RED remains tests-only. First, one corrected diagnostic invocation must retain
+both old-AHE and new-AHE orderings after `active-new`, proving exact floor/AHE
+effects and the identical post-commit cold-reopen classification without
+aborting after the first ordering. Then a deterministic real-store
+differential creates genuine 0→1→2 product state with one local issued/published
+row per epoch and attempts epoch-3 reopen. Its control uses the same product
+path and fixed inputs but omits only the epoch-1 issued row. The evidence must
+enumerate and signature-check the actual stored rows read by the recovery path,
+prove the epoch-1 row is the sole differential, obtain the exact predecessor
+`admission-rejected` without widening production error strings, and emit one
+frozen causal token. Any different row, filter call, or failure class stops the
+slice. The existing two process-death orderings remain retained consumption
+gates; no test may construct epoch-3 state or delete a row privately.
+
+GREEN implements only the reviewed selected family. It must make the unchanged
+epoch-0/1/2 fixture cold reopen epoch 3 and issue/publish its fourth message in
+both crash orderings while preserving the exact first-transition pending matrix
+and the signed D.110c-0c RED. Adversarial gates cover a forged lower epoch,
+valid same-room old fork, duplicated author sequence, substituted issued/outbox
+pair, unpublished intermediate row, current row claiming an older sequence,
+stale retirement boundary, rollback, ambiguous write, and scan-counter reset.
+The retained gate includes 0b1 cold reopen/census, Phase-6a reopen,
+issuance/outbox, offline/rebase, D.109 reclamation, room-head, snapshot,
+availability, and rollback suites. Exact-owner build/typecheck/lint/format/diff,
+one-test/one-file selection, source-slice predicates, protected paths, 27
+stashes, process/ports, hashes, and self-excluding evidence manifests remain
+mandatory.
+
+Because this prerequisite changes or may change production recovery and durable
+issuance policy, it is high risk. Freeze the exact selected construction after
+the two-order diagnostic and bounded audit, sign/push the plan, and run the
+governing Grok 4.6/high, direct Kimi K3 100-step, and Opus xhigh plan review.
+Only P0/P1 blocks. No production edit follows until that union is empty and the
+causal RED is signed/pushed. The held D.110c-0c pending-authenticator candidate
+is signed only as a labeled non-GREEN checkpoint and receives the existing
+final GREEN review together with 0c1 after the unchanged full gate passes. No
+Fable or collaboration subagent is invoked without a new express user
+authorization.
+
+The expressly authorized one-off `claude-fable-5-1`/high course review ended
+normally in session `3de42449-c135-4bf2-a060-de4782bce954` with zero subagents
+and verdict `RESLICE_REQUIRED`. It independently confirmed that the held
+pending-authenticator change is minimal, the epoch-3 admission failure is a
+separate intermediate-row recovery seam, and weakening the existing fixture
+would invalidate closure. Its two P1s are accepted above: split the
+contradictory owner/gate sequence and retain both post-commit orderings before
+freezing 0c1 RED. Its P2 semantic-preservation audit, diagnostic-only source
+check, exact AHE delta, inner-detail custody, and static gates are retained
+obligations. The review root is
+`.logs/d110c-0c-fable51-high-course-review-20260902/`; its validating four-entry
+self-excluding manifest SHA-256 is
+`d90b114e2c7b318a722006a8f0a473e1ff3ce34fe58a1e2a3cf2975c44a696df`.
+This was the only authorized Fable invocation; no further Fable review is
+permitted without new express authorization.
 
 The complete confirmation evidence is retained under
 `.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry
