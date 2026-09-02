@@ -94618,10 +94618,11 @@ status artifacts for both affected package builds and build-source
 typechecks, v3-room typecheck/build, independent v3-chat typecheck, the private
 D.110c-a fixture typecheck, exact-owner ESLint, the 12-GiB formatter, diff and
 seventeen-predicate source-shape checks, reporter summaries, changed paths and
-source hashes, protected-path/stash/process/port state, commit/signature/ref
-custody, and a validating self-excluding manifest. The signed correction and
-its evidence receive the one already-permitted material confirmation; there is
-no new review slice.
+source hashes, protected-path/stash/process/port pre-commit state, and a
+validating self-excluding manifest. The later
+confirmation root records exact post-commit signature/ref custody. The signed
+correction and its evidence receive the one already-permitted material
+confirmation; there is no new review slice.
 
 The nonblocking findings are dispositioned prospectively. The post-transfer
 alias-cleanup mutant, retained title/stall-token hygiene, and an exact durable-
@@ -94630,6 +94631,50 @@ also pins the disclosed one-displaced-generation boundary and proves the third
 adoption only after authenticated pruning/catch-up exists. No D.110c-b result
 is reinterpreted as a third adoption, cold reopen, or bounded long-horizon
 proof.
+
+The bounded correction is signed/pushed commit
+`5aa26cd489784b0478d06e9f4a01806972c92ad1`, tree
+`d1b9ac20df9021202f7c042328fc3a633fd22d10`, with good signature status `G`
+and `git verify-commit` status zero. The origin branch matched that exact commit
+before the documentation/evidence-only closure checkpoint. The correction
+ledger SHA-256 is
+`09eb56e4722f2a0c6c194d0de9ff9500d16e9bd7b05222598671f89d62d6602a`;
+the validated 138-entry self-excluding correction manifest SHA-256 is
+`3b423f19f1d3e0d5f6087284454098e63d4fd0927f75610816129b2c1aa5a1b9`.
+That manifest pins the original GREEN root, first-review record, correction
+root, and the fifteen-path feature-wide D.110c-b source set at the reviewed
+commit. The later confirmation root supplies a separate exact seven-path
+correction-only listing and commit-object hashes; it also records the deferred
+signature/ref custody explicitly. The earlier sentence saying the correction
+root itself retained post-commit signature/ref custody is superseded by this
+exact two-root description.
+
+The sole material confirmation has an empty blocking union. Grok 4.6/high
+session `01a06381-9f72-7542-a61a-82790bbff304` was canceled by the service at
+its 16-turn bound after active inspection; the exact session resumed once and
+ended normally with schema-clean `APPROVED`, P0=0/P1=0/P2=4. Direct
+`kimi-code/k3` session `session_1fde6564-f522-4077-8fc6-507c808bbf59`, with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, returned `APPROVED`, P0=0/P1=0/P2=4; its
+exact session resumed once only to remove a terminal-schema preface. Two
+incompatible option launches and the obsolete short `k3` alias failed before
+any Kimi model session and remain launcher diagnostics. Opus xhigh session
+`58fb2c64-0b86-4f9a-bf0f-637eedc9ec0a` ended normally with `APPROVED`,
+P0=0/P1=0/P2=4. All three terminal objects set
+`blocking_union_closed=true`, `scope_preserved=true`, and
+`evidence_sufficient=true`; deterministic local parsing validates those exact
+predicates.
+
+The confirmation P2 union does not reopen D.110c-b. D.110c-c additionally owns
+a failure-path-scoped predecessor-close stop guard, raw/visible authority
+equality, and a frozen D.110c-b browser-title roster. The confirmation custody
+record relabels the older fifteen-path list as feature-wide, adds the exact
+seven-path correction list, records the separately passing manifest status,
+uses explicit `present`/`none` state-audit values, and notes that the original
+Vitest JSON reporter did not retain the Batch-1 stdout marker. These are
+bookkeeping or prospective precision items, not a product-behavior or evidence-
+integrity blocker. D.110c-b GREEN is closed at the reviewed correction commit;
+no further D.110c-b model round or executable rerun is authorized by this
+closure.
 
 The four prerequisite decisions, including the newly demonstrated 0b0
 freshness-floor authority question, are reviewed before their production edits;
