@@ -93657,13 +93657,14 @@ checkpoint:
    records. After D.110c-0a has removed seal refusal as a confounder, the sole
    terminal runtime cause must be the compaction verifier's
    `INVALID_ANCHOR`/`previous history snapshot does not match the authenticated
-anchor` result. The actor must not emit a successor QC, terminalize the
+   anchor` result. The actor must not emit a successor QC, terminalize the
    plane, install adoption facts, advance the application floor, or activate a
    replacement. The evidence records the first failing owner verbatim. If
-   `stageSnapshot()`, `persistSnapshot()`, `sealDurableReplay()`, or another
-   pre-verifier owner fails first at epoch 1, RED stops and reslices from that
-   demonstrated owner; the fixture must not be adapted to force the expected
-   verifier failure.
+   `stageSnapshot()`, `persistSnapshot()`, or another actual pre-verifier owner
+   fails first at epoch 1, RED stops and reslices from that demonstrated owner;
+   the fixture must not be adapted to force the expected verifier failure.
+   `sealDurableReplay()` currently follows the compaction verifier and is not
+   classified as a possible pre-verifier cause.
 2. A closed TypeScript fixture assigns genuine epoch-1→2 result bytes to the
    existing exported `CreatorLiveCloseResult` shape and fails only because its
    two fields remain literal 0/1. It also freezes the exact existing result-key
@@ -93698,7 +93699,7 @@ genuine process:
   malformed, aliased, reset, cross-room, cross-anchor, and earlier-epoch
   substitution all fail before seal/QC, head/floor mutation,
   terminalization, adoption facts, state/ACL transfer, or recovery ownership;
-  those private registration refusals may retain the existing fail-closed
+  those private registration refusals must retain the existing fail-closed
   `CREATOR_CLOSE_UNAVAILABLE` reason rather than introduce a public error, but
   the fixture must distinguish them by proving that the same plane binds and
   closes with its genuine carrier and refuses every named mutation;
@@ -93718,9 +93719,9 @@ genuine process:
   new active owner is introduced. GREEN records the exact closure-membership
   and closure-blob byte delta across the genuine 1→2 close. Existing per-epoch
   cut/QC closure growth is explicit debt owned by D.110c-0b1's bounded control
-  proof and D.110c-d's long-horizon census; if bounding it requires changing
-  close composition, that work is separately reviewed and cannot widen
-  D.110c-a.
+  proof, D.110c-c's first bounded hot/control-closure gate, and D.110c-d's
+  long-horizon census; if bounding it requires changing close composition, that
+  work is separately reviewed and cannot widen D.110c-a.
 
 The focused GREEN gate runs once after the one bounded implementation batch,
 followed by the private type contract and the retained creator seal/close,
@@ -93732,7 +93733,10 @@ and root-test TypeScript gate carried from the 0b0 P2. Because the widened
 result is public and consumed by both examples, GREEN also records exact
 successful statuses for `pnpm --dir examples/v3-room typecheck`,
 `pnpm --dir examples/v3-room build`, and
-`pnpm --dir examples/v3-chat typecheck`. The stale
+`pnpm --dir examples/v3-chat typecheck`. The two v3-room commands currently
+compile the same configuration and must not be claimed as independent
+configurations; both remain as compatibility/evidence-convention gates, while
+v3-chat is the independent second consumer compile. The stale
 `d110cLastPendingRecovery` diagnostic call is removed in the same tests-only
 batch before extending the browser fixture; it cannot change product behavior
 or trigger a separate review.
@@ -93741,6 +93745,10 @@ The D.110c-b plan must name the still epoch-pinned adoption owners at
 `packages/node/src/creator-adoption.ts:546`, `:565`, `:840`, and `:1052` before
 its RED. They are inert in D.110c-a because this slice stops at a pending
 epoch-2 head and neither constructs nor activates an epoch-2 projection.
+D.110c-b also owns replacing the tests-only literal epoch-0 result mirror in
+`packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts` when its
+browser loop first exercises epoch 1→2; D.110c-a leaves that structurally
+decoupled declaration unchanged.
 
 The first high-risk plan review inspected signed/pushed commit
 `ec720f7d37cd7b32229cbe1c85557c3d73239cc7` from one clean detached checkout.
@@ -93764,6 +93772,36 @@ Grok public result, Kimi stream, and Opus stream SHA-256 values are respectively
 `e778ef351a9af96a57c502afbc40cb5268e1135ae2d3b4bb0880feb9b7268b26`,
 `65b3fb3b4a15412d0541e2e58d5adccb32c1442e01073493872ca5e2be8f5c34`,
 and `18b39a36afc2e01a34399553a28089244a251982b872e5ea42d6618dff543f87`.
+
+The one permitted confirmation inspected signed/pushed correction
+`5638a9afe400a4bba00c25aa34b25b99991d84a6` from the same clean detached
+checkout. Grok 4.6/high's first turn reached the 16-turn runner bound after
+285.245 seconds and ended `cancelled` before a verdict. Exact session
+`01a06227-3087-7482-b6df-beb3fb3191a6` was resumed once as required and then
+completed normally with `stopReason=end_turn`, `APPROVED`, P0=0/P1=0/P2=2.
+Standard direct Kimi K3 session
+`session_fcc4e9da-f7b0-4775-ac6a-a3309fa6c65c`, with the exact 100-step
+control, returned `APPROVED`, P0=0/P1=0/P2=2. Opus xhigh session
+`e59f4b8f-3cc6-44f2-973e-80553495aefd` returned `APPROVED`,
+P0=0/P1=0/P2=3. The blocking union is empty and D.110c-a may proceed to RED.
+The confirmation P2s are dispositioned mechanically above without another
+review: the hostile-carrier reason is mandatory rather than optional;
+`sealDurableReplay()` is correctly classified after the verifier; closure
+growth is carried into D.110c-c as well as 0b1/d; duplicate v3-room compile
+configurations are not overstated; and D.110c-b owns the decoupled browser
+literal mirror. The confirmation ledger is
+`.logs/d110c-a-plan-confirmation-5638a9af/confirmation-ledger.md`. Prompt,
+correction diff, custody, original Grok events/public text, Grok resume
+prompt/events, Kimi stream, and Opus stream SHA-256 values are respectively
+`4c1f8bf669d3176e18f07ef0b6bf5c0107f13197d9552fb9f5955d6a7a372c11`,
+`bbca3b9a368ed28274f68e3fbf82e2b81d7da00ecfe6aaeb29a067177a7b06b1`,
+`9ec160344fbc0481a26ff6eb6ff942ffd5d7df07f61766b026aabcc0ef1527dd`,
+`4704a3d9e355e27d90788e6a318205fd58e906317d0c886392672697ca308cfa`,
+`b0c3ed5c66f0bd0e3f24fe2e2824daed8b2e129b7ad6f37e337f9114dc7ab98d`,
+`2e7a0de3c311c29611f79f5a40fc8eb9ecc25bd634d491214c1a27b71c7c4e4d`,
+`0bdd151c146cb6e1aef2b48d10d57070a8e0e73ea3ee6ed1ab393963f616791f`,
+`acf48fe25e6b156ce14ea5a45374c3d62f9a97b1b4a1082d9e714a9117008c1c`,
+and `5911bad1742df1616fe206763be924222d90ea375e334531fd967ec28d937d5f`.
 
 This is a high-risk production authority/public-contract slice. The plan-only
 checkpoint is signed and pushed, then one Grok 4.6/high, standard direct Kimi K3
