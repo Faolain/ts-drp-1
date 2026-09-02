@@ -18024,13 +18024,13 @@ its eviction matrix green. Only then may any profile leave observation mode.
 > optimization. It is the **acceptance boundary** — the moment untrusted bytes become authoritative — and it
 > is already built and crash-tested in Phase 2e. Phase 6 _enables_ it, it does not invent it.
 
-| Slice    | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Class        | RED test → GREEN                                                                                                                                                                                                                                                                                                                                                      |
-| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **6a**   | Enable verified adoption: full external verification (authority chain, `CutValue`, commit QC, proposal/value binding, close + history extension, snapshot payload/manifest, blueprint, archive root, next anchor) **outside** the transaction; then one strict transaction with exact CAS on `(expectedEpoch, expectedAnchor, expectedCutValueDigest)`                                                                                                                                                                                                                                                                                                                                                                                           | coordinated  | Unsigned cut, stale expected anchor, same-epoch different value, and every crash point leave the old anchor unchanged; a valid cut yields exactly one new complete closure                                                                                                                                                                                            |
-| **6b**   | Enumerated-structure cleanup: closed-epoch `vertices`, `forwardEdges`, `frontier`, `vertexDistances`, causality caches, snapshots, checkpoints, finality state, pending indexes, sync inventories, rollback artifacts — **only after** verified commit QC + durable adoption + ≥2 rollback generations + availability policy satisfied + outbox fully categorized. Browser cleanup scheduling reuses the exact 5c primary-dispatch owner/port and introduces no second election mechanism; holding the advisory lease grants no deletion authority, and every cleanup precondition is transactionally rechecked immediately before deletion.                                                                                                     | consensus-v3 | Archival-vs-compacted differential over ≥100 epochs; raw-dependency audit instrumentation; Locks on/off/unavailable and takeover yield the same eligible deletion set, while a stale lease holder or changed precondition deletes nothing                                                                                                                             |
-| **6c**   | **Memory gate, made able to fail.** Round 1 routed this through `benchmark-memory.yml`, which sets `fail-on-alert: false`. Two artifacts instead: (i) **structure-census assertions in vitest** — deterministic, non-flaky, exact integers: after E epochs with pruning enabled, `hashGraph.vertices.size ≤ maxEpochVertices + activeTail`, closed-epoch `FinalityState` count `=== 0`, `states` map ≤ checkpoint bound, `forwardEdges`/`vertexDistances` census ≤ bound; (ii) heap slope under `node --expose-gc`, post-GC `heapUsed` per epoch, least-squares slope over the last E/2 epochs ≤ ε bytes/epoch **and** absolute ≤ budget. Flip `fail-on-alert: true` on the memory bench as a trend backstop.                                    | local-safe   | **Paired assertion** (a heap bound alone passes if writes were silently dropped): `expect(admittedAndAppliedOps).toBe(1_000_000)` **and** final state digest correct **and** heap bounded                                                                                                                                                                             |
-| **6c-r** | **Blocking repeated-room authenticated epoch lifecycle.** Generalize the already verified creator close/adopt/reopen orchestration so one adopted active successor becomes the authenticated close-capable predecessor of the next epoch. Preserve the existing wire, authority, digest, workload, threshold, dependency, and public-API contracts. This row is a prerequisite for any long-lived-room, bounded-after-E-epochs, archive, or age-independent cold-join claim; D.109f's synthetic durable differential and D.110a's 64 distinct one-transition rooms do not satisfy it.                                                                                                                                                            | coordinated  | A genuine room executes epoch 0→1, restart/reopen, epoch 1→2, and continued issue/publish with exact state/ACL/authority/anchor/history/archive/operation accounting; then one room executes at least 100 authenticated transitions with restart/prune boundaries, bounded owner/durable censuses, and a fresh-process post-GC memory gate.                           |
-| **6d**   | **Deferred legacy-finality retention resolution (former 0k bound).** Enabled legacy finality may delete or compact a record only after the adopted close/cut policy deterministically grants deletion permission and the required durable evidence or certified replacement exists. This is a coordinated compatibility operation, not a Phase-0 `Map.size` trick: define post-expiry query, late-attestation, sync and restart behavior; plumb configuration; integrate journal/commit discipline; and run mandatory XVER. Phase-4/5/6 artifacts establish policy consistency and deletion permission — frozen legacy rooms do not literally inherit v3 QC machinery. The Phase-1c off-switch remains the only bound-zero mode before this row. | coordinated  | Same history under permuted delivery/access orders expires the same records only after verified adoption; ancient late attestations, old queries, sync and restart follow the specified post-expiry result; rollback restores the exact pre-prune census; no sibling map merely relocates Θ(V) state; paired admitted-operation/digest/census/heap gates remain green |
+| Slice    | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Class        | RED test → GREEN                                                                                                                                                                                                                                                                                                                                                      |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **6a**   | Enable verified adoption: full external verification (authority chain, `CutValue`, commit QC, proposal/value binding, close + history extension, snapshot payload/manifest, blueprint, archive root, next anchor) **outside** the transaction; then one strict transaction with exact CAS on `(expectedEpoch, expectedAnchor, expectedCutValueDigest)`                                                                                                                                                                                                                                                                                                                                                                                                             | coordinated  | Unsigned cut, stale expected anchor, same-epoch different value, and every crash point leave the old anchor unchanged; a valid cut yields exactly one new complete closure                                                                                                                                                                                            |
+| **6b**   | Enumerated-structure cleanup: closed-epoch `vertices`, `forwardEdges`, `frontier`, `vertexDistances`, causality caches, snapshots, checkpoints, finality state, pending indexes, sync inventories, rollback artifacts — **only after** verified commit QC + durable adoption + ≥2 rollback generations + availability policy satisfied + outbox fully categorized. Browser cleanup scheduling reuses the exact 5c primary-dispatch owner/port and introduces no second election mechanism; holding the advisory lease grants no deletion authority, and every cleanup precondition is transactionally rechecked immediately before deletion.                                                                                                                       | consensus-v3 | Archival-vs-compacted differential over ≥100 epochs; raw-dependency audit instrumentation; Locks on/off/unavailable and takeover yield the same eligible deletion set, while a stale lease holder or changed precondition deletes nothing                                                                                                                             |
+| **6c**   | **Memory gate, made able to fail.** Round 1 routed this through `benchmark-memory.yml`, which sets `fail-on-alert: false`. Two artifacts instead: (i) **structure-census assertions in vitest** — deterministic, non-flaky, exact integers: after E epochs with pruning enabled, `hashGraph.vertices.size ≤ maxEpochVertices + activeTail`, closed-epoch `FinalityState` count `=== 0`, `states` map ≤ checkpoint bound, `forwardEdges`/`vertexDistances` census ≤ bound; (ii) heap slope under `node --expose-gc`, post-GC `heapUsed` per epoch, least-squares slope over the last E/2 epochs ≤ ε bytes/epoch **and** absolute ≤ budget. Flip `fail-on-alert: true` on the memory bench as a trend backstop.                                                      | local-safe   | **Paired assertion** (a heap bound alone passes if writes were silently dropped): `expect(admittedAndAppliedOps).toBe(1_000_000)` **and** final state digest correct **and** heap bounded                                                                                                                                                                             |
+| **6c-r** | **Blocking repeated-room authenticated epoch lifecycle.** Generalize the already verified creator close/adopt/reopen orchestration so one adopted active successor becomes the authenticated close-capable predecessor of the next epoch. Preserve existing wire, digest, workload, threshold, and dependency contracts unless a named high-risk prerequisite explicitly reslices one; the already demonstrated creator seal-authority and exported result-contract changes are not hidden behind a blanket compatibility claim. This row is a prerequisite for any long-lived-room, bounded-after-E-epochs, archive, or age-independent cold-join claim; D.109f's synthetic durable differential and D.110a's 64 distinct one-transition rooms do not satisfy it. | coordinated  | A genuine room executes epoch 0→1, restart/reopen, epoch 1→2, and continued issue/publish with exact state/ACL/authority/anchor/history/archive/operation accounting; then one room executes at least 100 authenticated transitions with restart/prune boundaries, bounded owner/durable censuses, and a fresh-process post-GC memory gate.                           |
+| **6d**   | **Deferred legacy-finality retention resolution (former 0k bound).** Enabled legacy finality may delete or compact a record only after the adopted close/cut policy deterministically grants deletion permission and the required durable evidence or certified replacement exists. This is a coordinated compatibility operation, not a Phase-0 `Map.size` trick: define post-expiry query, late-attestation, sync and restart behavior; plumb configuration; integrate journal/commit discipline; and run mandatory XVER. Phase-4/5/6 artifacts establish policy consistency and deletion permission — frozen legacy rooms do not literally inherit v3 QC machinery. The Phase-1c off-switch remains the only bound-zero mode before this row.                   | coordinated  | Same history under permuted delivery/access orders expires the same records only after verified adoption; ancient late attestations, old queries, sync and restart follow the specified post-expiry result; rollback restores the exact pre-prune census; no sibling map merely relocates Θ(V) state; paired admitted-operation/digest/census/heap gates remain green |
 
 ### Exit gate (Phase 6)
 
@@ -91632,6 +91632,196 @@ dependency, workload, threshold, availability/deletion rule, or additional
 public surface beyond the explicitly reviewed owners below stops the affected
 sub-slice for another high-risk reslice.
 
+##### D.110c-0b Hedera/Hiero comparative authority-lineage audit
+
+This bounded comparison is design evidence, not an implementation dependency or
+authorization. The audit pinned `hiero-improvement-proposals` at commit
+[`54ccb06659592ab201e7adea632f1019e9faa00e`](https://github.com/hiero-ledger/hiero-improvement-proposals/tree/54ccb06659592ab201e7adea632f1019e9faa00e)
+(tree `42ff7d2c1ff68ef662b405cb167838849d1b49f1`) and HIP-1200 blob
+`088088185786375a1478166bbd61c4021eedc85c`; it pinned
+`hiero-consensus-node` at commit
+[`1aa1d6c153907750cfbba6935b7a21867053968e`](https://github.com/hiero-ledger/hiero-consensus-node/tree/1aa1d6c153907750cfbba6935b7a21867053968e)
+(tree `7c7adb3015c782e4131cc2ad1ca7ec5f97cb8cc5`). The inspected
+exact-weight design blob is `c35cb34e6e797719fdb02f8541cb067f64e3972a`;
+the implementation blobs for `HistoryLibrary`, `HistoryLibraryImpl`,
+`WrapsHistoryProver`, `WritableHistoryStoreImpl`, `V071HistorySchema`,
+`TssHandoffCoordinator`, `WrapsProvingKeyVerification`, and
+`history_types.proto` are respectively
+`c4c998d06d611fe7ece9c62346fb6fad4c7a671c`,
+`c53deacbffe3352a0dba74d46cc7ddf265f4ed6c`,
+`fc7c893b20b9246be8f2b814af7810500ce4fa2a`,
+`589537503db6da008b876b540c37664cbb9665ba`,
+`0cb24998101688d3fe0f09986cceea780fd213d4`,
+`8ca7f9a87c853663add1bfb194b6017a80c6a2ff`,
+`e15e6c352a085d3d44b3ac433712b6dfcc070647`, and
+`5b4d59d4002426af096423af879390f883eda1ff`. The pinned test blobs for
+history-store handoff/purge, WRAPS handoff, reconnect reset, and signed-state
+validation are also retained in the audit ledger. The native implementation was
+independently pinned at `hiero-cryptography` commit
+[`39f28f39f609f80e52253d86169e2db5216a713e`](https://github.com/hiero-ledger/hiero-cryptography/tree/39f28f39f609f80e52253d86169e2db5216a713e),
+with WRAPS `lib.rs`/Cargo blobs
+`5beccdf8fdf35a5da6f55112663faa1b829bd849` and
+`f5aba82bedd5d17b8127e211ecf3d97632eb0a5a`. These pins distinguish
+what was inspected from later upstream movement.
+
+HIP-1200 is an approved proposal that defines a stable ledger ID as the hash of
+the genesis TSS address book and a chain-of-trust proof for a current history.
+The pinned consensus source demonstrates that `HistoryService`, genesis and
+incremental WRAPS construction, compressed-proof verification, persisted
+active/next constructions, joint Hints/History handoff, reconnect reset, and
+handoff purging are implemented on that revision. Source and tests do **not** by
+themselves prove a specific public-network deployment or operational enablement;
+this audit makes no such claim. In particular, the pinned `TssConfig` still
+defaults `forceMockSignatures` to true pending a full block-stream cutover. The
+exact-weight document is architecture documentation. HIP-1200 describes packed
+block-signature sizes and notes that ArkWorks/snarkjs compatibility is
+unconfirmed; the implemented protobuf uses one opaque `block_signature` byte
+field. Proposal sizes/layout and implementation defaults are recorded
+separately and are not ts-drp acceptance constants.
+
+The transferable comparison is deliberately narrow:
+
+| Hiero concept                   | ts-drp analogue                                 | Important non-equivalence                                                                                                                             |
+| ------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Genesis roster hash / ledger ID | Pinned room genesis anchor                      | A network-wide roster root is not a per-room creator key, and genesis authenticity remains out-of-band in both systems.                               |
+| Evolving roster and proof keys  | Evolving room ACL/authority                     | In D.110c's `creator-trusted-v1` scope, the creator checkpoint signer/profile/signer set stays fixed while the signed anchor's ACL digest may evolve. |
+| Roster transition and handoff   | Authenticated epoch close, adoption, activation | Hiero coordinates two services and a roster; ts-drp coordinates cut/QC, snapshot, trust, product ownership, and cleanup.                              |
+| Threshold signature             | Cut/QC certification                            | Hiero uses exact weights; creator-only ts-drp has one trusted signer and must not be relabelled BFT.                                                  |
+| Recursive WRAPS proof           | Candidate compact authority-lineage proof       | It is a design family only; no WRAPS, SNARK, BLS/hinTS, CRS, or proving artifact enters ts-drp implicitly.                                            |
+| Current signed state/history    | Authenticated room trust/checkpoint state       | A valid signed checkpoint establishes authenticity, not freshness against withholding or replay by itself.                                            |
+| Block/mirror history            | Archived room epochs/messages                   | Historical application bytes are separately growing archive state, not active authority/control proof.                                                |
+
+The pinned Hiero construction establishes the following and no more. A verifier
+authenticates the ledger ID out of band, verifies a compressed chain proof from
+that ledger ID to the target `History` `(addressBookHash, metadata)`, verifies
+that the metadata identifies the Hints verification key, and then verifies the
+current threshold signature. Genesis starts with aggregate Schnorr signatures;
+each incremental construction witnesses the prior uncompressed recursive proof,
+the source address book/proof keys, the target address book and verification
+key, and source-roster authorization of that transition. The design document
+describes source authorization at at least one-third of source weight and target
+readiness at strictly greater than two-thirds. The pinned implementation's
+`RosterTransitionWeights` exposes those thresholds, while its WRAPS MPC R1
+advances only above one-half of source weight and later phases require all
+accepted R1 participants; `TssConfig` also defaults its signing-threshold
+divisor to 2. Those distinct construction/liveness thresholds must not be
+collapsed into one claim or imported into ts-drp's quorum law.
+
+The externally presented recursive proof and its verification cost are
+age-independent, but the complete system is not stateless. It retains the
+ledger ID, an active construction, at most one next construction, current proof
+keys, construction-scoped votes/messages while in flight, the target history,
+and an uncompressed WRAPS proof needed to extend recursion. The prover also
+requires four separately installed, hash-verified proving/verification artifact
+files. The pinned native Rust/JNI implementation uses Nova folding with a
+Groth16/KZG decider over its selected curves and fixes a 128-entry address-book
+circuit bound; there is no browser/TypeScript verifier in the inspected source.
+Handoff refuses a mismatched or incomplete construction, requires the
+History proof metadata to match the Hints verification key for joint promotion,
+promotes the completed next construction, purges obsolete votes/messages, and
+removes departed-node proof keys where appropriate. Reconnect stops old
+controllers before learned state is installed. Thus safe purge follows a
+completed matching handoff; it is not permission to discard an unadopted source
+or availability/rollback material prematurely. The assumptions include an
+authentic genesis ledger ID, the recursive verifier key and proving artifacts,
+sound native cryptography, threshold-honest source authorization, sufficient
+target participation for liveness, and available state/block distribution.
+
+The D.110c-0b candidate decision is:
+
+| Candidate                                                   | Genesis authentication and evolving authority                                                                                                                                                                                                                           | Epoch growth / costs                                                                                                                                      | Browser, dependency, and contract impact                                                                                                                                                             | Restart, replay, archive, and pruning disposition                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stable genesis/root authority signs the current checkpoint  | Directly authenticates a current anchor under the creator key committed by a separately pin-verified genesis trust record. Supports evolving ACL/state/history fields while the `creator-trusted-v1` signer remains invariant; does not solve future seal-key rotation. | O(1) existing-v1 genesis/current trust records and fixed rollback generations; existing Ed25519 plus anchor/QC/history checks.                            | Browser-feasible with existing primitives, record schema, and no new crypto dependency or wire field. It still requires a reviewed opener/closure-law contract and durable compatibility transition. | Untrusted genesis/current bytes are fully reverified and cross-bound. A caller-held authenticated expected head/floor is required to reject a valid stale checkpoint; a new client with only genesis cannot infer latestness. Archive bytes grow separately. Prune only after authentic durable replacement, head installation, snapshot/availability/outbox gates, and two rollback generations. **Selected for creator-only D.110c integrity/control compaction.** |
+| Periodically certified checkpoint with external pin         | Can authenticate current authority and freshness if the external pin is trusted.                                                                                                                                                                                        | O(1) local control state; external service/state evolves.                                                                                                 | Introduces a new authority/availability carrier, API, migration, and operational dependency.                                                                                                         | Useful only as a separately accepted Phase-7 bootstrap/freshness design. **Rejected for D.110c-0b.**                                                                                                                                                                                                                                                                                                                                                                 |
+| WRAPS-like recursively accumulated transition proof         | Authenticates arbitrary changing authority from genesis when each transition is encoded and authorized.                                                                                                                                                                 | Constant-size public proof and fixed verification; nontrivial recursive proving/update work plus retained prior uncompressed proof and proving artifacts. | New recursive-SNARK/native dependency, verifier/prover keys or setup artifacts, wire fields, browser cost, compatibility, and migration.                                                             | Strong compact lineage, but freshness/availability remain separate and operational state is not zero. **Rejected as disproportionate for per-room creator-only scope; any future rotated-authority use is a separate high-risk design.**                                                                                                                                                                                                                             |
+| Merkle/skip consistency proof                               | Proves inclusion/append consistency, not authority transition without separately certified keys.                                                                                                                                                                        | O(log N) proof/state or an equivalent retained accumulator/index.                                                                                         | Hash-only and browser-friendly, but new schema and control-proof semantics.                                                                                                                          | RFC 9162 already helps history consistency; this does not independently authenticate changing authority and fails the strict bounded-control target if its required path grows. **Rejected as the authority solution.**                                                                                                                                                                                                                                              |
+| Existing anchor + cut/QC + RFC 9162 history root, unchanged | Existing bytes authenticate the first creator transition and append-only history under current assumptions.                                                                                                                                                             | Current closure retains every old cut/QC and therefore grows O(N); opener is epoch-0/first-successor-specific.                                            | No new dependency, but the unchanged form cannot meet the acceptance contract.                                                                                                                       | Useful primitives for the selected checkpoint, not a complete age-independent opener. **Rejected unchanged.**                                                                                                                                                                                                                                                                                                                                                        |
+
+The selected D.110c-0b architecture is therefore a **bounded dual-anchor creator
+checkpoint with a fixed rollback window**, not Hiero/WRAPS. It reuses the
+existing v1 trust-record bytes: one immutable genesis record opened against the
+pinned genesis digest, one current record, the current cut/QC and exact recovery
+descriptor, and exactly two complete rollback generations. The opener first
+authenticates the genesis record and extracts its creator/profile/signer-set
+material; it then requires byte-identical profile/signer-set carriers and
+digests in the current record, verifies the current anchor and creator
+signature, and verifies current cut/QC, ACL, history root and size,
+archive-index root, state/snapshot/manifest, and recovery bindings. A
+self-contained hash or self-signature cannot nominate its own trust key or
+claim to be latest.
+
+The logical retention law is exact even though implementation ref names remain
+owned by their existing stores. At epoch N the active generation retains one
+pin-verifiable genesis trust record, one current trust record, one current live
+projection, the current snapshot/manifest/ACL and recovery refs required by the
+existing reopen owner, and only the cut/QC for transition N-1→N. It retains no
+earlier transition cut/QC. Exactly two complete prior closures remain in
+`Superseded` rollback generations under D.109; no third rollback closure, copied
+journal chain, bootstrap chain, or sibling registration is permitted. Archive
+segments and application history are separately growing content-addressed data
+and are not required to authenticate the current creator key. The expected-head
+input is an authenticated `(objectId, epoch, currentAnchorDigest)` supplied
+outside the untrusted checkpoint bytes; absence or mismatch is a fail-closed
+freshness result, not permission to choose the largest stored epoch.
+
+This selection has a hard compatibility boundary. Current protocol-v3 exposes a
+genesis-only trust opener, `inspectTrustClosure` permits exactly one trust
+record, and the closure law accumulates old cut/QC proof refs. A new or extended
+authenticated opener/closure contract and atomic bounded-closure transition are
+therefore **D.110c-0b1**, a named high-risk prerequisite; it must prefer a
+private/package-internal composition and preserve the v1 record/wire schema. If
+the RED demonstrates that a new exported public API, record version, wire field,
+authority carrier, dependency, or migration protocol is genuinely required,
+0b1 stops and is resliced again rather than implementing it. D.110c-0b1 is
+limited to stable `creator-trusted-v1`; rotating creator/seal authority,
+delegated/BFT repeated rollover, external pins, and recursive proofs are
+excluded. Brand-new-client freshness is not created by a root signature: a
+valid earlier creator checkpoint is authentic but may be stale. Reopen must
+compare against a caller-held authenticated expected head/floor; Phase 7 must
+name how a new client obtains that input or reslice a freshness/availability
+authority. Until then, D.110c may claim bounded authentic recovery with an
+authenticated expected head, not discovery of latestness from hostile storage
+using genesis alone.
+
+D.110c-0b1 RED must use the real current trust opener and closure against at
+least three genuine sequential creator transitions. It must prove the current
+epoch>0 trust cannot open without replaying retained predecessors, exact active
+closure grows with each cut/QC, a stale but valid earlier checkpoint is rejected
+when a newer authenticated expected floor exists, and no tests-only trust record or private
+fixture shortcut can satisfy the path. GREEN must prove:
+
+- the pinned genesis digest, creator key/profile/signer set, current epoch,
+  current anchor signature, cut/QC, ACL digest, state/snapshot/manifest,
+  history root/size, archive root, and recovery facts are all authenticated;
+- tampered genesis, current anchor, signature, epoch, predecessor, ACL, cut/QC,
+  history, archive, state, manifest, recovery reference, or authenticated expected head/floor fails
+  closed with exact errors before activation or deletion;
+- replay, stale checkpoint, skipped epoch, substituted checkpoint, same-anchor
+  double close, equivocation, head regression, incomplete write, crash between
+  checkpoint and head CAS, and unavailable replacement cannot advance trust;
+- only after the new checkpoint and head are durably/authentically installed do
+  old control proofs outside two complete rollback generations become eligible
+  for deletion, with availability, snapshot, outbox, and rollback predicates
+  still authoritative;
+- active control closure, bootstrap/checkpoint metadata, registrations, and all
+  stores required for ordinary reopen remain constant-bounded with transition
+  count; growing archive/application bytes are separately enumerated and are not
+  required as active authority proof; and
+- legacy epoch-0/first-successor data either migrates deterministically or is
+  rejected by an explicit compatibility error; no silent reinterpretation is
+  permitted.
+
+Its focused and retained gates include creator seal/close/adoption/reopen,
+protocol-v3 trust vectors, snapshot substitution, D.109 cleanup/rollback/
+availability/outbox suites, Node and browser storage migrations, crash-point
+reopen, exact closure and store censuses, and adversarial untrusted-storage
+mutants. D.110c-c consumes the accepted opener and pruning law; D.110c-d proves
+the bound through at least 100 genuine transitions. Phase 7 consumes the
+multi-epoch producer and separately owns archive-root evolution, archived-byte
+availability, cold paging, and brand-new-client freshness. No D.110c-0b result
+may hide O(N) authority data in archive, metadata, registration, bootstrap, or
+recovery storage.
+
 ##### Explicit implementation reslice
 
 The umbrella closes through three reviewed prerequisite decisions followed by
@@ -91641,26 +91831,36 @@ receipt, archive record, or active registration in test code.
 
 1. **D.110c-0a — epoch-relative creator seal custody.** Owner:
    `packages/protocol-v3/src/seal.ts`, the creator-only owners in
-   `packages/seal`, and their genuine vote/evidence adapters. RED opens seal
+   `packages/seal`, the Node vote/evidence ports, and the browser adapters in
+   `packages/storage-browser/src/internal/seal-vote-store.ts`,
+   `seal-evidence-store.ts`, and `schema-idb.ts`. RED opens seal
    authority and a genuine actor with authenticated epoch-1 creator trust and
    proves today's exact epoch-0 refusal without synthesizing a QC. GREEN derives
    every proposal/vote/QC/evidence epoch and anchor from opaque trust authority,
    isolates write-once evidence/vote custody per authenticated
    `(objectId, closedEpoch)`, rejects cross-epoch store reuse, and leaves the
-   certified/BFT branch plus epoch-0 vectors byte-identical. This is a high-risk
-   security-authority slice and closes before D.110c-a RED.
+   certified/BFT branch plus epoch-0 vectors byte-identical. Its compatibility
+   boundary explicitly covers existing epoch-0 rows and schema migration; its
+   reclamation law covers `sealEvidence`, `voteSlots`, `signerState`, and
+   `voteOutbox` only after authenticated handoff plus the existing rollback,
+   availability, and outbox gates. Those four stores enter the D.110c-c/d
+   bounded durable census. This is a high-risk security-authority slice and
+   closes before D.110c-a RED.
 2. **D.110c-0b — bounded authenticated trust checkpoint and control-proof
    compaction decision.** Owner: protocol-v3/control-plane trust and closure
-   law, Node cold reopen, and existing durable owners as boundaries. The design
+   law, Node creator close, hot adoption verify/commit, cold reopen, and existing
+   durable owners as boundaries. The design
    must permit age-independent cold reopen from the pinned genesis while
    bounding the active control closure and without trusting storage bytes,
    retaining an O(N) proof chain, weakening the genesis pin, or moving growth
    into an uncounted store. Current trust records, live-journal anchor carriers,
-   and retained cut/QC evidence are inputs to the audit, not preselected fixes.
-   Because every obvious option changes authority, a package contract, or wire
-   custody, this prerequisite receives its own plan review and stops before RED
-   until one exact design, schema impact, proof, and migration/compatibility
-   boundary is approved. It closes before D.110c-c RED and D.110c-d freeze.
+   and retained cut/QC evidence are inputs to the audit. The comparative audit
+   selects the existing-v1 dual-anchor creator checkpoint plus two rollback
+   generations and rejects WRAPS, an external pin, and a Merkle proof as the
+   authority solution. D.110c-0b1 owns its reviewed opener/closure contract,
+   exact authenticated-head input, compatibility transition, RED/GREEN, and
+   stop boundary; it adds no new record/wire schema unless another high-risk
+   reslice is first accepted. It closes before D.110c-c RED and D.110c-d freeze.
 3. **D.110c-0c — durable pending-adoption resume decision.** Owner: creator
    close/adoption durable orchestration and existing AHE/snapshot/evidence
    owners. RED must create a real closed durable head, terminate the process
@@ -91680,7 +91880,9 @@ receipt, archive record, or active registration in test code.
    existing history derivation, and generalizes the exported close-result epoch
    fields under a separately pinned public contract. Root/size mismatch, reset,
    substitution, same-anchor double close, stale handle, and duplicate-close
-   mutants fail closed. Deadline: before D.110c-b RED.
+   mutants fail closed. This slice owns the epoch-N snapshot-substitution proof:
+   a snapshot or manifest from any earlier epoch/anchor must fail before state,
+   ACL, or recovery ownership changes. Deadline: before D.110c-b RED.
 5. **D.110c-b — general hot adoption, activation, and product custody.** Owner:
    creator adoption/commit/activate modules, `creator-successor-live`,
    installed-v3 handoff, and `examples/v3-room`. RED executes real 0→1 and
@@ -91699,7 +91901,10 @@ receipt, archive record, or active registration in test code.
    sequential prune plus one skipped-prune catch-up; two rollback generations;
    availability refusal; receipt replay/staleness; active-owner uniqueness;
    predecessor terminalization; bounded hot/control closure; and bounded live
-   registration/close ownership through at least three genuine transitions.
+   registration/close ownership through at least three genuine transitions. Its
+   exact durable census includes browser `sealEvidence`, `voteSlots`,
+   `signerState`, and `voteOutbox` rows by epoch and proves their authenticated,
+   rollback-safe retirement rather than merely counting AHE generations.
    Physical store deletion authority remains unchanged unless a separate RED
    demonstrates an owner defect. Deadline: before D.110c-d RED.
 7. **D.110c-d — retained long-horizon and golden-path prerequisite gate.**
@@ -91707,8 +91912,9 @@ receipt, archive record, or active registration in test code.
    room performs at least 100 genuine authenticated transitions. The exact bound
    remains 100 unless this high-risk plan review approves another explicit value
    before RED. It runs no adaptive retry and cannot replace real close/adopt
-   calls with synthetic maintenance. Deadline: before Phase-6 exit or Phase-7a
-   execution.
+   calls with synthetic maintenance. The retained durable census includes all
+   four creator-seal browser stores as well as Node control owners. Deadline:
+   before Phase-6 exit or Phase-7a execution.
 
 The three prerequisite decisions are reviewed before their production edits;
 each executable sub-slice receives its own bounded causal RED and GREEN. The
@@ -91783,11 +91989,26 @@ The current audit/plan checkpoint is signed and pushed before one bounded
 Grok 4.6/high, standard direct Kimi K3 with
 `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review. If Grok cancels,
 resume that exact session. Only P0/P1 findings block; P2 receives an owner and
-disposition without recursive prose review. No Fable or collaboration
-subagent runs. Because this is a high-risk production lifecycle, each later
+disposition without recursive prose review. No additional Fable or any
+collaboration subagent runs. Because this is a high-risk production lifecycle, each later
 production GREEN receives the governing final plan→RED→GREEN review, and the
 long-horizon workload receives a reviewed immutable freeze before its sole
 consuming execution.
+
+The umbrella-plan review of signed commit
+`d7c102b8e3cb7beb921fb67bc86e8ab096424b28` is preserved honestly at
+`.logs/d110c-plan-review-d7c102b8`. Kimi session
+`e4a22064-e892-41af-9044-e403e8c1a0bf` returned an immediate authentication
+401 and therefore `NO_VERDICT`. Grok's initial service run cancelled; the exact
+session `01a05fcf-470f-7222-9d6f-176a228a15a0` was resumed and returned zero
+P0/P1 plus three P2 findings. Opus session
+`6496e64d-1bb3-4ff8-ade2-16ab1d4a449f` returned one P1: browser
+`sealEvidence`, `voteSlots`, `signerState`, and `voteOutbox` had no deletion
+owner and were absent from the bounded census. The corrections above close that
+P1 and disposition Grok's P2 findings by qualifying the 6c-r compatibility
+claim, naming browser seal adapters/migration, assigning snapshot substitution
+to D.110c-a, and adding hot close/verify/commit consumers to D.110c-0b. No prior
+verdict is relabelled as having reviewed this later amendment.
 
 The one expressly authorized Fable 5.1/high read-only advisory run used session
 `eefd0856-c660-4cc6-aa98-3c41eb863316`, spawned no subagents, and returned
@@ -91799,6 +92020,21 @@ missing pending-resume/product owner, and cold-chain findings. It rejects only
 the suggested acceptance of exact linear active-closure growth: the user's
 bounded durable-structure requirement instead creates D.110c-0b. This one-off
 run is complete and does not authorize another Fable invocation.
+
+The separately and expressly authorized one-off Fable 5.1/high comparative
+research used CLI session `eb63f14c-826b-48f3-80b7-5fa40818620e`, spawned no
+subagents, changed no files, and returned `CHANGES_REQUIRED`/
+`D110C_0B_DESIGN_READY: NO`. Its prompt and raw-result SHA-256 values are
+`96159e1917d73b3529c5fc51633de1cfe1d9b5410be69c0c65f5b14c001277c5`
+and `11340aefc10f4d9e7302de4dbc23c98984c9734a32381525ca80aa4052abb0e6`;
+stderr was empty. The audit adopts its confirmed epoch-0 opener, linear closure,
+four unowned seal-store families, fixed creator-authority simplification,
+freshness caveat, certified-profile stop boundary, and proposal-versus-code
+threshold/wire cautions. Its “not ready” disposition is closed at plan level by
+naming the bounded dual-anchor v1 design, exact authenticated expected-head
+requirement, active-versus-rollback retention boundary, D.110c-0b1 stop gate,
+and seal-store owner/census above. It is advisory evidence, not a substitute for
+the governing Grok/Kimi/Opus review, and does not authorize another Fable run.
 
 Debt disposition is explicit: D.110c owns repeated same-room rollover,
 epoch-relative creator seal custody, bounded authenticated current-trust
