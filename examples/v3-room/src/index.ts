@@ -831,7 +831,14 @@ function sameRoomHead(left: V3RoomHead, right: V3RoomHead): boolean {
 function captureRoomHeadState(value: unknown, scope: V3RoomHeadScope): V3RoomHeadState | undefined {
 	const record = exactRecord(value, ROOM_HEAD_STATE_KEYS);
 	const stable = captureRoomHead(record?.stable);
-	if (record === undefined || stable === undefined || stable.objectId !== scope.objectId) return undefined;
+	if (
+		record === undefined ||
+		stable === undefined ||
+		stable.objectId !== scope.objectId ||
+		(stable.epoch === 0 && stable.currentAnchorDigest !== scope.pinnedGenesisAnchorDigest)
+	) {
+		return undefined;
+	}
 	if (record.pending === null) return Object.freeze({ pending: null, stable });
 	const pending = exactRecord(record.pending, ROOM_HEAD_PENDING_KEYS);
 	const previous = captureRoomHead(pending?.previous);
@@ -946,7 +953,7 @@ async function beginRoomHeadAdvance(
 		return roomHeadFailure("D110C_FLOOR_PENDING_INVALID");
 	}
 	if (!sameRoomHead(observed.stable, current)) {
-		return roomHeadFailure(observed.stable.epoch > current.epoch ? "D110C_FLOOR_HEAD_AHEAD" : "D110C_FLOOR_MISMATCH");
+		return roomHeadFailure(observed.stable.epoch < current.epoch ? "D110C_FLOOR_HEAD_AHEAD" : "D110C_FLOOR_MISMATCH");
 	}
 	const expected = Object.freeze({ pending: null, stable: current });
 	const selected = await callRoomHeadAuthority(() => authority.begin(Object.freeze({ expected, next, scope })), scope);
@@ -1551,21 +1558,24 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		} else {
 			roomHeadAuthority = candidate;
 			openedRoomHeadState = await initializeRoomHeadAuthority(candidate, roomHeadScope, genesisRoomHead);
+			if (openedRoomHeadState.pending !== null && input.successorSnapshotDeclaration === undefined) {
+				return roomHeadFailure("D110C_FLOOR_RECOVERY_UNAVAILABLE");
+			}
 			if (
 				openedRoomHeadState.pending === null &&
 				input.successorSnapshotDeclaration === undefined &&
 				!sameRoomHead(openedRoomHeadState.stable, genesisRoomHead)
 			) {
-				return roomHeadFailure(
-					openedRoomHeadState.stable.epoch > genesisRoomHead.epoch ? "D110C_FLOOR_HEAD_AHEAD" : "D110C_FLOOR_MISMATCH"
-				);
+				return roomHeadFailure("D110C_FLOOR_MISMATCH");
 			}
 			if (
 				openedRoomHeadState.pending === null &&
 				input.successorSnapshotDeclaration !== undefined &&
-				(openedRoomHeadState.stable.objectId !== input.objectId || openedRoomHeadState.stable.epoch !== 1)
+				openedRoomHeadState.stable.epoch !== 1
 			) {
-				return roomHeadFailure("D110C_FLOOR_MISMATCH");
+				return roomHeadFailure(
+					openedRoomHeadState.stable.epoch < 1 ? "D110C_FLOOR_HEAD_AHEAD" : "D110C_FLOOR_MISMATCH"
+				);
 			}
 		}
 	}
@@ -2185,7 +2195,12 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 					recoveredHead === undefined ||
 					!sameRoomHead(recoveredHead, selectedPending.next)
 				) {
-					return roomHeadFailure("D110C_FLOOR_RECOVERY_UNAVAILABLE");
+					const kind = Reflect.get(recoveredPending, "kind");
+					return roomHeadFailure(
+						kind === "true-fork" || kind === "chain-invalid" || kind === "stale-head" || kind === "malformed-input"
+							? "D110C_FLOOR_PENDING_INVALID"
+							: "D110C_FLOOR_RECOVERY_UNAVAILABLE"
+					);
 				}
 				openedRoomHeadState = await commitRoomHeadAdvance(roomHeadAuthority, roomHeadScope, pending);
 			}

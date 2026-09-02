@@ -11,6 +11,35 @@ interface DirectRoomSession {
 	sealEpoch(): Promise<unknown>;
 }
 
+type DirectRoomHeadFault =
+	| "begin-conflict"
+	| "begin-malformed"
+	| "begin-unavailable"
+	| "commit-conflict"
+	| "commit-malformed"
+	| "commit-unavailable-once"
+	| "create-conflict"
+	| "create-malformed"
+	| "create-unavailable"
+	| "none"
+	| "read-malformed"
+	| "read-unavailable";
+
+interface DirectRoomHeadControl {
+	fault: DirectRoomHeadFault;
+	initialStable?: PlainRecord;
+	readonly operations: string[];
+	state: PlainRecord | null;
+}
+
+interface DirectRoomOpenOptions {
+	readonly control?: DirectRoomHeadControl;
+	readonly initialization?: PlainRecord;
+	onOpenTransport?(): void;
+	readonly successorSnapshotDeclaration?: unknown;
+	readonly withCreatorSigner?: boolean;
+}
+
 interface DirectKeychain {
 	readonly localAuthorId: string;
 	signWithLocalAuthor(digest: Uint8Array): Promise<Uint8Array>;
@@ -118,9 +147,12 @@ interface TransitionInstrumentationSnapshot extends LifetimeInstrumentationSnaps
 interface LifetimeInstrumentation {
 	acceptedVertex(): Promise<void>;
 	cleanupReplacements(): Promise<void>;
+	d110cColdReopenCount(): number;
 	configure(
 		input: Readonly<{
+			readonly failBeforePublication?: boolean;
 			readonly injectActivationFailure?: boolean;
+			readonly mutateStagedDescriptor?: boolean;
 			readonly pauseAcceptedVertexFailure?: boolean;
 			readonly pauseAfterActivation?: boolean;
 			readonly pauseActivationFailure?: boolean;
@@ -175,7 +207,9 @@ declare global {
 			cleanupLifetimeReplacements(): Promise<void>;
 			configureLifetime(
 				input: Readonly<{
+					readonly failBeforePublication?: boolean;
 					readonly injectActivationFailure?: boolean;
+					readonly mutateStagedDescriptor?: boolean;
 					readonly pauseAcceptedVertexFailure?: boolean;
 					readonly pauseAfterActivation?: boolean;
 					readonly pauseActivationFailure?: boolean;
@@ -199,6 +233,7 @@ declare global {
 			closeDirectCreator(name: string): Promise<void>;
 			create(input: unknown): Promise<string>;
 			deleteDatabases(prefix: string): Promise<readonly string[]>;
+			d110cFloorMatrix(): Promise<PlainRecord>;
 			directAdoptionSettled(name: string): boolean;
 			d108e5OperationSettled(observation: string): boolean;
 			d108e5Snapshot(): Readonly<{ readonly redirectRecoveryCount: number; readonly verificationCount: number }>;
@@ -270,6 +305,8 @@ let pendingRehearsal: Promise<ObservedSettlement> | undefined;
 let pendingSend: Promise<ObservedSettlement> | undefined;
 let migrationReceipt: unknown;
 const directRooms = new Map<string, DirectRoomSession>();
+const directCreatorInvites = new Map<string, unknown>();
+const directRoomHeadControls = new Map<string, DirectRoomHeadControl>();
 const d108e5OperationSettlements = new Map<string, boolean>();
 const pendingD108e5Operations = new Map<string, Promise<ObservedSettlement>>();
 const pendingDirectAdoptions = new Map<string, Promise<ObservedSettlement>>();
@@ -803,8 +840,11 @@ function directDependencies(): DirectRoomDependencies {
 	return selected as DirectRoomDependencies;
 }
 
-function directRoomHeadAuthority(): PlainRecord {
-	let state: PlainRecord | null = null;
+function createDirectRoomHeadControl(fault: DirectRoomHeadFault = "none"): DirectRoomHeadControl {
+	return { fault, operations: [], state: null };
+}
+
+function directRoomHeadAuthority(control: DirectRoomHeadControl, initialization: PlainRecord): PlainRecord {
 	const same = (left: unknown, right: unknown): boolean => {
 		const leftBytes = encodeCanonical(left);
 		const rightBytes = encodeCanonical(right);
@@ -812,46 +852,74 @@ function directRoomHeadAuthority(): PlainRecord {
 			leftBytes.byteLength === rightBytes.byteLength && leftBytes.every((byte, index) => byte === rightBytes[index])
 		);
 	};
-	const success = (): PlainRecord => Object.freeze({ ok: true, state });
+	const success = (): PlainRecord => Object.freeze({ ok: true, state: control.state });
+	const selectedFailure = (operation: "begin" | "commit" | "create" | "read"): PlainRecord | undefined => {
+		if (control.fault === `${operation}-conflict`) return Object.freeze({ ok: false, reason: "conflict" });
+		if (control.fault === `${operation}-unavailable`) return Object.freeze({ ok: false, reason: "unavailable" });
+		if (control.fault === `${operation}-malformed`) return Object.freeze({ ok: true, state: { malformed: true } });
+		if (operation === "commit" && control.fault === "commit-unavailable-once") {
+			control.fault = "none";
+			return Object.freeze({ ok: false, reason: "unavailable" });
+		}
+		return undefined;
+	};
 	return Object.freeze({
-		initialization: Object.freeze({ kind: "create" }),
+		initialization,
 		begin: (input: PlainRecord): Promise<PlainRecord> => {
-			if (state === null || !same(state, input.expected)) {
+			control.operations.push("begin");
+			const failed = selectedFailure("begin");
+			if (failed !== undefined) return Promise.resolve(failed);
+			if (control.state === null || !same(control.state, input.expected)) {
 				return Promise.resolve(Object.freeze({ ok: false, reason: "conflict" }));
 			}
 			const expected = input.expected as PlainRecord;
-			state = Object.freeze({
+			control.state = Object.freeze({
 				pending: Object.freeze({ next: input.next, previous: expected.stable }),
 				stable: expected.stable,
 			});
 			return Promise.resolve(success());
 		},
 		commit: (input: PlainRecord): Promise<PlainRecord> => {
-			if (state === null || state.pending === null || !same(state, input.expected)) {
+			control.operations.push("commit");
+			const failed = selectedFailure("commit");
+			if (failed !== undefined) return Promise.resolve(failed);
+			if (control.state === null || control.state.pending === null || !same(control.state, input.expected)) {
 				return Promise.resolve(Object.freeze({ ok: false, reason: "conflict" }));
 			}
-			state = Object.freeze({ pending: null, stable: (state.pending as PlainRecord).next });
+			control.state = Object.freeze({ pending: null, stable: (control.state.pending as PlainRecord).next });
 			return Promise.resolve(success());
 		},
 		create: (input: PlainRecord): Promise<PlainRecord> => {
+			control.operations.push("create");
+			const failed = selectedFailure("create");
+			if (failed !== undefined) return Promise.resolve(failed);
 			const desired = Object.freeze({ pending: null, stable: input.stable });
-			if (state === null) state = desired;
-			else if (!same(state, desired)) return Promise.resolve(Object.freeze({ ok: false, reason: "conflict" }));
+			if (control.state === null) {
+				control.state = desired;
+				control.initialStable = input.stable as PlainRecord;
+			} else if (!same(control.state, desired)) {
+				return Promise.resolve(Object.freeze({ ok: false, reason: "conflict" }));
+			}
 			return Promise.resolve(success());
 		},
 		migrate: (input: PlainRecord): Promise<PlainRecord> => {
+			control.operations.push("migrate");
 			const desired = Object.freeze({ pending: null, stable: input.stable });
-			if (state !== null && !same(state, desired)) {
+			if (control.state !== null && !same(control.state, desired)) {
 				return Promise.resolve(Object.freeze({ ok: false, reason: "conflict" }));
 			}
-			state = desired;
+			control.state = desired;
 			return Promise.resolve(success());
 		},
-		read: (): Promise<PlainRecord> => Promise.resolve(success()),
+		read: (): Promise<PlainRecord> => {
+			control.operations.push("read");
+			const failed = selectedFailure("read");
+			return Promise.resolve(failed ?? success());
+		},
 	});
 }
 
-async function createDirectRoom(name: string): Promise<DirectRoomSession> {
+async function createDirectRoom(name: string, options: DirectRoomOpenOptions = {}): Promise<DirectRoomSession> {
 	if (name.length === 0 || directRooms.has(name)) throw new TypeError("D.108e3 direct room identity is invalid");
 	const databaseName = `d108e3-direct-${name}`;
 	const objectDigest = hex(hashDomain("ts-drp/d108e3-direct-room/v1", new TextEncoder().encode(databaseName))).slice(
@@ -902,7 +970,11 @@ async function createDirectRoom(name: string): Promise<DirectRoomSession> {
 			objectId: selectedObjectId,
 			signGenesisAnchorDigest: (anchorDigest: Uint8Array) => finalityKeychain.signWithLocalAuthor(anchorDigest),
 		});
-	const creatorInvite = await createInvite(objectId);
+	let creatorInvite = directCreatorInvites.get(name);
+	if (creatorInvite === undefined) {
+		creatorInvite = await createInvite(objectId);
+		directCreatorInvites.set(name, creatorInvite);
+	}
 	const rehearsalNonce = hashDomain("ts-drp/d108e3-direct-rehearsal/v1", new TextEncoder().encode(name));
 	const separator = objectId.indexOf(":");
 	const targetIdentity = hashDomain(
@@ -914,10 +986,12 @@ async function createDirectRoom(name: string): Promise<DirectRoomSession> {
 		name,
 		Object.freeze({ rehearsalNonce, targetCreatorInvite: await createInvite(targetObjectId) })
 	);
+	const control = options.control ?? createDirectRoomHeadControl();
+	directRoomHeadControls.set(name, control);
 	return dependencies.createV3RoomSession({
 		application,
 		author: authorKeychain.localAuthorId,
-		creatorFinalitySigner: finality.signer,
+		...(options.withCreatorSigner === false ? {} : { creatorFinalitySigner: finality.signer }),
 		creatorInvite,
 		databaseName,
 		initialLogicalTime: 3,
@@ -926,10 +1000,16 @@ async function createDirectRoom(name: string): Promise<DirectRoomSession> {
 		objectId,
 		onAcceptedVertex: () => instrumentation().acceptedVertex(),
 		onProjection: () => undefined,
-		openTransport: () => directTransport(authorKeychain.localAuthorId),
+		openTransport: () => {
+			options.onOpenTransport?.();
+			return directTransport(authorKeychain.localAuthorId);
+		},
 		publicKeyBytes: bytesFromHex(authorKeychain.localAuthorId),
-		roomHeadAuthority: directRoomHeadAuthority(),
+		roomHeadAuthority: directRoomHeadAuthority(control, options.initialization ?? Object.freeze({ kind: "create" })),
 		signRegisteredVertexDigest: (registeredDigest: Uint8Array) => authorKeychain.signWithLocalAuthor(registeredDigest),
+		...(options.successorSnapshotDeclaration === undefined
+			? {}
+			: { successorSnapshotDeclaration: options.successorSnapshotDeclaration }),
 	});
 }
 
@@ -981,6 +1061,271 @@ async function removeDirectDatabases(name: string): Promise<void> {
 	for (const { name: databaseName } of await indexedDB.databases()) {
 		if (databaseName?.startsWith(prefix) === true) await deleteDatabase(databaseName);
 	}
+}
+
+function directFailureDetail(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
+async function closeDirectForReopen(name: string): Promise<void> {
+	const room = directRooms.get(name);
+	directRooms.delete(name);
+	if (room !== undefined) await room.close().catch(() => undefined);
+	abandonDirectRoom(name);
+}
+
+function abandonDirectRoom(name: string): void {
+	directRooms.delete(name);
+	pendingDirectAdoptions.delete(name);
+	pendingDirectCloses.delete(name);
+	pendingDirectRehearsals.delete(name);
+	directAdoptionSettlements.delete(name);
+}
+
+async function discardDirectRoom(name: string): Promise<void> {
+	await closeDirectForReopen(name);
+	directCreatorInvites.delete(name);
+	directRoomHeadControls.delete(name);
+	directRehearsalInputs.delete(name);
+	directMigrationReceipts.delete(name);
+	await removeDirectDatabases(name);
+}
+
+async function directOpenSettlement(name: string, options: DirectRoomOpenOptions): Promise<string> {
+	try {
+		const room = await createDirectRoom(name, options);
+		directRooms.set(name, room);
+		return "fulfilled";
+	} catch (error) {
+		return directFailureDetail(error);
+	} finally {
+		await discardDirectRoom(name);
+	}
+}
+
+async function preparedGenesisControl(name: string): Promise<DirectRoomHeadControl> {
+	const control = createDirectRoomHeadControl();
+	const room = await createDirectRoom(name, { control });
+	directRooms.set(name, room);
+	await closeDirectForReopen(name);
+	if (control.initialStable === undefined) throw new TypeError("D110C model genesis floor is unavailable");
+	return control;
+}
+
+async function directAdoptionSettlement(
+	name: string,
+	input: Readonly<{
+		readonly fault?: DirectRoomHeadFault;
+		readonly mutateStagedDescriptor?: boolean;
+		readonly pendingOther?: boolean;
+	}>
+): Promise<Readonly<{ readonly detail: string; readonly operations: readonly string[] }>> {
+	const control = createDirectRoomHeadControl();
+	try {
+		const room = await createDirectRoom(name, { control });
+		directRooms.set(name, room);
+		await room.sealEpoch();
+		if (input.pendingOther === true) {
+			const stable = control.initialStable;
+			if (stable === undefined) throw new TypeError("D110C model stable floor is unavailable");
+			control.state = Object.freeze({
+				pending: Object.freeze({
+					next: Object.freeze({
+						currentAnchorDigest: "f".repeat(64),
+						epoch: 1,
+						objectId: stable.objectId,
+					}),
+					previous: stable,
+				}),
+				stable,
+			});
+		}
+		control.fault = input.fault ?? "none";
+		instrumentation().configure({ mutateStagedDescriptor: input.mutateStagedDescriptor });
+		return Object.freeze({
+			detail: await settlementDetail(room.adoptCreatorSuccessor()),
+			operations: Object.freeze([...control.operations]),
+		});
+	} finally {
+		await discardDirectRoom(name);
+	}
+}
+
+async function directPendingRecovery(
+	name: string,
+	ordering: "old-ahe" | "new-ahe"
+): Promise<Readonly<Record<string, unknown>>> {
+	const control = createDirectRoomHeadControl();
+	const databaseName = `d108e3-direct-${name}`;
+	let interruptedRoom: DirectRoomSession | undefined;
+	try {
+		const room = await createDirectRoom(name, { control });
+		interruptedRoom = room;
+		directRooms.set(name, room);
+		await room.sealEpoch();
+		instrumentation().configure({ failBeforePublication: ordering === "old-ahe" });
+		if (ordering === "new-ahe") control.fault = "commit-unavailable-once";
+		const interrupted = await settlementDetail(room.adoptCreatorSuccessor());
+		const snapshotDeclaration = await rawSnapshotDeclaration(databaseName);
+		// Model abrupt process loss: graceful close intentionally reclaims an unpublished staged generation.
+		// The interrupted session becomes unreachable, while its durable browser stores remain available to the opener.
+		abandonDirectRoom(name);
+		instrumentation().configure({});
+		let transportOpenCount = 0;
+		const reopened = await createDirectRoom(name, {
+			control,
+			initialization: Object.freeze({ kind: "reopen" }),
+			onOpenTransport: () => {
+				transportOpenCount += 1;
+			},
+			successorSnapshotDeclaration: snapshotDeclaration,
+			withCreatorSigner: false,
+		});
+		directRooms.set(name, reopened);
+		await reopened.issue({ action: "message", clientOperationId: crypto.randomUUID(), text: `recovered-${ordering}` });
+		return Object.freeze({
+			coldReopenCount: instrumentation().d110cColdReopenCount(),
+			interrupted,
+			operations: Object.freeze([...control.operations]),
+			state: control.state,
+			transportOpenCount,
+		});
+	} finally {
+		await closeDirectForReopen(name);
+		await interruptedRoom?.close().catch(() => undefined);
+		directCreatorInvites.delete(name);
+		directRoomHeadControls.delete(name);
+		directRehearsalInputs.delete(name);
+		directMigrationReceipts.delete(name);
+		await removeDirectDatabases(name);
+	}
+}
+
+async function directPendingWithoutDeclaration(name: string): Promise<Readonly<Record<string, unknown>>> {
+	const control = createDirectRoomHeadControl();
+	try {
+		const room = await createDirectRoom(name, { control });
+		directRooms.set(name, room);
+		await room.sealEpoch();
+		instrumentation().configure({ failBeforePublication: true });
+		const interrupted = await settlementDetail(room.adoptCreatorSuccessor());
+		await closeDirectForReopen(name);
+		instrumentation().configure({});
+		let transportOpenCount = 0;
+		const detail = await directOpenSettlement(name, {
+			control,
+			initialization: Object.freeze({ kind: "reopen" }),
+			onOpenTransport: () => {
+				transportOpenCount += 1;
+			},
+			withCreatorSigner: false,
+		});
+		return Object.freeze({
+			coldReopenCount: instrumentation().d110cColdReopenCount(),
+			detail,
+			interrupted,
+			transportOpenCount,
+		});
+	} finally {
+		await discardDirectRoom(name);
+	}
+}
+
+async function directHeadAhead(name: string): Promise<string> {
+	const control = createDirectRoomHeadControl();
+	const databaseName = `d108e3-direct-${name}`;
+	try {
+		const room = await createDirectRoom(name, { control });
+		directRooms.set(name, room);
+		await room.sealEpoch();
+		instrumentation().configure({});
+		await room.adoptCreatorSuccessor();
+		const snapshotDeclaration = await rawSnapshotDeclaration(databaseName);
+		await closeDirectForReopen(name);
+		if (control.initialStable === undefined) throw new TypeError("D110C model genesis floor is unavailable");
+		control.state = Object.freeze({ pending: null, stable: control.initialStable });
+		return await directOpenSettlement(name, {
+			control,
+			initialization: Object.freeze({ kind: "reopen" }),
+			successorSnapshotDeclaration: snapshotDeclaration,
+			withCreatorSigner: false,
+		});
+	} finally {
+		await discardDirectRoom(name);
+	}
+}
+
+async function d110cFloorMatrix(): Promise<Readonly<Record<string, unknown>>> {
+	const capturedCase = async (operation: () => Promise<unknown>): Promise<unknown> => {
+		try {
+			return await operation();
+		} catch (error) {
+			return Object.freeze({
+				pendingRecovery: instrumentation().d110cLastPendingRecovery(),
+				unexpected: directFailureDetail(error),
+			});
+		}
+	};
+	const createCase = async (name: string, fault: DirectRoomHeadFault): Promise<string> => {
+		const control = createDirectRoomHeadControl(fault);
+		return directOpenSettlement(name, { control });
+	};
+	const readCase = async (name: string, fault: DirectRoomHeadFault): Promise<string> => {
+		const control = createDirectRoomHeadControl(fault);
+		return directOpenSettlement(name, { control, initialization: Object.freeze({ kind: "reopen" }) });
+	};
+	const crossGenesisName = "d110c-cross-genesis";
+	const crossGenesis = await preparedGenesisControl(crossGenesisName);
+	const crossGenesisStable = crossGenesis.initialStable as PlainRecord;
+	crossGenesis.state = Object.freeze({
+		pending: null,
+		stable: Object.freeze({ ...crossGenesisStable, currentAnchorDigest: "f".repeat(64) }),
+	});
+	const crossGenesisResult = await directOpenSettlement(crossGenesisName, {
+		control: crossGenesis,
+		initialization: Object.freeze({ kind: "reopen" }),
+	});
+
+	const floorAheadName = "d110c-floor-ahead";
+	const floorAhead = await preparedGenesisControl(floorAheadName);
+	const floorAheadStable = floorAhead.initialStable as PlainRecord;
+	floorAhead.state = Object.freeze({
+		pending: null,
+		stable: Object.freeze({ ...floorAheadStable, currentAnchorDigest: "e".repeat(64), epoch: 1 }),
+	});
+	const floorAheadResult = await directOpenSettlement(floorAheadName, {
+		control: floorAhead,
+		initialization: Object.freeze({ kind: "reopen" }),
+	});
+
+	return Object.freeze({
+		beginConflict: await directAdoptionSettlement("d110c-begin-conflict", { fault: "begin-conflict" }),
+		beginMalformed: await directAdoptionSettlement("d110c-begin-malformed", { fault: "begin-malformed" }),
+		beginUnavailable: await directAdoptionSettlement("d110c-begin-unavailable", { fault: "begin-unavailable" }),
+		commitConflict: await directAdoptionSettlement("d110c-commit-conflict", { fault: "commit-conflict" }),
+		commitMalformed: await directAdoptionSettlement("d110c-commit-malformed", { fault: "commit-malformed" }),
+		createConflict: await createCase("d110c-create-conflict", "create-conflict"),
+		createMalformed: await createCase("d110c-create-malformed", "create-malformed"),
+		createUnavailable: await createCase("d110c-create-unavailable", "create-unavailable"),
+		crossGenesis: crossGenesisResult,
+		floorAhead: floorAheadResult,
+		headAhead: await directHeadAhead("d110c-head-ahead"),
+		migrateCrossObject: await directOpenSettlement("d110c-migrate-cross-object", {
+			control: createDirectRoomHeadControl(),
+			initialization: Object.freeze({
+				head: Object.freeze({ currentAnchorDigest: "d".repeat(64), epoch: 0, objectId: "foreign:room" }),
+				kind: "migrate",
+			}),
+		}),
+		missingReopen: await readCase("d110c-missing-reopen", "none"),
+		pendingInvalid: await directAdoptionSettlement("d110c-pending-invalid", { pendingOther: true }),
+		pendingNewAhe: await capturedCase(() => directPendingRecovery("d110c-pending-new-ahe", "new-ahe")),
+		pendingOldAhe: await capturedCase(() => directPendingRecovery("d110c-pending-old-ahe", "old-ahe")),
+		pendingWithoutDeclaration: await directPendingWithoutDeclaration("d110c-pending-no-declaration"),
+		readMalformed: await readCase("d110c-read-malformed", "read-malformed"),
+		readUnavailable: await readCase("d110c-read-unavailable", "read-unavailable"),
+		regression: await directAdoptionSettlement("d110c-regression", { mutateStagedDescriptor: true }),
+	});
 }
 
 function productApi(): ProductApi {
@@ -1189,6 +1534,8 @@ const api = Object.freeze({
 		pendingDirectCloses.delete(name);
 		pendingDirectRehearsals.delete(name);
 		directAdoptionSettlements.delete(name);
+		directCreatorInvites.delete(name);
+		directRoomHeadControls.delete(name);
 		directRehearsalInputs.delete(name);
 		directMigrationReceipts.delete(name);
 		await removeDirectDatabases(name);
@@ -1198,7 +1545,9 @@ const api = Object.freeze({
 	},
 	configureLifetime(
 		input: Readonly<{
+			readonly failBeforePublication?: boolean;
 			readonly injectActivationFailure?: boolean;
+			readonly mutateStagedDescriptor?: boolean;
 			readonly pauseAcceptedVertexFailure?: boolean;
 			readonly pauseAfterActivation?: boolean;
 			readonly pauseActivationFailure?: boolean;
@@ -1243,6 +1592,9 @@ const api = Object.freeze({
 			.sort();
 		for (const name of names) await deleteDatabase(name);
 		return Object.freeze(names);
+	},
+	d110cFloorMatrix(): Promise<PlainRecord> {
+		return d110cFloorMatrix();
 	},
 	directAdoptionSettled(name: string): boolean {
 		if (!directRooms.has(name) || !directAdoptionSettlements.has(name)) {

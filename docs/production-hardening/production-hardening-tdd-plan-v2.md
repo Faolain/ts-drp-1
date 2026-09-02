@@ -93479,6 +93479,73 @@ custody. Only P0/P1 blocks; any executable correction receives at most the one
 permitted confirmation. D.110c-0b0 is not closed and D.110c-a/b do not begin
 until that blocking union is empty.
 
+That governing final review inspected signed/pushed implementation commit
+`213850dbba5e4b3fca350592a3d1193c6d50e7b0`. Grok 4.6/high completed
+normally with `stop_reason=end_turn`; its strict runner recorded `NO_VERDICT`
+only because the model emitted inspection prose before its exact terminal JSON,
+while the extracted terminal verdict was honestly `CHANGES_REQUIRED`. It did
+not cancel or time out, so the cancel-resume rule did not apply. Standard direct
+Kimi K3 with `KIMI_LOOP_MAX_STEPS_PER_TURN=100` and Opus xhigh session
+`ac5e4ef3-d954-4088-95ab-7ebf4f3ad68c` also completed
+`CHANGES_REQUIRED`. The material union was consistent: a provider `pending`
+tuple could bypass the ordinary-open path and activate the old plane; the
+`HEAD_AHEAD` versus `MISMATCH` comparison was inverted; and the frozen product
+provider/crash/classification matrix lacked deterministic executable coverage.
+Cross-genesis epoch-zero capture and integrity-versus-availability recovery
+classification were accepted into the same bounded correction. Prompt, Grok
+status/public, Kimi stream, and Opus stream SHA-256 values are respectively
+`21f678717aa4772fa75bc6ebea57eff409a6fb1da8bb8860cad901b65a702fcd`,
+`447b2b575e3c546bf226500a08e1e3755d6952521bd0c533089582883c40af67`,
+`7f6bf593b8fb15e807d88a33c26f25df677eb25015fc49d7a73d9b50ef2cbc5b`,
+`1d81743f00f9e76b402a62a47bb564c87f57a9fbd0545d94b84b291e2f1bff44`,
+and `44b6e8441dbe80a6e205a2d3f18bbf2c4164e840c334ff561ba705861d24c431`.
+
+The one permitted executable correction now makes pending state dominate before
+transport or activation. A pending floor without the authenticated successor
+snapshot declaration fails `D110C_FLOOR_RECOVERY_UNAVAILABLE`; with that
+declaration, both old-AHE and new-AHE orderings must authenticate through the
+existing non-activating 0b0a recovery owner, commit and reread the exact provider
+tuple, and only then cold-reopen and issue. Epoch-zero floor capture is bound to
+the pinned genesis digest. `HEAD_AHEAD` is reserved for an authenticated room
+ahead of its stable provider floor; a provider-ahead or otherwise unequal value
+is `MISMATCH`. Fork, chain, stale-head, and malformed pending recovery map to
+`PENDING_INVALID`, while absence/availability failures remain
+`RECOVERY_UNAVAILABLE`. No Node, protocol-v3, control-plane, dependency, wire,
+schema, threshold, workload, or public cryptographic contract changed in this
+correction.
+
+The stateful browser provider matrix exercises exact create/read/begin/commit
+conflict, malformed and unavailable responses; cross-genesis and cross-object
+input; missing ordinary reopen; provider-ahead and room-ahead classification;
+pending disagreement; regression; pending-without-declaration refusal; and both
+crash orderings with exact operation, transport, recovery, and final-state
+counts. The first complete correction gate passed Chromium and Firefox but
+exposed a WebKit fixture error: the simulated restart regenerated rather than
+retained its authenticated creator invite, so its detached genesis signature
+differed from the staged durable trust. The fixture now retains the exact
+original invite, as a real reopen must. Temporary diagnostic markers were
+removed, and `packages/node/src/creator-adoption.ts` is unchanged from the
+parent checkpoint. The corrected complete browser gate passes 27/27 across all
+three engines.
+
+The final review also correctly identified the changed but omitted D.93.46
+room-semantics test. Adding it to the retained selection first exposed its
+inherited invalid one-byte invite and nondeterministic one-microtask close
+assumption. Its test-only fixture now supplies canonical object/ACL authority,
+mocks the exact source `@ts-drp/node/v3-live` seam, and waits until the owned
+node issue is active. Its 15/15 semantics pass; the final exact ten-file retained
+command disables only the unrelated repository-wide percentage gate and exits
+zero with 10/10 files and 112/112 tests. The v3-room typecheck/build,
+storage-browser build, private fixture typecheck, exact-owner ESLint/Prettier,
+diff check, and source audit pass. Whole storage-browser typecheck remains red
+only in inherited Phase-6b AHE-reclamation/differential fixtures, with no
+corrected D.110c owner in its diagnostics. The correction ledger is
+`.logs/d110c-0b0-correction-213850db/correction-ledger.md`, SHA-256
+`e8380857332bf88cf12af8dcc439823fe2e479e0140a62bcc091f0f2a80f6388`.
+Protected roots and all 27 stashes remain intact. D.110c-0b0 remains open only
+for the single permitted confirmation of this signed/pushed executable
+correction; D.110c-a/b still do not begin.
+
 The four prerequisite decisions, including the newly demonstrated 0b0
 freshness-floor authority question, are reviewed before their production edits;
 each executable sub-slice receives its own bounded causal RED and GREEN. The

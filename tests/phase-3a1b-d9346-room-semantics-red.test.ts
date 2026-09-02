@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- Vitest mock factories infer their closed controlled shapes. */
+import { encodeCanonical } from "@ts-drp/canonical";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { V3RoomAcceptedVertex, V3RoomCreatorInviteMaterial } from "../examples/v3-room/src/index.js";
@@ -110,7 +111,7 @@ vi.mock("../packages/message-queue/dist/src/index.js", async (importOriginal) =>
 	},
 }));
 
-vi.mock("../packages/node/dist/src/v3-live.js", async (importOriginal) => ({
+vi.mock("@ts-drp/node/v3-live", async (importOriginal) => ({
 	...(await importOriginal()),
 	activateV3LivePlane: (input: { onAdmittedVertex(value: { readonly vertex: unknown }): unknown }) => {
 		probe.activatedSink = input.onAdmittedVertex;
@@ -287,10 +288,24 @@ function project(operations: readonly AcceptedOperation[]): Projection {
 }
 
 function creatorInvite(): V3RoomCreatorInviteMaterial {
+	const objectId = "controlled-v3-room";
+	const creatorAuthor = "1".repeat(64);
 	return Object.freeze({
 		detachedGenesisSignature: new Uint8Array(64).fill(1),
-		exactCanonicalGenesisAnchorPreimageBytes: Uint8Array.of(1),
-		exactCanonicalLatchedAclBytes: Uint8Array.of(2),
+		exactCanonicalGenesisAnchorPreimageBytes: encodeCanonical({
+			blueprintDigest: "b".repeat(64),
+			objectId,
+		}),
+		exactCanonicalLatchedAclBytes: encodeCanonical({
+			members: Object.freeze([
+				Object.freeze({
+					author: creatorAuthor,
+					finalityKey: creatorAuthor,
+					groups: Object.freeze(["admin", "finality", "writer"]),
+				}),
+			]),
+			objectId,
+		}),
 		exactCanonicalParametersCarrierBytes: Uint8Array.of(3),
 		exactCanonicalProfileBytes: Uint8Array.of(4),
 		exactCanonicalSignerSetBytes: Uint8Array.of(5),
@@ -765,7 +780,7 @@ describe("D.93.46b real shared-room semantics", () => {
 			session.issue({ action: "message", text: "first" }),
 			session.issue({ action: "message", text: "second" }),
 		]);
-		await Promise.resolve();
+		await vi.waitFor(() => expect(probe.issueInputs).toHaveLength(1));
 		const closing = session.close();
 		await expect(session.issue({ action: "message", text: "too-late" })).rejects.toThrow();
 		release();

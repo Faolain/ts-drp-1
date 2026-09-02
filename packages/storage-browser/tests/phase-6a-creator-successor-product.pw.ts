@@ -61,12 +61,15 @@ function createState() {
     activationCount: 0,
     activationFailureGate: Promise.resolve(),
     commitCount: 0,
+    coldReopenCount: 0,
+    failBeforePublication: false,
     injectActivationFailure: false,
     independentVerificationCount: 0,
     issueThrowCount: 0,
     latestPredecessorPlaneId: 0,
     migrationRecordGate: Promise.resolve(),
     migrationRecordIssueCount: 0,
+    mutateStagedDescriptor: false,
     nestedPredecessorDeactivateCount: 0,
     nextPlaneId: 1,
     pauseAfterActivation: false,
@@ -110,10 +113,13 @@ function createState() {
     state.acceptedVertexFailureCount = 0;
     state.activationCount = 0;
     state.commitCount = 0;
+    state.coldReopenCount = 0;
+    state.failBeforePublication = input.failBeforePublication === true;
     state.injectActivationFailure = input.injectActivationFailure === true;
     state.independentVerificationCount = 0;
     state.issueThrowCount = 0;
     state.migrationRecordIssueCount = 0;
+    state.mutateStagedDescriptor = input.mutateStagedDescriptor === true;
     state.nestedPredecessorDeactivateCount = 0;
     state.pauseAfterActivation = input.pauseAfterActivation === true;
     state.pauseAcceptedVertexFailure = input.pauseAcceptedVertexFailure === true;
@@ -183,6 +189,7 @@ function createState() {
         await Promise.allSettled(Array.from(state.replacementPlanes, (plane) => plane.deactivate()));
       },
       configure,
+      d110cColdReopenCount: () => state.coldReopenCount,
       d108e5Snapshot: () => Object.freeze({
         redirectRecoveryCount: state.redirectRecoveryCount,
         verificationCount: state.d108e5VerificationCount,
@@ -421,9 +428,23 @@ export const commitCreatorSuccessorAdoption = async (input) => {
 import * as actual from ${JSON.stringify(creatorAdoptionStage)};
 export const stageCreatorSuccessorAdoption = async (input) => {
   if (closeHandlePlaneIds.get(input.handle) === state.targetPlaneId) state.commitCount += 1;
-  return actual.stageCreatorSuccessorAdoption(input);
+  const result = await actual.stageCreatorSuccessorAdoption(input);
+  if (state.mutateStagedDescriptor && result.ok === true) {
+    state.mutateStagedDescriptor = false;
+    return Object.freeze({
+      ...result,
+      descriptor: Object.freeze({ ...result.descriptor, epoch: Number(result.descriptor.epoch) + 1 }),
+    });
+  }
+  return result;
 };
-export const publishStagedCreatorSuccessorAdoption = actual.publishStagedCreatorSuccessorAdoption;`,
+export const publishStagedCreatorSuccessorAdoption = async (input) => {
+  if (state.failBeforePublication) {
+    state.failBeforePublication = false;
+    throw new TypeError("D110C controlled pre-publication process death");
+  }
+  return actual.publishStagedCreatorSuccessorAdoption(input);
+};`,
 				],
 				[
 					"@ts-drp/node/creator-adoption-recover",
@@ -434,7 +455,10 @@ export const recoverPendingCreatorSuccessorAdoption = actual.recoverPendingCreat
 					"@ts-drp/node/creator-adoption-activate",
 					`${shared}
 import * as actual from ${JSON.stringify(creatorAdoptionActivate)};
-export const reopenCreatorSuccessorAdoption = actual.reopenCreatorSuccessorAdoption;
+export const reopenCreatorSuccessorAdoption = async (input) => {
+  state.coldReopenCount += 1;
+  return actual.reopenCreatorSuccessorAdoption(input);
+};
 export const activateCreatorSuccessorAdoption = async (input) => {
   const planeId = closeHandlePlaneIds.get(input.handle);
   const targeted = planeId === state.targetPlaneId;
@@ -835,6 +859,46 @@ test(D108D2_BROWSER_BEHAVIORS[2], async () => {
 		expect(observation.objectId).toBe(sent?.objectId);
 		expect(observation.sender).toBe(sent?.sender);
 		expect(observation.type).toBe(sent?.type);
+	}
+});
+
+test("D.110c-0b0 provider crash and classification matrix fails closed", async () => {
+	if (creator === undefined) throw new TypeError("D.110c browser realm is absent");
+	const matrix = (await creator.evaluate(() => window.phase6aCreatorSuccessorProduct.d110cFloorMatrix())) as Readonly<
+		Record<string, unknown>
+	>;
+	const adoption = (key: string): Readonly<Record<string, unknown>> => matrix[key] as Readonly<Record<string, unknown>>;
+	expect(adoption("beginConflict").detail).toBe("D110C_FLOOR_CONFLICT");
+	expect(adoption("beginMalformed").detail).toBe("D110C_FLOOR_INVALID");
+	expect(adoption("beginUnavailable").detail).toBe("D110C_FLOOR_UNAVAILABLE");
+	expect(adoption("commitConflict").detail).toBe("D110C_FLOOR_CONFLICT");
+	expect(adoption("commitMalformed").detail).toBe("D110C_FLOOR_INVALID");
+	expect(matrix.createConflict).toBe("D110C_FLOOR_CONFLICT");
+	expect(matrix.createMalformed).toBe("D110C_FLOOR_INVALID");
+	expect(matrix.createUnavailable).toBe("D110C_FLOOR_UNAVAILABLE");
+	expect(matrix.crossGenesis).toBe("D110C_FLOOR_INVALID");
+	expect(matrix.floorAhead).toBe("D110C_FLOOR_MISMATCH");
+	expect(matrix.headAhead).toBe("D110C_FLOOR_HEAD_AHEAD");
+	expect(matrix.migrateCrossObject).toBe("D110C_FLOOR_INVALID");
+	expect(matrix.missingReopen).toBe("D110C_FLOOR_MIGRATION_REQUIRED");
+	expect(adoption("pendingInvalid").detail).toBe("D110C_FLOOR_PENDING_INVALID");
+	expect(matrix.readMalformed).toBe("D110C_FLOOR_INVALID");
+	expect(matrix.readUnavailable).toBe("D110C_FLOOR_UNAVAILABLE");
+	expect(adoption("regression").detail).toBe("D110C_FLOOR_REGRESSION");
+
+	const noDeclaration = matrix.pendingWithoutDeclaration as Readonly<Record<string, unknown>>;
+	expect(noDeclaration).toMatchObject({
+		coldReopenCount: 0,
+		detail: "D110C_FLOOR_RECOVERY_UNAVAILABLE",
+		transportOpenCount: 0,
+	});
+	for (const [key, operations] of [
+		["pendingOldAhe", ["create", "read", "begin", "read", "commit", "read"]],
+		["pendingNewAhe", ["create", "read", "begin", "commit", "read", "commit", "read"]],
+	] as const) {
+		const recovered = matrix[key] as Readonly<Record<string, unknown>>;
+		expect(recovered).toMatchObject({ coldReopenCount: 1, operations, transportOpenCount: 1 });
+		expect(recovered.state).toMatchObject({ pending: null, stable: { epoch: 1 } });
 	}
 });
 
