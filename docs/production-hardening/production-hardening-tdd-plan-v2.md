@@ -92091,8 +92091,8 @@ legacy migrate-scope operation, exact read, begin-CAS from
 `{stable, pending:null}` to `{stable, pending}`, and commit-CAS from that exact
 pending value to `{stable:next, pending:null}`. All inputs and results are
 copied, exact-shaped, and fail closed. No method may
-select the greatest stored epoch, accept an absent floor for an advanced room,
-blindly overwrite a conflict, or expose a general arbitrary-value store. At
+select the greatest stored epoch, accept an absent floor, blindly overwrite a
+conflict, or expose a general arbitrary-value store. At
 most one stable tuple and one pending tuple exist per room, so provider state is
 O(1) with epoch count.
 
@@ -92141,7 +92141,7 @@ prefix wildcard:
 | Provider value is malformed, cross-object, cross-genesis, or noncanonical | `D110C_FLOOR_INVALID`              |
 | Stable floor differs from the sole proposed current authenticated head    | `D110C_FLOOR_MISMATCH`             |
 | Proposed next epoch/anchor regresses, skips, or reuses the stable tuple   | `D110C_FLOOR_REGRESSION`           |
-| Exact begin/commit CAS loses or observes another value                    | `D110C_FLOOR_CONFLICT`             |
+| Exact create/migrate/begin/commit CAS loses or observes another value     | `D110C_FLOOR_CONFLICT`             |
 | Pending previous/next tuple is missing, duplicate, or inconsistent        | `D110C_FLOOR_PENDING_INVALID`      |
 | Authenticated room head is ahead while no exact pending advance exists    | `D110C_FLOOR_HEAD_AHEAD`           |
 | Exact pending-selected complete generation is absent or unavailable       | `D110C_FLOOR_RECOVERY_UNAVAILABLE` |
@@ -92279,6 +92279,27 @@ unsupported without a later tombstone policy. Because these changes alter the
 security initialization predicate and public capability operations, one
 bounded confirmation of the signed correction is required. No closure prose
 receives another review.
+
+The single confirmation inspected signed/pushed commit
+`49e8dcff1751662d8039ec138c56e72e3af1050a` from
+`.logs/d110c-0b0-owner-confirmation-49e8dcff`; prompt SHA-256 is
+`03ce567b0834905bdeb44b6ba605114160861322a126541402eec3e90be3f6f2`.
+Grok 4.6/high completed normally with P0=0/P1=0/P2=0; its event and public
+result SHA-256 values are
+`918190bcb4671a8f933d95828a748a804b1145b7c21d3ba76e784f8c5001c95f`
+and `c0f6a0f395c2c2996498c4b15c4d45a4a94582bf5b65968fd3784824fd465fc1`.
+Standard direct Kimi K3 session
+`session_3fe115c9-2baf-404b-98cc-a7a2395c0ea0`, with the exact 100-step
+control, returned P0=0/P1=0/P2=0; its exported session SHA-256 is
+`732ad623cf8049d617a1585b937ba63adde5eb47a350ab1ea6b96d5ce40ff061`.
+Opus xhigh session `62965e4c-1c33-4cbf-b9a2-e00b615d7303` returned
+P0=0/P1=0/P2=2; its transcript SHA-256 is
+`bbf8c00da8113a5ece09af118093ee0c03a62eedf95cdd3011065cdf30fc7e7e`.
+The two nonblocking wording findings are dispositioned without another round:
+create/migrate CAS refusal is explicitly `D110C_FLOOR_CONFLICT`, and no method
+may accept an absent floor in ordinary reopen regardless of local epoch. The
+blocking confirmation union is empty, the exact design is accepted, and the
+next state is `D110C_0A_PLAN_READY`.
 
 The four prerequisite decisions, including the newly demonstrated 0b0
 freshness-floor authority question, are reviewed before their production edits;
