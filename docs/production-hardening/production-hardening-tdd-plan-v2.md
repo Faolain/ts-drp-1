@@ -92078,7 +92078,8 @@ new public input shape in 0a. The exported fields that widen from literal `0`
 to a nonnegative safe integer are exactly `SealAuthorityState.epoch`,
 `SealAuthorityIdentity.epoch`, `SealVoterEnrollmentData.epoch`,
 `CreatorCloseEvidenceRecord.epoch`, `PacemakerEvent.epoch`, and the browser
-pending/evidence row epoch types. `CreatorLiveCloseResult.epoch` and
+`PendingVoteRow.epoch` plus `InternalSealVoteStore.markDispatched` tuple epoch.
+`CreatorLiveCloseResult.epoch` and
 `CreatorLiveCloseResult.successorEpoch`, including the literal values returned
 by `bindCreatorLiveClose`, remain owned by D.110c-a and are explicitly out of
 0a. Every epoch-0 value and byte remains unchanged. If implementation requires
@@ -92090,7 +92091,10 @@ the retained D.108 path. It attempts to open the real creator seal authority
 and freezes today's causal failure without fixture-authored QC/trust bytes:
 
 - genuine epoch-1 `openSealAuthority` returns exact `untrusted-context` solely
-  because of the `currentEpoch !== 0` guard;
+  because of the `currentEpoch !== 0` guard; the evidence must pair the same
+  genuine signer and epoch-0 trust success with the genuine successor-trust
+  failure plus the exact source predicate, because the error string alone also
+  owns foreign-trust rejection;
 - tests-only compile/source-shape assertions separately enumerate the existing
   seal/intent/pacemaker/evidence literal narrowings; they do not bypass the
   refusal or produce bytes admissible as GREEN evidence; and
@@ -92109,7 +92113,9 @@ two-field evidence selector can only return epoch 0. GREEN batch 2 must then
 rederive the successful epoch-1 rows through the genuine actor path. Each RED
 batch runs its focused non-campaign test exactly once before any production
 edit. Any failure outside the frozen matrix stops diagnosis before more
-changes.
+changes. The diagnostic encoder uses only the existing registry-v1 `sealVote`,
+`sealQC`, and cut kinds/domains and records its exact bytes and digests; it does
+not invent a fixture-only wire kind.
 
 GREEN batch 1 generalizes only opaque authenticated custody:
 
@@ -92143,19 +92149,24 @@ GREEN batch 2 generalizes the mechanical browser owners:
   activity in epoch N cannot occupy, advance, dispatch, overwrite, or satisfy
   epoch N+1;
 - the public evidence-selector union preserves legacy epoch-0 behavior and
-  returns only the explicitly selected epoch for the new form;
+  returns only the explicitly selected epoch for the new form. Rejecting extra
+  selector keys tightens today's destructuring behavior; the responder is
+  currently wired only by retained Phase-5e test assets, while the production
+  Node request already carries authenticated epoch, so this declared tightening
+  has no hidden production caller;
 - schema authority remains version 3 with unchanged key paths, so no IndexedDB
   migration is manufactured; existing epoch-0 rows reopen unchanged; and
 - creator evidence open/resume selects only the exact current-trust
-  `(objectId, epoch, signerId)` record before enforcing the one-record
+  `(objectId, epoch, anchor, signerId)` record before enforcing the one-record
   invariant. Without adding a public actor input, the actor authenticates each
   candidate signer public key against `currentTrust` through
   `openSealAuthority`, resolves that opaque authority's registered identity,
-  and retains only a record whose stored object/epoch/signer tuple equals that
-  identity before applying the count/resume law. A retained record from another
-  epoch is ignored for actor resume, cannot occupy or terminalize the current
-  actor, and cannot satisfy the current close. Same-epoch duplicates remain
-  fail closed. The epoch-0-retained plus epoch-1-open case is a required mutant;
+  and retains only a record whose stored object/epoch/anchor/signer tuple equals
+  that identity before applying the count/resume law. A retained record from
+  another epoch or anchor is ignored for actor resume, cannot occupy or
+  terminalize the current actor, and cannot satisfy the current close.
+  Same-scope duplicates remain fail closed. The epoch-0-retained plus
+  epoch-1-open case is a required mutant;
 - public `evidenceCount` and `pendingCount` remain observation-only totals over
   all durable epochs, preserving their existing epoch-0 value while making the
   retained-row census explicit; they do not select authority or resume state;
@@ -92235,6 +92246,31 @@ plan; the corrected read-only command
 docs/production-hardening/production-hardening-tdd-plan-v2.md` passed, as did
 `git diff --check`, the exact one-changed-path check, the three corrected source
 seam predicates above, the 26-stash check, and the protected-path audit.
+
+The single material confirmation of corrected signed/pushed HEAD `bc451706`
+closed with resumed Grok 4.6/high `P0=0/P1=0/P2=0`, standard Kimi K3 100-step
+`P0=0/P1=0/P2=2`, and Opus xhigh `P0=0/P1=0/P2=3`; the blocking union is empty
+and D.110c-0a RED is authorized. Grok's first confirmation request was canceled
+after active inspection and honestly classified `NO_VERDICT`; exact session
+`01a06062-8e44-76b3-a359-b9305cfb2864` was resumed and emitted the terminal
+approval. Kimi's current CLI hit host `EMFILE` watcher warnings, so the same
+direct session ran against a detached sparse worktree at exact HEAD; source
+identity and the named owner packages were verified before its terminal
+approval. The P2 dispositions are incorporated above: actor resume also matches
+anchor, RED1 uses the paired epoch-0/epoch-1 discriminator, selector extra-key
+rejection is an explicit safe tightening, exact browser epoch types and
+tests-only registry encoding are named, and no further confirmation is
+permitted or required. Confirmation artifacts are prompt
+`385e327b7d420cf73b12187c6b155e93cdd5570d860a0936e45f1681b363b4cb`,
+initial Grok events
+`8cdac05bc093f58905097e64fb90a2ec0d20792b935a683ed066b48c3bdb823f`,
+resumed Grok events/public
+`6f57e17fd71147b5e3e32f556c9c2f09a972f601086a80c40d971a9249d8ac1b` /
+`9c63e7aa31f311465120e364f953e7eba3180ed632aaf29c77a85a7002f724d0`,
+Kimi export
+`ca3c6541540896670cf64eb54f2564f70b5407738c46dc76b488f6158fc182b4`,
+and Opus transcript
+`e8cc97f2777db0c3d500de83027833139a5beb58b2204a90539b13a87f89f75c`.
 
 ##### D.110c-0b0 owner-selection design
 
