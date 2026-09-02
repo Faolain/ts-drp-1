@@ -22,7 +22,7 @@ export interface StoredSealCarrier {
 
 export interface PendingVoteRow {
 	readonly carrier: StoredSealCarrier;
-	readonly epoch: 0;
+	readonly epoch: number;
 	readonly objectId: string;
 	readonly phase: "commit" | "prepare" | "round-change";
 	readonly round: number;
@@ -38,7 +38,7 @@ export interface InternalSealVoteStore {
 	commitRoundChange(input: unknown): Promise<unknown>;
 	commitVote(input: unknown): Promise<unknown>;
 	close(): void;
-	markDispatched(key: readonly [string, 0, number, "commit" | "prepare" | "round-change", string]): Promise<void>;
+	markDispatched(key: readonly [string, number, number, "commit" | "prepare" | "round-change", string]): Promise<void>;
 	openSnapshot(scope: unknown): Promise<unknown>;
 	readPending(maxRows?: number): Promise<readonly PendingVoteRow[]>;
 }
@@ -155,12 +155,13 @@ async function settleAbort(transaction: IDBTransaction): Promise<void> {
 }
 
 function voteKey(input: {
+	readonly epoch: number;
 	readonly objectId: string;
 	readonly round: number;
 	readonly phase: "commit" | "prepare" | "round-change";
 	readonly signerId: string;
-}): [string, 0, number, "commit" | "prepare" | "round-change", string] {
-	return [input.objectId, 0, input.round, input.phase, input.signerId];
+}): [string, number, number, "commit" | "prepare" | "round-change", string] {
+	return [input.objectId, input.epoch, input.round, input.phase, input.signerId];
 }
 
 function copiedPendingRow(value: unknown): PendingVoteRow | undefined {
@@ -169,7 +170,7 @@ function copiedPendingRow(value: unknown): PendingVoteRow | undefined {
 	if (
 		carrier === undefined ||
 		typeof value.objectId !== "string" ||
-		value.epoch !== 0 ||
+		!safeNonnegative(value.epoch) ||
 		!safeNonnegative(value.round) ||
 		(value.phase !== "prepare" && value.phase !== "commit" && value.phase !== "round-change") ||
 		typeof value.signerId !== "string" ||
@@ -180,7 +181,7 @@ function copiedPendingRow(value: unknown): PendingVoteRow | undefined {
 	return Object.freeze({
 		carrier,
 		dispatched: value.dispatched,
-		epoch: 0,
+		epoch: value.epoch,
 		objectId: value.objectId,
 		phase: value.phase,
 		round: value.round,
@@ -231,7 +232,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 		if (
 			carrier === undefined ||
 			prepareQC === undefined ||
-			raw.epoch !== undefined ||
+			!safeNonnegative(raw.epoch) ||
 			typeof raw.anchor !== "string" ||
 			typeof raw.expectedIncarnation !== "string" ||
 			!safeNonnegative(raw.expectedRevision) ||
@@ -256,7 +257,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			!plainRecord(decoded) ||
 			decoded.kind !== "drp-seal-vote" ||
 			decoded.objectId !== raw.objectId ||
-			decoded.epoch !== 0 ||
+			decoded.epoch !== raw.epoch ||
 			decoded.phase !== raw.phase ||
 			decoded.round !== raw.round ||
 			decoded.signerId !== raw.signerId ||
@@ -277,7 +278,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			await settleAbort(transaction);
 			return Object.freeze({ ok: false as const, reason: "STORAGE_LOSS", writes: 0 });
 		}
-		const stateKey: [string, 0, string] = [raw.objectId, 0, raw.signerId];
+		const stateKey: [string, number, string] = [raw.objectId, raw.epoch, raw.signerId];
 		const existingState = await requestResult(transaction.objectStore(PHASE_5C_SIGNER_STATE_STORE).get(stateKey));
 		const currentRevision =
 			existingState === undefined ? 0 : plainRecord(existingState) ? existingState.revision : undefined;
@@ -294,6 +295,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			existingState !== undefined &&
 			(!plainRecord(existingState) ||
 				existingState.anchor !== raw.anchor ||
+				existingState.epoch !== raw.epoch ||
 				!safeNonnegative(existingState.enteredRound) ||
 				raw.round < existingState.enteredRound)
 		) {
@@ -340,7 +342,13 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			await settleAbort(transaction);
 			return Object.freeze({ ok: false as const, reason: "LOCKED_VALUE_CONFLICT", writes: 0 });
 		}
-		const key = voteKey({ objectId: raw.objectId, phase: raw.phase, round: raw.round, signerId: raw.signerId });
+		const key = voteKey({
+			epoch: raw.epoch,
+			objectId: raw.objectId,
+			phase: raw.phase,
+			round: raw.round,
+			signerId: raw.signerId,
+		});
 		const occupied = await requestResult(transaction.objectStore(PHASE_5C_VOTE_SLOTS_STORE).get(key));
 		if (occupied !== undefined) {
 			const stored = plainRecord(occupied) ? copiedCarrier(occupied.carrier) : undefined;
@@ -359,7 +367,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 		}
 		const slotRow = {
 			carrier,
-			epoch: 0,
+			epoch: raw.epoch,
 			objectId: raw.objectId,
 			phase: raw.phase,
 			round: raw.round,
@@ -386,7 +394,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 					? existingState.durablePrepareQcCount
 					: 0,
 			enteredRound,
-			epoch: 0,
+			epoch: raw.epoch,
 			finalizedCommitQC: plainRecord(existingState) ? (existingState.finalizedCommitQC ?? null) : null,
 			finalizedValueDigest: plainRecord(existingState) ? (existingState.finalizedValueDigest ?? null) : null,
 			highestPrepareQC: existingHighestPrepareQC,
@@ -399,7 +407,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 		const outboxRow: PendingVoteRow = {
 			carrier,
 			dispatched: false,
-			epoch: 0,
+			epoch: raw.epoch,
 			objectId: raw.objectId,
 			phase: raw.phase,
 			round: raw.round,
@@ -434,7 +442,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			!plainRecord(decoded) ||
 			decoded.kind !== "drp-seal-qc" ||
 			decoded.objectId !== raw.objectId ||
-			decoded.epoch !== 0 ||
+			decoded.epoch !== raw.epoch ||
 			decoded.phase !== raw.phase ||
 			decoded.round !== raw.round ||
 			decoded.proposalDigest !== raw.valueDigest ||
@@ -445,7 +453,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			typeof raw.expectedIncarnation !== "string" ||
 			!safeNonnegative(raw.expectedRevision) ||
 			typeof raw.objectId !== "string" ||
-			raw.epoch !== 0 ||
+			!safeNonnegative(raw.epoch) ||
 			(raw.phase !== "prepare" && raw.phase !== "commit") ||
 			!safeNonnegative(raw.round) ||
 			typeof raw.signerId !== "string" ||
@@ -470,13 +478,14 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			return Object.freeze({ ok: false as const, reason: "STORAGE_LOSS" });
 		}
 		const stateStore = transaction.objectStore(PHASE_5C_SIGNER_STATE_STORE);
-		const stateKey: [string, 0, string] = [raw.objectId, 0, raw.signerId];
+		const stateKey: [string, number, string] = [raw.objectId, raw.epoch, raw.signerId];
 		const storedState = await requestResult(stateStore.get(stateKey));
 		if (
 			(storedState === undefined && raw.expectedRevision !== 0) ||
 			(storedState !== undefined &&
 				(!plainRecord(storedState) ||
 					storedState.anchor !== raw.anchor ||
+					storedState.epoch !== raw.epoch ||
 					storedState.revision !== raw.expectedRevision ||
 					!safeNonnegative(storedState.revision) ||
 					storedState.revision === Number.MAX_SAFE_INTEGER))
@@ -493,7 +502,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 						durableCommitQcCount: 0,
 						durablePrepareQcCount: 0,
 						enteredRound: 0,
-						epoch: 0,
+						epoch: raw.epoch,
 						finalizedCommitQC: null,
 						finalizedValueDigest: null,
 						highestPrepareQC: null,
@@ -600,7 +609,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			!plainRecord(decoded) ||
 			decoded.kind !== "drp-round-change" ||
 			decoded.objectId !== raw.objectId ||
-			decoded.epoch !== 0 ||
+			decoded.epoch !== raw.epoch ||
 			decoded.anchor !== raw.anchor ||
 			decoded.round !== raw.round ||
 			decoded.phase !== "round-change" ||
@@ -609,6 +618,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			typeof raw.expectedIncarnation !== "string" ||
 			!safeNonnegative(raw.expectedRevision) ||
 			typeof raw.objectId !== "string" ||
+			!safeNonnegative(raw.epoch) ||
 			!safeNonnegative(raw.round) ||
 			typeof raw.signerId !== "string"
 		) {
@@ -628,7 +638,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			return Object.freeze({ ok: false as const, reason: "STORAGE_LOSS" });
 		}
 		const stateStore = transaction.objectStore(PHASE_5C_SIGNER_STATE_STORE);
-		const stateKey: [string, 0, string] = [raw.objectId, 0, raw.signerId];
+		const stateKey: [string, number, string] = [raw.objectId, raw.epoch, raw.signerId];
 		const state = await requestResult(stateStore.get(stateKey));
 		const current =
 			state === undefined
@@ -638,7 +648,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 						durableCommitQcCount: 0,
 						durablePrepareQcCount: 0,
 						enteredRound: 0,
-						epoch: 0,
+						epoch: raw.epoch,
 						finalizedCommitQC: null,
 						finalizedValueDigest: null,
 						highestPrepareQC: null,
@@ -652,6 +662,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 		if (
 			!plainRecord(current) ||
 			current.anchor !== raw.anchor ||
+			current.epoch !== raw.epoch ||
 			current.revision !== raw.expectedRevision ||
 			!safeNonnegative(current.revision) ||
 			current.revision === Number.MAX_SAFE_INTEGER ||
@@ -662,7 +673,13 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			await settleAbort(transaction);
 			return Object.freeze({ ok: false as const, reason: "REVALIDATION_REQUIRED" });
 		}
-		const key = voteKey({ objectId: raw.objectId, phase: "round-change", round: raw.round, signerId: raw.signerId });
+		const key = voteKey({
+			epoch: raw.epoch,
+			objectId: raw.objectId,
+			phase: "round-change",
+			round: raw.round,
+			signerId: raw.signerId,
+		});
 		const occupied = await requestResult(transaction.objectStore(PHASE_5C_VOTE_SLOTS_STORE).get(key));
 		if (occupied !== undefined) {
 			const stored = plainRecord(occupied) ? copiedCarrier(occupied.carrier) : undefined;
@@ -680,7 +697,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 		const row: PendingVoteRow = {
 			carrier,
 			dispatched: false,
-			epoch: 0,
+			epoch: raw.epoch,
 			objectId: raw.objectId,
 			phase: "round-change",
 			round: raw.round,
@@ -690,7 +707,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			requestResult(
 				transaction.objectStore(PHASE_5C_VOTE_SLOTS_STORE).add({
 					carrier,
-					epoch: 0,
+					epoch: raw.epoch,
 					objectId: raw.objectId,
 					phase: "round-change",
 					round: raw.round,
@@ -751,7 +768,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			!safeNonnegative(raw.round) ||
 			typeof raw.anchor !== "string" ||
 			typeof raw.objectId !== "string" ||
-			raw.epoch !== 0 ||
+			!safeNonnegative(raw.epoch) ||
 			typeof raw.signerId !== "string"
 		) {
 			return Object.freeze({ ok: false as const, reason: "MALFORMED_INPUT" });
@@ -772,7 +789,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			return Object.freeze({ ok: false as const, reason: "STORAGE_LOSS" });
 		}
 		const stateStore = transaction.objectStore(PHASE_5C_SIGNER_STATE_STORE);
-		const stateKey: [string, 0, string] = [raw.objectId, 0, raw.signerId];
+		const stateKey: [string, number, string] = [raw.objectId, raw.epoch, raw.signerId];
 		const existingState = await requestResult(stateStore.get(stateKey));
 		const state =
 			existingState === undefined
@@ -782,7 +799,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 						durableCommitQcCount: 0,
 						durablePrepareQcCount: 0,
 						enteredRound: 0,
-						epoch: 0,
+						epoch: raw.epoch,
 						finalizedCommitQC: null,
 						finalizedValueDigest: null,
 						highestPrepareQC: null,
@@ -796,6 +813,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 		if (
 			!plainRecord(state) ||
 			state.anchor !== raw.anchor ||
+			state.epoch !== raw.epoch ||
 			!safeNonnegative(state.revision) ||
 			state.revision === Number.MAX_SAFE_INTEGER ||
 			state.revision !== raw.expectedRevision ||
@@ -819,7 +837,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 		commitVote,
 		close: () => opened.close(),
 		incarnation,
-		markDispatched: async (key: readonly [string, 0, number, "commit" | "prepare" | "round-change", string]) => {
+		markDispatched: async (key: readonly [string, number, number, "commit" | "prepare" | "round-change", string]) => {
 			const transaction = opened.transaction(PHASE_5C_VOTE_OUTBOX_STORE, "readwrite", { durability: "strict" });
 			if (transaction.durability !== "strict") {
 				abort(transaction);
@@ -841,7 +859,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 				!plainRecord(scope) ||
 				typeof scope.expectedIncarnation !== "string" ||
 				typeof scope.objectId !== "string" ||
-				scope.epoch !== 0 ||
+				!safeNonnegative(scope.epoch) ||
 				typeof scope.signerId !== "string"
 			) {
 				throw new TypeError("invalid voter enrollment scope");
@@ -851,7 +869,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 			}
 			const transaction = opened.transaction([PHASE_5C_SIGNER_STATE_STORE, PHASE_5C_VOTE_OUTBOX_STORE], "readonly");
 			const state = await requestResult(
-				transaction.objectStore(PHASE_5C_SIGNER_STATE_STORE).get([scope.objectId, 0, scope.signerId])
+				transaction.objectStore(PHASE_5C_SIGNER_STATE_STORE).get([scope.objectId, scope.epoch, scope.signerId])
 			);
 			const pendingRows = await requestResult(transaction.objectStore(PHASE_5C_VOTE_OUTBOX_STORE).getAll());
 			await transactionComplete(transaction);
@@ -859,7 +877,7 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 				(row) =>
 					plainRecord(row) &&
 					row.objectId === scope.objectId &&
-					row.epoch === 0 &&
+					row.epoch === scope.epoch &&
 					row.signerId === scope.signerId &&
 					row.phase === "round-change"
 			).length;
@@ -878,7 +896,9 @@ export async function openInternalSealVoteStore(input: OpenInternalSealVoteStore
 					revision: 0,
 				});
 			}
-			if (!plainRecord(state) || state.anchor !== scope.anchor) throw new Error("invalid scoped signer state snapshot");
+			if (!plainRecord(state) || state.anchor !== scope.anchor || state.epoch !== scope.epoch) {
+				throw new Error("invalid scoped signer state snapshot");
+			}
 			const highest = plainRecord(state.highestPrepareQC) ? state.highestPrepareQC : null;
 			const finalized = plainRecord(state.finalizedCommitQC) ? state.finalizedCommitQC : null;
 			return Object.freeze({

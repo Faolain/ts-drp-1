@@ -20,7 +20,7 @@ export type PacemakerEventKind =
 
 export interface PacemakerEvent {
 	readonly anchor: string;
-	readonly epoch: 0;
+	readonly epoch: number;
 	readonly kind: PacemakerEventKind;
 	readonly objectId: string;
 	readonly phase: "commit" | "prepare" | "round-change";
@@ -117,7 +117,7 @@ export function leaderForRound(signerIds: readonly string[], round: number): str
 }
 
 /**
- * Opens the epoch-zero pacemaker over genuine protocol, voter, and durable-store capabilities.
+ * Opens an epoch-bound pacemaker over genuine protocol, voter, and durable-store capabilities.
  * @param input - Authenticated protocol, metrics, storage, and voter capabilities.
  * @returns A pacemaker handle or a typed failure.
  */
@@ -181,7 +181,7 @@ export function createSealPacemaker(
 	): void => {
 		const event = Object.freeze({
 			anchor: identity.anchor,
-			epoch: 0 as const,
+			epoch: identity.epoch,
 			kind,
 			objectId: identity.objectId,
 			phase: eventPhase,

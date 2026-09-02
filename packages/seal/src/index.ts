@@ -338,6 +338,7 @@ export async function createSealVoter(
 								exactCanonicalPreimageBytes: exactBytes(prepared.exactCanonicalPreimageBytes),
 								signature: exactBytes(signature, 64, 64),
 							}),
+							epoch: authorityIdentity.epoch,
 							expectedIncarnation: expectedStorageIncarnation,
 							expectedRevision: revision,
 							highestPrepareQcBytes,
@@ -428,6 +429,7 @@ export async function createSealVoter(
 							mintSealVoteIntent({
 								anchor: prepared.anchor,
 								carrier,
+								epoch: authorityIdentity.epoch,
 								expectedIncarnation: expectedStorageIncarnation,
 								expectedRevision,
 								objectId: prepared.objectId,

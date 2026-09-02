@@ -39,7 +39,9 @@ describe("D.110c-0a epoch-relative seal-authority causal RED", () => {
 		if (!successor.ok) return;
 
 		const source = readFileSync(resolve(import.meta.dirname, "../packages/protocol-v3/src/seal.ts"), "utf8");
-		expect(source, "D110C_0A_LITERAL_GUARD_SOURCE").toContain("material === undefined || material.currentEpoch !== 0");
+		expect(source, "D110C_0A_LITERAL_GUARD_SOURCE").not.toContain(
+			"material === undefined || material.currentEpoch !== 0"
+		);
 		expect(
 			openSealAuthority({ signerPublicKey: publicKey, trust: successor.trust }),
 			"D110C_0A_EPOCH_ONE_AUTHORITY_REFUSED"

@@ -1,6 +1,6 @@
 export interface SealAuthorityIdentity {
 	readonly anchor: string;
-	readonly epoch: 0;
+	readonly epoch: number;
 	readonly objectId: string;
 	readonly signerId: string;
 }

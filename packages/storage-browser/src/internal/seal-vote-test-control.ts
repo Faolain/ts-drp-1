@@ -125,6 +125,7 @@ function commitInput(
 	return Object.freeze({
 		anchor: ANCHOR,
 		carrier: stored,
+		epoch: 0,
 		expectedIncarnation: incarnation,
 		expectedRevision: revision,
 		objectId,

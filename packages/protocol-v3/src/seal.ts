@@ -27,7 +27,7 @@ interface RegistryKind {
 
 interface SealAuthorityState {
 	readonly anchor: string;
-	readonly epoch: 0;
+	readonly epoch: number;
 	readonly objectId: string;
 	readonly publicKeys: ReadonlyMap<string, Uint8Array>;
 	readonly quorum: number;
@@ -264,8 +264,8 @@ function failure(reason: string): Readonly<{ ok: false; reason: string }> {
 }
 
 /**
- * Binds a finality public key to the unique signer ID in certified epoch-zero custody.
- * @param input - Certified trust capability and exact finality public key.
+ * Binds a finality public key to the unique signer ID in authenticated seal custody.
+ * @param input - Certified or current creator trust capability and exact finality public key.
  * @returns Opaque seal authority or a typed failure.
  */
 export function openSealAuthority(
@@ -273,10 +273,17 @@ export function openSealAuthority(
 ): Readonly<{ authority: SealAuthority; ok: true; signerId: string } | { ok: false; reason: string }> {
 	try {
 		if (!plainRecord(input) || !exactRecordKeys(input, ["signerPublicKey", "trust"])) return failure("malformed-input");
-		const material =
-			resolveCertifiedSealAuthorityMaterial(input.trust as CertifiedAnchorTrust) ??
-			resolveCreatorAnchorTrustMaterial(input.trust as CurrentAnchorTrust);
-		if (material === undefined || material.currentEpoch !== 0) return failure("untrusted-context");
+		const certified = resolveCertifiedSealAuthorityMaterial(input.trust as CertifiedAnchorTrust);
+		const creator =
+			certified === undefined ? resolveCreatorAnchorTrustMaterial(input.trust as CurrentAnchorTrust) : undefined;
+		const material = certified ?? creator;
+		if (
+			material === undefined ||
+			!safeInteger(material.currentEpoch, 0) ||
+			(certified !== undefined && material.currentEpoch !== 0)
+		) {
+			return failure("untrusted-context");
+		}
 		const signerPublicKey = copyExactBytes(input.signerPublicKey, 32, 32);
 		const decodedSignerSet = decodeCanonical(material.exactCanonicalSignerSetBytes);
 		if (!validateSignerArray(decodedSignerSet)) {
@@ -298,7 +305,7 @@ export function openSealAuthority(
 			authority,
 			Object.freeze({
 				anchor: material.currentAnchorDigest,
-				epoch: 0,
+				epoch: material.currentEpoch,
 				objectId: material.objectId,
 				publicKeys,
 				quorum: material.quorum,
@@ -307,7 +314,7 @@ export function openSealAuthority(
 		);
 		registerSealAuthorityIdentity(authority, {
 			anchor: material.currentAnchorDigest,
-			epoch: 0,
+			epoch: material.currentEpoch,
 			objectId: material.objectId,
 			signerId,
 		});

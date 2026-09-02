@@ -3,6 +3,7 @@ import type { ExactSealCarrier } from "../index.js";
 export interface SealVoteIntentData {
 	readonly anchor: string;
 	readonly carrier: ExactSealCarrier;
+	readonly epoch: number;
 	readonly expectedIncarnation: string;
 	readonly expectedRevision: number;
 	readonly objectId: string;
@@ -16,6 +17,7 @@ export interface SealVoteIntentData {
 export interface SealRoundChangeIntentData {
 	readonly anchor: string;
 	readonly carrier: ExactSealCarrier;
+	readonly epoch: number;
 	readonly expectedIncarnation: string;
 	readonly expectedRevision: number;
 	readonly highestPrepareQcBytes: Uint8Array | null;
@@ -26,7 +28,7 @@ export interface SealRoundChangeIntentData {
 
 export interface SealVoterEnrollmentData {
 	readonly anchor: string;
-	readonly epoch: 0;
+	readonly epoch: number;
 	readonly expectedIncarnation: string;
 	readonly objectId: string;
 	readonly signerId: string;

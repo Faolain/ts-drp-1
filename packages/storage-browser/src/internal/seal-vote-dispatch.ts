@@ -51,7 +51,7 @@ export function createInternalVoteDispatcher(input: VoteDispatcherInput): Readon
 				try {
 					await input.publish({ carrier: row.carrier, key });
 					if (closed) return;
-					await input.store.markDispatched([row.objectId, 0, row.round, row.phase, row.signerId]);
+					await input.store.markDispatched([row.objectId, row.epoch, row.round, row.phase, row.signerId]);
 					sentKeys.push(key);
 				} finally {
 					inFlight -= 1;

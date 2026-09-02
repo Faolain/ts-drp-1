@@ -36,7 +36,7 @@ export interface InternalSealEvidenceStore {
 	restorePeerEvidence(
 		evidence: PeerSealEvidence
 	): Promise<Readonly<{ duplicate: boolean; ok: true } | { ok: false; reason: string }>>;
-	servePeerEvidence(objectId: string, signerId: string): Promise<PeerSealEvidence | null>;
+	servePeerEvidence(objectId: string, epoch: number, signerId: string): Promise<PeerSealEvidence | null>;
 }
 
 export interface PeerSealEvidence {
@@ -87,7 +87,7 @@ function copiedRecord(value: unknown): CreatorCloseEvidenceRecord | undefined {
 		signerPublicKey.byteLength !== 32 ||
 		typeof value.anchor !== "string" ||
 		!digestHex.test(value.anchor) ||
-		value.epoch !== 0 ||
+		!safeRevision(value.epoch) ||
 		typeof value.objectId !== "string" ||
 		typeof value.phase !== "string" ||
 		!phases.has(value.phase as CreatorCloseEvidencePhase) ||
@@ -101,7 +101,7 @@ function copiedRecord(value: unknown): CreatorCloseEvidenceRecord | undefined {
 	}
 	return copyCreatorCloseEvidenceRecord({
 		anchor: value.anchor,
-		epoch: 0,
+		epoch: value.epoch,
 		exactCanonicalCommitQcBytes: commit,
 		exactCanonicalCutValueBytes: cut,
 		exactCanonicalPrepareQcBytes: prepare,
@@ -168,7 +168,7 @@ function samePeerEvidence(left: PeerSealEvidence, right: PeerSealEvidence): bool
 
 function peerIdentity(
 	evidence: PeerSealEvidence
-): Readonly<{ anchor: string; epoch: 0; objectId: string; signerId: string; valueDigest: string }> | undefined {
+): Readonly<{ anchor: string; epoch: number; objectId: string; signerId: string; valueDigest: string }> | undefined {
 	try {
 		const vote = decodeCanonical(evidence.carrier.exactCanonicalPreimageBytes);
 		const qc = decodeCanonical(evidence.exactCanonicalCommitQcBytes);
@@ -179,7 +179,7 @@ function peerIdentity(
 			!plainRecord(cut) ||
 			vote.kind !== "drp-seal-vote" ||
 			vote.phase !== "commit" ||
-			vote.epoch !== 0 ||
+			!safeRevision(vote.epoch) ||
 			qc.kind !== "drp-seal-qc" ||
 			qc.phase !== "commit" ||
 			qc.objectId !== vote.objectId ||
@@ -196,7 +196,7 @@ function peerIdentity(
 		}
 		return Object.freeze({
 			anchor: cut.previousAnchor,
-			epoch: 0 as const,
+			epoch: vote.epoch,
 			objectId: vote.objectId,
 			signerId: vote.signerId,
 			valueDigest: Array.from(hashDomain("ts-drp/hard-epoch-cut/v3", evidence.exactCanonicalCutValueBytes), (byte) =>
@@ -298,7 +298,7 @@ export async function openInternalSealEvidenceStore(
 		}
 		const completion = transactionComplete(transaction);
 		const store = transaction.objectStore(PHASE_5E_SEAL_EVIDENCE_STORE);
-		const key: [string, 0, string] = [identity.objectId, 0, identity.signerId];
+		const key: [string, number, string] = [identity.objectId, identity.epoch, identity.signerId];
 		const raw = await requestResult(store.get(key));
 		const existing = copiedRecord(raw);
 		const existingPeer = peerEvidenceFromRow(raw);
@@ -331,7 +331,7 @@ export async function openInternalSealEvidenceStore(
 		}
 		const row =
 			existing === undefined
-				? { epoch: 0 as const, objectId: identity.objectId, peerEvidence: evidence, signerId: identity.signerId }
+				? { epoch: identity.epoch, objectId: identity.objectId, peerEvidence: evidence, signerId: identity.signerId }
 				: { ...existing, peerEvidence: evidence };
 		await requestResult(store.put(row));
 		await completion;
@@ -357,7 +357,7 @@ export async function openInternalSealEvidenceStore(
 			}
 			const completion = transactionComplete(transaction);
 			const store = transaction.objectStore(PHASE_5E_SEAL_EVIDENCE_STORE);
-			const key: [string, 0, string] = [copied.objectId, 0, copied.signerId];
+			const key: [string, number, string] = [copied.objectId, copied.epoch, copied.signerId];
 			const existing = copiedRecord(await requestResult(store.get(key)));
 			if (existing !== undefined && sameRecord(existing, copied)) {
 				await completion;
@@ -401,10 +401,11 @@ export async function openInternalSealEvidenceStore(
 		},
 		persistPeerEvidence: writePeerEvidence,
 		restorePeerEvidence: writePeerEvidence,
-		async servePeerEvidence(objectId: string, signerId: string): Promise<PeerSealEvidence | null> {
+		async servePeerEvidence(objectId: string, epoch: number, signerId: string): Promise<PeerSealEvidence | null> {
 			if (
 				typeof objectId !== "string" ||
 				objectId.length === 0 ||
+				!safeRevision(epoch) ||
 				typeof signerId !== "string" ||
 				signerId.length === 0
 			) {
@@ -412,7 +413,7 @@ export async function openInternalSealEvidenceStore(
 			}
 			const transaction = database.transaction(PHASE_5E_SEAL_EVIDENCE_STORE, "readonly");
 			const row = await requestResult(
-				transaction.objectStore(PHASE_5E_SEAL_EVIDENCE_STORE).get([objectId, 0, signerId])
+				transaction.objectStore(PHASE_5E_SEAL_EVIDENCE_STORE).get([objectId, epoch, signerId])
 			);
 			await transactionComplete(transaction);
 			return peerEvidenceFromRow(row) ?? null;

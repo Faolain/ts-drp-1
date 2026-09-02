@@ -6,6 +6,7 @@ import {
 	prepareCreatorClose,
 	prepareCreatorSuccessor,
 } from "@ts-drp/protocol-v3/creator-close";
+import { resolveSealAuthorityIdentity } from "@ts-drp/protocol-v3/internal/seal-authority-identity";
 import { openSealAuthority, type SealAuthority, verifySealQC } from "@ts-drp/protocol-v3/seal";
 
 import { createSealVoter, type ExactSealCarrier, type SealStorePort, type SealVoterHandle } from "./index.js";
@@ -97,17 +98,22 @@ function signerIdentity(closeInput: Readonly<Record<string, unknown>>): Readonly
 	return Object.freeze({ publicKey: hexBytes(signer.publicKey), signerId: signer.signerId });
 }
 
-function cutIdentity(exactCanonicalCutValueBytes: Uint8Array): Readonly<{ anchor: string; objectId: string }> {
+function cutIdentity(
+	exactCanonicalCutValueBytes: Uint8Array
+): Readonly<{ anchor: string; epoch: number; objectId: string }> {
 	const decoded = decodeCanonical(exactCanonicalCutValueBytes);
 	if (
 		!plainRecord(decoded) ||
+		typeof decoded.epoch !== "number" ||
+		!Number.isSafeInteger(decoded.epoch) ||
+		decoded.epoch < 0 ||
 		typeof decoded.objectId !== "string" ||
 		typeof decoded.previousAnchor !== "string" ||
 		!digestHex.test(decoded.previousAnchor)
 	) {
 		throw new TypeError("invalid creator cut identity");
 	}
-	return Object.freeze({ anchor: decoded.previousAnchor, objectId: decoded.objectId });
+	return Object.freeze({ anchor: decoded.previousAnchor, epoch: decoded.epoch, objectId: decoded.objectId });
 }
 
 function q1QcBytes(carrier: Readonly<{ exactCanonicalPreimageBytes: Uint8Array; signature: Uint8Array }>): Uint8Array {
@@ -244,7 +250,7 @@ async function runClose(
 		if (record === null) {
 			record = Object.freeze({
 				anchor: identity.anchor,
-				epoch: 0 as const,
+				epoch: identity.epoch,
 				exactCanonicalCommitQcBytes: null,
 				exactCanonicalCutValueBytes: Uint8Array.from(preparedClose.exactCanonicalCutValueBytes),
 				exactCanonicalPrepareQcBytes: null,
@@ -261,6 +267,8 @@ async function runClose(
 			if (evidenceFailure !== undefined) return failure(evidenceFailure);
 			emit(state, "close_evidence_committed");
 		} else if (
+			record.anchor !== identity.anchor ||
+			record.epoch !== identity.epoch ||
 			record.objectId !== identity.objectId ||
 			record.signerId !== signer.signerId ||
 			record.valueDigest !== preparedClose.valueDigest ||
@@ -427,8 +435,20 @@ export async function createCreatorSealActor(
 		const evidence = resolveCreatorCloseEvidenceStore(input.evidenceStore);
 		if (evidence === undefined) return failure("UNTRUSTED_EVIDENCE_STORE");
 		const rows = await evidence.readAll();
-		if (rows.length > 1) return failure("SIGNER_NOT_AUTHORIZED");
-		const record = rows[0] ?? null;
+		const currentRows = rows.filter((candidate) => {
+			const opened = openSealAuthority({ signerPublicKey: candidate.signerPublicKey, trust: input.currentTrust });
+			if (!opened.ok || opened.signerId !== candidate.signerId) return false;
+			const identity = resolveSealAuthorityIdentity(opened.authority);
+			return (
+				identity !== undefined &&
+				candidate.anchor === identity.anchor &&
+				candidate.epoch === identity.epoch &&
+				candidate.objectId === identity.objectId &&
+				candidate.signerId === identity.signerId
+			);
+		});
+		if (currentRows.length > 1) return failure("SIGNER_NOT_AUTHORIZED");
+		const record = currentRows[0] ?? null;
 		if (record !== null && record.storageIncarnation !== input.storageIncarnation) return failure("STORAGE_LOSS");
 		const state: ActorState = {
 			activeTask: null,

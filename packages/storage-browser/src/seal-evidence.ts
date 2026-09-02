@@ -22,7 +22,11 @@ export async function openBrowserSealEvidenceStore(input: Readonly<{ databaseNam
 		restorePeerEvidence(
 			input: Readonly<{ evidence: PeerSealEvidence }>
 		): Promise<Readonly<{ duplicate: boolean; ok: true } | { ok: false; reason: string }>>;
-		servePeerEvidence(input: Readonly<{ objectId: string; signerId: string }>): Promise<PeerSealEvidence | null>;
+		servePeerEvidence(
+			input:
+				| Readonly<{ objectId: string; signerId: string }>
+				| Readonly<{ epoch: number; objectId: string; signerId: string }>
+		): Promise<PeerSealEvidence | null>;
 		store: CreatorCloseEvidenceStore;
 	}>
 > {
@@ -37,6 +41,38 @@ export async function openBrowserSealEvidenceStore(input: Readonly<{ databaseNam
 	}
 	const internal = await openInternalSealEvidenceStore({ databaseName: input.databaseName });
 	const rows = await internal.readAll();
+	const selectPeerEvidence = async (selector: unknown): Promise<PeerSealEvidence | null> => {
+		if (selector === null || typeof selector !== "object" || Array.isArray(selector)) {
+			throw new TypeError("peer evidence identity is invalid");
+		}
+		const prototype = Object.getPrototypeOf(selector) as object | null;
+		const keys = Reflect.ownKeys(selector);
+		const expected = keys.length === 2 ? ["objectId", "signerId"] : ["epoch", "objectId", "signerId"];
+		const descriptors = Object.getOwnPropertyDescriptors(selector);
+		if (
+			(prototype !== Object.prototype && prototype !== null) ||
+			!keys.every((key): key is string => typeof key === "string") ||
+			keys.length !== expected.length ||
+			![...keys].sort().every((key, index) => key === expected[index]) ||
+			keys.some((key) => !("value" in (descriptors[key] as PropertyDescriptor)))
+		) {
+			throw new TypeError("peer evidence identity is invalid");
+		}
+		const record = selector as Readonly<Record<string, unknown>>;
+		const epoch = keys.length === 2 ? 0 : record.epoch;
+		if (
+			typeof record.objectId !== "string" ||
+			record.objectId.length === 0 ||
+			typeof epoch !== "number" ||
+			!Number.isSafeInteger(epoch) ||
+			epoch < 0 ||
+			typeof record.signerId !== "string" ||
+			record.signerId.length === 0
+		) {
+			throw new TypeError("peer evidence identity is invalid");
+		}
+		return internal.servePeerEvidence(record.objectId, epoch, record.signerId);
+	};
 	return Object.freeze({
 		close: () => Promise.resolve(internal.close()),
 		observation: Object.freeze({
@@ -46,7 +82,7 @@ export async function openBrowserSealEvidenceStore(input: Readonly<{ databaseNam
 		}),
 		persistPeerEvidence: ({ evidence }) => internal.persistPeerEvidence(evidence),
 		restorePeerEvidence: ({ evidence }) => internal.restorePeerEvidence(evidence),
-		servePeerEvidence: ({ objectId, signerId }) => internal.servePeerEvidence(objectId, signerId),
+		servePeerEvidence: selectPeerEvidence,
 		store: mintCreatorCloseEvidenceStore({
 			put: (record, expectedPhase) => internal.put(record, expectedPhase),
 			readAll: () => internal.readAll(),

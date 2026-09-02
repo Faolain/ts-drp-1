@@ -347,7 +347,7 @@ describe("Phase 5e durable creator actor RED", () => {
 	});
 
 	it.skipIf(!readiness.ready)(
-		"rejects foreign durable evidence and terminalizes an ambiguous commit retry",
+		"ignores foreign-scope durable evidence and terminalizes an ambiguous current-scope retry",
 		async () => {
 			const foreignDatabase = `phase5e-actor-foreign-${crypto.randomUUID()}`;
 			openedDatabases.push(foreignDatabase);
@@ -355,7 +355,13 @@ describe("Phase 5e durable creator actor RED", () => {
 			expect(await foreignFirst.actor.close({ closeInput: foreignFirst.closeInput })).toMatchObject({ ok: true });
 			await foreignFirst.close();
 			await mutateSealEvidence(foreignDatabase, (row) => ({ ...row, signerId: "foreign-finality" }));
-			await expect(openCreatorActorHarness(foreignDatabase)).rejects.toThrow(/SIGNER_NOT_AUTHORIZED/u);
+			const foreignIgnored = await openCreatorActorHarness(foreignDatabase);
+			try {
+				expect(foreignIgnored.actor.status()).toMatchObject({ phase: "empty", terminal: false });
+				expect(await foreignIgnored.actor.close({ closeInput: foreignIgnored.closeInput })).toMatchObject({ ok: true });
+			} finally {
+				await foreignIgnored.close();
+			}
 
 			const ambiguousDatabase = `phase5e-actor-ambiguous-${crypto.randomUUID()}`;
 			openedDatabases.push(ambiguousDatabase);

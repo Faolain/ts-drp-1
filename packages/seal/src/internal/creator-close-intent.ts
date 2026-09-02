@@ -9,7 +9,7 @@ export type CreatorCloseEvidencePhase =
 
 export interface CreatorCloseEvidenceRecord {
 	readonly anchor: string;
-	readonly epoch: 0;
+	readonly epoch: number;
 	readonly exactCanonicalCommitQcBytes: Uint8Array | null;
 	readonly exactCanonicalCutValueBytes: Uint8Array;
 	readonly exactCanonicalPrepareQcBytes: Uint8Array | null;

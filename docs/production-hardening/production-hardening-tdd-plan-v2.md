@@ -92308,6 +92308,74 @@ passed, all manifest entries validated, the protected untracked paths remained
 untouched, and all 26 stashes remained present. This signed RED authorizes only
 the frozen D.110c-0a GREEN batches described above.
 
+The D.110c-0a GREEN implementation now closes that causal RED without widening
+the first-transition product result or its wire/storage contracts. Genuine
+creator trust owns a copied safe nonnegative current epoch throughout protocol
+seal authority, voter enrollment and intent custody, pacemaker events, creator
+evidence, and the existing browser schema-v3 vote/evidence owners. Certified
+seal authority remains exactly epoch 0. Browser rows derive their epoch from
+decoded authenticated carriers or resolved opaque intent authority, reject a
+redundant mismatched epoch with the existing exact storage error, key every
+slot/state/outbox/dispatch/evidence operation by the exact epoch, and preserve
+the legacy public evidence selector as exact epoch 0. The new explicit selector
+form is a closed three-data-property shape with a safe nonnegative epoch; extra,
+missing, accessor, fractional, negative, or unsafe forms reject asynchronously
+with exact `TypeError("peer evidence identity is invalid")` before I/O.
+
+The genuine actor GREEN is not fixture-authored authority. It opens the real
+adopted epoch-1 successor trust, derives an epoch-1 close input from the
+authenticated prior cut and successor anchor, completes prepare, commit QC,
+finalize, and exact finalized reopen through the real creator actor and browser
+ports, and uses those product-created carriers for the storage/selector matrix.
+A retained genuine epoch-0 authored row coexists but cannot occupy or resume the
+epoch-1 actor; reopening selects the exact epoch-1 object/anchor/signer custody.
+The retained Phase-5e expectation was corrected accordingly: a foreign-scope
+row is ignored, while the existing same-current-scope ambiguous retry remains
+fail closed. No production change was needed for that expectation correction.
+
+The two accepted focused reports each selected one test in one file and passed
+1/1: `batch1-corrected-vitest.json` SHA-256
+`3b073cd6332bba24b46fc1f4f3213dfceffd1b76af1d2375a9483e3c1f14cefc`
+and `batch2-genuine-actor-matrix-vitest.json` SHA-256
+`4639118d5c6b3e3f2b33e1834b5ab7448292a0063233d9b14572043c42ca2768`.
+The complete 18-file retained Vitest run passed all 40 suites and 148 tests
+with zero failure or skip; report SHA-256 is
+`27296fbe5e781433e7f4010c395f84bebec1ec7955b1a2589a78677d7987d5e4`.
+Nine retained Playwright configurations passed 133 expected tests with two
+pre-existing skips, zero unexpected, and zero flaky outcomes: Phase-5c seal
+vote, Phase-5d round change, Phase-5e creator actor/live-close/relearn, and
+Phase-6a adoption-commit/activation/product/successor-epoch. No campaign, long
+workload, memory run, or D.110a invocation occurred.
+
+Exact-owner Prettier and ESLint, `git diff --check`, all four affected package
+builds, protocol-v3 and seal package typechecks, and the exact storage-browser
+production build-tsconfig typecheck pass. The full Node typecheck remains red
+only in inherited test-root/config ownership while its production build passes;
+the full storage-browser package typecheck remains red only in future Phase-6b
+test assets with missing private maintenance aliases/branded fixture IDs while
+its exact production build-tsconfig passes. These inherited failures neither
+touch nor mask a changed production owner in this slice. The unchanged registry,
+schema-v3 owner, Node creator-close owner, and lockfile SHA-256 values are
+respectively
+`2fd6f51286e06f2c3c634c244a0242a55da186258664ec54a371f19b814a11d9`,
+`166634277bc38dd4919300e2fa3f3509d10cfe51ab3cda22fd7dc52f1c42609e`,
+`dc509821d77523fda5afa71c6f6eea2de9a694ac8ad59c0bb56428fed18e1c90`,
+and `73c7c0660fa32c7380d0fe5a026897a7ad85a40edf1f169730c2d8e44e613a99`.
+
+All intervening fixture/setup attempts remain preserved and dispositioned in
+the GREEN ledger rather than being erased: one batch-order adapter abort, one
+async rejection assertion mistake, one wrong test parameter source, one omitted
+test import, two superseded passing matrices, and the corrected retained
+foreign-scope expectation. The exact command/result, changed-path, invariant,
+inherited-debt, and protected-state record is
+`.logs/d110c-0a-green-0b7a1cf6/green-ledger.json` SHA-256
+`5104f9ef54fee70df1733a9aae2669bce45f8e366e1aed712a7b7ea12ad378a5`.
+The validated self-excluding evidence/source manifest SHA-256 is
+`c2bf2e48d907042e76da6548ab5f6a852f23b4f769c78e212f1fde4bb008d85e`;
+the plan is excluded so it can record that manifest identity without a circular
+hash. The signed/pushed GREEN anchor is recorded with the checkpoint before the
+one required Grok/Kimi/Opus final review.
+
 ##### D.110c-0b0 owner-selection design
 
 The bounded owner audit rejects two superficially attractive shortcuts. The
