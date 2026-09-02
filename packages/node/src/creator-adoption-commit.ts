@@ -101,6 +101,21 @@ function record(value: unknown): value is Readonly<Record<string, unknown>> {
 	return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
+function predecessorProjectionKind(
+	material: CreatorAdoptionIntentMaterial
+): "v3-live-generation-1" | "v3-live-generation-2" | undefined {
+	const currentEpoch = material.activation.predecessor.trust.currentEpoch;
+	const successorEpoch = material.activation.successor.trust.currentEpoch;
+	return Number.isSafeInteger(currentEpoch) &&
+		currentEpoch >= 0 &&
+		Number.isSafeInteger(successorEpoch) &&
+		successorEpoch === currentEpoch + 1
+		? currentEpoch === 0
+			? "v3-live-generation-1"
+			: "v3-live-generation-2"
+		: undefined;
+}
+
 function captureInput(value: unknown): CapturedInput | undefined {
 	try {
 		if (!record(value) || Object.keys(value).sort().join(",") !== "handle,intent") return undefined;
@@ -307,7 +322,14 @@ function validStagedLineage(
 
 function validProjection(material: CreatorAdoptionIntentMaterial): Readonly<Record<string, unknown>> | undefined {
 	const descriptor = canonicalRecord(material.exactCanonicalProjectionBytes);
-	if (descriptor?.kind !== "v3-live-generation-2") return undefined;
+	const predecessorKind = predecessorProjectionKind(material);
+	if (
+		descriptor?.kind !== "v3-live-generation-2" ||
+		predecessorKind === undefined ||
+		descriptor.epoch !== material.activation.successor.trust.currentEpoch
+	) {
+		return undefined;
+	}
 	const digest = digestBlob(material.exactCanonicalProjectionBytes);
 	if (!digest.ok) return undefined;
 	const projectionRef = Object.freeze({
@@ -431,7 +453,8 @@ async function authenticatedTerminal(
 		}
 		const predecessor = currentCandidates.filter(
 			({ bytes, ref }) =>
-				sameRef(ref, material.predecessorLiveRef) && canonicalRecord(bytes)?.kind === "v3-live-generation-1"
+				sameRef(ref, material.predecessorLiveRef) &&
+				canonicalRecord(bytes)?.kind === predecessorProjectionKind(material)
 		);
 		return predecessor.length === 1
 			? Object.freeze({ head: Object.freeze({ ...active.head }), kind: candidate ? "active-new" : "pending-old" })
@@ -488,7 +511,8 @@ async function authenticatedStaged(
 		const projection = stagedCandidates.filter(({ bytes }) => sameBytes(bytes, material.exactCanonicalProjectionBytes));
 		const predecessor = currentCandidates.filter(
 			({ bytes, ref }) =>
-				sameRef(ref, material.predecessorLiveRef) && canonicalRecord(bytes)?.kind === "v3-live-generation-1"
+				sameRef(ref, material.predecessorLiveRef) &&
+				canonicalRecord(bytes)?.kind === predecessorProjectionKind(material)
 		);
 		return projection.length === 1 && predecessor.length === 1
 			? Object.freeze({ kind: "staged" })

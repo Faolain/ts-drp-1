@@ -94422,6 +94422,143 @@ contract. The RED ledger SHA-256 is
 the validating self-excluding evidence manifest SHA-256 is
 `44f4d03737162f99e3825c26c5445a0ce36e4200a5837d18669633851ee8ad04`.
 
+The first Batch-1 GREEN execution selected the exact one test/one file once and
+failed before transfer with `D110C_B_ACTIVATION_FAILED:recovery-rejected` after
+the verifier, durable commit, frozen refusal matrix, and pre-transfer cleanup
+had completed. No Batch-2 code or browser execution followed. The bounded
+source diagnosis identified the additional conditional owner anticipated by
+the reviewed plan's “`v3-live.ts` unchanged unless RED proves another owner”
+clause: `recoverV3LiveReplica()` selected `installGenesis()` solely from the
+absence of successor-recovery metadata. A genuine epoch-1 predecessor has no
+such metadata during its independent validation, but its authenticated anchor
+is non-genesis, so the journal contract rejects that install before live
+transfer. The narrow correction selects `installGenesis()` only for
+authenticated epoch zero and `installEpochAnchor()` for every positive
+authenticated epoch. It changes no record, wire, public API, dependency,
+authority, threshold, workload, or cold-reopen contract. The failed reporter
+is retained at
+`.logs/d110c-b-green-working-90147e3c/batch1-vitest.json`; it is diagnostic
+evidence, not a passing GREEN result. The first corrected execution at
+`batch1-vitest-corrected.json` advanced through epoch-anchor installation and
+then exposed exact predecessor replay failure
+`admission-rejected:v3 recovery vertex is not authenticated`. Bounded
+temporary diagnostics, removed before acceptance, proved that the unpruned
+issuance store contained an authenticated inherited epoch-0 row while the
+epoch-1 predecessor and epoch-2 successor were being recovered. The existing
+private filter already excluded authenticated future rows, but the epoch-1
+live registration's authenticated one-generation displaced-source authority
+was not supplied to predecessor validation or successor filtering.
+
+The corrected single private owner therefore carries that already-retained
+displaced-source authority through a one-use WeakMap into predecessor recovery,
+and uses one shared exact-authentication issuance filter to omit those inherited
+rows while reconstructing the successor and while that successor remains the
+active plane. Any unrecognized, malformed, same/current-epoch, backing-store,
+or signature failure remains visible and fails closed. The underlying durable
+issuance store remains complete and receives every delegated read, write, and
+publication transition; only the bounded authenticated inherited row is
+omitted from the live recovery/publication view until D.110c-c's authenticated
+pruning retires it. This is bounded to the one already-retained displaced
+generation and does not construct a growing history chain: D.110c-c still owns
+authenticated pruning and catch-up before deeper repetition. The diagnostic
+fixture, inner-detail expansion, and row telemetry were removed after the
+narrow diagnostic passed at the injected post-recovery terminalization
+boundary. A final replacement focused execution is required after exact
+source/static gates; these local runs do not retry a consuming campaign or
+scarce workload.
+
+That replacement completed the genuine main fixture and all pre-transfer
+mutants, then failed only on a stale tests-only assertion that expected a
+nonexistent verifier `lifecycle` field. The shipped verifier success contract
+has always been exact `{descriptor, intent, ok: true}`. The assertion is
+corrected to require `descriptor.epoch === 2` and `ok === true`; this diagnostic
+mistake is not classified as a product failure. Because the assertion stopped
+the test before its isolated post-transfer fixtures, one final focused
+execution remains necessary to exercise the complete frozen matrix.
+
+That execution completed activation and a genuine post-epoch-2 issue, then
+showed that restoring the unfiltered issuance port to the active plane exposed
+the same inherited epoch-0 row during `publishPending()`. The correction keeps
+the complete underlying store but retains the authenticated bounded view as the
+private epoch-2 runtime port. Exact publication failure detail is now preserved
+by the fixture if any later owner refuses.
+
+The next execution reached the isolated post-transfer setup and correctly
+refused its attempted 0->1 activation because the fixture had reused the main
+room's still-active default object ID and stable topic. This is a tests-only
+isolation defect, not a product failure: the terminalization and retirement
+mutants now use two distinct genuine object IDs while retaining the same real
+product path and thresholds.
+
+Batch 1 then passed its complete focused one-test/one-file matrix at
+`.logs/d110c-b-green-working-90147e3c/batch1-vitest-isolated.json`. It proved
+real 1->2 verify/stage/publish/floor-checked activation, same-head idempotence,
+old-plane terminality, exact active-owner custody, post-epoch-2 issue/publish,
+the complete frozen refusal matrix, and both isolated post-transfer failure
+classes. The emitted terminal token was `D110C_B_HOT_ADOPTION_COMPLETE`.
+
+Batch 2 generalized product authority to every positive safe authenticated
+epoch, retains the singular creator-close store owners as a private rebinding
+closure, replaces the first-transition latch with the exact close-lifecycle
+predicate, and installs a fresh close handle only after successful activation
+and predecessor deactivation. Activation failure after the durable room-head
+floor advances clears stale live/close custody and enters exact
+`D110C_B_ACTIVATION_STALLED`. Close-rebind failure keeps the genuine new active
+plane and authority but clears terminal close custody and enters exact
+`D110C_B_CLOSE_REBIND_FAILED`. The redirected adoption forwarding path now
+returns the forwarded adoption from the source lifetime queue instead of
+placing its promise in a side wrapper; therefore later redirected lifecycle
+work cannot settle ahead of the already-enqueued adoption.
+
+The first anchored Batch-2 Playwright execution selector again selected zero
+because Playwright applies the expression to its larger full-title string; no
+test ran. The corrected literal selector selected one test in one file and ran
+once. Chromium completed the genuine production-room sequence 0->1, published
+at epoch 1, completed 1->2, published at epoch 2, and closed the rebound epoch-2
+plane to exact successor epoch 3 without adopting epoch 3. Exact accepted
+messages, stable object/genesis authority, current anchor/room identity, and
+all three retained realm snapshots passed; the terminal token was
+`D110C_B_PRODUCT_HOT_LOOP_COMPLETE`. Its reporter is
+`packages/storage-browser/.logs/d110c-b-green-working-90147e3c/batch2-chromium.json`
+with expected=1, skipped=0, unexpected=0 and flaky=0.
+
+The first complete retained product-browser pass exposed one stale expectation
+in all engines: an unsealed active-plane adoption now correctly stops before
+verification, so verifier count is zero. The second pass exposed the same
+change at the remaining injected activation and retry expectations:
+post-floor activation failure is now exact `D110C_B_ACTIVATION_STALLED`, and an
+invalid first request plus a valid sealed retry invokes the verifier once, not
+twice. The third pass exposed a real retained redirect-ordering regression:
+the obsolete forwarding wrapper let a later redirected operation's observable
+promise settle before the earlier invalid adoption once that adoption no
+longer paused inside verification. The narrow product correction makes the
+source lifetime queue await that forwarded adoption. A bounded three-engine
+ordering test then passed, proving both requests were pending before redirect
+release, the invalid adoption remained exact
+`D110C_B_ACTIVATION_STALLED` with zero verifier calls, and its settlement
+preceded the later rehearsal or activation. These failed reporters and the
+corrected focused reporter remain immutable diagnostic evidence under the
+working root; they are not presented as GREEN passes.
+
+The final retained gates are green. Root Vitest passed 62/62 suites and
+282/282 tests with zero failures or pending tests in `retained-node.json`.
+The complete successor-product config passed 30/30, successor activation
+passed 24/24, and Phase-5e creator live close passed 9/9 across Chromium,
+Firefox, and WebKit, each with zero skipped, unexpected or flaky results.
+Node and storage-browser builds and build-source no-emit checks, v3-room
+typecheck/build, independent v3-chat typecheck, the private D.110c-a fixture
+typecheck, exact-owner ESLint, 12-GiB formatter check, diff check, and the
+thirteen-predicate GREEN source-shape audit all exited zero. The broad
+storage-browser test-root diagnostic still reports only the already-recorded
+unrelated Phase-6b branded fixture and private-alias debt; its build-source
+owner is green. No cold-reopen literal, wire/schema/API, dependency, threshold,
+workload, campaign, D.110a, or long multi-epoch execution changed or ran.
+The consolidated immutable GREEN evidence root is
+`.logs/d110c-b-green-90147e3c/`. Its ledger SHA-256 is
+`5dadc749185265d332f1a5588133b230b23b8a616e8321ad67e4e2833448cc7c`;
+its validated 17-entry self-excluding manifest SHA-256 is
+`ce501e519d7bb726d896938ada4443540c9dfecfe9e1299ba9202a37be4dc469`.
+
 The four prerequisite decisions, including the newly demonstrated 0b0
 freshness-floor authority question, are reviewed before their production edits;
 each executable sub-slice receives its own bounded causal RED and GREEN. The

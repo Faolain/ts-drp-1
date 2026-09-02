@@ -235,7 +235,7 @@ export interface V3RoomProjectionAuthority {
 export interface V3RoomSuccessorAuthority {
 	readonly aclDigest: string;
 	readonly anchorDigest: string;
-	readonly epoch: 1;
+	readonly epoch: number;
 	readonly genesisAnchorDigest: string;
 	readonly lifecycle: "active";
 	readonly objectId: string;
@@ -466,7 +466,9 @@ function successorAuthority(trust: unknown, handle: RoomPlaneHandle): V3RoomSucc
 		!/^[0-9a-f]{64}$/u.test(current.aclDigest) ||
 		typeof currentAnchorDigest !== "string" ||
 		!/^[0-9a-f]{64}$/u.test(currentAnchorDigest) ||
-		currentEpoch !== 1 ||
+		typeof currentEpoch !== "number" ||
+		!Number.isSafeInteger(currentEpoch) ||
+		currentEpoch < 1 ||
 		typeof genesisAnchorDigest !== "string" ||
 		!/^[0-9a-f]{64}$/u.test(genesisAnchorDigest) ||
 		typeof objectId !== "string" ||
@@ -480,7 +482,7 @@ function successorAuthority(trust: unknown, handle: RoomPlaneHandle): V3RoomSucc
 	return Object.freeze({
 		aclDigest: current.aclDigest,
 		anchorDigest: currentAnchorDigest,
-		epoch: 1 as const,
+		epoch: currentEpoch,
 		genesisAnchorDigest,
 		lifecycle: "active" as const,
 		objectId,
@@ -1879,6 +1881,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	const messageQueueManager = new MessageQueueManager<Message>({ logConfig: { level: "silent" } });
 	let activeHandle: RoomPlaneHandle | undefined;
 	let creatorCloseHandle: CreatorLiveCloseHandle | undefined;
+	let bindCurrentCreatorClose: ((plane: RoomPlaneHandle) => ReturnType<typeof bindCreatorLiveClose>) | undefined;
 	let creatorCloseUnavailableContinuity: CreatorLiveCloseStatus["continuity"] = "continuous";
 	const creatorCloseStoreClosers: Array<() => Promise<void>> = [];
 	let transport: V3RoomTransport | undefined;
@@ -2263,6 +2266,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (!result.ok) throw new TypeError(`v3 room retained publication failed: ${result.kind}`);
 		});
 		if (input.creatorFinalitySigner !== undefined && input.successorSnapshotDeclaration === undefined) {
+			const creatorFinalitySigner = input.creatorFinalitySigner;
 			const voteStore = await openBrowserSealVoteStore({ databaseName: input.databaseName });
 			creatorCloseStoreClosers.push(voteStore.close);
 			const evidenceStore = await openBrowserSealEvidenceStore({ databaseName: input.databaseName });
@@ -2274,16 +2278,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (voteStore.observation.incarnation !== evidenceStore.observation.incarnation) {
 				throw new TypeError("v3 room creator-close storage incarnation differs");
 			}
-			const bound = await bindCreatorLiveClose({
-				evidenceStore: evidenceStore.store,
-				exactCanonicalAvailabilityPolicyBytes: CREATOR_LOCAL_AVAILABILITY_POLICY_BYTES,
-				onObservation: () => undefined,
-				plane: activeHandle,
-				signer: input.creatorFinalitySigner,
-				snapshotStore,
-				storageIncarnation: voteStore.observation.incarnation,
-				voteStore: voteStore.store,
-			});
+			bindCurrentCreatorClose = (plane): ReturnType<typeof bindCreatorLiveClose> =>
+				bindCreatorLiveClose({
+					evidenceStore: evidenceStore.store,
+					exactCanonicalAvailabilityPolicyBytes: CREATOR_LOCAL_AVAILABILITY_POLICY_BYTES,
+					onObservation: () => undefined,
+					plane,
+					signer: creatorFinalitySigner,
+					snapshotStore,
+					storageIncarnation: voteStore.observation.incarnation,
+					voteStore: voteStore.store,
+				});
+			const bound = await bindCurrentCreatorClose(activeHandle);
 			if (bound.ok) creatorCloseHandle = bound.handle;
 			else {
 				creatorCloseUnavailableContinuity = [
@@ -3499,14 +3505,36 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	};
 	const performCreatorSuccessorAdoption = async (): Promise<void> => {
 		if (terminalFailure !== undefined) throw terminalFailure;
-		if (successorProjectionAuthority !== null) return;
 		if (creatorCloseHandle === undefined) throw new TypeError("creator close authority is unavailable");
 		if (activeHandle === undefined || transport === undefined) {
 			throw new TypeError("v3 room live plane is unavailable");
 		}
+		const closeStatus = creatorCloseHandle.status();
+		if (successorProjectionAuthority !== null && closeStatus.lifecycle === "active") {
+			const current = activeHandle.currentEphemeralAuthority();
+			const stable = openedRoomHeadState?.stable;
+			if (
+				current !== undefined &&
+				stable !== undefined &&
+				current.aclDigest === successorProjectionAuthority.aclDigest &&
+				current.anchorDigest === successorProjectionAuthority.anchorDigest &&
+				current.epoch === successorProjectionAuthority.epoch &&
+				current.objectId === successorProjectionAuthority.objectId &&
+				stable.currentAnchorDigest === successorProjectionAuthority.anchorDigest &&
+				stable.epoch === successorProjectionAuthority.epoch &&
+				stable.objectId === successorProjectionAuthority.objectId
+			) {
+				return;
+			}
+			throw new TypeError("D110C_B_ACTIVATION_STALLED");
+		}
+		if (closeStatus.lifecycle !== "successor-pending-adoption") {
+			throw new TypeError("D110C_B_ACTIVATION_STALLED");
+		}
+		const predecessorClose = creatorCloseHandle;
 		const verified = await verifyCreatorSuccessorAdoption({
 			catalog: input.application.catalog,
-			handle: creatorCloseHandle,
+			handle: predecessorClose,
 		});
 		if (!verified.ok) throw new TypeError(`v3 room successor verification failed: ${verified.kind}`);
 		if (roomHeadAuthority === undefined || openedRoomHeadState === undefined) {
@@ -3514,7 +3542,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		assertSessionOpen();
 		const staged = await stageCreatorSuccessorAdoption({
-			handle: creatorCloseHandle,
+			handle: predecessorClose,
 			intent: verified.intent,
 		});
 		if (!staged.ok) throw new TypeError(`v3 room successor stage failed: ${String(staged.kind)}`);
@@ -3528,7 +3556,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		assertSessionOpen();
 		const published = await publishStagedCreatorSuccessorAdoption({
 			capability: staged.capability,
-			handle: creatorCloseHandle,
+			handle: predecessorClose,
 		});
 		if (!published.ok) throw new TypeError(`v3 room successor publication failed: ${String(published.kind)}`);
 		openedRoomHeadState = await commitRoomHeadAdvance(roomHeadAuthority, roomHeadScope, pendingRoomHead);
@@ -3539,13 +3567,20 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		const activated = await activateCreatorSuccessorAdoption({
 			capability: published.capability,
 			expectedRoomHead: openedRoomHeadState.stable,
-			handle: creatorCloseHandle,
+			handle: predecessorClose,
 			messageQueueManager,
 			networkNode: transport.networkNode,
 			onAdmittedVertex: admittedSink as unknown as V3AdmittedVertexSink,
 		});
 		if (activated.ok !== true) {
-			throw new TypeError(`v3 room successor activation failed: ${String(activated.kind)}`);
+			const failure = new TypeError("D110C_B_ACTIVATION_STALLED");
+			terminalFailure = failure;
+			creatorCloseHandle = undefined;
+			creatorCloseUnavailableContinuity = "stalled";
+			const stale = activeHandle;
+			activeHandle = undefined;
+			await Promise.allSettled([predecessorClose.stop(), Promise.resolve().then(() => stale.deactivate())]);
+			throw failure;
 		}
 		const replacement = activated.handle as RoomPlaneHandle;
 		let replacementOwned = true;
@@ -3581,23 +3616,42 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			activeHandle = undefined;
 			return throwAfterReplacementCleanup(new TypeError("v3 room session is closed"));
 		}
+		if (bindCurrentCreatorClose === undefined) {
+			activeHandle = replacement;
+			replacementOwned = false;
+			successorProjectionAuthority = authority;
+			creatorCloseHandle = undefined;
+			creatorCloseUnavailableContinuity = "stalled";
+			terminalFailure = new TypeError("D110C_B_CLOSE_REBIND_FAILED");
+			throw terminalFailure;
+		}
+		const rebound = await bindCurrentCreatorClose(replacement);
+		if (!rebound.ok) {
+			activeHandle = replacement;
+			replacementOwned = false;
+			successorProjectionAuthority = authority;
+			creatorCloseHandle = undefined;
+			creatorCloseUnavailableContinuity = "stalled";
+			terminalFailure = new TypeError("D110C_B_CLOSE_REBIND_FAILED");
+			throw terminalFailure;
+		}
 		activeHandle = replacement;
 		replacementOwned = false;
 		successorProjectionAuthority = authority;
+		creatorCloseHandle = rebound.handle;
+		creatorCloseUnavailableContinuity = "continuous";
+		await predecessorClose.stop();
 	};
 	const adoptCreatorSuccessor = (): Promise<void> => {
 		if (creatorSuccessorAdoptionTask !== undefined) return creatorSuccessorAdoptionTask;
-		const forwarded: { result?: Promise<void> } = {};
-		const dispatch = enqueueLifetimeTransition(async () => {
+		const attempt = enqueueLifetimeTransition(async () => {
 			if (redirectPromise !== undefined) await redirectPromise;
 			assertSessionOpen();
 			if (redirectedSession !== undefined) {
-				forwarded.result = redirectedSession.adoptCreatorSuccessor();
-				return;
+				return redirectedSession.adoptCreatorSuccessor();
 			}
 			return performCreatorSuccessorAdoption();
 		});
-		const attempt = dispatch.then(() => forwarded.result);
 		const shared = attempt.finally(() => {
 			if (creatorSuccessorAdoptionTask === shared) creatorSuccessorAdoptionTask = undefined;
 		});

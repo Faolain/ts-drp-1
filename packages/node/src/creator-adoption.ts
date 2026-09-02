@@ -108,10 +108,13 @@ interface VerifiedChain {
 		readonly runtimeProfile: string;
 	}>;
 	readonly currentAnchor: Readonly<Record<string, unknown>>;
+	readonly currentEpoch: number;
+	readonly currentProjectionKind: "v3-live-generation-1" | "v3-live-generation-2";
 	readonly currentTrustRecord: Readonly<Record<string, unknown>>;
 	readonly cut: Readonly<Record<string, unknown>>;
 	readonly successorAnchor: Readonly<Record<string, unknown>>;
 	readonly successorAnchorBytes: Uint8Array;
+	readonly successorEpoch: number;
 	readonly successorTrust: CurrentAnchorTrust;
 	readonly successorTrustRecord: Readonly<Record<string, unknown>>;
 }
@@ -179,6 +182,10 @@ function hex(bytes: Uint8Array): string {
 
 function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
 	return left.byteLength === right.byteLength && left.every((byte, index) => byte === right[index]);
+}
+
+function currentProjectionKind(epoch: number): "v3-live-generation-1" | "v3-live-generation-2" {
+	return epoch === 0 ? "v3-live-generation-1" : "v3-live-generation-2";
 }
 
 function canonicalRecord(bytes: Uint8Array): Readonly<Record<string, unknown>> | undefined {
@@ -368,14 +375,33 @@ function verifyChain(facts: SealedAdoptionFacts, closure: RecoveredClosure): Ver
 	const currentAnchor = canonicalRecord(currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes);
 	const successorAnchorBytes = Uint8Array.from(successorTrustRecord.exactCanonicalCurrentAnchorPreimageBytes);
 	const successorAnchor = canonicalRecord(successorAnchorBytes);
+	const currentEpoch = facts.currentTrust.currentEpoch;
+	const successorEpoch = opened.trust.currentEpoch;
+	if (
+		!Number.isSafeInteger(currentEpoch) ||
+		currentEpoch < 0 ||
+		!Number.isSafeInteger(successorEpoch) ||
+		successorEpoch !== currentEpoch + 1 ||
+		facts.closeResult.epoch !== currentEpoch ||
+		facts.closeResult.successorEpoch !== successorEpoch ||
+		currentTrustRecord.currentEpoch !== currentEpoch ||
+		successorTrustRecord.currentEpoch !== successorEpoch ||
+		currentAnchor?.epoch !== currentEpoch ||
+		successorAnchor?.epoch !== successorEpoch ||
+		successorAnchor?.previousAnchor !== facts.currentTrust.currentAnchorDigest
+	) {
+		return undefined;
+	}
+	const expectedCurrentProjectionKind = currentProjectionKind(currentEpoch);
 	const projections = closure.currentCandidates
 		.map(({ bytes }) => canonicalRecord(bytes))
-		.filter((candidate) => candidate?.kind === "v3-live-generation-1");
+		.filter((candidate) => candidate?.kind === expectedCurrentProjectionKind);
 	const currentProjection = projections.length === 1 ? projections[0] : undefined;
 	if (
 		currentAnchor === undefined ||
 		successorAnchor === undefined ||
 		currentProjection === undefined ||
+		currentProjection.epoch !== currentEpoch ||
 		typeof currentProjection.artifactDigest !== "string" ||
 		typeof currentProjection.artifactId !== "string" ||
 		typeof currentProjection.blueprintDigest !== "string" ||
@@ -388,6 +414,8 @@ function verifyChain(facts: SealedAdoptionFacts, closure: RecoveredClosure): Ver
 	}
 	return Object.freeze({
 		currentAnchor,
+		currentEpoch,
+		currentProjectionKind: expectedCurrentProjectionKind,
 		currentTrustRecord,
 		currentCatalog: Object.freeze({
 			artifactDigest: currentProjection.artifactDigest,
@@ -399,6 +427,7 @@ function verifyChain(facts: SealedAdoptionFacts, closure: RecoveredClosure): Ver
 		cut,
 		successorAnchor,
 		successorAnchorBytes,
+		successorEpoch,
 		successorTrust: opened.trust,
 		successorTrustRecord,
 	});
@@ -542,7 +571,7 @@ function projection(
 			vertices: [
 				{
 					dependencies: [],
-					epoch: 1,
+					epoch: chain.successorEpoch,
 					hash: facts.closeResult.successorAnchorDigest,
 					kind: "drp-epoch-anchor",
 					objectId: chain.successorAnchor.objectId,
@@ -562,7 +591,7 @@ function projection(
 			byteCharge: chain.successorAnchorBytes.byteLength,
 			catalogDigest: resolved.evidence.catalogDigest,
 			compactHistory: facts.history.historySnapshot,
-			epoch: 1,
+			epoch: chain.successorEpoch,
 			graphDigest: graphDigest.value,
 			historyRoot: facts.history.historyRoot,
 			historySize: facts.history.historySize,
@@ -595,7 +624,8 @@ function projection(
 function successorCommitMaterial(
 	facts: SealedAdoptionFacts,
 	closure: RecoveredClosure,
-	exactCanonicalProjectionBytes: Uint8Array
+	exactCanonicalProjectionBytes: Uint8Array,
+	predecessorKind: VerifiedChain["currentProjectionKind"]
 ):
 	| Readonly<{
 			readonly candidateReferences: readonly GenerationRef[];
@@ -606,10 +636,7 @@ function successorCommitMaterial(
 	try {
 		const predecessors = closure.currentCandidates.filter(({ bytes, ref }) => {
 			const decoded = canonicalRecord(bytes);
-			return (
-				decoded?.kind === "v3-live-generation-1" &&
-				facts.proposedReferences.some((candidate) => sameRef(candidate, ref))
-			);
+			return decoded?.kind === predecessorKind && facts.proposedReferences.some((candidate) => sameRef(candidate, ref));
 		});
 		if (predecessors.length !== 1) return undefined;
 		const predecessorLiveRef = predecessors[0]?.ref;
@@ -663,7 +690,7 @@ function creatorSuccessorLiveSeed(
 	try {
 		const predecessorProjection = closure.currentCandidates.filter(
 			({ bytes, ref }) =>
-				canonicalRecord(bytes)?.kind === "v3-live-generation-1" && sameRef(ref, commitMaterial.predecessorLiveRef)
+				canonicalRecord(bytes)?.kind === chain.currentProjectionKind && sameRef(ref, commitMaterial.predecessorLiveRef)
 		);
 		const exactCanonicalLatchedAclBytes = encodeCanonical(snapshot.payload.acl);
 		if (
@@ -773,7 +800,7 @@ export async function verifyCreatorSuccessorAdoption(input: unknown): Promise<Ad
 		if (resolved === undefined) return failure("blueprint-invalid", "creator successor blueprint is invalid");
 		const projected = projection(facts, chain, snapshot, resolved);
 		if (projected === undefined) return failure("internal-invariant", "creator successor projection failed");
-		const commitMaterial = successorCommitMaterial(facts, closure, projected.bytes);
+		const commitMaterial = successorCommitMaterial(facts, closure, projected.bytes, chain.currentProjectionKind);
 		if (commitMaterial === undefined) {
 			return failure("internal-invariant", "creator successor commit material failed");
 		}
@@ -1006,6 +1033,7 @@ async function reopenCreatorSuccessorMaterial(
 		}
 		const chain: VerifiedChain = Object.freeze({
 			currentAnchor,
+			currentEpoch: 0,
 			currentCatalog: Object.freeze({
 				artifactDigest: String(currentProjection.record.artifactDigest),
 				artifactId: String(currentProjection.record.artifactId),
@@ -1013,10 +1041,12 @@ async function reopenCreatorSuccessorMaterial(
 				catalogDigest: String(currentProjection.record.catalogDigest),
 				runtimeProfile: String(currentProjection.record.runtimeProfile),
 			}),
+			currentProjectionKind: "v3-live-generation-1",
 			currentTrustRecord,
 			cut: cutCandidate.record,
 			successorAnchor,
 			successorAnchorBytes,
+			successorEpoch: 1,
 			successorTrust: openedSuccessor.trust,
 			successorTrustRecord,
 		});
@@ -1291,6 +1321,7 @@ async function authenticatePendingCandidate(
 		if (currentAnchor === undefined || successorAnchor === undefined) return undefined;
 		const chain: VerifiedChain = Object.freeze({
 			currentAnchor,
+			currentEpoch: 0,
 			currentCatalog: Object.freeze({
 				artifactDigest: String(currentProjection.record.artifactDigest),
 				artifactId: String(currentProjection.record.artifactId),
@@ -1298,10 +1329,12 @@ async function authenticatePendingCandidate(
 				catalogDigest: String(currentProjection.record.catalogDigest),
 				runtimeProfile: String(currentProjection.record.runtimeProfile),
 			}),
+			currentProjectionKind: "v3-live-generation-1",
 			currentTrustRecord,
 			cut: cutCandidate.record,
 			successorAnchor,
 			successorAnchorBytes: Uint8Array.from(successorTrustRecord.exactCanonicalCurrentAnchorPreimageBytes),
+			successorEpoch: 1,
 			successorTrust: openedSuccessor.trust,
 			successorTrustRecord,
 		});

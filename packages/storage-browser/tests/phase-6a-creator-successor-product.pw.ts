@@ -1044,6 +1044,7 @@ test(D108E2B_BROWSER_BEHAVIORS.join("; "), async () => {
 		},
 		failure: {
 			counts: failingCounts,
+			detail: failingSettlements[0].detail,
 			sameSettlement:
 				JSON.stringify(failingSettlements[0]) === JSON.stringify(failingSettlements[1]) &&
 				failingSettlements[0].status === "rejected",
@@ -1094,8 +1095,9 @@ test(D108E2B_BROWSER_BEHAVIORS.join("; "), async () => {
 				predecessorDeactivateCount: 0,
 				replacementDeactivateCount: 0,
 				replacementDeactivateCompletedCount: 0,
-				verificationCount: 1,
+				verificationCount: 0,
 			},
+			detail: "D110C_B_ACTIVATION_STALLED",
 			sameSettlement: true,
 		},
 		success: {
@@ -1838,7 +1840,7 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 				counts: { activationCount: 1, replacementDeactivateCount: 0 },
 				settlements: {
 					adoption: {
-						detail: "v3 room successor activation failed: authority-unavailable",
+						detail: "D110C_B_ACTIVATION_STALLED",
 						lifetime: expect.any(Object),
 						order: 1,
 						status: "rejected",
@@ -1960,7 +1962,7 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 					{ order: 3, status: "rejected" },
 				],
 			},
-			retry: { settled: ["rejected", "fulfilled"], verificationCount: 2 },
+			retry: { settled: ["rejected", "fulfilled"], verificationCount: 1 },
 		},
 	});
 });
@@ -1968,7 +1970,16 @@ test(D108E3_BROWSER_BEHAVIORS.join("; "), async () => {
 test(D108E5_BROWSER_BEHAVIORS.join("; "), async () => {
 	const runRedirectOrdering = async (
 		kind: "activation" | "rehearsal"
-	): Promise<Readonly<{ readonly laterSettledAtVerification: boolean }>> => {
+	): Promise<
+		Readonly<{
+			readonly adoptionBeforeLater: boolean;
+			readonly adoptionDetail?: string;
+			readonly adoptionStatus: "fulfilled" | "rejected";
+			readonly beforeRelease: Readonly<{ readonly adoption: boolean; readonly later: boolean }>;
+			readonly redirectStatus: "fulfilled" | "rejected";
+			readonly verificationCount: number;
+		}>
+	> => {
 		const context = await openD108e3Creator(false);
 		const name = `d108e5-${kind}-${lifetimeScenario}`;
 		const redirectObservation = `${name}-redirect`;
@@ -1981,7 +1992,6 @@ test(D108E5_BROWSER_BEHAVIORS.join("; "), async () => {
 		await context.page.evaluate(() =>
 			window.phase6aCreatorSuccessorProduct.configureLifetime({
 				pauseRedirectRecovery: true,
-				pauseVerification: true,
 			})
 		);
 		await context.page.evaluate(
@@ -2016,17 +2026,16 @@ test(D108E5_BROWSER_BEHAVIORS.join("; "), async () => {
 			},
 			{ observation: laterObservation, operation: kind, selected: name }
 		);
-		await context.page.evaluate(() => window.phase6aCreatorSuccessorProduct.releaseRedirectRecovery());
-		await expect
-			.poll(() => context.page.evaluate(() => window.phase6aCreatorSuccessorProduct.d108e5Snapshot().verificationCount))
-			.toBe(1);
-		await settleBrowserTurns(context.page);
-		const laterSettledAtVerification = await context.page.evaluate(
-			(observation) => window.phase6aCreatorSuccessorProduct.d108e5OperationSettled(observation),
-			laterObservation
+		const beforeRelease = await context.page.evaluate(
+			({ later, selected }) =>
+				Object.freeze({
+					adoption: window.phase6aCreatorSuccessorProduct.directAdoptionSettled(selected),
+					later: window.phase6aCreatorSuccessorProduct.d108e5OperationSettled(later),
+				}),
+			{ later: laterObservation, selected: name }
 		);
-		await context.page.evaluate(() => window.phase6aCreatorSuccessorProduct.releaseVerification());
-		await Promise.all([
+		await context.page.evaluate(() => window.phase6aCreatorSuccessorProduct.releaseRedirectRecovery());
+		const [redirect, later, adoption] = await Promise.all([
 			context.page.evaluate(
 				(observation) => window.phase6aCreatorSuccessorProduct.waitForD108e5DirectOperation(observation),
 				redirectObservation
@@ -2037,9 +2046,20 @@ test(D108E5_BROWSER_BEHAVIORS.join("; "), async () => {
 			),
 			context.page.evaluate((selected) => window.phase6aCreatorSuccessorProduct.waitForDirectAdoption(selected), name),
 		]);
+		const verificationCount = await context.page.evaluate(
+			() => window.phase6aCreatorSuccessorProduct.d108e5Snapshot().verificationCount
+		);
 		await context.page.evaluate((selected) => window.phase6aCreatorSuccessorProduct.closeDirectCreator(selected), name);
 		await context.page.close();
-		return Object.freeze({ laterSettledAtVerification });
+		return Object.freeze({
+			adoptionBeforeLater:
+				typeof adoption.order === "number" && typeof later.order === "number" && adoption.order < later.order,
+			adoptionDetail: adoption.detail,
+			adoptionStatus: adoption.status,
+			beforeRelease,
+			redirectStatus: redirect.status,
+			verificationCount,
+		});
 	};
 
 	const rehearsalOrdering = await runRedirectOrdering("rehearsal");
@@ -2055,8 +2075,22 @@ test(D108E5_BROWSER_BEHAVIORS.join("; "), async () => {
 	await bounds.page.evaluate((name) => window.phase6aCreatorSuccessorProduct.closeDirectCreator(name), boundsName);
 	await bounds.page.close();
 
-	expect.soft(rehearsalOrdering.laterSettledAtVerification).toBe(false);
-	expect.soft(activationOrdering.laterSettledAtVerification).toBe(false);
+	expect.soft(rehearsalOrdering).toMatchObject({
+		adoptionBeforeLater: true,
+		adoptionDetail: "D110C_B_ACTIVATION_STALLED",
+		adoptionStatus: "rejected",
+		beforeRelease: { adoption: false, later: false },
+		redirectStatus: "fulfilled",
+		verificationCount: 0,
+	});
+	expect.soft(activationOrdering).toMatchObject({
+		adoptionBeforeLater: true,
+		adoptionDetail: "D110C_B_ACTIVATION_STALLED",
+		adoptionStatus: "rejected",
+		beforeRelease: { adoption: false, later: false },
+		redirectStatus: "fulfilled",
+		verificationCount: 0,
+	});
 	expect.soft(observations.overLimitHex).toBe("v3 room migration target invite is unbounded");
 	expect.soft(observations.exact65537).toBe("v3 room migration target invite is unbounded");
 	expect.soft(observations.oversizedDigest).toBe("v3 room creator invite anchor is invalid");
@@ -2087,20 +2121,36 @@ test("D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and rebin
 			databaseName,
 		});
 		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.send("d110c-b-epoch-zero"));
-		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.sealEpoch());
+		const closeZero = await page.evaluate(() => window.phase6aCreatorSuccessorProduct.sealEpoch());
+		expect(closeZero).toMatchObject({ epoch: 0, successorEpoch: 1 });
 		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.adoptSuccessor());
 		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.send("d110c-b-epoch-one"));
-		const beforeRejectedClose = await snapshot(page);
-		expect(beforeRejectedClose.authority).toMatchObject({ epoch: 1 });
-		await expect(page.evaluate(() => window.phase6aCreatorSuccessorProduct.sealEpoch())).rejects.toThrow(
-			"creator close authority is unavailable"
-		);
-		const afterRejectedClose = await snapshot(page);
-		expect(afterRejectedClose.authority).toEqual(beforeRejectedClose.authority);
-		expect(afterRejectedClose.roomId).toBe(beforeRejectedClose.roomId);
-		expect(afterRejectedClose.accepted).toEqual(beforeRejectedClose.accepted);
+		const epochOne = await snapshot(page);
+		expect(epochOne.authority).toMatchObject({ epoch: 1 });
+		const closeOne = await page.evaluate(() => window.phase6aCreatorSuccessorProduct.sealEpoch());
+		expect(closeOne).toMatchObject({ epoch: 1, successorEpoch: 2 });
+		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.adoptSuccessor());
+		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.send("d110c-b-epoch-two"));
+		const epochTwo = await snapshot(page);
+		expect(epochTwo.authority).toMatchObject({
+			epoch: 2,
+			genesisAnchorDigest: (epochOne.authority as Readonly<Record<string, unknown>>).genesisAnchorDigest,
+			objectId: (epochOne.authority as Readonly<Record<string, unknown>>).objectId,
+		});
+		expect(epochTwo.accepted).toHaveLength(3);
+		expect((epochTwo.accepted as readonly Readonly<Record<string, unknown>>[]).map(({ text }) => text)).toEqual([
+			"d110c-b-epoch-zero",
+			"d110c-b-epoch-one",
+			"d110c-b-epoch-two",
+		]);
+		expect(epochTwo.roomId).toBe((epochTwo.authority as Readonly<Record<string, unknown>>).anchorDigest);
+		const closeTwo = await page.evaluate(() => window.phase6aCreatorSuccessorProduct.sealEpoch());
+		expect(closeTwo).toMatchObject({ epoch: 2, successorEpoch: 3 });
+		const pendingEpochThree = await snapshot(page);
+		expect(pendingEpochThree.authority).toEqual(epochTwo.authority);
+		expect(pendingEpochThree.accepted).toEqual(epochTwo.accepted);
 		expect(await Promise.all(retainedPages.map(snapshot))).toEqual(retainedBefore);
-		process.stdout.write("D110C_B_CLOSE_NOT_REBOUND\n");
+		process.stdout.write("D110C_B_PRODUCT_HOT_LOOP_COMPLETE\n");
 	} finally {
 		await page.evaluate(() => window.phase6aCreatorSuccessorProduct.close()).catch(() => undefined);
 		await page

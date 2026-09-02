@@ -832,6 +832,7 @@ const creatorSuccessorRecovery = new WeakMap<
 		readonly sourceCapability: PreparedV3Live;
 	}>
 >();
+const creatorPredecessorRecoverySource = new WeakMap<object, V3DisplacedSourceAuthority>();
 const creatorSuccessorInitialState = new WeakMap<
 	object,
 	Readonly<{
@@ -4511,12 +4512,12 @@ function matchingOutboxRows(left: SnapshottedOutboxRow, right: SnapshottedOutbox
 	);
 }
 
-function creatorPredecessorIssuanceStore(
+function creatorFilteredIssuanceStore(
 	issuanceStore: DurableIssuanceStore,
 	issuanceScope: DurableIssueScope,
-	successorPayload: PreparedV3LivePayload,
-	successorAuthorization: V3LiveAuthorization,
-	expectedEpoch: number
+	filterPayload: PreparedV3LivePayload,
+	filterAuthorization: V3LiveAuthorization,
+	excludedAfterEpoch?: number
 ): DurableIssuanceStore {
 	let skipped = 0;
 	return ObjectFreeze({
@@ -4539,8 +4540,8 @@ function creatorPredecessorIssuanceStore(
 					return page;
 				}
 				const authenticated = authenticateRecoveryVertex(
-					successorPayload,
-					successorAuthorization,
+					filterPayload,
+					filterAuthorization,
 					row.canonicalPreimageBytes,
 					row.signature
 				);
@@ -4551,7 +4552,7 @@ function creatorPredecessorIssuanceStore(
 					authenticated.author === issuanceScope.author &&
 					authenticated.authorSequence === row.authorSequence &&
 					typeof candidateEpoch === "number" &&
-					candidateEpoch > expectedEpoch
+					(excludedAfterEpoch === undefined || candidateEpoch > excludedAfterEpoch)
 				) {
 					const issuedCommit = await issuanceStore.readIssued(issuanceScope, row.authorSequence);
 					const issuedRow = outboxRowSnapshot(
@@ -4560,7 +4561,7 @@ function creatorPredecessorIssuanceStore(
 					);
 					if (issuedRow === undefined || !matchingOutboxRows(row, issuedRow)) return page;
 					skipped += 1;
-					if (skipped > successorPayload.parameters.maxEpochVertices) return page;
+					if (skipped > filterPayload.parameters.maxEpochVertices) return page;
 					afterKey = ObjectFreeze([issuanceScope.objectId, issuanceScope.author, row.authorSequence]) as readonly [
 						string,
 						string,
@@ -4621,6 +4622,10 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		if (input === undefined) return recoveryFailure("malformed-input", "v3 recovery input is invalid");
 		const successorRecovery = creatorSuccessorRecovery.get(input.capability as object);
 		if (successorRecovery !== undefined) creatorSuccessorRecovery.delete(input.capability as object);
+		const predecessorRecoverySource = creatorPredecessorRecoverySource.get(input.capability as object);
+		if (predecessorRecoverySource !== undefined) {
+			creatorPredecessorRecoverySource.delete(input.capability as object);
+		}
 		const rawOperationAdmissionPolicy = Reflect.get(input, OPERATION_ADMISSION_POLICY_KEY);
 		const selectedOperationAdmissionPolicy = operationAdmissionPolicy(rawOperationAdmissionPolicy);
 		if (rawOperationAdmissionPolicy !== undefined && selectedOperationAdmissionPolicy === undefined) {
@@ -4662,9 +4667,12 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			return recoveryFailure("authorization-rejected", "v3 recovery author is not authorized");
 		}
 
-		let displacedSource: V3DisplacedSourceAuthority | undefined;
+		let displacedSource = predecessorRecoverySource;
 		const rawDisplacedSource = Reflect.get(input, "displacedSource");
 		if (rawDisplacedSource !== undefined) {
+			if (displacedSource !== undefined) {
+				return recoveryFailure("malformed-input", "v3 displaced source authority is ambiguous");
+			}
 			const legacySource = snapshotClosedRecord(rawDisplacedSource, DISPLACED_LEGACY_SOURCE_KEYS);
 			const latchedSource = snapshotClosedRecord(rawDisplacedSource, DISPLACED_LATCHED_SOURCE_KEYS);
 			const crossSource = snapshotClosedRecord(rawDisplacedSource, DISPLACED_CROSS_OBJECT_SOURCE_KEYS);
@@ -4745,7 +4753,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		const scope = liveJournalScope(payload);
 		let installed;
 		try {
-			installed = await (successorRecovery === undefined ? journal.installGenesis : journal.installEpochAnchor)({
+			installed = await (payload.provenance.epoch === 0 ? journal.installGenesis : journal.installEpochAnchor)({
 				detachedAnchorSignature: new Uint8ArrayConstructor(payload.input.detachedSignature),
 				exactCanonicalAnchorPreimageBytes: new Uint8ArrayConstructor(payload.input.exactCanonicalAnchorPreimageBytes),
 				exactCanonicalParametersCarrierBytes: new Uint8ArrayConstructor(
@@ -7297,6 +7305,7 @@ async function activateCreatorSuccessorLive(
 	): Readonly<{ readonly detail: string; readonly kind: string; readonly ok: false }> =>
 		ObjectFreeze({ detail, kind, ok: false as const });
 	try {
+		const transportHandoff = creatorSuccessorTransportHandoff(material, bindings);
 		const [predecessorValidation, predecessorSource, successor, successorIssuanceAuthority] = await Promise.all([
 			prepareExistingCreatorGeneration(material.predecessor, material),
 			prepareExistingCreatorGeneration(material.predecessor, material),
@@ -7319,13 +7328,16 @@ async function activateCreatorSuccessorLive(
 		if (successorPayload === undefined || successorAuthorization === undefined) {
 			return rejected("preparation-rejected", "creator successor issuance authority preparation failed");
 		}
-		const predecessorIssuanceStore = creatorPredecessorIssuanceStore(
+		const predecessorIssuanceStore = creatorFilteredIssuanceStore(
 			material.issuanceStore,
 			material.issuanceScope,
 			successorPayload,
 			successorAuthorization,
 			material.predecessor.trust.currentEpoch
 		);
+		if (transportHandoff?.displacedSource !== undefined) {
+			creatorPredecessorRecoverySource.set(predecessorValidation, transportHandoff.displacedSource);
+		}
 		const validatedPredecessor = await recoverV3LiveReplica({
 			capability: predecessorValidation,
 			exactCanonicalLatchedAclBytes: material.predecessorExactCanonicalLatchedAclBytes,
@@ -7348,6 +7360,15 @@ async function activateCreatorSuccessorLive(
 				sourceCapability: predecessorSource,
 			})
 		);
+		const successorIssuanceStore =
+			transportHandoff?.displacedSource === undefined
+				? material.issuanceStore
+				: creatorFilteredIssuanceStore(
+						material.issuanceStore,
+						material.issuanceScope,
+						transportHandoff.displacedSource.prepared,
+						transportHandoff.displacedSource.authorization
+					);
 		const recovered = await recoverV3LiveReplica({
 			capability: successor,
 			displacedSource: ObjectFreeze({
@@ -7356,7 +7377,7 @@ async function activateCreatorSuccessorLive(
 			}),
 			exactCanonicalLatchedAclBytes: material.exactCanonicalLatchedAclBytes,
 			issuanceScope: material.issuanceScope,
-			issuanceStore: material.issuanceStore,
+			issuanceStore: successorIssuanceStore,
 			liveJournalStore: material.liveJournalStore,
 		});
 		if (!recovered.ok) return rejected("recovery-rejected", `creator successor recovery failed: ${recovered.kind}`);
@@ -7368,7 +7389,6 @@ async function activateCreatorSuccessorLive(
 				expectedPayloadDigest: material.snapshotPayloadDigest,
 			})
 		);
-		const transportHandoff = creatorSuccessorTransportHandoff(material, bindings);
 		if (transportHandoff !== undefined) {
 			creatorSuccessorTransportHandoffs.set(recovered.capability, transportHandoff);
 		}

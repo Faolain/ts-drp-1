@@ -16,15 +16,15 @@ import type {
 } from "../../../packages/node/src/creator-close.js";
 import {
 	consumeCreatorAdoptionIntent,
+	consumePreparedCreatorSuccessorAdoption,
 	createCreatorAdoptionIntent,
+	createPreparedCreatorSuccessorAdoption,
 	type CreatorAdoptionIntentMaterial,
 } from "../../../packages/node/src/internal/creator-adoption-intent.js";
+import type { CreatorSuccessorLiveMaterial } from "../../../packages/node/src/internal/creator-successor-live.js";
 import type { V3PlaneHandle } from "../../../packages/node/src/v3-live.js";
 import { contract, hexBytes } from "../phase-3a0-v3/controlled-anchor-trust.js";
-import {
-	type GenuineCreatorAdoptionFixtureModules,
-	openGenuineCreatorAdoptionFixture,
-} from "../phase-6a-v3/creator-adoption-contract.js";
+import { openGenuineCreatorAdoptionFixture } from "../phase-6a-v3/creator-adoption-contract.js";
 import { type D109dHotFixture, openD109dHotFixture } from "../phase-6b/runtime-reclamation-contract.js";
 
 const REPOSITORY_ROOT = resolve(import.meta.dirname, "../../..");
@@ -89,13 +89,29 @@ export interface D110cARepeatCloseEvidence {
 export interface D110cARepeatCloseFixture {
 	readonly evidence: D110cARepeatCloseEvidence;
 	close(): Promise<void>;
-	verifyPendingSuccessor(): Promise<
-		Readonly<{
-			readonly afterHead: Awaited<ReturnType<CreatorLiveCloseHandle["inspectDurableHead"]>>;
-			readonly beforeHead: Awaited<ReturnType<CreatorLiveCloseHandle["inspectDurableHead"]>>;
-			readonly result: Awaited<ReturnType<GenuineCreatorAdoptionFixtureModules["verifyCreatorSuccessorAdoption"]>>;
-		}>
-	>;
+	advancePendingSuccessor(): Promise<D110cBPendingSuccessorEvidence>;
+	failPendingSuccessor(mode: "retirement" | "terminalize"): Promise<D110cBFailureEvidence>;
+}
+
+export interface D110cBFailureEvidence {
+	readonly oldIssue: Readonly<Record<string, unknown>>;
+	readonly result: Readonly<Record<string, unknown>>;
+}
+
+export interface D110cBPendingSuccessorEvidence {
+	readonly activation: Readonly<Record<string, unknown>>;
+	readonly activeAuthority: Readonly<Record<string, unknown>> | undefined;
+	readonly afterHead: Awaited<ReturnType<CreatorLiveCloseHandle["inspectDurableHead"]>>;
+	readonly beforeHead: Awaited<ReturnType<CreatorLiveCloseHandle["inspectDurableHead"]>>;
+	readonly committed: Readonly<Record<string, unknown>>;
+	readonly duplicateActivation: Readonly<Record<string, unknown>>;
+	readonly duplicateCommit: Readonly<Record<string, unknown>>;
+	readonly duplicateHandleIdentity: boolean;
+	readonly issued: Readonly<Record<string, unknown>>;
+	readonly mutants: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+	readonly oldIssue: Readonly<Record<string, unknown>>;
+	readonly published: Readonly<Record<string, unknown>>;
+	readonly verification: Readonly<Record<string, unknown>>;
 }
 
 function copiedRoomHead(plane: V3PlaneHandle): Readonly<Record<string, unknown>> | undefined {
@@ -389,20 +405,30 @@ async function blobForRef(hot: D109dHotFixture, ref: GenerationRef): Promise<Uin
 
 /**
  * Executes a genuine adopted epoch-one close against the authenticated prior-history carrier.
+ * @param options - Optional genuine room identity and retained D.110c-a control selection.
  * @returns Retained GREEN evidence and a cooperative cleanup owner.
  */
-export async function openD110cARepeatCloseFixture(): Promise<D110cARepeatCloseFixture> {
-	const [carrierRefusals, overflow] = await Promise.all([hostileCarrierRefusals(), overflowRefusal()]);
-	const hot = await openD109dHotFixture();
+export async function openD110cARepeatCloseFixture(
+	options: Readonly<{ readonly objectId?: string; readonly retainedControls?: boolean }> = {}
+): Promise<D110cARepeatCloseFixture> {
+	const [carrierRefusals, overflow] =
+		options.retainedControls === false
+			? [Object.freeze([]), "D110C_A_RETAINED_CONTROLS_NOT_RUN"]
+			: await Promise.all([hostileCarrierRefusals(), overflowRefusal()]);
+	const hot = await openD109dHotFixture({
+		...(options.objectId === undefined ? {} : { creator: { objectId: options.objectId } }),
+	});
 	const primaryDatabaseName = `d110c-a-seal-${crypto.randomUUID()}`;
 	const snapshotDatabaseName = `d110c-a-snapshot-${crypto.randomUUID()}`;
 	const closers: StoreCloser[] = [];
 	let closeHandle: CreatorLiveCloseHandle | undefined;
+	let latestSuccessor: D109dHotFixture["successor"] | undefined;
 	let closed = false;
 	let successorVerificationConsumed = false;
 	const cleanup = async (): Promise<void> => {
 		if (closed) return;
 		closed = true;
+		await Promise.resolve(latestSuccessor?.deactivate()).catch(() => undefined);
 		await closeHandle?.stop().catch(() => undefined);
 		await Promise.all(closers.map((closer) => closer.close().catch(() => undefined)));
 		await hot.close();
@@ -502,18 +528,271 @@ export async function openD110cARepeatCloseFixture(): Promise<D110cARepeatCloseF
 					storageNodeBuiltUrl: pathToFileURL(resolve(REPOSITORY_ROOT, "packages/storage-node/dist/src/index.js")).href,
 				}),
 			}),
-			verifyPendingSuccessor: async () => {
+			advancePendingSuccessor: async () => {
 				if (successorVerificationConsumed) throw new TypeError("D110C_B_VERIFICATION_ALREADY_CONSUMED");
 				successorVerificationConsumed = true;
 				if (closeHandle === undefined) throw new TypeError("D110C_B_CLOSE_HANDLE_UNAVAILABLE");
-				const beforeHead = await closeHandle.inspectDurableHead();
-				const result = await hot.base.modules.verifyCreatorSuccessorAdoption({
+				const adoptionHandle = closeHandle;
+				const beforeHead = await adoptionHandle.inspectDurableHead();
+				const prepare = async (): Promise<
+					Readonly<{
+						readonly capability: object;
+						readonly descriptor: Readonly<Record<string, unknown>>;
+						readonly head: object;
+					}>
+				> => {
+					const verified = await hot.base.modules.verifyCreatorSuccessorAdoption({
+						catalog: hot.base.catalog,
+						handle: adoptionHandle,
+					});
+					if (!verified.ok) throw new TypeError(`D110C_B_VERIFY_FAILED:${verified.kind}`);
+					const result = await hot.base.modules.commitCreatorSuccessorAdoption({
+						handle: adoptionHandle,
+						intent: verified.intent,
+					});
+					if (!result.ok) throw new TypeError(`D110C_B_COMMIT_FAILED:${result.kind}`);
+					return result;
+				};
+				const verification = await hot.base.modules.verifyCreatorSuccessorAdoption({
 					catalog: hot.base.catalog,
-					handle: closeHandle,
+					handle: adoptionHandle,
+				});
+				if (!verification.ok) throw new TypeError(`D110C_B_VERIFY_FAILED:${verification.kind}`);
+				const committed = await hot.base.modules.commitCreatorSuccessorAdoption({
+					handle: adoptionHandle,
+					intent: verification.intent,
+				});
+				if (!committed.ok) throw new TypeError(`D110C_B_COMMIT_FAILED:${committed.kind}`);
+				const duplicateCommit = await prepare();
+				const expectedRoomHead = Object.freeze({
+					currentAnchorDigest: String(committed.descriptor.anchorDigest),
+					epoch: Number(committed.descriptor.epoch),
+					objectId: String(committed.descriptor.objectId),
+				});
+				const activationInput = (
+					capability: object,
+					expected: unknown,
+					bindings: typeof hot.runtimeBindings = hot.runtimeBindings
+				): Promise<Readonly<Record<string, unknown>>> =>
+					hot.base.modules.activateCreatorSuccessorAdoption({
+						capability,
+						expectedRoomHead: expected,
+						handle: adoptionHandle,
+						...bindings,
+					});
+				const mutatedCapability = async (
+					mutate: (material: CreatorSuccessorLiveMaterial) => CreatorSuccessorLiveMaterial
+				): Promise<
+					Readonly<{
+						readonly capability: object;
+						readonly expectedRoomHead: Readonly<Record<string, unknown>>;
+					}>
+				> => {
+					const source = await prepare();
+					const material = consumePreparedCreatorSuccessorAdoption(source.capability, adoptionHandle);
+					if (material === undefined) throw new TypeError("D110C_B_MUTANT_MATERIAL_UNAVAILABLE");
+					const activation = mutate(material.activation);
+					return Object.freeze({
+						capability: createPreparedCreatorSuccessorAdoption(adoptionHandle, {
+							activation,
+							exactCanonicalProjectionBytes: material.exactCanonicalProjectionBytes,
+							head: material.head,
+						}),
+						expectedRoomHead: Object.freeze({
+							currentAnchorDigest: activation.successor.trust.currentAnchorDigest,
+							epoch: activation.successor.trust.currentEpoch,
+							objectId: activation.successor.trust.objectId,
+						}),
+					});
+				};
+				const withTrust = (
+					material: CreatorSuccessorLiveMaterial,
+					predecessor: Readonly<Record<string, unknown>>,
+					successor: Readonly<Record<string, unknown>>
+				): CreatorSuccessorLiveMaterial =>
+					Object.freeze({
+						...material,
+						predecessor: Object.freeze({
+							...material.predecessor,
+							trust: Object.freeze({ ...material.predecessor.trust, ...predecessor }),
+						}),
+						successor: Object.freeze({
+							...material.successor,
+							trust: Object.freeze({ ...material.successor.trust, ...successor }),
+						}),
+					});
+				const changedAnchor = (anchor: string): string => (anchor === "f".repeat(64) ? "e".repeat(64) : "f".repeat(64));
+				const mutants: Record<string, Readonly<Record<string, unknown>>> = Object.create(null) as Record<
+					string,
+					Readonly<Record<string, unknown>>
+				>;
+				mutants.missingHotInput = await hot.base.modules.activateCreatorSuccessorAdoption({});
+				const malformedFloor = await prepare();
+				mutants.malformedFloor = await activationInput(malformedFloor.capability, Object.freeze({ epoch: "2" }));
+				for (const [name, expected] of [
+					["laggingFloor", Object.freeze({ ...expectedRoomHead, epoch: 1 })],
+					["aheadFloor", Object.freeze({ ...expectedRoomHead, epoch: 3 })],
+					[
+						"substitutedFloor",
+						Object.freeze({
+							...expectedRoomHead,
+							currentAnchorDigest: changedAnchor(expectedRoomHead.currentAnchorDigest),
+						}),
+					],
+				] as const) {
+					const floorPrepared = await prepare();
+					mutants[name] = await activationInput(floorPrepared.capability, expected);
+				}
+				const bindingPrepared = await prepare();
+				mutants.differentBindings = await activationInput(bindingPrepared.capability, expectedRoomHead, {
+					...hot.runtimeBindings,
+					onAdmittedVertex: () => undefined,
+				});
+				for (const [name, mutate] of [
+					[
+						"sameEpochDifferentAnchor",
+						(material: CreatorSuccessorLiveMaterial): CreatorSuccessorLiveMaterial =>
+							withTrust(
+								material,
+								{ currentAnchorDigest: changedAnchor(material.predecessor.trust.currentAnchorDigest) },
+								{}
+							),
+					],
+					[
+						"stalePredecessor",
+						(material: CreatorSuccessorLiveMaterial): CreatorSuccessorLiveMaterial =>
+							withTrust(
+								material,
+								{ currentAnchorDigest: changedAnchor(material.predecessor.trust.currentAnchorDigest), currentEpoch: 0 },
+								{ currentAnchorDigest: changedAnchor(material.successor.trust.currentAnchorDigest), currentEpoch: 1 }
+							),
+					],
+					[
+						"skippedPredecessor",
+						(material: CreatorSuccessorLiveMaterial): CreatorSuccessorLiveMaterial =>
+							withTrust(material, { currentEpoch: 2 }, { currentEpoch: 3 }),
+					],
+					[
+						"crossObject",
+						(material: CreatorSuccessorLiveMaterial): CreatorSuccessorLiveMaterial =>
+							withTrust(material, { objectId: `creator:${"c".repeat(32)}` }, {}),
+					],
+					[
+						"crossGenesis",
+						(material: CreatorSuccessorLiveMaterial): CreatorSuccessorLiveMaterial =>
+							withTrust(material, { genesisAnchorDigest: changedAnchor(material.pinnedGenesisAnchorDigest) }, {}),
+					],
+					[
+						"nonExactSuccessor",
+						(material: CreatorSuccessorLiveMaterial): CreatorSuccessorLiveMaterial =>
+							withTrust(material, {}, { currentEpoch: 3 }),
+					],
+				] as const) {
+					const mutant = await mutatedCapability(mutate);
+					mutants[name] = await activationInput(mutant.capability, mutant.expectedRoomHead);
+				}
+				const preTransfer = await mutatedCapability((material) =>
+					Object.freeze({
+						...material,
+						predecessor: Object.freeze({ ...material.predecessor, candidates: Object.freeze([]) }),
+					})
+				);
+				mutants.preTransferRefusal = await activationInput(preTransfer.capability, preTransfer.expectedRoomHead);
+				const activation = await hot.base.modules.activateCreatorSuccessorAdoption({
+					capability: committed.capability,
+					expectedRoomHead,
+					handle: adoptionHandle,
+					...hot.runtimeBindings,
+				});
+				if (!activation.ok || activation.handle === null || typeof activation.handle !== "object") {
+					throw new TypeError(`D110C_B_ACTIVATION_FAILED:${String(activation.kind)}:${String(activation.detail)}`);
+				}
+				latestSuccessor = activation.handle as D109dHotFixture["successor"];
+				const duplicateActivation = await hot.base.modules.activateCreatorSuccessorAdoption({
+					capability: duplicateCommit.capability,
+					expectedRoomHead,
+					handle: adoptionHandle,
+					...hot.runtimeBindings,
+				});
+				const oldIssue = await hot.successor.issueLocal({
+					operations: Object.freeze([
+						Object.freeze({ logicalTime: 42, operation: Object.freeze({ action: "add", value: 13 }) }),
+					]),
+					signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
+				});
+				await Promise.resolve(hot.successor.deactivate());
+				const issued = await latestSuccessor.issueLocal({
+					operations: Object.freeze([
+						Object.freeze({ logicalTime: 43, operation: Object.freeze({ action: "add", value: 17 }) }),
+					]),
+					signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
+				});
+				const published = await latestSuccessor.publishPending();
+				if (!published.ok) {
+					throw new TypeError(`D110C_B_PUBLISH_FAILED:${String(published.kind)}:${String(published.detail)}`);
+				}
+				return Object.freeze({
+					afterHead: await adoptionHandle.inspectDurableHead(),
+					activation,
+					activeAuthority: copiedRoomHead(latestSuccessor as V3PlaneHandle),
+					beforeHead,
+					committed,
+					duplicateActivation,
+					duplicateCommit,
+					duplicateHandleIdentity: duplicateActivation.ok === true && duplicateActivation.handle === activation.handle,
+					issued,
+					mutants: Object.freeze(mutants),
+					oldIssue,
+					published,
+					verification,
+				});
+			},
+			failPendingSuccessor: async (mode: "retirement" | "terminalize") => {
+				if (successorVerificationConsumed) throw new TypeError("D110C_B_VERIFICATION_ALREADY_CONSUMED");
+				successorVerificationConsumed = true;
+				if (closeHandle === undefined) throw new TypeError("D110C_B_CLOSE_HANDLE_UNAVAILABLE");
+				const adoptionHandle = closeHandle;
+				const verified = await hot.base.modules.verifyCreatorSuccessorAdoption({
+					catalog: hot.base.catalog,
+					handle: adoptionHandle,
+				});
+				if (!verified.ok) throw new TypeError(`D110C_B_FAILURE_VERIFY_FAILED:${verified.kind}`);
+				const committed = await hot.base.modules.commitCreatorSuccessorAdoption({
+					handle: adoptionHandle,
+					intent: verified.intent,
+				});
+				if (!committed.ok) throw new TypeError(`D110C_B_FAILURE_COMMIT_FAILED:${committed.kind}`);
+				const prepared = consumePreparedCreatorSuccessorAdoption(committed.capability, adoptionHandle);
+				if (prepared === undefined) throw new TypeError("D110C_B_FAILURE_MATERIAL_UNAVAILABLE");
+				const terminalizeSource =
+					mode === "terminalize"
+						? (): boolean => false
+						: (): boolean => {
+								void hot.successor.deactivate();
+								return prepared.activation.terminalizeSource();
+							};
+				const capability = createPreparedCreatorSuccessorAdoption(adoptionHandle, {
+					activation: Object.freeze({ ...prepared.activation, terminalizeSource }),
+					exactCanonicalProjectionBytes: prepared.exactCanonicalProjectionBytes,
+					head: prepared.head,
+				});
+				const result = await hot.base.modules.activateCreatorSuccessorAdoption({
+					capability,
+					expectedRoomHead: Object.freeze({
+						currentAnchorDigest: String(committed.descriptor.anchorDigest),
+						epoch: Number(committed.descriptor.epoch),
+						objectId: String(committed.descriptor.objectId),
+					}),
+					handle: adoptionHandle,
+					...hot.runtimeBindings,
 				});
 				return Object.freeze({
-					afterHead: await closeHandle.inspectDurableHead(),
-					beforeHead,
+					oldIssue: await hot.successor.issueLocal({
+						operations: Object.freeze([
+							Object.freeze({ logicalTime: 44, operation: Object.freeze({ action: "add", value: 19 }) }),
+						]),
+						signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
+					}),
 					result,
 				});
 			},

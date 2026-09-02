@@ -173,6 +173,7 @@ export interface D109dHotFixture {
 	readonly committedHead: PresentHead;
 	readonly oracle: D108d1Oracle;
 	readonly predecessor: object;
+	readonly runtimeBindings: GenuineCreatorAdoptionFixture["runtimeBindings"];
 	readonly successor: Readonly<{
 		deactivate(): void | Promise<void>;
 		issueLocal(input: unknown): Promise<Readonly<Record<string, unknown>>>;
@@ -257,6 +258,7 @@ async function openD109dFixture(mode: "cold" | "hot", options: D109dOpenOptions 
 			oracle: deriveD108d1Oracle(base),
 			predecessor: base.handle,
 			readAdmittedVertices: () => Object.freeze([...admittedVertices]),
+			runtimeBindings,
 			successor,
 		});
 	} catch (error) {

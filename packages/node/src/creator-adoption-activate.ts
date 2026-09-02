@@ -49,9 +49,24 @@ interface HeldLock {
 	release(): Promise<void>;
 }
 
+interface ActiveHead {
+	readonly anchorDigest: string;
+	readonly epoch: number;
+	readonly genesisAnchorDigest: string;
+	readonly objectId: string;
+}
+
 interface ActiveOwner {
 	readonly bindings: CreatorSuccessorRuntimeBindings;
-	readonly handle: object;
+	handle: object;
+	readonly head: ActiveHead;
+	readonly lock: HeldLock | undefined;
+	replacementInFlight: boolean;
+	replacementSettled: Promise<void> | undefined;
+	resolveReplacement: (() => void) | undefined;
+	retirementRequested: boolean;
+	readonly token: object;
+	readonly topic: string;
 }
 
 const activeOwners = new Map<string, ActiveOwner>();
@@ -101,6 +116,153 @@ function sameBindings(left: CreatorSuccessorRuntimeBindings, right: CreatorSucce
 		left.networkNode === right.networkNode &&
 		left.onAdmittedVertex === right.onAdmittedVertex
 	);
+}
+
+function activeHead(value: unknown): ActiveHead | undefined {
+	if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
+	const trust = value as Readonly<Record<string, unknown>>;
+	return typeof trust.currentAnchorDigest === "string" &&
+		/^[0-9a-f]{64}$/u.test(trust.currentAnchorDigest) &&
+		typeof trust.currentEpoch === "number" &&
+		Number.isSafeInteger(trust.currentEpoch) &&
+		trust.currentEpoch >= 0 &&
+		typeof trust.genesisAnchorDigest === "string" &&
+		/^[0-9a-f]{64}$/u.test(trust.genesisAnchorDigest) &&
+		typeof trust.objectId === "string"
+		? Object.freeze({
+				anchorDigest: trust.currentAnchorDigest,
+				epoch: trust.currentEpoch,
+				genesisAnchorDigest: trust.genesisAnchorDigest,
+				objectId: trust.objectId,
+			})
+		: undefined;
+}
+
+function sameActiveHead(left: ActiveHead, right: ActiveHead): boolean {
+	return (
+		left.anchorDigest === right.anchorDigest &&
+		left.epoch === right.epoch &&
+		left.genesisAnchorDigest === right.genesisAnchorDigest &&
+		left.objectId === right.objectId
+	);
+}
+
+function transitionHeads(
+	material: CreatorSuccessorLiveMaterial
+): Readonly<{ readonly predecessor: ActiveHead; readonly successor: ActiveHead }> | undefined {
+	const predecessor = activeHead(material.predecessor.trust);
+	const successor = activeHead(material.successor.trust);
+	return predecessor !== undefined &&
+		successor !== undefined &&
+		predecessor.objectId === successor.objectId &&
+		predecessor.genesisAnchorDigest === successor.genesisAnchorDigest &&
+		predecessor.genesisAnchorDigest === material.pinnedGenesisAnchorDigest &&
+		successor.epoch === predecessor.epoch + 1 &&
+		material.predecessor.head.objectId === predecessor.objectId &&
+		material.successor.head.objectId === successor.objectId
+		? Object.freeze({ predecessor, successor })
+		: undefined;
+}
+
+function beginReplacement(owner: ActiveOwner): void {
+	owner.replacementInFlight = true;
+	owner.replacementSettled = new Promise<void>((resolve) => {
+		owner.resolveReplacement = resolve;
+	});
+}
+
+function finishReplacement(owner: ActiveOwner): void {
+	owner.replacementInFlight = false;
+	const resolve = owner.resolveReplacement;
+	owner.resolveReplacement = undefined;
+	owner.replacementSettled = undefined;
+	resolve?.();
+}
+
+function currentOwner(owner: ActiveOwner): boolean {
+	return activeOwners.get(owner.topic)?.token === owner.token;
+}
+
+async function deactivateOwner(owner: ActiveOwner): Promise<void> {
+	const deactivate = Reflect.get(owner.handle, "deactivate");
+	try {
+		if (typeof deactivate === "function") await Reflect.apply(deactivate, owner.handle, []);
+	} finally {
+		if (currentOwner(owner)) activeOwners.delete(owner.topic);
+		await owner.lock?.release();
+	}
+}
+
+async function abandonOwner(owner: ActiveOwner): Promise<void> {
+	owner.retirementRequested = true;
+	finishReplacement(owner);
+	await deactivateOwner(owner);
+}
+
+async function ignoreCleanupFailure(task: Promise<void>): Promise<void> {
+	await task.catch(() => undefined);
+}
+
+function deactivateRawHandle(handle: Readonly<{ deactivate(): void | Promise<void> }>): Promise<void> {
+	return Promise.resolve().then(() => handle.deactivate());
+}
+
+function failureMayFollowTransfer(result: Readonly<{ readonly detail: string; readonly kind: string }>): boolean {
+	if (result.kind === "source-unavailable") return true;
+	if (result.kind !== "internal-invariant") return false;
+	return !["creator predecessor recovery custody failed", "creator successor live owner is unavailable"].includes(
+		result.detail
+	);
+}
+
+function wrapOwner(
+	topic: string,
+	rawHandle: Record<string, unknown> & Readonly<{ deactivate(): void | Promise<void> }>,
+	bindings: CreatorSuccessorRuntimeBindings,
+	head: ActiveHead,
+	lock: HeldLock | undefined
+): ActiveOwner {
+	const token = Object.freeze({});
+	let rawDeactivation: Promise<void> | undefined;
+	let wrapperDeactivation: Promise<void> | undefined;
+	const owner: ActiveOwner = {
+		bindings,
+		handle: rawHandle,
+		head,
+		lock,
+		replacementInFlight: false,
+		replacementSettled: undefined,
+		resolveReplacement: undefined,
+		retirementRequested: false,
+		token,
+		topic,
+	};
+	const deactivateRaw = (): Promise<void> => {
+		rawDeactivation ??= Promise.resolve().then(() => rawHandle.deactivate());
+		return rawDeactivation;
+	};
+	const wrapped = Object.freeze({
+		...rawHandle,
+		deactivate: (): Promise<void> => {
+			wrapperDeactivation ??= (async (): Promise<void> => {
+				if (owner.replacementInFlight) {
+					owner.retirementRequested = true;
+					await owner.replacementSettled;
+				}
+				try {
+					await deactivateRaw();
+				} finally {
+					if (currentOwner(owner)) {
+						activeOwners.delete(topic);
+						await lock?.release();
+					}
+				}
+			})();
+			return wrapperDeactivation;
+		},
+	});
+	owner.handle = wrapped;
+	return owner;
 }
 
 function browserLockRealm(): boolean {
@@ -190,12 +352,54 @@ async function activateMaterial(
 	material: CreatorSuccessorLiveMaterial,
 	bindings: CreatorSuccessorRuntimeBindings
 ): Promise<Readonly<Record<string, unknown>>> {
+	const heads = transitionHeads(material);
+	if (heads === undefined) return failure("chain-invalid", "creator successor authority transition is invalid");
 	const topic = deriveV3StableTopic(material.successor.trust.objectId, material.pinnedGenesisAnchorDigest);
 	const existing = activeOwners.get(topic);
 	if (existing !== undefined) {
-		return sameBindings(existing.bindings, bindings)
-			? success(material, existing.handle)
-			: failure("authority-unavailable", "creator successor already has a conflicting active owner");
+		if (!sameBindings(existing.bindings, bindings)) {
+			return failure("authority-unavailable", "creator successor already has a conflicting active owner");
+		}
+		if (existing.replacementInFlight) {
+			return failure("authority-unavailable", "creator successor replacement is already active");
+		}
+		if (sameActiveHead(existing.head, heads.successor)) return success(material, existing.handle);
+		if (!sameActiveHead(existing.head, heads.predecessor)) {
+			return heads.predecessor.objectId === existing.head.objectId &&
+				heads.predecessor.genesisAnchorDigest === existing.head.genesisAnchorDigest &&
+				heads.predecessor.epoch < existing.head.epoch
+				? failure("stale-head", "creator successor predecessor is stale")
+				: failure("chain-invalid", "creator successor predecessor differs from the active owner");
+		}
+		beginReplacement(existing);
+		const activated = await consumeCreatorSuccessorLive(material, bindings);
+		if (!activated.ok) {
+			if (failureMayFollowTransfer(activated)) await ignoreCleanupFailure(abandonOwner(existing));
+			else {
+				const retire = existing.retirementRequested;
+				finishReplacement(existing);
+				if (retire) await ignoreCleanupFailure(deactivateOwner(existing));
+			}
+			return failure(activated.kind, activated.detail);
+		}
+		const rawHandle = activated.handle as Record<string, unknown> &
+			Readonly<{
+				deactivate(): void | Promise<void>;
+			}>;
+		const replacement = wrapOwner(topic, rawHandle, bindings, heads.successor, existing.lock);
+		if (!consumeCreatorSuccessorHandleAlias(rawHandle, replacement.handle)) {
+			await ignoreCleanupFailure(deactivateRawHandle(rawHandle));
+			await ignoreCleanupFailure(abandonOwner(existing));
+			return failure("internal-invariant", "creator successor handle identity is unavailable");
+		}
+		if (!currentOwner(existing) || existing.retirementRequested) {
+			await ignoreCleanupFailure(deactivateRawHandle(rawHandle));
+			await ignoreCleanupFailure(abandonOwner(existing));
+			return failure("authority-unavailable", "creator successor active ownership changed during replacement");
+		}
+		activeOwners.set(topic, replacement);
+		finishReplacement(existing);
+		return success(material, replacement.handle);
 	}
 	const held = await acquireBrowserLock(topic);
 	if (held !== undefined && "ok" in held && held.ok === false) return held;
@@ -206,18 +410,8 @@ async function activateMaterial(
 		return failure(activated.kind, activated.detail);
 	}
 	const rawHandle = activated.handle as Record<string, unknown> & Readonly<{ deactivate(): void | Promise<void> }>;
-	let active = true;
-	const wrapped = Object.freeze({
-		...rawHandle,
-		deactivate: async (): Promise<void> => {
-			if (!active) return;
-			active = false;
-			await Promise.resolve(rawHandle.deactivate());
-			activeOwners.delete(topic);
-			await lock?.release();
-		},
-	});
-	if (!consumeCreatorSuccessorHandleAlias(rawHandle, wrapped)) {
+	const owner = wrapOwner(topic, rawHandle, bindings, heads.successor, lock);
+	if (!consumeCreatorSuccessorHandleAlias(rawHandle, owner.handle)) {
 		try {
 			await Promise.resolve(rawHandle.deactivate());
 		} catch {
@@ -226,8 +420,8 @@ async function activateMaterial(
 		await lock?.release();
 		return failure("internal-invariant", "creator successor handle identity is unavailable");
 	}
-	activeOwners.set(topic, Object.freeze({ bindings, handle: wrapped }));
-	return success(material, wrapped);
+	activeOwners.set(topic, owner);
+	return success(material, owner.handle);
 }
 
 /**

@@ -253,11 +253,11 @@ interface CreatorLiveCloseApi {
 			commitQcRef: Readonly<{ byteLength: number; digest: string }>;
 			currentTrustRef: Readonly<{ byteLength: number; digest: string }>;
 			cutValueRef: Readonly<{ byteLength: number; digest: string }>;
-			epoch: 0;
+			epoch: number;
 			lifecycle: "successor-pending-adoption";
 			ok: true;
 			successorAnchorDigest: string;
-			successorEpoch: 1;
+			successorEpoch: number;
 			successorTrustRef: Readonly<{ byteLength: number; digest: string }>;
 		}>
 	>;
