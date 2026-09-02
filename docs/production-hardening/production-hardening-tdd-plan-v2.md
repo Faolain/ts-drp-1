@@ -95200,17 +95200,23 @@ third transition or campaign, or reopen its immutable RED/GREEN evidence.
 
 ##### D.110c-0c durable pending-adoption resume plan
 
-**Status: bounded source audit complete; plan review pending.** Owner:
+**Status: bounded source audit complete; initial plan review found one P1;
+single material correction confirmation pending.** Owner:
 `packages/node/src/creator-adoption.ts` pending-candidate authentication and
 recovery kernel, the already exported
 `@ts-drp/node/creator-adoption-recover` capture boundary, the existing private
 epoch-relative transition classifier, and the existing v3-room room-head/AHE/
 snapshot composition. Storage-browser persistent-profile restart tests own the
-causal fault and restart harness. Deadline: signed GREEN before D.110c-c RED and
-before any post-close or pre-adoption restart acceptance. This slice does not
-reopen 0b0a/0b1, add another recovery entry, activate a pending head, authorize
-cleanup/pruning or a third completed hot transition, change wire/schema/root
-exports/dependencies/authority/floor/rollback/thresholds, or run a campaign.
+causal fault and restart harness, including one test-only origin-scoped durable
+`V3RoomHeadAuthority` implementation. That fixture provider is not a production
+floor-owner selection: the room alone drives its normal read/create/begin/commit
+methods, while the provider only makes those exact writes survive a killed
+Chromium process. Deadline: signed GREEN before D.110c-c RED and before any
+post-close or pre-adoption restart acceptance. This slice does not reopen
+0b0a/0b1, add another recovery entry, activate a pending head, authorize
+cleanup/pruning or a third completed hot transition, select the unresolved 0b0
+production floor owner, change wire/schema/root exports/dependencies/authority/
+floor semantics/rollback/thresholds, or run a campaign.
 
 The audit at signed/pushed 0b1 closure `ff1a9807` corrects the umbrella's old
 pre-0b0a premise: a genuine public recovery entry now exists and is already
@@ -95242,17 +95248,34 @@ epoch 0→1 and 1→2 with issue/publish work, closes epoch 2, and begins the re
 staged adoption. It uses the already retained `failBeforePublication` and
 one-shot room-head commit fault seams in separate old-AHE/new-AHE cases to stop
 after the authenticated pending floor and durable candidate exist but before
-the pair is jointly committed. The browser context is then terminated without
-graceful room cleanup, removing all in-memory handles/WeakMaps; the same browser
-profile and origin are reopened from the durable databases and exact snapshot
-declaration. Every semantic precondition is serialized before the terminal
+the pair is jointly committed. Its test-only room-head provider stores the exact
+canonical stable/pending tuple in a dedicated origin-scoped IndexedDB database
+inside the persistent profile. Genesis/create and every later floor write occur
+only because the real room invokes the provider's normal create, begin, or
+commit operation; neither the Playwright parent nor fixture code may construct,
+replace, normalize, or mutate a stable/pending value after the crash. Before
+termination the fixture records the begin result and its canonical byte digest.
+
+The Chromium process is then terminated without graceful room cleanup,
+removing all in-memory handles/WeakMaps. A newly launched process opens the same
+profile and origin, creates a fresh provider instance, and reads the stored
+floor verbatim. It must prove the reread canonical bytes and digest are exactly
+the pre-crash begin result before opening the room. The new process locally
+re-derives the snapshot declaration and opens every AHE, snapshot, journal, and
+issuance store from durable names; the parent passes no pre-crash store handle,
+capability, declaration object, or stable/pending value across the process
+boundary. Every semantic precondition is serialized before the terminal
 assertion: stable epoch 2, pending next epoch 3, genuine Cut/QC/trust/projection,
 expected AHE ordering, unchanged application state, and zero activation before
-recovery. Current production must return the exact room-level pending-invalid
-or recovery-unavailable classification, after which RED throws only
+recovery. Current production must deterministically return room-level
+`D110C_FLOOR_RECOVERY_UNAVAILABLE`, corresponding to the current pending
+authenticator's `pending-missing` result; any pending-invalid, floor-mismatch,
+or other classification is fixture/causality failure. RED then throws only
 `D110C_0C_PENDING_EPOCH3_RESUME_MISSING`. The focused reporter must select
 exactly the two orderings in one file, with two intended failures, no retained
-campaign title, no top-level error, and the complete token exactly twice.
+campaign title, no top-level error, and the complete token exactly twice. The
+provider is test evidence for process-death causality only and neither selects
+nor pre-empts D.110c-0b0's production floor owner.
 
 GREEN changes only the internal pending authenticator. For expected predecessor
 epoch 0 it preserves the present projection selection, genesis opener,
@@ -95268,11 +95291,16 @@ predicate, and chain fields. For expected predecessor epoch N≥1 it:
    expected previous and next room heads exactly;
 4. verifies the current→proposed closure with the shared bounded classifier in
    `verify` mode, without reconstructing or retaining an older proof chain;
-5. derives the chain epochs and projection kind from those authenticated
+5. applies the existing cold-reopen owner's exact current-projection bindings:
+   the projection epoch and object id equal the authenticated predecessor, and
+   its blueprint digest equals the independently resolved catalog blueprint;
+   this makes same-kind generation-2 projection substitution fail before any
+   write;
+6. derives the chain epochs and projection kind from those authenticated
    values, then reuses the existing snapshot, catalog, parameters, ACL,
    generation-lineage, fork-selection, CAS-reread, and room-head commit logic;
    and
-6. returns only the existing non-activating published-head result. Active
+7. returns only the existing non-activating published-head result. Active
    custody is still created solely by the later cold-reopen owner against the
    committed room-head floor.
 
@@ -95289,6 +95317,14 @@ substituted trust/Cut/QC/projection/snapshot, missing/duplicate candidates,
 incomplete writes, lost CAS response, true fork, and already-active idempotence.
 Every failure occurs before room-head commit or activation; an ambiguous write
 is decided only by authenticated reread.
+
+D.110c-0c's post-recovery epoch-3 cold open occurs in the same newly launched
+process immediately after its authenticated pending publication and floor
+commit. It does not claim a second process restart after the floor becomes
+`{stable: epoch 3, pending: null}`. The existing no-pending successor-open check
+in `examples/v3-room` is still pinned to stable epoch 1; D.110c-c explicitly
+owns generalizing and proving that completed epoch-N reopen, and it remains
+blocking before D.110c-c's post-adoption restart acceptance and D.110c-d RED.
 
 The 0b1 P2 union is an explicit retained obligation rather than hidden scope.
 This slice records, but does not mix into its causal production repair, that
@@ -95310,7 +95346,14 @@ cleanup/rollback/availability, and storage-browser restart roster. Exact-owner
 lint/format/diff, Node/storage-browser builds and production-source typechecks,
 one-test/file listing, source/export/runtime shape, protected paths, all 27
 stashes, process/port predicates, hashes, and a self-excluding manifest are
-mandatory. RED and GREEN evidence are signed and pushed. As a high-risk
+mandatory. The RED/GREEN source audit must first slice the exact
+`authenticatePendingCandidate()` function body, rather than use file-global
+substrings, and must prove both removal of the N≥1 pins and byte-preservation of
+the epoch-0 branch within that slice. Generated JSON evidence retains the raw
+byte-exact command output or records its formatting command explicitly. The RED
+evidence root also records the plan/correction commits' post-commit signature
+status and exact pushed-ref identity, closing the retained 0b1 custody item.
+RED and GREEN evidence are signed and pushed. As a high-risk
 production-lifecycle restart slice, the bounded plan receives one
 Grok 4.6/high, direct Kimi K3 100-step, and Opus xhigh review before RED; the
 signed GREEN receives the governing final plan→RED→GREEN review. Only P0/P1
@@ -95318,6 +95361,25 @@ blocks, and no Fable or collaboration subagent is invoked. The literal source
 audit and its six-entry self-excluding manifest are retained under
 `.logs/d110c-0c-plan-audit-ff1a9807/`; the validating manifest SHA-256 is
 `ae081775672303cb5a7fc740d6759710ba7b6d0d26034ad27f78203871f090fd`.
+
+The initial plan review at `f1e021f2` returned Grok APPROVED with three P2s,
+Kimi APPROVED with two P2s, and Opus CHANGES_REQUIRED with one P1 and five P2s.
+The blocking union contained only Opus's missing durable restart-floor owner.
+This correction accepts it through the bounded test-only provider above and
+also folds the exact room error, projection-field bindings, function-scoped
+audit, raw-output custody, post-commit identity, and completed-epoch-N reopen
+assignment into the same batch. Grok's exact session
+`01a06416-f757-7983-aebd-abda1aef6ac7` initially ended after emitting a valid
+public JSON object that the wrapper classified as `NO_VERDICT`; its one exact
+resume re-emitted structured APPROVED with the same findings. Kimi session
+`session_77a49a4b-892f-4c95-b3e9-4851553b12d0` and Opus session
+`0597a675-b79d-4f89-a602-5839bac2b23a` completed normally. One material
+three-model confirmation of this corrected executable scope is required; no
+further plan-review round is permitted. The initial review and correction are
+retained under `.logs/d110c-0c-plan-review-f1e021f2/` and
+`.logs/d110c-0c-plan-correction-f1e021f2/`; their joint self-excluding manifest
+SHA-256 is
+`2742853c1897e9ba164a9b058271171596d2cf09a13187bd3b4b7e2e6e9fb96c`.
 
 The four prerequisite decisions, including the newly demonstrated 0b0
 freshness-floor authority question, are reviewed before their production edits;
