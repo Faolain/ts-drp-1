@@ -94047,6 +94047,224 @@ plan→RED→GREEN review. No Fable, collaboration subagent, long campaign, D.11
 rerun, D.110c-b product rebind, 0b1 bounded-proof implementation, or Phase-7
 archive work occurs in D.110c-a. Deadline: GREEN before D.110c-b RED.
 
+##### D.110c-b bounded general hot adoption, activation, and product-custody plan
+
+The bounded source/architecture audit at signed/pushed base
+`3118da762c17785a4a34a1f1d6b173370dc33a4a` demonstrates a composition defect,
+not a missing wire protocol. `creator-adoption.ts` authenticates the close chain
+but selects only `v3-live-generation-1` as the current projection and
+predecessor, then emits graph and projection epoch `1`. The terminal/staged
+commit checks repeat the root-only predecessor kind. This is incompatible with
+the genuine D.110c-a epoch-1 close, whose current projection is correctly
+`v3-live-generation-2` and whose authenticated successor epoch is `2`.
+Separately, the hot activation owner is keyed by stable topic but records no
+authenticated head: a same-bindings request returns the stale wrapper as
+success, and stale-wrapper deactivation unconditionally removes the topic and
+releases its lock. The product room then has a permanent first-adoption latch,
+installs the epoch-1 live wrapper without rebinding creator-close, and exposes
+successor authority as literal epoch `1`. A room therefore cannot perform the
+real `0 -> 1 -> 2` loop even though D.110c-a can produce the genuine pending
+epoch-2 close.
+
+The exact source owners are
+`packages/node/src/creator-adoption.ts:371-373,539-569,607-610,664-666`,
+`packages/node/src/creator-adoption-commit.ts:308-310,432-434,489-491`,
+`packages/node/src/creator-adoption-activate.ts:52-57,189-230`, and
+`examples/v3-room/src/index.ts:235-242,453-488,1880-1883,2265-2287,3500-3586`.
+`v3-live.ts:1878-1930` already distinguishes the root projection at epoch zero
+from the existing non-root projection kind at every positive epoch, and its
+installed live activator already derives both planes from authenticated
+material; those rules are reused unchanged unless RED proves another owner.
+The audit ledger and source-shape record are
+`.logs/d110c-b-plan-audit-3118da76/audit.md` and
+`.logs/d110c-b-plan-audit-3118da76/source-shape.txt`, with SHA-256 values
+`61d34473cb5eb6590e8c8b41b5aa26fa27ff03276577f28090b3aded7ea268b7` and
+`49bb0fc62e96ce9054cafac195cd68b4fa9f46385ef8ca7a2ef271d26997e1bb`.
+The validating self-excluding manifest SHA-256 is
+`1ea2c137269835b94ffb9995e88031e7ed7c31aac366fb6364f0289ff3fe5d43`.
+
+The public compatibility boundary is exact. D.110c-b widens only the existing
+`V3RoomSuccessorAuthority.epoch` field from literal `1` to `number`; the value
+must be a positive safe integer copied from authenticated successor trust and
+must equal the active live handle's ephemeral-authority epoch. Epoch-1 callers
+remain source- and behavior-compatible. The interface key roster, methods,
+trust profile, live-generation kinds, record/wire schemas, digest and cut/QC
+authority, room-floor API, dependencies, availability policy, thresholds,
+workload, and storage schemas do not change. The tests-only
+`CreatorLiveCloseResult` declaration in
+`packages/storage-browser/tests/phase-5e-creator-live-close.pw.ts` is widened to
+the already-shipped D.110c-a `number` fields in the product batch; it does not
+create a second product contract. If RED or implementation requires a new
+public key/method, record or wire field, cryptographic/dependency change,
+authority carrier or assumption, threshold, or migration protocol, this slice
+stops and reslices rather than widening silently.
+
+The deterministic tests-only RED is one signed/pushed checkpoint with two
+causal observations and one source-shape gate:
+
+1. `tests/phase-6b-d110c-b-hot-adoption.test.ts`, using a private fixture under
+   `tests/fixtures/phase-6b-d110c-b/`, consumes the genuine D.110c-a path: one
+   room closes/adopts/activates 0->1, issues and publishes real epoch-1 work,
+   then genuinely closes 1->2. It passes the resulting real close handle and
+   durable facts to `verifyCreatorSuccessorAdoption()` exactly once. No
+   projection, CutValue, QC, trust record, snapshot, manifest, accumulator, or
+   AHE head may be fixture-minted or rewritten. The frozen current result is
+   exact `chain-invalid` because the verifier cannot find the authenticated
+   non-root predecessor. The fixture emits the diagnostic token
+   `D110C_B_EPOCH_PINNED_PREDECESSOR`; any earlier or different owner stops RED
+   and requires diagnosis rather than adapting the fixture.
+2. One exact Chromium test added to the retained Phase-6a product file, titled
+   `D.110c-b advances one genuine room through hot epoch 0 to 1 to 2 and
+   rebinds epoch 2 close custody`, creates an independent genuine room,
+   performs 0->1 adoption, and issues/publishes through epoch 1. Its first real
+   post-adoption `sealEpoch()` rejects through the stale terminal creator-close
+   handle, while the authority and room floor remain at the honestly adopted
+   epoch 1. The test records `D110C_B_CLOSE_NOT_REBOUND`. No synthetic epoch-2
+   state is introduced merely to reach the later adoption latch.
+3. A corrected deterministic source-shape script pins the projection epochs,
+   predecessor-kind checks, same-bindings stale-wrapper branch, unconditional
+   topic deletion, literal public epoch, one-transition latch, and absence of a
+   post-adoption close bind. A faulty grep/regex is corrected and recorded as a
+   diagnostic defect, never a code failure.
+
+The exact RED commands run each selected executable once with coverage
+disabled: root Vitest selects one file/one test, and Playwright uses
+`packages/storage-browser/playwright.phase-6a-creator-successor-product.config.ts`
+with `--project=chromium`, the exact D.110c-b title, `--reporter=json`, and
+`--fail-on-flaky-tests`. Reporter evidence must prove one selected test in one
+selected file, no top-level error, complete expected token/code and first
+failing owner, exact source/built import identity, unchanged authenticated room
+floor and durable head where required, changed paths, statuses, hashes,
+protected roots, all existing stashes, and a validating self-excluding
+manifest. RED may extend existing tests-only helpers to expose genuine handles
+and observations, but it may not change production or run a long campaign,
+D.110a workload, repeated-loop campaign, preflight, or profile. A RED matching
+this frozen matrix is causal evidence even though its diagnostic assertions
+pass; a separate three-model RED review is not run.
+
+GREEN is one checkpoint implemented in two tightly related batches without an
+intermediate model review or commit requirement.
+
+**Batch 1 — epoch-relative Node adoption and exact-next active ownership.**
+`creator-adoption.ts` derives the current projection kind from the already
+authenticated current epoch (`generation-1` only at epoch zero,
+`generation-2` at every positive epoch), uses the authenticated successor epoch
+in both graph and projection, and requires exact safe-integer
+`successorEpoch === currentEpoch + 1` before constructing commit/live material.
+`creator-adoption-commit.ts` applies the same authenticated predecessor-kind
+selection to terminal and staged checks; the successor kind remains the
+existing `v3-live-generation-2`. Root 0->1 bytes and behavior remain unchanged.
+
+The stable-topic active owner retains the existing browser lock while an
+authenticated exact-next wrapper replaces its predecessor. Its private entry
+records bindings, the authenticated current object/genesis/epoch/anchor tuple,
+handle, lock custody, and a unique local ownership token. Same exact head and
+same bindings is idempotent and returns the same wrapper. A request is eligible
+for replacement only when its predecessor tuple exactly equals the current
+entry and its successor is the same object/genesis with a safe-integer epoch
+exactly one greater and the authenticated next anchor. Same-epoch substitution,
+stale or skipped predecessor, cross-room/object/genesis, conflicting bindings,
+or a non-exact successor fails before live-material consumption or owner swap
+with the existing fail-closed result family. Live consumption and handle alias
+must succeed before the map entry changes. Any failed consume/alias retains the
+old owner and lock. A wrapper deactivates its raw plane once, but deletes the
+map entry and releases the stable-topic lock only if its token is still current;
+delayed old-wrapper cleanup can never remove the replacement.
+
+After Batch 1, the exact focused Node test runs once. GREEN must prove real
+1->2 verify, stage, publish, floor-checked activation, a new wrapper identity,
+the old plane terminal, one active topic owner and one browser lock, idempotent
+same-head activation, and post-epoch-2 issue/publish. Mutants cover same-epoch
+different anchor, stale, skipped, cross-object, cross-genesis, missing hot
+input, malformed floor, lagging/ahead/substituted floor, different bindings,
+failed live consumption, and failed alias/cleanup. They preserve exact existing
+`chain-invalid`, `stale-head`, `authority-unavailable`, `internal-invariant`,
+`malformed-input`, `D110C_FLOOR_INVALID`, and `D110C_FLOOR_MISMATCH`
+classifications at their current hot entry points. Every refusal occurs before
+replacement custody. Old-wrapper deactivation after a successful swap is
+separately proven unable to delete or unlock the new owner.
+
+**Batch 2 — product authority, close rebinding, and repeat request custody.**
+The room replaces the permanent boolean-like first-adoption latch with an
+authenticated current-head comparison. `successorAuthority()` accepts any
+positive safe exact epoch whose object, genesis, anchor, ACL, and live
+ephemeral authority agree. The existing singular creator-close store owners
+opened at room creation are retained as private binding material and reused;
+no per-epoch store family is opened. After verified publication, atomic
+room-floor commit, and exact-floor activation, the room binds a fresh
+creator-close handle to the new live plane before returning success, installs
+the new active handle/authority/close handle coherently, stops the terminal old
+close handle exactly once, and deactivates the old live wrapper without
+affecting the new stable-topic owner. Concurrent duplicate adoption continues
+to share the one in-flight task; once the current authority already equals the
+durable authenticated head, an additional call is an idempotent no-op, not a
+permanent epoch-1 latch.
+
+Successful activation cannot be falsely rolled back: the predecessor is
+terminal and the authenticated floor has advanced. If close rebinding then
+fails, the room keeps the genuine new active handle, authority, and floor,
+clears the stale terminal close handle, reports close authority unavailable
+with stalled continuity, and rejects that adoption attempt with exact
+`D110C_B_CLOSE_REBIND_FAILED`. It may not reactivate the predecessor, regress
+the floor, expose the old close handle, or claim readiness for another close.
+Shutdown remains idempotent and releases the current close handle, live owner,
+stores, transport, and stable-topic lock exactly once.
+
+After Batch 2, the same exact Chromium title runs once. It must prove one
+genuine production room completes 0->1, real issue/publish at epoch 1, genuine
+close 1->2, verify/stage/publish/floor commit/activation to epoch 2, exact
+authority and room-head tuples, unchanged stable topic, new wrapper and close
+handle identities, exactly one active owner/lock, and real issue/publish after
+epoch 2. It then performs a genuine close 2->3 (without adopting epoch 3) and
+asserts exact result epochs 2/3, proving the adopted epoch-2 plane became the
+close-capable predecessor. Exact state, ACL, writer/ephemeral authority,
+history-root/size extension, archive root, snapshot/manifest, operation count,
+semantic digest, and retained publication are unchanged or advance exactly as
+specified. Fault cases prove concurrent duplicate coalescing, failed
+replacement retention, close-bind failure's honest unavailable state, delayed
+stale cleanup, close/shutdown races, and floor refusal without a second live
+owner or stale usable close handle.
+
+The full GREEN then runs the focused Node and Chromium results already produced
+for the two batches only as recorded above, followed by the retained Node
+D.110c-a, D.110c-0b0 floor/provider, Phase-5e creator close/trust, Phase-6a
+verify/stage/commit/activate/reopen/handle-identity, D.109 reclamation/outbox,
+snapshot substitution/quarantine, and history-commitment suites. Retained
+browser gates are the complete Phase-6a successor product configuration in
+Chromium/Firefox/WebKit, successor activation/commit, and Phase-5e creator live
+close. Node and storage-browser builds plus exact source typechecks,
+`examples/v3-room` typecheck/build, independent `examples/v3-chat` typecheck,
+the exact root test project, exact-owner ESLint/Prettier/diff/source-shape, test
+and assertion inventories, complete reporter parsing, changed-path custody,
+hashes, protected paths, stash count, signed commit, pushed-ref identity, and a
+validating self-excluding manifest are mandatory. Broad inherited test/config
+diagnostics outside changed owners are recorded but cannot replace these exact
+gates.
+
+This slice owns only the hot loop and product close rebinding. The cold-reopen
+literals at `creator-adoption.ts:840,943-944,1052,1229-1230`, authenticated
+non-root checkpoint opener, fixed rollback window, pruning, age-independent
+reopen, and bounded active control proof remain D.110c-0b1/D.110c-c. The
+multi-transition durable census and fresh-process post-GC memory proof remain
+D.110c-d; Phase 7 still owns archive delivery and genuinely multi-epoch cold
+join. D.110c-b neither reopens D.110c-a nor relabels a hot 0->1->2 proof as
+bounded long-horizon recovery. Deadline: GREEN before D.110c-0b1 RED and in all
+cases before D.110c-c RED.
+
+Because this changes production lifecycle and one existing public field's
+type, the plan-only checkpoint is signed and pushed before one high-risk Grok
+4.6/high, standard direct Kimi K3 with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review. The review inspects
+the exact source audit, public compatibility boundary, causal RED, same-lock
+make-before-break custody, failure honesty, floor authority, retained gates,
+and debt boundary. Only P0/P1 findings block; P2 findings receive an owner and
+disposition without recursive prose review. At most one confirmation is
+permitted only if a correction materially changes executable causality, scope,
+authority, or public compatibility. The signed GREEN receives the one formal
+Grok/Kimi/Opus plan->RED->GREEN review; there is no separate full RED review or
+batch review. No Fable or collaboration subagent is authorized, and no long
+campaign or D.110a invocation may run.
+
 The four prerequisite decisions, including the newly demonstrated 0b0
 freshness-floor authority question, are reviewed before their production edits;
 each executable sub-slice receives its own bounded causal RED and GREEN. The
