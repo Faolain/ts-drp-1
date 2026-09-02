@@ -91457,3 +91457,104 @@ This closes the final GREEN review without another model round. After signing
 and pushing this documentation-only closure, run the already-frozen D.110a-x
 release revalidation and, if every predicate remains true, consume the sole
 64-object worker exactly once. A failure stops without retry.
+
+##### D.110a-x sole full execution and evidence closure
+
+Signed/pushed review closure `d450c281fe3874e900ec7cefd04d5ee10f689ace`
+with tree `6189639e00b3e995ac82a0f49d8e90f3242388c3` passed the corrected final
+release audit: inherited GREEN/review/preflight manifests and hashes were
+exact, the consumed 585,233-ms preflight remained below the frozen 630,000-ms
+release maximum, Node `v22.15.0` and pnpm `10.24.0` were exact, the tracked
+tree was clean and signed/pushed, `NODE_OPTIONS` was unset, fixed ports and
+relevant-process predicates were clear, all 26 stashes and protected roots
+were present, and the fresh full root did not yet exist. The first release-
+audit attempt had only used the inherited manifest validator from the wrong
+working directory; the corrected all-true result preserved that diagnostic
+and did not spawn or consume a worker.
+
+The sole authorized command was then executed exactly once:
+
+```text
+pnpm test:phase-6c-memory >.logs/phase-6c-d110ax-release/full-wrapper.stdout 2>.logs/phase-6c-d110ax-release/full-wrapper.stderr
+```
+
+The wrapper began at `2026-09-01T21:14:53Z`; the parent created the fresh
+write-once `.logs/phase-6c-d110a-full/` evidence root and consumed sentinel at
+`2026-09-01T21:15:07.430Z`, persisted authenticated source/runtime/import
+identity before spawning PID 77973, and recorded the exact seven-hour deadline
+`2026-09-02T04:15:07.430Z`. The parent finished successfully at
+`2026-09-02T01:06:56.307Z`; measured parent elapsed time was 13,908,829 ms
+(3h51m48.829s), safely below 25,200,000 ms. Wrapper status was zero, child exit
+was `0`/no signal, terminal receipt was true, watchdog-fired was false, and no
+failure classification or message exists. This invocation is consumed and
+must never be retried.
+
+The terminal proof passed the unchanged authoritative validator. Accounting is
+exactly 1,000,000 admitted and applied operations, 62,528 workload vertices,
+64 successful lifecycles, and 64 successor operations. The independent
+semantic digest is
+`b751b572617c72e9284bb66075a9674b9da3ec0b3919b22fc34fe8fda21fe587`.
+All 64 samples are explicitly `during-execution`, use three GC turns and three
+event-loop turns, preserve execution order, and retain the active-successor
+window through the terminal sample before closing it afterward. OLS slopes for
+array buffers, heap, and owned bytes are respectively 2,518,
+70,735.16715542522, and 73,253.16715542522 bytes/object, all below the signed
+165,161-byte limit. Maximum heap and owned bytes are 32,159,064 and 33,920,572,
+both below the 512,000,000-byte ceiling.
+
+Failure-forensics reconciliation also passed independently: the append-only
+journal contains exactly one baseline plus five lifecycle records and one
+completed-sample record for each object, for 385 records total and exactly 64
+completed samples. Indices 0..63, cumulative operations, completed-object
+counts, the capped 20-successor window, and every post-GC memory field exactly
+match the terminal proof. Launcher events are the ordered seven-event sequence
+`evidence-created`, `identity-persisted`, `child-spawned`, `terminal-received`,
+`child-exit`, `child-close`, and `parent-finish`. Parent JSON exactly matches
+the durable terminal proof and independent validation. Raw child stdout is
+empty; raw child stderr durably contains only the expected Node experimental-
+SQLite warning, while wrapper stdout contains the complete build output and
+final parent JSON and wrapper stderr is empty.
+
+The first post-run read-only audit correctly found every substantive predicate
+true but used an invalid millisecond comparison against the wrapper's
+second-granular finish timestamp. Its empty JSON and complete failing stderr
+were preserved. Correcting only that diagnostic to compare the containing UTC
+second produced an all-true audit; it did not rerun or alter the workload.
+
+Key immutable evidence SHA-256 values are:
+
+```text
+progress.jsonl                 a284e832c60d3b64157a8bd7ef285b3184d1b8a437d6445f24c086b7676b5234
+terminal.json                  b90061007bef6b5ddf2237a5025e92edb9fa97d3f6e70411f51354c5c309a3c7
+parent.json                    21731e1556d7c80f5ccb949d77e4242c8f1882b4ecae334829bb4598cf5eb25a
+execution-status.json          145c0f74cd4492cd37078ec597c3b775bc704906c8fff0f9d5e46b161441502b
+source-runtime-identity.json   c536b81f79307585f12e3f398040f10353595b94f923254de1460a1a82b1d175
+invocation-consumed.json       2c029184e2824ad9eea22ee314e83ded36a5cedeaeb883fdad71452a9b753f5d
+launcher-events.jsonl          62092d791b92beaa655098969c2d5464beff2aecfc0d15d94be9aef804f74270
+child.stdout                   e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+child.stderr                   973618ba376ace7181f7a1a0fdad7774982a4752580b07caf27604e051f15680
+full-wrapper.stdout            f462da49aee82237b742a5fd38bd30e85f667d9361eda4374a607b5ee8c10258
+full-wrapper.stderr            e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+full-evidence-audit.json       fb4321ada8090aa2897fe2a69528f0921bbcbde816421e7d459bdb7fdf2fee9c
+```
+
+The final syntax and `git diff --check` gates passed with empty output. The
+first whole-plan Prettier check exhausted Prettier's default 4-GiB parser heap
+on this 91,000-line file without reporting a formatting mismatch; that complete
+utility diagnostic is preserved. The identical read-only check with an
+8-GiB formatter-only heap passed (`All matched files use Prettier code style!`)
+and did not modify the plan. The final mechanical closure audit is all true:
+it authenticates the full and release audits, exact one-shot consumption,
+plan-only tracked delta, preserved failed diagnostic, source commit/upstream,
+signature prerequisites, protected roots, and all 26 stashes. Its JSON SHA-256
+is `0141f6488560e17b879e6233e09eef1ff54d86bae0a82512629f485f98a5d530`.
+The validating self-excluding 51-entry full/release/closure evidence manifest
+has SHA-256
+`6b003a553a6c945e4c46d3e05f0a23fd083293df3487495ea967ae0357ceed6c`;
+`shasum -a 256 -c` validates every entry with empty stderr.
+
+D.110a-x is therefore closed with a genuine one-shot full pass and sufficient
+success/failure custody. No product/API/dependency, workload, sample-window,
+memory-threshold, watchdog, retry, or preflight behavior changed. The existing
+nonblocking P2 dispositions remain deferred; no further D.110a invocation or
+review ceremony is authorized or required by this closure.
