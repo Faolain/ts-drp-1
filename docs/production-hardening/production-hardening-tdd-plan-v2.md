@@ -92065,7 +92065,28 @@ and the same confirmed next state; its result SHA-256 is
 Its two bookkeeping P2s are dispositioned above by naming 0b1 in the
 minimum-functional-GREEN roster and making 0c's post-0b1 deadline explicit.
 These prose-only dispositions do not trigger another model round. Grok and Opus
-are closed; only the required direct Kimi K3 verdict remains before 0b1 RED.
+were closed; at that checkpoint only the required direct Kimi K3 verdict
+remained before the next D.110c slice.
+
+The final direct Kimi gate is now closed. The legacy `kimi-cli` credential path
+first repeated the exact provider 401 under session
+`042e10cf-2cd2-4b00-8ca4-023385038440`; this remains honest transport evidence,
+not a review. The installed standard OAuth `kimi` client then authenticated and
+performed the one substantive Kimi K3 review of signed/pushed commit
+`e65d24def34151aa06cb7c1bd1d74bbfd3446ffe` with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100`. Session
+`session_2072438c-e6b5-45aa-87bc-8f883036a27e` returned
+`APPROVED`, P0=0/P1=0/P2=2, and `D110C_0A_PLAN_READY`. Prompt, streamed-event,
+and stderr SHA-256 values are
+`1f36bd420644a79e2123cd5096ec5805925323cc0defa8a79bbaf75bca6deeea`,
+`099f246393a3f7054769107eb4839a00911fc4379d6c5e2a46b15c9153399725`,
+and `ab3f2cf2b73f1d60a7b9af1229fe2aaca3b36f91fe68a0310e5b992fc8338106`.
+Its P2 dispositions are nonblocking: prior reviewer-session hashes were outside
+its deliberate no-peer-output inspection scope and remain plan-custodian
+metadata; the authenticated freshness-carrier stop-check already precedes any
+0b1 RED assertion that depends on such a carrier. The D.110c comparative-design
+gate is therefore accepted. This authorizes D.110c-0a planning/RED next, not
+0b1 implementation, production behavior outside 0a, or any campaign.
 
 The one expressly authorized Fable 5.1/high read-only advisory run used session
 `eefd0856-c660-4cc6-aa98-3c41eb863316`, spawned no subagents, and returned
