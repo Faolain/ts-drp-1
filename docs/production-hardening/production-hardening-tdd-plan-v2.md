@@ -94678,7 +94678,7 @@ closure.
 
 ##### D.110c-0b1 bounded checkpoint opener and control-proof compaction plan
 
-**Status: bounded plan review correction; no RED or production edit yet.** This
+**Status: deterministic causal RED accepted; no production edit yet.** This
 is the next executable D.110c slice after the closed D.110c-b checkpoint. Its
 owner is the accepted non-root protocol-v3 creator-checkpoint boundary, the
 accepted non-root control-plane bounded-advance boundary, and their existing
@@ -95012,6 +95012,58 @@ checks, protected-path/stash/process/port checks, and manifest validation pass.
 The first default-heap Prettier attempt exhausted its approximately 4 GiB Node
 heap and is recorded only as a corrected diagnostic-capacity failure, not a
 formatting or code failure.
+
+The deterministic tests-only RED is signed from accepted plan/confirmation
+base `2cd3ba512a62595a314b1806b70b0eac9092f09c` with evidence root
+`.logs/d110c-0b1-red-2cd3ba51/`. Its sole focused command was exactly:
+
+```text
+pnpm exec vitest run tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts --coverage.enabled=false --reporter=json --outputFile=.logs/d110c-0b1-red-2cd3ba51/vitest.json
+```
+
+It exited `1` with one result file, three selected tests, three intended
+failures, zero passed/pending/todo tests, no result-level top-level message,
+and each frozen complete token exactly once:
+`D110C_0B1_CHECKPOINT_OPENER_MISSING`,
+`D110C_0B1_BOUNDED_ADVANCE_MISSING`, and
+`D110C_0B1_COLD_REOPEN_EPOCH_PINNED`. All preceding semantic assertions
+passed before those terminal tokens: both genuine epoch-1/epoch-2 records were
+rejected by the epoch-0 opener as `trust-state-inconsistent`; attempting the
+real 1→2 evidence with the remaining genesis capability rejected as
+`EPOCH_GAP`; the current additive predicate accepted and retained the stale
+0→1 Cut/QC plus epoch-0 ACL while closure census grew exactly 5→7→8; and
+the real installed cold-reopen owner received the captured second-close
+snapshot/store, issuance, journal, genesis, parameters, runtime, and epoch-2
+floor inputs after hot-owner deactivation and returned exact fail-closed
+`chain-invalid` without a handle. The exact head revisions advanced once for
+close and once for adoption.
+
+The JSON reporter does not serialize arbitrary successful assertion operands,
+so the random runtime ref digests and numeric head revisions validated in
+memory were not copied into the evidence root before the terminal failures.
+The sole invocation is not retried to repair that evidence-capture omission.
+Owner/disposition: D.110c-0b1 GREEN must serialize the exact current, proposed,
+and active refs, decoded census, and head revisions before its terminal proof;
+the final plan→RED→GREEN review must treat this RED limitation honestly and
+confirm causality from the signed test source, its hash, assertion ordering,
+reporter stacks, and GREEN's exact comparison. This is diagnostic custody debt,
+not permission to weaken any GREEN bounded-census gate.
+
+The deterministic validator records one file, three tests, the exact failure
+matrix, zero top-level result messages, and all three token counts. The source-
+shape audit records both new subpaths absent, the epoch-0/1 literals and
+generation selectors present, both old unbounded classifier call sites
+present, and both retirement inputs absent. Exact-owner ESLint, Prettier,
+`git diff --check`, and the three-test read-only listing pass. An ad hoc deep
+fixture `tsc` probe was discarded after it could not resolve inherited bare
+workspace imports; it nevertheless exposed one real wrong singleton import,
+which was corrected before the sole execution. It is not reported as a code
+or authoritative typecheck failure. No production source, API, wire/schema,
+dependency, threshold, floor, rollback, pruning, pending-recovery, campaign,
+D.110a invocation, Fable run, or collaboration subagent changed or ran.
+The RED ledger is `.logs/d110c-0b1-red-2cd3ba51/red-ledger.md`; the validating
+self-excluding manifest SHA-256 is
+`38df4ad95ef80941f786a6c8ec1ab020b81063ddcf765a56a311d1acb718a399`.
 
 The four prerequisite decisions, including the newly demonstrated 0b0
 freshness-floor authority question, are reviewed before their production edits;

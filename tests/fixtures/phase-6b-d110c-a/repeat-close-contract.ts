@@ -3,12 +3,18 @@ import { type AccumulatorSnapshot, CompactMerkleAccumulator } from "@ts-drp/comp
 // eslint-disable-next-line import/no-unresolved -- Workspace subpath resolves after the required package build.
 import { createRecoverableFinalitySigner } from "@ts-drp/keychain/finality";
 import type { LiveJournalAcceptedRow } from "@ts-drp/live-journal";
-import { digestBlob, type GenerationRef } from "@ts-drp/storage";
+import { type AheDurableStore, digestBlob, type GenerationRef } from "@ts-drp/storage";
+import type {
+	SnapshotQuarantineDeclaration,
+	SnapshotQuarantineStore,
+	SnapshotVerificationReceipt,
+} from "@ts-drp/storage/snapshot-transfer";
 import { execFile } from "node:child_process";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
+import { reopenCreatorSuccessorAdoption } from "../../../packages/node/src/creator-adoption-activate.js";
 import type {
 	CreatorLiveCloseHandle,
 	CreatorLiveCloseResult,
@@ -20,11 +26,16 @@ import {
 	createCreatorAdoptionIntent,
 	createPreparedCreatorSuccessorAdoption,
 	type CreatorAdoptionIntentMaterial,
+	resolveCreatorAdoptionFacts,
 } from "../../../packages/node/src/internal/creator-adoption-intent.js";
 import type { CreatorSuccessorLiveMaterial } from "../../../packages/node/src/internal/creator-successor-live.js";
 import type { V3PlaneHandle } from "../../../packages/node/src/v3-live.js";
+import type { CurrentAnchorTrust } from "../../../packages/protocol-v3/src/index.js";
 import { contract, hexBytes } from "../phase-3a0-v3/controlled-anchor-trust.js";
-import { openGenuineCreatorAdoptionFixture } from "../phase-6a-v3/creator-adoption-contract.js";
+import {
+	type DetachedHeadEvidence,
+	openGenuineCreatorAdoptionFixture,
+} from "../phase-6a-v3/creator-adoption-contract.js";
 import { type D109dHotFixture, openD109dHotFixture } from "../phase-6b/runtime-reclamation-contract.js";
 
 const REPOSITORY_ROOT = resolve(import.meta.dirname, "../../..");
@@ -90,7 +101,23 @@ export interface D110cARepeatCloseFixture {
 	readonly evidence: D110cARepeatCloseEvidence;
 	close(): Promise<void>;
 	advancePendingSuccessor(): Promise<D110cBPendingSuccessorEvidence>;
+	captureD110c0b1RedMaterial(): Promise<D110c0b1RedMaterial>;
 	failPendingSuccessor(mode: "retirement" | "terminalize"): Promise<D110cBFailureEvidence>;
+}
+
+export interface D110c0b1RedMaterial {
+	readonly active: DetachedHeadEvidence;
+	readonly coldReopen: Readonly<Record<string, unknown>>;
+	readonly current: DetachedHeadEvidence;
+	readonly genesisTrust: CurrentAnchorTrust;
+	readonly proposed: DetachedHeadEvidence;
+}
+
+interface D110c0b1ColdFacts {
+	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
+	readonly snapshotDeclaration: SnapshotQuarantineDeclaration;
+	readonly snapshotStore: SnapshotQuarantineStore<SnapshotVerificationReceipt>;
+	readonly store: AheDurableStore;
 }
 
 export interface D110cBFailureEvidence {
@@ -403,6 +430,23 @@ async function blobForRef(hot: D109dHotFixture, ref: GenerationRef): Promise<Uin
 	return Uint8Array.from(value.value);
 }
 
+async function detachedHeadForInspection(
+	hot: D109dHotFixture,
+	inspection: Awaited<ReturnType<CreatorLiveCloseHandle["inspectDurableHead"]>>
+): Promise<DetachedHeadEvidence> {
+	const candidates = await Promise.all(
+		inspection.references.map(async (ref) =>
+			Object.freeze({ bytes: await blobForRef(hot, ref), ref: Object.freeze({ ...ref }) })
+		)
+	);
+	return Object.freeze({
+		candidates: Object.freeze(candidates),
+		head: Object.freeze({ ...inspection.head }),
+		references: Object.freeze(inspection.references.map((ref) => Object.freeze({ ...ref }))),
+		trustRef: Object.freeze({ ...inspection.trustRef }),
+	});
+}
+
 /**
  * Executes a genuine adopted epoch-one close against the authenticated prior-history carrier.
  * @param options - Optional genuine room identity and retained D.110c-a control selection.
@@ -423,6 +467,8 @@ export async function openD110cARepeatCloseFixture(
 	const closers: StoreCloser[] = [];
 	let closeHandle: CreatorLiveCloseHandle | undefined;
 	let latestSuccessor: D109dHotFixture["successor"] | undefined;
+	let d110c0b1ColdInput: Readonly<Record<string, unknown>> | undefined;
+	let d110c0b1ActiveInspection: Awaited<ReturnType<CreatorLiveCloseHandle["inspectDurableHead"]>> | undefined;
 	let closed = false;
 	let successorVerificationConsumed = false;
 	const cleanup = async (): Promise<void> => {
@@ -533,6 +579,20 @@ export async function openD110cARepeatCloseFixture(
 				successorVerificationConsumed = true;
 				if (closeHandle === undefined) throw new TypeError("D110C_B_CLOSE_HANDLE_UNAVAILABLE");
 				const adoptionHandle = closeHandle;
+				const coldFacts = resolveCreatorAdoptionFacts<D110c0b1ColdFacts>(adoptionHandle);
+				if (coldFacts === undefined) throw new TypeError("D110C_0B1_COLD_FACTS_UNAVAILABLE");
+				const genesisTrustCandidate = hot.base.evidence.current.candidates.find((candidate) => {
+					const record = canonicalRecord(candidate.bytes);
+					return record.kind === "drp-anchor-trust-state" && record.currentEpoch === 0;
+				});
+				if (genesisTrustCandidate === undefined) throw new TypeError("D110C_0B1_GENESIS_TRUST_UNAVAILABLE");
+				const genesisTrustRecord = canonicalRecord(genesisTrustCandidate.bytes);
+				if (
+					!(genesisTrustRecord.detachedCurrentAnchorSignature instanceof Uint8Array) ||
+					!(genesisTrustRecord.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array)
+				) {
+					throw new TypeError("D110C_0B1_GENESIS_CARRIERS_INVALID");
+				}
 				const beforeHead = await adoptionHandle.inspectDurableHead();
 				const prepare = async (): Promise<
 					Readonly<{
@@ -731,8 +791,28 @@ export async function openD110cARepeatCloseFixture(
 				if (!published.ok) {
 					throw new TypeError(`D110C_B_PUBLISH_FAILED:${String(published.kind)}:${String(published.detail)}`);
 				}
+				d110c0b1ActiveInspection = await adoptionHandle.inspectDurableHead();
+				d110c0b1ColdInput = Object.freeze({
+					authenticationProfile: "creator-only",
+					author: hot.base.evidence.issuanceScope.author,
+					catalog: hot.base.catalog,
+					detachedSignature: Uint8Array.from(genesisTrustRecord.detachedCurrentAnchorSignature),
+					exactCanonicalAnchorPreimageBytes: Uint8Array.from(
+						genesisTrustRecord.exactCanonicalCurrentAnchorPreimageBytes
+					),
+					exactCanonicalParametersCarrierBytes: Uint8Array.from(coldFacts.exactCanonicalParametersCarrierBytes),
+					expectedRoomHead,
+					issuanceStore: hot.base.evidence.issuanceStore,
+					liveJournalStore: hot.base.journal,
+					pinnedGenesisAnchorDigest: hot.base.evidence.currentTrust.genesisAnchorDigest,
+					signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
+					snapshotDeclaration: coldFacts.snapshotDeclaration,
+					snapshotStore: coldFacts.snapshotStore,
+					store: coldFacts.store,
+					...hot.runtimeBindings,
+				});
 				return Object.freeze({
-					afterHead: await adoptionHandle.inspectDurableHead(),
+					afterHead: d110c0b1ActiveInspection,
 					activation,
 					activeAuthority: copiedRoomHead(latestSuccessor as V3PlaneHandle),
 					beforeHead,
@@ -745,6 +825,19 @@ export async function openD110cARepeatCloseFixture(
 					oldIssue,
 					published,
 					verification,
+				});
+			},
+			captureD110c0b1RedMaterial: async () => {
+				if (d110c0b1ColdInput === undefined || d110c0b1ActiveInspection === undefined) {
+					throw new TypeError("D110C_0B1_HOT_ADOPTION_REQUIRED");
+				}
+				await Promise.resolve(latestSuccessor?.deactivate());
+				return Object.freeze({
+					active: await detachedHeadForInspection(hot, d110c0b1ActiveInspection),
+					coldReopen: await reopenCreatorSuccessorAdoption(d110c0b1ColdInput),
+					current: await detachedHeadForInspection(hot, beforeHead),
+					genesisTrust: hot.base.evidence.currentTrust,
+					proposed: await detachedHeadForInspection(hot, afterHead),
 				});
 			},
 			failPendingSuccessor: async (mode: "retirement" | "terminalize") => {
