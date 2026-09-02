@@ -92027,6 +92027,142 @@ receipt, archive record, or active registration in test code.
    and the Node control owners. Deadline:
    before Phase-6 exit or Phase-7a execution.
 
+##### D.110c-0a bounded epoch-relative seal-custody plan
+
+The completed source audit pins the exact defect and prevents a broader seal
+redesign. `packages/protocol-v3/src/seal.ts` holds `SealAuthorityState.epoch` as
+literal `0`, rejects genuine creator trust when `material.currentEpoch !== 0`,
+and registers every authority identity at epoch 0. `packages/seal` repeats that
+literal in voter enrollment, vote/round-change intent, pacemaker event, and
+creator-close evidence types. The browser `voteSlots`, `signerState`,
+`voteOutbox`, and `sealEvidence` schemas already key by epoch under schema v3,
+but their adapters validate, read, and write only epoch 0. Finally,
+`openBrowserSealEvidenceStore().servePeerEvidence({objectId, signerId})`
+hardcodes `[objectId, 0, signerId]`, while the Node recovery request already
+carries the authority's authenticated epoch. The production seam is therefore
+composition and literal narrowing across existing owners; no wire record,
+cryptographic rule, or database schema change is indicated.
+
+D.110c-0a is one security-authority TDD slice with two diagnostic batches and
+one final GREEN review. Its owner paths are:
+
+- `packages/protocol-v3/src/seal.ts` and private seal-authority identity/custody;
+- `packages/seal/src/creator.ts`, `pacemaker.ts`, and private creator-close,
+  vote-intent, and storage-port custody;
+- `packages/node/src/creator-seal.ts` plus creator close binding, without
+  changing network request bytes;
+- `packages/storage-browser/src/seal-vote.ts`, `seal-evidence.ts`, and the
+  internal vote/evidence adapters; and
+- schema-v3 only as a source-shape invariant: its existing epoch-bearing keys
+  remain byte-for-byte and no version bump is expected.
+
+The public compatibility decision is exact. The evidence-serving selector
+becomes the closed union
+`{objectId, signerId} | {objectId, epoch, signerId}`. The legacy two-field form
+means epoch 0 only; it never means latest, maximum, active, or any other stored
+epoch. The three-field form requires a nonnegative safe-integer epoch and reads
+the exact `[objectId, epoch, signerId]` row. Extra keys, malformed epoch, and
+cross-object/signer inputs fail before I/O. The internal evidence adapter always
+requires explicit epoch. This selector union is the only planned new public
+input shape in 0a. The exported epoch fields explicitly listed below widen from
+literal `0` to nonnegative safe integer while preserving every epoch-0 value
+and byte. If implementation requires another public API, a schema version,
+wire field, dependency, or migration carrier, stop and reslice.
+
+RED batch 1 uses the genuine adopted epoch-1 creator trust already produced by
+the retained D.108 path. It opens the real creator seal authority and actor,
+without fixture-authored QC/trust bytes, and freezes today's causal failure:
+
+- genuine epoch-1 `openSealAuthority` returns exact `untrusted-context` solely
+  because of the `currentEpoch !== 0` guard;
+- after isolating that refusal in the RED harness, the existing seal/intent/
+  pacemaker/evidence types and adapters cannot carry epoch 1; and
+- certified/BFT trust remains epoch-0-only and is not generalized by this
+  creator slice.
+
+RED batch 2 creates distinct genuine epoch-0 and epoch-1 creator evidence/vote
+facts for the same object and signer. It proves the schema can distinguish the
+rows but the adapters cannot write/read the epoch-1 facts and the public
+two-field evidence selector can only return epoch 0. The RED includes no manual
+IndexedDB row injection as success evidence; raw insertion may be used only as
+a negative selector discriminator and is separately labelled tests-only. Each
+batch runs its focused non-campaign test exactly once. Any failure outside the
+frozen matrix stops diagnosis before more changes.
+
+GREEN batch 1 generalizes only opaque authenticated custody:
+
+- `SealAuthorityState.epoch`, authority identity, voter enrollment, intent,
+  pacemaker events, creator evidence, and pending rows carry a copied
+  nonnegative safe-integer epoch derived from genuine trust/authority;
+- the creator branch of `openSealAuthority` accepts every genuine current
+  creator epoch, binds the current anchor/object/signer set, and registers that
+  exact epoch; the certified/BFT branch retains its exact epoch-0 contract;
+- no caller-supplied epoch can mint or retarget authority, and forged structural
+  trust/authority/enrollment/intent objects remain `untrusted-context` or their
+  existing exact untrusted-capability error;
+- vote, proposal, round-change, prepare-QC, commit-QC, cut, and successor-trust
+  verification all compare exact object/epoch/anchor/value/round/signer facts;
+  cross-epoch replay retains the existing exact `cut-binding-mismatch`,
+  `qc-binding-mismatch`, `round-change-binding-mismatch`,
+  `proposal-binding-mismatch`, or `leader-vote-binding-mismatch` owner; and
+- epoch-0 vectors and canonical registered bytes remain byte-identical.
+
+GREEN batch 2 generalizes the mechanical browser owners:
+
+- every vote/evidence state key, slot, outbox row, snapshot scope, pending row,
+  dispatched key, and peer-evidence lookup uses the authenticated explicit
+  epoch rather than literal 0;
+- the four stores isolate revision, lock, prepare/commit QC, equivocation,
+  pending dispatch, and evidence state by exact `(objectId, epoch, signerId)`;
+  activity in epoch N cannot occupy, advance, dispatch, overwrite, or satisfy
+  epoch N+1;
+- the public evidence-selector union preserves legacy epoch-0 behavior and
+  returns only the explicitly selected epoch for the new form;
+- schema authority remains version 3 with unchanged key paths, so no IndexedDB
+  migration is manufactured; existing epoch-0 rows reopen unchanged; and
+- row enumeration is exact by epoch for later D.110c-c retirement/census. 0a
+  does not delete old rows. D.110c-c may retire them only after authenticated
+  handoff, two rollback generations, availability, snapshot, and outbox gates;
+  physical deletion authority remains unchanged until that causal RED.
+
+The frozen adversarial matrix includes genuine epochs 0 and 1 plus invalid
+epochs `-1`, noninteger, unsafe integer, missing, extra-key, and accessor
+inputs; cross-object, cross-anchor, cross-signer, cross-epoch vote/QC/cut/
+proposal/round-change replay; epoch-0 and epoch-1 same-signer evidence
+coexistence; same-epoch duplicate idempotence; same-epoch conflicting vote and
+evidence; wrong-epoch selector; legacy selector with an epoch-1 row present;
+malformed/cross-incarnation row; pending dispatch isolation; restart/reopen;
+and failed epoch-1 write leaving epoch-0 counts and bytes unchanged. Every
+retained D.110c-0a mutant preserves the existing exact protocol/storage error
+owner unless this plan names the selector's TypeError boundary; no generic
+replacement code is accepted.
+
+Focused GREEN runs each new batch once, then one retained suite covers:
+
+- protocol-v3 anchor-trust, seal, creator-close, and current-epoch author
+  authorization vectors;
+- Phase-5d/5e creator actor, pacemaker, evidence relearn/recovery, live close,
+  and snapshot-substitution tests;
+- browser schema upgrade/compatibility, vote, evidence, storage-loss,
+  incarnation, outbox, and exact-selector tests;
+- retained D.108 first handoff/adoption/reopen and all D.109 rollback,
+  availability, cleanup, and reclamation gates affected by the four stores; and
+- affected package builds/typechecks, exact-owner lint/format/diff,
+  source-shape checks proving no literal epoch-0 narrowing remains in the
+  generalized creator path, signed/pushed evidence, protected paths, 26
+  stashes, and fixed process/port predicates.
+
+The RED evidence records the exact selected test/file count, full assertion and
+error matrix, commands/statuses, changed paths, source hashes, and a validating
+self-excluding manifest. GREEN records the complete focused and retained result
+sets plus unchanged schema/wire/registry hashes. No campaign, long workload,
+memory run, threshold change, production dependency, or floor-authority
+implementation occurs in 0a. The signed plan receives one Grok 4.6/high,
+standard direct Kimi K3 100-step, and Opus xhigh review. Deterministic RED then
+runs without a separate three-model round; one final GREEN review inspects the
+accepted plan, signed RED, and signed GREEN. Only P0/P1 blocks, with at most one
+confirmation after a material executable correction.
+
 ##### D.110c-0b0 owner-selection design
 
 The bounded owner audit rejects two superficially attractive shortcuts. The
