@@ -1,0 +1,34 @@
+audit_head=7e6ec39f7ecebee3eab630e90e9c08b964752afe
+origin_head=7e6ec39f7ecebee3eab630e90e9c08b964752afe
+tracked_status_begin
+ M docs/production-hardening/production-hardening-tdd-plan-v2.md
+tracked_status_end
+source_hashes_begin
+dc509821d77523fda5afa71c6f6eea2de9a694ac8ad59c0bb56428fed18e1c90  packages/node/src/creator-close.ts
+39c5c197a08218cf2f8b1af19679b1072ef3ee62d0751d18ab9a8f5b35893fc5  packages/node/src/v3-live.ts
+07e8c680dfd520a1ce45e10081561a4014d4ce0003aa4ffba06c8aade4e5c7db  packages/node/src/creator-adoption.ts
+8847c091b3497e9de8593da800c6389180b73333441d25cf4f403810fd1ab3b4  examples/v3-room/src/index.ts
+source_hashes_end
+empty_accumulator_owner_begin
+510:						previousHistorySnapshot: new CompactMerkleAccumulator().snapshot(),
+empty_accumulator_owner_end
+durable_accumulator_carrier_begin
+564:			compactHistory: facts.history.historySnapshot,
+durable_accumulator_carrier_end
+result_literals_begin
+70:	epoch: 0;
+74:	successorEpoch: 1;
+596:						epoch: 0 as const,
+600:						successorEpoch: 1 as const,
+result_literals_end
+registration_and_rebind_begin
+examples/v3-room/src/index.ts:2287:			if (bound.ok) creatorCloseHandle = bound.handle;
+examples/v3-room/src/index.ts:3584:		activeHandle = replacement;
+packages/node/src/v3-live.ts:6823:			registration.mode !== "genesis-active" ||
+packages/node/src/v3-live.ts:6858:function creatorCloseRegistration(registration: V3PlaneRegistration): V3CreatorCloseRegistration | undefined {
+packages/node/src/v3-live.ts:6861:		registration.mode !== "genesis-active" ||
+registration_and_rebind_end
+stash_count=27
+protected_present=.agents
+protected_present=.claude
+protected_present=.pnpm-store

@@ -93591,6 +93591,135 @@ during confirmation. The next ordered executable production slice is D.110c-a;
 its bounded plan/RED begins from this closure and must consume the carried P2
 test-gate cleanup before GREEN review.
 
+##### D.110c-a bounded authenticated repeat-close carrier plan
+
+The bounded source audit at signed/pushed anchor
+`7e6ec39f7ecebee3eab630e90e9c08b964752afe` identifies one narrow Node
+composition defect. `bindCreatorLiveClose()` always supplies a newly empty
+`previousHistorySnapshot` to the unchanged compaction verifier. That is correct
+only for epoch 0. The genuine adopted epoch-1 projection already durably carries
+the preceding authenticated accumulator as `compactHistory`, but the private
+prepared/live registration validates the surrounding projection and then drops
+that member. A real epoch-1 close therefore reaches the correct verifier and
+fails `INVALID_ANCHOR` because the empty snapshot cannot match the authenticated
+epoch-1 anchor's history root and size. This is the causal RED; it is not a
+reason to weaken history continuity or manufacture a second-epoch record.
+The durable audit and source-shape ledger are
+`.logs/d110c-a-plan-audit-7e6ec39f/audit.md` and `source-shape.txt`, with
+SHA-256 values
+`0f74b0775be7f8260300f9668dfbe2799fc4b269a52f6f2cfcf13d27c51ab2fe`
+and `8f432fc46d40d4e1461e68a52b6c8c070637017aa8c123069eb90f837a5f5140`.
+Their validating self-excluding manifest SHA-256 is
+`2aa5907eacd18146d3708beb9f777749833ff2ea0b95eba06b6d8d5c6c347afc`.
+
+The existing private registration is sufficient. A genuine adopted successor
+is an active `genesis-active` creator plane with latched ACL authority, current
+trust, current anchor preimage, strict AHE storage, and the already generalized
+D.110c-0a seal actor. D.110c-a adds one copied private
+`previousHistorySnapshot` registration member. Epoch 0 accepts only the
+canonical empty snapshot matching the authenticated genesis anchor. Epoch N
+greater than zero requires the exact `compactHistory` member of the
+authenticated current projection, restores it through the existing
+`CompactMerkleAccumulator`, requires its root and size to equal the current
+authenticated anchor, and copies its peaks before creator-close custody. The
+unchanged `deriveCloseSetHistoryCommitment()` remains the final verifier. No
+parallel accumulator, projection trust shortcut, wire field, record kind,
+store, dependency, or public authority is introduced.
+
+The already-declared public-contract change is frozen narrowly. The existing
+`CreatorLiveCloseResult` key roster is unchanged; only `epoch` and
+`successorEpoch` widen from literal `0` and `1` to `number`. Runtime values must
+be nonnegative safe integers copied from the authenticated current and opened
+successor trust, with exact `successorEpoch === epoch + 1`. Epoch 0 still emits
+exactly `0` and `1`; `Number.MAX_SAFE_INTEGER`, fractional, negative, skipped,
+or substituted epochs fail before generation staging, floor change,
+terminalization, or adoption-fact installation. No new result field, overload,
+generic façade, export, or compatibility alias is added. This intentional type
+widening is the sole D.110c-a public surface change and receives the high-risk
+plan review before RED or production edits.
+
+The deterministic RED is tests-only and has two causal gates in one signed
+checkpoint:
+
+1. The runtime fixture creates one genuine epoch-0 room, issues real work,
+   executes the existing genuine 0→1 creator close/adoption/activation path,
+   binds the adopted epoch-1 plane through the real `bindCreatorLiveClose()`,
+   issues and publishes post-adoption work, and invokes its close exactly once.
+   It may reuse the retained Phase-6a fixture owners but may not mint epoch-1
+   trust, CutValue, QC, projection, accumulator, snapshot, manifest, or AHE
+   records. After D.110c-0a has removed seal refusal as a confounder, the sole
+   terminal runtime cause must be the compaction verifier's
+   `INVALID_ANCHOR`/`previous history snapshot does not match the authenticated
+anchor` result. The actor must not emit a successor QC, terminalize the
+   plane, install adoption facts, advance the application floor, or activate a
+   replacement.
+2. A closed TypeScript fixture assigns genuine epoch-1→2 result bytes to the
+   existing exported `CreatorLiveCloseResult` shape and fails only because its
+   two fields remain literal 0/1. It also freezes the exact existing result-key
+   roster and an epoch-0 compatibility value. It introduces no runtime mock or
+   production record.
+
+The RED owner is
+`tests/phase-6b-d110c-a-repeat-close-red.test.ts` plus a private fixture under
+`tests/fixtures/phase-6b-d110c-a/`. The exact focused runtime command selects
+one test in one file once; the exact private TypeScript command runs once. RED
+evidence records the selected counts, complete error code/message, actor and
+floor observations, source and built-import identities, changed paths, command
+statuses, hashes, protected roots, all 27 stashes, and a self-excluding
+manifest. No browser campaign, long transition loop, D.110a invocation, or
+production source is authorized by RED.
+
+GREEN changes only `packages/node/src/creator-close.ts`,
+`packages/node/src/v3-live.ts`, the focused fixture/test, and directly affected
+type fixtures unless a demonstrated owner requires a reviewed reslice. It must
+prove in one genuine process:
+
+- epoch 0→1 remains byte- and behavior-identical, including exact result values
+  0/1, trust/CutValue/QC verification, snapshot scope, AHE head, and adoption
+  facts;
+- the adopted epoch-1 plane closes genuinely to an authenticated epoch-2
+  successor with exact result values 1/2, exact history size extension, a root
+  independently recomputed from the prior accumulator and new close-set leaves,
+  and a copied output snapshot that cannot mutate its input;
+- current anchor root/size versus `compactHistory` root/size mismatch, missing,
+  malformed, aliased, reset, cross-room, cross-anchor, and earlier-epoch
+  substitution all fail before seal/QC, head/floor mutation,
+  terminalization, adoption facts, state/ACL transfer, or recovery ownership;
+- same-anchor double close, concurrent duplicate close, rebinding the same
+  plane, a stale predecessor handle after adoption, skipped epoch, substituted
+  successor trust, and unsafe successor overflow fail closed with exact existing
+  or frozen D.110c-a errors;
+- the pending epoch-2 AHE head does not advance the 0b0 application/account
+  floor or activate a successor. Product close-handle rebinding and floor
+  advance remain D.110c-b, so D.110c-a does not edit `examples/v3-room` or claim
+  the complete 1→2 product loop; and
+- the existing binding/claimed-registration weak owners remain singular. No
+  parallel registry, hidden O(N) accumulator chain, archive substitution, or
+  new active owner is introduced.
+
+The focused GREEN gate runs once after the one bounded implementation batch,
+followed by the private type contract and the retained creator seal/close,
+creator adoption/commit/activation/reopen, D.110c-0a authority/browser custody,
+D.110c-0b0 floor/provider, snapshot quarantine/substitution, history
+commitment, D.109 cleanup/runtime-reclamation/outbox, Node build and exact source
+typecheck, storage-browser build, exact-owner ESLint/Prettier/diff/source-shape,
+and root-test TypeScript gate carried from the 0b0 P2. The stale
+`d110cLastPendingRecovery` diagnostic call is removed in the same tests-only
+batch before extending the browser fixture; it cannot change product behavior
+or trigger a separate review.
+
+This is a high-risk production authority/public-contract slice. The plan-only
+checkpoint is signed and pushed, then one Grok 4.6/high, standard direct Kimi K3
+with `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review inspects the
+source audit, exact public compatibility boundary, RED causality, accumulator
+authentication, floor/adoption separation, adversarial matrix, and retained
+gates. Only P0/P1 blocks; P2 receives an owner and disposition. At most one
+confirmation is permitted if a correction changes scope, executable causality,
+or the public contract. The final GREEN later receives the one governing
+plan→RED→GREEN review. No Fable, collaboration subagent, long campaign, D.110a
+rerun, D.110c-b product rebind, 0b1 bounded-proof implementation, or Phase-7
+archive work occurs in D.110c-a. Deadline: GREEN before D.110c-b RED.
+
 The four prerequisite decisions, including the newly demonstrated 0b0
 freshness-floor authority question, are reviewed before their production edits;
 each executable sub-slice receives its own bounded causal RED and GREEN. The
