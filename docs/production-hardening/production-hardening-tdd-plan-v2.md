@@ -95396,12 +95396,27 @@ new process must pass `initialization: {kind: "reopen"}` and must not call
 create/migrate; it serializes the exact durable head, lineage, candidate
 closure inventory, and zero recovery-CAS count so the collapsed room error
 cannot hide `storage-failed` or `pending-old`; snapshot-declaration discovery
-selects the exact epoch-3 verified scope rather than assuming only one scope;
-and the new-AHE commit fault is configured and consumed before process death,
-without carrying an in-memory one-shot reset into the new process. These checks
+selects the exact verified scope for the `2→3` transition rather than assuming
+only one scope; and the new-AHE commit fault is configured and consumed before
+process death, without carrying an in-memory one-shot reset into the new
+process. The selected quarantine scope is epoch 2 and the epoch-2 current
+anchor because `creator-close.ts::persistSnapshot()` keys the exported
+transition snapshot by the authenticated closing trust; epoch 3 remains the
+pending head and successor trust, not the snapshot-scope epoch. These checks
 join the existing exact room error and source-pin audit to establish
 `pending-missing` causally. They require test assets only and are resolved in
-the one authorized RED execution.
+the corrected RED execution.
+
+The first focused RED attempt is rejected as non-causal evidence. It selected a
+literal epoch-3 quarantine scope, stopped in the read-only fixture helper with
+`D.108d2 snapshot scope is ambiguous`, and never invoked pending recovery. The
+result is retained under `.logs/d110c-0c-red-8d2d729e/`; it is not a product
+failure and does not satisfy RED. The corrected selector follows the unchanged
+production ownership at `packages/node/src/creator-close.ts:502-509`; no
+product, workload, threshold, authority, or recovery behavior changes, and no
+additional plan-review round is authorized. The rejected root's validating
+eight-entry self-excluding manifest SHA-256 is
+`229a19cd9d0a2c20c058e66dd5da5c8afbdd483ccf39ebe38d70408c6b64222e`.
 
 The complete confirmation evidence is retained under
 `.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry
