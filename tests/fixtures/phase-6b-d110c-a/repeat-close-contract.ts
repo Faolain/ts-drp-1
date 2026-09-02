@@ -107,6 +107,14 @@ export interface D110cARepeatCloseFixture {
 
 export interface D110c0b1RedMaterial {
 	readonly active: DetachedHeadEvidence;
+	readonly checkpointGenesis: Readonly<{
+		readonly detachedGenesisSignature: Uint8Array;
+		readonly exactCanonicalGenesisAnchorPreimageBytes: Uint8Array;
+		readonly expectedObjectId: string;
+		readonly pinnedGenesisAnchorDigest: string;
+	}>;
+	readonly coldIssued: Readonly<Record<string, unknown>> | undefined;
+	readonly coldPublished: Readonly<Record<string, unknown>> | undefined;
 	readonly coldReopen: Readonly<Record<string, unknown>>;
 	readonly current: DetachedHeadEvidence;
 	readonly genesisTrust: CurrentAnchorTrust;
@@ -832,9 +840,40 @@ export async function openD110cARepeatCloseFixture(
 					throw new TypeError("D110C_0B1_HOT_ADOPTION_REQUIRED");
 				}
 				await Promise.resolve(latestSuccessor?.deactivate());
+				const detachedGenesisSignature = d110c0b1ColdInput.detachedSignature;
+				const exactCanonicalGenesisAnchorPreimageBytes = d110c0b1ColdInput.exactCanonicalAnchorPreimageBytes;
+				const pinnedGenesisAnchorDigest = d110c0b1ColdInput.pinnedGenesisAnchorDigest;
+				if (
+					!(detachedGenesisSignature instanceof Uint8Array) ||
+					!(exactCanonicalGenesisAnchorPreimageBytes instanceof Uint8Array) ||
+					typeof pinnedGenesisAnchorDigest !== "string"
+				) {
+					throw new TypeError("D110C_0B1_CHECKPOINT_GENESIS_INVALID");
+				}
+				const coldReopen = await reopenCreatorSuccessorAdoption(d110c0b1ColdInput);
+				let coldIssued: Readonly<Record<string, unknown>> | undefined;
+				let coldPublished: Readonly<Record<string, unknown>> | undefined;
+				if (coldReopen.ok === true && coldReopen.handle !== null && typeof coldReopen.handle === "object") {
+					latestSuccessor = coldReopen.handle as D109dHotFixture["successor"];
+					coldIssued = await latestSuccessor.issueLocal({
+						operations: Object.freeze([
+							Object.freeze({ logicalTime: 44, operation: Object.freeze({ action: "add", value: 19 }) }),
+						]),
+						signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
+					});
+					coldPublished = await latestSuccessor.publishPending();
+				}
 				return Object.freeze({
 					active: await detachedHeadForInspection(hot, d110c0b1ActiveInspection),
-					coldReopen: await reopenCreatorSuccessorAdoption(d110c0b1ColdInput),
+					checkpointGenesis: Object.freeze({
+						detachedGenesisSignature: Uint8Array.from(detachedGenesisSignature),
+						exactCanonicalGenesisAnchorPreimageBytes: Uint8Array.from(exactCanonicalGenesisAnchorPreimageBytes),
+						expectedObjectId: hot.base.evidence.issuanceScope.objectId,
+						pinnedGenesisAnchorDigest,
+					}),
+					coldIssued,
+					coldPublished,
+					coldReopen,
 					current: await detachedHeadForInspection(hot, beforeHead),
 					genesisTrust: hot.base.evidence.currentTrust,
 					proposed: await detachedHeadForInspection(hot, afterHead),

@@ -4512,14 +4512,51 @@ function matchingOutboxRows(left: SnapshottedOutboxRow, right: SnapshottedOutbox
 	);
 }
 
+function authenticatedPinnedGenesisOutboxRow(
+	row: SnapshottedOutboxRow,
+	issuanceScope: DurableIssueScope,
+	filterPayload: PreparedV3LivePayload,
+	pinnedGenesisAnchorDigest: string
+): boolean {
+	try {
+		if (V3_VERTEX_DOMAIN !== vertexRegistry.domain || typeof V3_VERTEX_SUITE_ID !== "string") return false;
+		const suiteId = V3_VERTEX_SUITE_ID;
+		const extracted = extractAdmittedReceivedVertex({
+			domain: V3_VERTEX_DOMAIN,
+			expectedAnchor: pinnedGenesisAnchorDigest,
+			preparedBlueprintAdmission: filterPayload.admission,
+			receivedCanonicalPreimageBytes: row.canonicalPreimageBytes,
+			resolveAuthorPublicKey: (author) => {
+				const bytes = author === issuanceScope.author ? publicKeyBytes(author) : undefined;
+				return bytes === undefined ? undefined : ObjectFreeze({ bytes, format: "raw" as const });
+			},
+			signature: row.signature,
+			suiteId,
+		});
+		return (
+			extracted.ok &&
+			extracted.vertex.anchor === pinnedGenesisAnchorDigest &&
+			extracted.vertex.epoch === 0 &&
+			extracted.vertex.objectId === issuanceScope.objectId &&
+			extracted.vertex.author === issuanceScope.author &&
+			extracted.vertex.authorSequence === row.authorSequence &&
+			lowerHexDigest(extracted.vertex.digest) === lowerHexDigest(row.digest)
+		);
+	} catch {
+		return false;
+	}
+}
+
 function creatorFilteredIssuanceStore(
 	issuanceStore: DurableIssuanceStore,
 	issuanceScope: DurableIssueScope,
 	filterPayload: PreparedV3LivePayload,
 	filterAuthorization: V3LiveAuthorization,
-	excludedAfterEpoch?: number
+	excludedAfterEpoch?: number,
+	pinnedGenesisAnchorDigest?: string
 ): DurableIssuanceStore {
 	let skipped = 0;
+	let skippedGenesis = 0;
 	return ObjectFreeze({
 		close: () => issuanceStore.close(),
 		compareAndMarkOutboxPublished: (input: DurableOutboxPublicationTransitionInput) =>
@@ -4546,22 +4583,31 @@ function creatorFilteredIssuanceStore(
 					row.signature
 				);
 				const candidateEpoch = authenticated?.vertex.epoch;
-				if (
+				const authenticatedFilterRow =
 					authenticated !== undefined &&
 					authenticated.digest === lowerHexDigest(row.digest) &&
 					authenticated.author === issuanceScope.author &&
 					authenticated.authorSequence === row.authorSequence &&
 					typeof candidateEpoch === "number" &&
-					(excludedAfterEpoch === undefined || candidateEpoch > excludedAfterEpoch)
-				) {
+					(excludedAfterEpoch === undefined || candidateEpoch > excludedAfterEpoch);
+				const authenticatedGenesisRow =
+					pinnedGenesisAnchorDigest !== undefined &&
+					authenticatedPinnedGenesisOutboxRow(row, issuanceScope, filterPayload, pinnedGenesisAnchorDigest);
+				if (authenticatedFilterRow || authenticatedGenesisRow) {
 					const issuedCommit = await issuanceStore.readIssued(issuanceScope, row.authorSequence);
 					const issuedRow = outboxRowSnapshot(
 						ObjectFreeze({ commit: issuedCommit, publishState: row.publishState }),
 						issuanceScope
 					);
 					if (issuedRow === undefined || !matchingOutboxRows(row, issuedRow)) return page;
-					skipped += 1;
-					if (skipped > filterPayload.parameters.maxEpochVertices) return page;
+					if (authenticatedFilterRow) skipped += 1;
+					if (authenticatedGenesisRow) skippedGenesis += 1;
+					if (
+						skipped > filterPayload.parameters.maxEpochVertices ||
+						skippedGenesis > filterPayload.parameters.maxEpochVertices
+					) {
+						return page;
+					}
 					afterKey = ObjectFreeze([issuanceScope.objectId, issuanceScope.author, row.authorSequence]) as readonly [
 						string,
 						string,
@@ -7333,7 +7379,8 @@ async function activateCreatorSuccessorLive(
 			material.issuanceScope,
 			successorPayload,
 			successorAuthorization,
-			material.predecessor.trust.currentEpoch
+			material.predecessor.trust.currentEpoch,
+			material.predecessor.trust.currentEpoch > 0 ? material.pinnedGenesisAnchorDigest : undefined
 		);
 		if (transportHandoff?.displacedSource !== undefined) {
 			creatorPredecessorRecoverySource.set(predecessorValidation, transportHandoff.displacedSource);
@@ -7362,7 +7409,16 @@ async function activateCreatorSuccessorLive(
 		);
 		const successorIssuanceStore =
 			transportHandoff?.displacedSource === undefined
-				? material.issuanceStore
+				? material.predecessor.trust.currentEpoch > 0
+					? creatorFilteredIssuanceStore(
+							material.issuanceStore,
+							material.issuanceScope,
+							successorPayload,
+							successorAuthorization,
+							Number.MAX_SAFE_INTEGER,
+							material.pinnedGenesisAnchorDigest
+						)
+					: material.issuanceStore
 				: creatorFilteredIssuanceStore(
 						material.issuanceStore,
 						material.issuanceScope,

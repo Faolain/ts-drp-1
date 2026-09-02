@@ -38,6 +38,10 @@
 			"types": "./dist/src/creator-close.d.ts",
 			"import": "./dist/src/creator-close.js"
 		},
+		"./creator-checkpoint": {
+			"types": "./dist/src/creator-checkpoint.d.ts",
+			"import": "./dist/src/creator-checkpoint.js"
+		},
 		"./seal": {
 			"types": "./dist/src/seal.d.ts",
 			"import": "./dist/src/seal.js"

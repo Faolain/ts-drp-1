@@ -1,6 +1,7 @@
 import { createAnchorTrustApi } from "./index.js";
 import {
 	certifiedSealAuthorityResolver,
+	creatorAnchorTrustCheckpointPredecessorMinter,
 	creatorAnchorTrustResolver,
 	creatorAnchorTrustSuccessorMinter,
 	installCertifiedSealAuthorityResolver,
@@ -11,6 +12,7 @@ const anchorTrustApi = createAnchorTrustApi();
 installCertifiedSealAuthorityResolver(anchorTrustApi[certifiedSealAuthorityResolver]);
 installCreatorAnchorTrustCustody(
 	anchorTrustApi[creatorAnchorTrustResolver],
+	anchorTrustApi[creatorAnchorTrustCheckpointPredecessorMinter],
 	anchorTrustApi[creatorAnchorTrustSuccessorMinter]
 );
 

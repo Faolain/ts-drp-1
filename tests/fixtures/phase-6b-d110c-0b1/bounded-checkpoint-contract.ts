@@ -1,7 +1,9 @@
 import { decodeCanonical } from "@ts-drp/canonical";
 
 import { inspectCreatorTrustAdvance } from "../../../packages/control-plane/src/creator-trust-advance.js";
+import type { InspectBoundedCreatorTrustAdvanceInput } from "../../../packages/control-plane/src/creator-trust-checkpoint-advance.js";
 import { openCurrentAnchorTrust } from "../../../packages/protocol-v3/src/anchor-trust-singleton.js";
+import type { OpenCreatorCheckpointTrustInput } from "../../../packages/protocol-v3/src/creator-checkpoint.js";
 import { openCreatorSuccessorTrust } from "../../../packages/protocol-v3/src/creator-close.js";
 import { type D110c0b1RedMaterial, openD110cARepeatCloseFixture } from "../phase-6b-d110c-a/repeat-close-contract.js";
 
@@ -19,6 +21,10 @@ export interface D110c0b1ClosureEntry {
 
 export interface D110c0b1RedEvidence {
 	readonly activeCensus: readonly D110c0b1ClosureEntry[];
+	readonly boundedInput: InspectBoundedCreatorTrustAdvanceInput;
+	readonly checkpointInput: OpenCreatorCheckpointTrustInput;
+	readonly coldIssued: Readonly<Record<string, unknown>> | undefined;
+	readonly coldPublished: Readonly<Record<string, unknown>> | undefined;
 	readonly coldReopen: Readonly<Record<string, unknown>>;
 	readonly currentCensus: readonly D110c0b1ClosureEntry[];
 	readonly currentOpenReasons: readonly [string, string];
@@ -26,6 +32,11 @@ export interface D110c0b1RedEvidence {
 		readonly active: Readonly<Record<string, unknown>>;
 		readonly current: Readonly<Record<string, unknown>>;
 		readonly proposed: Readonly<Record<string, unknown>>;
+	}>;
+	readonly durableReferences: Readonly<{
+		readonly active: readonly Readonly<{ readonly byteLength: number; readonly digest: string }>[];
+		readonly current: readonly Readonly<{ readonly byteLength: number; readonly digest: string }>[];
+		readonly proposed: readonly Readonly<{ readonly byteLength: number; readonly digest: string }>[];
 	}>;
 	readonly existingAdvance: Readonly<Record<string, unknown>>;
 	readonly oneStepFromGenesis: Readonly<Record<string, unknown>>;
@@ -99,6 +110,9 @@ export async function openD110c0b1RedFixture(): Promise<D110c0b1RedFixture> {
 		const material = await fixture.captureD110c0b1RedMaterial();
 		const epochOneTrust = candidate(material.current.candidates, "drp-anchor-trust-state", 1);
 		const epochTwoTrust = candidate(material.active.candidates, "drp-anchor-trust-state", 2);
+		const retiringCut = candidate(material.current.candidates, "drp-hard-epoch-cut", 0);
+		const retiringQc = candidate(material.current.candidates, "drp-seal-qc", 0, "commit");
+		const retiringAcl = candidate(material.current.candidates, "drp-v3-latched-acl", 0);
 		const newCut = candidate(material.proposed.candidates, "drp-hard-epoch-cut", 1);
 		const newQc = candidate(material.proposed.candidates, "drp-seal-qc", 1, "commit");
 		const expectedObjectId = material.genesisTrust.objectId;
@@ -114,10 +128,41 @@ export async function openD110c0b1RedFixture(): Promise<D110c0b1RedFixture> {
 			pinnedGenesisAnchorDigest,
 		});
 		if (openedEpochOne.ok || openedEpochTwo.ok) throw new TypeError("D110C_0B1_CURRENT_OPENER_UNEXPECTED_SUCCESS");
+		const retiredDigests = new Set([retiringCut.ref.digest, retiringQc.ref.digest, retiringAcl.ref.digest]);
+		const boundedReferences = Object.freeze(
+			material.proposed.references
+				.filter((ref) => !retiredDigests.has(ref.digest))
+				.map((ref) => Object.freeze({ ...ref }))
+				.sort((left, right) => left.digest.localeCompare(right.digest))
+		);
+		const boundedCandidates = Object.freeze(
+			material.proposed.candidates.filter((entry) => !retiredDigests.has(entry.ref.digest))
+		);
 		return Object.freeze({
 			close: fixture.close,
 			evidence: Object.freeze({
 				activeCensus: census(material.active.candidates),
+				boundedInput: Object.freeze({
+					current: Object.freeze({ candidates: material.current.candidates, closure: material.current.references }),
+					proofRefs: Object.freeze([newCut.ref, newQc.ref]),
+					proposed: Object.freeze({ candidates: boundedCandidates, closure: boundedReferences }),
+					retiringPredecessorAclRef: retiringAcl.ref,
+					retiringProofRefs: Object.freeze([retiringCut.ref, retiringQc.ref]),
+				}),
+				checkpointInput: Object.freeze({
+					...material.checkpointGenesis,
+					exactCanonicalCommitQcBytes: Uint8Array.from(newQc.bytes),
+					exactCanonicalCurrentTrustStateRecordBytes: Uint8Array.from(epochTwoTrust.bytes),
+					exactCanonicalCutValueBytes: Uint8Array.from(newCut.bytes),
+					exactCanonicalPredecessorTrustStateRecordBytes: Uint8Array.from(epochOneTrust.bytes),
+					expectedCurrentHead: Object.freeze({
+						currentAnchorDigest: String(record(epochTwoTrust).currentAnchorDigest),
+						epoch: 2,
+						objectId: expectedObjectId,
+					}),
+				}),
+				coldIssued: material.coldIssued,
+				coldPublished: material.coldPublished,
 				coldReopen: material.coldReopen,
 				currentCensus: census(material.current.candidates),
 				currentOpenReasons: Object.freeze([openedEpochOne.reason, openedEpochTwo.reason]),
@@ -125,6 +170,11 @@ export async function openD110c0b1RedFixture(): Promise<D110c0b1RedFixture> {
 					active: Object.freeze({ ...material.active.head }),
 					current: Object.freeze({ ...material.current.head }),
 					proposed: Object.freeze({ ...material.proposed.head }),
+				}),
+				durableReferences: Object.freeze({
+					active: Object.freeze(material.active.references.map((ref) => Object.freeze({ ...ref }))),
+					current: Object.freeze(material.current.references.map((ref) => Object.freeze({ ...ref }))),
+					proposed: Object.freeze(material.proposed.references.map((ref) => Object.freeze({ ...ref }))),
 				}),
 				existingAdvance: inspectCreatorTrustAdvance({
 					current: { candidates: material.current.candidates, closure: material.current.references },

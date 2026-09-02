@@ -94678,8 +94678,8 @@ closure.
 
 ##### D.110c-0b1 bounded checkpoint opener and control-proof compaction plan
 
-**Status: deterministic causal RED accepted; no production edit yet.** This
-is the next executable D.110c slice after the closed D.110c-b checkpoint. Its
+**Status: GREEN implemented and locally verified; signed final review pending.**
+This is the next executable D.110c slice after the closed D.110c-b checkpoint. Its
 owner is the accepted non-root protocol-v3 creator-checkpoint boundary, the
 accepted non-root control-plane bounded-advance boundary, and their existing
 Node creator-close, hot-adoption/commit, and cold-reopen consumers. Its deadline is
@@ -95064,6 +95064,102 @@ D.110a invocation, Fable run, or collaboration subagent changed or ran.
 The RED ledger is `.logs/d110c-0b1-red-2cd3ba51/red-ledger.md`; the validating
 self-excluding manifest SHA-256 is
 `38df4ad95ef80941f786a6c8ec1ab020b81063ddcf765a56a311d1acb718a399`.
+
+The D.110c-0b1 GREEN implementation closes those three causal seams without
+changing the fixed creator profile, any wire record, authority/floor owner,
+rollback count, dependency, threshold, product API, or pruning authority.
+`@ts-drp/protocol-v3/creator-checkpoint` now authenticates the exact pinned
+genesis carrier, genuine immediate predecessor/current v1 trust pair, 1→2
+CutValue/commit-QC, previous-anchor link, and copied room head, returning only
+the two opaque capabilities. Its private predecessor minter is reachable only
+through that checked opener. `@ts-drp/control-plane/creator-trust-checkpoint-advance`
+now requires the exact stale Cut/QC and predecessor-ACL refs, removes all three
+with the old trust ref, preserves every unrelated ref, and admits only the new
+trust plus exact new Cut/QC. Neither symbol is added to a package root export.
+
+One Node-private `inspectCreatorTransitionAdvance` owns the epoch-relative
+choice for close staging, hot verification, adoption commit, and active cold
+reopen. Epoch 0 retains the existing additive predicate; epoch N≥1 derives and
+retires the exact N-1 proof pair and ACL before using the bounded predicate.
+Active cold reopen now authenticates the stored epoch-1/epoch-2 pair through
+the checkpoint opener and derives projection/ACL epochs instead of assuming
+0/1. Pending-adoption recovery deliberately retains its literal 0→1 branch for
+D.110c-0c. The cold epoch-2 recovery path also filters only cryptographically
+authenticated pinned-genesis issuance rows from the epoch-2 verifier, after
+cross-binding their anchor, room, author, sequence, and digest against the
+durable issued row. Malformed or substituted rows remain visible and fail
+closed. This is intentionally sufficient only for the genuine 0→1→2 contract;
+general retirement/recovery of arbitrary intermediate issuance epochs remains
+blocking D.110c-0c/D.110c-d debt before the ≥100-transition gate and is not
+claimed here.
+
+Development evidence is preserved, not overwritten, under
+`.logs/d110c-0b1-green-9457680d-final/development/`. Batch 1 first passed its
+two boundary tests. The initial full focused run then failed only in active
+cold reopen. Its first diagnostic isolated the stale literal issuance ACL;
+after that correction, the next diagnostic reached the genuine recovery owner
+and reported `v3 recovery vertex is not authenticated`. Exact retained bytes
+showed a valid pinned-genesis epoch-0 outbox row being presented to the epoch-1
+verifier. The authenticated pinned-genesis filter closed that cause. A first
+retained run then exposed two stale tests-only expectations: D.110c-a still
+expected additive positive closure growth, and the protocol source-graph test
+omitted the already imported private seal-custody owner. Those expectations
+were corrected to the bounded `delta=-318` result and complete source graph;
+the corresponding correction test and full retained roster passed. No failed
+run was discarded or relabelled.
+
+Before custody closure, the boundary gate was strengthened in place to cover
+the complete practical frozen reason/retirement families: malformed input,
+genesis/predecessor/current rejection, replay/lineage, Cut/QC rejection,
+cross-genesis, stale floor, omitted/duplicated/substituted proof refs,
+wrong-epoch Cut, wrong-phase QC, cross-object ACL/new proof, still-retained
+stale refs, and extra deletion. `custody-unavailable` remains a defensive
+closed reason that cannot be induced without the forbidden test hook; the
+standalone built-subpath gate instead proves its required singleton import is
+initialized. The final two-test boundary report passes, and the final focused
+command is:
+
+```text
+D110C_0B1_EVIDENCE_PATH=.logs/d110c-0b1-green-9457680d-final/focused-evidence.json pnpm exec vitest run tests/phase-6b-d110c-0b1-boundaries.test.ts tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts --no-coverage --maxWorkers=1 --minWorkers=1 --reporter=json --outputFile=.logs/d110c-0b1-green-9457680d-final/focused-final.json
+```
+
+It passes all 5 tests with zero failed/pending tests. The serialized terminal
+proof records genuine epoch-2 predecessor/current capabilities, bounded
+success, exact head revisions, every current/proposed/active ref and decoded
+kind census, active epoch-2 cold reopen, and successful post-reopen issue and
+publish. The census is exactly 5 current refs (epoch-1 trust, epoch-0 Cut/QC,
+epoch-0 ACL, epoch-1 projection), 4 staged refs (epoch-2 trust, epoch-1
+Cut/QC, epoch-1 projection), and 5 active refs after adding the epoch-1
+predecessor ACL. No epoch-0 Cut/QC/ACL remains active.
+
+The final retained 36-file Vitest roster passes 350/350 tests across 79 suites,
+with zero failure, pending, or top-level error, at
+`.logs/d110c-0b1-green-9457680d-final/retained-final.json`. The exact retained
+Chromium D.110c-b title passes 1/1 with zero skipped/unexpected/flaky tests in
+`retained-browser.json`. Protocol-v3, control-plane, Node, storage-node, and
+storage-browser builds pass. Protocol-v3/control-plane package typechecks;
+Node/storage-node/storage-browser production-source `tsconfig.build.json`
+no-emit checks; v3-room typecheck/build; v3-chat typecheck; and the D.110c-a
+private fixture compile all pass. Exact-owner ESLint and Prettier pass. The
+broad test-inclusive `pnpm --filter @ts-drp/node typecheck` remains an
+unsuitable aggregate gate and is preserved with exit 2: it reports only the
+previously owned worker-host rootDir, E3-02 `emit`, and compact-history helper
+errors, none in a D.110c-0b1 owner. The exact production build and no-emit gate
+both pass; this slice does not silently widen to that inherited debt.
+
+The final source/export/runtime audit passes from the actual `packages/node`
+consumer context: both non-root subpaths export exactly one runtime function,
+neither package root widens, package maps and Vite aliases are exact, the built
+protocol subpath directly imports singleton custody, all four Node consumers
+use the shared classifier, and the pending branch remains pinned. A first run
+from the non-package repository root correctly could not resolve bare workspace
+imports; a second read-only predicate mistakenly searched `kind:` instead of
+`currentProjectionKind:`. Both diagnostics are retained with exit 1 and are not
+code failures; the corrected consumer-context audit exits 0. No D.110a worker,
+preflight, long campaign, Fable, or collaboration subagent ran. D.110c-0b1 is
+ready for its signed/pushed GREEN checkpoint and the single governing
+Grok/Kimi/Opus plan→RED→GREEN review; it is not closed until that blocking
+union is empty.
 
 The four prerequisite decisions, including the newly demonstrated 0b0
 freshness-floor authority question, are reviewed before their production edits;

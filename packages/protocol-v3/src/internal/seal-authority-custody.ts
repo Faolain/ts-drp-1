@@ -24,6 +24,9 @@ export interface CreatorAnchorSigningRequest {
 }
 
 export const certifiedSealAuthorityResolver: unique symbol = Symbol("certifiedSealAuthorityResolver");
+export const creatorAnchorTrustCheckpointPredecessorMinter: unique symbol = Symbol(
+	"creatorAnchorTrustCheckpointPredecessorMinter"
+);
 export const creatorAnchorTrustResolver: unique symbol = Symbol("creatorAnchorTrustResolver");
 export const creatorAnchorTrustSuccessorMinter: unique symbol = Symbol("creatorAnchorTrustSuccessorMinter");
 
@@ -37,8 +40,10 @@ type CreatorAnchorTrustSuccessorMinter = (
 	exactCanonicalSuccessorAnchorPreimageBytes: Uint8Array,
 	detachedSuccessorAnchorSignature: Uint8Array
 ) => CurrentAnchorTrust | undefined;
+type CreatorAnchorTrustCheckpointPredecessorMinter = CreatorAnchorTrustSuccessorMinter;
 
 let creatorResolver: CreatorAnchorTrustResolver | undefined;
+let creatorCheckpointPredecessorMinter: CreatorAnchorTrustCheckpointPredecessorMinter | undefined;
 let creatorSuccessorMinter: CreatorAnchorTrustSuccessorMinter | undefined;
 const creatorAnchorRequestDigests = new WeakMap<CreatorAnchorSigningRequest, Uint8Array>();
 
@@ -65,16 +70,23 @@ export function resolveCertifiedSealAuthorityMaterial(
 /**
  * Installs creator-trust resolution and successor minting from the singleton registry.
  * @param resolver - Resolver bound to the singleton creator-trust WeakMap.
+ * @param checkpointPredecessorMinter - Bounded checkpoint predecessor mint bound to the same WeakMap.
  * @param successorMinter - Successor mint bound to the same private WeakMap.
  */
 export function installCreatorAnchorTrustCustody(
 	resolver: CreatorAnchorTrustResolver,
+	checkpointPredecessorMinter: CreatorAnchorTrustCheckpointPredecessorMinter,
 	successorMinter: CreatorAnchorTrustSuccessorMinter
 ): void {
-	if (creatorResolver !== undefined || creatorSuccessorMinter !== undefined) {
+	if (
+		creatorResolver !== undefined ||
+		creatorCheckpointPredecessorMinter !== undefined ||
+		creatorSuccessorMinter !== undefined
+	) {
 		throw new Error("creator anchor trust custody already installed");
 	}
 	creatorResolver = resolver;
+	creatorCheckpointPredecessorMinter = checkpointPredecessorMinter;
 	creatorSuccessorMinter = successorMinter;
 }
 
@@ -103,6 +115,25 @@ export function mintCreatorAnchorTrustSuccessor(
 		currentTrust,
 		exactCanonicalSuccessorAnchorPreimageBytes,
 		detachedSuccessorAnchorSignature
+	);
+}
+
+/**
+ * Mints an already-authenticated checkpoint predecessor through singleton custody.
+ * @param genesisTrust - Genuine creator genesis capability whose fixed carriers are inherited.
+ * @param exactCanonicalPredecessorAnchorPreimageBytes - Exact verified predecessor-anchor preimage.
+ * @param detachedPredecessorAnchorSignature - Exact creator signature over the predecessor digest.
+ * @returns A checkpoint-local predecessor capability, or undefined for invalid/uninstalled custody.
+ */
+export function mintCreatorAnchorTrustCheckpointPredecessor(
+	genesisTrust: CurrentAnchorTrust,
+	exactCanonicalPredecessorAnchorPreimageBytes: Uint8Array,
+	detachedPredecessorAnchorSignature: Uint8Array
+): CurrentAnchorTrust | undefined {
+	return creatorCheckpointPredecessorMinter?.(
+		genesisTrust,
+		exactCanonicalPredecessorAnchorPreimageBytes,
+		detachedPredecessorAnchorSignature
 	);
 }
 

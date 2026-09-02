@@ -14,6 +14,7 @@ import registryJson from "../registry/registry-v1.json" with { type: "json" };
 import {
 	type CertifiedSealAuthorityMaterial,
 	certifiedSealAuthorityResolver,
+	creatorAnchorTrustCheckpointPredecessorMinter,
 	type CreatorAnchorTrustMaterial,
 	creatorAnchorTrustResolver,
 	creatorAnchorTrustSuccessorMinter,
@@ -369,6 +370,11 @@ interface AnchorTrustApi {
 		input: ResolveCurrentEpochAuthorizedAuthorInput
 	): ResolveCurrentEpochAuthorizedAuthorResult;
 	[certifiedSealAuthorityResolver](trust: CertifiedAnchorTrust): CertifiedSealAuthorityMaterial | undefined;
+	[creatorAnchorTrustCheckpointPredecessorMinter](
+		genesisTrust: CurrentAnchorTrust,
+		exactCanonicalPredecessorAnchorPreimageBytes: Uint8Array,
+		detachedPredecessorAnchorSignature: Uint8Array
+	): CurrentAnchorTrust | undefined;
 	[creatorAnchorTrustResolver](trust: CurrentAnchorTrust): CreatorAnchorTrustMaterial | undefined;
 	[creatorAnchorTrustSuccessorMinter](
 		currentTrust: CurrentAnchorTrust,
@@ -1665,6 +1671,56 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 		});
 	};
 
+	const mintCreatorAnchorTrustCheckpointPredecessor = (
+		genesisTrust: CurrentAnchorTrust,
+		exactCanonicalPredecessorAnchorPreimageBytes: Uint8Array,
+		detachedPredecessorAnchorSignature: Uint8Array
+	): CurrentAnchorTrust | undefined => {
+		try {
+			const genesisState = registry.get(genesisTrust);
+			if (genesisState === undefined || genesisTrust.currentEpoch !== 0) return undefined;
+			const anchorBytes = new intrinsicUint8Array(exactCanonicalPredecessorAnchorPreimageBytes);
+			const signature = new intrinsicUint8Array(detachedPredecessorAnchorSignature);
+			const decoded = decodeExact(anchorBytes);
+			if (!decoded.ok || !isAnchorRecord(decoded.value)) return undefined;
+			const anchor = decoded.value;
+			const anchorDigestBytes = hashDomain(ANCHOR_DIGEST_DOMAIN, anchorBytes);
+			const anchorDigest = bytesToHex(anchorDigestBytes);
+			if (
+				anchor.cryptoSuiteId !== ACTIVE_ANCHOR_SUITE ||
+				anchor.objectId !== genesisTrust.objectId ||
+				anchor.epoch < 1 ||
+				anchor.profileDigest !== genesisState.profileDigest ||
+				anchor.signerSetDigest !== genesisState.signerSetDigest ||
+				!verifyStrictSignature(signature, anchorDigestBytes, genesisState.publicKey)
+			) {
+				return undefined;
+			}
+			return mintAnchorTrust(
+				registry,
+				{
+					currentAnchorDigest: anchorDigest,
+					currentEpoch: anchor.epoch,
+					genesisAnchorDigest: genesisTrust.genesisAnchorDigest,
+					objectId: genesisTrust.objectId,
+					profileId: CREATOR_PROFILE,
+				},
+				{
+					detachedCurrentAnchorSignature: signature,
+					exactCanonicalCurrentAnchorPreimageBytes: anchorBytes,
+					exactCanonicalProfileBytes: genesisState.exactCanonicalProfileBytes,
+					exactCanonicalSignerSetBytes: genesisState.exactCanonicalSignerSetBytes,
+					publicKey: genesisState.publicKey,
+					profileDigest: genesisState.profileDigest,
+					quorum: 1,
+					signerSetDigest: genesisState.signerSetDigest,
+				}
+			);
+		} catch {
+			return undefined;
+		}
+	};
+
 	const mintCreatorAnchorTrustSuccessor = (
 		currentTrust: CurrentAnchorTrust,
 		exactCanonicalSuccessorAnchorPreimageBytes: Uint8Array,
@@ -1726,6 +1782,7 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 		openCurrentAnchorTrust,
 		resolveCurrentEpochAuthorizedAuthor,
 		[certifiedSealAuthorityResolver]: resolveCertifiedSealMaterial,
+		[creatorAnchorTrustCheckpointPredecessorMinter]: mintCreatorAnchorTrustCheckpointPredecessor,
 		[creatorAnchorTrustResolver]: resolveCreatorAnchorTrustMaterial,
 		[creatorAnchorTrustSuccessorMinter]: mintCreatorAnchorTrustSuccessor,
 	});

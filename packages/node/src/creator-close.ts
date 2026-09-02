@@ -5,7 +5,6 @@ import {
 	verifySnapshotStreamWithReceipt,
 } from "@ts-drp/compaction/snapshot-quarantine-receipt";
 import { inspectTrustClosure } from "@ts-drp/control-plane";
-import { inspectCreatorTrustAdvance } from "@ts-drp/control-plane/creator-trust-advance";
 import type { DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-store";
 import type { FinalitySigner } from "@ts-drp/keychain/finality";
 import type { DurableLiveJournalStore } from "@ts-drp/live-journal";
@@ -30,6 +29,7 @@ import {
 import type { SnapshotQuarantineDeclaration, SnapshotQuarantineStore } from "@ts-drp/storage/snapshot-transfer";
 
 import { installCreatorAdoptionFacts, revokeCreatorAdoptionFacts } from "./internal/creator-adoption-intent.js";
+import { inspectCreatorTransitionAdvance } from "./internal/creator-transition-advance.js";
 import {
 	type CreatorCloseRuntimeReleaseCensus,
 	type CreatorCloseRuntimeReleasePlan,
@@ -583,12 +583,14 @@ export async function bindCreatorLiveClose(
 						{ bytes: prepared.exactCanonicalCutValueBytes, ref: cutValueRef },
 						{ bytes: finalized.exactCanonicalCommitQcBytes, ref: commitQcRef },
 					].filter(({ ref }) => ref.byteLength <= SCANNABLE_BYTES);
-					const advance = inspectCreatorTrustAdvance({
+					const advance = inspectCreatorTransitionAdvance({
 						current: { candidates: current.candidates, closure: current.references },
+						mode: "stage",
 						proofRefs: [cutValueRef, commitQcRef],
 						proposed: { candidates: proposedCandidates, closure: proposed },
 					});
 					if (!advance.ok) throw new TypeError(`creator trust advance failed: ${advance.reason}`);
+					const acceptedProposed = advance.proposed.closure;
 					const proposedHead = await stageCombinedGeneration(
 						registration.store,
 						current,
@@ -597,7 +599,7 @@ export async function bindCreatorLiveClose(
 							{ bytes: prepared.exactCanonicalCutValueBytes, ref: cutValueRef },
 							{ bytes: finalized.exactCanonicalCommitQcBytes, ref: commitQcRef },
 						],
-						proposed
+						acceptedProposed
 					);
 					if (!registration.terminalize()) throw new TypeError("creator close terminalization failed");
 					lifecycle = "successor-pending-adoption";
@@ -630,7 +632,7 @@ export async function bindCreatorLiveClose(
 								liveJournalStore: registration.liveJournalStore,
 								objectId: registration.objectId,
 								proposedHead: Object.freeze({ ...proposedHead }),
-								proposedReferences: Object.freeze(proposed.map(copiedRef)),
+								proposedReferences: Object.freeze(acceptedProposed.map(copiedRef)),
 								snapshotDeclaration: persistedSnapshot.declaration,
 								snapshotStore: input.snapshotStore,
 								sourceRuntimeHandle: new WeakRef(input.plane),

@@ -1,5 +1,4 @@
 import { decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
-import { inspectCreatorTrustAdvance } from "@ts-drp/control-plane/creator-trust-advance";
 import type { CurrentAnchorTrust } from "@ts-drp/protocol-v3";
 import { openCreatorSuccessorTrust } from "@ts-drp/protocol-v3/creator-close";
 import {
@@ -25,6 +24,7 @@ import {
 } from "./internal/creator-adoption-intent.js";
 import { installCreatorAdoptionPublish, installCreatorAdoptionStage } from "./internal/creator-adoption-stage.js";
 import { completeCreatorSuccessorLiveMaterial } from "./internal/creator-successor-live.js";
+import { inspectCreatorTransitionAdvance } from "./internal/creator-transition-advance.js";
 
 type FailureKind =
 	| "malformed-input"
@@ -387,8 +387,9 @@ function validTrustChain(
 	) {
 		return false;
 	}
-	return inspectCreatorTrustAdvance({
+	return inspectCreatorTransitionAdvance({
 		current: { candidates: currentCandidates, closure: facts.currentReferences },
+		mode: "verify",
 		proofRefs: [facts.closeResult.cutValueRef, facts.closeResult.commitQcRef],
 		proposed: { candidates: pendingCandidates, closure: facts.proposedReferences },
 	}).ok;

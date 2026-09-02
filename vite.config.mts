@@ -8,6 +8,10 @@ const config = defineConfig({
 	plugins: [tsconfigPaths()],
 	resolve: {
 		alias: {
+			"@ts-drp/control-plane/creator-trust-checkpoint-advance": path.resolve(
+				__dirname,
+				"packages/control-plane/src/creator-trust-checkpoint-advance.ts"
+			),
 			"@ts-drp/keychain/finality": path.resolve(__dirname, "packages/keychain/src/finality.ts"),
 			"@ts-drp/network/seal": path.resolve(__dirname, "packages/network/src/seal.ts"),
 			"@ts-drp/node/creator-close": path.resolve(__dirname, "packages/node/src/creator-close.ts"),
@@ -30,6 +34,10 @@ const config = defineConfig({
 			"@ts-drp/protocol-v3/internal/seal-authority-identity": path.resolve(
 				__dirname,
 				"packages/protocol-v3/src/internal/seal-authority-identity.ts"
+			),
+			"@ts-drp/protocol-v3/creator-checkpoint": path.resolve(
+				__dirname,
+				"packages/protocol-v3/src/creator-checkpoint.ts"
 			),
 			"@ts-drp/protocol-v3/creator-close": path.resolve(__dirname, "packages/protocol-v3/src/creator-close.ts"),
 			"@ts-drp/protocol-v3/seal": path.resolve(__dirname, "packages/protocol-v3/src/seal.ts"),

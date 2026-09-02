@@ -74,6 +74,7 @@ const FIXTURE_DIRECTORY = resolve(CURRENT_DIRECTORY, "fixtures/phase-3a0-v3");
 const PROTOCOL_V3_PACKAGE = resolve(REPOSITORY_ROOT, "packages/protocol-v3/package.json");
 const PROTOCOL_V3_INDEX = resolve(REPOSITORY_ROOT, "packages/protocol-v3/src/index.ts");
 const ANCHOR_TRUST_SINGLETON = resolve(REPOSITORY_ROOT, "packages/protocol-v3/src/anchor-trust-singleton.ts");
+const ANCHOR_TRUST_CUSTODY = resolve(REPOSITORY_ROOT, "packages/protocol-v3/src/internal/seal-authority-custody.ts");
 const AUTHOR_AUTHORIZATION_ENTRY = resolve(REPOSITORY_ROOT, "packages/protocol-v3/src/author-authorization.ts");
 const EXPECTED_RUNTIME_EXPORTS = [
 	"ANCHOR_TRUST_STATE_MAX_RECORD_BYTES",
@@ -909,10 +910,11 @@ describe("Phase 3a-0-A creator trust causal RED", () => {
 		const publicSource = readFileSync(resolve(REPOSITORY_ROOT, "packages/protocol-v3/src/public.ts"), "utf8");
 		const indexSource = readFileSync(PROTOCOL_V3_INDEX, "utf8");
 		const singletonSource = existsSync(ANCHOR_TRUST_SINGLETON) ? readFileSync(ANCHOR_TRUST_SINGLETON, "utf8") : "";
+		const custodySource = existsSync(ANCHOR_TRUST_CUSTODY) ? readFileSync(ANCHOR_TRUST_CUSTODY, "utf8") : "";
 		const authorizationSource = existsSync(AUTHOR_AUTHORIZATION_ENTRY)
 			? readFileSync(AUTHOR_AUTHORIZATION_ENTRY, "utf8")
 			: "";
-		const source = `${publicSource}\n${indexSource}\n${singletonSource}\n${authorizationSource}`;
+		const source = `${publicSource}\n${indexSource}\n${singletonSource}\n${custodySource}\n${authorizationSource}`;
 		for (const forbidden of [
 			"AheDurableStore",
 			"catalog.resolve",
@@ -929,6 +931,7 @@ describe("Phase 3a-0-A creator trust causal RED", () => {
 			[publicPath, publicSource],
 			[PROTOCOL_V3_INDEX, indexSource],
 			[ANCHOR_TRUST_SINGLETON, singletonSource],
+			[ANCHOR_TRUST_CUSTODY, custodySource],
 			[AUTHOR_AUTHORIZATION_ENTRY, authorizationSource],
 		]);
 		expect(authorityViolations(publicPath, cleanGraph)).toEqual([]);
