@@ -93199,8 +93199,11 @@ earlier evidence:
   one immediate predecessor, current trust/CutValue/QC, and the external floor;
   no older transition chain is read. It proves the active closure retires
   exactly the prior transition pair while both rollback generations and D.109
-  gates preserve recoverability. No current trust capability exists before
-  current QC and expected-head verification.
+  gates preserve recoverability. On the genuine 0→1→2 path it mechanically
+  asserts exactly two head advances per transition, their exact revision deltas,
+  and that the older/floor retained closure still contains the epoch-(N-1)
+  `drp-anchor-trust-state` immediately before reclamation. No current trust
+  capability exists before current QC and expected-head verification.
 - Adversarial gates cover tampered or cross-room/cross-genesis carriers,
   signatures, object, epoch, current/predecessor anchors, previous-anchor link,
   CutValue, QC phase/value/signers, floor lag/ahead/conflict, skipped epoch,
@@ -93307,6 +93310,38 @@ P2 is the same two-trust sketch and is closed by that correction. Because the
 P1 correction changes the frozen security input and retention contract, one
 bounded confirmation of the signed/pushed correction is required before
 D.110c-0b0b acceptance. Grok's session did not cancel, so no resume is required.
+
+That single confirmation inspected signed/pushed correction
+`1db116646c764065084b6eb57a1949d369d14055`, tree
+`e1eb953668bcba47c9bdceb46a84279893c2960f`, in a second clean detached
+checkout. Prompt SHA-256 is
+`4456eefd3c14b8413b0ed3d85d04eda583effcdd746f31f56dabac034c45281a`.
+Grok 4.6/high again completed normally rather than canceling, after 390.174
+seconds with `stop_reason=end_turn` and no timeout. Its strict runner again
+classified leading inspection prose as `NO_VERDICT`, while the extracted
+terminal result was `APPROVED`, P0=0/P1=0/P2=0. Event, public, status, and
+terminal SHA-256 values are
+`34a4a1abb0884403832da9ca2120a60a90e7c13f314a15bbcf1ccfff5bcff8a6`,
+`5d81419720fabf9f1f3d5ec810f54469d2ea6071b6ad63f805d8e6d12869b0f6`,
+`94c79aafd83c548495da6a855ddca7496342f3aa9c848ce7dd4a2d7e105451ee`,
+and `e03d95a011a05cb5c665c91df99c1c778eb7a059cee679243d3c43af3e49cdd0`.
+Standard direct Kimi K3 session
+`session_f17f7e3b-dee7-46dd-8b61-d22e0ca8df1d` with the exact 100-step control
+returned `APPROVED`, P0=0/P1=0/P2=0; stream and terminal SHA-256 values are
+`47020a0a88879642752ba981136bb01976ba07ff5cad29f47f902838ccd95559`
+and `b48640e0630bd35958133c08b0a140c21491a3dbbfafdc3ff96e6c3f24db073e`.
+Opus xhigh session `c0fa54b4-c496-4db7-be74-89c600c4eec2` returned
+`APPROVED`, P0=0/P1=0/P2=1; stream and terminal SHA-256 values are
+`732418abe27b97f5d9d67010be7bb6dbfdf9cf69701dd05a2bdcc0f8e9c9a856`
+and `3964b91a01df76c0e5b2557d6441f2da92b4aeb68bee05917d97beabddeaf8ea`.
+Its P2 is assigned to D.110c-0b1 GREEN and is now explicit above: mechanically
+assert exactly two head advances/revision deltas per genuine transition and the
+predecessor trust's presence in the retained floor closure immediately before
+reclamation, carried into D.110c-c/d census. It does not reopen the accepted
+design or trigger another confirmation. The confirmed blocking union is empty;
+D.110c-0b0b is accepted. No production edit or workload is authorized by this
+design closure; the exact causal order now resumes with the already planned
+D.110c-0b0 GREEN before D.110c-a/b.
 
 The owner-selection review inspected signed/pushed plan-only commit
 `65912fbc6fc128fb4cc648c7f028924bd36cb865` from
