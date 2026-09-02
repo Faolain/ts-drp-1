@@ -95198,6 +95198,127 @@ post-commit signature plus pushed-ref identity in its evidence root. These
 items do not weaken this slice's genuine two-transition acceptance, authorize a
 third transition or campaign, or reopen its immutable RED/GREEN evidence.
 
+##### D.110c-0c durable pending-adoption resume plan
+
+**Status: bounded source audit complete; plan review pending.** Owner:
+`packages/node/src/creator-adoption.ts` pending-candidate authentication and
+recovery kernel, the already exported
+`@ts-drp/node/creator-adoption-recover` capture boundary, the existing private
+epoch-relative transition classifier, and the existing v3-room room-head/AHE/
+snapshot composition. Storage-browser persistent-profile restart tests own the
+causal fault and restart harness. Deadline: signed GREEN before D.110c-c RED and
+before any post-close or pre-adoption restart acceptance. This slice does not
+reopen 0b0a/0b1, add another recovery entry, activate a pending head, authorize
+cleanup/pruning or a third completed hot transition, change wire/schema/root
+exports/dependencies/authority/floor/rollback/thresholds, or run a campaign.
+
+The audit at signed/pushed 0b1 closure `ff1a9807` corrects the umbrella's old
+pre-0b0a premise: a genuine public recovery entry now exists and is already
+composed by v3-room. `recoverPendingCreatorSuccessorAdoption()` has an exact
+eleven-key input and delegates to one private installed owner. On reopen,
+v3-room obtains the exact stable/pending pair from the authenticated room-head
+owner, asks the recovery owner to publish the AHE candidate, commits the
+room-head advance only after that success, and only then calls the separately
+authenticated active cold-reopen path. Therefore no public entry, new
+authority carrier, or schema change is justified by the source audit.
+
+The demonstrated missing seam is narrower. `authenticatePendingCandidate()`
+still selects current projection kind `v3-live-generation-1`, opens the current
+trust with the genesis-only `openCurrentAnchorTrust()`, uses the one-transition
+`inspectCreatorTrustAdvance()`, requires the input genesis preimage/signature to
+equal the current trust record, and writes literal chain epochs 0 and 1. Those
+checks correctly preserve 0→1 compatibility but reject a genuine bounded
+epoch-2→3 pending candidate before the existing deterministic candidate/fork/
+CAS recovery logic can run. The accepted 0b1 checkpoint opener and shared
+`inspectCreatorTransitionAdvance(..., mode: "verify")` are the exact existing
+seams needed for N≥1; the authenticated expected previous/next room heads are
+the independent floor inputs. A RED that demonstrates a different missing
+authority, a public/API/schema need, or inability to preserve the 0→1 bytes
+stops production work and reslices.
+
+The deterministic RED is tests-only and runs once after this plan review. A
+Chromium persistent-profile fixture uses the real product room to complete
+epoch 0→1 and 1→2 with issue/publish work, closes epoch 2, and begins the real
+staged adoption. It uses the already retained `failBeforePublication` and
+one-shot room-head commit fault seams in separate old-AHE/new-AHE cases to stop
+after the authenticated pending floor and durable candidate exist but before
+the pair is jointly committed. The browser context is then terminated without
+graceful room cleanup, removing all in-memory handles/WeakMaps; the same browser
+profile and origin are reopened from the durable databases and exact snapshot
+declaration. Every semantic precondition is serialized before the terminal
+assertion: stable epoch 2, pending next epoch 3, genuine Cut/QC/trust/projection,
+expected AHE ordering, unchanged application state, and zero activation before
+recovery. Current production must return the exact room-level pending-invalid
+or recovery-unavailable classification, after which RED throws only
+`D110C_0C_PENDING_EPOCH3_RESUME_MISSING`. The focused reporter must select
+exactly the two orderings in one file, with two intended failures, no retained
+campaign title, no top-level error, and the complete token exactly twice.
+
+GREEN changes only the internal pending authenticator. For expected predecessor
+epoch 0 it preserves the present projection selection, genesis opener,
+one-step successor opener, input-carrier equality, additive transition
+predicate, and chain fields. For expected predecessor epoch N≥1 it:
+
+1. selects the current projection with the existing epoch-relative projection
+   helper and the successor projection at N+1;
+2. supplies the input's pinned-genesis preimage/signature, the exact current and
+   successor trust records, exact new Cut/QC, object id, and independently
+   authenticated expected-next head to `openCreatorCheckpointTrust()`;
+3. requires the returned predecessor and current opaque trusts to equal the
+   expected previous and next room heads exactly;
+4. verifies the current→proposed closure with the shared bounded classifier in
+   `verify` mode, without reconstructing or retaining an older proof chain;
+5. derives the chain epochs and projection kind from those authenticated
+   values, then reuses the existing snapshot, catalog, parameters, ACL,
+   generation-lineage, fork-selection, CAS-reread, and room-head commit logic;
+   and
+6. returns only the existing non-activating published-head result. Active
+   custody is still created solely by the later cold-reopen owner against the
+   committed room-head floor.
+
+The GREEN persistent-profile gate must pass both crash orderings, prove exactly
+one recovery CAS where needed, clear the pending floor only after authenticated
+AHE publication, cold reopen epoch 3, issue and publish genuine post-restart
+work, and compare an independently derived message/state digest, history root/
+size, ACL/writer authority, anchor lineage, snapshot/manifest identities,
+journal counts, and operation accounting against the pre-crash oracle. It also
+repeats the retained 0→1 pending-recovery matrix byte-for-byte and covers
+malformed heads, wrong previous/next epoch or anchor, stale floor/head, complete
+older generation, skipped epoch, same-epoch fork, cross-object/genesis,
+substituted trust/Cut/QC/projection/snapshot, missing/duplicate candidates,
+incomplete writes, lost CAS response, true fork, and already-active idempotence.
+Every failure occurs before room-head commit or activation; an ambiguous write
+is decided only by authenticated reread.
+
+The 0b1 P2 union is an explicit retained obligation rather than hidden scope.
+This slice records, but does not mix into its causal production repair, that
+`creatorFilteredIssuanceStore` counters are wrapper-lifetime rather than
+per-scan and currently permit two separately bounded row classes. D.110c-c owns
+the narrow deterministic RED/GREEN that scopes them per scan, freezes one
+combined `maxEpochVertices` hidden-row ceiling, and proves unresolved old or
+intermediate issuance/outbox work cannot be erased or silently treated as
+published before cleanup. General physical retirement of arbitrary
+intermediate-epoch issuance rows remains D.110c-c, before D.110c-d's ≥100
+transitions. D.110c-0c retains the current fail-closed behavior and makes no
+`v3-live.ts` counter/filter change. Its GREEN evidence serializes the
+independent post-reopen oracle and retains every audit script literally plus
+post-commit signature/pushed-ref identity.
+
+Focused GREEN runs once, followed by the exact retained 0b0a, 0b1, D.110c-a/b,
+Phase-6a adoption/reopen, issuance/outbox, room-head, snapshot-substitution,
+cleanup/rollback/availability, and storage-browser restart roster. Exact-owner
+lint/format/diff, Node/storage-browser builds and production-source typechecks,
+one-test/file listing, source/export/runtime shape, protected paths, all 27
+stashes, process/port predicates, hashes, and a self-excluding manifest are
+mandatory. RED and GREEN evidence are signed and pushed. As a high-risk
+production-lifecycle restart slice, the bounded plan receives one
+Grok 4.6/high, direct Kimi K3 100-step, and Opus xhigh review before RED; the
+signed GREEN receives the governing final plan→RED→GREEN review. Only P0/P1
+blocks, and no Fable or collaboration subagent is invoked. The literal source
+audit and its six-entry self-excluding manifest are retained under
+`.logs/d110c-0c-plan-audit-ff1a9807/`; the validating manifest SHA-256 is
+`ae081775672303cb5a7fc740d6759710ba7b6d0d26034ad27f78203871f090fd`.
+
 The four prerequisite decisions, including the newly demonstrated 0b0
 freshness-floor authority question, are reviewed before their production edits;
 each executable sub-slice receives its own bounded causal RED and GREEN. The
