@@ -92680,6 +92680,34 @@ the bounded plan review for this executable sub-slice; deterministic RED needs
 no additional model round. No browser campaign or D.110a invocation is
 authorized.
 
+That RED ran exactly once from signed/pushed freeze commit
+`2ba2752ff5dca0d39656f97b429fe6439be7bae9`, tree
+`8f77c0b7b5403d411cf9844a01b0f8df7b47a3f8`, after the complete workspace
+package build exited zero with empty stderr. From `2026-09-02T06:04:47Z`
+through `2026-09-02T06:04:54Z`, the exact command selected one test in one
+test-result file, returned status 1, and reported zero passes, one failure, zero
+skips, and no top-level or child-launch error. The genuine freshly built
+epoch-1 cold reopen activated without any independently authenticated
+room-head authority; the sole failure was exactly
+`TypeError: D110C_0B0_FRESHNESS_FLOOR_MISSING`. This is the frozen causal RED:
+the creator signature and authentic local successor bytes establish content
+authenticity but not freshness.
+
+The accepted RED audit SHA-256 is
+`834e8c20a85a6d1a74cd28a51b4832c1645e6005263c505f9556a763c593306a`.
+It proves local/upstream equality at the freeze commit, exact freshly built
+package import ownership, unchanged production/lockfile identities, zero
+tracked dirt before evidence recording, 26 preserved stashes, all protected
+roots present, no relevant ts-drp process, all four fixed ports clear, and zero
+campaign or D.110a invocation. Vitest JSON/stdout/stderr SHA-256 values are
+`732c82ff6233209326c337cee5f5b3cb50a1b634f0a99609a69a4de931b4e6b5`,
+`a4dd8d50187eb4056245d66dc1ef35874a59aab64806aad3ed48381b4fd8565d`,
+and `702197514be5b0d6cfb028f66fe2a1fe0a7cd881be4dafe4ef8e5db2539a5a3f`.
+The validating self-excluding RED manifest SHA-256 is
+`67f6311573e754a3cbd5d4233bd292aee994d06e7b7fbfc674c23b148b639fe2`.
+The RED gate is closed and the next authorized state is the narrow D.110c-0b0
+GREEN; the RED command may not be rerun.
+
 The expressly authorized one-off Fable 5.1/high parallel audit, session
 `5d9b90ff-5bca-4284-92fa-a9f1018273ff`, independently re-fetched the three
 pinned Hiero heads, inspected the local trust/closure/reopen owners read-only,
