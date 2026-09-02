@@ -1,0 +1,1120 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+commit 22ee1c59b3163e4f5b23c5cb299570cdeda08a03
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 15:29:13 2026 -0400
+
+    docs(d110c-0b1): freeze bounded checkpoint plan
+
+ .../d110c-0b1-plan-audit-80b2e65b/audit-ledger.md  |  34 ++++
+ .../production-hardening-tdd-plan-v2.md            | 197 +++++++++++++++++++++
+ 2 files changed, 231 insertions(+)
+22ee1c59b3163e4f5b23c5cb299570cdeda08a03 docs(d110c-0b1): freeze bounded checkpoint plan
+audit-ledger.md
+commit 22ee1c59b3163e4f5b23c5cb299570cdeda08a03
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Wed Sep 2 15:29:13 2026 -0400
+
+    docs(d110c-0b1): freeze bounded checkpoint plan
+
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index 7b69aac8..9e3dc347 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -94676,6 +94676,203 @@ integrity blocker. D.110c-b GREEN is closed at the reviewed correction commit;
+ no further D.110c-b model round or executable rerun is authorized by this
+ closure.
+ 
++##### D.110c-0b1 bounded checkpoint opener and control-proof compaction plan
++
++**Status: bounded plan and source audit; no RED or production edit yet.** This
++is the next executable D.110c slice after the closed D.110c-b checkpoint. Its
++owner is the accepted non-root protocol-v3 creator-checkpoint boundary, the
++accepted non-root control-plane bounded-advance boundary, and their existing
++Node creator-close/cold-reopen/pending-recovery consumers. Its deadline is
++GREEN before D.110c-0c and D.110c-c RED. It does not reopen 0b0, 0a, a, or b;
++change the v1 trust record, wire format, authority, floor, rollback count,
++archive law, dependency set, threshold, root export roster, or product API; or
++authorize pruning, a long campaign, D.110a reuse, Phase-7 archive work, or a
++third adoption.
++
++The bounded source audit at signed/pushed D.110c-b closure `80b2e65b` finds one
++coherent missing path rather than a second lifecycle defect:
++
++- `packages/protocol-v3/src/index.ts` can install/open only an epoch-0 creator
++  trust root. `packages/protocol-v3/src/creator-close.ts` can mint
++  `openCreatorSuccessorTrust()` only from an already genuine immediate
++  predecessor capability. There is no `creator-checkpoint` subpath, no safe way
++  for Node to mint epoch-(N-1) trust from raw storage, and no root export that
++  should be widened.
++- `packages/control-plane/src/creator-trust-advance.ts` implements
++  `inspectCreatorTrustAdvance()` as current closure minus current trust plus
++  successor trust and the new CutValue/QC pair. It has no retiring-proof input;
++  therefore every prior transition pair remains in the next active closure.
++- `packages/node/src/creator-close.ts` constructs that exact additive closure
++  and invokes the unbounded predicate for every epoch. The genuine D.110c-a/b
++  path consequently supplies a causal epoch-2 closure-growth control rather
++  than a synthetic census.
++- `packages/node/src/creator-adoption.ts` cold reopen and pending recovery both
++  call `openCurrentAnchorTrust()` on the predecessor record, require the
++  caller's genesis anchor/signature bytes to equal that predecessor record,
++  assign `currentEpoch: 0`/`successorEpoch: 1`, require
++  `v3-live-generation-1` followed by `v3-live-generation-2`, and use literal
++  epoch-0/epoch-1 ACL checks. Those branches therefore fail on a genuine active
++  epoch-2 room even though D.110c-b has already authenticated and activated it.
++- `packages/node/src/internal/creator-room-head.ts` and the accepted 0b0 room
++  authority already own exact copied `(objectId, epoch, currentAnchorDigest)`
++  validation. The checkpoint opener consumes that authenticated value; it does
++  not read a maximum epoch, trust the generation being opened, or create a new
++  floor.
++- `packages/node/src/internal/closed-epoch-cleanup.ts` already requires two
++  complete `Superseded` rollback generations. 0b1 may prove and preserve the
++  older/floor generation as the immediate-predecessor carrier, but it may not
++  delete a generation or weaken D.109 availability/snapshot/outbox authority.
++
++The end-state has one owner per concept. The new protocol subpath alone opens a
++bounded creator checkpoint; the existing successor opener remains the one-step
++hot/QC primitive it reuses. The new control-plane subpath alone classifies a
++bounded closure advance; the existing predicate remains the exact 0→1
++compatibility path. Node continues to own storage lineage and product
++composition, and its existing room-head owner remains the sole local floor
++shape/oracle. An unexported singleton-registry mint callback may be added inside
++protocol-v3 only so the reviewed opener can materialize the already-verified
++epoch-(N-1) capability; it is not a parallel public opener, naked authority
++constructor, test hook, or root export. The two duplicated cold/pending
++epoch-0/1 branches must consume one shared internal checkpoint-verification
++helper rather than retain divergent authentication copies.
++
++The public compatibility boundary is frozen as follows.
++
++1. `@ts-drp/protocol-v3/creator-checkpoint` exports exactly
++   `openCreatorCheckpointTrust` and its directly required types. Its exact
++   input keys are `detachedGenesisSignature`,
++   `exactCanonicalCommitQcBytes`, `exactCanonicalCurrentTrustStateRecordBytes`,
++   `exactCanonicalCutValueBytes`, `exactCanonicalGenesisAnchorPreimageBytes`,
++   `exactCanonicalPredecessorTrustStateRecordBytes`, `expectedCurrentHead`,
++   `expectedObjectId`, and `pinnedGenesisAnchorDigest`. `expectedCurrentHead`
++   is the copied exact three-key `{currentAnchorDigest,epoch,objectId}` room
++   floor and must equal the authenticated current trust. The opener validates
++   exact/canonical closed shapes and detached bytes; authenticates the genesis
++   preimage, creator carriers, signature, object, and pin; requires both v1
++   records to match those fixed creator carriers and genesis identity; verifies
++   both creator signatures; requires exact predecessor/current consecutive
++   epochs and the previous-anchor link; then reuses the existing one-step
++   creator successor/QC verification for the supplied current CutValue/QC. It
++   returns only the current `CurrentAnchorTrust`. Its exact failure roster is
++   `malformed-input`, `genesis-rejected`, `predecessor-rejected`,
++   `current-rejected`, `lineage-invalid`, `commit-qc-rejected`, and
++   `expected-head-mismatch`. No transient genesis/predecessor capability is
++   returned, no predecessor's older QC is read, and no self-selected floor is
++   accepted.
++2. `@ts-drp/control-plane/creator-trust-checkpoint-advance` exports exactly
++   `inspectBoundedCreatorTrustAdvance` and its directly required types. Its
++   exact input keys are `current`, `proofRefs`, `proposed`, and
++   `retiringProofRefs`. `proofRefs` and `retiringProofRefs` are each the exact
++   ordered `[CutValue ref, commit-QC ref]` tuple. The current candidates—not the
++   caller's labels—must decode the retiring tuple as exactly one current
++   `drp-hard-epoch-cut` and one commit-phase `drp-seal-qc`; the proposed
++   candidates must authenticate the exact new pair. The accepted closure is
++   current minus exactly one current trust ref and the exact retiring pair,
++   plus exactly one successor trust ref and the new pair, preserving every
++   other ref byte-for-byte. It reuses the existing successor-binding rules and
++   adds only `RETIRING_PROOF_REFS_INVALID` to the existing exact rejection
++   roster. Missing, duplicate, wrong-kind, wrong-phase, wrong-epoch,
++   substituted, still-retained, or extra-deleted refs fail closed.
++
++The deterministic tests-only RED is one signed/pushed checkpoint owned by
++`tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts` and
++`tests/fixtures/phase-6b-d110c-0b1/`. It extends the D.110c-a/b fixture only to
++expose the genuine storage, genesis invite, floor, snapshot, issuance, and live
++journal inputs already exercised by production. It may not author a trust
++record, anchor, CutValue, QC, generation, floor, or projection. One exact
++focused Vitest invocation selects three tests in one file, once, with coverage
++disabled and JSON reporting:
++
++1. the genuine 0→1→2 room supplies genesis invite bytes, epoch-1 predecessor,
++   epoch-2 current record, exact 1→2 CutValue/QC, and the authenticated epoch-2
++   floor; absence of the reviewed protocol seam yields only
++   `D110C_0B1_CHECKPOINT_OPENER_MISSING`;
++2. the same genuine closure proves the existing advance retains the 0→1 proof
++   pair and grows, while absence of the reviewed bounded predicate yields only
++   `D110C_0B1_BOUNDED_ADVANCE_MISSING`; and
++3. after terminalizing the hot owner, the real installed Node cold-reopen owner
++   receives that room's actual durable inputs and fails before returning
++   epoch-2 material, yielding only `D110C_0B1_COLD_REOPEN_EPOCH_PINNED`.
++
++RED acceptance is exactly three selected tests, three intended failures, zero
++unexpected/flaky/skipped tests, no top-level error, those three complete tokens,
++the demonstrated prior-pair retention and epoch literal/source predicates, and
++an otherwise unchanged durable head/floor. Any earlier seal, close, adoption,
++snapshot, storage, floor, or fixture failure stops and reslices from that owner.
++The signed RED records reporter JSON, stdout/stderr/status, current/proposed
++closure refs and decoded kind census, exact head revisions, changed paths,
++source hashes, and a validating self-excluding manifest. The final GREEN review
++must inspect this RED causality; no separate full three-model RED review runs
++under the governing prospective review policy.
++
++GREEN is one checkpoint implemented in two tightly related batches without an
++intermediate commit or model ceremony.
++
++**Batch 1 — protocol and control boundaries.** Add only the two reviewed
++non-root subpaths, their package export-map entries, and the minimum private
++protocol-v3 singleton-custody callback needed by the checkpoint opener. Keep
++root exports and all current APIs exact. Unit controls authenticate a genuine
++epoch-2 checkpoint from the pinned genesis carrier plus only its immediate
++predecessor/current pair; prove no N-2 record/QC is read; and cover every
++genesis, carrier, signature, room, epoch, link, CutValue, QC, expected-head,
++ambiguity, replay, fork, skipped-epoch, and stale-floor mutant with the frozen
++reason roster. Bounded-advance controls prove the exact retiring/new pair,
++byte-for-byte preservation of unrelated refs, constant closure count after the
++first transition, and all omission/substitution/duplication/wrong-kind/
++wrong-phase/still-retained/extra-deletion mutants. The exact two boundary tests
++run once after this batch.
++
++**Batch 2 — Node composition and genuine cold reopen.** For epoch 0→1,
++`creator-close.ts` and adoption retain the existing successor opener and
++unbounded compatibility predicate byte-for-byte. For every epoch N≥1 close,
++Node derives the unique authenticated prior CutValue/commit-QC pair from the
++current candidates, builds the bounded proposed closure, and requires the new
++predicate before staging. Cold reopen and pending recovery share one
++epoch-relative verifier: epoch 1 retains the existing genesis/one-step path;
++epoch N≥2 consumes the reviewed checkpoint opener, the independently captured
++expected room head, the older/floor immediate-predecessor closure, and the
++newer current/adoption closure. Projection and ACL checks derive exact
++predecessor/current epochs instead of using 0/1 literals. The verifier never
++walks N-2 state, chooses a largest stored epoch, or activates/deletes before
++checkpoint, snapshot, manifest, ACL, recovery, and floor verification.
++
++The full focused GREEN runs once after Batch 2 and must prove: a genuine room
++cold reopens at epoch 2 after 0→1, restart-equivalent owner teardown, and 1→2;
++the reopened room has exact state, semantic digest, ACL/writer authority,
++anchor, history root/size, archive root, snapshot/manifest, journal, operation
++accounting, issuance continuity, and successful issue/publish; the active epoch-2
++closure contains only the 1→2 CutValue/QC, while the older/floor rollback
++generation still contains the epoch-1 trust immediately before reclamation;
++there are exactly two AHE head advances with exact revision deltas for each
++transition; stale/forked floors and every frozen adversarial mutant fail before
++activation or deletion; and active/control closure counts and bytes are equal
++at epochs 1 and 2 apart from explicitly enumerated bounded projection/content
++differences. No GREEN claim includes pruning or a third transition.
++
++After the focused GREEN, the retained gate runs once and includes the complete
++D.110c-0b1 file; D.110c-0b0 floor/stage/recovery; protocol-v3 creator trust and
++seal vectors; control-plane trust closure; D.110c-0a seal custody; D.110c-a
++repeat close; D.110c-b hot adoption and its browser lock/failure controls;
++Phase-6a adoption/commit/activation/reopen; D.109 cleanup/rollback/
++availability/outbox non-consuming validators; and snapshot-substitution tests.
++Protocol-v3, control-plane, Node, storage-node, and storage-browser builds and
++exact source typechecks; v3-room/v3-chat typechecks; exact package export
++rosters; exact-owner ESLint/Prettier/diff/source-shape; runtime import identity;
++protected paths, all 27 stashes, process/port predicates, signed commits,
++pushed refs, hashes, and a self-excluding manifest are mandatory. D.110a's
++consumed preflight/full worker and every long campaign remain excluded.
++
++The bounded plan is signed and pushed before one Grok 4.6/high, standard direct
++Kimi K3 with `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review. If Grok
++cancels, resume the exact session. Only P0/P1 findings block; material findings
++are corrected in one batch with at most one confirmation when they change the
++public security contract, causal RED, scope, or acceptance behavior. P2 receives
++an owner/disposition without recursive prose review. The signed GREEN then
++receives the one governing formal plan→RED→GREEN review; it must prove causal
++RED closure, fixed-creator authority integrity, bounded control ownership,
++compatibility, retained behavior, and evidence custody. No Fable or
++collaboration subagent is invoked.
++
+ The four prerequisite decisions, including the newly demonstrated 0b0
+ freshness-floor authority question, are reviewed before their production edits;
+ each executable sub-slice receives its own bounded causal RED and GREEN. The
+						exactCanonicalSnapshotManifestBytes: persistedSnapshot.exactCanonicalManifestBytes,
+						historyRoot: commitment.historyRoot,
+						historySize: commitment.historySize,
+						snapshotManifestDigest: persistedSnapshot.manifestDigest,
+						stateDigest,
+					});
+					const prepared = prepareCreatorClose(closeInput);
+					if (!prepared.ok) throw new TypeError(`creator close preparation failed: ${prepared.reason}`);
+					const finalized = await actor.close({ closeInput });
+					if (
+						finalized.ok !== true ||
+						!(finalized.exactCanonicalCommitQcBytes instanceof Uint8Array) ||
+						!(finalized.exactCanonicalTrustStateRecordBytes instanceof Uint8Array)
+					)
+						throw new TypeError(`creator close actor failed: ${String(finalized.reason)}`);
+					const successor = openCreatorSuccessorTrust({
+						currentTrust: registration.currentTrust,
+						exactCanonicalCommitQcBytes: finalized.exactCanonicalCommitQcBytes,
+						exactCanonicalCutValueBytes: prepared.exactCanonicalCutValueBytes,
+						exactCanonicalTrustStateRecordBytes: finalized.exactCanonicalTrustStateRecordBytes,
+					});
+					if (!successor.ok) throw new TypeError(`creator successor reopen failed: ${successor.reason}`);
+					if (
+						successor.trust.currentEpoch !== successorEpoch ||
+						successor.trust.objectId !== registration.currentTrust.objectId ||
+						successor.trust.genesisAnchorDigest !== registration.currentTrust.genesisAnchorDigest
+					) {
+						throw new TypeError("creator successor epoch identity failed");
+					}
+					const successorTrustRef = refFor(finalized.exactCanonicalTrustStateRecordBytes);
+					const cutValueRef = refFor(prepared.exactCanonicalCutValueBytes);
+					const commitQcRef = refFor(finalized.exactCanonicalCommitQcBytes);
+					const proposed = Object.freeze(
+						[
+							...current.references.filter(({ digest }) => digest !== current.trustRef.digest),
+							successorTrustRef,
+							cutValueRef,
+							commitQcRef,
+						].sort(compareRef)
+					);
+					const proposedCandidates = [
+						...current.candidates.filter(({ ref }) => ref.digest !== current.trustRef.digest),
+						{ bytes: finalized.exactCanonicalTrustStateRecordBytes, ref: successorTrustRef },
+						{ bytes: prepared.exactCanonicalCutValueBytes, ref: cutValueRef },
+						{ bytes: finalized.exactCanonicalCommitQcBytes, ref: commitQcRef },
+					].filter(({ ref }) => ref.byteLength <= SCANNABLE_BYTES);
+					const advance = inspectCreatorTrustAdvance({
+						current: { candidates: current.candidates, closure: current.references },
+						proofRefs: [cutValueRef, commitQcRef],
+						proposed: { candidates: proposedCandidates, closure: proposed },
+					});
+					if (!advance.ok) throw new TypeError(`creator trust advance failed: ${advance.reason}`);
+					const proposedHead = await stageCombinedGeneration(
+						registration.store,
+						current,
+						[
+							{ bytes: finalized.exactCanonicalTrustStateRecordBytes, ref: successorTrustRef },
+							{ bytes: prepared.exactCanonicalCutValueBytes, ref: cutValueRef },
+							{ bytes: finalized.exactCanonicalCommitQcBytes, ref: commitQcRef },
+						],
+						proposed
+					);
+					if (!registration.terminalize()) throw new TypeError("creator close terminalization failed");
+					lifecycle = "successor-pending-adoption";
+					const result = Object.freeze({
+						closedVertexCount: commitment.closeSetCount,
+						commitQcRef: copiedRef(commitQcRef),
+						currentTrustRef: copiedRef(current.trustRef),
+						cutValueRef: copiedRef(cutValueRef),
+						epoch,
+						lifecycle: "successor-pending-adoption" as const,
+						ok: true as const,
+						successorAnchorDigest: successor.trust.currentAnchorDigest,
+						successorEpoch,
+						successorTrustRef: copiedRef(successorTrustRef),
+					});
+					if (
+						!installCreatorAdoptionFacts(
+							handle,
+							Object.freeze({
+								closeResult: result,
+								currentHead: Object.freeze({ ...current.head }),
+								currentReferences: Object.freeze(current.references.map(copiedRef)),
+								currentTrust: registration.currentTrust,
+								durableReplay,
+								exactCanonicalLatchedAclBytes: Uint8Array.from(registration.exactCanonicalLatchedAclBytes),
+								exactCanonicalParametersCarrierBytes: Uint8Array.from(registration.exactCanonicalParametersBytes),
+								history: commitment,
+								issuanceScope: Object.freeze({ ...registration.issuanceScope }),
+								issuanceStore: registration.issuanceStore,
+								liveJournalStore: registration.liveJournalStore,
+								objectId: registration.objectId,
+								proposedHead: Object.freeze({ ...proposedHead }),
+								proposedReferences: Object.freeze(proposed.map(copiedRef)),
+								snapshotDeclaration: persistedSnapshot.declaration,
+								snapshotStore: input.snapshotStore,
+								sourceRuntimeHandle: new WeakRef(input.plane),
+								store: registration.store,
+								terminalizeSource: (): boolean => {
+									if (lifecycle !== "successor-pending-adoption") return false;
+									lifecycle = "successor-adopted";
+8:import { type CurrentAnchorTrust, openCurrentAnchorTrust } from "@ts-drp/protocol-v3";
+112:	readonly currentProjectionKind: "v3-live-generation-1" | "v3-live-generation-2";
+187:function currentProjectionKind(epoch: number): "v3-live-generation-1" | "v3-live-generation-2" {
+188:	return epoch === 0 ? "v3-live-generation-1" : "v3-live-generation-2";
+598:			kind: "v3-live-generation-2",
+867:			expectedEpoch: 1,
+970:		const currentProjection = uniqueCandidateByKind(currentCandidates, "v3-live-generation-1");
+971:		const successorProjection = uniqueCandidateByKind(activeCandidates, "v3-live-generation-2");
+984:		const openedCurrent = openCurrentAnchorTrust({
+1036:			currentEpoch: 0,
+1044:			currentProjectionKind: "v3-live-generation-1",
+1049:			successorEpoch: 1,
+1060:			successorProjection.record.epoch !== 1 ||
+1259:		const currentProjection = uniqueCandidateByKind(currentCandidates, "v3-live-generation-1");
+1260:		const successorProjection = uniqueCandidateByKind(candidateCandidates, "v3-live-generation-2");
+1273:		const openedCurrent = openCurrentAnchorTrust({
+1324:			currentEpoch: 0,
+1332:			currentProjectionKind: "v3-live-generation-1",
+1337:			successorEpoch: 1,
+			return opened.ok ? [Object.freeze({ qc: candidate, trust: opened.trust })] : [];
+		});
+		if (openedSuccessors.length !== 1) return coldFailure("chain-invalid", "creator successor QC is invalid");
+		const openedSuccessor = openedSuccessors[0] as (typeof openedSuccessors)[number];
+		if (
+			!inspectCreatorTrustAdvance({
+				current: { candidates: currentCandidates, closure: currentGeneration.closure },
+				proofRefs: [cutCandidate.ref, openedSuccessor.qc.ref],
+				proposed: { candidates: proposedCandidates, closure: proposedGeneration.closure },
+			}).ok
+		) {
+			return coldFailure("chain-invalid", "creator successor trust advance is invalid");
+		}
+		const currentTrustRecord = currentTrustCandidate.record;
+		const successorTrustRecord = successorTrustCandidate.record;
+		if (
+			!(currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array) ||
+			!(currentTrustRecord.detachedCurrentAnchorSignature instanceof Uint8Array) ||
+			!(successorTrustRecord.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array) ||
+			!(successorTrustRecord.detachedCurrentAnchorSignature instanceof Uint8Array) ||
+			!sameBytes(
+				input.exactCanonicalAnchorPreimageBytes,
+				currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes
+			) ||
+			!sameBytes(input.detachedSignature, currentTrustRecord.detachedCurrentAnchorSignature)
+		) {
+			return coldFailure("chain-invalid", "creator genesis carriers do not match durable trust");
+		}
+		const currentAnchor = canonicalRecord(currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes);
+		const successorAnchorBytes = Uint8Array.from(successorTrustRecord.exactCanonicalCurrentAnchorPreimageBytes);
+		const successorAnchor = canonicalRecord(successorAnchorBytes);
+		if (currentAnchor === undefined || successorAnchor === undefined) {
+			return coldFailure("chain-invalid", "creator anchor carriers are invalid");
+		}
+		const chain: VerifiedChain = Object.freeze({
+			currentAnchor,
+			currentEpoch: 0,
+			currentCatalog: Object.freeze({
+				artifactDigest: String(currentProjection.record.artifactDigest),
+				artifactId: String(currentProjection.record.artifactId),
+				blueprintDigest: String(currentProjection.record.blueprintDigest),
+				catalogDigest: String(currentProjection.record.catalogDigest),
+				runtimeProfile: String(currentProjection.record.runtimeProfile),
+			}),
+			currentProjectionKind: "v3-live-generation-1",
+			currentTrustRecord,
+			cut: cutCandidate.record,
+			successorAnchor,
+			successorAnchorBytes,
+			successorEpoch: 1,
+			successorTrust: openedSuccessor.trust,
+			successorTrustRecord,
+		});
+		const snapshot = await verifySnapshot(input, chain);
+		if (snapshot === undefined) return coldFailure("snapshot-unavailable", "creator successor snapshot is unavailable");
+		const resolved = verifiedCatalog(input.catalog, snapshot.payload.blueprintDigest, chain.currentCatalog);
+		const manifestDigest = input.snapshotDeclaration.scope.manifestDigest;
+		if (
+			resolved === undefined ||
+			successorProjection.record.anchorDigest !== openedSuccessor.trust.currentAnchorDigest ||
+			successorProjection.record.epoch !== 1 ||
+			successorProjection.record.objectId !== objectId ||
+			successorProjection.record.blueprintDigest !== successorAnchor.blueprintDigest ||
+			successorProjection.record.parametersDigest !== successorAnchor.parametersDigest ||
+			successorProjection.record.snapshotManifestDigest !== manifestDigest ||
+			successorProjection.record.snapshotPayloadDigest !== snapshot.manifest.payloadDigest ||
+			successorProjection.record.stateDigest !== snapshot.manifest.stateDigest ||
+			hex(hashDomain("ts-drp/parameters/v3", input.exactCanonicalParametersCarrierBytes)) !==
+				successorAnchor.parametersDigest
+		) {
+			return coldFailure("chain-invalid", "creator successor projection is invalid");
+		}
+		const exactCanonicalLatchedAclBytes = encodeCanonical(snapshot.payload.acl);
+		const predecessorAclCandidates = activeCandidates.filter(
+			(candidate) => hex(hashDomain("ts-drp/latched-acl/v3", candidate.bytes)) === currentAnchor.aclDigest
+		);
+		const predecessorExactCanonicalLatchedAclBytes = predecessorAclCandidates[0]?.bytes;
+		const openedPredecessorAcl =
+			predecessorAclCandidates.length === 1 && predecessorExactCanonicalLatchedAclBytes !== undefined
+				? openCanonicalLatchedAclSnapshot({
+						exactCanonicalLatchedAclBytes: predecessorExactCanonicalLatchedAclBytes,
+						expectedAclDigest: String(currentAnchor.aclDigest),
+						expectedEpoch: 0,
+						expectedObjectId: objectId,
+					})
+				: undefined;
+		if (
+			predecessorExactCanonicalLatchedAclBytes === undefined ||
+			openedPredecessorAcl === undefined ||
+			!openedPredecessorAcl.ok
+		) {
+			return coldFailure("chain-invalid", "creator predecessor ACL cannot be reconstructed");
+		}
+		const issuance = await authenticatedSuccessorIssuanceScope(
+			input,
+			objectId,
+			String(successorAnchor.aclDigest),
+			exactCanonicalLatchedAclBytes
+		);
+		if (!issuance.ok) {
+			const detail =
+				issuance.reason === "authority"
+					? "creator issuance ACL authority is invalid"
+					: issuance.reason === "possession"
+						? "creator issuance possession proof failed"
+						: "creator issuance lineage is invalid";
+			return coldFailure("chain-invalid", detail);
+		}
+		const issuanceScope = issuance.scope;
+		const material: CreatorSuccessorLiveMaterial = Object.freeze({
+			catalog: factsForCatalog(resolved),
+			exactCanonicalLatchedAclBytes,
+			exactCanonicalParametersCarrierBytes: Uint8Array.from(input.exactCanonicalParametersCarrierBytes),
+			exactCanonicalSnapshotPayloadBytes: Uint8Array.from(snapshot.exactCanonicalPayloadBytes),
+			issuanceScope,
+			issuanceStore: input.issuanceStore,
+			liveJournalStore: input.liveJournalStore,
+			pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
+			predecessor: Object.freeze({
+				candidates: currentCandidates,
+				detachedAnchorSignature: Uint8Array.from(currentTrustRecord.detachedCurrentAnchorSignature),
+				exactCanonicalAnchorPreimageBytes: Uint8Array.from(currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes),
+				exactCanonicalProjectionBytes: Uint8Array.from(currentProjection.bytes),
+				head: currentHead,
+				references: Object.freeze(currentGeneration.closure.map((ref) => Object.freeze({ ...ref }))),
+				trust: openedCurrent.trust,
+				trustRef: Object.freeze({ ...currentTrustCandidate.ref }),
+			}),
+			predecessorExactCanonicalLatchedAclBytes,
+			snapshotPayloadDigest: String(snapshot.manifest.payloadDigest),
+			stateDigest: String(snapshot.manifest.stateDigest),
+			store: input.store,
+			successor: Object.freeze({
+				candidates: activeCandidates,
+				detachedAnchorSignature: Uint8Array.from(successorTrustRecord.detachedCurrentAnchorSignature),
+				exactCanonicalAnchorPreimageBytes: successorAnchorBytes,
+				exactCanonicalProjectionBytes: Uint8Array.from(successorProjection.bytes),
+				head: Object.freeze({ ...active.head }),
+				references: Object.freeze(active.references.map((ref) => Object.freeze({ ...ref }))),
+				trust: openedSuccessor.trust,
+				trustRef: Object.freeze({ ...successorTrustCandidate.ref }),
+			}),
+			terminalizeSource: () => true,
+		});
+		return Object.freeze({ material, ok: true as const });
+	} catch {
+		return coldFailure("internal-invariant", "creator successor reopen failed unexpectedly");
+	}
+}
+
+interface AuthenticatedPendingCandidate {
+	readonly closureDigest: string;
+	readonly generation: GenerationRecord;
+	readonly head: PresentHead;
+}
+
+function exactRoomHead(value: unknown): CreatorAdoptionRoomHead | undefined {
+	try {
+		if (
+			value === null ||
+			typeof value !== "object" ||
+			Object.getPrototypeOf(value) !== Object.prototype ||
+			Reflect.ownKeys(value).sort().join(",") !== "currentAnchorDigest,epoch,objectId"
+		) {
+			return undefined;
+		}
+		const anchor = Object.getOwnPropertyDescriptor(value, "currentAnchorDigest");
+		const epoch = Object.getOwnPropertyDescriptor(value, "epoch");
+		const objectId = Object.getOwnPropertyDescriptor(value, "objectId");
+		return anchor !== undefined &&
+			"value" in anchor &&
+			anchor.enumerable === true &&
+			typeof anchor.value === "string" &&
+			/^[0-9a-f]{64}$/u.test(anchor.value) &&
+			epoch !== undefined &&
+			"value" in epoch &&
+			epoch.enumerable === true &&
+			typeof epoch.value === "number" &&
+			Number.isSafeInteger(epoch.value) &&
+			epoch.value >= 0 &&
+			objectId !== undefined &&
+			"value" in objectId &&
+			objectId.enumerable === true &&
+			typeof objectId.value === "string"
+			? Object.freeze({
+					currentAnchorDigest: anchor.value,
+					epoch: epoch.value,
+					objectId: objectId.value,
+				})
+			: undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+function sameRoomHead(left: CreatorAdoptionRoomHead, right: CreatorAdoptionRoomHead): boolean {
+	return (
+		left.currentAnchorDigest === right.currentAnchorDigest &&
+		left.epoch === right.epoch &&
+		left.objectId === right.objectId
+	);
+}
+
+function roomHeadFromTrust(trust: CurrentAnchorTrust): CreatorAdoptionRoomHead {
+	return Object.freeze({
+		currentAnchorDigest: trust.currentAnchorDigest,
+		epoch: trust.currentEpoch,
+		objectId: trust.objectId,
+	});
+}
+
+async function authenticatePendingCandidate(
+	input: CreatorAdoptionPendingRecoveryInput,
+	lineage: readonly GenerationRecord[],
+	candidate: GenerationRecord,
+	expectedPrevious: CreatorAdoptionRoomHead,
+	expectedNext: CreatorAdoptionRoomHead,
+	objectId: StorageObjectId
+): Promise<AuthenticatedPendingCandidate | undefined> {
+	try {
+		if (candidate.state !== "Complete" && candidate.state !== "Adopted") return undefined;
+		const proposedHead = presentBase(candidate);
+		const byId = new Map(lineage.map((generation) => [generation.generationId, generation]));
+		if (byId.size !== lineage.length || proposedHead === undefined) return undefined;
+		const proposedGeneration = byId.get(proposedHead.generationId);
+		const currentHead = proposedGeneration === undefined ? undefined : presentBase(proposedGeneration);
+		const currentGeneration = currentHead === undefined ? undefined : byId.get(currentHead.generationId);
+		if (
+			proposedGeneration === undefined ||
+			currentHead === undefined ||
+			currentGeneration === undefined ||
+			currentGeneration.state !== "Superseded" ||
+			(proposedGeneration.state !== "Adopted" && proposedGeneration.state !== "Superseded") ||
+			candidate.baseExpectedHead.kind !== "present" ||
+			proposedGeneration.baseExpectedHead.kind !== "present" ||
+			candidate.objectId !== objectId ||
+			proposedGeneration.objectId !== objectId ||
+			currentGeneration.objectId !== objectId ||
+			proposedHead.revision !== currentHead.revision + 1
+		) {
+			return undefined;
+		}
+		const closureDigest = digestClosure(candidate.closure);
+		if (!closureDigest.ok || candidate.closureDigest !== closureDigest.value) return undefined;
+		const candidateHead: PresentHead = Object.freeze({
+			closureDigest: closureDigest.value,
+			generationId: candidate.generationId,
+			kind: "present",
+			objectId,
+			revision: (proposedHead.revision + 1) as PresentHead["revision"],
+		});
+		const [currentCandidates, proposedCandidates, candidateCandidates] = await Promise.all([
+			loadClosure(input.store, currentGeneration.closure),
+			loadClosure(input.store, proposedGeneration.closure),
+			loadClosure(input.store, candidate.closure),
+		]);
+		if (currentCandidates === undefined || proposedCandidates === undefined || candidateCandidates === undefined) {
+			return undefined;
+		}
+		const currentProjection = uniqueCandidateByKind(currentCandidates, "v3-live-generation-1");
+		const successorProjection = uniqueCandidateByKind(candidateCandidates, "v3-live-generation-2");
+		const currentTrustCandidate = uniqueCandidateByKind(currentCandidates, "drp-anchor-trust-state");
+		const successorTrustCandidate = uniqueCandidateByKind(proposedCandidates, "drp-anchor-trust-state");
+		const cutCandidate = uniqueCandidateByKind(proposedCandidates, "drp-hard-epoch-cut");
+		if (
+			currentProjection === undefined ||
+			successorProjection === undefined ||
+			currentTrustCandidate === undefined ||
+			successorTrustCandidate === undefined ||
+			cutCandidate === undefined
+		) {
+			return undefined;
+		}
+		const openedCurrent = openCurrentAnchorTrust({
+			exactCanonicalTrustStateRecordBytes: currentTrustCandidate.bytes,
+			expectedObjectId: objectId,
+			pinnedGenesisAnchorDigest: input.pinnedGenesisAnchorDigest,
+		});
+		if (!openedCurrent.ok || !sameRoomHead(roomHeadFromTrust(openedCurrent.trust), expectedPrevious)) {
+			return undefined;
+		}
+		const qcs = proposedCandidates.flatMap((entry) =>
+			canonicalRecord(entry.bytes)?.kind === "drp-seal-qc" ? [entry] : []
+		);
+		const openedSuccessors = qcs.flatMap((entry) => {
+			const opened = openCreatorSuccessorTrust({
+				currentTrust: openedCurrent.trust,
+				exactCanonicalCommitQcBytes: entry.bytes,
+				exactCanonicalCutValueBytes: cutCandidate.bytes,
+				exactCanonicalTrustStateRecordBytes: successorTrustCandidate.bytes,
+			});
+			return opened.ok ? [Object.freeze({ qc: entry, trust: opened.trust })] : [];
+		});
+		if (openedSuccessors.length !== 1) return undefined;
+		const openedSuccessor = openedSuccessors[0] as (typeof openedSuccessors)[number];
+		if (
+			!sameRoomHead(roomHeadFromTrust(openedSuccessor.trust), expectedNext) ||
+			!inspectCreatorTrustAdvance({
+				current: { candidates: currentCandidates, closure: currentGeneration.closure },
+				proofRefs: [cutCandidate.ref, openedSuccessor.qc.ref],
+				proposed: { candidates: proposedCandidates, closure: proposedGeneration.closure },
+			}).ok
+		) {
+			return undefined;
+		}
+		const currentTrustRecord = currentTrustCandidate.record;
+		const successorTrustRecord = successorTrustCandidate.record;
+		if (
+			!(currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array) ||
+			!(currentTrustRecord.detachedCurrentAnchorSignature instanceof Uint8Array) ||
+			!(successorTrustRecord.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array) ||
+			!sameBytes(
+				input.exactCanonicalAnchorPreimageBytes,
+				currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes
+			) ||
+			!sameBytes(input.detachedSignature, currentTrustRecord.detachedCurrentAnchorSignature)
+		) {
+			return undefined;
+		}
+		const currentAnchor = canonicalRecord(currentTrustRecord.exactCanonicalCurrentAnchorPreimageBytes);
+		const successorAnchor = canonicalRecord(successorTrustRecord.exactCanonicalCurrentAnchorPreimageBytes);
+		if (currentAnchor === undefined || successorAnchor === undefined) return undefined;
+		const chain: VerifiedChain = Object.freeze({
+			currentAnchor,
+			currentEpoch: 0,
+			currentCatalog: Object.freeze({
+				artifactDigest: String(currentProjection.record.artifactDigest),
+				artifactId: String(currentProjection.record.artifactId),
+				blueprintDigest: String(currentProjection.record.blueprintDigest),
+				catalogDigest: String(currentProjection.record.catalogDigest),
+				runtimeProfile: String(currentProjection.record.runtimeProfile),
+			}),
+			currentProjectionKind: "v3-live-generation-1",
+			currentTrustRecord,
+			cut: cutCandidate.record,
+			successorAnchor,
+			successorAnchorBytes: Uint8Array.from(successorTrustRecord.exactCanonicalCurrentAnchorPreimageBytes),
+			successorEpoch: 1,
+			successorTrust: openedSuccessor.trust,
+			successorTrustRecord,
+		});
+		const snapshot = await verifySnapshot(input, chain);
+		if (snapshot === undefined) return undefined;
+		const resolved = verifiedCatalog(input.catalog, snapshot.payload.blueprintDigest, chain.currentCatalog);
+		const manifestDigest = input.snapshotDeclaration.scope.manifestDigest;
+		if (
+			resolved === undefined ||
+			successorProjection.record.anchorDigest !== openedSuccessor.trust.currentAnchorDigest ||
+			successorProjection.record.epoch !== expectedNext.epoch ||
+			successorProjection.record.objectId !== objectId ||
+			successorProjection.record.blueprintDigest !== successorAnchor.blueprintDigest ||
+			successorProjection.record.parametersDigest !== successorAnchor.parametersDigest ||
+			successorProjection.record.snapshotManifestDigest !== manifestDigest ||
+			successorProjection.record.snapshotPayloadDigest !== snapshot.manifest.payloadDigest ||
+			successorProjection.record.stateDigest !== snapshot.manifest.stateDigest ||
+			hex(hashDomain("ts-drp/parameters/v3", input.exactCanonicalParametersCarrierBytes)) !==
+				successorAnchor.parametersDigest
+		) {
+			return undefined;
+		}
+		const predecessorAclCandidates = candidateCandidates.filter(
+			(entry) => hex(hashDomain("ts-drp/latched-acl/v3", entry.bytes)) === currentAnchor.aclDigest
+		);
+		if (predecessorAclCandidates.length !== 1) return undefined;
+		const openedPredecessorAcl = openCanonicalLatchedAclSnapshot({
+			exactCanonicalLatchedAclBytes: predecessorAclCandidates[0]?.bytes as Uint8Array,
+			expectedAclDigest: String(currentAnchor.aclDigest),
+			expectedEpoch: expectedPrevious.epoch,
+			expectedObjectId: objectId,
+		});
+		return openedPredecessorAcl.ok
+			? Object.freeze({ closureDigest: closureDigest.value, generation: candidate, head: candidateHead })
+			: undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+function pendingRecoveryFailure(kind: string, detail: string): CreatorAdoptionPendingRecoveryResult {
+	return Object.freeze({ detail, kind, ok: false as const });
+}
+
+async function recoverPendingCreatorSuccessorMaterial(
+	input: CreatorAdoptionPendingRecoveryInput
+): Promise<CreatorAdoptionPendingRecoveryResult> {
+	try {
+		const expectedPrevious = exactRoomHead(input.expectedPreviousRoomHead);
+		const expectedNext = exactRoomHead(input.expectedNextRoomHead);
+		const parsedObjectId = parseStorageObjectId(input.snapshotDeclaration.scope.objectId);
+		if (
+			input.authenticationProfile !== "creator-only" ||
+			expectedPrevious === undefined ||
+			expectedNext === undefined ||
+			!parsedObjectId.ok ||
+			expectedPrevious.objectId !== parsedObjectId.value ||
+			expectedNext.objectId !== parsedObjectId.value ||
+			expectedNext.epoch !== expectedPrevious.epoch + 1
+		) {
+			return pendingRecoveryFailure("chain-invalid", "creator pending room-head input is invalid");
+		}
+		const objectId = parsedObjectId.value;
+		const [headResult, lineage] = await Promise.all([
+			input.store.readHead(objectId),
+			readGenerationLineage(input.store, objectId),
+		]);
+		if (!headResult.ok || headResult.value.kind !== "present" || lineage === undefined) {
+			return pendingRecoveryFailure("storage-failed", "creator pending durable state is unavailable");
+		}
+		const durableHead = headResult.value;
+		const candidates: AuthenticatedPendingCandidate[] = [];
+		for (const generation of lineage) {
+			const candidate = await authenticatePendingCandidate(
+				input,
+				lineage,
+				generation,
+				expectedPrevious,
+				expectedNext,
+				objectId
+			);
+			if (candidate !== undefined) candidates.push(candidate);
+		}
+		if (candidates.length === 0) {
+			return pendingRecoveryFailure("pending-missing", "creator pending successor is unavailable");
+		}
+		const closureDigests = new Set(candidates.map(({ closureDigest }) => closureDigest));
+		if (closureDigests.size !== 1) {
+			return pendingRecoveryFailure("true-fork", "creator pending successors disagree");
+		}
+		const alreadyActive = candidates.find(({ head }) => sameHead(head, durableHead));
+		if (alreadyActive !== undefined) {
+			return Object.freeze({
+				head: Object.freeze({ ...expectedNext }),
+				lifecycle: "successor-published" as const,
+				ok: true as const,
+				recovery: "active-new" as const,
+			});
+		}
+		const selected = [...candidates].sort((left, right) =>
+			left.generation.generationId < right.generation.generationId
+				? -1
+				: left.generation.generationId > right.generation.generationId
+					? 1
+					: 0
+		)[0] as AuthenticatedPendingCandidate;
+		const previous = presentBase(selected.generation);
+		if (previous === undefined || !sameHead(previous, durableHead)) {
+			return pendingRecoveryFailure("stale-head", "creator pending head is stale");
+		}
+		try {
+			await input.store.swapHead({
+				expectedHead: previous,
+				generationId: selected.generation.generationId,
+				objectId,
+			});
+		} catch {
+			// The authenticated reread below is the only authority after an ambiguous CAS.
+		}
+		const recovered = await input.store.recoverActiveGeneration(objectId);
+		if (!recovered.ok || recovered.value.kind !== "active") {
+			return pendingRecoveryFailure("pending-old", "creator pending successor remains unpublished");
+		}
+		const recoveredHead = recovered.value.head;
+		if (!candidates.some(({ head }) => sameHead(head, recoveredHead))) {
+			return pendingRecoveryFailure("pending-old", "creator pending successor remains unpublished");
+		}
+		return Object.freeze({
+			head: Object.freeze({ ...expectedNext }),
+			lifecycle: "successor-published" as const,
+			ok: true as const,
+			recovery: "active-new" as const,
+		});
+	} catch {
+		return pendingRecoveryFailure("internal-invariant", "creator pending recovery failed unexpectedly");
+	}
+}
+
+if (!installCreatorSuccessorReopen(reopenCreatorSuccessorMaterial)) {
+	throw new TypeError("creator successor reopen owner was already installed");
+}
+if (!installCreatorAdoptionPendingRecovery(recoverPendingCreatorSuccessorMaterial)) {
+	throw new TypeError("creator adoption pending recovery owner was already installed");
+}
+7
+2
+2
+packages/node/src/creator-adoption.ts:4
+packages/node/src/creator-adoption-commit.ts:2
+packages/node/src/creator-close.ts:2
+packages/control-plane/src/creator-trust-advance.ts:1
+120:	readonly currentEpoch: number;
+128:	readonly currentEpoch: 0;
+367:	openCurrentAnchorTrust(input: OpenCurrentAnchorTrustInput): OpenCurrentAnchorTrustResult;
+466:	"currentEpoch",
+480:	"currentEpoch",
+521:	readonly currentEpoch: number;
+866:		typeof value.currentEpoch === "number" &&
+1097:		currentEpoch: 0 as const,
+1159:				currentEpoch: 0,
+1241:				record.currentEpoch !== 0 ||
+1327:				currentEpoch: 0,
+1349:					currentEpoch: 0,
+1375:	const openCurrentAnchorTrust = (input: OpenCurrentAnchorTrustInput): OpenCurrentAnchorTrustResult => {
+1431:				!isSafeNonnegative(record.currentEpoch) ||
+1438:				record.currentEpoch !== 0 ||
+1440:				anchor.epoch !== record.currentEpoch ||
+1457:					currentEpoch: record.currentEpoch,
+1503:			if (anchor.epoch !== trust.currentEpoch) return anchorTrustFailure("epoch-mismatch");
+1593:			if (carrier.epoch !== trust.currentEpoch) return anchorTrustFailure("epoch-mismatch");
+1644:			currentEpoch: 0 as const,
+1656:			currentEpoch: trust.currentEpoch,
+1686:				anchor.epoch !== currentTrust.currentEpoch + 1 ||
+1698:					currentEpoch: anchor.epoch,
+1726:		openCurrentAnchorTrust,
+    4859 packages/protocol-v3/src/index.ts
+	const openCurrentAnchorTrust = (input: OpenCurrentAnchorTrustInput): OpenCurrentAnchorTrustResult => {
+		try {
+			const values = snapshotClosedInput(
+				input,
+				OPEN_TRUST_INPUT_KEYS,
+				new Set(["exactCanonicalTrustStateRecordBytes"])
+			);
+			if (
+				values === undefined ||
+				!isStorageObjectIdText(values.expectedObjectId) ||
+				typeof values.pinnedGenesisAnchorDigest !== "string" ||
+				!DIGEST_HEX.test(values.pinnedGenesisAnchorDigest)
+			) {
+				return anchorTrustFailure("malformed-input");
+			}
+			const recordBytes = values.exactCanonicalTrustStateRecordBytes as Uint8Array;
+			if (recordBytes.byteLength === 0 || recordBytes.byteLength > ANCHOR_TRUST_STATE_MAX_RECORD_BYTES) {
+				return anchorTrustFailure("malformed-input");
+			}
+			const decoded = decodeExact(recordBytes);
+			if (!decoded.ok) {
+				return anchorTrustFailure(decoded.reason === "noncanonical" ? "noncanonical-record" : "record-decode-failed");
+			}
+			if (!trustRecordShape(decoded.value) || decoded.value.kind !== "drp-anchor-trust-state") {
+				return anchorTrustFailure("record-schema-invalid");
+			}
+			const record = decoded.value;
+			if (record.version !== 1) return anchorTrustFailure("unsupported-trust-state-version");
+			if (record.objectId !== values.expectedObjectId) return anchorTrustFailure("object-id-mismatch");
+			if (record.genesisAnchorDigest !== values.pinnedGenesisAnchorDigest)
+				return anchorTrustFailure("genesis-pin-mismatch");
+			if (record.profileId !== CREATOR_PROFILE) return anchorTrustFailure("unsupported-trust-profile");
+
+			const anchorBytes = new Uint8Array(record.exactCanonicalCurrentAnchorPreimageBytes);
+			const signature = new Uint8Array(record.detachedCurrentAnchorSignature);
+			const signerSetBytes = new Uint8Array(record.exactCanonicalSignerSetBytes);
+			const profileBytes = new Uint8Array(record.exactCanonicalProfileBytes);
+			const anchorDecoded = decodeExact(anchorBytes);
+			const profileId = decodedProfileId(profileBytes);
+			if (profileId !== undefined && profileId !== CREATOR_PROFILE) {
+				return anchorTrustFailure("unsupported-trust-profile");
+			}
+			const carriers = decodeCreatorCarriers(signerSetBytes, profileBytes);
+			if (
+				!anchorDecoded.ok ||
+				!isAnchorRecord(anchorDecoded.value) ||
+				anchorDecoded.value.cryptoSuiteId !== ACTIVE_ANCHOR_SUITE
+			) {
+				return anchorTrustFailure("trust-state-inconsistent");
+			}
+			const anchor = anchorDecoded.value;
+			const anchorDigestBytes = hashDomain(ANCHOR_DIGEST_DOMAIN, anchorBytes);
+			const anchorDigest = bytesToHex(anchorDigestBytes);
+			if (
+				!isStorageObjectIdText(record.objectId) ||
+				!DIGEST_HEX.test(record.genesisAnchorDigest) ||
+				!isSafeNonnegative(record.currentEpoch) ||
+				!DIGEST_HEX.test(record.currentAnchorDigest) ||
+				record.quorum !== 1 ||
+				carriers === undefined ||
+				carriers.quorum !== 1 ||
+				!carriers.signerSetMatchesProfile ||
+				record.currentAnchorDigest !== record.genesisAnchorDigest ||
+				record.currentEpoch !== 0 ||
+				anchor.objectId !== record.objectId ||
+				anchor.epoch !== record.currentEpoch ||
+				anchor.historySize !== 0 ||
+				anchor.previousAnchor !== ZERO_DIGEST ||
+				anchor.cutDigest !== ZERO_DIGEST ||
+				anchorDigest !== record.currentAnchorDigest ||
+				bytesToHex(hashDomain(SIGNER_SET_DIGEST_DOMAIN, signerSetBytes)) !== anchor.signerSetDigest ||
+				bytesToHex(hashDomain(PROFILE_DIGEST_DOMAIN, profileBytes)) !== anchor.profileDigest
+			) {
+				return anchorTrustFailure("trust-state-inconsistent");
+			}
+			if (!verifyStrictSignature(signature, anchorDigestBytes, carriers.publicKey)) {
+				return anchorTrustFailure("invalid-signature");
+			}
+			const trust = mintAnchorTrust(
+				registry,
+				{
+					currentAnchorDigest: record.currentAnchorDigest,
+					currentEpoch: record.currentEpoch,
+					genesisAnchorDigest: record.genesisAnchorDigest,
+					objectId: record.objectId,
+					profileId: CREATOR_PROFILE,
+				},
+				{
+					detachedCurrentAnchorSignature: signature,
+					exactCanonicalCurrentAnchorPreimageBytes: anchorBytes,
+					exactCanonicalProfileBytes: profileBytes,
+					exactCanonicalSignerSetBytes: signerSetBytes,
+					publicKey: carriers.publicKey,
+					profileDigest: anchor.profileDigest,
+					quorum: 1,
+					signerSetDigest: anchor.signerSetDigest,
+17:export const {
+---
+26:export const certifiedSealAuthorityResolver: unique symbol = Symbol("certifiedSealAuthorityResolver");
+27:export const creatorAnchorTrustResolver: unique symbol = Symbol("creatorAnchorTrustResolver");
+28:export const creatorAnchorTrustSuccessorMinter: unique symbol = Symbol("creatorAnchorTrustSuccessorMinter");
+49:export function installCertifiedSealAuthorityResolver(resolver: SealAuthorityResolver): void {
+59:export function resolveCertifiedSealAuthorityMaterial(
+70:export function installCreatorAnchorTrustCustody(
+86:export function resolveCreatorAnchorTrustMaterial(trust: CurrentAnchorTrust): CreatorAnchorTrustMaterial | undefined {
+97:export function mintCreatorAnchorTrustSuccessor(
+114:export function mintCreatorAnchorSigningRequest(digest: Uint8Array): CreatorAnchorSigningRequest {
+125:export function consumeCreatorAnchorSigningRequestDigest(request: unknown): Uint8Array | undefined {
+packages/protocol-v3/package.json
+  .
+  ./author-authorization
+  ./blueprint-application
+  ./latched-acl
+  ./creator-close
+  ./seal
+  ./internal/seal-signing-request
+  ./internal/creator-anchor-signing-request
+  ./internal/seal-authority-identity
+  ./snapshot-transfer
+  ./registry/registry-v1.json
+packages/control-plane/package.json
+  .
+  ./creator-trust-advance
+export interface CertifiedSealAuthorityMaterial {
+	readonly currentAnchorDigest: string;
+	readonly currentEpoch: 0;
+	readonly exactCanonicalSignerSetBytes: Uint8Array;
+	readonly objectId: string;
+	readonly quorum: number;
+}
+
+export interface CreatorAnchorTrustMaterial {
+	readonly currentAnchorDigest: string;
+	readonly currentEpoch: number;
+	readonly detachedCurrentAnchorSignature: Uint8Array;
+	readonly exactCanonicalCurrentAnchorPreimageBytes: Uint8Array;
+	readonly exactCanonicalProfileBytes: Uint8Array;
+	readonly exactCanonicalSignerSetBytes: Uint8Array;
+	readonly genesisAnchorDigest: string;
+	readonly objectId: string;
+	readonly publicKey: Uint8Array;
+	readonly quorum: 1;
+}
+
+export interface CreatorAnchorSigningRequest {
+	readonly __creatorAnchorSigningRequest?: never;
+}
+
+export const certifiedSealAuthorityResolver: unique symbol = Symbol("certifiedSealAuthorityResolver");
+export const creatorAnchorTrustResolver: unique symbol = Symbol("creatorAnchorTrustResolver");
+export const creatorAnchorTrustSuccessorMinter: unique symbol = Symbol("creatorAnchorTrustSuccessorMinter");
+
+type SealAuthorityResolver = (trust: CertifiedAnchorTrust) => CertifiedSealAuthorityMaterial | undefined;
+
+let singletonResolver: SealAuthorityResolver | undefined;
+
+type CreatorAnchorTrustResolver = (trust: CurrentAnchorTrust) => CreatorAnchorTrustMaterial | undefined;
+type CreatorAnchorTrustSuccessorMinter = (
+	currentTrust: CurrentAnchorTrust,
+	exactCanonicalSuccessorAnchorPreimageBytes: Uint8Array,
+	detachedSuccessorAnchorSignature: Uint8Array
+) => CurrentAnchorTrust | undefined;
+
+let creatorResolver: CreatorAnchorTrustResolver | undefined;
+let creatorSuccessorMinter: CreatorAnchorTrustSuccessorMinter | undefined;
+const creatorAnchorRequestDigests = new WeakMap<CreatorAnchorSigningRequest, Uint8Array>();
+
+/**
+ * Installs the one resolver owned by the public anchor-trust singleton.
+ * @param resolver - Resolver bound to the singleton's private WeakMap.
+ */
+export function installCertifiedSealAuthorityResolver(resolver: SealAuthorityResolver): void {
+	if (singletonResolver !== undefined) throw new Error("certified seal authority resolver already installed");
+	singletonResolver = resolver;
+}
+
+/**
+ * Resolves seal material only through the installed singleton custody.
+ * @param trust - Candidate certified trust capability.
+ * @returns Detached epoch-zero material or undefined for foreign custody.
+ */
+export function resolveCertifiedSealAuthorityMaterial(
+	trust: CertifiedAnchorTrust
+): CertifiedSealAuthorityMaterial | undefined {
+	return singletonResolver?.(trust);
+}
+
+/**
+ * Installs creator-trust resolution and successor minting from the singleton registry.
+ * @param resolver - Resolver bound to the singleton creator-trust WeakMap.
+ * @param successorMinter - Successor mint bound to the same private WeakMap.
+ */
+export function installCreatorAnchorTrustCustody(
+	resolver: CreatorAnchorTrustResolver,
+	successorMinter: CreatorAnchorTrustSuccessorMinter
+): void {
+	if (creatorResolver !== undefined || creatorSuccessorMinter !== undefined) {
+		throw new Error("creator anchor trust custody already installed");
+	}
+	creatorResolver = resolver;
+	creatorSuccessorMinter = successorMinter;
+}
+
+/**
+ * Resolves genuine creator trust through the singleton's private WeakMap.
+ * @param trust - Candidate current creator trust.
+ * @returns Detached immutable material, or undefined for foreign custody.
+ */
+export function resolveCreatorAnchorTrustMaterial(trust: CurrentAnchorTrust): CreatorAnchorTrustMaterial | undefined {
+	return creatorResolver?.(trust);
+}
+
+/**
+ * Mints a verified successor into the singleton's private creator-trust registry.
+ * @param currentTrust - Genuine current creator-trust capability.
+ * @param exactCanonicalSuccessorAnchorPreimageBytes - Exact verified successor-anchor preimage.
+ * @param detachedSuccessorAnchorSignature - Exact creator signature over the successor digest.
+ * @returns A new singleton creator-trust capability, or undefined for invalid custody.
+ */
+export function mintCreatorAnchorTrustSuccessor(
+	currentTrust: CurrentAnchorTrust,
+	exactCanonicalSuccessorAnchorPreimageBytes: Uint8Array,
+	detachedSuccessorAnchorSignature: Uint8Array
+): CurrentAnchorTrust | undefined {
+	return creatorSuccessorMinter?.(
+		currentTrust,
+		exactCanonicalSuccessorAnchorPreimageBytes,
+		detachedSuccessorAnchorSignature
+	);
+}
+
+/**
+ * Mints one creator-anchor request only after creator-close validates the full tuple.
+ * @param digest - Exact registered epoch-anchor digest.
+ * @returns Fieldless destructive-use signing request.
+ */
+export function mintCreatorAnchorSigningRequest(digest: Uint8Array): CreatorAnchorSigningRequest {
+	const request = Object.freeze({}) as CreatorAnchorSigningRequest;
+	creatorAnchorRequestDigests.set(request, Uint8Array.from(digest));
+	return request;
+}
+
+/**
+ * Destructively resolves one protocol-authored creator-anchor request.
+ * @param request - Candidate fieldless signing request.
+ * @returns Detached anchor digest, or undefined for foreign/already-consumed input.
+ */
+export function consumeCreatorAnchorSigningRequestDigest(request: unknown): Uint8Array | undefined {
+	if (request === null || typeof request !== "object") return undefined;
+	const digest = creatorAnchorRequestDigests.get(request as CreatorAnchorSigningRequest);
+	if (digest === undefined) return undefined;
+	creatorAnchorRequestDigests.delete(request as CreatorAnchorSigningRequest);
+	return Uint8Array.from(digest);
+94679:##### D.110c-0b1 bounded checkpoint opener and control-proof compaction plan
+94825:**Batch 2 — Node composition and genuine cold reopen.** For epoch 0→1,
+94849:at epochs 1 and 2 apart from explicitly enumerated bounded projection/content
+22ee1c59 docs(d110c-0b1): freeze bounded checkpoint plan
+?? .agents/
+?? .claude/
+?? .logs/d108e4-complete-config-a5ac938f/

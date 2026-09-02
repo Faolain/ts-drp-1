@@ -94678,11 +94678,11 @@ closure.
 
 ##### D.110c-0b1 bounded checkpoint opener and control-proof compaction plan
 
-**Status: bounded plan and source audit; no RED or production edit yet.** This
+**Status: bounded plan review correction; no RED or production edit yet.** This
 is the next executable D.110c slice after the closed D.110c-b checkpoint. Its
 owner is the accepted non-root protocol-v3 creator-checkpoint boundary, the
 accepted non-root control-plane bounded-advance boundary, and their existing
-Node creator-close/cold-reopen/pending-recovery consumers. Its deadline is
+Node creator-close, hot-adoption/commit, and cold-reopen consumers. Its deadline is
 GREEN before D.110c-0c and D.110c-c RED. It does not reopen 0b0, 0a, a, or b;
 change the v1 trust record, wire format, authority, floor, rollback count,
 archive law, dependency set, threshold, root export roster, or product API; or
@@ -94713,6 +94713,9 @@ coherent missing path rather than a second lifecycle defect:
   `v3-live-generation-1` followed by `v3-live-generation-2`, and use literal
   epoch-0/epoch-1 ACL checks. Those branches therefore fail on a genuine active
   epoch-2 room even though D.110c-b has already authenticated and activated it.
+  Only active cold reopen is generalized in 0b1. The pending-recovery pin is a
+  source-audit fact and remains the causal RED owned by D.110c-0c; 0b1 preserves
+  its current 0→1 behavior rather than landing an unexercised epoch≥2 branch.
 - `packages/node/src/internal/creator-room-head.ts` and the accepted 0b0 room
   authority already own exact copied `(objectId, epoch, currentAnchorDigest)`
   validation. The checkpoint opener consumes that authenticated value; it does
@@ -94730,11 +94733,16 @@ bounded closure advance; the existing predicate remains the exact 0→1
 compatibility path. Node continues to own storage lineage and product
 composition, and its existing room-head owner remains the sole local floor
 shape/oracle. An unexported singleton-registry mint callback may be added inside
-protocol-v3 only so the reviewed opener can materialize the already-verified
-epoch-(N-1) capability; it is not a parallel public opener, naked authority
-constructor, test hook, or root export. The two duplicated cold/pending
-epoch-0/1 branches must consume one shared internal checkpoint-verification
-helper rather than retain divergent authentication copies.
+protocol-v3 as `mintCreatorAnchorTrustCheckpointPredecessor` only so the
+reviewed opener can materialize the already-verified epoch-(N-1) capability.
+`openCreatorCheckpointTrust` is its only caller, and an unreturned capability
+becomes unreachable on any later failure; it is not a parallel public opener,
+naked authority constructor, test hook, or root export. One Node-private
+`inspectCreatorTransitionAdvance` helper owns epoch selection and retiring-ref
+derivation for close, hot verify, commit, and cold reopen, instead of four
+callers duplicating the bounded/unbounded branch. Pending recovery continues to
+use its existing first-transition classifier until D.110c-0c exercises and
+generalizes it.
 
 The public compatibility boundary is frozen as follows.
 
@@ -94753,26 +94761,45 @@ The public compatibility boundary is frozen as follows.
    both creator signatures; requires exact predecessor/current consecutive
    epochs and the previous-anchor link; then reuses the existing one-step
    creator successor/QC verification for the supplied current CutValue/QC. It
-   returns only the current `CurrentAnchorTrust`. Its exact failure roster is
+   returns only the bounded predecessor/current opaque trust pair described
+   below. Its exact failure roster is
    `malformed-input`, `genesis-rejected`, `predecessor-rejected`,
    `current-rejected`, `lineage-invalid`, `commit-qc-rejected`, and
-   `expected-head-mismatch`. No transient genesis/predecessor capability is
-   returned, no predecessor's older QC is read, and no self-selected floor is
-   accepted.
+   `expected-head-mismatch`, and `custody-unavailable`. On success it returns
+   exactly `{currentTrust,ok,predecessorTrust}`: the two opaque capabilities
+   that the existing `CreatorSuccessorLiveMaterial` consumer must authenticate
+   both generations. It returns no genesis capability, record bytes, key, or
+   authority constructor; no predecessor's older QC is read; and no
+   self-selected floor is accepted. This success-pair correction supersedes
+   only 0b0b's earlier current-only output sentence prospectively because the
+   signed source review demonstrated that `v3-live.ts` genuinely consumes the
+   predecessor capability through `authenticateCurrentEpochAnchor()`.
+   `creator-checkpoint.ts` imports `anchor-trust-singleton.js` directly so a
+   standalone built-package subpath import installs the genuine custody before
+   calling the private minter; runtime-identity tests prove that exact import
+   path and forbid a type-only/uninitialized subpath.
 2. `@ts-drp/control-plane/creator-trust-checkpoint-advance` exports exactly
    `inspectBoundedCreatorTrustAdvance` and its directly required types. Its
-   exact input keys are `current`, `proofRefs`, `proposed`, and
-   `retiringProofRefs`. `proofRefs` and `retiringProofRefs` are each the exact
-   ordered `[CutValue ref, commit-QC ref]` tuple. The current candidates—not the
-   caller's labels—must decode the retiring tuple as exactly one current
-   `drp-hard-epoch-cut` and one commit-phase `drp-seal-qc`; the proposed
-   candidates must authenticate the exact new pair. The accepted closure is
-   current minus exactly one current trust ref and the exact retiring pair,
+   exact input keys are `current`, `proofRefs`, `proposed`,
+   `retiringPredecessorAclRef`, and `retiringProofRefs`. `proofRefs` and
+   `retiringProofRefs` are each the exact ordered `[CutValue ref, commit-QC
+ref]` tuple. The current candidates—not the caller's labels—must decode the
+   retiring tuple as exactly one `drp-hard-epoch-cut` and one commit-phase
+   `drp-seal-qc` at `currentEpoch - 1`, and must decode the one retiring
+   predecessor ACL as the exact canonical `drp-v3-latched-acl` for the same
+   object and epoch. The proposed candidates must authenticate the exact new
+   pair at `currentEpoch`. The accepted closure is current minus exactly one
+   current trust ref, the retiring proof pair, and the retiring predecessor ACL,
    plus exactly one successor trust ref and the new pair, preserving every
-   other ref byte-for-byte. It reuses the existing successor-binding rules and
-   adds only `RETIRING_PROOF_REFS_INVALID` to the existing exact rejection
-   roster. Missing, duplicate, wrong-kind, wrong-phase, wrong-epoch,
-   substituted, still-retained, or extra-deleted refs fail closed.
+   other ref byte-for-byte. Adoption then replaces the predecessor live
+   projection and inserts exactly the current epoch's one predecessor ACL. It
+   reuses the existing successor-binding rules and adds
+   `RETIRING_PROOF_REFS_INVALID` and
+   `RETIRING_PREDECESSOR_ACL_INVALID` to the existing exact rejection roster.
+   Missing, duplicate, wrong-kind, wrong-phase, wrong-epoch, cross-object,
+   substituted, still-retained, or extra-deleted refs fail closed. This ACL
+   correction closes the reviewed linear-growth defect; it does not authorize
+   D.110c-c physical generation deletion.
 
 The deterministic tests-only RED is one signed/pushed checkpoint owned by
 `tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts` and
@@ -94783,13 +94810,16 @@ record, anchor, CutValue, QC, generation, floor, or projection. One exact
 focused Vitest invocation selects three tests in one file, once, with coverage
 disabled and JSON reporting:
 
-1. the genuine 0→1→2 room supplies genesis invite bytes, epoch-1 predecessor,
-   epoch-2 current record, exact 1→2 CutValue/QC, and the authenticated epoch-2
-   floor; absence of the reviewed protocol seam yields only
-   `D110C_0B1_CHECKPOINT_OPENER_MISSING`;
+1. the genuine 0→1→2 room first proves behaviorally that the current epoch-0
+   opener rejects the epoch-1 and epoch-2 records with exact
+   `trust-state-inconsistent` and that the one-step opener has no retained
+   admissible predecessor capability after hot-owner teardown. It then supplies
+   genesis invite bytes, epoch-1 predecessor, epoch-2 current record, exact
+   1→2 CutValue/QC, and the authenticated epoch-2 floor; absence of the reviewed
+   protocol seam yields only `D110C_0B1_CHECKPOINT_OPENER_MISSING`;
 2. the same genuine closure proves the existing advance retains the 0→1 proof
-   pair and grows, while absence of the reviewed bounded predicate yields only
-   `D110C_0B1_BOUNDED_ADVANCE_MISSING`; and
+   pair and epoch-0 predecessor ACL and grows, while absence of the reviewed
+   bounded predicate yields only `D110C_0B1_BOUNDED_ADVANCE_MISSING`; and
 3. after terminalizing the hot owner, the real installed Node cold-reopen owner
    receives that room's actual durable inputs and fails before returning
    epoch-2 material, yielding only `D110C_0B1_COLD_REOPEN_EPOCH_PINNED`.
@@ -94800,7 +94830,7 @@ the demonstrated prior-pair retention and epoch literal/source predicates, and
 an otherwise unchanged durable head/floor. Any earlier seal, close, adoption,
 snapshot, storage, floor, or fixture failure stops and reslices from that owner.
 The signed RED records reporter JSON, stdout/stderr/status, current/proposed
-closure refs and decoded kind census, exact head revisions, changed paths,
+closure refs and decoded kind/epoch census, exact head revisions, changed paths,
 source hashes, and a validating self-excluding manifest. The final GREEN review
 must inspect this RED causality; no separate full three-model RED review runs
 under the governing prospective review policy.
@@ -94813,41 +94843,60 @@ non-root subpaths, their package export-map entries, and the minimum private
 protocol-v3 singleton-custody callback needed by the checkpoint opener. Keep
 root exports and all current APIs exact. Unit controls authenticate a genuine
 epoch-2 checkpoint from the pinned genesis carrier plus only its immediate
-predecessor/current pair; prove no N-2 record/QC is read; and cover every
+predecessor/current pair; return exactly the genuine predecessor/current opaque
+capability pair; prove no N-2 record/QC is read; prove standalone built-subpath
+singleton initialization; and cover every
 genesis, carrier, signature, room, epoch, link, CutValue, QC, expected-head,
-ambiguity, replay, fork, skipped-epoch, and stale-floor mutant with the frozen
-reason roster. Bounded-advance controls prove the exact retiring/new pair,
-byte-for-byte preservation of unrelated refs, constant closure count after the
-first transition, and all omission/substitution/duplication/wrong-kind/
-wrong-phase/still-retained/extra-deletion mutants. The exact two boundary tests
-run once after this batch.
+custody-unavailable, ambiguity, replay, fork, skipped-epoch, and stale-floor
+mutant with the frozen reason roster. Bounded-advance controls prove the exact
+retiring/new proof epochs, exact stale predecessor-ACL retirement,
+byte-for-byte preservation of unrelated refs, constant post-adoption closure
+count after the first transition, and all omission/substitution/duplication/
+wrong-kind/wrong-phase/wrong-epoch/cross-object/still-retained/extra-deletion
+mutants. The exact two boundary tests run once after this batch.
 
 **Batch 2 — Node composition and genuine cold reopen.** For epoch 0→1,
 `creator-close.ts` and adoption retain the existing successor opener and
 unbounded compatibility predicate byte-for-byte. For every epoch N≥1 close,
-Node derives the unique authenticated prior CutValue/commit-QC pair from the
-current candidates, builds the bounded proposed closure, and requires the new
-predicate before staging. Cold reopen and pending recovery share one
-epoch-relative verifier: epoch 1 retains the existing genesis/one-step path;
-epoch N≥2 consumes the reviewed checkpoint opener, the independently captured
-expected room head, the older/floor immediate-predecessor closure, and the
-newer current/adoption closure. Projection and ACL checks derive exact
+Node derives the unique authenticated prior CutValue/commit-QC pair and stale
+predecessor ACL from the current candidates, builds the bounded proposed
+closure, and requires the new predicate before staging. The one private
+`inspectCreatorTransitionAdvance` classifier is also used by hot adoption's
+`verifyChain`, creator-adoption commit, and active cold reopen for every N≥1
+current→proposed pair; only 0→1 continues to call
+`inspectCreatorTrustAdvance`. Cold reopen at epoch 1 retains the existing
+genesis/one-step path. Cold reopen at epoch N≥2 consumes the reviewed
+checkpoint opener's authenticated predecessor/current pair, the independently
+captured expected room head, the older/floor immediate-predecessor closure, and
+the newer current/adoption closure. Projection and ACL checks derive exact
 predecessor/current epochs instead of using 0/1 literals. The verifier never
 walks N-2 state, chooses a largest stored epoch, or activates/deletes before
 checkpoint, snapshot, manifest, ACL, recovery, and floor verification.
+Pending-adoption recovery remains byte-compatible for 0→1 and does not gain an
+epoch≥2 success path here. D.110c-0c's first causal RED must terminate a genuine
+epoch≥1 close before adoption and prove that exact pending branch remains
+unavailable before it is generalized and restart-tested.
 
 The full focused GREEN runs once after Batch 2 and must prove: a genuine room
 cold reopens at epoch 2 after 0→1, restart-equivalent owner teardown, and 1→2;
 the reopened room has exact state, semantic digest, ACL/writer authority,
 anchor, history root/size, archive root, snapshot/manifest, journal, operation
 accounting, issuance continuity, and successful issue/publish; the active epoch-2
-closure contains only the 1→2 CutValue/QC, while the older/floor rollback
-generation still contains the epoch-1 trust immediately before reclamation;
+closure has the exact five-kind census of one current trust, one 1→2 CutValue,
+one 1→2 commit QC, one epoch-2 live projection, and one epoch-1 predecessor ACL,
+with no epoch-0 CutValue, QC, or ACL; the older/floor rollback generation still
+contains the epoch-1 trust immediately before reclamation;
 there are exactly two AHE head advances with exact revision deltas for each
 transition; stale/forked floors and every frozen adversarial mutant fail before
-activation or deletion; and active/control closure counts and bytes are equal
-at epochs 1 and 2 apart from explicitly enumerated bounded projection/content
-differences. No GREEN claim includes pruning or a third transition.
+activation or deletion; and active/control closure ref count and decoded-kind
+multiset are exactly equal at epochs 1 and 2. The evidence enumerates every
+per-kind ref and byte length and the exact epoch-1→epoch-2 deltas; bytes may
+differ only within the fixed existing schemas for successor trust, CutValue,
+QC, live projection, and predecessor ACL. No journal, bootstrap, registration,
+metadata, sibling store, or qualitative “content difference” may absorb another
+control item. D.110c-d later proves the same fixed census and per-kind ceilings
+across ≥100 transitions. No GREEN claim includes physical pruning, pending
+restart success, or a third transition.
 
 After the focused GREEN, the retained gate runs once and includes the complete
 D.110c-0b1 file; D.110c-0b0 floor/stage/recovery; protocol-v3 creator trust and
@@ -94872,6 +94921,50 @@ receives the one governing formal plan→RED→GREEN review; it must prove causa
 RED closure, fixed-creator authority integrity, bounded control ownership,
 compatibility, retained behavior, and evidence custody. No Fable or
 collaboration subagent is invoked.
+
+The first bounded plan review inspected signed/pushed commit
+`22ee1c59b3163e4f5b23c5cb299570cdeda08a03`, tree
+`dbe24f09507aa59c4f6e9d46829ad53f3500aaf9`, from
+`.logs/d110c-0b1-plan-review-22ee1c59/`. Prompt SHA-256 is
+`cc60165ab248ef116b700004c88ef22136dfec3d34728459ba8baaa6a2b1b211`.
+Grok 4.6/high session `01a0639a-57a5-7c41-b048-bbbe265cc1df` ended
+normally after 600.123 seconds with `stop_reason=end_turn`, no timeout or
+cancellation. Its strict runner honestly classified leading inspection prose
+as `NO_VERDICT`; the embedded terminal object was `CHANGES_REQUIRED`, P0=0,
+P1=1, P2=3. Event, public, and status SHA-256 values are
+`63a497775892d995b520a1393a1df5dffeeb3fedfe05df7f8e60fd9577f0b3d9`,
+`468c4177732a8d10554e3836292e54e5bb296ed0f481482bf06bdd3df9c1b8e5`,
+and `39b0369eaba277284ce20874eab7c4d58dbfdb00db2378cc84cd44bbf547a68e`.
+Direct `kimi-code/k3` session
+`session_427fa052-3c94-4fda-9d8f-784e03bc7c53`, with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, returned schema-clean `APPROVED`, P0=0,
+P1=0, P2=2; stream and stderr SHA-256 values are
+`645b6b8467dcf4646d3fc728ddd14ad9f0034568aef2345bac831c5982e1e344`
+and `dd61ac99b20dcf6091345b05451cb77c69db4c43b0ee6b5d11705be5613a0dbb`.
+Opus xhigh session `f6bb7cfd-ac15-491d-9da1-91e819a6f608` ended normally,
+spawned zero subagents, and returned `CHANGES_REQUIRED`, P0=0/P1=2/P2=3;
+raw-result SHA-256 is
+`2f2031592ef05ca662fb18f8dfca84e20562967319f0960d8187b0e0c9cae38f`.
+
+The material union is accepted in one correction. Grok proved that every
+downstream N≥1 classifier would reject the bounded staged closure unless it,
+not only close staging, uses the new predicate. Opus proved that the active
+closure also accumulates one epoch-tagged predecessor ACL and that the existing
+live-material consumer requires a genuine predecessor trust capability. The
+correction above therefore names one shared Node classifier for close, hot
+verify, commit, and cold reopen; retires the exact stale predecessor ACL with
+the stale proof pair; and returns the bounded authenticated
+predecessor/current capability pair. The correction also adopts the P2 union:
+exact retiring/new proof epochs, a named sole-caller private minter, standalone
+subpath singleton initialization, a behavioral opener RED before the missing-
+seam token, a closed five-kind census with exact per-kind byte deltas, and an
+explicit D.110c-0c owner for the still-unproven epoch≥2 pending-recovery path.
+No finding changes the fixed creator, v1 wire, floor authority, rollback count,
+dependency, threshold, product API, pruning authority, or campaign boundary.
+Because the accepted correction changes the public success output and bounded
+retirement contract, one confirmation of the signed/pushed correction is
+required. The completed first sessions are not relaunched or relabelled, and
+no closure prose receives recursive review.
 
 The four prerequisite decisions, including the newly demonstrated 0b0
 freshness-floor authority question, are reviewed before their production edits;

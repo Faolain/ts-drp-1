@@ -1,0 +1,256 @@
+commit 22ee1c59b3163e4f5b23c5cb299570cdeda08a03
+Author:     Faolain <Faolain@users.noreply.github.com>
+AuthorDate: Wed Sep 2 15:29:13 2026 -0400
+Commit:     Faolain <Faolain@users.noreply.github.com>
+CommitDate: Wed Sep 2 15:29:13 2026 -0400
+
+    docs(d110c-0b1): freeze bounded checkpoint plan
+
+diff --git a/.logs/d110c-0b1-plan-audit-80b2e65b/audit-ledger.md b/.logs/d110c-0b1-plan-audit-80b2e65b/audit-ledger.md
+new file mode 100644
+index 00000000..2733af1b
+--- /dev/null
++++ b/.logs/d110c-0b1-plan-audit-80b2e65b/audit-ledger.md
+@@ -0,0 +1,34 @@
++# D.110c-0b1 bounded plan/source audit
++
++- Audit base: `80b2e65bec793391efa619f197fc66ca208e0375`
++- Audited origin: `80b2e65bec793391efa619f197fc66ca208e0375`
++- Date: 2026-09-02
++- Scope: plan and read-only source audit only; no RED, production edit, D.110a invocation, campaign, Fable, or collaboration subagent.
++
++## Source facts
++
++- `packages/protocol-v3/package.json` contains zero `./creator-checkpoint` exports.
++- `packages/protocol-v3/src` contains zero `openCreatorCheckpointTrust` symbols.
++- `packages/control-plane/package.json` contains zero `./creator-trust-checkpoint-advance` exports.
++- `packages/control-plane/src` contains zero `inspectBoundedCreatorTrustAdvance` symbols.
++- Current Node uses of the existing creator openers are 7 in `creator-adoption.ts`, 2 in `creator-adoption-commit.ts`, and 2 in `creator-close.ts`.
++- Current unbounded-advance symbol counts are 4 in `creator-adoption.ts`, 2 in `creator-adoption-commit.ts`, 2 in `creator-close.ts`, and 1 definition in `creator-trust-advance.ts`.
++- `creator-adoption.ts` retains literal cold/pending assumptions at lines reported by the audit: `expectedEpoch: 1`, two `currentEpoch: 0` assignments, two `successorEpoch: 1` assignments, and `successorProjection.record.epoch !== 1`.
++- `creator-close.ts` lines 574-577 construct the additive closure from current-minus-trust plus successor trust, CutValue, and commit QC; it supplies no retiring pair.
++- `closed-epoch-cleanup.ts` owns an exact two-generation rollback tuple and verifies both retained generations are `Superseded`.
++- The new plan heading occurs exactly once.
++
++## Mechanical results
++
++- Tracked diff before checkpoint: only `docs/production-hardening/production-hardening-tdd-plan-v2.md` plus this audit ledger.
++- `git diff --check`: pass.
++- `NODE_OPTIONS=--max-old-space-size=12288 pnpm exec prettier --check docs/production-hardening/production-hardening-tdd-plan-v2.md`: pass.
++- The first formatter attempt with the default 4 GiB heap terminated with V8 heap exhaustion before any formatting verdict. It is retained as a diagnostic, not a code/format failure; the established 12 GiB command is authoritative.
++- The first process audit accidentally used zsh's special loop variable name `path`, which replaced the command search path and made the following `ps`/`rg` calls unresolved. The corrected check used a non-special variable and absolute command paths. It found no ts-drp Vitest, Playwright, test, profiler, Grok, Kimi, or Claude process beyond the audit command itself; a self-excluding regex then returned `none`.
++- Ports 4174, 4175, 51000, and 51002: clear.
++- Protected `.agents`, `.claude`, and `.pnpm-store`: present.
++- Stashes: 27.
++
++## Review/next gate
++
++The plan-only checkpoint must be good-signed and pushed, then receive one bounded Grok 4.6/high, direct Kimi K3 100-step, and Opus xhigh plan review. No production source or RED is authorized until the blocking P0/P1 union is empty.
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index 7b69aac8..9e3dc347 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -94676,6 +94676,203 @@ integrity blocker. D.110c-b GREEN is closed at the reviewed correction commit;
+ no further D.110c-b model round or executable rerun is authorized by this
+ closure.
+ 
++##### D.110c-0b1 bounded checkpoint opener and control-proof compaction plan
++
++**Status: bounded plan and source audit; no RED or production edit yet.** This
++is the next executable D.110c slice after the closed D.110c-b checkpoint. Its
++owner is the accepted non-root protocol-v3 creator-checkpoint boundary, the
++accepted non-root control-plane bounded-advance boundary, and their existing
++Node creator-close/cold-reopen/pending-recovery consumers. Its deadline is
++GREEN before D.110c-0c and D.110c-c RED. It does not reopen 0b0, 0a, a, or b;
++change the v1 trust record, wire format, authority, floor, rollback count,
++archive law, dependency set, threshold, root export roster, or product API; or
++authorize pruning, a long campaign, D.110a reuse, Phase-7 archive work, or a
++third adoption.
++
++The bounded source audit at signed/pushed D.110c-b closure `80b2e65b` finds one
++coherent missing path rather than a second lifecycle defect:
++
++- `packages/protocol-v3/src/index.ts` can install/open only an epoch-0 creator
++  trust root. `packages/protocol-v3/src/creator-close.ts` can mint
++  `openCreatorSuccessorTrust()` only from an already genuine immediate
++  predecessor capability. There is no `creator-checkpoint` subpath, no safe way
++  for Node to mint epoch-(N-1) trust from raw storage, and no root export that
++  should be widened.
++- `packages/control-plane/src/creator-trust-advance.ts` implements
++  `inspectCreatorTrustAdvance()` as current closure minus current trust plus
++  successor trust and the new CutValue/QC pair. It has no retiring-proof input;
++  therefore every prior transition pair remains in the next active closure.
++- `packages/node/src/creator-close.ts` constructs that exact additive closure
++  and invokes the unbounded predicate for every epoch. The genuine D.110c-a/b
++  path consequently supplies a causal epoch-2 closure-growth control rather
++  than a synthetic census.
++- `packages/node/src/creator-adoption.ts` cold reopen and pending recovery both
++  call `openCurrentAnchorTrust()` on the predecessor record, require the
++  caller's genesis anchor/signature bytes to equal that predecessor record,
++  assign `currentEpoch: 0`/`successorEpoch: 1`, require
++  `v3-live-generation-1` followed by `v3-live-generation-2`, and use literal
++  epoch-0/epoch-1 ACL checks. Those branches therefore fail on a genuine active
++  epoch-2 room even though D.110c-b has already authenticated and activated it.
++- `packages/node/src/internal/creator-room-head.ts` and the accepted 0b0 room
++  authority already own exact copied `(objectId, epoch, currentAnchorDigest)`
++  validation. The checkpoint opener consumes that authenticated value; it does
++  not read a maximum epoch, trust the generation being opened, or create a new
++  floor.
++- `packages/node/src/internal/closed-epoch-cleanup.ts` already requires two
++  complete `Superseded` rollback generations. 0b1 may prove and preserve the
++  older/floor generation as the immediate-predecessor carrier, but it may not
++  delete a generation or weaken D.109 availability/snapshot/outbox authority.
++
++The end-state has one owner per concept. The new protocol subpath alone opens a
++bounded creator checkpoint; the existing successor opener remains the one-step
++hot/QC primitive it reuses. The new control-plane subpath alone classifies a
++bounded closure advance; the existing predicate remains the exact 0→1
++compatibility path. Node continues to own storage lineage and product
++composition, and its existing room-head owner remains the sole local floor
++shape/oracle. An unexported singleton-registry mint callback may be added inside
++protocol-v3 only so the reviewed opener can materialize the already-verified
++epoch-(N-1) capability; it is not a parallel public opener, naked authority
++constructor, test hook, or root export. The two duplicated cold/pending
++epoch-0/1 branches must consume one shared internal checkpoint-verification
++helper rather than retain divergent authentication copies.
++
++The public compatibility boundary is frozen as follows.
++
++1. `@ts-drp/protocol-v3/creator-checkpoint` exports exactly
++   `openCreatorCheckpointTrust` and its directly required types. Its exact
++   input keys are `detachedGenesisSignature`,
++   `exactCanonicalCommitQcBytes`, `exactCanonicalCurrentTrustStateRecordBytes`,
++   `exactCanonicalCutValueBytes`, `exactCanonicalGenesisAnchorPreimageBytes`,
++   `exactCanonicalPredecessorTrustStateRecordBytes`, `expectedCurrentHead`,
++   `expectedObjectId`, and `pinnedGenesisAnchorDigest`. `expectedCurrentHead`
++   is the copied exact three-key `{currentAnchorDigest,epoch,objectId}` room
++   floor and must equal the authenticated current trust. The opener validates
++   exact/canonical closed shapes and detached bytes; authenticates the genesis
++   preimage, creator carriers, signature, object, and pin; requires both v1
++   records to match those fixed creator carriers and genesis identity; verifies
++   both creator signatures; requires exact predecessor/current consecutive
++   epochs and the previous-anchor link; then reuses the existing one-step
++   creator successor/QC verification for the supplied current CutValue/QC. It
++   returns only the current `CurrentAnchorTrust`. Its exact failure roster is
++   `malformed-input`, `genesis-rejected`, `predecessor-rejected`,
++   `current-rejected`, `lineage-invalid`, `commit-qc-rejected`, and
++   `expected-head-mismatch`. No transient genesis/predecessor capability is
++   returned, no predecessor's older QC is read, and no self-selected floor is
++   accepted.
++2. `@ts-drp/control-plane/creator-trust-checkpoint-advance` exports exactly
++   `inspectBoundedCreatorTrustAdvance` and its directly required types. Its
++   exact input keys are `current`, `proofRefs`, `proposed`, and
++   `retiringProofRefs`. `proofRefs` and `retiringProofRefs` are each the exact
++   ordered `[CutValue ref, commit-QC ref]` tuple. The current candidates—not the
++   caller's labels—must decode the retiring tuple as exactly one current
++   `drp-hard-epoch-cut` and one commit-phase `drp-seal-qc`; the proposed
++   candidates must authenticate the exact new pair. The accepted closure is
++   current minus exactly one current trust ref and the exact retiring pair,
++   plus exactly one successor trust ref and the new pair, preserving every
++   other ref byte-for-byte. It reuses the existing successor-binding rules and
++   adds only `RETIRING_PROOF_REFS_INVALID` to the existing exact rejection
++   roster. Missing, duplicate, wrong-kind, wrong-phase, wrong-epoch,
++   substituted, still-retained, or extra-deleted refs fail closed.
++
++The deterministic tests-only RED is one signed/pushed checkpoint owned by
++`tests/phase-6b-d110c-0b1-bounded-checkpoint-red.test.ts` and
++`tests/fixtures/phase-6b-d110c-0b1/`. It extends the D.110c-a/b fixture only to
++expose the genuine storage, genesis invite, floor, snapshot, issuance, and live
++journal inputs already exercised by production. It may not author a trust
++record, anchor, CutValue, QC, generation, floor, or projection. One exact
++focused Vitest invocation selects three tests in one file, once, with coverage
++disabled and JSON reporting:
++
++1. the genuine 0→1→2 room supplies genesis invite bytes, epoch-1 predecessor,
++   epoch-2 current record, exact 1→2 CutValue/QC, and the authenticated epoch-2
++   floor; absence of the reviewed protocol seam yields only
++   `D110C_0B1_CHECKPOINT_OPENER_MISSING`;
++2. the same genuine closure proves the existing advance retains the 0→1 proof
++   pair and grows, while absence of the reviewed bounded predicate yields only
++   `D110C_0B1_BOUNDED_ADVANCE_MISSING`; and
++3. after terminalizing the hot owner, the real installed Node cold-reopen owner
++   receives that room's actual durable inputs and fails before returning
++   epoch-2 material, yielding only `D110C_0B1_COLD_REOPEN_EPOCH_PINNED`.
++
++RED acceptance is exactly three selected tests, three intended failures, zero
++unexpected/flaky/skipped tests, no top-level error, those three complete tokens,
++the demonstrated prior-pair retention and epoch literal/source predicates, and
++an otherwise unchanged durable head/floor. Any earlier seal, close, adoption,
++snapshot, storage, floor, or fixture failure stops and reslices from that owner.
++The signed RED records reporter JSON, stdout/stderr/status, current/proposed
++closure refs and decoded kind census, exact head revisions, changed paths,
++source hashes, and a validating self-excluding manifest. The final GREEN review
++must inspect this RED causality; no separate full three-model RED review runs
++under the governing prospective review policy.
++
++GREEN is one checkpoint implemented in two tightly related batches without an
++intermediate commit or model ceremony.
++
++**Batch 1 — protocol and control boundaries.** Add only the two reviewed
++non-root subpaths, their package export-map entries, and the minimum private
++protocol-v3 singleton-custody callback needed by the checkpoint opener. Keep
++root exports and all current APIs exact. Unit controls authenticate a genuine
++epoch-2 checkpoint from the pinned genesis carrier plus only its immediate
++predecessor/current pair; prove no N-2 record/QC is read; and cover every
++genesis, carrier, signature, room, epoch, link, CutValue, QC, expected-head,
++ambiguity, replay, fork, skipped-epoch, and stale-floor mutant with the frozen
++reason roster. Bounded-advance controls prove the exact retiring/new pair,
++byte-for-byte preservation of unrelated refs, constant closure count after the
++first transition, and all omission/substitution/duplication/wrong-kind/
++wrong-phase/still-retained/extra-deletion mutants. The exact two boundary tests
++run once after this batch.
++
++**Batch 2 — Node composition and genuine cold reopen.** For epoch 0→1,
++`creator-close.ts` and adoption retain the existing successor opener and
++unbounded compatibility predicate byte-for-byte. For every epoch N≥1 close,
++Node derives the unique authenticated prior CutValue/commit-QC pair from the
++current candidates, builds the bounded proposed closure, and requires the new
++predicate before staging. Cold reopen and pending recovery share one
++epoch-relative verifier: epoch 1 retains the existing genesis/one-step path;
++epoch N≥2 consumes the reviewed checkpoint opener, the independently captured
++expected room head, the older/floor immediate-predecessor closure, and the
++newer current/adoption closure. Projection and ACL checks derive exact
++predecessor/current epochs instead of using 0/1 literals. The verifier never
++walks N-2 state, chooses a largest stored epoch, or activates/deletes before
++checkpoint, snapshot, manifest, ACL, recovery, and floor verification.
++
++The full focused GREEN runs once after Batch 2 and must prove: a genuine room
++cold reopens at epoch 2 after 0→1, restart-equivalent owner teardown, and 1→2;
++the reopened room has exact state, semantic digest, ACL/writer authority,
++anchor, history root/size, archive root, snapshot/manifest, journal, operation
++accounting, issuance continuity, and successful issue/publish; the active epoch-2
++closure contains only the 1→2 CutValue/QC, while the older/floor rollback
++generation still contains the epoch-1 trust immediately before reclamation;
++there are exactly two AHE head advances with exact revision deltas for each
++transition; stale/forked floors and every frozen adversarial mutant fail before
++activation or deletion; and active/control closure counts and bytes are equal
++at epochs 1 and 2 apart from explicitly enumerated bounded projection/content
++differences. No GREEN claim includes pruning or a third transition.
++
++After the focused GREEN, the retained gate runs once and includes the complete
++D.110c-0b1 file; D.110c-0b0 floor/stage/recovery; protocol-v3 creator trust and
++seal vectors; control-plane trust closure; D.110c-0a seal custody; D.110c-a
++repeat close; D.110c-b hot adoption and its browser lock/failure controls;
++Phase-6a adoption/commit/activation/reopen; D.109 cleanup/rollback/
++availability/outbox non-consuming validators; and snapshot-substitution tests.
++Protocol-v3, control-plane, Node, storage-node, and storage-browser builds and
++exact source typechecks; v3-room/v3-chat typechecks; exact package export
++rosters; exact-owner ESLint/Prettier/diff/source-shape; runtime import identity;
++protected paths, all 27 stashes, process/port predicates, signed commits,
++pushed refs, hashes, and a self-excluding manifest are mandatory. D.110a's
++consumed preflight/full worker and every long campaign remain excluded.
++
++The bounded plan is signed and pushed before one Grok 4.6/high, standard direct
++Kimi K3 with `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review. If Grok
++cancels, resume the exact session. Only P0/P1 findings block; material findings
++are corrected in one batch with at most one confirmation when they change the
++public security contract, causal RED, scope, or acceptance behavior. P2 receives
++an owner/disposition without recursive prose review. The signed GREEN then
++receives the one governing formal plan→RED→GREEN review; it must prove causal
++RED closure, fixed-creator authority integrity, bounded control ownership,
++compatibility, retained behavior, and evidence custody. No Fable or
++collaboration subagent is invoked.
++
+ The four prerequisite decisions, including the newly demonstrated 0b0
+ freshness-floor authority question, are reviewed before their production edits;
+ each executable sub-slice receives its own bounded causal RED and GREEN. The
