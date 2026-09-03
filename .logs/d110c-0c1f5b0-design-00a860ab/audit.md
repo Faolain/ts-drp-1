@@ -11,9 +11,12 @@
 - The first signed/pushed design checkpoint is
   `fc4b8fc78148e5211b09dc32e3f27f32756653ec`. Its governing review completed
   with a nonempty P0/P1 union. `review.md` preserves the exact reviewer
-  terminals, raw-session hashes, union and dispositions. The amendment closes
-  bounded carrier/lifecycle defects and isolates the removed-author identity
-  problem as blocking prerequisite D.110c-0c1f5b0p; it does not authorize RED.
+  terminals, raw-session hashes, union and dispositions. The first amendment
+  closed bounded carrier/lifecycle defects and isolated the removed-author
+  identity problem as blocking prerequisite D.110c-0c1f5b0p. The follow-on
+  source/design root at `.logs/d110c-0c1f5b0p-design-e6a67013/` selects the
+  missing registry/profile boundary and amends this design; it does not
+  authorize RED.
 
 ## Deterministic checks
 
@@ -23,18 +26,22 @@ docs/production-hardening/production-hardening-tdd-plan-v2.md
 .logs/d110c-0c1f5b0-design-00a860ab/design.md` — status 0; both files match
    Prettier style. The increased formatter heap is required by the existing
    approximately 100,000-line plan and changes no product/test limit.
-3. Exact amended token counts in `design.md`:
+3. Exact amended token counts in `design.md` are revalidated at this follow-on
+   checkpoint. The prior token list is historical evidence for the first
+   amendment; removed runtime-migration identifiers are not acceptance
+   contracts for the combined design:
    `$drp.author-settlement.v1` 3;
    `drp-creator-author-settlement-state` 2;
    `ts-drp/creator-author-settlement/v1` 1;
    `settleRebaseSources` 2;
-   `authorSettlementVersion` 1;
+   `authorSettlementVersion` 0;
    `hasDisplacedOperation` 1;
    `source-dispositions` 1;
    `author-baseline` 1 (deletion rationale only);
    `zero-intent` 6;
    `pruneAuthenticatedSettledPrefix` 1; and
-   `D.110c-0c1f5b0p` 4.
+   `D.110c-0c1f5b0p` 1 as the selected design prerequisite; and
+   `creator-trusted-settlement-v1` 4.
 4. Exact fixed-string source searches prove both new production identifiers
    are absent under `packages/` and `examples/`. This is a design-only
    checkpoint, not an already-implemented claim.
@@ -99,9 +106,12 @@ not an active ts-drp process or code failure.
 
 The exact first review is preserved under
 `.logs/d110c-0c1f5b0-plan-review-fc4b8fc7/`. Grok and Opus rejected RED; Kimi
-approved with P2 only. The union therefore blocks. D.110c-0c1f5b0p must now
-select the missing bounded identity-history construction. After that plan-only
-design is integrated, the one material Grok/Kimi/Opus confirmation reviews the
-combined amendment. Only an empty P0/P1 union can authorize f5b0a RED. Fable
-and collaboration subagents remain prohibited unless the user expressly
-authorizes a future invocation.
+approved with P2 only. The union therefore blocks. D.110c-0c1f5b0p now selects
+a creator-authenticated Merkle AVL retired-author dictionary and genesis-bound
+`creator-trusted-settlement-v1` profile. Direct canonical measurements give
+792 bytes for a maximum-shaped node and 7,064 bytes for the signed maximum
+64-frontier checkpoint, under unchanged 1,024/8,192-byte ceilings. The one
+material Grok/Kimi/Opus confirmation reviews the combined amendment. Only an
+empty P0/P1 union can authorize f5b0p-a or f5b0a RED. Fable and collaboration
+subagents remain prohibited unless the user expressly authorizes a future
+invocation.

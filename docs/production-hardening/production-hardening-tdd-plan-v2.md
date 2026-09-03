@@ -98337,8 +98337,9 @@ campaign was authorized or run by f5a.
 **Status: the first exact design was signed/pushed at `fc4b8fc7`; its governing
 Grok/Kimi/Opus review completed with a nonempty blocking union, so f5b0a RED and
 all production edits remain unauthorized. The bounded carrier/lifecycle
-corrections are integrated in one batch, and the one irreducible removed-key
-authority gap is now blocking prerequisite D.110c-0c1f5b0p.** Owner: one exact
+corrections are integrated. D.110c-0c1f5b0p's source audit now selects an exact
+Merkle AVL retired-author dictionary and genesis-bound settlement profile; the
+combined amended design awaits the one permitted material confirmation.** Owner: one exact
 author-signed source-disposition carrier; its authenticated bounded
 author→creator ingress and crash-durable custody; the creator-certified
 settled-prefix checkpoint and predecessor rule; its relationship to the
@@ -98433,8 +98434,8 @@ The first exact design and its amendment are
 `.logs/d110c-0c1f5b0-design-00a860ab/design.md`. The first signed manifest at
 `fc4b8fc7` is
 `a5dbd4f4bfd4df8d8b838ce057ac524706ab583a93e63cf527dd2a941ca87011`.
-The amended two-entry self-excluding manifest validates and has SHA-256
-`3419bc1a146f53a0f79ae84f3b557980c3370597c774872dec8e16ffed5c3dc6`.
+The twice-amended two-entry self-excluding manifest validates and has SHA-256
+`039defd111934dbad3a3f22300ad3058e6db0a5abfcdc77e9dae27683210ea5c`.
 The governing raw review and ledger are under
 `.logs/d110c-0c1f5b0-plan-review-fc4b8fc7/`. Grok completed normally with a
 substantive `CHANGES_REQUIRED` JSON verdict, although its wrapper labeled the
@@ -98464,39 +98465,41 @@ The amendment makes these bounded corrections in one batch:
    paths receive exact settlement recognition/skip rules. Control issue uses a
    dedicated Node transaction owner rather than the blueprint-bound issuer;
 6. the checkpoint carries distinct `admittedThrough` and `settledThrough` per
-   current member. Migration copies v1 only into admitted state and initializes
-   settled state to null, so an offline pending covered-historical row keeps
-   the shipped reissue path until its author signs settlement;
-7. the migration closure retains creator retirement only to authenticate the
-   initial creator admitted boundary. Later settlement closures contain neither
-   v1 aggregate nor legacy retirement; the creator settles uniformly; and
+   current member plus the authenticated retired-author registry root/count.
+   Settlement-profile genesis initializes both boundaries to null and uses the
+   empty registry; no legacy frontier is imported;
+7. `creator-trusted-settlement-v1` is selected in genesis profile bytes with
+   the same fixed one-of-one creator authority. Its closures contain neither
+   v1 aggregate nor legacy retirement. Existing `creator-trusted-v1` rooms
+   remain byte-compatible and cannot late-opt-in in this slice; and
 8. f5b0d owns `pruneAuthenticatedSettledPrefix`, a storage-neutral monotone CAS
    deletion across old epochs and pending/published rows after authenticated
    adoption/rollback/availability gates. Legacy v1 pruning is unchanged.
 
-The remaining blocker is real, narrow, and separately owned. Once a removed
-author is omitted from the current ≤64-member vector, no present authenticated
-state tells the creator whether that public key is globally new or is reusing
-a never-resetting sequence. Caller-local lineage is not authority; retaining
-all removed-key tombstones grows with room age. **D.110c-0c1f5b0p — bounded
-author identity history** must audit the genuine ACL add/remove/re-add and
-cold-open owners and select an age-independent authenticated construction that
-proves prior appearance and the last boundary from current trust. It must
-account for proof production, nonmembership/update verification, untrusted
-storage, rollback, availability, migration, browser cost, schema/API/dependency
-impact and durable census. Unbounded tombstones, a hidden mandatory O(history)
-bootstrap store, fixture facts, local-store claims, and a lifetime-64-author
-limit are prohibited. If this requires a new dependency, setup, vertex field,
-authority carrier, public API, identity contract or migration, it becomes an
-explicit high-risk prerequisite rather than an implicit settlement edit.
+The removed-key blocker is real and now has an exact proposed owner. Once a
+removed author is omitted from the current ≤64-member vector, no present
+authenticated state tells the creator whether that public key is globally new
+or is reusing a never-resetting sequence. D.110c-0c1f5b0p therefore selects a
+creator-authenticated content-addressed Merkle AVL dictionary of currently
+retired keys. Its root/count join the signed settlement checkpoint; membership
+restores the last boundaries, nonmembership alone permits sequence zero, and a
+separate strict-durability store supplies verified O(log R) paths only to the
+creator during ACL membership change. Ordinary cold reopen needs only the
+signed root/current vector. Reachable dictionary backing is explicit O(R)
+archive-tier control index state, counted separately rather than hidden as
+application archive or bootstrap. If confirmation requires O(1) durable bytes
+under unbounded distinct-key churn, the hash-only design stops and reslices to
+a cryptographic accumulator/recursive-proof prerequisite.
 
-After f5b0p is exact, implementation remains split by owner: f5b0a protocol
-codecs/reservation/compatibility; f5b0b Node settlement authentication,
+After an empty combined confirmation, implementation remains split by owner:
+f5b0p-a pure registry/profile codecs and f5b0p-b neutral memory/browser registry
+storage; f5b0a protocol carrier/checkpoint codecs/reservation/compatibility;
+f5b0b Node settlement authentication,
 transaction and close-graph split with compaction noninterference; f5b0c room
 policy, exact indexed replacements, zero-intent sources and migration-import
 manual review; f5b0d issuance-store/browser/cleanup settled-prefix reclamation;
-and f5b creator dual-frontier advancement, recovery, legacy-record migration
-and gated pruning. Each gets causal tests-only RED before GREEN and bounded
+and f5b creator dual-frontier advancement, registry transition, recovery and
+gated pruning. Each gets causal tests-only RED before GREEN and bounded
 focused/static/retained/isolated evidence. The final f5b review covers the
 complete signed design→RED→GREEN history.
 
@@ -98505,84 +98508,167 @@ reissue, creator ingress, close/adopt, restart and cold reopen; tests-only
 receipts/checkpoints/storage injection cannot satisfy causality. Required cases
 now include the 6,003-byte maximum and adjacent count/byte failures, batched
 entry substitution, zero-intent genesis gaps, settlement-in-history but not
-fold, creator and non-creator rows, v1 pending migration, mixed-epoch pruning,
-same-key re-entry refusal, manual review, cross-object migration refusal,
+fold, creator and non-creator rows, old-profile noninterference, mixed-epoch
+pruning, same-key re-entry continuation, fresh-key sequence zero, manual review, cross-object migration refusal,
 crashes, incompatible peers and unchanged f5a foreign-author liveness.
 
-No production edit or RED is authorized until f5b0p and the amended combined
-design receive the one permitted material Grok 4.6/high, direct Kimi K3
-100-step and Opus xhigh confirmation with an empty P0/P1 union. P2 receives an
+No production edit or RED is authorized until the amended combined design
+receives the one permitted material Grok 4.6/high, direct Kimi K3 100-step and
+Opus xhigh confirmation with an empty P0/P1 union. P2 receives an
 owner/disposition without recursive prose review. Do not invoke Fable or
 collaboration subagents without new express user authorization.
 
 ###### D.110c-0c1f5b0p bounded removed-author identity-history prerequisite
 
-**Status: OPEN and blocking; bounded source/architecture audit is next. No RED
-or production edit is authorized.** Owner: the exact authenticated state that
-lets a current creator distinguish a globally fresh public key from a removed
-key attempting same-key re-entry, recover that key's last admitted/settled
-boundary, and enforce the existing never-resetting author sequence without
-retaining an O(lifetime-authors) active checkpoint vector. Deadline: exact
-design and combined f5b0 confirmation before f5b0a RED, f5b, the repeated
-same-room gate, Phase-6 exit, or Phase-7 long-lived-room cold join.
+**Status: exact source audit and design drafted; blocking on the combined
+f5b0p/f5b0 Grok/Kimi/Opus confirmation. No RED or production edit is
+authorized.** Owner: the creator-authenticated retired-key dictionary,
+genesis-bound settlement profile, pure proof/update verifier, strict-durability
+registry store, current/two-rollback reachability and explicit archive-tier
+census. Deadline: empty combined confirmation before f5b0p-a RED, f5b0a RED,
+f5b, the repeated same-room gate, Phase-6 exit, or Phase-7 long-lived-room cold
+join.
 
-The audit starts from the signed first-review evidence at
-`.logs/d110c-0c1f5b0-plan-review-fc4b8fc7/` and the amended design at
-`.logs/d110c-0c1f5b0-design-00a860ab/design.md`. It must trace genuine ACL
-addition, removal, same-key re-addition, fresh-key addition, creator close,
-successor adoption, restart, cold reopen, rollback and pruning through the
-current ACL codec, close graph, transition closure, archive index/history root,
-creator trust and storage owners. It must establish which current component,
-if any, can authenticate historical key appearance or nonappearance without
-replaying room age. A local issuance watermark, author assertion, mutable
-application registry or tests-only record is not creator authority.
+The bounded audit is
+`.logs/d110c-0c1f5b0p-design-e6a67013/audit.md`; the exact design is its sibling
+`design.md`. They pin signed/pushed source anchor
+`e6a67013b1f64b7ea2155f59a3d578f52ed84ed6`.
 
-Compare at least: retained authenticated tombstones with an explicit growth
-bound; a hash-authenticated author/incarnation dictionary with membership,
-nonmembership and update proofs; an authority-signed fresh-incarnation
-certificate; an author-identity/sequence schema change; and a history/archive
-proof based on existing RFC 9162 and archive-index commitments. For each,
-record genesis authentication, proof/update size, active and durable growth,
-producer/verifier/browser cost, untrusted-storage behavior, availability,
-rollback, pruning, migration, wire/schema/API/dependency/setup impact, replay,
-substitution, equivocation, skipped incarnation and stale-proof resistance.
+Their two-entry self-excluding manifest validates and has SHA-256
+`696f0fbc14dd738663fbee077c3427e16bd014d549f5a6807c11e2783282a932`.
 
-Acceptance requires one exact construction in which:
+The audit establishes:
 
-1. current pinned trust authenticates both prior appearance/nonappearance and
-   the last admitted/settled boundary needed to reject a reset;
-2. ordinary cold reopen verifies current authority without O(epoch),
-   O(rebase), O(gap), or O(lifetime-authors) replay or mandatory active state;
-3. an unbounded sequence of distinct authorized keys does not exhaust the
-   current checkpoint merely because the concurrent ACL remains capped at 64;
-4. same-key re-entry either continues strictly above its authenticated prior
-   boundary or fails closed, while a genuinely new key can begin at zero;
-5. removed-key proof material is pruned only after its replacement root/state
-   is durable, authenticated, adopted, rollback-protected and available; and
-6. exact schema, signer, domain, predecessor, storage, migration, API and
-   compatibility boundaries are explicit before any codec RED.
+1. the current ACL stores at most 64 current members and deletes a key after
+   its last role/finality key is revoked;
+2. the RFC 9162 history is ordinal, not author-keyed, and cannot prove global
+   nonappearance or recover one key's last boundary without a new index;
+3. `archiveIndexRoot` has no implemented author-index producer/store/consumer;
+4. caller-local issuance lineage is not creator authority; and
+5. AHE validates/reclaims only explicit flat closure refs, so hiding an
+   indirect Merkle tree behind one existing blob would have unsound
+   reachability custody.
 
-If no construction satisfies those constraints with existing primitives, stop
-at an audited recommendation and open the exact high-risk cryptographic,
-wire/API, identity or migration prerequisite it needs. Do not hide growth in
-archive metadata required for ordinary reopen, impose a lifetime-64-author
-ceiling, weaken never-reset semantics, or accept caller-local state.
+The selected existing-primitive construction is a deterministic
+content-addressed Merkle AVL dictionary of **currently retired** keys. Every
+node canonically binds author, admitted/settled boundaries, left/right refs
+containing byteLength, digest, height, subtree size and min/max key bounds,
+plus its own height/subtree size under
+`ts-drp/retired-author-registry-node/v1`; the empty root has its own domain.
+Membership/nonmembership proofs rehash the exact root-to-terminal path and
+validate canonical bytes, digest/length, BST ordering/extrema, heights, sizes
+and AVL balance. Batch witnesses bind a canonical digest-keyed node set and an
+ordered path schedule against each evolving intermediate root; a two-child
+delete also opens its deterministic in-order-successor path. Safe-integer entry
+count bounds a path to 76 nodes. A maximum 64-insert/64-delete transition
+therefore schedules no more than 14,592 visits or 14,942,208 canonical node
+bytes under the 1,024-byte node ceiling, with shared node bytes carried once.
+Deterministic AVL rotations derive one successor root/count.
+The exact internal batch witness is a canonical
+`drp-retired-author-registry-batch-witness` v1 record binding prior root/count,
+mutation digest, sorted unique digest→node-byte entries and one ordered
+lookup/successor path schedule per mutation. The witness is capped at
+20,971,520 bytes with node/path limits checked before allocation; it is not a
+vertex, checkpoint or network record. Fresh additions use an exact
+`assert-absent` no-state-change mutation so their proof cannot disappear from
+the transaction transcript.
 
-After one design is selected, the combined f5b0p/f5b0 amendment receives the
-single material Grok/Kimi/Opus confirmation already owed by the rejected first
-review. Only an empty P0/P1 union authorizes a tests-only RED. That RED must use
-the real ACL and creator transition path to show a removed/re-added same key
-cannot reset, a preserved lineage advances correctly, a fresh key starts
-correctly, stale/substituted/nonmembership proofs fail, and restart/cold reopen
-do not depend on fixture history. GREEN and retained gates are then sliced at
-the selected production owner; no Fable, collaboration subagent, campaign, or
-long workload is authorized here.
+At current→successor ACL transition, retained keys keep active boundaries;
+removed keys are inserted with their exact boundaries; a re-added key must be
+found, deleted and restored strictly above its admitted boundary; and only
+verified nonmembership lets a genuinely new key begin at zero. The creator
+verifies paths from the prior checkpoint root and strictly commits/registers
+the successor root before signing the successor settlement checkpoint. Missing,
+stale, corrupt or unavailable paths stop the membership-changing close; they
+never imply freshness. ACL-unchanged close copies the root/count.
+
+Add a storage-neutral `RetiredAuthorRegistryStore` with pure-proof input and
+strict `prove`, expected-root `transactTransition`, ambiguous-outcome recovery
+and current/two-rollback `reclaim` contracts. Memory and dedicated IndexedDB
+implementations are conformant. They do not reuse AHE's non-recursive blob GC.
+Content-addressed nodes are reverified on every read; unknown outcomes resolve
+only by authenticating the exact registered root/count/mutation/witness digest.
+Each object has at most one serialized candidate, one current and two rollback
+root registrations; a different transition cannot bypass an unresolved
+candidate. Old copy-on-write nodes are pruned after authenticated adoption,
+room-head, snapshot, rollback and availability gates.
+
+The active checkpoint holds one root/count plus at most 64 current frontier
+triples and remains independent of room age. Ordinary issue/publish/restart and
+cold reopen do not load dictionary nodes. A creator membership change costs
+O(M log R), `M <= 128`; reachable backing is explicit O(R) archive-tier control
+index state for `R` currently retired distinct keys, plus nodes reachable from
+two rollback roots and one serialized candidate. It is counted by
+entries/nodes/bytes and is neither hidden application archive nor mandatory
+bootstrap state. Repeated churn of a fixed
+key set stays logically bounded; unbounded distinct-key churn necessarily grows
+the hash-only dictionary. If review requires O(1) durable bytes even for that
+case, stop and open a separately reviewed accumulator/recursive-proof
+prerequisite with its setup/dependency/browser costs.
+
+The compatibility boundary rejects the earlier runtime
+`authorSettlementVersion?: 1` migration. Exact profile ID
+`creator-trusted-settlement-v1` is selected in canonical profile bytes before
+genesis and bound by the existing genesis `profileDigest`. It has exactly the
+same fixed one-of-one creator signer/quorum, Ed25519 suite and creator-trusted/
+not-BFT UI meaning as `creator-trusted-v1`. The implicit genesis sentinel starts
+with null frontiers and the empty registry; there is no separate genesis
+settlement record. Every close uses settlement state, never the
+v1 aggregate or legacy retirement. Existing `creator-trusted-v1` rooms/bytes
+remain unchanged and cannot late-opt-in here; old binaries reject the unknown
+profile. A future legacy migration requires separately reviewed authenticated
+full-history author-index construction.
+
+This is a prospective profile-inventory amendment: completed Phase-3 evidence
+for the three then-supported profiles remains immutable, while successful
+f5b0p/f5b GREEN would add this fourth creator-only sibling for newly created
+settlement rooms. It does not reinterpret prior profile bytes or claim old
+binaries support the new ID.
+
+The settlement checkpoint therefore adds exact
+`retiredAuthorRegistryRoot/Size`, permits only `genesis | settled-v1`
+predecessors and must fit the unchanged 8,192-byte ceiling with 64 maximum
+frontiers. Direct workspace canonical measurement is 7,064 bytes including the
+64-byte creator signature, leaving 1,128 bytes. The maximum-shaped two-child
+registry node is 792 bytes, leaving 232 bytes under its 1,024-byte ceiling. The invite envelope, vertex envelope, CutValue, QC, signer, authority
+and third-party dependencies do not change. The sibling profile identifier,
+checkpoint schema and registry store are explicit high-risk public/storage
+compatibility changes, not silent implementation details.
+
+Implementation is two bounded prerequisite slices before the existing f5b0
+owners:
+
+1. **f5b0p-a protocol dictionary/profile:** causal tests-only RED for exact
+   node/proof/update codecs, deterministic rotations, member/nonmember and
+   corrupt/stale/substituted paths, 128-mutation boundary, profile rejection,
+   genesis-empty state and measured 64-frontier checkpoint bytes; then pure
+   protocol GREEN.
+2. **f5b0p-b registry storage:** causal tests-only RED for neutral memory/
+   browser conformance, strict write-before-sign, idempotence, ambiguous commit,
+   corruption poison, unavailable-node refusal and current/two-rollback
+   reachability GC; then store/schema GREEN without creator-close integration.
+
+The resumed genuine functional RED uses a real
+`creator-trusted-settlement-v1` room and real ACL/creator path: activity,
+settlement, removal, close/adopt/restart, same-key re-add and attempted sequence
+zero must expose the intended reset failure; a truly fresh key begins at zero.
+It also covers retained roles, remove/re-add within one staged ACL, unavailable
+store, stale/substituted proofs, old-profile noninterference and ordinary cold
+reopen with registry backing absent. Tests-only roots or appearance facts cannot
+satisfy causality.
+
+The combined f5b0p/f5b0 amendment now receives the single material confirmation
+already owed by the rejected first review: Grok 4.6/high, standard direct Kimi
+K3 with `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh. Only an empty P0/P1
+union authorizes RED. P2 is dispositioned without recursive prose review. No
+Fable, collaboration subagent, campaign, long workload or production edit is
+authorized here.
 
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
-**Status: BLOCKED on f5b0p's bounded authenticated removed-author identity
-history and the combined amended-design confirmation; no RED or production
-edit is authorized.** Owner: the cross-epoch relationship among creator-admitted
+**Status: BLOCKED on the combined amended-design confirmation and subsequent
+f5b0p-a/b plus f5b0a-d RED/GREEN; no RED or production edit is authorized.**
+Owner: the cross-epoch relationship among creator-admitted
 per-author identities, aggregate coverage, historical outbox classification,
 rebase source→replacement/disposition correlation, close-set/history proofs,
 writer-side proof availability after restart, and bounded pruning. Deadline:

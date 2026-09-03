@@ -5,9 +5,13 @@
 This design is based on signed/pushed source-audit anchor
 `00a860ab3c2ed64b236713fc63b7ae2b073f9f27`. The first high-risk review at
 signed/pushed design commit `fc4b8fc78148e5211b09dc32e3f27f32756653ec`
-rejected RED with a blocking union. This amendment closes every bounded
-carrier/lifecycle finding and isolates one genuine missing capability—bounded
-authenticated history for removed author keys—as `D.110c-0c1f5b0p`. It is not
+rejected RED with a blocking union. The first amendment closed the bounded
+carrier/lifecycle findings and isolated one genuine missing capability—bounded
+authenticated history for removed author keys—as `D.110c-0c1f5b0p`. The
+follow-on source audit and exact design are
+`.logs/d110c-0c1f5b0p-design-e6a67013/{audit,design}.md`. They select a
+creator-authenticated Merkle AVL retired-author dictionary and a genesis-bound
+`creator-trusted-settlement-v1` profile. This combined amendment is not
 production or RED authorization.
 
 The selected construction has two new protocol-v3 control values and no new
@@ -19,10 +23,9 @@ external trust service:
    `ts-drp/vertex/v3` domain; and
 2. a **creator author-settlement checkpoint** in the durable transition
    closure, signed by the fixed room creator and replacing (not shadowing) the
-   v1 admitted-frontier aggregate after an explicit upgrade. Its current
-   member-frontier grammar is fixed below, but its final removed-author
-   identity-history binding remains blocked on f5b0p and therefore cannot yet
-   be frozen as a production codec.
+   v1 admitted-frontier aggregate for rooms created under the new settlement
+   profile. Its active member vector is joined to the creator-authenticated
+   retired-author dictionary root/count frozen by f5b0p.
 
 The application operation and the protocol settlement statement have one
 owner each. The reserved settlement action never enters a blueprint reducer;
@@ -33,11 +36,12 @@ carrier. The checkpoint is the sole active recovery authority for settled
 issuance; receipt vertices are transient current-epoch evidence committed by
 the existing close-set/history roots and are prunable after adoption gates.
 
-This design changes protocol semantics, adds a transition-closure record and
-two package-facing opt-in seams. It therefore needs the governing high-risk
+This design changes protocol semantics, adds a transition-closure record, a
+sibling genesis trust profile, a storage-neutral retired-author registry and
+one application semantic query. It therefore needs the governing high-risk
 review before RED or production edits. It does not change a vertex field, the
-protobuf envelope, a digest suite, dependency semantics, epoch workload or
-resource ceilings.
+protobuf envelope, creator signer/quorum, digest suite, third-party dependency,
+epoch workload or resource ceilings.
 
 ## Exact carrier grammar
 
@@ -312,8 +316,10 @@ preimage fields are:
 	kind: "drp-creator-author-settlement-state",
 	objectId,
 	priorCheckpointDigest,
-	priorCheckpointKind: "admitted-v1" | "genesis" | "settled-v1",
+	priorCheckpointKind: "genesis" | "settled-v1",
 	protocolMajor: 3,
+	retiredAuthorRegistryRoot,
+	retiredAuthorRegistrySize,
 	snapshotManifestDigest,
 	successorAclDigest,
 	successorAnchorDigest,
@@ -330,23 +336,22 @@ contain at most the 64 members of the successor ACL (not only writers).
 that loses write permission but retains another ACL role therefore keeps both
 boundaries.
 
-A fully removed key cannot simply be omitted and later accepted as fresh.
-Doing so loses the only creator-authenticated never-resetting boundary. The
-exact bounded representation for prior author identity after removal is not
-present in the repository and is not selected here. The blocking
-`D.110c-0c1f5b0p` prerequisite below must choose and review an authenticated,
-age-independent identity-history construction or an equally enforceable
-compatibility boundary before this checkpoint shape is frozen. Unbounded
-tombstone vectors, caller-local lineage claims, fixture-only membership facts,
-and a lifetime-64-author limit are rejected.
+`retiredAuthorRegistryRoot` and `retiredAuthorRegistrySize` bind the exact
+Merkle AVL state frozen in the f5b0p design. A fully removed key is inserted
+with its final admitted/settled boundaries; a re-added key is deleted and its
+boundaries return to the active vector. Verified nonmembership is the only way
+a new key begins with null boundaries. Ordinary openers authenticate the
+creator-signed root/count without loading dictionary nodes; the creator
+verifies O(log R) paths only for membership-changing ACL transitions.
 
 The record binds the current and successor creator trust, object/genesis,
 adjacent epochs/anchors, both ACLs, cut digest, commit QC, snapshot manifest,
 and the history root/size produced for the current graph. The cut independently
-contains the same snapshot and history facts. Any mismatch fails closed. The
-predecessor is exactly one genesis sentinel, one v1 admitted-frontier record,
-or one prior settlement checkpoint; mixed, duplicate, skipped, stale or
-downgraded predecessors fail.
+contains the same snapshot and history facts. Any mismatch fails closed. Under
+`creator-trusted-settlement-v1`, the predecessor is exactly one genesis
+sentinel or one prior settlement checkpoint; mixed, duplicate, skipped, stale
+or downgraded predecessors fail. A `creator-trusted-v1` room never accepts this
+checkpoint.
 
 For each successor ACL member, the creator begins with the prior authenticated
 settled boundary (or null), groups the complete current close graph by exact
@@ -360,20 +365,14 @@ another author's result. Creator-owned duplicate/regression errors keep their
 current fail-closed behavior.
 
 The admitted boundary separately advances only across exact adjacent graph
-slots and never across a disposition. In the migration checkpoint it is copied
-from the authenticated v1 frontier; the settled boundary starts null. In later
-checkpoints both are monotone and neither can regress. The creator's own author
-participates in the same settlement scan. The migration close retains the
-legacy creator-issuance-retirement record only as the authenticated source of
-the creator's initial admitted boundary and refuses opt-in until the creator's
-existing v1 pending/displaced rows have drained. Subsequent settlement-mode
-closures contain no legacy retirement record and no v1 aggregate; the new
-checkpoint is the sole per-author recovery authority. The transition verifier
-branches exactly between `(v1 aggregate + creator retirement, no settlement
-checkpoint)`, `(migration settlement checkpoint + creator retirement, no v1
-aggregate)`, and `(settlement checkpoint only)`. The old equality between the
-creator retirement boundary and the v1 aggregate is not applied to later
-settled checkpoints.
+slots and never across a disposition. At settlement-profile genesis every
+active member begins with both boundaries null. In later checkpoints both are
+monotone and neither can regress. The creator's own author participates in the
+same settlement scan. Settlement-profile closures contain neither the v1
+aggregate nor the legacy creator-retirement record; the settlement checkpoint
+is the sole per-author recovery authority from the first close. Existing v1
+rooms retain their exact existing aggregate/retirement behavior and cannot
+late-opt-in in this slice.
 
 The scan advances from `prior + 1` (or zero) through exact adjacent accounted
 slots; a control vertex's own author sequence is an ordinary graph slot. It
@@ -386,11 +385,10 @@ foreign boundary cannot advance, preserving f5a's per-author liveness.
 The admitted and settled frontiers are different
 capabilities and have different consumers:
 
-- v1 retains its existing `covered-historical` behavior byte-for-byte;
-- the first settlement checkpoint copies a verified v1 frontier only into
-  `admittedThrough`; every `settledThrough` starts null, so an offline pending
-  same-slot row retains the shipped covered-historical reissue behavior rather
-  than becoming terminal without its author's statement;
+- `creator-trusted-v1` retains its existing `covered-historical` behavior
+  byte-for-byte;
+- `creator-trusted-settlement-v1` begins at genesis with null admitted/settled
+  boundaries and never imports a v1 admitted frontier;
 - under a verified settlement checkpoint, any same-author issuance row at or
   below `settledThrough` is **terminal**. It is never republished, rebased,
   reduced or used as application evidence, regardless of its digest; and
@@ -428,40 +426,37 @@ already bounded by `maxEpochVertices`, `maxEpochBytes`, `maxPendingEntries`
 and `maxPendingBytes`. No state grows with epoch count or number of completed
 rebases. Manual-review rows remain explicit application/outbox debt and stop
 only that author's boundary; they are not copied into another hidden store.
+The active checkpoint stays O(64), while reachable retired-author dictionary
+nodes are an explicit O(R) archive-tier control index, counted separately and
+unnecessary for ordinary cold reopen. They are needed only by the creator when
+membership changes; unavailability stalls that close rather than weakening
+freshness.
 
-## Compatibility and upgrade boundary
+## Compatibility and genesis-profile boundary
 
-The public room/session creation input adds one explicit opt-in:
-`authorSettlementVersion?: 1`. The application adds
+The application adds
 `hasDisplacedOperation(projection, operation): boolean`; it is required only
-when the opt-in is present or an authenticated settlement checkpoint is being
-opened. The function is called twice over the same detached authenticated
-inputs and disagreement fails closed. This is the only new application-facing
-semantic query. It does not sign, admit or settle anything.
+for a settlement-profile room. The function is called twice over the same
+detached authenticated inputs and disagreement fails closed. It does not sign,
+admit or settle anything.
 
-With no opt-in, a v1 room emits and consumes only the existing admitted
-frontier and creator retirement record. With opt-in, the next close emits the
-new settlement checkpoint and the creator retirement record, but no v1
-aggregate. The first record names the exact v1 aggregate digest as
-`priorCheckpointKind: "admitted-v1"`, or the genesis sentinel at epoch zero,
-copies only authenticated admitted boundaries, and initializes every settled
-boundary to null. After that checkpoint is active, every successor contains
-exactly one settlement checkpoint and neither legacy per-author record;
-downgrade, omission, mixed kinds, or a later retirement record fail closed.
+The creator selects exact profile ID `creator-trusted-settlement-v1` in the
+canonical profile bytes before genesis. Its signer set, quorum, crypto suite
+and creator-trusted/not-BFT UI meaning are identical to
+`creator-trusted-v1`; the genesis anchor's existing `profileDigest` binds the
+choice. Settlement state starts at genesis with the active ACL's null
+frontiers and the empty retired-author root/count. Every close uses the new
+checkpoint and control rules. Old binaries reject the unsupported profile.
 
-Settlement control operations are admitted only after an authenticated
-settlement checkpoint is active, never in the migration epoch. Therefore the
-first opt-in close uses existing v1 behavior and the successor enables the new
-carrier. Old binaries reject that successor because they require a v1
-aggregate and do not recognize the reserved action. They cannot silently
-continue or partition application state. Operators must coordinate the opt-in;
-there is no runtime negotiation, fallback or automatic upgrade. Existing v1
-history is preserved unchanged, and its bytes are never relabelled as the new
-record.
+An existing `creator-trusted-v1` room emits and consumes only the existing
+admitted frontier/creator retirement and cannot late-opt-in. There is no
+runtime option, negotiation, fallback or automatic migration. A future
+migration requires separately reviewed authenticated full-history author-index
+construction. Existing bytes are never relabelled.
 
-This is a protocol/closure-schema and public configuration/API change but not
-a protobuf/wire-envelope change. It adds no dependency and uses the current
-Ed25519, canonical and RFC 9162 implementations.
+This is a protocol/closure-schema/profile and public compatibility change but
+not a protobuf/wire-envelope or authority change. It adds no dependency and
+uses the current Ed25519, canonical and RFC 9162 implementations.
 
 ## Crash, attack and failure matrix
 
@@ -486,56 +481,53 @@ The implementation and retained tests must prove:
 | settlement vertex in close graph                                                    | included in charges/frontier/close-set/history, excluded exactly from application fold                         |
 | row substitution at or below settled prefix                                         | row is terminal and never applied                                                                              |
 | row above prefix                                                                    | ordinary authenticated displacement handling; never silently terminal                                          |
-| pending covered-historical row at v1 migration                                      | remains nonterminal and follows the shipped v1 reissue path until its author's later signed settlement         |
-| creator's own displaced row after migration                                         | settles through the same control/checkpoint path; no legacy retirement hard stop                               |
-| same-key removal/re-entry                                                           | fail closed until D.110c-0c1f5b0p supplies authenticated bounded identity history                              |
+| legacy v1 room receives settlement carrier/profile                                  | exact unsupported/mixed-profile rejection; existing behavior unchanged                                         |
+| creator's own displaced row in settlement profile                                   | settles through the same control/checkpoint path; no legacy retirement owner exists                            |
+| same-key removal/re-entry                                                           | registry membership restores the exact boundary; reset is rejected                                             |
+| genuinely fresh key                                                                 | registry nonmembership permits null boundary and sequence zero                                                 |
+| registry proof/store unavailable                                                    | membership-changing close stalls; no fallback-to-fresh                                                         |
 | cross-object migration import                                                       | remains explicit manual-review debt; no fabricated same-object replacement                                     |
 | manual review                                                                       | no receipt, no false settlement, other authors may close                                                       |
 | incompatible/mixed/downgraded closure                                               | successor open/advance rejects                                                                                 |
 
-## Blocking identity-history prerequisite
+## Resolved identity-history design prerequisite
 
 The first review proved that the carrier and checkpoint cannot safely infer
 that an ACL key absent from the immediately prior frontier is globally new.
-The current signed ACL, checkpoint, RFC 9162 history root, local issuance
-store, and archive-index root expose no bounded authenticated non-reuse proof.
-Omitting a removed key loses its never-resetting boundary; retaining every
-removed key grows active control state with room age. The design therefore
-opens `D.110c-0c1f5b0p` before any f5b0a RED.
+The f5b0p audit confirms no dormant current owner can do so and selects the
+Merkle AVL retired-author dictionary and genesis-bound settlement profile in
+`.logs/d110c-0c1f5b0p-design-e6a67013/design.md`.
 
-That prerequisite must audit the genuine ACL add/remove/re-add and cold-open
-owners and select exactly one age-independent creator-verifiable construction.
-It must authenticate from the current pinned checkpoint both whether a public
-key appeared before and the last admitted/settled boundary needed to reject a
-reset, while allowing ordinary reopen without replaying O(epoch) history.
-Candidates include a bounded authenticated author-incarnation dictionary, an
-explicit authority-signed fresh-incarnation carrier, or a reviewed change to
-the author identity/sequence contract. It must account for proof production,
-untrusted storage, update and nonmembership proofs, removed-key pruning,
-rollback, availability, migration, browser cost, schema/API/dependency impact,
-and durable census. It must reject caller-local lineage, unbounded checkpoint
-tombstones, an uncounted mandatory bootstrap store, and an arbitrary
-lifetime-author cap. If the selected construction changes a vertex field,
-authority assumption, public API, dependency, setup, or migration contract,
-it receives its own explicit high-risk prerequisite and review rather than
-being smuggled into settlement GREEN.
+The active checkpoint holds only one authenticated root/count plus the current
+64-member vector. Ordinary reopen does not read the dictionary. Membership-
+changing creator close verifies O(log R) paths from untrusted storage; reachable
+backing is an explicit O(R) archive-tier control index, not hidden active or
+bootstrap state. That information-theoretic growth is accepted only if the
+governing confirmation agrees it satisfies the durable-census contract. If
+review instead requires O(1) durable bytes under unbounded distinct-key churn,
+stop at design and open a cryptographic accumulator/recursive-proof prerequisite;
+do not implement a disguised tombstone list.
 
 ## TDD implementation slices
 
-After the blocking prerequisite selects the missing identity-history boundary,
+After the combined design confirmation has an empty P0/P1 union,
 implementation is split at natural owners without repeated plan ceremony:
 
-1. **f5b0p — bounded author identity history.** Source/architecture audit and
-   exact high-risk design only. It closes when the selected construction and
-   compatibility boundary have an empty P0/P1 review union; it authorizes no
-   settlement production edit by itself.
-2. **f5b0a — protocol carrier and checkpoint codecs.** RED freezes exact
-   canonical shapes, byte/count limits, signature/domain behavior, v1→settled
-   predecessor rules, admitted-versus-settled migration, global reservation of
-   the action, downgrade/mixed rejection and opaque signing custody. GREEN is
-   confined to protocol-v3 registry/codecs/exports, issuer-side discrimination,
-   and conformance.
-3. **f5b0b — Node admission, close-graph split and durable settlement
+1. **f5b0p-a — protocol dictionary/profile.** RED freezes the exact Merkle AVL
+   node/proof/update grammar, deterministic rotations, profile union,
+   genesis-empty state, root/count checkpoint fields and the measured
+   64-frontier byte ceiling. GREEN is pure codecs/verifiers/profile plumbing;
+   no store or creator-close behavior.
+2. **f5b0p-b — retired-author registry store.** RED freezes the neutral
+   contract plus memory/browser strict durability, idempotence, ambiguous
+   outcome recovery, corruption refusal and current/two-rollback reachability
+   GC. GREEN adds the dedicated store/schema; it does not hide nodes in AHE.
+3. **f5b0a — protocol carrier and checkpoint codecs.** RED freezes exact
+   canonical shapes, byte/count limits, signature/domain behavior,
+   genesis/settled predecessor rules, global reservation, old/mixed-profile
+   rejection and opaque signing custody. GREEN is confined to protocol-v3
+   registry/codecs/exports, issuer-side discrimination, and conformance.
+4. **f5b0b — Node admission, close-graph split and durable settlement
    transaction.** RED uses real
    signed vertices and durable issuance/live-journal stores for normal,
    restart, outcome-unknown, partial publication, duplicate and malformed
@@ -544,25 +536,27 @@ implementation is split at natural owners without repeated plan ceremony:
    `settleRebaseSources()`, and exact Node-owned close split; compaction is a
    retained invariant/test owner, not a widened reducer. No room policy or
    creator-frontier logic.
-4. **f5b0c — room disposition orchestration.** RED drives the real rebase
+5. **f5b0c — room disposition orchestration.** RED drives the real rebase
    outbox through expire, manual-review, already-present, rebase, transform,
    indexed batching, zero-intent control sources, migration-import refusal and
-   crash boundaries. GREEN adds only the opt-in, deterministic
+   crash boundaries. GREEN adds only the deterministic
    projection-presence query and internal result plumbing; public `issue()` is
    unchanged.
-5. **f5b0d — authenticated settled-prefix reclamation.** RED freezes the new
+6. **f5b0d — authenticated settled-prefix reclamation.** RED freezes the new
    storage-neutral CAS/delete contract and conformance across mixed epochs,
    pending/published/substituted rows, stale lineage/watermark, partial failure,
    rollback and v1 noninterference. GREEN owns issuance-store, memory model,
    browser implementation, closed-epoch cleanup integration and bounded
    retained census.
-6. **f5b — creator settlement and recovery integration.** The already-owned
+7. **f5b — creator settlement and recovery integration.** The already-owned
    causal RED covers rebase and honest delivery gaps, genesis gap, same-slot
    regression, membership re-entry, at least two later close/adopt cycles,
-   creator and non-creator rows, restart and cold reopen. GREEN replaces the
-   v1 aggregate only in opt-in mode, applies dual per-author advancement,
-   settlement-mode retirement-record removal, terminal recovery and gated
-   pruning.
+   creator and non-creator rows, restart and cold reopen. GREEN applies dual
+   per-author advancement only under the genesis-bound settlement profile,
+   emits no v1 aggregate/legacy retirement there, and owns terminal recovery
+   and gated pruning. It derives the real current/successor ACL diff, commits the exact
+   registry transition before checkpoint signing and keeps current plus two
+   rollback roots.
 
 Each sub-slice uses one causal tests-only RED before its production GREEN,
 focused/static/retained/isolated gates with complete logs, signed commits and
@@ -575,18 +569,22 @@ authority, dependency, threshold or API.
 
 ## Acceptance and stop rules
 
-No production edit or RED runs before f5b0p is exact and the amended design
-confirmation has an empty P0/P1 union. P2 receives an owner/disposition without
-prose-only recursion. If review shows that a normal signed control vertex cannot preserve the current
-causality/capacity contract, that author abandonment is insufficient authority,
-or the v1 migration/downgrade rule is unsafe, stop and amend the design rather
-than implementing a nearby substitute.
+No production edit or RED runs before the amended design confirmation has an
+empty P0/P1 union. P2 receives an owner/disposition without prose-only
+recursion. If review shows that a normal signed control vertex cannot preserve
+the current causality/capacity contract, that author abandonment is
+insufficient authority, that the genesis-profile boundary is unsafe, or that
+the explicit O(R) archive-tier registry violates the accepted durable-census
+contract, stop and reslice the exact prerequisite rather than implementing a
+nearby substitute.
 
 The complete GREEN must demonstrate genuine source rows and signed control
 vertices through ordinary publication, close/adopt, restart and cold reopen;
 exact state, ACL, authority, anchor, history, archive and operation accounting;
-no same-anchor double close; unchanged v1 behavior without opt-in; fail-closed
-old/mixed peers; retained f2/f4/f5a and D.108-D.110 lifecycle behavior; bounded
-durable/runtime census; and fresh-process repeated same-room memory in the
-later ≥100-transition gate. Tests-only receipt injection or synthetic
-checkpoint bytes cannot satisfy the end-to-end RED/GREEN.
+no same-anchor double close; unchanged `creator-trusted-v1` behavior;
+fail-closed old/mixed peers; authenticated same-key continuation and fresh-key
+zero; retained f2/f4/f5a and D.108-D.110 lifecycle behavior; bounded active
+checkpoint/runtime census plus explicit O(R) registry accounting; and
+fresh-process repeated same-room memory in the later ≥100-transition gate.
+Tests-only receipt/registry injection or synthetic checkpoint bytes cannot
+satisfy the end-to-end RED/GREEN.
