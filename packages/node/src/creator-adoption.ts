@@ -81,6 +81,7 @@ interface SealedAdoptionFacts {
 	readonly durableReplay: Readonly<{ verify(): Promise<boolean> }>;
 	readonly exactCanonicalLatchedAclBytes: Uint8Array;
 	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
+	readonly exactCanonicalPinnedGenesisBootstrapOperationBytes?: Uint8Array;
 	readonly history: CloseSetHistoryCommitment;
 	readonly issuanceScope: DurableIssueScope;
 	readonly issuanceStore: DurableIssuanceStore;
@@ -729,6 +730,10 @@ function creatorSuccessorLiveSeed(
 			catalog: factsForCatalog(resolved),
 			exactCanonicalLatchedAclBytes: Uint8Array.from(exactCanonicalLatchedAclBytes),
 			exactCanonicalParametersCarrierBytes: Uint8Array.from(facts.exactCanonicalParametersCarrierBytes),
+			exactCanonicalPinnedGenesisBootstrapOperationBytes:
+				facts.exactCanonicalPinnedGenesisBootstrapOperationBytes === undefined
+					? undefined
+					: Uint8Array.from(facts.exactCanonicalPinnedGenesisBootstrapOperationBytes),
 			exactCanonicalSnapshotPayloadBytes: Uint8Array.from(snapshot.exactCanonicalPayloadBytes),
 			issuanceScope: Object.freeze({ ...facts.issuanceScope }),
 			issuanceStore: facts.issuanceStore,
@@ -873,7 +878,9 @@ async function authenticatedSuccessorIssuanceScope(
 			expectedObjectId: objectId,
 		});
 		if (!opened.ok) return Object.freeze({ ok: false as const, reason: "authority" as const });
-		writers = opened.snapshot.members.flatMap(({ author, groups }) => (groups.includes("writer") ? [author] : []));
+		writers = opened.snapshot.members.flatMap(({ author, groups }) =>
+			opened.snapshot.permissionless || groups.includes("writer") ? [author] : []
+		);
 		if (
 			writers.length === 0 ||
 			new Set(writers).size !== writers.length ||
@@ -940,6 +947,17 @@ async function reopenCreatorSuccessorMaterial(
 	input: CreatorSuccessorReopenInput
 ): Promise<CreatorSuccessorReopenResult> {
 	try {
+		const rawBootstrapOperationBytes = input.exactCanonicalPinnedGenesisBootstrapOperationBytes;
+		const exactCanonicalPinnedGenesisBootstrapOperationBytes =
+			rawBootstrapOperationBytes === undefined
+				? undefined
+				: rawBootstrapOperationBytes instanceof Uint8Array &&
+					  Object.getPrototypeOf(rawBootstrapOperationBytes) === Uint8Array.prototype
+					? Uint8Array.from(rawBootstrapOperationBytes)
+					: undefined;
+		if (rawBootstrapOperationBytes !== undefined && exactCanonicalPinnedGenesisBootstrapOperationBytes === undefined) {
+			return coldFailure("malformed-input", "creator successor bootstrap policy input is invalid");
+		}
 		const parsedObjectId = parseStorageObjectId(input.snapshotDeclaration.scope.objectId);
 		if (!parsedObjectId.ok) return coldFailure("chain-invalid", "creator successor object identity is invalid");
 		const objectId = parsedObjectId.value;
@@ -1159,6 +1177,7 @@ async function reopenCreatorSuccessorMaterial(
 			catalog: factsForCatalog(resolved),
 			exactCanonicalLatchedAclBytes,
 			exactCanonicalParametersCarrierBytes: Uint8Array.from(input.exactCanonicalParametersCarrierBytes),
+			exactCanonicalPinnedGenesisBootstrapOperationBytes,
 			exactCanonicalSnapshotPayloadBytes: Uint8Array.from(snapshot.exactCanonicalPayloadBytes),
 			issuanceScope,
 			issuanceStore: input.issuanceStore,

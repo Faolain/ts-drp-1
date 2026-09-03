@@ -238,12 +238,53 @@ async function recoveryStore(
 }
 
 /**
+ * Builds detached recovery bindings for focused closed-input and policy tests.
+ * @param fixture - Authenticated live fixture that minted the capability.
+ * @param capability - Prepared capability selected by the caller.
+ * @param recoveryOperation - Optional exact vertex operation for the recovered row.
+ * @param trace - Optional shared event trace for durable-order assertions.
+ * @returns A closed public recovery input and its evidence owners.
+ */
+export async function createRecoveryInput(
+	fixture: GenuinePreparedV3Fixture,
+	capability: PreparedV3Live,
+	recoveryOperation?: Readonly<Record<string, unknown>>,
+	trace?: string[]
+): Promise<
+	Readonly<{
+		readonly input: Parameters<typeof recoverV3LiveReplica>[0];
+		readonly issuanceStore: DurableIssuanceStore;
+		readonly journal: DurableLiveJournalStore;
+		readonly recoveryVertexDigest: string;
+	}>
+> {
+	const recoveredStore = await recoveryStore(fixture, recoveryOperation, trace);
+	const journal = journalStore(fixture, trace);
+	const input = Object.freeze({
+		capability,
+		...(fixture.exactCanonicalLatchedAclBytes === undefined
+			? { exactCanonicalAuthorAuthorizationBytes: fixture.exactCanonicalAuthorAuthorizationBytes }
+			: { exactCanonicalLatchedAclBytes: fixture.exactCanonicalLatchedAclBytes }),
+		issuanceScope: Object.freeze({ author: fixture.author, objectId: fixture.objectId }),
+		issuanceStore: recoveredStore.store,
+		liveJournalStore: journal,
+	}) as Parameters<typeof recoverV3LiveReplica>[0];
+	return Object.freeze({
+		input,
+		issuanceStore: recoveredStore.store,
+		journal,
+		recoveryVertexDigest: recoveredStore.vertexDigest,
+	});
+}
+
+/**
  * Recovers one genuine prepared capability through the shipped replica path.
  * @param fixture - Authenticated live fixture that minted the capability.
  * @param capability - One-use prepared capability to recover.
  * @param recoveryOperation - Optional exact vertex operation for a closed-graph recovery proof.
  * @param operationAdmissionPolicy - Optional fresh policy used by the E5-01 pre-journal RED.
  * @param trace - Optional shared event trace for durable-order assertions.
+ * @param exactCanonicalPinnedGenesisBootstrapOperationBytes - Optional exact configured bootstrap policy.
  * @returns The recovered capability and the stores that authenticated it.
  */
 export async function recover(
@@ -251,7 +292,8 @@ export async function recover(
 	capability: PreparedV3Live,
 	recoveryOperation?: Readonly<Record<string, unknown>>,
 	operationAdmissionPolicy?: OperationAdmissionPolicyFixture,
-	trace?: string[]
+	trace?: string[],
+	exactCanonicalPinnedGenesisBootstrapOperationBytes?: Uint8Array
 ): Promise<
 	Readonly<{
 		capability: RecoveredV3Live;
@@ -260,25 +302,22 @@ export async function recover(
 		recoveryVertexDigest: string;
 	}>
 > {
-	const recoveredStore = await recoveryStore(fixture, recoveryOperation, trace);
-	const issuanceStore = recoveredStore.store;
-	const journal = journalStore(fixture, trace);
+	const bindings = await createRecoveryInput(fixture, capability, recoveryOperation, trace);
+	const issuanceStore = bindings.issuanceStore;
+	const journal = bindings.journal;
 	const result = await recoverV3LiveReplica({
-		capability,
-		...(fixture.exactCanonicalLatchedAclBytes === undefined
-			? { exactCanonicalAuthorAuthorizationBytes: fixture.exactCanonicalAuthorAuthorizationBytes }
-			: { exactCanonicalLatchedAclBytes: fixture.exactCanonicalLatchedAclBytes }),
-		issuanceScope: Object.freeze({ author: fixture.author, objectId: fixture.objectId }),
-		issuanceStore,
-		liveJournalStore: journal,
+		...bindings.input,
 		...(operationAdmissionPolicy === undefined ? {} : { operationAdmissionPolicy }),
+		...(exactCanonicalPinnedGenesisBootstrapOperationBytes === undefined
+			? {}
+			: { exactCanonicalPinnedGenesisBootstrapOperationBytes }),
 	} as Parameters<typeof recoverV3LiveReplica>[0]);
 	if (!result.ok) throw new TypeError(`recovery failed: ${result.kind}`);
 	return Object.freeze({
 		capability: result.capability,
 		issuanceStore,
 		journal,
-		recoveryVertexDigest: recoveredStore.vertexDigest,
+		recoveryVertexDigest: bindings.recoveryVertexDigest,
 	});
 }
 

@@ -17,6 +17,7 @@ import {
 	CREATOR_SUCCESSOR_ACTIVATION_FAILURE_KINDS,
 	CREATOR_SUCCESSOR_ACTIVATION_INPUT_KEYS,
 	CREATOR_SUCCESSOR_ACTIVATION_SUCCESS_KEYS,
+	CREATOR_SUCCESSOR_LOCAL_AUTHOR_REOPEN_BOOTSTRAP_POLICY_INPUT_KEYS,
 	CREATOR_SUCCESSOR_LOCAL_AUTHOR_REOPEN_INPUT_KEYS,
 	CREATOR_SUCCESSOR_REOPEN_INPUT_KEYS,
 	D108D1_BROWSER_BEHAVIORS,
@@ -173,7 +174,10 @@ describe("D.108d1 creator successor activation RED", () => {
 	it("rejects a hostile cold authentication profile before every downstream effect", async () => {
 		const reopen = (await candidate()).reopenCreatorSuccessorAdoption;
 		if (reopen === undefined) throw new TypeError("D.108e2a reopen export missing");
-		const run = async (authenticationProfile: unknown): Promise<Readonly<Record<string, number | unknown>>> => {
+		const run = async (
+			authenticationProfile: unknown,
+			additions: Readonly<Record<string, unknown>> = Object.freeze({})
+		): Promise<Readonly<Record<string, number | unknown>>> => {
 			let signerCount = 0;
 			let propertyReadCount = 0;
 			const downstream = new Proxy(Object.create(null) as Record<string, unknown>, {
@@ -207,6 +211,7 @@ describe("D.108d1 creator successor activation RED", () => {
 				snapshotDeclaration: downstream,
 				snapshotStore: downstream,
 				store: downstream,
+				...additions,
 			});
 			return Object.freeze({ propertyReadCount, result, signerCount });
 		};
@@ -228,6 +233,16 @@ describe("D.108d1 creator successor activation RED", () => {
 		const literal = await run("creator-only");
 		expect(literal.result).toEqual(expect.objectContaining({ kind: "internal-invariant", ok: false }));
 		expect(literal.propertyReadCount).toBeGreaterThan(0);
+		const bootstrapPolicy = await run("creator-only", {
+			exactCanonicalPinnedGenesisBootstrapOperationBytes: encodeCanonical({ action: "add", value: 1 }),
+		});
+		expect(bootstrapPolicy.result).toEqual(expect.objectContaining({ kind: "internal-invariant", ok: false }));
+		expect(bootstrapPolicy.propertyReadCount).toBeGreaterThan(0);
+		expect(await run("creator-only", { extra: true })).toEqual({
+			propertyReadCount: 0,
+			result: expect.objectContaining({ kind: "malformed-input", ok: false }),
+			signerCount: 0,
+		});
 	});
 
 	it("freezes exactly seven RED and eight GREEN owners", () => {
@@ -296,6 +311,10 @@ describe("D.108d1 creator successor activation RED", () => {
 			"snapshotDeclaration",
 			"snapshotStore",
 			"store",
+		]);
+		expect(CREATOR_SUCCESSOR_LOCAL_AUTHOR_REOPEN_BOOTSTRAP_POLICY_INPUT_KEYS).toEqual([
+			...CREATOR_SUCCESSOR_LOCAL_AUTHOR_REOPEN_INPUT_KEYS,
+			"exactCanonicalPinnedGenesisBootstrapOperationBytes",
 		]);
 		expect(CREATOR_SUCCESSOR_ACTIVATION_FAILURE_KINDS).toEqual([
 			"D110C_FLOOR_INVALID",

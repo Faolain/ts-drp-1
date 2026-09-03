@@ -1495,6 +1495,11 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	redirectSource?: RedirectSourceRecovery,
 	skipRoomHeadAuthority = false
 ): Promise<V3RoomSession<Projection>> {
+	const exactCanonicalPinnedGenesisBootstrapOperationBytes = encodeCanonical(
+		input.application.bootstrapOperation,
+		APPLICATION_BATCH_LIMITS
+	);
+	decodeCanonical(exactCanonicalPinnedGenesisBootstrapOperationBytes, APPLICATION_BATCH_LIMITS);
 	if (
 		input.successorSnapshotDeclaration !== undefined &&
 		(input.createOperationAdmissionPolicy !== undefined ||
@@ -2265,6 +2270,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				detachedSignature: material.detachedGenesisSignature,
 				exactCanonicalAnchorPreimageBytes: material.exactCanonicalGenesisAnchorPreimageBytes,
 				exactCanonicalParametersCarrierBytes: material.exactCanonicalParametersCarrierBytes,
+				exactCanonicalPinnedGenesisBootstrapOperationBytes,
 				expectedRoomHead,
 				issuanceStore,
 				liveJournalStore: journalStore,
@@ -3931,6 +3937,11 @@ async function prepareDurableRoomState<Projection extends V3RoomProjectionAuthor
 		readonly retainedBootstrapHeld: boolean;
 	}>
 > {
+	const exactCanonicalPinnedGenesisBootstrapOperationBytes = encodeCanonical(
+		input.application.bootstrapOperation,
+		APPLICATION_BATCH_LIMITS
+	);
+	decodeCanonical(exactCanonicalPinnedGenesisBootstrapOperationBytes, APPLICATION_BATCH_LIMITS);
 	const aheStore = await createBrowserAheDurableStore({ databaseName: `${input.databaseName}--ahe` });
 	const aheStores = [aheStore];
 	let issuanceStore: Awaited<ReturnType<typeof createBrowserDurableIssuanceStore>> | undefined;
@@ -4082,6 +4093,7 @@ async function prepareDurableRoomState<Projection extends V3RoomProjectionAuthor
 							}),
 						}),
 				exactCanonicalLatchedAclBytes: material.exactCanonicalLatchedAclBytes,
+				exactCanonicalPinnedGenesisBootstrapOperationBytes,
 				issuanceScope: scope,
 				issuanceStore: openedIssuanceStore,
 				liveJournalStore: openedJournalStore,

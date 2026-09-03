@@ -97585,7 +97585,11 @@ manifest validates and has SHA-256
 **Status: clean-isolated tests-only RED complete at corrected signed/pushed plan
 anchor `1033e22eaa152a1a1a26d1fc057564ac75b68192`; its causal matrix and
 supplemental immutable-0c1f2 preconditions are recorded below, with zero
-production-source change. The public-compatibility GREEN is next.** Owner: the public
+production-source change. The combined 0c1f4-plus-0c1f2 implementation now
+passes its frozen focused unit and two-title browser matrix, but it is not yet
+signed, finally reviewed, or closed. D.110c-0c1f5 below is a newly demonstrated
+blocking design gap that must be settled before this aggregate-frontier work or
+parent 0c1 can claim general historical rebase safety.** Owner: the public
 `@ts-drp/node/v3-live` `RecoverV3LiveReplicaInput` and closed input snapshot;
 the public `@ts-drp/node/creator-adoption-activate`
 `reopenCreatorSuccessorAdoption()` cold-input exact-key capture; the private
@@ -97761,6 +97765,152 @@ a wire/schema change, new signing authority, dependency, or migration protocol,
 stop and reslice that demonstrated requirement. Preserve protected paths, all
 27 stashes, signed commits, pushed refs, immutable evidence, and the prohibition
 on Fable or collaboration subagents absent express user authorization.
+
+The corrected combined working GREEN now passes 41/41 focused Vitest
+assertions in six files, 195/195 retained assertions in the frozen 20-file
+roster, and both named Chromium product tests with zero skips, unexpected
+results, flakes, or top-level errors. Protocol-v3 build/typecheck and public
+entry audits, Node build, room build/typecheck, storage-browser build,
+exact-owner ESLint/Prettier, and `git diff --check` pass. These are local
+pre-commit results, not closure: the signed clean-isolated replay and combined
+final Grok/Kimi/Opus review remain required, and D.110c-0c1f5 remains blocking
+for the broader historical-rebase claim. Working evidence is
+`.logs/d110c-0c1f24-green-working-fcd8735c/`; its five-entry self-excluding
+manifest validates and has SHA-256
+`f999b3fcfeec8a6da770975033c0c3d3d77c0057895cc50702ade7f573a2bcee`.
+
+A narrow transition diagnostic also rejected an invalid attempted check rather
+than widening the carrier. The proposed transition closure contains the
+successor trust, Cut, QC, retirement, and aggregate candidates, but not a
+detached successor-ACL candidate. Requiring that absent object made every
+genuine close fail `TRUST_CLOSURE_INVALID`. The attempt was removed. Exact
+successor-writer-set derivation remains enforced by the close owner from the
+authenticated successor snapshot ACL before the creator signs the aggregate;
+the transition verifier authenticates that creator-signed record and its
+current/successor ACL digests. No ACL bytes, new carrier field, or alternate
+authority were invented merely to duplicate close-time derivation. Whether an
+independently rederivable transition-side writer-set proof is required is a
+high-risk design question for the final review/f5 audit, not an implicit GREEN
+change.
+
+###### D.110c-0c1f5 authenticated rebase-supersession frontier prerequisite
+
+**Status: bounded source/architecture audit complete with no safe production
+repair selected; BLOCKED pending the governing high-risk plan/design review
+before final closure of D.110c-0c1f2/f4, parent D.110c-0c1/0c, the same-room
+≥100-transition gate, Phase-6 exit, or Phase-7 multi-author cold join. No f5
+production edit is authorized.** Owner: the interaction among
+`examples/v3-room/src/index.ts::drainRebaseOutbox()`, the fresh-sequence local
+issue path and `completeRebaseSource()` disposition, the authenticated close
+graph captured by `packages/node/src/v3-live.ts`,
+`packages/node/src/creator-close.ts::authorIssuanceFrontiersCandidate()`, the
+creator-signed aggregate transition verifier, and both
+`authenticatedCoveredHistoricalOutboxRow()` consumers. Deadline: audited,
+reviewed, causally RED, and GREEN before any named parent or golden-path claim
+above. This is prospective and does not reopen the signed 0c1f2/f4 plans or RED
+evidence.
+
+The bounded source audit has established a concrete incompatibility that the
+current focused GREEN matrix does not exercise. A displaced historical row is
+reduced to an application intent and reissued by the room through the ordinary
+local issue queue, which allocates a fresh author sequence. Only after the
+replacement issue completes does the room call `completeRebaseSource()` and
+mark the old outbox row published. The next creator close observes the fresh
+replacement vertex, not an authenticated statement that every skipped older
+sequence was preserved, transformed, expired, or deliberately held. The
+current aggregate algorithm advances only an adjacent creator-observed prefix:
+from prior boundary `S` it accepts `S+1`, `S+2`, and so on. If intervening local
+allocations cause old rows 5 and 6 to be reissued as fresh rows 7 and 8 while
+the prior aggregate is 4, observing 7 and 8 leaves the boundary at 4 forever.
+Subsequent valid writes remain above the same hole and signerless cold recovery
+cannot authenticate them.
+
+Replacing the prefix with an observed maximum is explicitly rejected. Seeing
+sequence 7 does not prove that unobserved sequences 5 and 6 were represented by
+the admitted replacement, nor that their operation bytes, disposition, and
+source identity agree. A maximum would let an unseen or substituted local row
+below it pass `authenticatedCoveredHistoricalOutboxRow()` solely because its
+number is below a creator-signed high-water mark. That would turn a liveness
+defect into an authority defect.
+
+The f5 audit must compare at least: (1) a creator-authenticated supersession
+commitment binding each skipped source `(author, sequence, digest)` to its exact
+admitted replacement or terminal disposition; (2) a bounded settled-prefix
+construction in which every gap is closed by authenticated evidence before the
+watermark advances; (3) a compact range/Merkle accumulator with explicit
+membership or consistency proofs and bounded ordinary reopen state; and (4)
+any simpler construction already available from the signed vertex preimage,
+application displaced-operation identity, close-set/history commitments, and
+the current aggregate carrier. For each family the audit must state who signs
+the evidence, how the creator independently verifies it, what is retained
+across close/adoption/restart, when old evidence is safe to prune, and whether
+proof or active-state size grows with epoch count or rebase count.
+
+The selected design must preserve these proof obligations:
+
+1. no frontier advances across a sequence whose exact authenticated
+   disposition is unknown;
+2. rebase and transform bind the old author/sequence/digest and canonical
+   operation identity to the exact admitted replacement; expire and
+   manual-review remain distinguishable and fail closed under their existing
+   application policy;
+3. missing, duplicate, substituted, forked, replayed, cross-author,
+   cross-object, cross-epoch, partial, or reordered disposition evidence cannot
+   advance the settled boundary;
+4. crash/restart before replacement publication or before source completion
+   cannot falsely settle the source row;
+5. creator close, successor adoption, cold reopen, and later pruning all agree
+   on the same authenticated settled state; and
+6. ordinary cold reopen and active control custody remain bounded rather than
+   hiding an O(N) supersession log in an uncounted store.
+
+The deterministic RED must use the genuine product path, not a fabricated
+frontier or tests-only durable record. One noncreator writer must create a
+known settled prefix, retain at least two displaced rows, allocate intervening
+sequences so their genuine rebase replacements appear above a gap, and have
+those replacements admitted by the creator. The creator then performs at least
+two further real close/adopt transitions. After restart, the unchanged writer
+database cold reopens at the resulting successor and attempts one new
+issue/publish. RED is causal only if exact evidence proves the old rows, fresh
+replacement rows, creator observations, aggregate boundary, and recovery
+refusal, and the terminal failure is the frozen f5 token rather than timing,
+transport, fixture, or unrelated recovery failure. A no-gap control must stay
+green.
+
+GREEN must make that unchanged RED and control pass while proving exact state
+and operation accounting. Adversarial mutants cover each proof obligation
+above plus stale predecessor evidence, wrong replacement operation bytes,
+wrong disposition policy, a replacement admitted on a different anchor,
+failure between replacement admission and old-row completion, and restart at
+each side of that boundary. Retained gates include the complete 0c1f2/f4 suite,
+creator adoption/activation, offline/rebase outbox continuity, transition
+normalization, package builds/typechecks, exact-owner lint/format/diff, isolated
+clean-checkout execution, protected paths, and 27-stash custody.
+
+The one-off Fable 5.1/high course review that exposed this gap is advisory,
+not a substitute for the governing high-risk review. Its exact session is
+`70a1e8cb-353d-467b-8c7a-768a9363fbb1`; the external JSONL transcript SHA-256
+is `739b7cd23e9a27700da5f12539c32ebf96a6882d6cc08fc562c3a98deda55994`.
+It also identified the already-corrected first-observed-sequence-one predicate
+and nonblocking empty-writer/byte-budget/pending-custody test obligations. No
+further Fable run is authorized. The f5 source audit and exact design require
+the governing Grok 4.6/high, direct Kimi K3 with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh plan review before any f5
+production edit. If the selected construction needs a carrier/wire change,
+new authority statement, dependency, public API, threshold change, or migration
+protocol, stop after the audit and create the corresponding explicit high-risk
+prerequisite instead of widening f5 silently.
+
+The bounded audit is
+`.logs/d110c-0c1f5-source-audit-fcd8735c/audit.md`. It pins signed/pushed RED
+anchor `fcd8735c8316b048166560ab904704102ce90705`, traces the exact room reissue,
+same-store completion, close-graph capture, aggregate advancement, and both
+historical consumers, and rejects a bare observed maximum because it would
+authenticate unseen rows below that maximum. It selects no production repair;
+the four candidate families and six proof obligations above must be decided by
+the required plan review first. Its one-entry self-excluding manifest validates
+and has SHA-256
+`f53ae45b110472fc83e90c4e8113330ef3b70e6ee89b26f085d1ab2e65a94485`.
 
 ###### D.110c-0c1d successor-reopen historical-rebase orchestration prerequisite
 

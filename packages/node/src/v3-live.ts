@@ -390,6 +390,7 @@ interface V3CreatorCloseRegistration {
 	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
 	readonly exactCanonicalLatchedAclBytes: Uint8Array;
 	readonly exactCanonicalParametersBytes: Uint8Array;
+	readonly exactCanonicalPinnedGenesisBootstrapOperationBytes?: Uint8Array;
 	readonly issuanceScope: DurableIssueScope;
 	readonly issuanceStore: DurableIssuanceStore;
 	readonly liveJournalStore: DurableLiveJournalStore;
@@ -647,6 +648,7 @@ const LATCHED_RETAINED_BOOTSTRAP_RECOVERY_INPUT_KEYS = [
 	"retainedBootstrapHold",
 ] as const;
 const OPERATION_ADMISSION_POLICY_KEY = "operationAdmissionPolicy";
+const PINNED_GENESIS_BOOTSTRAP_OPERATION_KEY = "exactCanonicalPinnedGenesisBootstrapOperationBytes";
 const DISPLACED_LEGACY_SOURCE_KEYS = ["capability", "exactCanonicalAuthorAuthorizationBytes"] as const;
 const DISPLACED_LATCHED_SOURCE_KEYS = ["capability", "exactCanonicalLatchedAclBytes"] as const;
 const DISPLACED_CROSS_OBJECT_SOURCE_KEYS = [
@@ -751,7 +753,10 @@ type RecoverV3LiveReplicaBaseInput =
 	  }>;
 
 export type RecoverV3LiveReplicaInput = RecoverV3LiveReplicaBaseInput &
-	Readonly<{ readonly operationAdmissionPolicy?: V3OperationAdmissionPolicy }>;
+	Readonly<{
+		readonly exactCanonicalPinnedGenesisBootstrapOperationBytes?: Uint8Array;
+		readonly operationAdmissionPolicy?: V3OperationAdmissionPolicy;
+	}>;
 
 export type RecoverV3LiveReplicaFailureKind =
 	| "malformed-input"
@@ -856,6 +861,7 @@ const preparedV3LiveAuthority = new WeakMap<object, PreparedV3LivePayload>();
 const creatorSuccessorRecovery = new WeakMap<
 	object,
 	Readonly<{
+		readonly exactCanonicalPinnedGenesisBootstrapOperationBytes?: Uint8Array;
 		readonly issuanceScope: DurableIssueScope;
 		readonly issuanceStore: DurableIssuanceStore;
 		readonly liveJournalStore: DurableLiveJournalStore;
@@ -917,7 +923,12 @@ function snapshotClosedRecord(value: unknown, keys: readonly string[]): PlainRec
 }
 
 function snapshotRecoveryRecord(value: unknown, keys: readonly string[]): PlainRecord | undefined {
-	return snapshotClosedRecord(value, keys) ?? snapshotClosedRecord(value, [...keys, OPERATION_ADMISSION_POLICY_KEY]);
+	return (
+		snapshotClosedRecord(value, keys) ??
+		snapshotClosedRecord(value, [...keys, OPERATION_ADMISSION_POLICY_KEY]) ??
+		snapshotClosedRecord(value, [...keys, PINNED_GENESIS_BOOTSTRAP_OPERATION_KEY]) ??
+		snapshotClosedRecord(value, [...keys, PINNED_GENESIS_BOOTSTRAP_OPERATION_KEY, OPERATION_ADMISSION_POLICY_KEY])
+	);
 }
 
 function isInstanceOf(value: unknown, constructor: object | undefined): boolean {
@@ -967,6 +978,18 @@ function copyDetachedBytes(value: unknown): Uint8Array | undefined {
 		ObjectDefineProperty(copy, "buffer", { configurable: true, value: copyBuffer });
 		ObjectDefineProperty(copy, "byteLength", { configurable: true, value: byteLength });
 		return copy;
+	} catch {
+		return undefined;
+	}
+}
+
+function exactCanonicalBootstrapOperationBytes(value: unknown): Uint8Array | undefined {
+	try {
+		const bytes = copyDetachedBytes(value);
+		if (bytes === undefined || bytes.byteLength === 0) return undefined;
+		const operation = decodeCanonical(bytes, APPLICATION_BATCH_LIMITS);
+		if (!isObject(operation) || ArrayIsArray(operation)) return undefined;
+		return sameBytes(encodeCanonical(operation, APPLICATION_BATCH_LIMITS), bytes) ? bytes : undefined;
 	} catch {
 		return undefined;
 	}
@@ -1546,14 +1569,63 @@ function copyApplicationVertices(source: Map<string, EpochVertex>): Map<string, 
 	}
 }
 
+interface ApplicationVertexIdentity {
+	readonly author: string;
+	readonly authorSequence: number;
+}
+
+function copyApplicationAuthors(
+	source: Map<string, ApplicationVertexIdentity>
+): Map<string, ApplicationVertexIdentity> | undefined {
+	try {
+		const copy = new IntrinsicMap<string, ApplicationVertexIdentity>();
+		const iterator = ReflectApply(MapPrototypeEntries, source, []) as unknown;
+		for (;;) {
+			const step = nextCapturedMapIterator(iterator);
+			if (step?.done === true) return copy;
+			if (step?.done !== false || !ArrayIsArray(step.value)) return undefined;
+			const key = ObjectGetOwnPropertyDescriptor(step.value, "0");
+			const identity = ObjectGetOwnPropertyDescriptor(step.value, "1");
+			const selectedIdentity =
+				identity !== undefined && "value" in identity && isObject(identity.value) ? identity.value : undefined;
+			const selectedAuthor = selectedIdentity === undefined ? undefined : Reflect.get(selectedIdentity, "author");
+			const selectedAuthorSequence =
+				selectedIdentity === undefined ? undefined : Reflect.get(selectedIdentity, "authorSequence");
+			if (
+				key === undefined ||
+				!("value" in key) ||
+				typeof key.value !== "string" ||
+				selectedIdentity === undefined ||
+				typeof selectedAuthor !== "string" ||
+				!NumberIsSafeInteger(selectedAuthorSequence) ||
+				(selectedAuthorSequence as number) < 0
+			) {
+				return undefined;
+			}
+			ReflectApply(MapPrototypeSet, copy, [
+				key.value,
+				ObjectFreeze({
+					author: selectedAuthor,
+					authorSequence: selectedAuthorSequence as number,
+				}),
+			]);
+		}
+	} catch {
+		return undefined;
+	}
+}
+
 function retainApplicationVertex(
 	vertices: Map<string, EpochVertex>,
-	authors: Map<string, string>,
+	authors: Map<string, ApplicationVertexIdentity>,
 	authenticated: AuthenticatedRecoveryVertex,
 	charges?: Map<string, number>
 ): void {
 	ReflectApply(MapPrototypeSet, vertices, [authenticated.digest, authenticated.vertex]);
-	ReflectApply(MapPrototypeSet, authors, [authenticated.digest, authenticated.author]);
+	ReflectApply(MapPrototypeSet, authors, [
+		authenticated.digest,
+		ObjectFreeze({ author: authenticated.author, authorSequence: authenticated.authorSequence }),
+	]);
 	if (charges !== undefined) ReflectApply(MapPrototypeSet, charges, [authenticated.digest, authenticated.byteCharge]);
 }
 
@@ -2543,7 +2615,7 @@ async function prepareV3LiveGeneration(input: PrepareV3LiveGenerationInput): Pro
 
 interface V3PlaneRegistration {
 	active: boolean;
-	readonly applicationAuthors: Map<string, string>;
+	readonly applicationAuthors: Map<string, ApplicationVertexIdentity>;
 	readonly applicationCharges: Map<string, number>;
 	readonly applicationVertices: Map<string, EpochVertex>;
 	readonly authorization: V3LiveAuthorization;
@@ -2560,6 +2632,7 @@ interface V3PlaneRegistration {
 	displacedIssuanceBoundary?: number;
 	displacedSource?: V3DisplacedSourceAuthority;
 	epochBytes: number;
+	readonly exactCanonicalPinnedGenesisBootstrapOperationBytes?: Uint8Array;
 	graphVersion: number;
 	handle: V3PlaneHandle;
 	hotPredecessor?: WeakRef<V3PlaneRegistration>;
@@ -4141,9 +4214,11 @@ type V3LiveAuthorization =
 interface V3DisplacedSourceAuthority {
 	readonly activationVertexDigest?: string;
 	readonly authorization: V3LiveAuthorization;
+	readonly exactCanonicalPinnedGenesisBootstrapOperationBytes?: Uint8Array;
 	readonly issuanceScope?: DurableIssueScope;
 	readonly issuanceStore?: DurableIssuanceStore;
 	readonly liveJournalStore?: DurableLiveJournalStore;
+	readonly pinnedGenesisAnchorDigest: string;
 	readonly prepared: PreparedV3LivePayload;
 }
 
@@ -4154,7 +4229,7 @@ type StagedLatchedAclOperation = Readonly<{
 }>;
 
 interface RecoveredV3LivePayload {
-	readonly applicationAuthors: Map<string, string>;
+	readonly applicationAuthors: Map<string, ApplicationVertexIdentity>;
 	readonly applicationCharges: Map<string, number>;
 	readonly applicationVertices: Map<string, EpochVertex>;
 	readonly authorization: V3LiveAuthorization;
@@ -4162,6 +4237,7 @@ interface RecoveredV3LivePayload {
 	readonly displacedIssuanceBoundary?: number;
 	readonly displacedSource?: V3DisplacedSourceAuthority;
 	readonly epochBytes: number;
+	readonly exactCanonicalPinnedGenesisBootstrapOperationBytes?: Uint8Array;
 	readonly historicalIssuance?: HistoricalIssuanceContext;
 	readonly index: CausalityIndex;
 	readonly issuanceScope: DurableIssueScope;
@@ -4517,6 +4593,7 @@ function classifyPlaneVertex(
 	displacedSource: V3DisplacedSourceAuthority | undefined,
 	historicalIssuance: HistoricalIssuanceContext | undefined,
 	pinnedGenesisAnchorDigest: string | undefined,
+	exactCanonicalPinnedGenesisBootstrapOperationBytes: Uint8Array | undefined,
 	canonicalPreimageBytes: Uint8Array,
 	signature: Uint8Array,
 	expectedDigest: Uint8Array,
@@ -4550,9 +4627,15 @@ function classifyPlaneVertex(
 		signature,
 	}) as SnapshottedOutboxRow;
 	const pinned =
-		pinnedGenesisAnchorDigest === undefined
+		pinnedGenesisAnchorDigest === undefined || exactCanonicalPinnedGenesisBootstrapOperationBytes === undefined
 			? undefined
-			: authenticatedPinnedGenesisOutboxRow(row, row.scope, payload, pinnedGenesisAnchorDigest);
+			: authenticatedPinnedGenesisOutboxRow(
+					row,
+					row.scope,
+					payload,
+					pinnedGenesisAnchorDigest,
+					exactCanonicalPinnedGenesisBootstrapOperationBytes
+				);
 	if (matches(pinned)) return ObjectFreeze({ authenticated: pinned, kind: "pinned-genesis" as const });
 	const historical = authenticatedCoveredHistoricalOutboxRow(row, row.scope, payload, historicalIssuance);
 	return matches(historical)
@@ -4598,9 +4681,16 @@ function authenticatedPinnedGenesisOutboxRow(
 	row: SnapshottedOutboxRow,
 	issuanceScope: DurableIssueScope,
 	filterPayload: PreparedV3LivePayload,
-	pinnedGenesisAnchorDigest: string
+	pinnedGenesisAnchorDigest: string,
+	exactCanonicalPinnedGenesisBootstrapOperationBytes: Uint8Array
 ): AuthenticatedRecoveryVertex | undefined {
 	try {
+		if (
+			row.authorSequence !== 0 ||
+			exactCanonicalBootstrapOperationBytes(exactCanonicalPinnedGenesisBootstrapOperationBytes) === undefined
+		) {
+			return undefined;
+		}
 		if (V3_VERTEX_DOMAIN !== vertexRegistry.domain || typeof V3_VERTEX_SUITE_ID !== "string") return undefined;
 		const suiteId = V3_VERTEX_SUITE_ID;
 		const extracted = extractAdmittedReceivedVertex({
@@ -4618,11 +4708,19 @@ function authenticatedPinnedGenesisOutboxRow(
 		if (
 			!extracted.ok ||
 			extracted.vertex.anchor !== pinnedGenesisAnchorDigest ||
+			extracted.vertex.authorSequence !== 0 ||
+			extracted.vertex.dependencies.length !== 1 ||
+			extracted.vertex.dependencies[0] !== pinnedGenesisAnchorDigest ||
 			extracted.vertex.epoch !== 0 ||
+			extracted.vertex.logicalTime !== 1 ||
 			extracted.vertex.objectId !== issuanceScope.objectId ||
 			extracted.vertex.author !== issuanceScope.author ||
 			extracted.vertex.authorSequence !== row.authorSequence ||
-			lowerHexDigest(extracted.vertex.digest) !== lowerHexDigest(row.digest)
+			lowerHexDigest(extracted.vertex.digest) !== lowerHexDigest(row.digest) ||
+			!sameBytes(
+				encodeCanonical(extracted.vertex.operation, APPLICATION_BATCH_LIMITS),
+				exactCanonicalPinnedGenesisBootstrapOperationBytes
+			)
 		) {
 			return undefined;
 		}
@@ -4640,6 +4738,7 @@ function authenticatedCoveredHistoricalOutboxRow(
 ): AuthenticatedRecoveryVertex | undefined {
 	try {
 		if (
+			row.authorSequence === 0 ||
 			historicalIssuance === undefined ||
 			V3_VERTEX_DOMAIN !== vertexRegistry.domain ||
 			typeof V3_VERTEX_SUITE_ID !== "string"
@@ -4653,6 +4752,7 @@ function authenticatedCoveredHistoricalOutboxRow(
 			historicalIssuance.scopeAuthorMatches !== true ||
 			identity.objectId !== issuanceScope.objectId ||
 			identity.author !== issuanceScope.author ||
+			identity.admittedAuthorSequence === null ||
 			row.authorSequence > identity.admittedAuthorSequence
 		) {
 			return undefined;
@@ -4678,6 +4778,7 @@ function authenticatedCoveredHistoricalOutboxRow(
 		});
 		if (
 			!extracted.ok ||
+			extracted.vertex.authorSequence === 0 ||
 			extracted.vertex.anchor !== anchor ||
 			extracted.vertex.epoch !== epoch ||
 			extracted.vertex.objectId !== issuanceScope.objectId ||
@@ -4700,6 +4801,7 @@ function creatorFilteredIssuanceStore(
 	filterAuthorization: V3LiveAuthorization,
 	excludedAfterEpoch?: number,
 	pinnedGenesisAnchorDigest?: string,
+	exactCanonicalPinnedGenesisBootstrapOperationBytes?: Uint8Array,
 	historicalIssuance?: HistoricalIssuanceContext
 ): DurableIssuanceStore {
 	return ObjectFreeze({
@@ -4741,9 +4843,15 @@ function creatorFilteredIssuanceStore(
 					typeof candidateEpoch === "number" &&
 					(excludedAfterEpoch === undefined || candidateEpoch > excludedAfterEpoch);
 				const authenticatedGenesisRow =
-					pinnedGenesisAnchorDigest === undefined
+					pinnedGenesisAnchorDigest === undefined || exactCanonicalPinnedGenesisBootstrapOperationBytes === undefined
 						? undefined
-						: authenticatedPinnedGenesisOutboxRow(row, issuanceScope, filterPayload, pinnedGenesisAnchorDigest);
+						: authenticatedPinnedGenesisOutboxRow(
+								row,
+								issuanceScope,
+								filterPayload,
+								pinnedGenesisAnchorDigest,
+								exactCanonicalPinnedGenesisBootstrapOperationBytes
+							);
 				const historicalIdentity =
 					historicalIssuance === undefined
 						? undefined
@@ -4842,18 +4950,18 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			snapshotRecoveryRecord(rawInput, LATCHED_RETAINED_BOOTSTRAP_RECOVERY_INPUT_KEYS);
 		const input = legacyInput ?? latchedInput;
 		if (input === undefined) return recoveryFailure("malformed-input", "v3 recovery input is invalid");
-		const successorRecovery = creatorSuccessorRecovery.get(input.capability as object);
-		if (successorRecovery !== undefined) creatorSuccessorRecovery.delete(input.capability as object);
-		const predecessorRecoverySource = creatorPredecessorRecoverySource.get(input.capability as object);
-		if (predecessorRecoverySource !== undefined) {
-			creatorPredecessorRecoverySource.delete(input.capability as object);
-		}
-		const historicalIssuance = creatorHistoricalIssuanceHandoffs.get(input.capability as object);
-		if (historicalIssuance !== undefined) creatorHistoricalIssuanceHandoffs.delete(input.capability as object);
 		const rawOperationAdmissionPolicy = Reflect.get(input, OPERATION_ADMISSION_POLICY_KEY);
 		const selectedOperationAdmissionPolicy = operationAdmissionPolicy(rawOperationAdmissionPolicy);
 		if (rawOperationAdmissionPolicy !== undefined && selectedOperationAdmissionPolicy === undefined) {
 			return recoveryFailure("malformed-input", "v3 operation admission policy is invalid");
+		}
+		const rawBootstrapOperationBytes = Reflect.get(input, PINNED_GENESIS_BOOTSTRAP_OPERATION_KEY);
+		const selectedBootstrapOperationBytes =
+			rawBootstrapOperationBytes === undefined
+				? undefined
+				: exactCanonicalBootstrapOperationBytes(rawBootstrapOperationBytes);
+		if (rawBootstrapOperationBytes !== undefined && selectedBootstrapOperationBytes === undefined) {
+			return recoveryFailure("malformed-input", "v3 pinned genesis bootstrap operation is invalid");
 		}
 		const terminalClassifier = Reflect.get(input, "classifyTerminalVertex");
 		if (terminalClassifier !== undefined && typeof terminalClassifier !== "function") {
@@ -4874,6 +4982,14 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		) {
 			return recoveryFailure("malformed-input", "v3 recovery binding is invalid");
 		}
+		const successorRecovery = creatorSuccessorRecovery.get(input.capability as object);
+		if (successorRecovery !== undefined) creatorSuccessorRecovery.delete(input.capability as object);
+		const predecessorRecoverySource = creatorPredecessorRecoverySource.get(input.capability as object);
+		if (predecessorRecoverySource !== undefined) {
+			creatorPredecessorRecoverySource.delete(input.capability as object);
+		}
+		const historicalIssuance = creatorHistoricalIssuanceHandoffs.get(input.capability as object);
+		if (historicalIssuance !== undefined) creatorHistoricalIssuanceHandoffs.delete(input.capability as object);
 		const payload = consumePreparedV3Live(input.capability as PreparedV3Live);
 		if (payload === undefined) return recoveryFailure("capability-consumed", "v3 capability is unavailable");
 		if (!payloadIsUsable(payload) || selectedScope.objectId !== payload.provenance.objectId) {
@@ -4949,9 +5065,12 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				displacedSource = ObjectFreeze({
 					activationVertexDigest: crossSource.activationVertexDigest,
 					authorization: sourceAuthorization,
+					exactCanonicalPinnedGenesisBootstrapOperationBytes:
+						successorRecovery?.exactCanonicalPinnedGenesisBootstrapOperationBytes,
 					issuanceScope: sourceScope,
 					issuanceStore: crossSource.issuanceStore as DurableIssuanceStore,
 					liveJournalStore: crossSource.liveJournalStore as DurableLiveJournalStore,
+					pinnedGenesisAnchorDigest: sourcePayload.input.pinnedGenesisAnchorDigest,
 					prepared: sourcePayload,
 				});
 			} else if (
@@ -4962,13 +5081,20 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			) {
 				displacedSource = ObjectFreeze({
 					authorization: sourceAuthorization,
+					exactCanonicalPinnedGenesisBootstrapOperationBytes:
+						successorRecovery.exactCanonicalPinnedGenesisBootstrapOperationBytes,
 					issuanceScope: successorRecovery.issuanceScope,
 					issuanceStore: successorRecovery.issuanceStore,
 					liveJournalStore: successorRecovery.liveJournalStore,
+					pinnedGenesisAnchorDigest: sourcePayload.input.pinnedGenesisAnchorDigest,
 					prepared: sourcePayload,
 				});
 			} else {
-				displacedSource = ObjectFreeze({ authorization: sourceAuthorization, prepared: sourcePayload });
+				displacedSource = ObjectFreeze({
+					authorization: sourceAuthorization,
+					pinnedGenesisAnchorDigest: sourcePayload.input.pinnedGenesisAnchorDigest,
+					prepared: sourcePayload,
+				});
 			}
 		}
 		if (historicalIssuance !== undefined) {
@@ -5047,7 +5173,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		if (applicationVertices === undefined || applicationCharges.size !== applicationVertices.size) {
 			return recoveryFailure("graph-rejected", "v3 recovery graph could not be retained");
 		}
-		const applicationAuthors = new IntrinsicMap<string, string>();
+		const applicationAuthors = new IntrinsicMap<string, ApplicationVertexIdentity>();
 		let epochBytes = 0;
 		for (const byteCharge of payload.charges.values()) {
 			const updated = nextEpochBytes(epochBytes, byteCharge, payload.parameters.maxEpochBytes);
@@ -5263,6 +5389,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 					displacedSource,
 					historicalIssuance,
 					payload.input.pinnedGenesisAnchorDigest,
+					selectedBootstrapOperationBytes,
 					row.canonicalPreimageBytes,
 					row.signature,
 					row.digest,
@@ -5521,6 +5648,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 			successorRecovery === undefined &&
 			!retainedBootstrapHold &&
 			currentRecordCount === 0 &&
+			(historicalIssuance?.count ?? 0) === 0 &&
 			(recoveredCount === 0 || (displacedSource !== undefined && displacedSource.activationVertexDigest === undefined))
 		) {
 			return recoveryFailure("issuance-rejected", "v3 recovery issued record chain is empty");
@@ -5528,7 +5656,8 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		if (
 			successorRecovery === undefined &&
 			!retainedBootstrapHold &&
-			(recoveredCount === 0 || index.size !== preparedVertexCount + recoveredCount)
+			((recoveredCount === 0 && (historicalIssuance?.count ?? 0) === 0) ||
+				index.size !== preparedVertexCount + recoveredCount)
 		) {
 			return recoveryFailure("issuance-rejected", "v3 recovery requires a complete issued record chain");
 		}
@@ -5552,6 +5681,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				latchedOperations,
 				liveJournalStore: journal,
 				operationAdmissionPolicy: selectedOperationAdmissionPolicy,
+				exactCanonicalPinnedGenesisBootstrapOperationBytes: selectedBootstrapOperationBytes,
 				prepared: payload,
 				quarantinedDigests,
 				retainedBootstrapHold,
@@ -6146,6 +6276,7 @@ function classifyRebaseRow(
 		registration.displacedSource,
 		registration.historicalIssuance,
 		registration.payload.input.pinnedGenesisAnchorDigest,
+		registration.exactCanonicalPinnedGenesisBootstrapOperationBytes,
 		row.canonicalPreimageBytes,
 		row.signature,
 		row.digest,
@@ -6910,8 +7041,10 @@ function stageClosedBlueprintEpoch(registration: V3PlaneRegistration): V3Bluepri
 		staged = foldBlueprintEpoch({
 			anchorHash: registration.payload.provenance.anchorDigest,
 			authorize: ({ hash }) => {
-				const author = ReflectApply(MapPrototypeGet, registration.applicationAuthors, [hash]) as string | undefined;
-				return author !== undefined && isV3ApplicationAuthorAuthorized(registration.authorization, author);
+				const identity = ReflectApply(MapPrototypeGet, registration.applicationAuthors, [hash]) as
+					| ApplicationVertexIdentity
+					| undefined;
+				return identity !== undefined && isV3ApplicationAuthorAuthorized(registration.authorization, identity.author);
 			},
 			machine: registration.blueprintMachine,
 			vertices,
@@ -7297,12 +7430,26 @@ function creatorCloseRegistration(registration: V3PlaneRegistration): V3CreatorC
 		captureCloseGraph: () => {
 			if (!currentRegistration(registration) || !registration.blueprintFolded) return undefined;
 			const vertices = copyApplicationVertices(registration.applicationVertices);
+			const authors = copyApplicationAuthors(registration.applicationAuthors);
 			const charges = new IntrinsicMap<string, number>(registration.applicationCharges);
 			ReflectApply(MapPrototypeDelete, charges, [registration.payload.provenance.anchorDigest]);
-			if (vertices === undefined || vertices.size !== charges.size + 1 || vertices.size !== registration.index.size) {
+			if (
+				vertices === undefined ||
+				authors === undefined ||
+				vertices.size !== charges.size + 1 ||
+				vertices.size !== authors.size + 1 ||
+				vertices.size !== registration.index.size ||
+				ReflectApply(MapPrototypeHas, authors, [registration.payload.provenance.anchorDigest])
+			) {
 				return undefined;
 			}
+			for (const digest of authors.keys()) {
+				if (!ReflectApply(MapPrototypeHas, vertices, [digest]) || !ReflectApply(MapPrototypeHas, charges, [digest])) {
+					return undefined;
+				}
+			}
 			return ObjectFreeze({
+				authors,
 				charges,
 				frontier: registration.index.tips(),
 				vertices,
@@ -7316,6 +7463,10 @@ function creatorCloseRegistration(registration: V3PlaneRegistration): V3CreatorC
 		exactCanonicalParametersBytes: new Uint8ArrayConstructor(
 			registration.payload.input.exactCanonicalParametersCarrierBytes
 		),
+		exactCanonicalPinnedGenesisBootstrapOperationBytes:
+			registration.exactCanonicalPinnedGenesisBootstrapOperationBytes === undefined
+				? undefined
+				: new Uint8ArrayConstructor(registration.exactCanonicalPinnedGenesisBootstrapOperationBytes),
 		issuanceScope: ObjectFreeze({ ...registration.issuanceScope }),
 		issuanceStore: registration.issuanceStore,
 		liveJournalStore: registration.liveJournalStore,
@@ -7589,6 +7740,8 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				displacedSource: recovered.displacedSource,
 				drainingPendingIngress: false,
 				epochBytes: recovered.epochBytes,
+				exactCanonicalPinnedGenesisBootstrapOperationBytes:
+					recovered.exactCanonicalPinnedGenesisBootstrapOperationBytes,
 				graphVersion: intrinsicMapSize(recovered.applicationAuthors) ?? -1,
 				handle: undefined as unknown as V3PlaneHandle,
 				hotPredecessor: undefined,
@@ -7691,6 +7844,7 @@ async function activateCreatorSuccessorLive(
 		}
 		const openHistoricalIssuance = (): HistoricalIssuanceContext | undefined => {
 			const capability = openVerifiedCreatorHistoricalIssuance({
+				author: material.issuanceScope.author,
 				closure: ObjectFreeze({
 					candidates: material.successor.candidates,
 					closure: material.successor.references,
@@ -7726,6 +7880,7 @@ async function activateCreatorSuccessorLive(
 			successorAuthorization,
 			material.predecessor.trust.currentEpoch,
 			material.predecessor.trust.currentEpoch > 0 ? material.pinnedGenesisAnchorDigest : undefined,
+			material.exactCanonicalPinnedGenesisBootstrapOperationBytes,
 			predecessorHistoricalIssuance
 		);
 		creatorHistoricalIssuanceHandoffs.set(predecessorValidation, predecessorHistoricalIssuance);
@@ -7735,6 +7890,12 @@ async function activateCreatorSuccessorLive(
 		const validatedPredecessor = await recoverV3LiveReplica({
 			capability: predecessorValidation,
 			exactCanonicalLatchedAclBytes: material.predecessorExactCanonicalLatchedAclBytes,
+			...(material.exactCanonicalPinnedGenesisBootstrapOperationBytes === undefined
+				? {}
+				: {
+						exactCanonicalPinnedGenesisBootstrapOperationBytes:
+							material.exactCanonicalPinnedGenesisBootstrapOperationBytes,
+					}),
 			issuanceScope: material.issuanceScope,
 			issuanceStore: predecessorIssuanceStore,
 			liveJournalStore: material.liveJournalStore,
@@ -7748,6 +7909,10 @@ async function activateCreatorSuccessorLive(
 		creatorSuccessorRecovery.set(
 			successor,
 			ObjectFreeze({
+				exactCanonicalPinnedGenesisBootstrapOperationBytes:
+					material.exactCanonicalPinnedGenesisBootstrapOperationBytes === undefined
+						? undefined
+						: new Uint8ArrayConstructor(material.exactCanonicalPinnedGenesisBootstrapOperationBytes),
 				issuanceScope: material.issuanceScope,
 				issuanceStore: material.issuanceStore,
 				liveJournalStore: material.liveJournalStore,
@@ -7764,6 +7929,7 @@ async function activateCreatorSuccessorLive(
 							successorAuthorization,
 							Number.MAX_SAFE_INTEGER,
 							material.pinnedGenesisAnchorDigest,
+							material.exactCanonicalPinnedGenesisBootstrapOperationBytes,
 							successorHistoricalIssuance
 						)
 					: material.issuanceStore
@@ -7773,7 +7939,8 @@ async function activateCreatorSuccessorLive(
 						transportHandoff.displacedSource.prepared,
 						transportHandoff.displacedSource.authorization,
 						undefined,
-						undefined,
+						transportHandoff.displacedSource.pinnedGenesisAnchorDigest,
+						transportHandoff.displacedSource.exactCanonicalPinnedGenesisBootstrapOperationBytes,
 						successorHistoricalIssuance
 					);
 		creatorHistoricalIssuanceHandoffs.set(successor, successorHistoricalIssuance);
@@ -7784,6 +7951,12 @@ async function activateCreatorSuccessorLive(
 				exactCanonicalLatchedAclBytes: material.predecessorExactCanonicalLatchedAclBytes,
 			}),
 			exactCanonicalLatchedAclBytes: material.exactCanonicalLatchedAclBytes,
+			...(material.exactCanonicalPinnedGenesisBootstrapOperationBytes === undefined
+				? {}
+				: {
+						exactCanonicalPinnedGenesisBootstrapOperationBytes:
+							material.exactCanonicalPinnedGenesisBootstrapOperationBytes,
+					}),
 			issuanceScope: material.issuanceScope,
 			issuanceStore: successorIssuanceStore,
 			liveJournalStore: material.liveJournalStore,

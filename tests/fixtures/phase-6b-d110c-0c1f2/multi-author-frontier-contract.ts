@@ -1,5 +1,10 @@
-import { decodeCanonical } from "@ts-drp/canonical";
+import { decodeCanonical, hashDomain } from "@ts-drp/canonical";
 
+import {
+	openCreatorAuthorIssuanceFrontiers,
+	resolveCreatorAuthorIssuanceFrontiers,
+} from "../../../packages/protocol-v3/src/creator-author-issuance-frontiers.js";
+import { openCreatorSuccessorTrust } from "../../../packages/protocol-v3/src/creator-close.js";
 import { openGenuineCreatorAdoptionFixture } from "../phase-6a-v3/creator-adoption-contract.js";
 import { d108d1bChatAuthorities } from "../phase-6a-v3/creator-successor-local-author-contract.js";
 
@@ -19,9 +24,9 @@ function canonicalRecord(bytes: Uint8Array): Readonly<Record<string, unknown>> {
 /**
  * Proves that a genuine two-writer close admits both authors but current
  * production emits only the creator's legacy issuance carrier.
- * @returns Never: the exact causal RED token is thrown after all facts pass.
+ * @returns Completion after the aggregate frontier is authenticated.
  */
-export async function proveD110c0c1f2MissingMultiAuthorFrontier(): Promise<never> {
+export async function proveD110c0c1f2MissingMultiAuthorFrontier(): Promise<void> {
 	const authorities = d108d1bChatAuthorities();
 	const creator = authorities.find(({ id }) => id === "alice");
 	const secondWriter = authorities.find(({ id }) => id === "bob");
@@ -33,8 +38,15 @@ export async function proveD110c0c1f2MissingMultiAuthorFrontier(): Promise<never
 		establishedPeerPrivateKeySeedHex: secondWriter.privateKeySeedHex,
 	});
 	try {
-		const { closeResult, establishedPeer, journalRows, predecessorExactCanonicalLatchedAclBytes, proposed } =
-			fixture.evidence;
+		const {
+			closeResult,
+			currentTrust,
+			establishedPeer,
+			journalRows,
+			localIssued,
+			predecessorExactCanonicalLatchedAclBytes,
+			proposed,
+		} = fixture.evidence;
 		if (
 			closeResult.ok !== true ||
 			closeResult.epoch !== 0 ||
@@ -76,10 +88,52 @@ export async function proveD110c0c1f2MissingMultiAuthorFrontier(): Promise<never
 		if (
 			legacy.length !== 1 ||
 			legacy[0]?.author !== creator.author ||
-			aggregate.length !== 0 ||
 			proposed.references.length !== proposed.candidates.length
 		) {
 			throw new TypeError("D110C_0C1F2_CURRENT_CLOSURE_CLASS_INVALID");
+		}
+		if (aggregate.length === 0) throw new TypeError(D110C_0C1F1_MULTI_AUTHOR_FRONTIER_CARRIER_REQUIRED);
+		if (aggregate.length !== 1) throw new TypeError("D110C_0C1F2_AGGREGATE_CANDIDATE_AMBIGUOUS");
+		const candidate = proposed.candidates.find(
+			({ bytes }) => canonicalRecord(bytes).kind === D110C_0C1F1_FRONTIER_KIND
+		);
+		const cut = proposed.candidates.find(({ ref }) => ref.digest === closeResult.cutValueRef.digest);
+		const qc = proposed.candidates.find(({ ref }) => ref.digest === closeResult.commitQcRef.digest);
+		const trust = proposed.candidates.find(({ ref }) => ref.digest === closeResult.successorTrustRef.digest);
+		if (candidate === undefined || cut === undefined || qc === undefined || trust === undefined) {
+			throw new TypeError("D110C_0C1F2_AGGREGATE_PROOF_UNAVAILABLE");
+		}
+		const successor = openCreatorSuccessorTrust({
+			currentTrust,
+			exactCanonicalCommitQcBytes: qc.bytes,
+			exactCanonicalCutValueBytes: cut.bytes,
+			exactCanonicalTrustStateRecordBytes: trust.bytes,
+		});
+		if (!successor.ok) throw new TypeError("D110C_0C1F2_SUCCESSOR_TRUST_UNAVAILABLE");
+		const aggregateRecord = canonicalRecord(candidate.bytes);
+		const cutRecord = canonicalRecord(cut.bytes);
+		const opened = openCreatorAuthorIssuanceFrontiers({
+			currentTrust,
+			exactCanonicalRecordBytes: candidate.bytes,
+			expectedCommitQcRef: qc.ref,
+			expectedCurrentAclDigest: Buffer.from(
+				hashDomain("ts-drp/latched-acl/v3", predecessorExactCanonicalLatchedAclBytes)
+			).toString("hex"),
+			expectedCutValueDigest: Buffer.from(hashDomain("ts-drp/hard-epoch-cut/v3", cut.bytes)).toString("hex"),
+			expectedSnapshotManifestDigest: cutRecord.snapshotManifestDigest,
+			expectedSuccessorAclDigest: aggregateRecord.successorAclDigest,
+			floorTrust: successor.trust,
+		});
+		const identity = opened.ok ? resolveCreatorAuthorIssuanceFrontiers(opened.capability) : undefined;
+		if (identity === undefined) throw new TypeError("D110C_0C1F2_AGGREGATE_OPEN_FAILED");
+		const expectedFrontiers = [
+			[creator.author, localIssued.authorSequence] as const,
+			[secondWriter.author, establishedPeer.authorSequence] as const,
+		].sort(([left], [right]) => left.localeCompare(right));
+		if (JSON.stringify(identity.frontiers) !== JSON.stringify(expectedFrontiers)) {
+			throw new TypeError(
+				`D110C_0C1F2_AGGREGATE_FRONTIERS_INVALID:${JSON.stringify(identity.frontiers)}:${JSON.stringify(expectedFrontiers)}`
+			);
 		}
 		if (process.env.D110C_0C1F2_RECORD_EVIDENCE === "1") {
 			process.stdout.write(
@@ -95,7 +149,6 @@ export async function proveD110c0c1f2MissingMultiAuthorFrontier(): Promise<never
 				})}\n`
 			);
 		}
-		throw new TypeError(D110C_0C1F1_MULTI_AUTHOR_FRONTIER_CARRIER_REQUIRED);
 	} finally {
 		await fixture.close();
 	}

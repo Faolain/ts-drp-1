@@ -394,14 +394,17 @@ describe("D.108b read-only creator-successor adoption RED", () => {
 			reason: "COMMIT_QC_REJECTED",
 		});
 
-		const retirementRefs = new Set(
+		const controlRefs = new Set(
 			first.proposed.candidates.flatMap((candidate) => {
 				const value = decodeCanonical(candidate.bytes) as Readonly<Record<string, unknown>>;
-				return value.kind === "drp-creator-issuance-retirement-state" ? [candidate.ref.digest] : [];
+				return value.kind === "drp-creator-issuance-retirement-state" ||
+					value.kind === "drp-creator-author-issuance-frontiers-state"
+					? [candidate.ref.digest]
+					: [];
 			})
 		);
 		const normalizedCandidates = first.proposed.candidates.filter(
-			(candidate) => !retirementRefs.has(candidate.ref.digest)
+			(candidate) => !controlRefs.has(candidate.ref.digest)
 		);
 		const advance = (
 			proposedReferences: typeof first.proposed.references
@@ -411,7 +414,7 @@ describe("D.108b read-only creator-successor adoption RED", () => {
 				proofRefs: [first.closeResult.cutValueRef, first.closeResult.commitQcRef],
 				proposed: {
 					candidates: normalizedCandidates,
-					closure: proposedReferences.filter((ref) => !retirementRefs.has(ref.digest)),
+					closure: proposedReferences.filter((ref) => !controlRefs.has(ref.digest)),
 				},
 			});
 		expect(advance(first.proposed.references)).toEqual({ kind: "successor", ok: true });

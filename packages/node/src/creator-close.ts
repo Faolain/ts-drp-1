@@ -9,6 +9,15 @@ import type { DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-s
 import { type FinalitySigner, signCreatorIssuanceRetirementRequest } from "@ts-drp/keychain/finality";
 import type { DurableLiveJournalStore } from "@ts-drp/live-journal";
 import type { CurrentAnchorTrust } from "@ts-drp/protocol-v3";
+import {
+	completeCreatorAuthorIssuanceFrontiers,
+	CREATOR_AUTHOR_ISSUANCE_FRONTIERS_GENESIS_SENTINEL,
+	CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND,
+	type CreatorAuthorIssuanceFrontier,
+	openCreatorAuthorIssuanceFrontiers,
+	prepareCreatorAuthorIssuanceFrontiers,
+	resolveCreatorAuthorIssuanceFrontiers,
+} from "@ts-drp/protocol-v3/creator-author-issuance-frontiers";
 import { openCreatorSuccessorTrust, prepareCreatorClose } from "@ts-drp/protocol-v3/creator-close";
 import {
 	completeCreatorIssuanceRetirement,
@@ -19,6 +28,11 @@ import {
 	prepareCreatorIssuanceRetirement,
 	resolveCreatorIssuanceRetirement,
 } from "@ts-drp/protocol-v3/creator-issuance-retirement";
+import {
+	authorizeLatchedApplicationWrite,
+	type LatchedAclSnapshot,
+	openCanonicalLatchedAclSnapshot,
+} from "@ts-drp/protocol-v3/latched-acl";
 import {
 	decodeSnapshotManifest,
 	encodeSnapshotTransfer,
@@ -53,6 +67,8 @@ const PROFILE: SnapshotTransferProfile = Object.freeze({
 	snapshotChunkBytes: 131_072,
 });
 const SCANNABLE_BYTES = 8192;
+const LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED = "D110C_0C1F1_LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED";
+const AUTHOR_REENTRY_PROOF_REQUIRED = "D110C_0C1F1_AUTHOR_REENTRY_PROOF_REQUIRED";
 const bindings = new WeakMap<V3PlaneHandle, CreatorLiveCloseHandle>();
 const runtimeReleaseOwners = new WeakMap<V3PlaneHandle, () => CreatorCloseRuntimeReleasePlan | undefined>();
 let creatorCloseRegistrationResolver: ((plane: V3PlaneHandle) => unknown) | undefined;
@@ -117,6 +133,7 @@ interface V3CreatorCloseRegistration {
 	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
 	readonly exactCanonicalLatchedAclBytes: Uint8Array;
 	readonly exactCanonicalParametersBytes: Uint8Array;
+	readonly exactCanonicalPinnedGenesisBootstrapOperationBytes?: Uint8Array;
 	readonly issuanceScope: DurableIssueScope;
 	readonly issuanceStore: DurableIssuanceStore;
 	readonly liveJournalStore: DurableLiveJournalStore;
@@ -127,6 +144,7 @@ interface V3CreatorCloseRegistration {
 	readonly store: AheDurableStore;
 	captureCloseGraph():
 		| Readonly<{
+				readonly authors: ReadonlyMap<string, Readonly<{ readonly author: string; readonly authorSequence: number }>>;
 				readonly charges: ReadonlyMap<string, number>;
 				readonly frontier: readonly string[];
 				readonly vertices: ReadonlyMap<string, EpochVertex>;
@@ -155,6 +173,7 @@ interface CreatorAdoptionFacts {
 	readonly durableReplay: Readonly<{ verify(): Promise<boolean> }>;
 	readonly exactCanonicalLatchedAclBytes: Uint8Array;
 	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
+	readonly exactCanonicalPinnedGenesisBootstrapOperationBytes?: Uint8Array;
 	readonly history: Awaited<ReturnType<typeof deriveCloseSetHistoryCommitment>>;
 	readonly issuanceScope: DurableIssueScope;
 	readonly issuanceStore: DurableIssuanceStore;
@@ -244,11 +263,17 @@ function uniqueRecordCandidate(
 	const matches = candidates.filter((candidate) => {
 		try {
 			const value = decodeCanonical(candidate.bytes);
+			const selectedEpoch =
+				plainRecord(value) &&
+				(value.kind === "drp-anchor-trust-state"
+					? value.currentEpoch
+					: value.kind === CREATOR_ISSUANCE_RETIREMENT_KIND || value.kind === CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND
+						? value.closedEpoch
+						: value.epoch);
 			return (
 				plainRecord(value) &&
 				value.kind === kind &&
-				(epoch === undefined ||
-					(value.kind === "drp-anchor-trust-state" ? value.currentEpoch : value.epoch) === epoch) &&
+				(epoch === undefined || selectedEpoch === epoch) &&
 				(phase === undefined || value.phase === phase)
 			);
 		} catch {
@@ -273,7 +298,15 @@ async function issuanceRetirementCandidate(
 		snapshotManifestDigest: string;
 		successorTrust: CurrentAnchorTrust;
 	}>
-): Promise<Readonly<{ bytes: Uint8Array; priorRef?: GenerationRef; ref: GenerationRef }>> {
+): Promise<
+	Readonly<{
+		admittedAuthorSequence: number;
+		author: string;
+		bytes: Uint8Array;
+		priorRef?: GenerationRef;
+		ref: GenerationRef;
+	}>
+> {
 	if (!(await input.durableReplay.verify())) throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
 	let priorAdmittedAuthorSequence: number | null = null;
 	let priorRetirementCandidateDigest = CREATOR_ISSUANCE_RETIREMENT_GENESIS_SENTINEL;
@@ -344,6 +377,186 @@ async function issuanceRetirementCandidate(
 		preparation: prepared.preparation,
 	});
 	if (!completed.ok) throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
+	const ref = refFor(completed.exactCanonicalRecordBytes);
+	return Object.freeze({
+		admittedAuthorSequence: boundary.admittedAuthorSequence,
+		author: input.issuanceScope.author,
+		bytes: Uint8Array.from(completed.exactCanonicalRecordBytes),
+		...(priorRef === undefined ? {} : { priorRef: copiedRef(priorRef) }),
+		ref,
+	});
+}
+
+function openedLatchedAcl(
+	exactCanonicalLatchedAclBytes: Uint8Array,
+	trust: CurrentAnchorTrust,
+	expectedAclDigest: string
+): LatchedAclSnapshot | undefined {
+	const opened = openCanonicalLatchedAclSnapshot({
+		exactCanonicalLatchedAclBytes,
+		expectedAclDigest,
+		expectedEpoch: trust.currentEpoch,
+		expectedObjectId: trust.objectId,
+	});
+	return opened.ok ? opened.snapshot : undefined;
+}
+
+function writeAuthorizedAuthors(snapshot: LatchedAclSnapshot): readonly string[] | undefined {
+	const selected: string[] = [];
+	for (const member of snapshot.members) {
+		const authorized = authorizeLatchedApplicationWrite({ author: member.author, snapshot });
+		if (!authorized.ok) return undefined;
+		if (authorized.authorized) selected.push(member.author);
+	}
+	return Object.freeze(selected.sort());
+}
+
+function candidateAclDigest(candidate: Readonly<{ readonly bytes: Uint8Array }>): string {
+	return hex(hashDomain("ts-drp/latched-acl/v3", candidate.bytes));
+}
+
+async function authorIssuanceFrontiersCandidate(
+	input: Readonly<{
+		current: InspectedHead;
+		currentAclDigest: string;
+		currentExactAclBytes: Uint8Array;
+		currentTrust: CurrentAnchorTrust;
+		cutValueDigest: string;
+		graph: Exclude<ReturnType<V3CreatorCloseRegistration["captureCloseGraph"]>, undefined>;
+		issuanceScope: DurableIssueScope;
+		issuanceStore: DurableIssuanceStore;
+		legacy: Awaited<ReturnType<typeof issuanceRetirementCandidate>>;
+		qcRef: GenerationRef;
+		signer: FinalitySigner;
+		snapshotManifestDigest: string;
+		successorAclDigest: string;
+		successorExactAclBytes: Uint8Array;
+		successorTrust: CurrentAnchorTrust;
+	}>
+): Promise<Readonly<{ bytes: Uint8Array; priorRef?: GenerationRef; ref: GenerationRef }>> {
+	const currentAcl = openedLatchedAcl(input.currentExactAclBytes, input.currentTrust, input.currentAclDigest);
+	const successorAcl = openedLatchedAcl(input.successorExactAclBytes, input.successorTrust, input.successorAclDigest);
+	const successorAuthors = successorAcl === undefined ? undefined : writeAuthorizedAuthors(successorAcl);
+	if (currentAcl === undefined || successorAcl === undefined || successorAuthors === undefined) {
+		throw new TypeError("creator issuance-frontier ACL authority is unavailable");
+	}
+
+	const aggregateCandidates = input.current.candidates.filter((candidate) => {
+		try {
+			return (
+				(decodeCanonical(candidate.bytes) as Readonly<Record<string, unknown>>)?.kind ===
+				CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND
+			);
+		} catch {
+			return false;
+		}
+	});
+	if (aggregateCandidates.length > 1 || (input.currentTrust.currentEpoch === 0 && aggregateCandidates.length !== 0)) {
+		throw new TypeError("creator issuance-frontier candidate is ambiguous");
+	}
+	let priorIdentity: ReturnType<typeof resolveCreatorAuthorIssuanceFrontiers>;
+	let priorRef: GenerationRef | undefined;
+	if (aggregateCandidates.length === 1) {
+		const candidate = aggregateCandidates[0] as (typeof aggregateCandidates)[number];
+		const closedEpoch = input.currentTrust.currentEpoch - 1;
+		const cut = uniqueRecordCandidate(input.current.candidates, "drp-hard-epoch-cut", closedEpoch);
+		const qc = uniqueRecordCandidate(input.current.candidates, "drp-seal-qc", closedEpoch, "commit");
+		const acl = uniqueRecordCandidate(input.current.candidates, "drp-v3-latched-acl", closedEpoch);
+		const cutRecord = cut === undefined ? undefined : decodeCanonical(cut.bytes);
+		if (cut === undefined || qc === undefined || acl === undefined || !plainRecord(cutRecord)) {
+			throw new TypeError("creator issuance-frontier predecessor proof is unavailable");
+		}
+		const opened = openCreatorAuthorIssuanceFrontiers({
+			exactCanonicalRecordBytes: candidate.bytes,
+			expectedCommitQcRef: qc.ref,
+			expectedCurrentAclDigest: candidateAclDigest(acl),
+			expectedCutValueDigest: hex(hashDomain("ts-drp/hard-epoch-cut/v3", cut.bytes)),
+			expectedSnapshotManifestDigest: cutRecord.snapshotManifestDigest,
+			expectedSuccessorAclDigest: input.currentAclDigest,
+			floorTrust: input.currentTrust,
+		});
+		priorIdentity = opened.ok ? resolveCreatorAuthorIssuanceFrontiers(opened.capability) : undefined;
+		if (priorIdentity === undefined) {
+			throw new TypeError("creator issuance-frontier predecessor proof is invalid");
+		}
+		priorRef = candidate.ref;
+	}
+
+	const byAuthor = new Map<string, number[]>();
+	for (const identity of input.graph.authors.values()) {
+		const sequences = byAuthor.get(identity.author) ?? [];
+		if (sequences.includes(identity.authorSequence)) {
+			throw new TypeError("creator issuance-frontier author slot is ambiguous");
+		}
+		sequences.push(identity.authorSequence);
+		byAuthor.set(identity.author, sequences);
+	}
+	for (const sequences of byAuthor.values()) sequences.sort((left, right) => left - right);
+
+	const prior = new Map(priorIdentity?.frontiers ?? []);
+	let localNext: number | undefined;
+	if (successorAuthors.includes(input.issuanceScope.author)) {
+		const lineage = await input.issuanceStore.readLineage(input.issuanceScope);
+		if (lineage.exhausted !== false || !Number.isSafeInteger(lineage.next) || lineage.next < 0) {
+			throw new TypeError("creator issuance-frontier local lineage is invalid");
+		}
+		localNext = lineage.next;
+	}
+	const frontiers: CreatorAuthorIssuanceFrontier[] = [];
+	for (const author of successorAuthors) {
+		const priorBoundary = prior.get(author);
+		const sequences = byAuthor.get(author) ?? [];
+		if (priorIdentity === undefined && author === input.legacy.author) {
+			frontiers.push(Object.freeze([author, input.legacy.admittedAuthorSequence] as const));
+			continue;
+		}
+		if (priorBoundary === undefined) {
+			const observedNext = author === input.issuanceScope.author ? localNext : undefined;
+			if ((sequences[0] ?? observedNext ?? 0) > 1) {
+				throw new TypeError(
+					priorIdentity === undefined ? LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED : AUTHOR_REENTRY_PROOF_REQUIRED
+				);
+			}
+		}
+		let boundary = priorBoundary ?? null;
+		const firstObserved = sequences[0];
+		if (boundary === null && firstObserved !== undefined && firstObserved > 1) {
+			throw new TypeError(LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED);
+		}
+		const minimum = boundary === null && firstObserved === 1 ? 1 : boundary === null ? 0 : boundary + 1;
+		if (sequences.some((sequence) => boundary !== null && sequence <= boundary)) {
+			throw new TypeError("creator issuance-frontier boundary regressed");
+		}
+		let expected = minimum;
+		for (const sequence of sequences) {
+			if (sequence !== expected) break;
+			boundary = sequence;
+			expected += 1;
+		}
+		frontiers.push(Object.freeze([author, boundary] as const));
+	}
+
+	const prepared = prepareCreatorAuthorIssuanceFrontiers({
+		commitQcRef: input.qcRef,
+		currentAclDigest: input.currentAclDigest,
+		currentTrust: input.currentTrust,
+		cutValueDigest: input.cutValueDigest,
+		frontiers,
+		priorAggregateCandidateDigest: priorRef?.digest ?? CREATOR_AUTHOR_ISSUANCE_FRONTIERS_GENESIS_SENTINEL,
+		snapshotManifestDigest: input.snapshotManifestDigest,
+		successorAclDigest: input.successorAclDigest,
+		successorTrust: input.successorTrust,
+	});
+	if (!prepared.ok) throw new TypeError("creator issuance-frontier preparation failed");
+	const signature = await signCreatorIssuanceRetirementRequest({
+		request: prepared.signingRequest,
+		signer: input.signer,
+	});
+	const completed = completeCreatorAuthorIssuanceFrontiers({
+		detachedSignature: signature,
+		preparation: prepared.preparation,
+	});
+	if (!completed.ok) throw new TypeError("creator issuance-frontier completion failed");
 	const ref = refFor(completed.exactCanonicalRecordBytes);
 	return Object.freeze({
 		bytes: Uint8Array.from(completed.exactCanonicalRecordBytes),
@@ -624,7 +837,12 @@ export async function bindCreatorLiveClose(
 					const acl = payload.acl;
 					const stateDigest = snapshot.applicationStateDigest;
 					const archiveIndexRoot = anchor.archiveIndexRoot;
-					if (acl === undefined || typeof stateDigest !== "string" || typeof archiveIndexRoot !== "string") {
+					if (
+						acl === undefined ||
+						typeof stateDigest !== "string" ||
+						typeof archiveIndexRoot !== "string" ||
+						typeof anchor.aclDigest !== "string"
+					) {
 						throw new TypeError("creator close snapshot identity failed");
 					}
 					const aclDigest = hex(hashDomain("ts-drp/latched-acl/v3", encodeCanonical(acl)));
@@ -712,25 +930,50 @@ export async function bindCreatorLiveClose(
 						snapshotManifestDigest: persistedSnapshot.manifestDigest,
 						successorTrust: successor.trust,
 					});
+					const aggregate = await authorIssuanceFrontiersCandidate({
+						current,
+						currentAclDigest: anchor.aclDigest,
+						currentExactAclBytes: registration.exactCanonicalLatchedAclBytes,
+						currentTrust: registration.currentTrust,
+						cutValueDigest: prepared.valueDigest,
+						graph,
+						issuanceScope: registration.issuanceScope,
+						issuanceStore: registration.issuanceStore,
+						legacy: retirement,
+						qcRef: commitQcRef,
+						signer: input.signer,
+						snapshotManifestDigest: persistedSnapshot.manifestDigest,
+						successorAclDigest: aclDigest,
+						successorExactAclBytes: encodeCanonical(acl),
+						successorTrust: successor.trust,
+					});
 					const proposed = Object.freeze(
 						[
 							...current.references.filter(
-								({ digest }) => digest !== current.trustRef.digest && digest !== retirement.priorRef?.digest
+								({ digest }) =>
+									digest !== current.trustRef.digest &&
+									digest !== retirement.priorRef?.digest &&
+									digest !== aggregate.priorRef?.digest
 							),
 							successorTrustRef,
 							cutValueRef,
 							commitQcRef,
 							retirement.ref,
+							aggregate.ref,
 						].sort(compareRef)
 					);
 					const proposedCandidates = [
 						...current.candidates.filter(
-							({ ref }) => ref.digest !== current.trustRef.digest && ref.digest !== retirement.priorRef?.digest
+							({ ref }) =>
+								ref.digest !== current.trustRef.digest &&
+								ref.digest !== retirement.priorRef?.digest &&
+								ref.digest !== aggregate.priorRef?.digest
 						),
 						{ bytes: finalized.exactCanonicalTrustStateRecordBytes, ref: successorTrustRef },
 						{ bytes: prepared.exactCanonicalCutValueBytes, ref: cutValueRef },
 						{ bytes: finalized.exactCanonicalCommitQcBytes, ref: commitQcRef },
 						{ bytes: retirement.bytes, ref: retirement.ref },
+						{ bytes: aggregate.bytes, ref: aggregate.ref },
 					].filter(({ ref }) => ref.byteLength <= SCANNABLE_BYTES);
 					const advance = inspectCreatorTransitionAdvance({
 						current: { candidates: current.candidates, closure: current.references },
@@ -750,6 +993,7 @@ export async function bindCreatorLiveClose(
 							{ bytes: prepared.exactCanonicalCutValueBytes, ref: cutValueRef },
 							{ bytes: finalized.exactCanonicalCommitQcBytes, ref: commitQcRef },
 							{ bytes: retirement.bytes, ref: retirement.ref },
+							{ bytes: aggregate.bytes, ref: aggregate.ref },
 						],
 						acceptedProposed
 					);
@@ -778,6 +1022,10 @@ export async function bindCreatorLiveClose(
 								durableReplay,
 								exactCanonicalLatchedAclBytes: Uint8Array.from(registration.exactCanonicalLatchedAclBytes),
 								exactCanonicalParametersCarrierBytes: Uint8Array.from(registration.exactCanonicalParametersBytes),
+								exactCanonicalPinnedGenesisBootstrapOperationBytes:
+									registration.exactCanonicalPinnedGenesisBootstrapOperationBytes === undefined
+										? undefined
+										: Uint8Array.from(registration.exactCanonicalPinnedGenesisBootstrapOperationBytes),
 								history: commitment,
 								issuanceScope: Object.freeze({ ...registration.issuanceScope }),
 								issuanceStore: registration.issuanceStore,

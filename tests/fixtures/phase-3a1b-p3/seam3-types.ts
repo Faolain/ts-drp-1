@@ -310,10 +310,16 @@ type ExpectedRecoveryInput =
 	  }>;
 type _RecoveryInput = Assert<
 	"operationAdmissionPolicy" extends keyof RecoverV3LiveReplicaInput
-		? Equal<
-				RecoverV3LiveReplicaInput,
-				ExpectedRecoveryInput & Readonly<{ readonly operationAdmissionPolicy?: ExpectedOperationAdmissionPolicy }>
-			>
+		? "exactCanonicalPinnedGenesisBootstrapOperationBytes" extends keyof RecoverV3LiveReplicaInput
+			? Equal<
+					RecoverV3LiveReplicaInput,
+					ExpectedRecoveryInput &
+						Readonly<{
+							readonly exactCanonicalPinnedGenesisBootstrapOperationBytes?: Uint8Array;
+							readonly operationAdmissionPolicy?: ExpectedOperationAdmissionPolicy;
+						}>
+				>
+			: false
 		: Equal<RecoverV3LiveReplicaInput, ExpectedRecoveryInput>
 >;
 type _Activate = Assert<Equal<typeof activateV3LivePlane, (input: ExpectedInput) => ExpectedActivationResult>>;

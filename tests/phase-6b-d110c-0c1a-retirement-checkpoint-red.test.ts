@@ -24,6 +24,11 @@ import {
 } from "../packages/keychain/src/finality.js";
 import { deriveCreatorIssuanceRetirementBoundary } from "../packages/node/src/internal/creator-issuance-retirement-boundary.js";
 import { inspectCreatorTransitionAdvance } from "../packages/node/src/internal/creator-transition-advance.js";
+import {
+	completeCreatorAuthorIssuanceFrontiers,
+	CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND,
+	prepareCreatorAuthorIssuanceFrontiers,
+} from "../packages/protocol-v3/src/creator-author-issuance-frontiers.js";
 import { openCreatorCheckpointTrust } from "../packages/protocol-v3/src/creator-checkpoint.js";
 import {
 	completeCreatorIssuanceRetirement,
@@ -75,6 +80,12 @@ function uniqueCandidate(candidates: readonly Candidate[], kind: string, epoch: 
 		return decoded.kind === kind && candidateEpoch === epoch && (phase === undefined || decoded.phase === phase);
 	});
 	if (matches.length !== 1) throw new TypeError(`D110C_0C1A_CANDIDATE_INVALID:${kind}:${epoch}`);
+	return matches[0] as (typeof matches)[number];
+}
+
+function uniqueKindCandidate(candidates: readonly Candidate[], kind: string): Candidate {
+	const matches = candidates.filter((candidate) => record(candidate.bytes).kind === kind);
+	if (matches.length !== 1) throw new TypeError(`D110C_0C1A_KIND_CANDIDATE_INVALID:${kind}`);
 	return matches[0] as (typeof matches)[number];
 }
 
@@ -342,6 +353,14 @@ describe("D.110c-0c1a creator issuance-retirement checkpoint RED", () => {
 				D110C_0C1A_RETIREMENT_KIND,
 				1
 			);
+			const currentAggregate = uniqueKindCandidate(
+				retirementTransition.current.candidates,
+				CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND
+			);
+			const ordinaryProposedAggregate = uniqueKindCandidate(
+				retirementTransition.proposed.candidates,
+				CREATOR_AUTHOR_ISSUANCE_FRONTIERS_KIND
+			);
 			const currentCut = uniqueCandidate(retirementTransition.current.candidates, "drp-hard-epoch-cut", 0);
 			const currentQc = uniqueCandidate(retirementTransition.current.candidates, "drp-seal-qc", 0, "commit");
 			const proposedCut = uniqueCandidate(retirementTransition.proposed.candidates, "drp-hard-epoch-cut", 1);
@@ -396,16 +415,60 @@ describe("D.110c-0c1a creator issuance-retirement checkpoint RED", () => {
 					digest: sameBoundaryRef.value,
 				}),
 			});
+			const ordinaryAggregateRecord = record(ordinaryProposedAggregate.bytes);
+			const replacementFrontiers = (
+				ordinaryAggregateRecord.frontiers as readonly (readonly [string, number | null])[]
+			).map(([author, boundary]) =>
+				Object.freeze([
+					author,
+					author === currentIdentity.author ? currentIdentity.admittedAuthorSequence : boundary,
+				] as const)
+			);
+			const preparedAggregate = prepareCreatorAuthorIssuanceFrontiers({
+				commitQcRef: proposedQc.ref,
+				currentAclDigest: ordinaryAggregateRecord.currentAclDigest,
+				currentTrust: checkpoint.predecessorTrust,
+				cutValueDigest: ordinaryAggregateRecord.cutValueDigest,
+				frontiers: replacementFrontiers,
+				priorAggregateCandidateDigest: currentAggregate.ref.digest,
+				snapshotManifestDigest: ordinaryAggregateRecord.snapshotManifestDigest,
+				successorAclDigest: ordinaryAggregateRecord.successorAclDigest,
+				successorTrust: checkpoint.currentTrust,
+			});
+			expect(preparedAggregate).toMatchObject({ ok: true });
+			if (!preparedAggregate.ok) throw new TypeError("D110C_0C1A_SAME_BOUNDARY_AGGREGATE_PREPARE_FAILED");
+			const aggregateSignature = await signCreatorIssuanceRetirementRequest({
+				request: preparedAggregate.signingRequest,
+				signer: signer.signer,
+			});
+			const completedAggregate = completeCreatorAuthorIssuanceFrontiers({
+				detachedSignature: aggregateSignature,
+				preparation: preparedAggregate.preparation,
+			});
+			expect(completedAggregate).toMatchObject({ ok: true });
+			if (!completedAggregate.ok) throw new TypeError("D110C_0C1A_SAME_BOUNDARY_AGGREGATE_COMPLETE_FAILED");
+			const aggregateReplacementDigest = digestBlob(completedAggregate.exactCanonicalRecordBytes);
+			expect(aggregateReplacementDigest).toMatchObject({ ok: true });
+			if (!aggregateReplacementDigest.ok) throw new TypeError("D110C_0C1A_SAME_BOUNDARY_AGGREGATE_DIGEST_FAILED");
+			const aggregateReplacement = Object.freeze({
+				bytes: completedAggregate.exactCanonicalRecordBytes,
+				ref: Object.freeze({
+					byteLength: completedAggregate.exactCanonicalRecordBytes.byteLength,
+					digest: aggregateReplacementDigest.value,
+				}),
+			});
 			const proposed = Object.freeze({
 				candidates: Object.freeze(
-					retirementTransition.proposed.candidates.map((candidate) =>
-						candidate.ref.digest === ordinaryProposedCarrier.ref.digest ? replacement : candidate
-					)
+					retirementTransition.proposed.candidates.map((candidate) => {
+						if (candidate.ref.digest === ordinaryProposedCarrier.ref.digest) return replacement;
+						return candidate.ref.digest === ordinaryProposedAggregate.ref.digest ? aggregateReplacement : candidate;
+					})
 				),
 				closure: Object.freeze(
-					retirementTransition.proposed.references.map((ref) =>
-						ref.digest === ordinaryProposedCarrier.ref.digest ? replacement.ref : ref
-					)
+					retirementTransition.proposed.references.map((ref) => {
+						if (ref.digest === ordinaryProposedCarrier.ref.digest) return replacement.ref;
+						return ref.digest === ordinaryProposedAggregate.ref.digest ? aggregateReplacement.ref : ref;
+					})
 				),
 			});
 			const openedProposed = openCreatorIssuanceRetirement({
@@ -428,19 +491,18 @@ describe("D.110c-0c1a creator issuance-retirement checkpoint RED", () => {
 			expect(retirementTransition.current.references).toContainEqual(currentCarrier.ref);
 			expect(proposed.closure).not.toContainEqual(currentCarrier.ref);
 			expect(proposed.closure).toContainEqual(replacement.ref);
-			expect(
-				inspectCreatorTransitionAdvance({
-					current: {
-						candidates: retirementTransition.current.candidates,
-						closure: retirementTransition.current.references,
-					},
-					currentTrust: checkpoint.predecessorTrust,
-					mode: "verify",
-					proofRefs: [proposedCut.ref, proposedQc.ref],
-					proposed,
-					successorTrust: checkpoint.currentTrust,
-				})
-			).toMatchObject({ ok: true });
+			const sameBoundaryAdvance = inspectCreatorTransitionAdvance({
+				current: {
+					candidates: retirementTransition.current.candidates,
+					closure: retirementTransition.current.references,
+				},
+				currentTrust: checkpoint.predecessorTrust,
+				mode: "verify",
+				proofRefs: [proposedCut.ref, proposedQc.ref],
+				proposed,
+				successorTrust: checkpoint.currentTrust,
+			});
+			expect(sameBoundaryAdvance, JSON.stringify(sameBoundaryAdvance)).toMatchObject({ ok: true });
 
 			const forkPrepared = prepareCreatorIssuanceRetirement({
 				admittedAuthorSequence: currentIdentity.admittedAuthorSequence,

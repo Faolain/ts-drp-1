@@ -103,6 +103,10 @@ export const CREATOR_SUCCESSOR_LOCAL_AUTHOR_REOPEN_INPUT_KEYS = Object.freeze([
 	"snapshotStore",
 	"store",
 ] as const);
+export const CREATOR_SUCCESSOR_LOCAL_AUTHOR_REOPEN_BOOTSTRAP_POLICY_INPUT_KEYS = Object.freeze([
+	...CREATOR_SUCCESSOR_LOCAL_AUTHOR_REOPEN_INPUT_KEYS,
+	"exactCanonicalPinnedGenesisBootstrapOperationBytes",
+] as const);
 export const CREATOR_SUCCESSOR_ACTIVATION_SUCCESS_KEYS = Object.freeze([
 	"handle",
 	"lifecycle",

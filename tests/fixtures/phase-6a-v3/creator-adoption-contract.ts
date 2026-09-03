@@ -799,6 +799,8 @@ async function recoverWithDurableStores(
 			digest: hashDomain("ts-drp/vertex/v3", fixture.recoveryCanonicalPreimageBytes),
 			signature: Uint8Array.from(fixture.recoverySignature),
 		});
+		const bootstrapVertex = decodeCanonical(envelope.canonicalPreimageBytes) as Readonly<Record<string, unknown>>;
+		const exactCanonicalPinnedGenesisBootstrapOperationBytes = encodeCanonical(bootstrapVertex.operation);
 		await issuanceStore.transactIssue(scope, (authorSequence) => {
 			if (authorSequence !== 0) throw new TypeError("D.108b recovery issuance sequence is invalid");
 			return Promise.resolve(
@@ -831,6 +833,7 @@ async function recoverWithDurableStores(
 		const recovered = await modules.recoverV3LiveReplica({
 			capability,
 			exactCanonicalLatchedAclBytes: fixture.exactCanonicalLatchedAclBytes,
+			exactCanonicalPinnedGenesisBootstrapOperationBytes,
 			issuanceScope: scope,
 			issuanceStore,
 			liveJournalStore: journal,

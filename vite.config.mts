@@ -8,6 +8,10 @@ const config = defineConfig({
 	plugins: [tsconfigPaths()],
 	resolve: {
 		alias: {
+			"@ts-drp/protocol-v3/creator-author-issuance-frontiers": path.resolve(
+				__dirname,
+				"packages/protocol-v3/src/creator-author-issuance-frontiers.ts"
+			),
 			"@ts-drp/control-plane/creator-trust-checkpoint-advance": path.resolve(
 				__dirname,
 				"packages/control-plane/src/creator-trust-checkpoint-advance.ts"

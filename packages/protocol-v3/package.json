@@ -46,6 +46,10 @@
 			"types": "./dist/src/creator-issuance-retirement.d.ts",
 			"import": "./dist/src/creator-issuance-retirement.js"
 		},
+		"./creator-author-issuance-frontiers": {
+			"types": "./dist/src/creator-author-issuance-frontiers.d.ts",
+			"import": "./dist/src/creator-author-issuance-frontiers.js"
+		},
 		"./seal": {
 			"types": "./dist/src/seal.d.ts",
 			"import": "./dist/src/seal.js"

@@ -41,6 +41,7 @@ const COLD_KEYS = Object.freeze([
 	"snapshotStore",
 	"store",
 ]);
+const COLD_BOOTSTRAP_POLICY_KEYS = Object.freeze([...COLD_KEYS, "exactCanonicalPinnedGenesisBootstrapOperationBytes"]);
 
 type PlainRecord = Record<string, unknown>;
 type Failure = Readonly<{ readonly detail: string; readonly kind: string; readonly ok: false }>;
@@ -465,7 +466,7 @@ export async function reopenCreatorSuccessorAdoption(input: unknown): Promise<Re
 			"creator successor reopen requires an authenticated room-head floor"
 		);
 	}
-	const captured = capture(input, COLD_KEYS);
+	const captured = capture(input, COLD_KEYS) ?? capture(input, COLD_BOOTSTRAP_POLICY_KEYS);
 	if (captured === undefined) return failure("malformed-input", "creator successor reopen input is invalid");
 	const expectedRoomHead = captureCreatorExpectedRoomHead(captured.expectedRoomHead);
 	if (expectedRoomHead === undefined) return failure("D110C_FLOOR_INVALID", "creator room-head floor is invalid");
@@ -475,9 +476,27 @@ export async function reopenCreatorSuccessorAdoption(input: unknown): Promise<Re
 	if (typeof captured.author !== "string" || typeof captured.signRegisteredVertexDigest !== "function") {
 		return failure("malformed-input", "creator successor local author input is invalid");
 	}
+	const rawBootstrapOperationBytes = captured.exactCanonicalPinnedGenesisBootstrapOperationBytes;
+	const exactCanonicalPinnedGenesisBootstrapOperationBytes =
+		rawBootstrapOperationBytes === undefined
+			? undefined
+			: rawBootstrapOperationBytes instanceof Uint8Array &&
+				  Object.getPrototypeOf(rawBootstrapOperationBytes) === Uint8Array.prototype
+				? Uint8Array.from(rawBootstrapOperationBytes)
+				: undefined;
+	if (rawBootstrapOperationBytes !== undefined && exactCanonicalPinnedGenesisBootstrapOperationBytes === undefined) {
+		return failure("malformed-input", "creator successor bootstrap policy input is invalid");
+	}
 	const bindings = runtimeBindings(captured);
 	if (bindings === undefined) return failure("malformed-input", "creator successor runtime bindings are invalid");
-	const reopened = await consumeCreatorSuccessorReopen(captured as never);
+	const reopened = await consumeCreatorSuccessorReopen(
+		Object.freeze({
+			...captured,
+			...(exactCanonicalPinnedGenesisBootstrapOperationBytes === undefined
+				? {}
+				: { exactCanonicalPinnedGenesisBootstrapOperationBytes }),
+		}) as never
+	);
 	if (!reopened.ok) return failure(reopened.kind, reopened.detail);
 	if (!sameCreatorRoomHead(expectedRoomHead, reopened.material.successor.trust)) {
 		return failure("D110C_FLOOR_MISMATCH", "creator successor differs from the authenticated room-head floor");

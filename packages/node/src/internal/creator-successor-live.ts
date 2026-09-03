@@ -28,6 +28,7 @@ export interface CreatorSuccessorLiveMaterial {
 	readonly catalog: TrustedBlueprintCatalog;
 	readonly exactCanonicalLatchedAclBytes: Uint8Array;
 	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
+	readonly exactCanonicalPinnedGenesisBootstrapOperationBytes?: Uint8Array;
 	readonly exactCanonicalSnapshotPayloadBytes: Uint8Array;
 	readonly issuanceScope: DurableIssueScope;
 	readonly issuanceStore: DurableIssuanceStore;
@@ -89,6 +90,7 @@ export interface CreatorSuccessorReopenInput {
 	readonly detachedSignature: Uint8Array;
 	readonly exactCanonicalAnchorPreimageBytes: Uint8Array;
 	readonly exactCanonicalParametersCarrierBytes: Uint8Array;
+	readonly exactCanonicalPinnedGenesisBootstrapOperationBytes?: Uint8Array;
 	readonly expectedRoomHead: CreatorExpectedRoomHead;
 	readonly issuanceStore: DurableIssuanceStore;
 	readonly liveJournalStore: DurableLiveJournalStore;

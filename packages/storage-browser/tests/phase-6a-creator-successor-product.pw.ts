@@ -471,7 +471,7 @@ function d110c0c1TestInstrumentation() {
 				);
 				replaceOnce(
 					"\t\t\t\tif (\n\t\t\t\t\tauthenticatedFilterRow ||\n\t\t\t\t\tauthenticatedGenesisRow !== undefined ||\n\t\t\t\t\tauthenticatedHistoricalRow !== undefined\n\t\t\t\t) {",
-					'\t\t\t\td110c0c1TestInstrumentation()?.d110c0c1Record(ObjectFreeze({\n\t\t\t\t\tauthorSequence: row.authorSequence,\n\t\t\t\t\tclassification: authenticatedFilterRow ? "filtered-current" : authenticatedGenesisRow !== undefined ? "pinned-genesis" : "covered-historical",\n\t\t\t\t\tdigest: lowerHexDigest(row.digest),\n\t\t\t\t\tpayloadEpoch: filterPayload.provenance.epoch,\n\t\t\t\t}));\n\t\t\t\tif (\n\t\t\t\t\tauthenticatedFilterRow ||\n\t\t\t\t\tauthenticatedGenesisRow !== undefined ||\n\t\t\t\t\tauthenticatedHistoricalRow !== undefined\n\t\t\t\t) {'
+					'\t\t\t\td110c0c1TestInstrumentation()?.d110c0c1Record(ObjectFreeze({\n\t\t\t\t\tauthorSequence: row.authorSequence,\n\t\t\t\t\tclassification: authenticatedFilterRow ? "filtered-current" : authenticatedGenesisRow !== undefined ? "pinned-genesis" : authenticatedHistoricalRow !== undefined ? "covered-historical" : "rejected",\n\t\t\t\t\tdigest: lowerHexDigest(row.digest),\n\t\t\t\t\tpayloadEpoch: filterPayload.provenance.epoch,\n\t\t\t\t}));\n\t\t\t\tif (\n\t\t\t\t\tauthenticatedFilterRow ||\n\t\t\t\t\tauthenticatedGenesisRow !== undefined ||\n\t\t\t\t\tauthenticatedHistoricalRow !== undefined\n\t\t\t\t) {'
 				);
 				replaceOnce(
 					"\t\t\tregistration.handle = makeV3PlaneHandle(registration);",
@@ -615,6 +615,10 @@ export const reopenCreatorSuccessorAdoption = async (input) => {
   const fault = state.d110c0c1cFault;
   state.d110c0c1cFault = null;
   let selected = input;
+  if (fault === "bootstrap-policy-missing") {
+    const { exactCanonicalPinnedGenesisBootstrapOperationBytes: ignored, ...withoutBootstrapPolicy } = input;
+    selected = Object.freeze(withoutBootstrapPolicy);
+  }
   if (fault === "ahe-lineage") {
     const store = new Proxy(input.store, {
       get(target, key) {
@@ -701,7 +705,12 @@ export const reopenCreatorSuccessorAdoption = async (input) => {
     });
     selected = Object.freeze({ ...input, issuanceStore });
   }
-  return actual.reopenCreatorSuccessorAdoption(selected);
+  const reopened = actual.reopenCreatorSuccessorAdoption(selected);
+  if (fault === "bootstrap-policy-alias") {
+    const bootstrapPolicy = input.exactCanonicalPinnedGenesisBootstrapOperationBytes;
+    if (bootstrapPolicy instanceof Uint8Array) bootstrapPolicy.fill(0);
+  }
+  return reopened;
 };
 export const activateCreatorSuccessorAdoption = async (input) => {
   const planeId = closeHandlePlaneIds.get(input.handle);
@@ -3038,7 +3047,7 @@ test("D.110c-0c1f4 exact configured bootstrap authority is required on epoch-N c
 }, testInfo) => {
 	const selectedServers = Object.freeze(
 		await Promise.all(
-			["creator", "control", "treatment"].map(() =>
+			["creator", "control", "treatment", "missing"].map(() =>
 				startProductBrowserServer(
 					new URL("./assets/phase-6a-creator-successor-product-entry.ts", import.meta.url).pathname
 				)
@@ -3049,16 +3058,24 @@ test("D.110c-0c1f4 exact configured bootstrap authority is required on epoch-N c
 	const creatorPage = await context.newPage();
 	const controlPage = await context.newPage();
 	const treatmentPage = await context.newPage();
-	const pages = (): readonly Page[] => [creatorPage, controlPage, treatmentPage];
+	const missingPage = await context.newPage();
+	const pages = (): readonly Page[] => [creatorPage, controlPage, treatmentPage, missingPage];
 	const creatorDatabase = "d110c-0c1f4-creator";
 	const controlDatabase = "d110c-0c1f4-control";
 	const treatmentDatabase = "d110c-0c1f4-treatment";
+	const missingDatabase = "d110c-0c1f4-missing";
+	const replicas = Object.freeze([
+		[controlPage, controlDatabase],
+		[treatmentPage, treatmentDatabase],
+		[missingPage, missingDatabase],
+	] as const) satisfies readonly (readonly [Page, string])[];
 	const channelName = "d110c-0c1f4-exact-bootstrap-authority";
 	try {
 		await Promise.all([
 			openRealm(creatorPage, selectedServers[0]?.origin ?? "about:blank", "d110c-0c1f4-creator", pages),
 			openRealm(controlPage, selectedServers[1]?.origin ?? "about:blank", "d110c-0c1f4-control", pages),
 			openRealm(treatmentPage, selectedServers[2]?.origin ?? "about:blank", "d110c-0c1f4-treatment", pages),
+			openRealm(missingPage, selectedServers[3]?.origin ?? "about:blank", "d110c-0c1f4-missing", pages),
 		]);
 		const invite = await creatorPage.evaluate((input) => window.phase6aCreatorSuccessorProduct.create(input), {
 			channelName,
@@ -3066,11 +3083,8 @@ test("D.110c-0c1f4 exact configured bootstrap authority is required on epoch-N c
 			databaseName: creatorDatabase,
 		});
 		await Promise.all(
-			[
-				[controlPage, controlDatabase],
-				[treatmentPage, treatmentDatabase],
-			].map(([page, databaseName]) =>
-				(page as Page).evaluate((input) => window.phase6aCreatorSuccessorProduct.join(input), {
+			replicas.map(([page, databaseName]) =>
+				page.evaluate((input) => window.phase6aCreatorSuccessorProduct.join(input), {
 					channelName,
 					clientId: "bob",
 					databaseName,
@@ -3079,12 +3093,9 @@ test("D.110c-0c1f4 exact configured bootstrap authority is required on epoch-N c
 			)
 		);
 		const before = await Promise.all(
-			[
-				[controlPage, controlDatabase],
-				[treatmentPage, treatmentDatabase],
-			].map(async ([page, databaseName]) =>
+			replicas.map(async ([page, databaseName]) =>
 				d110c0cRecord(
-					await (page as Page).evaluate(
+					await page.evaluate(
 						(selectedDatabase) => window.phase6aCreatorSuccessorProduct.d110c0c1f2Evidence(selectedDatabase),
 						databaseName
 					)
@@ -3098,9 +3109,10 @@ test("D.110c-0c1f4 exact configured bootstrap authority is required on epoch-N c
 					({ authorSequence, epoch, publishState }) => authorSequence === 0 && epoch === 0 && publishState === "pending"
 				)
 		);
-		expect(bootstrapRows.map((rows) => rows.length)).toEqual([1, 1]);
+		expect(bootstrapRows.map((rows) => rows.length)).toEqual([1, 1, 1]);
 		const writerAuthor = bootstrapRows[0]?.[0]?.author;
 		expect(writerAuthor).toBe(bootstrapRows[1]?.[0]?.author);
+		expect(writerAuthor).toBe(bootstrapRows[2]?.[0]?.author);
 		const creatorJournalBefore = await creatorPage.evaluate(
 			(databaseName) => window.phase6aCreatorSuccessorProduct.d110c0c1JournalVertices(databaseName),
 			creatorDatabase
@@ -3111,6 +3123,7 @@ test("D.110c-0c1f4 exact configured bootstrap authority is required on epoch-N c
 		await Promise.all([
 			controlPage.evaluate(() => window.phase6aCreatorSuccessorProduct.close()),
 			treatmentPage.evaluate(() => window.phase6aCreatorSuccessorProduct.close()),
+			missingPage.evaluate(() => window.phase6aCreatorSuccessorProduct.close()),
 		]);
 		await creatorPage.evaluate(() => window.phase6aCreatorSuccessorProduct.sealEpoch());
 		await creatorPage.evaluate(() => window.phase6aCreatorSuccessorProduct.adoptSuccessor());
@@ -3126,11 +3139,8 @@ test("D.110c-0c1f4 exact configured bootstrap authority is required on epoch-N c
 		);
 		expect(epochThree.authority).toMatchObject({ epoch: 3 });
 		await Promise.all(
-			[
-				[controlPage, controlDatabase],
-				[treatmentPage, treatmentDatabase],
-			].map(([page, databaseName]) =>
-				(page as Page).evaluate(
+			replicas.map(([page, databaseName]) =>
+				page.evaluate(
 					({ carrier, source, target }) =>
 						window.phase6aCreatorSuccessorProduct.importSuccessor(carrier, source, target),
 					{ carrier: epochThree, source: creatorDatabase, target: databaseName }
@@ -3142,7 +3152,13 @@ test("D.110c-0c1f4 exact configured bootstrap authority is required on epoch-N c
 			treatmentPage.evaluate(() => window.phase6aCreatorSuccessorProduct.d110c0c1f4BootstrapHex("dave")),
 		]);
 		expect(configuredAHex).not.toBe(configuredBHex);
+		await controlPage.evaluate(() =>
+			window.phase6aCreatorSuccessorProduct.d110c0c1f4SetReopenFault("bootstrap-policy-alias")
+		);
 		await treatmentPage.evaluate(() => window.phase6aCreatorSuccessorProduct.d110c0c1f4SetBootstrapClientId("dave"));
+		await missingPage.evaluate(() =>
+			window.phase6aCreatorSuccessorProduct.d110c0c1f4SetReopenFault("bootstrap-policy-missing")
+		);
 		const reopen = async (page: Page, databaseName: string): Promise<string> => {
 			try {
 				await page.evaluate((input) => window.phase6aCreatorSuccessorProduct.join(input), {
@@ -3162,15 +3178,19 @@ test("D.110c-0c1f4 exact configured bootstrap authority is required on epoch-N c
 				return error instanceof Error ? error.message : String(error);
 			}
 		};
-		const [controlDetail, treatmentDetail] = await Promise.all([
+		const [controlDetail, treatmentDetail, missingDetail] = await Promise.all([
 			reopen(controlPage, controlDatabase),
 			reopen(treatmentPage, treatmentDatabase),
+			reopen(missingPage, missingDatabase),
 		]);
-		const expectedDownstreamDetail =
-			"page.evaluate: TypeError: v3 room successor reopen failed: recovery-rejected: creator predecessor recovery failed: issuance-rejected";
-		expect(controlDetail.split("\n", 1)[0]).toBe(expectedDownstreamDetail);
-		expect(treatmentDetail.split("\n", 1)[0]).toBe(expectedDownstreamDetail);
-		const [control, treatment] = await Promise.all([
+		expect(controlDetail).toBe("fulfilled");
+		expect(treatmentDetail.split("\n", 1)[0]).toBe(
+			"page.evaluate: TypeError: v3 room successor reopen failed: recovery-rejected: creator predecessor recovery failed: admission-rejected"
+		);
+		expect(missingDetail.split("\n", 1)[0]).toBe(
+			"page.evaluate: TypeError: v3 room successor reopen failed: recovery-rejected: creator predecessor recovery failed: admission-rejected"
+		);
+		const [control, treatment, missing] = await Promise.all([
 			controlPage.evaluate(
 				(databaseName) => window.phase6aCreatorSuccessorProduct.d110c0c1f2Evidence(databaseName),
 				controlDatabase
@@ -3179,9 +3199,14 @@ test("D.110c-0c1f4 exact configured bootstrap authority is required on epoch-N c
 				(databaseName) => window.phase6aCreatorSuccessorProduct.d110c0c1f2Evidence(databaseName),
 				treatmentDatabase
 			),
+			missingPage.evaluate(
+				(databaseName) => window.phase6aCreatorSuccessorProduct.d110c0c1f2Evidence(databaseName),
+				missingDatabase
+			),
 		]);
 		const controlTrace = d110c0cArray(d110c0cRecord(control).trace).map(d110c0cRecord);
 		const treatmentTrace = d110c0cArray(d110c0cRecord(treatment).trace).map(d110c0cRecord);
+		const missingTrace = d110c0cArray(d110c0cRecord(missing).trace).map(d110c0cRecord);
 		expect(controlTrace).toContainEqual(
 			expect.objectContaining({
 				authorSequence: 0,
@@ -3193,12 +3218,28 @@ test("D.110c-0c1f4 exact configured bootstrap authority is required on epoch-N c
 		expect(treatmentTrace).toContainEqual(
 			expect.objectContaining({
 				authorSequence: 0,
+				classification: "rejected",
+				owner: "predecessor-validation",
+				payloadEpoch: 3,
+			})
+		);
+		expect(treatmentTrace).not.toContainEqual(
+			expect.objectContaining({
+				authorSequence: 0,
 				classification: "pinned-genesis",
 				owner: "predecessor-validation",
 				payloadEpoch: 3,
 			})
 		);
-		await testInfo.attach("d110c-0c1f4-product-red", {
+		expect(missingTrace).toContainEqual(
+			expect.objectContaining({
+				authorSequence: 0,
+				classification: "rejected",
+				owner: "predecessor-validation",
+				payloadEpoch: 3,
+			})
+		);
+		await testInfo.attach("d110c-0c1f4-product-green", {
 			body: Buffer.from(
 				JSON.stringify({
 					bootstrapRows,
@@ -3207,18 +3248,20 @@ test("D.110c-0c1f4 exact configured bootstrap authority is required on epoch-N c
 					control,
 					controlDetail,
 					creatorJournalBefore,
+					missing,
+					missingDetail,
 					treatment,
 					treatmentDetail,
 				})
 			),
 			contentType: "application/json",
 		});
-		console.log("D110C_0C1F4_EXACT_BOOTSTRAP_AUTHORITY_REQUIRED");
 	} finally {
 		await Promise.allSettled([
 			creatorPage.evaluate(() => window.phase6aCreatorSuccessorProduct.close()),
 			controlPage.evaluate(() => window.phase6aCreatorSuccessorProduct.close()),
 			treatmentPage.evaluate(() => window.phase6aCreatorSuccessorProduct.close()),
+			missingPage.evaluate(() => window.phase6aCreatorSuccessorProduct.close()),
 		]);
 		await context.close();
 		await Promise.all(selectedServers.map((server) => server.close()));
@@ -3350,23 +3393,20 @@ test("D.110c-0c1f2 non-creator writer requires an authenticated historical front
 				window.phase6aCreatorSuccessorProduct.importSuccessor(selectedCarrier, source, target),
 			{ carrier: epochThree, source: creatorDatabase, target: writerDatabase }
 		);
-		let detail = "fulfilled";
-		try {
-			await writerPage.evaluate((input) => window.phase6aCreatorSuccessorProduct.join(input), {
-				channelName,
-				clientId: "bob",
-				databaseName: writerDatabase,
-				invite: selectedInvite,
-				roomHead: {
-					currentAnchorDigest: epochThree.authority.anchorDigest,
-					epoch: epochThree.authority.epoch,
-					objectId: epochThree.authority.objectId,
-				},
-				successorSnapshotDeclaration: epochThree.snapshotDeclaration,
-			});
-		} catch (error) {
-			detail = error instanceof Error ? error.message : String(error);
-		}
+		await writerPage.evaluate((input) => window.phase6aCreatorSuccessorProduct.join(input), {
+			channelName,
+			clientId: "bob",
+			databaseName: writerDatabase,
+			invite: selectedInvite,
+			roomHead: {
+				currentAnchorDigest: epochThree.authority.anchorDigest,
+				epoch: epochThree.authority.epoch,
+				objectId: epochThree.authority.objectId,
+			},
+			successorSnapshotDeclaration: epochThree.snapshotDeclaration,
+		});
+		await writerPage.evaluate(() => window.phase6aCreatorSuccessorProduct.send("d110c-0c1f2-writer-epoch-three"));
+		await waitForText(creatorPage, "d110c-0c1f2-writer-epoch-three");
 		const after = d110c0cRecord(
 			await writerPage.evaluate(
 				(databaseName) => window.phase6aCreatorSuccessorProduct.d110c0c1f2Evidence(databaseName),
@@ -3383,27 +3423,25 @@ test("D.110c-0c1f2 non-creator writer requires an authenticated historical front
 				owner === "predecessor-validation" &&
 				payloadEpoch === 2
 		);
-		const headline = detail.split("\n", 1)[0];
-		expect(headline).toBe(
-			"page.evaluate: TypeError: v3 room successor reopen failed: recovery-rejected: creator predecessor recovery failed: admission-rejected"
-		);
-		expect(targetRefusals).toHaveLength(1);
-		await testInfo.attach("d110c-0c1f2-product-red", {
+		const reopenedRows = d110c0cArray(after.rows).map(d110c0cRecord);
+		expect(targetRefusals).toHaveLength(0);
+		expect(reopenedRows).toContainEqual(expect.objectContaining({ digest: target.digest, publishState: "published" }));
+		expect(reopenedRows).toContainEqual(expect.objectContaining({ epoch: 3, publishState: "published" }));
+		await testInfo.attach("d110c-0c1f2-product-green", {
 			body: Buffer.from(
 				JSON.stringify({
 					bootstrapRows,
 					creatorJournalAfterWriterOne,
 					creatorJournalBefore,
 					currentEpoch: epochThree.authority.epoch,
-					detail,
 					displacedEpoch: 2,
 					intermediateRows,
+					reopenedRows,
 					targetRefusals,
 				})
 			),
 			contentType: "application/json",
 		});
-		throw new TypeError("D110C_0C1F1_MULTI_AUTHOR_FRONTIER_CARRIER_REQUIRED");
 	} finally {
 		await Promise.allSettled([
 			creatorPage.evaluate(() => window.phase6aCreatorSuccessorProduct.close()),

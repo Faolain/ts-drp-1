@@ -271,6 +271,7 @@ declare global {
 			d110c0c1JournalVertices(databaseName: string): Promise<readonly PlainRecord[]>;
 			d110c0c1f4BootstrapHex(clientId: "alice" | "bob" | "carol" | "dave"): string;
 			d110c0c1f4SetBootstrapClientId(clientId: null | "alice" | "bob" | "carol" | "dave"): void;
+			d110c0c1f4SetReopenFault(fault: "bootstrap-policy-alias" | "bootstrap-policy-missing" | null): void;
 			d110c0c1eSameAuthorControl(name: string): Promise<PlainRecord>;
 			d110c0c1cControl(name: string): Promise<PlainRecord>;
 			d110c0c1gGridControl(): PlainRecord;
@@ -2521,6 +2522,9 @@ const api = Object.freeze({
 	d110c0c1f4SetBootstrapClientId(clientId: null | "alice" | "bob" | "carol" | "dave"): void {
 		if (clientId === null) Reflect.deleteProperty(globalThis, "__d110c0c1f4BootstrapClientId");
 		else Reflect.set(globalThis, "__d110c0c1f4BootstrapClientId", clientId);
+	},
+	d110c0c1f4SetReopenFault(fault: "bootstrap-policy-alias" | "bootstrap-policy-missing" | null): void {
+		instrumentation().d110c0c1cSetFault(fault);
 	},
 	d110c0c1eSameAuthorControl(name: string): Promise<PlainRecord> {
 		return d110c0c1eSameAuthorControl(name);
