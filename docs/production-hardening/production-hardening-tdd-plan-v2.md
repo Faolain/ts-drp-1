@@ -95860,7 +95860,7 @@ epochs.
 The tests-only RED uses a fresh genuine 0→1 creator close. It proves the current
 proposed closure contains zero authenticated
 `drp-creator-issuance-retirement-state` candidates even though the exact
-issuance lineage and published bootstrap row exist, and terminates only with
+issuance lineage and pending bootstrap row exist, and terminates only with
 `D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE`. A second product-shaped row
 extends the lineage before close and must leave the same exact causal failure;
 no fixture writes a carrier or mutates the AHE closure. The RED evidence records
@@ -95898,7 +95898,7 @@ GREEN implements only the reviewed carrier prerequisite:
    added/dropped/unknown candidate with the existing reason, preserves the
    existing stage-only retiring Cut/QC/ACL filtering, and restores only the
    opened successor retirement pair to the inner accepted proposal. The same
-   predicate normalization applies in stage and all three verify-mode
+   predicate normalization applies in stage and all four verify-mode
    consumers;
 5. stage exactly one signed record in the proposed AHE closure, preserve it
    through pending process death, and replace the adjacent predecessor record
@@ -95991,6 +95991,46 @@ self-excluding manifest SHA-256 is
 `b1d63cad7ca15389590739a2e83e64b10aa6024eaac3e3891af81421f2569a5d`.
 The blocking union is empty and tests-only RED is authorized. Production GREEN
 remains unauthorized until the signed/pushed causal RED is accepted.
+
+The user's expressly authorized one-off advisory Fable 5.1/high course check
+then inspected this signed state independently. Session
+`1d97d050-d284-49c1-ae23-aebdb33708fc` used effective model
+`claude-fable-5-1`, high effort, read-only permissions, and zero subagents. It
+returned `PROCEED_TO_D110C_0C1A_RED` with no P0/P1-equivalent blocker. This was
+not a governing reviewer or substitute for the completed Grok/Kimi/Opus gate.
+Its useful P2 dispositions are applied prospectively here: the genuine fixture's
+bootstrap row is pending rather than published, and the eventual GREEN owner
+set is every `inspectCreatorTransitionAdvance()` caller—one stage and four
+verify call sites—instead of relying on the stale “all three” count. Complete
+advisory evidence is under
+`.logs/d110c-0c1a-fable51-high-course-review-20260903/`; its validating
+self-excluding manifest SHA-256 is
+`3ab16462eb058285509c4fb1ce9ea34c0228dc6c15d592030bec1ba5ef445c14`.
+This consumes the one-off authorization; no further Fable run is authorized.
+
+The tests-only RED was then implemented with zero production-source diff and
+executed exactly once against base `add7f7dc8d5848c9305bec27fd4e52d4a4b358b3`.
+The exact listing selected one test in one file and no retained-campaign title.
+The genuine creator close completed epoch 0→1 with dense issuance keys
+`[0,1,2]`, lineage `{exhausted:false,next:3}`, three exact issued/outbox/journal
+cross-links, observed publication states `[pending,pending,pending]`, verified
+sealed replay, close-set count/history size `3`, independently matching
+close-set/history root
+`c14dfa31eaab315aa0a435cdf3e5f042a9a5994177f093c91c43e1f6cce690e2`,
+and exact Cut/QC/snapshot/successor identities. Only after those assertions, the
+proposed closure's zero retirement candidates produced the sole failed test and
+exact token `D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE`, recorded with
+subclass `missing-carrier`. Reporter totals were one total, zero passed, one
+failed, zero skipped/todo, zero top-level errors; exit `1` is the accepted RED.
+The temporary standalone test-tsconfig diagnostic failed only because root
+NodeNext resolution has no root `@ts-drp` workspace links; it was removed before
+collection/execution and was not classified as a code failure. Exact-owner
+ESLint, Prettier, diff, protected-path, 27-stash, port, and zero-production-diff
+gates passed. Complete evidence is under
+`.logs/d110c-0c1a-red-add7f7dc/`; its validating self-excluding manifest SHA-256
+is `5726596405fe05894c2b796b1e400406ef11aaa1c07e07a2d0cee2e216829053`.
+This is the accepted causal RED; once its signed commit and pushed ref are
+verified, the frozen narrow D.110c-0c1a production GREEN becomes authorized.
 
 The complete confirmation evidence is retained under
 `.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry
