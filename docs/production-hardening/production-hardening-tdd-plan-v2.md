@@ -92045,6 +92045,10 @@ receipt, archive record, or active registration in test code.
    availability refusal; receipt replay/staleness; active-owner uniqueness;
    predecessor terminalization; bounded hot/control closure; and bounded live
    registration/close ownership through at least three genuine transitions. Its
+   close/reopen gate compares the room application's exact canonical state to
+   the blueprint snapshot exported for that same close before it becomes an
+   authenticated successor base; a mismatch refuses the transition rather than
+   signing divergent state. Its
    exact durable census includes browser `sealEvidence`, `voteSlots`,
    `signerState`, and `voteOutbox` rows by epoch plus the selected 0b0 freshness
    floor owner, and proves their authenticated, rollback-safe retirement rather
@@ -92058,7 +92062,10 @@ receipt, archive record, or active registration in test code.
    before RED. It runs no adaptive retry and cannot replace real close/adopt
    calls with synthetic maintenance. The retained durable census includes all
    four creator-seal browser stores, the selected 0b0 freshness-floor owner,
-   and the Node control owners. Deadline:
+   and the Node control owners. At each selected close/restart boundary it also
+   proves the exported blueprint state bytes and digest equal the application's
+   exact canonical state, so projector/machine divergence cannot be deferred to
+   the next cold reopen. Deadline:
    before Phase-6 exit or Phase-7a execution.
 
 ##### D.110c-0a bounded epoch-relative seal-custody plan
@@ -96509,14 +96516,18 @@ slice is closed by the held working tree.
 
 ###### D.110c-0c1g authenticated successor projection-base prerequisite
 
-**Status: bounded source/architecture audit complete; high-risk plan review is
+**Status: bounded source/architecture audit and first high-risk plan review are
+complete; its material P0/P1 union is corrected below and one confirmation is
 pending before tests-only RED or production edits.** Owner:
 `examples/v3-room/src/index.ts::V3RoomApplication` and
-`createV3RoomSessionOwned()` projection initialization/stage/commit path;
+`createV3RoomSessionOwned()` projection initialization/stage/commit and
+successor-migration refusal paths;
 `packages/node/src/v3-live.ts::bindV3BlueprintLivePlane()` only at its existing
-handle-retrieval branch; the chat and grid application projectors; the existing
-room public-contract compile fixture; and one new focused storage-browser
-successor-reopen test. Deadline: GREEN before D.110c-0c1e/0c1d or parent
+binding/retrieval union plus the private registration's machine-origin and
+imported-digest facts; the chat and grid application projectors; the existing
+room public-contract compile fixture; the seven retained positional consumers
+enumerated below; and one new focused storage-browser successor-reopen test.
+Deadline: GREEN before D.110c-0c1e/0c1d or parent
 D.110c-0c1 closes, before 0c1f RED, before D.110c-0c resumes, and before
 D.110c-c/d or Phase 7 relies on a cold-reopened epoch-N projection.
 
@@ -96540,47 +96551,107 @@ closed `V3RoomProjectionInput` object containing:
 
 - `authenticatedBase`, either `undefined` or an immutable detached
   `V3RoomAuthenticatedProjectionBase` with exact canonical application-state
-  bytes, their `stateDigest`, and the `blueprintDigest`; and
+  bytes, their `stateDigest`, the `blueprintDigest`, `objectId`, and `epoch`; and
 - `currentEpochOperations`, the existing sorted accepted-operation rows for the
   current live epoch only.
 
 Fresh genesis and ordinary journal recovery pass `authenticatedBase:
 undefined` and their genuine recovered/current operations. A declaration-
-bearing successor must obtain the existing blueprint handle after successful
-authenticated reopen, take exactly one detached `blueprintSnapshot()`, verify
-that the current plane/handle, object, epoch, blueprint digest, exact bytes, and
-recomputed state digest agree with the reopened successor trust and room
-descriptor, and freeze the result before ingress binding, projection
-publication, or rebase startup. Every initialization, containment attempt,
-stage, commit, and migration-state observation then calls the same required
-projector with that immutable base plus the current epoch's genuine operations.
-An absent, consumed, deactivated, noncurrent, machine-less, mismatched, or
-mutable base fails closed; no empty projection is published as fallback.
+bearing successor uses one new tagged branch of the existing exported function:
+`bindV3BlueprintLivePlane({plane, purpose: "projection-base"})`. The existing
+`{plane}` snapshot-closed handle retrieval remains byte-for-byte. The tagged
+branch returns a closed detached value containing only object, epoch, blueprint
+digest, exact canonical application-state bytes, and state digest. It never
+returns `V3BlueprintLiveHandle` or any callable method, so
+`stageBlueprintEpoch()`, `exportSnapshotPayload()`, adoption, and close/fold
+authority are unreachable through this result.
 
-The only Node behavior change widens the existing `{plane}` retrieval predicate
-to a current active registration that already owns the authenticated imported
-machine and its handle. It does not bind a second machine, return a handle for a
-plain genesis registration, revive a consumed registration, accept caller
-bytes, or change close/fold/adoption authority. This is still an exported-
-behavior change and therefore remains inside this reviewed high-risk slice.
-The room application signature is an explicit public TypeScript contract
-change: every in-repository implementation and the exact compile fixture must
-move in one batch, with no deprecated overload or legacy alias.
+The private registration gains one immutable machine-origin discriminator and
+the expected imported state digest. `creator-successor-import` is set only when
+`importCreatorSuccessorInitialMachine()` succeeds during activation; a machine
+created later by the signed-genesis binding branch is marked separately and is
+never eligible. Tagged retrieval requires the exact current registered plane,
+mode `genesis-active`, origin `creator-successor-import`, active terminal state,
+no close/fold in progress, the same machine/registration generation, and a
+machine snapshot whose blueprint and state digests equal the registration's
+authenticated imported facts. Handle/machine presence, epoch greater than zero,
+or caller-bound signed-genesis bytes are never sufficient.
+
+Base authenticity is rooted in Node's existing payload-digest and expected-
+application-state-digest verification before the creator-successor machine is
+constructed, then inherited through exact plane identity, current registration,
+and the new immutable origin/digest facts. The room does not claim an
+independent state digest from `V3RoomSuccessorAuthority`, which has none. It
+checks returned object/epoch/blueprint against reopened trust and the room
+descriptor, copies the bytes, recomputes their state digest as a corruption/
+mixup guard, and freezes the base before ingress binding, projection
+publication, or rebase startup. Every initialization, containment attempt,
+stage, and commit then calls the same required projector with that immutable
+base plus current-epoch genuine operations. An absent, consumed, deactivated,
+noncurrent, wrong-origin, machine-less, mismatched, callable, or mutable result
+fails closed; no empty projection is published as fallback.
+
+The room application signature and tagged existing-function branch are explicit
+public TypeScript/exported-behavior changes. Every in-repository implementation
+and consumer moves in one batch, with no deprecated overload, legacy projector
+alias, or second projection source. The tagged result is snapshot-only and does
+not expand D.110c-c's close/fold authority.
 
 Application state and historical vertex evidence are deliberately not
 conflated. Chat's authenticated snapshot state currently contains only
 `clientOperationId` and `text`; zone state contains blocks and outcomes. The
-projectors decode those exact durable product fields and add only genuine
-current-epoch provenance from `currentEpochOperations`. They must not invent
-historical author, sequence, digest, logical-time, operation-index, accepted-
-digest, or peer-roster facts that the snapshot did not authenticate. Any
-projection view whose old row lacks those facts represents it explicitly as
-snapshot-derived; digests or transport mappings that require live vertex
-evidence exclude rather than counterfeit that evidence. If preserving a
-required security decision instead requires historical metadata absent from
-the authenticated snapshot, implementation stops and reslices a versioned
-application-state/authority carrier rather than silently changing snapshot
-bytes or trusting caller configuration.
+chat projector decodes the base as a closed canonical ordered
+`{clientOperationId,text}` prefix and represents those rows explicitly as
+snapshot-derived without author, sequence, vertex digest, logical time, or
+operation index. It preserves the base order exactly; genuine current-epoch
+rows retain their existing deterministic ordering and author-plus-client-id
+identity rule and append after the prefix. Cross-boundary repeated client ids
+are not treated as vertex-identity conflicts because the shipped blueprint
+reducer appends them; the exact canonical-state equality gate requires the
+projection to preserve that reducer result rather than silently merge or drop
+it. Existing no-base chat projections and their metadata remain byte-for-byte.
+
+Grid is deliberately not made successor-reopen capable here. Its authenticated
+application state omits the epoch-zero join roster used by
+`transportPeerAuthors`, and that mapping is an ephemeral-authorization input.
+Every existing grid path has `authenticatedBase: undefined` and receives only a
+signature migration. A deterministic direct control proves a non-undefined
+grid base rejects with exact
+`D110C_0C1G_GRID_AUTHORITY_BASE_UNAVAILABLE` before projection publication or
+ephemeral admission; it may not silently return an empty roster, trust caller
+members, or reinterpret blocks/outcomes as authority. D.110c-0c1h below owns a
+versioned authenticated projection-authority carrier before any grid successor
+reopen or MMORPG golden-path claim.
+
+Migration is also an explicit boundary rather than a second state
+reconstruction. Existing `V3RoomMigrationCapability.canonicalStateBytes()`,
+`prepare()`, `acceptedOperationSnapshot()`, retained-prefix checks, record
+digests, activation, and every base-less migration path remain byte-for-byte.
+While `authenticatedBase` is present, `rehearseMigration()` rejects before
+`prepare()` with exact `D110C_0C1G_SUCCESSOR_MIGRATION_UNAVAILABLE` and the room
+remains usable; it cannot compare a base-bearing projection with a current-
+epoch-only operation snapshot. D.110c-0c1i below owns any future base-aware
+successor migration. No historical author, digest, roster, or operation row is
+fabricated for either boundary.
+
+The complete positional-consumer inventory is fixed before RED. In addition to
+v3-room, chat, grid, and the exact room-contract fixture, signature-only edits
+are authorized in:
+
+- `tests/phase-3f-b-chat-zone-causal-join-red.test.ts`;
+- `tests/phase-3f-c-chat-zone-batching-red.test.ts`;
+- `tests/phase-3g-chat-zone-rebase-red.test.ts`;
+- `tests/phase-3g-v3-room-rebase-red.test.ts`;
+- `tests/phase-3h-v3-room-rehearsal-red.test.ts`;
+- `tests/phase-3a1b-d9346-room-semantics-red.test.ts`; and
+- `tests/phase-3-exit-genesis-roots-red.test.ts`.
+
+Those test edits only wrap the prior positional operations array in the exact
+new no-base input. They preserve every assertion, expected error, and fixture
+behavior, including the two `Reflect.apply()` projector interceptors in the
+v3-room rebase test and the genesis-root digest calculation. A mechanical
+inventory must prove exactly these eleven source/fixture/test owners and zero
+remaining positional `projectAcceptedOperations` calls before GREEN tests run.
 
 The causal RED is one new one-test/one-file Chromium case on a stable successor,
 not another D.110c-0c pending-adoption execution. It performs genuine hot
@@ -96601,14 +96672,26 @@ new issue, canonical state bytes and digest must exactly equal the authenticated
 snapshot base. After it, the old durable product rows remain exact, the new row
 appears exactly once with genuine current-epoch provenance, canonical state
 advances to the expected digest, and another commit cannot drop or duplicate
-the base. Mutants cover missing/duplicate retrieval, plain-genesis retrieval,
-consumed/deactivated plane, missing machine/handle, wrong object/epoch/
-blueprint/state digest, changed detached bytes, projector rejection, attempted
-base mutation, and a projector that ignores its supplied base. Each fails
+the base. Mutants cover malformed/duplicate tagged retrieval; proof that the
+returned value has no callable `blueprintSnapshot`, `stageBlueprintEpoch`,
+`exportSnapshotPayload`, fold, close, or adopt member; plain epoch-zero genesis;
+an epoch-N journal-recovered plane later bound through the signed-genesis branch;
+consumed/deactivated/noncurrent plane; wrong machine origin; missing machine or
+imported digest; close/fold already in progress; wrong object/epoch/blueprint/
+state digest; changed detached bytes; projector rejection; attempted base
+mutation; and a projector that ignores its supplied base. The treatment also
+issues successfully after projection-base retrieval, proving the read-only
+result cannot set `blueprintClosing` or halt local admission. Each mutant fails
 before ingress/rebase/projection publication with the existing closed Node
-failure or one exact room initialization error. Controls prove genesis,
-journal recovery, migration rebase/rehearsal, hot adoption, 0c1c fail-closed
-successor reopening, issuance, and rebase custody retain their semantics.
+failure or one exact room initialization error.
+
+Controls prove base-less genesis, journal recovery, migration rebase/rehearsal,
+hot adoption, 0c1c fail-closed successor reopening, issuance, and rebase custody
+retain their exact semantics. One base-carrying chat control proves successor
+migration returns only the frozen unavailable error and a subsequent issue
+still succeeds. One direct grid control proves a non-undefined base returns only
+the frozen authority-base-unavailable error and performs no ephemeral admission.
+No zone outcome carrier is decoded or reverified from a base in this slice.
 
 The completed GREEN retained gate runs once in this order: the new focused
 case/mutants; D.110c-0c1e's three tests; D.110c-0c1d's focused test;
@@ -96619,13 +96702,16 @@ the complete retained 14-title Chromium product file, the accepted 174-test
 Vitest roster, Node/storage-browser/v3-room/chat/grid builds and production
 no-emit checks, exact-owner ESLint/Prettier/diff, and source-shape predicates.
 Source shape proves one required projector contract, no old overload/fallback,
-one immutable base owner, base use at every projection call, current-handle
-retrieval guards, no fabricated historical provenance, and the held 0c1d and
-0c1e predicates. Any unexpected soft failure stops before more changes.
+one immutable base owner, base use at every projection call, a tagged
+snapshot-only result with no handle methods, exact import-origin/digest guards,
+zero positional callers, the two explicit grid/migration refusals, no
+fabricated historical provenance, and the held 0c1d and 0c1e predicates. Any
+unexpected soft failure stops before more changes.
 
 The only public-surface changes authorized here are the required room
-application projector input and the narrowed widening of the existing Node
-handle-retrieval behavior described above. This slice adds no new public entry,
+application projector input and the tagged snapshot-only branch of the existing
+Node binding/retrieval function described above. This slice adds no new public
+runtime export,
 wire field, snapshot schema, dependency, authority assumption, threshold,
 workload, retry, campaign, or D.110a invocation. It does not authenticate a
 foreign writer's older issuance row;
@@ -96646,6 +96732,37 @@ D.110c-0c1 GREEN review covers 0c1e, 0c1d, and 0c1g together; this prerequisite
 adds no intermediate full review. Do not invoke Fable or a collaboration
 subagent.
 
+The first governing review inspected signed/pushed plan commit
+`a1d4782471bd0a4fa4266ef0d67474b539be07e6`, tree
+`8e9c15f0b827939141083fe8e2016ee9c4cd9381`. Grok 4.6/high returned
+`CHANGES_REQUIRED`, P0/P1/P2 `0/1/2`; direct Kimi K3/100-step returned
+`CHANGES_REQUIRED`, `0/1/4`; and Opus xhigh returned `CHANGES_REQUIRED`,
+`0/5/2`. All three accepted the demonstrated base-loss cause, the need to carry
+one immutable base through every stage/commit, the stable-successor RED, and
+the D.110c-c/0c1f separation. The material union is corrected in one batch
+above: the output is snapshot-only rather than fold-capable; registration
+origin and expected digest are explicit; room digest recomputation is correctly
+described as anti-mixup rather than independent authentication; base-carrying
+migration refuses explicitly; all seven retained positional callers are
+owned; and grid successor authority has a separate fail-closed owner. Chat's
+base ordering/duplicate rule, grid outcome non-decoding, and close-time
+application/blueprint equality disposition cover the P2 union.
+
+Grok's first runner result was conservatively `NO_VERDICT` because inspection
+prose preceded its valid terminal JSON; exact session
+`01a06704-5d2d-7b33-9e7e-6e10798d454b` performed a schema-only re-emission
+without reinspection or finding change. Kimi session
+`session_1d8d8036-0e6c-459f-bd49-70f049ba8342` likewise normalized its same
+review once. Opus session was `d892b644-3ac9-4036-b985-d73d5c2434d5`.
+Complete review evidence is `.logs/d110c-0c1g-plan-review-a1d47824/`; its
+24-entry self-excluding manifest validates and its manifest SHA-256 is
+`c332930dce6053d14ec4a76fb5808182b36dc84e3612676f120078bc6ad54ed0`.
+Because the correction changes the exported result authority surface,
+registration provenance, and executable migration/grid acceptance, exactly one
+Grok/Kimi/Opus confirmation is required after this text is signed and pushed.
+No RED begins until its P0/P1 union is empty; no further plan confirmation is
+permitted.
+
 The bounded audit is `.logs/d110c-0c1g-source-audit-c5613498/`; its two-entry
 self-excluding manifest validates and its manifest SHA-256 is
 `8e746683abc09d8040f1cb7a945fe45b26db76d90c166e945f569de74298aab7`.
@@ -96656,6 +96773,45 @@ it returned `CONTINUE_NARROW_RESLICE`, P0/P1/P2 `0/2/4`, session
 It does not substitute for the governing review and authorizes no production
 edit. No further Fable run is authorized unless the user expressly requests
 one.
+
+###### D.110c-0c1h grid successor projection-authority carrier prerequisite
+
+**Status: explicit blocking MMORPG-path capability debt; architecture audit and
+high-risk plan review are pending after D.110c-0c1g.** Owner: the authenticated,
+bounded source of grid `transportPeerAuthors`/writer association across a
+successor snapshot, its application projection consumer, and ephemeral
+`authorForPeer` use. Deadline: before any grid successor reopen, before D.110c-d
+may claim the MMORPG-style ≥100-transition golden path, and before Phase-6 exit.
+
+RED must use a genuine grid room whose epoch-zero signed join roster is no
+longer in the current live graph, then cold reopen a real successor and attempt
+ephemeral admission. It must fail because the current snapshot application
+state authenticates blocks/outcomes but not peer-to-author roster facts. GREEN
+must authenticate the current mapping from existing ACL/control evidence or an
+explicitly reviewed versioned carrier, remain bounded with epoch count, reject
+substitution/staleness/omission, and never trust caller configuration. Any
+snapshot-content, wire, schema, authority, API, dependency, or migration change
+requires its own reviewed high-risk design. The 0c1g grid refusal is a safety
+guard and does not satisfy this capability.
+
+###### D.110c-0c1i base-aware successor migration prerequisite
+
+**Status: explicit nonblocking-for-0c1g migration capability debt.** Owner:
+`V3RoomMigrationCapability.prepare()`, `canonicalStateBytes()`, the room's
+`acceptedOperationSnapshot()` and rehearsal comparison, and only the required
+application consumers. Deadline: before any product or Phase-7 claim that a
+cold-reopened successor can rehearse or activate migration; it is not required
+for the current same-room rollover gates unless their reviewed workload invokes
+migration.
+
+RED must cold reopen from a genuine authenticated application-state base and
+reach the current exact unavailable error without exporting a partial/current-
+epoch-only migration. A separately reviewed GREEN, if required, must give
+`prepare()` the same authenticated base/current-epoch semantics as the sole
+projector, reproduce exact canonical application bytes, retain import-operation
+and source-operation accounting, and preserve every migration authority and
+failure gate. It may not reconstruct retired vertices, invent provenance, or
+silently change migration record/schema bytes.
 
 ###### D.110c-0c1f multi-author historical-issuance authority prerequisite
 
