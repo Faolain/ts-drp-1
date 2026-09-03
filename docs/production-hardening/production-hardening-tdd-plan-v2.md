@@ -97264,10 +97264,11 @@ identity, or silently change the wire shape.
 
 ###### D.110c-0c1f2 compact issuance-frontier encoding reslice
 
-**Status: ACCEPTED for causal tests-only RED at signed/pushed plan commit
-`1502d4d81e1769a75bc3c416937b53e57dc3390b`; the single material Grok/Kimi/Opus
-confirmation has an empty P0/P1 union. Production behavior remains frozen until
-the causal RED is signed and pushed.** Owner and deadline are exactly the
+**Status: causal tests-only RED is CLOSED at signed/pushed commit
+`c584b76bb7376fe2cbf4664dfdebacab8c153568`; the single material Grok/Kimi/Opus
+plan confirmation has an empty P0/P1 union, both RED layers terminate only at
+the frozen causal token, and the reviewed narrow production GREEN is now
+authorized.** Owner and deadline are exactly the
 corrected 0c1f1 owners/deadline above. This reslice
 changes only the canonical representation of each frontier entry and retains
 every 0c1f1 trust assumption, fixed preimage field, permissionless-aware writer
@@ -97352,6 +97353,47 @@ closed epoch only when the authenticated current closure contains no prior
 aggregate, with a prior-aggregate-plus-sentinel mutant owned by transition
 normalization. These are GREEN-specification exactness items; they do not alter
 RED causality or require recursive confirmation.
+
+The signed/pushed RED contains no production-source change. Its protocol layer
+uses a genuine two-writer close and records two permissioned writers, one
+authenticated received row from the second writer, exactly one legacy creator
+retirement carrier, and zero aggregate frontier carriers before throwing exact
+`D110C_0C1F1_MULTI_AUTHOR_FRONTIER_CARRIER_REQUIRED`. Its product layer uses
+Alice and Bob in one real browser room: Alice advances epoch 0 to 1, Bob cold
+reopens and genuinely issues/publishes his sequence-1 row in epoch 1, Alice
+also issues the current creator-owned row required by the retained predecessor
+recovery contract, and Alice advances the room through epochs 2 and 3. Bob's
+signerless cold reopen from his unchanged issuance database and the exact
+epoch-3 successor then reaches the existing
+`recovery-rejected: creator predecessor recovery failed: admission-rejected`
+path for that exact epoch-1 digest during predecessor validation against
+displaced epoch 2. Only then does the test throw the same frozen token.
+
+The stopped diagnostic executions are preserved rather than mislabeled. One
+fixture assertion initially read received-journal identity from nonexistent
+top-level fields; the corrected check decodes the journal's authenticated
+canonical preimage and correlates its exact digest. The first product shape
+omitted Alice's epoch-1 local row and therefore correctly hit an empty local
+issued-chain refusal; adding one ordinary creator row repaired that fixture
+precondition. The original single-successor export helper also correctly found
+multiple projections ambiguous, so the tests-only exporter now selects the
+already-authenticated exact epoch and matching snapshot declaration. Finally,
+the captured refusal belongs to displaced predecessor epoch 2 rather than the
+epoch-3 filter pass. No threshold, timing, product source, private durable
+record, or production API changed.
+
+The final focused Vitest and Playwright commands each selected exactly one test
+in one file, exited 1 only at
+`D110C_0C1F1_MULTI_AUTHOR_FRONTIER_CARRIER_REQUIRED`, used zero retries, and
+reported no flaky or unexpected failure. Exact-owner ESLint, Prettier,
+`git diff --check`, listings, protected-path, 27-stash, process, and fixed-port
+checks pass. The broad storage-browser typecheck remains nonzero only for the
+already inherited Phase-6b AHE test aliases and branded fixture values and
+emits no D.110c-0c1f2 changed-path diagnostic; it is recorded honestly and is
+not a RED failure. Complete RED evidence is
+`.logs/d110c-0c1f2-red-f488f1f6/`; its six-entry self-excluding manifest
+validates and its SHA-256 is
+`7acd9cbaf90013bb8cfc719b158976b3b0bdcd624dca12324dafd6e2116af568`.
 
 ###### D.110c-0c1d successor-reopen historical-rebase orchestration prerequisite
 
