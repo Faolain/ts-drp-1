@@ -98334,8 +98334,9 @@ campaign was authorized or run by f5a.
 
 ###### D.110c-0c1f5b0 author settlement carrier and compatibility prerequisite
 
-**Status: BLOCKED at high-risk design; the bounded source/architecture audit is
-complete, but no RED or production edit is authorized.** Owner: one exact
+**Status: exact high-risk design is frozen at source-audit anchor `00a860ab`;
+one governing Grok/Kimi/Opus plan review is pending, and no RED or production
+edit is authorized before its P0/P1 union is empty.** Owner: one exact
 author-signed source-disposition carrier; its authenticated bounded
 author→creator ingress and crash-durable custody; the creator-certified
 settled-prefix checkpoint and predecessor rule; its relationship to the
@@ -98425,6 +98426,117 @@ freeze all of the following in one exact design:
     batches, open gaps, rebases, and epochs. If manual-review or offline
     continuity makes bounded in-flight custody impossible, stop and reslice the
     resource/retention contract explicitly.
+
+The exact design is
+`.logs/d110c-0c1f5b0-design-00a860ab/design.md`. It selects the existing signed
+v3 vertex as the sole author-to-creator transport and adds the exact reserved
+operation action `$drp.author-settlement.v1`; there is no second signature or
+new network envelope. Its canonical `statement` is either
+`source-dispositions` version 1 or `author-baseline` version 1. A source
+disposition binds the outer vertex's author/object to an exact old
+`[epoch, anchorDigest, authorSequence, vertexDigest]`, every application intent
+index, canonical operation and semantic-identity digests, one closed
+`already-present | expire | rebase | transform` outcome, and the exact ordered
+current-epoch replacement refs. An older settlement-control row is itself a
+closed `settlement-control` source. A baseline compactly retires exactly
+`lineageNext - 1` for a genesis gap or same-key membership re-entry and is valid
+only with the original monotonic issuance store; store loss still requires a
+fresh author key and never resets an author sequence.
+
+The same evidence root contains `audit.md` with the exact source-shape,
+source-hash, formatting, diff, protected-path, 27-stash, process, port and
+signing checks. Its two-entry self-excluding manifest validates and has SHA-256
+`a5dbd4f4bfd4df8d8b838ce057ac524706ab583a93e63cf527dd2a941ca87011`.
+The audit also records and corrects a read-only zsh diagnostic that temporarily
+overwrote the special `path` array; it is not misclassified as a code failure.
+
+The operation has an 8,192-canonical-byte ceiling, 1..16 sources, at most 16
+application intents total, and at most 16 replacement refs total. Sources are
+strictly ordered and unique; dispositions are exactly `0..operationCount-1`;
+replacement order is retained and digests are unique. `expire` has no
+replacement, `already-present` has no replacement and binds the authenticated
+current-anchor state digest, and `rebase`/`transform` have one through sixteen
+same-author current-anchor replacements. Every replacement must be an exact
+strict ancestor of the receipt vertex in the current close graph. The complete
+ordinary vertex preimage remains signed under `ts-drp/vertex/v3`; operation and
+semantic-identity evidence use the two exact inner domains recorded in the
+design. The control vertex bypasses the blueprint reducer only after normal
+vertex authentication, ACL envelope membership, settlement-mode, exact-shape,
+dependency and existing capacity checks. It remains in the causality index,
+close set and RFC 9162 history and consumes the unchanged vertex, byte and
+pending budgets.
+
+The room retains ordinary replacement identities internally and calls one new
+Node-plane method, `settleRebaseSources()`. Public application `issue()` remains
+`Promise<void>`. Replacement issue/admission/publication precedes durable
+control issue/journal append/publication, which precedes exact source
+completion. Restart enumerates existing issuance and journal truth by exact
+source identity before authoring; identical or conflicting duplicate accepted
+statements are ambiguous, an unknown outcome halts issue, and mutable local
+publish state never settles a source. The room stays the sole displacement and
+semantic-identity owner. Its one new deterministic application query,
+`hasDisplacedOperation(projection, operation)`, selects honest
+`already-present` behavior over the authenticated snapshot-base projection
+with no current-epoch operations and binds that anchor's state digest; a match
+in the current graph is instead an exact replacement ref. The query conveys no
+creator authority; the author's registered-vertex signature is the authority
+to abandon or replace only its own old operation. Manual-review emits no
+receipt and stops only that author's advancement. Every source/replacement
+sequence is below the outer control sequence, and a baseline's `lineageNext`
+equals that outer sequence exactly.
+
+The creator-signed closure record is exactly
+`drp-creator-author-settlement-state`, version 1, domain
+`ts-drp/creator-author-settlement/v1`, with an 8,192-byte maximum. Its preimage
+binds object/genesis; closed and successor epoch/anchor; both ACL digests; cut
+digest; commit-QC ref; snapshot manifest; history root/size; a predecessor kind
+and digest; and a strictly code-unit-sorted vector of at most 64 successor ACL
+members as `[author, settledThrough | null]`. It is the sole replacement for,
+not an adapter beside, the v1 aggregate in settlement mode. The creator scans
+from the authenticated prior boundary and advances only through an exact graph
+slot, an exact same-author source disposition, or a valid baseline range. A
+digest mismatch, duplicate/equivocation, malformed receipt, invalid
+replacement or missing slot stops that author at the last exact prefix without
+aborting other authors; creator-owned corruption retains its hard failures.
+
+Recovery keeps the two capabilities distinct. V1 retains its current
+covered-historical consumer unchanged. A v1 dense admitted prefix may seed the
+first new checkpoint because its effects are already in the authenticated
+snapshot. Under a verified settled checkpoint, every local row at or below the
+settled prefix is terminal regardless of digest: it is never republished,
+rebased, reduced or used as application evidence. Rows above the prefix retain
+ordinary displaced handling. That terminal rule, rather than an observed
+maximum interpreted as admission, prevents a substituted old row from gaining
+authority. Pruning still waits for durable checkpoint staging, verified
+adoption, rollback protection and availability. Completed receipt bytes remain
+archival history, not active reopen input. Active control remains one ≤64-entry
+checkpoint, fixed rollback generations, compact history peaks and only
+current-epoch control vertices bounded by the existing resource parameters;
+nothing grows with completed epoch or rebase count.
+
+Compatibility is explicit and fail closed. Session creation adds the opt-in
+`authorSettlementVersion?: 1`, and the application presence query is required
+only for that opt-in or an authenticated settlement checkpoint. Without it,
+the room emits/consumes only v1. The opt-in close emits one new checkpoint and
+no v1 aggregate; its predecessor is exactly the v1 aggregate digest or the
+genesis sentinel. Settlement operations are enabled only in the successor, not
+the migration epoch. Once enabled, every transition requires exactly one new
+checkpoint and rejects v1, missing, mixed or downgraded closure state. Old
+binaries reject the successor rather than silently partitioning. This is an
+operator-coordinated protocol/API/closure-schema upgrade with unchanged v3
+protobuf envelope, cryptographic dependencies, signature suites, wire vertex
+fields and resource thresholds.
+
+Implementation is resliced at its natural owners without another architecture
+decision: f5b0a owns protocol carrier/checkpoint codecs and compatibility;
+f5b0b owns Node reserved admission plus the issuance/journal settlement
+transaction; f5b0c owns room policy/presence/orchestration; f5b then owns
+creator advancement, terminal recovery and pruning integration. Each gets one
+causal tests-only RED, bounded GREEN, focused/static/retained/isolated evidence,
+signed commits and pushed refs. The final f5b Grok/Kimi/Opus review covers the
+complete signed design→RED→GREEN history. A contradictory RED or a need for a
+different wire, authority, dependency, threshold or API stops and amends this
+design; no nearby substitute is implemented silently.
 
 The accepted design must preserve these RED/GREEN obligations prospectively.
 RED uses genuine signed vertices, genuine durable source rows, normal reissue,
