@@ -95502,17 +95502,19 @@ RED-to-GREEN closure and is prohibited.
 ##### D.110c-0c1 authenticated intermediate-epoch issuance prerequisite
 
 **Status: bounded architecture decision complete; D.110c-0c1a and
-D.110c-0c1b are closed; the first high-risk plan review at signed/pushed
-`7186d028558e75cc49d05d89a4e3c4764a664dd3` returned P0=0/P1>0, so this one
-plan-only correction freezes the exact consumer seam before the single
-permitted confirmation. No causal RED or production edit has begun.** Owner:
+D.110c-0c1b are closed; the first high-risk plan review and sole material
+confirmation are complete, the confirmation's Opus P1s are corrected and
+deterministically validated, and the plan gate is closed. Causal RED is next;
+no causal RED or production edit has begun.** Owner:
 the predecessor and successor issuance views created by
 `packages/node/src/v3-live.ts::activateCreatorSuccessorLive()`, the existing
 Node-private retirement-transition opener/correlation helper,
-`creatorFilteredIssuanceStore()`, the internal verified historical-issuance
-capability carried through `recoverV3LiveReplica()` into the activated
-registration, and the registered `publishPending`, `readRebaseOutbox`, and
-`completeRebaseSource` scans. `creator-adoption.ts` and its pending
+`creatorFilteredIssuanceStore()`, both the no-transport and
+transport-handoff successor-store branches, the predecessor-validation store,
+the internal verified historical-issuance capability carried through
+`recoverV3LiveReplica()` into the activated registration, and the registered
+`publishPending`, `readRebaseOutbox`, and `completeRebaseSource` scans.
+`creator-adoption.ts` and its pending
 authenticator are explicitly outside this prerequisite. The durable
 issuance/outbox contract and browser/Node store implementations join the owner
 set only if deterministic RED proves the frozen internal view cannot be
@@ -95577,29 +95579,39 @@ claimed epoch alone remains insufficient.
 After D.110c-0c1a and D.110c-0c1b closure, D.110c-0c1 RED remains tests-only and
 does not invoke or depend on D.110c-0c's held N≥1 pending authenticator. One
 deterministic real-store prefix differential uses genuine nonfaulted product
-issue/close/adopt calls, one room, and identical message inputs. Its control
-completes 0→1 and 1→2 normally, tears down the owner only after completed
-adoption, and cold reopens epoch 2 with local issued/published rows r0 and r1;
-there is no pending crash. Its treatment continues the same room through a
-normal 2→3 close/adoption, tears down the owner, and attempts epoch-3 cold
-reopen with r2. This makes byte-identical r1 current in the control and strictly
-historical in the treatment without exercising the still-non-GREEN pending
-resume branch.
+issue/close/adopt calls and two deterministic copies of the same room/message
+prefix. Its control completes 0→1 and 1→2 normally, tears down the owner only
+after completed adoption, and cold reopens epoch 2 with local issued/published
+rows r0 and r1; there is no pending crash. Its treatment does **not** tear down
+or cold reopen at epoch 2: it remains on the genuine hot owner, issues r2,
+completes the normal 2→3 close and live adoption through the transport-handoff
+successor-store branch, and only then tears down and attempts epoch-3 cold
+reopen. The carried nested facade suppresses r0/r1 during that pre-GREEN hot
+adoption; if live 2→3 adoption does not complete, the test stops as a failed
+RED precondition rather than accepting another failure. This makes
+byte-identical r1 current in the control and strictly historical only during
+the treatment's later cold reopen without exercising the still-non-GREEN
+pending-resume branch.
 
 A test-owned read-only store-boundary trace records every `readOutboxPage` and
 `readIssued` call, returned row key/digest/publish state, and issue result for
 each epoch. A second read-only assertion at the wrapper-to-recovery-consumer
-boundary records the exact classification attempt, so the raw-store trace is
-not asked to infer which consumer saw a row. RED must prove r1 is accepted as
-`current` in the epoch-2 control, r2 is accepted as `displaced` in the epoch-3
-treatment before r1 is reached, the treatment reaches the exact r1 bytes
-through the real recovery scan, and only that r1 ends in exact
+boundary records the exact classification attempt and labels both the lifecycle
+phase and recovery owner, so the raw-store trace is not asked to infer which
+consumer saw a row. RED must prove r1 is accepted as `current` in the epoch-2
+control; the treatment's **hot-adoption successor scan** accepts r2 as
+`displaced` and completes live epoch-3 activation; then the later
+**cold-reopen predecessor-validation scan** reaches the exact r1 bytes first in
+ascending sequence order and only that r1 ends in exact
 `recovery-rejected: creator predecessor recovery failed: admission-rejected`
 without widening production error strings. It also records the 0c1a retirement
 candidate present in every close. Any control failure, failure before the
-epoch-2 reopen, treatment trace not ending at r1, changed r1 digest, missing r2
-displaced classification, changed `displacedIssuanceBoundary`, different
-filter call, or failure class stops the slice.
+epoch-2 reopen, incomplete hot 2→3 adoption, treatment cold-reopen trace not
+ending at r1, changed r1 digest, missing adoption-phase r2 displaced
+classification, different filter call, or failure class stops the slice.
+`displacedIssuanceBoundary === 2` is a post-GREEN successor-recovery assertion;
+RED does not pretend the failing cold-reopen scan can reach r2 after it stops at
+r1.
 
 The signed `907a0499` two-order process-death diagnostic remains honest
 inherited non-causal context; it predates 0c1a/0c1b and does not satisfy this
@@ -95657,12 +95669,15 @@ the independently authenticated successor floor/trust, exact Cut/QC/snapshot
 identities, and its adjacent predecessor candidate. Before exposing a boundary
 it compares the opened `identity.author` and object with the resolved issuance
 scope. `activateCreatorSuccessorLive()` installs the opaque result in an
-internal one-use WeakMap keyed by the prepared/recovered capability; recovery
-consumes it into `RecoveredV3LivePayload`, and activation copies it into the
-private `V3PlaneRegistration`. Absence, duplicate consumption, wrong floor,
-wrong candidate, correlation failure, or author/scope mismatch rejects before
-row suppression or activation. No public `RecoverV3LiveReplicaInput`, room,
-issuance-store, or package-root shape changes.
+internal one-use WeakMap for **every** prepared capability whose recovery scans
+a wrapped issuance store in that activation: predecessor validation and
+successor recovery, in both the no-transport and transport-handoff branches.
+Each recovery consumes its own opaque handoff into `RecoveredV3LivePayload`,
+and successor activation copies it into the private `V3PlaneRegistration`.
+Absence, duplicate consumption, wrong floor, wrong candidate, correlation
+failure, or author/scope mismatch rejects before row suppression or activation.
+No public `RecoverV3LiveReplicaInput`, room, issuance-store, or package-root
+shape changes.
 
 Classification order is frozen. The unchanged current predicate runs first;
 the unchanged immediate-predecessor/displaced predicate runs second; neither
@@ -95678,6 +95693,18 @@ Any current/immediate-predecessor match wins irrespective of boundary position;
 any row above the boundary or at the current/displaced epochs that those
 predicates reject remains rejected.
 
+The historical decode seam is exact and Node-private. It canonical-decodes the
+signed vertex preimage to obtain the row's own anchor and epoch, then invokes
+the existing vertex-domain signature/extraction primitive with that signed
+anchor, the resolved issuance-scope author key, and the stable authenticated
+blueprint admission/profile already cross-bound by the current checkpoint. It
+does not call `authenticateRecoveryVertex()` or pin the row to the current
+anchor. The historical anchor is not independently replayed through an old
+authority chain: the verified cumulative address frontier plus the explicit
+non-equivocating-signer assumption supplies that membership authority. Any
+noncanonical preimage, signature failure, unstable profile, scope mismatch, or
+failure of the strict historical epoch predicate rejects.
+
 The facade suppresses only authenticated `published` covered-historical rows.
 A covered-historical `pending` row is returned. Recovery authenticates and
 accounts for it as historical without replaying it into the already recovered
@@ -95689,7 +95716,11 @@ current stable application-ABI validation; `completeRebaseSource` marks the
 original row published only after the genuine current-epoch rebase issue and
 publication succeeds. Failure leaves the row pending and rebase-visible. The
 same publish-state rule applies to the pinned-genesis class, closing the
-pre-existing publish-state-blind residual rather than copying it.
+pre-existing publish-state-blind residual rather than copying it. This custody
+classification runs before `publishPending`'s current
+`displacedSource === undefined` raw-row branch as well as its displaced branch;
+absence of a displaced source never authorizes direct publication of a covered
+historical or genesis row.
 
 One internal scan owner resets one combined counter exactly once at the start
 of each complete recovery, publication, or rebase traversal and carries it
@@ -95699,6 +95730,15 @@ consume that same counter. More than `maxEpochVertices` total refuses; a new
 logical scan resets to zero. This 0c1 assignment prospectively supersedes only
 D.110c-c's earlier per-scan/counter cleanup sentence; D.110c-c still owns
 numeric reconciliation and physical pruning.
+
+The focused post-GREEN lifecycle proves the treatment's nonfaulted hot 2→3
+close/adoption completes through the transport-handoff branch, yields a live
+epoch-3 plane, and then cold reopens epoch 3 after teardown. During the hot
+adoption, r2 remains `displaced`; during cold reopen, r1 is suppressed and
+accounted as covered-historical before the successor scan reaches r2; the
+recovered registration reports unchanged `displacedIssuanceBoundary === 2`.
+This is phase-labelled evidence, not an impossible r2-before-r1 ordering inside
+one ascending scan.
 
 Adversarial gates cover a forged lower epoch, unsigned or altered old-row
 substitution, two observable same-address signed rows, duplicated author
@@ -95772,6 +95812,37 @@ The corrected local audit is
 `.logs/d110c-0c1-plan-correction-7186d028/`; its two-entry self-excluding
 manifest SHA-256 is
 `3ff197823fb1fbf5c97d40c08eb470ba8ba6e83e26b60f9f7422bb0f0bbf7c5c`.
+
+The sole confirmation inspected signed/pushed plan commit
+`617c3cfaf240497e3794b690fce7590bc8f3854d`, tree
+`6db0d26547bd76db3f747c74089ecefb1e5e57ff`, from
+`.logs/d110c-0c1-plan-confirmation-617c3cfa/`. Grok 4.6/high session
+`01a065ef-c4bb-7350-96fc-12ecef017680` and direct Kimi K3 100-step session
+`session_16f5f777-7b47-4a9d-9faf-ba77b64b42f5` both returned `APPROVED`,
+P0=0/P1=0. Kimi used no subagent in this confirmation. Opus xhigh session
+`1b69ec6c-4489-468d-8cbc-343001c7a6b7` returned `CHANGES_REQUIRED`,
+P0=0/P1=2/P2=2. Its stricter P1 severity governs: the final correction above
+separates the successful hot-adoption r2 observation from the later ascending
+cold-reopen r1 failure, moves `displacedIssuanceBoundary === 2` to GREEN,
+freezes the treatment's no-epoch-2-reopen lifecycle, and names the
+transport-handoff view. The combined P2s name the historical decode/signature
+context, both per-recovery WeakMap handoffs, the
+`displacedSource === undefined` publication branch, and phase-labelled trace
+evidence. These are direct corrections to the sole confirmation's findings;
+the governing at-most-one-confirmation rule prohibits another model round, so
+deterministic local source/path predicates close them before RED. The
+confirmation root's 15-entry self-excluding manifest SHA-256 is
+`3bfb832bdb5781c15eef5a5282d39db06cdcbd1600c08316aeab71b9a55a1b0d`.
+The corrected final local audit is
+`.logs/d110c-0c1-plan-final-audit-617c3cfa/`; its two-entry self-excluding
+manifest validates from repository root and has SHA-256
+`c7be1f82d10de12f47cfd5d75695c23ef5d8c28fbf84c6168582585b4284bbcd`.
+It proves the corrected source/path predicates, exact tracked-path custody,
+zero production diff, confirmation evidence integrity, reviewed signature and
+pushed-ref identity, protected-path/stash custody, process/port predicates, and
+the absence of RED, campaign, Fable, collaboration-subagent, or second-review
+execution. The plan gate therefore closes under the governing
+at-most-one-confirmation rule; the next operation is the tests-only causal RED.
 
 The expressly authorized one-off `claude-fable-5-1`/high course review ended
 normally in session `3de42449-c135-4bf2-a060-de4782bce954` with zero subagents
