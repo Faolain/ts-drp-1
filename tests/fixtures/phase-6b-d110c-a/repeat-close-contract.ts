@@ -69,6 +69,11 @@ export interface D110cARepeatCloseEvidence {
 	readonly actorStatusBeforeClose: CreatorLiveCloseStatus;
 	readonly afterHead: Awaited<ReturnType<CreatorLiveCloseHandle["inspectDurableHead"]>>;
 	readonly beforeHead: Awaited<ReturnType<CreatorLiveCloseHandle["inspectDurableHead"]>>;
+	readonly authorIssuanceFrontiers: Readonly<{
+		readonly bytes: Uint8Array;
+		readonly record: Readonly<Record<string, unknown>>;
+		readonly ref: GenerationRef;
+	}>;
 	readonly closeAttempts: 1;
 	readonly closeResult: CreatorLiveCloseResult;
 	readonly closureBytes: Readonly<{ readonly after: number; readonly before: number; readonly delta: number }>;
@@ -123,9 +128,14 @@ export interface D110cARepeatCloseOptions {
 	): Promise<void>;
 	beforeRepeatClose?(
 		input: Readonly<{
+			readonly createRegisteredVertex: GenuineCreatorAdoptionFixture["createRegisteredVertex"];
+			readonly currentAnchorDigest: string;
+			readonly currentEpoch: number;
 			readonly issuanceScope: GenuineCreatorAdoptionFixture["evidence"]["issuanceScope"];
 			readonly issuanceStore: GenuineCreatorAdoptionFixture["evidence"]["issuanceStore"];
+			readonly latestDependencyDigest: string;
 			readonly plane: V3PlaneHandle;
+			readonly routeRegisteredVertex: GenuineCreatorAdoptionFixture["routeRegisteredVertex"];
 			readonly signRegisteredVertexDigest: GenuineCreatorAdoptionFixture["signRegisteredVertexDigest"];
 		}>
 	): Promise<
@@ -136,9 +146,14 @@ export interface D110cARepeatCloseOptions {
 	>;
 	beforeRepeatCloseBinding?(
 		input: Readonly<{
+			readonly createRegisteredVertex: GenuineCreatorAdoptionFixture["createRegisteredVertex"];
+			readonly currentAnchorDigest: string;
+			readonly currentEpoch: number;
 			readonly issuanceScope: GenuineCreatorAdoptionFixture["evidence"]["issuanceScope"];
 			readonly issuanceStore: GenuineCreatorAdoptionFixture["evidence"]["issuanceStore"];
+			readonly latestDependencyDigest: string;
 			readonly plane: V3PlaneHandle;
+			readonly routeRegisteredVertex: GenuineCreatorAdoptionFixture["routeRegisteredVertex"];
 			readonly signRegisteredVertexDigest: GenuineCreatorAdoptionFixture["signRegisteredVertexDigest"];
 		}>
 	): Promise<void>;
@@ -587,13 +602,23 @@ export async function openD110cARepeatCloseFixture(
 		if (issued.ok !== true) throw new TypeError(`D110C_A_POST_ADOPTION_ISSUE_FAILED:${String(issued.kind)}`);
 		const published = await hot.successor.publishPending();
 		if (published.ok !== true) throw new TypeError(`D110C_A_POST_ADOPTION_PUBLISH_FAILED:${String(published.kind)}`);
-		const previousHistory = copiedCompactHistory(hot.base.evidence.exactCanonicalProjectionBytes);
-		await options.beforeRepeatCloseBinding?.({
+		const currentAuthority = plane.currentEphemeralAuthority();
+		if (currentAuthority === undefined || typeof issued.digest !== "string" || !/^[0-9a-f]{64}$/u.test(issued.digest)) {
+			throw new TypeError("D110C_A_REPEAT_CLOSE_MUTATION_CONTEXT_INVALID");
+		}
+		const repeatCloseMutationContext = Object.freeze({
+			createRegisteredVertex: hot.base.createRegisteredVertex,
+			currentAnchorDigest: currentAuthority.anchorDigest,
+			currentEpoch: currentAuthority.epoch,
 			issuanceScope: hot.base.evidence.issuanceScope,
 			issuanceStore: hot.base.evidence.issuanceStore,
+			latestDependencyDigest: issued.digest,
 			plane,
+			routeRegisteredVertex: hot.base.routeRegisteredVertex,
 			signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
 		});
+		const previousHistory = copiedCompactHistory(hot.base.evidence.exactCanonicalProjectionBytes);
+		await options.beforeRepeatCloseBinding?.(repeatCloseMutationContext);
 		const signer = await createRecoverableFinalitySigner({ seed: hexBytes(contract.privateKeySeedHex) });
 		const [vote, evidenceStore, snapshotStore] = await Promise.all([
 			hot.base.modules.openBrowserSealVoteStore({ databaseName: primaryDatabaseName }),
@@ -627,12 +652,7 @@ export async function openD110cARepeatCloseFixture(
 		const roomHeadBefore = copiedRoomHead(plane);
 		const beforeHead = await closeHandle.inspectDurableHead();
 		const actorStatusBeforeClose = closeHandle.status();
-		const inFlight = await options.beforeRepeatClose?.({
-			issuanceScope: hot.base.evidence.issuanceScope,
-			issuanceStore: hot.base.evidence.issuanceStore,
-			plane,
-			signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
-		});
+		const inFlight = await options.beforeRepeatClose?.(repeatCloseMutationContext);
 		const closeTask = closeHandle.close();
 		inFlight?.release();
 		const inFlightIssue = await inFlight?.completed;
@@ -648,6 +668,19 @@ export async function openD110cARepeatCloseFixture(
 		);
 		const afterHead = await closeHandle.inspectDurableHead();
 		const cutValue = canonicalRecord(await blobForRef(hot, closeResult.cutValueRef));
+		let authorIssuanceFrontiers: D110cARepeatCloseEvidence["authorIssuanceFrontiers"] | undefined;
+		for (const ref of afterHead.references) {
+			const bytes = await blobForRef(hot, ref);
+			const record = canonicalRecord(bytes);
+			if (record.kind !== "drp-creator-author-issuance-frontiers-state") continue;
+			if (authorIssuanceFrontiers !== undefined) {
+				throw new TypeError("D110C_A_AUTHOR_ISSUANCE_FRONTIERS_AMBIGUOUS");
+			}
+			authorIssuanceFrontiers = Object.freeze({ bytes: Uint8Array.from(bytes), record, ref });
+		}
+		if (authorIssuanceFrontiers === undefined) {
+			throw new TypeError("D110C_A_AUTHOR_ISSUANCE_FRONTIERS_UNAVAILABLE");
+		}
 		const independentlyDerived = await independentHistory(hot, previousHistory);
 		const beforeBytes = beforeHead.references.reduce((total, ref) => total + ref.byteLength, 0);
 		const afterBytes = afterHead.references.reduce((total, ref) => total + ref.byteLength, 0);
@@ -657,6 +690,7 @@ export async function openD110cARepeatCloseFixture(
 				actorStatusAfterClose: closeHandle.status(),
 				actorStatusBeforeClose,
 				afterHead,
+				authorIssuanceFrontiers,
 				beforeHead,
 				closeAttempts: 1 as const,
 				closeResult,

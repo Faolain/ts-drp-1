@@ -69,6 +69,7 @@ import { contract, hexBytes } from "../phase-3a0-v3/controlled-anchor-trust.js";
 import {
 	createGenuinePreparedV3Fixture,
 	type CreateSqliteAheDurableStoreForFixture,
+	type GenuinePreparedV3Fixture,
 	type PrepareV3LiveGenerationForFixture,
 } from "../phase-3a1b-p3/live-fixture.js";
 
@@ -389,6 +390,11 @@ export interface GenuineCreatorAdoptionFixture {
 		onAdmittedVertex(input: Readonly<Record<string, unknown>>): Promise<void> | void;
 	}>;
 	readonly scope: LiveJournalScope;
+	readonly createRegisteredVertex: GenuinePreparedV3Fixture["createRegisteredVertex"];
+	routeRegisteredVertex(
+		vertex: ReturnType<GenuinePreparedV3Fixture["createRegisteredVertex"]>,
+		transportSender?: string
+	): Promise<void>;
 	readonly signRegisteredVertexDigest: V3LocalIssueInput["signRegisteredVertexDigest"];
 	close(): Promise<void>;
 }
@@ -1102,11 +1108,16 @@ export async function openGenuineCreatorAdoptionFixture(
 	const networkNode = fakeNetwork(`d108b-${crypto.randomUUID()}`);
 	let establishedPeerAuthor: string | undefined;
 	let resolveEstablishedPeer: (() => void) | undefined;
+	const admittedVertexDigests = new Set<string>();
+	const admittedVertexWaiters = new Map<string, () => void>();
 	const establishedPeerAdmission = new Promise<void>((resolveAdmission) => {
 		resolveEstablishedPeer = resolveAdmission;
 	});
 	const onAdmittedVertex = (delivery: Parameters<V3AdmittedVertexSink>[0]): void => {
 		if (delivery.vertex.author === establishedPeerAuthor) resolveEstablishedPeer?.();
+		const digest = Buffer.from(delivery.vertex.digest).toString("hex");
+		admittedVertexDigests.add(digest);
+		admittedVertexWaiters.get(digest)?.();
 	};
 	const activation = activateV3LivePlane({
 		capability: recovered.capability,
@@ -1115,6 +1126,47 @@ export async function openGenuineCreatorAdoptionFixture(
 		onAdmittedVertex,
 	});
 	if (!activation.ok) throw new TypeError(`D.108b fixture activation failed: ${activation.kind}`);
+	Reflect.set(networkNode, "gossipTopicFor", (message: Message) => message.objectId);
+	const routeRegisteredVertex = async (
+		vertex: ReturnType<GenuinePreparedV3Fixture["createRegisteredVertex"]>,
+		transportSender = "d110c-fixture-peer"
+	): Promise<void> => {
+		const digest = Buffer.from(vertex.digest).toString("hex");
+		if (admittedVertexDigests.has(digest)) return;
+		let admissionTimer: ReturnType<typeof setTimeout> | undefined;
+		let resolveAdmission: (() => void) | undefined;
+		const admission = new Promise<void>((resolvePromise) => {
+			resolveAdmission = resolvePromise;
+		});
+		admittedVertexWaiters.set(digest, () => resolveAdmission?.());
+		try {
+			const claimed = routeV3Ingress(
+				networkNode,
+				Message.create({
+					data: V3Envelope.encode({
+						canonicalPreimage: vertex.canonicalPreimageBytes,
+						signature: vertex.signature,
+					}).finish(),
+					objectId: activation.handle.topic,
+					sender: transportSender,
+					type: MessageType.MESSAGE_TYPE_V3_ENVELOPE,
+				})
+			);
+			if (!claimed) throw new TypeError("D110C_FIXTURE_REGISTERED_VERTEX_NOT_CLAIMED");
+			await Promise.race([
+				admission,
+				new Promise<never>((_resolve, reject) => {
+					admissionTimer = setTimeout(
+						() => reject(new TypeError(`D110C_FIXTURE_REGISTERED_VERTEX_ADMISSION_TIMEOUT:${digest}`)),
+						5_000
+					);
+				}),
+			]);
+		} finally {
+			admittedVertexWaiters.delete(digest);
+			if (admissionTimer !== undefined) clearTimeout(admissionTimer);
+		}
+	};
 	const blueprint = bindV3BlueprintLivePlane({
 		exactCanonicalInitialStateBytes: encodeCanonical(0),
 		plane: activation.handle,
@@ -1186,34 +1238,7 @@ export async function openGenuineCreatorAdoptionFixture(
 			privateKeySeedHex: options.establishedPeerPrivateKeySeedHex,
 		});
 		establishedPeerAuthor = carrier.author;
-		Reflect.set(networkNode, "gossipTopicFor", () => activation.handle.topic);
-		const claimed = routeV3Ingress(
-			networkNode,
-			Message.create({
-				data: V3Envelope.encode({
-					canonicalPreimage: carrier.canonicalPreimageBytes,
-					signature: carrier.signature,
-				}).finish(),
-				objectId: activation.handle.topic,
-				sender: "d108d1b-established-peer",
-				type: MessageType.MESSAGE_TYPE_V3_ENVELOPE,
-			})
-		);
-		if (!claimed) throw new TypeError("D.108d1b established peer ingress was not claimed");
-		let admissionTimer: ReturnType<typeof setTimeout> | undefined;
-		try {
-			await Promise.race([
-				establishedPeerAdmission,
-				new Promise<never>((_resolve, reject) => {
-					admissionTimer = setTimeout(
-						() => reject(new TypeError("D.108d1b established peer admission timed out")),
-						5_000
-					);
-				}),
-			]);
-		} finally {
-			if (admissionTimer !== undefined) clearTimeout(admissionTimer);
-		}
+		await Promise.all([routeRegisteredVertex(carrier, "d108d1b-established-peer"), establishedPeerAdmission]);
 		establishedPeer = Object.freeze({
 			author: carrier.author,
 			authorSequence: 0,
@@ -1341,6 +1366,7 @@ export async function openGenuineCreatorAdoptionFixture(
 			await Promise.all([deleteDatabase(primaryDatabaseName), deleteDatabase(snapshotDatabaseName)]);
 		},
 		controls,
+		createRegisteredVertex: fixture.createRegisteredVertex,
 		evidence: Object.freeze({
 			aheBackend,
 			aheStore,
@@ -1372,6 +1398,7 @@ export async function openGenuineCreatorAdoptionFixture(
 		modules,
 		runtimeBindings: Object.freeze({ messageQueueManager, networkNode, onAdmittedVertex }),
 		scope: journalScope,
+		routeRegisteredVertex,
 		signRegisteredVertexDigest: fixture.signRegisteredVertexDigest,
 	});
 }

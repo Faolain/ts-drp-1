@@ -98050,9 +98050,10 @@ not independently rederived by the transition closure.
 
 ###### D.110c-0c1f5a foreign-author close-liveness prerequisite
 
-**Status: reviewed scope frozen; tests-only RED is authorized immediately after
-this correction is signed/pushed, but no production edit is authorized before
-that RED is causal, recorded, signed, and pushed.** Owner:
+**Status: one authorized focused execution from signed anchor `eeaaaca8` was a
+useful but noncausal diagnostic; the corrected tests-only RED requires the one
+material plan confirmation below, and no production edit is authorized before
+that corrected RED is causal, recorded, signed, and pushed.** Owner:
 `packages/node/src/creator-close.ts::authorIssuanceFrontiersCandidate()` at the
 construction of `byAuthor`, duplicate detection, prior/null boundary checks,
 regression checks, and per-author frontier advancement; the exact captured
@@ -98067,9 +98068,13 @@ Phase-7 multi-author cold join.
 F5a freezes the distinction between local corruption and a foreign-author
 anomaly. Duplicate, regressed, missing-prefix, or noncontiguous identities for
 the creator's own issuance scope retain the existing fail-closed close error.
-The same shapes for another author—including an author no longer present in
-the successor writer set—must not abort the creator's transition. For an
-authorized successor writer, the close leaves that author's frontier exactly
+The same shapes for another author—including a currently authorized writer
+that is removed from the successor writer set by this close—must not abort the
+creator's transition. An author that was already unauthorized for current-epoch
+application writes is not an f5a treatment: the existing snapshot fold rejects
+such an application row before issuance-frontier construction, and f5a does
+not weaken that authorization boundary. For an authorized successor writer,
+the close leaves that author's frontier exactly
 at its authenticated prior value, or null when no prior numeric boundary
 exists; it does not advance through any anomalous row. For an author excluded
 from the successor writer set, no frontier entry is emitted. Every other valid
@@ -98077,19 +98082,23 @@ successor author advances under the unchanged adjacent-prefix rule. No public
 per-author diagnostic field or alternate carrier is added.
 
 The deterministic RED uses signed production vertices and the real close path,
-not a fabricated aggregate or tests-only durable record. Its exact cases are:
+not a fabricated aggregate or tests-only durable record. Its corrected exact
+cases are:
 
-1. a genuinely offline noncreator has a null prior frontier, re-enters through
-   ordinary rebase at first creator-observed sequence greater than one, and the
-   next creator close currently throws the legacy-migration error;
-2. a newly authorized/absent prior author is first observed above one and the
-   close currently throws the author-reentry error;
-3. a noncreator local rollback produces a current-anchor signed sequence at or
+1. a genuinely offline noncreator has a null prior frontier, resumes through
+   authenticated current-anchor ingress at first creator-observed sequence
+   greater than one, and the next creator close currently throws the
+   legacy-migration error; this f5a treatment does not claim that the existing
+   rebase protocol created or settled the gap;
+2. a noncreator local rollback produces a current-anchor signed sequence at or
    below its numeric prior boundary and close currently throws
    `creator issuance-frontier boundary regressed`;
-4. two distinct admitted current-epoch vertices carry the same foreign
+3. two distinct admitted current-epoch vertices carry the same foreign
    `(author, sequence)` and close currently throws
    `creator issuance-frontier author slot is ambiguous`; and
+4. a currently authorized foreign writer has a duplicated current-epoch slot,
+   the same close validly removes that writer from the successor ACL, and the
+   pre-f5a duplicate scan still aborts before successor-writer filtering; and
 5. a no-gap two-writer control closes and opens the exact unchanged aggregate.
 
 Each treatment must first assert the exact current product error and the
@@ -98097,19 +98106,52 @@ creator's otherwise-valid transition inputs, then terminate only at
 `D110C_0C1F5_FOREIGN_AUTHOR_CLOSE_LIVENESS_REQUIRED`. Failure to reach close,
 a different error, an invalid signature/anchor/ACL precondition, timing, or
 transport is noncausal. RED also freezes controls proving the equivalent
-creator-owned anomalies still fail closed and a deauthorized foreign author's
-rows do not enter the successor vector or block close. Run the focused RED once
-from the signed plan anchor, validate its exact complete result set, then sign
-and push it. No separate model RED review is required; final GREEN review must
-inspect RED causality.
+creator-owned anomalies still fail closed and a foreign writer removed by the
+current close does not enter the successor vector or block close. A row from an
+author already unauthorized in the current epoch remains an exact snapshot-fold
+refusal control. Run the corrected focused RED once from the signed amended-plan
+anchor, validate its exact complete result set, then sign and push it. No
+separate model RED review is required; final GREEN review must inspect RED
+causality.
+
+The first focused execution was consumed once from signed/pushed anchor
+`eeaaaca8d7a30a84fda321b37544d57b6cc1c1f4`; it is not accepted as RED and is
+never relabelled. The null-prior treatment reached its exact
+`D110C_0C1F1_LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED` error, but the then-proposed
+absent-prior treatment stopped earlier at
+`creator snapshot export failed: not-active`. Source tracing establishes why:
+the writer had been revoked in the current epoch, a staged grant applied only
+to the successor ACL, and `foldBlueprintEpoch()` authorizes every current graph
+operation against the current latched ACL before
+`authorIssuanceFrontiersCandidate()` runs. Therefore this construction cannot
+exercise `D110C_0C1F1_AUTHOR_REENTRY_PROOF_REQUIRED` through ordinary ingress
+and must not be counted as a close-frontier product defect. The exact command
+was `pnpm exec vitest run
+tests/phase-6b-d110c-0c1f5-foreign-author-close-liveness-red.test.ts
+--reporter=json --outputFile=.logs/d110c-0c1f5a-red-eeaaaca8/result.json`;
+runner status was `1`, selected file/title counts were exactly one/one, and the
+complete result SHA-256 is
+`f9253e4a15c14341dc240b49bf4ed08f191784cf8ce28fd56518f91d7e55b627`.
+The immutable diagnostic root is `.logs/d110c-0c1f5a-red-eeaaaca8/`.
+
+The author-reentry guard remains fail closed and unchanged. Whether a genuine
+membership lifecycle can make a currently authorized writer absent from the
+prior authenticated aggregate is now an f5b admitted-set/membership audit
+question, not an f5a behavior claim. Because this correction changes causal
+acceptance, sign/push the diagnostic and amended plan, then run exactly one
+material Grok/Kimi/Opus confirmation before the corrected RED. Do not review
+bookkeeping prose recursively.
 
 GREEN changes only the close-side per-author classification. It must make all
 foreign treatments close successfully, keep the affected frontier unchanged or
 null, preserve all unaffected frontiers byte-for-byte, stage one valid
-aggregate, and complete verified transition/adoption. The anomalous row must
-remain outside authenticated historical coverage. Repeating close derivation
-over the same captured graph must be deterministic. The no-gap aggregate bytes
-and digest remain identical to the pre-f5a implementation. The former
+aggregate, and complete verified transition/adoption. The anomalous row remains
+an authenticated close-set/history member when it is a valid authorized
+application vertex, but it must remain outside the issuance sequence range
+claimed by the aggregate frontier; f5a does not rewrite application history.
+Repeating close derivation over the same captured graph must be deterministic.
+The no-gap aggregate bytes and digest remain identical to the pre-f5a
+implementation. The former
 null-boundary diagnostic mismatch is closed by pinning the current RED error
 and proving it is no longer exposed as a close-wide foreign-author failure;
 existing legacy/local errors are not renamed without an independently retained
