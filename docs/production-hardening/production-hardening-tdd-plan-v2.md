@@ -95503,9 +95503,11 @@ RED-to-GREEN closure and is prohibited.
 
 **Status: bounded architecture decision complete; D.110c-0c1a and
 D.110c-0c1b are closed; the first high-risk plan review and sole material
-confirmation are complete, the confirmation's Opus P1s are corrected and
-deterministically validated, and the plan gate is closed. Causal RED is next;
-no causal RED or production edit has begun.** Owner:
+confirmation are complete, and the confirmation's findings are corrected and
+deterministically validated. The first causal attempt exposed an earlier
+stable-successor cold-reopen product precondition, so D.110c-0c1 is paused on
+the blocking D.110c-0c1c prerequisite below. No D.110c-0c1 production edit has
+begun.** Owner:
 the predecessor and successor issuance views created by
 `packages/node/src/v3-live.ts::activateCreatorSuccessorLive()`, the existing
 Node-private retirement-transition opener/correlation helper,
@@ -95861,6 +95863,93 @@ entered, one fresh-name focused invocation remains the single causal RED
 execution. This mechanical tests-only correction changes no plan acceptance,
 product source, workload, threshold, dependency, or lifecycle and does not
 trigger another model review.
+
+The fresh causal attempt then ran from signed/pushed tests-only anchor
+`aad02bd2a585558f72a8f20275b5b7659db45c75`, tree
+`26b3afd95f38db9d4872b46bb3de761f41e5c4ac`. The browser and genuine room
+workload started, but the control's stable epoch-2 cold reopen stopped first at
+exact `D110C_FLOOR_MISMATCH`; it therefore did not reach the historical-row
+classification matrix and is not accepted as D.110c-0c1 RED. Playwright exited
+`1` with expected/skipped/unexpected/flaky `0/0/1/0`, zero top-level errors,
+and one 740-ms result. No retry followed. The complete result is
+`.logs/d110c-0c1-red-aad02bd2/`; its five-entry self-excluding manifest SHA-256
+is `115cd4bad1f8432bbe5341afaa10ccb7a0d7a21f0657cab937b1109c9568cdcb`.
+Source audit proves the earlier owner is the room opener's hard-coded stable
+epoch-one restriction, so using a lower-level fixture to bypass it would fail
+the genuine product-path acceptance.
+
+###### D.110c-0c1c stable adopted-successor cold-reopen prerequisite
+
+**Status: blocking source/architecture audit complete; plan review required
+before production RED/GREEN.** Owner:
+`examples/v3-room/src/index.ts::createV3RoomSessionOwned()` at the early
+stable-room-head/successor-snapshot admission predicate, plus the focused
+browser control and existing room-head/reopen mutants. Deadline: GREEN before
+D.110c-0c1 causal RED resumes, before D.110c-0c production integration, and
+before D.110c-c/d or Phase-7 claims any stable adopted epoch-N cold reopen.
+
+The demonstrated defect is orchestration, not a request to weaken trust. When
+the authenticated room-head authority has `pending === null` and the caller
+supplies a successor snapshot declaration, the opener currently accepts only
+`stable.epoch === 1`; a genuine stable epoch 2 is rejected as
+`D110C_FLOOR_MISMATCH` before `reopenCreatorSuccessorAdoption()` runs. The
+bounded audit confirms that the downstream recovery path already authenticates
+the generalized case: room-head scope binds object and pinned genesis; the AHE
+lineage must contain exact adjacent predecessor/successor generations;
+non-genesis recovery uses `openCreatorCheckpointTrust()` to bind the expected
+current head, predecessor trust, Cut, commit QC, and pinned genesis; snapshot
+manifest/payload/state, successor projection, ACL, parameters, author
+possession, and issuance lineage are verified; and the reconstructed successor
+trust must equal the expected room head before activation.
+
+The selected repair changes only that early admission predicate. Preserve the
+stable epoch-0 successor-declaration refusal and its exact
+`D110C_FLOOR_HEAD_AHEAD` code, but allow a stable safe positive epoch greater
+than one to reach the existing authenticated reopen verifier. Do not trust the
+room-head epoch, snapshot declaration, or AHE independently; do not bypass or
+weaken any downstream checkpoint, chain, snapshot, ACL, possession, lineage,
+or expected-head check. Do not change pending-adoption recovery, wire/schema,
+public API, dependency, threshold, history, pruning, or issuance behavior. If
+implementation requires more than the one room-opener predicate and tests, or
+if the downstream verifier cannot authenticate epoch N from the pinned genesis
+checkpoint, stop and reslice rather than widening this prerequisite.
+
+RED is the preserved signed/pushed `aad02bd2` invocation above: genuine hot
+0→1→2 succeeds, stable epoch-2 room-head and its genuine predecessor snapshot
+exist, but the ordinary room opener returns exact `D110C_FLOOR_MISMATCH` before
+any D.110c-0c1 historical classification. GREEN runs a dedicated control-only
+focused test proving that the same stable epoch-2 room reopens through the
+ordinary `createV3RoomSession()` product path, reports exact active epoch-2
+authority/ACL/state, issues and publishes the next message, and invokes the
+real downstream successor reopen exactly once. The D.110c-0c1 differential
+then receives one fresh-name execution and must advance past this control into
+its separately frozen historical-row RED; D.110c-0c1c must not fix, mask, or
+relabel that later failure.
+
+Adversarial GREEN gates retain exact outcomes for stable epoch 0 with a
+successor declaration; missing snapshot at stable epoch N; pending floor with
+and without a declaration; lower/higher/different-anchor expected head;
+cross-object or cross-genesis floor; wrong snapshot object, epoch, anchor,
+manifest, payload, or state; stale, malformed, missing, reordered, or
+non-adjacent AHE lineage; invalid Cut/QC/checkpoint/ACL; and author possession
+or issuance-lineage failure. None may activate, publish, mutate the floor, or
+change its existing error class. Retained gates include D.110c-0b1 cold reopen,
+D.110c-b hot 0→1→2, D.110c-0c pending recovery, the Phase-6a creator reopen,
+room-head matrices, snapshot verification, rollback, availability, and exact
+owner build/typecheck/lint/format/diff checks.
+
+This is a high-risk production-lifecycle compatibility change even though the
+code seam is narrow. Sign/push this bounded plan and run one governing Grok
+4.6/high, direct Kimi K3 100-step, and Opus xhigh plan review. Only P0/P1
+blocks; P2 receives an owner/disposition without recursive prose review. At
+most one material confirmation is permitted if corrections change scope,
+causal acceptance, or executable behavior. No production edit begins until the
+blocking union is empty. Do not invoke Fable or a collaboration subagent.
+
+The bounded source audit is
+`.logs/d110c-0c1c-source-audit-aad02bd2/`; its two-entry self-excluding
+manifest validates with SHA-256
+`b021c40ccdb3d74cffcb73f89f8fad9d75d3e31f9955c7609120b7bcc990d858`.
 
 The expressly authorized one-off `claude-fable-5-1`/high course review ended
 normally in session `3de42449-c135-4bf2-a060-de4782bce954` with zero subagents
