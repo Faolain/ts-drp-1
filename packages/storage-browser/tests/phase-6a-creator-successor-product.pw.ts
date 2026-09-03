@@ -2389,6 +2389,91 @@ function d110c0cArray(value: unknown): readonly unknown[] {
 	return value;
 }
 
+test("D.110c-0c1c cold reopens a stable adopted epoch-2 successor", async ({ browser }, testInfo) => {
+	const server = await startProductBrowserServer(
+		new URL("./assets/phase-6a-creator-successor-product-entry.ts", import.meta.url).pathname
+	);
+	const isolatedContext = await browser.newContext();
+	const page = await isolatedContext.newPage();
+	try {
+		await openRealm(page, server.origin, "d110c-0c1c", () => [page]);
+		const evidence = d110c0cRecord(
+			await page.evaluate(() => window.phase6aCreatorSuccessorProduct.d110c0c1cControl("stable-epoch-two"))
+		);
+		const reopened = d110c0cRecord(evidence.reopened);
+		const after = d110c0cRecord(evidence.after);
+		const prefixRows = d110c0cArray(evidence.prefixRows).map(d110c0cRecord);
+		const postReopenRows = d110c0cArray(evidence.postReopenRows).map(d110c0cRecord);
+		expect(evidence.coldReopenCount).toBe(1);
+		expect(reopened.authority).toMatchObject({ epoch: 2, lifecycle: "active" });
+		expect(reopened.acl).toMatchObject({ current: { epoch: 2 }, next: { epoch: 3 } });
+		expect(after.authority).toEqual(reopened.authority);
+		expect(after.acl).toEqual(reopened.acl);
+		expect(
+			prefixRows.map(({ authorSequence, epoch, publishState }) => ({ authorSequence, epoch, publishState }))
+		).toEqual([
+			{ authorSequence: 0, epoch: 0, publishState: "published" },
+			{ authorSequence: 1, epoch: 0, publishState: "published" },
+			{ authorSequence: 2, epoch: 1, publishState: "published" },
+		]);
+		expect(
+			postReopenRows.map(({ authorSequence, epoch, publishState }) => ({ authorSequence, epoch, publishState }))
+		).toEqual([
+			...prefixRows.map(({ authorSequence, epoch, publishState }) => ({ authorSequence, epoch, publishState })),
+			{ authorSequence: 3, epoch: 2, publishState: "published" },
+		]);
+		expect(d110c0cRecord(after.projection)).toMatchObject({
+			accepted: expect.arrayContaining([expect.objectContaining({ text: "d110c-0c1-control-after-reopen" })]),
+		});
+		const matrix = d110c0cArray(
+			d110c0cRecord(await page.evaluate(() => window.phase6aCreatorSuccessorProduct.d110c0c1cMatrix("matrix"))).results
+		).map(d110c0cRecord);
+		expect(matrix).toEqual([
+			expect.objectContaining({
+				coldReopenCount: 0,
+				detail: "D110C_FLOOR_MISMATCH",
+				fault: "missing-snapshot",
+			}),
+			expect.objectContaining({
+				coldReopenCount: 0,
+				detail: "D110C_FLOOR_HEAD_AHEAD",
+				fault: "epoch-zero",
+			}),
+			...(["lower-epoch", "higher-epoch", "different-anchor"] as const).map((fault) =>
+				expect.objectContaining({
+					coldReopenCount: 1,
+					detail: "v3 room successor reopen failed: chain-invalid: creator checkpoint trust is invalid",
+					fault,
+				})
+			),
+			expect.objectContaining({ coldReopenCount: 0, detail: "D110C_FLOOR_INVALID", fault: "stable-cross-object" }),
+			expect.objectContaining({
+				coldReopenCount: 1,
+				detail: "v3 room successor reopen failed: chain-invalid: creator successor object identity is invalid",
+				fault: "snapshot-object",
+			}),
+			...(["snapshot-epoch", "snapshot-anchor", "snapshot-manifest"] as const).map((fault) =>
+				expect.objectContaining({
+					coldReopenCount: 1,
+					detail: "v3 room successor reopen failed: snapshot-unavailable: creator successor snapshot is unavailable",
+					fault,
+				})
+			),
+		]);
+		for (const result of matrix) expect(result.afterDigest).toBe(result.beforeDigest);
+		await testInfo.attach("d110c-0c1c-green", {
+			body: Buffer.from(JSON.stringify({ control: evidence, matrix })),
+			contentType: "application/json",
+		});
+	} finally {
+		await page
+			.evaluate(() => window.phase6aCreatorSuccessorProduct.closeDirectCreator("stable-epoch-two"))
+			.catch(() => undefined);
+		await isolatedContext.close();
+		await server.close();
+	}
+});
+
 test("D.110c-0c1 cold reopens a genuine hot epoch-3 successor with authenticated historical issuance", async ({
 	browser,
 }, testInfo) => {
@@ -2411,17 +2496,19 @@ test("D.110c-0c1 cold reopens a genuine hot epoch-3 successor with authenticated
 			controlRows.map(({ authorSequence, epoch, publishState }) => ({ authorSequence, epoch, publishState }))
 		).toEqual([
 			{ authorSequence: 0, epoch: 0, publishState: "published" },
-			{ authorSequence: 1, epoch: 1, publishState: "published" },
+			{ authorSequence: 1, epoch: 0, publishState: "published" },
+			{ authorSequence: 2, epoch: 1, publishState: "published" },
 		]);
 		expect(treatmentPrefixRows).toEqual(controlRows);
 		expect(
 			treatmentRows.map(({ authorSequence, epoch, publishState }) => ({ authorSequence, epoch, publishState }))
 		).toEqual([
 			{ authorSequence: 0, epoch: 0, publishState: "published" },
-			{ authorSequence: 1, epoch: 1, publishState: "published" },
-			{ authorSequence: 2, epoch: 2, publishState: "published" },
+			{ authorSequence: 1, epoch: 0, publishState: "published" },
+			{ authorSequence: 2, epoch: 1, publishState: "published" },
+			{ authorSequence: 3, epoch: 2, publishState: "published" },
 		]);
-		expect(treatmentRows[1]).toEqual(controlRows[1]);
+		expect(treatmentRows[2]).toEqual(controlRows[2]);
 		expect(d110c0cRecord(control.reopened).authority).toMatchObject({ epoch: 2, lifecycle: "active" });
 		expect(treatment.close).toMatchObject({ epoch: 2, successorEpoch: 3 });
 		expect(d110c0cRecord(treatment.hot).authority).toMatchObject({ epoch: 3, lifecycle: "active" });
@@ -2430,7 +2517,7 @@ test("D.110c-0c1 cold reopens a genuine hot epoch-3 successor with authenticated
 		const treatmentTrace = d110c0cArray(treatment.trace).map(d110c0cRecord);
 		expect(controlTrace).toContainEqual(
 			expect.objectContaining({
-				authorSequence: 1,
+				authorSequence: 2,
 				classification: "current",
 				owner: "predecessor-validation",
 				phase: "control-cold-reopen-epoch-2",
@@ -2438,7 +2525,7 @@ test("D.110c-0c1 cold reopens a genuine hot epoch-3 successor with authenticated
 		);
 		expect(treatmentTrace).toContainEqual(
 			expect.objectContaining({
-				authorSequence: 2,
+				authorSequence: 3,
 				classification: "displaced",
 				owner: "successor-recovery",
 				phase: "hot-adoption-2-to-3",
@@ -2447,13 +2534,13 @@ test("D.110c-0c1 cold reopens a genuine hot epoch-3 successor with authenticated
 		const coldTrace = treatmentTrace.filter(({ phase }) => phase === "treatment-cold-reopen-epoch-3");
 		expect(coldTrace).toContainEqual(
 			expect.objectContaining({
-				authorSequence: 1,
+				authorSequence: 2,
 				classification: "rejected",
 				owner: "predecessor-validation",
 				payloadEpoch: 2,
 			})
 		);
-		expect(coldTrace.some(({ authorSequence }) => authorSequence === 2)).toBe(false);
+		expect(coldTrace.some(({ authorSequence }) => authorSequence === 3)).toBe(false);
 		expect(treatment.reopened).toBeNull();
 		expect(treatment.detail).toBe(
 			"v3 room successor reopen failed: recovery-rejected: creator predecessor recovery failed: admission-rejected"

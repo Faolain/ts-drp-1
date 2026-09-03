@@ -1573,11 +1573,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			if (
 				openedRoomHeadState.pending === null &&
 				input.successorSnapshotDeclaration !== undefined &&
-				openedRoomHeadState.stable.epoch !== 1
+				openedRoomHeadState.stable.epoch < 1
 			) {
-				return roomHeadFailure(
-					openedRoomHeadState.stable.epoch < 1 ? "D110C_FLOOR_HEAD_AHEAD" : "D110C_FLOOR_MISMATCH"
-				);
+				return roomHeadFailure("D110C_FLOOR_HEAD_AHEAD");
 			}
 		}
 	}

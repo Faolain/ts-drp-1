@@ -256,6 +256,8 @@ declare global {
 			create(input: unknown): Promise<string>;
 			deleteDatabases(prefix: string): Promise<readonly string[]>;
 			d110c0c1Differential(name: string): Promise<PlainRecord>;
+			d110c0c1cControl(name: string): Promise<PlainRecord>;
+			d110c0c1cMatrix(name: string): Promise<PlainRecord>;
 			d110c0cRecover(name: string): Promise<PlainRecord>;
 			d110c0cStage(name: string, ordering: "new-ahe" | "old-ahe"): Promise<PlainRecord>;
 			d110cBSnapshot(): Readonly<{
@@ -1169,6 +1171,19 @@ async function d110cRoomHeadEvidence(name: string): Promise<PlainRecord> {
 	}
 }
 
+async function overwriteD110cStableRoomHead(name: string, stable: PlainRecord): Promise<void> {
+	const database = await openD110cRoomHeadDatabase(name);
+	try {
+		const transaction = database.transaction("floor", "readwrite", { durability: "strict" });
+		await request(
+			transaction.objectStore("floor").put({ key: "state", value: Object.freeze({ pending: null, stable }) })
+		);
+		await transactionDone(transaction);
+	} finally {
+		database.close();
+	}
+}
+
 async function d110cAheEvidence(databaseName: string): Promise<PlainRecord> {
 	const database = await openExistingDatabase(`${databaseName}--ahe`);
 	try {
@@ -1580,6 +1595,16 @@ async function d110c0cRoomSnapshot(room: DirectRoomSession): Promise<PlainRecord
 	});
 }
 
+function d110c0cColdRoomSnapshot(room: DirectRoomSession): PlainRecord {
+	return Object.freeze({
+		acl: normalize(room.previewLatchedAcl()),
+		authority: normalize(room.authority()),
+		projection: normalize(room.projection()),
+		roomId: room.roomId,
+		status: normalize(room.status()),
+	});
+}
+
 async function d110c0c1IssuanceRows(databaseName: string): Promise<readonly PlainRecord[]> {
 	const database = await dumpDatabase(`${databaseName}--drp-issuance-v1`);
 	const issued = database.stores.find(({ name }) => name === "issuedRecords")?.rows.map(exactRecord) ?? [];
@@ -1648,10 +1673,15 @@ async function d110c0c1Case(name: string, kind: "control" | "treatment"): Promis
 				withCreatorSigner: false,
 			});
 			directRooms.set(name, room);
-			const reopened = await d110c0cRoomSnapshot(room);
+			const reopened = d110c0cColdRoomSnapshot(room);
 			await issue("d110c-0c1-control-after-reopen", "d110c-0c1-control-after-reopen");
+			const after = d110c0cColdRoomSnapshot(room);
+			const postReopenRows = await d110c0c1IssuanceRows(databaseName);
 			return Object.freeze({
+				after,
+				coldReopenCount: instrumentation().d110cColdReopenCount(),
 				kind,
+				postReopenRows,
 				prefixRows,
 				reopened,
 				trace: instrumentation().d110c0c1TraceSnapshot(),
@@ -1676,7 +1706,7 @@ async function d110c0c1Case(name: string, kind: "control" | "treatment"): Promis
 				withCreatorSigner: false,
 			});
 			directRooms.set(name, room);
-			reopened = await d110c0cRoomSnapshot(room);
+			reopened = d110c0cColdRoomSnapshot(room);
 			await issue("d110c-0c1-treatment-after-reopen", "d110c-0c1-treatment-after-reopen");
 		} catch (error) {
 			detail = directFailureDetail(error);
@@ -1701,6 +1731,119 @@ async function d110c0c1Differential(name: string): Promise<PlainRecord> {
 	const control = await d110c0c1Case(name, "control");
 	const treatment = await d110c0c1Case(name, "treatment");
 	return Object.freeze({ control, treatment });
+}
+
+type D110c0c1cFault =
+	| "different-anchor"
+	| "epoch-zero"
+	| "higher-epoch"
+	| "lower-epoch"
+	| "missing-snapshot"
+	| "snapshot-anchor"
+	| "snapshot-epoch"
+	| "snapshot-manifest"
+	| "snapshot-object"
+	| "stable-cross-object";
+
+async function d110c0c1cFailureCase(name: string, fault: D110c0c1cFault): Promise<PlainRecord> {
+	const databaseName = `d108e3-direct-${name}`;
+	const roomHeadAuthority = d110cRoomHeadAuthority(name, Object.freeze({ kind: "create" }));
+	let room = await createDirectRoom(name, { roomHeadAuthority });
+	directRooms.set(name, room);
+	try {
+		await room.issue(Object.freeze({ action: "message", clientOperationId: `${name}-zero`, text: `${name}-zero` }));
+		const genesisEvidence = await d110cRoomHeadEvidence(name);
+		const genesisStable = exactRecord(exactRecord(genesisEvidence.state).stable);
+		await room.sealEpoch();
+		await room.adoptCreatorSuccessor();
+		await room.issue(Object.freeze({ action: "message", clientOperationId: `${name}-one`, text: `${name}-one` }));
+		await room.sealEpoch();
+		await room.adoptCreatorSuccessor();
+		const declaration = await rawSnapshotDeclarationAtEpoch(databaseName, 1);
+		await closeDirectForReopen(name);
+		const stableEvidence = await d110cRoomHeadEvidence(name);
+		const stable = exactRecord(exactRecord(stableEvidence.state).stable);
+		let selectedDeclaration: unknown = declaration;
+		if (fault === "missing-snapshot") selectedDeclaration = undefined;
+		if (fault === "epoch-zero") await overwriteD110cStableRoomHead(name, genesisStable);
+		if (fault === "lower-epoch") {
+			await overwriteD110cStableRoomHead(name, Object.freeze({ ...stable, epoch: 1 }));
+		}
+		if (fault === "higher-epoch") {
+			await overwriteD110cStableRoomHead(name, Object.freeze({ ...stable, epoch: 3 }));
+		}
+		if (fault === "different-anchor") {
+			await overwriteD110cStableRoomHead(name, Object.freeze({ ...stable, currentAnchorDigest: "f".repeat(64) }));
+		}
+		if (fault === "stable-cross-object") {
+			await overwriteD110cStableRoomHead(name, Object.freeze({ ...stable, objectId: "creator:foreign" }));
+		}
+		const scope = exactRecord(declaration.scope);
+		if (fault === "snapshot-object") {
+			selectedDeclaration = Object.freeze({
+				...declaration,
+				scope: Object.freeze({ ...scope, objectId: "creator:foreign" }),
+			});
+		}
+		if (fault === "snapshot-epoch") {
+			selectedDeclaration = Object.freeze({
+				...declaration,
+				scope: Object.freeze({ ...scope, epoch: Number(scope.epoch) + 1 }),
+			});
+		}
+		if (fault === "snapshot-anchor") {
+			selectedDeclaration = Object.freeze({
+				...declaration,
+				scope: Object.freeze({ ...scope, anchor: "e".repeat(64) }),
+			});
+		}
+		if (fault === "snapshot-manifest") {
+			const manifest = new Uint8Array(declaration.exactCanonicalManifestBytes as Uint8Array);
+			manifest[0] = (manifest[0] ?? 0) ^ 1;
+			selectedDeclaration = Object.freeze({ ...declaration, exactCanonicalManifestBytes: manifest });
+		}
+		const attemptBefore = await d110cRoomHeadEvidence(name);
+		instrumentation().configure({});
+		let detail = "fulfilled";
+		try {
+			room = await createDirectRoom(name, {
+				roomHeadAuthority: d110cRoomHeadAuthority(name, Object.freeze({ kind: "reopen" })),
+				...(selectedDeclaration === undefined ? {} : { successorSnapshotDeclaration: selectedDeclaration }),
+				withCreatorSigner: false,
+			});
+			directRooms.set(name, room);
+		} catch (error) {
+			detail = directFailureDetail(error);
+		}
+		const after = await d110cRoomHeadEvidence(name);
+		return Object.freeze({
+			afterDigest: after.stateDigest,
+			beforeDigest: attemptBefore.stateDigest,
+			coldReopenCount: instrumentation().d110cColdReopenCount(),
+			detail,
+			fault,
+		});
+	} finally {
+		await discardDirectRoom(name);
+	}
+}
+
+async function d110c0c1cMatrix(name: string): Promise<PlainRecord> {
+	const faults = Object.freeze([
+		"missing-snapshot",
+		"epoch-zero",
+		"lower-epoch",
+		"higher-epoch",
+		"different-anchor",
+		"stable-cross-object",
+		"snapshot-object",
+		"snapshot-epoch",
+		"snapshot-anchor",
+		"snapshot-manifest",
+	] as const);
+	const results: PlainRecord[] = [];
+	for (const fault of faults) results.push(await d110c0c1cFailureCase(`${name}-${fault}`, fault));
+	return Object.freeze({ results: Object.freeze(results) });
 }
 
 async function d110c0cStage(name: string, ordering: "new-ahe" | "old-ahe"): Promise<PlainRecord> {
@@ -2144,6 +2287,12 @@ const api = Object.freeze({
 	},
 	d110c0c1Differential(name: string): Promise<PlainRecord> {
 		return d110c0c1Differential(name);
+	},
+	d110c0c1cControl(name: string): Promise<PlainRecord> {
+		return d110c0c1Case(name, "control");
+	},
+	d110c0c1cMatrix(name: string): Promise<PlainRecord> {
+		return d110c0c1cMatrix(name);
 	},
 	d110c0cRecover(name: string): Promise<PlainRecord> {
 		return d110c0cRecover(name);

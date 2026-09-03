@@ -95881,8 +95881,8 @@ the genuine product-path acceptance.
 ###### D.110c-0c1c stable adopted-successor cold-reopen prerequisite
 
 **Status: blocking source/architecture audit and governing plan review complete;
-blocking union empty; the preserved tests-only RED is accepted and the
-one-predicate GREEN is next.** Owner:
+blocking union empty; the preserved tests-only RED and narrow GREEN are
+complete, and signed/pushed GREEN plus the final three-model review are next.** Owner:
 `examples/v3-room/src/index.ts::createV3RoomSessionOwned()` at the early
 stable-room-head/successor-snapshot admission predicate, plus the focused
 browser control and existing room-head/reopen mutants. Deadline: GREEN before
@@ -95981,6 +95981,46 @@ neither started or consumed a review. Complete raw and normalized evidence is
 `.logs/d110c-0c1c-plan-review-aee6c015/`; its thirteen-entry self-excluding
 manifest validates with SHA-256
 `a466da84769afe10148a68e95693db9f3586743816e0e95189750716cc9baf85`.
+
+GREEN changes the sole reviewed product predicate in
+`createV3RoomSessionOwned()` from `stable.epoch !== 1` to `stable.epoch < 1`;
+epoch 0 therefore retains exact `D110C_FLOOR_HEAD_AHEAD`, while every safe
+positive stable epoch reaches the unchanged authenticated downstream reopen.
+The focused launcher selects exactly one Chromium test in one file. Its final
+6.4-second execution passes one control plus ten fail-closed rows: genuine hot
+0→1→2, signerless stable epoch-2 cold reopen, exact active authority and ACL,
+post-reopen sequence-3 epoch-2 publication, exactly one downstream reopen,
+lower/higher/different-anchor expected heads, cross-object floor, missing
+declaration, epoch-0 declaration, and wrong snapshot object/epoch/anchor/
+manifest. Every failure leaves the room-head state digest unchanged and emits
+its pinned bare or wrapped error.
+
+One fresh one-test/one-file D.110c-0c1 execution now reaches the separately
+frozen exact terminal `D110C_0C1_INTERMEDIATE_ISSUANCE_RECOVERY_REQUIRED`.
+Its attachment proves control issuance `0@0,1@0,2@1`, treatment issuance
+`0@0,1@0,2@1,3@2`, and the intended cold predecessor rejection of sequence 2;
+the former `D110C_FLOOR_MISMATCH` is absent. Thus 0c1c unblocks but does not
+close or mask D.110c-0c1. The retained Chromium product selection excluding
+the two open 0c slices passes 10/10; the six-file retained Vitest selection
+passes 42/42 with focused coverage disabled; and the existing D.110c-0c
+pending fixture retains exactly two owned
+`D110C_0C_EPOCH3_COLD_REOPEN_BLOCKED` soft failures.
+
+`pnpm --filter @ts-drp/example-v3-room build` and `typecheck` pass. Exact-owner
+ESLint, 8-GiB Prettier, diff, source-shape, list, protected-path, 27-stash,
+process, and fixed-port checks pass. Package-wide storage-browser typecheck
+remains nonzero only for the previously inherited Phase-6b alias/branding
+fixtures and reports zero D.110c-0c1c-owner diagnostics. Four noncausal test
+expectation corrections are preserved: a hot-only durable-head observation on
+a signerless cold session, the ACL result shape, the genuine sequence-1
+epoch-0 close/anchor row, and the stronger wrong-snapshot-object error. The
+audit also records and rejects an accidental partial-suite coverage gate, a
+wrong pnpm exit-code predicate, a non-fail-fast compound audit, the known
+default-heap Prettier OOM, and a tracked-only path listing that omitted the new
+config. Only corrected commands are credited. Complete evidence is under
+`.logs/d110c-0c1c-green-audit-563f04dd/`; its twenty-entry self-excluding
+manifest validates with SHA-256
+`184bf2ce7ed822c2f1e1a9ccc17313613ac145350e4d9f74a012aa4a581db653`.
 
 The expressly authorized one-off `claude-fable-5-1`/high course review ended
 normally in session `3de42449-c135-4bf2-a060-de4782bce954` with zero subagents
