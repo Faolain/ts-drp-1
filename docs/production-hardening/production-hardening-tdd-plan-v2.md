@@ -96300,92 +96300,154 @@ inventory is inside the root and its four-entry self-excluding manifest
 SHA-256 is
 `814f98305ea36ee3a0a37bdf07055dd4fbae8ac053b7bf5c58148904754bb1cd`.
 
-###### D.110c-0c1e epoch-zero historical-authority initialization prerequisite
+###### D.110c-0c1e scope-local historical-authority scan-custody prerequisite
 
-**Status: bounded source audit complete; plan review pending.** Owner:
-`packages/node/src/v3-live.ts::bindCreatorSuccessorLive()` at the historical
-issuance capability preparation, rejection, handoff, and issuance-store
-selection predicates only. Deadline: GREEN before D.110c-0c1d or its parent
-D.110c-0c1 closes, before D.110c-0c resumes, and before any later phase relies
-on the retained first-successor cold-reopen path.
+**Status: bounded source audit and first plan review complete; the original
+epoch-floor diagnosis is rejected and the material correction below awaits its
+sole confirmation.** Owner: `packages/node/src/v3-live.ts` at
+`activateCreatorSuccessorLive()`, `HistoricalIssuanceContext`,
+`recoverV3LiveReplica()`, `creatorFilteredIssuanceStore()`, and the existing
+registered recovery/publication/rebase scan consumers only. Deadline: GREEN
+before D.110c-0c1d or parent D.110c-0c1 closes, before D.110c-0c resumes, and
+before any retained peer successor reopen is claimed.
 
 The D.110c-0c1d focused GREEN passed on its first run, the retained 174-test
-Vitest roster passed 174/174, and the focused stable epoch-2 successor browser
-test passed. The complete retained Chromium product file then exposed one
-separate parent D.110c-0c1 initialization regression. Its preceding hot creator
-0→1 adoption passed, but the established peer's genuine epoch-1 successor cold
-reopen failed before room construction with exact detail
-`preparation-rejected: creator historical issuance authority preparation
-failed`. The room-side 0c1d task cannot cause or close this earlier Node
-refusal, so further test execution stopped and the Node repair is resliced
-rather than folded into 0c1d.
+Vitest roster passed 174/174, and focused stable epoch-2 successor reopen
+passed. The complete retained Chromium product file then exposed one separate
+parent D.110c-0c1 regression. Its hot creator 0→1 adoption passed, but the
+established peer's genuine imported epoch-1 successor cold reopen failed before
+room construction with exact detail `preparation-rejected: creator historical
+issuance authority preparation failed`. The room-side 0c1d task cannot cause or
+close this earlier Node refusal.
 
-The cause is exact. `openVerifiedCreatorHistoricalIssuance()` intentionally
-returns `undefined` when `floorTrust.currentEpoch < 1`, because there is no
-pre-genesis covered-historical interval. `bindCreatorSuccessorLive()` now opens
-two one-use capabilities and unconditionally requires both. On the first
-successor, `material.predecessor.trust.currentEpoch === 0`, so that preparation
-is guaranteed to reject even though historical authentication is neither
-possible nor required. Before D.110c-0c1, this path passed no historical
-context to the already-optional `creatorFilteredIssuanceStore()` argument and
-used the raw issuance store for the ordinary no-transport successor. Current
-classification, recovery, scan counting, and registration already accept an
-absent historical context.
+The first plan's epoch-floor explanation was wrong and is superseded here.
+`openVerifiedCreatorHistoricalIssuance()` receives
+`material.successor.trust`, whose epoch is always at least one. It opens the
+unique creator-signed retirement record successfully; the local helper then
+rejects because that record's creator `identity.author` differs from the
+reopening peer's local `issuanceScope.author`. This difference is expected:
+the close owner can authenticate its own cumulative issuance frontier but does
+not thereby authenticate every other writer's private durable outbox.
 
-GREEN adds one named `historicalIssuanceRequired` predicate equal to
-`material.predecessor.trust.currentEpoch > 0`. Only when true does the binding
-open, require, hand off, and register the two opaque historical capabilities.
-At predecessor epoch zero both remain absent: predecessor validation uses the
-same existing filtered-store call with an absent historical argument; the
-ordinary no-transport successor keeps the existing raw-store branch; and any
-transport-displaced branch keeps its existing current/displaced authentication
-with no invented historical authority. At every predecessor epoch ≥1, both
-capabilities remain mandatory and the existing exact identity checks,
-combined-scan ceiling, filtered stores, WeakMap one-use custody, recovery
-validation, and registration semantics remain byte-for-byte. Do not weaken
-`openVerifiedCreatorHistoricalIssuance()`, synthesize an epoch-zero capability,
-fall back at epoch ≥1, bypass filtered authentication, or change the room-side
-0c1d predicates.
+The first proposed absent-context repair is also rejected. One context
+currently owns both the optional creator historical boundary and the mandatory
+combined `maxEpochVertices` scan counter. `countHistoricalIssuanceRow()` returns
+false without it, and `creatorFilteredIssuanceStore()` uses that counter for
+successor-relative current rows as well as pinned-genesis and
+covered-historical rows. Omitting the context could expose a successor-era row
+to predecessor validation and fail later rather than reproduce prior behavior.
+No undefined-context fallback is authorized.
 
-The bounded RED uses the existing genuine product flow and no new fixture: in
-one Chromium file, the hot creator 0→1 setup passes and the established peer's
-imported epoch-1 cold reopen deterministically translates only the exact
-historical-preparation refusal into
-`D110C_0C1E_EPOCH_ZERO_HISTORICAL_AUTHORITY_NOT_APPLICABLE`. A failure in the
-hot setup, import, snapshot/authority match, or any other detail is noncausal.
-GREEN makes those two selected serial tests pass, then the complete 13-title
-Chromium product file must pass without exclusion. It must preserve the
-D.110c-0c1d historical and pinned-genesis matrices, the stable epoch-2 reopen,
-and the epoch-3 pending-adoption recovery.
+The selected GREEN separates the two meanings inside the existing private
+context without changing any public input. Both contexts are still created
+from the unique retirement carrier opened against the authenticated successor
+floor, and both retain independent counter/set state plus the exact
+`maxEpochVertices` limit. Object, closed/successor epoch and anchor, Cut/QC,
+snapshot, and carrier uniqueness correlations remain mandatory. The binding
+and `recoverV3LiveReplica()` no longer reject solely because the authenticated
+carrier author differs from the local issuance-scope author. Instead, the
+context records that relationship and supplies bounded scan custody only.
 
-Retained gates are the D.110c-0c1 focused differential, D.110c-0c1c stable
-successor, the complete Chromium product file, the accepted 14-path/174-test
+Historical boundary authority remains strictly scope local. The existing
+`authenticatedCoveredHistoricalOutboxRow()` author equality remains mandatory:
+only `identity.author === issuanceScope.author` may use
+`admittedAuthorSequence` to authenticate a covered-historical row. A
+foreign-scope context can count and process rows independently authenticated as
+current, displaced, or pinned-genesis, but it cannot authenticate, suppress,
+publish, rebase, or complete a covered-historical local row. Encountering one
+still fails closed with the row unchanged. Missing, malformed, ambiguous, or
+wrong object/epoch/anchor carrier material still rejects before activation.
+Both one-use WeakMap handoffs remain required, are consumed once, and reach the
+activated registration in the same order. Same-author D.110c-0c1 behavior is
+unchanged.
+
+The causal RED uses the existing serial Chromium product flow. The hot creator
+0→1 setup must pass; only the established peer's exact author-mismatch
+historical-preparation refusal is translated to
+`D110C_0C1E_SCOPE_LOCAL_SCAN_CUSTODY_REQUIRED`. Any other setup, import,
+snapshot, authority, recovery, or room failure is noncausal. A bounded
+same-author control cold reopens an epoch-1 successor after that same author has
+already issued a successor-era row, proving the wrapper suppresses/counts that
+row during predecessor validation and the successor recovers it exactly once.
+RED preserves this control if already green; it does not manufacture a failure.
+
+GREEN first passes the two selected serial peer tests plus the same-author
+successor-row control. Then restore the separately reviewed two-predicate
+D.110c-0c1d room overlay under its own owner and run the complete 13-title
+Chromium product file as a combined retained gate. The D.110c-0c1 historical
+and pinned-genesis matrices, D.110c-0c1c stable epoch-2 reopen, and D.110c-0c
+pending-adoption recovery must remain green. The accepted 14-path/174-test
 0c1a/0c1b/rebase/issuance/reclamation/snapshot Vitest roster, Node and
 storage-browser builds and production-source no-emit checks, v3-room
 build/typecheck, exact-owner ESLint/Prettier/diff, and source-shape predicates
-proving epoch-zero optionality plus epoch-one-or-later mandatory custody. The
-broad Node test-inclusive typecheck may reproduce only its recorded unrelated
-worker-host rootDir, E3-02 `emit`, and compact-history helper diagnostics; the
-production-source build/no-emit gate must pass. No D.110a invocation, campaign,
-new fixture, product API, schema, wire, dependency, threshold, authority
-assumption, or room behavior is authorized.
+are retained. Source shape proves two scan contexts, one-use custody, bounded
+counting for all filter classes, author equality at the sole historical
+boundary use, and no undefined-context success. The broad Node test-inclusive
+typecheck may reproduce only its recorded unrelated diagnostics; production
+build/no-emit must pass.
 
-This is a high-risk recovery-initialization correction inside the already-open
-D.110c-0c1 GREEN. Sign and push this bounded plan, then run one Grok 4.6/high,
-direct Kimi K3 with `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review.
-Only P0/P1 blocks; P2 receives disposition without recursive prose review. One
-confirmation is permitted only if a correction materially changes executable
-scope or acceptance. After an empty blocking union, add the exact tests-only
-RED translation and run its two selected tests once before changing the Node
-predicate. The existing combined D.110c-0c1 final GREEN review covers 0c1d and
-0c1e; do not add another final-review ceremony. Do not invoke Fable or a
-collaboration subagent.
+This slice does not claim that the creator carrier authenticates a different
+writer's intermediate-epoch history. That missing capability is assigned to
+D.110c-0c1f below and remains blocking before parent D.110c-0c1, Phase-6 exit,
+or Phase-7 long-lived-room closure. No D.110a invocation, campaign, product API,
+schema, wire, dependency, threshold, external authority, or room behavior is
+changed by 0c1e.
 
-The source audit is `.logs/d110c-0c1e-source-audit-5bf872b6/`. It preserves the
-non-GREEN full-browser reporter and pins the exact opener, unconditional bind
-rejection, pre-D.110c-0c1 behavior, and current optional-context consumers. Its
-two-entry self-excluding manifest validates with SHA-256
+The first review inspected signed/pushed `ed4bcb80844451a3e98732db9eb57a2bb8e01d99`,
+tree `2382a3efff152942995a2dddb04eaf1d1a242503`. Grok 4.6/high, direct
+Kimi K3/100-step, and Opus xhigh all returned `CHANGES_REQUIRED`. Their
+blocking union is corrected above: the refusal is author mismatch rather than
+the opener's epoch floor; scan counting cannot use an absent context; a
+same-author successor-row control is added; and the later peer-history gap has
+an explicit blocking owner. The nonexistent `bindCreatorSuccessorLive()` name
+is corrected to `activateCreatorSuccessorLive()`. The first audit's room-source
+hash is preserved and explicitly identified as the tested, held 0c1d overlay,
+not the signed tree blob. Because these corrections change causal attribution,
+production ownership, and executable acceptance, exactly one confirmation is
+required after this text is signed and pushed. Only an empty P0/P1 confirmation
+union authorizes RED. No further confirmation or recursive prose review is
+permitted.
+
+The original source audit is `.logs/d110c-0c1e-source-audit-5bf872b6/`; its
+two-entry self-excluding manifest remains
 `78c5f0bc3d483c1f599e4441c53f7200fcdf4d238bd9b92e7d3355ba00f0daff`.
+The correction audit is `.logs/d110c-0c1e-plan-correction-ed4bcb80/`; its
+one-entry self-excluding manifest validates with SHA-256
+`c6fe18225eb94a052ab6d4fdd4393af7655ccb4729d94910db27e90d2ce6f159`.
+Complete first-review evidence is `.logs/d110c-0c1e-plan-review-ed4bcb80/`;
+its 23-entry self-excluding manifest validates with SHA-256
+`4b8b2bcc292265555f8b1ef62bcaccf3b1e779613fe89326c3c76703310efa83`.
+The current Grok/Kimi schema-only normalizations join array-valued evidence
+lines without changing finding substance; they are not repeat reviews.
+
+###### D.110c-0c1f multi-author historical-issuance authority prerequisite
+
+**Status: explicit blocking product-capability debt; bounded architecture audit
+and its own high-risk plan review are pending after D.110c-0c1e.** Owner: the
+authenticated control proof that permits a non-creator local issuance author
+to prove its own admitted intermediate-epoch frontier across later room
+successors, plus the corresponding private Node recovery consumer. Deadline:
+before D.110c-0c1 closes, before the ≥100-transition same-room gate, before
+Phase-6 exit, and before Phase-7 Discord/MMORPG cold-join claims.
+
+RED must use one genuine multi-author room: a non-creator writer issues in an
+intermediate epoch, the room advances until that row is older than both current
+and displaced anchors, and that same writer cold reopens from pinned genesis
+and the authenticated current checkpoint. It must fail through the real
+product path because the creator-only retirement carrier cannot authorize that
+writer's historical boundary. No tests-only carrier, cleared outbox, oversized
+single epoch, or private record mutation may substitute.
+
+The architecture audit must first decide whether existing per-author signed
+vertices plus Cut/QC, RFC 9162 history roots, checkpoint authority, and bounded
+archive proofs can authenticate this frontier without O(epoch) active control
+state. If it requires a new carrier shape, wire field, authority assumption,
+public API, dependency, or migration, stop at a separately reviewed high-risk
+prerequisite rather than folding it into 0c1e. GREEN must preserve pending
+offline/rebase custody, fail closed for an unprovable writer, keep combined
+scan and active-control state bounded, survive restart/prune boundaries, and
+join the genuine multi-epoch and Phase-7 cold-join gates. D.110c-0c1e's
+scan-only foreign-scope context is not authority and cannot satisfy this slice.
 
 ###### D.110c-0c1d successor-reopen historical-rebase orchestration prerequisite
 
