@@ -92028,7 +92028,17 @@ receipt, archive record, or active registration in test code.
    new epoch-N controls are additive. Deadline: before D.110c-c RED.
 7. **D.110c-c — bounded cold reopen, repeated cleanup, restart, and custody.**
    Owner: the existing D.109 cleanup/reclamation orchestrators and installed-v3
-   registration custody, consuming approved 0b/0c designs. RED/Green cover
+   registration custody, consuming approved 0b/0c designs. This slice also owns
+   the currently missing close-capability composition after cold reopen: today
+   `successorSnapshotDeclaration` and `creatorFinalitySigner` are mutually
+   exclusive and the room binds creator close only on the non-declaration path.
+   Its reviewed RED must prove a genuinely authenticated cold-reopened active
+   epoch-N successor cannot invoke the existing close/adopt path; GREEN must
+   re-establish exact current finality/close custody without weakening the
+   declaration trust, accepting a caller-selected signer, or creating a second
+   close owner. If that needs a new authority carrier, public API, or wire
+   change, D.110c-c stops and reslices it explicitly before implementation.
+   RED/GREEN otherwise cover
    fresh-process pre-close, post-close, pre-adoption, post-adoption, and
    post-prune boundaries; age-independent trust reopen; offline/rebase outbox;
    sequential prune plus one skipped-prune catch-up; two rollback generations;
@@ -96303,7 +96313,9 @@ SHA-256 is
 ###### D.110c-0c1e scope-local historical-authority scan-custody prerequisite
 
 **Status: bounded source audit, corrected plan, sole material confirmation, and
-causal tests-only RED complete; production GREEN has not begun.** Owner:
+causal tests-only RED complete; the production GREEN is implemented and its
+focused cases pass, but it remains held and unclosed after the combined gate
+exposed D.110c-0c1g below.** Owner:
 `packages/node/src/v3-live.ts` at
 `activateCreatorSuccessorLive()`, `HistoricalIssuanceContext`,
 `recoverV3LiveReplica()`, `creatorFilteredIssuanceStore()`, and the existing
@@ -96471,10 +96483,185 @@ self-excluding manifest SHA-256 values are
 `b3f7f007f376767e5987f8a3142ff641949bf0f9b87afdb72856e9e7934a98af`
 and `29d40e141120710b3490afe0a6d944ce37cf69aae1516f176c8b0d89156b5caa`.
 
+The first combined retained run advanced every D.110c-0c1e and D.110c-0c1d
+case, then exposed one stale D.110c-0c fixture probe. Both process-death
+orderings completed recovery as `active-new`, committed stable epoch 3, and
+issued the post-restart message. The fixture next called the hot-owner
+`d110c0cRoomSnapshot()`, whose `inspectDurableHead()` intentionally requires a
+creator close handle, even though this cold recovery deliberately passed
+`withCreatorSigner: false`. The resulting `creator close authority is
+unavailable` was therefore a test-observation failure after successful product
+recovery, not a new close-authority or scan-custody defect. The fixture now uses
+the existing `d110c0cColdRoomSnapshot()` for authority, ACL, projection, room,
+and status; the same test continues to verify durable room-head and AHE state
+through its separate authenticated evidence reads. This tests-only correction
+does not claim the recovered peer can close another epoch.
+
+The corrected probe then exposed a genuine, separately owned product-
+composition defect. The one-test run reached active epoch 3 and issued the
+post-restart message, but its projection contained only
+`d110c-0c-post-restart`; the authenticated epoch-zero, epoch-one, and epoch-two
+messages were absent. The semantic expectation was not weakened. Execution is
+frozen before another focused or combined browser run while D.110c-0c1g below
+owns the missing authenticated projection base. This result is not attributed
+to 0c1e's Node scan-custody GREEN or 0c1d's startup predicates, and neither
+slice is closed by the held working tree.
+
+###### D.110c-0c1g authenticated successor projection-base prerequisite
+
+**Status: bounded source/architecture audit complete; high-risk plan review is
+pending before tests-only RED or production edits.** Owner:
+`examples/v3-room/src/index.ts::V3RoomApplication` and
+`createV3RoomSessionOwned()` projection initialization/stage/commit path;
+`packages/node/src/v3-live.ts::bindV3BlueprintLivePlane()` only at its existing
+handle-retrieval branch; the chat and grid application projectors; the existing
+room public-contract compile fixture; and one new focused storage-browser
+successor-reopen test. Deadline: GREEN before D.110c-0c1e/0c1d or parent
+D.110c-0c1 closes, before 0c1f RED, before D.110c-0c resumes, and before
+D.110c-c/d or Phase 7 relies on a cold-reopened epoch-N projection.
+
+The demonstrated defect is exact. A declaration-bearing successor reopen skips
+`prepareDurableRoomState()`, leaves `recovered` absent, initializes an empty
+`acceptedVertices` map, and calls the application projector with an empty
+operation list. Every later `stage()` reconstructs the projection from that
+current map alone, so a one-shot seed would be discarded by the first new
+commit. This caused the retained epoch-3 room to report only the post-restart
+message. The Node recovery path already imports the exact snapshot application
+bytes into a `BlueprintStateMachine` after payload/state-digest checks and
+installs a blueprint handle on the current successor registration. The room
+cannot retrieve it because the existing `{plane}` retrieval branch accepts
+only mode `snapshot-closed`, whereas a usable adopted successor is current,
+`genesis-active`, and already owns that authenticated imported machine.
+
+The selected contract has one projection owner; it does not add an optional
+parallel projector or a compatibility fallback. The required
+`projectAcceptedOperations` callback changes from an operations array to one
+closed `V3RoomProjectionInput` object containing:
+
+- `authenticatedBase`, either `undefined` or an immutable detached
+  `V3RoomAuthenticatedProjectionBase` with exact canonical application-state
+  bytes, their `stateDigest`, and the `blueprintDigest`; and
+- `currentEpochOperations`, the existing sorted accepted-operation rows for the
+  current live epoch only.
+
+Fresh genesis and ordinary journal recovery pass `authenticatedBase:
+undefined` and their genuine recovered/current operations. A declaration-
+bearing successor must obtain the existing blueprint handle after successful
+authenticated reopen, take exactly one detached `blueprintSnapshot()`, verify
+that the current plane/handle, object, epoch, blueprint digest, exact bytes, and
+recomputed state digest agree with the reopened successor trust and room
+descriptor, and freeze the result before ingress binding, projection
+publication, or rebase startup. Every initialization, containment attempt,
+stage, commit, and migration-state observation then calls the same required
+projector with that immutable base plus the current epoch's genuine operations.
+An absent, consumed, deactivated, noncurrent, machine-less, mismatched, or
+mutable base fails closed; no empty projection is published as fallback.
+
+The only Node behavior change widens the existing `{plane}` retrieval predicate
+to a current active registration that already owns the authenticated imported
+machine and its handle. It does not bind a second machine, return a handle for a
+plain genesis registration, revive a consumed registration, accept caller
+bytes, or change close/fold/adoption authority. This is still an exported-
+behavior change and therefore remains inside this reviewed high-risk slice.
+The room application signature is an explicit public TypeScript contract
+change: every in-repository implementation and the exact compile fixture must
+move in one batch, with no deprecated overload or legacy alias.
+
+Application state and historical vertex evidence are deliberately not
+conflated. Chat's authenticated snapshot state currently contains only
+`clientOperationId` and `text`; zone state contains blocks and outcomes. The
+projectors decode those exact durable product fields and add only genuine
+current-epoch provenance from `currentEpochOperations`. They must not invent
+historical author, sequence, digest, logical-time, operation-index, accepted-
+digest, or peer-roster facts that the snapshot did not authenticate. Any
+projection view whose old row lacks those facts represents it explicitly as
+snapshot-derived; digests or transport mappings that require live vertex
+evidence exclude rather than counterfeit that evidence. If preserving a
+required security decision instead requires historical metadata absent from
+the authenticated snapshot, implementation stops and reslices a versioned
+application-state/authority carrier rather than silently changing snapshot
+bytes or trusting caller configuration.
+
+The causal RED is one new one-test/one-file Chromium case on a stable successor,
+not another D.110c-0c pending-adoption execution. It performs genuine hot
+0→1→2, closes the first room, cold reopens epoch 2 without a creator signer,
+and observes projection before and after one new current-epoch issue. The exact
+tests-only terminal token is
+`D110C_0C1G_AUTHENTICATED_PROJECTION_BASE_REQUIRED`, emitted only when reopen,
+trust, snapshot import, activation, and the new issue all succeed but the
+authenticated predecessor application state is absent initially or discarded
+after commit. A failure before active epoch 2, a different token, a digest or
+authority mismatch, direct fixture seeding, private record mutation, or a
+tests-only reconstructed predecessor vertex is noncausal and stops. The
+already observed two-ordering D.110c-0c failure remains an immutable pending-
+path witness and is not rerun for RED.
+
+GREEN first proves the focused treatment and deterministic mutants. Before the
+new issue, canonical state bytes and digest must exactly equal the authenticated
+snapshot base. After it, the old durable product rows remain exact, the new row
+appears exactly once with genuine current-epoch provenance, canonical state
+advances to the expected digest, and another commit cannot drop or duplicate
+the base. Mutants cover missing/duplicate retrieval, plain-genesis retrieval,
+consumed/deactivated plane, missing machine/handle, wrong object/epoch/
+blueprint/state digest, changed detached bytes, projector rejection, attempted
+base mutation, and a projector that ignores its supplied base. Each fails
+before ingress/rebase/projection publication with the existing closed Node
+failure or one exact room initialization error. Controls prove genesis,
+journal recovery, migration rebase/rehearsal, hot adoption, 0c1c fail-closed
+successor reopening, issuance, and rebase custody retain their semantics.
+
+The completed GREEN retained gate runs once in this order: the new focused
+case/mutants; D.110c-0c1e's three tests; D.110c-0c1d's focused test;
+D.110c-0c1c; D.110c-0c1; and both D.110c-0c process-death orderings with exact
+application state, ACL/authority/anchor/history, snapshot identity, room-head,
+AHE, and issuance/journal accounting against the pre-crash oracle. It then runs
+the complete retained 14-title Chromium product file, the accepted 174-test
+Vitest roster, Node/storage-browser/v3-room/chat/grid builds and production
+no-emit checks, exact-owner ESLint/Prettier/diff, and source-shape predicates.
+Source shape proves one required projector contract, no old overload/fallback,
+one immutable base owner, base use at every projection call, current-handle
+retrieval guards, no fabricated historical provenance, and the held 0c1d and
+0c1e predicates. Any unexpected soft failure stops before more changes.
+
+The only public-surface changes authorized here are the required room
+application projector input and the narrowed widening of the existing Node
+handle-retrieval behavior described above. This slice adds no new public entry,
+wire field, snapshot schema, dependency, authority assumption, threshold,
+workload, retry, campaign, or D.110a invocation. It does not authenticate a
+foreign writer's older issuance row;
+0c1f remains the owner. It does not make a cold-reopened successor close-
+capable; D.110c-c owns that distinct lifecycle seam below. If either capability
+is required to make this focused projection case pass, stop and reslice rather
+than widening 0c1g.
+
+Because this changes exported Node behavior and the room application contract
+adjacent to authenticated recovery, sign and push this plan before production
+edits, then run one Grok 4.6/high, direct Kimi K3 with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh plan review. Only P0/P1
+blocks. Correct their material union in one batch and permit at most one
+confirmation only if executable scope, causal acceptance, or a security
+boundary changes; dispose P2 without recursive prose review. After an empty
+blocking union, execute the focused RED exactly once. The final combined
+D.110c-0c1 GREEN review covers 0c1e, 0c1d, and 0c1g together; this prerequisite
+adds no intermediate full review. Do not invoke Fable or a collaboration
+subagent.
+
+The bounded audit is `.logs/d110c-0c1g-source-audit-c5613498/`; its two-entry
+self-excluding manifest validates and its manifest SHA-256 is
+`8e746683abc09d8040f1cb7a945fe45b26db76d90c166e945f569de74298aab7`.
+The expressly authorized one-off Fable 5.1/high course review is advisory only:
+it returned `CONTINUE_NARROW_RESLICE`, P0/P1/P2 `0/2/4`, session
+`29a4d4c6-2c79-4508-8e6c-9ec45a3ca97c`; its evidence-manifest SHA-256 is
+`b976041dfe358ee284b9493bf0af0ff7ae8893de52b198a93b6b73dfe1fbf838`.
+It does not substitute for the governing review and authorizes no production
+edit. No further Fable run is authorized unless the user expressly requests
+one.
+
 ###### D.110c-0c1f multi-author historical-issuance authority prerequisite
 
 **Status: explicit blocking product-capability debt; bounded architecture audit
-and its own high-risk plan review are pending after D.110c-0c1e.** Owner: the
+and its own high-risk plan review are pending after D.110c-0c1g and the combined
+D.110c-0c1 GREEN.** Owner: the
 authenticated control proof that permits a non-creator local issuance author
 to prove its own admitted intermediate-epoch frontier across later room
 successors, plus the corresponding private Node recovery consumer. Deadline:
