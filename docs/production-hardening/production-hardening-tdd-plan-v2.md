@@ -96516,10 +96516,8 @@ slice is closed by the held working tree.
 
 ###### D.110c-0c1g authenticated successor projection-base prerequisite
 
-**Status: bounded source/architecture audit, first high-risk plan review, and
-the sole correction confirmation are complete with an empty P0/P1 union;
-tests-only RED is next and production edits remain prohibited before causal RED
-acceptance.** Owner:
+**Status: bounded source/architecture audit, plan review, sole correction
+confirmation, and causal tests-only RED are complete; GREEN is next.** Owner:
 `examples/v3-room/src/index.ts::V3RoomApplication` and
 `createV3RoomSessionOwned()` projection initialization/stage/commit and
 successor-migration refusal paths;
@@ -96797,6 +96795,29 @@ fact; both refusal tokens are pinned in RED; successor `activateMigration()` is
 not claimed and may fail closed pending 0c1i; and any unexpected retained
 Chromium semantic-assertion edit stops and reslices. No further confirmation is
 permitted. The blocking union is empty, so the frozen causal RED may proceed.
+
+The causal RED executed exactly once against signed/pushed anchor `6f569a40`.
+The corrected listing selected one test in one file; an earlier over-escaped
+read-only selector selected zero and was corrected without executing a test.
+The sole execution returned runner status 1 and reporter counts
+expected/skipped/unexpected/flaky `0/0/1/0`, no top-level error, one failed
+result, retry zero, and exact terminal token
+`D110C_0C1G_AUTHENTICATED_PROJECTION_BASE_REQUIRED`. Before that token, hot
+0→1→2, active epoch-2 signerless cold reopen, identical authority and ACL,
+and the post-reopen epoch-2 issue and durable issuance row all succeeded. The
+hot projection contained epoch-zero and epoch-one; the reopened projection was
+empty; after the new commit it contained only the new epoch-2 row. This is the
+frozen causal matrix: authenticated predecessor application state is dropped
+at reopen and remains absent after commit. The test did not traverse pending
+adoption, seed a predecessor vertex, mutate private state, or rerun the consumed
+D.110c-0c witness. The reporter initially landed below the package directory
+because its relative environment path was resolved there; that already-written
+file was moved into the intended root without a rerun. Complete evidence is
+`.logs/d110c-0c1g-red-6f569a40/`; its 14-entry self-excluding manifest validates
+and its manifest SHA-256 is
+`86ab3e92cfeafc2a6857e6083d221c1bd78257d69339e53fdc8b41be5e0f8511`.
+The RED matrix matches exactly, so the frozen narrow GREEN may begin without a
+separate RED model review.
 
 The bounded audit is `.logs/d110c-0c1g-source-audit-c5613498/`; its two-entry
 self-excluding manifest validates and its manifest SHA-256 is

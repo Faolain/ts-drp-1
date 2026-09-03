@@ -2568,6 +2568,74 @@ function d110c0cArray(value: unknown): readonly unknown[] {
 	return value;
 }
 
+test("D.110c-0c1g preserves authenticated projection base across a stable epoch-2 successor reopen", async ({
+	browser,
+}, testInfo) => {
+	const server = await startProductBrowserServer(
+		new URL("./assets/phase-6a-creator-successor-product-entry.ts", import.meta.url).pathname
+	);
+	const isolatedContext = await browser.newContext();
+	const page = await isolatedContext.newPage();
+	const name = "projection-base-red";
+	try {
+		await openRealm(page, server.origin, "d110c-0c1g", () => [page]);
+		const evidence = d110c0cRecord(
+			await page.evaluate((selectedName) => {
+				return window.phase6aCreatorSuccessorProduct.d110c0c1cControl(selectedName);
+			}, name)
+		);
+		await testInfo.attach("d110c-0c1g-red", {
+			body: Buffer.from(JSON.stringify(evidence)),
+			contentType: "application/json",
+		});
+
+		const hot = d110c0cRecord(evidence.hot);
+		const reopened = d110c0cRecord(evidence.reopened);
+		const after = d110c0cRecord(evidence.after);
+		const prefixRows = d110c0cArray(evidence.prefixRows).map(d110c0cRecord);
+		const postReopenRows = d110c0cArray(evidence.postReopenRows).map(d110c0cRecord);
+		const projectionTexts = (snapshot: Readonly<Record<string, unknown>>): readonly unknown[] =>
+			d110c0cArray(d110c0cRecord(snapshot.projection).accepted).map((row) => d110c0cRecord(row).text);
+		const expectedBase = Object.freeze(["d110c-0c1-epoch-zero", "d110c-0c1-epoch-one"]);
+		const expectedAfter = Object.freeze([...expectedBase, "d110c-0c1-control-after-reopen"]);
+
+		expect(evidence.coldReopenCount).toBe(1);
+		expect(d110c0cRecord(hot.authority)).toMatchObject({ epoch: 2, lifecycle: "active" });
+		expect(reopened.authority).toEqual(hot.authority);
+		expect(reopened.acl).toEqual(hot.acl);
+		expect(after.authority).toEqual(reopened.authority);
+		expect(after.acl).toEqual(reopened.acl);
+		expect(projectionTexts(hot)).toEqual(expectedBase);
+		expect(
+			prefixRows.map(({ authorSequence, epoch, publishState }) => ({ authorSequence, epoch, publishState }))
+		).toEqual([
+			{ authorSequence: 0, epoch: 0, publishState: "published" },
+			{ authorSequence: 1, epoch: 0, publishState: "published" },
+			{ authorSequence: 2, epoch: 1, publishState: "published" },
+		]);
+		expect(
+			postReopenRows.map(({ authorSequence, epoch, publishState }) => ({ authorSequence, epoch, publishState }))
+		).toEqual([
+			...prefixRows.map(({ authorSequence, epoch, publishState }) => ({ authorSequence, epoch, publishState })),
+			{ authorSequence: 3, epoch: 2, publishState: "published" },
+		]);
+		expect(projectionTexts(after)).toContain("d110c-0c1-control-after-reopen");
+
+		if (
+			JSON.stringify(projectionTexts(reopened)) !== JSON.stringify(expectedBase) ||
+			JSON.stringify(projectionTexts(after)) !== JSON.stringify(expectedAfter)
+		) {
+			throw new TypeError("D110C_0C1G_AUTHENTICATED_PROJECTION_BASE_REQUIRED");
+		}
+	} finally {
+		await page
+			.evaluate((selectedName) => window.phase6aCreatorSuccessorProduct.closeDirectCreator(selectedName), name)
+			.catch(() => undefined);
+		await isolatedContext.close();
+		await server.close();
+	}
+});
+
 test("D.110c-0c1c cold reopens a stable adopted epoch-2 successor", async ({ browser }, testInfo) => {
 	const server = await startProductBrowserServer(
 		new URL("./assets/phase-6a-creator-successor-product-entry.ts", import.meta.url).pathname
