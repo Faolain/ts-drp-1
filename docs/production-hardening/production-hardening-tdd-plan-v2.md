@@ -95335,9 +95335,11 @@ blocking before D.110c-c's post-adoption restart acceptance and D.110c-d RED.
 The 0b1 P2 union is an explicit retained obligation rather than hidden scope.
 This slice records, but does not mix into its causal production repair, that
 `creatorFilteredIssuanceStore` counters are wrapper-lifetime rather than
-per-scan and currently permit two separately bounded row classes. D.110c-c owns
-the narrow deterministic RED/GREEN that scopes them per scan, freezes one
-combined `maxEpochVertices` hidden-row ceiling, and proves unresolved old or
+per-scan and currently permit two separately bounded row classes. The corrected
+D.110c-0c1 plan prospectively absorbs only the logical-scan reset and one
+combined `maxEpochVertices` hidden-row ceiling because its new third class
+cannot be safely added to the legacy counter regime. D.110c-c retains the
+physical-retirement and numeric-boundary work and proves unresolved old or
 intermediate issuance/outbox work cannot be erased or silently treated as
 published before cleanup. General physical retirement of arbitrary
 intermediate-epoch issuance rows remains D.110c-c, before D.110c-d's ≥100
@@ -95500,36 +95502,62 @@ RED-to-GREEN closure and is prohibited.
 ##### D.110c-0c1 authenticated intermediate-epoch issuance prerequisite
 
 **Status: bounded architecture decision complete; D.110c-0c1a and
-D.110c-0c1b are closed, so the existing frozen construction receives its
-high-risk plan review next, before causal RED or any `v3-live.ts` or
-issuance-store production edit.** Owner: the predecessor and successor issuance
-views created by `packages/node/src/v3-live.ts::activateCreatorSuccessorLive()`,
-`creatorFilteredIssuanceStore()`, their exact outbox classification inside
-`recoverV3LiveReplica()`, and the registered view's `publishPending` and
-`readRebaseOutbox` scans. The durable issuance/outbox contract and browser/Node
-store implementations join the owner set only if the reviewed design requires
-an authenticated retirement boundary or physical deletion; that outcome is an
-explicit high-risk compatibility/schema prerequisite, not an implicit 0c
-change. Deadline: GREEN before D.110c-0c may claim its same-process post-commit
-reopen, before D.110c-c RED, and before any D.110c-d/Phase-7 long-lived-room
-gate.
+D.110c-0c1b are closed; the first high-risk plan review at signed/pushed
+`7186d028558e75cc49d05d89a4e3c4764a664dd3` returned P0=0/P1>0, so this one
+plan-only correction freezes the exact consumer seam before the single
+permitted confirmation. No causal RED or production edit has begun.** Owner:
+the predecessor and successor issuance views created by
+`packages/node/src/v3-live.ts::activateCreatorSuccessorLive()`, the existing
+Node-private retirement-transition opener/correlation helper,
+`creatorFilteredIssuanceStore()`, the internal verified historical-issuance
+capability carried through `recoverV3LiveReplica()` into the activated
+registration, and the registered `publishPending`, `readRebaseOutbox`, and
+`completeRebaseSource` scans. `creator-adoption.ts` and its pending
+authenticator are explicitly outside this prerequisite. The durable
+issuance/outbox contract and browser/Node store implementations join the owner
+set only if deterministic RED proves the frozen internal view cannot be
+implemented over their existing six-method facade; that result stops and
+reslices rather than widening 0c1. Physical deletion remains D.109/D.110c-c.
+Deadline: GREEN before D.110c-0c may claim its same-process post-commit reopen,
+before D.110c-c RED, and before any D.110c-d/Phase-7 long-lived-room gate.
 
 The threat model remains untrusted durable store bytes under a trusted pinned
-genesis and current room floor. It is not sufficient to decode a claimed epoch
-and skip the row. A solution must prove that no current/unpublished row can be
-hidden or substituted; authenticate object, author, sequence, signature,
-anchor/epoch relation, and the exact retained authority needed for any row it
-discards; independently compare the opened retirement carrier author with the
+genesis, current room floor, and non-equivocating protocol-owned creator
+issuance signer. It is not sufficient to decode a claimed epoch and skip the
+row. A solution must prove that no current or unpublished row is hidden;
+authenticate object, author, sequence, signature, the strict historical epoch
+relation, and the verified cumulative admission boundary for every discarded
+row; independently compare the opened retirement carrier author with the
 resolved issuance scope before consuming its boundary; preserve pending
-publication and offline/rebase custody; never copy
-the current genesis filter's publish-state-blind treatment of an unpublished
-old row; fail closed or explicitly resolve every such pending row; fail closed
-on malformed, duplicate, reordered, forked, stale, cross-object, cross-author,
-or ambiguous rows; and keep hidden-row accounting per scan under one combined
-`maxEpochVertices` ceiling. It may not retain an O(N) authority/projection
-chain, manufacture displaced authority, mark an unpublished row published,
-trust the issuance database as an authority, weaken the two-generation rollback
-window, or hide growth outside the D.110c-c/d durable census.
+publication and offline/rebase custody; correct rather than copy the current
+genesis filter's publish-state-blind treatment of an unpublished old row; fail
+closed or explicitly rebase every such pending row; fail closed on malformed,
+duplicate, reordered, unsigned or byte-substituted, stale, cross-object,
+cross-author, or ambiguous rows; and keep all rows suppressed by the three
+filter classes under one combined `maxEpochVertices` ceiling per complete
+logical recovery/publication/rebase scan, not per limit-1 page or wrapper
+lifetime.
+
+The v1 carrier authenticates the dense admitted **address frontier**, not a
+per-address digest vector. The product-owned transactional issuer plus the
+D.110c-0c1b post-sign unknown-outcome halt are therefore part of the security
+assumption: for one object/author/sequence the trusted signer produces at most
+one externally usable signed vertex. Untrusted storage alone cannot manufacture
+a second valid signature. Exact issued/outbox byte equality rejects ordinary
+storage substitution, and two simultaneously observable conflicting rows still
+fail closed. A lone, otherwise valid creator-signed equivocation substituted at
+one covered address is cryptographically indistinguishable under the closed v1
+carrier and is explicitly not claimed detectable, matching the bounded trust
+checkpoint's existing lone-signed-fork limitation. Expanding the threat model
+to a compromised/equivocating signer requires a separately reviewed
+per-address commitment or membership-proof contract; it is not silently folded
+into 0c1. The adversarial roster below tests every in-scope substitution and the
+observable two-row fork, not an impossible claim against a lone valid signer
+equivocation. The slice may not retain an O(N) authority/projection chain,
+manufacture displaced authority, mark an unpublished row published before
+successful rebase completion, trust the issuance database as an authority,
+weaken the two-generation rollback window, or hide growth outside the
+D.110c-c/d durable census.
 
 The bounded architecture audit compares exactly:
 
@@ -95546,27 +95574,41 @@ bounded signed-control form of option 2 and freezes its exact high-risk
 protocol-contract prerequisite as D.110c-0c1a before implementation. A signed
 claimed epoch alone remains insufficient.
 
-After D.110c-0c1a closure and D.110c-0c1b GREEN, D.110c-0c1 RED remains tests-only. First, one corrected
-diagnostic invocation must retain
-both old-AHE and new-AHE orderings after `active-new`, proving exact floor/AHE
-effects and the identical post-commit reopen classification without aborting
-after the first ordering. Then a deterministic real-store prefix differential
-uses the same product path, room, and message inputs. Its control performs the
-genuine 0→1 transition with local issued/published rows r0 and r1, crashes in
-the pending 1→2 state, recovers, and reopens at epoch 2. Its treatment adds the
-next genuine transition, with r2, and attempts the same-process post-commit
-epoch-3 reopen. A test-owned read-only store-boundary trace records every
-`readOutboxPage` and `readIssued` call, returned row key and digest, and the
-pre-crash issue result for each epoch. It must prove byte-identical r1 is
-accepted as current in the control, the treatment reaches r1 through the real
-recovery scan, and the treatment fails there with exact predecessor
-`admission-rejected` without widening production error strings. Any control
-failure before epoch-2 reopen, treatment trace not ending at r1, different row,
-filter call, or failure class stops the slice. An empty-epoch/omitted-row control
-is prohibited unless a separate bounded tests-only probe first proves the
-product supports that lifecycle. The existing two process-death orderings
-remain retained consumption gates; no test may construct epoch-3 state, delete
-a row privately, or mutate store bytes to manufacture the differential.
+After D.110c-0c1a and D.110c-0c1b closure, D.110c-0c1 RED remains tests-only and
+does not invoke or depend on D.110c-0c's held N≥1 pending authenticator. One
+deterministic real-store prefix differential uses genuine nonfaulted product
+issue/close/adopt calls, one room, and identical message inputs. Its control
+completes 0→1 and 1→2 normally, tears down the owner only after completed
+adoption, and cold reopens epoch 2 with local issued/published rows r0 and r1;
+there is no pending crash. Its treatment continues the same room through a
+normal 2→3 close/adoption, tears down the owner, and attempts epoch-3 cold
+reopen with r2. This makes byte-identical r1 current in the control and strictly
+historical in the treatment without exercising the still-non-GREEN pending
+resume branch.
+
+A test-owned read-only store-boundary trace records every `readOutboxPage` and
+`readIssued` call, returned row key/digest/publish state, and issue result for
+each epoch. A second read-only assertion at the wrapper-to-recovery-consumer
+boundary records the exact classification attempt, so the raw-store trace is
+not asked to infer which consumer saw a row. RED must prove r1 is accepted as
+`current` in the epoch-2 control, r2 is accepted as `displaced` in the epoch-3
+treatment before r1 is reached, the treatment reaches the exact r1 bytes
+through the real recovery scan, and only that r1 ends in exact
+`recovery-rejected: creator predecessor recovery failed: admission-rejected`
+without widening production error strings. It also records the 0c1a retirement
+candidate present in every close. Any control failure, failure before the
+epoch-2 reopen, treatment trace not ending at r1, changed r1 digest, missing r2
+displaced classification, changed `displacedIssuanceBoundary`, different
+filter call, or failure class stops the slice.
+
+The signed `907a0499` two-order process-death diagnostic remains honest
+inherited non-causal context; it predates 0c1a/0c1b and does not satisfy this
+RED. It is not rerun inside 0c1. After 0c1 GREEN, D.110c-0c itself owns a fresh
+execution of both old-AHE and new-AHE orderings on the then-current signed tree,
+including exact `active-new`, floor, head-swap, retirement-candidate, and
+post-commit reopen assertions. An empty-epoch/omitted-row control remains
+prohibited. No test may construct epoch-2/3 state, crash a pending adoption,
+delete a row privately, or mutate store bytes to manufacture this differential.
 
 The one authorized corrected diagnostic ran from signed/pushed plan anchor
 `907a0499cfe03a858f682a2066faf3bbd210a59d`. Its read-only listing selected
@@ -95599,26 +95641,86 @@ and diff checks pass. These results prove the pending authenticator through
 durable commit and the separate post-commit seam; they are explicitly not a
 GREEN or permission to edit `v3-live.ts`.
 
-GREEN implements only the reviewed selected family. It must make the unchanged
-epoch-0/1/2 fixture complete its same-process post-commit epoch-3 reopen and
-issue/publish its fourth message in both crash orderings while preserving the
-exact first-transition pending matrix
-and the signed D.110c-0c RED. The N≥1 pending authenticator also applies the
-same commit-phase/current-epoch QC filtering used by the retained cold-reopen
-owner before its exactly-one opener. Adversarial gates cover a forged lower epoch,
-valid same-room old fork, duplicated author sequence, substituted issued/outbox
-pair, unpublished intermediate row, current row claiming an older sequence,
-stale retirement boundary, rollback, ambiguous write, and scan-counter reset.
-The retained gate includes 0b1 cold reopen/census, Phase-6a reopen,
-issuance/outbox, offline/rebase, D.109 reclamation, room-head, snapshot,
-availability, and rollback suites. Exact-owner build/typecheck/lint/format/diff,
-one-test/one-file selection, source-slice predicates, protected paths, 27
-stashes, process/ports, hashes, and self-excluding evidence manifests remain
-mandatory.
+GREEN implements only the reviewed selected family in `v3-live.ts` plus the
+shared Node-private retirement-opening/correlation helper. It makes the
+nonfaulted real-store prefix differential reopen epoch 3 and issue/publish its
+fourth message while preserving the exact 0→1 pending matrix, the signed
+D.110c-0c RED, and all current error strings. D.110c-0c—not 0c1—owns the N≥1
+pending authenticator and the commit-phase/current-epoch QC filter before its
+exactly-one opener.
+
+The implementation uses one physical six-method issuance facade and one
+Node-private verified historical-issuance capability, not two fictitious store
+objects or a new exported input. The existing retirement opener/correlation
+owner opens the exact successor closure's unique retirement candidate against
+the independently authenticated successor floor/trust, exact Cut/QC/snapshot
+identities, and its adjacent predecessor candidate. Before exposing a boundary
+it compares the opened `identity.author` and object with the resolved issuance
+scope. `activateCreatorSuccessorLive()` installs the opaque result in an
+internal one-use WeakMap keyed by the prepared/recovered capability; recovery
+consumes it into `RecoveredV3LivePayload`, and activation copies it into the
+private `V3PlaneRegistration`. Absence, duplicate consumption, wrong floor,
+wrong candidate, correlation failure, or author/scope mismatch rejects before
+row suppression or activation. No public `RecoverV3LiveReplicaInput`, room,
+issuance-store, or package-root shape changes.
+
+Classification order is frozen. The unchanged current predicate runs first;
+the unchanged immediate-predecessor/displaced predicate runs second; neither
+can ever be demoted because its sequence is at or below a retirement boundary.
+Only when both reject may the private capability classify
+`covered-historical`. That third result requires exact issued/outbox bytes and
+publish state, canonical object/author/sequence/digest, a valid creator vertex
+signature, `authorSequence <= admittedAuthorSequence`, and a decoded vertex
+epoch strictly less than the retained displaced epoch (equivalently strictly
+less than the opened carrier's `closedEpoch` for the active successor). The
+row's scope author must equal both the issuance scope and opened carrier author.
+Any current/immediate-predecessor match wins irrespective of boundary position;
+any row above the boundary or at the current/displaced epochs that those
+predicates reject remains rejected.
+
+The facade suppresses only authenticated `published` covered-historical rows.
+A covered-historical `pending` row is returned. Recovery authenticates and
+accounts for it as historical without replaying it into the already recovered
+snapshot state. `publishPending` gives it the existing displaced-custody
+disposition: advance the scan cursor, perform no direct stale-anchor
+publication, and do not mark it published. `readRebaseOutbox` returns it as a
+historical rebase source only after the same capability authentication and
+current stable application-ABI validation; `completeRebaseSource` marks the
+original row published only after the genuine current-epoch rebase issue and
+publication succeeds. Failure leaves the row pending and rebase-visible. The
+same publish-state rule applies to the pinned-genesis class, closing the
+pre-existing publish-state-blind residual rather than copying it.
+
+One internal scan owner resets one combined counter exactly once at the start
+of each complete recovery, publication, or rebase traversal and carries it
+across every limit-1 page. Successor-relative, pinned-genesis, and
+covered-historical rows suppressed from the ordinary current/displaced path all
+consume that same counter. More than `maxEpochVertices` total refuses; a new
+logical scan resets to zero. This 0c1 assignment prospectively supersedes only
+D.110c-c's earlier per-scan/counter cleanup sentence; D.110c-c still owns
+numeric reconciliation and physical pruning.
+
+Adversarial gates cover a forged lower epoch, unsigned or altered old-row
+substitution, two observable same-address signed rows, duplicated author
+sequence, substituted issued/outbox pair, uncovered historical row,
+unpublished intermediate and genesis rows, current/displaced rows below the
+boundary, stale or wrong-floor retirement boundary, jumped boundary, replay of
+the retired carrier after replacement, cross-object/cross-author rows,
+rollback, ambiguous write, and counter overflow/reset across multiple pages.
+The unpublished rows must remain rebase-visible with zero direct publication
+and unchanged `pending` state until successful rebase completion. A 1→2 or 2→3
+retained D.109 gate proves `displacedIssuanceBoundary` is unchanged; D.110c-c
+alone later reconciles it numerically with the admitted frontier before
+deletion. The retained gate includes 0c1a/0c1b, 0b1 cold reopen/census, the
+0→1 first-transition matrix, Phase-6a reopen, issuance/outbox, offline/rebase,
+D.109 reclamation, room-head, snapshot, availability, and rollback suites.
+Exact-owner build/typecheck/lint/format/diff, one-test/one-file selection,
+source-slice predicates, protected paths, 27 stashes, process/ports, hashes,
+and self-excluding evidence manifests remain mandatory.
 
 Because this prerequisite changes or may change production recovery and durable
 issuance policy, it is high risk. Freeze the exact selected construction after
-the two-order diagnostic and bounded audit, sign/push the plan, and run the
+the bounded audit, sign/push the plan, and run the
 governing Grok 4.6/high, direct Kimi K3 100-step, and Opus xhigh plan review.
 Only P0/P1 blocks. No production edit follows until that union is empty and the
 causal RED is signed/pushed. The held D.110c-0c pending-authenticator candidate
@@ -95626,6 +95728,50 @@ is signed only as a labeled non-GREEN checkpoint and receives the existing
 final GREEN review together with 0c1 after the unchanged full gate passes. No
 Fable or collaboration subagent is invoked without a new express user
 authorization.
+
+The first plan review inspected signed/pushed `7186d028558e75cc49d05d89a4e3c4764a664dd3`,
+tree `cc6631b6eb2f4ed2d873d7b26591742b161bf097`, from
+`.logs/d110c-0c1-plan-review-7186d028/`. Grok 4.6/high exact session
+`01a065c0-b20f-7681-abee-67d21c8ccbc0` ended normally and its strict runner
+reported `NO_VERDICT` only because inspection prose preceded its valid terminal
+object; an exact-session schema-only re-emission, without re-review, preserved
+`CHANGES_REQUIRED`, P0=0/P1=2/P2=2. Direct Kimi K3 session
+`session_8cfeace9-0f56-48dc-94d5-c3669720ee73` with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100` ended normally with `CHANGES_REQUIRED`,
+P0=0/P1=2/P2=4. Its CLI used two read-only internal exploration workers despite
+the requested direct-review posture; that execution fact is preserved and no
+replacement is launched. Opus xhigh session
+`c69f8ad0-4fb0-4397-8752-26d34c379e8d` returned `CHANGES_REQUIRED`,
+P0=0/P1=4/P2=4. No reviewer requested a different authority family or found an
+existing product edit.
+The first-review root's 22-entry self-excluding manifest SHA-256 is
+`fd5cfdf7dc0870b6b8dc35fe7d789ec51ee663a91905c5d089e13c1508bef28a`.
+
+The blocking union is accepted in this one plan-only correction. Current and
+displaced classification now has explicit precedence and a strict historical
+epoch guard; 0c1 RED no longer invokes the out-of-owner pending authenticator;
+the stale `907a0499` diagnostic is inherited context rather than claimed
+post-0c1a/0c1b evidence; the one-store/private-capability handoff is named
+through recovery and registration; covered pending rows route only through
+rebase completion; and the single combined counter spans whole logical scans.
+The v1 frontier's inability to distinguish a lone otherwise-valid signer
+equivocation is stated as an exact non-equivocating-signer assumption rather
+than hidden behind a false fork-rejection claim. The P2 union is also
+dispositioned without widening production scope: wrapper-to-consumer tracing
+disambiguates RED; pending genesis rows receive the same rebase custody;
+`displacedIssuanceBoundary` remains unchanged while D.110c-c owns numeric
+reconciliation and pruning; jumped-boundary and retired-carrier replay rows join
+the adversarial matrix; and the public `./internal/*` signing-request mint is
+accepted as the existing seal/anchor trust pattern, with export-map narrowing
+deferred to nonblocking package hygiene. Because these corrections change
+causal RED and executable classification/custody acceptance, exactly one
+Grok/Kimi/Opus confirmation is required after this corrected plan is signed and
+pushed. No production edit or RED begins before its P0/P1 union is empty, and
+no bookkeeping-only confirmation follows it.
+The corrected local audit is
+`.logs/d110c-0c1-plan-correction-7186d028/`; its two-entry self-excluding
+manifest SHA-256 is
+`3ff197823fb1fbf5c97d40c08eb470ba8ba6e83e26b60f9f7422bb0f0bbf7c5c`.
 
 The expressly authorized one-off `claude-fable-5-1`/high course review ended
 normally in session `3de42449-c135-4bf2-a060-de4782bce954` with zero subagents
@@ -95794,25 +95940,31 @@ both adjacent closures exist; cold-reopen freshness reduces to the accepted
 D.110c-0b0 floor authority and the record's successor binding.
 
 An authenticated boundary permits old-address **admission authentication**
-only at or below its inclusive sequence. The future D.110c-0c1 wrappers still
-require exact issued/outbox equality, canonical object/author/sequence, and a
-valid author signature, but apply two explicit view policies. The recovery
-admission view classifies a covered old row from the verified capability rather
-than returning it to the unmodified current/displaced predicate. The separate
-offline/rebase custody view may hide a covered `published` row but must return a
-covered `pending` row for existing rebase completion; that row is never
-prune-eligible. Thus the checkpoint, not the row's claimed old anchor or
-database watermark, supplies historical admission authority without converting
-an unpublished row into a published one. Rows above the boundary retain
-existing current/displaced admission. One combined per-scan
-`maxEpochVertices` counter bounds all rows classified through the new
-capability.
+only at or below its inclusive sequence and only after the unchanged current
+and immediate-predecessor predicates both reject. It can never demote a row
+those predicates authenticate. The future D.110c-0c1 consumer uses one
+six-method facade plus a private verified capability. It requires exact
+issued/outbox equality, canonical object/author/sequence/digest, a valid author
+signature, carrier-author/issuance-scope equality, and an epoch strictly older
+than the retained immediate predecessor. The facade suppresses only covered
+`published` historical rows. It returns covered `pending` rows; recovery
+classifies them without replay, `publishPending` routes them to rebase custody
+without direct publication or a published mark, and only successful
+`completeRebaseSource` may mark them published. The same rule covers a pending
+pinned-genesis row. Thus the checkpoint plus the trusted non-equivocating
+issuer—not a row's self-claimed epoch or a database watermark—supplies the
+historical address authority without converting an unpublished row into a
+published one. One combined counter spans all suppressed filter classes across
+the complete logical scan and resets only when a new recovery/publication/
+rebase traversal begins.
 
 Physical pruning remains an execution mechanism owned by D.109/D.110c-c. The
 existing D.109d law at `packages/node/src/v3-live.ts:2845` requires
-`prunedThroughAuthorSequence === displacedIssuanceBoundary`; D.110c-0c1 and
-D.110c-c must explicitly reconcile that immediate-predecessor boundary with the
-new authenticated admitted frontier before any deletion. Pruning may
+`prunedThroughAuthorSequence === displacedIssuanceBoundary`; D.110c-0c1 leaves
+that runtime meaning byte-for-byte unchanged and proves it at a genuine 1→2 or
+2→3 adoption. D.110c-c alone reconciles the immediate-predecessor boundary
+numerically with the authenticated admitted frontier before any deletion.
+Pruning may
 run only after verified adoption, authenticated floor commit, snapshot
 availability, two complete rollback generations, outbox completion, and exact
 retirement-checkpoint agreement. Refusal or crash may retain certified rows;
