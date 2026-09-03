@@ -97264,12 +97264,17 @@ identity, or silently change the wire shape.
 
 ###### D.110c-0c1f2 compact issuance-frontier encoding reslice
 
-**Status: causal tests-only RED is CLOSED at signed/pushed commit
-`c584b76bb7376fe2cbf4664dfdebacab8c153568`; the single material Grok/Kimi/Opus
-plan confirmation has an empty P0/P1 union, both RED layers terminate only at
-the frozen causal token, and the reviewed narrow production GREEN is now
-authorized.** Owner and deadline are exactly the
-corrected 0c1f1 owners/deadline above. This reslice
+**Status: narrow implementation checkpoint accepted. Causal RED is preserved
+at signed/pushed commit `c584b76bb7376fe2cbf4664dfdebacab8c153568`, combined
+f2/f4 GREEN is signed/pushed at
+`9e1781e0966953d7adce8cf6b0a4d9e56d12299a`, and isolated proof is
+signed/pushed at `da3e75514e3921b71d57d611d9e2b61785124b07`. The combined
+Grok/Kimi/Opus review at plan anchor
+`f3617a8284af6d149441f0531ddec520370a34fe` unanimously accepts RED causality
+and GREEN closure for this narrow checkpoint. General multi-author rebase
+safety and foreign-author close availability remain blocked by f5a/f5b below;
+no multi-author room may rely on repeated close before they close.** Owner and
+deadline are exactly the corrected 0c1f1 owners/deadline above. This reslice
 changes only the canonical representation of each frontier entry and retains
 every 0c1f1 trust assumption, fixed preimage field, permissionless-aware writer
 set, private admitted-identity owner, legacy bootstrap/equality rule, refusal
@@ -97585,14 +97590,15 @@ manifest validates and has SHA-256
 
 ###### D.110c-0c1f4 exact pinned-genesis bootstrap recovery authority prerequisite
 
-**Status: clean-isolated tests-only RED complete at corrected signed/pushed plan
-anchor `1033e22eaa152a1a1a26d1fc057564ac75b68192`; its causal matrix and
-supplemental immutable-0c1f2 preconditions are recorded below, with zero
-production-source change. The combined 0c1f4-plus-0c1f2 implementation now
-passes its frozen focused unit and two-title browser matrix, but it is not yet
-signed, finally reviewed, or closed. D.110c-0c1f5 below is a newly demonstrated
-blocking design gap that must be settled before this aggregate-frontier work or
-parent 0c1 can claim general historical rebase safety.** Owner: the public
+**Status: narrow implementation checkpoint accepted. Clean-isolated tests-only
+RED is preserved at corrected signed/pushed plan anchor
+`1033e22eaa152a1a1a26d1fc057564ac75b68192`; combined f4-plus-f2 GREEN and its
+isolated proof are signed/pushed at `9e1781e0966953d7adce8cf6b0a4d9e56d12299a`
+and `da3e75514e3921b71d57d611d9e2b61785124b07`. The combined Grok/Kimi/Opus
+review at `f3617a8284af6d149441f0531ddec520370a34fe` unanimously accepts the
+f2/f4 RED-to-GREEN checkpoint. D.110c-0c1f5a/f5b below remain blocking before
+this work or parent 0c1 may claim general historical rebase safety or operate a
+multi-author room through repeated close.** Owner: the public
 `@ts-drp/node/v3-live` `RecoverV3LiveReplicaInput` and closed input snapshot;
 the public `@ts-drp/node/creator-adoption-activate`
 `reopenCreatorSuccessorAdoption()` cold-input exact-key capture; the private
@@ -97816,12 +97822,14 @@ change.
 
 ###### D.110c-0c1f5 authenticated rebase-supersession frontier prerequisite
 
-**Status: bounded source/architecture audit and targeted close-liveness
-addendum complete with no safe production repair selected; BLOCKED pending one
-combined governing high-risk review of the signed f2/f4 checkpoint and f5
-exact-design selection before final closure of D.110c-0c1f2/f4, parent
-D.110c-0c1/0c, the same-room ≥100-transition gate, Phase-6 exit, or Phase-7
-multi-author cold join. No f5 production edit is authorized.** Owner: the
+**Status: the combined governing high-risk review is complete and unanimously
+accepts f2/f4 as a narrow checkpoint, but it exposes two separable f5 owners.
+F5a owns foreign-author close liveness and may proceed to its causal tests-only
+RED after this split is signed/pushed. F5b owns authenticated historical
+settlement; its candidate designs did not converge, so its RED and production
+edit remain BLOCKED pending the one material design confirmation. Both block
+parent D.110c-0c1/0c, the same-room ≥100-transition gate, Phase-6 exit, and
+Phase-7 multi-author cold join.** Owner: the
 interaction among
 `examples/v3-room/src/index.ts::drainRebaseOutbox()`, the fresh-sequence local
 issue path and `completeRebaseSource()` disposition, the authenticated close
@@ -97980,19 +97988,216 @@ the f4 source-policy claim to the tested same-room handoff, and retain the
 cross-object unused field as separately owned cleanup. No further Fable run is
 authorized without new express user instruction.
 
-The next single governing plan review—Grok 4.6/high, direct Kimi K3 with
-`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh—must occur before any f5
-production edit and cover both the signed f2/f4 plan→RED→GREEN history as a
-narrow implementation checkpoint and f5 exact-design selection under the
-amended causal matrix. It may accept f2/f4 checkpoint evidence without
-claiming general historical-rebase safety, but f2/f4 final semantic closure
-remains held by f5. This combined review avoids recursively reviewing the same
-aggregate carrier in two rounds and does not reopen or alter immutable
-RED/GREEN evidence.
-If the selected construction needs a carrier/wire change,
-new authority statement, dependency, public API, threshold change, or migration
+The single combined governing review ran at signed/pushed plan anchor
+`f3617a8284af6d149441f0531ddec520370a34fe`. Grok 4.6/high exact session
+`01a068df-7056-7e70-92bc-4bbfc0b86be0` returned `APPROVED`, P0/P1/P2 `0/0/3`
+after the bounded runner timed out while its terminal object was streaming and
+the exact session re-emitted that existing judgment. Direct Kimi K3 with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, exact session
+`session_e2d5e95e-311a-4a67-a092-1350cfa7ac58`, returned `APPROVED`, `0/0/3`.
+Opus xhigh exact session `b72eb02d-92e5-42fc-978b-47b029ce8562` returned
+`CHANGES_REQUIRED`, `0/2/3`. All three set f24 checkpoint acceptance, both RED
+causality, GREEN closure, demonstrated f5 problem, and scope preservation true.
+Complete prompts, raw streams, exact continuation evidence, terminal results,
+commands, validation, and dispositions are under
+`.logs/d110c-0c1f24-f5-combined-review-f3617a82/`; its 26-entry self-excluding
+manifest validates and has SHA-256
+`cc4bf2321b0a23af1c475bb78c1d03ce02dabed8049e53231f111d6ddca95fba`.
+
+Opus's first P1 was evidence custody, not product behavior: the cited f2
+plan-confirmation and RED roots were valid locally but untracked. Their existing
+manifests revalidated byte-for-byte at
+`ddcea1d8d9f363ead8bd5c5fb3cb65476e5dba11956c417c2033d4b22717d218`
+and `7acd9cbaf90013bb8cfc719b158976b3b0bdcd624dca12324dafd6e2116af568`
+and are now preserved unchanged in signed/pushed evidence-only commit
+`1b591cf2be7c6a1cd64b0c58c55753dbae9b3f9b`. The raw historical
+`grok/review.diff` contains pre-existing trailing spaces, so a blanket diff
+check over that immutable capture remains nonzero; source/document diffs retain
+their ordinary clean gate.
+
+Opus's second P1 is accepted. Rebase is not the only way to strand a frontier.
+If the creator admits signed author sequence `n+1` while `n` is delayed and then
+closes epoch `k`, `n+1` leaves the live close graph without advancing the
+adjacent prefix. The delayed epoch-`k` vertex `n` cannot later be admitted under
+the epoch-`k+1` anchor, and no later close graph can make either identity
+reachable. The boundary remains permanently below `n`, after which the writer's
+cold reopen rejects rows above the boundary. This honest network-ordering path
+joins f5b's causal matrix; a fixture that claims the old-epoch `n` is admitted
+in epoch `k+1` would be invalid.
+
+The three design selections are intentionally not collapsed into a false
+consensus. Grok selected an author-signed per-disposition commitment and found
+that it requires a new authority/schema prerequisite. Kimi selected existing
+close-set/history primitives but left genuine writer-side close-set leaf and
+proof availability unproved. Opus selected a creator-attested covered run,
+which changes the aggregate tuple/schema and also requires new held/refused
+recovery behavior for rows below the moving floor. These are materially
+different security, availability, retention, and compatibility contracts. F5b
+must resolve them by source architecture rather than silently choosing the
+easiest proposal. If the selected construction needs a carrier/wire change, new
+authority statement, dependency, public API, threshold change, or migration
 protocol, stop after the audit and create the corresponding explicit high-risk
-prerequisite instead of widening f5 silently.
+prerequisite instead of widening f5b silently.
+
+The f24 working validation sentence that lists re-entry assertions as passing
+is prospectively narrowed: the sealed matrix proves first-observed sequence one
+and the stated aggregate/bootstrap paths, but it does not contain an exact
+remove/re-add refusal-token test, permissionless transition differential, or
+creator-deauthorization differential. The immutable evidence file is not
+edited. Those cases remain explicit retained obligations below. Likewise, the
+aggregate writer set is creator-attested and authenticated by the opener; it is
+not independently rederived by the transition closure.
+
+###### D.110c-0c1f5a foreign-author close-liveness prerequisite
+
+**Status: reviewed scope frozen; tests-only RED is authorized immediately after
+this correction is signed/pushed, but no production edit is authorized before
+that RED is causal, recorded, signed, and pushed.** Owner:
+`packages/node/src/creator-close.ts::authorIssuanceFrontiersCandidate()` at the
+construction of `byAuthor`, duplicate detection, prior/null boundary checks,
+regression checks, and per-author frontier advancement; the exact captured
+`graph.authors` identities supplied by the existing close path; and one focused
+Node fixture plus the genuine room close control. Protocol-v3 carrier parsing,
+encoding, signature preimage, transition normalization, recovery consumers,
+wire format, public APIs, dependencies, thresholds, and issuance semantics are
+outside f5a. Deadline: GREEN and final review before f5b implementation, parent
+0c1/0c, any repeated multi-author close claim, D.110c-c/d, Phase-6 exit, or
+Phase-7 multi-author cold join.
+
+F5a freezes the distinction between local corruption and a foreign-author
+anomaly. Duplicate, regressed, missing-prefix, or noncontiguous identities for
+the creator's own issuance scope retain the existing fail-closed close error.
+The same shapes for another author—including an author no longer present in
+the successor writer set—must not abort the creator's transition. For an
+authorized successor writer, the close leaves that author's frontier exactly
+at its authenticated prior value, or null when no prior numeric boundary
+exists; it does not advance through any anomalous row. For an author excluded
+from the successor writer set, no frontier entry is emitted. Every other valid
+successor author advances under the unchanged adjacent-prefix rule. No public
+per-author diagnostic field or alternate carrier is added.
+
+The deterministic RED uses signed production vertices and the real close path,
+not a fabricated aggregate or tests-only durable record. Its exact cases are:
+
+1. a genuinely offline noncreator has a null prior frontier, re-enters through
+   ordinary rebase at first creator-observed sequence greater than one, and the
+   next creator close currently throws the legacy-migration error;
+2. a newly authorized/absent prior author is first observed above one and the
+   close currently throws the author-reentry error;
+3. a noncreator local rollback produces a current-anchor signed sequence at or
+   below its numeric prior boundary and close currently throws
+   `creator issuance-frontier boundary regressed`;
+4. two distinct admitted current-epoch vertices carry the same foreign
+   `(author, sequence)` and close currently throws
+   `creator issuance-frontier author slot is ambiguous`; and
+5. a no-gap two-writer control closes and opens the exact unchanged aggregate.
+
+Each treatment must first assert the exact current product error and the
+creator's otherwise-valid transition inputs, then terminate only at
+`D110C_0C1F5_FOREIGN_AUTHOR_CLOSE_LIVENESS_REQUIRED`. Failure to reach close,
+a different error, an invalid signature/anchor/ACL precondition, timing, or
+transport is noncausal. RED also freezes controls proving the equivalent
+creator-owned anomalies still fail closed and a deauthorized foreign author's
+rows do not enter the successor vector or block close. Run the focused RED once
+from the signed plan anchor, validate its exact complete result set, then sign
+and push it. No separate model RED review is required; final GREEN review must
+inspect RED causality.
+
+GREEN changes only the close-side per-author classification. It must make all
+foreign treatments close successfully, keep the affected frontier unchanged or
+null, preserve all unaffected frontiers byte-for-byte, stage one valid
+aggregate, and complete verified transition/adoption. The anomalous row must
+remain outside authenticated historical coverage. Repeating close derivation
+over the same captured graph must be deterministic. The no-gap aggregate bytes
+and digest remain identical to the pre-f5a implementation. The former
+null-boundary diagnostic mismatch is closed by pinning the current RED error
+and proving it is no longer exposed as a close-wide foreign-author failure;
+existing legacy/local errors are not renamed without an independently retained
+caller.
+
+Focused and adversarial tests cover all five cases, permutation of graph
+iteration, multiple simultaneous foreign anomalies, creator-plus-foreign
+anomaly precedence, permissionless writer-set derivation, creator
+deauthorization, remove/re-add with hidden history, and the 64-writer bound.
+The retained inventory includes both the current f2 GREEN test and the still
+tracked f2 RED-named unit wrapper, plus the RED-named Playwright configuration
+as an exact listing/execution control; none is silently excluded because of its
+filename. When the shared f2 fixture is next edited, its expected-frontier sort
+must use the same code-unit ordering as production rather than `localeCompare`.
+Run the focused GREEN once, affected builds/typechecks and exact-owner
+lint/format/diff, the complete f2/f4 41-test roster, the 195-test retained
+roster, exact two-title browser gate, the RED-named retained controls, and an
+isolated offline checkout. Sign/push GREEN, then perform the one formal
+Grok/Kimi/Opus final review over plan→RED→GREEN. Only P0/P1 blocks; no long
+campaign is authorized.
+
+###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
+
+**Status: BLOCKED at architecture/design; no RED or production edit is
+authorized.** Owner: the cross-epoch relationship among creator-admitted
+per-author identities, aggregate coverage, historical outbox classification,
+rebase source→replacement/disposition correlation, close-set/history proofs,
+writer-side proof availability after restart, and bounded pruning. Deadline:
+one exact construction must be audited, reviewed, causally RED, and GREEN after
+f5a but before parent 0c1/0c, D.110c-c/d, the ≥100-transition gate, Phase-6
+exit, or Phase-7 multi-author cold join.
+
+The audit must cover two independent genuine triggers. The rebase trigger is
+the existing prior boundary `S`, displaced source rows above it, intervening
+local allocations, fresh replacement sequences above a hole, and later cold
+reopen. The no-rebase trigger is honest delivery ordering: sequence `n+1` is
+admitted in epoch `k` while `n` is delayed, the creator closes epoch `k`, and
+the old-anchor `n` can no longer be admitted after adoption. Because later close
+graphs contain neither earlier admitted `n+1` nor admissible `n`, the adjacent
+prefix remains permanently below both. A test that fabricates admission of the
+old-anchor row under epoch `k+1` is invalid.
+
+The bounded architecture audit must reconcile, not merely list, the review's
+three proposals:
+
+1. an author-signed source→replacement/disposition binding compacted into a
+   creator-settled prefix, including its new authority/schema statement,
+   temporary open-gap custody, byte ceiling, crash ordering, and pruning;
+2. a creator-attested covered run or other bounded admitted-set carrier,
+   including how prior covered rows below a moving floor remain classifiable or
+   are durably and safely retired, how held/refused rows surface without a new
+   public contract, and why one interval is sufficient under repeated gaps;
+3. membership/consistency under existing close-set or RFC 9162 history roots,
+   including the exact leaf grammar and ordinal, authenticated root chain,
+   source→replacement relationship, inclusion-proof production and delivery,
+   writer-side availability after restart, proof pruning, and why ordinary
+   reopen does not reconstruct O(epoch) history; and
+4. any simpler ingress/order or issuance construction that prevents permanent
+   holes without losing honest operations, relying on retries, or weakening
+   offline/rebase continuity.
+
+For every candidate, produce exact state-growth bounds by writers, open gaps,
+rebases, and epochs; identify the signer and pinned trust path; trace source,
+creator, successor, restart, and cold-reopen custody; define crash-before and
+crash-after behavior; and test replay, substitution, equivocation,
+cross-author/object/epoch, skipped sequence, multiple disjoint runs, rollback,
+availability, and prune boundaries. A solution cannot hide O(epoch), O(rebase),
+or unbounded O(gap) proof material in an uncounted journal, archive, bootstrap
+store, registration, or application callback required for ordinary reopen.
+
+Before choosing, mechanically establish whether the genuine writer database
+and authenticated successor material contain enough exact close-set/history
+leaves or inclusion proofs to validate an earlier admitted replacement after
+restart. Also establish whether current recovery can report and retain a
+per-row held/refused disposition without changing a public result or silently
+ignoring an unclassifiable published row. If either fact is absent, the audit
+must reject the candidate or name the explicit high-risk carrier/API/retention
+prerequisite.
+
+The selected design and compatibility boundary receive the one permitted
+material Grok/Kimi/Opus confirmation. F5b RED remains unauthorized until that
+confirmation has an empty P0/P1 union. Its eventual genuine RED must cover both
+triggers, multiple gaps, restart, at least two later close/adopt transitions,
+unchanged writer storage, cold reopen, and post-reopen issue/publish; terminate
+only at `D110C_0C1F5_REBASE_SUPERSESSION_FRONTIER_REQUIRED`; and keep a no-gap
+control green. If the design needs a carrier/wire/API/dependency/authority,
+threshold, migration, archive, or pruning-policy change, stop and open that
+named prerequisite rather than folding it into f5b.
 
 The bounded audit is
 `.logs/d110c-0c1f5-source-audit-fcd8735c/audit.md`. It pins signed/pushed RED
