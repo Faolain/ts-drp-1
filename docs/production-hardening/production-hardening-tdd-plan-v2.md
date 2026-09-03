@@ -95522,8 +95522,9 @@ RED-to-GREEN closure and is prohibited.
 0c1d, 0c1e, and 0c1g are closed; the reviewed causal RED is preserved; and the
 remaining multi-author boundary has been isolated by D.110c-0c1f's source
 audit. That audit proves a new versioned signed carrier is required, so no
-production edit begins before the separate D.110c-0c1f1 high-risk plan is
-signed, pushed, reviewed, and accepted.**
+production edit begins before the stopped D.110c-0c1f1 design and its explicit
+D.110c-0c1f2 compact-encoding reslice are signed, pushed, reviewed, and
+accepted.**
 Owner:
 the predecessor and successor issuance views created by
 `packages/node/src/v3-live.ts::activateCreatorSuccessorLive()`, the existing
@@ -96977,8 +96978,8 @@ silently change migration record/schema bytes.
 **Status: blocking product-capability debt; bounded source/architecture audit is
 complete and selects a bounded creator-signed current-writer frontier vector,
 but the selected family requires a new versioned protocol control carrier.
-Production work is stopped pending the separate D.110c-0c1f1 high-risk plan and
-review below.** Owner: the
+Production work is stopped pending acceptance of the D.110c-0c1f2 compact
+encoding reslice after D.110c-0c1f1's maximum-shape stop below.** Owner: the
 authenticated control proof that permits a non-creator local issuance author
 to prove its own admitted intermediate-epoch frontier across later room
 successors, plus the corresponding private Node recovery consumer. Deadline:
@@ -97022,16 +97023,27 @@ is `bbd9af504606ec706af2f333822e21b4964d67deb8424befad6260a58fbfabdf`.
 
 ###### D.110c-0c1f1 bounded multi-author issuance-frontier carrier prerequisite
 
-**Status: bounded high-risk plan awaiting its single governing plan review; no
-production edit, RED execution, or campaign is authorized before an empty
-P0/P1 union.** Owner: one new protocol-v3 non-root signed carrier and its
-prepare/complete/open/resolve contract; reuse of the existing protocol-authored
-creator-retirement signing-request custody only if the review confirms the
-domain separation; `packages/node/src/creator-close.ts` graph/ACL frontier
-derivation and AHE candidate staging; the matching private bounded transition
-normalization in `creator-transition-advance.ts`; and `v3-live.ts` opening,
-selected-author capability, recovery/publication/rebase classification, and
-combined logical-scan accounting. Deadline: GREEN before 0c1f's genuine
+**Status: STOPPED before RED by its mandatory maximum-shape gate. The
+signed/pushed first plan review found three material P1 plan defects, and the
+corrected object-entry schema then encoded to 8,289 bytes at the legal maximum,
+97 bytes above the unchanged 8,192-byte ceiling. D.110c-0c1f2 below owns the
+explicit compact-encoding reslice; no production edit, RED execution, or
+campaign is authorized before its material confirmation has an empty P0/P1
+union.** Owner: one new protocol-v3 non-root
+signed carrier and its prepare/complete/open/resolve contract; reuse of the
+existing protocol-authored creator-retirement signing-request custody because
+the first review confirmed its opaque one-use digest custody and the new
+carrier's independent signature domain; `packages/node/src/creator-close.ts`
+graph/ACL frontier derivation and AHE candidate staging; the matching private
+bounded transition normalization in `creator-transition-advance.ts`;
+`creator-adoption.ts::authenticatedSuccessorIssuanceScope()` only for the same
+permissionless-aware local-author authorization and local-store lineage
+selection; and `v3-live.ts` admission-identity retention/copy/close capture,
+runtime census/reclamation, carrier opening, selected-author capability,
+recovery/publication/rebase classification, and combined logical-scan
+accounting. The admission-identity owner is a private bounded map alongside
+`applicationVertices`, not a change to the shared compaction `EpochVertex`
+type, public handle, product API, or wire vertex. Deadline: GREEN before 0c1f's genuine
 multi-author product RED can close, before parent 0c1/0c resumes, before
 D.110c-c cleanup/close work, before D.110c-d's ≥100 transitions, and before
 Phase-6/Phase-7 multi-author cold-reopen claims.
@@ -97055,11 +97067,19 @@ successor epoch/anchor; current and successor ACL digest; cut-value digest;
 commit-QC ref; snapshot-manifest digest; prior aggregate candidate digest or a
 domain-separated genesis sentinel; and one author-sorted `frontiers` vector.
 Each vector entry has exactly `author` and nullable
-`admittedAuthorSequence`. The vector must equal the authenticated successor
-ACL's writer set exactly, with no duplicate, omitted, extra, or reordered
-author, and must fit under both the existing ACL maximum of 64 members and the
-unchanged 8,192-byte record ceiling. A deterministic maximum-shape encoder test
-must prove that bound before GREEN can claim the selected shape is feasible.
+`admittedAuthorSequence`. The vector must equal the successor snapshot's
+application-write-authorized member set exactly: when `permissionless === true`
+it is every snapshot member, and otherwise it is exactly the members whose
+groups contain `writer`, matching `authorizeLatchedApplicationWrite()` rather
+than a literal writer-group-only filter. The result is author-sorted with no
+duplicate, omitted, extra, or reordered author and remains under the existing
+64-member ACL maximum. Non-write-authorized members may still author
+authenticated ACL operations, but their application rows receive no historical
+frontier and fail closed by design. The record must fit the unchanged
+8,192-byte ceiling. A deterministic maximum-shape encoder test must prove the
+bound before GREEN can claim the selected shape is feasible. If that test
+exceeds 8,192 bytes, stop before RED and reslice the carrier; do not reduce
+field/entry fidelity or raise the scannable-control ceiling.
 
 The legacy `drp-creator-issuance-retirement-state` v1 record and every immutable
 fixture remain unchanged. During the compatibility window, exactly one legacy
@@ -97067,31 +97087,52 @@ creator record and at most one aggregate record may coexist in the active
 closure; both counts and bytes enter the census. The new bounded transition law
 permits aggregate `0→1` initialization and thereafter replaces exactly one
 prior aggregate with one adjacent successor aggregate. It does not weaken the
-existing legacy one-record law. A legacy room with non-creator issuance before
-its first aggregate cannot infer a writer boundary from a later local lineage
-or current graph; it returns exact
-`D110C_0C1F1_LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED` until a separately
-authenticated migration is available. Creator-only legacy rooms continue
-through the existing carrier.
+existing legacy one-record law. At aggregate `0→1`, the entry for the author
+authenticated by the unique legacy v1 carrier is seeded at exactly that
+carrier's `admittedAuthorSequence`; every other write-authorized successor
+member starts at null and may advance only through a current-graph prefix
+beginning at sequence zero. A non-creator row whose first current-graph
+sequence is greater than zero proves an unavailable pre-aggregate boundary and
+refuses close with exact
+`D110C_0C1F1_LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED`. On every close where both
+carriers exist, the aggregate creator entry and unique legacy v1 identity must
+authenticate the same author and exact admitted frontier; a missing or unequal
+pair is ambiguity and refuses before staging. This equality also makes
+recovery selection deterministic: a non-null aggregate entry is the selected
+capability, while the legacy record is an independently checked creator
+compatibility witness, never a conflicting precedence path.
 
 At close, open both current and staged-successor ACL snapshots against their
 independently authenticated anchor digests. Start each continuing successor
 writer at the exact prior opened frontier and each genuinely new writer at
-null. Advance only through that author's exact contiguous sequence beginning at
-prior+1 or zero in the already authenticated current close graph. Every graph
-row must retain exact object, author, epoch, anchor, signature, digest, and
-admission identity. A gap leaves the boundary before the gap; it does not hide
-later rows. A regression, jump in the certified boundary, duplicate/conflicting
-slot, wrong ACL author, wrong prior aggregate, wrong cut/QC/snapshot, or
-ambiguous candidate refuses before staging or terminalization. Remote writers'
-durable stores are never consulted by the close owner and need not be online.
+null, subject to the legacy initialization rule above. Advance only through
+that author's exact contiguous sequence beginning at prior+1 or zero in the
+already authenticated current close graph. The live admission boundary retains
+one private entry per non-anchor application vertex keyed by digest, containing
+exactly its verified `author` and `authorSequence`. Local issue, received
+ingress, and journal recovery populate that map only after the existing exact
+canonical-preimage, digest, detached-signature, anchor, epoch, object, ACL, and
+admission checks pass. Close capture copies it with the vertices/charges and
+requires exact non-anchor key-set/cardinality equality; no untrusted close
+input can manufacture or mutate an identity. Signature and canonical-preimage
+bytes are deliberately not duplicated into this map: their verification is the
+admission prerequisite, while the captured immutable vertex plus keyed
+author/sequence identity is the bounded close fact. Missing, foreign,
+duplicate, out-of-range, or mismatched identity refuses capture. The map joins
+the existing runtime census and is released/pruned with the same graph. A gap
+leaves the boundary before the gap; it does not hide later rows. A regression,
+jump in the certified boundary, duplicate/conflicting slot, wrong ACL author,
+wrong prior aggregate, wrong cut/QC/snapshot, or ambiguous candidate refuses
+before staging or terminalization. Remote writers' durable stores are never
+consulted by the close owner and need not be online.
 
-Removal drops an author from the successor vector only because that author is
-not authorized to reopen under the successor ACL; the two rollback generations
-retain the prior vector until the existing availability/outbox/prune law allows
-retirement. Same-key re-add after its frontier leaves that window is not
-silently supported. The current issuance scope has no membership-incarnation
-field, so a re-added author with nonzero lineage must fail with exact
+Removal drops an author from the new successor vector at the first close whose
+successor ACL no longer authorizes that member to write; the displaced/rollback
+generation retains the preceding vector only for the existing rollback and
+availability window. Re-adding that same key after even one absent successor
+vector is not silently supported. The current issuance scope has no
+membership-incarnation field, so a re-added author with nonzero lineage must
+fail with exact
 `D110C_0C1F1_AUTHOR_REENTRY_PROOF_REQUIRED`. If review concludes that the
 Discord/MMORPG golden paths require transparent same-key re-entry, stop and
 create an explicit authority/schema/migration prerequisite; never retain all
@@ -97101,13 +97142,21 @@ Cold recovery opens the unique aggregate against the independently
 authenticated current floor, adjacent cut/QC/snapshot, and exact current ACL,
 then selects exactly the local issuance author's detached frontier. The private
 capability exposes only that selected identity, not the full vector or signing
-authority. `authenticatedCoveredHistoricalOutboxRow()` uses it only when the
-row's object/author/sequence/signature/digest and strict historical epoch
-relation match. Rows at or below the frontier may be classified historical;
-rows above it remain visible and fail closed or rebase through existing pending
-custody. Pending originals are marked only after successful current-epoch
-reissue/completion. Recovery, publication, and rebase reset and share one
-combined `maxEpochVertices` historical-row count per complete logical scan.
+authority. A null selected frontier with nonzero local lineage cannot become
+historical authority: if the first aggregate close directly observed a
+non-creator current-graph sequence above zero it already emitted
+`D110C_0C1F1_LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED`; every otherwise
+indistinguishable null-plus-nonzero cold-reopen case, including a quiescent
+legacy writer or same-key re-entry, deterministically emits
+`D110C_0C1F1_AUTHOR_REENTRY_PROOF_REQUIRED`. This diagnostic precedence does
+not weaken either refusal. `authenticatedCoveredHistoricalOutboxRow()` uses a
+non-null capability only when the row's object/author/sequence/signature/digest
+and strict historical epoch relation match. Rows at or below the frontier may
+be classified historical; rows above it remain visible and fail closed or
+rebase through existing pending custody. Pending originals are marked only
+after successful current-epoch reissue/completion. Recovery, publication, and
+rebase reset and share one combined `maxEpochVertices` historical-row count per
+complete logical scan.
 
 The causal tests-only RED has two layers and executes only after plan approval.
 A protocol/close fixture uses a genuine two-writer epoch and proves the current
@@ -97122,14 +97171,21 @@ foreign-author historical classification, an incomplete transition, tests-only
 frontier, private record mutation, or synthetic epoch state is noncausal and
 stops.
 
-GREEN implements only the frozen carrier and selected-author consumer. The
-functional gate proves a fresh two-writer room produces and opens exact
-frontiers for both writers, advances them monotonically across at least three
-genuine transitions, cold reopens as the non-creator writer, preserves exact
-published and pending outbox behavior, and issues/publishes new work. Mutants
-cover every field/ref/signature/vector mutation; missing/duplicate/extra/
-reordered writers; null/non-null boundary substitution; boundary regression or
-jump; sequence gaps; same-slot conflicts; legacy mixed-room migration refusal;
+GREEN implements only the frozen carrier, private admitted-identity map, and
+selected-author consumer. The functional gate proves both a permissioned and a
+permissionless fresh two-writer room produce and open exact frontiers for both
+write-authorized members, advance them monotonically across at least three
+genuine transitions, cold reopen as the non-creator writer, preserve exact
+published and pending outbox behavior, and issue/publish new work. A separate
+legacy creator-only room seeds its first aggregate from the v1 carrier, adds a
+zero-lineage second writer, and proves exact creator equality and both writers'
+later cold reopen. Mutants cover every field/ref/signature/vector mutation;
+missing/duplicate/extra/reordered writers; literal-writer-group derivation in a
+permissionless ACL; a frontier for a non-write-authorized member; missing,
+foreign, duplicate, or mismatched private admission identity; null/non-null
+boundary substitution; creator legacy/aggregate inequality; boundary
+regression or jump; sequence gaps; same-slot conflicts; observed legacy
+multi-author migration refusal; remove-then-readd-at-the-next-epoch and later
 same-key re-entry refusal; wrong current/successor ACL; wrong object/genesis/
 epoch/anchor/cut/QC/snapshot; stale/forked aggregate; consumed signing request;
 and candidate ambiguity. All fail before AHE stage, recovery activation,
@@ -97155,6 +97211,91 @@ fields, authority, compatibility, or executable acceptance changes. P2 receives
 an owner/disposition without recursive review. RED begins only after an empty
 blocking union; GREEN receives the single final plan→RED→GREEN review. Do not
 invoke Fable or a collaboration subagent.
+
+The first review at signed/pushed plan `5e0170670973f4920731a6d418436c9b4ae971ff`
+is preserved honestly. Direct Kimi K3/100-step returned `CHANGES_REQUIRED`,
+P0/P1/P2 `0/3/3`, with `red_causal=true` and `scope_preserved=true`; its same
+session performed one schema-only re-emission because the substantive first
+answer used a richer wrapper. The three P1s are closed prospectively above by
+declaring the private capture-side owner and bounded identity representation,
+pinning permissionless-aware write authorization, and specifying exact legacy
+seeding plus dual-carrier equality/selection. P2 dispositions are also frozen:
+null-plus-nonzero diagnostic precedence belongs to the protocol opener and
+private selected-author recovery consumer; maximum-shape overflow stops and
+reslices without raising the ceiling; and removal/re-add wording plus the
+next-epoch mutant belong to close derivation. The local audit additionally
+brings the already-affected `creator-adoption.ts` permissionless writer
+selection under the same owner rather than allowing a later surprise diff.
+
+Grok's original read-only run inspected the relevant seams but reached the
+1,200-second runner limit without a terminal response; its exact session
+`01a0676c-9659-76d3-9d10-3af7082a2a46` was resumed as required, remained
+connected for a further 30 bounded minutes without emitting a model event, and
+is `NO_VERDICT`, not approval. Opus exact session
+`5c73725b-d572-4e58-8b99-f238e4f8e3ed` inspected for 17 turns but produced no
+terminal verdict after provider HTTP 500, 500, and 529 failures, so it too is
+`NO_VERDICT`. These service outcomes do not erase Kimi's blocking findings or
+authorize RED. Because the correction changes declared source ownership,
+permissionless executable behavior, and compatibility acceptance, it consumes
+the plan's one permitted material confirmation. That confirmation must obtain
+actual schema-valid Grok 4.6/high, direct Kimi K3/100-step, and Opus xhigh
+verdicts over the corrected signed/pushed commit; RED remains frozen until its
+combined P0/P1 union is empty.
+
+The required pre-RED maximum-shape probe then encoded the exact proposed signed
+record with 64 object-form frontier entries, a 256-character object ID,
+maximum-safe integer epochs/sequences/ref length, all fixed 64-hex identities,
+and the 64-byte creator signature. Canonical size was exactly 8,289 bytes, 97
+bytes over the frozen 8,192-byte ceiling. This is a demonstrated schema blocker,
+not a product or runtime failure. In accordance with the frozen fallback above,
+0c1f1 stops before RED; it does not raise the ceiling, omit a field, shorten an
+identity, or silently change the wire shape.
+
+###### D.110c-0c1f2 compact issuance-frontier encoding reslice
+
+**Status: bounded high-risk plan correction awaiting the one material
+confirmation already authorized by 0c1f1; no production edit or RED is
+authorized until Grok, Kimi, and Opus return an empty P0/P1 union.** Owner and
+deadline are exactly the corrected 0c1f1 owners/deadline above. This reslice
+changes only the canonical representation of each frontier entry and retains
+every 0c1f1 trust assumption, fixed preimage field, permissionless-aware writer
+set, private admitted-identity owner, legacy bootstrap/equality rule, refusal
+code, causal RED layer, GREEN behavior, mutant, retained gate, and scope
+prohibition.
+
+The selected exact representation keeps the carrier kind
+`drp-creator-author-issuance-frontiers-state`, signature domain
+`ts-drp/creator-author-issuance-frontiers/v1`, version `1`, and every fixed
+record field from 0c1f1. Only `frontiers` changes from an array of repeated-key
+objects to an author-sorted array of exact two-element canonical arrays:
+`[author, admittedAuthorSequence]`, where `author` is one lowercase 64-hex
+Ed25519 public key and `admittedAuthorSequence` is either null or a nonnegative
+safe integer. The outer vector must contain exactly the permissionless-aware
+successor write-authorized set, and every inner value must be an ordinary exact
+two-element decoded array with no holes, extra properties, duplicate author,
+reordering, coercion, or alternate object/map form. The semantic identity and
+signature preimage remain one-to-one; compact syntax does not omit or weaken a
+frontier fact.
+
+The same deterministic worst-case probe encodes this tuple form to exactly
+6,241 bytes, leaving 1,951 bytes below the unchanged 8,192-byte ceiling. GREEN
+must reproduce that result through the real protocol encoder and assert the
+exact maximum-shape byte length before any close integration. Mutants add an
+object-form row, one- and three-element tuples, swapped tuple positions, holes,
+extra properties, null author, non-null invalid sequence, and tuple/object
+substitution. Any drift above 8,192 bytes still stops and reslices; no threshold
+change is authorized.
+
+The confirmation reviews the complete 0c1f1 first-round evidence, corrections,
+size failure, and this one-field-shape reslice together. It must explicitly
+confirm that the private admitted `(digest, author, authorSequence)` fact is
+sufficient after existing signature/preimage admission authentication; that
+`creator-adoption.ts` uses the identical permissionless authorization set; that
+legacy-v1/aggregate creator equality removes carrier precedence ambiguity; and
+that tuple encoding is canonical, type-safe, bounded, and does not change
+authority. This is the single material confirmation, not a new recursive review
+round. RED begins only after actual schema-valid Grok 4.6/high, direct Kimi
+K3/100-step, and Opus xhigh verdicts produce an empty P0/P1 union.
 
 ###### D.110c-0c1d successor-reopen historical-rebase orchestration prerequisite
 
