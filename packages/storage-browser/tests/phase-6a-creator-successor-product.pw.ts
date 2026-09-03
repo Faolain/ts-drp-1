@@ -3020,6 +3020,162 @@ test("D.110c-0c1 cold reopens a genuine hot epoch-3 successor with authenticated
 	}
 });
 
+test("D.110c-0c1f2 non-creator writer requires an authenticated historical frontier", async ({ browser }, testInfo) => {
+	const selectedServers = Object.freeze(
+		await Promise.all(
+			["creator", "writer"].map(() =>
+				startProductBrowserServer(
+					new URL("./assets/phase-6a-creator-successor-product-entry.ts", import.meta.url).pathname
+				)
+			)
+		)
+	);
+	const selectedContext = await browser.newContext();
+	const creatorPage = await selectedContext.newPage();
+	const writerPage = await selectedContext.newPage();
+	const selectedPages = (): readonly Page[] => [creatorPage, writerPage];
+	const creatorDatabase = "d110c-0c1f2-creator";
+	const writerDatabase = "d110c-0c1f2-writer";
+	const channelName = "d110c-0c1f2-multi-author-frontier";
+	try {
+		await Promise.all([
+			openRealm(creatorPage, selectedServers[0]?.origin ?? "about:blank", "d110c-0c1f2-creator", selectedPages),
+			openRealm(writerPage, selectedServers[1]?.origin ?? "about:blank", "d110c-0c1f2-writer", selectedPages),
+		]);
+		await Promise.all([
+			creatorPage.evaluate(() => window.phase6aCreatorSuccessorProduct.configureLifetime({})),
+			writerPage.evaluate(() => window.phase6aCreatorSuccessorProduct.configureLifetime({})),
+		]);
+		const selectedInvite = await creatorPage.evaluate((input) => window.phase6aCreatorSuccessorProduct.create(input), {
+			channelName,
+			clientId: "alice",
+			databaseName: creatorDatabase,
+		});
+		await writerPage.evaluate((input) => window.phase6aCreatorSuccessorProduct.join(input), {
+			channelName,
+			clientId: "bob",
+			databaseName: writerDatabase,
+			invite: selectedInvite,
+		});
+		await creatorPage.evaluate(() => window.phase6aCreatorSuccessorProduct.send("d110c-0c1f2-epoch-zero"));
+		await waitForText(writerPage, "d110c-0c1f2-epoch-zero");
+		await creatorPage.evaluate(() => window.phase6aCreatorSuccessorProduct.sealEpoch());
+		await creatorPage.evaluate(() => window.phase6aCreatorSuccessorProduct.adoptSuccessor());
+		const epochOne = await creatorPage.evaluate(
+			(databaseName) => window.phase6aCreatorSuccessorProduct.exportSuccessor(databaseName),
+			creatorDatabase
+		);
+		expect(epochOne.authority).toMatchObject({ epoch: 1 });
+		await writerPage.evaluate(() => window.phase6aCreatorSuccessorProduct.close());
+		await writerPage.evaluate(
+			({ carrier: selectedCarrier, source, target }) =>
+				window.phase6aCreatorSuccessorProduct.importSuccessor(selectedCarrier, source, target),
+			{ carrier: epochOne, source: creatorDatabase, target: writerDatabase }
+		);
+		await writerPage.evaluate((input) => window.phase6aCreatorSuccessorProduct.join(input), {
+			channelName,
+			clientId: "bob",
+			databaseName: writerDatabase,
+			invite: selectedInvite,
+			roomHead: {
+				currentAnchorDigest: epochOne.authority.anchorDigest,
+				epoch: epochOne.authority.epoch,
+				objectId: epochOne.authority.objectId,
+			},
+			successorSnapshotDeclaration: epochOne.snapshotDeclaration,
+		});
+		await writerPage.evaluate(() => window.phase6aCreatorSuccessorProduct.send("d110c-0c1f2-writer-epoch-one"));
+		await waitForText(creatorPage, "d110c-0c1f2-writer-epoch-one");
+		await creatorPage.evaluate(() => window.phase6aCreatorSuccessorProduct.send("d110c-0c1f2-creator-epoch-one"));
+		await waitForText(writerPage, "d110c-0c1f2-creator-epoch-one");
+		await creatorPage.evaluate(() => window.phase6aCreatorSuccessorProduct.sealEpoch());
+		await creatorPage.evaluate(() => window.phase6aCreatorSuccessorProduct.adoptSuccessor());
+		await creatorPage.evaluate(() => window.phase6aCreatorSuccessorProduct.send("d110c-0c1f2-creator-epoch-two"));
+		await creatorPage.evaluate(() => window.phase6aCreatorSuccessorProduct.sealEpoch());
+		await creatorPage.evaluate(() => window.phase6aCreatorSuccessorProduct.adoptSuccessor());
+		const epochThree = await creatorPage.evaluate(
+			(databaseName) => window.phase6aCreatorSuccessorProduct.exportSuccessorAtEpoch(databaseName, 3),
+			creatorDatabase
+		);
+		expect(epochThree.authority).toMatchObject({ epoch: 3 });
+		const before = d110c0cRecord(
+			await writerPage.evaluate(
+				(databaseName) => window.phase6aCreatorSuccessorProduct.d110c0c1f2Evidence(databaseName),
+				writerDatabase
+			)
+		);
+		const writerRows = d110c0cArray(before.rows).map(d110c0cRecord);
+		const intermediateRows = writerRows.filter(
+			({ epoch, publishState }) => epoch === 1 && publishState === "published"
+		);
+		expect(intermediateRows).toHaveLength(1);
+		await writerPage.evaluate(() => window.phase6aCreatorSuccessorProduct.close());
+		await writerPage.evaluate(
+			({ carrier: selectedCarrier, source, target }) =>
+				window.phase6aCreatorSuccessorProduct.importSuccessor(selectedCarrier, source, target),
+			{ carrier: epochThree, source: creatorDatabase, target: writerDatabase }
+		);
+		let detail = "fulfilled";
+		try {
+			await writerPage.evaluate((input) => window.phase6aCreatorSuccessorProduct.join(input), {
+				channelName,
+				clientId: "bob",
+				databaseName: writerDatabase,
+				invite: selectedInvite,
+				roomHead: {
+					currentAnchorDigest: epochThree.authority.anchorDigest,
+					epoch: epochThree.authority.epoch,
+					objectId: epochThree.authority.objectId,
+				},
+				successorSnapshotDeclaration: epochThree.snapshotDeclaration,
+			});
+		} catch (error) {
+			detail = error instanceof Error ? error.message : String(error);
+		}
+		const after = d110c0cRecord(
+			await writerPage.evaluate(
+				(databaseName) => window.phase6aCreatorSuccessorProduct.d110c0c1f2Evidence(databaseName),
+				writerDatabase
+			)
+		);
+		const trace = d110c0cArray(after.trace).map(d110c0cRecord);
+		const target = intermediateRows[0] as Readonly<Record<string, unknown>>;
+		const targetRefusals = trace.filter(
+			({ authorSequence, classification, digest, owner, payloadEpoch }) =>
+				authorSequence === target.authorSequence &&
+				classification === "rejected" &&
+				digest === target.digest &&
+				owner === "predecessor-validation" &&
+				payloadEpoch === 2
+		);
+		const headline = detail.split("\n", 1)[0];
+		expect(headline).toBe(
+			"page.evaluate: TypeError: v3 room successor reopen failed: recovery-rejected: creator predecessor recovery failed: admission-rejected"
+		);
+		expect(targetRefusals).toHaveLength(1);
+		await testInfo.attach("d110c-0c1f2-product-red", {
+			body: Buffer.from(
+				JSON.stringify({
+					currentEpoch: epochThree.authority.epoch,
+					detail,
+					displacedEpoch: 2,
+					intermediateRows,
+					targetRefusals,
+				})
+			),
+			contentType: "application/json",
+		});
+		throw new TypeError("D110C_0C1F1_MULTI_AUTHOR_FRONTIER_CARRIER_REQUIRED");
+	} finally {
+		await Promise.allSettled([
+			creatorPage.evaluate(() => window.phase6aCreatorSuccessorProduct.close()),
+			writerPage.evaluate(() => window.phase6aCreatorSuccessorProduct.close()),
+		]);
+		await selectedContext.close();
+		await Promise.all(selectedServers.map((server) => server.close()));
+	}
+});
+
 function d110c0cKillGroup(pid: number): void {
 	try {
 		process.kill(-pid, "SIGKILL");

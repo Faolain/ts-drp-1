@@ -266,6 +266,7 @@ declare global {
 			create(input: unknown): Promise<string>;
 			deleteDatabases(prefix: string): Promise<readonly string[]>;
 			d110c0c1Differential(name: string): Promise<PlainRecord>;
+			d110c0c1f2Evidence(databaseName: string): Promise<PlainRecord>;
 			d110c0c1eSameAuthorControl(name: string): Promise<PlainRecord>;
 			d110c0c1cControl(name: string): Promise<PlainRecord>;
 			d110c0c1gGridControl(): PlainRecord;
@@ -285,6 +286,7 @@ declare global {
 			d108e5Snapshot(): Readonly<{ readonly redirectRecoveryCount: number; readonly verificationCount: number }>;
 			deliver(packet: RelayPacket): void;
 			exportSuccessor(databaseName: string): Promise<SuccessorCarrier>;
+			exportSuccessorAtEpoch(databaseName: string, expectedEpoch: number): Promise<SuccessorCarrier>;
 			rawAuthorityAtEpoch(databaseName: string, expectedEpoch: number): Promise<PlainRecord>;
 			importSuccessor(carrier: SuccessorCarrier, sourceDatabaseName: string, targetDatabaseName: string): Promise<void>;
 			join(input: unknown): Promise<void>;
@@ -2479,6 +2481,13 @@ const api = Object.freeze({
 	d110c0c1Differential(name: string): Promise<PlainRecord> {
 		return d110c0c1Differential(name);
 	},
+	async d110c0c1f2Evidence(databaseName: string): Promise<PlainRecord> {
+		return Object.freeze({
+			coldReopenCount: instrumentation().d110cColdReopenCount(),
+			rows: await d110c0c1IssuanceRows(databaseName),
+			trace: instrumentation().d110c0c1TraceSnapshot(),
+		});
+	},
 	d110c0c1eSameAuthorControl(name: string): Promise<PlainRecord> {
 		return d110c0c1eSameAuthorControl(name);
 	},
@@ -2543,6 +2552,19 @@ const api = Object.freeze({
 				])
 			),
 			snapshotDeclaration: await rawSnapshotDeclaration(databaseName),
+		});
+	},
+	async exportSuccessorAtEpoch(databaseName: string, expectedEpoch: number): Promise<SuccessorCarrier> {
+		return Object.freeze({
+			authority: await rawAuthorityAtEpoch(databaseName, expectedEpoch),
+			databases: Object.freeze(
+				await Promise.all([
+					dumpDatabase(`${databaseName}--ahe`),
+					portableJournalDump(databaseName),
+					dumpDatabase(`${databaseName}--drp-snapshot-quarantine-v1`),
+				])
+			),
+			snapshotDeclaration: await rawSnapshotDeclarationAtEpoch(databaseName, expectedEpoch - 1),
 		});
 	},
 	rawAuthorityAtEpoch(databaseName: string, expectedEpoch: number): Promise<PlainRecord> {
