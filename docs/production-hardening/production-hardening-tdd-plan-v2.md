@@ -97779,6 +97779,20 @@ for the broader historical-rebase claim. Working evidence is
 manifest validates and has SHA-256
 `f999b3fcfeec8a6da770975033c0c3d3d77c0057895cc50702ade7f573a2bcee`.
 
+The exact signed/pushed GREEN commit
+`9e1781e0966953d7adce8cf6b0a4d9e56d12299a` was then checked out detached in
+`/tmp/ts-drp-d110c-f24-clean.vc0NSD`. A frozen offline install from pnpm's
+existing global content store downloaded nothing, rebuilt all 40 workspace
+packages plus the affected examples, and the isolated checkout passed the same
+41/41 focused assertions and both Chromium titles. Its tracked status remained
+empty; the unrelated local Phase-0g RED files and `.agents` directory were
+absent. The first command that forced the repo-local partial store stopped only
+because that cache lacked `fake-indexeddb@6.2.5`; the corrected global-store
+offline command passed and is the accepted proof. Evidence is
+`.logs/d110c-0c1f24-clean-9e1781e0/`; its one-entry self-excluding manifest
+validates and has SHA-256
+`162941d3d0881a8fa5e4eebc01840b1b1d6abed78b8289822d83658e6d0b00e8`.
+
 A narrow transition diagnostic also rejected an invalid attempted check rather
 than widening the carrier. The proposed transition closure contains the
 successor trust, Cut, QC, retirement, and aggregate candidates, but not a
