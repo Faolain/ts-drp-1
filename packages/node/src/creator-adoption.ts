@@ -357,9 +357,11 @@ function verifyChain(facts: SealedAdoptionFacts, closure: RecoveredClosure): Ver
 	}
 	const advance = inspectCreatorTransitionAdvance({
 		current: { candidates: closure.currentCandidates, closure: facts.currentReferences },
+		currentTrust: facts.currentTrust,
 		mode: "verify",
 		proofRefs: [closeResult.cutValueRef, closeResult.commitQcRef],
 		proposed: { candidates: closure.proposedCandidates, closure: facts.proposedReferences },
+		successorTrust: opened.trust,
 	});
 	if (!advance.ok) return undefined;
 	const cut = canonicalRecord(cutBytes);
@@ -1055,9 +1057,11 @@ async function reopenCreatorSuccessorMaterial(
 		if (
 			!inspectCreatorTransitionAdvance({
 				current: { candidates: currentCandidates, closure: currentGeneration.closure },
+				currentTrust: predecessorTrust,
 				mode: "verify",
 				proofRefs: [cutCandidate.ref, selectedQc.ref],
 				proposed: { candidates: proposedCandidates, closure: proposedGeneration.closure },
+				successorTrust,
 			}).ok
 		) {
 			return coldFailure("chain-invalid", "creator successor trust advance is invalid");
@@ -1389,9 +1393,11 @@ async function authenticatePendingCandidate(
 			!sameRoomHead(roomHeadFromTrust(successorTrust), expectedNext) ||
 			!inspectCreatorTransitionAdvance({
 				current: { candidates: currentCandidates, closure: currentGeneration.closure },
+				currentTrust: predecessorTrust,
 				mode: "verify",
 				proofRefs: [cutCandidate.ref, selectedQc.ref],
 				proposed: { candidates: proposedCandidates, closure: proposedGeneration.closure },
+				successorTrust,
 			}).ok
 		) {
 			return undefined;

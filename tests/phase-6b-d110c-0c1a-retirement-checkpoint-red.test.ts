@@ -1,13 +1,58 @@
 import "fake-indexeddb/auto";
 
-import { compareBytes, decodeCanonical } from "@ts-drp/canonical";
+import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { digestBlob } from "@ts-drp/storage";
 import { describe, expect, it } from "vitest";
 
+import { contract, hexBytes } from "./fixtures/phase-3a0-v3/controlled-anchor-trust.js";
+import { openD110c0b1RedFixture } from "./fixtures/phase-6b-d110c-0b1/bounded-checkpoint-contract.js";
 import {
 	D110C_0C1A_RED_TOKEN,
 	D110C_0C1A_RETIREMENT_KIND,
 	openD110c0c1aRetirementCheckpointFixture,
 } from "./fixtures/phase-6b-d110c-0c1a/retirement-checkpoint-contract.js";
+import {
+	createRecoverableFinalitySigner,
+	signCreatorAnchorRequest,
+	signCreatorIssuanceRetirementRequest,
+} from "../packages/keychain/src/finality.js";
+import { inspectCreatorTransitionAdvance } from "../packages/node/src/internal/creator-transition-advance.js";
+import { openCreatorCheckpointTrust } from "../packages/protocol-v3/src/creator-checkpoint.js";
+import {
+	completeCreatorIssuanceRetirement,
+	CREATOR_ISSUANCE_RETIREMENT_GENESIS_SENTINEL,
+	openCreatorIssuanceRetirement,
+	prepareCreatorIssuanceRetirement,
+	resolveCreatorIssuanceRetirement,
+} from "../packages/protocol-v3/src/creator-issuance-retirement.js";
+
+interface Candidate {
+	readonly bytes: Uint8Array;
+	readonly ref: Readonly<{ readonly byteLength: number; readonly digest: string }>;
+}
+
+function record(value: Uint8Array): Readonly<Record<string, unknown>> {
+	const decoded = decodeCanonical(value);
+	if (decoded === null || typeof decoded !== "object" || Array.isArray(decoded)) {
+		throw new TypeError("D110C_0C1A_RECORD_INVALID");
+	}
+	return decoded as Readonly<Record<string, unknown>>;
+}
+
+function uniqueCandidate(candidates: readonly Candidate[], kind: string, epoch: number, phase?: string): Candidate {
+	const matches = candidates.filter((candidate) => {
+		const decoded = record(candidate.bytes);
+		const candidateEpoch =
+			decoded.kind === "drp-anchor-trust-state"
+				? decoded.currentEpoch
+				: decoded.kind === D110C_0C1A_RETIREMENT_KIND
+					? decoded.closedEpoch
+					: decoded.epoch;
+		return decoded.kind === kind && candidateEpoch === epoch && (phase === undefined || decoded.phase === phase);
+	});
+	if (matches.length !== 1) throw new TypeError(`D110C_0C1A_CANDIDATE_INVALID:${kind}:${epoch}`);
+	return matches[0] as (typeof matches)[number];
+}
 
 describe("D.110c-0c1a creator issuance-retirement checkpoint RED", () => {
 	it("requires one authenticated retirement carrier after a genuine dense creator close", async () => {
@@ -106,8 +151,346 @@ describe("D.110c-0c1a creator issuance-retirement checkpoint RED", () => {
 				throw new TypeError(D110C_0C1A_RED_TOKEN);
 			}
 			expect(retirementCandidates).toHaveLength(1);
-			expect(retirementCandidates[0]?.value.kind).toBe(D110C_0C1A_RETIREMENT_KIND);
-			expect(fixture.evidence.proposed.references).toContainEqual(retirementCandidates[0]?.ref);
+			const candidate = retirementCandidates[0];
+			if (candidate === undefined) throw new TypeError("D110C_0C1A_GREEN_CANDIDATE_UNAVAILABLE");
+			expect(candidate.value.kind).toBe(D110C_0C1A_RETIREMENT_KIND);
+			expect(fixture.evidence.proposed.references).toContainEqual(candidate.ref);
+			const expectedOpen = Object.freeze({
+				expectedCommitQcRef: closeResult.commitQcRef,
+				expectedCutValueDigest: Buffer.from(
+					hashDomain("ts-drp/hard-epoch-cut/v3", encodeCanonical(closeIdentity.cut))
+				).toString("hex"),
+				expectedSnapshotManifestDigest: closeIdentity.snapshotManifestDigest,
+				floorTrust: fixture.evidence.successorTrust,
+			});
+			expect(
+				openCreatorIssuanceRetirement({
+					...expectedOpen,
+					exactCanonicalRecordBytes: candidate.bytes,
+				})
+			).toMatchObject({ ok: true });
+			const mutatedSignature = Uint8Array.from(candidate.value.detachedCreatorSignature as Uint8Array);
+			mutatedSignature[0] = (mutatedSignature[0] as number) ^ 1;
+			const mutants = Object.freeze([
+				Object.freeze({ ...candidate.value, author: "0".repeat(64) }),
+				Object.freeze({ ...candidate.value, objectId: `${String(candidate.value.objectId)}-foreign` }),
+				Object.freeze({ ...candidate.value, genesisAnchorDigest: "0".repeat(64) }),
+				Object.freeze({ ...candidate.value, closedAnchorDigest: "0".repeat(64) }),
+				Object.freeze({ ...candidate.value, successorAnchorDigest: "0".repeat(64) }),
+				Object.freeze({ ...candidate.value, cutValueDigest: "0".repeat(64) }),
+				Object.freeze({ ...candidate.value, snapshotManifestDigest: "0".repeat(64) }),
+				Object.freeze({ ...candidate.value, priorRetirementCandidateDigest: "0".repeat(64) }),
+				Object.freeze({ ...candidate.value, admittedAuthorSequence: 1 }),
+				Object.freeze({ ...candidate.value, observedLineage: { exhausted: true, next: 3 } }),
+				Object.freeze({ ...candidate.value, detachedCreatorSignature: mutatedSignature }),
+			]);
+			for (const mutant of mutants) {
+				expect(
+					openCreatorIssuanceRetirement({
+						...expectedOpen,
+						exactCanonicalRecordBytes: encodeCanonical(mutant),
+					})
+				).toMatchObject({ ok: false });
+			}
+			expect(
+				openCreatorIssuanceRetirement({
+					...expectedOpen,
+					exactCanonicalRecordBytes: new Uint8Array(8193),
+				})
+			).toMatchObject({ ok: false });
+			const transition = Object.freeze({
+				current: {
+					candidates: fixture.evidence.current.candidates,
+					closure: fixture.evidence.current.references,
+				},
+				currentTrust: fixture.evidence.currentTrust,
+				mode: "verify" as const,
+				proofRefs: [closeResult.cutValueRef, closeResult.commitQcRef],
+				proposed: {
+					candidates: fixture.evidence.proposed.candidates,
+					closure: fixture.evidence.proposed.references,
+				},
+				successorTrust: fixture.evidence.successorTrust,
+			});
+			expect(inspectCreatorTransitionAdvance(transition)).toMatchObject({ ok: true });
+			expect(
+				inspectCreatorTransitionAdvance({
+					...transition,
+					proposed: {
+						candidates: transition.proposed.candidates.filter(({ ref }) => ref.digest !== candidate.ref.digest),
+						closure: transition.proposed.closure.filter(({ digest }) => digest !== candidate.ref.digest),
+					},
+				})
+			).toEqual({ ok: false, reason: "TRUST_CLOSURE_INVALID" });
+			expect(
+				inspectCreatorTransitionAdvance({
+					...transition,
+					proposed: {
+						candidates: [...transition.proposed.candidates, candidate],
+						closure: [...transition.proposed.closure, candidate.ref],
+					},
+				})
+			).toEqual({ ok: false, reason: "TRUST_CLOSURE_INVALID" });
+			expect(
+				inspectCreatorTransitionAdvance({
+					...transition,
+					proposed: {
+						candidates: transition.proposed.candidates,
+						closure: transition.proposed.closure.filter(({ digest }) => digest !== candidate.ref.digest),
+					},
+				})
+			).toEqual({ ok: false, reason: "TRUST_CLOSURE_INVALID" });
+			expect(
+				inspectCreatorTransitionAdvance({
+					...transition,
+					proposed: {
+						candidates: transition.proposed.candidates.filter(({ ref }) => ref.digest !== candidate.ref.digest),
+						closure: transition.proposed.closure,
+					},
+				})
+			).toEqual({ ok: false, reason: "TRUST_CLOSURE_INVALID" });
+			expect(
+				inspectCreatorTransitionAdvance({
+					...transition,
+					proposed: {
+						candidates: transition.proposed.candidates,
+						closure: [...transition.proposed.closure, candidate.ref],
+					},
+				})
+			).toEqual({ ok: false, reason: "TRUST_CLOSURE_INVALID" });
+
+			const recreated = prepareCreatorIssuanceRetirement({
+				admittedAuthorSequence: candidate.value.admittedAuthorSequence,
+				author: candidate.value.author,
+				commitQcRef: closeResult.commitQcRef,
+				currentTrust: fixture.evidence.currentTrust,
+				cutValueDigest: candidate.value.cutValueDigest,
+				observedLineage: candidate.value.observedLineage,
+				priorAdmittedAuthorSequence: candidate.value.priorAdmittedAuthorSequence,
+				priorRetirementCandidateDigest: candidate.value.priorRetirementCandidateDigest,
+				snapshotManifestDigest: candidate.value.snapshotManifestDigest,
+				successorTrust: fixture.evidence.successorTrust,
+			});
+			expect(recreated).toMatchObject({ ok: true });
+			if (!recreated.ok) throw new TypeError("D110C_0C1A_GREEN_PREPARATION_UNAVAILABLE");
+			const signer = await createRecoverableFinalitySigner({ seed: hexBytes(contract.privateKeySeedHex) });
+			await expect(
+				signCreatorAnchorRequest({ request: recreated.signingRequest as never, signer: signer.signer })
+			).rejects.toThrow("untrusted or consumed creator-anchor signing request");
+			const detachedSignature = await signCreatorIssuanceRetirementRequest({
+				request: recreated.signingRequest,
+				signer: signer.signer,
+			});
+			await expect(
+				signCreatorIssuanceRetirementRequest({
+					request: recreated.signingRequest,
+					signer: signer.signer,
+				})
+			).rejects.toThrow("untrusted or consumed creator issuance-retirement signing request");
+			const completed = completeCreatorIssuanceRetirement({
+				detachedSignature,
+				preparation: recreated.preparation,
+			});
+			expect(completed).toMatchObject({ ok: true });
+			if (!completed.ok) throw new TypeError("D110C_0C1A_GREEN_COMPLETION_UNAVAILABLE");
+			expect(completed.exactCanonicalRecordBytes).toEqual(candidate.bytes);
+			expect(
+				completeCreatorIssuanceRetirement({
+					detachedSignature,
+					preparation: recreated.preparation,
+				})
+			).toEqual({ ok: false, reason: "PREPARATION_UNAVAILABLE" });
+		} finally {
+			await fixture.close();
+		}
+	});
+
+	it("replaces the authenticated epoch-one carrier when the admitted boundary does not advance", async () => {
+		const fixture = await openD110c0b1RedFixture();
+		try {
+			const { checkpointInput, retirementTransition } = fixture.evidence;
+			const checkpoint = openCreatorCheckpointTrust(checkpointInput);
+			expect(checkpoint).toMatchObject({ ok: true });
+			if (!checkpoint.ok) throw new TypeError("D110C_0C1A_SAME_BOUNDARY_CHECKPOINT_FAILED");
+			const currentCarrier = uniqueCandidate(retirementTransition.current.candidates, D110C_0C1A_RETIREMENT_KIND, 0);
+			const ordinaryProposedCarrier = uniqueCandidate(
+				retirementTransition.proposed.candidates,
+				D110C_0C1A_RETIREMENT_KIND,
+				1
+			);
+			const currentCut = uniqueCandidate(retirementTransition.current.candidates, "drp-hard-epoch-cut", 0);
+			const currentQc = uniqueCandidate(retirementTransition.current.candidates, "drp-seal-qc", 0, "commit");
+			const proposedCut = uniqueCandidate(retirementTransition.proposed.candidates, "drp-hard-epoch-cut", 1);
+			const proposedQc = uniqueCandidate(retirementTransition.proposed.candidates, "drp-seal-qc", 1, "commit");
+			const currentCutRecord = record(currentCut.bytes);
+			const proposedCutRecord = record(proposedCut.bytes);
+			const openedCurrent = openCreatorIssuanceRetirement({
+				exactCanonicalRecordBytes: currentCarrier.bytes,
+				expectedCommitQcRef: currentQc.ref,
+				expectedCutValueDigest: Buffer.from(hashDomain("ts-drp/hard-epoch-cut/v3", currentCut.bytes)).toString("hex"),
+				expectedSnapshotManifestDigest: currentCutRecord.snapshotManifestDigest,
+				floorTrust: checkpoint.predecessorTrust,
+			});
+			expect(openedCurrent).toMatchObject({ ok: true });
+			if (!openedCurrent.ok) throw new TypeError("D110C_0C1A_SAME_BOUNDARY_OPEN_FAILED");
+			const currentIdentity = resolveCreatorIssuanceRetirement(openedCurrent.capability);
+			expect(currentIdentity).toBeDefined();
+			if (currentIdentity === undefined) throw new TypeError("D110C_0C1A_SAME_BOUNDARY_IDENTITY_FAILED");
+			const ordinaryProposedRecord = record(ordinaryProposedCarrier.bytes);
+			const prepared = prepareCreatorIssuanceRetirement({
+				admittedAuthorSequence: currentIdentity.admittedAuthorSequence,
+				author: currentIdentity.author,
+				commitQcRef: proposedQc.ref,
+				currentTrust: checkpoint.predecessorTrust,
+				cutValueDigest: Buffer.from(hashDomain("ts-drp/hard-epoch-cut/v3", proposedCut.bytes)).toString("hex"),
+				observedLineage: ordinaryProposedRecord.observedLineage,
+				priorAdmittedAuthorSequence: currentIdentity.admittedAuthorSequence,
+				priorRetirementCandidateDigest: currentCarrier.ref.digest,
+				snapshotManifestDigest: proposedCutRecord.snapshotManifestDigest,
+				successorTrust: checkpoint.currentTrust,
+			});
+			expect(prepared).toMatchObject({ ok: true });
+			if (!prepared.ok) throw new TypeError("D110C_0C1A_SAME_BOUNDARY_PREPARE_FAILED");
+			const signer = await createRecoverableFinalitySigner({ seed: hexBytes(contract.privateKeySeedHex) });
+			const signature = await signCreatorIssuanceRetirementRequest({
+				request: prepared.signingRequest,
+				signer: signer.signer,
+			});
+			const completed = completeCreatorIssuanceRetirement({
+				detachedSignature: signature,
+				preparation: prepared.preparation,
+			});
+			expect(completed).toMatchObject({ ok: true });
+			if (!completed.ok) throw new TypeError("D110C_0C1A_SAME_BOUNDARY_COMPLETE_FAILED");
+			const sameBoundaryRef = digestBlob(completed.exactCanonicalRecordBytes);
+			expect(sameBoundaryRef).toMatchObject({ ok: true });
+			if (!sameBoundaryRef.ok) throw new TypeError("D110C_0C1A_SAME_BOUNDARY_DIGEST_FAILED");
+			const replacement = Object.freeze({
+				bytes: completed.exactCanonicalRecordBytes,
+				ref: Object.freeze({
+					byteLength: completed.exactCanonicalRecordBytes.byteLength,
+					digest: sameBoundaryRef.value,
+				}),
+			});
+			const proposed = Object.freeze({
+				candidates: Object.freeze(
+					retirementTransition.proposed.candidates.map((candidate) =>
+						candidate.ref.digest === ordinaryProposedCarrier.ref.digest ? replacement : candidate
+					)
+				),
+				closure: Object.freeze(
+					retirementTransition.proposed.references.map((ref) =>
+						ref.digest === ordinaryProposedCarrier.ref.digest ? replacement.ref : ref
+					)
+				),
+			});
+			const openedProposed = openCreatorIssuanceRetirement({
+				exactCanonicalRecordBytes: replacement.bytes,
+				expectedCommitQcRef: proposedQc.ref,
+				expectedCutValueDigest: Buffer.from(hashDomain("ts-drp/hard-epoch-cut/v3", proposedCut.bytes)).toString("hex"),
+				expectedSnapshotManifestDigest: proposedCutRecord.snapshotManifestDigest,
+				floorTrust: checkpoint.currentTrust,
+			});
+			expect(openedProposed).toMatchObject({ ok: true });
+			if (!openedProposed.ok) throw new TypeError("D110C_0C1A_SAME_BOUNDARY_SUCCESSOR_OPEN_FAILED");
+			const proposedIdentity = resolveCreatorIssuanceRetirement(openedProposed.capability);
+			expect(proposedIdentity).toMatchObject({
+				admittedAuthorSequence: currentIdentity.admittedAuthorSequence,
+				closedEpoch: 1,
+				priorAdmittedAuthorSequence: currentIdentity.admittedAuthorSequence,
+				priorRetirementCandidateDigest: currentCarrier.ref.digest,
+				successorEpoch: 2,
+			});
+			expect(retirementTransition.current.references).toContainEqual(currentCarrier.ref);
+			expect(proposed.closure).not.toContainEqual(currentCarrier.ref);
+			expect(proposed.closure).toContainEqual(replacement.ref);
+			expect(
+				inspectCreatorTransitionAdvance({
+					current: {
+						candidates: retirementTransition.current.candidates,
+						closure: retirementTransition.current.references,
+					},
+					currentTrust: checkpoint.predecessorTrust,
+					mode: "verify",
+					proofRefs: [proposedCut.ref, proposedQc.ref],
+					proposed,
+					successorTrust: checkpoint.currentTrust,
+				})
+			).toMatchObject({ ok: true });
+
+			const forkPrepared = prepareCreatorIssuanceRetirement({
+				admittedAuthorSequence: currentIdentity.admittedAuthorSequence,
+				author: currentIdentity.author,
+				commitQcRef: proposedQc.ref,
+				currentTrust: checkpoint.predecessorTrust,
+				cutValueDigest: Buffer.from(hashDomain("ts-drp/hard-epoch-cut/v3", proposedCut.bytes)).toString("hex"),
+				observedLineage: ordinaryProposedRecord.observedLineage,
+				priorAdmittedAuthorSequence: currentIdentity.admittedAuthorSequence,
+				priorRetirementCandidateDigest: currentCarrier.ref.digest === "f".repeat(64) ? "e".repeat(64) : "f".repeat(64),
+				snapshotManifestDigest: proposedCutRecord.snapshotManifestDigest,
+				successorTrust: checkpoint.currentTrust,
+			});
+			expect(forkPrepared).toMatchObject({ ok: true });
+			if (!forkPrepared.ok) throw new TypeError("D110C_0C1A_FORK_PREPARE_FAILED");
+			const forkSignature = await signCreatorIssuanceRetirementRequest({
+				request: forkPrepared.signingRequest,
+				signer: signer.signer,
+			});
+			const forkCompleted = completeCreatorIssuanceRetirement({
+				detachedSignature: forkSignature,
+				preparation: forkPrepared.preparation,
+			});
+			expect(forkCompleted).toMatchObject({ ok: true });
+			if (!forkCompleted.ok) throw new TypeError("D110C_0C1A_FORK_COMPLETE_FAILED");
+			const forkDigest = digestBlob(forkCompleted.exactCanonicalRecordBytes);
+			expect(forkDigest).toMatchObject({ ok: true });
+			if (!forkDigest.ok) throw new TypeError("D110C_0C1A_FORK_DIGEST_FAILED");
+			const forkCandidate = Object.freeze({
+				bytes: forkCompleted.exactCanonicalRecordBytes,
+				ref: Object.freeze({
+					byteLength: forkCompleted.exactCanonicalRecordBytes.byteLength,
+					digest: forkDigest.value,
+				}),
+			});
+			const forkedProposed = Object.freeze({
+				candidates: Object.freeze(
+					retirementTransition.proposed.candidates.map((candidate) =>
+						candidate.ref.digest === ordinaryProposedCarrier.ref.digest ? forkCandidate : candidate
+					)
+				),
+				closure: Object.freeze(
+					retirementTransition.proposed.references.map((ref) =>
+						ref.digest === ordinaryProposedCarrier.ref.digest ? forkCandidate.ref : ref
+					)
+				),
+			});
+			expect(
+				inspectCreatorTransitionAdvance({
+					current: {
+						candidates: retirementTransition.current.candidates,
+						closure: retirementTransition.current.references,
+					},
+					currentTrust: checkpoint.predecessorTrust,
+					mode: "verify",
+					proofRefs: [proposedCut.ref, proposedQc.ref],
+					proposed: forkedProposed,
+					successorTrust: checkpoint.currentTrust,
+				})
+			).toEqual({ ok: false, reason: "TRUST_CLOSURE_INVALID" });
+			expect(
+				prepareCreatorIssuanceRetirement({
+					admittedAuthorSequence: currentIdentity.admittedAuthorSequence,
+					author: currentIdentity.author,
+					commitQcRef: proposedQc.ref,
+					currentTrust: checkpoint.predecessorTrust,
+					cutValueDigest: Buffer.from(hashDomain("ts-drp/hard-epoch-cut/v3", proposedCut.bytes)).toString("hex"),
+					observedLineage: ordinaryProposedRecord.observedLineage,
+					priorAdmittedAuthorSequence: null,
+					priorRetirementCandidateDigest: CREATOR_ISSUANCE_RETIREMENT_GENESIS_SENTINEL,
+					snapshotManifestDigest: proposedCutRecord.snapshotManifestDigest,
+					successorTrust: checkpoint.currentTrust,
+				})
+			).toEqual({ ok: false, reason: "IDENTITY_INVALID" });
 		} finally {
 			await fixture.close();
 		}

@@ -389,9 +389,11 @@ function validTrustChain(
 	}
 	return inspectCreatorTransitionAdvance({
 		current: { candidates: currentCandidates, closure: facts.currentReferences },
+		currentTrust: facts.currentTrust,
 		mode: "verify",
 		proofRefs: [facts.closeResult.cutValueRef, facts.closeResult.commitQcRef],
 		proposed: { candidates: pendingCandidates, closure: facts.proposedReferences },
+		successorTrust: opened.trust,
 	}).ok;
 }
 

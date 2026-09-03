@@ -4,6 +4,10 @@ import {
 	consumeCreatorAnchorSigningRequest,
 	type CreatorAnchorSigningRequest,
 } from "@ts-drp/protocol-v3/internal/creator-anchor-signing-request";
+import {
+	consumeCreatorIssuanceRetirementSigningRequest,
+	type CreatorIssuanceRetirementSigningRequest,
+} from "@ts-drp/protocol-v3/internal/creator-issuance-retirement-signing-request";
 import { consumeSealSigningRequest, type SealSigningRequest } from "@ts-drp/protocol-v3/internal/seal-signing-request";
 
 declare const finalitySignerBrand: unique symbol;
@@ -153,5 +157,35 @@ export async function signCreatorAnchorRequest(
 	const consumed = consumeCreatorAnchorSigningRequest(input.request);
 	if (consumed === undefined) throw new TypeError("untrusted or consumed creator-anchor signing request");
 	const digest = exactBytes(consumed, 32, "creator anchor digest must be exactly 32 bytes");
+	return copyLibrarySignature(await state.privateKey.sign(digest));
+}
+
+/**
+ * Signs one protocol-authored, one-use creator issuance-retirement request.
+ * @param input - Opaque signer and retirement signing request.
+ * @returns Detached exact Ed25519 signature bytes.
+ */
+export async function signCreatorIssuanceRetirementRequest(
+	input: Readonly<{
+		request: CreatorIssuanceRetirementSigningRequest;
+		signer: FinalitySigner;
+	}>
+): Promise<Uint8Array> {
+	if (
+		input === null ||
+		typeof input !== "object" ||
+		Reflect.ownKeys(input).length !== 2 ||
+		!Object.hasOwn(input, "request") ||
+		!Object.hasOwn(input, "signer")
+	) {
+		throw new TypeError("creator issuance-retirement signing input is malformed");
+	}
+	const state = signerStates.get(input.signer);
+	if (state === undefined) throw new TypeError("untrusted finality signer");
+	const consumed = consumeCreatorIssuanceRetirementSigningRequest(input.request);
+	if (consumed === undefined) {
+		throw new TypeError("untrusted or consumed creator issuance-retirement signing request");
+	}
+	const digest = exactBytes(consumed, 32, "creator issuance-retirement digest must be exactly 32 bytes");
 	return copyLibrarySignature(await state.privateKey.sign(digest));
 }

@@ -1,8 +1,16 @@
-import { decodeCanonical } from "@ts-drp/canonical";
+import { decodeCanonical, hashDomain } from "@ts-drp/canonical";
 import type { DetachedClosureCandidate } from "@ts-drp/control-plane";
 import { inspectCreatorTrustAdvance } from "@ts-drp/control-plane/creator-trust-advance";
 import { inspectBoundedCreatorTrustAdvance } from "@ts-drp/control-plane/creator-trust-checkpoint-advance";
-import type { GenerationRef } from "@ts-drp/storage";
+import type { CurrentAnchorTrust } from "@ts-drp/protocol-v3";
+import {
+	CREATOR_ISSUANCE_RETIREMENT_GENESIS_SENTINEL,
+	CREATOR_ISSUANCE_RETIREMENT_KIND,
+	type CreatorIssuanceRetirementIdentity,
+	openCreatorIssuanceRetirement,
+	resolveCreatorIssuanceRetirement,
+} from "@ts-drp/protocol-v3/creator-issuance-retirement";
+import { digestBlob, type GenerationRef } from "@ts-drp/storage";
 
 export interface CreatorTransitionClosure {
 	readonly candidates: readonly DetachedClosureCandidate[];
@@ -11,9 +19,11 @@ export interface CreatorTransitionClosure {
 
 export interface InspectCreatorTransitionAdvanceInput {
 	readonly current: CreatorTransitionClosure;
+	readonly currentTrust: CurrentAnchorTrust;
 	readonly mode: "stage" | "verify";
 	readonly proofRefs: readonly GenerationRef[];
 	readonly proposed: CreatorTransitionClosure;
+	readonly successorTrust: CurrentAnchorTrust;
 }
 
 export type InspectCreatorTransitionAdvanceResult =
@@ -60,6 +70,137 @@ function failure(reason: string): InspectCreatorTransitionAdvanceResult {
 	return Object.freeze({ ok: false as const, reason });
 }
 
+function sameRef(left: GenerationRef, right: GenerationRef): boolean {
+	return left.byteLength === right.byteLength && left.digest === right.digest;
+}
+
+function exactCandidate(candidate: DetachedClosureCandidate): boolean {
+	const digest = digestBlob(candidate.bytes);
+	return digest.ok && digest.value === candidate.ref.digest && candidate.bytes.byteLength === candidate.ref.byteLength;
+}
+
+function hex(bytes: Uint8Array): string {
+	return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function retirementCandidates(closure: CreatorTransitionClosure): readonly DetachedClosureCandidate[] {
+	return closure.candidates.filter((candidate) => record(candidate)?.kind === CREATOR_ISSUANCE_RETIREMENT_KIND);
+}
+
+function exactClosureOccurrence(closure: readonly GenerationRef[], candidate: DetachedClosureCandidate): boolean {
+	return closure.filter((ref) => sameRef(ref, candidate.ref)).length === 1;
+}
+
+function openedRetirement(
+	candidate: DetachedClosureCandidate,
+	floorTrust: CurrentAnchorTrust,
+	cut: DetachedClosureCandidate,
+	qc: DetachedClosureCandidate
+):
+	| Readonly<{
+			readonly candidate: DetachedClosureCandidate;
+			readonly identity: CreatorIssuanceRetirementIdentity;
+	  }>
+	| undefined {
+	const decodedCut = record(cut);
+	if (
+		!exactCandidate(candidate) ||
+		!exactCandidate(cut) ||
+		!exactCandidate(qc) ||
+		typeof decodedCut?.snapshotManifestDigest !== "string"
+	) {
+		return undefined;
+	}
+	const opened = openCreatorIssuanceRetirement({
+		exactCanonicalRecordBytes: candidate.bytes,
+		expectedCommitQcRef: qc.ref,
+		expectedCutValueDigest: hex(hashDomain("ts-drp/hard-epoch-cut/v3", cut.bytes)),
+		expectedSnapshotManifestDigest: decodedCut.snapshotManifestDigest,
+		floorTrust,
+	});
+	if (!opened.ok) return undefined;
+	const identity = resolveCreatorIssuanceRetirement(opened.capability);
+	return identity === undefined ||
+		decodedCut.kind !== "drp-hard-epoch-cut" ||
+		decodedCut.objectId !== identity.objectId ||
+		decodedCut.epoch !== identity.closedEpoch ||
+		decodedCut.previousAnchor !== identity.closedAnchorDigest
+		? undefined
+		: Object.freeze({ candidate, identity });
+}
+
+function authenticatedRetirementPair(input: InspectCreatorTransitionAdvanceInput):
+	| Readonly<{
+			readonly current?: DetachedClosureCandidate;
+			readonly proposed: DetachedClosureCandidate;
+	  }>
+	| undefined {
+	if (
+		input.currentTrust.currentEpoch < 0 ||
+		input.successorTrust.currentEpoch !== input.currentTrust.currentEpoch + 1 ||
+		input.currentTrust.objectId !== input.successorTrust.objectId ||
+		input.currentTrust.genesisAnchorDigest !== input.successorTrust.genesisAnchorDigest ||
+		input.proofRefs.length !== 2
+	) {
+		return undefined;
+	}
+	const currentMatches = retirementCandidates(input.current);
+	const proposedMatches = retirementCandidates(input.proposed);
+	if (proposedMatches.length !== 1 || currentMatches.length !== (input.currentTrust.currentEpoch === 0 ? 0 : 1)) {
+		return undefined;
+	}
+	const proposedRetirement = proposedMatches[0] as DetachedClosureCandidate;
+	if (!exactClosureOccurrence(input.proposed.closure, proposedRetirement)) return undefined;
+	if (
+		currentMatches.length === 1 &&
+		!exactClosureOccurrence(input.current.closure, currentMatches[0] as DetachedClosureCandidate)
+	) {
+		return undefined;
+	}
+	const proposedCut = input.proposed.candidates.find((candidate) =>
+		sameRef(candidate.ref, input.proofRefs[0] as GenerationRef)
+	);
+	const proposedQc = input.proposed.candidates.find((candidate) =>
+		sameRef(candidate.ref, input.proofRefs[1] as GenerationRef)
+	);
+	if (proposedCut === undefined || proposedQc === undefined) return undefined;
+	const openedProposed = openedRetirement(proposedRetirement, input.successorTrust, proposedCut, proposedQc);
+	if (
+		openedProposed === undefined ||
+		openedProposed.identity.closedEpoch !== input.currentTrust.currentEpoch ||
+		openedProposed.identity.closedAnchorDigest !== input.currentTrust.currentAnchorDigest
+	) {
+		return undefined;
+	}
+	if (input.currentTrust.currentEpoch === 0) {
+		return openedProposed.identity.priorAdmittedAuthorSequence === null &&
+			openedProposed.identity.priorRetirementCandidateDigest === CREATOR_ISSUANCE_RETIREMENT_GENESIS_SENTINEL
+			? Object.freeze({ proposed: openedProposed.candidate })
+			: undefined;
+	}
+	const currentCandidate = currentMatches[0] as DetachedClosureCandidate;
+	const retiringCut = uniqueCandidate(
+		input.current.candidates,
+		"drp-hard-epoch-cut",
+		input.currentTrust.currentEpoch - 1
+	);
+	const retiringQc = uniqueCandidate(
+		input.current.candidates,
+		"drp-seal-qc",
+		input.currentTrust.currentEpoch - 1,
+		"commit"
+	);
+	if (retiringCut === undefined || retiringQc === undefined) return undefined;
+	const openedCurrent = openedRetirement(currentCandidate, input.currentTrust, retiringCut, retiringQc);
+	return openedCurrent !== undefined &&
+		openedProposed.identity.author === openedCurrent.identity.author &&
+		openedProposed.identity.priorRetirementCandidateDigest === currentCandidate.ref.digest &&
+		openedProposed.identity.priorAdmittedAuthorSequence === openedCurrent.identity.admittedAuthorSequence &&
+		openedProposed.identity.admittedAuthorSequence >= openedCurrent.identity.admittedAuthorSequence
+		? Object.freeze({ current: currentCandidate, proposed: openedProposed.candidate })
+		: undefined;
+}
+
 /**
  * Selects the compatibility or bounded transition predicate and owns stale-ref derivation.
  * @param input - Current/proposed closure pair, new proof refs, and staging/verification mode.
@@ -69,6 +210,20 @@ export function inspectCreatorTransitionAdvance(
 	input: InspectCreatorTransitionAdvanceInput
 ): InspectCreatorTransitionAdvanceResult {
 	try {
+		const retirement = authenticatedRetirementPair(input);
+		if (retirement === undefined) return failure("TRUST_CLOSURE_INVALID");
+		const withoutRetirement = (
+			closure: CreatorTransitionClosure,
+			candidate?: DetachedClosureCandidate
+		): CreatorTransitionClosure =>
+			candidate === undefined
+				? closure
+				: Object.freeze({
+						candidates: Object.freeze(closure.candidates.filter((item) => !sameRef(item.ref, candidate.ref))),
+						closure: Object.freeze(closure.closure.filter((ref) => !sameRef(ref, candidate.ref))),
+					});
+		const normalizedCurrent = withoutRetirement(input.current, retirement.current);
+		const normalizedProposed = withoutRetirement(input.proposed, retirement.proposed);
 		const trustCandidates = input.current.candidates.filter(
 			(candidate) => record(candidate)?.kind === "drp-anchor-trust-state"
 		);
@@ -78,7 +233,11 @@ export function inspectCreatorTransitionAdvance(
 			return failure("TRUST_CLOSURE_INVALID");
 		}
 		if (trust.currentEpoch === 0) {
-			const result = inspectCreatorTrustAdvance(input);
+			const result = inspectCreatorTrustAdvance({
+				current: normalizedCurrent,
+				proofRefs: input.proofRefs,
+				proposed: normalizedProposed,
+			});
 			return result.ok
 				? Object.freeze({ kind: result.kind, ok: true as const, proposed: input.proposed })
 				: failure(result.reason);
@@ -91,23 +250,37 @@ export function inspectCreatorTransitionAdvance(
 			return failure("RETIRING_PROOF_REFS_INVALID");
 		}
 		const retiring = new Set([retiringCut.ref.digest, retiringQc.ref.digest, retiringAcl.ref.digest]);
-		const proposed =
+		const proposedWithoutRetiring =
 			input.mode === "stage"
 				? Object.freeze({
 						candidates: Object.freeze(
-							input.proposed.candidates.filter((candidate) => !retiring.has(candidate.ref.digest))
+							normalizedProposed.candidates.filter((candidate) => !retiring.has(candidate.ref.digest))
 						),
-						closure: Object.freeze(input.proposed.closure.filter((ref) => !retiring.has(ref.digest)).sort(compareRef)),
+						closure: Object.freeze(
+							normalizedProposed.closure.filter((ref) => !retiring.has(ref.digest)).sort(compareRef)
+						),
 					})
-				: input.proposed;
+				: normalizedProposed;
 		const result = inspectBoundedCreatorTrustAdvance({
-			current: input.current,
+			current: normalizedCurrent,
 			proofRefs: input.proofRefs,
-			proposed,
+			proposed: proposedWithoutRetiring,
 			retiringPredecessorAclRef: retiringAcl.ref,
 			retiringProofRefs: [retiringCut.ref, retiringQc.ref],
 		});
-		return result.ok ? Object.freeze({ kind: result.kind, ok: true as const, proposed }) : failure(result.reason);
+		if (!result.ok) return failure(result.reason);
+		const proposed =
+			input.mode === "verify"
+				? input.proposed
+				: Object.freeze({
+						candidates: Object.freeze(
+							[...proposedWithoutRetiring.candidates, retirement.proposed].sort((left, right) =>
+								compareRef(left.ref, right.ref)
+							)
+						),
+						closure: Object.freeze([...proposedWithoutRetiring.closure, retirement.proposed.ref].sort(compareRef)),
+					});
+		return Object.freeze({ kind: result.kind, ok: true as const, proposed });
 	} catch {
 		return failure("TRUST_CLOSURE_INVALID");
 	}

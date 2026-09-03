@@ -102,9 +102,12 @@ describe("D.110c-0b1 bounded checkpoint and control-proof GREEN", () => {
 		const { activeCensus, currentCensus, existingAdvance, proposedCensus } = fixture.evidence;
 		expect(existingAdvance).toMatchObject({ ok: false, reason: "TRUST_CLOSURE_INVALID" });
 		expect(bounded).toEqual({ kind: "successor", ok: true });
-		expect(currentCensus).toHaveLength(5);
-		expect(proposedCensus).toHaveLength(4);
-		expect(activeCensus).toHaveLength(5);
+		expect(currentCensus).toHaveLength(6);
+		expect(proposedCensus).toHaveLength(5);
+		expect(activeCensus).toHaveLength(6);
+		expect(entries(currentCensus, "drp-creator-issuance-retirement-state", 0)).toHaveLength(1);
+		expect(entries(proposedCensus, "drp-creator-issuance-retirement-state", 1)).toHaveLength(1);
+		expect(entries(activeCensus, "drp-creator-issuance-retirement-state", 1)).toHaveLength(1);
 		expect(entries(currentCensus, "drp-hard-epoch-cut", 0)).toHaveLength(1);
 		expect(entries(currentCensus, "drp-seal-qc", 0, "commit")).toHaveLength(1);
 		expect(entries(currentCensus, "drp-v3-latched-acl", 0)).toHaveLength(1);

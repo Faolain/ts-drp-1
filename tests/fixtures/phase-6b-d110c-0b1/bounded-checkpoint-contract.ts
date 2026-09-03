@@ -41,6 +41,10 @@ export interface D110c0b1RedEvidence {
 	readonly existingAdvance: Readonly<Record<string, unknown>>;
 	readonly oneStepFromGenesis: Readonly<Record<string, unknown>>;
 	readonly proposedCensus: readonly D110c0b1ClosureEntry[];
+	readonly retirementTransition: Readonly<{
+		readonly current: D110c0b1RedMaterial["current"];
+		readonly proposed: D110c0b1RedMaterial["proposed"];
+	}>;
 }
 
 export interface D110c0b1RedFixture {
@@ -84,7 +88,9 @@ function census(candidates: readonly Candidate[]): readonly D110c0b1ClosureEntry
 							? decoded.currentEpoch
 							: typeof decoded.epoch === "number"
 								? decoded.epoch
-								: undefined,
+								: typeof decoded.closedEpoch === "number"
+									? decoded.closedEpoch
+									: undefined,
 					kind: String(decoded.kind),
 					phase: typeof decoded.phase === "string" ? decoded.phase : undefined,
 				});
@@ -117,6 +123,11 @@ export async function openD110c0b1RedFixture(): Promise<D110c0b1RedFixture> {
 		const newQc = candidate(material.proposed.candidates, "drp-seal-qc", 1, "commit");
 		const expectedObjectId = material.genesisTrust.objectId;
 		const pinnedGenesisAnchorDigest = material.genesisTrust.genesisAnchorDigest;
+		const retirementDigests = new Set(
+			[...material.current.candidates, ...material.proposed.candidates].flatMap((entry) =>
+				record(entry).kind === "drp-creator-issuance-retirement-state" ? [entry.ref.digest] : []
+			)
+		);
 		const openedEpochOne = openCurrentAnchorTrust({
 			exactCanonicalTrustStateRecordBytes: epochOneTrust.bytes,
 			expectedObjectId,
@@ -131,19 +142,27 @@ export async function openD110c0b1RedFixture(): Promise<D110c0b1RedFixture> {
 		const retiredDigests = new Set([retiringCut.ref.digest, retiringQc.ref.digest, retiringAcl.ref.digest]);
 		const boundedReferences = Object.freeze(
 			material.proposed.references
-				.filter((ref) => !retiredDigests.has(ref.digest))
+				.filter((ref) => !retiredDigests.has(ref.digest) && !retirementDigests.has(ref.digest))
 				.map((ref) => Object.freeze({ ...ref }))
 				.sort((left, right) => left.digest.localeCompare(right.digest))
 		);
 		const boundedCandidates = Object.freeze(
-			material.proposed.candidates.filter((entry) => !retiredDigests.has(entry.ref.digest))
+			material.proposed.candidates.filter(
+				(entry) => !retiredDigests.has(entry.ref.digest) && !retirementDigests.has(entry.ref.digest)
+			)
+		);
+		const boundedCurrentReferences = Object.freeze(
+			material.current.references.filter((ref) => !retirementDigests.has(ref.digest))
+		);
+		const boundedCurrentCandidates = Object.freeze(
+			material.current.candidates.filter((entry) => !retirementDigests.has(entry.ref.digest))
 		);
 		return Object.freeze({
 			close: fixture.close,
 			evidence: Object.freeze({
 				activeCensus: census(material.active.candidates),
 				boundedInput: Object.freeze({
-					current: Object.freeze({ candidates: material.current.candidates, closure: material.current.references }),
+					current: Object.freeze({ candidates: boundedCurrentCandidates, closure: boundedCurrentReferences }),
 					proofRefs: Object.freeze([newCut.ref, newQc.ref]),
 					proposed: Object.freeze({ candidates: boundedCandidates, closure: boundedReferences }),
 					retiringPredecessorAclRef: retiringAcl.ref,
@@ -188,6 +207,7 @@ export async function openD110c0b1RedFixture(): Promise<D110c0b1RedFixture> {
 					exactCanonicalTrustStateRecordBytes: epochTwoTrust.bytes,
 				}),
 				proposedCensus: census(material.proposed.candidates),
+				retirementTransition: Object.freeze({ current: material.current, proposed: material.proposed }),
 			}),
 		});
 	} catch (error) {

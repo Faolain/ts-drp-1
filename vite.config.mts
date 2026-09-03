@@ -27,6 +27,10 @@ const config = defineConfig({
 				__dirname,
 				"packages/protocol-v3/src/internal/creator-anchor-signing-request.ts"
 			),
+			"@ts-drp/protocol-v3/internal/creator-issuance-retirement-signing-request": path.resolve(
+				__dirname,
+				"packages/protocol-v3/src/internal/creator-issuance-retirement-signing-request.ts"
+			),
 			"@ts-drp/protocol-v3/internal/seal-signing-request": path.resolve(
 				__dirname,
 				"packages/protocol-v3/src/internal/seal-signing-request.ts"
@@ -40,6 +44,10 @@ const config = defineConfig({
 				"packages/protocol-v3/src/creator-checkpoint.ts"
 			),
 			"@ts-drp/protocol-v3/creator-close": path.resolve(__dirname, "packages/protocol-v3/src/creator-close.ts"),
+			"@ts-drp/protocol-v3/creator-issuance-retirement": path.resolve(
+				__dirname,
+				"packages/protocol-v3/src/creator-issuance-retirement.ts"
+			),
 			"@ts-drp/protocol-v3/seal": path.resolve(__dirname, "packages/protocol-v3/src/seal.ts"),
 			"@ts-drp/storage-browser/seal-vote": path.resolve(__dirname, "packages/storage-browser/src/seal-vote.ts"),
 			"@ts-drp/seal/internal/storage-port": path.resolve(__dirname, "packages/seal/src/storage-port.ts"),

@@ -95834,8 +95834,9 @@ SHA-256 is
 
 ###### D.110c-0c1a creator-signed issuance-retirement checkpoint prerequisite
 
-**Status: material confirmation passed with zero P0/P1; tests-only RED is
-authorized; production implementation remains unauthorized.** Owner:
+**Status: causal RED is signed/pushed; bounded production GREEN and retained
+gates pass locally; the signed/pushed GREEN checkpoint and governing final
+plan→RED→GREEN review remain before closure.** Owner:
 protocol-v3 creator retirement record/opener and one-use signing request,
 keychain finality signing dispatch, the creator-close row/graph/replay capture,
 the Node-private
@@ -96031,6 +96032,101 @@ gates passed. Complete evidence is under
 is `5726596405fe05894c2b796b1e400406ef11aaa1c07e07a2d0cee2e216829053`.
 This is the accepted causal RED; once its signed commit and pushed ref are
 verified, the frozen narrow D.110c-0c1a production GREEN becomes authorized.
+
+The causal RED is signed/pushed commit
+`7e2f2694cdd1b3a2feb0265dd0a73fa52dcb52dc`, tree
+`bcf8073f2d41c92c30eb17944f595291b23d584b`, with a good Faolain GPG
+signature and an exact remote branch ref. GREEN therefore proceeded without
+changing the frozen carrier design. Protocol-v3 now owns the exact canonical
+record, 8,192-byte limit, opaque verified capability, frozen genesis sentinel,
+and destructively one-use signing request; keychain dispatch signs only that
+protocol-authored request. Creator close derives the cumulative per-author
+admitted frontier only from complete dense issued/outbox agreement, exact
+nested scope/sequence/preimage/digest/signature equality, authenticated graph
+membership, sealed durable replay, and an exact non-exhausted lineage suffix
+bounded by `maxEpochVertices`. Pending admitted rows remain admitted; a
+post-boundary suffix absent from the close graph remains pending; gaps,
+substitution, graph re-entry after the first omitted row, exhaustion, incomplete
+lineage, empty initialization, and over-limit scans fail closed with the frozen
+unavailable token.
+
+The Node-private transition owner is now the single normalization seam for the
+one stage and four verify consumers. It opens the exact current/proposed
+carrier against independently authenticated adjacent floors and exact Cut/QC/
+snapshot identities, checks the carrier's closed anchor/epoch/object against
+the Cut, requires exact candidate/ref occurrence, accepts only epoch-0
+zero-to-one initialization or N≥1 one-to-one linked replacement, strips only
+that pair for the unchanged inner predicates, and restores only the opened
+successor carrier in stage mode. It exposes no issuance skip/filter decision.
+`registry-v1.json` and its normative wire table, `v3-live.ts`, dependencies,
+thresholds, and the protocol-v3 root export roster are unchanged.
+
+The final focused execution passes 2/2. It proves the genuine dense epoch-0
+close carrier; exact opener and recreation bytes; signature/preimage/head/Cut/
+QC/snapshot/sentinel/lineage/size mutants; exact missing, duplicate,
+candidate-only, ref-only, and duplicate-ref closure failures; one-use and
+cross-request signing refusal; an authenticated epoch-1 replacement whose
+tracked author boundary remains unchanged across a genuine nonempty Cut; and a
+valid creator-signed same-room stale-prior fork rejected with exact
+`TRUST_CLOSURE_INVALID`. Its evidence root is
+`.logs/d110c-0c1a-green-adversarial-final-7e2f2694/`; the three-entry
+self-excluding manifest SHA-256 is
+`9ebd55702fc02f46ecfd6f972b9afe839c754e5a45a7eac0dca65a3335e9db72`.
+
+The final retained unit run passes 230/230 with zero skip/todo across 24
+affected files, including creator close/adoption, successor activation/local
+author/product, genuine 0→1→2 checkpoint/census, issuance/outbox/rebase, AHE,
+snapshot quarantine, storage-node death/reopen, and the current registry suite.
+Its evidence root is
+`.logs/d110c-0c1a-green-retained-post-refactor-7e2f2694/`; manifest SHA-256 is
+`8a3ba7c69c15d70c3ec7580bbf5daca5b4ddae52cba5af82d2bdca98c3af6c8e`.
+Retained browser results are live close 9/9, adoption commit 6/6, successor
+activation 24/24, successor product 30/30 with only the separately preserved
+D.110c-0c causal RED selected out, successor epoch 3/3, AHE reclamation 4/4,
+and issuance retention 4/4. Stdout/status and reporter-JSON manifest SHA-256s
+are respectively
+`3eb2fba5e6d2c2d4ed6961c86771ae8b8d7fe35db96c8de6c988a846b33b3a1a`
+and
+`7a09bc9d7fa06721b9244d915407e185a3570a292a9970555c4c85219269ad04`.
+After the final fail-closed scan tightening, live close repeated 9/9 and the
+genuine three-engine D.110c-b 0→1→2 hot loop repeated 3/3; their paired
+manifest SHA-256s are
+`b6f7ce68ad3aa375ed3f3dfa62d7a2845d1bfa8db97ce8ba2683538f93d284ee`
+and
+`e13a26535d1c89c38fefaf1ce136dc8379a179046d4548e29c99e1f449a9055a`.
+
+Protocol-v3 typecheck/build/public-entry audit, keychain typecheck/build, Node
+production-source no-emit typecheck/build, storage-browser build, actual
+Node-consumer built-subpath import, exact-owner ESLint, 8-GiB Prettier, diff,
+and source-shape gates pass. The source audit proves exactly five wrapper call
+sites (one stage/four verify), the compound cursor order
+`[objectId, author, sequence]`, exact dense-lineage equality, the 8,192-byte
+bound, and zero registry/`v3-live.ts` diff. Static-root manifest SHA-256 is
+`e8e24b3de4b9a979e76f10c1df0a1e305a9ed9206b36aa594e346cde4faa7072`;
+the consolidated closure ledger is
+`.logs/d110c-0c1a-green-closure-7e2f2694/` with validating manifest SHA-256
+`74389094ae89affe4e76f82966bb856f9e5c96a675f3f9333cfd82d161410b6e`.
+
+Preserved non-product corrections remain explicit. The first same-boundary
+probe attempted a prohibited empty Cut and correctly met the pre-existing
+`CUT_VALUE_MISMATCH`; the accepted control instead uses a genuine nonempty Cut
+with an unchanged tracked-author frontier. A selector initially read `epoch`
+instead of `closedEpoch`; a live-close browser expectation omitted the new
+required ref; a bare-subpath smoke ran from the intentionally unlinked monorepo
+root rather than the actual Node consumer; and initial lint found only import
+order/return-type issues. Each diagnostic was corrected without weakening a
+contract. A first macOS `pgrep -a` process counter also counted its own shell
+PIDs because that platform emitted PIDs rather than command lines; the
+corrected `ps`-based predicate records zero relevant processes, zero protected
+port listeners, all three protected paths, and all 27 stashes. The successful
+final evidence is separate. The unrelated
+N1-prime canonical source-shape test still expects historical source hash
+`25ca…` while the signed repository has long contained `49b585…`; it remains
+explicit inherited test-contract debt and was not repinned or represented as a
+D.110c-0c1a failure. The current registry/public-entry and affected canonical
+behavior gates pass. The signed downstream D.110c-0c failure remains owned by
+D.110c-0c1 and was neither rerun nor weakened. D.110a and campaign identities
+remain excluded.
 
 The complete confirmation evidence is retained under
 `.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry

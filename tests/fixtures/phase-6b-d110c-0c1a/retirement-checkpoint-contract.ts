@@ -6,6 +6,7 @@ import { digestBlob, type GenerationRef } from "@ts-drp/storage";
 import type { CreatorLiveCloseResult } from "../../../packages/node/src/creator-close.js";
 import { resolveCreatorAdoptionFacts } from "../../../packages/node/src/internal/creator-adoption-intent.js";
 import { openCreatorSuccessorTrust } from "../../../packages/protocol-v3/src/creator-close.js";
+import type { CurrentAnchorTrust } from "../../../packages/protocol-v3/src/index.js";
 import {
 	bytesForRef,
 	type DetachedHeadEvidence,
@@ -43,6 +44,8 @@ export interface D110c0c1aRetirementCheckpointEvidence {
 		readonly successorTrustRefExact: boolean;
 	}>;
 	readonly closeResult: CreatorLiveCloseResult;
+	readonly current: DetachedHeadEvidence;
+	readonly currentTrust: CurrentAnchorTrust;
 	readonly durableReplayVerified: boolean;
 	readonly history: CloseSetHistoryCommitment;
 	readonly lineage: DurableLineage;
@@ -53,6 +56,7 @@ export interface D110c0c1aRetirementCheckpointEvidence {
 		readonly value: Readonly<Record<string, unknown>>;
 	}>[];
 	readonly proposed: DetachedHeadEvidence;
+	readonly successorTrust: CurrentAnchorTrust;
 }
 
 export interface D110c0c1aRetirementCheckpointFixture {
@@ -104,8 +108,17 @@ export async function openD110c0c1aRetirementCheckpointFixture(): Promise<D110c0
 	});
 
 	try {
-		const { closeResult, currentTrust, declaration, history, issuanceScope, issuanceStore, journalRows, proposed } =
-			fixture.evidence;
+		const {
+			closeResult,
+			current,
+			currentTrust,
+			declaration,
+			history,
+			issuanceScope,
+			issuanceStore,
+			journalRows,
+			proposed,
+		} = fixture.evidence;
 		const lineage = await issuanceStore.readLineage(issuanceScope);
 		const outbox = await issuanceStore.readOutboxPage({ limit: 128, scope: issuanceScope });
 		const rows = await Promise.all(
@@ -144,6 +157,7 @@ export async function openD110c0c1aRetirementCheckpointFixture(): Promise<D110c0
 			exactCanonicalTrustStateRecordBytes: successorTrustBytes,
 		});
 		const snapshotManifest = canonicalRecord(declaration.exactCanonicalManifestBytes);
+		if (!successor.ok) throw new TypeError(`D.110c-0c1a successor open failed: ${successor.reason}`);
 		const retirementCandidates = proposed.candidates.flatMap((candidate) => {
 			const value = canonicalRecord(candidate.bytes);
 			return value.kind === D110C_0C1A_RETIREMENT_KIND
@@ -174,12 +188,15 @@ export async function openD110c0c1aRetirementCheckpointFixture(): Promise<D110c0
 					successorTrustRefExact: exactRef(successorTrustBytes, closeResult.successorTrustRef),
 				}),
 				closeResult,
+				current,
+				currentTrust,
 				durableReplayVerified,
 				history,
 				lineage,
 				proposed,
 				retirementCandidates: Object.freeze(retirementCandidates),
 				rows: Object.freeze(rows),
+				successorTrust: successor.trust,
 			}),
 		});
 	} catch (error) {

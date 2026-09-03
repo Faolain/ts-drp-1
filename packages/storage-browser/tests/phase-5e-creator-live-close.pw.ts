@@ -51,12 +51,13 @@ function expectedCombinedClosure(
 		current: readonly ModelRef[];
 		currentTrustRef: ModelRef;
 		proofRefs: readonly ModelRef[];
+		retirementRef: ModelRef;
 		successorTrustRef: ModelRef;
 	}>
 ): readonly ModelRef[] {
 	const retained = input.current.filter(({ digest }) => digest !== input.currentTrustRef.digest);
 	if (retained.length !== input.current.length - 1) throw new TypeError("current trust ref must occur exactly once");
-	return [...retained, input.successorTrustRef, ...input.proofRefs].sort((left, right) =>
+	return [...retained, input.successorTrustRef, ...input.proofRefs, input.retirementRef].sort((left, right) =>
 		left.digest < right.digest ? -1 : left.digest > right.digest ? 1 : 0
 	);
 }
@@ -340,11 +341,23 @@ test("closes a genuine non-empty creator room and terminalizes the old live hand
 	expect(after.revision).toBe(before.revision + 1);
 	expect(after.generationId).not.toBe(before.generationId);
 	expect(after.trustRef).toEqual(sealed.successorTrustRef);
+	const knownDigests = new Set([
+		...before.references.map(({ digest }) => digest),
+		sealed.successorTrustRef.digest,
+		sealed.cutValueRef.digest,
+		sealed.commitQcRef.digest,
+	]);
+	const retirementRefs = after.references.filter(({ digest }) => !knownDigests.has(digest));
+	expect(retirementRefs).toHaveLength(1);
+	const retirementRef = retirementRefs[0];
+	if (retirementRef === undefined) throw new TypeError("creator retirement ref is unavailable");
+	expect(retirementRef.byteLength).toBeLessThanOrEqual(8192);
 	expect(after.references).toEqual(
 		expectedCombinedClosure({
 			current: before.references,
 			currentTrustRef: sealed.currentTrustRef,
 			proofRefs: [sealed.cutValueRef, sealed.commitQcRef],
+			retirementRef,
 			successorTrustRef: sealed.successorTrustRef,
 		})
 	);
