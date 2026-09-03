@@ -96516,16 +96516,18 @@ slice is closed by the held working tree.
 
 ###### D.110c-0c1g authenticated successor projection-base prerequisite
 
-**Status: bounded source/architecture audit and first high-risk plan review are
-complete; its material P0/P1 union is corrected below and one confirmation is
-pending before tests-only RED or production edits.** Owner:
+**Status: bounded source/architecture audit, first high-risk plan review, and
+the sole correction confirmation are complete with an empty P0/P1 union;
+tests-only RED is next and production edits remain prohibited before causal RED
+acceptance.** Owner:
 `examples/v3-room/src/index.ts::V3RoomApplication` and
 `createV3RoomSessionOwned()` projection initialization/stage/commit and
 successor-migration refusal paths;
 `packages/node/src/v3-live.ts::bindV3BlueprintLivePlane()` only at its existing
 binding/retrieval union plus the private registration's machine-origin and
-imported-digest facts; the chat and grid application projectors; the existing
-room public-contract compile fixture; the seven retained positional consumers
+imported-digest facts; the complete chat application/product/transcript
+projection surface and the grid application projector; the existing room
+public-contract compile fixture; the seven retained positional consumers
 enumerated below; and one new focused storage-browser successor-reopen test.
 Deadline: GREEN before D.110c-0c1e/0c1d or parent
 D.110c-0c1 closes, before 0c1f RED, before D.110c-0c resumes, and before
@@ -96624,9 +96626,13 @@ versioned authenticated projection-authority carrier before any grid successor
 reopen or MMORPG golden-path claim.
 
 Migration is also an explicit boundary rather than a second state
-reconstruction. Existing `V3RoomMigrationCapability.canonicalStateBytes()`,
-`prepare()`, `acceptedOperationSnapshot()`, retained-prefix checks, record
-digests, activation, and every base-less migration path remain byte-for-byte.
+reconstruction. Every base-less result and behavior of
+`V3RoomMigrationCapability.canonicalStateBytes()`, `prepare()`,
+`acceptedOperationSnapshot()`, retained-prefix checks, record digests,
+activation, and migration remains byte-for-byte. For the new base-carrying
+projection only, `canonicalStateBytes(projection)` encodes the authenticated
+base prefix in its exact order and appends current-epoch rows in the shipped
+reducer order; metadata-less base rows never enter the live-metadata sort.
 While `authenticatedBase` is present, `rehearseMigration()` rejects before
 `prepare()` with exact `D110C_0C1G_SUCCESSOR_MIGRATION_UNAVAILABLE` and the room
 remains usable; it cannot compare a base-bearing projection with a current-
@@ -96762,6 +96768,35 @@ registration provenance, and executable migration/grid acceptance, exactly one
 Grok/Kimi/Opus confirmation is required after this text is signed and pushed.
 No RED begins until its P0/P1 union is empty; no further plan confirmation is
 permitted.
+
+That sole confirmation inspected signed/pushed correction commit
+`f1262b4a7d83ee0d8929f9b3bf85f692a818037f`, tree
+`d013a633d509c1c98a64f0e78518357a1c36c49e`. Grok 4.6/high, direct Kimi
+K3/100-step, and Opus xhigh each returned `APPROVED`, with P0/P1/P2 respectively
+`0/0/2`, `0/0/3`, and `0/0/3`; every reviewer set plan sufficiency, RED
+causality, and scope preservation true. Grok session
+`01a0671c-2671-7191-843d-17c8b91b2ec8` ended normally but its first public
+answer included prose before a valid JSON object, so the conservative runner
+reported `NO_VERDICT`; the same session performed one schema-only re-emission
+without reinspection or finding change. Kimi session was
+`session_821db628-94a7-4408-b4d1-069ae4e2c76f`; one malformed local CLI command
+failed before creating a review session, then the corrected command completed
+the sole review. Opus session was `aa40b4b7-c86a-4f36-ac61-89a4bf9374e8`.
+Complete confirmation evidence is
+`.logs/d110c-0c1g-plan-confirmation-f1262b4a/`; its 21-entry self-excluding
+manifest validates and its manifest SHA-256 is
+`1f6f4c753b997b2097dde7a4625531ee876d6839904779307f7cbd4db5907784`.
+
+The nonblocking P2 union constrains GREEN without another plan review:
+snapshot-derived chat rows are excluded from every digest/transport view that
+requires live vertex evidence and receive no fabricated provenance; the chat
+owner includes its accepted-map, sorting, render, accepted-operation digest,
+and durable-transcript digest surfaces; a private machine/registration
+generation fact is added only if the registration lacks an equivalent existing
+fact; both refusal tokens are pinned in RED; successor `activateMigration()` is
+not claimed and may fail closed pending 0c1i; and any unexpected retained
+Chromium semantic-assertion edit stops and reslices. No further confirmation is
+permitted. The blocking union is empty, so the frozen causal RED may proceed.
 
 The bounded audit is `.logs/d110c-0c1g-source-audit-c5613498/`; its two-entry
 self-excluding manifest validates and its manifest SHA-256 is
