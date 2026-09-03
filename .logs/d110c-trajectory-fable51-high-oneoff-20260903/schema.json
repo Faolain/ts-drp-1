@@ -1,0 +1,55 @@
+{
+	"type": "object",
+	"properties": {
+		"verdict": {
+			"type": "string",
+			"enum": ["PROCEED", "CORRECT_NARROWLY", "STOP_AND_RESLICE", "NO_VERDICT"]
+		},
+		"trajectory_sound": { "type": "boolean" },
+		"p0_count": { "type": "integer", "minimum": 0 },
+		"p1_count": { "type": "integer", "minimum": 0 },
+		"p2_count": { "type": "integer", "minimum": 0 },
+		"findings": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"properties": {
+					"severity": { "type": "string", "enum": ["P0", "P1", "P2"] },
+					"title": { "type": "string" },
+					"evidence": { "type": "string" },
+					"required_action": { "type": "string" }
+				},
+				"required": ["severity", "title", "evidence", "required_action"],
+				"additionalProperties": false
+			}
+		},
+		"demonstrated_facts": {
+			"type": "array",
+			"items": { "type": "string" }
+		},
+		"golden_path_gaps": {
+			"type": "array",
+			"items": { "type": "string" }
+		},
+		"smallest_next_action": { "type": "string" },
+		"recommended_sequence": {
+			"type": "array",
+			"items": { "type": "string" }
+		},
+		"summary": { "type": "string" }
+	},
+	"required": [
+		"verdict",
+		"trajectory_sound",
+		"p0_count",
+		"p1_count",
+		"p2_count",
+		"findings",
+		"demonstrated_facts",
+		"golden_path_gaps",
+		"smallest_next_action",
+		"recommended_sequence",
+		"summary"
+	],
+	"additionalProperties": false
+}

@@ -97283,12 +97283,15 @@ record field from 0c1f1. Only `frontiers` changes from an array of repeated-key
 objects to an author-sorted array of exact two-element canonical arrays:
 `[author, admittedAuthorSequence]`, where `author` is one lowercase 64-hex
 Ed25519 public key and `admittedAuthorSequence` is either null or a nonnegative
-safe integer. The outer vector must contain exactly the permissionless-aware
-successor write-authorized set, and every inner value must be an ordinary exact
-two-element decoded array with no holes, extra properties, duplicate author,
-reordering, coercion, or alternate object/map form. The semantic identity and
-signature preimage remain one-to-one; compact syntax does not omit or weaken a
-frontier fact.
+safe integer. The creator close must attest exactly the permissionless-aware
+successor write-authorized set in the outer vector, and every inner value must
+be an ordinary exact two-element decoded array with no holes, extra properties,
+duplicate author, reordering, coercion, or alternate object/map form. The
+opener authenticates that creator attestation and consumers fail closed when a
+required author is absent; the transition verifier cannot independently
+rederive the set because its closure contains no detached successor-ACL
+candidate. The semantic identity and signature preimage remain one-to-one;
+compact syntax does not omit or weaken a frontier fact.
 
 The carrier's `objectId` is additionally constrained by the independently
 opened current and successor latched ACLs, whose canonical grammar permits at
@@ -97732,10 +97735,14 @@ author/dependency/logical time, digest/signature mutation, issued/outbox
 substitution, use of sequence zero through covered-historical authority,
 hot-adoption policy loss, cold-reopen policy loss, and cross-application reopen.
 Pending recovery is retained as a no-classification control, not given a new
-field. A displaced-source/migration mutant proves its filtered store uses the
-matching source registration's pinned genesis anchor and policy, never the
+field. The same-room transport-handoff mutant proves its filtered store uses
+the matching source registration's pinned genesis anchor and policy, never the
 target registration's values or `undefined`, and cannot stale-publish a source
-sequence-zero row. Current-epoch rows retain their existing path; the
+sequence-zero row. The cross-object displaced-source structure currently
+copies a target-derived policy into an unconsumed field; no f4 behavior or
+authority claim relies on that field, and removing or source-deriving it is
+owned only by a later change that otherwise touches that cross-object branch.
+Current-epoch rows retain their existing path; the
 null-frontier post-bootstrap refusal applies only to historical rows. The full
 legacy recovery roster must prove the declared compatibility mode. Exact
 source-shape gates prove there is one shared predicate, the four recovery-input
@@ -97809,11 +97816,13 @@ change.
 
 ###### D.110c-0c1f5 authenticated rebase-supersession frontier prerequisite
 
-**Status: bounded source/architecture audit complete with no safe production
-repair selected; BLOCKED pending the governing high-risk plan/design review
-before final closure of D.110c-0c1f2/f4, parent D.110c-0c1/0c, the same-room
-≥100-transition gate, Phase-6 exit, or Phase-7 multi-author cold join. No f5
-production edit is authorized.** Owner: the interaction among
+**Status: bounded source/architecture audit and targeted close-liveness
+addendum complete with no safe production repair selected; BLOCKED pending one
+combined governing high-risk review of the signed f2/f4 checkpoint and f5
+exact-design selection before final closure of D.110c-0c1f2/f4, parent
+D.110c-0c1/0c, the same-room ≥100-transition gate, Phase-6 exit, or Phase-7
+multi-author cold join. No f5 production edit is authorized.** Owner: the
+interaction among
 `examples/v3-room/src/index.ts::drainRebaseOutbox()`, the fresh-sequence local
 issue path and `completeRebaseSource()` disposition, the authenticated close
 graph captured by `packages/node/src/v3-live.ts`,
@@ -97839,6 +97848,34 @@ the prior aggregate is 4, observing 7 and 8 leaves the boundary at 4 forever.
 Subsequent valid writes remain above the same hole and signerless cold recovery
 cannot authenticate them.
 
+The targeted addendum establishes three related close-wide liveness failures,
+not merely another cold-recovery symptom. When a prior aggregate contains an
+author with a null boundary, a first creator-observed sequence greater than one
+throws `LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED`; when the author is absent from
+an otherwise present prior aggregate, the same shape throws
+`AUTHOR_REENTRY_PROOF_REQUIRED`. An admitted foreign-author sequence at or
+below a numeric prior boundary throws `creator issuance-frontier boundary
+regressed`, and duplicate `(author, sequence)` identities throw `creator
+issuance-frontier author slot is ambiguous`. In each case the exception aborts
+the creator's whole close, while the accepted offending vertex remains in that
+epoch graph and makes an unchanged retry fail again. Receive-side ingress does
+not enforce a per-author contiguous issuance prefix, and genuine rebase assigns
+fresh target sequences before completing the displaced source, so these states
+are reachable through ordinary offline noncreator behavior rather than only by
+a fabricated fixture.
+
+The required close-liveness invariant is therefore explicit: a foreign
+author's missing, duplicate, regressed, or noncontiguous admitted rows may
+prevent that author's frontier from advancing, or may produce an exact reviewed
+per-author refusal/disposition, but must not by themselves prevent the creator
+from closing the room. Any treatment must remain fail closed for that author,
+must not authenticate the anomalous row or cross a gap implicitly, and must
+preserve creator close/adoption availability for the other valid authors. The
+existing null-boundary branch also emits the legacy-migration code where the
+earlier plan assigns the author-reentry code; f5 GREEN owns exact causal tests
+and the reviewed error-code correction rather than hiding it in a separate
+slice.
+
 Replacing the prefix with an observed maximum is explicitly rejected. Seeing
 sequence 7 does not prove that unobserved sequences 5 and 6 were represented by
 the admitted replacement, nor that their operation bytes, disposition, and
@@ -97846,6 +97883,20 @@ source identity agree. A maximum would let an unseen or substituted local row
 below it pass `authenticatedCoveredHistoricalOutboxRow()` solely because its
 number is below a creator-signed high-water mark. That would turn a liveness
 defect into an authority defect.
+
+Design selection must nevertheless begin from the actual consumer contract,
+not silently strengthen it. A covered-historical row is an authenticated
+candidate for reissue under the current ACL, admission policy, canonical
+operation transformation, and displaced-operation identity deduplication; it
+does not directly install application state. The current predicate already
+accepts an author-signed historical row at or below the creator-attested
+boundary without a per-sequence digest commitment. The governing review must
+decide exactly which source disposition fact is necessary for safe reissue and
+frontier settlement before selecting a per-gap receipt, settled prefix, or
+accumulator. This qualification does not authorize the bare maximum or weaken
+the six proof obligations below; it prevents choosing an O(rebase) proof log or
+new cryptography to satisfy a stronger authority claim than any production
+consumer needs.
 
 The f5 audit must compare at least: (1) a creator-authenticated supersession
 commitment binding each skipped source `(author, sequence, digest)` to its exact
@@ -97883,13 +97934,23 @@ frontier or tests-only durable record. One noncreator writer must create a
 known settled prefix, retain at least two displaced rows, allocate intervening
 sequences so their genuine rebase replacements appear above a gap, and have
 those replacements admitted by the creator. The creator then performs at least
-two further real close/adopt transitions. After restart, the unchanged writer
-database cold reopens at the resulting successor and attempts one new
-issue/publish. RED is causal only if exact evidence proves the old rows, fresh
-replacement rows, creator observations, aggregate boundary, and recovery
-refusal, and the terminal failure is the frozen f5 token rather than timing,
-transport, fixture, or unrelated recovery failure. A no-gap control must stay
-green.
+two further real close/adopt transitions. A second genuine null-boundary case
+must keep the writer offline across the first close, reissue its displaced row
+at a first observed sequence greater than one, admit it at the creator, and
+prove the next creator close aborts at the exact current refusal. Focused
+mutants cover an absent prior-author entry, a foreign-author sequence at or
+below a numeric prior boundary, and a duplicate `(author, sequence)` slot; each
+must demonstrate current close-wide failure while the no-gap control remains
+green. After restart, the unchanged writer database cold reopens at the
+resulting successor and attempts one new issue/publish. RED is causal only if
+exact evidence proves the old rows, fresh replacement rows, creator
+observations, aggregate boundary, close result, and recovery refusal, and the
+tests emit exact
+`D110C_0C1F5_REBASE_SUPERSESSION_FRONTIER_REQUIRED` for the numeric/cold-reopen
+case and exact `D110C_0C1F5_FOREIGN_AUTHOR_CLOSE_LIVENESS_REQUIRED` for the
+null, absent, regression, and duplicate close-wide cases after first asserting
+their current product outcomes. Timing, transport, fixture, or unrelated
+recovery failures are noncausal and stop.
 
 GREEN must make that unchanged RED and control pass while proving exact state
 and operation accounting. Adversarial mutants cover each proof obligation
@@ -97907,10 +97968,28 @@ not a substitute for the governing high-risk review. Its exact session is
 is `739b7cd23e9a27700da5f12539c32ebf96a6882d6cc08fc562c3a98deda55994`.
 It also identified the already-corrected first-observed-sequence-one predicate
 and nonblocking empty-writer/byte-budget/pending-custody test obligations. No
-further Fable run is authorized. The f5 source audit and exact design require
-the governing Grok 4.6/high, direct Kimi K3 with
-`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh plan review before any f5
-production edit. If the selected construction needs a carrier/wire change,
+further Fable run was authorized by that result. A later expressly authorized
+one-off Fable 5.1/high trajectory review, session
+`8323a0e9-296a-4f5f-b981-cf2c034725b6`, returned `CORRECT_NARROWLY`, P0/P1/P2
+`0/1/5`; its external transcript SHA-256 is
+`b0f317390e0b023063b344a282383c08ee3a880e1f67db907677c8461bdc2b8e`.
+Local source inspection confirmed its blocking close-liveness paths above. Its
+nonblocking dispositions are also explicit above: use the real historical-row
+consumer contract, describe the exact writer set as creator-attested, narrow
+the f4 source-policy claim to the tested same-room handoff, and retain the
+cross-object unused field as separately owned cleanup. No further Fable run is
+authorized without new express user instruction.
+
+The next single governing plan review—Grok 4.6/high, direct Kimi K3 with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh—must occur before any f5
+production edit and cover both the signed f2/f4 plan→RED→GREEN history as a
+narrow implementation checkpoint and f5 exact-design selection under the
+amended causal matrix. It may accept f2/f4 checkpoint evidence without
+claiming general historical-rebase safety, but f2/f4 final semantic closure
+remains held by f5. This combined review avoids recursively reviewing the same
+aggregate carrier in two rounds and does not reopen or alter immutable
+RED/GREEN evidence.
+If the selected construction needs a carrier/wire change,
 new authority statement, dependency, public API, threshold change, or migration
 protocol, stop after the audit and create the corresponding explicit high-risk
 prerequisite instead of widening f5 silently.
