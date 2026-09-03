@@ -97859,25 +97859,26 @@ cannot authenticate them.
 The targeted addendum establishes three related close-wide liveness failures,
 not merely another cold-recovery symptom. When a prior aggregate contains an
 author with a null boundary, a first creator-observed sequence greater than one
-throws `LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED`; when the author is absent from
-an otherwise present prior aggregate, the same shape throws
-`AUTHOR_REENTRY_PROOF_REQUIRED`. An admitted foreign-author sequence at or
-below a numeric prior boundary throws `creator issuance-frontier boundary
-regressed`, and duplicate `(author, sequence)` identities throw `creator
-issuance-frontier author slot is ambiguous`. In each case the exception aborts
-the creator's whole close, while the accepted offending vertex remains in that
-epoch graph and makes an unchanged retry fail again. Receive-side ingress does
-not enforce a per-author contiguous issuance prefix, and genuine rebase assigns
-fresh target sequences before completing the displaced source, so these states
-are reachable through ordinary offline noncreator behavior rather than only by
-a fabricated fixture.
+throws `LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED`. An admitted foreign-author
+sequence at or below a numeric prior boundary throws `creator
+issuance-frontier boundary regressed`, and duplicate `(author, sequence)`
+identities throw `creator issuance-frontier author slot is ambiguous`. In each
+demonstrated case the exception aborts the creator's whole close, while the
+accepted offending vertex remains in that epoch graph and makes an unchanged
+retry fail again. The separate
+`D110C_0C1F1_AUTHOR_REENTRY_PROOF_REQUIRED` branch for an author absent from an
+otherwise present prior aggregate remains fail closed, but the first focused
+diagnostic proved that the proposed revoke/staged-grant construction cannot
+reach it through ordinary ingress because current-ACL snapshot authorization
+runs first. Its genuine reachability is therefore an f5b admitted-set and
+membership question, not a demonstrated f5a product failure.
 
 The required close-liveness invariant is therefore explicit: a foreign
 author's missing, duplicate, regressed, or noncontiguous admitted rows may
 prevent that author's frontier from advancing, or may produce an exact reviewed
 per-author refusal/disposition, but must not by themselves prevent the creator
 from closing the room. Any treatment must remain fail closed for that author,
-must not authenticate the anomalous row or cross a gap implicitly, and must
+must not claim the anomalous issuance range or cross a gap implicitly, and must
 preserve creator close/adoption availability for the other valid authors. The
 existing null-boundary branch also emits the legacy-migration code where the
 earlier plan assigns the author-reentry code; f5 GREEN owns exact causal tests
@@ -97937,28 +97938,12 @@ The selected design must preserve these proof obligations:
 6. ordinary cold reopen and active control custody remain bounded rather than
    hiding an O(N) supersession log in an uncounted store.
 
-The deterministic RED must use the genuine product path, not a fabricated
-frontier or tests-only durable record. One noncreator writer must create a
-known settled prefix, retain at least two displaced rows, allocate intervening
-sequences so their genuine rebase replacements appear above a gap, and have
-those replacements admitted by the creator. The creator then performs at least
-two further real close/adopt transitions. A second genuine null-boundary case
-must keep the writer offline across the first close, reissue its displaced row
-at a first observed sequence greater than one, admit it at the creator, and
-prove the next creator close aborts at the exact current refusal. Focused
-mutants cover an absent prior-author entry, a foreign-author sequence at or
-below a numeric prior boundary, and a duplicate `(author, sequence)` slot; each
-must demonstrate current close-wide failure while the no-gap control remains
-green. After restart, the unchanged writer database cold reopens at the
-resulting successor and attempts one new issue/publish. RED is causal only if
-exact evidence proves the old rows, fresh replacement rows, creator
-observations, aggregate boundary, close result, and recovery refusal, and the
-tests emit exact
-`D110C_0C1F5_REBASE_SUPERSESSION_FRONTIER_REQUIRED` for the numeric/cold-reopen
-case and exact `D110C_0C1F5_FOREIGN_AUTHOR_CLOSE_LIVENESS_REQUIRED` for the
-null, absent, regression, and duplicate close-wide cases after first asserting
-their current product outcomes. Timing, transport, fixture, or unrelated
-recovery failures are noncausal and stop.
+The umbrella RED described here is superseded by the signed f5a/f5b split
+below. F5a owns only the corrected real-close null, regression, duplicate,
+same-close writer-removal, and no-gap matrix. F5b owns the genuine rebase gap,
+cross-epoch delivery ordering, absent-prior reachability, authenticated
+settlement, restart, and cold-reopen proof. Neither slice may reuse the other's
+terminal token or relabel the first noncausal f5a diagnostic as accepted RED.
 
 GREEN must make that unchanged RED and control pass while proving exact state
 and operation accounting. Adversarial mutants cover each proof obligation
@@ -98066,8 +98051,10 @@ outside f5a. Deadline: GREEN and final review before f5b implementation, parent
 Phase-7 multi-author cold join.
 
 F5a freezes the distinction between local corruption and a foreign-author
-anomaly. Duplicate, regressed, missing-prefix, or noncontiguous identities for
-the creator's own issuance scope retain the existing fail-closed close error.
+anomaly. Duplicate or regressed identities for the creator's own issuance
+scope retain their existing exact fail-closed close errors. A noncontiguous
+creator sequence retains the existing adjacent-prefix nonadvancement behavior;
+f5a neither invents nor claims an existing close error for that shape.
 The same shapes for another author—including a currently authorized writer
 that is removed from the successor writer set by this close—must not abort the
 creator's transition. An author that was already unauthorized for current-epoch
@@ -98090,16 +98077,20 @@ cases are:
    greater than one, and the next creator close currently throws the
    legacy-migration error; this f5a treatment does not claim that the existing
    rebase protocol created or settled the gap;
-2. a noncreator local rollback produces a current-anchor signed sequence at or
-   below its numeric prior boundary and close currently throws
+2. a noncreator with an established-peer numeric prior boundary of zero
+   produces a current-anchor signed sequence at or below that boundary and
+   close currently throws
    `creator issuance-frontier boundary regressed`;
-3. two distinct admitted current-epoch vertices carry the same foreign
-   `(author, sequence)` and close currently throws
-   `creator issuance-frontier author slot is ambiguous`; and
+3. a noncreator with the same established-peer numeric prior boundary has two
+   distinct admitted current-epoch vertices carrying the same foreign
+   `(author, sequence)`, and close currently throws
+   `creator issuance-frontier author slot is ambiguous`;
 4. a currently authorized foreign writer has a duplicated current-epoch slot,
    the same close validly removes that writer from the successor ACL, and the
    pre-f5a duplicate scan still aborts before successor-writer filtering; and
-5. a no-gap two-writer control closes and opens the exact unchanged aggregate.
+5. a no-gap two-writer control closes and exposes the exact expected creator
+   and foreign numeric boundaries. GREEN, not RED, owns byte/digest identity
+   and verified successor open/adoption.
 
 Each treatment must first assert the exact current product error and the
 creator's otherwise-valid transition inputs, then terminate only at
@@ -98108,8 +98099,10 @@ a different error, an invalid signature/anchor/ACL precondition, timing, or
 transport is noncausal. RED also freezes controls proving the equivalent
 creator-owned anomalies still fail closed and a foreign writer removed by the
 current close does not enter the successor vector or block close. A row from an
-author already unauthorized in the current epoch remains an exact snapshot-fold
-refusal control. Run the corrected focused RED once from the signed amended-plan
+author already unauthorized in the current epoch remains an exact fail-closed
+snapshot-export refusal control; the public error is a coarse `not-active`
+bucket, so the assertion does not claim to distinguish every underlying fold
+cause. Run the corrected focused RED once from the signed amended-plan
 anchor, validate its exact complete result set, then sign and push it. No
 separate model RED review is required; final GREEN review must inspect RED
 causality.
@@ -98141,6 +98134,35 @@ question, not an f5a behavior claim. Because this correction changes causal
 acceptance, sign/push the diagnostic and amended plan, then run exactly one
 material Grok/Kimi/Opus confirmation before the corrected RED. Do not review
 bookkeeping prose recursively.
+
+That one material confirmation completed at signed/pushed anchor
+`052eaa2151e57633485565ea5135f725e723183c`, tree
+`7887ad49fd1ce18a2cc04026dfa88dab07533f06`, with an empty blocking union and
+all three reviewers explicitly authorizing the corrected one-file/one-title
+RED. Grok 4.6/high exact session `01a06914-8300-76a2-b525-07b7925c45f6`
+returned `APPROVED`, P0/P1/P2 `0/0/2`; the bounded runner recorded
+`NO_VERDICT` because the service ended the turn after emitting the complete
+schema-valid object as public text but without the terminal structured event,
+so the exact session re-emitted the same judgment as structured output without
+reinspection. Direct Kimi K3 exact session
+`session_632e6b15-12f2-4ba3-b891-97352e31674c` returned `APPROVED`, `0/0/2`;
+its same-session schema-only re-emission corrected presentation keys without
+changing substance. Opus xhigh exact session
+`779978e5-3eca-4fad-8284-31f09a9480b0` returned schema-valid `APPROVED`,
+`0/0/6`. All three set plan sufficiency, honest diagnostic classification,
+corrected RED causality/authorization, and scope preservation true.
+
+The nonblocking P2 union is dispositioned without another confirmation. Before
+RED, the test derives the creator's latest issued sequence from durable lineage
+instead of assuming sequence one, sets an explicit 120-second focused timeout,
+states the established-peer numeric-prior precondition, fixes list wording,
+narrows the coarse `not-active` control, and names the author-reentry question
+inside f5b itself. The parent umbrella no longer presents absent-prior re-entry
+as demonstrated. RED owns numeric no-gap frontiers; GREEN retains exact
+aggregate bytes/digest plus verified adoption. The pre-existing divergent
+private `captureCloseGraph()` declarations remain a named f5a-GREEN follow-up
+and are not widened into this tests-only checkpoint. Complete review artifacts
+are under `.logs/d110c-0c1f5a-plan-confirmation-052eaa21/`.
 
 GREEN changes only the close-side per-author classification. It must make all
 foreign treatments close successfully, keep the affected frontier unchanged or
@@ -98193,6 +98215,13 @@ the old-anchor `n` can no longer be admitted after adoption. Because later close
 graphs contain neither earlier admitted `n+1` nor admissible `n`, the adjacent
 prefix remains permanently below both. A test that fabricates admission of the
 old-anchor row under epoch `k+1` is invalid.
+
+The audit also owns the exact reachability and meaning of
+`D110C_0C1F1_AUTHOR_REENTRY_PROOF_REQUIRED`: determine whether any genuine
+recovery, membership, or admitted-set lifecycle can produce a currently
+authorized writer absent from the prior authenticated aggregate. If none can,
+retain the guard fail closed as unreachable defense and do not manufacture a
+fixture-only carrier mismatch to justify product behavior.
 
 The bounded architecture audit must reconcile, not merely list, the review's
 three proposals:

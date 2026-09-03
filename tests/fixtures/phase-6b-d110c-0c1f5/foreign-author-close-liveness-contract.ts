@@ -141,6 +141,14 @@ async function stageForeignRemoval(
 	);
 }
 
+async function latestCreatorSequence(context: RepeatCloseContext, label: string): Promise<number> {
+	const lineage = await context.issuanceStore.readLineage(context.issuanceScope);
+	if (lineage.exhausted !== false || !Number.isSafeInteger(lineage.next) || lineage.next <= 0) {
+		throw new TypeError(`${label}:CREATOR_LINEAGE_INVALID`);
+	}
+	return lineage.next - 1;
+}
+
 /**
  * Demonstrates that foreign-author frontier anomalies currently abort an
  * otherwise valid creator close, while creator corruption remains fail closed.
@@ -237,14 +245,16 @@ export async function proveD110c0c1f5ForeignAuthorCloseLivenessRequired(): Promi
 
 	for (const creatorCase of [
 		Object.freeze({ expected: BOUNDARY_REGRESSED, sequence: 0, label: "REGRESSION", logicalTime: 56 }),
-		Object.freeze({ expected: AUTHOR_SLOT_AMBIGUOUS, sequence: 1, label: "DUPLICATE", logicalTime: 57 }),
+		Object.freeze({ expected: AUTHOR_SLOT_AMBIGUOUS, sequence: null, label: "DUPLICATE", logicalTime: 57 }),
 	]) {
 		await observedCloseError(
 			{
 				creator: Object.freeze({ authorizedPrivateKeySeedHexes: twoWriterSeeds }),
 				beforeRepeatCloseBinding: async (context) => {
+					const sequence =
+						creatorCase.sequence ?? (await latestCreatorSequence(context, `D110C_0C1F5_CREATOR_${creatorCase.label}`));
 					await routeVertex(context, {
-						authorSequence: creatorCase.sequence,
+						authorSequence: sequence,
 						logicalTime: creatorCase.logicalTime,
 						privateKeySeedHex: creator.privateKeySeedHex,
 						value: creatorCase.logicalTime,
@@ -256,12 +266,14 @@ export async function proveD110c0c1f5ForeignAuthorCloseLivenessRequired(): Promi
 		);
 	}
 
+	let noGapCreatorBoundary: number | undefined;
 	const noGap = await openD110cARepeatCloseFixture({
 		creator: Object.freeze({
 			authorizedPrivateKeySeedHexes: twoWriterSeeds,
 			establishedPeerPrivateKeySeedHex: foreign.privateKeySeedHex,
 		}),
 		beforeRepeatCloseBinding: async (context) => {
+			noGapCreatorBoundary = await latestCreatorSequence(context, "D110C_0C1F5_NO_GAP");
 			await routeVertex(context, {
 				authorSequence: 1,
 				logicalTime: 58,
@@ -274,7 +286,8 @@ export async function proveD110c0c1f5ForeignAuthorCloseLivenessRequired(): Promi
 	try {
 		const frontiers = exactFrontiers(noGap.evidence.authorIssuanceFrontiers.record);
 		if (
-			frontiers.find(([author]) => author === creator.author)?.[1] !== 1 ||
+			noGapCreatorBoundary === undefined ||
+			frontiers.find(([author]) => author === creator.author)?.[1] !== noGapCreatorBoundary ||
 			frontiers.find(([author]) => author === foreign.author)?.[1] !== 1
 		) {
 			throw new TypeError(`D110C_0C1F5_NO_GAP_CONTROL_INVALID:${JSON.stringify(frontiers)}`);
