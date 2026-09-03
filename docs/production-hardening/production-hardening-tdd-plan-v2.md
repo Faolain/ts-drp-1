@@ -95501,13 +95501,12 @@ RED-to-GREEN closure and is prohibited.
 
 ##### D.110c-0c1 authenticated intermediate-epoch issuance prerequisite
 
-**Status: bounded architecture decision complete; D.110c-0c1a and
-D.110c-0c1b are closed; the first high-risk plan review and sole material
-confirmation are complete, and the confirmation's findings are corrected and
-deterministically validated. The first causal attempt exposed an earlier
-stable-successor cold-reopen product precondition, so D.110c-0c1 is paused on
-the blocking D.110c-0c1c prerequisite below. No D.110c-0c1 production edit has
-begun.** Owner:
+**Status: bounded architecture decision complete; D.110c-0c1a,
+D.110c-0c1b, and D.110c-0c1c are closed; the reviewed causal RED is preserved;
+and the in-progress GREEN has reached the distinct D.110c-0c1d orchestration
+prerequisite below. The bounded 0c1d source audit and plan are complete, but no
+out-of-owner room-orchestration edit begins before its governing plan review.**
+Owner:
 the predecessor and successor issuance views created by
 `packages/node/src/v3-live.ts::activateCreatorSuccessorLive()`, the existing
 Node-private retirement-transition opener/correlation helper,
@@ -96300,6 +96299,106 @@ The audit evidence is
 inventory is inside the root and its four-entry self-excluding manifest
 SHA-256 is
 `814f98305ea36ee3a0a37bdf07055dd4fbae8ac053b7bf5c58148904754bb1cd`.
+
+###### D.110c-0c1d successor-reopen historical-rebase orchestration prerequisite
+
+**Status: bounded source/architecture audit and plan complete; governing plan
+review pending.** Owner:
+`examples/v3-room/src/index.ts::createV3RoomSessionOwned()` at the single
+`rebasePromise` startup predicate, plus the existing D.110c-0c1 browser
+differential. The already-reviewed `v3-live.ts` historical classification,
+publication, rebase, and completion implementation remains owned by
+D.110c-0c1 and is not redesigned here. Deadline: GREEN before D.110c-0c1 can
+close, before D.110c-0c resumes, and before D.110c-c/d or Phase 7 relies on a
+reopened epoch-N room.
+
+The focused 0c1 GREEN attempt established a separate orchestration defect after
+the intended historical classifier began working. An ordinary successor cold
+reopen supplies `successorSnapshotDeclaration` and leaves
+`rebaseSourceInvite` absent, so `sourceMaterial === undefined`. The room
+therefore constructs `rebasePromise` as `Promise.resolve()` and never calls
+`publishAccepted()` followed by `drainRebaseOutbox()`. Public `issue()` does
+await that promise, so this is not a test timing race. The Node plane correctly
+keeps authenticated pending pinned-genesis and covered-historical rows out of
+direct stale-anchor publication and exposes them through `readRebaseOutbox()`,
+but the room has no caller for that custody on this ordinary successor-reopen
+path. The first pending assertion consequently observes `pending` after the
+new current-epoch issue succeeds. Running the test again, weakening the pending
+assertion, directly marking the old row published, or adding a delay cannot
+close that missing call path.
+
+This seam is outside D.110c-0c1's frozen production owner list, so the parent
+slice's explicit stop-and-reslice rule governs. The selected repair broadens
+only the existing startup rebase task predicate: run the unchanged ordered
+`waitForRetainedBootstrap()` → terminal check → `publishAccepted()` →
+`drainRebaseOutbox()` task when either a migration `sourceMaterial` exists or
+an authenticated `successorSnapshotDeclaration` is opening the successor.
+Fresh/genesis opens with neither input keep the resolved no-op. Existing
+migration-source behavior remains byte-for-byte on the same branch. Public
+`issue()`, `sealEpoch()`, and shutdown continue to await or settle the same
+single promise, and any startup publication/rebase failure remains captured in
+`terminalFailure` and surfaced fail closed. Do not create a second task, poll,
+retry, publish an old anchor directly, bypass `completeRebaseSource()`, or add a
+public API.
+
+The causal RED is the existing one-test/one-file D.110c-0c1 differential with
+one tests-only exact attribution check. Genuine 0→1→2→3, hot adoption, and
+epoch-3 cold reopen succeed; the authenticated sequence-2 epoch-1 row is made
+pending before reopen; the next public issue succeeds; and the fixture emits
+exact `D110C_0C1D_HISTORICAL_REBASE_ORCHESTRATION_REQUIRED` because that row
+remains pending. RED must also record that no direct stale-anchor publication
+occurred and that the row was classified `covered-historical`. A failure before
+epoch-3 activation, a different token, direct publication, missing historical
+classification, or failure of the ordinary control is noncausal and stops.
+
+GREEN changes only the startup predicate above. The same focused differential
+must prove both pending cases: sequence 2 is reissued and published once at the
+current epoch before its original row is marked published; the pending
+pinned-genesis sequence 0 row has zero application intents and is marked only
+through successful `completeRebaseSource()`; neither is directly published at
+its stale anchor; the user's subsequent message is issued and published once;
+projection, ACL, authority, anchor, history, lifecycle, and exact issuance-row
+accounting remain unchanged. The normal treatment still cold reopens epoch 3
+and publishes sequence 4. The historical-pending case contains the rebased
+operation at sequence 4 and requested operation at sequence 5; the
+pinned-genesis case creates only requested sequence 4. Both original rows end
+`published` only after the startup task completes.
+
+Adversarial gates prove fresh/genesis startup does not spuriously enter rebase;
+ordinary migration rebase still runs exactly once; malformed or uncovered old
+rows, issued/outbox mismatch, failed current reissue/publication, failed
+completion, and missing historical capability fail closed with the original row
+still pending; a published historical row is not reissued; duplicate operation
+identity remains deduplicated/conflict-checked; and close during startup cannot
+erase a failure. Retained gates include the complete D.110c-0c1 focused test,
+D.110c-0c1a/b/c, offline/rebase and issuance/outbox tests, stable successor
+reopen, room-head, snapshot, rollback, availability, D.109 lifecycle and
+reclamation selections, plus exact-owner example/node/storage-browser
+build/typecheck/lint/format/diff and source-shape checks. No retained campaign,
+D.110a invocation, dependency, threshold, schema, wire, authority, public API,
+or production Node behavior is changed by 0c1d.
+
+Because this changes production lifecycle orchestration adjacent to recovery,
+it is high risk despite the one-predicate code seam. Sign and push this plan,
+then run one Grok 4.6/high, direct Kimi K3 with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh plan review. Only P0/P1
+blocks; dispose P2 without recursive prose review. At most one confirmation is
+permitted only if a correction changes executable scope or causal acceptance.
+After an empty blocking union, add the exact tests-only RED attribution and run
+the focused test once before the one production edit. The final D.110c-0c1
+Grok/Kimi/Opus review covers the combined parent GREEN and this prerequisite;
+0c1d does not add a second final-review ceremony. Do not invoke Fable or a
+collaboration subagent.
+
+The bounded local audit is rooted at
+`.logs/d110c-0c1d-source-audit-b21a6d47/`. It pins signed/pushed parent anchor
+`b21a6d47f467bfa51dc0deb76122a9edaa29bba0`, the sole
+`drainRebaseOutbox()` definition/invocation pair, the
+successor-declaration/source-material branch, and the public `issue()` await.
+It records the latest focused 0c1
+attempt as non-GREEN evidence: Playwright selected one test in one file, the
+genuine semantic path reached active epoch 3, and the only assertion failure
+was the first old pending row remaining `pending` rather than `published`.
 
 ###### D.110c-0c1a creator-signed issuance-retirement checkpoint prerequisite
 
