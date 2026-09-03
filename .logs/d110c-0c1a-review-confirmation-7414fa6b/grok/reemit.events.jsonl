@@ -1,0 +1,166 @@
+{"type":"available_commands","tools":["read_file","list_dir","grep","search_tool","use_tool"],"commands":["compact","always-approve","context","hooks-trust","hooks-list","hooks-add","hooks-remove","hooks-untrust","plugins","reload-plugins","session-info","feedback","goal","claude","brave-search","close-spec","codex","compare-screenshots","dep-tldr","eval-skills","feature-slicing","find-skills","implement-spec","instruments-profiling","llm-tldr-dep-indexer","llm-tldr-usage","oracle","preview-shots","refactor-clean","renderer","screenshot-critique","skill-creator","swift-concurrency-expert","swiftui-liquid-glass","swiftui-performance-audit","swiftui-view-refactor","use-railway","video-transcript-downloader","write-docs","write-skills","explain-diff-html","skills-manager","twitter-clip","video-to-gif","build-with-ai","code-review","create-skill","create-workflow","design","execute-plan","bundled:imagine","implement","pr-babysit","resume-claude","resume-codex","resume-cursor","review","skill-design-principles","adversarial-spec","playground"]}
+{"type":"available_commands","tools":["read_file","list_dir","grep","search_tool","use_tool"],"commands":["compact","always-approve","context","hooks-trust","hooks-list","hooks-add","hooks-remove","hooks-untrust","plugins","reload-plugins","session-info","feedback","goal","claude","brave-search","close-spec","codex","compare-screenshots","dep-tldr","eval-skills","feature-slicing","find-skills","implement-spec","instruments-profiling","llm-tldr-dep-indexer","llm-tldr-usage","oracle","preview-shots","refactor-clean","renderer","screenshot-critique","skill-creator","swift-concurrency-expert","swiftui-liquid-glass","swiftui-performance-audit","swiftui-view-refactor","use-railway","video-transcript-downloader","write-docs","write-skills","explain-diff-html","skills-manager","twitter-clip","video-to-gif","build-with-ai","code-review","create-skill","create-workflow","design","execute-plan","bundled:imagine","implement","pr-babysit","resume-claude","resume-codex","resume-cursor","review","skill-design-principles","adversarial-spec","playground"]}
+{"type":"thought","data":"The"}
+{"type":"thought","data":" user"}
+{"type":"thought","data":" wants"}
+{"type":"thought","data":" me"}
+{"type":"thought","data":" to"}
+{"type":"thought","data":" re"}
+{"type":"thought","data":"-"}
+{"type":"thought","data":"emit"}
+{"type":"thought","data":" the"}
+{"type":"thought","data":" exact"}
+{"type":"thought","data":" terminal"}
+{"type":"thought","data":" JSON"}
+{"type":"thought","data":" verdict"}
+{"type":"thought","data":" I"}
+{"type":"thought","data":" already"}
+{"type":"thought","data":" reached"}
+{"type":"thought","data":","}
+{"type":"thought","data":" with"}
+{"type":"thought","data":" no"}
+{"type":"thought","data":" markdown"}
+{"type":"thought","data":" fence"}
+{"type":"thought","data":","}
+{"type":"thought","data":" no"}
+{"type":"thought","data":" prose"}
+{"type":"thought","data":","}
+{"type":"thought","data":" no"}
+{"type":"thought","data":" inspection"}
+{"type":"thought","data":"."}
+{"type":"thought","data":" I"}
+{"type":"thought","data":" should"}
+{"type":"thought","data":" output"}
+{"type":"thought","data":" only"}
+{"type":"thought","data":" the"}
+{"type":"thought","data":" JSON"}
+{"type":"thought","data":" object"}
+{"type":"thought","data":"."}
+{"type":"text","data":"{\n"}
+{"type":"text","data":" "}
+{"type":"text","data":" \""}
+{"type":"text","data":"ver"}
+{"type":"text","data":"dict"}
+{"type":"text","data":"\":"}
+{"type":"text","data":" \""}
+{"type":"text","data":"APPRO"}
+{"type":"text","data":"VED"}
+{"type":"text","data":"\","}
+{"type":"text","data":"\n"}
+{"type":"text","data":" "}
+{"type":"text","data":" \""}
+{"type":"text","data":"summary"}
+{"type":"text","data":"\":"}
+{"type":"text","data":" \""}
+{"type":"text","data":"Extraction"}
+{"type":"text","data":" is"}
+{"type":"text","data":" behavior"}
+{"type":"text","data":"-"}
+{"type":"text","data":"preserving"}
+{"type":"text","data":";"}
+{"type":"text","data":" the"}
+{"type":"text","data":" named"}
+{"type":"text","data":" fail"}
+{"type":"text","data":"-"}
+{"type":"text","data":"closed"}
+{"type":"text","data":" matrix"}
+{"type":"text","data":" is"}
+{"type":"text","data":" directly"}
+{"type":"text","data":" executable"}
+{"type":"text","data":";"}
+{"type":"text","data":" D"}
+{"type":"text","data":"."}
+{"type":"text","data":"110"}
+{"type":"text","data":"c"}
+{"type":"text","data":"-"}
+{"type":"text","data":"0"}
+{"type":"text","data":"c"}
+{"type":"text","data":"1"}
+{"type":"text","data":"b"}
+{"type":"text","data":" blocks"}
+{"type":"text","data":" the"}
+{"type":"text","data":" reachable"}
+{"type":"text","data":" post"}
+{"type":"text","data":"-"}
+{"type":"text","data":"commit"}
+{"type":"text","data":" hole"}
+{"type":"text","data":" without"}
+{"type":"text","data":" a"}
+{"type":"text","data":" production"}
+{"type":"text","data":" repair"}
+{"type":"text","data":" or"}
+{"type":"text","data":" frontier"}
+{"type":"text","data":" weaken"}
+{"type":"text","data":";"}
+{"type":"text","data":" Opus"}
+{"type":"text","data":" P"}
+{"type":"text","data":"2"}
+{"type":"text","data":" is"}
+{"type":"text","data":" owned"}
+{"type":"text","data":" by"}
+{"type":"text","data":" D"}
+{"type":"text","data":"."}
+{"type":"text","data":"110"}
+{"type":"text","data":"c"}
+{"type":"text","data":"-"}
+{"type":"text","data":"0"}
+{"type":"text","data":"c"}
+{"type":"text","data":"1"}
+{"type":"text","data":"."}
+{"type":"text","data":" No"}
+{"type":"text","data":" P"}
+{"type":"text","data":"0"}
+{"type":"text","data":"/"}
+{"type":"text","data":"P"}
+{"type":"text","data":"1"}
+{"type":"text","data":" remains"}
+{"type":"text","data":" against"}
+{"type":"text","data":" closing"}
+{"type":"text","data":" D"}
+{"type":"text","data":"."}
+{"type":"text","data":"110"}
+{"type":"text","data":"c"}
+{"type":"text","data":"-"}
+{"type":"text","data":"0"}
+{"type":"text","data":"c"}
+{"type":"text","data":"1"}
+{"type":"text","data":"a"}
+{"type":"text","data":".\","}
+{"type":"text","data":"\n"}
+{"type":"text","data":" "}
+{"type":"text","data":" \""}
+{"type":"text","data":"find"}
+{"type":"text","data":"ings"}
+{"type":"text","data":"\":"}
+{"type":"text","data":" [],"}
+{"type":"text","data":"\n"}
+{"type":"text","data":" "}
+{"type":"text","data":" \""}
+{"type":"text","data":"red"}
+{"type":"text","data":"_"}
+{"type":"text","data":"causal"}
+{"type":"text","data":"\":"}
+{"type":"text","data":" true"}
+{"type":"text","data":",\n"}
+{"type":"text","data":" "}
+{"type":"text","data":" \""}
+{"type":"text","data":"green"}
+{"type":"text","data":"_"}
+{"type":"text","data":"closes"}
+{"type":"text","data":"_"}
+{"type":"text","data":"red"}
+{"type":"text","data":"\":"}
+{"type":"text","data":" true"}
+{"type":"text","data":",\n"}
+{"type":"text","data":" "}
+{"type":"text","data":" \""}
+{"type":"text","data":"scope"}
+{"type":"text","data":"_"}
+{"type":"text","data":"preserved"}
+{"type":"text","data":"\":"}
+{"type":"text","data":" true"}
+{"type":"text","data":"\n"}
+{"type":"text","data":"}"}
+{"type":"available_commands","tools":["read_file","list_dir","grep","search_tool","use_tool","codex__codex","codex__codex-reply","railway__add_reference_variable","railway__connect_service_source","railway__create_bucket","railway__create_environment","railway__create_project","railway__create_service","railway__create_tcp_proxy","railway__create_volume","railway__delete_domain","railway__deploy","railway__deploy_template","railway__disconnect_service_source","railway__docs_fetch","railway__docs_search","railway__domain_status","railway__environment_status","railway__generate_domain","railway__get_logs","railway__get_service_config","railway__get_tcp_proxy","railway__http_error_rate","railway__http_requests","railway__http_response_time","railway__link_environment","railway__link_service","railway__list_deployments","railway__list_domains","railway__list_projects","railway__list_services","railway__list_tcp_proxies","railway__list_variables","railway__list_workspaces","railway__private_network_status","railway__private_network_update","railway__remove_bucket","railway__remove_service","railway__remove_tcp_proxy","railway__remove_volume","railway__retry_domain_certificate","railway__scale_service","railway__search_templates","railway__service_metrics","railway__set_variables","railway__update_domain","railway__update_service","railway__update_volume","railway__whoami","react-grab-mcp__get_element_context"],"commands":["compact","always-approve","context","hooks-trust","hooks-list","hooks-add","hooks-remove","hooks-untrust","plugins","reload-plugins","session-info","feedback","goal","claude","brave-search","close-spec","codex","compare-screenshots","dep-tldr","eval-skills","feature-slicing","find-skills","implement-spec","instruments-profiling","llm-tldr-dep-indexer","llm-tldr-usage","oracle","preview-shots","refactor-clean","renderer","screenshot-critique","skill-creator","swift-concurrency-expert","swiftui-liquid-glass","swiftui-performance-audit","swiftui-view-refactor","use-railway","video-transcript-downloader","write-docs","write-skills","explain-diff-html","skills-manager","twitter-clip","video-to-gif","build-with-ai","code-review","create-skill","create-workflow","design","execute-plan","bundled:imagine","implement","pr-babysit","resume-claude","resume-codex","resume-cursor","review","skill-design-principles","adversarial-spec","playground"]}
+{"type":"usage","usage":{"input_tokens":3882,"output_tokens":168,"cache_read_input_tokens":198912,"cache_creation_input_tokens":0,"reasoning_tokens":39},"signature":"39ozqRFrdSDNL8Nnmoq7NshH+s+7YMFQD5Ln5Jeu42ZdKcO17qgZ9n6YizWtR2L8Ndc6UXuefidrvLpcBNfY3RlwPcNOe4qYnBPuDwx3Ro+lpcUC3PRbJ3aY8XuTG7ZE9zjmNdeho/Tw926Dbxm09gRKvJAcPJq1j7FeoEHXTl3vsshAhB7yIOIGcQfdtr3q1U3PClLeM8MGqvJZdq5Hpo0kkKGU5u7ESQ6HFsf3M76WrmZvKY+xioyFeq/PzLBC7+Q"}
+{"type":"end","stopReason":"end_turn","sessionId":"01a0653e-29e9-7761-8377-e2041e09c668","requestId":"2872f57c-70fa-4c0d-9f23-43f9659a0560","usage":{"input_tokens":3882,"cache_read_input_tokens":198912,"cache_creation_input_tokens":0,"output_tokens":168,"reasoning_tokens":39,"total_tokens":202962},"num_turns":1,"total_cost_usd":0.03679752,"total_cost_usd_ticks":367975200,"modelUsage":{"grok-4.6-build":{"inputTokens":3882,"outputTokens":168,"cacheReadInputTokens":198912,"cacheCreationInputTokens":0,"modelCalls":1,"costUSD":0.03679752}}}

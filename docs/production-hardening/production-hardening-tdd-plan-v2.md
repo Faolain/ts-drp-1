@@ -95518,7 +95518,9 @@ genesis and current room floor. It is not sufficient to decode a claimed epoch
 and skip the row. A solution must prove that no current/unpublished row can be
 hidden or substituted; authenticate object, author, sequence, signature,
 anchor/epoch relation, and the exact retained authority needed for any row it
-discards; preserve pending publication and offline/rebase custody; never copy
+discards; independently compare the opened retirement carrier author with the
+resolved issuance scope before consuming its boundary; preserve pending
+publication and offline/rebase custody; never copy
 the current genesis filter's publish-state-blind treatment of an unpublished
 old row; fail closed or explicitly resolve every such pending row; fail closed
 on malformed, duplicate, reordered, forked, stale, cross-object, cross-author,
@@ -95834,11 +95836,11 @@ SHA-256 is
 
 ###### D.110c-0c1a creator-signed issuance-retirement checkpoint prerequisite
 
-**Status: causal RED and initial production GREEN are signed/pushed; focused and
-retained gates pass, but the governing final review found a reachable
-committed-issuance hole and missing derivation-branch coverage. The tests-only
-review correction and explicit D.110c-0c1b prerequisite remain before one
-material confirmation may close this slice.** Owner:
+**Status: CLOSED at signed/pushed correction commit
+`7414fa6bad30edc34de162f274ecee1504637579`; causal RED, production GREEN,
+focused/retained gates, review correction, and the one material confirmation
+all pass with an empty P0/P1 union. D.110c-0c1b remains the blocking next
+prerequisite before the boundary consumer or repeated-epoch continuation.** Owner:
 protocol-v3 creator retirement record/opener and one-use signing request,
 keychain finality signing dispatch, the creator-close row/graph/replay capture,
 the Node-private
@@ -96176,6 +96178,28 @@ evidence wrapper used zsh's reserved `status` name; both diagnostic-only errors
 and their corrected proofs are preserved without changing acceptance. One
 audit also omitted the established 8-GiB formatting heap and met the default
 4-GiB ceiling; the corrected 8-GiB Prettier gate passes.
+
+The one material confirmation inspected signed/pushed correction commit
+`7414fa6bad30edc34de162f274ecee1504637579`, tree
+`4daa440035ba8cde11719701d0fcc8e4a807d7c8`. Grok 4.6/high session
+`01a0653e-29e9-7761-8377-e2041e09c668` returned `APPROVED`, P0=0/P1=0/P2=0;
+its runner again preserved `NO_VERDICT` because progress prose preceded valid
+terminal JSON, and the exact session re-emitted the unchanged schema-only
+result without reinspection. Standard direct Kimi K3 session
+`session_febc54cb-bc78-44a6-9bd6-769cadecb568`, with the exact 100-step
+control, returned `APPROVED`, P0=0/P1=0/P2=1. Opus xhigh session
+`43dc1ed0-5b9d-4ac5-9e08-0b88ec675179` returned `APPROVED`, P0=0/P1=0/P2=4.
+The blocking union is empty. Their P2s are dispositioned without another
+round: D.110c-0c1b owns the real-store non-null continuation and stale
+epoch/anchor branch; direct multi-page coverage is required only if that slice
+changes pagination; the terminal lineage disjunct remains an acknowledged
+defensive branch after the stronger exact-length invariant; D.110c-0c1 now
+states the independent carrier-author binding explicitly; and future evidence
+wrappers must distinguish a literal process exit from a derived reporter
+verdict. The immutable diagnostic root is not rewritten. Confirmation evidence
+is under `.logs/d110c-0c1a-review-confirmation-7414fa6b/`; its validating
+24-entry self-excluding manifest SHA-256 is
+`f50b8dadc5eb0fdd93c7feef27442b6f5c898126447c1e2cac3d815d9caff8dd`.
 
 ###### D.110c-0c1b committed-issuance outcome reconciliation prerequisite
 
