@@ -96203,8 +96203,10 @@ is under `.logs/d110c-0c1a-review-confirmation-7414fa6b/`; its validating
 
 ###### D.110c-0c1b committed-issuance outcome reconciliation prerequisite
 
-**Status: blocking bounded audit and causal RED are next after D.110c-0c1a
-closure; no production repair is selected or authorized.** Owner: the
+**Status: bounded source/architecture audit complete at signed/pushed anchor
+`90a06a1aae79d408a1c2c6b014dae1a99daf866d`; the exact orchestration repair and
+causal tests-only RED are frozen below, with plan review next and no production
+edit yet.** Owner: the
 post-`transactIssue()` outcome window in
 `packages/node/src/v3-live.ts::issueOneVertex()`, live-journal append, graph
 admission, restart recovery of pending issuance/outbox rows, and the close-time
@@ -96212,42 +96214,95 @@ retirement-boundary input. Deadline: GREEN before D.110c-0c1 changes either
 registered issuance view, before D.110c-0c resumes, and before D.110c-c/d or
 Phase 7 claims repeatable epochs.
 
-The bounded source/architecture audit must determine whether existing restart
-recovery can safely finish admission of a committed row, whether the issuance
-transaction needs a durable outcome/reconciliation marker, or whether another
-explicit store contract is required. The store is untrusted bytes: deletion,
-publication, epoch reassignment, or a database-only watermark cannot establish
-admission. Preserve author signature, exact object/sequence, original
-epoch/anchor authority, dependency and ACL checks, pending publication and
-rebase custody, operation-reservation semantics, graph capacity, journal
-ordering, and at-most-once application. If repair requires a schema, public
-API, wire field, dependency, authority rule, or threshold change, stop after
-the audit and reslice that exact high-risk prerequisite.
+The bounded source/architecture audit inspected `issueOneVertex()`, the
+registration task queue, blueprint fold/creator-close capture, the complete
+recovery outbox/journal path, issuance and journal contracts, the retained
+E5-01 uncertain-outcome test, and the genuine D.110c-a repeat-close fixture.
+It establishes a narrow composition defect. `issuer.issue()` returns only
+after `transactIssue()` has durably committed the issued and pending-outbox
+pair. Every later `committedFailure()` therefore owns a durable row, but it
+sets `operationAdmissionHalted` only when the optional operation-policy
+reservation exists. Even when set, neither `creatorCloseRegistration()` nor
+the queued `stageClosedBlueprintEpoch()` checks the flag. Because snapshot
+staging queues the fold behind an already running issue, the fold can observe
+the issue's committed failure and still capture a graph that omits its row.
 
-Tests-only RED must use the real product issue path to force one deterministic
-post-commit journal or graph-admission failure. It must prove the issue reports
-the existing committed-failure class, the exact issued/outbox row survives,
-the row is absent from the authenticated close graph/journal, the genuine 0→1
-close can only truncate above the prior admitted boundary, and after verified
-adoption/restart the next genuine close refuses with exact
+The existing `recoverV3LiveReplica()` outbox scan is already the exact
+reconciliation owner. It pages and point-reads the real store, requires exact
+issued/outbox equality, authenticates authority/signature/object/epoch/anchor/
+author/sequence/operation/dependencies/ACL/terminal order, reserves the
+operation policy, appends the journal with exact idempotence rules, appends the
+graph/application state once, and commits the recovered reservation before
+activation. Therefore no durable outcome marker, schema, public API, wire
+field, dependency, new authority rule, or store operation is required.
+
+GREEN is frozen to three internal checks in `packages/node/src/v3-live.ts`:
+
+1. after `issuer.issue()` returned, every `committedFailure()` unconditionally
+   sets the existing `operationAdmissionHalted` recovery-required flag, even
+   when no operation admission policy exists;
+2. `creatorCloseRegistration()` refuses to mint close authority while that
+   flag is set; and
+3. `stageClosedBlueprintEpoch()` rechecks the flag after the registration queue
+   barrier so a handle bound before an in-flight issue cannot fold after the
+   committed failure.
+
+The flag remains a conservative in-memory stop, not proof of reconciliation.
+Only deactivation plus the existing authenticated recovery path produces a
+fresh active registration with the flag clear. In-process close-time outbox
+repair is rejected because it would duplicate recovery ownership; skipping,
+retiring, deleting, republishing, or epoch-reassigning the row is rejected
+because it would falsify durable issuance/outbox truth or weaken dense
+sequence; a cross-store transaction/marker is rejected as unnecessary schema
+work; and relaxing the retirement boundary is prohibited. The audit evidence
+is under `.logs/d110c-0c1b-source-audit-90a06a1a/`. If implementation discovers
+that any frozen assumption is false or requires the rejected schema/API/wire/
+dependency/authority changes, stop and reslice that exact prerequisite.
+The audit root's validating three-entry self-excluding manifest SHA-256 is
+`48309c9c5ea98d4bdbd0e44ab1b05ab4fab5a375d8f091548e7adc2a260361fe`.
+
+Tests-only RED must use the real product issue path and real store
+implementations behind a one-use journal adapter that blocks at the target
+`local-issued` append and then rejects without writing. Bind creator close
+before releasing the failure and call close while issue owns the registration
+queue. Current code must prove the issue reports existing `journal-rejected`,
+the exact issued/pending-outbox row survives, journal and graph omit it, yet the
+queued genuine close advances; after verified adoption/restart the next genuine
+close must refuse with exact
 `D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE` because that same row carries
-the old authenticated epoch/anchor. No test may insert, delete, republish,
-rewrite, or privately classify the row to manufacture the failure.
+the old authenticated epoch/anchor. The test's intended expectation is the
+earlier close refusal token
+`D110C_0C1B_COMMITTED_ISSUANCE_RECOVERY_REQUIRED`, so the present advance is
+the sole causal RED. No test may insert, delete, republish, rewrite, or
+privately classify the row to manufacture the failure. Any earlier failure,
+different row, missing current-close advance, or different next-close token
+stops and diagnoses RED.
 
-GREEN must deterministically reconcile every durably committed outcome before
-it can obstruct a later close: either authenticate and complete its original
-admission exactly once under the preserved original authority, or fail closed
-with a durable, bounded, explicitly reviewed resolution that preserves dense
-sequence and outbox truth. It must then prove restart, genuine 0→1 and 1→2
-close/adoption, continued issue/publish, exact application state and operation
-accounting, no duplicate journal/graph/application entry, no skipped sequence,
-and no hidden pending row. Adversarial gates cover crash at each boundary,
-substituted row, stale authority/ACL, invalid dependency, graph capacity,
-ambiguous transaction outcome, replay, and repeated recovery. Retain all
-D.110c-0c1a carrier, Phase-6a recovery, issuance/outbox/rebase, AHE rollback,
-snapshot, and D.109 reclamation gates. This is a high-risk production-lifecycle
-slice and receives the governing plan review, causal RED custody, signed GREEN,
-and one final Grok/Kimi/Opus review. No campaign or D.110a invocation runs.
+GREEN must prove both orderings: a close handle bound before the committed
+failure rejects dynamically, and a bind attempted after the failure cannot
+claim close authority. Neither refusal may change durable head, snapshot,
+graph, application state, or the surviving row. A second issue must reject
+without another issuance transaction. Deactivate and recover the same epoch;
+the existing product recovery path must authenticate and admit the exact row
+once, restore exact application and operation-policy state, and then complete
+genuine 0→1 close/adoption, restart/reopen, genuine 1→2 close/adoption, and
+continued issue/publish after epoch 2. Assert no duplicate journal/graph/
+application entry, no skipped sequence, no hidden pending row, the exact
+carrier boundary and non-null continuation, exact state digest, and exact
+operation count.
+
+The focused matrix covers failure before journal write, journal write then
+thrown outcome, graph append failure, operation-policy commit failure, close
+racing the failure, bind after failure, repeated recovery, substituted
+issued/outbox row, stale epoch/anchor, invalid dependency/ACL, capacity, and
+terminal classification. Preserve all existing fail-closed result kinds and
+details; the D.110c-0c1b token is tests-only. Retain D.110c-0c1a carrier,
+E5-01 admission/recovery, Phase-6a successor recovery/adoption,
+issuance/outbox/rebase, AHE rollback, snapshot, D.109 reclamation, exact-owner
+static gates, and the D.110c-a/b hot path. This is a high-risk
+production-lifecycle slice and receives the governing plan review, causal RED
+custody, signed GREEN, and one final Grok/Kimi/Opus review. No campaign or
+D.110a invocation runs.
 
 The complete confirmation evidence is retained under
 `.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry
