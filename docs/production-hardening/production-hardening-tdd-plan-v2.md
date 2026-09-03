@@ -96319,10 +96319,11 @@ SHA-256 is
 
 ###### D.110c-0c1e scope-local historical-authority scan-custody prerequisite
 
-**Status: bounded source audit, corrected plan, sole material confirmation, and
-causal tests-only RED complete; the production GREEN is implemented and its
-focused cases pass, but it remains held and unclosed after the combined gate
-exposed D.110c-0c1g below.** Owner:
+**Status: CLOSED at signed/pushed combined GREEN commit
+`c05679e3f53f21673b4e7327dca05848ed42ebe1`; the bounded source audit,
+corrected plan, sole material confirmation, causal tests-only RED, production
+GREEN, focused/retained gates, and combined final review pass with an empty
+P0/P1 union.** Owner:
 `packages/node/src/v3-live.ts` at
 `activateCreatorSuccessorLive()`, `HistoricalIssuanceContext`,
 `recoverV3LiveReplica()`, `creatorFilteredIssuanceStore()`, and the existing
@@ -96516,10 +96517,11 @@ slice is closed by the held working tree.
 
 ###### D.110c-0c1g authenticated successor projection-base prerequisite
 
-**Status: bounded source/architecture audit, plan review, sole correction
-confirmation, causal tests-only RED, narrow GREEN implementation, and its
-deterministic focused/static/retained evidence are complete; signed/pushed
-GREEN and the sole combined final review are next.** Owner:
+**Status: CLOSED at signed/pushed GREEN commit
+`c05679e3f53f21673b4e7327dca05848ed42ebe1`; the bounded source/architecture
+audit, plan review, sole correction confirmation, causal tests-only RED,
+narrow GREEN, deterministic focused/static/retained evidence, and sole
+combined final review pass with an empty P0/P1 union.** Owner:
 `examples/v3-room/src/index.ts::V3RoomApplication` and
 `createV3RoomSessionOwned()` projection initialization/stage/commit and
 successor-migration refusal paths;
@@ -96885,6 +96887,40 @@ the checkpoint is sealed. Its 71-entry self-excluding manifest validates and
 its SHA-256 is
 `6f8e8538ad8192bcda8d6f147c67564988c6e57a9ea0d2f3d52bdf2177ad234e`.
 
+The sole combined final review inspected signed/pushed plan
+`f1262b4a7d83ee0d8929f9b3bf85f692a818037f`, RED
+`4871f68084887555896257ad263f6dcc35ca7d33`, and GREEN
+`c05679e3f53f21673b4e7327dca05848ed42ebe1`, including the held 0c1d/e
+history. Grok 4.6/high returned `APPROVED`, P0/P1/P2 `0/0/5`; direct Kimi
+K3/100-step returned `APPROVED`, `0/0/3`; and Opus xhigh returned `APPROVED`,
+`0/0/4`. All set plan sufficiency, RED causality, and scope preservation true.
+Grok's normal completion and Kimi's initial completion both contained valid
+substantive verdicts wrapped in non-schema prose; each exact session performed
+one schema-only re-emission without reinspection or finding change. Opus
+completed with `is_error=false`. The blocking union is empty.
+
+The P2 union is owned without another review. D.110c-0c1h retains the inherited
+grid `roomHeadAuthority` typecheck diagnostic before any grid successor reopen,
+MMORPG long-horizon gate, or Phase-6 exit. D.110c-d's test/build-infrastructure
+owner must modernize the two legacy positional fixtures' noncanonical invite
+bytes and grid initialization before either file is cited by its
+≥100-transition gate; the passing D.93.46b semantics suite remains the current
+projector-containment proof. Before D.110c-c consumes projection-base retrieval
+for close custody, its retained Node gate must add wrong-origin, close/fold,
+noncurrent-registration, digest-mismatch, and detached-byte-mutation cases.
+D.110c-c must also assert the post-issue base-bearing canonical-state digest
+against the exported blueprint snapshot. D.110c-0c1i inherits the same digest
+obligation for base-aware prepare/rehearsal/activation, and either 0c1i or
+D.110c-c must introduce an explicit guarded projection state if it makes the
+currently serial pre-base-installation successor window observable. The
+focused wrapper diagnostic remains record-only and is not rerun.
+
+Complete review evidence is `.logs/d110c-0c1g-final-review-c05679e3/`; its
+30-entry self-excluding manifest validates and its SHA-256 is
+`0d9c3e55c82385c37dcc2fde349fe4241f1bd9f93dbf1e82b61b2ac349c98f9f`.
+This review closes 0c1g and the held 0c1d/e GREEN checkpoints but does not close
+parent 0c1: D.110c-0c1f remains blocking for multi-author historical issuance.
+
 The bounded audit is `.logs/d110c-0c1g-source-audit-c5613498/`; its two-entry
 self-excluding manifest validates and its manifest SHA-256 is
 `8e746683abc09d8040f1cb7a945fe45b26db76d90c166e945f569de74298aab7`.
@@ -96967,11 +97003,12 @@ scan-only foreign-scope context is not authority and cannot satisfy this slice.
 
 ###### D.110c-0c1d successor-reopen historical-rebase orchestration prerequisite
 
-**Status: bounded source/architecture audit, governing plan review, sole
-material confirmation, and causal tests-only RED complete; the two-predicate
-focused GREEN passes, but its broader retained browser gate exposed the
-separate D.110c-0c1e initialization blocker above, so neither 0c1d nor its
-parent is closed.** Owner:
+**Status: CLOSED at signed/pushed combined GREEN commit
+`c05679e3f53f21673b4e7327dca05848ed42ebe1`; the bounded source/architecture
+audit, governing plan review, sole material confirmation, causal tests-only
+RED, two-predicate GREEN, focused/retained gates, and combined final review pass
+with an empty P0/P1 union. Parent 0c1 remains open only for its separately
+owned prerequisites.** Owner:
 `examples/v3-room/src/index.ts::createV3RoomSessionOwned()` at the
 `rebasePromise` startup predicate and the same function's published-displaced
 identity-verification predicate inside `drainRebaseOutbox()`, plus the existing
