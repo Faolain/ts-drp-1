@@ -96300,11 +96300,100 @@ inventory is inside the root and its four-entry self-excluding manifest
 SHA-256 is
 `814f98305ea36ee3a0a37bdf07055dd4fbae8ac053b7bf5c58148904754bb1cd`.
 
+###### D.110c-0c1e epoch-zero historical-authority initialization prerequisite
+
+**Status: bounded source audit complete; plan review pending.** Owner:
+`packages/node/src/v3-live.ts::bindCreatorSuccessorLive()` at the historical
+issuance capability preparation, rejection, handoff, and issuance-store
+selection predicates only. Deadline: GREEN before D.110c-0c1d or its parent
+D.110c-0c1 closes, before D.110c-0c resumes, and before any later phase relies
+on the retained first-successor cold-reopen path.
+
+The D.110c-0c1d focused GREEN passed on its first run, the retained 174-test
+Vitest roster passed 174/174, and the focused stable epoch-2 successor browser
+test passed. The complete retained Chromium product file then exposed one
+separate parent D.110c-0c1 initialization regression. Its preceding hot creator
+0→1 adoption passed, but the established peer's genuine epoch-1 successor cold
+reopen failed before room construction with exact detail
+`preparation-rejected: creator historical issuance authority preparation
+failed`. The room-side 0c1d task cannot cause or close this earlier Node
+refusal, so further test execution stopped and the Node repair is resliced
+rather than folded into 0c1d.
+
+The cause is exact. `openVerifiedCreatorHistoricalIssuance()` intentionally
+returns `undefined` when `floorTrust.currentEpoch < 1`, because there is no
+pre-genesis covered-historical interval. `bindCreatorSuccessorLive()` now opens
+two one-use capabilities and unconditionally requires both. On the first
+successor, `material.predecessor.trust.currentEpoch === 0`, so that preparation
+is guaranteed to reject even though historical authentication is neither
+possible nor required. Before D.110c-0c1, this path passed no historical
+context to the already-optional `creatorFilteredIssuanceStore()` argument and
+used the raw issuance store for the ordinary no-transport successor. Current
+classification, recovery, scan counting, and registration already accept an
+absent historical context.
+
+GREEN adds one named `historicalIssuanceRequired` predicate equal to
+`material.predecessor.trust.currentEpoch > 0`. Only when true does the binding
+open, require, hand off, and register the two opaque historical capabilities.
+At predecessor epoch zero both remain absent: predecessor validation uses the
+same existing filtered-store call with an absent historical argument; the
+ordinary no-transport successor keeps the existing raw-store branch; and any
+transport-displaced branch keeps its existing current/displaced authentication
+with no invented historical authority. At every predecessor epoch ≥1, both
+capabilities remain mandatory and the existing exact identity checks,
+combined-scan ceiling, filtered stores, WeakMap one-use custody, recovery
+validation, and registration semantics remain byte-for-byte. Do not weaken
+`openVerifiedCreatorHistoricalIssuance()`, synthesize an epoch-zero capability,
+fall back at epoch ≥1, bypass filtered authentication, or change the room-side
+0c1d predicates.
+
+The bounded RED uses the existing genuine product flow and no new fixture: in
+one Chromium file, the hot creator 0→1 setup passes and the established peer's
+imported epoch-1 cold reopen deterministically translates only the exact
+historical-preparation refusal into
+`D110C_0C1E_EPOCH_ZERO_HISTORICAL_AUTHORITY_NOT_APPLICABLE`. A failure in the
+hot setup, import, snapshot/authority match, or any other detail is noncausal.
+GREEN makes those two selected serial tests pass, then the complete 13-title
+Chromium product file must pass without exclusion. It must preserve the
+D.110c-0c1d historical and pinned-genesis matrices, the stable epoch-2 reopen,
+and the epoch-3 pending-adoption recovery.
+
+Retained gates are the D.110c-0c1 focused differential, D.110c-0c1c stable
+successor, the complete Chromium product file, the accepted 14-path/174-test
+0c1a/0c1b/rebase/issuance/reclamation/snapshot Vitest roster, Node and
+storage-browser builds and production-source no-emit checks, v3-room
+build/typecheck, exact-owner ESLint/Prettier/diff, and source-shape predicates
+proving epoch-zero optionality plus epoch-one-or-later mandatory custody. The
+broad Node test-inclusive typecheck may reproduce only its recorded unrelated
+worker-host rootDir, E3-02 `emit`, and compact-history helper diagnostics; the
+production-source build/no-emit gate must pass. No D.110a invocation, campaign,
+new fixture, product API, schema, wire, dependency, threshold, authority
+assumption, or room behavior is authorized.
+
+This is a high-risk recovery-initialization correction inside the already-open
+D.110c-0c1 GREEN. Sign and push this bounded plan, then run one Grok 4.6/high,
+direct Kimi K3 with `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review.
+Only P0/P1 blocks; P2 receives disposition without recursive prose review. One
+confirmation is permitted only if a correction materially changes executable
+scope or acceptance. After an empty blocking union, add the exact tests-only
+RED translation and run its two selected tests once before changing the Node
+predicate. The existing combined D.110c-0c1 final GREEN review covers 0c1d and
+0c1e; do not add another final-review ceremony. Do not invoke Fable or a
+collaboration subagent.
+
+The source audit is `.logs/d110c-0c1e-source-audit-5bf872b6/`. It preserves the
+non-GREEN full-browser reporter and pins the exact opener, unconditional bind
+rejection, pre-D.110c-0c1 behavior, and current optional-context consumers. Its
+two-entry self-excluding manifest validates with SHA-256
+`78c5f0bc3d483c1f599e4441c53f7200fcdf4d238bd9b92e7d3355ba00f0daff`.
+
 ###### D.110c-0c1d successor-reopen historical-rebase orchestration prerequisite
 
 **Status: bounded source/architecture audit, governing plan review, sole
-material confirmation, and causal tests-only RED complete; the blocking union
-is empty and the frozen two-predicate production GREEN is authorized.** Owner:
+material confirmation, and causal tests-only RED complete; the two-predicate
+focused GREEN passes, but its broader retained browser gate exposed the
+separate D.110c-0c1e initialization blocker above, so neither 0c1d nor its
+parent is closed.** Owner:
 `examples/v3-room/src/index.ts::createV3RoomSessionOwned()` at the
 `rebasePromise` startup predicate and the same function's published-displaced
 identity-verification predicate inside `drainRebaseOutbox()`, plus the existing
@@ -96504,8 +96593,9 @@ Prettier invocation exhausted its default 4 GiB heap while parsing this large
 plan; the corrected split invocation gave only the formatter an 8 GiB heap and
 passed both the plan and all four TypeScript owners. This was a formatter
 invocation defect, not a code, product-memory, or acceptance failure.
-The frozen two-predicate room GREEN may now begin; no other product owner is
-authorized.
+The frozen two-predicate room GREEN produced its expected focused pass and is
+preserved in evidence, but its uncommitted source diff is held while the
+D.110c-0c1e plan gate closes. No other product owner is authorized.
 
 The bounded local audit is rooted at
 `.logs/d110c-0c1d-source-audit-b21a6d47/`. It pins signed/pushed parent anchor
