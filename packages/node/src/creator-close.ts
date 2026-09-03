@@ -483,10 +483,15 @@ async function authorIssuanceFrontiersCandidate(
 	}
 
 	const byAuthor = new Map<string, number[]>();
+	const duplicateAuthors = new Set<string>();
 	for (const identity of input.graph.authors.values()) {
 		const sequences = byAuthor.get(identity.author) ?? [];
 		if (sequences.includes(identity.authorSequence)) {
-			throw new TypeError("creator issuance-frontier author slot is ambiguous");
+			if (identity.author === input.issuanceScope.author) {
+				throw new TypeError("creator issuance-frontier author slot is ambiguous");
+			}
+			duplicateAuthors.add(identity.author);
+			continue;
 		}
 		sequences.push(identity.authorSequence);
 		byAuthor.set(identity.author, sequences);
@@ -520,12 +525,24 @@ async function authorIssuanceFrontiersCandidate(
 		}
 		let boundary = priorBoundary ?? null;
 		const firstObserved = sequences[0];
+		if (duplicateAuthors.has(author)) {
+			frontiers.push(Object.freeze([author, boundary] as const));
+			continue;
+		}
 		if (boundary === null && firstObserved !== undefined && firstObserved > 1) {
-			throw new TypeError(LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED);
+			if (author === input.issuanceScope.author) {
+				throw new TypeError(LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED);
+			}
+			frontiers.push(Object.freeze([author, boundary] as const));
+			continue;
 		}
 		const minimum = boundary === null && firstObserved === 1 ? 1 : boundary === null ? 0 : boundary + 1;
 		if (sequences.some((sequence) => boundary !== null && sequence <= boundary)) {
-			throw new TypeError("creator issuance-frontier boundary regressed");
+			if (author === input.issuanceScope.author) {
+				throw new TypeError("creator issuance-frontier boundary regressed");
+			}
+			frontiers.push(Object.freeze([author, boundary] as const));
+			continue;
 		}
 		let expected = minimum;
 		for (const sequence of sequences) {

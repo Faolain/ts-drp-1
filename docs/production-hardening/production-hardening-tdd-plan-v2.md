@@ -98037,8 +98037,10 @@ not independently rederived by the transition closure.
 
 **Status: the first execution from `eeaaaca8` remains a noncausal diagnostic;
 the corrected tests-only RED from signed/pushed anchor `466169aa` is causal and
-complete. Production GREEN is authorized only after the signed/pushed RED
-checkpoint containing this record.** Owner:
+complete. The bounded production GREEN and its local runtime/static evidence
+are prepared from signed/pushed RED commit `e379cfd2`; signed clean-isolated
+replay and the one final Grok/Kimi/Opus review remain required before f5a may
+close.** Owner:
 `packages/node/src/creator-close.ts::authorIssuanceFrontiersCandidate()` at the
 construction of `byAuthor`, duplicate detection, prior/null boundary checks,
 regression checks, and per-author frontier advancement; the exact captured
@@ -98176,6 +98178,63 @@ setup token. The complete reporter JSON SHA-256 is
 the fresh immutable evidence root is `.logs/d110c-0c1f5a-red-466169aa/`.
 This RED is not rerun and receives no separate model review; the final GREEN
 review must inspect its causality.
+
+The bounded GREEN changes only
+`authorIssuanceFrontiersCandidate()` classification. Duplicate detection still
+throws its exact existing error for the creator's own issuance scope, while a
+foreign duplicate marks only that author anomalous. A foreign duplicate, null
+prior with first observed sequence above one, or regression at/below a numeric
+prior emits the authenticated prior boundary unchanged (or null); it never
+advances across the anomalous row. A writer removed from the successor writer
+set emits no entry. The creator's exact duplicate and regression errors remain
+unchanged, absent-prior author re-entry remains fail closed and owned by f5b,
+and the normal adjacent-prefix loop is unchanged. No protocol-v3 carrier,
+preimage, parser, recovery consumer, wire format, public API, dependency,
+threshold, or product configuration changed.
+
+One tests-only regression was found and closed while running the retained
+roster. The f5a RED support had installed a permanent synthetic
+`fakeNetwork.gossipTopicFor()` override in the shared creator-adoption fixture.
+That made D.109d's later direct-retained route fail before product admission.
+The exact D.109d title reproduced at untouched signed RED anchor `e379cfd2` in
+an offline detached worktree, proving the production GREEN was not causal. The
+fixture now installs the synthetic gossip classifier only through the queued
+registered vertex's authenticated admission and restores the original
+classifier in `finally` before returning. A too-early restoration diagnostic
+is also preserved: restoring immediately after enqueue made the asynchronous
+authenticator time out. The final two-title fixture boundary proves both
+registered gossip admission and subsequent direct-retained routing.
+
+The one focused GREEN invocation selected the exact file/title and its complete
+JSON reporter records one pass, zero failures/pending/todo, and `success: true`.
+Its outer status is honestly `1` because the command omitted the established
+focused-run `--coverage.enabled=false` switch and therefore applied the global
+70% repository threshold to one selected file (19.99% coverage). The launcher
+also attempted absent `/usr/bin/date`; this host supplies `/bin/date`.
+Neither affected the executed assertion, and the focused command was not
+repeated. After the shared fixture correction, the same RED-named file ran
+once in its separately planned retained-control role with coverage disabled
+and exited zero with the same exact one-file/one-title pass.
+
+Required local gates now pass: the f2/f4 roster is 41/41; the final 20-file
+retained roster is 195/195; the two Chromium titles report expected/skipped/
+unexpected/flaky `2/0/0/0` with zero top-level errors; Protocol v3
+build/typecheck and public-entry audits, Node production build, room
+build/typecheck, Storage Browser build, exact-owner ESLint/Prettier, source
+shape, and diff checks are green. Two additional broad diagnostics remain
+honest nonblocking inherited debt: Node's repository-wide `tsc --noEmit`
+reaches unrelated worker-host rootDir, old WebRTC test-surface, and
+compact-history config errors, while Storage Browser's repository-wide
+`tsc --noEmit` reaches unrelated AHE fixture alias/branding errors. Their
+production builds pass and f5a changes none of those owners.
+
+Complete commands, all failed diagnostics, final reporters, source identity,
+and deterministic validation are under
+`.logs/d110c-0c1f5a-green-e379cfd2/`. Its 72-entry self-excluding manifest
+validates and has SHA-256
+`e5e1a84486363b10fcbf04288affacfba04fd63ef9a2d53ed5efd4fecada3a12`.
+This is working GREEN evidence pending the signed clean-isolated replay and
+final review; it does not close f5a or authorize f5b production work.
 
 GREEN changes only the close-side per-author classification. It must make all
 foreign treatments close successfully, keep the affected frontier unchanged or

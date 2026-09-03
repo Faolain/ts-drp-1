@@ -1,14 +1,11 @@
 import type { V3LocalIssueResult } from "../../../packages/node/src/v3-live.js";
 import { d108d1bChatAuthorities } from "../phase-6a-v3/creator-successor-local-author-contract.js";
 import {
+	type D110cARepeatCloseFixture,
 	type D110cARepeatCloseOptions,
 	openD110cARepeatCloseFixture,
 } from "../phase-6b-d110c-a/repeat-close-contract.js";
 
-export const D110C_0C1F5_FOREIGN_AUTHOR_CLOSE_LIVENESS_REQUIRED =
-	"D110C_0C1F5_FOREIGN_AUTHOR_CLOSE_LIVENESS_REQUIRED" as const;
-
-const LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED = "D110C_0C1F1_LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED";
 const BOUNDARY_REGRESSED = "creator issuance-frontier boundary regressed";
 const AUTHOR_SLOT_AMBIGUOUS = "creator issuance-frontier author slot is ambiguous";
 const SNAPSHOT_NOT_ACTIVE = "creator snapshot export failed: not-active";
@@ -73,6 +70,57 @@ async function observedCloseError(options: D110cARepeatCloseOptions, expected: s
 		if (observed !== expected) {
 			throw new TypeError(`${label}:NONCAUSAL_ERROR:${observed}`);
 		}
+	}
+}
+
+async function acceptedForeignClose(
+	options: D110cARepeatCloseOptions,
+	input: Readonly<{
+		readonly expectedClosedVertexCount: number;
+		readonly expectedForeignBoundary: number | null | "absent";
+		readonly foreignAuthor: string;
+		readonly label: string;
+	}>
+): Promise<void> {
+	let fixture: D110cARepeatCloseFixture | undefined;
+	try {
+		fixture = await openD110cARepeatCloseFixture({ ...options, retainedControls: false });
+		const frontiers = exactFrontiers(fixture.evidence.authorIssuanceFrontiers.record);
+		const foreign = frontiers.find(([author]) => author === input.foreignAuthor);
+		if (
+			(input.expectedForeignBoundary === "absent"
+				? foreign !== undefined
+				: foreign?.[1] !== input.expectedForeignBoundary) ||
+			fixture.evidence.closeResult.closedVertexCount !== input.expectedClosedVertexCount ||
+			fixture.evidence.cutValue.closeSetCount !== input.expectedClosedVertexCount ||
+			fixture.evidence.independentHistory.closeOrder.length !== input.expectedClosedVertexCount
+		) {
+			throw new TypeError(
+				`${input.label}:FOREIGN_CLOSE_INVALID:${JSON.stringify({
+					closeOrder: fixture.evidence.independentHistory.closeOrder.length,
+					closeSetCount: fixture.evidence.cutValue.closeSetCount,
+					closedVertexCount: fixture.evidence.closeResult.closedVertexCount,
+					frontiers,
+				})}`
+			);
+		}
+		await assertAdoption(fixture, input.label);
+	} finally {
+		await fixture?.close();
+	}
+}
+
+async function assertAdoption(fixture: D110cARepeatCloseFixture, label: string): Promise<void> {
+	const adoption = await fixture.advancePendingSuccessor();
+	if (
+		adoption.verification.ok !== true ||
+		adoption.committed.ok !== true ||
+		adoption.activation.ok !== true ||
+		adoption.issued.ok !== true ||
+		adoption.published.ok !== true ||
+		adoption.activeAuthority?.epoch !== 2
+	) {
+		throw new TypeError(`${label}:ADOPTION_INVALID`);
 	}
 }
 
@@ -150,14 +198,14 @@ async function latestCreatorSequence(context: RepeatCloseContext, label: string)
 }
 
 /**
- * Demonstrates that foreign-author frontier anomalies currently abort an
- * otherwise valid creator close, while creator corruption remains fail closed.
+ * Proves foreign-author frontier anomalies stay local while creator corruption
+ * remains fail closed and every successful close remains adoptable.
  */
-export async function proveD110c0c1f5ForeignAuthorCloseLivenessRequired(): Promise<void> {
+export async function proveD110c0c1f5ForeignAuthorCloseLiveness(): Promise<void> {
 	const { creator, foreign } = twoWriterAuthorities();
 	const twoWriterSeeds = Object.freeze([creator.privateKeySeedHex, foreign.privateKeySeedHex]);
 
-	await observedCloseError(
+	await acceptedForeignClose(
 		{
 			creator: Object.freeze({ authorizedPrivateKeySeedHexes: twoWriterSeeds }),
 			beforeRepeatCloseBinding: async (context) => {
@@ -169,11 +217,15 @@ export async function proveD110c0c1f5ForeignAuthorCloseLivenessRequired(): Promi
 				});
 			},
 		},
-		LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED,
-		"D110C_0C1F5_NULL_PRIOR"
+		{
+			expectedClosedVertexCount: 2,
+			expectedForeignBoundary: null,
+			foreignAuthor: foreign.author,
+			label: "D110C_0C1F5_NULL_PRIOR",
+		}
 	);
 
-	await observedCloseError(
+	await acceptedForeignClose(
 		{
 			creator: Object.freeze({
 				authorizedPrivateKeySeedHexes: twoWriterSeeds,
@@ -188,11 +240,15 @@ export async function proveD110c0c1f5ForeignAuthorCloseLivenessRequired(): Promi
 				});
 			},
 		},
-		BOUNDARY_REGRESSED,
-		"D110C_0C1F5_FOREIGN_REGRESSION"
+		{
+			expectedClosedVertexCount: 2,
+			expectedForeignBoundary: 0,
+			foreignAuthor: foreign.author,
+			label: "D110C_0C1F5_FOREIGN_REGRESSION",
+		}
 	);
 
-	await observedCloseError(
+	await acceptedForeignClose(
 		{
 			creator: Object.freeze({
 				authorizedPrivateKeySeedHexes: twoWriterSeeds,
@@ -213,11 +269,15 @@ export async function proveD110c0c1f5ForeignAuthorCloseLivenessRequired(): Promi
 				});
 			},
 		},
-		AUTHOR_SLOT_AMBIGUOUS,
-		"D110C_0C1F5_FOREIGN_DUPLICATE"
+		{
+			expectedClosedVertexCount: 3,
+			expectedForeignBoundary: 0,
+			foreignAuthor: foreign.author,
+			label: "D110C_0C1F5_FOREIGN_DUPLICATE",
+		}
 	);
 
-	await observedCloseError(
+	await acceptedForeignClose(
 		{
 			creator: Object.freeze({
 				authorizedPrivateKeySeedHexes: twoWriterSeeds,
@@ -239,8 +299,12 @@ export async function proveD110c0c1f5ForeignAuthorCloseLivenessRequired(): Promi
 				await stageForeignRemoval(context, foreign.author, 62);
 			},
 		},
-		AUTHOR_SLOT_AMBIGUOUS,
-		"D110C_0C1F5_REMOVED_FOREIGN_DUPLICATE"
+		{
+			expectedClosedVertexCount: 4,
+			expectedForeignBoundary: "absent",
+			foreignAuthor: foreign.author,
+			label: "D110C_0C1F5_REMOVED_FOREIGN_DUPLICATE",
+		}
 	);
 
 	for (const creatorCase of [
@@ -292,6 +356,7 @@ export async function proveD110c0c1f5ForeignAuthorCloseLivenessRequired(): Promi
 		) {
 			throw new TypeError(`D110C_0C1F5_NO_GAP_CONTROL_INVALID:${JSON.stringify(frontiers)}`);
 		}
+		await assertAdoption(noGap, "D110C_0C1F5_NO_GAP");
 	} finally {
 		await noGap.close();
 	}
@@ -317,6 +382,7 @@ export async function proveD110c0c1f5ForeignAuthorCloseLivenessRequired(): Promi
 		if (frontiers.some(([author]) => author === foreign.author)) {
 			throw new TypeError(`D110C_0C1F5_DEAUTHORIZED_FOREIGN_EMITTED:${JSON.stringify(frontiers)}`);
 		}
+		await assertAdoption(deauthorized, "D110C_0C1F5_DEAUTHORIZED_FOREIGN");
 	} finally {
 		await deauthorized.close();
 	}
@@ -336,6 +402,4 @@ export async function proveD110c0c1f5ForeignAuthorCloseLivenessRequired(): Promi
 		SNAPSHOT_NOT_ACTIVE,
 		"D110C_0C1F5_CURRENTLY_UNAUTHORIZED_FOREIGN"
 	);
-
-	throw new TypeError(D110C_0C1F5_FOREIGN_AUTHOR_CLOSE_LIVENESS_REQUIRED);
 }

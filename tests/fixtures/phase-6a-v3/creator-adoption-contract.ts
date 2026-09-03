@@ -1126,7 +1126,6 @@ export async function openGenuineCreatorAdoptionFixture(
 		onAdmittedVertex,
 	});
 	if (!activation.ok) throw new TypeError(`D.108b fixture activation failed: ${activation.kind}`);
-	Reflect.set(networkNode, "gossipTopicFor", (message: Message) => message.objectId);
 	const routeRegisteredVertex = async (
 		vertex: ReturnType<GenuinePreparedV3Fixture["createRegisteredVertex"]>,
 		transportSender = "d110c-fixture-peer"
@@ -1139,7 +1138,9 @@ export async function openGenuineCreatorAdoptionFixture(
 			resolveAdmission = resolvePromise;
 		});
 		admittedVertexWaiters.set(digest, () => resolveAdmission?.());
+		const gossipTopicFor = networkNode.gossipTopicFor;
 		try {
+			Reflect.set(networkNode, "gossipTopicFor", (message: Message) => message.objectId);
 			const claimed = routeV3Ingress(
 				networkNode,
 				Message.create({
@@ -1163,6 +1164,7 @@ export async function openGenuineCreatorAdoptionFixture(
 				}),
 			]);
 		} finally {
+			Reflect.set(networkNode, "gossipTopicFor", gossipTopicFor);
 			admittedVertexWaiters.delete(digest);
 			if (admissionTimer !== undefined) clearTimeout(admissionTimer);
 		}
