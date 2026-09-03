@@ -98035,10 +98035,10 @@ not independently rederived by the transition closure.
 
 ###### D.110c-0c1f5a foreign-author close-liveness prerequisite
 
-**Status: one authorized focused execution from signed anchor `eeaaaca8` was a
-useful but noncausal diagnostic; the corrected tests-only RED requires the one
-material plan confirmation below, and no production edit is authorized before
-that corrected RED is causal, recorded, signed, and pushed.** Owner:
+**Status: the first execution from `eeaaaca8` remains a noncausal diagnostic;
+the corrected tests-only RED from signed/pushed anchor `466169aa` is causal and
+complete. Production GREEN is authorized only after the signed/pushed RED
+checkpoint containing this record.** Owner:
 `packages/node/src/creator-close.ts::authorIssuanceFrontiersCandidate()` at the
 construction of `byAuthor`, duplicate detection, prior/null boundary checks,
 regression checks, and per-author frontier advancement; the exact captured
@@ -98163,6 +98163,19 @@ aggregate bytes/digest plus verified adoption. The pre-existing divergent
 private `captureCloseGraph()` declarations remain a named f5a-GREEN follow-up
 and are not widened into this tests-only checkpoint. Complete review artifacts
 are under `.logs/d110c-0c1f5a-plan-confirmation-052eaa21/`.
+
+The single corrected focused RED then ran exactly once from signed/pushed
+anchor `466169aaf7c74b0c08b14e8c5f00b20f8710bfb8`, tree
+`a7a33f9a7e590fc0393ae998af1f24cd0182e26f`. The runner exited `1` with exactly
+one selected test result/title, zero passes, one intended failure, zero
+pending/todo, and the sole complete error
+`D110C_0C1F5_FOREIGN_AUTHOR_CLOSE_LIVENESS_REQUIRED`. Its validator proves the
+terminal contains no noncausal, unexpected-success, admission-timeout, or
+setup token. The complete reporter JSON SHA-256 is
+`d1456017748e33e7215118e2722465248a6e5481066780596a143775774abdfc`;
+the fresh immutable evidence root is `.logs/d110c-0c1f5a-red-466169aa/`.
+This RED is not rerun and receives no separate model review; the final GREEN
+review must inspect its causality.
 
 GREEN changes only the close-side per-author classification. It must make all
 foreign treatments close successfully, keep the affected frontier unchanged or
