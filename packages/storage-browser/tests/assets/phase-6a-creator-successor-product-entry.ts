@@ -155,6 +155,8 @@ interface LifetimeInstrumentation {
 	acceptedVertex(): Promise<void>;
 	cleanupReplacements(): Promise<void>;
 	d110cColdReopenCount(): number;
+	d110c0c1SetPhase(phase: string | null): void;
+	d110c0c1TraceSnapshot(): readonly PlainRecord[];
 	d110c0cRecoverySnapshot(): Readonly<{
 		readonly callCount: number;
 		readonly resultKind: string | null;
@@ -253,6 +255,7 @@ declare global {
 			closeDirectCreator(name: string): Promise<void>;
 			create(input: unknown): Promise<string>;
 			deleteDatabases(prefix: string): Promise<readonly string[]>;
+			d110c0c1Differential(name: string): Promise<PlainRecord>;
 			d110c0cRecover(name: string): Promise<PlainRecord>;
 			d110c0cStage(name: string, ordering: "new-ahe" | "old-ahe"): Promise<PlainRecord>;
 			d110cBSnapshot(): Readonly<{
@@ -1577,6 +1580,129 @@ async function d110c0cRoomSnapshot(room: DirectRoomSession): Promise<PlainRecord
 	});
 }
 
+async function d110c0c1IssuanceRows(databaseName: string): Promise<readonly PlainRecord[]> {
+	const database = await dumpDatabase(`${databaseName}--drp-issuance-v1`);
+	const issued = database.stores.find(({ name }) => name === "issuedRecords")?.rows.map(exactRecord) ?? [];
+	const outbox = database.stores.find(({ name }) => name === "issuanceOutbox")?.rows.map(exactRecord) ?? [];
+	if (issued.length !== outbox.length) throw new TypeError("D110C_0C1_ISSUANCE_PAIR_COUNT_INVALID");
+	return Object.freeze(
+		issued
+			.map((row) => {
+				const authorSequence = Number(row.authorSequence);
+				const paired = outbox.filter(
+					(candidate) =>
+						candidate.objectId === row.objectId &&
+						candidate.author === row.author &&
+						candidate.authorSequence === authorSequence
+				);
+				if (
+					paired.length !== 1 ||
+					!(row.canonicalPreimageBytes instanceof Uint8Array) ||
+					!(row.digest instanceof Uint8Array) ||
+					!(paired[0]?.digest instanceof Uint8Array) ||
+					hex(row.digest) !== hex(paired[0].digest)
+				) {
+					throw new TypeError("D110C_0C1_ISSUANCE_PAIR_INVALID");
+				}
+				const vertex = exactRecord(decodeCanonical(row.canonicalPreimageBytes));
+				return Object.freeze({
+					anchor: vertex.anchor,
+					author: row.author,
+					authorSequence,
+					digest: hex(row.digest),
+					epoch: vertex.epoch,
+					objectId: row.objectId,
+					preimageHex: hex(row.canonicalPreimageBytes),
+					publishState: paired[0].publishState,
+				});
+			})
+			.sort((left, right) => Number(left.authorSequence) - Number(right.authorSequence))
+	);
+}
+
+async function d110c0c1Case(name: string, kind: "control" | "treatment"): Promise<PlainRecord> {
+	const databaseName = `d108e3-direct-${name}`;
+	const roomHeadAuthority = d110cRoomHeadAuthority(name, Object.freeze({ kind: "create" }));
+	instrumentation().configure({});
+	instrumentation().d110c0c1SetPhase("prefix-0-to-1");
+	let room = await createDirectRoom(name, { roomHeadAuthority });
+	directRooms.set(name, room);
+	const issue = (identity: string, text: string): Promise<void> =>
+		room.issue(Object.freeze({ action: "message", clientOperationId: identity, text }));
+	try {
+		await issue("d110c-0c1-epoch-zero", "d110c-0c1-epoch-zero");
+		await room.sealEpoch();
+		await room.adoptCreatorSuccessor();
+		instrumentation().d110c0c1SetPhase("prefix-1-to-2");
+		await issue("d110c-0c1-epoch-one", "d110c-0c1-epoch-one");
+		await room.sealEpoch();
+		await room.adoptCreatorSuccessor();
+		const prefixRows = await d110c0c1IssuanceRows(databaseName);
+		if (kind === "control") {
+			const declaration = await rawSnapshotDeclarationAtEpoch(databaseName, 1);
+			instrumentation().d110c0c1SetPhase("control-cold-reopen-epoch-2");
+			await closeDirectForReopen(name);
+			room = await createDirectRoom(name, {
+				roomHeadAuthority: d110cRoomHeadAuthority(name, Object.freeze({ kind: "reopen" })),
+				successorSnapshotDeclaration: declaration,
+				withCreatorSigner: false,
+			});
+			directRooms.set(name, room);
+			const reopened = await d110c0cRoomSnapshot(room);
+			await issue("d110c-0c1-control-after-reopen", "d110c-0c1-control-after-reopen");
+			return Object.freeze({
+				kind,
+				prefixRows,
+				reopened,
+				trace: instrumentation().d110c0c1TraceSnapshot(),
+			});
+		}
+
+		instrumentation().d110c0c1SetPhase("hot-adoption-2-to-3");
+		await issue("d110c-0c1-epoch-two", "d110c-0c1-epoch-two");
+		const close = normalize(await room.sealEpoch());
+		await room.adoptCreatorSuccessor();
+		const hot = await d110c0cRoomSnapshot(room);
+		const treatmentRows = await d110c0c1IssuanceRows(databaseName);
+		const declaration = await rawSnapshotDeclarationAtEpoch(databaseName, 2);
+		instrumentation().d110c0c1SetPhase("treatment-cold-reopen-epoch-3");
+		await closeDirectForReopen(name);
+		let detail = "fulfilled";
+		let reopened: PlainRecord | null = null;
+		try {
+			room = await createDirectRoom(name, {
+				roomHeadAuthority: d110cRoomHeadAuthority(name, Object.freeze({ kind: "reopen" })),
+				successorSnapshotDeclaration: declaration,
+				withCreatorSigner: false,
+			});
+			directRooms.set(name, room);
+			reopened = await d110c0cRoomSnapshot(room);
+			await issue("d110c-0c1-treatment-after-reopen", "d110c-0c1-treatment-after-reopen");
+		} catch (error) {
+			detail = directFailureDetail(error);
+		}
+		return Object.freeze({
+			close,
+			detail,
+			hot,
+			kind,
+			prefixRows,
+			reopened,
+			trace: instrumentation().d110c0c1TraceSnapshot(),
+			treatmentRows,
+		});
+	} finally {
+		instrumentation().d110c0c1SetPhase(null);
+		await discardDirectRoom(name);
+	}
+}
+
+async function d110c0c1Differential(name: string): Promise<PlainRecord> {
+	const control = await d110c0c1Case(name, "control");
+	const treatment = await d110c0c1Case(name, "treatment");
+	return Object.freeze({ control, treatment });
+}
+
 async function d110c0cStage(name: string, ordering: "new-ahe" | "old-ahe"): Promise<PlainRecord> {
 	const databaseName = `d108e3-direct-${name}`;
 	const roomHeadAuthority = d110cRoomHeadAuthority(name, Object.freeze({ kind: "create" }));
@@ -2015,6 +2141,9 @@ const api = Object.freeze({
 			.sort();
 		for (const name of names) await deleteDatabase(name);
 		return Object.freeze(names);
+	},
+	d110c0c1Differential(name: string): Promise<PlainRecord> {
+		return d110c0c1Differential(name);
 	},
 	d110c0cRecover(name: string): Promise<PlainRecord> {
 		return d110c0cRecover(name);

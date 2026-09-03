@@ -95844,6 +95844,24 @@ the absence of RED, campaign, Fable, collaboration-subagent, or second-review
 execution. The plan gate therefore closes under the governing
 at-most-one-confirmation rule; the next operation is the tests-only causal RED.
 
+The first exact one-test/one-file runner attempt from signed/pushed plan anchor
+`62629d123a053cce41a734b6d552a00a73245984` did not execute that causal RED.
+Esbuild rejected the test-only instrumentation plugin's `/v3-live\.ts$/u`
+filter because plugin filters use Go regular-expression syntax and do not
+accept JavaScript's Unicode flag. Playwright exited `1` with
+expected/skipped/unexpected/flaky `0/0/1/0`, zero top-level errors, and result
+duration `0` ms; the browser server, room lifecycle, workload, and test body
+never started. It is preserved honestly as `NON_CAUSAL_HARNESS_FAILURE` under
+`.logs/d110c-0c1-red-62629d12/`; its five-entry self-excluding manifest
+SHA-256 is
+`e9360aef5ee4c665272334ca878a3e4e97565960f1cb32d39f85432566b54761`.
+The sole correction removes only the unsupported regex flag and adds a direct
+plugin-registration smoke gate. Because no product path or assertion was
+entered, one fresh-name focused invocation remains the single causal RED
+execution. This mechanical tests-only correction changes no plan acceptance,
+product source, workload, threshold, dependency, or lifecycle and does not
+trigger another model review.
+
 The expressly authorized one-off `claude-fable-5-1`/high course review ended
 normally in session `3de42449-c135-4bf2-a060-de4782bce954` with zero subagents
 and verdict `RESLICE_REQUIRED`. It independently confirmed that the held

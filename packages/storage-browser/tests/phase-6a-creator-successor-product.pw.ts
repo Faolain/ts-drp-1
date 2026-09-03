@@ -1,10 +1,10 @@
 import { type BrowserContext, expect, type Page, test } from "@playwright/test";
 import { build, type Plugin } from "esbuild";
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { captureProcessForest, processClosure } from "./fixtures/process-forest.js";
@@ -74,6 +74,9 @@ function createState() {
     d110c0cRecoveryCallCount: 0,
     d110c0cRecoveryResultKind: null,
     d110c0cRecoverySwapHeadCount: 0,
+    d110c0c1Owner: null,
+    d110c0c1Phase: null,
+    d110c0c1Trace: [],
     failBeforePublication: false,
     injectActivationFailure: false,
     independentVerificationCount: 0,
@@ -132,6 +135,9 @@ function createState() {
     state.d110c0cRecoveryCallCount = 0;
     state.d110c0cRecoveryResultKind = null;
     state.d110c0cRecoverySwapHeadCount = 0;
+    state.d110c0c1Owner = null;
+    state.d110c0c1Phase = null;
+    state.d110c0c1Trace = [];
     state.failBeforePublication = input.failBeforePublication === true;
     state.injectActivationFailure = input.injectActivationFailure === true;
     state.independentVerificationCount = 0;
@@ -214,6 +220,16 @@ function createState() {
         resultKind: state.d110c0cRecoveryResultKind,
         swapHeadCount: state.d110c0cRecoverySwapHeadCount,
       }),
+      d110c0c1Record: (input) => {
+        state.d110c0c1Trace.push(Object.freeze({
+          ...input,
+          owner: state.d110c0c1Owner,
+          phase: state.d110c0c1Phase,
+        }));
+      },
+      d110c0c1SetOwner: (owner) => { state.d110c0c1Owner = owner; },
+      d110c0c1SetPhase: (phase) => { state.d110c0c1Phase = phase; },
+      d110c0c1TraceSnapshot: () => Object.freeze(state.d110c0c1Trace.map((entry) => Object.freeze({ ...entry }))),
       d108e5Snapshot: () => Object.freeze({
         redirectRecoveryCount: state.redirectRecoveryCount,
         verificationCount: state.d108e5VerificationCount,
@@ -393,6 +409,45 @@ const instrumentPlane = (plane, kind, ownerPlaneId) => {
 	return {
 		name: "d108e2b-lifetime-instrumentation",
 		setup(context): void {
+			context.onLoad({ filter: /v3-live\.ts$/ }, ({ path }) => {
+				if (resolve(path) !== v3Live) return undefined;
+				let contents = readFileSync(path, "utf8");
+				const replaceOnce = (needle: string, replacement: string): void => {
+					const first = contents.indexOf(needle);
+					if (first < 0 || contents.indexOf(needle, first + needle.length) >= 0) {
+						throw new TypeError(`D110C_0C1_INSTRUMENTATION_SEAM_INVALID:${needle}`);
+					}
+					contents = `${contents.slice(0, first)}${replacement}${contents.slice(first + needle.length)}`;
+				};
+				const helper = `
+function d110c0c1TestInstrumentation() {
+  return globalThis.__d108e2bLifetimeInstrumentation;
+}
+
+`;
+				replaceOnce("function creatorFilteredIssuanceStore(", `${helper}function creatorFilteredIssuanceStore(`);
+				replaceOnce(
+					"\t\tconst validatedPredecessor = await recoverV3LiveReplica({",
+					'\t\td110c0c1TestInstrumentation()?.d110c0c1SetOwner("predecessor-validation");\n\t\tconst validatedPredecessor = await recoverV3LiveReplica({'
+				);
+				replaceOnce(
+					"\t\t});\n\t\tif (!validatedPredecessor.ok) {",
+					"\t\t});\n\t\td110c0c1TestInstrumentation()?.d110c0c1SetOwner(null);\n\t\tif (!validatedPredecessor.ok) {"
+				);
+				replaceOnce(
+					"\t\tconst recovered = await recoverV3LiveReplica({",
+					'\t\td110c0c1TestInstrumentation()?.d110c0c1SetOwner("successor-recovery");\n\t\tconst recovered = await recoverV3LiveReplica({'
+				);
+				replaceOnce(
+					'\t\tif (!recovered.ok) return rejected("recovery-rejected", `creator successor recovery failed: ${recovered.kind}`);',
+					'\t\td110c0c1TestInstrumentation()?.d110c0c1SetOwner(null);\n\t\tif (!recovered.ok) return rejected("recovery-rejected", `creator successor recovery failed: ${recovered.kind}`);'
+				);
+				replaceOnce(
+					'\t\t\t} catch {\n\t\t\t\treturn recoveryFailure("admission-rejected", "v3 recovery admission failed");\n\t\t\t}\n\t\t\tif (classified?.kind === "displaced") {',
+					'\t\t\t} catch {\n\t\t\t\treturn recoveryFailure("admission-rejected", "v3 recovery admission failed");\n\t\t\t}\n\t\t\td110c0c1TestInstrumentation()?.d110c0c1Record(ObjectFreeze({\n\t\t\t\tauthorSequence: row.authorSequence,\n\t\t\t\tclassification: classified?.kind ?? "rejected",\n\t\t\t\tdigest: lowerHexDigest(row.digest),\n\t\t\t\tpayloadEpoch: payload.provenance.epoch,\n\t\t\t}));\n\t\t\tif (classified?.kind === "displaced") {'
+				);
+				return { contents, loader: "ts", resolveDir: dirname(path) };
+			});
 			const modules = new Map<string, string>([
 				[
 					"@ts-drp/node/v3-live",
@@ -2333,6 +2388,89 @@ function d110c0cArray(value: unknown): readonly unknown[] {
 	if (!Array.isArray(value)) throw new TypeError("D110C_0C fixture array is invalid");
 	return value;
 }
+
+test("D.110c-0c1 cold reopens a genuine hot epoch-3 successor with authenticated historical issuance", async ({
+	browser,
+}, testInfo) => {
+	const server = await startProductBrowserServer(
+		new URL("./assets/phase-6a-creator-successor-product-entry.ts", import.meta.url).pathname
+	);
+	const isolatedContext = await browser.newContext();
+	const page = await isolatedContext.newPage();
+	try {
+		await openRealm(page, server.origin, "d110c-0c1", () => [page]);
+		const evidence = d110c0cRecord(
+			await page.evaluate(() => window.phase6aCreatorSuccessorProduct.d110c0c1Differential("same-room"))
+		);
+		const control = d110c0cRecord(evidence.control);
+		const treatment = d110c0cRecord(evidence.treatment);
+		const controlRows = d110c0cArray(control.prefixRows).map(d110c0cRecord);
+		const treatmentPrefixRows = d110c0cArray(treatment.prefixRows).map(d110c0cRecord);
+		const treatmentRows = d110c0cArray(treatment.treatmentRows).map(d110c0cRecord);
+		expect(
+			controlRows.map(({ authorSequence, epoch, publishState }) => ({ authorSequence, epoch, publishState }))
+		).toEqual([
+			{ authorSequence: 0, epoch: 0, publishState: "published" },
+			{ authorSequence: 1, epoch: 1, publishState: "published" },
+		]);
+		expect(treatmentPrefixRows).toEqual(controlRows);
+		expect(
+			treatmentRows.map(({ authorSequence, epoch, publishState }) => ({ authorSequence, epoch, publishState }))
+		).toEqual([
+			{ authorSequence: 0, epoch: 0, publishState: "published" },
+			{ authorSequence: 1, epoch: 1, publishState: "published" },
+			{ authorSequence: 2, epoch: 2, publishState: "published" },
+		]);
+		expect(treatmentRows[1]).toEqual(controlRows[1]);
+		expect(d110c0cRecord(control.reopened).authority).toMatchObject({ epoch: 2, lifecycle: "active" });
+		expect(treatment.close).toMatchObject({ epoch: 2, successorEpoch: 3 });
+		expect(d110c0cRecord(treatment.hot).authority).toMatchObject({ epoch: 3, lifecycle: "active" });
+
+		const controlTrace = d110c0cArray(control.trace).map(d110c0cRecord);
+		const treatmentTrace = d110c0cArray(treatment.trace).map(d110c0cRecord);
+		expect(controlTrace).toContainEqual(
+			expect.objectContaining({
+				authorSequence: 1,
+				classification: "current",
+				owner: "predecessor-validation",
+				phase: "control-cold-reopen-epoch-2",
+			})
+		);
+		expect(treatmentTrace).toContainEqual(
+			expect.objectContaining({
+				authorSequence: 2,
+				classification: "displaced",
+				owner: "successor-recovery",
+				phase: "hot-adoption-2-to-3",
+			})
+		);
+		const coldTrace = treatmentTrace.filter(({ phase }) => phase === "treatment-cold-reopen-epoch-3");
+		expect(coldTrace).toContainEqual(
+			expect.objectContaining({
+				authorSequence: 1,
+				classification: "rejected",
+				owner: "predecessor-validation",
+				payloadEpoch: 2,
+			})
+		);
+		expect(coldTrace.some(({ authorSequence }) => authorSequence === 2)).toBe(false);
+		expect(treatment.reopened).toBeNull();
+		expect(treatment.detail).toBe(
+			"v3 room successor reopen failed: recovery-rejected: creator predecessor recovery failed: admission-rejected"
+		);
+		await testInfo.attach("d110c-0c1-causal-red", {
+			body: Buffer.from(JSON.stringify(evidence)),
+			contentType: "application/json",
+		});
+		throw new TypeError("D110C_0C1_INTERMEDIATE_ISSUANCE_RECOVERY_REQUIRED");
+	} finally {
+		await page
+			.evaluate(() => window.phase6aCreatorSuccessorProduct.closeDirectCreator("same-room"))
+			.catch(() => undefined);
+		await isolatedContext.close();
+		await server.close();
+	}
+});
 
 function d110c0cKillGroup(pid: number): void {
 	try {
