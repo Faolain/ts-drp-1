@@ -1,0 +1,7 @@
+{
+  "classification": "TERMINAL_SCHEMA_AFTER_EXACT_SESSION_REEMIT",
+  "exit_code": 0,
+  "reemit_exit_code": 0,
+  "session_id": "01a06562-a0eb-7593-a74b-756454b90574",
+  "stop_reason": "end_turn"
+}

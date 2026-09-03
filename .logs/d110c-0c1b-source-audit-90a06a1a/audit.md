@@ -6,8 +6,8 @@ Audit anchor: signed/pushed commit
 
 ## Demonstrated defect
 
-`packages/node/src/v3-live.ts::issueOneVertex()` returns from
-`issuer.issue()` normally returns only after
+`packages/node/src/v3-live.ts::issueOneVertex()` normally returns from
+`issuer.issue()` only after
 `DurableIssuanceStore.transactIssue()` has committed the exact issued record
 and pending outbox row. All failures from `committedFailure()` therefore occur
 after durable issuance. There is also one pre-return ambiguous arm: both real

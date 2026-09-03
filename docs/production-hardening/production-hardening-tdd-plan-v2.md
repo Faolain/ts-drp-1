@@ -96203,10 +96203,9 @@ is under `.logs/d110c-0c1a-review-confirmation-7414fa6b/`; its validating
 
 ###### D.110c-0c1b committed-issuance outcome reconciliation prerequisite
 
-**Status: bounded source/architecture audit complete at signed/pushed anchor
-`90a06a1aae79d408a1c2c6b014dae1a99daf866d`; initial plan review completed with
-the material corrections below applied in one batch, one confirmation is due,
-and no production edit has begun.** Owner: the
+**Status: bounded source/architecture audit and the one material plan
+confirmation are complete with an empty P0/P1 union; the frozen tests-only RED
+is next and no production edit has begun.** Owner: the
 post-`transactIssue()` outcome window in
 `packages/node/src/v3-live.ts::issueOneVertex()`, live-journal append, graph
 admission, restart recovery of pending issuance/outbox rows, and the close-time
@@ -96266,7 +96265,7 @@ is under `.logs/d110c-0c1b-source-audit-90a06a1a/`. If implementation discovers
 that any frozen assumption is false or requires the rejected schema/API/wire/
 dependency/authority changes, stop and reslice that exact prerequisite.
 The audit root's validating three-entry self-excluding manifest SHA-256 is
-`08d278438087bbef20d61e5d058c02f02b89b84c33d02a7ad4f4e6212ca26b7b`.
+`c7fe1259d74a37613497a493e41bfd143a2af7b9e90690e9c862dcfcabac9fc3`.
 
 Tests-only RED must use the real product issue path and real store
 implementations. First admit sequence 0 so the retirement boundary has a real
@@ -96294,8 +96293,11 @@ bind attempted after the failure returns existing `CREATOR_CLOSE_UNAVAILABLE`
 without claiming close authority. Neither refusal may change durable head,
 snapshot, graph, application state, or the surviving row. Creator-close's
 existing abort path clears `blueprintClosing` after the queued-fold refusal,
-while `operationAdmissionHalted` remains set; another local issue and another
-close bind still refuse until deactivation/recovery. A second issue must reject
+while `operationAdmissionHalted` remains set; another local issue refuses until
+deactivation/recovery. On the pre-bound plane, rebinding returns the cached
+handle and another `close()` must again fail through exact
+`creator snapshot export failed: not-active`; on a never-bound plane, bind
+after failure returns `CREATOR_CLOSE_UNAVAILABLE`. A second issue must reject
 without another issuance transaction. Deactivate and recover the same epoch;
 the existing product recovery path must authenticate and admit the exact row
 once, restore exact application and operation-policy state, and then complete
@@ -96307,8 +96309,10 @@ operation count.
 
 The focused matrix covers failure before journal write, journal write then
 thrown outcome, graph append failure, operation-policy commit failure, exact
-non-terminal `ISSUANCE_OUTCOME_UNKNOWN` after durable commit with no operation
-policy, close racing the failure, bind after failure, repeated recovery,
+non-terminal `ISSUANCE_OUTCOME_UNKNOWN` after a genuine durable commit with no
+operation policy (using the real terminal-suppression arm or an adapter that
+throws the real unknown-outcome error only after delegating the real commit),
+close racing the failure, bind after failure, repeated recovery,
 substituted issued/outbox row, stale epoch/anchor, invalid dependency/ACL,
 capacity, and terminal classification. Reusing the halt conservatively refuses
 new local and received admission after uncertain local issuance and permits a
@@ -96336,7 +96340,20 @@ validating 20-entry self-excluding manifest SHA-256 is
 `7c3592e1edb59992740be65d7565cf3105f80c0e9b188ec51f2f160fa227e88c`.
 Because the P1 correction changes executable fault coverage, the corrected
 signed/pushed plan receives exactly one material Grok/Kimi/Opus confirmation.
-No production edit or RED execution precedes its empty blocking union.
+No production edit or RED execution precedes its empty blocking union. That
+confirmation reviewed signed/pushed commit
+`56cdba29056d493dd95a98a80cb0f5e3c77260c5`: Grok 4.6/high, direct Kimi K3
+with the exact 100-step control, and Opus xhigh each returned `APPROVED` with
+P0=0/P1=0. Grok's first terminal JSON followed progress prose, so the exact
+session re-emitted the semantically identical schema-only object; it was not
+canceled or relaunched. The P2 dispositions pin same-handle close retry, a
+genuine post-commit unknown-outcome fault, the never-bound bind distinction,
+and clean-tree custody for the ignored empty stderr artifact. The complete
+confirmation evidence is under
+`.logs/d110c-0c1b-plan-confirmation-56cdba29/`; its validating 24-entry
+self-excluding manifest SHA-256 is
+`068597a0d30ceafd6ceaf464d17b6f083e2efec3cf3fc35c8dd3d99856af0e50`.
+The plan gate is closed; proceed directly to tests-only RED.
 
 The complete confirmation evidence is retained under
 `.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry
