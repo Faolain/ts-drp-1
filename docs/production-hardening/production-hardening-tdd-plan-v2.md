@@ -95880,8 +95880,9 @@ the genuine product-path acceptance.
 
 ###### D.110c-0c1c stable adopted-successor cold-reopen prerequisite
 
-**Status: blocking source/architecture audit complete; plan review required
-before production RED/GREEN.** Owner:
+**Status: blocking source/architecture audit and governing plan review complete;
+blocking union empty; the preserved tests-only RED is accepted and the
+one-predicate GREEN is next.** Owner:
 `examples/v3-room/src/index.ts::createV3RoomSessionOwned()` at the early
 stable-room-head/successor-snapshot admission predicate, plus the focused
 browser control and existing room-head/reopen mutants. Deadline: GREEN before
@@ -95894,10 +95895,15 @@ supplies a successor snapshot declaration, the opener currently accepts only
 `stable.epoch === 1`; a genuine stable epoch 2 is rejected as
 `D110C_FLOOR_MISMATCH` before `reopenCreatorSuccessorAdoption()` runs. The
 bounded audit confirms that the downstream recovery path already authenticates
-the generalized case: room-head scope binds object and pinned genesis; the AHE
-lineage must contain exact adjacent predecessor/successor generations;
-non-genesis recovery uses `openCreatorCheckpointTrust()` to bind the expected
-current head, predecessor trust, Cut, commit QC, and pinned genesis; snapshot
+the generalized case: room-head scope binds object and the caller-held pinned
+genesis digest; the AHE lineage must contain exact adjacent
+predecessor/successor generations; non-genesis recovery uses
+`openCreatorCheckpointTrust()` to bind the expected current head, predecessor
+trust, Cut, commit QC, and creator-trusted genesis scope. For epoch N at least
+2, that checkpoint roots its immediate predecessor by the genesis creator
+signature and declared genesis digest, not by walking an anchor chain back to
+genesis. Exact AHE adjacency, snapshot, ACL, expected-head, possession, and
+issuance-lineage checks therefore carry branch uniqueness. Snapshot
 manifest/payload/state, successor projection, ACL, parameters, author
 possession, and issuance lineage are verified; and the reconstructed successor
 trust must equal the expected room head before activation.
@@ -95932,11 +95938,17 @@ and without a declaration; lower/higher/different-anchor expected head;
 cross-object or cross-genesis floor; wrong snapshot object, epoch, anchor,
 manifest, payload, or state; stale, malformed, missing, reordered, or
 non-adjacent AHE lineage; invalid Cut/QC/checkpoint/ACL; and author possession
-or issuance-lineage failure. None may activate, publish, mutate the floor, or
-change its existing error class. Retained gates include D.110c-0b1 cold reopen,
-D.110c-b hot 0→1→2, D.110c-0c pending recovery, the Phase-6a creator reopen,
-room-head matrices, snapshot verification, rollback, availability, and exact
-owner build/typecheck/lint/format/diff checks.
+or issuance-lineage failure. Every declaration-bearing mutant runs against a
+genuine stable epoch at least 2. Invalid stable-epoch-N declarations must
+surface the existing exact wrapped downstream kind/detail; the bare room-head
+codes remain exact only for epoch 0, no-declaration, pending, and malformed
+rows that still stop at the room-head owner. None may activate, publish, or
+mutate the floor. The focused bundle reuses the existing cold-reopen-count
+instrumentation pattern to prove that the genuine downstream successor reopen
+runs exactly once. Retained gates include D.110c-0b1 cold reopen, D.110c-b hot
+0→1→2, D.110c-0c pending recovery, the Phase-6a creator reopen, room-head
+matrices, snapshot verification, rollback, availability, and exact owner
+build/typecheck/lint/format/diff checks.
 
 This is a high-risk production-lifecycle compatibility change even though the
 code seam is narrow. Sign/push this bounded plan and run one governing Grok
@@ -95950,6 +95962,25 @@ The bounded source audit is
 `.logs/d110c-0c1c-source-audit-aad02bd2/`; its two-entry self-excluding
 manifest validates with SHA-256
 `b021c40ccdb3d74cffcb73f89f8fad9d75d3e31f9955c7609120b7bcc990d858`.
+
+The one governing plan review of signed/pushed commit
+`aee6c0158a237ffd5f25a09d8ec1666850871d9d`, tree
+`845d005265dd599ba414fc981392ac4d321a8d1a`, completed normally. Grok
+4.6/high, direct Kimi K3 with the 100-step bound, and Opus xhigh each returned
+`APPROVED`, P0/P1/P2 `0/0/2`; the blocking union is empty. The six P2s are
+disposed above by keeping the repair general to every safe positive epoch,
+requiring the later D.110c-0c1 run to reach its distinct historical-row
+failure, pinning declaration-bearing mutants to stable epoch at least 2,
+naming the exactly-once test observation, distinguishing downstream wrapped
+errors from preserved bare room-head codes, and qualifying the creator-trusted
+genesis-rooting proof. These corrections change neither executable scope nor
+causal acceptance, so they do not trigger confirmation. The direct Kimi
+review followed two local pre-model CLI diagnostics: `--auto` could not be
+combined with `--prompt`, and the legacy agent YAML lacked current frontmatter;
+neither started or consumed a review. Complete raw and normalized evidence is
+`.logs/d110c-0c1c-plan-review-aee6c015/`; its thirteen-entry self-excluding
+manifest validates with SHA-256
+`a466da84769afe10148a68e95693db9f3586743816e0e95189750716cc9baf85`.
 
 The expressly authorized one-off `claude-fable-5-1`/high course review ended
 normally in session `3de42449-c135-4bf2-a060-de4782bce954` with zero subagents
