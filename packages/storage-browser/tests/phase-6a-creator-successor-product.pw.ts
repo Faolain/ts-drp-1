@@ -941,6 +941,64 @@ test("pins the exact successor product browser inventory", () => {
 	]);
 });
 
+test("D.110c-0c1e same-author first-successor cold reopen preserves successor-era issuance", async ({
+	browser,
+}, testInfo) => {
+	const server = await startProductBrowserServer(
+		new URL("./assets/phase-6a-creator-successor-product-entry.ts", import.meta.url).pathname
+	);
+	const isolatedContext = await browser.newContext();
+	const page = await isolatedContext.newPage();
+	try {
+		await openRealm(page, server.origin, "d110c-0c1e-control", () => [page]);
+		const evidence = d110c0cRecord(
+			await page.evaluate(() =>
+				window.phase6aCreatorSuccessorProduct.d110c0c1eSameAuthorControl("same-author-first-successor")
+			)
+		);
+		await testInfo.attach("d110c-0c1e-same-author-control", {
+			body: Buffer.from(JSON.stringify(evidence)),
+			contentType: "application/json",
+		});
+		const before = d110c0cArray(evidence.before).map(d110c0cRecord);
+		const after = d110c0cArray(evidence.after).map(d110c0cRecord);
+		expect(d110c0cRecord(evidence.reopened).authority).toEqual(d110c0cRecord(evidence.hot).authority);
+		expect(d110c0cRecord(evidence.reopened).authority).toMatchObject({ epoch: 1, lifecycle: "active" });
+		expect(before.map(({ authorSequence, epoch, publishState }) => ({ authorSequence, epoch, publishState }))).toEqual([
+			{ authorSequence: 0, epoch: 0, publishState: "published" },
+			{ authorSequence: 1, epoch: 0, publishState: "published" },
+			{ authorSequence: 2, epoch: 1, publishState: "published" },
+		]);
+		expect(after.map(({ authorSequence, epoch, publishState }) => ({ authorSequence, epoch, publishState }))).toEqual([
+			...before.map(({ authorSequence, epoch, publishState }) => ({ authorSequence, epoch, publishState })),
+			{ authorSequence: 3, epoch: 1, publishState: "published" },
+		]);
+		expect(after[2]).toEqual(before[2]);
+		const trace = d110c0cArray(evidence.trace).map(d110c0cRecord);
+		expect(
+			trace.filter(
+				({ authorSequence, classification, owner, payloadEpoch }) =>
+					authorSequence === 2 &&
+					classification === "filtered-current" &&
+					owner === "predecessor-validation" &&
+					payloadEpoch === 1
+			)
+		).toHaveLength(1);
+		expect(
+			trace.filter(
+				({ authorSequence, classification, owner, payloadEpoch }) =>
+					authorSequence === 2 && classification === "current" && owner === "successor-recovery" && payloadEpoch === 1
+			)
+		).toHaveLength(1);
+	} finally {
+		await page
+			.evaluate(() => window.phase6aCreatorSuccessorProduct.closeDirectCreator("same-author-first-successor"))
+			.catch(() => undefined);
+		await isolatedContext.close();
+		await server.close();
+	}
+});
+
 test(D108D2_BROWSER_BEHAVIORS[0], async () => {
 	if (creator === undefined || established === undefined) throw new TypeError("D.108d2 browser realms are absent");
 	invite = await creator.evaluate((input) => window.phase6aCreatorSuccessorProduct.create(input), {
@@ -974,7 +1032,7 @@ test(D108D2_BROWSER_BEHAVIORS[0], async () => {
 	await waitForText(creator, "successor-hot");
 });
 
-test(D108D2_BROWSER_BEHAVIORS[1], async () => {
+test(D108D2_BROWSER_BEHAVIORS[1], async (_fixtures, testInfo) => {
 	if (creator === undefined || established === undefined || carrier === undefined) {
 		throw new TypeError("D.108d2 established-peer state is absent");
 	}
@@ -983,18 +1041,37 @@ test(D108D2_BROWSER_BEHAVIORS[1], async () => {
 		({ carrier, source, target }) => window.phase6aCreatorSuccessorProduct.importSuccessor(carrier, source, target),
 		{ carrier, source: DATABASES.creator, target: DATABASES.established }
 	);
-	await established.evaluate((input) => window.phase6aCreatorSuccessorProduct.join(input), {
-		channelName: CHANNEL_NAME,
-		clientId: "bob",
-		databaseName: DATABASES.established,
-		invite,
-		roomHead: {
-			currentAnchorDigest: carrier.authority.anchorDigest,
-			epoch: carrier.authority.epoch,
-			objectId: carrier.authority.objectId,
-		},
-		successorSnapshotDeclaration: carrier.snapshotDeclaration,
-	});
+	try {
+		await established.evaluate((input) => window.phase6aCreatorSuccessorProduct.join(input), {
+			channelName: CHANNEL_NAME,
+			clientId: "bob",
+			databaseName: DATABASES.established,
+			invite,
+			roomHead: {
+				currentAnchorDigest: carrier.authority.anchorDigest,
+				epoch: carrier.authority.epoch,
+				objectId: carrier.authority.objectId,
+			},
+			successorSnapshotDeclaration: carrier.snapshotDeclaration,
+		});
+	} catch (error) {
+		const detail = error instanceof Error ? error.message : String(error);
+		const expected =
+			"page.evaluate: TypeError: v3 room successor reopen failed: preparation-rejected: creator historical issuance authority preparation failed";
+		const [headline] = detail.split("\n", 1);
+		if (headline !== expected) throw error;
+		await testInfo.attach("d110c-0c1e-red-observation", {
+			body: Buffer.from(
+				JSON.stringify({
+					detail,
+					discriminator:
+						"openVerifiedCreatorHistoricalIssuance succeeded against successor trust; creator carrier author differs from local issuance-scope author",
+				})
+			),
+			contentType: "application/json",
+		});
+		throw new TypeError("D110C_0C1E_SCOPE_LOCAL_SCAN_CUSTODY_REQUIRED");
+	}
 	const reopened = await snapshot(established);
 	expect(reopened.authority).toEqual(carrier.authority);
 	expect(reopened.roomId).toBe(carrier.authority.anchorDigest);

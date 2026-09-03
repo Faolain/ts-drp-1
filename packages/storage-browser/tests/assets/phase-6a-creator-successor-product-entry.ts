@@ -257,6 +257,7 @@ declare global {
 			create(input: unknown): Promise<string>;
 			deleteDatabases(prefix: string): Promise<readonly string[]>;
 			d110c0c1Differential(name: string): Promise<PlainRecord>;
+			d110c0c1eSameAuthorControl(name: string): Promise<PlainRecord>;
 			d110c0c1cControl(name: string): Promise<PlainRecord>;
 			d110c0c1cMatrix(name: string): Promise<PlainRecord>;
 			d110c0cRecover(name: string): Promise<PlainRecord>;
@@ -1707,6 +1708,46 @@ async function d110c0c1PendingCase(name: string, authorSequence: 0 | 2): Promise
 	}
 }
 
+async function d110c0c1eSameAuthorControl(name: string): Promise<PlainRecord> {
+	const databaseName = `d108e3-direct-${name}`;
+	instrumentation().configure({});
+	let room = await createDirectRoom(name, {
+		roomHeadAuthority: d110cRoomHeadAuthority(name, Object.freeze({ kind: "create" })),
+	});
+	directRooms.set(name, room);
+	try {
+		await room.issue(
+			Object.freeze({ action: "message", clientOperationId: `${name}-epoch-zero`, text: `${name}-epoch-zero` })
+		);
+		await room.sealEpoch();
+		await room.adoptCreatorSuccessor();
+		await room.issue(
+			Object.freeze({ action: "message", clientOperationId: `${name}-successor-era`, text: `${name}-successor-era` })
+		);
+		const hot = d110c0cColdRoomSnapshot(room);
+		const declaration = await rawSnapshotDeclarationAtEpoch(databaseName, 0);
+		const before = await d110c0c1IssuanceRows(databaseName);
+		await closeDirectForReopen(name);
+		room = await createDirectRoom(name, {
+			roomHeadAuthority: d110cRoomHeadAuthority(name, Object.freeze({ kind: "reopen" })),
+			successorSnapshotDeclaration: declaration,
+			withCreatorSigner: false,
+		});
+		directRooms.set(name, room);
+		const reopened = d110c0cColdRoomSnapshot(room);
+		await room.issue(Object.freeze({ action: "message", clientOperationId: `${name}-after`, text: `${name}-after` }));
+		return Object.freeze({
+			after: await d110c0c1IssuanceRows(databaseName),
+			before,
+			hot,
+			reopened,
+			trace: instrumentation().d110c0c1TraceSnapshot(),
+		});
+	} finally {
+		await discardDirectRoom(name);
+	}
+}
+
 async function d110c0c1Case(name: string, kind: "control" | "treatment"): Promise<PlainRecord> {
 	const databaseName = `d108e3-direct-${name}`;
 	const roomHeadAuthority = d110cRoomHeadAuthority(name, Object.freeze({ kind: "create" }));
@@ -2385,6 +2426,9 @@ const api = Object.freeze({
 	},
 	d110c0c1Differential(name: string): Promise<PlainRecord> {
 		return d110c0c1Differential(name);
+	},
+	d110c0c1eSameAuthorControl(name: string): Promise<PlainRecord> {
+		return d110c0c1eSameAuthorControl(name);
 	},
 	d110c0c1cControl(name: string): Promise<PlainRecord> {
 		return d110c0c1Case(name, "control");

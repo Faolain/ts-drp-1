@@ -96302,9 +96302,9 @@ SHA-256 is
 
 ###### D.110c-0c1e scope-local historical-authority scan-custody prerequisite
 
-**Status: bounded source audit and first plan review complete; the original
-epoch-floor diagnosis is rejected and the material correction below awaits its
-sole confirmation.** Owner: `packages/node/src/v3-live.ts` at
+**Status: bounded source audit, corrected plan, sole material confirmation, and
+causal tests-only RED complete; production GREEN has not begun.** Owner:
+`packages/node/src/v3-live.ts` at
 `activateCreatorSuccessorLive()`, `HistoricalIssuanceContext`,
 `recoverV3LiveReplica()`, `creatorFilteredIssuanceStore()`, and the existing
 registered recovery/publication/rebase scan consumers only. Deadline: GREEN
@@ -96419,6 +96419,57 @@ its 23-entry self-excluding manifest validates with SHA-256
 `4b8b2bcc292265555f8b1ef62bcaccf3b1e779613fe89326c3c76703310efa83`.
 The current Grok/Kimi schema-only normalizations join array-valued evidence
 lines without changing finding substance; they are not repeat reviews.
+
+The sole corrected-plan confirmation inspected signed/pushed `41818d8707b8731e1dc1888cb21808526ea25731`,
+tree `3e76fc12ee7531d3c58f16d7d92599aa10585bb2`. Grok 4.6/high and direct Kimi
+K3/100-step returned `APPROVED` with zero findings; Opus xhigh returned
+`APPROVED`, P0/P1/P2 `0/0/2`. The blocking union is empty. D.110c-0c1d owns
+Opus's nonblocking request to reapply its two exact reviewed room predicates,
+rerun its focused GREEN, and repin the overlay hash before the combined gate.
+The 0c1e GREEN executor owns the other P2: RED records the exact refusal and
+source-derived author discriminator, and must stop if the narrow author-relation
+change does not flip it. Complete confirmation evidence is
+`.logs/d110c-0c1e-plan-confirmation-41818d87/`; its self-excluding manifest
+SHA-256 is
+`a706417ff1d8c1871d2d96a241012aaca96a4ff57004a6de8fc1dc86fe422386`.
+
+The first focused attempt is preserved at
+`.logs/d110c-0c1e-red-41818d87/`. It exposed a faulty control observation: the
+genuine recovery trace and durable rows succeeded, but the assertion looked in
+the synchronous projection and skipped both later serial tests. The second
+attempt at `.logs/d110c-0c1e-red-corrected-41818d87/` passed both controls and
+reached the intended refusal, but an exact whole-message comparison did not
+account for Playwright's appended remote stack lines and therefore rethrew the
+original error. Neither is accepted as causal RED. The corrected diagnostic
+compares only the exact first line and retains the complete message.
+
+The accepted execution at `.logs/d110c-0c1e-red-final-41818d87/` selected
+exactly three tests in one file and returned runner exit 1 with
+expected/skipped/unexpected/flaky `2/0/1/0` and zero top-level errors. The
+same-author first-successor control proved its successor-era row remained
+byte-identical and appeared exactly once as predecessor `filtered-current` and
+once as successor `current`; the hot creator 0→1 setup passed. Only the
+established peer failed with exact terminal
+`D110C_0C1E_SCOPE_LOCAL_SCAN_CUSTODY_REQUIRED`, and its attachment retains the
+original preparation refusal and discriminator. Its self-excluding manifest
+SHA-256 is
+`1f2e8ccf0dfece57eb5084414241fdcbd19b63e37f18c995256deaf2c8b7649d`.
+The two preserved invalid-attempt manifest hashes are
+`c270b0132c0f7c8cf71f001b2d22faf2187ef47da9d7377e5a4defdc9682e1a3`
+and `e9464bb25b1bb10ecbfa35b3e9228a70cfc7dbb69b77db19bf132551d9cefc0c`.
+No production source changed in RED.
+
+The first exact-owner RED lint then rejected only the new empty callback binding
+with `no-empty-pattern`. Naming the unused fixture argument corrected that
+source shape without changing execution, so the accepted browser RED was not
+rerun. Exact-owner ESLint, test-file Prettier, the plan Prettier check with its
+previously established formatter-only 8 GiB heap, and `git diff --check` then
+passed. The failed and corrected static evidence roots remain
+`.logs/d110c-0c1e-red-static-41818d87/` and
+`.logs/d110c-0c1e-red-static-corrected-41818d87/`; their validated
+self-excluding manifest SHA-256 values are
+`b3f7f007f376767e5987f8a3142ff641949bf0f9b87afdb72856e9e7934a98af`
+and `29d40e141120710b3490afe0a6d944ce37cf69aae1516f176c8b0d89156b5caa`.
 
 ###### D.110c-0c1f multi-author historical-issuance authority prerequisite
 
