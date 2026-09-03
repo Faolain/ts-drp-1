@@ -1,0 +1,27 @@
+{
+	"blockingUnionClosed": true,
+	"grok": {
+		"exit": 0,
+		"findings": { "P0": 0, "P1": 0, "P2": 1 },
+		"sessionId": "01a0649a-9cee-7dd1-8241-41f673464078",
+		"terminalShape": "prior-session-schema",
+		"verdict": "APPROVED"
+	},
+	"kimi": {
+		"exit": 0,
+		"findings": { "P0": 0, "P1": 0, "P2": 3 },
+		"sessionId": "session_3047d80e-87b6-4dfb-a756-6f1e351b13f5",
+		"terminalShape": "prior-session-schema",
+		"verdict": "APPROVED"
+	},
+	"opus": {
+		"exit": 0,
+		"findings": { "P0": 0, "P1": 0, "P2": 4 },
+		"sessionId": "5091c63d-4245-41cc-b3e3-d6e6eb194674",
+		"terminalShape": "schema-valid",
+		"verdict": "APPROVED"
+	},
+	"redAuthorized": true,
+	"reviewedCommit": "037b82442167ef27b750b2349ec66f1285780e59",
+	"reviewedTree": "a0afed6257fb0ba75f0ace792036351fac923126"
+}

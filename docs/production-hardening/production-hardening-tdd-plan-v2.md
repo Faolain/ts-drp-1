@@ -95764,6 +95764,16 @@ boundary forward while rebinding it to the new successor checkpoint. The
 successor anchor, Cut/QC, and snapshot identities are fixed before completing
 the deterministic Ed25519 signature.
 
+This relies on the existing `blueprintClosing`/serialized registration-task
+owner preventing local issuance from interleaving after the graph freeze and
+before close capture. RED/GREEN must assert that exact ordering. An
+issued-but-unadmitted suffix may remain fail-safe above the boundary, but a
+permanent hole followed by a later admitted address freezes the frontier and
+all later reopen remains fail closed. If the deterministic gate demonstrates
+that such an interleaving is reachable on the product path after ordinary
+recovery, stop and reslice its issuance-outcome owner rather than weakening the
+dense frontier.
+
 Cold reopen never trusts this record merely because storage returned it. The
 opener consumes pinned-genesis-derived creator trust plus the independently
 authenticated room floor, verifies the exact signature and all scope/head/
@@ -95772,21 +95782,28 @@ bounded active closure. Its `successorEpoch`/anchor must equal the independently
 authenticated current room floor; its closed/current epoch/anchor identifies
 the retained immediate predecessor. Cold reopen rejects missing, duplicate,
 future, cross-room, cross-author, wrong-floor, forked, or malformed candidates.
+For a stable-only floor the stable closure candidate binds the stable head; for
+a floor with pending adoption, the stable closure candidate binds the stable
+head and the pending closure candidate binds the pending head, with exactly one
+selected per closure.
 Prior-digest and monotonic-boundary continuity are transition-time checks while
 both adjacent closures exist; cold-reopen freshness reduces to the accepted
 D.110c-0b0 floor authority and the record's successor binding.
 
 An authenticated boundary permits old-address **admission authentication**
-only at or below its inclusive sequence. The future D.110c-0c1 wrapper still
-requires exact issued/outbox equality, canonical object/author/sequence, and a
-valid author signature. A covered `published` row may be hidden from ordinary
-outbox traversal; a covered `pending` row must remain visible to existing
-offline/rebase custody and is neither hidden nor prune-eligible. Thus the
-checkpoint, not the row's claimed old anchor or database watermark, supplies
-historical admission authority without converting an unpublished row into a
-published one. Rows above the boundary retain existing current/displaced
-admission. One combined per-scan `maxEpochVertices` counter bounds all rows
-classified through the new capability.
+only at or below its inclusive sequence. The future D.110c-0c1 wrappers still
+require exact issued/outbox equality, canonical object/author/sequence, and a
+valid author signature, but apply two explicit view policies. The recovery
+admission view classifies a covered old row from the verified capability rather
+than returning it to the unmodified current/displaced predicate. The separate
+offline/rebase custody view may hide a covered `published` row but must return a
+covered `pending` row for existing rebase completion; that row is never
+prune-eligible. Thus the checkpoint, not the row's claimed old anchor or
+database watermark, supplies historical admission authority without converting
+an unpublished row into a published one. Rows above the boundary retain
+existing current/displaced admission. One combined per-scan
+`maxEpochVertices` counter bounds all rows classified through the new
+capability.
 
 Physical pruning remains an execution mechanism owned by D.109/D.110c-c. The
 existing D.109d law at `packages/node/src/v3-live.ts:2845` requires
@@ -95817,20 +95834,25 @@ SHA-256 is
 
 ###### D.110c-0c1a creator-signed issuance-retirement checkpoint prerequisite
 
-**Status: P0/P1 plan corrections frozen; one material confirmation required;
-RED and production implementation remain unauthorized.** Owner: protocol-v3
-creator retirement record/opener and one-use signing request, keychain finality
-signing dispatch, the creator-close row/graph/replay capture, the Node-private
+**Status: material confirmation passed with zero P0/P1; tests-only RED is
+authorized; production implementation remains unauthorized.** Owner:
+protocol-v3 creator retirement record/opener and one-use signing request,
+keychain finality signing dispatch, the creator-close row/graph/replay capture,
+the Node-private
 `inspectCreatorTransitionAdvance()` exact-one normalization law across all
 stage/adoption/cold-reopen/pending-resume consumers, and pending/reopen AHE
 closure preservation. The underlying control-plane trust predicates remain
 unchanged: the Node-private wrapper strips and verifies exactly the permitted
-retirement candidate delta before invoking them, then returns the original
-accepted proposal. Candidate authenticity is not delegated to this structural
-normalization: every stage/verify consumer must first open the exact candidate
-against pinned-genesis creator trust and its independently authenticated
-current/successor floor, then pass that selected pair to the wrapper. Deadline:
-GREEN before D.110c-0c1 may
+retirement ref/candidate pair from detached predicate inputs before invoking
+them. Candidate authenticity is not delegated to this structural normalization:
+every stage/verify consumer must first open the exact candidate against
+pinned-genesis creator trust and its independently authenticated
+current/successor floor, then pass that selected pair to the wrapper. After the
+inner verdict, stage mode preserves its existing retiring Cut/QC/ACL filter and
+restores only the opened successor retirement ref/candidate to that accepted
+proposal; verify mode preserves the stored closure and applies only the same
+retirement-pair normalization for predicate evaluation. Deadline: GREEN before
+D.110c-0c1 may
 change `creatorFilteredIssuanceStore()`, before D.110c-0c may claim its
 same-process epoch-3 reopen, and before D.110c-c/d or Phase 7 consumes repeated
 epochs.
@@ -95845,6 +95867,12 @@ no fixture writes a carrier or mutates the AHE closure. The RED evidence records
 and **asserts** the exact dense row keys/digests, issued/outbox byte equality,
 lineage, graph membership, durable-replay membership, and exact
 cut/QC/snapshot/successor identities before inspecting the selected closure.
+Per-row replay membership is discharged without a new product export: the RED
+asserts the sealed-replay `verify()` result, exact per-row issued/outbox bytes,
+and the independently recomputed close-set root/count that includes those row
+digests. Each refusal records a subclass (`missing-carrier`,
+`empty-initialization`, `exhausted-lineage`, or `non-dense-derivation`) beside
+the shared closed token.
 It records the one-test/one-file listing, reporter counts, and complete token.
 Any earlier close failure, different missing candidate, incomplete mint input,
 or hidden source mutation stops the slice.
@@ -95864,11 +95892,14 @@ GREEN implements only the reviewed carrier prerequisite:
    scan;
 4. make the Node-private transition wrapper accept only these normalized laws:
    epoch-0 initialization adds exactly one record and N≥1 replaces exactly one
-   prior record with exactly one successor. It removes those exact candidates
-   from detached current/proposed inputs before calling the unchanged existing
-   control-plane predicate, rejects every other added/dropped/unknown candidate
-   with the existing reason, and applies identically in stage and all three
-   verify-mode consumers;
+   prior record with exactly one successor. It removes those exact ref/candidate
+   pairs from detached current/proposed inputs before calling the unchanged
+   existing control-plane predicate, rejects every other
+   added/dropped/unknown candidate with the existing reason, preserves the
+   existing stage-only retiring Cut/QC/ACL filtering, and restores only the
+   opened successor retirement pair to the inner accepted proposal. The same
+   predicate normalization applies in stage and all three verify-mode
+   consumers;
 5. stage exactly one signed record in the proposed AHE closure, preserve it
    through pending process death, and replace the adjacent predecessor record
    with no third active/pending copy or uncounted sibling state;
@@ -95948,6 +95979,18 @@ prospectively: the demonstrated seam and this prerequisite cover recovery and
 bind-time filtered views; post-activation raw-store publication/rebase behavior
 is retained and must not be relabelled as already filtered. Complete raw review
 evidence is under `.logs/d110c-0c1a-plan-review-fc384d1f/`.
+
+The single material confirmation reviewed signed/pushed correction
+`037b82442167ef27b750b2349ec66f1285780e59`. Grok 4.6/high, standard Kimi K3
+with the 100-step cap, and Opus xhigh each returned `APPROVED` with zero P0/P1.
+Their one-, three-, and four-item P2 sets respectively are dispositioned in the
+executable wording above and do not trigger another review round. Exact-session
+continuity, raw outputs, commands, statuses, and the corrected local audit are
+under `.logs/d110c-0c1a-plan-confirmation-037b8244/`; its validating
+self-excluding manifest SHA-256 is
+`b1d63cad7ca15389590739a2e83e64b10aa6024eaac3e3891af81421f2569a5d`.
+The blocking union is empty and tests-only RED is authorized. Production GREEN
+remains unauthorized until the signed/pushed causal RED is accepted.
 
 The complete confirmation evidence is retained under
 `.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry
