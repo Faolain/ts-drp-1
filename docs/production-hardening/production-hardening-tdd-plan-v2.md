@@ -96203,10 +96203,9 @@ is under `.logs/d110c-0c1a-review-confirmation-7414fa6b/`; its validating
 
 ###### D.110c-0c1b committed-issuance outcome reconciliation prerequisite
 
-**Status: bounded source/architecture audit, plan confirmation, causal RED,
-initial GREEN, and the final-review P1 correction are complete and locally
-verified; the correction's signed checkpoint and one permitted confirmation
-are next.** Owner: the
+**Status: closed.** The bounded source/architecture audit, plan confirmation,
+causal RED, GREEN, final review, accepted P1 correction, and its single
+confirmation are complete. Owner: the
 post-`transactIssue()` outcome window in
 `packages/node/src/v3-live.ts::issueOneVertex()`, live-journal append, graph
 admission, restart recovery of pending issuance/outbox rows, and the close-time
@@ -96483,6 +96482,26 @@ Because the accepted P1 changes
 executable classification, the signed/pushed correction receives exactly one
 Grok/Kimi/Opus confirmation; it is not a new review slice or a recursive prose
 review.
+
+The correction was signed and pushed as
+`9172e4adf60108b4c195c20ce61a7c67d2d8266d` (tree
+`0de18a80fbd21967621ef05f39ee43f829e6d466`). Its single permitted
+confirmation returned an empty blocking union: Grok 4.6/high `APPROVED`, direct
+Kimi K3 with the exact 100-step control `APPROVED`, and Opus xhigh `APPROVED`.
+Grok ended normally with approval JSON after progress prose; exact session
+`01a065b7-2ea2-70f3-9124-d02ab6d97547` re-emitted the same schema-only result,
+so no cancellation or relaunch occurred. Opus's sole P2 observes that the
+focused runtime proof executes the non-terminal capacity arm while the
+terminal arm is protected by static ordering. Disposition: accept the explicit
+invariant that terminal `commitOutsideTransaction(expectedSequence)` and any
+capacity throw occur before both `terminalTransactionStarted = true` and store
+`transactIssue`; no additional test or slice is justified. The complete
+confirmation is under
+`.logs/d110c-0c1b-correction-confirmation-9172e4ad/`; its validating
+self-excluding manifest SHA-256 is
+`20db558f84316cf094c94787d6128ce30f64ade0aa03b570099ef04e7ef84d8c`.
+D.110c-0c1b is closed; resume the existing D.110c lifecycle sequence without
+reopening this evidence.
 
 The complete confirmation evidence is retained under
 `.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry
