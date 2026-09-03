@@ -1,6 +1,6 @@
 # D.110c-0c1f5b0 design checkpoint audit
 
-## Anchor and scope
+## Anchor, amendment and scope
 
 - Base/source-audit commit and upstream before this checkpoint:
   `00a860ab3c2ed64b236713fc63b7ae2b073f9f27`.
@@ -8,6 +8,12 @@
 - This checkpoint changes only the canonical production-hardening plan and
   this design evidence root. It runs no product test, RED, campaign, preflight
   or long workload and changes no production source.
+- The first signed/pushed design checkpoint is
+  `fc4b8fc78148e5211b09dc32e3f27f32756653ec`. Its governing review completed
+  with a nonempty P0/P1 union. `review.md` preserves the exact reviewer
+  terminals, raw-session hashes, union and dispositions. The amendment closes
+  bounded carrier/lifecycle defects and isolates the removed-author identity
+  problem as blocking prerequisite D.110c-0c1f5b0p; it does not authorize RED.
 
 ## Deterministic checks
 
@@ -17,23 +23,29 @@ docs/production-hardening/production-hardening-tdd-plan-v2.md
 .logs/d110c-0c1f5b0-design-00a860ab/design.md` — status 0; both files match
    Prettier style. The increased formatter heap is required by the existing
    approximately 100,000-line plan and changes no product/test limit.
-3. Exact token counts in `design.md`:
-   `$drp.author-settlement.v1` 2;
+3. Exact amended token counts in `design.md`:
+   `$drp.author-settlement.v1` 3;
    `drp-creator-author-settlement-state` 2;
    `ts-drp/creator-author-settlement/v1` 1;
    `settleRebaseSources` 2;
    `authorSettlementVersion` 1;
    `hasDisplacedOperation` 1;
-   `source-dispositions` 1; and `author-baseline` 4.
+   `source-dispositions` 1;
+   `author-baseline` 1 (deletion rationale only);
+   `zero-intent` 6;
+   `pruneAuthenticatedSettledPrefix` 1; and
+   `D.110c-0c1f5b0p` 4.
 4. Exact fixed-string source searches prove both new production identifiers
    are absent under `packages/` and `examples/`. This is a design-only
    checkpoint, not an already-implemented claim.
 5. Current-source seam checks found blueprint-only operation admission at
    `packages/protocol-v3/src/index.ts:3414,4693`; the proposed-v1 aggregate
    requirement at
-   `packages/node/src/internal/creator-transition-advance.ts:327`; issuance
+   `packages/node/src/internal/creator-transition-advance.ts:398`; issuance
    publication ownership at `packages/issuance-store/src/types.ts:85`; and the
    current `completeRebaseSource()` owner/callers in `v3-live.ts` and the room.
+   The review corrected this citation: the requirement is the
+   `proposedMatches.length !== 1` check, not the retirement check at line 327.
 6. Source SHA-256 values exactly match the preceding audit:
    - creator close:
      `770add5766018e6db251602f7a479df5e310b8d2176fdbba67b67107cc943bb2`;
@@ -57,6 +69,13 @@ docs/production-hardening/production-hardening-tdd-plan-v2.md
    command and no ts-drp reviewer, test or profiler.
 8. `commit.gpgsign=true`, signing key `A81C6289`; HEAD equalled upstream before
    staging.
+9. The amended maximum-shape operation was encoded directly with
+   `packages/canonical/src/index.ts` through the workspace `tsx` binary. Eight
+   application sources, eight transform intents and eight references into
+   sixteen-entry batches, using maximum-safe ordinals and full 64-character
+   digests, encode to exactly 6,003 bytes. The unchanged 8,192-byte ceiling
+   therefore has 2,189 bytes of margin. The previous 16/16/16 claim is
+   rejected and not retained as an acceptance contract.
 
 ## Corrected diagnostic
 
@@ -67,10 +86,22 @@ The check was corrected by using `protected_item`; the corrected protected
 path, stash, port, process, branch/upstream and signing checks above passed.
 This was a read-only diagnostic error and was not treated as a code failure.
 
-## Review gate
+The first post-review process predicate also matched the Codex
+`SkyComputerUseClient` turn-completion notification because that process's
+serialized conversation text contained historical `playwright`, `vitest`, and
+reviewer command strings. The corrected predicate first restricts the
+executable class to Node/pnpm/npx/Kimi/Claude/Python and only then matches this
+workspace plus the active test/reviewer terms. It returned
+`relevant-process-clear`. This was another read-only predicate false positive,
+not an active ts-drp process or code failure.
 
-After this evidence and the plan are signed and pushed, exactly one governing
-high-risk plan review will inspect the full design using Grok 4.6/high, direct
-Kimi K3 with `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh. Only P0/P1
-blocks production RED. Fable and collaboration subagents are prohibited unless
-the user expressly authorizes a future invocation.
+## Review result and next gate
+
+The exact first review is preserved under
+`.logs/d110c-0c1f5b0-plan-review-fc4b8fc7/`. Grok and Opus rejected RED; Kimi
+approved with P2 only. The union therefore blocks. D.110c-0c1f5b0p must now
+select the missing bounded identity-history construction. After that plan-only
+design is integrated, the one material Grok/Kimi/Opus confirmation reviews the
+combined amendment. Only an empty P0/P1 union can authorize f5b0a RED. Fable
+and collaboration subagents remain prohibited unless the user expressly
+authorizes a future invocation.
