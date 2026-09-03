@@ -1,0 +1,2 @@
+Previous HEAD position was e379cfd2 test: prove foreign frontier close liveness red
+HEAD is now at 52fe3b44 fix: keep foreign frontier anomalies author-local

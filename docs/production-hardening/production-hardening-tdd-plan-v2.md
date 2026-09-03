@@ -98037,9 +98037,9 @@ not independently rederived by the transition closure.
 
 **Status: the first execution from `eeaaaca8` remains a noncausal diagnostic;
 the corrected tests-only RED from signed/pushed anchor `466169aa` is causal and
-complete. The bounded production GREEN and its local runtime/static evidence
-are prepared from signed/pushed RED commit `e379cfd2`; signed clean-isolated
-replay and the one final Grok/Kimi/Opus review remain required before f5a may
+complete. The bounded production GREEN is signed/pushed at
+`52fe3b44a40ab025102cad7637bbd10fae6edaac`, and its clean-isolated replay is
+complete. The one final Grok/Kimi/Opus review remains required before f5a may
 close.** Owner:
 `packages/node/src/creator-close.ts::authorIssuanceFrontiersCandidate()` at the
 construction of `byAuthor`, duplicate detection, prior/null boundary checks,
@@ -98233,8 +98233,32 @@ and deterministic validation are under
 `.logs/d110c-0c1f5a-green-e379cfd2/`. Its 72-entry self-excluding manifest
 validates and has SHA-256
 `e5e1a84486363b10fcbf04288affacfba04fd63ef9a2d53ed5efd4fecada3a12`.
-This is working GREEN evidence pending the signed clean-isolated replay and
-final review; it does not close f5a or authorize f5b production work.
+This local GREEN evidence is anchored by the signed checkpoint below; it does
+not close f5a or authorize f5b production work before final review.
+
+The GREEN implementation/evidence checkpoint is signed and pushed at
+`52fe3b44a40ab025102cad7637bbd10fae6edaac`, tree
+`a174b6717d26ff2a1a41dd5e8b398efcaf996bd4`. Its signature verifies. The
+source/document diff check is clean. A blanket staged check additionally
+reported whitespace embedded in the preserved generated `green.patch` and raw
+coverage table; those immutable captures are not rewritten or represented as
+source-format failures.
+
+That exact signed commit was then checked out detached in
+`/private/tmp/ts-drp-d109d-baseline.18SC07`. A frozen
+`pnpm install --offline --frozen-lockfile` succeeded, the worktree remained
+tracked-clean, the f5a RED-named retained control passed its exact one
+file/title, the registered-gossip/direct-retained fixture boundary passed both
+selected assertions together, and the two Chromium compatibility titles again
+reported `2/0/0/0` with zero top-level errors. Complete proof and deterministic
+validation are under `.logs/d110c-0c1f5a-clean-52fe3b44-v2/`; its 32-entry
+self-excluding manifest validates and has SHA-256
+`677ffc036196a3d82d6c69eee276700e5baab60b83ba231fda9bf7bed26ec2f1`.
+The sibling `.logs/d110c-0c1f5a-clean-52fe3b44/` honestly preserves an initial
+setup-only failure caused by an incorrectly expanded commit hash; no f5a test
+ran there. Its 12-entry manifest validates at
+`39add4a1adc7f5e4e792a397a9eea9a7c427f1e13e33327058f0a5e812b36792`.
+The final three-model review is now the only remaining f5a closure gate.
 
 GREEN changes only the close-side per-author classification. It must make all
 foreign treatments close successfully, keep the affected frontier unchanged or
