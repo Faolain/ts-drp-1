@@ -74,6 +74,7 @@ function createState() {
     d110c0cRecoveryCallCount: 0,
     d110c0cRecoveryResultKind: null,
     d110c0cRecoverySwapHeadCount: 0,
+    d110c0c1cFault: null,
     d110c0c1Owner: null,
     d110c0c1Phase: null,
     d110c0c1Trace: [],
@@ -135,6 +136,7 @@ function createState() {
     state.d110c0cRecoveryCallCount = 0;
     state.d110c0cRecoveryResultKind = null;
     state.d110c0cRecoverySwapHeadCount = 0;
+    state.d110c0c1cFault = null;
     state.d110c0c1Owner = null;
     state.d110c0c1Phase = null;
     state.d110c0c1Trace = [];
@@ -215,6 +217,9 @@ function createState() {
       },
       configure,
       d110cColdReopenCount: () => state.coldReopenCount,
+      d110c0c1cSetFault: (fault) => {
+        state.d110c0c1cFault = fault;
+      },
       d110c0cRecoverySnapshot: () => Object.freeze({
         callCount: state.d110c0cRecoveryCallCount,
         resultKind: state.d110c0cRecoveryResultKind,
@@ -568,7 +573,96 @@ export const recoverPendingCreatorSuccessorAdoption = async (input) => {
 import * as actual from ${JSON.stringify(creatorAdoptionActivate)};
 export const reopenCreatorSuccessorAdoption = async (input) => {
   state.coldReopenCount += 1;
-  return actual.reopenCreatorSuccessorAdoption(input);
+  const fault = state.d110c0c1cFault;
+  state.d110c0c1cFault = null;
+  let selected = input;
+  if (fault === "ahe-lineage") {
+    const store = new Proxy(input.store, {
+      get(target, key) {
+        if (key === "recoverActiveGeneration") {
+          return async (...args) => {
+            const recovered = await Reflect.apply(target.recoverActiveGeneration, target, args);
+            return recovered?.ok === true && recovered.value?.kind === "active"
+              ? Object.freeze({
+                  ...recovered,
+                  value: Object.freeze({
+                    ...recovered.value,
+                    head: Object.freeze({
+                      ...recovered.value.head,
+                      revision: Number(recovered.value.head.revision) + 1,
+                    }),
+                  }),
+                })
+              : recovered;
+          };
+        }
+        const value = Reflect.get(target, key, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    selected = Object.freeze({ ...input, store });
+  }
+  if (fault === "snapshot-payload") {
+    const snapshotStore = new Proxy(input.snapshotStore, {
+      get(target, key) {
+        if (key === "openScope") {
+          return async (...args) => {
+            const scope = await Reflect.apply(target.openScope, target, args);
+            const verificationQuarantine = new Proxy(scope.verificationQuarantine, {
+              get(quarantine, quarantineKey) {
+                if (quarantineKey === "open") {
+                  return (...openArgs) => {
+                    const port = Reflect.apply(quarantine.open, quarantine, openArgs);
+                    return new Proxy(port, {
+                      get(portTarget, portKey) {
+                        if (portKey === "read") {
+                          return async (...readArgs) => {
+                            const bytes = await Reflect.apply(portTarget.read, portTarget, readArgs);
+                            if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0) return bytes;
+                            const corrupted = Uint8Array.from(bytes);
+                            corrupted[0] = (corrupted[0] ?? 0) ^ 1;
+                            return corrupted;
+                          };
+                        }
+                        const value = Reflect.get(portTarget, portKey, portTarget);
+                        return typeof value === "function" ? value.bind(portTarget) : value;
+                      },
+                    });
+                  };
+                }
+                const value = Reflect.get(quarantine, quarantineKey, quarantine);
+                return typeof value === "function" ? value.bind(quarantine) : value;
+              },
+            });
+            return new Proxy(scope, {
+              get(scopeTarget, scopeKey) {
+                if (scopeKey === "verificationQuarantine") return verificationQuarantine;
+                const value = Reflect.get(scopeTarget, scopeKey, scopeTarget);
+                return typeof value === "function" ? value.bind(scopeTarget) : value;
+              },
+            });
+          };
+        }
+        const value = Reflect.get(target, key, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    selected = Object.freeze({ ...input, snapshotStore });
+  }
+  if (fault === "possession") {
+    selected = Object.freeze({ ...input, signRegisteredVertexDigest: async () => new Uint8Array(64) });
+  }
+  if (fault === "issuance-lineage") {
+    const issuanceStore = new Proxy(input.issuanceStore, {
+      get(target, key) {
+        if (key === "readLineage") return async () => Object.freeze({ exhausted: true, next: 0 });
+        const value = Reflect.get(target, key, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    selected = Object.freeze({ ...input, issuanceStore });
+  }
+  return actual.reopenCreatorSuccessorAdoption(selected);
 };
 export const activateCreatorSuccessorAdoption = async (input) => {
   const planeId = closeHandlePlaneIds.get(input.handle);
@@ -2405,8 +2499,20 @@ test("D.110c-0c1c cold reopens a stable adopted epoch-2 successor", async ({ bro
 		const prefixRows = d110c0cArray(evidence.prefixRows).map(d110c0cRecord);
 		const postReopenRows = d110c0cArray(evidence.postReopenRows).map(d110c0cRecord);
 		expect(evidence.coldReopenCount).toBe(1);
-		expect(reopened.authority).toMatchObject({ epoch: 2, lifecycle: "active" });
-		expect(reopened.acl).toMatchObject({ current: { epoch: 2 }, next: { epoch: 3 } });
+		expect(reopened.authority).toEqual(d110c0cRecord(evidence.hot).authority);
+		expect(reopened.acl).toEqual(d110c0cRecord(evidence.hot).acl);
+		expect(reopened.status).toEqual({
+			closeAuthority: "unavailable",
+			continuity: "continuous",
+			lifecycle: "active",
+			trust: {
+				byzantineFaultTolerant: false,
+				kind: "creator-certified",
+				quorum: 1,
+				signerCount: 1,
+				text: "Creator-certified; one of one; not Byzantine-fault-tolerant.",
+			},
+		});
 		expect(after.authority).toEqual(reopened.authority);
 		expect(after.acl).toEqual(reopened.acl);
 		expect(
@@ -2429,6 +2535,11 @@ test("D.110c-0c1c cold reopens a stable adopted epoch-2 successor", async ({ bro
 			d110c0cRecord(await page.evaluate(() => window.phase6aCreatorSuccessorProduct.d110c0c1cMatrix("matrix"))).results
 		).map(d110c0cRecord);
 		expect(matrix).toEqual([
+			expect.objectContaining({
+				coldReopenCount: 1,
+				detail: "v3 room successor reopen failed: chain-invalid: creator successor generation lineage is invalid",
+				fault: "ahe-lineage",
+			}),
 			expect.objectContaining({
 				coldReopenCount: 0,
 				detail: "D110C_FLOOR_MISMATCH",
@@ -2459,6 +2570,21 @@ test("D.110c-0c1c cold reopens a stable adopted epoch-2 successor", async ({ bro
 					fault,
 				})
 			),
+			expect.objectContaining({
+				coldReopenCount: 1,
+				detail: "v3 room successor reopen failed: snapshot-unavailable: creator successor snapshot is unavailable",
+				fault: "snapshot-payload",
+			}),
+			expect.objectContaining({
+				coldReopenCount: 1,
+				detail: "v3 room successor reopen failed: chain-invalid: creator issuance possession proof failed",
+				fault: "possession",
+			}),
+			expect.objectContaining({
+				coldReopenCount: 1,
+				detail: "v3 room successor reopen failed: chain-invalid: creator issuance lineage is invalid",
+				fault: "issuance-lineage",
+			}),
 		]);
 		for (const result of matrix) expect(result.afterDigest).toBe(result.beforeDigest);
 		await testInfo.attach("d110c-0c1c-green", {

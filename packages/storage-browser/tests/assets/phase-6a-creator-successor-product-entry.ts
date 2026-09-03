@@ -155,6 +155,7 @@ interface LifetimeInstrumentation {
 	acceptedVertex(): Promise<void>;
 	cleanupReplacements(): Promise<void>;
 	d110cColdReopenCount(): number;
+	d110c0c1cSetFault(fault: string | null): void;
 	d110c0c1SetPhase(phase: string | null): void;
 	d110c0c1TraceSnapshot(): readonly PlainRecord[];
 	d110c0cRecoverySnapshot(): Readonly<{
@@ -1664,6 +1665,7 @@ async function d110c0c1Case(name: string, kind: "control" | "treatment"): Promis
 		await room.adoptCreatorSuccessor();
 		const prefixRows = await d110c0c1IssuanceRows(databaseName);
 		if (kind === "control") {
+			const hot = await d110c0cRoomSnapshot(room);
 			const declaration = await rawSnapshotDeclarationAtEpoch(databaseName, 1);
 			instrumentation().d110c0c1SetPhase("control-cold-reopen-epoch-2");
 			await closeDirectForReopen(name);
@@ -1680,6 +1682,7 @@ async function d110c0c1Case(name: string, kind: "control" | "treatment"): Promis
 			return Object.freeze({
 				after,
 				coldReopenCount: instrumentation().d110cColdReopenCount(),
+				hot,
 				kind,
 				postReopenRows,
 				prefixRows,
@@ -1734,15 +1737,19 @@ async function d110c0c1Differential(name: string): Promise<PlainRecord> {
 }
 
 type D110c0c1cFault =
+	| "ahe-lineage"
 	| "different-anchor"
 	| "epoch-zero"
 	| "higher-epoch"
 	| "lower-epoch"
 	| "missing-snapshot"
+	| "issuance-lineage"
+	| "possession"
 	| "snapshot-anchor"
 	| "snapshot-epoch"
 	| "snapshot-manifest"
 	| "snapshot-object"
+	| "snapshot-payload"
 	| "stable-cross-object";
 
 async function d110c0c1cFailureCase(name: string, fault: D110c0c1cFault): Promise<PlainRecord> {
@@ -1804,6 +1811,9 @@ async function d110c0c1cFailureCase(name: string, fault: D110c0c1cFault): Promis
 		}
 		const attemptBefore = await d110cRoomHeadEvidence(name);
 		instrumentation().configure({});
+		instrumentation().d110c0c1cSetFault(
+			["ahe-lineage", "issuance-lineage", "possession", "snapshot-payload"].includes(fault) ? fault : null
+		);
 		let detail = "fulfilled";
 		try {
 			room = await createDirectRoom(name, {
@@ -1830,6 +1840,7 @@ async function d110c0c1cFailureCase(name: string, fault: D110c0c1cFault): Promis
 
 async function d110c0c1cMatrix(name: string): Promise<PlainRecord> {
 	const faults = Object.freeze([
+		"ahe-lineage",
 		"missing-snapshot",
 		"epoch-zero",
 		"lower-epoch",
@@ -1840,6 +1851,9 @@ async function d110c0c1cMatrix(name: string): Promise<PlainRecord> {
 		"snapshot-epoch",
 		"snapshot-anchor",
 		"snapshot-manifest",
+		"snapshot-payload",
+		"possession",
+		"issuance-lineage",
 	] as const);
 	const results: PlainRecord[] = [];
 	for (const fault of faults) results.push(await d110c0c1cFailureCase(`${name}-${fault}`, fault));

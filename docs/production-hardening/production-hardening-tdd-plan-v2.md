@@ -95880,9 +95880,10 @@ the genuine product-path acceptance.
 
 ###### D.110c-0c1c stable adopted-successor cold-reopen prerequisite
 
-**Status: blocking source/architecture audit and governing plan review complete;
-blocking union empty; the preserved tests-only RED and narrow GREEN are
-complete, and signed/pushed GREEN plus the final three-model review are next.** Owner:
+**Status: blocking source/architecture audit, governing plan review, preserved
+tests-only RED, and narrow GREEN are complete; the signed/pushed GREEN received
+one material final-review P1, and its bounded tests-only correction is green and
+awaits the permitted single confirmation.** Owner:
 `examples/v3-room/src/index.ts::createV3RoomSessionOwned()` at the early
 stable-room-head/successor-snapshot admission predicate, plus the focused
 browser control and existing room-head/reopen mutants. Deadline: GREEN before
@@ -95986,23 +95987,35 @@ GREEN changes the sole reviewed product predicate in
 `createV3RoomSessionOwned()` from `stable.epoch !== 1` to `stable.epoch < 1`;
 epoch 0 therefore retains exact `D110C_FLOOR_HEAD_AHEAD`, while every safe
 positive stable epoch reaches the unchanged authenticated downstream reopen.
-The focused launcher selects exactly one Chromium test in one file. Its final
-6.4-second execution passes one control plus ten fail-closed rows: genuine hot
-0→1→2, signerless stable epoch-2 cold reopen, exact active authority and ACL,
-post-reopen sequence-3 epoch-2 publication, exactly one downstream reopen,
-lower/higher/different-anchor expected heads, cross-object floor, missing
-declaration, epoch-0 declaration, and wrong snapshot object/epoch/anchor/
-manifest. Every failure leaves the room-head state digest unchanged and emits
-its pinned bare or wrapped error.
+The focused launcher selects exactly one Chromium test in one file. Its initial
+6.4-second execution passed one control plus ten fail-closed rows. The bounded
+final-review correction expands that same test-only matrix to fourteen rows and
+passes once in 6.2 test seconds: genuine hot 0→1→2, signerless stable epoch-2
+cold reopen, exact active authority, ACL, and status, post-reopen sequence-3
+epoch-2 publication, exactly one downstream reopen, lower/higher/different-
+anchor expected heads, cross-object floor, missing declaration, epoch-0
+declaration, wrong snapshot object/epoch/anchor/manifest, non-adjacent AHE
+generation lineage, changed snapshot payload bytes, failed author possession,
+and invalid issuance lineage. Every failure runs against the genuine stable
+epoch-2 product path where applicable, leaves the room-head state digest
+unchanged, and emits its pinned bare or wrapped error. The four new fault seams
+exist only in the browser test bundle; they delegate to the unchanged real
+`reopenCreatorSuccessorAdoption()` owner and do not add a production API or
+production-source change.
 
 One fresh one-test/one-file D.110c-0c1 execution now reaches the separately
 frozen exact terminal `D110C_0C1_INTERMEDIATE_ISSUANCE_RECOVERY_REQUIRED`.
 Its attachment proves control issuance `0@0,1@0,2@1`, treatment issuance
 `0@0,1@0,2@1,3@2`, and the intended cold predecessor rejection of sequence 2;
 the former `D110C_FLOOR_MISMATCH` is absent. Thus 0c1c unblocks but does not
-close or mask D.110c-0c1. The retained Chromium product selection excluding
-the two open 0c slices passes 10/10; the six-file retained Vitest selection
-passes 42/42 with focused coverage disabled; and the existing D.110c-0c
+close or mask D.110c-0c1. The effective D.110c-0c1 executable assertion anchor
+is signed/pushed `cd2e9c3c`: the original `aad02bd2` precondition evidence is
+immutable, while the later commit corrected previously unreachable issuance
+row indexing without weakening the frozen terminal or differential. The
+retained Chromium product selection excluding three separately owned tests—the
+focused 0c1c control and the open 0c1/0c slices—passes 10/10; the preserved raw
+six-file retained Vitest reporter passes 42/42 with focused coverage disabled;
+and the existing D.110c-0c
 pending fixture retains exactly two owned
 `D110C_0C_EPOCH3_COLD_REOPEN_BLOCKED` soft failures.
 
@@ -96010,7 +96023,10 @@ pending fixture retains exactly two owned
 ESLint, 8-GiB Prettier, diff, source-shape, list, protected-path, 27-stash,
 process, and fixed-port checks pass. Package-wide storage-browser typecheck
 remains nonzero only for the previously inherited Phase-6b alias/branding
-fixtures and reports zero D.110c-0c1c-owner diagnostics. Four noncausal test
+fixtures and reports zero diagnostics in the changed entry asset and Playwright
+test. The dedicated Playwright config is outside the package TypeScript include
+set by the same convention as the existing D.110c configs, so no vacuous config
+typecheck claim is made. Four noncausal test
 expectation corrections are preserved: a hot-only durable-head observation on
 a signerless cold session, the ACL result shape, the genuine sequence-1
 epoch-0 close/anchor row, and the stronger wrong-snapshot-object error. The
@@ -96021,6 +96037,33 @@ config. Only corrected commands are credited. Complete evidence is under
 `.logs/d110c-0c1c-green-audit-563f04dd/`; its twenty-entry self-excluding
 manifest validates with SHA-256
 `184bf2ce7ed822c2f1e1a9ccc17313613ac145350e4d9f74a012aa4a581db653`.
+
+The first final GREEN review of signed/pushed `cd2e9c3c`, tree
+`c855a7af301af0885a067903a103d4d4e02f12e2`, completed normally. Grok
+4.6/high and direct Kimi K3/100-step returned `APPROVED`, each with P0/P1/P2
+`0/0/2`. Opus xhigh returned `CHANGES_REQUIRED`, P0/P1/P2 `0/1/4`. Its sole
+blocking finding is accepted: the initial ten-row focused matrix did not itself
+exercise the newly reachable stable-epoch-at-least-2 AHE-lineage,
+snapshot-payload/state, or possession/issuance-lineage guards. The correction
+above closes that finding with one representative from each missing ownership
+class and exact errors rather than weakening the plan's adversarial contract.
+Opus's four P2s are also disposed without recursive prose review: preserve the
+raw six-file/42-test Vitest reporter; assert exact authority, ACL, and status;
+correct the three-test exclusion and TypeScript-include descriptions; and
+re-anchor the effective D.110c-0c1 assertions as stated above. Grok's and Kimi's
+P2s remain assigned to the retained verifier and inherited Phase-6b fixture
+owners. The raw first-review root is
+`.logs/d110c-0c1c-green-review-cd2e9c3c/`. Because the accepted P1 correction
+changes executable test coverage but no product behavior, the governing policy
+permits exactly one Grok/Kimi/Opus confirmation after the correction is signed
+and pushed; no further round follows if its P0/P1 union is empty. The additive
+correction evidence is
+`.logs/d110c-0c1c-green-correction-audit-cd2e9c3c/`; its 69-entry
+self-excluding manifest validates with SHA-256
+`509e78c9b51611169b35e15ac2dcffd47456812291a90d2a9cf52f1e2b685c30`
+and authenticates the first-review raw streams, the focused/RED/retained
+reporters, the raw six-file Vitest reporter, and the static/mechanical gates
+without rewriting the original GREEN evidence root.
 
 The expressly authorized one-off `claude-fable-5-1`/high course review ended
 normally in session `3de42449-c135-4bf2-a060-de4782bce954` with zero subagents
