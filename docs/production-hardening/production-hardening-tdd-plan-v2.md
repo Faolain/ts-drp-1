@@ -95499,9 +95499,10 @@ RED-to-GREEN closure and is prohibited.
 
 ##### D.110c-0c1 authenticated intermediate-epoch issuance prerequisite
 
-**Status: bounded architecture decision complete; implementation and causal RED
-remain blocked on D.110c-0c1a closure and D.110c-0c1b GREEN before any
-`v3-live.ts` or issuance-store production edit.** Owner: the predecessor and successor issuance
+**Status: bounded architecture decision complete; D.110c-0c1a and
+D.110c-0c1b are closed, so the existing frozen construction receives its
+high-risk plan review next, before causal RED or any `v3-live.ts` or
+issuance-store production edit.** Owner: the predecessor and successor issuance
 views created by `packages/node/src/v3-live.ts::activateCreatorSuccessorLive()`,
 `creatorFilteredIssuanceStore()`, their exact outbox classification inside
 `recoverV3LiveReplica()`, and the registered view's `publishPending` and
@@ -95839,8 +95840,9 @@ SHA-256 is
 **Status: CLOSED at signed/pushed correction commit
 `7414fa6bad30edc34de162f274ecee1504637579`; causal RED, production GREEN,
 focused/retained gates, review correction, and the one material confirmation
-all pass with an empty P0/P1 union. D.110c-0c1b remains the blocking next
-prerequisite before the boundary consumer or repeated-epoch continuation.** Owner:
+all pass with an empty P0/P1 union. D.110c-0c1b is also closed at
+`50d20496fe0d08d8621c22b8ae4eb9ad84c377a7`; D.110c-0c1 plan review is the
+next boundary before the consumer or repeated-epoch continuation.** Owner:
 protocol-v3 creator retirement record/opener and one-use signing request,
 keychain finality signing dispatch, the creator-close row/graph/replay capture,
 the Node-private
