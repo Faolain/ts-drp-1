@@ -95880,10 +95880,10 @@ the genuine product-path acceptance.
 
 ###### D.110c-0c1c stable adopted-successor cold-reopen prerequisite
 
-**Status: blocking source/architecture audit, governing plan review, preserved
-tests-only RED, and narrow GREEN are complete; the signed/pushed GREEN received
-one material final-review P1, and its bounded tests-only correction is green and
-awaits the permitted single confirmation.** Owner:
+**Status: complete; source/architecture audit, governing plan review, preserved
+tests-only RED, narrow GREEN, accepted final-review correction, and the sole
+material confirmation are complete; the final blocking union is empty and
+D.110c-0c1 may resume.** Owner:
 `examples/v3-room/src/index.ts::createV3RoomSessionOwned()` at the early
 stable-room-head/successor-snapshot admission predicate, plus the focused
 browser control and existing room-head/reopen mutants. Deadline: GREEN before
@@ -96015,8 +96015,7 @@ row indexing without weakening the frozen terminal or differential. The
 retained Chromium product selection excluding three separately owned tests—the
 focused 0c1c control and the open 0c1/0c slices—passes 10/10; the preserved raw
 six-file retained Vitest reporter passes 42/42 with focused coverage disabled;
-and the existing D.110c-0c
-pending fixture retains exactly two owned
+and the existing D.110c-0c pending fixture retains exactly two owned
 `D110C_0C_EPOCH3_COLD_REOPEN_BLOCKED` soft failures.
 
 `pnpm --filter @ts-drp/example-v3-room build` and `typecheck` pass. Exact-owner
@@ -96064,6 +96063,29 @@ self-excluding manifest validates with SHA-256
 and authenticates the first-review raw streams, the focused/RED/retained
 reporters, the raw six-file Vitest reporter, and the static/mechanical gates
 without rewriting the original GREEN evidence root.
+
+The sole material confirmation of signed/pushed correction `3fc4f4d3`, tree
+`066ebf1fcd1a8437a8fcc38ab3c51204323891c7`, is complete. Grok
+4.6/high, direct Kimi K3/100-step, and Opus xhigh all returned `APPROVED` with
+P0/P1/P2 `0/0/2`, `0/0/2`, and `0/0/3`; the blocking union is empty. Grok's
+first terminal emitted its valid verdict after prohibited progress prose and
+was therefore preserved honestly as `NO_VERDICT`; the exact session was
+resumed once under the schema and produced the accepted structured verdict
+without further inspection. Pre-model empty-prompt/variadic-option diagnostics
+for Kimi and Opus created no model sessions and are preserved rather than
+counted as reviews. The P2 union is nonblocking and assigned: host-wide process
+noise and Git custody remain evidence-template concerns; per-row epoch and
+Vitest suite-count presentation are accepted bookkeeping; a dedicated negative
+epoch-2 ACL mutant is retained for the next slice that edits ACL handling; exact
+authority/ACL equality plus literal post-reopen epoch-2 publication is accepted
+as stronger coverage; and an all-untracked production-source status check now
+supplements the earlier tracked-only check. Signature and pushed-ref identity
+for `3fc4f4d3` pass mechanically. Complete raw and normalized confirmation
+evidence is `.logs/d110c-0c1c-green-confirmation-3fc4f4d3/`; its 32-entry
+self-excluding manifest validates with SHA-256
+`99e9299740530bd32463b9ea00afd78672687dd48182827ab64bd1f7ba267947`.
+No further review round follows, and this documentation-only closure does not
+change the D.110c-0c1 RED or authorize broader product behavior.
 
 The expressly authorized one-off `claude-fable-5-1`/high course review ended
 normally in session `3de42449-c135-4bf2-a060-de4782bce954` with zero subagents
