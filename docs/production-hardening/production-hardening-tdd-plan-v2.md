@@ -97395,6 +97395,91 @@ not a RED failure. Complete RED evidence is
 validates and its SHA-256 is
 `7acd9cbaf90013bb8cfc719b158976b3b0bdcd624dca12324dafd6e2116af568`.
 
+**D.110c-0c1f2 GREEN diagnostic stop:** the first narrow implementation draft
+successfully emits, signs, stages, opens, and replaces the reviewed aggregate
+carrier. The focused genuine close passes with exact creator and remote-writer
+frontiers. A browser control in which Bob's epoch-zero join and first
+application row both reach Alice before the first close advances Bob's
+frontier through later epochs and completes the epoch-three signerless cold
+reopen. This is diagnostic draft evidence only; it is not a signed GREEN and
+does not change the immutable RED result.
+
+The unchanged causal browser case exposes one previously unmodelled bootstrap
+boundary. Bob's local issuance rows are sequence 0 `join` at epoch zero and
+sequence 1 application write at epoch one. The join row remains pending and is
+not present in Alice's authenticated close graph. Therefore the frozen
+aggregate initialization correctly records Bob as null, and the frozen
+contiguous-prefix rule correctly refuses to advance from null when Alice later
+observes sequence 1. The resulting epoch-three aggregate remains null for Bob,
+so his original signerless cold reopen still fails at the same predecessor
+admission boundary. Adding one ordinary Bob application write before the first
+close publishes and admits sequences 0 and 1, advances the aggregate, and
+makes the complete path pass. That control proves the carrier and selected-
+author consumer work when the reviewed continuity premise holds, but it does
+not close the original RED.
+
+This is a specification contradiction, not authorization to weaken the gap
+rule or rewrite the causal test. The frozen plan simultaneously requires every
+noncreator initial frontier to begin from a creator-observed graph prefix at
+sequence zero and requires the unchanged product RED to turn green even though
+its sequence-zero join is not creator-observed. Production GREEN stops before
+commit. No bootstrap row is relabelled as admitted, no null frontier is treated
+as numeric zero, and no sequence gap is crossed implicitly.
+
+###### D.110c-0c1f3 noncreator genesis-issuance bootstrap authority reslice
+
+**Status: blocking bounded authority-design audit required before further
+D.110c-0c1f2 production edits or GREEN claim.** Owner: the exact relationship
+between the existing pinned-genesis outbox authority, zero-intent join
+completion, creator-observed aggregate frontiers, complete local issuance-chain
+validation, and the selected-author historical recovery consumer. Deadline:
+before 0c1f2 GREEN, parent 0c1/0c, the same-room long-horizon gate, Phase-6
+exit, or Phase-7 multi-author cold join.
+
+The audit must choose exactly one compatible rule for an initially authorized
+noncreator whose sequence-zero pinned-genesis join is absent from the creator's
+close graph but whose later application row is genuinely admitted. At minimum
+it must compare: retaining strict null until a creator-observed sequence-zero
+prefix exists; authenticating a bounded genesis issuance base through the
+already-existing pinned-genesis authority and complete local-chain proof;
+adding an explicit proof-class/base fact to the aggregate schema; or changing
+join publication/orchestration so the existing graph premise becomes true.
+It must prove which party authenticates sequence zero, what the aggregate
+frontier asserts, how missing/substituted/forked local rows fail closed, and
+why the choice does not permit an unadmitted self-signed application row to be
+replayed merely because its key was in the genesis ACL.
+
+The audit must preserve the transactional non-equivocating issuer assumption,
+creator checkpoint authority, current aggregate schema unless an explicit
+schema reslice is selected, the exact permissionless-aware writer set, and the
+remove/re-add refusal. It must distinguish continuously authorized genesis
+writers from later additions and same-key re-entry without O(epoch) state. If
+that distinction cannot be represented by the current tuple carrier, stop at
+an explicit schema/migration prerequisite. Do not treat local lineage, ACL
+membership, or a valid author signature alone as creator-observed admission.
+
+RED remains the signed original D.110c-0c1f2 browser case. Additional bounded
+tests must cover a missing sequence-zero row, a substituted sequence-zero row,
+a valid but never admitted epoch-zero application row, a continuously
+authorized genesis writer, a later zero-lineage addition, same-key re-entry,
+and the fully creator-observed prefix control. GREEN must make the original RED
+pass without adding an extra setup write, preserve the explicit gap rule for
+all non-authorized bootstrap cases, validate an exact complete local issuance
+chain before activation/rebase, and retain every 0c1f2 carrier, transition,
+ACL, pruning, rollback, and size mutant. Any new carrier field, wire/schema
+meaning, join-publication behavior, or authority assumption is a high-risk
+change and requires a separately accepted compatibility boundary.
+
+Sign and push this diagnostic plan correction without staging the draft
+production implementation. Then run one governing Grok 4.6/high, direct Kimi
+K3/100-step, and Opus xhigh plan review over the signed RED, the exact null-to-
+sequence-one trace, and the candidate decision. Only P0/P1 blocks; P2 receives
+an owner/disposition without recursive prose review. Do not invoke Fable or a
+collaboration subagent. No further production edit, retained campaign, D.110a
+invocation, dependency, threshold, or workload change is authorized until one
+bootstrap authority rule and its adversarial acceptance are reviewed and
+accepted.
+
 ###### D.110c-0c1d successor-reopen historical-rebase orchestration prerequisite
 
 **Status: CLOSED at signed/pushed combined GREEN commit
