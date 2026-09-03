@@ -95,7 +95,10 @@ interface ProductApplication {
 	readonly bootstrapOperation: Readonly<Record<string, unknown>>;
 	readonly canonicalBlueprintPackageBytes: Uint8Array;
 	readonly catalog: TrustedBlueprintCatalog;
-	projectAcceptedOperations(operations: readonly unknown[]): Readonly<Record<string, unknown>>;
+	projectAcceptedOperations(input: {
+		readonly authenticatedBase: undefined;
+		readonly currentEpochOperations: readonly unknown[];
+	}): Readonly<Record<string, unknown>>;
 }
 
 function operations(application: ProductApplication): readonly unknown[] {
@@ -129,7 +132,8 @@ function expectSameApplication(
 	for (const digest of expected.catalog.blueprintDigests) {
 		expect(actual.catalog.resolve(digest)).toEqual(expected.catalog.resolve(digest));
 	}
-	expect(actual.projectAcceptedOperations(vertices)).toEqual(expected.projectAcceptedOperations(vertices));
+	const input = { authenticatedBase: undefined, currentEpochOperations: vertices } as const;
+	expect(actual.projectAcceptedOperations(input)).toEqual(expected.projectAcceptedOperations(input));
 }
 
 function hex(bytes: Uint8Array): string {
@@ -224,10 +228,16 @@ describe("Phase 3f-b real chat and zone causalJoin composition RED", () => {
 			{ action: "causalJoin" },
 			{ action: "message", clientOperationId: "message-visible", text: "visible" },
 		]);
-		const projection = application.projectAcceptedOperations([
-			accepted(Object.freeze({ action: "message", clientOperationId: "message-durable", text: "already durable" }), 1),
-			...frontier.issued.map(({ operation }, index) => accepted(operation, index + 2)),
-		]);
+		const projection = application.projectAcceptedOperations({
+			authenticatedBase: undefined,
+			currentEpochOperations: [
+				accepted(
+					Object.freeze({ action: "message", clientOperationId: "message-durable", text: "already durable" }),
+					1
+				),
+				...frontier.issued.map(({ operation }, index) => accepted(operation, index + 2)),
+			],
+		});
 		expect(Reflect.get(projection, "accepted")).toMatchObject([{ text: "already durable" }, { text: "visible" }]);
 	});
 
@@ -307,13 +317,16 @@ describe("Phase 3f-b real chat and zone causalJoin composition RED", () => {
 				),
 			]);
 			if (entrySession !== undefined) {
-				const projection = entryApplication.projectAcceptedOperations([
-					accepted(
-						Object.freeze({ action: "join", roster: Object.freeze({ entries: entryMembers }) }),
-						0x41,
-						localAuthor
-					),
-				]);
+				const projection = entryApplication.projectAcceptedOperations({
+					authenticatedBase: undefined,
+					currentEpochOperations: [
+						accepted(
+							Object.freeze({ action: "join", roster: Object.freeze({ entries: entryMembers }) }),
+							0x41,
+							localAuthor
+						),
+					],
+				});
 				const openCount = entrySession.openOptions.length;
 				entrySession.emitProjection(projection);
 				expect(entrySession.openOptions).toHaveLength(openCount);
@@ -352,7 +365,10 @@ describe("Phase 3f-b real chat and zone causalJoin composition RED", () => {
 			accepted(Object.freeze({ action: "placeBlock", id: "seed", kind: "stone", x: 0, y: 0 }), 2),
 			...frontier.issued.map(({ operation }, index) => accepted(operation, index + 3)),
 		];
-		const projection = application.projectAcceptedOperations(zoneVertices);
+		const projection = application.projectAcceptedOperations({
+			authenticatedBase: undefined,
+			currentEpochOperations: zoneVertices,
+		});
 		expect(Reflect.get(projection, "blocks")).toEqual([
 			{ id: "block", kind: "stone", x: 1, y: 2 },
 			{ id: "seed", kind: "stone", x: 0, y: 0 },

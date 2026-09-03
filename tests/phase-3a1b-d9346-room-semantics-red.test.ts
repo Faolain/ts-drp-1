@@ -29,7 +29,10 @@ interface ExpectedApplication {
 	readonly bootstrapOperation: Readonly<Record<string, unknown>>;
 	readonly canonicalBlueprintPackageBytes: Uint8Array;
 	readonly catalog: unknown;
-	projectAcceptedOperations(operations: readonly AcceptedOperation[]): Projection;
+	projectAcceptedOperations(input: {
+		readonly authenticatedBase: undefined;
+		readonly currentEpochOperations: readonly AcceptedOperation[];
+	}): Projection;
 }
 
 interface AcceptedOperation {
@@ -269,7 +272,11 @@ function digest(vertex: V3RoomAcceptedVertex): string {
 	return Array.from(vertex.digest, (value) => value.toString(16).padStart(2, "0")).join("");
 }
 
-function project(operations: readonly AcceptedOperation[]): Projection {
+function project(input: {
+	readonly authenticatedBase: undefined;
+	readonly currentEpochOperations: readonly AcceptedOperation[];
+}): Projection {
+	const operations = input.currentEpochOperations;
 	const transportPeerAuthors = operations.flatMap((acceptedOperation) => {
 		const peerId = Reflect.get(acceptedOperation.operation, "peerId");
 		return Reflect.get(acceptedOperation.operation, "action") === "join" && typeof peerId === "string"
@@ -592,7 +599,8 @@ describe("D.93.46b real shared-room semantics", () => {
 		) => Promise<ExpectedSession>;
 		const session = await createV3RoomSession(
 			input(
-				application((operations) => {
+				application((projectInput) => {
+					const operations = projectInput.currentEpochOperations;
 					if (
 						operations.some(
 							({ operation }) =>
@@ -602,7 +610,7 @@ describe("D.93.46b real shared-room semantics", () => {
 						throw new TypeError("D93515_PRODUCT_INVALID_BATCH");
 					}
 					snapshots.push([...operations]);
-					return project(operations);
+					return project(projectInput);
 				}),
 				() => undefined
 			)
@@ -652,9 +660,9 @@ describe("D.93.46b real shared-room semantics", () => {
 		const liveSnapshots: AcceptedOperation[][] = [];
 		const liveSession = await createV3RoomSession(
 			input(
-				application((operations) => {
-					liveSnapshots.push([...operations]);
-					return project(operations);
+				application((projectInput) => {
+					liveSnapshots.push([...projectInput.currentEpochOperations]);
+					return project(projectInput);
 				}),
 				() => undefined
 			)
@@ -666,9 +674,9 @@ describe("D.93.46b real shared-room semantics", () => {
 		const retainedSnapshots: AcceptedOperation[][] = [];
 		const retainedSession = await createV3RoomSession(
 			input(
-				application((operations) => {
-					retainedSnapshots.push([...operations]);
-					return project(operations);
+				application((projectInput) => {
+					retainedSnapshots.push([...projectInput.currentEpochOperations]);
+					return project(projectInput);
 				}),
 				() => undefined
 			)
@@ -735,11 +743,15 @@ describe("D.93.46b real shared-room semantics", () => {
 		) => Promise<ExpectedSession>;
 		const sessionHolder: { current?: ExpectedSession } = {};
 		let reentered: Promise<void> | undefined;
-		const selectedApplication = application((operations) => {
-			if (operations.length > 0 && sessionHolder.current !== undefined && reentered === undefined) {
+		const selectedApplication = application((projectInput) => {
+			if (
+				projectInput.currentEpochOperations.length > 0 &&
+				sessionHolder.current !== undefined &&
+				reentered === undefined
+			) {
 				reentered = sessionHolder.current.issue({ action: "message", text: "sink-reentrant" });
 			}
-			return project(operations);
+			return project(projectInput);
 		});
 		const session = await createV3RoomSession(input(selectedApplication, () => undefined));
 		sessionHolder.current = session;
@@ -924,9 +936,9 @@ describe("D.93.46b real shared-room semantics", () => {
 		});
 		const session = await createV3RoomSession(
 			input(
-				application((operations) => {
-					if (operations.length > 0) throw new Error("D9351_SINK_FAILURE");
-					return project(operations);
+				application((projectInput) => {
+					if (projectInput.currentEpochOperations.length > 0) throw new Error("D9351_SINK_FAILURE");
+					return project(projectInput);
 				}),
 				() => undefined
 			)
@@ -988,8 +1000,8 @@ describe("D.93.46b real shared-room semantics", () => {
 				operation: Object.freeze({ action: "join", peerId: "peer-reader" }),
 			}),
 		];
-		const widenedProjection = application((operations) => {
-			const value = project(operations);
+		const widenedProjection = application((projectInput) => {
+			const value = project(projectInput);
 			return { ...value, writerAuthors: ["author-writer", "author-reader"] };
 		});
 		const { createV3RoomSession: currentCreateV3RoomSession } = await roomModule;

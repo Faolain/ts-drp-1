@@ -78,6 +78,7 @@ function createState() {
     d110c0c1Owner: null,
     d110c0c1Phase: null,
     d110c0c1Trace: [],
+    projectionBaseObservations: [],
     failBeforePublication: false,
     injectActivationFailure: false,
     independentVerificationCount: 0,
@@ -140,6 +141,7 @@ function createState() {
     state.d110c0c1Owner = null;
     state.d110c0c1Phase = null;
     state.d110c0c1Trace = [];
+    state.projectionBaseObservations = [];
     state.failBeforePublication = input.failBeforePublication === true;
     state.injectActivationFailure = input.injectActivationFailure === true;
     state.independentVerificationCount = 0;
@@ -235,6 +237,9 @@ function createState() {
       d110c0c1SetOwner: (owner) => { state.d110c0c1Owner = owner; },
       d110c0c1SetPhase: (phase) => { state.d110c0c1Phase = phase; },
       d110c0c1TraceSnapshot: () => Object.freeze(state.d110c0c1Trace.map((entry) => Object.freeze({ ...entry }))),
+      projectionBaseObservations: () => Object.freeze(
+        state.projectionBaseObservations.map((entry) => Object.freeze({ ...entry }))
+      ),
       d108e5Snapshot: () => Object.freeze({
         redirectRecoveryCount: state.redirectRecoveryCount,
         verificationCount: state.d108e5VerificationCount,
@@ -479,11 +484,24 @@ export const activateV3LivePlane = (input) => {
   const result = actual.activateV3LivePlane(input);
   return result.ok === true ? Object.freeze({ ...result, handle: instrumentPlane(result.handle, "predecessor") }) : result;
 };
-export const bindV3BlueprintLivePlane = (input) => actual.bindV3BlueprintLivePlane(
-  input !== null && typeof input === "object" && "plane" in input
-    ? { ...input, plane: unwrapPlane(input.plane) }
-    : input
-);
+export const bindV3BlueprintLivePlane = (input) => {
+  const result = actual.bindV3BlueprintLivePlane(
+    input !== null && typeof input === "object" && "plane" in input
+      ? { ...input, plane: unwrapPlane(input.plane) }
+      : input
+  );
+  if (input !== null && typeof input === "object" && input.purpose === "projection-base") {
+    const keys = Reflect.ownKeys(result);
+    state.projectionBaseObservations.push(Object.freeze({
+      callableMembers: Object.freeze(
+        keys.filter((key) => typeof Reflect.get(result, key) === "function").map(String).sort()
+      ),
+      frozen: Object.isFrozen(result),
+      keys: Object.freeze(keys.map(String).sort()),
+    }));
+  }
+  return result;
+};
 export const routeV3RetainedIngress = (handle, message) => actual.routeV3RetainedIngress(unwrapPlane(handle), message);
 export const republishV3RetainedTo = (handle, targetPeerId) => actual.republishV3RetainedTo(unwrapPlane(handle), targetPeerId);`,
 				],
@@ -771,15 +789,19 @@ async function startProductBrowserServer(entryPoint: string): Promise<ProductBro
 		stdin: {
 			contents: `
 import { createV3ChatApplication } from ${JSON.stringify(resolve(REPOSITORY_ROOT, "examples/v3-chat/src/index.ts"))};
+import { createV3ZoneApplication } from ${JSON.stringify(resolve(REPOSITORY_ROOT, "examples/grid/src/v3-zone.ts"))};
 import { createV3RoomCreatorInviteMaterial, createV3RoomSession } from ${JSON.stringify(resolve(REPOSITORY_ROOT, "examples/v3-room/src/index.ts"))};
+import { bindV3BlueprintLivePlane } from ${JSON.stringify(resolve(REPOSITORY_ROOT, "packages/node/src/v3-live.ts"))};
 import { Keychain } from ${JSON.stringify(resolve(REPOSITORY_ROOT, "packages/keychain/src/index.ts"))};
 import { createRecoverableFinalitySigner } from ${JSON.stringify(resolve(REPOSITORY_ROOT, "packages/keychain/src/finality.ts"))};
 import ${JSON.stringify(entryPoint)};
 Object.defineProperty(globalThis, "__d108e3DirectRoomDependencies", {
   configurable: false,
   value: Object.freeze({
+    bindV3BlueprintLivePlane,
     createRecoverableFinalitySigner,
     createV3ChatApplication,
+    createV3ZoneApplication,
     createV3RoomCreatorInviteMaterial,
     createV3RoomSession,
     Keychain,
@@ -1032,7 +1054,7 @@ test(D108D2_BROWSER_BEHAVIORS[0], async () => {
 	await waitForText(creator, "successor-hot");
 });
 
-test(D108D2_BROWSER_BEHAVIORS[1], async (_fixtures, testInfo) => {
+test(D108D2_BROWSER_BEHAVIORS[1], async ({ browser: _browser }, testInfo) => {
 	if (creator === undefined || established === undefined || carrier === undefined) {
 		throw new TypeError("D.108d2 established-peer state is absent");
 	}
@@ -2584,7 +2606,7 @@ test("D.110c-0c1g preserves authenticated projection base across a stable epoch-
 				return window.phase6aCreatorSuccessorProduct.d110c0c1cControl(selectedName);
 			}, name)
 		);
-		await testInfo.attach("d110c-0c1g-red", {
+		await testInfo.attach("d110c-0c1g-green", {
 			body: Buffer.from(JSON.stringify(evidence)),
 			contentType: "application/json",
 		});
@@ -2592,8 +2614,10 @@ test("D.110c-0c1g preserves authenticated projection base across a stable epoch-
 		const hot = d110c0cRecord(evidence.hot);
 		const reopened = d110c0cRecord(evidence.reopened);
 		const after = d110c0cRecord(evidence.after);
+		const afterMigrationRefusal = d110c0cRecord(evidence.afterMigrationRefusal);
 		const prefixRows = d110c0cArray(evidence.prefixRows).map(d110c0cRecord);
 		const postReopenRows = d110c0cArray(evidence.postReopenRows).map(d110c0cRecord);
+		const projectionBases = d110c0cArray(evidence.projectionBases).map(d110c0cRecord);
 		const projectionTexts = (snapshot: Readonly<Record<string, unknown>>): readonly unknown[] =>
 			d110c0cArray(d110c0cRecord(snapshot.projection).accepted).map((row) => d110c0cRecord(row).text);
 		const expectedBase = Object.freeze(["d110c-0c1-epoch-zero", "d110c-0c1-epoch-one"]);
@@ -2606,6 +2630,18 @@ test("D.110c-0c1g preserves authenticated projection base across a stable epoch-
 		expect(after.authority).toEqual(reopened.authority);
 		expect(after.acl).toEqual(reopened.acl);
 		expect(projectionTexts(hot)).toEqual(expectedBase);
+		expect(d110c0cArray(d110c0cRecord(reopened.projection).accepted).map(d110c0cRecord)).toEqual([
+			{
+				clientOperationId: "d110c-0c1-epoch-zero",
+				provenance: "authenticated-snapshot",
+				text: "d110c-0c1-epoch-zero",
+			},
+			{
+				clientOperationId: "d110c-0c1-epoch-one",
+				provenance: "authenticated-snapshot",
+				text: "d110c-0c1-epoch-one",
+			},
+		]);
 		expect(
 			prefixRows.map(({ authorSequence, epoch, publishState }) => ({ authorSequence, epoch, publishState }))
 		).toEqual([
@@ -2620,6 +2656,28 @@ test("D.110c-0c1g preserves authenticated projection base across a stable epoch-
 			{ authorSequence: 3, epoch: 2, publishState: "published" },
 		]);
 		expect(projectionTexts(after)).toContain("d110c-0c1-control-after-reopen");
+		expect(projectionBases).toEqual([
+			{
+				callableMembers: [],
+				frozen: true,
+				keys: ["blueprintDigest", "epoch", "exactCanonicalApplicationStateBytes", "objectId", "ok", "stateDigest"],
+			},
+		]);
+		expect(evidence.successorMigrationDetail).toBe("D110C_0C1G_SUCCESSOR_MIGRATION_UNAVAILABLE");
+		expect(projectionTexts(afterMigrationRefusal)).toEqual([...expectedAfter, "d110c-0c1-after-migration-refusal"]);
+		expect(await page.evaluate(() => window.phase6aCreatorSuccessorProduct.d110c0c1gGridControl())).toEqual({
+			detail: "D110C_0C1G_GRID_AUTHORITY_BASE_UNAVAILABLE",
+			malformedTagged: {
+				detail: "v3 blueprint binding input is invalid",
+				kind: "malformed-input",
+				ok: false,
+			},
+			noncurrentTagged: {
+				detail: "v3 successor projection base is unavailable",
+				kind: "capability-consumed",
+				ok: false,
+			},
+		});
 
 		if (
 			JSON.stringify(projectionTexts(reopened)) !== JSON.stringify(expectedBase) ||

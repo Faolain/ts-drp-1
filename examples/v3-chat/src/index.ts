@@ -13,6 +13,7 @@ import {
 	type V3RoomMigrationActivationReceipt,
 	type V3RoomMigrationProjection,
 	type V3RoomMigrationRehearsalReceipt,
+	type V3RoomProjectionInput,
 	type V3RoomSession,
 	type V3RoomSuccessorAuthority,
 	type V3RoomTransport,
@@ -80,14 +81,24 @@ interface AcceptedMessage {
 	readonly text: string;
 }
 
+interface SnapshotAcceptedMessage {
+	readonly clientOperationId: string;
+	readonly provenance: "authenticated-snapshot";
+	readonly text: string;
+}
+
+type ProjectedMessage = AcceptedMessage | SnapshotAcceptedMessage;
+
 interface ChatProjection {
-	readonly accepted: readonly AcceptedMessage[];
+	readonly accepted: readonly ProjectedMessage[];
 	readonly transportPeerAuthors: readonly Readonly<{ readonly author: string; readonly peerId: string }>[];
 	readonly writerAuthors: readonly string[];
 }
 
+const authenticatedBaseProjections = new WeakSet<ChatProjection>();
+
 interface ChatSnapshot {
-	readonly accepted: readonly AcceptedMessage[];
+	readonly accepted: readonly ProjectedMessage[];
 	readonly acceptedOperationDigest: string;
 	readonly authority: V3RoomSuccessorAuthority | null;
 	readonly durableTranscriptDigest: string;
@@ -114,7 +125,7 @@ interface ChatSnapshot {
 }
 
 interface ActiveChat {
-	readonly accepted: Map<string, AcceptedMessage>;
+	readonly accepted: Map<string, ProjectedMessage>;
 	readonly clientId: ClientId;
 	readonly clientAuthors: Readonly<Record<ClientId, string>>;
 	readonly databaseName: string;
@@ -225,17 +236,25 @@ function prepareChatMigration(operations: readonly V3RoomAcceptedOperation[]): V
 	});
 }
 
-function sortedMessages(accepted: Map<string, AcceptedMessage>): readonly AcceptedMessage[] {
+function isSnapshotAcceptedMessage(message: ProjectedMessage): message is SnapshotAcceptedMessage {
+	return "provenance" in message && message.provenance === "authenticated-snapshot";
+}
+
+function sortedMessages(accepted: Map<string, ProjectedMessage>): readonly ProjectedMessage[] {
+	const messages = [...accepted.values()];
 	return Object.freeze(
-		[...accepted.values()]
-			.sort(
-				(left, right) =>
-					left.logicalTime - right.logicalTime ||
-					compareText(left.author, right.author) ||
-					left.authorSequence - right.authorSequence ||
-					compareText(left.digest, right.digest)
-			)
-			.map((entry) => Object.freeze({ ...entry }))
+		[
+			...messages.filter(isSnapshotAcceptedMessage),
+			...messages
+				.filter((message): message is AcceptedMessage => !isSnapshotAcceptedMessage(message))
+				.sort(
+					(left, right) =>
+						left.logicalTime - right.logicalTime ||
+						compareText(left.author, right.author) ||
+						left.authorSequence - right.authorSequence ||
+						compareText(left.digest, right.digest)
+				),
+		].map((entry) => Object.freeze({ ...entry }))
 	);
 }
 
@@ -265,8 +284,9 @@ function visibleGroups(
 
 function snapshot(active: ActiveChat | undefined): ChatSnapshot {
 	const accepted = active === undefined ? Object.freeze([]) : sortedMessages(active.accepted);
-	const operationIdentities = accepted.map(({ digest: identity }) => identity);
-	const transcript = accepted.map(({ author, authorSequence, digest: identity, logicalTime, text }) => ({
+	const liveAccepted = accepted.filter((message): message is AcceptedMessage => !isSnapshotAcceptedMessage(message));
+	const operationIdentities = liveAccepted.map(({ digest: identity }) => identity);
+	const transcript = liveAccepted.map(({ author, authorSequence, digest: identity, logicalTime, text }) => ({
 		author,
 		authorSequence,
 		digest: identity,
@@ -448,17 +468,21 @@ function applicationMaterial(): ApplicationMaterial {
  * @returns Exact canonical durable chat state bytes.
  */
 function canonicalChatStateBytes(projection: ChatProjection): Uint8Array {
+	const snapshotDerived = authenticatedBaseProjections.has(projection);
 	return encodeCanonical(
-		[...projection.accepted]
-			.sort(
-				(left, right) =>
-					left.logicalTime - right.logicalTime ||
-					compareText(left.author, right.author) ||
-					left.authorSequence - right.authorSequence ||
-					compareText(left.digest, right.digest) ||
-					left.operationIndex - right.operationIndex
-			)
-			.map(({ clientOperationId, text }) => Object.freeze({ clientOperationId, text }))
+		(snapshotDerived
+			? [...projection.accepted]
+			: [...projection.accepted].sort((left, right) => {
+					if (isSnapshotAcceptedMessage(left) || isSnapshotAcceptedMessage(right)) return 0;
+					return (
+						left.logicalTime - right.logicalTime ||
+						compareText(left.author, right.author) ||
+						left.authorSequence - right.authorSequence ||
+						compareText(left.digest, right.digest) ||
+						left.operationIndex - right.operationIndex
+					);
+				})
+		).map(({ clientOperationId, text }) => Object.freeze({ clientOperationId, text }))
 	);
 }
 
@@ -569,7 +593,9 @@ async function createCreatorAuthorityMaterial(objectId = OBJECT_ID): Promise<Cre
 	const exactCanonicalParametersCarrierBytes = encodeCanonical(PARAMETERS);
 	const material = await createV3RoomCreatorInviteMaterial({
 		blueprintDigest: application.blueprintDigest,
-		exactCanonicalApplicationStateBytes: canonicalChatStateBytes(projectChat([])),
+		exactCanonicalApplicationStateBytes: canonicalChatStateBytes(
+			projectChat(Object.freeze({ authenticatedBase: undefined, currentEpochOperations: Object.freeze([]) }))
+		),
 		exactCanonicalLatchedAclBytes,
 		exactCanonicalParametersCarrierBytes,
 		exactCanonicalProfileBytes,
@@ -690,9 +716,45 @@ function createRoomNetwork(peerId: string, channelName: string, knownPeerIds: re
 	});
 }
 
-function projectChat(operations: readonly V3RoomAcceptedOperation[]): ChatProjection {
+function authenticatedSnapshotMessages(
+	input: V3RoomProjectionInput["authenticatedBase"]
+): readonly SnapshotAcceptedMessage[] {
+	if (input === undefined) return Object.freeze([]);
+	let decoded: unknown;
+	try {
+		decoded = decodeCanonical(input.exactCanonicalApplicationStateBytes);
+	} catch {
+		throw new TypeError("v3 chat authenticated projection base is invalid");
+	}
+	if (!Array.isArray(decoded) || !sameBytes(encodeCanonical(decoded), input.exactCanonicalApplicationStateBytes)) {
+		throw new TypeError("v3 chat authenticated projection base is invalid");
+	}
+	return Object.freeze(
+		decoded.map((value) => {
+			if (value === null || typeof value !== "object" || Array.isArray(value)) {
+				throw new TypeError("v3 chat authenticated projection base is invalid");
+			}
+			const keys = Reflect.ownKeys(value);
+			const clientOperationId = Reflect.get(value, "clientOperationId");
+			const text = Reflect.get(value, "text");
+			if (
+				keys.length !== 2 ||
+				!keys.every((key) => key === "clientOperationId" || key === "text") ||
+				typeof clientOperationId !== "string" ||
+				clientOperationId.length === 0 ||
+				typeof text !== "string"
+			) {
+				throw new TypeError("v3 chat authenticated projection base is invalid");
+			}
+			return Object.freeze({ clientOperationId, provenance: "authenticated-snapshot" as const, text });
+		})
+	);
+}
+
+function projectChat(input: V3RoomProjectionInput): ChatProjection {
+	const base = authenticatedSnapshotMessages(input.authenticatedBase);
 	const identities = new Map<string, Uint8Array>();
-	const accepted = operations.flatMap((acceptedOperation) => {
+	const accepted = input.currentEpochOperations.flatMap((acceptedOperation) => {
 		const operation = acceptedOperation.operation;
 		const action = Reflect.get(operation, "action");
 		if (action === "migrationActivation" || action === "migrationRecord") return [];
@@ -730,11 +792,13 @@ function projectChat(operations: readonly V3RoomAcceptedOperation[]): ChatProjec
 			}),
 		];
 	});
-	return Object.freeze({
-		accepted: Object.freeze(accepted),
+	const projection = Object.freeze({
+		accepted: Object.freeze([...base, ...accepted]),
 		transportPeerAuthors: Object.freeze([]),
 		writerAuthors: Object.freeze([]),
 	});
+	if (input.authenticatedBase !== undefined) authenticatedBaseProjections.add(projection);
+	return projection;
 }
 
 function chatRoomHeadAuthority(migrationHead?: V3RoomHead): V3RoomHeadAuthority {
@@ -789,7 +853,7 @@ async function joinRoom(input: RoomJoinInput): Promise<ActiveChat> {
 	const clientAuthors = await createClientAuthors();
 	const keychain = await createLocalKeychain(input.clientId);
 	const author = keychain.localAuthorId;
-	const accepted = new Map<string, AcceptedMessage>();
+	const accepted = new Map<string, ProjectedMessage>();
 	let redirectedRoom: V3RoomSession<ChatProjection> | undefined;
 	let currentObjectId = OBJECT_ID;
 	const source = { room: undefined as V3RoomSession<ChatProjection> | undefined };
@@ -820,8 +884,13 @@ async function joinRoom(input: RoomJoinInput): Promise<ActiveChat> {
 		},
 		onProjection: (projection): void => {
 			accepted.clear();
-			for (const message of projection.accepted) {
-				accepted.set(`${message.digest}:${message.operationIndex}`, message);
+			for (const [index, message] of projection.accepted.entries()) {
+				accepted.set(
+					isSnapshotAcceptedMessage(message)
+						? `authenticated-snapshot:${index}:${message.clientOperationId}`
+						: `${message.digest}:${message.operationIndex}`,
+					message
+				);
 			}
 		},
 		publicKeyBytes: bytes(author),

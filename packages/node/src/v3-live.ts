@@ -212,6 +212,7 @@ const SNAPSHOT_ACTIVATION_INPUT_KEYS = [
 ] as const;
 const BLUEPRINT_BINDING_INPUT_KEYS = ["exactCanonicalInitialStateBytes", "plane"] as const;
 const BLUEPRINT_RETRIEVAL_INPUT_KEYS = ["plane"] as const;
+const BLUEPRINT_PROJECTION_BASE_INPUT_KEYS = ["plane", "purpose"] as const;
 const LOCAL_ISSUE_INPUT_KEYS = ["operations", "signRegisteredVertexDigest"] as const;
 const LOCAL_ISSUE_ENTRY_KEYS = ["logicalTime", "operation"] as const;
 const CANONICAL_APPLICATION_BATCH_ENTRY_KEYS = ["operation", "logicalTime"] as const;
@@ -329,9 +330,19 @@ interface V3SnapshotPlaneActivationInput extends V3GenesisPlaneActivationInput {
 
 export type V3PlaneActivationInput = V3GenesisPlaneActivationInput | V3SnapshotPlaneActivationInput;
 
+type V3BlueprintLiveBindInput = Readonly<{
+	readonly exactCanonicalInitialStateBytes: Uint8Array;
+	readonly plane: V3PlaneHandle;
+}>;
+type V3BlueprintLiveRetrievalInput = Readonly<{ readonly plane: V3PlaneHandle }>;
+type V3BlueprintProjectionBaseInput = Readonly<{
+	readonly plane: V3PlaneHandle;
+	readonly purpose: "projection-base";
+}>;
 type V3BlueprintLiveBindingInput =
-	| Readonly<{ readonly exactCanonicalInitialStateBytes: Uint8Array; readonly plane: V3PlaneHandle }>
-	| Readonly<{ readonly plane: V3PlaneHandle }>;
+	| V3BlueprintLiveBindInput
+	| V3BlueprintLiveRetrievalInput
+	| V3BlueprintProjectionBaseInput;
 
 export type V3AdmittedVertexSink = (
 	delivery: Readonly<{
@@ -525,9 +536,22 @@ export type V3PlaneActivationResult =
 	| Readonly<{ readonly ok: true; readonly handle: V3PlaneHandle }>
 	| Readonly<{ readonly ok: false; readonly kind: V3PlaneActivationFailureKind; readonly detail: string }>;
 
-type V3BlueprintLiveBindingResult =
+type V3BlueprintLiveHandleResult =
 	| Readonly<{ readonly ok: true; readonly handle: V3BlueprintLiveHandle }>
 	| Readonly<{ readonly ok: false; readonly kind: V3PlaneActivationFailureKind; readonly detail: string }>;
+
+type V3BlueprintProjectionBaseResult =
+	| Readonly<{
+			readonly blueprintDigest: string;
+			readonly epoch: number;
+			readonly exactCanonicalApplicationStateBytes: Uint8Array;
+			readonly objectId: string;
+			readonly ok: true;
+			readonly stateDigest: string;
+	  }>
+	| Readonly<{ readonly ok: false; readonly kind: V3PlaneActivationFailureKind; readonly detail: string }>;
+
+type V3BlueprintLiveBindingResult = V3BlueprintLiveHandleResult | V3BlueprintProjectionBaseResult;
 
 export type V3EgressResult =
 	| Readonly<{ readonly ok: true; readonly kind: "empty" | "published" }>
@@ -2526,6 +2550,11 @@ interface V3PlaneRegistration {
 	blueprintClosing: boolean;
 	blueprintFolded: boolean;
 	blueprintMachine?: BlueprintStateMachine;
+	blueprintMachineIdentity?: Readonly<{
+		readonly expectedStateDigest: string;
+		readonly machine: BlueprintStateMachine;
+		readonly origin: "creator-successor-import" | "signed-genesis-bind" | "snapshot-activation";
+	}>;
 	blueprintHandle?: V3BlueprintLiveHandle;
 	readonly classifyTerminalVertex?: V3TerminalVertexClassifier;
 	displacedIssuanceBoundary?: number;
@@ -3125,6 +3154,7 @@ async function reclaimV3RuntimeKernel(input: D109dRuntimeReclamationInput): Prom
 				predecessor.epochBytes = anchorCharge;
 				predecessor.graphVersion = 1;
 				predecessor.blueprintMachine = undefined;
+				predecessor.blueprintMachineIdentity = undefined;
 				predecessor.blueprintHandle = undefined;
 				predecessor.quarantinedDigests = emptyQuarantine;
 				predecessor.publicationCursor = undefined;
@@ -4231,6 +4261,7 @@ interface HistoricalIssuanceContext {
 	readonly countedSequences: Set<number>;
 	count: number;
 	readonly maxEpochVertices: number;
+	readonly scopeAuthorMatches: boolean;
 }
 
 function beginHistoricalIssuanceScan(context: HistoricalIssuanceContext | undefined): void {
@@ -4619,6 +4650,7 @@ function authenticatedCoveredHistoricalOutboxRow(
 		const identity = resolveVerifiedCreatorHistoricalIssuance(historicalIssuance.capability);
 		if (
 			identity === undefined ||
+			historicalIssuance.scopeAuthorMatches !== true ||
 			identity.objectId !== issuanceScope.objectId ||
 			identity.author !== issuanceScope.author ||
 			row.authorSequence > identity.admittedAuthorSequence
@@ -4947,7 +4979,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				identity === undefined ||
 				expectedClosedEpoch === undefined ||
 				identity.objectId !== selectedScope.objectId ||
-				identity.author !== selectedScope.author ||
+				historicalIssuance.scopeAuthorMatches !== (identity.author === selectedScope.author) ||
 				identity.closedEpoch !== expectedClosedEpoch ||
 				identity.successorEpoch !== expectedClosedEpoch + 1 ||
 				(successorRecovery === undefined
@@ -7073,11 +7105,15 @@ function importCreatorSuccessorInitialMachine(
 }
 
 /**
- * Binds exact signed-genesis application state to one active recovered v3 plane.
- * @param rawInput - Closed plane and exact canonical state bytes.
- * @returns A live blueprint fold handle or a closed binding failure.
+ * Binds exact signed-genesis state or retrieves an eligible plane's bounded blueprint state.
+ * @param rawInput - A closed binding/retrieval request for one registered plane.
+ * @returns A live fold handle, a detached projection base, or a closed failure.
  */
-export function bindV3BlueprintLivePlane(rawInput: V3BlueprintLiveBindingInput): V3BlueprintLiveBindingResult {
+function bindV3BlueprintLivePlane(rawInput: V3BlueprintProjectionBaseInput): V3BlueprintProjectionBaseResult;
+function bindV3BlueprintLivePlane(
+	rawInput: V3BlueprintLiveBindInput | V3BlueprintLiveRetrievalInput
+): V3BlueprintLiveHandleResult;
+function bindV3BlueprintLivePlane(rawInput: V3BlueprintLiveBindingInput): V3BlueprintLiveBindingResult {
 	try {
 		const retrieval = snapshotClosedRecord(rawInput, BLUEPRINT_RETRIEVAL_INPUT_KEYS);
 		if (retrieval !== undefined) {
@@ -7088,6 +7124,45 @@ export function bindV3BlueprintLivePlane(rawInput: V3BlueprintLiveBindingInput):
 				registration.blueprintHandle !== undefined
 				? ObjectFreeze({ handle: registration.blueprintHandle, ok: true as const })
 				: activationFailure("capability-consumed", "v3 snapshot plane is unavailable");
+		}
+		const projectionBase = snapshotClosedRecord(rawInput, BLUEPRINT_PROJECTION_BASE_INPUT_KEYS);
+		if (projectionBase !== undefined) {
+			if (projectionBase.purpose !== "projection-base") {
+				return activationFailure("malformed-input", "v3 projection base input is invalid");
+			}
+			const registration = v3HandleRegistrations.get(projectionBase.plane as V3PlaneHandle);
+			const machine = registration?.blueprintMachine;
+			const identity = registration?.blueprintMachineIdentity;
+			if (
+				registration === undefined ||
+				!currentRegistration(registration) ||
+				registration.mode !== "genesis-active" ||
+				registration.terminalState !== "active" ||
+				registration.blueprintClosing ||
+				registration.blueprintFolded ||
+				registration.blueprintHandle === undefined ||
+				machine === undefined ||
+				identity === undefined ||
+				identity.origin !== "creator-successor-import" ||
+				identity.machine !== machine
+			) {
+				return activationFailure("capability-consumed", "v3 successor projection base is unavailable");
+			}
+			const snapshot = machine.snapshot();
+			if (
+				snapshot.blueprintDigest !== registration.payload.provenance.blueprintDigest ||
+				snapshot.stateDigest !== identity.expectedStateDigest
+			) {
+				return activationFailure("capability-consumed", "v3 successor projection base differs");
+			}
+			return ObjectFreeze({
+				blueprintDigest: snapshot.blueprintDigest,
+				epoch: registration.payload.provenance.epoch,
+				exactCanonicalApplicationStateBytes: new Uint8ArrayConstructor(snapshot.exactCanonicalStateBytes),
+				objectId: registration.payload.provenance.objectId,
+				ok: true as const,
+				stateDigest: snapshot.stateDigest,
+			});
 		}
 		const input = snapshotClosedRecord(rawInput, BLUEPRINT_BINDING_INPUT_KEYS);
 		if (input === undefined) return activationFailure("malformed-input", "v3 blueprint binding input is invalid");
@@ -7119,6 +7194,11 @@ export function bindV3BlueprintLivePlane(rawInput: V3BlueprintLiveBindingInput):
 			return activationFailure("malformed-input", "v3 signed genesis state is invalid");
 		}
 		registration.blueprintMachine = machine;
+		registration.blueprintMachineIdentity = ObjectFreeze({
+			expectedStateDigest: initialStateDigest,
+			machine,
+			origin: "signed-genesis-bind" as const,
+		});
 		const handle = makeV3BlueprintLiveHandle(registration);
 		registration.blueprintHandle = handle;
 		return ObjectFreeze({ handle, ok: true as const });
@@ -7126,6 +7206,8 @@ export function bindV3BlueprintLivePlane(rawInput: V3BlueprintLiveBindingInput):
 		return activationFailure("internal-invariant", "v3 blueprint binding failed");
 	}
 }
+
+export { bindV3BlueprintLivePlane };
 
 function creatorClosePreviousHistorySnapshot(payload: PreparedV3LivePayload): AccumulatorSnapshot | undefined {
 	try {
@@ -7371,6 +7453,19 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 		if ((mode === "snapshot-closed" || successorInitialState !== undefined) && snapshotMachine === undefined) {
 			return activationFailure("malformed-input", "v3 snapshot activation input is invalid");
 		}
+		const blueprintMachineIdentity =
+			snapshotMachine === undefined
+				? undefined
+				: ObjectFreeze({
+						expectedStateDigest:
+							successorInitialState?.expectedApplicationStateDigest ??
+							(snapshotInput?.expectedApplicationStateDigest as string),
+						machine: snapshotMachine,
+						origin:
+							successorInitialState === undefined
+								? ("snapshot-activation" as const)
+								: ("creator-successor-import" as const),
+					});
 		const boundNetworkNode = networkNode as DRPNetworkNode;
 		if (typeof boundNetworkNode.peerId !== "string" || boundNetworkNode.peerId.length === 0) {
 			return activationFailure("not-started", "v3 network is not started");
@@ -7488,6 +7583,7 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				blueprintFolded: mode === "snapshot-closed",
 				blueprintHandle: undefined,
 				blueprintMachine: snapshotMachine,
+				blueprintMachineIdentity,
 				classifyTerminalVertex: recovered.classifyTerminalVertex,
 				displacedIssuanceBoundary: recovered.displacedIssuanceBoundary,
 				displacedSource: recovered.displacedSource,
@@ -7605,7 +7701,6 @@ async function activateCreatorSuccessorLive(
 			return capability === undefined ||
 				identity === undefined ||
 				identity.objectId !== material.issuanceScope.objectId ||
-				identity.author !== material.issuanceScope.author ||
 				identity.closedEpoch !== material.predecessor.trust.currentEpoch ||
 				identity.closedAnchorDigest !== material.predecessor.trust.currentAnchorDigest ||
 				identity.successorEpoch !== material.successor.trust.currentEpoch ||
@@ -7616,6 +7711,7 @@ async function activateCreatorSuccessorLive(
 						count: 0,
 						countedSequences: new IntrinsicSet<number>(),
 						maxEpochVertices: successorPayload.parameters.maxEpochVertices,
+						scopeAuthorMatches: identity.author === material.issuanceScope.author,
 					};
 		};
 		const predecessorHistoricalIssuance = openHistoricalIssuance();

@@ -55,11 +55,19 @@ interface DirectKeychain {
 
 interface DirectRoomDependencies {
 	readonly Keychain: new (input: Readonly<{ readonly private_key_seed: string }>) => DirectKeychain;
+	bindV3BlueprintLivePlane(input: Readonly<Record<string, unknown>>): PlainRecord;
 	createRecoverableFinalitySigner(
 		input: Readonly<{ readonly seed: Uint8Array }>
 	): Promise<Readonly<{ readonly publicKey: Uint8Array; readonly signer: unknown }>>;
 	createV3ChatApplication(clientId: "alice"): Readonly<{
 		readonly catalog: Readonly<{ readonly blueprintDigests: readonly string[] }>;
+	}>;
+	createV3ZoneApplication(
+		members: readonly PlainRecord[],
+		creatorPeerId: string,
+		creatorAuthor: string
+	): Readonly<{
+		projectAcceptedOperations(input: Readonly<Record<string, unknown>>): unknown;
 	}>;
 	createV3RoomCreatorInviteMaterial(input: Readonly<Record<string, unknown>>): Promise<unknown>;
 	createV3RoomSession(input: Readonly<Record<string, unknown>>): Promise<DirectRoomSession>;
@@ -158,6 +166,7 @@ interface LifetimeInstrumentation {
 	d110c0c1cSetFault(fault: string | null): void;
 	d110c0c1SetPhase(phase: string | null): void;
 	d110c0c1TraceSnapshot(): readonly PlainRecord[];
+	projectionBaseObservations(): readonly PlainRecord[];
 	d110c0cRecoverySnapshot(): Readonly<{
 		readonly callCount: number;
 		readonly resultKind: string | null;
@@ -259,6 +268,7 @@ declare global {
 			d110c0c1Differential(name: string): Promise<PlainRecord>;
 			d110c0c1eSameAuthorControl(name: string): Promise<PlainRecord>;
 			d110c0c1cControl(name: string): Promise<PlainRecord>;
+			d110c0c1gGridControl(): PlainRecord;
 			d110c0c1cMatrix(name: string): Promise<PlainRecord>;
 			d110c0cRecover(name: string): Promise<PlainRecord>;
 			d110c0cStage(name: string, ordering: "new-ahe" | "old-ahe"): Promise<PlainRecord>;
@@ -1781,14 +1791,27 @@ async function d110c0c1Case(name: string, kind: "control" | "treatment"): Promis
 			await issue("d110c-0c1-control-after-reopen", "d110c-0c1-control-after-reopen");
 			const after = d110c0cColdRoomSnapshot(room);
 			const postReopenRows = await d110c0c1IssuanceRows(databaseName);
+			const rehearsalInput = directRehearsalInputs.get(name);
+			if (rehearsalInput === undefined) throw new TypeError("D110C_0C1G_REHEARSAL_INPUT_ABSENT");
+			let successorMigrationDetail = "fulfilled";
+			try {
+				await room.rehearseMigration(rehearsalInput);
+			} catch (error) {
+				successorMigrationDetail = directFailureDetail(error);
+			}
+			await issue("d110c-0c1-after-migration-refusal", "d110c-0c1-after-migration-refusal");
+			const afterMigrationRefusal = d110c0cColdRoomSnapshot(room);
 			return Object.freeze({
 				after,
+				afterMigrationRefusal,
 				coldReopenCount: instrumentation().d110cColdReopenCount(),
 				hot,
 				kind,
 				postReopenRows,
 				prefixRows,
+				projectionBases: instrumentation().projectionBaseObservations(),
 				reopened,
+				successorMigrationDetail,
 				trace: instrumentation().d110c0c1TraceSnapshot(),
 			});
 		}
@@ -1844,6 +1867,35 @@ async function d110c0c1Case(name: string, kind: "control" | "treatment"): Promis
 		instrumentation().d110c0c1SetPhase(null);
 		await discardDirectRoom(name);
 	}
+}
+
+function d110c0c1gGridControl(): PlainRecord {
+	const dependencies = directDependencies();
+	const application = dependencies.createV3ZoneApplication(Object.freeze([]), "peer:grid", "author:grid");
+	let detail = "fulfilled";
+	try {
+		application.projectAcceptedOperations(
+			Object.freeze({
+				authenticatedBase: Object.freeze({
+					blueprintDigest: "a".repeat(64),
+					epoch: 1,
+					exactCanonicalApplicationStateBytes: encodeCanonical({ blocks: [], outcomes: [] }),
+					objectId: "creator:grid",
+					stateDigest: "b".repeat(64),
+				}),
+				currentEpochOperations: Object.freeze([]),
+			})
+		);
+	} catch (error) {
+		detail = directFailureDetail(error);
+	}
+	const malformedTagged = dependencies.bindV3BlueprintLivePlane(
+		Object.freeze({ extra: true, plane: Object.freeze({}), purpose: "projection-base" })
+	);
+	const noncurrentTagged = dependencies.bindV3BlueprintLivePlane(
+		Object.freeze({ plane: Object.freeze({}), purpose: "projection-base" })
+	);
+	return Object.freeze({ detail, malformedTagged, noncurrentTagged });
 }
 
 async function d110c0c1Differential(name: string): Promise<PlainRecord> {
@@ -2058,7 +2110,7 @@ async function d110c0cRecover(name: string): Promise<PlainRecord> {
 				text: "d110c-0c-post-restart",
 			})
 		);
-		reopenedSnapshot = await d110c0cRoomSnapshot(reopened);
+		reopenedSnapshot = d110c0cColdRoomSnapshot(reopened);
 	} catch (error) {
 		detail = directFailureDetail(error);
 	}
@@ -2432,6 +2484,9 @@ const api = Object.freeze({
 	},
 	d110c0c1cControl(name: string): Promise<PlainRecord> {
 		return d110c0c1Case(name, "control");
+	},
+	d110c0c1gGridControl(): PlainRecord {
+		return d110c0c1gGridControl();
 	},
 	d110c0c1cMatrix(name: string): Promise<PlainRecord> {
 		return d110c0c1cMatrix(name);

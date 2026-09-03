@@ -2,6 +2,7 @@ import type {
 	CreateV3RoomSessionInput,
 	V3RoomAcceptedOperation,
 	V3RoomApplication,
+	V3RoomAuthenticatedProjectionBase,
 	V3RoomMigrationActivationInput,
 	V3RoomMigrationActivationReceipt,
 	V3RoomMigrationCapability,
@@ -9,6 +10,7 @@ import type {
 	V3RoomMigrationRehearsalInput,
 	V3RoomMigrationRehearsalReceipt,
 	V3RoomProjectionAuthority,
+	V3RoomProjectionInput,
 	V3RoomSession,
 	V3RoomTransport,
 } from "../../../examples/v3-room/src/index.js";
@@ -85,9 +87,25 @@ interface ExpectedMigrationActivationInput {
 	readonly targetCreatorInvite: CreateV3RoomSessionInput<ExpectedProjection>["creatorInvite"];
 }
 
-type ExpectedProjector = (operations: readonly V3RoomAcceptedOperation[]) => ExpectedProjection;
+interface ExpectedAuthenticatedProjectionBase {
+	readonly blueprintDigest: string;
+	readonly epoch: number;
+	readonly exactCanonicalApplicationStateBytes: Uint8Array;
+	readonly objectId: string;
+	readonly stateDigest: string;
+}
+
+interface ExpectedProjectionInput {
+	readonly authenticatedBase: ExpectedAuthenticatedProjectionBase | undefined;
+	readonly currentEpochOperations: readonly V3RoomAcceptedOperation[];
+}
+
+type ExpectedProjector = (input: ExpectedProjectionInput) => ExpectedProjection;
 
 type _AcceptedOperation = Assert<Equal<V3RoomAcceptedOperation, ExpectedAcceptedOperation>>;
+type _AuthenticatedProjectionBase = Assert<
+	Equal<V3RoomAuthenticatedProjectionBase, ExpectedAuthenticatedProjectionBase>
+>;
 type _ApplicationKeys = Assert<
 	Equal<
 		keyof V3RoomApplication<ExpectedProjection>,
@@ -127,6 +145,7 @@ type _DisplacementPolicies = Assert<
 	>
 >;
 type _Projector = Assert<Equal<V3RoomApplication<ExpectedProjection>["projectAcceptedOperations"], ExpectedProjector>>;
+type _ProjectionInput = Assert<Equal<V3RoomProjectionInput, ExpectedProjectionInput>>;
 type _TransformDisplacedOperation = Assert<
 	Equal<
 		V3RoomApplication<ExpectedProjection>["transformDisplacedOperation"],
@@ -156,7 +175,7 @@ type _OperationAdmissionFactory = Assert<
 							context: Readonly<{
 								readonly aclDigest: string;
 								readonly anchorDigest: string;
-								readonly epoch: 0;
+								readonly epoch: number;
 								readonly objectId: string;
 							}>
 					  ) => ExpectedOperationAdmissionPolicy)

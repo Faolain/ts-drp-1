@@ -563,7 +563,12 @@ describe.skipIf(!canonicalStateInputReady)("D.93.56 shared genesis-root builder 
 		const chatBlueprintDigest = String(chatApplication.catalog.blueprintDigests[0] ?? "");
 		const chatMigration = chatApplication.migration;
 		if (chatMigration === undefined) throw new TypeError("missing expected chat migration owner");
-		const chatStateBytes = chatMigration.canonicalStateBytes(chatApplication.projectAcceptedOperations([]));
+		const chatStateBytes = chatMigration.canonicalStateBytes(
+			chatApplication.projectAcceptedOperations({
+				authenticatedBase: undefined,
+				currentEpochOperations: Object.freeze([]),
+			})
+		);
 		expectProductInput(chatInput, {
 			acl: await expectedChatAcl(chatObjectId),
 			blueprintDigest: chatBlueprintDigest,
@@ -581,7 +586,12 @@ describe.skipIf(!canonicalStateInputReady)("D.93.56 shared genesis-root builder 
 		const zoneBlueprintDigest = String(zoneApplication.catalog.blueprintDigests[0] ?? "");
 		const zoneMigration = zoneApplication.migration;
 		if (zoneMigration === undefined) throw new TypeError("missing expected zone migration owner");
-		const zoneStateBytes = zoneMigration.canonicalStateBytes(zoneApplication.projectAcceptedOperations([]));
+		const zoneStateBytes = zoneMigration.canonicalStateBytes(
+			zoneApplication.projectAcceptedOperations({
+				authenticatedBase: undefined,
+				currentEpochOperations: Object.freeze([]),
+			})
+		);
 		expectProductInput(zoneInput, {
 			acl: encodeCanonical({
 				epoch: 0,

@@ -96517,7 +96517,9 @@ slice is closed by the held working tree.
 ###### D.110c-0c1g authenticated successor projection-base prerequisite
 
 **Status: bounded source/architecture audit, plan review, sole correction
-confirmation, and causal tests-only RED are complete; GREEN is next.** Owner:
+confirmation, causal tests-only RED, narrow GREEN implementation, and its
+deterministic focused/static/retained evidence are complete; signed/pushed
+GREEN and the sole combined final review are next.** Owner:
 `examples/v3-room/src/index.ts::V3RoomApplication` and
 `createV3RoomSessionOwned()` projection initialization/stage/commit and
 successor-migration refusal paths;
@@ -96697,7 +96699,7 @@ still succeeds. One direct grid control proves a non-undefined base returns only
 the frozen authority-base-unavailable error and performs no ephemeral admission.
 No zone outcome carrier is decoded or reverified from a base in this slice.
 
-The completed GREEN retained gate runs once in this order: the new focused
+The completed GREEN retained gate runs in this order: the new focused
 case/mutants; D.110c-0c1e's three tests; D.110c-0c1d's focused test;
 D.110c-0c1c; D.110c-0c1; and both D.110c-0c process-death orderings with exact
 application state, ACL/authority/anchor/history, snapshot identity, room-head,
@@ -96818,6 +96820,70 @@ and its manifest SHA-256 is
 `86ab3e92cfeafc2a6857e6083d221c1bd78257d69339e53fdc8b41be5e0f8511`.
 The RED matrix matches exactly, so the frozen narrow GREEN may begin without a
 separate RED model review.
+
+GREEN implements the frozen single-projector contract and no broader recovery
+authority. Node's existing binder now has the tagged, snapshot-only
+`projection-base` retrieval; its private registration authenticates the exact
+imported machine origin and expected state digest, and reclamation clears that
+identity. The room owns one frozen authenticated base, threads it through every
+initialization/stage/commit, checks exact projected canonical-state equality on
+successor reopen, and refuses base-bearing migration with the frozen token.
+Chat decodes only the exact canonical `{clientOperationId,text}` snapshot
+prefix, labels those rows `authenticated-snapshot`, preserves their order,
+excludes them from live-vertex metadata digests, and appends genuine current-
+epoch rows. Grid rejects any nonempty base with its frozen authority-carrier
+token. All seven inventoried positional consumers use the new closed input.
+
+The sole focused Chromium execution passed 1/1 in 2.5 seconds with exact
+before/after canonical state, a retained base after the new issue, a frozen
+six-key projection-base result containing no callable member, the migration
+refusal followed by successful continued issue, the grid refusal, and malformed
+and noncurrent tagged-input controls. Playwright returned zero with reporter
+counts expected/skipped/unexpected/flaky `1/0/0/0` and no top-level error. The
+surrounding evidence shell then returned one only because it assigned to zsh's
+read-only `status` parameter after Playwright had completed; this is recorded
+as a harness diagnostic and the test was not rerun. The later complete product
+file exercised the final source and passed all 15 titles in 36.4 seconds with
+counts `15/0/0/0` and no top-level error.
+
+The frozen retained Vitest roster first passed 173/174; its sole failure was a
+source-AST export count seeing three TypeScript overload export declarations
+for the one runtime function. GREEN kept the overload contract but converted
+the declarations to nonexported overloads plus one named runtime export. The
+affected seven-test correction passed, then the complete frozen roster passed
+174/174 with zero failed suites/tests. Node, storage-browser, v3-room, and chat
+build/typecheck gates; grid's production Vite build; the exact room public-
+contract compile fixture; exact-owner ESLint/Prettier; diff; and source-shape
+checks passed. The contract fixture also corrected an inherited stale literal-
+zero epoch expectation to the already-public current `number` type.
+
+The additional seven-file positional-consumer runtime sweep returned 41/60.
+All 19 failures are confined to two legacy fixtures and occur before the
+changed projector can be called: the v3-room rebase fixture supplies obsolete
+noncanonical invite bytes (`truncated canonical value`), and the Phase-3 exit
+grid mock lacks current zone initialization (`zoneId.length`). The other five
+consumer files pass. These two files are outside the accepted 174-test roster;
+their assertions were not excluded, rewritten, or represented as passing.
+Repairing either fixture is broader than the authorized signature-only edit and
+is therefore held as pre-existing retained-fixture debt for final-review
+disposition rather than silently widened into 0c1g.
+
+Grid's production build passes. Its package-wide typecheck retains the
+pre-existing missing `roomHeadAuthority` diagnostic at `v3-zone.ts:637`, while
+the changed projector is at the later projection-owner seam and all other
+affected typechecks pass. D.110c-0c1h already owns grid successor/floor
+authority; 0c1g does not fabricate that authority or cast it away merely to
+silence this inherited diagnostic. The sole combined GREEN review must decide
+whether either inherited diagnostic is a material P0/P1 for this checkpoint;
+they are not hidden as green gates.
+
+Complete GREEN evidence is `.logs/d110c-0c1g-green-4871f680/`. No D.110a
+invocation, retained campaign, dependency, wire/schema, threshold, workload,
+Fable, or collaboration-subagent run occurred. The signed/pushed GREEN commit,
+self-excluding manifest identity, and final review result are recorded after
+the checkpoint is sealed. Its 71-entry self-excluding manifest validates and
+its SHA-256 is
+`6f8e8538ad8192bcda8d6f147c67564988c6e57a9ea0d2f3d52bdf2177ad234e`.
 
 The bounded audit is `.logs/d110c-0c1g-source-audit-c5613498/`; its two-entry
 self-excluding manifest validates and its manifest SHA-256 is

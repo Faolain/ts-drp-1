@@ -1126,9 +1126,12 @@ describe("Phase 3g room-owned rebase scheduling RED", () => {
 		let projectionRejections = 0;
 		const selectedApplication = Object.freeze({
 			...base,
-			projectAcceptedOperations: (operations: readonly Readonly<Record<string, unknown>>[]) => {
+			projectAcceptedOperations: (input: {
+				readonly authenticatedBase: undefined;
+				readonly currentEpochOperations: readonly Readonly<Record<string, unknown>>[];
+			}) => {
 				if (
-					operations.some(
+					input.currentEpochOperations.some(
 						({ operation }) =>
 							Reflect.get(operation, "action") === "transform-me" && Reflect.get(operation, "value") === 2
 					)
@@ -1136,7 +1139,7 @@ describe("Phase 3g room-owned rebase scheduling RED", () => {
 					projectionRejections += 1;
 					throw new TypeError("controlled product projection rejection");
 				}
-				return Reflect.apply(Reflect.get(base, "projectAcceptedOperations") as () => unknown, base, [operations]);
+				return Reflect.apply(Reflect.get(base, "projectAcceptedOperations") as () => unknown, base, [input]);
 			},
 			transformDisplacedOperation: () =>
 				Object.freeze({ action: "transform-me", clientOperationId: "projection-rejected", value: 2 }),
@@ -1185,12 +1188,15 @@ describe("Phase 3g room-owned rebase scheduling RED", () => {
 		let projectionRejections = 0;
 		const selectedApplication = Object.freeze({
 			...base,
-			projectAcceptedOperations: (operations: readonly Readonly<Record<string, unknown>>[]) => {
-				if (operations.some(({ operation }) => Reflect.get(operation, "value") === 2)) {
+			projectAcceptedOperations: (input: {
+				readonly authenticatedBase: undefined;
+				readonly currentEpochOperations: readonly Readonly<Record<string, unknown>>[];
+			}) => {
+				if (input.currentEpochOperations.some(({ operation }) => Reflect.get(operation, "value") === 2)) {
 					projectionRejections += 1;
 					throw new TypeError("controlled recovered product projection rejection");
 				}
-				return Reflect.apply(Reflect.get(base, "projectAcceptedOperations") as () => unknown, base, [operations]);
+				return Reflect.apply(Reflect.get(base, "projectAcceptedOperations") as () => unknown, base, [input]);
 			},
 			transformDisplacedOperation: () => replacement,
 		});

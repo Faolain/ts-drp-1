@@ -357,8 +357,21 @@ export interface V3RoomApplication<Projection extends V3RoomProjectionAuthority 
 	readonly displacementPolicies: Readonly<Record<string, "expire" | "manual-review" | "rebase" | "transform">>;
 	readonly migration?: V3RoomMigrationCapability<Projection>;
 	/** Throw a direct TypeError only when authenticated product fields are invalid. */
-	projectAcceptedOperations(operations: readonly V3RoomAcceptedOperation[]): Projection;
+	projectAcceptedOperations(input: V3RoomProjectionInput): Projection;
 	transformDisplacedOperation?(operation: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
+}
+
+export interface V3RoomAuthenticatedProjectionBase {
+	readonly blueprintDigest: string;
+	readonly epoch: number;
+	readonly exactCanonicalApplicationStateBytes: Uint8Array;
+	readonly objectId: string;
+	readonly stateDigest: string;
+}
+
+export interface V3RoomProjectionInput {
+	readonly authenticatedBase: V3RoomAuthenticatedProjectionBase | undefined;
+	readonly currentEpochOperations: readonly V3RoomAcceptedOperation[];
 }
 
 export interface CreateV3RoomSessionInput<Projection extends V3RoomProjectionAuthority = V3RoomProjectionAuthority> {
@@ -799,6 +812,14 @@ const ROOM_HEAD_INITIALIZATION_KEYS = Object.freeze(["kind"]);
 const ROOM_HEAD_MIGRATION_KEYS = Object.freeze(["head", "kind"]);
 const ROOM_HEAD_RESULT_FAILURE_KEYS = Object.freeze(["ok", "reason"]);
 const ROOM_HEAD_RESULT_SUCCESS_KEYS = Object.freeze(["ok", "state"]);
+const PROJECTION_BASE_RESULT_KEYS = Object.freeze([
+	"blueprintDigest",
+	"epoch",
+	"exactCanonicalApplicationStateBytes",
+	"objectId",
+	"ok",
+	"stateDigest",
+]);
 const LOWER_HEX_256 = /^[0-9a-f]{64}$/u;
 
 function roomHeadFailure(code: string): never {
@@ -1747,7 +1768,8 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	const recoveredActivation = recoveredActivations[0];
 	const acceptedVertices = new Map<string, V3RoomAcceptedVertex>();
 	const acceptedOperationRows = new Map<string, readonly V3RoomAcceptedOperation[] | null>();
-	let projection: Projection;
+	let projection!: Projection;
+	let authenticatedProjectionBase: V3RoomAuthenticatedProjectionBase | undefined;
 	let successorProjectionAuthority: V3RoomSuccessorAuthority | null = null;
 	let logicalTime = input.initialLogicalTime;
 	const roomCreatorAuthor = roomInviteAuthority === undefined ? input.author : roomInviteAuthority.creatorAuthor;
@@ -1784,10 +1806,36 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			candidate.set(identity, vertex);
 			additions.push(Object.freeze({ identity, vertex }));
 		}
-		const project = (selected: ReadonlyMap<string, V3RoomAcceptedVertex>): Projection =>
-			input.application.projectAcceptedOperations(
-				Object.freeze([...selected.values()].sort(compareAcceptedVertices).flatMap((vertex) => expand(vertex) ?? []))
+		const project = (selected: ReadonlyMap<string, V3RoomAcceptedVertex>): Projection => {
+			const currentEpochOperations = Object.freeze(
+				[...selected.values()].sort(compareAcceptedVertices).flatMap((vertex) => expand(vertex) ?? [])
 			);
+			const baseBytes =
+				authenticatedProjectionBase === undefined
+					? undefined
+					: new INTRINSIC_UINT8_ARRAY(authenticatedProjectionBase.exactCanonicalApplicationStateBytes);
+			const authenticatedBase =
+				authenticatedProjectionBase === undefined || baseBytes === undefined
+					? undefined
+					: Object.freeze({
+							blueprintDigest: authenticatedProjectionBase.blueprintDigest,
+							epoch: authenticatedProjectionBase.epoch,
+							exactCanonicalApplicationStateBytes: baseBytes,
+							objectId: authenticatedProjectionBase.objectId,
+							stateDigest: authenticatedProjectionBase.stateDigest,
+						});
+			const projected = input.application.projectAcceptedOperations(
+				Object.freeze({ authenticatedBase, currentEpochOperations })
+			);
+			if (
+				authenticatedProjectionBase !== undefined &&
+				(baseBytes === undefined ||
+					!sameBytes(baseBytes, authenticatedProjectionBase.exactCanonicalApplicationStateBytes))
+			) {
+				throw new TypeError("v3 room authenticated projection base was mutated");
+			}
+			return projected;
+		};
 		try {
 			return Object.freeze({ additions: Object.freeze(additions), projection: project(candidate) });
 		} catch {
@@ -1864,14 +1912,18 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 				})
 			)
 		);
-	try {
-		if (!(await commit(recovered?.descriptor.recoveredVertices ?? Object.freeze([])))) {
-			projection = input.application.projectAcceptedOperations(Object.freeze([]));
-			input.onProjection(projection);
+	if (input.successorSnapshotDeclaration === undefined) {
+		try {
+			if (!(await commit(recovered?.descriptor.recoveredVertices ?? Object.freeze([])))) {
+				projection = input.application.projectAcceptedOperations(
+					Object.freeze({ authenticatedBase: undefined, currentEpochOperations: Object.freeze([]) })
+				);
+				input.onProjection(projection);
+			}
+		} catch (error) {
+			await Promise.all([issuanceStore.close(), journalStore.close(), ...aheStores.map((store) => store.close())]);
+			throw error;
 		}
-	} catch (error) {
-		await Promise.all([issuanceStore.close(), journalStore.close(), ...aheStores.map((store) => store.close())]);
-		throw error;
 	}
 	const recoveredProjectionRejected = (recovered?.descriptor.recoveredVertices ?? Object.freeze([])).some(
 		(vertex) => vertex.author === input.author && acceptedOperationRows.get(hex(vertex.digest)) === null
@@ -2230,12 +2282,53 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 			}
 			activeHandle = reopened.handle as RoomPlaneHandle;
 			successorProjectionAuthority = successorAuthority(reopened.trust, activeHandle);
+			const projectionBaseResult = bindV3BlueprintLivePlane({ plane: activeHandle, purpose: "projection-base" });
+			if (!projectionBaseResult.ok) {
+				throw new TypeError(`v3 room successor projection base failed: ${projectionBaseResult.kind}`);
+			}
+			if (exactRecord(projectionBaseResult, PROJECTION_BASE_RESULT_KEYS) === undefined) {
+				throw new TypeError("v3 room successor projection base differs");
+			}
+			const exactCanonicalApplicationStateBytes = normalizeApplicationStateBytes(
+				projectionBaseResult.exactCanonicalApplicationStateBytes,
+				"migration"
+			);
+			if (
+				projectionBaseResult.objectId !== input.objectId ||
+				projectionBaseResult.epoch !== successorProjectionAuthority.epoch ||
+				projectionBaseResult.blueprintDigest !== roomDescriptor.blueprintDigest ||
+				projectionBaseResult.stateDigest !== digest("ts-drp/state/v3", exactCanonicalApplicationStateBytes)
+			) {
+				throw new TypeError("v3 room successor projection base differs");
+			}
+			authenticatedProjectionBase = Object.freeze({
+				blueprintDigest: projectionBaseResult.blueprintDigest,
+				epoch: projectionBaseResult.epoch,
+				exactCanonicalApplicationStateBytes,
+				objectId: projectionBaseResult.objectId,
+				stateDigest: projectionBaseResult.stateDigest,
+			});
+			projection = stage(Object.freeze([])).projection;
+			const canonicalStateBytes = input.application.migration?.canonicalStateBytes;
+			if (typeof canonicalStateBytes !== "function") {
+				throw new TypeError("v3 room successor projection state is unavailable");
+			}
+			const projectedStateBytes = normalizeApplicationStateBytes(
+				Reflect.apply(canonicalStateBytes, input.application.migration, [projection]) as Uint8Array,
+				"migration"
+			);
+			if (!sameBytes(projectedStateBytes, exactCanonicalApplicationStateBytes)) {
+				throw new TypeError("v3 room successor projection state differs");
+			}
+			input.onProjection(projection);
 		}
 		if (input.creatorFinalitySigner !== undefined && input.successorSnapshotDeclaration === undefined) {
 			if (input.application.migration === undefined) {
 				throw new TypeError("v3 room creator close initial state is unavailable");
 			}
-			const initialProjection = input.application.projectAcceptedOperations(Object.freeze([]));
+			const initialProjection = input.application.projectAcceptedOperations(
+				Object.freeze({ authenticatedBase: undefined, currentEpochOperations: Object.freeze([]) })
+			);
 			const exactCanonicalInitialStateBytes = normalizeApplicationStateBytes(
 				Reflect.apply(input.application.migration.canonicalStateBytes, input.application.migration, [
 					initialProjection,
@@ -2721,7 +2814,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 		const acceptedRows = acceptedIdentityRows();
 		const migrationImportRows = migrationImportIdentityRows();
-		if (redirectSource === undefined) {
+		if (redirectSource === undefined && sourceMaterial !== undefined) {
 			for (const source of sources.filter(({ publishState }) => publishState === "published")) {
 				for (const intent of source.intents) {
 					const operation = detachedRoomOperation(intent.operation);
@@ -2878,7 +2971,7 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 		}
 	};
 	const rebasePromise =
-		sourceMaterial === undefined
+		sourceMaterial === undefined && input.successorSnapshotDeclaration === undefined
 			? Promise.resolve()
 			: Promise.resolve().then(async () => {
 					await waitForRetainedBootstrap();
@@ -2915,6 +3008,9 @@ async function createV3RoomSessionOwned<Projection extends V3RoomProjectionAutho
 	): Promise<V3RoomMigrationRehearsalReceipt> => {
 		if (terminalFailure !== undefined) throw terminalFailure;
 		if (closed) throw new TypeError("v3 room session is closed");
+		if (authenticatedProjectionBase !== undefined) {
+			throw new TypeError("D110C_0C1G_SUCCESSOR_MIGRATION_UNAVAILABLE");
+		}
 		const fields = exactRecord(rehearsalInput, ["rehearsalNonce", "targetCreatorInvite"]);
 		const nonce = fields?.rehearsalNonce;
 		let nonceBacking: unknown;

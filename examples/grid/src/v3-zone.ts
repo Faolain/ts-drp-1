@@ -8,6 +8,7 @@ import {
 	type V3RoomMigrationActivationReceipt,
 	type V3RoomMigrationProjection,
 	type V3RoomMigrationRehearsalReceipt,
+	type V3RoomProjectionInput,
 	type V3RoomSession,
 } from "@ts-drp/example-v3-room";
 import type { DRPNode } from "@ts-drp/node";
@@ -1284,8 +1285,12 @@ export function createV3ZoneApplication(
 			canonicalStateBytes: canonicalZoneStateBytes,
 			prepare: prepareZoneMigration,
 		}),
-		projectAcceptedOperations: (operations: readonly V3RoomAcceptedOperation[]) =>
-			projectZone(operations, creatorPeerId, creatorAuthor),
+		projectAcceptedOperations: (input: V3RoomProjectionInput) => {
+			if (input.authenticatedBase !== undefined) {
+				throw new TypeError("D110C_0C1G_GRID_AUTHORITY_BASE_UNAVAILABLE");
+			}
+			return projectZone(input.currentEpochOperations, creatorPeerId, creatorAuthor);
+		},
 	});
 }
 

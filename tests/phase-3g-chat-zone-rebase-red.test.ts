@@ -39,7 +39,10 @@ interface RebaseApplication {
 	readonly catalog: TrustedBlueprintCatalog;
 	readonly displacementPolicies: Readonly<Record<string, "expire" | "manual-review" | "rebase" | "transform">>;
 	displacedOperationIdentity(operation: Readonly<Record<string, unknown>>): string;
-	projectAcceptedOperations(operations: readonly unknown[]): Readonly<Record<string, unknown>>;
+	projectAcceptedOperations(input: {
+		readonly authenticatedBase: undefined;
+		readonly currentEpochOperations: readonly unknown[];
+	}): Readonly<Record<string, unknown>>;
 }
 
 function operations(application: RebaseApplication): readonly Readonly<Record<string, unknown>>[] {
@@ -89,22 +92,32 @@ describe("Phase 3g chat and zone stable rebase identity RED", () => {
 		});
 		const authorA = "a".repeat(64);
 		const authorB = "b".repeat(64);
-		const projection = application.projectAcceptedOperations([
-			accepted(first, { author: authorA, digestByte: 1, sequence: 1 }),
-			accepted(first, { author: authorA, digestByte: 2, sequence: 2 }),
-			accepted(first, { author: authorB, digestByte: 3, sequence: 1 }),
-			accepted(second, { author: authorA, digestByte: 4, sequence: 3 }),
-		]);
+		const projection = application.projectAcceptedOperations({
+			authenticatedBase: undefined,
+			currentEpochOperations: [
+				accepted(first, { author: authorA, digestByte: 1, sequence: 1 }),
+				accepted(first, { author: authorA, digestByte: 2, sequence: 2 }),
+				accepted(first, { author: authorB, digestByte: 3, sequence: 1 }),
+				accepted(second, { author: authorA, digestByte: 4, sequence: 3 }),
+			],
+		});
 		expect(Reflect.get(projection, "accepted")).toEqual([
 			expect.objectContaining({ author: authorA, clientOperationId: "message-1", text: "hello" }),
 			expect.objectContaining({ author: authorB, clientOperationId: "message-1", text: "hello" }),
 			expect.objectContaining({ author: authorA, clientOperationId: "message-2", text: "world" }),
 		]);
 		expect(() =>
-			application.projectAcceptedOperations([
-				accepted(first, { author: authorA, digestByte: 5, sequence: 4 }),
-				accepted(Object.freeze({ ...first, text: "changed" }), { author: authorA, digestByte: 6, sequence: 5 }),
-			])
+			application.projectAcceptedOperations({
+				authenticatedBase: undefined,
+				currentEpochOperations: [
+					accepted(first, { author: authorA, digestByte: 5, sequence: 4 }),
+					accepted(Object.freeze({ ...first, text: "changed" }), {
+						author: authorA,
+						digestByte: 6,
+						sequence: 5,
+					}),
+				],
+			})
 		).toThrow();
 	});
 
@@ -150,11 +163,14 @@ describe("Phase 3g chat and zone stable rebase identity RED", () => {
 		const second = Object.freeze({ action: "placeBlock", id: "block-a", kind: "dirt", x: 3, y: 4 });
 		expect(application.displacementPolicies).toEqual({ placeBlock: "rebase" });
 		expect(application.displacedOperationIdentity(first)).toBe("block-b");
-		const projection = application.projectAcceptedOperations([
-			accepted(first, { author, digestByte: 0x11, sequence: 1 }),
-			accepted(first, { author, digestByte: 0x12, sequence: 2 }),
-			accepted(second, { author, digestByte: 0x13, sequence: 3 }),
-		]);
+		const projection = application.projectAcceptedOperations({
+			authenticatedBase: undefined,
+			currentEpochOperations: [
+				accepted(first, { author, digestByte: 0x11, sequence: 1 }),
+				accepted(first, { author, digestByte: 0x12, sequence: 2 }),
+				accepted(second, { author, digestByte: 0x13, sequence: 3 }),
+			],
+		});
 		expect(Reflect.get(projection, "blocks")).toEqual([
 			{ id: second.id, kind: second.kind, x: second.x, y: second.y },
 			{ id: first.id, kind: first.kind, x: first.x, y: first.y },

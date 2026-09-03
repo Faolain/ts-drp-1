@@ -317,9 +317,9 @@ function application(
 	return Object.freeze({
 		...base,
 		migration: Object.freeze({ ...migration, prepare }),
-		projectAcceptedOperations: (accepted: readonly V3RoomAcceptedOperation[]) => {
-			onProjection?.(accepted);
-			return base.projectAcceptedOperations(accepted);
+		projectAcceptedOperations: (input) => {
+			onProjection?.(input.currentEpochOperations);
+			return base.projectAcceptedOperations(input);
 		},
 	});
 }

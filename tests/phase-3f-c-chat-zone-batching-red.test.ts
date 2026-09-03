@@ -31,7 +31,10 @@ interface BatchApplication {
 	readonly batchableOperationActions: readonly string[];
 	readonly canonicalBlueprintPackageBytes: Uint8Array;
 	readonly catalog: TrustedBlueprintCatalog;
-	projectAcceptedOperations(operations: readonly unknown[]): Readonly<Record<string, unknown>>;
+	projectAcceptedOperations(input: {
+		readonly authenticatedBase: undefined;
+		readonly currentEpochOperations: readonly unknown[];
+	}): Readonly<Record<string, unknown>>;
 }
 
 function manifest(application: BatchApplication): Readonly<Record<string, unknown>> {
@@ -212,30 +215,33 @@ describe("Phase 3f-c real chat and zone batching composition RED", () => {
 			await expect(reduceOperation(application, Object.freeze([]), operation)).rejects.toThrow();
 		}
 		const vertexDigest = "1".repeat(64);
-		const projection = application.projectAcceptedOperations([
-			acceptedOperation(
-				{
-					author: "a".repeat(64),
-					authorSequence: 1,
-					logicalTime: 3,
-					operation: { action: "message", clientOperationId: "message-1", text: "first" },
-					vertexDigest,
-				},
-				0,
-				2
-			),
-			acceptedOperation(
-				{
-					author: "a".repeat(64),
-					authorSequence: 1,
-					logicalTime: 5,
-					operation: { action: "message", clientOperationId: "message-2", text: "second" },
-					vertexDigest,
-				},
-				1,
-				2
-			),
-		]);
+		const projection = application.projectAcceptedOperations({
+			authenticatedBase: undefined,
+			currentEpochOperations: [
+				acceptedOperation(
+					{
+						author: "a".repeat(64),
+						authorSequence: 1,
+						logicalTime: 3,
+						operation: { action: "message", clientOperationId: "message-1", text: "first" },
+						vertexDigest,
+					},
+					0,
+					2
+				),
+				acceptedOperation(
+					{
+						author: "a".repeat(64),
+						authorSequence: 1,
+						logicalTime: 5,
+						operation: { action: "message", clientOperationId: "message-2", text: "second" },
+						vertexDigest,
+					},
+					1,
+					2
+				),
+			],
+		});
 		expect(Reflect.get(projection, "accepted")).toMatchObject([
 			{ clientOperationId: "message-1", digest: vertexDigest, operationIndex: 0, text: "first" },
 			{ clientOperationId: "message-2", digest: vertexDigest, operationIndex: 1, text: "second" },
@@ -312,30 +318,33 @@ describe("Phase 3f-c real chat and zone batching composition RED", () => {
 			await expect(reduceOperation(application, Object.freeze({ durable: "unchanged" }), operation)).rejects.toThrow();
 		}
 		const vertexDigest = "2".repeat(64);
-		const projection = application.projectAcceptedOperations([
-			acceptedOperation(
-				{
-					author,
-					authorSequence: 1,
-					logicalTime: 3,
-					operation: { action: "placeBlock", id: "a", kind: "stone", x: 1, y: 2 },
-					vertexDigest,
-				},
-				0,
-				2
-			),
-			acceptedOperation(
-				{
-					author,
-					authorSequence: 1,
-					logicalTime: 5,
-					operation: { action: "placeBlock", id: "b", kind: "dirt", x: 3, y: 4 },
-					vertexDigest,
-				},
-				1,
-				2
-			),
-		]);
+		const projection = application.projectAcceptedOperations({
+			authenticatedBase: undefined,
+			currentEpochOperations: [
+				acceptedOperation(
+					{
+						author,
+						authorSequence: 1,
+						logicalTime: 3,
+						operation: { action: "placeBlock", id: "a", kind: "stone", x: 1, y: 2 },
+						vertexDigest,
+					},
+					0,
+					2
+				),
+				acceptedOperation(
+					{
+						author,
+						authorSequence: 1,
+						logicalTime: 5,
+						operation: { action: "placeBlock", id: "b", kind: "dirt", x: 3, y: 4 },
+						vertexDigest,
+					},
+					1,
+					2
+				),
+			],
+		});
 		expect(Reflect.get(projection, "blocks")).toEqual([
 			{ id: "a", kind: "stone", x: 1, y: 2 },
 			{ id: "b", kind: "dirt", x: 3, y: 4 },
