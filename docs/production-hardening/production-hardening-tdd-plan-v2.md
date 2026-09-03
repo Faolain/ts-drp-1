@@ -97574,16 +97574,20 @@ is `exactCanonicalPinnedGenesisBootstrapOperationBytes`. It is trusted local
 application policy, not a signed wire field, persisted control carrier, public
 room API, or statement that the creator observed the operation. The room must
 canonicalize a detached copy of `application.bootstrapOperation`, enforce the
-existing operation-size/depth/item limits, and supply the same bytes to fresh
+opened blueprint's existing operation-byte budget and the enclosing v3
+vertex's existing canonical depth/item/byte limits, and supply the same bytes to fresh
 recovery, successor hot activation custody, pending-adoption recovery, and
 cold successor reopen. Private successor material must copy rather than alias
 the bytes. A caller that omits, mutates, supplies noncanonical/oversized bytes,
 or changes them across a successor boundary cannot obtain pinned-genesis
 bootstrap classification on a historical aggregate path. Existing recovery
 paths with no pinned-genesis row or no historical aggregate remain behaviorally
-unchanged; the review must confirm whether the TypeScript field is required or
-optional-with-fail-closed-use so package compatibility is explicit rather than
-accidental.
+unchanged. The field is optional in the exported TypeScript input so recovery
+that never needs a pinned-genesis row retains source compatibility, but it is
+mandatory at runtime for every pinned-genesis classification: absence returns
+the existing typed authentication/recovery refusal. No call may retain the
+current permissive predicate as a fallback. This optional-with-fail-closed-use
+rule is the frozen compatibility choice.
 
 The selected implementation must use one exact predicate at both current-row
 classification and filtered issuance-store classification. In addition to the
