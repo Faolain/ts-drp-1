@@ -98035,12 +98035,13 @@ not independently rederived by the transition closure.
 
 ###### D.110c-0c1f5a foreign-author close-liveness prerequisite
 
-**Status: the first execution from `eeaaaca8` remains a noncausal diagnostic;
-the corrected tests-only RED from signed/pushed anchor `466169aa` is causal and
-complete. The bounded production GREEN is signed/pushed at
-`52fe3b44a40ab025102cad7637bbd10fae6edaac`, and its clean-isolated replay is
-complete. The one final Grok/Kimi/Opus review remains required before f5a may
-close.** Owner:
+**Status: CLOSED. The first execution from `eeaaaca8` remains a noncausal
+diagnostic; the corrected tests-only RED from signed/pushed anchor `466169aa`
+is causal and complete. The bounded production GREEN is signed/pushed at
+`52fe3b44a40ab025102cad7637bbd10fae6edaac`, its clean-isolated replay is
+complete, and the final Grok/Kimi/Opus review of signed/pushed evidence anchor
+`3c305872fbee759b1b6386c10a1d1ebbde3dd6e6` closed with an empty P0/P1
+union. F5a does not authorize f5b production work.** Owner:
 `packages/node/src/creator-close.ts::authorIssuanceFrontiersCandidate()` at the
 construction of `byAuthor`, duplicate detection, prior/null boundary checks,
 regression checks, and per-author frontier advancement; the exact captured
@@ -98258,15 +98259,54 @@ The sibling `.logs/d110c-0c1f5a-clean-52fe3b44/` honestly preserves an initial
 setup-only failure caused by an incorrectly expanded commit hash; no f5a test
 ran there. Its 12-entry manifest validates at
 `39add4a1adc7f5e4e792a397a9eea9a7c427f1e13e33327058f0a5e812b36792`.
-The final three-model review is now the only remaining f5a closure gate.
+The final three-model review inspected signed/pushed evidence anchor
+`3c305872fbee759b1b6386c10a1d1ebbde3dd6e6`, tree
+`a65781dcafb3941a2dda924aad6f60e78f0bc84b`, and closed with an empty P0/P1
+union. Grok 4.6/high exact session
+`01a0694a-8769-7e92-9c14-10a40505a473` returned `APPROVED`, P0/P1/P2
+`0/0/3`. Its bounded runner honestly recorded `NO_VERDICT` after the service
+completed normally with `stop_reason: end_turn` and printed a complete
+schema-valid object as fenced public text instead of emitting the required
+structured event; the exact same session then re-emitted the unchanged
+judgment through structured output without reinspection. Direct Kimi K3 exact
+session `session_96c604b1-fd7b-4149-af66-1c18ca71ab02` returned `APPROVED`,
+`0/0/3`; its exact-session schema-only re-emission changed presentation only.
+Opus xhigh exact session `a1430b93-04b9-4d22-acca-633fffbe1637` returned
+schema-valid `APPROVED`, `0/0/5`. All three set RED causality, GREEN closure,
+scope preservation, retained behavior, evidence sufficiency, and f5a
+closability true. Complete review artifacts and deterministic validation are
+under `.logs/d110c-0c1f5a-final-review-3c305872/`. Its 33-entry self-excluding
+manifest validates and has SHA-256
+`f65016c9e38671b8cec02573d9ea9a9681afdb381a89486ce70fc523c3370cc5`.
+
+The nonblocking P2 union is owned prospectively and does not reopen f5a. The
+next tests-only edit to the f5a retained fixture owns explicit unaffected
+creator/honest-writer frontier assertions plus one mixed creator-and-foreign
+anomaly precedence case; the other permutation, multi-foreign, writer-set,
+deauthorization, hidden-history, and 64-writer cases remain structurally or
+retained-test covered and need not delay parent work. The shared
+`routeRegisteredVertex()` synthetic-classifier override is sequential-only;
+its next edit, or any introduction of concurrent callers, must give the
+outermost caller shared/refcounted restore ownership. The standing f2
+`localeCompare` ordering correction remains due on the next f2-fixture edit.
+The immutable GREEN validator's intended function slice used a nonexistent end
+anchor; its searched tokens are unique and the owner was inspected directly,
+so the evidence conclusion stands, while any reuse must assert a real positive
+end offset before slicing. The genesis `priorIdentity === undefined` foreign
+first-observed-above-one branch remains fail closed and is explicitly owned by
+the f5b audit below rather than silently classified as solved by f5a.
 
 GREEN changes only the close-side per-author classification. It must make all
 foreign treatments close successfully, keep the affected frontier unchanged or
 null, preserve all unaffected frontiers byte-for-byte, stage one valid
 aggregate, and complete verified transition/adoption. The anomalous row remains
 an authenticated close-set/history member when it is a valid authorized
-application vertex, but it must remain outside the issuance sequence range
-claimed by the aggregate frontier; f5a does not rewrite application history.
+application vertex, but the claimed issuance range remains exactly the
+authenticated prior and never advances through the anomalous row; f5a does
+not rewrite application history. A regressed row can share an `(author,
+sequence)` inside that unchanged historical range because the current carrier
+does not commit per-sequence digests; f5b owns the resulting substitution and
+settlement proof obligation rather than f5a claiming physical exclusion.
 Repeating close derivation over the same captured graph must be deterministic.
 The no-gap aggregate bytes and digest remain identical to the pre-f5a
 implementation. The former
@@ -98275,21 +98315,22 @@ and proving it is no longer exposed as a close-wide foreign-author failure;
 existing legacy/local errors are not renamed without an independently retained
 caller.
 
-Focused and adversarial tests cover all five cases, permutation of graph
-iteration, multiple simultaneous foreign anomalies, creator-plus-foreign
-anomaly precedence, permissionless writer-set derivation, creator
-deauthorization, remove/re-add with hidden history, and the 64-writer bound.
+The focused contract covers the five exact cases and creator-owned controls.
+Permutation, simultaneous foreign anomalies, creator-plus-foreign precedence,
+permissionless writer-set derivation, creator deauthorization, remove/re-add
+with hidden history, and the 64-writer bound remain structurally or retained
+covered as dispositioned above; they are not relabelled as dedicated f5a cases.
 The retained inventory includes both the current f2 GREEN test and the still
 tracked f2 RED-named unit wrapper, plus the RED-named Playwright configuration
 as an exact listing/execution control; none is silently excluded because of its
 filename. When the shared f2 fixture is next edited, its expected-frontier sort
 must use the same code-unit ordering as production rather than `localeCompare`.
-Run the focused GREEN once, affected builds/typechecks and exact-owner
-lint/format/diff, the complete f2/f4 41-test roster, the 195-test retained
-roster, exact two-title browser gate, the RED-named retained controls, and an
-isolated offline checkout. Sign/push GREEN, then perform the one formal
-Grok/Kimi/Opus final review over plan→RED→GREEN. Only P0/P1 blocks; no long
-campaign is authorized.
+The execution record above includes the one focused GREEN, affected
+builds/typechecks and exact-owner lint/format/diff, complete f2/f4 41-test
+roster, 195-test retained roster, exact two-title browser gate, RED-named
+retained controls, and isolated offline checkout. GREEN was signed/pushed
+before the one formal Grok/Kimi/Opus review over plan→RED→GREEN. No long
+campaign was authorized or run by f5a.
 
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
@@ -98317,7 +98358,14 @@ The audit also owns the exact reachability and meaning of
 recovery, membership, or admitted-set lifecycle can produce a currently
 authorized writer absent from the prior authenticated aggregate. If none can,
 retain the guard fail closed as unreachable defense and do not manufacture a
-fixture-only carrier mismatch to justify product behavior.
+fixture-only carrier mismatch to justify product behavior. The same audit owns
+the `priorIdentity === undefined` genesis-close branch where a foreign
+first-observed sequence above one currently throws
+`D110C_0C1F1_LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED`; it must determine whether
+that state is genuinely reachable and, if so, whether it belongs to the same
+settlement construction or a separately reviewed prerequisite. It also owns
+the case where a current-epoch regressed row shares an `(author, sequence)`
+with already-covered history under an unchanged numeric frontier.
 
 The bounded architecture audit must reconcile, not merely list, the review's
 three proposals:
