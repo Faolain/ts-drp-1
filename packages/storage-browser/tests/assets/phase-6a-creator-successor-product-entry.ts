@@ -1646,6 +1646,67 @@ async function d110c0c1IssuanceRows(databaseName: string): Promise<readonly Plai
 	);
 }
 
+async function d110c0c1SetPublishState(
+	databaseName: string,
+	authorSequence: number,
+	publishState: "pending" | "published"
+): Promise<void> {
+	const database = await openExistingDatabase(`${databaseName}--drp-issuance-v1`);
+	try {
+		const transaction = database.transaction("issuanceOutbox", "readwrite", { durability: "strict" });
+		const store = transaction.objectStore("issuanceOutbox");
+		const rows = (await request(store.getAll())).map(exactRecord);
+		const matches = rows.filter((row) => row.authorSequence === authorSequence);
+		if (matches.length !== 1) throw new TypeError("D110C_0C1_PENDING_ROW_INVALID");
+		await request(store.put({ ...matches[0], publishState }));
+		await transactionDone(transaction);
+	} finally {
+		database.close();
+	}
+}
+
+async function d110c0c1PendingCase(name: string, authorSequence: 0 | 2): Promise<PlainRecord> {
+	const databaseName = `d108e3-direct-${name}`;
+	const roomHeadAuthority = d110cRoomHeadAuthority(name, Object.freeze({ kind: "create" }));
+	instrumentation().configure({});
+	instrumentation().d110c0c1SetPhase(`pending-${authorSequence}-prefix`);
+	let room = await createDirectRoom(name, { roomHeadAuthority });
+	directRooms.set(name, room);
+	try {
+		await room.issue({ action: "message", clientOperationId: `${name}-epoch-zero`, text: `${name}-epoch-zero` });
+		await room.sealEpoch();
+		await room.adoptCreatorSuccessor();
+		await room.issue({ action: "message", clientOperationId: `${name}-epoch-one`, text: `${name}-epoch-one` });
+		await room.sealEpoch();
+		await room.adoptCreatorSuccessor();
+		await room.issue({ action: "message", clientOperationId: `${name}-epoch-two`, text: `${name}-epoch-two` });
+		await room.sealEpoch();
+		await room.adoptCreatorSuccessor();
+		const declaration = await rawSnapshotDeclarationAtEpoch(databaseName, 2);
+		await closeDirectForReopen(name);
+		await d110c0c1SetPublishState(databaseName, authorSequence, "pending");
+		const before = await d110c0c1IssuanceRows(databaseName);
+		instrumentation().d110c0c1SetPhase(`pending-${authorSequence}-cold-reopen`);
+		room = await createDirectRoom(name, {
+			roomHeadAuthority: d110cRoomHeadAuthority(name, Object.freeze({ kind: "reopen" })),
+			successorSnapshotDeclaration: declaration,
+			withCreatorSigner: false,
+		});
+		directRooms.set(name, room);
+		await room.issue({ action: "message", clientOperationId: `${name}-after`, text: `${name}-after` });
+		return Object.freeze({
+			after: await d110c0c1IssuanceRows(databaseName),
+			authorSequence,
+			before,
+			reopened: d110c0cColdRoomSnapshot(room),
+			trace: instrumentation().d110c0c1TraceSnapshot(),
+		});
+	} finally {
+		instrumentation().d110c0c1SetPhase(null);
+		await discardDirectRoom(name);
+	}
+}
+
 async function d110c0c1Case(name: string, kind: "control" | "treatment"): Promise<PlainRecord> {
 	const databaseName = `d108e3-direct-${name}`;
 	const roomHeadAuthority = d110cRoomHeadAuthority(name, Object.freeze({ kind: "create" }));
@@ -1711,6 +1772,20 @@ async function d110c0c1Case(name: string, kind: "control" | "treatment"): Promis
 			directRooms.set(name, room);
 			reopened = d110c0cColdRoomSnapshot(room);
 			await issue("d110c-0c1-treatment-after-reopen", "d110c-0c1-treatment-after-reopen");
+			const after = d110c0cColdRoomSnapshot(room);
+			const postReopenRows = await d110c0c1IssuanceRows(databaseName);
+			return Object.freeze({
+				after,
+				close,
+				detail,
+				hot,
+				kind,
+				postReopenRows,
+				prefixRows,
+				reopened,
+				trace: instrumentation().d110c0c1TraceSnapshot(),
+				treatmentRows,
+			});
 		} catch (error) {
 			detail = directFailureDetail(error);
 		}
@@ -1731,9 +1806,18 @@ async function d110c0c1Case(name: string, kind: "control" | "treatment"): Promis
 }
 
 async function d110c0c1Differential(name: string): Promise<PlainRecord> {
-	const control = await d110c0c1Case(name, "control");
-	const treatment = await d110c0c1Case(name, "treatment");
-	return Object.freeze({ control, treatment });
+	const run = async (label: string, task: () => Promise<PlainRecord>): Promise<PlainRecord> => {
+		try {
+			return await task();
+		} catch (error) {
+			throw new TypeError(`D110C_0C1_CASE_FAILED:${label}:${directFailureDetail(error)}`);
+		}
+	};
+	const control = await run("control", () => d110c0c1Case(name, "control"));
+	const treatment = await run("treatment", () => d110c0c1Case(name, "treatment"));
+	const pendingHistorical = await run("pending-historical", () => d110c0c1PendingCase(`${name}-pending-historical`, 2));
+	const pendingGenesis = await run("pending-genesis", () => d110c0c1PendingCase(`${name}-pending-genesis`, 0));
+	return Object.freeze({ control, pendingGenesis, pendingHistorical, treatment });
 }
 
 type D110c0c1cFault =

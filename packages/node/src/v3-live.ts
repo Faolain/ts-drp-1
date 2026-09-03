@@ -83,6 +83,11 @@ import {
 	installCreatorSuccessorLive,
 } from "./internal/creator-successor-live.js";
 import {
+	openVerifiedCreatorHistoricalIssuance,
+	resolveVerifiedCreatorHistoricalIssuance,
+	type VerifiedCreatorHistoricalIssuance,
+} from "./internal/creator-transition-advance.js";
+import {
 	type CreatorCloseRuntimeReleaseCensus,
 	type D109dRuntimeCensus,
 	type D109dRuntimeReclamationErrorCode,
@@ -126,6 +131,7 @@ const MapIteratorPrototype = ObjectGetPrototypeOf(ReflectApply(MapPrototypeEntri
 const MapIteratorNext = ObjectGetOwnPropertyDescriptor(MapIteratorPrototype, "next")?.value;
 const IntrinsicSet = Set;
 const SetPrototypeAdd = Set.prototype.add;
+const SetPrototypeClear = Set.prototype.clear;
 const SetPrototypeHas = Set.prototype.has;
 const SetSizeGetter = ObjectGetOwnPropertyDescriptor(Set.prototype, "size")?.get;
 const DRP_ERROR_BRAND = Symbol.for("@ts-drp/errors/DRPError");
@@ -833,6 +839,7 @@ const creatorSuccessorRecovery = new WeakMap<
 	}>
 >();
 const creatorPredecessorRecoverySource = new WeakMap<object, V3DisplacedSourceAuthority>();
+const creatorHistoricalIssuanceHandoffs = new WeakMap<object, HistoricalIssuanceContext>();
 const creatorSuccessorInitialState = new WeakMap<
 	object,
 	Readonly<{
@@ -2527,6 +2534,7 @@ interface V3PlaneRegistration {
 	graphVersion: number;
 	handle: V3PlaneHandle;
 	hotPredecessor?: WeakRef<V3PlaneRegistration>;
+	historicalIssuance?: HistoricalIssuanceContext;
 	index: CausalityIndex;
 	readonly issuanceScope: DurableIssueScope;
 	readonly issuanceStore: DurableIssuanceStore;
@@ -3505,6 +3513,7 @@ function sameActivation(
 		registration.onAdmittedVertex === input.onAdmittedVertex &&
 		registration.operationAdmissionPolicy === recovered.operationAdmissionPolicy &&
 		registration.authorization === recovered.authorization &&
+		registration.historicalIssuance === recovered.historicalIssuance &&
 		registration.index === recovered.index &&
 		registration.issuanceStore === recovered.issuanceStore &&
 		registration.classifyTerminalVertex === recovered.classifyTerminalVertex &&
@@ -4123,6 +4132,7 @@ interface RecoveredV3LivePayload {
 	readonly displacedIssuanceBoundary?: number;
 	readonly displacedSource?: V3DisplacedSourceAuthority;
 	readonly epochBytes: number;
+	readonly historicalIssuance?: HistoricalIssuanceContext;
 	readonly index: CausalityIndex;
 	readonly issuanceScope: DurableIssueScope;
 	readonly issuanceStore: DurableIssuanceStore;
@@ -4213,8 +4223,29 @@ interface AuthenticatedRecoveryVertex {
 
 type ClassifiedPlaneVertex = Readonly<{
 	authenticated: AuthenticatedRecoveryVertex;
-	kind: "current" | "displaced";
+	kind: "covered-historical" | "current" | "displaced" | "pinned-genesis";
 }>;
+
+interface HistoricalIssuanceContext {
+	readonly capability: VerifiedCreatorHistoricalIssuance;
+	readonly countedSequences: Set<number>;
+	count: number;
+	readonly maxEpochVertices: number;
+}
+
+function beginHistoricalIssuanceScan(context: HistoricalIssuanceContext | undefined): void {
+	if (context === undefined) return;
+	context.count = 0;
+	ReflectApply(SetPrototypeClear, context.countedSequences, []);
+}
+
+function countHistoricalIssuanceRow(context: HistoricalIssuanceContext | undefined, authorSequence: number): boolean {
+	if (context === undefined) return false;
+	if (ReflectApply(SetPrototypeHas, context.countedSequences, [authorSequence]) === true) return true;
+	context.count += 1;
+	ReflectApply(SetPrototypeAdd, context.countedSequences, [authorSequence]);
+	return context.count <= context.maxEpochVertices;
+}
 
 function recoveryFailure(
 	kind: RecoverV3LiveReplicaFailureKind,
@@ -4453,9 +4484,11 @@ function classifyPlaneVertex(
 	payload: PreparedV3LivePayload,
 	authorization: V3LiveAuthorization,
 	displacedSource: V3DisplacedSourceAuthority | undefined,
+	historicalIssuance: HistoricalIssuanceContext | undefined,
+	pinnedGenesisAnchorDigest: string | undefined,
 	canonicalPreimageBytes: Uint8Array,
 	signature: Uint8Array,
-	expectedDigest: string | undefined,
+	expectedDigest: Uint8Array,
 	expectedAuthor: string,
 	expectedAuthorSequence: number
 ): ClassifiedPlaneVertex | undefined {
@@ -4463,19 +4496,37 @@ function classifyPlaneVertex(
 		authenticated: AuthenticatedRecoveryVertex | undefined
 	): authenticated is AuthenticatedRecoveryVertex =>
 		authenticated !== undefined &&
-		authenticated.digest === expectedDigest &&
+		authenticated.digest === lowerHexDigest(expectedDigest) &&
 		authenticated.author === expectedAuthor &&
 		authenticated.authorSequence === expectedAuthorSequence;
 	const current = authenticateRecoveryVertex(payload, authorization, canonicalPreimageBytes, signature);
 	if (matches(current)) return ObjectFreeze({ authenticated: current, kind: "current" as const });
-	if (displacedSource === undefined) return undefined;
-	const displaced = authenticateRecoveryVertex(
-		displacedSource.prepared,
-		displacedSource.authorization,
+	if (displacedSource !== undefined) {
+		const displaced = authenticateRecoveryVertex(
+			displacedSource.prepared,
+			displacedSource.authorization,
+			canonicalPreimageBytes,
+			signature
+		);
+		if (matches(displaced)) return ObjectFreeze({ authenticated: displaced, kind: "displaced" as const });
+	}
+	const row = ObjectFreeze({
+		authorSequence: expectedAuthorSequence,
 		canonicalPreimageBytes,
-		signature
-	);
-	return matches(displaced) ? ObjectFreeze({ authenticated: displaced, kind: "displaced" as const }) : undefined;
+		digest: expectedDigest,
+		publishState: "pending" as const,
+		scope: ObjectFreeze({ author: expectedAuthor, objectId: payload.provenance.objectId }),
+		signature,
+	}) as SnapshottedOutboxRow;
+	const pinned =
+		pinnedGenesisAnchorDigest === undefined
+			? undefined
+			: authenticatedPinnedGenesisOutboxRow(row, row.scope, payload, pinnedGenesisAnchorDigest);
+	if (matches(pinned)) return ObjectFreeze({ authenticated: pinned, kind: "pinned-genesis" as const });
+	const historical = authenticatedCoveredHistoricalOutboxRow(row, row.scope, payload, historicalIssuance);
+	return matches(historical)
+		? ObjectFreeze({ authenticated: historical, kind: "covered-historical" as const })
+		: undefined;
 }
 
 function authenticatedRecoveryVertex(
@@ -4517,9 +4568,9 @@ function authenticatedPinnedGenesisOutboxRow(
 	issuanceScope: DurableIssueScope,
 	filterPayload: PreparedV3LivePayload,
 	pinnedGenesisAnchorDigest: string
-): boolean {
+): AuthenticatedRecoveryVertex | undefined {
 	try {
-		if (V3_VERTEX_DOMAIN !== vertexRegistry.domain || typeof V3_VERTEX_SUITE_ID !== "string") return false;
+		if (V3_VERTEX_DOMAIN !== vertexRegistry.domain || typeof V3_VERTEX_SUITE_ID !== "string") return undefined;
 		const suiteId = V3_VERTEX_SUITE_ID;
 		const extracted = extractAdmittedReceivedVertex({
 			domain: V3_VERTEX_DOMAIN,
@@ -4533,17 +4584,80 @@ function authenticatedPinnedGenesisOutboxRow(
 			signature: row.signature,
 			suiteId,
 		});
-		return (
-			extracted.ok &&
-			extracted.vertex.anchor === pinnedGenesisAnchorDigest &&
-			extracted.vertex.epoch === 0 &&
-			extracted.vertex.objectId === issuanceScope.objectId &&
-			extracted.vertex.author === issuanceScope.author &&
-			extracted.vertex.authorSequence === row.authorSequence &&
-			lowerHexDigest(extracted.vertex.digest) === lowerHexDigest(row.digest)
-		);
+		if (
+			!extracted.ok ||
+			extracted.vertex.anchor !== pinnedGenesisAnchorDigest ||
+			extracted.vertex.epoch !== 0 ||
+			extracted.vertex.objectId !== issuanceScope.objectId ||
+			extracted.vertex.author !== issuanceScope.author ||
+			extracted.vertex.authorSequence !== row.authorSequence ||
+			lowerHexDigest(extracted.vertex.digest) !== lowerHexDigest(row.digest)
+		) {
+			return undefined;
+		}
+		return authenticatedRecoveryVertex(extracted.vertex, row.canonicalPreimageBytes.byteLength);
 	} catch {
-		return false;
+		return undefined;
+	}
+}
+
+function authenticatedCoveredHistoricalOutboxRow(
+	row: SnapshottedOutboxRow,
+	issuanceScope: DurableIssueScope,
+	filterPayload: PreparedV3LivePayload,
+	historicalIssuance: HistoricalIssuanceContext | undefined
+): AuthenticatedRecoveryVertex | undefined {
+	try {
+		if (
+			historicalIssuance === undefined ||
+			V3_VERTEX_DOMAIN !== vertexRegistry.domain ||
+			typeof V3_VERTEX_SUITE_ID !== "string"
+		) {
+			return undefined;
+		}
+		const suiteId = V3_VERTEX_SUITE_ID;
+		const identity = resolveVerifiedCreatorHistoricalIssuance(historicalIssuance.capability);
+		if (
+			identity === undefined ||
+			identity.objectId !== issuanceScope.objectId ||
+			identity.author !== issuanceScope.author ||
+			row.authorSequence > identity.admittedAuthorSequence
+		) {
+			return undefined;
+		}
+		const decoded = decodeCanonical(row.canonicalPreimageBytes);
+		if (!isObject(decoded) || !sameBytes(encodeCanonical(decoded), row.canonicalPreimageBytes)) return undefined;
+		const anchor = Reflect.get(decoded, "anchor");
+		const epoch = Reflect.get(decoded, "epoch");
+		if (!isDigestHex(anchor) || !NumberIsSafeInteger(epoch) || (epoch as number) < 0 || epoch >= identity.closedEpoch) {
+			return undefined;
+		}
+		const extracted = extractAdmittedReceivedVertex({
+			domain: V3_VERTEX_DOMAIN,
+			expectedAnchor: anchor,
+			preparedBlueprintAdmission: filterPayload.admission,
+			receivedCanonicalPreimageBytes: row.canonicalPreimageBytes,
+			resolveAuthorPublicKey: (author) => {
+				const bytes = author === identity.author ? publicKeyBytes(author) : undefined;
+				return bytes === undefined ? undefined : ObjectFreeze({ bytes, format: "raw" as const });
+			},
+			signature: row.signature,
+			suiteId,
+		});
+		if (
+			!extracted.ok ||
+			extracted.vertex.anchor !== anchor ||
+			extracted.vertex.epoch !== epoch ||
+			extracted.vertex.objectId !== issuanceScope.objectId ||
+			extracted.vertex.author !== issuanceScope.author ||
+			extracted.vertex.authorSequence !== row.authorSequence ||
+			lowerHexDigest(extracted.vertex.digest) !== lowerHexDigest(row.digest)
+		) {
+			return undefined;
+		}
+		return authenticatedRecoveryVertex(extracted.vertex, row.canonicalPreimageBytes.byteLength);
+	} catch {
+		return undefined;
 	}
 }
 
@@ -4553,10 +4667,9 @@ function creatorFilteredIssuanceStore(
 	filterPayload: PreparedV3LivePayload,
 	filterAuthorization: V3LiveAuthorization,
 	excludedAfterEpoch?: number,
-	pinnedGenesisAnchorDigest?: string
+	pinnedGenesisAnchorDigest?: string,
+	historicalIssuance?: HistoricalIssuanceContext
 ): DurableIssuanceStore {
-	let skipped = 0;
-	let skippedGenesis = 0;
 	return ObjectFreeze({
 		close: () => issuanceStore.close(),
 		compareAndMarkOutboxPublished: (input: DurableOutboxPublicationTransitionInput) =>
@@ -4564,6 +4677,11 @@ function creatorFilteredIssuanceStore(
 		readIssued: (scope: DurableIssueScope, authorSequence: number) => issuanceStore.readIssued(scope, authorSequence),
 		readLineage: (scope: DurableIssueScope) => issuanceStore.readLineage(scope),
 		readOutboxPage: async (input?: DurableOutboxPageInput) => {
+			const requestedLimit = input?.limit ?? 1;
+			if (!NumberIsSafeInteger(requestedLimit) || requestedLimit < 1) {
+				return issuanceStore.readOutboxPage(input);
+			}
+			const visible: DurableIssuanceOutboxRecord[] = [];
 			let afterKey = input?.afterKey;
 			for (;;) {
 				const page = await issuanceStore.readOutboxPage({
@@ -4571,7 +4689,7 @@ function creatorFilteredIssuanceStore(
 					limit: 1,
 					scope: issuanceScope,
 				});
-				if (page.length !== 1) return page;
+				if (page.length !== 1) return visible.length === 0 ? page : ObjectFreeze(visible);
 				const row = outboxRowSnapshot(page[0], issuanceScope);
 				if (row === undefined || (afterKey !== undefined && afterKey !== null && row.authorSequence <= afterKey[2])) {
 					return page;
@@ -4591,22 +4709,42 @@ function creatorFilteredIssuanceStore(
 					typeof candidateEpoch === "number" &&
 					(excludedAfterEpoch === undefined || candidateEpoch > excludedAfterEpoch);
 				const authenticatedGenesisRow =
-					pinnedGenesisAnchorDigest !== undefined &&
-					authenticatedPinnedGenesisOutboxRow(row, issuanceScope, filterPayload, pinnedGenesisAnchorDigest);
-				if (authenticatedFilterRow || authenticatedGenesisRow) {
+					pinnedGenesisAnchorDigest === undefined
+						? undefined
+						: authenticatedPinnedGenesisOutboxRow(row, issuanceScope, filterPayload, pinnedGenesisAnchorDigest);
+				const historicalIdentity =
+					historicalIssuance === undefined
+						? undefined
+						: resolveVerifiedCreatorHistoricalIssuance(historicalIssuance.capability);
+				const authenticatedHistoricalRow =
+					historicalIdentity === undefined
+						? undefined
+						: authenticatedCoveredHistoricalOutboxRow(row, issuanceScope, filterPayload, historicalIssuance);
+				if (
+					authenticatedFilterRow ||
+					authenticatedGenesisRow !== undefined ||
+					authenticatedHistoricalRow !== undefined
+				) {
 					const issuedCommit = await issuanceStore.readIssued(issuanceScope, row.authorSequence);
 					const issuedRow = outboxRowSnapshot(
 						ObjectFreeze({ commit: issuedCommit, publishState: row.publishState }),
 						issuanceScope
 					);
 					if (issuedRow === undefined || !matchingOutboxRows(row, issuedRow)) return page;
-					if (authenticatedFilterRow) skipped += 1;
-					if (authenticatedGenesisRow) skippedGenesis += 1;
+					if (!countHistoricalIssuanceRow(historicalIssuance, row.authorSequence)) return page;
 					if (
-						skipped > filterPayload.parameters.maxEpochVertices ||
-						skippedGenesis > filterPayload.parameters.maxEpochVertices
+						!authenticatedFilterRow &&
+						row.publishState === "pending" &&
+						(authenticatedGenesisRow !== undefined || authenticatedHistoricalRow !== undefined)
 					) {
-						return page;
+						visible.push(page[0] as DurableIssuanceOutboxRecord);
+						afterKey = ObjectFreeze([issuanceScope.objectId, issuanceScope.author, row.authorSequence]) as readonly [
+							string,
+							string,
+							number,
+						];
+						if (visible.length >= requestedLimit) return ObjectFreeze(visible);
+						continue;
 					}
 					afterKey = ObjectFreeze([issuanceScope.objectId, issuanceScope.author, row.authorSequence]) as readonly [
 						string,
@@ -4615,7 +4753,13 @@ function creatorFilteredIssuanceStore(
 					];
 					continue;
 				}
-				return page;
+				visible.push(page[0] as DurableIssuanceOutboxRecord);
+				afterKey = ObjectFreeze([issuanceScope.objectId, issuanceScope.author, row.authorSequence]) as readonly [
+					string,
+					string,
+					number,
+				];
+				if (visible.length >= requestedLimit) return ObjectFreeze(visible);
 			}
 		},
 		transactIssue: (scope: DurableIssueScope, buildAndSign: DurableBuildAndSign) =>
@@ -4672,6 +4816,8 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		if (predecessorRecoverySource !== undefined) {
 			creatorPredecessorRecoverySource.delete(input.capability as object);
 		}
+		const historicalIssuance = creatorHistoricalIssuanceHandoffs.get(input.capability as object);
+		if (historicalIssuance !== undefined) creatorHistoricalIssuanceHandoffs.delete(input.capability as object);
 		const rawOperationAdmissionPolicy = Reflect.get(input, OPERATION_ADMISSION_POLICY_KEY);
 		const selectedOperationAdmissionPolicy = operationAdmissionPolicy(rawOperationAdmissionPolicy);
 		if (rawOperationAdmissionPolicy !== undefined && selectedOperationAdmissionPolicy === undefined) {
@@ -4791,6 +4937,24 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				});
 			} else {
 				displacedSource = ObjectFreeze({ authorization: sourceAuthorization, prepared: sourcePayload });
+			}
+		}
+		if (historicalIssuance !== undefined) {
+			const identity = resolveVerifiedCreatorHistoricalIssuance(historicalIssuance.capability);
+			const expectedClosedEpoch =
+				successorRecovery === undefined ? payload.provenance.epoch : displacedSource?.prepared.provenance.epoch;
+			if (
+				identity === undefined ||
+				expectedClosedEpoch === undefined ||
+				identity.objectId !== selectedScope.objectId ||
+				identity.author !== selectedScope.author ||
+				identity.closedEpoch !== expectedClosedEpoch ||
+				identity.successorEpoch !== expectedClosedEpoch + 1 ||
+				(successorRecovery === undefined
+					? identity.successorEpoch !== payload.provenance.epoch + 1
+					: identity.successorEpoch !== payload.provenance.epoch)
+			) {
+				return recoveryFailure("authorization-rejected", "v3 historical issuance authority does not match");
 			}
 		}
 
@@ -5028,6 +5192,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 		let currentRecordCount = 0;
 		let displacedRecordCount = 0;
 		let displacedIssuanceBoundary: number | undefined;
+		beginHistoricalIssuanceScan(historicalIssuance);
 		for (;;) {
 			let rawPage: unknown;
 			try {
@@ -5064,14 +5229,30 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 					payload,
 					authorization,
 					displacedSource,
+					historicalIssuance,
+					payload.input.pinnedGenesisAnchorDigest,
 					row.canonicalPreimageBytes,
 					row.signature,
-					lowerHexDigest(row.digest),
+					row.digest,
 					selectedScope.author,
 					row.authorSequence
 				);
 			} catch {
 				return recoveryFailure("admission-rejected", "v3 recovery admission failed");
+			}
+			if (classified?.kind === "covered-historical" || classified?.kind === "pinned-genesis") {
+				if (
+					!countHistoricalIssuanceRow(historicalIssuance, row.authorSequence) ||
+					!acceptedApplicationOperation(
+						payload,
+						classified.authenticated.vertex.operation,
+						classified.authenticated.admitted.logicalTime
+					)
+				) {
+					return recoveryFailure("admission-rejected", "v3 historical issuance row is not authenticated");
+				}
+				afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, row.authorSequence] as const);
+				continue;
 			}
 			if (classified?.kind === "displaced") {
 				displacedRecordCount += 1;
@@ -5332,6 +5513,7 @@ export async function recoverV3LiveReplica(rawInput: RecoverV3LiveReplicaInput):
 				displacedSource,
 				displacedIssuanceBoundary,
 				epochBytes,
+				historicalIssuance,
 				index,
 				issuanceScope: selectedScope,
 				issuanceStore: issuance,
@@ -5918,7 +6100,7 @@ function enqueueLocalIssue(
 
 type ClassifiedRebaseRow = Readonly<{
 	authenticated: AuthenticatedRecoveryVertex;
-	kind: "current" | "displaced";
+	kind: "covered-historical" | "current" | "displaced" | "pinned-genesis";
 	row: SnapshottedOutboxRow;
 }>;
 
@@ -5930,9 +6112,11 @@ function classifyRebaseRow(
 		registration.payload,
 		registration.authorization,
 		registration.displacedSource,
+		registration.historicalIssuance,
+		registration.payload.input.pinnedGenesisAnchorDigest,
 		row.canonicalPreimageBytes,
 		row.signature,
-		lowerHexDigest(row.digest),
+		row.digest,
 		row.scope.author,
 		row.authorSequence
 	);
@@ -5940,7 +6124,13 @@ function classifyRebaseRow(
 }
 
 function validRebaseRow(registration: V3PlaneRegistration, classified: ClassifiedRebaseRow): boolean {
-	const source = classified.kind === "current" ? registration.payload : registration.displacedSource?.prepared;
+	const historical = classified.kind === "covered-historical" || classified.kind === "pinned-genesis";
+	const source =
+		classified.kind === "current"
+			? registration.payload
+			: historical
+				? registration.payload
+				: registration.displacedSource?.prepared;
 	return (
 		source !== undefined &&
 		acceptedApplicationOperation(
@@ -6021,6 +6211,7 @@ async function readRebaseOutbox(registration: V3PlaneRegistration): Promise<V3Re
 		let currentRecordCount = 0;
 		let displacedRecordCount = 0;
 		let afterKey: readonly [string, string, number] | undefined;
+		beginHistoricalIssuanceScan(registration.historicalIssuance);
 		for (;;) {
 			let rawPage: unknown;
 			try {
@@ -6061,6 +6252,14 @@ async function readRebaseOutbox(registration: V3PlaneRegistration): Promise<V3Re
 				});
 			}
 			afterKey = ObjectFreeze([selectedScope.objectId, selectedScope.author, classified.row.authorSequence] as const);
+			const historical = classified.kind === "covered-historical" || classified.kind === "pinned-genesis";
+			if (historical && !countHistoricalIssuanceRow(registration.historicalIssuance, classified.row.authorSequence)) {
+				return ObjectFreeze({
+					detail: "v3 rebase historical plane is at capacity",
+					kind: "record-rejected" as const,
+					ok: false as const,
+				});
+			}
 			if (classified.kind === "current") {
 				currentRecordCount += 1;
 				if (currentRecordCount > registration.payload.parameters.maxEpochVertices) {
@@ -6080,10 +6279,11 @@ async function readRebaseOutbox(registration: V3PlaneRegistration): Promise<V3Re
 					ok: false as const,
 				});
 			}
-			if (classified.kind === "displaced") {
+			if (classified.kind === "displaced" || historical) {
+				if (historical && classified.row.publishState === "published") continue;
 				if (crossSource === undefined && classified.row.publishState !== "pending") continue;
 				const intents = rebaseIntents(
-					(registration.displacedSource as V3DisplacedSourceAuthority).prepared,
+					historical ? registration.payload : (registration.displacedSource as V3DisplacedSourceAuthority).prepared,
 					classified.authenticated
 				);
 				if (intents === undefined) {
@@ -6094,6 +6294,7 @@ async function readRebaseOutbox(registration: V3PlaneRegistration): Promise<V3Re
 					});
 				}
 				if (
+					!historical &&
 					crossSource !== undefined &&
 					(classified.row.authorSequence === 0 ||
 						classified.authenticated.digest === crossSource.activationVertexDigest)
@@ -6101,10 +6302,10 @@ async function readRebaseOutbox(registration: V3PlaneRegistration): Promise<V3Re
 					continue;
 				}
 				displacedRecordCount += 1;
-				if (
-					displacedRecordCount >
-					(registration.displacedSource as V3DisplacedSourceAuthority).prepared.parameters.maxEpochVertices
-				) {
+				const displacedLimit = historical
+					? registration.payload.parameters.maxEpochVertices
+					: (registration.displacedSource as V3DisplacedSourceAuthority).prepared.parameters.maxEpochVertices;
+				if (displacedRecordCount > displacedLimit) {
 					return ObjectFreeze({
 						detail: "v3 rebase displaced plane is at capacity",
 						kind: "record-rejected" as const,
@@ -6123,7 +6324,8 @@ async function readRebaseOutbox(registration: V3PlaneRegistration): Promise<V3Re
 	if (selected === undefined) return ObjectFreeze({ kind: "empty" as const, ok: true as const });
 	registration.rebaseCursor = selected.row.authorSequence;
 	const source = registration.displacedSource as V3DisplacedSourceAuthority;
-	const intents = rebaseIntents(source.prepared, selected.authenticated);
+	const historical = selected.kind === "covered-historical" || selected.kind === "pinned-genesis";
+	const intents = rebaseIntents(historical ? registration.payload : source.prepared, selected.authenticated);
 	if (intents === undefined) {
 		return ObjectFreeze({
 			detail: "v3 rebase outbox intent is invalid",
@@ -6172,6 +6374,7 @@ async function publishPending(
 			: undefined;
 	let selectedRow = completionRow;
 	let skipPublication = completionRow !== undefined;
+	if (completionRow === undefined) beginHistoricalIssuanceScan(registration.historicalIssuance);
 	while (selectedRow === undefined) {
 		let rawPage: unknown;
 		try {
@@ -6186,22 +6389,21 @@ async function publishPending(
 		if (page === undefined) return egressFailure("record-rejected", "v3 publication record is invalid");
 		if (page === null) return egressSuccess("empty");
 		let classified: ClassifiedRebaseRow | undefined;
-		let row: SnapshottedOutboxRow | undefined;
-		if (registration.displacedSource === undefined) {
-			row = outboxRowSnapshot(page, scope);
-		} else {
-			try {
-				classified = await authenticatedOutboxRow(registration, page);
-			} catch {
-				return egressFailure("store-failed", "v3 publication issued record read failed");
-			}
-			row = classified?.row;
+		try {
+			classified = await authenticatedOutboxRow(registration, page);
+		} catch {
+			return egressFailure("store-failed", "v3 publication issued record read failed");
 		}
-		if (row === undefined) return egressFailure("record-rejected", "v3 publication record is invalid");
+		if (classified === undefined) return egressFailure("record-rejected", "v3 publication record is invalid");
+		const row = classified.row;
+		const historical = classified.kind === "covered-historical" || classified.kind === "pinned-genesis";
+		if (historical && !countHistoricalIssuanceRow(registration.historicalIssuance, row.authorSequence)) {
+			return egressFailure("record-rejected", "v3 publication historical plane is at capacity");
+		}
 		const quarantinedCurrent =
-			classified?.kind === "current" &&
+			classified.kind === "current" &&
 			ReflectApply(SetPrototypeHas, registration.quarantinedDigests, [classified.authenticated.digest]) === true;
-		if (classified !== undefined && !quarantinedCurrent && !validRebaseRow(registration, classified)) {
+		if (!quarantinedCurrent && !validRebaseRow(registration, classified)) {
 			return egressFailure("record-rejected", "v3 publication record is invalid");
 		}
 		if (row.publishState === "published") {
@@ -6214,7 +6416,7 @@ async function publishPending(
 			continue;
 		}
 		if (row.publishState !== "pending") return egressFailure("record-rejected", "v3 publication state is invalid");
-		if (classified?.kind === "displaced") {
+		if (classified.kind === "displaced" || historical) {
 			if (afterKey !== undefined && row.authorSequence <= afterKey[2]) {
 				return egressFailure("record-rejected", "v3 publication cursor did not advance");
 			}
@@ -6290,7 +6492,17 @@ async function completeRebaseSource(
 		const issued = await selectedStore.readIssued(selectedScope, input.authorSequence);
 		const row = outboxRowSnapshot(ObjectFreeze({ commit: issued, publishState: "pending" as const }), selectedScope);
 		const classified = row === undefined ? undefined : classifyRebaseRow(registration, row);
-		if (classified?.kind !== "displaced" || classified.authenticated.digest !== input.digest) {
+		if (classified === undefined) {
+			return egressFailure("record-rejected", "v3 displaced source completion does not match");
+		}
+		const completionClass = classified?.kind;
+		if (
+			(completionClass !== "displaced" &&
+				completionClass !== "covered-historical" &&
+				completionClass !== "pinned-genesis") ||
+			classified.authenticated.digest !== input.digest ||
+			!validRebaseRow(registration, classified)
+		) {
 			return egressFailure("record-rejected", "v3 displaced source completion does not match");
 		}
 		if (row === undefined) return egressFailure("record-rejected", "v3 displaced source completion does not match");
@@ -7284,6 +7496,7 @@ export function activateV3LivePlane(rawInput: V3PlaneActivationInput): V3PlaneAc
 				graphVersion: intrinsicMapSize(recovered.applicationAuthors) ?? -1,
 				handle: undefined as unknown as V3PlaneHandle,
 				hotPredecessor: undefined,
+				historicalIssuance: recovered.historicalIssuance,
 				index: recovered.index,
 				issuanceScope: selectedScope,
 				issuanceStore: boundIssuanceStore,
@@ -7380,14 +7593,46 @@ async function activateCreatorSuccessorLive(
 		if (successorPayload === undefined || successorAuthorization === undefined) {
 			return rejected("preparation-rejected", "creator successor issuance authority preparation failed");
 		}
+		const openHistoricalIssuance = (): HistoricalIssuanceContext | undefined => {
+			const capability = openVerifiedCreatorHistoricalIssuance({
+				closure: ObjectFreeze({
+					candidates: material.successor.candidates,
+					closure: material.successor.references,
+				}),
+				floorTrust: material.successor.trust,
+			});
+			const identity = capability === undefined ? undefined : resolveVerifiedCreatorHistoricalIssuance(capability);
+			return capability === undefined ||
+				identity === undefined ||
+				identity.objectId !== material.issuanceScope.objectId ||
+				identity.author !== material.issuanceScope.author ||
+				identity.closedEpoch !== material.predecessor.trust.currentEpoch ||
+				identity.closedAnchorDigest !== material.predecessor.trust.currentAnchorDigest ||
+				identity.successorEpoch !== material.successor.trust.currentEpoch ||
+				identity.successorAnchorDigest !== material.successor.trust.currentAnchorDigest
+				? undefined
+				: {
+						capability,
+						count: 0,
+						countedSequences: new IntrinsicSet<number>(),
+						maxEpochVertices: successorPayload.parameters.maxEpochVertices,
+					};
+		};
+		const predecessorHistoricalIssuance = openHistoricalIssuance();
+		const successorHistoricalIssuance = openHistoricalIssuance();
+		if (predecessorHistoricalIssuance === undefined || successorHistoricalIssuance === undefined) {
+			return rejected("preparation-rejected", "creator historical issuance authority preparation failed");
+		}
 		const predecessorIssuanceStore = creatorFilteredIssuanceStore(
 			material.issuanceStore,
 			material.issuanceScope,
 			successorPayload,
 			successorAuthorization,
 			material.predecessor.trust.currentEpoch,
-			material.predecessor.trust.currentEpoch > 0 ? material.pinnedGenesisAnchorDigest : undefined
+			material.predecessor.trust.currentEpoch > 0 ? material.pinnedGenesisAnchorDigest : undefined,
+			predecessorHistoricalIssuance
 		);
+		creatorHistoricalIssuanceHandoffs.set(predecessorValidation, predecessorHistoricalIssuance);
 		if (transportHandoff?.displacedSource !== undefined) {
 			creatorPredecessorRecoverySource.set(predecessorValidation, transportHandoff.displacedSource);
 		}
@@ -7422,15 +7667,20 @@ async function activateCreatorSuccessorLive(
 							successorPayload,
 							successorAuthorization,
 							Number.MAX_SAFE_INTEGER,
-							material.pinnedGenesisAnchorDigest
+							material.pinnedGenesisAnchorDigest,
+							successorHistoricalIssuance
 						)
 					: material.issuanceStore
 				: creatorFilteredIssuanceStore(
 						material.issuanceStore,
 						material.issuanceScope,
 						transportHandoff.displacedSource.prepared,
-						transportHandoff.displacedSource.authorization
+						transportHandoff.displacedSource.authorization,
+						undefined,
+						undefined,
+						successorHistoricalIssuance
 					);
+		creatorHistoricalIssuanceHandoffs.set(successor, successorHistoricalIssuance);
 		const recovered = await recoverV3LiveReplica({
 			capability: successor,
 			displacedSource: ObjectFreeze({

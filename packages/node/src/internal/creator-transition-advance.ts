@@ -34,6 +34,12 @@ export type InspectCreatorTransitionAdvanceResult =
 			readonly proposed: CreatorTransitionClosure;
 	  }>;
 
+export interface VerifiedCreatorHistoricalIssuance {
+	readonly __verifiedCreatorHistoricalIssuance?: never;
+}
+
+const verifiedHistoricalIssuance = new WeakMap<VerifiedCreatorHistoricalIssuance, CreatorIssuanceRetirementIdentity>();
+
 function record(candidate: DetachedClosureCandidate): Readonly<Record<string, unknown>> | undefined {
 	try {
 		const decoded = decodeCanonical(candidate.bytes);
@@ -127,6 +133,68 @@ function openedRetirement(
 		decodedCut.previousAnchor !== identity.closedAnchorDigest
 		? undefined
 		: Object.freeze({ candidate, identity });
+}
+
+/**
+ * Opens the sole retirement carrier in one authenticated successor generation.
+ * The returned capability is private to the Node lifecycle and cannot be
+ * manufactured from durable row bytes alone.
+ * @param input - Exact successor closure and its independently authenticated floor.
+ * @returns An opaque historical-issuance capability or undefined on any ambiguity.
+ */
+export function openVerifiedCreatorHistoricalIssuance(
+	input: Readonly<{
+		readonly closure: CreatorTransitionClosure;
+		readonly floorTrust: CurrentAnchorTrust;
+	}>
+): VerifiedCreatorHistoricalIssuance | undefined {
+	try {
+		if (input.floorTrust.currentEpoch < 1) return undefined;
+		const closedEpoch = input.floorTrust.currentEpoch - 1;
+		const retirement = retirementCandidates(input.closure);
+		const cut = uniqueCandidate(input.closure.candidates, "drp-hard-epoch-cut", closedEpoch);
+		const qc = uniqueCandidate(input.closure.candidates, "drp-seal-qc", closedEpoch, "commit");
+		if (
+			retirement.length !== 1 ||
+			cut === undefined ||
+			qc === undefined ||
+			!exactClosureOccurrence(input.closure.closure, retirement[0] as DetachedClosureCandidate)
+		) {
+			return undefined;
+		}
+		const opened = openedRetirement(retirement[0] as DetachedClosureCandidate, input.floorTrust, cut, qc);
+		if (
+			opened === undefined ||
+			opened.identity.closedEpoch !== closedEpoch ||
+			opened.identity.successorEpoch !== input.floorTrust.currentEpoch ||
+			opened.identity.successorAnchorDigest !== input.floorTrust.currentAnchorDigest
+		) {
+			return undefined;
+		}
+		const capability = Object.freeze({}) as VerifiedCreatorHistoricalIssuance;
+		verifiedHistoricalIssuance.set(capability, opened.identity);
+		return capability;
+	} catch {
+		return undefined;
+	}
+}
+
+/**
+ * Resolves a detached identity from a genuine Node-private capability.
+ * @param capability - Capability returned by openVerifiedCreatorHistoricalIssuance.
+ * @returns A detached frozen identity or undefined for foreign custody.
+ */
+export function resolveVerifiedCreatorHistoricalIssuance(
+	capability: VerifiedCreatorHistoricalIssuance
+): CreatorIssuanceRetirementIdentity | undefined {
+	const identity = verifiedHistoricalIssuance.get(capability);
+	return identity === undefined
+		? undefined
+		: Object.freeze({
+				...identity,
+				commitQcRef: Object.freeze({ ...identity.commitQcRef }),
+				observedLineage: Object.freeze({ ...identity.observedLineage }),
+			});
 }
 
 function authenticatedRetirementPair(input: InspectCreatorTransitionAdvanceInput):

@@ -448,8 +448,16 @@ function d110c0c1TestInstrumentation() {
 					'\t\td110c0c1TestInstrumentation()?.d110c0c1SetOwner(null);\n\t\tif (!recovered.ok) return rejected("recovery-rejected", `creator successor recovery failed: ${recovered.kind}`);'
 				);
 				replaceOnce(
-					'\t\t\t} catch {\n\t\t\t\treturn recoveryFailure("admission-rejected", "v3 recovery admission failed");\n\t\t\t}\n\t\t\tif (classified?.kind === "displaced") {',
-					'\t\t\t} catch {\n\t\t\t\treturn recoveryFailure("admission-rejected", "v3 recovery admission failed");\n\t\t\t}\n\t\t\td110c0c1TestInstrumentation()?.d110c0c1Record(ObjectFreeze({\n\t\t\t\tauthorSequence: row.authorSequence,\n\t\t\t\tclassification: classified?.kind ?? "rejected",\n\t\t\t\tdigest: lowerHexDigest(row.digest),\n\t\t\t\tpayloadEpoch: payload.provenance.epoch,\n\t\t\t}));\n\t\t\tif (classified?.kind === "displaced") {'
+					'\t\t\t} catch {\n\t\t\t\treturn recoveryFailure("admission-rejected", "v3 recovery admission failed");\n\t\t\t}\n\t\t\tif (classified?.kind === "covered-historical" || classified?.kind === "pinned-genesis") {',
+					'\t\t\t} catch {\n\t\t\t\treturn recoveryFailure("admission-rejected", "v3 recovery admission failed");\n\t\t\t}\n\t\t\td110c0c1TestInstrumentation()?.d110c0c1Record(ObjectFreeze({\n\t\t\t\tauthorSequence: row.authorSequence,\n\t\t\t\tclassification: classified?.kind ?? "rejected",\n\t\t\t\tdigest: lowerHexDigest(row.digest),\n\t\t\t\tpayloadEpoch: payload.provenance.epoch,\n\t\t\t}));\n\t\t\tif (classified?.kind === "covered-historical" || classified?.kind === "pinned-genesis") {'
+				);
+				replaceOnce(
+					"\t\t\t\tif (\n\t\t\t\t\tauthenticatedFilterRow ||\n\t\t\t\t\tauthenticatedGenesisRow !== undefined ||\n\t\t\t\t\tauthenticatedHistoricalRow !== undefined\n\t\t\t\t) {",
+					'\t\t\t\td110c0c1TestInstrumentation()?.d110c0c1Record(ObjectFreeze({\n\t\t\t\t\tauthorSequence: row.authorSequence,\n\t\t\t\t\tclassification: authenticatedFilterRow ? "filtered-current" : authenticatedGenesisRow !== undefined ? "pinned-genesis" : "covered-historical",\n\t\t\t\t\tdigest: lowerHexDigest(row.digest),\n\t\t\t\t\tpayloadEpoch: filterPayload.provenance.epoch,\n\t\t\t\t}));\n\t\t\t\tif (\n\t\t\t\t\tauthenticatedFilterRow ||\n\t\t\t\t\tauthenticatedGenesisRow !== undefined ||\n\t\t\t\t\tauthenticatedHistoricalRow !== undefined\n\t\t\t\t) {'
+				);
+				replaceOnce(
+					"\t\t\tregistration.handle = makeV3PlaneHandle(registration);",
+					'\t\t\td110c0c1TestInstrumentation()?.d110c0c1Record(ObjectFreeze({\n\t\t\t\tclassification: "activation",\n\t\t\t\tdisplacedIssuanceBoundary: registration.displacedIssuanceBoundary ?? null,\n\t\t\t\tpayloadEpoch: payload.provenance.epoch,\n\t\t\t}));\n\t\t\tregistration.handle = makeV3PlaneHandle(registration);'
 				);
 				return { contents, loader: "ts", resolveDir: dirname(path) };
 			});
@@ -2614,7 +2622,13 @@ test("D.110c-0c1 cold reopens a genuine hot epoch-3 successor with authenticated
 			await page.evaluate(() => window.phase6aCreatorSuccessorProduct.d110c0c1Differential("same-room"))
 		);
 		const control = d110c0cRecord(evidence.control);
+		const pendingGenesis = d110c0cRecord(evidence.pendingGenesis);
+		const pendingHistorical = d110c0cRecord(evidence.pendingHistorical);
 		const treatment = d110c0cRecord(evidence.treatment);
+		await testInfo.attach("d110c-0c1-observation", {
+			body: Buffer.from(JSON.stringify(evidence)),
+			contentType: "application/json",
+		});
 		const controlRows = d110c0cArray(control.prefixRows).map(d110c0cRecord);
 		const treatmentPrefixRows = d110c0cArray(treatment.prefixRows).map(d110c0cRecord);
 		const treatmentRows = d110c0cArray(treatment.treatmentRows).map(d110c0cRecord);
@@ -2661,21 +2675,139 @@ test("D.110c-0c1 cold reopens a genuine hot epoch-3 successor with authenticated
 		expect(coldTrace).toContainEqual(
 			expect.objectContaining({
 				authorSequence: 2,
-				classification: "rejected",
+				classification: "covered-historical",
+				owner: "predecessor-validation",
+				payloadEpoch: 3,
+			})
+		);
+		expect(coldTrace).toContainEqual(
+			expect.objectContaining({
+				authorSequence: 3,
+				classification: "current",
 				owner: "predecessor-validation",
 				payloadEpoch: 2,
 			})
 		);
-		expect(coldTrace.some(({ authorSequence }) => authorSequence === 3)).toBe(false);
-		expect(treatment.reopened).toBeNull();
-		expect(treatment.detail).toBe(
-			"v3 room successor reopen failed: recovery-rejected: creator predecessor recovery failed: admission-rejected"
+		expect(coldTrace).toContainEqual(
+			expect.objectContaining({
+				authorSequence: 3,
+				classification: "displaced",
+				owner: "successor-recovery",
+				payloadEpoch: 3,
+			})
 		);
-		await testInfo.attach("d110c-0c1-causal-red", {
+		expect(coldTrace).toContainEqual(
+			expect.objectContaining({
+				classification: "activation",
+				displacedIssuanceBoundary: 3,
+				payloadEpoch: 3,
+			})
+		);
+		expect(treatment.detail).toBe("fulfilled");
+		expect(d110c0cRecord(treatment.reopened).authority).toMatchObject({ epoch: 3, lifecycle: "active" });
+		expect(d110c0cRecord(d110c0cRecord(treatment.after).projection)).toMatchObject({
+			accepted: expect.arrayContaining([expect.objectContaining({ text: "d110c-0c1-treatment-after-reopen" })]),
+		});
+		expect(
+			d110c0cArray(treatment.postReopenRows)
+				.map(d110c0cRecord)
+				.map(({ authorSequence, epoch, publishState }) => ({ authorSequence, epoch, publishState }))
+		).toEqual([
+			...treatmentRows.map(({ authorSequence, epoch, publishState }) => ({ authorSequence, epoch, publishState })),
+			{ authorSequence: 4, epoch: 3, publishState: "published" },
+		]);
+		const pendingHistoricalBefore = d110c0cArray(pendingHistorical.before).map(d110c0cRecord);
+		const pendingHistoricalAfter = d110c0cArray(pendingHistorical.after).map(d110c0cRecord);
+		const pendingHistoricalTrace = d110c0cArray(pendingHistorical.trace).map(d110c0cRecord);
+		const pendingGenesisBefore = d110c0cArray(pendingGenesis.before).map(d110c0cRecord);
+		const pendingGenesisAfter = d110c0cArray(pendingGenesis.after).map(d110c0cRecord);
+		const pendingGenesisTrace = d110c0cArray(pendingGenesis.trace).map(d110c0cRecord);
+		const historicalRebaseOrchestrationMissing =
+			pendingHistoricalBefore.some(
+				({ authorSequence, publishState }) => authorSequence === 2 && publishState === "pending"
+			) &&
+			pendingHistoricalAfter.some(
+				({ authorSequence, publishState }) => authorSequence === 2 && publishState === "pending"
+			) &&
+			pendingHistoricalAfter.some(
+				({ authorSequence, epoch, publishState }) => authorSequence === 4 && epoch === 3 && publishState === "published"
+			) &&
+			pendingHistoricalTrace.some(
+				({ authorSequence, classification, owner, phase }) =>
+					authorSequence === 2 &&
+					classification === "covered-historical" &&
+					owner === "predecessor-validation" &&
+					phase === "pending-2-cold-reopen"
+			) &&
+			pendingGenesisBefore.some(
+				({ authorSequence, publishState }) => authorSequence === 0 && publishState === "pending"
+			) &&
+			pendingGenesisAfter.some(
+				({ authorSequence, publishState }) => authorSequence === 0 && publishState === "pending"
+			) &&
+			pendingGenesisTrace.some(
+				({ authorSequence, classification, owner, phase }) =>
+					authorSequence === 0 &&
+					classification === "pinned-genesis" &&
+					owner === "predecessor-validation" &&
+					phase === "pending-0-cold-reopen"
+			);
+		if (historicalRebaseOrchestrationMissing) {
+			throw new TypeError("D110C_0C1D_HISTORICAL_REBASE_ORCHESTRATION_REQUIRED");
+		}
+		for (const pending of [pendingGenesis, pendingHistorical]) {
+			expect(d110c0cRecord(pending.reopened).authority).toMatchObject({ epoch: 3, lifecycle: "active" });
+			const before = d110c0cArray(pending.before).map(d110c0cRecord);
+			const selected = before.find(({ authorSequence }) => authorSequence === pending.authorSequence);
+			expect(selected).toMatchObject({ publishState: "pending" });
+			const after = d110c0cArray(pending.after).map(d110c0cRecord);
+			expect(after.find(({ authorSequence }) => authorSequence === pending.authorSequence)).toMatchObject({
+				publishState: "published",
+			});
+		}
+		expect(
+			d110c0cArray(pendingHistorical.after)
+				.map(d110c0cRecord)
+				.map(({ authorSequence, epoch, publishState }) => ({ authorSequence, epoch, publishState }))
+		).toEqual([
+			{ authorSequence: 0, epoch: 0, publishState: "published" },
+			{ authorSequence: 1, epoch: 0, publishState: "published" },
+			{ authorSequence: 2, epoch: 1, publishState: "published" },
+			{ authorSequence: 3, epoch: 2, publishState: "published" },
+			{ authorSequence: 4, epoch: 3, publishState: "published" },
+			{ authorSequence: 5, epoch: 3, publishState: "published" },
+		]);
+		expect(
+			d110c0cArray(pendingGenesis.after)
+				.map(d110c0cRecord)
+				.map(({ authorSequence, epoch, publishState }) => ({ authorSequence, epoch, publishState }))
+		).toEqual([
+			{ authorSequence: 0, epoch: 0, publishState: "published" },
+			{ authorSequence: 1, epoch: 0, publishState: "published" },
+			{ authorSequence: 2, epoch: 1, publishState: "published" },
+			{ authorSequence: 3, epoch: 2, publishState: "published" },
+			{ authorSequence: 4, epoch: 3, publishState: "published" },
+		]);
+		expect(d110c0cArray(pendingHistorical.trace).map(d110c0cRecord)).toContainEqual(
+			expect.objectContaining({
+				authorSequence: 2,
+				classification: "covered-historical",
+				owner: "predecessor-validation",
+				phase: "pending-2-cold-reopen",
+			})
+		);
+		expect(d110c0cArray(pendingGenesis.trace).map(d110c0cRecord)).toContainEqual(
+			expect.objectContaining({
+				authorSequence: 0,
+				classification: "pinned-genesis",
+				owner: "predecessor-validation",
+				phase: "pending-0-cold-reopen",
+			})
+		);
+		await testInfo.attach("d110c-0c1-green", {
 			body: Buffer.from(JSON.stringify(evidence)),
 			contentType: "application/json",
 		});
-		throw new TypeError("D110C_0C1_INTERMEDIATE_ISSUANCE_RECOVERY_REQUIRED");
 	} finally {
 		await page
 			.evaluate(() => window.phase6aCreatorSuccessorProduct.closeDirectCreator("same-room"))

@@ -96302,9 +96302,9 @@ SHA-256 is
 
 ###### D.110c-0c1d successor-reopen historical-rebase orchestration prerequisite
 
-**Status: bounded source/architecture audit and first governing plan review
-complete; its one material blocking union is corrected below; the sole
-confirmation is pending.** Owner:
+**Status: bounded source/architecture audit, governing plan review, sole
+material confirmation, and causal tests-only RED complete; the blocking union
+is empty and the frozen two-predicate production GREEN is authorized.** Owner:
 `examples/v3-room/src/index.ts::createV3RoomSessionOwned()` at the
 `rebasePromise` startup predicate and the same function's published-displaced
 identity-verification predicate inside `drainRebaseOutbox()`, plus the existing
@@ -96462,6 +96462,50 @@ The deterministic correction audit is
 `.logs/d110c-0c1d-plan-correction-ecd9296c/`; its one-entry self-excluding
 manifest validates with SHA-256
 `ef33679624635edd4e8ce1631091e25045451410ac6d956acb61adf9b983fe1d`.
+
+The sole material confirmation inspected signed/pushed correction
+`0f3759b632e497fa361b4b3076d043283dfbfd96`, tree
+`3843afd2368cc2c106a81040ca92202ae10518e0`. Grok 4.6/high and Kimi
+K3/100-step each returned `APPROVED`, P0/P1/P2 `0/0/0`; their initial terminal
+content required exact-session schema-only re-emission, without re-review, to
+remove surrounding progress prose and one wrong field name respectively.
+Opus xhigh returned `APPROVED`, P0/P1/P2 `0/0/5`. All three set
+`blocking_finding_closed`, `plan_sufficient`, and `scope_preserved` to `true`,
+so the blocking union is empty. Opus's actionable RED-ordering disposition is
+implemented: the sequence-2 causal check precedes the existing sequence-0-first
+GREEN assertion loop. Its remaining P2 findings do not widen this slice:
+successor rebase application-policy absence remains fail closed with the source
+row pending; monotonic logical time now advances beyond authenticated
+predecessor intents; migration-only identity retention is proven by exact
+source shape and the previously-vacuous conjunct rather than a new negative
+fixture; and projector identity deduplication versus snapshot-restored reducer
+state remains an explicit parent D.110c-0c1 semantic-review concern. Complete
+confirmation evidence is
+`.logs/d110c-0c1d-plan-confirmation-0f3759b6/`; its 13-entry self-excluding
+manifest validates with SHA-256
+`a37a09cc8d8f6fac27114529b9a8cbfe59f1ab7bdbfff8cf8bee7e933afc5761`.
+
+The tests-only RED then ran exactly once. The listing selected one test in one
+file. The reporter recorded expected/skipped/unexpected/flaky `0/0/1/0`, zero
+top-level errors, runner status `1`, and the sole exact error
+`D110C_0C1D_HISTORICAL_REBASE_ORCHESTRATION_REQUIRED`. Its complete attached
+observation proves genuine epoch-3 activation and successful current issue at
+sequence 4 while the sequence-2 epoch-1 source row remained `pending` before
+and after and was authenticated as `covered-historical`. The independently
+recorded sequence-0 row likewise remained `pending` and was authenticated as
+`pinned-genesis`; it is retained as the same missing-drain symptom and did not
+emit the causal token. Neither old row was directly published at its stale
+anchor. This is the accepted RED, not a product pass. Complete evidence is
+`.logs/d110c-0c1d-red-0f3759b6/`; its nine-entry self-excluding manifest
+validates with SHA-256
+`a00dfbce7dba85de9687f34ddc46ae7e149c197324db72f45d8fa870765feea7`.
+Exact-owner ESLint, Prettier, and `git diff --check` pass. The first combined
+Prettier invocation exhausted its default 4 GiB heap while parsing this large
+plan; the corrected split invocation gave only the formatter an 8 GiB heap and
+passed both the plan and all four TypeScript owners. This was a formatter
+invocation defect, not a code, product-memory, or acceptance failure.
+The frozen two-predicate room GREEN may now begin; no other product owner is
+authorized.
 
 The bounded local audit is rooted at
 `.logs/d110c-0c1d-source-audit-b21a6d47/`. It pins signed/pushed parent anchor
