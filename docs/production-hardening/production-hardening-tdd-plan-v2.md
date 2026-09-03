@@ -96204,9 +96204,9 @@ is under `.logs/d110c-0c1a-review-confirmation-7414fa6b/`; its validating
 ###### D.110c-0c1b committed-issuance outcome reconciliation prerequisite
 
 **Status: bounded source/architecture audit complete at signed/pushed anchor
-`90a06a1aae79d408a1c2c6b014dae1a99daf866d`; the exact orchestration repair and
-causal tests-only RED are frozen below, with plan review next and no production
-edit yet.** Owner: the
+`90a06a1aae79d408a1c2c6b014dae1a99daf866d`; initial plan review completed with
+the material corrections below applied in one batch, one confirmation is due,
+and no production edit has begun.** Owner: the
 post-`transactIssue()` outcome window in
 `packages/node/src/v3-live.ts::issueOneVertex()`, live-journal append, graph
 admission, restart recovery of pending issuance/outbox rows, and the close-time
@@ -96218,14 +96218,17 @@ The bounded source/architecture audit inspected `issueOneVertex()`, the
 registration task queue, blueprint fold/creator-close capture, the complete
 recovery outbox/journal path, issuance and journal contracts, the retained
 E5-01 uncertain-outcome test, and the genuine D.110c-a repeat-close fixture.
-It establishes a narrow composition defect. `issuer.issue()` returns only
-after `transactIssue()` has durably committed the issued and pending-outbox
-pair. Every later `committedFailure()` therefore owns a durable row, but it
-sets `operationAdmissionHalted` only when the optional operation-policy
-reservation exists. Even when set, neither `creatorCloseRegistration()` nor
-the queued `stageClosedBlueprintEpoch()` checks the flag. Because snapshot
-staging queues the fold behind an already running issue, the fold can observe
-the issue's committed failure and still capture a graph that omits its row.
+It establishes a narrow composition defect. `issuer.issue()` normally returns
+only after `transactIssue()` has durably committed the issued and
+pending-outbox pair. Every later `committedFailure()` therefore owns a durable
+row. Both real issuance stores also have one pre-return ambiguous arm: a commit
+can succeed and the bounded terminal readback can then throw exact
+`ISSUANCE_OUTCOME_UNKNOWN`. The surrounding catch and `committedFailure()` set
+`operationAdmissionHalted` only when the optional operation-policy reservation
+exists. Even when set, neither `creatorCloseRegistration()` nor the queued
+`stageClosedBlueprintEpoch()` checks the flag. Because snapshot staging queues
+the fold behind an already running issue, the fold can observe the issue's
+committed failure and still capture a graph that omits its row.
 
 The existing `recoverV3LiveReplica()` outbox scan is already the exact
 reconciliation owner. It pages and point-reads the real store, requires exact
@@ -96236,11 +96239,15 @@ graph/application state once, and commits the recovered reservation before
 activation. Therefore no durable outcome marker, schema, public API, wire
 field, dependency, new authority rule, or store operation is required.
 
-GREEN is frozen to three internal checks in `packages/node/src/v3-live.ts`:
+GREEN is frozen to three internal check families in
+`packages/node/src/v3-live.ts`:
 
 1. after `issuer.issue()` returned, every `committedFailure()` unconditionally
    sets the existing `operationAdmissionHalted` recovery-required flag, even
-   when no operation admission policy exists;
+   when no operation admission policy exists; the surrounding catch binds its
+   error and also sets the flag for exact `ISSUANCE_OUTCOME_UNKNOWN`,
+   independent of reservation presence, while definitely pre-transaction
+   signer and capacity failures preserve their current release/retry behavior;
 2. `creatorCloseRegistration()` refuses to mint close authority while that
    flag is set; and
 3. `stageClosedBlueprintEpoch()` rechecks the flag after the registration queue
@@ -96259,29 +96266,36 @@ is under `.logs/d110c-0c1b-source-audit-90a06a1a/`. If implementation discovers
 that any frozen assumption is false or requires the rejected schema/API/wire/
 dependency/authority changes, stop and reslice that exact prerequisite.
 The audit root's validating three-entry self-excluding manifest SHA-256 is
-`48309c9c5ea98d4bdbd0e44ab1b05ab4fab5a375d8f091548e7adc2a260361fe`.
+`08d278438087bbef20d61e5d058c02f02b89b84c33d02a7ad4f4e6212ca26b7b`.
 
 Tests-only RED must use the real product issue path and real store
-implementations behind a one-use journal adapter that blocks at the target
-`local-issued` append and then rejects without writing. Bind creator close
+implementations. First admit sequence 0 so the retirement boundary has a real
+in-graph prefix. Then use a one-use journal adapter that blocks at sequence 1's
+target `local-issued` append and rejects without writing. Bind creator close
 before releasing the failure and call close while issue owns the registration
 queue. Current code must prove the issue reports existing `journal-rejected`,
-the exact issued/pending-outbox row survives, journal and graph omit it, yet the
-queued genuine close advances; after verified adoption/restart the next genuine
-close must refuse with exact
+the exact issued/pending-outbox sequence-1 row survives, journal and graph omit
+it, yet the queued genuine close truncates after sequence 0 and advances; after
+verified adoption/restart the next genuine close must refuse with exact
 `D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE` because that same row carries
-the old authenticated epoch/anchor. The test's intended expectation is the
-earlier close refusal token
-`D110C_0C1B_COMMITTED_ISSUANCE_RECOVERY_REQUIRED`, so the present advance is
-the sole causal RED. No test may insert, delete, republish, rewrite, or
+the old authenticated epoch/anchor. Test case id
+`D110C_0C1B_COMMITTED_ISSUANCE_RECOVERY_REQUIRED` marks unexpected advancement;
+it is not a product error. GREEN preserves existing product-visible refusals:
+bind-after-failure returns `CREATOR_CLOSE_UNAVAILABLE`, while a pre-bound close
+fails through the existing `creator snapshot export failed: not-active` path.
+No test may insert, delete, republish, rewrite, or
 privately classify the row to manufacture the failure. Any earlier failure,
 different row, missing current-close advance, or different next-close token
 stops and diagnoses RED.
 
 GREEN must prove both orderings: a close handle bound before the committed
-failure rejects dynamically, and a bind attempted after the failure cannot
-claim close authority. Neither refusal may change durable head, snapshot,
-graph, application state, or the surviving row. A second issue must reject
+failure rejects dynamically through the existing snapshot-export error, and a
+bind attempted after the failure returns existing `CREATOR_CLOSE_UNAVAILABLE`
+without claiming close authority. Neither refusal may change durable head,
+snapshot, graph, application state, or the surviving row. Creator-close's
+existing abort path clears `blueprintClosing` after the queued-fold refusal,
+while `operationAdmissionHalted` remains set; another local issue and another
+close bind still refuse until deactivation/recovery. A second issue must reject
 without another issuance transaction. Deactivate and recover the same epoch;
 the existing product recovery path must authenticate and admit the exact row
 once, restore exact application and operation-policy state, and then complete
@@ -96292,17 +96306,37 @@ carrier boundary and non-null continuation, exact state digest, and exact
 operation count.
 
 The focused matrix covers failure before journal write, journal write then
-thrown outcome, graph append failure, operation-policy commit failure, close
-racing the failure, bind after failure, repeated recovery, substituted
-issued/outbox row, stale epoch/anchor, invalid dependency/ACL, capacity, and
-terminal classification. Preserve all existing fail-closed result kinds and
-details; the D.110c-0c1b token is tests-only. Retain D.110c-0c1a carrier,
+thrown outcome, graph append failure, operation-policy commit failure, exact
+non-terminal `ISSUANCE_OUTCOME_UNKNOWN` after durable commit with no operation
+policy, close racing the failure, bind after failure, repeated recovery,
+substituted issued/outbox row, stale epoch/anchor, invalid dependency/ACL,
+capacity, and terminal classification. Reusing the halt conservatively refuses
+new local and received admission after uncertain local issuance and permits a
+received-path uncertain outcome to refuse close; this broader fail-closed
+effect is intentional. The retained no-failure D.110c-a/b hot path must still
+bind and close. Preserve all existing fail-closed result kinds and details; the
+D.110c-0c1b token is tests-only. Retain D.110c-0c1a carrier,
 E5-01 admission/recovery, Phase-6a successor recovery/adoption,
 issuance/outbox/rebase, AHE rollback, snapshot, D.109 reclamation, exact-owner
 static gates, and the D.110c-a/b hot path. This is a high-risk
 production-lifecycle slice and receives the governing plan review, causal RED
 custody, signed GREEN, and one final Grok/Kimi/Opus review. No campaign or
 D.110a invocation runs.
+
+The initial plan review at signed/pushed commit
+`d4ed70242c9f21cfb24e1d5c6b1c9c6216096616` produced one material correction
+family: exact `ISSUANCE_OUTCOME_UNKNOWN` after a possible durable commit must
+halt even without a policy reservation, while the D.110c-0c1b token remains a
+test case id and existing creator-close errors remain unchanged. The accepted
+P2 dispositions add a real sequence-0 prefix to the RED, record conservative
+halt reuse, pin creator-close abort/latch behavior, preserve the unconsumed
+refused claim, and retain the no-failure close path. The complete review and
+disposition evidence is under `.logs/d110c-0c1b-plan-review-d4ed7024/`; its
+validating 20-entry self-excluding manifest SHA-256 is
+`7c3592e1edb59992740be65d7565cf3105f80c0e9b188ec51f2f160fa227e88c`.
+Because the P1 correction changes executable fault coverage, the corrected
+signed/pushed plan receives exactly one material Grok/Kimi/Opus confirmation.
+No production edit or RED execution precedes its empty blocking union.
 
 The complete confirmation evidence is retained under
 `.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry

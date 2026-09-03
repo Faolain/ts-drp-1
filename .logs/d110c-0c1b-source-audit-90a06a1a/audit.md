@@ -7,11 +7,15 @@ Audit anchor: signed/pushed commit
 ## Demonstrated defect
 
 `packages/node/src/v3-live.ts::issueOneVertex()` returns from
-`issuer.issue()` only after `DurableIssuanceStore.transactIssue()` has
-committed the exact issued record and pending outbox row. All failures from
-`committedFailure()` therefore occur after durable issuance. The helper sets
+`issuer.issue()` normally returns only after
+`DurableIssuanceStore.transactIssue()` has committed the exact issued record
+and pending outbox row. All failures from `committedFailure()` therefore occur
+after durable issuance. There is also one pre-return ambiguous arm: both real
+issuance stores can commit and then throw exact
+`ISSUANCE_OUTCOME_UNKNOWN` when the bounded terminal readback is unavailable.
+The surrounding catch and `committedFailure()` set
 `operationAdmissionHalted` only when an optional operation-policy reservation
-exists. Even when it does set the flag, neither
+exists. Even when they do set the flag, neither
 `creatorCloseRegistration()` nor the queued `stageClosedBlueprintEpoch()`
 checks it. A close can consequently fold/capture a graph that omits a durable
 issued row.
@@ -46,10 +50,12 @@ operation is necessary for this defect.
 
 This is composition/orchestration, not new product data:
 
-1. Once `issuer.issue()` returned a durable commit, every
-   `committedFailure()` unconditionally sets the existing
-   `operationAdmissionHalted` recovery-required flag, including when no
-   operation admission policy is installed.
+1. Every `committedFailure()` after `issuer.issue()` returned a durable commit
+   unconditionally sets the existing `operationAdmissionHalted`
+   recovery-required flag. The surrounding catch also sets it when the thrown
+   error has exact code `ISSUANCE_OUTCOME_UNKNOWN`, independent of whether an
+   operation admission policy is installed. Definitely pre-transaction
+   signer and capacity failures retain their existing release/retry behavior.
 2. `creatorCloseRegistration()` refuses to mint a close registration while
    that flag is set.
 3. `stageClosedBlueprintEpoch()` rechecks the same flag after the registration
@@ -78,18 +84,23 @@ only after the existing authenticated outbox/journal reconciliation succeeds.
 
 ## Frozen RED witness
 
-A tests-only fixture uses the genuine issue path and real store implementations
-with a one-use journal adapter that blocks at the target `local-issued` append
-and then rejects without writing. It binds creator close before releasing the
-failure, calls close while issue owns the registration queue, then releases the
-journal rejection. At current code the issue returns the existing
+A tests-only fixture uses the genuine issue path and real store implementations.
+It first admits sequence 0 so the current retirement boundary is non-empty,
+then uses a one-use journal adapter that blocks at sequence 1's target
+`local-issued` append and rejects without writing. It binds creator close
+before releasing the failure, calls close while issue owns the registration
+queue, then releases the journal rejection. At current code the issue returns
+the existing
 `journal-rejected` class, the exact issued/pending-outbox row survives, the
 journal and graph omit it, yet the queued creator close advances. After genuine
 adoption/restart, the next close fails with exact
 `D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE` because the row retains the old
-authenticated epoch/anchor. The test expects the earlier close to refuse with
-`D110C_0C1B_COMMITTED_ISSUANCE_RECOVERY_REQUIRED`, so current code is causal
-RED. No fixture inserts, mutates, deletes, republishes or reclassifies the row.
+authenticated epoch/anchor. Test case id
+`D110C_0C1B_COMMITTED_ISSUANCE_RECOVERY_REQUIRED` marks unexpected advancement;
+it is not a product error. GREEN must preserve the existing product surfaces:
+bind-after-failure returns `CREATOR_CLOSE_UNAVAILABLE`, while a pre-bound close
+fails through the existing `creator snapshot export failed: not-active` path.
+No fixture inserts, mutates, deletes, republishes or reclassifies the row.
 
 ## Frozen GREEN and retained gates
 
@@ -105,11 +116,18 @@ sequence skip, no hidden pending row, exact carrier boundary and non-null
 continuation, exact state digest and operation count.
 
 Fault cases cover failure before journal write, journal write then thrown
-outcome, graph append failure, policy-commit failure, close racing the failure,
-close binding after the failure, repeated recovery, substituted issued/outbox
-row, stale epoch/anchor, invalid dependency/ACL, capacity, and terminal
-classification. Existing fail-closed error classes remain unchanged; the RED
-token is test-only. Retain D.110c-0c1a, E5-01 admission/recovery, Phase-6a
+outcome, graph append failure, policy-commit failure, a non-terminal
+`ISSUANCE_OUTCOME_UNKNOWN` after durable commit with no operation policy, close
+racing the failure, close binding after the failure, repeated recovery,
+substituted issued/outbox row, stale epoch/anchor, invalid dependency/ACL,
+capacity, and terminal classification. The conservative halt also refuses new
+local and received admissions and a received-path uncertain outcome can refuse
+close; this fail-closed reuse is intentional. On queued-fold refusal,
+creator-close's existing abort path clears `blueprintClosing` while
+`operationAdmissionHalted` remains set; the refused mint consumes no close
+claim, and only deactivate/recover creates a fresh close-capable registration.
+Existing fail-closed error classes remain unchanged; the RED token is test-only.
+Retain D.110c-0c1a, E5-01 admission/recovery, Phase-6a
 successor recovery/adoption, issuance/outbox/rebase, AHE rollback, snapshot,
 D.109 reclamation, exact-owner static gates, and the D.110c-a/b hot path. No
 campaign or D.110a invocation is permitted.

@@ -1,0 +1,32 @@
+I'll inspect the frozen D.110c-0c1b plan, source audit, and the exact `v3-live.ts` owners at HEAD without editing or running tests.The review skill would write artifacts and spawn a subagent, so I’ll stay on the frozen plan, audit, and source owners with read-only inspection.The audit is in place; next I’ll locate the D.110c-0c1b plan section and the exact `v3-live.ts` owners.I found the D.110c-0c1b section; next I’ll read that plan text and the cited `v3-live.ts` owners.I’ll inspect the issue, close, recovery, and halt-flag owners next so the three proposed checks can be judged against the real control flow.```json
+{
+  "verdict": "CHANGES_REQUIRED",
+  "summary": "The audit of the post-transactIssue live-close omission is correct, recovery already reconciles the exact row, and the three in-memory halt/close/fold checks cover both bind orderings without a new store contract. Frozen RED/GREEN acceptance still names an exact D.110c-0c1b refusal token while forbidding a new product class, which cannot be surfaced by the three v3-live.ts checks.",
+  "findings": [
+    {
+      "severity": "P1",
+      "title": "Exact 0c1b refusal token cannot be produced by frozen GREEN",
+      "evidence": "docs/production-hardening/production-hardening-tdd-plan-v2.md D.110c-0c1b (RED expects earlier close to refuse with exact D110C_0C1B_COMMITTED_ISSUANCE_RECOVERY_REQUIRED, then says the token is tests-only and existing fail-closed kinds/details stay unchanged); packages/node/src/v3-live.ts creatorCloseRegistration()/stageSnapshot() (undefined mint; all fold failures mapped to snapshotExportFailure(\"not-active\", detail)); packages/node/src/creator-close.ts bindCreatorLiveClose()/close() (undefined registration → CREATOR_CLOSE_UNAVAILABLE; snapshot failure → TypeError `creator snapshot export failed: ${snapshot.kind}` and detail is discarded). GREEN is frozen to three internal v3-live.ts checks and must not edit creator-close.ts or add a public result kind.",
+      "impact": "A RED transcribed like the sibling 0c1a `rejects.toThrow(TOKEN)` cannot go green under the frozen repair, so correct halt/close/fold code fails. The two orderings already surface different existing errors, so inventing a product 0c1b string would also breach the no-new-API freeze.",
+      "required_action": "Keep D110C_0C1B_COMMITTED_ISSUANCE_RECOVERY_REQUIRED as the test-owned case id only. Freeze product-visible refusals: bind-after-failure returns existing CREATOR_CLOSE_UNAVAILABLE; pre-bound/in-flight close fails the existing snapshot-export path after the fold recheck. Do not add a new public kind, wire field, or creator-close.ts mapping."
+    },
+    {
+      "severity": "P2",
+      "title": "Defective first close needs a prior in-graph issued prefix",
+      "evidence": "packages/node/src/internal/creator-issuance-retirement-boundary.ts deriveCreatorIssuanceRetirementBoundary(): unadmitted suffix truncates, but admitted === null throws D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE. A sole committed-but-omitted issue is an empty admitted prefix, so the queued close cannot advance.",
+      "impact": "A minimal RED that only fires the one-use journal failure can fail first-close for the 0c1a empty-prefix reason and mis-attribute causality.",
+      "required_action": "Disposition on the RED owner: compose the witness onto a genuine closeable D.110c-a prefix (at least one in-graph issued vertex) so the defective close truncates rather than hitting admitted === null. No executable-scope change."
+    },
+    {
+      "severity": "P2",
+      "title": "Halt reuse newly fail-closes close after received-path halt",
+      "evidence": "packages/node/src/v3-live.ts handleV3Ingress() already sets operationAdmissionHalted on post-durable received journal/graph/policy failures when a reservation exists; creatorCloseRegistration()/stageClosedBlueprintEpoch() currently ignore it. GREEN checks 2–3 would refuse creator close on that existing flag too.",
+      "impact": "Broader live-session close refusal after received uncertain outcomes, not only local committed issuance. Fail-closed and does not drop a local issued row.",
+      "required_action": "Disposition: treat as intended conservative reuse of the existing recovery-required flag; do not carve a received-path exception in this slice."
+    }
+  ],
+  "red_causal": true,
+  "green_closes_red": false,
+  "scope_preserved": true
+}
+```
