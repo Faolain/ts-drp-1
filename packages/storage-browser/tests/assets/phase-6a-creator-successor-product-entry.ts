@@ -59,7 +59,8 @@ interface DirectRoomDependencies {
 	createRecoverableFinalitySigner(
 		input: Readonly<{ readonly seed: Uint8Array }>
 	): Promise<Readonly<{ readonly publicKey: Uint8Array; readonly signer: unknown }>>;
-	createV3ChatApplication(clientId: "alice"): Readonly<{
+	createV3ChatApplication(clientId: "alice" | "bob" | "carol" | "dave"): Readonly<{
+		readonly bootstrapOperation: PlainRecord;
 		readonly catalog: Readonly<{ readonly blueprintDigests: readonly string[] }>;
 	}>;
 	createV3ZoneApplication(
@@ -267,6 +268,9 @@ declare global {
 			deleteDatabases(prefix: string): Promise<readonly string[]>;
 			d110c0c1Differential(name: string): Promise<PlainRecord>;
 			d110c0c1f2Evidence(databaseName: string): Promise<PlainRecord>;
+			d110c0c1JournalVertices(databaseName: string): Promise<readonly PlainRecord[]>;
+			d110c0c1f4BootstrapHex(clientId: "alice" | "bob" | "carol" | "dave"): string;
+			d110c0c1f4SetBootstrapClientId(clientId: null | "alice" | "bob" | "carol" | "dave"): void;
 			d110c0c1eSameAuthorControl(name: string): Promise<PlainRecord>;
 			d110c0c1cControl(name: string): Promise<PlainRecord>;
 			d110c0c1gGridControl(): PlainRecord;
@@ -1659,6 +1663,26 @@ async function d110c0c1IssuanceRows(databaseName: string): Promise<readonly Plai
 	);
 }
 
+async function d110c0c1JournalVertices(databaseName: string): Promise<readonly PlainRecord[]> {
+	const database = await portableJournalDump(databaseName);
+	const rows = database.stores.find(({ name }) => name === "acceptedEntries")?.rows.map(exactRecord) ?? [];
+	return Object.freeze(
+		rows.map((row) => {
+			if (!(row.exactCanonicalPreimageBytes instanceof Uint8Array)) {
+				throw new TypeError("D110C_0C1F4_JOURNAL_PREIMAGE_ABSENT");
+			}
+			const vertex = exactRecord(decodeCanonical(row.exactCanonicalPreimageBytes));
+			return Object.freeze({
+				author: vertex.author,
+				authorSequence: vertex.authorSequence,
+				digest: row.vertexDigest,
+				epoch: vertex.epoch,
+				objectId: vertex.objectId,
+			});
+		})
+	);
+}
+
 async function d110c0c1SetPublishState(
 	databaseName: string,
 	authorSequence: number,
@@ -2487,6 +2511,16 @@ const api = Object.freeze({
 			rows: await d110c0c1IssuanceRows(databaseName),
 			trace: instrumentation().d110c0c1TraceSnapshot(),
 		});
+	},
+	d110c0c1JournalVertices(databaseName: string): Promise<readonly PlainRecord[]> {
+		return d110c0c1JournalVertices(databaseName);
+	},
+	d110c0c1f4BootstrapHex(clientId: "alice" | "bob" | "carol" | "dave"): string {
+		return hex(encodeCanonical(directDependencies().createV3ChatApplication(clientId).bootstrapOperation));
+	},
+	d110c0c1f4SetBootstrapClientId(clientId: null | "alice" | "bob" | "carol" | "dave"): void {
+		if (clientId === null) Reflect.deleteProperty(globalThis, "__d110c0c1f4BootstrapClientId");
+		else Reflect.set(globalThis, "__d110c0c1f4BootstrapClientId", clientId);
 	},
 	d110c0c1eSameAuthorControl(name: string): Promise<PlainRecord> {
 		return d110c0c1eSameAuthorControl(name);

@@ -97582,9 +97582,10 @@ manifest validates and has SHA-256
 
 ###### D.110c-0c1f4 exact pinned-genesis bootstrap recovery authority prerequisite
 
-**Status: blocking high-risk public compatibility plan; its single material
-confirmation is complete and its corrected P0/P1 union is empty by deterministic
-source audit, so a clean-isolated tests-only RED is next.** Owner: the public
+**Status: clean-isolated tests-only RED complete at corrected signed/pushed plan
+anchor `1033e22eaa152a1a1a26d1fc057564ac75b68192`; its causal matrix and
+supplemental immutable-0c1f2 preconditions are recorded below, with zero
+production-source change. The public-compatibility GREEN is next.** Owner: the public
 `@ts-drp/node/v3-live` `RecoverV3LiveReplicaInput` and closed input snapshot;
 the public `@ts-drp/node/creator-adoption-activate`
 `reopenCreatorSuccessorAdoption()` cold-input exact-key capture; the private
@@ -97671,10 +97672,55 @@ and stops. The held diagnostic GREEN draft stays untouched in the main
 workspace; RED is authored and executed from a temporary clean worktree rooted
 at this signed plan commit so draft production files cannot leak into causality.
 
-GREEN first closes 0c1f4 only. The mismatch treatment must fail with the
+The accepted clean-isolated RED uses one Alice creator plus two genuine Bob
+replicas with distinct durable databases. Both Bob sequence-zero rows are
+exact pending epoch-zero rows and are absent from Alice's accepted journal.
+Alice advances the genuine room to epoch three, and both Bob databases receive
+the same genuine epoch-three successor state. The control retains Bob's
+configured canonical bootstrap bytes `A`; the treatment keeps the same Bob
+signing identity and durable database but configures distinct blueprint-valid
+bootstrap bytes `B`. Both recovery traces reach exact sequence zero,
+`pinned-genesis`, owner `predecessor-validation`, and payload epoch three.
+That equality is the causal RED: the unmodified product cannot distinguish the
+configured authority mismatch. The test then emits exact
+`D110C_0C1F4_EXACT_BOOTSTRAP_AUTHORITY_REQUIRED` as an observation pass.
+
+The held 0c1f2 aggregate-carrier draft is deliberately absent from this clean
+worktree. Consequently both A and B proceed beyond the intended 0c1f4 seam and
+later stop at the separately owned `issuance-rejected` boundary. The retained
+0c1f2 test remains the invocation's one unexpected result at unchanged exact
+`D110C_0C1F1_MULTI_AUTHOR_FRONTIER_CARRIER_REQUIRED`; its new assertions prove
+one pending Bob sequence-zero row, its absence from Alice before and after Bob
+sequence one, and Alice's genuine receipt of Bob sequence one. The accepted
+matrix is therefore one 0c1f4 observation pass plus one exact retained causal
+failure, zero skips/flakes/top-level errors, and zero production-source changes.
+It does not claim the A control completes recovery before 0c1f2 GREEN is
+integrated. The three earlier diagnostic reporters are retained honestly: an
+epoch-one creator case reached covered/displaced authority rather than the
+pinned-genesis seam; an epoch-one noncreator case still authenticated through
+the displaced source; and the first epoch-three case incorrectly required full
+reopen despite the known downstream aggregate-carrier RED.
+
+Complete reporters, commands, source-shape checks, attachment validation, and
+diagnostic dispositions are under
+`.logs/d110c-0c1f4-red-causal-1033e22e/`; its self-excluding manifest validates.
+The 12-entry manifest SHA-256 is
+`e029304a2ad63bfdebb3fdbdc2cbf9a482fc8a2f940394e66ebfcd6a5880bd3f`.
+The exact accepted reporter SHA-256 is
+`d4f7c8c6f798e45094ae4a5241552871de28eafecfc78f08b2b37277902af041`.
+The three diagnostic reporter hashes are
+`396f6ad16bde84ca5d652627bc19bb3474f10ed94e7c93712db908f309bf0d60`,
+`9ee3216ab5cb91cbf42a2abdcca459b3bb5233f0df906250e667a63822de7bb4`,
+and `3184d38a6444191e4489f5957f76461d347296416e06f8fefe8d54636adb235f`.
+
+GREEN implements the 0c1f4 policy prerequisite first. Its focused authority
+gates must prove that A passes the new exact predicate and B fails with the
 existing typed recovery/authorization failure before journal installation,
-activation, publication suppression, or rebase completion; the exact control
-must recover. Mutants cover missing policy, noncanonical bytes, aliased
+activation, publication suppression, or rebase completion. The browser-level
+claim that the exact A control fully recovers is deferred to the combined
+0c1f4-plus-0c1f2 GREEN because immutable RED proves the missing 0c1f2 aggregate
+carrier is the later independent blocker; this is not a weakening of either
+acceptance condition. Mutants cover missing policy, noncanonical bytes, aliased
 post-capture mutation, oversized/deep/item-heavy operation, action substitution,
 same action with changed application field, cross-process configured-value
 mismatch, wrong sequence/epoch/anchor/object/
@@ -97692,12 +97738,15 @@ source-shape gates prove there is one shared predicate, the four recovery-input
 key combinations and two cold-reopen key combinations are closed, hot/pending
 key surfaces remain unchanged, and no tests-only bypass exists.
 
-After 0c1f4 GREEN is signed/pushed and its focused/static/retained gates pass,
-the held 0c1f2 draft may be rebased onto the reviewed policy. Its functional
+After the 0c1f4 implementation is signed/pushed and its focused/static/retained
+authority gates pass, the held 0c1f2 draft may be rebased onto the reviewed
+policy. Its functional
 GREEN must then make the unchanged signed product RED pass without an extra
 setup write. It must prove exact rows `0...S`, slot-zero bootstrap authority,
 creator-covered slots `1...S`, matching terminal proof/counts, and both safe
 bootstrap-only re-entry and refused prior-application-history re-entry. The
+combined browser gate must finally prove A fully recovers while B refuses at
+the 0c1f4 authority boundary. The
 combined final Grok/Kimi/Opus review covers 0c1f3 audit, 0c1f4 RED/GREEN, and
 0c1f2 causal RED-to-GREEN closure. Only P0/P1 blocks; one material plan
 confirmation was consumed because authority and public compatibility changed.
