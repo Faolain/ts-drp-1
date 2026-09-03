@@ -95499,8 +95499,9 @@ RED-to-GREEN closure and is prohibited.
 
 ##### D.110c-0c1 authenticated intermediate-epoch issuance prerequisite
 
-**Status: bounded decision/RED plan required before any `v3-live.ts` or
-issuance-store production edit.** Owner: the predecessor and successor issuance
+**Status: bounded architecture decision complete; implementation and causal RED
+remain blocked on D.110c-0c1a GREEN before any `v3-live.ts` or issuance-store
+production edit.** Owner: the predecessor and successor issuance
 views created by `packages/node/src/v3-live.ts::activateCreatorSuccessorLive()`,
 `creatorFilteredIssuanceStore()`, their exact outbox classification inside
 `recoverV3LiveReplica()`, and the registered view's `publishPending` and
@@ -95527,7 +95528,7 @@ chain, manufacture displaced authority, mark an unpublished row published,
 trust the issuance database as an authority, weaken the two-generation rollback
 window, or hide growth outside the D.110c-c/d durable census.
 
-Before production edits, the bounded architecture decision compares exactly:
+The bounded architecture audit compares exactly:
 
 1. authenticated discard-only classification of signed obsolete rows against
    the retained current/immediate-predecessor trust and ACL material;
@@ -95537,13 +95538,13 @@ Before production edits, the bounded architecture decision compares exactly:
 4. retaining older authority/projection material, which is rejected unless it
    can meet the existing O(1) control-state law.
 
-If options 2 or 3 require a new issuance-store method, browser schema/version,
-wire field, public API, or migration, the decision stops and freezes that exact
-high-risk prerequisite before implementation. Option 1 is acceptable only if
-the audit proves a hostile-store substitution cannot cause a current or pending
-row to be classified obsolete; a signed claimed epoch alone is not proof.
+The audit below rejects options 1, 3 as a sole authority, and 4; it selects a
+bounded signed-control form of option 2 and freezes its exact high-risk
+protocol-contract prerequisite as D.110c-0c1a before implementation. A signed
+claimed epoch alone remains insufficient.
 
-RED remains tests-only. First, one corrected diagnostic invocation must retain
+After D.110c-0c1a GREEN, D.110c-0c1 RED remains tests-only. First, one corrected
+diagnostic invocation must retain
 both old-AHE and new-AHE orderings after `active-new`, proving exact floor/AHE
 effects and the identical post-commit reopen classification without aborting
 after the first ordering. Then a deterministic real-store prefix differential
@@ -95596,8 +95597,9 @@ durable commit and the separate post-commit seam; they are explicitly not a
 GREEN or permission to edit `v3-live.ts`.
 
 GREEN implements only the reviewed selected family. It must make the unchanged
-epoch-0/1/2 fixture cold reopen epoch 3 and issue/publish its fourth message in
-both crash orderings while preserving the exact first-transition pending matrix
+epoch-0/1/2 fixture complete its same-process post-commit epoch-3 reopen and
+issue/publish its fourth message in both crash orderings while preserving the
+exact first-transition pending matrix
 and the signed D.110c-0c RED. The N≥1 pending authenticator also applies the
 same commit-phase/current-epoch QC filtering used by the retained cold-reopen
 owner before its exactly-one opener. Adversarial gates cover a forged lower epoch,
@@ -95658,17 +95660,203 @@ self-excluding manifest SHA-256 is
 This authorization is consumed; no further Fable review is permitted without
 new express authorization.
 
+The bounded post-diagnostic source audit is now pinned to signed/pushed
+non-GREEN checkpoint `d6f5de263c5d0bcabe4df25532a0a8d3dcf0ccbd`, tree
+`17ecf3edf922ca3b27e96a5c8b25ae7888f67146`. It confirms that current data is
+not sufficient for a general age-independent intermediate-row decision.
+`openCreatorCheckpointTrust()` authenticates pinned genesis and exactly one
+predecessor/current pair; the current anchor commits only its immediate
+predecessor. The cut/anchor schemas authenticate state, ACL, compact history,
+snapshot, archive, signer, parameters, and adjacent lineage, but no per-author
+resolved sequence. `DurableIssuanceStore.readLineage()` omits the maintenance
+watermark, while `prunedThroughAuthorSequence` and its pruning receipt are
+store-held unsigned facts. No product path invokes `prunePublishedPrefix()`.
+The RFC 9162 history frontier authenticates accumulated history, not the claim
+that every local issuance address through one ordinal is represented and safe
+to retire.
+
+The decision matrix therefore rejects four incomplete constructions:
+
+1. current/immediate-predecessor filtering cannot authenticate an arbitrary
+   retained epoch;
+2. decoding and signature-checking a row's self-claimed old epoch/anchor does
+   not establish accepted room lineage or prefix completeness;
+3. a database watermark or physical deletion alone is not an authority under
+   the untrusted-durable-bytes model and cannot cover fail-safe retained rows;
+   and
+4. retaining all prior anchors, ACLs, cuts, or QCs violates the O(1)-in-epoch
+   control-state law.
+
+The selected family is one **creator-signed cumulative issuance-retirement
+checkpoint**, stored as exactly one replaceable AHE closure candidate. It is
+authenticated by the stable `creator-trusted-v1` finality key already rooted in
+the pinned genesis, binds the current local creator issuance scope to the
+authenticated successor checkpoint, and directly attests the inclusive
+resolved author-sequence frontier. It neither trusts the database watermark nor
+requires replay of an old authority chain. This selection is creator-only: a
+future rotating signer or independently reopening non-creator writer requires
+its own reviewed authority design and is not silently claimed here.
+
+The exact canonical
+`drp-creator-issuance-retirement-state` v1 record is signed over domain
+`ts-drp/creator-issuance-retirement/v1` and binds all of:
+
+- protocol/version, object id, pinned genesis digest, and creator issuance
+  author;
+- closed/current epoch and anchor plus successor epoch and anchor;
+- the exact cut-value digest, commit-QC ref, and snapshot-manifest digest;
+- the prior retirement-candidate digest or the frozen genesis sentinel;
+- prior inclusive resolved author sequence, nullable only for initialization;
+  and
+- new inclusive resolved author sequence plus the exact observed issuance
+  lineage `{ exhausted, next }` from which it is derived.
+
+The initial and advancing rules are exact. A fresh room emits its first
+checkpoint during 0→1 close while its genuine epoch-0 close graph, durable
+replay, and pinned-genesis issuance row are present. Any inherited epoch≥1 room
+with no checkpoint fails closed and requires a separate migration/recovery
+decision: bounded current trust can authenticate an old row's signature but
+cannot prove its membership in an already-completed close. No genuine
+repeated-epoch producer has shipped, so the plan does not invent compatibility
+evidence. Thereafter each close requires exactly one authenticated previous
+checkpoint and replaces it with exactly one successor checkpoint. The
+successor record directly authenticates the cumulative fact under the stable
+genesis signer; the prior digest is used to enforce transition continuity while
+both adjacent closures exist, not to create an O(N) proof chain.
+
+Minting starts from the authenticated prior checkpoint and exact issuance
+scope. It reads the lineage and every address strictly above the prior boundary
+through `lineage.exhausted ? lineage.next : lineage.next - 1`. Every new address
+must be dense and increasing and have one byte-identical issued/outbox pair, a
+canonical vertex, valid author signature, exact current room/anchor/epoch,
+`published` state, and a digest present in both the captured close graph and
+sealed durable replay. Missing, duplicate, pending, malformed, substituted,
+cross-scope, non-current, or non-member rows refuse signing. The successor
+anchor, Cut/QC, and snapshot identities are fixed before completing the
+deterministic Ed25519 signature. A close with no newly issued address carries
+the prior sequence forward while rebinding it to the new successor checkpoint.
+
+Cold reopen never trusts this record merely because storage returned it. The
+opener consumes pinned-genesis-derived creator trust plus the independently
+authenticated room floor, verifies the exact signature and all scope/head/
+Cut/QC/snapshot fields, and requires the one candidate selected from the
+bounded active closure. Missing, duplicate, stale, future, cross-room,
+cross-author, forked, malformed, or nonmonotonic candidates fail closed. An
+authenticated boundary permits old-address classification only at or below its
+inclusive sequence. The wrapper still requires exact issued/outbox equality,
+canonical object/author/sequence, a valid author signature, and `published`
+state; the creator checkpoint, not the row's claimed old anchor or database
+watermark, supplies the authority that the address is resolved. Rows above the
+boundary retain existing current/displaced admission and offline/rebase
+custody. One combined per-scan `maxEpochVertices` counter bounds all hidden
+rows.
+
+Physical pruning remains an execution mechanism owned by D.109/D.110c-c. It may
+run only after verified adoption, authenticated floor commit, snapshot
+availability, two complete rollback generations, outbox completion, and exact
+retirement-checkpoint agreement. Refusal or crash may retain certified rows;
+neither can advance the certificate, remove an uncertified address, or report a
+partial deletion as complete.
+
+This design introduces a protocol-v3 control-record/registry contract and a new
+protocol-owned finality signing request. That is a material high-risk
+compatibility boundary. It does not require a new cryptographic primitive,
+dependency, epoch-anchor/Cut field, product API, or issuance database schema:
+the signed record is one bounded AHE closure blob and reuses existing Ed25519,
+the existing creator finality signer, exact AHE blob/ref storage, and current
+room-floor authority. Per the stop rule, no production implementation begins
+inside D.110c-0c1. The new prerequisite below owns that contract first. The
+audit evidence is
+`.logs/d110c-0c1-architecture-audit-d6f5de26/`; its validated nine-source hash
+inventory is inside the root and its four-entry self-excluding manifest
+SHA-256 is
+`814f98305ea36ee3a0a37bdf07055dd4fbae8ac053b7bf5c58148904754bb1cd`.
+
+###### D.110c-0c1a creator-signed issuance-retirement checkpoint prerequisite
+
+**Status: plan review required; no production implementation authorized.**
+Owner: protocol-v3 creator retirement record/opener and one-use signing request,
+keychain finality signing dispatch, the creator-close row/graph/replay capture,
+the shared creator transition classifier's exact-one replacement law, and
+pending/reopen AHE closure preservation. Deadline: GREEN before D.110c-0c1 may
+change `creatorFilteredIssuanceStore()`, before D.110c-0c may claim its
+same-process epoch-3 reopen, and before D.110c-c/d or Phase 7 consumes repeated
+epochs.
+
+The tests-only RED uses a fresh genuine 0→1 creator close. It proves the current
+proposed closure contains zero authenticated
+`drp-creator-issuance-retirement-state` candidates even though the exact
+issuance lineage and published bootstrap row exist, and terminates only with
+`D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE`. A second product-shaped row
+extends the lineage before close and must leave the same exact causal failure;
+no fixture writes a carrier or mutates the AHE closure. The RED evidence records
+the exact row keys/digests, lineage, graph membership, durable-replay result,
+cut/QC/snapshot/successor identities, selected closure, one-test/one-file
+listing, reporter counts, and the complete token. Any earlier close failure,
+different missing candidate, or hidden source mutation stops the slice.
+
+GREEN implements only the reviewed carrier prerequisite:
+
+1. add the exact registry kind, canonical capture, prepare/complete/open APIs,
+   opaque verified capability, and one-use domain-separated signing request;
+2. extend finality-key custody only with the matching protocol-owned request;
+   arbitrary-digest signing remains impossible;
+3. derive the dense published boundary through genuine creator close graph,
+   issuance, and durable-replay owners before producing the successor-bound
+   record;
+4. stage exactly one signed record in the proposed AHE closure, preserve it
+   through pending process death, and replace the adjacent predecessor record
+   with no third live copy or uncounted sibling state;
+5. enforce fresh 0→1 initialization, ordinary monotonic advance,
+   same-boundary advance, and inherited epoch≥1 missing-record refusal pending
+   a separately reviewed migration;
+   and
+6. expose no filter/skip decision yet. D.110c-0c1 remains the sole consumer
+   that classifies old addresses from the verified capability.
+
+Adversarial GREEN rows cover wrong creator signer, altered signature/preimage,
+wrong object/genesis/author/current or successor head, wrong Cut/QC/snapshot,
+stale prior digest, decreased or jumped sequence, inconsistent exhausted/next,
+missing/duplicate record, duplicate/gapped issued address, issued/outbox
+substitution, pending row, valid same-room fork, graph/replay omission,
+post-capture mutation, ambiguous persistence, and replay after candidate
+replacement. The closure census proves exactly one active retirement candidate,
+at most one adjacent predecessor during atomic advance, and constant bytes with
+epoch count for fixed scope/field sizes.
+
+Focused protocol/keychain/control-plane/Node tests run once for RED and once for
+GREEN. GREEN then retains creator close/seal/QC, 0b0/0b1 checkpoint opening and
+bounded closure, 0c pending process-death, Phase-6a adoption/reopen,
+issuance/outbox/offline-rebase, AHE crash/CAS, snapshot, D.109 pruning/runtime
+reclamation, and current protocol-v3 canonical/registry suites. Exact affected
+package builds and production-source typechecks, exact-owner lint/format/diff,
+source/export shape, protected paths, 27 stashes, process/ports, signed commits,
+pushed refs, hashes, and self-excluding manifests remain mandatory. D.110a's
+consumed full/preflight identities and every retained campaign remain excluded.
+
+Because 0c1a changes a signed protocol control carrier adjacent to authority,
+restart, pruning, and compatibility, this plan-only checkpoint receives the
+governing Grok 4.6/high, standard direct Kimi K3 with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review before RED. Only P0/P1
+blocks. Corrections that alter carrier fields, authority, compatibility, or
+executable acceptance receive at most one confirmation; P2/bookkeeping does not
+recurse. The signed GREEN later receives the single complete plan→RED→GREEN
+review. If the review cannot accept this exact local signed carrier without an
+epoch-anchor/Cut wire change, public product API, new dependency, or different
+authority assumption, stop and reslice that demonstrated requirement rather
+than widening 0c1a. No Fable or collaboration subagent runs.
+
 The complete confirmation evidence is retained under
 `.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry
 self-excluding manifest SHA-256 is
 `5f932353bbd41bffc697424adfbe2c9a2835ac79de6f2dc9e51e6c455ae6a9e7`.
 
-The four prerequisite decisions, including the newly demonstrated 0b0
-freshness-floor authority question, are reviewed before their production edits;
-each executable sub-slice receives its own bounded causal RED and GREEN. The
+The prerequisite decisions, including 0b0 freshness-floor authority and 0c1a
+issuance-retirement authority, are reviewed before their production edits; each
+executable sub-slice receives its own bounded causal RED and GREEN. The
 umbrella's minimum functional GREEN is not satisfied until
-D.110c-0a/0b0/0b/0b1/0c/a/b/c jointly prove one genuine room completes epoch 0→1,
-restart/reopen, epoch 1→2,
+D.110c-0a/0b0/0b/0b1/0c1a/0c1/0c/a/b/c jointly prove one genuine room completes
+epoch 0→1, restart/reopen, epoch 1→2,
 continued issue/publish after epoch 2, and cold recovery with exact application
 state, ACL, writer authority, current anchor/trust, compact history,
 archive-index root, snapshots, journals, and operation accounting. A second
