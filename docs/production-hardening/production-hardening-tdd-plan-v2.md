@@ -97428,57 +97428,218 @@ as numeric zero, and no sequence gap is crossed implicitly.
 
 ###### D.110c-0c1f3 noncreator genesis-issuance bootstrap authority reslice
 
-**Status: blocking bounded authority-design audit required before further
-D.110c-0c1f2 production edits or GREEN claim.** Owner: the exact relationship
-between the existing pinned-genesis outbox authority, zero-intent join
-completion, creator-observed aggregate frontiers, complete local issuance-chain
-validation, and the selected-author historical recovery consumer. Deadline:
-before 0c1f2 GREEN, parent 0c1/0c, the same-room long-horizon gate, Phase-6
-exit, or Phase-7 multi-author cold join.
+**Status: bounded audit complete with `CHANGES_REQUIRED`; the original RED is
+causal, but D.110c-0c1f2 GREEN remains stopped pending the explicit
+D.110c-0c1f4 public compatibility prerequisite below.** Owner: the exact
+relationship between the existing pinned-genesis outbox authority, zero-intent
+join completion, creator-observed aggregate frontiers, complete local
+issuance-chain validation, and the selected-author historical recovery
+consumer. Deadline: before 0c1f2 GREEN, parent 0c1/0c, the same-room
+long-horizon gate, Phase-6 exit, or Phase-7 multi-author cold join.
 
-The audit must choose exactly one compatible rule for an initially authorized
-noncreator whose sequence-zero pinned-genesis join is absent from the creator's
-close graph but whose later application row is genuinely admitted. At minimum
-it must compare: retaining strict null until a creator-observed sequence-zero
-prefix exists; authenticating a bounded genesis issuance base through the
-already-existing pinned-genesis authority and complete local-chain proof;
-adding an explicit proof-class/base fact to the aggregate schema; or changing
-join publication/orchestration so the existing graph premise becomes true.
-It must prove which party authenticates sequence zero, what the aggregate
-frontier asserts, how missing/substituted/forked local rows fail closed, and
-why the choice does not permit an unadmitted self-signed application row to be
-replayed merely because its key was in the genesis ACL.
+The signed/pushed source audit establishes the causal boundary. The room issues
+the application-defined bootstrap operation at local sequence zero, epoch zero,
+the pinned genesis anchor, dependencies `[pinnedGenesisAnchorDigest]`, and
+logical time one before activation. `publishAccepted()` is not called merely
+because that local bootstrap issue succeeded, and the later live/rebase drain
+deliberately skips an already authenticated `pinned-genesis` row. Bob can
+therefore publish sequence one while sequence zero remains pending and absent
+from Alice's authenticated graph. This is stable product structure, not a
+timing race. The signed original 0c1f2 browser RED remains the required causal
+treatment and must additionally assert that Bob's sequence-zero row is pending
+and absent from Alice's graph before sequence one is admitted. The fully
+creator-observed prefix remains only a passing control.
 
-The audit must preserve the transactional non-equivocating issuer assumption,
-creator checkpoint authority, current aggregate schema unless an explicit
-schema reslice is selected, the exact permissionless-aware writer set, and the
-remove/re-add refusal. It must distinguish continuously authorized genesis
-writers from later additions and same-key re-entry without O(epoch) state. If
-that distinction cannot be represented by the current tuple carrier, stop at
-an explicit schema/migration prerequisite. Do not treat local lineage, ACL
-membership, or a valid author signature alone as creator-observed admission.
+The selected family is a constrained version of candidate 2: sequence zero is
+one separately authenticated, application-defined pinned-genesis bootstrap
+base; the creator-signed aggregate boundary `S` attests only the complete
+creator-observed issuance prefix from sequence one through `S`, except that
+an actually observed sequence-zero bootstrap row may also produce numeric
+boundary zero. On aggregate initialization from null, first observed sequence
+zero may advance through the contiguous `0...S` prefix, first observed
+sequence one may advance through the contiguous `1...S` prefix, and first
+observed sequence greater than one refuses with exact
+`D110C_0C1F1_LEGACY_MULTI_AUTHOR_MIGRATION_REQUIRED`. Once numeric, the
+existing adjacent `S+1` rule remains unchanged. A null boundary means no
+creator-observed post-bootstrap history; it no longer means that every local
+issuance store must be empty.
 
-RED remains the signed original D.110c-0c1f2 browser case. Additional bounded
-tests must cover a missing sequence-zero row, a substituted sequence-zero row,
-a valid but never admitted epoch-zero application row, a continuously
-authorized genesis writer, a later zero-lineage addition, same-key re-entry,
-and the fully creator-observed prefix control. GREEN must make the original RED
-pass without adding an extra setup write, preserve the explicit gap rule for
-all non-authorized bootstrap cases, validate an exact complete local issuance
-chain before activation/rebase, and retain every 0c1f2 carrier, transition,
-ACL, pruning, rollback, and size mutant. Any new carrier field, wire/schema
-meaning, join-publication behavior, or authority assumption is a high-risk
-change and requires a separately accepted compatibility boundary.
+Recovery must authenticate the two halves independently before activation or
+rebase. Slot zero is never accepted by
+`authenticatedCoveredHistoricalOutboxRow()`; it must instead be exact local
+sequence zero, epoch zero, pinned-genesis anchor, matching object and author,
+dependencies exactly `[pinnedGenesisAnchorDigest]`, logical time one, a valid
+registered-vertex signature/digest, and operation bytes exactly equal to the
+trusted application's canonical bootstrap-operation bytes. Slots `1...S`
+must be a dense, paired issued/outbox chain and individually authenticate as
+creator-covered historical rows. Missing, duplicate, substituted, forked,
+out-of-order, or noncontiguous rows; issued/outbox byte disagreement; an
+unexpected action or bootstrap payload; or an observed first sequence greater
+than one refuses before recovered capability installation, activation,
+publication suppression, or rebase completion. A historical-only chain counts
+as nonempty only after these exact per-slot checks; changing only the final
+empty-chain count is necessary for the valid treatment but is not sufficient
+authority by itself.
 
-Sign and push this diagnostic plan correction without staging the draft
-production implementation. Then run one governing Grok 4.6/high, direct Kimi
-K3/100-step, and Opus xhigh plan review over the signed RED, the exact null-to-
-sequence-one trace, and the candidate decision. Only P0/P1 blocks; P2 receives
-an owner/disposition without recursive prose review. Do not invoke Fable or a
-collaboration subagent. No further production edit, retained campaign, D.110a
-invocation, dependency, threshold, or workload change is authorized until one
-bootstrap authority rule and its adversarial acceptance are reviewed and
-accepted.
+This uniform bootstrap-base rule applies to every product author, not only a
+genesis writer. Later additions also began with the same locally issued exact
+sequence-zero bootstrap operation, so they do not require an initial-only proof
+class or an O(epoch) membership-incarnation ledger. Same-key re-entry is safe
+only when the retained local lineage contains no post-bootstrap row and is
+therefore indistinguishable from a zero-history addition. Re-entry with any
+sequence above zero while the current aggregate is null, or whose next
+creator-observed sequence begins above one, still refuses with exact
+`D110C_0C1F1_AUTHOR_REENTRY_PROOF_REQUIRED` or the existing migration-required
+gap code according to the frozen opener/close diagnostic precedence. Tests
+must cover both the safe bootstrap-only case and the refused prior-application-
+history case. This replaces the overly broad 0c1f1 statement that every
+remove/re-add is refused; it does not allow a lineage reset, erase old rows, or
+hide an issuance gap.
+
+Candidate 1 is rejected because it makes the signed RED unimplementable.
+Candidate 4 is rejected because making joins reach the creator would alter
+ordinary publication/census behavior, would not deterministically authenticate
+an offline writer before the first close, and would still strand later-added
+writers whose locally issued sequence zero is anchored at genesis. Candidate
+3's sticky initial-only proof class is rejected for the selected uniform rule:
+it would require membership-incarnation/tombstone semantics and still needs an
+exact bootstrap-operation authority, while the reserved slot-zero base plus
+the `>1` gap refusal distinguishes safe zero-history additions from hidden
+application history without growing the carrier. A new carrier field remains
+the fallback only if the exact prerequisite review disproves that invariant.
+
+The audit also proves the existing pinned-genesis predicate is too broad for
+this selected use: today it accepts any valid local-author registered vertex
+at epoch zero and the pinned genesis anchor. It does not require sequence zero,
+the exact one dependency, logical time one, action `join`, or equality to the
+product's configured bootstrap operation. Neither the blueprint (which admits
+multiple application actions), ACL membership, local signature, issuance
+lineage, nor `V3OperationAdmissionPolicy.reserve(operation)` supplies that
+missing exact policy fact. The trusted `V3RoomApplication.bootstrapOperation`
+does, but `RecoverV3LiveReplicaInput` and private successor-reopen/live
+material do not carry it. Tightening this securely therefore requires an
+explicit public compatibility boundary and cannot be folded silently into the
+already-authorized 0c1f2 draft.
+
+The governing review inspected signed/pushed plan commit
+`50b281e3dd9732a2dd7403992ec5336dcd96a0ce`, its signed RED and diagnostic
+trace, and the uncommitted draft only as non-GREEN evidence. Grok 4.6/high
+session `01a06823-4340-76b0-98da-431ed42d01f4` returned
+`CHANGES_REQUIRED`, P0/P1/P2 `2/2/0`; Kimi K3/100-step session
+`session_9c1b5118-1c1b-4c98-bf0f-ac00d96b419a` returned
+`CHANGES_REQUIRED`, `0/4/2`; and Opus xhigh session
+`78381cf7-4d72-4289-a155-3650fbd059ab` returned `CHANGES_REQUIRED`,
+`3/6/2`. All three accepted the original RED as causal. Their blocking union
+is dispositioned above: freeze one implementable rule and both its close and
+recovery consumers; forbid covered-historical slot zero; tighten the exact
+pinned-genesis predicate; prove the complete dense chain rather than a count;
+state the changed aggregate semantics and dual-carrier equality; add the
+missing RED preconditions; and gate draft behavior away from legacy paths.
+Grok preferred candidate 3 because the prior text did not specify a uniform
+later-addition bootstrap rule; the corrected invariant above answers that
+concern without silent schema growth. Kimi and Opus preferred constrained
+candidate 2 but likewise required the exact compatibility boundary now owned
+by 0c1f4. P2 dispositions require the real maximum-shape/export checks at
+GREEN and retain local-lineage asymmetry as an explicitly tested non-authority
+fact. Raw prompt, schema, trace, terminal summaries, commands, session IDs, and
+available transcript hashes are under
+`.logs/d110c-0c1f3-plan-review-50b281e3/`. Its six-entry self-excluding
+manifest validates and its SHA-256 is
+`429c829e0602c15e0d7b5d5ce73c97c9f4c83f434e91226d9d334667a7b16f0d`.
+
+No diagnostic production draft is accepted or committed. Because this
+correction selects authority semantics and identifies a public API boundary,
+the single material confirmation must review this corrected 0c1f3 decision and
+the exact 0c1f4 prerequisite together after their plan/evidence-only commit is
+signed and pushed. No further 0c1f2 production edit, retained campaign,
+D.110a invocation, dependency, threshold, or workload change is authorized
+until that Grok/Kimi/Opus P0/P1 union is empty.
+
+###### D.110c-0c1f4 exact pinned-genesis bootstrap recovery authority prerequisite
+
+**Status: blocking high-risk public compatibility plan; RED begins only after
+the one material 0c1f3/0c1f4 confirmation has an empty P0/P1 union.** Owner:
+the public `@ts-drp/node/v3-live` recovery input and closed input snapshot; the
+private creator successor live/reopen material needed to retain that policy
+across hot adoption and cold reopen; `examples/v3-room` canonical capture and
+wiring from `V3RoomApplication.bootstrapOperation`; the two existing
+`authenticatedPinnedGenesisOutboxRow()` consumers; and focused Node/room
+compatibility tests. Deadline: GREEN before any 0c1f2 draft resumes, before
+parent 0c1/0c or the ≥100-transition gate, Phase-6 exit, or Phase-7
+multi-author cold join.
+
+The compatibility contract adds one detached, bounded, exact-canonical
+bootstrap-operation policy value to recovery custody. Its frozen semantic name
+is `exactCanonicalPinnedGenesisBootstrapOperationBytes`. It is trusted local
+application policy, not a signed wire field, persisted control carrier, public
+room API, or statement that the creator observed the operation. The room must
+canonicalize a detached copy of `application.bootstrapOperation`, enforce the
+existing operation-size/depth/item limits, and supply the same bytes to fresh
+recovery, successor hot activation custody, pending-adoption recovery, and
+cold successor reopen. Private successor material must copy rather than alias
+the bytes. A caller that omits, mutates, supplies noncanonical/oversized bytes,
+or changes them across a successor boundary cannot obtain pinned-genesis
+bootstrap classification on a historical aggregate path. Existing recovery
+paths with no pinned-genesis row or no historical aggregate remain behaviorally
+unchanged; the review must confirm whether the TypeScript field is required or
+optional-with-fail-closed-use so package compatibility is explicit rather than
+accidental.
+
+The selected implementation must use one exact predicate at both current-row
+classification and filtered issuance-store classification. In addition to the
+existing registered-vertex checks, it requires row and extracted sequence
+zero, epoch zero, exact pinned genesis anchor, exact scope object/author, exact
+dependencies `[pinnedGenesisAnchorDigest]`, logical time one, operation action
+`join`, and canonical operation bytes equal to the detached trusted policy
+bytes. The action check is defense in depth; byte equality is the product
+authority. `authenticatedCoveredHistoricalOutboxRow()` rejects sequence zero
+unconditionally. No caller-provided author/sequence number, local lineage,
+signature, generic reducer success, admission reservation, or current ACL
+membership substitutes for these checks.
+
+The causal tests-only RED constructs a genuine registered local sequence-zero
+epoch-zero vertex whose operation is valid under the blueprint and author
+signature but differs from the configured bootstrap operation. It proves the
+current broad pinned-genesis path accepts/classifies that row and then emits
+exact `D110C_0C1F4_EXACT_BOOTSTRAP_AUTHORITY_REQUIRED`. A paired control uses
+the real configured bootstrap operation. RED must exercise the exported
+recovery path and the filtered-store consumer rather than call a private helper
+or manufacture a verified capability. Any failure before the accepted broad
+classification, a different token, or a production-source change is
+noncausal and stops.
+
+GREEN first closes 0c1f4 only. The mismatch treatment must fail with the
+existing typed recovery/authorization failure before journal installation,
+activation, publication suppression, or rebase completion; the exact control
+must recover. Mutants cover missing policy, noncanonical bytes, aliased
+post-capture mutation, oversized/deep/item-heavy operation, action substitution,
+same action with changed application field, wrong sequence/epoch/anchor/object/
+author/dependency/logical time, digest/signature mutation, issued/outbox
+substitution, use of sequence zero through covered-historical authority,
+hot-adoption policy loss, pending-resume policy loss, cold-reopen policy loss,
+and cross-application reopen. The full legacy recovery roster must prove the
+declared compatibility mode. Exact source-shape gates prove there is one shared
+predicate and no tests-only bypass.
+
+After 0c1f4 GREEN is signed/pushed and its focused/static/retained gates pass,
+the held 0c1f2 draft may be rebased onto the reviewed policy. Its functional
+GREEN must then make the unchanged signed product RED pass without an extra
+setup write. It must prove exact rows `0...S`, slot-zero bootstrap authority,
+creator-covered slots `1...S`, matching terminal proof/counts, and both safe
+bootstrap-only re-entry and refused prior-application-history re-entry. The
+combined final Grok/Kimi/Opus review covers 0c1f3 audit, 0c1f4 RED/GREEN, and
+0c1f2 causal RED-to-GREEN closure. Only P0/P1 blocks; one material plan
+confirmation is permitted now because authority and public compatibility
+changed, while documentation-only dispositions do not recurse.
+
+No protocol carrier or vertex wire field, digest/signing domain, creator or ACL
+authority, dependency, threshold, workload, memory/timing ceiling, join
+publication behavior, or application bootstrap value changes. If review shows
+that exact policy cannot be carried through all hot/cold/pending paths without
+a wire/schema change, new signing authority, dependency, or migration protocol,
+stop and reslice that demonstrated requirement. Preserve protected paths, all
+27 stashes, signed commits, pushed refs, immutable evidence, and the prohibition
+on Fable or collaboration subagents absent express user authorization.
 
 ###### D.110c-0c1d successor-reopen historical-rebase orchestration prerequisite
 
