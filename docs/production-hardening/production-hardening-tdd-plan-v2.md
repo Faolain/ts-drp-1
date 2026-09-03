@@ -98332,10 +98332,126 @@ retained controls, and isolated offline checkout. GREEN was signed/pushed
 before the one formal Grok/Kimi/Opus review over plan→RED→GREEN. No long
 campaign was authorized or run by f5a.
 
+###### D.110c-0c1f5b0 author settlement carrier and compatibility prerequisite
+
+**Status: BLOCKED at high-risk design; the bounded source/architecture audit is
+complete, but no RED or production edit is authorized.** Owner: one exact
+author-signed source-disposition carrier; its authenticated bounded
+author→creator ingress and crash-durable custody; the creator-certified
+settled-prefix checkpoint and predecessor rule; its relationship to the
+existing close cut/QC, ACL, snapshot, RFC 9162 history root/size, and fixed
+creator trust; ordinary recovery's terminal-versus-rebase classification; the
+room's source→replacement completion handoff; and an explicit protocol-v3,
+storage, and API compatibility/migration boundary. Deadline: accepted exact
+design before f5b RED or any production edit, and implemented/retained before
+f5b can close, parent 0c1/0c, the ≥100-transition gate, Phase-6 exit, or
+Phase-7 multi-author cold join.
+
+The source audit is
+`.logs/d110c-0c1f5b-source-audit-9f0310cd/audit.md`. It pins signed/pushed
+f5a closure anchor `9f0310cdb9a759bd3ae41ec87331a0edbc949203` and establishes
+that the existing product has no authenticated fact connecting a displaced
+source `(anchor, epoch, author, authorSequence, digest)` to its exact
+replacement identity or terminal disposition. Its one-entry self-excluding
+manifest validates and has SHA-256
+`5934101d80c926c8c599921efd9f529c12bbfcf0810dd74be87df9b898c8a070`.
+It changes no source, test, schema, dependency, threshold, or workload.
+
+The missing seam is not a local arithmetic bug. The room owns the source
+operation, application displacement policy, semantic identity, and knowledge
+that replacement issues completed; `completeRebaseSource()` receives only the
+source sequence/digest and changes local publish state. The creator close owns
+only admitted current-graph `(author, sequence)` values. The v1 aggregate owns
+only numeric admitted frontiers, and the historical recovery consumer treats
+every signed row at or below that number as creator-covered without a
+per-sequence digest. Neither the issuance-store shape, the cleanup receipt, nor
+the RFC 9162 root supplies the missing relation to the creator. An observed
+maximum is therefore unsafe, while the adjacent-prefix boundary leaves the
+gap permanent.
+
+The audit rejects observed maximum, sequence reuse/reset, application-callback
+inference as authority, an external settlement service, per-row active Merkle
+proof custody, and recursive/WRAPS-like proving. The preferred family is an
+**author-signed exact disposition receipt plus a creator-certified settled
+prefix**, reusing Ed25519, canonical encoding, fixed creator authority,
+cut/QC, and the existing RFC 9162 history commitment. A receipt must bind the
+source identity and exact ordered replacement identities or an explicit
+zero-replacement terminal outcome. The creator may advance a settled prefix
+only after it has verified every intervening slot as an admitted vertex or the
+unique source of an accepted receipt. Once the resulting checkpoint is
+durable, verified, adopted, rollback-protected, and availability-safe, rows at
+or below that prefix are terminal and may be pruned; they are never silently
+reapplied. Historical receipt/proof bytes may live in the archive, but ordinary
+reopen cannot require O(epoch), O(rebase), or O(gap) active control material.
+
+That family is not implementation authorization. The current signed vertex
+registry has no settlement field, blueprint admission has no protocol-reserved
+settlement operation, the live journal has no independent receipt row, the
+v1 frontier record has admitted rather than settled semantics, and the room
+handle does not pass replacement outcomes to Node. At least one authority or
+public-contract boundary must therefore change. Before f5b RED, f5b0 must
+freeze all of the following in one exact design:
+
+1. the canonical receipt kind, domain, exact fields, byte ceiling, author key
+   selection, signature preimage, outcome enum, ordered replacement grammar,
+   batch limits, and duplicate/equivocation rules;
+2. whether the receipt uses a protocol-reserved signed vertex operation or a
+   distinct envelope, how old nodes fail closed, and why the selected transport
+   does not let control material enter the application reducer or bypass ACL,
+   capacity, anchor, and dependency checks;
+3. the exact durable write-before-ack owner, restart enumeration, idempotence
+   key, retry/outcome-unknown rule, and bounded in-flight count/bytes;
+4. the exact room/Node handoff for `rebase`, `transform`, `expire`,
+   `manual-review`, already-present semantic identity, and one-to-many batched
+   replacements; mutable local publish state alone is never authority;
+5. the creator validation algorithm proving every sequence from prior
+   settled-through plus one through proposed settled-through is present exactly
+   once as an admitted application/control vertex or a receipt source, with
+   every replacement reference validated under the intended anchor/ACL;
+6. the creator checkpoint record kind/version, sorted per-author shape,
+   predecessor digest, genesis sentinel, byte ceiling, signature, and exact
+   binding to object/genesis, closed/successor anchors and epochs, both ACLs,
+   cut digest, commit QC, snapshot manifest, and history root/size;
+7. the compatibility rule for v1 admitted frontiers, mixed old/new closures,
+   peers that do not understand the carrier, and rooms already containing v1
+   history. The v1 field is not silently renamed or reinterpreted;
+8. the recovery rule for old rows at/below and above the settled prefix,
+   including replay, substitution, same-slot equivocation, shared
+   `(author, sequence)` regression, removed/re-added authors, and genesis gaps;
+9. the crash matrix before/after replacement issue, receipt issue/admission,
+   source completion, close staging, adoption, rollback protection, archive
+   availability, and prune; and
+10. exact active-state bounds by writer, current-epoch receipts, held rows,
+    batches, open gaps, rebases, and epochs. If manual-review or offline
+    continuity makes bounded in-flight custody impossible, stop and reslice the
+    resource/retention contract explicitly.
+
+The accepted design must preserve these RED/GREEN obligations prospectively.
+RED uses genuine signed vertices, genuine durable source rows, normal reissue,
+creator ingress, close/adopt, restart, and cold reopen; no tests-only aggregate,
+receipt, or storage injection can satisfy causality. It terminates only at
+`D110C_0C1F5_SETTLEMENT_CARRIER_REQUIRED` after proving the exact missing
+source→outcome fact. GREEN must close both rebase and honest-delivery gaps,
+preserve creator corruption fail-closed behavior, keep manual-review visible,
+maintain exact application/history/ACL/authority accounting, and permit safe
+pruning only after authenticated adoption and rollback/availability gates.
+Adversarial cases cover malformed/cross-bound receipt fields, replay,
+substitution, equivocation, missing/extra/reordered replacements, partial
+batches, stale/future anchors, skipped slots, duplicate sources, remove/re-add,
+genesis gaps, crash boundaries, untrusted storage, and incompatible peers.
+
+Because this decision changes authority semantics and likely protocol/API or
+storage compatibility, use the governing high-risk Grok 4.6/high, direct Kimi
+K3 with `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh review over the exact
+design. Only P0/P1 blocks; P2 receives an owner/disposition. No implementation,
+RED execution, retained campaign, or long run begins until that review accepts
+one exact construction and compatibility boundary. Do not invoke Fable or
+collaboration subagents.
+
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
-**Status: BLOCKED at architecture/design; no RED or production edit is
-authorized.** Owner: the cross-epoch relationship among creator-admitted
+**Status: BLOCKED on f5b0's exact high-risk carrier/compatibility design; no RED
+or production edit is authorized.** Owner: the cross-epoch relationship among creator-admitted
 per-author identities, aggregate coverage, historical outbox classification,
 rebase source→replacement/disposition correlation, close-set/history proofs,
 writer-side proof availability after restart, and bounded pruning. Deadline:
