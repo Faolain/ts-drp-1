@@ -1,17 +1,11 @@
-import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import { type AccumulatorSnapshot, deriveCloseSetHistoryCommitment, type EpochVertex } from "@ts-drp/compaction";
 import {
 	type SnapshotVerificationReceipt,
 	verifySnapshotStreamWithReceipt,
 } from "@ts-drp/compaction/snapshot-quarantine-receipt";
 import { inspectTrustClosure } from "@ts-drp/control-plane";
-import {
-	type DurableIssuanceOutboxRecord,
-	type DurableIssuanceStore,
-	type DurableIssueCommit,
-	type DurableIssueScope,
-	MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT,
-} from "@ts-drp/issuance-store";
+import type { DurableIssuanceStore, DurableIssueScope } from "@ts-drp/issuance-store";
 import { type FinalitySigner, signCreatorIssuanceRetirementRequest } from "@ts-drp/keychain/finality";
 import type { DurableLiveJournalStore } from "@ts-drp/live-journal";
 import type { CurrentAnchorTrust } from "@ts-drp/protocol-v3";
@@ -44,6 +38,7 @@ import {
 import type { SnapshotQuarantineDeclaration, SnapshotQuarantineStore } from "@ts-drp/storage/snapshot-transfer";
 
 import { installCreatorAdoptionFacts, revokeCreatorAdoptionFacts } from "./internal/creator-adoption-intent.js";
+import { deriveCreatorIssuanceRetirementBoundary } from "./internal/creator-issuance-retirement-boundary.js";
 import { inspectCreatorTransitionAdvance } from "./internal/creator-transition-advance.js";
 import {
 	type CreatorCloseRuntimeReleaseCensus,
@@ -263,42 +258,6 @@ function uniqueRecordCandidate(
 	return matches.length === 1 ? matches[0] : undefined;
 }
 
-function sameIssuanceScope(left: DurableIssueScope, right: DurableIssueScope): boolean {
-	return left.author === right.author && left.objectId === right.objectId;
-}
-
-function exactIssuanceCommit(commit: DurableIssueCommit, scope: DurableIssueScope, authorSequence: number): boolean {
-	return (
-		commit.authorSequence === authorSequence &&
-		commit.issuedRecord.authorSequence === authorSequence &&
-		commit.outboxEntry.authorSequence === authorSequence &&
-		sameIssuanceScope(commit.issuedRecord.scope, scope) &&
-		sameIssuanceScope(commit.outboxEntry.scope, scope) &&
-		compareBytes(commit.envelope.canonicalPreimageBytes, commit.issuedRecord.envelope.canonicalPreimageBytes) === 0 &&
-		compareBytes(commit.envelope.canonicalPreimageBytes, commit.outboxEntry.envelope.canonicalPreimageBytes) === 0 &&
-		compareBytes(commit.envelope.digest, commit.issuedRecord.envelope.digest) === 0 &&
-		compareBytes(commit.envelope.digest, commit.outboxEntry.envelope.digest) === 0 &&
-		compareBytes(commit.envelope.signature, commit.issuedRecord.envelope.signature) === 0 &&
-		compareBytes(commit.envelope.signature, commit.outboxEntry.envelope.signature) === 0
-	);
-}
-
-function exactIssuancePair(
-	left: DurableIssuanceOutboxRecord,
-	right: Awaited<ReturnType<DurableIssuanceStore["readIssued"]>>,
-	scope: DurableIssueScope,
-	authorSequence: number
-): boolean {
-	return (
-		right !== null &&
-		exactIssuanceCommit(left.commit, scope, authorSequence) &&
-		exactIssuanceCommit(right, scope, authorSequence) &&
-		compareBytes(left.commit.envelope.canonicalPreimageBytes, right.envelope.canonicalPreimageBytes) === 0 &&
-		compareBytes(left.commit.envelope.digest, right.envelope.digest) === 0 &&
-		compareBytes(left.commit.envelope.signature, right.envelope.signature) === 0
-	);
-}
-
 async function issuanceRetirementCandidate(
 	input: Readonly<{
 		current: InspectedHead;
@@ -354,71 +313,22 @@ async function issuanceRetirementCandidate(
 		priorRetirementCandidateDigest = candidate.ref.digest;
 		priorRef = candidate.ref;
 	}
-	const lineage = await input.issuanceStore.readLineage(input.issuanceScope);
-	if (lineage.exhausted) throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
-	const rows: DurableIssuanceOutboxRecord[] = [];
-	let afterKey: readonly [string, string, number] | null =
-		priorAdmittedAuthorSequence === null
-			? null
-			: [input.issuanceScope.objectId, input.issuanceScope.author, priorAdmittedAuthorSequence];
-	while (rows.length <= input.maxEpochVertices) {
-		const page = await input.issuanceStore.readOutboxPage({
-			afterKey,
-			limit: Math.min(MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT, input.maxEpochVertices + 1 - rows.length),
-			scope: input.issuanceScope,
-		});
-		if (page.length === 0) break;
-		rows.push(...page);
-		const last = page[page.length - 1] as DurableIssuanceOutboxRecord;
-		afterKey = [input.issuanceScope.objectId, input.issuanceScope.author, last.commit.authorSequence];
-		if (
-			page.length <
-			Math.min(MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT, input.maxEpochVertices + 1 - (rows.length - page.length))
-		)
-			break;
-	}
-	const firstExpected = priorAdmittedAuthorSequence === null ? 0 : priorAdmittedAuthorSequence + 1;
-	if (rows.length > input.maxEpochVertices || lineage.next !== firstExpected + rows.length) {
-		throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
-	}
-	let admitted = priorAdmittedAuthorSequence;
-	let expected = firstExpected;
-	let truncated = false;
-	for (const row of rows) {
-		if (row.commit.authorSequence !== expected) throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
-		const issued = await input.issuanceStore.readIssued(input.issuanceScope, expected);
-		if (!exactIssuancePair(row, issued, input.issuanceScope, expected)) {
-			throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
-		}
-		const bytes = row.commit.envelope.canonicalPreimageBytes;
-		const digest = hex(row.commit.envelope.digest);
-		const decoded = decodeCanonical(bytes);
-		if (
-			!plainRecord(decoded) ||
-			compareBytes(encodeCanonical(decoded), bytes) !== 0 ||
-			hex(hashDomain("ts-drp/vertex/v3", bytes)) !== digest ||
-			decoded.anchor !== input.currentTrust.currentAnchorDigest ||
-			decoded.author !== input.issuanceScope.author ||
-			decoded.epoch !== input.currentTrust.currentEpoch ||
-			decoded.objectId !== input.issuanceScope.objectId ||
-			decoded.authorSequence !== expected
-		) {
-			throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
-		}
-		const inGraph = input.graph.vertices.has(digest);
-		if (inGraph && truncated) throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
-		if (inGraph) admitted = expected;
-		else truncated = true;
-		expected += 1;
-	}
-	if (admitted === null || lineage.next <= admitted) throw new TypeError(CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE);
+	const boundary = await deriveCreatorIssuanceRetirementBoundary({
+		currentAnchorDigest: input.currentTrust.currentAnchorDigest,
+		currentEpoch: input.currentTrust.currentEpoch,
+		graphVertexDigests: input.graph.vertices,
+		issuanceScope: input.issuanceScope,
+		issuanceStore: input.issuanceStore,
+		maxEpochVertices: input.maxEpochVertices,
+		priorAdmittedAuthorSequence,
+	});
 	const prepared = prepareCreatorIssuanceRetirement({
-		admittedAuthorSequence: admitted,
+		admittedAuthorSequence: boundary.admittedAuthorSequence,
 		author: input.issuanceScope.author,
 		commitQcRef: input.qcRef,
 		currentTrust: input.currentTrust,
 		cutValueDigest: input.cutValueDigest,
-		observedLineage: lineage,
+		observedLineage: boundary.observedLineage,
 		priorAdmittedAuthorSequence,
 		priorRetirementCandidateDigest,
 		snapshotManifestDigest: input.snapshotManifestDigest,

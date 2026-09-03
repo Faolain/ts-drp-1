@@ -1,6 +1,12 @@
 import "fake-indexeddb/auto";
 
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
+import type {
+	DurableIssuanceOutboxRecord,
+	DurableIssuanceStore,
+	DurableIssueCommit,
+	DurableLineage,
+} from "@ts-drp/issuance-store";
 import { digestBlob } from "@ts-drp/storage";
 import { describe, expect, it } from "vitest";
 
@@ -16,6 +22,7 @@ import {
 	signCreatorAnchorRequest,
 	signCreatorIssuanceRetirementRequest,
 } from "../packages/keychain/src/finality.js";
+import { deriveCreatorIssuanceRetirementBoundary } from "../packages/node/src/internal/creator-issuance-retirement-boundary.js";
 import { inspectCreatorTransitionAdvance } from "../packages/node/src/internal/creator-transition-advance.js";
 import { openCreatorCheckpointTrust } from "../packages/protocol-v3/src/creator-checkpoint.js";
 import {
@@ -29,6 +36,23 @@ import {
 interface Candidate {
 	readonly bytes: Uint8Array;
 	readonly ref: Readonly<{ readonly byteLength: number; readonly digest: string }>;
+}
+
+function derivationStore(
+	input: Readonly<{
+		issued: ReadonlyMap<number, DurableIssueCommit>;
+		lineage: DurableLineage;
+		rows: readonly DurableIssuanceOutboxRecord[];
+	}>
+): DurableIssuanceStore {
+	return Object.freeze({
+		close: () => Promise.resolve(),
+		compareAndMarkOutboxPublished: () => Promise.resolve(),
+		readIssued: (_scope, authorSequence) => Promise.resolve(input.issued.get(authorSequence) ?? null),
+		readLineage: () => Promise.resolve(input.lineage),
+		readOutboxPage: () => Promise.resolve(input.rows),
+		transactIssue: () => Promise.reject(new TypeError("D110C_0C1A_TEST_STORE_READ_ONLY")),
+	});
 }
 
 function record(value: Uint8Array): Readonly<Record<string, unknown>> {
@@ -491,6 +515,77 @@ describe("D.110c-0c1a creator issuance-retirement checkpoint RED", () => {
 					successorTrust: checkpoint.currentTrust,
 				})
 			).toEqual({ ok: false, reason: "IDENTITY_INVALID" });
+		} finally {
+			await fixture.close();
+		}
+	});
+
+	it("fails closed for every frozen issuance-boundary derivation mutant", async () => {
+		const fixture = await openD110c0c1aRetirementCheckpointFixture();
+		try {
+			const { currentTrust, issuanceScope, lineage, rows } = fixture.evidence;
+			const [row0, row1, row2] = rows;
+			if (row0 === undefined || row1 === undefined || row2 === undefined) {
+				throw new TypeError("D110C_0C1A_DERIVATION_FIXTURE_INCOMPLETE");
+			}
+			const outboxRows = rows.map(({ outbox }) => outbox);
+			const issued = new Map(rows.map((row) => [row.authorSequence, row.issued] as const));
+			const graph = new Set(rows.map(({ digest }) => digest));
+			const derive = (
+				input: Readonly<{
+					graph?: ReadonlySet<string>;
+					issued?: ReadonlyMap<number, DurableIssueCommit>;
+					lineage?: DurableLineage;
+					maxEpochVertices?: number;
+					rows?: readonly DurableIssuanceOutboxRecord[];
+				}>
+			): ReturnType<typeof deriveCreatorIssuanceRetirementBoundary> =>
+				deriveCreatorIssuanceRetirementBoundary({
+					currentAnchorDigest: currentTrust.currentAnchorDigest,
+					currentEpoch: currentTrust.currentEpoch,
+					graphVertexDigests: input.graph ?? graph,
+					issuanceScope,
+					issuanceStore: derivationStore({
+						issued: input.issued ?? issued,
+						lineage: input.lineage ?? lineage,
+						rows: input.rows ?? outboxRows,
+					}),
+					maxEpochVertices: input.maxEpochVertices ?? 8,
+					priorAdmittedAuthorSequence: null,
+				});
+
+			await expect(derive({})).resolves.toEqual({
+				admittedAuthorSequence: 2,
+				observedLineage: { exhausted: false, next: 3 },
+			});
+			await expect(derive({ graph: new Set([row0.digest, row1.digest]) })).resolves.toEqual({
+				admittedAuthorSequence: 1,
+				observedLineage: { exhausted: false, next: 3 },
+			});
+
+			const substituted = new Map(issued);
+			substituted.set(1, row2.issued);
+			const rejectionCases = Object.freeze([
+				Object.freeze({
+					lineage: { exhausted: false, next: 2 },
+					name: "gapped-address",
+					rows: [row0.outbox, row2.outbox],
+				}),
+				Object.freeze({
+					lineage: { exhausted: false, next: 4 },
+					name: "duplicate-address",
+					rows: [row0.outbox, row0.outbox, row1.outbox, row2.outbox],
+				}),
+				Object.freeze({ issued: substituted, name: "issued-outbox-substitution" }),
+				Object.freeze({ graph: new Set([row0.digest, row2.digest]), name: "graph-reentry-after-omission" }),
+				Object.freeze({ lineage: { exhausted: false, next: 4 }, name: "incomplete-lineage" }),
+				Object.freeze({ lineage: { exhausted: true, next: 3 }, name: "exhausted-lineage" }),
+				Object.freeze({ maxEpochVertices: 2, name: "over-limit-scan" }),
+				Object.freeze({ lineage: { exhausted: false, next: 0 }, name: "empty-initialization", rows: [] }),
+			] as const);
+			for (const rejection of rejectionCases) {
+				await expect(derive(rejection)).rejects.toThrow(D110C_0C1A_RED_TOKEN);
+			}
 		} finally {
 			await fixture.close();
 		}

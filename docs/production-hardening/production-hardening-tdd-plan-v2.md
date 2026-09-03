@@ -95500,8 +95500,8 @@ RED-to-GREEN closure and is prohibited.
 ##### D.110c-0c1 authenticated intermediate-epoch issuance prerequisite
 
 **Status: bounded architecture decision complete; implementation and causal RED
-remain blocked on D.110c-0c1a GREEN before any `v3-live.ts` or issuance-store
-production edit.** Owner: the predecessor and successor issuance
+remain blocked on D.110c-0c1a closure and D.110c-0c1b GREEN before any
+`v3-live.ts` or issuance-store production edit.** Owner: the predecessor and successor issuance
 views created by `packages/node/src/v3-live.ts::activateCreatorSuccessorLive()`,
 `creatorFilteredIssuanceStore()`, their exact outbox classification inside
 `recoverV3LiveReplica()`, and the registered view's `publishPending` and
@@ -95543,7 +95543,7 @@ bounded signed-control form of option 2 and freezes its exact high-risk
 protocol-contract prerequisite as D.110c-0c1a before implementation. A signed
 claimed epoch alone remains insufficient.
 
-After D.110c-0c1a GREEN, D.110c-0c1 RED remains tests-only. First, one corrected
+After D.110c-0c1a closure and D.110c-0c1b GREEN, D.110c-0c1 RED remains tests-only. First, one corrected
 diagnostic invocation must retain
 both old-AHE and new-AHE orderings after `active-new`, proving exact floor/AHE
 effects and the identical post-commit reopen classification without aborting
@@ -95834,9 +95834,11 @@ SHA-256 is
 
 ###### D.110c-0c1a creator-signed issuance-retirement checkpoint prerequisite
 
-**Status: causal RED is signed/pushed; bounded production GREEN and retained
-gates pass locally; the signed/pushed GREEN checkpoint and governing final
-plan→RED→GREEN review remain before closure.** Owner:
+**Status: causal RED and initial production GREEN are signed/pushed; focused and
+retained gates pass, but the governing final review found a reachable
+committed-issuance hole and missing derivation-branch coverage. The tests-only
+review correction and explicit D.110c-0c1b prerequisite remain before one
+material confirmation may close this slice.** Owner:
 protocol-v3 creator retirement record/opener and one-use signing request,
 keychain finality signing dispatch, the creator-close row/graph/replay capture,
 the Node-private
@@ -96127,6 +96129,101 @@ D.110c-0c1a failure. The current registry/public-entry and affected canonical
 behavior gates pass. The signed downstream D.110c-0c failure remains owned by
 D.110c-0c1 and was neither rerun nor weakened. D.110a and campaign identities
 remain excluded.
+
+The initial final review inspected signed/pushed GREEN commit
+`d77ee315a7688cffb5fd55870c38231403ecc41f`, tree
+`1c907ac05acb6cd844fb5dbb4f15e7c1ee8940af`. Grok 4.6/high session
+`01a0651a-343b-7f60-a4d7-f05ee3f628c3` returned `APPROVED`, P0=0/P1=0/P2=0;
+the first wrapper classification was `NO_VERDICT` only because progress prose
+preceded its valid terminal JSON, so the exact session re-emitted the unchanged
+schema-only verdict without another inspection. Standard direct Kimi K3
+session `session_33a04ee3-e4d3-48aa-9156-0277699281c2`, with the exact 100-step
+control, returned `APPROVED`, P0=0/P1=0/P2=2. Its claimed-missing reporter JSON
+manifests are in the Playwright-relative
+`packages/storage-browser/.logs/d110c-0c1a-green-retained-browser-*` roots and
+validate exactly; its remaining evidence-custody P2 is accepted by committing
+the final GREEN/evidence roots with closure. Opus xhigh session
+`515198a9-6310-4637-bf97-196a4fe28420` returned P0=0/P1=2/P2=1. The P2 is
+assigned to D.110c-0c1: before consuming the boundary it must compare the
+opened carrier author with its independently resolved issuance scope.
+
+Both Opus P1s are accepted. First, the close-boundary derivation is extracted
+without behavior change into one Node-internal seam and receives direct
+deterministic cases for a valid full prefix, valid unadmitted suffix, gap,
+duplicate, issued/outbox substitution, graph omission followed by re-entry,
+lineage mismatch, exhausted lineage, over-limit scan, and empty initialization.
+Second, source inspection demonstrates the plan's existing stop condition:
+`issueOneVertex()` durably commits issuance before live-journal and graph
+admission, and its post-commit failure branches can leave a genuine row absent
+from the close graph. Such a row may safely truncate the current close, but
+after adoption it retains the old epoch/anchor above the authenticated boundary
+and therefore freezes later closes. The strict dense frontier is not weakened.
+D.110c-0c1b below owns the product outcome before the boundary consumer or
+another repeated-epoch claim proceeds. Because these corrections change
+executable coverage and slice sequencing, exactly one material Grok/Kimi/Opus
+confirmation reviews the signed correction; no P2/prose-only round follows.
+The corrected focused reporter passes 3/3 with the complete derivation matrix;
+the unchanged retained 24-file set passes 230/230. Node production-source
+typecheck/build, exact-owner ESLint/Prettier, and diff checks pass. The initial
+review root's validating manifest SHA-256 is
+`21ffaab1f04a7a83ebbd9b5a4b477f7a974e94facda6e99476df0daf4a562c1e`;
+the correction evidence root
+`.logs/d110c-0c1a-green-review-correction-d77ee315/` has validating manifest
+SHA-256
+`e62e8ec6f3c3aa854cb8fdacb0984f801b2972451ad8484e820bb08b888bf7bd`.
+The first extraction omitted an import still used elsewhere and the first
+evidence wrapper used zsh's reserved `status` name; both diagnostic-only errors
+and their corrected proofs are preserved without changing acceptance. One
+audit also omitted the established 8-GiB formatting heap and met the default
+4-GiB ceiling; the corrected 8-GiB Prettier gate passes.
+
+###### D.110c-0c1b committed-issuance outcome reconciliation prerequisite
+
+**Status: blocking bounded audit and causal RED are next after D.110c-0c1a
+closure; no production repair is selected or authorized.** Owner: the
+post-`transactIssue()` outcome window in
+`packages/node/src/v3-live.ts::issueOneVertex()`, live-journal append, graph
+admission, restart recovery of pending issuance/outbox rows, and the close-time
+retirement-boundary input. Deadline: GREEN before D.110c-0c1 changes either
+registered issuance view, before D.110c-0c resumes, and before D.110c-c/d or
+Phase 7 claims repeatable epochs.
+
+The bounded source/architecture audit must determine whether existing restart
+recovery can safely finish admission of a committed row, whether the issuance
+transaction needs a durable outcome/reconciliation marker, or whether another
+explicit store contract is required. The store is untrusted bytes: deletion,
+publication, epoch reassignment, or a database-only watermark cannot establish
+admission. Preserve author signature, exact object/sequence, original
+epoch/anchor authority, dependency and ACL checks, pending publication and
+rebase custody, operation-reservation semantics, graph capacity, journal
+ordering, and at-most-once application. If repair requires a schema, public
+API, wire field, dependency, authority rule, or threshold change, stop after
+the audit and reslice that exact high-risk prerequisite.
+
+Tests-only RED must use the real product issue path to force one deterministic
+post-commit journal or graph-admission failure. It must prove the issue reports
+the existing committed-failure class, the exact issued/outbox row survives,
+the row is absent from the authenticated close graph/journal, the genuine 0→1
+close can only truncate above the prior admitted boundary, and after verified
+adoption/restart the next genuine close refuses with exact
+`D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE` because that same row carries
+the old authenticated epoch/anchor. No test may insert, delete, republish,
+rewrite, or privately classify the row to manufacture the failure.
+
+GREEN must deterministically reconcile every durably committed outcome before
+it can obstruct a later close: either authenticate and complete its original
+admission exactly once under the preserved original authority, or fail closed
+with a durable, bounded, explicitly reviewed resolution that preserves dense
+sequence and outbox truth. It must then prove restart, genuine 0→1 and 1→2
+close/adoption, continued issue/publish, exact application state and operation
+accounting, no duplicate journal/graph/application entry, no skipped sequence,
+and no hidden pending row. Adversarial gates cover crash at each boundary,
+substituted row, stale authority/ACL, invalid dependency, graph capacity,
+ambiguous transaction outcome, replay, and repeated recovery. Retain all
+D.110c-0c1a carrier, Phase-6a recovery, issuance/outbox/rebase, AHE rollback,
+snapshot, and D.109 reclamation gates. This is a high-risk production-lifecycle
+slice and receives the governing plan review, causal RED custody, signed GREEN,
+and one final Grok/Kimi/Opus review. No campaign or D.110a invocation runs.
 
 The complete confirmation evidence is retained under
 `.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry

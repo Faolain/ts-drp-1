@@ -1,6 +1,11 @@
 import { compareBytes, decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 import type { CloseSetHistoryCommitment } from "@ts-drp/compaction";
-import type { DurableIssuanceOutboxRecord, DurableIssueCommit, DurableLineage } from "@ts-drp/issuance-store";
+import type {
+	DurableIssuanceOutboxRecord,
+	DurableIssueCommit,
+	DurableIssueScope,
+	DurableLineage,
+} from "@ts-drp/issuance-store";
 import { digestBlob, type GenerationRef } from "@ts-drp/storage";
 
 import type { CreatorLiveCloseResult } from "../../../packages/node/src/creator-close.js";
@@ -48,6 +53,7 @@ export interface D110c0c1aRetirementCheckpointEvidence {
 	readonly currentTrust: CurrentAnchorTrust;
 	readonly durableReplayVerified: boolean;
 	readonly history: CloseSetHistoryCommitment;
+	readonly issuanceScope: DurableIssueScope;
 	readonly lineage: DurableLineage;
 	readonly rows: readonly D110c0c1aIssuedRowEvidence[];
 	readonly retirementCandidates: readonly Readonly<{
@@ -192,6 +198,7 @@ export async function openD110c0c1aRetirementCheckpointFixture(): Promise<D110c0
 				currentTrust,
 				durableReplayVerified,
 				history,
+				issuanceScope,
 				lineage,
 				proposed,
 				retirementCandidates: Object.freeze(retirementCandidates),
