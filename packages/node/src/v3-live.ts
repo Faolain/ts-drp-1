@@ -5679,10 +5679,12 @@ async function issueOneVertex(
 			objectId: registration.payload.provenance.objectId,
 			operation,
 		});
-	} catch {
+	} catch (error) {
+		const issuanceOutcomeUnknown =
+			error !== null && typeof error === "object" && Reflect.get(error, "code") === "ISSUANCE_OUTCOME_UNKNOWN";
 		if (!signerResolved && !terminalTransactionStarted) {
 			releaseOperationReservation(reservation);
-		} else if (reservation !== undefined) {
+		} else if (reservation !== undefined || issuanceOutcomeUnknown) {
 			registration.operationAdmissionHalted = true;
 		}
 		if (requireTerminalAuthorization && terminalTransactionStarted) {
@@ -5702,7 +5704,7 @@ async function issueOneVertex(
 		kind: Exclude<Extract<V3LocalIssueResult, { readonly ok: false }>["kind"], "split-required">,
 		detail: string
 	): InternalLocalIssueResult => {
-		if (reservation !== undefined) registration.operationAdmissionHalted = true;
+		registration.operationAdmissionHalted = true;
 		return requireTerminalAuthorization
 			? internalLocalIssueFailure(kind, detail, "outcome-unknown")
 			: localIssueFailure(kind, detail);
@@ -6650,6 +6652,9 @@ function stageClosedBlueprintEpoch(registration: V3PlaneRegistration): V3Bluepri
 	if (!currentRegistration(registration) || registration.blueprintMachine === undefined) {
 		return blueprintFoldFailure("not-active", "v3 blueprint fold is not active");
 	}
+	if (registration.operationAdmissionHalted) {
+		return blueprintFoldFailure("not-active", "v3 blueprint fold requires live recovery");
+	}
 	if (registration.blueprintFolded) {
 		return blueprintFoldFailure("already-folded", "v3 blueprint epoch was already folded");
 	}
@@ -6977,6 +6982,7 @@ function creatorClosePreviousHistorySnapshot(payload: PreparedV3LivePayload): Ac
 function creatorCloseRegistration(registration: V3PlaneRegistration): V3CreatorCloseRegistration | undefined {
 	if (
 		!currentRegistration(registration) ||
+		registration.operationAdmissionHalted ||
 		registration.mode !== "genesis-active" ||
 		registration.authorization.kind !== "latched-acl" ||
 		registration.terminalState !== "active" ||

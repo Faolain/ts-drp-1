@@ -1,0 +1,8 @@
+25ad2cd079fe568b56da4b1145cce072d8a51504daeb0e5c43f2d305de1181f0  docs/production-hardening/production-hardening-tdd-plan-v2.md
+60e32fe431936d1c9282c08a21b176ba7347eb8717d57d981b7cb5db66f0bb1c  packages/node/src/v3-live.ts
+0435f89d625e900335538d458ae920263996c2e2026d7fc24a3b44fcaea492a0  tests/fixtures/phase-6a-v3/creator-adoption-contract.ts
+e40e8dddc916380763caa10fe3f4267cf73e5915e786704eef97c7d3bfa72277  tests/fixtures/phase-6b/runtime-reclamation-contract.ts
+7f1e6ad8cbe6d318109c7da1a6e61ce99e4025917e10d5f415fe8ffe5e86e422  tests/fixtures/phase-6b-d110c-a/repeat-close-contract.ts
+d1df6c84e23495be0e8520a3d120f9a756894fe79272d91eb3bf314a511bdb19  tests/fixtures/phase-6b-d110c-0c1b/committed-issuance-recovery-contract.ts
+aa3bef042d36003662ac5e1fe10419fdaa09f671ff2306e1a5e71326dc72d64d  tests/phase-6b-d110c-0c1b-committed-issuance-red.test.ts
+4049a87f2a556150189e0e10ee80737c4254c40f6d17644da8dc7a87d1b1f883  tests/phase-6b-d110c-a-repeat-close-red.test.ts

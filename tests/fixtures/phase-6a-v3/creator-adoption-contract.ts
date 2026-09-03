@@ -402,6 +402,7 @@ export interface GenuineCreatorAdoptionFixtureOptions {
 			readonly signRegisteredVertexDigest: V3LocalIssueInput["signRegisteredVertexDigest"];
 		}>
 	): Promise<Readonly<{ readonly authorSequence: number; readonly digest: string }>>;
+	decorateIssuanceStore?(store: DurableIssuanceStore): DurableIssuanceStore;
 	decorateLiveJournalStore?(store: DurableLiveJournalStore): DurableLiveJournalStore;
 	readonly establishedPeerPrivateKeySeedHex?: string;
 	readonly modules?: GenuineCreatorAdoptionFixtureModules;
@@ -727,6 +728,7 @@ async function recoverWithDurableStores(
 	capability: PreparedV3Live,
 	controls: GenuineCreatorAdoptionFixture["controls"],
 	modules: GenuineCreatorAdoptionFixtureModules,
+	decorateIssuanceStore?: (store: DurableIssuanceStore) => DurableIssuanceStore,
 	decorateLiveJournalStore?: (store: DurableLiveJournalStore) => DurableLiveJournalStore
 ): Promise<
 	Readonly<{
@@ -744,7 +746,7 @@ async function recoverWithDurableStores(
 	const issuanceMaintenance = modules.resolveNodeDurableIssuancePruningMaintenance(rawIssuanceStore);
 	if (issuanceMaintenance === undefined) throw new TypeError("D.108b fixture issuance maintenance is unavailable");
 	const rawJournal = modules.createNodeDurableLiveJournalStore({ primaryFilename: join(directory, "journal.sqlite") });
-	const issuanceStore: DurableIssuanceStore = Object.freeze({
+	const baseIssuanceStore: DurableIssuanceStore = Object.freeze({
 		close: () => rawIssuanceStore.close(),
 		compareAndMarkOutboxPublished: (input) => rawIssuanceStore.compareAndMarkOutboxPublished(input),
 		readIssued: async (scope, sequence) => {
@@ -766,6 +768,7 @@ async function recoverWithDurableStores(
 		},
 		transactIssue: (scope, buildAndSign) => rawIssuanceStore.transactIssue(scope, buildAndSign),
 	});
+	const issuanceStore = decorateIssuanceStore?.(baseIssuanceStore) ?? baseIssuanceStore;
 	const baseJournal: DurableLiveJournalStore = Object.freeze({
 		appendAccepted: (input) => rawJournal.appendAccepted(input),
 		close: () => rawJournal.close(),
@@ -1082,6 +1085,7 @@ export async function openGenuineCreatorAdoptionFixture(
 		fixture.capability,
 		controls,
 		modules,
+		options.decorateIssuanceStore,
 		options.decorateLiveJournalStore
 	);
 	const messageQueueManager = new MessageQueueManager<Message>({ logConfig: { level: "silent" } });

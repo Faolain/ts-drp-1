@@ -18,6 +18,7 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import type { ClosedEpochCleanupPlan } from "../../../packages/node/src/internal/closed-epoch-cleanup.js";
+import { resolveCreatorAdoptionFacts } from "../../../packages/node/src/internal/creator-adoption-intent.js";
 import {
 	bytesForRef,
 	commitGenuineCreatorAdoptionFixture,
@@ -173,6 +174,7 @@ export interface D109dHotFixture {
 	readonly committedHead: PresentHead;
 	readonly oracle: D108d1Oracle;
 	readonly predecessor: object;
+	readonly predecessorColdFacts: Readonly<Record<string, unknown>>;
 	readonly runtimeBindings: GenuineCreatorAdoptionFixture["runtimeBindings"];
 	readonly successor: Readonly<{
 		deactivate(): void | Promise<void>;
@@ -215,6 +217,8 @@ async function openD109dFixture(mode: "cold" | "hot", options: D109dOpenOptions 
 	const base = await openGenuineCreatorAdoptionFixture(options.creator);
 	let successor: D109dHotFixture["successor"] | undefined;
 	try {
+		const predecessorColdFacts = resolveCreatorAdoptionFacts<Readonly<Record<string, unknown>>>(base.handle);
+		if (predecessorColdFacts === undefined) throw new TypeError("D109D_PREDECESSOR_COLD_FACTS_UNAVAILABLE");
 		const prepared = await commitGenuineCreatorAdoptionFixture(base);
 		const selectedBindings =
 			mode === "hot"
@@ -257,6 +261,7 @@ async function openD109dFixture(mode: "cold" | "hot", options: D109dOpenOptions 
 			},
 			oracle: deriveD108d1Oracle(base),
 			predecessor: base.handle,
+			predecessorColdFacts,
 			readAdmittedVertices: () => Object.freeze([...admittedVertices]),
 			runtimeBindings,
 			successor,

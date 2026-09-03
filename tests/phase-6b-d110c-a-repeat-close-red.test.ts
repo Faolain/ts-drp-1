@@ -72,7 +72,7 @@ describe("D.110c-a authenticated repeat-close carrier RED", () => {
 			expect(evidence.previousHistoryAfter).toEqual(evidence.independentHistory.previous);
 			expect(evidence.previousHistoryAfter).not.toBe(evidence.independentHistory.previous);
 			expect(evidence.afterHead.references).toHaveLength(evidence.beforeHead.references.length - 1);
-			expect(evidence.closureBytes.delta).toBe(-318);
+			expect(evidence.closureBytes.delta).toBe(-317);
 			expect(evidence.duplicateCloseErrors).toEqual({
 				concurrent: "creator close authority is unavailable",
 				sequential: "creator close authority is unavailable",

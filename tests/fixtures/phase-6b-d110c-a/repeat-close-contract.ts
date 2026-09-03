@@ -110,6 +110,17 @@ export interface D110cARepeatCloseFixture {
 }
 
 export interface D110cARepeatCloseOptions {
+	afterRepeatCloseFailure?(
+		input: Readonly<{
+			readonly closeHandle: CreatorLiveCloseHandle;
+			readonly error: unknown;
+			readonly issuanceScope: GenuineCreatorAdoptionFixture["evidence"]["issuanceScope"];
+			readonly issuanceStore: GenuineCreatorAdoptionFixture["evidence"]["issuanceStore"];
+			readonly plane: V3PlaneHandle;
+			readonly signRegisteredVertexDigest: GenuineCreatorAdoptionFixture["signRegisteredVertexDigest"];
+			recoverCurrentSuccessor(): Promise<Readonly<Record<string, unknown>>>;
+		}>
+	): Promise<void>;
 	beforeRepeatClose?(
 		input: Readonly<{
 			readonly issuanceScope: GenuineCreatorAdoptionFixture["evidence"]["issuanceScope"];
@@ -123,6 +134,14 @@ export interface D110cARepeatCloseOptions {
 			release(): void;
 		}>
 	>;
+	beforeRepeatCloseBinding?(
+		input: Readonly<{
+			readonly issuanceScope: GenuineCreatorAdoptionFixture["evidence"]["issuanceScope"];
+			readonly issuanceStore: GenuineCreatorAdoptionFixture["evidence"]["issuanceStore"];
+			readonly plane: V3PlaneHandle;
+			readonly signRegisteredVertexDigest: GenuineCreatorAdoptionFixture["signRegisteredVertexDigest"];
+		}>
+	): Promise<void>;
 	readonly creator?: GenuineCreatorAdoptionFixtureOptions;
 	readonly objectId?: string;
 	readonly retainedControls?: boolean;
@@ -514,6 +533,49 @@ export async function openD110cARepeatCloseFixture(
 		await hot.close();
 		await Promise.all([deleteDatabase(primaryDatabaseName), deleteDatabase(snapshotDatabaseName)]);
 	};
+	const recoverCurrentSuccessor = async (): Promise<Readonly<Record<string, unknown>>> => {
+		const coldFacts = hot.predecessorColdFacts as unknown as D110c0b1ColdFacts;
+		const genesisTrustCandidate = hot.base.evidence.current.candidates.find((candidate) => {
+			const record = canonicalRecord(candidate.bytes);
+			return record.kind === "drp-anchor-trust-state" && record.currentEpoch === 0;
+		});
+		if (genesisTrustCandidate === undefined) throw new TypeError("D110C_A_CURRENT_GENESIS_TRUST_UNAVAILABLE");
+		const genesisTrustRecord = canonicalRecord(genesisTrustCandidate.bytes);
+		const currentAuthority = copiedRoomHead(hot.successor as V3PlaneHandle);
+		if (
+			currentAuthority === undefined ||
+			!(genesisTrustRecord.detachedCurrentAnchorSignature instanceof Uint8Array) ||
+			!(genesisTrustRecord.exactCanonicalCurrentAnchorPreimageBytes instanceof Uint8Array)
+		) {
+			throw new TypeError("D110C_A_CURRENT_COLD_INPUT_INVALID");
+		}
+		await Promise.resolve(hot.successor.deactivate());
+		const reopened = await reopenCreatorSuccessorAdoption({
+			authenticationProfile: "creator-only",
+			author: hot.base.evidence.issuanceScope.author,
+			catalog: hot.base.catalog,
+			detachedSignature: Uint8Array.from(genesisTrustRecord.detachedCurrentAnchorSignature),
+			exactCanonicalAnchorPreimageBytes: Uint8Array.from(genesisTrustRecord.exactCanonicalCurrentAnchorPreimageBytes),
+			exactCanonicalParametersCarrierBytes: Uint8Array.from(coldFacts.exactCanonicalParametersCarrierBytes),
+			expectedRoomHead: Object.freeze({
+				currentAnchorDigest: currentAuthority.anchorDigest,
+				epoch: currentAuthority.epoch,
+				objectId: currentAuthority.objectId,
+			}),
+			issuanceStore: hot.base.evidence.issuanceStore,
+			liveJournalStore: hot.base.journal,
+			pinnedGenesisAnchorDigest: hot.base.evidence.currentTrust.genesisAnchorDigest,
+			signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
+			snapshotDeclaration: coldFacts.snapshotDeclaration,
+			snapshotStore: coldFacts.snapshotStore,
+			store: coldFacts.store,
+			...hot.runtimeBindings,
+		});
+		if (reopened.ok === true && reopened.handle !== null && typeof reopened.handle === "object") {
+			latestSuccessor = reopened.handle as D109dHotFixture["successor"];
+		}
+		return reopened;
+	};
 	try {
 		const plane = hot.successor as V3PlaneHandle;
 		const issued = await hot.successor.issueLocal({
@@ -526,6 +588,12 @@ export async function openD110cARepeatCloseFixture(
 		const published = await hot.successor.publishPending();
 		if (published.ok !== true) throw new TypeError(`D110C_A_POST_ADOPTION_PUBLISH_FAILED:${String(published.kind)}`);
 		const previousHistory = copiedCompactHistory(hot.base.evidence.exactCanonicalProjectionBytes);
+		await options.beforeRepeatCloseBinding?.({
+			issuanceScope: hot.base.evidence.issuanceScope,
+			issuanceStore: hot.base.evidence.issuanceStore,
+			plane,
+			signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
+		});
 		const signer = await createRecoverableFinalitySigner({ seed: hexBytes(contract.privateKeySeedHex) });
 		const [vote, evidenceStore, snapshotStore] = await Promise.all([
 			hot.base.modules.openBrowserSealVoteStore({ databaseName: primaryDatabaseName }),
@@ -1009,7 +1077,21 @@ export async function openD110cARepeatCloseFixture(
 			},
 		});
 	} catch (error) {
-		await cleanup();
+		try {
+			if (closeHandle !== undefined && options.afterRepeatCloseFailure !== undefined) {
+				await options.afterRepeatCloseFailure({
+					closeHandle,
+					error,
+					issuanceScope: hot.base.evidence.issuanceScope,
+					issuanceStore: hot.base.evidence.issuanceStore,
+					plane: hot.successor as V3PlaneHandle,
+					recoverCurrentSuccessor,
+					signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
+				});
+			}
+		} finally {
+			await cleanup();
+		}
 		throw error;
 	}
 }

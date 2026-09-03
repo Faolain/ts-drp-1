@@ -96203,9 +96203,9 @@ is under `.logs/d110c-0c1a-review-confirmation-7414fa6b/`; its validating
 
 ###### D.110c-0c1b committed-issuance outcome reconciliation prerequisite
 
-**Status: bounded source/architecture audit and the one material plan
-confirmation are complete with an empty P0/P1 union; the frozen tests-only RED
-is causal and complete, GREEN is next, and no production edit has begun.** Owner: the
+**Status: bounded source/architecture audit, plan confirmation, and causal RED
+are complete; GREEN is implemented and locally verified, with its signed
+checkpoint and final Grok/Kimi/Opus review next.** Owner: the
 post-`transactIssue()` outcome window in
 `packages/node/src/v3-live.ts::issueOneVertex()`, live-journal append, graph
 admission, restart recovery of pending issuance/outbox rows, and the close-time
@@ -96378,6 +96378,61 @@ validating 10-entry self-excluding manifest SHA-256 is
 `50fe6d607e01c739689feca0ea39cb4f986256b50deac99b858fb60ea40ab410`.
 The causal matrix matches the freeze, so proceed to the three-check GREEN
 without a separate RED model-review round.
+
+GREEN implements only the frozen internal halt and close-refusal checks in
+`packages/node/src/v3-live.ts`. Every failure after a returned durable issuance
+commit now sets `operationAdmissionHalted`; exact
+`ISSUANCE_OUTCOME_UNKNOWN` also sets it when the durable transaction may have
+committed without an operation-policy reservation. Creator-close registration
+refuses while halted, and queued blueprint folding rechecks the halt after its
+barrier. Definitely pre-transaction signer/capacity failure keeps its existing
+reservation release and retry behavior. No public API, root export, package
+manifest, wire/schema, dependency, authority, threshold, or product
+configuration changes.
+
+The accepted focused GREEN selects one file and passes 2/2 tests with zero
+failed/pending tests and runner exit 0. The pre-bound ordering proves one real
+issuance/outbox row commits, its journal admission fails without a write, the
+queued close and its same-handle retry both return exact
+`creator snapshot export failed: not-active`, and a second issue creates no
+new row. It then deactivates and cold-reopens the same genuine epoch-one room
+using detached, already-authenticated close inputs retained before their normal
+post-adoption revocation: the exact target row remains present once and the
+recovered plane accepts the immediately following author sequence. The
+never-bound ordering delegates a real no-policy issuance transaction to
+durable completion, throws the store's exact `ISSUANCE_OUTCOME_UNKNOWN` only
+after that commit, retains one pending row, and refuses later close binding
+with existing `D110C_A_CLOSE_BIND_FAILED:CREATOR_CLOSE_UNAVAILABLE`.
+
+The retained GREEN selects nine files and passes 60/60 tests with zero
+failed/pending tests and runner exit 0. It includes E5-01 authenticated
+exact-once recovery, Phase-6a adoption/activation/epoch behavior, D.109d
+runtime reclamation, D.110c-0c1a retirement, D.110c-a genuine repeat close,
+and D.110c-b hot epoch-two adoption. Its first aggregate run exposed only a
+stale D.110c-a byte expectation: after completed D.110c-0c1a added the
+authenticated issuance-retirement carrier, the deterministic closure census is
+`before=6833`, `after=6516`, `delta=-317`, with one fewer retained reference;
+the old `-318` literal was corrected without a production encoding change.
+All semantic assertions had passed in that diagnostic.
+
+The exact-owner ESLint, Prettier, diff check, Node build, and Node
+production-source no-emit typecheck pass. Four corrected source-shape
+predicates independently locate the unknown-outcome catch, unconditional
+committed-failure halt, queued fold recheck, and creator-close registration
+refusal. A proposed test-fixture-only `tsconfig` was discarded because it
+expanded inherited fixtures while failing bare workspace package resolution;
+it is not treated as a code failure or retained acceptance gate. The initial
+one-case focused command also passed its semantic assertion but exited 1 only
+because a repository-wide 70% coverage threshold was applied to one file; the
+accepted focused command disables coverage and exits 0.
+
+Complete accepted commands, reporter JSON, stdout/stderr, statuses,
+timestamps, source-shape output, changed-path custody, protected-path/stash
+checks, source hashes, and the self-excluding manifest are under
+`.logs/d110c-0c1b-green-0873dfd0/`. No campaign, D.110a invocation, Fable, or
+collaboration subagent ran. Sign and push this GREEN checkpoint, then run the
+single governing Grok/Kimi/Opus plan→RED→GREEN review. Only P0/P1 findings
+block closure.
 
 The complete confirmation evidence is retained under
 `.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry
