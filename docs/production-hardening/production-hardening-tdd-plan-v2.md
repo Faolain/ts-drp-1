@@ -96302,15 +96302,17 @@ SHA-256 is
 
 ###### D.110c-0c1d successor-reopen historical-rebase orchestration prerequisite
 
-**Status: bounded source/architecture audit and plan complete; governing plan
-review pending.** Owner:
-`examples/v3-room/src/index.ts::createV3RoomSessionOwned()` at the single
-`rebasePromise` startup predicate, plus the existing D.110c-0c1 browser
-differential. The already-reviewed `v3-live.ts` historical classification,
-publication, rebase, and completion implementation remains owned by
-D.110c-0c1 and is not redesigned here. Deadline: GREEN before D.110c-0c1 can
-close, before D.110c-0c resumes, and before D.110c-c/d or Phase 7 relies on a
-reopened epoch-N room.
+**Status: bounded source/architecture audit and first governing plan review
+complete; its one material blocking union is corrected below; the sole
+confirmation is pending.** Owner:
+`examples/v3-room/src/index.ts::createV3RoomSessionOwned()` at the
+`rebasePromise` startup predicate and the same function's published-displaced
+identity-verification predicate inside `drainRebaseOutbox()`, plus the existing
+D.110c-0c1 browser differential. The already-reviewed `v3-live.ts` historical
+classification, publication, rebase, and completion implementation remains
+owned by D.110c-0c1 and is not redesigned here. Deadline: GREEN before
+D.110c-0c1 can close, before D.110c-0c resumes, and before D.110c-c/d or Phase
+7 relies on a reopened epoch-N room.
 
 The focused 0c1 GREEN attempt established a separate orchestration defect after
 the intended historical classifier began working. An ordinary successor cold
@@ -96328,32 +96330,69 @@ assertion, directly marking the old row published, or adding a delay cannot
 close that missing call path.
 
 This seam is outside D.110c-0c1's frozen production owner list, so the parent
-slice's explicit stop-and-reslice rule governs. The selected repair broadens
-only the existing startup rebase task predicate: run the unchanged ordered
+slice's explicit stop-and-reslice rule governs. The first review proved that a
+startup-predicate-only repair is insufficient. Same-room successor recovery
+retains authenticated immediate-predecessor custody, so
+`readRebaseOutbox()` also returns its already-`published` row as `displaced`.
+Unlike migration rebase, successor snapshot recovery authenticates application
+state but does not populate the room's per-vertex `acceptedVertices` map with
+the predecessor journal. Applying the unchanged migration-only
+published-displaced identity check would therefore throw
+`v3 room published displaced operation is absent from target` before the
+pending historical reissue and would regress the already-green control and
+treatment.
+
+The corrected selected repair owns exactly two predicates in the same room
+function. First, broaden the existing startup rebase task predicate: run the
+unchanged ordered
 `waitForRetainedBootstrap()` → terminal check → `publishAccepted()` →
 `drainRebaseOutbox()` task when either a migration `sourceMaterial` exists or
 an authenticated `successorSnapshotDeclaration` is opening the successor.
 Fresh/genesis opens with neither input keep the resolved no-op. Existing
-migration-source behavior remains byte-for-byte on the same branch. Public
-`issue()`, `sealEpoch()`, and shutdown continue to await or settle the same
-single promise, and any startup publication/rebase failure remains captured in
-`terminalFailure` and surfaced fail closed. Do not create a second task, poll,
-retry, publish an old anchor directly, bypass `completeRebaseSource()`, or add a
-public API.
+migration-source behavior remains on the same single task. Second, run the
+existing published-displaced `acceptedIdentityRows()` verification only for
+its original explicit rebase-source/migration case:
+`redirectSource === undefined && sourceMaterial !== undefined`. An ordinary
+successor declaration has `redirectSource === undefined` and
+`sourceMaterial === undefined`; its already-published displaced predecessor
+rows remain authenticated and are omitted from reissue by the unchanged
+`publishState !== "published"` state-selection predicate, but are not compared
+against an intentionally empty current-room per-vertex map. Pending
+covered-historical rows remain selected for current-epoch reissue, and pending
+zero-intent pinned-genesis rows remain selected for completion. Do not change
+the state-selection predicate, `readRebaseOutbox()`, or
+`completeRebaseSource()`.
+
+Public `issue()` and `sealEpoch()` continue to await the same single promise.
+Shutdown waits for its settlement before deactivation but retains its existing
+cleanup-oriented rejection suppression; active operations surface the captured
+`terminalFailure`, and any failed reissue/completion must leave the source row
+pending. Starting the task also calls `publishAccepted()` once on every valid
+successor reopen. With no pending current or historical work this must perform
+no network publication and end empty; any real store/authentication failure is
+captured before a later issue or seal. Do not create a second task, poll, retry,
+publish an old anchor directly, mark before completion, bypass
+`completeRebaseSource()`, or add a public API.
 
 The causal RED is the existing one-test/one-file D.110c-0c1 differential with
 one tests-only exact attribution check. Genuine 0→1→2→3, hot adoption, and
-epoch-3 cold reopen succeed; the authenticated sequence-2 epoch-1 row is made
-pending before reopen; the next public issue succeeds; and the fixture emits
-exact `D110C_0C1D_HISTORICAL_REBASE_ORCHESTRATION_REQUIRED` because that row
-remains pending. RED must also record that no direct stale-anchor publication
-occurred and that the row was classified `covered-historical`. A failure before
-epoch-3 activation, a different token, direct publication, missing historical
+epoch-3 cold reopen succeed. The differential creates both a sequence-2
+epoch-1 `covered-historical` pending case and a sequence-0 `pinned-genesis`
+pending case. It records both complete results, then deterministically emits
+exact `D110C_0C1D_HISTORICAL_REBASE_ORCHESTRATION_REQUIRED` from the
+sequence-2 case because the next public issue succeeds while that row remains
+pending. The sequence-0 result is retained as the same missing-drain symptom,
+not relabelled as proof of historical reissue. RED must record no direct
+stale-anchor publication and the exact classification of each row. A failure
+before epoch-3 activation, a different token, direct publication, missing
 classification, or failure of the ordinary control is noncausal and stops.
 
-GREEN changes only the startup predicate above. The same focused differential
-must prove both pending cases: sequence 2 is reissued and published once at the
-current epoch before its original row is marked published; the pending
+GREEN changes only the two predicates above. The same focused differential
+must first prove a fully published ordinary epoch-2 and epoch-3 successor cold
+reopen starts the task, ignores authenticated published displaced predecessor
+rows for reissue and migration-only identity replay, performs no startup
+network publication, and remains usable. It then proves both pending cases:
+sequence 2 is reissued and published once at the current epoch before its original row is marked published; the pending
 pinned-genesis sequence 0 row has zero application intents and is marked only
 through successful `completeRebaseSource()`; neither is directly published at
 its stale anchor; the user's subsequent message is issued and published once;
@@ -96365,12 +96404,16 @@ pinned-genesis case creates only requested sequence 4. Both original rows end
 `published` only after the startup task completes.
 
 Adversarial gates prove fresh/genesis startup does not spuriously enter rebase;
-ordinary migration rebase still runs exactly once; malformed or uncovered old
-rows, issued/outbox mismatch, failed current reissue/publication, failed
-completion, and missing historical capability fail closed with the original row
-still pending; a published historical row is not reissued; duplicate operation
-identity remains deduplicated/conflict-checked; and close during startup cannot
-erase a failure. Retained gates include the complete D.110c-0c1 focused test,
+an empty valid successor startup performs no publication; a published
+immediate-predecessor row is neither reissued nor subjected to the
+migration-only accepted-identity check; ordinary explicit migration rebase
+still runs exactly once and preserves that check byte-for-byte; malformed or
+uncovered old rows, issued/outbox mismatch, failed current
+reissue/publication, failed completion, and missing historical capability fail
+closed with the original row still pending; a published historical row is not
+reissued; duplicate operation identity remains deduplicated/conflict-checked;
+and close waits task settlement before cleanup without converting partial
+custody into success. Retained gates include the complete D.110c-0c1 focused test,
 D.110c-0c1a/b/c, offline/rebase and issuance/outbox tests, stable successor
 reopen, room-head, snapshot, rollback, availability, D.109 lifecycle and
 reclamation selections, plus exact-owner example/node/storage-browser
@@ -96379,7 +96422,7 @@ D.110a invocation, dependency, threshold, schema, wire, authority, public API,
 or production Node behavior is changed by 0c1d.
 
 Because this changes production lifecycle orchestration adjacent to recovery,
-it is high risk despite the one-predicate code seam. Sign and push this plan,
+it is high risk despite the two-predicate single-function code seam. Sign and push this plan,
 then run one Grok 4.6/high, direct Kimi K3 with
 `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh plan review. Only P0/P1
 blocks; dispose P2 without recursive prose review. At most one confirmation is
@@ -96389,6 +96432,36 @@ the focused test once before the one production edit. The final D.110c-0c1
 Grok/Kimi/Opus review covers the combined parent GREEN and this prerequisite;
 0c1d does not add a second final-review ceremony. Do not invoke Fable or a
 collaboration subagent.
+
+The first governing review inspected signed/pushed plan commit
+`ecd9296ce399b01b81630d4594654368cf1ae988`, tree
+`59fbe45304cf547cb2f6fd995aceca873a3faebb`. Kimi K3/100-step returned
+`APPROVED`, P0/P1/P2 `0/0/2`. Grok 4.6/high ended normally but its runner
+honestly classified the initial response `NO_VERDICT` because inspection prose
+preceded the valid terminal object; an exact-session schema-only re-emission,
+without another review, preserved `CHANGES_REQUIRED`, P0/P1/P2 `0/1/1`.
+Opus xhigh returned `CHANGES_REQUIRED`, P0/P1/P2 `1/0/2`. Grok's P1 and
+Opus's P0 are the same blocking finding: the unchanged room drain would apply
+a migration-only published-displaced identity check to an ordinary successor
+whose current `acceptedVertices` map intentionally omits predecessor vertices.
+The correction above adds that second room predicate, its fully-published
+successor control, and exact migration-retention gate. The P2 union is also
+disposed without widening scope: RED names both pending cases but attributes
+the exact token to covered-historical sequence 2; the existing focused browser
+file and retained offline/rebase and issuance/outbox suites own adversarial
+coverage; successor startup's `publishAccepted()` timing and no-op behavior are
+explicit; and shutdown is described as settlement-before-cleanup rather than a
+false promise that cleanup rethrows the task failure. Because this correction
+changes executable scope and causal acceptance, exactly one confirmation is
+required after it is signed and pushed. No production orchestration edit or RED
+begins before that confirmation's P0/P1 union is empty. Raw review evidence is
+`.logs/d110c-0c1d-plan-review-ecd9296c/`; its 23-entry self-excluding manifest
+validates with SHA-256
+`fed3ed41c106bde7e2d9ce585f2f65ba38bce0c3f43f713c836000820163560f`.
+The deterministic correction audit is
+`.logs/d110c-0c1d-plan-correction-ecd9296c/`; its one-entry self-excluding
+manifest validates with SHA-256
+`ef33679624635edd4e8ce1631091e25045451410ac6d956acb61adf9b983fe1d`.
 
 The bounded local audit is rooted at
 `.logs/d110c-0c1d-source-audit-b21a6d47/`. It pins signed/pushed parent anchor
