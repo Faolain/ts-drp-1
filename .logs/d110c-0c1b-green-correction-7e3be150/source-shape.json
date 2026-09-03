@@ -1,0 +1,7 @@
+{
+  "capacityRelease": true,
+  "closeBindRefusal": true,
+  "committedFailureHalt": true,
+  "foldRecheck": true,
+  "unknownOutcomeHalt": true
+}

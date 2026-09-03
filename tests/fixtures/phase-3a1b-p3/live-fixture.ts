@@ -22,6 +22,7 @@ const ROOT = path.resolve(import.meta.dirname, "../../..");
 const ARTIFACT = path.join(ROOT, "tests/fixtures/track-p2-c/primary.mjs");
 const LATCHED_ACL_ARTIFACT_SOURCE = `function aclReducer(input){return {output:null,state:input.state}}function addReducer(input){const value=input.operation.value??1;const state=input.state+value;return {output:state,state}}function readReducer(input){return {output:input.state,state:input.state}}function setReducer(input){const state=input.operation.value??0;return {output:state,state}}export const blueprint={exportSchemaVersion:1,artifactId:"counter.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{acl:aclReducer,add:addReducer,"read-value":readReducer,set:setReducer}};`;
 const LATCHED_ACL_BATCH_ARTIFACT_SOURCE = `function aclReducer(input){return {output:null,state:input.state}}function addReducer(input){const value=input.operation.value??1;const state=input.state+value;return {output:state,state}}function applicationBatchReducer(input){let state=input.state;const output=[];for(const entry of input.operation.batch.entries){const operation=entry.operation;if(operation.action!=="add")throw new TypeError("unknown batch action");state+=operation.value??1;output.push(state)}return {output,state}}function readReducer(input){return {output:input.state,state:input.state}}function setReducer(input){const state=input.operation.value??0;return {output:state,state}}export const blueprint={exportSchemaVersion:1,artifactId:"counter.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{acl:aclReducer,add:addReducer,applicationBatch:applicationBatchReducer,"read-value":readReducer,set:setReducer}};`;
+const LATCHED_ACL_STRING_ARTIFACT_SOURCE = `function aclReducer(input){return {output:null,state:input.state}}function addReducer(input){const value=input.operation.value??1;const state=input.state+value;return {output:state,state}}function padReducer(input){return {output:input.operation.payload.length,state:input.state}}function readReducer(input){return {output:input.state,state:input.state}}function setReducer(input){const state=input.operation.value??0;return {output:state,state}}export const blueprint={exportSchemaVersion:1,artifactId:"counter.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{acl:aclReducer,add:addReducer,pad:padReducer,"read-value":readReducer,set:setReducer}};`;
 const PARAMETERS = Object.freeze({
 	maxEpochVertices: 8192,
 	maxEpochBytes: 8_388_608,
@@ -101,6 +102,7 @@ export interface GenuinePreparedV3FixtureOptions {
 	readonly exactCanonicalInitialStateBytes?: Uint8Array;
 	readonly latchedAclGroups?: readonly ("admin" | "finality" | "referee" | "writer")[];
 	readonly latchedAclVersion?: 1 | 2;
+	readonly stringPayloadOperation?: boolean;
 	readonly objectId?: string;
 	readonly createSqliteAheDurableStore?: CreateSqliteAheDurableStoreForFixture;
 	readonly prepareV3LiveGeneration?: PrepareV3LiveGenerationForFixture;
@@ -121,16 +123,22 @@ function lowerHex(bytes: Uint8Array): string {
 
 function blueprintFixture(
 	authorizationMode: "latched-acl" | "legacy-author-list",
-	applicationBatch: boolean
+	applicationBatch: boolean,
+	stringPayloadOperation: boolean
 ): BlueprintFixture {
-	if (applicationBatch && authorizationMode !== "latched-acl") {
-		throw new TypeError("application batch fixture requires latched ACL");
+	if ((applicationBatch || stringPayloadOperation) && authorizationMode !== "latched-acl") {
+		throw new TypeError("extended operation fixture requires latched ACL");
+	}
+	if (applicationBatch && stringPayloadOperation) {
+		throw new TypeError("extended operation fixture modes are mutually exclusive");
 	}
 	const exactArtifactBytes = new TextEncoder().encode(
 		authorizationMode === "latched-acl"
 			? applicationBatch
 				? LATCHED_ACL_BATCH_ARTIFACT_SOURCE
-				: LATCHED_ACL_ARTIFACT_SOURCE
+				: stringPayloadOperation
+					? LATCHED_ACL_STRING_ARTIFACT_SOURCE
+					: LATCHED_ACL_ARTIFACT_SOURCE
 			: readFileSync(ARTIFACT, "utf8")
 	);
 	const artifactDigest = lowerHex(hashDomain(packageGolden.artifactDigestDomain, exactArtifactBytes));
@@ -154,6 +162,17 @@ function blueprintFixture(
 								name: "acl",
 							}),
 							packageGolden.package.manifest.operations[0],
+							...(stringPayloadOperation
+								? [
+										Object.freeze({
+											argumentSchema: Object.freeze({
+												fields: Object.freeze([Object.freeze({ name: "payload", required: true, type: "string" })]),
+												kind: "closed-record",
+											}),
+											name: "pad",
+										}),
+									]
+								: []),
 							...(applicationBatch
 								? [
 										Object.freeze({
@@ -235,7 +254,11 @@ export async function createGenuinePreparedV3Fixture(
 	const store = options.storeDecorator?.(backendStore) ?? backendStore;
 	try {
 		const authorizationMode = options.authorizationMode ?? "legacy-author-list";
-		const fixture = blueprintFixture(authorizationMode, options.applicationBatch === true);
+		const fixture = blueprintFixture(
+			authorizationMode,
+			options.applicationBatch === true,
+			options.stringPayloadOperation === true
+		);
 		const anchorPrivateKeySeedHex = options.anchorPrivateKeySeedHex ?? contract.privateKeySeedHex;
 		const objectIdValue = options.objectId ?? `creator:${"a".repeat(32)}`;
 		const base = makeCreatorMaterial({ objectId: objectIdValue, privateKeySeedHex: anchorPrivateKeySeedHex });

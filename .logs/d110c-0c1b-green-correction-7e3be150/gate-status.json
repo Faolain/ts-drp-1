@@ -1,0 +1,18 @@
+{
+  "build": 0,
+  "diffCheck": 0,
+  "eslint": 0,
+  "focused": 0,
+  "focusedFailed": 0,
+  "focusedPassed": 3,
+  "focusedPending": 0,
+  "focusedSelectedFiles": 1,
+  "prettier": 0,
+  "retained": 0,
+  "retainedFailed": 0,
+  "retainedPassed": 174,
+  "retainedPending": 0,
+  "retainedSelectedPaths": 14,
+  "stashCount": 27,
+  "tscNoEmit": 0
+}

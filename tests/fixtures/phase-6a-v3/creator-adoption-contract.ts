@@ -55,6 +55,7 @@ import type {
 	routeV3Ingress,
 	V3AdmittedVertexSink,
 	V3LocalIssueInput,
+	V3OperationAdmissionPolicy,
 	V3PlaneHandle,
 } from "../../../packages/node/src/v3-live.js";
 import type { CurrentAnchorTrust } from "../../../packages/protocol-v3/src/index.js";
@@ -404,10 +405,12 @@ export interface GenuineCreatorAdoptionFixtureOptions {
 	): Promise<Readonly<{ readonly authorSequence: number; readonly digest: string }>>;
 	decorateIssuanceStore?(store: DurableIssuanceStore): DurableIssuanceStore;
 	decorateLiveJournalStore?(store: DurableLiveJournalStore): DurableLiveJournalStore;
+	readonly operationAdmissionPolicy?: V3OperationAdmissionPolicy;
 	readonly establishedPeerPrivateKeySeedHex?: string;
 	readonly modules?: GenuineCreatorAdoptionFixtureModules;
 	readonly objectId?: string;
 	readonly stageAclChange?: boolean;
+	readonly stringPayloadOperation?: boolean;
 	readonly successorAclGroups?: Readonly<Record<string, readonly ("admin" | "finality" | "writer")[]>>;
 }
 
@@ -729,7 +732,8 @@ async function recoverWithDurableStores(
 	controls: GenuineCreatorAdoptionFixture["controls"],
 	modules: GenuineCreatorAdoptionFixtureModules,
 	decorateIssuanceStore?: (store: DurableIssuanceStore) => DurableIssuanceStore,
-	decorateLiveJournalStore?: (store: DurableLiveJournalStore) => DurableLiveJournalStore
+	decorateLiveJournalStore?: (store: DurableLiveJournalStore) => DurableLiveJournalStore,
+	operationAdmissionPolicy?: V3OperationAdmissionPolicy
 ): Promise<
 	Readonly<{
 		readonly capability: RecoveredV3Live;
@@ -830,6 +834,7 @@ async function recoverWithDurableStores(
 			issuanceScope: scope,
 			issuanceStore,
 			liveJournalStore: journal,
+			...(operationAdmissionPolicy === undefined ? {} : { operationAdmissionPolicy }),
 		});
 		if (!recovered.ok) throw new TypeError(`D.108b durable recovery failed: ${recovered.kind}`);
 		return Object.freeze({
@@ -1063,6 +1068,7 @@ export async function openGenuineCreatorAdoptionFixture(
 		historyRoot: emptyHistoryRoot,
 		historySize: 0,
 		...(options.objectId === undefined ? {} : { objectId: options.objectId }),
+		...(options.stringPayloadOperation === undefined ? {} : { stringPayloadOperation: options.stringPayloadOperation }),
 		createSqliteAheDurableStore: modules.createSqliteAheDurableStore,
 		prepareV3LiveGeneration: modules.prepareV3LiveGeneration,
 		storeDecorator: (backend) => {
@@ -1086,7 +1092,8 @@ export async function openGenuineCreatorAdoptionFixture(
 		controls,
 		modules,
 		options.decorateIssuanceStore,
-		options.decorateLiveJournalStore
+		options.decorateLiveJournalStore,
+		options.operationAdmissionPolicy
 	);
 	const messageQueueManager = new MessageQueueManager<Message>({ logConfig: { level: "silent" } });
 	const networkNode = fakeNetwork(`d108b-${crypto.randomUUID()}`);

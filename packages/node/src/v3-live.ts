@@ -5682,7 +5682,7 @@ async function issueOneVertex(
 	} catch (error) {
 		const issuanceOutcomeUnknown =
 			error !== null && typeof error === "object" && Reflect.get(error, "code") === "ISSUANCE_OUTCOME_UNKNOWN";
-		if (!signerResolved && !terminalTransactionStarted) {
+		if ((!signerResolved && !terminalTransactionStarted) || capacityRejected) {
 			releaseOperationReservation(reservation);
 		} else if (reservation !== undefined || issuanceOutcomeUnknown) {
 			registration.operationAdmissionHalted = true;

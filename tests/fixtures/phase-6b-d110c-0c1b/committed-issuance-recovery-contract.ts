@@ -8,6 +8,7 @@ import type { DurableLiveJournalStore } from "@ts-drp/live-journal";
 // eslint-disable-next-line import/no-unresolved -- Workspace subpath resolves after the required package build.
 import { CREATOR_ISSUANCE_RETIREMENT_UNAVAILABLE } from "@ts-drp/protocol-v3/creator-issuance-retirement";
 
+import { openGenuineCreatorAdoptionFixture } from "../phase-6a-v3/creator-adoption-contract.js";
 import {
 	type D110cARepeatCloseFixture,
 	openD110cARepeatCloseFixture,
@@ -48,6 +49,13 @@ export interface D110c0c1bUnknownOutcomeEvidence {
 	readonly issueKind: "admission-rejected";
 	readonly pendingRowDelta: 1;
 	readonly transactDelegated: true;
+}
+
+export interface D110c0c1bCapacityEvidence {
+	readonly closeAdvanced: true;
+	readonly issueKind: "graph-rejected";
+	readonly reservationCommitted: false;
+	readonly reservationReleased: true;
 }
 
 function deferred(): Deferred {
@@ -313,5 +321,76 @@ export async function proveD110c0c1bUnknownIssuanceOutcome(): Promise<D110c0c1bU
 			pendingRowDelta: 1 as const,
 			transactDelegated: true as const,
 		});
+	}
+}
+
+/**
+ * Proves that the issue path's own byte-capacity refusal is definitely
+ * pre-durable: its policy reservation is released and the genuine creator
+ * close remains available.
+ * @returns Exact capacity-refusal and successful-close evidence.
+ */
+export async function proveD110c0c1bPreDurableCapacityRelease(): Promise<D110c0c1bCapacityEvidence> {
+	let targetCommitted = false;
+	let targetReleased = false;
+	let issue: Readonly<Record<string, unknown>> | undefined;
+	const operationAdmissionPolicy = Object.freeze({
+		reserve(operation: Readonly<Record<string, unknown>>) {
+			const target = operation.action === "pad";
+			return Object.freeze({
+				commit(): "committed" {
+					if (target) targetCommitted = true;
+					return "committed";
+				},
+				kind: "fresh" as const,
+				release(): void {
+					if (target) targetReleased = true;
+				},
+			});
+		},
+	});
+	const fixture = await openGenuineCreatorAdoptionFixture({
+		beforeCreatorClose: async ({ firstLogicalTime, plane, signRegisteredVertexDigest }) => {
+			const retry = await plane.issueLocal({
+				operations: Object.freeze([
+					Object.freeze({
+						logicalTime: firstLogicalTime,
+						operation: Object.freeze({ action: "add", value: 31 }),
+					}),
+				]),
+				signRegisteredVertexDigest,
+			});
+			if (retry.ok !== true) throw new TypeError("D110C_0C1B_PRE_DURABLE_CAPACITY_RETRY_FAILED");
+			issue = await plane.issueLocal({
+				operations: Object.freeze([
+					Object.freeze({
+						logicalTime: firstLogicalTime + 1,
+						operation: Object.freeze({ action: "pad", payload: "x".repeat(8_388_608) }),
+					}),
+				]),
+				signRegisteredVertexDigest,
+			});
+			return Object.freeze({ authorSequence: retry.authorSequence, digest: retry.digest });
+		},
+		operationAdmissionPolicy,
+		stringPayloadOperation: true,
+	});
+	try {
+		if (issue?.ok !== false || issue.kind !== "graph-rejected") {
+			throw new TypeError(`D110C_CAP_ISSUE:${String(issue?.kind)}:${String(issue?.detail)}`);
+		}
+		if (!targetReleased) throw new TypeError("D110C_CAP_NOT_RELEASED");
+		if (targetCommitted) throw new TypeError("D110C_CAP_COMMITTED");
+		if (fixture.evidence.closeResult.ok !== true || fixture.evidence.closeResult.successorEpoch !== 1) {
+			throw new TypeError("D110C_CAP_CLOSE_FAILED");
+		}
+		return Object.freeze({
+			closeAdvanced: true as const,
+			issueKind: "graph-rejected" as const,
+			reservationCommitted: false as const,
+			reservationReleased: true as const,
+		});
+	} finally {
+		await fixture.close();
 	}
 }

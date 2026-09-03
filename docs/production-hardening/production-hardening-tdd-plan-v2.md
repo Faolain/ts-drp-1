@@ -96203,9 +96203,10 @@ is under `.logs/d110c-0c1a-review-confirmation-7414fa6b/`; its validating
 
 ###### D.110c-0c1b committed-issuance outcome reconciliation prerequisite
 
-**Status: bounded source/architecture audit, plan confirmation, and causal RED
-are complete; GREEN is implemented and locally verified, with its signed
-checkpoint and final Grok/Kimi/Opus review next.** Owner: the
+**Status: bounded source/architecture audit, plan confirmation, causal RED,
+initial GREEN, and the final-review P1 correction are complete and locally
+verified; the correction's signed checkpoint and one permitted confirmation
+are next.** Owner: the
 post-`transactIssue()` outcome window in
 `packages/node/src/v3-live.ts::issueOneVertex()`, live-journal append, graph
 admission, restart recovery of pending issuance/outbox rows, and the close-time
@@ -96433,6 +96434,55 @@ checks, source hashes, and the self-excluding manifest are under
 collaboration subagent ran. Sign and push this GREEN checkpoint, then run the
 single governing Grok/Kimi/Opus plan→RED→GREEN review. Only P0/P1 findings
 block closure.
+
+That review inspected signed/pushed GREEN
+`7e3be150bdfd75683aa4473c947758f79c1b1fce`. Grok 4.6/high and direct Kimi
+K3 with the exact 100-step control approved with no P0/P1; Opus xhigh found two
+P1s. First, the new close refusal exposed an inherited classification error:
+the issue path's own `capacityRejected` arm occurs after signing but before any
+issuance-store commit, so a configured admission-policy reservation was marked
+recovery-required and could prevent the ordinary capacity-triggered close.
+Second, the accepted nine-file retained command omitted five test owners named
+by the frozen plan. Both findings are accepted and corrected narrowly. The
+review's P2 findings remain nonblocking and are dispositioned without expanding
+this slice: preserve the disclosed RED wrapper result; preserve existing
+product-visible error detail; carry broader post-recovery close/state proof in
+D.110c-0c1/0c and retained lifecycle owners; and retain structural proof of the
+nondelegated journal fault rather than adding another product seam.
+
+The production correction changes only the catch classification: exact
+`capacityRejected` now releases the operation-policy reservation as definitely
+pre-durable and does not set the recovery-required halt. A tests-only
+closed-schema `pad` operation creates a valid canonical candidate larger than
+the fixed supported epoch-byte ceiling; the genuine predecessor first accepts
+a normal operation, then rejects the oversized candidate with existing
+`graph-rejected`, observes reservation release without commit, and completes
+the real creator close to epoch 1. The final focused file passes 3/3. The
+expanded retained command selects the original nine files plus
+`phase-3g-v3-rebase-outbox-red`,
+`phase-3a1b-p2-outbox-publication-contract`,
+`phase-6b-issuance-retention-red`, `phase-6b-ahe-reclamation-red`, and
+`phase-4b-v3-live-snapshot-composition-red`; it passes 174/174 with zero
+failed/pending tests. Vitest reports the two subprocess-owned retention files
+twice in its result array, but the command selects exactly fourteen paths.
+ESLint, Prettier, diff check, Node build, and the Node no-emit typecheck pass.
+Early diagnostic runs are retained honestly: one used a nonexistent root
+Vitest config and selected no test; subsequent runs exposed first missing
+`navigator.storage` setup, then an invalid extra operation field, then the
+unsupported attempt to vary the pinned parameter profile. Those tests-only
+approaches were removed; no product result is inferred from them. The accepted
+correction evidence is under
+`.logs/d110c-0c1b-green-correction-7e3be150/`; its current validating
+self-excluding manifest SHA-256 is
+`2ad41d49ce9fec3c3d84a0017cff3f2f6cb2f2eeea210acbc628c07839b5dfe4`.
+The initial final-review evidence is under
+`.logs/d110c-0c1b-final-review-7e3be150/`; its current validating
+self-excluding manifest SHA-256 is
+`405a6094347e47b1a536627865a03cacbb160d26b7ff94ad9977187ac5430d7e`.
+Because the accepted P1 changes
+executable classification, the signed/pushed correction receives exactly one
+Grok/Kimi/Opus confirmation; it is not a new review slice or a recursive prose
+review.
 
 The complete confirmation evidence is retained under
 `.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry
