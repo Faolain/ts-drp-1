@@ -1,0 +1,10 @@
+{
+	"classification": "CAUSAL_RED_WITH_POSTRUN_WRAPPER_CAPTURE_ERROR",
+	"focusedInvocationCount": 1,
+	"postrunWrapperError": "zsh read-only variable: status",
+	"reportSuccess": false,
+	"runnerExitCode": null,
+	"selectedFileCount": 1,
+	"selectedTestCount": 1,
+	"failedTestCount": 1
+}

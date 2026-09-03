@@ -402,6 +402,7 @@ export interface GenuineCreatorAdoptionFixtureOptions {
 			readonly signRegisteredVertexDigest: V3LocalIssueInput["signRegisteredVertexDigest"];
 		}>
 	): Promise<Readonly<{ readonly authorSequence: number; readonly digest: string }>>;
+	decorateLiveJournalStore?(store: DurableLiveJournalStore): DurableLiveJournalStore;
 	readonly establishedPeerPrivateKeySeedHex?: string;
 	readonly modules?: GenuineCreatorAdoptionFixtureModules;
 	readonly objectId?: string;
@@ -725,7 +726,8 @@ async function recoverWithDurableStores(
 	fixture: Awaited<ReturnType<typeof createGenuinePreparedV3Fixture>>,
 	capability: PreparedV3Live,
 	controls: GenuineCreatorAdoptionFixture["controls"],
-	modules: GenuineCreatorAdoptionFixtureModules
+	modules: GenuineCreatorAdoptionFixtureModules,
+	decorateLiveJournalStore?: (store: DurableLiveJournalStore) => DurableLiveJournalStore
 ): Promise<
 	Readonly<{
 		readonly capability: RecoveredV3Live;
@@ -764,7 +766,7 @@ async function recoverWithDurableStores(
 		},
 		transactIssue: (scope, buildAndSign) => rawIssuanceStore.transactIssue(scope, buildAndSign),
 	});
-	const journal: DurableLiveJournalStore = Object.freeze({
+	const baseJournal: DurableLiveJournalStore = Object.freeze({
 		appendAccepted: (input) => rawJournal.appendAccepted(input),
 		close: () => rawJournal.close(),
 		installEpochAnchor: (input) => rawJournal.installEpochAnchor(input),
@@ -782,6 +784,7 @@ async function recoverWithDurableStores(
 				: result;
 		},
 	});
+	const journal = decorateLiveJournalStore?.(baseJournal) ?? baseJournal;
 	try {
 		const scope = Object.freeze({ author: fixture.author, objectId: fixture.objectId });
 		const envelope = Object.freeze({
@@ -1074,7 +1077,13 @@ export async function openGenuineCreatorAdoptionFixture(
 	}).open();
 	if (!openedCurrentTrust.ok)
 		throw new TypeError(`D.108b fixture current trust open failed: ${openedCurrentTrust.reason}`);
-	const recovered = await recoverWithDurableStores(fixture, fixture.capability, controls, modules);
+	const recovered = await recoverWithDurableStores(
+		fixture,
+		fixture.capability,
+		controls,
+		modules,
+		options.decorateLiveJournalStore
+	);
 	const messageQueueManager = new MessageQueueManager<Message>({ logConfig: { level: "silent" } });
 	const networkNode = fakeNetwork(`d108b-${crypto.randomUUID()}`);
 	let establishedPeerAuthor: string | undefined;

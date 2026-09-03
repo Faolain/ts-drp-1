@@ -96205,7 +96205,7 @@ is under `.logs/d110c-0c1a-review-confirmation-7414fa6b/`; its validating
 
 **Status: bounded source/architecture audit and the one material plan
 confirmation are complete with an empty P0/P1 union; the frozen tests-only RED
-is next and no production edit has begun.** Owner: the
+is causal and complete, GREEN is next, and no production edit has begun.** Owner: the
 post-`transactIssue()` outcome window in
 `packages/node/src/v3-live.ts::issueOneVertex()`, live-journal append, graph
 admission, restart recovery of pending issuance/outbox rows, and the close-time
@@ -96354,6 +96354,30 @@ confirmation evidence is under
 self-excluding manifest SHA-256 is
 `068597a0d30ceafd6ceaf464d17b6f083e2efec3cf3fc35c8dd3d99856af0e50`.
 The plan gate is closed; proceed directly to tests-only RED.
+
+The tests-only RED selected exactly one test in exactly one file. It armed a
+dormant live-journal decorator only after a genuine admitted/published prefix,
+blocked and rejected the next `local-issued` append without delegating it, and
+proved that current production retained one additional pending issuance/outbox
+row, advanced the genuine epoch 1→2 close across its journal/graph omission,
+then failed the next genuine close with exact
+`D110C_0C1A_RETIREMENT_CHECKPOINT_UNAVAILABLE`. The test consequently failed
+with its unique tests-only case token
+`D110C_0C1B_COMMITTED_ISSUANCE_RECOVERY_REQUIRED`. Vitest's JSON reporter
+abbreviated the displayed rejected-promise value, so the validator joins its
+unique runtime prefix to the only complete matching source literal and only
+throw site; no other token shares that prefix.
+
+The test ran once. After its complete JSON report was durable, the capture
+wrapper used zsh's reserved read-only variable `status`, losing only the saved
+numeric exit code and wrapper finish timestamp. This is recorded honestly and
+was not retried: the report itself is fail-closed with `success=false`, one
+selected file, one selected test, one failed test, zero passes and zero pending.
+The complete RED evidence is under `.logs/d110c-0c1b-red-4d616285/`; its
+validating 10-entry self-excluding manifest SHA-256 is
+`50fe6d607e01c739689feca0ea39cb4f986256b50deac99b858fb60ea40ab410`.
+The causal matrix matches the freeze, so proceed to the three-check GREEN
+without a separate RED model-review round.
 
 The complete confirmation evidence is retained under
 `.logs/d110c-0c-plan-confirmation-cb5b3437/`. Its validating 34-entry

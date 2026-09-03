@@ -34,6 +34,8 @@ import type { CurrentAnchorTrust } from "../../../packages/protocol-v3/src/index
 import { contract, hexBytes } from "../phase-3a0-v3/controlled-anchor-trust.js";
 import {
 	type DetachedHeadEvidence,
+	type GenuineCreatorAdoptionFixture,
+	type GenuineCreatorAdoptionFixtureOptions,
 	openGenuineCreatorAdoptionFixture,
 } from "../phase-6a-v3/creator-adoption-contract.js";
 import { type D109dHotFixture, openD109dHotFixture } from "../phase-6b/runtime-reclamation-contract.js";
@@ -79,6 +81,7 @@ export interface D110cARepeatCloseEvidence {
 		readonly previous: AccumulatorSnapshot;
 		readonly previousRoot: string;
 	}>;
+	readonly inFlightIssue?: Readonly<Record<string, unknown>>;
 	readonly issued: Readonly<Record<string, unknown>>;
 	readonly hostileCarrierRefusals: readonly D110cAHostileCarrierEvidence[];
 	readonly overflowRefusal: string;
@@ -101,8 +104,28 @@ export interface D110cARepeatCloseFixture {
 	readonly evidence: D110cARepeatCloseEvidence;
 	close(): Promise<void>;
 	advancePendingSuccessor(): Promise<D110cBPendingSuccessorEvidence>;
+	attemptCurrentSuccessorClose(): Promise<string>;
 	captureD110c0b1RedMaterial(): Promise<D110c0b1RedMaterial>;
 	failPendingSuccessor(mode: "retirement" | "terminalize"): Promise<D110cBFailureEvidence>;
+}
+
+export interface D110cARepeatCloseOptions {
+	beforeRepeatClose?(
+		input: Readonly<{
+			readonly issuanceScope: GenuineCreatorAdoptionFixture["evidence"]["issuanceScope"];
+			readonly issuanceStore: GenuineCreatorAdoptionFixture["evidence"]["issuanceStore"];
+			readonly plane: V3PlaneHandle;
+			readonly signRegisteredVertexDigest: GenuineCreatorAdoptionFixture["signRegisteredVertexDigest"];
+		}>
+	): Promise<
+		Readonly<{
+			readonly completed: Promise<Readonly<Record<string, unknown>>>;
+			release(): void;
+		}>
+	>;
+	readonly creator?: GenuineCreatorAdoptionFixtureOptions;
+	readonly objectId?: string;
+	readonly retainedControls?: boolean;
 }
 
 export interface D110c0b1RedMaterial {
@@ -461,14 +484,17 @@ async function detachedHeadForInspection(
  * @returns Retained GREEN evidence and a cooperative cleanup owner.
  */
 export async function openD110cARepeatCloseFixture(
-	options: Readonly<{ readonly objectId?: string; readonly retainedControls?: boolean }> = {}
+	options: D110cARepeatCloseOptions = {}
 ): Promise<D110cARepeatCloseFixture> {
 	const [carrierRefusals, overflow] =
 		options.retainedControls === false
 			? [Object.freeze([]), "D110C_A_RETAINED_CONTROLS_NOT_RUN"]
 			: await Promise.all([hostileCarrierRefusals(), overflowRefusal()]);
 	const hot = await openD109dHotFixture({
-		...(options.objectId === undefined ? {} : { creator: { objectId: options.objectId } }),
+		creator: Object.freeze({
+			...options.creator,
+			...(options.objectId === undefined ? {} : { objectId: options.objectId }),
+		}),
 	});
 	const primaryDatabaseName = `d110c-a-seal-${crypto.randomUUID()}`;
 	const snapshotDatabaseName = `d110c-a-snapshot-${crypto.randomUUID()}`;
@@ -533,7 +559,15 @@ export async function openD110cARepeatCloseFixture(
 		const roomHeadBefore = copiedRoomHead(plane);
 		const beforeHead = await closeHandle.inspectDurableHead();
 		const actorStatusBeforeClose = closeHandle.status();
+		const inFlight = await options.beforeRepeatClose?.({
+			issuanceScope: hot.base.evidence.issuanceScope,
+			issuanceStore: hot.base.evidence.issuanceStore,
+			plane,
+			signRegisteredVertexDigest: hot.base.signRegisteredVertexDigest,
+		});
 		const closeTask = closeHandle.close();
+		inFlight?.release();
+		const inFlightIssue = await inFlight?.completed;
 		const concurrentCloseError = rejectedMessage(closeHandle.close(), "D110C_A_CONCURRENT_CLOSE_UNEXPECTED_SUCCESS");
 		const closeResult = await closeTask;
 		const sequentialCloseError = await rejectedMessage(
@@ -565,6 +599,7 @@ export async function openD110cARepeatCloseFixture(
 					sequential: sequentialCloseError,
 				}),
 				independentHistory: independentlyDerived,
+				...(inFlightIssue === undefined ? {} : { inFlightIssue }),
 				issued,
 				hostileCarrierRefusals: carrierRefusals,
 				overflowRefusal: overflow,
@@ -834,6 +869,50 @@ export async function openD110cARepeatCloseFixture(
 					published,
 					verification,
 				});
+			},
+			attemptCurrentSuccessorClose: async () => {
+				if (latestSuccessor === undefined) throw new TypeError("D110C_A_CURRENT_SUCCESSOR_UNAVAILABLE");
+				const currentPrimaryDatabaseName = `d110c-a-next-seal-${crypto.randomUUID()}`;
+				const currentSnapshotDatabaseName = `d110c-a-next-snapshot-${crypto.randomUUID()}`;
+				let currentCloseHandle: CreatorLiveCloseHandle | undefined;
+				const signer = await createRecoverableFinalitySigner({ seed: hexBytes(contract.privateKeySeedHex) });
+				const [vote, evidenceStore, snapshotStore] = await Promise.all([
+					hot.base.modules.openBrowserSealVoteStore({ databaseName: currentPrimaryDatabaseName }),
+					hot.base.modules.openBrowserSealEvidenceStore({ databaseName: currentPrimaryDatabaseName }),
+					hot.base.modules.createBrowserSnapshotQuarantineStore({
+						primaryDatabaseName: currentSnapshotDatabaseName,
+					}),
+				]);
+				try {
+					if (vote.observation.incarnation !== evidenceStore.observation.incarnation) {
+						throw new TypeError("D110C_A_CURRENT_SEAL_INCARNATION_MISMATCH");
+					}
+					const bound = await hot.base.modules.bindCreatorLiveClose({
+						evidenceStore: evidenceStore.store,
+						exactCanonicalAvailabilityPolicyBytes: encodeCanonical({
+							minLocalCopies: 1,
+							minMirrorReceipts: 0,
+							minRollbackGenerations: 2,
+							mode: "local-only",
+						}),
+						onObservation: () => undefined,
+						plane: latestSuccessor as V3PlaneHandle,
+						signer: signer.signer,
+						snapshotStore,
+						storageIncarnation: vote.observation.incarnation,
+						voteStore: vote.store,
+					});
+					if (!bound.ok) return bound.reason;
+					currentCloseHandle = bound.handle;
+					return await rejectedMessage(
+						currentCloseHandle.close(),
+						"D110C_A_CURRENT_SUCCESSOR_CLOSE_UNEXPECTED_SUCCESS"
+					);
+				} finally {
+					await currentCloseHandle?.stop().catch(() => undefined);
+					await Promise.all([vote.close(), evidenceStore.close(), snapshotStore.close()]);
+					await Promise.all([deleteDatabase(currentPrimaryDatabaseName), deleteDatabase(currentSnapshotDatabaseName)]);
+				}
 			},
 			captureD110c0b1RedMaterial: async () => {
 				if (d110c0b1ColdInput === undefined || d110c0b1ActiveInspection === undefined) {
