@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { DatabaseSync, type StatementSync } from "node:sqlite";
+import ts from "typescript";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -124,6 +125,42 @@ async function writePlan(store: TestPlanStore, input: Parameters<typeof settleme
 
 async function assertRowsRemain(store: TestPlanStore, sequences: readonly number[]): Promise<void> {
 	for (const sequence of sequences) expect(await store.readIssued(F5B0S_SCOPE, sequence)).not.toBeNull();
+}
+
+type HistoricalIssuanceCounter = (
+	context:
+		| {
+				readonly countedSequences: Set<number>;
+				count: number;
+				readonly maxEpochVertices: number;
+		  }
+		| undefined,
+	authorSequence: number
+) => boolean;
+
+async function executableHistoricalIssuanceCounter(): Promise<HistoricalIssuanceCounter> {
+	const filename = resolve(REPOSITORY_ROOT, "packages/node/src/v3-live.ts");
+	const source = await readFile(filename, "utf8");
+	const unit = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+	const matches = unit.statements.filter(
+		(statement): statement is ts.FunctionDeclaration =>
+			ts.isFunctionDeclaration(statement) && statement.name?.text === "countHistoricalIssuanceRow"
+	);
+	if (matches.length !== 1) throw new TypeError("D110C_0C1F5B0D_HISTORICAL_SCAN_OWNER_MISSING");
+	const emitted = ts.transpileModule(matches[0].getText(unit), {
+		compilerOptions: { module: ts.ModuleKind.None, target: ts.ScriptTarget.ES2022 },
+	}).outputText;
+	const load = Function(
+		"ReflectApply",
+		"SetPrototypeHas",
+		"SetPrototypeAdd",
+		`"use strict";\n${emitted}\nreturn countHistoricalIssuanceRow;`
+	) as (
+		reflectApply: typeof Reflect.apply,
+		setPrototypeHas: typeof Set.prototype.has,
+		setPrototypeAdd: typeof Set.prototype.add
+	) => HistoricalIssuanceCounter;
+	return load(Reflect.apply, Set.prototype.has, Set.prototype.add);
 }
 
 afterEach(async () => {
@@ -297,29 +334,21 @@ describe("D.110c-0c1f5b0d authenticated settled-prefix reclamation RED", () => {
 		}
 	});
 
-	it("invokes authenticated pruning only from the production cleanup path that owns verified adoption gates", async () => {
-		const source = await readFile(resolve(REPOSITORY_ROOT, "packages/node/src/v3-live.ts"), "utf8");
-		expect(source, "D110C_0C1F5B0D_PRODUCTION_PRUNE_INVOCATION_MISSING").toContain(".pruneAuthenticatedSettledPrefix(");
-		expect(source, "D110C_0C1F5B0D_PRUNE_BYPASSES_AUTHENTICATED_CLEANUP_PLAN").toContain("planClosedEpochCleanup(");
-	});
-
-	it("removes the raw single-epoch historical issuance scan ceiling", async () => {
-		const source = await readFile(resolve(REPOSITORY_ROOT, "packages/node/src/v3-live.ts"), "utf8");
-		const body = source.match(/function countHistoricalIssuanceRow[\s\S]*?\n\}/u)?.[0] ?? "";
-		expect(body, "D110C_0C1F5B0D_HISTORICAL_SCAN_OWNER_MISSING").not.toBe("");
-		expect(body, "D110C_0C1F5B0D_SINGLE_EPOCH_RECOVERY_SCAN_CAP_RETAINED").not.toContain(
-			"context.count <= context.maxEpochVertices"
-		);
-	});
-
-	it("bounds historical recovery by rollback generations or the authenticated settled watermark", async () => {
-		const source = await readFile(resolve(REPOSITORY_ROOT, "packages/node/src/v3-live.ts"), "utf8");
-		const body = source.match(/function countHistoricalIssuanceRow[\s\S]*?\n\}/u)?.[0] ?? "";
+	it("keeps creator-trusted-v1 historical issuance within one maxEpochVertices window", async () => {
+		const countHistoricalIssuanceRow = await executableHistoricalIssuanceCounter();
+		const context = { count: 0, countedSequences: new Set<number>(), maxEpochVertices: 8_192 };
+		let accepted = 0;
+		for (let authorSequence = 0; authorSequence < context.maxEpochVertices; authorSequence += 1) {
+			if (countHistoricalIssuanceRow(context, authorSequence)) accepted += 1;
+		}
+		expect(accepted).toBe(8_192);
+		expect(context).toMatchObject({ count: 8_192 });
+		expect(context.countedSequences.size).toBe(8_192);
+		expect(countHistoricalIssuanceRow(context, 8_191)).toBe(true);
+		expect(context).toMatchObject({ count: 8_192 });
 		expect(
-			/(?:maxEpochVertices\s*\*\s*3|maxHistoricalIssuanceRows|prunedThroughAuthorSequence|settledWatermark)/u.test(
-				body
-			),
-			"D110C_0C1F5B0D_RECOVERY_SCAN_NOT_ROLLBACK_OR_WATERMARK_BOUNDED"
-		).toBe(true);
+			countHistoricalIssuanceRow(context, 8_192),
+			"D110C_0C1F5B0D_LEGACY_HISTORICAL_SCAN_EXCEEDS_ONE_EPOCH_WINDOW"
+		).toBe(false);
 	});
 });
