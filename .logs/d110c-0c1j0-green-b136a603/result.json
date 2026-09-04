@@ -1,0 +1,15 @@
+{
+  "record": "D.110c-0c1j-0",
+  "checkpoint": "GREEN",
+  "commit": "b136a603d40d0265ef5a40135cef9c9943e1cfd1",
+  "agentSourceCommit": "0ee3d9ea78f3a1a2fb592cff0891c8a62e9f5f85",
+  "focusedFiles": 1,
+  "focusedTests": 5,
+  "focusedPassed": 5,
+  "retainedTests": 34,
+  "retainedPassed": 34,
+  "registryVersion": 5,
+  "protocolV3Changed": false,
+  "nodeChanged": false,
+  "success": true
+}
