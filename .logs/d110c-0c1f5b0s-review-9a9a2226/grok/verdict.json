@@ -1,0 +1,29 @@
+{
+  "verdict": "PASS",
+  "redCausal": true,
+  "scopePreserved": true,
+  "p0": [],
+  "p1": [],
+  "p2": [
+    {
+      "id": "P2-W0-COMMIT-IDENTITY",
+      "finding": "Claimed facade repair 0d6e38c2 is W0 writer-capacity GREEN, not a dedicated two-line f5b0s patch; forwarding is present in the current Node facade and later node-compiling trees.",
+      "evidence": "packages/node/src/v3-live.ts:4878",
+      "owner": "f5b0s",
+      "disposition": "accept; eight-method compile gap is closed at HEAD"
+    },
+    {
+      "id": "P2-FOCUSED-SCHEMA-KEYPATH",
+      "finding": "Focused f5b0s vitest pins fresh four-store names/version only; v1 row preservation and compound settlementPlans keyPath live in retained 2l-b playwright.",
+      "evidence": "tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts:552",
+      "owner": "f5b0s",
+      "disposition": "accept; 9a9a2226 retained suite covers the success path"
+    }
+  ],
+  "notes": [
+    "Original RED 5b286468 failed 21/45 against the absent eight-method plan store; GREEN 9fef8d24 implemented the contract without a Node package build.",
+    "creatorFilteredIssuanceStore now forwards readSettlementPlan and transactWriteSettlementPlan on the DurableIssuanceStore object, so @ts-drp/node compiles against the eight-method contract.",
+    "9a9a2226 adds v1-upgrade-preserves-committed-rows: adapter-derived v1 three-store IDB with lineage/issued/published rows, opened through createBrowserDurableIssuanceStore, exact v2 four-store schema and compound settlementPlans keyPath, exact old-row readback, null plan; neighboring AHE-shaped native-v1 still rejects ISSUANCE_UNSUPPORTED_SCHEMA.",
+    "No focused/retained assertion was relaxed; FAST_CASES grew by the success-migration case and death arms use the four-store helper."
+  ]
+}

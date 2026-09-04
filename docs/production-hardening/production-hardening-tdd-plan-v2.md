@@ -18386,32 +18386,42 @@ signer-profile eviction matrix are all green.
 
 ---
 
-### Current frontier — author settlement and writer capacity (as of 2026-09-03, commit e5bec209)
+### Current frontier — author settlement and writer capacity (as of 2026-09-04, commit a7a643ce)
 
 This subsection is the entry point for an agent resuming the D.110c-0c1f /
 D.110c-0c1k lineage. Per-record status paragraphs remain authoritative; when a
 superseded record's "Prior status" text disagrees with this list, this list and
 the superseding record win.
 
-Authorized now (tests-only RED first, then GREEN, per slice):
+Closed in the 2026-09-04 checkpoint:
 
-- **f5b0a** protocol codecs and **f5b0s** settlement plan store, in parallel,
-  from the accepted design `.logs/d110c-0c1f5b0r-design-3a156aca/design.md`
-  (record `D.110c-0c1f5b0r`). The exact resume prompt is
+- **f5b0a protocol codecs**, **f5b0s settlement plan store** and
+  **D.110c-0c1k W0** are GREEN, signed, pushed and formally reviewed with an
+  empty P0/P1 union. The interleaved v1 referee-carrier regression was isolated
+  by tests-only RED `f511a18b` and closed by one-file GREEN `a7a643ce`; legacy
+  v1/v2 remains at 8,192 bytes and the authoritative 31/64/65 writer-only plus
+  41 full-shape matrix is unchanged. Review evidence:
+  `.logs/d110c-0c1f5b0a-review-a7a643ce/`,
+  `.logs/d110c-0c1f5b0s-review-9a9a2226/`, and
+  `.logs/d110c-0c1k-w0-review-a7a643ce/`.
+- **D.110c-0c1j-0** is GREEN and reviewed with an empty P0/P1 union. The
+  optional lineage-policy key is byte/digest/anchor absent-compatible; only
+  fixed-creator is room-accepted. Evidence:
+  `.logs/d110c-0c1j0-review-b136a603/`.
+
+Authorized now (tests-only RED first, then GREEN):
+
+- **f5b0b Node** from accepted design
+  `.logs/d110c-0c1f5b0r-design-3a156aca/design.md`, item 3. Its f5b0a and
+  f5b0s dependencies are closed. The exact resume prompt remains
   `.logs/d110c-0c1f5b0r-design-3a156aca/next-prompt.md`.
-- **D.110c-0c1k stage W0** defect corrections (decoder/staging parity, loud
-  oversized-record rejection, O(1) membership lookup, per-author epoch share),
-  independent of the two above (record `D.110c-0c1k`, solution.md §3 W0).
-- **D.110c-0c1j-0** genesis lineage-policy reservation: one optional
-  `parameters.lineagePolicy` key whose absence is byte-identical to today;
-  independent of the three above (end of record `D.110c-0c1j`).
 
 Blocked, and on what:
 
-- **f5b0b** Node → needs f5b0a and f5b0s GREEN. **f5b0c** room → f5b0b GREEN.
-  **f5b0d** reclamation → f5b0a and f5b0s GREEN. **f5b** creator settlement →
-  f5b0a–f5b0d GREEN and W0 GREEN. Stage W1 (256-line frontier, version-3 ACL)
-  is inside f5b0a/f5b, not a separate slice.
+- **f5b0c** room → f5b0b GREEN. **f5b0d** reclamation is dependency-ready but
+  follows the immediate f5b0b execution order above. **f5b** creator
+  settlement → f5b0b–f5b0d GREEN; f5b0a/f5b0s/W0 are already closed. Stage W1
+  (256-line frontier, version-3 ACL) is inside f5b0a/f5b, not a separate slice.
 - **D.110c-0c1k stage W2** → its own design checkpoint and review first; the
   five-step path is at the end of the 0c1k record. **D.110c-0c1j** host
   migration → separate design; not started. **D.110c-c / D.110c-d / Phase 7**
@@ -96981,8 +96991,17 @@ It does not substitute for the governing review and authorizes no production
 edit. No further Fable run is authorized unless the user expressly requests
 one.
 
-**0c1j-0 genesis lineage-policy reservation (specified 2026-09-04; tests-only
-RED authorized by user decision; bounded and independent of the rest of 0c1j).**
+**0c1j-0 genesis lineage-policy reservation (CLOSED 2026-09-04).** Signed RED
+`507e5541` failed 4/5 causally with the old-binary control passing; GREEN
+`b136a603` passed 5/5 plus 33/33 retained and the registry coverage gate.
+Grok 4.6/high and direct Kimi K3/100 returned PASS with an empty P0/P1 union;
+Opus was not required because no protocol-v3 path changed. Review evidence is
+`.logs/d110c-0c1j0-review-b136a603/`, whose self-excluding manifest SHA-256 is
+`516adf7781b2e358db1e6e07ae033b11a920533f24e0fc020a1f2597ea4747a8`.
+Invite-consumption pinning, v5 mint/freeze hashes, the live Node parameter
+migration boundary and future non-fixed mode semantics remain owned by
+D.110c-0c1j proper; none reopens this reservation.
+
 Why now: the parameters record is a registry kind whose digest is bound into
 the genesis anchor and copied unchanged by every close
 (`packages/protocol-v3/src/creator-close.ts:218`, checked at `:380`;
@@ -97108,10 +97127,23 @@ bound ACL digests, never on the closing-authority key. Evidence:
 
 ###### D.110c-0c1k ACL member ceiling versus chat-profile writer count
 
-**Status: research complete and a staged construction decided on 2026-09-03.
-Stage W1 rides f5b0a/f5b under the accepted D.110c-0c1f5b0r design; stage W0
-tests-only RED is authorized as a bounded defect correction; stage W2 needs its
-own design checkpoint before RED. No production edit before its slice's RED.**
+**Status: stage W0 CLOSED GREEN and reviewed on 2026-09-04. Stage W1 rides
+f5b0a/f5b under the accepted D.110c-0c1f5b0r design; stage W2 still needs its
+own design checkpoint before RED.** Authoritative RED `8860b432` failed 10/10
+causally; initial GREEN `0d6e38c2` exposed one legacy-v1 vocabulary widening.
+Corrective RED `f511a18b` pinned it and one-file GREEN `a7a643ce` restored v1
+closure; focused W0 10/10, direct ACL 7/7 and retained 49/49 passed, including
+fresh detached-worktree verification. The final Grok/Kimi/Opus confirmation
+has an empty P0/P1 union. Evidence roots
+`.logs/d110c-0c1k-w0-corrective-red-f511a18b/`,
+`.logs/d110c-0c1k-w0-corrective-green-a7a643ce/`, and
+`.logs/d110c-0c1k-w0-review-a7a643ce/` have manifest SHA-256 values
+`b8e62785e4dd085bbd74b46f6abfee4e9953d90762bfc3a4393dc478114a0f26`,
+`432ce0cb7c345ba2de36bd4c91969f75926ddf1aea277bee3bfdf138d27a1bd0`,
+and `d3a213f9d9508e20eccf8692d390e32fb31b14087d79d173b54d09a8b5dea800`.
+W1 owns version-plumbing for the 41-full-shape close/adoption/recovery fixture,
+decode-reason normalization and shared ceiling constants; f5b0b owns fence
+restart. No W1/W2 production work is authorized by W0 closure.
 Owner: W0 the latched-ACL decoder/staging parity, the duplicated
 `SCANNABLE_BYTES` filter, O(1) membership lookup and the per-author epoch
 share; W1 the version-3 ACL constants and the 256-line settlement frontier;
@@ -99072,11 +99104,13 @@ Do not invoke Fable or a collaboration subagent.
 
 ###### D.110c-0c1f5b0r author fence and membership-incarnation settlement reslice
 
-**Status: exact superseding design signed and ACCEPTED. The three-model
+**Status: exact superseding design signed and ACCEPTED; f5b0a and f5b0s are
+CLOSED GREEN and reviewed as of 2026-09-04, so f5b0b tests-only RED is now
+authorized. The three-model
 (Grok 4.6/high, Kimi K3, Opus xhigh) design-review gate is waived for f5b0r by
 explicit user decision on 2026-09-03; the recorded `pre-review.md` pass is the
-accepted design review. f5b0a and f5b0s tests-only RED are authorized; no
-production edit before its slice's RED.** Owner: the
+accepted design review. Completed slice evidence is preserved below; no
+production edit runs before the next slice's RED.** Owner: the
 author fence control operation, the durable settlement plan store contract, the
 `[author, admissionEpoch, terminalThrough]` settlement checkpoint with its
 signer-agnostic codec and predicate-enforced predecessor rules, the creator
@@ -99162,11 +99196,28 @@ contiguity, plan authority or anchor fencing stops and reslices rather than
 reintroducing the per-source grammar or the global floor. P2 findings receive
 an owner/disposition without prose-only recursion.
 
+Implementation checkpoint (2026-09-04): f5b0a closed through causal RED
+`62f164b6`, GREEN `5bf45aab`, corrective RED `6921ec65`, corrective GREEN
+`b926a606`, and the independently owned W0 compatibility repair `a7a643ce`.
+Its final review root is `.logs/d110c-0c1f5b0a-review-a7a643ce/` (manifest
+SHA-256 `d9ec79d44caa41344c87cca462196bb48cb1c42f56ac809a931d0fb751f35644`)
+with an empty P0/P1 union. f5b0s closed through RED `5b286468`, GREEN
+`9fef8d24`, Node facade forwarding at `0d6e38c2`, and retained migration pin
+`9a9a2226`; its correction and review manifests hash to
+`3dc20c5190e44357cf658fb3737b7ead97add7564e70ec45a0a991855b0b878f` and
+`385eeedb54711b6399bf100122b9640f378341fabe6568703ad2da61343b5d4f`.
+The exact browser v1-to-v2 migration file passed 8/8 after the correction.
+P2 ownership remains prospective: f5b0b owns live settlement producer/caller,
+epoch-greater-than-zero adjacency, strict Node input shapes and fence restart;
+f5b0c owns room typecheck; W1 owns enlarged decode-limit parity and its ACL
+version decision. No P2 widens these closed slices.
+
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
-**Status: BLOCKED on f5b0a, f5b0s, f5b0b, f5b0c and f5b0d RED/GREEN under the
-accepted D.110c-0c1f5b0r design; f5b0p-a/b are deleted; the f5b RED itself is
-authorized by f5b0d GREEN, and no production edit runs before that RED.**
+**Status: BLOCKED on f5b0b, f5b0c and f5b0d RED/GREEN under the accepted
+D.110c-0c1f5b0r design; f5b0a, f5b0s and W0 are closed, f5b0p-a/b are deleted,
+the f5b RED itself is authorized by f5b0d GREEN, and no production edit runs
+before that RED.**
 
 Superseding note (D.110c-0c1f5b0r): the two-trigger requirement, the
 three-proposal reconciliation and the
