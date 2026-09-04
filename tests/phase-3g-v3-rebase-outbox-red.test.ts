@@ -66,7 +66,7 @@ describe("Phase 3g authenticated-plane rebase outbox RED", () => {
 		}
 	});
 
-	it("retires an authenticated stored structural source row without exposing an application policy intent", async () => {
+	it("preserves the authenticated legacy causalJoin source row as an application intent", async () => {
 		const structural = await runSharedPlaneScenario({ sourceOperationProfile: "structural" });
 		expect(structural.recovery).toMatchObject({ ok: true });
 		expect(structural.rebaseOutbox).toEqual({
@@ -75,7 +75,7 @@ describe("Phase 3g authenticated-plane rebase outbox RED", () => {
 			source: {
 				author: structural.sourceRowAuthor,
 				authorSequence: 1,
-				intents: [],
+				intents: [{ logicalTime: 3, operation: { action: "causalJoin" } }],
 				vertexDigest: structural.sourceDigest,
 			},
 		});
