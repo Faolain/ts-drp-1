@@ -36,7 +36,8 @@
 		"@noble/curves": "2.2.0",
 		"@noble/hashes": "^1.7.1",
 		"@ts-drp/canonical": "0.11.0",
-		"@ts-drp/errors": "0.11.0"
+		"@ts-drp/errors": "0.11.0",
+		"@ts-drp/protocol-v3": "0.11.0"
 	},
 	"devDependencies": {
 		"@stryker-mutator/core": "9.6.1",

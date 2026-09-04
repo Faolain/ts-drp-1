@@ -1,3 +1,5 @@
+import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
+
 import { compareBytes, encodeCanonical } from "./canonical.js";
 import { hashDomain } from "./hash.js";
 import registryJson from "../registry/field-registry.json" with { type: "json" };
@@ -360,7 +362,15 @@ function assertFieldConstraints(value: unknown, field: RegistryField, kind: stri
 		throw new TypeError(`${fieldName} must be lowercase`);
 	}
 	if (Object.hasOwn(constraints, "values")) {
-		if (!Array.isArray(constraints.values) || constraints.values.length === 0 || !constraints.values.includes(value)) {
+		const registeredSettlementProfile =
+			kind === "profile" && field.name === "profileId" && typeof value === "string"
+				? settlementProfileFor(value)
+				: "none";
+		if (
+			!Array.isArray(constraints.values) ||
+			constraints.values.length === 0 ||
+			(!constraints.values.includes(value) && registeredSettlementProfile === "none")
+		) {
 			throw new TypeError(`${fieldName} must be one of ${(constraints.values as readonly unknown[]).join(", ")}`);
 		}
 	}
@@ -455,6 +465,10 @@ function assertProfileConstraints(document: RegistryDocument, output: Readonly<R
 	const attestedFormula = quorumField.constraints.attestedFormula;
 	if (!Number.isSafeInteger(creator) || !Number.isSafeInteger(delegatedMinimum) || attestedFormula !== "ceil(2*n/3)") {
 		throw new TypeError("profile quorum constraints are invalid");
+	}
+	if (typeof output.profileId === "string" && settlementProfileFor(output.profileId) !== "none") {
+		if (quorum !== creator) throw new TypeError(`profile.quorum must equal creator quorum ${String(creator)}`);
+		return;
 	}
 	switch (output.profileId) {
 		case "creator-trusted-v1":

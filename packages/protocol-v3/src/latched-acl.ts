@@ -1,5 +1,7 @@
 import { decodeCanonical, encodeCanonical, hashDomain } from "@ts-drp/canonical";
 
+import { settlementProfileFor } from "./settlement-profile.js";
+
 const AUTHOR = /^[0-9a-f]{64}$/u;
 const OBJECT_ID = /^[A-Za-z0-9._:-]{1,256}$/u;
 const GROUPS_V1 = ["admin", "finality", "writer"] as const;
@@ -12,8 +14,10 @@ const SIGNER_INPUT_KEYS = ["snapshot"] as const;
 const GRANT_REVOKE_KEYS = ["actor", "group", "kind", "target"] as const;
 const SET_KEY_KEYS = ["actor", "finalityKey", "kind"] as const;
 const OPEN_KEYS = ["exactCanonicalLatchedAclBytes", "expectedAclDigest", "expectedEpoch", "expectedObjectId"] as const;
+const OPEN_KEYS_WITH_PROFILE = [...OPEN_KEYS, "expectedProfileId"] as const;
 const DIGEST = /^[0-9a-f]{64}$/u;
 const MAX_CANONICAL_BYTES = 8192;
+const SETTLEMENT_MAX_CANONICAL_BYTES = 65_536;
 
 export type LatchedAclGroup = (typeof GROUPS_V2)[number];
 
@@ -29,7 +33,7 @@ export type LatchedAclSnapshot = Readonly<{
 	readonly members: readonly LatchedAclMember[];
 	readonly objectId: string;
 	readonly permissionless: boolean;
-	readonly version: 1 | 2;
+	readonly version: 1 | 2 | 3;
 }>;
 
 export type LatchedAclOperation =
@@ -122,7 +126,7 @@ function copySnapshot(value: unknown): LatchedAclSnapshot | undefined {
 	if (
 		record === undefined ||
 		record.kind !== "drp-v3-latched-acl" ||
-		(record.version !== 1 && record.version !== 2) ||
+		(record.version !== 1 && record.version !== 2 && record.version !== 3) ||
 		typeof record.epoch !== "number" ||
 		!Number.isSafeInteger(record.epoch) ||
 		record.epoch < 0 ||
@@ -131,7 +135,7 @@ function copySnapshot(value: unknown): LatchedAclSnapshot | undefined {
 		typeof record.permissionless !== "boolean" ||
 		!Array.isArray(record.members) ||
 		record.members.length === 0 ||
-		record.members.length > 64
+		record.members.length > (record.version === 3 ? 256 : 64)
 	) {
 		return undefined;
 	}
@@ -195,15 +199,21 @@ export function openCanonicalLatchedAclSnapshot(
 		readonly expectedAclDigest: string;
 		readonly expectedEpoch: number;
 		readonly expectedObjectId: string;
+		readonly expectedProfileId?: string;
 	}>
 ): OpenCanonicalLatchedAclResult {
 	try {
-		const record = exactDataRecord(input, OPEN_KEYS);
+		const record = exactDataRecord(input, OPEN_KEYS) ?? exactDataRecord(input, OPEN_KEYS_WITH_PROFILE);
+		const settlementProfile =
+			record !== undefined && typeof record.expectedProfileId === "string"
+				? settlementProfileFor(record.expectedProfileId)
+				: "none";
+		const maximumBytes = settlementProfile === "v1" ? SETTLEMENT_MAX_CANONICAL_BYTES : MAX_CANONICAL_BYTES;
 		if (
 			record === undefined ||
 			!(record.exactCanonicalLatchedAclBytes instanceof Uint8Array) ||
 			record.exactCanonicalLatchedAclBytes.byteLength === 0 ||
-			record.exactCanonicalLatchedAclBytes.byteLength > MAX_CANONICAL_BYTES ||
+			record.exactCanonicalLatchedAclBytes.byteLength > maximumBytes ||
 			typeof record.expectedAclDigest !== "string" ||
 			!DIGEST.test(record.expectedAclDigest) ||
 			typeof record.expectedEpoch !== "number" ||
@@ -215,13 +225,19 @@ export function openCanonicalLatchedAclSnapshot(
 			return Object.freeze({ ok: false, reason: "malformed-input" });
 		}
 		const exactBytes = new Uint8Array(record.exactCanonicalLatchedAclBytes);
-		const decoded = decodeCanonical(exactBytes, { maxBytes: MAX_CANONICAL_BYTES, maxDepth: 4, maxItems: 512 });
+		const decoded = decodeCanonical(
+			exactBytes,
+			settlementProfile === "v1"
+				? { maxBytes: SETTLEMENT_MAX_CANONICAL_BYTES, maxDepth: 4, maxItems: 8192 }
+				: { maxBytes: MAX_CANONICAL_BYTES, maxDepth: 4, maxItems: 512 }
+		);
 		if (!sameBytes(encodeCanonical(decoded), exactBytes)) {
 			return Object.freeze({ ok: false, reason: "malformed-input" });
 		}
 		const snapshot = copySnapshot(decoded);
 		if (
 			snapshot === undefined ||
+			(snapshot.version === 3) !== (settlementProfile === "v1") ||
 			snapshot.epoch !== record.expectedEpoch ||
 			snapshot.objectId !== record.expectedObjectId ||
 			lowerHex(hashDomain("ts-drp/latched-acl/v3", exactBytes)) !== record.expectedAclDigest

@@ -1,4 +1,5 @@
 import { compareBytes, decodeCanonical, encodeCanonical } from "@ts-drp/canonical";
+import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
 import type { GenerationRef } from "@ts-drp/storage";
 
 import { type DetachedClosureCandidate, inspectTrustClosure } from "./anchor-trust.js";
@@ -117,7 +118,9 @@ function trustIdentity(
 ): Readonly<{ readonly currentEpoch: number; readonly objectId: string }> | undefined {
 	try {
 		const decoded = decodeCanonical(bytes);
+		const profileId = plainRecord(decoded) && typeof decoded.profileId === "string" ? decoded.profileId : "";
 		return plainRecord(decoded) &&
+			(profileId === "creator-trusted-v1" || settlementProfileFor(profileId) !== "none") &&
 			typeof decoded.currentEpoch === "number" &&
 			Number.isSafeInteger(decoded.currentEpoch) &&
 			decoded.currentEpoch >= 1 &&

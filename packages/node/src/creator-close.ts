@@ -33,6 +33,7 @@ import {
 	type LatchedAclSnapshot,
 	openCanonicalLatchedAclSnapshot,
 } from "@ts-drp/protocol-v3/latched-acl";
+import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
 import {
 	decodeSnapshotManifest,
 	encodeSnapshotTransfer,
@@ -201,12 +202,13 @@ function verifiedCreatorTrustRecord(
 		const record = decodeCanonical(exactCanonicalTrustStateRecordBytes);
 		if (!plainRecord(record) || !(record.exactCanonicalSignerSetBytes instanceof Uint8Array)) return undefined;
 		const signerSet = decodeCanonical(record.exactCanonicalSignerSetBytes);
+		const profileId = typeof record.profileId === "string" ? record.profileId : "";
 		return record.currentAnchorDigest === registration.currentTrust.currentAnchorDigest &&
 			record.currentEpoch === registration.currentTrust.currentEpoch &&
 			record.genesisAnchorDigest === registration.currentTrust.genesisAnchorDigest &&
 			record.objectId === registration.currentTrust.objectId &&
-			record.profileId === registration.currentTrust.profileId &&
-			record.profileId === "creator-trusted-v1" &&
+			profileId === registration.currentTrust.profileId &&
+			(profileId === "creator-trusted-v1" || settlementProfileFor(profileId) !== "none") &&
 			record.quorum === 1 &&
 			Array.isArray(signerSet) &&
 			signerSet.length === 1

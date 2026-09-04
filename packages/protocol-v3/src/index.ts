@@ -21,6 +21,17 @@ import {
 } from "./internal/seal-authority-custody.js";
 import blueprintArtifactProfileJson from "../supplements/blueprint-artifact-profile-v1/profile.json" with { type: "json" };
 
+export type SettlementProfile = "none" | "v1";
+
+/**
+ * Selects the author-settlement contract latched by a genesis profile.
+ * @param profileId - The authenticated profile identifier.
+ * @returns The selected settlement contract, or `none` for legacy profiles.
+ */
+export function settlementProfileFor(profileId: string): SettlementProfile {
+	return profileId === "creator-trusted-settlement-v1" ? "v1" : "none";
+}
+
 const intrinsicArray = Array;
 const intrinsicArrayIsArray = Array.isArray;
 const intrinsicFloat32Array = Float32Array;
@@ -760,7 +771,7 @@ interface AuthorAuthorizationCarrier extends Record<string, unknown> {
 	readonly version: number;
 }
 
-function isAuthorAuthorizationCarrier(value: unknown): value is AuthorAuthorizationCarrier {
+function isAuthorAuthorizationCarrier(value: unknown, trustProfileId: string): value is AuthorAuthorizationCarrier {
 	if (!isClosedDataRecord(value, AUTHOR_AUTHORIZATION_KEYS)) return false;
 	if (
 		value.kind !== AUTHOR_AUTHORIZATION_KIND ||
@@ -771,7 +782,7 @@ function isAuthorAuthorizationCarrier(value: unknown): value is AuthorAuthorizat
 		typeof value.profileId !== "string" ||
 		!Array.isArray(value.authors) ||
 		value.authors.length < 1 ||
-		value.authors.length > 64
+		value.authors.length > (settlementProfileFor(trustProfileId) === "none" ? 64 : 256)
 	) {
 		return false;
 	}
@@ -1587,7 +1598,7 @@ export function createAnchorTrustApi(): AnchorTrustApi {
 					authorizationDecoded.reason === "noncanonical" && hasNonzeroByte ? "noncanonical-acl" : "acl-decode-failed"
 				);
 			}
-			if (!isAuthorAuthorizationCarrier(authorizationDecoded.value)) {
+			if (!isAuthorAuthorizationCarrier(authorizationDecoded.value, trust.profileId)) {
 				return anchorTrustFailure("acl-schema-invalid");
 			}
 			const carrier = authorizationDecoded.value;
@@ -2210,6 +2221,7 @@ const BLUEPRINT_ADMISSION_DOMAIN = "ts-drp/blueprint-admission/v3";
 const EQUIVOCATION_PROFILE_ID = "equivocation-digest-identity-v1";
 const EQUIVOCATION_PROOF_KIND = "drp-equivocation-proof";
 const EQUIVOCATION_PROOF_DOMAIN = "ts-drp/equivocation-proof/v1";
+export const AUTHOR_FENCE_ACTION = "$drp.author-fence.v1" as const;
 const textEncoder = new TextEncoder();
 const blueprintArtifactProfile = compileBlueprintArtifactProfile(blueprintArtifactProfileJson);
 const BLUEPRINT_ARTIFACT_DOMAIN = blueprintArtifactProfile.artifactDigestDomain;
@@ -2573,6 +2585,9 @@ function compileOperation(
 	const name = ownDataProperty(value, "name", context);
 	const argumentSchema = ownDataProperty(value, "argumentSchema", context);
 	assertNonEmptyString(name, `${context}.name`);
+	if (name === AUTHOR_FENCE_ACTION) {
+		throw new TypeError(`blueprint operation ${AUTHOR_FENCE_ACTION} is globally reserved`);
+	}
 	if (previousOperationName !== undefined && compareCodePointStrings(previousOperationName, name) >= 0) {
 		throw new TypeError("blueprint manifest operations must have unique names in codepoint order");
 	}
@@ -2749,6 +2764,67 @@ function operationSchemaForPreparedAdmission(
 		}
 	}
 	return schema;
+}
+
+export type AuthorFenceOperation = Readonly<{
+	readonly action: typeof AUTHOR_FENCE_ACTION;
+	readonly fenceSequence: number;
+	readonly version: 1;
+}>;
+
+function copiedAuthorFenceOperation(operation: unknown, authorSequence: unknown): AuthorFenceOperation | undefined {
+	if (
+		!Number.isSafeInteger(authorSequence) ||
+		(authorSequence as number) < 0 ||
+		!isPlainRecord(operation) ||
+		Reflect.ownKeys(operation).length !== 3
+	) {
+		return undefined;
+	}
+	for (const key of ["action", "fenceSequence", "version"] as const) {
+		const descriptor = Object.getOwnPropertyDescriptor(operation, key);
+		if (descriptor === undefined || !Object.hasOwn(descriptor, "value") || descriptor.enumerable !== true) {
+			return undefined;
+		}
+	}
+	const fenceSequence = operation.fenceSequence;
+	return operation.action === AUTHOR_FENCE_ACTION &&
+		operation.version === 1 &&
+		Number.isSafeInteger(fenceSequence) &&
+		(fenceSequence as number) >= 0 &&
+		(fenceSequence as number) <= (authorSequence as number)
+		? Object.freeze({
+				action: AUTHOR_FENCE_ACTION,
+				fenceSequence: fenceSequence as number,
+				version: 1 as const,
+			})
+		: undefined;
+}
+
+/**
+ * Opens the globally reserved author-fence control operation.
+ * @param input - Outer author sequence and candidate control operation.
+ * @returns A detached exact fence or a fail-closed rejection.
+ */
+export function openAuthorFenceOperation(
+	input: unknown
+): Readonly<
+	| { readonly ok: false; readonly reason: "AUTHOR_FENCE_INVALID" }
+	| { readonly ok: true; readonly operation: AuthorFenceOperation }
+> {
+	if (!isPlainRecord(input) || Reflect.ownKeys(input).length !== 2) {
+		return Object.freeze({ ok: false, reason: "AUTHOR_FENCE_INVALID" });
+	}
+	for (const key of ["authorSequence", "operation"] as const) {
+		const descriptor = Object.getOwnPropertyDescriptor(input, key);
+		if (descriptor === undefined || !Object.hasOwn(descriptor, "value") || descriptor.enumerable !== true) {
+			return Object.freeze({ ok: false, reason: "AUTHOR_FENCE_INVALID" });
+		}
+	}
+	const operation = copiedAuthorFenceOperation(input.operation, input.authorSequence);
+	return operation === undefined
+		? Object.freeze({ ok: false, reason: "AUTHOR_FENCE_INVALID" })
+		: Object.freeze({ ok: true, operation });
 }
 
 function operationWithinCanonicalByteBudget(
@@ -3439,6 +3515,13 @@ function authenticateReceivedVertex(input: VerifyReceivedVertexInput): Authentic
 			sortRegisteredArrays: false,
 		});
 		if (preimage.anchor !== input.expectedAnchor) return undefined;
+		if (
+			isPlainRecord(preimage.operation) &&
+			preimage.operation.action === AUTHOR_FENCE_ACTION &&
+			copiedAuthorFenceOperation(preimage.operation, preimage.authorSequence) === undefined
+		) {
+			return undefined;
+		}
 
 		const digest = digestReceivedVertexPreimage(input.receivedCanonicalPreimageBytes);
 		const author = preimage.author;
@@ -3639,6 +3722,7 @@ export function materializeCurrentEquivocationProof(
 		if (first === undefined) return undefined;
 		const second = detachCurrentEquivocationVertex(capturedVertices[1]);
 		if (second === undefined || compareBytes(first.digest, second.digest) === 0) return undefined;
+		if (first.witness.expectedAnchor !== second.witness.expectedAnchor) return undefined;
 
 		const resolveAuthorPublicKey = (candidateAuthor: string): RawEd25519PublicKey | undefined =>
 			Reflect.apply(capturedResolver, input, [candidateAuthor]);

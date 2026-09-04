@@ -53,6 +53,7 @@ import {
 	stageLatchedAclOperations,
 } from "@ts-drp/protocol-v3/latched-acl";
 import parameterRegistry from "@ts-drp/protocol-v3/registry/registry-v1.json" with { type: "json" };
+import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
 import {
 	type AheDurableStore,
 	type BlobDigest,
@@ -1428,7 +1429,7 @@ function snapshotOpenedTrust(value: unknown, expectedObjectId: string): OpenedTr
 		head.revision < 1 ||
 		trust === undefined ||
 		trust.objectId !== expectedObjectId ||
-		trust.profileId !== "creator-trusted-v1" ||
+		(trust.profileId !== "creator-trusted-v1" && settlementProfileFor(String(trust.profileId)) === "none") ||
 		!isDigestHex(trust.currentAnchorDigest) ||
 		!isDigestHex(trust.genesisAnchorDigest) ||
 		typeof trust.currentEpoch !== "number" ||

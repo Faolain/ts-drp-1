@@ -39,6 +39,7 @@ import {
 	prepareBlueprintAdmission,
 	type SignRegisteredVertexDigest,
 } from "@ts-drp/protocol-v3";
+import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
 import { parseStorageObjectId, type StorageObjectId } from "@ts-drp/storage";
 import type { SnapshotQuarantineDeclaration } from "@ts-drp/storage/snapshot-transfer";
 import { createBrowserAheDurableStore } from "@ts-drp/storage-browser";
@@ -485,7 +486,8 @@ function successorAuthority(trust: unknown, handle: RoomPlaneHandle): V3RoomSucc
 		typeof genesisAnchorDigest !== "string" ||
 		!/^[0-9a-f]{64}$/u.test(genesisAnchorDigest) ||
 		typeof objectId !== "string" ||
-		profileId !== "creator-trusted-v1" ||
+		(profileId !== "creator-trusted-v1" &&
+			(typeof profileId !== "string" || settlementProfileFor(profileId) === "none")) ||
 		current.anchorDigest !== currentAnchorDigest ||
 		current.epoch !== currentEpoch ||
 		current.objectId !== objectId
@@ -3982,7 +3984,11 @@ async function prepareDurableRoomState<Projection extends V3RoomProjectionAuthor
 				throw new TypeError(`v3 room trust installation failed: ${installed.reason}`);
 			}
 			const openedTrust = installed.ok ? installed : await trustStore.open();
-			if (!openedTrust.ok || openedTrust.trust.profileId !== "creator-trusted-v1") {
+			if (
+				!openedTrust.ok ||
+				(openedTrust.trust.profileId !== "creator-trusted-v1" &&
+					settlementProfileFor(openedTrust.trust.profileId) === "none")
+			) {
 				throw new TypeError("v3 room verified trust profile is invalid");
 			}
 			const prepared = await prepareV3LiveGeneration({

@@ -50,6 +50,10 @@
 			"types": "./dist/src/creator-author-issuance-frontiers.d.ts",
 			"import": "./dist/src/creator-author-issuance-frontiers.js"
 		},
+		"./settlement-profile": {
+			"types": "./dist/src/settlement-profile.d.ts",
+			"import": "./dist/src/settlement-profile.js"
+		},
 		"./seal": {
 			"types": "./dist/src/seal.d.ts",
 			"import": "./dist/src/seal.js"

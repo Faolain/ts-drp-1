@@ -17,6 +17,7 @@ import {
 	openCreatorIssuanceRetirement,
 	resolveCreatorIssuanceRetirement,
 } from "@ts-drp/protocol-v3/creator-issuance-retirement";
+import { settlementProfileFor } from "@ts-drp/protocol-v3/settlement-profile";
 import { digestBlob, type GenerationRef } from "@ts-drp/storage";
 
 export interface CreatorTransitionClosure {
@@ -56,6 +57,158 @@ export interface CreatorHistoricalIssuanceIdentity {
 }
 
 const verifiedHistoricalIssuance = new WeakMap<VerifiedCreatorHistoricalIssuance, CreatorHistoricalIssuanceIdentity>();
+const SETTLEMENT_PROFILE = settlementProfileFor("creator-trusted-settlement-v1");
+
+type SettlementFrontier = readonly [author: string, admissionEpoch: number, terminalThrough: number | null];
+
+function settlementMembers(value: unknown): readonly string[] | undefined {
+	if (value === null || typeof value !== "object" || Array.isArray(value)) return undefined;
+	const epoch = Reflect.get(value, "epoch");
+	const members = Reflect.get(value, "members");
+	if (
+		!Number.isSafeInteger(epoch) ||
+		(epoch as number) < 0 ||
+		!Array.isArray(members) ||
+		members.length < 1 ||
+		members.length > 256
+	) {
+		return undefined;
+	}
+	const authors: string[] = [];
+	let previous: string | undefined;
+	for (const member of members) {
+		if (member === null || typeof member !== "object" || Array.isArray(member)) return undefined;
+		const author = Reflect.get(member, "author");
+		if (
+			typeof author !== "string" ||
+			!/^[0-9a-f]{64}$/u.test(author) ||
+			(previous !== undefined && author <= previous)
+		) {
+			return undefined;
+		}
+		previous = author;
+		authors.push(author);
+	}
+	return Object.freeze(authors);
+}
+
+function settlementFrontiers(value: unknown): readonly SettlementFrontier[] | undefined {
+	if (!Array.isArray(value) || value.length > 256) return undefined;
+	const output: SettlementFrontier[] = [];
+	let previous: string | undefined;
+	for (const entry of value) {
+		if (!Array.isArray(entry) || entry.length !== 3) return undefined;
+		const [author, admissionEpoch, terminalThrough] = entry;
+		if (
+			typeof author !== "string" ||
+			!/^[0-9a-f]{64}$/u.test(author) ||
+			(previous !== undefined && author <= previous) ||
+			!Number.isSafeInteger(admissionEpoch) ||
+			(admissionEpoch as number) < 0 ||
+			(terminalThrough !== null && (!Number.isSafeInteger(terminalThrough) || (terminalThrough as number) < 0))
+		) {
+			return undefined;
+		}
+		previous = author;
+		output.push(Object.freeze([author, admissionEpoch as number, terminalThrough as number | null]));
+	}
+	return Object.freeze(output);
+}
+
+/**
+ * Validates the bounded adjacency and ACL transition laws for one settlement checkpoint.
+ * The checkpoint opener deliberately does not perform these predecessor-relative checks.
+ * @param input - Opened current/successor ACLs and proposed/predecessor settlement identities.
+ * @returns A fail-closed transition verdict.
+ */
+export function inspectCreatorAuthorSettlementAdvance(
+	input: unknown
+): Readonly<{ readonly ok: true } | { readonly ok: false; readonly reason: string }> {
+	try {
+		if (SETTLEMENT_PROFILE !== "v1" || input === null || typeof input !== "object" || Array.isArray(input)) {
+			return Object.freeze({ ok: false, reason: "SETTLEMENT_ADVANCE_INVALID" });
+		}
+		const currentAcl = Reflect.get(input, "currentAcl");
+		const successorAcl = Reflect.get(input, "successorAcl");
+		const predecessor = Reflect.get(input, "predecessor");
+		const proposed = Reflect.get(input, "proposed");
+		if (proposed === null || typeof proposed !== "object" || Array.isArray(proposed)) {
+			return Object.freeze({ ok: false, reason: "SETTLEMENT_ADVANCE_INVALID" });
+		}
+		const currentMembers = settlementMembers(currentAcl);
+		const successorMembers = settlementMembers(successorAcl);
+		const proposedFrontiers = settlementFrontiers(Reflect.get(proposed, "frontiers"));
+		const currentEpoch = Reflect.get(currentAcl, "epoch");
+		const successorEpoch = Reflect.get(successorAcl, "epoch");
+		const closedEpoch = Reflect.get(proposed, "closedEpoch");
+		const proposedSuccessorEpoch = Reflect.get(proposed, "successorEpoch");
+		if (currentMembers === undefined || successorMembers === undefined || proposedFrontiers === undefined) {
+			return Object.freeze({ ok: false, reason: "SETTLEMENT_ADVANCE_SHAPE_INVALID" });
+		}
+		if (
+			closedEpoch !== currentEpoch ||
+			proposedSuccessorEpoch !== successorEpoch ||
+			!Number.isSafeInteger(closedEpoch) ||
+			(successorEpoch as number) !== (closedEpoch as number) + 1 ||
+			proposedFrontiers.length !== successorMembers.length ||
+			proposedFrontiers.some((frontier, index) => frontier[0] !== successorMembers[index])
+		) {
+			return Object.freeze({ ok: false, reason: "SETTLEMENT_ADVANCE_INVALID" });
+		}
+		const currentSet = new Set(currentMembers);
+		if (predecessor === null) {
+			if (closedEpoch !== 0 || Reflect.get(proposed, "priorCheckpointKind") !== "genesis") {
+				return Object.freeze({ ok: false, reason: "SETTLEMENT_ADVANCE_INVALID" });
+			}
+			for (const [author, admissionEpoch, terminalThrough] of proposedFrontiers) {
+				if (currentSet.has(author)) {
+					if (admissionEpoch !== 0) return Object.freeze({ ok: false, reason: "SETTLEMENT_ADVANCE_INVALID" });
+				} else if (admissionEpoch !== successorEpoch || terminalThrough !== null) {
+					return Object.freeze({ ok: false, reason: "SETTLEMENT_ADVANCE_INVALID" });
+				}
+			}
+			return Object.freeze({ ok: true });
+		}
+		if (predecessor === null || typeof predecessor !== "object" || Array.isArray(predecessor)) {
+			return Object.freeze({ ok: false, reason: "SETTLEMENT_ADVANCE_INVALID" });
+		}
+		const predecessorDigest = Reflect.get(predecessor, "candidateDigest");
+		const predecessorClosedEpoch = Reflect.get(predecessor, "closedEpoch");
+		const predecessorSuccessorEpoch = Reflect.get(predecessor, "successorEpoch");
+		const predecessorFrontiers = settlementFrontiers(Reflect.get(predecessor, "frontiers"));
+		if (
+			Reflect.get(proposed, "priorCheckpointKind") !== "settled-v1" ||
+			Reflect.get(proposed, "priorCheckpointDigest") !== predecessorDigest ||
+			typeof predecessorDigest !== "string" ||
+			!/^[0-9a-f]{64}$/u.test(predecessorDigest) ||
+			predecessorFrontiers === undefined ||
+			predecessorSuccessorEpoch !== closedEpoch ||
+			predecessorClosedEpoch !== (closedEpoch as number) - 1
+		) {
+			return Object.freeze({ ok: false, reason: "SETTLEMENT_ADVANCE_INVALID" });
+		}
+		const priorByAuthor = new Map(predecessorFrontiers.map((frontier) => [frontier[0], frontier]));
+		for (const [author, admissionEpoch, terminalThrough] of proposedFrontiers) {
+			if (!currentSet.has(author)) {
+				if (admissionEpoch !== successorEpoch || terminalThrough !== null) {
+					return Object.freeze({ ok: false, reason: "SETTLEMENT_ADVANCE_INVALID" });
+				}
+				continue;
+			}
+			const prior = priorByAuthor.get(author);
+			if (
+				prior === undefined ||
+				admissionEpoch !== prior[1] ||
+				(prior[2] !== null && (terminalThrough === null || terminalThrough < prior[2]))
+			) {
+				return Object.freeze({ ok: false, reason: "SETTLEMENT_ADVANCE_INVALID" });
+			}
+		}
+		return Object.freeze({ ok: true });
+	} catch {
+		return Object.freeze({ ok: false, reason: "SETTLEMENT_ADVANCE_INVALID" });
+	}
+}
 
 function record(candidate: DetachedClosureCandidate): Readonly<Record<string, unknown>> | undefined {
 	try {
