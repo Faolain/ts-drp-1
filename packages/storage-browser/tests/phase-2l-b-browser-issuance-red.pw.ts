@@ -70,6 +70,32 @@ test("derived v2 schema is exact while primary identity remains completely opaqu
 	expect(value.badError).toMatchObject({ code: "ISSUANCE_UNSUPPORTED_SCHEMA" });
 });
 
+test("exact adapter-derived v1 rows survive the in-place v2 settlement-plan upgrade", async ({ page }) => {
+	const value = await runCase(page, "v1-upgrade-preserves-committed-rows");
+	expect(value.beforeSchema).toEqual(PHASE_2L_B_SCHEMA);
+	expect(value.afterSchema).toEqual(PHASE_2L_B_SETTLEMENT_SCHEMA);
+	expect(value.readable).toEqual({
+		issued: {
+			authorSequence: 0,
+			canonicalPreimageBytes: value.expectedCanonicalPreimageBytes,
+			digest: [37, 209],
+			issuedScope: { author: "alice", objectId: "room:alpha" },
+			outboxScope: { author: "alice", objectId: "room:alpha" },
+			signature: [37, 81],
+		},
+		lineage: { exhausted: false, next: 1 },
+		outbox: [
+			{
+				authorSequence: 0,
+				digest: [37, 209],
+				publishState: "published",
+				scope: { author: "alice", objectId: "room:alpha" },
+			},
+		],
+		settlementPlan: null,
+	});
+});
+
 test("real adapter commits one detached closure and pages in shared UTF-16 order", async ({ page }) => {
 	const value = await runCase(page, "issue-read-copy-paging");
 	expect(value.schema).toEqual(PHASE_2L_B_SETTLEMENT_SCHEMA);
@@ -133,5 +159,5 @@ test("raw key collision poisons and all five ambiguity cases execute through the
 });
 
 test("the bounded fast inventory is fully consumed", () => {
-	expect(PHASE_2L_B_FAST_CASES).toHaveLength(6);
+	expect(PHASE_2L_B_FAST_CASES).toHaveLength(7);
 });

@@ -275,6 +275,7 @@ export const PHASE_2L_B_AMBIGUITY_CASES = Object.freeze([
 export const PHASE_2L_B_FAST_CASES = Object.freeze([
 	"surface-options-identity",
 	"primary-opacity-schema-admission",
+	"v1-upgrade-preserves-committed-rows",
 	"issue-read-copy-paging",
 	"same-scope-race-and-cross-scope-progress",
 	"close-versionchange-and-max",
