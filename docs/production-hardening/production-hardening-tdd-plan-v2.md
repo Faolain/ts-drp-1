@@ -18386,7 +18386,7 @@ signer-profile eviction matrix are all green.
 
 ---
 
-### Current frontier — author settlement and writer capacity (as of 2026-09-04, review e7c59191)
+### Current frontier — author settlement and writer capacity (as of 2026-09-04, review 508d700a)
 
 This subsection is the entry point for an agent resuming the D.110c-0c1f /
 D.110c-0c1k lineage. Per-record status paragraphs remain authoritative; when a
@@ -18438,6 +18438,13 @@ Authorized now (tests-only RED first, then GREEN):
   deletion, epoch ceiling, crash/replay/watermark behavior, backend parity,
   and corruption classification. It does not claim real close/adopt
   reachability or a behaviorally unreachable recovery-scan correction.
+  Corrective production `292fc14f` closes the backend future-epoch defect, but
+  review `508d700a` leaves f5b0d open on two P1s inherited from rejected GREEN
+  `1063feca`: restore the legacy one-window historical scan cap and remove the
+  retained comment/regex oracles that falsely pin production reachability and
+  the global 3x bound. One direct unit-level execution of the actual private
+  counter body may pin 8,192 accepted / 8,193 refused; it is not product-path
+  evidence and cannot discharge parent f5b.
 
 Blocked, and on what:
 
@@ -99340,6 +99347,34 @@ future-epoch-ceiling cases fail because an epoch-8 row is deleted under
 and watermark intact. The real Chromium IndexedDB case fails with the same
 matrix. A corrective causal tests-only RED must precede its production
 correction.
+
+Confirmation `508d700a` accepts the three backend predicates but blocks closure
+on two live remnants of rejected GREEN `1063feca`: the unconditional
+`maxEpochVertices * 3` historical-issuance cap changes
+`creator-trusted-v1`, and the retained suite still accepts a comment as the
+production cleanup caller while pinning that wrong constant. The next
+tests-only RED deletes those three invalid source/string assertions and
+directly executes the actual private `countHistoricalIssuanceRow` function body
+at the registry-pinned boundary: count 8,192 is accepted and 8,193 is refused.
+It may use a TypeScript AST to select and execute the exact body with its real
+set/count state; it must not copy the predicate, accept a substring, export a
+new product seam or claim full recovery behavior. GREEN restores only the
+legacy one-window predicate (plus the nonblocking accurate same-realm
+maintenance JSDoc if touched). The already-green 12-case backend ceiling test
+stays byte-identical.
+
+This unit-level correction is deliberately not the genuine recovery proof. A
+single-room Chromium attempt with pinned parameters required 8,192/8,193 real
+historical rows and hit its hard 120,000-ms test timeout at 120,004 ms, so it is
+rejected and never committed. A small-limit fixture is invalid because
+`prepareV3LiveGeneration` admits only the registry-pinned parameter digests.
+The in-memory genuine path reaches 8,192 after close/adopt, but reaching 8,193
+requires one further successful successor close/adoption that the existing
+fixture intentionally does not expose. Parent f5b therefore retains the real
+8,192-success/8,193-refusal hot/restart/cold-reopen acceptance after it
+implements repeated settlement adoption. The direct counter test merely
+prevents the known legacy regression while honoring the no-long-workload and
+no-new-product-seam constraints.
 
 The parent f5b integration owns the part that cannot exist before its genuine
 settlement close/adopt path: the first production call on every peer after
