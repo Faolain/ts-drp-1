@@ -121,10 +121,6 @@ function groupsForVersion(version: LatchedAclSnapshot["version"]): readonly Latc
 	return version === 1 ? GROUPS_V1 : GROUPS_V2;
 }
 
-function snapshotGroupsForVersion(version: LatchedAclSnapshot["version"]): readonly LatchedAclGroup[] {
-	return version === 1 ? GROUPS_V2 : groupsForVersion(version);
-}
-
 function isGroup(value: unknown, version: LatchedAclSnapshot["version"]): value is LatchedAclGroup {
 	return typeof value === "string" && groupsForVersion(version).includes(value as LatchedAclGroup);
 }
@@ -151,7 +147,7 @@ function copySnapshot(value: unknown): LatchedAclSnapshot | undefined {
 		return undefined;
 	}
 	const version = record.version;
-	const groupsForSnapshot = snapshotGroupsForVersion(version);
+	const groupsForSnapshot = groupsForVersion(version);
 	const members: LatchedAclMember[] = [];
 	let previousAuthor = "";
 	for (const valueMember of record.members) {
@@ -180,7 +176,6 @@ function copySnapshot(value: unknown): LatchedAclSnapshot | undefined {
 			previousGroup = index;
 			groups.push(valueGroup as LatchedAclGroup);
 		}
-		if (version === 1 && groups.includes("referee") && groups.join(",") !== GROUPS_V2.join(",")) return undefined;
 		if (selected.finalityKey !== null && !groups.includes("finality")) return undefined;
 		previousAuthor = selected.author;
 		members.push(
@@ -405,8 +400,7 @@ function freezeMembers(
 					finalityKey,
 					groups: Object.freeze(
 						[...groups].sort(
-							(left, right) =>
-								snapshotGroupsForVersion(version).indexOf(left) - snapshotGroupsForVersion(version).indexOf(right)
+							(left, right) => groupsForVersion(version).indexOf(left) - groupsForVersion(version).indexOf(right)
 						)
 					),
 				})
