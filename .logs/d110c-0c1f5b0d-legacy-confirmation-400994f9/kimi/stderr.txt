@@ -1,0 +1,919 @@
+Warning: [loop_control] 'max_retries_per_step' is deprecated and no longer used; rename it to 'max_attempts_per_step'. Run /update-config to fix it.
+.logs/d110c-0c1f5b0d-corrective-review-502198f3/:
+blocking-union.json
+commands.md
+grok
+kimi
+manifest.sha256
+opus
+prompt.md
+result.json
+review-ledger.md
+
+.logs/d110c-0c1f5b0d-legacy-green-b384c7d9/:
+README.md
+backend-ceiling.json
+browser.json
+changed-paths.txt
+commands.md
+custody.md
+eslint.json
+focused.json
+isolated-focused.json
+isolated-path.txt
+isolated-retained-settlement.json
+isolated-retained-store.json
+manifest.sha256
+node-build.log
+node-typecheck.log
+prettier.log
+result.json
+retained-files.md
+retained-settlement.json
+retained-store.json
+source-shape.md
+typecheck-baseline.md
+
+.logs/d110c-0c1f5b0d-legacy-red-7d037ed8/:
+README.md
+changed-paths.txt
+commands.md
+custody.md
+eslint.json
+focused.json
+listing.json
+manifest.sha256
+matrix.md
+source-selection.md
+
+.logs/d110c-0c1f5b0r-design-3a156aca/:
+design.md
+manifest.sha256
+next-prompt.md
+pre-review.md
+400994f9 test(hardening): record legacy scan green evidence
+b384c7d9 fix(node): restore legacy historical scan bound
+932db106 test(hardening): record legacy scan red evidence
+7d037ed8 test(hardening): red legacy historical scan bound
+721d1c0e docs(hardening): bound legacy scan correction
+508d700a test(hardening): reject incomplete reclamation correction
+502198f3 test(hardening): record corrective reclamation green
+292fc14f fix(storage): reject unsettled future epochs
+---
+commit 7d037ed825a092cf985d1a271d3f56d965992ed3
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Fri Sep 4 18:54:30 2026 -0400
+
+    test(hardening): red legacy historical scan bound
+
+ ...phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts | 75 +++++++++++++++-------
+ 1 file changed, 52 insertions(+), 23 deletions(-)
+---
+commit b384c7d9bdb3b3b3f5fa5b7de05cbafb3da7f4af
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Fri Sep 4 19:02:21 2026 -0400
+
+    fix(node): restore legacy historical scan bound
+
+ packages/node/src/v3-live.ts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+commit b384c7d9bdb3b3b3f5fa5b7de05cbafb3da7f4af
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Fri Sep 4 19:02:21 2026 -0400
+
+    fix(node): restore legacy historical scan bound
+
+diff --git a/packages/node/src/v3-live.ts b/packages/node/src/v3-live.ts
+index 6e2a2680..02e7dbc2 100644
+--- a/packages/node/src/v3-live.ts
++++ b/packages/node/src/v3-live.ts
+@@ -4489,7 +4489,7 @@ function countHistoricalIssuanceRow(context: HistoricalIssuanceContext | undefin
+ 	if (ReflectApply(SetPrototypeHas, context.countedSequences, [authorSequence]) === true) return true;
+ 	context.count += 1;
+ 	ReflectApply(SetPrototypeAdd, context.countedSequences, [authorSequence]);
+-	const maxHistoricalIssuanceRows = context.maxEpochVertices * 3;
++	const maxHistoricalIssuanceRows = context.maxEpochVertices;
+ 	return context.count <= maxHistoricalIssuanceRows;
+ }
+ 
+commit 7d037ed825a092cf985d1a271d3f56d965992ed3
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Fri Sep 4 18:54:30 2026 -0400
+
+    test(hardening): red legacy historical scan bound
+
+diff --git a/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts b/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts
+index bd4fd414..181a2032 100644
+--- a/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts
++++ b/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts
+@@ -4,6 +4,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
+ import { tmpdir } from "node:os";
+ import { join, resolve } from "node:path";
+ import { DatabaseSync, type StatementSync } from "node:sqlite";
++import ts from "typescript";
+ import { afterEach, describe, expect, it } from "vitest";
+ 
+ import {
+@@ -126,6 +127,42 @@ async function assertRowsRemain(store: TestPlanStore, sequences: readonly number
+ 	for (const sequence of sequences) expect(await store.readIssued(F5B0S_SCOPE, sequence)).not.toBeNull();
+ }
+ 
++type HistoricalIssuanceCounter = (
++	context:
++		| {
++				readonly countedSequences: Set<number>;
++				count: number;
++				readonly maxEpochVertices: number;
++		  }
++		| undefined,
++	authorSequence: number
++) => boolean;
++
++async function executableHistoricalIssuanceCounter(): Promise<HistoricalIssuanceCounter> {
++	const filename = resolve(REPOSITORY_ROOT, "packages/node/src/v3-live.ts");
++	const source = await readFile(filename, "utf8");
++	const unit = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
++	const matches = unit.statements.filter(
++		(statement): statement is ts.FunctionDeclaration =>
++			ts.isFunctionDeclaration(statement) && statement.name?.text === "countHistoricalIssuanceRow"
++	);
++	if (matches.length !== 1) throw new TypeError("D110C_0C1F5B0D_HISTORICAL_SCAN_OWNER_MISSING");
++	const emitted = ts.transpileModule(matches[0].getText(unit), {
++		compilerOptions: { module: ts.ModuleKind.None, target: ts.ScriptTarget.ES2022 },
++	}).outputText;
++	const load = Function(
++		"ReflectApply",
++		"SetPrototypeHas",
++		"SetPrototypeAdd",
++		`"use strict";\n${emitted}\nreturn countHistoricalIssuanceRow;`
++	) as (
++		reflectApply: typeof Reflect.apply,
++		setPrototypeHas: typeof Set.prototype.has,
++		setPrototypeAdd: typeof Set.prototype.add
++	) => HistoricalIssuanceCounter;
++	return load(Reflect.apply, Set.prototype.has, Set.prototype.add);
++}
++
+ afterEach(async () => {
+ 	await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { force: true, recursive: true })));
+ });
+@@ -297,29 +334,21 @@ describe("D.110c-0c1f5b0d authenticated settled-prefix reclamation RED", () => {
+ 		}
+ 	});
+ 
+-	it("invokes authenticated pruning only from the production cleanup path that owns verified adoption gates", async () => {
+-		const source = await readFile(resolve(REPOSITORY_ROOT, "packages/node/src/v3-live.ts"), "utf8");
+-		expect(source, "D110C_0C1F5B0D_PRODUCTION_PRUNE_INVOCATION_MISSING").toContain(".pruneAuthenticatedSettledPrefix(");
+-		expect(source, "D110C_0C1F5B0D_PRUNE_BYPASSES_AUTHENTICATED_CLEANUP_PLAN").toContain("planClosedEpochCleanup(");
+-	});
+-
+-	it("removes the raw single-epoch historical issuance scan ceiling", async () => {
+-		const source = await readFile(resolve(REPOSITORY_ROOT, "packages/node/src/v3-live.ts"), "utf8");
+-		const body = source.match(/function countHistoricalIssuanceRow[\s\S]*?\n\}/u)?.[0] ?? "";
+-		expect(body, "D110C_0C1F5B0D_HISTORICAL_SCAN_OWNER_MISSING").not.toBe("");
+-		expect(body, "D110C_0C1F5B0D_SINGLE_EPOCH_RECOVERY_SCAN_CAP_RETAINED").not.toContain(
+-			"context.count <= context.maxEpochVertices"
+-		);
+-	});
+-
+-	it("bounds historical recovery by rollback generations or the authenticated settled watermark", async () => {
+-		const source = await readFile(resolve(REPOSITORY_ROOT, "packages/node/src/v3-live.ts"), "utf8");
+-		const body = source.match(/function countHistoricalIssuanceRow[\s\S]*?\n\}/u)?.[0] ?? "";
++	it("keeps creator-trusted-v1 historical issuance within one maxEpochVertices window", async () => {
++		const countHistoricalIssuanceRow = await executableHistoricalIssuanceCounter();
++		const context = { count: 0, countedSequences: new Set<number>(), maxEpochVertices: 8_192 };
++		let accepted = 0;
++		for (let authorSequence = 0; authorSequence < context.maxEpochVertices; authorSequence += 1) {
++			if (countHistoricalIssuanceRow(context, authorSequence)) accepted += 1;
++		}
++		expect(accepted).toBe(8_192);
++		expect(context).toMatchObject({ count: 8_192 });
++		expect(context.countedSequences.size).toBe(8_192);
++		expect(countHistoricalIssuanceRow(context, 8_191)).toBe(true);
++		expect(context).toMatchObject({ count: 8_192 });
+ 		expect(
+-			/(?:maxEpochVertices\s*\*\s*3|maxHistoricalIssuanceRows|prunedThroughAuthorSequence|settledWatermark)/u.test(
+-				body
+-			),
+-			"D110C_0C1F5B0D_RECOVERY_SCAN_NOT_ROLLBACK_OR_WATERMARK_BOUNDED"
+-		).toBe(true);
++			countHistoricalIssuanceRow(context, 8_192),
++			"D110C_0C1F5B0D_LEGACY_HISTORICAL_SCAN_EXCEEDS_ONE_EPOCH_WINDOW"
++		).toBe(false);
+ 	});
+ });
+total 19 passed 18 failed 1 suites 2
+SUITE: /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts
+ FAILED: D.110c-0c1f5b0d authenticated settled-prefix reclamation RED keeps creator-trusted-v1 historical issuance within one maxEpochVertices window
+AssertionError: D110C_0C1F5B0D_LEGACY_HISTORICAL_SCAN_EXCEEDS_ONE_EPOCH_WINDOW: expected true to be false // Object.is equality
+    at /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts:352:5
+    at file:///Users/aristotle/Documents/Projects/ts-drp-1/node_modules/.pnpm/@vitest+runner@3.1.1/node_modules/@vitest/runner/dist/index.js:595:20
+tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts
+===
+[
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > pins the f5b0d boundary and hands non-issuance scope retirement to D.110c-c",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > installs one storage-neutral authenticated settled-prefix owner without relying on a missing import",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > memory refuses a settlement-profile prefix when the durable plan is absent",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > browser refuses a settlement-profile prefix when the durable plan is absent",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > node refuses a settlement-profile prefix when the durable plan is absent",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > memory refuses while the required fence link is incomplete",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > browser refuses while the required fence link is incomplete",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > node refuses while the required fence link is incomplete",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > memory refuses an unlinked entry outside the selected prefix and deletes nothing",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > browser refuses an unlinked entry outside the selected prefix and deletes nothing",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > node refuses an unlinked entry outside the selected prefix and deletes nothing",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > memory refuses manual review outside the selected prefix and deletes nothing",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > browser refuses manual review outside the selected prefix and deletes nothing",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > node refuses manual review outside the selected prefix and deletes nothing",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > memory prunes one authenticated complete mixed-epoch pending/published prefix and replays monotonically",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > browser prunes one authenticated complete mixed-epoch pending/published prefix and replays monotonically",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > node prunes one authenticated complete mixed-epoch pending/published prefix and replays monotonically",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > node rolls back both tables and the watermark when an authenticated prune crashes mid-transaction",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  },
+  {
+    "name": "D.110c-0c1f5b0d authenticated settled-prefix reclamation RED > keeps creator-trusted-v1 historical issuance within one maxEpochVertices window",
+    "file": "/Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts"
+  }
+]===
+# Commands and results
+
+- `pnpm exec vitest list tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts --json=.logs/d110c-0c1f5b0d-legacy-red-7d037ed8/listing.json`
+  — exit 0; exactly one file and 19 tests.
+- `pnpm exec vitest run tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts --reporter=json --outputFile=.logs/d110c-0c1f5b0d-legacy-red-7d037ed8/focused.json`
+  — expected exit 1; one file, 19 tests, 18 passed, one failed, zero skipped,
+  zero todo, and no module-load or top-level error.
+- `pnpm exec eslint tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts -f json -o .logs/d110c-0c1f5b0d-legacy-red-7d037ed8/eslint.json`
+  — exit 0; zero errors and zero warnings.
+- `pnpm exec prettier --check tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts`
+  — exit 0.
+- `git show --check --oneline 7d037ed8` — exit 0.
+- `git diff --name-only 721d1c0e..7d037ed8` — exactly
+  `tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts`.
+- `git diff --quiet 721d1c0e..7d037ed8 -- tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts`
+  — exit 0; the retained 12-case corrective backend suite is byte-identical.
+- `pnpm exec vitest list tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts --json`
+  — exit 0; exactly 12 retained tests listed.
+- `git log --format='%H %G? %s' -1` at the RED commit — signed status `G`.
+- `git rev-parse origin/codex/phase3a1b-p6-golden-path` after the RED push —
+  `7d037ed825a092cf985d1a271d3f56d965992ed3`.
+- `git stash list | wc -l` — 27 before and after the RED.
+numTestResults: 1
+name: /Users/aristotle/Documents/Projects/ts-drp-1/tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts status: failed assertions: 19
+['numTotalTestSuites', 'numPassedTestSuites', 'numFailedTestSuites', 'numPendingTestSuites', 'numTotalTests', 'numPassedTests', 'numFailedTests', 'numPendingTests', 'numTodoTests', 'snapshot', 'startTime', 'success', 'testResults']
+['assertionResults', 'startTime', 'endTime', 'status', 'message', 'name']
+message repr: ''
+Counter({'passed': 18, 'failed': 1})
+# Causal matrix
+
+| Case | Expected legacy contract | Current RED result | Meaning |
+| --- | --- | --- | --- |
+| Distinct sequences 0 through 8,191 | all accepted | pass | The existing function admits one complete `maxEpochVertices` window. |
+| Duplicate sequence 8,191 | accepted without increment | pass | Duplicate accounting remains idempotent. |
+| New sequence 8,192 | refused | fail: returned `true` | The rejected GREEN's global `maxEpochVertices * 3` behavior expands `creator-trusted-v1` beyond its frozen one-window bound. |
+| Other retained reclamation cases | unchanged | 18 total focused passes including controls | The corrective RED introduces no second causal failure. |
+
+The complete reporter is `focused.json`. The sole failure carries exact token
+`D110C_0C1F5B0D_LEGACY_HISTORICAL_SCAN_EXCEEDS_ONE_EPOCH_WINDOW`.
+
+This matrix is deliberately unit-level. It does not claim that an 8,193-row
+genuine recovery path is reachable before parent f5b settlement integration.
+# Exact production-body selection
+
+The test parses `packages/node/src/v3-live.ts` with the TypeScript compiler AST
+and requires exactly one top-level function declaration named
+`countHistoricalIssuanceRow`. It transpiles and executes that declaration's
+exact source text.
+
+The execution environment supplies only the standard intrinsics referenced by
+the existing private body: `Reflect.apply`, `Set.prototype.has`, and
+`Set.prototype.add`. The tested count and membership state are ordinary live
+objects. No production predicate is copied into the test, no product export is
+added, and no comment, regex, or source substring decides acceptance.
+
+If the production owner is removed, duplicated, or ceases to be executable in
+this bounded unit harness, the test fails closed with
+`D110C_0C1F5B0D_HISTORICAL_SCAN_OWNER_MISSING` rather than silently testing a
+substitute.
+# Custody and scope
+
+- Branch: `codex/phase3a1b-p6-golden-path`.
+- Signed/pushed reslice: `721d1c0e0675b16ca45ca61f4b264de67cbff5f6`.
+- Signed/pushed RED: `7d037ed825a092cf985d1a271d3f56d965992ed3`.
+- Changed path: `tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts`.
+- Production, plan, dependency, lockfile, schema, wire, public API,
+  cryptography, authority and threshold paths changed: none.
+- The retained 12-case backend ceiling test has identical Git blob
+  `1b1f908c89604818199079c407ed25628105ca47` at the reslice and RED commits.
+- Protected untracked paths were neither staged nor modified by this slice.
+- Stash count remained 27.
+- Deferred to parent f5b integration: genuine repeated-close recovery and the
+  real settlement invocation/recovery bound. This reduced RED closes neither
+  obligation.
+# D.110c-0c1f5b0d legacy-bound GREEN
+
+This packet records the narrow production correction at signed and pushed
+commit `b384c7d9bdb3b3b3f5fa5b7de05cbafb3da7f4af`, based on tests-only RED
+`7d037ed825a092cf985d1a271d3f56d965992ed3` and reslice
+`721d1c0e0675b16ca45ca61f4b264de67cbff5f6`.
+
+The sole production change restores `countHistoricalIssuanceRow` to one
+`maxEpochVertices` window for `creator-trusted-v1`. The exact AST-selected
+private implementation accepts 8,192 distinct sequences, ignores a duplicate
+without incrementing, and refuses distinct sequence 8,193.
+
+This does not implement or claim settlement-profile rollback-window behavior,
+real product reachability, repeated close/adopt, or parent f5b integration.
+No API, schema, wire, authority, dependency, threshold, or test file changed.
+
+All focused, unchanged backend, real Chromium, retained, build, static and
+corrected isolated-checkout gates passed. The package-wide Node typecheck
+retains its accepted test-root/fixture baseline: its 13 normalized diagnostic
+lines have the exact same SHA-256 as the earlier f5b0d GREEN baseline.
+
+======
+packages/node/src/v3-live.ts
+======
+# Commands and results
+
+## Runtime gates
+
+- Focused `tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts` with
+  coverage disabled and one worker: exit 0; 19/19 passed.
+- Unchanged `tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts`: exit 0;
+  12/12 passed.
+- Chromium issuance-retention config filtered to `authenticates settlement
+  refusal`: exit 0; exactly 1 expected pass, zero unexpected, flaky or skipped.
+- Seven-file retained store/reclamation selector in `retained-files.md`: exit
+  0; 134/134 passed. This is the recalculated total after removal of two
+  invalid source/comment oracles; it does not reuse the former 136 count.
+- Ten-file retained settlement/recovery selector in `retained-files.md`: exit
+  0; 122/122 passed. This is the corresponding recalculated total, not the
+  former 124 count.
+
+## Build and static gates
+
+- `pnpm --filter @ts-drp/node build`: exit 0.
+- `pnpm --filter @ts-drp/node typecheck`: nonzero on the same 13 inherited
+  test-root, worker-host, WebRTC fixture and compact-history helper diagnostics
+  as the accepted earlier baseline. The normalized diagnostic hashes match;
+  see `typecheck-baseline.md` and the complete `node-typecheck.log`.
+- `pnpm exec eslint packages/node/src/v3-live.ts`: exit 0, zero errors and
+  warnings (`eslint.json`).
+- `pnpm exec prettier --check packages/node/src/v3-live.ts`: exit 0.
+- `git diff --check`, `git show --check --oneline b384c7d9`, and the exact
+  owner diff check: exit 0; only `packages/node/src/v3-live.ts` changed.
+
+## Detached clean checkout
+
+- Added a detached temporary worktree at exact signed GREEN `b384c7d9`.
+- `pnpm install --offline --frozen-lockfile --ignore-scripts`: exit 0.
+- Topological builds for `@ts-drp/node...`, `@ts-drp/storage-browser...`, and
+  `@ts-drp/storage-node...`: exit 0.
+- Isolated focused: 19/19; isolated seven-file retained store/reclamation:
+  134/134; isolated ten-file retained settlement/recovery: 122/122.
+- The temporary worktree was removed after completion.
+
+The first isolated retained diagnostic built only the Node dependency closure.
+Eleven fixtures then failed because the sibling storage package `dist` outputs
+were freshly absent. That result was rejected as a build-order diagnostic. The
+corrected topological command built both storage closures before rerunning; all
+retained tests then passed without using main-checkout artifacts.
+
+focused.json 19 19 0 True files: 1
+backend-ceiling.json 12 12 0 True files: 1
+retained-store.json 134 134 0 True files: 7
+retained-settlement.json 122 122 0 True files: 10
+isolated-focused.json 19 19 0 True files: 1
+isolated-retained-store.json 134 134 0 True files: 7
+isolated-retained-settlement.json 122 122 0 True files: 10
+{
+  "config": {
+    "argv": [
+      "/Users/aristotle/Library/Application Support/fnm/node-versions/v22.15.0/installation/bin/node",
+      "/Users/aristotle/Documents/Projects/ts-drp-1/node_modules/@playwright/test/cli.js",
+      "test",
+      "--config",
+      "packages/storage-browser/playwright.phase-6b-issuance-retention.config.ts",
+      "--grep",
+      "authenticates settlement refusal",
+      "--reporter=json"
+    ],
+    "configFile": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/playwright.phase-6b-issuance-retention.config.ts",
+    "rootDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": true,
+    "fullyParallel": false,
+    "globalSetup": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests/phase-6b-issuance-retention-global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 120000,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/aristotle/Documents/Projects/ts-drp-1/packages/storage-browser/tests",
+        "testIgnore": [],
+        "testMatch": [
+stats: {'startTime': '2026-09-04T23:02:43.578Z', 'duration': 859.2330000000001, 'expected': 1, 'skipped': 0, 'unexpected': 0, 'flaky': 0}
+[{"filePath":"/Users/aristotle/Documents/Projects/ts-drp-1/packages/node/src/v3-live.ts","messages":[],"suppressedMessages":[{"ruleId":"@typescript-eslint/no-invalid-void-type","severity":2,"message":"void is not valid as a constituent in a union type","line":381,"column":3,"nodeType":"TSVoidKeyword","messageId":"invalidVoidUnionConstituent","endLine":381,"endColumn":7,"suppressions":[{"kind":"directive","justification":"the sink retains legacy void alongside explicit terminal dispositions."}]},{"ruleId":"@typescript-eslint/no-invalid-void-type","severity":2,"message":"void is not valid as a constituent in a union type","line":384,"column":12,"nodeType":"TSVoidKeyword","messageId":"invalidVoidUnionConstituent","endLine":384,"endColumn":16,"suppressions":[{"kind":"directive","justification":"asynchronous legacy sinks resolve void."}]},{"ruleId":"@typescript-eslint/require-await","severity":2,"message":"Async arrow function has no 'await' expression.","line":7488,"column":62,"nodeType":"ArrowFunctionExpression","messageId":"missingAwait","endLine":7488,"endColumn":64,"suggestions":[{"messageId":"removeAsync","fix":{"range":[287867,287873],"text":""},"desc":"Remove 'async'."}],"suppressions":[{"kind":"directive","justification":"queue tasks share one async result contract."}]}],"errorCount":0,"fatalErrorCount":0,"warningCount":0,"fixableErrorCount":0,"fixableWarningCount":0,"usedDeprecatedRules":[]}]
+===
+^DChecking formatting...
+packages/node/src/v3-live.ts[2K[1GAll matched files use Prettier code style!
+===
+
+
+> @ts-drp/node@0.11.0 build /Users/aristotle/Documents/Projects/ts-drp-1/packages/node
+> tsc -b tsconfig.build.json && node build.mjs
+
+===
+# Node typecheck baseline comparison
+
+The package-wide Node typecheck remains nonzero for inherited test-only
+diagnostics unrelated to the one-line production change.
+
+- Accepted earlier f5b0d baseline:
+  `.logs/d110c-0c1f5b0d-green-1063feca/typecheck-node.log`
+- Current complete output: `node-typecheck.log`
+- `error TS` lines in each: 13
+- Normalization: retain only `error TS` lines, strip the absolute prefix through
+  `packages/node/`, and remove carriage returns.
+- Earlier normalized SHA-256:
+  `a5fd26b3d324c4cfefa2d850001d3b39bb4c4cef31ae0a92e232ba790f39e190`
+- Current normalized SHA-256:
+  `a5fd26b3d324c4cfefa2d850001d3b39bb4c4cef31ae0a92e232ba790f39e190`
+- Normalized diff: empty.
+
+The production build configuration passed, so no diagnostic is introduced by
+the changed owner.
+
+===
+# Retained selectors
+
+The 134-test store/reclamation gate selected:
+
+- `tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts`
+- `tests/phase-6b-cleanup-eligibility-red.test.ts`
+- `tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts`
+- `tests/phase-6b-d110c-0c1f5b0s-settlement-plan-red.test.ts`
+- `tests/phase-6b-issuance-retention-red.test.ts`
+- `tests/phase-6b-runtime-reclamation-red.test.ts`
+- `packages/storage-node/tests/phase-6b-issuance-retention-red.test.ts`
+
+The 122-test settlement/recovery gate selected:
+
+- `tests/d110c-0c1f5b0a-settlement-codec-red.test.ts`
+- `tests/phase-3a1b-d9336-authorized-recovery-red.test.ts`
+- `tests/phase-3g-v3-rebase-outbox-red.test.ts`
+- `tests/phase-3h-v3-terminal-transition-red.test.ts`
+- `tests/phase-5e-creator-close-red.test.ts`
+- `tests/phase-6b-d110c-0c1f5b0b-node-corrective-red.test.ts`
+- `tests/phase-6b-d110c-0c1f5b0b-node-red.test.ts`
+- `tests/phase-6b-d110c-0c1f5b0c-room-red.test.ts`
+- `tests/phase-6b-d110c-0c1f5b0d-reclamation-red.test.ts`
+- `tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts`
+
+===
+# Source and owner validation
+
+- The AST-executed focused test finds exactly one top-level function declaration
+  named `countHistoricalIssuanceRow` in `packages/node/src/v3-live.ts`.
+- The exact emitted function accepts 8,192 distinct rows, accepts duplicate
+  8,191 without increment, and rejects distinct 8,192 (the 8,193rd row).
+- The changed production commit contains one path only:
+  `packages/node/src/v3-live.ts`.
+- The changed line replaces `context.maxEpochVertices * 3` with
+  `context.maxEpochVertices`; no settlement-profile conditional or new seam was
+  introduced.
+- The unchanged backend ceiling suite remains 12/12 green.
+
+400994f9 test(hardening): record legacy scan green evidence
+?? .agents/
+?? .claude/
+?? .logs/d108e4-complete-config-a5ac938f/
+?? .logs/d108e4-plan-grok-50fd6fd5/
+?? .logs/d108e4a-green-reviews-3f10ac71/
+?? .logs/d108e4a-plan-reviews-1a90eff2/
+?? .logs/d108e4a-red-reviews-e91cf5e3/
+?? .logs/d108e4aa-green/
+?? .logs/d108e4aa-plan-review-8463378c/
+?? .logs/d108e4aa-red/
+===
+(empty = byte-identical)
+===
+commit 400994f9e18e4cc8d7d45039a61c00a8cc0edf06
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Fri Sep 4 19:09:27 2026 -0400
+
+    test(hardening): record legacy scan green evidence
+
+ .../d110c-0c1f5b0d-legacy-green-b384c7d9/README.md |  21 ++++
+ .../backend-ceiling.json                           |   1 +
+ .../browser.json                                   | 117 +++++++++++++++++++++
+ .../changed-paths.txt                              |   1 +
+ .../commands.md                                    |  46 ++++++++
+ .../custody.md                                     |  19 ++++
+ .../eslint.json                                    |   1 +
+ .../focused.json                                   |   1 +
+ .../isolated-focused.json                          |   1 +
+ .../isolated-path.txt                              |   1 +
+ .../isolated-retained-settlement.json              |   1 +
+ .../isolated-retained-store.json                   |   1 +
+ .../manifest.sha256                                |  21 ++++
+ .../node-build.log                                 |   8 ++
+ .../node-typecheck.log                             |  61 +++++++++++
+ .../prettier.log                                   |   2 +
+ .../result.json                                    |  15 +++
+ .../retained-files.md                              |  25 +++++
+ .../retained-settlement.json                       |   1 +
+ .../retained-store.json                            |   1 +
+ .../source-shape.md                                |  13 +++
+ .../typecheck-baseline.md                          |  20 ++++
+ 22 files changed, 378 insertions(+)
+
+function beginHistoricalIssuanceScan(context: HistoricalIssuanceContext | undefined): void {
+	if (context === undefined) return;
+	context.count = 0;
+	ReflectApply(SetPrototypeClear, context.countedSequences, []);
+}
+
+function countHistoricalIssuanceRow(context: HistoricalIssuanceContext | undefined, authorSequence: number): boolean {
+	if (context === undefined) return false;
+	if (ReflectApply(SetPrototypeHas, context.countedSequences, [authorSequence]) === true) return true;
+	context.count += 1;
+	ReflectApply(SetPrototypeAdd, context.countedSequences, [authorSequence]);
+	const maxHistoricalIssuanceRows = context.maxEpochVertices;
+	return context.count <= maxHistoricalIssuanceRows;
+}
+
+.logs/
+.logs/d110c-0c1f5b-source-audit-9f0310cd
+.logs/d110c-0c1f5b0-design-00a860ab
+.logs/d110c-0c1f5b0-fable51-research-20260903
+.logs/d110c-0c1f5b0-plan-review-fc4b8fc7
+.logs/d110c-0c1f5b0a-corrective-green-b926a606
+.logs/d110c-0c1f5b0a-corrective-red-6921ec65
+.logs/d110c-0c1f5b0a-green-5bf45aab
+.logs/d110c-0c1f5b0a-red-47a88377
+.logs/d110c-0c1f5b0a-red-62f164b6
+.logs/d110c-0c1f5b0a-review-a7a643ce
+.logs/d110c-0c1f5b0b-corrective-review-bb94a03f
+.logs/d110c-0c1f5b0b-final-review-52d1819f
+.logs/d110c-0c1f5b0b-green-802a647e
+.logs/d110c-0c1f5b0b-green-93585bf3
+.logs/d110c-0c1f5b0b-green-e07f8a94
+.logs/d110c-0c1f5b0b-red-37ae2f7b
+.logs/d110c-0c1f5b0b-red-4543b957
+.logs/d110c-0c1f5b0b-red-4e8cfb97
+.logs/d110c-0c1f5b0b-red-6e542c3d
+.logs/d110c-0c1f5b0b-red-882a3dc1
+.logs/d110c-0c1f5b0b-red-9a4b35f4
+.logs/d110c-0c1f5b0b-red-a19e8454
+.logs/d110c-0c1f5b0b-red-bc773799
+.logs/d110c-0c1f5b0b-red-c77f8a1f
+.logs/d110c-0c1f5b0b-red-de1eed2a
+.logs/d110c-0c1f5b0b-red-f7f693b7
+.logs/d110c-0c1f5b0b-review-9b02f9c2
+.logs/d110c-0c1f5b0c-green-3b6a66a9
+.logs/d110c-0c1f5b0c-red-d062c5f6
+.logs/d110c-0c1f5b0c-review-6f8e80ca
+.logs/d110c-0c1f5b0d-corrective-green-292fc14f
+.logs/d110c-0c1f5b0d-corrective-green-292fc14f
+.logs/d110c-0c1f5b0d-corrective-red-0cafd357
+.logs/d110c-0c1f5b0d-corrective-red-0cafd357
+.logs/d110c-0c1f5b0d-corrective-review-502198f3
+.logs/d110c-0c1f5b0d-corrective-review-502198f3
+.logs/d110c-0c1f5b0d-green-1063feca
+.logs/d110c-0c1f5b0d-green-1063feca
+.logs/d110c-0c1f5b0d-legacy-confirmation-400994f9
+.logs/d110c-0c1f5b0d-legacy-confirmation-400994f9
+.logs/d110c-0c1f5b0d-legacy-green-b384c7d9
+.logs/d110c-0c1f5b0d-legacy-green-b384c7d9
+.logs/d110c-0c1f5b0d-legacy-red-7d037ed8
+.logs/d110c-0c1f5b0d-legacy-red-7d037ed8
+.logs/d110c-0c1f5b0d-red-9ab5924a
+.logs/d110c-0c1f5b0d-red-9ab5924a
+.logs/d110c-0c1f5b0d-review-307825ef
+.logs/d110c-0c1f5b0d-review-307825ef
+.logs/d110c-0c1f5b0p-confirmation-7ecd5f19
+.logs/d110c-0c1f5b0p-confirmation-correction-7ecd5f19
+.logs/d110c-0c1f5b0p-design-e6a67013
+.logs/d110c-0c1f5b0q-plan-061457f2
+.logs/d110c-0c1f5b0q-plan-review-dc62238b
+.logs/d110c-0c1f5b0r-design-3a156aca
+.logs/d110c-0c1f5b0s-correction-9a9a2226
+.logs/d110c-0c1f5b0s-green-9fef8d24
+.logs/d110c-0c1f5b0s-red-5b286468
+.logs/d110c-0c1f5b0s-red-b207e40e
+.logs/d110c-0c1f5b0s-red-b41bafb3
+.logs/d110c-0c1f5b0s-review-9a9a2226
+13
+===
+green manifest checked
+red manifest checked
+design manifest checked
+commit adab0f56428bf0290a4437c83083db18e17eb2dc
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Fri Sep 4 18:02:41 2026 -0400
+
+    docs(hardening): reslice settlement reclamation reachability
+
+ .../production-hardening-tdd-plan-v2.md            | 79 +++++++++++++++++++---
+ 1 file changed, 71 insertions(+), 8 deletions(-)
+=====
+commit 721d1c0e0675b16ca45ca61f4b264de67cbff5f6
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Fri Sep 4 18:52:15 2026 -0400
+
+    docs(hardening): bound legacy scan correction
+
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index 6863252a..6da3bd7d 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -18386,7 +18386,7 @@ signer-profile eviction matrix are all green.
+ 
+ ---
+ 
+-### Current frontier — author settlement and writer capacity (as of 2026-09-04, review e7c59191)
++### Current frontier — author settlement and writer capacity (as of 2026-09-04, review 508d700a)
+ 
+ This subsection is the entry point for an agent resuming the D.110c-0c1f /
+ D.110c-0c1k lineage. Per-record status paragraphs remain authoritative; when a
+@@ -18438,6 +18438,13 @@ Authorized now (tests-only RED first, then GREEN):
+   deletion, epoch ceiling, crash/replay/watermark behavior, backend parity,
+   and corruption classification. It does not claim real close/adopt
+   reachability or a behaviorally unreachable recovery-scan correction.
++  Corrective production `292fc14f` closes the backend future-epoch defect, but
++  review `508d700a` leaves f5b0d open on two P1s inherited from rejected GREEN
++  `1063feca`: restore the legacy one-window historical scan cap and remove the
++  retained comment/regex oracles that falsely pin production reachability and
++  the global 3x bound. One direct unit-level execution of the actual private
++  counter body may pin 8,192 accepted / 8,193 refused; it is not product-path
++  evidence and cannot discharge parent f5b.
+ 
+ Blocked, and on what:
+ 
+@@ -99341,6 +99348,34 @@ and watermark intact. The real Chromium IndexedDB case fails with the same
+ matrix. A corrective causal tests-only RED must precede its production
+ correction.
+ 
++Confirmation `508d700a` accepts the three backend predicates but blocks closure
++on two live remnants of rejected GREEN `1063feca`: the unconditional
++`maxEpochVertices * 3` historical-issuance cap changes
++`creator-trusted-v1`, and the retained suite still accepts a comment as the
++production cleanup caller while pinning that wrong constant. The next
++tests-only RED deletes those three invalid source/string assertions and
++directly executes the actual private `countHistoricalIssuanceRow` function body
++at the registry-pinned boundary: count 8,192 is accepted and 8,193 is refused.
++It may use a TypeScript AST to select and execute the exact body with its real
++set/count state; it must not copy the predicate, accept a substring, export a
++new product seam or claim full recovery behavior. GREEN restores only the
++legacy one-window predicate (plus the nonblocking accurate same-realm
++maintenance JSDoc if touched). The already-green 12-case backend ceiling test
++stays byte-identical.
++
++This unit-level correction is deliberately not the genuine recovery proof. A
++single-room Chromium attempt with pinned parameters required 8,192/8,193 real
++historical rows and hit its hard 120,000-ms test timeout at 120,004 ms, so it is
++rejected and never committed. A small-limit fixture is invalid because
++`prepareV3LiveGeneration` admits only the registry-pinned parameter digests.
++The in-memory genuine path reaches 8,192 after close/adopt, but reaching 8,193
++requires one further successful successor close/adoption that the existing
++fixture intentionally does not expose. Parent f5b therefore retains the real
++8,192-success/8,193-refusal hot/restart/cold-reopen acceptance after it
++implements repeated settlement adoption. The direct counter test merely
++prevents the known legacy regression while honoring the no-long-workload and
++no-new-product-seam constraints.
++
+ The parent f5b integration owns the part that cannot exist before its genuine
+ settlement close/adopt path: the first production call on every peer after
+ durable checkpoint staging, verified adoption, rollback-generation retention,
+commit adab0f56428bf0290a4437c83083db18e17eb2dc
+Author: Faolain <Faolain@users.noreply.github.com>
+Date:   Fri Sep 4 18:02:41 2026 -0400
+
+    docs(hardening): reslice settlement reclamation reachability
+
+diff --git a/docs/production-hardening/production-hardening-tdd-plan-v2.md b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+index 6eaca229..6863252a 100644
+--- a/docs/production-hardening/production-hardening-tdd-plan-v2.md
++++ b/docs/production-hardening/production-hardening-tdd-plan-v2.md
+@@ -18386,7 +18386,7 @@ signer-profile eviction matrix are all green.
+ 
+ ---
+ 
+-### Current frontier — author settlement and writer capacity (as of 2026-09-04, review 6919a6a8)
++### Current frontier — author settlement and writer capacity (as of 2026-09-04, review e7c59191)
+ 
+ This subsection is the entry point for an agent resuming the D.110c-0c1f /
+ D.110c-0c1k lineage. Per-record status paragraphs remain authoritative; when a
+@@ -18427,16 +18427,33 @@ Closed in the 2026-09-04 checkpoint:
+ 
+ Authorized now (tests-only RED first, then GREEN):
+ 
+-- **f5b0d reclamation** from accepted design
+-  `.logs/d110c-0c1f5b0r-design-3a156aca/design.md`, item 5. Its f5b0a/f5b0s
+-  dependencies are closed and the requested f5b0c-first ordering is now
+-  satisfied. Begin with one causal tests-only RED before any reclamation
+-  production edit.
++- **f5b0d reclamation correction** from accepted design
++  `.logs/d110c-0c1f5b0r-design-3a156aca/design.md`, item 5, narrowed at the
++  design stop rule after rejected review `e7c59191`. The first GREEN
++  `1063feca` and evidence `352db789`/`307825ef` are preserved, but they do not
++  close the slice: all three reviewers found that authenticated pruning was a
++  post-delete no-op replay and that neither cleanup owner had a production
++  caller. Corrective f5b0d RED/GREEN owns the storage-neutral deleting
++  transaction, complete-plan/fence/link gate, mixed-epoch pending/published
++  deletion, epoch ceiling, crash/replay/watermark behavior, backend parity,
++  and corruption classification. It does not claim real close/adopt
++  reachability or a behaviorally unreachable recovery-scan correction.
+ 
+ Blocked, and on what:
+ 
+-- **f5b** creator settlement → f5b0d GREEN; f5b0a/f5b0s/f5b0b/f5b0c/W0 are
+-  already closed. Stage W1
++- **f5b** creator settlement → corrective f5b0d GREEN;
++  f5b0a/f5b0s/f5b0b/f5b0c/W0 are already closed. Its causal RED now also owns
++  the first real, every-peer invocation of the authenticated deleting owner
++  after durable checkpoint staging, verified close/adoption, rollback,
++  availability and expected-head eligibility. The integrated hot, restart and
++  cold-reopen path must prove no legacy deletion occurs first, incomplete
++  settlement plans preserve rows and the watermark before mutation, and the
++  settlement-profile recovery scan is bounded by the reviewed rollback window
++  while the legacy one-epoch bound remains unchanged. This
++  ownership moved because the pre-integration settlement fixtures stop at
++  `CERTIFIED_VALUE_MISMATCH`, while both cleanup functions otherwise have no
++  product caller; accepting a comment, source substring or fixture-only call
++  would repeat the rejected GREEN rather than establish causality. Stage W1
+   (256-line frontier, version-3 ACL) is inside f5b0a/f5b, not a separate slice.
+ - **D.110c-0c1k stage W2** → its own design checkpoint and review first; the
+   five-step path is at the end of the 0c1k record. **D.110c-0c1j** host
+@@ -99298,6 +99315,52 @@ frontier/terminal suppression likewise remains f5b-owned because f5b0c has no
+ verified checkpoint frontier. These findings neither reopen f5b0c nor authorize
+ an unreviewed retry, schema change, or public API change.
+ 
++f5b0d remains OPEN after a rejected first GREEN. Tests-only RED `9ab5924a`
++and evidence `f05048f9` were followed by production `1063feca` and evidence
++`352db789`/`307825ef`; the three-model review is preserved at signed/pushed
++`e7c59191` under `.logs/d110c-0c1f5b0d-review-307825ef/`. Its blocking union
++identified one call-graph defect: `pruneAuthenticatedSettledPrefix` was invoked
++only after a caller-supplied legacy deletion receipt, so it could be a no-op,
++and the purported production seam for `planClosedEpochCleanup` was only a
++comment while neither cleanup owner had a non-test caller. The evidence
++therefore proves backend mechanics, not production reachability, and its
++closure claim is rejected without rewriting the commits or evidence.
++
++The corrective ownership is intentionally split at the existing f5b boundary.
++Corrective f5b0d owns the actual storage-neutral deleting transaction and its
++backend invariants: no deletion or watermark movement without a complete
++linked plan and accepted fence state; deletion of every eligible old-epoch
++pending and published row; rejection of any row newer than the authenticated
++closed epoch; atomic crash/rollback, idempotent replay and monotone watermark;
++memory, Node and real IndexedDB parity; and permanent corruption distinguished
++from a retryable refusal. The frozen corrective RED selects twelve Vitest
++cases: nine controls pass and exactly the memory, browser and Node
++future-epoch-ceiling cases fail because an epoch-8 row is deleted under
++`closedEpoch = 7` instead of returning `ISSUANCE_INVALID_ARGUMENT` with rows
++and watermark intact. The real Chromium IndexedDB case fails with the same
++matrix. A corrective causal tests-only RED must precede its production
++correction.
++
++The parent f5b integration owns the part that cannot exist before its genuine
++settlement close/adopt path: the first production call on every peer after
++durable checkpoint staging, verified adoption, rollback-generation retention,
++availability and expected-head eligibility. Its RED must demonstrate through
++real hot, restart and cold-reopen behavior that this authenticated owner is the
++first deleting issuance mutation, that no legacy prune runs first, that an
++incomplete plan preserves rows and watermark, and that a complete plan deletes
++the eligible mixed pending/published prefix. It also owns the behavioral
++recovery-scan proof: the settlement profile uses the reviewed rollback-window
++bound without raising the legacy one-epoch bound. This is a dependency
++correction, not a weakening of accepted design item 5: exploratory hot and cold
++`creator-trusted-settlement-v1` fixtures stopped earlier at
++`CERTIFIED_VALUE_MISMATCH`, exactly the integration behavior f5b has not yet
++implemented. A source-text assertion, direct fixture call or manufactured
++receipt cannot substitute for the parent RED. If the parent cannot provide
++this internal call without a wire/schema/public-API/authority/dependency or
++threshold change, it stops and reslices under the existing high-risk rule.
++The final f5b0d confirmation reviews this ownership correction and corrective
++RED/GREEN together; no separate review-only slice is created.
++
+ f5b0b P2 disposition is explicit. Authenticated frontier threading and
+ classifier-local terminal suppression, replacement `planEffect` authority,
+ and same-store activation-digest runtime coverage were assigned to f5b0c; room
+3b3d2459e4da135cd40e0e5a1d0df5d4b7cc393febd46fe88525c51e60d98603  -
+3b3d2459e4da135cd40e0e5a1d0df5d4b7cc393febd46fe88525c51e60d98603  -
+{
+  "backendCeiling": { "failed": 0, "passed": 12, "skipped": 0, "total": 12 },
+  "browser": { "expected": 1, "flaky": 0, "skipped": 0, "unexpected": 0 },
+  "focused": { "failed": 0, "passed": 19, "skipped": 0, "total": 19 },
+  "greenCommit": "b384c7d9bdb3b3b3f5fa5b7de05cbafb3da7f4af",
+  "isolated": {
+    "focused": { "failed": 0, "passed": 19, "total": 19 },
+    "retainedSettlement": { "failed": 0, "passed": 122, "total": 122 },
+    "retainedStore": { "failed": 0, "passed": 134, "total": 134 }
+  },
+  "retainedSettlement": { "failed": 0, "passed": 122, "skipped": 0, "total": 122 },
+  "retainedStore": { "failed": 0, "passed": 134, "skipped": 0, "total": 134 },
+  "scope": "creator-trusted-v1 legacy historical issuance scan cap only"
+}
+
+# Custody and scope
+
+- Branch: `codex/phase3a1b-p6-golden-path`.
+- Signed/pushed plan: `721d1c0e0675b16ca45ca61f4b264de67cbff5f6`.
+- Signed/pushed RED: `7d037ed825a092cf985d1a271d3f56d965992ed3`.
+- Signed/pushed production GREEN:
+  `b384c7d9bdb3b3b3f5fa5b7de05cbafb3da7f4af` (`%G? = G`).
+- Production changed path: `packages/node/src/v3-live.ts`, blob
+  `02e7dbc2d7a3ed8ffc5d465298dd792f429fc849`.
+- The production diff is exactly one insertion and one deletion in the private
+  historical issuance counter.
+- Tests, APIs, schemas, wire formats, authority, dependencies, lockfile,
+  thresholds, settlement behavior, and parent f5b integration changed: none.
+- Protected untracked paths were neither staged nor modified by this slice.
+- Stash count remained 27.
+- `origin/codex/phase3a1b-p6-golden-path` equaled the GREEN commit before this
+  evidence packet was created.
+- `manifest.sha256` is self-excluding.
+
+/tmp/d110c-f5b0d-legacy-green.AbM0sn
+a5fd26b3d324c4cfefa2d850001d3b39bb4c4cef31ae0a92e232ba790f39e190  -
+a5fd26b3d324c4cfefa2d850001d3b39bb4c4cef31ae0a92e232ba790f39e190  -
+144:	const unit = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+150:	const emitted = ts.transpileModule(matches[0].getText(unit), {
+351:			"D110C_0C1F5B0D_LEGACY_HISTORICAL_SCAN_EXCEEDS_ONE_EPOCH_WINDOW"
+4
+7d037ed8 G test(hardening): red legacy historical scan bound
+b384c7d9 G fix(node): restore legacy historical scan bound
+721d1c0e G docs(hardening): bound legacy scan correction
+400994f9 G test(hardening): record legacy scan green evidence
+292fc14f G fix(storage): reject unsettled future epochs
+99368:historical rows and hit its hard 120,000-ms test timeout at 120,004 ms, so it is
+99369:rejected and never committed. A small-limit fixture is invalid because
+99373:fixture intentionally does not expose. Parent f5b therefore retains the real
