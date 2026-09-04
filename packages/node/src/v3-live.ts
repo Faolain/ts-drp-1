@@ -6435,7 +6435,7 @@ async function issueOneVertex(
 				"outcome-unknown"
 			);
 		}
-		if (issuanceOutcomeUnknown) {
+		if (issuanceOutcomeUnknown && settlementProfileFor(registration.payload.trust.trust.profileId) === "v1") {
 			return internalLocalIssueFailure("issuance-rejected", "v3 local issue transaction outcome is unknown");
 		}
 		return capacityRejected
@@ -6799,9 +6799,7 @@ function rebaseIntents(
 		isControlOperation(sourceOperation, payload.trust.trust.profileId) ||
 		(typeof action === "string" &&
 			isReservedBatchAction(action) &&
-			settlementProfileFor(payload.trust.trust.profileId) !== "v1" &&
-			action !== "causalJoin" &&
-			action !== "join")
+			settlementProfileFor(payload.trust.trust.profileId) !== "v1")
 	) {
 		return ObjectFreeze([]);
 	}
