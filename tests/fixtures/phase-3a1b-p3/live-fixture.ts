@@ -314,7 +314,7 @@ export async function createGenuinePreparedV3Fixture(
 								? {
 										author: selectedAuthor,
 										finalityKey: selectedAuthor === issuingAuthor ? selectedAuthor : null,
-										groups: selectedAuthor === issuingAuthor ? ["admin", "finality", "referee", "writer"] : ["writer"],
+										groups: selectedAuthor === issuingAuthor ? ["admin", "finality", "writer"] : ["writer"],
 									}
 								: {
 										author: selectedAuthor,

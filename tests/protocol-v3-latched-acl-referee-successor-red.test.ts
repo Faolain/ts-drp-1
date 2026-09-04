@@ -122,6 +122,10 @@ describe("E5-02 latched ACL referee-role successor RED", () => {
 			ok: false,
 			reason: "snapshot-mismatch",
 		});
+		expect(open(snapshot(1, [member(ADMIN, ["admin", "finality", "referee", "writer"], ADMIN_KEY)]))).toEqual({
+			ok: false,
+			reason: "snapshot-mismatch",
+		});
 		expect(
 			surface.stageLatchedAclOperations({
 				operations: [Object.freeze({ actor: ADMIN, group: "referee", kind: "grant", target: CANDIDATE })],
