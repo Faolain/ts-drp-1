@@ -4,6 +4,7 @@ import type {
 	DurableIssuanceStore,
 	DurableIssueCommit,
 	DurableIssueScope,
+	SettlementPlan,
 } from "@ts-drp/issuance-store";
 import type {
 	DurableLiveJournalStore,
@@ -70,6 +71,7 @@ function journalStore(fixture: GenuinePreparedV3Fixture, trace?: string[]): Dura
 		objectId: fixture.objectId,
 	});
 	const rows: LiveJournalAcceptedRow[] = [];
+	let genesisInstalled = false;
 	const snapshot = (): LiveJournalSnapshotToken =>
 		Object.freeze({
 			genesisDigest: "1".repeat(64),
@@ -110,16 +112,18 @@ function journalStore(fixture: GenuinePreparedV3Fixture, trace?: string[]): Dura
 			);
 		}),
 		close: vi.fn(() => Promise.resolve()),
-		installGenesis: vi.fn(() =>
-			Promise.resolve(
+		installGenesis: vi.fn(() => {
+			const idempotent = genesisInstalled;
+			genesisInstalled = true;
+			return Promise.resolve(
 				Object.freeze({
-					idempotent: false,
+					idempotent,
 					ok: true as const,
 					parametersDigest: fixture.descriptor.parametersDigest,
 					scope,
 				})
-			)
-		),
+			);
+		}),
 		readiness: vi.fn(() =>
 			Promise.resolve(
 				Object.freeze({ ok: true as const, ready: true as const, rowCount: rows.length, scope, snapshot: snapshot() })
@@ -193,6 +197,7 @@ async function recoveryStore(
 		[0, Object.freeze({ commit, publishState: "published" })],
 	]);
 	let nextAuthorSequence = 1;
+	let settlementPlan: SettlementPlan | null = null;
 	const store = Object.freeze({
 		close: vi.fn(() => Promise.resolve()),
 		compareAndMarkOutboxPublished: vi.fn((input) => {
@@ -209,7 +214,7 @@ async function recoveryStore(
 					: null
 			)
 		),
-		readLineage: vi.fn(() => Promise.resolve({ exhausted: false, next: 1 })),
+		readLineage: vi.fn(() => Promise.resolve({ exhausted: false, next: nextAuthorSequence })),
 		readOutboxPage: vi.fn((input = {}) => {
 			const after = input.afterKey?.[2] ?? -1;
 			return Promise.resolve(
@@ -222,16 +227,58 @@ async function recoveryStore(
 				)
 			);
 		}),
+		readSettlementPlan: vi.fn(() => Promise.resolve(settlementPlan)),
 		transactIssue: vi.fn(async (selectedScope, buildAndSign) => {
 			trace?.push("issuance");
 			if (selectedScope.author !== scope.author || selectedScope.objectId !== scope.objectId) {
 				throw new TypeError("issuance scope mismatch");
 			}
 			const issued = await buildAndSign(nextAuthorSequence);
+			if (issued.planEffect?.kind === "fence") {
+				if (settlementPlan === null || settlementPlan.fenceSequence !== null) {
+					throw new TypeError("settlement fence plan is unavailable");
+				}
+				settlementPlan = Object.freeze({
+					...settlementPlan,
+					fenceSequence: nextAuthorSequence,
+					revision: settlementPlan.revision + 1,
+				});
+			} else if (issued.planEffect?.kind === "replacement") {
+				const entry = settlementPlan?.entries.find(
+					(candidate) => candidate.sourceSequence === issued.planEffect?.sourceSequence
+				);
+				if (settlementPlan === null || entry === undefined || entry.replacementSequence !== null) {
+					throw new TypeError("settlement replacement plan is unavailable");
+				}
+				settlementPlan = Object.freeze({
+					...settlementPlan,
+					entries: Object.freeze(
+						settlementPlan.entries.map((candidate) =>
+							candidate === entry ? Object.freeze({ ...candidate, replacementSequence: nextAuthorSequence }) : candidate
+						)
+					),
+					revision: settlementPlan.revision + 1,
+				});
+			}
 			commits.set(nextAuthorSequence, issued);
 			outbox.set(nextAuthorSequence, Object.freeze({ commit: issued, publishState: "pending" }));
 			nextAuthorSequence += 1;
 			return issued;
+		}),
+		transactWriteSettlementPlan: vi.fn((input) => {
+			if (input.scope.author !== scope.author || input.scope.objectId !== scope.objectId) {
+				return Promise.reject(new TypeError("settlement plan scope mismatch"));
+			}
+			if ((settlementPlan?.revision ?? null) !== input.expectedRevision) {
+				return Promise.reject(new TypeError("settlement plan revision mismatch"));
+			}
+			settlementPlan = Object.freeze({
+				...input.plan,
+				entries: Object.freeze(input.plan.entries.map((entry) => Object.freeze({ ...entry }))),
+				revision: (settlementPlan?.revision ?? -1) + 1,
+				scope,
+			});
+			return Promise.resolve(settlementPlan);
 		}),
 	});
 	return Object.freeze({ store, vertexDigest: lowerHex(carrier.digest) });

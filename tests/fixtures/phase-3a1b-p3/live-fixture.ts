@@ -107,7 +107,8 @@ export interface GenuinePreparedV3FixtureOptions {
 	readonly exactCanonicalInitialStateBytes?: Uint8Array;
 	readonly latchedAclGroups?: readonly ("admin" | "finality" | "referee" | "writer")[];
 	readonly latchedAclWriterOnlyRoster?: boolean;
-	readonly latchedAclVersion?: 1 | 2;
+	readonly latchedAclVersion?: 1 | 2 | 3;
+	readonly creatorTrustProfileId?: "creator-trusted-settlement-v1" | "creator-trusted-v1";
 	readonly stringPayloadOperation?: boolean;
 	readonly objectId?: string;
 	readonly createSqliteAheDurableStore?: CreateSqliteAheDurableStoreForFixture;
@@ -282,7 +283,11 @@ export async function createGenuinePreparedV3Fixture(
 		);
 		const anchorPrivateKeySeedHex = options.anchorPrivateKeySeedHex ?? contract.privateKeySeedHex;
 		const objectIdValue = options.objectId ?? `creator:${"a".repeat(32)}`;
-		const base = makeCreatorMaterial({ objectId: objectIdValue, privateKeySeedHex: anchorPrivateKeySeedHex });
+		const base = makeCreatorMaterial({
+			objectId: objectIdValue,
+			privateKeySeedHex: anchorPrivateKeySeedHex,
+			...(options.creatorTrustProfileId === undefined ? {} : { profileId: options.creatorTrustProfileId }),
+		});
 		const authorizedPrivateKeySeedHexes = options.authorizedPrivateKeySeedHexes ?? [contract.privateKeySeedHex];
 		if (authorizedPrivateKeySeedHexes.length === 0) throw new TypeError("deterministic Seam3 author roster is invalid");
 		const issuingAuthor = bytesHex(ed25519.getPublicKey(hexBytes(authorizedPrivateKeySeedHexes[0] as string)));

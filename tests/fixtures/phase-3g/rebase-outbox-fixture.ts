@@ -44,8 +44,10 @@ const PARAMETERS = Object.freeze({
 });
 
 export type SourceOperationProfile =
+	| "acl"
 	| "batch-2"
 	| "batch-16"
+	| "join"
 	| "malformed-batch"
 	| "mixed-control-batch"
 	| "nested-batch"
@@ -74,6 +76,8 @@ export interface SharedPlaneScenarioOptions {
 	readonly omitTargetBootstrap?: boolean;
 	readonly omitSourceAuthority?: boolean;
 	readonly reopenTarget?: boolean;
+	readonly settlementProfile?: boolean;
+	readonly publishSourceBeforeClose?: boolean;
 	readonly sourceAuthorityMutation?:
 		| "acl-context"
 		| "authorization-bytes"
@@ -238,6 +242,17 @@ function mustObjectId(value: string): StorageObjectId {
 	return parsed.value;
 }
 
+function recoveryAuthorization(
+	plane: PreparedPlane,
+	bytes: Uint8Array = plane.authorizationBytes
+):
+	| Readonly<{ readonly exactCanonicalAuthorAuthorizationBytes: Uint8Array }>
+	| Readonly<{ readonly exactCanonicalLatchedAclBytes: Uint8Array }> {
+	return plane.exactCanonicalLatchedAclBytes === undefined
+		? Object.freeze({ exactCanonicalAuthorAuthorizationBytes: bytes })
+		: Object.freeze({ exactCanonicalLatchedAclBytes: bytes });
+}
+
 async function preparePlane(
 	objectIdValue: string,
 	stateDigest: string,
@@ -246,6 +261,7 @@ async function preparePlane(
 		readonly authorizationAuthors?: readonly string[];
 		readonly blueprintVariant?: string;
 		readonly privateKeySeedHex?: string;
+		readonly settlementProfile?: boolean;
 		readonly useLatchedAcl?: boolean;
 		readonly terminalCatalog?: boolean;
 	}> = {}
@@ -256,10 +272,14 @@ async function preparePlane(
 		const selectedCatalog =
 			options.terminalCatalog === true ? terminalBatchCatalog() : counterBatchCatalog(options.blueprintVariant);
 		const privateKeySeedHex = options.privateKeySeedHex ?? contract.privateKeySeedHex;
-		const base = makeCreatorMaterial({ objectId: objectIdValue, privateKeySeedHex });
+		const base = makeCreatorMaterial({
+			objectId: objectIdValue,
+			privateKeySeedHex,
+			...(options.settlementProfile === true ? { profileId: "creator-trusted-settlement-v1" as const } : {}),
+		});
 		const author = bytesHex(ed25519.getPublicKey(hexBytes(privateKeySeedHex)));
 		const exactCanonicalLatchedAclBytes =
-			options.useLatchedAcl === true
+			options.useLatchedAcl === true || options.settlementProfile === true
 				? encodeCanonical({
 						epoch: 0,
 						kind: "drp-v3-latched-acl",
@@ -272,7 +292,7 @@ async function preparePlane(
 						),
 						objectId: objectIdValue,
 						permissionless: false,
-						version: 1,
+						version: options.settlementProfile === true ? 3 : 1,
 					})
 				: undefined;
 		const authorizationBytes =
@@ -422,6 +442,22 @@ function sourceOperations(profile: SourceOperationProfile): readonly Readonly<{
 			}),
 		]);
 	}
+	if (profile === "acl") {
+		return Object.freeze([
+			Object.freeze({
+				logicalTime: 3,
+				operation: Object.freeze({
+					action: "acl",
+					group: "writer",
+					kind: "grant",
+					target: "2".repeat(64),
+				}),
+			}),
+		]);
+	}
+	if (profile === "join") {
+		return Object.freeze([Object.freeze({ logicalTime: 3, operation: Object.freeze({ action: "join" }) })]);
+	}
 	if (profile === "structural") {
 		return Object.freeze([
 			Object.freeze({
@@ -457,9 +493,11 @@ function batchOperation(entries: ReturnType<typeof sourceOperations>): Readonly<
 function isHostileProfile(profile: SourceOperationProfile): boolean {
 	return (
 		profile === "malformed-batch" ||
+		profile === "acl" ||
 		profile === "mixed-control-batch" ||
 		profile === "nested-batch" ||
 		profile === "over-limit-batch" ||
+		profile === "join" ||
 		profile === "structural"
 	);
 }
@@ -559,8 +597,12 @@ export async function runSharedPlaneScenario(
 	options: SharedPlaneScenarioOptions = {}
 ): Promise<SharedPlaneScenarioResult> {
 	const objectId = `creator:${"d".repeat(32)}`;
-	const source = await preparePlane(objectId, "7".repeat(64), "source");
-	const target = await preparePlane(objectId, "8".repeat(64), "target");
+	const source = await preparePlane(objectId, "7".repeat(64), "source", {
+		settlementProfile: options.settlementProfile,
+	});
+	const target = await preparePlane(objectId, "8".repeat(64), "target", {
+		settlementProfile: options.settlementProfile,
+	});
 	const mismatchedSource =
 		options.sourceAuthorityMutation === "object-context"
 			? await preparePlane(`creator:${"e".repeat(32)}`, "7".repeat(64), "source-object")
@@ -592,7 +634,7 @@ export async function runSharedPlaneScenario(
 		sourceJournal = await installJournal(source);
 		const sourceRecovery = await recoverV3LiveReplica({
 			capability: source.capability,
-			exactCanonicalAuthorAuthorizationBytes: source.authorizationBytes,
+			...recoveryAuthorization(source),
 			issuanceScope: scope,
 			issuanceStore: sourceStore,
 			liveJournalStore: sourceJournal,
@@ -616,10 +658,10 @@ export async function runSharedPlaneScenario(
 		let sourceCommit: DurableIssueCommit;
 		const sourceCommits: DurableIssueCommit[] = [];
 		if (isHostileProfile(profile)) {
-			const hostile =
-				profile === "structural"
-					? (operations[0]?.operation ?? Object.freeze({ action: "causalJoin" }))
-					: batchOperation(operations);
+			const directControl = profile === "acl" || profile === "join" || profile === "structural";
+			const hostile = directControl
+				? (operations[0]?.operation ?? Object.freeze({ action: "causalJoin" }))
+				: batchOperation(operations);
 			const bootstrap = await sourceStore.readIssued(scope, 0);
 			if (bootstrap === null) throw new TypeError("Phase 3g source bootstrap row is unavailable");
 			sourceCommit = await sourceStore.transactIssue(scope, (authorSequence) =>
@@ -629,7 +671,7 @@ export async function runSharedPlaneScenario(
 						authorSequence,
 						hostile,
 						operations[0]?.logicalTime ?? 3,
-						profile === "structural" ? [bytesHex(bootstrap.envelope.digest)] : undefined
+						directControl ? [bytesHex(bootstrap.envelope.digest)] : undefined
 					)
 				)
 			);
@@ -658,6 +700,12 @@ export async function runSharedPlaneScenario(
 			const secondCommit = await sourceStore.readIssued(scope, secondIssue.authorSequence);
 			if (secondCommit === null) throw new TypeError("Phase 3g second source issued row is unavailable");
 			sourceCommits.push(secondCommit);
+		}
+		if (options.publishSourceBeforeClose === true) {
+			const sourcePublication = await sourceActivated.handle.publishPending();
+			if (!sourcePublication.ok || sourcePublication.kind !== "published") {
+				throw new TypeError("Phase 3g source publication failed");
+			}
 		}
 		sourceActivated.handle.deactivate();
 		await sourceJournal.close();
@@ -828,10 +876,10 @@ export async function runSharedPlaneScenario(
 				: {
 						displacedSource: Object.freeze({
 							capability: sourceCapability,
-							exactCanonicalAuthorAuthorizationBytes: sourceAuthorization,
+							...recoveryAuthorization(selectedSourcePlane, sourceAuthorization),
 						}),
 					}),
-			exactCanonicalAuthorAuthorizationBytes: targetAuthorization,
+			...recoveryAuthorization(target, targetAuthorization),
 			issuanceScope: scope,
 			issuanceStore: recoveryIssuanceStore,
 			liveJournalStore: targetJournal,
@@ -884,9 +932,9 @@ export async function runSharedPlaneScenario(
 						capability: restartedTargetCapability,
 						displacedSource: Object.freeze({
 							capability: restartedSourceCapability,
-							exactCanonicalAuthorAuthorizationBytes: source.authorizationBytes,
+							...recoveryAuthorization(source),
 						}),
-						exactCanonicalAuthorAuthorizationBytes: target.authorizationBytes,
+						...recoveryAuthorization(target),
 						issuanceScope: scope,
 						issuanceStore: targetStore,
 						liveJournalStore: targetJournal,
@@ -964,9 +1012,9 @@ export async function runSharedPlaneScenario(
 					capability: reopenedCapability,
 					displacedSource: Object.freeze({
 						capability: reopenedSource,
-						exactCanonicalAuthorAuthorizationBytes: source.authorizationBytes,
+						...recoveryAuthorization(source),
 					}),
-					exactCanonicalAuthorAuthorizationBytes: target.authorizationBytes,
+					...recoveryAuthorization(target),
 					issuanceScope: scope,
 					issuanceStore: reopenedStore,
 					liveJournalStore: reopenedJournal,
