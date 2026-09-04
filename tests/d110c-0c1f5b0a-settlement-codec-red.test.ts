@@ -539,6 +539,7 @@ describe("D.110c-0c1f5b0a settlement protocol codecs RED", () => {
 
 	it("puts ACL membership, genesis admission, adjacency, and monotonicity in the bounded advance predicate", async () => {
 		const surface = await advanceSurface();
+		const genesisSentinel = (await settlementSurface()).CREATOR_AUTHOR_SETTLEMENT_GENESIS_SENTINEL;
 		const currentAuthors = Object.freeze(["0".repeat(64), "1".repeat(64)] as const);
 		const successorAuthors = Object.freeze([...currentAuthors, "2".repeat(64)] as const);
 		const membersFor = (authors: readonly string[]): readonly Readonly<Record<string, unknown>>[] =>
@@ -560,7 +561,7 @@ describe("D.110c-0c1f5b0a settlement protocol codecs RED", () => {
 				Object.freeze([successorAuthors[1], 0, null]),
 				Object.freeze([successorAuthors[2], 1, null]),
 			]),
-			priorCheckpointDigest: surface.CREATOR_AUTHOR_SETTLEMENT_GENESIS_SENTINEL,
+			priorCheckpointDigest: genesisSentinel,
 			priorCheckpointKind: "genesis",
 			successorEpoch: 1,
 		});
