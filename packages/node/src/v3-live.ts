@@ -4489,7 +4489,7 @@ function countHistoricalIssuanceRow(context: HistoricalIssuanceContext | undefin
 	if (ReflectApply(SetPrototypeHas, context.countedSequences, [authorSequence]) === true) return true;
 	context.count += 1;
 	ReflectApply(SetPrototypeAdd, context.countedSequences, [authorSequence]);
-	const maxHistoricalIssuanceRows = context.maxEpochVertices * 3;
+	const maxHistoricalIssuanceRows = context.maxEpochVertices;
 	return context.count <= maxHistoricalIssuanceRows;
 }
 
