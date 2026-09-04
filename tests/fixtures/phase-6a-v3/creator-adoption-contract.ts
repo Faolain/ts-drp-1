@@ -368,6 +368,7 @@ export interface GenuineCreatorAdoptionFixture {
 	}>;
 	readonly controls: {
 		activeRefMutation?: "digest" | "length";
+		activeRefLengthMutation?: Readonly<{ readonly byteLength: number; readonly kind: string }>;
 		adoptionPhase: boolean;
 		aheMutationCount: number;
 		aheMutationHook?(observation: CreatorAdoptionAheMutationObservation): void;
@@ -402,17 +403,30 @@ export interface GenuineCreatorAdoptionFixture {
 export interface GenuineCreatorAdoptionFixtureOptions {
 	readonly applicationBatch?: boolean;
 	readonly authorizedPrivateKeySeedHexes?: readonly string[];
+	readonly causalJoinOperation?: boolean;
 	beforeCreatorClose?(
 		input: Readonly<{
+			readonly createRegisteredVertex: GenuinePreparedV3Fixture["createRegisteredVertex"];
 			readonly firstLogicalTime: number;
+			readonly initialDependency: string;
 			readonly plane: V3PlaneHandle;
+			routeRegisteredVertex(
+				vertex: ReturnType<GenuinePreparedV3Fixture["createRegisteredVertex"]>,
+				transportSender?: string
+			): Promise<void>;
+			routeRegisteredVertexUnchecked(
+				vertex: ReturnType<GenuinePreparedV3Fixture["createRegisteredVertex"]>,
+				transportSender?: string
+			): boolean;
 			readonly signRegisteredVertexDigest: V3LocalIssueInput["signRegisteredVertexDigest"];
+			wasRegisteredVertexAdmitted(vertex: ReturnType<GenuinePreparedV3Fixture["createRegisteredVertex"]>): boolean;
 		}>
 	): Promise<Readonly<{ readonly authorSequence: number; readonly digest: string }>>;
 	decorateIssuanceStore?(store: DurableIssuanceStore): DurableIssuanceStore;
 	decorateLiveJournalStore?(store: DurableLiveJournalStore): DurableLiveJournalStore;
 	readonly operationAdmissionPolicy?: V3OperationAdmissionPolicy;
 	readonly establishedPeerPrivateKeySeedHex?: string;
+	readonly latchedAclGroups?: readonly ("admin" | "finality" | "referee" | "writer")[];
 	readonly modules?: GenuineCreatorAdoptionFixtureModules;
 	readonly objectId?: string;
 	readonly stageAclChange?: boolean;
@@ -632,13 +646,42 @@ function decoratedAheStore(
 				observe("ahe-generation", result.value.adoptedGeneration.generationId);
 				for (const reference of result.value.references) observe("ahe-blob", reference.digest);
 			}
-			if (!result.ok || result.value.kind !== "active" || controls.activeRefMutation === undefined) return result;
+			if (!result.ok || result.value.kind !== "active") return result;
+			const activeRefLengthMutation = controls.activeRefLengthMutation;
+			let selectedDigest: string | undefined;
+			if (activeRefLengthMutation !== undefined) {
+				for (const reference of result.value.references) {
+					const loaded = await backend.getBlob(reference.digest);
+					if (!loaded.ok || loaded.value === null) continue;
+					try {
+						const decoded = decodeCanonical(loaded.value);
+						if (
+							decoded !== null &&
+							typeof decoded === "object" &&
+							!Array.isArray(decoded) &&
+							(decoded as Readonly<Record<string, unknown>>).kind === activeRefLengthMutation.kind
+						) {
+							selectedDigest = reference.digest;
+							break;
+						}
+					} catch {
+						// Non-canonical fixture closure blobs are not candidates for this targeted mutation.
+					}
+				}
+				if (selectedDigest === undefined) {
+					throw new TypeError(`D110C_0C1K_ACTIVE_REF_KIND_UNAVAILABLE:${activeRefLengthMutation.kind}`);
+				}
+			}
+			if (controls.activeRefMutation === undefined && selectedDigest === undefined) return result;
+			const selectedByteLength = activeRefLengthMutation?.byteLength;
 			const references = result.value.references.map((ref, index) =>
-				index !== 0
-					? ref
-					: controls.activeRefMutation === "length"
-						? { ...ref, byteLength: ref.byteLength + 1 }
-						: { ...ref, digest: "f".repeat(64) as typeof ref.digest }
+				selectedDigest === ref.digest
+					? { ...ref, byteLength: selectedByteLength ?? ref.byteLength }
+					: index !== 0 || controls.activeRefMutation === undefined
+						? ref
+						: controls.activeRefMutation === "length"
+							? { ...ref, byteLength: ref.byteLength + 1 }
+							: { ...ref, digest: "f".repeat(64) as typeof ref.digest }
 			);
 			return Object.freeze({
 				ok: true as const,
@@ -1076,6 +1119,8 @@ export async function openGenuineCreatorAdoptionFixture(
 		exactCanonicalInitialStateBytes: encodeCanonical(0),
 		historyRoot: emptyHistoryRoot,
 		historySize: 0,
+		...(options.causalJoinOperation === undefined ? {} : { causalJoinOperation: options.causalJoinOperation }),
+		...(options.latchedAclGroups === undefined ? {} : { latchedAclGroups: options.latchedAclGroups }),
 		...(options.objectId === undefined ? {} : { objectId: options.objectId }),
 		...(options.stringPayloadOperation === undefined ? {} : { stringPayloadOperation: options.stringPayloadOperation }),
 		createSqliteAheDurableStore: modules.createSqliteAheDurableStore,
@@ -1169,6 +1214,29 @@ export async function openGenuineCreatorAdoptionFixture(
 			if (admissionTimer !== undefined) clearTimeout(admissionTimer);
 		}
 	};
+	const routeRegisteredVertexUnchecked = (
+		vertex: ReturnType<GenuinePreparedV3Fixture["createRegisteredVertex"]>,
+		transportSender = "d110c-fixture-peer"
+	): boolean => {
+		const gossipTopicFor = networkNode.gossipTopicFor;
+		try {
+			Reflect.set(networkNode, "gossipTopicFor", (message: Message) => message.objectId);
+			return routeV3Ingress(
+				networkNode,
+				Message.create({
+					data: V3Envelope.encode({
+						canonicalPreimage: vertex.canonicalPreimageBytes,
+						signature: vertex.signature,
+					}).finish(),
+					objectId: activation.handle.topic,
+					sender: transportSender,
+					type: MessageType.MESSAGE_TYPE_V3_ENVELOPE,
+				})
+			);
+		} finally {
+			Reflect.set(networkNode, "gossipTopicFor", gossipTopicFor);
+		}
+	};
 	const blueprint = bindV3BlueprintLivePlane({
 		exactCanonicalInitialStateBytes: encodeCanonical(0),
 		plane: activation.handle,
@@ -1258,9 +1326,14 @@ export async function openGenuineCreatorAdoptionFixture(
 			throw new TypeError("D.110a pre-close fixture option is incompatible with other staged operations");
 		}
 		const preCloseIssued = await options.beforeCreatorClose({
+			createRegisteredVertex: fixture.createRegisteredVertex,
 			firstLogicalTime: 3,
+			initialDependency: localIssued.digest,
 			plane: activation.handle,
+			routeRegisteredVertex,
+			routeRegisteredVertexUnchecked,
 			signRegisteredVertexDigest: fixture.signRegisteredVertexDigest,
+			wasRegisteredVertexAdmitted: (vertex) => admittedVertexDigests.has(Buffer.from(vertex.digest).toString("hex")),
 		});
 		if (
 			!Number.isSafeInteger(preCloseIssued.authorSequence) ||

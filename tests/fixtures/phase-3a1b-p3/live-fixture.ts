@@ -21,6 +21,10 @@ import packageGolden from "../track-p2-b/forward-counter-package.json" with { ty
 const ROOT = path.resolve(import.meta.dirname, "../../..");
 const ARTIFACT = path.join(ROOT, "tests/fixtures/track-p2-c/primary.mjs");
 const LATCHED_ACL_ARTIFACT_SOURCE = `function aclReducer(input){return {output:null,state:input.state}}function addReducer(input){const value=input.operation.value??1;const state=input.state+value;return {output:state,state}}function readReducer(input){return {output:input.state,state:input.state}}function setReducer(input){const state=input.operation.value??0;return {output:state,state}}export const blueprint={exportSchemaVersion:1,artifactId:"counter.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{acl:aclReducer,add:addReducer,"read-value":readReducer,set:setReducer}};`;
+const LATCHED_ACL_CAUSAL_JOIN_ARTIFACT_SOURCE = LATCHED_ACL_ARTIFACT_SOURCE.replace(
+	"function readReducer",
+	"function causalJoinReducer(input){return {output:null,state:input.state}}function readReducer"
+).replace("add:addReducer,", "add:addReducer,causalJoin:causalJoinReducer,");
 const LATCHED_ACL_BATCH_ARTIFACT_SOURCE = `function aclReducer(input){return {output:null,state:input.state}}function addReducer(input){const value=input.operation.value??1;const state=input.state+value;return {output:state,state}}function applicationBatchReducer(input){let state=input.state;const output=[];for(const entry of input.operation.batch.entries){const operation=entry.operation;if(operation.action!=="add")throw new TypeError("unknown batch action");state+=operation.value??1;output.push(state)}return {output,state}}function readReducer(input){return {output:input.state,state:input.state}}function setReducer(input){const state=input.operation.value??0;return {output:state,state}}export const blueprint={exportSchemaVersion:1,artifactId:"counter.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{acl:aclReducer,add:addReducer,applicationBatch:applicationBatchReducer,"read-value":readReducer,set:setReducer}};`;
 const LATCHED_ACL_STRING_ARTIFACT_SOURCE = `function aclReducer(input){return {output:null,state:input.state}}function addReducer(input){const value=input.operation.value??1;const state=input.state+value;return {output:state,state}}function padReducer(input){return {output:input.operation.payload.length,state:input.state}}function readReducer(input){return {output:input.state,state:input.state}}function setReducer(input){const state=input.operation.value??0;return {output:state,state}}export const blueprint={exportSchemaVersion:1,artifactId:"counter.v1",runtimeProfile:"ecmascript-2024-sync-v1",reducers:{acl:aclReducer,add:addReducer,pad:padReducer,"read-value":readReducer,set:setReducer}};`;
 const PARAMETERS = Object.freeze({
@@ -97,6 +101,7 @@ export interface GenuinePreparedV3FixtureOptions {
 	readonly anchorPrivateKeySeedHex?: string;
 	readonly authorizationMode?: "latched-acl" | "legacy-author-list";
 	readonly authorizedPrivateKeySeedHexes?: readonly string[];
+	readonly causalJoinOperation?: boolean;
 	readonly historyRoot?: string;
 	readonly historySize?: number;
 	readonly exactCanonicalInitialStateBytes?: Uint8Array;
@@ -124,9 +129,10 @@ function lowerHex(bytes: Uint8Array): string {
 function blueprintFixture(
 	authorizationMode: "latched-acl" | "legacy-author-list",
 	applicationBatch: boolean,
-	stringPayloadOperation: boolean
+	stringPayloadOperation: boolean,
+	causalJoinOperation: boolean
 ): BlueprintFixture {
-	if ((applicationBatch || stringPayloadOperation) && authorizationMode !== "latched-acl") {
+	if ((applicationBatch || stringPayloadOperation || causalJoinOperation) && authorizationMode !== "latched-acl") {
 		throw new TypeError("extended operation fixture requires latched ACL");
 	}
 	if (applicationBatch && stringPayloadOperation) {
@@ -138,7 +144,9 @@ function blueprintFixture(
 				? LATCHED_ACL_BATCH_ARTIFACT_SOURCE
 				: stringPayloadOperation
 					? LATCHED_ACL_STRING_ARTIFACT_SOURCE
-					: LATCHED_ACL_ARTIFACT_SOURCE
+					: causalJoinOperation
+						? LATCHED_ACL_CAUSAL_JOIN_ARTIFACT_SOURCE
+						: LATCHED_ACL_ARTIFACT_SOURCE
 			: readFileSync(ARTIFACT, "utf8")
 	);
 	const artifactDigest = lowerHex(hashDomain(packageGolden.artifactDigestDomain, exactArtifactBytes));
@@ -162,6 +170,17 @@ function blueprintFixture(
 								name: "acl",
 							}),
 							packageGolden.package.manifest.operations[0],
+							...(causalJoinOperation
+								? [
+										Object.freeze({
+											argumentSchema: Object.freeze({
+												fields: Object.freeze([]),
+												kind: "closed-record",
+											}),
+											name: "causalJoin",
+										}),
+									]
+								: []),
 							...(stringPayloadOperation
 								? [
 										Object.freeze({
@@ -257,7 +276,8 @@ export async function createGenuinePreparedV3Fixture(
 		const fixture = blueprintFixture(
 			authorizationMode,
 			options.applicationBatch === true,
-			options.stringPayloadOperation === true
+			options.stringPayloadOperation === true,
+			options.causalJoinOperation === true
 		);
 		const anchorPrivateKeySeedHex = options.anchorPrivateKeySeedHex ?? contract.privateKeySeedHex;
 		const objectIdValue = options.objectId ?? `creator:${"a".repeat(32)}`;
