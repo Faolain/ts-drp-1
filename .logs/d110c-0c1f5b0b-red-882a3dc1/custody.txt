@@ -1,0 +1,10 @@
+record=D.110c-0c1f5b0b
+checkpoint=RED
+commit=882a3dc1de1a550003b0e105fbbb89444e915b2e
+tree=39dcecaba558d1a61953f816bcb2c4c989cb14b0
+parent=0cf461041fbfc0191030ed563b727edb0453008a
+signature=G
+remote_ref=origin/codex/phase3a1b-p6-golden-path
+remote_value_at_capture=882a3dc1de1a550003b0e105fbbb89444e915b2e
+threat_model=trusted_local_operator_accidental_drift_detection
+
