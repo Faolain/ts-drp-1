@@ -38,6 +38,23 @@ function fullMember(index: number): LatchedAclMember {
 	});
 }
 
+type BoundaryShape = "full-shape" | "writer-only";
+
+function measurementAuthor(index: number): string {
+	return index.toString(16).padStart(8, "0").repeat(8);
+}
+
+function measurementMember(index: number, shape: BoundaryShape): LatchedAclMember {
+	const identity = measurementAuthor(index);
+	return shape === "writer-only"
+		? Object.freeze({ author: identity, finalityKey: null, groups: Object.freeze(["writer"] as const) })
+		: Object.freeze({
+				author: identity,
+				finalityKey: measurementAuthor(index + 1_000_000),
+				groups: Object.freeze(["admin", "finality", "referee", "writer"] as const),
+			});
+}
+
 function digest(bytes: Uint8Array): string {
 	return Array.from(hashDomain("ts-drp/latched-acl/v3", bytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
@@ -64,36 +81,49 @@ function genesisSnapshot(permissionless = false): LatchedAclSnapshot {
 }
 
 /**
- * Measures one exact full-member legacy version-2 ACL snapshot.
+ * Measures one exact authoritative legacy version-2 ACL sizing snapshot.
  * @param memberCount - Boundary member count.
+ * @param shape - Writer-only or full member shape.
  * @returns Exact canonical byte length and legacy-ceiling disposition.
  */
-export function encodedAclBoundary(memberCount: 31 | 64 | 65): Readonly<{
+export function encodedAclBoundary(
+	memberCount: 31 | 41 | 64 | 65,
+	shape: BoundaryShape
+): Readonly<{
 	readonly byteLength: number;
 	readonly fitsLegacyCeiling: boolean;
 }> {
 	const snapshot: LatchedAclSnapshot = Object.freeze({
-		...genesisSnapshot(),
-		members: Object.freeze(Array.from({ length: memberCount }, (_, index) => fullMember(index))),
+		epoch: 4096,
+		kind: "drp-v3-latched-acl",
+		members: Object.freeze(Array.from({ length: memberCount }, (_, index) => measurementMember(index, shape))),
+		objectId: "room-abcdefgh",
+		permissionless: false,
+		version: 2,
 	});
 	const byteLength = encodeCanonical(snapshot).byteLength;
 	return Object.freeze({ byteLength, fitsLegacyCeiling: byteLength <= W0_LEGACY_ACL_MAX_CANONICAL_BYTES });
 }
 
-export function stageOpenBoundary(memberCount: 31 | 64 | 65): Readonly<{
+export function stageOpenBoundary(
+	memberCount: 31 | 41 | 64 | 65,
+	shape: BoundaryShape
+): Readonly<{
 	readonly openOk: boolean;
 	readonly stageOk: boolean;
 }> {
 	const genesis = genesisSnapshot();
 	const grants: LatchedAclOperation[] = [];
 	for (let index = 1; index < memberCount; index += 1) {
-		for (const group of ["admin", "finality", "referee", "writer"] as const) {
+		const groups =
+			shape === "writer-only" ? (["writer"] as const) : (["admin", "finality", "referee", "writer"] as const);
+		for (const group of groups) {
 			grants.push(Object.freeze({ actor: genesis.members[0]!.author, group, kind: "grant", target: author(index) }));
 		}
 	}
 	const granted = stageLatchedAclOperations({ operations: Object.freeze(grants), snapshot: genesis });
 	if (!granted.ok) return Object.freeze({ openOk: false, stageOk: false });
-	if (memberCount === 65) {
+	if (shape === "writer-only") {
 		return Object.freeze({ openOk: openSnapshot(granted.next).ok, stageOk: true });
 	}
 	const keyOperations = granted.next.members

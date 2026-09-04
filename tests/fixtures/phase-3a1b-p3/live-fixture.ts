@@ -106,6 +106,7 @@ export interface GenuinePreparedV3FixtureOptions {
 	readonly historySize?: number;
 	readonly exactCanonicalInitialStateBytes?: Uint8Array;
 	readonly latchedAclGroups?: readonly ("admin" | "finality" | "referee" | "writer")[];
+	readonly latchedAclWriterOnlyRoster?: boolean;
 	readonly latchedAclVersion?: 1 | 2;
 	readonly stringPayloadOperation?: boolean;
 	readonly objectId?: string;
@@ -308,11 +309,19 @@ export async function createGenuinePreparedV3Fixture(
 				? encodeCanonical({
 						epoch: 0,
 						kind: "drp-v3-latched-acl",
-						members: authors.map((selectedAuthor) => ({
-							author: selectedAuthor,
-							finalityKey: selectedAuthor,
-							groups: [...(options.latchedAclGroups ?? ["admin", "finality", "writer"])],
-						})),
+						members: authors.map((selectedAuthor) =>
+							options.latchedAclWriterOnlyRoster === true
+								? {
+										author: selectedAuthor,
+										finalityKey: selectedAuthor === issuingAuthor ? selectedAuthor : null,
+										groups: selectedAuthor === issuingAuthor ? ["admin", "finality", "referee", "writer"] : ["writer"],
+									}
+								: {
+										author: selectedAuthor,
+										finalityKey: selectedAuthor,
+										groups: [...(options.latchedAclGroups ?? ["admin", "finality", "writer"])],
+									}
+						),
 						objectId: base.anchor.objectId,
 						permissionless: false,
 						version: options.latchedAclVersion ?? 1,

@@ -11,7 +11,7 @@ import {
 } from "./fixtures/phase-6b-d110c-0c1k/w0-contract.js";
 
 describe("D.110c-0c1k W0 writer-capacity RED", () => {
-	it("keeps the legacy 8,192-byte ACL ceiling and aligns stage/open at 31/64/65", () => {
+	it("aligns 31/64/65 writer-only and 41 full-shape ACLs under the legacy 8,192-byte ceiling", () => {
 		const lifecycleConsumers = [
 			"packages/node/src/creator-close.ts",
 			"packages/node/src/creator-adoption.ts",
@@ -22,26 +22,26 @@ describe("D.110c-0c1k W0 writer-capacity RED", () => {
 				"openCanonicalLatchedAclSnapshot"
 			);
 		}
-		const expectedByCount = new Map<31 | 64 | 65, boolean>([
-			[31, true],
-			[64, false],
-			[65, false],
-		]);
 		expect(W0_LEGACY_ACL_MAX_CANONICAL_BYTES).toBe(8_192);
 		const aclSource = source("packages/protocol-v3/src/latched-acl.ts");
 		expect(aclSource).toContain("const MAX_CANONICAL_BYTES = 8192;");
 		expect(aclSource).toContain("record.members.length > (record.version === 3 ? 256 : 64)");
-		expect([31, 64, 65].map((count) => encodedAclBoundary(count as 31 | 64 | 65))).toEqual([
-			{ byteLength: 6_297, fitsLegacyCeiling: true },
-			{ byteLength: 12_864, fitsLegacyCeiling: false },
-			{ byteLength: 13_063, fitsLegacyCeiling: false },
-		]);
-		for (const memberCount of [31, 64, 65] as const) {
-			const result = stageOpenBoundary(memberCount);
-			const expected = expectedByCount.get(memberCount);
-			expect.soft(result.stageOk, `${memberCount} members: staging boundary`).toBe(expected);
-			expect.soft(result.openOk, `${memberCount} members: close/adoption/recovery open boundary`).toBe(expected);
-			expect.soft(result.stageOk, `${memberCount} members: stage/open parity`).toBe(result.openOk);
+		const boundaries = [
+			{ byteLength: 3_450, expected: true, memberCount: 31, shape: "writer-only" },
+			{ byteLength: 7_014, expected: true, memberCount: 64, shape: "writer-only" },
+			{ byteLength: 7_122, expected: false, memberCount: 65, shape: "writer-only" },
+			{ byteLength: 8_261, expected: false, memberCount: 41, shape: "full-shape" },
+		] as const;
+		for (const { byteLength, expected, memberCount, shape } of boundaries) {
+			expect(encodedAclBoundary(memberCount, shape)).toEqual({
+				byteLength,
+				fitsLegacyCeiling: byteLength <= W0_LEGACY_ACL_MAX_CANONICAL_BYTES,
+			});
+			const result = stageOpenBoundary(memberCount, shape);
+			const label = `${memberCount} ${shape} members`;
+			expect.soft(result.stageOk, `${label}: staging boundary`).toBe(expected);
+			expect.soft(result.openOk, `${label}: close/adoption/recovery open boundary`).toBe(expected);
+			expect.soft(result.stageOk, `${label}: stage/open parity`).toBe(result.openOk);
 		}
 	});
 

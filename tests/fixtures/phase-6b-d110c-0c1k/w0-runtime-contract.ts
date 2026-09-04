@@ -31,7 +31,7 @@ export function deterministicAuthorSeeds(count: number): readonly string[] {
  * @param memberCount - Accepted W0 boundary size.
  * @returns Real close count and committed recovery disposition.
  */
-export async function exerciseAcceptedAclLifecycle(memberCount: 31): Promise<
+export async function exerciseAcceptedAclLifecycle(memberCount: 31 | 64): Promise<
 	Readonly<{
 		readonly closeCount: number;
 		readonly committedRecovery: unknown;
@@ -39,7 +39,7 @@ export async function exerciseAcceptedAclLifecycle(memberCount: 31): Promise<
 > {
 	const fixture = await openGenuineCreatorAdoptionFixture({
 		authorizedPrivateKeySeedHexes: deterministicAuthorSeeds(memberCount),
-		latchedAclGroups: Object.freeze(["admin", "finality", "referee", "writer"]),
+		latchedAclWriterOnlyRoster: true,
 	});
 	try {
 		const committed = await commitGenuineCreatorAdoptionFixture(fixture);
@@ -57,11 +57,16 @@ export async function exerciseAcceptedAclLifecycle(memberCount: 31): Promise<
  * @param memberCount - Byte- or cardinality-rejected member count.
  * @returns Failure detail, or undefined if the invalid lifecycle opened.
  */
-export async function rejectedAclLifecycle(memberCount: 64 | 65): Promise<string | undefined> {
+export async function rejectedAclLifecycle(
+	memberCount: 41 | 65,
+	shape: "full-shape" | "writer-only"
+): Promise<string | undefined> {
 	try {
 		const fixture = await openGenuineCreatorAdoptionFixture({
 			authorizedPrivateKeySeedHexes: deterministicAuthorSeeds(memberCount),
-			latchedAclGroups: Object.freeze(["admin", "finality", "referee", "writer"]),
+			...(shape === "writer-only"
+				? { latchedAclWriterOnlyRoster: true }
+				: { latchedAclGroups: Object.freeze(["admin", "finality", "referee", "writer"] as const) }),
 		});
 		await fixture.close();
 		return undefined;

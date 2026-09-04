@@ -427,6 +427,7 @@ export interface GenuineCreatorAdoptionFixtureOptions {
 	readonly operationAdmissionPolicy?: V3OperationAdmissionPolicy;
 	readonly establishedPeerPrivateKeySeedHex?: string;
 	readonly latchedAclGroups?: readonly ("admin" | "finality" | "referee" | "writer")[];
+	readonly latchedAclWriterOnlyRoster?: boolean;
 	readonly modules?: GenuineCreatorAdoptionFixtureModules;
 	readonly objectId?: string;
 	readonly stageAclChange?: boolean;
@@ -1121,6 +1122,9 @@ export async function openGenuineCreatorAdoptionFixture(
 		historySize: 0,
 		...(options.causalJoinOperation === undefined ? {} : { causalJoinOperation: options.causalJoinOperation }),
 		...(options.latchedAclGroups === undefined ? {} : { latchedAclGroups: options.latchedAclGroups }),
+		...(options.latchedAclWriterOnlyRoster === undefined
+			? {}
+			: { latchedAclWriterOnlyRoster: options.latchedAclWriterOnlyRoster }),
 		...(options.objectId === undefined ? {} : { objectId: options.objectId }),
 		...(options.stringPayloadOperation === undefined ? {} : { stringPayloadOperation: options.stringPayloadOperation }),
 		createSqliteAheDurableStore: modules.createSqliteAheDurableStore,

@@ -26,28 +26,45 @@ beforeAll(() => {
 });
 
 describe("D.110c-0c1k W0 real lifecycle and capacity RED", () => {
-	it("stages, opens, recovers, closes, and adopts a genuine 31-member full legacy ACL", async () => {
-		const lifecycle = await exerciseAcceptedAclLifecycle(31).then(
-			(value) => value,
-			(error: unknown) => (error instanceof Error ? error.message : String(error))
-		);
-		expect(encodedAclBoundary(31)).toEqual({ byteLength: 6_297, fitsLegacyCeiling: true });
-		expect(W0_LEGACY_ACL_MAX_CANONICAL_BYTES).toBe(8_192);
-		expect.soft(stageOpenBoundary(31), "stage/open parity").toEqual({ openOk: true, stageOk: true });
-		expect(lifecycle).toEqual({
-			closeCount: 2,
-			committedRecovery: "active-new",
-		});
-	});
-
-	for (const [memberCount, byteLength, authority] of [
-		[64, 12_864, "legacy byte ceiling"],
-		[65, 13_063, "legacy cardinality"],
+	for (const [memberCount, byteLength] of [
+		[31, 3_450],
+		[64, 7_014],
 	] as const) {
-		it(`rejects ${memberCount} full members consistently by ${authority}`, async () => {
-			const rejected = await rejectedAclLifecycle(memberCount);
-			expect(encodedAclBoundary(memberCount)).toEqual({ byteLength, fitsLegacyCeiling: false });
-			expect.soft(stageOpenBoundary(memberCount), "stage/open parity").toEqual({ openOk: false, stageOk: false });
+		it(`stages, opens, recovers, closes, and adopts a genuine ${memberCount}-member writer-only ACL`, async () => {
+			const lifecycle = await exerciseAcceptedAclLifecycle(memberCount).then(
+				(value) => value,
+				(error: unknown) => (error instanceof Error ? error.message : String(error))
+			);
+			expect(encodedAclBoundary(memberCount, "writer-only")).toEqual({
+				byteLength,
+				fitsLegacyCeiling: true,
+			});
+			expect(W0_LEGACY_ACL_MAX_CANONICAL_BYTES).toBe(8_192);
+			expect.soft(stageOpenBoundary(memberCount, "writer-only"), "stage/open parity").toEqual({
+				openOk: true,
+				stageOk: true,
+			});
+			expect(lifecycle).toEqual({
+				closeCount: 2,
+				committedRecovery: "active-new",
+			});
+		});
+	}
+
+	for (const [memberCount, shape, byteLength, authority] of [
+		[65, "writer-only", 7_122, "legacy cardinality"],
+		[41, "full-shape", 8_261, "legacy byte ceiling"],
+	] as const) {
+		it(`rejects ${memberCount} ${shape} members consistently by ${authority}`, async () => {
+			const rejected = await rejectedAclLifecycle(memberCount, shape);
+			expect(encodedAclBoundary(memberCount, shape)).toEqual({
+				byteLength,
+				fitsLegacyCeiling: memberCount === 65,
+			});
+			expect.soft(stageOpenBoundary(memberCount, shape), "stage/open parity").toEqual({
+				openOk: false,
+				stageOk: false,
+			});
 			expect(rejected).toMatch(
 				/(?:live preparation failed: invalid-input|durable recovery failed: authorization-rejected)/iu
 			);
