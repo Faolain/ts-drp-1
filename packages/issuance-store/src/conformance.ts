@@ -431,7 +431,10 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 			) {
 				throw this.#latchCorruption();
 			}
-			if (!authenticatedSettled && decoded.epoch !== captured.closedEpoch) {
+			if (
+				(authenticatedSettled && decoded.epoch > captured.closedEpoch) ||
+				(!authenticatedSettled && decoded.epoch !== captured.closedEpoch)
+			) {
 				throw new InvalidArgumentFailure("selected issuance row belongs to another epoch");
 			}
 			if (!authenticatedSettled && outbox.publishState === "pending") {

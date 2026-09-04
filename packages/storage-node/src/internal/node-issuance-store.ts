@@ -872,7 +872,10 @@ class NodeIssuanceImplementation {
 					}
 					const decoded = decodeDurableIssuancePreimage(issued.canonicalPreimageBytes, captured.scope, authorSequence);
 					if (decoded === undefined) throw this.#latchCorruption("selected issuance preimage is malformed");
-					if (!authenticatedSettled && decoded.epoch !== captured.closedEpoch) {
+					if (
+						(authenticatedSettled && decoded.epoch > captured.closedEpoch) ||
+						(!authenticatedSettled && decoded.epoch !== captured.closedEpoch)
+					) {
 						throw invalid("selected issuance row belongs to another epoch");
 					}
 					if (!authenticatedSettled && outbox.publishState === "pending") {
