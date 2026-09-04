@@ -186,3 +186,36 @@ test("rejects the genuine IndexedDB native-row mutant matrix without pruning wri
 		tokens.delete(issued.token);
 	}
 });
+
+test("authenticates settlement refusal, mixed-prefix deletion, replay and future-epoch refusal in Chromium", async ({
+	page,
+}) => {
+	test.skip(process.env.D109B_BROWSER_MAINTENANCE_READY !== "true", "D110C_F5B0D_BROWSER_MAINTENANCE_MISSING");
+	const issued = transition();
+	try {
+		await page.goto(issued.url, { waitUntil: "load" });
+		const value = await page.evaluate(() => {
+			const fixture = (
+				globalThis as unknown as {
+					phase6bIssuanceRetention: {
+						authenticatedSettlementCase(databaseName: string): Promise<Record<string, unknown>>;
+					};
+				}
+			).phase6bIssuanceRetention;
+			return fixture.authenticatedSettlementCase(`d110c-f5b0d-${crypto.randomUUID()}`);
+		});
+		expect(value).toEqual({
+			absentPlanCode: "ISSUANCE_RETRY_REQUIRED",
+			firstRange: { from: 0, through: 2 },
+			futureCode: "ISSUANCE_INVALID_ARGUMENT",
+			futureRowsPresent: true,
+			futureWatermark: null,
+			refusalRowPresent: true,
+			refusalWatermark: null,
+			replayRange: null,
+			successRemaining: 0,
+		});
+	} finally {
+		tokens.delete(issued.token);
+	}
+});

@@ -75,6 +75,7 @@ export interface TestPruningMaintenance {
 			readonly scope: TestScope;
 		}>
 	>;
+	pruneAuthenticatedSettledPrefix(input: unknown): Promise<unknown>;
 	prunePublishedPrefix(input: unknown): Promise<unknown>;
 }
 

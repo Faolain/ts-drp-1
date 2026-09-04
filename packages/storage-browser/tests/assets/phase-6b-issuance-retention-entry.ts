@@ -377,8 +377,90 @@ async function runNativeMutants(prefix: string): Promise<readonly Readonly<Recor
 	return Object.freeze(results);
 }
 
+async function authenticatedSettlementCase(prefix: string): Promise<Readonly<Record<string, unknown>>> {
+	const refusal = await createBrowserDurableIssuanceStore({ primaryDatabaseName: `${prefix}-refusal` });
+	const refusalOwner = resolveBrowserDurableIssuancePruningMaintenance(refusal);
+	if (refusalOwner === undefined) throw new TypeError("D110C_F5B0D_BROWSER_MAINTENANCE_MISSING");
+	await issue(refusal, SCOPE, 7);
+	const refusalState = await refusalOwner.inspectPruningState(SCOPE);
+	const absentPlanCode = await capturedCode(() =>
+		refusalOwner.pruneAuthenticatedSettledPrefix({
+			closedEpoch: 7,
+			commitQcRef: { byteLength: 32, digest: "e".repeat(64) },
+			expectedLineage: refusalState.lineage,
+			expectedPrunedThroughAuthorSequence: null,
+			scope: SCOPE,
+			snapshotManifestDigest: "f".repeat(64),
+			throughAuthorSequence: 0,
+		})
+	);
+	const refusalRowPresent = (await refusal.readIssued(SCOPE, 0)) !== null;
+	const refusalWatermark = (await refusalOwner.inspectPruningState(SCOPE)).prunedThroughAuthorSequence;
+	await refusal.close();
+
+	const success = await createBrowserDurableIssuanceStore({ primaryDatabaseName: `${prefix}-success` });
+	const successOwner = resolveBrowserDurableIssuancePruningMaintenance(success);
+	if (successOwner === undefined) throw new TypeError("D110C_F5B0D_BROWSER_MAINTENANCE_MISSING");
+	await issue(success, SCOPE, 5);
+	await issue(success, SCOPE, 6, false);
+	await issue(success, SCOPE, 7);
+	await success.transactWriteSettlementPlan({
+		expectedRevision: null,
+		plan: Object.freeze({ entries: Object.freeze([]), fenceSequence: 2, revision: 0, scope: SCOPE }),
+		scope: SCOPE,
+	});
+	const successState = await successOwner.inspectPruningState(SCOPE);
+	const successInput = Object.freeze({
+		closedEpoch: 7,
+		commitQcRef: { byteLength: 32, digest: "e".repeat(64) },
+		expectedLineage: successState.lineage,
+		expectedPrunedThroughAuthorSequence: null,
+		scope: SCOPE,
+		snapshotManifestDigest: "f".repeat(64),
+		throughAuthorSequence: 2,
+	});
+	const first = await successOwner.pruneAuthenticatedSettledPrefix(successInput);
+	const replay = await successOwner.pruneAuthenticatedSettledPrefix(successInput);
+	const successRemaining = (await success.readOutboxPage({ scope: SCOPE })).length;
+	await success.close();
+
+	const future = await createBrowserDurableIssuanceStore({ primaryDatabaseName: `${prefix}-future` });
+	const futureOwner = resolveBrowserDurableIssuancePruningMaintenance(future);
+	if (futureOwner === undefined) throw new TypeError("D110C_F5B0D_BROWSER_MAINTENANCE_MISSING");
+	await issue(future, SCOPE, 6);
+	await issue(future, SCOPE, 7, false);
+	await issue(future, SCOPE, 8);
+	await future.transactWriteSettlementPlan({
+		expectedRevision: null,
+		plan: Object.freeze({ entries: Object.freeze([]), fenceSequence: 2, revision: 0, scope: SCOPE }),
+		scope: SCOPE,
+	});
+	const futureState = await futureOwner.inspectPruningState(SCOPE);
+	const futureCode = await capturedCode(() =>
+		futureOwner.pruneAuthenticatedSettledPrefix({ ...successInput, expectedLineage: futureState.lineage })
+	);
+	const futureRowsPresent = await Promise.all([0, 1, 2].map((sequence) => future.readIssued(SCOPE, sequence))).then(
+		(rows) => rows.every((row) => row !== null)
+	);
+	const futureWatermark = (await futureOwner.inspectPruningState(SCOPE)).prunedThroughAuthorSequence;
+	await future.close();
+
+	return Object.freeze({
+		absentPlanCode,
+		firstRange: first.deletedAuthorSequenceRange,
+		futureCode,
+		futureRowsPresent,
+		futureWatermark,
+		refusalRowPresent,
+		refusalWatermark,
+		replayRange: replay.deletedAuthorSequenceRange,
+		successRemaining,
+	});
+}
+
 Object.assign(globalThis, {
 	phase6bIssuanceRetention: Object.freeze({
+		authenticatedSettlementCase,
 		ready: D109B_BROWSER_MAINTENANCE_READY,
 		run,
 		runNativeMutants,
