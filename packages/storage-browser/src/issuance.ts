@@ -9,7 +9,7 @@ export interface BrowserDurableIssuanceStoreOptions {
 /**
  * Creates one strict-durability browser issuance capability over its dedicated derived database.
  * @param options - Exact browser factory options.
- * @returns The shared six-method durable issuance capability.
+ * @returns The shared eight-method durable issuance capability.
  */
 export async function createBrowserDurableIssuanceStore(
 	options: BrowserDurableIssuanceStoreOptions

@@ -1,11 +1,15 @@
 import {
+	applySettlementPlanEffect,
+	captureSettlementPlanWriteInput,
 	cloneDurableIssueCommit as cloneCommit,
 	copyDurableIssueScope as cloneScope,
+	cloneSettlementPlan,
 	isClosedDurableIssuanceRecord as closedRecord,
 	compareDurableIssuanceCompoundKeys as compareCompoundKey,
 	type DurableIssuanceCompoundKey as CompoundKey,
 	copyAndValidateDurableIssueCommit as copyAndValidateCommit,
 	copyDurableIssuanceBytes as copyBytes,
+	copySettlementPlan,
 	createDurableIssuanceFailure as failure,
 	DurableIssuanceInvalidArgumentError as InvalidArgumentFailure,
 	type DurableIssuanceContractError as IssuanceFailure,
@@ -39,6 +43,7 @@ import type {
 	DurableLineage,
 	DurableOutboxPageInput,
 	DurableOutboxPublicationTransitionInput,
+	SettlementPlan,
 } from "./types.js";
 
 export {
@@ -135,6 +140,7 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 	readonly #issued = new Map<string, DurableIssueCommit>();
 	readonly #lineages = new Map<string, DurableLineage>();
 	readonly #outbox = new Map<string, DurableIssuanceOutboxRecord>();
+	readonly #plans = new Map<string, SettlementPlan>();
 	readonly #watermarks = new Map<string, number>();
 	#closed = false;
 	#poison?: IssuanceFailure;
@@ -235,6 +241,32 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 		return cloneLineage(this.#lineages.get(scopeKey(scope)) ?? { exhausted: false, next: 0 });
 	}
 
+	async readSettlementPlan(scope: DurableIssueScope): Promise<SettlementPlan | null> {
+		await Promise.resolve();
+		this.#assertAvailable();
+		validateScope(scope);
+		const detached = cloneScope(scope);
+		const stored = this.#plans.get(scopeKey(detached));
+		if (stored === undefined) return null;
+		const plan = copySettlementPlan(stored, detached);
+		if (plan === undefined) throw this.#latchCorruption();
+		return cloneSettlementPlan(plan);
+	}
+
+	async transactWriteSettlementPlan(input: unknown): Promise<SettlementPlan> {
+		const captured = captureSettlementPlanWriteInput(input);
+		await Promise.resolve();
+		this.#assertAvailable();
+		const key = scopeKey(captured.scope);
+		const current = this.#plans.get(key);
+		if ((current?.revision ?? null) !== captured.expectedRevision) {
+			throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan revision changed");
+		}
+		const durable = cloneSettlementPlan(captured.plan);
+		this.#plans.set(key, durable);
+		return cloneSettlementPlan(durable);
+	}
+
 	async readOutboxPage(input: DurableOutboxPageInput = {}): Promise<readonly DurableIssuanceOutboxRecord[]> {
 		await Promise.resolve();
 		this.#assertAvailable();
@@ -289,12 +321,23 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 			throw failure("ISSUANCE_RECOVERY_CORRUPT", "issuance key already exists at the selected lineage");
 		}
 		const durable = cloneCommit(candidate);
+		let updatedPlan: SettlementPlan | undefined;
+		if (candidate.planEffect !== undefined) {
+			const stored = this.#plans.get(key);
+			if (stored === undefined) {
+				throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan is absent");
+			}
+			const plan = copySettlementPlan(stored, detachedScope);
+			if (plan === undefined) throw this.#latchCorruption();
+			updatedPlan = applySettlementPlanEffect(plan, candidate.planEffect, candidate.authorSequence);
+		}
 		this.#lineages.set(key, {
 			exhausted: prior.next === Number.MAX_SAFE_INTEGER,
 			next: prior.next === Number.MAX_SAFE_INTEGER ? prior.next : prior.next + 1,
 		});
 		this.#issued.set(durableKey, durable);
 		this.#outbox.set(durableKey, { commit: durable, publishState: "pending" });
+		if (updatedPlan !== undefined) this.#plans.set(key, cloneSettlementPlan(updatedPlan));
 		return cloneCommit(durable);
 	}
 
@@ -343,6 +386,17 @@ class EphemeralDurableIssuanceStore implements DurableIssuanceStore {
 			throw new InvalidArgumentFailure("selected pruning boundary is invalid");
 		}
 		const from = watermark === null ? 0 : watermark + 1;
+		const plan = this.#plans.get(key);
+		if (
+			plan?.entries.some(
+				(entry) =>
+					entry.replacementSequence === null &&
+					entry.sourceSequence >= from &&
+					entry.sourceSequence <= captured.throughAuthorSequence
+			)
+		) {
+			throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan still references the selected prefix");
+		}
 		for (let authorSequence = from; authorSequence <= captured.throughAuthorSequence; authorSequence += 1) {
 			const recordAddress = recordKey(captured.scope, authorSequence);
 			const issued = this.#issued.get(recordAddress);
@@ -407,7 +461,9 @@ export function createEphemeralDurableIssuanceStore(
 		readIssued: (scope, authorSequence) => implementation.readIssued(scope, authorSequence),
 		readLineage: (scope) => implementation.readLineage(scope),
 		readOutboxPage: (input) => implementation.readOutboxPage(input),
+		readSettlementPlan: (scope) => implementation.readSettlementPlan(scope),
 		transactIssue: (scope, buildAndSign) => implementation.transactIssue(scope, buildAndSign),
+		transactWriteSettlementPlan: (input) => implementation.transactWriteSettlementPlan(input),
 	};
 	implementationByStore.set(store, implementation);
 	return store;

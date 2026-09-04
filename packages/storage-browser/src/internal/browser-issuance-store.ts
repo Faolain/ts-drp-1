@@ -1,11 +1,15 @@
 import {
+	applySettlementPlanEffect,
 	assertDurableIssueScope,
+	captureSettlementPlanWriteInput,
 	classifyDurableIssuanceTerminalSuppression,
 	cloneDurableIssueCommit,
+	cloneSettlementPlan,
 	compareDurableIssuanceCompoundKeys,
 	copyAndValidateDurableIssueCommit,
 	copyDurableIssuanceBytes,
 	copyDurableIssueScope,
+	copySettlementPlan,
 	createDurableIssuanceFailure,
 	DEFAULT_DURABLE_ISSUANCE_PAGE_LIMIT,
 	type DurableBuildAndSign,
@@ -26,6 +30,7 @@ import {
 	isValidDurableAuthorSequence,
 	isValidDurableScopeField,
 	MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT,
+	type SettlementPlan,
 } from "@ts-drp/issuance-store";
 import {
 	captureDurableIssuancePruningInput,
@@ -42,8 +47,8 @@ import {
 } from "@ts-drp/issuance-store/maintenance";
 
 const DATABASE_SUFFIX = "--drp-issuance-v1";
-const DATABASE_VERSION = 1;
-const STORE_NAMES = ["lineages", "issuedRecords", "issuanceOutbox"] as const;
+const DATABASE_VERSION = 2;
+const STORE_NAMES = ["lineages", "issuedRecords", "issuanceOutbox", "settlementPlans"] as const;
 const LINEAGE_KEY_PATH = ["objectId", "author"] as const;
 const RECORD_KEY_PATH = ["objectId", "author", "authorSequence"] as const;
 
@@ -58,6 +63,12 @@ interface NativeOutboxRecord extends DurableIssueScope {
 	readonly authorSequence: number;
 	readonly digest: Uint8Array;
 	readonly publishState: "pending" | "published";
+}
+
+interface NativeSettlementPlan extends DurableIssueScope {
+	readonly entries: SettlementPlan["entries"];
+	readonly fenceSequence: number | null;
+	readonly revision: number;
 }
 
 interface TerminalReadback {
@@ -272,6 +283,35 @@ function copyNativeOutbox(value: unknown): NativeOutboxRecord | undefined {
 	};
 }
 
+function copyNativeSettlementPlan(value: unknown, scope: DurableIssueScope): SettlementPlan | undefined {
+	if (
+		!isClosedDurableIssuanceRecord(value, ["author", "entries", "fenceSequence", "objectId", "revision"]) ||
+		value.author !== scope.author ||
+		value.objectId !== scope.objectId
+	) {
+		return undefined;
+	}
+	return copySettlementPlan(
+		{
+			entries: value.entries,
+			fenceSequence: value.fenceSequence,
+			revision: value.revision,
+			scope,
+		},
+		scope
+	);
+}
+
+function nativeSettlementPlan(plan: SettlementPlan): NativeSettlementPlan {
+	const detached = cloneSettlementPlan(plan);
+	return {
+		...copyDurableIssueScope(detached.scope),
+		entries: detached.entries,
+		fenceSequence: detached.fenceSequence,
+		revision: detached.revision,
+	};
+}
+
 function commitFromIssued(row: NativeIssuedRecord): DurableIssueCommit {
 	const scope = { author: row.author, objectId: row.objectId };
 	const envelope = {
@@ -417,6 +457,69 @@ class BrowserIssuanceImplementation {
 		} catch (error) {
 			if (this.#isClosedFailure(error)) throw error;
 			throw mapSubstrateError(error, "lineage read failed");
+		}
+	}
+
+	async readSettlementPlan(scope: DurableIssueScope): Promise<SettlementPlan | null> {
+		this.#assertAvailable();
+		assertDurableIssueScope(scope);
+		const detached = copyDurableIssueScope(scope);
+		const transaction = this.#startTransaction("readonly");
+		try {
+			const raw = await requestResult(
+				transaction.objectStore("settlementPlans").get([detached.objectId, detached.author])
+			);
+			await transactionResult(transaction);
+			if (raw === undefined) return null;
+			const plan = copyNativeSettlementPlan(raw, detached);
+			if (plan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
+			return cloneSettlementPlan(plan);
+		} catch (error) {
+			if (this.#isClosedFailure(error)) throw error;
+			throw mapSubstrateError(error, "settlement plan read failed");
+		}
+	}
+
+	async transactWriteSettlementPlan(input: unknown): Promise<SettlementPlan> {
+		const captured = captureSettlementPlanWriteInput(input);
+		this.#assertAvailable();
+		const transaction = this.#startTransaction("readwrite");
+		const terminal = transactionResult(transaction);
+		let reason: Error | undefined;
+		try {
+			const plans = transaction.objectStore("settlementPlans");
+			const key = [captured.scope.objectId, captured.scope.author];
+			const raw = await requestResult(plans.get(key));
+			const current = raw === undefined ? null : copyNativeSettlementPlan(raw, captured.scope);
+			if (raw !== undefined && current === undefined) {
+				reason = this.#latchCorruption("stored settlement plan is malformed");
+				transaction.abort();
+			} else if ((current?.revision ?? null) !== captured.expectedRevision) {
+				reason = createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement plan revision changed");
+				transaction.abort();
+			} else {
+				const writtenKey = await requestResult(plans.put(nativeSettlementPlan(captured.plan)));
+				if (!this.#sameNativePlanKey(writtenKey, captured.scope)) {
+					reason = this.#latchCorruption("settlement plan put returned an impossible key");
+					transaction.abort();
+				}
+			}
+			await terminal;
+			if (reason !== undefined) throw reason;
+			return cloneSettlementPlan(captured.plan);
+		} catch (error) {
+			try {
+				transaction.abort();
+			} catch {
+				// The transaction may already be terminal.
+			}
+			await terminal.catch(() => undefined);
+			if (reason !== undefined) throw reason;
+			if (error instanceof DurableIssuanceContractError || error instanceof DurableIssuanceInvalidArgumentError) {
+				throw error;
+			}
+			if (this.#closed || this.#poison !== undefined) this.#assertAvailable();
+			throw mapSubstrateError(error, "settlement plan write failed");
 		}
 	}
 
@@ -595,6 +698,7 @@ class BrowserIssuanceImplementation {
 			const lineages = transaction.objectStore("lineages");
 			const issuedRecords = transaction.objectStore("issuedRecords");
 			const issuanceOutbox = transaction.objectStore("issuanceOutbox");
+			const settlementPlans = transaction.objectStore("settlementPlans");
 			const lineageKey = [captured.scope.objectId, captured.scope.author];
 			const rawLineage = await requestResult(lineages.get(lineageKey));
 			const current =
@@ -631,6 +735,24 @@ class BrowserIssuanceImplementation {
 				throw invalid("selected pruning boundary is invalid");
 			}
 			const from = current.prunedThroughAuthorSequence === null ? 0 : current.prunedThroughAuthorSequence + 1;
+			const rawPlan = await requestResult(settlementPlans.get([captured.scope.objectId, captured.scope.author]));
+			const plan = rawPlan === undefined ? null : copyNativeSettlementPlan(rawPlan, captured.scope);
+			if (rawPlan !== undefined && plan === undefined) {
+				throw this.#latchCorruption("stored settlement plan is malformed");
+			}
+			if (
+				plan?.entries.some(
+					(entry) =>
+						entry.replacementSequence === null &&
+						entry.sourceSequence >= from &&
+						entry.sourceSequence <= captured.throughAuthorSequence
+				)
+			) {
+				throw createDurableIssuanceFailure(
+					"ISSUANCE_RETRY_REQUIRED",
+					"settlement plan still references the selected prefix"
+				);
+			}
 			for (let pageFrom = from; pageFrom <= captured.throughAuthorSequence; pageFrom += 64) {
 				const pageThrough = Math.min(captured.throughAuthorSequence, pageFrom + 63);
 				for (let authorSequence = pageFrom; authorSequence <= pageThrough; authorSequence += 1) {
@@ -721,6 +843,7 @@ class BrowserIssuanceImplementation {
 			const lineages = transaction.objectStore("lineages");
 			const issued = transaction.objectStore("issuedRecords");
 			const outbox = transaction.objectStore("issuanceOutbox");
+			const plans = transaction.objectStore("settlementPlans");
 			const rawPrior = await requestResult(lineages.get([scope.objectId, scope.author]));
 			const current =
 				rawPrior === undefined
@@ -733,6 +856,31 @@ class BrowserIssuanceImplementation {
 				reason = createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "author sequence changed while signing");
 				transaction.abort();
 			} else {
+				let updatedPlan: SettlementPlan | undefined;
+				if (candidate.planEffect !== undefined) {
+					const rawPlan = await requestResult(plans.get([scope.objectId, scope.author]));
+					if (rawPlan === undefined) {
+						reason = createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement plan is absent");
+						transaction.abort();
+					} else {
+						const plan = copyNativeSettlementPlan(rawPlan, scope);
+						if (plan === undefined) {
+							reason = this.#latchCorruption("stored settlement plan is malformed");
+							transaction.abort();
+						} else {
+							try {
+								updatedPlan = applySettlementPlanEffect(plan, candidate.planEffect, candidate.authorSequence);
+							} catch (error) {
+								reason = error instanceof Error ? error : invalid("settlement plan effect failed");
+								transaction.abort();
+							}
+						}
+					}
+					if (reason !== undefined) {
+						await terminal;
+						throw reason;
+					}
+				}
 				const next = {
 					...scope,
 					exhausted: prior.next === Number.MAX_SAFE_INTEGER,
@@ -744,18 +892,25 @@ class BrowserIssuanceImplementation {
 				await requestResult(rawPrior === undefined ? lineages.add(next) : lineages.put(next));
 				await requestResult(issued.add(nativeIssued(candidate)));
 				await requestResult(outbox.add(nativeOutbox(candidate)));
+				if (updatedPlan !== undefined) await requestResult(plans.put(nativeSettlementPlan(updatedPlan)));
 			}
 			await terminal;
 			if (reason !== undefined) throw reason;
-			const observation = await this.#readTerminal(scope, candidate.authorSequence);
-			return classifyDurableIssuanceTerminalSuppression({ candidate, observation, priorLineage: prior, scope });
+			const observation = await this.#readTerminal(scope, candidate.authorSequence, candidate);
+			const committed = classifyDurableIssuanceTerminalSuppression({
+				candidate,
+				observation,
+				priorLineage: prior,
+				scope,
+			});
+			return committed;
 		} catch {
 			await terminal.catch(() => undefined);
 			if (reason !== undefined) throw reason;
 			if (this.#poison !== undefined) throw this.#poison;
 			let observation: TerminalReadback;
 			try {
-				observation = await this.#readTerminal(scope, candidate.authorSequence);
+				observation = await this.#readTerminal(scope, candidate.authorSequence, candidate);
 			} catch {
 				if (this.#closed || this.#poison !== undefined) this.#assertAvailable();
 				return classifyDurableIssuanceTerminalSuppression({
@@ -766,7 +921,13 @@ class BrowserIssuanceImplementation {
 				});
 			}
 			try {
-				return classifyDurableIssuanceTerminalSuppression({ candidate, observation, priorLineage: prior, scope });
+				const committed = classifyDurableIssuanceTerminalSuppression({
+					candidate,
+					observation,
+					priorLineage: prior,
+					scope,
+				});
+				return committed;
 			} catch (classified) {
 				if (this.#hasCode(classified, "ISSUANCE_RECOVERY_CORRUPT")) {
 					throw this.#latchCorruption("terminal issuance readback is corrupt");
@@ -776,16 +937,50 @@ class BrowserIssuanceImplementation {
 		}
 	}
 
-	async #readTerminal(scope: DurableIssueScope, authorSequence: number): Promise<TerminalReadback> {
+	#assertPlanEffectReadback(
+		plan: SettlementPlan | null,
+		observation: TerminalReadback,
+		candidate: DurableIssueCommit
+	): void {
+		const effect = candidate.planEffect;
+		if (effect === undefined) return;
+		const linked =
+			effect.kind === "fence"
+				? plan?.fenceSequence === candidate.authorSequence
+				: plan?.entries.some(
+						(entry) =>
+							entry.sourceSequence === effect.sourceSequence && entry.replacementSequence === candidate.authorSequence
+					);
+		if ((observation.issuedRecord !== null) !== linked) {
+			throw this.#latchCorruption("issued row and settlement plan link are inconsistent");
+		}
+	}
+
+	async #readTerminal(
+		scope: DurableIssueScope,
+		authorSequence: number,
+		candidate?: DurableIssueCommit
+	): Promise<TerminalReadback> {
 		const transaction = this.#startTransaction("readonly");
 		const key = [scope.objectId, scope.author, authorSequence];
-		const [rawLineage, rawIssued, rawOutbox] = await Promise.all([
+		const [rawLineage, rawIssued, rawOutbox, rawPlan] = await Promise.all([
 			requestResult(transaction.objectStore("lineages").get([scope.objectId, scope.author])),
 			requestResult(transaction.objectStore("issuedRecords").get(key)),
 			requestResult(transaction.objectStore("issuanceOutbox").get(key)),
+			candidate?.planEffect === undefined
+				? Promise.resolve(undefined)
+				: requestResult(transaction.objectStore("settlementPlans").get([scope.objectId, scope.author])),
 		]);
 		await transactionResult(transaction);
-		return this.#terminalFromRaw(scope, rawLineage, rawIssued, rawOutbox);
+		const observation = this.#terminalFromRaw(scope, rawLineage, rawIssued, rawOutbox);
+		if (candidate?.planEffect !== undefined) {
+			const plan = rawPlan === undefined ? null : copyNativeSettlementPlan(rawPlan, scope);
+			if (plan === undefined) {
+				throw this.#latchCorruption("stored settlement plan is malformed");
+			}
+			this.#assertPlanEffectReadback(plan, observation, candidate);
+		}
+		return observation;
 	}
 
 	#terminalFromRaw(
@@ -857,6 +1052,10 @@ class BrowserIssuanceImplementation {
 			value[1] === scope.author &&
 			value[2] === authorSequence
 		);
+	}
+
+	#sameNativePlanKey(value: IDBValidKey, scope: DurableIssueScope): boolean {
+		return Array.isArray(value) && value.length === 2 && value[0] === scope.objectId && value[1] === scope.author;
 	}
 
 	#publicationStatus(
@@ -1029,13 +1228,33 @@ async function openIssuanceDatabase(name: string): Promise<IDBDatabase> {
 		}
 		request.addEventListener("upgradeneeded", (event) => {
 			try {
-				if (event.oldVersion !== 0 || request.result.objectStoreNames.length !== 0) {
+				if (event.oldVersion === 0 && request.result.objectStoreNames.length === 0) {
+					request.result.createObjectStore("lineages", { autoIncrement: false, keyPath: [...LINEAGE_KEY_PATH] });
+					request.result.createObjectStore("issuedRecords", { autoIncrement: false, keyPath: [...RECORD_KEY_PATH] });
+					request.result.createObjectStore("issuanceOutbox", { autoIncrement: false, keyPath: [...RECORD_KEY_PATH] });
+				} else if (
+					event.oldVersion !== 1 ||
+					request.result.objectStoreNames.length !== 3 ||
+					!["issuanceOutbox", "issuedRecords", "lineages"].every((name) =>
+						request.result.objectStoreNames.contains(name)
+					)
+				) {
 					throw createDurableIssuanceFailure("ISSUANCE_UNSUPPORTED_SCHEMA", "issuance database cannot be upgraded");
 				}
+				if (event.oldVersion === 1) {
+					const transaction = request.transaction;
+					if (transaction === null) {
+						throw createDurableIssuanceFailure(
+							"ISSUANCE_UNSUPPORTED_SCHEMA",
+							"issuance database migration transaction is absent"
+						);
+					}
+					verifyStore(transaction.objectStore("lineages"), LINEAGE_KEY_PATH);
+					verifyStore(transaction.objectStore("issuedRecords"), RECORD_KEY_PATH);
+					verifyStore(transaction.objectStore("issuanceOutbox"), RECORD_KEY_PATH);
+				}
 				upgraded = true;
-				request.result.createObjectStore("lineages", { autoIncrement: false, keyPath: [...LINEAGE_KEY_PATH] });
-				request.result.createObjectStore("issuedRecords", { autoIncrement: false, keyPath: [...RECORD_KEY_PATH] });
-				request.result.createObjectStore("issuanceOutbox", { autoIncrement: false, keyPath: [...RECORD_KEY_PATH] });
+				request.result.createObjectStore("settlementPlans", { autoIncrement: false, keyPath: [...LINEAGE_KEY_PATH] });
 			} catch (error) {
 				request.transaction?.abort();
 				if (!settled) {
@@ -1080,6 +1299,7 @@ async function admitDatabase(database: IDBDatabase): Promise<void> {
 		verifyStore(transaction.objectStore("lineages"), LINEAGE_KEY_PATH);
 		verifyStore(transaction.objectStore("issuedRecords"), RECORD_KEY_PATH);
 		verifyStore(transaction.objectStore("issuanceOutbox"), RECORD_KEY_PATH);
+		verifyStore(transaction.objectStore("settlementPlans"), LINEAGE_KEY_PATH);
 		await transactionResult(transaction);
 	} catch (error) {
 		try {
@@ -1095,7 +1315,7 @@ async function admitDatabase(database: IDBDatabase): Promise<void> {
 /**
  * Creates one strict-durability browser issuance capability over a dedicated derived IndexedDB database.
  * @param options - Untrusted exact browser factory options.
- * @returns The six-method shared issuance capability.
+ * @returns The eight-method shared issuance capability.
  */
 export async function createBrowserDurableIssuanceStoreImplementation(options: unknown): Promise<DurableIssuanceStore> {
 	const primaryDatabaseName = captureOptions(options);
@@ -1112,8 +1332,10 @@ export async function createBrowserDurableIssuanceStoreImplementation(options: u
 				implementation.readIssued(scope, authorSequence),
 			readLineage: (scope: DurableIssueScope) => implementation.readLineage(scope),
 			readOutboxPage: (input?: DurableOutboxPageInput) => implementation.readOutboxPage(input),
+			readSettlementPlan: (scope: DurableIssueScope) => implementation.readSettlementPlan(scope),
 			transactIssue: (scope: DurableIssueScope, buildAndSign: DurableBuildAndSign) =>
 				implementation.transactIssue(scope, buildAndSign),
+			transactWriteSettlementPlan: (input: unknown) => implementation.transactWriteSettlementPlan(input),
 		});
 		implementationByStore.set(store, implementation);
 		return store;

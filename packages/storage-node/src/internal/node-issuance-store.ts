@@ -1,11 +1,15 @@
 import {
+	applySettlementPlanEffect,
 	assertDurableIssueScope,
+	captureSettlementPlanWriteInput,
 	classifyDurableIssuanceTerminalSuppression,
 	cloneDurableIssueCommit,
+	cloneSettlementPlan,
 	compareDurableIssuanceCompoundKeys,
 	copyAndValidateDurableIssueCommit,
 	copyDurableIssuanceBytes,
 	copyDurableIssueScope,
+	copySettlementPlan,
 	createDurableIssuanceFailure,
 	DEFAULT_DURABLE_ISSUANCE_PAGE_LIMIT,
 	type DurableBuildAndSign,
@@ -26,6 +30,7 @@ import {
 	isValidDurableAuthorSequence,
 	isValidDurableScopeField,
 	MAXIMUM_DURABLE_ISSUANCE_PAGE_LIMIT,
+	type SettlementPlan,
 } from "@ts-drp/issuance-store";
 import {
 	captureDurableIssuancePruningInput,
@@ -43,7 +48,7 @@ import {
 import { DatabaseSync, type StatementSync } from "node:sqlite";
 
 const DATABASE_SUFFIX = ".drp-issuance-v1.sqlite";
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 const PAGE_SIZE = 4096;
 const BUSY_TIMEOUT = 1000;
 
@@ -55,9 +60,17 @@ const ISSUED_RECORDS_DDL =
 	"CREATE TABLE issued_records (\n  object_id TEXT NOT NULL,\n  author TEXT NOT NULL,\n  author_sequence INTEGER NOT NULL CHECK(author_sequence BETWEEN 0 AND 9007199254740991),\n  canonical_preimage BLOB NOT NULL CHECK(typeof(canonical_preimage) = 'blob' AND length(canonical_preimage) > 0),\n  digest BLOB NOT NULL CHECK(typeof(digest) = 'blob' AND length(digest) > 0),\n  signature BLOB NOT NULL CHECK(typeof(signature) = 'blob' AND length(signature) > 0),\n  PRIMARY KEY (object_id,author,author_sequence)\n) WITHOUT ROWID";
 const ISSUANCE_OUTBOX_DDL =
 	"CREATE TABLE issuance_outbox (\n  object_id TEXT NOT NULL,\n  author TEXT NOT NULL,\n  author_sequence INTEGER NOT NULL CHECK(author_sequence BETWEEN 0 AND 9007199254740991),\n  digest BLOB NOT NULL CHECK(typeof(digest) = 'blob' AND length(digest) > 0),\n  publish_state TEXT NOT NULL CHECK(publish_state IN ('pending','published')),\n  PRIMARY KEY (object_id,author,author_sequence)\n) WITHOUT ROWID";
+const SETTLEMENT_PLANS_DDL =
+	"CREATE TABLE settlement_plans (\n  object_id TEXT NOT NULL,\n  author TEXT NOT NULL,\n  revision INTEGER NOT NULL CHECK(revision BETWEEN 0 AND 9007199254740991),\n  fence_sequence INTEGER CHECK(fence_sequence IS NULL OR fence_sequence BETWEEN 0 AND 9007199254740991),\n  entries_json TEXT NOT NULL CHECK(typeof(entries_json) = 'text' AND length(entries_json) > 0),\n  PRIMARY KEY (object_id,author)\n) WITHOUT ROWID";
 
-const DDL = Object.freeze([LINEAGES_DDL, ISSUED_RECORDS_DDL, ISSUANCE_OUTBOX_DDL] as const);
+const DDL = Object.freeze([LINEAGES_DDL, ISSUED_RECORDS_DDL, ISSUANCE_OUTBOX_DDL, SETTLEMENT_PLANS_DDL] as const);
 const EXPECTED_CATALOG = Object.freeze([
+	Object.freeze({ name: "issuance_outbox", sql: ISSUANCE_OUTBOX_DDL, type: "table" }),
+	Object.freeze({ name: "issued_records", sql: ISSUED_RECORDS_DDL, type: "table" }),
+	Object.freeze({ name: "lineages", sql: LINEAGES_DDL, type: "table" }),
+	Object.freeze({ name: "settlement_plans", sql: SETTLEMENT_PLANS_DDL, type: "table" }),
+] as const);
+const V2_EXPECTED_CATALOG = Object.freeze([
 	Object.freeze({ name: "issuance_outbox", sql: ISSUANCE_OUTBOX_DDL, type: "table" }),
 	Object.freeze({ name: "issued_records", sql: ISSUED_RECORDS_DDL, type: "table" }),
 	Object.freeze({ name: "lineages", sql: LINEAGES_DDL, type: "table" }),
@@ -176,7 +189,7 @@ function catalog(database: DatabaseSync): readonly Record<string, unknown>[] {
 
 function catalogMatches(
 	rows: readonly Record<string, unknown>[],
-	expectedCatalog: typeof EXPECTED_CATALOG | typeof V1_EXPECTED_CATALOG = EXPECTED_CATALOG
+	expectedCatalog: typeof EXPECTED_CATALOG | typeof V2_EXPECTED_CATALOG | typeof V1_EXPECTED_CATALOG = EXPECTED_CATALOG
 ): boolean {
 	return (
 		rows.length === expectedCatalog.length &&
@@ -252,12 +265,16 @@ function admit(database: DatabaseSync): void {
 				"INSERT INTO lineages (object_id,author,next,exhausted,pruned_through_author_sequence) SELECT object_id,author,next,exhausted,NULL FROM lineages_v1"
 			);
 			database.exec("DROP TABLE lineages_v1");
+			database.exec(SETTLEMENT_PLANS_DDL);
+			database.exec(`PRAGMA user_version=${SCHEMA_VERSION}`);
+		} else if (lockedVersion === 2 && catalogMatches(lockedCatalog, V2_EXPECTED_CATALOG)) {
+			database.exec(SETTLEMENT_PLANS_DDL);
 			database.exec(`PRAGMA user_version=${SCHEMA_VERSION}`);
 		} else if (lockedVersion !== SCHEMA_VERSION || !catalogMatches(lockedCatalog)) {
 			throw unsupported("existing issuance SQLite authority is unsupported");
 		}
 		if (!catalogMatches(catalog(database)) || scalar(database, "PRAGMA user_version") !== SCHEMA_VERSION) {
-			throw unsupported("issuance SQLite authority did not match its exact v2 schema");
+			throw unsupported("issuance SQLite authority did not match its exact v3 schema");
 		}
 		database.exec("COMMIT");
 	} catch (error) {
@@ -352,6 +369,56 @@ function copyOutboxRow(value: unknown): NativeOutboxRow | undefined {
 		return undefined;
 	}
 	return { author, authorSequence, digest, objectId, publishState };
+}
+
+function settlementPlanEntriesJson(plan: SettlementPlan): string {
+	return JSON.stringify(
+		plan.entries.map((entry) => ({
+			disposition: entry.disposition,
+			replacementSequence: entry.replacementSequence,
+			sourceDigest: [...entry.sourceDigest],
+			sourceSequence: entry.sourceSequence,
+		}))
+	);
+}
+
+function copySettlementPlanRow(value: unknown, scope: DurableIssueScope): SettlementPlan | undefined {
+	if (typeof value !== "object" || value === null) return undefined;
+	const objectId = Reflect.get(value, "object_id");
+	const author = Reflect.get(value, "author");
+	const revision = Reflect.get(value, "revision");
+	const fenceSequence = Reflect.get(value, "fence_sequence");
+	const entriesJson = Reflect.get(value, "entries_json");
+	if (objectId !== scope.objectId || author !== scope.author || typeof entriesJson !== "string") return undefined;
+	try {
+		const decoded: unknown = JSON.parse(entriesJson);
+		if (!Array.isArray(decoded)) return undefined;
+		const entries = decoded.map((entry) => {
+			if (typeof entry !== "object" || entry === null) {
+				return entry;
+			}
+			const sourceDigest = Reflect.get(entry, "sourceDigest");
+			if (
+				!Array.isArray(sourceDigest) ||
+				sourceDigest.length === 0 ||
+				sourceDigest.some((byte) => !Number.isInteger(byte) || byte < 0 || byte > 255)
+			) {
+				return entry;
+			}
+			return { ...entry, sourceDigest: Uint8Array.from(sourceDigest as number[]) };
+		});
+		return copySettlementPlan({ entries, fenceSequence, revision, scope }, scope);
+	} catch {
+		return undefined;
+	}
+}
+
+function readSettlementPlanRow(database: DatabaseSync, scope: DurableIssueScope): SettlementPlan | null | undefined {
+	const raw = statement(
+		database,
+		"SELECT object_id,author,revision,fence_sequence,entries_json FROM settlement_plans WHERE object_id=? AND author=?"
+	).get(scope.objectId, scope.author);
+	return raw === undefined ? null : copySettlementPlanRow(raw, scope);
 }
 
 function issuedCommit(row: NativeIssuedRow): DurableIssueCommit {
@@ -508,6 +575,77 @@ class NodeIssuanceImplementation {
 			issuedRecord: observation.issuedRecord,
 			outboxEntry: observation.issuedRecord,
 		});
+	}
+
+	// Async is intentional: all capability failures are Promise rejections.
+	// eslint-disable-next-line @typescript-eslint/require-await
+	async readSettlementPlan(scope: DurableIssueScope): Promise<SettlementPlan | null> {
+		this.#assertAvailable();
+		assertDurableIssueScope(scope);
+		const detached = copyDurableIssueScope(scope);
+		try {
+			const plan = readSettlementPlanRow(this.#database, detached);
+			if (plan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
+			return plan === null ? null : cloneSettlementPlan(plan);
+		} catch (error) {
+			throw this.#mapOperationError(error, "settlement plan read failed");
+		}
+	}
+
+	transactWriteSettlementPlan(input: unknown): Promise<SettlementPlan> {
+		let captured: ReturnType<typeof captureSettlementPlanWriteInput>;
+		try {
+			captured = captureSettlementPlanWriteInput(input);
+			this.#assertAvailable();
+		} catch (error) {
+			return Promise.reject(error);
+		}
+		let began = false;
+		try {
+			this.#database.exec("BEGIN IMMEDIATE");
+			began = true;
+			const current = readSettlementPlanRow(this.#database, captured.scope);
+			if (current === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
+			if ((current?.revision ?? null) !== captured.expectedRevision) {
+				throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan revision changed");
+			}
+			const changes =
+				current === null
+					? statement(
+							this.#database,
+							"INSERT INTO settlement_plans (object_id,author,revision,fence_sequence,entries_json) VALUES(?,?,?,?,?)"
+						).run(
+							captured.scope.objectId,
+							captured.scope.author,
+							captured.plan.revision,
+							captured.plan.fenceSequence,
+							settlementPlanEntriesJson(captured.plan)
+						).changes
+					: statement(
+							this.#database,
+							"UPDATE settlement_plans SET revision=?,fence_sequence=?,entries_json=? WHERE object_id=? AND author=? AND revision=?"
+						).run(
+							captured.plan.revision,
+							captured.plan.fenceSequence,
+							settlementPlanEntriesJson(captured.plan),
+							captured.scope.objectId,
+							captured.scope.author,
+							captured.expectedRevision
+						).changes;
+			if (changes !== 1) throw this.#latchCorruption("settlement plan CAS changed an impossible row count");
+			this.#database.exec("COMMIT");
+			began = false;
+			return Promise.resolve(cloneSettlementPlan(captured.plan));
+		} catch (error) {
+			if (began) {
+				try {
+					this.#database.exec("ROLLBACK");
+				} catch {
+					// Preserve the settlement plan failure.
+				}
+			}
+			return Promise.reject(this.#mapOperationError(error, "settlement plan write failed"));
+		}
 	}
 
 	// Async is intentional: all capability failures are Promise rejections.
@@ -672,6 +810,18 @@ class NodeIssuanceImplementation {
 				throw invalid("selected pruning boundary is invalid");
 			}
 			const from = current.prunedThroughAuthorSequence === null ? 0 : current.prunedThroughAuthorSequence + 1;
+			const plan = readSettlementPlanRow(this.#database, captured.scope);
+			if (plan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
+			if (
+				plan?.entries.some(
+					(entry) =>
+						entry.replacementSequence === null &&
+						entry.sourceSequence >= from &&
+						entry.sourceSequence <= captured.throughAuthorSequence
+				)
+			) {
+				throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan still references the selected prefix");
+			}
 			for (let pageFrom = from; pageFrom <= captured.throughAuthorSequence; pageFrom += 64) {
 				const pageThrough = Math.min(captured.throughAuthorSequence, pageFrom + 63);
 				const issuedRows = statement(
@@ -766,6 +916,24 @@ class NodeIssuanceImplementation {
 				began = false;
 				throw failure("ISSUANCE_RETRY_REQUIRED", "author sequence changed while signing");
 			}
+			if (candidate.planEffect !== undefined) {
+				const plan = readSettlementPlanRow(this.#database, scope);
+				if (plan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
+				if (plan === null) throw failure("ISSUANCE_RETRY_REQUIRED", "settlement plan is absent");
+				const updated = applySettlementPlanEffect(plan, candidate.planEffect, candidate.authorSequence);
+				const planChanges = statement(
+					this.#database,
+					"UPDATE settlement_plans SET revision=?,fence_sequence=?,entries_json=? WHERE object_id=? AND author=? AND revision=?"
+				).run(
+					updated.revision,
+					updated.fenceSequence,
+					settlementPlanEntriesJson(updated),
+					scope.objectId,
+					scope.author,
+					plan.revision
+				).changes;
+				if (planChanges !== 1) throw this.#latchCorruption("settlement plan effect changed an impossible row count");
+			}
 			const exhausted = prior.next === Number.MAX_SAFE_INTEGER;
 			const next = exhausted ? prior.next : prior.next + 1;
 			let lineageChanges: number | bigint;
@@ -827,23 +995,25 @@ class NodeIssuanceImplementation {
 		const priorLineage = { exhausted: prior.exhausted, next: prior.next };
 		let observation: TerminalReadback;
 		try {
-			observation = this.#readTerminal(scope, candidate.authorSequence);
+			observation = this.#readTerminal(scope, candidate.authorSequence, candidate);
 		} catch (error) {
 			if (error === this.#poison) throw error;
-			return classifyDurableIssuanceTerminalSuppression({
+			const committed = classifyDurableIssuanceTerminalSuppression({
 				candidate,
 				observation: { unreadable: true },
 				priorLineage,
 				scope,
 			});
+			return committed;
 		}
 		try {
-			return classifyDurableIssuanceTerminalSuppression({
+			const committed = classifyDurableIssuanceTerminalSuppression({
 				candidate,
 				observation,
 				priorLineage,
 				scope,
 			});
+			return committed;
 		} catch (error) {
 			if (this.#hasCode(error, "ISSUANCE_RECOVERY_CORRUPT")) {
 				throw this.#latchCorruption("terminal issuance readback is corrupt");
@@ -852,10 +1022,34 @@ class NodeIssuanceImplementation {
 		}
 	}
 
-	#readTerminal(scope: DurableIssueScope, authorSequence: number): TerminalReadback {
+	#assertPlanEffectReadback(
+		plan: SettlementPlan | null,
+		observation: TerminalReadback,
+		candidate: DurableIssueCommit
+	): void {
+		const effect = candidate.planEffect;
+		if (effect === undefined) return;
+		const linked =
+			effect.kind === "fence"
+				? plan?.fenceSequence === candidate.authorSequence
+				: plan?.entries.some(
+						(entry) =>
+							entry.sourceSequence === effect.sourceSequence && entry.replacementSequence === candidate.authorSequence
+					);
+		if ((observation.issuedRecord !== null) !== linked) {
+			throw this.#latchCorruption("issued row and settlement plan link are inconsistent");
+		}
+	}
+
+	#readTerminal(scope: DurableIssueScope, authorSequence: number, candidate?: DurableIssueCommit): TerminalReadback {
 		this.#database.exec("BEGIN");
 		try {
 			const observation = this.#queryTerminal(scope, authorSequence);
+			if (candidate?.planEffect !== undefined) {
+				const plan = readSettlementPlanRow(this.#database, scope);
+				if (plan === undefined) throw this.#latchCorruption("stored settlement plan is malformed");
+				this.#assertPlanEffectReadback(plan, observation, candidate);
+			}
 			this.#database.exec("COMMIT");
 			return observation;
 		} catch (error) {
@@ -1082,7 +1276,7 @@ const maintenanceByStore = new WeakMap<
 /**
  * Creates one exact Node SQLite issuance capability.
  * @param options - Untrusted exact Node factory options.
- * @returns A frozen plain six-method facade.
+ * @returns A frozen plain eight-method facade.
  */
 export function createNodeDurableIssuanceStoreImplementation(options: unknown): DurableIssuanceStore {
 	const primaryFilename = capturePrimaryFilename(options);
@@ -1108,8 +1302,10 @@ export function createNodeDurableIssuanceStoreImplementation(options: unknown): 
 				implementation.readIssued(scope, authorSequence),
 			readLineage: (scope: DurableIssueScope) => implementation.readLineage(scope),
 			readOutboxPage: (input?: DurableOutboxPageInput) => implementation.readOutboxPage(input),
+			readSettlementPlan: (scope: DurableIssueScope) => implementation.readSettlementPlan(scope),
 			transactIssue: (scope: DurableIssueScope, buildAndSign: DurableBuildAndSign) =>
 				implementation.transactIssue(scope, buildAndSign),
+			transactWriteSettlementPlan: (input: unknown) => implementation.transactWriteSettlementPlan(input),
 		});
 		maintenanceByStore.set(
 			store,

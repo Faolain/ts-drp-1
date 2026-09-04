@@ -9,7 +9,11 @@ import type {
 	DurableIssuedRecord,
 	DurableIssueScope,
 	DurableSignedEnvelope,
+	SettlementPlan,
+	SettlementPlanEntry,
 } from "./types.js";
+
+type SettlementPlanEffect = NonNullable<DurableIssueCommit["planEffect"]>;
 
 /** Closed failure used by durable issuance adapters and conformance controls. */
 export class DurableIssuanceContractError extends Error implements DurableIssuanceError {
@@ -262,7 +266,176 @@ export function cloneDurableIssueCommit(commit: DurableIssueCommit): DurableIssu
 			envelope: cloneDurableSignedEnvelope(commit.outboxEntry.envelope),
 			scope: copyDurableIssueScope(commit.outboxEntry.scope),
 		},
+		...(commit.planEffect === undefined
+			? {}
+			: {
+					planEffect:
+						commit.planEffect.kind === "fence"
+							? { kind: "fence" as const }
+							: { kind: "replacement" as const, sourceSequence: commit.planEffect.sourceSequence },
+				}),
 	};
+}
+
+/**
+ * Validates and detaches one optional settlement-plan issue effect.
+ * @param value - Untrusted candidate effect.
+ * @returns The detached effect, or undefined when invalid.
+ */
+export function copySettlementPlanEffect(value: unknown): SettlementPlanEffect | undefined {
+	if (!isClosedDurableIssuanceRecord(value, ["kind"])) {
+		if (
+			!isClosedDurableIssuanceRecord(value, ["kind", "sourceSequence"]) ||
+			value.kind !== "replacement" ||
+			!isValidDurableAuthorSequence(value.sourceSequence)
+		) {
+			return undefined;
+		}
+		return { kind: "replacement", sourceSequence: value.sourceSequence };
+	}
+	return value.kind === "fence" ? { kind: "fence" } : undefined;
+}
+
+function copySettlementPlanEntry(value: unknown): SettlementPlanEntry | undefined {
+	if (
+		!isClosedDurableIssuanceRecord(value, ["disposition", "replacementSequence", "sourceDigest", "sourceSequence"]) ||
+		!isValidDurableAuthorSequence(value.sourceSequence) ||
+		(value.replacementSequence !== null && !isValidDurableAuthorSequence(value.replacementSequence)) ||
+		(value.disposition !== "expire" &&
+			value.disposition !== "rebase" &&
+			value.disposition !== "transform" &&
+			value.disposition !== "manual-review")
+	) {
+		return undefined;
+	}
+	const sourceDigest = copyDurableIssuanceBytes(value.sourceDigest);
+	if (sourceDigest === undefined) return undefined;
+	return {
+		disposition: value.disposition,
+		replacementSequence: value.replacementSequence,
+		sourceDigest,
+		sourceSequence: value.sourceSequence,
+	};
+}
+
+/**
+ * Validates and detaches one exact settlement plan for its selected scope.
+ * @param value - Untrusted candidate plan.
+ * @param scope - Validated scope the plan must match.
+ * @returns The detached plan, or undefined when invalid.
+ */
+export function copySettlementPlan(value: unknown, scope: DurableIssueScope): SettlementPlan | undefined {
+	if (
+		!isClosedDurableIssuanceRecord(value, ["entries", "fenceSequence", "revision", "scope"]) ||
+		!Array.isArray(value.entries) ||
+		!isValidDurableAuthorSequence(value.revision) ||
+		(value.fenceSequence !== null && !isValidDurableAuthorSequence(value.fenceSequence))
+	) {
+		return undefined;
+	}
+	try {
+		assertDurableIssueScope(value.scope);
+	} catch {
+		return undefined;
+	}
+	if (!durableIssueScopesEqual(value.scope, scope)) return undefined;
+	const entries: SettlementPlanEntry[] = [];
+	let prior = -1;
+	for (const rawEntry of value.entries) {
+		const entry = copySettlementPlanEntry(rawEntry);
+		if (entry === undefined || entry.sourceSequence <= prior) return undefined;
+		entries.push(entry);
+		prior = entry.sourceSequence;
+	}
+	return {
+		entries,
+		fenceSequence: value.fenceSequence,
+		revision: value.revision,
+		scope: copyDurableIssueScope(scope),
+	};
+}
+
+/**
+ * Deeply detaches a previously validated settlement plan.
+ * @param plan - Validated plan to detach.
+ * @returns A deep copy of the plan.
+ */
+export function cloneSettlementPlan(plan: SettlementPlan): SettlementPlan {
+	return {
+		entries: plan.entries.map((entry) => ({
+			disposition: entry.disposition,
+			replacementSequence: entry.replacementSequence,
+			sourceDigest: new Uint8Array(entry.sourceDigest),
+			sourceSequence: entry.sourceSequence,
+		})),
+		fenceSequence: plan.fenceSequence,
+		revision: plan.revision,
+		scope: copyDurableIssueScope(plan.scope),
+	};
+}
+
+/**
+ * Validates and detaches one exact settlement-plan CAS write request.
+ * @param value - Untrusted write request.
+ * @returns The validated detached write request.
+ */
+export function captureSettlementPlanWriteInput(value: unknown): Readonly<{
+	readonly expectedRevision: number | null;
+	readonly plan: SettlementPlan;
+	readonly scope: DurableIssueScope;
+}> {
+	try {
+		if (!isClosedDurableIssuanceRecord(value, ["expectedRevision", "plan", "scope"])) {
+			throw new DurableIssuanceInvalidArgumentError("settlement plan write must be an exact record");
+		}
+		assertDurableIssueScope(value.scope);
+		const scope = copyDurableIssueScope(value.scope);
+		if (value.expectedRevision !== null && !isValidDurableAuthorSequence(value.expectedRevision)) {
+			throw new DurableIssuanceInvalidArgumentError("expected settlement plan revision must be null or safe");
+		}
+		const plan = copySettlementPlan(value.plan, scope);
+		const nextRevision = value.expectedRevision === null ? 0 : value.expectedRevision + 1;
+		if (plan === undefined || !Number.isSafeInteger(nextRevision) || plan.revision !== nextRevision) {
+			throw new DurableIssuanceInvalidArgumentError("settlement plan must be valid and carry the next revision");
+		}
+		return { expectedRevision: value.expectedRevision, plan, scope };
+	} catch (error) {
+		if (error instanceof DurableIssuanceInvalidArgumentError) throw error;
+		throw new DurableIssuanceInvalidArgumentError("settlement plan write could not be inspected");
+	}
+}
+
+/**
+ * Applies a validated issue effect to a validated settlement plan.
+ * @param plan - Current validated plan.
+ * @param effect - Validated issue effect.
+ * @param authorSequence - Sequence allocated to the issue.
+ * @returns The detached next plan revision.
+ */
+export function applySettlementPlanEffect(
+	plan: SettlementPlan,
+	effect: SettlementPlanEffect,
+	authorSequence: number
+): SettlementPlan {
+	if (plan.revision === Number.MAX_SAFE_INTEGER) {
+		throw createDurableIssuanceFailure("ISSUANCE_RECOVERY_CORRUPT", "settlement plan revision is exhausted");
+	}
+	if (effect.kind === "fence") {
+		if (plan.fenceSequence !== null || plan.entries.some((entry) => entry.disposition === "manual-review")) {
+			throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement fence precondition changed");
+		}
+		return { ...cloneSettlementPlan(plan), fenceSequence: authorSequence, revision: plan.revision + 1 };
+	}
+	const index = plan.entries.findIndex((entry) => entry.sourceSequence === effect.sourceSequence);
+	const entry = plan.entries[index];
+	if (entry === undefined || entry.replacementSequence !== null || entry.disposition === "manual-review") {
+		throw createDurableIssuanceFailure("ISSUANCE_RETRY_REQUIRED", "settlement replacement precondition changed");
+	}
+	const detached = cloneSettlementPlan(plan);
+	const entries = detached.entries.map((candidate, candidateIndex) =>
+		candidateIndex === index ? { ...candidate, replacementSequence: authorSequence } : candidate
+	);
+	return { ...detached, entries, revision: plan.revision + 1 };
 }
 
 /**
@@ -277,8 +450,16 @@ export function copyAndValidateDurableIssueCommit(
 	scope: DurableIssueScope,
 	authorSequence: number
 ): DurableIssueCommit {
+	const hasPlanEffect =
+		typeof value === "object" && value !== null && Object.prototype.hasOwnProperty.call(value, "planEffect");
 	if (
-		!isClosedDurableIssuanceRecord(value, ["authorSequence", "envelope", "issuedRecord", "outboxEntry"]) ||
+		!isClosedDurableIssuanceRecord(value, [
+			"authorSequence",
+			"envelope",
+			"issuedRecord",
+			"outboxEntry",
+			...(hasPlanEffect ? ["planEffect"] : []),
+		]) ||
 		value.authorSequence !== authorSequence
 	) {
 		throw createDurableIssuanceFailure("ISSUANCE_COMMIT_INVALID", "commit has an invalid top-level shape or ordinal");
@@ -286,6 +467,7 @@ export function copyAndValidateDurableIssueCommit(
 	const envelope = copyDurableSignedEnvelope(value.envelope);
 	const issuedRecord = copyDurableIssuedRecord(value.issuedRecord);
 	const outboxEntry = copyDurableIssuedRecord(value.outboxEntry);
+	const planEffect = hasPlanEffect ? copySettlementPlanEffect(value.planEffect) : undefined;
 	if (
 		envelope === undefined ||
 		issuedRecord === undefined ||
@@ -300,7 +482,8 @@ export function copyAndValidateDurableIssueCommit(
 		!durableIssuanceBytesEqual(envelope.digest, outboxEntry.envelope.digest) ||
 		!durableIssuanceBytesEqual(envelope.signature, issuedRecord.envelope.signature) ||
 		!durableIssuanceBytesEqual(envelope.signature, outboxEntry.envelope.signature) ||
-		!durablePreimageMatchesScopeAndSequence(envelope.canonicalPreimageBytes, scope, authorSequence)
+		!durablePreimageMatchesScopeAndSequence(envelope.canonicalPreimageBytes, scope, authorSequence) ||
+		(hasPlanEffect && planEffect === undefined)
 	) {
 		throw createDurableIssuanceFailure(
 			"ISSUANCE_COMMIT_INVALID",
@@ -320,6 +503,7 @@ export function copyAndValidateDurableIssueCommit(
 			envelope: cloneDurableSignedEnvelope(envelope),
 			scope: copyDurableIssueScope(scope),
 		},
+		...(planEffect === undefined ? {} : { planEffect }),
 	};
 }
 

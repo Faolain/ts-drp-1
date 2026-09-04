@@ -45,11 +45,30 @@ export interface DurableIssuanceOutboxEntry {
 	readonly scope: DurableIssueScope;
 }
 
+export type SettlementDisposition = "expire" | "rebase" | "transform" | "manual-review";
+
+export interface SettlementPlanEntry {
+	readonly sourceSequence: number;
+	readonly sourceDigest: Uint8Array;
+	readonly disposition: SettlementDisposition;
+	readonly replacementSequence: number | null;
+}
+
+export interface SettlementPlan {
+	readonly scope: DurableIssueScope;
+	readonly revision: number;
+	readonly fenceSequence: number | null;
+	readonly entries: readonly SettlementPlanEntry[];
+}
+
 export interface DurableIssueCommit {
 	readonly authorSequence: number;
 	readonly envelope: DurableSignedEnvelope;
 	readonly issuedRecord: DurableIssuedRecord;
 	readonly outboxEntry: DurableIssuanceOutboxEntry;
+	readonly planEffect?:
+		| Readonly<{ readonly kind: "fence" }>
+		| Readonly<{ readonly kind: "replacement"; readonly sourceSequence: number }>;
 }
 
 export type DurableBuildAndSign = (authorSequence: number) => Promise<DurableIssueCommit>;
@@ -86,6 +105,12 @@ export interface DurableIssuanceStore {
 	readIssued(scope: DurableIssueScope, authorSequence: number): Promise<DurableIssueCommit | null>;
 	readOutboxPage(input?: DurableOutboxPageInput): Promise<readonly DurableIssuanceOutboxRecord[]>;
 	readLineage(scope: DurableIssueScope): Promise<DurableLineage>;
+	readSettlementPlan(scope: DurableIssueScope): Promise<SettlementPlan | null>;
+	transactWriteSettlementPlan(input: {
+		readonly expectedRevision: number | null;
+		readonly plan: SettlementPlan;
+		readonly scope: DurableIssueScope;
+	}): Promise<SettlementPlan>;
 	close(): Promise<void>;
 }
 
