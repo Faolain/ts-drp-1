@@ -80,6 +80,7 @@ export interface SharedPlaneScenarioOptions {
 	readonly reopenTarget?: boolean;
 	readonly settlementProfile?: boolean;
 	readonly publishSourceBeforeClose?: boolean;
+	readonly rebaseReadLimit?: number;
 	readonly sourceAuthorityMutation?:
 		| "acl-context"
 		| "authorization-bytes"
@@ -716,6 +717,10 @@ async function outboxSnapshot(
 export async function runSharedPlaneScenario(
 	options: SharedPlaneScenarioOptions = {}
 ): Promise<SharedPlaneScenarioResult> {
+	const rebaseReadLimit = options.rebaseReadLimit ?? 1;
+	if (!Number.isSafeInteger(rebaseReadLimit) || rebaseReadLimit < 1 || rebaseReadLimit > 16) {
+		throw new TypeError("Phase 3g rebase read limit is invalid");
+	}
 	const objectId = `creator:${"d".repeat(32)}`;
 	const joinCatalog = options.sourceOperationProfile === "join";
 	const nonCreatorAnchorSeed = options.nonCreatorWriter === true ? "56".repeat(32) : undefined;
@@ -1133,6 +1138,11 @@ export async function runSharedPlaneScenario(
 					]);
 					const next = await Reflect.apply(read, activeHandle, []);
 					rebaseOutboxes.push(next);
+				}
+				while (rebaseOutboxes.length < rebaseReadLimit) {
+					const next = await Reflect.apply(read, activeHandle, []);
+					rebaseOutboxes.push(next);
+					if (Reflect.get(next as object, "kind") === "empty") break;
 				}
 				publication = await activeHandle.publishPending();
 				if (options.targetDirectQuarantinedRow === true) {

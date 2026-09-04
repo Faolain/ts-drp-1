@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, type Mock } from "vitest";
 
 import { runFrontierScenario } from "./fixtures/phase-3f-b/frontier-reduction-fixture.js";
 import {
+	runCrossObjectActivationScenario,
 	runSharedPlaneScenario,
 	runTerminalOutcomeUnknownScenario,
 } from "./fixtures/phase-3g/rebase-outbox-fixture.js";
@@ -67,11 +68,20 @@ describe("D.110c-0c1f5b0b rejected-GREEN corrective RED", () => {
 	});
 
 	it("[control] keeps settlement join control-only", async () => {
-		const result = await runSharedPlaneScenario({ settlementProfile: true, sourceOperationProfile: "join" });
-		expect(result.rebaseOutbox).toMatchObject({
+		const result = await runSharedPlaneScenario({
+			rebaseReadLimit: 2,
+			settlementProfile: true,
+			sourceOperationProfile: "join",
+		});
+		expect(result.rebaseOutboxes[0]).toMatchObject({
 			kind: "displaced",
 			ok: true,
-			source: { authorSequence: 1, intents: [] },
+			source: { authorSequence: 0, vertexDigest: result.sourceBootstrapDigest },
+		});
+		expect(result.rebaseOutboxes[1]).toMatchObject({
+			kind: "displaced",
+			ok: true,
+			source: { authorSequence: 1, intents: [], vertexDigest: result.sourceDigest },
 		});
 	});
 
@@ -90,17 +100,15 @@ describe("D.110c-0c1f5b0b rejected-GREEN corrective RED", () => {
 		});
 	});
 
-	it("[control] excludes the creator bootstrap by its authenticated activation identity", async () => {
-		const result = await runSharedPlaneScenario({ settlementProfile: true });
-		expect(result.rebaseOutbox).toMatchObject({
-			kind: "displaced",
-			ok: true,
-			source: {
-				authorSequence: 1,
-				vertexDigest: result.sourceDigest,
-			},
-		});
-		expect(result.sourceDigest).not.toBe(result.sourceBootstrapDigest);
+	it("[control] excludes an authenticated activation vertex while surfacing later source work", async () => {
+		const result = await runCrossObjectActivationScenario();
+		const sources = result.rebaseOutboxes
+			.map((page) => Reflect.get(page as object, "source"))
+			.filter((source) => source !== undefined);
+		expect(sources.map((source) => Reflect.get(source as object, "vertexDigest"))).toEqual(result.sourceDigests);
+		expect(sources.map((source) => Reflect.get(source as object, "vertexDigest"))).not.toContain(
+			result.activationVertexDigest
+		);
 	});
 
 	it("[RED] refuses a settlement issued/outbox mismatch with the existing corruption classification", async () => {

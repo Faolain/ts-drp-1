@@ -297,44 +297,85 @@ describe("D.110c-0c1f5b0b Node settlement RED", () => {
 	});
 
 	it("[RED] surfaces a published same-key displaced row under settlement", async () => {
-		const result = await runSharedPlaneScenario({ publishSourceBeforeClose: true, settlementProfile: true });
+		const result = await runSharedPlaneScenario({
+			publishSourceBeforeClose: true,
+			rebaseReadLimit: 2,
+			settlementProfile: true,
+		});
 		expect(result.recovery).toMatchObject({ ok: true });
-		expect(result.rebaseOutbox).toMatchObject({
+		expect(result.rebaseOutboxes[0]).toMatchObject({
 			kind: "displaced",
 			ok: true,
-			source: { authorSequence: 1, vertexDigest: result.sourceDigest },
+			source: {
+				authorSequence: 0,
+				publishState: "published",
+				vertexDigest: result.sourceBootstrapDigest,
+			},
+		});
+		expect(result.rebaseOutboxes[1]).toMatchObject({
+			kind: "displaced",
+			ok: true,
+			source: { authorSequence: 1, publishState: "published", vertexDigest: result.sourceDigest },
 		});
 	});
 
 	it("[control] classifies signed same-key cross-anchor causalJoin without application intents", async () => {
-		const result = await runSharedPlaneScenario({ settlementProfile: true, sourceOperationProfile: "structural" });
+		const result = await runSharedPlaneScenario({
+			rebaseReadLimit: 2,
+			settlementProfile: true,
+			sourceOperationProfile: "structural",
+		});
 		expect(result.sourceAnchor).not.toBe(result.targetAnchor);
 		expect(result.sourceContextAuthor).toBe(result.targetAuthor);
-		expect(result.rebaseOutbox).toMatchObject({
+		expect(result.rebaseOutboxes[0]).toMatchObject({
 			kind: "displaced",
 			ok: true,
-			source: { authorSequence: 1, intents: [] },
+			source: { authorSequence: 0, vertexDigest: result.sourceBootstrapDigest },
+		});
+		expect(result.rebaseOutboxes[1]).toMatchObject({
+			kind: "displaced",
+			ok: true,
+			source: { authorSequence: 1, intents: [], vertexDigest: result.sourceDigest },
 		});
 	});
 
 	it("[RED] classifies signed same-key cross-anchor join without application intents", async () => {
-		const result = await runSharedPlaneScenario({ settlementProfile: true, sourceOperationProfile: "join" });
+		const result = await runSharedPlaneScenario({
+			rebaseReadLimit: 2,
+			settlementProfile: true,
+			sourceOperationProfile: "join",
+		});
 		expect(result.sourceAnchor).not.toBe(result.targetAnchor);
 		expect(result.sourceContextAuthor).toBe(result.targetAuthor);
-		expect(result.rebaseOutbox).toMatchObject({
+		expect(result.rebaseOutboxes[0]).toMatchObject({
 			kind: "displaced",
 			ok: true,
-			source: { authorSequence: 1, intents: [] },
+			source: { authorSequence: 0, vertexDigest: result.sourceBootstrapDigest },
+		});
+		expect(result.rebaseOutboxes[1]).toMatchObject({
+			kind: "displaced",
+			ok: true,
+			source: { authorSequence: 1, intents: [], vertexDigest: result.sourceDigest },
 		});
 	});
 
 	it("[RED] surfaces a displaced ACL source before fence issuance", async () => {
-		const result = await runSharedPlaneScenario({ settlementProfile: true, sourceOperationProfile: "acl" });
-		expect(result.rebaseOutbox).toMatchObject({
+		const result = await runSharedPlaneScenario({
+			rebaseReadLimit: 2,
+			settlementProfile: true,
+			sourceOperationProfile: "acl",
+		});
+		expect(result.rebaseOutboxes[0]).toMatchObject({
+			kind: "displaced",
+			ok: true,
+			source: { authorSequence: 0, vertexDigest: result.sourceBootstrapDigest },
+		});
+		expect(result.rebaseOutboxes[1]).toMatchObject({
 			kind: "displaced",
 			ok: true,
 			source: {
 				authorSequence: 1,
+				vertexDigest: result.sourceDigest,
 				intents: [expect.objectContaining({ operation: expect.objectContaining({ action: "acl" }) })],
 			},
 		});
