@@ -98403,7 +98403,10 @@ campaign was authorized or run by f5a.
 
 ###### D.110c-0c1f5b0 author settlement carrier and compatibility prerequisite
 
-**Status: the first exact design was signed/pushed at `fc4b8fc7`; its governing
+**Status: SUPERSEDED by D.110c-0c1f5b0r, which replaces the per-source
+disposition carrier with an author fence and a membership-incarnation
+checkpoint; this record and its review evidence are retained, not
+reinterpreted. Prior status: the first exact design was signed/pushed at `fc4b8fc7`; its governing
 Grok/Kimi/Opus review completed with a nonempty blocking union, so f5b0a RED and
 all production edits remain unauthorized. The bounded carrier/lifecycle
 corrections are integrated. D.110c-0c1f5b0p's source audit now selects an exact
@@ -98589,9 +98592,12 @@ collaboration subagents without new express user authorization.
 
 ###### D.110c-0c1f5b0p bounded removed-author identity-history prerequisite
 
-**Status: combined confirmation completed with a blocking P0/P1 union; the
-bounded design correction is being closed and no RED or production edit is
-authorized.** Owner: the creator-authenticated retired-key dictionary,
+**Status: SUPERSEDED by D.110c-0c1f5b0r, which drops the Merkle AVL
+retired-author dictionary in favor of an `admissionEpoch` carried in the
+settlement checkpoint frontier; the signed checkpoint and its blocking union are
+retained as evidence. Prior status: combined confirmation completed with a
+blocking P0/P1 union; the bounded design correction is being closed and no RED
+or production edit is authorized.** Owner: the creator-authenticated retired-key dictionary,
 genesis-bound settlement profile, pure proof/update verifier, strict-durability
 registry store, current/two-rollback reachability and explicit archive-tier
 census. Deadline: empty combined confirmation before f5b0p-a RED, f5b0a RED,
@@ -98777,8 +98783,12 @@ authorized here.
 
 ###### D.110c-0c1f5b0q confirmation-found witness/lifecycle reconciliation
 
-**Status: exact material reslice drafted; awaiting one bounded Grok/Kimi/Opus
-plan review before f5b0p-a RED. No RED or production edit is authorized.**
+**Status: CLOSED AS SUPERSEDED by D.110c-0c1f5b0r before any review ran; its
+three executable gaps (deletion-rebalance witnesses, codec ownership, registry
+state transitions) are moot without a dictionary, and single ownership of the
+settlement checkpoint codec is carried into f5b0a. No RED or production edit is
+authorized. Prior status: exact material reslice drafted; awaiting one bounded
+Grok/Kimi/Opus plan review before f5b0p-a RED.**
 Owner: only the three executable gaps first demonstrated by the consumed
 f5b0p confirmation: deletion-rebalance witness completeness/resource bounds,
 single ownership of the signed settlement checkpoint codec, and exact registry
@@ -98848,10 +98858,87 @@ edit, campaign or long workload is authorized by the plan review. A material
 P0/P1 means stop and diagnose rather than manufacturing another confirmation.
 Do not invoke Fable or a collaboration subagent.
 
+###### D.110c-0c1f5b0r author fence and membership-incarnation settlement reslice
+
+**Status: exact superseding design drafted and signed; awaiting one bounded
+Grok 4.6/high, direct Kimi K3 (`KIMI_LOOP_MAX_STEPS_PER_TURN=100`) and Opus
+xhigh design review. No RED or production edit is authorized.** Owner: the
+author fence control operation, the durable settlement plan store contract, the
+`[author, admissionEpoch, terminalThrough]` settlement checkpoint with its
+signer-agnostic codec and predicate-enforced predecessor rules, the creator
+close scan, the author drain order, the ACL transition law and the crash/attack
+matrix. Deadline: accepted design before f5b0a or f5b0s RED, any production
+edit, f5b, the ≥100-transition gate, Phase-6 exit or Phase-7 long-lived-room
+cold join.
+
+The exact design is `.logs/d110c-0c1f5b0r-design-3a156aca/design.md`, pinning
+signed/pushed source anchor `3a156aca11462d18ce9d675d2ef95157d740fb4f`. Its one-entry
+self-excluding manifest `manifest.sha256` records design SHA-256
+`251d37995bad58e2b1959dbb35d780722a0692a4eab81e9f389507e3193fde5b`. The
+evidence base is the Fable 5.1 research checkpoint
+`.logs/d110c-0c1f5b0-fable51-research-20260903/` (signed `d5b8168e`,
+`c9289c6a`, `cb2e723d`); the adjudicated crash walk is its `plan-change.md`
+Part A and the lineage-profile deltas are its `lineage-profiles-impact.md` §3.
+
+This supersedes f5b0, f5b0p and f5b0q on substance while preserving their
+signed checkpoints and review evidence. The decisive fact is code, not
+argument: local issue takes its dependencies from the causality-index tips
+(`packages/node/src/v3-live.ts:6217-6240`) and ingress refuses vertices whose
+dependencies are not installed (`:3711-3716`, `:3862`), so an honest author's
+admitted slots in any close graph are contiguous. The f5b "no-rebase trigger"
+below (`n+1` admitted while `n` is delayed) is therefore unreachable within an
+epoch, and every grammar element that represented an admitted-above-gap slot is
+deleted: `already-present`, `coveredStateDigest`, `semanticIdentityDigest`,
+replacement references, `zero-intent`, `settlement-control`,
+`hasDisplacedOperation`, the retired-author dictionary, its witnesses and its
+archive tier. f5b RED case 1 in the design replaces that trigger with the
+delayed-dependency case.
+
+The construction: (1) a durable settlement plan in a fourth issuance-store
+object store, written before any issue after open/adopt, with `planEffect`
+applied atomically inside `transactIssue`; (2) an author-signed
+`$drp.author-fence.v1 { fenceSequence: m, version: 1 }` with `m` at most the
+outer sequence, issued first with `m = lineage.next`, replacements issued after
+it so every replacement causally follows the fence; (3) a creator-signed
+checkpoint whose frontier is exactly the successor ACL's members as
+`[author, admissionEpoch, terminalThrough | null]`, `admissionEpoch` derived
+from the ACL diff and carried only in the checkpoint. No ACL schema change, no
+issuance-store scope change, no lineage jump, no global floor, no K bound. A
+null-boundary member's first accountable vertex is a fence or slot 0, replacing
+the shipped `D110C_0C1F1_AUTHOR_REENTRY_PROOF_REQUIRED` throw under the
+settlement profile only. Replacement-first ordering and a global
+`sequenceFloor` were both considered and rejected in the design with the
+failing matrix rows named. The checkpoint codec signs under the successor
+material and verifies under floor trust only, so it composes with a later
+rotated-authority lineage profile (D.110c-0c1j) without a second codec.
+
+Slices, replacing f5b0p-a/b and the earlier f5b0a-d list: f5b0a protocol codecs
+(fence, checkpoint, `settlementProfileFor` predicate and its seven consumers,
+signer-agnostic codec, re-measured 64-member ceiling); f5b0s settlement plan
+store (independent of f5b0a); f5b0b Node (fence issuer, anchor-agnostic own-row
+classification, `readSettlementSources` regardless of `publishState`,
+close-graph split with the `applicationVertices` rename); f5b0c room
+(plan/fence/replacement order, deletion of the published-must-be-present
+throw); f5b0d reclamation (`pruneAuthenticatedSettledPrefix` with the plan
+gate, production invocation, recovery-scan cap); f5b creator settlement and
+recovery integration. Dependency order: f5b0a and f5b0s in parallel, then
+f5b0b, then f5b0c; f5b0d after f5b0a and f5b0s; f5b after all five. The design
+lists 27 deterministic RED cases.
+
+Review instruction: one bounded material review of the design by Grok
+4.6/high, direct Kimi K3 (100 steps) and Opus xhigh, not a Fable or
+collaboration subagent. Only an empty P0/P1 union authorizes the f5b0a and
+f5b0s tests-only REDs. A P0 against the checkpoint-carried `admissionEpoch`
+falls back to `admissionEpoch` in a version-3 latched-ACL member record, never
+to the dictionary. A P0 against contiguity, plan authority or anchor fencing
+stops and reslices. P2 findings receive an owner/disposition without prose-only
+recursion.
+
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
-**Status: BLOCKED on f5b0q accepted design review and subsequent f5b0p-a/b plus
-f5b0a-d RED/GREEN; no RED or production edit is authorized.**
+**Status: BLOCKED on D.110c-0c1f5b0r accepted design review and subsequent
+f5b0a, f5b0s, f5b0b, f5b0c and f5b0d RED/GREEN; f5b0p-a/b are deleted; no RED
+or production edit is authorized.**
 Owner: the cross-epoch relationship among creator-admitted
 per-author identities, aggregate coverage, historical outbox classification,
 rebase source→replacement/disposition correlation, close-set/history proofs,
