@@ -18132,6 +18132,11 @@ Every number names its harness. **Cold join is measured on a fixture with ≥100
 synthetic age**, not a 1 h session — otherwise the gate proves nothing about a six-month-old room, which is
 the actual product case.
 
+The active-writer rows are rates of distinct authors per epoch (at 25 ops/s an 8,192-vertex epoch lasts
+about 5.5 minutes), not a stock of members. The membership carrier that makes them reachable is decided in
+D.110c-0c1k: the operational latched-ACL cap today is about 30 members, stage W1 raises it to 256 with the
+settlement profile, stage W2 to 10,240 with a sparse settlement frontier.
+
 **Comparative honesty gate (CMP).** Against Yjs/Automerge on the same semantic chat workload, DRP wins only
 on _signed application commands with ACL-gated custom concurrency_. Sync efficiency, durability, snapshots,
 archive paging, ephemeral separation and mesh budgets are all **table stakes** those ecosystems already ship.
