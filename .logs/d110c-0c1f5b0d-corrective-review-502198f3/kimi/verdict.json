@@ -1,0 +1,27 @@
+{
+  "verdict": "PASS",
+  "summary": "Corrective f5b0d GREEN is sound within its resliced backend scope. The corrective RED was causal: exactly 12 focused Vitest cases with 9 controls passing and only the memory/browser/Node future-epoch cases failing for the intended reason (operation succeeded instead of returning ISSUANCE_INVALID_ARGUMENT), with real Chromium failing identically on the same fixture (rows deleted, watermark advanced to 2, no refusal). The GREEN commit 292fc14f (signed G, pushed) changes exactly one predicate in each of the three pruning owners; tests are byte-unchanged since the RED. In all three backends the per-row epoch ceiling runs inside the validation loop strictly before issuance/outbox deletion and watermark mutation, within each store's existing atomic envelope (memory synchronous section, single strict IndexedDB transaction with abort, SQLite BEGIN IMMEDIATE with change-count and watermark CAS plus ROLLBACK). Legacy exact-epoch pruning is byte-identical; mixed old-epoch pending/published deletion, replay, rollback, corruption classification and exact-store identity are all covered by the frozen tests and pass (12/12 focused re-run independently at HEAD, Chromium 1/1, retained 136/136 and 124/124, isolated 12/12 + 136/136 per packet JSONs). No public API, wire, schema, crypto, authority, dependency, threshold or workload change. The reslice is honest: the rejected review's call-graph contradiction is preserved verbatim, genuine every-peer invocation and recovery-scan bounds remain explicitly blocking obligations of parent f5b (whose fixtures really do stop at CERTIFIED_VALUE_MISMATCH), and the backend contract (fail-closed ceiling, monotone watermark, CAS inputs) supports that integration without forbidden changes.",
+  "p0_count": 0,
+  "p1_count": 0,
+  "p2_count": 2,
+  "findings": [
+    {
+      "severity": "P2",
+      "title": "Vitest RED raw output captures only the first failed assertion for the three future-epoch cases",
+      "evidence": ".logs/d110c-0c1f5b0d-corrective-red-0cafd357/focused.json failure messages show only 'expected undefined to be ISSUANCE_INVALID_ARGUMENT' at tests/phase-6b-d110c-0c1f5b0d-corrective-red.test.ts:200; the rows-retained and watermark-null assertions never executed, so deletion/watermark advancement for the memory and Node Vitest runs is narration (matrix.md) plus code-level inference (a successful prune with watermark null and through=2 cannot be a replay no-op), not raw captured output. The identical Chromium fixture does capture all three facts raw (browser.json: futureCode undefined, futureRowsPresent false, futureWatermark 2).",
+      "required_action": "None for acceptance; recorded as an evidence-completeness note. The causal core (no ISSUANCE_INVALID_ARGUMENT refusal) is directly proven and the frozen tests now pass all assertions at GREEN.",
+      "owner": "f5b0d"
+    },
+    {
+      "severity": "P2",
+      "title": "Inherited typecheck diagnostics asserted rather than byte-compared in the GREEN packet",
+      "evidence": ".logs/d110c-0c1f5b0d-corrective-green-292fc14f/result.json records storage-browser/storage-node typecheck as inherited without a baseline diff in the packet. Independently verified in this review: every diagnostic is in test assets or cross-package rootDir complaints, none reference the three changed production files, the browser '#phase-6b-issuance-maintenance' alias diagnostic predates the corrective RED (present at adab0f56), the prior f5b0b record proved the Node exit 2 byte-identical to its untouched parent, and all three production builds plus issuance-store typecheck pass.",
+      "required_action": "None; the inheritance claim is confirmed by construction (the diff cannot produce test-file or rootDir diagnostics). Future packets should retain the baseline comparison as the f5b0b record did.",
+      "owner": "inherited"
+    }
+  ],
+  "causal_red_confirmed": true,
+  "scope_preserved": true,
+  "evidence_sufficient": true,
+  "reslice_sound": true
+}
