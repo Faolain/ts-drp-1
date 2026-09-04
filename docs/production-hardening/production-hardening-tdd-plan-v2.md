@@ -98699,17 +98699,90 @@ store, stale/substituted proofs, old-profile noninterference and ordinary cold
 reopen with registry backing absent. Tests-only roots or appearance facts cannot
 satisfy causality.
 
-The combined f5b0p/f5b0 amendment now receives the single material confirmation
-already owed by the rejected first review: Grok 4.6/high, standard direct Kimi
-K3 with `KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh. Only an empty P0/P1
-union authorizes RED. P2 is dispositioned without recursive prose review. No
-Fable, collaboration subagent, campaign, long workload or production edit is
+The combined f5b0p/f5b0 amendment received its single material confirmation.
+Its nonempty P1 union is immutable and does not authorize RED. The executable
+corrections discovered by that confirmation are assigned prospectively to
+f5b0q below; this does not reopen, relabel or erase the f5b0p result. No Fable,
+collaboration subagent, campaign, long workload or production edit is
 authorized here.
+
+###### D.110c-0c1f5b0q confirmation-found witness/lifecycle reconciliation
+
+**Status: exact material reslice drafted; awaiting one bounded Grok/Kimi/Opus
+plan review before f5b0p-a RED. No RED or production edit is authorized.**
+Owner: only the three executable gaps first demonstrated by the consumed
+f5b0p confirmation: deletion-rebalance witness completeness/resource bounds,
+single ownership of the signed settlement checkpoint codec, and exact registry
+adoption/rollback/candidate state transitions. Deadline: accepted exact design
+before f5b0p-a RED, f5b0a RED, any production edit, the ≥100-transition gate,
+Phase-6 exit or Phase-7 long-lived-room cold join.
+
+This is a material reslice rather than a second f5b0p confirmation. It preserves
+the signed/pushed f5b0p checkpoint `7ecd5f19`, its immutable review union and
+the signed/pushed correction checkpoint
+`061457f2dad3ed5590832c8968061654bd8bf4ff`. It does not rerun the source audit,
+reopen completed D.110c evidence, change the selected creator-authenticated
+Merkle AVL family, or reinterpret a rejected verdict as approval. Its reviewed
+input is the exact corrected design and plan at `061457f2` plus this bounded
+owner statement.
+
+The bounded f5b0q plan audit is
+`.logs/d110c-0c1f5b0q-plan-061457f2/audit.md`; its one-entry self-excluding
+manifest validates and has SHA-256
+`5ef432aca3632db1c8a1a79cd9b38d1eb01aa755127bd6b3133cc4140a2d9079`.
+
+The acceptance matrix is closed:
+
+1. Every AVL delete can reconstruct and authenticate each required rotation
+   from the lookup, optional successor and exact ordered off-path rebalance
+   nodes against the evolving intermediate root. Missing, reordered, foreign,
+   duplicated or surplus schedule entries fail closed. The exact rotation
+   tie-break and in-order-successor choice yield one root.
+2. The conservative maximum remains 24,320 visits, 24,903,680 canonical node
+   bytes and 33,554,432 whole-witness bytes. This is an internal creator/store
+   input cap, not a vertex, operation, room-age, memory or public workload
+   threshold. If this bound is insufficient, stop here rather than relaxing it
+   during RED/GREEN.
+3. f5b0a is the sole owner of the signed settlement checkpoint codec, its
+   signature/domain, exact genesis predecessor digest, root/count fields,
+   7,064-byte maximum and unchanged 8,192-byte ceiling. f5b0p-a owns only the
+   dictionary node/proof/witness/transition codecs and low-level profile union.
+4. The neutral registry state machine binds roles to checkpoint digest plus
+   epoch, uses one monotone CAS revision, and has exact operations for proof,
+   transition/candidate receipt, signed-candidate binding, authenticated
+   adoption/rollback lifecycle installation, safe unbound-candidate discard,
+   state inspection and reclamation. Every crash/unknown outcome resolves from
+   exact persisted revision, roles and receipt/checkpoint digests; blind retry
+   or caller-labeled repair is forbidden.
+5. Adoption promotes only its matching bound candidate and supplies the exact
+   authenticated current/two-rollback set. Genuine room rollback promotes only
+   a retained authenticated binding and reconciles roles to the AHE generation
+   set. Oldest-root eviction follows that set; unresolved candidates remain in
+   the reclaim mark set and cannot be discarded after signature/reference.
+6. Equal registry roots across ACL-unchanged epochs cannot conflate lifecycle
+   identity. Settlement-profile permissionless authors still require ACL
+   membership. Null-boundary re-entry uses sequence zero; non-null re-entry
+   continues strictly above the admitted boundary.
+7. Low-level profile parsing does not activate product behavior. Protocol/Node/
+   room close, adoption and reopen paths reject the new profile until f5b owns
+   mandatory settlement. Existing v1 rooms, defaults, vectors and binaries
+   remain unchanged; the fixed-literal widen/reject roster is exhaustive.
+
+Run exactly one bounded plan review over the signed/pushed f5b0q checkpoint:
+Grok 4.6/high, standard direct Kimi K3 with
+`KIMI_LOOP_MAX_STEPS_PER_TURN=100`, and Opus xhigh. Reviewers must inspect the
+full corrected design, the immutable f5b0p review evidence and this seven-row
+matrix. Only P0/P1 blocks. P2 receives an owner/disposition without recursive
+review. If and only if the blocking union is empty, f5b0p-a tests-only RED may
+begin exactly as frozen; no f5b0p-b RED, GREEN, functional f5b RED, production
+edit, campaign or long workload is authorized by the plan review. A material
+P0/P1 means stop and diagnose rather than manufacturing another confirmation.
+Do not invoke Fable or a collaboration subagent.
 
 ###### D.110c-0c1f5b authenticated admitted-set and settlement prerequisite
 
-**Status: BLOCKED on the combined amended-design confirmation and subsequent
-f5b0p-a/b plus f5b0a-d RED/GREEN; no RED or production edit is authorized.**
+**Status: BLOCKED on f5b0q accepted design review and subsequent f5b0p-a/b plus
+f5b0a-d RED/GREEN; no RED or production edit is authorized.**
 Owner: the cross-epoch relationship among creator-admitted
 per-author identities, aggregate coverage, historical outbox classification,
 rebase source→replacement/disposition correlation, close-set/history proofs,
