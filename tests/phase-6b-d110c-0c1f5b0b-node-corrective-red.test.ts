@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, type Mock } from "vitest";
+import { afterEach, describe, expect, it, type Mock, vi } from "vitest";
 
 import { runFrontierScenario } from "./fixtures/phase-3f-b/frontier-reduction-fixture.js";
 import {
@@ -51,20 +51,19 @@ describe("D.110c-0c1f5b0b rejected-GREEN corrective RED", () => {
 		expect(opened.sink).not.toHaveBeenCalled();
 	});
 
-	it("[RED] preserves legacy join as an application-visible displaced operation", async () => {
+	it("[RED] preserves legacy join structural retirement without exposing an application intent", async () => {
 		const result = await runSharedPlaneScenario({ sourceOperationProfile: "join" });
-		expect(result.rebaseOutbox).toMatchObject({
+		expect(result.rebaseOutbox).toEqual({
 			kind: "displaced",
 			ok: true,
 			source: {
+				author: result.sourceRowAuthor,
 				authorSequence: 1,
-				intents: [
-					expect.objectContaining({
-						operation: { action: "join", clientId: "phase-3g-displaced-client" },
-					}),
-				],
+				intents: [],
+				vertexDigest: result.sourceDigest,
 			},
 		});
+		expect(result.completion).toEqual({ kind: "published", ok: true });
 	});
 
 	it("[control] keeps settlement join control-only", async () => {
@@ -129,6 +128,32 @@ describe("D.110c-0c1f5b0b rejected-GREEN corrective RED", () => {
 		});
 		expect(result.resumeAfterUnknown).toMatchObject({ kind: "invalid-state", ok: false });
 		expect(result.beginAfterUnknown).toMatchObject({ kind: "already-terminal", ok: false });
+	});
+
+	it("[RED] preserves the legacy admission-rejected outcome and halt after an ordinary unknown commit", async () => {
+		const opened = await openSettlementNode("creator-trusted-v1");
+		activeNodes.push(opened);
+		const transactIssue = vi.mocked(opened.issuanceStore.transactIssue);
+		const durableTransactIssue = transactIssue.getMockImplementation();
+		if (durableTransactIssue === undefined) throw new TypeError("legacy issuance fixture is unavailable");
+		transactIssue.mockImplementationOnce(async (scope, buildAndSign) => {
+			await durableTransactIssue(scope, buildAndSign);
+			throw Object.assign(new Error("controlled ordinary transaction outcome"), {
+				code: "ISSUANCE_OUTCOME_UNKNOWN",
+			});
+		});
+		const issue = (): ReturnType<typeof opened.plane.issueLocal> =>
+			opened.plane.issueLocal({
+				operations: Object.freeze([
+					Object.freeze({ logicalTime: 3, operation: Object.freeze({ action: "add", value: 1 }) }),
+				]),
+				signRegisteredVertexDigest: opened.fixture.signRegisteredVertexDigest,
+			});
+		expect(await issue()).toMatchObject({ kind: "admission-rejected", ok: false });
+		const callsAfterUnknown = transactIssue.mock.calls.length;
+		expect(await issue()).toMatchObject({ kind: "admission-rejected", ok: false });
+		expect(transactIssue).toHaveBeenCalledTimes(callsAfterUnknown);
+		expect(opened.sink).not.toHaveBeenCalled();
 	});
 
 	it.each([
