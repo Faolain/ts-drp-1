@@ -97118,6 +97118,40 @@ past the rotation horizon loses protocol-level replay of unpublished displaced
 rows, surfaced as manual-review candidates, and re-admission waits one close
 until the deferred admission vertex exists.
 
+Path to W2 RED (so a future peer needs no further decision from this record):
+
+1. Trigger: Train S or Phase 7 claims a room above 256 writers, or a product
+   profile is amended to require it. Preconditions: f5b GREEN and W0 GREEN,
+   because W2 reuses the fence, plan-store, drain and same-key re-entry paths
+   those slices build.
+2. Freeze `.logs/d110c-0c1k-w2-design-<anchor>/design.md` with a
+   self-excluding `manifest.sha256`, promoting solution.md §3 W2, §5
+   invariants and RED cases 9-18 into the f5b0r design voice: carriers (ACL
+   `version: 4` member record, checkpoint `version: 2` `boundaries`, ACL delta
+   record, `writerIdleEpochs` parameter), the sparse verifier rules, the
+   creator scan over active ∪ carried, the eviction rule and its tie-break,
+   the mandatory durable own boundary, profile gating under
+   `settlementProfileFor = "v2"`, a crash/attack matrix that adds eviction
+   races, reconnect herds, delta/base mismatch and rollback across an eviction,
+   and the stop rules (no proofs, no new cryptography, no mid-epoch admission).
+3. Review: one adversarial read-only pass over the design before RED. The
+   project default is the three-model Grok 4.6/high, Kimi K3 and Opus xhigh
+   review; the user waived it for f5b0r and may do so again, in which case a
+   recorded single-agent pre-review is the accepted review. Either way the
+   design's review section names which one authorized the RED.
+4. Slices, each with a causal tests-only RED before GREEN: W2a protocol codecs
+   (ACL v4, checkpoint v2, delta record, `"v2"` predicate value; RED 9, 10, 17,
+   18); W2b Node close (scan over active ∪ carried, eviction and delta
+   emission, advance-predicate rules; RED 11, 15); W2c author side (drain reads
+   `e` from the ACL, durable own boundary in the issuance store, manual-review
+   surfacing after eviction; RED 12, 16); W2d transport and parameters (delta
+   apply/fallback over the chunk transport, `writerIdleEpochs` genesis key;
+   RED 13, 14). Order: W2a, then W2b and W2c in parallel, then W2d.
+5. Exit: the Discord-style ≥100-transition golden path runs with ≥ 1,024
+   rotating historical authors and ≤ 128 active per epoch, cold join under the
+   Profile D budget and independent of fixture size, and the W1 and W2
+   carriers produce identical boundaries on the shared fence fixture.
+
 ###### D.110c-0c1f multi-author historical-issuance authority prerequisite
 
 **Status: blocking product-capability debt; bounded source/architecture audit is
