@@ -92128,12 +92128,15 @@ receipt, archive record, or active registration in test code.
    room performs at least 100 genuine authenticated transitions. The exact bound
    remains 100 unless this high-risk plan review approves another explicit value
    before RED. It runs no adaptive retry and cannot replace real close/adopt
-   calls with synthetic maintenance. The retained durable census includes all
-   four creator-seal browser stores, the selected 0b0 freshness-floor owner,
-   and the Node control owners. At each selected close/restart boundary it also
-   proves the exported blueprint state bytes and digest equal the application's
-   exact canonical state, so projector/machine divergence cannot be deferred to
-   the next cold reopen. Deadline:
+   calls with synthetic maintenance. Its MMORPG control must use the exact
+   64-active-writer contribution and offline/rejoin schedule frozen under
+   "Retained long-horizon and golden-path acceptance" below; ACL membership by
+   itself is not this proof. The retained durable census includes all four
+   creator-seal browser stores, the selected 0b0 freshness-floor owner, and the
+   Node control owners. At each selected close/restart boundary it also proves
+   the exported blueprint state bytes and digest equal the application's exact
+   canonical state, so projector/machine divergence cannot be deferred to the
+   next cold reopen. Deadline:
    before Phase-6 exit or Phase-7a execution.
 
 ##### D.110c-0a bounded epoch-relative seal-custody plan
@@ -99194,6 +99197,29 @@ recovery integration. Dependency order: f5b0a and f5b0s in parallel, then
 f5b0b, then f5b0c; f5b0d after f5b0a and f5b0s; f5b after all five. The design
 lists 27 deterministic RED cases.
 
+The f5b integration has one prospective 64-writer composition acceptance
+amendment (2026-09-04). One real settlement-profile room must retain exactly
+64 active authenticated writers through at least three genuine close/adopt
+transitions. Every one of the 64 writers must issue, admit, apply, and publish
+at least one real application operation in every epoch; merely listing a
+writer in the ACL is not acceptance. A deterministic rotating cohort must go
+offline only after contributing in its current epoch, remain offline across a
+close/adopt boundary and a selected restart, rejoin in the next epoch, and
+contribute before the following close. Selected pending and published work
+must cross those boundaries through the real plan -> fence -> replacement
+workflow. Restart and cold reopen must recover exact application state, ACL
+and authority, authenticated anchor and compact-history lineage, settlement
+plan links, and per-author plus aggregate operation accounting. This composes
+rather than replaces W0's ACL-capacity proof, D.110a's distinct-room churn
+proof, and the earlier small-writer repeated-lifecycle controls.
+
+This amendment changes no frozen threshold, workload, protocol limit, or
+consumed invocation identity. It does not conflict with a frozen contract:
+the f5b integration RED has not begun and the D.110c-d workload freeze has not
+been created. If implementing the literal composition later requires changing
+an already frozen workload or threshold, that conflict stops for the smallest
+explicit high-risk amendment rather than weakening this acceptance condition.
+
 Authorization: the f5b0a and f5b0s tests-only REDs may begin from this record
 without a further design review; f5b0b, f5b0c, f5b0d and f5b are each
 authorized by their predecessors' GREEN in the dependency order above. Each
@@ -100259,7 +100285,10 @@ epoch 0→1, restart/reopen, epoch 1→2,
 continued issue/publish after epoch 2, and cold recovery with exact application
 state, ACL, writer authority, current anchor/trust, compact history,
 archive-index root, snapshots, journals, and operation accounting. A second
-close that only returns an epoch number is not acceptance.
+close that only returns an epoch number is not acceptance. The f5b integration
+must additionally satisfy its prospective 64-active-writer, three-transition
+composition amendment; W0 capacity, D.110a distinct-room churn, and a
+small-writer lifecycle fixture cannot substitute for that combined proof.
 
 ##### Retained long-horizon and golden-path acceptance
 
@@ -100267,6 +100296,14 @@ D.110c-d must prove, in a fresh process where required, all of the following:
 
 - at least 100 genuine transitions on one production room, with strictly
   increasing epochs and authenticated anchor/QC/cut lineage;
+- the MMORPG control keeps exactly 64 active authenticated writers for the
+  complete run. All 64 issue, admit, apply, and publish at least one real
+  application operation in every epoch. A deterministic rotating cohort goes
+  offline only after its current-epoch contribution, spans the close/adopt
+  boundary and selected restart, rejoins during the next epoch, and contributes
+  before the next close. The gate asserts exact per-author and aggregate
+  accounting and exercises the real plan -> fence -> replacement path;
+  membership alone is not contribution;
 - exact compact-history root and size extension at every step, with no skipped,
   duplicated, reordered, or substituted epoch and no same-anchor double close;
 - real issue/admit/apply/publish work before and after selected transitions,
@@ -100291,12 +100328,13 @@ D.110c-d must prove, in a fresh process where required, all of the following:
   separately reviewed freeze before execution; D.110a's distinct-room values
   are preserved as evidence but are not silently reused as this contract; and
 - two real semantic controls using the same production lifecycle: an
-  MMORPG-style world whose current state and authority continue across
-  rotations, and a Discord-shaped room whose messages span genuine epochs and
-  whose current work continues after safe pruning. D.110c must produce the
-  latter without synthetic archive rows; actual evolving archive roots and
-  cold paging remain a separately reviewed Phase-7 control because the current
-  creator-close wire requires the archive root to remain unchanged.
+  MMORPG-style world using the 64-writer schedule above whose current state and
+  authority continue across rotations, and a Discord-shaped room whose messages
+  span genuine epochs and whose current work continues after safe pruning.
+  D.110c must produce the latter without synthetic archive rows; actual evolving
+  archive roots and cold paging remain a separately reviewed Phase-7 control
+  because the current creator-close wire requires the archive root to remain
+  unchanged.
 
 Phase 7a's one-million-message cold-join gate is downstream acceptance, not a
 D.110c shortcut. Before implementation it must explicitly reslice the current
