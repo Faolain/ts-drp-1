@@ -1,0 +1,40 @@
+{
+  "verdict": "PASS",
+  "summary": "Corrective GREEN e07f8a94 closes the rejected 93585bf3 P0/P1 union in one Node file. Canonical REDs 9a4b35f4/6e542c3d are product-causal (39 selected, 14 assertion failures, 0 import/export/setup errors); fixture edits only drop same-store publishState and keep nonempty legacy causalJoin pending. Profile-aware isControlOperation restores creator-trusted-v1 join/causalJoin through reservation, sink, fold, recovery, and rebase intents while settlement join/causalJoin/fence stay control-only and malformed ABI stays rejected. Same-store ordinary seq 0 is surfaced; cross-object seq 0 and activationVertexDigest stay excluded. Recovery always cross-checks issued vs outbox; copySettlementPlan fail-closes malformed/absent/wrong-scope plans; fence refusal/halt and terminal outcome-unknown latch remain. Stale gitignored dist is retained as invalid identity, then rebuild/64-64/isolated-built-child pass. No contiguity, device-local plan, or anchor-fence stop-rule regression. Remaining work is the already-owned f5b0c/f5b and inherited items.",
+  "p0_count": 0,
+  "p1_count": 0,
+  "p2_count": 4,
+  "findings": [
+    {
+      "severity": "P2",
+      "title": "Authenticated frontier is not yet threaded into settlement source classification",
+      "evidence": "packages/node/src/v3-live.ts:8644-8649 still comments that readSettlementSources retains every authenticated candidate until the checkpoint/room owner supplies settlementFrontier, so classifier-local terminal/old-incarnation suppression is inactive in this slice.",
+      "required_action": "Wire the verified checkpoint frontier at the room/creator owner and apply settlementOwnRowClass skips there; do not invent a Node-local frontier.",
+      "owner": "f5b0c"
+    },
+    {
+      "severity": "P2",
+      "title": "Replacement planEffect authority remains a later room contract",
+      "evidence": "packages/node/src/v3-live.ts:6645-6649 refuses replacement planEffect on reserved actions and leaves the public DurableIssueCommit planEffect shape unchanged, matching the rejected-review disposition that terminal-entry validation is not this slice.",
+      "required_action": "Own replacement linking, reserved-action policy, and terminal-entry validation in the room plan-merge slice.",
+      "owner": "f5b0c"
+    },
+    {
+      "severity": "P2",
+      "title": "Payload-seeded settlement control-set handling is still unowned here",
+      "evidence": ".logs/d110c-0c1f5b0b-review-9b02f9c2/review-ledger.md records the latent payload-seeded control-set observation as f5b0c/f5b work before a retained payload can carry settlement controls; this GREEN does not add that retained payload.",
+      "required_action": "Handle settlement control operations on a retained/payload-seeded path in the later owner before such payloads exist.",
+      "owner": "f5b"
+    },
+    {
+      "severity": "P2",
+      "title": "Node typecheck remains inherited exit 2",
+      "evidence": ".logs/d110c-0c1f5b0b-green-e07f8a94/result.json and node-typecheck.normalized vs parent-node-typecheck.normalized are byte-identical SHA-256 f1fe7cb5fed31ebcd1b48e34eaae0c2b5518d2deeafd8c1914967312d25171c8 after root normalization.",
+      "required_action": "Keep as inherited; do not treat the exit-2 typecheck as an f5b0b product failure.",
+      "owner": "inherited"
+    }
+  ],
+  "causal_red_confirmed": true,
+  "scope_preserved": true,
+  "evidence_sufficient": true
+}
