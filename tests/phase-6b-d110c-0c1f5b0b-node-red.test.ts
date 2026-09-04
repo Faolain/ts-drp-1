@@ -308,14 +308,13 @@ describe("D.110c-0c1f5b0b Node settlement RED", () => {
 			ok: true,
 			source: {
 				authorSequence: 0,
-				publishState: "published",
 				vertexDigest: result.sourceBootstrapDigest,
 			},
 		});
 		expect(result.rebaseOutboxes[1]).toMatchObject({
 			kind: "displaced",
 			ok: true,
-			source: { authorSequence: 1, publishState: "published", vertexDigest: result.sourceDigest },
+			source: { authorSequence: 1, vertexDigest: result.sourceDigest },
 		});
 	});
 
